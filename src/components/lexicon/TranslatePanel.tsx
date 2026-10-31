@@ -157,11 +157,11 @@ export default function TranslatePanel() {
                     )
                   ))
                 ) : (
-                  <span className="text-faint">{t('lexicon.resultPlaceholder')}</span>
+                  <span className="text-subtle">{t('lexicon.resultPlaceholder')}</span>
                 )}
               </div>
               {result && result.wordCount > 0 && (
-                <p className="text-xs text-faint mt-2">
+                <p className="text-xs text-subtle mt-2">
                   {t('lexicon.textWordCount', { count: result.wordCount })}
                   {result.unknownCount > 0 && (
                     <> · {t(mode === 'letters' ? 'lexicon.unmappedCount' : 'lexicon.unknownCount', { count: result.unknownCount })}</>

@@ -119,7 +119,7 @@ export default function EntryListTab<T>({
             placeholder={t('search.placeholder')}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="sidebar-search-input bg-transparent text-sm text-soft placeholder:text-faint outline-none w-full selectable"
+            className="sidebar-search-input bg-transparent text-sm text-soft placeholder:text-subtle outline-none w-full selectable"
           />
         </div>
       </div>
@@ -132,7 +132,7 @@ export default function EntryListTab<T>({
             <p className="text-[13px] text-muted">
               {items.length > 0 ? t('sidebar.noResultsFor', { query: searchQuery.trim() }) : emptyMessage}
             </p>
-            <p className="text-xs text-faint">
+            <p className="text-xs text-subtle">
               {items.length > 0 ? t('sidebar.noResultsHint') : t('sidebar.emptyHint')}
             </p>
           </div>

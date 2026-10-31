@@ -359,7 +359,7 @@ export default function AppShell() {
   const leftSidebarWidth = (railOpen ? RAIL_WIDTH : 0) + (leftListOpen ? entryListWidth : 0);
   // With nothing to its left, the sheet keeps its distance from the window
   // edge there too — it always floats, instead of sticking to the edge with a
-  // rounded corner.
+  // rounded-md corner.
   const leftFrameEmpty = isAltarWindowFullscreen || leftSidebarWidth === 0;
   // Tied to the deferred unmount instead of `rightSidebarOpen`: when
   // collapsing, the main area only gets its right edge once the bar is gone,

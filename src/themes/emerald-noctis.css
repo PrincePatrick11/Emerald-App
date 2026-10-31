@@ -3,20 +3,17 @@ html[data-theme='emerald-noctis'] {
   --bg-app: #15110d;
   --bg-surface-1: rgba(35, 29, 24, 0.64);
   --bg-surface-2: rgba(29, 24, 20, 0.9);
-  --bg-elevated: rgba(27, 23, 19, 0.97);
   --text-primary: #f5f5f4;
   --text-secondary: #e7e5e4;
   --text-muted: #a8a29e;
-  --text-subtle: #78716c;
+  --text-subtle: #8a837d;
   --border-soft: rgba(87, 83, 78, 0.62);
-  --border-subtle: rgba(87, 83, 78, 0.5);
   --border-strong: rgba(120, 113, 108, 0.72);
   --interactive-hover: rgba(245, 245, 244, 0.06);
   --interactive-active: rgba(245, 245, 244, 0.1);
   --code-bg: rgba(41, 37, 36, 0.95);
   --accent: #00c47f;
   --accent-strong: #00a066;
-  --accent-contrast: #003322;
   --focus-ring: rgba(0, 196, 127, 0.42);
   --scrollbar: rgba(120, 113, 108, 0.9);
   --scrollbar-hover: rgba(168, 162, 158, 0.95);
@@ -146,15 +143,12 @@ html[data-theme='emerald-noctis'] {
   --tone-neutral-text: #a8a29e;
   --tone-neutral-text-hover: #e7e5e4;
   /* Heights (design.md, Heights and Spacing). */
-  --content-bar-h: 56px;
   --control-h: 30px;
-  --control-h-sm: 24px;
   /* Generic text, surfaces and edges behind the Tailwind colour names in tailwind.config.js. */
   --text-soft: #d6d3d1;
-  --text-faint: #57534e;
   --text-raise: #d6d3d1;
   --text-on-accent: #70ffca;
-  --accent-text: #2dfdb0;
+  --accent-text: #00c47f;
   --accent-text-raise: #70ffca;
   --success-text: #4ade80;
   --border-default: #44403c;
@@ -179,4 +173,10 @@ html[data-theme='emerald-noctis'] {
   --accent-fill: rgba(0, 138, 87, 0.3);
   --accent-fill-strong: rgba(0, 92, 58, 0.7);
   --danger-wash: rgba(127, 29, 29, 0.2);
+  --secondary-bg: rgba(46, 38, 32, 0.76);
+  --secondary-bg-hover: rgba(58, 47, 40, 0.9);
+  --secondary-border: rgba(113, 94, 77, 0.48);
+  --secondary-border-hover: rgba(142, 121, 101, 0.58);
+  --secondary-text: #b9a38e;
+  --secondary-text-hover: #f3e9dd;
 }

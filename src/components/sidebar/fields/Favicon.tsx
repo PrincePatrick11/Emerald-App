@@ -21,7 +21,7 @@ export function FaviconGlyph({ value, className = 'w-5 h-5 text-base' }: {
 }) {
   if (!value) return null;
   return isImageIcon(value) ? (
-    <img src={value} alt="" className={`${className} object-contain rounded border border-edge flex-shrink-0`} />
+    <img src={value} alt="" className={`${className} object-contain rounded-md border border-edge flex-shrink-0`} />
   ) : (
     <span className={`${className} leading-none flex items-center justify-center flex-shrink-0`}>{value}</span>
   );

@@ -277,7 +277,7 @@ export default function OperationsView() {
           {isCardView(view) ? (
             <>
               {isImageIcon(iconValue)
-                ? <img src={iconValue} alt="" className="w-6 h-6 object-cover rounded mb-2" />
+                ? <img src={iconValue} alt="" className="w-6 h-6 object-cover rounded-md mb-2" />
                 : <div className="text-xl mb-2">{iconValue}</div>}
               {renaming
                 ? renameInput('text-sm font-medium text-secondary w-full bg-transparent outline-none selectable mb-1')
@@ -289,7 +289,7 @@ export default function OperationsView() {
           ) : (
             <>
               {isImageIcon(iconValue)
-                ? <img src={iconValue} alt="" className="w-5 h-5 object-cover rounded flex-shrink-0" />
+                ? <img src={iconValue} alt="" className="w-5 h-5 object-cover rounded-md flex-shrink-0" />
                 : <span className="text-base flex-shrink-0">{iconValue}</span>
               }
               {renaming

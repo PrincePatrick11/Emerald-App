@@ -275,7 +275,7 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
   .search-match {
     background-color: rgba(0, 176, 118, 0.22);
     background-color: color-mix(in srgb, var(--accent) 22%, transparent);
-    color: var(--accent);
+    color: var(--accent-text);
     border-radius: 2px;
   }
 
@@ -402,7 +402,7 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
   }
 
   .sidebar-item {
-    @apply flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm cursor-pointer transition-colors duration-150;
+    @apply flex items-center gap-2.5 px-3 py-2 rounded-md text-sm cursor-pointer transition-colors duration-150;
     color: var(--text-muted);
   }
 
@@ -554,15 +554,15 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
   /* Secondary action button — neutral stone */
   .btn-secondary {
     @apply flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border transition-colors duration-150;
-    background-color: var(--bg-surface-2);
-    color: var(--text-secondary);
-    border-color: var(--border-soft);
+    background-color: var(--secondary-bg);
+    color: var(--secondary-text);
+    border-color: var(--secondary-border);
   }
 
   .btn-secondary:hover {
-    background-color: var(--interactive-hover);
-    color: var(--text-primary);
-    border-color: var(--border-strong);
+    background-color: var(--secondary-bg-hover);
+    color: var(--secondary-text-hover);
+    border-color: var(--secondary-border-hover);
   }
 
   /* Danger text — a warning or a broken state that is not a button.
@@ -652,7 +652,7 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
 
   .vault-card-active .vault-badge {
     background-color: color-mix(in srgb, var(--accent) 22%, transparent);
-    color: var(--accent);
+    color: var(--accent-text);
   }
 
   .vault-name {
@@ -903,7 +903,7 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
   }
 
   .emoji-picker-search:focus {
-    border-color: var(--accent);
+    border-color: var(--accent-text);
     box-shadow: 0 0 0 2px var(--focus-ring);
   }
 
@@ -984,7 +984,7 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
   /* The same focus as `.emoji-picker-search`, so that every field in the app
      shows it — until now each caller brought it along itself, or not. */
   .input-field:focus {
-    border-color: var(--accent);
+    border-color: var(--accent-text);
     box-shadow: 0 0 0 2px var(--focus-ring);
   }
 
@@ -1085,7 +1085,7 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
 /* The divider is a block node without text — without a selection state of its own
    it would stay invisible that it is the one meant when deleting. */
 .tiptap hr.ProseMirror-selectednode {
-  border-color: var(--accent);
+  border-color: var(--accent-text);
 }
 
 .tiptap code {
@@ -1627,9 +1627,6 @@ html[data-theme] .panel-subheading--divided {
   border-color: var(--field-border);
 }
 
-/* Parchment sets every border with `html[data-theme='emerald-parchment'] *`
-   (see `.settings-nav-item-idle`) — the border colours here therefore need
-   the attribute selector in front, otherwise `--border-soft` would apply there. */
 html[data-theme] .edit-bar-done {
   border-color: var(--primary-solid-border);
 }
@@ -1821,7 +1818,7 @@ html[data-theme] .prop-segment--active {
 }
 
 .block-insert-btn:hover {
-  color: var(--accent);
+  color: var(--accent-text);
   background: var(--interactive-hover);
 }
 
@@ -1909,7 +1906,7 @@ button.block-altar:hover .block-altar-title {
 }
 
 .block-sigil-status--loaded {
-  color: var(--accent);
+  color: var(--accent-text);
 }
 
 /* The letter bank: tiles that switch between "open" and "used" —
@@ -1931,7 +1928,7 @@ button.block-altar:hover .block-altar-title {
 }
 
 .block-sigil-letter--on {
-  color: var(--accent);
+  color: var(--accent-text);
   border-color: color-mix(in srgb, var(--accent) 45%, transparent);
   background: color-mix(in srgb, var(--accent) 12%, transparent);
 }
@@ -1984,7 +1981,7 @@ button.block-altar:hover .block-altar-title {
   padding: 0 6px;
   border-radius: 999px;
   font-size: 10px;
-  color: var(--accent);
+  color: var(--accent-text);
   background: color-mix(in srgb, var(--accent) 12%, transparent);
   transition: background-color 150ms;
 }
@@ -2037,7 +2034,7 @@ button.block-altar:hover .block-altar-title {
 .template-default-star {
   display: flex;
   flex-shrink: 0;
-  color: var(--accent);
+  color: var(--accent-text);
 }
 
 /* Assignment table of a template (the dialog only, `AssignmentTable`):
@@ -2067,7 +2064,7 @@ button.block-altar:hover .block-altar-title {
 
 /* "Replaces X": the star takes something away from another template — in the accent. */
 .template-assign-replaces {
-  color: var(--accent);
+  color: var(--accent-text);
 }
 
 /* Default templates overview in the dashboard: the name of a template as a link to its page. */
@@ -2298,7 +2295,7 @@ html[data-theme] .block-manager-row--idle,
 
 .block-toggle--on,
 .block-check--on {
-  color: var(--accent);
+  color: var(--accent-text);
 }
 
 .block-toggle:not(:disabled):hover,
@@ -2348,12 +2345,12 @@ html[data-theme] .block-manager-row--idle,
 }
 
 .block-checkbox:hover {
-  border-color: var(--accent);
+  border-color: var(--accent-text);
 }
 
 .block-checkbox:checked {
-  background-color: var(--accent);
-  border-color: var(--accent);
+  background-color: var(--accent-text);
+  border-color: var(--accent-text);
 }
 
 /* The tick itself, cut out as a shape: in the app's surface colour,
@@ -2633,14 +2630,9 @@ html[data-theme] .block-manager-row--idle,
 /* The four links in the About section. Colour from --accent instead of a
    jade utility, so that Parchment need not carry another bridge for it; the
    hover mixes toward the text colour and thereby gets lighter in Noctis and
-   darker in Parchment. The focus ring is mandatory, not optional: Noctis has no
-   generic button:focus-visible rule. */
+   darker in Parchment. */
 /* The border of the inactive row is purely a placeholder for the width of the
-   active one — it is not meant to become visible. Parchment pre-colours
-   every border with `html[data-theme='emerald-parchment'] *`, and against that
-   both the border-transparent utility and a simple
-   class rule lose: same specificity, the later one wins. Hence the
-   attribute selector in front — 0-2-0 instead of 0-1-0. */
+   active one — it is not meant to become visible. */
 html[data-theme] .settings-nav-item-idle {
   border-color: transparent;
 }
@@ -2652,7 +2644,7 @@ html[data-theme] .settings-nav-item-idle {
    specificity the later rule wins. The focus ring is mandatory — Noctis
    has no generic button:focus-visible rule. */
 html[data-theme] .settings-about-link {
-  color: var(--accent);
+  color: var(--accent-text);
 }
 
 html[data-theme] .settings-about-link:hover {
@@ -2711,16 +2703,14 @@ html[data-theme] .entry-list-nav .sidebar-item.active {
 
 /* The horizontal dividers of the right sidebar — below the bar
    (`SidebarActionBar`) and between the sections below it. As quiet as the
-   border of the sheet. `html[data-theme]` keeps the specificity above Parchment's
-   `* { border-color }`. */
+   border of the sheet. */
 html[data-theme] .sidebar-divider {
   border-color: var(--sheet-border);
 }
 
 /* The search field of a dashboard in the main area (`ListSearchField`): the
    light fill of the entry list search with the quiet border of the sheet.
-   `html[data-theme]` keeps the specificity above Parchment's
-   `* { border-color }`. */
+   */
 html[data-theme] .list-search-field {
   background: var(--list-search-bg);
   border: 1px solid var(--sheet-border);
@@ -2742,8 +2732,8 @@ html[data-theme] .app-main {
   z-index: 1;
 }
 
-/* The placeholder border of `.rail-button` stays invisible — Parchment's
-   `* { border-color }` would otherwise win over the class and frame every button
+/* The placeholder border of `.rail-button` stays invisible — the base
+   border colour would otherwise win over the class and frame every button
    in the rail and title bar. The active view colours it in more specifically. */
 html[data-theme] .rail-button {
   border-color: transparent;
@@ -2869,20 +2859,8 @@ html[data-theme='emerald-noctis'] .rail-button.active:hover {
   box-shadow: inset 0 0 0 1px rgba(0, 196, 127, 0.24);
 }
 
-html[data-theme='emerald-noctis'] .btn-ghost,
-html[data-theme='emerald-noctis'] .btn-secondary {
+html[data-theme='emerald-noctis'] .btn-ghost {
   color: #b9a38e;
-}
-
-html[data-theme='emerald-noctis'] .btn-secondary {
-  background: rgba(46, 38, 32, 0.76);
-  border-color: rgba(113, 94, 77, 0.48);
-}
-
-html[data-theme='emerald-noctis'] .btn-secondary:hover {
-  color: #f3e9dd;
-  background: rgba(58, 47, 40, 0.9);
-  border-color: rgba(142, 121, 101, 0.58);
 }
 
 html[data-theme='emerald-noctis'] .btn-ghost:hover {
@@ -2919,7 +2897,7 @@ html[data-theme='emerald-noctis'] .link-picker-modal .text-subtle {
   color: #9f8a75;
 }
 
-html[data-theme='emerald-noctis'] .link-picker-modal .text-faint {
+html[data-theme='emerald-noctis'] .link-picker-modal .text-subtle {
   color: #87715e;
 }
 
@@ -2966,7 +2944,7 @@ html[data-theme='emerald-noctis'] .link-picker-row .text-xs {
   color: #9f8a75;
 }
 
-html[data-theme='emerald-noctis'] .link-picker-row .text-faint {
+html[data-theme='emerald-noctis'] .link-picker-row .text-subtle {
   color: #7f6a57;
 }
 
@@ -3177,7 +3155,7 @@ html[data-theme='emerald-parchment'] textarea::placeholder {
 html[data-theme='emerald-parchment'] input:focus,
 html[data-theme='emerald-parchment'] textarea:focus,
 html[data-theme='emerald-parchment'] select:focus,
-html[data-theme='emerald-parchment'] button:focus-visible {
+button:focus-visible {
   outline: none;
   box-shadow: 0 0 0 2px var(--focus-ring);
 }
@@ -3354,14 +3332,6 @@ html[data-theme='emerald-parchment'] .link-picker-tab-idle:hover {
    into tones that are readable on Parchment. */
 html[data-theme='emerald-parchment'] .list-toolbar-option-active.text-danger {
   color: #b63f32;
-}
-
-html[data-theme='emerald-parchment'] .list-toolbar-option-active.text-yellow-400 {
-  color: #9a5c00;
-}
-
-html[data-theme='emerald-parchment'] .list-toolbar-option-active.text-green-400 {
-  color: #0b6e48;
 }
 
 html[data-theme='emerald-parchment'] .task-priority-pill-high {
@@ -3618,7 +3588,7 @@ html[data-theme='emerald-parchment'] .emerald-mark { --mark-crown: 1; --mark-tab
 .emerald-mark-crown        { fill: var(--accent); opacity: var(--mark-crown); }
 .emerald-mark-table        { opacity: var(--mark-table); }
 .emerald-mark-outline      { stroke: var(--accent); }
-.emerald-mark-table-top    { stop-color: var(--accent); }
+.emerald-mark-table-top    { stop-color: var(--accent-text); }
 .emerald-mark-table-bottom { stop-color: var(--accent-strong); }
 
 /* The step cut is a light reflection and not a theme colour — it always lies

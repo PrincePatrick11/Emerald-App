@@ -43,14 +43,14 @@ export function AltarItemTile({ item, draggable, onEdit, onClick }: Props) {
           : <span className={`leading-none select-none ${isCandleEmoji(item.emoji) ? 'candle-flame' : ''}`} style={{ fontSize: 34 }}>{item.emoji}</span>}
       </div>
       <div className="mt-auto flex items-center gap-1">
-        <span className="flex-1 truncate text-[10px] text-soft">{item.name}</span>
+        <span className="flex-1 truncate text-[11px] text-soft">{item.name}</span>
         {onEdit && (
           <button
             onClick={(e) => { e.stopPropagation(); onEdit(); }}
-            className="text-faint hover:text-raise transition-colors p-0.5"
+            className="text-subtle hover:text-raise transition-colors p-0.5"
             title={t('editor.edit')}
           >
-            <Pencil size={10} />
+            <Pencil size={12} />
           </button>
         )}
       </div>

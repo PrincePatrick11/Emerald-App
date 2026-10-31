@@ -316,7 +316,7 @@ export default function Dashboard<T>({
             {grouping.isGroupCollapsed?.(group)
               ? null
               : group.items.length === 0
-                ? (grouping.renderEmptyGroup?.(group) ?? <p className="text-xs text-faint px-1 py-1">—</p>)
+                ? (grouping.renderEmptyGroup?.(group) ?? <p className="text-xs text-subtle px-1 py-1">—</p>)
                 : renderItems(group.items)}
           </div>
         ))}

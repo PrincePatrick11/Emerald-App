@@ -176,7 +176,7 @@ export default function UpdatesPage() {
               <span className="text-muted">{t('settings.version')}</span>
               <span className="truncate">{packageJson.version}</span>
             </span>
-            <Button onClick={check} disabled={busy} tone="amber" className="shrink-0">
+            <Button onClick={check} disabled={busy} tone="neutral" className="shrink-0">
               <RefreshCw size={14} className={status === 'checking' ? 'animate-spin' : undefined} />
               {status === 'checking' ? t('settings.updateChecking') : t('settings.updateCheck')}
             </Button>

@@ -73,7 +73,7 @@ export function PropertySelect<T extends string>({ value, options, onChange, tex
           className={`prop-value-btn${muted ? ' prop-value-btn--muted' : ''}`}
         >
           <span className="min-w-0 truncate">{text}</span>
-          <ChevronDown size={13} />
+          <ChevronDown size={14} />
         </button>
       )}
     />
@@ -85,7 +85,7 @@ function MediaPreview({ kind, value }: { kind: 'icon' | 'cover'; value: string }
   if (kind === 'cover') return <img src={value} alt="" className="prop-value-thumb w-11" />;
   return isImageIcon(value)
     ? <img src={value} alt="" className="prop-value-thumb w-5" />
-    : <span className="text-[14px] leading-none px-0.5">{value}</span>;
+    : <span className="text-sm leading-none px-0.5">{value}</span>;
 }
 
 /**
@@ -174,7 +174,7 @@ export function MediaPropertyRow({ rowIcon, label, kind, value, onChange, onRemo
     >
       {value ? <MediaPreview kind={kind} value={value} /> : (
         <>
-          <Plus size={13} />
+          <Plus size={14} />
           <span className="min-w-0 truncate">{t('properties.add')}</span>
         </>
       )}

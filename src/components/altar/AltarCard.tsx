@@ -34,7 +34,7 @@ function PreviewFallback({ altar, wide }: { altar: AltarRecord; wide?: boolean }
     <div className={`flex items-center justify-center ${wide ? 'h-24' : 'h-20'}`}>
       {altar.icon_data
         ? <FaviconGlyph value={altar.icon_data} className={wide ? 'h-16 w-16 text-5xl' : 'h-12 w-12 text-4xl'} />
-        : <Flame size={32} className="text-faint" />}
+        : <Flame size={32} className="text-subtle" />}
     </div>
   );
 }
@@ -43,7 +43,7 @@ function PreviewFallback({ altar, wide }: { altar: AltarRecord; wide?: boolean }
 function ListPreviewFallback({ altar }: { altar: AltarRecord }) {
   return altar.icon_data
     ? <FaviconGlyph value={altar.icon_data} />
-    : <Flame size={14} className="text-faint" />;
+    : <Flame size={14} className="text-subtle" />;
 }
 
 type AltarCardProps = CommonProps & {
@@ -93,7 +93,7 @@ export const AltarCard = memo(function AltarCard({
           onCancel={onCancelRename}
           className="mb-2 w-full bg-transparent text-sm font-medium text-secondary outline-none selectable"
         />
-        <p className="text-xs text-faint">{formatEntryDate(altar.updated_at)}</p>
+        <p className="text-xs text-subtle">{formatEntryDate(altar.updated_at)}</p>
       </DashboardItem>
     );
   }
@@ -165,7 +165,7 @@ export const AltarListRow = memo(function AltarListRow({
     ? <ListPreviewFallback altar={altar} />
     : thumbnail
       ? <img src={thumbnail} alt="" draggable={false}
-          className="h-8 rounded object-cover border border-edge"
+          className="h-8 rounded-md object-cover border border-edge"
           style={{ aspectRatio: `${resW}/${resH}` }} />
       : <AltarCardPreview altar={altar} previewItems={previewItems} compact />;
 
@@ -173,7 +173,7 @@ export const AltarListRow = memo(function AltarListRow({
     <DashboardItem view={altarView(altar)} layout="row" onContextMenu={onContextMenu}>
       <span className="flex-shrink-0">{preview}</span>
       <span className="flex-1 text-sm text-soft truncate">{displayTitle(t, 'altar', altar.title)}</span>
-      <span className="text-xs text-faint">{formatEntryDate(altar.updated_at)}</span>
+      <span className="text-xs text-subtle">{formatEntryDate(altar.updated_at)}</span>
     </DashboardItem>
   );
 });

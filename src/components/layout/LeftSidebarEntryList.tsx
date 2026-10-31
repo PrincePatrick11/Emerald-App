@@ -229,7 +229,7 @@ function useOperationsConfig(): EntryListTabProps<Entry> {
       const cat = lookupCategory(catById, op.category_id);
       const iconValue = entryIcon('operation', op, cat);
       return isImageIcon(iconValue)
-        ? <img src={iconValue} alt="" className="w-4 h-4 object-cover rounded flex-shrink-0" />
+        ? <img src={iconValue} alt="" className="w-4 h-4 object-cover rounded-md flex-shrink-0" />
         : <span className="text-base leading-none flex-shrink-0">{iconValue}</span>;
     },
     isActive: (op) => activeView.id === op.id,
@@ -296,7 +296,7 @@ function useWikiConfig(): EntryListTabProps<Entry> {
     getIcon: (a) => {
       const icon = entryIcon('wiki', a, lookupCategory(catById, a.category_id));
       return isImageIcon(icon)
-        ? <img src={icon} alt="" className="w-4 h-4 object-cover rounded flex-shrink-0" />
+        ? <img src={icon} alt="" className="w-4 h-4 object-cover rounded-md flex-shrink-0" />
         : <span className="text-base leading-none flex-shrink-0">{icon}</span>;
     },
     isActive: (a) => activeView.id === a.id,
@@ -346,8 +346,8 @@ function useAltarConfig(): EntryListTabProps<AltarRecord> {
     getEditTitle: (a) => a.title,
     getDateStr: (a) => formatEntryDate(a.updated_at),
     getIcon: (a) => (isImageIcon(a.icon_data)
-      ? <img src={a.icon_data!} alt="" className="w-4 h-4 object-cover rounded flex-shrink-0" />
-      : <Flame size={14} className="flex-shrink-0 text-faint" />),
+      ? <img src={a.icon_data!} alt="" className="w-4 h-4 object-cover rounded-md flex-shrink-0" />
+      : <Flame size={14} className="flex-shrink-0 text-subtle" />),
     isActive: (a) => activeView.id === a.id,
     onOpen: (a) => setActiveView({ type: 'altar', id: a.id, mode: 'view' }),
     onOpenNewTab: (a) => openViewInNewTab({ type: 'altar', id: a.id, mode: 'view' }),
@@ -411,8 +411,8 @@ function useTasksConfig(): EntryListTabProps<Task> {
     getEditTitle: (task) => task.title,
     getDateStr: categoryNameOf,
     getIcon: (task) => (task.completed
-      ? <CheckSquare size={14} className="flex-shrink-0 text-faint" />
-      : <Square size={14} className="flex-shrink-0 text-faint" />),
+      ? <CheckSquare size={14} className="flex-shrink-0 text-subtle" />
+      : <Square size={14} className="flex-shrink-0 text-subtle" />),
     isActive: (task) => activeView.id === task.id,
     onOpen: (task) => openTask(task.id),
     onDragStart: taskDragItem,
@@ -428,7 +428,7 @@ function useTasksConfig(): EntryListTabProps<Task> {
       if (isRenaming) {
         return (
           <div className={`sidebar-item ${isActive ? 'active' : ''}`}>
-            <CheckSquare size={14} className="flex-shrink-0 text-faint" />
+            <CheckSquare size={14} className="flex-shrink-0 text-subtle" />
             <div className="flex-1 min-w-0">
               <input
                 autoFocus

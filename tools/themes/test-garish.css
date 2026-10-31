@@ -6,20 +6,17 @@ html[data-theme='test-garish'] {
   --bg-app: hsl(240, 85%, 16%);
   --bg-surface-1: hsl(240, 80%, 22%);
   --bg-surface-2: hsl(240, 80%, 22%);
-  --bg-elevated: hsl(240, 80%, 22%);
   --text-primary: hsl(60, 100%, 75%);
   --text-secondary: hsl(60, 90%, 70%);
   --text-muted: hsl(60, 70%, 62%);
   --text-subtle: hsl(60, 55%, 55%);
   --border-soft: hsl(190, 90%, 45%);
-  --border-subtle: hsl(190, 90%, 45%);
   --border-strong: hsl(190, 90%, 45%);
   --interactive-hover: hsl(300, 80%, 28%);
   --interactive-active: hsl(300, 80%, 28%);
   --code-bg: hsl(240, 80%, 22%);
   --accent: hsl(300, 95%, 65%);
   --accent-strong: hsl(300, 95%, 65%);
-  --accent-contrast: hsl(240, 90%, 12%);
   --focus-ring: hsl(300, 95%, 65%);
   --scrollbar: hsl(190, 90%, 45%);
   --scrollbar-hover: hsl(190, 90%, 45%);
@@ -132,12 +129,9 @@ html[data-theme='test-garish'] {
   --tone-neutral-border-hover: hsl(190, 90%, 55%);
   --tone-neutral-text: hsl(60, 70%, 62%);
   --tone-neutral-text-hover: hsl(60, 90%, 70%);
-  --content-bar-h: 56px;
   --control-h: 30px;
-  --control-h-sm: 24px;
   color-scheme: dark;
   --text-soft: hsl(60, 80%, 68%);
-  --text-faint: hsl(60, 50%, 52%);
   --text-raise: hsl(60, 100%, 78%);
   --text-on-accent: hsl(300, 95%, 88%);
   --accent-text: hsl(300, 95%, 78%);
@@ -165,4 +159,10 @@ html[data-theme='test-garish'] {
   --accent-fill: hsl(300, 90%, 35%);
   --accent-fill-strong: hsl(300, 90%, 30%);
   --danger-wash: hsla(335, 95%, 50%, 0.2);
+  --secondary-bg: hsl(240, 80%, 24%);
+  --secondary-bg-hover: hsl(240, 80%, 30%);
+  --secondary-border: hsl(190, 90%, 45%);
+  --secondary-border-hover: hsl(190, 90%, 55%);
+  --secondary-text: hsl(60, 90%, 70%);
+  --secondary-text-hover: hsl(60, 100%, 75%);
 }

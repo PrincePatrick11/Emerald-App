@@ -555,7 +555,7 @@ const TaskRow = memo(function TaskRow({
                 if (freshTaskIds.delete(task.id)) void handleDelete();
               }
             }}
-            className="flex-1 bg-well-solid border border-edge-strong rounded px-2 py-0.5 text-sm text-secondary outline-none focus:border-accent-edge"
+            className="flex-1 bg-well-solid border border-edge-strong rounded-md px-2 py-0.5 text-sm text-secondary outline-none focus:border-accent-edge"
             autoFocus
           />
         ) : (
@@ -575,7 +575,7 @@ const TaskRow = memo(function TaskRow({
             {resolvedLinks.map((link) => (
               <span
                 key={link.id}
-                className="tasks-linked-entry text-xs cursor-pointer px-1.5 py-0.5 rounded transition-colors"
+                className="tasks-linked-entry text-xs cursor-pointer px-1.5 py-0.5 rounded-md transition-colors"
                 title={`${link.target_type}: ${link.title}`}
                 onClick={() => {
                   useUIStore.getState().setActiveView({ type: viewTypeForEntryType(link.target_type), id: link.target_id, mode: 'view' });
@@ -629,7 +629,7 @@ const TaskRow = memo(function TaskRow({
                 onClick={toggle}
                 aria-haspopup="listbox"
                 aria-expanded={open}
-                className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-xs ${TASK_PRIORITY_PILL_CLASSES[task.priority]}`}
+                className={`flex items-center gap-1 px-1.5 py-0.5 rounded-md text-xs ${TASK_PRIORITY_PILL_CLASSES[task.priority]}`}
                 title={t('tasks.priority.' + task.priority)}
               >
                 <Flag size={12} />

@@ -162,13 +162,13 @@ export function AltarLibraryStrip({ editable }: { editable: boolean }) {
           <div className={`altar-cat-scroll-fade pointer-events-none absolute left-0 top-0 bottom-0 w-8 z-10 bg-gradient-to-r from-well-page to-transparent transition-opacity duration-150 ${catScrollState.left ? 'opacity-100' : 'opacity-0'}`} />
           <div className={`altar-cat-scroll-fade pointer-events-none absolute right-0 top-0 bottom-0 w-8 z-10 bg-gradient-to-l from-well-page to-transparent transition-opacity duration-150 ${catScrollState.right ? 'opacity-100' : 'opacity-0'}`} />
           <div ref={catScrollRef} onScroll={checkCatScroll} className="scrollbar-none flex gap-1 overflow-x-auto">
-            <button onClick={() => setActiveCategoryTab('all')} className={`px-2 py-1 rounded-md text-xs transition-colors whitespace-nowrap ${activeCategoryTab === 'all' ? 'bg-well-active text-secondary' : 'text-faint hover:text-muted'}`}>{t('altar.all')}</button>
+            <button onClick={() => setActiveCategoryTab('all')} className={`px-2 py-1 rounded-md text-xs transition-colors whitespace-nowrap ${activeCategoryTab === 'all' ? 'bg-well-active text-secondary' : 'text-subtle hover:text-muted'}`}>{t('altar.all')}</button>
             {/* In the order of the categories page; ordering happens only there, for all modules. */}
             {categories.map((cat) => (
               <button
                 key={cat.id}
                 onClick={() => setActiveCategoryTab(cat.id)}
-                className={`px-2 py-1 rounded-md text-xs transition-colors whitespace-nowrap ${activeCategoryTab === cat.id ? 'bg-well-active text-secondary' : 'text-faint hover:text-muted'}`}
+                className={`px-2 py-1 rounded-md text-xs transition-colors whitespace-nowrap ${activeCategoryTab === cat.id ? 'bg-well-active text-secondary' : 'text-subtle hover:text-muted'}`}
               >
                 {cat.emoji} {categoryLabel(t, cat)}
               </button>
@@ -176,7 +176,7 @@ export function AltarLibraryStrip({ editable }: { editable: boolean }) {
             {hasUncategorized && (
               <button
                 onClick={() => setActiveCategoryTab(UNCATEGORIZED_KEY)}
-                className={`px-2 py-1 rounded-md text-xs transition-colors whitespace-nowrap ${activeCategoryTab === UNCATEGORIZED_KEY ? 'bg-well-active text-secondary' : 'text-faint hover:text-muted'}`}
+                className={`px-2 py-1 rounded-md text-xs transition-colors whitespace-nowrap ${activeCategoryTab === UNCATEGORIZED_KEY ? 'bg-well-active text-secondary' : 'text-subtle hover:text-muted'}`}
               >
                 {t('categories.uncategorized')}
               </button>
@@ -185,7 +185,7 @@ export function AltarLibraryStrip({ editable }: { editable: boolean }) {
         </div>
       </div>
       <div className="flex-1 min-h-0 overflow-y-auto pr-1">
-        {filteredItems.length === 0 && <p className="text-xs text-faint px-2 py-3">{t('altar.noElements')}</p>}
+        {filteredItems.length === 0 && <p className="text-xs text-subtle px-2 py-3">{t('altar.noElements')}</p>}
         <div className="grid [grid-template-columns:repeat(auto-fill,70px)] gap-1.5 justify-start">
           {filteredItems.map((item) => (
             <AltarItemTile

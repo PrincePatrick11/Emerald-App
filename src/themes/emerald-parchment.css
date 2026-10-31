@@ -2,20 +2,17 @@ html[data-theme='emerald-parchment'] {
   --bg-app: #f7efdf;
   --bg-surface-1: rgba(255, 249, 238, 0.9);
   --bg-surface-2: rgba(247, 236, 217, 0.97);
-  --bg-elevated: rgba(255, 252, 246, 0.99);
   --text-primary: #2c2014;
   --text-secondary: #433121;
   --text-muted: #5b442e;
   --text-subtle: #775c41;
   --border-soft: rgba(166, 129, 91, 0.35);
-  --border-subtle: rgba(145, 108, 70, 0.32);
   --border-strong: rgba(141, 104, 68, 0.52);
   --interactive-hover: rgba(130, 87, 44, 0.12);
   --interactive-active: rgba(130, 87, 44, 0.18);
   --code-bg: rgba(133, 95, 58, 0.12);
   --accent: #008a57;
   --accent-strong: #006941;
-  --accent-contrast: #f3fff9;
   --focus-ring: rgba(0, 138, 87, 0.34);
   --scrollbar: rgba(166, 129, 91, 0.72);
   --scrollbar-hover: rgba(141, 104, 68, 0.86);
@@ -49,7 +46,7 @@ html[data-theme='emerald-parchment'] {
   --linked-chip-border: rgba(145, 108, 70, 0.3);
   --linked-chip-text: #5b432d;
   /* Warnton: Schrift wie Flaeche (siehe .block-checkbox--warning). */
-  --warning-text: #c97229;
+  --warning-text: #a75924;
   --danger-text: #b63f32;
   --danger-bg: rgba(239, 68, 68, 0.08);
   --danger-border: rgba(239, 68, 68, 0.2);
@@ -142,12 +139,9 @@ html[data-theme='emerald-parchment'] {
   --tone-neutral-text: #5b442e;
   --tone-neutral-text-hover: #433121;
   /* Heights (design.md, Heights and Spacing). */
-  --content-bar-h: 56px;
   --control-h: 30px;
-  --control-h-sm: 24px;
   /* Generic text, surfaces and edges behind the Tailwind colour names in tailwind.config.js. */
   --text-soft: #5b442e;
-  --text-faint: #775c41;
   --text-raise: #2c2014;
   --text-on-accent: #f3fff9;
   --accent-text: #0a7a53;
@@ -175,4 +169,10 @@ html[data-theme='emerald-parchment'] {
   --accent-fill: #006941;
   --accent-fill-strong: #006941;
   --danger-wash: rgba(239, 68, 68, 0.1);
+  --secondary-bg: #f6ead6;
+  --secondary-bg-hover: rgba(130, 87, 44, 0.12);
+  --secondary-border: rgba(152, 114, 75, 0.32);
+  --secondary-border-hover: rgba(141, 104, 68, 0.52);
+  --secondary-text: #6d553d;
+  --secondary-text-hover: #2c2014;
 }

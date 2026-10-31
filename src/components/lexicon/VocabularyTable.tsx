@@ -71,10 +71,10 @@ export default function VocabularyTable({ languageId, entries }: {
     <section className="max-w-4xl">
       <div className="flex items-center gap-2 mb-3">
         <p className="label-xs">{t('lexicon.vocabulary')}</p>
-        <span className="text-xs text-faint">({entries.length})</span>
+        <span className="text-xs text-subtle">({entries.length})</span>
         <span className="flex-1" />
         <div className="relative">
-          <Search size={12} className="absolute left-2 top-1/2 -translate-y-1/2 text-faint pointer-events-none" />
+          <Search size={12} className="absolute left-2 top-1/2 -translate-y-1/2 text-subtle pointer-events-none" />
           <input
             className={`${OP_PROP_SELECT_CLASSES} w-48 pl-7`}
             value={search}
@@ -90,9 +90,9 @@ export default function VocabularyTable({ languageId, entries }: {
       </div>
 
       {entries.length === 0 ? (
-        <p className="text-sm text-faint">{t('lexicon.noWords')}</p>
+        <p className="text-sm text-subtle">{t('lexicon.noWords')}</p>
       ) : visible.length === 0 ? (
-        <p className="text-sm text-faint">{t('search.noResults')}</p>
+        <p className="text-sm text-subtle">{t('search.noResults')}</p>
       ) : (
         <>
           <div className={`${COLUMNS} px-1 mb-1`}>

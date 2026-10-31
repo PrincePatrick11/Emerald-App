@@ -41,7 +41,7 @@ The dev build uses a separate database and app identity (`com.emerald.app.dev`) 
 
 ## Continuous Integration
 
-Every push to `main` or a version branch and every pull request runs `ci.yml`: a frontend job (`npm run check`, which runs `check:schema`, `check:i18n`, `check:blocks`, `check:docs` and `check:english`, then the typecheck-carrying `build`) and a `cargo check --locked --all-targets` matrix across Linux, macOS, and Windows, with and without the `devbridge` feature, since parts of the Rust side are platform-gated and only actually compile on their own OS. `rust-tests.yml` runs `cargo test --lib` when `src-tauri/` changes. See [`Documentation/build.md`](Documentation/build.md#ci--the-smoke-detector) for the full pipeline, including what CI does *not* cover (bundling, signing, notarisation).
+Every push to `main` or a version branch and every pull request runs `ci.yml`: a frontend job (`npm run check`, which runs `check:schema`, `check:i18n`, `check:blocks`, `check:docs`, `check:english` and `check:colors`, then the typecheck-carrying `build`) and a `cargo check --locked --all-targets` matrix across Linux, macOS, and Windows, with and without the `devbridge` feature, since parts of the Rust side are platform-gated and only actually compile on their own OS. `rust-tests.yml` runs `cargo test --lib` when `src-tauri/` changes. See [`Documentation/build.md`](Documentation/build.md#ci--the-smoke-detector) for the full pipeline, including what CI does *not* cover (bundling, signing, notarisation).
 
 ## Working with a Coding Assistant
 

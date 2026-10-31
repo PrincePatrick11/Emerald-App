@@ -291,7 +291,7 @@ export default function CategoriesView() {
         ) : (
           <span
             onPointerDown={(e) => startDrag(e, cat.id)}
-            className="flex-shrink-0 cursor-grab active:cursor-grabbing touch-none text-faint hover:text-muted transition-colors"
+            className="flex-shrink-0 cursor-grab active:cursor-grabbing touch-none text-subtle hover:text-muted transition-colors"
           >
             <GripVertical size={12} />
           </span>
@@ -338,7 +338,7 @@ export default function CategoriesView() {
         mode: 'custom',
         render: () => (
           <div className="max-w-2xl">
-            {!query && <p className="text-xs text-faint mb-3">{t('categories.dragHint')}</p>}
+            {!query && <p className="text-xs text-subtle mb-3">{t('categories.dragHint')}</p>}
             {query && visualCategories.length === 0 && <NoResults query={search} onReset={() => setSearch('')} />}
             <div ref={listRef} className="space-y-1">
               {visualCategories.map(renderRow)}

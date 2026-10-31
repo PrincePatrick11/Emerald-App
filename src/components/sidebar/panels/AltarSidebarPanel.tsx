@@ -231,7 +231,7 @@ const noticeTimerRef = useRef<number | null>(null);
                         <button
                           key={r}
                           onClick={() => updateAltarResolution(activeAltar.id, r)}
-                          className={`rounded border py-1.5 text-[11px] font-medium text-center transition-colors ${
+                          className={`rounded-md border py-1.5 text-[11px] font-medium text-center transition-colors ${
                             active
                               ? 'border-accent-edge bg-accent-fill text-on-accent'
                               : 'border-edge bg-well-sunk text-muted hover:border-edge-raise hover:text-raise'
@@ -395,7 +395,7 @@ const noticeTimerRef = useRef<number | null>(null);
                                     className="absolute inset-0 h-full w-full cursor-pointer rounded-full opacity-0"
                                   />
                                   {isPresetDraft && (
-                                    <span className="text-[10px] leading-none text-muted pointer-events-none">+</span>
+                                    <span className="text-[11px] leading-none text-muted pointer-events-none">+</span>
                                   )}
                                 </button>
                               </div>
@@ -483,7 +483,7 @@ const noticeTimerRef = useRef<number | null>(null);
                       : t(`altar.backgrounds.${activeAltar.background_preset || DEFAULT_ALTAR_BACKGROUND}`)}
                 </div>
                 <span className="absolute right-1.5 top-1.5 rounded-full border border-accent-edge bg-accent-fill-strong p-0.5 text-on-accent">
-                  <Check size={10} />
+                  <Check size={12} />
                 </span>
               </div>
             </div>
@@ -512,7 +512,7 @@ const noticeTimerRef = useRef<number | null>(null);
                         <div className="absolute inset-x-0 h-1 rounded-full bg-well-tint" />
                         <div className="absolute left-0 h-1 rounded-full bg-accent-track" style={{ width: `${overlayPercent}%` }} />
                         <div
-                          className="absolute h-2.5 w-2.5 rounded-full bg-accent border border-accent-edge shadow pointer-events-none"
+                          className="absolute h-2.5 w-2.5 rounded-full bg-accent border border-accent-edge shadow-menu pointer-events-none"
                           style={{ left: `calc(${overlayPercent}% - 5px)` }}
                         />
                         <input
@@ -530,7 +530,7 @@ const noticeTimerRef = useRef<number | null>(null);
                         <button
                           key={color}
                           onClick={() => updateAltar(activeAltar.id, { background_overlay_color: color })}
-                          className={`flex items-center justify-center gap-1.5 rounded border py-1 text-[10px] uppercase tracking-wide transition-colors ${
+                          className={`flex items-center justify-center gap-1.5 rounded-md border py-1 text-[11px] uppercase tracking-wide transition-colors ${
                             overlayColor === color
                               ? 'border-accent-edge bg-accent-fill text-on-accent'
                               : 'border-edge bg-well-sunk text-muted hover:border-edge-raise hover:text-raise'
@@ -567,8 +567,8 @@ const noticeTimerRef = useRef<number | null>(null);
                     title={title}
                     className={`flex flex-col items-center gap-0.5 rounded-md border px-1 py-1.5 transition-colors ${active ? 'border-accent-edge bg-accent-fill text-on-accent' : 'border-edge bg-well-sunk text-subtle hover:border-edge-raise hover:text-raise'}`}
                   >
-                    <Icon size={13} />
-                    <span className="text-[9px] leading-none">{label}</span>
+                    <Icon size={14} />
+                    <span className="text-[11px] leading-none">{label}</span>
                   </button>
                 ))}
               </div>
@@ -584,7 +584,7 @@ const noticeTimerRef = useRef<number | null>(null);
                       <div className="absolute inset-x-0 h-1 rounded-full bg-well-tint" />
                       <div className="absolute left-0 h-1 rounded-full bg-accent-track" style={{ width: `${((activeAltar.grid_size - 8) / 120) * 100}%` }} />
                       <div
-                        className="absolute h-2.5 w-2.5 rounded-full bg-accent border border-accent-edge shadow pointer-events-none"
+                        className="absolute h-2.5 w-2.5 rounded-full bg-accent border border-accent-edge shadow-menu pointer-events-none"
                         style={{ left: `calc(${((activeAltar.grid_size - 8) / 120) * 100}% - 5px)` }}
                       />
                       <input
@@ -608,7 +608,7 @@ const noticeTimerRef = useRef<number | null>(null);
                       <div className="absolute inset-x-0 h-1 rounded-full bg-well-tint" />
                       <div className="absolute left-0 h-1 rounded-full bg-accent-track" style={{ width: `${((gridOpacityPercent - 1) / 24) * 100}%` }} />
                       <div
-                        className="absolute h-2.5 w-2.5 rounded-full bg-accent border border-accent-edge shadow pointer-events-none"
+                        className="absolute h-2.5 w-2.5 rounded-full bg-accent border border-accent-edge shadow-menu pointer-events-none"
                         style={{ left: `calc(${((gridOpacityPercent - 1) / 24) * 100}% - 5px)` }}
                       />
                       <input
@@ -629,7 +629,7 @@ const noticeTimerRef = useRef<number | null>(null);
                       value={activeAltar.grid_color}
                       disabled={!isEditing}
                       onChange={(event) => updateAltarGrid(activeAltar.id, { grid_color: event.target.value })}
-                      className="h-6 w-10 rounded border border-edge-default bg-well-solid p-0"
+                      className="h-6 w-10 rounded-md border border-edge-default bg-well-solid p-0"
                     />
                   </div>
                   </>}
@@ -645,7 +645,7 @@ const noticeTimerRef = useRef<number | null>(null);
                     <div className="absolute inset-x-0 h-1 rounded-full bg-well-tint" />
                     <div className="absolute left-0 h-1 rounded-full bg-accent-track" style={{ width: `${((activeAltar.rotation_snap_angle - 1) / 179) * 100}%` }} />
                     <div
-                      className="absolute h-2.5 w-2.5 rounded-full bg-accent border border-accent-edge shadow pointer-events-none"
+                      className="absolute h-2.5 w-2.5 rounded-full bg-accent border border-accent-edge shadow-menu pointer-events-none"
                       style={{ left: `calc(${((activeAltar.rotation_snap_angle - 1) / 179) * 100}% - 5px)` }}
                     />
                     <input
@@ -675,7 +675,7 @@ const noticeTimerRef = useRef<number | null>(null);
           />
           {placementsOpen && <div ref={listRef} className="mt-2 space-y-1 pr-1" onClick={(e) => { if (e.target === e.currentTarget) selectPlacement(null); }}>
             {sortedPlacements.length === 0 && (
-              <p className="px-2 py-2 text-xs text-faint">{t('altar.noElementsPlaced')}</p>
+              <p className="px-2 py-2 text-xs text-subtle">{t('altar.noElementsPlaced')}</p>
             )}
             {visualPlacements.map((placement) => (
               <div key={placement.id} className="space-y-1">

@@ -13,7 +13,7 @@ import type { SuggestionItem } from '../../../lib/linkItems';
 export function LinkItemIcon({ item }: { item: SuggestionItem }) {
   const icon = item.displayIcon || item.icon || DEFAULT_ENTRY_EMOJI[item.entryType];
   return isImageIcon(icon)
-    ? <img src={icon} alt="" className="w-4 h-4 object-cover rounded flex-shrink-0" />
+    ? <img src={icon} alt="" className="w-4 h-4 object-cover rounded-md flex-shrink-0" />
     : <span className="flex-shrink-0">{icon}</span>;
 }
 
@@ -60,7 +60,7 @@ export function LinkedEntryChip({
     </>
   );
   return (
-    <span className="linked-entry-chip flex items-center gap-1 px-2 py-0.5 rounded text-xs bg-well-strong border border-edge text-soft transition-colors">
+    <span className="linked-entry-chip flex items-center gap-1 px-2 py-0.5 rounded-md text-xs bg-well-strong border border-edge text-soft transition-colors">
       {onClick ? (
         <button
           onClick={onClick}
@@ -73,7 +73,7 @@ export function LinkedEntryChip({
       {onRemove && (
         <button
           onClick={onRemove}
-          className="text-faint hover:text-muted ml-0.5 flex-shrink-0"
+          className="text-subtle hover:text-muted ml-0.5 flex-shrink-0"
           title={removeTitle}
           aria-label={removeTitle}
         >
@@ -159,11 +159,11 @@ export default function LinkedEntryPicker<T>({
         {open && createPortal(
           <div
             ref={menuRef}
-            className="linked-entry-menu border border-edge rounded-lg shadow-xl py-1 max-h-40 overflow-y-auto"
+            className="linked-entry-menu border border-edge rounded-lg shadow-menu py-1 max-h-40 overflow-y-auto"
             style={menuPos ?? { position: 'fixed', visibility: 'hidden' }}
           >
             {results.length === 0 ? (
-              <p className="text-xs text-faint px-3 py-2">{t('search.noResultsShort')}</p>
+              <p className="text-xs text-subtle px-3 py-2">{t('search.noResultsShort')}</p>
             ) : results.map((item) => (
               <button
                 key={resultKey(item)}

@@ -30,7 +30,7 @@ export default function DragGhost() {
   return (
     <div
       className="fixed pointer-events-none z-50 flex items-center gap-1.5 px-2 py-1
-                 bg-well-solid border border-edge-strong rounded shadow-lg opacity-90"
+                 bg-well-solid border border-edge-strong rounded-md shadow-menu opacity-90"
       style={{ left: pos.x + 12, top: pos.y + 12 }}
     >
       {/* `category` carries the category emoji in every module. */}

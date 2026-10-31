@@ -22,7 +22,7 @@ export default function UndoToast() {
   if (!active) return null;
 
   return (
-    <div className="fixed bottom-4 right-4 z-50 flex items-center gap-3 px-4 py-3 bg-well-solid border border-edge rounded-xl shadow-xl animate-slide-in">
+    <div className="fixed bottom-4 right-4 z-50 flex items-center gap-3 px-4 py-3 bg-well-solid border border-edge rounded-lg shadow-menu animate-slide-in">
       <span className="text-sm text-soft max-w-xs truncate">{active.description}</span>
       <Button
         onClick={executeUndo}
@@ -31,7 +31,7 @@ export default function UndoToast() {
       >
         {t('undo.action')}
       </Button>
-      <button onClick={dismiss} className="flex-shrink-0 text-faint hover:text-muted transition-colors">
+      <button onClick={dismiss} className="flex-shrink-0 text-subtle hover:text-muted transition-colors">
         <X size={14} />
       </button>
     </div>

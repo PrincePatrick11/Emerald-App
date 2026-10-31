@@ -292,7 +292,7 @@ export default function RichEditor({
       {editable && linkPopup && (
         <div
           ref={linkPopupRef}
-          className="fixed z-50 flex items-center gap-1 px-2 py-1.5 bg-well-solid border border-edge-strong rounded-lg shadow-xl text-xs"
+          className="fixed z-50 flex items-center gap-1 px-2 py-1.5 bg-well-solid border border-edge-strong rounded-lg shadow-menu text-xs"
           style={{
             left: linkPopup.rect.left,
             top: linkPopup.rect.bottom + 6,
@@ -309,7 +309,7 @@ export default function RichEditor({
                   if (e.key === 'Enter') handleLinkEditConfirm();
                   if (e.key === 'Escape') { setEditingHref(null); }
                 }}
-                className="bg-well-page border border-edge-strong rounded px-2 py-0.5 text-secondary w-64 outline-none focus:border-accent-edge"
+                className="bg-well-page border border-edge-strong rounded-md px-2 py-0.5 text-secondary w-64 outline-none focus:border-accent-edge"
                 placeholder="https://"
               />
               <button onClick={handleLinkEditConfirm} className="p-1 text-accent hover:text-accent-raise" title={t('editor.confirm')}>
@@ -321,14 +321,14 @@ export default function RichEditor({
             </>
           ) : (
             <>
-              <ExternalLink size={11} className="text-subtle shrink-0" />
+              <ExternalLink size={12} className="text-subtle shrink-0" />
               <span className="text-muted max-w-[220px] truncate">{linkPopup.href}</span>
               <button
                 onClick={() => setEditingHref(linkPopup.href)}
                 className="p-1 text-subtle hover:text-raise ml-1"
                 title={t('editor.editLink')}
               >
-                <Pencil size={11} />
+                <Pencil size={12} />
               </button>
               <Button
                 onClick={handleLinkRemove}
@@ -336,7 +336,7 @@ export default function RichEditor({
                 className="p-1"
                 title={t('editor.removeLink')}
               >
-                <Trash2 size={11} />
+                <Trash2 size={12} />
               </Button>
             </>
           )}

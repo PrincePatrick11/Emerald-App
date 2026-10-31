@@ -73,14 +73,14 @@ const SuggestionList = forwardRef<SuggestionListRef, Props>(
 
     if (items.length === 0) {
       return (
-        <div className="bg-well-solid border border-edge-default rounded-lg px-3 py-2 text-xs text-subtle shadow-xl">
+        <div className="bg-well-solid border border-edge-default rounded-lg px-3 py-2 text-xs text-subtle shadow-menu">
           {t('search.noResultsShort')}
         </div>
       );
     }
 
     return (
-      <div className="bg-well-solid border border-edge-default rounded-lg overflow-hidden shadow-xl min-w-[220px] max-h-64 overflow-y-auto">
+      <div className="bg-well-solid border border-edge-default rounded-lg overflow-hidden shadow-menu min-w-[220px] max-h-64 overflow-y-auto">
         {items.map((item, index) => {
           const TypeIcon = ENTRY_TYPE_ICONS[item.entryType];
           return (
@@ -95,7 +95,7 @@ const SuggestionList = forwardRef<SuggestionListRef, Props>(
             >
               <TypeIcon size={12} className="text-subtle flex-shrink-0" />
               <span className="flex-1 truncate">{item.label}</span>
-              <span className="text-xs text-faint flex-shrink-0 capitalize">
+              <span className="text-xs text-subtle flex-shrink-0 capitalize">
                 {t(ENTRY_TYPE_LABEL_KEYS[item.entryType])}
               </span>
             </button>

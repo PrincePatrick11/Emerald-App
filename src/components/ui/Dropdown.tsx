@@ -111,7 +111,7 @@ export default function Dropdown<T extends string>({
         >
           {label && <span className="list-toolbar-chip-label mr-0.5">{label}</span>}
           {selected}
-          <ChevronDown size={11} className="list-toolbar-chip-label" />
+          <ChevronDown size={12} className="list-toolbar-chip-label" />
         </button>
       )}
       {open && (portal ? createPortal(menu, document.body) : menu)}

@@ -46,14 +46,14 @@ export const PlacedElementRow = memo(function PlacedElementRow({
       <div
         onClick={onSelect}
         onContextMenu={handleContextMenu}
-        className={`w-full flex items-center gap-2 rounded border px-2 py-1.5 text-left transition-all cursor-pointer select-none ${
+        className={`w-full flex items-center gap-2 rounded-md border px-2 py-1.5 text-left transition-all cursor-pointer select-none ${
           sidebarRowStateClasses({ dragging: isDragging, selected: isSelected })
         }`}
       >
         {isEditing && (
           <span
             onPointerDown={onGripPointerDown}
-            className={`flex-shrink-0 cursor-grab active:cursor-grabbing touch-none transition-colors ${isSelected ? 'hover:text-accent-raise' : 'text-faint hover:text-muted'}`}
+            className={`flex-shrink-0 cursor-grab active:cursor-grabbing touch-none transition-colors ${isSelected ? 'hover:text-accent-raise' : 'text-subtle hover:text-muted'}`}
             onClick={(e) => e.stopPropagation()}
           >
             <GripVertical size={12} />
@@ -68,21 +68,21 @@ export const PlacedElementRow = memo(function PlacedElementRow({
               className={`transition-colors ${isSelected ? 'hover:text-accent-raise' : 'text-subtle hover:text-raise'}`}
               title={t('altar.duplicateElement')}
             >
-              <Copy size={11} />
+              <Copy size={12} />
             </button>
             <button
               onClick={onToggleLocked}
               className={`transition-colors ${placement.locked ? 'text-warning hover:text-warning' : isSelected ? 'hover:text-accent-raise' : 'text-subtle hover:text-raise'}`}
               title={placement.locked ? t('altar.unlock') : t('altar.lock')}
             >
-              {placement.locked ? <Lock size={11} /> : <Unlock size={11} />}
+              {placement.locked ? <Lock size={12} /> : <Unlock size={12} />}
             </button>
             <button
               onClick={onToggleHidden}
               className={`transition-colors ${placement.hidden ? 'text-soft hover:text-primary' : isSelected ? 'hover:text-accent-raise' : 'text-subtle hover:text-raise'}`}
               title={placement.hidden ? t('altar.show') : t('altar.hide')}
             >
-              {placement.hidden ? <EyeOff size={11} /> : <Eye size={11} />}
+              {placement.hidden ? <EyeOff size={12} /> : <Eye size={12} />}
             </button>
             <Button
               onClick={onRemove}
@@ -90,7 +90,7 @@ export const PlacedElementRow = memo(function PlacedElementRow({
               className="ml-3"
               title={t('altar.removeElement')}
             >
-              <Trash2 size={11} />
+              <Trash2 size={12} />
             </Button>
           </span>
         )}
@@ -175,7 +175,7 @@ export const PlacedElementInspector = memo(function PlacedElementInspector({
     },
   });
 
-  const inputClass = 'w-full rounded border border-edge bg-well px-1.5 py-1 text-[11px] text-secondary outline-none focus:border-edge-raise placeholder:text-faint';
+  const inputClass = 'w-full rounded-md border border-edge bg-well px-1.5 py-1 text-[11px] text-secondary outline-none focus:border-edge-raise placeholder:text-subtle';
 
   const opacityPercent = Math.max(5, Math.min(100, Number(draft.opacity) || 100));
 
@@ -184,7 +184,7 @@ export const PlacedElementInspector = memo(function PlacedElementInspector({
     <fieldset
       disabled={placement.locked}
       title={placement.locked ? t('altar.inspectorLocked') : undefined}
-      className={`min-w-0 rounded border border-edge bg-well px-2 py-1.5 space-y-1.5 ${placement.locked ? 'opacity-50' : ''}`}
+      className={`min-w-0 rounded-md border border-edge bg-well px-2 py-1.5 space-y-1.5 ${placement.locked ? 'opacity-50' : ''}`}
     >
       <div className="grid grid-cols-4 gap-1">
         {([
@@ -194,24 +194,24 @@ export const PlacedElementInspector = memo(function PlacedElementInspector({
           { field: 'scalePercent' as const, label: t('altar.inspectorScale'),    apply: () => applyScalePercent(draft.scalePercent),  unit: '%' },
         ]).map(({ field, label, apply, unit }) => (
           <label key={field} className="space-y-0.5">
-            <span className="text-[10px] uppercase tracking-wider text-subtle">{label}</span>
+            <span className="text-[11px] uppercase tracking-wider text-subtle">{label}</span>
             <div className="relative">
               <input {...bindInput(field, apply)} className={inputClass + (unit ? ' pr-4' : '')} aria-label={field} />
-              {unit && <span className="absolute right-1.5 top-1/2 -translate-y-1/2 text-[10px] text-subtle pointer-events-none">{unit}</span>}
+              {unit && <span className="absolute right-1.5 top-1/2 -translate-y-1/2 text-[11px] text-subtle pointer-events-none">{unit}</span>}
             </div>
           </label>
         ))}
       </div>
       <div className="space-y-1">
         <div className="flex items-center justify-between">
-          <span className="text-[10px] uppercase tracking-wider text-subtle">{t('altar.inspectorOpacity')}</span>
-          <span className="text-[10px] tabular-nums text-soft">{opacityPercent}%</span>
+          <span className="text-[11px] uppercase tracking-wider text-subtle">{t('altar.inspectorOpacity')}</span>
+          <span className="text-[11px] tabular-nums text-soft">{opacityPercent}%</span>
         </div>
         <div className="relative h-4 flex items-center">
           <div className="absolute inset-x-0 h-1 rounded-full bg-well-tint" />
           <div className="absolute left-0 h-1 rounded-full bg-accent-track" style={{ width: `${opacityPercent}%` }} />
           <div
-            className="absolute h-2.5 w-2.5 rounded-full bg-accent border border-accent-edge shadow pointer-events-none"
+            className="absolute h-2.5 w-2.5 rounded-full bg-accent border border-accent-edge shadow-menu pointer-events-none"
             style={{ left: `calc(${opacityPercent}% - 5px)` }}
           />
           <input

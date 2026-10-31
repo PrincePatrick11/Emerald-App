@@ -285,7 +285,7 @@ export default function EditorToolbar({ editor, onInsertImage, onOpenLinkPicker 
       </ToolbarGroup>
 
       {imageError && (
-        <span className="ml-auto text-[10px] text-danger">{imageError}</span>
+        <span className="ml-auto text-[11px] text-danger">{imageError}</span>
       )}
     </div>
   );
@@ -321,11 +321,11 @@ function ToolbarBtn({
       onClick={onClick}
       title={title}
       disabled={disabled}
-      className={`editor-toolbar-btn p-1 rounded-md transition-colors duration-100 ${
+      className={`editor-toolbar-btn p-1 rounded-md transition-colors duration-150 ${
         active
           ? 'editor-toolbar-btn-active bg-well-active text-primary'
           : disabled
-          ? 'editor-toolbar-btn-disabled text-faint cursor-not-allowed'
+          ? 'editor-toolbar-btn-disabled text-subtle opacity-50 cursor-not-allowed'
           : 'editor-toolbar-btn-idle text-subtle hover:text-raise hover:bg-well-raise'
       }`}
     >

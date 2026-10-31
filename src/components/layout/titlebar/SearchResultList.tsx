@@ -28,7 +28,7 @@ export const searchOptionId = (listboxId: string, index: number) => `${listboxId
 
 function kindIcon(kind: SearchKind): ReactNode {
   const Icon = KIND_META[kind].icon;
-  return <Icon size={13} />;
+  return <Icon size={14} />;
 }
 
 /**

@@ -30,14 +30,14 @@ function SectionHeader({ label, count }: { label: string; count: number }) {
   return (
     <div className="flex items-center gap-2 mt-5 mb-2 first:mt-0">
       <p className="text-xs font-semibold uppercase tracking-wider text-subtle">{label}</p>
-      <span className="text-xs text-faint">{count}</span>
+      <span className="text-xs text-subtle">{count}</span>
     </div>
   );
 }
 
 function SubSectionHeader({ label }: { label: string }) {
   return (
-    <p className="text-xs text-faint italic mt-3 mb-1.5 pl-1">{label}</p>
+    <p className="text-xs text-subtle italic mt-3 mb-1.5 pl-1">{label}</p>
   );
 }
 
@@ -59,8 +59,8 @@ function SelectCheckbox({ selected, onToggle }: { selected: boolean; onToggle: (
       className="flex-shrink-0 text-subtle hover:text-accent-raise transition-colors"
     >
       {selected
-        ? <CheckSquare size={15} className="text-accent" />
-        : <Square size={15} />}
+        ? <CheckSquare size={14} className="text-accent" />
+        : <Square size={14} />}
     </button>
   );
 }
@@ -74,7 +74,7 @@ function useDaysLeft(deletedAt: string): number | null {
 
 function DaysLeft({ days, t }: { days: number; t: ItemSharedProps['t'] }) {
   return (
-    <span className={days <= 3 ? 'text-danger' : 'text-faint'}>
+    <span className={days <= 3 ? 'text-danger' : 'text-subtle'}>
       {t('trash.daysLeft', { count: days })}
     </span>
   );
@@ -99,7 +99,7 @@ function ItemRow({ item, confirmingId, setConfirmingId, restore, deleteNow, sele
       {typeIcon(item.type)}
       <div className="flex-1 min-w-0">
         <div className="text-sm text-soft truncate">{item.title}</div>
-        <div className="text-xs text-faint mt-0.5">
+        <div className="text-xs text-subtle mt-0.5">
           {t('trash.deletedAgo', { time: formatTimeDistance(item.deleted_at) })}
           {daysLeft !== null && (
             <>
@@ -149,7 +149,7 @@ function ItemCard({ item, confirmingId, setConfirmingId, restore, deleteNow, sel
           {item.title}
         </p>
       </div>
-      <div className="text-xs text-faint">
+      <div className="text-xs text-subtle">
         {t('trash.deletedAgo', { time: formatTimeDistance(item.deleted_at) })}
       </div>
       {daysLeft !== null && (
@@ -443,7 +443,7 @@ export default function TrashView() {
 
   const renderTrashContent = () => (
     <>
-      {loading && <p className="text-sm text-faint">{t('common.loading')}</p>}
+      {loading && <p className="text-sm text-subtle">{t('common.loading')}</p>}
 
       {!loading && items.length === 0 && (
         <EmptyState
@@ -459,7 +459,7 @@ export default function TrashView() {
 
       {!loading && matching.length > 0 && (
         <div className="space-y-1">
-          <p className="text-xs text-faint mb-3">
+          <p className="text-xs text-subtle mb-3">
             {retentionDays === null ? t('trash.retentionNoteNever') : t('trash.retentionNote', { count: retentionDays })}
           </p>
           {trashPrefs.grouping === 'grouped' && trashPrefs.view !== 'timeline' && renderGrouped(trashPrefs.view)}

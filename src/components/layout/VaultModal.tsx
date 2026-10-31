@@ -34,7 +34,7 @@ interface Props {
 
 const INPUT_CLASS = 'input-field flex-1 min-w-0 rounded-lg px-2.5 py-1.5 text-sm outline-none';
 const CHECKBOX_CLASS =
-  'mt-0.5 w-4 h-4 shrink-0 rounded border flex items-center justify-center transition-colors ' +
+  'mt-0.5 w-4 h-4 shrink-0 rounded-md border flex items-center justify-center transition-colors ' +
   'peer-focus-visible:ring-2 peer-focus-visible:ring-focus';
 
 /** The one open editor, if any — edit, delete confirmation and the create row
@@ -226,7 +226,7 @@ function DeleteConfirmRow({
             deleteFiles ? 'bg-accent-wash-strong border-accent-edge' : 'border-edge-strong hover:border-edge-raise'
           }`}
         >
-          {deleteFiles && <Check size={10} className="text-accent" />}
+          {deleteFiles && <Check size={12} className="text-accent" />}
         </span>
         <span className="min-w-0">
           {t('vault.deleteFiles')}

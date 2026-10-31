@@ -24,7 +24,8 @@ Three jobs, on every push to `main` or a version branch and on every pull reques
 3. `npm run check:blocks` (`scripts/check-blocks.mjs`) — the stored block format in `src/lib/blocks/blockHtml.ts` round-trips and runs under Node without a DOM
 4. `npm run check:docs` (`scripts/check-docs.mjs`) — every relative link in `README.md`, `AGENTS.md`, `CONTRIBUTING.md`, `CHANGELOG.md`, `Documentation/` and `tools/` points to an existing file and, with `#anchor`, to an existing heading, and a repository path in backticks exists
 5. `npm run check:english` (`scripts/check-english.mjs`) — no German in code comments, or anywhere in `scripts/` and the workflows. It looks for umlauts and typical words, so it can miss some; `lang-ok` on a line exempts German test data
-6. `npm run build` — `tsc && vite build --configLoader runner`, so it carries the typecheck
+6. `npm run check:colors` (`scripts/check-colors.mjs`) — no raw Tailwind palette classes in `src/`; colours come from the theme tokens.
+7. `npm run build` — `tsc && vite build --configLoader runner`, so it carries the typecheck
 
 **`rust`** (matrix: `ubuntu-22.04`, `macos-15`, `windows-latest`): `cargo check --manifest-path src-tauri/Cargo.toml --locked --all-targets`, and the same again with `--features devbridge`, since the [dev bridge](security.md#the-dev-bridge) is in no build by default and the first check never sees it. Then `cargo clippy` with `-D warnings`, without the bridge. It uses the stable toolchain, so a new Rust release can bring a new lint and turn CI red without a code change: fix it or allow it where it occurs.
 

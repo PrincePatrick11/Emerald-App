@@ -91,7 +91,7 @@ export default function TagInput({ tags, onChange, readOnly = false, chipSize = 
   }
 
   const menu = open && (input || suggestions.length > 0) && (
-    <div className="absolute top-full left-0 mt-1 z-50 bg-well-solid border border-edge-default rounded-lg shadow-xl min-w-[160px] py-1">
+    <div className="absolute top-full left-0 mt-1 z-50 bg-well-solid border border-edge-default rounded-lg shadow-menu min-w-[160px] py-1">
       {suggestions.map((t) => (
         <button
           key={t.id}

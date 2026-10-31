@@ -166,12 +166,12 @@ function BlockManager({ session }: { session: BlockSession }) {
         {/* Set off below a line: the buttons belong to the list but are not rows in it. */}
         <div className="sidebar-section-actions">
           <button type="button" className="sidebar-section-button" onClick={openAddMenu}>
-            <Plus size={13} className="flex-shrink-0" />
+            <Plus size={14} className="flex-shrink-0" />
             <span className="min-w-0 truncate">{t('blocks.add')}</span>
           </button>
           {session.templates && (
             <button type="button" className="sidebar-section-button" onClick={api.openTemplatePicker}>
-              <CopyPlus size={13} className="flex-shrink-0" />
+              <CopyPlus size={14} className="flex-shrink-0" />
               <span className="min-w-0 truncate">{t('templates.insert.button')}</span>
             </button>
           )}
@@ -220,7 +220,7 @@ function ManagerRow({
       <div
         onContextMenu={(e) => { e.preventDefault(); onOpenMenu(e); }}
         // 32px tall, 13px and 14px icons like the other rows of the sidebar.
-        className={`w-full flex items-center gap-2 h-8 rounded border pl-1 pr-1 text-[13px] transition-all select-none ${
+        className={`w-full flex items-center gap-2 h-8 rounded-md border pl-1 pr-1 text-[13px] transition-all select-none ${
           // Without a border as long as it is neither selected nor dragged; the
           // states above it are shared with the altar's elements.
           isDragging || selected ? sidebarRowStateClasses({ dragging: isDragging, selected }) : 'block-manager-row--idle'

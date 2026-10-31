@@ -12,7 +12,7 @@ export const ENTRY_TITLE_HEADING_CLASSES = 'entry-view-title text-2xl font-semib
 
 /** The title line as an input: entries when editing, the altar and the libraries' pages (`LibraryPageFrame`). */
 export const ENTRY_TITLE_INPUT_CLASSES =
-  `${ENTRY_TITLE_HEADING_CLASSES} w-full bg-transparent placeholder:text-faint outline-none selectable`;
+  `${ENTRY_TITLE_HEADING_CLASSES} w-full bg-transparent placeholder:text-subtle outline-none selectable`;
 
 /**
  * The narrow row above the title: on the left the way back to the overview

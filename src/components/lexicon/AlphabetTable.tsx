@@ -58,17 +58,17 @@ export default function AlphabetTable({ language }: { language: Language }) {
     <section className="max-w-4xl mt-10">
       <div className="flex items-center gap-2 mb-1">
         <p className="label-xs">{t('lexicon.alphabet')}</p>
-        <span className="text-xs text-faint">({filled.length})</span>
+        <span className="text-xs text-subtle">({filled.length})</span>
         <span className="flex-1" />
         <Button tone="jade" small onClick={() => setRows((current) => [...current, { key: generateId(), from: '', to: '' }])}>
           <Plus size={12} />
           {t('lexicon.addLetter')}
         </Button>
       </div>
-      <p className="text-xs text-faint mb-3">{t('lexicon.alphabetHint')}</p>
+      <p className="text-xs text-subtle mb-3">{t('lexicon.alphabetHint')}</p>
 
       {rows.length === 0 ? (
-        <p className="text-sm text-faint">{t('lexicon.noLetters')}</p>
+        <p className="text-sm text-subtle">{t('lexicon.noLetters')}</p>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
           {rows.map((row) => (
@@ -85,7 +85,7 @@ export default function AlphabetTable({ language }: { language: Language }) {
                 onBlur={() => save(rows)}
                 onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }}
               />
-              <ArrowRight size={12} className="text-faint flex-shrink-0" aria-hidden="true" />
+              <ArrowRight size={12} className="text-subtle flex-shrink-0" aria-hidden="true" />
               <input
                 className={`${OP_PROP_SELECT_CLASSES} selectable text-center`}
                 value={row.to}

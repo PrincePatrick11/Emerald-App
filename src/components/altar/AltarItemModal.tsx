@@ -123,7 +123,7 @@ export function AltarItemModal({
             trigger={({ toggle }) => (
               <button onClick={toggle} className="w-full flex items-center gap-2 bg-well-strong rounded-lg px-3 py-2 text-sm hover:bg-well-raise transition-colors">
                 {imageSrc(editImageData)
-                  ? <img src={imageSrc(editImageData)} alt="" className="w-6 h-6 object-contain rounded" />
+                  ? <img src={imageSrc(editImageData)} alt="" className="w-6 h-6 object-contain rounded-md" />
                   : <span className="text-xl">{editEmoji || getCategoryEmoji(editCategory)}</span>}
                 <span className="text-xs text-subtle">{t('altar.chooseEmoji')}</span>
               </button>

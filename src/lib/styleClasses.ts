@@ -1,6 +1,6 @@
 export const OP_PROP_SELECT_CLASSES =
   'op-prop-select w-full bg-well-strong rounded-md px-3 py-1.5 text-xs text-soft outline-none ' +
-  'border border-edge focus:border-edge-strong transition-colors placeholder:text-faint';
+  'border border-edge focus:border-edge-strong transition-colors placeholder:text-subtle';
 
 /**
  * The surface of a row in the sidebar lists with a handle — the altar's

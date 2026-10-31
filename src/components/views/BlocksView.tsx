@@ -152,7 +152,7 @@ function BuiltInBlocksSection({ query }: { query: string }) {
           {/* Deliberately the small line instead of `NoResults`: the list only
               becomes empty through the search, and the large "No results" is already above. */}
           {presets.length === 0
-            ? <p className="text-xs text-faint px-1 py-1">{t('search.noResults')}</p>
+            ? <p className="text-xs text-subtle px-1 py-1">{t('search.noResults')}</p>
             : (
               // Tiles with a frame, but without hover and pointer: nothing can
               // be created or opened on them, they only show what exists.

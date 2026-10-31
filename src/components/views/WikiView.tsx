@@ -252,7 +252,7 @@ export default function WikiView() {
     const renderArticle = (a: typeof articles[0]) => {
       const cat = lookupCategory(catById, a.category_id);
       const icon = entryIcon('wiki', a, cat);
-      const iconEl = isImageIcon(icon) ? <img src={icon} alt="" className="w-5 h-5 object-cover rounded inline" /> : icon;
+      const iconEl = isImageIcon(icon) ? <img src={icon} alt="" className="w-5 h-5 object-cover rounded-md inline" /> : icon;
       // No fallback to the raw category_id: for a deleted category its id
       // would otherwise appear here as the label (as in OperationsView it is then omitted).
       const catLabel = categoryLabel(t, cat);
@@ -272,7 +272,7 @@ export default function WikiView() {
           {isCardView(view) ? (
             <>
               <div className="flex items-center gap-2 mb-2">
-                {isImageIcon(icon) ? <img src={icon} alt="" className="w-6 h-6 object-cover rounded" /> : <span className="text-xl">{icon}</span>}
+                {isImageIcon(icon) ? <img src={icon} alt="" className="w-6 h-6 object-cover rounded-md" /> : <span className="text-xl">{icon}</span>}
               </div>
               {renaming
                 ? renameInput('text-sm font-medium text-secondary w-full bg-transparent outline-none selectable mb-1')

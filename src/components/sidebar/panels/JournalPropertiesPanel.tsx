@@ -43,7 +43,7 @@ export default function JournalPropertiesPanel() {
   const entry = activeView.id ? entries.find((e) => e.id === activeView.id) : null;
 
   if (!entry) {
-    return <p className="text-xs text-faint px-2 py-3">{t('properties.noEntry')}</p>;
+    return <p className="text-xs text-subtle px-2 py-3">{t('properties.noEntry')}</p>;
   }
 
   const phase = entryMoonPhase(entry, showMoonPhase);

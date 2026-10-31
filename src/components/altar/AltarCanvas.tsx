@@ -635,9 +635,9 @@ const PlacedItem = memo(function PlacedItem({ placement, editable, selected, rot
       <div style={{ opacity: placement.opacity ?? 1 }}>
         <AltarItemVisual item={placement} size={Math.max(displayWidth, displayHeight)} candleAnimate={isCandleEmoji(placement.emoji)} />
       </div>
-      {(selected || (editable && hovered)) && <span className="absolute inset-0 rounded border border-accent-edge pointer-events-none" />}
+      {(selected || (editable && hovered)) && <span className="absolute inset-0 rounded-md border border-accent-edge pointer-events-none" />}
       {editable && isRotating && (
-        <span style={{ top: tooltipTopOffset, fontSize: Math.round(14 / safeScale), padding: `${Math.round(4 / safeScale)}px ${Math.round(10 / safeScale)}px` }} className="absolute left-1/2 -translate-x-1/2 rounded bg-overlay border border-accent-edge font-semibold text-on-accent shadow-lg pointer-events-none whitespace-nowrap">
+        <span style={{ top: tooltipTopOffset, fontSize: Math.round(14 / safeScale), padding: `${Math.round(4 / safeScale)}px ${Math.round(10 / safeScale)}px` }} className="absolute left-1/2 -translate-x-1/2 rounded-md bg-overlay border border-accent-edge font-semibold text-on-accent shadow-menu pointer-events-none whitespace-nowrap">
           {Math.round((placement.rotation ?? 0) * 10) / 10}°
         </span>
       )}

@@ -75,17 +75,17 @@ export default function LinkPickerModal({ onSelect, onClose }: Props) {
         {/* Search */}
         <div className="px-4 py-2.5 border-b border-edge flex-shrink-0">
           <div className="flex items-center gap-2 bg-well-solid rounded-lg px-3 py-1.5">
-            <Search size={13} className="text-subtle shrink-0" />
+            <Search size={14} className="text-subtle shrink-0" />
             <input
               ref={searchRef}
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder={t('linkPicker.searchPlaceholder')}
-              className="flex-1 bg-transparent text-sm text-secondary placeholder:text-faint outline-none"
+              className="flex-1 bg-transparent text-sm text-secondary placeholder:text-subtle outline-none"
             />
             {query && (
-              <button onClick={() => setQuery('')} className="text-faint hover:text-muted">
-                <X size={11} />
+              <button onClick={() => setQuery('')} className="text-subtle hover:text-muted">
+                <X size={12} />
               </button>
             )}
           </div>
@@ -116,7 +116,7 @@ export default function LinkPickerModal({ onSelect, onClose }: Props) {
               }`}
             >
               {tab.icon}
-              <span className={`link-picker-tab-count ${activeTab === tab.id ? 'text-accent' : 'text-faint'}`}>
+              <span className={`link-picker-tab-count ${activeTab === tab.id ? 'text-accent' : 'text-subtle'}`}>
                 {tab.count}
               </span>
             </button>
@@ -126,7 +126,7 @@ export default function LinkPickerModal({ onSelect, onClose }: Props) {
         {/* Results list */}
         <div className="flex-1 overflow-y-auto p-2">
           {filtered.length === 0 ? (
-            <div className="flex items-center justify-center h-24 text-sm text-faint">
+            <div className="flex items-center justify-center h-24 text-sm text-subtle">
               {t('linkPicker.noResults')}
             </div>
           ) : (
@@ -155,13 +155,13 @@ export default function LinkPickerModal({ onSelect, onClose }: Props) {
                     <span className="link-picker-label flex-1 text-secondary truncate">{item.label}</span>
 
                     {/* Type badge */}
-                    <span className="text-xs text-faint flex-shrink-0 flex items-center gap-1 group-hover:text-subtle">
-                      <TypeIcon size={10} />
+                    <span className="text-xs text-subtle flex-shrink-0 flex items-center gap-1 group-hover:text-subtle">
+                      <TypeIcon size={12} />
                       <span className="capitalize">{t(ENTRY_TYPE_LABEL_KEYS[item.entryType])}</span>
                     </span>
 
                     {item.entry_number != null && (
-                      <span className="text-xs text-faint flex-shrink-0">#{item.entry_number}</span>
+                      <span className="text-xs text-subtle flex-shrink-0">#{item.entry_number}</span>
                     )}
                   </button>
                 );

@@ -121,7 +121,7 @@ export default function EmojiDefaultsSection() {
               // Keyboard: Enter/Space removes like a click. Pointer clicks are
               // handled by `onPointerUp`; `detail === 0` means triggered by key.
               onClick={(e) => { if (e.detail === 0) remove(index); }}
-              className={`emoji-picker-item text-xl w-9 h-9 flex items-center justify-center rounded transition-colors touch-none disabled:opacity-50 disabled:cursor-default ${
+              className={`emoji-picker-item text-xl w-9 h-9 flex items-center justify-center rounded-md transition-colors touch-none disabled:opacity-50 disabled:cursor-default ${
                 draggingIndex === index ? 'emoji-picker-item-active cursor-grabbing' : 'emoji-picker-item-idle cursor-grab'
               }`}
             >
@@ -135,7 +135,7 @@ export default function EmojiDefaultsSection() {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder={t('common.searchEmoji')}
-            className="emoji-picker-search flex-1 min-w-0 rounded px-2 py-1 text-xs outline-none"
+            className="emoji-picker-search flex-1 min-w-0 rounded-md px-2 py-1 text-xs outline-none"
           />
           {stored !== null && (
             <Button variant="secondary" onClick={() => update('emojis', { defaults: null })} className="shrink-0">
@@ -159,7 +159,7 @@ export default function EmojiDefaultsSection() {
                     disabled={added}
                     aria-label={t('settings.emojiAdd', { emoji })}
                     onClick={() => save([...current, emoji])}
-                    className={`emoji-picker-item text-xl w-9 h-9 flex items-center justify-center rounded transition-colors ${
+                    className={`emoji-picker-item text-xl w-9 h-9 flex items-center justify-center rounded-md transition-colors ${
                       added ? 'emoji-picker-item-active cursor-default' : 'emoji-picker-item-idle'
                     }`}
                   >

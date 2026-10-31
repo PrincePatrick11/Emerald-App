@@ -69,7 +69,7 @@ function TagColorDot({ color, onPick }: { color: string; onPick?: (color: string
         {dot}
       </button>
       {open && (
-        <div className="tag-color-popover absolute left-0 top-full mt-1.5 z-50 bg-well-solid border border-edge-default rounded-lg shadow-xl p-2 flex flex-wrap gap-1.5 w-40">
+        <div className="tag-color-popover absolute left-0 top-full mt-1.5 z-50 bg-well-solid border border-edge-default rounded-lg shadow-menu p-2 flex flex-wrap gap-1.5 w-40">
           {TAG_COLORS.map((c) => (
             <button
               key={c}
@@ -343,7 +343,7 @@ export default function TagsView() {
           label={tag.name}
           meta={usage
             ? <ModuleCounts modules={TAG_MODULE_IDS} counts={usage} />
-            : <span className="text-xs text-faint">
+            : <span className="text-xs text-subtle">
                 {templateUsage.has(tag.id) ? t('tags.onlyInTemplates') : t('tags.unused')}
               </span>}
           actions={
@@ -426,7 +426,7 @@ export default function TagsView() {
         mode: 'category',
         groups,
         renderGroupHeader: renderTagHeader,
-        renderEmptyGroup: () => <p className="text-xs text-faint px-1 py-1">{t('tags.unusedHint')}</p>,
+        renderEmptyGroup: () => <p className="text-xs text-subtle px-1 py-1">{t('tags.unusedHint')}</p>,
         isGroupCollapsed: groupCollapsed,
         // The selection above has already decided which tags are shown — an
         // unused tag is still one without search and filter.

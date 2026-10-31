@@ -276,7 +276,7 @@ export default function JournalView() {
               {!renaming && visibleTags(e.tags, tagMap).length > 0 && (
                 <div className="flex flex-wrap gap-1 mt-2">
                   {visibleTags(e.tags, tagMap).slice(0, 3).map((tag) => (
-                    <span key={tag.id} className="px-1.5 py-0.5 rounded text-xs bg-well-raise text-subtle">{tag.name}</span>
+                    <span key={tag.id} className="px-1.5 py-0.5 rounded-md text-xs bg-well-raise text-subtle">{tag.name}</span>
                   ))}
                 </div>
               )}

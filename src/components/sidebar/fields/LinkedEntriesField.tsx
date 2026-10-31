@@ -201,8 +201,8 @@ export default function LinkedEntriesField({ content }: Props) {
               <>
                 <LinkItemIcon item={item} />
                 <span className="flex-1 truncate">{item.label}</span>
-                <TypeIcon size={12} className="text-faint flex-shrink-0" />
-                <span className="text-faint flex-shrink-0">{t(ENTRY_TYPE_LABEL_KEYS[item.entryType])}</span>
+                <TypeIcon size={12} className="text-subtle flex-shrink-0" />
+                <span className="text-subtle flex-shrink-0">{t(ENTRY_TYPE_LABEL_KEYS[item.entryType])}</span>
               </>
             );
           }}

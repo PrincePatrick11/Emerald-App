@@ -201,7 +201,7 @@ export default function HomeView() {
                     <BookOpen size={12} />
                     {t('nav.journal')}
                   </h2>
-                  <span className="text-xs text-faint group-hover:text-muted transition-colors">{t('home.viewAll')}</span>
+                  <span className="text-xs text-subtle group-hover:text-muted transition-colors">{t('home.viewAll')}</span>
                 </button>
                 <div className="ml-auto flex-shrink-0">
                   <SectionToolbar prefs={homeJournalPrefs} setPrefs={setHomeJournalPrefs} />
@@ -264,7 +264,7 @@ export default function HomeView() {
                     <Wand2 size={12} />
                     {t('nav.operations')}
                   </h2>
-                  <span className="text-xs text-faint group-hover:text-muted transition-colors">{t('home.viewAll')}</span>
+                  <span className="text-xs text-subtle group-hover:text-muted transition-colors">{t('home.viewAll')}</span>
                 </button>
                 <div className="ml-auto flex-shrink-0">
                   <SectionToolbar prefs={homeOpsPrefs} setPrefs={setHomeOpsPrefs} />
@@ -286,7 +286,7 @@ export default function HomeView() {
                         onContextMenu={(e) => openCtx(e, { kind: 'operation', id: op.id })}
                       >
                         {isImageIcon(icon)
-                          ? <img src={icon} alt="" className="w-6 h-6 object-cover rounded flex-shrink-0" />
+                          ? <img src={icon} alt="" className="w-6 h-6 object-cover rounded-md flex-shrink-0" />
                           : <span className="text-xl">{icon}</span>
                         }
                         <div className="flex-1 min-w-0">
@@ -313,7 +313,7 @@ export default function HomeView() {
                         onContextMenu={(e) => openCtx(e, { kind: 'operation', id: op.id })}
                       >
                         {isImageIcon(icon)
-                          ? <img src={icon} alt="" className="w-6 h-6 object-cover rounded mb-1" />
+                          ? <img src={icon} alt="" className="w-6 h-6 object-cover rounded-md mb-1" />
                           : <div className="text-lg mb-1">{icon}</div>
                         }
                         {itemTitle('operation', op.id, op.title)}
@@ -335,7 +335,7 @@ export default function HomeView() {
                     <Library size={12} />
                     {t('nav.wiki')}
                   </h2>
-                  <span className="text-xs text-faint group-hover:text-muted transition-colors">{t('home.viewAll')}</span>
+                  <span className="text-xs text-subtle group-hover:text-muted transition-colors">{t('home.viewAll')}</span>
                 </button>
                 <div className="ml-auto flex-shrink-0">
                   <SectionToolbar prefs={homeWikiPrefs} setPrefs={setHomeWikiPrefs} />
@@ -360,7 +360,7 @@ export default function HomeView() {
                         onContextMenu={(e) => openCtx(e, { kind: 'wiki', id: article.id })}
                       >
                         {isImageIcon(icon)
-                          ? <img src={icon} alt="" className="w-6 h-6 object-cover rounded flex-shrink-0" />
+                          ? <img src={icon} alt="" className="w-6 h-6 object-cover rounded-md flex-shrink-0" />
                           : <span className="text-xl flex-shrink-0">{icon}</span>
                         }
                         <div className="flex-1 min-w-0">
@@ -388,7 +388,7 @@ export default function HomeView() {
                         onContextMenu={(e) => openCtx(e, { kind: 'wiki', id: article.id })}
                       >
                         {isImageIcon(icon)
-                          ? <img src={icon} alt="" className="w-6 h-6 object-cover rounded mb-1" />
+                          ? <img src={icon} alt="" className="w-6 h-6 object-cover rounded-md mb-1" />
                           : <div className="text-lg mb-1">{icon}</div>
                         }
                         {itemTitle('wiki', article.id, article.title)}
