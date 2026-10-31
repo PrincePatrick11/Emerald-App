@@ -20,6 +20,12 @@ For the *components* (which shared building blocks exist, when to use them) see 
 
 **Red means destructive, nothing else.** Via `Button variant="danger"` or `tone="danger"`, not via a per-site red treatment of its own.
 
+**Text holds 4.5:1 against its surface, in both themes.** Icons, control borders and focus rings that carry meaning hold 3:1. Pairs that miss this today are [Open Point 11](#open-points).
+
+**A new component adds its tokens to both theme files in the same commit.** It uses the general tokens first and adds its own only where a value really differs. Theme rules in `index.css` take tokens, not hex literals.
+
+**Tokens are the contract with a theme.** A theme sets colours, and it may choose radius and fonts from what the app ships. Spacing and layout stay fixed in every theme, so that any theme still works and still reads as Emerald. Custom themes do not exist yet; they need [Open Point 2](#open-points) resolved first.
+
 ### Typography
 
 - **UI**: `font-sans` — Inter by default, switchable in settings.
@@ -27,7 +33,21 @@ For the *components* (which shared building blocks exist, when to use them) see 
 - Applied through `data-ui-font`/`data-editor-font` on `<html>`, never through a direct `font-family` in a component.
 - Eight selectable fonts ship with the app — nothing is fetched from the network. `src/fonts.css` is **generated** (`npm run fonts`) and never edited by hand; another font or weight means the `FONTS` list in `scripts/make-fonts-css.mjs`, the package in `package.json`, **and** `FONT_OPTIONS` in `src/themes/theme.ts` — all three or none. See [Font System](architecture/appearance.md#font-system).
 - `public/splash.css` (the loading screen's styles, see [Loading Screen and Boot Order](architecture/shell.md#loading-screen-and-boot-order)) holds hand-kept copies: `--splash-bg` / `--splash-gem` / `--splash-text` mirror `--shell-bg` / `--accent` / `--text-subtle` from `src/themes/*.css` — change one, update the other. `--splash-bg` is copied once more as `backgroundColor` in `src-tauri/tauri.conf.json` and the three `tauri.{windows,macos,linux}.conf.json` (never `tauri.dev.conf.json` — see [Per-platform Tauri configs](build.md#per-platform-tauri-configs)), so the window's pre-paint frame is dark instead of white.
-- `font-mono` does not resolve to its configured font, see [Open Points](#open-points).
+- `font-mono` is the system's monospace, for inline code and recovery keys only. No monospace font is bundled ([Open Point 7](#open-points)).
+
+Size is a fixed scale. 11px is the floor; weights are 400, 500 and 600, and bold is for headings and `.label-xs`, not for emphasis in running UI text. Digits that line up in columns get `tabular-nums`.
+
+| Style | Size / line | Weight | Font | For |
+| --- | --- | --- | --- | --- |
+| `text-2xl` | 24 / 32 | 600 | editor | entry and dashboard titles (`.entry-view-title`) |
+| `text-lg` | 18 / 28 | 600 | editor | empty-state title |
+| `text-sm` | 14 / 20 | 400 | UI | list rows, modal text |
+| `text-[13px]` | 13 / 18 | 400 | UI | sidebar values, empty-state sentence |
+| `text-xs` | 12 / 16 | 400–500 | UI | buttons and menu items (500), dates and counts (400) |
+| `.label-xs` | 12 / 16 | 600 | UI | uppercase section headings |
+| `text-[11px]` | 11 / 14 | 600 | UI | `tone` buttons, dense meta rows |
+
+Editor text is 17px by default (14–22 in settings) with `leading-relaxed`; its headings are `em`-sized so they grow with it.
 
 ### Border Radius
 
@@ -43,6 +63,21 @@ Four steps, each with a responsibility. Not chosen by feel:
 `rounded-sm` stays reserved for decorative miniature surfaces below ~16px (colour swatch, resize handle, image thumbnail) — `rounded-md` would be visibly too round there. It is not a general step.
 
 What decides is **what an element is**, not how large it is: `ContextMenu` and `UndoToast` are both small floating overlays and therefore belong on the same step (`lg`).
+
+Bare `rounded` (4px) is not a step; it becomes `rounded-md`.
+
+### Depth
+
+Four levels. Only what floats casts a shadow.
+
+| Level | What | Surface | Shadow |
+| --- | --- | --- | --- |
+| 0 | frame | `--shell-bg` | none |
+| 1 | sheet and panels | `--sheet-bg`, `--panel-bg`, with an edge | none |
+| 2 | menu, popover, toast | `--menu-bg`, with an edge | `--menu-shadow` |
+| 3 | modal | `--bg-surface-2`, with an edge | `shadow-2xl` |
+
+Stacking is `z-10` within a column, `z-50` for modals and `z-[9999]` for overlays, nothing else.
 
 ### Icon Sizes
 
@@ -79,7 +114,7 @@ Size tokens in both theme files: `--tab-pill-h` (30px, `TabBar`), `--control-h` 
 
 **Horizontal padding has exactly one source per column.** The column's outer container sets it; the panels inside add no `px-*` of their own. In the right sidebar that is `SidebarColumn`'s scrolling body (`p-3`, with a comment in place) — if a panel adds its own padding again, its rows end up visibly indented differently from the button in the action bar above them.
 
-There is no enforced spacing scale. Observed practice: `px-8` for main-area content columns (`Dashboard`'s content, `EntryDetailFrame`), `px-3`/`p-3` in the sidebars, `px-4 py-3` through `px-5 py-4` in modal headers and bodies.
+**Spacing scale:** 2, 4, 6, 8, 10, 12, 16, 20, 24 and 32px (Tailwind `0.5`, `1`, `1.5`, `2`, `2.5`, `3`, `4`, `5`, `6`, `8`). `2.5` is for icon-to-label in menu and list rows. An arbitrary value needs a comment. Usual places: `px-8` for main-area content columns (`Dashboard`'s content, `EntryDetailFrame`), `px-3`/`p-3` in the sidebars, `px-4 py-3` through `px-5 py-4` in modal headers and bodies.
 
 ### States
 
@@ -91,6 +126,10 @@ There is no enforced spacing scale. Observed practice: `px-8` for main-area cont
 
 **Active/inactive toggles use `Button`'s `tone` mode**, not a ternary in the `className` template. The base variants (`primary`/`secondary`/`ghost`/`danger`) have no active state; `tone` does. Documented exceptions: `EditorToolbar`'s `ToolbarBtn` and `AltarCanvas`'s drag handles — neither is a generic action button.
 
+**Hover changes the surface, active also changes the meaning.** Active shows jade; something merely hovered stays neutral (`--interactive-hover`).
+
+**Motion:** 150ms for colour changes and hover (`transition-colors duration-150`), 200ms for what changes the room, such as sidebars and fades. Nothing bounces or blinks for attention; dragging tabs is the exception.
+
 **Animations respect `prefers-reduced-motion`** and live as a class in the stylesheet, never as an inline style: an inline style beats every rule in the stylesheet and with it the opt-out.
 
 ---
@@ -101,7 +140,7 @@ Where the code contradicts the rules above today. No prioritisation — each poi
 
 **1. The primary colour is maintained independently in three places.** The `jade` Tailwind scale (`tailwind.config.js`), the per-theme `--accent` variables, and the bridge overrides in `index.css` that set yet another set of values for `.btn-primary` and friends (the `html[data-theme='emerald-noctis'] .btn-primary` and `html[data-theme='emerald-parchment'] .btn-primary` rule groups). Noctis's `--accent: #00c47f` happens to be exactly `jade-600`; Parchment's `#008a57` sits between no two steps of the scale. *Cost: move the bridge overrides onto `var(--accent*)` and check that the layer ordering still holds.*
 
-**2. Roughly 530 raw colour utilities across ~67 `.tsx` files** (grep over `src/**/*.tsx` for a colour-utility prefix — `bg-`, `text-`, `border-`, `ring-`, … — followed by `stone|jade|red|amber|parchment` and a step). The largest single item, and the reason point 1 exists at all. *Cost: not doable in one pass — sensible only file by file or module by module, each verified in both themes.*
+**2. 528 raw colour utilities across 67 `.tsx` files** (grep over `src/**/*.tsx` for a colour-utility prefix — `bg-`, `text-`, `border-`, `ring-`, … — followed by `stone|jade|red|amber|parchment` and a step). The largest single item, and the reason point 1 exists at all. *Cost: not doable in one pass — sensible only file by file or module by module, each verified in both themes.*
 
 **3. `amber` is a second accent tone with no theme equivalent.** It comes from Tailwind's default palette, not from an `--accent-*` variable and not from the `parchment` scale. Emerald Parchment needs its own overrides on the underlying utility classes (`.bg-amber-900\/30` and others). Uses beyond the edit action, without a deviation comment: the lock indicator in `PlacedElementRow` (`text-amber-400`), and `tone="amber"` on the Storage page's scan button and the Updates page's check button. *Cost: one token pair in both theme files, then switch `TONE_CLASSES` over.*
 
@@ -111,13 +150,23 @@ Where the code contradicts the rules above today. No prioritisation — each poi
 
 **6. Radius-rule violations.** `UndoToast` carries `rounded-xl` (a floating overlay on the surface step); `.sidebar-item` in `index.css` is a list row on `rounded-lg` instead of `rounded-md`. *Cost: one line each.*
 
-**7. `JetBrains Mono` is dead config.** Declared as `font-mono` in `tailwind.config.js` (`theme.extend.fontFamily.mono`) but not among the bundled fonts (`src/fonts.css`). The one site using `font-mono` — inline code in the editor (`.tiptap code`) — falls back to the system monospace. *Cost: either load it or strike it from the config — open because it is unclear whether a dedicated monospace font is needed.*
+**7. `JetBrains Mono` is dead config.** Declared as `font-mono` in `tailwind.config.js` (`theme.extend.fontFamily.mono`) but not among the bundled fonts (`src/fonts.css`). `font-mono` — inline code in the editor (`.tiptap code`), `RecoveryKeyBox`, `BackupUnlockDialog`, `VaultKeyDialog` — falls back to the system monospace, which is what the rule asks for. *Cost: strike it from the config.*
 
 **8. Emerald Noctis lacks the generic focus rule.** Parchment has `html[data-theme='emerald-parchment'] button:focus-visible`; Noctis only has per-class patches (e.g. `.window-control`, `.rail-button`, `.menu-item`, and the shared group starting at `.filter-row:focus-visible` in `@layer components`). The base `Button` variants and any plain `<button>` written directly in a view still look unfocused in Noctis. *Cost: one rule, mirrored from Parchment.*
 
 **9. The entry actions live exclusively in a collapsible surface.** Edit/Done/Delete/Cancel exist only in the right sidebar. Collapsing it mid-edit leaves no visible way back; there is no keyboard fallback. *Switching* into edit mode expands it automatically (`uiStore.ts`, driven by the registry's `usesEditorSidebar`) — that covers entry, not later collapsing. Mitigated, not fixed: both sidebars can also be reopened from the View menu. *Cost: keyboard shortcuts for Edit/Done/Cancel, or a second home for the actions.*
 
 **10. `LinkPickerModal`'s six tabs are a hand-written button, not `TabIconButton`.** `TabIconButton`'s active state is wired to the stone tone the sidebars use; the picker needs the jade tone the modal is themed in, and the component has no tone variant for that yet. The deviation is commented at the definition (`LinkPickerModal.tsx`). *Cost: add a `tone` prop to `TabIconButton`, then switch the picker over.*
+
+**11. Contrast below the rule** (measured against the sheet or the surface named). Noctis: `--text-subtle` 3.71:1. Parchment: date text `text-parchment-500/70` on `--panel-bg` about 1.8:1 (see point 4), `--warning-text` 3.21:1, `--accent` as text 3.99:1, text on `.btn-primary` 3.84:1, text on `tone="amber"` 3.24:1, `--accent-contrast` on `--accent` 4.29:1. *Cost: token values in the theme files: `--text-subtle` `#8a837d` in Noctis (4.76:1), `--warning-text` `#a75924` in Parchment (4.64:1), accent text and solid fills on `--accent-strong` (6.14:1 and 6.61:1).*
+
+**12. Parchment has three greens for the main action.** `.btn-primary` and active `tone` buttons are `#159165`, `--accent` and `--primary-solid-bg` (the edit bar's Done) are `#008a57`, the hover rule is `#0f7a54`. *Cost: resolved with point 1, onto the `--primary-solid-*` tokens.*
+
+**13. Sizes and steps off the scale.** Bare `rounded` 42 times; `text-[10px]` 8 times and `text-[9px]` once; `shadow`, `shadow-lg` and `shadow-xl` on 15 floating surfaces instead of `--menu-shadow`; `duration-100` once. *Cost: mechanical, best per file when it is touched anyway.*
+
+**14. Tokens without a user.** `--accent-contrast`, `--bg-elevated`, `--border-subtle`, `--content-bar-h`, `--control-h-sm`. *Cost: wire them up or strike them from both theme files.*
+
+**15. `.btn-secondary` holds hex literals** in its Noctis theme rule rather than tokens. *Cost: one token set, part of point 1's work.*
 
 ---
 

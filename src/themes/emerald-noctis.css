@@ -70,7 +70,7 @@ html[data-theme='emerald-noctis'] {
      on the muted jade track when on. */
   --switch-thumb: #f5f5f4;
   --switch-thumb-on: #9dffd5;
-  /* Controls of the edit sidebar (design.md, Edit Sidebar):
+  /* Controls of the edit sidebar (components.md, `SidebarActionBar`):
      value buttons and inputs (`--field-*`), the inset search fields
      (`--field-inset-bg`) and the primary action "Done" (`--primary-solid-*`,
      built like `--danger-solid-*`). */
