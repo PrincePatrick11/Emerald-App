@@ -15,6 +15,8 @@ src/themes/
 
 Each theme file defines the same set of custom properties, and components reference these instead of hardcoded colours. Noctis is attached to `:root` as well, so it is the visual default when no theme attribute is present.
 
+Imported themes are described in [Custom Themes](../themes.md).
+
 ### Token Strategy
 
 | Tier | Prefix | Purpose | Examples |

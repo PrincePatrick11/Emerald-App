@@ -24,7 +24,7 @@ For the *components* (which shared building blocks exist, when to use them) see 
 
 **A new component adds its tokens to both theme files in the same commit.** It uses the general tokens first and adds its own only where a value really differs. New rules in `index.css` take tokens, not hex literals; the older per-theme rules there still hold some ([Open Point 2](#open-points)).
 
-**Tokens are the contract with a theme.** A theme sets colours, and it may choose radius and fonts from what the app ships. Spacing and layout stay fixed in every theme, so that any theme still works and still reads as Emerald. `tools/themes/test-garish.css` is the check for this: anything still brown, grey or jade under it is not coming from a token.
+**Tokens are the contract with a theme.** A [custom theme](themes.md) sets colours only. Spacing, layout, radius and fonts stay fixed, so that any theme still works and still reads as Emerald. A new colour token needs a derivation in `src/themes/customTheme.ts`. `tools/themes/test-garish.css` is the check for this: anything still brown, grey or jade under it is not coming from a token.
 
 ### Typography
 

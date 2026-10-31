@@ -595,4 +595,6 @@ Emerald ships with two themes, selectable in Settings → General:
 - **Emerald Noctis** — dark, with warm stone tones and jade green accents. The default.
 - **Emerald Parchment** — light, with warm parchment backgrounds, flat bordered panels and adapted accents.
 
+**Custom themes:** import a theme file under Settings → General. It sets colours only; see [Custom Themes](themes.md).
+
 The whole UI, the Altar included, follows the chosen theme. For how themes are built and how to add one, see [Architecture → Theming System](architecture/appearance.md#theming-system).

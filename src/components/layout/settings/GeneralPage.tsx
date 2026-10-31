@@ -5,6 +5,7 @@ import { useSettingsStore } from '../../../store/settingsStore';
 import {
   EDITOR_FONT_SIZE_OPTIONS, FONT_OPTIONS, THEME_OPTIONS, UI_SCALE_OPTIONS, type FontId,
 } from '../../../themes/theme';
+import CustomThemesSection from './CustomThemesSection';
 import SettingsChoiceButton, { SettingsChoiceRow } from './SettingsChoiceButton';
 import SettingsSection, { SettingsDescription } from './SettingsSection';
 
@@ -59,6 +60,7 @@ export default function GeneralPage() {
             );
           })}
         </div>
+        <CustomThemesSection />
         <div className="mt-4 space-y-3">
           <div>
             <label className="label-xs flex items-center gap-2 mb-1">

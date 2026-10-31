@@ -24,6 +24,13 @@ for (const file of walk('src')) {
   });
 }
 
+// A custom theme derives every colour token; a token missing there would stay Noctis.
+const SIZES = new Set(['sheet-radius', 'sheet-inset', 'tab-pill-h', 'control-h']);
+const derived = readFileSync('src/themes/customTheme.ts', 'utf8');
+for (const [, name] of readFileSync('src/themes/emerald-noctis.css', 'utf8').matchAll(/^\s*--([a-z0-9-]+):/gm)) {
+  if (!SIZES.has(name) && !derived.includes(`'${name}':`)) problems.push(`src/themes/customTheme.ts  missing token ${name}`);
+}
+
 if (problems.length) {
   console.error(`✗ ${problems.length} raw colour classes; use a theme token:\n${problems.join('\n')}`);
   process.exit(1);
