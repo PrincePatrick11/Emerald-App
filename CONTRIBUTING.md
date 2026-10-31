@@ -5,9 +5,18 @@ Thanks for your interest in contributing!
 ## Getting Started
 
 1. Fork the repository
-2. Create a feature branch: `git checkout -b my-feature`
-3. Make your changes
-4. Open a pull request
+2. Create a feature branch from the current `version/x.y.z` branch: `git checkout -b my-feature version/x.y.z`
+3. Make your changes and run `npm run check`
+4. Open a pull request against that same version branch
+
+## Branches and Releases
+
+- **Each version has one branch, `version/x.y.z`.** The branch with the highest version number is the one in progress. Work lands there directly or through a short-lived branch.
+- **`main` holds the latest finished version.** It only changes through a pull request from a version branch, merged as a merge commit and never squashed, so the version's history stays intact and later merges stay clean.
+- **Tags mark releases, `vX.Y.Z`, on the merge commit in `main`.** Branch names carry the `version/` prefix so that a branch and a tag never share a name. After the release the tag is the fixed point, and the version branch can go.
+- **A patch to a finished version** gets its own version branch from `main`. Once it is released, merge `main` into the version in progress.
+
+The steps of a release are in [Cutting a release](Documentation/build.md#cutting-a-release).
 
 ## Development Setup
 
@@ -32,11 +41,11 @@ The dev build uses a separate database and app identity (`com.emerald.app.dev`) 
 
 ## Continuous Integration
 
-Every push and pull request runs `ci.yml`: a frontend job (`npm run check:schema`, `check:i18n`, `check:blocks` and `check:docs`, then the typecheck-carrying `npm run build`) and a `cargo check --locked --all-targets` matrix across Linux, macOS, and Windows, since parts of the Rust side are platform-gated and only actually compile on their own OS. See [`Documentation/build.md`](Documentation/build.md#ci--the-smoke-detector) for the full pipeline, including what CI does *not* cover (bundling, signing, notarisation).
+Every push and pull request runs `ci.yml`: a frontend job (`npm run check`, which runs `check:schema`, `check:i18n`, `check:blocks` and `check:docs`, then the typecheck-carrying `build`) and a `cargo check --locked --all-targets` matrix across Linux, macOS, and Windows, since parts of the Rust side are platform-gated and only actually compile on their own OS. See [`Documentation/build.md`](Documentation/build.md#ci--the-smoke-detector) for the full pipeline, including what CI does *not* cover (bundling, signing, notarisation).
 
 ## Working with a Coding Assistant
 
-The repository carries its own review agents (`tools/agents/`, set up with `npm run agents:link`), and an MCP server (`tools/mcp/`, registered with `npm run mcp:register`) that drives a running Emerald instance so an assistant can check a change in the app itself. [`Documentation/agents.md`](Documentation/agents.md) lists the agents, which one fits which kind of change, and what each may do; [`Documentation/mcp.md`](Documentation/mcp.md) covers using the MCP server.
+[`AGENTS.md`](AGENTS.md) is the entry point for an assistant. The repository carries its own review agents (`tools/agents/`, set up with `npm run agents:link`), and an MCP server (`tools/mcp/`, registered with `npm run mcp:register`) that drives a running Emerald instance so an assistant can check a change in the app itself. [`Documentation/agents.md`](Documentation/agents.md) lists the agents, which one fits which kind of change, and what each may do; [`Documentation/mcp.md`](Documentation/mcp.md) covers using the MCP server.
 
 ## Writing Docs
 

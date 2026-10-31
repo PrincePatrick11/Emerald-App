@@ -1,7 +1,7 @@
 [package]
 name = "emerald"
 version = "0.2.0"
-description = "A local-first desktop journal for documenting magical practice"
+description = "A private desktop journal for documenting magical practice"
 authors = ["Lukas Reuter"]
 license = "GPL-3.0-or-later"
 edition = "2021"

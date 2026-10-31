@@ -1,5 +1,5 @@
 /**
- * Prüft die relativen Links der Doku (README, CONTRIBUTING, CHANGELOG, Documentation/**):
+ * Prüft die relativen Links der Doku (README, AGENTS, CONTRIBUTING, CHANGELOG, Documentation/**):
  *
  *   1. Zieldatei existiert — eine verschobene oder umbenannte Datei fällt sofort auf.
  *   2. Anker existiert — `datei.md#abschnitt` muss auf eine Überschrift der Zieldatei

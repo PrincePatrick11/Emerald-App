@@ -10,8 +10,11 @@
  *
  * Unter Windows entsteht eine Junction, die keine Adminrechte braucht.
  * Ein vorhandener Ordner, der kein Link ist, wird nie angefasst.
+ *
+ * Im Checkout legt es außerdem ein ignoriertes `CLAUDE.md` an, das auf
+ * `AGENTS.md` verweist. Ein vorhandenes bleibt unverändert.
  */
-import { existsSync, lstatSync, mkdirSync, readlinkSync, rmSync, symlinkSync } from 'node:fs';
+import { existsSync, lstatSync, mkdirSync, readlinkSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -40,6 +43,12 @@ if (args.includes('--remove')) {
   if (found) rmSync(link);
   console.log(found ? `Link entfernt: ${link}` : `Kein Link vorhanden: ${link}`);
   process.exit(0);
+}
+
+const pointer = join(root, 'CLAUDE.md');
+if (!args.includes('--user') && !existsSync(pointer)) {
+  writeFileSync(pointer, '@AGENTS.md\n');
+  console.log(`Angelegt: ${pointer}`);
 }
 
 if (found) {

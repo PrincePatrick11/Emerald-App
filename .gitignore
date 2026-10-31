@@ -59,7 +59,6 @@ credentials.json
 .claude/
 .mcp.json
 .opencode/
-/AGENTS.md
 AI_HANDOFF.md
 COMPONENT_PATTERNS.md
 DESIGN_SYSTEM.md

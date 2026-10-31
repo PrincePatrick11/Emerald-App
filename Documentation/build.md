@@ -17,12 +17,12 @@ All workflows pin **Node 22**, and `package.json` records the same floor under `
 
 Two jobs, on every push to every branch and on every pull request. `cancel-in-progress` is on, so a quick follow-up push supersedes the previous run rather than queueing behind it.
 
-**`frontend`** (`ubuntu-latest`, once — the frontend build is platform-independent):
+**`frontend`** (`ubuntu-latest`, once — the frontend build is platform-independent) runs `npm run check`, the same command as locally, which runs in this order and stops at the first failure:
 
 1. `npm run check:schema` (needs `esbuild` from `devDependencies`)
 2. `npm run check:i18n` — the four locale files carry the same keys and `{{placeholder}}`s, see [`internationalization.md`](internationalization.md)
 3. `npm run check:blocks` (`scripts/check-blocks.mjs`) — the stored block format in `src/lib/blocks/blockHtml.ts` round-trips and runs under Node without a DOM
-4. `npm run check:docs` (`scripts/check-docs.mjs`) — every relative link in `README.md`, `CONTRIBUTING.md`, `CHANGELOG.md` and `Documentation/` points to an existing file and, with `#anchor`, to an existing heading
+4. `npm run check:docs` (`scripts/check-docs.mjs`) — every relative link in `README.md`, `AGENTS.md`, `CONTRIBUTING.md`, `CHANGELOG.md` and `Documentation/` points to an existing file and, with `#anchor`, to an existing heading
 5. `npm run build` — `tsc && vite build --configLoader runner`, so it carries the typecheck
 
 **`rust`** (matrix: `ubuntu-22.04`, `macos-14`, `windows-latest`): `cargo check --manifest-path src-tauri/Cargo.toml --locked --all-targets`, and the same again with `--features devbridge`, since the [dev bridge](security.md#the-dev-bridge) is in no build by default and the first check never sees it.
@@ -168,8 +168,11 @@ Windows builds are unsigned; SmartScreen warns on first run — including when t
 ## Cutting a release
 
 1. Set the version in `package.json`, `src-tauri/tauri.conf.json` and `src-tauri/Cargo.toml` — character-identical in all three — and rename `## [Unreleased]` in `CHANGELOG.md` to `## [<version>] - <date>`.
-2. Run `manual-desktop-builds.yml` from the branch and confirm all three platforms produce bundles.
-3. Commit, push, then tag and push the tag. `prepare-release` re-checks the versions; if step 1 was skipped it fails there rather than later.
+2. Commit and push to the version branch, run `manual-desktop-builds.yml` from it and confirm all three platforms produce bundles.
+3. Open a pull request from the version branch to `main` and, with CI green, merge it as a merge commit.
+4. Tag that merge commit in `main` as `vX.Y.Z` and push the tag. `prepare-release` re-checks the versions; if step 1 was skipped it fails there rather than later.
+
+A release of an older line, published after a newer one, must not be marked as the latest release: the updater reads `releases/latest`.
 
 ### Once, for the first release that carries the new identifier
 
