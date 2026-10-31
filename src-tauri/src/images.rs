@@ -163,11 +163,11 @@ fn locate(app: &tauri::AppHandle, vault_id: &str, filename: &str) -> Result<Path
 
 // ── commands ─────────────────────────────────────────────────────────────────
 
-/// Serialisiert Schreiben und Loeschen in der Bildablage. Solange die
-/// Commands synchron auf dem Main-Thread liefen, war diese Serialisierung
-/// implizit; seit sie auf dem Blocking-Pool laufen, koennte sonst der
-/// Storage-Cleanup eine Datei loeschen, deren Hash ein gleichzeitiges
-/// save_image gerade als "existiert schon" uebersprungen hat.
+/// Serialises writing and deleting in the image store. While the commands
+/// ran synchronously on the main thread, this serialisation was implicit;
+/// now that they run on the blocking pool, the storage cleanup could
+/// otherwise delete a file whose hash a concurrent save_image has just
+/// skipped as "already exists".
 static IMAGE_WRITE_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
 
 fn image_write_guard() -> std::sync::MutexGuard<'static, ()> {
@@ -415,8 +415,8 @@ fn serve(app: &tauri::AppHandle, request: &Request<Vec<u8>>) -> Response<Vec<u8>
     let Ok(bytes) = load(app, vault_id, filename) else {
         return not_found();
     };
-    // Entschlüsselte Bilder gehören nicht in den Platten-Cache der WebView —
-    // dort lägen sie im Klartext außerhalb des Vaults.
+    // Decrypted images do not belong in the WebView's disk cache — there
+    // they would sit in plain text outside the vault.
     let encrypted = vault::vault_dir(app, vault_id)
         .map(|dir| keys::is_encrypted_dir(&dir))
         .unwrap_or(true);
@@ -447,11 +447,11 @@ pub fn register(builder: tauri::Builder<tauri::Wry>) -> tauri::Builder<tauri::Wr
         "emerald-img",
         |ctx: UriSchemeContext<'_, tauri::Wry>, request, responder| {
             let app = ctx.app_handle().clone();
-            // spawn_blocking statt thread::spawn: der Blocking-Pool
-            // wiederverwendet seine Threads ueber Bursts hinweg, statt fuer
-            // jedes Bild einen frischen OS-Thread zu starten und wieder
-            // abzubauen. (Sein Limit liegt bei 512 — ein Deckel ist er bei
-            // realen Eintragsgroessen nicht, der Gewinn ist die Wiederverwendung.)
+            // spawn_blocking instead of thread::spawn: the blocking pool
+            // reuses its threads across bursts instead of starting a fresh
+            // OS thread for every image and tearing it down again. (Its
+            // limit is 512 — at real entry sizes it is no cap; the gain is
+            // the reuse.)
             tauri::async_runtime::spawn_blocking(move || {
                 responder.respond(serve(&app, &request));
             });

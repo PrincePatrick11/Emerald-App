@@ -7,8 +7,8 @@ export interface UndoAction {
 }
 
 /**
- * Das eine Rückgängig: die jüngste Aktion, solange ihr Hinweis steht. Eine
- * neue ersetzt sie — zurück an ältere kommt man über den Papierkorb.
+ * The one undo: the most recent action, as long as its notice is up. A
+ * new one replaces it — older ones can be reached via the trash.
  */
 interface UndoState {
   active: UndoAction | null;
@@ -29,6 +29,6 @@ export const useUndoStore = create<UndoState>((set, get) => ({
     await active.undo();
   },
 
-  /** Auch beim Vault-Wechsel: die Aktion stellt Zeilen per ID in der gerade offenen DB wieder her. */
+  /** Also on vault switch: the action restores rows by ID in the currently open DB. */
   dismiss: () => set({ active: null }),
 }));

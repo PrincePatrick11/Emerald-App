@@ -26,10 +26,10 @@ import { THUMBNAIL_W, canvasToCappedThumbnail } from '../../lib/thumbnail';
 import { isHistoryButton } from '../../lib/mouseButtons';
 
 const BASE_SIZE = 40;
-/** Ab so viel Weg wird aus einem Druck auf ein Element ein Ziehen. */
+/** Past this much travel, a press on an element becomes a drag. */
 const DRAG_THRESHOLD_PX = 3;
 
-/** Ein Bildschirmpunkt in Prozent der Fläche `el`, ungerundet. */
+/** A screen point as a percentage of the area of `el`, unrounded. */
 function pointerPercent(el: HTMLElement, clientX: number, clientY: number): { x: number; y: number } {
   const rect = el.getBoundingClientRect();
   return { x: ((clientX - rect.left) / rect.width) * 100, y: ((clientY - rect.top) / rect.height) * 100 };
@@ -61,13 +61,13 @@ function _radialGrad(
 }
 
 /**
- * Alles, was hier gezeichnet wird, landet in `exportCurrentAltarImage` und wird
- * mit `toBlob()` wieder ausgelesen. Das geht nur, solange keine fremde Quelle
- * auf der Flaeche liegt — deshalb kommen die Quellen aus `canvasImageSrc()`,
- * das gespeicherte Bilder als Data-URL liefert statt ueber `emerald-img`.
+ * Everything drawn here ends up in `exportCurrentAltarImage` and is read back
+ * with `toBlob()`. That only works as long as no foreign source is on the
+ * canvas, which is why the sources come from `canvasImageSrc()`, which returns
+ * stored images as data URLs instead of via `emerald-img`.
  *
- * Kein `crossOrigin` also: es gaebe hier nichts mehr, worauf es sich beziehen
- * koennte, und same-origin holt es nur ein zweites Mal in den Cache.
+ * So no `crossOrigin`: there would be nothing left for it to apply to, and
+ * same-origin only fetches the image a second time into the cache.
  */
 function _loadImg(src: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
@@ -209,7 +209,7 @@ async function renderAltarThumbnail(
 ): Promise<string | null> {
   const canvas = await _renderAltar(altar, backgroundSrc, placements, nativeW, nativeH, THUMBNAIL_W);
   if (!canvas) return null;
-  // WebP-Leiter mit JPEG-Fallback und 512-KB-Deckel aus lib/thumbnail.ts.
+  // WebP ladder with JPEG fallback and 512 KB cap from lib/thumbnail.ts.
   return canvasToCappedThumbnail(canvas, 'jpeg');
 }
 
@@ -333,12 +333,12 @@ export function AltarCanvas({
   const canvasScale = nativeW / BASE_RESOLUTION_WIDTH;
   const canvasRef = useRef<HTMLDivElement>(null);
   /**
-   * Das gezogene Element: wo es gegriffen wurde (relativ zu seiner Mitte, in
-   * Prozent) und wo der Druck begann. Erst ab ein paar Pixeln Weg ist es ein
-   * Ziehen — ein Klick wählt nur aus und verschiebt nichts.
+   * The dragged element: where it was grabbed (relative to its centre, in
+   * percent) and where the press began. Only after a few pixels of travel is it
+   * a drag; a click merely selects and moves nothing.
    */
   const draggingRef = useRef<{ id: string; grabX: number; grabY: number; startX: number; startY: number; moved: boolean } | null>(null);
-  // Eingerastet wird auch am ausgeblendeten Raster — „Raster" blendet es nur ein.
+  // Snapping also applies to the hidden grid; the "Grid" toggle only shows it.
   const snapPosition = snapToGrid;
   const snapScale = snapScaleToGrid;
   const [sidebarDragItem, setSidebarDragItem] = useState<AltarItem | null>(null);
@@ -378,7 +378,7 @@ export function AltarCanvas({
     [updatePlacement],
   );
 
-  /** Ein Punkt in Prozent der Fläche, eingerastet und am Rand gehalten. */
+  /** A point as a percentage of the area, snapped and kept within the edge. */
   const placeAt = useCallback((rawX: number, rawY: number) => {
     if (snapPosition) {
       const stepX = 100 / gridNumCols;
@@ -395,7 +395,7 @@ export function AltarCanvas({
     return placeAt(x, y);
   }, [placeAt]);
 
-  /** Wohin das gezogene Element gehört: der Zeiger, versetzt um die Stelle, an der es gegriffen wurde. */
+  /** Where the dragged element belongs: the pointer, offset by the spot where it was grabbed. */
   const dragTarget = useCallback((drag: { grabX: number; grabY: number }, clientX: number, clientY: number) => {
     const { x, y } = pointerPercent(canvasRef.current!, clientX, clientY);
     return placeAt(x - drag.grabX, y - drag.grabY);

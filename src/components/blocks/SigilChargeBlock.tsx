@@ -21,15 +21,15 @@ import type { BlockViewProps } from './blockViews';
 
 type ChargeData = Omit<SigilCharge, 'broken'>;
 
-/** Ein Rechner oder eine Zeichnung im Eintrag, wie die Ladung sie zur Auswahl anbietet. */
+/** A calculator or a drawing in the entry, as the charge offers it for selection. */
 interface ToolBlock {
   id: string;
   label: string;
 }
 
 /**
- * Die Rechner und Zeichnungen des Eintrags — Blöcke und Teile eigener Blöcke
- * (dann „Block · Teil"); gleich heißende bekommen ihre Nummer dazu.
+ * The calculators and drawings of the entry: blocks and parts of custom blocks
+ * (then "Block · Part"); those with identical names get their number added.
  */
 function toolBlocks(t: TFunction, blocks: readonly BlockInstance[]): ToolBlock[] {
   const tools = sigilUnits(blocks)
@@ -52,11 +52,11 @@ function toolBlocks(t: TFunction, blocks: readonly BlockInstance[]): ToolBlock[]
 }
 
 /**
- * Die Ladung der Sigille: Zieldatum, Ladetechnik (ein Link-Chip), welche
- * Rechner und Zeichnungen sie verdeckt und was „geladen" sperrt. Laden und
- * Entladen gehen im Lesemodus, mit Bestätigung — geladen sperrt den Eintrag
- * (oder nur die verdeckten Blöcke) und verbirgt sie bis zum Datum, ohne Datum
- * bis zum Entladen.
+ * The sigil's charge: target date, charging technique (a link chip), which
+ * calculators and drawings it conceals and what "charged" locks. Charging and
+ * discharging work in read mode, with confirmation; charged locks the entry
+ * (or only the concealed blocks) and hides them until the date, or without a date
+ * until discharged.
  */
 export default function SigilChargeBlock({ block, blocks, isEditing, onBlockChange, onPersist }: BlockViewProps) {
   const { t } = useTranslation();
@@ -91,13 +91,13 @@ function Technique({ html, onChange }: { html: string | null; onChange?: (html: 
 }
 
 /**
- * Beim Bearbeiten: welche Rechner und Zeichnungen die Ladung verdeckt. Alle
- * angehakt heißt „alle" — auch einer, der später dazukommt.
+ * When editing: which calculators and drawings the charge conceals. All
+ * checked means "all", including one that is added later.
  */
 function Targets({ charge, tools, onChange }: {
   charge: ChargeData;
   tools: ToolBlock[];
-  /** Fehlt, solange die Sigille geladen ist: dann steht die Auswahl fest. */
+  /** Absent while the sigil is charged: then the selection is fixed. */
   onChange?: (targets: string[] | null) => void;
 }) {
   const { t } = useTranslation();
@@ -125,7 +125,7 @@ function Targets({ charge, tools, onChange }: {
   );
 }
 
-/** Die Statuszeile: geladen oder nicht, und wie lange die Sigille verborgen bleibt. */
+/** The status line: charged or not, and how long the sigil stays concealed. */
 function chargeStatus(t: TFunction, charge: ChargeData, date: string | null): string {
   if (!charge.loaded) return t('blocks.sigil.notLoaded');
   const detail = !date
@@ -143,7 +143,7 @@ function ChargeReader({ charge, tools, onPersist }: {
 }) {
   const { t } = useTranslation();
   const date = charge.revealDate ? formatIsoDateLong(charge.revealDate) : null;
-  // Die verdeckten Blöcke beim Namen — nur, wenn nicht einfach alle gemeint sind.
+  // The concealed blocks by name, only if not simply all of them are meant.
   const covered = charge.targets === null
     ? null
     : tools.filter((tool) => chargeCovers(charge, tool.id)).map((tool) => tool.label).join(', ');
@@ -170,14 +170,14 @@ function ChargeReader({ charge, tools, onPersist }: {
   );
 }
 
-/** Laden (optional nach einem Timer) und Entladen, je mit Bestätigung. */
+/** Charging (optionally after a timer) and discharging, each with confirmation. */
 function ChargeActions({ charge, date, onPersist }: { charge: ChargeData; date: string | null; onPersist: (next: ChargeData) => void }) {
   const { t } = useTranslation();
   const [confirming, setConfirming] = useState(false);
   const [delayInput, setDelayInput] = useState('0');
   const [countdown, setCountdown] = useState<number | null>(null);
 
-  // Über Refs: Block und Handgriff sind pro Render neu, der Timer soll dabei nicht neu anlaufen.
+  // Via refs: block and handle are new on every render, and the timer should not restart because of that.
   const latest = useRef({ charge, onPersist });
   latest.current = { charge, onPersist };
   const setLoaded = (loaded: boolean) => latest.current.onPersist({ ...latest.current.charge, loaded });
@@ -220,7 +220,7 @@ function ChargeActions({ charge, date, onPersist }: { charge: ChargeData; date: 
     );
   }
   if (charge.loaded) {
-    // In einer Zeile wie Laden — allein in der Spalte von `.block-fields` zöge der Knopf sich sonst über die ganze Breite.
+    // In one row like Charge; alone in the column of `.block-fields` the button would otherwise stretch across the full width.
     return (
       <div className="flex items-center gap-2">
         <Button tone="neutral" small onClick={() => setConfirming(true)}>{t('creation.unloadSigil')}</Button>
@@ -253,8 +253,8 @@ function ChargeEditor({ charge, tools, onChange }: {
   onChange: (next: ChargeData) => void;
 }) {
   const { t } = useTranslation();
-  // Geladen: Datum, Auswahl und Sperre stehen fest — ein Datum in der
-  // Vergangenheit oder ein abgewählter Block höbe das Verbergen auf.
+  // Charged: date, selection and lock are fixed; a date in the
+  // past or a deselected block would end the concealing.
   const fixed = charge.loaded;
   return (
     <div className="block-fields block-fields--edit">

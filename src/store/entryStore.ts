@@ -10,13 +10,13 @@ import { displayTitle } from '../lib/entryTitle';
 import { startOfNewEntry, useTemplateNoticeStore } from './templateStore';
 
 /**
- * Die Einträge von Journal, Wiki und Operationen — ein Store über der einen
- * Tabelle `entries` (seit v49; vorher drei fast gleiche Stores).
+ * The entries of journal, wiki and operations — one store over the single
+ * table `entries` (since v49; previously three nearly identical stores).
  *
- * Die Einträge liegen je Typ in einem eigenen Array: ein Modul abonniert
- * `s.entries.wiki` und zeichnet nicht neu, wenn sich ein Journal-Eintrag
- * ändert — und ein Selektor liefert immer dasselbe Array, solange sich an
- * seinem Typ nichts ändert (zustand 5 verlangt stabile Snapshots).
+ * The entries sit in a separate array per type: a module subscribes to
+ * `s.entries.wiki` and does not re-render when a journal entry
+ * changes — and a selector always returns the same array as long as nothing
+ * changes for its type (zustand 5 requires stable snapshots).
  */
 export type EntriesByType = Record<EntryType, Entry[]>;
 
@@ -24,40 +24,40 @@ interface EntryState {
   entries: EntriesByType;
   loading: boolean;
   /**
-   * Einträge, deren `content` noch nicht geladen ist — `null`, sobald alle da
-   * sind. `fetchEntries` lädt in zwei Stufen: erst die Metadaten (die Listen
-   * stehen sofort), die Inhalte im Hintergrund. Bis dahin ist `content` dieser
-   * Einträge leer; wer ihn braucht, wartet mit `ensureEntryContent` bzw.
+   * Entries whose `content` is not loaded yet — `null` once all are
+   * there. `fetchEntries` loads in two stages: first the metadata (the lists
+   * appear immediately), the contents in the background. Until then the `content` of these
+   * entries is empty; whoever needs it waits with `ensureEntryContent` or
    * `whenEntryContentLoaded`.
    */
   pendingContent: ReadonlySet<string> | null;
 
   /**
-   * Lädt alle Einträge neu. `keepLoaded`: Einträge, deren Inhalt schon geladen
-   * ist, behalten ihn — nach einem Import (`reloadModules`), der nur über diesen
-   * Store schrieb. Ein Vault-Wechsel oder Backup-Import lädt alles neu.
+   * Reloads all entries. `keepLoaded`: entries whose content is already loaded
+   * keep it — after an import (`reloadModules`) that wrote only through this
+   * store. A vault switch or backup import reloads everything.
    */
   fetchEntries: (options?: { keepLoaded?: boolean }) => Promise<void>;
-  /** Lädt den Inhalt eines Eintrags sofort, falls er noch aussteht. */
+  /** Loads an entry's content immediately, if it is still pending. */
   ensureEntryContent: (id: string) => Promise<void>;
-  /** Mit dem Standard der Kombination (Vorlagen) — außer `blank`. Das Journal hat keine Kategorie. */
+  /** With the default of the combination (templates) — unless `blank`. The journal has no category. */
   createEntry: (type: EntryType, opts?: { categoryId?: string | null; blank?: boolean; createdAt?: string }) => Promise<Entry>;
   duplicateEntry: (id: string) => Promise<Entry | undefined>;
   updateEntry: (id: string, patch: Partial<Entry>, options?: WriteOptions) => Promise<void>;
   deleteEntry: (id: string) => Promise<void>;
   restoreEntry: (id: string) => Promise<void>;
   permanentlyDeleteEntry: (id: string) => Promise<void>;
-  /** Mit `type` nur ein Eintrag dieses Typs (`findEntry`). */
+  /** With `type`, only an entry of that type (`findEntry`). */
   getEntry: (id: string, type?: EntryType) => Entry | undefined;
 }
 
 export const ENTRY_TYPES: readonly EntryType[] = ['journal', 'wiki', 'operation'];
 
 /**
- * Die Reihenfolge der Listen, wie sie die drei Stores hatten: das Journal
- * nach Anlage, das Wiki nach Titel, Operationen nach letzter Änderung. Neue
- * Einträge kommen im Journal und bei den Operationen nach vorn, im Wiki ans
- * Ende — bis zum nächsten Laden, wie bisher.
+ * The order of the lists, as the three stores had it: the journal
+ * by creation, the wiki by title, operations by last change. New
+ * entries go to the front in the journal and operations, to the end in the
+ * wiki — until the next load, as before.
  */
 const ORDER: Record<EntryType, { sort: (a: Entry, b: Entry) => number; newAtEnd: boolean }> = {
   journal: { sort: (a, b) => b.created_at.localeCompare(a.created_at), newAtEnd: false },
@@ -67,20 +67,20 @@ const ORDER: Record<EntryType, { sort: (a: Entry, b: Entry) => number; newAtEnd:
 
 const emptyEntries = (): EntriesByType => ({ journal: [], wiki: [], operation: [] });
 
-/** Die Spalten von `idx_entries_list` — die Abfrage liest nur den Index (`ENTRIES_INDEX_DDL`). */
+/** The columns of `idx_entries_list` — the query reads only the index (`ENTRIES_INDEX_DDL`). */
 const LIST_COLUMNS = 'id, type, title, category_id, entry_number, tags, created_at, updated_at, deleted_at';
 
 /**
- * Die lebenden Einträge aus der Datenbank, je Typ sortiert — ohne Inhalt, die
- * erste Stufe von `fetchEntries`. Icon und Titelbild stehen nicht im Index
- * (Data-URLs): sie kommen für die wenigen Einträge, die eins tragen, über
- * `idx_entries_decorated` — dafür steht dessen Bedingung wörtlich im WHERE.
+ * The live entries from the database, sorted per type — without content, the
+ * first stage of `fetchEntries`. Icon and cover image are not in the index
+ * (data URLs): for the few entries that carry one, they come via
+ * `idx_entries_decorated` — which is why its condition appears verbatim in the WHERE.
  */
 async function selectLiveEntries(): Promise<EntriesByType> {
   const db = await getDb();
-  // Zwei Verbindungen, also nicht derselbe Stand: ein Schreiben genau
-  // dazwischen kann ein älteres Icon an neuere Listenspalten hängen — nur
-  // Anzeige, und der nächste Ladevorgang richtet es.
+  // Two connections, so not the same state: a write exactly in
+  // between can attach an older icon to newer list columns — display
+  // only, and the next load fixes it.
   const [rows, decorated] = await Promise.all([
     db.select<DbRow[]>(`SELECT ${LIST_COLUMNS} FROM entries WHERE deleted_at IS NULL`),
     db.select<DbRow[]>(
@@ -101,13 +101,13 @@ async function selectLiveEntries(): Promise<EntriesByType> {
   return byType;
 }
 
-/** Die laufende zweite Stufe von `fetchEntries`; ein neuer Ladevorgang macht eine ältere wirkungslos. */
+/** The running second stage of `fetchEntries`; a new load makes an older one ineffective. */
 let contentLoad: Promise<void> = Promise.resolve();
 let loadGeneration = 0;
-/** Einträge je Abfrage der zweiten Stufe. */
+/** Entries per query of the second stage. */
 const CONTENT_CHUNK = 1000;
 
-/** `pending` ohne die `ids` — `null`, wenn danach keiner mehr aussteht. */
+/** `pending` without the `ids` — `null` if none is left pending afterwards. */
 export function withoutIds(pending: ReadonlySet<string>, ids: Iterable<string>): ReadonlySet<string> | null {
   const next = new Set(pending);
   for (const id of ids) next.delete(id);
@@ -115,21 +115,21 @@ export function withoutIds(pending: ReadonlySet<string>, ids: Iterable<string>):
 }
 
 /**
- * Trägt die Inhalte nach — nur bei Einträgen, die noch ausstehen. Ein Eintrag,
- * den `ensureEntryContent` schon geholt und der Autosave seitdem geschrieben
- * hat, behielte sonst den älteren Stand dieser Abfrage.
+ * Fills in the contents afterwards — only for entries that are still pending. An entry
+ * that `ensureEntryContent` has already fetched and the autosave has written to
+ * since would otherwise be left with the older state from this query.
  */
 async function loadAllContent(generation: number): Promise<void> {
   if (generation !== loadGeneration || !useEntryStore.getState().pendingContent) return;
   const db = await getDb();
-  // In Stücken: ein überholter Ladevorgang (Vault-Wechsel, neu geladene
-  // Seite) hört nach dem laufenden Stück auf, statt noch alle Inhalte über
-  // die IPC zu schieben — und keine einzelne Antwort wird zig Megabyte groß.
+  // In chunks: a superseded load (vault switch, reloaded
+  // page) stops after the current chunk instead of pushing all contents over
+  // the IPC — and no single response grows to tens of megabytes.
   const contentById = new Map<string, string>();
   for (let after = -1; ;) {
-    // `+deleted_at`: kein Index für diesen Term. Sonst nähme SQLite
-    // `idx_entries_list` und sortierte für jedes Stück den Inhalt aller
-    // übrigen Zeilen nach rowid — so läuft es die rowid entlang.
+    // `+deleted_at`: no index for this term. Otherwise SQLite would take
+    // `idx_entries_list` and sort the content of all remaining rows
+    // by rowid for every chunk — this way it walks along the rowid.
     const rows = await db.select<{ rid: number; id: string; content: string | null }[]>(
       'SELECT rowid AS rid, id, content FROM entries WHERE +deleted_at IS NULL AND rowid > $1 ORDER BY rowid LIMIT $2',
       [after, CONTENT_CHUNK],
@@ -152,7 +152,7 @@ async function loadAllContent(generation: number): Promise<void> {
   });
 }
 
-/** Einmal nachgefasst: ein einzelner Fehler soll nicht für die ganze Sitzung leere Inhalte hinterlassen. */
+/** Retried once: a single error should not leave empty contents for the whole session. */
 async function loadAllContentWithRetry(generation: number): Promise<void> {
   try {
     await loadAllContent(generation);
@@ -164,13 +164,13 @@ async function loadAllContentWithRetry(generation: number): Promise<void> {
 }
 
 /**
- * Erfüllt sich, sobald jeder Eintrag seinen Inhalt hat — für alles, was über
- * alle Inhalte geht. Scheitert das Nachladen, wirft es.
+ * Resolves as soon as every entry has its content — for everything that spans
+ * all contents. Throws if the reload fails.
  *
- * `contentLoad` wird gesetzt, sobald `fetchEntries` beginnt: nach dem Warten
- * ist entweder alles da, oder ein neuerer Ladevorgang hat übernommen — dann
- * auf den. Ohne den Vergleich drehte die Schleife über einem schon erfüllten
- * Promise nur in Microtasks, und die IPC-Antwort käme nie an die Reihe.
+ * `contentLoad` is set as soon as `fetchEntries` begins: after waiting,
+ * either everything is there, or a newer load has taken over — then wait
+ * for that one. Without the comparison the loop would spin over an already fulfilled
+ * promise in microtasks only, and the IPC response would never get its turn.
  */
 export async function whenEntryContentLoaded(): Promise<void> {
   for (let load = contentLoad; useEntryStore.getState().pendingContent; load = contentLoad) {
@@ -179,15 +179,15 @@ export async function whenEntryContentLoaded(): Promise<void> {
   }
 }
 
-/** Alle Einträge in einer Liste — Journal, Wiki, Operationen. */
+/** All entries in one list — journal, wiki, operations. */
 export function allEntries(entries: EntriesByType): Entry[] {
   return [...entries.journal, ...entries.wiki, ...entries.operation];
 }
 
 /**
- * Der Eintrag `id` — mit `type` nur, wenn er diesen Typ hat. Liefert das
- * Objekt aus dem Store selbst: ein Selektor darüber zeichnet nur neu, wenn
- * sich genau dieser Eintrag ändert.
+ * The entry `id` — with `type` only if it has that type. Returns the
+ * object from the store itself: a selector over it re-renders only when
+ * exactly this entry changes.
  */
 export function findEntry(entries: EntriesByType, id: string, type?: EntryType): Entry | undefined {
   for (const t of type ? [type] : ENTRY_TYPES) {
@@ -197,28 +197,28 @@ export function findEntry(entries: EntriesByType, id: string, type?: EntryType):
   return undefined;
 }
 
-/** Wendet `map` auf die Liste jedes Typs an. */
+/** Applies `map` to the list of each type. */
 export function mapEntries(entries: EntriesByType, map: (list: Entry[], type: EntryType) => Entry[]): EntriesByType {
   return { journal: map(entries.journal, 'journal'), wiki: map(entries.wiki, 'wiki'), operation: map(entries.operation, 'operation') };
 }
 
 /**
- * Fügt einen Eintrag in die Liste seines Typs ein — vorn oder hinten wie beim
- * Anlegen. Für `entryTypeChange`, das einen Eintrag in ein anderes Modul zieht.
+ * Inserts an entry into the list of its type — at the front or back as when
+ * creating. For `entryTypeChange`, which moves an entry into another module.
  */
 export function withAddedEntry(entries: EntriesByType, entry: Entry): EntriesByType {
   return withEntry(entries, entry.type, (list) => (ORDER[entry.type].newAtEnd ? [...list, entry] : [entry, ...list]));
 }
 
 /**
- * Fügt einen Eintrag in die Liste seines Typs ein, einsortiert wie beim Laden —
- * für einen, der an seinen alten Platz zurückkehrt (`revertEntryType`).
+ * Inserts an entry into the list of its type, sorted in as on load —
+ * for one that returns to its old place (`revertEntryType`).
  */
 export function withSortedEntry(entries: EntriesByType, entry: Entry): EntriesByType {
   return withEntry(entries, entry.type, (list) => [...list.filter((e) => e.id !== entry.id), entry].sort(ORDER[entry.type].sort));
 }
 
-/** Ersetzt oder entfernt einen Eintrag in seinem Typ — die anderen Arrays bleiben dieselben. */
+/** Replaces or removes an entry in its type — the other arrays stay the same. */
 function withEntry(entries: EntriesByType, type: EntryType, map: (list: Entry[]) => Entry[]): EntriesByType {
   return { ...entries, [type]: map(entries[type]) };
 }
@@ -250,7 +250,7 @@ export const useEntryStore = create<EntryState>((set, get) => ({
         set({ loading: false });
       }
     })();
-    // Sofort, nicht erst nach den Metadaten — siehe `whenEntryContentLoaded`.
+    // Immediately, not only after the metadata — see `whenEntryContentLoaded`.
     contentLoad = metadata.then(() => loadAllContentWithRetry(generation));
     contentLoad.catch((err: unknown) => console.error('[entries] loading content failed', err));
     return metadata;
@@ -261,7 +261,7 @@ export const useEntryStore = create<EntryState>((set, get) => ({
     const db = await getDb();
     const rows = await db.select<{ content: string | null }[]>('SELECT content FROM entries WHERE id = $1', [id]);
     set((s) => {
-      // Inzwischen kam die zweite Stufe — oder ein anderer Aufruf — zuvor.
+      // In the meantime the second stage — or another call — got there first.
       if (!s.pendingContent?.has(id)) return {};
       const entry = findEntry(s.entries, id);
       const content = rows[0]?.content ?? '';
@@ -276,8 +276,8 @@ export const useEntryStore = create<EntryState>((set, get) => ({
     const db = await getDb();
     const now = nowIso();
     const category = type === 'journal' ? null : categoryId;
-    // Die Kategorie „Sigillen" beginnt so mit Rechner, Zeichnung und Ladung
-    // (Vorlage `core-sigil`) — sofern der Vault Standards von selbst einsetzt.
+    // The "Sigils" category thus begins with calculator, drawing and charge
+    // (template `core-sigil`) — provided the vault applies defaults by itself.
     const start = startOfNewEntry(type, category, blank);
     const entry: Entry = {
       id: generateId(),
@@ -303,10 +303,10 @@ export const useEntryStore = create<EntryState>((set, get) => ({
   },
 
   /**
-   * Kopiert alle Inhaltsfelder des Quelleintrags; Identität, Nummer und
-   * Zeitstempel bleiben beim neuen — und mit dem Anlagedatum die Mondphase,
-   * die daraus folgt. Die Aufrufer haben die Feldliste früher jeweils selbst
-   * aufgezählt — ein neues Feld fehlte dann still an einzelnen Stellen.
+   * Copies all content fields of the source entry; identity, number and
+   * timestamps stay with the new one — and with the creation date the moon phase
+   * that follows from it. The callers used to enumerate the field list
+   * themselves — a new field would then silently be missing in individual places.
    */
   duplicateEntry: async (id) => {
     await get().ensureEntryContent(id);
@@ -326,14 +326,14 @@ export const useEntryStore = create<EntryState>((set, get) => ({
     return get().getEntry(copy.id) ?? copy;
   },
 
-  // serialized: siehe lib/serialize.ts. Ein Schlüssel je Eintrag, nicht je
-  // Typ — ein Typwechsel läuft unter demselben (`entryTypeChange`).
+  // serialized: see lib/serialize.ts. One key per entry, not per
+  // type — a type change runs under the same one (`entryTypeChange`).
   updateEntry: (id, patch, { touch } = {}) => serialized(serialKey('entry', id), async () => {
     const entry = get().getEntry(id);
     if (!entry) return;
-    // Ein noch nicht geladener Inhalt ist leer, nicht der gespeicherte — was
-    // ihn mitschickt, kann ihn nicht gelesen haben. Der Editor montiert erst
-    // mit Inhalt; das hier fängt jeden anderen Weg ab.
+    // Content that is not loaded yet is empty, not the saved one — whatever
+    // sends it along cannot have read it. The editor only mounts
+    // with content; this catches every other path.
     if (patch.content !== undefined && get().pendingContent?.has(id)) {
       console.warn('[entries] content of', id, 'not loaded yet — left as stored');
       const { content: _dropped, ...rest } = patch;
@@ -341,11 +341,11 @@ export const useEntryStore = create<EntryState>((set, get) => ({
     }
     if (!needsWrite(entry, patch, touch)) return;
     const db = await getDb();
-    // Den Typ ändert nur `entryTypeChange`.
+    // Only `entryTypeChange` changes the type.
     const merged: Entry = { ...entry, ...patch, type: entry.type, updated_at: stampFor(entry.updated_at, touch) };
 
-    // `content` nur, wenn er sich ändern soll: er ist das mit Abstand größte
-    // Feld, und ein Titel- oder Tag-Wechsel muss ihn nicht neu verschlüsseln.
+    // `content` only if it is meant to change: it is by far the largest
+    // field, and a title or tag change need not re-encrypt it.
     const writesContent = patch.content !== undefined;
     await db.execute(
       `UPDATE entries
@@ -377,13 +377,13 @@ export const useEntryStore = create<EntryState>((set, get) => ({
   restoreEntry: async (id) => {
     const db = await getDb();
     await db.execute('UPDATE entries SET deleted_at=NULL WHERE id=$1', [id]);
-    // Nur diese Zeile, einsortiert wie beim Laden.
+    // Only this row, sorted in as on load.
     const rows = await db.select<DbRow[]>('SELECT * FROM entries WHERE id = $1', [id]);
     if (!rows[0]) return;
     const entry = fromRow.entry(rows[0]);
     set((s) => ({
       entries: withEntry(s.entries, entry.type, (list) => [...list.filter((e) => e.id !== id), entry].sort(ORDER[entry.type].sort)),
-      // Die volle Zeile ist da — auch, wenn die zweite Stufe noch läuft.
+      // The full row is here — even if the second stage is still running.
       pendingContent: s.pendingContent && withoutIds(s.pendingContent, [id]),
     }));
   },

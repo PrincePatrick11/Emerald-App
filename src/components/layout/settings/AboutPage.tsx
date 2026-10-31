@@ -8,19 +8,19 @@ import packageJson from '../../../../package.json';
 import { DiscordMark, GithubMark, PatreonMark } from './BrandIcons';
 import SettingsSection from './SettingsSection';
 
-/** Die Website fuehrt dieselben vier Sprachen wie die App, unter denselben
- *  Kuerzeln. Eine fuenfte Sprache in LANGUAGE_OPTIONS braucht deshalb auch dort
- *  eine Seite — sonst laeuft der Link ins Leere und faellt hier auf Englisch
- *  zurueck. */
+/** The website offers the same four languages as the app, under the same
+ *  codes. A fifth language in LANGUAGE_OPTIONS therefore needs a page there too
+ *  — otherwise the link leads nowhere and falls back to English
+ *  here. */
 const WEBSITE_BASE = 'https://the-emerald-app.de';
 const PATREON_URL = 'https://www.patreon.com/cw/PrincePatrick';
 const DISCORD_URL = 'https://discord.gg/3TpYUn2AkM';
 
-/** Ein Link, der die App verlaesst: `openUrl` statt <a href>, damit die WebView
- *  nicht selbst dorthin navigiert. Gleicher Weg wie bei den Links im Editor.
+/** A link that leaves the app: `openUrl` instead of <a href>, so the WebView
+ *  does not navigate there itself. The same route as the links in the editor.
  *
- *  Nur das Symbol, in der Akzentfarbe — der Name steht im Tooltip und, fuer
- *  Screenreader, im aria-label. */
+ *  Only the symbol, in the accent colour — the name is in the tooltip and, for
+ *  screen readers, in the aria-label. */
 function AboutLink({ icon, label, url }: { icon: ReactNode; label: string; url: string }) {
   return (
     <button
@@ -35,7 +35,7 @@ function AboutLink({ icon, label, url }: { icon: ReactNode; label: string; url: 
   );
 }
 
-/** Eine Zeile der Faktenliste: Beschriftung links, Wert rechts. */
+/** One row of the fact list: label on the left, value on the right. */
 function AboutFact({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex justify-between text-sm">
@@ -53,13 +53,13 @@ export default function AboutPage() {
     : 'en';
 
   return (
-    // Mit Abschnitts-Ueberschrift wie jede andere Seite des Fensters; die
-    // Karte darin haelt die Faktenliste zusammen.
+    // With a section heading like every other page of the window; the
+    // card inside holds the fact list together.
     <SettingsSection icon={<Info size={14} />} title={t('settings.about')}>
       <div className="panel px-4 py-3 space-y-1.5">
-      {/* Die Marke steht anstelle einer Zeile "App — Emerald App": sie sagt
-          dasselbe und ist die einzige stehende Stelle, an der der Stein gross
-          genug fuer seinen Schliff ist. */}
+      {/* The mark stands in place of a row "App — Emerald App": it says
+          the same and is the only static spot where the stone is large
+          enough for its facets. */}
         <div className="settings-divider-bottom flex items-center gap-2.5 pb-2.5 mb-1">
           <EmeraldMark size={30} />
           <span className="text-sm text-secondary">Emerald App</span>

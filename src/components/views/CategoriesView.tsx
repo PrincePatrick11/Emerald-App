@@ -20,25 +20,25 @@ import ModuleCounts from '../ui/ModuleCounts';
 import type { Category } from '../../types';
 import { useSessionState } from '../../store/sessionStore';
 
-/** Vorbelegung beim Anlegen: modulneutral, dieselbe Glyphe wie das Sammelbecken. */
+/** Default on creation: module-neutral, the same glyph as the catch-all. */
 const DEFAULT_EMOJI = '📦';
 
-/** Wie lange die per Tiefenlink angesprungene Zeile hervorgehoben bleibt. */
+/** How long the row jumped to via deep link stays highlighted. */
 const HIGHLIGHT_MS = 2000;
 
 /**
- * Anlegen und Bearbeiten schließen sich aus — ein Zustand statt zwei parallelen
- * Tripeln, damit das nicht bloß in den Reset-Listen mehrerer Handler steht.
+ * Creating and editing exclude each other — one state instead of two parallel
+ * triples, so that this does not merely live in the reset lists of several handlers.
  */
 type FormState =
   | { mode: 'add' }
   | { mode: 'edit'; id: string };
 
 /**
- * Emoji-Trigger vor dem Namens-Editor — die eine Zeile für Entwurf und
- * Bearbeitung. Als Komponente mit benannten Props: als Helfer mit sechs
- * Stellungsparametern ließen sich Emoji und Name (beide `string`) oder
- * Speichern und Abbrechen (beide `() => void`) lautlos vertauschen.
+ * Emoji trigger in front of the name editor — the one row for draft and
+ * editing. As a component with named props: as a helper with six
+ * positional parameters, emoji and name (both `string`) or
+ * save and cancel (both `() => void`) could be swapped silently.
  */
 function CategoryEditRow({
   emoji, onEmoji, name, onName, error, onSave, onCancel,
@@ -54,8 +54,8 @@ function CategoryEditRow({
   const { t } = useTranslation();
   return (
     <div className="flex items-center gap-3 rounded-md border border-stone-600/70 bg-stone-800/60 px-3 py-2">
-      {/* Platzhalter für den Ziehgriff der Lesezeile — ohne ihn sprängen Emoji
-          und Name beim Wechsel in den Bearbeitungsmodus nach links. */}
+      {/* Placeholder for the read row's drag handle — without it emoji
+          and name would jump to the left when switching to edit mode. */}
       <span className="w-3 flex-shrink-0" />
       <EmojiPicker
         value={emoji}
@@ -76,17 +76,17 @@ function CategoryEditRow({
 }
 
 /**
- * Die eine Verwaltung der globalen Kategorienliste: anlegen, umbenennen,
- * Emoji, löschen, Reihenfolge. Die Module weisen Kategorien nur noch zu und
- * gruppieren nach ihnen — hier gehört die Liste als Liste hin, samt der
- * Antwort darauf, wer eine Kategorie überhaupt benutzt.
+ * The one place managing the global category list: create, rename,
+ * emoji, delete, order. The modules only assign categories now and
+ * group by them — this is where the list belongs as a list, along with the
+ * answer to who uses a category at all.
  *
- * `Dashboard` liefert den Kopf — Titel, „Kategorie hinzufügen" und die Suche —
- * und portalt ihn wie in jedem Modul in die rechte Seitenleiste, sobald die
- * offen ist. Ansicht und Sortierung bleiben weg: die Ordnung dieser Liste ist
- * die von Hand gezogene `sort_order`, ein Sortier-Dropdown darüber widerspräche
- * sich. Der Inhalt läuft über `grouping: { mode: 'custom' }`, weil die Liste
- * weder Gruppen noch Karten kennt.
+ * `Dashboard` supplies the header — title, "Add category" and the search —
+ * and portals it into the right sidebar as in every module, as soon as that
+ * is open. View and sorting are left out: this list's order is the
+ * hand-dragged `sort_order`, a sort dropdown on top of it would contradict
+ * itself. The content runs through `grouping: { mode: 'custom' }`, because
+ * the list knows neither groups nor cards.
  */
 export default function CategoriesView() {
   const { t } = useTranslation();
@@ -103,8 +103,8 @@ export default function CategoriesView() {
     );
   const pushUndo = useUndoStore((s) => s.push);
 
-  // Kein fetch beim Mount: reloadAllStores() lädt beim Start und beim
-  // Vault-Wechsel Einträge, Aufgaben und Altar samt Kategorien.
+  // No fetch on mount: reloadAllStores() loads entries, tasks and altar
+  // along with categories at startup and on vault switch.
   const articles = useEntryStore((s) => s.entries.wiki);
   const operations = useEntryStore((s) => s.entries.operation);
   const tasks = useTaskStore((s) => s.tasks);
@@ -114,13 +114,13 @@ export default function CategoriesView() {
   const [name, setName] = useState('');
   const [emoji, setEmoji] = useState(DEFAULT_EMOJI);
   const [search, setSearch] = useSessionState('categories.search', '');
-  /** Fehlermeldung neben dem Namensfeld — heute nur „Name schon vergeben". */
+  /** Error message next to the name field — today only "Name already taken". */
   const [nameError, setNameError] = useState<string | null>(null);
 
   /**
-   * Der Tiefenlink aus der globalen Suche scrollt zur Zeile und hebt sie kurz
-   * hervor — es gibt hier keine Auswahl, an der ein Treffer sonst
-   * hängenbleiben könnte.
+   * The deep link from the global search scrolls to the row and briefly
+   * highlights it — there is no selection here a hit could otherwise
+   * get stuck on.
    */
   const [highlightId, setHighlightId] = useState<string | null>(null);
   useDeepLink({
@@ -130,9 +130,9 @@ export default function CategoriesView() {
     onOpen: (cat) => setHighlightId(cat.id),
   });
 
-  // Das Ausblenden hängt an `highlightId`, nicht am Tiefenlink: dort räumte
-  // jede Kategorienänderung innerhalb der zwei Sekunden den Timer ab — die
-  // Hervorhebung bliebe bis zum Verlassen der Ansicht stehen.
+  // The fade-out hangs on `highlightId`, not on the deep link: there, every
+  // category change within the two seconds would clear the timer — the
+  // highlight would stay until the view is left.
   useEffect(() => {
     if (!highlightId) return;
     const timer = window.setTimeout(() => setHighlightId(null), HIGHLIGHT_MS);
@@ -140,28 +140,28 @@ export default function CategoriesView() {
   }, [highlightId]);
 
   /**
-   * Zwei Feinheiten der Zahlen: Unteraufgaben zählen mit (sie tragen eine
-   * eigene `category_id`, die ein endgültiges Löschen mit umhängt), und die
-   * Stores halten nur lebende Zeilen — was im Papierkorb liegt, zählt nicht.
+   * Two subtleties of the numbers: subtasks count too (they carry their own
+   * `category_id`, which a permanent delete reassigns as well), and the
+   * stores only hold live rows — what is in the trash does not count.
    */
   const countsById = useMemo(
     () => categoryUsageCounts({ wiki: articles, operations, tasks, altar: items }),
     [articles, operations, tasks, items],
   );
 
-  // ── Drag-Sortieren ────────────────────────────────────────────────────────
-  // Dasselbe Pointer-Muster wie die Ebenenliste im Altar-Panel: kein
-  // HTML5-Drag, kein Paket. `visualRef` hält die Endordnung für die
-  // pointerup-Closure, die sonst den Stand vom Drag-Beginn sähe.
+  // ── Drag sorting ──────────────────────────────────────────────────────────
+  // The same pointer pattern as the layer list in the altar panel: no
+  // HTML5 drag, no package. `visualRef` holds the final order for the
+  // pointerup closure, which would otherwise see the state from drag start.
   const [dragState, setDragState] = useState<{ fromId: string; overIndex: number } | null>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const visualRef = useRef<Category[]>([]);
 
   const query = search.trim().toLowerCase();
   /**
-   * Die Suche dünnt nur aus. Ziehen ist dabei gesperrt: `reorderCategories`
-   * schreibt die komplette Ordnung, aus einer gefilterten Liste käme die
-   * Reihenfolge der ausgeblendeten Kategorien nicht zurück.
+   * The search only thins the list out. Dragging is locked while it is active:
+   * `reorderCategories` writes the complete order, and from a filtered list the
+   * order of the hidden categories would not come back.
    */
   const matches = useMemo(
     () => (query ? categories.filter((c) => categoryLabel(t, c).toLowerCase().includes(query)) : categories),
@@ -201,7 +201,7 @@ export default function CategoriesView() {
     };
     const onUp = () => {
       const order = visualRef.current.map((c) => c.id);
-      // Ein Fehlklick auf den Griff soll kein UPDATE über die ganze Tabelle auslösen.
+      // A misclick on the handle should not trigger an UPDATE across the whole table.
       if (order.some((id, i) => categories[i]?.id !== id)) reorderCategories(order);
       setDragState(null);
       document.removeEventListener('pointermove', onMove);
@@ -211,7 +211,7 @@ export default function CategoriesView() {
     document.addEventListener('pointerup', onUp);
   }, [categories, reorderCategories]);
 
-  // ── Anlegen / Bearbeiten / Löschen ────────────────────────────────────────
+  // ── Create / edit / delete ────────────────────────────────────────────────
   const openForm = (next: FormState, withName: string, withEmoji: string) => {
     setNameError(null);
     setName(withName);
@@ -224,7 +224,7 @@ export default function CategoriesView() {
     setForm(null);
   };
 
-  /** Legt an oder speichert um — je nachdem, welches Formular offen ist. */
+  /** Creates or saves the change — depending on which form is open. */
   const submitForm = async () => {
     const trimmed = name.trim();
     if (!form || !trimmed) return;
@@ -232,7 +232,7 @@ export default function CategoriesView() {
       if (form.mode === 'add') await addCategory(trimmed, emoji);
       else await updateCategory(form.id, trimmed, emoji);
     } catch (err) {
-      // Der Store wirft bei vergebenem Namen, statt einen Fehlerwert zu liefern.
+      // The store throws on a taken name instead of returning an error value.
       if (err instanceof Error && err.message === CATEGORY_NAME_TAKEN) setNameError(t('categories.nameTaken'));
       else console.error('[CategoriesView] saving the category failed:', err);
       return;
@@ -240,11 +240,11 @@ export default function CategoriesView() {
     closeForm();
   };
 
-  /** Ohne Rückfrage in den Papierkorb, wie alles andere — der Hinweis bietet Rückgängig. */
+  /** To the trash without confirmation, like everything else — the notice offers undo. */
   const handleDelete = async (id: string) => {
-    // Eingebaute Kategorien lehnt der Store ab. Ohne diese Prüfung meldete die
-    // Oberfläche „Kategorie gelöscht" samt Rückgängig-Knopf für etwas, das nie
-    // passiert ist.
+    // The store rejects built-in categories. Without this check the interface
+    // would report "Category deleted" with an undo button for something that
+    // never happened.
     if ((await deleteCategory(id)) === false) return;
     pushUndo({
       id: generateId(),
@@ -263,7 +263,7 @@ export default function CategoriesView() {
     onCancel: closeForm,
   };
 
-  // ── Zeilen ────────────────────────────────────────────────────────────────
+  // ── Rows ──────────────────────────────────────────────────────────────────
   const renderRow = (cat: Category) => {
     if (form?.mode === 'edit' && form.id === cat.id) {
       return <CategoryEditRow key={cat.id} {...formProps} />;
@@ -286,7 +286,7 @@ export default function CategoriesView() {
         }`}
       >
         {query ? (
-          // Platz halten, damit die gefilterte Liste nicht um 12px verspringt.
+          // Hold the space so the filtered list does not jump by 12px.
           <span className="w-3 flex-shrink-0" />
         ) : (
           <span
@@ -301,10 +301,10 @@ export default function CategoriesView() {
 
         <ModuleCounts modules={CATEGORY_MODULE_IDS} counts={counts} />
 
-        {/* Sigillen: nicht löschbar, und ein Umbenennen liefe ins Leere — der
-            Name kommt aus der Locale, nicht aus der Zeile. Der Block bleibt
-            trotzdem stehen, sonst rückte die Zahlenspalte dieser einen Zeile um
-            die Breite der beiden Knöpfe aus der Flucht. */}
+        {/* Sigils: not deletable, and a rename would lead nowhere — the
+            name comes from the locale, not from the row. The block stays
+            anyway, otherwise this one row's number column would shift out of
+            alignment by the width of the two buttons. */}
         <span className="flex items-center justify-end gap-1.5 flex-shrink-0 min-w-[54px]">
           {cat.is_builtin ? null : (
             <>
@@ -343,8 +343,8 @@ export default function CategoriesView() {
             <div ref={listRef} className="space-y-1">
               {visualCategories.map(renderRow)}
             </div>
-            {/* Der Entwurf steht bewusst außerhalb der Liste: er wäre sonst ein
-                Kind mehr, über das die Index-Rechnung des Ziehens stolpert. */}
+            {/* The draft deliberately sits outside the list: it would otherwise
+                be one more child for the drag's index calculation to trip over. */}
             {form?.mode === 'add' && (
               <div className="mt-1">
                 <CategoryEditRow {...formProps} />

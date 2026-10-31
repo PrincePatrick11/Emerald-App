@@ -2,7 +2,7 @@ import { useTranslation } from 'react-i18next';
 import { EyeOff } from 'lucide-react';
 import { formatIsoDateLong } from '../../lib/formatDate';
 
-/** Was Rechner und Zeichnung zeigen, solange die Sigille geladen und verborgen ist — in beiden Modi. */
+/** What calculator and drawing show while the sigil is charged and concealed, in both modes. */
 export default function SigilConcealed({ revealDate }: { revealDate: string | null }) {
   const { t } = useTranslation();
   return (

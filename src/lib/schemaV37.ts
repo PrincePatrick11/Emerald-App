@@ -1,23 +1,23 @@
 /**
- * Eingefrorenes Schema, Stand v37 — der Zustand, den Migration v33
- * (`normalizeSchema.ts`) herstellt.
+ * Frozen schema, as of v37 — the state that migration v33
+ * (`normalizeSchema.ts`) produces.
  *
- * Bis v37 hat v33 direkt aus `schema.ts` gebaut, weil beide dasselbe Schema
- * meinten. Seit v38 die vier Kategorie-Tabellen zu einer zusammenlegt, stimmt
- * das nicht mehr: Liefe v33 gegen das lebende DDL, legte es auf alten Vaults
- * `categories` an und scheiterte beim Kopieren der Inhalte, deren Spalten es
- * nicht mehr gibt. Also bekommt v33 hier seine eigene Kopie der Tabellen, die
- * sich seither geändert haben. Alle anderen zieht es weiter aus `schema.ts` —
- * **wer eine davon in einer späteren Migration ändert, friert sie hier ein.**
- * (`journal_entries` kommt aus `schemaV48.ts`: bis v48 unverändert, seit v49
- * in `entries` aufgegangen.)
+ * Up to v37, v33 built directly from `schema.ts`, because both meant the same
+ * schema. Since v38 merges the four category tables into one, that is no
+ * longer true: if v33 ran against the live DDL, it would create `categories`
+ * on old vaults and fail when copying the contents, whose columns no longer
+ * exist. So v33 gets its own copy here of the tables that have changed
+ * since. It still pulls all the others from `schema.ts` —
+ * **whoever changes one of them in a later migration freezes it here.**
+ * (`journal_entries` comes from `schemaV48.ts`: unchanged up to v48, merged
+ * into `entries` since v49.)
  *
- * `scripts/schema-check.mjs` beweist weiterhin, dass Baseline und Kettenende
- * beim identischen Schema landen.
+ * `scripts/schema-check.mjs` continues to prove that baseline and chain end
+ * land on the identical schema.
  *
- * Zweite Aufgabe der Datei: die eingebauten Kategorien von damals als Daten
- * (`LEGACY_*_CATEGORIES`), die v36–v38 und der Import alter Dateien noch
- * brauchen, um IDs von früher zu Namen und Emojis aufzulösen.
+ * The file's second job: the built-in categories of that time as data
+ * (`LEGACY_*_CATEGORIES`), which v36–v38 and the import of old files still
+ * need to resolve IDs from back then to names and emojis.
  */
 import { ddlBeforeV49 } from './schemaV48';
 
@@ -54,7 +54,7 @@ const V37_SOFT_DELETE_TABLES = [
 ] as const;
 
 const FROZEN: Partial<Record<V37TableName, string>> = {
-  // Seit v47 (`drop_links`) gibt es die Tabelle nicht mehr — v33 baut sie noch.
+  // Since v47 (`drop_links`) the table no longer exists — v33 still builds it.
   links: `
     CREATE TABLE links (
       source_id TEXT NOT NULL,
@@ -64,7 +64,7 @@ const FROZEN: Partial<Record<V37TableName, string>> = {
       PRIMARY KEY (source_id, target_id)
     )`,
 
-  // Seit v46 (`altars_soft_delete`) trägt die Tabelle `deleted_at` — v33 baut sie ohne.
+  // Since v46 (`altars_soft_delete`) the table carries `deleted_at` — v33 builds it without.
   altars: `
     CREATE TABLE altars (
       id TEXT PRIMARY KEY,
@@ -89,7 +89,7 @@ const FROZEN: Partial<Record<V37TableName, string>> = {
       updated_at TEXT NOT NULL
     )`,
 
-  // Seit v44 (`routines_to_templates`) gibt es die Tabelle im lebenden Schema nicht mehr.
+  // Since v44 (`routines_to_templates`) the table no longer exists in the live schema.
   routines: `
     CREATE TABLE routines (
       id TEXT PRIMARY KEY,
@@ -238,10 +238,10 @@ export const V37_INDEX_DDL: string[] = [
 ];
 
 /**
- * Die eingebauten Kategorien von vor v38, wie die Kette v7/v12/v22 sie
- * angelegt hat: [id, Seed-Name, Emoji]. Gebraucht von den Migrationen v36–v38
- * (Emoji-Rückfall, Erkennung „noch nicht umbenannt") und vom Import alter
- * `.emerald`-Dateien, die eine Wiki-Kategorie noch über ihre Builtin-ID nennen.
+ * The built-in categories from before v38, as the chain v7/v12/v22 created
+ * them: [id, seed name, emoji]. Needed by migrations v36–v38
+ * (emoji fallback, detection of "not renamed yet") and by the import of old
+ * `.emerald` files that still name a wiki category by its built-in ID.
  */
 export const LEGACY_WIKI_CATEGORIES: readonly [string, string, string][] = [
   ['paradigm', 'Paradigma', '🌀'],

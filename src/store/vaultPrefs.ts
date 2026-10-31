@@ -4,23 +4,23 @@ import {
 } from './uiStore';
 
 /**
- * Die Vorlieben eines Vaults: wie jede Liste aussieht (Ansicht, Sortierung,
- * Gruppierung), die Abschnitte der Startseite, welche Gruppen und Abschnitte
- * zugeklappt sind. Dauerhaft und je Vault — ein anderer Vault hat andere
- * Kategorien und andere Gewohnheiten.
+ * The preferences of a vault: how each list looks (view, sorting,
+ * grouping), the sections of the home page, which groups and sections
+ * are collapsed. Permanent and per vault — another vault has different
+ * categories and different habits.
  *
- * Gelebt wird im `uiStore`, wie bisher; dieses Modul lädt die Felder beim
- * Öffnen eines Vaults (`loadVaultPrefs`) und schreibt jede Änderung zurück, in
- * den localStorage unter `vault-prefs:<id>`. Nicht in `settings.json`: das
- * sind keine Einstellungen, und jeder Klick auf „Sortieren" wäre sonst ein
- * Dateizugriff.
+ * They live in the `uiStore`, as before; this module loads the fields when
+ * a vault is opened (`loadVaultPrefs`) and writes every change back, into
+ * localStorage under `vault-prefs:<id>`. Not in `settings.json`: these
+ * are not settings, and every click on "Sort" would otherwise be a
+ * file access.
  *
- * Was nicht dazugehört: der Arbeitszustand — Suche, Filter, Auswahl —, der
- * nur für die Sitzung gilt (`sessionStore`), und das Fenster-Layout —
- * Leistenbreiten, welche Seitenleisten offen sind, die Tabs —, das für die App
- * gilt, gleich welcher Vault offen ist.
+ * What does not belong here: the working state — search, filters, selection —,
+ * which applies only to the session (`sessionStore`), and the window layout —
+ * bar widths, which sidebars are open, the tabs —, which applies to the app
+ * regardless of which vault is open.
  */
-/** Die Listen mit Ansicht, Sortierung und Gruppierung (`ListPrefs`). */
+/** The lists with view, sorting and grouping (`ListPrefs`). */
 const LIST_PREF_KEYS = [
   'journalPrefs', 'wikiPrefs', 'operationsPrefs', 'tasksPrefs', 'altarPrefs', 'trashPrefs',
   'templatesPrefs', 'blocksPrefs', 'lexiconPrefs',
@@ -39,12 +39,12 @@ type Prefs = Pick<UIState, PrefKey>;
 
 const storageKey = (vaultId: string) => `vault-prefs:${vaultId}`;
 
-/** Was ein Vault ohne gespeicherte Vorlieben bekommt — der Anfangszustand des Stores. */
+/** What a vault without saved preferences gets — the initial state of the store. */
 const DEFAULTS: Prefs = pick(useUIStore.getState());
 
-/** Der Vault, dessen Vorlieben im Store stehen — `null`, solange keiner geladen ist. Dann wird nichts geschrieben. */
+/** The vault whose preferences are in the store — `null` while none is loaded. Then nothing is written. */
 let prefsVaultId: string | null = null;
-/** Während `loadVaultPrefs` den Store füllt: das Füllen selbst schreibt nichts zurück. */
+/** While `loadVaultPrefs` fills the store: the filling itself writes nothing back. */
 let hydrating = false;
 
 function pick(s: UIState): Prefs {
@@ -54,7 +54,7 @@ function pick(s: UIState): Prefs {
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
 
-/** `saved`, wenn es einer der erlaubten Werte ist, sonst `fallback`. */
+/** `saved` if it is one of the allowed values, otherwise `fallback`. */
 function oneOf<T>(saved: unknown, allowed: readonly string[], fallback: T): T {
   return typeof saved === 'string' && allowed.includes(saved) ? (saved as T) : fallback;
 }
@@ -73,7 +73,7 @@ function homePrefs(saved: unknown, fallback: HomeSectionPrefs): HomeSectionPrefs
   return {
     view: oneOf(saved.view, HOME_VIEWS, fallback.view),
     sort: oneOf(saved.sort, SORT_MODES.filter((s) => s !== 'count_desc'), fallback.sort),
-    // Nur, was das Menü anbietet — ein Vault von früher kann noch den alten Wiki-Standard 6 tragen.
+    // Only what the menu offers — an older vault may still carry the old wiki default 6.
     count: (HOME_COUNTS as readonly unknown[]).includes(saved.count) ? (saved.count as number) : fallback.count,
   };
 }
@@ -87,8 +87,8 @@ function libraryPrefs(saved: unknown, fallback: AltarLibraryPrefs): AltarLibrary
 }
 
 /**
- * Die Vorlieben, die vor den Vorlieben je Vault app-weit lagen. Ein Vault ohne
- * eigene fängt mit ihnen an, damit nach dem Update nichts zurückspringt.
+ * The preferences that were app-wide before there were per-vault preferences. A vault without
+ * its own starts with them, so that nothing jumps back after the update.
  */
 function legacyPrefs(): Partial<Prefs> {
   try {
@@ -106,9 +106,9 @@ function legacyPrefs(): Partial<Prefs> {
 }
 
 /**
- * Die gespeicherten Vorlieben, geprüft statt geglaubt: nur Felder, die es gibt
- * und die gültig sind — ein Schlüssel überlebt Versionen, in denen es andere
- * Werte gab. Alles andere fällt auf den Standard.
+ * The saved preferences, checked rather than trusted: only fields that exist
+ * and are valid — a key survives versions in which there were other
+ * values. Everything else falls back to the default.
  */
 function parse(raw: string | null): Prefs {
   let saved: Record<string, unknown> = {};
@@ -116,7 +116,7 @@ function parse(raw: string | null): Prefs {
     const parsed: unknown = raw === null ? null : JSON.parse(raw);
     if (isRecord(parsed)) saved = parsed;
   } catch {
-    // Kaputt heißt: wie ein Vault ohne Vorlieben.
+    // Broken means: like a vault without preferences.
   }
   const lists = Object.fromEntries(
     LIST_PREF_KEYS.map((key) => [key, listPrefs(saved[key], DEFAULTS[key])]),
@@ -154,13 +154,13 @@ function serialize(prefs: Prefs): string {
   });
 }
 
-/** Lädt die Vorlieben von `vaultId` in den Store — beim Start und nach jedem Vault-Wechsel. */
+/** Loads the preferences of `vaultId` into the store — at startup and after every vault switch. */
 export function loadVaultPrefs(vaultId: string): void {
   let raw: string | null = null;
   try {
     raw = localStorage.getItem(storageKey(vaultId));
   } catch {
-    // Ohne Speicher gelten die Standards.
+    // Without storage the defaults apply.
   }
   const prefs = raw === null ? { ...parse(null), ...legacyPrefs() } : parse(raw);
   hydrating = true;
@@ -172,18 +172,18 @@ export function loadVaultPrefs(vaultId: string): void {
   prefsVaultId = vaultId || null;
 }
 
-/** Kein Vault mehr offen (ein gescheiterter erster Wechsel): ab jetzt wird nichts geschrieben. */
+/** No vault open any more (a failed first switch): from now on nothing is written. */
 export function detachVaultPrefs(): void {
   prefsVaultId = null;
 }
 
-/** Ein Vault wird entfernt: seine Vorlieben gehen mit. */
+/** A vault is removed: its preferences go with it. */
 export function forgetVaultPrefs(vaultId: string): void {
   if (prefsVaultId === vaultId) prefsVaultId = null;
   try {
     localStorage.removeItem(storageKey(vaultId));
   } catch {
-    // Nichts zu tun.
+    // Nothing to do.
   }
 }
 

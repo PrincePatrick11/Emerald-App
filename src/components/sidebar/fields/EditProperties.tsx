@@ -10,23 +10,23 @@ import { reportImageError } from '../../../store/imageNoticeStore';
 import { RowIcon } from './SidebarSection';
 
 /**
- * Die Bausteine der Bearbeiten-Seitenleiste — das Gegenstück zu
- * `SidebarPropertyRow` der Leseansicht. Dieselbe Zeile (Icon, Name, rechts der
- * Wert, gleich eingerückt), nur ist der Wert hier ein Bedienelement: ein
- * Wert-Knopf mit Menü, ein Medium mit Vorschau oder die Typ-Segmente.
+ * The building blocks of the edit sidebar, the counterpart to
+ * `SidebarPropertyRow` of the read view. The same row (icon, name, value on the
+ * right, indented the same), except that here the value is a control: a
+ * value button with a menu, a medium with a preview, or the type segments.
  *
- * Der Körper darum herum ist `EditSidebarBody`; die Abschnitte sind dieselben
- * `SidebarSection`s wie im Lesen, samt ihrem gemerkten Auf/Zu.
+ * The body around it is `EditSidebarBody`; the sections are the same
+ * `SidebarSection`s as when reading, including their remembered open/closed state.
  */
 
-/** Der Körper der Bearbeiten-Seitenleiste einer Bibliotheksseite — Abstand wie `RightSidebar` im Lesen. */
+/** The body of the edit sidebar of a library page; spacing as in `RightSidebar` when reading. */
 export function EditSidebarBody({ children }: { children: ReactNode }) {
   return <div className="flex flex-col gap-5">{children}</div>;
 }
 
 /**
- * Eine Eigenschaft im Bearbeiten: Icon und Name links (nie gekürzt), das
- * Bedienelement rechts. 36px hoch, damit ein 28px-Wert-Knopf Luft hat.
+ * A property when editing: icon and name on the left (never truncated), the
+ * control on the right. 36px tall so that a 28px value button has room.
  */
 export function EditPropertyRow({ icon, label, children }: {
   icon: ReactNode;
@@ -43,14 +43,14 @@ export function EditPropertyRow({ icon, label, children }: {
 }
 
 /**
- * Der Wert einer Auswahl-Eigenschaft (Kategorie): Wert-Knopf mit
- * Chevron, das Menü geportalt und rechtsbündig. `muted` für „Keine".
+ * The value of a choice property (category): value button with
+ * chevron, the menu portalled and right-aligned. `muted` for "None".
  */
 export function PropertySelect<T extends string>({ value, options, onChange, text, muted = false, ariaLabel }: {
   value: T;
   options: DropdownOption<T>[];
   onChange: (value: T) => void;
-  /** Was der Knopf zeigt — meist Emoji und Name der gewählten Option. */
+  /** What the button shows, usually the emoji and name of the chosen option. */
   text: string;
   muted?: boolean;
   ariaLabel: string;
@@ -80,7 +80,7 @@ export function PropertySelect<T extends string>({ value, options, onChange, tex
   );
 }
 
-/** Die Vorschau im Medien-Knopf: Bild als Thumbnail (Icon 20×18, Titelbild 44×18) oder das Emoji. */
+/** The preview in the media button: image as thumbnail (icon 20×18, cover image 44×18) or the emoji. */
 function MediaPreview({ kind, value }: { kind: 'icon' | 'cover'; value: string }) {
   if (kind === 'cover') return <img src={value} alt="" className="prop-value-thumb w-11" />;
   return isImageIcon(value)
@@ -89,14 +89,14 @@ function MediaPreview({ kind, value }: { kind: 'icon' | 'cover'; value: string }
 }
 
 /**
- * Icon oder Titelbild als Eigenschaft: der Knopf zeigt nur die Vorschau (ohne
- * Chevron), leer „+ Hinzufügen". Ein Klick öffnet ein Menü — Bild wählen,
- * beim Icon Emoji, und Entfernen. Ein leeres Titelbild hat nur den einen Weg
- * und öffnet gleich die Dateiauswahl.
+ * Icon or cover image as a property: the button shows only the preview (no
+ * chevron), or "+ Add" when empty. A click opens a menu: choose image,
+ * for the icon also emoji, and Remove. An empty cover image has only the one way
+ * and opens the file picker right away.
  *
- * Mit `fallback` setzt „Entfernen" auf dieses Icon zurück statt auf nichts und
- * fehlt, solange es schon gilt — ein eigener Block und eine Vorlage tragen
- * immer ein Icon.
+ * With `fallback`, "Remove" resets to this icon instead of to nothing and
+ * is absent while it already applies: a custom block and a template always
+ * carry an icon.
  */
 export function MediaPropertyRow({ rowIcon, label, kind, value, onChange, onRemove, fallback }: {
   rowIcon: ReactNode;
@@ -105,7 +105,7 @@ export function MediaPropertyRow({ rowIcon, label, kind, value, onChange, onRemo
   value?: string | null;
   onChange: (value: string) => void;
   onRemove?: () => void;
-  /** Das Standard-Icon, auf das „Entfernen" zurücksetzt (statt `onRemove`). */
+  /** The default icon that "Remove" resets to (instead of `onRemove`). */
   fallback?: string;
 }) {
   const { t } = useTranslation();
@@ -128,11 +128,11 @@ export function MediaPropertyRow({ rowIcon, label, kind, value, onChange, onRemo
     }
     try {
       const next = kind === 'icon' ? await readIconFile(file) : await prepareImageDataUrl(await readFileAsDataUrl(file));
-      // `null`: ein Icon in einem abgelehnten Format (auch SVG) — wie beim Titelbild sagen.
+      // `null`: an icon in a rejected format (SVG too); say so, as with the cover image.
       if (next) onChange(next);
       else showNotice(t('common.unsupportedImageFormat'));
     } catch (err) {
-      // Lieber nichts setzen als ein leeres Bild: der bisherige Wert ist besser als keiner.
+      // Better to set nothing than an empty image: the previous value is better than none.
       if (kind === 'icon') {
         reportImageError(err, 'icon');
       } else if (err instanceof ImageTooLargeError) {
@@ -148,14 +148,14 @@ export function MediaPropertyRow({ rowIcon, label, kind, value, onChange, onRemo
     ? (value === fallback ? undefined : () => onChange(fallback))
     : (value ? onRemove : undefined);
 
-  // Emoji nur beim Icon: nur dort gibt es einen Picker, der es aufklappt.
+  // Emoji only for the icon: only there is there a picker that opens it.
   const actions = (toggleEmoji?: () => void): ContextMenuAction[] => [
     { label: t('properties.chooseImage'), icon: <ImagePlus size={12} />, onClick: pickFile },
     ...(toggleEmoji ? [{ label: t('properties.emoji'), icon: <Smile size={12} />, onClick: toggleEmoji }] : []),
     ...(remove ? [{ label: t('properties.remove'), icon: <X size={12} />, onClick: remove, danger: true }] : []),
   ];
 
-  // Ein leeres Titelbild öffnet gleich die Dateiauswahl, kein Menü.
+  // An empty cover image opens the file picker right away, no menu.
   const opensMenu = kind === 'icon' || !!value;
 
   const button = (toggleEmoji?: () => void) => (

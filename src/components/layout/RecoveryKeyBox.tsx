@@ -5,11 +5,11 @@ import Button from '../ui/Button';
 import { SwitchRow } from '../ui/Switch';
 
 /**
- * Ein frisch erzeugter Wiederherstellungsschlüssel: der Schlüssel selbst,
- * Kopieren und die Bestätigung, ihn aufbewahrt zu haben. Er wird nur dieses
- * eine Mal gezeigt — beim Anlegen, Verschlüsseln und beim Passwortwechsel,
- * der einen neuen bringt. Was nach der Bestätigung geschieht, entscheidet
- * der Aufrufer (`stored`).
+ * A freshly generated recovery key: the key itself,
+ * copying and the confirmation of having stored it. It is shown only this
+ * once — on creating, encrypting and on a password change
+ * that brings a new one. What happens after the confirmation is decided
+ * by the caller (`stored`).
  */
 export default function RecoveryKeyBox({ recoveryKey, stored, onStoredChange }: {
   recoveryKey: string;

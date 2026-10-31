@@ -13,23 +13,23 @@ import type { BlockGroup, BlockTypeMeta } from './blockTypes';
 import type { BlockInstance } from './types';
 
 /**
- * Was „Block hinzufügen" anbietet. Ein Eintrag ist nicht dasselbe wie ein
- * Blocktyp: jede Feldart ist ein eigener Eintrag, legt aber einen `core.fields`
- * mit einem Element an. Dahinter stehen die eigenen Blöcke aus der
- * Blöcke-Ansicht (`def:<id>`) — die liest der Aufrufer aus dem Store und
- * reicht sie herein, weil `lib/blocks` keine Stores kennt.
+ * What "Add block" offers. An entry is not the same as a block type: each
+ * field kind is its own entry but creates a `core.fields` with one element.
+ * Behind them come the custom blocks from the blocks view (`def:<id>`) —
+ * the caller reads them from the store and passes them in, because
+ * `lib/blocks` knows no stores.
  */
 export interface BlockPreset {
   id: string;
   labelKey: string;
-  /** Erklärung als Tooltip in der Übersicht der Blöcke-Ansicht — nur wo die Beschriftung nicht reicht. */
+  /** Explanation as a tooltip in the overview of the blocks view — only where the label is not enough. */
   descriptionKey?: string;
   icon: LucideIcon;
   group: BlockGroup;
   create: () => BlockInstance;
 }
 
-/** Das Zeichen eines Blocks: ein lucide-Icon, oder das Emoji eines eigenen Blocks. */
+/** The glyph of a block: a lucide icon, or the emoji of a custom block. */
 export type GlyphSource = LucideIcon | string;
 
 export const ELEMENT_KIND_ICONS: Record<ElementKind, LucideIcon> = {
@@ -51,8 +51,8 @@ export const ELEMENT_KIND_ICONS: Record<ElementKind, LucideIcon> = {
 
 const KIND_GROUPS: Partial<Record<ElementKind, BlockGroup>> = { link: 'reference', altar: 'reference', image: 'media', moon: 'moon' };
 
-// Text und die Sigillen-Teile gibt es nur in eigenen Blöcken — einzeln fügt man
-// den Textblock und die Sigillen-Blöcke ein (oben und unten).
+// Text and the sigil parts exist only in custom blocks — on their own one
+// inserts the text block and the sigil blocks (above and below).
 const FIELD_PRESET_KINDS = ELEMENT_KINDS.filter((kind) => kind !== 'text' && !isSigilKind(kind));
 
 export const BLOCK_PRESETS: readonly BlockPreset[] = [
@@ -71,14 +71,14 @@ export const BLOCK_PRESETS: readonly BlockPreset[] = [
 
 const DEFINITION_PRESET_PREFIX = 'def:';
 
-/** Die Voreinstellungs-ID eines eigenen Blocks. */
+/** The preset ID of a custom block. */
 export function definitionPresetId(defId: string): string {
   return `${DEFINITION_PRESET_PREFIX}${defId}`;
 }
 
 /**
- * Ein neuer Block aus einer Voreinstellung — `null`, wenn es sie (nicht mehr)
- * gibt. `text` schreibt den Fallback der Vorgaben eines eigenen Blocks.
+ * A new block from a preset — `null` if it does not (or no longer) exist.
+ * `text` writes the fallback of a custom block's defaults.
  */
 export function createFromPreset(
   presetId: string,
@@ -93,8 +93,8 @@ export function createFromPreset(
 }
 
 /**
- * Das Zeichen eines Blocks: eine Kopie eines eigenen Blocks trägt dessen
- * Emoji, ein Feldblock mit genau einem Element das Icon seiner Art.
+ * The glyph of a block: a copy of a custom block carries its emoji,
+ * a fields block with exactly one element the icon of its kind.
  */
 export function blockIcon(block: BlockInstance, meta: BlockTypeMeta | undefined): GlyphSource | undefined {
   if (meta?.id === FIELDS_BLOCK_TYPE) {

@@ -11,22 +11,22 @@ import { insertTemplateRow, nextTemplateSortOrder, templateById } from './templa
 import { DEFAULT_TEMPLATE_ICON, isTemplateId, type Template } from './blocks/templates';
 
 /**
- * Die Routinen (Tabelle `routines`, bis v43) werden Vorlagen — Migration v44
- * und der Import älterer Sicherungen gehen denselben Weg.
+ * The routines (table `routines`, up to v43) become templates — migration v44
+ * and the import of older backups take the same path.
  *
- * Eine Routine war Name, Emoji, Text (Markdown), Tags und je eine Liste
- * verknüpfter Operationen und Wiki-Artikel, die man in einen Eintrag zog. Seit
- * dem Umbau der Seitenleiste gab es keinen Weg mehr dorthin; die Vorlage kann
- * alles, was sie konnte. Aus ihr wird eine Vorlage ohne Zuweisung (also in
- * jedem Eintrag wählbar) mit derselben ID: der Text als Absätze, die
- * Verknüpfungen als Link-Blöcke — dieselben, die das Einfügen einer Routine
- * geschrieben hätte —, die Tags als Tags.
+ * A routine was a name, emoji, text (Markdown), tags and one list each of
+ * linked operations and wiki articles that one dragged into an entry. Since
+ * the sidebar rework there was no way to get there any more; the template can do
+ * everything it could. It becomes a template without an assignment (so selectable in
+ * every entry) with the same ID: the text as paragraphs, the
+ * links as link blocks — the same ones that inserting a routine would have
+ * written —, the tags as tags.
  */
 
-/** Eine Routine, wie sie in der Tabelle oder einer Sicherung steht. */
+/** A routine as it appears in the table or a backup. */
 type RoutineRow = Record<string, unknown>;
 
-/** Ein mögliches Link-Ziel (Operation oder Wiki-Artikel). */
+/** A possible link target (operation or wiki article). */
 export interface RoutineTargetRow {
   id: string;
   title: string | null;
@@ -43,7 +43,7 @@ export interface RoutineCategoryRow {
   is_builtin: number | boolean;
 }
 
-/** Was ein Link-Chip über sein Ziel wissen muss. */
+/** What a link chip needs to know about its target. */
 interface RoutineLinkTarget {
   title: string;
   icon: string;
@@ -53,13 +53,13 @@ interface RoutineLinkTarget {
 
 type RoutineLinkResolver = (entryType: 'operation' | 'wiki', id: string) => RoutineLinkTarget | undefined;
 
-/** Links und Bilder nur mit diesen Schemata — alles andere bleibt Text. */
+/** Links and images only with these schemes — everything else stays text. */
 const SAFE_URL_RE = /^(?:https?:|mailto:)/i;
 
 /**
- * Markdown wie beim Einfügen einer Routine, aber ohne rohes HTML und ohne
- * fremde Link-Schemata: rohes HTML stand im Text als Zeichen, nicht als Markup
- * (beim Einfügen nahm es DOMPurify heraus) — hier wird es sichtbar maskiert.
+ * Markdown as when inserting a routine, but without raw HTML and without
+ * foreign link schemes: raw HTML stood in the text as characters, not as markup
+ * (on insertion DOMPurify removed it) — here it is visibly escaped.
  */
 const markdown = new Marked({
   async: false,
@@ -82,7 +82,7 @@ function stringList(value: unknown): string[] {
 
 const stringOr = (value: unknown, fallback = '') => (typeof value === 'string' ? value : fallback);
 
-/** Eine Routine als Vorlage — `null` ohne brauchbare ID. */
+/** A routine as a template — `null` without a usable ID. */
 export function routineToTemplate(
   routine: RoutineRow,
   resolve: RoutineLinkResolver,
@@ -97,7 +97,7 @@ export function routineToTemplate(
   for (const [entryType, column] of [['operation', 'operation_ids'], ['wiki', 'wiki_ids']] as const) {
     for (const id of stringList(routine[column])) {
       const target = resolve(entryType, id);
-      if (!target) continue; // Ziel gelöscht oder nicht da.
+      if (!target) continue; // Target deleted or not there.
       links += internalLinkBlockHtml(
         { id, entryType, label: target.title, icon: target.icon, entry_number: target.entry_number },
         target.categoryLabel,
@@ -122,10 +122,10 @@ export function routineToTemplate(
 }
 
 /**
- * Löst Link-Ziele aus Zeilen auf — aus der Datenbank (Migration) oder aus
- * Sicherung und Vault (Import). Was im Papierkorb liegt, zählt nicht: ein
- * gelöschtes Ziel stünde sonst als Chip dauerhaft in der Vorlage. Bei
- * mehreren Quellen gewinnt die erste, die das Ziel kennt.
+ * Resolves link targets from rows — from the database (migration) or from
+ * backup and vault (import). Anything in the trash does not count: a
+ * deleted target would otherwise stay in the template permanently as a chip. With
+ * several sources, the first one that knows the target wins.
  */
 export function routineLinkResolver(
   t: TFunction,
@@ -142,7 +142,7 @@ export function routineLinkResolver(
     const row = source?.[entryType].get(id);
     if (!source || !row) return undefined;
     const cat = row.category_id ? source.categories.get(String(row.category_id)) : undefined;
-    // Bilder gehören nicht in den Chip (siehe v36) — nur Emoji.
+    // Images do not belong in the chip (see v36) — emoji only.
     const icon = row.icon && !isImageIcon(row.icon) ? row.icon : (cat?.emoji || DEFAULT_ENTRY_EMOJI[entryType]);
     return {
       title: row.title ?? '',
@@ -154,8 +154,8 @@ export function routineLinkResolver(
 }
 
 /**
- * Die Link-Ziele eines Vaults — für die Migration und als Rückfall beim Import.
- * v44 läuft vor v49 und liest noch die zwei alten Tabellen, der Import danach
+ * The link targets of a vault — for the migration and as a fallback on import.
+ * v44 runs before v49 and still reads the two old tables, the import afterwards
  * `entries`.
  */
 export async function vaultRoutineLinkSource(db: Database) {
@@ -173,9 +173,9 @@ export async function vaultRoutineLinkSource(db: Database) {
 }
 
 /**
- * Migration v44: jede Routine wird eine Vorlage, danach entfällt die Tabelle.
- * Wiederholbar — eine schon übernommene Routine (gleiche ID) wird übersprungen.
- * Vorher eine Sicherung der Datei, wenn es Routinen gibt.
+ * Migration v44: every routine becomes a template, afterwards the table is dropped.
+ * Repeatable — a routine that was already carried over (same ID) is skipped.
+ * A backup of the file is taken beforehand if there are routines.
  */
 export async function migrateRoutinesToTemplates(db: Database, t: TFunction): Promise<void> {
   const [table] = await db.select<{ n: number }[]>(

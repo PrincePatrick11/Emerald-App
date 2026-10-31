@@ -37,7 +37,7 @@ mod reencrypt;
 mod backup;
 /// Automatic backups: the target folder, the file name, what gets pruned.
 mod auto_backup;
-/// Der In-App-Updater: variable Quelle, Pruefung, Installation.
+/// The in-app updater: variable source, check, installation.
 mod updates;
 /// Lets the MCP server in `tools/mcp` drive the app where the webview has no
 /// debug port. Dev builds only, and only when asked for.
@@ -71,15 +71,14 @@ pub(crate) fn ext_for_path(path: &str) -> String {
 /// or reading a *document* — a backup file, a Markdown export — inside a vault
 /// folder that sits outside the user directories. That is the intended trade.
 pub(crate) fn resolve_allowed_roots(app: &tauri::AppHandle) -> Result<Vec<PathBuf>, String> {
-    // Cache gegen die sechs canonicalize-Syscalls pro Aufruf (jeder
-    // Datei-Command laeuft hier durch, `copy_image_file` einmal pro Bild).
-    // Gecacht wird NUR ein vollstaendig kanonisiertes Ergebnis: ein Root, bei
-    // dem canonicalize scheiterte (Verzeichnis existiert noch nicht, ein
-    // Windows-Known-Folder liegt auf einem gerade nicht verbundenen
-    // Netzlaufwerk), faellt auf den rohen Pfad zurueck — und der matcht auf
-    // Windows nie gegen kanonisierte Zielpfade mit Verbatim-Praefix.
-    // Eingefroren waere das ein permanentes "access denied" bis zum Neustart;
-    // ungecacht heilt es sich beim naechsten Aufruf.
+    // Cache against the six canonicalize syscalls per call (every file command
+    // goes through here, `copy_image_file` once per image). ONLY a fully
+    // canonicalized result is cached: a root for which canonicalize failed (the
+    // directory does not exist yet, a Windows known folder sits on a network drive
+    // that is not connected right now) falls back to the raw path — and on Windows
+    // that never matches against canonicalized target paths with a verbatim
+    // prefix. Frozen, that would be a permanent "access denied" until restart;
+    // uncached, it heals itself on the next call.
     static ALLOWED_ROOTS: std::sync::OnceLock<Vec<PathBuf>> = std::sync::OnceLock::new();
 
     if let Some(cached) = ALLOWED_ROOTS.get() {
@@ -171,9 +170,9 @@ fn app_data_write_allowed(target: &Path, app_data_dir: &Path) -> bool {
 /// allowed entries.
 pub(crate) fn check_app_data_write(app: &tauri::AppHandle, target: &Path) -> Result<(), String> {
     let Some(app_data_dir) = app.path().app_data_dir().ok().and_then(|dir| resolve_existing_part(&dir)) else {
-        // Kein App-Datenordner, oder keiner, der sich auflösen lässt: dann
-        // löst sich auch kein Ziel darin auf, und die Module, die ihren
-        // Zustand dort halten, lesen ihn ebenso wenig. Nichts zu schützen.
+        // No app data folder, or none that can be resolved: then no target in it
+        // resolves either, and the modules that keep their state there cannot read it
+        // either. Nothing to protect.
         return Ok(());
     };
     if app_data_write_allowed(target, &app_data_dir) {
@@ -201,9 +200,9 @@ pub(crate) fn guarded_write_target(app: &tauri::AppHandle, path: &str) -> Result
     let target = PathBuf::from(path);
     let parent = target.parent().ok_or("invalid path")?;
 
-    // Der tiefste bereits existierende Vorfahre wird geprueft, *bevor*
-    // irgendetwas angelegt wird. Andersherum legte ein abgelehnter Schreibzugriff
-    // trotzdem Verzeichnisse ausserhalb der Grenze an.
+    // The deepest already existing ancestor is checked *before* anything is
+    // created. The other way round, a rejected write would still create
+    // directories outside the boundary.
     let mut existing = parent;
     while !existing.exists() {
         existing = existing.parent().ok_or("invalid path")?;
@@ -213,8 +212,8 @@ pub(crate) fn guarded_write_target(app: &tauri::AppHandle, path: &str) -> Result
     if !is_within_allowed_roots(&canonical_existing, &allowed_roots) {
         return Err("access denied: path outside allowed directories".to_string());
     }
-    // Ebenfalls vor dem Anlegen: sonst entstünde im App-Datenordner ein Ordner
-    // unter dem Namen einer Zustandsdatei, und deren Modul könnte sie nie mehr schreiben.
+    // Also before creating: otherwise a folder would appear in the app data
+    // folder under the name of a state file, and its module could never write it again.
     let resolved = resolve_existing_part(&target).ok_or("invalid path")?;
     check_app_data_write(app, &resolved)?;
 
@@ -224,10 +223,10 @@ pub(crate) fn guarded_write_target(app: &tauri::AppHandle, path: &str) -> Result
         return Err("access denied: path outside allowed directories".to_string());
     }
 
-    // `symlink_metadata` statt `target.exists()`: `exists()` folgt dem Link und
-    // meldet fuer einen *kaputten* Symlink `false`. Der Zweig mit der
-    // Symlink-Pruefung wurde damit uebersprungen, und `fs::write` legte die Datei
-    // am Linkziel an — ausserhalb der erlaubten Wurzeln.
+    // `symlink_metadata` instead of `target.exists()`: `exists()` follows the
+    // link and reports `false` for a *broken* symlink. The branch with the
+    // symlink check was thereby skipped, and `fs::write` created the file at the
+    // link target — outside the allowed roots.
     match std::fs::symlink_metadata(&target) {
         Ok(metadata) => {
             if metadata.file_type().is_symlink() {
@@ -238,8 +237,8 @@ pub(crate) fn guarded_write_target(app: &tauri::AppHandle, path: &str) -> Result
             if !is_within_allowed_roots(&canonical_target, &allowed_roots) {
                 return Err("access denied: path outside allowed directories".to_string());
             }
-            // Noch einmal am endgültigen Pfad: zurückgegeben wird dieser, nicht
-            // der vor dem Anlegen der Ordner aufgelöste.
+            // Once more at the final path: this one is returned, not the one
+            // resolved before the folders were created.
             check_app_data_write(app, &canonical_target)?;
             Ok(canonical_target)
         }
@@ -268,14 +267,13 @@ pub(crate) fn guarded_read_path(app: &tauri::AppHandle, path: &str) -> Result<Pa
 
 // ── commands ──────────────────────────────────────────────────────────────────
 //
-// Die Datei-Commands sind `async` und wickeln ihre `std::fs`-Arbeit in
-// `spawn_blocking`: eine `.emeralddb` mit eingebetteten Bildern ist
-// zweistellige MB gross und blockierte frueher fuer die Dauer das Fenster.
-// `async` allein genuegt nicht — ohne `spawn_blocking` laege die blockierende
-// Arbeit auf einem Worker der Runtime und koennte auf kleinen Maschinen alle
-// Worker belegen (SQL-Plugin, PDF-Export und IPC-Antworten hungern dann).
-// Die vier Menue-Commands weiter unten bleiben absichtlich synchron: sie
-// mutieren NSMenu, und das ist auf macOS Main-Thread-only.
+// The file commands are `async` and wrap their `std::fs` work in
+// `spawn_blocking`: an `.emeralddb` with embedded images is tens of MB large
+// and used to block the window for its duration. `async` alone is not enough —
+// without `spawn_blocking` the blocking work would sit on a runtime worker and
+// could occupy all workers on small machines (SQL plugin, PDF export and IPC
+// responses would then starve). The four menu commands further down stay
+// synchronous on purpose: they mutate NSMenu, and that is main-thread-only on macOS.
 
 /// Writes text content to a user-selected file path.
 /// Only .md, .emerald, .json, and .txt extensions are permitted. Backups
@@ -391,20 +389,20 @@ async fn export_pdf(app: tauri::AppHandle, html: String, path: String, page_size
 /// they become no-ops on the platforms that never get here.
 #[cfg(target_os = "macos")]
 fn install_native_menu(app: &tauri::App) -> tauri::Result<()> {
-    // Der Name der Anwendung in der macOS-Menueleiste. Haengt am
-    // `productName` in `tauri.conf.json` — beide gehoeren zusammen geaendert.
-    // Bewusst ohne den Zusatz aus `tauri.dev.conf.json`: im Dev-Build heisst
-    // die App "Emerald App Dev", das Menue hier trotzdem nur "Emerald App".
+    // The application's name in the macOS menu bar. Tied to `productName` in
+    // `tauri.conf.json` — the two must be changed together. Deliberately without
+    // the suffix from `tauri.dev.conf.json`: in the dev build the app is called
+    // "Emerald App Dev", but the menu here is still just "Emerald App".
     let app_submenu = Submenu::with_items(app, "Emerald App", true, &[
         &PredefinedMenuItem::about(app, None, None)?,
         &PredefinedMenuItem::separator(app)?,
         &PredefinedMenuItem::hide(app, None)?,
         &PredefinedMenuItem::hide_others(app, None)?,
         &PredefinedMenuItem::separator(app)?,
-        // Kein `PredefinedMenuItem::quit`: das beendet die App am Fenster
-        // vorbei (`terminate:`), und die Frage nach ungesicherten Bearbeitungen
-        // kaeme nie. Der eigene Punkt schliesst das Fenster — siehe "quit" in
-        // `on_menu_event` unten. Auf echter Hardware ungetestet.
+        // No `PredefinedMenuItem::quit`: it ends the app past the window
+        // (`terminate:`), and the question about unsaved edits would never come. Our
+        // own item closes the window — see "quit" in `on_menu_event` below. Untested
+        // on real hardware.
         &MenuItem::with_id(app, "quit", "Quit Emerald App", true, Some("CmdOrCtrl+Q"))?,
     ])?;
     let edit_submenu = Submenu::with_id_and_items(app, "edit-submenu", "Edit", true, &[
@@ -465,9 +463,9 @@ fn install_native_menu(app: &tauri::App) -> tauri::Result<()> {
         false,
         None::<&str>,
     )?;
-    // Zeigt den Ladebildschirm noch einmal, bis irgendwo hingeklickt wird.
-    // Kein Check-Eintrag: es gibt keinen Zustand, der sichtbar bliebe — die
-    // Vorschau schliesst sich selbst und meldet das dem Menue nicht zurueck.
+    // Shows the loading screen once more until something is clicked.
+    // Not a check item: there is no state that would stay visible — the preview
+    // closes itself and does not report back to the menu.
     let show_splash_item = MenuItem::with_id(
         app,
         "show-splash",
@@ -591,8 +589,8 @@ fn install_native_menu(app: &tauri::App) -> tauri::Result<()> {
             "export-altar-webp"    => { app.emit("export-altar-webp", ()).ok(); }
             "import-markdown"      => { app.emit("import-markdown", ()).ok(); }
             "import-emerald"       => { app.emit("import-emerald", ()).ok(); }
-            // Ueber das Fenster: `close()` loest die Schliess-Anfrage aus, die
-            // das Frontend beantwortet. Mit dem letzten Fenster endet die App.
+            // Via the window: `close()` triggers the close request, which the
+            // frontend answers. The app ends with the last window.
             "quit" => match app.get_webview_window("main") {
                 Some(window) => { window.close().ok(); }
                 None => app.exit(0),
@@ -835,25 +833,25 @@ fn update_menu_labels(
     }
 }
 
-/// Wann das Fenster zuletzt geschlossen werden sollte, ohne dass das Frontend
-/// die Anfrage bestaetigt hat.
+/// When the window should last have been closed without the frontend
+/// having confirmed the request.
 ///
-/// Das Frontend fragt vor dem Schliessen nach ungesicherten Bearbeitungen
-/// (`onCloseRequested` in `AppShell.tsx`), und solange es dafuer einen
-/// Listener angemeldet hat, haelt Tauri jedes Schliessen zurueck. Haengt die
-/// Oberflaeche oder ist sie abgestuerzt, antwortet niemand mehr — und ohne
-/// Systemdekoration fuehrten dann auch Alt+F4 und die Taskleiste ins Leere.
-/// Deshalb bestaetigt das Frontend jede Anfrage sofort
-/// (`close_request_seen`); bleibt das aus, schliesst die naechste Anfrage nach
-/// [`CLOSE_ANSWER_TIMEOUT`] das Fenster direkt.
+/// The frontend asks about unsaved edits before closing
+/// (`onCloseRequested` in `AppShell.tsx`), and as long as it has registered a
+/// listener for that, Tauri holds back every close. If the UI hangs or has
+/// crashed, nobody answers any more — and without system decorations, Alt+F4
+/// and the taskbar would lead nowhere either. That is why the frontend
+/// confirms every request immediately (`close_request_seen`); if that does not
+/// happen, the next request after [`CLOSE_ANSWER_TIMEOUT`] closes the window
+/// directly.
 #[derive(Default)]
 struct CloseWatch(std::sync::Mutex<Option<std::time::Instant>>);
 
 const CLOSE_ANSWER_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(3);
 
 impl CloseWatch {
-    /// Eine Schliess-Anfrage kam an. `true`: die vorige blieb unbeantwortet,
-    /// das Fenster soll jetzt ohne Frage zu.
+    /// A close request arrived. `true`: the previous one went unanswered, the
+    /// window should now close without asking.
     fn requested(&self, now: std::time::Instant) -> bool {
         let mut pending = self.0.lock().unwrap_or_else(|e| e.into_inner());
         match *pending {
@@ -874,7 +872,7 @@ impl CloseWatch {
     }
 }
 
-/// Das Frontend hat die Schliess-Anfrage bekommen und kuemmert sich.
+/// The frontend has received the close request and is taking care of it.
 #[tauri::command]
 fn close_request_seen(watch: tauri::State<'_, CloseWatch>) {
     watch.seen();
@@ -883,17 +881,16 @@ fn close_request_seen(watch: tauri::State<'_, CloseWatch>) {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let builder = tauri::Builder::default()
-        // Die Daten einer Installation aufnehmen, die noch unter dem vorigen
-        // Identifier liegt.
+        // Take over the data of an installation that still lives under the
+        // previous identifier.
         //
-        // Als Plugin und nicht im `setup` unten, obwohl es dort hingehoerte:
-        // Tauris eigenes `setup` baut zuerst die Fenster aus der Konfiguration
-        // und ruft erst danach unseren Hook. Mit dem ersten Fenster entsteht
-        // auf Linux und Windows das Webview-Profil unter
-        // `LocalData/{identifier}` — und auf Linux ist das dasselbe
-        // Verzeichnis wie `app_data_dir`. Die Uebernahme faende es also bereits
-        // bewohnt vor. Ein Plugin-`setup` laeuft noch in `Builder::build()`,
-        // vor der Ereignisschleife und vor jedem Fenster.
+        // As a plugin and not in the `setup` below, although it belonged there:
+        // Tauri's own `setup` first builds the windows from the configuration and only
+        // then calls our hook. With the first window, the webview profile is created
+        // on Linux and Windows under `LocalData/{identifier}` — and on Linux that is
+        // the same directory as `app_data_dir`. The takeover would thus find it
+        // already occupied. A plugin `setup` still runs inside `Builder::build()`,
+        // before the event loop and before any window.
         .plugin(
             tauri::plugin::Builder::<tauri::Wry, ()>::new("emerald-adopt")
                 .setup(|app, _api| {
@@ -904,8 +901,8 @@ pub fn run() {
         )
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
-        // Wird nur aus `updates.rs` benutzt, nie aus dem Frontend — deshalb
-        // steht keine `updater:`-Berechtigung in der Capability.
+        // Used only from `updates.rs`, never from the frontend — which is why
+        // there is no `updater:` permission in the capability.
         .plugin(tauri_plugin_updater::Builder::new().build())
         .manage(vault::VaultRegistry::default())
         .manage(db::Databases::default())
@@ -914,7 +911,7 @@ pub fn run() {
         .manage(CloseWatch::default())
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::CloseRequested { .. } = event {
-                // Nur das Hauptfenster fragt; das versteckte PDF-Fenster hat keinen Listener.
+                // Only the main window asks; the hidden PDF window has no listener.
                 if window.label() == "main" && window.state::<CloseWatch>().requested(std::time::Instant::now()) {
                     window.destroy().ok();
                 }
@@ -1001,8 +998,8 @@ pub fn run() {
     builder
         .setup(|_app| {
             keys::init_keychain(&_app.config().identifier);
-            // Was ein abgestürzter PDF-Export im Temp-Ordner liegen ließ — dort
-            // stünde ein Eintrag im Klartext.
+            // What a crashed PDF export left in the temp folder — an entry would
+            // sit there in plain text.
             tauri::async_runtime::spawn_blocking(pdf_export::sweep_leftovers);
             // Both of these are macOS-only; `_app` keeps the parameter from
             // reading as unused on the platforms where the block is empty.
@@ -1031,10 +1028,10 @@ mod app_data_write_tests {
             "auto-backup.json",
             "auto-backup.json.tmp",
             "update.json",
-            // Schreibweisen, die ein Dateisystem auf denselben Namen abbildet.
+            // Spellings that a file system maps to the same name.
             "AUTO-BACKUP.JSON",
             "auto-bac\u{212A}up.json",
-            // Ein Ordner unter dem Namen einer Zustandsdatei.
+            // A folder under the name of a state file.
             "auto-backup.json/x.json",
             "vaults.json/x.json",
             "notes.json",
@@ -1043,7 +1040,7 @@ mod app_data_write_tests {
             assert!(!app_data_write_allowed(&data.join(refused), data), "{refused}");
         }
         assert!(!app_data_write_allowed(data, data));
-        // Außerhalb des App-Datenordners gilt die Regel nicht.
+        // Outside the app data folder the rule does not apply.
         assert!(app_data_write_allowed(Path::new("/home/u/Documents/auto-backup.json"), data));
         assert!(app_data_write_allowed(Path::new("/home/u/.local/share/emerald-other/update.json"), data));
     }
@@ -1055,7 +1052,7 @@ mod app_data_write_tests {
         let canonical = std::fs::canonicalize(&dir).unwrap();
         assert_eq!(resolve_existing_part(&dir.join("a").join("b.json")), Some(canonical.join("a").join("b.json")));
         assert_eq!(resolve_existing_part(&dir), Some(canonical));
-        // `..` hinter etwas, das es nicht gibt, lässt sich nicht auflösen.
+        // `..` behind something that does not exist cannot be resolved.
         assert_eq!(resolve_existing_part(&dir.join("a").join("b").join("..").join("c.json")), None);
         let _ = std::fs::remove_dir_all(&dir);
     }
@@ -1072,7 +1069,7 @@ mod close_watch_tests {
         let start = Instant::now();
         assert!(!watch.requested(start));
         watch.seen();
-        // Beliebig viel spaeter: die vorige Anfrage war beantwortet.
+        // Arbitrarily later: the previous request was answered.
         assert!(!watch.requested(start + CLOSE_ANSWER_TIMEOUT * 10));
     }
 
@@ -1081,11 +1078,11 @@ mod close_watch_tests {
         let watch = CloseWatch::default();
         let start = Instant::now();
         assert!(!watch.requested(start));
-        // Ungeduldiges zweites Klicken zaehlt noch nicht ...
+        // An impatient second click does not count yet ...
         assert!(!watch.requested(start + Duration::from_millis(500)));
-        // ... nach der Frist schon, gemessen an der ersten Anfrage.
+        // ... after the deadline it does, measured from the first request.
         assert!(watch.requested(start + CLOSE_ANSWER_TIMEOUT));
-        // Danach beginnt es von vorn.
+        // After that it starts over.
         assert!(!watch.requested(start + CLOSE_ANSWER_TIMEOUT * 2));
     }
 }

@@ -16,39 +16,39 @@ import {
 } from './migrateLinkedIdsToContent';
 
 /**
- * Migration v37 — die drei festen Journal-Felder Paradigma, Bannung und
- * Meditation werden zu Link-Chips im Inhalt.
+ * Migration v37 — the three fixed journal fields Paradigm, Banishing and
+ * Meditation become link chips in the content.
  *
- * Sie waren Dropdowns in der rechten Seitenleiste und Chips unter dem Titel,
- * jedes auf eine Wiki-Kategorie festgelegt. Beides ist weg: Ein Journal-Eintrag
- * verlinkt jetzt frei, und das Verlinkungs-Feld zeigt die Ziele nach Kategorie
- * sortiert — womit Paradigma, Bannung und Meditation dort weiterhin
- * beieinanderstehen, nur ohne eigenes Feld.
+ * They were dropdowns in the right sidebar and chips under the title,
+ * each tied to one wiki category. Both are gone: a journal entry
+ * now links freely, and the linking field shows the targets sorted by
+ * category — so Paradigm, Banishing and Meditation still sit
+ * together there, just without a field of their own.
  *
- * Derselbe Umzug wie bei v36 (`linked_operation_ids`/`linked_wiki_ids`), mit
- * zwei Eigenheiten:
- * - Die Meditationsdauer hat kein Link-Ziel. Sie wandert als Text hinter den
- *   Chip: „Stilles Sitzen (20 min)".
- * - `is_bannung`/`is_meditation` konnten ohne Artikel gesetzt sein (der Haken
- *   ist älter als die Auswahl dahinter). Dann bleibt nur ein Absatz mit dem
- *   Namen der Kategorie — ein Chip ohne Ziel wäre ein toter Link.
- * Ein Feld, dessen Artikel im Papierkorb liegt oder gelöscht wurde, fällt weg;
- * wie in v36 wird ein verschwundenes Ziel nicht als Chip verewigt.
+ * The same move as v36 (`linked_operation_ids`/`linked_wiki_ids`), with
+ * two peculiarities:
+ * - The meditation duration has no link target. It moves as text after the
+ *   chip: "Silent sitting (20 min)".
+ * - `is_bannung`/`is_meditation` could be set without an article (the checkbox
+ *   is older than the selection behind it). Then only a paragraph with the
+ *   category name remains — a chip without a target would be a dead link.
+ * A field whose article is in the trash or was deleted is dropped;
+ * as in v36, a vanished target is not immortalized as a chip.
  *
- * Wie in v36 arbeitet die Umwandlung (`journalFieldsToContent`) auf einer
- * Zeile und einer `LegacyLinkSource` — der Import einer Sicherung von vor v37
- * nimmt denselben Weg, seit v49 die Spalten gestrichen hat.
+ * As in v36, the conversion (`journalFieldsToContent`) works on one
+ * row and a `LegacyLinkSource` — the import of a backup from before v37
+ * takes the same path, since v49 dropped the columns.
  */
 
 /**
- * Die drei abgelösten Felder in der Reihenfolge, in der sie in der Seitenleiste
- * standen — Schlüssel ist zugleich die ID ihrer Wiki-Kategorie. `fallbackName`
- * greift nur, wenn es die Kategorie-Zeile selbst nicht mehr gibt; sonst kommt
- * der Anzeigename aus dem Locale-Key.
+ * The three replaced fields in the order in which they appeared in the sidebar
+ * — the key is also the ID of their wiki category. `fallbackName`
+ * only applies if the category row itself no longer exists; otherwise the
+ * display name comes from the locale key.
  *
- * Exportiert, weil der `.emerald`-/Markdown-Import dieselbe Kenntnis braucht:
- * eine Datei von vor v37 trägt diese Felder im Kopf und soll dort dieselben
- * Blöcke ergeben wie die Migration hier.
+ * Exported because the `.emerald`/Markdown import needs the same knowledge:
+ * a file from before v37 carries these fields in its header and should produce
+ * the same blocks there as the migration here.
  */
 export const LEGACY_JOURNAL_FIELDS = {
   paradigm: { emoji: '🌀', fallbackName: 'Paradigma' },
@@ -60,7 +60,7 @@ export type LegacyJournalField = keyof typeof LEGACY_JOURNAL_FIELDS;
 
 const FIELD_ORDER: LegacyJournalField[] = ['paradigm', 'bannung', 'meditation'];
 
-/** Die sechs alten Spalten einer Journal-Zeile — aus der Datenbank oder aus einer Sicherung. */
+/** The six old columns of a journal row — from the database or from a backup. */
 export interface JournalFieldsRow {
   paradigm_id?: unknown;
   is_bannung?: unknown;
@@ -71,21 +71,21 @@ export interface JournalFieldsRow {
 }
 
 const idOf = (v: unknown): string | null => (v == null || v === '' ? null : String(v));
-/** `1`, `true` oder `'1'` — die Datenbank liefert Zahlen, eine Sicherung womöglich Booleans. */
+/** `1`, `true` or `'1'` — the database delivers numbers, a backup possibly booleans. */
 const flag = (v: unknown): boolean => v === true || Number(v) === 1;
 
 /**
- * Der Inhalt mit Paradigma, Bannung und Meditation als Blöcke dahinter. Ohne
- * gesetzte Felder kommt `content` unverändert zurück.
+ * The content with Paradigm, Banishing and Meditation as blocks after it. Without
+ * any fields set, `content` comes back unchanged.
  */
 export function journalFieldsToContent(content: string, row: JournalFieldsRow, source: LegacyLinkSource): string {
   const alreadyLinked = new Set(extractInternalLinks(content).map(linkItemKey));
   let separator = !isBlankContent(content);
   let appended = '';
 
-  // Was jedes Feld zu sagen hat: eine Artikel-ID, ein „war gesetzt"-Flag und
-  // beim Meditations-Feld die Dauer. Erst hier zusammengetragen, damit die
-  // Schleife darunter alle drei gleich behandelt.
+  // What each field has to say: an article ID, a "was set" flag and,
+  // for the meditation field, the duration. Gathered here first, so that the
+  // loop below treats all three the same.
   const paradigmId = idOf(row.paradigm_id);
   const bannungId = idOf(row.bannung_type_wiki_id);
   const meditationId = idOf(row.meditation_type_wiki_id);
@@ -106,19 +106,19 @@ export function journalFieldsToContent(content: string, row: JournalFieldsRow, s
 
     const field = LEGACY_JOURNAL_FIELDS[key];
     const article: LegacyLinkTarget | undefined = id ? source.target('wiki', id) : undefined;
-    // Eingebaute Wiki-Kategorien liegen mit deutschem Seed-Namen in der DB;
-    // der Anzeigename kommt aus der Quelle (Locale-Key). Ohne diesen Umweg
-    // stünde in einem englischen Vault dauerhaft „Bannung" im Eintrag. Ohne
-    // Kategorie-Zeile bleibt der Name leer — lieber keine Überschrift als
-    // eine erfundene.
+    // Built-in wiki categories sit in the DB with a German seed name;
+    // the display name comes from the source (locale key). Without this detour,
+    // an English vault would permanently have "Bannung" in the entry. Without a
+    // category row the name stays empty — better no heading than
+    // an invented one.
     const cat = source.category('wiki', article?.category_id ?? key);
     const label = cat?.label ?? '';
 
     if (!article) {
-      // Gesetzt, aber ohne Artikel dahinter — nur der Name der Kategorie.
-      // Ein `paradigm_id`, dessen Artikel gelöscht wurde, fällt hier ebenfalls
-      // heraus: `active` ist dann zwar wahr, aber der Text „Paradigma" allein
-      // sagt nichts, was der Eintrag nicht schon durch sein Fehlen sagt.
+      // Set, but with no article behind it — only the category name.
+      // A `paradigm_id` whose article was deleted drops out here as well:
+      // `active` is true then, but the text "Paradigma" alone
+      // says nothing that the entry does not already say by its absence.
       if (id) continue;
       const text = `${cat?.emoji || field.emoji} ${label || field.fallbackName}`;
       appended += plainBlockHtml(suffix ? `${text} ${suffix}` : text, { separator });
@@ -134,7 +134,7 @@ export function journalFieldsToContent(content: string, row: JournalFieldsRow, s
       id: article.id,
       entryType: 'wiki',
       label: article.title ?? '',
-      // Wie in v36: ein hochgeladenes Bild gehört nicht in die Node-Attrs.
+      // As in v36: an uploaded image does not belong in the node attrs.
       icon: legacyChipIcon('wiki', article, cat?.emoji),
       entry_number: article.entry_number,
     };
@@ -172,8 +172,8 @@ export async function migrateJournalFieldsToContent(db: Database): Promise<void>
   const source = tablesLinkSource({ wiki: articles }, { wiki: categories });
 
   for (const entry of entries) {
-    // `updated_at` bleibt unangetastet — die Migration ist keine Bearbeitung
-    // durch den Nutzer und soll die Sortierung nicht umwerfen.
+    // `updated_at` stays untouched — the migration is not an edit
+    // by the user and should not upset the sort order.
     const nextContent = journalFieldsToContent(entry.content ?? '', entry, source);
     await db.execute(
       `UPDATE journal_entries

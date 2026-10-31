@@ -21,9 +21,9 @@ import SidebarSection, { SidebarEmpty, SidebarItemRow, SidebarPropertyRow } from
 import { PropertiesSection } from './EntryReadSections';
 
 /**
- * Die Leseansicht eines Altars in der rechten Seitenleiste: seine
- * Eigenschaften (Format, Hintergrund, Überlagerung, Raster) und die sichtbaren
- * Elemente — ein Klick markiert eines auf der Fläche, wie im Bearbeiten.
+ * The read view of an altar in the right sidebar: its
+ * properties (format, background, overlay, grid) and the visible
+ * elements; a click selects one on the canvas, as when editing.
  */
 export default function AltarReadingSummary() {
   const { t } = useTranslation();
@@ -31,7 +31,7 @@ export default function AltarReadingSummary() {
   const placements = useAltarStore((s) => s.placements);
   const selectedPlacementId = useAltarStore((s) => s.selectedPlacementId);
   const selectPlacement = useAltarStore((s) => s.selectPlacement);
-  // Was auf dem Altar zu sehen ist, oben das Vorderste — wie die Liste im Bearbeiten.
+  // What is visible on the altar, frontmost on top, like the list when editing.
   const visiblePlacements = useMemo(
     () => placements.filter((p) => !p.hidden).sort((a, b) => b.z_index - a.z_index),
     [placements],
@@ -76,7 +76,7 @@ export default function AltarReadingSummary() {
   const overlayPercent = Math.round((activeAltar.background_overlay ?? 0) * 100);
   const gridActive = activeAltar.grid_enabled;
 
-  // Eigener Abstand: das Panel des Altars liegt als ein Kind im Körper der Leiste.
+  // Own spacing: the altar's panel sits as a single child in the sidebar body.
   return (
     <div className="flex flex-col gap-5">
       <PropertiesSection>
@@ -90,7 +90,7 @@ export default function AltarReadingSummary() {
         <SidebarPropertyRow
           icon={<Proportions size={14} />}
           label={t('altar.summaryFormat')}
-          // Wie die übrigen Werte gesetzt; nur das „x“ der Auflösung wird zum Malzeichen.
+          // Set like the other values; only the "x" of the resolution becomes a multiplication sign.
           value={activeAltar.resolution.replace('x', ' × ')}
         />
         {backgroundInfo && (

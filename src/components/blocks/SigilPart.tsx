@@ -16,19 +16,19 @@ const PART_VIEWS: Record<SigilElementKind, ComponentType<BlockViewProps>> = {
 const noHtml = () => {};
 
 /**
- * Ein Sigillen-Teil eines eigenen Blocks: dieselbe Komponente wie der Block
- * gleicher Art, nur auf dem virtuellen Block (`sigilPartBlock`). Was sie
- * schreibt, geht zurück ins Modell des Feldblocks und von dort als ganzer
- * Block in den Eintrag — beim Bearbeiten über `onBlockChange`, im Lesemodus
- * (Laden, Entladen, eine spät gespeicherte Zeichnung) über `onPersist`.
+ * A sigil part of a custom block: the same component as the block
+ * of the same kind, just on the virtual block (`sigilPartBlock`). What it
+ * writes goes back into the field block's model and from there as a whole
+ * block into the entry: when editing via `onBlockChange`, in read mode
+ * (charging, discharging, a drawing saved late) via `onPersist`.
  */
 export default function SigilPart({ element, block, model, write, persist, ...rest }: {
   element: ElementDef & { kind: SigilElementKind };
   block: BlockInstance;
   model: FieldsModel;
-  /** Das geänderte Modell beim Bearbeiten übernehmen. */
+  /** Adopt the changed model when editing. */
   write: (next: FieldsModel) => void;
-  /** Das geänderte Modell sofort speichern — fehlt, wenn der Lesemodus hier nichts darf. */
+  /** Save the changed model immediately; absent if read mode is not allowed to do anything here. */
   persist?: (next: FieldsModel) => void;
 } & Pick<BlockViewProps, 'blocks' | 'isEditing' | 'sigil'>) {
   const View = PART_VIEWS[element.kind];

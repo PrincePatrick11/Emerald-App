@@ -2,15 +2,15 @@ import { useTranslation } from 'react-i18next';
 import { MODULES, type EntryModuleId } from '../../lib/modules';
 
 interface Props<M extends EntryModuleId> {
-  /** Spalten in dieser Reihenfolge — fest, damit die Zahlen untereinander fluchten. */
+  /** Columns in this order; fixed so the numbers line up one below the other. */
   modules: readonly M[];
   counts: Record<M, number>;
 }
 
 /**
- * Die Verwendungszähler je Modul: Modul-Icon plus Zahl, gedimmt bei 0, der
- * Modulname im Tooltip. Die eine Stelle für diese Reihe — Kategorien- und
- * Tags-Ansicht zeigen damit, wo etwas benutzt wird.
+ * The usage counters per module: module icon plus number, dimmed at 0, the
+ * module name in the tooltip. The one place for this row; the categories and
+ * tags views use it to show where something is used.
  */
 export default function ModuleCounts<M extends EntryModuleId>({ modules, counts }: Props<M>) {
   const { t } = useTranslation();

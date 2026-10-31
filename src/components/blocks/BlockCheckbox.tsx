@@ -1,19 +1,19 @@
 /**
- * Das Häkchen der App: Block-Seitenleiste, Baukasten der Blöcke-Ansicht,
- * Vorlagen-Dialog und die Datensicherung in den Einstellungen. Beschriftung
- * und optionaler Hinweis darunter gehören dazu; gezeichnet wird das Kästchen
- * in `.block-checkbox` (siehe index.css), aus Theme-Variablen statt als
- * natives Kästchen.
+ * The app's checkbox: block sidebar, the block builder of the blocks view,
+ * template dialog and the backup in the settings. The label
+ * and an optional hint below it are part of it; the box is drawn
+ * in `.block-checkbox` (see index.css), from theme variables instead of as a
+ * native checkbox.
  */
 export default function BlockCheckbox({ checked, onChange, label, hint, title, tone, disabled = false }: {
   checked: boolean;
   onChange: (checked: boolean) => void;
   label: string;
-  /** Steht sichtbar unter der Beschriftung. */
+  /** Shown visibly below the label. */
   hint?: string;
-  /** Erscheint beim Zeigen — fuer Haken, deren Folge die Beschriftung nicht fasst. */
+  /** Appears on hover, for checkboxes whose consequence the label does not capture. */
   title?: string;
-  /** Faerbt Fuellung und Rahmen des Kaestchens um, statt des Akzents. */
+  /** Recolours the box's fill and border instead of the accent. */
   tone?: 'warning' | 'danger';
   disabled?: boolean;
 }) {

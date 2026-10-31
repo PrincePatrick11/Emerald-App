@@ -55,10 +55,10 @@ jobs:
 
       - name: Build macOS Apple Silicon bundle
         env:
-          # Seit `createUpdaterArtifacts` in der Config steht, bricht der
-          # Bundler ohne privaten Schluessel ab: "A public key has been found,
-          # but no private key." Die Secrets gehoeren deshalb auch hierher,
-          # nicht nur ins Release.
+          # Since `createUpdaterArtifacts` is set in the config, the
+          # bundler aborts without a private key: "A public key has been found,
+          # but no private key." So the secrets belong here too,
+          # not only in the release.
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         run: npm run tauri build -- --target aarch64-apple-darwin
@@ -67,11 +67,11 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: emerald-macos-apple-silicon
-          # Nur die Installer. Seit `createUpdaterArtifacts` an ist,
-          # liegen im Bundle-Verzeichnis auch das Updater-Bundle und die
-          # Signaturen — und Workflow-Artefakte kann auf einem oeffentlichen
-          # Repository jeder angemeldete Nutzer herunterladen. Signierte
-          # Bundles beliebiger Zweige gehoeren dort nicht hin.
+          # Only the installers. Since `createUpdaterArtifacts` is on,
+          # the bundle directory also holds the updater bundle and the
+          # signatures, and on a public repository any logged-in user can
+          # download workflow artifacts. Signed bundles from arbitrary
+          # branches do not belong there.
           path: src-tauri/target/aarch64-apple-darwin/release/bundle/dmg/*.dmg
           if-no-files-found: error
 
@@ -101,16 +101,16 @@ jobs:
       - name: Install frontend dependencies
         run: npm ci
 
-      # OpenSSL (unter SQLCipher) baut ohne NASM ohne Assembler — also ohne
-      # AES-NI, langsamer und nicht in konstanter Zeit.
+      # OpenSSL (under SQLCipher) builds without an assembler if NASM is missing, so
+      # without AES-NI: slower and not constant-time.
       - uses: ilammy/setup-nasm@v1
 
       - name: Build Windows bundle
         env:
-          # Seit `createUpdaterArtifacts` in der Config steht, bricht der
-          # Bundler ohne privaten Schluessel ab: "A public key has been found,
-          # but no private key." Die Secrets gehoeren deshalb auch hierher,
-          # nicht nur ins Release.
+          # Since `createUpdaterArtifacts` is set in the config, the
+          # bundler aborts without a private key: "A public key has been found,
+          # but no private key." So the secrets belong here too,
+          # not only in the release.
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         run: npm run tauri build -- --target x86_64-pc-windows-msvc
@@ -119,11 +119,11 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: emerald-windows
-          # Nur die Installer. Seit `createUpdaterArtifacts` an ist,
-          # liegen im Bundle-Verzeichnis auch das Updater-Bundle und die
-          # Signaturen — und Workflow-Artefakte kann auf einem oeffentlichen
-          # Repository jeder angemeldete Nutzer herunterladen. Signierte
-          # Bundles beliebiger Zweige gehoeren dort nicht hin.
+          # Only the installers. Since `createUpdaterArtifacts` is on,
+          # the bundle directory also holds the updater bundle and the
+          # signatures, and on a public repository any logged-in user can
+          # download workflow artifacts. Signed bundles from arbitrary
+          # branches do not belong there.
           path: |
             src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/*.exe
             src-tauri/target/x86_64-pc-windows-msvc/release/bundle/msi/*.msi
@@ -170,10 +170,10 @@ jobs:
 
       - name: Build Ubuntu bundle
         env:
-          # Seit `createUpdaterArtifacts` in der Config steht, bricht der
-          # Bundler ohne privaten Schluessel ab: "A public key has been found,
-          # but no private key." Die Secrets gehoeren deshalb auch hierher,
-          # nicht nur ins Release.
+          # Since `createUpdaterArtifacts` is set in the config, the
+          # bundler aborts without a private key: "A public key has been found,
+          # but no private key." So the secrets belong here too,
+          # not only in the release.
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         run: npm run tauri build -- --target x86_64-unknown-linux-gnu --bundles deb,appimage
@@ -182,11 +182,11 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: emerald-ubuntu
-          # Nur die Installer. Seit `createUpdaterArtifacts` an ist,
-          # liegen im Bundle-Verzeichnis auch das Updater-Bundle und die
-          # Signaturen — und Workflow-Artefakte kann auf einem oeffentlichen
-          # Repository jeder angemeldete Nutzer herunterladen. Signierte
-          # Bundles beliebiger Zweige gehoeren dort nicht hin.
+          # Only the installers. Since `createUpdaterArtifacts` is on,
+          # the bundle directory also holds the updater bundle and the
+          # signatures, and on a public repository any logged-in user can
+          # download workflow artifacts. Signed bundles from arbitrary
+          # branches do not belong there.
           path: |
             src-tauri/target/x86_64-unknown-linux-gnu/release/bundle/deb/*.deb
             src-tauri/target/x86_64-unknown-linux-gnu/release/bundle/appimage/*.AppImage

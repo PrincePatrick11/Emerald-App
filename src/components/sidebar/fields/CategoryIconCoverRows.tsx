@@ -4,7 +4,7 @@ import { useCategoryStore } from '../../../store/categoryStore';
 import { categoryLabel } from '../../../lib/categories';
 import { EditPropertyRow, MediaPropertyRow, PropertySelect } from './EditProperties';
 
-/** Der „ohne Kategorie"-Eintrag des Menüs — kein gültiger Wert der Spalte. */
+/** The "no category" entry of the menu; not a valid value of the column. */
 const NO_CATEGORY = '__none__';
 
 interface Patch {
@@ -14,9 +14,9 @@ interface Patch {
 }
 
 /**
- * Kategorie, Icon und Titelbild im Bearbeiten — was Wiki und Operationen
- * gleich tragen, unter dem Typ im Abschnitt „Eigenschaften". Ein
- * Kategoriewechsel lässt den Inhalt, wie er ist.
+ * Category, icon and cover image when editing: what wiki and operations
+ * carry alike, under the type in the "Properties" section. A
+ * category change leaves the content as it is.
  */
 export default function CategoryIconCoverRows({ entry, update }: {
   entry: { id: string; category_id: string | null; icon?: string; cover_image?: string };
@@ -24,7 +24,7 @@ export default function CategoryIconCoverRows({ entry, update }: {
 }) {
   const { t } = useTranslation();
   const categories = useCategoryStore((s) => s.categories);
-  // Eine Kategorie im Papierkorb löst nicht mehr auf und gilt als „Keine".
+  // A category in the trash no longer resolves and counts as "None".
   const category = categories.find((c) => c.id === entry.category_id);
 
   const changeCategory = (next: string) => {

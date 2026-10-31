@@ -7,28 +7,28 @@ import { decodeHtmlAttr, neutralizeSectionTags } from './blockHtml';
 import { BLOCK_ATTR, type BlockInstance, type BlockTypeId } from './types';
 
 /**
- * Der Feldblock (`core.fields`): eine Folge von Elementen — Text, Kurztext, Zahl,
- * Datum, Auswahl, Ja/Nein, Checkliste, Verknüpfung, Bild, Mondphase, Altar
- * (eine Verknüpfung auf einen Altar, groß mit seinem Bild gezeigt) und die
- * drei Sigillen-Teile Rechner, Zeichnung, Ladung (siehe `isSigilKind`). Ein
- * einzelnes Feld ist ein Feldblock mit einem Element; eigene, zusammengesetzte
- * Blöcke (Blöcke-Ansicht) sind Feldblöcke mit mehreren.
+ * The field block (`core.fields`): a sequence of elements — text, short text, number,
+ * date, select, yes/no, checklist, link, image, moon phase, altar
+ * (a link to an altar, shown large with its image) and the
+ * three sigil parts calculator, drawing, charge (see `isSigilKind`). A
+ * single field is a field block with one element; custom, composite
+ * blocks (blocks view) are field blocks with several.
  *
- * Wo was steht — dieselbe Konvention wie für alle Blöcke:
- * - `data-block-config` (JSON): die Elemente und die Anzeigeregeln.
- * - `data-block-data` (JSON): skalare Werte, unter der ID ihres Elements.
- * - Verweise, Bilder und Text stehen NICHT im JSON, sondern als echter Link-Chip,
- *   `<img src>` bzw. das HTML des Texteditors im inneren HTML, in einem
+ * Where things are — the same convention as for all blocks:
+ * - `data-block-config` (JSON): the elements and the display rules.
+ * - `data-block-data` (JSON): scalar values, under the ID of their element.
+ * - References, images and text are NOT in the JSON, but stand as a real link chip,
+ *   `<img src>` or the text editor's HTML in the inner HTML, in a
  *   `<dd data-block-slot="el:<id>">`.
- *   So finden Link-Tabelle, Backlinks, Merge-Import-Remap und Bild-Aufräumen
- *   sie ohne Sonderfall.
- * - Das innere HTML ist zugleich der lesbare Fallback (`<dl>` mit Beschriftung
- *   und Wert) für Suche, Export und eine App, die den Typ nicht kennt. Es wird
- *   bei jeder Änderung neu geschrieben; die Wahrheit für Skalare ist das JSON.
+ *   That way the link table, backlinks, merge-import remap and image cleanup
+ *   find them without a special case.
+ * - The inner HTML is also the readable fallback (`<dl>` with label
+ *   and value) for search, export and an app that does not know the type. It is
+ *   rewritten on every change; the truth for scalars is the JSON.
  *
- * Rein und DOM-frei wie der Rest von `lib/blocks`. Slot-Inhalte sind ein Chip,
- * ein Bild oder TipTap-HTML (dessen Schema kennt keine Definitionslisten), nie
- * ein `</dd>` — deshalb reicht zum Lesen ein Regex.
+ * Pure and DOM-free like the rest of `lib/blocks`. Slot contents are a chip,
+ * an image or TipTap HTML (whose schema has no definition lists), never
+ * a `</dd>` — so a regex is enough for reading.
  */
 
 export const FIELDS_BLOCK_TYPE = 'core.fields' satisfies BlockTypeId;
@@ -40,7 +40,7 @@ export const ELEMENT_KINDS = [
 export type ElementKind = (typeof ELEMENT_KINDS)[number];
 
 const KIND_SET: ReadonlySet<string> = new Set(ELEMENT_KINDS);
-/** Elementarten, deren Wert im Markup steht statt im JSON. */
+/** Element kinds whose value is in the markup instead of the JSON. */
 const SLOT_KINDS: ReadonlySet<ElementKind> = new Set<ElementKind>(['text', 'link', 'image', 'altar']);
 
 export function isSlotKind(kind: ElementKind): boolean {
@@ -50,19 +50,19 @@ export function isSlotKind(kind: ElementKind): boolean {
 export type SigilElementKind = 'sigilCalc' | 'sigilCanvas' | 'sigilCharge';
 
 /**
- * Die Sigillen-Teile eines eigenen Blocks: Rechner, Zeichnung, Ladung — was
- * es sonst als eigene Blöcke gibt (`lib/blocks/sigil.ts`). Ein Teil speichert
- * genau das, was der Block speichert: sein Daten-JSON als Wert unter der
- * Element-ID, sein inneres HTML (Lesefassung, Zeichnung als `<img>`,
- * Ladetechnik als Chip) im Slot. `sigil.ts` behandelt ihn deshalb als
- * „virtuellen Block" mit der ID `<Block-ID>:<Element-ID>` — Laden, Verdecken
- * und Sperren gelten für Teile wie für Blöcke.
+ * The sigil parts of a custom block: calculator, drawing, charge — what
+ * otherwise exists as separate blocks (`lib/blocks/sigil.ts`). A part stores
+ * exactly what the block stores: its data JSON as a value under the
+ * element ID, its inner HTML (read version, drawing as `<img>`,
+ * charging technique as a chip) in the slot. `sigil.ts` therefore treats it as a
+ * "virtual block" with the ID `<block ID>:<element ID>` — loading, concealing
+ * and locking apply to parts as to blocks.
  */
 export function isSigilKind(kind: ElementKind): kind is SigilElementKind {
   return kind === 'sigilCalc' || kind === 'sigilCanvas' || kind === 'sigilCharge';
 }
 
-/** Der i18n-Key für den Namen einer Elementart — Picker, Beschriftung, Platzhalter. */
+/** The i18n key for the name of an element kind — picker, label, placeholder. */
 export function elementKindLabelKey(kind: ElementKind): string {
   return `blocks.kinds.${kind}`;
 }
@@ -75,55 +75,55 @@ export interface SelectOption {
 export interface ElementDef {
   id: string;
   kind: ElementKind;
-  /** Leer = Name der Elementart in der aktuellen Sprache. */
+  /** Empty = name of the element kind in the current language. */
   label: string;
-  /** Nur Auswahl. Werte speichern die Options-ID, Umbenennen verliert nichts. */
+  /** Select only. Values store the option ID, renaming loses nothing. */
   options?: SelectOption[];
-  /** Überschreibt `display.readHideEmpty` für dieses Element. */
+  /** Overrides `display.readHideEmpty` for this element. */
   hideWhenEmpty?: boolean;
   /**
-   * Entfernt, aber nicht vergessen: in der Definition gelöscht oder bei einer
-   * Aktualisierung weggefallen. Unsichtbar in Lesen, Bearbeiten und Fallback —
-   * der Wert bleibt stehen und kommt zurück, wenn das Element es tut.
+   * Removed, but not forgotten: deleted in the definition or dropped during an
+   * update. Invisible in reading, editing and fallback —
+   * the value stays and comes back if the element does.
    */
   archived?: boolean;
   /**
-   * Nur in einer eigenen Block-Definition: der Wert, mit dem jede neue Kopie
-   * das Element vorbelegt (Checkliste mit Punkten, Ja/Nein auf „Ja", ein
-   * verknüpfter Eintrag …). Die Kopie trägt ihn als Wert, nicht als Vorgabe.
-   * Verknüpfung und Altar geben ihr Ziel an, Bild seinen Dateinamen — erst die
-   * Kopie schreibt daraus Chip bzw. `<img>` in ihren Slot (`slotFromDefault`).
-   * So steht in der Definition kein Markup, und Merge-Import und Bild-Aufräumen
-   * finden Ziel-ID und Datei.
+   * Only in a custom block definition: the value with which every new copy
+   * prefills the element (checklist with items, yes/no set to "yes", a
+   * linked entry …). The copy carries it as a value, not as a default.
+   * Link and altar give their target, image its file name — only the
+   * copy writes a chip or `<img>` from it into its slot (`slotFromDefault`).
+   * That way the definition contains no markup, and merge import and image cleanup
+   * find target ID and file.
    */
   defaultValue?: ElementDefault;
-  /** Nur Sigillen-Rechner: welche Wege zur Buchstabenbank er anbietet — fehlt = beide. */
+  /** Sigil calculator only: which ways to the letter bank it offers — missing = both. */
   calcMode?: CalcMode;
-  /** Nur Sigillen-Zeichnung: Farbe und Pinselgröße, mit denen das Zeichnen beginnt. */
+  /** Sigil drawing only: colour and brush size with which drawing starts. */
   brushColor?: string;
   brushSize?: number;
 }
 
-/** Wie der Rechner zur Buchstabenbank kommt: aus der Absicht, von Hand oder beides. */
+/** How the calculator arrives at the letter bank: from the intention, by hand, or both. */
 export type CalcMode = 'auto' | 'manual' | 'both';
 export const CALC_MODES: readonly CalcMode[] = ['both', 'auto', 'manual'];
 
-/** Die Grenzen des Pinsels — dieselben wie der Regler der Zeichnung. */
+/** The brush limits — the same as the drawing's slider. */
 export const BRUSH_SIZE_MIN = 2;
 export const BRUSH_SIZE_MAX = 48;
 
 /**
- * Die Vorgabe einer Ladung: was „geladen" sperrt und was sie verdeckt — `null`
- * heißt alle Sigillen im Eintrag, sonst Element-IDs der Rechner und
- * Zeichnungen desselben Blocks. Erst die Kopie macht daraus Ziele
- * (`<Block-ID>:<Element-ID>`), denn ihre Block-ID steht vorher nicht fest.
+ * The default of a charge: what "loaded" locks and what it conceals — `null`
+ * means all sigils in the entry, otherwise element IDs of the calculators and
+ * drawings of the same block. Only the copy turns these into targets
+ * (`<block ID>:<element ID>`), since its block ID is not known beforehand.
  */
 export interface ChargeDefault {
   lock: 'entry' | 'sigil';
   targets: string[] | null;
 }
 
-/** Die Vorgabe einer Verknüpfung (oder eines Altars): das Ziel samt dem Namen zum Zeitpunkt der Wahl. */
+/** The default of a link (or an altar): the target together with its name at the time of selection. */
 export interface LinkDefault {
   id: string;
   entryType: ContentType;
@@ -133,9 +133,9 @@ export interface LinkDefault {
 export type ElementDefault = FieldValue | LinkDefault | ChargeDefault;
 
 export interface DisplayRules {
-  /** Leere Elemente im Lesemodus ausblenden. */
+  /** Hide empty elements in read mode. */
   readHideEmpty: boolean;
-  /** Auch im Lesemodus nichts abhaken oder umschalten. */
+  /** Do not tick or toggle anything in read mode either. */
   readOnly: boolean;
 }
 
@@ -147,36 +147,36 @@ export interface ChecklistItem {
   checked: boolean;
 }
 
-/** Das Daten-JSON eines Sigillen-Teils — geprüft wird es erst von `sigil.ts`, beim Lesen des virtuellen Blocks. */
+/** The data JSON of a sigil part — it is only validated by `sigil.ts`, when reading the virtual block. */
 export type SigilData = Record<string, unknown>;
 
 export type FieldValue = string | number | boolean | ChecklistItem[] | SigilData;
 
 export interface FieldsModel {
   /**
-   * Config oder Daten sind vorhanden, aber nicht lesbar. Ein solcher Block wird
-   * wie ein unbekannter angezeigt und NIE geschrieben — sonst überschriebe die
-   * nächste Änderung die unlesbaren Originaldaten mit „leer".
+   * Config or data are present but not readable. Such a block is displayed
+   * like an unknown one and NEVER written — otherwise the next change would
+   * overwrite the unreadable original data with "empty".
    */
   broken: boolean;
   elements: ElementDef[];
   display: DisplayRules;
-  /** Skalare Werte bekannter Elemente, geprüft nach ihrer Art. */
+  /** Scalar values of known elements, validated by their kind. */
   values: Record<string, FieldValue>;
   /**
-   * Werte ohne bekanntes Element — unverändert zurückgeschrieben. (Ein Wert der
-   * falschen Art für ein bekanntes Element fällt dagegen weg; ein neues
-   * Wertformat käme mit einer neuen `data-block-v` und würde gar nicht gelesen.)
+   * Values without a known element — written back unchanged. (A value of the
+   * wrong kind for a known element, on the other hand, is dropped; a new
+   * value format would come with a new `data-block-v` and not be read at all.)
    */
   orphans: Record<string, unknown>;
-  /** Element-ID → inneres HTML seines Slots (Link-Chip oder `<img>`), auch ohne bekanntes Element. */
+  /** Element ID → inner HTML of its slot (link chip or `<img>`), also without a known element. */
   slots: Record<string, string>;
-  /** Name und Icon (Emoji) der eigenen Block-Definition, aus der der Block kopiert wurde — leer bei einzelnen Feldern. */
+  /** Name and icon (emoji) of the custom block definition the block was copied from — empty for single fields. */
   name: string;
   icon: string;
 }
 
-/* ---------------- Lesen ---------------- */
+/* ---------------- Reading ---------------- */
 
 function parseJson(raw: string | undefined): { ok: boolean; value: unknown } {
   if (raw === undefined) return { ok: true, value: undefined };
@@ -192,10 +192,10 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 /**
- * Eine Element-ID muss harmlos sein: sie wird Schlüssel in `values`/`slots`
- * und Attributwert im Markup. Ein Name wie `constructor` oder `__proto__` aus
- * einer präparierten Import-Datei läse sonst eingebaute Objekt-Eigenschaften
- * als Slot-Inhalt — und das Rendern bräche ab.
+ * An element ID must be harmless: it becomes a key in `values`/`slots`
+ * and an attribute value in the markup. A name like `constructor` or `__proto__` from
+ * a doctored import file would otherwise read built-in object properties
+ * as slot content — and rendering would break.
  */
 const ELEMENT_ID_RE = /^[A-Za-z0-9_-]{1,64}$/;
 
@@ -203,7 +203,7 @@ function isSafeElementId(id: string): boolean {
   return ELEMENT_ID_RE.test(id) && !(id in Object.prototype);
 }
 
-/** Ein Schlüssel-Wert-Objekt ohne Prototyp — was darin nicht steht, gibt es nicht. */
+/** A key-value object without a prototype — what is not in it does not exist. */
 function bareRecord<T>(): Record<string, T> {
   return Object.create(null) as Record<string, T>;
 }
@@ -239,7 +239,7 @@ function parseElement(raw: unknown): ElementDef | null {
   return element;
 }
 
-/** Eine Elementliste aus unsicherer Quelle (Inhalt, Import, Datenbank): Ungültiges und doppelte IDs fallen weg. */
+/** An element list from an unreliable source (content, import, database): invalid entries and duplicate IDs are dropped. */
 export function parseElements(raw: unknown): ElementDef[] {
   if (!Array.isArray(raw)) return [];
   const seen = new Set<string>();
@@ -250,7 +250,7 @@ export function parseElements(raw: unknown): ElementDef[] {
   });
 }
 
-/** Anzeigeregeln aus unsicherer Quelle; Fehlendes nach `DEFAULT_DISPLAY`. */
+/** Display rules from an unreliable source; anything missing falls back to `DEFAULT_DISPLAY`. */
 export function parseDisplay(raw: unknown): DisplayRules {
   const rules = isRecord(raw) ? raw : {};
   return {
@@ -259,7 +259,7 @@ export function parseDisplay(raw: unknown): DisplayRules {
   };
 }
 
-/** Die Elemente, die der Block zeigt — ohne die archivierten. */
+/** The elements the block shows — without the archived ones. */
 export function activeElements(model: FieldsModel): ElementDef[] {
   return model.elements.filter((e) => !e.archived);
 }
@@ -290,16 +290,16 @@ function parseValue(kind: ElementKind, raw: unknown): FieldValue | undefined {
   }
 }
 
-// Die Attribut-Abschnitte begrenzt (IDs sind ohnehin höchstens 64 Zeichen):
-// ungebremst liefe der Regex auf präpariertem Markup quadratisch.
+// The attribute sections are bounded (IDs are at most 64 characters anyway):
+// unbounded, the regex would run quadratically on doctored markup.
 const SLOT_RE = /<dd\b[^<>]{0,256}?\bdata-block-slot="el:([^"]{1,200})"[^<>]{0,256}>([\s\S]*?)<\/dd>/gi;
 
-// Blöcke sind unveränderliche Werte: dasselbe Objekt, dasselbe Modell. Der
-// Stapel, die Seitenleiste, Name und Icon lesen denselben Block pro Render
-// mehrfach — ohne Cache hieße das mehrmals JSON.parse pro Tastendruck.
+// Blocks are immutable values: same object, same model. The stack, the
+// sidebar, name and icon read the same block several times per render —
+// without a cache that would mean several JSON.parse calls per keystroke.
 const modelCache = new WeakMap<BlockInstance, FieldsModel>();
 
-/** Das Modell eines Feldblocks. Wirft nie — Unlesbares setzt `broken`. */
+/** The model of a field block. Never throws — unreadable input sets `broken`. */
 export function parseFields(block: BlockInstance): FieldsModel {
   const cached = modelCache.get(block);
   if (cached) return cached;
@@ -346,7 +346,7 @@ export function parseFields(block: BlockInstance): FieldsModel {
   return model;
 }
 
-/** Ziel des Link-Chips in einem Slot, samt gespeichertem Label — oder `null`. */
+/** Target of the link chip in a slot, with its stored label — or `null`. */
 export function linkFromSlot(html: string | undefined): { id: string; entryType: string; label: string } | null {
   if (typeof html !== 'string' || !html) return null;
   const [link] = extractInternalLinks(html);
@@ -355,17 +355,17 @@ export function linkFromSlot(html: string | undefined): { id: string; entryType:
   return { ...link, label: label !== undefined ? decodeHtmlAttr(label) : '' };
 }
 
-/** Der gespeicherte Bild-Dateiname in einem Slot — oder `null`. */
+/** The stored image file name in a slot — or `null`. */
 export function imageFromSlot(html: string | undefined): string | null {
   const src = typeof html === 'string' ? /\bsrc="([^"]*)"/i.exec(html)?.[1] : undefined;
   return src ? decodeHtmlAttr(src) : null;
 }
 
-/* ---------------- Vorgaben ---------------- */
+/* ---------------- Defaults ---------------- */
 
 /**
- * Eine Vorgabe aus unsicherer Quelle (Datenbank, Backup, `.emerald`), geprüft
- * nach der Art des Elements — `undefined` für alles, was nicht passt.
+ * A default from an unreliable source (database, backup, `.emerald`), validated
+ * by the element's kind — `undefined` for anything that does not fit.
  */
 function parseDefault(element: ElementDef, raw: unknown): ElementDefault | undefined {
   switch (element.kind) {
@@ -375,7 +375,7 @@ function parseDefault(element: ElementDef, raw: unknown): ElementDefault | undef
       if (element.kind === 'altar' && raw.entryType !== 'altar') return undefined;
       return {
         id: raw.id as string,
-        // `isValidLinkTarget` hat die Art gegen die Liste geprüft.
+        // `isValidLinkTarget` has checked the kind against the list.
         entryType: String(raw.entryType).trim() as ContentType,
         label: typeof raw.label === 'string' ? raw.label : '',
       };
@@ -392,10 +392,10 @@ function parseDefault(element: ElementDef, raw: unknown): ElementDefault | undef
     case 'text':
     case 'sigilCalc':
     case 'sigilCanvas':
-      return undefined; // Text, Rechner und Zeichnung beginnen leer.
+      return undefined; // Text, calculator and drawing start empty.
     default: {
       const value = parseValue(element.kind, raw);
-      // Eine Auswahl-Vorgabe nur auf eine Option, die es noch gibt — sonst bekäme jede Kopie einen toten Wert.
+      // A select default only for an option that still exists — otherwise every copy would get a dead value.
       const stale = element.kind === 'select' && !element.options?.some((o) => o.id === value);
       return stale ? undefined : value;
     }
@@ -406,7 +406,7 @@ function isLinkDefault(value: ElementDefault | undefined): value is LinkDefault 
   return isRecord(value) && typeof value.id === 'string';
 }
 
-/** Der Slot-Inhalt, den eine Vorgabe in der Kopie ergibt — Chip oder `<img>`; `null` für Nicht-Slot-Arten. */
+/** The slot content that a default yields in the copy — chip or `<img>`; `null` for non-slot kinds. */
 export function slotFromDefault(element: ElementDef): string | null {
   const value = element.defaultValue;
   if (element.kind === 'image') return typeof value === 'string' ? imageSlotHtml(value) : null;
@@ -415,26 +415,26 @@ export function slotFromDefault(element: ElementDef): string | null {
 }
 
 /**
- * Umgekehrt: die Vorgabe, die ein Slot-Inhalt ergibt (Baukasten) — `undefined`
- * für leer oder Unbrauchbares. Durch dieselbe Prüfung wie beim Lesen, damit
- * nichts gespeichert wird, was `parseElement` später verwürfe.
+ * The reverse: the default that a slot content yields (builder) — `undefined`
+ * for empty or unusable input. Through the same validation as when reading, so
+ * that nothing is saved that `parseElement` would later discard.
  */
 export function defaultFromSlot(element: ElementDef, html: string | null): ElementDefault | undefined {
-  // Text hat keine Vorgabe (sie wäre Markup in der Definition).
+  // Text has no default (it would be markup in the definition).
   if (!html || element.kind === 'text') return undefined;
   return parseDefault(element, element.kind === 'image' ? imageFromSlot(html) : linkFromSlot(html));
 }
 
-/** Der Slot eines Bildfelds: ein echtes `<img src>` — so findet das Bild-Aufräumen die Datei. */
+/** The slot of an image field: a real `<img src>` — that is how the image cleanup finds the file. */
 export function imageSlotHtml(filename: string): string {
   return `<img src="${escapeHtml(filename)}">`;
 }
 
-/* ---------------- Leer / sichtbar ---------------- */
+/* ---------------- Empty / visible ---------------- */
 
 /**
- * Hat das Element keinen (gültigen) Wert? Ja/Nein ist nie leer: ungesetzt
- * heißt „Nein" — so zeigen Eingabe, Lesemodus und Fallback dasselbe.
+ * Does the element have no (valid) value? Yes/no is never empty: unset
+ * means "no" — so input, read mode and fallback show the same.
  */
 export function isElementEmpty(element: ElementDef, model: FieldsModel): boolean {
   const value = model.values[element.id];
@@ -453,7 +453,7 @@ export function isElementEmpty(element: ElementDef, model: FieldsModel): boolean
     case 'moon':
       return !MOON_PHASE_ORDER.includes(value as MoonPhase);
     case 'text':
-      // Sichtbarer Inhalt zählt — eine leere Überschrift oder ein leerer Aufzählungspunkt nicht.
+      // Visible content counts — an empty heading or an empty bullet point does not.
       return isBlankContent(model.slots[element.id] ?? '');
     case 'link':
     case 'image':
@@ -462,26 +462,26 @@ export function isElementEmpty(element: ElementDef, model: FieldsModel): boolean
       return !model.slots[element.id];
     case 'sigilCanvas':
     case 'sigilCharge':
-      // Die Ladung: Laden und Entladen gehören in den Lesemodus. Die Zeichnung:
-      // ihr Speichern überdauert „Fertig" und braucht die montierte Komponente.
+      // The charge: loading and unloading belong in read mode. The drawing:
+      // its saving outlasts "Done" and needs the mounted component.
       return false;
   }
 }
 
-/** Kann ein Element dieser Art leer sein? Ja/Nein, Zeichnung und Ladung nie — für sie gibt es kein „leer ausblenden". */
+/** Can an element of this kind be empty? Yes/no, drawing and charge never — for them there is no "hide when empty". */
 export function canBeEmpty(kind: ElementKind): boolean {
   return kind !== 'toggle' && kind !== 'sigilCanvas' && kind !== 'sigilCharge';
 }
 
-/** Blendet der Lesemodus dieses Element aus? Archiviert, oder leer UND (Element- oder Blockregel). */
+/** Does read mode hide this element? Archived, or empty AND (element or block rule). */
 export function isHiddenInRead(element: ElementDef, model: FieldsModel): boolean {
   return !!element.archived
     || (isElementEmpty(element, model) && (element.hideWhenEmpty ?? model.display.readHideEmpty));
 }
 
-/* ---------------- Schreiben ---------------- */
+/* ---------------- Writing ---------------- */
 
-/** Was der lesbare Fallback in der aktuellen Sprache sagt — die Aufrufer reichen `t` hinein. */
+/** What the readable fallback says in the current language — the callers pass `t` in. */
 export interface FallbackText {
   label: (element: ElementDef) => string;
   yes: string;
@@ -489,7 +489,7 @@ export interface FallbackText {
   moonName: (phase: MoonPhase) => string;
 }
 
-/** Der Wert eines Feldes als HTML (kein Slot) — `null` für leer. Fallback und Export teilen ihn. */
+/** The value of a field as HTML (not a slot) — `null` for empty. Fallback and export share it. */
 export function fieldValueHtml(element: ElementDef, model: FieldsModel, text: FallbackText): string | null {
   if (isElementEmpty(element, model)) return null;
   const value = model.values[element.id];
@@ -515,14 +515,14 @@ export function fieldValueHtml(element: ElementDef, model: FieldsModel, text: Fa
 }
 
 function slotRow(id: string, html: string): string {
-  // Entschärft wie Editor-HTML: ein `<section` im Slot (aus einem Import)
-  // darf das Blockformat beim nächsten Lesen nicht verschachteln.
+  // Defused like editor HTML: a `<section` in the slot (from an import)
+  // must not nest the block format on the next read.
   return `<dd data-block-slot="el:${escapeHtml(id)}">${neutralizeSectionTags(html)}</dd>`;
 }
 
 /**
- * Der Block mit neu geschriebenem Config-/Daten-JSON und Fallback-HTML. Für
- * einen `broken` Block nicht aufrufen — er würde mit „leer" überschrieben.
+ * The block with rewritten config/data JSON and fallback HTML. Do not call it
+ * for a `broken` block — it would be overwritten with "empty".
  */
 export function serializeFields(block: BlockInstance, model: FieldsModel, text: FallbackText): BlockInstance {
   const known = new Set(model.elements.map((e) => e.id));
@@ -530,7 +530,7 @@ export function serializeFields(block: BlockInstance, model: FieldsModel, text: 
     const dt = `<dt>${escapeHtml(text.label(element))}</dt>`;
     if (isSlotKind(element.kind) || isSigilKind(element.kind)) {
       const slot = model.slots[element.id];
-      // Archiviert: ohne Beschriftung, aber der Slot bleibt — mit ihm Link und Bild.
+      // Archived: without a label, but the slot stays — and with it link and image.
       if (!slot) return '';
       return element.archived ? slotRow(element.id, slot) : `${dt}${slotRow(element.id, slot)}`;
     }
@@ -538,8 +538,8 @@ export function serializeFields(block: BlockInstance, model: FieldsModel, text: 
     const html = fieldValueHtml(element, model, text);
     return html === null ? '' : `${dt}<dd>${html}</dd>`;
   });
-  // Slots ohne bekanntes Element bleiben stehen, wie die verwaisten Werte —
-  // mit ihnen ginge sonst ein Link samt Rückverweis still verloren.
+  // Slots without a known element stay, like the orphaned values —
+  // otherwise a link and its backlink would be silently lost with them.
   for (const [id, html] of Object.entries(model.slots)) {
     if (!known.has(id)) rows.push(slotRow(id, html));
   }
@@ -561,21 +561,21 @@ export function serializeFields(block: BlockInstance, model: FieldsModel, text: 
   return { ...block, attrs, html: body ? `<dl>${body}</dl>` : '' };
 }
 
-/* ---------------- Ohne Neuschreiben ---------------- */
+/* ---------------- Without rewriting ---------------- */
 
-// Beschriftung und Slot eines Elements im Fallback — dieselben Grenzen wie SLOT_RE.
+// Label and slot of an element in the fallback — the same bounds as SLOT_RE.
 const SLOT_ROW_RE = /(?:<dt>[^<]*<\/dt>)?<dd\b[^<>]{0,256}?\bdata-block-slot="el:([^"]{1,200})"[^<>]{0,256}>[\s\S]*?<\/dd>/gi;
 
-/** Das Daten-JSON des Blocks, oder `null`, wenn es fehlt oder unlesbar ist. */
+/** The block's data JSON, or `null` if it is missing or unreadable. */
 function readValuesJson(block: BlockInstance): Record<string, unknown> | null {
   const parsed = parseJson(block.attrs[BLOCK_ATTR.data]);
   return parsed.ok && isRecord(parsed.value) && isRecord(parsed.value.values) ? parsed.value.values : null;
 }
 
 /**
- * Der Block ohne Wert und Slot dieser Elemente — für Suche und Export, wenn
- * eine Sigille Teile verbirgt. Ohne `FallbackText`: nur Daten-JSON und die
- * Zeilen im Fallback fallen weg, sonst bleibt alles Byte für Byte.
+ * The block without value and slot of these elements — for search and export
+ * when a sigil conceals parts. Without `FallbackText`: only the data JSON and
+ * the rows in the fallback are dropped, everything else stays byte for byte.
  */
 export function withoutElementContent(block: BlockInstance, ids: ReadonlySet<string>): BlockInstance {
   if (ids.size === 0) return block;
@@ -589,13 +589,13 @@ export function withoutElementContent(block: BlockInstance, ids: ReadonlySet<str
   return { ...block, attrs, html };
 }
 
-/** Der Block mit einem neuen Wert für dieses Element — nur im Daten-JSON, der Fallback bleibt. */
+/** The block with a new value for this element — only in the data JSON, the fallback stays. */
 export function withElementValue(block: BlockInstance, id: string, value: FieldValue): BlockInstance {
   const values = readValuesJson(block) ?? {};
   return { ...block, attrs: { ...block.attrs, [BLOCK_ATTR.data]: JSON.stringify({ values: { ...values, [id]: value } }) } };
 }
 
-/** Ein neuer Feldblock mit genau einem Element dieser Art. */
+/** A new field block with exactly one element of this kind. */
 export function createFieldsBlock(kind: ElementKind): BlockInstance {
   const element: ElementDef = { id: generateId(), kind, label: '' };
   if (kind === 'select') element.options = [];

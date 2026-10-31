@@ -1,18 +1,18 @@
 /**
- * Das Lexikon: die Sprachen (Tabelle `languages`, seit v45) und ihre Vokabeln
- * (`lexicon_entries`). Ein Store für beides, weil die Vokabeln ohne ihre
- * Sprache nichts sind und jede Ansicht immer beide braucht — das Dashboard
- * zählt sie, die Sprachseite listet sie, das Übersetzen-Feld liest sie.
+ * The lexicon: the languages (table `languages`, since v45) and their vocabulary
+ * (`lexicon_entries`). One store for both, because the vocabulary is nothing
+ * without its language and every view always needs both — the dashboard
+ * counts them, the language page lists them, the translate field reads them.
  *
- * Gespeichert wird sofort, nicht erst mit „Fertig": eine Vokabelzeile ist ein
- * Paar aus zwei Feldern, kein Entwurf. Die Sprachseite braucht deshalb keinen
- * `draftStore` wie die Blöcke- und Vorlagenseite.
+ * Saving is immediate, not only with "Done": a vocabulary row is a
+ * pair of two fields, not a draft. The language page therefore needs no
+ * `draftStore` like the blocks and templates pages.
  *
- * Löschen: eine Sprache wandert in den Papierkorb (Soft-Delete, ihre Vokabeln
- * bleiben an ihr hängen), eine einzelne Vokabel ist sofort weg — mit
- * Rückgängig über `undoStore`, das sie unter derselben ID zurückschreibt.
+ * Deleting: a language moves to the trash (soft delete, its vocabulary
+ * stays attached to it), a single vocabulary item is gone immediately — with
+ * undo via `undoStore`, which writes it back under the same ID.
  *
- * Import-Regel wie `blockDefinitionStore`: keine Inhalts-Stores.
+ * Import rule as in `blockDefinitionStore`: no content stores.
  */
 import { create } from 'zustand';
 import type Database from '../lib/sqlite';
@@ -32,28 +32,28 @@ export type LanguagePatch = Partial<Pick<Language, 'name' | 'icon' | 'alphabet'>
 export type EntryPatch = Partial<Pick<LexiconEntry, 'term' | 'translation' | 'pronunciation' | 'note'>>;
 
 interface LexiconState {
-  /** Aktive Sprachen in Anzeigereihenfolge. */
+  /** Active languages in display order. */
   languages: Language[];
-  /** Die Vokabeln aller Sprachen — die Ansichten filtern selbst (`entriesOfLanguage`). */
+  /** The vocabulary of all languages — the views filter themselves (`entriesOfLanguage`). */
   entries: LexiconEntry[];
 
   fetchLexicon: () => Promise<void>;
   createLanguage: (name: string, init?: Omit<LanguagePatch, 'name'>) => Promise<Language>;
   updateLanguage: (id: string, patch: LanguagePatch) => Promise<void>;
   duplicateLanguage: (id: string) => Promise<Language | undefined>;
-  /** Soft-Delete. Die Vokabeln bleiben an der Sprache und kommen mit ihr zurück. */
+  /** Soft delete. The vocabulary stays with the language and comes back with it. */
   deleteLanguage: (id: string) => Promise<void>;
   restoreLanguage: (id: string) => Promise<void>;
   permanentlyDeleteLanguage: (id: string) => Promise<void>;
 
   addEntry: (languageId: string, init?: EntryPatch) => Promise<LexiconEntry>;
   updateEntry: (id: string, patch: EntryPatch) => Promise<void>;
-  /** Sofort weg. Rückgängig macht `restoreEntry` mit der zurückgegebenen Zeile. */
+  /** Gone immediately. `restoreEntry` undoes it with the returned row. */
   deleteEntry: (id: string) => Promise<LexiconEntry | undefined>;
   restoreEntry: (entry: LexiconEntry) => Promise<void>;
 }
 
-/** Sprachen und Vokabeln schreiben unter einem Schlüssel: ein Löschen betrifft beide Tabellen. */
+/** Languages and vocabulary write under one key: a delete affects both tables. */
 const WRITE_KEY = serialKey('language', '*');
 
 async function selectActive(db: Database): Promise<Language[]> {
@@ -64,9 +64,9 @@ async function selectActive(db: Database): Promise<Language[]> {
 }
 
 /**
- * Die Vokabeln der aktiven Sprachen. Die einer gelöschten bleiben in der
- * Datenbank, aber aus dem Speicher heraus — sonst zählte das Übersetzen-Feld
- * Wörter mit, zu denen es keine Sprache mehr gibt.
+ * The vocabulary of the active languages. That of a deleted one stays in the
+ * database but out of memory — otherwise the translate field would count
+ * words for which there is no language any more.
  */
 async function selectEntries(db: Database): Promise<LexiconEntry[]> {
   const rows = await db.select<DbRow[]>(
@@ -130,7 +130,7 @@ export const useLexiconStore = create<LexiconState>((set, get) => ({
       icon: source.icon,
       alphabet: source.alphabet,
     });
-    // Die Vokabeln kommen mit: eine Sprache ohne sie wäre nur ein Name.
+    // The vocabulary comes along: a language without it would be just a name.
     const db = await getDb();
     const now = nowIso();
     const entries = get().entries
@@ -154,7 +154,7 @@ export const useLexiconStore = create<LexiconState>((set, get) => ({
     const db = await getDb();
     const language = await languageById(db, id);
     if (!language) return;
-    // Ans Ende der Liste: der alte Platz ist inzwischen womöglich vergeben.
+    // To the end of the list: the old slot may have been taken in the meantime.
     await db.execute(
       'UPDATE languages SET deleted_at=NULL, sort_order=$1 WHERE id=$2',
       [await nextLanguageSortOrder(db), id],
@@ -165,7 +165,7 @@ export const useLexiconStore = create<LexiconState>((set, get) => ({
 
   permanentlyDeleteLanguage: async (id) => {
     const db = await getDb();
-    // Nur aus dem Papierkorb erreichbar. ON DELETE CASCADE nimmt die Vokabeln mit.
+    // Reachable only from the trash. ON DELETE CASCADE takes the vocabulary along.
     await db.execute('DELETE FROM languages WHERE id=$1', [id]);
   },
 
@@ -213,9 +213,9 @@ export const useLexiconStore = create<LexiconState>((set, get) => ({
 
   restoreEntry: (entry) => serialized(WRITE_KEY, async () => {
     const db = await getDb();
-    // Die Sprache kann inzwischen im Papierkorb liegen — dann liefe das INSERT
-    // zwar durch (die Zeile existiert noch), die Vokabel gehörte aber zu einer
-    // Sprache, die der Store nicht hält. Lieber gar nicht.
+    // The language may be in the trash by now — the INSERT would then go
+    // through (the row still exists), but the vocabulary item would belong to a
+    // language the store does not hold. Better not at all.
     if (!get().languages.some((l) => l.id === entry.language_id)) return;
     await insertEntryRow(db, entry);
     set((s) => ({ entries: [...s.entries, entry] }));

@@ -3,10 +3,10 @@ import { subscribeDrag } from '../../lib/dragState';
 import type { SuggestionItem } from './SuggestionList';
 
 /**
- * Das schwebende Schild am Mauszeiger, während ein Eintrag aus der linken
- * Liste in den Editor gezogen wird. Einmal pro geöffnetem
- * Eintrag (am `BlockStack`), nicht pro Textblock — sonst lägen mehrere
- * deckungsgleiche Schilder übereinander.
+ * The floating tag at the mouse pointer while an entry from the left
+ * list is dragged into the editor. Once per opened
+ * entry (at the `BlockStack`), not per text block; otherwise several
+ * congruent tags would lie on top of each other.
  */
 export default function DragGhost() {
   const [linkItem, setLinkItem] = useState<SuggestionItem | null>(null);
@@ -33,7 +33,7 @@ export default function DragGhost() {
                  bg-stone-800 border border-stone-600 rounded shadow-lg opacity-90"
       style={{ left: pos.x + 12, top: pos.y + 12 }}
     >
-      {/* `category` trägt in jedem Modul das Kategorie-Emoji. */}
+      {/* `category` carries the category emoji in every module. */}
       {linkItem.category ? <span className="text-sm">{linkItem.category}</span> : null}
       <span className="text-xs text-jade-400">{linkItem.label}</span>
     </div>

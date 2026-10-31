@@ -1,12 +1,12 @@
 /**
- * Ein Bild als Data-URL auf höchstens `maxEdge` Pixel Kantenlänge zeichnen.
- * Passt es schon, kommt es unverändert zurück.
+ * Draw an image as a data URL at no more than `maxEdge` pixels edge length.
+ * If it already fits, it comes back unchanged.
  *
- * `mime` bestimmt das Ausgabeformat: ohne Angabe das des Bildes (ein
- * JPEG-Foto als PNG würde größer statt kleiner), `quality` gilt nur für die
- * verlustbehafteten Formate. Die eine Zeichenfläche für beide Aufrufer —
- * `shrinkImageDataUrl` für Icons und `prepareImageDataUrl` für die Grenzen
- * eines Vaults (`lib/imageLimits.ts`).
+ * `mime` determines the output format: by default that of the image (a
+ * JPEG photo as PNG would get larger instead of smaller), `quality` applies only to the
+ * lossy formats. The one canvas for both callers —
+ * `shrinkImageDataUrl` for icons and `prepareImageDataUrl` for a vault's
+ * limits (`lib/imageLimits.ts`).
  */
 export async function scaleToMaxEdge(
   dataUrl: string,
@@ -33,20 +33,20 @@ function drawScaled(img: HTMLImageElement, scale: number, options: { mime?: stri
 }
 
 /**
- * Ein Icon verkleinern (PNG, damit Transparenz bleibt). Ist es in Maß und
- * Größe schon klein genug, kommt es unverändert zurück — ein kurzes animiertes
- * GIF bleibt dann animiert.
+ * Shrink an icon (PNG, so that transparency is kept). If it is already small
+ * enough in dimensions and size, it comes back unchanged — a short animated
+ * GIF then stays animated.
  *
- * Für Icons, die viele Male mitreisen: das Icon eines eigenen Blocks steckt in
- * jeder Kopie in jedem Eintrag, ein Foto in voller Größe blähte jeden davon auf.
+ * For icons that travel along many times: a custom block's icon sits in
+ * every copy in every entry, a full-size photo would bloat every one of them.
  */
 export async function shrinkImageDataUrl(dataUrl: string, maxEdge: number): Promise<string> {
   const img = new Image();
   img.src = dataUrl;
   await img.decode();
   const longest = Math.max(img.naturalWidth, img.naturalHeight);
-  // Klein, aber schwer (eingebettete Metadaten, lange GIF-Animation): auch
-  // das wird neu kodiert. Die Grenze liegt über einem 64px-PNG.
+  // Small but heavy (embedded metadata, long GIF animation): that too
+  // is re-encoded. The limit lies above a 64px PNG.
   if (longest <= maxEdge && dataUrl.length <= maxEdge * maxEdge * 8) return dataUrl;
   return drawScaled(img, Math.min(1, maxEdge / longest), { mime: 'image/png' });
 }

@@ -4,9 +4,9 @@ export function isImageIcon(icon: string | null | undefined): boolean {
 }
 
 /**
- * Icon und Name als eine Zeile — für Listen, die beides nebeneinander zeigen
- * (Papierkorb). Ein Bild-Icon ist eine Data-URL und stünde als Base64 vor dem
- * Namen; dann trägt die Zeile ihr Symbol ohnehin schon in der eigenen Spalte.
+ * Icon and name as one line — for lists that show both side by side
+ * (trash). An image icon is a data URL and would appear as Base64 in front of the
+ * name; in that case the row already carries its symbol in its own column.
  */
 export function iconTitle(icon: string, name: string): string {
   return isImageIcon(icon) ? name : `${icon} ${name}`;
@@ -20,7 +20,7 @@ export function nowIso(): string {
   return new Date().toISOString();
 }
 
-/** Ein Tag als `YYYY-MM-DD` in lokaler Zeit — `toISOString()` wäre UTC und nachts der falsche Tag. */
+/** A day as `YYYY-MM-DD` in local time — `toISOString()` would be UTC and the wrong day at night. */
 export function localIsoDay(date = new Date()): string {
   const pad = (n: number) => String(n).padStart(2, '0');
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
@@ -58,10 +58,10 @@ export function hexToRgb(hex: string): { r: number; g: number; b: number } {
 }
 
 /**
- * Dateigroesse fuer die Anzeige — eine Nachkommastelle ab MB.
+ * File size for display — one decimal place from MB upwards.
  *
- * Die Einheiten kommen von aussen statt fest im Code zu stehen: Franzoesisch
- * rechnet in Oktett und schreibt `o` / `Ko` / `Mo`, nicht `B` / `KB` / `MB`.
+ * The units come from outside instead of being hard-coded: French
+ * counts in octets and writes `o` / `Ko` / `Mo`, not `B` / `KB` / `MB`.
  */
 export function formatBytes(bytes: number, units: [string, string, string]): string {
   if (bytes < 1024) return `${bytes} ${units[0]}`;
@@ -69,8 +69,8 @@ export function formatBytes(bytes: number, units: [string, string, string]): str
   return `${(bytes / (1024 * 1024)).toFixed(1)} ${units[2]}`;
 }
 
-/** `raw`, wenn es genau einer der `options` ist, sonst `fallback` — für Werte
- *  aus Dateien und localStorage, die eine feste Auswahl treffen müssen. */
+/** `raw` if it is exactly one of the `options`, otherwise `fallback` — for values
+ *  from files and localStorage that have to pick from a fixed set. */
 export function oneOf<T>(raw: unknown, options: readonly T[], fallback: T): T {
   return options.includes(raw as T) ? (raw as T) : fallback;
 }

@@ -1,25 +1,25 @@
 /**
- * Eingefrorenes Schema, Stand v48 — jede Tabelle, die eine spätere Migration
- * noch umgebaut hat: die drei Eintragstabellen, bevor v49 (`unifyEntries.ts`)
- * sie zu `entries` zusammenlegt, und `tasks`, `altar_items` und `tags`, bevor
- * v50, v52, v53 und v54 Spalten wegnehmen oder dazutun.
+ * Frozen schema, as of v48 — every table that a later migration
+ * rebuilt: the three entry tables before v49 (`unifyEntries.ts`)
+ * merges them into `entries`, and `tasks`, `altar_items` and `tags` before
+ * v50, v52, v53 and v54 remove or add columns.
  *
- * Die Migrationen davor bauen oder lesen diese Tabellen noch: v33 legt
- * `journal_entries` und `tags` an (`schemaV37.ts` holt sie von hier), v38 und
- * v39 bauen `wiki_articles`, `operations`, `tasks` und `altar_items` neu, v35
- * läuft über ihre Bildspalten, v48 über ihre Titel. Im lebenden `schema.ts`
- * sehen sie anders aus oder fehlen — also stehen sie hier, wie sie bis dahin
- * aussahen.
- * **Nichts hier ändern:** `scripts/schema-check.mjs` beweist, dass die Kette
- * über diesen Stand beim selben Schema landet wie ein frischer Vault.
+ * The migrations before that still build or read these tables: v33 creates
+ * `journal_entries` and `tags` (`schemaV37.ts` fetches them from here), v38 and
+ * v39 rebuild `wiki_articles`, `operations`, `tasks` and `altar_items`, v35
+ * runs over their image columns, v48 over their titles. In the live `schema.ts`
+ * they look different or are missing — so they stand here as they
+ * looked up to then.
+ * **Change nothing here:** `scripts/schema-check.mjs` proves that the chain
+ * via this state ends up at the same schema as a fresh vault.
  */
 import { TABLE_DDL, type TableName } from './schema';
 
 export type V48Table = 'journal_entries' | 'wiki_articles' | 'operations' | 'tasks' | 'altar_items' | 'tags';
 
 export const V48_TABLE_DDL: Record<V48Table, string> = {
-  // `affected_ids`: wem ein Tag im Papierkorb beim Wiederherstellen
-  // zurückgegeben wird — bis v53 hingen Tags per Name an den Einträgen.
+  // `affected_ids`: whom a tag in the trash is given back to on
+  // restoring — until v53 tags were attached to entries by name.
   tags: `
     CREATE TABLE tags (
       id TEXT PRIMARY KEY,
@@ -40,7 +40,7 @@ export const V48_TABLE_DDL: Record<V48Table, string> = {
       created_at TEXT NOT NULL
     )`,
 
-  // `tags` wurde nie gelesen oder geschrieben (v50 nimmt sie weg).
+  // `tags` was never read or written (v50 removes it).
   tasks: `
     CREATE TABLE tasks (
       id TEXT PRIMARY KEY,
@@ -59,9 +59,9 @@ export const V48_TABLE_DDL: Record<V48Table, string> = {
       deleted_at TEXT
     )`,
 
-  // paradigm_id, bannung_type_wiki_id, meditation_type_wiki_id und die beiden
-  // linked_*_ids-Arrays verweisen auf Wiki-Artikel bzw. Operationen (seit
-  // v36/v37 geleert und ungelesen).
+  // paradigm_id, bannung_type_wiki_id, meditation_type_wiki_id and the two
+  // linked_*_ids arrays refer to wiki articles and operations respectively
+  // (emptied and unread since v36/v37).
   journal_entries: `
     CREATE TABLE journal_entries (
       id TEXT PRIMARY KEY,
@@ -131,12 +131,12 @@ export const V48_TABLE_DDL: Record<V48Table, string> = {
     )`,
 };
 
-/** Das DDL, das eine Migration bis v48 für `table` meint: die eingefrorene Fassung, sonst die lebende. */
+/** The DDL that a migration up to v48 means for `table`: the frozen version, otherwise the live one. */
 export function ddlBeforeV49(table: string): string {
   return (V48_TABLE_DDL as Record<string, string>)[table] ?? TABLE_DDL[table as TableName];
 }
 
-/** Die Bildspalten bis v48 — v35 läuft darüber (siehe `IMAGE_FIELDS` in `schema.ts`). */
+/** The image columns up to v48 — v35 runs over them (see `IMAGE_FIELDS` in `schema.ts`). */
 export const IMAGE_FIELDS_V48: { table: string; html: string[]; plain: string[]; legacy: string[] }[] = [
   { table: 'journal_entries', html: ['content'], plain: [], legacy: [] },
   { table: 'wiki_articles', html: ['content'], plain: [], legacy: ['icon', 'cover_image'] },
@@ -150,5 +150,5 @@ export const IMAGE_FIELDS_V48: { table: string; html: string[]; plain: string[];
   { table: 'altar_items', html: [], plain: [], legacy: ['image_data'] },
 ];
 
-/** Die Tabellen mit Titel bis v48 — v48 (`untitled_is_empty`) leert ihre Standardtitel. */
+/** The tables with a title up to v48 — v48 (`untitled_is_empty`) clears their default titles. */
 export const TITLED_TABLES_V48 = ['journal_entries', 'wiki_articles', 'operations', 'tasks', 'altars'] as const;

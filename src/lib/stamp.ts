@@ -1,19 +1,18 @@
 import { nowIso } from './helpers';
 
 /**
- * Wann ein Schreibzugriff „Zuletzt geändert" (`updated_at`) weiterstellt. Es
- * zählt nur, was jemand an genau diesem Eintrag ändert — was als Folge von
- * anderswo hereinkommt, lässt den Stempel stehen, und mit ihm die Reihenfolge
- * der Listen.
+ * When a write advances "Last modified" (`updated_at`). Only what someone
+ * changes on exactly this entry counts — what comes in as a consequence from
+ * elsewhere leaves the stamp alone, and with it the order of the lists.
  *
- * Gilt für die Einträge der drei Module, Aufgaben, Vorlagen, Altäre, eigene
- * Blöcke und das Lexikon — jede Methode, die `updated_at` schreibt, fragt
- * `needsWrite` und stempelt über `stampFor`.
+ * Applies to the entries of the three modules, tasks, templates, altars, custom
+ * blocks and the lexicon — every method that writes `updated_at` asks
+ * `needsWrite` and stamps via `stampFor`.
  *
- * - `true` (Standard): jetzt.
- * - `false`: eine Folge — ein umbenannter Tag, „Alle aktualisieren", ein
- *   neues Vorschaubild.
- * - ein Zeitstempel: genau dieser. Cancel stellt so den von vorher wieder her.
+ * - `true` (default): now.
+ * - `false`: a consequence — a renamed tag, "Update all", a
+ *   new thumbnail.
+ * - a timestamp: exactly that one. Cancel uses it to restore the earlier one.
  */
 export type Touch = boolean | string;
 
@@ -21,7 +20,7 @@ export interface WriteOptions {
   touch?: Touch;
 }
 
-/** Für jeden Schreibzugriff, der eine Folge von anderswo ist — so lassen sie sich alle finden. */
+/** For every write that is a consequence of something elsewhere — so they can all be found. */
 export const AS_A_CONSEQUENCE: WriteOptions = { touch: false };
 
 export function stampFor(current: string, touch: Touch = true): string {
@@ -30,10 +29,10 @@ export function stampFor(current: string, touch: Touch = true): string {
 }
 
 /**
- * Muss ein Store für `patch` überhaupt schreiben? Nicht, wenn sich nichts
- * ändert — ein „Fertig" ohne Änderung oder ein Autosave auf denselben Stand
- * stellen „Zuletzt geändert" sonst weiter. Fehlend und `null` gelten gleich.
- * Ein ausdrücklich gesetzter Stempel, der abweicht, ist auch eine Änderung.
+ * Does a store have to write for `patch` at all? Not if nothing
+ * changes — a "Done" without changes or an autosave to the same state would
+ * otherwise advance "Last modified". Missing and `null` count as equal.
+ * An explicitly set stamp that differs is also a change.
  */
 export function needsWrite(current: { updated_at: string }, patch: object, touch?: Touch): boolean {
   if (typeof touch === 'string' && touch !== current.updated_at) return true;

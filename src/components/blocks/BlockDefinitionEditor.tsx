@@ -38,7 +38,7 @@ const draftOf = (d: DefinitionDraft): DefinitionDraft => ({
   name: d.name, icon: d.icon, elements: d.elements, display: d.display,
 });
 
-/** Die sichtbaren Elemente vorn, die archivierten dahinter — die Ordnung, die Definition und Kopie halten. */
+/** The visible elements first, the archived ones after them; the order that definition and copy keep. */
 const withArchivedLast = (elements: ElementDef[]): ElementDef[] => [
   ...elements.filter((e) => !e.archived),
   ...elements.filter((e) => e.archived),
@@ -47,26 +47,26 @@ const withArchivedLast = (elements: ElementDef[]): ElementDef[] => [
 interface Props {
   definition: BlockDefinition;
   usage: CopyUsage | undefined;
-  /** Zurück zur Liste. Der Zurück-Link über dem Titel lässt den Entwurf liegen (die Liste
-   *  zeigt ihn als ungespeichert); „Fertig" und „Abbrechen" erledigen ihn vorher. */
+  /** Back to the list. The back link above the title leaves the draft behind (the list
+   *  shows it as unsaved); "Done" and "Cancel" settle it first. */
   onClose: () => void;
-  /** Löscht — ohne Kopien sofort, sonst über den Dialog, den die Ansicht hält,
-   *  damit seine Abschlussmeldung die Seite überlebt, die mit der Definition verschwindet. */
+  /** Deletes: immediately without copies, otherwise via the dialog the view holds,
+   *  so that its completion notice survives the page, which disappears with the definition. */
   onDelete: () => void;
-  /** Gerade mit „Neu" angelegt: „Abbrechen" legt ihn in den Papierkorb (`onDelete`). */
+  /** Just created with "New": "Cancel" moves it to the trash (`onDelete`). */
   isNew?: boolean;
 }
 
 /**
- * Die Seite eines eigenen Blocks (`LibraryPageFrame`): Name als Titel,
- * darunter die Felder (hinzufügen, benennen, sortieren,
- * entfernen); in der Seitenleiste Icon, Anzeigeregeln und Verwendung.
+ * A custom block's page (`LibraryPageFrame`): name as title,
+ * below it the fields (add, name, sort,
+ * remove); in the sidebar icon, display rules and usage.
  *
- * Bearbeitet wird ein Entwurf (`useDraftPage`); erst „Fertig" schreibt ihn und
- * hebt die Revision — sonst machte jeder Tastendruck im Namen alle Kopien zu
- * „älteren Versionen". Ein gespeichertes Feld wird beim Entfernen archiviert
- * statt gelöscht: Kopien können Werte dafür haben, und es lässt sich
- * zurückholen.
+ * A draft is edited (`useDraftPage`); only "Done" writes it and
+ * bumps the revision, otherwise every keystroke in the name would turn all copies into
+ * "older versions". A saved field is archived on removal
+ * instead of deleted: copies may have values for it, and it can be
+ * restored.
  */
 export default function BlockDefinitionEditor({ definition, usage, onClose, onDelete, isNew }: Props) {
   const { t } = useTranslation();
@@ -102,11 +102,11 @@ export default function BlockDefinitionEditor({ definition, usage, onClose, onDe
     if (kind === 'select') element.options = [];
     setElements((els) => [...els, element]);
   };
-  // Nur im Entwurf: ganz weg. Gespeichert: archiviert — Kopien können Werte dafür haben.
+  // Draft only: removed entirely. Saved: archived, since copies may have values for it.
   const removeElement = (id: string) => setElements((els) => (savedIds.has(id)
     ? els.map((e) => (e.id === id ? { ...e, archived: true } : e))
     : els.filter((e) => e.id !== id)));
-  // Ans Ende der sichtbaren: dorthin, wo ein neues Feld auch landete.
+  // To the end of the visible ones: where a new field would also land.
   const restoreElement = (id: string) => setElements((els) => {
     const element = els.find((e) => e.id === id);
     if (!element) return els;
@@ -147,7 +147,7 @@ export default function BlockDefinitionEditor({ definition, usage, onClose, onDe
   const sidebar = (
     <EditSidebarBody>
       <PropertiesSection>
-        {/* Der Rückfall ist das Standard-Icon: ohne eines stünde der Block in Menüs ohne Zeichen da. */}
+        {/* The fallback is the default icon: without one the block would appear in menus without a glyph. */}
         <MediaPropertyRow
           rowIcon={<Smile size={14} />}
           label={t('properties.icon')}
@@ -235,7 +235,7 @@ export default function BlockDefinitionEditor({ definition, usage, onClose, onDe
       sidebar={sidebar}
     >
       <div className="max-w-3xl space-y-6">
-        {/* Felder */}
+        {/* Fields */}
         <section className="space-y-2">
           <p className="label-xs">{t('blocks.library.fields')}</p>
           <Reorder.Group as="div" axis="y" values={active.map((e) => e.id)} onReorder={reorderActive} className="space-y-2">
@@ -289,7 +289,7 @@ export default function BlockDefinitionEditor({ definition, usage, onClose, onDe
 
 function ElementRow({ element, siblings, blockHidesEmpty, onPatch, onRemove }: {
   element: ElementDef;
-  /** Die sichtbaren Elemente des Blocks — die Ladung wählt daraus, was sie verdeckt. */
+  /** The visible elements of the block; the charge picks from them what it conceals. */
   siblings: readonly ElementDef[];
   blockHidesEmpty: boolean;
   onPatch: (p: Partial<ElementDef>) => void;
@@ -344,12 +344,12 @@ function ElementRow({ element, siblings, blockHidesEmpty, onPatch, onRemove }: {
         {canBeEmpty(element.kind) && (
           <BlockCheckbox
             checked={hides}
-            // Gleich der Blockregel: kein eigener Wert — die Regel des Blocks gilt.
+            // Same as the block rule: no value of its own; the block's rule applies.
             onChange={(v) => onPatch({ hideWhenEmpty: v === blockHidesEmpty ? undefined : v })}
             label={t('blocks.fields.hideEmpty')}
           />
         )}
-        {/* Text hat keine Vorgabe: sie wäre Markup in der Definition. */}
+        {/* Text has no default: it would be markup in the definition. */}
         {isSigilKind(element.kind)
           ? <SigilPartSettings element={element} siblings={siblings} onPatch={onPatch} />
           : element.kind !== 'text' && <PrefillEditor element={element} onPatch={onPatch} />}
@@ -359,19 +359,19 @@ function ElementRow({ element, siblings, blockHidesEmpty, onPatch, onRemove }: {
 }
 
 /**
- * Die Vorgabe eines Felds: angehakt, bekommt jede neue Kopie diesen Wert —
- * eine Checkliste mit ihren Punkten, Ja/Nein auf „Ja". Ob angehakt, hält der
- * Baukasten selbst: eine geleerte Eingabe (die Zahl beim Neutippen) soll das
- * Feld nicht gleich wieder zuklappen.
+ * The default of a field: when checked, every new copy gets this value,
+ * a checklist with its items, yes/no set to "Yes". Whether it is checked is held by
+ * the builder itself: an emptied input (the number while retyping) should not
+ * immediately collapse the field again.
  */
 function PrefillEditor({ element, onPatch }: { element: ElementDef; onPatch: (p: Partial<ElementDef>) => void }) {
   const { t } = useTranslation();
-  // Eine Vorgabe da heißt angehakt; `armed` hält den Haken, solange die Eingabe noch leer ist.
+  // A default being present means checked; `armed` keeps the check while the input is still empty.
   const [armed, setArmed] = useState(false);
   const on = armed || element.defaultValue !== undefined;
   const toggle = (next: boolean) => {
     setArmed(next);
-    // Ja/Nein steht ohne Wert schon auf „Nein" — wer vorbelegt, will „Ja".
+    // Yes/no is already "No" without a value; whoever prefills wants "Yes".
     onPatch({ defaultValue: next && element.kind === 'toggle' ? true : undefined });
   };
   return (
@@ -407,12 +407,12 @@ function resultNotice(t: ReturnType<typeof useTranslation>['t'], key: 'updated' 
 }
 
 /**
- * Löschen, in zwei Stufen: standardmäßig bleiben alle Kopien in den Einträgen
- * stehen, und die Definition geht in den Papierkorb (rückgängig machbar). Nur
- * wer „auch aus Einträgen entfernen" ankreuzt, bekommt eine zweite Bestätigung
- * — das Entfernen lässt sich nur über ein Backup zurückholen.
+ * Deleting, in two stages: by default all copies stay in the entries,
+ * and the definition goes to the trash (undoable). Only
+ * whoever ticks "also remove from entries" gets a second confirmation,
+ * since that removal can only be recovered via a backup.
  */
-/** Die Texte des Löschdialogs, wenn auch Vorlagen Kopien tragen. */
+/** The texts of the delete dialog when templates also carry copies. */
 const WITH_TEMPLATES = {
   deleteFromEntries: 'deleteFromCopies',
   deleteFromEntriesWarning: 'deleteFromCopiesWarning',
@@ -436,7 +436,7 @@ export function DeleteDefinitionModal({ definition, usage, onClose, onDeleted }:
   const title = t('blocks.library.deleteTitle', { name: definitionLabel(t, definition) });
   const entryCount = usage?.entries ?? 0;
   const copyCount = entryCount + (usage?.templates ?? 0);
-  // Stecken Kopien auch in Vorlagen, nennen die Texte „Einträge und Vorlagen".
+  // If copies are also in templates, the texts say "entries and templates".
   const copies = (key: keyof typeof WITH_TEMPLATES) => ((usage?.templates ?? 0) > 0
     ? t(`blocks.library.${WITH_TEMPLATES[key]}`, { count: copyCount })
     : t(`blocks.library.${key}`, { count: entryCount }));
@@ -451,7 +451,7 @@ export function DeleteDefinitionModal({ definition, usage, onClose, onDeleted }:
       if (alsoRemove) {
         const result = await removeAllCopies(definition.id);
         await deleteDefinition(definition.id);
-        // Wer gerade bearbeitet wird, behält den Block — das muss man erfahren.
+        // Whoever is currently being edited keeps the block, and the user must be told.
         if (result.skippedEditing || result.skippedDrafts || result.skippedLocked || result.failed) {
           setNotice(resultNotice(t, 'removed', result));
           setStep('done');

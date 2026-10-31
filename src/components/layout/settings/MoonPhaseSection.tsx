@@ -5,9 +5,9 @@ import { SwitchRow } from '../../ui/Switch';
 import SettingsSection from './SettingsSection';
 
 /**
- * Ob Journal-Einträge ihre Mondphase zeigen — die des Tages, an dem sie
- * angelegt wurden. Sie wird berechnet, nicht gespeichert, und gilt deshalb
- * sofort für alle Einträge.
+ * Whether journal entries show their moon phase — that of the day they
+ * were created. It is computed, not stored, and therefore applies
+ * immediately to all entries.
  */
 export default function MoonPhaseSection() {
   const { t } = useTranslation();

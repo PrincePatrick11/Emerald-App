@@ -19,14 +19,14 @@ interface ModalProps {
 }
 
 /**
- * Die offenen Modals, das zuletzt geöffnete oben. Escape gehört nur dem
- * obersten — sonst schlösse ein Druck über einem zweiten Modal (das
- * Entsperren über dem Vault-Fenster) beide. Ein nicht schließbares oberes
- * Modal schluckt Escape: das darunter darf dann auch nicht gehen.
+ * The open modals, the most recently opened on top. Escape belongs only to the
+ * topmost; otherwise one press over a second modal (the
+ * unlock over the vault window) would close both. A topmost modal that cannot be closed
+ * swallows Escape: the one below must not go either.
  */
 const openModals: symbol[] = [];
 
-/** Ob gerade mindestens ein `Modal` offen ist — Menüs, Dropdowns und Picker zählen nicht. */
+/** Whether at least one `Modal` is currently open; menus, dropdowns and pickers do not count. */
 export function hasOpenModal(): boolean {
   return openModals.length > 0;
 }
@@ -59,18 +59,18 @@ export default function Modal({
     return () => document.removeEventListener('keydown', handler);
   }, [onClose, dismissible, self]);
 
-  // Ein Modal ohne Ausweg darf die Titelleiste nicht verdecken. Auf Windows
-  // und Linux laeuft das Fenster ohne Systemdekoration — die Leiste *ist* dort
-  // Ziehen, Minimieren und Schliessen. Ein Backdrop darueber, ohne X, ohne
-  // Escape und ohne Backdrop-Klick, liesse nur noch Alt+F4. Bei schliessbaren
-  // Modalen bleibt es beim vollen Overlay: dort ist der Ausweg das Modal selbst.
+  // A modal with no way out must not cover the title bar. On Windows
+  // and Linux the window runs without system decoration, and there the bar *is*
+  // dragging, minimising and closing. A backdrop over it, with no X, no
+  // Escape and no backdrop click, would leave only Alt+F4. For closable
+  // modals the full overlay stays: there the way out is the modal itself.
   const clearsTitleBar = !dismissible && usesCustomWindowControls;
 
   return createPortal(
     <div
       className={`fixed inset-x-0 bottom-0 ${clearsTitleBar ? 'top-10' : 'top-0'} z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4`}
       onMouseDown={(e) => {
-        // Eine Daumentaste schlösse sonst das Modal — und blätterte beim Loslassen.
+        // A thumb button would otherwise close the modal and navigate back on release.
         if (dismissible && !isHistoryButton(e) && e.target === e.currentTarget) onClose();
       }}
     >

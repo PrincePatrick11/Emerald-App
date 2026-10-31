@@ -19,7 +19,7 @@ export interface ChipData {
   fallbackIcon?: string;  // plain emoji to use when icon is a data-URL (markdown export)
 }
 
-/** Die Texte, mit denen die Blöcke in der aktuellen Sprache exportiert werden. */
+/** The texts the blocks are exported with, in the current language. */
 function exportText(): ExportText {
   const t = i18n.t;
   return {
@@ -47,7 +47,7 @@ export interface ExportData {
   createdAt: string;
   // journal
   moonPhase?: string;         // emoji + label, e.g. "🌕 Full Moon"
-  // wiki + operation: die Kategorie des Eintrags, in der Kopfzeile gezeigt
+  // wiki + operation: the entry's category, shown in the header line
   category?: ChipData;
   // custom icon on the entry itself (wiki article or operation), may be data-URL or emoji
   entryIcon?: string;
@@ -62,7 +62,7 @@ function moonLabel(phase: string): string {
 export async function collectExportData(): Promise<ExportData | null> {
   const view = useUIStore.getState().activeView;
   if (!view.id) return null;
-  // Direkt nach dem Start kann der Inhalt des offenen Eintrags noch ausstehen.
+  // Right after startup the content of the open entry may still be pending.
   await useEntryStore.getState().ensureEntryContent(view.id);
 
   const { journal: entries, wiki: articles, operation: operations } = useEntryStore.getState().entries;

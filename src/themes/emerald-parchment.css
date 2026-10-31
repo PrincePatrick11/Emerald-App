@@ -56,7 +56,7 @@ html[data-theme='emerald-parchment'] {
   --danger-hover-text: #8f2f26;
   --danger-hover-bg: rgba(239, 68, 68, 0.16);
   --danger-hover-border: rgba(239, 68, 68, 0.34);
-  /* Rote Primäraktion (.btn-primary-danger) — gebaut wie .btn-primary. */
+  /* Red primary action (.btn-primary-danger) — built like .btn-primary. */
   --danger-solid-bg: #b63f32;
   --danger-solid-border: #973227;
   --danger-solid-text: #fff4f1;
@@ -65,11 +65,11 @@ html[data-theme='emerald-parchment'] {
   --select-option-text: #3a2918;
   --select-option-active-bg: #d6eee1;
   --select-option-active-text: #075e3d;
-  /* Knopf des Ein/Aus-Schalters (.switch-thumb): aus hell, an in Jade auf
-     der hellgruenen Schiene. */
+  /* Knob of the on/off switch (.switch-thumb): light when off, jade
+     on the light green track when on. */
   --switch-thumb: #fffaf1;
   --switch-thumb-on: #008a57;
-  /* Bedienelemente der Bearbeiten-Seitenleiste — siehe emerald-noctis.css. */
+  /* Controls of the edit sidebar — see emerald-noctis.css. */
   --field-bg: #fbf5ea;
   --field-bg-hover: #f4e9d6;
   --field-border: rgba(154, 117, 80, 0.42);
@@ -81,20 +81,20 @@ html[data-theme='emerald-parchment'] {
   --primary-solid-hover-bg: #006941;
   --danger-soft-text: #b63f32;
   --danger-soft-border: rgba(182, 63, 50, 0.5);
-  /* Rahmen + Blatt (design.md, Shell Layout): Titelleiste, Rail und linke
-     Seitenleiste sind der Rahmen, Inhalt und rechte Seitenleiste das Blatt darauf. */
+  /* Frame + sheet (design.md, Shell Layout): title bar, rail and left
+     sidebar are the frame, content and right sidebar the sheet on top of it. */
   --shell-bg: #ecdec7;
   --sheet-bg: #faf3e6;
   --sheet-border: rgba(145, 108, 70, 0.28);
-  /* Bewusst 10px statt rounded-xl (12): das Blatt ist Fensterflaeche, kein
-     Panel darauf — eine Stufe weicher wuerde die Ecken am Rahmen aufblaehen. */
+  /* Deliberately 10px instead of rounded-xl (12): the sheet is window surface,
+     not a panel on it — one step softer would puff up the corners at the frame. */
   --sheet-radius: 10px;
   --sheet-inset: 6px;
   --panel-bg: #f7eddb;
   --panel-border: rgba(154, 117, 80, 0.34);
   --panel-hover-bg: #f9f1e3;
   --panel-hover-border: rgba(131, 96, 62, 0.48);
-  /* Tabs sind Pills auf der Titelleiste: inaktiv ohne Flaeche, aktiv eine leichte. */
+  /* Tabs are pills on the title bar: inactive without a fill, active with a light one. */
   --tab-pill-h: 30px;
   --tab-pill-active: rgba(130, 87, 44, 0.12);
   --tab-pill-hover: rgba(130, 87, 44, 0.06);
@@ -102,9 +102,9 @@ html[data-theme='emerald-parchment'] {
   --search-bg: rgba(248, 239, 223, 0.92);
   --search-border: rgba(146, 107, 68, 0.38);
   --search-inset: inset 0 1px 0 rgba(255, 255, 255, 0.7);
-  /* Die Suche der Eintragsliste: randlos auf dem Rahmen. */
+  /* The entry list search: borderless on the frame. */
   --list-search-bg: rgba(130, 87, 44, 0.08);
-  /* Hoehen (design.md, Heights and Spacing). */
+  /* Heights (design.md, Heights and Spacing). */
   --content-bar-h: 56px;
   --control-h: 30px;
   --control-h-sm: 24px;

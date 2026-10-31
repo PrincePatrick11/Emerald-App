@@ -5,7 +5,7 @@ import Button from './Button';
 interface InlineNameEditorProps {
   value: string;
   onChange: (value: string) => void;
-  /** Steht neben dem Feld, z. B. „Name schon vergeben". */
+  /** Shown next to the field, e.g. "Name already taken". */
   error: string | null;
   onSave: () => void;
   onCancel: () => void;
@@ -13,10 +13,10 @@ interface InlineNameEditorProps {
 }
 
 /**
- * Der Körper eines Namens-Editors in einer Zeile: Feld (Enter speichert,
- * Escape bricht ab), Fehlermeldung, Speichern, Abbrechen. Ein Fragment ohne
- * eigenen Rahmen — Zeile und führende Glyphe (Emoji-Picker, Farbpunkt,
- * Platzhalter für Griff oder Chevron) bringt der Aufrufer mit.
+ * The body of a name editor in one row: field (Enter saves,
+ * Escape cancels), error message, save, cancel. A fragment without
+ * a frame of its own; the row and leading glyph (emoji picker, colour dot,
+ * placeholder for handle or chevron) are brought by the caller.
  */
 export default function InlineNameEditor({
   value, onChange, error, onSave, onCancel, placeholder,

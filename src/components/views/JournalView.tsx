@@ -45,10 +45,10 @@ export default function JournalView() {
   const pushUndo = useUndoStore((s) => s.push);
 
   const entry = activeView.id ? getEntry(activeView.id, 'journal') : null;
-  // Der Start lädt Inhalte nach den Listen: bis dieser da ist, steht der
-  // Rahmen mit Titel, der Blockstapel montiert erst mit dem echten Inhalt.
+  // Startup loads content after the lists: until it arrives, the frame with
+  // the title is shown, and the block stack only mounts with the real content.
   const contentReady = useEntryContentReady(entry?.id);
-  // Eine geladene Sigille mit Sperre „ganzer Eintrag" öffnet nie im Bearbeitungsmodus.
+  // A loaded sigil with the "whole entry" lock never opens in edit mode.
   const locked = !!entry && !!entryBlockSummary(entry.id, entry.content).sigil?.lockEntry;
   const isEditing = activeView.mode === 'edit' && !locked;
 
@@ -63,8 +63,8 @@ export default function JournalView() {
   const [tags, setTags] = useState<string[]>([]);
   const [loadedEntryId, setLoadedEntryId] = useState<string | null>(null);
 
-  // Cancel verwirft die ungespeicherten letzten Sekunden, indem der Editor
-  // ueber den Key frisch vom wiederhergestellten Stand mountet.
+  // Cancel discards the unsaved last seconds by having the editor mount
+  // afresh from the restored state via the key.
   const [editorEpoch, setEditorEpoch] = useState(0);
 
   const fieldsOf = (e: NonNullable<typeof entry>) => ({ title: e.title, content: e.content, tags: e.tags ?? [] });
@@ -74,8 +74,8 @@ export default function JournalView() {
     entityId: entry?.id,
     isEditing,
     ready: !!entry && loadedEntryId === entry.id,
-    // Auch, was Cancel wiederherstellt: der Eintrag, wie er beim Betreten des
-    // Bearbeitens war — samt den Tags, die die Seitenleiste inzwischen gespeichert hat.
+    // Also what Cancel restores: the entry as it was on entering edit
+    // mode — including the tags the sidebar has saved in the meantime.
     buildPatch: (content) => ({ title, content, tags }),
     readStored: (id) => {
       const stored = getEntry(id, 'journal');
@@ -101,8 +101,8 @@ export default function JournalView() {
     if (entry) setTags(entry.tags ?? []);
   }, [entry?.tags]);
 
-  // Titel ebenso: ein Rename aus der Sidebar bei offenem Edit-Modus wuerde
-  // sonst vom naechsten Autosave zurueckgedreht.
+  // The title likewise: a rename from the sidebar while edit mode is open
+  // would otherwise be reverted by the next autosave.
   useEffect(() => {
     if (entry) setTitle(entry.title);
   }, [entry?.title]);
@@ -146,17 +146,17 @@ export default function JournalView() {
   };
 
   const handleCancel = async () => {
-    // Ein nie mit „Fertig" bestätigter Eintrag geht, wie jeder gelöschte, in den Papierkorb.
+    // An entry never confirmed with "Done" goes to the trash, like any deleted one.
     if (activeView.isNew && entry) return handleDelete();
     cancelAutoSave();
     if (entry) {
-      // Nicht auf den Store-Stand zurück — nach dem ersten Debounce-Autosave
-      // IST der Store der editierte Stand. restoreOnCancel schreibt den beim
-      // Betreten des Edit-Modus gemerkten Stand des Eintrags zurück; die Setter
-      // hier fangen den Fall vor dem ersten Autosave ab (Store unverändert,
-      // Sync-Effekte laufen nicht).
+      // Not back to the store state — after the first debounced autosave
+      // the store IS the edited state. restoreOnCancel writes back the state
+      // of the entry remembered on entering edit mode; the setters
+      // here handle the case before the first autosave (store unchanged,
+      // sync effects do not run).
       const restored = await restoreOnCancel();
-      // Die Seite zeigt diesen Eintrag nicht mehr, das Bearbeiten ist schon beendet — nichts mehr zu tun.
+      // The page no longer shows this entry, editing has already ended — nothing left to do.
       if (restored === EDIT_ENDED) return;
       const from = restored ?? fieldsOf(entry);
       setTitle(from.title);
@@ -169,7 +169,7 @@ export default function JournalView() {
 
   const handleDelete = async () => {
     if (!entry) return;
-    // Erst schreiben, was noch aufgeschoben ist: im Papierkorb liegt der letzte Stand.
+    // Write what is still deferred first: the trash holds the latest state.
     await flushAutoSave().catch(console.error);
     const id = entry.id;
     await deleteEntry(id);
@@ -197,10 +197,10 @@ export default function JournalView() {
         )
       : entries;
 
-    // Die Phase folgt aus dem Anlagedatum (`entryMoonPhase`). Zeigt der Vault
-    // sie nicht, gibt es weder Phasen-Filter noch Phasen-Gruppen — ein Filter,
-    // den man nicht sieht, darf auch nicht wirken. Nur Phasen des Zyklus: der
-    // frühere Chip „Ohne Mondphase“ kann noch in der Sitzung stehen.
+    // The phase follows from the creation date (`entryMoonPhase`). If the vault
+    // does not show it, there is neither a phase filter nor phase groups — a
+    // filter you cannot see must not take effect either. Only phases of the
+    // cycle: the former chip "No moon phase" may still be in the session.
     const phaseOf = (e: Entry) => entryMoonPhase(e, showMoonPhase);
     const activePhases = showMoonPhase ? filterPhases.filter((p) => MOON_PHASE_ORDER.includes(p as MoonPhase)) : [];
 
@@ -211,9 +211,9 @@ export default function JournalView() {
           return phase != null && activePhases.includes(phase);
         });
 
-    // Alle acht Phasen anbieten, auch die ohne Einträge — sie sind ein fester
-    // Zyklus, keine wachsende Liste; die Gruppen darunter zeigen trotzdem nur
-    // die belegten. Gezählt über die Suche, ohne den Phasen-Filter selbst.
+    // Offer all eight phases, even those without entries — they are a fixed
+    // cycle, not a growing list; the groups below still show only the
+    // occupied ones. Counted over the search, without the phase filter itself.
     const phaseCounts = countByCategory(
       searchFiltered, (p) => MOON_PHASE_ORDER.includes(p as MoonPhase), phaseOf,
     );
@@ -227,11 +227,11 @@ export default function JournalView() {
 
     const timelineGroups = groupByMonth(sorted, (e) => e.created_at);
 
-    // Gruppiert heißt im Journal: nach Mondphase — gerendert mit denselben
-    // Gruppenköpfen wie die Kategorie-Gruppen der anderen Module, in fester
-    // Zyklus-Reihenfolge. Abgewählte Phasen fallen weg, leere ebenso (das
-    // erledigt Dashboard zentral); der Waisen-Bucket fängt nur noch Einträge
-    // mit unlesbarem Anlagedatum auf.
+    // Grouped in the journal means: by moon phase — rendered with the same
+    // group headers as the category groups of the other modules, in fixed
+    // cycle order. Deselected phases drop out, empty ones likewise (Dashboard
+    // handles that centrally); the orphan bucket now only catches entries
+    // with an unreadable creation date.
     const visiblePhases = activePhases.length > 0
       ? MOON_PHASE_ORDER.filter((p) => activePhases.includes(p))
       : MOON_PHASE_ORDER;
@@ -302,8 +302,8 @@ export default function JournalView() {
         sort={sort}
         onView={(v) => setJournalPrefs({ view: v })}
         onSort={(s) => setJournalPrefs({ sort: s })}
-        // Das Journal gruppiert nach Mondphase, nicht nach Kategorie — der
-        // Schalter trägt deshalb das Wort, das auch über seinen Filtern steht.
+        // The journal groups by moon phase, not by category — the toggle
+        // therefore carries the word that also stands above its filters.
         groupBy={showMoonPhase ? { value: grouping, onChange: (g) => setJournalPrefs({ grouping: g }), label: t('filters.moonPhase') } : undefined}
         search={search}
         onSearch={setSearch}
@@ -330,10 +330,10 @@ export default function JournalView() {
           actionLabel: t('emptyState.journal.action'),
           onAction: handleNew,
         }}
-        // Im gruppierten Modus entscheidet Dashboard selbst: überlebt keine
-        // Gruppe, zeigt es „Keine Ergebnisse" — und ein leerer Kopf (die
-        // gerade angelegte Kategorie) hat dort Vorrang. Dieser Zweig darf ihm
-        // also nicht zuvorkommen.
+        // In grouped mode Dashboard decides itself: if no group survives,
+        // it shows "No results" — and an empty header (the category just
+        // created) takes precedence there. This branch must therefore not
+        // pre-empt it.
         hasNoResults={filtered.length === 0 && !(grouped && view !== 'timeline')}
         grouping={
           view === 'timeline'
@@ -365,10 +365,10 @@ export default function JournalView() {
 
   const detailPhase = entryMoonPhase(entry, showMoonPhase);
 
-  // Unter dem Titel steht beim Journal nichts mehr: die Verlinkungs-Badges sind
-  // seit v36 Chips im Fließtext, die Paradigma-/Bannung-/Meditations-Chips seit
-  // v37 ebenfalls. Gesammelt zeigt beides das Verlinkungs-Feld der rechten
-  // Seitenleiste, nach Kategorie sortiert.
+  // Nothing is left under the title in the journal: the linking badges have
+  // been chips in the running text since v36, the paradigm/banishing/meditation
+  // chips since v37 as well. Collected, both are shown by the linking field of
+  // the right sidebar, sorted by category.
   return (
     <EntryDetailFrame
       module="journal"

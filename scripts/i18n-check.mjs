@@ -1,13 +1,13 @@
 /**
- * Prüft die vier Locale-Dateien gegeneinander:
+ * Checks the four locale files against each other:
  *
- *   1. Key-Parität — jede Sprache hat exakt dieselbe Menge an Leaf-Keys wie en.
- *   2. Platzhalter-Parität — jeder Key hat in jeder Sprache dieselben
- *      {{interpolationen}} wie in en (ein vergessener Platzhalter fällt sonst
- *      erst zur Laufzeit als roher Text auf).
+ *   1. Key parity — every language has exactly the same set of leaf keys as en.
+ *   2. Placeholder parity — every key has the same {{interpolations}} in every
+ *      language as in en (a forgotten placeholder would otherwise only show up
+ *      at runtime as raw text).
  *
- * Bewusst keine Dead-Key-Erkennung: dynamische Präfixe wie
- * `t(`${module}.categories.${id}`)` machen jede Code-Suche zu verrauscht.
+ * Deliberately no dead-key detection: dynamic prefixes such as
+ * `t(`${module}.categories.${id}`)` make any code search too noisy.
  *
  *   npm run check:i18n
  */
@@ -19,7 +19,7 @@ const localesDir = join(dirname(fileURLToPath(import.meta.url)), '..', 'src', 'i
 const REFERENCE = 'en';
 const LANGUAGES = ['en', 'de', 'es', 'fr'];
 
-/** Verschachteltes Objekt zu flachen "a.b.c"-Pfaden. */
+/** Nested object to flat "a.b.c" paths. */
 function flatten(obj, prefix = '', out = new Map()) {
   for (const [key, value] of Object.entries(obj)) {
     const path = prefix ? `${prefix}.${key}` : key;
@@ -29,9 +29,9 @@ function flatten(obj, prefix = '', out = new Map()) {
   return out;
 }
 
-/** Nur der Name zählt, nicht ein Formatierer dahinter: `{{label, lowercase}}`
- *  in en und `{{label}}` in de sind derselbe Platzhalter (Deutsch schreibt
- *  das Substantiv groß und lässt den Formatierer weg). */
+/** Only the name counts, not a formatter after it: `{{label, lowercase}}`
+ *  in en and `{{label}}` in de are the same placeholder (German capitalises
+ *  the noun and omits the formatter). */
 function placeholders(value) {
   return [...value.matchAll(/\{\{\s*([\w.]+)\s*(?:,[^}]*)?\}\}/g)].map((m) => m[1]).sort();
 }
@@ -47,10 +47,10 @@ const refKeys = flat[REFERENCE];
 for (const lng of LANGUAGES) {
   if (lng === REFERENCE) continue;
   for (const key of refKeys.keys()) {
-    if (!flat[lng].has(key)) errors.push(`${lng}: fehlender Key "${key}"`);
+    if (!flat[lng].has(key)) errors.push(`${lng}: missing key "${key}"`);
   }
   for (const key of flat[lng].keys()) {
-    if (!refKeys.has(key)) errors.push(`${lng}: überzähliger Key "${key}" (nicht in ${REFERENCE})`);
+    if (!refKeys.has(key)) errors.push(`${lng}: extra key "${key}" (not in ${REFERENCE})`);
   }
   for (const [key, refValue] of refKeys) {
     const value = flat[lng].get(key);
@@ -58,15 +58,15 @@ for (const lng of LANGUAGES) {
     const want = placeholders(refValue).join(',');
     const got = placeholders(value).join(',');
     if (want !== got) {
-      errors.push(`${lng}: "${key}" hat Platzhalter [${got}], ${REFERENCE} hat [${want}]`);
+      errors.push(`${lng}: "${key}" has placeholders [${got}], ${REFERENCE} has [${want}]`);
     }
   }
 }
 
 if (errors.length > 0) {
-  console.error(`i18n-Check fehlgeschlagen (${errors.length} Problem(e)):\n`);
+  console.error(`i18n check failed (${errors.length} problem(s)):\n`);
   for (const err of errors) console.error(`  - ${err}`);
   process.exit(1);
 }
 
-console.log(`i18n-Check ok: ${refKeys.size} Keys, ${LANGUAGES.length} Sprachen in Parität.`);
+console.log(`i18n check ok: ${refKeys.size} keys, ${LANGUAGES.length} languages in parity.`);

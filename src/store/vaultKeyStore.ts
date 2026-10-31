@@ -2,11 +2,11 @@ import { create } from 'zustand';
 import { unlockRemembered, vaultKeyStatus } from '../lib/vaultKeys';
 
 /**
- * Was `VaultKeyDialog` gerade fragt.
+ * What `VaultKeyDialog` is currently asking.
  *
- * - `create`: ein neuer Vault bekommt sein Passwort.
- * - `encrypt`: ein Vault aus der Zeit vor der Verschlüsselung wird verschlüsselt.
- * - `unlock`: ein verschlüsselter Vault ist gesperrt.
+ * - `create`: a new vault gets its password.
+ * - `encrypt`: a vault from before encryption was introduced gets encrypted.
+ * - `unlock`: an encrypted vault is locked.
  */
 export type VaultKeyRequest = {
   kind: 'create' | 'encrypt' | 'unlock';
@@ -16,13 +16,13 @@ export type VaultKeyRequest = {
 
 interface VaultKeyStore {
   request: VaultKeyRequest | null;
-  /** Vom Dialog: der Vault ist bereit. */
+  /** From the dialog: the vault is ready. */
   finish: () => void;
-  /** Vom Dialog: der Nutzer bricht ab. */
+  /** From the dialog: the user cancels. */
   cancel: () => void;
 }
 
-/** Der Fehler, mit dem `ensureVaultReady` auf „Abbrechen" endet. */
+/** The error with which `ensureVaultReady` ends on "Cancel". */
 export const VAULT_KEY_CANCELLED = 'VAULT_KEY_CANCELLED';
 
 let pending: {
@@ -49,12 +49,12 @@ export const useVaultKeyStore = create<VaultKeyStore>((set) => ({
 }));
 
 function ask(request: VaultKeyRequest): Promise<void> {
-  // Dieselbe Frage noch einmal — StrictMode startet den Boot-Effekt doppelt —
-  // wartet auf die offene, statt sie abzubrechen.
+  // The same question again — StrictMode runs the boot effect twice —
+  // waits for the open one instead of cancelling it.
   if (pending && pending.request.kind === request.kind && pending.request.vaultId === request.vaultId) {
     return pending.promise;
   }
-  // Eine Frage nach einem anderen Vault überholt die ältere.
+  // A question about another vault overtakes the older one.
   pending?.reject(new Error(VAULT_KEY_CANCELLED));
   let resolve!: () => void;
   let reject!: (err: Error) => void;
@@ -65,19 +65,19 @@ function ask(request: VaultKeyRequest): Promise<void> {
 }
 
 /**
- * Das eine Tor vor jeder Datenbank: danach ist der Vault verschlüsselt und
- * entsperrt.
+ * The one gate in front of every database: afterwards the vault is encrypted and
+ * unlocked.
  *
- * Ein neuer Vault (noch keine `emerald.db`) bekommt hier sein Passwort, ein
- * alter, unverschlüsselter wird verschlüsselt — Pflicht, Rust öffnet keinen
- * Vault ohne `vault.key` —, und ein gesperrter wird mit dem gemerkten
- * Schlüssel entsperrt oder fragt nach dem Passwort. Endet mit
- * {@link VAULT_KEY_CANCELLED}, wenn der Nutzer abbricht; ein fehlender
- * Vault-Ordner scheitert schon an der Statusabfrage.
+ * A new vault (no `emerald.db` yet) gets its password here, an
+ * old, unencrypted one is encrypted — mandatory, Rust opens no
+ * vault without `vault.key` —, and a locked one is unlocked with the remembered
+ * key or asks for the password. Ends with
+ * {@link VAULT_KEY_CANCELLED} if the user cancels; a missing
+ * vault folder already fails at the status query.
  *
- * Start, Wechsel, Anlegen, Öffnen und der Import als neuer Vault laufen alle
- * hier durch, weil sie alle in `openActiveVault` bzw. dem Start in `AppShell`
- * münden. Rust sichert dasselbe ab: ohne Schlüssel öffnet `db_load` nichts.
+ * Startup, switching, creating, opening and import as a new vault all pass
+ * through here, because they all end up in `openActiveVault` or the startup in `AppShell`.
+ * Rust enforces the same: without a key, `db_load` opens nothing.
  */
 export async function ensureVaultReady(
   vault: { id: string; name: string },
@@ -86,9 +86,9 @@ export async function ensureVaultReady(
   const status = await vaultKeyStatus(vault.id);
   if (status.encrypted) {
     if (status.unlocked) return;
-    // Ein Schlüsselbund, der nicht antwortet, ist kein Grund zum Scheitern —
-    // dann eben das Passwort. `askPassword`: ausdrücklich gesperrt, also nicht
-    // gleich wieder still entsperren.
+    // A keychain that does not respond is no reason to fail —
+    // then the password it is. `askPassword`: explicitly locked, so do not
+    // silently unlock again right away.
     if (!askPassword && (await unlockRemembered(vault.id).catch(() => false))) return;
     return ask({ kind: 'unlock', vaultId: vault.id, vaultName: vault.name });
   }

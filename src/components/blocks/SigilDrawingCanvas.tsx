@@ -5,11 +5,11 @@ export type DrawMode = 'draw' | 'erase';
 export const SIGIL_COLORS = ['#f8fafc', '#00e699', '#f59e0b', '#ef4444', '#60a5fa', '#a78bfa', '#111827'];
 
 /**
- * Die Zeichenfläche der Sigille (1200×800, transparenter Grund) — aus der
- * früheren Sigillen-Ansicht übernommen. Sie meldet nach jedem Strich den
- * Stand als Data-URL; wohin er geht, entscheidet der Block. `initialData`
- * muss eine Data-URL sein: ein Bild über `emerald-img:` machte die Fläche
- * „tainted", und `toDataURL` schlüge danach fehl.
+ * The sigil's drawing canvas (1200×800, transparent background), taken over from the
+ * former sigil view. After each stroke it reports the
+ * state as a data URL; where it goes is decided by the block. `initialData`
+ * must be a data URL: an image via `emerald-img:` would make the canvas
+ * "tainted", and `toDataURL` would then fail.
  */
 export default function SigilDrawingCanvas({
   initialData,
@@ -98,12 +98,12 @@ export default function SigilDrawingCanvas({
     const point = getPoint(event);
     isDrawingRef.current = true;
     lastPointRef.current = point;
-    // Wirft NotFoundError für Pointer-IDs ohne echte OS-Pointer-Session
-    // (synthetische Events, exotische Eingabegeräte). Zeichnen geht auch ohne.
+    // Throws NotFoundError for pointer IDs without a real OS pointer session
+    // (synthetic events, exotic input devices). Drawing works without it too.
     try {
       canvas.setPointerCapture(event.pointerId);
     } catch {
-      /* siehe oben */
+      /* see above */
     }
     stroke(ctx, point, point);
   };

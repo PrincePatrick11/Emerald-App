@@ -27,19 +27,19 @@ const PAGES = [
 
 interface Props {
   onClose: () => void;
-  /** Bereich, mit dem das Fenster aufgeht. Die Rail springt damit direkt auf
-   *  „Updates", wenn die Pruefung beim Start etwas gefunden hat. */
+  /** Area the window opens with. The rail uses it to jump straight to
+   *  "Updates" when the check at startup has found something. */
   initialPage?: SettingsPage;
 }
 
 export default function SettingsModal({ onClose, initialPage = 'general' }: Props) {
   const { t } = useTranslation();
   const [page, setPage] = useState<SettingsPage>(initialPage);
-  // Eine Seite, die gerade nicht verlassen werden darf — die Sicherheitsseite
-  // mit einem neuen Wiederherstellungsschlüssel, der noch nicht gesichert ist.
+  // A page that must not be left right now — the security page
+  // with a new recovery key that has not been saved yet.
   const [closeBlocked, setCloseBlocked] = useState(false);
   const blockClose = useCallback((blocked: boolean) => setCloseBlocked(blocked), []);
-  // Ein Import oder Update, das an einer laufenden Bearbeitung hängen blieb.
+  // An import or update that got stuck on an edit in progress.
   useCloseOnKeepEditing(onClose);
 
   return (
@@ -48,16 +48,16 @@ export default function SettingsModal({ onClose, initialPage = 'general' }: Prop
       onClose={onClose}
       dismissible={!closeBlocked}
       widthClassName="w-[680px]"
-      // Feste Hoehe statt max-h: die drei Bereiche sind unterschiedlich hoch,
-      // und eine mitwachsende Karte springt bei jedem Wechsel — dasselbe
-      // Problem, das der Link-Picker mit h-[75vh] loest. Die 680 sind kein
-      // runder Zufallswert: plus die 32 des Backdrop-p-4 bleiben sie unter der
-      // Fenster-Mindestbreite von 720. Nicht auf 700 aufrunden.
+      // Fixed height instead of max-h: the three areas differ in height,
+      // and a card that grows along jumps on every switch — the same
+      // problem the link picker solves with h-[75vh]. The 680 is no
+      // round random value: plus the 32 of the backdrop p-4 it stays below the
+      // minimum window width of 720. Do not round up to 700.
       className="overflow-hidden h-[600px] max-h-[85vh]"
       bodyClassName="flex-1 flex overflow-hidden"
     >
-      {/* Nur Tab und Enter, keine Pfeiltasten-Navigation — derselbe Umfang wie
-          bei der Tab-Leiste des Link-Pickers. */}
+      {/* Only Tab and Enter, no arrow-key navigation — the same scope as
+          the link picker's tab bar. */}
       <nav
         role="tablist"
         aria-orientation="vertical"
@@ -72,16 +72,16 @@ export default function SettingsModal({ onClose, initialPage = 'general' }: Prop
             aria-selected={page === id}
             disabled={closeBlocked && page !== id}
             onClick={() => setPage(id)}
-            // `border border-transparent` als Grundzustand, weil die
-            // Theme-Regel dem aktiven Eintrag einen 1px-Rahmen gibt: ohne den
-            // Platzhalter ruckte die Spalte bei jedem Wechsel um 2px.
+            // `border border-transparent` as the base state, because the
+            // theme rule gives the active item a 1px border: without that
+            // placeholder the column would jerk by 2px on every switch.
             //
-            // Farbe und Flaeche kommen ausschliesslich aus den beiden
-            // Theme-Regeln, keine jade-/stone-Utility als Grundton: Parchment
-            // biegt `.text-jade-300` weiter unten im Stylesheet auf ein helles
-            // #ecfff7 um — gedacht fuer dunkle Jade-Flaechen. Bei gleicher
-            // Spezifitaet gewinnt die spaetere Regel, und die aktive Zeile
-            // stand weiss auf hellem Mint.
+            // Colour and surface come exclusively from the two theme
+            // rules, no jade/stone utility as a base tone: Parchment
+            // bends `.text-jade-300` further down in the stylesheet to a light
+            // #ecfff7 — meant for dark jade surfaces. At equal
+            // specificity the later rule wins, and the active row
+            // was white on light mint.
             className={`w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-md border border-transparent text-sm text-left transition-colors ${
               page === id ? 'settings-nav-item-active' : 'settings-nav-item-idle'
             }`}

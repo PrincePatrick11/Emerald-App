@@ -47,9 +47,9 @@ type Editor =
       kind: 'create';
       name: string;
       icon?: string;
-      /** `{Dokumente}/Emerald Vaults`, einmal beim Oeffnen der Zeile aufgeloest. */
+      /** `{Documents}/Emerald Vaults`, resolved once when the row is opened. */
       baseDir: string | null;
-      /** Selbst gewaehlt — schlaegt `baseDir` dann aus dem Rennen. */
+      /** Chosen by hand — then takes `baseDir` out of the running. */
       customPath: string | null;
     };
 
@@ -68,10 +68,10 @@ export function VaultLocationRow({
 }) {
   const { t } = useTranslation();
   const { parent: targetParent, leaf: targetLeaf } = splitPath(target ?? '');
-  // Der Pfad steht in voller Laenge auf einer eigenen Zeile — `break-all`,
-  // weil ein Windows-Pfad keine Leerzeichen braucht, an denen `break-words`
-  // umbrechen koennte. Abgeschnitten wird nichts: wohin der Vault kommt,
-  // muss ganz lesbar sein.
+  // The path appears in full length on a line of its own — `break-all`,
+  // because a Windows path needs no spaces at which `break-words`
+  // could wrap. Nothing is cut off: where the vault goes
+  // has to be fully readable.
   return (
     <div className="space-y-1 min-w-0">
       <div className="flex items-center gap-2">
@@ -107,8 +107,8 @@ function IconField({ icon, onChange }: { icon?: string; onChange: (icon?: string
   const { t } = useTranslation();
   return (
     <>
-      {/* Die eingebaute Auswahl, nicht die des offenen Vaults: bearbeitet wird
-          hier auch das Icon eines anderen — oder eines, das es noch nicht gibt. */}
+      {/* The built-in selection, not the open vault's: here the icon of another
+          vault is edited too — or of one that does not exist yet. */}
       <EmojiPicker
         value={icon ?? ''}
         onChange={onChange}
@@ -183,8 +183,8 @@ function DeleteConfirmRow({
 }: {
   vault: VaultRecord;
   deleteFiles: boolean;
-  /** Was danach passiert — bei der aktiven und der letzten Vault ist das mehr
-   *  als „verschwindet aus der Liste". */
+  /** What happens afterwards — for the active and the last vault that is more
+   *  than "disappears from the list". */
   hintKey: 'vault.deleteHint' | 'vault.deleteActiveHint' | 'vault.deleteLastHint';
   busy: boolean;
   onToggleFiles: (next: boolean) => void;
@@ -200,9 +200,9 @@ function DeleteConfirmRow({
           <div className="vault-name">{vault.name}</div>
           <div className="vault-meta">{t(hintKey)}</div>
         </div>
-        {/* Die getoenten Row-Action-Buttons der Button-Komponente — dieselbe
-            30px-Reihe wie Edit/Loeschen auf den Vault-Karten, ohne
-            handgeschriebene Padding-Ketten. */}
+        {/* The tinted row-action buttons of the Button component — the same
+            30px row as Edit/Delete on the vault cards, without
+            hand-written padding chains. */}
         <Button onClick={onConfirm} tone="danger" className="shrink-0" disabled={busy}>
           {busy ? <Loader2 size={12} className="animate-spin" /> : t('common.confirmYes')}
         </Button>
@@ -212,8 +212,8 @@ function DeleteConfirmRow({
       </div>
 
       <label className="flex items-start gap-2 text-xs cursor-pointer" style={{ color: 'var(--text-muted)' }}>
-        {/* Echtes Input fuer Tastatur und Screenreader, optisch das Kaestchen,
-            das der Export-Panel schon benutzt. */}
+        {/* A real input for keyboard and screen readers, visually the checkbox
+            that the export panel already uses. */}
         <input
           type="checkbox"
           className="sr-only peer"
@@ -264,8 +264,8 @@ function VaultRow({
         title={isActive || isUnreachable ? undefined : t('vault.switch')}
         className="flex items-center gap-3 flex-1 min-w-0 text-left"
       >
-        {/* Status schlaegt Identitaet: waehrend eines Wechsels und bei einem
-            unerreichbaren Ordner zaehlt, was los ist, nicht welcher Vault. */}
+        {/* Status beats identity: during a switch and with an unreachable
+            folder, what is going on matters, not which vault it is. */}
         <div className="vault-badge">
           {isSwitching
             ? <Loader2 size={16} className="animate-spin" />
@@ -318,8 +318,8 @@ function CreateRow({
   onCancel: () => void;
 }) {
   const { t } = useTranslation();
-  // Die Zeile zeigt den Ordner, in dem der Vault tatsaechlich landet — nicht
-  // bloss die Aufforderung, einen zu waehlen.
+  // The row shows the folder the vault actually ends up in — not
+  // merely the prompt to choose one.
   const target = newVaultTarget(baseDir, customPath, name);
   return (
     <div className="vault-card flex-col items-stretch gap-2">
@@ -378,8 +378,8 @@ export default function VaultModal({ onClose, dismissible = true }: Props) {
   const [editor, setEditor] = useState<Editor>({ kind: 'none' });
   const [switchingId, setSwitchingId] = useState<string | null>(null);
   const [removingId, setRemovingId] = useState<string | null>(null);
-  // 'missing' = Ordner nicht auffindbar, 'denied' = da, aber kein Zugriff.
-  // Der Unterschied ist der zwischen "such woanders" und "erlaub den Zugriff".
+  // 'missing' = folder not found, 'denied' = there, but no access.
+  // The difference is that between "look elsewhere" and "allow access".
   const [unreachable, setUnreachable] = useState<Map<string, 'missing' | 'denied'>>(new Map());
   const [error, setError] = useState('');
 
@@ -424,8 +424,8 @@ export default function VaultModal({ onClose, dismissible = true }: Props) {
     try {
       await action();
     } catch (e) {
-      // Anlegen und Öffnen enden im Wechsel — abgebrochen beim Passwort ist
-      // kein Fehler.
+      // Creating and opening end in a switch — cancelling at the password is
+      // not an error.
       if (keyErrorOf(e) === VAULT_KEY_CANCELLED) return;
       console.error(`[vault] ${label} failed`, e);
       setError(t('vault.saveFailed'));
@@ -455,9 +455,9 @@ export default function VaultModal({ onClose, dismissible = true }: Props) {
     });
     if (!picked) return null;
     const file = typeof picked === 'string' ? picked : picked[0];
-    // Der Filter laesst jede `.db` durch. Waere hier irgendeine erlaubt, wuerde
-    // aus `~/Documents/fremd.db` der Ordner `~/Documents` zum Vault-Verzeichnis
-    // — samt `images/` darin und samt „Dateien loeschen" darauf.
+    // The filter lets every `.db` through. If any were allowed here, then
+    // `~/Documents/foreign.db` would make the folder `~/Documents` the vault
+    // directory — with `images/` in it and with "Delete files" applied to it.
     if (splitPath(file).leaf !== DB_FILE) {
       setError(t('vault.folderHasNoVault'));
       return null;
@@ -469,8 +469,8 @@ export default function VaultModal({ onClose, dismissible = true }: Props) {
    *  and actually hold a vault. Returns `false` once the reason is displayed. */
   async function requireVaultDir(path: string): Promise<boolean> {
     const probe = await probeVaultDir(path);
-    // `denied` zuerst: ein verweigerter Probe meldet has_db=false und ginge
-    // sonst als "kein Vault in diesem Ordner" durch.
+    // `denied` first: a denied probe reports has_db=false and would
+    // otherwise pass as "no vault in this folder".
     if (probe.denied) {
       setError(t('vault.accessDenied'));
       return false;
@@ -498,7 +498,7 @@ export default function VaultModal({ onClose, dismissible = true }: Props) {
       await switchVault(id);
       onClose();
     } catch (e) {
-      // Abgebrochen ist kein Fehler: der Nutzer wollte das Passwort nicht eingeben.
+      // Cancelling is not an error: the user did not want to enter the password.
       if (keyErrorOf(e) !== VAULT_KEY_CANCELLED) {
         console.error('[vault] switch failed', e);
         setError(t('vault.switchFailed'));
@@ -521,8 +521,8 @@ export default function VaultModal({ onClose, dismissible = true }: Props) {
     if (!name) return;
     const target = newVaultTarget(pending.baseDir, pending.customPath, name);
     await run('create', async () => {
-      // Erst pruefen, dann den Editor schliessen: sonst sind Name und Ordner
-      // weg, sobald der Ordner nicht taugt.
+      // Check first, then close the editor: otherwise name and folder are
+      // gone as soon as the folder is unsuitable.
       if (target) {
         const problem = await probeNewVaultTarget(target);
         if (problem) {
@@ -556,31 +556,31 @@ export default function VaultModal({ onClose, dismissible = true }: Props) {
     if (!path) return;
     await run('relocate', async () => {
       if (!(await requireVaultDir(path))) return;
-      // Zwei Vaults auf einem Ordner waeren zwei Ids auf einer Datenbank —
-      // und „Dateien loeschen" beim einen risse dem anderen den Boden weg.
+      // Two vaults on one folder would be two ids on one database —
+      // and "Delete files" on one would pull the rug out from under the other.
       if (vaults.some((v) => v.id !== id && v.path === path)) {
         setError(t('vault.alreadyOpen'));
         return;
       }
-      // Kein manuelles Aufraeumen von `missing` — die geaenderte Vault-Liste
-      // laesst den Probe-Effekt ohnehin neu laufen.
+      // No manual cleanup of `missing` — the changed vault list
+      // makes the probe effect run again anyway.
       await relocateVault(id, path);
     });
   }
 
   async function handleRemove(id: string, deleteFiles: boolean) {
-    // Ein zweiter Klick waehrend des ersten wuerde seinen Nachfolger aus einem
-    // Zustand berechnen, den es nicht mehr gibt — und `delete_vault_files`
-    // faende die Id nicht mehr in der Registry.
+    // A second click during the first would compute its successor from a
+    // state that no longer exists — and `delete_vault_files` would no
+    // longer find the id in the registry.
     if (removingId) return;
     setRemovingId(id);
     setError('');
     try {
       const dirRemoved = await removeVault(id, deleteFiles);
       closeEditor();
-      // Kein Fehler: `delete_vault_files` raeumt nur die eigenen Dateien weg
-      // und laesst den Ordner stehen, sobald noch etwas anderes darin liegt —
-      // der Hinweis sagt nur, dass er noch da ist.
+      // Not an error: `delete_vault_files` only removes its own files
+      // and leaves the folder in place as soon as anything else is in it —
+      // the notice merely says that it is still there.
       if (deleteFiles && !dirRemoved) setError(t('vault.deleteFilesLeftover'));
     } catch (e) {
       console.error('[vault] remove failed', e);

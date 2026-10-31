@@ -1,12 +1,12 @@
 /**
- * Die eigenen Blöcke der Blöcke-Ansicht (Tabelle `block_definitions`, seit
- * v40). Eine Definition ist nur die Vorlage — eingefügte Blöcke sind Kopien im
- * Inhalt ihres Eintrags (siehe `lib/blocks/definitions.ts`). Löschen,
- * Wiederherstellen und Umbenennen berühren deshalb keinen Eintrag; was mit den
- * Kopien geschieht, entscheidet `blockCopies.ts` ausdrücklich.
+ * The custom blocks of the blocks view (table `block_definitions`, since
+ * v40). A definition is only the template — inserted blocks are copies in the
+ * content of their entry (see `lib/blocks/definitions.ts`). Deleting,
+ * restoring and renaming therefore touch no entry; what happens to the
+ * copies is decided explicitly by `blockCopies.ts`.
  *
- * Import-Regel wie `categoryStore`: keine Inhalts-Stores, alle Zugriffe über
- * `getState()` zur Laufzeit.
+ * Import rule as in `categoryStore`: no content stores, all access via
+ * `getState()` at runtime.
  */
 import { create } from 'zustand';
 import type Database from '../lib/sqlite';
@@ -25,21 +25,21 @@ import {
 export type BlockDefinitionPatch = Partial<Pick<BlockDefinition, 'name' | 'icon' | 'elements' | 'display'>>;
 
 interface BlockDefinitionState {
-  /** Aktive Definitionen in Anzeigereihenfolge. */
+  /** Active definitions in display order. */
   definitions: BlockDefinition[];
 
   fetchDefinitions: () => Promise<void>;
   createDefinition: (name: string) => Promise<BlockDefinition>;
-  /** Hebt die Revision, sobald sich etwas ändert, das die Kopien betrifft (Name, Icon, Elemente, Anzeige). */
+  /** Bumps the revision as soon as something changes that affects the copies (name, icon, elements, display). */
   updateDefinition: (id: string, patch: BlockDefinitionPatch) => Promise<void>;
-  /** Soft-Delete. Kopien in Einträgen bleiben unberührt. */
+  /** Soft delete. Copies in entries stay untouched. */
   deleteDefinition: (id: string) => Promise<void>;
   restoreDefinition: (id: string) => Promise<void>;
   permanentlyDeleteDefinition: (id: string) => Promise<void>;
   /**
-   * `.emerald`-Import: Definitionen, die hier fehlen, mit ihrer ID anlegen —
-   * dann erkennen die mitgebrachten Kopien ihre Herkunft wieder. Eine
-   * vorhandene (auch im Papierkorb) bleibt, wie sie ist.
+   * `.emerald` import: create definitions that are missing here with their ID —
+   * then the copies brought along recognise their origin again. An
+   * existing one (even in the trash) stays as it is.
    */
   importDefinitions: (defs: readonly BlockDefinition[]) => Promise<void>;
 }
@@ -80,8 +80,8 @@ export const useBlockDefinitionStore = create<BlockDefinitionState>((set, get) =
     return def;
   },
 
-  // serialized: siehe lib/serialize.ts — zwei schnelle Speichervorgänge
-  // sollen die Revision zweimal heben, nicht beide von derselben aus.
+  // serialized: see lib/serialize.ts — two quick saves
+  // should bump the revision twice, not both from the same one.
   updateDefinition: (id, patch) => serialized(serialKey('blockDefinition', id), async () => {
     const current = get().definitions.find((d) => d.id === id);
     if (!current || !needsWrite(current, patch)) return;
@@ -112,7 +112,7 @@ export const useBlockDefinitionStore = create<BlockDefinitionState>((set, get) =
 
   restoreDefinition: async (id) => {
     const db = await getDb();
-    // Ans Ende der Liste: der alte Platz ist inzwischen womöglich vergeben.
+    // To the end of the list: the old slot may have been taken in the meantime.
     await db.execute(
       'UPDATE block_definitions SET deleted_at=NULL, sort_order=$1 WHERE id=$2',
       [await nextSortOrder(db), id]
@@ -122,7 +122,7 @@ export const useBlockDefinitionStore = create<BlockDefinitionState>((set, get) =
 
   permanentlyDeleteDefinition: async (id) => {
     const db = await getDb();
-    // Nur aus dem Papierkorb erreichbar — in `definitions` (aktive) steht sie nicht.
+    // Reachable only from the trash — it is not in `definitions` (active).
     await db.execute('DELETE FROM block_definitions WHERE id=$1', [id]);
   },
 

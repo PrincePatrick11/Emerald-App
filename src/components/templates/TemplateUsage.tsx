@@ -5,13 +5,13 @@ import { MODULES, viewTypeForEntryType } from '../../lib/modules';
 import { displayTitle } from '../../lib/entryTitle';
 import SidebarSection, { SidebarEmpty, SidebarItemRow } from '../sidebar/fields/SidebarSection';
 
-/** So viele Einträge listet „Verwendung" — der Rest steht als Zahl darunter. */
+/** This many entries are listed under "Usage"; the rest is shown as a number below. */
 const LIST_LIMIT = 8;
 
 /**
- * Die Einträge, die Blöcke aus der Vorlage tragen — ein Abschnitt der
- * Seitenleiste ihrer Seite, mit der Zahl im Kopf, zuletzt geänderte zuerst.
- * Ein Klick öffnet den Eintrag.
+ * The entries that carry blocks from the template: a section of the
+ * sidebar of its page, with the count in the header, most recently changed first.
+ * A click opens the entry.
  */
 export default function TemplateUsage({ entries }: { entries: readonly EntryContentRow[] }) {
   const { t } = useTranslation();

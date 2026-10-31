@@ -1,9 +1,9 @@
 import { create } from 'zustand';
 import { ImageTooLargeError } from '../lib/imageLimits';
 
-/** Warum ein Bild nicht eingefügt wurde — für die Wege ohne eigene Meldezeile:
- *  Einfügen aus der Zwischenablage, Drop aus dem Datei-Explorer, Werkzeugleiste
- *  und Bildfeld. Wer eine Zeile hat (Titelbild, Altar), meldet dort. */
+/** Why an image was not inserted — for the paths without their own message line:
+ *  pasting from the clipboard, dropping from the file explorer, the toolbar
+ *  and the image field. Whoever has a line (cover image, altar) reports there. */
 export type ImageNotice = { kind: 'format' } | { kind: 'tooLarge'; maxBytes: number };
 
 interface ImageNoticeState {
@@ -19,8 +19,8 @@ export const useImageNoticeStore = create<ImageNoticeState>((set) => ({
 }));
 
 /**
- * Meldet ein zu großes Bild und liefert `true`; jeder andere Fehler bleibt ein
- * Konsolen-Eintrag (`false`), damit der Aufrufer ihn selbst anzeigen kann.
+ * Reports an oversized image and returns `true`; any other error stays a
+ * console entry (`false`), so the caller can display it itself.
  */
 export function reportImageError(err: unknown, context: string): boolean {
   if (err instanceof ImageTooLargeError) {

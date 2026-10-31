@@ -18,31 +18,31 @@ import {
 } from '../../editor/SuggestionList';
 
 interface Props {
-  /** Der gespeicherte HTML-Inhalt des Eintrags — die Quelle der Liste. */
+  /** The stored HTML content of the entry, the source of the list. */
   content: string;
 }
 
 /**
- * So viele Vorschläge zeigt die Liste — alle fünf Module liegen in einem Topf:
- * bei wenigen Treffern bekäme man ohne Suchbegriff nur das erste Modul zu
- * sehen. Das Menü ist auf `max-h-40` begrenzt und scrollt.
+ * This many suggestions the list shows. All five modules are in one pool:
+ * with few hits and no search term you would only see the first module.
+ * The menu is limited to `max-h-40` and scrolls.
  */
 const RESULT_LIMIT = 50;
 
-/** Auf/Zu der Verlinkungen — Lesen und Bearbeiten teilen es. */
+/** Open/closed state of the links; reading and editing share it. */
 const OPEN_KEY = 'entry-sidebar-links-open';
 
-/** Zuletzt bearbeitet zuerst — ohne Zeitstempel ans Ende. */
+/** Most recently edited first; entries without a timestamp go to the end. */
 function byRecency(a: SuggestionItem, b: SuggestionItem): number {
   return (b.updatedAt ?? '').localeCompare(a.updatedAt ?? '');
 }
 
-/** Nach Kategorie, darin nach Titel. Einträge ohne Kategorie kommen zuletzt. */
+/** By category, within it by title. Entries without a category come last. */
 function byCategory(a: SuggestionItem, b: SuggestionItem): number {
   const ca = a.categoryLabel ?? '';
   const cb = b.categoryLabel ?? '';
-  // Erst die Frage „hat überhaupt eine Kategorie?" — ein Platzhalterzeichen am
-  // Ende des Alphabets wäre kürzer, aber die Kollation darf es ignorieren.
+  // First the question "does it have a category at all?"; a placeholder character at
+  // the end of the alphabet would be shorter, but the collation may ignore it.
   if (!ca !== !cb) return ca ? -1 : 1;
   return ca.localeCompare(cb) || a.label.localeCompare(b.label);
 }
@@ -51,9 +51,9 @@ const NO_ITEMS: SuggestionItem[] = [];
 const NO_KEYS: string[] = [];
 
 /**
- * Die Verlinkungen eines Eintrags, nach Kategorie sortiert: die Link-Chips
- * seines Inhalts. `pending`/`removed` überbrücken im Bearbeiten den Autosave
- * (siehe `LinkedEntriesField`).
+ * The links of an entry, sorted by category: the link chips
+ * of its content. `pending`/`removed` bridge the autosave when editing
+ * (see `LinkedEntriesField`).
  */
 function useLinkedEntries(
   content: string,
@@ -69,23 +69,23 @@ function useLinkedEntries(
     for (const link of [...extractInternalLinks(content), ...pending]) {
       const key = itemKey(link);
       if (seen.has(key) || gone.has(key)) continue;
-      // Ziel gelöscht oder unbekannt: der Chip im Text zeigt dann seinen
-      // gespeicherten Label-Text, hier bleibt die Zeile lieber leer.
+      // Target deleted or unknown: the chip in the text then shows its
+      // stored label text; here the row is better left empty.
       const item = byKey.get(key);
       if (!item) continue;
       seen.add(key);
       out.push(item);
     }
-    // Nach Kategorie sortiert, nicht in der Reihenfolge des Textes: gleichartige
-    // Verlinkungen stehen so beieinander, unabhängig davon, wann sie in den
-    // Eintrag geraten sind.
+    // Sorted by category, not in text order: links of the same kind
+    // thus stand together, regardless of when they got into the
+    // entry.
     return out.sort(byCategory);
   }, [content, pending, removed, byKey]);
 }
 
 /**
- * Ein Klick zeigt die Stelle im Eintrag, an der der Link steht. Nur wenn der
- * Editor ihn nicht findet, geht es zum verlinkten Eintrag selbst.
+ * A click shows the place in the entry where the link stands. Only if the
+ * editor does not find it does it go to the linked entry itself.
  */
 function useRevealLink() {
   const setActiveView = useUIStore((s) => s.setActiveView);
@@ -96,8 +96,8 @@ function useRevealLink() {
 }
 
 /**
- * Die Verlinkungen in der Leseansicht: ein Abschnitt mit Zähler, je Link eine
- * Zeile — Icon, Titel, rechts die Kategorie (ohne Kategorie die Eintragsart).
+ * The links in the read view: a section with a counter, one row per link:
+ * icon, title, and on the right the category (the entry type if there is no category).
  */
 export function LinkedEntriesSection({ content }: Props) {
   const { t } = useTranslation();
@@ -120,24 +120,24 @@ export function LinkedEntriesSection({ content }: Props) {
 }
 
 /**
- * Was der Eintrag verlinkt — gelesen aus den internen Link-Chips seines
- * Inhalts, nicht aus eigenen Spalten. Damit zeigt das Feld auch die Links, die
- * im Fließtext über `[[` oder den Link-Picker entstanden sind, und eine
- * Auswahl hier landet umgekehrt als Chip unten im Eintrag. Die Bearbeiten-
- * Variante von `LinkedEntriesSection`: dieselben Zeilen, dazu je ein „×" und
- * darunter das Suchfeld.
+ * What the entry links to, read from the internal link chips of its
+ * content, not from dedicated columns. So the field also shows the links that
+ * were created in the running text via `[[` or the link picker, and a
+ * selection here conversely ends up as a chip at the bottom of the entry. The edit
+ * variant of `LinkedEntriesSection`: the same rows, plus a "×" on each and
+ * the search field below.
  *
- * Eine Verlinkung lässt sich hier auch wieder entfernen.
+ * A link can also be removed again here.
  */
 export default function LinkedEntriesField({ content }: Props) {
   const { t } = useTranslation();
   const items = useLinkItems();
   const [query, setQuery] = useState('');
 
-  // Der Store-Inhalt hinkt dem Editor um den Autosave-Debounce hinterher — das
-  // gilt für hier angehängte Links ebenso wie für die, die im Text über `[[`
-  // entstehen. Nur die eigenen kann das Feld überbrücken: sie leben so lange
-  // hier und fallen wieder heraus, sobald der gespeicherte Inhalt sie mitbringt.
+  // The store content lags behind the editor by the autosave debounce. That
+  // holds for links added here as well as for those created in the text via `[[`.
+  // The field can only bridge its own: they live here until
+  // they drop out again as soon as the stored content includes them.
   const [pending, setPending] = useState<SuggestionItem[]>([]);
   const [removed, setRemoved] = useState<string[]>([]);
   useEffect(() => { setPending([]); setRemoved([]); }, [content]);
@@ -149,8 +149,8 @@ export default function LinkedEntriesField({ content }: Props) {
     const q = query.toLowerCase();
     return items
       .filter((i) => !linkedKeys.has(itemKey(i)) && i.label.toLowerCase().includes(q))
-      // Zuletzt bearbeitet zuerst — sonst entschiede die Modul-Reihenfolge aus
-      // `buildLinkItems`, und ohne Suchbegriff stünde nur Journal in der Liste.
+      // Most recently edited first; otherwise the module order from
+      // `buildLinkItems` would decide, and with no search term only journal would be in the list.
       .sort(byRecency)
       .slice(0, RESULT_LIMIT);
   }, [items, linked, query]);
@@ -158,8 +158,8 @@ export default function LinkedEntriesField({ content }: Props) {
   const reveal = useRevealLink();
 
   const add = (item: SuggestionItem) => {
-    // Nur als eingefügt vormerken, wenn ein Editor die Bitte quittiert hat —
-    // sonst stünde hier eine Zeile für einen Link, den es im Eintrag nicht gibt.
+    // Only mark as inserted if an editor acknowledged the request;
+    // otherwise there would be a row here for a link that does not exist in the entry.
     if (requestEntryLinkAppend(item)) {
       setPending((prev) => [...prev, item]);
       setRemoved((prev) => prev.filter((k) => k !== itemKey(item)));

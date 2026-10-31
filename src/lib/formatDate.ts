@@ -4,14 +4,14 @@ import { enUS } from 'date-fns/locale/en-US';
 import type { AppLanguage } from '../i18n';
 
 /**
- * Nur enUS liegt im Start-Bundle — die anderen date-fns-Locales laden als
- * eigene Chunks beim Sprachwechsel nach, nach demselben Muster wie die
- * i18n-Bundles (siehe changeAppLanguage in i18n/index.ts, das preload +
- * setDateLocale aufruft). Eine neue App-Sprache braucht einen Loader hier —
- * der Record über AppLanguage macht das Vergessen zum Compile-Fehler.
+ * Only enUS is in the startup bundle — the other date-fns locales load as
+ * separate chunks on a language switch, following the same pattern as the
+ * i18n bundles (see changeAppLanguage in i18n/index.ts, which calls preload +
+ * setDateLocale). A new app language needs a loader here —
+ * the Record over AppLanguage makes forgetting it a compile error.
  *
- * lib/export.ts und lib/emeraldFormat.ts formatieren bewusst NICHT hierüber:
- * Dateiexporte bleiben locale-unabhängig (englisch bzw. yyyy-MM-dd).
+ * lib/export.ts and lib/emeraldFormat.ts deliberately do NOT format through here:
+ * file exports stay locale-independent (English or yyyy-MM-dd).
  */
 const LOCALE_LOADERS: Record<Exclude<AppLanguage, 'en'>, () => Promise<Locale>> = {
   de: () => import('date-fns/locale/de').then((m) => m.de),
@@ -24,9 +24,9 @@ const loaded: Record<string, Locale> = { en: enUS };
 let activeLocale: Locale = enUS;
 
 /**
- * Lädt die date-fns-Locale einer Sprache nach (gecacht); aktiviert noch nichts.
- * Ein fehlgeschlagener Chunk-Download fällt auf enUS zurück, statt den
- * Sprachwechsel des UI-Textes mitzureißen.
+ * Loads the date-fns locale of a language (cached); activates nothing yet.
+ * A failed chunk download falls back to enUS instead of taking the
+ * UI text's language switch down with it.
  */
 export async function preloadDateLocale(lng: string): Promise<Locale> {
   const key = lng.slice(0, 2).toLowerCase();
@@ -43,48 +43,48 @@ export async function preloadDateLocale(lng: string): Promise<Locale> {
   return loaded[key];
 }
 
-/** Aktiviert eine (vorab geladene) Locale für alle format*-Helper. */
+/** Activates a (preloaded) locale for all format* helpers. */
 export function setDateLocale(locale: Locale): void {
   activeLocale = locale;
 }
 
-// 'PP'/'PPP' statt fester US-Muster: die Locale bestimmt auch die Reihenfolge
-// (de: „26.08.2026" / „26. August 2026" statt „Aug. 26, 2026"). Für enUS ist
-// 'PP' identisch mit dem früheren 'MMM d, yyyy'.
+// 'PP'/'PPP' instead of fixed US patterns: the locale also decides the order
+// (de: "26.08.2026" / "26. August 2026" instead of "Aug. 26, 2026"). For enUS,
+// 'PP' is identical to the former 'MMM d, yyyy'.
 
-/** Mittleres Datum ('PP', enUS: "Aug 26, 2026") — die Standard-Metazeile in Listen und Karten. */
+/** Medium date ('PP', enUS: "Aug 26, 2026") — the standard meta line in lists and cards. */
 export function formatEntryDate(date: string | Date): string {
   return format(new Date(date), 'PP', { locale: activeLocale });
 }
 
-/** Langes Datum ('PPP', enUS: "August 26th, 2026") — Grundlage von `formatIsoDateLong`. */
+/** Long date ('PPP', enUS: "August 26th, 2026") — the basis of `formatIsoDateLong`. */
 function formatEntryDateLong(date: string | Date): string {
   return format(new Date(date), 'PPP', { locale: activeLocale });
 }
 
-/** Standalone-Monat + Jahr — Monats-Header der Timeline-Gruppierung. */
+/** Standalone month + year — month header of the timeline grouping. */
 export function formatMonthGroup(date: string | Date): string {
   return format(new Date(date), 'LLLL yyyy', { locale: activeLocale });
 }
 
-/** 'EEEE, MMMM d' — die Tagesüberschrift der Home-Ansicht. */
+/** 'EEEE, MMMM d' — the day heading of the Home view. */
 export function formatDayHeading(date: string | Date): string {
   return format(new Date(date), 'EEEE, MMMM d', { locale: activeLocale });
 }
 
 /**
- * Lokalisierte Distanz OHNE Suffix („3 Tagen"), für Keys wie trash.deletedAgo
- * („Gelöscht vor {{time}}"), die das „vor/ago" selbst mitbringen.
+ * Localized distance WITHOUT a suffix ("3 days"), for keys like trash.deletedAgo
+ * ("Deleted {{time}} ago") that bring the "ago" themselves.
  */
 export function formatTimeDistance(date: string | Date): string {
   return formatDistanceToNow(new Date(date), { locale: activeLocale });
 }
 
 /**
- * Ein ISO-Datum (`YYYY-MM-DD`) in der langen Form der App-Sprache. Als lokales
- * Datum gebaut — die ISO-Zeichenkette direkt hieße UTC-Mitternacht und damit
- * westlich von Greenwich den Vortag. Ein unmögliches Datum (31. Februar) bleibt
- * roh stehen, statt still in den März zu rollen.
+ * An ISO date (`YYYY-MM-DD`) in the long form of the app language. Built as a local
+ * date — the ISO string directly would mean UTC midnight and thus, west of
+ * Greenwich, the previous day. An impossible date (31 February) is left
+ * raw instead of silently rolling over into March.
  */
 export function formatIsoDateLong(iso: string): string {
   const [y, m, d] = iso.split('-').map(Number);
@@ -93,22 +93,22 @@ export function formatIsoDateLong(iso: string): string {
   return formatEntryDateLong(date);
 }
 
-/** Wochentag wie `Date.getDay()`: 0 = Sonntag. */
+/** Weekday like `Date.getDay()`: 0 = Sunday. */
 export type Weekday = 0 | 1 | 2 | 3 | 4 | 5 | 6;
 
 /**
- * Der Name eines Wochentags (`Date.getDay()`: 0 = Sonntag) in der App-Sprache —
- * `short` für Auswahlknöpfe („Mo"), `long` für deren Tooltip („Montag").
+ * The name of a weekday (`Date.getDay()`: 0 = Sunday) in the app language —
+ * `short` for selection buttons ("Mo"), `long` for their tooltip ("Monday").
  */
 export function formatWeekday(day: Weekday, width: 'short' | 'long'): string {
-  // Der 1. Januar 2023 war ein Sonntag.
+  // 1 January 2023 was a Sunday.
   const name = format(new Date(2023, 0, 1 + day), width === 'short' ? 'EEEEEE' : 'EEEE', { locale: activeLocale });
-  // date-fns schreibt Wochentage auf Spanisch und Französisch klein („lu"); als
-  // Beschriftung eines Knopfes stehen sie für sich und beginnen groß.
+  // date-fns writes weekdays in lower case in Spanish and French ("lu"); as
+  // the label of a button they stand on their own and start with a capital.
   return name.charAt(0).toLocaleUpperCase() + name.slice(1);
 }
 
-/** Die sieben Wochentage, beginnend mit dem ersten der App-Sprache (enUS: Sonntag, sonst Montag). */
+/** The seven weekdays, starting with the first one of the app language (enUS: Sunday, otherwise Monday). */
 export function weekdaysInLocaleOrder(): Weekday[] {
   const first = activeLocale.options?.weekStartsOn ?? 0;
   return Array.from({ length: 7 }, (_, i) => ((first + i) % 7) as Weekday);

@@ -4,19 +4,19 @@ import { FIELDS_BLOCK_TYPE } from '../../lib/blocks/fields';
 import FieldsSidebarEdit from './FieldsSidebarEdit';
 
 /**
- * Einstellungen, die ein Blocktyp in die rechte Seitenleiste mitbringt — je
- * eine Lese- und eine Bearbeitungsvariante, wie die Eigenschaften-Panels. Die
- * Block-Verwaltung zeigt sie unter der Zeile eines ausgewählten Blocks, dessen
- * Typ hier steht. Nachgeschlagen wird über den
- * aufgelösten Typ (`resolveBlockType`): ein Block mit zu neuem Datenformat
- * bekommt hier so wenig eine Bearbeitungsansicht wie im Stapel.
+ * Settings that a block type brings into the right sidebar: one
+ * read and one edit variant, like the properties panels. The
+ * block management shows them below the row of a selected block whose
+ * type is listed here. Lookup goes via the
+ * resolved type (`resolveBlockType`): a block with too new a data format
+ * gets an edit view here just as little as in the stack.
  *
- * Der Textblock trägt nichts ein — Titel und Sichtbarkeit gelten für jeden
- * Block und stehen in der Verwaltungsliste. Der Feldblock bringt seine
- * Einstellungen mit (Beschriftungen, Optionen, Anzeigeregeln).
+ * The text block registers nothing: title and visibility apply to every
+ * block and are in the management list. The field block brings its
+ * settings along (labels, options, display rules).
  *
- * Importregel: nur `BlockSidebarArea` importiert diese Datei, und sie darf
- * nichts ziehen, was TipTap lädt — die Seitenleiste wird eager geladen.
+ * Import rule: only `BlockSidebarArea` imports this file, and it must not
+ * pull in anything that loads TipTap, since the sidebar is loaded eagerly.
  */
 export interface BlockSidebarReadProps {
   block: BlockInstance;
@@ -24,13 +24,13 @@ export interface BlockSidebarReadProps {
 
 export interface BlockSidebarEditProps extends BlockSidebarReadProps {
   /**
-   * Ein Instanz-Attribut setzen; läuft durch den Stapel, Cancel dreht es
-   * zurück. Nur die Bearbeitungsvariante bekommt Schreibzugriff: eine Änderung
-   * im Lesemodus landete in keinem Autosave und würde von der nächsten
-   * Cancel-Baseline geschluckt.
+   * Set an instance attribute; goes through the stack, Cancel rolls it
+   * back. Only the edit variant gets write access: a change
+   * in read mode would end up in no autosave and be swallowed by the next
+   * cancel baseline.
    */
   setAttr: (name: BlockAttrName, value: string | null) => void;
-  /** Den ganzen Block ersetzen (Attribute und inneres HTML) — für Typen, deren Fallback mitwandert. */
+  /** Replace the whole block (attributes and inner HTML), for types whose fallback travels along. */
   update: (next: BlockInstance) => void;
 }
 

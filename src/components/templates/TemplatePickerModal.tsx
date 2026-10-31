@@ -7,9 +7,9 @@ import { templateLabel } from '../../lib/blocks/blockAttrs';
 import type { Template } from '../../lib/blocks/templates';
 
 /**
- * Die Auswahl einer Vorlage für einen Eintrag: Suche über den Namen,
- * darunter die Vorlagen in der Reihenfolge von `templatesFor` (zugewiesene
- * zuerst). Ein Klick wählt.
+ * The choice of a template for an entry: search by name,
+ * below it the templates in the order of `templatesFor` (assigned ones
+ * first). A click selects.
  */
 export default function TemplatePickerModal({ templates, onSelect, onClose }: {
   templates: readonly Template[];
@@ -42,7 +42,7 @@ export default function TemplatePickerModal({ templates, onSelect, onClose }: {
         <ul className="space-y-0.5 overflow-y-auto">
           {shown.map((template) => (
             <li key={template.id}>
-              {/* `.menu-item`: dieselben Hover- und Fokus-Farben wie die Menüs, in beiden Themes. */}
+              {/* `.menu-item`: the same hover and focus colours as the menus, in both themes. */}
               <button type="button" className="menu-item rounded-md" onClick={() => onSelect(template)}>
                 <BlockGlyph icon={template.icon} size={14} />
                 <span className="min-w-0 flex-1 truncate">{templateLabel(t, template)}</span>

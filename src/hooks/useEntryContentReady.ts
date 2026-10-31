@@ -1,13 +1,13 @@
 import { useEffect, useState } from 'react';
 import { useEntryStore } from '../store/entryStore';
 
-/** Weitere Versuche nach einem gescheiterten Laden, je eine Sekunde später. */
+/** Further attempts after a failed load, one second apart. */
 const RETRIES = 3;
 
 /**
- * Ob der Inhalt des Eintrags `id` geladen ist — und holt ihn sofort, falls
- * nicht. Der Start lädt Inhalte erst nach den Listen (`fetchEntries`); wer
- * einen Eintrag öffnet, bevor das durch ist, wartet nur auf diesen einen.
+ * Whether the content of entry `id` is loaded — and fetches it right away if
+ * not. Startup loads contents only after the lists (`fetchEntries`); whoever
+ * opens an entry before that is done waits only for that one.
  */
 export function useEntryContentReady(id: string | undefined): boolean {
   const ready = useEntryStore((s) => !id || !s.pendingContent?.has(id));

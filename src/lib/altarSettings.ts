@@ -6,12 +6,12 @@ import {
 import { isValidHexColor } from './helpers';
 
 /**
- * Wie ein Altar aussieht — Hintergrund, Raster, Einrasten, Auflösung. Seit v51
- * eine JSON-Spalte `altars.settings` statt zwölf eigener Spalten: gelesen und
- * geschrieben werden sie nur zusammen, und keine Abfrage filtert danach.
- * `AltarRecord` bleibt flach — `fromRow.altar` packt aus, `altarSettingsJson`
- * packt ein. Die Bildspalten (`background_image_data` …) bleiben Spalten,
- * weil das Bild-Aufräumen und `IMAGE_FIELDS` in Spalten suchen.
+ * How an altar looks — background, grid, snapping, resolution. Since v51
+ * a JSON column `altars.settings` instead of twelve separate columns: they are
+ * only read and written together, and no query filters on them.
+ * `AltarRecord` stays flat — `fromRow.altar` unpacks, `altarSettingsJson`
+ * packs. The image columns (`background_image_data` …) stay columns,
+ * because the image cleanup and `IMAGE_FIELDS` look for columns.
  */
 export const ALTAR_SETTING_KEYS = [
   'background_preset', 'background_overlay', 'background_overlay_color',
@@ -36,10 +36,10 @@ function isResolution(v: string): boolean {
 }
 
 /**
- * Die Einstellungen aus einem JSON-Text oder einem Objekt — dem Inhalt von
- * `settings` oder, für v51 und Sicherungen bis Format 11, einer Altarzeile mit
- * den alten Einzelspalten (Schalter dort als 0/1). Fehlendes und Unbrauchbares
- * fällt auf den Standard; die Datei kann fremd sein.
+ * The settings from a JSON text or an object — the content of `settings` or,
+ * for v51 and backups up to format 11, an altar row with the old individual
+ * columns (switches there as 0/1). Anything missing or unusable falls back to
+ * the default; the file may be foreign.
  */
 export function parseAltarSettings(raw: unknown): AltarSettings {
   let source: unknown = raw;
@@ -70,9 +70,9 @@ export function parseAltarSettings(raw: unknown): AltarSettings {
 }
 
 /**
- * Der Inhalt von `altars.settings` — geprüft wie beim Lesen, immer alle
- * Schlüssel in fester Reihenfolge. Nimmt einen Altar, eine Zeile mit den alten
- * Einzelspalten oder einen JSON-Text.
+ * The content of `altars.settings` — validated as on reading, always all
+ * keys in a fixed order. Takes an altar, a row with the old individual
+ * columns, or a JSON text.
  */
 export function altarSettingsJson(source: unknown): string {
   return JSON.stringify(parseAltarSettings(source));

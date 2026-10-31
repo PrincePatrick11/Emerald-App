@@ -15,20 +15,20 @@ import {
 import { hideSplash } from '../../lib/splash';
 
 /**
- * Passwort festlegen, entsperren, mit dem Wiederherstellungsschlüssel ein
- * neues Passwort setzen — die Fragen von `ensureVaultReady`.
+ * Set a password, unlock, set a new password with the recovery key —
+ * the questions of `ensureVaultReady`.
  *
- * Steht über allem, auch über dem Vault-Setup: ein Vault, der gerade geöffnet
- * werden soll, kommt ohne diese Antwort nicht weiter.
+ * Sits above everything, including the vault setup: a vault that is about to
+ * be opened cannot go any further without this answer.
  */
 export default function VaultKeyDialog() {
   const request = useVaultKeyStore((s) => s.request);
   if (!request) return null;
-  // Der Schlüssel: jede neue Frage beginnt mit leeren Feldern.
+  // The key: every new question starts with empty fields.
   return <VaultKeyDialogBody key={`${request.kind}:${request.vaultId}`} request={request} />;
 }
 
-/** `rememberFailed`: entsperrt, aber der Schlüsselbund hat das Merken abgelehnt. */
+/** `rememberFailed`: unlocked, but the keychain refused to remember it. */
 type Step = 'unlock' | 'recover' | 'create' | 'encrypt' | 'showRecovery' | 'rememberFailed';
 
 const FAILED_KEY = {
@@ -47,9 +47,9 @@ function VaultKeyDialogBody({ request }: { request: VaultKeyRequest }) {
   const [password, setPassword] = useState('');
   const [repeat, setRepeat] = useState('');
   const [recoveryInput, setRecoveryInput] = useState('');
-  // Beim Anlegen und Verschlüsseln an — der übliche Wunsch auf dem eigenen
-  // Rechner. Beim Entsperren aus, aber nur angezeigt: solange niemand den
-  // Schalter bewegt, bleibt der Schlüsselbund, wie er ist (`rememberTouched`).
+  // On when creating and encrypting — the usual wish on one's own
+  // computer. Off when unlocking, but only displayed: as long as nobody moves
+  // the switch, the keychain stays as it is (`rememberTouched`).
   const newKey = request.kind !== 'unlock';
   const [remember, setRemember] = useState(newKey);
   const [rememberTouched, setRememberTouched] = useState(newKey);
@@ -60,8 +60,8 @@ function VaultKeyDialogBody({ request }: { request: VaultKeyRequest }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
 
-  // Beim Start fragt der Dialog, bevor der Ladebildschirm von selbst ginge —
-  // der läge sonst über der Frage.
+  // At startup the dialog asks before the loading screen would go away by itself —
+  // it would otherwise lie over the question.
   useEffect(hideSplash, []);
 
   useEffect(() => {
@@ -70,7 +70,7 @@ function VaultKeyDialogBody({ request }: { request: VaultKeyRequest }) {
     return () => { live = false; };
   }, []);
 
-  // Beim Wechsel zwischen den Schritten keine Fehlermeldung des vorigen mitnehmen.
+  // Do not carry the previous step's error message over when switching between steps.
   useEffect(() => { setError(''); }, [step]);
 
   const rememberWish = keychain && rememberTouched ? remember : undefined;
@@ -88,7 +88,7 @@ function VaultKeyDialogBody({ request }: { request: VaultKeyRequest }) {
     }
   }
 
-  /** Nach dem Entsperren: weiter — oder erst sagen, dass das Merken nicht ging. */
+  /** After unlocking: continue — or first say that remembering did not work. */
   const unlocked = (remembered: boolean) => {
     if (rememberWish && !remembered) setStep('rememberFailed');
     else finish();
@@ -100,9 +100,9 @@ function VaultKeyDialogBody({ request }: { request: VaultKeyRequest }) {
   });
 
   /**
-   * Alles, was einen neuen Schlüssel macht — neuer Vault, Verschlüsselung
-   * eines alten, „Passwort vergessen" — endet beim neuen
-   * Wiederherstellungsschlüssel.
+   * Everything that makes a new key — new vault, encryption
+   * of an old one, "Forgot password" — ends at the new
+   * recovery key.
    */
   const submitNewKey = (kind: 'create' | 'encrypt' | 'recover') => attempt(kind, async () => {
     const problem = newPasswordProblem(t, password, repeat);
@@ -129,9 +129,9 @@ function VaultKeyDialogBody({ request }: { request: VaultKeyRequest }) {
     rememberFailed: t('vaultKey.rememberFailedTitle', { name: request.vaultName }),
   }[step];
 
-  // Abbrechen geht nur, solange noch nichts geschehen ist: nach dem Anlegen
-  // hieße es, den Wiederherstellungsschlüssel ungesehen wegzuklicken, und
-  // während eine Aktion läuft, käme Rust mit ihr trotzdem durch.
+  // Cancelling is only possible while nothing has happened yet: after creating
+  // it would mean clicking away the recovery key unseen, and
+  // while an action is running, Rust would get through with it anyway.
   const cancelShown = step === 'unlock' || step === 'recover' || step === 'create' || step === 'encrypt';
 
   const busyIcon = busy ? <Loader2 size={14} className="animate-spin" /> : null;
@@ -185,8 +185,8 @@ function VaultKeyDialogBody({ request }: { request: VaultKeyRequest }) {
         </KeyField>
         {rememberRow}
         <div>
-          {/* Ein Link, kein Knopf: bündig mit den Feldern statt um die
-              Innenabstände von `.btn-ghost` eingerückt. */}
+          {/* A link, not a button: flush with the fields instead of indented by
+              the inner padding of `.btn-ghost`. */}
           <Button variant="ghost" className="text-xs -ml-1.5" disabled={busy} onClick={() => setStep('recover')}>
             {t('vaultKey.forgot')}
           </Button>
@@ -230,8 +230,8 @@ function VaultKeyDialogBody({ request }: { request: VaultKeyRequest }) {
       </>
     );
   } else if (step === 'create' || step === 'encrypt') {
-    // Dasselbe Formular; ein alter Vault bekommt dazu den Hinweis auf seine
-    // früheren Backups.
+    // The same form; an old vault additionally gets the notice about its
+    // earlier backups.
     const submit = () => submitNewKey(step);
     body = (
       <>
@@ -278,7 +278,7 @@ function VaultKeyDialogBody({ request }: { request: VaultKeyRequest }) {
       bodyClassName="px-5 py-4 space-y-4"
     >
       {body}
-      {/* Verschlüsseln und „Passwort vergessen" schreiben den ganzen Vault neu. */}
+      {/* Encrypting and "Forgot password" rewrite the whole vault. */}
       <ReencryptProgressLine vaultId={request.vaultId} active={busy && (step === 'encrypt' || step === 'recover')} />
       <div className="flex justify-end gap-2 pt-1">
         {cancelShown && <Button tone="neutral" disabled={busy} onClick={cancel}>{t('common.cancel')}</Button>}

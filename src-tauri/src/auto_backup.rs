@@ -129,7 +129,7 @@ fn own_backups(dir: &Path, tag: &str) -> Result<Vec<(String, PathBuf)>, String> 
 /// and returns how many went. Nothing that is not exactly such a file.
 fn prune_in(dir: &Path, tag: &str, keep: u32) -> Result<u32, String> {
     let found = own_backups(dir, tag)?;
-    // Nie alle: das eben geschriebene bleibt, was auch immer ankommt.
+    // Never all of them: the one just written stays, whatever arrives.
     let surplus = found.len().saturating_sub(keep.max(1) as usize);
     for (_, path) in &found[..surplus] {
         std::fs::remove_file(path).map_err(|e| format!("remove {}: {e}", path.display()))?;
@@ -163,7 +163,7 @@ fn target(app: &tauri::AppHandle, vault_id: &str) -> Result<Target, String> {
     let vault_dir = vault::vault_dir(app, vault_id)?;
     if let Some(custom) = load_state(app).dirs.get(vault_id).cloned() {
         let dir = PathBuf::from(&custom);
-        // Der Dialog liefert nur absolute Pfade; alles andere stand nicht von hier in der Datei.
+        // The dialog only returns absolute paths; anything else did not come from here in the file.
         let missing = !dir.is_absolute() || !dir.is_dir();
         return Ok(Target { custom: Some(custom), dir, missing });
     }
@@ -224,7 +224,7 @@ pub async fn pick_auto_backup_dir(
     window: tauri::WebviewWindow,
     vault_id: String,
 ) -> Result<Option<String>, String> {
-    // Nur eine registrierte Vault-Id bekommt einen Ordner.
+    // Only a registered vault id gets a folder.
     vault::vault_dir(&app, &vault_id)?;
     tauri::async_runtime::spawn_blocking(move || {
         // In a build with the dev bridge, while a client is connected and the
@@ -248,8 +248,8 @@ pub async fn pick_auto_backup_dir(
         if !dir.is_absolute() || !dir.is_dir() {
             return Err(DIR_MISSING.to_string());
         }
-        // Ein Name, der kein UTF-8 ist, käme verlustbehaftet in die Datei und
-        // passte danach nie wieder auf den Ordner.
+        // A name that is not UTF-8 would enter the file lossily and then
+        // never match the folder again.
         let path = dir.to_str().ok_or("folder name is not valid UTF-8")?.to_string();
         update_state(&app, |state| {
             state.dirs.insert(vault_id, path.clone());
@@ -263,10 +263,10 @@ pub async fn pick_auto_backup_dir(
 /// Back to the vault's own `backup/` folder.
 #[tauri::command(async)]
 pub fn reset_auto_backup_dir(app: tauri::AppHandle, vault_id: String) -> Result<(), String> {
-    // Nur die Form der Id, nicht die Registry: ein Vault wird erst entfernt und
-    // dann hier vergessen — andersherum stünde er nach einem gescheiterten
-    // Entfernen ohne seinen Ordner da. Einen Eintrag zu streichen, den es nicht
-    // gibt, ändert nichts.
+    // Only the shape of the id, not the registry: a vault is removed first
+    // and forgotten here afterwards — the other way round, a failed removal
+    // would leave it without its folder. Dropping an entry that does not
+    // exist changes nothing.
     if !vault::is_valid_vault_id(&vault_id) {
         return Err("invalid vault id".to_string());
     }
@@ -296,7 +296,7 @@ pub async fn write_auto_backup(
         }
         let tag = vault_tag(&vault_id);
         write_in(&target.dir, tag, &today(), &sealed)?;
-        // Das Backup steht. Scheitert das Aufräumen, ist das kein gescheitertes Backup.
+        // The backup is in place. If the cleanup fails, that is not a failed backup.
         if let Some(keep) = keep {
             if let Err(e) = prune_in(&target.dir, tag, keep) {
                 eprintln!("[auto-backup] prune failed: {e}");
@@ -373,7 +373,7 @@ mod tests {
         }
         assert!(dir.join(file_name(tag, "2019-01-01")).is_dir());
 
-        // Nie alles: auch `0` lässt das jüngste stehen.
+        // Never everything: even `0` leaves the newest one.
         assert_eq!(prune_in(&dir, tag, 0).unwrap(), 1);
         assert!(dir.join(file_name(tag, "2026-10-06")).is_file());
         assert_eq!(prune_in(&dir.join("missing"), tag, 3).unwrap(), 0);

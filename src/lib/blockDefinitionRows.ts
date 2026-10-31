@@ -3,12 +3,12 @@ import { fromRow, type DbRow } from './row';
 import { definitionToRow, type BlockDefinition } from './blocks/definitions';
 
 /**
- * Die Zugriffe auf `block_definitions`, die Store, Migrationen und Importe
- * teilen. Hier statt im Store, weil Migrationen und `lib/`-Module keinen Store
- * importieren dürfen.
+ * The accesses to `block_definitions` that the store, migrations and imports
+ * share. Here instead of in the store, because migrations and `lib/` modules
+ * must not import a store.
  */
 
-/** Der nächste freie Platz am Ende der Liste — auch hinter Definitionen im Papierkorb. */
+/** The next free slot at the end of the list — also behind definitions in the trash. */
 export async function nextDefinitionSortOrder(db: Database): Promise<number> {
   const rows = await db.select<{ n: number }[]>('SELECT COALESCE(MAX(sort_order), -1) + 1 AS n FROM block_definitions');
   return rows[0]?.n ?? 0;
@@ -27,7 +27,7 @@ export async function insertDefinitionRow(db: Database, def: BlockDefinition): P
   );
 }
 
-/** Eine Definition nach ID — auch aus dem Papierkorb, anders als der Store, der nur die aktiven hält. */
+/** One definition by ID — from the trash too, unlike the store, which holds only the active ones. */
 export async function definitionById(db: Database, id: string): Promise<BlockDefinition | undefined> {
   const [row] = await db.select<DbRow[]>('SELECT * FROM block_definitions WHERE id=$1', [id]);
   return row ? fromRow.blockDefinition(row) : undefined;

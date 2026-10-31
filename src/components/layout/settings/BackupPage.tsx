@@ -32,10 +32,10 @@ import AutoBackupSection from './AutoBackupSection';
 import SettingsChoiceButton from './SettingsChoiceButton';
 import SettingsSection, { SettingsCheckboxGrid, SettingsStatus } from './SettingsSection';
 
-/** Alles wie beim automatischen Backup — bis auf den Papierkorb, den nimmt man von Hand dazu. */
+/** Everything as in the automatic backup — except the trash, which is added by hand. */
 const DEFAULT_EXPORT_OPTIONS: BackupOptions = { ...FULL_BACKUP_OPTIONS, includeDeleted: false };
 
-/** Record statt Liste: eine neue Einstellungs-Gruppe ohne Beschriftung ist ein Typfehler. */
+/** A record instead of a list: a new settings group without a label is a type error. */
 const SETTINGS_GROUP_LABEL_KEYS: Record<SettingsGroup, string> = {
   appearance: 'settings.groupAppearance',
   trash: 'settings.groupTrash',
@@ -50,11 +50,11 @@ const SETTINGS_GROUP_LABEL_KEYS: Record<SettingsGroup, string> = {
 };
 
 /**
- * Export und Import der Datenbank. Beides steht offen da: seit die Sicherung
- * einen eigenen Bereich hat, ist der Platz vorhanden, und die Klapp-Panels von
- * vorher versteckten nur, was der Bereich ohnehin ankuendigt. Der Import zeigt
- * seine Optionen weiterhin erst, wenn eine Datei gewaehlt ist — das ist keine
- * Faltung, sondern hat ohne Datei keinen Inhalt.
+ * Export and import of the database. Both are shown open: now that backup has
+ * its own area there is room for it, and the collapsible panels from before
+ * only hid what the area announces anyway. The import still shows its options
+ * only once a file is chosen — that is not folding, it simply has no content
+ * without a file.
  */
 export default function BackupPage() {
   const { t } = useTranslation();
@@ -62,10 +62,10 @@ export default function BackupPage() {
 
   // Export
   const [exportOpts, setExportOpts] = useState<BackupOptions>(DEFAULT_EXPORT_OPTIONS);
-  // Nur Darstellung: der Export liest allein `dateFrom`/`dateTo`, und leer
-  // heisst dort „keine Grenze“ (siehe lib/dbBackup). An ⇒ beide Felder leer;
-  // aus ⇒ sie duerfen leer bleiben und nehmen dann weiterhin alles mit — der
-  // Haken grenzt nichts ein, er gibt die Felder nur frei.
+  // Presentation only: the export reads just `dateFrom`/`dateTo`, and empty
+  // means "no limit" there (see lib/dbBackup). On ⇒ both fields empty; off ⇒
+  // they may stay empty and then still include everything — the checkbox
+  // restricts nothing, it only enables the fields.
   const [allTime, setAllTime] = useState(true);
   const [exporting, setExporting] = useState(false);
   const [exportDone, setExportDone] = useState(false);
@@ -73,17 +73,17 @@ export default function BackupPage() {
 
   // Import
   const [importedFile, setImportedFile] = useState<{ backup: BackupFile; preview: BackupPreview } | null>(null);
-  // Add-Vault als Vorauswahl: der einzige Modus, der bestehende Daten sicher
-  // nicht anfasst.
+  // Add-vault as the default: the only mode that surely does not touch
+  // existing data.
   const [importMode, setImportMode] = useState<ImportMode>('add-vault');
   const [newVaultName, setNewVaultName] = useState('');
-  // Zielordner des neuen Vaults — dieselbe Mechanik wie im Vault-Modal:
-  // `{Dokumente}/Emerald Vaults` als Basis, ein selbst gewaehlter Ordner
-  // schlaegt sie.
+  // Target folder of the new vault — the same mechanism as in the vault modal:
+  // `{Documents}/Emerald Vaults` as the base, a folder chosen by hand
+  // overrides it.
   const [vaultBaseDir, setVaultBaseDir] = useState<string | null>(null);
   const [vaultCustomPath, setVaultCustomPath] = useState<string | null>(null);
   const [importTypeFilters, setImportTypeFilters] = useState<ImportTypeFilters>(allTypesIncluded);
-  // Beim Zusammenführen bleibt ohne Wahl alles, wie es im Vault eingestellt ist.
+  // When merging, without a choice everything stays as set in the vault.
   const [settingsGroups, setSettingsGroups] = useState<SettingsGroup[]>([]);
   const [importing, setImporting] = useState(false);
   const [importDone, setImportDone] = useState(false);
@@ -95,13 +95,13 @@ export default function BackupPage() {
     setExportDone(false);
     setExportError(false);
     try {
-      // Abbruch im Dialog ist kein Erfolg — `exportDatabase` meldet, ob
-      // wirklich geschrieben wurde.
+      // Cancelling in the dialog is not a success — `exportDatabase` reports
+      // whether anything was actually written.
       setExportDone(await exportDatabase(exportOpts));
     } catch (e) {
-      // Ohne catch verpuffte ein abgelehnter Schreibzugriff (z. B. Ziel
-      // ausserhalb der erlaubten Wurzeln) als unhandled rejection — der Knopf
-      // sprang zurueck, und nichts sagte warum.
+      // Without the catch, a rejected write (e.g. target outside the allowed
+      // roots) would fizzle out as an unhandled rejection — the button would
+      // snap back and nothing said why.
       console.error('[backup] export failed', e);
       setExportError(true);
     } finally {
@@ -118,25 +118,25 @@ export default function BackupPage() {
       setImportedFile({ backup: result.backup, preview: result.preview });
       setNewVaultName(t('settings.importedVault'));
       setVaultCustomPath(null);
-      // Wie `openCreateRow` im Vault-Modal: einmal aufloesen, damit die Zeile
-      // von Anfang an einen echten Pfad zeigt — und zwar bevor der Import
-      // klickbar wird, sonst laeuft ein schneller Klick in den Rueckfall
-      // `{appDataDir}/vaults/{id}`. Scheitert die Aufloesung, bleibt der.
+      // Like `openCreateRow` in the vault modal: resolve once so the row shows
+      // a real path from the start — and before the import becomes clickable,
+      // otherwise a quick click runs into the fallback
+      // `{appDataDir}/vaults/{id}`. If resolving fails, that fallback stays.
       setVaultBaseDir(await newVaultBaseDir().catch(() => null));
       setImportTypeFilters(allTypesIncluded());
       setSettingsGroups([]);
     } catch (err) {
-      // Außerhalb der eigenen Ordner liest Emerald nichts (`guarded_read_path`) —
-      // ein automatisches Backup auf einem anderen Laufwerk ist deshalb kein
-      // kaputtes, und die Meldung sagt, was zu tun ist.
+      // Emerald reads nothing outside its own folders (`guarded_read_path`) —
+      // so an automatic backup on another drive is not a broken one, and the
+      // message says what to do.
       setImportError(t(keyErrorOf(err).includes('access denied') ? 'settings.importErrorOutside' : 'settings.importErrorInvalid'));
     }
   }
 
   async function handleImport() {
     if (!importedFile) return;
-    // Ersetzen und „Neuer Vault" schließen jeden Tab — vorher klären, was mit
-    // laufenden Bearbeitungen geschieht. Zusammenführen lässt sie offen.
+    // Replace and "New vault" close every tab — first settle what happens to
+    // edits in progress. Merge leaves them open.
     if (importMode !== 'merge' && !(await resolveOpenEdits())) return;
     setImporting(true);
     setImportDone(false);
@@ -146,9 +146,9 @@ export default function BackupPage() {
       ? newVaultTarget(vaultBaseDir, vaultCustomPath, vaultName)
       : null;
     try {
-      // Dieselbe Pruefung wie beim Anlegen eines Vaults — und zwar bevor der
-      // Import irgendetwas anfasst: danach staende der neue Vault schon in der
-      // Liste, waehrend sein Ordner nie entstehen kann.
+      // The same check as when creating a vault — and before the import
+      // touches anything: afterwards the new vault would already be in the
+      // list while its folder can never come into being.
       if (vaultTarget) {
         const problem = await probeNewVaultTarget(vaultTarget);
         if (problem) {
@@ -168,7 +168,7 @@ export default function BackupPage() {
       setImportDone(true);
       setImportedFile(null);
     } catch (err) {
-      // Beim Passwort des neuen Vaults abgebrochen: kein Fehler, nur kein Import.
+      // Cancelled at the new vault's password: not an error, just no import.
       if (keyErrorOf(err) !== VAULT_KEY_CANCELLED) setImportError(String(err));
     } finally {
       setImporting(false);
@@ -184,13 +184,13 @@ export default function BackupPage() {
     <>
       <SettingsSection icon={<Download size={14} />} title={t('settings.exportDb')} description={t('settings.exportDbHint')}>
         <div className="space-y-3">
-          {/* Packliste = Haken, Einzelwahl = Auswahlknopf (unten die drei
-              Import-Modi). Dieselbe Form fuer beides las sich wie eine
-              Einstellung der uebrigen Seiten. */}
+          {/* Packing list = checkbox, single choice = choice button (below, the
+              three import modes). The same form for both would read like a
+              setting from the other pages. */}
           <SettingsCheckboxGrid label={t('settings.exportInclude')}>
             {(
-              // Die Einstellungen stehen nur hier, nicht beim Import: dort
-              // wählt man sie unten gruppenweise aus.
+              // The settings appear only here, not for the import: there they
+              // are picked group by group further down.
               [...CONTENT_TYPES, ['includeSettings', 'settings.includeSettings']] as [keyof BackupOptions, string][]
             ).map(([key, labelKey]) => (
               <BlockCheckbox
@@ -203,9 +203,9 @@ export default function BackupPage() {
             ))}
           </SettingsCheckboxGrid>
 
-          {/* Gehoert zur Packliste, steht aber ausserhalb des Rasters: die eine
-              Zeile, die Weggeworfenes wieder mitnimmt, bekommt die Warnfarbe
-              und eine Zeile fuer sich. */}
+          {/* Part of the packing list, but outside the grid: the one row that
+              takes along what was thrown away gets the warning colour and a
+              row of its own. */}
           <BlockCheckbox
             checked={exportOpts.includeDeleted}
             onChange={() => toggleExportOpt('includeDeleted')}
@@ -213,13 +213,13 @@ export default function BackupPage() {
             tone="danger"
           />
 
-          {/* Zeitraum: der Haken steht ueber den Feldern und schaltet sie ab,
-              statt sie zu verstecken — so ist zu sehen, was die andere Wahl
-              waere. Beim Einschalten raeumt er sie, sonst wirkte ein
-              abgeschaltetes Datum beim Export unsichtbar weiter. */}
+          {/* Period: the checkbox sits above the fields and disables them
+              instead of hiding them — so you can see what the other choice
+              would be. Switching it on clears them, otherwise a disabled date
+              would keep silently taking effect in the export. */}
           <div className="space-y-2">
-            {/* Eigene Ueberschrift wie „Inhalt“ darueber: ohne sie las sich der
-                Haken wie ein achter Eintrag der Packliste. */}
+            {/* Its own heading like "Content" above: without it the checkbox
+                would read like an eighth entry of the packing list. */}
             <p className="label-xs">{t('settings.exportPeriod')}</p>
             <BlockCheckbox
               checked={allTime}
@@ -238,8 +238,8 @@ export default function BackupPage() {
                   type="date"
                   value={exportOpts.dateFrom}
                   disabled={allTime}
-                  // Leer zeigt das Feld seine Schreibweise statt eines Datums — die
-                  // soll so blass sein wie ein Platzhalter (siehe index.css).
+                  // When empty, the field shows its format instead of a date — that
+                  // should be as pale as a placeholder (see index.css).
                   data-empty={exportOpts.dateFrom === '' || undefined}
                   onChange={(e) => setExportOpts((o) => ({ ...o, dateFrom: e.target.value }))}
                   className="input-field settings-field"
@@ -259,9 +259,9 @@ export default function BackupPage() {
             </div>
           </div>
 
-          {/* Etwas mehr Luft als zwischen den Gruppen darueber: der Knopf
-              loest aus, was sie zusammen beschreiben, und klebte sonst an den
-              Datumsfeldern. */}
+          {/* A bit more air than between the groups above: the button triggers
+              what they describe together, and would otherwise stick to the
+              date fields. */}
           <div className="flex items-center gap-2 pt-2">
             <Button
               onClick={handleExport}
@@ -279,12 +279,11 @@ export default function BackupPage() {
 
       <SettingsSection icon={<Upload size={14} />} title={t('settings.importDb')} description={t('settings.importDbHint')}>
         <div className="space-y-3">
-          {/* File picker — die Vorschau auf eigener Zeile: in der
-              Button-Zeile hatte sie jeden weiteren Nachbarn auf null
-              Breite gequetscht. */}
+          {/* File picker — the preview on its own line: in the button row it
+              had squeezed every further neighbour to zero width. */}
           <div className="space-y-1.5">
-            {/* Ohne Datei besteht der Abschnitt nur aus einem Knopf; die Zeile
-                sagt, was danach passiert, statt die Flaeche leer zu lassen. */}
+            {/* Without a file the section is just one button; the line says
+                what happens next, instead of leaving the area empty. */}
             <Button variant="secondary" onClick={handleBrowse}>
               <FolderOpen size={14} />
               {t('settings.importBrowse')}
@@ -305,7 +304,7 @@ export default function BackupPage() {
             )}
           </div>
 
-          {/* Type filters — dieselbe Packliste wie beim Export. */}
+          {/* Type filters — the same packing list as for the export. */}
           {importedFile && (
             <SettingsCheckboxGrid label={t('settings.importInclude')}>
               {CONTENT_TYPES.map(([key, labelKey]) => (
@@ -322,10 +321,10 @@ export default function BackupPage() {
           {/* Import mode radio */}
           {importedFile && (
             <>
-              {/* Modus als Choice-Karten (derselbe Knopf wie die
-                  Theme-Wahl oben) — Add-Vault zuerst: der Modus, der
-                  nichts Bestehendes anfasst, ist Vorauswahl und erster
-                  Griff, Replace steht als destruktivster zuletzt. */}
+              {/* Mode as choice cards (the same button as the theme
+                  choice above) — add-vault first: the mode that touches
+                  nothing existing is the default and the first handle,
+                  replace comes last as the most destructive. */}
               <div className="space-y-1.5">
                 <p className="label-xs mb-2">{t('settings.importMode')}</p>
                 {(
@@ -342,9 +341,9 @@ export default function BackupPage() {
                     layout="card"
                     className="block w-full text-left px-3 py-2"
                   >
-                    {/* Aktiv nur ueber die Faerbung des Knopfes selbst
-                        (settings-choice-btn), wie bei der Theme- und
-                        Sprachwahl — kein Haekchen. */}
+                    {/* Active only through the colouring of the button itself
+                        (settings-choice-btn), as with the theme and language
+                        choice — no checkmark. */}
                     <span className="block text-xs font-medium">{t(labelKey)}</span>
                     <span className="block text-xs mt-0.5 text-muted">{t(descKey)}</span>
                   </SettingsChoiceButton>
@@ -377,8 +376,8 @@ export default function BackupPage() {
                         const picked = await openDialog({ directory: true, multiple: false });
                         if (typeof picked !== 'string') return;
                         setVaultCustomPath(picked);
-                        // Wie `pickFolder` im Vault-Modal: die Korrektur
-                        // nimmt die alte Fehlermeldung sofort mit.
+                        // Like `pickFolder` in the vault modal: the correction
+                        // takes the old error message away immediately.
                         setImportError('');
                       }}
                       onResetFolder={() => setVaultCustomPath(null)}
@@ -387,8 +386,8 @@ export default function BackupPage() {
                 </div>
               )}
 
-              {/* Nur beim Zusammenführen eine Wahl: Ersetzen und Neuer Vault
-                  übernehmen die Einstellungen der Datei ganz. */}
+              {/* A choice only when merging: Replace and New vault take over
+                  the file's settings entirely. */}
               {importMode === 'merge' && importedFile.preview.hasSettings && (
                 <SettingsCheckboxGrid label={t('settings.importSettings')}>
                   {SETTINGS_GROUPS.map((group) => {
@@ -406,16 +405,16 @@ export default function BackupPage() {
                 </SettingsCheckboxGrid>
               )}
 
-              {/* Replace warning — die Danger-Tokens, nicht Amber: die
-                  Warnung kuendigt endgueltigen Datenverlust an, und Rot
-                  heisst destruktiv (design.md), in beiden Themes. */}
+              {/* Replace warning — the danger tokens, not amber: the warning
+                  announces permanent data loss, and red means destructive
+                  (design.md), in both themes. */}
               {importMode === 'replace' && (
                 <div className="flex items-start gap-2 text-xs rounded-lg border px-3 py-2 text-[var(--danger-text)] bg-[var(--danger-bg)] border-[var(--danger-border)]">
                   <AlertTriangle size={12} className="shrink-0 mt-0.5" />
                   <span className="min-w-0">
                     {t('settings.modeReplaceWarning')}
-                    {/* Ersetzen ist der eine Modus, in dem Sprache und Aussehen
-                        ohne eigene Wahl umspringen. */}
+                    {/* Replace is the one mode in which language and appearance
+                        switch without a choice of their own. */}
                     {importedFile.preview.hasSettings && ` ${t('settings.modeReplaceSettingsWarning')}`}
                   </span>
                 </div>
@@ -436,17 +435,16 @@ export default function BackupPage() {
             </>
           )}
 
-          {/* Am Ende des Panels, nicht in der Datei-Zeile: dort wurde
-              die Meldung neben Button und Vorschau-Text auf null
-              Breite gequetscht — gesetzt, aber unsichtbar. Hier steht
-              sie beim Import-Button, der sie ausloest, und darf
-              umbrechen. */}
+          {/* At the end of the panel, not in the file row: there the message
+              was squeezed to zero width next to the button and preview text —
+              set, but invisible. Here it sits by the import button that
+              triggers it, and may wrap. */}
           {importError && <SettingsStatus tone="error">{importError}</SettingsStatus>}
         </div>
       </SettingsSection>
 
-      {/* Unter Export und Import: die beiden sind das, wofür man die Seite
-          öffnet; das automatische Backup stellt man einmal ein. */}
+      {/* Below export and import: those two are what the page is opened for;
+          the automatic backup is set once. */}
       <AutoBackupSection />
     </>
   );

@@ -1,16 +1,16 @@
 /**
- * Import-Sperre fuer die Editor-Speicherpfade.
+ * Import lock for the editor's save paths.
  *
- * Ein Backup-Restore im replace-Modus behaelt die Original-IDs. Navigierte der
- * Import den offenen Editor weg, feuerte dessen Unmount-Save und schrieb den
- * VOR-Import-Inhalt ueber die gerade wiederhergestellte Zeile — stiller
- * Datenverlust, den es (verteilt auf drei Kopien) schon vor dem
- * useEntryEditor-Hook gab. dbBackup haelt die Sperre um replace- und
- * add-vault-Importe; der Hook prueft sie vor jedem
- * automatischen Speichern.
+ * A backup restore in replace mode keeps the original IDs. If the import
+ * navigated the open editor away, its unmount save fired and wrote the
+ * PRE-import content over the row that had just been restored — silent
+ * data loss that already existed (spread over three copies) before the
+ * useEntryEditor hook. dbBackup holds the lock around replace and
+ * add-vault imports; the hook checks it before every
+ * automatic save.
  *
- * Ein Zaehler statt eines booleschen Flags, damit sich verschachtelte oder
- * ueberlappende Sperren nicht gegenseitig vorzeitig aufheben.
+ * A counter instead of a boolean flag, so that nested or
+ * overlapping locks do not release each other prematurely.
  */
 let suspended = 0;
 

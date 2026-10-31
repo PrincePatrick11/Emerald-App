@@ -9,29 +9,29 @@ import {
 } from '../lib/vaultSettings';
 
 interface SettingsState {
-  /** Der Vault, dem `settings` gehört; `null` vor dem ersten Laden. */
+  /** The vault that `settings` belongs to; `null` before the first load. */
   vaultId: string | null;
   settings: VaultSettings;
 
-  /** Liest die Einstellungen eines Vaults und wendet sie an. Läuft beim Start
-   *  und bei jedem Vault-Wechsel VOR dem Öffnen der Datenbank: die Migration
-   *  v39 übersetzt einen Kategorienamen in die Sprache des Boot-Spiegels, und
-   *  den schreibt erst `changeAppLanguage` hier. */
+  /** Reads a vault's settings and applies them. Runs at startup
+   *  and on every vault switch BEFORE the database is opened: migration
+   *  v39 translates a category name into the language of the boot mirror, and
+   *  only `changeAppLanguage` writes that here. */
   loadForVault: (vaultId: string) => Promise<void>;
-  /** Kein Vault mehr offen (gescheiterter Wechsel, letzter Vault entfernt):
-   *  zurück auf die Standards. Sonst liefe die Oberfläche mit den
-   *  Einstellungen eines Vaults weiter, in den nichts mehr geschrieben wird. */
+  /** No vault open any more (failed switch, last vault removed):
+   *  back to the defaults. Otherwise the interface would keep running with the
+   *  settings of a vault that is no longer being written to. */
   clear: () => Promise<void>;
-  /** Übernimmt ganze Einstellungen, etwa aus einem Backup, und schreibt sie. */
+  /** Adopts a complete set of settings, e.g. from a backup, and writes them. */
   replaceSettings: (settings: VaultSettings) => Promise<void>;
   update: <G extends SettingsGroup>(group: G, patch: Partial<VaultSettings[G]>) => void;
 }
 
 /**
- * Das Aussehen gilt sofort — und landet zusätzlich unter den alten
- * localStorage-Schlüsseln. Die liest der Start, bevor ein Vault offen ist
- * (`index.html`, `main.tsx`), damit die App nicht erst in Noctis und Englisch
- * aufblitzt und dann umspringt.
+ * The appearance applies immediately — and is additionally stored under the old
+ * localStorage keys. Startup reads those before a vault is open
+ * (`index.html`, `main.tsx`), so the app does not flash Noctis and English
+ * first and then switch.
  */
 async function applyAppearance(appearance: AppearanceSettings): Promise<void> {
   applyTheme(appearance.theme);
@@ -46,17 +46,17 @@ async function applyAppearance(appearance: AppearanceSettings): Promise<void> {
     localStorage.setItem(APPEARANCE_MIRROR_KEYS.uiScale, String(appearance.uiScale));
     localStorage.setItem(APPEARANCE_MIRROR_KEYS.editorFontSize, String(appearance.editorFontSize));
   } catch {
-    // Ohne Spiegel blitzt beim nächsten Start höchstens das Standard-Theme auf.
+    // Without the mirror, at worst the default theme flashes on the next start.
   }
-  // Schreibt seinen Spiegel selbst, sobald das Bundle geladen ist.
+  // Writes its mirror itself once the bundle is loaded.
   await changeAppLanguage(appearance.language).catch((err) => {
     console.error('[settings] language switch failed', err);
   });
 }
 
-/** Schreibaufträge laufen hintereinander, sonst überholt ein früher Stand den späteren. */
+/** Write jobs run one after another, otherwise an early state overtakes a later one. */
 function persist(vaultId: string, settings: VaultSettings): Promise<void> {
-  // Geloggt wird schon in `serialized`.
+  // Logging already happens in `serialized`.
   return serialized('settings', () => writeVaultSettings(vaultId, settings)).catch(() => {});
 }
 
@@ -66,16 +66,16 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
 
   loadForVault: async (vaultId) => {
     const { settings: stored, corrupt } = await readVaultSettings(vaultId);
-    // Für eine unlesbare Datei springen die Standards ein — bis auf die
-    // Papierkorb-Frist: 30 Tage, die niemand gewählt hat, dürften einen auf
-    // „nie" gestellten Papierkorb nicht ausräumen, weder jetzt noch nachdem die
-    // nächste Änderung die Datei samt dieser Werte neu geschrieben hat.
+    // For an unreadable file the defaults step in — except for the
+    // trash retention period: 30 days that nobody chose must not empty a trash
+    // set to "never", neither now nor after the next change has rewritten
+    // the file along with these values.
     const fallback = initialSettingsFor(vaultId);
     const settings = stored ?? (corrupt ? { ...fallback, trash: { ...fallback.trash, retentionDays: null } } : fallback);
     set({ vaultId, settings });
     await applyAppearance(settings.appearance);
-    // Die Startwerte gleich festhalten: sonst bekäme der Vault beim nächsten
-    // Öffnen erneut den Umstiegs-Schnappschuss statt dem, was galt.
+    // Persist the initial values right away: otherwise the vault would get the
+    // migration snapshot again on the next open instead of what applied.
     if (!stored && !corrupt) await persist(vaultId, settings);
   },
 

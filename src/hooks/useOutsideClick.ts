@@ -2,32 +2,32 @@ import { useEffect, useRef } from 'react';
 import type { RefObject } from 'react';
 
 interface UseOutsideClickOptions {
-  /** Alle „Innen"-Bereiche; ein mousedown außerhalb von allen löst onDismiss aus.
-   *  Mehrere Refs, wenn das Popover per Portal hängt und kein Nachfahre des Triggers mehr ist. */
+  /** All "inside" areas; a mousedown outside all of them triggers onDismiss.
+   *  Multiple refs when the popover hangs off a portal and is no longer a descendant of the trigger. */
   refs: RefObject<HTMLElement | null>[];
   /**
-   * Escape schließt ebenfalls. `'capture'` registriert den keydown in der
-   * Capture-Phase und stoppt die Propagation — nötig, wenn ein umgebendes
-   * `Modal` seinen eigenen Escape-Handler in der Bubble-Phase am Dokument hat
-   * und sonst gewinnt (es hat sich beim Mount zuerst registriert).
+   * Escape closes as well. `'capture'` registers the keydown in the
+   * capture phase and stops propagation — needed when a surrounding
+   * `Modal` has its own Escape handler in the bubble phase on the document
+   * and would otherwise win (it registered first on mount).
    */
   escape?: boolean | 'capture';
   /**
-   * mousedown in der Capture-Phase abfangen. Nötig, wo Tauris `drag.js` auf
-   * `data-tauri-drag-region`-Elementen `stopImmediatePropagation()` ruft und
-   * der Klick die Bubble-Phase nie erreicht.
+   * Intercept mousedown in the capture phase. Needed where Tauri's `drag.js`
+   * calls `stopImmediatePropagation()` on `data-tauri-drag-region` elements
+   * and the click never reaches the bubble phase.
    */
   capture?: boolean;
-  /** Registrierung verzögern, um das öffnende mousedown selbst zu überspringen (ContextMenu). */
+  /** Delay registration to skip the opening mousedown itself (ContextMenu). */
   delay?: number;
 }
 
 /**
- * Dismiss-Muster für Menüs und Popover: mousedown außerhalb (und optional
- * Escape) ruft `onDismiss`. Listener hängen nur, solange `active` wahr ist.
+ * Dismiss pattern for menus and popovers: mousedown outside (and optionally
+ * Escape) calls `onDismiss`. Listeners are attached only while `active` is true.
  *
- * `onDismiss` und `refs` laufen über einen Ref und dürfen Inline-Werte sein —
- * sie re-registrieren die Listener nicht.
+ * `onDismiss` and `refs` run through a ref and may be inline values —
+ * they do not re-register the listeners.
  */
 export function useOutsideClick(
   active: boolean,
@@ -36,10 +36,10 @@ export function useOutsideClick(
 ): void {
   const { escape = false, capture = false, delay } = opts;
   const stateRef = useRef({ refs: opts.refs, onDismiss });
-  // Bewusstes Ref-Latching im Render (dasselbe Muster wie useEntryEditor):
-  // die Handler bleiben aktuell, ohne dass wechselnde Inline-Closures die
-  // Listener re-registrieren. Ein verworfener Render latcht schlimmstenfalls
-  // eine Closure, die der Commit gleich darauf überschreibt.
+  // Deliberate ref latching during render (the same pattern as useEntryEditor):
+  // the handlers stay current without changing inline closures re-registering
+  // the listeners. At worst, a discarded render latches a closure that the
+  // commit overwrites right afterwards.
   stateRef.current = { refs: opts.refs, onDismiss };
 
   useEffect(() => {

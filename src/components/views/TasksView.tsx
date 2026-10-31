@@ -55,7 +55,7 @@ export default function TasksView() {
   );
   const categories = useCategoryStore((s) => s.categories);
   const getCategory = useCategoryStore((s) => s.getCategory);
-  /** Die Kategorie einer Aufgabe — undefined ohne und bei einer im Papierkorb. */
+  /** A task's category — undefined without one and for one in the trash. */
   const categoryOf = (task: { category_id: string | null }) =>
     (task.category_id ? getCategory(task.category_id) : undefined);
 
@@ -67,23 +67,23 @@ export default function TasksView() {
   const [searchQuery, setSearchQuery] = useSessionState('tasks.search', '');
   const [filterCategory, setFilterCategory] = useSessionState<Set<string>>('tasks.filterCategory', new Set());
   const [filterPriority, setFilterPriority] = useSessionState<Set<string>>('tasks.filterPriority', new Set());
-  // „Erledigte anzeigen" ist eine Vorliebe wie die Vorschau im Altar, kein
-  // Filter: dauerhaft je Vault (`vaultPrefs`), ein Zurücksetzen lässt es stehen.
+  // "Show completed" is a preference like the preview in the altar, not a
+  // filter: permanent per vault (`vaultPrefs`), a reset leaves it alone.
   const [showCompleted, , setShowCompleted] = usePersistedFlag(SHOW_COMPLETED_FLAG);
   const { isCollapsed: isCategoryCollapsed, toggle: toggleCategoryCollapse, expand: expandCategories } = useCollapsedSet('tasks');
   const [linkModal, setLinkModal] = useState<{ taskId: string } | null>(null);
 
-  // Kein Refetch beim Mount: AppShell laedt die Tasks beim Start und beim
-  // Vault-Wechsel; danach haelt der Store sich selbst aktuell.
+  // No refetch on mount: AppShell loads the tasks at startup and on vault
+  // switch; after that the store keeps itself up to date.
 
   const rootTasks = tasks.filter((task) => task.parent_task_id === null);
 
-  // Erledigt und Suche gelten für alles, auch für die Anzahlen der Filter.
+  // Completed and search apply to everything, including the filter counts.
   const visibleRootTasks = rootTasks.filter((task) =>
     (showCompleted || !task.completed)
     && (!searchQuery || task.title.toLowerCase().includes(searchQuery.toLowerCase())));
-  // Der „Ohne Kategorie"-Filter wählt die Waisen aus — deren category_id
-  // (gelöschte Kategorie) steht nie selbst in der Auswahl.
+  // The "No category" filter selects the orphans — their category_id
+  // (deleted category) is never itself in the selection.
   const matchesCategory = (task: Task) => filterCategory.size === 0
     || (!!task.category_id && filterCategory.has(task.category_id))
     || (filterCategory.has(UNCATEGORIZED_KEY) && !categoryOf(task));
@@ -91,9 +91,8 @@ export default function TasksView() {
 
   const filteredTasks = visibleRootTasks.filter((task) => matchesCategory(task) && matchesPriority(task));
 
-  // Jede Filtergruppe zählt unter der jeweils anderen, nicht unter sich
-  // selbst: die Zahlen bleiben stehen, während man in einer Gruppe an- und
-  // abwählt.
+  // Each filter group counts under the other one, not under itself: the
+  // numbers stay put while you select and deselect within a group.
   const categoryBase = visibleRootTasks.filter(matchesPriority);
   const priorityBase = visibleRootTasks.filter(matchesCategory);
   const categoryCounts = countByCategory(categoryBase, (id) => !!getCategory(id), (task) => task.category_id);
@@ -103,8 +102,8 @@ export default function TasksView() {
 
   const groupedTasks = tasksPrefs.grouping === 'grouped'
     ? sortedTasks.reduce((acc, task) => {
-        // Ohne Kategorie und mit einer im Papierkorb landen im selben
-        // Bucket — für den Leser ist beides „ohne Kategorie".
+        // No category and a category in the trash end up in the same
+        // bucket — to the reader both mean "no category".
         const catId = categoryOf(task) ? task.category_id! : UNCATEGORIZED_KEY;
         if (!acc[catId]) acc[catId] = [];
         acc[catId].push(task);
@@ -118,24 +117,24 @@ export default function TasksView() {
 
   const uncatCollapsed = isCategoryCollapsed(UNCATEGORIZED_KEY);
 
-  // Chips und Gruppen zeigen nur, was bei den Aufgaben vorkommt (plus Sonstiges).
+  // Chips and groups only show what occurs among the tasks (plus Other).
   const usedCategories = categoriesUsedBy(categories, tasks);
-  // Waisen: ihre Kategorie liegt im Papierkorb. Ohne sie gibt es nichts zu
-  // filtern, dann entfällt der „Ohne Kategorie"-Chip — es sei denn, er ist
-  // noch ausgewählt; sonst bliebe ein Filter wirksam, den nichts anzeigt.
-  // Über `rootTasks`, nicht über alle: der Waisen-Block zeigt nur Wurzeln,
-  // ein Chip über eine verwaiste Unteraufgabe fände also nichts.
+  // Orphans: their category is in the trash. Without them there is nothing to
+  // filter, so the "No category" chip goes away — unless it is still
+  // selected; otherwise a filter would stay active that nothing displays.
+  // Over `rootTasks`, not all of them: the orphan block only shows roots,
+  // so a chip for an orphaned subtask would find nothing.
   const showUncatChip = hasUncategorized(categories, rootTasks) || filterCategory.has(UNCATEGORIZED_KEY);
   const chipFilteredCategories = filterCategory.size > 0
     ? usedCategories.filter((c) => filterCategory.has(c.id))
     : usedCategories;
-  // Leere Kategorie-Gruppen fallen weg — Tasks rendert im custom-Modus selbst,
-  // deshalb greift Dashboards zentrale Auswertung hier nicht.
+  // Empty category groups drop out — Tasks renders itself in custom mode,
+  // so the Dashboard's central evaluation does not apply here.
   const visibleCategories = groupedTasks
     ? chipFilteredCategories.filter((c) => (groupedTasks[c.id]?.length ?? 0) > 0)
     : chipFilteredCategories;
 
-  // Der Waisen-Block erscheint nur, wenn er etwas enthält.
+  // The orphan block only appears if it contains something.
   const showUncatBlock = groupedTasks !== null && uncategorized.length > 0;
 
   const handleCreateTask = async (categoryId?: string | null) => {
@@ -164,12 +163,11 @@ export default function TasksView() {
 
 
   /**
-   * Der Tiefenlink aus der globalen Suche. Aufgaben haben keine eigene
-   * Detailseite, die Ansicht holt die Zeile also stattdessen in den Blick — und
-   * räumt vorher weg, was sie verdecken könnte: die Suche dieser Ansicht, die
-   * Filter, ein zugeklapptes Kategoriefach, eingeklappte Elternzeilen und der
-   * ausgeblendete Erledigt-Zustand. Ohne das zeigte der Treffer auf eine Zeile,
-   * die gar nicht gerendert wird.
+   * The deep link from the global search. Tasks have no detail page of their
+   * own, so the view brings the row into sight instead — and first clears away
+   * whatever could hide it: this view's search, the filters, a collapsed
+   * category section, collapsed parent rows and the hidden completed state.
+   * Without that, the hit would point at a row that is not rendered at all.
    */
   useDeepLink({
     type: 'tasks',
@@ -183,7 +181,7 @@ export default function TasksView() {
       if (target.completed) setShowCompleted(true);
       expandCategories(target.category_id ?? UNCATEGORIZED_KEY, UNCATEGORIZED_KEY);
 
-      // Eine Unteraufgabe ist nur sichtbar, wenn jede Zeile über ihr offen ist.
+      // A subtask is only visible if every row above it is open.
       const ancestors: string[] = [];
       for (let parentId = target.parent_task_id; parentId; ) {
         ancestors.push(parentId);
@@ -195,8 +193,8 @@ export default function TasksView() {
 
   const activeFilterCount = filterCategory.size + filterPriority.size;
   const isFiltering = !!searchQuery.trim() || activeFilterCount > 0;
-  // Gruppiert zählt, ob eine Gruppe übrig bleibt (ein Kategorie-Chip kann alle
-  // ausblenden, obwohl Aufgaben passen), ungruppiert die Liste selbst.
+  // When grouped, what counts is whether a group is left (a category chip can
+  // hide all of them although tasks match), when ungrouped the list itself.
   const nothingVisible = groupedTasks
     ? visibleCategories.length === 0 && !showUncatBlock
     : sortedTasks.length === 0;
@@ -204,7 +202,7 @@ export default function TasksView() {
     setFilterCategory(new Set());
     setFilterPriority(new Set());
   };
-  // Custom-Modus: Dashboards eigenes „Keine Treffer" greift hier nicht.
+  // Custom mode: the Dashboard's own "No results" does not apply here.
   const noResults = (
     <NoResults
       query={searchQuery}
@@ -214,8 +212,8 @@ export default function TasksView() {
   );
 
   /**
-   * Der Titel eines Verknüpfungsziels — aus derselben Liste wie Link-Chips und
-   * Picker (`useLinkItems`). Liegt es im Papierkorb oder ist es weg, „Gelöscht".
+   * The title of a link target — from the same list as link chips and
+   * picker (`useLinkItems`). If it is in the trash or gone, "Deleted".
    */
   const linkItems = useLinkItems();
   const linkItemByKey = useMemo(() => linkItemsByKey(linkItems), [linkItems]);
@@ -229,7 +227,7 @@ export default function TasksView() {
           ? visibleCategories.map((cat) => {
               const catTasks = groupedTasks[cat.id] || [];
               const isCollapsed = isCategoryCollapsed(cat.id);
-              // Leere Gruppen gibt es hier nicht: `visibleCategories` filtert sie schon weg.
+              // There are no empty groups here: `visibleCategories` already filters them out.
               return (
                 <div key={cat.id} className="mb-6 space-y-1.5">
                   <CollapsibleGroupHeader
@@ -278,8 +276,8 @@ export default function TasksView() {
               />
             ))}</div>}
 
-        {/* Ganz unten, wie der Waisen-Bucket in Wiki/Operations — und wie
-            dort nur, wenn er etwas enthält. */}
+        {/* At the very bottom, like the orphan bucket in Wiki/Operations — and
+            as there, only if it contains something. */}
         {showUncatBlock && (
           <div className="mb-6 space-y-1.5">
             <CollapsibleGroupHeader
@@ -309,11 +307,11 @@ export default function TasksView() {
           </div>
         )}
 
-        {/* Custom-Modus-Pendant zu Dashboards zentralem Rückfall. Steht nichts
-            da, entscheidet nur, ob gesucht oder gefiltert wird: dann „Keine
-            Treffer", sonst gibt es keine offene Aufgabe (erledigte blendet der
-            Schalter aus) — ob es Kategorien gibt, spielt keine Rolle, die
-            globalen gibt es immer. */}
+        {/* Custom-mode counterpart to the Dashboard's central fallback. If
+            nothing is shown, all that matters is whether a search or filter is
+            active: then "No results", otherwise there is no open task (the
+            toggle hides completed ones) — whether categories exist does not
+            matter, the global ones always do. */}
         {nothingVisible && (isFiltering ? noResults : (
           <EmptyState
             icon={MODULES.tasks.icon}
@@ -344,7 +342,7 @@ export default function TasksView() {
           onClearAll: clearFilters,
           panelProps: {
             chipLabel: t('filters.category'),
-            // „Ohne Kategorie" nur, wenn es Waisen gibt.
+            // "No category" only if there are orphans.
             chips: [
               ...usedCategories.map((c) => ({ value: c.id, label: categoryLabel(t, c), emoji: c.emoji, count: categoryCounts.get(c.id) ?? 0 })),
               ...(showUncatChip ? [{ value: UNCATEGORIZED_KEY, label: t('categories.uncategorized'), emoji: '📄', count: categoryCounts.get(UNCATEGORIZED_KEY) ?? 0 }] : []),
@@ -357,23 +355,23 @@ export default function TasksView() {
               return next;
             }),
             onAllChips: () => setFilterCategory(new Set()),
-            // „Erledigte anzeigen" ist ein Anzeige-Schalter, kein Filter:
-            // zählt nicht in activeFilterCount, Zurücksetzen lässt ihn stehen.
+            // "Show completed" is a display toggle, not a filter:
+            // does not count in activeFilterCount, a reset leaves it alone.
             displayToggles: [{
               label: t('tasks.showCompleted'),
               icon: CheckSquare,
               checked: showCompleted,
               onChange: setShowCompleted,
             }],
-            // Prioritäten als zweite Filtergruppe des FilterPanels
-            // (statusChips mit eigenem Label).
+            // Priorities as the FilterPanel's second filter group
+            // (statusChips with their own label).
             statusLabel: t('tasks.filter.priority'),
             statusChips: (['high', 'medium', 'low'] as const).map((p) => ({
               value: p,
               label: t('tasks.priority.' + p),
-              // Dieselben Prioritätsfarben wie im Prioritätsmenü der Zeile —
-              // die einzige feste Farbe in der Filterliste, bewusst: die
-              // Flagge soll hier aussehen wie an der Aufgabe.
+              // The same priority colours as in the row's priority menu —
+              // the only fixed colour in the filter list, on purpose: the
+              // flag should look here the way it does on the task.
               icon: <Flag size={14} className={TASK_PRIORITY_COLORS[p]} />,
               count: priorityCounts.get(p) ?? 0,
             })),
@@ -411,9 +409,9 @@ export default function TasksView() {
 }
 
 /**
- * Die gerade angelegten Aufgaben, deren Titel noch nie bestätigt wurde. Escape
- * legt eine solche wieder weg (in den Papierkorb, mit Rückgängig) — wie
- * „Abbrechen" bei einem neuen Eintrag. Nur für die Sitzung.
+ * The tasks just created whose title has never been confirmed. Escape
+ * puts such a task away again (into the trash, with undo) — like
+ * "Cancel" on a new entry. For the session only.
  */
 const freshTaskIds = new Set<string>();
 
@@ -436,9 +434,9 @@ const TaskRow = memo(function TaskRow({
   task, editingId, editValue, setEditValue, setEditingId,
   handleSaveEdit, toggleExpand, expandedTasks, setCtxMenu, setLinkModal, resolveTaskLinkTitle, t,
 }: TaskRowProps) {
-  // Wie `.sidebar-item.active` anderswo: die Markierung haengt am aktiven
-  // View, nicht an einem Timer. Sie steht, solange der Tiefenlink auf diese
-  // Zeile zeigt, und verschwindet, sobald anderswohin navigiert wird.
+  // Like `.sidebar-item.active` elsewhere: the highlight hangs on the active
+  // view, not on a timer. It stays as long as the deep link points at this
+  // row, and disappears as soon as navigation goes elsewhere.
   const isTarget = useUIStore((s) => s.activeView.type === 'tasks' && s.activeView.id === task.id);
   const updateTask = useTaskStore((s) => s.updateTask);
   const categories = useCategoryStore((s) => s.categories);
@@ -449,7 +447,7 @@ const TaskRow = memo(function TaskRow({
   const createTask = useTaskStore((s) => s.createTask);
   const toggleComplete = useTaskStore((s) => s.toggleComplete);
   const pushUndo = useUndoStore((s) => s.push);
-  // „Erledigte anzeigen" gilt auf jeder Ebene, nicht nur für die obersten.
+  // "Show completed" applies at every level, not only the top ones.
   const [showCompleted] = usePersistedFlag(SHOW_COMPLETED_FLAG);
   const subtasks = getSubtasks(task.id).filter((sub) => showCompleted || !sub.completed);
   const hasSubtasks = subtasks.length > 0;
@@ -469,7 +467,7 @@ const TaskRow = memo(function TaskRow({
   const handleCreateSubtaskLocal = async () => {
     const subtask = await createTask(task.category_id, task.id);
     freshTaskIds.add(subtask.id);
-    // Nur aufklappen: eine schon offene Aufgabe klappte sonst zu und verbärge die neue Zeile.
+    // Only expand: an already open task would otherwise collapse and hide the new row.
     if (!isExpanded) toggleExpand(task.id);
     setEditingId(subtask.id);
     setEditValue(subtask.title);

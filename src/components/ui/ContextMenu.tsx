@@ -8,9 +8,9 @@ export interface ContextMenuAction {
   icon?: ReactNode;
   onClick: () => void;
   danger?: boolean;
-  /** Ausgegraut statt versteckt: ein Menue, dessen Eintraege je nach Lage
-   *  verschwinden, wechselt bei jedem Aufruf die Reihenfolge. Dieselbe
-   *  Bedeutung wie disabled in MenuDropdown. */
+  /** Greyed out instead of hidden: a menu whose entries disappear depending on
+   *  the situation changes its order on every call. Same
+   *  meaning as disabled in MenuDropdown. */
   disabled?: boolean;
 }
 
@@ -20,23 +20,23 @@ interface Props {
   actions: ContextMenuAction[];
   onClose: () => void;
   /**
-   * `right`: `x` ist die rechte Kante — das Menü schließt dort ab, wie ein
-   * rechtsbündiges `Dropdown`. Für Menüs an einem Knopf am rechten Rand (die
-   * Wert-Knöpfe der Seitenleiste); sonst kippte es erst nach links weg.
+   * `right`: `x` is the right edge; the menu ends there, like a
+   * right-aligned `Dropdown`. For menus on a button at the right edge (the
+   * sidebar's value buttons); otherwise it would first flip away to the left.
    */
   align?: 'left' | 'right';
-  /** Mindestbreite in px — kürzer für die knappen Menüs der Wert-Knöpfe (120). */
+  /** Minimum width in px; shorter for the terse menus of the value buttons (120). */
   minWidth?: number;
 }
 
-/** Abstand, den das Panel zu jeder Fensterkante haelt. */
+/** Distance the panel keeps from every window edge. */
 const VIEWPORT_MARGIN = 8;
 
 /**
- * Flip-then-clamp auf einer Achse: kippt das Panel an den Cursor zurueck, wenn
- * es sonst hinten anstoesst, und schiebt es danach in jedem Fall ins Fenster.
- * Ohne das Klemmen bekommt ein Menue, das hoeher ist als der Klick-Y-Offset,
- * ein negatives `top` und wird oben abgeschnitten.
+ * Flip-then-clamp on one axis: flips the panel back to the cursor if
+ * it would otherwise hit the far edge, and then shifts it into the window in every case.
+ * Without the clamping, a menu taller than the click Y offset
+ * gets a negative `top` and is cut off at the top.
  */
 function place(cursor: number, size: number, viewport: number): number {
   const flipped = cursor + size > viewport - VIEWPORT_MARGIN ? cursor - size : cursor;
@@ -57,22 +57,22 @@ export default function ContextMenu({ x, y, actions, onClose, align = 'left', mi
     });
   }, [x, y, align]);
 
-  // Delay, um das rechtsklickende mousedown zu ueberspringen, das dieses Menue oeffnete.
-  // Escape in der Capture-Phase: ein Menue ueber einem Modal ist der oberste
-  // Layer, und ohne das Abfangen schloesse dieselbe Taste auch das Modal
-  // darunter, dessen Handler ebenfalls am document haengt.
+  // Delay, to skip the right-clicking mousedown that opened this menu.
+  // Escape in the capture phase: a menu above a modal is the topmost
+  // layer, and without intercepting it the same key would also close the modal
+  // below, whose handler is likewise attached to the document.
   useOutsideClick(true, onClose, { refs: [ref], escape: 'capture', delay: 50 });
 
-  // Portal nach `document.body`, aus demselben Grund wie bei `EmojiPicker`:
-  // `.app-sidebar` und `.app-main` tragen in beiden Themes `position: relative;
-  // z-index: 1` und sind damit gleichrangige Stacking-Contexts. Inline
-  // gerendert gilt das `z-[9999]` nur innerhalb der Sidebar und verliert gegen
-  // den spaeter gemalten Hauptbereich — eine hoehere Zahl aendert daran nichts.
+  // Portal to `document.body`, for the same reason as in `EmojiPicker`:
+  // `.app-sidebar` and `.app-main` carry `position: relative;
+  // z-index: 1` in both themes and are thus sibling stacking contexts. Rendered
+  // inline, the `z-[9999]` only applies inside the sidebar and loses against
+  // the main area painted later; a higher number changes nothing about that.
   return createPortal(
     <div
       ref={ref}
-      // `w-max`: an der Klickposition nahe dem Fensterrand schrumpfte das Menü
-      // sonst beim Messen und stand nach dem Verschieben breiter als gemessen.
+      // `w-max`: at a click position near the window edge the menu would otherwise
+      // shrink while being measured and end up wider than measured after being shifted.
       className="context-menu fixed z-[9999] w-max border border-stone-700/60 rounded-lg shadow-2xl py-1"
       style={{ left: pos.left, top: pos.top, minWidth }}
     >
@@ -80,11 +80,11 @@ export default function ContextMenu({ x, y, actions, onClose, align = 'left', mi
         <button
           key={i}
           disabled={action.disabled}
-          // stopPropagation haelt das Menue offen, preventDefault haelt die
-          // Auswahl am Leben: sonst wandert der Fokus beim Mousedown auf
-          // diesen Button, die Markierung im Feld kollabiert und Kopieren
-          // haette nichts mehr zu kopieren. Gleicher Griff wie in
-          // MenuDropdown und TitleBarMenuButton.
+          // stopPropagation keeps the menu open, preventDefault keeps the
+          // selection alive: otherwise focus moves to this button on mousedown,
+          // the selection in the field collapses and Copy
+          // would have nothing left to copy. Same trick as in
+          // MenuDropdown and TitleBarMenuButton.
           onMouseDown={(e) => { e.stopPropagation(); e.preventDefault(); }}
           onClick={() => { action.onClick(); onClose(); }}
           className={`context-menu-item w-full text-left px-3 py-2 text-xs flex items-center gap-2.5 transition-colors ${

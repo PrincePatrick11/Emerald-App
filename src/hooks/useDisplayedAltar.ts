@@ -3,12 +3,12 @@ import { useUIStore } from '../store/uiStore';
 import type { AltarRecord } from '../types';
 
 /**
- * Der Altar, den die Ansicht gerade zeigt — oder `null`, solange er noch lädt.
+ * The altar the view is currently showing — or `null` while it is still loading.
  *
- * Maßgeblich ist `activeView.id`, nicht `activeAltarId` allein: `setActiveAltar`
- * lädt die Platzierungen asynchron, und bis dahin steht im Store noch kein
- * oder der vorige Altar (samt dessen `placements`). Wer nur den Store liest,
- * zeigt in dieser Lücke das Dashboard oder den falschen Altar.
+ * `activeView.id` is authoritative, not `activeAltarId` alone: `setActiveAltar`
+ * loads the placements asynchronously, and until then the store holds no
+ * altar or the previous one (with its `placements`). Anyone who reads only
+ * the store shows the dashboard or the wrong altar in that gap.
  */
 export function useDisplayedAltar(): AltarRecord | null {
   const viewAltarId = useUIStore((s) => (s.activeView.type === 'altar' ? s.activeView.id : undefined));

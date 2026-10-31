@@ -7,7 +7,7 @@ import { useEmojiSearchData } from '../../../hooks/useEmojiSearchData';
 import { useSettingsStore } from '../../../store/settingsStore';
 import SettingsSection from './SettingsSection';
 
-/** Ab so vielen Pixeln Bewegung ist ein Druck ein Ziehen und kein Klick mehr. */
+/** From this many pixels of movement on, a press is a drag and no longer a click. */
 const DRAG_THRESHOLD = 4;
 
 interface DragState {
@@ -20,17 +20,17 @@ interface DragState {
 }
 
 /**
- * Die Emojis, die jeder Picker ohne Suche anbietet. Klick entfernt, Ziehen
- * sortiert, die Suche darunter fügt hinzu.
+ * The emojis every picker offers without a search. Click removes, dragging
+ * sorts, the search below adds.
  *
- * Gezogen wird über Pointer-Events statt HTML5-Drag: unter Windows fängt
- * Tauris Datei-Drop die nativen Drag-Ereignisse ab (dieselbe Lage wie beim
- * Ziehen von Einträgen, siehe `lib/dragState`).
+ * Dragging uses pointer events instead of HTML5 drag: on Windows,
+ * Tauri's file drop intercepts the native drag events (the same situation as
+ * when dragging entries, see `lib/dragState`).
  *
- * Nicht über `hooks/usePointerReorder`: der misst die Zielposition an der
- * Y-Achse und erwartet eine Liste aus Zeilen. Das Raster hier bricht um, ein
- * Emoji hat also Nachbarn links und rechts — die Zielposition kommt deshalb
- * aus `elementFromPoint`.
+ * Not via `hooks/usePointerReorder`: it measures the target position on the
+ * Y axis and expects a list of rows. The grid here wraps, so an
+ * emoji has neighbours left and right — the target position therefore comes
+ * from `elementFromPoint`.
  */
 export default function EmojiDefaultsSection() {
   const { t } = useTranslation();
@@ -38,7 +38,7 @@ export default function EmojiDefaultsSection() {
   const update = useSettingsStore((s) => s.update);
   const current = stored ?? DEFAULT_EMOJI_PICKER_EMOJIS;
 
-  // Während des Ziehens eine lokale Reihenfolge; geschrieben wird erst beim Loslassen.
+  // A local order while dragging; it is only written on release.
   const [draft, setDraft] = useState<string[] | null>(null);
   const [draggingIndex, setDraggingIndex] = useState<number | null>(null);
   const drag = useRef<DragState | null>(null);
@@ -50,13 +50,13 @@ export default function EmojiDefaultsSection() {
   const results = trimmedQuery && searchData ? searchEmojis(searchData, trimmedQuery) : [];
 
   const save = (defaults: string[]) => update('emojis', { defaults });
-  // Wie bei den Tabs der Seitenleiste bleibt eins stehen.
+  // As with the sidebar tabs, one is always left.
   const remove = (index: number) => { if (current.length > 1) save(current.filter((_, i) => i !== index)); };
 
   function onPointerDown(e: React.PointerEvent<HTMLButtonElement>, index: number) {
     if (e.button !== 0) return;
-    // Ohne Capture geht es auch (die Nachbarn tragen dieselben Handler) — nur
-    // ein synthetisches Ereignis lehnt es ab.
+    // It works without capture too (the neighbours carry the same handlers) —
+    // only a synthetic event rejects it.
     try { e.currentTarget.setPointerCapture(e.pointerId); } catch { /* s.o. */ }
     drag.current = { pointerId: e.pointerId, startX: e.clientX, startY: e.clientY, index, moved: false, order: [...current] };
   }
@@ -87,8 +87,8 @@ export default function EmojiDefaultsSection() {
     drag.current = null;
     setDraggingIndex(null);
     setDraft(null);
-    // Ohne Bewegung ist `state.index` das Emoji, auf dem der Druck begann — nicht
-    // unbedingt das unter dem Loslassen, falls die Capture ausblieb.
+    // Without movement, `state.index` is the emoji the press began on — not
+    // necessarily the one under the release, if the capture did not happen.
     if (state.moved) save(state.order);
     else remove(state.index);
   }
@@ -109,8 +109,8 @@ export default function EmojiDefaultsSection() {
               key={emoji}
               type="button"
               data-emoji-index={index}
-              // Das letzte bleibt (wie der letzte Tab der Seitenleiste) — als
-              // sichtbar ausgegraut, statt auf den Klick nur nicht zu reagieren.
+              // The last one stays (like the sidebar's last tab) — visibly
+              // greyed out, instead of merely not reacting to the click.
               disabled={list.length === 1}
               title={t('settings.emojiItemTitle')}
               aria-label={t('settings.emojiRemove', { emoji })}
@@ -118,8 +118,8 @@ export default function EmojiDefaultsSection() {
               onPointerMove={onPointerMove}
               onPointerUp={onPointerUp}
               onPointerCancel={onPointerCancel}
-              // Tastatur: Enter/Leertaste entfernt wie ein Klick. Pointer-Klicks
-              // erledigt `onPointerUp`; `detail === 0` heißt ausgelöst per Taste.
+              // Keyboard: Enter/Space removes like a click. Pointer clicks are
+              // handled by `onPointerUp`; `detail === 0` means triggered by key.
               onClick={(e) => { if (e.detail === 0) remove(index); }}
               className={`emoji-picker-item text-xl w-9 h-9 flex items-center justify-center rounded transition-colors touch-none disabled:opacity-50 disabled:cursor-default ${
                 draggingIndex === index ? 'emoji-picker-item-active cursor-grabbing' : 'emoji-picker-item-idle cursor-grab'

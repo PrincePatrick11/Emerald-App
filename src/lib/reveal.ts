@@ -1,24 +1,24 @@
 /**
- * „Hier ist es": zu einem Element scrollen und es kurz aufleuchten lassen —
- * für den Link-Chip im Text (`revealEntryLink`) und den Block im Stapel
- * (Sprung aus der Block-Verwaltung). Nur DOM, keine Komponenten.
+ * "It's here": scroll to an element and make it flash briefly —
+ * for the link chip in the text (`revealEntryLink`) and the block in the stack
+ * (jump from block management). DOM only, no components.
  */
 
-/** Scrollt das Element in die Mitte; bei reduzierter Bewegung ohne Animation. */
+/** Scrolls the element to the centre; with reduced motion, without animation. */
 export function scrollIntoViewCentered(el: HTMLElement): void {
   const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   el.scrollIntoView({ behavior: reduceMotion ? 'auto' : 'smooth', block: 'center' });
 }
 
-// Pro Klasse ist je nur ein Element markiert. Ein zweiter Aufruf — auch auf
-// dasselbe Element — setzt die Markierung neu, statt am noch laufenden ersten
-// Durchlauf hängenzubleiben.
+// Only one element is marked per class. A second call — even on the
+// same element — restarts the marking instead of getting stuck on the
+// first run that is still going.
 const flashing = new Map<string, { el: HTMLElement; timer: number }>();
 
 /**
- * Setzt `className` für `ms` Millisekunden und startet dabei eine
- * CSS-Animation neu (Klasse ab, Reflow, Klasse an). `ms` muss zur Dauer der
- * Keyframes passen, die an der Klasse hängen.
+ * Sets `className` for `ms` milliseconds and restarts a
+ * CSS animation in the process (class off, reflow, class on). `ms` must match the duration of the
+ * keyframes attached to the class.
  */
 export function flashReveal(el: HTMLElement, className: string, ms: number): void {
   const previous = flashing.get(className);
@@ -27,7 +27,7 @@ export function flashReveal(el: HTMLElement, className: string, ms: number): voi
     previous.el.classList.remove(className);
   }
   el.classList.remove(className);
-  void el.offsetWidth; // Reflow erzwingen, sonst startet die Animation nicht neu.
+  void el.offsetWidth; // Force a reflow, otherwise the animation does not restart.
   el.classList.add(className);
   const timer = window.setTimeout(() => {
     el.classList.remove(className);

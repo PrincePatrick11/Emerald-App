@@ -1,38 +1,38 @@
 /**
- * Der Ladebildschirm aus `index.html` — abräumen beim Start, und auf Wunsch
- * noch einmal zeigen.
+ * The loading screen from `index.html` — clear it away at startup, and show
+ * it once more on request.
  *
- * Das Markup selbst liegt dort und nicht in einer Komponente: es muss im
- * ersten Frame stehen, lange bevor React gemountet ist — sonst bleibt genau
- * das weiße Fenster stehen, das es verdecken soll. Von hier aus wird es nur
- * noch entfernt und für die Vorschau wieder eingehängt.
+ * The markup itself lives there and not in a component: it has to be in the
+ * first frame, long before React has mounted — otherwise exactly the white
+ * window it is meant to cover stays visible. From here it is only
+ * removed and re-attached for the preview.
  */
 
-/** Kommt es nie zum regulären Abräumen — Render wirft, Datenbank hängt —,
- *  soll trotzdem irgendwann die Oberfläche zu sehen sein statt einer ewig
- *  kreisenden Animation. Ein zweites, härteres Netz für den Fall, dass schon
- *  das Bundle nicht lädt, steht im Inline-Skript in `index.html`. */
+/** If the regular clearing never happens — render throws, database hangs —,
+ *  the UI should still become visible at some point instead of an animation
+ *  circling forever. A second, harder safety net for the case that even
+ *  the bundle does not load is in the inline script in `index.html`. */
 const FALLBACK_MS = 10_000;
 
-/** Kopie des Originals, gezogen solange es noch im DOM steht. Ohne sie
- *  könnte „Ladebildschirm anzeigen" nichts mehr zeigen — das Original ist
- *  nach dem Start entfernt. */
+/** Copy of the original, taken while it is still in the DOM. Without it
+ *  "Show loading screen" could no longer show anything — the original is
+ *  removed after startup. */
 let template: HTMLElement | null = null;
 
-/** Die gerade offene Vorschau, damit ein zweiter Menüaufruf keine zweite
- *  Ebene stapelt. */
+/** The preview currently open, so that a second menu call does not stack
+ *  a second layer. */
 let openPreview: HTMLElement | null = null;
 
-/** Ob das Original schon behandelt wurde. Das DOM taugt dafür nicht: während
- *  des Ausblendens steht `#splash` noch im DOM, ein Zweitaufruf fände es und
- *  zöge ein zweites Ausblenden auf. */
+/** Whether the original has already been handled. The DOM is no good for that: during
+ *  fading out `#splash` is still in the DOM, a second call would find it and
+ *  start a second fade-out. */
 let dismissed = false;
 
 /**
- * Blendet ein Splash-Element aus und entfernt es. Die Ausblenddauer kommt aus
- * der `transition` in `public/splash.css` statt aus einer Konstante hier: eine
- * Zahl, die auseinanderlaufen kann, ist eine Zahl zu viel. Ist die Transition
- * abgeschaltet, kommt 0 heraus und das Element verschwindet sofort.
+ * Fades out a splash element and removes it. The fade duration comes from
+ * the `transition` in `public/splash.css` instead of a constant here: a
+ * number that can drift apart is one number too many. If the transition is
+ * disabled, 0 comes out and the element disappears immediately.
  */
 function fadeOutAndRemove(el: HTMLElement): void {
   const fadeMs = parseFloat(getComputedStyle(el).transitionDuration) * 1000 || 0;
@@ -41,13 +41,13 @@ function fadeOutAndRemove(el: HTMLElement): void {
 }
 
 /**
- * Einmalig beim Hochfahren. Zieht die Kopie für die Vorschau und spannt das
- * Sicherheitsnetz auf.
+ * Once at startup. Takes the copy for the preview and sets up the
+ * safety net.
  *
- * Muss laufen, solange das Original noch im DOM steht — also im Modulrumpf von
- * `main.tsx` und nicht in einer Komponente. Bekäme `main.tsx` je eine
- * HMR-Grenze, liefe dies nach einem Hot-Update erneut, fände kein `#splash`
- * mehr und die Menü-Vorschau bliebe bis zum nächsten vollen Reload stumm.
+ * Must run while the original is still in the DOM — so in the module body of
+ * `main.tsx` and not in a component. If `main.tsx` ever got an
+ * HMR boundary, this would run again after a hot update, find no `#splash`
+ * any more and the menu preview would stay silent until the next full reload.
  */
 export function initSplash(): void {
   const splash = document.getElementById('splash');
@@ -56,52 +56,52 @@ export function initSplash(): void {
 }
 
 /**
- * Blendet den Ladebildschirm aus und entfernt ihn aus dem DOM. Mehrfach
- * aufrufbar — der zweite Aufruf (Sicherheitsnetz, StrictMode-Doppelmount)
- * tut nichts.
+ * Fades out the loading screen and removes it from the DOM. Can be called
+ * repeatedly — the second call (safety net, StrictMode double mount)
+ * does nothing.
  */
 export function hideSplash(): void {
   if (dismissed) return;
   const splash = document.getElementById('splash');
   if (!splash) return;
   dismissed = true;
-  // Keine Mindeststandzeit: der Ladebildschirm steht genau so lange, wie
-  // tatsächlich geladen wird.
+  // No minimum display time: the loading screen stays exactly as long as
+  // loading actually takes.
   fadeOutAndRemove(splash);
 }
 
 /**
- * Zeigt den Ladebildschirm noch einmal, bis irgendwo hingeklickt (oder
- * Escape gedrückt) wird — damit man ihn sich in Ruhe ansehen kann, statt ihn
- * beim Start im Vorbeigehen zu erwischen.
+ * Shows the loading screen once more, until a click anywhere (or
+ * Escape) — so that one can look at it in peace instead of catching it
+ * in passing at startup.
  *
- * Bewusst eine Kopie und nicht das Original: eine frische Kopie startet alle
- * Animationen von vorn, auch den einmaligen Auflauf des Schriftzugs.
+ * Deliberately a copy and not the original: a fresh copy restarts all
+ * animations from the beginning, including the one-off run-up of the lettering.
  */
 export function showSplash(): void {
   if (!template || openPreview) return;
   const el = template.cloneNode(true) as HTMLElement;
 
-  // Die `id` gehört dem Original — `hideSplash()` sucht danach.
+  // The `id` belongs to the original — `hideSplash()` looks for it.
   el.removeAttribute('id');
-  // Und das Drag-Region muss weg: Tauri fängt den mousedown darauf ab und
-  // zieht daran das Fenster — auf allen drei Plattformen, nicht nur dort, wo
-  // die Titelleiste selbst gezeichnet wird. Ein `click` käme nie an, und
-  // genau der soll die Vorschau schließen. Nur hier am Wurzelelement; der
-  // Streifen `.splash-drag` darunter behält seines.
+  // And the drag region has to go: Tauri intercepts mousedown on it and
+  // drags the window with it — on all three platforms, not only where
+  // the title bar itself is drawn. A `click` would never arrive, and
+  // that is exactly what should close the preview. Only here on the root element; the
+  // `.splash-drag` strip below it keeps its own.
   el.removeAttribute('data-tauri-drag-region');
 
   const dismiss = () => {
-    // Der Klick-Listener bleibt über das Ausblenden hinweg am Element; ohne
-    // diese Sperre zöge ein zweiter Klick währenddessen erneut Timer auf.
+    // The click listener stays on the element throughout the fade-out; without
+    // this guard a second click in the meantime would start timers again.
     if (openPreview !== el) return;
     openPreview = null;
     document.removeEventListener('keydown', onKeyDown, true);
     fadeOutAndRemove(el);
   };
-  // Escape teilen sich mehrere Ebenen — `Modal`, `AltarView` und
-  // `useOutsideClick`. Capture-Phase plus Abbruch der Weiterreichung, damit
-  // die Vorschau zuerst drankommt und darunter nichts mitschließt.
+  // Several layers share Escape — `Modal`, `AltarView` and
+  // `useOutsideClick`. Capture phase plus stopping propagation, so that
+  // the preview gets it first and nothing underneath closes along with it.
   const onKeyDown = (e: KeyboardEvent) => {
     if (e.key !== 'Escape') return;
     e.preventDefault();

@@ -36,24 +36,24 @@ const ERROR_KEYS: Record<AutoBackupError, string> = {
 };
 
 /**
- * Das automatische Backup des offenen Vaults: an/aus, Intervall, wie viele
- * bleiben, wohin. Intervall und Anzahl sind Einstellungen des Vaults; der
- * Zielordner gehört zur Installation und wird von Rust gewählt und gehalten
- * (`auto_backup.rs`) — hier steht er nur zur Anzeige.
+ * The automatic backup of the open vault: on/off, interval, how many
+ * are kept, where to. Interval and count are vault settings; the
+ * target folder belongs to the installation and is chosen and held by Rust
+ * (`auto_backup.rs`) — here it is shown for display only.
  */
 export default function AutoBackupSection() {
   const { t } = useTranslation();
   const vaultId = useVaultStore((s) => s.activeVaultId);
   const backup = useSettingsStore((s) => s.settings.backup);
   const update = useSettingsStore((s) => s.update);
-  // Stand und Fehler eines anderen Vaults gehören nicht hierher.
+  // Status and errors of another vault do not belong here.
   const status = useAutoBackupStore((s) => (s.vaultId === vaultId ? s.status : null));
   const error = useAutoBackupStore((s) => (s.vaultId === vaultId ? s.error : null));
   const running = useAutoBackupStore((s) => s.running);
-  // Nur für den Ordner-Dialog: was der Lauf selbst meldet, steht im Store.
+  // Only for the folder dialog: what the run itself reports is in the store.
   const [folderFailed, setFolderFailed] = useState(false);
-  // „Jetzt sichern" wartet, wenn gerade ein Import oder Typwechsel schreibt —
-  // solange zeigt der Knopf, dass der Klick angekommen ist.
+  // "Back up now" waits if an import or type change is currently writing —
+  // until then the button shows that the click has arrived.
   const requested = useAutoBackupStore((s) => s.requested);
   const pending = running || requested;
 
@@ -62,14 +62,14 @@ export default function AutoBackupSection() {
     refreshAutoBackupStatus(vaultId).catch((e: unknown) => console.error('[auto-backup] status failed', e));
   }, [vaultId]);
 
-  /** `change` meldet `false`, wenn nichts geändert wurde (Dialog abgebrochen). */
+  /** `change` reports `false` if nothing was changed (dialog cancelled). */
   async function changeFolder(change: () => Promise<boolean | void>) {
     setFolderFailed(false);
     try {
       if ((await change()) === false) return;
-      // Der neue Ordner ist leer oder trägt einen anderen Stand — prüfen, ob
-      // etwas fällig ist. Über den Planer: der versucht es erneut, falls gerade
-      // noch ein Lauf in den alten Ordner schreibt.
+      // The new folder is empty or holds a different state — check whether
+      // anything is due. Via the scheduler: it retries if a run is still
+      // writing into the old folder.
       requestAutoBackupCheck();
     } catch (e) {
       console.error('[auto-backup] folder change failed', e);
@@ -90,9 +90,9 @@ export default function AutoBackupSection() {
 
         {backup.auto && (
           <>
-            {/* Was die einzelnen Wahlen bedeuten, steht im Tooltip — wie bei den
-                Bildgrenzen: eine Zeile Erklärung je Gruppe machte den Abschnitt
-                doppelt so hoch wie jeden anderen des Fensters. */}
+            {/* What the individual choices mean is in the tooltip — as with the
+                image limits: a line of explanation per group would make the section
+                twice as tall as any other in the window. */}
             <div>
               <p className="label-xs flex items-center gap-2 mb-2">
                 <CalendarClock size={14} />
@@ -110,8 +110,8 @@ export default function AutoBackupSection() {
                   </SettingsChoiceButton>
                 ))}
               </SettingsChoiceRow>
-              {/* Der Wochentag gehört zur Wahl „Wöchentlich" und steht ohne
-                  eigene Überschrift direkt darunter. */}
+              {/* The weekday belongs to the "Weekly" choice and sits directly
+                  below it without a heading of its own. */}
               {backup.interval === 'weekly' && (
                 <div className="mt-2" role="group" aria-label={t('settings.autoBackupWeekday')}>
                   <SettingsChoiceRow>

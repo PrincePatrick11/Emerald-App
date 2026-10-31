@@ -11,9 +11,9 @@ import { useTranslation } from 'react-i18next';
 const COLUMNS = 5;
 const MIN_COLUMNS = 3;
 
-/** Abstand zwischen Trigger und Popover. */
+/** Gap between trigger and popover. */
 const ANCHOR_GAP = 4;
-/** Mindestabstand zum Fensterrand, damit das Popover nicht am Rand klebt. */
+/** Minimum distance to the window edge so the popover does not stick to it. */
 const VIEWPORT_MARGIN = 12;
 
 /** Fixed-position coordinates for the portalled popover. */
@@ -58,9 +58,9 @@ export default function EmojiPicker({
     if (!open) setQuery('');
   }, [open]);
 
-  // popoverRef zusätzlich: das Popover haengt im Portal und ist kein Nachfahre
-  // des Triggers mehr. `escape: 'capture'`, damit Escape nur den Picker
-  // schliesst und nicht das umgebende Modal (dessen Bubble-Handler gewinnt sonst).
+  // popoverRef as well: the popover hangs in the portal and is no longer a descendant
+  // of the trigger. `escape: 'capture'` so that Escape closes only the picker
+  // and not the surrounding modal (whose bubble handler would otherwise win).
   useOutsideClick(open, () => setOpen(false), { refs: [ref, popoverRef], escape: 'capture' });
 
   /**
@@ -84,7 +84,7 @@ export default function EmojiPicker({
       ? { bottom: window.innerHeight - anchor.top + ANCHOR_GAP }
       : { top: anchor.bottom + ANCHOR_GAP };
 
-    // Am Fensterrand nachruecken, statt halb hinauszuragen.
+    // Shift back at the window edge instead of sticking half out.
     const clamp = (value: number) =>
       width > 0
         ? Math.min(Math.max(VIEWPORT_MARGIN, value), Math.max(VIEWPORT_MARGIN, window.innerWidth - width - VIEWPORT_MARGIN))
@@ -102,11 +102,11 @@ export default function EmojiPicker({
       setPlacement(null);
       return;
     }
-    // Laeuft vor dem Paint, das Popover steht also schon messbar im DOM und
-    // wird nie an der falschen Stelle sichtbar.
+    // Runs before paint, so the popover is already measurable in the DOM and
+    // is never visible in the wrong place.
     place();
     window.addEventListener('resize', place);
-    // capture, damit auch das Scrollen eines beliebigen Vorfahren ankommt.
+    // capture, so that scrolling of any ancestor arrives too.
     window.addEventListener('scroll', place, true);
     return () => {
       window.removeEventListener('resize', place);
@@ -147,12 +147,12 @@ export default function EmojiPicker({
   return (
     <div ref={ref} className={wrapperClassName}>
       {trigger({ open, toggle: () => setOpen((o) => !o) })}
-      {/* Im Portal statt im Trigger: sonst schneidet der erstbeste Vorfahre mit
-          `overflow` das Popover ab — im Vault-Modal etwa der scrollende Body,
-          in dem es nicht einmal etwas zu scrollen gibt. Positioniert wird
-          dafuer selbst, in Viewport-Koordinaten (siehe `place`), und `z-[9999]`
-          ist die Stufe, die ContextMenu und MenuDropdown fuer Overlays ueber
-          einem Modal (z-50) benutzen. */}
+      {/* In a portal instead of in the trigger: otherwise the first ancestor with
+          `overflow` clips the popover, in the vault modal for example the scrolling body,
+          in which there is not even anything to scroll. Positioning is done
+          by itself, in viewport coordinates (see `place`), and `z-[9999]`
+          is the level that ContextMenu and MenuDropdown use for overlays above
+          a modal (z-50). */}
       {open && createPortal(
         <div
           ref={popoverRef}

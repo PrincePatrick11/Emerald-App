@@ -2,39 +2,39 @@ import { invoke } from '@tauri-apps/api/core';
 import { listen, type UnlistenFn } from '@tauri-apps/api/event';
 
 /**
- * Die Frontend-Seite des In-App-Updaters.
+ * The frontend side of the in-app updater.
  *
- * Geprüft und installiert wird ausschließlich in Rust (`src-tauri/src/updates.rs`) —
- * hier stehen nur die vier Aufrufe und das Fortschritts-Ereignis. Der Grund
- * steht drüben: die Signaturprüfung und der Netzverkehr gehören nicht in die
- * WebView, und die Endpoints lassen sich nur dort zur Laufzeit überschreiben.
+ * Checking and installing happen exclusively in Rust (`src-tauri/src/updates.rs`) —
+ * here are only the four calls and the progress event. The reason
+ * is stated over there: signature verification and network traffic do not belong in the
+ * WebView, and the endpoints can only be overridden at runtime there.
  */
 
 export interface UpdateSettings {
   version: number;
-  /** Leer heißt: die einkompilierten Quellen der App. */
+  /** Empty means: the app's compiled-in sources. */
   endpoint: string;
   auto_check: boolean;
 }
 
 export interface UpdateCheck {
   available: boolean;
-  /** Die gefundene Version; leer, wenn nichts anliegt. */
+  /** The version found; empty if nothing is pending. */
   version: string;
   current_version: string;
   notes: string | null;
   date: string | null;
-  /** Falsch auf einer `.deb`-Installation — dort ersetzt der Updater nichts. */
+  /** False on a `.deb` installation — there the updater replaces nothing. */
   installable: boolean;
 }
 
 /**
- * Der Fehler, den die Rust-Seite liefert: ein Code zum Übersetzen und der
- * Originaltext fürs Log. Der Originaltext ist englisch und für Entwickler
- * geschrieben — er gehört in die Konsole, nicht ins Fenster.
+ * The error that the Rust side delivers: a code for translating and the
+ * original text for the log. The original text is English and written for developers
+ * — it belongs in the console, not in the window.
  *
- * Codes: `unreachable` (niemand hat geantwortet), `unsupported-target` (diese
- * Plattform steht nicht im Manifest), `invalid-url`, `write-failed`,
+ * Codes: `unreachable` (nobody answered), `unsupported-target` (this
+ * platform is not in the manifest), `invalid-url`, `write-failed`,
  * `unsupported-install`, `nothing-to-install`, `failed`.
  */
 export interface UpdateError {
@@ -42,8 +42,8 @@ export interface UpdateError {
   detail: string;
 }
 
-/** Was aus einem `catch` kommt, ist `unknown` — hier wird es zu einem Fehler
- *  mit Code, auch wenn etwas ganz anderes geflogen ist. */
+/** What comes out of a `catch` is `unknown` — here it becomes an error
+ *  with a code, even if something quite different was thrown. */
 export function asUpdateError(e: unknown): UpdateError {
   if (e && typeof e === 'object' && 'code' in e && typeof (e as UpdateError).code === 'string') {
     return e as UpdateError;
@@ -53,7 +53,7 @@ export function asUpdateError(e: unknown): UpdateError {
 
 export interface UpdateProgress {
   downloaded: number;
-  /** Fehlt, wenn die Quelle keine Größe mitschickt. */
+  /** Missing if the source does not send a size. */
   total: number | null;
 }
 
@@ -69,7 +69,7 @@ export function checkForUpdate(): Promise<UpdateCheck> {
   return invoke<UpdateCheck>('check_for_update');
 }
 
-/** Läuft es durch, startet die App neu — dieses Promise löst dann nie auf. */
+/** If it succeeds, the app restarts — this promise then never resolves. */
 export function installUpdate(): Promise<void> {
   return invoke<void>('install_update');
 }

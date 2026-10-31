@@ -33,79 +33,79 @@ type DashboardGrouping<T> =
       /** Collapsed groups render only their header — the chevron lives in the
        *  caller's renderGroupHeader (CollapsibleGroupHeader's onToggleCollapse). */
       isGroupCollapsed?: (group: DashboardGroup<T>) => boolean;
-      /** Leere Gruppen stehen lassen statt sie zentral wegzufiltern — für
-       *  Gruppen, die für sich etwas sind (Tags: ein unbenutzter Tag bleibt
-       *  sichtbar und verwaltbar). */
+      /** Keep empty groups instead of filtering them out centrally, for
+       *  groups that are something in themselves (tags: an unused tag stays
+       *  visible and manageable). */
       keepEmptyGroups?: boolean;
     }
   | { mode: 'custom'; render: () => ReactNode };
 
-/** Gerendert als `EmptyState` — das `icon` ist meist das Rail-Icon der Ansicht. */
+/** Rendered as `EmptyState`; the `icon` is usually the view's rail icon. */
 export type DashboardEmptyState = EmptyStateProps;
 
 export interface DashboardGroupBy {
   value: GroupingMode;
   onChange: (g: GroupingMode) => void;
-  /** Wonach gruppiert wird, in den Worten des Moduls — „Mondphase" im
-   *  Journal, „Typ" im Papierkorb. Default: „Kategorie". */
+  /** What is grouped by, in the module's own words: "Moon phase" in the
+   *  journal, "Type" in the trash. Default: "Category". */
   label?: string;
 }
 
-/** Die Hauptaktion der Seitenleiste: Jade mit „+", oder rot (`danger`) mit
- *  eigenem Icon, wenn die Hauptaktion der Seite zerstört (Papierkorb leeren). */
+/** The sidebar's main action: jade with "+", or red (`danger`) with
+ *  its own icon when the page's main action destroys (emptying the trash). */
 export interface DashboardPrimaryAction {
   label: string;
   onClick: () => void;
   danger?: boolean;
-  /** Ersetzt das „+". */
+  /** Replaces the "+". */
   icon?: ReactNode;
   disabled?: boolean;
 }
 
 export interface DashboardFilters {
-  /** Zählt für den Zurücksetzen-Knopf des „Keine Ergebnisse"-Hinweises. */
+  /** Counts for the reset button of the "No results" notice. */
   activeFilterCount: number;
-  /** Leert die Filter — derselbe Knopf; in der Leiste selbst übernimmt das
-   *  die „Alle"-Zeile jeder Liste. */
+  /** Clears the filters, the same button; in the sidebar itself the
+   *  "All" row of each list does that. */
   onClearAll?: () => void;
   panelProps: FilterPanelProps;
 }
 
 interface DashboardBaseProps<T> {
-  // Kopf — Titel und Suche im Hauptbereich, Aktionen, Toolbar und Filter in
-  // der rechten Seitenleiste
-  /** Nur der Titel — kein Icon, keine Zahl: das Icon steht schon in der Rail,
-   *  gezählt wird in den Abschnitten darunter nicht (überall gleich schlicht). */
+  // Header: title and search in the main area; actions, toolbar and filter in
+  // the right sidebar
+  /** Only the title: no icon, no number. The icon is already in the rail,
+   *  and counting is not done in the sections below (equally plain everywhere). */
   title?: string;
-  /** Ersetzt die ganze Titelzeile — für Köpfe mit mehr als dem Titel
-   *  (Home: zwei Zeilen; Papierkorb: `DashboardTitle` plus „Alle wählen"). */
+  /** Replaces the whole title line, for headers with more than the title
+   *  (Home: two lines; trash: `DashboardTitle` plus "Select all"). */
   headerLeft?: ReactNode;
-  /** Beschrifteter Knopf, der die Leiste oben in der Seitenleiste füllt. */
+  /** Labelled button that fills the bar at the top of the sidebar. */
   primaryAction?: DashboardPrimaryAction;
-  /** Kompakte Icon-Knöpfe rechts neben der Primäraktion, in derselben Reihe;
-   *  ihr Label steht nur im Tooltip. Für Nebenschauplätze des Moduls (Altar:
-   *  die Bibliothek unter den Altären) und das Abbrechen einer Rückfrage,
-   *  die die Primäraktion stellt (Papierkorb). */
+  /** Compact icon buttons to the right of the primary action, in the same row;
+   *  their label is only in the tooltip. For side areas of the module (altar:
+   *  the library below the altars) and for cancelling a confirmation
+   *  that the primary action raises (trash). */
   extraActions?: { label: string; icon: ReactNode; onClick: () => void }[];
 
-  // ListToolbar passthrough. Ansicht und Sortierung sind optional wie
-  // `groupBy`: ohne Handler entfällt die jeweilige Reihe.
+  // ListToolbar passthrough. View and sorting are optional like
+  // `groupBy`: without a handler the respective row is omitted.
   view?: ViewMode;
   sort?: SortMode;
   onView?: (v: ViewMode) => void;
   onSort?: (s: SortMode) => void;
   viewOptions?: { value: ViewMode; label: string }[];
-  /** Welche Sortiermodi zur Wahl stehen — Default: die vier Datums-/Alpha-Modi. */
+  /** Which sort modes are on offer; default: the four date/alphabetical modes. */
   sortModes?: readonly SortMode[];
-  /** Welches Datum die Datums-Sortierung vergleicht (Label „Erstellt · neueste"). */
+  /** Which date the date sort compares (label "Created · newest"). */
   sortDate?: SortDateField;
-  /** Überschrift der Sortierung statt „Sortierung" (Altar: „Sortierung · Altäre"). */
+  /** Heading of the sort section instead of "Sort" (altar: "Sort · Altars"). */
   sortLabel?: string;
-  /** Die Gruppierungs-Achse der Toolbar — als ein Objekt, damit Wert und
-   *  Handler nicht einzeln fehlen können und der Name sich nicht mit
-   *  `grouping` unten verwechselt, das die Struktur des Inhalts beschreibt.
-   *  Ohne sie zeigt die Toolbar nur Ansicht und Sortierung (Altar: seine
-   *  Altäre haben nichts zu gruppieren). */
+  /** The toolbar's grouping axis, as one object so that value and
+   *  handler cannot go missing individually and the name is not confused with
+   *  `grouping` below, which describes the structure of the content.
+   *  Without it the toolbar shows only view and sorting (altar: its
+   *  altars have nothing to group). */
   groupBy?: DashboardGroupBy;
   search?: string;
   onSearch?: (v: string) => void;
@@ -117,18 +117,18 @@ interface DashboardBaseProps<T> {
   items: T[];
   itemKey: (item: T) => string;
 
-  /** Über dem Inhalt, auch im Leer- und „Keine Ergebnisse"-Fall — die
-   *  Abschnitts-Überschrift des Hauptbereichs (Altar: „Altäre" mit Chevron,
-   *  passend zu der der Bibliothek darunter). */
+  /** Above the content, also in the empty and "No results" case: the
+   *  section heading of the main area (altar: "Altars" with a chevron,
+   *  matching that of the library below). */
   contentHeader?: ReactNode;
-  /** Unter dem Inhalt, auch im Leer- und „Keine Ergebnisse"-Fall — ein
-   *  zweiter Bereich desselben Moduls (Altar: die Bibliothek). */
+  /** Below the content, also in the empty and "No results" case: a
+   *  second area of the same module (altar: the library). */
   contentFooter?: ReactNode;
 
   cardsClassName?: string;
-  /** Raster der Ansicht „Karten in voller Breite" — eine Spalte statt drei.
-   *  Eigene Prop statt einer Variante von `cardsClassName`, weil Module die
-   *  breite Karte anders füllen dürfen (Altar: höhere Vorschau). */
+  /** Grid of the "Full-width cards" view: one column instead of three.
+   *  A separate prop instead of a variant of `cardsClassName`, because modules may
+   *  fill the wide card differently (altar: taller preview). */
   wideCardsClassName?: string;
   listClassName?: string;
   contentClassName?: string;
@@ -168,10 +168,10 @@ const DEFAULT_WIDE_CARDS_CLASSNAME = 'grid grid-cols-1 gap-3';
 const DEFAULT_LIST_CLASSNAME = 'space-y-1.5';
 
 /**
- * Der Titel eines Dashboards im Hauptbereich — nur der Titel. Dashboard rendert
- * ihn selbst aus `title`; exportiert für Köpfe, die hinter ihm noch etwas
- * brauchen (`children`, der Papierkorb sein „Alle wählen") und ihn deshalb als
- * `headerLeft` bauen.
+ * The title of a dashboard in the main area: just the title. Dashboard renders
+ * it itself from `title`; exported for headers that need something after it
+ * (`children`, the trash its "Select all") and therefore build it as
+ * `headerLeft`.
  */
 export function DashboardTitle({ title, children }: {
   title: string;
@@ -186,12 +186,12 @@ export function DashboardTitle({ title, children }: {
 }
 
 /**
- * Die Trennlinien-Ueberschrift der Timeline-Gruppen — Label, danach eine Linie
- * bis zum Rand. Exportiert, weil auch ein ganzer Abschnitt so ueberschrieben
- * wird (die Bibliothek im Altar-Dashboard); dort mit Chevron. Bewusst ohne
- * Zaehler — ein Abschnitt heisst nur, gezaehlt wird nirgends im Kopf.
- * Nicht CollapsibleGroupHeader: der hat keine Linie und traegt Kategoriezeilen,
- * nicht Abschnitte.
+ * The divider heading of the timeline groups: a label, then a line
+ * to the edge. Exported because a whole section is also headed this way
+ * (the library in the altar dashboard); there with a chevron. Deliberately without
+ * a counter: a section is only named, nothing is counted in the header.
+ * Not CollapsibleGroupHeader: that one has no line and carries category rows,
+ * not sections.
  */
 export function GroupDivider({
   label, collapsed, onToggleCollapse,
@@ -245,8 +245,8 @@ export default function Dashboard<T>({
   contextMenuSlot,
 }: DashboardProps<T>) {
   const { t } = useTranslation();
-  // Ohne Ansichts-Achse gibt es nur die Liste — Karten sind eine Wahl, die
-  // eine solche View nicht anbietet.
+  // Without a view axis there is only the list; cards are a choice that
+  // such a view does not offer.
   const renderItems = (subset: T[]) =>
     view !== undefined && isCardView(view) ? (
       <div className={isWideCardView(view) ? wideCardsClassName : cardsClassName}>
@@ -258,7 +258,7 @@ export default function Dashboard<T>({
       </div>
     );
 
-  // Ein Knopf leert Suche und Filter zusammen — was davon aktiv war, ist egal.
+  // One button clears search and filters together; which of them was active does not matter.
   const activeFilterCount = filters?.activeFilterCount ?? 0;
   const canReset = !!search?.trim() || activeFilterCount > 0;
   const noResults = (
@@ -297,13 +297,13 @@ export default function Dashboard<T>({
     }
 
     // mode === 'category'
-    // Leere Gruppen fallen hier zentral weg (außer mit `keepEmptyGroups`): die Kategorienliste ist global,
-    // eine für das Wiki angelegte Kategorie stünde sonst als leerer Kopf auch
-    // in den Operationen.
-    // Bleibt keine Gruppe übrig, greift der „Keine Ergebnisse"-Hinweis,
-    // den sonst hasNoResults liefert.
-    // Nicht die einzige Stelle: Tasks rendert im custom-Modus und führt
-    // dieselbe Regel selbst (TasksView, `visibleCategories`).
+    // Empty groups are dropped centrally here (except with `keepEmptyGroups`): the category list is global,
+    // so a category created for the wiki would otherwise also show up as an empty header
+    // in operations.
+    // If no group remains, the "No results" notice kicks in,
+    // which hasNoResults would otherwise supply.
+    // Not the only place: Tasks renders in custom mode and applies
+    // the same rule itself (TasksView, `visibleCategories`).
     const groups = grouping.keepEmptyGroups
       ? grouping.groups
       : grouping.groups.filter((group) => group.items.length > 0);
@@ -324,10 +324,10 @@ export default function Dashboard<T>({
     );
   };
 
-  // Anmelden, damit RightSidebar das Portal-Ziel stellt (siehe
-  // `uiStore.dashboardMounted`). Layout- statt Passiv-Effekt: Oeffnet ein
-  // Klick einen Eintrag, muss die Leiste noch vor dem Zeichnen auf die
-  // Aktionsleiste umschalten, sonst stuende einen Frame lang ein leerer Host da.
+  // Register so that RightSidebar provides the portal target (see
+  // `uiStore.dashboardMounted`). Layout effect instead of passive effect: if a
+  // click opens an entry, the sidebar must switch to the action bar
+  // before painting, otherwise an empty host would stand there for one frame.
   const setDashboardMounted = useUIStore((s) => s.setDashboardMounted);
   useLayoutEffect(() => {
     setDashboardMounted(true);
@@ -347,12 +347,12 @@ export default function Dashboard<T>({
     </Button>
   ));
 
-  // In der Seitenleiste ganz oben die Aktionen (`actionBar`). Toolbar und
-  // FilterPanel bringen kein eigenes Streifen-Chrome mit — den Einzug stellt
+  // At the very top of the sidebar are the actions (`actionBar`). Toolbar and
+  // FilterPanel bring no strip chrome of their own; the indentation is provided by
   // `SidebarColumn`.
-  // Die Aktionen stehen wie „Bearbeiten" eines Eintrags in der 56px-Leiste
-  // mit der Trennlinie darunter: die Primäraktion füllt die Zeile, die
-  // Nebenaktionen bleiben daneben kompakt.
+  // The actions sit like an entry's "Edit" in the 56px bar
+  // with the divider below it: the primary action fills the row, the
+  // secondary actions stay compact beside it.
   const actionBar = primaryAction || extraActions?.length ? (
     <SidebarActionBar>
       {primaryAction && (
@@ -384,8 +384,8 @@ export default function Dashboard<T>({
         groupBy={groupBy}
       />
 
-      {/* In der Seitenleiste ist Platz in der Höhe: das FilterPanel steht
-          dauerhaft, statt hinter einem Auf/Zu-Knopf. */}
+      {/* The sidebar has room in height: the FilterPanel stays
+          permanently open instead of behind an open/close button. */}
       {filters && (
         <FilterPanel {...filters.panelProps} />
       )}
@@ -394,17 +394,17 @@ export default function Dashboard<T>({
 
   return (
     <div className="h-full flex flex-col">
-      {/* Aktionen, Toolbar und Filter wohnen in der rechten Seitenleiste: Sie
-          stellt in Listenansichten ein Portal-Ziel (RightSidebar →
-          setListHeaderHost). Ist sie zu, fehlen sie — bewusst, die Liste
-          bekommt dann die ganze Breite. Beim Zuklappen hält AppShell die Leiste für die
-          200ms-Animation noch gemountet (inert); der Kopf fährt mit ihr hinaus
-          und verschwindet, wenn der Host abgemeldet wird. */}
+      {/* Actions, toolbar and filter live in the right sidebar: it
+          provides a portal target in list views (RightSidebar →
+          setListHeaderHost). When it is closed they are absent, deliberately; the list
+          then gets the full width. On collapse, AppShell keeps the sidebar mounted
+          (inert) for the 200ms animation; the header slides out with it
+          and disappears when the host is unregistered. */}
       <SidebarPortal>{header}</SidebarPortal>
 
-      {/* Titel und Suche im Hauptbereich, in einer Zeile: der Titel links, die
-          Suche 260px breit rechtsbündig. Über dem Scrollbereich, damit sie
-          unabhängig vom Einzug stehen, den eine View für ihren Inhalt setzt. */}
+      {/* Title and search in the main area, on one line: the title on the left, the
+          search 260px wide, right-aligned. Above the scroll area, so that they stand
+          independently of the indentation a view sets for its content. */}
       <div className="px-8 pt-6 flex items-center gap-4 flex-shrink-0">
         <div className="flex-1 min-w-0">
           {headerLeft ?? (title && <DashboardTitle title={title} />)}

@@ -70,24 +70,24 @@ export default function AltarView() {
 
   const [search, setSearch] = useSessionState('altar.search', '');
   const [ctxMenu, setCtxMenu] = useState<{ id: string; x: number; y: number } | null>(null);
-  // Wie die Bibliothek darunter: der Abschnitt lässt sich zuklappen, und das
-  // bleibt so — dieselbe Vorliebe, derselbe Hook.
+  // Like the library below: the section can be collapsed, and that sticks —
+  // the same preference, the same hook.
   const [altarsCollapsed, toggleAltars] = usePersistedFlag('altar-list-collapsed');
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState('');
   const [title, setTitle] = useState('');
-  // Die Bibliothek im Dashboard: das Element-Modal wohnt hier, weil sein Knopf
-  // in der Dashboard-Kopfzeile sitzt.
+  // The library in the dashboard: the element modal lives here because its
+  // button sits in the dashboard header.
   const [itemModal, setItemModal] = useState<{ item: AltarItem | null; categoryId: string | null } | null>(null);
   const viewportRef = useRef<HTMLDivElement>(null);
   // ref keeps ResizeObserver callback current without re-observing on fullscreen toggle
   const altarWindowFullscreenRef = useRef(altarWindowFullscreen);
   const [canvasTransform, setCanvasTransform] = useState<{ scale: number; offsetX: number; offsetY: number; nativeW: number; nativeH: number }>({ scale: 1, offsetX: 0, offsetY: 0, nativeW: 1920, nativeH: 1080 });
-  // Gesetzt, während „Fertig" oder Cancel die Bearbeitung beenden:
-  // ihr Ende gehört dann dem Handler, und der Abbau des Bearbeiten-Effekts
-  // unten (Titel sichern, Vorschaubild aufnehmen) tut nichts.
+  // Set while "Done" or Cancel end the edit: its end then belongs to the
+  // handler, and the teardown of the editing effect below (saving the title,
+  // capturing the thumbnail) does nothing.
   const endingEditRef = useRef(false);
-  /** Führt das Ende der Bearbeitung aus; das Flag fällt erst nach dem Commit, damit der Abbau es noch sieht. */
+  /** Runs the end of the edit; the flag only drops after the commit so the teardown still sees it. */
   const endingEdit = async (run: () => Promise<void>) => {
     endingEditRef.current = true;
     try {
@@ -97,13 +97,13 @@ export default function AltarView() {
     }
   };
 
-  // Kein Refetch beim Mount: AppShell laedt die Altaere beim Start und beim
-  // Vault-Wechsel; danach haelt der Store sich selbst aktuell.
+  // No refetch on mount: AppShell loads the altars at startup and on vault
+  // switch; after that the store keeps itself up to date.
 
   // Must be placed BEFORE the activeView.id effect so that when both run in the same
   // commit (e.g. back-button press), getState() is called before clearActiveAltar().
   const isEditing = activeView.mode === 'edit';
-  // Der getippte Titel, für den Abbau unten: dessen Closure ist so alt wie der Effekt.
+  // The typed title, for the teardown below: its closure is as old as the effect.
   const titleRef = useRef('');
   useEffect(() => {
     if (!isEditing) return;
@@ -111,31 +111,31 @@ export default function AltarView() {
       if (endingEditRef.current) return;
       const { activeAltarId: altarId, altars: current, updateAltar: update } = useAltarStore.getState();
       if (!altarId) return;
-      // Weggeschaltet, ohne „Fertig" oder Cancel (ein anderer Tab): der Titel
-      // lebt nur in dieser View und ginge mit ihr. Die Bearbeitung läuft
-      // weiter, und Cancel holt auch ihn zurück (`altarEdit.ts`).
+      // Switched away without "Done" or Cancel (another tab): the title lives
+      // only in this view and would go with it. The edit carries on, and
+      // Cancel brings it back too (`altarEdit.ts`).
       const typed = titleRef.current.trim();
       const stored = current.find((altar) => altar.id === altarId)?.title;
       const titleChanged = !!typed && stored !== undefined && typed !== stored;
-      // Ohne Änderung bleibt alles, wie es war — ein neues Vorschaubild schöbe
-      // den Altar in den Listen nach oben, obwohl nichts geschah.
+      // Without a change everything stays as it was — a new thumbnail would
+      // push the altar up in the lists although nothing happened.
       if (!titleChanged && !altarEditChanged(altarId)) return;
-      // Die Aufnahme sofort beginnen: sie liest den aktiven Altar aus dem
-      // Store, und nach dem ersten await ist das schon der nächste.
+      // Start the capture immediately: it reads the active altar from the
+      // store, and after the first await that is already the next one.
       const capture = captureCurrentAltar();
       trackAltarWrite(altarId, (async () => {
         if (titleChanged) await update(altarId, { title: typed });
         const thumbnailData = await capture;
-        // Das Bild folgt nur — „Zuletzt geändert" hat die Änderung selbst schon gestellt.
+        // The image only follows — "Last modified" was already set by the change itself.
         if (thumbnailData !== null) await update(altarId, { thumbnail_data: thumbnailData }, AS_A_CONSEQUENCE);
       })().catch(console.error));
     };
-    // Auch beim Wechsel von einem Altar im Bearbeiten zum nächsten: die View
-    // bleibt dabei montiert, und `isEditing` ändert sich nicht.
+    // Also when switching from one altar being edited to the next: the view
+    // stays mounted and `isEditing` does not change.
   }, [isEditing, activeView.id]);
 
-  // Als Abhängigkeit unten: ein Altar, der aus dem Papierkorb zurückkommt,
-  // während die Ansicht schon auf ihn zeigt, wird sonst nie geladen.
+  // As a dependency below: an altar that comes back from the trash while the
+  // view already points at it would otherwise never be loaded.
   const viewAltarExists = altars.some((altar) => altar.id === activeView.id);
   useEffect(() => {
     if (activeView.id) {
@@ -147,8 +147,8 @@ export default function AltarView() {
     }
   }, [activeView.id, activeAltarId, viewAltarExists, setActiveAltar, clearActiveAltar]);
 
-  // Ohne den Abgleich mit der Ansicht blitzte beim Öffnen per Link erst das
-  // Dashboard auf — siehe useDisplayedAltar.
+  // Without the comparison with the view, the dashboard would flash up first
+  // when opening via a link — see useDisplayedAltar.
   const activeAltar = useDisplayedAltar();
   const isAltarLoading = !activeAltar && !!activeView.id && viewAltarExists;
 
@@ -158,16 +158,16 @@ export default function AltarView() {
   }, [activeAltar?.id, activeAltar?.title]);
   titleRef.current = title;
 
-  // Der Stand, zu dem Cancel zurückkehrt — sobald der Altar geladen im Bearbeiten steht.
+  // The state Cancel returns to — as soon as the altar is loaded and in edit mode.
   useEffect(() => {
     if (isEditing && activeAltar) void beginAltarEdit(activeAltar.id);
   }, [isEditing, activeAltar?.id]);
 
   useEffect(() => { altarWindowFullscreenRef.current = altarWindowFullscreen; }, [altarWindowFullscreen]);
 
-  // Vollbild gilt dem einen Altar im Lesen: Bearbeiten, das Dashboard und
-  // jedes Wegnavigieren beenden es — sonst stünde der nächste Altar-Besuch
-  // (auch das Dashboard, ohne Knopf zum Verlassen) wieder darin.
+  // Fullscreen applies to the one altar being viewed: editing, the dashboard
+  // and any navigating away end it — otherwise the next altar visit (even the
+  // dashboard, with no button to leave) would be in it again.
   useEffect(() => {
     if (altarWindowFullscreen && (isEditing || !activeAltar)) setAltarWindowFullscreen(false);
   }, [isEditing, activeAltar, altarWindowFullscreen, setAltarWindowFullscreen]);
@@ -239,7 +239,7 @@ export default function AltarView() {
 
   const handleDuplicate = async (id: string) => {
     const altar = await duplicateAltar(id);
-    // Den Altar lädt der activeView.id-Effekt oben — wie beim Klick auf die Karte.
+    // The activeView.id effect above loads the altar — as when clicking the card.
     if (altar) setActiveView({ type: 'altar', id: altar.id, mode: 'view' });
   };
 
@@ -255,7 +255,7 @@ export default function AltarView() {
       if (thumbnailData !== null)
         await updateAltar(altarId, { thumbnail_data: thumbnailData }, AS_A_CONSEQUENCE);
     })().catch((err: unknown) => console.error('[handleDone]', err));
-    // Wer gleich wieder „Bearbeiten" drückt, wartet darauf (`beginAltarEdit`).
+    // Whoever presses "Edit" again right away waits for it (`beginAltarEdit`).
     trackAltarWrite(altarId, writes);
     await writes;
   });
@@ -263,30 +263,30 @@ export default function AltarView() {
   const handleCancel = () => endingEdit(async () => {
     if (!activeAltar) return;
     const altarId = activeAltar.id;
-    // Ein nie mit „Fertig" bestätigter Altar geht, wie jeder gelöschte, in den Papierkorb.
+    // An altar never confirmed with "Done" goes to the trash, like any deleted one.
     if (activeView.isNew) {
       await handleDelete(altarId).catch((err: unknown) => console.error('[handleCancel]', err));
       return;
     }
-    // Zurück auf den Stand beim Betreten des Bearbeitens — der Altar hat jede
-    // Handlung sofort gespeichert. Das Vorschaubild kommt mit dem Stand
-    // zurück; ein neues aufzunehmen hieße, ihn in den Listen nach oben zu schieben.
+    // Back to the state on entering edit mode — the altar saved every action
+    // immediately. The thumbnail comes back with that state; capturing a new
+    // one would mean pushing the altar up in the lists.
     //
-    // Erst die Ansicht, dann warten: das Zurückschreiben greift sich den
-    // gemerkten Stand sofort, und im Lesemodus kann währenddessen nichts mehr
-    // verschoben werden. Wer gleich woanders hinklickt, kommt dort an.
+    // View first, then wait: the write-back grabs the remembered state
+    // immediately, and in read mode nothing can be moved in the meantime.
+    // Whoever clicks elsewhere right away ends up there.
     const restoring = restoreAltarEdit(altarId);
     setActiveView({ type: 'altar', id: altarId, mode: 'view' });
     try {
       await restoring;
     } catch (err) {
-      // Zeigen, was wirklich in der Datenbank steht. Der gemerkte Stand ist
-      // noch da: „Bearbeiten" und noch einmal Cancel bringt es zu Ende.
+      // Show what is really in the database. The remembered state is still
+      // there: "Edit" and Cancel once more finishes the job.
       console.error('[handleCancel]', err);
       await useAltarStore.getState().fetchAltars().catch(console.error);
     }
-    // Der getippte Titel lebt nur hier — zurück auf den gespeicherten, solange
-    // die Ansicht noch diesen Altar zeigt.
+    // The typed title lives only here — back to the saved one, as long as
+    // the view still shows this altar.
     if (useUIStore.getState().activeView.id !== altarId) return;
     const stored = useAltarStore.getState().altars.find((altar) => altar.id === altarId)?.title;
     if (stored !== undefined) setTitle(stored);
@@ -303,8 +303,8 @@ export default function AltarView() {
 
   const backgroundSrc = imageSrc(activeAltar?.background_image_data);
 
-  // Leerer Rahmen für den einen Ladeschritt — kurz genug, dass nichts
-  // Sichtbares nötig ist, aber eben nicht das Dashboard.
+  // An empty frame for the one loading step — short enough that nothing
+  // visible is needed, but just not the dashboard.
   if (isAltarLoading) return <div className="h-full" />;
 
   if (!activeAltar) {
@@ -344,11 +344,11 @@ export default function AltarView() {
         />
       );
 
-    // Die Regler der Bibliothek stehen beim übrigen Dashboard-Kopf, nicht im
-    // Inhalt: in derselben Spalte wie Ansicht und Sortierung der Altäre, mit
-    // denselben Bausteinen — und die Bibliothek darunter bleibt der reine
-    // Inhalt. „Name · A → Z" meint hier den Elementnamen statt des
-    // Altartitels, das Wort bleibt.
+    // The library's controls sit with the rest of the dashboard header, not in
+    // the content: in the same column as view and sorting of the altars, with
+    // the same building blocks — and the library below stays pure content.
+    // "Name · A → Z" here means the element name rather than the altar title;
+    // the word stays.
     const libraryControls = (
       <>
         <SortSelect
@@ -371,10 +371,10 @@ export default function AltarView() {
       <Dashboard<AltarRecord>
         title={t('nav.altar')}
         primaryAction={{ label: t('altar.newAltar'), onClick: handleNew }}
-        // „Element" steht hier statt bei den Aktionen mit Beschriftung: es
-        // gehört zur Bibliothek unter den Altären, nicht zu den Altären selbst,
-        // und steht darum als Icon daneben — der beschriftete Platz bleibt
-        // dem neuen Altar.
+        // "Element" is here instead of among the labelled actions: it belongs
+        // to the library below the altars, not to the altars themselves, and
+        // therefore sits next to them as an icon — the labelled spot stays
+        // with the new altar.
         extraActions={[
           { label: t('altar.addElement'), icon: <PackagePlus size={14} />, onClick: () => openNewElement() },
         ]}
@@ -386,8 +386,8 @@ export default function AltarView() {
         onSort={(next) => setAltarPrefs({ sort: next })}
         search={search}
         onSearch={setSearch}
-        // Nur ein Anzeige-Schalter, kein Filter: er zählt nicht als aktiver
-        // Filter, und es gibt nichts zurückzusetzen.
+        // Only a display toggle, not a filter: it does not count as an active
+        // filter, and there is nothing to reset.
         filters={{
           activeFilterCount: 0,
           panelProps: {
@@ -400,9 +400,9 @@ export default function AltarView() {
             extraGroups: [{ label: t('altar.sortLibrary'), content: libraryControls }],
           },
         }}
-        // Zugeklappt eine leere Liste statt eines Sonderzweigs: der Leer- und
-        // der „Keine Ergebnisse"-Hinweis gehören zum ausgeklappten Abschnitt
-        // und dürfen nicht anstelle der zugeklappten Überschrift stehen.
+        // Collapsed means an empty list instead of a special branch: the empty
+        // and the "No results" notice belong to the expanded section and must
+        // not appear in place of the collapsed heading.
         items={altarsCollapsed ? [] : sorted}
         itemKey={(altar) => altar.id}
         renderItem={renderAltarItem}
@@ -417,8 +417,8 @@ export default function AltarView() {
         hasNoResults={!altarsCollapsed && filteredCount === 0}
         contentHeader={
           <GroupDivider
-            // Mehrzahl, nicht t('nav.altar'): das ist die Überschrift über
-            // einer Liste, kein Modulname in der Leiste.
+            // Plural, not t('nav.altar'): this is the heading above a list,
+            // not a module name in the bar.
             label={t('altar.sectionTitle')}
             collapsed={altarsCollapsed}
             onToggleCollapse={toggleAltars}
@@ -466,8 +466,8 @@ export default function AltarView() {
 
   return (
     <div className="flex flex-col h-full">
-      {/* Wie in EntryDetailFrame: darueber zurueck zum Altar-Dashboard und das
-          Datum, im Bearbeiten der Status. */}
+      {/* As in EntryDetailFrame: above it, back to the altar dashboard and the
+          date, while editing the status. */}
       {!altarWindowFullscreen && (
         <EntryHeaderRow
           inset="px-6"
@@ -498,10 +498,10 @@ export default function AltarView() {
       )}
 
       <div ref={viewportRef} className="flex-1 relative overflow-hidden min-h-0">
-        {/* Der Vollbild-Knopf steht oben in der rechten Seitenleiste.
-            Schwebend hier nur, wo die Leiste fehlt:
-            im Vollbild (sonst gaebe es keinen Weg zurueck) und bei
-            geschlossener Leiste. */}
+        {/* The fullscreen button sits at the top of the right sidebar.
+            Floating here only where the bar is missing:
+            in fullscreen (otherwise there would be no way back) and with
+            the bar closed. */}
         {!isEditing && (altarWindowFullscreen || !rightSidebarOpen) && (
           <div className="absolute top-3 right-3 z-10">
             <Button

@@ -3,29 +3,29 @@ import { Plus, RotateCcw, SearchX, type LucideIcon } from 'lucide-react';
 import Button from './Button';
 
 export interface EmptyStateProps {
-  /** Meist das Rail-Icon der Ansicht bzw. des Abschnitts. */
+  /** Usually the rail icon of the view or section. */
   icon?: LucideIcon;
-  /** Kurz, in der Schrift der Eintragstitel — „Noch keine Artikel". */
+  /** Short, in the font of the entry titles: "No articles yet". */
   title: string;
-  /** Ein Satz darunter: wozu der Bereich da ist. */
+  /** One sentence below it: what the area is for. */
   description?: string;
-  /** Beschriftung des Knopfs — ohne `onAction` kein Knopf (Papierkorb). */
+  /** Label of the button; without `onAction` there is no button (trash). */
   actionLabel?: string;
   onAction?: () => void;
-  /** Das Icon im Knopf; Default „+", denn meist legt er etwas an. */
+  /** The icon in the button; default "+", since it usually creates something. */
   actionIcon?: LucideIcon;
   className?: string;
 }
 
 /**
- * Der Leer-Zustand eines Dashboards oder eines seiner Abschnitte, nach dem
- * Designer-Muster „1b": keine Box, eine 44er Icon-Kachel, Titel in der
- * Titelschrift (18px), ein Satz (13px), der sagt, was hierhin kommt, und ein
- * 30px-Knopf. Oben im Inhalt statt vertikal zentriert — 64px unter dem Kopf
- * zusammen mit dem `py-6` des Dashboards —, damit nichts springt, wenn der
- * erste Eintrag erscheint (zentriert ausprobiert und verworfen). Die grüne
- * Hauptaktion im Panel bleibt die eigentliche, der Knopf hier wiederholt sie
- * nur leise.
+ * The empty state of a dashboard or one of its sections, following the
+ * designer pattern "1b": no box, a 44px icon tile, title in the
+ * title font (18px), one sentence (13px) saying what goes here, and a
+ * 30px button. At the top of the content instead of vertically centred (64px below the header
+ * together with the dashboard's `py-6`) so that nothing jumps when the
+ * first entry appears (centred was tried and discarded). The green
+ * main action in the panel remains the real one, the button here only
+ * repeats it quietly.
  */
 export default function EmptyState({
   icon: Icon, title, description, actionLabel, onAction, actionIcon: ActionIcon = Plus, className,
@@ -40,9 +40,9 @@ export default function EmptyState({
       <h2 className="entry-view-title text-lg font-semibold text-stone-100">{title}</h2>
       {description && <p className="mt-1.5 max-w-sm text-[13px] text-stone-400">{description}</p>}
       {actionLabel && onAction && (
-        // Die 13px des Musters statt der 11px der Tone-Knöpfe — `!`, weil
-        // beide Schriftgrößen beliebige Werte sind und sonst die Reihenfolge
-        // im Stylesheet entschiede.
+        // The pattern's 13px instead of the tone buttons' 11px; `!` because
+        // both font sizes are arbitrary values and the order
+        // in the stylesheet would otherwise decide.
         <Button tone="neutral" onClick={onAction} className="mt-5 px-3 !text-[13px] !font-medium">
           <ActionIcon size={14} className="flex-shrink-0" />
           {actionLabel}
@@ -53,16 +53,16 @@ export default function EmptyState({
 }
 
 /**
- * Suche oder Filter haben alles weggefiltert — derselbe Aufbau wie der
- * Leer-Zustand, damit „nichts da" und „nichts gefunden" gleich aussehen. Der
- * Satz nennt den Suchbegriff; der Knopf leert Suche und Filter in einem.
+ * Search or filters have filtered everything out; the same structure as the
+ * empty state, so that "nothing there" and "nothing found" look alike. The
+ * sentence names the search term; the button clears search and filters in one go.
  */
 export function NoResults({ query, filtered = false, onReset, className }: {
-  /** Der Suchtext; leer, wenn nur Filter greifen. */
+  /** The search text; empty if only filters apply. */
   query?: string;
-  /** Ob außer der Suche noch Filter aktiv sind. */
+  /** Whether filters are active besides the search. */
   filtered?: boolean;
-  /** Ohne Handler kein Knopf. */
+  /** Without a handler there is no button. */
   onReset?: () => void;
   className?: string;
 }) {

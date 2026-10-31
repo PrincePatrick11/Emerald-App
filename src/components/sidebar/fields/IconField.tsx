@@ -2,15 +2,15 @@ import { useTranslation } from 'react-i18next';
 import Favicon from './Favicon';
 
 /**
- * Das Icon-Feld der Seite einer Sprache: die Überschrift „Icon" über
- * `Favicon`, und ein Entfernen, das auf das Standard-Icon des Moduls
- * zurückfällt statt auf nichts — eine Sprache trägt immer eines. Eigene
- * Blöcke und Vorlagen zeigen ihr Icon als `MediaPropertyRow`.
+ * The icon field of a language's page: the heading "Icon" above
+ * `Favicon`, and a Remove that falls back to the module's default icon
+ * instead of to nothing, since a language always carries one. Custom
+ * blocks and templates show their icon as `MediaPropertyRow`.
  */
 export default function IconField({ value, onChange, fallback }: {
   value: string;
   onChange: (icon: string) => void;
-  /** Das Icon, auf das „Entfernen" zurücksetzt. */
+  /** The icon that "Remove" resets to. */
   fallback: string;
 }) {
   const { t } = useTranslation();

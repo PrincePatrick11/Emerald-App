@@ -1,12 +1,12 @@
 /**
- * Store-Schicht der Modul-Registry (`lib/modules.ts`): welcher Store lädt
- * welches Modul, und wie werden Papierkorb-Einträge je Typ wiederhergestellt
- * bzw. endgültig gelöscht.
+ * Store layer of the module registry (`lib/modules.ts`): which store loads
+ * which module, and how trash entries are restored
+ * or permanently deleted per type.
  *
- * Import-Regel dieser Datei: nur Content-Stores (entry/task/altar/tag/category/
- * blockDefinition/template/lexicon) — niemals uiStore, vaultStore oder trashStore,
- * die ihrerseits hierher zeigen (dürfen). Alle Zugriffe laufen zur Laufzeit
- * über `getState()`, nicht zur Import-Zeit.
+ * Import rule of this file: content stores only (entry/task/altar/tag/category/
+ * blockDefinition/template/lexicon) — never uiStore, vaultStore or trashStore,
+ * which in turn point here (they may). All access happens at runtime
+ * via `getState()`, not at import time.
  */
 import { useEntryStore } from './entryStore';
 import { useTaskStore } from './taskStore';
@@ -19,13 +19,13 @@ import { useLexiconStore } from './lexiconStore';
 import { ENTRY_MODULE_IDS, type EntryModuleId, type TrashKind } from '../lib/modules';
 
 /**
- * Lädt den Inhalt eines Moduls neu aus der aktiven DB. Journal, Wiki und
- * Operationen teilen sich einen Store und damit dieselbe Funktion — die
- * Reload-Helfer unten rufen sie je Aufruf nur einmal.
+ * Reloads the content of a module from the active DB. Journal, wiki and
+ * operations share one store and thus the same function — the
+ * reload helpers below call it only once per invocation.
  */
 const reloadEntries = (options?: ReloadOptions) => useEntryStore.getState().fetchEntries(options);
 
-/** `keepLoaded`: schon geladene Inhalte bleiben (`fetchEntries`) — nur nach einem Import. */
+/** `keepLoaded`: already loaded contents stay (`fetchEntries`) — only after an import. */
 type ReloadOptions = { keepLoaded?: boolean };
 
 export const moduleWiring: Record<EntryModuleId, { reload: (options?: ReloadOptions) => Promise<void> }> = {
@@ -37,8 +37,8 @@ export const moduleWiring: Record<EntryModuleId, { reload: (options?: ReloadOpti
 };
 
 /**
- * Nach dem Wiederherstellen: IDs von Tags, die es nicht mehr gibt, fallen weg
- * (`dropUnknownTagIds`) — für alles, was Tags trägt.
+ * After restoring: IDs of tags that no longer exist are dropped
+ * (`dropUnknownTagIds`) — for everything that carries tags.
  */
 async function withLiveTags(type: TaggedType, id: string, restored: Promise<void>): Promise<void> {
   await restored;
@@ -89,8 +89,8 @@ export const trashWiring: Record<TrashKind, {
     restore: (id) => useAltarStore.getState().restoreAltar(id),
     permanentlyDelete: async (id) => {
       await useAltarStore.getState().permanentlyDeleteAltar(id);
-      // Die `task_links` auf den Altar sind aus der Datenbank — hier, damit
-      // `altarStore` den Aufgaben-Store nicht importieren muss.
+      // The `task_links` to the altar are gone from the database — handled here, so that
+      // `altarStore` need not import the task store.
       useTaskStore.setState((s) => ({ links: s.links.filter((link) => link.target_id !== id) }));
     },
   },
@@ -101,15 +101,15 @@ export const trashWiring: Record<TrashKind, {
 };
 
 /**
- * Die kanonische Lade-Sequenz: erst Tags, Kategorien, eigene Blöcke, Vorlagen
- * und das Lexikon, dann alle Inhalte. Genutzt von AppShell (Erstladung), vaultStore (Vault-Wechsel)
- * und dbBackup (Import) — vorher drei handgepflegte Kopien derselben Liste.
+ * The canonical load sequence: first tags, categories, custom blocks, templates
+ * and the lexicon, then all contents. Used by AppShell (initial load), vaultStore (vault switch)
+ * and dbBackup (import) — previously three hand-maintained copies of the same list.
  *
- * Warum sequenziert: keine harte Datenabhängigkeit (kein Fetcher liest einen
- * anderen Store), sondern Darstellung — stehen Tags und Kategorien vor den
- * Inhalten, rendern Listen nie einen Frame lang unaufgelöste Kategorie- oder
- * Tag-Namen. Bei lokalem SQLite kostet das Mikrosekunden; wer es flacher will,
- * darf zu einem Promise.all zusammenziehen, handelt sich aber den Flash ein.
+ * Why sequenced: not a hard data dependency (no fetcher reads another
+ * store), but presentation — with tags and categories ahead of the
+ * contents, lists never render unresolved category or tag names for even
+ * a frame. With local SQLite this costs microseconds; anyone who wants it flatter
+ * may collapse it into a Promise.all, but takes on the flash.
  */
 export async function reloadAllStores(): Promise<void> {
   await Promise.all([
@@ -123,9 +123,9 @@ export async function reloadAllStores(): Promise<void> {
 }
 
 /**
- * Gezielter Reload einzelner Module (Emerald-Import): Tags, Kategorien,
- * eigene Blöcke, Vorlagen, das Lexikon und die genannten Inhalte — die ersten
- * fünf immer, weil ein Import neue anlegen kann.
+ * Targeted reload of individual modules (Emerald import): tags, categories,
+ * custom blocks, templates, the lexicon and the named contents — the first
+ * five always, because an import can create new ones.
  */
 export async function reloadModules(ids: readonly EntryModuleId[]): Promise<void> {
   await Promise.all([
@@ -135,11 +135,11 @@ export async function reloadModules(ids: readonly EntryModuleId[]): Promise<void
     useTemplateStore.getState().fetchTemplates(),
     useLexiconStore.getState().fetchLexicon(),
   ]);
-  // Ein Import schreibt über die Stores: was an Inhalten schon geladen ist, stimmt.
+  // An import writes through the stores: whatever content is already loaded is correct.
   await reloadEach(ids, { keepLoaded: true });
 }
 
-/** Lädt die Module neu — Journal, Wiki und Operationen teilen sich dabei eine Abfrage. */
+/** Reloads the modules — journal, wiki and operations share one query. */
 function reloadEach(ids: readonly EntryModuleId[], options?: ReloadOptions): Promise<unknown> {
   const reloads = new Set(ids.map((id) => moduleWiring[id].reload));
   return Promise.all([...reloads].map((reload) => reload(options)));

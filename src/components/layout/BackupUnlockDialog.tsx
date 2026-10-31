@@ -7,9 +7,9 @@ import { KeyField, onEnter } from './vaultKeyParts';
 import { useBackupSecretStore } from '../../store/backupSecretStore';
 
 /**
- * Die Frage nach Passwort oder Wiederherstellungsschlüssel eines Backups, das
- * keiner der offenen Vaults öffnen kann — eines aus einem anderen Vault, oder
- * aus diesem, aber vor einem Passwortwechsel.
+ * The question for the password or recovery key of a backup that
+ * none of the open vaults can open — one from another vault, or
+ * from this one, but from before a password change.
  */
 export default function BackupUnlockDialog() {
   const request = useBackupSecretStore((s) => s.request);
@@ -23,7 +23,7 @@ function Body({ error, busy }: { error: string | null; busy: boolean }) {
   const cancel = useBackupSecretStore((s) => s.cancel);
   const [useRecovery, setUseRecovery] = useState(false);
   const [value, setValue] = useState('');
-  // Der Fehler gilt dem Versuch, nach dem er kam — nicht der anderen Eingabeart.
+  // The error belongs to the attempt after which it came — not to the other input type.
   const [shownError, setShownError] = useState(error);
   useEffect(() => { setShownError(error); }, [error]);
 
@@ -75,7 +75,7 @@ function Body({ error, busy }: { error: string | null; busy: boolean }) {
         )}
       </KeyField>
       <div>
-        {/* Ein Link, kein Knopf — bündig mit dem Feld, wie im Entsperr-Dialog. */}
+        {/* A link, not a button — flush with the field, as in the unlock dialog. */}
         <Button variant="ghost" className="text-xs -ml-1.5" disabled={busy} onClick={switchMode}>
           {useRecovery ? t('backupKey.usePassword') : t('backupKey.useRecovery')}
         </Button>

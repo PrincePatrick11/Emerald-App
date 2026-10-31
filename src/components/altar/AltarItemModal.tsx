@@ -17,8 +17,8 @@ import CategorySelect from '../ui/CategorySelect';
 const IMAGE_MAX_BYTES = 2 * 1024 * 1024; // 2 MB
 
 /**
- * Anlegen und Bearbeiten eines Bibliothekselements. Ein Modal für die Leiste
- * im Editor und den Bibliotheks-Teil im Dashboard.
+ * Creating and editing a library element. One modal for the strip in the
+ * editor and the library section in the dashboard.
  */
 export function AltarItemModal({
   item,
@@ -27,7 +27,7 @@ export function AltarItemModal({
   onClose,
 }: {
   item: AltarItem | null;
-  /** Die Volliste — ein Element darf in jede Kategorie, auch eine, die bisher nur das Wiki nutzt. */
+  /** The full list: an element may go into any category, even one that so far only the wiki uses. */
   categories: Category[];
   defaultCategory: string | null;
   onClose: () => void;
@@ -47,8 +47,8 @@ export function AltarItemModal({
 
   const getCategoryEmoji = (catId: string | null) => (catId ? categories.find((c) => c.id === catId)?.emoji : undefined) ?? '✨';
 
-  // Ein selbst gewähltes Emoji überlebt den Kategoriewechsel. Nur wenn das
-  // Element bisher das Standard-Emoji seiner Kategorie trug, folgt es der neuen.
+  // A self-chosen emoji survives a category change. Only if the element
+  // so far carried the default emoji of its category does it follow the new one.
   const changeCategory = (catId: string | null) => {
     if (editEmoji === getCategoryEmoji(editCategory)) setEditEmoji('');
     setEditCategory(catId);
@@ -63,9 +63,9 @@ export function AltarItemModal({
       return;
     }
     setImageError(null);
-    // Erst verkleinern, dann prüfen: ein großes Foto passt verkleinert oft unter
-    // den festen Deckel. Gemeldet wird in der eigenen Zeile — eine Meldung im
-    // Modal darüber schlösse mit Escape auch diesen Dialog.
+    // Shrink first, then check: a large photo often fits under the fixed cap
+    // once shrunk. The notice is shown in its own row; a notice in the
+    // modal above it would also close this dialog on Escape.
     readFileAsDataUrl(file).then((data) => prepareImageDataUrl(data, { capBytes: IMAGE_MAX_BYTES })).then((data) => {
       setEditImageData(data);
       if (!editName.trim()) {
@@ -98,8 +98,8 @@ export function AltarItemModal({
     onClose();
   };
 
-  // In den Papierkorb, ohne Rückfrage: von jedem Altar verschwunden, kommt es
-  // mit Rückgängig oder aus dem Papierkorb an dieselben Stellen zurück.
+  // To the trash without confirmation: gone from every altar, it comes back
+  // to the same places with Undo or from the trash.
   const doDelete = async () => {
     if (!item) return;
     await deleteItem(item.id);

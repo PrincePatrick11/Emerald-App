@@ -8,12 +8,12 @@ import { useUIStore } from '../../store/uiStore';
 import { useOutsideClick } from '../../hooks/useOutsideClick';
 
 interface TagInputProps {
-  /** Tag-IDs. Die von Tags im Papierkorb bleiben unsichtbar in der Liste stehen. */
+  /** Tag IDs. Those of tags in the trash stay invisibly in the list. */
   tags: string[];
   onChange: (tags: string[]) => void;
   readOnly?: boolean;
-  /** Nur im Lesen: `row` macht die Chips 24px hoch — für die Seitenleiste,
-   *  wo sie in einer Zeile mit den Listenzeilen darüber stehen. */
+  /** Reading only: `row` makes the chips 24px tall, for the sidebar,
+   *  where they stand in line with the list rows above them. */
   chipSize?: 'default' | 'row';
 }
 
@@ -41,12 +41,12 @@ export default function TagInput({ tags, onChange, readOnly = false, chipSize = 
   const addTag = async (name: string) => {
     const trimmed = name.trim();
     if (!trimmed) { setInput(''); return; }
-    // Ohne Anlegen-Erlaubnis nur vorhandene Tags; der Hinweis im Menü darunter
-    // sagt, wo neue entstehen.
+    // Without permission to create, only existing tags; the hint in the menu below
+    // says where new ones come from.
     if (!createInline && !getByName(trimmed)) { setOpen(true); return; }
-    // ensureTag findet „foo" auch als „Foo". Immer schreiben: holt es einen
-    // Tag aus dem Papierkorb, nimmt es ihn auch aus diesem Eintrag, und die
-    // Liste hier wäre dann veraltet.
+    // ensureTag finds "foo" also as "Foo". Always write: if it fetches a
+    // tag from the trash, it also takes it out of this entry, and the
+    // list here would then be stale.
     const { id } = await ensureTag(trimmed);
     onChange([...new Set([...tags, id])]);
     setInput('');
@@ -68,8 +68,8 @@ export default function TagInput({ tags, onChange, readOnly = false, chipSize = 
     }
   };
 
-  // Close dropdown on outside click. Escape wird nicht hier, sondern im
-  // onKeyDown des Inputs behandelt (siehe handleKeyDown).
+  // Close dropdown on outside click. Escape is not handled here but in the
+  // input's onKeyDown (see handleKeyDown).
   const wrapperRef = useRef<HTMLDivElement>(null);
   useOutsideClick(open, () => setOpen(false), { refs: [wrapperRef] });
 
@@ -123,8 +123,8 @@ export default function TagInput({ tags, onChange, readOnly = false, chipSize = 
     </div>
   );
 
-  // Bearbeitet wird nur in der Seitenleiste (`TagsField`): die Chips (24px,
-  // mit rundem „×") stehen für sich, darunter das Feld „Tag hinzufügen …".
+  // Editing happens only in the sidebar (`TagsField`): the chips (24px,
+  // with a round "×") stand on their own, with the field "Add tag …" below.
   return (
     <div ref={wrapperRef} className="relative flex flex-col gap-1">
       {shown.length > 0 && (
@@ -149,7 +149,7 @@ export default function TagInput({ tags, onChange, readOnly = false, chipSize = 
           ))}
         </div>
       )}
-      {/* Eingerückt wie die Zeilen der Seitenleiste, nicht wie ihre Überschriften. */}
+      {/* Indented like the sidebar's rows, not like its headings. */}
       <div className="sidebar-add-field ml-[9px] mr-3">
         <Tag size={14} />
         <input

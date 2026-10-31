@@ -9,10 +9,10 @@ import { SIGIL_COLORS } from './SigilDrawingCanvas';
 type Patch = (p: Partial<ElementDef>) => void;
 
 /**
- * Was ein Sigillen-Teil im Baukasten einstellen lässt: der Rechner seinen
- * Modus, die Zeichnung Farbe und Pinsel zu Beginn, die Ladung ihre Vorgabe —
- * Sperre und was sie verdeckt. `siblings` sind die sichtbaren Elemente des
- * Blocks, aus denen die Ladung ihre Ziele wählt.
+ * What a sigil part lets you set in the builder: the calculator its
+ * mode, the drawing its colour and brush at the start, the charge its default:
+ * the lock and what it conceals. `siblings` are the visible elements of the
+ * block from which the charge picks its targets.
  */
 export default function SigilPartSettings({ element, siblings, onPatch }: {
   element: ElementDef;
@@ -39,7 +39,7 @@ function CalcSettings({ element, onPatch }: { element: ElementDef; onPatch: Patc
       <Dropdown<CalcMode>
         portal
         value={element.calcMode ?? 'both'}
-        // „Beides" ist der Standard — dann kein eigener Wert.
+        // "Both" is the default; then no value of its own.
         onChange={(mode) => onPatch({ calcMode: mode === 'both' ? undefined : mode })}
         options={CALC_MODES.map((mode) => ({ value: mode, label: t(`blocks.library.calcModes.${mode}`) }))}
       />
@@ -48,9 +48,9 @@ function CalcSettings({ element, onPatch }: { element: ElementDef; onPatch: Patc
 }
 
 /**
- * Wie beim Vorbefüllen: erst angehakt gibt es Farbe und Pinsel. Angehakt
- * stehen beide ausdrücklich im Element — auch wenn sie dem Standard gleichen,
- * sonst wäre der Haken nach dem Speichern wieder weg.
+ * As with prefilling: colour and brush exist only once checked. Once checked,
+ * both are explicitly in the element, even if they equal the default,
+ * otherwise the checkmark would be gone again after saving.
  */
 function CanvasSettings({ element, onPatch }: { element: ElementDef; onPatch: Patch }) {
   const { t } = useTranslation();
@@ -113,7 +113,7 @@ function ChargeSettings({ element, siblings, onPatch }: { element: ElementDef; s
             <p className="label-xs">{t('blocks.sigil.covers')}</p>
             <BlockCheckbox
               checked={preset.targets === null}
-              // Abgehakt: gezielt die Teile dieses Blocks — zu Beginn alle.
+              // Unchecked: targeted at the parts of this block; all of them at the start.
               onChange={(all) => set({ ...preset, targets: all ? null : tools.map((e) => e.id) })}
               label={t('blocks.library.chargeCoversAll')}
             />

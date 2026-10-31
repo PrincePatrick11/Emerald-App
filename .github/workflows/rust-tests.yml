@@ -3,30 +3,31 @@ name: Rust tests
 # A file of its own rather than a line in `ci.yml`: `cargo test` covers a small,
 # changing set of things, listed in Documentation/build.md under Known gaps.
 #
-# Was die Matrix bringt, und was nicht — der Unterschied ist wichtig genug fuer
-# eigene Zeilen, weil er sonst falsch erinnert wird:
+# What the matrix brings and what it does not: the difference is important
+# enough for lines of its own, because it is otherwise remembered wrongly:
 #
-# Sie bringt: dass die Tests ueberhaupt *laufen* statt nur zu uebersetzen (die
-# Rust-Seite wird hier zum ersten Mal bei einem Push auch gelinkt), und die drei
-# Pfad-Parser und `rename`-Semantiken gegeneinander. Der Test um `..` in einem
-# gespeicherten Pfad etwa sagt auf Windows etwas anderes aus als auf Linux.
+# It brings: that the tests actually *run* rather than only compile (this is
+# the first time the Rust side is also linked on a push), and the three
+# path parsers and `rename` semantics checked against each other. The test
+# around `..` in a stored path, for instance, says something different on
+# Windows than on Linux.
 #
-# Sie bringt *nicht* den Fall, an dem die erste Fassung der Uebernahme
-# gescheitert waere. Der liegt nicht im Code, sondern in Tauris Startreihenfolge
-# — auf Linux existiert das Zielverzeichnis bereits, weil das erste Fenster es
-# als Webview-Profil anlegt — und `vault.rs` hat kein einziges
-# `cfg(target_os)`. Der Test stellt fremde Dateien im Ziel nach; dass die
-# wirklich dort landen, bevor unser Code laeuft, kann nur ein echter Start
-# zeigen. Der steht als eigener Punkt in `Documentation/build.md` unter
-# "Cutting a release" und wird von dieser Datei **nicht** abgeloest.
+# It does *not* bring the case the first version of the takeover would have
+# failed on. That lies not in the code but in Tauri's startup order
+# (on Linux the target directory already exists because the first window
+# creates it as a webview profile), and `vault.rs` has not a single
+# `cfg(target_os)`. The test simulates foreign files in the target; that
+# they really land there before our code runs can only be shown by a real
+# start. That is a separate item in `Documentation/build.md` under
+# "Cutting a release" and is **not** replaced by this file.
 
 on:
   push:
     branches: [main, 'version/**']
-    # Nur wenn die Rust-Seite sich bewegt. Der Lauf kostet dieselbe
-    # Vorbereitung wie `ci.yml` (Toolchain, Linux-Pakete, Frontend-Build, weil
-    # `tauri-build` ohne `dist/` abbricht), und den Preis lohnt es nur zu
-    # zahlen, wenn es etwas Neues zu pruefen gibt.
+    # Only when the Rust side changes. The run costs the same
+    # setup as `ci.yml` (toolchain, Linux packages, frontend build, because
+    # `tauri-build` aborts without `dist/`), and the price is only worth
+    # paying when there is something new to check.
     paths:
       - 'src-tauri/**'
       - '.github/workflows/rust-tests.yml'
@@ -47,9 +48,9 @@ jobs:
     name: cargo test (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
     strategy:
-      # Ein rotes Linux soll den macOS-Lauf nicht abwuergen; die Tests fassen
-      # Pfade und `rename` an, und die verhalten sich je Plattform anders —
-      # jedes der drei Ergebnisse ist fuer sich interessant.
+      # A red Linux run should not kill the macOS run; the tests touch
+      # paths and `rename`, which behave differently per platform, so
+      # each of the three results is interesting on its own.
       fail-fast: false
       matrix:
         os: [ubuntu-22.04, macos-15, windows-latest]
@@ -83,13 +84,13 @@ jobs:
 
       - run: npm ci
 
-      # Wie in `ci.yml`: `tauri-build` liest `frontendDist: "../dist"` und
-      # bricht ab, wenn das Verzeichnis fehlt. Auch ein Testlauf kommt daran
-      # nicht vorbei, obwohl er vom Frontend nichts anfasst.
+      # As in `ci.yml`: `tauri-build` reads `frontendDist: "../dist"` and
+      # aborts if the directory is missing. A test run cannot get around that
+      # either, although it touches nothing of the frontend.
       - name: Build frontend
         run: npm run build
 
-      # `--lib` mit Absicht: Integrationstests unter `src-tauri/tests/` und
-      # Doc-Tests gibt es nicht. Kommen welche dazu, gehoert das Flag weg.
+      # `--lib` on purpose: there are no integration tests under `src-tauri/tests/`
+      # and no doc tests. If some are added, the flag has to go.
       - name: Run tests
         run: cargo test --manifest-path src-tauri/Cargo.toml --locked --lib

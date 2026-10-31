@@ -29,7 +29,7 @@ export const useTrashStore = create<TrashState>((set, get) => ({
     set({ loading: true });
     try {
       const db = await getDb();
-      // Journal, Wiki und Operationen in einer Abfrage — die Kategorie haben nur die beiden letzten.
+      // Journal, wiki and operations in one query — only the last two have a category.
       const entries = await db.select<{ id: string; type: EntryType; title: string; deleted_at: string; category: string | null }[]>(
         `SELECT e.id, e.type, e.title, e.deleted_at, c.name as category
            FROM entries e LEFT JOIN categories c ON e.category_id = c.id
@@ -41,7 +41,7 @@ export const useTrashStore = create<TrashState>((set, get) => ({
       const categories = await db.select<{ id: string; name: string; emoji: string; deleted_at: string }[]>(
         `SELECT id, name, emoji, deleted_at FROM categories WHERE deleted_at IS NOT NULL`
       );
-      // Eine Aufgabe samt der Unteraufgaben, die mit ihr gingen, ist ein Eintrag.
+      // A task together with the subtasks that went with it counts as one entry.
       const tasks = await selectTrashedTaskRoots(db);
       const blockDefinitions = await db.select<{ id: string; name: string; icon: string; deleted_at: string }[]>(
         `SELECT id, name, icon, deleted_at FROM block_definitions WHERE deleted_at IS NOT NULL`
@@ -59,7 +59,7 @@ export const useTrashStore = create<TrashState>((set, get) => ({
         `SELECT id, name, emoji, deleted_at FROM altar_items WHERE deleted_at IS NOT NULL`
       );
       const items: TrashedItem[] = [
-        // Ohne eigenen Titel „Unbenannt…", wie überall (`displayTitle`).
+        // Without a title of its own, "Unnamed…", as everywhere (`displayTitle`).
         ...entries.map((r) => ({
           id: r.id,
           title: displayTitle(i18n.t, r.type, r.title),
@@ -109,7 +109,7 @@ export const useTrashStore = create<TrashState>((set, get) => ({
 
   permanentlyDelete: async (item) => {
     await trashWiring[item.type].permanentlyDelete(item.id);
-    // Eine Aufgabe nimmt Unteraufgaben mit, die für sich im Papierkorb lagen.
+    // A task takes along subtasks that were in the trash on their own.
     if (item.type === 'task') await get().fetchTrashed();
     else set((s) => ({ items: s.items.filter((i) => i.id !== item.id) }));
   },
@@ -117,40 +117,40 @@ export const useTrashStore = create<TrashState>((set, get) => ({
   emptyTrash: async () => {
     const db = await getDb();
     await db.execute(`DELETE FROM entries WHERE deleted_at IS NOT NULL`);
-    // Tags hängen per ID an Einträgen — erst aus jeder Liste, dann die Zeilen.
+    // Tags hang on entries by ID — first from every list, then the rows.
     await useTagStore.getState().purgeTrashedTags();
     await db.execute(`DELETE FROM task_links WHERE task_id IN (SELECT id FROM tasks WHERE deleted_at IS NOT NULL)`);
     await db.execute(`DELETE FROM tasks WHERE deleted_at IS NOT NULL`);
-    // Kopien in Einträgen kommen ohne ihre Definition aus — nichts nachzuziehen.
+    // Copies in entries manage without their definition — nothing to follow up.
     await db.execute(`DELETE FROM block_definitions WHERE deleted_at IS NOT NULL`);
-    // Ebenso Vorlagen: Einträge tragen nur ihre Herkunft.
+    // Likewise templates: entries carry only their origin.
     await db.execute(`DELETE FROM templates WHERE deleted_at IS NOT NULL`);
-    // Die Vokabeln nimmt ON DELETE CASCADE mit — sie haben kein eigenes `deleted_at`.
+    // ON DELETE CASCADE takes the vocabulary along — it has no `deleted_at` of its own.
     await db.execute(`DELETE FROM languages WHERE deleted_at IS NOT NULL`);
-    // Die Platzierungen ebenso; die Verknüpfungen auf den Altar fegt `sweepDanglingTaskLinks` unten.
+    // The placements likewise; `sweepDanglingTaskLinks` below sweeps the links to the altar.
     await db.execute(`DELETE FROM altars WHERE deleted_at IS NOT NULL`);
-    // Ebenso die eines Elements.
+    // Likewise those of an item.
     await db.execute(`DELETE FROM altar_items WHERE deleted_at IS NOT NULL`);
 
-    // Kategorien zuletzt, und erst nachdem ihre verbliebenen Inhalte umgehängt
-    // sind. Früher wurden die Zeilen einfach gelöscht und alles, was noch auf
-    // sie zeigte, behielt eine category_id ohne Gegenstueck. Seit v33 blockiert
-    // ON DELETE RESTRICT das — was den Papierkorb ohne diesen Schritt mit einer
-    // Fehlermeldung stehenlassen wuerde.
+    // Categories last, and only after their remaining contents have been
+    // reassigned. Previously the rows were simply deleted and everything that still
+    // pointed at them kept a category_id without a counterpart. Since v33,
+    // ON DELETE RESTRICT blocks that — which, without this step, would leave the trash stuck
+    // with an error message.
     const doomed = new Set(
       (await db.select<{ id: string }[]>(`SELECT id FROM categories WHERE deleted_at IS NOT NULL`))
         .map((r) => r.id)
     );
     for (const id of doomed) await purgeCategory(db, id);
 
-    // Die Umhängung auch in den In-Memory-Stores nachziehen: dort geladene
-    // Zeilen zeigen sonst weiter auf die geloeschte Kategorie, und der naechste
-    // update* wuerde sie zurueckschreiben und am Foreign Key scheitern.
+    // Carry the reassignment over to the in-memory stores too: rows loaded there
+    // would otherwise keep pointing at the deleted category, and the next
+    // update* would write it back and fail on the foreign key.
     if (doomed.size > 0) reassignCategoriesInMemory(doomed);
 
-    // Erst jetzt, wenn alle Inhalte weg sind: Verknüpfungen ins Leere räumen.
-    // Vorher lief das nur über Journal- und Wiki-IDs und ließ die Links
-    // gelöschter Operationen sowie alle task_links stehen.
+    // Only now, when all contents are gone: clear links pointing into the void.
+    // Previously this ran only over journal and wiki IDs and left the links
+    // of deleted operations as well as all task_links in place.
     await sweepDanglingTaskLinks(db);
 
     set({ items: [] });

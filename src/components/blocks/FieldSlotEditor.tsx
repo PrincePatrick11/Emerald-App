@@ -10,11 +10,11 @@ import { LinkEditor } from './BlockLink';
 import { AltarFieldEditor } from './AltarField';
 
 /**
- * Die Eingaben der Elementarten, deren Wert im Markup steht — Verknüpfung,
- * Bild, Altar. Der Wert ist der Slot-Inhalt (Link-Chip oder `<img>`);
- * `onChange(null)` leert ihn. Geteilt vom Feldblock im Bearbeitungsmodus und
- * von den Vorgaben im Baukasten der Blöcke-Ansicht — das Gegenstück zu
- * `FieldValueEditor` für die Werte im JSON.
+ * The inputs for the element kinds whose value sits in the markup: link,
+ * image, altar. The value is the slot content (link chip or `<img>`);
+ * `onChange(null)` clears it. Shared by the field block in edit mode and
+ * by the defaults in the block builder of the blocks view; the counterpart to
+ * `FieldValueEditor` for the values in the JSON.
  */
 export default function FieldSlotEditor({ element, slot, onChange }: {
   element: ElementDef;
@@ -61,9 +61,9 @@ function ImageEditor({ slot, onChange }: { slot: string | undefined; onChange: (
     <div className="block-image-field">
       {filename && <img src={imageSrc(filename)} alt="" className="block-field-image" />}
       <div className="flex items-center gap-2">
-        {/* „Ändern"/„Entfernen" wie die übrigen Bild-Picker (Favicon, MediaPropertyRow);
-            nur der leere Zustand sagt „Bild wählen" — „Titelbild hinzufügen"
-            wäre hier falsch. */}
+        {/* "Change"/"Remove" like the other image pickers (Favicon, MediaPropertyRow);
+            only the empty state says "Choose image"; "Add cover image"
+            would be wrong here. */}
         <button type="button" className="block-insert-btn" onClick={() => inputRef.current?.click()}>
           <ImagePlus size={12} />
           <span>{filename ? t('properties.change') : t('blocks.fields.chooseImage')}</span>

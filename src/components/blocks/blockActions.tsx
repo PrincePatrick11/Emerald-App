@@ -8,13 +8,13 @@ import { BLOCK_PRESETS, definitionPresetId } from '../../lib/blocks/presets';
 import BlockGlyph from './BlockGlyph';
 
 /**
- * Menüeinträge, die Stapel (Rahmen-Menü, Einfügelinie) und Block-Verwaltung
- * der Seitenleiste teilen. Jedes Menü ergänzt seine eigenen Einträge davor.
+ * Menu entries shared by the stack (frame menu, insertion line) and the sidebar's
+ * block management. Each menu adds its own entries before them.
  */
 
 /**
- * „Block hinzufügen": ein Eintrag pro Voreinstellung (Text, jede Feldart),
- * dahinter die eigenen Blöcke aus der Blöcke-Ansicht.
+ * "Add block": one entry per preset (text, each field kind),
+ * followed by the custom blocks from the blocks view.
  */
 export function addBlockActions(
   t: TFunction,
@@ -35,9 +35,9 @@ export function addBlockActions(
 }
 
 /**
- * Duplizieren und Entfernen. Ein unbekannter Block (`meta` fehlt: fremder Typ
- * oder zu neues Datenformat) lässt sich nur entfernen — eine Kopie seiner
- * Daten wäre ohne den Typ, der sie versteht, nichts wert.
+ * Duplicate and remove. An unknown block (`meta` is missing: foreign type
+ * or too new a data format) can only be removed; a copy of its
+ * data would be worthless without the type that understands it.
  */
 export function commonBlockActions(
   t: TFunction,

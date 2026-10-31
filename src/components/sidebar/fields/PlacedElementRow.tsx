@@ -179,7 +179,7 @@ export const PlacedElementInspector = memo(function PlacedElementInspector({
 
   const opacityPercent = Math.max(5, Math.min(100, Number(draft.opacity) || 100));
 
-  // Gesperrt heißt auch hier gesperrt, nicht nur auf der Fläche.
+  // Locked means locked here too, not only on the canvas.
   return (
     <fieldset
       disabled={placement.locked}

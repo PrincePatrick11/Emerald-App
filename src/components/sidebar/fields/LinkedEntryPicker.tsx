@@ -9,7 +9,7 @@ import { isImageIcon } from '../../../lib/helpers';
 import { DEFAULT_ENTRY_EMOJI } from '../../../lib/modules';
 import type { SuggestionItem } from '../../../lib/linkItems';
 
-/** Das Icon eines Link-Ziels in Chips und Trefferzeilen: Bild (Altar), Emoji oder der Standard der Art. */
+/** The icon of a link target in chips and hit rows: image (altar), emoji, or the default of its kind. */
 export function LinkItemIcon({ item }: { item: SuggestionItem }) {
   const icon = item.displayIcon || item.icon || DEFAULT_ENTRY_EMOJI[item.entryType];
   return isImageIcon(icon)
@@ -18,8 +18,8 @@ export function LinkItemIcon({ item }: { item: SuggestionItem }) {
 }
 
 interface Props<T> {
-  /** Treffer zur aktuellen Eingabe; das Filtern bleibt beim Aufrufer, der
-   *  seinen Bestand kennt. */
+  /** Hits for the current input; filtering stays with the caller, who
+   *  knows its own stock. */
   results: T[];
   resultKey: (item: T) => string;
   renderResult: (item: T) => ReactNode;
@@ -28,20 +28,20 @@ interface Props<T> {
   onQueryChange: (query: string) => void;
   placeholder: string;
   /**
-   * Das eingelassene Feld der Bearbeiten-Seitenleiste (`.sidebar-add-field`):
-   * Icon vor der Eingabe, beides in einem Rahmen. Ohne es hat die Suchzeile
-   * den Feld-Look der Panels.
+   * The inset field of the edit sidebar (`.sidebar-add-field`):
+   * icon before the input, both in one frame. Without it the search row
+   * has the field look of the panels.
    */
   fieldIcon?: ReactNode;
 }
 
-/** Höhe des Menüs (`max-h-40`) — ab hier klappt es nach oben. */
+/** Height of the menu (`max-h-40`); from here on it opens upwards. */
 const MENU_MAX_HEIGHT = 160;
 
 /**
- * Der Chip einer Verknüpfung. `onClick` macht das Label anklickbar (das
- * Verlinkungs-Feld springt damit zur Stelle im Text), `onRemove` hängt das „×"
- * an. Ohne beides ist es eine reine Anzeige.
+ * The chip of a link. `onClick` makes the label clickable (the
+ * links field jumps to the spot in the text with it), `onRemove` attaches the "×".
+ * Without either it is a pure display.
  */
 export function LinkedEntryChip({
   icon, label, labelMaxWidth = 'max-w-[110px]', onClick, onRemove, removeTitle,
@@ -85,18 +85,18 @@ export function LinkedEntryChip({
 }
 
 /**
- * Die gemeinsame Hülle der Verknüpfungs-Felder: Suchzeile und Ergebnismenü
- * (mit `fieldIcon` im eingelassenen Look der Seitenleiste, `.sidebar-add-field`). Zuvor stand dieses Gerüst dreimal fast wortgleich in
- * `LinkedEntriesField` und zwei inzwischen entfernten ID-Feldern.
+ * The shared shell of the link fields: search row and results menu
+ * (with `fieldIcon` in the sidebar's inset look, `.sidebar-add-field`). This scaffold used to appear three times, almost verbatim, in
+ * `LinkedEntriesField` and two ID fields that have since been removed.
  *
- * Das Menü hängt per Portal am `body` und liegt `fixed`, wie `Dropdown` mit
- * `portal` und `ContextMenu`: die Felder sitzen im `overflow-y-auto` der
- * rechten Seitenleiste, und ein absolut positioniertes Menü würde dort an der
- * unteren Kante abgeschnitten.
+ * The menu hangs on `body` via a portal and is `fixed`, like `Dropdown` with
+ * `portal` and `ContextMenu`: the fields sit in the `overflow-y-auto` of the
+ * right sidebar, and an absolutely positioned menu would be clipped there at the
+ * bottom edge.
  *
- * Was NICHT hierher gehört: die Chips selbst und was ein Treffer bedeutet. Die
- * drei Felder haben verschiedene Verträge — zwei bearbeiten ein ID-Array,
- * eines liest die Links aus dem Inhalt des Eintrags.
+ * What does NOT belong here: the chips themselves and what a hit means. The
+ * three fields have different contracts: two edit an ID array,
+ * one reads the links from the entry's content.
  */
 export default function LinkedEntryPicker<T>({
   results, resultKey, renderResult, onSelect,
@@ -108,7 +108,7 @@ export default function LinkedEntryPicker<T>({
   const menuRef = useRef<HTMLDivElement>(null);
   const [menuPos, setMenuPos] = useState<CSSProperties | null>(null);
 
-  // menuRef zusätzlich: im Portal ist das Menü kein Nachfahre des Wrappers.
+  // menuRef as well: in the portal the menu is not a descendant of the wrapper.
   useOutsideClick(open, () => setOpen(false), { refs: [wrapRef, menuRef], escape: true });
 
   useLayoutEffect(() => {
@@ -127,8 +127,8 @@ export default function LinkedEntryPicker<T>({
       });
     };
     place();
-    // `capture: true`, damit auch das Scrollen der rechten Seitenleiste zählt —
-    // ein fixed positioniertes Menü wandert sonst nicht mit seinem Anker mit.
+    // `capture: true` so that scrolling of the right sidebar counts too;
+    // a fixed-position menu otherwise does not move along with its anchor.
     window.addEventListener('resize', place);
     window.addEventListener('scroll', place, true);
     return () => {
@@ -137,7 +137,7 @@ export default function LinkedEntryPicker<T>({
     };
   }, [open, query, results.length]);
 
-  // Schließen UND leeren gehören zusammen — vorher tat das jedes Feld selbst.
+  // Closing AND clearing belong together; previously each field did this itself.
   const select = (item: T) => {
     onSelect(item);
     onQueryChange('');
@@ -167,9 +167,9 @@ export default function LinkedEntryPicker<T>({
             ) : results.map((item) => (
               <button
                 key={resultKey(item)}
-                // mousedown nur entschärfen (der Blur würde das Menü vor dem
-                // Klick schließen); ausgelöst wird per click, damit die Zeile
-                // auch mit der Tastatur erreichbar bleibt.
+                // Only defuse mousedown (the blur would close the menu before the
+                // click); the action fires on click so the row
+                // stays reachable by keyboard too.
                 onMouseDown={(e) => e.preventDefault()}
                 onClick={() => select(item)}
                 className="linked-entry-menu-item w-full text-left flex items-center gap-2 px-3 py-1.5 text-xs text-stone-400 hover:text-stone-200"

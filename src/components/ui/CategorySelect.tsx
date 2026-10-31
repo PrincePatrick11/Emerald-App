@@ -2,7 +2,7 @@ import { useTranslation } from 'react-i18next';
 import Dropdown from './Dropdown';
 import FieldDropdown from './FieldDropdown';
 
-/** Der „ohne Kategorie"-Eintrag. Kein gültiger Wert der Spalte, nur des Menüs. */
+/** The "no category" entry. Not a valid value of the column, only of the menu. */
 const NONE = '__none__';
 
 interface Props<C extends { id: string; emoji: string }> {
@@ -11,23 +11,23 @@ interface Props<C extends { id: string; emoji: string }> {
   onChange: (id: string | null) => void;
   /** Wiki/Ops binden categoryLabel: (c) => categoryLabel(t, 'wiki', c); Tasks: (c) => c.name */
   getLabel: (cat: C) => string;
-  /** 'field' = Feld-Look in voller Breite (AltarItemModal), 'chip' = Inline-Chip in der TaskRow. */
+  /** 'field' = full-width field look (AltarItemModal), 'chip' = inline chip in the TaskRow. */
   variant: 'field' | 'chip';
   align?: 'left' | 'right';
-  /** Tooltip des Chip-Triggers. */
+  /** Tooltip of the chip trigger. */
   title?: string;
 }
 
 /**
- * Kategorie-Zuweisung als gethemtes Menü statt nativem <select>: die
- * Design-Sprache der App sind eigene Menüs (ContextMenu, Dropdown, TaskRow),
- * und ein OS-Popup neben dem verbleibenden Prioritäts-Menü der TaskRow würde
- * brechen. Vereinheitlicht ist das Popover, der Trigger variiert pro Kontext —
- * dasselbe Muster wie beim EmojiPicker.
+ * Category assignment as a themed menu instead of a native <select>: the
+ * app's design language is custom menus (ContextMenu, Dropdown, TaskRow),
+ * and an OS popup next to the remaining priority menu of the TaskRow would
+ * clash. The popover is unified, the trigger varies per context,
+ * the same pattern as in the EmojiPicker.
  *
- * Ganz oben steht „Ohne Kategorie" — seit v39 ein echter Zustand und nicht
- * mehr bloß der Anzeigetext für eine Kategorie, die es nicht mehr gibt. Er ist
- * zugleich das, was ein neuer Eintrag mitbringt.
+ * At the very top is "No category", since v39 a real state and no longer
+ * merely the display text for a category that no longer exists. It is
+ * also what a new entry starts with.
  */
 export default function CategorySelect<C extends { id: string; emoji: string }>({
   categories, value, onChange, getLabel, variant, align, title,
@@ -38,8 +38,8 @@ export default function CategorySelect<C extends { id: string; emoji: string }>(
     { value: NONE, label: t('categories.uncategorized') },
     ...categories.map((c) => ({ value: c.id, label: getLabel(c), emoji: c.emoji })),
   ];
-  // Auch eine Kategorie im Papierkorb landet hier: ihre id löst nicht mehr auf,
-  // der Eintrag ist für den Leser so kategorielos wie einer mit `null`.
+  // A category in the trash also ends up here: its id no longer resolves,
+  // so for the reader the entry is as category-less as one with `null`.
   const triggerText = current ? `${current.emoji} ${getLabel(current)}` : t('categories.uncategorized');
   const select = (next: string) => onChange(next === NONE ? null : next);
 

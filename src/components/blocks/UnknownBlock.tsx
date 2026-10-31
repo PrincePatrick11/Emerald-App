@@ -4,14 +4,13 @@ import { openUrl } from '@tauri-apps/plugin-opener';
 import type { BlockInstance } from '../../lib/blocks/types';
 
 /**
- * Was ein Fallback darstellen darf: die Textstruktur, die auch TipTap kennt,
- * plus die Listen, die ein Block als lesbare Zusammenfassung schreibt. Kein
- * `style`, keine `class`, kein `<style>`, keine Formulare — der Inhalt kann aus
- * einem Import stammen, und bis hierher lief bisher alles durch TipTaps Schema,
- * das all das verwirft. Ohne diese Liste könnte ein importierter Block das
- * Fenster mit einer gefälschten Oberfläche überdecken (`position: fixed`, die
- * App-eigenen Tailwind-Klassen) oder ein Formular an einen fremden Server
- * schicken.
+ * What a fallback may display: the text structure that TipTap also knows,
+ * plus the lists that a block writes as a readable summary. No
+ * `style`, no `class`, no `<style>`, no forms: the content may come from
+ * an import, and until here everything has gone through TipTap's schema,
+ * which discards all of that. Without this list an imported block could cover the
+ * window with a fake interface (`position: fixed`, the
+ * app's own Tailwind classes) or send a form to a foreign server.
  */
 const FALLBACK_SANITIZE = {
   ALLOWED_TAGS: [
@@ -24,18 +23,18 @@ const FALLBACK_SANITIZE = {
 };
 
 /**
- * Ein Block, den diese App-Version nicht darstellen kann — ein Typ aus einer
- * fehlenden Erweiterung oder ein Datenformat aus einer neueren Version. Gezeigt
- * wird der lesbare Fallback, den jeder Block in seiner Section mitspeichert.
- * Bearbeiten lässt er sich nicht, nur verschieben oder entfernen; beim
- * Speichern schreibt der Stapel ihn unverändert zurück.
+ * A block that this app version cannot display: a type from a
+ * missing extension or a data format from a newer version. What is shown
+ * is the readable fallback that every block stores along in its section.
+ * It cannot be edited, only moved or removed; on
+ * saving, the stack writes it back unchanged.
  */
 export default function UnknownBlock({ block }: { block: BlockInstance }) {
   const html = useMemo(() => DOMPurify.sanitize(block.html, FALLBACK_SANITIZE), [block.html]);
 
-  // Ein Link im Fallback darf das App-Fenster nicht selbst wegnavigieren —
-  // http(s) geht in den System-Browser, wie bei externen Links im Editor,
-  // alles andere bleibt wirkungslos.
+  // A link in the fallback must not navigate the app window away itself:
+  // http(s) goes to the system browser, as with external links in the editor,
+  // everything else stays without effect.
   const handleClick = (e: MouseEvent<HTMLDivElement>) => {
     const anchor = (e.target as HTMLElement).closest('a');
     if (!anchor) return;

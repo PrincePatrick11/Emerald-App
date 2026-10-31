@@ -6,13 +6,13 @@ import { useUIStore } from '../../store/uiStore';
 import { useSettingsStore } from '../../store/settingsStore';
 import ContextMenu, { type ContextMenuAction } from './ContextMenu';
 
-/** Zeilen je Schritt, wenn die Liste ohne Limit („alle") läuft. */
+/** Rows per step when the list runs without a limit ("all"). */
 const RENDER_STEP = 100;
 
 export interface RenderRowArgs<T> {
   item: T;
-  /** Das Ergebnis von `isActive` — damit eine eigene Zeile die Auswahl
-   *  markieren kann, ohne dieselbe Bedingung ein zweites Mal zu formulieren. */
+  /** The result of `isActive`, so that a custom row can mark the selection
+   *  without stating the same condition a second time. */
   isActive: boolean;
   isRenaming: boolean;
   renameValue: string;
@@ -26,7 +26,7 @@ export interface EntryListTabProps<T> {
   items: T[];
   getId: (item: T) => string;
   getTitle: (item: T) => string;
-  /** Womit das Umbenennen beginnt — der gespeicherte Titel, ohne „Unbenannt…". Fehlt es, `getTitle`. */
+  /** What renaming starts with: the saved title, without "Untitled…". If absent, `getTitle`. */
   getEditTitle?: (item: T) => string;
   getDateStr?: (item: T) => string | null | undefined;
   getIcon?: (item: T) => ReactNode;
@@ -53,16 +53,16 @@ export default function EntryListTab<T>({
   const [ctxMenu, setCtxMenu] = useState<{ id: string; x: number; y: number } | null>(null);
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState('');
-  // Wie viele Einträge die Einstellung des Vaults zeigt; „Mehr anzeigen" legt
-  // je ein Limit nach. Ein Tab-Wechsel montiert die Liste neu und beginnt von vorn.
+  // How many entries the vault setting shows; "Show more" adds
+  // one limit each time. A tab switch remounts the list and starts over.
   const limit = useSettingsStore((s) => s.settings.leftList.limit);
   const [pages, setPages] = useState(1);
-  // Ohne Limit („alle") wird trotzdem nicht alles auf einmal gezeichnet: erst
-  // ein Stück, der Rest, sobald die Liste dorthin gescrollt wird. Tausende
-  // Zeilen kosteten sonst bei jedem Klick (neue `activeView`) und beim Start
-  // ein spürbares Neuzeichnen.
+  // Even without a limit ("all"), not everything is drawn at once: first
+  // a chunk, the rest once the list is scrolled there. Thousands of
+  // rows would otherwise cost a noticeable redraw on every click (new `activeView`) and at
+  // startup.
   const [rendered, setRendered] = useState(RENDER_STEP);
-  // Ein neues Limit oder eine neue Suche beginnt wieder bei der ersten Seite.
+  // A new limit or a new search starts at the first page again.
   useEffect(() => { setPages(1); setRendered(RENDER_STEP); }, [limit, searchQuery]);
 
   const query = searchQuery.toLowerCase();
@@ -73,9 +73,9 @@ export default function EntryListTab<T>({
 
   const navRef = useRef<HTMLElement>(null);
   const sentinelRef = useRef<HTMLDivElement>(null);
-  // Neu bei jedem Wachsen: ein frischer Observer meldet sofort, ob der Rand
-  // noch sichtbar ist — so füllt sich auch ein hoher Bildschirm, ohne dass
-  // erst gescrollt werden muss.
+  // Recreated on every growth: a fresh observer reports immediately whether the edge
+  // is still visible, so even a tall screen fills up without
+  // having to scroll first.
   useEffect(() => {
     const sentinel = sentinelRef.current;
     if (!hasUnrendered || !sentinel) return;
@@ -108,9 +108,9 @@ export default function EntryListTab<T>({
 
   return (
     <div className="flex flex-col h-full">
-      {/* 56px hoch wie die Aktionsleiste rechts (`SidebarActionBar`), ohne
-          Trennlinie: die Liste liegt direkt auf dem Rahmen. Anlegen laeuft
-          ueber die Hauptaktion im rechten Panel, nicht ueber einen Knopf hier. */}
+      {/* 56px tall like the action bar on the right (`SidebarActionBar`), without
+          a divider: the list sits directly on the frame. Creating goes
+          through the main action in the right panel, not through a button here. */}
       <div className="entry-list-search-row h-14 px-3 flex-shrink-0 flex items-center">
         <div className="entry-list-search flex-1 flex items-center gap-2 rounded-md px-2.5 h-[30px] min-w-0">
           <Search size={14} className="text-stone-500 flex-shrink-0" />
@@ -126,8 +126,8 @@ export default function EntryListTab<T>({
 
       <nav ref={navRef} className="entry-list-nav flex-1 overflow-y-auto py-2 px-2">
         {matching.length === 0 ? (
-          // Zwei Zeilen an der Stelle des ersten Eintrags, ohne Icon und Knopf —
-          // das Dashboard daneben trägt den großen Leer-Zustand.
+          // Two lines in place of the first entry, without icon and button;
+          // the dashboard next to it carries the large empty state.
           <div className="px-2 py-1.5">
             <p className="text-[13px] text-stone-400">
               {items.length > 0 ? t('sidebar.noResultsFor', { query: searchQuery.trim() }) : emptyMessage}
@@ -209,7 +209,7 @@ export default function EntryListTab<T>({
                 </button>
               );
             })}
-            {/* `limit !== null` folgt schon aus `hiddenCount > 0` — nur TypeScript weiß das nicht. */}
+            {/* `limit !== null` already follows from `hiddenCount > 0`; only TypeScript does not know that. */}
             {hiddenCount > 0 && limit !== null && (
               <button
                 type="button"

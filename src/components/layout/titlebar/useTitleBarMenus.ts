@@ -21,9 +21,9 @@ export interface TitleBarMenu {
  * The items mirror the native menu exactly, down to which items are
  * disabled — both sides read that from `computeMenuEnabledState`.
  *
- * Nur der Inhalt: wo die vier Menüs stehen, entscheidet `TitleBar` —
- * Bearbeiten und Ansicht hinter dem Knopf mit drei Strichen, Export und
- * Import als eigene Knöpfe hinter den Pfeilen.
+ * Content only: where the four menus sit is decided by `TitleBar` —
+ * Edit and View behind the three-line button, Export and
+ * Import as buttons of their own behind the arrows.
  */
 export function useTitleBarMenus() {
   const { t } = useTranslation();
@@ -83,7 +83,7 @@ export function useTitleBarMenus() {
     ],
   };
 
-  // Bearbeiten und Ansicht als Untermenüs des Knopfs mit drei Strichen.
+  // Edit and View as submenus of the three-line button.
   const appMenu: MenuNode[] = [edit, view].map((menu) => ({ kind: 'submenu', label: menu.label, children: menu.nodes }));
 
   return { appMenu, exportMenu, importMenu };

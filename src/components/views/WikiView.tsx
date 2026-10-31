@@ -48,10 +48,10 @@ export default function WikiView() {
   const pushUndo = useUndoStore((s) => s.push);
 
   const article = activeView.id ? getEntry(activeView.id, 'wiki') : null;
-  // Der Start lädt Inhalte nach den Listen: bis dieser da ist, steht der
-  // Rahmen mit Titel, der Blockstapel montiert erst mit dem echten Inhalt.
+  // Startup loads content after the lists: until it arrives, the frame with
+  // the title is shown, and the block stack only mounts with the real content.
   const contentReady = useEntryContentReady(article?.id);
-  // Eine geladene Sigille mit Sperre „ganzer Eintrag" öffnet nie im Bearbeitungsmodus.
+  // A loaded sigil with the "whole entry" lock never opens in edit mode.
   const locked = !!article && !!entryBlockSummary(article.id, article.content).sigil?.lockEntry;
   const isEditing = activeView.mode === 'edit' && !locked;
 
@@ -78,13 +78,13 @@ export default function WikiView() {
     entityId: article?.id,
     isEditing,
     ready: !!article && loadedArticleId === article.id,
-    // Kategorie, Cover und Icon gehören dem Properties-Panel (sofort
-    // gespeichert) und stehen deshalb nicht im Patch: ein Autosave direkt nach
-    // einer Panel-Änderung schriebe sonst den lokalen Stand zurück, bevor der
-    // Sync-Effekt lief.
+    // Category, cover and icon belong to the properties panel (saved
+    // immediately) and are therefore not in the patch: an autosave right after
+    // a panel change would otherwise write the local state back before the
+    // sync effect ran.
     buildPatch: (content) => ({ title, content, tags }),
-    // Cancel stellt den Artikel her, wie er beim Betreten des Bearbeitens war —
-    // auch, was die Seitenleiste inzwischen gespeichert hat.
+    // Cancel restores the article as it was on entering edit mode —
+    // including what the sidebar has saved in the meantime.
     buildRestorePatch: (content) => ({
       title, content, tags,
       category_id: article?.category_id ?? null, icon: article?.icon, cover_image: article?.cover_image,
@@ -117,8 +117,8 @@ export default function WikiView() {
     }
   }, [article?.tags, article?.cover_image]);
 
-  // Titel ebenso: ein Rename aus der Sidebar bei offenem Edit-Modus wuerde
-  // sonst vom naechsten Autosave zurueckgedreht.
+  // The title likewise: a rename from the sidebar while edit mode is open
+  // would otherwise be reverted by the next autosave.
   useEffect(() => {
     if (article) setTitle(article.title);
   }, [article?.title]);
@@ -131,17 +131,17 @@ export default function WikiView() {
   };
 
   const handleCancel = async () => {
-    // Ein nie mit „Fertig" bestätigter Artikel geht, wie jeder gelöschte, in den Papierkorb.
+    // An article never confirmed with "Done" goes to the trash, like any deleted one.
     if (activeView.isNew && article) return handleDelete();
     cancelAutoSave();
     if (article) {
-      // Nicht auf den Store-Stand zurück — nach dem ersten Debounce-Autosave
-      // IST der Store der editierte Stand. restoreOnCancel schreibt den beim
-      // Betreten des Edit-Modus gemerkten Stand des Artikels zurück; die Setter
-      // hier fangen den Fall vor dem ersten Autosave ab (Store unverändert,
-      // Sync-Effekte laufen nicht).
+      // Not back to the store state — after the first debounced autosave
+      // the store IS the edited state. restoreOnCancel writes back the state
+      // of the article remembered on entering edit mode; the setters
+      // here handle the case before the first autosave (store unchanged,
+      // sync effects do not run).
       const restored = await restoreOnCancel();
-      // Die Seite zeigt diesen Eintrag nicht mehr, das Bearbeiten ist schon beendet — nichts mehr zu tun.
+      // The page no longer shows this entry, editing has already ended — nothing left to do.
       if (restored === EDIT_ENDED) return;
       const from = restored ?? fieldsOf(article);
       setTitle(from.title);
@@ -155,7 +155,7 @@ export default function WikiView() {
 
   const handleDelete = async () => {
     if (!article) return;
-    // Erst schreiben, was noch aufgeschoben ist: im Papierkorb liegt der letzte Stand.
+    // Write what is still deferred first: the trash holds the latest state.
     await flushAutoSave().catch(console.error);
     const id = article.id;
     await deleteEntry(id);
@@ -172,8 +172,8 @@ export default function WikiView() {
     } : undefined,
   });
 
-  // Ohne Argument entsteht der Artikel ohne Kategorie; der „+"-Knopf am
-  // Kategorienkopf gibt seine Kategorie mit — wie handleCreateTask(cat.id).
+  // Without an argument the article is created without a category; the "+"
+  // button on the category header passes its category — like handleCreateTask(cat.id).
   const handleNew = async (categoryId?: string) => {
     const a = await createEntry('wiki', { categoryId });
     setActiveView({ type: 'wiki', id: a.id, mode: 'edit', isNew: true });
@@ -208,8 +208,8 @@ export default function WikiView() {
   if (!article) {
     const { view, sort, grouping } = wikiPrefs;
     const catById = Object.fromEntries(categories.map((c) => [c.id, c]));
-    // Chips und Gruppen zeigen nur, was im Wiki vorkommt (plus Sonstiges);
-    // catById bleibt die Volliste, damit fremde Kategorien auflösen.
+    // Chips and groups only show what occurs in the wiki (plus Other);
+    // catById stays the full list so foreign categories resolve.
     const usedCategories = categoriesUsedBy(categories, articles);
 
     const searchFiltered = search
@@ -223,20 +223,20 @@ export default function WikiView() {
       ? searchFiltered
       : searchFiltered.filter((a) =>
           (!!a.category_id && filterCatIds.includes(a.category_id)) ||
-          // Der „Ohne Kategorie"-Chip wählt die Waisen aus — deren category_id
-          // (gelöschte Kategorie) steht nie selbst in der Chip-Auswahl.
+          // The "No category" chip selects the orphans — their category_id
+          // (deleted category) is never itself in the chip selection.
           (filterCatIds.includes(UNCATEGORIZED_KEY) && !lookupCategory(catById, a.category_id)));
 
     const filtered = catFiltered;
 
-    // Nur die hier benutzten Kategorien — die Liste ist global, die anderen
-    // Module sollen hier keine leeren Chips hinterlassen.
-    // „Ohne Kategorie" nur, wenn es Waisen gibt — oder solange der Chip noch
-    // ausgewählt ist: verschwände er unter der aktiven Auswahl, bliebe ein
-    // Filter wirksam, den nichts mehr anzeigt.
+    // Only the categories used here — the list is global, the other
+    // modules should not leave empty chips here.
+    // "No category" only if there are orphans — or as long as the chip is
+    // still selected: if it vanished under the active selection, a filter
+    // would stay active that nothing displays anymore.
     const showUncatChip = hasUncategorized(categories, articles) || filterCatIds.includes(UNCATEGORIZED_KEY);
-    // Gezählt über die Suche, ohne den Kategorie-Filter selbst: die Zahl bleibt
-    // stehen, während man Kategorien an- und abwählt.
+    // Counted over the search, without the category filter itself: the number
+    // stays put while categories are selected and deselected.
     const catCounts = countByCategory(searchFiltered, (id) => !!lookupCategory(catById, id), (a) => a.category_id);
     const catChips = [
       ...usedCategories.map((c) => ({ value: c.id, label: categoryLabel(t, c), emoji: c.emoji, count: catCounts.get(c.id) ?? 0 })),
@@ -245,7 +245,7 @@ export default function WikiView() {
 
     const activeFilterCount = filterCatIds.length > 0 ? 1 : 0;
 
-    // Nach dem Datum, das die Zeile zeigt — „zuletzt geändert", wie auf Home und in der linken Liste.
+    // By the date the row shows — "last modified", as on Home and in the left list.
     const sortedArticles = sortItems(filtered, sort, { date: (a) => a.updated_at });
     const timelineGroups = groupByMonth(sortedArticles, (a) => a.updated_at);
 
@@ -253,8 +253,8 @@ export default function WikiView() {
       const cat = lookupCategory(catById, a.category_id);
       const icon = entryIcon('wiki', a, cat);
       const iconEl = isImageIcon(icon) ? <img src={icon} alt="" className="w-5 h-5 object-cover rounded inline" /> : icon;
-      // Ohne Fallback auf die rohe category_id: bei gelöschter Kategorie stünde
-      // hier sonst deren id als Label (wie in OperationsView entfällt es dann).
+      // No fallback to the raw category_id: for a deleted category its id
+      // would otherwise appear here as the label (as in OperationsView it is then omitted).
       const catLabel = categoryLabel(t, cat);
       const dateStr = `${catLabel}${catLabel ? ' · ' : ''}${formatEntryDate(a.updated_at)}`;
       const renaming = renamingId === a.id;
@@ -294,13 +294,13 @@ export default function WikiView() {
 
     type Article = typeof articles[number];
 
-    // Abgewählte Kategorien ganz ausblenden statt sie leer stehen zu lassen —
-    // wie visibleCategories in TasksView.
+    // Hide deselected categories entirely instead of leaving them empty —
+    // like visibleCategories in TasksView.
     const visibleCategories = filterCatIds.length > 0
       ? usedCategories.filter((c) => filterCatIds.includes(c.id))
       : usedCategories;
-    // Der Waisen-Bucket fängt Artikel auf, deren Kategorie im Papierkorb liegt —
-    // sonst verschwänden sie aus der Kategorien-Gruppierung.
+    // The orphan bucket catches articles whose category is in the trash —
+    // otherwise they would vanish from the category grouping.
     const catGroups: DashboardGroup<Article>[] = groupByCategory(
       sortedArticles, visibleCategories, (a) => a.category_id,
       (c) => categoryLabel(t, c), t('categories.uncategorized'),
@@ -335,8 +335,8 @@ export default function WikiView() {
     return (
       <Dashboard<Article>
         title={t('wiki.title')}
-        // Gewrappt, nicht durchgereicht: onClick liefert ein MouseEvent, das
-        // sonst als categoryId in handleNew landet.
+        // Wrapped, not passed through: onClick supplies a MouseEvent that
+        // would otherwise end up as categoryId in handleNew.
         primaryAction={{ label: t('wiki.newArticle'), onClick: () => handleNew() }}
         view={view}
         sort={sort}
@@ -369,9 +369,9 @@ export default function WikiView() {
           actionLabel: t('wiki.newArticle'),
           onAction: () => handleNew(),
         }}
-        // Im gruppierten Modus entscheidet Dashboard selbst: überlebt keine
-        // Gruppe, zeigt es „Keine Ergebnisse". Dieser Zweig darf ihm also
-        // nicht zuvorkommen.
+        // In grouped mode Dashboard decides itself: if no group survives,
+        // it shows "No results". This branch must therefore not
+        // pre-empt it.
         hasNoResults={filtered.length === 0 && !(grouping === 'grouped' && view !== 'timeline')}
         grouping={
           view === 'timeline'

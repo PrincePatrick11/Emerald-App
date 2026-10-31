@@ -38,10 +38,10 @@ export function AltarLibraryStrip({ editable }: { editable: boolean }) {
   const [isItemModalOpen, setIsItemModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<AltarItem | null>(null);
 
-  // Die Tabs zeigen nur, was in der Bibliothek vorkommt (plus Sonstiges) —
-  // die Volliste gilt nur beim Zuweisen im ItemModal. Memoisiert, weil zwei
-  // Effekte unten an der Referenz hängen: ein frisches Array pro Render ließe
-  // checkCatScroll endlos setState aufrufen.
+  // The tabs only show what occurs in the library (plus Other); the full
+  // list only applies when assigning in the ItemModal. Memoised because two
+  // effects below depend on the reference: a fresh array per render would make
+  // checkCatScroll call setState endlessly.
   const categories = useMemo(
     () => categoriesUsedBy(allCategories, items),
     [allCategories, items],
@@ -49,7 +49,7 @@ export function AltarLibraryStrip({ editable }: { editable: boolean }) {
 
   const hasUncategorized = items.some((i) => !allCategories.find((c) => c.id === i.category_id));
 
-  // Ein Tab, den es nicht mehr gibt (Kategorie gelöscht, Waisen weg), fällt auf „Alle" zurück.
+  // A tab that no longer exists (category deleted, orphans gone) falls back to "All".
   useEffect(() => {
     if (activeCategoryTab === 'all') return;
     const stillThere = activeCategoryTab === UNCATEGORIZED_KEY
@@ -100,10 +100,10 @@ export function AltarLibraryStrip({ editable }: { editable: boolean }) {
   }, []);
 
   const handlePanelMouseDown = (event: React.MouseEvent<HTMLDivElement>) => {
-    // Die Modale hängen im React-Baum unter dem Strip, im DOM aber unter
-    // <body>: ihr Klick käme hier oberhalb der Panel-Kante an und würde als
-    // Resize-Start mit preventDefault verschluckt — das Namensfeld bekam so
-    // keinen Fokus.
+    // The modals sit under the strip in the React tree but under <body> in
+    // the DOM: their click would arrive here above the panel edge and be
+    // swallowed as a resize start with preventDefault, so the name field
+    // never got focus.
     if (!event.currentTarget.contains(event.target as Node)) return;
     const bounds = event.currentTarget.getBoundingClientRect();
     if (event.clientY - bounds.top <= 6) startResize(event);
@@ -128,8 +128,8 @@ export function AltarLibraryStrip({ editable }: { editable: boolean }) {
 
   useEffect(() => { checkCatScroll(); }, [categories, checkCatScroll]);
 
-  // Neue Elemente landen in der gerade gewählten Kategorie — steht die Leiste
-  // auf „Alle" oder „Ohne Kategorie", bleiben sie ohne.
+  // New elements land in the currently selected category; if the strip is
+  // on "All" or "No category", they stay without one.
   const defaultCategory = activeCategoryTab !== 'all' && activeCategoryTab !== UNCATEGORIZED_KEY
     ? activeCategoryTab
     : null;
@@ -163,7 +163,7 @@ export function AltarLibraryStrip({ editable }: { editable: boolean }) {
           <div className={`altar-cat-scroll-fade pointer-events-none absolute right-0 top-0 bottom-0 w-8 z-10 bg-gradient-to-l from-stone-900 to-transparent transition-opacity duration-150 ${catScrollState.right ? 'opacity-100' : 'opacity-0'}`} />
           <div ref={catScrollRef} onScroll={checkCatScroll} className="scrollbar-none flex gap-1 overflow-x-auto">
             <button onClick={() => setActiveCategoryTab('all')} className={`px-2 py-1 rounded-md text-xs transition-colors whitespace-nowrap ${activeCategoryTab === 'all' ? 'bg-stone-700 text-stone-200' : 'text-stone-600 hover:text-stone-400'}`}>{t('altar.all')}</button>
-            {/* In der Reihenfolge der Kategorien-Seite — geordnet wird nur dort, für alle Module. */}
+            {/* In the order of the categories page; ordering happens only there, for all modules. */}
             {categories.map((cat) => (
               <button
                 key={cat.id}

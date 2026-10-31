@@ -2,34 +2,34 @@ import type Database from './sqlite';
 import { jsonArray } from './row';
 
 /**
- * Tags hängen seit v53 per **ID** an Einträgen und Vorlagen — `entries.tags`
- * und `templates.tags` sind JSON-Arrays von `tags.id`. Umbenennen ändert nur
- * die Tag-Zeile; ein Tag im Papierkorb bleibt als ID in seinen Einträgen
- * stehen und ist bloß unsichtbar, bis er zurückkommt. Nur wenn ein Tag ganz
- * verschwindet (endgültig gelöscht, Frist abgelaufen) oder in einem anderen
- * aufgeht, werden die Listen umgeschrieben (`rewriteTagRefs`).
+ * Since v53 tags are attached to entries and templates by **ID** — `entries.tags`
+ * and `templates.tags` are JSON arrays of `tags.id`. Renaming only changes
+ * the tag row; a tag in the trash stays in its entries as an ID
+ * and is merely invisible until it comes back. Only when a tag disappears
+ * entirely (permanently deleted, grace period expired) or merges into another
+ * are the lists rewritten (`rewriteTagRefs`).
  *
- * DOM-frei und ohne Stores — es läuft auch in node (`scripts/schema-check.mjs`).
+ * DOM-free and without stores — it also runs in node (`scripts/schema-check.mjs`).
  */
 
-/** Die Tabellen, deren Zeilen Tags tragen — auch die im Papierkorb. */
+/** The tables whose rows carry tags — including those in the trash. */
 export const TAGGED_TABLES = ['entries', 'templates'] as const;
 
-/** Eine Tag-ID aus fremder Quelle (Sicherung): nur harmlose Zeichen, wie `isDefinitionId`. */
+/** A tag ID from a foreign source (backup): only harmless characters, like `isDefinitionId`. */
 export function isTagId(id: unknown): id is string {
   return typeof id === 'string' && /^[\w-]{1,100}$/.test(id);
 }
 
-/** Die Tag-IDs einer Zeile — doppelte einmal, Fremdes fällt weg. */
+/** The tag IDs of a row — duplicates once, foreign values dropped. */
 export function tagIdList(raw: unknown): string[] {
   return [...new Set(jsonArray<unknown>(raw).filter(isTagId))];
 }
 
 /**
- * Schreibt die Tag-Liste jeder Zeile in `TAGGED_TABLES` um, deren Liste `fn`
- * ändert — samt Papierkorb, ohne `updated_at`: eine Folge, keine Änderung am
- * Eintrag. Liefert die neuen Listen nach Zeilen-ID, damit die Stores im
- * Speicher nachziehen können.
+ * Rewrites the tag list of every row in `TAGGED_TABLES` whose list `fn`
+ * changes — trash included, without `updated_at`: a consequence, not a change to the
+ * entry. Returns the new lists by row ID so that the stores can catch up
+ * in memory.
  */
 export async function rewriteTagRefs(db: Database, fn: (ids: string[]) => string[]): Promise<Map<string, string[]>> {
   const changed = new Map<string, string[]>();
@@ -43,57 +43,57 @@ export async function rewriteTagRefs(db: Database, fn: (ids: string[]) => string
       updates.push([`UPDATE ${table} SET tags=$1 WHERE id=$2`, [JSON.stringify(after), row.id]]);
       changed.set(row.id, after);
     }
-    // Eine Transaktion je Tabelle: ein Tag auf hunderten Einträgen wären sonst
-    // hunderte Commits.
+    // One transaction per table: a tag on hundreds of entries would otherwise be
+    // hundreds of commits.
     await db.batch(updates);
   }
   return changed;
 }
 
-/** Nimmt die IDs aus jeder Liste — für Tags, die es gleich nicht mehr gibt. */
+/** Removes the IDs from every list — for tags that are about to no longer exist. */
 export function stripTagIds(db: Database, ids: Iterable<string>): Promise<Map<string, string[]>> {
   const gone = new Set(ids);
   if (!gone.size) return Promise.resolve(new Map());
   return rewriteTagRefs(db, (list) => list.filter((id) => !gone.has(id)));
 }
 
-/** Ersetzt `from` durch `to` in jeder Liste — ein Tag geht in einem anderen auf. */
+/** Replaces `from` with `to` in every list — one tag merges into another. */
 export function replaceTagId(db: Database, from: string, to: string): Promise<Map<string, string[]>> {
   return rewriteTagRefs(db, (list) => list.map((id) => (id === from ? to : id)));
 }
 
-/** Gilt ein Name als derselbe Tag? Ohne Rücksicht auf Groß-/Kleinschreibung und Leerraum am Rand. */
+/** Does a name count as the same tag? Regardless of case and whitespace at the edges. */
 export function tagNameKey(name: string): string {
   return name.trim().toLowerCase();
 }
 
-/** Eine Zeile aus `tags`, wie die Datenbank bis v52 und Sicherungen bis Format 11 sie kennen. */
+/** A row from `tags`, as the database up to v52 and backups up to format 11 know it. */
 export interface LegacyTagRow {
   id: string;
   name: string;
   color?: string;
   deleted_at?: string | null;
-  /** JSON: `{ id, type }` je Eintrag, dem der Tag beim Löschen genommen wurde. */
+  /** JSON: `{ id, type }` per entry from which the tag was taken on deletion. */
   affected_ids?: unknown;
 }
 
 /**
- * Macht aus den Tag-*Namen* einer Zeile (Stand bis v52) Tag-IDs — dieselbe
- * Regel für Migration v53 und für Sicherungen bis Format 11:
- * - Ohne Rücksicht auf Groß-/Kleinschreibung, ein lebender Tag vor einem im
- *   Papierkorb (dessen Namen trugen bis dahin nur Einträge im Papierkorb).
- * - Ein Name ohne Tag (nach einem Merge-Import oder einer Sicherung ohne Tags)
- *   bekommt einen neuen — `created`, damit nichts verloren geht.
- * - Ein Wert, der schon eine bekannte ID ist, bleibt: ein zweiter Lauf ändert
- *   nichts.
- * - `withAffected`: der Tag im Papierkorb kommt zurück in jede Zeile, der ihn
- *   das Löschen nahm (`affected_ids`) — im neuen Modell behält sie ihn, bis er
- *   wiederhergestellt ist. Außer sie trägt inzwischen einen gleichnamigen.
+ * Turns the tag *names* of a row (state up to v52) into tag IDs — the same
+ * rule for migration v53 and for backups up to format 11:
+ * - Regardless of case, a live tag before one in the trash (whose names
+ *   until then were carried only by entries in the trash).
+ * - A name without a tag (after a merge import or a backup without tags)
+ *   gets a new one — `created`, so that nothing is lost.
+ * - A value that is already a known ID stays: a second run changes
+ *   nothing.
+ * - `withAffected`: the tag in the trash returns to every row from which
+ *   deletion took it (`affected_ids`) — in the new model the row keeps it until it is
+ *   restored. Unless it now carries one of the same name.
  */
 export function tagNameResolver(tags: readonly LegacyTagRow[], makeId: () => string) {
   const byId = new Map<string, LegacyTagRow>(tags.map((t) => [t.id, t]));
   const byName = new Map<string, LegacyTagRow>();
-  // Lebende zuerst, damit sie bei gleichem Namen gewinnen.
+  // Live ones first, so that they win on an equal name.
   for (const tag of [...tags].sort((a, b) => Number(!!a.deleted_at) - Number(!!b.deleted_at))) {
     const key = tagNameKey(tag.name);
     if (!byName.has(key)) byName.set(key, tag);

@@ -33,7 +33,7 @@ function InternalLinkNodeView({ node, editor, extension }: NodeViewRendererProps
     // Use editor.isEditable directly (live value) rather than the isEditable React state,
     // which may lag behind if the transaction event hasn't fired yet.
     if (!editor.isEditable) {
-      // Navigation via CustomEvent — kein direkter Store-Zugriff aus NodeView möglich
+      // Navigation via CustomEvent; no direct store access possible from a NodeView
       document.dispatchEvent(new CustomEvent('internal-link-navigate', {
         detail: { id, entryType },
         bubbles: true,

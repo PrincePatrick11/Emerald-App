@@ -9,12 +9,12 @@ import { sigilBlockSet } from './blocks/sigil';
 import { SIGIL_TEMPLATE_ID, templateToRow, type Template } from './blocks/templates';
 
 /**
- * Die Zugriffe auf `templates`, die Store, Migration, frische Vaults und
- * Importe teilen. Hier statt im Store, weil Migrationen und `lib/`-Module
- * keinen Store importieren dürfen — dasselbe Muster wie `blockDefinitionRows`.
+ * The accesses to `templates` that store, migration, fresh vaults and
+ * imports share. Here instead of in the store, because migrations and `lib/` modules
+ * may not import a store — the same pattern as `blockDefinitionRows`.
  */
 
-/** Der nächste freie Platz am Ende der Liste — auch hinter Vorlagen im Papierkorb. */
+/** The next free position at the end of the list — also behind templates in the trash. */
 export async function nextTemplateSortOrder(db: Database): Promise<number> {
   const rows = await db.select<{ n: number }[]>('SELECT COALESCE(MAX(sort_order), -1) + 1 AS n FROM templates');
   return rows[0]?.n ?? 0;
@@ -33,16 +33,16 @@ export async function insertTemplateRow(db: Database, template: Template): Promi
   );
 }
 
-/** Eine Vorlage nach ID — auch aus dem Papierkorb, anders als der Store, der nur die aktiven hält. */
+/** A template by ID — also from the trash, unlike the store, which holds only the active ones. */
 export async function templateById(db: Database, id: string): Promise<Template | undefined> {
   const [row] = await db.select<DbRow[]>('SELECT * FROM templates WHERE id=$1', [id]);
   return row ? fromRow.template(row) : undefined;
 }
 
 /**
- * Die eingebaute Vorlage „Sigille": Rechner, Zeichnung und Ladung, Standard
- * für Operationen der Kategorie „Sigillen" — was bis v42 fest verdrahtet war.
- * Der Name landet fest in der Zeile; ist i18n noch nicht bereit, Englisch.
+ * The built-in "Sigil" template: calculator, drawing and charge, default
+ * for operations of the "Sigils" category — what was hard-wired up to v42.
+ * The name ends up permanently in the row; if i18n is not ready yet, English.
  */
 function sigilTemplate(t: TFunction, now: string, sortOrder: number): Omit<Template, 'assignments'> {
   return {
@@ -60,9 +60,9 @@ function sigilTemplate(t: TFunction, now: string, sortOrder: number): Omit<Templ
 }
 
 /**
- * Legt die Sigillen-Vorlage an, falls es sie (auch im Papierkorb) noch nicht
- * gibt — für frische Vaults und Migration v43. Ohne die Kategorie „Sigillen"
- * (nur eine präparierte Datenbank) bleibt sie ohne Zuweisung.
+ * Creates the sigil template if it does not yet exist (including in the trash)
+ * — for fresh vaults and migration v43. Without the "Sigils" category
+ * (only a doctored database) it stays without an assignment.
  */
 export async function seedSigilTemplate(db: Database, t: TFunction): Promise<void> {
   if (await templateById(db, SIGIL_TEMPLATE_ID)) return;

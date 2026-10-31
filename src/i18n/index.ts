@@ -3,9 +3,9 @@ import { initReactI18next } from 'react-i18next';
 import en from './locales/en.json';
 import { preloadDateLocale, setDateLocale } from '../lib/formatDate';
 
-// Nur Englisch — Start- und Fallback-Sprache — liegt im Start-Bundle. Die
-// anderen drei Locales laden als eigene Chunks erst beim Umschalten nach,
-// nach demselben Muster wie die Emoji-Daten in `EmojiPicker`.
+// Only English — the start and fallback language — is in the start bundle. The
+// other three locales load as their own chunks only when switching,
+// following the same pattern as the emoji data in `EmojiPicker`.
 const loaders: Record<string, () => Promise<{ default: typeof en }>> = {
   de: () => import('./locales/de.json'),
   es: () => import('./locales/es.json'),
@@ -13,10 +13,10 @@ const loaders: Record<string, () => Promise<{ default: typeof en }>> = {
 };
 
 /**
- * Die eine Quelle fuer "welche Sprachen gibt es": Settings rendert seine
- * Buttons daraus, savedAppLanguage validiert dagegen, changeAppLanguage
- * lehnt Unbekanntes ab. Eine neue Sprache heisst: Eintrag hier, Loader oben,
- * Locale-Datei — sonst nichts.
+ * The single source for "which languages exist": Settings renders its
+ * buttons from it, savedAppLanguage validates against it, changeAppLanguage
+ * rejects anything unknown. A new language means: entry here, loader above,
+ * locale file — nothing else.
  */
 export const LANGUAGE_OPTIONS = [
   { code: 'en', label: 'English' },
@@ -29,12 +29,12 @@ export type AppLanguage = (typeof LANGUAGE_OPTIONS)[number]['code'];
 
 const SUPPORTED = new Set<string>(LANGUAGE_OPTIONS.map((o) => o.code));
 
-// Die Sprache gehoert zu den Einstellungen des Vaults (settingsStore). Unter
-// diesem Schluessel liegt nur ihr Spiegel — die Sprache des zuletzt geoeffneten
-// Vaults, mit der `main.tsx` startet, bevor ein Vault geladen ist.
+// The language belongs to the vault's settings (settingsStore). Under this
+// key sits only its mirror — the language of the last opened vault, which
+// `main.tsx` starts with before a vault is loaded.
 export const LANGUAGE_STORAGE_KEY = 'app-language';
 
-/** Die Sprache des zuletzt geoeffneten Vaults, gegen LANGUAGE_OPTIONS validiert. */
+/** The language of the last opened vault, validated against LANGUAGE_OPTIONS. */
 export function savedAppLanguage(): string {
   const stored = localStorage.getItem(LANGUAGE_STORAGE_KEY);
   return stored && SUPPORTED.has(stored) ? stored : 'en';
@@ -53,19 +53,20 @@ i18n
     },
   });
 
-// `{{label, lowercase}}`: ein Substantiv mitten im Satz („Group by
-// category"). Deutsch schreibt es groß und lässt den Formatierer weg.
+// `{{label, lowercase}}`: a noun in the middle of a sentence ("Group by
+// category"). German capitalises it and omits the formatter.
 i18n.services.formatter?.add('lowercase', (value, lng) =>
   typeof value === 'string' ? value.toLocaleLowerCase(lng) : value);
 
 /**
- * Wechselt die App-Sprache und laedt das Locale-Bundle vorher nach, falls es
- * noch fehlt. Immer diese Funktion statt `i18n.changeLanguage` direkt
- * verwenden — sonst schaltet die UI auf den englischen Fallback um.
+ * Switches the app language and loads the locale bundle beforehand if it is
+ * still missing. Always use this function instead of calling
+ * `i18n.changeLanguage` directly — otherwise the UI switches to the English
+ * fallback.
  *
- * Der Sequenzzaehler laesst bei schnellen Doppel-Klicks den ZULETZT gewaehlten
- * Wunsch gewinnen: ohne ihn koennte ein langsamer erster Download nach dem
- * schnelleren zweiten fertig werden und die Sprache zurueckdrehen.
+ * With quick double clicks, the sequence counter lets the LAST chosen request
+ * win: without it, a slow first download could finish after the faster
+ * second one and flip the language back.
  */
 let switchSeq = 0;
 
@@ -79,19 +80,19 @@ export async function changeAppLanguage(lng: string): Promise<void> {
       i18n.addResourceBundle(lng, 'translation', bundle, true, true);
     }
   }
-  // Die date-fns-Locale zieht im selben Zug nach — vor changeLanguage, damit
-  // der dadurch ausgelöste Re-Render schon mit der richtigen Locale formatiert.
+  // The date-fns locale follows in the same step — before changeLanguage, so
+  // the re-render it triggers already formats with the right locale.
   const dateLocale = await preloadDateLocale(lng);
   if (seq !== switchSeq) return;
   setDateLocale(dateLocale);
   await i18n.changeLanguage(lng);
-  // Zweite Prüfung: hat ein späterer Wechsel überholt, während changeLanguage
-  // lief, dürfen localStorage und <html lang> nicht mehr für den Verlierer schreiben.
-  // Den Spiegel der Sprache schreibt nur diese Stelle (die übrigen setzt
-  // `applyAppearance` im settingsStore) — erst, wenn das Bundle wirklich gilt.
+  // Second check: if a later switch overtook this one while changeLanguage
+  // was running, localStorage and <html lang> must not be written for the loser.
+  // Only this spot writes the language mirror (the others are set by
+  // `applyAppearance` in the settingsStore) — only once the bundle really applies.
   if (seq !== switchSeq) return;
   localStorage.setItem(LANGUAGE_STORAGE_KEY, lng);
-  // Fuer Rechtschreibpruefung und Screenreader — index.html startet mit "en".
+  // For spell checking and screen readers — index.html starts with "en".
   document.documentElement.lang = lng;
 }
 

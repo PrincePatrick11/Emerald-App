@@ -57,7 +57,7 @@ html[data-theme='emerald-noctis'] {
   --danger-hover-text: #fca5a5;
   --danger-hover-bg: rgba(239, 68, 68, 0.14);
   --danger-hover-border: rgba(239, 68, 68, 0.32);
-  /* Rote Primäraktion (.btn-primary-danger) — gebaut wie .btn-primary. */
+  /* Red primary action (.btn-primary-danger) — built like .btn-primary. */
   --danger-solid-bg: rgba(185, 28, 28, 0.3);
   --danger-solid-border: rgba(248, 113, 113, 0.44);
   --danger-solid-text: #ffe4e4;
@@ -66,14 +66,14 @@ html[data-theme='emerald-noctis'] {
   --select-option-text: #e7e5e4;
   --select-option-active-bg: rgba(0, 122, 77, 0.2);
   --select-option-active-text: #b8ffe2;
-  /* Knopf des Ein/Aus-Schalters (.switch-thumb): aus hell, an mintgruen auf
-     der gedaempften Jade-Schiene. */
+  /* Knob of the on/off switch (.switch-thumb): light when off, mint green
+     on the muted jade track when on. */
   --switch-thumb: #f5f5f4;
   --switch-thumb-on: #9dffd5;
-  /* Bedienelemente der Bearbeiten-Seitenleiste (design.md, Edit Sidebar):
-     Wert-Knöpfe und Eingaben (`--field-*`), die eingelassenen Suchfelder
-     (`--field-inset-bg`) und die Primäraktion „Fertig" (`--primary-solid-*`,
-     gebaut wie `--danger-solid-*`). */
+  /* Controls of the edit sidebar (design.md, Edit Sidebar):
+     value buttons and inputs (`--field-*`), the inset search fields
+     (`--field-inset-bg`) and the primary action "Done" (`--primary-solid-*`,
+     built like `--danger-solid-*`). */
   --field-bg: #1f1915;
   --field-bg-hover: #261f1a;
   --field-border: rgba(95, 81, 68, 0.55);
@@ -85,20 +85,20 @@ html[data-theme='emerald-noctis'] {
   --primary-solid-hover-bg: rgba(0, 138, 87, 0.42);
   --danger-soft-text: #f4a7ad;
   --danger-soft-border: rgba(232, 100, 110, 0.5);
-  /* Rahmen + Blatt (design.md, Shell Layout): Titelleiste, Rail und linke
-     Seitenleiste sind der Rahmen, Inhalt und rechte Seitenleiste das Blatt darauf. */
+  /* Frame + sheet (design.md, Shell Layout): title bar, rail and left
+     sidebar are the frame, content and right sidebar the sheet on top of it. */
   --shell-bg: #100d0a;
   --sheet-bg: #1c1712;
   --sheet-border: rgba(87, 83, 78, 0.35);
-  /* Bewusst 10px statt rounded-xl (12): das Blatt ist Fensterflaeche, kein
-     Panel darauf — eine Stufe weicher wuerde die Ecken am Rahmen aufblaehen. */
+  /* Deliberately 10px instead of rounded-xl (12): the sheet is window surface,
+     not a panel on it — one step softer would puff up the corners at the frame. */
   --sheet-radius: 10px;
   --sheet-inset: 6px;
   --panel-bg: rgba(38, 32, 27, 0.78);
   --panel-border: rgba(95, 81, 68, 0.5);
   --panel-hover-bg: rgba(45, 37, 32, 0.9);
   --panel-hover-border: rgba(119, 101, 85, 0.58);
-  /* Tabs sind Pills auf der Titelleiste: inaktiv ohne Flaeche, aktiv eine leichte. */
+  /* Tabs are pills on the title bar: inactive without a fill, active with a light one. */
   --tab-pill-h: 30px;
   --tab-pill-active: rgba(245, 245, 244, 0.08);
   --tab-pill-hover: rgba(245, 245, 244, 0.04);
@@ -106,9 +106,9 @@ html[data-theme='emerald-noctis'] {
   --search-bg: rgba(34, 28, 24, 0.9);
   --search-border: rgba(109, 91, 75, 0.5);
   --search-inset: inset 0 1px 0 rgba(255, 241, 223, 0.06);
-  /* Die Suche der Eintragsliste: randlos auf dem Rahmen. */
+  /* The entry list search: borderless on the frame. */
   --list-search-bg: rgba(245, 245, 244, 0.05);
-  /* Hoehen (design.md, Heights and Spacing). */
+  /* Heights (design.md, Heights and Spacing). */
   --content-bar-h: 56px;
   --control-h: 30px;
   --control-h-sm: 24px;

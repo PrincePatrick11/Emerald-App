@@ -1,31 +1,31 @@
 /**
- * Migration v49 — `journal_entries`, `wiki_articles` und `operations` werden
- * eine Tabelle `entries` mit einer Spalte `type`.
+ * Migration v49 — `journal_entries`, `wiki_articles` and `operations` become
+ * one table `entries` with a column `type`.
  *
- * Seit Status, Sigillen, Paradigma und Verlinkungen Blöcke im Inhalt sind,
- * hatten die drei Tabellen denselben Kern; der Rest waren Spalten, die niemand
- * mehr las (siehe `schemaV48.ts`). Sie fallen hier weg, ebenso `slug` (nie
- * gelesen) und `moon_phase` (folgt aus `created_at`, `entryMoonPhase`).
+ * Since status, sigils, paradigm and links are blocks in the content,
+ * the three tables had the same core; the rest were columns nobody
+ * read any more (see `schemaV48.ts`). They are dropped here, as are `slug` (never
+ * read) and `moon_phase` (follows from `created_at`, `entryMoonPhase`).
  *
- * Wie die anderen Umbauten ohne Transaktion (warum, steht im Kopf von
- * `normalizeSchema.ts`), aber ohne Umbenennen und ohne Marke: jede alte
- * Tabelle wird für sich kopiert und erst gelöscht, wenn jede ihrer Zeilen in
- * `entries` steht. Ein abgebrochener Lauf setzt deshalb einfach wieder an —
- * die Kopie überspringt, was schon drüben ist, und eine Tabelle, die schon weg
- * ist, ist fertig. Keine andere Tabelle hat einen Fremdschlüssel auf die drei
- * (`task_links` ist polymorph), das Löschen reißt also nichts mit.
+ * Like the other rebuilds without a transaction (why is explained at the top of
+ * `normalizeSchema.ts`), but without renaming and without a marker: each old
+ * table is copied on its own and only dropped once every one of its rows is in
+ * `entries`. An aborted run therefore simply resumes —
+ * the copy skips what is already over there, and a table that is already gone
+ * is done. No other table has a foreign key to the three
+ * (`task_links` is polymorphic), so dropping takes nothing else with it.
  *
- * Vorher holt es die Sigillen nach, deren Zeichnung v42 nicht als Datei
- * speichern konnte (bis v48 versuchte `getDb` das bei jedem Öffnen): danach
- * gäbe es die Spalte nicht mehr, in der sie wartet. Gelingt es wieder nicht,
- * bricht v49 ab und versucht es beim nächsten Öffnen erneut — lieber ein
- * Vault, der sich erst später öffnet, als eine verlorene Zeichnung.
+ * Beforehand it catches up on the sigils whose drawing v42 could not save
+ * as a file (until v48 `getDb` tried that on every open): afterwards
+ * the column in which they wait would no longer exist. If it fails again,
+ * v49 aborts and tries again on the next open — better a
+ * vault that opens only later than a lost drawing.
  *
- * Eine ID, die in zwei der alten Tabellen stand — ein Typwechsel, der früher
- * mittendrin abbrach (`entryTypeChange` verschob Zeilen zwischen Tabellen) —,
- * kommt nur einmal an: in der Reihenfolge unten gewinnt die erste. Die andere
- * Zeile war eine Kopie desselben Eintrags; sie bleibt in der Sicherung
- * `.pre-v49.bak` und wird im Log genannt.
+ * An ID that stood in two of the old tables — a type change that earlier
+ * aborted midway (`entryTypeChange` moved rows between tables) —
+ * arrives only once: in the order below, the first one wins. The other
+ * row was a copy of the same entry; it stays in the backup
+ * `.pre-v49.bak` and is named in the log.
  */
 import type Database from './sqlite';
 import { ENTRIES_INDEX_DDL_V49, TABLE_DDL, ddlIfNotExists } from './schema';
@@ -33,7 +33,7 @@ import { assertForeignKeysIntact, backupDatabaseFile, createIndexesIfMissing, ta
 import { convertLegacySigils } from './migrateLegacySigils';
 import type { EntryType } from '../types';
 
-/** Die alten Tabellen und ihre Spalten in `entries`. Literal, weil in SQL interpoliert. */
+/** The old tables and their columns in `entries`. A literal, because it is interpolated into SQL. */
 const SOURCES: readonly { table: string; type: EntryType; categorized: boolean }[] = [
   { table: 'journal_entries', type: 'journal', categorized: false },
   { table: 'wiki_articles', type: 'wiki', categorized: true },
@@ -41,7 +41,7 @@ const SOURCES: readonly { table: string; type: EntryType; categorized: boolean }
 ];
 
 async function copyInto(db: Database, { table, type, categorized }: (typeof SOURCES)[number]): Promise<void> {
-  // Das Journal hatte weder Kategorie noch Icon oder Titelbild.
+  // The journal had neither a category nor an icon or cover image.
   const extra = categorized ? 'o.category_id, o.icon, o.cover_image' : 'NULL, NULL, NULL';
   await db.execute(
     `INSERT INTO entries (id, type, title, content, category_id, icon, cover_image,
@@ -52,7 +52,7 @@ async function copyInto(db: Database, { table, type, categorized }: (typeof SOUR
       WHERE o.id NOT IN (SELECT id FROM entries)`
   );
 
-  // Was jetzt noch fehlt, stand schon unter einem anderen Typ in `entries`.
+  // What is still missing now was already in `entries` under a different type.
   const skipped = await db.select<{ id: string }[]>(
     `SELECT o.id FROM ${table} o JOIN entries e ON e.id = o.id WHERE e.type != '${type}'`
   );
@@ -84,7 +84,7 @@ export async function unifyEntries(db: Database): Promise<void> {
     await db.execute(ddlIfNotExists(TABLE_DDL.entries));
     for (const source of remaining) {
       await copyInto(db, source);
-      // Die Indizes der alten Tabelle gehen mit.
+      // The old table's indexes go with it.
       await db.execute(`DROP TABLE ${source.table}`);
     }
   }

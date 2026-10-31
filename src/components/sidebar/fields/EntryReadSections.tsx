@@ -8,10 +8,10 @@ import { LinkedEntriesSection } from './LinkedEntriesField';
 import { TagsSection } from './TagsField';
 
 /**
- * Die Leseansicht eines Eintrags in der rechten Seitenleiste — Journal, Wiki
- * und Operationen gleich: Eigenschaften, Verlinkungen, Tags. Ein Fragment,
- * damit die Blöcke darunter (`BlockSidebarArea`) im selben Abstand folgen.
- * Ohne `properties` entfällt der Eigenschaften-Abschnitt.
+ * The read view of an entry in the right sidebar, the same for journal, wiki
+ * and operations: properties, links, tags. A fragment, so that
+ * the blocks below (`BlockSidebarArea`) follow at the same spacing.
+ * Without `properties` the properties section is omitted.
  */
 export default function EntryReadSections({ properties, content, tags }: {
   properties?: ReactNode;
@@ -27,13 +27,13 @@ export default function EntryReadSections({ properties, content, tags }: {
   );
 }
 
-/** Der Abschnitt „Eigenschaften" — auch vom Altar benutzt, der sonst andere Abschnitte hat. */
+/** The "Properties" section, also used by the altar, which otherwise has different sections. */
 export function PropertiesSection({ children }: { children: ReactNode }) {
   const { t } = useTranslation();
   return <SidebarSection storageKey="entry-sidebar-properties-open" label={t('properties.title')}>{children}</SidebarSection>;
 }
 
-/** Die Kategorie als Eigenschaft — eine gelöschte zeigt „Keine" statt der rohen id. */
+/** The category as a property; a deleted one shows "None" instead of the raw id. */
 export function CategoryPropertyRow({ categoryId }: { categoryId?: string | null }) {
   const { t } = useTranslation();
   const category = useCategoryStore((s) => s.categories.find((c) => c.id === categoryId));

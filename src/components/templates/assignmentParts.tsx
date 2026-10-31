@@ -7,19 +7,19 @@ import { MODULES, viewTypeForEntryType } from '../../lib/modules';
 import { ALL_CATEGORIES, TEMPLATE_ENTRY_TYPES, type AssignmentState, type TemplateEntryType } from '../../lib/blocks/templates';
 
 /**
- * Was der Zuweisungs-Dialog einer Vorlage und die Standardvorlagen-Übersicht
- * im Dashboard gemeinsam haben: die drei Stufen, ihre Icons und Namen. Die
- * Tabelle (`AssignmentTable`) gehört nur dem Dialog — die Übersicht hat
- * denselben Aufbau, baut ihn aber als eigene Panel-Tabelle ohne Schalter.
+ * What a template's assignment dialog and the default-templates overview
+ * in the dashboard have in common: the three levels, their icons and names. The
+ * table (`AssignmentTable`) belongs only to the dialog; the overview has
+ * the same structure but builds it as its own panel table without switches.
  */
 
-/** Die Eintragsarten mit Kategorien — die Spalten der Tabelle. */
+/** The entry types with categories: the columns of the table. */
 export const CATEGORY_TYPES = TEMPLATE_ENTRY_TYPES.filter((type) => type !== 'journal');
 
 export const ASSIGNMENT_STATES: AssignmentState[] = ['off', 'assigned', 'default'];
 export const ASSIGNMENT_STATE_ICONS: Record<AssignmentState, LucideIcon> = { off: Minus, assigned: Check, default: Star };
 
-/** Die Namen der drei Stufen, wie Legende, Tooltips und Seitenleiste sie zeigen. */
+/** The names of the three levels, as legend, tooltips and sidebar show them. */
 export function useAssignmentStateLabels(): Record<AssignmentState, string> {
   const { t } = useTranslation();
   return {
@@ -29,7 +29,7 @@ export function useAssignmentStateLabels(): Record<AssignmentState, string> {
   };
 }
 
-/** Die Legende über der Tabelle: Icon, Name und was die Stufe bewirkt. */
+/** The legend above the table: icon, name and what the level does. */
 export function AssignmentLegend({ states }: { states: readonly AssignmentState[] }) {
   const { t } = useTranslation();
   const labels = useAssignmentStateLabels();
@@ -49,7 +49,7 @@ export function AssignmentLegend({ states }: { states: readonly AssignmentState[
   );
 }
 
-/** Der Kopf einer Eintragsart: Modul-Icon und Name. */
+/** The header of an entry type: module icon and name. */
 export function EntryTypeHeading({ entryType }: { entryType: TemplateEntryType }) {
   const { t } = useTranslation();
   const meta = MODULES[viewTypeForEntryType(entryType)];
@@ -62,23 +62,22 @@ export function EntryTypeHeading({ entryType }: { entryType: TemplateEntryType }
 }
 
 interface AssignmentTableProps {
-  /** Der Inhalt einer Zelle. `rowLabel` benennt die Zeile — für Beschriftungen, die ohne sie mehrdeutig wären. */
+  /** The content of a cell. `rowLabel` names the row, for labels that would be ambiguous without it. */
   cell: (entryType: TemplateEntryType, category: string | null, rowLabel: string) => ReactNode;
-  /** Eine Spalte hinter den Eintragsarten, je Kategorie-Zeile eine Zelle — der Dialog setzt dort beide zugleich. */
+  /** A column after the entry types, one cell per category row; the dialog sets both at once there. */
   extraColumn?: { heading: ReactNode; cell: (category: string | null, rowLabel: string) => ReactNode };
 }
 
 /**
- * Die Tabelle selbst: Journal als eine Zeile (die Zelle steht unter Wiki),
- * darunter der Kopf mit den Eintragsarten und die Zeilen „Alle Kategorien",
- * „Ohne Kategorie" und je Kategorie. Was in den Zellen steht, gibt der Dialog
- * vor.
+ * The table itself: journal as one row (its cell sits under wiki),
+ * below it the header with the entry types and the rows "All categories",
+ * "No category" and one per category. What goes in the cells is set by the dialog.
  */
 export function AssignmentTable({ cell, extraColumn }: AssignmentTableProps) {
   const { t } = useTranslation();
   const categories = useCategoryStore((s) => s.categories);
   const label = (text: string, sub?: string) => (
-    // `pt-1`: die Schalter sind höher als eine Textzeile; das Label sitzt mittig zur ersten Zeile.
+    // `pt-1`: the switches are taller than a line of text; the label sits centred on the first line.
     <div className="min-w-0 pt-1">
       <p className="truncate text-xs text-[var(--text-secondary)]" title={text}>{text}</p>
       {sub && <p className="block-field-hint">{sub}</p>}

@@ -7,10 +7,10 @@ export interface FilterChip {
   value: string;
   label: string;
   emoji?: string;
-  /** Lucide-Icon vor dem Label (14px-Stufe), z. B. Flag bei Tasks-Prioritäten. */
+  /** Lucide icon before the label (14px size), e.g. flag for task priorities. */
   icon?: ReactNode;
-  /** Treffer dieses Werts in der Liste nach der Suche, ohne den eigenen
-   *  Filter — so bleibt die Zahl stehen, während man an- und abwählt. */
+  /** Hits of this value in the list after the search, without its own
+   *  filter, so the number stays put while you toggle it on and off. */
   count?: number;
 }
 
@@ -22,8 +22,8 @@ function FilterRow({ active, onClick, lead, label, count }: {
   count?: number;
 }) {
   return (
-    // 30px hoch (leading-5 + 2×5px) wie der Primärknopf oben in der Leiste
-    // und die Sortier-Auswahl — alle Bedienelemente der Leiste gleich hoch.
+    // 30px tall (leading-5 + 2×5px) like the primary button at the top of the sidebar
+    // and the sort select: all controls in the sidebar equally tall.
     <button
       type="button"
       aria-pressed={active}
@@ -40,16 +40,16 @@ function FilterRow({ active, onClick, lead, label, count }: {
 }
 
 /**
- * Filterwerte als senkrechte Liste — Icon, Name, Anzahl — mit „Alle" oben.
- * Mehrfachauswahl: ein Klick schaltet einen Wert zu oder ab, „Alle" ist
- * aktiv, solange nichts gewählt ist, und leert die Auswahl.
+ * Filter values as a vertical list (icon, name, count) with "All" on top.
+ * Multi-select: a click toggles a value on or off, "All" is
+ * active as long as nothing is selected, and clears the selection.
  */
 export default function FilterList({ label, chips, selected, onToggle, onAll, allCount }: {
   label?: string;
   chips: FilterChip[];
   selected: string[];
   onToggle: (value: string) => void;
-  /** Blendet die „Alle"-Zeile ein. */
+  /** Shows the "All" row. */
   onAll?: () => void;
   allCount?: number;
 }) {

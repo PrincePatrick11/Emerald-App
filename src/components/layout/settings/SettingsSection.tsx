@@ -2,12 +2,12 @@ import type { ReactNode } from 'react';
 import { AlertTriangle, Check, CloudOff } from 'lucide-react';
 
 /**
- * Die Ueberschrift eines Einstellungs-Abschnitts. Stand vorher in jeder Sektion
- * einzeln — fuenfmal dieselbe Klassenkette, jedes Mal mit einer Icon-Groesse,
- * die auf der Skala der App keine Stufe ist. `.label-xs` traegt die
- * Schriftregeln, die auch die Seitenleisten benutzen.
+ * The heading of a settings section. It used to be written out in every
+ * section separately — five times the same class chain, each time with an icon
+ * size that is not a step on the app's scale. `.label-xs` carries the
+ * font rules that the sidebars use too.
  *
- * `description` sagt in einem Satz, was die Einstellung bewirkt.
+ * `description` says in one sentence what the setting does.
  */
 export default function SettingsSection({
   icon,
@@ -33,13 +33,13 @@ export default function SettingsSection({
 }
 
 /**
- * Die Rückmeldung zu einer Aktion: ein Symbol und ein Satz. Stand vorher auf
- * jeder Seite des Fensters einzeln — zehnmal dieselbe Kette, mal mit
- * `items-center gap-1`, mal mit `items-start gap-1.5`.
+ * The feedback for an action: a symbol and a sentence. It used to be written
+ * out on every page of the window separately — ten times the same chain, sometimes with
+ * `items-center gap-1`, sometimes with `items-start gap-1.5`.
  *
- * `success` grün, `error` rot, `muted` still: ein Ausgang, der kein Defekt ist
- * (niemand hat geantwortet, es gibt nichts zu tun). Jeder Ton bringt sein
- * Symbol mit; `icon` schlägt es, wo ein Fehler einer ruhigen Lage entspricht.
+ * `success` green, `error` red, `muted` quiet: an outcome that is not a defect
+ * (nobody answered, there is nothing to do). Each tone brings its own
+ * symbol; `icon` overrides it where an error corresponds to a calm situation.
  */
 export function SettingsStatus({ tone, icon, children, className }: {
   tone: 'success' | 'error' | 'muted';
@@ -68,8 +68,8 @@ const STATUS_ICON = {
 } as const;
 
 /**
- * Eine Packliste: die Überschrift und darunter Haken in zwei Spalten — was
- * mitkommt, nicht welche Einstellung gilt. Die Haken bringt der Aufrufer mit.
+ * A packing list: the heading and below it checkboxes in two columns — what
+ * comes along, not which setting applies. The caller brings the checkboxes.
  */
 export function SettingsCheckboxGrid({ label, children }: { label: string; children: ReactNode }) {
   return (
@@ -80,7 +80,7 @@ export function SettingsCheckboxGrid({ label, children }: { label: string; child
   );
 }
 
-/** Der erklärende Satz unter einer Einstellung — unter einem Abschnitt oder einer Zeile darin. */
+/** The explanatory sentence under a setting — under a section or a row within it. */
 export function SettingsDescription({ children, className = 'mb-2' }: { children: ReactNode; className?: string }) {
   return (
     <p className={`text-xs text-muted ${className}`}>

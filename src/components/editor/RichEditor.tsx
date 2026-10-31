@@ -34,31 +34,31 @@ interface LinkPopupState {
 
 interface RichEditorProps {
   /**
-   * Nur der INITIALWERT — der Editor ist danach unkontrolliert. Der Stapel
-   * mountet ihn per `key` neu, wenn ein anderer Eintrag geladen oder Cancel
-   * gedrueckt wird. Der fruehere Sync-Effekt, der bei jedem Render
-   * `getHTML()` mit dem Prop verglich, war zusammen mit `onUpdate` eine
-   * doppelte Serialisierung des gesamten Dokuments pro Tastendruck.
+   * Only the INITIAL VALUE: the editor is uncontrolled afterwards. The stack
+   * remounts it via `key` when another entry is loaded or Cancel is
+   * pressed. The former sync effect, which compared `getHTML()` with the prop
+   * on every render, amounted together with `onUpdate` to a
+   * double serialisation of the entire document per keystroke.
    */
   initialContent: string;
   placeholder?: string;
   onChange: (content: string) => void;
   editable?: boolean;
-  /** Meldet die Editor-Instanz, sobald sie steht, und `null` beim Abbau. */
+  /** Reports the editor instance once it exists, and `null` on teardown. */
   onEditorReady?: (editor: Editor | null) => void;
 }
 
-/** `Link` ohne das Verlinken eingefügter Adressen — für „Automatische Links" aus. */
+/** `Link` without linking pasted addresses, for "Automatic links" off. */
 const LinkWithoutPasteRule = Link.extend({ addPasteRules: () => [] });
 
 /**
- * Was die Einstellungen der automatischen Formatierung am Editor ändern:
+ * What the automatic-formatting settings change in the editor:
  *
- * | Einstellung       | aus heißt                                                        |
+ * | Setting           | off means                                                        |
  * |-------------------|------------------------------------------------------------------|
- * | markdownShortcuts | keine Eingabe- und Einfügeregeln, außer denen der beiden anderen |
- * | typography        | `Typography` fehlt ganz                                          |
- * | autoLinks         | `Link` ohne `autolink`, `linkOnPaste` und Einfügeregel           |
+ * | markdownShortcuts | no input and paste rules, except those of the other two          |
+ * | typography        | `Typography` is missing entirely                                 |
+ * | autoLinks         | `Link` without `autolink`, `linkOnPaste` and paste rule          |
  */
 function formattingOptions(format: EditorSettings) {
   const ownInputRules = format.typography ? ['typography'] : [];
@@ -77,21 +77,21 @@ function formattingOptions(format: EditorSettings) {
 }
 
 /**
- * Die Schreibfläche eines Textblocks.
+ * The writing surface of a text block.
  *
- * Alles, was es pro geöffnetem Eintrag nur EINMAL geben darf, hält der
- * `BlockStack`: Toolbar, Linkauswahl, die Link-Bitten der Seitenleiste, die
- * Navigation per Chip-Klick, Drops (Dateien aus dem Explorer, Einträge aus der
- * linken Liste) und das Drag-Schild. Das hing früher hier und damit
- * pro Editor am `document` — mit mehreren Textblöcken hätte jede Bitte jeden
- * Block getroffen.
+ * Everything that may exist only ONCE per opened entry is held by the
+ * `BlockStack`: toolbar, link picker, the sidebar's link requests,
+ * navigation via chip click, drops (files from the explorer, entries from the
+ * left list) and the drag tag. That used to hang here, and thus
+ * on the `document` per editor; with several text blocks every request would have
+ * hit every block.
  *
- * Hier bleibt, was an genau diesem Editor hängt: Extensions und Chip-Lookups,
- * das Popup für externe Links und Einfügen per Paste.
+ * What stays here is whatever hangs on exactly this editor: extensions and chip lookups,
+ * the popup for external links and inserting via paste.
  */
 export default function RichEditor({
   initialContent,
-  // Kein englischer Default: der Stapel übergibt den lokalisierten Placeholder.
+  // No English default: the stack passes in the localised placeholder.
   placeholder = '',
   onChange,
   editable = true,
@@ -109,9 +109,9 @@ export default function RichEditor({
   const itemsRef = useRef<SuggestionItem[]>([]);
   itemsRef.current = linkItems;
 
-  // Icon und Titel eines Chips, live nachgeschlagen — aus derselben Liste wie
-  // Picker und Seitenleiste (`buildLinkItems`), damit alle drei dasselbe
-  // zeigen. `displayIcon` ist auch ein Bild, das nicht in die Node-Attrs darf.
+  // Icon and title of a chip, looked up live from the same list as
+  // picker and sidebar (`buildLinkItems`), so that all three show the same
+  // thing. `displayIcon` can also be an image, which must not go into the node attrs.
   const byKey = useMemo(() => linkItemsByKey(linkItems), [linkItems]);
   const byKeyRef = useRef(byKey);
   byKeyRef.current = byKey;
@@ -122,9 +122,9 @@ export default function RichEditor({
   const getLabelRef = useRef((id: string, entryType: string): string | null =>
     byKeyRef.current.get(linkItemKey({ id, entryType }))?.label ?? null);
 
-  // Was der Editor beim Tippen und Einfügen von selbst formatiert
-  // (Einstellungen → Einträge). Beim Anlegen gelesen: ein offener Editor
-  // behält, womit er aufging — ein neuer bekäme sonst mitten im Tippen andere Regeln.
+  // What the editor formats by itself while typing and pasting
+  // (Settings → Entries). Read at creation: an open editor
+  // keeps what it opened with; a new one would otherwise get different rules mid-typing.
   const [format] = useState(() => formattingOptions(useSettingsStore.getState().settings.editor));
 
   const editor = useEditor({
@@ -136,8 +136,8 @@ export default function RichEditor({
       Highlight.configure({ multicolor: false }),
       TaskList,
       TaskItem.configure({ nested: true }),
-      // Bilder bleiben aussen vor: sie richten sich ueber ihr eigenes
-      // `align`-Attribut aus (Blocknode mit eigener Breite), siehe
+      // Images are left out: they align via their own
+      // `align` attribute (block node with its own width), see
       // `alignMargins` in ResizableImageExtension.
       TextAlign.configure({ types: [...TEXT_ALIGN_TYPES] }),
       createInternalLinkExtension(
@@ -157,10 +157,10 @@ export default function RichEditor({
     enablePasteRules: format.enablePasteRules,
     content: initialContent || '',
     editable,
-    // Sonst rendert @tiptap/react diese Komponente bei jeder Transaktion
-    // (jedem Tastendruck, jeder Cursorbewegung) neu. Nichts hier liest im
-    // Render Editor-Zustand: das Link-Popup hört auf `selectionUpdate`, die
-    // Werkzeugleiste in BlockStack selbst auf `transaction`.
+    // Otherwise @tiptap/react re-renders this component on every transaction
+    // (every keystroke, every cursor movement). Nothing here reads editor
+    // state during render: the link popup listens to `selectionUpdate`, the
+    // toolbar in BlockStack itself to `transaction`.
     shouldRerenderOnTransaction: false,
     onUpdate: ({ editor }) => {
       onChange(editor.getHTML());
@@ -241,8 +241,8 @@ export default function RichEditor({
     };
   }, [editor, editable, updateLinkPopup]);
 
-  // Ohne `update`-Ereignis: das Umschalten ändert keinen Inhalt, und ein
-  // Ereignis hier landete als vermeintliche Änderung beim Blockstapel.
+  // Without an `update` event: toggling changes no content, and an
+  // event here would reach the block stack as a supposed change.
   useEffect(() => {
     editor?.setEditable(editable, false);
   }, [editable, editor]);

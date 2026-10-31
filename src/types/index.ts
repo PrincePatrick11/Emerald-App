@@ -2,41 +2,41 @@ import type { TrashKind, ViewId } from '../lib/modules';
 
 export type ContentType = 'journal' | 'wiki' | 'operation' | 'task' | 'altar';
 
-/** Die Eintragsarten der Tabelle `entries` — die Module mit Blockstapel. */
+/** The entry kinds of the `entries` table — the modules with a block stack. */
 export type EntryType = 'journal' | 'wiki' | 'operation';
 
 /**
- * Ein Eintrag aus `entries` — Journal, Wiki oder Operation. Was die drei
- * unterscheidet, steht im Inhalt (Blöcke); `type` sagt nur, in welchem Modul
- * er steht, und ein Typwechsel ändert genau das (`entryTypeChange`).
+ * An entry from `entries` — journal, wiki or operation. What sets the three
+ * apart lives in the content (blocks); `type` only says which module it
+ * belongs to, and a type change changes exactly that (`entryTypeChange`).
  *
- * Die Mondphase eines Journal-Eintrags folgt aus `created_at`
- * (`entryMoonPhase`); Status, Sigillen, Paradigma, Bannung, Meditation und die
- * verlinkten Einträge sind seit v36–v42 Blöcke bzw. Link-Chips im Inhalt.
+ * The moon phase of a journal entry follows from `created_at`
+ * (`entryMoonPhase`); status, sigils, paradigm, banishing, meditation and the
+ * linked entries have been blocks or link chips in the content since v36–v42.
  */
 export interface Entry {
   id: string;
   type: EntryType;
   title: string;
-  content: string; // HTML, wie TipTaps getHTML() es liefert
-  /** `null` = ohne Kategorie, seit v39 der Normalfall eines neuen Eintrags — im Journal immer. */
+  content: string; // HTML, as TipTap's getHTML() returns it
+  /** `null` = no category, the normal case for a new entry since v39 — always in the journal. */
   category_id: string | null;
   created_at: string;
   updated_at: string;
-  /** Tag-IDs (`lib/tagRefs.ts`) — die von Tags im Papierkorb bleiben stehen, unsichtbar. */
+  /** Tag IDs (`lib/tagRefs.ts`) — those of tags in the trash stay in place, invisible. */
   tags: string[];
   deleted_at: string | null;
   entry_number?: number;
-  /** Eigenes Icon (Emoji oder Bild) — nur Wiki und Operationen. */
+  /** Custom icon (emoji or image) — wiki and operations only. */
   icon?: string;
-  /** Titelbild — nur Wiki und Operationen. */
+  /** Cover image — wiki and operations only. */
   cover_image?: string;
 }
 
 /**
- * Eine Zeile der globalen `categories`-Tabelle — dieselbe Liste für Wiki,
- * Operationen, Aufgaben und Altar-Elemente. `is_builtin` gilt nur für `other`
- * und `sigils`; der Anzeigename läuft über `lib/categories.categoryLabel`.
+ * A row of the global `categories` table — the same list for wiki,
+ * operations, tasks and altar items. `is_builtin` applies only to `other`
+ * and `sigils`; the display name goes through `lib/categories.categoryLabel`.
  */
 export interface Category {
   id: string;
@@ -91,7 +91,7 @@ export interface AltarRecord {
   resolution: string;
   thumbnail_data?: string | null;
   icon_data?: string | null;
-  /** Im Papierkorb seit — der Store hält nur Altäre ohne. */
+  /** In the trash since — the store only holds altars without it. */
   deleted_at?: string | null;
 }
 
@@ -99,12 +99,12 @@ export interface AltarItem {
   id: string;
   name: string;
   emoji: string;
-  /** `null` = ohne Kategorie, seit v39 der Normalfall eines neuen Eintrags. */
+  /** `null` = no category, the normal case for a new entry since v39. */
   category_id: string | null;
   note: string;
   image_data?: string;
-  /** Nur für die Sortierung der Bibliothek — die Spalte gab es in
-   *  `altar_items` schon, sie kam bloß nie im Typ an. */
+  /** Only for sorting the library — the column already existed in
+   *  `altar_items`, it just never made it into the type. */
   created_at: string;
   updated_at: string;
 }
@@ -113,11 +113,11 @@ export interface AltarPlacement {
   id: string;
   altar_id?: string;
   item_id: string;
-  // name, emoji, category_id und image_data stammen aus altar_items und werden
-  // beim Laden hinzugejoint — sie sind keine Spalten von altar_placements.
+  // name, emoji, category_id and image_data come from altar_items and are
+  // joined in on load — they are not columns of altar_placements.
   name: string;
   emoji: string;
-  /** `null` = ohne Kategorie, seit v39 der Normalfall eines neuen Eintrags. */
+  /** `null` = no category, the normal case for a new entry since v39. */
   category_id: string | null;
   x: number;
   y: number;
@@ -143,7 +143,7 @@ export interface TaskLink {
 export interface Task {
   id: string;
   title: string;
-  /** `null` = ohne Kategorie, seit v39 der Normalfall eines neuen Eintrags. */
+  /** `null` = no category, the normal case for a new entry since v39. */
   category_id: string | null;
   priority: TaskPriority;
   completed: boolean;
@@ -154,21 +154,21 @@ export interface Task {
 }
 
 /**
- * Ein Zeichenpaar des Alphabets einer Sprache: `from` ist das Zeichen (oder
- * die Zeichenfolge) der eigenen Schrift, `to` das der Sprache. Mehrbuchstabige
- * Paare sind ausdrücklich erlaubt — „th" → „ᚦ" ist genau der Fall, für den die
- * Umschrift beim längsten Treffer zuerst schaut (siehe `lib/lexicon.ts`).
+ * A character pair of a language's alphabet: `from` is the character (or
+ * character sequence) of the own script, `to` that of the language. Multi-letter
+ * pairs are explicitly allowed — "th" → "ᚦ" is exactly the case for which the
+ * transliteration tries the longest match first (see `lib/lexicon.ts`).
  */
 export interface AlphabetPair {
   from: string;
   to: string;
 }
 
-/** Eine Sprache des Lexikons. Ihre Vokabeln stehen als `LexiconEntry` daneben. */
+/** A language of the lexicon. Its vocabulary sits alongside as `LexiconEntry`. */
 export interface Language {
   id: string;
   name: string;
-  /** Emoji oder Bild-Data-URL, wie bei eigenen Blöcken und Vorlagen. */
+  /** Emoji or image data URL, as with custom blocks and templates. */
   icon: string;
   alphabet: AlphabetPair[];
   sort_order: number;
@@ -178,8 +178,8 @@ export interface Language {
 }
 
 /**
- * Eine Vokabel. `term` steht in der Sprache, `translation` in der eigenen —
- * das Übersetzen-Feld liest das Paar in beide Richtungen.
+ * A vocabulary item. `term` is in the language, `translation` in the user's
+ * own — the translate field reads the pair in both directions.
  */
 export interface LexiconEntry {
   id: string;
@@ -194,13 +194,13 @@ export interface LexiconEntry {
 }
 
 export interface ActiveView {
-  // ViewId statt der alten Ad-hoc-Union: die enthielt über ContentType auch
-  // 'operation' (singular), das als View-Typ nie gültig war.
+  // ViewId instead of the old ad-hoc union: via ContentType it also contained
+  // 'operation' (singular), which was never a valid view type.
   type: ViewId;
   id?: string;
   mode?: 'view' | 'edit';
-  /** Frisch angelegt und noch nie mit „Fertig" bestätigt — Cancel verwirft
-   *  den Eintrag wieder, statt nur zum letzten Speicherstand zurückzukehren.
-   *  Wird von jedem „Neu"-Handler gesetzt und fällt beim Speichern weg. */
+  /** Freshly created and never confirmed with "Done" — Cancel discards
+   *  the entry again instead of just returning to the last saved state.
+   *  Set by every "New" handler and dropped on save. */
   isNew?: boolean;
 }

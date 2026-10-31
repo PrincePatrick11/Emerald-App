@@ -1,8 +1,8 @@
 /**
- * Das Feld fürs Umbenennen an Ort und Stelle: Enter und Verlassen speichern,
- * Escape bricht ab. Der Inhalt eines `DashboardItem` mit `editing` — die
- * Schrift bringt der Aufrufer mit, damit das Feld aussieht wie der Titel,
- * den es ersetzt.
+ * The field for renaming in place: Enter and leaving save,
+ * Escape cancels. The content of a `DashboardItem` with `editing`; the
+ * caller supplies the font so that the field looks like the title
+ * it replaces.
  */
 export default function RenameField({ value, onChange, onCommit, onCancel, className }: {
   value: string;

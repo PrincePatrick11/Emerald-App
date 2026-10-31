@@ -1,30 +1,30 @@
 /**
- * Ein Backup-Import, der den Vault nie halb geändert zurücklässt.
+ * A backup import that never leaves the vault half-changed.
  *
- * `doReplace` und `doMerge` schreiben über viele einzelne Anweisungen. Eine
- * Transaktion darum geht nicht: die SQL-Schicht (`db.rs`) verteilt jede
- * Anweisung auf eine beliebige Verbindung ihres Pools (siehe `normalizeSchema.ts`),
- * und `db.batch` fasst nur eine fertige Liste — der Import baut seine
- * Anweisungen aus Abfragen dazwischen. Brach der
- * Import mittendrin ab — eine kaputte Datei, ein Absturz —, war beim Ersetzen
- * der alte Inhalt gelöscht und der neue unvollständig, beim Zusammenführen ein
- * Teil der Datei im Vault und der Rest nicht.
+ * `doReplace` and `doMerge` write through many individual statements. A
+ * transaction around them does not work: the SQL layer (`db.rs`) distributes each
+ * statement to an arbitrary connection of its pool (see `normalizeSchema.ts`),
+ * and `db.batch` only takes a finished list — the import builds its
+ * statements from queries in between. If the
+ * import aborted midway — a broken file, a crash —, then on replace
+ * the old content was deleted and the new one incomplete, and on merge
+ * part of the file was in the vault and the rest was not.
  *
- * Deshalb läuft der Import gegen eine Arbeitskopie:
+ * That is why the import runs against a working copy:
  *
- *   1. Reste eines abgebrochenen Laufs wegräumen
- *   2. `VACUUM INTO` — die Kopie neben der Datenbank, gleiches Schema
- *   3. Import in die Kopie; der Vault bleibt unberührt
- *   4. Austausch in einem einzigen `execute`: ATTACH, BEGIN, alle Tabellen
- *      leeren und aus der Kopie füllen, COMMIT. Ein `execute` bleibt auf *einer*
- *      Verbindung (sqlx führt die Anweisungen eines Strings nacheinander aus),
- *      also ist das eine echte SQLite-Transaktion — auch gegen einen Absturz.
- *   5. Kopie löschen
+ *   1. Clear away leftovers of an aborted run
+ *   2. `VACUUM INTO` — the copy next to the database, same schema
+ *   3. Import into the copy; the vault stays untouched
+ *   4. Swap in a single `execute`: ATTACH, BEGIN, empty all tables
+ *      and fill them from the copy, COMMIT. One `execute` stays on *one*
+ *      connection (sqlx runs the statements of a string one after another),
+ *      so this is a real SQLite transaction — even against a crash.
+ *   5. Delete the copy
  *
- * Scheitert 3, ist nur die Kopie verloren. Ein Absturz in 3 lässt sie liegen;
- * Schritt 1 des nächsten Imports räumt sie weg. Bilder schreibt der Import
- * direkt in den Vault — nach einem Abbruch liegen sie unbenutzt dort, bis die
- * Aufräum-Aktion sie findet.
+ * If 3 fails, only the copy is lost. A crash in 3 leaves it lying around;
+ * step 1 of the next import clears it away. The import writes images
+ * directly into the vault — after an abort they sit there unused until the
+ * cleanup action finds them.
  */
 import Database from './sqlite';
 import { invoke } from '@tauri-apps/api/core';
@@ -32,10 +32,10 @@ import { resetDbCache, markDbReplaced } from './db';
 import { TABLES } from './schema';
 import { getActiveImportStagingFile, getActiveVaultId } from './vaultManager';
 
-/** Name, unter dem die Kopie im Austausch angehängt wird. */
+/** Name under which the copy is attached during the swap. */
 const STAGING_SCHEMA = 'import_staging';
 
-/** `schema_version` bleibt: Kopie und Vault stehen ohnehin auf demselben Stand. */
+/** `schema_version` stays: copy and vault are at the same version anyway. */
 const SWAPPED = TABLES.filter((t) => t !== 'schema_version');
 
 function sqlString(value: string): string {
@@ -47,13 +47,13 @@ async function discardStaging(vaultId: string): Promise<void> {
 }
 
 /**
- * Leert den Vault und füllt ihn aus der Kopie — in einer Transaktion.
- * Spalten explizit statt `SELECT *`: die Reihenfolge ist durch `VACUUM INTO`
- * zwar dieselbe, aber das soll nicht still vorausgesetzt sein.
+ * Empties the vault and fills it from the copy — in one transaction.
+ * Columns are explicit instead of `SELECT *`: the order is the same thanks to
+ * `VACUUM INTO`, but that should not be silently assumed.
  */
 async function swapIn(db: Database, stagingFile: string): Promise<void> {
   const statements = [`ATTACH DATABASE ${sqlString(stagingFile)} AS ${STAGING_SCHEMA}`, 'BEGIN IMMEDIATE'];
-  // Fremdschlüssel erst beim COMMIT prüfen — zwischendurch ist der Vault leer.
+  // Check foreign keys only at COMMIT — in between, the vault is empty.
   statements.push('PRAGMA defer_foreign_keys = ON');
   for (const table of [...SWAPPED].reverse()) statements.push(`DELETE FROM main.${table}`);
   for (const table of SWAPPED) {
@@ -65,17 +65,17 @@ async function swapIn(db: Database, stagingFile: string): Promise<void> {
   try {
     await db.execute(statements.join(';\n'));
   } catch (err) {
-    // Bricht der String nach BEGIN ab, hängt die Verbindung mit offener
-    // Transaktion und angehängter Kopie im Pool: jeder weitere Schreibzugriff
-    // liefe in „database is locked". Schließen rollt zurück und löst die Kopie.
+    // If the string aborts after BEGIN, the connection stays in the pool with an open
+    // transaction and the copy attached: every further write access
+    // would run into "database is locked". Closing rolls back and detaches the copy.
     await resetDbCache();
     throw err;
   }
 }
 
 /**
- * Führt `fill` gegen eine Kopie des aktiven Vaults aus und tauscht sie danach
- * atomar ein. `db` ist die Verbindung des aktiven Vaults.
+ * Runs `fill` against a copy of the active vault and then swaps it in
+ * atomically. `db` is the connection of the active vault.
  */
 export async function importViaStaging(db: Database, fill: (staging: Database) => Promise<void>): Promise<void> {
   const vaultId = await getActiveVaultId();
@@ -89,15 +89,15 @@ export async function importViaStaging(db: Database, fill: (staging: Database) =
     try {
       await fill(staging);
     } finally {
-      // Ein Fehler beim Schließen soll den des Imports nicht überdecken.
+      // An error while closing should not mask the import's own error.
       await staging.close().catch((err: unknown) => console.warn('[backup] Arbeitskopie nicht geschlossen:', err));
     }
     await swapIn(db, stagingFile);
-    // Wer gerade über mehrere Abfragen hinweg liest, hat jetzt einen gemischten Stand (`dbEpoch`).
+    // Anyone currently reading across several queries now has a mixed state (`dbEpoch`).
     markDbReplaced();
   } finally {
-    // Nach Erfolg nur noch Platz auf der Platte — ein Fehler hier darf den
-    // Import nicht nachträglich scheitern lassen. Schritt 1 holt es nach.
+    // After success it is just space on the disk — an error here must not
+    // make the import fail retroactively. Step 1 catches up on it.
     await discardStaging(vaultId).catch((err: unknown) => console.warn('[backup] Arbeitskopie bleibt liegen:', err));
   }
 }

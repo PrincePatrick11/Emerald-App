@@ -10,36 +10,36 @@ import type { TemplateApplyOptions } from '../../store/templateApply';
 import { templateLabel } from '../../lib/blocks/blockAttrs';
 import { templatesFor, type Template, type TemplateEntryType } from '../../lib/blocks/templates';
 
-/** So viele Vorlagen stehen im leeren Eintrag als Knopf — der Rest über „Alle Vorlagen". */
+/** This many templates appear as a button in the empty entry; the rest via "All templates". */
 const SUGGESTION_LIMIT = 5;
 
 export interface TemplateTarget {
   entryType: TemplateEntryType;
   categoryId: string | null;
-  /** Speichert sofort, was der Editor noch aufschiebt (Titel, Tags) — vor dem Einsetzen. */
+  /** Immediately saves what the editor still defers (title, tags), before inserting. */
   flush: () => Promise<void>;
 }
 
 interface Props {
   entryId: string;
   target: TemplateTarget;
-  /** Ist der Stapel gerade leer? Dann setzt eine Wahl direkt ein, und die Vorschläge stehen da. */
+  /** Is the stack currently empty? Then a choice inserts directly, and the suggestions are shown. */
   empty: boolean;
   pickerOpen: boolean;
   onPickerOpenChange: (open: boolean) => void;
   apply: (template: Template, options: TemplateApplyOptions) => void;
-  /** Rückgängig nach dem automatischen Einsetzen: Stapel leeren, Titel und Tags zurück. */
+  /** Undo after the automatic insertion: empty the stack, restore title and tags. */
   undo: (template: Template) => void;
 }
 
 /**
- * Was ein Eintrag im Bearbeiten an Vorlagen anbietet — neben dem Blockstapel,
- * der die Blöcke selbst einsetzt:
- * - der Hinweis „Vorlage angewendet" nach dem automatischen Standard, mit
- *   Rückgängig und „Andere Vorlage";
- * - im leeren Eintrag die passenden Vorlagen als Knöpfe;
- * - die Auswahl (auch aus der Seitenleiste) und, wenn schon Inhalt da ist,
- *   der Dialog Anhängen/Ersetzen.
+ * What an entry offers in the way of templates when editing, besides the block stack,
+ * which inserts the blocks itself:
+ * - the notice "Template applied" after the automatic default, with
+ *   Undo and "Other template";
+ * - in an empty entry the matching templates as buttons;
+ * - the picker (also from the sidebar) and, when content is already there,
+ *   the Append/Replace dialog.
  */
 export default function TemplateInsertion({ entryId, target, empty, pickerOpen, onPickerOpenChange, apply, undo }: Props) {
   const { t } = useTranslation();
@@ -47,7 +47,7 @@ export default function TemplateInsertion({ entryId, target, empty, pickerOpen, 
   const notice = useTemplateNoticeStore((s) => (s.notice?.entryId === entryId ? s.notice : null));
   const dismiss = useTemplateNoticeStore((s) => s.dismiss);
   const [choosing, setChoosing] = useState<Template | null>(null);
-  /** Die Auswahl kam über „Andere Vorlage": sie ersetzt die angewendete. */
+  /** The selection came via "Other template": it replaces the applied one. */
   const [replacing, setReplacing] = useState<Template | null>(null);
 
   const available = templatesFor(templates, target.entryType, target.categoryId);
@@ -74,8 +74,8 @@ export default function TemplateInsertion({ entryId, target, empty, pickerOpen, 
 
   return (
     <>
-      {/* Kein UndoToast: der Hinweis bleibt, bis man tippt oder ihn schließt,
-          steht im Dokument und braucht einen zweiten Knopf („Andere Vorlage"). */}
+      {/* No UndoToast: the notice stays until you type or close it,
+          sits in the document and needs a second button ("Other template"). */}
       {applied && (
         <div className="template-notice" role="status">
           <BlockGlyph icon={applied.icon} size={14} />

@@ -3,18 +3,18 @@ import { isImageIcon } from '../lib/helpers';
 import { shrinkImageDataUrl } from '../lib/shrinkImage';
 
 /**
- * Kantenlänge eines Bild-Icons. Icons eigener Blöcke und Vorlagen erscheinen
- * höchstens 20px groß — und das eines Blocks steckt in jeder Kopie in jedem
- * Eintrag. 64px reichen auch für hochauflösende Schirme.
+ * Edge length of an image icon. Icons of custom blocks and templates appear
+ * at most 20px large — and a block's icon sits in every copy in every
+ * entry. 64px is enough even for high-resolution screens.
  */
 const ICON_MAX_EDGE = 64;
 
 /**
- * Setzt ein Icon aus dem Icon-Feld (`Favicon`) in einen Entwurf: ein Bild wird
- * vorher verkleinert, ein Emoji direkt übernommen. Die letzte Wahl gewinnt —
- * ein Emoji, gewählt während ein Bild noch verkleinert wird, darf nicht vom
- * späten Bild überschrieben werden. Deshalb läuft jede Änderung des Icons
- * hierdurch, auch das Zurücksetzen auf den Standard.
+ * Puts an icon from the icon field (`Favicon`) into a draft: an image is
+ * shrunk first, an emoji is taken as is. The last choice wins —
+ * an emoji chosen while an image is still being shrunk must not be
+ * overwritten by the late image. That is why every change of the icon runs
+ * through here, including resetting to the default.
  */
 export function useShrunkIcon(apply: (icon: string) => void, logTag: string): (value: string) => Promise<void> {
   const request = useRef(0);

@@ -12,25 +12,25 @@ import { imageSrc } from '../../lib/images';
 import { FaviconGlyph } from '../sidebar/fields/Favicon';
 import DashboardItem from '../ui/DashboardItem';
 
-/** Bezugsmaß der Leinwand-Vorschau je Kartenbreite: Höhendeckel für das
- *  Thumbnail, Breitendeckel für die Live-Vorschau (die ein aspect-ratio-Kasten
- *  ist und sich nur über die Breite steuern lässt). Die breite Karte füllt die
- *  ganze Spalte, deshalb darf sie so hoch werden, dass man den Altar wirklich
- *  erkennt; im Dreier-Raster bliebe dieselbe Höhe nur ein Briefmarkenbild
- *  neben einer überlangen Karte. Der Icon-Platzhalter unten hat eigene, viel
- *  kleinere Höhen — er soll die Vorschau ersetzen, nicht ihren Platz halten. */
+/** Reference size of the canvas preview per card width: a height cap for the
+ *  thumbnail, a width cap for the live preview (which is an aspect-ratio box
+ *  and can only be controlled via its width). The wide card fills the whole
+ *  column, so it may grow tall enough for the altar to be recognisable; in the
+ *  three-column grid the same height would only be a postage-stamp image next
+ *  to an overlong card. The icon placeholder below has its own, much smaller
+ *  heights: it is meant to replace the preview, not to hold its space. */
 const PREVIEW_BASE = { normal: 176, wide: 380 } as const;
 
-/** Platzhalter, wenn die Vorschau abgeschaltet ist (uiStore.altarShowPreview):
- *  das Icon, das der Altar in seinen Eigenschaften trägt — und nur wenn er
- *  keines hat, das Modul-Icon. Bewusst niedriger als die Vorschau: ein leerer
- *  Kasten in Vorschaugröße wäre nur Luft. */
+/** Placeholder when the preview is switched off (uiStore.altarShowPreview):
+ *  the icon the altar carries in its properties, and only if it has none, the
+ *  module icon. Deliberately lower than the preview: an empty box the size of
+ *  the preview would just be wasted space. */
 function PreviewFallback({ altar, wide }: { altar: AltarRecord; wide?: boolean }) {
   return (
-    // Ohne Rahmen: der Rahmen gehört zur Vorschau, deren Kante er zeigt. Um
-    // ein freistehendes Icon wäre er ein leerer Kasten. Die Höhe bleibt, damit
-    // die Karten mit und ohne Icon gleich hoch sind; 32px ist die dekorative
-    // Icon-Stufe der Leerzustände (design.md), nicht die UI-Skala.
+    // No border: the border belongs to the preview, whose edge it shows. Around
+    // a freestanding icon it would be an empty box. The height stays so that
+    // cards with and without an icon are equally tall; 32px is the decorative
+    // icon size of the empty states (design.md), not the UI scale.
     <div className={`flex items-center justify-center ${wide ? 'h-24' : 'h-20'}`}>
       {altar.icon_data
         ? <FaviconGlyph value={altar.icon_data} className={wide ? 'h-16 w-16 text-5xl' : 'h-12 w-12 text-4xl'} />
@@ -39,7 +39,7 @@ function PreviewFallback({ altar, wide }: { altar: AltarRecord; wide?: boolean }
   );
 }
 
-/** Dasselbe eine Stufe kleiner, für die Listenzeile. */
+/** The same one step smaller, for the list row. */
 function ListPreviewFallback({ altar }: { altar: AltarRecord }) {
   return altar.icon_data
     ? <FaviconGlyph value={altar.icon_data} />
@@ -47,14 +47,14 @@ function ListPreviewFallback({ altar }: { altar: AltarRecord }) {
 }
 
 type AltarCardProps = CommonProps & {
-  /** Karten in voller Breite: höhere Vorschau, sonst dieselbe Karte. */
+  /** Full-width cards: taller preview, otherwise the same card. */
   wide?: boolean;
 };
 
 type CommonProps = {
   altar: AltarRecord;
   previewItems: AltarPlacement[];
-  /** Aus heißt: Flammen-Icon statt Leinwand-Vorschau. */
+  /** Off means: flame icon instead of the canvas preview. */
   showPreview: boolean;
   isRenaming: boolean;
   renameValue: string;
@@ -64,8 +64,8 @@ type CommonProps = {
   onContextMenu: (event: React.MouseEvent) => void;
 };
 
-/** Wohin Klick und Mittelklick führen. Den Altar selbst lädt AltarView über
- *  seinen `activeView.id`-Effekt nach — wie beim Öffnen aus der Seitenleiste. */
+/** Where click and middle click lead. AltarView loads the altar itself via
+ *  its `activeView.id` effect, as when opening from the sidebar. */
 const altarView = (altar: AltarRecord) => ({ type: 'altar', id: altar.id, mode: 'view' } as const);
 
 export const AltarCard = memo(function AltarCard({
@@ -80,8 +80,8 @@ export const AltarCard = memo(function AltarCard({
   onCancelRename,
   onContextMenu,
 }: AltarCardProps) {
-  // Abonniert auch Sprachwechsel für die Datums-Locale — memo ohne t-Prop würde
-  // sonst beim Umschalten das alte Format weiterzeigen.
+  // Also subscribes to language changes for the date locale; memo without a t prop
+  // would otherwise keep showing the old format after switching.
   const { t } = useTranslation();
   if (isRenaming) {
     return (
@@ -108,9 +108,9 @@ export const AltarCard = memo(function AltarCard({
     preview = <img src={thumbnail} alt="" draggable={false} style={{ maxHeight: base }}
       className="w-auto max-w-full mx-auto block rounded-lg border border-stone-700/40" />;
   } else {
-    // Die Live-Vorschau ist ein aspect-ratio-Kasten in voller Breite; über
-    // maxWidth statt maxHeight gedeckelt, weil ein höhenbegrenzter Kasten sie
-    // nur beschneiden würde.
+    // The live preview is a full-width aspect-ratio box; capped via
+    // maxWidth instead of maxHeight, because a height-limited box would
+    // only crop it.
     preview = (
       <div className="mx-auto w-full" style={{ maxWidth: base * (resW / resH) }}>
         <AltarCardPreview altar={altar} previewItems={previewItems} />
@@ -140,7 +140,7 @@ export const AltarListRow = memo(function AltarListRow({
   onCancelRename,
   onContextMenu,
 }: CommonProps) {
-  // Siehe AltarCard: auch die Subscription für die Datums-Locale.
+  // See AltarCard: also the subscription for the date locale.
   const { t } = useTranslation();
   if (isRenaming) {
     return (
@@ -159,8 +159,8 @@ export const AltarListRow = memo(function AltarListRow({
   const { w: resW, h: resH } = resolveResolutionPixels(altar.resolution ?? '1920x1080');
   const thumbnail = imageSrc(altar.thumbnail_data);
 
-  // Dieselbe Reihenfolge wie auf der Karte, nur auf Zeilenhöhe: Icon statt
-  // Vorschau, sonst Thumbnail, sonst die gerechnete Live-Vorschau.
+  // The same order as on the card, just at row height: icon instead of
+  // preview, otherwise thumbnail, otherwise the computed live preview.
   const preview = !showPreview
     ? <ListPreviewFallback altar={altar} />
     : thumbnail

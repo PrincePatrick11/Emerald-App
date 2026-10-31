@@ -7,10 +7,10 @@ export type FontId = 'inter' | 'source-sans-3' | 'nunito' | 'ibm-plex-sans' | 'a
 
 export const DEFAULT_THEME_ID: ThemeId = 'emerald-noctis';
 
-/** Ein neues Theme braucht zusätzlich einen Zweig im Boot-Skript in
- *  `index.html` — das läuft vor dem Bundle und kann `normalizeThemeId()`
- *  nicht aufrufen. Fehlt der Zweig, startet das neue Theme mit den Farben
- *  des Ladebildschirms von Noctis. */
+/** A new theme additionally needs a branch in the boot script in
+ *  `index.html` — it runs before the bundle and cannot call
+ *  `normalizeThemeId()`. Without the branch, the new theme starts with the
+ *  colours of Noctis's loading screen. */
 export const THEME_OPTIONS: Array<{ id: ThemeId; label: string }> = [
   { id: 'emerald-noctis', label: 'Emerald Noctis' },
   { id: 'emerald-parchment', label: 'Emerald Parchment' },
@@ -30,15 +30,15 @@ export const FONT_OPTIONS: Array<{ id: FontId; label: string }> = [
   { id: 'merriweather', label: 'Merriweather' },
 ];
 
-/** Größe der Oberfläche in Prozent, als Zoom des WebViews. Ein Wurzel-
- *  `font-size` reichte nicht: Spalten und Leisten mit fester px-Breite wuchsen
- *  nicht mit, und der größere Text brach aus ihnen heraus. */
+/** Size of the interface in percent, as the WebView's zoom. A root
+ *  `font-size` was not enough: columns and bars with a fixed px width did not
+ *  grow with it, and the larger text broke out of them. */
 export const UI_SCALE_OPTIONS = [90, 100, 110, 120] as const;
 export type UIScale = (typeof UI_SCALE_OPTIONS)[number];
 export const DEFAULT_UI_SCALE: UIScale = 100;
 
-/** Textgröße im Editor und in Feldwerten, in px — unabhängig von der
- *  Oberfläche. 17 war der feste Wert davor. */
+/** Text size in the editor and in field values, in px — independent of the
+ *  interface. 17 was the fixed value before. */
 export const EDITOR_FONT_SIZE_OPTIONS = [14, 15, 16, 17, 18, 20, 22] as const;
 export type EditorFontSize = (typeof EDITOR_FONT_SIZE_OPTIONS)[number];
 export const DEFAULT_EDITOR_FONT_SIZE: EditorFontSize = 17;
@@ -75,7 +75,7 @@ export function applyEditorFont(fontId: FontId) {
 }
 
 export function normalizeUIScale(raw: unknown): UIScale {
-  // Der Boot-Spiegel liefert Zahlen als Text.
+  // The boot mirror delivers numbers as text.
   return oneOf(typeof raw === 'string' ? Number(raw) : raw, UI_SCALE_OPTIONS, DEFAULT_UI_SCALE);
 }
 
@@ -84,8 +84,8 @@ export function normalizeEditorFontSize(raw: unknown): EditorFontSize {
 }
 
 export function applyUIScale(scale: UIScale) {
-  // Außerhalb von Tauri (Vite im Browser) gibt es kein WebView zum Zoomen —
-  // `getCurrentWebview()` würfe dort schon synchron.
+  // Outside Tauri (Vite in the browser) there is no WebView to zoom —
+  // `getCurrentWebview()` would already throw synchronously there.
   if (!isTauri) return;
   getCurrentWebview().setZoom(scale / 100).catch((err: unknown) => {
     console.warn('[theme] could not set webview zoom', err);

@@ -7,13 +7,13 @@ import BlockGlyph from './BlockGlyph';
 interface BlockFrameProps {
   isEditing: boolean;
   icon: GlyphSource;
-  /** Eigener Titel der Instanz oder der Typname. */
+  /** The instance's own title or the type name. */
   label: string;
-  /** Ausgeblendet: im Lesemodus weg, im Bearbeitungsmodus ausgegraut. */
+  /** Hidden: gone in read mode, greyed out in edit mode. */
   hidden: boolean;
-  /** Titel im Lesemodus zeigen (Anzeigeregel des Blocks). */
+  /** Show the title in read mode (the block's display rule). */
   showReadTitle: boolean;
-  /** Kopie eines eigenen Blocks, dessen Definition inzwischen weiter ist — das Menü bietet „Block aktualisieren". */
+  /** Copy of a custom block whose definition has since moved on; the menu offers "Update block". */
   outdated?: boolean;
   onGripPointerDown: (e: PointerEvent) => void;
   onOpenMenu: (e: MouseEvent) => void;
@@ -21,15 +21,15 @@ interface BlockFrameProps {
 }
 
 /**
- * Die Hülle um einen Block. Im Lesemodus unsichtbar — die Blöcke fließen wie
- * ein Dokument, höchstens mit einem dezenten Titel darüber. Im
- * Bearbeitungsmodus ein Rahmen mit Griff zum Verschieben, Titel und Menü.
+ * The shell around a block. Invisible in read mode: the blocks flow like
+ * a document, at most with a discreet title above. In
+ * edit mode a frame with a handle for moving, title and menu.
  *
- * Der Inhalt steht in beiden Modi an derselben Stelle im Baum: wechselte die
- * Struktur mit dem Modus, montierte React den Block neu, und ein Textblock
- * verlöre seinen Editor samt ungespeicherter Eingabe. Aus demselben Grund
- * wird ein ausgeblendeter Block im Lesemodus per CSS versteckt, nicht
- * weggelassen.
+ * The content sits at the same place in the tree in both modes: if the
+ * structure changed with the mode, React would remount the block, and a text block
+ * would lose its editor along with unsaved input. For the same reason
+ * a hidden block is hidden via CSS in read mode, not
+ * omitted.
  */
 export default function BlockFrame({
   isEditing, icon, label, hidden, showReadTitle, outdated = false, onGripPointerDown, onOpenMenu, children,

@@ -5,10 +5,10 @@ import { OP_PROP_SELECT_CLASSES } from '../../lib/styleClasses';
 import type { SelectOption } from '../../lib/blocks/fields';
 
 /**
- * Die Optionen eines Auswahl-Elements: umbenennen, entfernen, hinzufügen.
- * Werte speichern die Options-ID, Umbenennen verliert also nichts. Geteilt von
- * der Block-Seitenleiste (`variant="panel"`: Beschriftung, Eingaben und
- * „×" im Stil der Seitenleiste) und dem Baukasten der Blöcke-Ansicht.
+ * The options of a choice element: rename, remove, add.
+ * Values store the option ID, so renaming loses nothing. Shared by
+ * the block sidebar (`variant="panel"`: label, inputs and
+ * "×" in the sidebar's style) and the block builder of the blocks view.
  */
 export default function OptionsEditor({ options, onChange, variant = 'default' }: {
   options: SelectOption[];

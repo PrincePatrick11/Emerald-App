@@ -14,7 +14,7 @@ export function useEmojiSearchData(enabled: boolean): string[][] | null {
     let cancelled = false;
     loadEmojiSearchData(locale).then(
       (loaded) => { if (!cancelled) setData(loaded); },
-      // Ohne Daten bleibt die Suche leer statt ewig am Laden.
+      // Without data the search stays empty instead of loading forever.
       (err: unknown) => {
         console.error('[emoji] could not load search data', err);
         if (!cancelled) setData([]);

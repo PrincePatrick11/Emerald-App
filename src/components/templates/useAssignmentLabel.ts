@@ -5,8 +5,8 @@ import { MODULES, viewTypeForEntryType } from '../../lib/modules';
 import { ALL_CATEGORIES, type TemplateEntryType } from '../../lib/blocks/templates';
 
 /**
- * Die zwei Teile einer Kombination: die Eintragsart und, außer beim Journal,
- * die Kategorie („🪄 Ritual", „Alle Kategorien", „Ohne Kategorie").
+ * The two parts of a combination: the entry type and, except for the journal,
+ * the category ("🪄 Ritual", "All categories", "No category").
  */
 export function useAssignmentParts(): (entryType: TemplateEntryType, category: string | null) => { type: string; place: string | null } {
   const { t } = useTranslation();
@@ -17,12 +17,12 @@ export function useAssignmentParts(): (entryType: TemplateEntryType, category: s
     if (category === ALL_CATEGORIES) return { type, place: t('templates.allCategories') };
     if (category === null) return { type, place: t('categories.uncategorized') };
     const cat = categories.find((c) => c.id === category);
-    // Eine Kategorie im Papierkorb: die Zuweisung ruht, bis sie zurückkommt.
+    // A category in the trash: the assignment rests until it comes back.
     return { type, place: cat ? `${cat.emoji} ${categoryLabel(t, cat)}` : t('templates.missingCategory') };
   };
 }
 
-/** Der Name einer Kombination, wie Liste, Zuweisungen und Hinweise ihn zeigen: „Wiki · 🪄 Ritual". */
+/** The name of a combination, as list, assignments and notices show it: "Wiki · 🪄 Ritual". */
 export function useAssignmentLabel(): (entryType: TemplateEntryType, category: string | null) => string {
   const parts = useAssignmentParts();
   return (entryType, category) => {

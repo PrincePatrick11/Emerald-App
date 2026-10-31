@@ -10,8 +10,8 @@ import Modal from '../ui/Modal';
 
 type Tab = 'all' | ContentType;
 
-/** Tab-Reihenfolge = Rail-Reihenfolge (Registry), nicht die Key-Reihenfolge
- *  irgendeiner Map: journal, task, operation, wiki, altar. */
+/** Tab order = rail order (registry), not the key order
+ *  of some map: journal, task, operation, wiki, altar. */
 const LINK_TYPE_ORDER: ContentType[] = MODULE_LIST.map((mod) => mod.entryType);
 
 interface Props {
@@ -30,7 +30,7 @@ export default function LinkPickerModal({ onSelect, onClose }: Props) {
     searchRef.current?.focus();
   }, []);
 
-  // Reihenfolge = LINK_TYPE_ORDER (Rail), siehe useLinkItems.
+  // Order = LINK_TYPE_ORDER (rail), see useLinkItems.
   const allItems: SuggestionItem[] = useLinkItems();
 
   const filtered = useMemo(() => {
@@ -52,8 +52,8 @@ export default function LinkPickerModal({ onSelect, onClose }: Props) {
   }, [allItems, query]);
 
   const tabs: { id: Tab; label: string; icon: React.ReactNode; count: number }[] = [
-    // 14px wie in jeder anderen Icon-Tab-Leiste (LeftSidebarEntryList,
-    // ListToolbar) — 12 ist der Schritt für Meta-Zeilen und Badges.
+    // 14px as in every other icon tab bar (LeftSidebarEntryList,
+    // ListToolbar); 12 is the step for meta rows and badges.
     { id: 'all', label: t('linkPicker.tabAll'), icon: <LayoutList size={14} />, count: counts.all },
     ...LINK_TYPE_ORDER.map((type) => {
       const Icon = ENTRY_TYPE_ICONS[type];
@@ -67,9 +67,9 @@ export default function LinkPickerModal({ onSelect, onClose }: Props) {
       onClose={onClose}
       widthClassName="w-[560px]"
       bodyClassName="flex-1 flex flex-col overflow-hidden"
-      // Feste statt maximale Höhe: mit max-h wuchs und schrumpfte das Modal
-      // mit der Trefferzahl des aktiven Tabs und sprang, weil es vertikal
-      // zentriert ist, bei jedem Tab-Wechsel in der Höhe hin und her.
+      // Fixed instead of maximum height: with max-h the modal grew and shrank
+      // with the hit count of the active tab and, because it is vertically
+      // centred, jumped up and down in height on every tab switch.
       className="link-picker-modal overflow-hidden h-[75vh]"
     >
         {/* Search */}
@@ -91,15 +91,15 @@ export default function LinkPickerModal({ onSelect, onClose }: Props) {
           </div>
         </div>
 
-        {/* Tabs — nur Icon + Zähler, das Label liefert der Tooltip: sechs Tabs
-            mit Locale-Labels sprengten die Modal-Breite. Bewusst KEIN
-            overflow-x-auto als Netz: ein Overflow-Container clippt auch
-            vertikal und wird beim Fokussieren eines Tabs verschoben — die
-            Reihe sprang dann in der Höhe. Die Icon-Tabs passen ohnehin.
-            Abweichung von TabIconButton (components.md): dessen Aktiv-Zustand
-            ist fest auf die Stone-Tönung der Seitenleisten verdrahtet, hier
-            braucht es die Jade-Tönung des Pickers — eine Tone-Variante fehlt
-            dort noch; bis dahin bleibt dies der eigene Button. */}
+        {/* Tabs: only icon + counter, the label comes from the tooltip; six tabs
+            with locale labels would burst the modal width. Deliberately NO
+            overflow-x-auto as a safety net: an overflow container also clips
+            vertically and gets shifted when a tab is focused, so the
+            row jumped in height. The icon tabs fit anyway.
+            Deviation from TabIconButton (components.md): its active state
+            is hard-wired to the stone tint of the sidebars, whereas here
+            the picker's jade tint is needed; a tone variant is still missing
+            there, and until then this remains the custom button. */}
         <div role="tablist" className="flex items-center gap-1 px-4 py-2 border-b border-stone-700/40 flex-shrink-0">
           {tabs.map((tab) => (
             <button
@@ -142,8 +142,8 @@ export default function LinkPickerModal({ onSelect, onClose }: Props) {
                     {/* Icon */}
                     <span className="text-base w-5 flex-shrink-0 flex items-center justify-center">
                       {(() => {
-                        // displayIcon zuerst: Altäre tragen ihre Grafik nur dort
-                        // (siehe SuggestionItem), `icon` bliebe leer.
+                        // displayIcon first: altars carry their graphic only there
+                        // (see SuggestionItem), `icon` would stay empty.
                         const icon = item.displayIcon || item.icon;
                         return isImageIcon(icon)
                           ? <img src={icon} alt="" className="w-4 h-4 object-contain" />

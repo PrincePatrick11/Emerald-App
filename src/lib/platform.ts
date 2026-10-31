@@ -7,12 +7,12 @@
  * wrong layout first.
  */
 /**
- * Die `typeof`-Wachen hier und an `isTauri` sind kein Zierrat:
- * `scripts/schema-check.mjs` buendelt `db.ts` fuer node, und ueber `images.ts`
- * haengt dieses Modul mit drin. Ein ungeschuetzter Zugriff auf `navigator` oder
- * `window` beim Laden sprengt den Harness beim Import, bevor irgendeine
- * Pruefung laeuft. Ausserhalb eines Browsers ist die Antwort schlicht "nichts
- * davon".
+ * The `typeof` guards here and on `isTauri` are not decoration:
+ * `scripts/schema-check.mjs` bundles `db.ts` for node, and this module is
+ * pulled in via `images.ts`. An unguarded access to `navigator` or
+ * `window` at load time blows up the harness on import, before any
+ * check runs. Outside a browser the answer is simply "none
+ * of it".
  */
 const ua = typeof navigator === 'undefined' ? '' : navigator.userAgent;
 

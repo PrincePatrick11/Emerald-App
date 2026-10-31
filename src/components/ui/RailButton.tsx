@@ -1,7 +1,7 @@
 import type { ButtonHTMLAttributes } from 'react';
 
 interface RailButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
-  /** Die gerade offene Ansicht — bekommt denselben Akzentrahmen wie
+  /** The currently open view; gets the same accent border as
    *  `.sidebar-item.active`. */
   active?: boolean;
 }

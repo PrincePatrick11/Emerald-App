@@ -7,18 +7,18 @@ import type { AltarItem } from '../../types';
 
 interface Props {
   item: AltarItem;
-  /** Ziehen auf die Leinwand — nur im Altar-Editor, wo es eine Leinwand gibt. */
+  /** Dragging onto the canvas, only in the altar editor, where a canvas exists. */
   draggable?: boolean;
-  /** Stift beim Hover. Im Dashboard entfällt er, dort öffnet der Klick selbst. */
+  /** Pencil on hover. Omitted in the dashboard, where the click itself opens it. */
   onEdit?: () => void;
-  /** Klick auf die Kachel — im Dashboard das Bearbeiten-Modal. */
+  /** Click on the tile; in the dashboard this is the edit modal. */
   onClick?: () => void;
 }
 
 /**
- * Die 70px-Kachel eines Bibliothekselements: Bild oder Emoji über dem Namen.
- * Eine Kachel für beide Orte — die Leiste im Editor (ziehbar, Stift) und den
- * Bibliotheks-Teil im Dashboard (klickbar).
+ * The 70px tile of a library element: image or emoji above the name.
+ * One tile for both places: the strip in the editor (draggable, pencil) and the
+ * library section in the dashboard (clickable).
  */
 export function AltarItemTile({ item, draggable, onEdit, onClick }: Props) {
   const { t } = useTranslation();

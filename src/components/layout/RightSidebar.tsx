@@ -14,9 +14,9 @@ import AltarSidebarPanel from '../sidebar/panels/AltarSidebarPanel';
 import Button from '../ui/Button';
 import SidebarColumn, { EditActionBar, SidebarActionBar } from '../ui/SidebarColumn';
 
-// Eager, nicht lazy: die Panels hängen ohnehin an Stores, die beim Start
-// geladen sind, und die Seitenleiste ist ab dem ersten Frame sichtbar.
-// tasks hat bewusst kein Panel (Aufgaben werden inline bearbeitet).
+// Eager, not lazy: the panels depend on stores that are loaded at startup
+// anyway, and the sidebar is visible from the first frame.
+// tasks deliberately has no panel (tasks are edited inline).
 const PROPERTIES_PANELS: Partial<Record<ViewId, ComponentType>> = {
   journal: JournalPropertiesPanel,
   wiki: WikiPropertiesPanel,
@@ -25,13 +25,13 @@ const PROPERTIES_PANELS: Partial<Record<ViewId, ComponentType>> = {
 };
 
 /**
- * Views ohne Einträge. Sie bekommen nie die Eintrags-Aktionsleiste: ein
- * Tiefenlink aus der Suche (`{ type: 'tags' | 'categories', id }`) trägt eine
- * id, bekäme sonst die Eintrags-Aktionsleiste und darin einen
- * „Bearbeiten"-Knopf, der `mode: 'edit'` auf eine Ansicht ohne Editor setzt.
- * Die Seite eines eigenen Blocks oder einer Vorlage (`{ type: 'blocks' |
- * 'templates', id }`) bringt ihre Leiste selbst mit und portalt sie in
- * denselben Host wie ein Dashboard.
+ * Views without entries. They never get the entry action bar: a
+ * deep link from the search (`{ type: 'tags' | 'categories', id }`) carries an
+ * id, and would otherwise get the entry action bar with an
+ * "Edit" button in it, which sets `mode: 'edit'` on a view without an editor.
+ * The page of a custom block or a template (`{ type: 'blocks' |
+ * 'templates', id }`) brings its own bar and portals it into
+ * the same host as a dashboard.
  */
 const VIEWS_WITHOUT_ENTRIES: ReadonlySet<ViewId> = new Set<ViewId>(['home', 'tags', 'categories', ...LIBRARY_VIEW_IDS]);
 
@@ -51,7 +51,7 @@ function RightSidebarActionBar() {
   const editLocked = useUIStore((s) => s.editLocked);
   const altarWindowFullscreen = useUIStore((s) => s.altarWindowFullscreen);
   const setAltarWindowFullscreen = useUIStore((s) => s.setAltarWindowFullscreen);
-  // Der Inhalt des offenen Eintrags — für die Sperre einer geladenen Sigille.
+  // The content of the open entry — for the lock of a loaded sigil.
   const entryType = entryTypeForView(activeView.type);
   const content = useEntryStore((s) => (entryType && activeView.id ? findEntry(s.entries, activeView.id, entryType)?.content : undefined));
 
@@ -60,8 +60,8 @@ function RightSidebarActionBar() {
 
   if (isEditing) {
     if (!editActions) return null;
-    // Die Sperre gilt ab dem Klick, der sie auslöst — nicht erst, wenn die
-    // Knöpfe als gesperrt gezeichnet sind: deshalb fragt jeder Griff den Store.
+    // The lock applies from the click that triggers it — not only once the
+    // buttons are drawn as locked: that is why every handler asks the store.
     const unlessLocked = (run: () => void | Promise<void>) => () => {
       if (!useUIStore.getState().editLocked) void run();
     };
@@ -75,16 +75,16 @@ function RightSidebarActionBar() {
     );
   }
 
-  // Eine geladene Sigille mit Sperre „ganzer Eintrag" lässt sich nicht
-  // bearbeiten — der Ladung-Block entscheidet, in jeder Eintragsart. Der Knopf
-  // bleibt stehen und sagt, warum er nichts tut.
+  // A loaded sigil with the "whole entry" lock cannot be edited — the
+  // charge block decides, in every entry type. The button stays
+  // and says why it does nothing.
   const locked = content !== undefined && !!entryBlockSummary(activeView.id, content).sigil?.lockEntry;
   const isAltar = activeView.type === 'altar';
 
   return (
     <SidebarActionBar>
-      {/* Der Tooltip hängt an einer Hülle: ein gesperrter Tone-Button lässt
-          keine Maus an sich heran (`disabled:pointer-events-none`). */}
+      {/* The tooltip hangs on a wrapper: a locked tone button lets no
+          mouse reach it (`disabled:pointer-events-none`). */}
       <span className="flex flex-1 min-w-0" title={locked ? t('editor.lockedBySigil') : undefined}>
         <Button
           tone="amber"
@@ -119,21 +119,21 @@ export default function RightSidebar() {
   const setListHeaderHost = useUIStore((s) => s.setListHeaderHost);
   const dashboardMounted = useUIStore((s) => s.dashboardMounted);
 
-  // Ist ein Dashboard gemountet, gehört die Leiste seinem Kopf —
-  // Aktions-Buttons, Toolbar und Filter portalt es hierher. Das entscheidet
-  // seine Anmeldung, nicht `activeView.id`: Aufgaben zeigen ihre Liste auch
-  // mit einer id (Sprungziel, kein offener Eintrag), und die id eines
-  // gelöschten Eintrags fällt ebenfalls aufs Dashboard zurück.
-  // Views ohne Einträge und Listenansichten ohne id bekommen den Host auch
-  // vor der Anmeldung, damit er bereitsteht, solange der Chunk einer lazy
-  // geladenen Ansicht noch lädt. Einen Platzhalter braucht es nicht mehr:
-  // jede View ohne Einträge hat ein Dashboard (die Blöcke dazu ihre Seite).
+  // If a dashboard is mounted, the bar belongs to its header —
+  // action buttons, toolbar and filters are portaled here. Its registration
+  // decides that, not `activeView.id`: tasks show their list even
+  // with an id (jump target, no open entry), and the id of a
+  // deleted entry likewise falls back to the dashboard.
+  // Views without entries and list views without an id get the host even
+  // before registration, so that it is ready while the chunk of a lazily
+  // loaded view is still loading. A placeholder is no longer needed:
+  // every view without entries has a dashboard (blocks have their page as well).
   if (dashboardMounted || VIEWS_WITHOUT_ENTRIES.has(activeView.type) || !activeView.id) {
     return <div ref={setListHeaderHost} className="flex flex-col h-full" />;
   }
 
-  // Lesen und Bearbeiten zeigen dieselben Abschnitte (`SidebarSection`) ohne
-  // Linie untereinander; der Abstand kommt von hier.
+  // Reading and editing show the same sections (`SidebarSection`) without a
+  // line between them; the spacing comes from here.
   return (
     <SidebarColumn bar={<RightSidebarActionBar />} bodyClassName="flex flex-col gap-5">
       <PropertiesContent activeView={activeView} />

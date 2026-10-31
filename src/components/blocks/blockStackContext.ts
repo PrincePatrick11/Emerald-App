@@ -2,13 +2,13 @@ import { createContext } from 'react';
 import type { Editor } from '@tiptap/react';
 
 /**
- * Was ein Textblock vom umgebenden `BlockStack` braucht, ohne dass jede
- * Block-Komponente dafür eigene Props bekommt: seine Editor-Instanz anmelden
- * (der Stapel entscheidet darüber, wer Toolbar, Link-Bitten und Datei-Drops
- * bekommt) und seinen Platzhalter.
+ * What a text block needs from the surrounding `BlockStack`, without every
+ * block component getting its own props for it: registering its editor instance
+ * (the stack decides who gets toolbar, link requests and file drops)
+ * and its placeholder.
  */
 export interface BlockStackContextValue {
-  /** `blockId` — oder `<Block-ID>:<Element-ID>` für das Text-Element eines eigenen Blocks. */
+  /** `blockId`, or `<block ID>:<element ID>` for the text element of a custom block. */
   registerTextEditor: (blockId: string, editor: Editor | null) => void;
   placeholderFor: (blockId: string) => string;
 }

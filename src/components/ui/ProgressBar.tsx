@@ -1,13 +1,13 @@
 /**
- * Ein schmaler Fortschrittsbalken mit Beschriftung rechts daneben.
+ * A narrow progress bar with a label to its right.
  *
- * `percent` `null`: unbekannt — der Balken bleibt leer statt zu lügen, die
- * Beschriftung zeigt, dass es läuft.
+ * `percent` `null`: unknown; the bar stays empty instead of lying, and the
+ * label shows that it is running.
  */
 export default function ProgressBar({ percent, label, ariaLabel }: {
   percent: number | null;
   label?: React.ReactNode;
-  /** Name des Balkens für Screenreader — die sichtbare Beschriftung steht oft daneben. */
+  /** Name of the bar for screen readers; the visible label is often next to it. */
   ariaLabel?: string;
 }) {
   return (

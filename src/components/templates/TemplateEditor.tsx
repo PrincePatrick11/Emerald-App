@@ -27,24 +27,24 @@ const draftOf = (d: TemplateDraft): TemplateDraft => ({
 interface Props {
   template: Template;
   entries: readonly EntryContentRow[];
-  /** Zurück zur Liste. Der Zurück-Link über dem Titel lässt den Entwurf liegen; „Fertig" und „Abbrechen" erledigen ihn vorher. */
+  /** Back to the list. The back link above the title leaves the draft behind; "Done" and "Cancel" settle it first. */
   onClose: () => void;
   onDelete: () => void;
-  /** Gerade mit „Neu" angelegt: „Abbrechen" legt sie in den Papierkorb (`onDelete`). */
+  /** Just created with "New": "Cancel" moves it to the trash (`onDelete`). */
   isNew?: boolean;
 }
 
 /**
- * Die Seite einer Vorlage (`LibraryPageFrame`, wie ein eigener Block): Name
- * als Titel, der Titel neuer Einträge und der Blockstapel —
- * derselbe Editor wie im Eintrag, immer im Bearbeiten. In der Seitenleiste
- * Icon, verlinkte Einträge, Tags, Zuweisung und Standard (festgelegt im
- * Dialog), die Block-Verwaltung und die Einträge, die aus der Vorlage
- * entstanden sind.
+ * A template's page (`LibraryPageFrame`, like a custom block): name
+ * as title, the title of new entries and the block stack,
+ * the same editor as in an entry, always in edit mode. In the sidebar:
+ * icon, linked entries, tags, assignment and default (set in the
+ * dialog), the block management and the entries that arose from the
+ * template.
  *
- * Bearbeitet wird ein Entwurf (`useDraftPage`); erst „Fertig" speichert die
- * geänderten Felder — und setzt dabei gewählte Sterne, die anderen Vorlagen
- * dann fehlen. Einträge ändern sich nie: sie tragen Kopien.
+ * A draft is edited (`useDraftPage`); only "Done" saves the
+ * changed fields, and in doing so applies chosen stars, which the other templates
+ * then lack. Entries never change: they carry copies.
  */
 export default function TemplateEditor({ template, entries, onClose, onDelete, isNew }: Props) {
   const { t } = useTranslation();
@@ -55,7 +55,7 @@ export default function TemplateEditor({ template, entries, onClose, onDelete, i
     id: template.id,
     label: (current) => templateLabel(t, current),
     saved: draftOf(template),
-    // Zuweisungen als Änderung auf den aktuellen Stand — eine andere Vorlage kann inzwischen Sterne genommen haben.
+    // Assignments as a change on top of the current state; another template may have taken stars in the meantime.
     save: (id, patch, base) => updateTemplate(id, patch.assignments
       ? { ...patch, assignments: mergeAssignmentChanges(base.assignments, patch.assignments, useTemplateStore.getState().templates.find((t) => t.id === id)?.assignments ?? []) }
       : patch),
@@ -63,7 +63,7 @@ export default function TemplateEditor({ template, entries, onClose, onDelete, i
     onCancelNew: isNew ? onDelete : undefined,
     logTag: 'TemplateEditor',
   });
-  // Nur der Anfangswert: der Stapel ist danach unkontrolliert (siehe BlockStack).
+  // Only the initial value: the stack is uncontrolled afterwards (see BlockStack).
   const [initialContent] = useState(draft.content);
   const setIcon = useShrunkIcon((icon) => patch({ icon }), 'TemplateEditor');
 

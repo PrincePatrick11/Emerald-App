@@ -1,38 +1,38 @@
 /**
- * Emeralds Schema an einer Stelle.
+ * Emerald's schema in one place.
  *
- * Der Baseline-Pfad in `db.ts` führt es für frische Vaults direkt aus; die
- * Rebuild-Migrationen v33 (`normalizeSchema.ts`, gegen die eingefrorene Kopie
+ * The baseline path in `db.ts` executes it directly for fresh vaults; the
+ * rebuild migrations v33 (`normalizeSchema.ts`, against the frozen copy
  * in `schemaV37.ts`), v38/v39 (`mergeCategoryTables.ts`/`nullableCategory.ts`,
- * gegen dieses DDL und `schemaV48.ts`) und v49 (`unifyEntries.ts`) bringen
- * bestehende Vaults auf denselben Stand. `scripts/schema-check.mjs`
- * beweist, dass beide Wege beim identischen Schema landen — ohne diese Prüfung
- * produziert ein Baseline-Squash erfahrungsgemäß nach ein paar Releases zwei
- * verschiedene Schemata, und niemand merkt es.
+ * against this DDL and `schemaV48.ts`) and v49 (`unifyEntries.ts`) bring
+ * existing vaults to the same state. `scripts/schema-check.mjs`
+ * proves that both paths end up at the identical schema — without this check
+ * a baseline squash, experience shows, produces two different schemas
+ * after a few releases, and nobody notices.
  *
- * Wer eine Spalte ändern will, ändert sie hier — und schreibt zusätzlich eine
- * neue Migration, die dasselbe für bestehende Datenbanken tut. Baut die
- * Migration eine Tabelle neu, die v33, v38 oder v39 ebenfalls anfassen, bekommen
- * die ihren alten Stand eingefroren (siehe `schemaV37.ts` und `schemaV48.ts`).
+ * Whoever wants to change a column changes it here — and additionally writes a
+ * new migration that does the same for existing databases. If the
+ * migration rebuilds a table that v33, v38 or v39 also touch, those
+ * get their old state frozen (see `schemaV37.ts` and `schemaV48.ts`).
  */
 import type Database from './sqlite';
 
 /**
- * Muss der höchsten Version in MIGRATIONS entsprechen. `db.ts` prüft das beim
- * Start, damit ein neuer Migrationsschritt nicht vergessen werden kann.
+ * Must match the highest version in MIGRATIONS. `db.ts` checks this at
+ * startup so that a new migration step cannot be forgotten.
  */
 export const BASELINE_VERSION = 55;
 
 /**
- * Tabellen in Abhängigkeitsreihenfolge: Eltern vor Kindern.
+ * Tables in dependency order: parents before children.
  *
- * Diese Reihenfolge ist nicht kosmetisch. Foreign Keys sind in dieser App
- * dauerhaft aktiv — sqlx setzt `foreign_keys = ON` als Default-Pragma auf jeder
- * Pool-Verbindung — und ein INSERT prüft sofort, ob die Elternzeile existiert.
- * Wer hier umsortiert, bricht die Rebuild-Migrationen und den Backup-Import.
+ * This order is not cosmetic. Foreign keys are permanently on in this app
+ * — sqlx sets `foreign_keys = ON` as a default pragma on every
+ * pool connection — and an INSERT immediately checks whether the parent row exists.
+ * Whoever reorders here breaks the rebuild migrations and the backup import.
  *
- * `schema_version` steht bewusst vorne und wird von keinem Rebuild neu gebaut:
- * dort steht der Migrationsstand, den der Rebuild gerade abarbeitet.
+ * `schema_version` is deliberately first and is rebuilt by no rebuild:
+ * it holds the migration state that the rebuild is currently working through.
  */
 export const TABLES = [
   'schema_version',
@@ -60,8 +60,8 @@ export const TABLE_DDL: Record<TableName, string> = {
       applied_at TEXT NOT NULL
     )`,
 
-  // Einträge und Vorlagen tragen Tag-IDs als JSON (seit v53, vorher Namen;
-  // `lib/tagRefs.ts`). Ein Tag im Papierkorb bleibt in ihren Listen stehen.
+  // Entries and templates carry tag IDs as JSON (since v53, names before;
+  // `lib/tagRefs.ts`). A tag in the trash stays in their lists.
   tags: `
     CREATE TABLE tags (
       id TEXT PRIMARY KEY,
@@ -70,13 +70,13 @@ export const TABLE_DDL: Record<TableName, string> = {
       deleted_at TEXT
     )`,
 
-  // Eine Liste für Wiki, Operationen, Aufgaben und Altar-Elemente (seit v38;
-  // vorher vier gleich gebaute Tabellen je Modul). Eingebaut ist seit v39 nur
-  // noch `sigils`, deren neue Operationen mit den Sigillen-Blöcken beginnen.
-  // Alles andere legt der Nutzer an; Eindeutigkeit der Namen prüft der Store
-  // (categoryKey), nicht die Datenbank — ein UNIQUE-Index würde das
-  // Wiederherstellen aus dem Papierkorb blockieren, sobald eine aktive
-  // gleichnamige Kategorie existiert.
+  // One list for wiki, operations, tasks and altar items (since v38;
+  // before, four identically built tables, one per module). Since v39 the only
+  // built-in one is `sigils`, whose new operations start with the sigil blocks.
+  // Everything else is created by the user; uniqueness of names is checked by the store
+  // (categoryKey), not the database — a UNIQUE index would block
+  // restoring from the trash as soon as an active category
+  // of the same name exists.
   categories: `
     CREATE TABLE categories (
       id TEXT PRIMARY KEY,
@@ -87,15 +87,15 @@ export const TABLE_DDL: Record<TableName, string> = {
       deleted_at TEXT
     )`,
 
-  // Die eigenen Blöcke der Blöcke-Ansicht (seit v40). Eine Definition ist die
-  // Vorlage für Kopien: ein eingefügter Block trägt Elemente und Anzeigeregeln
-  // selbst im `content` und merkt sich nur Herkunft und Revision
-  // (`data-block-origin`/`-rev`). Deshalb kein Fremdschlüssel und kein
-  // Aufräumen beim Löschen — die Kopien kommen ohne ihre Definition aus.
-  // `elements`/`display` sind JSON (lib/blocks/definitions.ts); `revision`
-  // steigt mit jeder Änderung, die Kopien betrifft. Der Icon-Default ist
-  // `DEFAULT_DEFINITION_ICON` — hier als Literal, damit das Schema nichts aus
-  // der Blocklogik importiert.
+  // The custom blocks of the blocks view (since v40). A definition is the
+  // template for copies: an inserted block carries elements and display rules
+  // itself in the `content` and remembers only origin and revision
+  // (`data-block-origin`/`-rev`). Hence no foreign key and no
+  // cleanup on deletion — the copies manage without their definition.
+  // `elements`/`display` are JSON (lib/blocks/definitions.ts); `revision`
+  // rises with every change that affects copies. The icon default is
+  // `DEFAULT_DEFINITION_ICON` — here as a literal so that the schema imports nothing from
+  // the block logic.
   block_definitions: `
     CREATE TABLE block_definitions (
       id TEXT PRIMARY KEY,
@@ -110,14 +110,14 @@ export const TABLE_DDL: Record<TableName, string> = {
       deleted_at TEXT
     )`,
 
-  // Die Vorlagen des Vorlagen-Dashboards (seit v43): Titel, Blockstapel und
-  // Tags, die ein Eintrag beim Anlegen oder Einfügen als Kopie bekommt. Wie
-  // `block_definitions` ohne Fremdschlüssel — Einträge merken sich nur die
-  // Herkunft im `content` (`data-template-origin`). `assignments` ist JSON
-  // (lib/blocks/templates.ts): welche Eintragsart × Kategorie die Vorlage
-  // anbietet und wo sie Standard ist; die Kategorie-IDs darin räumt
-  // `dropCategoryFromTemplates` beim endgültigen Löschen einer Kategorie.
-  // Der Icon-Default ist `DEFAULT_TEMPLATE_ICON`.
+  // The templates of the templates dashboard (since v43): title, block stack and
+  // tags that an entry receives as a copy on creation or insertion. Like
+  // `block_definitions` without a foreign key — entries remember only the
+  // origin in the `content` (`data-template-origin`). `assignments` is JSON
+  // (lib/blocks/templates.ts): which entry kind × category the template
+  // offers and where it is the default; the category IDs in it are cleaned up by
+  // `dropCategoryFromTemplates` when a category is permanently deleted.
+  // The icon default is `DEFAULT_TEMPLATE_ICON`.
   templates: `
     CREATE TABLE templates (
       id TEXT PRIMARY KEY,
@@ -133,9 +133,9 @@ export const TABLE_DDL: Record<TableName, string> = {
       deleted_at TEXT
     )`,
 
-  // `settings` (seit v51) ist JSON: Hintergrund, Raster, Einrasten und
-  // Auflösung (`lib/altarSettings.ts`) — vorher zwölf eigene Spalten. Die
-  // Bildspalten bleiben Spalten, das Bild-Aufräumen sucht dort.
+  // `settings` (since v51) is JSON: background, grid, snapping and
+  // resolution (`lib/altarSettings.ts`) — formerly twelve columns of their own. The
+  // image columns remain columns, the image cleanup looks there.
   altars: `
     CREATE TABLE altars (
       id TEXT PRIMARY KEY,
@@ -149,16 +149,16 @@ export const TABLE_DDL: Record<TableName, string> = {
       settings TEXT NOT NULL DEFAULT '{}'
     )`,
 
-  // Journal-Einträge, Wiki-Artikel und Operationen in einer Tabelle (seit v49;
-  // vorher drei, siehe `schemaV48.ts`). Was sie unterscheidet, steht im
-  // Inhalt — Blöcke —, nicht in Spalten: `type` sagt nur, in welchem Modul der
-  // Eintrag steht. Ein Typwechsel ist deshalb ein UPDATE (`entryTypeChange`).
-  // - `category_id`: das Journal hat keine Kategorien; Store und Typwechsel
-  //   halten sie dort auf NULL.
-  // - `entry_number` zählt pro Typ (`nextEntryNumber`) — dieselben Nummern
-  //   wie zu Zeiten der drei Tabellen.
-  // - Die Mondphase eines Journal-Eintrags folgt aus `created_at`
-  //   (`entryMoonPhase`), sie ist keine Spalte.
+  // Journal entries, wiki articles and operations in one table (since v49;
+  // before, three, see `schemaV48.ts`). What distinguishes them is in the
+  // content — blocks —, not in columns: `type` only says in which module the
+  // entry lives. A type change is therefore an UPDATE (`entryTypeChange`).
+  // - `category_id`: the journal has no categories; store and type change
+  //   keep it NULL there.
+  // - `entry_number` counts per type (`nextEntryNumber`) — the same numbers
+  //   as in the days of the three tables.
+  // - The moon phase of a journal entry follows from `created_at`
+  //   (`entryMoonPhase`), it is not a column.
   entries: `
     CREATE TABLE entries (
       id TEXT PRIMARY KEY,
@@ -175,12 +175,12 @@ export const TABLE_DDL: Record<TableName, string> = {
       deleted_at TEXT
     )`,
 
-  // category_id hielt bis v33 den Kategorie-*Namen* statt der ID — die einzige
-  // namensbasierte Referenz im ganzen Schema. Deshalb musste v23 ein Rename
-  // über zwei Tabellen kaskadieren.
-  // `updated_at`/`deleted_at` seit v52: ein gelöschtes Element liegt im
-  // Papierkorb, seine Platzierungen bleiben stehen und kommen mit ihm zurück.
-  // Endgültig weg nimmt ON DELETE CASCADE sie mit.
+  // category_id held the category *name* instead of the ID until v33 — the only
+  // name-based reference in the whole schema. That is why v23 had to cascade a rename
+  // across two tables.
+  // `updated_at`/`deleted_at` since v52: a deleted item lies in the
+  // trash, its placements stay and come back with it.
+  // When it is gone for good, ON DELETE CASCADE takes them along.
   altar_items: `
     CREATE TABLE altar_items (
       id TEXT PRIMARY KEY,
@@ -225,7 +225,7 @@ export const TABLE_DDL: Record<TableName, string> = {
       hidden INTEGER NOT NULL DEFAULT 0
     )`,
 
-  // target_id ist polymorph — kein Foreign Key möglich; checkIntegrity() prüft die Beziehung.
+  // target_id is polymorphic — no foreign key possible; checkIntegrity() checks the relationship.
   task_links: `
     CREATE TABLE task_links (
       id TEXT PRIMARY KEY,
@@ -235,12 +235,12 @@ export const TABLE_DDL: Record<TableName, string> = {
       UNIQUE (task_id, target_id, target_type)
     )`,
 
-  // Die Sprachen des Lexikons (seit v45): je eine Sprache mit ihrem Alphabet,
-  // die Vokabeln stehen in `lexicon_entries`. `alphabet` ist JSON
-  // (lib/lexicon.ts): Paare `{ from, to }`, mit denen das Übersetzen-Feld
-  // Zeichen für Zeichen umschreibt. Ohne Fremdschlüssel nach außen — eine
-  // Sprache hängt an keinem Eintrag und kein Eintrag an ihr.
-  // Der Icon-Default ist `DEFAULT_LANGUAGE_ICON`.
+  // The languages of the lexicon (since v45): one language each with its alphabet,
+  // the vocabulary is in `lexicon_entries`. `alphabet` is JSON
+  // (lib/lexicon.ts): pairs `{ from, to }` with which the translate field
+  // rewrites character by character. No foreign key to the outside — a
+  // language hangs off no entry and no entry off it.
+  // The icon default is `DEFAULT_LANGUAGE_ICON`.
   languages: `
     CREATE TABLE languages (
       id TEXT PRIMARY KEY,
@@ -253,10 +253,10 @@ export const TABLE_DDL: Record<TableName, string> = {
       deleted_at TEXT
     )`,
 
-  // Die Vokabeln einer Sprache (seit v45). Kein eigenes `deleted_at`: eine
-  // gelöschte Vokabel ist sofort weg (mit Rückgängig im Speicher), in den
-  // Papierkorb wandert nur die Sprache als Ganzes. ON DELETE CASCADE räumt
-  // deshalb beim endgültigen Löschen der Sprache mit auf.
+  // The vocabulary of a language (since v45). No `deleted_at` of its own: a
+  // deleted word is gone immediately (with undo in memory), only the
+  // language as a whole goes to the trash. ON DELETE CASCADE therefore
+  // cleans up too when the language is permanently deleted.
   lexicon_entries: `
     CREATE TABLE lexicon_entries (
       id TEXT PRIMARY KEY,
@@ -273,15 +273,15 @@ export const TABLE_DDL: Record<TableName, string> = {
 
 
 /**
- * Was v38 (`mergeCategoryTables`) und v39 (`nullableCategory`) mitten in der
- * Kette anlegen — auf jeder Foreign-Key-Spalte, auf beiden Seiten von
- * `task_links` und auf jeder `deleted_at`-Spalte. Dort gibt es `links` und die
- * drei Eintragstabellen noch; v47 wirft `links` weg, v49 die drei.
+ * What v38 (`mergeCategoryTables`) and v39 (`nullableCategory`) create in the
+ * middle of the chain — on every foreign key column, on both sides of
+ * `task_links` and on every `deleted_at` column. There `links` and the
+ * three entry tables still exist; v47 drops `links`, v49 the three.
  */
 /**
- * Die Indizes aus `INDEX_DDL_V38`, die es noch gibt. Die `deleted_at`-Indizes,
- * weil `runPeriodicCleanup` bei jedem Öffnen eines Vaults einen Bereichsscan
- * über alle Soft-Delete-Tabellen fährt.
+ * The indexes from `INDEX_DDL_V38` that still exist. The `deleted_at` indexes,
+ * because `runPeriodicCleanup` runs a range scan over all soft-delete tables
+ * every time a vault is opened.
  */
 const KEPT_INDEX_DDL_V38: readonly string[] = [
   'CREATE INDEX idx_task_links_task ON task_links(task_id)',
@@ -294,7 +294,7 @@ const KEPT_INDEX_DDL_V38: readonly string[] = [
   ...(['tags', 'categories', 'tasks'] as const).map((t) => `CREATE INDEX idx_${t}_deleted ON ${t}(deleted_at)`),
 ];
 
-/** Die aus `INDEX_DDL_V38`, deren Tabellen v47 (`links`) und v49 (die drei Eintragstabellen) verwerfen. */
+/** Those from `INDEX_DDL_V38` whose tables v47 (`links`) and v49 (the three entry tables) drop. */
 const DROPPED_INDEX_DDL_V38: readonly string[] = [
   'CREATE INDEX idx_links_source ON links(source_id)',
   'CREATE INDEX idx_links_target ON links(target_id)',
@@ -306,32 +306,32 @@ const DROPPED_INDEX_DDL_V38: readonly string[] = [
 export const INDEX_DDL_V38: readonly string[] = [...DROPPED_INDEX_DDL_V38, ...KEPT_INDEX_DDL_V38];
 
 /**
- * Der Index von `block_definitions` (v40), getrennt von `INDEX_DDL_V38`: v38
- * (`mergeCategoryTables`) und v39 (`nullableCategory`) legen ihre Liste mitten
- * in der Kette an, wo es die Tabelle noch nicht gibt. v40 legt ihn an, frische
- * Vaults über `INDEX_DDL`.
+ * The index of `block_definitions` (v40), separate from `INDEX_DDL_V38`: v38
+ * (`mergeCategoryTables`) and v39 (`nullableCategory`) create their list in the middle
+ * of the chain, where the table does not yet exist. v40 creates it, fresh
+ * vaults via `INDEX_DDL`.
  */
 export const BLOCK_DEFINITIONS_INDEX_DDL = 'CREATE INDEX idx_block_definitions_deleted ON block_definitions(deleted_at)';
 
-/** Der Index von `templates` (v43) — aus demselben Grund getrennt wie der von `block_definitions`. */
+/** The index of `templates` (v43) — separate for the same reason as that of `block_definitions`. */
 export const TEMPLATES_INDEX_DDL = 'CREATE INDEX idx_templates_deleted ON templates(deleted_at)';
 
-/** Die Indizes des Lexikons (v45) — getrennt wie die beiden darüber. */
+/** The lexicon's indexes (v45) — separate like the two above. */
 export const LEXICON_INDEX_DDL: readonly string[] = [
   'CREATE INDEX idx_languages_deleted ON languages(deleted_at)',
   'CREATE INDEX idx_lexicon_entries_language ON lexicon_entries(language_id)',
 ];
 
-/** Der Index des Altar-Papierkorbs (v46) — getrennt wie die darüber. */
+/** The index of the altar trash (v46) — separate like those above. */
 export const ALTARS_INDEX_DDL = 'CREATE INDEX idx_altars_deleted ON altars(deleted_at)';
 
-/** Der Index des Papierkorbs der Altar-Elemente (v52). */
+/** The index of the altar items' trash (v52). */
 export const ALTAR_ITEMS_INDEX_DDL = 'CREATE INDEX idx_altar_items_deleted ON altar_items(deleted_at)';
 
 /**
- * Die Indizes von `entries`, wie v49 sie anlegte — eingefroren für
- * `unifyEntries`, damit die Kette bei v55 denselben Umbau sieht wie ein echter
- * v54-Vault. v55 ersetzt `idx_entries_deleted` (`ENTRIES_INDEX_DDL`).
+ * The indexes of `entries` as v49 created them — frozen for
+ * `unifyEntries`, so that the chain at v55 sees the same rebuild as a real
+ * v54 vault. v55 replaces `idx_entries_deleted` (`ENTRIES_INDEX_DDL`).
  */
 export const ENTRIES_INDEX_DDL_V49: readonly string[] = [
   'CREATE INDEX idx_entries_type ON entries(type, deleted_at)',
@@ -340,19 +340,19 @@ export const ENTRIES_INDEX_DDL_V49: readonly string[] = [
 ];
 
 /**
- * Die Indizes von `entries`. `type` samt `deleted_at`, weil jedes Modul seine
- * lebenden Einträge so lädt.
+ * The indexes of `entries`. `type` together with `deleted_at`, because every module
+ * loads its live entries that way.
  *
- * `idx_entries_list` (v55) trägt jede Spalte, die die Listen beim Start lesen
- * (`fetchEntries`, erste Stufe), und die Tags (`rewriteTagRefs` beim Öffnen).
- * In der Zeile liegen `tags`, `created_at` … hinter `content`: ohne den Index
- * las SQLite dafür die Überlaufseiten jedes Eintrags — und SQLCipher
- * entschlüsselte dafür fast die ganze Datei. Mit ihm reicht der Index allein.
- * `deleted_at` führt, so dient er auch dem Bereichsscan von
- * `runPeriodicCleanup`. Icon und Titelbild fehlen bewusst: sie können
- * Data-URLs sein. Die wenigen Einträge, die eins tragen, findet der Teilindex
- * `idx_entries_decorated` — eine Abfrage nutzt ihn nur mit genau dieser
- * Bedingung im WHERE.
+ * `idx_entries_list` (v55) carries every column that the lists read at startup
+ * (`fetchEntries`, first stage), and the tags (`rewriteTagRefs` on open).
+ * In the row, `tags`, `created_at` … lie behind `content`: without the index
+ * SQLite read the overflow pages of every entry for that — and SQLCipher
+ * decrypted almost the whole file for it. With it, the index alone is enough.
+ * `deleted_at` leads, so it also serves the range scan of
+ * `runPeriodicCleanup`. Icon and cover image are deliberately missing: they can be
+ * data URLs. The few entries that carry one are found by the partial index
+ * `idx_entries_decorated` — a query uses it only with exactly this
+ * condition in its WHERE.
  */
 export const ENTRIES_INDEX_DDL: readonly string[] = [
   'CREATE INDEX idx_entries_type ON entries(type, deleted_at)',
@@ -361,43 +361,43 @@ export const ENTRIES_INDEX_DDL: readonly string[] = [
   'CREATE INDEX idx_entries_decorated ON entries(deleted_at) WHERE icon IS NOT NULL OR cover_image IS NOT NULL',
 ];
 
-/** Alle Indizes des aktuellen Schemas — was ein frischer Vault bekommt. */
+/** All indexes of the current schema — what a fresh vault gets. */
 export const INDEX_DDL: readonly string[] = [
   ...KEPT_INDEX_DDL_V38, BLOCK_DEFINITIONS_INDEX_DDL, TEMPLATES_INDEX_DDL, ...LEXICON_INDEX_DDL, ALTARS_INDEX_DDL,
   ...ENTRIES_INDEX_DDL, ALTAR_ITEMS_INDEX_DDL,
 ];
 
 /**
- * Das frühere Sammelbecken. Seit v39 ist es keins mehr: `category_id` darf
- * NULL sein, ein Eintrag ohne Kategorie ist der Normalfall, und `other` ist
- * eine gewöhnliche Kategorie wie jede andere — umbenenn- und löschbar, in
- * frischen Vaults gar nicht erst angelegt. Die Konstante bleibt für die
- * Migrationen v36–v39 und das Heben alter Sicherungen, die den alten
- * Sonderstatus noch kennen.
+ * The former catch-all. Since v39 it is none any more: `category_id` may be
+ * NULL, an entry without a category is the normal case, and `other` is
+ * an ordinary category like any other — renamable and deletable, not even
+ * created in fresh vaults. The constant remains for the
+ * migrations v36–v39 and for lifting old backups that still know the old
+ * special status.
  */
 export const FALLBACK_CATEGORY_ID = 'other';
 
 /**
- * Seit v39 die einzige eingebaute Kategorie. Eine neue Operation darin beginnt
- * mit den Sigillen-Blöcken — seit v43 nicht mehr fest verdrahtet, sondern über
- * die eingebaute Vorlage `core-sigil`, die dort Standard ist (und die der
- * Nutzer ändern oder löschen kann). Für Artikel, Aufgaben und Altar-Elemente
- * ist sie eine Kategorie wie jede andere.
+ * Since v39 the only built-in category. A new operation in it starts
+ * with the sigil blocks — since v43 no longer hard-wired, but via
+ * the built-in template `core-sigil`, which is the default there (and which the
+ * user can change or delete). For articles, tasks and altar items
+ * it is a category like any other.
  */
 export const SIGIL_CATEGORY_ID = 'sigils';
 
 /**
- * [id, Name (nur Datenbank — angezeigt wird `categories.builtin.<id>`), Emoji].
- * Seit v39 nur noch eine: `other` hat seinen Sonderstatus verloren.
+ * [id, name (database only — `categories.builtin.<id>` is displayed), emoji].
+ * Since v39 only one: `other` has lost its special status.
  */
 export const BUILTIN_CATEGORIES: readonly [string, string, string][] = [
   [SIGIL_CATEGORY_ID, 'Sigils', '🔯'],
 ];
 
 /**
- * Was ein frischer Vault außer den Builtins bekommt: normale, umbenenn- und
- * löschbare Kategorien, in der App-Sprache angelegt (`categories.starter.<key>`).
- * Die Schlüssel sind zugleich die IDs.
+ * What a fresh vault gets besides the built-ins: normal, renamable and
+ * deletable categories, created in the app language (`categories.starter.<key>`).
+ * The keys are at the same time the IDs.
  */
 export const STARTER_CATEGORIES: readonly [string, string][] = [
   ['paradigm', '🌀'],
@@ -410,20 +410,20 @@ export const STARTER_CATEGORIES: readonly [string, string][] = [
   ['tools', '⚗️'],
 ];
 
-/** Die Inhaltstabellen mit `category_id` (Wiki und Operationen stehen in `entries`). Literal, weil in SQL interpoliert. */
+/** The content tables with `category_id` (wiki and operations are in `entries`). A literal, because it is interpolated into SQL. */
 export const CATEGORIZED_TABLES = ['entries', 'tasks', 'altar_items'] as const;
 
 /**
- * Dasselbe DDL, aber verträglich mit einer bereits vorhandenen Tabelle.
- * Der Kettenpfad braucht das für `schema_version`, die dort schon existieren
- * kann — ohne diesen Umweg stünde das CREATE ein zweites Mal im Code, und genau
- * daran ist die Trennung von Baseline und Kette sonst gescheitert.
+ * The same DDL, but compatible with an already existing table.
+ * The chain path needs this for `schema_version`, which may already exist
+ * there — without this detour the CREATE would stand in the code a second time, and that is
+ * exactly what the separation of baseline and chain would otherwise have failed on.
  */
 export function ddlIfNotExists(ddl: string): string {
   return ddl.replace('CREATE TABLE ', 'CREATE TABLE IF NOT EXISTS ');
 }
 
-/** Legt Tabellen und Indizes an. Reihenfolge folgt TABLES. */
+/** Creates tables and indexes. The order follows TABLES. */
 export async function createSchema(db: Database): Promise<void> {
   for (const table of TABLES) {
     await db.execute(TABLE_DDL[table]);
@@ -433,7 +433,7 @@ export async function createSchema(db: Database): Promise<void> {
   }
 }
 
-/** Eine Kategoriezeile, wie `seedBuiltins` und die Migration v38 sie schreiben. */
+/** A category row as `seedBuiltins` and migration v38 write it. */
 export interface CategorySeedRow {
   id: string;
   name: string;
@@ -453,10 +453,10 @@ export async function insertCategoryRows(db: Database, rows: readonly CategorySe
 }
 
 /**
- * Legt die eingebauten Kategorien und das Starter-Set an. Nur für frische
- * Vaults. `starterName` übersetzt einen STARTER_CATEGORIES-Schlüssel in die
- * App-Sprache — der Aufrufer reicht `i18n.t` durch, damit diese Datei frei von
- * i18n bleibt.
+ * Creates the built-in categories and the starter set. Only for fresh
+ * vaults. `starterName` translates a STARTER_CATEGORIES key into the
+ * app language — the caller passes `i18n.t` through so that this file stays free of
+ * i18n.
  */
 export async function seedBuiltins(
   db: Database,
@@ -474,30 +474,30 @@ export async function seedBuiltins(
 }
 
 /**
- * Löst die Kategorie von allen ihren Inhalten — in allen vier Modulen — und
- * meldet, wie viele es waren. **Vor** jedem endgültigen Löschen einer
- * Kategorie aufzurufen.
+ * Detaches the category from all its contents — in all four modules — and
+ * reports how many there were. To be called **before** every permanent deletion of a
+ * category.
  *
- * Vorher hat das niemand getan: `runPeriodicCleanup` und `emptyTrash` haben
- * Kategoriezeilen hart gelöscht und die Inhalte unangetastet gelassen, die
- * damit auf eine `category_id` zeigten, zu der es keine Zeile mehr gab. Seit
- * v33 verhindert ON DELETE RESTRICT das — der Loeschversuch schlaegt fehl,
- * statt still Muell zu hinterlassen. Dieser Helfer ist die Gegenseite davon:
- * Er sorgt dafuer, dass das Löschen erlaubt ist, ohne dass ein Inhalt
- * verschwindet.
+ * Nobody used to do that: `runPeriodicCleanup` and `emptyTrash` hard-deleted
+ * category rows and left the contents untouched, which
+ * thereby pointed to a `category_id` for which no row existed any more. Since
+ * v33 ON DELETE RESTRICT prevents that — the delete attempt fails
+ * instead of silently leaving garbage behind. This helper is the other side of it:
+ * it ensures that deleting is allowed without any content
+ * disappearing.
  *
- * Bis v38 landeten die Inhalte auf dem Sammelbecken `other`. Seit `category_id`
- * NULL sein darf, werden sie schlicht kategorielos — dasselbe, was ein neuer
- * Eintrag ohnehin ist.
+ * Until v38 the contents landed in the catch-all `other`. Since `category_id`
+ * may be NULL, they simply become categoryless — the same as a new
+ * entry is anyway.
  *
- * Seit v43 nimmt es die Kategorie auch aus den Zuweisungen der Vorlagen
- * (`dropCategoryFromTemplates`) — beide Aufräumarbeiten gehören zum selben
- * endgültigen Löschen.
+ * Since v43 it also removes the category from the templates' assignments
+ * (`dropCategoryFromTemplates`) — both cleanup jobs belong to the same
+ * permanent deletion.
  *
- * Mit `to` ziehen die Inhalte statt dessen in diese Kategorie — wenn eine
- * zurückgeholte in ihrer gleichnamigen aufgeht (`categoryStore.restoreCategory`).
+ * With `to` the contents move into that category instead — when a
+ * restored one merges into the one of the same name (`categoryStore.restoreCategory`).
  */
-/** Endgültig löschen: erst die Inhalte lösen (ON DELETE RESTRICT), dann die Zeile. */
+/** Delete permanently: first detach the contents (ON DELETE RESTRICT), then the row. */
 export async function purgeCategory(db: Database, categoryId: string): Promise<void> {
   await reassignCategoryContent(db, categoryId);
   await db.execute('DELETE FROM categories WHERE id=$1', [categoryId]);
@@ -512,14 +512,14 @@ export async function reassignCategoryContent(db: Database, categoryId: string, 
     );
     moved += result.rowsAffected ?? 0;
   }
-  // Vorlagen zählen nicht mit — sie sind keine Inhalte. Beim Zusammenlegen
-  // ziehen ihre Zuweisungen mit, sonst gehen sie.
+  // Templates do not count — they are not contents. On merging
+  // their assignments move along, otherwise they are removed.
   if (to) await moveCategoryInTemplates(db, categoryId, to);
   else await dropCategoryFromTemplates(db, categoryId);
   return moved;
 }
 
-/** Eine verwaiste Referenz: Zeile `id` in `table` zeigt auf ein Ziel, das fehlt. */
+/** An orphaned reference: row `id` in `table` points to a target that is missing. */
 export interface Orphan {
   table: string;
   column: string;
@@ -528,19 +528,19 @@ export interface Orphan {
 }
 
 /**
- * Prüft die Beziehungen, für die kein Foreign Key deklarierbar ist: die
- * polymorphe `task_links`, die Kategorie-IDs im JSON der Vorlagen und die
- * Tag-IDs in Einträgen und Vorlagen. Foreign Keys decken den Rest ab, das
- * prüft `PRAGMA foreign_key_check`.
+ * Checks the relationships for which no foreign key can be declared: the
+ * polymorphic `task_links`, the category IDs in the templates' JSON and the
+ * tag IDs in entries and templates. Foreign keys cover the rest, which
+ * `PRAGMA foreign_key_check` checks.
  *
- * Nur für Verifikation und Diagnose gedacht, nicht für den Produktionspfad —
- * die Abfragen scannen mehrere Tabellen vollständig.
+ * Intended only for verification and diagnosis, not for the production path —
+ * the queries scan several tables completely.
  */
 export async function checkIntegrity(db: Database): Promise<Orphan[]> {
   const orphans: Orphan[] = [];
 
-  // Polymorphe Ziele: das *_type-Feld entscheidet, wo das Ziel steht. Die drei
-  // Eintragsarten stehen in `entries` und müssen dort auch den Typ tragen.
+  // Polymorphic targets: the *_type field decides where the target is. The three
+  // entry kinds are in `entries` and must carry the type there too.
   const contentTargets: Record<string, string> = {
     journal: "SELECT id FROM entries WHERE type = 'journal'",
     wiki: "SELECT id FROM entries WHERE type = 'wiki'",
@@ -566,7 +566,7 @@ export async function checkIntegrity(db: Database): Promise<Orphan[]> {
     return new Set(rows.map((r) => r.id));
   };
 
-  // Kategorie-IDs in den Zuweisungen der Vorlagen.
+  // Category IDs in the templates' assignments.
   const categoryIds = await idsOf('categories');
   const templates = await db.select<{ id: string; assignments: string | null }[]>('SELECT id, assignments FROM templates');
   for (const r of templates) {
@@ -582,7 +582,7 @@ export async function checkIntegrity(db: Database): Promise<Orphan[]> {
     }
   }
 
-  // Tag-IDs, auch die im Papierkorb: eine ID ohne Zeile in `tags` zeigt ins Leere.
+  // Tag IDs, including those in the trash: an ID without a row in `tags` points nowhere.
   const tagIds = await idsOf('tags');
   for (const table of ['entries', 'templates'] as const) {
     const rows = await db.select<{ id: string; tags: string }[]>(`SELECT id, tags FROM ${table} WHERE tags != '[]'`);
@@ -598,12 +598,12 @@ export async function checkIntegrity(db: Database): Promise<Orphan[]> {
   return orphans;
 }
 
-/** Das rohe `assignments`-JSON einer Vorlagenzeile als Liste — `null`, wenn es keine ist. */
+/** The raw `assignments` JSON of a template row as a list — `null` if it is not one. */
 function rawAssignments(json: string | null): unknown[] | null {
   return rawJsonList(json);
 }
 
-/** Ein JSON-Array aus einer Spalte — `null`, wenn es keins ist. */
+/** A JSON array from a column — `null` if it is not one. */
 function rawJsonList(json: string | null): unknown[] | null {
   try {
     const parsed: unknown = JSON.parse(json ?? '[]');
@@ -614,9 +614,9 @@ function rawJsonList(json: string | null): unknown[] | null {
 }
 
 /**
- * Die Kategorie-ID einer rohen Zuweisung — `null` für „alle" (`'*'`) und „ohne
- * Kategorie". Dieselbe Regel wie `assignedCategoryId` in
- * `lib/blocks/templates.ts`, das diese Datei nicht importiert.
+ * The category ID of a raw assignment — `null` for "all" (`'*'`) and "no
+ * category". The same rule as `assignedCategoryId` in
+ * `lib/blocks/templates.ts`, which this file does not import.
  */
 function assignedCategory(a: unknown): string | null {
   const category = (a as { category?: unknown } | null)?.category;
@@ -624,11 +624,11 @@ function assignedCategory(a: unknown): string | null {
 }
 
 /**
- * Nimmt eine Kategorie aus den Zuweisungen aller Vorlagen — auch aus dem
- * Papierkorb. `reassignCategoryContent` ruft es beim endgültigen Löschen einer
- * Kategorie auf; nicht zusätzlich aufrufen. Vorlagen haben keinen
- * Fremdschlüssel, der das erzwingen würde, und eine Zuweisung ins Leere böte
- * die Vorlage in einer Kombination an, die es nicht mehr gibt.
+ * Removes a category from the assignments of all templates — including those in the
+ * trash. `reassignCategoryContent` calls it on permanent deletion of a
+ * category; do not call it in addition. Templates have no
+ * foreign key that would enforce this, and an assignment pointing nowhere would offer
+ * the template in a combination that no longer exists.
  */
 export async function dropCategoryFromTemplates(db: Database, categoryId: string): Promise<void> {
   const rows = await db.select<{ id: string; assignments: string | null }[]>(
@@ -645,12 +645,12 @@ export async function dropCategoryFromTemplates(db: Database, categoryId: string
 }
 
 /**
- * Hängt die Zuweisungen an `from` auf `to` um — wenn eine Kategorie in ihrer
- * gleichnamigen aufgeht. Hatte eine Vorlage beide, bleibt eine Zuweisung. Ein
- * Stern zieht nur mit, wenn für diesen Typ und `to` noch keine aktive Vorlage
- * einen trägt: zwei Standards für dieselbe Kombination gibt es nicht. Sterne
- * gehören aktiven Vorlagen (wie in `restoreTemplate`) — eine im Papierkorb
- * verliert ihren hier.
+ * Re-attaches the assignments on `from` to `to` — when a category merges into
+ * the one of the same name. If a template had both, one assignment remains. A
+ * star only moves along if no active template carries one yet for this type
+ * and `to`: there are not two defaults for the same combination. Stars
+ * belong to active templates (as in `restoreTemplate`) — one in the trash
+ * loses its star here.
  */
 async function moveCategoryInTemplates(db: Database, from: string, to: string): Promise<void> {
   const rows = await db.select<{ id: string; assignments: string | null; deleted_at: string | null }[]>(
@@ -677,36 +677,36 @@ async function moveCategoryInTemplates(db: Database, from: string, to: string): 
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Bildreferenzen
+// Image references
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
- * Das vollstaendige Inventar der Spalten, in denen ein Bild referenziert sein
- * kann. Drei Sorten, weil sie unterschiedlich behandelt werden muessen:
+ * The complete inventory of the columns in which an image can be referenced.
+ * Three kinds, because they have to be treated differently:
  *
- * - `html` — der Verweis steckt in einem `src`-Attribut. Wird umgeschrieben.
- * - `plain` — die Spalte *ist* der Verweis. Wird umgeschrieben.
- * - `legacy` — die Spalte haelt heute eine Data-URL. Wird **gelesen**, aber nie
- *   umgeschrieben.
+ * - `html` — the reference sits in a `src` attribute. Is rewritten.
+ * - `plain` — the column *is* the reference. Is rewritten.
+ * - `legacy` — the column today holds a data URL. Is **read**, but never
+ *   rewritten.
  *
- * Die `legacy`-Gruppe ist der Grund, warum diese Liste vollstaendig sein muss
- * und nicht nur die umschreibbaren Spalten nennt. `collectUsedImageFilenames`
- * entscheidet, welche Datei die Aufraeum-Aktion loeschen darf; eine Spalte, die
- * hier fehlt, waere eine Referenz, die niemand sieht. Data-URLs stoeren dabei
- * nicht — sie enthalten keine 64 Hex-Zeichen mit Bildendung und fallen von
- * selbst durch.
+ * The `legacy` group is the reason why this list has to be complete
+ * and not name only the rewritable columns. `collectUsedImageFilenames`
+ * decides which file the cleanup action may delete; a column that is
+ * missing here would be a reference nobody sees. Data URLs do not
+ * interfere — they contain no 64 hex characters with an image extension and fall
+ * through by themselves.
  *
- * Umgeschrieben werden sie trotzdem nicht, und das ist Absicht:
- * `entries.icon` und `cover_image` werden von
- * `MediaPropertyRow` (Icons wie in `Favicon` über `readIconFile`) per
- * `FileReader` als Data-URL geschrieben, und ihre Renderer
- * pruefen mit `isImageIcon` auf `data:` / `blob:` / `/`. Ein Dateiname wuerde
- * dort als Text durchfallen. Dasselbe gilt fuer `altars.thumbnail_data` /
- * `icon_data` und `altar_items.image_data` (siehe die Base64-Notiz in
+ * They are still not rewritten, and that is intentional:
+ * `entries.icon` and `cover_image` are written by
+ * `MediaPropertyRow` (icons as in `Favicon` via `readIconFile`) as a data URL
+ * through `FileReader`, and their renderers
+ * check with `isImageIcon` for `data:` / `blob:` / `/`. A file name would
+ * fall through there as text. The same applies to `altars.thumbnail_data` /
+ * `icon_data` and `altar_items.image_data` (see the Base64 note in
  * `database.md`).
  *
- * Migration v35 läuft über den Stand von damals (`IMAGE_FIELDS_V48`), noch mit
- * den drei Eintragstabellen.
+ * Migration v35 runs over the state of that time (`IMAGE_FIELDS_V48`), still with
+ * the three entry tables.
  */
 export const IMAGE_FIELDS: {
   table: string;
@@ -720,26 +720,26 @@ export const IMAGE_FIELDS: {
 ];
 
 /**
- * Spiegelt `is_valid_image_name` in `src-tauri/src/images.rs`: ein gespeichertes
- * Bild heisst nach einem Hash seines eigenen Inhalts — SHA-256, in einem
- * verschluesselten Vault ein mit dem Vault-Schluessel gebildeter.
+ * Mirrors `is_valid_image_name` in `src-tauri/src/images.rs`: a stored
+ * image is named after a hash of its own content — SHA-256, in an
+ * encrypted vault one formed with the vault key.
  *
- * Das Format ist eine Eigenschaft der Spalten, nicht der Oberflaeche — deshalb
- * steht es hier und nicht in `images.ts`, das es nur re-exportiert. `db.ts`
- * kann es so in Migration v35 benutzen, ohne die Tauri-Module zu ziehen, die
- * `scripts/schema-check.mjs` gar nicht hat.
+ * The format is a property of the columns, not of the UI — which is why
+ * it lives here and not in `images.ts`, which only re-exports it. `db.ts`
+ * can thus use it in migration v35 without pulling in the Tauri modules that
+ * `scripts/schema-check.mjs` does not have at all.
  */
 const STORED_IMAGE_RE = /^[0-9a-f]{64}\.(?:png|jpe?g|gif|webp|svg)$/;
 
-/** Dieselbe Form, ungeankert — zum Aufsammeln aus HTML. */
+/** The same form, unanchored — for collecting from HTML. */
 const IMAGE_NAME_RE = /[0-9a-f]{64}\.(?:png|jpe?g|gif|webp|svg)/g;
 
 /**
- * Der gespeicherte Dateiname einer Referenz, oder null.
+ * The stored file name of a reference, or null.
  *
- * Nimmt auch einen vollen Pfad: v35 schreibt jeden absoluten Pfad um, den sie
- * findet, aber eine `.emerald`-Datei aus einer aelteren Version traegt weiter
- * welche.
+ * Also accepts a full path: v35 rewrites every absolute path it
+ * finds, but a `.emerald` file from an older version still carries
+ * some.
  */
 export function storedImageName(ref: string | null | undefined): string | null {
   if (!ref) return null;
@@ -748,11 +748,11 @@ export function storedImageName(ref: string | null | undefined): string | null {
 }
 
 /**
- * Alle Spalten einer Tabelle, die einen Bildverweis halten koennen.
+ * All columns of a table that can hold an image reference.
  *
- * Fuer alles, was nicht zwischen den drei Gruppen unterscheiden muss — der
- * Backup-Export und beide Import-Modi wollen schlicht "jede Spalte, in der ein
- * Bild stecken kann".
+ * For everything that does not need to distinguish between the three groups — the
+ * backup export and both import modes simply want "every column in which an
+ * image can be".
  */
 export function imageColumns(table: string): string[] {
   const entry = IMAGE_FIELDS.find((f) => f.table === table);
@@ -760,11 +760,11 @@ export function imageColumns(table: string): string[] {
 }
 
 /**
- * Alle Bild-Dateinamen, die dieser Vault tatsaechlich referenziert.
+ * All image file names that this vault actually references.
  *
- * Diagnose- und Aufraeumcode, kein Produktivpfad: die Funktion scannt ganze
- * Tabellen. Sie steht neben `checkIntegrity`, weil sie dieselbe Rolle hat —
- * etwas pruefen, das keine Fremdschluesselbeziehung abdecken kann.
+ * Diagnostic and cleanup code, not a production path: the function scans entire
+ * tables. It sits next to `checkIntegrity` because it has the same role —
+ * checking something that no foreign key relationship can cover.
  */
 export async function collectUsedImageFilenames(db: Database): Promise<Set<string>> {
   const used = new Set<string>();
@@ -778,23 +778,23 @@ export async function collectUsedImageFilenames(db: Database): Promise<Set<strin
       for (const column of columns) {
         const value = row[column];
         if (!value) continue;
-        // Ein Data-URL enthaelt keine 64 Hex-Zeichen mit Bildendung und
-        // faellt von selbst durch — deshalb duerfen die `legacy`-Spalten hier
-        // ohne Sonderbehandlung mitlaufen.
+        // A data URL contains no 64 hex characters with an image extension and
+        // falls through by itself — which is why the `legacy` columns may run
+        // along here without special handling.
         for (const match of value.matchAll(IMAGE_NAME_RE)) used.add(match[0]);
       }
     }
   }
 
-  // Bild-Vorgaben eigener Blöcke: das `elements`-JSON nennt die Datei, bevor
-  // eine Kopie sie in einen Inhalt schreibt. Nicht in IMAGE_FIELDS — Migration
-  // v35 läuft über diese Liste, und die Tabelle entsteht erst mit v40.
+  // Image defaults of custom blocks: the `elements` JSON names the file before
+  // a copy writes it into a content. Not in IMAGE_FIELDS — migration
+  // v35 runs over that list, and the table only comes into being with v40.
   const definitions = await db.select<{ elements: string | null }[]>('SELECT elements FROM block_definitions');
   for (const { elements } of definitions) {
     for (const match of (elements ?? '').matchAll(IMAGE_NAME_RE)) used.add(match[0]);
   }
 
-  // Bilder im Blockstapel der Vorlagen (v43) — aus demselben Grund nicht in IMAGE_FIELDS.
+  // Images in the templates' block stack (v43) — not in IMAGE_FIELDS for the same reason.
   const templates = await db.select<{ content: string | null }[]>('SELECT content FROM templates');
   for (const { content } of templates) {
     for (const match of (content ?? '').matchAll(IMAGE_NAME_RE)) used.add(match[0]);

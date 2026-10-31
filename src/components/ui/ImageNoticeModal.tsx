@@ -6,8 +6,8 @@ import { imageSizeLabel } from '../../lib/imageLimits';
 import { useImageNoticeStore } from '../../store/imageNoticeStore';
 
 /**
- * Warum ein Bild nicht eingefügt wurde — für die Wege ohne eigene Meldezeile
- * (siehe `imageNoticeStore`). Einmal in der AppShell.
+ * Why an image was not inserted, for the paths without their own notice row
+ * (see `imageNoticeStore`). Once in the AppShell.
  */
 export default function ImageNoticeModal() {
   const { t } = useTranslation();
@@ -18,8 +18,8 @@ export default function ImageNoticeModal() {
   const tooLarge = notice.kind === 'tooLarge';
   const detail = tooLarge
     ? t('common.imageTooLargeDetail', { max: imageSizeLabel(notice.maxBytes, t('common.megabytes')) })
-    // Die Liste als eigener Schluessel: der Titel nennt nur noch den Grund,
-    // sonst stuenden die Formate zweimal untereinander.
+    // The list as its own key: the title only names the reason,
+    // otherwise the formats would appear twice, one below the other.
     : t('common.acceptedImageFormats');
 
   return (

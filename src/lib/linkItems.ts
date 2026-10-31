@@ -7,80 +7,80 @@ import { isImageIcon } from './helpers';
 import type { AltarRecord, Category, ContentType, Entry, Task } from '../types';
 
 /**
- * Ein verlinkbarer Eintrag, wie ihn die `[[`-Autovervollständigung, der
- * Link-Picker, das Verlinkungs-Feld und die Import-/Export-Pfade sehen.
+ * A linkable entry, as seen by the `[[` autocomplete, the
+ * link picker, the linking field and the import/export paths.
  *
- * Wohnt hier und nicht bei `SuggestionList`: `buildLinkItems` unten ist die
- * Quelle dieser Werte, und `lib/`-Module (Import/Export) brauchen den Typ,
- * ohne eine React-Komponente zu importieren. `SuggestionList` reicht ihn für
- * die Komponenten weiter, die ihn von dort holen.
+ * It lives here and not with `SuggestionList`: `buildLinkItems` below is the
+ * source of these values, and `lib/` modules (import/export) need the type
+ * without importing a React component. `SuggestionList` passes it on for
+ * the components that get it from there.
  */
 export interface SuggestionItem {
   id: string;
   entryType: ContentType;
   label: string;
-  /** Emoji der Kategorie des Eintrags, wo es eine gibt. */
+  /** Emoji of the entry's category, where there is one. */
   category?: string;
-  /** Wandert beim Einfügen in die Node-Attrs und damit ins gespeicherte HTML. */
+  /** Travels into the node attrs on insertion and thus into the stored HTML. */
   icon?: string;
   /**
-   * Nur zum Anzeigen, nie zum Speichern — für Altäre die data-URL aus
-   * `icon_data`, die in den Node-Attrs nichts zu suchen hat. Fällt auf `icon`
-   * und von dort auf `DEFAULT_ENTRY_EMOJI` zurück.
+   * For display only, never for storing — for altars the data URL from
+   * `icon_data`, which has no business in the node attrs. Falls back to `icon`
+   * and from there to `DEFAULT_ENTRY_EMOJI`.
    */
   displayIcon?: string;
   /**
-   * Übersetzter Name der Kategorie, in der der Eintrag in seinem Modul steht —
-   * die Überschrift, unter der ein angehängter Link im Eintrag landet. Journal
-   * hat keine Kategorien und nimmt die Mondphase (so heißt „Kategorie" dort
-   * auch beim Sortieren) — oder, wenn der Vault sie nicht zeigt, wie Altäre
-   * den Modulnamen.
+   * Translated name of the category the entry is in within its module —
+   * the heading under which an appended link lands in the entry. Journal
+   * has no categories and uses the moon phase (that is what "category" is called there
+   * when sorting too) — or, if the vault does not show it, like altars
+   * the module name.
    */
   categoryLabel?: string;
   /**
-   * `updated_at` des Ziels — nur zum Sortieren. Der Link-Picker zeigt ohne
-   * Suchbegriff die zuletzt bearbeiteten Einträge, damit dort nicht bloß das
-   * erste Modul der Liste steht.
+   * `updated_at` of the target — for sorting only. Without a search term, the link picker
+   * shows the most recently edited entries, so that it is not simply
+   * the first module of the list that appears there.
    */
   updatedAt?: string;
   entry_number?: number;
 }
 
 /**
- * Alle verlinkbaren Einträge aller Module als eine Liste — die eine Wahrheit
- * dafür, welches Icon, welches Label und welche Kategorie ein Link-Ziel trägt.
- * Genutzt von der `[[`-Autovervollständigung, dem Link-Picker, dem
- * Verlinkungs-Feld der Seitenleiste (alle über `useLinkItems`) und vom
- * `.emerald`-Import/-Export, der dieselbe Zuordnung ohne React braucht.
+ * All linkable entries of all modules as one list — the single source of truth
+ * for which icon, which label and which category a link target carries.
+ * Used by the `[[` autocomplete, the link picker, the
+ * sidebar's linking field (all via `useLinkItems`) and by the
+ * `.emerald` import/export, which needs the same mapping without React.
  *
- * Reine Funktion über Store-Momentaufnahmen: der Hook memoisiert sie, die
- * Import/Export-Pfade rufen sie mit `getState()` und `i18n.t` direkt.
+ * A pure function over store snapshots: the hook memoizes it, the
+ * import/export paths call it with `getState()` and `i18n.t` directly.
  *
- * Blockreihenfolge = Rail-Reihenfolge (Registry): journal, task, operation,
- * wiki, altar — nichts erzwingt das, es steht hier von Hand.
+ * Block order = rail order (registry): journal, task, operation,
+ * wiki, altar — nothing enforces that, it is written here by hand.
  *
- * Gelöschte Einträge filtern bereits die Stores heraus (`deleted_at IS NULL`
- * beim Laden), hier braucht es dafür keinen zweiten Filter.
+ * Deleted entries are already filtered out by the stores (`deleted_at IS NULL`
+ * on load), so no second filter is needed here.
  */
 export interface LinkItemSources {
   entries: Entry[];
   tasks: Task[];
   operations: Entry[];
   articles: Entry[];
-  /** Die eine globale Liste — Aufgaben, Operationen und Artikel zeigen alle hinein. */
+  /** The one global list — tasks, operations and articles all point into it. */
   categories: Category[];
   altars: AltarRecord[];
-  /** Die Vault-Einstellung `journal.moonPhase` — ob Journal-Einträge ihre Phase zeigen. */
+  /** The vault setting `journal.moonPhase` — whether journal entries show their phase. */
   showMoonPhase: boolean;
 }
 
 /**
- * Trennt Anzeige- und Speicher-Icon. Ein hochgeladenes Bild (data-URL, Blob,
- * Vault-Dateiname) darf NICHT in `icon` landen: das wandert beim Einfügen in
- * die Node-Attrs und damit in den gespeicherten Inhalt jedes Eintrags, der das
- * Ziel verlinkt — eine data-URL bläht ihn dort um ihre volle Größe auf, ohne je
- * gelesen zu werden (der Chip löst sein Icon live auf). Gespeichert wird der
- * Emoji-Rückfall, angezeigt das Bild.
+ * Separates the display icon from the stored icon. An uploaded image (data URL, blob,
+ * vault filename) must NOT end up in `icon`: that travels on insertion into
+ * the node attrs and thus into the stored content of every entry that links
+ * the target — a data URL inflates it there by its full size without ever being
+ * read (the chip resolves its icon live). The emoji fallback is stored,
+ * the image is displayed.
  */
 function splitIcon(icon: string | null | undefined, emojiFallback: string) {
   if (icon && isImageIcon(icon)) return { icon: emojiFallback, displayIcon: icon };
@@ -140,23 +140,23 @@ export function buildLinkItems(s: LinkItemSources, t: TFunction): SuggestionItem
         entry_number: a.entry_number,
       };
     }),
-    // Kein `icon`: es landet beim Einfügen in den Node-Attrs, und die einzige
-    // Altar-Grafik (icon_data) ist eine data-URL — gespeichert wird nur der
-    // Emoji-Fallback. Für die Anzeige trägt sie `displayIcon`.
+    // No `icon`: it lands in the node attrs on insertion, and the only
+    // altar graphic (icon_data) is a data URL — only the
+    // emoji fallback is stored. For display it is carried by `displayIcon`.
     ...s.altars.map((a) => ({
       id: a.id,
       entryType: 'altar' as const,
       label: displayTitle(t, 'altar', a.title),
       displayIcon: a.icon_data || DEFAULT_ENTRY_EMOJI.altar,
-      // Altäre kennen keine Kategorien (die Kategorien gehören den Elementen
-      // auf dem Altar, nicht dem Altar selbst) — es bleibt der Modulname.
+      // Altars have no categories (the categories belong to the items
+      // on the altar, not to the altar itself) — the module name remains.
       categoryLabel: t('nav.altar'),
       updatedAt: a.updated_at,
     })),
   ];
 }
 
-/** `entryType:id` → Item. Der Schlüssel, unter dem Link-Chips nachgesehen werden. */
+/** `entryType:id` → item. The key under which link chips are looked up. */
 export function linkItemKey(target: { id: string; entryType: string }): string {
   return `${target.entryType}:${target.id}`;
 }

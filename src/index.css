@@ -7,7 +7,7 @@
     --sidebar-left-width: 240px;
     --font-ui: 'Inter', 'Segoe UI', system-ui, sans-serif;
     --font-editor: 'Lora', Georgia, serif;
-    /* Einstellbar (settingsStore); 17px ist der Standard. */
+    /* Adjustable (settingsStore); 17px is the default. */
     --editor-font-size: 17px;
   }
 
@@ -73,19 +73,19 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
      here; macOS keeps its native traffic lights overlaid on the webview and
      only needs room reserved for them. */
 
-  /* ── Rahmen + Blatt ─────────────────────────────────────────────────────
-     Titelleiste, Rail und Eintragsliste bilden einen durchgehenden Rahmen
-     ohne Trennlinien; Hauptbereich und rechte Seitenleiste liegen als ein
-     abgerundetes Blatt darauf. Die Kante zwischen den beiden Blatthaelften
-     zieht die rechte Leiste (`.app-sheet-side`), nicht der Hauptbereich. */
+  /* ── Frame + sheet ──────────────────────────────────────────────────────
+     Title bar, rail and entry list form one continuous frame
+     without dividers; the main area and the right sidebar sit on it as a
+     single rounded sheet. The edge between the two halves of the sheet
+     is drawn by the right sidebar (`.app-sheet-side`), not the main area. */
   .app-shell,
   .titlebar,
   .app-sidebar-left {
     background: var(--shell-bg);
   }
 
-  /* Luft nur rechts und unten — links schliesst der Rahmen der Seitenleiste
-     an. Ist links nichts, haelt das Blatt auch dort Abstand. */
+  /* Breathing room only on the right and bottom — on the left the sidebar's
+     frame connects. If there is nothing on the left, the sheet keeps its distance there too. */
   .app-sheet-frame {
     padding: 0 var(--sheet-inset) var(--sheet-inset) 0;
   }
@@ -104,7 +104,7 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
     border-radius: var(--sheet-radius);
   }
 
-  /* Mit rechter Leiste daneben: rechts gerade und ohne eigenen Rand. */
+  /* With the right sidebar beside it: straight on the right and without its own border. */
   .app-sheet-main-joined {
     border-right-width: 0;
     border-top-right-radius: 0;
@@ -115,14 +115,14 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
     border-radius: 0 var(--sheet-radius) var(--sheet-radius) 0;
   }
 
-  /* Icon-Knoepfe der Titelleiste: 30x30, kleiner Radius — `.rail-button`
-     bringt `rounded-lg` und die Polsterung von `.btn-ghost` mit. */
+  /* Icon buttons of the title bar: 30x30, small radius — `.rail-button`
+     brings `rounded-lg` and the padding of `.btn-ghost` along. */
   .titlebar .rail-button {
     @apply flex items-center justify-center w-[30px] h-[30px] p-0 rounded-md;
   }
 
-  /* Der Knopfbereich faehrt die Breite der linken Seitenleiste nach —
-     gleiche Dauer wie .app-sidebar-animated. */
+  /* The button area follows the width of the left sidebar —
+     same duration as .app-sidebar-animated. */
   .titlebar-follow-animated {
     transition: min-width 200ms ease-out;
   }
@@ -135,8 +135,8 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
     padding-left: 5rem;
   }
 
-  /* Ein Menü-Knopf der Titelleiste, solange sein Menü offen ist. Mit
-     `.titlebar` davor, damit es die Theme-Farben von `.btn-ghost` schlägt. */
+  /* A menu button of the title bar while its menu is open. With
+     `.titlebar` in front, so that it beats the theme colours of `.btn-ghost`. */
   .titlebar .rail-button[data-open] {
     background: var(--interactive-active);
     color: var(--text-primary);
@@ -202,17 +202,17 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
     background: var(--menu-border);
   }
 
-  /* Die Trefferliste der globalen Suche (`SearchModal`). Sie borgt sich die
-     Hover-Tokens der Menues, damit die Auswahl in beiden Themes dieselbe
-     Markierung zeigt wie ein Menueeintrag. */
+  /* The result list of the global search (`SearchModal`). It borrows the
+     hover tokens of the menus, so that the selection shows the same
+     highlight in both themes as a menu item. */
   .search-result-row {
     @apply w-full flex items-start gap-2.5 px-3 py-2 text-left transition-colors duration-150;
     color: var(--text-secondary);
   }
 
-  /* Tastatur- und Mausauswahl sind derselbe Zustand: die Liste fuehrt genau
-     eine Markierung, und die Maus setzt sie beim Ueberfahren um. Ein eigener
-     :hover daneben liesse zwei Zeilen gleichzeitig ausgewaehlt aussehen. */
+  /* Keyboard and mouse selection are the same state: the list keeps exactly
+     one highlight, and the mouse moves it on hover. A separate
+     :hover beside it would make two rows look selected at the same time. */
   .search-result-row[aria-selected='true'] {
     background: var(--menu-item-hover-bg);
     color: var(--menu-item-hover-text);
@@ -238,12 +238,12 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
     color: var(--text-subtle);
   }
 
-  /* Die Fusszeile, die den Rest der Treffer herausgibt. Sie sitzt angeheftet
-     unter der scrollenden Liste, also braucht sie die Trennlinie, die der
-     Scrollrand nicht hergibt — sonst laeuft die halb abgeschnittene letzte
-     Zeile optisch in sie hinein. Kein `.search-result-row`: sie ist keine
-     Zeile der Liste, traegt keine Auswahl und wird von den Pfeiltasten nie
-     markiert. */
+  /* The footer that reveals the rest of the results. It is pinned
+     below the scrolling list, so it needs the divider that the
+     scroll edge does not provide — otherwise the half-cut-off last
+     row visually runs into it. Not a `.search-result-row`: it is not a
+     row of the list, carries no selection and is never highlighted by the
+     arrow keys. */
   .search-result-more {
     @apply w-full text-xs text-left px-3 py-2 transition-colors duration-150;
     color: var(--text-subtle);
@@ -255,7 +255,7 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
     color: var(--menu-item-hover-text);
   }
 
-  /* Dasselbe „N weitere anzeigen" unter den Listen der linken Seitenleiste. */
+  /* The same "show N more" below the lists of the left sidebar. */
   .entry-list-more {
     @apply w-full text-xs text-left px-2 py-1.5 rounded transition-colors duration-150;
     color: var(--text-subtle);
@@ -265,13 +265,13 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
     color: var(--menu-item-hover-text);
   }
 
-  /* Die Fundstelle im Titel oder im Textausschnitt. Dieselbe Akzentmischung
-     wie `.vault-card-active .vault-badge` — die Stelle wird eingefaerbt, nicht
-     umrahmt, damit eine Trefferliste nicht zum Flickenteppich wird. */
-  /* Die erste Deklaration ist kein Stilmittel, sondern der Rueckfall: faellt
-     `color-mix` aus (WebKit vor 16.2, WebKitGTK vor 2.40), bliebe hier sonst
-     das gelbe UA-Standardgelb des <mark> stehen — unter accentfarbener Schrift
-     in einem dunklen Theme. */
+  /* The match in the title or in the text excerpt. The same accent mix
+     as `.vault-card-active .vault-badge` — the spot is tinted, not
+     outlined, so that a result list does not turn into a patchwork. */
+  /* The first declaration is not a stylistic device but the fallback: if
+     `color-mix` is unsupported (WebKit before 16.2, WebKitGTK before 2.40), the
+     yellow UA default of <mark> would otherwise remain here — under accent-coloured text
+     in a dark theme. */
   .search-match {
     background-color: rgba(0, 176, 118, 0.22);
     background-color: color-mix(in srgb, var(--accent) 22%, transparent);
@@ -279,40 +279,40 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
     border-radius: 2px;
   }
 
-  /* Die Aufgabenzeile, auf die ein Treffer der globalen Suche gerade zeigt.
-     Sie haengt am aktiven View wie `.sidebar-item.active`, nicht an einem
-     Timer — die Markierung steht, solange der Tiefenlink steht.
+  /* The task row that a hit of the global search is currently pointing at.
+     It hangs off the active view like `.sidebar-item.active`, not off a
+     timer — the highlight stays for as long as the deep link stands.
 
-     Ein Ring statt einer Flaeche, und zwar ueber `outline`: die Zeile ist ein
-     `.panel-interactive`, und dessen `background`, `border-color` und
-     `box-shadow` werden pro Theme mit hoeherer Spezifitaet ueberschrieben
-     (`html[data-theme=…] .panel-interactive`) — dieselbe Falle, die bei den
-     Vault-Karten oben dokumentiert ist. `outline` setzt dort niemand, die
-     Regel braucht deshalb keinen Theme-Zwilling und keinen Wettlauf um
-     Spezifitaet. `outline-offset` zieht den Ring nach innen, damit die Zeile
-     im Fluss nicht springt. */
+     A ring instead of a fill, via `outline`: the row is a
+     `.panel-interactive`, and its `background`, `border-color` and
+     `box-shadow` are overridden per theme with higher specificity
+     (`html[data-theme=…] .panel-interactive`) — the same trap documented
+     for the vault cards above. Nobody sets `outline` there, so the
+     rule needs no theme twin and no specificity race.
+     `outline-offset` pulls the ring inward so the row does not jump
+     in the flow. */
   .task-row-target {
-    /* Wie oben ein Rueckfall, hier aber noetiger: `outline` ist eine
-       Kurzschreibweise, ein nicht verstandenes `color-mix` darin verwirft die
-       ganze Deklaration — der Ring waere ersatzlos und lautlos weg. */
+    /* A fallback as above, but more necessary here: `outline` is a
+       shorthand, a `color-mix` that is not understood discards the
+       whole declaration — the ring would be gone without replacement and silently. */
     outline: 1px solid rgba(0, 176, 118, 0.55);
     outline: 1px solid color-mix(in srgb, var(--accent) 55%, transparent);
     outline-offset: -1px;
   }
 
-  /* Das Ein-/Ausblenden der Seitenleisten (`AppShell`); `margin-left` schiebt
-     die Rail aus dem Bild, `padding-left` am Blattrahmen (`.app-sheet-frame`)
-     gibt dem Blatt links Luft, sobald dort nichts mehr steht. Die Dauer haengt mit SIDEBAR_ANIM_MS dort
-     zusammen, das den Inhalt so lange gemountet laesst.
-     Waehrend eines Resize-Drags nimmt `AppShell` die Klasse weg. */
+  /* Showing/hiding the sidebars (`AppShell`); `margin-left` pushes
+     the rail out of view, `padding-left` on the sheet frame (`.app-sheet-frame`)
+     gives the sheet room on the left as soon as nothing stands there. The duration is tied to SIDEBAR_ANIM_MS
+     there, which keeps the content mounted for that long.
+     During a resize drag `AppShell` removes the class. */
   .app-sidebar-animated {
     transition: width 200ms ease-out, margin-left 200ms ease-out, padding-left 200ms ease-out;
   }
 
-  /* Steht danach und ist gleich spezifisch, gewinnt also ueber die
-     Reihenfolge. Der verzoegerte Unmount haengt an einem Timeout statt an
-     `transitionend` und laeuft deshalb auch hier. WebKitGTK vor 2.38 meldet
-     immer `no-preference` — dort laesst sich die Animation nicht abbestellen. */
+  /* Comes after and is equally specific, so it wins by
+     order. The delayed unmount hangs off a timeout rather than
+     `transitionend` and therefore also runs here. WebKitGTK before 2.38 reports
+     `no-preference` always — the animation cannot be switched off there. */
   @media (prefers-reduced-motion: reduce) {
     .app-sidebar-animated,
     .titlebar-follow-animated {
@@ -320,20 +320,20 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
     }
   }
 
-  /* Die Zeilen der Eintragsliste sind dichter als `.sidebar-item` sonst
-     (Rueckverweise, Aufgaben): 13px-Titel ueber dem Datum ohne Abstand
-     dazwischen, luftig gepolstert (48px hoch), dafuer nur 4px zwischen den
-     Zeilen (`space-y-1` in EntryListTab) und 12px vom Icon bis zum Text. Links
-     bleibt die Polsterung, sie haelt die Icon-Spalte unter der Suche. */
+  /* The rows of the entry list are denser than `.sidebar-item` otherwise
+     (backlinks, tasks): 13px title above the date with no gap
+     in between, airily padded (48px tall), but only 4px between the
+     rows (`space-y-1` in EntryListTab) and 12px from the icon to the text. On the left
+     the padding stays, it keeps the icon column under the search. */
   .entry-list-nav .sidebar-item {
     padding-top: 6px;
     padding-bottom: 6px;
     gap: 12px;
   }
 
-  /* Feste 16px-Spalte fuers Icon: ein Emoji belegt in seiner Schrift bis zu
-     22px Breite, ein lucide-Icon 14 — ohne feste Spalte begaennen die Titel
-     je nach Icon an anderer Stelle. */
+  /* Fixed 16px column for the icon: an emoji takes up to
+     22px width in its font, a lucide icon 14 — without a fixed column the titles would start
+     at a different place depending on the icon. */
   .entry-list-nav .sidebar-item > :first-child {
     width: 16px;
     display: flex;
@@ -352,11 +352,11 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
     color: var(--text-subtle);
   }
 
-  /* Neben der Rail braucht die Liste links nur wenig eigenen Rand — die Rail
-     bringt ihre 6px Luft mit. Suchsymbol und Zeilen-Icons stehen 14px nach der
-     Rail auf einer Linie, direkt unter dem Menue-Icon der Titelleiste (dort
-     `mr-1.5` am Logo — die Werte zusammen aendern). Ohne Rail bleiben die
-     gewohnten Raender zum Fenster. */
+  /* Next to the rail, the list on the left needs little margin of its own — the rail
+     brings its 6px of room along. Search icon and row icons sit 14px after the
+     rail on one line, directly under the menu icon of the title bar (there
+     `mr-1.5` on the logo — change the values together). Without a rail the
+     usual margins to the window remain. */
   .app-sidebar-left-with-rail .entry-list-search-row,
   .app-sidebar-left-with-rail .entry-list-nav {
     padding-left: 4px;
@@ -367,8 +367,8 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
     padding-left: 10px;
   }
 
-  /* Die Zeile ueber dem Titel (`EntryHeaderRow`): Chevron und Modulname
-     zurueck zur Uebersicht, rechts Datum oder Status mit Punkt. */
+  /* The row above the title (`EntryHeaderRow`): chevron and module name
+     back to the overview, on the right date or status with a dot. */
   .entry-back-link {
     @apply inline-flex items-center gap-1 min-w-0 rounded-md text-[13px] transition-colors;
     color: var(--text-subtle);
@@ -395,8 +395,8 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
     background: var(--warning-text);
   }
 
-  /* Die Suche der Eintragsliste: randlos auf dem Rahmen, anders als die
-     umrandete `.sidebar-search-inner`-Pill der globalen Suche. */
+  /* The entry list search: borderless on the frame, unlike the
+     bordered `.sidebar-search-inner` pill of the global search. */
   .entry-list-search {
     background: var(--list-search-bg);
   }
@@ -426,8 +426,8 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
     background-color: var(--interactive-hover);
   }
 
-  /* Die Knoepfe der linken Rail. Der transparente Rahmen haelt den Platz fuer
-     den Akzentrahmen der aktiven Ansicht frei, damit nichts springt. */
+  /* The buttons of the left rail. The transparent border reserves the space for
+     the accent border of the active view, so nothing jumps. */
   .rail-button {
     @apply rounded-lg;
     border: 1px solid transparent;
@@ -456,9 +456,9 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
            border border-jade-800/40 transition-colors duration-150;
   }
 
-  /* Die Primäraktion in Rot — dieselbe Form wie .btn-primary, für eine
-     Seite, deren Hauptaktion zerstört (Papierkorb leeren). Farben aus den
-     --danger-solid-*-Tokens der Themes. */
+  /* The primary action in red — the same shape as .btn-primary, for a
+     page whose main action destroys (empty trash). Colours from the
+     --danger-solid-* tokens of the themes. */
   .btn-primary-danger {
     @apply flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border transition-colors duration-150;
     background-color: var(--danger-solid-bg);
@@ -495,8 +495,8 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
     color: var(--danger-text);
   }
 
-  /* Die beiden Textfarben, die sonst ueberall als Inline-Style standen —
-     dieselbe Stelle und dieselbe Form wie `.text-danger`. */
+  /* The two text colours that used to appear everywhere as inline styles —
+     the same place and the same form as `.text-danger`. */
   .text-secondary {
     color: var(--text-secondary);
   }
@@ -566,9 +566,9 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
     color: var(--text-muted);
   }
 
-  /* Das Badge war rein dekorativ, solange es in der Zeilen-Schaltflaeche sass
-     und deren Hover erbte. Als eigener Trigger fuer den Emoji-Picker steht es
-     zwischen lauter .btn-ghost-Buttons und braucht dieselbe Rueckmeldung. */
+  /* The badge was purely decorative as long as it sat inside the row button
+     and inherited its hover. As a trigger of its own for the emoji picker it stands
+     among nothing but .btn-ghost buttons and needs the same feedback. */
   .vault-badge-interactive:hover {
     background-color: var(--interactive-hover);
     color: var(--text-primary);
@@ -646,9 +646,9 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
     background-color: var(--menu-item-hover-bg);
   }
 
-  /* Filterzeilen der Dashboard-Seitenleiste (FilterList): Icon, Name,
-     Anzahl. Aktiv in der Jade-Flaeche der Menues, wie eine gewaehlte Option.
-     Nur Theme-Variablen — Noctis und Parchment brauchen keine eigene Regel. */
+  /* Filter rows of the dashboard sidebar (FilterList): icon, name,
+     count. Active in the jade fill of the menus, like a chosen option.
+     Theme variables only — Noctis and Parchment need no rule of their own. */
   .filter-row {
     color: var(--text-muted);
     transition: color 150ms, background-color 150ms;
@@ -658,9 +658,9 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
     color: var(--text-primary);
   }
 
-  /* Fläche für Hover und Auswahl teilen sich die Filterzeilen mit den
-     Listenzeilen der Leseansicht (`.sidebar-row`, `SidebarItemRow`) — nur
-     die Textfarbe bleibt je eigen. */
+  /* The filter rows share the fill for hover and selection with the
+     list rows of the read view (`.sidebar-row`, `SidebarItemRow`) — only
+     the text colour stays separate. */
   .filter-row:hover,
   .sidebar-row:hover {
     background-color: var(--interactive-hover);
@@ -692,7 +692,7 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
     opacity: 0.6;
   }
 
-  /* Ein/Aus-Schalter (Switch): Schiene 28x16, Knopf 12. */
+  /* On/off switch: track 28x16, knob 12. */
   .switch {
     position: relative;
     flex-shrink: 0;
@@ -703,8 +703,8 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
     transition: background-color 150ms;
   }
 
-  /* An: gedämpftes Jade mit Rand, heller Knopf — wie die aktive Filterzeile,
-     nicht die volle Akzentfläche eines Primärknopfs. */
+  /* On: muted jade with a border, light knob — like the active filter row,
+     not the full accent fill of a primary button. */
   .switch--on {
     background-color: color-mix(in srgb, var(--accent) 38%, transparent);
     box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 55%, transparent);
@@ -760,12 +760,12 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
     cursor: not-allowed;
   }
 
-  /* Ueber --accent in beiden Themes sichtbar. Die Filterzeilen, die
-     Schalter, die tone-Buttons (sidebar-action-btn), die Tab-/Segment-Toggles
-     (TabIconButton), die klickbaren Bibliothekskacheln (div[role=button]),
-     die Link-Picker-Tabs und die Settings-Navigation sind fokussierbar, Noctis
-     hat aber keine generische button:focus-visible-Regel (design.md, Open
-     Point 8) — ohne eigenen Ring blieben sie dort tastatur-unsichtbar. */
+  /* Visible in both themes via --accent. The filter rows, the
+     switches, the tone buttons (sidebar-action-btn), the tab/segment toggles
+     (TabIconButton), the clickable library tiles (div[role=button]),
+     the link picker tabs and the settings navigation are focusable, but Noctis
+     has no generic button:focus-visible rule (design.md, Open
+     Point 8) — without a ring of their own they would be keyboard-invisible there. */
   .filter-row:focus-visible,
   .sidebar-row:focus-visible,
   .switch:focus-visible,
@@ -807,14 +807,14 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
     box-shadow: 0 0 0 2px var(--focus-ring);
   }
 
-  /* ── Einstellungs-Fenster ──────────────────────────────────────────────
-     Eine Sprache fuer alle Seiten: ein Abschnitt (SettingsSection) traegt
-     Ueberschrift, Beschreibung und seinen Inhalt ohne Karte darum. Die
-     Eingabefelder komponieren `.input-field` (Farben) mit ihren Groessen,
-     Behaelter nehmen `.panel`; eigene Klassen gibt es nur fuer das, was
-     beides nicht abdeckt. */
-  /* Die Groesse der Felder im Einstellungs-Fenster; die Farben bringt
-     `.input-field` mit, mit dem zusammen diese Klasse steht. */
+  /* ── Settings window ───────────────────────────────────────────────────
+     One language for all pages: a section (SettingsSection) carries
+     heading, description and its content without a card around it. The
+     input fields compose `.input-field` (colours) with their sizes,
+     containers take `.panel`; classes of their own exist only for what
+     neither covers. */
+  /* The size of the fields in the settings window; the colours come from
+     `.input-field`, which this class is always used together with. */
   .settings-field {
     @apply w-full rounded-lg px-3 py-2 text-sm outline-none transition-colors;
   }
@@ -825,7 +825,7 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
     border-color: var(--border-soft);
   }
 
-  /* Die Trennlinien der Ueber-Seite. */
+  /* The dividers of the About page. */
   .settings-divider-bottom {
     @apply border-b;
     border-color: var(--border-soft);
@@ -840,25 +840,25 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
     background-color: color-mix(in srgb, var(--bg-surface-1) 80%, transparent);
     border: 1px solid var(--border-soft);
     color: var(--text-secondary);
-    /* Ohne das nimmt ein `input` die Systemschrift — am deutlichsten an den
-       Datumsfeldern, die neben einem normalen Feld aus der Reihe fielen. */
+    /* Without this, an `input` takes the system font — most noticeable on the
+       date fields, which stood out next to a normal field. */
     font-family: inherit;
   }
 
-  /* Ein Datumsfeld ist ein natives Bedienelement: seine Ziffernfelder, das
-     Kalendersymbol und das Auswahlfenster bringt die WebView mit. Was sich
-     davon faerben laesst, faerben wir — der Rest folgt ueber `color-scheme`
-     weiter unten wenigstens hell/dunkel dem Theme.
+  /* A date field is a native control: its digit fields, the
+     calendar icon and the picker popup come with the WebView. Whatever of this
+     can be coloured, we colour — the rest follows the theme via `color-scheme`
+     further down, at least light/dark.
 
-     Das leere Feld zeigt statt eines Datums seine Schreibweise (TT.MM.JJJJ).
-     Das ist ein Platzhalter und soll so zurueckhaltend sein wie jeder andere;
-     `data-empty` setzt der Aufrufer, CSS sieht den Wert nicht. */
+     The empty field shows its format (e.g. DD.MM.YYYY) instead of a date.
+     That is a placeholder and should be as subdued as any other;
+     `data-empty` is set by the caller, CSS cannot see the value. */
   .input-field[data-empty]::-webkit-datetime-edit {
     color: var(--text-muted);
   }
 
-  /* Das gerade bearbeitete Ziffernfeld — sonst markiert die WebView es in
-     ihrem eigenen Blau. */
+  /* The digit field currently being edited — otherwise the WebView highlights it in
+     its own blue. */
   .input-field::-webkit-datetime-edit-day-field:focus,
   .input-field::-webkit-datetime-edit-month-field:focus,
   .input-field::-webkit-datetime-edit-year-field:focus {
@@ -868,8 +868,8 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
     outline: none;
   }
 
-  /* Das Kalendersymbol: dieselbe Zurueckhaltung wie die uebrigen Symbole in
-     Feldern, und erst beim Zeigen voll da. */
+  /* The calendar icon: the same restraint as the other icons in
+     fields, and fully there only on hover. */
   .input-field::-webkit-calendar-picker-indicator {
     opacity: 0.5;
     cursor: pointer;
@@ -881,16 +881,16 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
     opacity: 0.9;
   }
 
-  /* Derselbe Fokus wie bei `.emoji-picker-search`, damit jedes Feld der App
-     ihn zeigt — bisher brachte ihn jeder Aufrufer selbst mit, oder eben nicht. */
+  /* The same focus as `.emoji-picker-search`, so that every field in the app
+     shows it — until now each caller brought it along itself, or not. */
   .input-field:focus {
     border-color: var(--accent);
     box-shadow: 0 0 0 2px var(--focus-ring);
   }
 
-  /* Abgeschaltet (die Datumsfelder der Datensicherung, solange der ganze
-     Zeitraum gilt): blass macht sie dort der Aufrufer, den Griff nimmt das
-     Feld sich selbst — das Kalendersymbol lud sonst weiter zum Klicken ein. */
+  /* Disabled (the date fields of the data backup while the whole
+     period applies): the caller makes them pale there, the field takes away
+     its own grip — the calendar icon would otherwise keep inviting a click. */
   .input-field:disabled {
     cursor: not-allowed;
   }
@@ -933,8 +933,8 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
   @apply mb-3;
 }
 
-/* Relativ zum Editortext (em) statt zur Wurzel, damit sie mit dessen
-   Einstellung wachsen: 1.5rem, 1.25rem und 1.125rem bei den früheren 17px. */
+/* Relative to the editor text (em) instead of the root, so that they grow with its
+   setting: 1.5rem, 1.25rem and 1.125rem at the former 17px. */
 .tiptap h1 { @apply font-semibold mb-3 mt-6; font-size: 1.412em; line-height: 1.33; color: var(--text-primary); }
 .tiptap h2 { @apply font-semibold mb-2 mt-5; font-size: 1.176em; line-height: 1.4; color: var(--text-primary); }
 .tiptap h3 { @apply font-semibold mb-2 mt-4; font-size: 1.059em; line-height: 1.55; color: var(--text-secondary); }
@@ -977,13 +977,13 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
   color: var(--text-muted);
 }
 
-/* Die Farbe kommt aus der `hr`-Regel im Base-Layer — hier nur der Abstand. */
+/* The colour comes from the `hr` rule in the base layer — only the spacing here. */
 .tiptap hr {
   @apply my-6 border-0 border-t;
 }
 
-/* Die Trennlinie ist ein Blocknode ohne Text — ohne eigenen Auswahlzustand
-   bliebe unsichtbar, dass sie beim Loeschen gemeint ist. */
+/* The divider is a block node without text — without a selection state of its own
+   it would stay invisible that it is the one meant when deleting. */
 .tiptap hr.ProseMirror-selectednode {
   border-color: var(--accent);
 }
@@ -1043,15 +1043,15 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
   color: var(--text-subtle);
 }
 
-/* Titel eines Abschnitts in der rechten Seitenleiste — SidebarSectionHeader
-   und SidebarSection (beide einklappbar). Über Theme-Variablen statt
-   stone-*-Klassen: so braucht Parchment keine eigene Brücke, auch nicht für
-   den Hover. */
+/* Title of a section in the right sidebar — SidebarSectionHeader
+   and SidebarSection (both collapsible). Via theme variables instead of
+   stone-* classes: this way Parchment needs no bridge of its own, not even for
+   the hover. */
 .sidebar-section-title {
   display: flex;
   align-items: center;
   gap: 0.25rem;
-  /* 12px wie `label-xs`: im Bearbeiten stehen beide untereinander. */
+  /* 12px like `label-xs`: in edit mode both stand one below the other. */
   font-size: 0.75rem;
   line-height: 1rem;
   font-weight: 600;
@@ -1071,9 +1071,9 @@ button.sidebar-section-title:focus-visible {
   box-shadow: 0 0 0 2px var(--focus-ring);
 }
 
-/* Die Leseansicht eines Eintrags in der rechten Seitenleiste (`SidebarSection`):
-   Abschnittskopf mit Zähler, darunter Eigenschafts- und Listenzeilen. Wie der
-   Titel über Theme-Variablen, damit Parchment ohne Brücke auskommt. */
+/* The read view of an entry in the right sidebar (`SidebarSection`):
+   section header with counter, below it property and list rows. Like the
+   title via theme variables, so that Parchment gets by without a bridge. */
 .sidebar-section-count {
   margin-left: auto;
   font-family: theme('fontFamily.mono');
@@ -1110,14 +1110,14 @@ button.sidebar-section-title:focus-visible {
   transition: background-color 150ms;
 }
 
-/* Hover-, Auswahl- und Fokusfläche von `.sidebar-row` stehen bei `.filter-row`. */
+/* Hover, selection and focus fill of `.sidebar-row` are defined with `.filter-row`. */
 
-/* ── Bearbeiten-Seitenleiste (EditProperties, design.md: Edit Sidebar) ──
-   Dieselben Abschnitte und Zeilen wie die Leseansicht; nur die Werte werden
-   zu Bedienelementen. Farben aus den `--field-*`-Tokens der Themes. */
+/* ── Edit sidebar (EditProperties, design.md: Edit Sidebar) ──
+   The same sections and rows as the read view; only the values become
+   controls. Colours from the `--field-*` tokens of the themes. */
 
-/* Leiste: „Fertig" 30px hoch (`--control-h`, wie „Bearbeiten" im Lesen),
-   daneben Löschen und Abbrechen als Quadrate derselben Höhe. */
+/* Bar: "Done" 30px tall (`--control-h`, like "Edit" in read mode),
+   beside it Delete and Cancel as squares of the same height. */
 .edit-bar-done {
   display: flex;
   flex: 1;
@@ -1172,8 +1172,8 @@ button.sidebar-section-title:focus-visible {
   pointer-events: none;
 }
 
-/* Der Wert einer Eigenschaft als Knopf: Auswahl (mit Chevron) oder Medium
-   (nur Vorschau). Höchstens 130px, der Text kürzt am Ende. */
+/* The value of a property as a button: choice (with chevron) or medium
+   (preview only). At most 130px, the text truncates at the end. */
 .prop-value-btn {
   display: inline-flex;
   min-width: 0;
@@ -1223,7 +1223,7 @@ button.sidebar-section-title:focus-visible {
   object-fit: cover;
 }
 
-/* Typ als Segmente: eingelassene Schiene, das aktive Segment in Jade. */
+/* Type as segments: inset track, the active segment in jade. */
 .prop-segments {
   display: flex;
   flex-shrink: 0;
@@ -1264,8 +1264,8 @@ button.sidebar-section-title:focus-visible {
   pointer-events: none;
 }
 
-/* Eingelassenes Suchfeld unter einer Liste („Eintrag verknüpfen …", „Tag
-   hinzufügen …"): Icon und Eingabe in einem 32px-Rahmen. */
+/* Inset search field below a list ("Link entry …", "Add
+   tag …"): icon and input in a 32px frame. */
 .sidebar-add-field {
   display: flex;
   height: 2rem;
@@ -1293,8 +1293,8 @@ button.sidebar-section-title:focus-visible {
   flex-shrink: 0;
 }
 
-/* Theme-Brücken setzen jedem input einen Rahmen und Hintergrund — hier
-   gehört beides dem Rahmen drumherum. */
+/* Theme bridges give every input a border and background — here
+   both belong to the frame around it. */
 html[data-theme] .sidebar-add-field input,
 .sidebar-add-field input {
   flex: 1;
@@ -1314,7 +1314,7 @@ html[data-theme] .sidebar-add-field input::placeholder,
   color: var(--text-subtle);
 }
 
-/* Das „×" am Ende einer Listenzeile (Verlinkungen) und eines Tag-Chips. */
+/* The "×" at the end of a list row (links) and of a tag chip. */
 .sidebar-row-remove {
   display: flex;
   flex-shrink: 0;
@@ -1343,11 +1343,11 @@ html[data-theme] .sidebar-add-field input::placeholder,
 }
 
 .tag-chip-remove:hover {
-  /* Bewusst ohne Token: dunkelt die Tagfarbe des Chips ab, in beiden Themes gleich. */
+  /* Deliberately without a token: darkens the chip's tag colour, the same in both themes. */
   background-color: rgba(0, 0, 0, 0.25);
 }
 
-/* Eine Aktion als Zeile statt als umrandeter Knopf („Alle aktualisieren"). */
+/* An action as a row instead of a bordered button ("Update all"). */
 .sidebar-action-row {
   display: flex;
   width: 100%;
@@ -1372,10 +1372,10 @@ html[data-theme] .sidebar-add-field input::placeholder,
   cursor: not-allowed;
 }
 
-/* Die Einstellungen eines Blocks unter seiner Zeile (`BlockSettingsBox`):
-   eingelassene Fläche, darin Beschriftung über Eingabe wie in der übrigen
-   Seitenleiste — 12px, nicht in Großbuchstaben, damit sie nicht mit den
-   Abschnittsköpfen konkurriert. */
+/* The settings of a block below its row (`BlockSettingsBox`):
+   inset surface, inside it label above input as in the rest of the
+   sidebar — 12px, not in capitals, so that it does not compete with the
+   section headers. */
 .block-settings-panel {
   margin: 4px 0 6px;
   padding: 10px;
@@ -1430,7 +1430,7 @@ html[data-theme] .sidebar-add-field input::placeholder,
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 15%, transparent);
 }
 
-/* „+ Option hinzufügen" unter den Optionen: eine leise Aktionszeile. */
+/* "+ Add option" below the options: a quiet action row. */
 .panel-add-row {
   display: flex;
   height: 1.75rem;
@@ -1452,9 +1452,9 @@ html[data-theme] .sidebar-add-field input::placeholder,
   box-shadow: 0 0 0 2px var(--focus-ring);
 }
 
-/* Die Knöpfe am Ende eines Abschnitts, unter einer Linie: volle Breite,
-   zentriert, untereinander — „Block hinzufügen" und „Vorlage einfügen"
-   unter den Blöcken. */
+/* The buttons at the end of a section, below a line: full width,
+   centred, stacked — "Add block" and "Insert template"
+   below the blocks. */
 .sidebar-section-actions {
   display: flex;
   flex-direction: column;
@@ -1501,8 +1501,8 @@ html[data-theme] .sidebar-section-button:hover {
   border-color: var(--field-border-hover);
 }
 
-/* Theme-Brücken setzen jedem input Rahmen, Fläche und Fokus — hier gehören
-   sie `.panel-input`; und Parchments `*`-Rahmenregel trifft auch den Kasten. */
+/* Theme bridges give every input border, fill and focus — here they belong
+   to `.panel-input`; and Parchment's `*` border rule also hits the box. */
 html[data-theme] .block-settings-panel,
 html[data-theme] .panel-input {
   border-color: var(--field-border);
@@ -1527,9 +1527,9 @@ html[data-theme] .panel-subheading--divided {
   border-color: var(--field-border);
 }
 
-/* Parchment setzt mit `html[data-theme='emerald-parchment'] *` jeden Rahmen
-   (siehe `.settings-nav-item-idle`) — die Rahmenfarben hier brauchen deshalb
-   den Attribut-Selektor davor, sonst gälte dort `--border-soft`. */
+/* Parchment sets every border with `html[data-theme='emerald-parchment'] *`
+   (see `.settings-nav-item-idle`) — the border colours here therefore need
+   the attribute selector in front, otherwise `--border-soft` would apply there. */
 html[data-theme] .edit-bar-done {
   border-color: var(--primary-solid-border);
 }
@@ -1576,16 +1576,16 @@ html[data-theme] .prop-segment--active {
   box-shadow: 0 0 0 2px var(--focus-ring);
 }
 
-/* ---- Funktionale Blöcke (components/blocks/BlockStack) ----
-   Lesemodus: keine sichtbare Hülle, die Blöcke fließen wie ein Dokument.
-   Bearbeitungsmodus: dezenter Rahmen je Block, Griff + Menü, Einfügelinie. */
+/* ---- Functional blocks (components/blocks/BlockStack) ----
+   Read mode: no visible shell, the blocks flow like a document.
+   Edit mode: subtle frame per block, handle + menu, insertion line. */
 .block-stack {
   display: flex;
   flex-direction: column;
 }
 
-/* Ein einzelner Textblock behält die 200px Klickfläche des alten Editors;
-   in einem Stapel mit mehreren Blöcken wäre das je Block zu viel. */
+/* A single text block keeps the 200px click area of the old editor;
+   in a stack with several blocks that would be too much per block. */
 .block-stack--multi .tiptap {
   min-height: 2.5rem;
 }
@@ -1595,20 +1595,20 @@ html[data-theme] .prop-segment--active {
   box-shadow: inset 0 0 0 1px var(--focus-ring);
 }
 
-/* Die eine Toolbar des Stapels bleibt beim Scrollen oben stehen. */
+/* The stack's one toolbar stays at the top while scrolling. */
 .block-stack-toolbar {
   position: sticky;
   top: 0;
   z-index: 10;
-  /* Dieselbe Ausladung wie .block-frame--editing, damit Toolbar und Rahmen
-     darunter auf einer Kante stehen. */
+  /* The same overhang as .block-frame--editing, so that toolbar and frame
+     below it sit on one edge. */
   margin: 0 -0.75rem 0.5rem;
   background: var(--bg-app);
 }
 
-/* Der negative Außenabstand hebt das Innen-Padding horizontal auf: der Text
-   bleibt im Bearbeitungsmodus bündig unter dem Titel, genau wo er im
-   Lesemodus steht — der Rahmen legt sich außen herum, in das px-8 der Seite. */
+/* The negative outer margin cancels the inner padding horizontally: the text
+   stays flush under the title in edit mode, exactly where it sits in
+   read mode — the frame wraps around the outside, into the page's px-8. */
 .block-frame--editing {
   margin: 0 -0.75rem;
   padding: 0.25rem 0.75rem 0.5rem;
@@ -1641,9 +1641,9 @@ html[data-theme] .prop-segment--active {
   white-space: nowrap;
 }
 
-/* Griff und Menü sind bewusst keine `Button`s: Griff ist Ziehfläche (wie die
-   Griffe im Altar), das Menü ein kaum sichtbarer Auslöser, der erst beim
-   Überfahren des Blocks erscheint. */
+/* Handle and menu are deliberately not `Button`s: the handle is a drag surface (like the
+   handles in the altar), the menu a barely visible trigger that appears only when
+   hovering over the block. */
 .block-frame-grip,
 .block-frame-menu {
   display: inline-flex;
@@ -1662,7 +1662,7 @@ html[data-theme] .prop-segment--active {
 
 .block-frame-grip {
   cursor: grab;
-  /* Ohne das übernimmt auf Touch-Geräten das Scrollen die Geste. */
+  /* Without this, scrolling takes over the gesture on touch devices. */
   touch-action: none;
 }
 
@@ -1686,8 +1686,8 @@ html[data-theme] .prop-segment--active {
   opacity: 1;
 }
 
-/* Einfügelinie zwischen den Blöcken: erscheint beim Überfahren. Die letzte
-   steht immer da, mit Beschriftung. */
+/* Insertion line between the blocks: appears on hover. The last one
+   is always there, with a label. */
 .block-insert {
   display: flex;
   align-items: center;
@@ -1725,8 +1725,8 @@ html[data-theme] .prop-segment--active {
   background: var(--interactive-hover);
 }
 
-/* Ausgeblendete Blöcke: im Lesemodus weg — per CSS, der Baum bleibt (siehe
-   BlockFrame) —, beim Bearbeiten ausgegraut und im Kopf markiert. */
+/* Hidden blocks: gone in read mode — via CSS, the tree stays (see
+   BlockFrame) —, greyed out when editing and marked in the header. */
 .block-frame--hidden:not(.block-frame--editing) {
   display: none;
 }
@@ -1740,8 +1740,8 @@ html[data-theme] .prop-segment--active {
   color: var(--text-subtle);
 }
 
-/* Sigillen-Blöcke: die Zeichnung im Lesemodus, die ruhige Zeile „verborgen bis …"
-   und der Ladestatus. Die Werkzeugleiste nutzt die bestehenden .sigil-*-Klassen. */
+/* Sigil blocks: the drawing in read mode, the quiet "hidden until …" row
+   and the charge status. The toolbar uses the existing .sigil-* classes. */
 .block-sigil-image {
   display: block;
   width: 100%;
@@ -1752,9 +1752,9 @@ html[data-theme] .prop-segment--active {
   border-radius: 0.75rem;
 }
 
-/* Das Altar-Feld: das Vorschaubild des Altars in seiner eigenen Breite (die
-   Thumbnails werden auf 640px gerechnet — breiter würde es nur unscharf),
-   darunter der Name. Im Lesemodus ist das Ganze ein Knopf, der den Altar öffnet. */
+/* The altar field: the altar's thumbnail at its own width (the
+   thumbnails are computed at 640px — wider would only make it blurry),
+   with the name below. In read mode the whole thing is a button that opens the altar. */
 .block-altar {
   display: flex;
   flex-direction: column;
@@ -1812,8 +1812,8 @@ button.block-altar:hover .block-altar-title {
   color: var(--accent);
 }
 
-/* Die Buchstabenbank: Kacheln, die zwischen „offen" und „umgesetzt" wechseln —
-   über Theme-Variablen, damit Parchment keine eigene Brücke braucht. */
+/* The letter bank: tiles that switch between "open" and "used" —
+   via theme variables, so that Parchment needs no bridge of its own. */
 .block-sigil-letter {
   width: 2.25rem;
   height: 2.25rem;
@@ -1845,7 +1845,7 @@ button.block-altar:hover .block-altar-title {
   box-shadow: 0 0 0 2px var(--focus-ring);
 }
 
-/* Das Timer-Feld vor „Sigille laden". */
+/* The timer field before "Charge sigil". */
 .block-sigil-timer {
   display: inline-flex;
   align-items: center;
@@ -1864,8 +1864,8 @@ button.block-altar:hover .block-altar-title {
   outline: none;
 }
 
-/* Das Emoji eines eigenen Blocks an der Stelle eines lucide-Icons (BlockGlyph):
-   dieselbe Box, damit Rahmen und Listen nicht springen. */
+/* The emoji of a custom block in place of a lucide icon (BlockGlyph):
+   the same box, so that frames and lists do not jump. */
 .block-glyph-emoji {
   display: inline-flex;
   flex-shrink: 0;
@@ -1874,8 +1874,8 @@ button.block-altar:hover .block-altar-title {
   line-height: 1;
 }
 
-/* „Neuere Version" im Rahmen einer veralteten Kopie — ein leiser Hinweis,
-   der das Menü mit „Block aktualisieren" öffnet. */
+/* "Newer version" in the frame of an outdated copy — a quiet hint
+   that opens the menu with "Update block". */
 .block-frame-outdated {
   display: inline-flex;
   flex-shrink: 0;
@@ -1898,8 +1898,8 @@ button.block-altar:hover .block-altar-title {
   box-shadow: 0 0 0 2px var(--focus-ring);
 }
 
-/* Blöcke-Ansicht: Punkt „ältere Versionen in Einträgen" und die Feldzeilen
-   der Block-Seite. */
+/* Blocks view: the "older versions in entries" dot and the field rows
+   of the block page. */
 .block-library-outdated-dot {
   width: 6px;
   height: 6px;
@@ -1908,8 +1908,8 @@ button.block-altar:hover .block-altar-title {
   background: var(--accent);
 }
 
-/* Vorlagen im Eintrag: der Hinweis „Vorlage angewendet" über dem Stapel und
-   die Vorschläge im leeren Eintrag. */
+/* Templates in the entry: the "Template applied" notice above the stack and
+   the suggestions in the empty entry. */
 .template-notice {
   display: flex;
   align-items: center;
@@ -1932,18 +1932,18 @@ button.block-altar:hover .block-altar-title {
   margin-bottom: 0.75rem;
 }
 
-/* Vorlagen: der Stern „Standard" in der Standardvorlagen-Übersicht und in der
-   Seitenleiste einer Vorlage — im Akzent wie der Punkt oben, in beiden Themes. */
+/* Templates: the "Default" star in the default templates overview and in the
+   sidebar of a template — in the accent like the dot above, in both themes. */
 .template-default-star {
   display: flex;
   flex-shrink: 0;
   color: var(--accent);
 }
 
-/* Zuweisungs-Tabelle einer Vorlage (nur der Dialog, `AssignmentTable`):
-   Label links; im Dialog feste Spalten für Wiki, Operationen und „beide" —
-   fest, damit der Hinweis unter einer Zelle kürzt statt die Spalte zu
-   verbreitern. */
+/* Assignment table of a template (the dialog only, `AssignmentTable`):
+   label on the left; in the dialog fixed columns for wiki, operations and "both" —
+   fixed, so that the hint below a cell truncates instead of widening the
+   column. */
 .template-assign-row {
   display: grid;
   grid-template-columns: minmax(0, 1fr) repeat(3, 6.5rem);
@@ -1958,19 +1958,19 @@ button.block-altar:hover .block-altar-title {
   border-bottom: 1px solid var(--border-soft);
 }
 
-/* Das Häkchen „zur Wahl" vor einem Vorlagennamen — der Standard steht ohne Zeichen. */
+/* The "available" tick before a template name — the default stands without a mark. */
 .template-overview-state {
   display: flex;
   flex-shrink: 0;
   color: var(--text-subtle);
 }
 
-/* „Ersetzt X": der Stern nimmt einer anderen Vorlage etwas weg — im Akzent. */
+/* "Replaces X": the star takes something away from another template — in the accent. */
 .template-assign-replaces {
   color: var(--accent);
 }
 
-/* Standardvorlagen-Übersicht im Dashboard: der Name einer Vorlage als Link zu ihrer Seite. */
+/* Default templates overview in the dashboard: the name of a template as a link to its page. */
 .template-overview-link {
   display: inline-flex;
   max-width: 100%;
@@ -2008,13 +2008,13 @@ button.block-altar:hover .block-altar-title {
   flex-direction: column;
   gap: 0.5rem;
   margin-top: 0.5rem;
-  /* Bündig unter dem Eingabefeld: Griff + Art-Icon + zwei Lücken. */
+  /* Flush below the input field: handle + kind icon + two gaps. */
   padding-left: 2.25rem;
 }
 
-/* Zeilen der Block-Verwaltung (BlockSidebarArea): Griff, Auge und Menü als
-   kleine Icon-Knöpfe, das Label als Knopf „zum Block springen". Farben über
-   Theme-Variablen, damit Parchment ohne eigene Brücke stimmt. */
+/* Rows of the block management (BlockSidebarArea): handle, eye and menu as
+   small icon buttons, the label as a "jump to block" button. Colours via
+   theme variables, so that Parchment is correct without a bridge of its own. */
 .block-row-action {
   display: inline-flex;
   flex-shrink: 0;
@@ -2028,9 +2028,9 @@ button.block-altar:hover .block-altar-title {
   color: var(--text-secondary);
 }
 
-/* Eine Zeile der Block-Verwaltung in Ruhe: kein Rahmen, keine Fläche, Hover
-   wie die übrigen Zeilen der Seitenleiste. Der Attribut-Selektor gegen
-   Parchments `*`-Rahmenregel (siehe `.settings-nav-item-idle`). */
+/* A row of the block management at rest: no border, no fill, hover
+   like the other rows of the sidebar. The attribute selector counters
+   Parchment's `*` border rule (see `.settings-nav-item-idle`). */
 html[data-theme] .block-manager-row--idle,
 .block-manager-row--idle {
   border-color: transparent;
@@ -2053,7 +2053,7 @@ html[data-theme] .block-manager-row--idle,
   cursor: pointer;
 }
 
-/* Auge und Menü einer Zeile der Block-Verwaltung: 24px-Trefferfläche. */
+/* Eye and menu of a block management row: 24px hit area. */
 .block-manager-icon-btn {
   display: flex;
   flex-shrink: 0;
@@ -2083,9 +2083,9 @@ html[data-theme] .block-manager-row--idle,
   box-shadow: 0 0 0 2px var(--focus-ring);
 }
 
-/* Der dezente Titel über einem Block im Lesemodus (Anzeigeregel des Blocks).
-   Ist der erste Block ausgeblendet, behält der erste sichtbare seinen oberen
-   Abstand — hingenommen: `:first-child` sieht ausgeblendete Blöcke mit. */
+/* The subtle title above a block in read mode (the block's display rule).
+   If the first block is hidden, the first visible one keeps its top
+   spacing — accepted: `:first-child` also counts hidden blocks. */
 .block-read-title {
   margin: 1rem 0 0.375rem;
 }
@@ -2094,7 +2094,7 @@ html[data-theme] .block-manager-row--idle,
   margin-top: 0;
 }
 
-/* „Zum Block springen" aus der Seitenleiste: kurz aufleuchten. */
+/* "Jump to block" from the sidebar: flash briefly. */
 .block-stack-item--revealed {
   border-radius: 0.75rem;
   animation: block-reveal 1.6s ease-out;
@@ -2105,8 +2105,8 @@ html[data-theme] .block-manager-row--idle,
   to { box-shadow: 0 0 0 2px transparent; }
 }
 
-/* Ohne Bewegung bleibt der Ring für die Dauer stehen, statt ganz zu fehlen —
-   wie beim Link-Chip. */
+/* Without motion, the ring stays for the duration instead of being missing entirely —
+   as with the link chip. */
 @media (prefers-reduced-motion: reduce) {
   .block-stack-item--revealed {
     animation: none;
@@ -2114,8 +2114,8 @@ html[data-theme] .block-manager-row--idle,
   }
 }
 
-/* Feldblock (FieldsBlock): im Lesemodus eine ruhige Liste „Beschriftung — Wert"
-   in der Schrift des Textes, beim Bearbeiten dieselbe Zeile mit Eingabe. */
+/* Field block (FieldsBlock): in read mode a quiet "label — value" list
+   in the text's typeface, when editing the same row with an input. */
 .block-fields {
   display: flex;
   flex-direction: column;
@@ -2134,8 +2134,8 @@ html[data-theme] .block-manager-row--idle,
   align-items: center;
 }
 
-/* Ein Feld, dessen Wert die ganze Breite braucht (der Altar mit seinem Bild):
-   Beschriftung darüber statt daneben. */
+/* A field whose value needs the full width (the altar with its image):
+   label above instead of beside it. */
 .block-field--wide,
 .block-fields--edit .block-field--wide {
   grid-template-columns: minmax(0, 1fr);
@@ -2211,8 +2211,8 @@ html[data-theme] .block-manager-row--idle,
   color: var(--accent-strong);
 }
 
-/* Schreibgeschützt (Block „komplett schreibgeschützt"): sichtbar gedimmt wie
-   jedes andere deaktivierte Bedienelement. */
+/* Read-only (block "fully read-only"): visibly dimmed like
+   any other disabled control. */
 .block-toggle:disabled,
 .block-check:disabled {
   opacity: 0.5;
@@ -2227,11 +2227,11 @@ html[data-theme] .block-manager-row--idle,
   box-shadow: 0 0 0 2px var(--focus-ring);
 }
 
-/* Das Häkchen der App (BlockCheckbox): Blöcke, Vorlagen-Dialog und die
-   Einstellungen. Selbst gezeichnet statt nativ — ein natives Kästchen bringt
-   seine eigenen Farben und Kanten mit und stand neben den Feldern und Knöpfen
-   daneben. Alles kommt aus Theme-Variablen, also braucht Parchment keine
-   eigene Brücke. */
+/* The app's checkbox (BlockCheckbox): blocks, template dialog and the
+   settings. Drawn by hand instead of native — a native checkbox brings
+   its own colours and edges and looked out of place next to the fields and buttons.
+   Everything comes from theme variables, so Parchment needs no
+   bridge of its own. */
 .block-checkbox {
   appearance: none;
   -webkit-appearance: none;
@@ -2256,8 +2256,8 @@ html[data-theme] .block-manager-row--idle,
   border-color: var(--accent);
 }
 
-/* Der Haken selbst, als Form ausgeschnitten: in der Flaechenfarbe der App,
-   die in beiden Themes den Gegensatz zum Akzent traegt. */
+/* The tick itself, cut out as a shape: in the app's surface colour,
+   which provides the contrast to the accent in both themes. */
 .block-checkbox:checked::after {
   content: '';
   width: 0.5rem;
@@ -2271,11 +2271,11 @@ html[data-theme] .block-manager-row--idle,
   opacity: 0.5;
 }
 
-/* Warn- und Gefahrfuellung statt des Akzents, fuer Haken, deren Folge die
-   Beschriftung allein nicht traegt. Der Haken darin bleibt `--bg-app`, der in
-   beiden Themes den Gegensatz zu jeder dieser Fuellungen traegt. Die Klasse
-   steht doppelt, damit die Regel die Basis nicht nur nach Quelltext-Reihenfolge
-   schlaegt — sonst haengt die Farbe daran, wo im Stylesheet sie landet. */
+/* Warning and danger fill instead of the accent, for ticks whose consequence the
+   label alone does not convey. The tick inside stays `--bg-app`, which provides the contrast to each of these fills
+   in both themes. The class
+   appears twice so that the rule beats the base not merely by source order
+   — otherwise the colour depends on where in the stylesheet it ends up. */
 .block-checkbox.block-checkbox--warning:hover {
   border-color: var(--warning-text);
 }
@@ -2332,8 +2332,8 @@ html[data-theme] .block-manager-row--idle,
 .block-unknown {
   font-family: var(--font-editor);
   color: var(--text-muted);
-  /* Zweite Schicht hinter der Sanitize-Allowlist in UnknownBlock: was immer
-     durchrutscht, bleibt im Kasten des Blocks — auch `position: fixed`. */
+  /* Second layer behind the sanitize allowlist in UnknownBlock: whatever
+     slips through stays inside the block's box — even `position: fixed`. */
   contain: paint;
   overflow: hidden;
 }
@@ -2409,15 +2409,15 @@ html[data-theme='emerald-parchment'] .border-stone-600 { border-color: var(--bor
   background-color: var(--link-chip-bg-hover);
 }
 
-/* Kurzzeitige Markierung, wenn das Verlinkungs-Feld der rechten Seitenleiste
-   zu diesem Chip gesprungen ist. Der Ring liegt außen (box-shadow statt
-   border), damit der Chip beim Aufblitzen nicht in der Zeile springt.
+/* Brief highlight when the links field of the right sidebar
+   has jumped to this chip. The ring sits on the outside (box-shadow instead of
+   border), so that the chip does not shift in the row when it flashes.
 
-   Bewusst --focus-ring und NICHT --link-chip-border: letzteres ist in
-   emerald-noctis `transparent` (der ruhende Chip hat dort keinen Rand), der
-   Ring wäre im dunklen Theme also unsichtbar gewesen. --focus-ring trägt in
-   beiden Themes eine sichtbare Farbe und ist genau dafür da, den Blick kurz
-   auf eine Stelle zu ziehen. */
+   Deliberately --focus-ring and NOT --link-chip-border: the latter is
+   `transparent` in emerald-noctis (the resting chip has no border there), so the
+   ring would have been invisible in the dark theme. --focus-ring carries
+   a visible colour in both themes and exists precisely to draw the eye briefly
+   to one spot. */
 .internal-link-chip.is-revealed {
   background-color: var(--link-chip-bg-hover);
   box-shadow: 0 0 0 2px var(--focus-ring);
@@ -2429,10 +2429,10 @@ html[data-theme='emerald-parchment'] .border-stone-600 { border-color: var(--bor
   100%    { box-shadow: 0 0 0 2px transparent; }
 }
 
-/* Ohne Bewegung bleibt der Ring einfach stehen, bis die Klasse nach 1,6s
-   wieder entfernt wird — die Markierung geht nicht verloren, nur das
-   Ausblenden. (Wie bei .app-sidebar-animated: WebKitGTK vor 2.38 meldet immer
-   `no-preference` und kann sie nicht abbestellen.) */
+/* Without motion, the ring simply stays until the class is removed
+   after 1.6s — the highlight is not lost, only the
+   fade-out. (As with .app-sidebar-animated: WebKitGTK before 2.38 always reports
+   `no-preference` and cannot switch it off.) */
 @media (prefers-reduced-motion: reduce) {
   .internal-link-chip.is-revealed {
     animation: none;
@@ -2519,8 +2519,8 @@ html[data-theme='emerald-parchment'] .border-stone-600 { border-color: var(--bor
   color: var(--linked-chip-text);
 }
 
-/* Die Knöpfe im Chip — Springen und Entfernen. `--focus-ring` trägt in beiden
-   Themes eine sichtbare Farbe, die Regel gilt damit für beide. */
+/* The buttons in the chip — jump and remove. `--focus-ring` carries a visible
+   colour in both themes, so the rule applies to both. */
 .linked-entry-chip button:focus-visible {
   outline: none;
   border-radius: 3px;
@@ -2542,27 +2542,27 @@ html[data-theme='emerald-parchment'] .border-stone-600 { border-color: var(--bor
   background-color: var(--menu-bg);
 }
 
-/* Die vier Links im Ueber-Bereich. Farbe aus --accent statt aus einer
-   jade-Utility, damit Parchment dafuer keine weitere Bruecke tragen muss; der
-   Hover mischt Richtung Textfarbe und wird dadurch in Noctis heller und in
-   Parchment dunkler. Der Fokusring ist Pflicht und nicht Kür: Noctis hat keine
-   generische button:focus-visible-Regel. */
-/* Der Rahmen der inaktiven Zeile ist reiner Platzhalter fuer die Breite der
-   aktiven — sichtbar werden soll er nicht. Parchment faerbt mit
-   `html[data-theme='emerald-parchment'] *` jeden Rahmen vor, und dagegen
-   verlieren sowohl die Utility border-transparent als auch eine einfache
-   Klassenregel: gleiche Spezifitaet, die spaetere gewinnt. Deshalb der
-   Attribut-Selektor davor — 0-2-0 statt 0-1-0. */
+/* The four links in the About section. Colour from --accent instead of a
+   jade utility, so that Parchment need not carry another bridge for it; the
+   hover mixes toward the text colour and thereby gets lighter in Noctis and
+   darker in Parchment. The focus ring is mandatory, not optional: Noctis has no
+   generic button:focus-visible rule. */
+/* The border of the inactive row is purely a placeholder for the width of the
+   active one — it is not meant to become visible. Parchment pre-colours
+   every border with `html[data-theme='emerald-parchment'] *`, and against that
+   both the border-transparent utility and a simple
+   class rule lose: same specificity, the later one wins. Hence the
+   attribute selector in front — 0-2-0 instead of 0-1-0. */
 html[data-theme] .settings-nav-item-idle {
   border-color: transparent;
 }
 
-/* Die vier Icon-Links im Ueber-Bereich. Alles aus Theme-Tokens statt aus
-   stone-/jade-Utilities, sonst haengt an jeder Farbe hier eine weitere
-   Parchment-Bruecke. Der Attribut-Selektor davor aus demselben Grund wie eine
-   Regel weiter oben: Parchment faerbt jeden Rahmen vor, und bei gleicher
-   Spezifitaet gewinnt die spaetere Regel. Der Fokusring ist Pflicht — Noctis
-   hat keine generische button:focus-visible-Regel. */
+/* The four icon links in the About section. Everything from theme tokens instead of
+   stone-/jade utilities, otherwise every colour here drags along another
+   Parchment bridge. The attribute selector in front for the same reason as a
+   rule further up: Parchment pre-colours every border, and at equal
+   specificity the later rule wins. The focus ring is mandatory — Noctis
+   has no generic button:focus-visible rule. */
 html[data-theme] .settings-about-link {
   color: var(--accent);
 }
@@ -2610,9 +2610,9 @@ html[data-theme] .settings-about-link:focus-visible {
   border-color: rgba(74, 222, 128, 0.3);
 }
 
-/* Eintragsliste: helle Titel statt der gedaempften `.sidebar-item`-Farbe der
-   Theme-Regeln, die aktive Zeile im Minzton der Menues. Hover bleibt beim
-   Theme. */
+/* Entry list: light titles instead of the muted `.sidebar-item` colour of the
+   theme rules, the active row in the mint tone of the menus. Hover is left to the
+   theme. */
 html[data-theme] .entry-list-nav .sidebar-item:not(.active):not(:hover) {
   color: var(--text-secondary);
 }
@@ -2621,48 +2621,48 @@ html[data-theme] .entry-list-nav .sidebar-item.active {
   color: var(--menu-item-active-text);
 }
 
-/* Die waagrechten Trennlinien der rechten Seitenleiste — unter der Leiste
-   (`SidebarActionBar`) und zwischen den Abschnitten darunter. So leise wie der
-   Rand des Blatts. `html[data-theme]` haelt die Spezifitaet ueber Parchments
+/* The horizontal dividers of the right sidebar — below the bar
+   (`SidebarActionBar`) and between the sections below it. As quiet as the
+   border of the sheet. `html[data-theme]` keeps the specificity above Parchment's
    `* { border-color }`. */
 html[data-theme] .sidebar-divider {
   border-color: var(--sheet-border);
 }
 
-/* Das Suchfeld eines Dashboards im Hauptbereich (`ListSearchField`): die
-   helle Flaeche der Eintragslisten-Suche mit dem leisen Rand des Blatts.
-   `html[data-theme]` haelt die Spezifitaet ueber Parchments
+/* The search field of a dashboard in the main area (`ListSearchField`): the
+   light fill of the entry list search with the quiet border of the sheet.
+   `html[data-theme]` keeps the specificity above Parchment's
    `* { border-color }`. */
 html[data-theme] .list-search-field {
   background: var(--list-search-bg);
   border: 1px solid var(--sheet-border);
 }
 
-/* Beide Themes: der Ring des Zurueck-Links ueber dem Titel und des Leeren-X
-   im Suchfeld — ueber Parchments generischer button:focus-visible-Regel. */
+/* Both themes: the ring of the back link above the title and of the clear-X
+   in the search field — above Parchment's generic button:focus-visible rule. */
 html[data-theme] .list-toolbar-clear:focus-visible,
 html[data-theme] .entry-back-link:focus-visible {
   outline: none;
   box-shadow: 0 0 0 2px var(--focus-ring);
 }
 
-/* Beide Themes: die Seitenleisten und der Hauptbereich sind Geschwister-
-   Stacking-Contexts (design.md, Overlays and Portals). */
+/* Both themes: the sidebars and the main area are sibling
+   stacking contexts (design.md, Overlays and Portals). */
 html[data-theme] .app-sidebar,
 html[data-theme] .app-main {
   position: relative;
   z-index: 1;
 }
 
-/* Der Platzhalter-Rahmen von `.rail-button` bleibt unsichtbar — Parchments
-   `* { border-color }` gewaenne sonst ueber die Klasse und rahmte jeden Knopf
-   in Rail und Titelleiste. Die aktive Ansicht faerbt ihn spezifischer ein. */
+/* The placeholder border of `.rail-button` stays invisible — Parchment's
+   `* { border-color }` would otherwise win over the class and frame every button
+   in the rail and title bar. The active view colours it in more specifically. */
 html[data-theme] .rail-button {
   border-color: transparent;
 }
 
-/* Icon-Knoepfe der Titelleiste: dieselbe neutrale Flaeche in beiden Themes,
-   statt des warmen `.btn-ghost`-Hovers der Theme-Regeln. */
+/* Icon buttons of the title bar: the same neutral fill in both themes,
+   instead of the warm `.btn-ghost` hover of the theme rules. */
 html[data-theme] .titlebar .rail-button:hover:not(:disabled) {
   background: var(--interactive-hover);
 }
@@ -2699,17 +2699,17 @@ html[data-theme='emerald-noctis'] .panel-interactive:hover {
   border-color: var(--panel-hover-border);
 }
 
-/* Dashboard-Einträge (DashboardItem) sind Buttons und brauchen einen eigenen
-   Fokus-Ring. Panels sind bewusst schattenlos — Kante und Fläche tragen sie. */
+/* Dashboard entries (DashboardItem) are buttons and need a focus ring of their
+   own. Panels are deliberately shadowless — edge and fill carry them. */
 html[data-theme='emerald-noctis'] .panel-interactive:focus-visible {
   outline: none;
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 40%, transparent);
 }
 
-/* Tab-Leiste — beide Themes, die Unterschiede stecken nur in den Tokens.
-   `html[data-theme]` haelt die Spezifitaet ueber Parchments generischer
-   button:focus-visible-Regel. Die Tabs sind Pills auf dem Rahmen: inaktiv
-   ohne Flaeche, aktiv eine leichte, keine Kanten. */
+/* Tab bar — both themes, the differences live only in the tokens.
+   `html[data-theme]` keeps the specificity above Parchment's generic
+   button:focus-visible rule. The tabs are pills on the frame: inactive
+   without a fill, active with a light one, no edges. */
 html[data-theme] .tab-item {
   color: var(--text-muted);
 }
@@ -2746,9 +2746,9 @@ html[data-theme] .tab-close:hover {
   color: var(--text-primary);
 }
 
-/* Der Ring sitzt innen: die scrollende Liste schneidet ab, was ueber die
-   Pill hinausragt. Den Ring des Titel-Buttons (Parchments generische Regel)
-   zeichnet stattdessen die ganze Pill. */
+/* The ring sits inside: the scrolling list clips whatever extends beyond the
+   pill. The ring of the title button (Parchment's generic rule)
+   is instead drawn by the whole pill. */
 html[data-theme] .tab-button:focus-visible {
   outline: none;
   box-shadow: none;
@@ -2927,12 +2927,12 @@ html[data-theme='emerald-noctis'] .panel-interactive:hover .home-item-title {
   color: #f4e8db;
 }
 
-/* Die Bereichsnavigation der Einstellungen teilt sich die Werte mit den
-   Sidebar-Tabs, bekommt aber einen eigenen Namen: eine Nav-Zeile in einem
-   Dialog ist etwas anderes als ein Tab-Icon in der Seitenleiste, und die
-   Zeilen sollen sich spaeter aendern koennen, ohne die Leisten mitzuziehen.
-   Beitritt zur bestehenden Gruppe statt eigener Hexwerte, damit die Parität
-   beider Themes bauartbedingt bleibt. */
+/* The settings section navigation shares its values with the
+   sidebar tabs, but gets a name of its own: a nav row in a
+   dialog is something different from a tab icon in the sidebar, and the
+   rows should be able to change later without dragging the bars along.
+   Joining the existing group instead of own hex values, so that parity
+   of both themes is guaranteed by construction. */
 html[data-theme='emerald-noctis'] .settings-nav-item-active,
 html[data-theme='emerald-noctis'] .right-sidebar-tab-active,
 html[data-theme='emerald-noctis'] .app-sidebar-right .bg-stone-700.text-stone-200,
@@ -3053,7 +3053,7 @@ html[data-theme='emerald-parchment'] .panel-interactive:hover {
   border-color: var(--panel-hover-border);
 }
 
-/* Siehe Noctis. */
+/* See Noctis. */
 html[data-theme='emerald-parchment'] .panel-interactive:focus-visible {
   outline: none;
   box-shadow: 0 0 0 2px var(--focus-ring);
@@ -3381,8 +3381,8 @@ html[data-theme='emerald-parchment'] .link-picker-tab-idle:hover {
   color: var(--link-picker-tab-idle-hover-text);
 }
 
-/* Prioritätsfarben der aktiven Menüzeile (TaskRow-Prioritätsmenü auf ui/Dropdown)
-   in Parchment-lesbare Töne übersetzen. */
+/* Translate the priority colours of the active menu row (TaskRow priority menu on ui/Dropdown)
+   into tones that are readable on Parchment. */
 html[data-theme='emerald-parchment'] .list-toolbar-option-active.text-red-400 {
   color: #b63f32;
 }
@@ -3696,7 +3696,7 @@ html[data-theme='emerald-parchment'] .border-jade-700\/60 {
   border-color: rgba(0, 138, 87, 0.6);
 }
 
-/* Die gezogene Zeile (platzierte Elemente, Block-Verwaltung): ein Hauch Akzent statt Nachtgrün. */
+/* The dragged row (placed items, block management): a touch of accent instead of night green. */
 html[data-theme='emerald-parchment'] .bg-jade-900\/20 {
   background-color: rgba(0, 138, 87, 0.1);
 }
@@ -3772,20 +3772,20 @@ html[data-theme='emerald-parchment'] .altar-cat-scroll-fade {
   width: 3.5rem;
 }
 
-/* ── Emerald-Marke ────────────────────────────────────────────────────────────
-   Die Farben von `components/ui/EmeraldMark.tsx` stehen hier und nicht als
-   `fill="var(--accent)"` am Element: `var()` in einem SVG-Praesentations-
-   attribut wird nicht von jeder Engine ersetzt, und wo es nicht ersetzt wird,
-   ist der Wert ungueltig und faellt auf den Startwert zurueck — `fill` auf
-   Schwarz, `stroke` auf `none`. Die Marke waere ein schwarzes Achteck, ohne
-   Fehlermeldung. Genau der Grund, aus dem `public/splash.css` den Stein des
-   Ladebildschirms ueber Klassen einfaerbt statt am Element. */
-/* Die Daempfung ist nicht dieselbe in beiden Themen, und zwar aus einem
-   Grund, der sich beim Bauen leicht uebersehen laesst: auf dem dunklen Noctis
-   naehert weniger Deckkraft die Marke dem Hintergrund an und nimmt ihr das
-   Grelle. Auf dem hellen Parchment tut sie dasselbe — und dort heisst
-   "naeher am Hintergrund" ausgebleicht. Der Stein steht dort deshalb voll da;
-   dunkles Gruen auf Pergament ist von sich aus ruhig genug. */
+/* ── Emerald mark ─────────────────────────────────────────────────────────────
+   The colours of `components/ui/EmeraldMark.tsx` live here and not as
+   `fill="var(--accent)"` on the element: `var()` in an SVG presentation
+   attribute is not substituted by every engine, and where it is not substituted,
+   the value is invalid and falls back to the initial value — `fill` to
+   black, `stroke` to `none`. The mark would be a black octagon, without
+   an error message. Exactly the reason `public/splash.css` colours the stone of the
+   loading screen via classes instead of on the element. */
+/* The dimming is not the same in both themes, for a
+   reason that is easy to overlook when building: on the dark Noctis,
+   less opacity brings the mark closer to the background and takes away its
+   glare. On the light Parchment it does the same — and there "closer to the
+   background" means washed out. The stone therefore stands at full strength there;
+   dark green on parchment is calm enough on its own. */
 .emerald-mark { --mark-crown: 0.55; --mark-table: 0.5; }
 html[data-theme='emerald-parchment'] .emerald-mark { --mark-crown: 1; --mark-table: 0.9; }
 
@@ -3795,9 +3795,9 @@ html[data-theme='emerald-parchment'] .emerald-mark { --mark-crown: 1; --mark-tab
 .emerald-mark-table-top    { stop-color: var(--accent); }
 .emerald-mark-table-bottom { stop-color: var(--accent-strong); }
 
-/* Der Stufenschliff ist ein Lichtreflex und kein Themenfarbton — er liegt
-   immer auf der eingefaerbten Tafel, nie auf dem App-Hintergrund. Auf dem
-   helleren Parchment-Gruen muss er dafuer kraeftiger sein, sonst verschwindet
-   er; dieselbe Staffelung, die `--splash-sheen` zwischen den Themen macht. */
+/* The step cut is a light reflection and not a theme colour — it always lies
+   on the tinted table, never on the app background. On the
+   lighter Parchment green it has to be stronger, otherwise it disappears;
+   the same gradation that `--splash-sheen` makes between the themes. */
 .emerald-mark-step { stroke: rgba(255, 255, 255, 0.26); }
 html[data-theme='emerald-parchment'] .emerald-mark-step { stroke: rgba(255, 255, 255, 0.42); }

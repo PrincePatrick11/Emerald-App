@@ -8,9 +8,9 @@ on:
 permissions:
   contents: write
 
-# Derselbe Tag zweimal geschoben liesse sonst zwei Laeufe um dieselben
-# Release-Assets rennen. Kein `cancel-in-progress`: einen laufenden Release-Build
-# bricht man nicht ab, der zweite wartet.
+# Pushing the same tag twice would otherwise let two runs race for the same
+# release assets. No `cancel-in-progress`: a running release build is not
+# cancelled, the second run waits.
 concurrency:
   group: release-${{ github.ref }}
   cancel-in-progress: false
@@ -21,10 +21,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # Die Version steht an drei Stellen und muss zeichengleich sein — die UI
-      # zeigt sie aus package.json, der Bundle-Dateiname kommt aus Cargo.toml.
-      # Laeuft vor dem Release-Anlegen: alle Build-Jobs haengen per `needs` hier
-      # dran, ein Fehlschlag kostet also keine einzige Buildminute.
+      # The version appears in three places and must match character for character:
+      # the UI shows it from package.json, the bundle file name comes from Cargo.toml.
+      # Runs before the release is created: all build jobs depend on this one via
+      # `needs`, so a failure costs not a single build minute.
       - name: Verify the tag matches all three version sites
         run: |
           python3 - "$GITHUB_REF_NAME" <<'PY'
@@ -68,8 +68,8 @@ jobs:
         with:
           body_path: release-notes.md
 
-      # Der Manifest-Job laeuft in einem eigenen Container und haette die Datei
-      # sonst nicht — sie wandert als `notes` in die latest.json.
+      # The manifest job runs in its own container and would not have the file
+      # otherwise; it ends up as `notes` in latest.json.
       - name: Keep the notes for the update manifest
         uses: actions/upload-artifact@v4
         with:
@@ -144,8 +144,8 @@ jobs:
           name: updater-fragment-darwin-aarch64
           path: updater-fragments/*.json
 
-      # Das `.app.tar.gz` ist das, was der Updater laedt — die .dmg bleibt fuer
-      # die Erstinstallation von Hand.
+      # The `.app.tar.gz` is what the updater downloads; the .dmg stays for
+      # the first installation by hand.
       - name: Upload to release
         uses: softprops/action-gh-release@v2
         with:
@@ -179,8 +179,8 @@ jobs:
         shell: bash
         run: rm -rf "src-tauri/target/x86_64-pc-windows-msvc/release/bundle"
 
-      # OpenSSL (unter SQLCipher) baut ohne NASM ohne Assembler — also ohne
-      # AES-NI, langsamer und nicht in konstanter Zeit.
+      # OpenSSL (under SQLCipher) builds without an assembler if NASM is missing, so
+      # without AES-NI: slower and not constant-time.
       - uses: ilammy/setup-nasm@v1
 
       - name: Build
@@ -189,9 +189,9 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         run: npm run tauri build -- --target x86_64-pc-windows-msvc
 
-      # NSIS, nicht MSI: der Updater kann beide, aber im Manifest steht pro
-      # Plattform genau eine Adresse — und der NSIS-Installer ist der, den die
-      # Webseite ausliefert.
+      # NSIS, not MSI: the updater can handle both, but the manifest holds exactly
+      # one address per platform, and the NSIS installer is the one the
+      # website serves.
       - name: Collect the updater signature
         run: >
           node scripts/updater-fragment.mjs
@@ -255,8 +255,8 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         run: npm run tauri build -- --target x86_64-unknown-linux-gnu --bundles deb,appimage
 
-      # Nur das AppImage: ein `.deb` kann der Updater nicht ersetzen, deshalb
-      # steht Linux im Manifest ausschliesslich mit dem AppImage.
+      # Only the AppImage: the updater cannot replace a `.deb`, so Linux
+      # appears in the manifest with the AppImage only.
       - name: Collect the updater signature
         run: >
           node scripts/updater-fragment.mjs
@@ -275,9 +275,9 @@ jobs:
             src-tauri/target/x86_64-unknown-linux-gnu/release/bundle/deb/*.deb
             src-tauri/target/x86_64-unknown-linux-gnu/release/bundle/appimage/*.AppImage
 
-  # Zuletzt, mit `needs` auf allen drei Builds: das Manifest ist der Schalter,
-  # der die neue Version fuer installierte Apps sichtbar macht. Waere es frueher
-  # da, boete die App ein Update an, dessen Datei noch gebaut wird.
+  # Last, with `needs` on all three builds: the manifest is the switch that
+  # makes the new version visible to installed apps. If it existed earlier,
+  # the app would offer an update whose file is still being built.
   publish-manifest:
     needs: [build-macos-apple-silicon, build-windows, build-ubuntu]
     runs-on: ubuntu-latest
@@ -299,8 +299,8 @@ jobs:
         with:
           name: release-notes
 
-      # Die Adressen kommen vom Release selbst: GitHub schreibt Sonderzeichen in
-      # Asset-Namen um, eine selbst gebaute URL liefe ins Leere.
+      # The addresses come from the release itself: GitHub rewrites special characters in
+      # asset names, so a self-built URL would lead nowhere.
       - name: Read the release assets
         env:
           GH_TOKEN: ${{ github.token }}

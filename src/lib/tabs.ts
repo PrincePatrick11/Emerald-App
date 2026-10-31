@@ -1,7 +1,7 @@
 import type { ActiveView } from '../types';
 import { ENTRY_MODULE_IDS, isLibraryView, isViewId } from './modules';
 
-/** Der Zurück/Vor-Verlauf eines Tabs: die besuchten Seiten und die Stelle, an der man steht. */
+/** A tab's back/forward history: the pages visited and the position one is at. */
 export interface NavHistory {
   views: ActiveView[];
   index: number;
@@ -10,11 +10,11 @@ export interface NavHistory {
 export interface OpenTab {
   id: string;
   view: ActiveView;
-  /** Jeder Tab hat seinen eigenen Verlauf — Zurück und Vor bleiben im Tab. */
+  /** Every tab has its own history — back and forward stay within the tab. */
   history: NavHistory;
 }
 
-/** Obergrenze je Verlauf: er wird mit den Tabs in localStorage gespeichert. */
+/** Upper limit per history: it is saved to localStorage along with the tabs. */
 export const MAX_HISTORY_LENGTH = 50;
 
 export function createTabId(): string {
@@ -22,9 +22,9 @@ export function createTabId(): string {
 }
 
 /**
- * isNew nicht in den Verlauf: käme man per Zurück (oder nach einem Neustart)
- * auf die frische Edit-View zurück, würde Cancel einen längst autogespeicherten
- * Eintrag endgültig löschen.
+ * isNew does not go into the history: if one came back to the fresh edit view
+ * via Back (or after a restart), Cancel would permanently delete an
+ * entry that was autosaved long ago.
  */
 export function stripSessionFlags(view: ActiveView): ActiveView {
   const { isNew: _isNew, ...rest } = view;
@@ -36,9 +36,9 @@ export function freshHistory(view: ActiveView): NavHistory {
 }
 
 /**
- * Hängt eine Seite hinter die aktuelle Stelle und kappt, was vor ihr lag.
- * Dieselbe Seite (gleicher Typ, gleiche id) — etwa der Wechsel in den
- * Bearbeiten-Modus — ist kein neuer Schritt; der Verlauf bleibt unverändert.
+ * Appends a page after the current position and cuts off whatever lay ahead of it.
+ * The same page (same type, same id) — e.g. switching into
+ * edit mode — is not a new step; the history stays unchanged.
  */
 export function pushHistory(history: NavHistory, view: ActiveView): NavHistory {
   const current = history.views[history.index];
@@ -49,9 +49,9 @@ export function pushHistory(history: NavHistory, view: ActiveView): NavHistory {
 }
 
 /**
- * Stellt einen gespeicherten Verlauf wieder her. Tabs aus Versionen ohne
- * eigenen Verlauf, veraltete View-Typen und ein Index außerhalb der Liste
- * fallen auf einen Verlauf zurück, der mit der aktuellen Seite des Tabs endet.
+ * Restores a saved history. Tabs from versions without their own
+ * history, outdated view types and an index outside the list
+ * fall back to a history that ends with the tab's current page.
  */
 export function normalizeSavedHistory(raw: unknown, view: ActiveView): NavHistory {
   const candidate = raw as Partial<NavHistory> | null | undefined;
@@ -61,8 +61,8 @@ export function normalizeSavedHistory(raw: unknown, view: ActiveView): NavHistor
   const views = (candidate.views as unknown[])
     .filter((v): v is ActiveView => !!v && typeof v === 'object' && isViewId((v as ActiveView).type))
     .map(stripSessionFlags);
-  // Beim Filtern können Einträge vor dem Index wegfallen — dann stimmt er
-  // nicht mehr, und der Verlauf wäre ein Rätsel. Lieber frisch anfangen.
+  // Filtering can drop entries before the index — then it no longer
+  // matches, and the history would be a mystery. Better to start fresh.
   if (views.length !== candidate.views.length || candidate.index < 0 || candidate.index >= views.length) {
     return freshHistory(view);
   }
@@ -70,9 +70,9 @@ export function normalizeSavedHistory(raw: unknown, view: ActiveView): NavHistor
 }
 
 /**
- * Eine Detailseite, die ohne offenen Tab einen eigenen bekommt: ein Eintrag
- * oder die Seite eines eigenen Blocks oder einer Vorlage. Tiefenlinks in Tags
- * und Kategorien tragen auch eine id, sind aber nur ein Sprung in die Liste.
+ * A detail page that gets a tab of its own when no tab is open: an entry
+ * or the page of a custom block or a template. Deep links into tags
+ * and categories also carry an id, but are only a jump into the list.
  */
 export function isContentView(view: ActiveView): boolean {
   if (!view.id) return false;

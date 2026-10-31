@@ -6,27 +6,27 @@ import { getDb } from '../lib/db';
 import type { AltarPlacement, AltarRecord } from '../types';
 
 /**
- * Der Altar, wie er war, als „Bearbeiten" gedrückt wurde — samt seinen
- * Platzierungen. Anders als ein Eintrag speichert der Altar jede Handlung
- * sofort (Platzieren, Ziehen, Hintergrund, Raster …); ohne diesen Stand gäbe
- * es für Cancel nichts, wohin es zurück könnte.
+ * The altar as it was when "Edit" was pressed — including its
+ * placements. Unlike an entry, the altar saves every action immediately
+ * (placing, dragging, background, grid …); without this snapshot there would
+ * be nothing for Cancel to go back to.
  *
- * Wie der Ausgangsstand der Einträge (`entryEdit`) außerhalb der
- * Komponente: die Bearbeitung überlebt den Blick in einen anderen Tab. Ein
- * Stand lebt, solange irgendein Tab den Altar im Bearbeiten zeigt — das liest
- * der Abgleich unten am `uiStore` ab. Nur im Speicher.
+ * Like the baseline of the entries (`entryEdit`), it lives outside the
+ * component: the edit survives a look at another tab. A snapshot lives as long
+ * as any tab shows the altar in edit mode — the reconciliation below reads
+ * that off the `uiStore`. In memory only.
  *
- * Nicht Teil des Stands ist die Bibliothek: ein Element gehört allen Altären,
- * und was an ihm geändert wird, bleibt. Wurde ein Element inzwischen gelöscht,
- * kommt seine Platzierung mit Cancel nicht zurück.
+ * The library is not part of the snapshot: an item belongs to all altars,
+ * and what is changed on it stays. If an item has been deleted in the
+ * meantime, its placement does not come back with Cancel.
  */
 interface AltarSnapshot {
   altar: AltarRecord;
   placements: AltarPlacement[];
   /**
-   * Die Elemente, die beim Betreten im Papierkorb lagen. Ihre Platzierungen
-   * stehen in keinem Stand — kommt eines während der Bearbeitung zurück, darf
-   * Cancel sie trotzdem nicht wegräumen.
+   * The items that were in the trash on entering. Their placements are in
+   * no snapshot — if one comes back during the edit, Cancel must still not
+   * clear them away.
    */
   trashedItemIds: string[];
 }
@@ -34,19 +34,19 @@ interface AltarSnapshot {
 const snapshots = new Map<string, AltarSnapshot>();
 
 /**
- * Stände, die der Abgleich unten nicht räumen darf, obwohl kein Tab den Altar
- * mehr im Bearbeiten zeigt: Cancel schreibt gerade zurück — die Ansicht ist
- * dann schon gewechselt —, oder ist daran gescheitert und soll es beim
- * nächsten Mal zu Ende bringen können.
+ * Snapshots that the reconciliation below must not clear even though no tab
+ * shows the altar in edit mode any more: Cancel is writing back right now —
+ * the view has already switched by then — or failed at it and should be able
+ * to finish the job next time.
  */
 const held = new Set<string>();
 
 /**
- * Was für einen Altar gerade noch geschrieben wird, ohne in einer
- * Schreibkette zu hängen: „Fertig" (Titel, Vorschaubild) und die Aufnahme des
- * Vorschaubilds beim Wegschalten. Ein neuer Stand wartet darauf — sonst
- * merkte er sich den Titel von vor dem „Fertig" —, und Cancel auch, damit
- * nichts davon nach dem Zurückschreiben landet.
+ * What is still being written for an altar without hanging in a write
+ * chain: "Done" (title, thumbnail) and capturing the thumbnail when
+ * switching away. A new snapshot waits for it — otherwise it would remember
+ * the title from before the "Done" — and so does Cancel, so that none of it
+ * lands after the write-back.
  */
 const writing = new Map<string, Promise<unknown>>();
 
@@ -58,10 +58,10 @@ export function trackAltarWrite(id: string, write: Promise<unknown>): void {
 }
 
 /**
- * Das Zurückschreiben, das für einen Altar gerade läuft. Wer gleich nach
- * Cancel wieder „Bearbeiten" drückt, wartet darauf: sonst hielte er den alten
- * Stand für seinen eigenen, und der verschwände mit dem Ende des
- * Zurückschreibens — die neue Bearbeitung hätte keinen.
+ * The write-back currently running for an altar. Anyone who presses "Edit"
+ * again right after Cancel waits for it: otherwise they would take the old
+ * snapshot for their own, and it would vanish when the write-back ends — the
+ * new edit would have none.
  */
 const restoring = new Map<string, Promise<void>>();
 
@@ -74,21 +74,21 @@ useUIStore.subscribe(() => {
 });
 
 /**
- * Die Platzierungen, wie sie gerade sind. Für den offenen Altar die aktive
- * Liste: sie kommt frisch aus der Datenbank, während `previewPlacements` für
- * einen Altar auch einmal fehlen kann.
+ * The placements as they currently are. For the open altar, the active
+ * list: it comes fresh from the database, while `previewPlacements` may be
+ * missing for an altar.
  */
 function currentPlacements(id: string): AltarPlacement[] {
   const { activeAltarId, placements, previewPlacements } = useAltarStore.getState();
   return activeAltarId === id ? placements : previewPlacements[id] ?? [];
 }
 
-/** Merkt sich den Altar beim Betreten des Bearbeitens. Läuft die Bearbeitung schon, bleibt ihr Stand. */
+/** Remembers the altar on entering edit mode. If the edit is already running, its snapshot stays. */
 export async function beginAltarEdit(id: string): Promise<void> {
-  // Scheitert es, bleibt sein Stand — und gilt dann auch für diese Bearbeitung.
+  // If it fails, its snapshot stays — and then also applies to this edit.
   await restoring.get(id)?.catch(() => {});
   await writing.get(id);
-  // Inzwischen kann die Bearbeitung beendet oder der Stand schon da sein.
+  // In the meantime the edit may have ended or the snapshot may already exist.
   if (snapshots.has(id) || !isEditingAltar(id)) return;
   const altar = useAltarStore.getState().altars.find((entry) => entry.id === id);
   if (!altar) return;
@@ -100,10 +100,10 @@ export async function beginAltarEdit(id: string): Promise<void> {
 }
 
 /**
- * Was an einem Altar zählt, wenn es um „geändert oder nicht" geht. Eine
- * Feldliste statt des ganzen Records: ein frisch angelegter trägt manche
- * Felder gar nicht, die nach dem nächsten Laden `null` heißen. Zeitstempel und
- * Vorschaubild fehlen mit Absicht — die folgen nur.
+ * What counts on an altar when it comes to "changed or not". A field list
+ * instead of the whole record: a freshly created one lacks some fields
+ * entirely that are called `null` after the next load. Timestamps and
+ * thumbnail are missing on purpose — they only follow.
  */
 function comparableAltar(altar: AltarRecord, title = altar.title): string {
   return JSON.stringify([
@@ -115,7 +115,7 @@ function comparableAltar(altar: AltarRecord, title = altar.title): string {
   ]);
 }
 
-/** Nur, was die Platzierung selbst trägt — Name, Emoji und Bild gehören dem Bibliothekselement. */
+/** Only what the placement itself carries — name, emoji and image belong to the library item. */
 function comparablePlacements(placements: readonly AltarPlacement[]): string {
   return JSON.stringify(
     placements
@@ -126,9 +126,8 @@ function comparablePlacements(placements: readonly AltarPlacement[]): string {
 }
 
 /**
- * Wurde der Altar seit dem Betreten des Bearbeitens geändert? `title`: der
- * getippte, noch nicht gespeicherte Titel — der Altar speichert ihn erst mit
- * „Fertig".
+ * Has the altar changed since entering edit mode? `title`: the typed,
+ * not yet saved title — the altar only saves it with "Done".
  */
 export function altarEditChanged(id: string, title?: string): boolean {
   const snapshot = snapshots.get(id);
@@ -140,9 +139,9 @@ export function altarEditChanged(id: string, title?: string): boolean {
 }
 
 /**
- * Trägt die Bearbeitung des Altars etwas, wonach beim Verlassen zu fragen
- * wäre? Ein neuer, nie bestätigter immer; ein gelöschter nie. Der Wächter der
- * offenen Seite und die Probe für Tabs im Hintergrund fragen beide hier.
+ * Does the altar's edit carry anything that would warrant asking on leaving?
+ * A new, never confirmed one always; a deleted one never. The guard of the
+ * open page and the probe for background tabs both ask here.
  */
 export function altarEditDirty(id: string, isNew: boolean, title?: string): boolean {
   if (!useAltarStore.getState().altars.some((altar) => altar.id === id)) return false;
@@ -150,31 +149,31 @@ export function altarEditDirty(id: string, isNew: boolean, title?: string): bool
 }
 
 /**
- * Vault-Wechsel und Ersetzen aus einer Sicherung: kein Stand gilt mehr. Auch
- * kein gehaltener — die Ids eines ersetzten Vaults kommen wieder, und Cancel
- * schriebe dann den alten Altar über den eingespielten.
+ * Vault switch and replacing from a backup: no snapshot applies any more. Not
+ * even a held one — the ids of a replaced vault come back, and Cancel would
+ * then write the old altar over the restored one.
  */
 export function clearAltarEdits(): void {
   held.clear();
   snapshots.clear();
 }
 
-/** „Fertig": die Bearbeitung ist bestätigt, ihr Stand wird nicht mehr gebraucht. */
+/** "Done": the edit is confirmed, its snapshot is no longer needed. */
 export function endAltarEdit(id: string): void {
   held.delete(id);
   snapshots.delete(id);
 }
 
 /**
- * Cancel: schreibt den gemerkten Stand zurück — auch wenn nur Zeitstempel und
- * Vorschaubild abweichen, damit der Altar in den Listen steht, wo er stand.
- * Scheitert das Schreiben, wirft es, und der Stand bleibt für einen zweiten
- * Versuch: das nächste „Bearbeiten" setzt auf ihm auf, das nächste Cancel
- * bringt es zu Ende.
+ * Cancel: writes the remembered snapshot back — even if only the timestamp and
+ * thumbnail differ, so the altar sits in the lists where it was.
+ * If the write fails, it throws and the snapshot stays for a second
+ * attempt: the next "Edit" builds on it, the next Cancel
+ * finishes the job.
  */
 export function restoreAltarEdit(id: string): Promise<void> {
-  // Vor dem ersten await: die Ansicht wechselt gleich, und der Abgleich oben
-  // räumte den Stand weg, während hier noch gewartet wird.
+  // Before the first await: the view switches right away, and the reconciliation
+  // above would clear the snapshot while we are still waiting here.
   const snapshot = snapshots.get(id);
   if (!snapshot) return Promise.resolve();
   held.add(id);
@@ -186,8 +185,8 @@ export function restoreAltarEdit(id: string): Promise<void> {
 }
 
 async function writeBack(id: string, snapshot: AltarSnapshot): Promise<void> {
-  // Was noch unterwegs ist (ein Vorschaubild, ein Schieberegler), erst zu
-  // Ende bringen — sonst landete es nach dem Zurückschreiben.
+  // Finish whatever is still in flight (a thumbnail, a slider) first —
+  // otherwise it would land after the write-back.
   await writing.get(id);
   await drainSerialized();
   const altar = useAltarStore.getState().altars.find((entry) => entry.id === id);
@@ -198,7 +197,7 @@ async function writeBack(id: string, snapshot: AltarSnapshot): Promise<void> {
   endAltarEdit(id);
 }
 
-// Für Tabs im Hintergrund: trägt die Bearbeitung dort Änderungen (`leaveGuardStore`)?
+// For background tabs: does the edit there carry changes (`leaveGuardStore`)?
 registerEditProbe((view) =>
   view.type === 'altar' && view.mode === 'edit' && !!view.id && snapshots.has(view.id)
     && altarEditDirty(view.id, !!view.isNew));

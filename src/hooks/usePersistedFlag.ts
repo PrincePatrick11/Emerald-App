@@ -2,13 +2,13 @@ import { useCallback } from 'react';
 import { useUIStore } from '../store/uiStore';
 
 /**
- * Ein Ein/Aus-Zustand, der den Neustart überlebt — eine Vorliebe wie „welcher
- * Abschnitt des Altar-Dashboards zugeklappt bleibt". Dauerhaft und je Vault,
- * mit den übrigen Vorlieben (`uiStore.flags`, `vaultPrefs`).
+ * An on/off state that survives a restart — a preference like "which
+ * section of the altar dashboard stays collapsed". Persistent and per vault,
+ * along with the other preferences (`uiStore.flags`, `vaultPrefs`).
  *
- * Hat ein Vault den Schlüssel noch nie gesetzt, gilt, was vor den Vorlieben je
- * Vault app-weit unter demselben Schlüssel stand — nach dem Update springt so
- * nichts auf.
+ * If a vault has never set the key, what stood app-wide under the same key
+ * before the per-vault preferences applies — so nothing pops open after the
+ * update.
  */
 export function usePersistedFlag(key: string, fallback = false): [boolean, () => void, (value: boolean) => void] {
   const value = useUIStore((s) => resolve(s.flags, key, fallback));

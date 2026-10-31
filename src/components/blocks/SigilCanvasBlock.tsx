@@ -10,19 +10,19 @@ import { DEFAULT_BRUSH_SIZE, SigilBrushSize, SigilColorSwatches } from './SigilB
 import type { BlockViewProps } from './blockViews';
 
 /**
- * Die Sigillen-Zeichnung. Gespeichert wird sie als Bilddatei (`saveImage`),
- * im Block steht nur ihr Dateiname — Base64 kommt nie in den Inhalt. Die
- * Rückgängig-Liste lebt nur im Speicher, solange bearbeitet wird;
- * Zwischenstände, die dabei als Datei entstehen, räumt „Unbenutzte Bilder
- * löschen" auf (Einstellungen → Speicher).
+ * The sigil drawing. It is stored as an image file (`saveImage`),
+ * the block holds only its file name; base64 never enters the content. The
+ * undo list lives only in memory while editing;
+ * intermediate states that arise as files in the process are cleaned up by "Delete
+ * unused images" (Settings → Storage).
  *
- * Das Speichern ist asynchron:
- * - Es kann den Moduswechsel überdauern — kommt der Dateiname erst nach
- *   „Fertig" zurück, geht er über `onPersist` direkt in den Eintrag. Dieser
- *   Teil bleibt dafür über beide Modi montiert (der Stapel behält seinen Baum).
- * - Zwei schnelle Striche speichern parallel; nur das Ergebnis des jüngsten
- *   zählt (`seq`), sonst überschriebe ein spät fertiges älteres den neueren.
- * - Nach dem Abbau (anderer Eintrag, Abbrechen) wird nichts mehr geschrieben.
+ * Saving is asynchronous:
+ * - It can outlast the mode switch: if the file name only comes back after
+ *   "Done", it goes directly into the entry via `onPersist`. This
+ *   part therefore stays mounted across both modes (the stack keeps its tree).
+ * - Two quick strokes save in parallel; only the result of the most recent one
+ *   counts (`seq`), otherwise an older one finishing late would overwrite the newer.
+ * - After teardown (other entry, cancel) nothing is written any more.
  */
 export default function SigilCanvasBlock({ block, isEditing, onBlockChange, onPersist, sigil, part }: BlockViewProps) {
   const { t } = useTranslation();
@@ -31,8 +31,8 @@ export default function SigilCanvasBlock({ block, isEditing, onBlockChange, onPe
 
   const latest = useRef({ block, isEditing, onBlockChange, onPersist });
   latest.current = { block, isEditing, onBlockChange, onPersist };
-  // Im Effekt gesetzt, nicht nur im Aufräumen: React (StrictMode) montiert im
-  // Entwicklungsmodus doppelt, und ein nur im Cleanup gesetztes `false` bliebe stehen.
+  // Set in the effect, not only in cleanup: React (StrictMode) mounts twice in
+  // development mode, and a `false` set only in cleanup would stick.
   const mounted = useRef(false);
   useEffect(() => {
     mounted.current = true;
@@ -60,7 +60,7 @@ export default function SigilCanvasBlock({ block, isEditing, onBlockChange, onPe
     else persist?.(next);
   }, []);
 
-  // Verborgen auch beim Bearbeiten — bei Sperre „nur Sigille" ist Bearbeiten erlaubt.
+  // Hidden when editing too; with the lock "sigil only", editing is allowed.
   if (sigil.concealed.has(block.id)) return <SigilConcealed revealDate={sigil.concealed.get(block.id) ?? null} />;
   if (!isEditing || sigil.locked.has(block.id)) {
     return (
@@ -90,7 +90,7 @@ interface History {
   index: number;
 }
 
-/** `startColor`/`startSize`: womit gezeichnet wird, bis man umstellt — ein eigener Block kann es vorgeben. */
+/** `startColor`/`startSize`: what is drawn with until you switch; a custom block can specify it. */
 function CanvasEditor({ filename, startColor, startSize, onDrawn }: {
   filename: string | null;
   startColor: string;
@@ -98,7 +98,7 @@ function CanvasEditor({ filename, startColor, startSize, onDrawn }: {
   onDrawn: (dataUrl: string | null) => void;
 }) {
   const { t } = useTranslation();
-  // Die Zeichnung, mit der geöffnet wurde — danach ist die Fläche selbst die Wahrheit.
+  // The drawing it was opened with; afterwards the canvas itself is the truth.
   const [openedWith] = useState(filename);
   const [initial, setInitial] = useState<string | null>(null);
   const [load, setLoad] = useState<'loading' | 'ready' | 'failed'>(openedWith ? 'loading' : 'ready');
@@ -108,9 +108,9 @@ function CanvasEditor({ filename, startColor, startSize, onDrawn }: {
   const [clearVersion, setClearVersion] = useState(0);
   const [history, setHistory] = useState<History>({ steps: [null], index: 0 });
 
-  // Die gespeicherte Zeichnung als Data-URL laden (siehe SigilDrawingCanvas).
-  // Scheitert das, bleibt die Fläche gesperrt: der erste Strich speicherte
-  // sonst eine leere Fläche über die echte Zeichnung.
+  // Load the saved drawing as a data URL (see SigilDrawingCanvas).
+  // If that fails, the canvas stays locked: the first stroke would
+  // otherwise save an empty canvas over the real drawing.
   useEffect(() => {
     if (!openedWith) return;
     let cancelled = false;
@@ -158,8 +158,8 @@ function CanvasEditor({ filename, startColor, startSize, onDrawn }: {
         onChange={handleChange}
       />
       <div className="flex flex-wrap items-center gap-3">
-        {/* Der Umschalter aus der früheren Sigillen-Ansicht, mit Parchment-Brücke
-            (.sigil-tool-*) — bewusst kein Button: zwei Zustände eines Werkzeugs. */}
+        {/* The toggle from the former sigil view, with a parchment bridge
+            (.sigil-tool-*); deliberately not a Button: two states of one tool. */}
         <div className="sigil-tool-toggle flex items-center gap-1 rounded-lg border border-stone-700/40 bg-stone-800/70 p-1">
           {(['draw', 'erase'] as const).map((m) => {
             const Icon = m === 'draw' ? PenTool : Eraser;

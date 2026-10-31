@@ -78,14 +78,13 @@ pub async fn db_load(
     file: DbFile,
 ) -> Result<String, String> {
     let dir = vault::vault_dir(&app, &vault_id)?;
-    // Nur verschlüsselte Vaults: ein Vault ohne `vault.key` wird erst
-    // verschlüsselt (`reencrypt.rs`), nie im Klartext geöffnet — auch
-    // dann nicht, wenn jemand `vault.key` gelöscht und eine Klartext-Datenbank
-    // untergeschoben hat.
+    // Encrypted vaults only: a vault without `vault.key` is encrypted
+    // first (`reencrypt.rs`) and never opened in plain text — not even when
+    // someone deleted `vault.key` and slipped in a plain-text database.
     let vault_key = keys::key_for(&app, &vault_id)?.ok_or_else(|| keys::VAULT_NOT_ENCRYPTED.to_string())?;
-    // Der Schlüssel im Speicher muss zu diesem Ordner gehören: zeigt die Id
-    // inzwischen woandershin, entstünde sonst eine Datenbank unter einem
-    // Schlüssel, den dessen `vault.key` nicht kennt.
+    // The key in memory must belong to this folder: if the id now points
+    // elsewhere, a database would otherwise end up under a key that its
+    // `vault.key` does not know.
     if !keys::read_key_file(&dir)?.is_some_and(|file| file.accepts(&vault_key)) {
         return Err(keys::VAULT_LOCKED.to_string());
     }
@@ -95,18 +94,18 @@ pub async fn db_load(
         .create_if_missing(true)
         .disable_statement_logging()
         .pragma("key", sqlcipher_key(&key).to_string())
-        // SQLCipher entschlüsselt eine Seite, wenn sie in den Seiten-Cache
-        // kommt. Mit SQLites 2 MB verdrängt ein Durchlauf über `entries` seine
-        // eigenen Seiten, und jeder weitere entschlüsselt alles neu (gemessen:
-        // 2000 Einträge 238 statt 40 ms). 32 MB pro Verbindung; belegt wird
-        // nur, was gelesen wurde.
+        // SQLCipher decrypts a page when it enters the page cache. With
+        // SQLite's 2 MB, a pass over `entries` evicts its own pages, and
+        // every further pass decrypts everything again (measured: 2000
+        // entries 238 instead of 40 ms). 32 MB per connection; only what
+        // was read is actually occupied.
         .pragma("cache_size", "-32768");
     let pool = connect(options, &dir).await?;
 
     let handle = handle(&vault_id, file);
     let mut map = dbs.0.write().await;
-    // Unter der Sperre noch einmal: ein `vault_lock` während des Verbindens
-    // hat den Schlüssel entfernt, und dieser Pool überlebte es sonst.
+    // Once more under the lock: a `vault_lock` during connecting removed
+    // the key, and this pool would otherwise outlive it.
     if app.state::<keys::VaultKeys>().get(&vault_id).is_none() {
         drop(map);
         pool.close().await;
@@ -114,11 +113,11 @@ pub async fn db_load(
     }
     let previous = map.insert(handle.clone(), pool);
     drop(map);
-    // Im Hintergrund: `close` wartet, bis jede laufende Abfrage des alten
-    // Pools fertig ist — nach einem Neuladen der Seite etwa das Nachladen
-    // aller Einträge (`fetchEntries`, zweite Stufe). Der neue Pool braucht den
-    // alten nicht zu, und wer die Dateien wirklich frei braucht, schließt
-    // ausdrücklich (`db_close`, `close_vault`).
+    // In the background: `close` waits until every running query of the old
+    // pool is done — after a page reload, say, the reload of all entries
+    // (`fetchEntries`, second stage). The new pool does not need the old one
+    // closed, and whoever really needs the files freed closes explicitly
+    // (`db_close`, `close_vault`).
     if let Some(previous) = previous {
         tauri::async_runtime::spawn(async move { previous.close().await });
     }
@@ -149,7 +148,7 @@ pub(crate) fn normalize_path(path: &str) -> String {
 /// attaches its target internally). Both stay under the vault key — an
 /// `ATTACH` without `KEY` inherits it.
 fn may_attach(scope: &str, filename: &str) -> bool {
-    // `VACUUM` ohne Ziel hängt eine leere, temporäre Datenbank an.
+    // `VACUUM` without a target attaches an empty, temporary database.
     if filename.is_empty() {
         return true;
     }
@@ -163,8 +162,8 @@ fn may_attach(scope: &str, filename: &str) -> bool {
 async fn connect(options: SqliteConnectOptions, vault_dir: &Path) -> Result<SqlitePool, String> {
     let scope = attach_scope(vault_dir);
     SqlitePoolOptions::new()
-        // Jede Verbindung hat ihren eigenen Seiten-Cache; wenige Verbindungen
-        // heißen wärmere Caches und begrenzten Speicher.
+        // Every connection has its own page cache; few connections mean
+        // warmer caches and bounded memory.
         .max_connections(4)
         .after_connect(move |conn, _| {
             Box::pin(async move {
@@ -335,7 +334,7 @@ async fn batch_on(pool: &SqlitePool, statements: Vec<(String, Vec<JsonValue>)>) 
     let mut tx = pool.begin().await.map_err(|e| e.to_string())?;
     let mut affected = 0;
     for (query, values) in statements {
-        // Ein Fehler lässt `tx` ungenutzt fallen — sqlx rollt dann zurück.
+        // An error drops `tx` unused — sqlx then rolls back.
         affected += bind_all(sqlx::query(&query), values)
             .execute(&mut *tx)
             .await
@@ -551,7 +550,7 @@ mod tests {
         let key = crypto::random_key();
         let pool = connect(keyed(&dir.join("main.db"), &key), &dir).await.unwrap();
         execute_on(&pool, "CREATE TABLE t (s TEXT)", vec![]).await.unwrap();
-        // Ein ATTACH außerhalb der eigenen Kopien, verschlüsselt oder nicht.
+        // An ATTACH outside the app's own copies, encrypted or not.
         let elsewhere = dir.join("anywhere.db");
         assert!(execute_on(&pool, &format!("ATTACH DATABASE '{}' AS p KEY ''", elsewhere.display()), vec![]).await.is_err());
         assert!(execute_on(&pool, &format!("VACUUM INTO '{}'", elsewhere.display()), vec![]).await.is_err());
@@ -568,9 +567,9 @@ mod tests {
         let plain = dir.join("plain.db");
         let export = format!("ATTACH DATABASE '{}' AS p KEY ''; SELECT sqlcipher_export('p')", plain.display());
         assert!(execute_on(&pool, &export, vec![]).await.is_err());
-        // Das ATTACH darf die Datei anlegen — gefüllt wird sie nicht.
+        // The ATTACH may create the file — it is not filled.
         assert!(!plain.exists() || !is_plain_sqlite(&plain));
-        // Was erlaubt bleibt.
+        // What stays allowed.
         assert!(select_on(&pool, "PRAGMA cipher_version", vec![]).await.is_ok());
         assert!(select_on(&pool, "PRAGMA table_info(t)", vec![]).await.is_ok());
         assert!(execute_on(&pool, "PRAGMA foreign_keys = ON", vec![]).await.is_ok());

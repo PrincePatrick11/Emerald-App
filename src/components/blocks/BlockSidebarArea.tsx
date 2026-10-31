@@ -18,37 +18,37 @@ import { blockIcon } from '../../lib/blocks/presets';
 import { BLOCK_SIDEBAR_VIEWS } from './blockSidebarViews';
 import { addBlockActions, commonBlockActions } from './blockActions';
 
-/** Auf/Zu der Blöcke — Gliederung (Lesen) und Verwaltung (Bearbeiten) teilen es. */
+/** Open/closed state of the blocks; outline (reading) and management (editing) share it. */
 const OPEN_KEY = 'blocks-sidebar-open';
 
-/** Was die Gliederung im Lesemodus zeigt: nur, was man lesen kann. */
+/** What the outline shows in read mode: only what can be read. */
 function readableBlocks(session: BlockSession): BlockInstance[] {
   return session.blocks.filter((b) => !isBlockHidden(b));
 }
 
-/** Die aufgeklappten Einstellungen eines Blocks unter seiner Zeile. */
+/** The expanded settings of a block below its row. */
 function BlockSettingsBox({ children, className = '' }: { children: ReactNode; className?: string }) {
   return <div className={`block-settings-panel ${className}`}>{children}</div>;
 }
 
 /**
- * Die Block-Verwaltung des geöffneten Eintrags in der rechten Seitenleiste:
- * im Bearbeitungsmodus Liste mit Griff, Auge und Menü (Umbenennen, Titel im
- * Lesemodus, Duplizieren, Entfernen) plus „Block hinzufügen"; im Lesemodus
- * eine Gliederung der sichtbaren Blöcke (`BlockOutline`), deren Zeilen zum
- * Block springen — dort nur, wenn es mehr als einen gibt. Bringt ein
- * Blocktyp Einstellungen mit (`blockSidebarViews.ts`), klappt ein Klick auf
- * seine Zeile sie darunter auf — wie die platzierten Elemente des Altars.
+ * The block management of the opened entry in the right sidebar:
+ * in edit mode a list with handle, eye and menu (rename, title in
+ * read mode, duplicate, remove) plus "Add block"; in read mode
+ * an outline of the visible blocks (`BlockOutline`), whose rows jump to the
+ * block, and only if there is more than one. If a
+ * block type brings settings (`blockSidebarViews.ts`), a click on
+ * its row expands them below it, like the altar's placed elements.
  *
- * Alles läuft über die API, die der `BlockStack` im `blockSessionStore`
- * veröffentlicht — die Seitenleiste ändert nie selbst am Eintrag.
+ * Everything goes through the API that the `BlockStack` publishes in the
+ * `blockSessionStore`; the sidebar never changes the entry itself.
  */
 export default function BlockSidebarArea() {
   const activeViewId = useUIStore((s) => s.activeView.id);
   const session = useBlockSessionStore((s) => s.session);
   if (!session || session.entryId !== activeViewId) return null;
-  // Beide pro Montage des Stapels neu (`key`): ein offenes Menü, Umbenennen oder
-  // eine Auswahl darf einen Cancel-Remount nicht überleben — es gehörte zum Stapel davor.
+  // Both are new per mount of the stack (`key`): an open menu, a rename or
+  // a selection must not survive a cancel remount, since it belonged to the previous stack.
   if (!session.isEditing) {
     if (readableBlocks(session).length < 2) return null;
     return <BlockOutline key={session.sessionId} session={session} />;
@@ -57,9 +57,9 @@ export default function BlockSidebarArea() {
 }
 
 /**
- * Die Gliederung im Lesemodus: ein Abschnitt wie Verlinkungen und Tags darüber
- * (`SidebarSection`), je sichtbarem Block eine Zeile. Ein Klick springt zum
- * Block; bringt sein Typ Einstellungen fürs Lesen mit, klappen sie darunter auf.
+ * The outline in read mode: a section like the links and tags above it
+ * (`SidebarSection`), one row per visible block. A click jumps to the
+ * block; if its type brings settings for reading, they expand below it.
  */
 function BlockOutline({ session }: { session: BlockSession }) {
   const { t } = useTranslation();
@@ -97,7 +97,7 @@ function BlockManager({ session }: { session: BlockSession }) {
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const { api } = session;
-  // Ohne Animation, wie die platzierten Elemente des Altars.
+  // Without animation, like the altar's placed elements.
   const { listRef, visualItems, draggingId, startDrag } = usePointerReorder(session.blocks, (ordered) => api.reorder(ordered.map((b) => b.id)));
   const definitions = useBlockDefinitionStore((s) => s.definitions);
 
@@ -129,8 +129,8 @@ function BlockManager({ session }: { session: BlockSession }) {
 
   return (
     <>
-      {/* Derselbe Abschnitt wie im Lesen (`BlockOutline`): gleicher Kopf, gleiches
-          Auf/Zu, gleicher Zähler — die Zeilen darin bleiben die der Verwaltung. */}
+      {/* The same section as when reading (`BlockOutline`): same header, same
+          open/closed state, same counter; the rows in it remain those of the management. */}
       <SidebarSection storageKey={OPEN_KEY} label={t('blocks.sidebarTitle')} count={session.blocks.length}>
         <div ref={listRef} className="space-y-1">
           {visualItems.map((block) => {
@@ -163,7 +163,7 @@ function BlockManager({ session }: { session: BlockSession }) {
             );
           })}
         </div>
-        {/* Unter einer Linie abgesetzt: die Knöpfe gehören zur Liste, sind aber keine Zeilen darin. */}
+        {/* Set off below a line: the buttons belong to the list but are not rows in it. */}
         <div className="sidebar-section-actions">
           <button type="button" className="sidebar-section-button" onClick={openAddMenu}>
             <Plus size={13} className="flex-shrink-0" />
@@ -189,23 +189,23 @@ interface ManagerRowProps {
   label: string;
   typeLabel: string;
   renaming: boolean;
-  /** Neuer Titel, oder `undefined` für „abgebrochen". */
+  /** New title, or `undefined` for "cancelled". */
   onRenamed: (title: string | undefined) => void;
-  /** Ausgewählt — hat der Block Einstellungen, stehen sie aufgeklappt unter der Zeile. */
+  /** Selected; if the block has settings, they are shown expanded below the row. */
   selected: boolean;
   isDragging: boolean;
   onGripPointerDown: (e: PointerEvent) => void;
-  /** Klick auf die Beschriftung: zum Block springen, aus- oder abwählen. */
+  /** Click on the label: jump to the block, select or deselect. */
   onActivate: () => void;
   onToggleHidden: () => void;
   onOpenMenu: (e: MouseEvent) => void;
-  /** Die Einstellungen des Blocks (`null`: keine) — unter der Zeile, damit sie beim Ziehen mitwandern. */
+  /** The block's settings (`null`: none), below the row so that they move along when dragging. */
   settings: ReactNode;
 }
 
 /**
- * Eine Zeile der Verwaltungsliste im Bearbeiten — dieselbe Form wie die platzierten Elemente
- * des Altars, mit denselben Zuständen (`sidebarRowStateClasses`).
+ * A row of the management list when editing; the same shape as the altar's placed
+ * elements, with the same states (`sidebarRowStateClasses`).
  */
 function ManagerRow({
   block, meta, label, typeLabel, renaming, onRenamed, selected, isDragging, onGripPointerDown, onActivate, onToggleHidden, onOpenMenu, settings,
@@ -219,10 +219,10 @@ function ManagerRow({
     <div>
       <div
         onContextMenu={(e) => { e.preventDefault(); onOpenMenu(e); }}
-        // 32px hoch, 13px und 14px-Icons wie die übrigen Zeilen der Seitenleiste.
+        // 32px tall, 13px and 14px icons like the other rows of the sidebar.
         className={`w-full flex items-center gap-2 h-8 rounded border pl-1 pr-1 text-[13px] transition-all select-none ${
-          // Ohne Rahmen, solange sie weder gewählt noch gezogen wird — die
-          // Zustände darüber teilt sie mit den Elementen des Altars.
+          // Without a border as long as it is neither selected nor dragged; the
+          // states above it are shared with the altar's elements.
           isDragging || selected ? sidebarRowStateClasses({ dragging: isDragging, selected }) : 'block-manager-row--idle'
         } ${hidden ? 'opacity-50' : ''}`}
       >
@@ -280,8 +280,8 @@ function ManagerRow({
 }
 
 /**
- * Die Einstellungen, die ein Blocktyp in die Seitenleiste mitbringt
- * (`blockSidebarViews.ts`) — `null`, wenn er für diesen Modus keine hat.
+ * The settings that a block type brings into the sidebar
+ * (`blockSidebarViews.ts`); `null` if it has none for this mode.
  */
 function blockSettings(session: BlockSession, block: BlockInstance, meta: BlockTypeMeta | undefined): ReactNode {
   const { isEditing, api } = session;

@@ -3,40 +3,41 @@ import { generateId } from '../helpers';
 import { TEXT_BLOCK_TYPE, type BlockInstance } from './types';
 
 /**
- * Das Blockformat im gespeicherten `content` — Lesen und Schreiben.
+ * The block format in the stored `content` — reading and writing.
  *
- * Ein Eintrag ist eine Folge von Blöcken; jeder steht als
- * `<section data-block="<typ>" data-block-id="<id>" …>inneres HTML</section>`
- * auf oberster Ebene des HTML. Drei Regeln tragen das Format:
+ * An entry is a sequence of blocks; each one stands as
+ * `<section data-block="<type>" data-block-id="<id>" …>inner HTML</section>`
+ * at the top level of the HTML. Three rules carry the format:
  *
- * 1. Inhalt AUSSERHALB einer Block-Section ist Text. Altinhalt ohne jeden
- *    Wrapper ist damit ein einziger Textblock, und was Importe oder Migrationen
- *    als rohes HTML anhängen, wird zu einem weiteren Textblock — bestehende
- *    Einträge brauchen keine Migration.
- * 2. Ein einzelner Textblock ohne weitere Attribute wird OHNE Wrapper
- *    geschrieben. Die allermeisten Einträge bleiben so Byte für Byte, was sie
- *    waren; Export, Suche und ältere App-Versionen merken nichts.
- * 3. Block-Sections stehen nur auf oberster Ebene. TipTap kennt keinen
- *    Section-Knoten, im Text eines Blocks steht also keine.
+ * 1. Content OUTSIDE a block section is text. Legacy content without any
+ *    wrapper is thus a single text block, and whatever imports or migrations
+ *    append as raw HTML becomes another text block — existing entries need
+ *    no migration.
+ * 2. A single text block without further attributes is written WITHOUT a
+ *    wrapper. The vast majority of entries thus stay byte for byte what they
+ *    were; export, search and older app versions notice nothing.
+ * 3. Block sections stand only at the top level. TipTap has no section
+ *    node, so there is none inside a block's text.
  *
- * Bewusst ohne `DOMParser`, wie `extractInternalLinks`: Migrationen und
- * `scripts/check-blocks.mjs` laufen unter Node. Gelesen wird jedes Tag einmal,
- * quote-bewusst — ein `>` in einem gequoteten Attributwert beendet kein Tag,
- * und ein `</section>` in einem Attributwert oder Kommentar ist keins.
- * Gezählt werden nur `<section>`-Tags, auch gewöhnliche ohne `data-block` (aus
- * einem Import), damit deren End-Tag keinen Block vorzeitig schließt.
+ * Deliberately without `DOMParser`, like `extractInternalLinks`: migrations and
+ * `scripts/check-blocks.mjs` run under Node. Every tag is read once,
+ * quote-aware — a `>` in a quoted attribute value does not end a tag,
+ * and a `</section>` in an attribute value or comment is not one.
+ * Only `<section>` tags are counted, including ordinary ones without
+ * `data-block` (from an import), so that their end tag does not close a
+ * block prematurely.
  *
- * Bewusst nachsichtig, wo Browser anders parsen würden: `<section data-block …/>`
- * gilt als leerer Block (ein Browser öffnete ein Element), ein gewöhnliches
- * `<section/>` zählt nicht in die Tiefe. Unbekannte benannte Entities in einem
- * Attributwert (`&hellip;`) bleiben stehen und werden beim Zurückschreiben zu
- * `&amp;hellip;` — der Wert selbst ändert sich dabei nicht.
+ * Deliberately lenient where browsers would parse differently: `<section data-block …/>`
+ * counts as an empty block (a browser would open an element), an ordinary
+ * `<section/>` does not count towards depth. Unknown named entities in an
+ * attribute value (`&hellip;`) are left alone and become `&amp;hellip;`
+ * when written back — the value itself does not change in the process.
  */
 
 const TAG_RE = /<!--[\s\S]*?-->|<(\/?)([a-z][^\s/>]*)((?:[^>"']|"[^"]*"|'[^']*')*)>/gi;
 const ATTR_RE = /([^\s"'<>/=]+)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'=<>`]+)))?/g;
-/** Nur `data-*` wird durchgereicht. Alles andere an einer Section hat für das
- *  Format keine Bedeutung und soll auch keine bekommen (`onclick` …). */
+/** Only `data-*` is passed through. Everything else on a section has no
+ *  meaning for the format and should not get one either (`onclick` …). */
 const KEPT_ATTR_RE = /^data-[a-z0-9-]+$/;
 
 const ENTITY_RE = /&(#x[0-9a-f]+|#\d+|quot|apos|lt|gt|amp|nbsp);/gi;
@@ -44,7 +45,7 @@ const NAMED_ENTITIES: Record<string, string> = {
   quot: '"', apos: "'", lt: '<', gt: '>', amp: '&', nbsp: ' ',
 };
 
-/** Entities in einem Attributwert auflösen — wie der Browser, ohne DOM. */
+/** Resolve entities in an attribute value — like the browser, without a DOM. */
 export function decodeHtmlAttr(value: string): string {
   return decodeAttr(value);
 }
@@ -60,12 +61,12 @@ function decodeAttr(value: string): string {
   });
 }
 
-/** Die Attribute eines Section-Tags — `body` ist alles zwischen Tag-Name und `>`. */
+/** The attributes of a section tag — `body` is everything between the tag name and `>`. */
 function parseSectionAttrs(body: string): Record<string, string> {
   const out: Record<string, string> = {};
   for (const m of body.replace(/\/\s*$/, '').matchAll(ATTR_RE)) {
     const name = m[1].toLowerCase();
-    // Wie im Browser gewinnt das erste Vorkommen eines Attributs.
+    // As in the browser, the first occurrence of an attribute wins.
     if (!KEPT_ATTR_RE.test(name) || name in out) continue;
     out[name] = decodeAttr(m[2] ?? m[3] ?? m[4] ?? '');
   }
@@ -78,12 +79,12 @@ function toBlock(attrs: Record<string, string>, html: string): BlockInstance {
 }
 
 /**
- * Entschärft `<section`/`</section` im HTML, das ein Editor liefert. TipTap
- * schreibt nie ein echtes Section-Element — ein Treffer steht also immer in
- * einem Attributwert (der Titel eines verlinkten Eintrags im `data-label` eines
- * Chips, ein `alt`-Text). Ältere WebKit-Versionen escapen `<` in Attributwerten
- * nicht; der Parser oben sähe dort ein Block-Tag und risse den Eintrag
- * auseinander. `&lt;` dekodiert im Attribut zum selben Zeichen — verlustfrei.
+ * Defuses `<section`/`</section` in the HTML an editor delivers. TipTap
+ * never writes a real section element — a match is therefore always in an
+ * attribute value (the title of a linked entry in a chip's `data-label`, an
+ * `alt` text). Older WebKit versions do not escape `<` in attribute values;
+ * the parser above would see a block tag there and tear the entry apart.
+ * `&lt;` decodes to the same character in the attribute — lossless.
  */
 export function neutralizeSectionTags(html: string): string {
   return html.replace(/<(\/?section)\b/gi, '&lt;$1');
@@ -93,7 +94,7 @@ export function createTextBlock(html = ''): BlockInstance {
   return { id: generateId(), type: TEXT_BLOCK_TYPE, html, attrs: {} };
 }
 
-/** Die Blöcke eines gespeicherten Inhalts, in Reihenfolge. Leerer Inhalt → `[]`. */
+/** The blocks of stored content, in order. Empty content → `[]`. */
 export function parseBlocks(html: string): BlockInstance[] {
   const blocks: BlockInstance[] = [];
   if (!html) return blocks;
@@ -108,12 +109,12 @@ export function parseBlocks(html: string): BlockInstance[] {
   };
 
   for (const m of html.matchAll(TAG_RE)) {
-    // Kommentare (kein Tag-Name) und alles außer <section> überspringen.
+    // Skip comments (no tag name) and everything except <section>.
     if (m[2]?.toLowerCase() !== 'section') continue;
     const tag = m[0];
     const at = m.index!;
     if (m[1] === '/') {
-      if (depth === 0) continue; // verirrtes End-Tag — gehört zum losen Text
+      if (depth === 0) continue; // stray end tag — belongs to the loose text
       depth--;
       if (depth === 0 && open) {
         blocks.push(toBlock(open.attrs, html.slice(open.contentFrom, at)));
@@ -139,14 +140,14 @@ export function parseBlocks(html: string): BlockInstance[] {
     if (!selfClosing) depth++;
   }
 
-  // Ein nie geschlossener Block behält alles bis zum Ende — lieber zu viel im
-  // Block als verlorene Daten.
+  // A block that is never closed keeps everything up to the end — better too
+  // much in the block than lost data.
   if (open) blocks.push(toBlock(open.attrs, html.slice(open.contentFrom)));
   else pushLoose(html.length);
 
-  // Doppelte IDs (von Hand kopierter Inhalt, ein Import) bekommen eine neue:
-  // der Stapel führt Blöcke über ihre ID, und zwei gleiche verlören beim
-  // Verschieben einen der beiden.
+  // Duplicate IDs (hand-copied content, an import) get a new one:
+  // the stack tracks blocks by their ID, and two identical ones would lose
+  // one of the two when moved.
   const seen = new Set<string>();
   for (const block of blocks) {
     if (seen.has(block.id)) block.id = generateId();
@@ -155,8 +156,8 @@ export function parseBlocks(html: string): BlockInstance[] {
   return blocks;
 }
 
-/** Eine Section, Attribute doppelt gequotet und escaped — dieselbe Form, die
- *  `DOMParser` + `innerHTML` beim Merge-Import wieder ausgeben. */
+/** A section, attributes double-quoted and escaped — the same form that
+ *  `DOMParser` + `innerHTML` output again on merge import. */
 export function blockSectionHtml(block: BlockInstance): string {
   const attrs: Array<[string, string]> = [
     ['data-block', block.type],
@@ -170,7 +171,7 @@ function isPlainTextBlock(block: BlockInstance): boolean {
   return block.type === TEXT_BLOCK_TYPE && Object.keys(block.attrs).length === 0;
 }
 
-/** Der gespeicherte Inhalt zu einer Blockfolge — siehe Regel 2 im Kopf. */
+/** The stored content for a sequence of blocks — see rule 2 in the header. */
 export function serializeBlocks(blocks: BlockInstance[]): string {
   if (blocks.length === 1 && isPlainTextBlock(blocks[0])) return blocks[0].html;
   return blocks.map(blockSectionHtml).join('');

@@ -48,11 +48,11 @@ export default function OperationsView() {
   const pushUndo = useUndoStore((s) => s.push);
 
   const operation = activeView.id ? getEntry(activeView.id, 'operation') : null;
-  // Der Start lädt Inhalte nach den Listen: bis dieser da ist, steht der
-  // Rahmen mit Titel, der Blockstapel montiert erst mit dem echten Inhalt.
+  // Startup loads content after the lists: until it arrives, the frame with
+  // the title is shown, and the block stack only mounts with the real content.
   const contentReady = useEntryContentReady(operation?.id);
-  // Eine geladene Sigille mit Sperre „ganzer Eintrag" öffnet nie im
-  // Bearbeitungsmodus — gleich, woher der kommt (Seitenleiste, Home, Tab).
+  // A loaded sigil with the "whole entry" lock never opens in edit
+  // mode — no matter where that comes from (sidebar, home, tab).
   const locked = !!operation && !!entryBlockSummary(operation.id, operation.content).sigil?.lockEntry;
   const isEditing = activeView.mode === 'edit' && !locked;
 
@@ -78,12 +78,12 @@ export default function OperationsView() {
     entityId: operation?.id,
     isEditing,
     ready: !!operation && loadedOperationId === operation.id,
-    // Die Kategorie gehört dem Properties-Panel (sofort gespeichert) und steht
-    // deshalb nicht im Patch: ein Autosave direkt nach dem Wechsel schriebe
-    // sonst den alten Stand zurück.
+    // The category belongs to the properties panel (saved immediately) and is
+    // therefore not in the patch: an autosave right after the change would
+    // otherwise write the old state back.
     buildPatch: (content) => ({ title, content, tags }),
-    // Cancel stellt die Operation her, wie sie beim Betreten des Bearbeitens war —
-    // auch, was die Seitenleiste inzwischen gespeichert hat.
+    // Cancel restores the operation as it was on entering edit mode —
+    // including what the sidebar has saved in the meantime.
     buildRestorePatch: (content) => ({
       title, content, tags,
       category_id: operation?.category_id ?? null, icon: operation?.icon, cover_image: operation?.cover_image,
@@ -114,8 +114,8 @@ export default function OperationsView() {
     }
   }, [operation?.tags]);
 
-  // Titel ebenso: ein Rename aus der Sidebar bei offenem Edit-Modus wuerde
-  // sonst vom naechsten Autosave zurueckgedreht.
+  // The title likewise: a rename from the sidebar while edit mode is open
+  // would otherwise be reverted by the next autosave.
   useEffect(() => {
     if (operation) setTitle(operation.title);
   }, [operation?.title]);
@@ -125,7 +125,7 @@ export default function OperationsView() {
     setActiveView({ type: 'operations', id: op.id, mode: 'edit', isNew: true });
   };
 
-  // Der „+"-Knopf am Kategorienkopf — wie handleCreateTask(cat.id) in TasksView.
+  // The "+" button on the category header — like handleCreateTask(cat.id) in TasksView.
   const handleNewInCategory = async (categoryId: string) => {
     const op = await createEntry('operation', { categoryId });
     setActiveView({ type: 'operations', id: op.id, mode: 'edit', isNew: true });
@@ -165,17 +165,17 @@ export default function OperationsView() {
   };
 
   const handleCancel = async () => {
-    // Eine nie mit „Fertig" bestätigte Operation geht, wie jede gelöschte, in den Papierkorb.
+    // An operation never confirmed with "Done" goes to the trash, like any deleted one.
     if (activeView.isNew && operation) return handleDelete();
     cancelAutoSave();
     if (operation) {
-      // Nicht auf den Store-Stand zurück — nach dem ersten Debounce-Autosave
-      // IST der Store der editierte Stand. restoreOnCancel schreibt den beim
-      // Betreten des Edit-Modus gemerkten Stand der Operation zurück; die Setter
-      // hier fangen den Fall vor dem ersten Autosave ab (Store unverändert,
-      // Sync-Effekte laufen nicht).
+      // Not back to the store state — after the first debounced autosave
+      // the store IS the edited state. restoreOnCancel writes back the state
+      // of the operation remembered on entering edit mode; the setters
+      // here handle the case before the first autosave (store unchanged,
+      // sync effects do not run).
       const restored = await restoreOnCancel();
-      // Die Seite zeigt diesen Eintrag nicht mehr, das Bearbeiten ist schon beendet — nichts mehr zu tun.
+      // The page no longer shows this entry, editing has already ended — nothing left to do.
       if (restored === EDIT_ENDED) return;
       const from = restored ?? fieldsOf(operation);
       setTitle(from.title);
@@ -188,7 +188,7 @@ export default function OperationsView() {
 
   const handleDelete = async () => {
     if (!operation) return;
-    // Erst schreiben, was noch aufgeschoben ist: im Papierkorb liegt der letzte Stand.
+    // Write what is still deferred first: the trash holds the latest state.
     await flushAutoSave().catch(console.error);
     const id = operation.id;
     await deleteEntry(id);
@@ -209,8 +209,8 @@ export default function OperationsView() {
   if (!operation) {
     const { view, sort, grouping } = operationsPrefs;
     const catById = Object.fromEntries(categories.map((c) => [c.id, c]));
-    // Chips und Gruppen zeigen nur, was bei den Operationen vorkommt (plus
-    // Sonstiges); catById bleibt die Volliste, damit fremde Kategorien auflösen.
+    // Chips and groups only show what occurs among the operations (plus
+    // Other); catById stays the full list so foreign categories resolve.
     const usedCategories = categoriesUsedBy(categories, operations);
 
     const searchFiltered = search
@@ -224,21 +224,21 @@ export default function OperationsView() {
       ? searchFiltered
       : searchFiltered.filter((o) =>
           (!!o.category_id && filterCatIds.includes(o.category_id)) ||
-          // Der „Ohne Kategorie"-Chip wählt die Waisen aus — deren category_id
-          // (gelöschte Kategorie) steht nie selbst in der Chip-Auswahl.
+          // The "No category" chip selects the orphans — their category_id
+          // (deleted category) is never itself in the chip selection.
           (filterCatIds.includes(UNCATEGORIZED_KEY) && !lookupCategory(catById, o.category_id)));
 
     const catName = (c: typeof categories[0]) => categoryLabel(t, c);
 
-    // Nur die hier benutzten Kategorien (plus Sonstiges und eine gerade
-    // angelegte) — die Liste ist global, die anderen Module sollen hier keine
-    // leeren Chips hinterlassen.
-    // „Ohne Kategorie" nur, wenn es Waisen gibt — oder solange der Chip noch
-    // ausgewählt ist: verschwände er unter der aktiven Auswahl, bliebe ein
-    // Filter wirksam, den nichts mehr anzeigt.
+    // Only the categories used here (plus Other and one just
+    // created) — the list is global, the other modules should not leave
+    // empty chips here.
+    // "No category" only if there are orphans — or as long as the chip is
+    // still selected: if it vanished under the active selection, a filter
+    // would stay active that nothing displays anymore.
     const showUncatChip = hasUncategorized(categories, operations) || filterCatIds.includes(UNCATEGORIZED_KEY);
-    // Gezählt über die Suche, ohne den Kategorie-Filter selbst: die Zahl bleibt
-    // stehen, während man Kategorien an- und abwählt.
+    // Counted over the search, without the category filter itself: the number
+    // stays put while categories are selected and deselected.
     const catCounts = countByCategory(searchFiltered, (id) => !!lookupCategory(catById, id), (o) => o.category_id);
     const catChips = [
       ...usedCategories.map((c) => ({ value: c.id, label: catName(c), emoji: c.emoji, count: catCounts.get(c.id) ?? 0 })),
@@ -255,7 +255,7 @@ export default function OperationsView() {
       const cat = lookupCategory(catById, op.category_id);
       const iconValue = entryIcon('operation', op, cat);
       const catDisplayName = cat ? catName(cat) : '';
-      // Eine Sigille mit Zieldatum hängt es an — Zeile und Karte gleich.
+      // A sigil with a target date appends it — row and card alike.
       const revealDate = entryBlockSummary(op.id, op.content).sigil?.revealDate;
       const dateStr = [
         catDisplayName,
@@ -302,13 +302,13 @@ export default function OperationsView() {
       );
     };
 
-    // Abgewählte Kategorien ganz ausblenden statt sie leer stehen zu lassen —
-    // wie visibleCategories in TasksView.
+    // Hide deselected categories entirely instead of leaving them empty —
+    // like visibleCategories in TasksView.
     const visibleCategories = filterCatIds.length > 0
       ? usedCategories.filter((c) => filterCatIds.includes(c.id))
       : usedCategories;
-    // Der Waisen-Bucket fängt Operationen auf, deren Kategorie im Papierkorb
-    // liegt — sonst verschwänden sie aus der Kategorien-Gruppierung.
+    // The orphan bucket catches operations whose category is in the trash —
+    // otherwise they would vanish from the category grouping.
     const catGroups: DashboardGroup<Entry>[] = groupByCategory(
       sortedOps, visibleCategories, (o) => o.category_id,
       catName, t('categories.uncategorized'),
@@ -375,9 +375,9 @@ export default function OperationsView() {
           actionLabel: t('operations.new'),
           onAction: handleNew,
         }}
-        // Im gruppierten Modus entscheidet Dashboard selbst: überlebt keine
-        // Gruppe, zeigt es „Keine Ergebnisse". Dieser Zweig darf ihm also
-        // nicht zuvorkommen.
+        // In grouped mode Dashboard decides itself: if no group survives,
+        // it shows "No results". This branch must therefore not
+        // pre-empt it.
         hasNoResults={filtered.length === 0 && !(grouping === 'grouped' && view !== 'timeline')}
         grouping={
           view === 'timeline'
@@ -397,9 +397,9 @@ export default function OperationsView() {
             onClose={() => setCtxMenu(null)}
             actions={[
               openInNewTabAction({ type: 'operations', id: ctxMenu.id, mode: 'view' }),
-              // Sigil-Operationen waren hier frueher ausgenommen, weil das
-              // Duplizieren die Zeichnung verlor. Seit die Sigille Blöcke im
-              // Inhalt sind, kopiert duplicateEntry sie mit — die Ausnahme ist weg.
+              // Sigil operations used to be excluded here because duplicating
+              // lost the drawing. Since sigils are blocks in the content,
+              // duplicateEntry copies them along — the exception is gone.
               { label: t('contextMenu.duplicate'), icon: <Copy size={12} />, onClick: () => handleDuplicate(ctxMenu.id) },
               saveAsTemplateAction('operation', ctxMenu.id),
               { label: t('contextMenu.rename'),    icon: <Pencil size={12} />, onClick: () => startRename(ctxMenu.id) },
@@ -418,7 +418,7 @@ export default function OperationsView() {
       meta={formatEntryDate(operation.updated_at)}
       title={isEditing ? title : operation.title}
       onTitleChange={(nextTitle) => { setTitle(nextTitle); triggerAutoSave(); }}
-      // Cover image — read mode hero (bewusst nach dem Titel, anders als im Wiki)
+      // Cover image — read mode hero (deliberately after the title, unlike in the wiki)
       belowTitle={!isEditing && operation.cover_image && (
         <div className="flex-shrink-0 px-8 pt-5">
           <img src={operation.cover_image} alt="" className="w-full max-h-48 object-cover rounded-lg border border-stone-700/40" />

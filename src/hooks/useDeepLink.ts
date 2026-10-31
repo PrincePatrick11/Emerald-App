@@ -3,36 +3,36 @@ import { useUIStore } from '../store/uiStore';
 import type { ViewId } from '../lib/modules';
 
 interface DeepLinkOptions<T extends { id: string }> {
-  /** Die Ansicht, deren Tiefenlinks (`{ type, id }`) hier ankommen. */
+  /** The view whose deep links (`{ type, id }`) arrive here. */
   type: ViewId;
-  /** Worin die id gesucht wird. Ein Tiefenlink, der einen noch leeren Store
-   *  vorfindet, greift, sobald die Liste nachkommt. */
+  /** Where the id is looked up. A deep link that finds the store still empty
+   *  takes effect as soon as the list arrives. */
   items: readonly T[];
-  /** Das Attribut, das die Zeile mit der id trägt, z. B. `data-task-id`. */
+  /** The attribute that carries the id on the row, e.g. `data-task-id`. */
   rowAttribute: string;
   block?: ScrollLogicalPosition;
-  /** Räumt weg, was die Zeile verdecken könnte (Suche, Filter, zugeklappte
-   *  Gruppen) — läuft einmal pro Tiefenlink, vor dem Scrollen. */
+  /** Clears away whatever could hide the row (search, filters, collapsed
+   *  groups) — runs once per deep link, before scrolling. */
   onOpen: (target: T) => void;
 }
 
 /**
- * Der Tiefenlink aus der globalen Suche für Ansichten ohne eigene
- * Detailseite: `{ type, id }` holt die Zeile in den Blick.
+ * The deep link from global search for views without their own detail page:
+ * `{ type, id }` brings the row into view.
  *
- * Ausgelöst wird das vom `activeView`-*Objekt*, nicht von der id darin:
- * `setActiveView` legt bei jeder Navigation ein frisches an, sodass derselbe
- * Treffer auch zweimal hintereinander wirkt. `handledView` merkt sich, welches
- * Objekt schon dran war — damit darf `items` in den Abhängigkeiten stehen,
- * ohne dass eine spätere Änderung dem Nutzer seine Filter wegräumt.
+ * It is triggered by the `activeView` *object*, not by the id inside it:
+ * `setActiveView` creates a fresh one on every navigation, so the same hit
+ * works twice in a row. `handledView` remembers which object was already
+ * handled — so `items` may stay in the dependencies without a later change
+ * clearing the user's filters.
  *
- * Gescrollt wird in einem eigenen Effekt einen Frame später, weil die Zeile
- * erst nach dem, was `onOpen` aufräumt, gerendert ist. Der Scroll-Effekt hängt
- * bewusst nicht an den aufgeräumten Zuständen — sonst würfe jedes spätere
- * Auf- oder Zuklappen den Nutzer zurück. `onOpen` läuft über einen Ref (wie
- * in `useEditActions`), damit der Aufrufer ihn nicht memoisieren muss.
+ * Scrolling happens in a separate effect one frame later, because the row is
+ * only rendered after what `onOpen` clears away. The scroll effect
+ * deliberately does not depend on the cleared states — otherwise every later
+ * expand or collapse would throw the user back. `onOpen` runs through a ref
+ * (as in `useEditActions`) so the caller does not have to memoize it.
  *
- * `scrollTo(id)` scrollt ohne Tiefenlink — etwa zu einer gerade angelegten Zeile.
+ * `scrollTo(id)` scrolls without a deep link — e.g. to a row that was just created.
  */
 export function useDeepLink<T extends { id: string }>({
   type, items, rowAttribute, block = 'nearest', onOpen,

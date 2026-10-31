@@ -1,18 +1,18 @@
 /**
- * Migration v53 — Einträge und Vorlagen tragen Tag-IDs statt Tag-Namen, und
- * `tags.affected_ids` fällt weg (`tagRefs.ts`).
+ * Migration v53 — entries and templates carry tag IDs instead of tag names, and
+ * `tags.affected_ids` is dropped (`tagRefs.ts`).
  *
- * Bis v52 hing ein Tag am Namen: Umbenennen schrieb jede Zeile um, Löschen
- * nahm den Namen aus den Einträgen und merkte sich in `affected_ids`, wem es
- * ihn beim Wiederherstellen zurückgibt. Jetzt behält ein Eintrag die ID, auch
- * solange der Tag im Papierkorb liegt — die Merkliste wird hier ein letztes
- * Mal gelesen und in die Zeilen zurückgeschrieben.
+ * Up to v52 a tag was attached by name: renaming rewrote every row, deleting
+ * took the name out of the entries and remembered in `affected_ids` whom to
+ * give it back to on restoring. Now an entry keeps the ID, even
+ * while the tag is in the trash — the memory list is read here one last
+ * time and written back into the rows.
  *
- * Wiederholbar ohne Transaktion: zuerst werden alle neuen Listen berechnet,
- * dann die Tags für verwaiste Namen angelegt, dann die Zeilen geschrieben,
- * zuletzt fällt die Spalte. Bricht es dazwischen ab, sind die neuen Tags schon
- * da und eine geschriebene Liste trägt bekannte IDs — ein zweiter Lauf lässt
- * beides stehen.
+ * Repeatable without a transaction: first all new lists are computed,
+ * then the tags for orphaned names are created, then the rows are written,
+ * finally the column is dropped. If it aborts in between, the new tags are already
+ * there and a written list carries known IDs — a second run leaves
+ * both in place.
  */
 import type Database from './sqlite';
 import { backupDatabaseFile, columnNames, dropColumnsIfPresent } from './dbRebuild';

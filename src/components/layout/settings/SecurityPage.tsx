@@ -12,12 +12,12 @@ import { useVaultStore } from '../../../store/vaultStore';
 import SettingsSection, { SettingsStatus } from './SettingsSection';
 
 /**
- * Der Schlüssel des offenen Vaults: merken, sperren, Passwort ändern.
+ * The open vault's key: remember, lock, change password.
  *
- * Das Passwort zu ändern verschlüsselt den Vault unter einem neuen Schlüssel
- * neu und bringt einen neuen Wiederherstellungsschlüssel. Der wird hier
- * gezeigt, bis bestätigt ist, dass er aufbewahrt ist — so lange, und solange
- * die Änderung läuft, hält `onBlockClose` das Einstellungsfenster offen.
+ * Changing the password re-encrypts the vault under a new key
+ * and brings a new recovery key. It is shown here
+ * until it is confirmed to be stored — for that long, and while
+ * the change is running, `onBlockClose` keeps the settings window open.
  */
 export default function SecurityPage({ onClose, onBlockClose }: {
   onClose: () => void;
@@ -49,8 +49,8 @@ export default function SecurityPage({ onClose, onBlockClose }: {
     return () => { live = false; };
   }, [vaultId]);
 
-  // Weder während der Neuverschlüsselung noch mit einem ungesicherten
-  // Wiederherstellungsschlüssel darf das Fenster zugehen.
+  // The window must close neither during re-encryption nor with an unsaved
+  // recovery key.
   const holding = busy || Boolean(recoveryKey);
   useEffect(() => {
     onBlockClose(holding);

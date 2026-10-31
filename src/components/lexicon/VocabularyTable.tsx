@@ -8,18 +8,18 @@ import { OP_PROP_SELECT_CLASSES } from '../../lib/styleClasses';
 import Button from '../ui/Button';
 import type { LexiconEntry } from '../../types';
 
-/** Die Spalten der Tabelle. Dieselbe Aufteilung in Kopf und Zeilen — eine Wahrheit, sonst versetzen sie sich. */
+/** The columns of the table. The same split in header and rows: one truth, otherwise they drift out of line. */
 const COLUMNS = 'grid grid-cols-[1fr_1fr_minmax(0,0.7fr)_minmax(0,0.9fr)_auto] gap-2 items-center';
 
 /**
- * Die Vokabeln einer Sprache als Tabelle: Begriff, Übersetzung, Aussprache,
- * Notiz. Jedes Feld speichert, sobald es den Fokus verliert — eine Vokabel ist
- * ein Wortpaar und kein Entwurf, ein „Speichern"-Knopf je Zeile wäre eine
- * Bremse beim Eintragen einer Wortliste.
+ * The vocabulary of a language as a table: term, translation, pronunciation,
+ * note. Each field saves as soon as it loses focus; a vocabulary item is
+ * a word pair and not a draft, and a "Save" button per row would be a
+ * drag when entering a word list.
  *
- * Gelöscht wird sofort, mit Rückgängig über die gewohnte Meldung unten links —
- * eine einzelne Vokabel im Papierkorb wäre dort nur Lärm neben Einträgen und
- * Sprachen.
+ * Deletion is immediate, with Undo via the usual notice at the bottom left;
+ * a single vocabulary item in the trash would just be noise there next to entries and
+ * languages.
  */
 export default function VocabularyTable({ languageId, entries }: {
   languageId: string;
@@ -33,10 +33,10 @@ export default function VocabularyTable({ languageId, entries }: {
   const pushUndo = useUndoStore((s) => s.push);
   const [search, setSearch] = useState('');
   /**
-   * Die frisch angelegte Zeile bekommt den Fokus — sonst müsste man nach jedem
-   * „+" klicken. Danach wird er wieder abgeräumt: bliebe er stehen, risse
-   * jedes erneute Rendern (etwa beim Tippen in der Suche) den Cursor zurück
-   * in diese Zeile.
+   * The freshly created row gets focus; otherwise you would have to click after every
+   * "+". It is cleared again afterwards: if it stayed, every re-render
+   * (for instance while typing in the search) would yank the cursor back
+   * into this row.
    */
   const [focusId, setFocusId] = useState<string | null>(null);
 
@@ -55,7 +55,7 @@ export default function VocabularyTable({ languageId, entries }: {
     try {
       removed = await deleteEntry(entry.id);
     } catch (err) {
-      // Nichts verloren: die Vokabel bleibt, wo sie war.
+      // Nothing lost: the vocabulary item stays where it was.
       console.error('[VocabularyTable] deleting the word failed:', err);
       return;
     }
@@ -100,7 +100,7 @@ export default function VocabularyTable({ languageId, entries }: {
             <span className="label-xs">{t('lexicon.translation')}</span>
             <span className="label-xs">{t('lexicon.pronunciation')}</span>
             <span className="label-xs">{t('lexicon.note')}</span>
-            {/* Platzhalter über der Spalte des Löschen-Knopfes. */}
+            {/* Placeholder above the column of the delete button. */}
             <span className="w-6" />
           </div>
           <div className="space-y-1">
@@ -121,7 +121,7 @@ export default function VocabularyTable({ languageId, entries }: {
   );
 }
 
-/** Die vier Felder als lokaler Stand — geschrieben wird erst beim Verlassen des Feldes. */
+/** The four fields as local state; written only when the field is left. */
 type Draft = Pick<LexiconEntry, 'term' | 'translation' | 'pronunciation' | 'note'>;
 
 const FIELDS = ['term', 'translation', 'pronunciation', 'note'] as const;
@@ -133,7 +133,7 @@ const draftOf = (e: LexiconEntry): Draft => ({
 function VocabularyRow({ entry, autoFocus, onFocused, onPatch, onDelete }: {
   entry: LexiconEntry;
   autoFocus: boolean;
-  /** Der Fokus ist gesetzt — der Aufrufer darf ihn vergessen. */
+  /** Focus has been set; the caller may forget it. */
   onFocused: () => void;
   onPatch: (patch: EntryPatch) => void;
   onDelete: () => void;
@@ -144,13 +144,13 @@ function VocabularyRow({ entry, autoFocus, onFocused, onPatch, onDelete }: {
   const previous = useRef(entry);
 
   /**
-   * Nachführen, aber feldweise und nur dort, wo nicht getippt wurde.
+   * Sync, but field by field and only where nothing was typed.
    *
-   * Speichern ist asynchron: Wer ein Feld verlässt und sofort ins nächste
-   * tippt, hat dort schon Text stehen, wenn die Zeile aus dem Store
-   * zurückkommt. Ein pauschales `setDraft(draftOf(entry))` risse genau diesen
-   * Text wieder heraus. Übernommen wird ein Feld deshalb nur, wenn es sich
-   * von außen geändert hat und im Feld noch der vorherige Stand steht.
+   * Saving is asynchronous: whoever leaves a field and immediately types into
+   * the next already has text there by the time the row comes back
+   * from the store. A blanket `setDraft(draftOf(entry))` would tear exactly that
+   * text out again. A field is therefore only adopted if it has changed
+   * from outside and the field still holds the previous state.
    */
   useEffect(() => {
     const before = previous.current;
@@ -175,9 +175,9 @@ function VocabularyRow({ entry, autoFocus, onFocused, onPatch, onDelete }: {
   }, [autoFocus, onFocused]);
 
   /**
-   * Was beim Verlassen der Seite noch offen ist, wird beim Aufräumen
-   * geschrieben — wer eine Vokabel tippt und dann den Zurück-Link klickt,
-   * bekommt keinen Fokusverlust mehr mit.
+   * Whatever is still pending when the page is left is written during
+   * cleanup; whoever types a vocabulary item and then clicks the back link
+   * no longer gets a focus loss.
    */
   const pending = useRef({ draft, entry, onPatch });
   pending.current = { draft, entry, onPatch };
@@ -201,8 +201,8 @@ function VocabularyRow({ entry, autoFocus, onFocused, onPatch, onDelete }: {
       aria-label={label}
       onChange={(e) => setDraft((d) => ({ ...d, [name]: e.target.value }))}
       onBlur={() => commit(name)}
-      // Enter bestätigt wie das Verlassen des Feldes — Tippen und Speichern
-      // sollen sich nicht unterscheiden, je nachdem womit man abschließt.
+      // Enter confirms like leaving the field; typing and saving
+      // should not differ depending on how you finish.
       onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }}
     />
   );

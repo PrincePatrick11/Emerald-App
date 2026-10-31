@@ -1,18 +1,17 @@
-//! Der In-App-Updater: Quelle, Pruefung, Installation.
+//! The in-app updater: source, check, installation.
 //!
-//! Die Update-Quelle ist absichtlich veraenderbar — steht sie in
-//! `{appDataDir}/update.json`, wird sie den einkompilierten Endpoints aus
-//! `tauri.conf.json` vorangestellt. Der oeffentliche Schluessel ist es
-//! NICHT: er bleibt einkompiliert. Das ist die ganze Sicherheitsarchitektur
-//! dieses Moduls. Eine umgebogene URL kann hoechstens nichts liefern oder ein
-//! Bundle, dessen Signatur nicht passt — nie etwas, das installiert wird.
-//! Waere der Schluessel mitveraenderbar, waere die variable Quelle ein
-//! Einfallstor statt einer Bequemlichkeit.
+//! The update source is deliberately changeable — if it is set in
+//! `{appDataDir}/update.json`, it is prepended to the compiled-in endpoints from
+//! `tauri.conf.json`. The public key is NOT: it stays compiled in. That is the
+//! whole security architecture of this module. A redirected URL can at most
+//! deliver nothing or a bundle whose signature does not match — never anything
+//! that gets installed. Were the key changeable too, the variable source would
+//! be an entry point instead of a convenience.
 //!
-//! Alles laeuft hier in Rust statt ueber die JS-API des Plugins, aus zwei
-//! Gruenden: die Endpoints lassen sich nur ueber den `UpdaterBuilder` zur
-//! Laufzeit ueberschreiben, und der Netzverkehr bleibt so ausserhalb der
-//! WebView — die CSP der App muss fuer Updates nicht aufgemacht werden.
+//! Everything runs here in Rust instead of through the plugin's JS API, for two
+//! reasons: the endpoints can only be overridden at runtime through the
+//! `UpdaterBuilder`, and the network traffic stays outside the WebView — the
+//! app's CSP does not have to be opened up for updates.
 
 use serde::{Deserialize, Serialize};
 use std::sync::Mutex;
@@ -20,17 +19,17 @@ use std::time::Duration;
 use tauri::{AppHandle, Emitter, Manager, State};
 use tauri_plugin_updater::{Update, UpdaterExt};
 
-/// Liegt neben `vaults.json` im App-Datenordner — bewusst dort und nicht in
-/// den Vault-Einstellungen: welche Quelle diese Installation nach Updates
-/// fragt, gehoert zur Installation, nicht zum Inhalt. Sonst koennte ein
-/// importiertes fremdes Backup die Update-Quelle mitbringen.
+/// Sits next to `vaults.json` in the app data folder — deliberately there and
+/// not in the vault settings: which source this installation asks for updates
+/// belongs to the installation, not to the content. Otherwise an imported
+/// foreign backup could bring the update source along.
 const SETTINGS_FILE: &str = "update.json";
 
-/// Kein Endlos-Haenger, wenn die Quelle nicht antwortet. Gilt pro Endpoint.
+/// No endless hang if the source does not answer. Applies per endpoint.
 const CHECK_TIMEOUT: Duration = Duration::from_secs(20);
 
-/// Genug fuer jede URL, die ein Mensch eintippt, und eine harte Grenze gegen
-/// eine Datei, die per Hand aufgeblaeht wurde.
+/// Enough for any URL a human types, and a hard limit against a file that
+/// was inflated by hand.
 const MAX_ENDPOINT_LEN: usize = 2048;
 
 fn settings_version() -> u32 {
@@ -41,14 +40,13 @@ fn default_true() -> bool {
     true
 }
 
-/// Jedes Feld mit `serde(default)`: eine halb geschriebene oder von einer
-/// aelteren Version stammende Datei laedt weiter, statt die Update-Seite
-/// unbenutzbar zu machen.
+/// Every field has `serde(default)`: a half-written file, or one from an
+/// older version, still loads instead of making the update page unusable.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct UpdateSettings {
     #[serde(default = "settings_version")]
     version: u32,
-    /// Leer heisst: die einkompilierten Endpoints, nichts vorangestellt.
+    /// Empty means: the compiled-in endpoints, nothing prepended.
     #[serde(default)]
     endpoint: String,
     #[serde(default = "default_true")]
@@ -65,32 +63,31 @@ impl Default for UpdateSettings {
     }
 }
 
-/// Was die Pruefung gefunden hat.
+/// What the check found.
 #[derive(Debug, Serialize)]
 pub struct UpdateCheck {
     available: bool,
-    /// Die gefundene Version; leer, wenn nichts anliegt.
+    /// The version found; empty if nothing is pending.
     version: String,
     current_version: String,
     notes: Option<String>,
     date: Option<String>,
-    /// Falsch auf einer `.deb`-Installation. Nicht, weil das Plugin es nicht
-    /// koennte — es ruft dafuer `pkexec dpkg -i` —, sondern weil das Manifest
-    /// dafuer einen eigenen Schluessel `linux-x86_64-deb` braeuchte und der
-    /// Release-Workflow keinen veroeffentlicht. Die UI zeigt deshalb einen
-    /// Hinweis statt eines Knopfes, statt den Fehler erst beim Klick zu
-    /// liefern.
+    /// False on a `.deb` installation. Not because the plugin could not do it
+    /// — it calls `pkexec dpkg -i` for that — but because the manifest would need
+    /// its own key `linux-x86_64-deb` for it and the release workflow publishes
+    /// none. The UI therefore shows a notice instead of a button, rather than
+    /// delivering the error only on click.
     installable: bool,
 }
 
-/// Ein Fehler, den die UI uebersetzen kann.
+/// An error the UI can translate.
 ///
-/// `code` statt eines fertigen Satzes: die Meldungen des Updater-Plugins sind
-/// englisch und fuer Entwickler geschrieben ("Could not fetch a valid release
-/// JSON from the remote"). Die haben im Fenster nichts verloren — und die
-/// Alternative, sie im Frontend auf ihren Wortlaut zu pruefen, waere eine
-/// Kopplung an Zeichenketten einer fremden Bibliothek. `detail` traegt den
-/// Originaltext weiter, aber nur in die Konsole.
+/// `code` instead of a finished sentence: the updater plugin's messages are
+/// English and written for developers ("Could not fetch a valid release JSON
+/// from the remote"). They do not belong in the window — and the alternative,
+/// checking their wording in the frontend, would couple us to the strings of a
+/// foreign library. `detail` carries the original text along, but only into the
+/// console.
 #[derive(Debug, Serialize)]
 pub struct UpdateError {
     code: &'static str,
@@ -103,17 +100,17 @@ impl UpdateError {
     }
 }
 
-/// Ordnet einen Fehler der PRUEFUNG einem der Faelle zu, die sich fuer einen
-/// Nutzer wirklich unterscheiden: niemand hat geantwortet, diese Plattform
-/// steht nicht im Manifest, oder etwas anderes ist schiefgegangen.
+/// Maps an error of the CHECK to one of the cases that really differ for a
+/// user: nobody answered, this platform is not in the manifest, or something
+/// else went wrong.
 fn classify_check(e: tauri_plugin_updater::Error) -> UpdateError {
     use tauri_plugin_updater::Error as E;
     let code = match &e {
-        // Die Anfrage kam gar nicht durch: kein Netz, DNS, TLS. Eine Quelle,
-        // die mit 404 ANTWORTET, landet nicht hier — siehe `check_for_update`.
+        // The request did not get through at all: no network, DNS, TLS. A source
+        // that ANSWERS with 404 does not end up here — see `check_for_update`.
         E::Reqwest(_) | E::Io(_) => "unreachable",
-        // Der Fall eines Intel-Macs: das Manifest ist da, fuehrt diese
-        // Plattform aber nicht.
+        // The case of an Intel Mac: the manifest is there, but it does not list
+        // this platform.
         E::TargetNotFound(_) | E::TargetsNotFound(_) | E::UnsupportedArch | E::UnsupportedOs => {
             "unsupported-target"
         }
@@ -122,11 +119,11 @@ fn classify_check(e: tauri_plugin_updater::Error) -> UpdateError {
     UpdateError::new(code, e)
 }
 
-/// Dasselbe fuer die INSTALLATION — und bewusst nicht dieselbe Funktion.
-/// `Io` heisst hier nicht „niemand hat geantwortet", sondern dass das Bundle
-/// nicht geschrieben oder ersetzt werden konnte. Mit der Zuordnung der
-/// Pruefung haette der Nutzer bei einem Rechteproblem gelesen, die Quelle sei
-/// nicht erreichbar — und an der falschen Stelle gesucht.
+/// The same for the INSTALLATION — and deliberately not the same function.
+/// `Io` here does not mean "nobody answered" but that the bundle could not be
+/// written or replaced. With the check's mapping, a user with a permissions
+/// problem would have read that the source is unreachable — and looked in the
+/// wrong place.
 fn classify_install(e: tauri_plugin_updater::Error) -> UpdateError {
     use tauri_plugin_updater::Error as E;
     let code = match &e {
@@ -137,11 +134,11 @@ fn classify_install(e: tauri_plugin_updater::Error) -> UpdateError {
     UpdateError::new(code, e)
 }
 
-/// Das Ergebnis der letzten Pruefung, bis es installiert wird.
+/// The result of the last check, until it is installed.
 ///
-/// Gehalten wird es, damit `install_update` nicht erneut ueber das Netz muss —
-/// und damit nicht etwas anderes installiert wird als das, was dem Nutzer
-/// gezeigt wurde.
+/// It is kept so that `install_update` does not have to go over the network
+/// again — and so that nothing other than what was shown to the user gets
+/// installed.
 #[derive(Default)]
 pub struct PendingUpdate(pub Mutex<Option<Update>>);
 
@@ -152,9 +149,9 @@ fn settings_path(app: &AppHandle) -> Result<std::path::PathBuf, String> {
         .map_err(|e| format!("no app data dir: {e}"))
 }
 
-/// Fehlt die Datei oder ist sie kaputt, gelten die Vorgaben. Ein Lesefehler
-/// darf den Updater nicht abschalten — er faellt auf die einkompilierte
-/// Quelle zurueck, und die ist der Normalfall.
+/// If the file is missing or broken, the defaults apply. A read error must
+/// not switch the updater off — it falls back to the compiled-in source, and
+/// that is the normal case.
 fn load_settings(app: &AppHandle) -> UpdateSettings {
     let Ok(path) = settings_path(app) else {
         return UpdateSettings::default();
@@ -174,10 +171,10 @@ fn save_settings(app: &AppHandle, settings: &UpdateSettings) -> Result<(), Strin
     std::fs::write(&path, json).map_err(|e| format!("write failed: {e}"))
 }
 
-/// Nur `https`. Eine `http`-Quelle waere eine Einladung, das Manifest im Netz
-/// zu ersetzen — die Signaturpruefung faenge das zwar ab, aber ein Angreifer
-/// koennte die App beliebig lange auf einer alten, verwundbaren Version
-/// festhalten. `file:` und alles andere haben hier ebenfalls nichts zu suchen.
+/// `https` only. An `http` source would be an invitation to replace the
+/// manifest on the network — the signature check would catch that, but an
+/// attacker could hold the app on an old, vulnerable version for as long as
+/// they like. `file:` and everything else have no business here either.
 fn parse_endpoint(raw: &str) -> Result<url::Url, String> {
     if raw.len() > MAX_ENDPOINT_LEN {
         return Err("endpoint too long".into());
@@ -189,11 +186,11 @@ fn parse_endpoint(raw: &str) -> Result<url::Url, String> {
     Ok(url)
 }
 
-/// Die Endpoints aus `tauri.conf.json`, gelesen statt in Rust wiederholt.
+/// The endpoints from `tauri.conf.json`, read instead of repeated in Rust.
 ///
-/// `UpdaterBuilder::endpoints` ersetzt die Liste, statt sie zu ergaenzen. Um
-/// die eingebauten Quellen als Rueckfall zu behalten, muessen sie also hier
-/// bekannt sein — und die einzige Wahrheit dafuer ist die Konfiguration.
+/// `UpdaterBuilder::endpoints` replaces the list instead of extending it. To
+/// keep the built-in sources as a fallback, they must be known here — and the
+/// single source of truth for that is the configuration.
 fn configured_endpoints(app: &AppHandle) -> Vec<url::Url> {
     app.config()
         .plugins
@@ -210,26 +207,25 @@ fn configured_endpoints(app: &AppHandle) -> Vec<url::Url> {
         .unwrap_or_default()
 }
 
-/// Ob sich diese Installation selbst ersetzen kann.
+/// Whether this installation can replace itself.
 ///
-/// Auf Linux haengt das am AppImage — aber `APPIMAGE` allein zu pruefen waere
-/// falsch, und zwar gefaehrlich falsch: die Variable ist eine ganz normale
-/// Umgebungsvariable und wird an jeden Kindprozess vererbt. Ein aus einem
-/// `.deb` installiertes Emerald, gestartet aus einem Terminal oder Editor, der
-/// selbst ein AppImage ist, sieht dort den Pfad JENES AppImage. Das Plugin
-/// nimmt genau diesen Pfad als Installationsziel (`env.appimage` →
-/// `extract_path`) — im schlechtesten Fall wird also eine fremde Anwendung
-/// ueberschrieben, im besten bricht die Installation nach dem vollstaendigen
-/// Download ab.
+/// On Linux this hangs on the AppImage — but checking `APPIMAGE` alone would be
+/// wrong, and dangerously so: the variable is an ordinary environment variable
+/// and is inherited by every child process. An Emerald installed from a `.deb`,
+/// started from a terminal or editor that is itself an AppImage, sees the path
+/// of THAT AppImage there. The plugin takes exactly this path as the
+/// installation target (`env.appimage` → `extract_path`) — so in the worst case
+/// a foreign application is overwritten, and in the best case the installation
+/// fails after the complete download.
 ///
-/// Deshalb zusaetzlich die Probe, die `tauri-utils` selbst benutzt (dort
-/// allerdings nur fuer eine Warnung): eine laufende AppImage-Anwendung liegt
-/// im Mountpunkt `{temp}/.mount_…`. Beides zusammen ist die Aussage „dieses
-/// Programm IST ein AppImage", statt „irgendwo hier war mal eines".
+/// Hence the additional probe that `tauri-utils` itself uses (there only for a
+/// warning): a running AppImage application lives in the mount point
+/// `{temp}/.mount_…`. Both together mean "this program IS an AppImage", rather
+/// than "there was one somewhere around here".
 ///
-/// Ein von Hand entpacktes AppImage (`--appimage-extract` plus `AppRun`, der
-/// uebliche Weg ohne libfuse2) faellt damit auf „nicht ersetzbar" — richtig so,
-/// dort gibt es keine einzelne Datei zum Austauschen.
+/// A hand-unpacked AppImage (`--appimage-extract` plus `AppRun`, the usual way
+/// without libfuse2) thus falls into "not replaceable" — correct, since there is
+/// no single file to swap there.
 fn install_supported() -> bool {
     #[cfg(target_os = "linux")]
     {
@@ -259,9 +255,9 @@ pub fn set_update_settings(
     auto_check: bool,
 ) -> Result<UpdateSettings, UpdateError> {
     let endpoint = endpoint.trim().to_string();
-    // Geprueft wird vor dem Schreiben, damit eine unbrauchbare Quelle gar
-    // nicht erst in der Datei landet — sonst stuende sie beim naechsten Start
-    // wieder da und die Pruefung schluge jedes Mal fehl.
+    // Checked before writing, so that an unusable source does not even land in
+    // the file — otherwise it would be there again at the next start and the check
+    // would fail every time.
     if !endpoint.is_empty() {
         parse_endpoint(&endpoint).map_err(|e| UpdateError::new("invalid-url", e))?;
     }
@@ -270,8 +266,8 @@ pub fn set_update_settings(
         endpoint,
         auto_check,
     };
-    // Getrennt vom Adressfehler: eine Platte, auf die nicht geschrieben werden
-    // kann, ist kein Tippfehler des Nutzers und darf nicht so heissen.
+    // Separate from the address error: a disk that cannot be written to is not
+    // a typo by the user and must not be called one.
     save_settings(&app, &settings).map_err(|e| UpdateError::new("write-failed", e))?;
     Ok(settings)
 }
@@ -295,12 +291,11 @@ pub async fn check_for_update(
 
     let found = match builder.build().map_err(classify_check)?.check().await {
         Ok(found) => found,
-        // Jeder Endpoint hat geantwortet, keiner mit einem brauchbaren
-        // Manifest — das Plugin sammelt einen Fehler nur, wenn die Anfrage
-        // selbst scheiterte, und meldet sonst am Ende `ReleaseNotFound`. Fuer
-        // den Nutzer heisst das dasselbe wie eine Quelle ohne neuere Version:
-        // es gibt nichts zu holen. Das ist kein Fehler, sondern der Normalfall,
-        // solange noch kein Release ein Manifest traegt.
+        // Every endpoint answered, none with a usable manifest — the plugin only
+        // collects an error if the request itself failed, and otherwise reports
+        // `ReleaseNotFound` at the end. For the user this means the same as a source
+        // without a newer version: there is nothing to fetch. That is not an error but
+        // the normal case, as long as no release carries a manifest yet.
         Err(tauri_plugin_updater::Error::ReleaseNotFound) => None,
         Err(e) => return Err(classify_check(e)),
     };
@@ -324,15 +319,15 @@ pub async fn check_for_update(
         },
     };
 
-    // Auch ein `None` wird uebernommen: sonst haenge der vorige Fund weiter im
-    // Zustand und "Installieren" bezoege sich auf ein Ergebnis, das der Nutzer
-    // gerade widerlegt hat.
+    // A `None` is taken over too: otherwise the previous finding would stay in
+    // the state and "Install" would refer to a result the user has just
+    // disproved.
     *state.0.lock().map_err(|_| UpdateError::new("failed", "state poisoned"))? = found;
     Ok(check)
 }
 
-/// Laedt und installiert, was die letzte Pruefung gefunden hat, und startet
-/// die App neu. Kehrt im Erfolgsfall nicht zurueck.
+/// Downloads and installs what the last check found, and restarts the app.
+/// Does not return on success.
 #[tauri::command]
 pub async fn install_update(
     app: AppHandle,
@@ -342,9 +337,9 @@ pub async fn install_update(
         return Err(UpdateError::new("unsupported-install", "no APPIMAGE in the environment"));
     }
 
-    // Herausgenommen statt gehalten: ein MutexGuard darf nicht ueber ein
-    // `await` leben. Bei einem Fehlschlag wandert der Fund zurueck, damit ein
-    // zweiter Versuch nicht erst neu pruefen muss.
+    // Taken out instead of held: a MutexGuard must not live across an
+    // `await`. On failure the finding goes back, so that a second attempt does not
+    // have to check anew.
     let update = {
         let mut pending = state.0.lock()
             .map_err(|_| UpdateError::new("failed", "state poisoned"))?;
@@ -378,7 +373,7 @@ pub async fn install_update(
         return Err(classify_install(e));
     }
 
-    // Auf Windows beendet der NSIS-Installer die App selbst; kommt der Aufruf
-    // doch zurueck, ist der Neustart der dokumentierte Abschluss.
+    // On Windows the NSIS installer ends the app itself; if the call returns
+    // after all, the restart is the documented conclusion.
     app.restart();
 }

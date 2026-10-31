@@ -4,41 +4,41 @@ import { guardKey, useLeaveGuardStore } from '../store/leaveGuardStore';
 
 interface Options<T extends { name: string }> {
   store: DraftStore<T>;
-  /** Die Ansicht, der die Seite gehört — für den Wächter (`leaveGuardStore`). */
+  /** The view the page belongs to — for the guard (`leaveGuardStore`). */
   viewType: 'blocks' | 'templates';
   id: string;
-  /** Wie der Entwurf in der Frage beim Verlassen heißt. */
+  /** What the draft is called in the question when leaving. */
   label: (draft: T) => string;
-  /** Der gespeicherte Stand, auf die Felder des Entwurfs gebracht. */
+  /** The saved state, mapped onto the draft's fields. */
   saved: T;
-  /** Speichert die geänderten Felder — genau die, sonst nichts. `base` ist der Stand beim Öffnen. */
+  /** Saves the changed fields — exactly those, nothing else. `base` is the state when opened. */
   save: (id: string, patch: Partial<T>, base: T) => Promise<unknown>;
-  /** Zurück zur Liste. */
+  /** Back to the list. */
   onClose: () => void;
   /**
-   * Nur für eine gerade mit „Neu" angelegte Seite: was „Abbrechen" tut — sie
-   * in den Papierkorb legen, wie einen neuen Eintrag (`useEntryEditor`).
+   * Only for a page that was just created with "New": what "Cancel" does — put
+   * it in the trash, like a new entry (`useEntryEditor`).
    */
   onCancelNew?: () => void;
   logTag: string;
 }
 
-/** Getrimmt, wie die Stores den Namen speichern: ein Leerzeichen am Ende ist keine Änderung. */
+/** Trimmed, the way the stores save the name: a trailing space is not a change. */
 function comparable<T extends { name: string }>(value: T, key: keyof T): string {
   return JSON.stringify(key === 'name' ? value.name.trim() : value[key]);
 }
 
 /**
- * Der Entwurf einer Seite, die erst mit „Fertig" speichert (eigene Blöcke,
- * Vorlagen): beim Öffnen aus dem Entwurfs-Store oder dem gespeicherten Stand,
- * bei jeder Änderung zurück in den Store — ein offener Tab behält seine Arbeit,
- * auch wenn die Ansicht unmountet. „Fertig" schreibt nur die Felder, die sich
- * gegenüber dem Stand beim Öffnen geändert haben, und bleibt bei einem Fehler
- * auf der Seite; „Abbrechen" verwirft. Beide führen zurück zur Liste.
+ * The draft of a page that only saves with "Done" (custom blocks,
+ * templates): on open it comes from the draft store or the saved state,
+ * on every change it goes back into the store — an open tab keeps its work,
+ * even when the view unmounts. "Done" writes only the fields that changed
+ * compared to the state at open, and stays on the page on an error;
+ * "Cancel" discards. Both lead back to the list.
  *
- * Wer die Seite mit einem Entwurf anders verlässt, wird gefragt
- * (`leaveGuardStore`) — wie bei einem Eintrag im Bearbeiten. Nur der Wechsel
- * in einen anderen Tab lässt den Entwurf liegen: dort geht die Arbeit weiter.
+ * Anyone who leaves the page with a draft any other way is asked
+ * (`leaveGuardStore`) — as with an entry being edited. Only switching to
+ * another tab leaves the draft in place: the work continues there.
  */
 export function useDraftPage<T extends { name: string }>({ store, viewType, id, label, saved, save, onClose, onCancelNew, logTag }: Options<T>) {
   const [base] = useState<T>(() => store.getState().drafts[id]?.base ?? saved);
@@ -53,7 +53,7 @@ export function useDraftPage<T extends { name: string }>({ store, viewType, id, 
   useEffect(() => {
     if (dirty) saveDraft(id, { base, draft });
     else clearDraft(id);
-    // `changedKey` statt `changed`: dieselbe Liste ist bei jedem Render ein neues Array.
+    // `changedKey` instead of `changed`: the same list is a new array on every render.
   }, [id, base, draft, dirty, changedKey, saveDraft, clearDraft]);
 
   const patch = (p: Partial<T>) => setDraft((d) => ({ ...d, ...p }));
@@ -64,8 +64,8 @@ export function useDraftPage<T extends { name: string }>({ store, viewType, id, 
   };
 
   /**
-   * „Abbrechen": verwirft den Entwurf — und eine neue, nie bestätigte Seite
-   * gleich mit. Den Entwurf räumt dann das Löschen, erst wenn es geglückt ist.
+   * "Cancel": discards the draft — and a new, never confirmed page along
+   * with it. The deletion then clears the draft, only once it has succeeded.
    */
   const cancel = () => (onCancelNew ? onCancelNew() : leave());
 
@@ -79,7 +79,7 @@ export function useDraftPage<T extends { name: string }>({ store, viewType, id, 
         await save(id, changes, base);
       }
     } catch (err) {
-      // Auf der Seite bleiben: der Entwurf ist nicht gespeichert.
+      // Stay on the page: the draft is not saved.
       console.error(`[${logTag}] saving failed:`, err);
       setBusy(false);
       return;
@@ -87,14 +87,14 @@ export function useDraftPage<T extends { name: string }>({ store, viewType, id, 
     leave();
   };
 
-  // Der Wächter ruft immer die Handgriffe des letzten Renders. Die Probe für
-  // Tabs im Hintergrund meldet der Store selbst an (`draftStore`).
+  // The guard always calls the handlers of the latest render. The probe for
+  // background tabs is registered by the store itself (`draftStore`).
   const latest = useRef({ draft, label, finish, cancel });
   latest.current = { draft, label, finish, cancel };
   useEffect(() => {
     const key = guardKey(viewType, id);
-    // Ob es einen Entwurf gibt, sagt der Store: „Fertig", „Abbrechen" und
-    // Löschen räumen ihn, bevor sie die Seite verlassen — und fragen damit nicht.
+    // Whether there is a draft is up to the store: "Done", "Cancel" and
+    // delete clear it before they leave the page — and so do not ask.
     const hasDraft = () => id in store.getState().drafts;
     useLeaveGuardStore.getState().setGuard({
       key,
@@ -102,10 +102,10 @@ export function useDraftPage<T extends { name: string }>({ store, viewType, id, 
       isDirty: hasDraft,
       save: async () => {
         await latest.current.finish();
-        // `finish` bleibt bei einem Fehler auf der Seite — dann auch hier bleiben.
+        // `finish` stays on the page on an error — then stay here too.
         if (hasDraft()) throw new Error('draft could not be saved');
       },
-      // Wie „Abbrechen": eine neue, nie bestätigte Seite geht in den Papierkorb.
+      // Like "Cancel": a new, never confirmed page goes to the trash.
       discard: () => latest.current.cancel(),
     });
     return () => useLeaveGuardStore.getState().clearGuard(key);

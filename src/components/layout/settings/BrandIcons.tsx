@@ -1,12 +1,12 @@
 /**
- * Die drei Markenzeichen fuer die Links im Ueber-Bereich — GitHub, Patreon und
- * Discord. Bewusst keine lucide-Icons: lucide fuehrt seit 0.400 keine Marken
- * mehr, und ein Herz fuer Patreon oder eine Sprechblase fuer Discord ist
- * geraten, nicht erkannt. Die Pfade sind dieselben, die die Website unter dem
- * Titel zeigt, damit App und Seite dieselbe Reihe zeigen.
+ * The three brand marks for the links in the About area — GitHub, Patreon and
+ * Discord. Deliberately not lucide icons: lucide has carried no brands since
+ * 0.400, and a heart for Patreon or a speech bubble for Discord is
+ * guessed, not recognised. The paths are the same ones the website shows under the
+ * title, so app and site show the same row.
  *
- * `fill="currentColor"` statt eines eigenen Farbwerts: die Icons erben die
- * Farbe ihres Knopfes, so wie es design.md fuer Icons vorschreibt.
+ * `fill="currentColor"` instead of a colour value of its own: the icons inherit the
+ * colour of their button, as design.md prescribes for icons.
  */
 interface BrandIconProps {
   size?: number;

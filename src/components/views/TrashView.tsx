@@ -65,7 +65,7 @@ function SelectCheckbox({ selected, onToggle }: { selected: boolean; onToggle: (
   );
 }
 
-/** Tage bis zum automatischen Löschen — `null`, wenn der Vault nie automatisch leert. */
+/** Days until automatic deletion — `null` if the vault never empties automatically. */
 function useDaysLeft(deletedAt: string): number | null {
   const retentionDays = useSettingsStore((s) => s.settings.trash.retentionDays);
   if (retentionDays === null) return null;
@@ -177,8 +177,8 @@ function ItemCard({ item, confirmingId, setConfirmingId, restore, deleteNow, sel
   );
 }
 
-/** So lange nach dem Öffnen der Rückfrage zählt ein Klick aufs „Ja" nicht —
- *  länger als ein Doppelklick, kürzer als ein bewusster zweiter Klick. */
+/** For this long after the confirmation opens, a click on "Yes" does not count —
+ *  longer than a double click, shorter than a deliberate second click. */
 const CONFIRM_GUARD_MS = 400;
 
 export default function TrashView() {
@@ -193,20 +193,20 @@ export default function TrashView() {
   const categories = useCategoryStore((s) => s.categories);
   const [confirmingId, setConfirmingId] = useState<string | null>(null);
   const [selectedIds, setSelectedIds] = useSessionState<Set<string>>('trash.selection', new Set());
-  // Welche Rückfrage der Primärknopf gerade stellt. Ein Zustand für beide,
-  // und jede Änderung der Auswahl setzt ihn zurück: sonst tauchte nach
-  // An- und Abwählen ein altes „Ja, alles löschen" wieder auf.
+  // Which confirmation the primary button is currently asking. One state for
+  // both, and every change of the selection resets it: otherwise an old
+  // "Yes, delete everything" would reappear after selecting and deselecting.
   const [confirm, setConfirm] = useState<'empty' | 'selected' | null>(null);
-  // Wann die Rückfrage aufging. Das „Ja" steht auf demselben Knopf wie die
-  // Frage — der zweite Klick eines Doppelklicks löschte sonst sofort.
+  // When the confirmation opened. The "Yes" is on the same button as the
+  // question — the second click of a double click would otherwise delete immediately.
   const confirmArmedAt = useRef(0);
   const [search, setSearch] = useSessionState('trash.search', '');
 
   useEffect(() => { fetchTrashed(); }, []);
 
-  // „Alle wählen" wählt nur die Treffer der Suche — sonst löschte die
-  // Mehrfachauswahl endgültig, was der Filter gerade verbirgt. „Papierkorb
-  // leeren" bleibt bewusst global.
+  // "Select all" selects only the search hits — otherwise the
+  // multi-selection would permanently delete what the filter is currently hiding. "Empty
+  // trash" deliberately stays global.
   const query = search.trim().toLowerCase();
   const matching = query ? items.filter((i) => i.title.toLowerCase().includes(query)) : items;
 
@@ -239,8 +239,8 @@ export default function TrashView() {
     setConfirm(null);
   };
 
-  // Die Knöpfe stellen nur die Rückfrage; gelöscht wird erst über das „Ja"
-  // der Primäraktion (Leeren/Auswahl) bzw. InlineConfirm (einzelne Zeile).
+  // The buttons only pose the confirmation; deletion only happens via the "Yes"
+  // of the primary action (empty/selection) or InlineConfirm (single row).
   const emptyTrashNow = async () => {
     setConfirm(null);
     await emptyTrash();
@@ -265,11 +265,11 @@ export default function TrashView() {
   const sorted = sortItems(matching, trashPrefs.sort, { date: (i) => i.deleted_at });
 
   // ── Grouped by type/category ───────────────────────────────────────────────
-  // Ein Raster für beide Kartenansichten: drei Spalten, in voller Breite eine.
+  // One grid for both card views: three columns, one at full width.
   const cardsGridClass = isWideCardView(trashPrefs.view) ? 'grid grid-cols-1 gap-3' : 'grid grid-cols-3 gap-3';
 
-  // Ohne 'timeline': der Zeitstrahl hat seinen eigenen Zweig, sonst fiele er
-  // hier stillschweigend in den Karten-Ast.
+  // Without 'timeline': the timeline has its own branch, otherwise it would
+  // silently fall into the card branch here.
   const renderGrouped = (viewMode: Exclude<ViewMode, 'timeline'>) => {
     const journal    = sorted.filter((i) => i.type === 'journal');
     const wiki       = sorted.filter((i) => i.type === 'wiki');
@@ -288,7 +288,7 @@ export default function TrashView() {
         ? <div className="space-y-1">{subset.map((item) => <ItemRow key={item.id} item={item} {...itemProps} />)}</div>
         : <div className={cardsGridClass}>{subset.map((item) => <ItemCard key={item.id} item={item} {...itemProps} />)}</div>;
 
-    // '' = ohne Kategorie; trashStore joint c.name als category — der Schlüssel ist der Name, nicht die id.
+    // '' = no category; trashStore joins c.name as category — the key is the name, not the id.
     const wikiByCategory = groupBy(wiki, (item) => item.category ?? '');
     const opsByCategory = groupBy(operations, (item) => item.category ?? '');
     const categoryGroupLabel = (name: string) => {
@@ -411,11 +411,11 @@ export default function TrashView() {
     </DashboardTitle>
   );
 
-  // Die Hauptaktion des Papierkorbs ist rot und steht wie „+ Neuer …" oben
-  // in der Leiste: ohne Auswahl „Papierkorb leeren", mit Auswahl „Ausgewählte
-  // löschen". Die Rückfrage übernimmt denselben Platz — der Knopf wird zum
-  // „Ja", daneben ein X zum Abbrechen —, statt eine Zeile im Körper zu
-  // brauchen, die in der schmalen Leiste umbräche.
+  // The trash's main action is red and sits at the top of the bar like "+ New …":
+  // without a selection "Empty trash", with a selection "Delete
+  // selected". The confirmation takes the same spot — the button becomes
+  // "Yes", with an X next to it to cancel —, instead of needing a row
+  // in the body that would wrap in the narrow bar.
   const confirming = confirm === (hasSelection ? 'selected' : 'empty');
   const confirmNow = () => {
     if (performance.now() - confirmArmedAt.current < CONFIRM_GUARD_MS) return;
@@ -433,8 +433,8 @@ export default function TrashView() {
         },
     danger: true,
     icon: <Trash2 size={14} className="flex-shrink-0" />,
-    // Ein leerer Papierkorb behält den Knopf, gesperrt — die Leiste bleibt
-    // stehen, statt beim letzten Löschen zu verschwinden.
+    // An empty trash keeps the button, disabled — the bar stays
+    // instead of disappearing on the last deletion.
     disabled: items.length === 0,
   };
   const extraActions = confirming
@@ -484,7 +484,7 @@ export default function TrashView() {
       sortDate="deleted"
       onView={(v) => setTrashPrefs({ view: v })}
       onSort={(s) => setTrashPrefs({ sort: s })}
-      // Der Papierkorb gruppiert nach Eintragstyp, nicht nach Kategorie.
+      // The trash groups by entry type, not by category.
       groupBy={{ value: trashPrefs.grouping, onChange: (g) => setTrashPrefs({ grouping: g }), label: t('listView.type') }}
       items={items}
       itemKey={(item) => item.id}

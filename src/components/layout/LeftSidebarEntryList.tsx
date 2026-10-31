@@ -22,19 +22,19 @@ import { useOpenInNewTabAction } from '../../hooks/useOpenInNewTabAction';
 import { useSaveAsTemplateAction } from '../../hooks/useSaveAsTemplateAction';
 
 /**
- * Die Eintragsliste links: oben die Suche, darunter die Liste. Welche Liste —
- * alle Einträge oder die eines Moduls — legt die Einstellung des Vaults fest
- * (Einstellungen → Seitenleiste); einen Umschalter in der Leiste gibt es nicht,
- * die Module wechselt man über die Rail.
+ * The entry list on the left: the search on top, the list below it. Which list —
+ * all entries or those of one module — is determined by the vault's setting
+ * (Settings → Sidebar); there is no switcher in the bar,
+ * modules are changed via the rail.
  */
 export default function LeftSidebarEntryList() {
   const list = useSettingsStore((s) => s.settings.leftList.list);
-  // Neu gerendert je Vault: „Mehr anzeigen" beginnt dort wieder beim Limit.
+  // Re-rendered per vault: "Show more" starts again at the limit there.
   const vaultId = useSettingsStore((s) => s.vaultId);
 
-  // `flex-1 min-w-0`: die Liste füllt die Spalte und schrumpft mit ihr —
-  // ohne `min-w-0` bliebe sie so breit wie ihr längster Titel und liefe beim
-  // Schmalerziehen unter das Blatt.
+  // `flex-1 min-w-0`: the list fills the column and shrinks with it —
+  // without `min-w-0` it would stay as wide as its longest title and run
+  // under the sheet when narrowed.
   return (
     <div className="flex flex-col h-full flex-1 min-w-0">
       <ActiveList key={vaultId} list={list} />
@@ -42,7 +42,7 @@ export default function LeftSidebarEntryList() {
   );
 }
 
-/** Ein Component pro Liste; die Config-Hooks je Modul bleiben die Fachlogik. */
+/** One component per list; the config hooks per module remain the domain logic. */
 const TAB_LISTS: Record<LeftListTabId, ComponentType> = {
   all: AllList,
   journal: JournalList,
@@ -68,17 +68,17 @@ function ActiveList({ list }: { list: LeftListTabId }) {
 
 type EntryKind = 'journal' | 'task' | 'operation' | 'wiki' | 'altar';
 
-/** Die Config einer Liste, typ-gelöscht: ihre Funktionen bekommen nur Items
- *  derselben Config zurück (`AllRow.item`), der Cast in `toAllRows` ist also
- *  sicher. */
+/** A list's config, type-erased: its functions only get items of
+ *  the same config back (`AllRow.item`), so the cast in `toAllRows` is
+ *  safe. */
 interface AllSource {
   kindLabel: string;
   cfg: EntryListTabProps<unknown>;
 }
 
-/** Bewusst schlank: Titel, Datum und Icon rechnet die Liste erst für die
- *  Zeilen aus, die sie auch zeichnet — bei tausenden Einträgen wäre das sonst
- *  bei jedem Klick (neue `activeView`) die ganze Liste. */
+/** Deliberately lean: the list only computes title, date and icon for the
+ *  rows it actually draws — with thousands of entries this would otherwise be
+ *  the whole list on every click (new `activeView`). */
 interface AllRow {
   id: string;
   sortDate: string;
@@ -288,8 +288,8 @@ function useWikiConfig(): EntryListTabProps<Entry> {
     getEditTitle: (a) => a.title,
     getDateStr: (a) => {
       const cat = lookupCategory(catById, a.category_id);
-      // Kein Fallback auf die rohe category_id — bei gelöschter Kategorie
-      // entfällt das Label, wie eine Zeile höher bei den Operationen.
+      // No fallback to the raw category_id — for a deleted category
+      // the label is omitted, as one row higher for the operations.
       const catLabel = categoryLabel(t, cat);
       return `${catLabel}${catLabel ? ' · ' : ''}${formatEntryDate(a.updated_at)}`;
     },
@@ -380,12 +380,12 @@ function useTasksConfig(): EntryListTabProps<Task> {
 
   const catById = Object.fromEntries(categories.map((c) => [c.id, c]));
 
-  /** Aufgaben haben keine eigene Seite; die id waehlt die Zeile in `TasksView`
-   *  aus, die sich daraufhin sichtbar macht und markiert. */
+  /** Tasks have no page of their own; the id selects the row in `TasksView`,
+   *  which then makes itself visible and highlights it. */
   const openTask = (id: string) => setActiveView({ type: 'tasks', id });
 
-  // Eine Payload für beide Drag-Stellen (Standard-Config fürs „Alle"-Tab und
-  // der Hand-Griff im renderRow unten), damit sie nicht auseinanderdriften.
+  // One payload for both drag spots (default config for the "All" tab and
+  // the hand grip in renderRow below), so they do not drift apart.
   const taskDragItem = (task: Task) =>
     setDragItem({ id: task.id, entryType: 'task', label: displayTitle(t, 'task', task.title), category: lookupCategory(catById, task.category_id)?.emoji });
 
@@ -447,7 +447,7 @@ function useTasksConfig(): EntryListTabProps<Task> {
       return (
         <div onContextMenu={openCtxMenu} className={`sidebar-item w-full text-left ${isActive ? 'active' : ''}`}>
           <button
-            // Wie das Kästchen in der Aufgaben-Ansicht: mit Unteraufgaben.
+            // Like the checkbox in the tasks view: with subtasks.
             onClick={(e) => { e.stopPropagation(); toggleComplete(task.id); }}
             className="flex-shrink-0 text-stone-500 hover:text-stone-300"
             title={task.completed ? t('tasks.markActive') : t('tasks.markCompleted')}
@@ -455,11 +455,11 @@ function useTasksConfig(): EntryListTabProps<Task> {
             {task.completed ? <CheckSquare size={14} /> : <Square size={14} />}
           </button>
           <button
-            // renderRow umgeht EntryListTabs zentrale Drag-Verdrahtung, daher
-            // hier derselbe pointerdown-Griff wie dort: setzt nur den Drag-
-            // Kanal, der Klick zum Öffnen feuert weiterhin normal. Den Kanal
-            // räumt erst der pointerup eines gemounteten RichEditors — nach
-            // einem blossen Klick bleibt der Wert folgenlos stehen.
+            // renderRow bypasses EntryListTabs' central drag wiring, hence
+            // the same pointerdown handler here as there: it only sets the drag
+            // channel, the click to open still fires normally. The channel
+            // is only cleared by the pointerup of a mounted RichEditor — after
+            // a mere click the value stays around without consequence.
             onPointerDown={(e) => {
               if (e.button !== 0) return;
               e.preventDefault();

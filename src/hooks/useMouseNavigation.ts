@@ -5,15 +5,15 @@ import { HISTORY_BUTTON_STEPS, isHistoryButton } from '../lib/mouseButtons';
 import { hasOpenModal } from '../components/ui/Modal';
 import { isAltarFullscreen, useUIStore } from '../store/uiStore';
 
-/** Multimedia-Tastaturen — und Maustreiber, die statt eines Klicks diese Tasten senden. */
+/** Multimedia keyboards — and mouse drivers that send these keys instead of a click. */
 const KEY_STEPS: Partial<Record<string, -1 | 1>> = { BrowserBack: -1, BrowserForward: 1 };
 
-/** Ein Schritt im Verlauf des aktiven Tabs — der gemeinsame Ausgang aller Wege. */
+/** One step in the active tab's history — the common exit of all paths. */
 function step(delta: -1 | 1): void {
-  // Über einem Modal ist die Seite dahinter nicht zu sehen: ein Schritt dort
-  // fiele erst auf, wenn es schließt.
+  // Above a modal the page behind it is not visible: a step there
+  // would only be noticed once it closes.
   if (hasOpenModal()) return;
-  // Wie die Pfeile der Titelleiste, die es im Vollfenster des Altars nicht gibt.
+  // Like the title bar arrows, which do not exist in the altar's full window.
   if (isAltarFullscreen(useUIStore.getState())) return;
   const { navigateBack, navigateForward } = useUIStore.getState();
   if (delta < 0) navigateBack();
@@ -21,16 +21,16 @@ function step(delta: -1 | 1): void {
 }
 
 /**
- * Zurück und Vor über die Daumentasten der Maus — dasselbe wie die Pfeile in
- * der Titelleiste. Unter Windows liefert der WebView sie als Mausereignisse,
- * unter Linux fängt wry sie ab und setzt `mousedown`/`mouseup` selbst in die
- * Seite — nur diese beiden, weshalb der Schritt an `mouseup` hängt und nicht
- * an `auxclick` oder `pointerup`. macOS meldet sie aus Rust
- * (`install_mouse_nav_monitor`): Treiber wie Logi Options+ machen dort
- * Wischgesten aus den Tasten, die als DOM-Ereignis nie ankommen.
+ * Back and forward via the mouse's thumb buttons — the same as the arrows in
+ * the title bar. On Windows the WebView delivers them as mouse events,
+ * on Linux wry intercepts them and injects `mousedown`/`mouseup` into the
+ * page itself — only those two, which is why the step hangs on `mouseup` and
+ * not on `auxclick` or `pointerup`. macOS reports them from Rust
+ * (`install_mouse_nav_monitor`): drivers like Logi Options+ turn the buttons
+ * into swipe gestures there, which never arrive as a DOM event.
  *
- * Dazu die Tasten „Browser zurück/vor" der Tastatur, auf jeder Plattform. Kein
- * Weg blättert über einem Modal oder im Vollfenster des Altars.
+ * Plus the keyboard's "Browser back/forward" keys, on every platform. No
+ * path navigates above a modal or in the altar's full window.
  */
 export function useMouseNavigation(): void {
   useEffect(() => {
@@ -43,7 +43,7 @@ export function useMouseNavigation(): void {
     };
   }, []);
 
-  // Die Tasten der Tastatur sieht der Monitor in Rust nicht — also überall hier.
+  // The monitor in Rust does not see the keyboard keys — so they are handled here, everywhere.
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       const delta = KEY_STEPS[e.key];
@@ -56,17 +56,17 @@ export function useMouseNavigation(): void {
   }, []);
 
   useEffect(() => {
-    // wry setzt die Mausereignisse auch unter macOS in die Seite: neben dem
-    // Monitor zählte jeder Druck doppelt.
+    // wry injects the mouse events into the page on macOS too: alongside the
+    // monitor every press would count twice.
     if (isMacOS) return;
-    // Kein Griff der App soll mit einer Daumentaste beginnen — ein Zug, ein
-    // Strich auf der Sigille. Nur anhalten, nicht `preventDefault`: das nähme
-    // dem Druck die Mausereignisse, an denen der Schritt hängt.
+    // No grip in the app should begin with a thumb button — a drag, a
+    // stroke on the sigil. Only stop it, no `preventDefault`: that would take
+    // the mouse events away from the press, which the step depends on.
     const onPointerDown = (e: PointerEvent) => {
       if (isHistoryButton(e)) e.stopPropagation();
     };
-    // Der Druck abgebrochen, damit er den Fokus nicht umsetzt; das Loslassen,
-    // damit der WebView nicht in seinem eigenen Verlauf zurückgeht.
+    // The press is cancelled so that it does not move the focus; the release,
+    // so that the WebView does not go back in its own history.
     const onMouseDown = (e: MouseEvent) => {
       if (isHistoryButton(e)) e.preventDefault();
     };
@@ -76,7 +76,7 @@ export function useMouseNavigation(): void {
       e.preventDefault();
       step(delta);
     };
-    // Capture: kein Bereich der App soll die Tasten für sich behalten können.
+    // Capture: no area of the app should be able to keep the buttons for itself.
     window.addEventListener('pointerdown', onPointerDown, true);
     window.addEventListener('mousedown', onMouseDown, true);
     window.addEventListener('mouseup', onMouseUp, true);

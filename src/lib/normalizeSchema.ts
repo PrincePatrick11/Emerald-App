@@ -1,37 +1,36 @@
 /**
- * Migration v33 — der Rebuild, der bestehende Datenbanken auf das Schema von
- * v37 bringt (`schemaV37.ts`; bis v37 war das dasselbe wie `schema.ts`).
+ * Migration v33 — the rebuild that brings existing databases to the schema of
+ * v37 (`schemaV37.ts`; up to v37 that was the same as `schema.ts`).
  *
- * Warum das nicht die übliche 12-Schritt-Prozedur aus der SQLite-Doku ist:
- * Die SQL-Schicht (`db.rs`) fährt einen sqlx-Connection-Pool (Default 10
- * Verbindungen). `PRAGMA foreign_keys = OFF` und `BEGIN` treffen
- * jeweils nur *eine* Verbindung, und welche die nächste Anweisung bedient, ist
- * nicht steuerbar. Beides ist hier also nicht verlässlich verfügbar.
+ * Why this is not the usual 12-step procedure from the SQLite docs:
+ * the SQL layer (`db.rs`) runs an sqlx connection pool (default 10
+ * connections). `PRAGMA foreign_keys = OFF` and `BEGIN` each hit
+ * only *one* connection, and which one serves the next statement is
+ * not controllable. Neither is reliably available here, then.
  *
- * Der Ablauf ist deshalb so gebaut, dass Foreign Keys durchgehend aktiv bleiben
- * dürfen:
+ * The procedure is therefore built so that foreign keys may stay active
+ * throughout:
  *
- *   1. Reste eines abgebrochenen Laufs zurückrollen
- *   2. Datei-Snapshot ziehen (VACUUM INTO)
- *   3. Altlasten reparieren, solange noch das alte Schema steht
- *   4. Alte Tabellen auf `*_old` umbenennen  — zu diesem Zeitpunkt hat noch
- *      keine Tabelle einen Foreign Key, ein RENAME kann also keine Referenz
- *      verbiegen
- *   5. Neue Tabellen unter den endgültigen Namen anlegen
- *   6. Daten Eltern-vor-Kindern kopieren
- *   7. `*_old` löschen — nichts verweist darauf, also keine FK-Verletzung
- *   8. Indizes anlegen (erst jetzt, vorher wären die Namen belegt)
+ *   1. Roll back leftovers of an aborted run
+ *   2. Take a file snapshot (VACUUM INTO)
+ *   3. Repair legacy damage while the old schema is still in place
+ *   4. Rename old tables to `*_old`  — at this point no table has a
+ *      foreign key yet, so a RENAME cannot bend any reference
+ *   5. Create new tables under their final names
+ *   6. Copy data parents-before-children
+ *   7. Drop `*_old` — nothing refers to them, so no FK violation
+ *   8. Create indexes (only now, before that the names would be taken)
  *   9. `PRAGMA foreign_key_check`
  *
- * Bricht der Lauf zwischen 4 und 7 ab, liegen `*_old`-Tabellen herum und v33
- * ist nicht gestempelt. Schritt 1 stellt beim nächsten Start den Ausgangszustand
- * wieder her und der Rebuild läuft erneut.
+ * If the run aborts between 4 and 7, `*_old` tables are left lying around and v33
+ * is not stamped. Step 1 restores the initial state on the next start
+ * and the rebuild runs again.
  *
- * Bricht er zwischen 7 und 9 ab, ist der Rebuild inhaltlich fertig, aber immer
- * noch ungestempelt. `alreadyRebuilt` erkennt das und überspringt den Teil, der
- * das alte Schema voraussetzt — ohne diese Prüfung liefe `repairLegacyDamage`
- * gegen die bereits umbenannte Spalte und der Vault ließe sich nie wieder
- * öffnen.
+ * If it aborts between 7 and 9, the rebuild is finished content-wise, but still
+ * unstamped. `alreadyRebuilt` detects that and skips the part that
+ * presupposes the old schema — without this check, `repairLegacyDamage` would run
+ * against the already renamed column and the vault could never be opened
+ * again.
  */
 import type Database from './sqlite';
 import { V37_TABLES, V37_TABLE_DDL, V37_INDEX_DDL } from './schemaV37';
@@ -45,19 +44,19 @@ import {
 } from './dbRebuild';
 
 /**
- * `schema_version` überlebt den Rebuild — dort steht, was gerade läuft.
+ * `schema_version` survives the rebuild — it records what is currently running.
  *
- * Bewusst die eingefrorene v37-Liste, nicht `TABLES` aus `schema.ts`: v33 baut
- * den Stand von damals, nicht den heutigen (siehe Kopf von `schemaV37.ts`).
+ * Deliberately the frozen v37 list, not `TABLES` from `schema.ts`: v33 builds
+ * the state of back then, not today's (see the header of `schemaV37.ts`).
  */
 const REBUILT = V37_TABLES.filter((t) => t !== 'schema_version');
 
-/** Tabellen, die v33 ersatzlos entfernt. */
+/** Tables that v33 removes without replacement. */
 const DROPPED = ['creations', 'altar_intentions'] as const;
 
 /**
- * Stellt den Zustand vor einem abgebrochenen Rebuild wieder her: die halbfertige
- * neue Tabelle fliegt raus, `*_old` bekommt seinen Namen zurück.
+ * Restores the state before an aborted rebuild: the half-finished
+ * new table is thrown out, `*_old` gets its name back.
  */
 async function rollbackPartialRebuild(db: Database): Promise<void> {
   for (const table of REBUILT) {
@@ -71,16 +70,16 @@ async function rollbackPartialRebuild(db: Database): Promise<void> {
 }
 
 /**
- * Bringt die alten Tabellen in einen Zustand, den das neue Schema akzeptiert.
- * Läuft noch vor dem Umbenennen, also gegen das alte Schema.
+ * Brings the old tables into a state that the new schema accepts.
+ * Runs before the renaming, i.e. against the old schema.
  */
 async function repairLegacyDamage(db: Database): Promise<void> {
-  // --- Kategorien, auf die Inhalte zeigen, die es aber nicht mehr gibt -------
-  // Entstanden durch den 30-Tage-Purge und `emptyTrash`, die Kategorien hart
-  // gelöscht haben, ohne ihre Inhalte anzufassen. Der neue RESTRICT-Foreign-Key
-  // würde den Rebuild sonst blockieren.
-  // Die Rückfall-IDs von damals als Literale: `general` gab es nur bei Tasks,
-  // und v38 legt später ohnehin alles auf das eine `other` zusammen.
+  // --- Categories that content points at but that no longer exist ------------
+  // Caused by the 30-day purge and `emptyTrash`, which hard-deleted categories
+  // without touching their content. The new RESTRICT foreign key
+  // would otherwise block the rebuild.
+  // The fallback IDs of back then as literals: `general` existed only for tasks,
+  // and v38 later merges everything into the one `other` anyway.
   for (const [table, target, fallback] of [
     ['operations', 'operation_categories', 'other'],
     ['tasks', 'task_categories', 'general'],
@@ -98,8 +97,8 @@ async function repairLegacyDamage(db: Database): Promise<void> {
          OR category NOT IN (SELECT id FROM wiki_categories)`
   );
 
-  // Die Fallback-Kategorien müssen existieren, sonst greift der Foreign Key
-  // gleich wieder daneben. Auf sehr alten Vaults kann das Seeding gefehlt haben.
+  // The fallback categories must exist, otherwise the foreign key misses
+  // again right away. On very old vaults the seeding may have been missing.
   await db.execute(
     `INSERT OR IGNORE INTO operation_categories (id, name, emoji, sort_order, is_builtin)
      VALUES ('sigils', 'Sigils', '🔯', 0, 1)`
@@ -122,10 +121,10 @@ async function repairLegacyDamage(db: Database): Promise<void> {
     [new Date().toISOString()]
   );
 
-  // --- creations nach operations überführen ---------------------------------
-  // Legacy-Tabelle, Vorgänger von operations. Kein Store schreibt sie mehr, und
-  // das Backup hat sie nie exportiert — ihre Zeilen gingen bei jedem Restore
-  // still verloren. Statt sie zu droppen, bekommen sie hier ein Zuhause.
+  // --- Move creations into operations ---------------------------------------
+  // Legacy table, predecessor of operations. No store writes it any more, and
+  // the backup never exported it — its rows were silently lost on every
+  // restore. Instead of dropping them, they get a home here.
   if (await tableExists(db, 'creations')) {
     await db.execute(`
       INSERT OR IGNORE INTO operations (
@@ -145,11 +144,11 @@ async function repairLegacyDamage(db: Database): Promise<void> {
     `);
   }
 
-  // --- Altar-Platzierungen ohne Altar ---------------------------------------
-  // Der eigentliche v4-Schaden: v4 brach nach dem ersten ALTER ab, `altar_id`
-  // kam erst mit v30/v31 nach — als NULL für jede bestehende Zeile. Diese
-  // Platzierungen sind seitdem unsichtbar, weil die App Platzierungen immer nur
-  // pro Altar lädt. Der neue NOT-NULL-Foreign-Key erzwingt jetzt eine Klärung.
+  // --- Altar placements without an altar ------------------------------------
+  // The actual v4 damage: v4 aborted after the first ALTER, `altar_id`
+  // only came later with v30/v31 — as NULL for every existing row. These
+  // placements have been invisible since, because the app only ever loads placements
+  // per altar. The new NOT NULL foreign key now forces a resolution.
   const placementCols = await columnNames(db, 'altar_placements');
   if (!placementCols.has('altar_id')) {
     await db.execute('ALTER TABLE altar_placements ADD COLUMN altar_id TEXT');
@@ -165,9 +164,9 @@ async function repairLegacyDamage(db: Database): Promise<void> {
     );
     let target = existing[0]?.id;
     if (!target) {
-      // Kein einziger Altar vorhanden: genau das Szenario, für das v4 den
-      // Default-Altar anlegen wollte. Jetzt wird es nachgeholt — die alten
-      // Platzierungen werden damit wieder sichtbar.
+      // Not a single altar exists: exactly the scenario for which v4 wanted to
+      // create the default altar. It is made up for now — the old
+      // placements become visible again as a result.
       target = crypto.randomUUID();
       const legacyIntention = (await tableExists(db, 'altar_intentions'))
         ? await db.select<{ text: string }[]>(
@@ -189,35 +188,35 @@ async function repairLegacyDamage(db: Database): Promise<void> {
     );
   }
 
-  // Platzierungen, deren Item verschwunden ist, sind nicht darstellbar.
+  // Placements whose item has vanished cannot be displayed.
   await db.execute(
     'DELETE FROM altar_placements WHERE item_id NOT IN (SELECT id FROM altar_items)'
   );
 
-  // --- Waisen in den Link-Tabellen ------------------------------------------
+  // --- Orphans in the link tables --------------------------------------------
   await db.execute(
     'DELETE FROM task_links WHERE task_id NOT IN (SELECT id FROM tasks)'
   );
-  // Das neue UNIQUE(task_id, target_id, target_type) verträgt keine Dubletten.
+  // The new UNIQUE(task_id, target_id, target_type) tolerates no duplicates.
   await db.execute(
     `DELETE FROM task_links WHERE rowid NOT IN (
        SELECT MIN(rowid) FROM task_links GROUP BY task_id, target_id, target_type
      )`
   );
 
-  // --- Laufende Nummern nachtragen ------------------------------------------
-  // Migration v9 hat `entry_number` einmalig aus der ROWID befuellt, aber kein
-  // INSERT hat die Spalte je geschrieben. Sichtbar war trotzdem immer eine
-  // Nummer, weil die Stores beim Lesen `ROWID as entry_number` darübergelegt
-  // haben. Dieser Alias ist weg — ohne Backfill verlieren alle seit v9
-  // angelegten Eintraege ihre angezeigte Nummer.
+  // --- Backfill sequence numbers ---------------------------------------------
+  // Migration v9 filled `entry_number` once from the ROWID, but no
+  // INSERT ever wrote the column. A number was still always visible,
+  // because the stores laid `ROWID as entry_number` over it when reading.
+  // That alias is gone — without a backfill, all entries created since
+  // v9 lose their displayed number.
   for (const table of ['journal_entries', 'wiki_articles', 'operations'] as const) {
     await db.execute(
       `UPDATE ${table} SET entry_number = ROWID WHERE entry_number IS NULL`
     );
   }
 
-  // --- Lose Enden -----------------------------------------------------------
+  // --- Loose ends ------------------------------------------------------------
   await db.execute(
     'UPDATE tasks SET parent_task_id = NULL WHERE parent_task_id NOT IN (SELECT id FROM tasks)'
   );
@@ -243,7 +242,7 @@ async function createNewTables(db: Database): Promise<void> {
 }
 
 async function copyData(db: Database): Promise<void> {
-  // Reihenfolge folgt V37_TABLES: Eltern vor Kindern, weil Foreign Keys aktiv sind.
+  // The order follows V37_TABLES: parents before children, because foreign keys are active.
   for (const table of REBUILT) {
     const from = `${table}_old`;
     switch (table) {
@@ -252,8 +251,8 @@ async function copyData(db: Database): Promise<void> {
         break;
 
       case 'altar_items':
-        // Die alte Spalte hielt den Kategorie-*Namen*. Erst per ID versuchen —
-        // falls doch schon eine ID drinsteht — dann per Name, sonst 'other'.
+        // The old column held the category *name*. Try by ID first —
+        // in case an ID is in there after all — then by name, otherwise 'other'.
         await copyTable(db, table, from, {
           category_id: `COALESCE(
             (SELECT c.id FROM altar_categories c WHERE c.id = o.category),
@@ -286,8 +285,8 @@ async function dropOldTables(db: Database): Promise<void> {
 }
 
 /**
- * Sind die Tabellen schon neu gebaut? Dann wurde v33 nur nicht mehr gestempelt,
- * etwa weil der Prozess zwischen `dropOldTables` und dem Stempeln endete.
+ * Are the tables already rebuilt? Then v33 was just not stamped any more,
+ * for example because the process ended between `dropOldTables` and the stamping.
  */
 async function alreadyRebuilt(db: Database): Promise<boolean> {
   for (const table of REBUILT) {

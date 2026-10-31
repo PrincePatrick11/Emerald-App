@@ -3,14 +3,14 @@ import TagInput from '../../editor/TagInput';
 import { useTagMap, visibleTags } from '../../../store/tagStore';
 import SidebarSection, { SidebarEmpty } from './SidebarSection';
 
-/** Auf/Zu der Tags — Lesen und Bearbeiten teilen es. */
+/** Open/closed state of the tags; reading and editing share it. */
 const OPEN_KEY = 'entry-sidebar-tags-open';
 
 /**
- * Die Tags im Bearbeiten: derselbe Abschnitt wie im Lesen (`TagsSection`,
- * gleicher Zähler, gleiches Auf/Zu), die Chips mit „×", darunter das Feld
- * „Tag hinzufügen …". Journal, Wiki, Operationen und die Seite einer Vorlage
- * zeigen es gleich.
+ * The tags when editing: the same section as when reading (`TagsSection`,
+ * same counter, same open/closed state), the chips with "×", and below them the field
+ * "Add tag …". Journal, wiki, operations and a template's page
+ * show it the same way.
  */
 export default function TagsField({ tags, onChange }: {
   tags: string[];
@@ -26,7 +26,7 @@ export default function TagsField({ tags, onChange }: {
   );
 }
 
-/** Die Tags in der Leseansicht: ein Abschnitt mit Zähler, darunter die Chips. */
+/** The tags in the read view: a section with a counter, the chips below it. */
 export function TagsSection({ tags }: { tags: string[] }) {
   const { t } = useTranslation();
   const count = visibleTags(tags, useTagMap()).length;
@@ -34,8 +34,8 @@ export function TagsSection({ tags }: { tags: string[] }) {
     <SidebarSection storageKey={OPEN_KEY} label={t('properties.tags')} count={count}>
       {count === 0
         ? <SidebarEmpty>{t('properties.noTags')}</SidebarEmpty>
-        // Wie eine Zeile: der Chip beginnt, wo die Icons der Zeilen beginnen
-        // (10px), und 24px Chip plus `py-1` ergeben ihre 32px Höhe.
+        // Like a row: the chip starts where the icons of the rows start
+        // (10px), and a 24px chip plus `py-1` gives their 32px height.
         : <div className="pl-2.5 pr-3 py-1"><TagInput tags={tags} onChange={() => {}} readOnly chipSize="row" /></div>}
     </SidebarSection>
   );

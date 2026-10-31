@@ -175,73 +175,71 @@ fn move_file(from: &Path, to: &Path) -> Result<(), String> {
     std::fs::remove_file(from).map_err(|e| format!("remove {}: {e}", from.display()))
 }
 
-// ── Uebernahme aus dem Verzeichnis des vorigen Identifiers ───────────────────
+// ── Taking over data from the previous identifier's directory ────────────────
 
-/// Der Identifier vor 0.2.1.
+/// The identifier before 0.2.1.
 ///
-/// Eingefrorene Geschichte, kein Konfigurationswert: unter diesem Namen liefen
-/// die zehn Releases bis v0.1.3.6, und so heissen deren Verzeichnisse bis
-/// heute. Wird der Identifier je erneut gewechselt, kommt eine weitere Stufe
-/// dazu — dieser Wert bleibt, was er ist.
+/// Frozen history, not a configuration value: the ten releases up to v0.1.3.6
+/// ran under this name, and that is what their directories are still called.
+/// Should the identifier ever change again, a further stage is added — this
+/// value stays what it is.
 const PREVIOUS_IDENTIFIER: &str = "com.emerald.magical-journal";
 
-/// So tief, wie hier je etwas liegen kann (`vaults/{id}/images/`), mit
-/// reichlich Luft. Die Grenze ist kein Geschmack, sondern der Boden unter der
-/// Rekursion: ein Stack-Overflow ist ein `abort` und kein `Err`, den
-/// [`adopt_previous_identifier_dirs`] auffangen koennte.
+/// As deep as anything can ever lie here (`vaults/{id}/images/`), with
+/// plenty of room. The limit is not a matter of taste but the floor under the
+/// recursion: a stack overflow is an `abort` and not an `Err` that
+/// [`adopt_previous_identifier_dirs`] could catch.
 const MAX_COPY_DEPTH: u32 = 16;
 
-/// Das Verzeichnis, das derselben Installation unter dem vorigen Identifier
-/// entspraeche.
+/// The directory that would correspond to the same installation under the
+/// previous identifier.
 ///
-/// Abgeleitet aus dem Namen des aktuellen und nicht aus einer zweiten
-/// Konstante: so steht der jetzige Identifier hier nirgends, und der naechste
-/// Wechsel fasst diese Zeile nicht an. Das `.dev` des Dev-Builds wandert mit,
-/// damit der nicht aus dem Produktivordner schoepft.
+/// Derived from the name of the current one and not from a second constant:
+/// that way the current identifier appears nowhere here, and the next change
+/// does not touch this line. The `.dev` of the dev build travels along, so
+/// that it does not draw from the production folder.
 fn previous_dir(current: &Path) -> Option<PathBuf> {
     let name = current.file_name()?.to_str()?;
     let suffix = if name.ends_with(".dev") { ".dev" } else { "" };
     Some(current.with_file_name(format!("{PREVIOUS_IDENTIFIER}{suffix}")))
 }
 
-/// Was von der alten Installation ueberhaupt uebernommen wird, am Namen
-/// erkannt.
+/// What is taken over from the old installation at all, recognised by name.
 ///
-/// Eine Liste und nicht "alles, was dort liegt", weil in diesem Verzeichnis
-/// nicht nur unsere Daten liegen. Auf Linux ist `app_data_dir` zugleich das
-/// Webview-Profil: `dirs::data_local_dir()` ist dort dieselbe Funktion wie
-/// `data_dir()`, und Tauri legt das Profil unter `LocalData/{identifier}` an.
-/// Der alte Ordner enthaelt dort also auch Cookies und den `localStorage` der
-/// Altinstallation — die haben im Profil der neuen nichts verloren, schon gar
-/// nicht, waehrend WebKitGTK es geoeffnet haelt.
+/// A list and not "everything that lies there", because this directory holds
+/// more than our data. On Linux `app_data_dir` is also the webview profile:
+/// `dirs::data_local_dir()` is the same function there as `data_dir()`, and
+/// Tauri creates the profile under `LocalData/{identifier}`. The old folder
+/// there therefore also contains cookies and the `localStorage` of the old
+/// installation — they have no business in the new one's profile, least of all
+/// while WebKitGTK holds it open.
 ///
-/// Dieselbe Liste beantwortet die Frage, ob hier schon uebernommen wurde.
-/// Kommt ein weiteres eigenes Artefakt hinzu, gehoert es hierher.
+/// The same list answers the question whether a takeover has already happened
+/// here. If another artefact of our own is added, it belongs here.
 fn is_own_data(name: &str) -> bool {
     name == VAULTS_FILE
         || name == IMAGES_SUBDIR
         || name == VAULTS_SUBDIR
-        // `emerald.db`, die flachen `emerald-{uuid}.db` des Alt-Layouts, ihre
-        // `-journal`-Beilagen und die `.pre-vNN.bak`-Sicherungen.
+        // `emerald.db`, the flat `emerald-{uuid}.db` of the old layout, their
+        // `-journal` companions and the `.pre-vNN.bak` backups.
         || name.starts_with("emerald")
 }
 
-/// Ob in `dir` noch nichts von uns liegt.
+/// Whether nothing of ours lies in `dir` yet.
 ///
-/// Bewusst nicht "das Verzeichnis ist leer". Auf Linux legt Tauri es an, bevor
-/// das erste Fenster steht, und WebKitGTK schreibt hinein; auf Windows und
-/// macOS koennen `desktop.ini` und `.DS_Store` darin auftauchen. Ein leerer
-/// Ordner waere also die falsche Frage — die richtige ist, ob eine fruehere
-/// Uebernahme oder ein Start der neuen Version hier schon etwas hinterlassen
-/// hat.
+/// Deliberately not "the directory is empty". On Linux Tauri creates it before
+/// the first window exists, and WebKitGTK writes into it; on Windows and macOS
+/// `desktop.ini` and `.DS_Store` can show up in it. An empty folder would thus
+/// be the wrong question — the right one is whether an earlier takeover or a
+/// start of the new version has already left something here.
 fn holds_no_data_yet(dir: &Path) -> bool {
     match std::fs::read_dir(dir) {
         Ok(entries) => !entries
             .flatten()
             .any(|e| e.file_name().to_str().is_some_and(is_own_data)),
-        // `read_dir` wirft fuer "gibt es nicht" und "darf ich nicht" denselben
-        // Fehler, `metadata` unterscheidet sie. Nicht da heisst frei; alles
-        // andere heisst: nichts anfassen.
+        // `read_dir` throws the same error for "does not exist" and "not
+        // allowed", `metadata` tells them apart. Not there means free; anything else
+        // means: touch nothing.
         Err(_) => matches!(
             std::fs::metadata(dir),
             Err(e) if e.kind() == std::io::ErrorKind::NotFound
@@ -249,8 +247,8 @@ fn holds_no_data_yet(dir: &Path) -> bool {
     }
 }
 
-/// Raeumt einen Pfad weg, gleich ob Datei oder Verzeichnis. Was es nicht gibt,
-/// ist nichts zu tun.
+/// Clears away a path, whether file or directory. If it does not exist,
+/// there is nothing to do.
 fn clear(path: &Path) -> Result<(), String> {
     let removed = match std::fs::symlink_metadata(path) {
         Ok(md) if md.is_dir() => std::fs::remove_dir_all(path),
@@ -260,9 +258,9 @@ fn clear(path: &Path) -> Result<(), String> {
     removed.map_err(|e| format!("clear {}: {e}", path.display()))
 }
 
-/// Kopiert einen Verzeichnisbaum. Symlinks bleiben liegen: hier steht keiner,
-/// und einem zu folgen hiesse aus einem Verzeichnis zu kopieren, ueber das die
-/// App nichts weiss.
+/// Copies a directory tree. Symlinks are left alone: there is none here,
+/// and following one would mean copying from a directory the app knows
+/// nothing about.
 fn copy_dir(from: &Path, to: &Path, depth: u32) -> Result<(), String> {
     if depth > MAX_COPY_DEPTH {
         return Err(format!("too deep at {}", from.display()));
@@ -270,8 +268,8 @@ fn copy_dir(from: &Path, to: &Path, depth: u32) -> Result<(), String> {
     std::fs::create_dir_all(to).map_err(|e| format!("create {}: {e}", to.display()))?;
     for entry in std::fs::read_dir(from).map_err(|e| format!("read {}: {e}", from.display()))? {
         let entry = entry.map_err(|e| e.to_string())?;
-        // `file_type` loest Symlinks nicht auf, sie sind hier also weder das
-        // eine noch das andere und fallen durch.
+        // `file_type` does not resolve symlinks, so they are neither one nor the
+        // other here and fall through.
         let kind = entry.file_type().map_err(|e| e.to_string())?;
         let target = to.join(entry.file_name());
         if kind.is_dir() {
@@ -284,13 +282,13 @@ fn copy_dir(from: &Path, to: &Path, depth: u32) -> Result<(), String> {
     Ok(())
 }
 
-/// Legt `source` unter `target` ab, ohne dass es dort je halb steht:
-/// geschrieben wird daneben, und erst das abschliessende `rename` — im selben
-/// Verzeichnis, also ein Namenstausch und keine Kopie — macht es sichtbar.
+/// Places `source` under `target` without it ever standing there half done:
+/// it is written alongside, and only the final `rename` — in the same
+/// directory, so a name swap and not a copy — makes it visible.
 ///
-/// Darauf ruht alles Weitere. Ein halb kopiertes `emerald.db` unter seinem
-/// richtigen Namen saehe beim naechsten Start wie eine gelungene Uebernahme
-/// aus und wuerde nie wiederholt.
+/// Everything else rests on this. A half-copied `emerald.db` under its right
+/// name would look like a successful takeover at the next start and would
+/// never be repeated.
 fn place_atomically(source: &Path, target: &Path) -> Result<(), String> {
     let name = target
         .file_name()
@@ -315,21 +313,19 @@ fn place_atomically(source: &Path, target: &Path) -> Result<(), String> {
     placed
 }
 
-/// Zieht die Pfade in der kopierten `vaults.json` von `old_root` auf
-/// `new_root` um.
+/// Moves the paths in the copied `vaults.json` from `old_root` to `new_root`.
 ///
-/// Die Datei speichert je Vault ein absolutes Verzeichnis. Fuer die ueblichen —
-/// vom Nutzer gewaehlt, meist unter `Dokumente` — aendert sich dadurch nichts.
-/// Ein aus dem Vor-0.2.1-Layout migrierter Vault liegt dagegen unter
-/// `{appDataDir}/vaults/{id}`, und damit steckt der alte Identifier in seinem
-/// gespeicherten Pfad. Bliebe der stehen, laese und schriebe die neue Version
-/// weiter im alten Ordner, waehrend die Kopie daneben still veraltete.
+/// The file stores an absolute directory per vault. For the usual ones — chosen
+/// by the user, mostly under `Documents` — nothing changes as a result. A vault
+/// migrated from the pre-0.2.1 layout, however, lives under
+/// `{appDataDir}/vaults/{id}`, and so the old identifier is in its stored path.
+/// If that stayed, the new version would keep reading and writing in the old
+/// folder while the copy next to it silently went stale.
 ///
-/// Eine unlesbare Datei ist kein Fehler. Sie bleibt dann, wie sie ist, und das
-/// ist die bessere Haelfte einer schlechten Wahl: die alte Installation stand
-/// schon vor derselben Datei, und eine Kopie mit unangetasteter Registry laesst
-/// sich von Hand richten — eine ausgefallene Uebernahme sieht dagegen aus wie
-/// ein leeres Journal.
+/// An unreadable file is not an error. It stays as it is, and that is the
+/// better half of a bad choice: the old installation already faced the same
+/// file, and a copy with an untouched registry can be fixed by hand — a failed
+/// takeover, by contrast, looks like an empty journal.
 fn retarget_registry(file: &Path, old_root: &Path, new_root: &Path) -> Result<(), String> {
     let raw = std::fs::read_to_string(file).map_err(|e| format!("read {}: {e}", file.display()))?;
     let mut doc: serde_json::Value = match serde_json::from_str(&raw) {
@@ -349,15 +345,13 @@ fn retarget_registry(file: &Path, old_root: &Path, new_root: &Path) -> Result<()
             continue;
         };
         if let Ok(rest) = path.strip_prefix(old_root) {
-            // `strip_prefix` und `join` arbeiten rein lexikalisch: ein `..` im
-            // gespeicherten Pfad ueberlebte die Umschreibung und zeigte danach
-            // aus dem Datenverzeichnis heraus. Anderswo waere das egal, hier
-            // nicht — diese Registry kommt aus einem Ordner, den die App nicht
-            // verwaltet, und `register_vaults` laesst jeden absoluten Pfad
-            // durch. Also nur umschreiben, was ausschliesslich aus
-            // gewoehnlichen Namen besteht; alles andere bleibt stehen, wie es
-            // war, und faellt dem Nutzer als fehlender Vault auf, statt still
-            // woandershin zu zeigen.
+            // `strip_prefix` and `join` work purely lexically: a `..` in the stored
+            // path would survive the rewrite and afterwards point out of the data
+            // directory. Elsewhere that would not matter, here it does — this registry
+            // comes from a folder the app does not manage, and `register_vaults` lets
+            // every absolute path through. So only rewrite what consists exclusively of
+            // ordinary names; everything else stays as it was, and the user notices it as
+            // a missing vault instead of it silently pointing somewhere else.
             if !rest
                 .components()
                 .all(|c| matches!(c, std::path::Component::Normal(_)))
@@ -370,29 +364,27 @@ fn retarget_registry(file: &Path, old_root: &Path, new_root: &Path) -> Result<()
         }
     }
 
-    // Nichts umgeschrieben heisst: die Datei nicht anfassen. Sonst schriebe
-    // diese Funktion sie allein fuer die Formatierung neu — und die aelteste
-    // Fassung der Registry, die es noch gibt, kennt `path` gar nicht, sondern
-    // `dbName` (siehe `migrate_vault_layout`). Die faellt hier durch, und sie
-    // soll unveraendert weiterreisen.
+    // Nothing rewritten means: do not touch the file. Otherwise this function
+    // would rewrite it just for the formatting — and the oldest version of the
+    // registry that still exists does not know `path` at all, but `dbName` (see
+    // `migrate_vault_layout`). It falls through here, and it should travel on
+    // unchanged.
     if !moved_any {
         return Ok(());
     }
 
-    // Beim Neuschreiben sortiert serde_json die Schluessel eines Objekts
-    // alphabetisch. Folgenlos — gelesen wird die Datei als JSON —, aber es
-    // erklaert, warum sie danach anders aussieht, als sie hineinging.
+    // When rewriting, serde_json sorts an object's keys alphabetically.
+    // Harmless — the file is read as JSON — but it explains why it looks
+    // different afterwards than it did going in.
     let text = serde_json::to_string_pretty(&doc).map_err(|e| e.to_string())?;
     std::fs::write(file, text).map_err(|e| format!("write {}: {e}", file.display()))
 }
 
-/// Legt die Registry als letztes ab — kopieren, umschreiben, dann sichtbar
-/// machen.
+/// Places the registry last — copy, rewrite, then make visible.
 ///
-/// Die Reihenfolge ist der Grund, warum es diese Funktion getrennt gibt: waere
-/// erst die Datei da und danach die Umschreibung, hinterliesse ein Abbruch
-/// dazwischen eine Registry, die auf den alten Ordner zeigt und dabei
-/// uebernommen aussieht.
+/// The order is the reason this function exists separately: if the file were
+/// there first and the rewrite after, an abort in between would leave a
+/// registry that points to the old folder and yet looks adopted.
 fn place_registry(source: &Path, target: &Path, previous: &Path, current: &Path) -> Result<(), String> {
     let staging = target.with_file_name(format!("{VAULTS_FILE}.adopting"));
     clear(&staging)?;
@@ -411,8 +403,8 @@ fn place_registry(source: &Path, target: &Path, previous: &Path, current: &Path)
     placed
 }
 
-/// Holt jeden eigenen Eintrag herueber und merkt sich in `placed`, was
-/// tatsaechlich abgelegt wurde — das braucht der Aufrufer zum Zuruecknehmen.
+/// Brings over every entry of our own and notes in `placed` what was
+/// actually placed — the caller needs that for rolling back.
 fn adopt_entries(previous: &Path, current: &Path, placed: &mut Vec<PathBuf>) -> Result<(), String> {
     std::fs::create_dir_all(current).map_err(|e| format!("create {}: {e}", current.display()))?;
 
@@ -427,7 +419,7 @@ fn adopt_entries(previous: &Path, current: &Path, placed: &mut Vec<PathBuf>) -> 
         if !is_own_data(&name) {
             continue;
         }
-        // Die Registry zum Schluss, siehe `place_registry`.
+        // The registry last, see `place_registry`.
         if name == VAULTS_FILE {
             registry = Some(entry.path());
             continue;
@@ -445,29 +437,29 @@ fn adopt_entries(previous: &Path, current: &Path, placed: &mut Vec<PathBuf>) -> 
     Ok(())
 }
 
-/// Uebernimmt ein Verzeichnis, wenn es das des Vorgaengers gibt und im eigenen
-/// noch nichts von uns liegt.
+/// Adopts a directory if the predecessor's exists and nothing of ours lies
+/// in our own yet.
 ///
-/// **Kopiert, verschiebt nicht.** `previous` wird nur gelesen. Die alte
-/// Installation bleibt lauffaehig und ist die Rueckfallebene.
+/// **Copies, does not move.** `previous` is only read. The old installation
+/// stays runnable and is the fallback.
 ///
-/// **Ganz oder gar nicht.** Jeder einzelne Eintrag entsteht neben seinem Platz
-/// und wird per `rename` sichtbar; scheitert einer, wird zurueckgenommen, was
-/// dieser Lauf abgelegt hat. Danach liegt hier wieder nichts von uns, und der
-/// naechste Start versucht es erneut. Das Zuruecknehmen ist gefahrlos, weil
-/// die Pruefung oben zusichert, dass vor diesem Lauf nichts von uns hier lag.
+/// **All or nothing.** Every single entry is created next to its place and
+/// made visible by `rename`; if one fails, what this run placed is rolled
+/// back. Afterwards nothing of ours lies here again, and the next start tries
+/// again. The rollback is safe because the check above guarantees that nothing
+/// of ours lay here before this run.
 ///
-/// **Nur die eigenen Daten**, siehe [`is_own_data`] — der alte Ordner ist auf
-/// Linux zugleich das Webview-Profil der Altinstallation.
+/// **Only our own data**, see [`is_own_data`] — on Linux the old folder is also
+/// the old installation's webview profile.
 fn adopt_into(current: &Path) -> Result<(), String> {
     let Some(previous) = previous_dir(current) else {
         return Ok(());
     };
-    // `symlink_metadata` und nicht `is_dir()`: das folgte einem Symlink, und
-    // der Wurzelordner ist der einzige, den `copy_dir` nicht selbst
-    // ueberspringt. Zeigte er auf einen Vorfahren des Zielordners, kopierte
-    // sich der Zwischenordner in sich selbst. Die Metadaten eines Links sind
-    // nie die eines Verzeichnisses, die Bedingung faengt also beides.
+    // `symlink_metadata` and not `is_dir()`: that would follow a symlink, and
+    // the root folder is the only one that `copy_dir` does not skip itself. If it
+    // pointed to an ancestor of the target folder, the intermediate folder would
+    // copy itself into itself. A link's metadata is never that of a directory, so
+    // the condition catches both.
     if !std::fs::symlink_metadata(&previous).is_ok_and(|m| m.is_dir()) {
         return Ok(());
     }
@@ -485,31 +477,31 @@ fn adopt_into(current: &Path) -> Result<(), String> {
     outcome
 }
 
-/// Uebernimmt beim ersten Start die Daten aus dem Verzeichnis des vorigen
-/// Identifiers.
+/// On the first start, takes over the data from the previous identifier's
+/// directory.
 ///
-/// Tauri leitet `app_data_dir` und `app_config_dir` aus dem `identifier` ab.
-/// Mit dem Wechsel auf `com.emerald.app` schaut die App also woanders nach als
-/// jede Installation bis v0.1.3.6 — deren `vaults.json` liegt unversehrt
-/// nebenan, und ohne diesen Schritt begruesste die neue Version einen
-/// langjaehrigen Nutzer mit einem leeren Journal.
+/// Tauri derives `app_data_dir` and `app_config_dir` from the `identifier`.
+/// With the switch to `com.emerald.app` the app therefore looks somewhere else
+/// than every installation up to v0.1.3.6 — their `vaults.json` lies intact
+/// next door, and without this step the new version would greet a long-time
+/// user with an empty journal.
 ///
-/// Was uebernommen wird und unter welchen Zusicherungen, steht an
-/// [`adopt_into`]. Hier bleibt das Aeussere:
+/// What is taken over and under which guarantees is documented at
+/// [`adopt_into`]. What remains here is the outside:
 ///
-/// **Bricht den Start nicht ab.** Eine misslungene Uebernahme ist ein leeres
-/// Journal neben unversehrten Daten und von Hand zu beheben; ein `?` an dieser
-/// Stelle waere eine App, die gar nicht erst hochkommt.
+/// **Does not abort the start.** A failed takeover is an empty journal next to
+/// intact data and can be fixed by hand; a `?` at this point would be an app
+/// that does not come up at all.
 ///
-/// **Laeuft, bevor es ein Fenster gibt** — als Plugin-`setup`, siehe den
-/// Aufruf in `lib.rs`. Das Kopieren blockiert dadurch keinen Fensterthread und
-/// niemand kann auf eine eingefrorene Oberflaeche sehen.
+/// **Runs before there is a window** — as a plugin `setup`, see the call in
+/// `lib.rs`. Copying thus blocks no window thread and nobody can look at a
+/// frozen UI.
 pub fn adopt_previous_identifier_dirs(app: &tauri::AppHandle) {
-    // Auf Windows und macOS sind beide dasselbe Verzeichnis, auf Linux nicht —
-    // siehe `migrate_vault_layout`. Doppelt liefe harmlos (der zweite Durchgang
-    // faende das Ziel nicht mehr frei), aber die Fehlermeldung waere eine zu
-    // viel. Bewusst `contains` und nicht `dedup`: das entfernt nur benachbarte
-    // Gleiche und griffe bei einem dritten Eintrag still daneben.
+    // On Windows and macOS both are the same directory, on Linux not — see
+    // `migrate_vault_layout`. Running twice would be harmless (the second pass
+    // would no longer find the target free), but the error message would be one
+    // too many. Deliberately `contains` and not `dedup`: that only removes
+    // adjacent equals and would silently miss with a third entry.
     let mut dirs: Vec<PathBuf> = Vec::new();
     for dir in [
         app.path().app_data_dir().ok(),
@@ -544,18 +536,18 @@ pub fn register_vaults(app: tauri::AppHandle, vaults: Vec<VaultEntry>) -> Result
     let previous = std::mem::take(&mut *map);
     for entry in vaults {
         let path = PathBuf::from(&entry.path);
-        // Ein relativer Pfad wuerde gegen das Arbeitsverzeichnis des Prozesses
-        // aufgeloest — auch ein handgeschriebenes `~`, das hier niemand
-        // expandiert. Ein Vault-Pfad ist immer absolut.
+        // A relative path would be resolved against the process's working
+        // directory — also a hand-written `~`, which nobody expands here. A vault
+        // path is always absolute.
         if !is_valid_vault_id(&entry.id) || !path.is_absolute() {
             continue;
         }
         map.insert(entry.id, path);
     }
-    // Ein Schlüssel im Speicher gehört zu dem Ordner, in dem er entsperrt
-    // wurde. Zeigt die Id jetzt woandershin (oder gibt es sie nicht mehr),
-    // wird er vergessen — sonst würden Bilder und Entwürfe im neuen Ordner
-    // unter einem Schlüssel versiegelt, den dessen `vault.key` nicht kennt.
+    // A key in memory belongs to the folder in which it was unlocked. If the
+    // id now points elsewhere (or no longer exists), it is forgotten — otherwise
+    // images and drafts would be sealed in the new folder under a key that its
+    // `vault.key` does not know.
     let vault_keys = app.state::<crate::keys::VaultKeys>();
     for (id, old_path) in &previous {
         if map.get(id) != Some(old_path) {
@@ -572,11 +564,11 @@ pub fn register_vaults(app: tauri::AppHandle, vaults: Vec<VaultEntry>) -> Result
 pub fn create_vault_dirs(app: tauri::AppHandle, vault_id: String) -> Result<(), String> {
     let dir = vault_dir(&app, &vault_id)?;
     std::fs::create_dir_all(dir.join(IMAGES_SUBDIR)).map_err(|e| e.to_string())?;
-    // `backup/` gehoert von Anfang an dazu, nicht erst zum ersten Export — so
-    // ist die Struktur eines Vault-Ordners immer dieselbe. Fuer Vaults
-    // ausserhalb der erlaubten Wurzeln bleibt er folgenlos leer (der Export
-    // bietet ihn dort nicht an, siehe `ensure_backup_dir`), und ein leerer
-    // `backup/` steht dem Loeschen des Ordners nicht im Weg.
+    // `backup/` belongs from the start, not only from the first export — that
+    // way the structure of a vault folder is always the same. For vaults outside
+    // the allowed roots it stays empty without consequence (the export does not
+    // offer it there, see `ensure_backup_dir`), and an empty `backup/` does not
+    // stand in the way of deleting the folder.
     std::fs::create_dir_all(dir.join(BACKUP_SUBDIR)).map_err(|e| e.to_string())
 }
 
@@ -609,25 +601,25 @@ pub fn default_vault_dir(app: tauri::AppHandle, vault_id: String) -> Result<Stri
 #[tauri::command]
 pub fn ensure_backup_dir(app: tauri::AppHandle, vault_id: String) -> Result<String, String> {
     let vault = vault_dir(&app, &vault_id)?;
-    // Wie ueberall hier: einen verschwundenen Vault-Ordner nicht wiederbeleben
-    // (siehe `images_dir`), nur den Unterordner darin anlegen.
+    // As everywhere here: do not resurrect a vanished vault folder (see
+    // `images_dir`), only create the subfolder in it.
     directory_state(&vault)?;
 
-    // Der Dialog ist nur die halbe Strecke: geschrieben wird die Datei danach
-    // von `write_file`, und das ist auf die festen Wurzeln begrenzt (siehe
-    // `resolve_allowed_roots` — Vault-Verzeichnisse erweitern sie bewusst
-    // nicht). Einem Vault ausserhalb — anderes Laufwerk, Ordner ausserhalb von
-    // `~` — hier ein Ziel anzubieten, hiesse eines anbieten, das der
-    // Schreibbefehl anschliessend verweigert. Der `Err` landet im Frontend im
-    // Fallback (blosser Dateiname), bevor ein toter `backup/`-Ordner entsteht.
+    // The dialog is only half the way: the file is then written by
+    // `write_file`, and that is limited to the fixed roots (see
+    // `resolve_allowed_roots` — vault directories deliberately do not extend
+    // them). Offering a target for a vault outside — another drive, a folder
+    // outside `~` — would mean offering one that the write command then refuses.
+    // The `Err` ends up in the frontend's fallback (bare file name) before a dead
+    // `backup/` folder is created.
     let allowed = crate::resolve_allowed_roots(&app)?;
     let canonical = std::fs::canonicalize(&vault).map_err(|e| e.to_string())?;
     if !crate::is_within_allowed_roots(&canonical, &allowed) {
         return Err("vault outside allowed storage roots".to_string());
     }
-    // Dasselbe für die zweite Regel des Schreibbefehls: im App-Datenordner
-    // nimmt er nur `vaults/` an. Ein Vault, der dort daneben liegt, bekäme
-    // sonst ein Ziel angeboten, das anschliessend verweigert wird.
+    // The same for the write command's second rule: in the app data folder it
+    // only accepts `vaults/`. A vault lying next to it there would otherwise be
+    // offered a target that is then refused.
     crate::check_app_data_write(&app, &canonical.join(BACKUP_SUBDIR))?;
 
     let dir = vault.join(BACKUP_SUBDIR);
@@ -788,9 +780,9 @@ pub fn migrate_vault_layout(
 /// Returns whether the vault directory itself is gone, so the UI can say "the
 /// folder stayed".
 ///
-/// Ein halb geloeschter Vault kann nicht als leerer wiederauferstehen: der
-/// Aufrufer nimmt ihn nach jedem `Ok` aus `vaults.json`, und ein `Err` faellt
-/// nur, solange die Datenbank noch liegt (Loeschen gesperrt/verweigert).
+/// A half-deleted vault cannot come back as an empty one: the caller takes
+/// it out of `vaults.json` after every `Ok`, and an `Err` only occurs while
+/// the database is still there (deletion locked/refused).
 #[tauri::command]
 pub fn delete_vault_files(app: tauri::AppHandle, vault_id: String) -> Result<bool, String> {
     let dir = vault_dir(&app, &vault_id)?;
@@ -798,8 +790,8 @@ pub fn delete_vault_files(app: tauri::AppHandle, vault_id: String) -> Result<boo
         return Err("not a vault directory: no database found".to_string());
     }
 
-    // Die Datenbank zuerst: sie ist das einzige Stueck, das noch gesperrt sein
-    // kann, und ein Fehlschlag laesst dann wenigstens die Bilder stehen.
+    // The database first: it is the only piece that can still be locked, and
+    // a failure then at least leaves the images in place.
     let journal = format!("{DB_FILE}-journal");
     for name in [DB_FILE, journal.as_str()] {
         let file = dir.join(name);
@@ -808,12 +800,11 @@ pub fn delete_vault_files(app: tauri::AppHandle, vault_id: String) -> Result<boo
         }
     }
 
-    // Ab hier kein `?` mehr: die Datenbank ist bereits weg, und der Aufrufer
-    // nimmt den Vault nur nach einem `Ok` aus `vaults.json`. Ein Fehler ab
-    // dieser Stelle liesse den Eintrag stehen, und das naechste `getDb()`
-    // legte in den Ordner eine frische, leere Datenbank — der Zustand, den
-    // die Invariante oben ausschliesst. Was sich nicht loeschen laesst,
-    // bleibt eben liegen, samt Ordner.
+    // No more `?` from here: the database is already gone, and the caller only
+    // takes the vault out of `vaults.json` after an `Ok`. An error from this
+    // point on would leave the entry in place, and the next `getDb()` would put
+    // a fresh, empty database into the folder — the state that the invariant
+    // above rules out. What cannot be deleted simply stays, folder included.
     let images = dir.join(IMAGES_SUBDIR);
     if let Ok(entries) = std::fs::read_dir(&images) {
         for entry in entries.flatten() {
@@ -828,8 +819,8 @@ pub fn delete_vault_files(app: tauri::AppHandle, vault_id: String) -> Result<boo
     for name in [SETTINGS_FILE, SETTINGS_TEMP_FILE, DRAFTS_FILE, DRAFTS_TEMP_FILE, crate::keys::KEY_FILE, crate::keys::KEY_TEMP_FILE] {
         std::fs::remove_file(dir.join(name)).ok();
     }
-    // Was ohne den Schlüssel nichts mehr taugt: Arbeitskopien, Sicherungen
-    // vor Migrationen, Reste einer abgebrochenen Neuverschlüsselung.
+    // What is useless without the key: working copies, backups before
+    // migrations, remains of an aborted re-encryption.
     for suffix in ["", "-journal", "-wal", "-shm"] {
         std::fs::remove_file(dir.join(format!("{IMPORT_STAGING_FILE}{suffix}"))).ok();
     }
@@ -841,13 +832,13 @@ pub fn delete_vault_files(app: tauri::AppHandle, vault_id: String) -> Result<boo
         }
     }
     crate::reencrypt::remove_leftovers(&dir);
-    // Mit den Dateien ist der Schlüssel wertlos — auch der gemerkte.
+    // With the files gone the key is worthless — the remembered one too.
     crate::keys::discard(&app, &vault_id);
 
-    // Ein *leerer* `backup/` — seit `create_vault_dirs` ihn mit anlegt, der
-    // Normalfall ohne Export — soll das Entfernen des Ordners nicht
-    // verhindern. `remove_dir` scheitert, sobald ein Backup darin liegt, und
-    // genau dann bleibt beides stehen.
+    // An *empty* `backup/` — the normal case without an export, since
+    // `create_vault_dirs` creates it too — should not prevent the folder from
+    // being removed. `remove_dir` fails as soon as a backup lies in it, and
+    // exactly then both stay.
     std::fs::remove_dir(dir.join(BACKUP_SUBDIR)).ok();
 
     Ok(std::fs::remove_dir(&dir).is_ok())
@@ -914,7 +905,7 @@ fn read_drafts_in(dir: &Path, key: Option<&crate::crypto::Key>) -> VaultFileRead
     let file = dir.join(DRAFTS_FILE);
     let bytes = match std::fs::symlink_metadata(&file) {
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => return VaultFileRead::Missing,
-        // Versiegelt ist die Datei um Kopf und Tag größer als ihr Inhalt.
+        // A sealed file is larger than its content by header and tag.
         Ok(md) if md.is_file() && md.len() <= DRAFTS_MAX_BYTES + 64 => match std::fs::read(&file) {
             Ok(bytes) => bytes,
             Err(e) => {
@@ -1016,9 +1007,9 @@ pub(crate) fn patiently<T>(mut op: impl FnMut() -> std::io::Result<T>) -> std::i
 /// One of the vault's own JSON files (`settings.json`, `drafts.json`).
 fn read_json_in(dir: &Path, name: &str, max_bytes: u64) -> VaultFileRead {
     let file = dir.join(name);
-    // `symlink_metadata`, nicht `metadata`: ein Vault-Ordner kann von
-    // anderswo stammen, und ein Link darin soll nicht verfolgt werden — wie
-    // bei `guarded_read_path` in `lib.rs`.
+    // `symlink_metadata`, not `metadata`: a vault folder can come from
+    // elsewhere, and a link in it should not be followed — as with
+    // `guarded_read_path` in `lib.rs`.
     match std::fs::symlink_metadata(&file) {
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => VaultFileRead::Missing,
         Ok(md) if md.is_file() && md.len() <= max_bytes => match std::fs::read_to_string(&file) {
@@ -1065,16 +1056,16 @@ pub(crate) fn write_atomic_anywhere(dir: &Path, name: &str, temp_name: &str, byt
 /// the data is flushed, because `write` has merely filled a cache by then.
 fn sync_refusal_is_harmless(error: &std::io::Error) -> bool {
     use std::io::ErrorKind;
-    // ENOTTY: was ein Dateisystem antwortet, das den Flush-Aufruf nicht kennt.
-    // Dieselbe Zahl unter Linux und macOS; unter Windows hieße 25 etwas anderes.
+    // ENOTTY: what a file system answers that does not know the flush call.
+    // The same number on Linux and macOS; on Windows 25 would mean something else.
     const ENOTTY: i32 = 25;
-    // macOS: ENOTSUP (45) ist dort nicht EOPNOTSUPP (102), und std bildet nur
-    // EOPNOTSUPP und ENOSYS auf `Unsupported` ab. So antwortet F_FULLFSYNC —
-    // das ist `sync_all` unter macOS — auf einer SMB-Freigabe.
+    // macOS: ENOTSUP (45) is not EOPNOTSUPP (102) there, and std maps only
+    // EOPNOTSUPP and ENOSYS to `Unsupported`. This is how F_FULLFSYNC — which is
+    // `sync_all` on macOS — answers on an SMB share.
     const MACOS_ENOTSUP: i32 = 45;
     // ERROR_INVALID_FUNCTION, ERROR_NOT_SUPPORTED.
     const WINDOWS_NOT_SUPPORTED: [i32; 2] = [1, 50];
-    // InvalidInput: EINVAL — so antwortet `fsync`, wenn das Ziel kein Synchronisieren kennt.
+    // InvalidInput: EINVAL — this is how `fsync` answers when the target has no notion of syncing.
     matches!(error.kind(), ErrorKind::Unsupported | ErrorKind::InvalidInput)
         || (cfg!(unix) && error.raw_os_error() == Some(ENOTTY))
         || (cfg!(target_os = "macos") && error.raw_os_error() == Some(MACOS_ENOTSUP))
@@ -1085,20 +1076,20 @@ fn sync_refusal_is_harmless(error: &std::io::Error) -> bool {
 fn write_atomic_with(dir: &Path, name: &str, temp_name: &str, bytes: &[u8], must_sync: bool) -> Result<(), String> {
     use std::io::Write;
 
-    // Was unter dem Temp-Namen liegt — Rest eines Absturzes oder ein
-    // untergeschobener Link —, weg damit (ein Link verschwindet, sein Ziel
-    // bleibt). `create_new` scheitert, falls dazwischen wieder etwas auftaucht,
-    // statt einem Link hinterherzuschreiben.
+    // Whatever lies under the temp name — a crash remnant or a planted
+    // link — get rid of it (a link disappears, its target stays). `create_new`
+    // fails if something shows up again in between, instead of writing after a
+    // link.
     let temp = dir.join(temp_name);
     std::fs::remove_file(&temp).ok();
     let written = std::fs::OpenOptions::new()
         .write(true)
         .create_new(true)
         .open(&temp)
-        // Erst auf der Platte, dann umbenennen: sonst kann nach einem
-        // Stromausfall eine leere Datei unter dem Zielnamen stehen — bei
-        // `vault.key` hieße das, der Vault ist verloren. Ohne `must_sync` darf
-        // ein Volume den Flush ablehnen — jeder andere Fehler dabei zählt.
+        // First onto the disk, then rename: otherwise an empty file can sit under
+        // the target name after a power failure — for `vault.key` that would mean the
+        // vault is lost. Without `must_sync` a volume may refuse the flush — any
+        // other error there counts.
         .and_then(|mut file| {
             file.write_all(bytes)?;
             match file.sync_all() {
@@ -1110,15 +1101,15 @@ fn write_atomic_with(dir: &Path, name: &str, temp_name: &str, bytes: &[u8], must
         std::fs::remove_file(&temp).ok();
         return Err(format!("write {}: {e}", temp.display()));
     }
-    // `rename` ersetzt eine vorhandene Datei auf allen drei Plattformen — auch
-    // einen Link unter dem Zielnamen, ohne ihm zu folgen.
+    // `rename` replaces an existing file on all three platforms — also a
+    // link under the target name, without following it.
     let target = dir.join(name);
     patiently(|| std::fs::rename(&temp, &target)).map_err(|e| {
         std::fs::remove_file(&temp).ok();
         format!("replace {name}: {e}")
     })?;
-    // Unter Unix steht der neue Name erst fest, wenn der Ordner selbst auf der
-    // Platte ist. Windows hält das mit dem Umbenennen fest.
+    // On Unix the new name is only settled once the folder itself is on the
+    // disk. Windows records that with the rename.
     #[cfg(unix)]
     if let Ok(dir) = std::fs::File::open(dir) {
         dir.sync_all().ok();
@@ -1126,12 +1117,13 @@ fn write_atomic_with(dir: &Path, name: &str, temp_name: &str, bytes: &[u8], must
     Ok(())
 }
 
-/// Entfernt die Arbeitskopie eines Backup-Imports (`importStaging.ts`) samt
-/// Journal. Fehlt sie, ist das kein Fehler — vor jedem Import wird aufgeräumt,
-/// was ein abgestürzter Lauf liegen ließ, und meist liegt da nichts.
+/// Removes the working copy of a backup import (`importStaging.ts`) along
+/// with its journal. If it is missing, that is no error — before every import,
+/// whatever a crashed run left lying around is cleaned up, and usually there
+/// is nothing.
 ///
-/// Der Dateiname ist fest: der Befehl kann nichts anderes löschen als diese
-/// Kopie im registrierten Vault-Ordner.
+/// The file name is fixed: the command can delete nothing other than this copy
+/// in the registered vault folder.
 #[tauri::command]
 pub fn discard_import_staging(app: tauri::AppHandle, vault_id: String) -> Result<(), String> {
     let dir = vault_dir(&app, &vault_id)?;
@@ -1147,9 +1139,9 @@ pub fn discard_import_staging(app: tauri::AppHandle, vault_id: String) -> Result
     Ok(())
 }
 
-/// Die Versionsnummer einer Migrations-Sicherung (`emerald.db.pre-v42.bak`,
-/// angelegt von `backupDatabaseFile` in `dbRebuild.ts`) — `None` für jeden
-/// anderen Namen.
+/// The version number of a migration backup (`emerald.db.pre-v42.bak`,
+/// created by `backupDatabaseFile` in `dbRebuild.ts`) — `None` for every other
+/// name.
 pub(crate) fn migration_backup_version(name: &str) -> Option<u32> {
     name.strip_prefix(DB_FILE)?
         .strip_prefix(".pre-v")?
@@ -1158,9 +1150,9 @@ pub(crate) fn migration_backup_version(name: &str) -> Option<u32> {
         .ok()
 }
 
-/// Löscht in `dir` alle Migrations-Sicherungen bis auf die jüngste und gibt
-/// zurück, wie viele es waren. Nur gewöhnliche Dateien genau dieses Namens —
-/// ein Symlink oder Ordner gleichen Namens bleibt stehen.
+/// Deletes in `dir` all migration backups except the newest and returns
+/// how many there were. Only ordinary files of exactly this name — a symlink
+/// or folder of the same name stays.
 fn prune_migration_backups_in(dir: &Path) -> Result<u32, String> {
     let entries = match std::fs::read_dir(dir) {
         Ok(entries) => entries,
@@ -1183,11 +1175,11 @@ fn prune_migration_backups_in(dir: &Path) -> Result<u32, String> {
     Ok(found.len() as u32)
 }
 
-/// Jede Migration, die umbaut, legt vorher eine volle Kopie der Datenbank an
-/// (samt eingebetteter Bilder). Ist der Vault danach geöffnet, braucht es nur
-/// noch die jüngste — die älteren lagen bisher für immer im Vault-Ordner.
-/// Löscht nichts außerhalb des registrierten Vault-Ordners und nichts, was
-/// nicht genau `emerald.db.pre-vNN.bak` heißt.
+/// Every migration that rebuilds creates a full copy of the database
+/// beforehand (embedded images included). Once the vault is open afterwards,
+/// only the newest is needed — the older ones used to lie in the vault folder
+/// forever. Deletes nothing outside the registered vault folder and nothing
+/// that is not named exactly `emerald.db.pre-vNN.bak`.
 #[tauri::command]
 pub fn prune_migration_backups(app: tauri::AppHandle, vault_id: String) -> Result<u32, String> {
     prune_migration_backups_in(&vault_dir(&app, &vault_id)?)
@@ -1200,9 +1192,9 @@ mod tests {
 
     static NEXT: AtomicUsize = AtomicUsize::new(0);
 
-    /// Ein eigenes Elternverzeichnis je Test. `adopt_into` leitet den Quell-
-    /// aus dem Zielordner ab und erwartet beide nebeneinander, ein gemeinsamer
-    /// Temp-Ordner liesse die Tests einander ins Handwerk pfuschen.
+    /// A parent directory of its own per test. `adopt_into` derives the source
+    /// from the target folder and expects both side by side; a shared temp folder
+    /// would let the tests interfere with each other.
     fn scratch() -> PathBuf {
         let n = NEXT.fetch_add(1, Ordering::Relaxed);
         let dir = std::env::temp_dir().join(format!("emerald-adopt-{}-{n}", std::process::id()));
@@ -1252,7 +1244,7 @@ mod tests {
     fn drafts_round_trip_and_an_empty_object_removes_the_file() {
         let dir = scratch();
         assert_eq!(read_json_in(&dir, DRAFTS_FILE, DRAFTS_MAX_BYTES), VaultFileRead::Missing);
-        // Nichts da, nichts zu entfernen — kein Fehler.
+        // Nothing there, nothing to remove — no error.
         write_drafts_in(&dir, "{}", None).unwrap();
         write_drafts_in(&dir, r#"{"version":1,"templates":{}}"#, None).unwrap();
         assert_eq!(
@@ -1263,7 +1255,7 @@ mod tests {
         write_drafts_in(&dir, "{}", None).unwrap();
         assert!(!dir.join(DRAFTS_FILE).exists());
         assert!(write_drafts_in(&dir, "[]", None).is_err());
-        // Die Einstellungen daneben bleiben unberührt.
+        // The settings next to it stay untouched.
         write_settings_in(&dir, r#"{"version":1}"#).unwrap();
         write_drafts_in(&dir, r#"{"version":1}"#, None).unwrap();
         write_drafts_in(&dir, "{}", None).unwrap();
@@ -1274,7 +1266,7 @@ mod tests {
     fn drafts_are_sealed_in_an_encrypted_vault() {
         let dir = scratch();
         let key = crate::crypto::random_key();
-        // Ein Klartext-Rest aus der Zeit vor der Verschlüsselung wird noch gelesen.
+        // A plain-text remnant from before encryption is still read.
         write_drafts_in(&dir, r#"{"version":1,"old":true}"#, None).unwrap();
         assert_eq!(
             read_drafts_in(&dir, Some(&key)),
@@ -1287,7 +1279,7 @@ mod tests {
             read_drafts_in(&dir, Some(&key)),
             VaultFileRead::Found { contents: r#"{"version":1,"secret":"GEHEIM-DRAFT"}"#.to_string() }
         );
-        // Ohne den richtigen Schlüssel: unlesbar, nicht Klartext.
+        // Without the right key: unreadable, not plain text.
         assert_eq!(read_drafts_in(&dir, Some(&crate::crypto::random_key())), VaultFileRead::Unreadable);
         assert!(write_drafts_in(&dir, "[]", Some(&key)).is_err());
         write_drafts_in(&dir, "{}", Some(&key)).unwrap();
@@ -1383,8 +1375,8 @@ mod tests {
         let _ = std::fs::remove_dir_all(&root);
     }
 
-    /// Der Fall, der ueber "einmalig" entscheidet: laeuft die Uebernahme ein
-    /// zweites Mal, ueberschriebe sie das, was der Nutzer seither angelegt hat.
+    /// The case that decides on "once": if the takeover ran a second time, it
+    /// would overwrite what the user has created since.
     #[test]
     fn keeps_its_hands_off_a_directory_that_already_holds_something() {
         let root = scratch();
@@ -1413,8 +1405,8 @@ mod tests {
         let _ = std::fs::remove_dir_all(&root);
     }
 
-    /// Nur Pfade, die im alten Verzeichnis lagen, werden umgeschrieben — die
-    /// vom Nutzer gewaehlten Vaults liegen woanders und bleiben, wo sie sind.
+    /// Only paths that lay in the old directory are rewritten — the vaults
+    /// chosen by the user lie elsewhere and stay where they are.
     #[test]
     fn moves_only_the_paths_that_pointed_into_the_old_directory() {
         let root = scratch();
@@ -1443,9 +1435,9 @@ mod tests {
         let _ = std::fs::remove_dir_all(&root);
     }
 
-    /// Ein `..` im gespeicherten Pfad ueberlebte `strip_prefix`/`join` und
-    /// zeigte danach aus dem Datenverzeichnis heraus. Solche Eintraege bleiben
-    /// unangetastet stehen, statt still woandershin zu zeigen.
+    /// A `..` in the stored path survived `strip_prefix`/`join` and then
+    /// pointed out of the data directory. Such entries stay untouched instead of
+    /// silently pointing elsewhere.
     #[test]
     fn refuses_to_retarget_a_path_that_climbs_out() {
         let root = scratch();
@@ -1464,10 +1456,9 @@ mod tests {
         let _ = std::fs::remove_dir_all(&root);
     }
 
-    /// Der Linux-Fall: das Zielverzeichnis ist dort zugleich das
-    /// Webview-Profil und existiert schon, bevor das erste Fenster steht.
-    /// Fremde Dateien darin duerfen die Uebernahme nicht verhindern — und
-    /// unsere duerfen ihre nicht ueberschreiben.
+    /// The Linux case: the target directory is also the webview profile there
+    /// and exists before the first window does. Foreign files in it must not
+    /// prevent the takeover — and ours must not overwrite theirs.
     #[test]
     fn foreign_files_in_the_target_neither_block_nor_get_touched() {
         let root = scratch();
@@ -1488,9 +1479,9 @@ mod tests {
         let _ = std::fs::remove_dir_all(&root);
     }
 
-    /// Eine Registry, die sich nicht lesen laesst, darf die Uebernahme nicht
-    /// verhindern — sonst faende der Nutzer ein leeres Journal statt einer
-    /// Kopie, die er von Hand richten kann.
+    /// A registry that cannot be read must not prevent the takeover —
+    /// otherwise the user would find an empty journal instead of a copy they can
+    /// fix by hand.
     #[test]
     fn an_unreadable_registry_still_gets_copied() {
         let root = scratch();
@@ -1518,12 +1509,12 @@ mod tests {
             assert!(!sync_refusal_is_harmless(&Error::from(kind)), "{kind:?}");
         }
 
-        // Die Betriebssystem-Codes selbst — sie hängen daran, wie std sie auf
-        // `ErrorKind` abbildet, und das soll hier rot werden, nicht beim Nutzer.
+        // The operating system codes themselves — they depend on how std maps
+        // them to `ErrorKind`, and that should turn red here, not at the user's.
         let harmless = |code: i32| sync_refusal_is_harmless(&Error::from_raw_os_error(code));
         #[cfg(unix)]
         {
-            // ENOTTY, EINVAL — und nicht: EIO, ENOSPC.
+            // ENOTTY, EINVAL — and not: EIO, ENOSPC.
             assert!(harmless(25) && harmless(22));
             assert!(!harmless(5) && !harmless(28));
         }
@@ -1534,7 +1525,7 @@ mod tests {
         #[cfg(windows)]
         {
             // ERROR_INVALID_FUNCTION, ERROR_NOT_SUPPORTED, ERROR_CALL_NOT_IMPLEMENTED —
-            // und nicht: ERROR_DISK_FULL, ERROR_NETNAME_DELETED.
+            // and not: ERROR_DISK_FULL, ERROR_NETNAME_DELETED.
             assert!(harmless(1) && harmless(50) && harmless(120));
             assert!(!harmless(112) && !harmless(64));
         }
@@ -1546,7 +1537,7 @@ mod tests {
         for name in ["emerald.db.pre-v33.bak", "emerald.db.pre-v9.bak", "emerald.db.pre-v42.bak"] {
             write(&dir.join(name), "db");
         }
-        // Nicht dieses Muster, oder kein Dateiname in Ordnung: bleibt.
+        // Not this pattern, or no file name in order: stays.
         for name in ["emerald.db", "emerald.db.pre-vx.bak", "other.db.pre-v50.bak", "emerald.db.pre-v50.bak.old"] {
             write(&dir.join(name), "keep");
         }

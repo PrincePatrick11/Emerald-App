@@ -18,8 +18,8 @@ interface Props {
 }
 
 /**
- * Rang einer Kategorie in der Liste — wie die Zeilen im Dialog: „Alle
- * Kategorien", „Ohne Kategorie", dann die Kategorien; eine im Papierkorb zuletzt.
+ * Rank of a category in the list, like the rows in the dialog: "All
+ * categories", "No category", then the categories; one in the trash last.
  */
 function categoryRank(category: string | null, order: ReadonlyMap<string, number>): number {
   if (category === ALL_CATEGORIES) return -2;
@@ -28,12 +28,12 @@ function categoryRank(category: string | null, order: ReadonlyMap<string, number
 }
 
 /**
- * „Zuweisung" als Eigenschaft einer Vorlage: ein Wert-Knopf — „Überall", die
- * eine Zuweisung (mit Stern, wenn sie Standard ist) oder die Zahl —, der den
- * Dialog öffnet, in dem man Zuweisung und Standard festlegt
- * (`TemplateAssignmentsModal`); dort steht auch, wessen Standard ein Stern
- * ablöst, ersetzt wird erst mit „Fertig". Keine Liste darunter: jede Variante
- * davon las sich als eigene Einträge statt als Wert der Eigenschaft.
+ * "Assignment" as a property of a template: a value button ("Everywhere", the
+ * single assignment (with a star if it is the default) or the count) that opens the
+ * dialog in which assignment and default are set
+ * (`TemplateAssignmentsModal`); it also shows whose default a star
+ * supersedes, and replacement only happens with "Done". No list below: every variant
+ * of that read as separate entries instead of as a value of the property.
  */
 export default function TemplateAssignments({ templateId, name, assignments, onChange }: Props) {
   const { t } = useTranslation();
@@ -44,13 +44,13 @@ export default function TemplateAssignments({ templateId, name, assignments, onC
 
   const categories = useCategoryStore((s) => s.categories);
   const order = new Map(categories.map((c, i) => [c.id, i]));
-  // Journal, Wiki, Operationen; darin in der Reihenfolge der Tabelle im Dialog.
+  // Journal, wiki, operations; within them in the order of the table in the dialog.
   const sorted = [...assignments].sort((a, b) =>
     TEMPLATE_ENTRY_TYPES.indexOf(a.entryType) - TEMPLATE_ENTRY_TYPES.indexOf(b.entryType)
     || categoryRank(a.category, order) - categoryRank(b.category, order));
 
-  // Eine Zuweisung zeigt der Knopf selbst, mehrere als Zahl; die ganze Liste
-  // (★ für einen Standard) steht im Tooltip und im Dialog.
+  // The button itself shows a single assignment, several as a count; the whole list
+  // (★ for a default) is in the tooltip and in the dialog.
   const single = sorted.length === 1 ? sorted[0] : null;
   const singleParts = single ? parts(single.entryType, single.category) : null;
   let summary: string;
@@ -64,8 +64,8 @@ export default function TemplateAssignments({ templateId, name, assignments, onC
   return (
     <>
       <EditPropertyRow icon={<SlidersHorizontal size={14} />} label={t('templates.assignment')}>
-        {/* Wie Icon und Titelbild: leer öffnet der Knopf gleich den Dialog,
-            sonst ein Menü — festlegen oder alle Zuweisungen lösen. */}
+        {/* Like icon and cover image: when empty the button opens the dialog right away,
+            otherwise a menu: set, or clear all assignments. */}
         <button
           type="button"
           aria-haspopup={sorted.length === 0 ? 'dialog' : 'menu'}
@@ -97,7 +97,7 @@ export default function TemplateAssignments({ templateId, name, assignments, onC
           onClose={() => setMenu(null)}
           actions={[
             { label: t('templates.assign.assignShort'), icon: <SlidersHorizontal size={12} />, onClick: () => setModalOpen(true) },
-            // Landet wie jede Änderung im Entwurf — gilt erst mit „Fertig".
+            // Ends up in the draft like any change; only applies with "Done".
             { label: t('templates.assign.clearShort'), icon: <X size={12} />, onClick: () => onChange([]), danger: true },
           ]}
         />
@@ -109,7 +109,7 @@ export default function TemplateAssignments({ templateId, name, assignments, onC
           name={name}
           assignments={assignments}
           onApply={(next) => {
-            // Nichts wirklich geändert (auch nicht durch Hin und Her): der Entwurf bleibt unberührt.
+            // Nothing really changed (not even by going back and forth): the draft stays untouched.
             if (!sameAssignments(assignments, next)) onChange(next);
             setModalOpen(false);
           }}

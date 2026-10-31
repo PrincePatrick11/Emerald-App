@@ -2,8 +2,8 @@ import type { MouseEvent, ReactNode } from 'react';
 import { useUIStore } from '../../store/uiStore';
 import type { ActiveView } from '../../types';
 
-/** Rahmen je Darstellung. Die Karte trägt `w-full` für die Raster-Zelle, die
- *  Zeile `group` für Hover-Details im Inhalt. */
+/** Frame per presentation. The card carries `w-full` for the grid cell, the
+ *  row `group` for hover details in the content. */
 const LAYOUT_CLASS: Record<DashboardItemLayout, string> = {
   row: 'panel-interactive w-full text-left flex items-center gap-3 px-4 py-3 group',
   card: 'panel-interactive w-full text-left px-4 py-4',
@@ -12,21 +12,21 @@ const LAYOUT_CLASS: Record<DashboardItemLayout, string> = {
 export type DashboardItemLayout = 'row' | 'card';
 
 interface DashboardItemProps {
-  /** Wohin Klick (dieser Tab) und Mittelklick (neuer Tab) führen. */
+  /** Where click (this tab) and middle click (new tab) lead. */
   view: ActiveView;
   layout: DashboardItemLayout;
   onContextMenu?: (event: MouseEvent) => void;
-  /** Umbenennen an Ort und Stelle: derselbe Rahmen als schlichtes `div`, ohne
-   *  Klick, Mittelklick und Kontextmenü — das Eingabefeld darin (`RenameField`)
-   *  soll Klicks bekommen, nicht die Navigation. `view` bleibt dann ungenutzt. */
+  /** Rename in place: the same frame as a plain `div`, without
+   *  click, middle click and context menu; the input field inside it (`RenameField`)
+   *  should receive clicks, not the navigation. `view` is then unused. */
   editing?: boolean;
   children: ReactNode;
 }
 
 /**
- * Ein klickbarer Eintrag auf einem Dashboard: `panel-interactive`-Rahmen,
- * Klick öffnet `view`, Mittelklick öffnet ihn in einem neuen Tab. Der Inhalt
- * bleibt beim Aufrufer — die Module zeigen darin sehr Verschiedenes.
+ * A clickable entry on a dashboard: `panel-interactive` frame,
+ * click opens `view`, middle click opens it in a new tab. The content
+ * stays with the caller; the modules show very different things in it.
  */
 export default function DashboardItem({ view, layout, onContextMenu, editing, children }: DashboardItemProps) {
   const setActiveView = useUIStore((s) => s.setActiveView);

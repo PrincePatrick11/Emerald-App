@@ -1,14 +1,14 @@
 import type { ViewMode } from '../store/uiStore';
 
 /**
- * Karten und Karten-in-voller-Breite teilen sich dieselbe Kachel — nur das
- * Raster darum unterscheidet sie (Dashboard: drei Spalten gegen eine). Views,
- * die ihre Kachel je nach Ansicht anders bauen, fragen deshalb hier statt auf
- * `view === 'cards'`; sonst fiele der neue Modus in jeder Ansicht einzeln auf
- * den Listen-Zweig zurück.
+ * Cards and full-width cards share the same tile — only the surrounding
+ * grid distinguishes them (dashboard: three columns versus one). Views
+ * that build their tile differently depending on the view therefore ask here instead of testing
+ * `view === 'cards'`; otherwise the new mode would fall back to the list
+ * branch separately in every view.
  */
 export const isCardView = (view: ViewMode): boolean => view === 'cards' || view === 'cards_wide';
 
-/** Die volle Breite unter den Kartenansichten: eine Spalte statt drei, und im
- *  Altar zusätzlich eine höhere Vorschau. */
+/** The full width among the card views: one column instead of three, and in the
+ *  altar additionally a taller preview. */
 export const isWideCardView = (view: ViewMode): boolean => view === 'cards_wide';

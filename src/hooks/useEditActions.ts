@@ -2,27 +2,27 @@ import { useEffect, useRef } from 'react';
 import { useUIStore, type EditActions } from '../store/uiStore';
 import { useLeaveGuardStore, withoutLeaveGuard } from '../store/leaveGuardStore';
 
-/** Was eine View anmeldet: ihre Handgriffe, dazu der Wächter für das Verlassen mit Änderungen. */
+/** What a view registers: its handlers, plus the guard for leaving with changes. */
 export interface EditHandlers extends EditActions {
   /**
-   * Womit die Seite gefragt wird, bevor man sie mit Änderungen verlässt
-   * (`leaveGuardStore`): „Speichern" ruft `onSave`, „Verwerfen" `onCancel`.
+   * What the page is asked with before it is left with changes
+   * (`leaveGuardStore`): "Save" calls `onSave`, "Discard" calls `onCancel`.
    */
   guard?: { key: string; title: () => string; isDirty: () => boolean };
 }
 
 /**
- * Registriert Save/Cancel/Delete der aktiven View in der rechten Seitenleiste,
- * solange `active` wahr ist — vorher fünfmal kopiert (Journal/Wiki/Operations/
- * Altar und die frühere Sigillen-Ansicht).
+ * Registers Save/Cancel/Delete of the active view in the right sidebar,
+ * as long as `active` is true — previously copied five times (journal/wiki/operations/
+ * altar and the former sigil view).
  *
- * Die Handler laufen über einen Ref: die Sidebar ruft dadurch nie eine
- * veraltete Closure, und der Effekt muss nicht bei jedem Render
- * re-registrieren.
+ * The handlers run through a ref: the sidebar therefore never calls a
+ * stale closure, and the effect does not have to re-register on every
+ * render.
  *
- * Mit `guard` meldet die View zugleich ihren Wächter an: wer die Seite mit
- * Änderungen verlässt, wird gefragt (`leaveGuardStore`). Die Knöpfe selbst
- * fragen nicht — sie beenden die Bearbeitung ja gerade.
+ * With `guard` the view also registers its guard: whoever leaves the page
+ * with changes is asked (`leaveGuardStore`). The buttons themselves do not
+ * ask — they are what ends the editing.
  */
 export function useEditActions(active: boolean, handlers: EditHandlers): void {
   const handlersRef = useRef(handlers);
@@ -33,7 +33,7 @@ export function useEditActions(active: boolean, handlers: EditHandlers): void {
 
   useEffect(() => {
     if (!active) return;
-    // Ohne Wächter gibt es nichts zu umgehen.
+    // Without a guard there is nothing to bypass.
     const unguarded = <T,>(run: () => T | Promise<T>) => (key ? withoutLeaveGuard(key, run) : run());
     setEditActions({
       onSave: () => unguarded(() => handlersRef.current.onSave()),

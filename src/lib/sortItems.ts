@@ -1,18 +1,18 @@
 import type { SortMode } from '../store/uiStore';
 
 interface BaseSortOptions<T> {
-  /** ISO-Datumsstring des Items — created_at, updated_at oder deleted_at, je nach Modul. */
+  /** ISO date string of the item — created_at, updated_at or deleted_at, depending on the module. */
   date: (item: T) => string;
-  /** Nachrangiges Kriterium bei Gleichstand (Tags: Name). */
+  /** Secondary criterion on a tie (tags: name). */
   tiebreak?: (a: T, b: T) => number;
-  /** Für `count_desc` (Tags: Anzahl Verwendungen). Fehlt er, zählt jedes Item 0. */
+  /** For `count_desc` (tags: number of uses). If missing, every item counts as 0. */
   count?: (item: T) => number;
 }
 
 /**
- * Der Titel-Getter ist Pflicht, sobald das Item kein Feld `title` hat — die
- * Altar-Bibliothek sortiert nach `name`. Ohne diese Bedingung fiele so ein
- * Aufruf still auf leere Titel zurück, und die Alpha-Modi täten gar nichts.
+ * The title getter is mandatory as soon as the item has no `title` field — the
+ * altar library sorts by `name`. Without this condition such a call would
+ * silently fall back to empty titles, and the alpha modes would do nothing at all.
  */
 type TitleOption<T> = 'title' extends keyof T
   ? { title?: (item: T) => string }
@@ -20,11 +20,11 @@ type TitleOption<T> = 'title' extends keyof T
 
 type SortOptions<T> = BaseSortOptions<T> & TitleOption<T>;
 
-/** Byte-Vergleich für ISO-8601-Strings — sortiert chronologisch, ohne Dates zu bauen. */
+/** Byte comparison for ISO 8601 strings — sorts chronologically without building Dates. */
 const compareIso = (a: string, b: string): number => (a < b ? -1 : a > b ? 1 : 0);
 
-/** Der eine SortMode-Komparator für alle Dashboards. Gruppiert wird nicht
- *  hier, sondern über die eigene Achse `GroupingMode` — siehe uiStore. */
+/** The one SortMode comparator for all dashboards. Grouping is not done
+ *  here, but via its own axis `GroupingMode` — see uiStore. */
 export function sortItems<T extends object>(
   items: readonly T[],
   sort: SortMode,

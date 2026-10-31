@@ -5,29 +5,29 @@ import Button from './Button';
 interface InlineConfirmProps {
   onConfirm: () => void;
   onCancel: () => void;
-  /** Die Frage vor den Knöpfen. Default: „Sicher?". */
+  /** The question before the buttons. Default: "Sure?". */
   message?: ReactNode;
-  /** Beschriftung des Bestätigens. Default: „Ja, löschen". */
+  /** Label of the confirm button. Default: "Yes, delete". */
   confirmLabel?: ReactNode;
-  /** Ton des Bestätigens. Default `danger`; `jade` für eine Rückfrage, die
-   *  nichts löscht (einen Block in allen Einträgen aktualisieren). Nur
-   *  `inline` — das `banner` ist ein Lösch-Streifen. */
+  /** Tone of the confirm button. Default `danger`; `jade` for a confirmation that
+   *  deletes nothing (updating a block in all entries). Only
+   *  `inline`; the `banner` is a delete strip. */
   tone?: 'danger' | 'jade';
-  /** `inline` sitzt in einer Zeile anstelle ihrer Aktionen; `banner` ist ein
-   *  eigener Streifen in voller Breite, für Dialoge. */
+  /** `inline` sits in a row in place of its actions; `banner` is a
+   *  strip of its own at full width, for dialogs. */
   variant?: 'inline' | 'banner';
-  /** Die 24px-Knöpfe für dichte Zeilen (Kategorien- und Tag-Köpfe). */
+  /** The 24px buttons for dense rows (category and tag headers). */
   small?: boolean;
-  /** Frage und Knöpfe dürfen umbrechen — für schmale Kopfzeilen (die rechte
-   *  Seitenleiste ist bis 180px schmal). In Zeilen bleibt es aus, dort soll
-   *  die Rückfrage nicht schrumpfen. */
+  /** Question and buttons may wrap, for narrow header rows (the right
+   *  sidebar is as narrow as 180px). It stays off in rows, where the
+   *  confirmation should not shrink. */
   wrap?: boolean;
 }
 
 /**
- * Die Rückfrage vor einem Löschen, an Ort und Stelle statt in einem Dialog:
- * Frage, „Ja" (danger) und „Nein" (neutral). Wann sie steht, entscheidet der
- * Aufrufer — meist ein `confirmingId`-State, den der erste Klick setzt.
+ * The confirmation before a deletion, in place instead of in a dialog:
+ * question, "Yes" (danger) and "No" (neutral). When it shows is decided by the
+ * caller, usually a `confirmingId` state that the first click sets.
  */
 export default function InlineConfirm({
   onConfirm, onCancel, message, confirmLabel, tone = 'danger', variant = 'inline', small, wrap,

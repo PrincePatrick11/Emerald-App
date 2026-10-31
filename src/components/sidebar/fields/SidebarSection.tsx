@@ -4,21 +4,21 @@ import { usePersistedFlag } from '../../../hooks/usePersistedFlag';
 import SidebarSectionHeader from './SidebarSectionHeader';
 
 /**
- * Ein einklappbarer Abschnitt der Leseansicht in der rechten Seitenleiste —
- * Eigenschaften, Verlinkungen, Tags, Blöcke, beim Altar die Elemente. Kopf mit
- * Chevron, Label und optionalem Zähler rechts; ob er zu ist, merkt sich
- * `storageKey` über alle Einträge hinweg (eine Vorliebe, keine Arbeitsgeste).
+ * A collapsible section of the read view in the right sidebar:
+ * properties, links, tags, blocks, and for the altar the elements. Header with
+ * chevron, label and an optional counter on the right; whether it is closed is remembered by
+ * `storageKey` across all entries (a preference, not a working gesture).
  *
- * Die Abschnitte stehen ohne Trennlinie untereinander; den Abstand zwischen
- * ihnen setzt der Aufrufer (`RightSidebar`: `gap-5` im Körper).
+ * The sections stand one below the other without a divider; the spacing between
+ * them is set by the caller (`RightSidebar`: `gap-5` in the body).
  *
- * Der Kopf steht links 4px, rechts 6px innerhalb der Kante (`pl-1 pr-1.5`),
- * die Mitte seines 12px-Pfeils also bei 10px. Dort beginnen die Icons der
- * Zeilen: `pl-[9px]` plus 1px, um den ein 14px-Icon in seiner 16px-Spalte
- * eingerückt ist. Rechts enden die Werte 14px vor der Kante, wo der Zähler
- * der Überschrift beginnt: der Inhalt steht mit `mr-0.5` 2px eingerückt, die
- * Zeilen mit `pr-3`. So endet auch die Hover-Fläche rechts 2px früher und
- * wirkt neben dem Pfeil links nicht breiter.
+ * The header sits 4px on the left and 6px on the right inside the edge (`pl-1 pr-1.5`),
+ * so the centre of its 12px arrow is at 10px. That is where the icons of the
+ * rows begin: `pl-[9px]` plus 1px, by which a 14px icon is
+ * indented in its 16px column. On the right the values end 14px before the edge, where the counter
+ * of the heading begins: the content is inset 2px with `mr-0.5`, the
+ * rows with `pr-3`. So the hover area also ends 2px earlier on the right and
+ * does not look wider than the arrow on the left.
  */
 export default function SidebarSection({ storageKey, label, count, children }: {
   storageKey: string;
@@ -35,14 +35,14 @@ export default function SidebarSection({ storageKey, label, count, children }: {
   );
 }
 
-/** Feste 16px-Spalte vor jeder Zeile: Emoji und lucide-Icon beginnen so an derselben Stelle. */
+/** Fixed 16px column before every row: emoji and lucide icon thus start at the same spot. */
 export function RowIcon({ children }: { children: ReactNode }) {
   return <span className="sidebar-row-icon w-4 flex-shrink-0 flex items-center justify-center leading-none">{children}</span>;
 }
 
 /**
- * Eine Eigenschaft: Icon und Name links, Wert rechts. `muted` für einen
- * Leerwert („Keine", „Aus") — er steht leiser und nicht fett.
+ * A property: icon and name on the left, value on the right. `muted` for an
+ * empty value ("None", "Off"), which is quieter and not bold.
  */
 export function SidebarPropertyRow({ icon, label, value, muted = false }: {
   icon: ReactNode;
@@ -53,11 +53,11 @@ export function SidebarPropertyRow({ icon, label, value, muted = false }: {
   return (
     <div className="flex items-center gap-1.5 pl-[9px] pr-3 py-1.5 text-[13px] min-w-0">
       <RowIcon>{icon}</RowIcon>
-      {/* Wird es eng, kürzt zuerst der Name — der Wert ist das, was man liest.
-          Er nimmt höchstens 65 %, darüber kürzt auch er. */}
+      {/* When space gets tight, the name truncates first; the value is what gets read.
+          It takes at most 65 %, beyond that it truncates too. */}
       <span className="sidebar-prop-label min-w-0 truncate" title={label}>{label}</span>
-      {/* Kein `truncate` am Flex-Container selbst: mit `justify-end` schnitte er
-          links ab. Ein Text kürzt in seiner eigenen Spanne am Ende. */}
+      {/* No `truncate` on the flex container itself: with `justify-end` it would cut
+          off on the left. A text truncates at its end within its own span. */}
       <span className={`ml-auto flex-shrink-0 max-w-[65%] flex items-center justify-end gap-1.5 ${muted ? 'sidebar-prop-value--muted' : 'sidebar-prop-value'}`}>
         {typeof value === 'string' ? <span className="min-w-0 truncate" title={value}>{value}</span> : value}
       </span>
@@ -66,13 +66,13 @@ export function SidebarPropertyRow({ icon, label, value, muted = false }: {
 }
 
 /**
- * Eine anklickbare Listenzeile — eine Verlinkung, ein Block, ein Element des
- * Altars: Icon, Name, rechts leise eine Zuordnung (`meta`). Hover hebt die
- * Zeile als Fläche an; `active` markiert die gewählte.
+ * A clickable list row: a link, a block, an element of the
+ * altar: icon, name, and on the right a quiet assignment (`meta`). Hover raises the
+ * row as a surface; `active` marks the selected one.
  *
- * `action` hängt im Bearbeiten einen Knopf hinter die Zeile (die Verlinkungen:
- * `SidebarRowRemove`). Die Zeile ist dann ein Rahmen um zwei Knöpfe — der
- * Hauptteil trägt Icon, Name und Zuordnung wie sonst die ganze Zeile.
+ * When editing, `action` attaches a button behind the row (the links:
+ * `SidebarRowRemove`). The row is then a frame around two buttons, with the
+ * main part carrying icon, name and assignment as the whole row otherwise would.
  */
 export function SidebarItemRow({ icon, label, meta, onClick, active = false, title, action }: {
   icon: ReactNode;
@@ -118,8 +118,8 @@ export function SidebarItemRow({ icon, label, meta, onClick, active = false, tit
 }
 
 /**
- * Das „×" am Ende einer `SidebarItemRow` (`action`). Ohne `onClick` bleibt nur
- * sein Platz leer — so fluchten die Zuordnungen mit denen der Zeilen, die eines haben.
+ * The "×" at the end of a `SidebarItemRow` (`action`). Without `onClick` only
+ * its space stays empty, so the assignments line up with those of the rows that have one.
  */
 export function SidebarRowRemove({ title, onClick }: { title: string; onClick?: () => void }) {
   if (!onClick) return <span className="w-6 flex-shrink-0" />;
@@ -130,7 +130,7 @@ export function SidebarRowRemove({ title, onClick }: { title: string; onClick?: 
   );
 }
 
-/** Der Leerzustand eines Abschnitts, bündig mit den Icons der Zeilen. */
+/** The empty state of a section, flush with the icons of the rows. */
 export function SidebarEmpty({ children }: { children: ReactNode }) {
   return <p className="sidebar-empty pl-[9px] pr-3 py-1 text-[13px]">{children}</p>;
 }

@@ -6,34 +6,34 @@ import {
 } from './fields';
 
 /**
- * Lesen und Setzen der Instanz-Attribute aus `BLOCK_ATTR` — dieselben Regeln
- * für den Stapel, die Seitenleiste und später den Export.
+ * Reading and setting the instance attributes from `BLOCK_ATTR` — the same
+ * rules for the stack, the sidebar and, later, the export.
  */
 
-/** Ausgeblendet: im Lesemodus weg, im Bearbeitungsmodus ausgegraut. Die Daten bleiben. */
+/** Hidden: gone in read mode, greyed out in edit mode. The data stays. */
 export function isBlockHidden(block: BlockInstance): boolean {
   return block.attrs[BLOCK_ATTR.hidden] === '1';
 }
 
-/** Der eigene Titel der Instanz, oder `null` für „Typname". */
+/** The instance's own title, or `null` for "type name". */
 export function customBlockTitle(block: BlockInstance): string | null {
   return block.attrs[BLOCK_ATTR.title]?.trim() || null;
 }
 
 /**
- * Wie ein Block heißt — eine Regel für Rahmen, Verwaltungsliste und
- * Seitenleisten-Abschnitt: der eigene Titel, sonst der Typname, sonst (Typ
- * unbekannt oder Datenformat zu neu — `meta` ist dann `undefined`) „Unbekannter
- * Block (typ)".
+ * What a block is called — one rule for frame, management list and
+ * sidebar section: its own title, otherwise the type name, otherwise (type
+ * unknown or data format too new — `meta` is then `undefined`) "Unknown
+ * block (type)".
  */
 export function blockLabel(t: TFunction, block: BlockInstance, meta: BlockTypeMeta | undefined): string {
   return customBlockTitle(block) ?? blockTypeLabel(t, block, meta);
 }
 
 /**
- * Der Typname allein — ohne eigenen Titel, etwa als Platzhalter beim
- * Umbenennen. Die Kopie eines eigenen Blocks heißt wie dieser, ein Feldblock
- * mit genau einem Element wie dieses Element.
+ * The type name alone — without its own title, e.g. as a placeholder when
+ * renaming. The copy of a custom block is named like that block, a fields
+ * block with exactly one element like that element.
  */
 export function blockTypeLabel(t: TFunction, block: BlockInstance, meta: BlockTypeMeta | undefined): string {
   if (!meta) return t('blocks.unknown', { type: block.type });
@@ -47,16 +47,16 @@ export function blockTypeLabel(t: TFunction, block: BlockInstance, meta: BlockTy
 }
 
 /**
- * `t(key)` — außer i18n ist noch nicht bereit und gibt den Schlüssel selbst
- * zurück; dann `fallback`. Für Texte, die fest in Inhalt oder Definition
- * landen: dort bliebe sonst für immer „blocks.fields.no" stehen.
+ * `t(key)` — unless i18n is not ready yet and returns the key itself;
+ * then `fallback`. For texts that end up permanently in content or a
+ * definition: otherwise "blocks.fields.no" would stay there forever.
  */
 export function translatedOr(t: TFunction, key: string, fallback: string): string {
   const value = t(key);
   return typeof value === 'string' && value && value !== key ? value : fallback;
 }
 
-/** Die Texte, mit denen `serializeFields` den lesbaren Fallback schreibt — in der Sprache von `t`. */
+/** The texts with which `serializeFields` writes the readable fallback — in the language of `t`. */
 export function fieldFallbackText(t: TFunction): FallbackText {
   return {
     label: (element) => elementLabel(t, element),
@@ -66,27 +66,27 @@ export function fieldFallbackText(t: TFunction): FallbackText {
   };
 }
 
-/** Wie eine Vorlage heißt: ihr Name, sonst „Unbenannte Vorlage". */
+/** What a template is called: its name, otherwise "Untitled template". */
 export function templateLabel(t: TFunction, template: { name: string }): string {
   return template.name.trim() || t('templates.untitled');
 }
 
-/** Wie ein eigener Block (Definition) heißt: sein Name, sonst „Unbenannter Block". */
+/** What a custom block (definition) is called: its name, otherwise "Untitled block". */
 export function definitionLabel(t: TFunction, def: { name: string }): string {
   return def.name.trim() || t('blocks.library.untitled');
 }
 
-/** Die Beschriftung eines Feld-Elements: die eigene, sonst der Name seiner Art. */
+/** The label of a field element: its own, otherwise the name of its kind. */
 export function elementLabel(t: TFunction, element: ElementDef): string {
   return element.label.trim() || t(elementKindLabelKey(element.kind));
 }
 
-/** Der Attributwert für „ausgeblendet: `hidden`". */
+/** The attribute value for "hidden: `hidden`". */
 export function hiddenAttrValue(hidden: boolean): string | null {
   return hidden ? '1' : null;
 }
 
-/** Zeigt der Block im Lesemodus seinen Titel? Die Instanz schlägt den Standard des Typs. */
+/** Does the block show its title in read mode? The instance beats the type's default. */
 export function showsTitleInRead(block: BlockInstance, meta: BlockTypeMeta | undefined): boolean {
   const value = block.attrs[BLOCK_ATTR.showTitle];
   if (value === '1') return true;
@@ -94,7 +94,7 @@ export function showsTitleInRead(block: BlockInstance, meta: BlockTypeMeta | und
   return meta?.defaultShowTitle ?? false;
 }
 
-/** Kopie des Blocks mit gesetztem Attribut; `null` entfernt es. */
+/** Copy of the block with the attribute set; `null` removes it. */
 export function withBlockAttr(block: BlockInstance, name: BlockAttrName, value: string | null): BlockInstance {
   const attrs = { ...block.attrs };
   if (value === null) delete attrs[name];
@@ -103,9 +103,9 @@ export function withBlockAttr(block: BlockInstance, name: BlockAttrName, value: 
 }
 
 /**
- * Der Attributwert für „Titel im Lesemodus: `show`". Entspricht er dem
- * Standard des Typs, fällt das Attribut weg — ein Textblock, dessen Schalter
- * wieder auf Standard steht, wird dann wieder ohne Wrapper gespeichert.
+ * The attribute value for "title in read mode: `show`". If it equals the
+ * type's default, the attribute is dropped — a text block whose switch is
+ * back at the default is then saved without a wrapper again.
  */
 export function showTitleAttrValue(show: boolean, meta: BlockTypeMeta | undefined): string | null {
   return show === (meta?.defaultShowTitle ?? false) ? null : show ? '1' : '0';

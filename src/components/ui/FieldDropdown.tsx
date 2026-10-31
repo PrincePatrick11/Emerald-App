@@ -2,10 +2,10 @@ import { ChevronDown, ChevronsUpDown } from 'lucide-react';
 import Dropdown, { type DropdownOption } from './Dropdown';
 import { OP_PROP_SELECT_CLASSES } from '../../lib/styleClasses';
 
-/** Der Feld-Look mit der Schrift der Filterzeilen darunter: 13px statt
- *  `text-xs`, 30px hoch wie der Primärknopf der Leiste — ausgeschrieben statt überschrieben, damit keine zwei
- *  Tailwind-Klassen um dieselbe Eigenschaft streiten. Sonst dieselben
- *  Klassen wie OP_PROP_SELECT_CLASSES (die Theme-Brücken hängen an
+/** The field look with the font of the filter rows below it: 13px instead of
+ *  `text-xs`, 30px tall like the sidebar's primary button; spelled out instead of overridden, so that no two
+ *  Tailwind classes fight over the same property. Otherwise the same
+ *  classes as OP_PROP_SELECT_CLASSES (the theme bridges hang on
  *  `op-prop-select`). */
 const SIDEBAR_SELECT_CLASSES =
   'op-prop-select w-full bg-stone-800/60 rounded-md px-3 py-1 text-[13px] leading-5 text-stone-300 outline-none ' +
@@ -15,23 +15,23 @@ interface Props<T extends string> {
   value: T;
   options: DropdownOption<T>[];
   onChange: (value: T) => void;
-  /** Text des Auslösers, wenn er nicht aus der gewählten Option kommen soll. */
+  /** Text of the trigger, if it should not come from the chosen option. */
   triggerText?: string;
   align?: 'left' | 'right';
-  /** `sidebar`: die Auswahl der Dashboard-Seitenleiste (SortSelect) — das
-   *  Icon der gewählten Option vorn, 13px wie die Filterzeilen, Hoch/Runter-
-   *  Chevron; Icon und Chevron fluchten mit den `SwitchRow`s darunter. */
+  /** `sidebar`: the dashboard sidebar's select (SortSelect): the
+   *  icon of the chosen option at the front, 13px like the filter rows, up/down
+   *  chevron; icon and chevron line up with the `SwitchRow`s below. */
   variant?: 'field' | 'sidebar';
-  /** aria-label des Auslösers, wenn sein Text allein nicht sagt, was er wählt. */
+  /** aria-label of the trigger, when its text alone does not say what it selects. */
   ariaLabel?: string;
 }
 
 /**
- * Ein Auswahlmenü im Look der Eigenschaftsfelder: volle Breite, Feldrahmen,
- * Chevron. Das Menü wird geportalt — die Seitenleisten scrollen, ein absolut
- * positioniertes Menü würde dort abgeschnitten. Nutzer: `CategorySelect`
- * (`variant="field"`), die Zuweisungen einer Vorlage, die Übersicht der
- * Standardvorlagen und die Sortierung der Dashboard-Seitenleiste
+ * A select menu in the look of the property fields: full width, field border,
+ * chevron. The menu is portalled: the sidebars scroll, and an absolutely
+ * positioned menu would be clipped there. Users: `CategorySelect`
+ * (`variant="field"`), a template's assignments, the overview of the
+ * default templates and the sorting of the dashboard sidebar
  * (`SortSelect`, `variant="sidebar"`).
  */
 export default function FieldDropdown<T extends string>({ value, options, onChange, triggerText, align, variant = 'field', ariaLabel }: Props<T>) {

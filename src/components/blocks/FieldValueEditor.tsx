@@ -9,10 +9,10 @@ import { OP_PROP_SELECT_CLASSES } from '../../lib/styleClasses';
 import type { MoonPhase } from '../../types';
 
 /**
- * Die Eingaben für die Werte eines Feld-Elements, die im JSON stehen — alles
- * außer Verknüpfung, Bild und Altar (die stehen im Markup, siehe
- * `FieldSlotEditor`). Geteilt vom Feldblock im Bearbeitungsmodus und von den
- * Vorgaben im Baukasten der Blöcke-Ansicht. `onChange(undefined)` heißt „leer".
+ * The inputs for the values of a field element that sit in the JSON: everything
+ * except link, image and altar (which sit in the markup, see
+ * `FieldSlotEditor`). Shared by the field block in edit mode and by the
+ * defaults in the block builder of the blocks view. `onChange(undefined)` means "empty".
  */
 export default function FieldValueEditor({ element, value, onChange }: {
   element: ElementDef;
@@ -55,7 +55,7 @@ export default function FieldValueEditor({ element, value, onChange }: {
       return (
         <Dropdown<string>
           portal
-          // Eine gelöschte Option zeigt „Auswählen …" statt ihrer rohen ID.
+          // A deleted option shows "Select …" instead of its raw ID.
           value={options.some((o) => o.id === value) ? (value as string) : ''}
           onChange={(v) => onChange(v || undefined)}
           options={[
@@ -81,7 +81,7 @@ export default function FieldValueEditor({ element, value, onChange }: {
           ]}
         />
       );
-    default: // Slot-Arten: FieldSlotEditor
+    default: // Slot kinds: FieldSlotEditor
       return null;
   }
 }

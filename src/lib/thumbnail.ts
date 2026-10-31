@@ -1,15 +1,15 @@
 /**
- * Thumbnail-Erzeugung fuer die Altar-Karten (frueher auch fuer die Sigil-
- * Listen; seit v41 zeigen die Karten die gespeicherte Zeichnung selbst).
+ * Thumbnail generation for the altar cards (formerly also for the sigil
+ * lists; since v41 the cards show the stored drawing itself).
  *
- * Rendert auf THUMBNAIL_W Breite und presst das Ergebnis unter
- * THUMBNAIL_MAX_BYTES: erst WebP ueber eine Qualitaetsleiter, dann das
- * Fallback-Format des Aufrufers (Altaere: JPEG, deckende Szene; PNG fuer
- * transparenten Grund, den JPEG schwarz fuellen wuerde).
+ * Renders at THUMBNAIL_W width and squeezes the result under
+ * THUMBNAIL_MAX_BYTES: first WebP via a quality ladder, then the
+ * caller's fallback format (altars: JPEG, opaque scene; PNG for
+ * a transparent background, which JPEG would fill with black).
  *
- * Die 512-KB-Grenze war frueher ein vierfach kopiertes Literal (drei
- * Capture-Stellen in AltarView plus die Downscale-Schleife hier) — sie
- * lebt jetzt ausschliesslich in dieser Datei.
+ * The 512 KB limit used to be a literal copied four times (three
+ * capture sites in AltarView plus the downscale loop here) — it
+ * now lives exclusively in this file.
  */
 export const THUMBNAIL_W = 640;
 export const THUMBNAIL_MAX_BYTES = 524288;
@@ -40,10 +40,10 @@ export async function canvasToCappedThumbnail(
   canvas: HTMLCanvasElement,
   fallback: 'jpeg' | 'png'
 ): Promise<string | null> {
-  // Ein Aufruf sondiert die WebP-Unterstuetzung: liefert die Runtime kein
-  // echtes WebP, ist sie still auf PNG ausgewichen (verlustfrei, Quality
-  // wirkungslos) — dann direkt zum Fallback-Format mit verlaesslicher
-  // Groessensteuerung.
+  // One call probes WebP support: if the runtime does not deliver real
+  // WebP, it has silently fallen back to PNG (lossless, quality
+  // ineffective) — then go straight to the fallback format with reliable
+  // size control.
   const probe = await toDataUrl(canvas, 'image/webp', 0.85);
   if (probe !== null) {
     if (probe.startsWith('data:image/webp')) {
@@ -65,8 +65,8 @@ export async function canvasToCappedThumbnail(
     return null;
   }
 
-  // PNG kennt keine Quality-Leiter; ein 640px-Strichbild bleibt ohnehin weit
-  // unter der Grenze. Faellt es doch darueber, gibt es keinen Thumbnail.
+  // PNG has no quality ladder; a 640px line drawing stays far below the
+  // limit anyway. If it does exceed it, there is no thumbnail.
   const png = await toDataUrl(canvas, 'image/png', 1);
   return png !== null && png.length <= THUMBNAIL_MAX_BYTES ? png : null;
 }

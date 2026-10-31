@@ -6,15 +6,15 @@ import type { SuggestionItem } from './SuggestionList';
 
 interface PointerDropOptions {
   enabled: boolean;
-  /** Die Editoren der Textblöcke, in Reihenfolge. */
+  /** The editors of the text blocks, in order. */
   getEditors: () => Editor[];
-  /** Die Fläche, die als Ziel zählt — auch zwischen den Editoren. */
+  /** The area that counts as a target, also between the editors. */
   getContainer: () => HTMLElement | null;
 }
 
-/** Der Editor unter dem Punkt — oder, liegt der Punkt zwischen den Editoren
- *  (Rahmenkopf, Einfügelinie, Abstand), der vertikal nächste. `null` nur, wenn
- *  der Punkt ganz außerhalb des Stapels liegt. */
+/** The editor under the point, or, if the point lies between the editors
+ *  (frame header, insertion line, gap), the vertically nearest one. `null` only if
+ *  the point lies entirely outside the stack. */
 function dropTarget(editors: Editor[], container: HTMLElement | null, x: number, y: number) {
   let nearest: { editor: Editor; rect: DOMRect; distance: number } | null = null;
   for (const editor of editors) {
@@ -25,8 +25,8 @@ function dropTarget(editors: Editor[], container: HTMLElement | null, x: number,
   }
   const bounds = container?.getBoundingClientRect();
   if (!nearest || !bounds || x < bounds.left || x > bounds.right || y < bounds.top || y > bounds.bottom) return null;
-  // In den Editor hineinziehen, damit `posAtCoords` eine Stelle findet — an
-  // seinem oberen oder unteren Rand, je nachdem, von wo der Zeiger kam.
+  // Pull into the editor so that `posAtCoords` finds a position, at
+  // its top or bottom edge, depending on where the pointer came from.
   const { rect } = nearest;
   return {
     editor: nearest.editor,
@@ -36,18 +36,18 @@ function dropTarget(editors: Editor[], container: HTMLElement | null, x: number,
 }
 
 /**
- * Drops per Zeiger in einen Textblock: ein Eintrag aus der linken Liste wird
- * zum Link-Chip. Der Drag läuft über `lib/dragState` statt über HTML5-Drag-and-drop
- * (das kann der WebView nicht) und endet mit einem `pointerup` irgendwo im
- * Fenster.
+ * Pointer-based drops into a text block: an entry from the left list becomes
+ * a link chip. The drag runs via `lib/dragState` instead of HTML5 drag-and-drop
+ * (which the WebView cannot do) and ends with a `pointerup` anywhere in the
+ * window.
  *
- * EIN Zuhörer pro Eintrag: er sucht den Editor am Zeiger und räumt den Drag in
- * jedem Fall ab — so wie früher der einzelne Editor. Hinge jeder Textblock
- * selbst am `document`, nähme der erste Zuhörer dem zweiten den Drag weg, oder
- * niemand räumte ihn, wenn der Zeiger neben allen Blöcken landet.
+ * ONE listener per entry: it finds the editor at the pointer and clears the drag in
+ * every case, as the single editor used to. If each text block
+ * hung on the `document` itself, the first listener would take the drag away from the second, or
+ * nobody would clear it if the pointer lands beside all blocks.
  *
- * Gibt zurück, ob gerade ein Drag läuft, der hier landen könnte — für die
- * Markierung des Stapels.
+ * Returns whether a drag is currently running that could land here, for the
+ * highlighting of the stack.
  */
 export function useEditorPointerDrops({ enabled, getEditors, getContainer }: PointerDropOptions): boolean {
   const optionsRef = useRef({ getEditors, getContainer });

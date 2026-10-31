@@ -12,14 +12,14 @@ interface State {
 }
 
 /**
- * Fängt einen Block ab, dessen Darstellung wirft — kaputte Daten aus einem
- * Import, ein Fehler in einem Blocktyp. Statt der ganzen App fällt nur dieser
- * Block aus und zeigt seinen bereinigten Fallback, wie ein unbekannter Typ.
- * Ohne das nähme ein einziger Block die Oberfläche mit, und weil der Tab beim
- * Start wiederhergestellt wird, bei jedem Start erneut.
+ * Catches a block whose rendering throws: broken data from an
+ * import, a bug in a block type. Instead of the whole app, only this
+ * block fails and shows its sanitised fallback, like an unknown type.
+ * Without it a single block would take the UI down with it, and because the tab is
+ * restored on startup, again on every startup.
  *
- * Der Stapel schlüsselt die Grenze pro Block; ein ersetzter Block (neue Daten)
- * bekommt über `componentDidUpdate` eine neue Chance.
+ * The stack keys the boundary per block; a replaced block (new data)
+ * gets a new chance via `componentDidUpdate`.
  */
 export default class BlockErrorBoundary extends Component<Props, State> {
   state: State = { failed: false };

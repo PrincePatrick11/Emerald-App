@@ -48,7 +48,7 @@ export interface SearchHit {
   /** Only for `kind: 'category'`: the module holding most of its entries, shown as a hint — unset when nothing uses it. */
   module?: CategoryModuleId;
   categoryId?: string | null;
-  /** Nur für `kind: 'lexiconEntry'`: die Sprache, in der die Vokabel steht — ihr Sprungziel. */
+  /** Only for `kind: 'lexiconEntry'`: the language the word belongs to — its jump target. */
   languageId?: string;
   entryNumber?: number;
   /** Sort tie-break. Tags and categories have no timestamp and pass `''`. */
@@ -74,7 +74,7 @@ export interface SearchCorpus {
   tags: Tag[];
   categories: SearchCategory[];
   languages: Language[];
-  /** Die Vokabeln aller Sprachen — der Treffer öffnet die Sprache, zu der eine gehört. */
+  /** The words of all languages — a hit opens the language a word belongs to. */
   lexiconEntries: LexiconEntry[];
 }
 
@@ -179,7 +179,7 @@ export function searchCorpus(corpus: SearchCorpus, rawQuery: string): SearchHit[
   if (!q) return [];
 
   const hits: SearchHit[] = [];
-  // Einträge tragen Tag-IDs; gesucht wird im Namen der lebenden Tags.
+  // Entries carry tag IDs; the search runs on the names of the live tags.
   const tagNames = new Map(corpus.tags.map((tag) => [tag.id, tag.name]));
   const namesOf = (ids: string[] | undefined) => (ids ?? []).flatMap((id) => tagNames.get(id) ?? []);
 
@@ -204,11 +204,11 @@ export function searchCorpus(corpus: SearchCorpus, rawQuery: string): SearchHit[
     });
   };
 
-  // Eine geladene, noch verborgene Sigille ist auch für die Suche verborgen —
-  // in jeder Eintragsart. Der Zustand steckt im Cache-Stempel: die Länge des
-  // sichtbaren Inhalts ändert sich, sobald eine von mehreren Ladungen ihr
-  // Zieldatum erreicht — dann wird neu gelesen. Ebenso, wenn der Inhalt erst
-  // nach dem Start nachgeladen wurde (`pendingContent`): vorher ist er leer.
+  // A loaded sigil that is still concealed is concealed from the search too —
+  // in every entry type. The state lives in the cache stamp: the length of the
+  // visible content changes as soon as one of several chargings reaches its
+  // target date — then it is re-read. Likewise when the content was only
+  // loaded after startup (`pendingContent`): before that it is empty.
   const today = todayIso();
   const visibleText = (id: string, updatedAt: string, content: string) => {
     const visible = withoutConcealed(content, today);
@@ -257,18 +257,18 @@ export function searchCorpus(corpus: SearchCorpus, rawQuery: string): SearchHit[
     push('tag', tag.id, tag.name, matchRecord(q, tag.name, null, () => []));
   }
 
-  // Eine Sprache ist ihr Name — mehr Text trägt sie nicht.
+  // A language is its name — it carries no more text than that.
   for (const language of corpus.languages.filter(notDeleted)) {
     push('language', language.id, language.name,
       matchRecord(q, language.name, null, () => []),
       { updatedAt: language.updated_at });
   }
 
-  // Eine Vokabel steht mit beiden Seiten im Titel: gesucht wird mal nach dem
-  // Wort der Sprache, mal nach dem eigenen, und beide sollen den Treffer
-  // lesbar machen. Die `id` ist die der Vokabel (sie macht den Treffer
-  // eindeutig); gesprungen wird über `languageId`, denn eine eigene Seite hat
-  // ein Wort nicht.
+  // A word has both sides in its title: sometimes the search is for the
+  // word of the language, sometimes for the user's own, and both should make
+  // the hit readable. The `id` is the word's (it makes the hit
+  // unique); the jump goes via `languageId`, since a word has no page
+  // of its own.
   for (const entry of corpus.lexiconEntries) {
     const title = [entry.term, entry.translation].filter(Boolean).join(' – ');
     if (!title) continue;

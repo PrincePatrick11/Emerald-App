@@ -8,14 +8,14 @@ import { useSettingsStore } from '../store/settingsStore';
 import { buildLinkItems } from '../lib/linkItems';
 import type { SuggestionItem } from '../components/editor/SuggestionList';
 
-/** Das letzte Ergebnis samt Eingaben — geteilt über alle Aufrufer. */
+/** The last result together with its inputs — shared across all callers. */
 let shared: { deps: readonly unknown[]; items: SuggestionItem[] } | null = null;
 
 /**
- * Jeder Text-Editor eines Eintrags ruft `useLinkItems` — ein `useMemo` je
- * Instanz rechnete dieselbe Liste über den ganzen Vault so oft, wie Editoren
- * offen sind. Bei denselben Eingaben (Store-Arrays sind bis zur nächsten
- * Änderung identisch) gibt es das Ergebnis des ersten zurück.
+ * Every text editor of an entry calls `useLinkItems` — a `useMemo` per
+ * instance computed the same list over the whole vault as many times as
+ * editors are open. For the same inputs (store arrays are identical until
+ * the next change) the result of the first call is returned.
  */
 function sharedLinkItems(deps: readonly unknown[], build: () => SuggestionItem[]): SuggestionItem[] {
   if (shared && shared.deps.length === deps.length && shared.deps.every((d, i) => d === deps[i])) return shared.items;
@@ -24,8 +24,8 @@ function sharedLinkItems(deps: readonly unknown[], build: () => SuggestionItem[]
 }
 
 /**
- * Die React-Seite von `buildLinkItems` — dort steht, was die Liste enthält und
- * warum. Hier nur die Store-Abos und das (geteilte) Memo.
+ * The React side of `buildLinkItems` — that is where it says what the list
+ * contains and why. Here only the store subscriptions and the (shared) memo.
  */
 export function useLinkItems(): SuggestionItem[] {
   const { t } = useTranslation();

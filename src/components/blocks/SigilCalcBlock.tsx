@@ -11,11 +11,11 @@ import type { CalcMode } from '../../lib/blocks/fields';
 import type { BlockViewProps } from './blockViews';
 
 /**
- * Der Sigillen-Rechner: aus der Absicht die Buchstabenbank (jeder Buchstabe
- * einmal), und welche davon schon in der Zeichnung stecken. Solange eine
- * Ladung, die ihn verdeckt, geladen ist, schreibgeschützt; bis zu ihrem
- * Zieldatum verborgen — auch beim Bearbeiten, sonst zeigte „Bearbeiten"
- * (Sperre „nur Sigille") ihn vorzeitig.
+ * The sigil calculator: from the intent the letter bank (each letter
+ * once), and which of them are already in the drawing. As long as a
+ * charge that conceals it is loaded, read-only; hidden until its
+ * target date, also when editing, otherwise "Edit"
+ * (lock "sigil only") would show it prematurely.
  */
 export default function SigilCalcBlock({ block, isEditing, onBlockChange, sigil, part }: BlockViewProps) {
   const calc = parseSigilCalc(block);
@@ -34,9 +34,9 @@ export default function SigilCalcBlock({ block, isEditing, onBlockChange, sigil,
 }
 
 /**
- * Die Buchstabenbank. Die Kacheln sind bewusst kein `Button`: ein
- * Buchstabe, der zwischen „offen" und „umgesetzt" wechselt, ist ein
- * Schalter im Inhalt, keine Aktion — Farben über `.block-sigil-letter`.
+ * The letter bank. The tiles are deliberately not a `Button`: a
+ * letter that switches between "open" and "applied" is a
+ * toggle in the content, not an action; colours via `.block-sigil-letter`.
  */
 function LetterBank({ calc, onToggle }: { calc: SigilCalc; onToggle?: (letter: string) => void }) {
   const { t } = useTranslation();
@@ -74,15 +74,15 @@ function CalcReader({ calc, locked }: { calc: SigilCalc; locked: boolean }) {
 type CalcData = Omit<SigilCalc, 'broken'>;
 
 /**
- * `mode` legt fest, welche Wege zur Buchstabenbank es gibt — ein eigener Block
- * kann den Rechner auf „nur automatisch" (aus der Absicht) oder „nur manuell"
- * (Buchstaben von Hand) festlegen; der Block allein bietet beide.
+ * `mode` determines which ways to the letter bank exist. A custom block
+ * can fix the calculator to "automatic only" (from the intent) or "manual only"
+ * (letters by hand); the block on its own offers both.
  */
 function CalcEditor({ calc, mode, onChange }: { calc: CalcData; mode: CalcMode; onChange: (next: CalcData) => void }) {
   const { t } = useTranslation();
   const [manual, setManual] = useState('');
 
-  // Neue Bank: was schon umgesetzt war und drin bleibt, bleibt umgesetzt.
+  // New bank: whatever was already applied and stays in remains applied.
   const setLetters = (letters: string[]) => onChange({ ...calc, letters, implemented: implementedIn(letters, calc.implemented) });
   const toggle = (letter: string) => onChange({
     ...calc,

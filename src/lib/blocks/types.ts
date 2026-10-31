@@ -1,64 +1,64 @@
 /**
- * Datentypen der funktionalen Blöcke.
+ * Data types of the functional blocks.
  *
- * Importregel für alles unter `lib/blocks/`: nur Typen, `lucide-react` und
- * andere reine `lib`-Module — keine React-Komponenten, keine Stores, kein
- * TipTap. Migrationen, Export und `scripts/check-blocks.mjs` benutzen diese
- * Dateien, und die laufen ohne Browser.
+ * Import rule for everything under `lib/blocks/`: only types, `lucide-react`
+ * and other pure `lib` modules — no React components, no stores, no
+ * TipTap. Migrations, export and `scripts/check-blocks.mjs` use these
+ * files, and those run without a browser.
  */
 
-/** `<herkunft>.<name>` — eingebaute Typen heißen `core.*`; die Form lässt
- *  später Erweiterungen (`meinplugin.x`) neben den eingebauten zu. */
+/** `<origin>.<name>` — built-in types are named `core.*`; the form later
+ *  allows extensions (`myplugin.x`) alongside the built-in ones. */
 export type BlockTypeId = `${string}.${string}`;
 
-/** Der Textblock: TipTap-HTML als inneres HTML seiner Section. */
+/** The text block: TipTap HTML as the inner HTML of its section. */
 export const TEXT_BLOCK_TYPE = 'core.text' satisfies BlockTypeId;
 
-/** Name eines Section-Attributs — nur `data-*` übersteht das Lesen (siehe `parseBlocks`). */
+/** Name of a section attribute — only `data-*` survives reading (see `parseBlocks`). */
 export type BlockAttrName = `data-${string}`;
 
 /**
- * Die Instanz-Attribute, die jeder Block tragen kann, unabhängig vom Typ.
- * Sie stehen am Block selbst — und damit im Inhalt: Cancel dreht sie mit dem
- * Text zurück, Export und Backup tragen sie ohne eigenes Feld.
+ * The instance attributes any block can carry, regardless of type.
+ * They sit on the block itself — and thus in the content: Cancel rolls them
+ * back along with the text, export and backup carry them without a field of their own.
  */
 export const BLOCK_ATTR = {
-  /** Datenformat-Version des Typs; fehlt = 1. */
+  /** Data format version of the type; missing = 1. */
   version: 'data-block-v',
-  /** `"1"`: im Lesemodus ausgeblendet, im Bearbeitungsmodus ausgegraut. */
+  /** `"1"`: hidden in read mode, greyed out in edit mode. */
   hidden: 'data-block-hidden',
-  /** Eigener Titel statt des Typnamens. */
+  /** Own title instead of the type name. */
   title: 'data-block-title',
-  /** `"1"`/`"0"`: Titel im Lesemodus zeigen — fehlt = Standard des Typs. */
+  /** `"1"`/`"0"`: show the title in read mode — missing = the type's default. */
   showTitle: 'data-block-show-title',
-  /** JSON: wie der Block aufgebaut ist (Feldblock: Elemente + Anzeigeregeln). */
+  /** JSON: how the block is built (field block: elements + display rules). */
   config: 'data-block-config',
-  /** JSON: skalare Werte des Blocks. Verweise und Bilder stehen im Markup (Slots). */
+  /** JSON: scalar values of the block. References and images are in the markup (slots). */
   data: 'data-block-data',
-  /** ID der eigenen Block-Definition, aus der dieser Block kopiert wurde. */
+  /** ID of the custom block definition this block was copied from. */
   origin: 'data-block-origin',
-  /** Revision der Definition zum Zeitpunkt der Kopie — kleiner als ihre aktuelle heißt „ältere Version". */
+  /** Revision of the definition at the time of the copy — lower than its current one means "older version". */
   rev: 'data-block-rev',
-  /** ID der Vorlage, mit der dieser Block in den Eintrag kam — jede Blockart. */
+  /** ID of the template with which this block came into the entry — every block kind. */
   template: 'data-template-origin',
 } as const;
 
 /**
- * Ein Block, wie er im gespeicherten `content` steht.
+ * A block as it stands in the stored `content`.
  *
- * `type` ist bewusst `string`, nicht `BlockTypeId`: gelesen wird auch, was
- * diese App-Version nicht kennt — ein Block aus einer neueren Version oder aus
- * einer fehlenden Erweiterung. Er muss unverändert zurückgeschrieben werden.
+ * `type` is deliberately `string`, not `BlockTypeId`: what this app version
+ * does not know is read too — a block from a newer version or from a missing
+ * extension. It must be written back unchanged.
  */
 export interface BlockInstance {
   id: string;
   type: string;
-  /** Inneres HTML der Section. Beim Textblock das TipTap-HTML. */
+  /** Inner HTML of the section. For the text block, the TipTap HTML. */
   html: string;
   /**
-   * Alle übrigen `data-*`-Attribute der Section (`data-block-v`,
-   * `data-block-hidden` …), dekodiert und in ihrer Reihenfolge — damit ein
-   * unbekannter Typ beim Speichern nichts verliert.
+   * All remaining `data-*` attributes of the section (`data-block-v`,
+   * `data-block-hidden` …), decoded and in their order — so that an
+   * unknown type loses nothing on saving.
    */
   attrs: Record<string, string>;
 }

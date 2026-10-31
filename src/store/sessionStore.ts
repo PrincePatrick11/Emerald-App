@@ -2,25 +2,25 @@ import { useCallback, useRef } from 'react';
 import { create } from 'zustand';
 
 /**
- * Der Arbeitszustand der Listen — Suche, Filter, Auswahl —, je Ansicht unter
- * einem Schlüssel wie `wiki.search`. Er überlebt den Wechsel des Moduls: wer
- * vom gefilterten Wiki kurz ins Journal schaut, findet den Filter wieder. Den
- * Neustart überlebt er nicht, und auch nicht den Vault-Wechsel oder das
- * Ersetzen aus einer Sicherung (`clearSessionState`, aus `closeAllTabs`) —
- * seine ids zeigten dann ins Leere.
+ * The working state of the lists — search, filters, selection — per view under
+ * a key like `wiki.search`. It survives a module switch: anyone who
+ * glances at the journal from the filtered wiki finds the filter again. It does
+ * not survive a restart, nor a vault switch or
+ * replacing from a backup (`clearSessionState`, from `closeAllTabs`) —
+ * its ids would then point into the void.
  *
- * Das Gegenstück, die Vorlieben (Ansicht, Sortierung, Klappzustände), bleibt
- * dauerhaft je Vault (`vaultPrefs`).
+ * The counterpart, the preferences (view, sorting, collapse states), stays
+ * permanently per vault (`vaultPrefs`).
  *
- * Importiert keinen anderen Store.
+ * Imports no other store.
  */
 const useSessionStore = create<{ values: Record<string, unknown> }>(() => ({ values: {} }));
 
 type Update<T> = T | ((prev: T) => T);
 
-/** Wie `useState`, aber für die Sitzung aufbewahrt. `initial` gilt, solange unter `key` nichts steht. */
+/** Like `useState`, but kept for the session. `initial` applies as long as nothing is stored under `key`. */
 export function useSessionState<T>(key: string, initial: T): [T, (next: Update<T>) => void] {
-  // Ein Anfangswert wie bei useState — ein neues Objekt je Render ändert nichts.
+  // An initial value as with useState — a new object per render changes nothing.
   const initialRef = useRef(initial);
   const stored = useSessionStore((s) => s.values[key]) as T | undefined;
   const value = stored === undefined ? initialRef.current : stored;

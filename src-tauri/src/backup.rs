@@ -61,7 +61,7 @@ pub struct Secrets<'a> {
 /// could be tried, `WRONG_PASSWORD` / `WRONG_RECOVERY_KEY` when one was wrong.
 fn open(bytes: &[u8], secrets: &Secrets) -> Result<Zeroizing<String>, String> {
     if !bytes.starts_with(MAGIC) {
-        // Vor der Verschlüsselung: reines JSON.
+        // From before encryption: plain JSON.
         return String::from_utf8(bytes.to_vec()).map(Zeroizing::new).map_err(|_| NOT_A_BACKUP.to_string());
     }
     if bytes.len() < PREFIX_LEN {

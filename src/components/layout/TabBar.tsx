@@ -38,18 +38,18 @@ function renderIconValue(icon: string | null | undefined, fallback: ReactNode) {
 
 function AltarTabIcon({ iconData }: { iconData: string | null | undefined }) {
   if (!iconData) return <Flame size={14} />;
-  // `/`-Pfade sind Presets aus public/ und gehen an imageSrc vorbei.
+  // `/` paths are presets from public/ and bypass imageSrc.
   const src = iconData.startsWith('/') ? iconData : imageSrc(iconData);
   if (src) return <img src={src} alt="" className="h-3.5 w-3.5 rounded object-cover" />;
   return <span className="text-sm leading-none">{iconData}</span>;
 }
 
 /**
- * Titel und Icon eines Tabs. Jeder Tab abonniert nur seinen eigenen Eintrag:
- * die Selektoren liefern das Objekt selbst, das sich nur bei einer Änderung an
- * genau diesem Eintrag ändert — so zieht eine Umbenennung sofort in den Tab,
- * ohne dass jeder Autosave eines anderen Eintrags die Leiste neu zeichnet.
- * (Stabile Getter wie `getEntry` abonnierten nichts: ihre Identität ändert sich nie.)
+ * Title and icon of a tab. Each tab subscribes only to its own entry:
+ * the selectors return the object itself, which only changes when exactly
+ * this entry changes — so a rename reaches the tab immediately,
+ * without every autosave of another entry redrawing the bar.
+ * (Stable getters like `getEntry` subscribed to nothing: their identity never changes.)
  */
 function TabButton({ view, onSelect, onClose }: { view: ActiveView; onSelect: () => void; onClose: () => void }) {
   const { t } = useTranslation();
@@ -108,8 +108,8 @@ function TabButton({ view, onSelect, onClose }: { view: ActiveView; onSelect: ()
   );
 }
 
-/** Wie lange die Layout-Animation nach dem Loslassen eines Tabs noch laeuft —
- *  reichlich fuer REORDER_SPRING, bis die ausgewichenen Tabs stehen. */
+/** How long the layout animation keeps running after a tab is released —
+ *  ample for REORDER_SPRING, until the tabs that moved aside have settled. */
 const REORDER_SETTLE_MS = 500;
 
 export default function TabBar() {
@@ -118,13 +118,13 @@ export default function TabBar() {
     useShallow((s) => ({ tabs: s.tabs, activeTabId: s.activeTabId, selectTab: s.selectTab, closeTab: s.closeTab, addTab: s.addTab, setTabsOrder: s.setTabsOrder }))
   );
   const scrollRef = useRef<HTMLUListElement>(null);
-  // Layout-Animation der Items nur, solange ein Tab gezogen wird — dort
-  // weichen die anderen ihm aus. Sonst federte jeder Tab hinterher, sobald sich
-  // die Leiste als Ganzes verschiebt (Eintragsliste per Drag breiter,
-  // Seitenleiste ein- oder ausgeblendet), und saesse waehrenddessen nicht
-  // buendig ueber dem Blatt. Nach dem Loslassen bleibt sie noch REORDER_SETTLE_MS
-  // an, damit ein Tab, der gerade erst ausgewichen ist, zu Ende federt statt zu
-  // springen.
+  // Layout animation of the items only while a tab is being dragged — there
+  // the others make way for it. Otherwise every tab would spring after it as soon as
+  // the bar as a whole shifts (entry list dragged wider,
+  // sidebar shown or hidden), and in the meantime would not sit
+  // flush above the sheet. After release it stays on for REORDER_SETTLE_MS,
+  // so that a tab that has only just made way finishes springing instead of
+  // jumping.
   const [reordering, setReordering] = useState(false);
   const settleTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
   const startReorder = () => { clearTimeout(settleTimer.current); setReordering(true); };
@@ -132,17 +132,17 @@ export default function TabBar() {
     clearTimeout(settleTimer.current);
     settleTimer.current = setTimeout(() => setReordering(false), REORDER_SETTLE_MS);
   };
-  // Wird der gezogene Tab mitten im Ziehen geschlossen (Tastenkuerzel), kommt
-  // kein `onDragEnd` mehr — der Schalter faellt dann mit der Tab-Zahl zurueck.
+  // If the dragged tab is closed mid-drag (keyboard shortcut), no more
+  // `onDragEnd` arrives — the switch then drops back with the tab count.
   useEffect(() => {
     if (reordering) endReorder();
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- nur bei geaenderter Tab-Zahl
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only when the tab count changes
   }, [tabs.length]);
   useEffect(() => () => clearTimeout(settleTimer.current), []);
 
-  // Der aktive Tab bleibt sichtbar — ein neuer per „+" ebenso wie einer, der
-  // von anderswo geoeffnet oder gewaehlt wurde. Von Hand gerechnet statt
-  // `scrollIntoView`: das scrollte auch die Vorfahren, die nur abschneiden.
+  // The active tab stays visible — a new one via "+" as well as one that was
+  // opened or chosen from elsewhere. Computed by hand instead of
+  // `scrollIntoView`: that would also scroll the ancestors, which only clip.
   useEffect(() => {
     const list = scrollRef.current;
     const item = list?.querySelector<HTMLElement>('.tab-item-active');
@@ -173,14 +173,14 @@ export default function TabBar() {
   if (tabs.length === 0) return null;
 
   return (
-    // Sitzt in der Titelleiste und beginnt ohne Polsterung, also buendig mit
-    // der linken Kante des Blatts darunter; die Tabs sind Pills darin. Die freien
-    // Raender und das flex-1-Element am Ende bleiben Ziehflaeche fuers Fenster
-    // (das Attribut vererbt sich nicht, s. TitleBar). Die Luecken zwischen den
-    // Pills nicht: ein Klick dorthin kurz nach einem Tab-Klick zaehlte als
-    // Doppelklick und maximierte das Fenster.
-    // Das Endelement hat eine Mindestbreite, damit auch bei vielen Tabs vor den
-    // Fensterknoepfen ein Stueck zum Verschieben des Fensters bleibt.
+    // Sits in the title bar and starts without padding, so flush with
+    // the left edge of the sheet below; the tabs are pills inside it. The free
+    // margins and the flex-1 element at the end remain a drag area for the window
+    // (the attribute is not inherited, see TitleBar). The gaps between the
+    // pills do not: a click there shortly after a tab click counted as a
+    // double click and maximized the window.
+    // The end element has a minimum width so that, even with many tabs, a piece
+    // remains in front of the window buttons for moving the window.
     <div
       data-tauri-drag-region
       className="tabbar flex h-full min-w-0 flex-1 items-center gap-0.5 overflow-hidden"
@@ -199,15 +199,15 @@ export default function TabBar() {
               <Reorder.Item
                 key={tab.id}
                 value={tab.id}
-                // Reorder.Items Typ kennt nur `true | 'position'`; `false`
-                // reicht es unveraendert an motion.li durch, wo es gilt.
+                // Reorder.Item's type only knows `true | 'position'`; `false`
+                // it passes through unchanged to motion.li, where it is valid.
                 layout={reordering as true}
                 onDragStart={startReorder}
                 onDragEnd={endReorder}
                 whileDrag={{ scale: 1.005 }}
                 transition={REORDER_SPRING}
                 style={{ position: 'relative' }}
-                // Schrumpfen von 180 bis 96px, darunter scrollt die Liste.
+                // Shrinks from 180 to 96px, below that the list scrolls.
                 className={`tab-item group flex h-[var(--tab-pill-h)] min-w-[96px] flex-[0_1_180px] items-center gap-2 rounded-md pl-2.5 pr-1 text-[13px] transition-colors ${
                   isActive ? 'tab-item-active font-medium' : 'tab-item-idle'
                 }`}
@@ -215,7 +215,7 @@ export default function TabBar() {
                 <TabButton view={tab.view} onSelect={() => selectTab(tab.id)} onClose={() => closeTab(tab.id)} />
                 <button
                   onClick={() => closeTab(tab.id)}
-                  // Am aktiven Tab immer da, an den anderen erst beim Ueberfahren.
+                  // Always there on the active tab, on the others only on hover.
                   className={`tab-close flex h-[22px] w-[22px] flex-shrink-0 items-center justify-center rounded-md transition-colors${
                     isActive ? '' : ' opacity-0 group-hover:opacity-100 focus-visible:opacity-100'
                   }`}

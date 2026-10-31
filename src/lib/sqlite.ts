@@ -1,15 +1,15 @@
 /**
- * Die Verbindung zu einer Vault-Datenbank — die Schnittstelle von
- * `@tauri-apps/plugin-sql`, aber über die eigenen Befehle in `db.rs`.
+ * The connection to a vault database — the interface of
+ * `@tauri-apps/plugin-sql`, but via our own commands in `db.rs`.
  *
- * Das Plugin öffnete jeden Pfad, den die WebView nannte, und konnte eine
- * Verbindung nicht verschlüsseln. Hier wird eine Datenbank über Vault-Id und
- * Datei benannt; den Pfad löst Rust über die Vault-Registry auf.
+ * The plugin opened any path the WebView named, and could not encrypt a
+ * connection. Here a database is named by vault ID and
+ * file; Rust resolves the path through the vault registry.
  *
- * `execute`, `select` und `close` verhalten sich wie beim Plugin: Werte werden
- * genauso gebunden, Zeilen kommen als Objekte in Spaltenreihenfolge, und jede
- * Anweisung landet auf einer beliebigen Verbindung des Pools — eine
- * Transaktion hält nur innerhalb eines `execute`-Strings.
+ * `execute`, `select` and `close` behave as with the plugin: values are
+ * bound the same way, rows come as objects in column order, and every
+ * statement lands on an arbitrary connection of the pool — a
+ * transaction holds only within a single `execute` string.
  */
 import { invoke } from '@tauri-apps/api/core';
 
@@ -18,11 +18,11 @@ export interface QueryResult {
   lastInsertId?: number;
 }
 
-/** Die Datenbankdateien eines Vaults (`DbFile` in `db.rs`). */
+/** The database files of a vault (`DbFile` in `db.rs`). */
 export type DbFile = 'main' | 'importStaging';
 
 export default class Database {
-  /** Der Handle, unter dem Rust den Pool führt. */
+  /** The handle under which Rust keeps the pool. */
   readonly path: string;
 
   private constructor(path: string) {
@@ -43,9 +43,9 @@ export default class Database {
   }
 
   /**
-   * Mehrere Anweisungen als eine Transaktion auf einer Verbindung
-   * (`db_batch`) — alle oder keine. Eine Schleife über `execute` schriebe die
-   * Datei je Anweisung einmal fest. Liefert die betroffenen Zeilen insgesamt.
+   * Several statements as one transaction on one connection
+   * (`db_batch`) — all or none. A loop over `execute` would commit the
+   * file once per statement. Returns the total number of affected rows.
    */
   async batch(statements: ReadonlyArray<readonly [query: string, bindValues?: readonly unknown[]]>): Promise<number> {
     if (!statements.length) return 0;
@@ -59,7 +59,7 @@ export default class Database {
     return invoke<T>('db_select', { db: this.path, query, values: bindValues ?? [] });
   }
 
-  /** Schließt diesen Pool. Anders als beim Plugin nie alle. */
+  /** Closes this pool. Unlike with the plugin, never all of them. */
   async close(): Promise<boolean> {
     return invoke<boolean>('db_close', { db: this.path });
   }

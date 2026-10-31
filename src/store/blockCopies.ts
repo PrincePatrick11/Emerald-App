@@ -1,30 +1,29 @@
 /**
- * Was mit den Kopien eines eigenen Blocks in Einträgen und Vorlagen geschieht
- * — nur auf ausdrücklichen Wunsch aus der Blöcke-Ansicht: alle auf den Stand
- * der Definition bringen, oder (beim Löschen, zweite Bestätigung) alle
- * entfernen. Dazu, reaktiv, die Zahlen, die die Blöcke- und die
- * Vorlagen-Ansicht über diese Kopien und Herkünfte zeigen.
+ * What happens to the copies of a custom block in entries and templates
+ * — only on explicit request from the blocks view: bring all of them to the
+ * state of the definition, or (on delete, second confirmation) remove all of
+ * them. Plus, reactively, the numbers that the blocks and templates views
+ * show about these copies and origins.
  *
- * Geschrieben wird über `update*(id, { content })` der Stores — serialisiert
- * pro Eintrag, wie jede andere Änderung. Der Eintrag, der
- * gerade bearbeitet wird, bleibt aus: sein Editor hält den Inhalt und schriebe
- * beim nächsten Speichern den Stand von vorher zurück. Ein offener Eintrag im
- * Lesemodus übernimmt den neuen Stand selbst (`BlockStack`).
+ * Writing goes through the stores' `update*(id, { content })` — serialized
+ * per entry, like any other change. The entry that is currently being
+ * edited is skipped: its editor holds the content and would write the
+ * earlier state back on the next save. An open entry in read mode picks up
+ * the new state itself (`BlockStack`).
  *
- * Nur aktive Einträge — was im Papierkorb liegt, behält seine Kopie. Die
- * Änderung ist eine Folge des Blocks, keine an den Einträgen selbst:
- * „Zuletzt geändert" bleibt (`AS_A_CONSEQUENCE`, `lib/stamp.ts`), und nach
- * Änderung sortierte Listen bleiben, wie sie waren.
+ * Active entries only — whatever is in the trash keeps its copy. The
+ * change is a consequence of the block, not a change to the entries themselves:
+ * "Last modified" stays (`AS_A_CONSEQUENCE`, `lib/stamp.ts`), and lists sorted
+ * by modification stay as they were.
  *
- * Vorlagen tragen ebenfalls Kopien und werden mitgenommen — sonst brächte eine
- * Vorlage einen entfernten Block in jeden neuen Eintrag zurück. Sie zählen
- * getrennt von den Einträgen. Eine offene Vorlagen-Seite oder ein
- * ungespeicherter Entwurf lässt die Vorlage aus, wie das Bearbeiten einen
- * Eintrag.
+ * Templates also carry copies and are taken along — otherwise a template
+ * would bring a removed block back into every new entry. They are counted
+ * separately from the entries. An open template page or an unsaved draft
+ * leaves the template out, as editing does for an entry.
  *
- * Welche Module Blöcke tragen, sagt die Registry (`ModuleMeta.usesBlocks`);
- * die Stores dazu stehen hier und nur hier — Zählung, Herkunft und Umschreiben
- * lesen dieselbe Liste.
+ * Which modules carry blocks is stated by the registry (`ModuleMeta.usesBlocks`);
+ * the stores for them are listed here and only here — counting, origin and
+ * rewriting read the same list.
  */
 import { useMemo } from 'react';
 import { useEntryStore, allEntries, whenEntryContentLoaded } from './entryStore';
@@ -43,7 +42,7 @@ interface ContentRow {
   content: string;
 }
 
-/** Ein aktiver Eintrag mit Blockstapel. */
+/** An active entry with a block stack. */
 export interface EntryContentRow extends ContentRow {
   entryType: TemplateEntryType;
   title: string;
@@ -64,7 +63,7 @@ function contentSources(): ContentSource[] {
   ];
 }
 
-/** Die Einträge mit Blöcken, reaktiv — für Verwendungszahlen und die Herkunft aus Vorlagen. */
+/** The entries with blocks, reactive — for usage counts and the origin from templates. */
 export function useBlockContentRows(): EntryContentRow[] {
   const entries = useEntryStore((s) => s.entries);
   return useMemo(() => allEntries(entries).map((e) => ({
@@ -73,17 +72,17 @@ export function useBlockContentRows(): EntryContentRow[] {
 }
 
 export interface CopyUsage {
-  /** Einträge mit mindestens einer Kopie. */
+  /** Entries with at least one copy. */
   entries: number;
-  /** Davon mit mindestens einer Kopie in älterer Revision. */
+  /** Of those, with at least one copy in an older revision. */
   outdated: number;
-  /** Vorlagen mit mindestens einer Kopie. */
+  /** Templates with at least one copy. */
   templates: number;
-  /** Davon mit mindestens einer Kopie in älterer Revision. */
+  /** Of those, with at least one copy in an older revision. */
   outdatedTemplates: number;
 }
 
-/** Je Definition: in wie vielen Einträgen und Vorlagen sie steckt und wie viele davon eine ältere Version tragen. */
+/** Per definition: in how many entries and templates it appears and how many of those carry an older version. */
 export function copyUsage(
   rows: readonly ContentRow[],
   templates: readonly ContentRow[],
@@ -112,7 +111,7 @@ export function copyUsage(
   return usage;
 }
 
-/** Je Vorlagen-ID die Einträge mit mindestens einem Block aus ihr, zuletzt geänderte zuerst. */
+/** Per template ID, the entries with at least one block from it, most recently modified first. */
 export function templateEntries(rows: readonly EntryContentRow[]): Map<string, EntryContentRow[]> {
   const byTemplate = new Map<string, EntryContentRow[]>();
   for (const row of rows) {
@@ -128,30 +127,30 @@ export function templateEntries(rows: readonly EntryContentRow[]): Map<string, E
 
 export interface CopyRunResult {
   changed: number;
-  /** Davon Vorlagen. */
+  /** Of those, templates. */
   changedTemplates: number;
-  /** Übersprungen, weil gerade im Bearbeitungsmodus. */
+  /** Skipped because currently in edit mode. */
   skippedEditing: number;
-  /** Vorlagen, übersprungen, weil ihre Seite offen ist oder ein Entwurf wartet. */
+  /** Templates skipped because their page is open or a draft is pending. */
   skippedDrafts: number;
-  /** Einträge, in denen eine Kopie stehen blieb, weil eine geladene Sigille sie festhält. */
+  /** Entries in which a copy was left in place because a loaded sigil holds it. */
   skippedLocked: number;
   failed: number;
 }
 
 async function rewriteAll(defId: string, transform: (content: string) => string | null): Promise<CopyRunResult> {
   const result: CopyRunResult = { changed: 0, changedTemplates: 0, skippedEditing: 0, skippedDrafts: 0, skippedLocked: 0, failed: 0 };
-  // Ein Backup-Import tauscht gerade den Vault aus.
+  // A backup import is replacing the vault right now.
   if (editorSavesSuspended()) return result;
-  // Über alle Inhalte: ein noch nicht nachgeladener (`pendingContent`) ist
-  // leer und enthielte scheinbar keine Kopie.
+  // Across all contents: one that has not been loaded yet (`pendingContent`) is
+  // empty and would seemingly contain no copy.
   await whenEntryContentLoaded();
   const session = useBlockSessionStore.getState().session;
   const editingId = session?.isEditing ? session.entryId : null;
   const templateDrafts = useTemplateDraftStore.getState().drafts;
 
   for (const source of contentSources()) {
-    // Billiger Vorfilter: ohne die ID steht auch keine Kopie im Inhalt.
+    // Cheap pre-filter: without the ID, no copy is in the content either.
     if (!source.content.includes(defId)) continue;
     if (hasFrozenCopy(source.content, defId)) result.skippedLocked += 1;
     const next = transform(source.content);
@@ -176,12 +175,12 @@ async function rewriteAll(defId: string, transform: (content: string) => string 
   return result;
 }
 
-/** Alle veralteten Kopien auf den Stand der Definition bringen. */
+/** Bring all outdated copies to the state of the definition. */
 export function updateAllCopies(def: BlockDefinition, text: FallbackText): Promise<CopyRunResult> {
   return rewriteAll(def.id, (content) => updateCopiesInContent(content, def, text));
 }
 
-/** Alle Kopien der Definition aus Einträgen und Vorlagen entfernen — nur über ein Backup umkehrbar. */
+/** Remove all copies of the definition from entries and templates — reversible only via a backup. */
 export function removeAllCopies(defId: string): Promise<CopyRunResult> {
   return rewriteAll(defId, (content) => removeCopiesFromContent(content, defId));
 }

@@ -1,12 +1,12 @@
 /**
- * Eine Vorlage in einen bestehenden Eintrag bringen — was dafür außerhalb des
- * Blockstapels geschieht: Titel und Tags über den Store des Eintrags (wie die
- * Eigenschaften-Seitenleiste im Bearbeiten, die Views übernehmen den Stand
- * über ihre Sync-Effekte) und „Als Vorlage speichern". Die Blöcke setzt der Stapel selbst
- * (`applyTemplate` im `BlockStack`) — er hält den lebenden Inhalt.
+ * Bringing a template into an existing entry — what happens for that outside the
+ * block stack: title and tags via the entry's store (like the
+ * properties sidebar in edit mode, the views pick up the state
+ * through their sync effects) and "Save as template". The blocks are set by the stack itself
+ * (`applyTemplate` in `BlockStack`) — it holds the live content.
  *
- * Import-Regel wie `blockCopies`: dieser Store liest die Inhalts-Stores und
- * den Vorlagen-Store, keiner von ihnen importiert zurück.
+ * Import rule as in `blockCopies`: this store reads the content stores and
+ * the template store, none of them imports back.
  */
 import { useEntryStore } from './entryStore';
 import { useTemplateStore } from './templateStore';
@@ -18,25 +18,25 @@ import {
   type Template, type TemplateEntryType, type TemplateFields,
 } from '../lib/blocks/templates';
 
-/** Was außer den Blöcken übernommen wird. */
+/** What is adopted besides the blocks. */
 export interface TemplateFieldOptions {
   /**
-   * Den Titel der Vorlage setzen (nur, wenn sie einen hat). `'ifUntitled'`:
-   * nur, solange der Eintrag keinen eigenen trägt (`mayTakeTemplateTitle`) —
-   * entschieden erst nach dem Speichern der laufenden Eingabe.
+   * Set the template's title (only if it has one). `'ifUntitled'`:
+   * only as long as the entry carries none of its own (`mayTakeTemplateTitle`) —
+   * decided only after saving the current input.
    */
   title: boolean | 'ifUntitled';
-  /** Die Tags der Vorlage ergänzen. */
+  /** Add the template's tags. */
   tags: boolean;
 }
 
-/** Wie eine Vorlage in den Stapel kommt. */
+/** How a template gets into the stack. */
 export interface TemplateApplyOptions extends TemplateFieldOptions {
-  /** Anhängen ans Ende oder den ganzen Inhalt ersetzen. Ein leerer Stapel wird immer ersetzt. */
+  /** Append at the end or replace the entire content. An empty stack is always replaced. */
   mode: 'append' | 'replace';
-  /** Die Vorlage, die sie ablöst („Andere Vorlage") — ihre Tags fallen vorher weg. */
+  /** The template it replaces ("Other template") — its tags are dropped beforehand. */
   replaces?: Template;
-  /** Danach den Hinweis „Vorlage angewendet" zeigen. */
+  /** Afterwards show the "Template applied" notice. */
   notice?: boolean;
 }
 
@@ -44,20 +44,20 @@ function entryFields(entryType: TemplateEntryType, id: string): (TemplateFields 
   return useEntryStore.getState().getEntry(id, entryType);
 }
 
-/** Schreibt nur, was sich an Titel oder Tags geändert hat. */
+/** Writes only what has changed in title or tags. */
 async function writeChangedFields(id: string, before: TemplateFields, after: TemplateFields): Promise<void> {
   const patch: Partial<TemplateFields> = {};
   if (after.title !== before.title) patch.title = after.title;
-  // Nicht nur die Länge: ein Tausch gegen gleich viele Tags ändert sie nicht.
+  // Not just the length: swapping for the same number of tags does not change it.
   if (after.tags.length !== before.tags.length || after.tags.some((tag, i) => tag !== before.tags[i])) patch.tags = after.tags;
   if (Object.keys(patch).length) await useEntryStore.getState().updateEntry(id, patch);
 }
 
 /**
- * Titel und Tags der Vorlage in den Eintrag (`fieldsWithTemplate`). Der
- * Aufrufer speichert vorher, was im Editor noch nicht gespeichert ist — sonst
- * läse das hier einen älteren Titel, und der Sync der View überschriebe die
- * laufende Eingabe.
+ * Title and tags of the template into the entry (`fieldsWithTemplate`). The
+ * caller first saves whatever is not yet saved in the editor — otherwise
+ * this would read an older title, and the view's sync would overwrite the
+ * current input.
  */
 export async function applyTemplateFields(
   entryType: TemplateEntryType,
@@ -71,9 +71,9 @@ export async function applyTemplateFields(
 }
 
 /**
- * Rückgängig nach einer automatisch eingesetzten Vorlage (`fieldsWithoutTemplate`)
- * — bei einem frisch angelegten Eintrag trug er keinen ihrer Tags schon vorher.
- * Die Blöcke leert der Stapel.
+ * Undo after an automatically applied template (`fieldsWithoutTemplate`)
+ * — for a freshly created entry it carried none of its tags beforehand.
+ * The stack clears the blocks.
  */
 export async function undoTemplateFields(
   entryType: TemplateEntryType,
@@ -86,12 +86,12 @@ export async function undoTemplateFields(
 }
 
 /**
- * Einen Eintrag als neue Vorlage speichern — sein Titel wird ihr Name, Inhalt
- * und Tags kommen mit. Ist der Eintrag gerade im Bearbeiten offen, zählt der
- * lebende Inhalt seines Stapels, nicht der letzte Autosave.
+ * Save an entry as a new template — its title becomes the name, content
+ * and tags come along. If the entry is currently open in edit mode, the
+ * live content of its stack counts, not the last autosave.
  */
 export async function saveEntryAsTemplate(entryType: TemplateEntryType, id: string): Promise<Template | undefined> {
-  // Auch aus dem Kontextmenü, für einen seit dem Start nie geöffneten Eintrag.
+  // Also from the context menu, for an entry never opened since startup.
   await useEntryStore.getState().ensureEntryContent(id);
   const entry = entryFields(entryType, id);
   if (!entry) return undefined;

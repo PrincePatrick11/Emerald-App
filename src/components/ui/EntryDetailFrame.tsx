@@ -6,21 +6,21 @@ import { MODULES, type EntryModuleId } from '../../lib/modules';
 import { displayTitle } from '../../lib/entryTitle';
 import TagInput from '../editor/TagInput';
 
-/** Der Seitentitel als Überschrift — Einträge, Altar und Dashboards
- *  (`DashboardTitle`, Home) stehen bewusst gleich groß. Eine Klassenkette,
- *  kein `@apply` in `.entry-view-title`: die Theme-Regeln für `.text-stone-100`
- *  griffen sonst nicht mehr. */
+/** The page title as a heading: entries, altar and dashboards
+ *  (`DashboardTitle`, Home) are deliberately the same size. One class chain,
+ *  no `@apply` in `.entry-view-title`: the theme rules for `.text-stone-100`
+ *  would otherwise no longer apply. */
 export const ENTRY_TITLE_HEADING_CLASSES = 'entry-view-title text-2xl font-semibold text-stone-100';
 
-/** Die Titelzeile als Eingabe — Einträge im Bearbeiten, der Altar und die Seiten der Bibliotheken (`LibraryPageFrame`). */
+/** The title line as an input: entries when editing, the altar and the libraries' pages (`LibraryPageFrame`). */
 export const ENTRY_TITLE_INPUT_CLASSES =
   `${ENTRY_TITLE_HEADING_CLASSES} w-full bg-transparent placeholder-stone-700 outline-none selectable`;
 
 /**
- * Die schmale Zeile über dem Titel: links der Weg zurück zur Übersicht
- * (Chevron und Modulname), rechts das Datum — im Bearbeiten stattdessen der
- * Status (`EntryStatus`). Geteilt von `EntryDetailFrame`, `LibraryPageFrame`
- * und `AltarView`; `inset` folgt dem Einzug des Titels darunter.
+ * The narrow row above the title: on the left the way back to the overview
+ * (chevron and module name), on the right the date, or when editing the
+ * status (`EntryStatus`) instead. Shared by `EntryDetailFrame`, `LibraryPageFrame`
+ * and `AltarView`; `inset` follows the indentation of the title below.
  */
 export function EntryHeaderRow({ back, meta, inset = 'px-8' }: {
   back: { label: string; onClick: () => void };
@@ -38,12 +38,12 @@ export function EntryHeaderRow({ back, meta, inset = 'px-8' }: {
   );
 }
 
-/** Ein Status in der Zeile über dem Titel: Punkt und Text. `warning` für Ungespeichertes. */
+/** A status in the row above the title: dot and text. `warning` for unsaved changes. */
 export function EntryStatus({ tone, children }: { tone: 'accent' | 'warning'; children: ReactNode }) {
   return (
     <span className="flex items-center gap-1.5">
-      {/* Ausgeschriebene Klassen: Tailwind erzeugt Regeln aus `@layer components`
-          nur für Namen, die wörtlich im Quelltext stehen. */}
+      {/* Spelled-out classes: Tailwind generates rules from `@layer components`
+          only for names that appear literally in the source. */}
       <span
         className={`entry-status-dot flex-shrink-0 ${tone === 'warning' ? 'entry-status-dot-warning' : 'entry-status-dot-accent'}`}
         aria-hidden
@@ -54,34 +54,34 @@ export function EntryStatus({ tone, children }: { tone: 'accent' | 'warning'; ch
 }
 
 interface EntryDetailFrameProps {
-  /** Bestimmt Zurück-Ziel/-Label und den Untitled-Platzhalter (Registry). */
+  /** Determines the back target/label and the Untitled placeholder (registry). */
   module: EntryModuleId;
   isEditing: boolean;
-  /** Rechts über dem Titel im Lesen, meist das Datum. Im Bearbeiten steht dort der Status. */
+  /** Top right above the title when reading, usually the date. When editing, the status is there. */
   meta?: ReactNode;
-  /** Edit-Mode: lokaler Titel-State; View-Mode: gespeicherter Titel. */
+  /** Edit mode: local title state; view mode: saved title. */
   title: string;
   onTitleChange: (value: string) => void;
-  /** Vor dem Titelblock (Wiki: Cover-Hero). */
+  /** Before the title block (wiki: cover hero). */
   aboveTitle?: ReactNode;
-  /** Zwischen Titel und Tags (Journal: Chips; Operations: Cover + Property-Chips). */
+  /** Between title and tags (journal: chips; operations: cover + property chips). */
   belowTitle?: ReactNode;
-  /** Weglassen = keine Tag-Zeile. Immer readOnly — editiert wird im Properties-Panel. */
+  /** Omit = no tag row. Always readOnly; editing happens in the properties panel. */
   tags?: { value: string[]; onChange: (tags: string[]) => void };
-  /** Der Körper scrollt im Frame — die sticky Toolbar des BlockStack braucht den Scrollbereich hier, nicht im Editor. */
+  /** The body scrolls within the frame; the BlockStack's sticky toolbar needs the scroll area here, not in the editor. */
   children: ReactNode;
 }
 
 /**
- * Der gemeinsame Detail-View-Rahmen von Journal, Wiki und Operations (auch
- * Sigillen, seit v41 Blöcke): Titelblock (Input ↔ h1), optionale Tag-Zeile,
- * Body-Container. Darüber die Kopfzeile (`EntryHeaderRow`): zurück zur
- * Übersicht des Moduls, rechts das Datum (`meta`) bzw. im Bearbeiten der
- * Status. `useEntryEditor`, `setEditActions` und der
- * `editorEpoch`-Key bleiben in den Views — der Frame ist rein präsentational.
+ * The shared detail-view frame of journal, wiki and operations (including
+ * sigils, blocks since v41): title block (input ↔ h1), optional tag row,
+ * body container. Above it the header row (`EntryHeaderRow`): back to the
+ * module's overview, on the right the date (`meta`) or, when editing, the
+ * status. `useEntryEditor`, `setEditActions` and the
+ * `editorEpoch` key stay in the views; the frame is purely presentational.
  *
- * AltarView bleibt bewusst außen vor: eigener Titelblock (px-6, Fullscreen-
- * Verhalten) — eine Teilnutzung bräuchte mehr Props als sie Zeilen spart.
+ * AltarView is deliberately left out: own title block (px-6, fullscreen
+ * behaviour); partial use would need more props than it saves lines.
  */
 export default function EntryDetailFrame({
   module, isEditing, meta,

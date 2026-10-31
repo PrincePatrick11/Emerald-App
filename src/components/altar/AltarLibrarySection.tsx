@@ -16,22 +16,22 @@ import { GroupDivider } from '../ui/Dashboard';
 import EmptyState from '../ui/EmptyState';
 import { AltarItemTile } from './AltarItemTile';
 
-/** Der Abschnitt als Ganzes klappt mit einem eigenen Schalter zu, unabhängig
- *  von den Kategorien darin (useCollapsedSet); beide bleiben je Vault erhalten. */
+/** The section as a whole collapses with its own toggle, independently of
+ *  the categories inside it (useCollapsedSet); both are kept per vault. */
 const SECTION_COLLAPSED_KEY = 'altar-library-collapsed';
 
 interface Props {
-  /** Das Suchfeld des Dashboards — trifft hier den Elementnamen. */
+  /** The dashboard's search field; here it matches the element name. */
   search: string;
   onNewElement: (categoryId?: string) => void;
   onEditElement: (item: AltarItem) => void;
 }
 
 /**
- * Die Altar-Bibliothek unter den Altären im Dashboard: 70px-Kacheln, dieselben
- * wie in der Leiste des Editors — dort zum Ziehen auf die Leinwand, hier zum
- * Bearbeiten. Sortierung und Gruppierung kommen aus dem Store, ihre Regler
- * stehen im Dashboard-Kopf.
+ * The altar library below the altars in the dashboard: 70px tiles, the same
+ * as in the editor's strip, where they are dragged onto the canvas and here
+ * edited. Sorting and grouping come from the store, their controls
+ * are in the dashboard header.
  */
 export function AltarLibrarySection({ search, onNewElement, onEditElement }: Props) {
   const { t } = useTranslation();
@@ -39,7 +39,7 @@ export function AltarLibrarySection({ search, onNewElement, onEditElement }: Pro
   const allCategories = useCategoryStore((s) => s.categories);
   const { isCollapsed: isGroupCollapsed, toggle } = useCollapsedSet('altar-library');
   const [sectionCollapsed, toggleSection] = usePersistedFlag(SECTION_COLLAPSED_KEY);
-  // Die Regler dazu stehen im Dashboard-Kopf (AltarView), darum im Store.
+  // The controls for these are in the dashboard header (AltarView), hence the store.
   const { sort, grouping } = useUIStore((s) => s.altarLibraryPrefs);
 
   const query = search.trim().toLowerCase();
@@ -48,9 +48,9 @@ export function AltarLibrarySection({ search, onNewElement, onEditElement }: Pro
     return sortItems(matched, sort, { date: (item) => item.created_at, title: (item) => item.name });
   }, [items, query, sort]);
 
-  // Nur Kategorien, in denen wirklich etwas liegt. `categoriesUsedBy` täte
-  // seit v39 dasselbe — es nimmt das Sammelbecken nicht mehr immer mit auf —,
-  // filtert aber gegen die Volliste statt gegen die schon gesuchte.
+  // Only categories that actually contain something. Since v39, `categoriesUsedBy`
+  // would do the same (it no longer always includes the catch-all bucket),
+  // but it filters against the full list instead of the already searched one.
   const categories = useMemo(() => {
     const used = new Set(filtered.map((item) => item.category_id));
     return allCategories.filter((cat) => used.has(cat.id));
@@ -69,9 +69,9 @@ export function AltarLibrarySection({ search, onNewElement, onEditElement }: Pro
     </div>
   );
 
-  // Ohne ein einziges Element ist die Bibliothek leer, auch wenn gesucht wird.
-  // Sonst fand nur die Suche nichts — dafür reicht die kleine Zeile, das große
-  // „Keine Treffer" steht schon über den Altären.
+  // Without a single element the library is empty, even while searching.
+  // Otherwise only the search found nothing, for which the small line is enough;
+  // the big "No results" is already shown above the altars.
   const emptyHint = items.length > 0
     ? <p className="text-xs text-stone-700 px-1 py-1">{t('search.noResults')}</p>
     : (
@@ -85,9 +85,9 @@ export function AltarLibrarySection({ search, onNewElement, onEditElement }: Pro
     );
 
   const renderBody = () => {
-    // Ohne Gruppen: ein Raster über alle Elemente. Die Kategorie-Köpfe
-    // entfallen mitsamt ihrem „hier anlegen" — dafür steht der Knopf in der
-    // Dashboard-Kopfzeile.
+    // Without groups: one grid across all elements. The category headers
+    // are dropped along with their "create here"; the button in the
+    // dashboard header covers that.
     if (grouping === 'flat') return filtered.length === 0 ? emptyHint : renderTiles(filtered);
     if (groups.length === 0) return emptyHint;
     return (
@@ -109,8 +109,8 @@ export function AltarLibrarySection({ search, onNewElement, onEditElement }: Pro
                   add={{ title: t('altar.addElement'), onClick: () => onNewElement(cat.id) }}
                 />
               ) : (
-                // Waisen: ihre Kategorie liegt im Papierkorb — es gibt
-                // nichts, worin man ein Element anlegen könnte.
+                // Orphans: their category is in the trash, so there is
+                // nothing to create an element in.
                 <CollapsibleGroupHeader
                   collapsed={isCollapsed}
                   onToggleCollapse={() => toggle(UNCATEGORIZED_KEY)}
@@ -131,8 +131,8 @@ export function AltarLibrarySection({ search, onNewElement, onEditElement }: Pro
 
   return (
     <div className="mt-8">
-      {/* Dieselbe Trennlinien-Überschrift wie die Timeline-Gruppen des
-          Dashboards — hier mit Chevron. */}
+      {/* The same divider heading as the timeline groups of the
+          dashboard, here with a chevron. */}
       <GroupDivider
         label={t('altar.libraryTitle')}
         collapsed={sectionCollapsed}

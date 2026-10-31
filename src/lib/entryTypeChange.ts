@@ -1,30 +1,30 @@
 /**
- * Den Typ eines Eintrags wechseln — Journal, Operation und Wiki untereinander,
- * die drei Module mit Blockstapel. Aufgaben und Altäre haben ein anderes
- * Datenmodell und bleiben, was sie sind.
+ * Changing an entry's type — journal, operation and wiki among each other,
+ * the three modules with a block stack. Tasks and altars have a different
+ * data model and stay what they are.
  *
- * Der Eintrag behält seine id: seine Zeile in `entries` bekommt den neuen Typ,
- * und alles, was ihn über `(id, Typ)` adressiert, zieht mit — Link-Chips in
- * Einträgen, Vorlagen und den Vorgaben eigener Blöcke, die `task_links`-Zeilen,
- * offene Tabs und ihre Verläufe. Titel, Inhalt, Tags und
- * Anlagedatum bleiben; die Nummer (`entry_number`) zählt im neuen Typ weiter.
- * Kategorie, Icon und Titelbild wandern zwischen Wiki und Operation mit — das
- * Journal kennt keine davon, sie fallen dort weg (die Seitenleiste fragt vorher).
+ * The entry keeps its id: its row in `entries` gets the new type,
+ * and everything that addresses it via `(id, type)` follows — link chips in
+ * entries, templates and the presets of custom blocks, the `task_links` rows,
+ * open tabs and their histories. Title, content, tags and
+ * creation date stay; the number (`entry_number`) continues counting in the new type.
+ * Category, icon and cover image move along between wiki and operation — the
+ * journal has none of them, they are dropped there (the sidebar asks beforehand).
  *
- * Der Inhalt bleibt, wie er ist: ein Standard greift nur beim Anlegen. Die
- * Vorlagen des neuen Typs stehen danach zum Einsetzen von Hand bereit.
+ * The content stays as it is: a default only applies on creation. The
+ * templates of the new type are then ready to be inserted by hand.
  *
- * Ein Wechsel mitten im Bearbeiten gehört zur Bearbeitung: ihr Ausgangsstand
- * zieht mit (`store/entryEdit.ts`), und Cancel bringt den Eintrag auf demselben
- * Weg zurück (`revertEntryType`) — in sein Modul, mit seiner alten Nummer.
+ * A change in the middle of editing belongs to the edit: its baseline
+ * moves along (`store/entryEdit.ts`), and Cancel brings the entry back the same
+ * way (`revertEntryType`) — into its module, with its old number.
  *
- * Ohne Transaktion (siehe `normalizeSchema.ts`): erst die Zeile, dann die
- * Verweise. Bricht es dazwischen ab, zeigen schlimmstenfalls einzelne Chips
- * noch den alten Typ — der Eintrag selbst ist nie doppelt und nie weg (bis v48
- * zog die Zeile zwischen drei Tabellen um).
+ * Without a transaction (see `normalizeSchema.ts`): first the row, then the
+ * references. If it aborts in between, at worst individual chips still
+ * show the old type — the entry itself is never duplicated and never gone (until v48
+ * the row moved between three tables).
  *
- * Import-Regel wie `dbBackup`: liest und schreibt die Stores von außen; keiner
- * von ihnen importiert zurück.
+ * Import rule like `dbBackup`: reads and writes the stores from the outside; none
+ * of them imports back.
  */
 import type Database from './sqlite';
 import { getDb, nextEntryNumber } from './db';
@@ -43,33 +43,33 @@ import { useBlockDefinitionStore } from '../store/blockDefinitionStore';
 import { useUIStore, withEditLock } from '../store/uiStore';
 import type { Entry, EntryType } from '../types';
 
-/** Die Typen, zwischen denen ein Eintrag wechseln kann — die Module mit Blockstapel. */
+/** The types an entry can switch between — the modules with a block stack. */
 export type ConvertibleEntryType = EntryType;
 
-/** Was ein Eintrag über den Typwechsel mitnimmt. */
+/** What an entry takes along through the type change. */
 type EntryCore = Pick<Entry, 'id' | 'title' | 'content' | 'tags' | 'created_at' | 'category_id' | 'icon' | 'cover_image'>;
 
 
 /**
- * Verliert der Eintrag etwas, wenn er `to` wird? Nur das Journal hat weniger
- * Eigenschaften als die anderen beiden.
+ * Does the entry lose anything when it becomes `to`? Only the journal has fewer
+ * properties than the other two.
  */
 export function typeChangeDropsProperties(entry: Pick<EntryCore, 'category_id' | 'icon' | 'cover_image'>, to: ConvertibleEntryType): boolean {
   return to === 'journal' && !!(entry.category_id || entry.icon || entry.cover_image);
 }
 
-/** Die Rücknahme eines Typwechsels: wohin, und mit welchem Stand. */
+/** The reversal of a type change: where to, and with which state. */
 interface Revert {
   origin: EditOrigin;
   fields: BaselineFields;
-  /** „Zuletzt geändert" vom Beginn der Bearbeitung. */
+  /** "Last modified" from the start of the edit. */
   stamp: string | undefined;
 }
 
 /**
- * Die Nummer, die ein Eintrag in `type` schon einmal hatte — oder die nächste,
- * wenn sie inzwischen ein anderer trägt (`nextEntryNumber` zählt vom höchsten
- * Wert weiter, und der war vielleicht dieser Eintrag).
+ * The number an entry already had once in `type` — or the next one,
+ * if someone else has taken it in the meantime (`nextEntryNumber` continues from the highest
+ * value, and that may have been this entry).
  */
 async function formerEntryNumber(db: Database, type: ConvertibleEntryType, id: string, former: number | undefined): Promise<number> {
   if (former !== undefined) {
@@ -81,7 +81,7 @@ async function formerEntryNumber(db: Database, type: ConvertibleEntryType, id: s
   return nextEntryNumber(db, type);
 }
 
-/** Gibt der Zeile den neuen Typ — samt den Feldern aus `core`, der Nummer in dessen Zählung und dem Stempel. */
+/** Gives the row the new type — along with the fields from `core`, the number in its numbering and the stamp. */
 async function retypeRow(
   db: Database, to: ConvertibleEntryType, core: EntryCore, entryNumber: number, updatedAt: string,
 ): Promise<Entry> {
@@ -97,10 +97,10 @@ async function retypeRow(
 }
 
 /**
- * Schreibt `content` jeder Zeile um, die einen Chip auf `id` trägt — auch im
- * Papierkorb, sonst käme ein wiederhergestellter Eintrag mit einem toten Link
- * zurück. Ohne `updated_at`: am Inhalt dieser Einträge hat niemand etwas
- * geändert. Liefert die neuen Inhalte je id, für die Stores.
+ * Rewrites `content` of every row that carries a chip pointing at `id` — also in the
+ * trash, otherwise a restored entry would come back with a dead link.
+ * Without `updated_at`: nobody changed anything about the content of these entries.
+ * Returns the new contents per id, for the stores.
  */
 async function retypeContentColumn(db: Database, table: string, id: string, to: ConvertibleEntryType): Promise<Map<string, string>> {
   const rows = await db.select<{ id: string; content: string }[]>(
@@ -121,26 +121,26 @@ function withContent<T extends { id: string; content: string }>(items: T[], chan
 }
 
 /**
- * Wechselt den Typ des Eintrags `id` von `from` nach `to` und öffnet ihn
- * überall unter dem neuen Typ. Ist er gerade im Bearbeiten offen, wird die
- * laufende Eingabe vorher gespeichert; das Bearbeiten geht danach im neuen
- * Modul weiter.
+ * Changes the type of entry `id` from `from` to `to` and opens it
+ * everywhere under the new type. If it is currently open in edit mode, the
+ * input in progress is saved first; editing then continues in the new
+ * module.
  */
 export async function changeEntryType(id: string, from: ConvertibleEntryType, to: ConvertibleEntryType): Promise<void> {
   if (from === to) return;
-  // Gesperrt, solange es schreibt: Fertig und Abbrechen gehören der Ansicht,
-  // die gleich abgebaut wird, und führten nach dem Wechsel auf ein Paar aus
-  // Typ und id, das es nicht mehr gibt.
+  // Locked while it writes: Done and Cancel belong to the view
+  // that is about to be torn down, and after the change they would act on a pair of
+  // type and id that no longer exists.
   await withEditLock(async () => {
-    // Vor der Kette unten: der Flush läuft selbst unter dem Schlüssel des Eintrags.
+    // Before the chain below: the flush itself runs under the entry's key.
     await useUIStore.getState().editActions?.flush?.();
-    // Der Inhalt zieht mit — auch bei einem Eintrag, der seit dem Start nie offen war.
+    // The content moves along — also for an entry that was never open since startup.
     await useEntryStore.getState().ensureEntryContent(id);
     await retypeEntry(id, from, to);
   });
 }
 
-/** Stellt die Link-Vorgaben eigener Blöcke, die auf `id` zeigen, auf den Typ `to` — `hit`, wenn es eine gab. */
+/** Sets the link presets of custom blocks that point at `id` to the type `to` — `hit` if there was one. */
 function retypeDefinitionTargets(elements: unknown, id: string, to: ConvertibleEntryType): { next: unknown; hit: boolean } {
   let hit = false;
   const next = remapDefinitionDefaults(elements, (name) => name, (target) => {
@@ -152,10 +152,10 @@ function retypeDefinitionTargets(elements: unknown, id: string, to: ConvertibleE
 }
 
 /**
- * Was noch nicht gespeichert ist und trotzdem auf den Eintrag zeigt: die
- * Ausgangsstände anderer Bearbeitungen und die Entwürfe von Vorlagen und
- * eigenen Blöcken (`base` wie `draft` — „Fertig" speichert nur den Unterschied).
- * Ohne das käme der alte Typ mit dem nächsten Cancel oder Fertig dort zurück.
+ * What is not saved yet and still points at the entry: the
+ * baselines of other edits and the drafts of templates and
+ * custom blocks (`base` as well as `draft` — "Done" saves only the difference).
+ * Without this, the old type would come back there with the next Cancel or Done.
  */
 function retypeUnsavedLinks(id: string, to: ConvertibleEntryType): void {
   retypeBaselineLinks(id, to);
@@ -184,11 +184,11 @@ function retypeUnsavedLinks(id: string, to: ConvertibleEntryType): void {
 }
 
 /**
- * Nimmt die Typwechsel einer Bearbeitung zurück: der Eintrag `id`, gerade vom
- * Typ `from`, wird wieder, was er beim Betreten war — Typ und Nummer aus
- * `origin`, die Felder aus dem Ausgangsstand, „Zuletzt geändert" eingeschlossen.
- * Die offene Seite steht danach im Lesen. Ohne Flush: die laufende Eingabe
- * wird ja verworfen. `false`, wenn es den Eintrag unter `from` nicht mehr gibt.
+ * Reverts the type changes of an edit: the entry `id`, currently of
+ * type `from`, becomes again what it was on entering — type and number from
+ * `origin`, the fields from the baseline, "last modified" included.
+ * The open page is then in reading mode. Without a flush: the input in progress
+ * is discarded anyway. `false` if the entry no longer exists under `from`.
  */
 export function revertEntryType(
   id: string, from: ConvertibleEntryType, origin: EditOrigin, fields: BaselineFields, stamp: string | undefined,
@@ -197,9 +197,9 @@ export function revertEntryType(
 }
 
 /**
- * Der eine Weg in beide Richtungen: die Zeile, dann alles, was den Eintrag
- * über `(id, Typ)` adressiert. Mit `revert` kommen die Felder aus dem
- * Ausgangsstand statt aus dem Store, und die Bearbeitung endet.
+ * The one path in both directions: the row, then everything that addresses the entry
+ * via `(id, type)`. With `revert` the fields come from the
+ * baseline instead of the store, and the edit ends.
  */
 function retypeEntry(id: string, from: ConvertibleEntryType, to: ConvertibleEntryType, revert?: Revert): Promise<boolean> {
   return serialized(serialKey('entry', id), async () => {
@@ -215,16 +215,16 @@ function retypeEntry(id: string, from: ConvertibleEntryType, to: ConvertibleEntr
       category_id: fields.category_id,
       icon: fields.icon,
       cover_image: fields.cover_image,
-      // Ein unbenannter Eintrag heißt danach wie ein unbenannter des neuen Typs.
-      // Ohne eigenen Titel bleibt er leer — „Unbenannt…" zeigt die neue Art von selbst.
-      // Der Ausgangsstand dagegen kommt zurück, wie er war.
+      // An untitled entry is afterwards called like an untitled one of the new type.
+      // Without a title of its own it stays empty — "Untitled…" shows the new kind by itself.
+      // The baseline, on the other hand, comes back as it was.
       title: (revert || hasOwnTitle(fields.title)) ? fields.title : '',
-      // Ein Link des Eintrags auf sich selbst zieht mit.
+      // A link of the entry to itself moves along.
       content: retypeInternalLinks(fields.content, id, to),
       ...(to === 'journal' ? { category_id: null, icon: undefined, cover_image: undefined } : {}),
     };
-    // Zurück zum Typ vom Beginn der Bearbeitung — über Cancel oder von Hand —
-    // bekommt der Eintrag seine Nummer von damals wieder.
+    // Back to the type from the start of the edit — via Cancel or by hand —
+    // the entry gets its number from back then again.
     const origin = revert?.origin ?? originOfEdit(id, from);
     const entryNumber = origin?.type === to
       ? await formerEntryNumber(db, to, id, origin.entry_number)
@@ -239,7 +239,7 @@ function retypeEntry(id: string, from: ConvertibleEntryType, to: ConvertibleEntr
     );
     let definitionsChanged = false;
     for (const row of definitionRows) {
-      // Ohne Revisionssprung: die Kopien in den Einträgen hat `retypeContentColumn` schon umgeschrieben.
+      // Without a revision jump: `retypeContentColumn` has already rewritten the copies in the entries.
       const { next, hit } = retypeDefinitionTargets(row.elements, id, to);
       if (!hit) continue;
       await db.execute('UPDATE block_definitions SET elements=$1 WHERE id=$2', [next, row.id]);
@@ -248,13 +248,13 @@ function retypeEntry(id: string, from: ConvertibleEntryType, to: ConvertibleEntr
 
     await db.execute('UPDATE task_links SET target_type=$1 WHERE target_id=$2', [to, id]);
 
-    // Ohne await dazwischen: der neue Typ steht im Store, bevor die Ansicht
-    // wechselt, und der alte verschwindet erst mit ihr — kein Frame, in dem
-    // der offene Tab auf einen Eintrag zeigt, den es nicht gibt.
-    // Zurückgenommen steht der Eintrag wieder an seinem Platz, nicht vorn wie ein neuer.
+    // No await in between: the new type is in the store before the view
+    // switches, and the old one disappears only with it — no frame in which
+    // the open tab points at an entry that does not exist.
+    // When reverted, the entry is back in its place, not at the front like a new one.
     useEntryStore.setState((s) => ({ entries: (revert ? withSortedEntry : withAddedEntry)(s.entries, converted) }));
-    // Der Ausgangsstand der Bearbeitung zieht mit, bevor die Tabs es tun; nach
-    // einer Rücknahme ist sie zu Ende, und er verfällt mit dem Wechsel ins Lesen.
+    // The baseline of the edit moves along before the tabs do; after
+    // a revert it is over, and it lapses with the switch to reading mode.
     if (!revert) carryBaseline(id, from, to, { type: from, entry_number: source.entry_number });
     useUIStore.getState().retypeEntryViews(id, viewTypeForEntryType(from), viewTypeForEntryType(to), { endEdit: !!revert });
     useEntryStore.setState((s) => ({
@@ -262,8 +262,8 @@ function retypeEntry(id: string, from: ConvertibleEntryType, to: ConvertibleEntr
         const next = withContent(list, entryContent);
         return type === from ? next.filter((e) => e.id !== id) : next;
       }),
-      // Die umgeschriebenen Inhalte sind der neueste Stand: ein noch laufendes
-      // Nachladen (`fetchEntries`) darf sie nicht mit seinem älteren ersetzen.
+      // The rewritten contents are the latest state: a reload still in
+      // progress (`fetchEntries`) must not replace them with its older one.
       pendingContent: s.pendingContent && withoutIds(s.pendingContent, entryContent.keys()),
     }));
     useTemplateStore.setState((s) => ({ templates: withContent(s.templates, templateContent) }));

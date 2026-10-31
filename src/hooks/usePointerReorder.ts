@@ -1,14 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
 
 /**
- * Umsortieren per Griff, ohne Animation — die platzierten Elemente des Altars
- * und die Block-Verwaltung der Seitenleiste. Solange gezogen wird, zeigt
- * `visualItems` die Liste mit der Zeile an ihrem neuen Platz; losgelassen,
- * bekommt `onDrop` die neue Reihenfolge (nur, wenn sie sich geändert hat).
+ * Reordering by handle, without animation — the altar's placed elements
+ * and the sidebar's block management. While dragging, `visualItems` shows
+ * the list with the row in its new place; on release, `onDrop` receives the
+ * new order (only if it has changed).
  *
- * Die Zielposition misst jedes Kind von `listRef` an seinem ersten Kind (der
- * Zeile, ohne aufgeklappten Inhalt darunter) — die Liste darf also nur die
- * Zeilen-Wrapper als Kinder haben.
+ * The target position measures each child of `listRef` by its first child
+ * (the row, without expanded content below it) — so the list may only have
+ * the row wrappers as children.
  */
 export function usePointerReorder<T extends { id: string }>(items: readonly T[], onDrop: (ordered: T[]) => void) {
   const [dragState, setDragState] = useState<{ fromId: string; overIndex: number } | null>(null);
@@ -24,15 +24,15 @@ export function usePointerReorder<T extends { id: string }>(items: readonly T[],
     return list;
   }, [dragState, items]);
 
-  // Hält die Closures der Listener aktuell, ohne sie neu zu hängen.
+  // Keeps the listeners' closures current without re-attaching them.
   const itemsRef = useRef(items);
   itemsRef.current = items;
   const visualItemsRef = useRef(visualItems);
   visualItemsRef.current = visualItems;
   const onDropRef = useRef(onDrop);
   onDropRef.current = onDrop;
-  // Ein Drag, der beim Abbau noch läuft, darf nichts mehr fallen lassen —
-  // `onDrop` gehörte dann zu einer Liste, die es nicht mehr gibt.
+  // A drag that is still running at teardown must not drop anything any more —
+  // `onDrop` would then belong to a list that no longer exists.
   const stopRef = useRef<(() => void) | null>(null);
   useEffect(() => () => stopRef.current?.(), []);
 
@@ -41,8 +41,8 @@ export function usePointerReorder<T extends { id: string }>(items: readonly T[],
     const fromIndex = itemsRef.current.findIndex((item) => item.id === fromId);
     if (fromIndex < 0) return;
     stopRef.current?.();
-    // Losgelassen außerhalb des Fensters kommt `pointerup` sonst nie an.
-    try { (e.currentTarget as Element).setPointerCapture(e.pointerId); } catch { /* ohne Capture wie bisher */ }
+    // Released outside the window, `pointerup` would otherwise never arrive.
+    try { (e.currentTarget as Element).setPointerCapture(e.pointerId); } catch { /* without capture as before */ }
     setDragState({ fromId, overIndex: fromIndex });
 
     const getOverIndex = (clientY: number): number => {
@@ -77,7 +77,7 @@ export function usePointerReorder<T extends { id: string }>(items: readonly T[],
     stopRef.current = stop;
     document.addEventListener('pointermove', onMove);
     document.addEventListener('pointerup', onUp);
-    // Vom System abgebrochen (Fenster verloren, Touch-Geste): zurück, ohne Umsortieren.
+    // Cancelled by the system (window lost, touch gesture): back, without reordering.
     document.addEventListener('pointercancel', stop);
   }, []);
 

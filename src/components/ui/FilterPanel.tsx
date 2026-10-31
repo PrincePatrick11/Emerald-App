@@ -5,8 +5,8 @@ import FilterList, { type FilterChip } from './FilterList';
 import { SwitchRow } from './Switch';
 import { SidebarGroup } from './SidebarColumn';
 
-/** Ein Anzeige-Schalter: eine Vorliebe der Ansicht, kein Filter — zählt nicht
- *  in `activeFilterCount` und bleibt beim Zurücksetzen stehen. */
+/** A display toggle: a preference of the view, not a filter; it does not count
+ *  towards `activeFilterCount` and stays put on reset. */
 export interface DisplayToggle {
   label: string;
   icon?: LucideIcon;
@@ -19,28 +19,28 @@ export interface FilterPanelProps {
   chips?: FilterChip[];
   selectedChips?: string[];
   onChipToggle?: (value: string) => void;
-  /** Rendert vor den Werten eine „Alle"-Zeile: aktiv bei leerer Auswahl,
-   *  Klick leert sie (= alles anzeigen). */
+  /** Renders an "All" row before the values: active when the selection is empty,
+   *  a click clears it (= show everything). */
   onAllChips?: () => void;
-  /** Anzahl neben „Alle" — die Liste nach der Suche, ohne diesen Filter. */
+  /** Count next to "All": the list after the search, without this filter. */
   allChipsCount?: number;
-  /** Eigene „Anzeige"-Gruppe vor den Filtern (Tasks: „Erledigte anzeigen",
-   *  Altar: „Altar-Vorschau"). */
+  /** Separate "Display" group before the filters (tasks: "Show completed",
+   *  altar: "Altar preview"). */
   displayToggles?: DisplayToggle[];
 
-  /** Zweite Filtergruppe mit eigener Überschrift — Tasks: Prioritäten. */
+  /** Second filter group with its own heading; tasks: priorities. */
   statusChips?: FilterChip[];
   selectedStatus?: string[];
   onStatusToggle?: (value: string) => void;
   onAllStatus?: () => void;
   allStatusCount?: number;
-  /** Überschrift der statusChips-Gruppe; Default t('filters.status'). */
+  /** Heading of the statusChips group; default t('filters.status'). */
   statusLabel?: string;
 
-  /** Weitere Gruppen mit eigener Überschrift, für Regler, die weder Filter
-   *  noch Anzeige-Schalter sind — der Altar hängt die Sortierung seiner
-   *  Bibliothek hier ein, damit sie beim übrigen Dashboard-Kopf steht statt
-   *  im Inhalt. Sie stehen zuerst, direkt unter der Sortierung. */
+  /** Further groups with their own heading, for controls that are neither filters
+   *  nor display toggles: the altar hangs the sorting of its
+   *  library here so that it sits with the rest of the dashboard header instead of
+   *  in the content. They come first, directly below the sorting. */
   extraGroups?: { label: string; content: ReactNode }[];
 }
 
@@ -63,8 +63,8 @@ export default function FilterPanel({
   const { t } = useTranslation();
 
   return (
-    // Gruppen untereinander, ohne eigenes px/bg: die Spalte der rechten
-    // Seitenleiste (Dashboard-Portal) liefert den Einzug.
+    // Groups stacked, without their own px/bg: the right sidebar's
+    // column (dashboard portal) provides the indentation.
     <div className="flex flex-col gap-4">
       {extraGroups?.map((group) => (
         <SidebarGroup key={group.label} label={group.label}>
@@ -80,7 +80,7 @@ export default function FilterPanel({
         </SidebarGroup>
       )}
 
-      {/* Primäre Filter (Kategorie / Mondphase / Modul) */}
+      {/* Primary filters (category / moon phase / module) */}
       {chips && chips.length > 0 && onChipToggle && (
         <FilterList
           label={chipLabel}

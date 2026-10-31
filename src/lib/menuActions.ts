@@ -59,12 +59,12 @@ export const SELF_CONTAINED_MENU_ACTIONS = Object.keys(SELF_CONTAINED) as SelfCo
 
 /** Runs a menu action. Errors surface as native dialogs, matching the previous behaviour. */
 export async function runMenuAction(id: SelfContainedMenuActionId): Promise<void> {
-  // Diese vier brauchen keinen Vault und stehen deshalb vor der Sperre
-  // unten. Sie muessen es sogar: muda, Tauris Menue-Crate, kippt das Haekchen
-  // eines nativen Check-Eintrags selbst, bevor es das Event schickt — ein
-  // frueher Rueckkehren liesse auf macOS ein Haekchen ohne Zustand dahinter
-  // stehen, das der auf genau diesen Zustand gekeyte Sync-Effekt in
-  // `AppShell` nie korrigieren wuerde.
+  // These four need no vault and therefore come before the guard
+  // below. They even have to: muda, Tauri's menu crate, flips the checkmark
+  // of a native check item itself before it sends the event — returning
+  // early would leave a checkmark on macOS with no state behind it,
+  // which the sync effect in `AppShell`, keyed on exactly that state,
+  // would never correct.
   switch (id) {
     case 'toggle-rail':
       useUIStore.getState().toggleRail();
@@ -78,25 +78,25 @@ export async function runMenuAction(id: SelfContainedMenuActionId): Promise<void
     case 'toggle-view-lock':
       useUIStore.getState().toggleViewLock();
       return;
-    // Zeigt den Ladebildschirm noch einmal an, bis irgendwo hingeklickt wird.
-    // Steht hier oben bei den Toggles, weil er wie sie keinen Vault
-    // braucht — er soll sich auch waehrend der Vault-Einrichtung ansehen
-    // lassen, das ist der Moment, in dem man ihn am ehesten sucht.
+    // Shows the loading screen once more, until somewhere is clicked.
+    // Sits up here with the toggles because, like them, it needs no
+    // vault — it should be viewable during vault setup too,
+    // which is the moment when one is most likely to look for it.
     case 'show-splash':
       showSplash();
       return;
   }
 
-  // Waehrend der Vault-Einrichtung gibt es keine Datenbank, aber die Menuleiste
-  // steht — sie sitzt in der Titelleiste, und die bleibt sichtbar, damit sich
-  // das Fenster bedienen laesst. Ohne diese Sperre liefe „Exportieren" in einen
-  // rohen NO_ACTIVE_VAULT-Dialog, und „Markdown importieren" wartete auf ein
-  // Ziel-Modal, das im Setup gar nicht gemountet ist: das Versprechen loeste
-  // sich nie auf und poppte auf, sobald der erste Vault fertig war.
+  // During vault setup there is no database, but the menu bar
+  // is there — it sits in the title bar, which stays visible so that
+  // the window can be operated. Without this guard, "Export" would run into a
+  // raw NO_ACTIVE_VAULT dialog, and "Import Markdown" would wait for a
+  // target modal that is not even mounted during setup: the promise would never
+  // resolve and would pop up as soon as the first vault was ready.
   if (!hasActiveVault(useVaultStore.getState())) return;
 
-  // Die Export-/Import-Module (samt turndown und marked) werden erst beim
-  // ersten Menueaufruf geladen — sie hingen sonst ueber AppShell am Startpfad.
+  // The export/import modules (including turndown and marked) are only loaded on the
+  // first menu call — otherwise they would hang on the startup path via AppShell.
   switch (id) {
     case 'export-pdf': {
       const { exportAsPDF, noEntryMessage, exportErrorMessage } = await import('./export');

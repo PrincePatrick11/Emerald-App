@@ -32,11 +32,11 @@ const _dbCache = new Map<string, Database>();
 const _initPromises = new Map<string, Promise<Database>>();
 
 /**
- * Zählt jedes Mal, wenn die Datenbank unter ihren Lesern ausgetauscht wird: jedes
- * Schließen der Verbindungen (`resetDbCache`) und jeder eingetauschte Import
- * (`markDbReplaced`). Wer über mehrere awaits hinweg liest (das automatische
- * Backup), merkt daran, dass sein Stand nicht mehr aus einem Guss ist — auch
- * wenn am Ende wieder alles aussieht wie vorher.
+ * Counts every time the database is swapped out from under its readers: every
+ * closing of the connections (`resetDbCache`) and every swapped-in import
+ * (`markDbReplaced`). Anyone reading across several awaits (the automatic
+ * backup) can tell from it that their state is no longer all of a piece — even
+ * if in the end everything looks as before.
  */
 let _epoch = 0;
 
@@ -44,7 +44,7 @@ export function dbEpoch(): number {
   return _epoch;
 }
 
-/** Der Inhalt wurde ersetzt, die Verbindung blieb — nach dem Eintauschen eines Imports. */
+/** The content was replaced, the connection stayed — after swapping in an import. */
 export function markDbReplaced(): void {
   _epoch++;
 }
@@ -60,11 +60,11 @@ export function markDbReplaced(): void {
  */
 export async function resetDbCache(): Promise<void> {
   _epoch++;
-  // Erst die laufenden Ladevorgaenge abwarten, dann leeren. Ein `getDb()`
-  // traegt seine Verbindung erst *nach* `Database.load` in den Cache ein — wer
-  // nur leert, uebersieht genau die: sie landet danach in der frisch geleerten
-  // Map, wird nie geschlossen, und auf Windows bleibt die Datei bis zum
-  // Neustart gesperrt.
+  // First wait for the running loads, then clear. A `getDb()`
+  // enters its connection into the cache only *after* `Database.load` — anyone who
+  // just clears misses exactly those: they land in the freshly cleared
+  // map afterwards, are never closed, and on Windows the file stays locked
+  // until restart.
   const pending = [..._initPromises.values()];
   if (pending.length) await Promise.all(pending.map((p) => p.catch(() => null)));
 
@@ -82,14 +82,14 @@ let _blocked = false;
 /**
  * Runs `fn` with every connection closed and no new one allowed.
  *
- * Das Löschen der Dateien eines Vaults braucht die Datenbank entsperrt.
- * `resetDbCache()` allein reicht dafür nicht: die Editoren halten entprellte
- * Speicher-Timer, und einer, der in genau diesem Moment feuert, öffnet über
- * `getDb()` wieder die Datei, die gerade verschwinden soll.
+ * Deleting a vault's files needs the database unlocked.
+ * `resetDbCache()` alone is not enough for that: the editors hold debounced
+ * save timers, and one that fires at exactly that moment reopens, via
+ * `getDb()`, the file that is about to disappear.
  *
- * `getDb()` wirft solange `DB_CLOSED`. Die Speicher-Timer sind fire-and-forget
- * und fangen das ab — die verlorene Änderung gehört zu dem Vault, der gerade
- * gelöscht wird.
+ * Meanwhile `getDb()` throws `DB_CLOSED`. The save timers are fire-and-forget
+ * and catch that — the lost change belongs to the vault that is just being
+ * deleted.
  */
 export async function withDbClosed<T>(fn: () => Promise<T>): Promise<T> {
   _blocked = true;
@@ -114,8 +114,8 @@ export async function getDb(): Promise<Database> {
     await invoke('ensure_vault_dirs', { vaultId });
     const db = await Database.load(vaultId);
     await runMigrations(db);
-    // Von den Sicherungen vor einem Umbau (`backupDatabaseFile`) bleibt nur die
-    // jüngste. Scheitern darf das Öffnen daran nicht.
+    // Of the backups made before a rebuild (`backupDatabaseFile`) only the
+    // newest is kept. Opening must not fail because of this.
     await invoke('prune_migration_backups', { vaultId })
       .catch((e: unknown) => console.warn('[db] migration backups:', e));
     await runPeriodicCleanup(db, trashRetentionFor(vaultId));
@@ -132,10 +132,10 @@ type Migration = {
   version: number;
   name: string;
   /**
-   * Eingefrorene Historie: v1–v32, so wie bestehende Datenbanken sie gelaufen
-   * sind. Nur bei diesen werden „already applied"-Fehler geschluckt (siehe
-   * isAlreadyAppliedError). Neue Migrationen ab v33 tragen das Flag nicht und
-   * schlagen laut fehl, wenn etwas schiefgeht.
+   * Frozen history: v1–v32, as existing databases have run them. Only for
+   * these are "already applied" errors swallowed (see
+   * isAlreadyAppliedError). New migrations from v33 on do not carry the flag and
+   * fail loudly if anything goes wrong.
    */
   legacy?: true;
   up: (db: Database) => Promise<void>;
@@ -145,13 +145,13 @@ type Migration = {
  * Whether an error from a migration's `up` indicates the schema change was
  * already applied by an older version of the app.
  *
- * Gilt ausschließlich für `legacy`-Migrationen. Das Schlucken ist bequem, aber
- * gefährlich: Es bricht die *gesamte* restliche Migration ab und stempelt sie
- * trotzdem als angewendet. Genau daran ist v4 gescheitert — v1 legt `altars`
- * bereits mit `background_preset` an, v4 fängt mit einem ALTER für dieselbe
- * Spalte an, und alles danach (u. a. `altar_placements.altar_id` und das
- * Default-Altar-Seeding) wurde nie ausgeführt. Die Notfall-Migrationen v30 und
- * v31 existieren deshalb. Für neue Migrationen darf das nie wieder gelten.
+ * Applies exclusively to `legacy` migrations. Swallowing is convenient but
+ * dangerous: it aborts the *entire* rest of the migration and stamps it as
+ * applied anyway. That is exactly how v4 failed — v1 already creates `altars`
+ * with `background_preset`, v4 starts with an ALTER for the same
+ * column, and everything after it (including `altar_placements.altar_id` and the
+ * default altar seeding) was never executed. The emergency migrations v30 and
+ * v31 exist for that reason. This must never apply to new migrations again.
  */
 function isAlreadyAppliedError(err: unknown): boolean {
   const msg = err instanceof Error ? err.message : String(err);
@@ -159,10 +159,10 @@ function isAlreadyAppliedError(err: unknown): boolean {
 }
 
 /**
- * Ist das eine unberührte Datei? Dann bekommt sie das Baseline-Schema statt 33
- * Migrationsschritten. `schema_version` allein reicht als Kriterium nicht: Eine
- * Datenbank aus der Zeit vor dem Migrationssystem hätte Tabellen, aber keine
- * Versionstabelle — sie muss die Kette laufen.
+ * Is this an untouched file? Then it gets the baseline schema instead of 33
+ * migration steps. `schema_version` alone is not enough as a criterion: a
+ * database from before the migration system would have tables but no
+ * version table — it must run the chain.
  */
 async function isEmptyDatabase(db: Database): Promise<boolean> {
   const rows = await db.select<{ n: number }[]>(
@@ -172,11 +172,11 @@ async function isEmptyDatabase(db: Database): Promise<boolean> {
 }
 
 /**
- * Der Blöcke-Zweig stempelte seine drei Migrationen zuerst als v39–v41; v39
- * ging danach an `category_optional`. Ein Entwicklungs-Vault mit der alten
- * Zählung stünde sonst auf „v41 erledigt" und bekäme `category_optional` nie.
- * Einmalig über den Namen umstempeln (absteigend — `version` ist eindeutig)
- * und v39 nachholen; für jeden anderen Vault ein leerer Blick in die Tabelle.
+ * The blocks branch first stamped its three migrations as v39–v41; v39
+ * then went to `category_optional`. A development vault with the old
+ * numbering would otherwise sit at "v41 done" and never get `category_optional`.
+ * Re-stamp once by name (descending — `version` is unique)
+ * and catch up v39; for every other vault it is just a quick look at the table.
  */
 const RENUMBERED_BLOCK_MIGRATIONS: readonly [string, number][] = [
   ['sigils_to_blocks', 42],
@@ -217,14 +217,14 @@ export async function runMigrations(db: Database): Promise<void> {
     );
   }
 
-  // Frische Datei: Baseline direkt anlegen und die Kette überspringen.
+  // Fresh file: create the baseline directly and skip the chain.
   if (await isEmptyDatabase(db)) {
     await createSchema(db);
-    // Das Starter-Set entsteht in der Sprache, die beim ersten Öffnen aktiv
-    // ist — `main.tsx` wartet die gespeicherte Sprache ab, bevor irgendetwas
-    // die Datenbank öffnet.
+    // The starter set is created in the language that is active at first
+    // open — `main.tsx` waits for the stored language before anything
+    // opens the database.
     await seedBuiltins(db, (key) => i18n.t(`categories.starter.${key}`));
-    // Nicht in seedBuiltins: schema.ts importiert keine Blocklogik.
+    // Not in seedBuiltins: schema.ts imports no block logic.
     await seedSigilTemplate(db, i18n.t);
     const now = new Date().toISOString();
     await db.execute(
@@ -260,13 +260,13 @@ export async function runMigrations(db: Database): Promise<void> {
 }
 
 /**
- * Tabellen, aus denen das Leeren nach der Papierkorb-Frist des Vaults endgültig löscht. Läuft bei jedem
- * Öffnen eines Vaults, bewusst getrennt vom Migrationssystem — idempotent,
- * zeitabhängig und kein Teil der Schema-Historie.
+ * Tables from which the purge after the vault's trash retention period deletes permanently. Runs on every
+ * opening of a vault, deliberately separate from the migration system — idempotent,
+ * time-dependent and not part of the schema history.
  *
- * `categories` steht nicht hier: was noch auf eine Kategorie zeigt, muss erst
- * von ihr gelöst werden (ON DELETE RESTRICT, seit v33). Das macht
- * `runPeriodicCleanup` danach, wie das Leeren des Papierkorbs.
+ * `categories` is not here: whatever still points to a category must first
+ * be detached from it (ON DELETE RESTRICT, since v33). `runPeriodicCleanup`
+ * does that afterwards, like emptying the trash.
  *
  * Table names interpolated into SQL — must stay a hardcoded literal list.
  */
@@ -274,27 +274,27 @@ const CLEANUP_TABLES = [
   'entries',
   'tags',
   'tasks',
-  // Ohne Fremdschlüssel und ohne Nachlauf: Einträge tragen ihre Kopien selbst.
+  // No foreign keys and no follow-up: entries carry their own copies.
   'block_definitions',
   'templates',
-  // Ihre Vokabeln nimmt ON DELETE CASCADE mit — sie tragen kein eigenes `deleted_at`.
+  // ON DELETE CASCADE takes their vocabulary along — it carries no `deleted_at` of its own.
   'languages',
-  // Ebenso die Platzierungen eines Altars; was auf ihn zeigte, fegt `sweepDanglingTaskLinks`.
+  // Likewise an altar's placements; what pointed to it is swept by `sweepDanglingTaskLinks`.
   'altars',
-  // Und die eines Elements.
+  // And those of an item.
   'altar_items',
 ] as const;
 
 /**
- * Die nächste laufende Nummer eines Eintragstyps — jeder Typ zählt für sich,
- * wie zu Zeiten der drei Tabellen. Einträge im Papierkorb zählen mit, damit
- * eine Nummer nach dem Wiederherstellen nicht doppelt vorkommt.
+ * The next running number of an entry type — each type counts on its own,
+ * as in the days of the three tables. Entries in the trash count too, so that
+ * a number does not occur twice after a restore.
  *
- * Früher wurde `entry_number` gar nicht geschrieben — die Stores holten sich
- * beim Lesen `SELECT *, ROWID as entry_number` und überschrieben damit die
- * Spalte, die Migration v9 einmal befuellt hatte. Das ging so lange gut, bis
- * ein Replace-Import die ROWIDs neu vergab und sich alle angezeigten Nummern
- * verschoben. Jetzt wird die Nummer beim Anlegen vergeben und bleibt.
+ * Formerly `entry_number` was not written at all — the stores fetched
+ * `SELECT *, ROWID as entry_number` on read, overwriting the
+ * column that migration v9 had once filled. That worked until
+ * a replace import reassigned the ROWIDs and all displayed numbers
+ * shifted. Now the number is assigned on creation and stays.
  */
 export async function nextEntryNumber(db: Database, type: EntryType): Promise<number> {
   const rows = await db.select<{ n: number }[]>(
@@ -304,11 +304,11 @@ export async function nextEntryNumber(db: Database, type: EntryType): Promise<nu
   return rows[0]?.n ?? 1;
 }
 
-/** Wann das Ziel einer Verknüpfung existiert — dieselben Typen und dieselbe
- *  Regel wie `checkIntegrity` (schema.ts), sonst löscht der Sweep genau die
- *  Zeilen, die die Diagnose für gültig hält: ein Eintrag zählt nur unter
- *  seinem eigenen Typ. Soft-gelöschte Zeilen zählen bewusst mit:
- *  Papierkorb-Inhalte sind noch keine Waisen. */
+/** When the target of a link exists — the same types and the same
+ *  rule as `checkIntegrity` (schema.ts), otherwise the sweep deletes exactly the
+ *  rows the diagnosis considers valid: an entry counts only under
+ *  its own type. Soft-deleted rows deliberately count:
+ *  trash contents are not orphans yet. */
 const LINK_TARGET_EXISTS = `(
   (target_type IN ('journal', 'wiki', 'operation')
     AND EXISTS (SELECT 1 FROM entries e WHERE e.id = task_links.target_id AND e.type = task_links.target_type))
@@ -317,11 +317,11 @@ const LINK_TARGET_EXISTS = `(
 )`;
 
 /**
- * Die Papierkorb-Frist des Vaults, der gerade geöffnet wird — seine
- * Einstellungen lädt `openActiveVault` vor `getDb()`. Gehören die geladenen
- * Einstellungen einem anderen Vault, wird nicht geleert (`null`): dessen Frist
- * könnte einen auf „nie" gestellten Papierkorb unwiderruflich ausräumen. (Für
- * eine unlesbare `settings.json` setzt `loadForVault` die Frist selbst auf nie.)
+ * The trash retention period of the vault being opened right now — its
+ * settings are loaded by `openActiveVault` before `getDb()`. If the loaded
+ * settings belong to another vault, nothing is purged (`null`): that vault's period
+ * could irrevocably clear a trash set to "never". (For
+ * an unreadable `settings.json`, `loadForVault` itself sets the period to never.)
  */
 function trashRetentionFor(vaultId: string): number | null {
   const { vaultId: settingsVaultId, settings } = useSettingsStore.getState();
@@ -329,22 +329,22 @@ function trashRetentionFor(vaultId: string): number | null {
 }
 
 async function runPeriodicCleanup(db: Database, retentionDays: number | null): Promise<void> {
-  // Papierkorb-Inhalte älter als die eingestellte Frist endgültig löschen — „nie" überspringt das.
+  // Permanently delete trash contents older than the configured period — "never" skips this.
   if (retentionDays !== null) {
     const cutoff = new Date(Date.now() - retentionDays * 24 * 60 * 60 * 1000).toISOString();
-    // Tags hängen per ID an Einträgen: wer geht, geht vorher aus jeder Liste.
+    // Tags are attached to entries by ID: whoever goes is removed from every list first.
     const expiredTags = await db.select<{ id: string }[]>(
       'SELECT id FROM tags WHERE deleted_at IS NOT NULL AND deleted_at < $1',
       [cutoff]
     );
     await stripTagIds(db, expiredTags.map((t) => t.id));
-    // Eine Transaktion statt eines Commits je Tabelle — das läuft bei jedem Öffnen.
+    // One transaction instead of one commit per table — this runs on every open.
     await db.batch(CLEANUP_TABLES.map((table) => [
       `DELETE FROM ${table} WHERE deleted_at IS NOT NULL AND deleted_at < $1`,
       [cutoff],
     ] as const));
-    // Die Kategorien zuletzt, nachdem ihre Inhalte kategorielos sind. Hier
-    // reicht die Datenbank: die Stores laden erst nach `getDb()`.
+    // Categories last, after their contents are uncategorized. The database
+    // is enough here: the stores only load after `getDb()`.
     const expired = await db.select<{ id: string }[]>(
       'SELECT id FROM categories WHERE deleted_at IS NOT NULL AND deleted_at < $1',
       [cutoff]
@@ -357,9 +357,9 @@ async function runPeriodicCleanup(db: Database, retentionDays: number | null): P
 }
 
 /**
- * Nimmt Tag-IDs ohne Tag-Zeile aus jeder Liste. Entstehen kann so eine, wenn
- * ein Tag endgültig geht, während ein Entwurf oder ein offener Eintrag die
- * alte Liste noch hält und danach speichert.
+ * Removes tag IDs without a tag row from every list. One can arise when
+ * a tag is permanently deleted while a draft or an open entry still holds the
+ * old list and saves afterwards.
  */
 async function sweepDanglingTagIds(db: Database): Promise<void> {
   const known = new Set((await db.select<{ id: string }[]>('SELECT id FROM tags')).map((r) => r.id));
@@ -367,14 +367,14 @@ async function sweepDanglingTagIds(db: Database): Promise<void> {
 }
 
 /**
- * Entfernt Verknüpfungen, deren Ziel nicht mehr existiert.
+ * Removes links whose target no longer exists.
  *
- * `task_links.target_id` ist polymorph — `target_type` entscheidet, welche
- * Tabelle gemeint ist — und kann deshalb keinen Foreign Key tragen. Es räumt hier also nichts von selbst auf, und jedes endgültige
- * Löschen von Inhalten hinterlässt Waisen, wenn es nicht ausdrücklich passiert.
+ * `task_links.target_id` is polymorphic — `target_type` decides which
+ * table is meant — and therefore cannot carry a foreign key. So nothing cleans up here by itself, and every permanent
+ * deletion of content leaves orphans unless it happens explicitly.
  *
- * Wird sowohl vom Leeren nach der Frist als auch vom Leeren des Papierkorbs benutzt,
- * damit beide Wege dasselbe Ergebnis liefern.
+ * Used both by the purge after the retention period and by emptying the trash,
+ * so that both paths give the same result.
  */
 export async function sweepDanglingTaskLinks(db: Database): Promise<void> {
   await db.execute(`DELETE FROM task_links WHERE NOT ${LINK_TARGET_EXISTS}`);
@@ -1086,27 +1086,27 @@ export const MIGRATIONS: Migration[] = [
     },
   },
   {
-    // Erste Migration ohne `legacy`-Flag: Fehler werden nicht mehr geschluckt.
+    // First migration without the `legacy` flag: errors are no longer swallowed.
     //
-    // Bringt bestehende Datenbanken auf das Schema aus `schema.ts` — dasselbe
-    // DDL, das frische Vaults über den Baseline-Pfad bekommen. Ab hier sind die
-    // beiden Wege wieder deckungsgleich, und `scripts/schema-check.mjs` prueft
-    // genau das.
+    // Brings existing databases to the schema from `schema.ts` — the same
+    // DDL that fresh vaults get via the baseline path. From here on the
+    // two paths coincide again, and `scripts/schema-check.mjs` checks
+    // exactly that.
     //
-    // Der Ablauf steht in `normalizeSchema.ts`; er ist zu umfangreich, um hier
-    // noch lesbar zu sein.
+    // The procedure is in `normalizeSchema.ts`; it is too extensive to remain
+    // readable here.
     version: 33,
     name: 'normalize_schema',
     up: normalizeSchema,
   },
   {
-    // Eine eingebaute „Other"-Kategorie für Operationen. Bis hierher gab es nur
-    // `sigils` und `servitors`, weshalb Operationen einer gelöschten Kategorie
-    // bei den Sigillen landeten — inhaltlich falsch, denn eine Operation wird
-    // nicht dadurch zum Sigill, dass ihre Kategorie verschwindet.
+    // A built-in "Other" category for operations. Until here there were only
+    // `sigils` and `servitors`, so operations of a deleted category
+    // ended up with the sigils — wrong in substance, since an operation does
+    // not become a sigil just because its category disappears.
     //
-    // v33 legt sie auf Vaults an, die den Rebuild noch vor sich haben; dieser
-    // Schritt holt sie für alle nach, die ihn schon hinter sich haben.
+    // v33 creates it on vaults that still have the rebuild ahead of them; this
+    // step catches it up for all that already have it behind them.
     version: 34,
     name: 'operation_other_category',
     up: async (db) => {
@@ -1117,30 +1117,29 @@ export const MIGRATIONS: Migration[] = [
     },
   },
   {
-    // Bilder gehoeren ab hier dem Vault. Sie liegen in `{vaultDir}/images/`, und
-    // referenziert wird nur noch der Dateiname.
+    // From here on, images belong to the vault. They live in `{vaultDir}/images/`, and
+    // only the file name is referenced.
     //
-    // Vorher stand in `content` der absolute Pfad in eine Ablage, die sich alle
-    // Vaults geteilt haben. Das hat drei Dinge gleichzeitig kaputtgemacht: die
-    // Datenbank war an einen Rechner und einen Benutzer gebunden, ein Bild war
-    // aus jedem Vault sichtbar, und Aufraeumen war unmoeglich — `cleanup_unused_images`
-    // musste entfernt werden, weil es Bilder fremder Vaults als unbenutzt
-    // geloescht hat.
+    // Before, `content` held the absolute path into a store that all
+    // vaults shared. That broke three things at once: the
+    // database was tied to one machine and one user, an image was
+    // visible from every vault, and cleanup was impossible — `cleanup_unused_images`
+    // had to be removed because it deleted images of other vaults as unused.
     //
-    // Der Umzug der Datenbankdatei selbst ist *keine* Migration: sie zieht um,
-    // bevor sie geoeffnet wird. Das macht `migrate_vault_layout`, angestossen
-    // aus `vaultManager.loadVaultsFile()`.
+    // Moving the database file itself is *not* a migration: it moves
+    // before it is opened. That is done by `migrate_vault_layout`, triggered
+    // from `vaultManager.loadVaultsFile()`.
     version: 35,
     name: 'vault_scoped_images',
     up: async (db) => {
       const adopt = new Set<string>();
       const updates: { sql: string; params: unknown[] }[] = [];
 
-      // Bewusst ohne die `legacy`-Spalten aus IMAGE_FIELDS_V48: die halten
-      // Data-URLs, und ihre Renderer koennen mit einem Dateinamen nichts
-      // anfangen. Gelesen werden sie trotzdem — von
-      // `collectUsedImageFilenames`, damit die Aufraeum-Aktion nichts loescht,
-      // worauf sie noch zeigen.
+      // Deliberately without the `legacy` columns from IMAGE_FIELDS_V48: they hold
+      // data URLs, and their renderers cannot do anything with a file name.
+      // They are read all the same — by
+      // `collectUsedImageFilenames`, so that the cleanup action does not delete
+      // anything they still point to.
       for (const { table, html, plain } of IMAGE_FIELDS_V48) {
         const columns = [...html, ...plain];
         if (columns.length === 0) continue;
@@ -1181,13 +1180,13 @@ export const MIGRATIONS: Migration[] = [
         }
       }
 
-      // Erst kopieren, dann umschreiben. Schlaegt das Kopieren fehl, wird
-      // trotzdem umgeschrieben: der Protokoll-Handler faellt auf die alte
-      // gemeinsame Ablage zurueck, das Bild bleibt also sichtbar. Andersherum
-      // — umschreiben ohne Kopie und ohne Fallback — waere es weg.
-      // `adoptLegacyImages` schreibt in den *aktiven* Vault. Das passt, weil
-      // `runMigrations` ausschliesslich aus `getDb()` laeuft und das immer den
-      // aktiven Vault oeffnet — aber die Annahme steht nicht in der Signatur.
+      // Copy first, then rewrite. If copying fails, the rewrite
+      // happens anyway: the protocol handler falls back to the old
+      // shared store, so the image stays visible. The other way round
+      // — rewriting without a copy and without a fallback — it would be gone.
+      // `adoptLegacyImages` writes into the *active* vault. That works because
+      // `runMigrations` runs exclusively from `getDb()`, which always opens the
+      // active vault — but the assumption is not in the signature.
       if (adopt.size > 0) {
         try {
           await adoptLegacyImages([...adopt]);
@@ -1202,15 +1201,15 @@ export const MIGRATIONS: Migration[] = [
     },
   },
   {
-    // Die Journal-Spalten `linked_operation_ids`/`linked_wiki_ids` waren die
-    // beiden Verknüpfungs-Felder in der rechten Seitenleiste. An ihre Stelle
-    // tritt das Verlinkungs-Feld, das die Links aus dem INHALT des Eintrags
-    // liest — die Spalten hätten damit keine Anzeige mehr. Ihr Inhalt zieht
-    // deshalb hier einmalig als Link-Chip in den Text um.
+    // The journal columns `linked_operation_ids`/`linked_wiki_ids` were the
+    // two link fields in the right sidebar. They are replaced by the
+    // link field, which reads the links from the entry's CONTENT
+    // — the columns would then have no display anymore. Their content
+    // therefore moves once, here, into the text as a link chip.
     //
-    // Die Spalten selbst bleiben (Export, Import und checkIntegrity kennen
-    // sie), werden aber geleert: dieselbe Verknüpfung soll nicht an zwei
-    // Stellen stehen.
+    // The columns themselves stay (export, import and checkIntegrity know
+    // them), but are emptied: the same link should not appear in two
+    // places.
     version: 36,
     name: 'journal_linked_ids_to_content',
     up: async (db) => {
@@ -1218,12 +1217,12 @@ export const MIGRATIONS: Migration[] = [
     },
   },
   {
-    // Paradigma, Bannung und Meditation waren drei feste Felder am
-    // Journal-Eintrag, jedes auf eine Wiki-Kategorie festgelegt. Sie sind weg —
-    // ein Eintrag verlinkt jetzt frei, und das Verlinkungs-Feld zeigt die Ziele
-    // nach Kategorie sortiert. Wie bei v36 ziehen die gespeicherten Werte
-    // einmalig als Link-Chip in den Text um; die Spalten bleiben im Schema und
-    // werden geleert.
+    // Paradigm, banishing and meditation were three fixed fields on the
+    // journal entry, each tied to a wiki category. They are gone —
+    // an entry now links freely, and the link field shows the targets
+    // sorted by category. As with v36, the stored values move
+    // once into the text as a link chip; the columns stay in the schema and
+    // are emptied.
     version: 37,
     name: 'journal_paradigm_bannung_meditation_to_content',
     up: async (db) => {
@@ -1231,35 +1230,35 @@ export const MIGRATIONS: Migration[] = [
     },
   },
   {
-    // Vier Kategorie-Tabellen — eine je Modul, drei davon zeichengleich —
-    // werden die eine `categories`. Eine Kategorie kann seitdem Artikel,
-    // Operationen, Aufgaben und Altar-Elemente zugleich halten. Eingebaut
-    // bleiben nur `other` und `sigils`; alle anderen Builtins werden normale
-    // Kategorien, gleichnamige aus verschiedenen Modulen gehen ineinander auf.
+    // Four category tables — one per module, three of them identical in structure —
+    // become the one `categories`. A category can since then hold articles,
+    // operations, tasks and altar items at the same time. Only `other` and
+    // `sigils` stay built in; all other builtins become normal
+    // categories, same-named ones from different modules merge into each other.
     //
-    // Der Ablauf steht in `mergeCategoryTables.ts` — ein Rebuild wie v33, mit
-    // der Foreign-Key-Falle beim Umbenennen, die dort erklärt ist.
+    // The procedure is in `mergeCategoryTables.ts` — a rebuild like v33, with
+    // the foreign-key trap on renaming, which is explained there.
     version: 38,
     name: 'merge_category_tables',
     up: mergeCategoryTables,
   },
   {
-    // `category_id` wird nullable — „ohne Kategorie" ist der Normalfall eines
-    // neuen Eintrags statt eines Unfalls —, und `other` verliert seinen
-    // Sonderstatus. Ablauf und Foreign-Key-Falle in `nullableCategory.ts`.
+    // `category_id` becomes nullable — "uncategorized" is the normal case of a
+    // new entry rather than an accident —, and `other` loses its
+    // special status. Procedure and foreign-key trap in `nullableCategory.ts`.
     //
-    // Achtung beim Lesen von v38 darüber: Beide bauen aus demselben
-    // `TABLE_DDL`. Ein Vault von vor v38 bekommt dort also schon die nullable
-    // Spalte; v39 erkennt das und holt nur noch das `is_builtin` nach.
+    // Careful when reading v38 above: both build from the same
+    // `TABLE_DDL`. A vault from before v38 thus already gets the nullable
+    // column there; v39 recognises that and only catches up `is_builtin`.
     version: 39,
     name: 'category_optional',
     up: makeCategoryOptional,
   },
   {
-    // Die eigenen Blöcke der Blöcke-Ansicht bekommen ihre Tabelle. Rein
-    // additiv: Einträge tragen ihre Kopien im `content`, hier steht nur die
-    // Vorlage. IF NOT EXISTS, damit ein angelegter, aber nicht gestempelter
-    // Lauf beim nächsten Start nicht hängen bleibt.
+    // The custom blocks of the blocks view get their table. Purely
+    // additive: entries carry their copies in `content`, only the
+    // template is stored here. IF NOT EXISTS, so that a run that created the table but was not
+    // stamped does not get stuck at the next start.
     version: 40,
     name: 'block_definitions',
     up: async (db) => {
@@ -1268,20 +1267,20 @@ export const MIGRATIONS: Migration[] = [
     },
   },
   {
-    // Status, Enddatum und Version der Operationen waren feste Spalten mit
-    // Filter, Listenpunkt und Chips. Sie werden die Kopie eines eigenen
-    // Blocks „Status" im Inhalt; die Spalten bleiben und werden geleert.
-    // Ablauf in `migrateOperationStatusToBlocks.ts`.
+    // Status, end date and version of operations were fixed columns with
+    // filter, list item and chips. They become the copy of a custom
+    // "Status" block in the content; the columns stay and are emptied.
+    // Procedure in `migrateOperationStatusToBlocks.ts`.
     version: 41,
     name: 'operation_status_to_blocks',
     up: migrateOperationStatusToBlocks,
   },
   {
-    // Die Sigillen-Operation verliert ihre eigene Ansicht und ihre eigenen
-    // Spalten: Rechner, Zeichnung und Ladung werden Blöcke im Inhalt, die
-    // Zeichnung eine Bilddatei. Vorher eine Sicherung — die Zeichnungen
-    // wandern aus der Datenbank in Dateien. Ablauf in `migrateLegacySigils.ts`;
-    // was hier am Speichern scheitert, holt v49 (`unifyEntries.ts`) nach.
+    // The sigil operation loses its own view and its own
+    // columns: calculator, drawing and charge become blocks in the content, the
+    // drawing an image file. A backup first — the drawings
+    // move from the database into files. Procedure in `migrateLegacySigils.ts`;
+    // whatever fails to save here is caught up by v49 (`unifyEntries.ts`).
     version: 42,
     name: 'sigils_to_blocks',
     up: async (db) => {
@@ -1290,10 +1289,10 @@ export const MIGRATIONS: Migration[] = [
     },
   },
   {
-    // Die Vorlagen des Vorlagen-Dashboards bekommen ihre Tabelle. Dazu die
-    // eingebaute Vorlage „Sigille" als Standard für Operation × Sigillen —
-    // bis hierher war das Sigillen-Set neuer Operationen fest verdrahtet
-    // (`lib/blocks/layouts.ts`). Additiv und wiederholbar wie v40.
+    // The templates of the templates dashboard get their table. Plus the
+    // built-in template "Sigil" as the default for operation × sigils —
+    // until here the sigil set of new operations was hard-wired
+    // (`lib/blocks/layouts.ts`). Additive and repeatable like v40.
     version: 43,
     name: 'templates',
     up: async (db) => {
@@ -1303,18 +1302,18 @@ export const MIGRATIONS: Migration[] = [
     },
   },
   {
-    // Die Routinen hatten seit dem Umbau der Seitenleiste keinen Weg mehr in
-    // die Oberfläche; Vorlagen können alles, was sie konnten. Jede wird eine
-    // Vorlage ohne Zuweisung, danach entfällt die Tabelle. Vorher eine
-    // Sicherung, wenn es Routinen gibt. Ablauf in `migrateRoutinesToTemplates.ts`.
+    // Since the sidebar rework, routines had no way into
+    // the interface anymore; templates can do everything they could. Each becomes a
+    // template without an assignment, after which the table is dropped. A backup
+    // first if there are routines. Procedure in `migrateRoutinesToTemplates.ts`.
     version: 44,
     name: 'routines_to_templates',
     up: (db) => migrateRoutinesToTemplates(db, i18n.t),
   },
   {
-    // Das Lexikon bekommt seine beiden Tabellen: die Sprachen und ihre
-    // Vokabeln. Rein additiv und wiederholbar wie v40 und v43 — es gibt
-    // nichts umzuschreiben, das Modul ist neu.
+    // The lexicon gets its two tables: the languages and their
+    // vocabulary. Purely additive and repeatable like v40 and v43 — there is
+    // nothing to rewrite, the module is new.
     version: 45,
     name: 'lexicon',
     up: async (db) => {
@@ -1324,9 +1323,9 @@ export const MIGRATIONS: Migration[] = [
     },
   },
   {
-    // Altäre bekommen einen Papierkorb wie alles andere: bis hierher löschte
-    // der Knopf sofort und endgültig, ohne Rückfrage und ohne Rückweg.
-    // Additiv und wiederholbar — die Spalte kommt nur dazu, wo sie fehlt.
+    // Altars get a trash like everything else: until here the button deleted
+    // immediately and permanently, without confirmation and without a way back.
+    // Additive and repeatable — the column is only added where it is missing.
     version: 46,
     name: 'altars_soft_delete',
     up: async (db) => {
@@ -1338,9 +1337,9 @@ export const MIGRATIONS: Migration[] = [
     },
   },
   {
-    // `links` spiegelte bei jedem Speichern die Link-Chips eines Eintrags —
-    // für ein Rückverweis-Panel, das nie eingebunden wurde. Gelesen hat es
-    // niemand; die Chips selbst stehen im `content`. Die Indizes gehen mit.
+    // `links` mirrored an entry's link chips on every save —
+    // for a backlinks panel that was never wired in. Nobody ever read it;
+    // the chips themselves are in `content`. The indexes go with it.
     version: 47,
     name: 'drop_links',
     up: async (db) => {
@@ -1348,24 +1347,24 @@ export const MIGRATIONS: Migration[] = [
     },
   },
   {
-    // Neue Einträge heißen seit v48 leer, angezeigt wird „Unbenannt…" in der
-    // Sprache der App (`displayTitle`). Die englischen Standardtitel von früher
-    // werden leer — wiederholbar, ein Backup-Import ruft es auch.
+    // Since v48 new entries have an empty title, and "Untitled…" is displayed in the
+    // app's language (`displayTitle`). The English default titles of earlier times
+    // become empty — repeatable, a backup import calls it too.
     version: 48,
     name: 'untitled_is_empty',
     up: (db) => clearLegacyUntitledTitles(db, TITLED_TABLES_V48),
   },
   {
-    // Journal, Wiki und Operationen in eine Tabelle `entries` — die toten
-    // Spalten, `slug` und `moon_phase` bleiben dabei zurück (`unifyEntries.ts`).
+    // Journal, wiki and operations into one table `entries` — the dead
+    // columns, `slug` and `moon_phase` are left behind (`unifyEntries.ts`).
     version: 49,
     name: 'unify_entries',
     up: unifyEntries,
   },
   {
-    // Zwei Spalten, die nie jemand las: `tasks.tags` (Aufgaben hatten nie
-    // Tags) und `altars.intention` (das Feld aus der Zeit vor den Altären mit
-    // Hintergrund; v33 füllte es zuletzt). Wiederholbar.
+    // Two columns nobody ever read: `tasks.tags` (tasks never had
+    // tags) and `altars.intention` (the field from the time before altars with
+    // a background; v33 filled it last). Repeatable.
     version: 50,
     name: 'drop_dead_columns',
     up: async (db) => {
@@ -1374,17 +1373,17 @@ export const MIGRATIONS: Migration[] = [
     },
   },
   {
-    // Die zwölf Darstellungsspalten eines Altars werden eine JSON-Spalte
-    // `settings` (`lib/altarSettings.ts`). Ohne Neubau der Tabelle — ein DROP
-    // TABLE risse über ON DELETE CASCADE die Platzierungen mit. Wiederholbar:
-    // gefüllt wird nur, wo `settings` noch leer ist, und weg geht erst danach.
+    // The twelve display columns of an altar become one JSON column
+    // `settings` (`lib/altarSettings.ts`). Without rebuilding the table — a DROP
+    // TABLE would take the placements along via ON DELETE CASCADE. Repeatable:
+    // it is only filled where `settings` is still empty, and the old columns go only afterwards.
     version: 51,
     name: 'altar_settings',
     up: altarSettingsToJson,
   },
   {
-    // Altar-Elemente bekommen einen Papierkorb — bisher war ein gelöschtes
-    // sofort weg, von jedem Altar. Additiv und wiederholbar.
+    // Altar items get a trash — until now a deleted one was
+    // gone immediately, from every altar. Additive and repeatable.
     version: 52,
     name: 'altar_items_soft_delete',
     up: async (db) => {
@@ -1398,15 +1397,15 @@ export const MIGRATIONS: Migration[] = [
     },
   },
   {
-    // Tags per ID statt per Name (`tagsById.ts`).
+    // Tags by ID instead of by name (`tagsById.ts`).
     version: 53,
     name: 'tags_by_id',
     up: tagsById,
   },
   {
-    // Noch vier Spalten, die nichts mehr las oder schrieb: Beschreibung und
-    // Fälligkeit einer Aufgabe, die Beschreibung eigener Blöcke und Vorlagen —
-    // Felder ohne Eingabe. Wiederholbar wie v50.
+    // Four more columns that nothing read or wrote anymore: description and
+    // due date of a task, the description of custom blocks and templates —
+    // fields without input. Repeatable like v50.
     version: 54,
     name: 'drop_unused_descriptions',
     up: async (db) => {
@@ -1416,9 +1415,9 @@ export const MIGRATIONS: Migration[] = [
     },
   },
   {
-    // Die Listen-Spalten als Index (`idx_entries_list`, siehe `ENTRIES_INDEX_DDL`):
-    // der Start las sie sonst durch die Überlaufseiten jedes Inhalts.
-    // `idx_entries_deleted` geht darin auf. Wiederholbar.
+    // The list columns as an index (`idx_entries_list`, see `ENTRIES_INDEX_DDL`):
+    // startup would otherwise read them through the overflow pages of every content.
+    // `idx_entries_deleted` is merged into it. Repeatable.
     version: 55,
     name: 'entries_list_index',
     up: async (db) => {
@@ -1442,12 +1441,12 @@ async function altarSettingsToJson(db: Database): Promise<void> {
   await dropColumnsIfPresent(db, 'altars', ALTAR_SETTING_KEYS);
 }
 
-/** Die Tabellen, deren Zeilen einen Titel tragen, der leer sein darf. */
+/** The tables whose rows carry a title that may be empty. */
 const TITLED_TABLES = ['entries', 'tasks', 'altars'] as const;
 
 /**
- * Leert die englischen Standardtitel früherer Versionen (`LEGACY_UNTITLED_TITLES`).
- * `tables` ist für v48, die vor `entries` läuft.
+ * Empties the English default titles of earlier versions (`LEGACY_UNTITLED_TITLES`).
+ * `tables` is for v48, which runs before `entries`.
  */
 export async function clearLegacyUntitledTitles(
   db: Database,

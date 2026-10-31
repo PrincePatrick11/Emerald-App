@@ -10,9 +10,9 @@ import { usableTemplateTags } from '../../lib/templateTags';
 import { useTagMap, visibleTags } from '../../store/tagStore';
 
 /**
- * Eine Vorlage in einen Eintrag, der schon Inhalt hat: anhängen oder den
- * ganzen Inhalt ersetzen, dazu ob Titel und Tags mitkommen. Ein leerer Eintrag
- * braucht den Dialog nicht — dort setzt die Auswahl direkt ein.
+ * A template into an entry that already has content: append, or replace
+ * the whole content, plus whether title and tags come along. An empty entry
+ * does not need the dialog; there the selection inserts directly.
  */
 export default function TemplateApplyDialog({ template, onApply, onClose }: {
   template: Template;
@@ -22,7 +22,7 @@ export default function TemplateApplyDialog({ template, onApply, onClose }: {
   const { t } = useTranslation();
   const [mode, setMode] = useState<TemplateApplyOptions['mode']>('append');
   const hasTitle = !!template.title.trim();
-  // Nur, was wirklich ankommt — ein Tag im Papierkorb bleibt in der Vorlage.
+  // Only what actually arrives; a tag in the trash stays in the template.
   const shownTags = visibleTags(usableTemplateTags(template.tags), useTagMap()).map((tag) => tag.name);
   const hasTags = shownTags.length > 0;
   const [title, setTitle] = useState(false);

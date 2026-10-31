@@ -1,23 +1,23 @@
 /**
- * Erzeugt alle App-Symbole aus den beiden Vorlagen unter
+ * Generates all app icons from the two templates under
  * `src-tauri/icons/source/`.
  *
- * Nötig ist das Skript, weil zwei Vorlagen auf einen Ordner treffen:
- * `emerald.svg` ist freigestellt (Windows und Linux zeichnen keinen Kasten um
- * ein Symbol), `emerald-macos.svg` sitzt auf der gerundeten Platte, die macOS
- * erwartet und die `tauri icon` nicht selbst hinzufügt. Jeder Lauf von
- * `tauri icon` schreibt aber *alle* Ziele — ein zweiter Lauf überschriebe den
- * ersten vollständig. Deshalb: zwei Läufe in getrennte Ordner, und aus dem
- * zweiten wird allein `icon.icns` übernommen, die einzige Datei, die nur
- * macOS liest.
+ * The script is needed because two templates meet in one folder:
+ * `emerald.svg` is cut out (Windows and Linux draw no box around an
+ * icon), `emerald-macos.svg` sits on the rounded plate that macOS
+ * expects and that `tauri icon` does not add itself. Every run of
+ * `tauri icon` writes *all* targets, though — a second run would overwrite the
+ * first completely. Hence: two runs into separate folders, and from the
+ * second only `icon.icns` is taken, the one file that only
+ * macOS reads.
  *
- * Ohne dieses Skript wäre die naheliegende Handlung — ein `npx tauri icon` mit
- * der einen Vorlage, die man gerade zur Hand hat — genau die falsche, und der
- * Fehler fiele erst auf einem Mac auf.
+ * Without this script the obvious action — an `npx tauri icon` with
+ * whichever template happens to be at hand — would be exactly the wrong one, and the
+ * mistake would only show up on a Mac.
  *
- * Läuft nicht in CI: die Symbole liegen als Ergebnis im Repository, weil der
- * Rust-Build sie braucht und weil ihre Änderung eine gestalterische
- * Entscheidung ist und keine Bauleistung.
+ * Does not run in CI: the icons live in the repository as a result, because the
+ * Rust build needs them and because changing them is a design
+ * decision, not a build task.
  *
  *   npm run icons
  */
@@ -33,7 +33,7 @@ const work = mkdtempSync(join(tmpdir(), 'emerald-icons-'));
 const squareOut = join(work, 'square');
 const macOut = join(work, 'macos');
 
-/** `tauri` liegt als lokale Abhängigkeit; npm legt den Shim in node_modules/.bin. */
+/** `tauri` is a local dependency; npm puts the shim in node_modules/.bin. */
 function tauriIcon(source, out) {
   execFileSync('npm', ['exec', '--', 'tauri', 'icon', source, '-o', out], {
     stdio: ['ignore', 'ignore', 'inherit'],
@@ -45,16 +45,16 @@ try {
   tauriIcon(`${SOURCE}/emerald.svg`, squareOut);
   tauriIcon(`${SOURCE}/emerald-macos.svg`, macOut);
 
-  // Erst der vollständige freigestellte Satz …
+  // First the complete cut-out set …
   cpSync(squareOut, TARGET, { recursive: true });
-  // … dann die eine Datei, die von der Platte kommen muss.
+  // … then the one file that has to come from the plate.
   copyFileSync(join(macOut, 'icon.icns'), join(TARGET, 'icon.icns'));
 
-  // Und das Favicon, das `index.html` im Dev-Browser zeigt. Es fällt hier mit
-  // ab, statt eine fünfte handgepflegte Kopie der Geometrie zu sein.
+  // And the favicon that `index.html` shows in the dev browser. It comes out
+  // of this run too, instead of being a fifth hand-maintained copy of the geometry.
   copyFileSync(`${SOURCE}/emerald.svg`, 'public/favicon.svg');
 
-  console.log(`Icons erzeugt: ${TARGET} (icon.icns aus der macOS-Vorlage), public/favicon.svg`);
+  console.log(`Icons generated: ${TARGET} (icon.icns from the macOS template), public/favicon.svg`);
 } finally {
   rmSync(work, { recursive: true, force: true });
 }

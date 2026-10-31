@@ -129,8 +129,8 @@ fn check_space(dir: &Path) -> Result<(), String> {
     let copy = size(&dir.join(vault::DB_FILE))
         + size(&dir.join(vault::DRAFTS_FILE))
         + image_names(&images).iter().map(|name| size(&images.join(name))).sum::<u64>();
-    // Etwas Luft: der Kopf jeder versiegelten Datei, die Seitenstruktur der
-    // neuen Datenbank, das Journal beim Umschreiben der Bildnamen.
+    // Some headroom: the header of every sealed file, the page structure of
+    // the new database, the journal while the image names are rewritten.
     let needed = copy + copy / 20 + 64 * 1024 * 1024;
     match free_space(dir) {
         Some(free) if free < needed => Err(format!("{NOT_ENOUGH_SPACE}:{needed}:{free}")),
@@ -271,9 +271,9 @@ fn recover_interrupted(dir: &Path) -> Result<(), String> {
     if dir.join(MARKER).exists() {
         return finish_commit(dir).map(|_| ());
     }
-    // Ohne Marker ist das Original unberührt: nur wegräumen, was Schritt 1
-    // angelegt haben kann — Abfall unter einem Schlüssel, den es nie gab.
-    // Was sich jetzt nicht löschen lässt, ist beim nächsten Mal dran.
+    // Without a marker the original is untouched: only clear away what
+    // step 1 can have created — junk under a key that never existed. What
+    // cannot be deleted now is dealt with next time.
     remove_db_file(dir, DB_NEW);
     for name in [PENDING_KEY, PENDING_KEY_TEMP, DRAFTS_NEW, DRAFTS_NEW_TEMP, MARKER_TEMP] {
         std::fs::remove_file(dir.join(name)).ok();
@@ -293,9 +293,9 @@ fn finish_commit(dir: &Path) -> Result<bool, String> {
     let text = std::fs::read_to_string(dir.join(MARKER)).map_err(|e| format!("read {MARKER}: {e}"))?;
     let marker: Marker = serde_json::from_str(&text).map_err(|e| format!("{MARKER} is damaged, nothing was changed: {e}"))?;
 
-    // Der Marker gehört zu genau einem neuen Schlüssel. Liegt der weder
-    // bereit noch schon an seinem Platz, ist hier nichts zu tun — auch nicht,
-    // wenn jemand einen Marker untergeschoben hat.
+    // The marker belongs to exactly one new key. If that key is neither
+    // ready nor already in its place, there is nothing to do here — not
+    // even when someone slipped in a marker.
     let pending = keys::read_key_file_named(dir, PENDING_KEY)?.is_some_and(|f| f.check() == marker.check);
     let in_place = keys::read_key_file(dir)?.is_some_and(|f| f.check() == marker.check);
     if !pending && !in_place {
@@ -335,8 +335,8 @@ fn finish_commit(dir: &Path) -> Result<bool, String> {
     sync_dir(&images);
     sync_dir(dir);
 
-    // Ab hier steht der Vault unter dem neuen Schlüssel; was folgt, ist der
-    // alte Stand — Klartext, oder unter einem Schlüssel, den es nicht mehr gibt.
+    // From here on the vault is under the new key; what follows is the old
+    // state — plain text, or under a key that no longer exists.
     let keep: HashSet<&str> = marker.keep.iter().map(String::as_str).filter(|n| images::is_valid_image_name(n)).collect();
     let mut failed = Vec::new();
     for name in image_names(&images) {
@@ -530,7 +530,7 @@ async fn prepare(dir: &Path, source: Source<'_>, new_key: &Key, progress: OnProg
 
     progress(Progress { phase: Phase::Database, done: 0, total: 1 });
 
-    // Die Datenbank.
+    // The database.
     let new_file = dir.join(DB_NEW);
     let mut old = open_source(&dir.join(vault::DB_FILE), source).await?;
     let exported = async {
@@ -545,12 +545,12 @@ async fn prepare(dir: &Path, source: Source<'_>, new_key: &Key, progress: OnProg
         row_counts(&mut old).await
     }
     .await;
-    // Auch im Fehlerfall schließen: unter Windows ließe sich die halbe Kopie
-    // sonst nicht wegräumen.
+    // Close on failure too: on Windows the half-finished copy could not
+    // be cleared away otherwise.
     old.close().await.ok();
     let expected = exported?;
 
-    // Die Bilder: unter neuem Namen in den eigenen Ordner.
+    // The images: under a new name into the vault's own folder.
     let images = dir.join(vault::IMAGES_SUBDIR);
     let staged = dir.join(IMAGES_NEW);
     std::fs::create_dir_all(&staged).map_err(|e| format!("create {IMAGES_NEW}: {e}"))?;
@@ -562,7 +562,7 @@ async fn prepare(dir: &Path, source: Source<'_>, new_key: &Key, progress: OnProg
         progress(Progress { phase: Phase::Images, done: index, total });
         let bytes = std::fs::read(images.join(&name)).map_err(|e| format!("read {name}: {e}"))?;
         let Some(bytes) = plaintext(bytes, source, Context::Image(&name)) else {
-            // Bleibt, wie es ist — öffnen lässt es sich so wenig wie vorher.
+            // Stays as it is — it cannot be opened any more than before.
             eprintln!("[reencrypt] {name} does not open under this vault's key, kept as it is");
             keep.push(name);
             continue;
@@ -578,7 +578,7 @@ async fn prepare(dir: &Path, source: Source<'_>, new_key: &Key, progress: OnProg
     progress(Progress { phase: Phase::Images, done: total, total });
     sync_dir(&staged);
 
-    // Die Verweise in der Kopie, dann die Prüfung.
+    // The references in the copy, then the check.
     progress(Progress { phase: Phase::Checking, done: 0, total: 1 });
     let mut new_db = open_keyed(&new_file, &db_key).await?;
     let checked = async {
@@ -599,8 +599,8 @@ async fn prepare(dir: &Path, source: Source<'_>, new_key: &Key, progress: OnProg
         return Err("new copy does not match the original".into());
     }
 
-    // Die Entwürfe. Ein Link wird nicht verfolgt; Entwürfe, die sich nicht
-    // öffnen lassen, gehen verloren, wie sie es schon waren.
+    // The drafts. A link is not followed; drafts that cannot be opened
+    // are lost, as they already were.
     let drafts = dir.join(vault::DRAFTS_FILE);
     if is_regular_file(&drafts) {
         let bytes = std::fs::read(&drafts).map_err(|e| format!("read drafts: {e}"))?;
@@ -758,9 +758,10 @@ pub async fn vault_encrypt_existing(
     let dir = vault_dir_checked(&app, &vault_id)?;
     crate::db::close_vault(&app, &vault_id).await;
     let done = encrypt_dir(&dir, &password, keys::DEFAULT_KDF, &progress_events(&app, &vault_id)).await?;
-    // Bilder, die vorher angezeigt wurden, liegen im Klartext im Platten-Cache
-    // der WebView — damals noch mit `immutable` ausgeliefert. Weg damit; der
-    // Preis sind die übrigen Browserdaten (Spaltenbreiten, offene Tabs).
+    // Images that were shown earlier sit in plain text in the WebView's
+    // disk cache — back then still served with `immutable`. Get rid of
+    // them; the price is the remaining browser data (column widths, open
+    // tabs).
     {
         use tauri::Manager;
         if let Some(window) = app.get_webview_window("main") {
@@ -1015,13 +1016,13 @@ mod tests {
         let (file, new_key, _) = KeyFile::create("correct horse", TEST_KDF).unwrap();
         vault::write_atomic(&dir, PENDING_KEY, PENDING_KEY_TEMP, file.to_json().as_bytes()).unwrap();
         prepare(&dir, Source::Plain, &new_key, &quiet).await.unwrap();
-        // Absturz hier: kein Marker. Beim nächsten Öffnen wird aufgeräumt.
+        // Crash here: no marker. The next open cleans up.
         recover_interrupted(&dir).unwrap();
         assert!(!keys::is_encrypted_dir(&dir));
         assert_no_leftovers_except_backup(&dir);
         assert_eq!(stored_images(&dir), vec![image]);
         assert!(contains(&dir.join(vault::DB_FILE), "GEHEIM-MIGRATION"));
-        // Und es lässt sich danach ganz normal verschlüsseln.
+        // And it can be encrypted normally afterwards.
         encrypt_dir(&dir, "correct horse", TEST_KDF, &quiet).await.unwrap();
         assert!(keys::is_encrypted_dir(&dir));
         std::fs::remove_dir_all(&dir).ok();
@@ -1040,7 +1041,7 @@ mod tests {
         vault::write_atomic(&dir, PENDING_KEY, PENDING_KEY_TEMP, file.to_json().as_bytes()).unwrap();
         let keep = prepare(&dir, Source::Plain, &new_key, &quiet).await.unwrap();
         write_marker(&dir, &file, &keep);
-        // Absturz mitten im Tausch: die Datenbank ist schon beiseite gelegt.
+        // Crash in the middle of the swap: the database is already set aside.
         std::fs::rename(dir.join(vault::DB_FILE), dir.join(DB_OLD)).unwrap();
         recover_interrupted(&dir).unwrap();
         assert!(keys::read_key_file(&dir).unwrap().unwrap().accepts(&new_key));
@@ -1057,8 +1058,8 @@ mod tests {
 
     #[tokio::test]
     async fn a_marker_without_its_key_touches_nothing() {
-        // Ein Absturz-Überbleibsel ohne den neuen Schlüssel — oder ein
-        // untergeschobener Marker: kein Tausch, kein Löschen.
+        // A crash leftover without the new key — or a planted marker: no
+        // swap, no deletion.
         let (dir, image) = plain_vault().await;
         let (file, new_key, _) = KeyFile::create("correct horse", TEST_KDF).unwrap();
         vault::write_atomic(&dir, PENDING_KEY, PENDING_KEY_TEMP, file.to_json().as_bytes()).unwrap();
@@ -1091,7 +1092,7 @@ mod tests {
             recover_if_idle(&dir).unwrap();
             assert!(dir.join(PENDING_KEY).exists() && dir.join(IMAGES_NEW).exists() && dir.join(DB_NEW).exists());
         }
-        // Ohne laufenden Lauf ist es ein Absturzrest und wird weggeräumt.
+        // Without a run in progress it is a crash remnant and gets cleared away.
         recover_if_idle(&dir).unwrap();
         assert!(!dir.join(PENDING_KEY).exists() && !dir.join(IMAGES_NEW).exists());
         std::fs::remove_dir_all(&dir).ok();
@@ -1131,7 +1132,7 @@ mod tests {
         let new = format!("{}.png", "b".repeat(64));
         let map = HashMap::from([(old.clone(), new.clone())]);
         assert_eq!(rewrite_image_names(&format!("src=\"{old}\" x {old}"), &map), Some(format!("src=\"{new}\" x {new}")));
-        // Längere Hex-Folgen, andere Endungen und unbekannte Namen bleiben.
+        // Longer hex sequences, other extensions and unknown names stay.
         assert_eq!(rewrite_image_names(&format!("f{old}"), &map), None);
         assert_eq!(rewrite_image_names(&format!("{}.pngx", "a".repeat(64)), &map), None);
         assert_eq!(rewrite_image_names(&format!("{}.png", "c".repeat(64)), &map), None);

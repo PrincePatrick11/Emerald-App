@@ -21,14 +21,14 @@ import type { Language } from '../../types';
 import { useSessionState } from '../../store/sessionStore';
 
 /**
- * Die Rail-Ansicht „Lexikon", gebaut wie „Vorlagen": die Sprachen im
- * gemeinsamen Dashboard-Gerüst, ein Klick öffnet eine als eigene Seite
- * (`{ type: 'lexicon', id }`). Darunter, wie die Bibliothek unter den
- * Altären, das Übersetzen-Feld — es arbeitet mit allen Sprachen und gehört
- * deshalb neben die Liste, nicht auf eine einzelne Sprachseite.
+ * The rail view "Lexicon", built like "Templates": the languages in the
+ * shared dashboard scaffold, a click opens one as a page of its own
+ * (`{ type: 'lexicon', id }`). Below it, like the library under the
+ * altars, the translate field — it works with all languages and therefore
+ * belongs next to the list, not on a single language page.
  *
- * Löschen legt eine Sprache in den Papierkorb (mit Rückgängig); ihre Vokabeln
- * bleiben an ihr hängen und kommen mit ihr zurück.
+ * Deleting moves a language to the trash (with undo); its vocabulary
+ * stays attached to it and comes back with it.
  */
 export default function LexiconView() {
   const { t } = useTranslation();
@@ -40,7 +40,7 @@ export default function LexiconView() {
   const setActiveView = useUIStore((s) => s.setActiveView);
   const pushUndo = useUndoStore((s) => s.push);
 
-  // Eine id ohne Sprache (gelöscht, anderer Vault im gemerkten Tab) fällt auf die Liste zurück.
+  // An id without a language (deleted, another vault in the remembered tab) falls back to the list.
   const selected = activeView.id ? languages.find((l) => l.id === activeView.id) ?? null : null;
 
   const open = (id: string) => setActiveView({ type: 'lexicon', id });
@@ -55,7 +55,7 @@ export default function LexiconView() {
     try {
       await deleteLanguage(language.id);
     } catch (err) {
-      // Nichts verloren: die Sprache bleibt, wo sie war.
+      // Nothing lost: the language stays where it was.
       console.error('[LexiconView] deleting the language failed:', err);
       return;
     }
@@ -80,9 +80,9 @@ export default function LexiconView() {
 }
 
 /**
- * Die Liste der Sprachen im gemeinsamen Dashboard-Gerüst — Ansicht und
- * Sortierung wie in den anderen Dashboards, unter einer einklappbaren
- * Überschrift wie das Übersetzen-Feld darunter.
+ * The list of languages in the shared dashboard scaffold — view and
+ * sorting as in the other dashboards, under a collapsible
+ * heading like the translate field below.
  */
 function LanguageList({ onCreate, onDelete }: {
   onCreate: () => void;
@@ -99,7 +99,7 @@ function LanguageList({ onCreate, onDelete }: {
   const [search, setSearch] = useSessionState('lexicon.search', '');
   const [ctxMenu, setCtxMenu] = useState<{ id: string; x: number; y: number } | null>(null);
 
-  /** Wie viele Vokabeln je Sprache — eine Zählung für alle Zeilen statt einer je Zeile. */
+  /** How many words per language — one count for all rows instead of one per row. */
   const wordCounts = useMemo(() => {
     const counts = new Map<string, number>();
     for (const entry of entries) counts.set(entry.language_id, (counts.get(entry.language_id) ?? 0) + 1);
@@ -163,7 +163,7 @@ function LanguageList({ onCreate, onDelete }: {
       onSort={(sort) => setPrefs({ sort })}
       search={search}
       onSearch={setSearch}
-      // Zugeklappt eine leere Liste statt eines Sonderzweigs — wie Altar, Blöcke und Vorlagen.
+      // Collapsed means an empty list instead of a special branch — like altar, blocks and templates.
       items={collapsed ? [] : sorted}
       itemKey={(l) => l.id}
       renderItem={renderItem}

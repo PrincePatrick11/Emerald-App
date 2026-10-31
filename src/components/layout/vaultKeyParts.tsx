@@ -9,9 +9,9 @@ import {
 } from '../../lib/vaultKeys';
 
 /**
- * Was `VaultKeyDialog` und die Sicherheitsseite der Einstellungen teilen: das
- * beschriftete Feld, das Paar „neues Passwort / wiederholen", dessen Prüfung
- * und die Fehlertexte der Schlüssel-Befehle.
+ * What `VaultKeyDialog` and the settings' security page share: the
+ * labelled field, the "new password / repeat" pair, its validation
+ * and the error texts of the key commands.
  */
 
 export function KeyField({ label, children }: { label: string; children: React.ReactNode }) {
@@ -23,7 +23,7 @@ export function KeyField({ label, children }: { label: string; children: React.R
   );
 }
 
-/** Enter schickt ab — außer mitten in einer IME-Eingabe. */
+/** Enter submits — except in the middle of IME input. */
 export function onEnter(submit: () => void) {
   return (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.nativeEvent.isComposing) submit();
@@ -69,14 +69,14 @@ export function NewPasswordFields({ t, password, repeat, onPassword, onRepeat, d
   );
 }
 
-/** Was an einem neuen Passwort nicht stimmt, oder `''`. */
+/** What is wrong with a new password, or `''`. */
 export function newPasswordProblem(t: TFunction, password: string, repeat: string): string {
   if (password.length < MIN_PASSWORD_LENGTH) return t('vaultKey.tooShort', { count: MIN_PASSWORD_LENGTH });
   if (password !== repeat) return t('vaultKey.mismatch');
   return '';
 }
 
-/** Der Text zu einem Fehler der Schlüssel-Befehle; `fallbackKey` für alles Unerwartete. */
+/** The text for an error of the key commands; `fallbackKey` for anything unexpected. */
 export function keyErrorText(t: TFunction, err: unknown, fallbackKey: string): string {
   const code = keyErrorOf(err);
   if (code === KEY_ERRORS.wrongPassword) return t('vaultKey.wrongPassword');
@@ -89,12 +89,12 @@ export function keyErrorText(t: TFunction, err: unknown, fallbackKey: string): s
 }
 
 /**
- * Plattengröße in MB oder GB, in der Schreibweise der Sprache („1,5 GB", „1,5 Go").
- * Nicht `formatBytes`: das hört bei MB auf, und hier geht es um Gigabytes.
+ * Disk size in MB or GB, in the notation of the language ("1,5 GB", "1,5 Go").
+ * Not `formatBytes`: that stops at MB, and here it is about gigabytes.
  */
 function diskSize(bytes: number): string {
-  // Wie der Dateimanager daneben rechnet: Explorer in 1024ern, Finder und
-  // GNOME Files in 1000ern — sonst stimmen die Zahlen nicht überein.
+  // The way the neighbouring file manager counts: Explorer in 1024s, Finder and
+  // GNOME Files in 1000s — otherwise the numbers do not match.
   const base = isWindows ? 1024 : 1000;
   const gb = bytes >= base ** 3;
   return new Intl.NumberFormat(i18n.language, {
@@ -105,9 +105,9 @@ function diskSize(bytes: number): string {
 }
 
 /**
- * Wie weit die Neuverschlüsselung von `vaultId` ist — solange `active`. Bei
- * einem großen Vault dauert sie Minuten; ohne Anzeige sähe das aus wie ein
- * hängendes Programm.
+ * How far the re-encryption of `vaultId` has got — while `active`. With
+ * a large vault it takes minutes; without a display it would look like a
+ * hung program.
  */
 const STATIC_PROGRESS_LABEL = {
   database: 'vaultKey.progressDatabase',
@@ -121,7 +121,7 @@ export function ReencryptProgressLine({ vaultId, active }: { vaultId: string; ac
 
   useEffect(() => {
     if (!active) { setProgress(null); return; }
-    // Auf der Sicherheitsseite steht die Zeile unter dem Formular — ins Bild damit.
+    // On the security page the line sits below the form — bring it into view.
     ref.current?.scrollIntoView({ block: 'nearest' });
     let unlisten: (() => void) | undefined;
     let live = true;
@@ -132,7 +132,7 @@ export function ReencryptProgressLine({ vaultId, active }: { vaultId: string; ac
   }, [vaultId, active]);
 
   if (!active) return null;
-  // Vor dem ersten Ereignis schon da, damit die Knöpfe darunter nicht springen.
+  // Present before the first event, so the buttons below do not jump.
   const phase = progress?.phase ?? 'database';
   const number = (n: number) => n.toLocaleString(i18n.language);
   const phaseLabel = t(phase === 'images' ? 'vaultKey.progressImages' : STATIC_PROGRESS_LABEL[phase], {
@@ -144,7 +144,7 @@ export function ReencryptProgressLine({ vaultId, active }: { vaultId: string; ac
     : null;
   return (
     <div ref={ref} className="space-y-1.5">
-      {/* Vorgelesen wird nur der Wechsel der Phase, nicht jedes einzelne Bild. */}
+      {/* Only the change of phase is read aloud, not every single image. */}
       <p className="sr-only" role="status">{t(phase === 'images' ? 'vaultKey.progressImagesPhase' : STATIC_PROGRESS_LABEL[phase])}</p>
       <p className="text-xs text-secondary" aria-hidden="true">{phaseLabel}</p>
       <ProgressBar percent={percent} label={percent !== null ? `${percent}%` : undefined} ariaLabel={phaseLabel} />

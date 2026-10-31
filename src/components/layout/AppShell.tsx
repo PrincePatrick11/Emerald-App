@@ -30,29 +30,29 @@ import { loadVaultPrefs } from '../../store/vaultPrefs';
 import { startAutoBackup } from '../../lib/autoBackup';
 import ImportDestinationModal from '../ui/ImportDestinationModal';
 
-// Ohne Props, alles über eigene Store-Abos: `memo` hält sie aus dem Neuzeichnen
-// der Shell heraus — sonst liefe beim Ziehen einer Seitenleiste jede
-// Mausbewegung durch Liste, Blatt samt Editoren und rechte Leiste.
+// No props, everything through their own store subscriptions: `memo` keeps them
+// out of the shell's re-renders — otherwise dragging a sidebar would push every
+// mouse move through the list, the sheet with its editors and the right sidebar.
 const LeftSidebarRail = memo(LeftSidebarRailBase);
 const LeftSidebarEntryList = memo(LeftSidebarEntryListBase);
 const RightSidebar = memo(RightSidebarBase);
 const MainArea = memo(MainAreaBase);
 
 const ENTRY_LIST_MIN = 180;
-/** Zusammen mit der Rail (44) breiter als die Werkzeuggruppe der Titelleiste
- *  auf Windows/Linux — Logo in Railbreite + Menue + drei Navigations- und zwei
- *  Export/Import-Knoepfe samt Abstaenden, rund 238px —, damit die Tabs dort
- *  buendig ueber dem Blatt beginnen. */
+/** Together with the rail (44), wider than the title bar's tool group on
+ *  Windows/Linux — logo at rail width + menu + three navigation and two
+ *  export/import buttons with their gaps, about 238px — so the tabs there
+ *  start flush above the sheet. */
 const ENTRY_LIST_DEFAULT = 226;
 const RIGHT_MIN = 180;
-/** So breit wie die linke Seite im Ganzen — Rail plus Eintragsliste. */
+/** As wide as the left side as a whole — rail plus entry list. */
 const RIGHT_DEFAULT = RAIL_WIDTH + ENTRY_LIST_DEFAULT;
 
-/* Die Breiten-Transition der Seitenleisten. Eine Klasse in `index.css`, kein
-   `style={{ transition: … }}` aus SIDEBAR_ANIM_MS heraus: ein Inline-Style
-   schlaegt jede Regel im Stylesheet, also auch die `prefers-reduced-motion`-
-   Abbestellung. SIDEBAR_ANIM_MS muss deshalb von Hand zur Dauer dort passen —
-   es steuert nur, wie lange der Inhalt noch gemountet bleibt. */
+/* The width transition of the sidebars. A class in `index.css`, not a
+   `style={{ transition: … }}` built from SIDEBAR_ANIM_MS: an inline style
+   beats every rule in the stylesheet, including the `prefers-reduced-motion`
+   opt-out. SIDEBAR_ANIM_MS therefore has to match the duration there by hand —
+   it only controls how long the content stays mounted. */
 const SIDEBAR_ANIM_CLASS = 'app-sidebar-animated';
 const SIDEBAR_ANIM_MS = 200;
 
@@ -64,12 +64,12 @@ const RIGHT_WIDTH_KEY = 'sidebar-right-width';
 const NEVER_CLOSE = () => {};
 
 /**
- * Haelt den Inhalt einer Seitenleiste ueber die Ausblend-Animation hinweg
- * gemountet und raeumt ihn erst danach ab. Dauerhaft gemountet lassen waere
- * einfacher, kostet aber: `AllList` ruft alle fuenf Config-Hooks der Module,
- * `AltarSidebarPanel` bringt eigene Effekte und Drag-Listener mit — beides
- * soll unsichtbar nicht mitlaufen. Timeout statt `transitionend`, damit auch
- * abgeraeumt wird, wenn die Transition (Reduced Motion) gar nicht laeuft.
+ * Keeps a sidebar's content mounted through the fade-out animation and only
+ * unmounts it afterwards. Leaving it mounted permanently would be simpler but
+ * costs: `AllList` calls all five config hooks of the modules,
+ * `AltarSidebarPanel` brings its own effects and drag listeners — neither
+ * should keep running while invisible. A timeout instead of `transitionend`, so
+ * it is also unmounted when the transition (reduced motion) never runs.
  */
 function useDeferredUnmount(open: boolean): boolean {
   const [mounted, setMounted] = useState(open);
@@ -107,13 +107,13 @@ export default function AppShell() {
   const [rightWidth, setRightWidth] = useState(() =>
     loadSavedWidth(RIGHT_WIDTH_KEY, RIGHT_MIN, RIGHT_DEFAULT)
   );
-  // State, nicht Ref: das Abschalten der Transition muss neu rendern.
+  // State, not a ref: turning the transition off has to re-render.
   const [resizing, setResizing] = useState(false);
-  // Der erste Start ist erst durch, wenn auch die Einstellungen des Vaults
-  // geladen sind (oder das gescheitert ist): vorher darf nichts `getDb()`
-  // aufrufen — die Aufräumroutine dort braucht die Papierkorb-Frist, die
-  // Migrationen die Sprache. Ohne dieses Tor öffnete etwa ein wiederhergestellter
-  // Papierkorb-Tab die Datenbank schon mit den Einstellungen von niemandem.
+  // The first start is only done once the vault's settings are loaded too
+  // (or that failed): until then nothing may call `getDb()` — the cleanup
+  // routine there needs the trash retention period, the migrations the
+  // language. Without this gate, a restored trash tab, say, would open the
+  // database with nobody's settings.
   const [bootSettled, setBootSettled] = useState(false);
 
   const leftListMounted = useDeferredUnmount(leftListOpen);
@@ -134,20 +134,20 @@ export default function AppShell() {
   useEffect(() => {
     // Load vault metadata first so getDb() knows which DB file to open
     loadVaults().then(() => {
-      // Erststart: es gibt noch keine Datenbank, aus der sich etwas laden
-      // liesse. Der erste Vault wird ueber `switchVault` aktiviert, und das
-      // endet in `reloadAllStores()` — dieser Effekt laeuft dafuer nicht erneut.
+      // First start: there is no database yet to load anything from. The first
+      // vault is activated through `switchVault`, which ends in
+      // `reloadAllStores()` — this effect does not run again for that.
       const vaultState = useVaultStore.getState();
       const active = activeVault(vaultState);
       if (!active) return;
-      // Vor allem anderen: ein verschlüsselter Vault muss entsperrt sein, bevor
-      // Entwürfe oder Datenbank gelesen werden. Wer abbricht, wählt im
-      // Vault-Fenster einen anderen — der gespeicherte aktive Vault bleibt, bis
-      // dort gewechselt wird.
+      // Before anything else: an encrypted vault has to be unlocked before
+      // drafts or the database are read. Whoever cancels picks another one in
+      // the vault window — the saved active vault stays until it is switched
+      // there.
       return ensureVaultReady(active).then(() => {
-        // Wie in `openActiveVault`: die Einstellungen vor der Datenbank. Davor,
-        // was ein Absturz an Entwürfen übrig gelassen hat — bevor eine Seite
-        // sie sucht —, und wie die Listen dieses Vaults aussehen sollen.
+        // As in `openActiveVault`: the settings before the database. Before
+        // that, whatever drafts a crash left behind — before a page looks for
+        // them — and how this vault's lists should look.
         loadVaultPrefs(vaultState.activeVaultId);
         return restoreDrafts(vaultState.activeVaultId)
           .then(() => useSettingsStore.getState().loadForVault(vaultState.activeVaultId))
@@ -157,36 +157,36 @@ export default function AppShell() {
         useVaultStore.setState({ activeVaultId: '' });
       });
     })
-      // Ohne `catch` bliebe der Fehler eine unbehandelte Rejection in der
-      // Konsole — sichtbar nur, wenn jemand hinschaut.
+      // Without a `catch` the error would stay an unhandled rejection in the
+      // console — visible only if someone looks.
       .catch((err) => console.error('[boot] initial load failed', err))
       .finally(() => setBootSettled(true))
-      // Ab hier steht entweder der geladene Inhalt oder — beim Erststart —
-      // das Vault-Setup. Beides ist ein fertiger Bildschirm, also kann der
-      // Ladebildschirm weg. Auch im Fehlerfall: eine leere Oberflaeche ist
-      // immer noch besser als ein Ladebildschirm, der nie endet.
+      // From here on there is either the loaded content or — on first start —
+      // the vault setup. Both are a finished screen, so the loading screen can
+      // go. Also on failure: an empty interface is still better than a loading
+      // screen that never ends.
       .finally(hideSplash);
   }, []);
 
-  // Fenster zu: erst klären, was mit laufenden Bearbeitungen geschieht. Der
-  // Handler wird abgewartet, bevor das Fenster geht — „Weiter bearbeiten"
-  // hält es offen.
+  // Window closing: first settle what happens to edits in progress. The
+  // handler is awaited before the window goes — "Keep editing" keeps it
+  // open.
   useEffect(() => {
     if (!isTauri) return;
     const appWindow = getCurrentWindow();
     const unlisten = appWindow.onCloseRequested(async (event) => {
-      // Zuerst, und ohne darauf zu warten: Rust schließt das Fenster sonst
-      // beim nächsten Versuch selbst (`CloseWatch` in `lib.rs`).
+      // First, and without waiting for it: otherwise Rust closes the window
+      // itself on the next attempt (`CloseWatch` in `lib.rs`).
       void invoke('close_request_seen').catch(() => {});
       try {
         if (hasOpenEdits()) {
-          // Die Frage in einem minimierten Fenster sähe niemand — es wirkte,
-          // als würde das Schließen ignoriert.
+          // Nobody would see the question in a minimized window — closing
+          // would look ignored.
           if (await appWindow.isMinimized()) {
             await appWindow.unminimize();
-            // Linux (X11): tao lässt `setFocus` fallen, solange es das Fenster
-            // noch für minimiert hält — und das erfährt es erst, wenn GTK den
-            // neuen Zustand zurückmeldet. Höchstens eine Sekunde darauf warten.
+            // Linux (X11): tao drops `setFocus` while it still considers the
+            // window minimized — and it only learns otherwise when GTK reports
+            // the new state back. Wait at most one second for that.
             for (let i = 0; i < 20 && (await appWindow.isMinimized()); i++) {
               await new Promise((resolve) => setTimeout(resolve, 50));
             }
@@ -195,15 +195,15 @@ export default function AppShell() {
         }
         if (!(await settleBeforeExit())) event.preventDefault();
       } catch (e) {
-        // Ein Fehler hier darf das Fenster nicht offen halten: Tauri schließt
-        // erst, wenn dieser Handler zurückkehrt, ohne zu verhindern.
+        // An error here must not keep the window open: Tauri only closes once
+        // this handler returns without preventing it.
         console.error('[close] leave guard failed', e);
       }
     });
     return () => { void unlisten.then((stop) => stop()); };
   }, []);
 
-  // Das automatische Backup prüft für die Dauer der Sitzung, ob eines fällig ist.
+  // The automatic backup checks for the duration of the session whether one is due.
   useEffect(() => (isTauri ? startAutoBackup() : undefined), []);
 
   // Sync menu bar labels with the current language
@@ -264,8 +264,8 @@ export default function AppShell() {
       localStorage.removeItem(ENTRY_LIST_WIDTH_KEY);
       localStorage.removeItem(RIGHT_WIDTH_KEY);
       setAltarWindowFullscreen(false);
-      // Auch der Rückweg zu ausgeblendeten Leisten — mit der Rail wären sonst
-      // Einstellungen und Vault-Knopf weg, bis man das Ansicht-Menü findet.
+      // Also the way back to hidden bars — with the rail gone, settings and
+      // the vault button would otherwise stay away until the View menu is found.
       useUIStore.getState().showAllPanels();
     });
     return () => { unlisten.then(fn => fn()); };
@@ -319,14 +319,14 @@ export default function AppShell() {
     setResizing(false);
   };
 
-  // Die Sperre nimmt den Ziehgriff weg — ein Ziehen, das gerade läuft, endet
-  // damit, sonst liefe es ohne Griff weiter, bis irgendwo losgelassen wird.
+  // The lock removes the drag handle — a drag in progress ends with it,
+  // otherwise it would carry on without a handle until released somewhere.
   useEffect(() => {
     if (viewLocked) onPointerUp();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [viewLocked]);
 
-  // Fensterrahmen und Titelleiste — alles, was auch ohne offenen Vault steht.
+  // Window frame and title bar — everything that stands even without an open vault.
   const chrome = (children: React.ReactNode) => (
     <div className="app-shell flex flex-col h-screen w-screen overflow-hidden relative">
       <TitleBar />
@@ -335,14 +335,14 @@ export default function AppShell() {
     </div>
   );
 
-  // Solange kein Vault offen ist, bleibt der Shell-Inhalt ungemountet: jedes
-  // `getDb()` aus Sidebar, Tableiste oder Hauptbereich liefe in den
-  // NO_ACTIVE_VAULT-Fehler aus `getActiveVaultPath()`.
+  // While no vault is open, the shell content stays unmounted: every
+  // `getDb()` from the sidebar, tab bar or main area would run into the
+  // NO_ACTIVE_VAULT error from `getActiveVaultPath()`.
   //
-  // Drei getrennte Ausgaenge, damit sichtbar bleibt, warum: waehrend `loaded`
-  // noch falsch ist, steht nur noch nicht fest, ob ein Vault da ist — dann darf
-  // das Setup-Modal nicht schon aufblitzen. Und mit Vault, aber vor dem Ende
-  // des Starts, fehlen noch dessen Einstellungen (siehe `bootSettled`).
+  // Three separate exits so the reason stays visible: while `loaded` is still
+  // false, it is merely not yet known whether a vault exists — the setup modal
+  // must not flash up then. And with a vault but before the end of the start,
+  // its settings are still missing (see `bootSettled`).
   if (!vaultsLoaded) return chrome(<main className="app-main flex-1 min-h-0" />);
   if (needsVault) {
     return chrome(
@@ -353,34 +353,34 @@ export default function AppShell() {
     );
   }
   if (!bootSettled) return chrome(<main className="app-main flex-1 min-h-0" />);
-  // Gesperrt: nichts vom Inhalt bleibt hinter der Passwortfrage stehen.
+  // Locked: none of the content stays standing behind the password prompt.
   if (vaultLocked) return chrome(<main className="app-main flex-1 min-h-0" />);
 
   const leftSidebarWidth = (railOpen ? RAIL_WIDTH : 0) + (leftListOpen ? entryListWidth : 0);
-  // Ohne etwas links davon haelt das Blatt auch dort Abstand zum Fensterrand —
-  // es schwebt immer, statt mit gerundeter Ecke am Rand zu kleben.
+  // With nothing to its left, the sheet keeps its distance from the window
+  // edge there too — it always floats, instead of sticking to the edge with a
+  // rounded corner.
   const leftFrameEmpty = isAltarWindowFullscreen || leftSidebarWidth === 0;
-  // Haengt am verzoegerten Unmount statt an `rightSidebarOpen`: beim Zuklappen
-  // bekommt der Hauptbereich seinen rechten Rand erst, wenn die Leiste weg ist,
-  // statt neben ihr einen doppelten Strich zu ziehen.
+  // Tied to the deferred unmount instead of `rightSidebarOpen`: when
+  // collapsing, the main area only gets its right edge once the bar is gone,
+  // instead of drawing a double line next to it.
   const sheetJoined = rightSidebarMounted && !isAltarWindowFullscreen;
 
   return (
     <div className="app-shell flex flex-col h-screen w-screen overflow-hidden relative">
-      {/* Die Tabs sitzen in der Titelleiste, ueber dem Blatt. */}
+      {/* The tabs sit in the title bar, above the sheet. */}
       <TitleBar tabs leadWidth={leftSidebarWidth} animate={!resizing} />
 
       {/* The sidebar resize handles live in here, so the pointer handlers that
           drive them do too. */}
-      {/* Beide Leisten animieren ihre Breite und klippen ihren Inhalt, statt ihn
-          mitschrumpfen zu lassen: der innere Container behaelt seine
-          Pixelbreite, das <aside> schneidet sie ab. Sonst quetscht sich der
-          Inhalt waehrend der Animation zusammen — und die Tab-Leiste der
-          Eintragsliste braeche mitten im Uebergang um. Waehrend eines
-          Resize-Drags laeuft keine Transition. Solange der geschlossene Inhalt
-          noch gemountet ist, halten `inert` und `aria-hidden` ihn zusammen aus
-          Fokus *und* Vorlesereihenfolge heraus; `inert` allein waere auf
-          aelteren WebKit-Versionen wirkungslos. */}
+      {/* Both bars animate their width and clip their content instead of
+          letting it shrink along: the inner container keeps its pixel width,
+          the <aside> cuts it off. Otherwise the content squeezes together
+          during the animation — and the entry list's tab bar would wrap in the
+          middle of the transition. During a resize drag no transition runs.
+          While the closed content is still mounted, `inert` and `aria-hidden`
+          together keep it out of both focus *and* screen-reader order; `inert`
+          alone would have no effect on older WebKit versions. */}
       <div
         className={`app-sheet-frame flex flex-1 min-h-0 overflow-hidden relative${
           leftFrameEmpty ? ' app-sheet-frame-free-left' : ''
@@ -390,15 +390,15 @@ export default function AppShell() {
       >
         {!isAltarWindowFullscreen && (
           <aside
-            // Rahmen, keine Trennlinie: Rail und Liste gehen nahtlos in die
-            // Titelleiste ueber, abgesetzt ist erst das Blatt daneben.
+            // A frame, not a divider: rail and list merge seamlessly into the
+            // title bar, only the sheet next to them is set apart.
             className={`app-sidebar app-sidebar-left flex-shrink-0 relative overflow-hidden${
               railOpen ? ' app-sidebar-left-with-rail' : ''
             }${resizing ? '' : ` ${SIDEBAR_ANIM_CLASS}`}`}
             style={{ width: leftSidebarWidth }}
           >
-            {/* Eine ausgeblendete Rail schiebt der negative Rand nach links
-                aus dem Bild, damit die Liste an ihre Stelle rueckt. */}
+            {/* A hidden rail is pushed out of view to the left by the negative
+                margin, so the list moves into its place. */}
             <div
               className={`flex h-full${resizing ? '' : ` ${SIDEBAR_ANIM_CLASS}`}`}
               style={{ width: RAIL_WIDTH + entryListWidth, marginLeft: railOpen ? 0 : -RAIL_WIDTH }}
@@ -425,8 +425,8 @@ export default function AppShell() {
         )}
 
         {/* Main Content */}
-        {/* Das Blatt, linke Haelfte. Mit rechter Leiste daneben ist es rechts
-            gerade und randlos — die Kante dazwischen zieht die Leiste. */}
+        {/* The sheet, left half. With the right bar next to it, it is straight
+            and borderless on the right — the bar draws the edge between them. */}
         <main
           className={`app-main app-sheet-main flex-1 min-w-0 overflow-hidden flex flex-col${
             sheetJoined ? ' app-sheet-main-joined' : ''
@@ -437,8 +437,8 @@ export default function AppShell() {
           </div>
         </main>
 
-        {/* Right Sidebar — Inhalt am rechten Rand verankert, damit er sich beim
-            Aufklappen von dort hereinschiebt statt links aufzuklappen. */}
+        {/* Right Sidebar — content anchored to the right edge, so it slides in
+            from there when opening instead of unfolding from the left. */}
         {!isAltarWindowFullscreen && (
           <aside
             className={`app-sidebar app-sidebar-right flex-shrink-0 relative overflow-hidden${
@@ -446,19 +446,19 @@ export default function AppShell() {
             }`}
             style={{ width: rightSidebarOpen ? rightWidth : 0 }}
           >
-            {/* Resize handle — bei geschlossener Leiste saesse er sonst als
-                Streifen am Rand des Hauptbereichs. Mit „Ansicht sperren" gibt
-                es ihn auf beiden Seiten nicht. */}
+            {/* Resize handle — with the bar closed it would otherwise sit as a
+                strip at the edge of the main area. With "Lock view" it does
+                not exist on either side. */}
             {rightSidebarOpen && !viewLocked && (
               <div
                 onPointerDown={onRightPointerDown}
                 className="absolute top-0 left-0 w-1 h-full cursor-col-resize z-10 hover:bg-jade-500/20 transition-colors"
               />
             )}
-            {/* Das Blatt, rechte Haelfte. Flaeche, Rand und Radius sitzen am
-                Inhalt, nicht am <aside>: dort blieben die Raender bei Breite 0
-                als 2px-Strich stehen. So fahren sie mit dem Inhalt hinaus und
-                werden mit ihm geklippt. */}
+            {/* The sheet, right half. Surface, border and radius sit on the
+                content, not on the <aside>: there the borders would remain as
+                a 2px line at width 0. This way they move out with the content
+                and are clipped along with it. */}
             <div
               className="app-sheet-side absolute top-0 right-0 h-full"
               style={{ width: rightWidth }}

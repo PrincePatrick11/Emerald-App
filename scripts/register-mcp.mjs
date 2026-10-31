@@ -1,13 +1,13 @@
 #!/usr/bin/env node
 /**
- * Trägt den MCP-Server aus `tools/mcp/` in die `.mcp.json` dieses Checkouts
- * ein, aus der Claude Code seine Server liest. Die Datei ist nicht Teil des
- * Repositories; die Vorlage ist `tools/mcp/mcp.example.json`.
+ * Adds the MCP server from `tools/mcp/` to this checkout's `.mcp.json`,
+ * which Claude Code reads its servers from. The file is not part of the
+ * repository; the template is `tools/mcp/mcp.example.json`.
  *
- *   node scripts/register-mcp.mjs            eintragen oder auf den Stand der Vorlage bringen
- *   node scripts/register-mcp.mjs --remove   den Eintrag wieder entfernen
+ *   node scripts/register-mcp.mjs            add the entry or bring it up to the template
+ *   node scripts/register-mcp.mjs --remove   remove the entry again
  *
- * Andere Server in einer vorhandenen `.mcp.json` bleiben, wie sie sind.
+ * Other servers in an existing `.mcp.json` stay as they are.
  */
 import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
@@ -22,7 +22,7 @@ if (existsSync(target)) {
   try {
     config = JSON.parse(readFileSync(target, 'utf-8'));
   } catch (e) {
-    console.error(`${target} ist kein gültiges JSON — nichts geändert. (${e.message})`);
+    console.error(`${target} is not valid JSON — nothing changed. (${e.message})`);
     process.exit(1);
   }
   config.mcpServers ??= {};
@@ -33,10 +33,10 @@ if (process.argv.includes('--remove')) {
   for (const name of names) delete config.mcpServers[name];
   if (Object.keys(config.mcpServers).length === 0 && Object.keys(config).length === 1) {
     rmSync(target, { force: true });
-    console.log(`Entfernt: ${target}`);
+    console.log(`Removed:${target}`);
   } else {
     writeFileSync(target, JSON.stringify(config, null, 2) + '\n', 'utf-8');
-    console.log(`Eintrag entfernt aus ${target}`);
+    console.log(`Entry removed from${target}`);
   }
   process.exit(0);
 }
@@ -44,8 +44,8 @@ if (process.argv.includes('--remove')) {
 const before = JSON.stringify(config);
 Object.assign(config.mcpServers, template.mcpServers);
 if (JSON.stringify(config) === before) {
-  console.log(`Schon eingetragen: ${names.join(', ')} in ${target}`);
+  console.log(`Already registered: ${names.join(', ')} in${target}`);
 } else {
   writeFileSync(target, JSON.stringify(config, null, 2) + '\n', 'utf-8');
-  console.log(`Eingetragen: ${names.join(', ')} in ${target}`);
+  console.log(`Registered: ${names.join(', ')} in${target}`);
 }

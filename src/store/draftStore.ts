@@ -8,17 +8,17 @@ import type { TemplatePatch } from './templateStore';
 import type { VaultFileRead } from '../lib/vaultSettings';
 import { tagNameKey } from '../lib/tagRefs';
 
-/** Was die Seite eines eigenen Blocks bearbeitet — genau das, was `updateDefinition` annimmt. */
+/** What the page of a custom block edits — exactly what `updateDefinition` accepts. */
 export type DefinitionDraft = Required<BlockDefinitionPatch>;
 
-/** Was die Seite einer Vorlage bearbeitet — was `updateTemplate` annimmt. */
+/** What the page of a template edits — what `updateTemplate` accepts. */
 export type TemplateDraft = Required<TemplatePatch>;
 
 /**
- * Ein offener Entwurf: der Stand beim Öffnen (`base`) und die Bearbeitung
- * (`draft`). „Fertig" speichert nur, was sich gegenüber `base` geändert hat —
- * was andere Stellen inzwischen geschrieben haben (ein umbenannter Tag, ein
- * Stern, den eine andere Vorlage übernommen hat), bleibt so stehen.
+ * An open draft: the state on opening (`base`) and the edit
+ * (`draft`). "Done" saves only what has changed relative to `base` —
+ * whatever other places have written in the meantime (a renamed tag, a
+ * star that another template took over) stays in place.
  */
 export interface DraftEntry<T> {
   base: T;
@@ -26,16 +26,16 @@ export interface DraftEntry<T> {
 }
 
 export interface DraftState<T> {
-  /** Ungespeicherte Entwürfe je id. */
+  /** Unsaved drafts per id. */
   drafts: Readonly<Record<string, DraftEntry<T>>>;
   saveDraft: (id: string, entry: DraftEntry<T>) => void;
-  /** Erledigt: mit „Fertig" gespeichert, abgebrochen oder gelöscht. */
+  /** Finished: saved with "Done", cancelled or deleted. */
   clearDraft: (id: string) => void;
   /**
-   * Alle weg, auch die mitgeschriebenen — beim Ersetzen aus einer Sicherung,
-   * wo auch alle Tabs zugehen. Nach einer Wiederherstellung kommen dieselben
-   * ids zurück; ein alter Entwurf schriebe sonst mit „Fertig" über das
-   * Wiederhergestellte. (Der Vault-Wechsel nimmt sie nur aus dem Speicher:
+   * Remove all, including the persisted ones — when replacing from a backup,
+   * where all tabs close as well. After a restore the same ids come back;
+   * an old draft would otherwise overwrite the restored data with "Done".
+   * (A vault switch only takes them out of memory:
    * `restoreDrafts`.)
    */
   clearAll: () => void;
@@ -43,32 +43,32 @@ export interface DraftState<T> {
 
 export type DraftStore<T> = UseBoundStore<StoreApi<DraftState<T>>>;
 
-/** Die Arten von Entwürfen — zugleich der View-Typ ihrer Seite und ihr Schlüssel in `drafts.json`. */
+/** The kinds of drafts — also the view type of their page and their key in `drafts.json`. */
 type DraftKind = 'blocks' | 'templates';
 
-/** Bringt, was in der Datei stand, auf die Form eines Entwurfs — Feld für Feld, wie `fromRow` eine Zeile. */
+/** Brings what was in the file into the shape of a draft — field by field, like `fromRow` does for a row. */
 type Normalize<T> = (raw: Record<string, unknown>) => T;
 
 const stores: { kind: DraftKind; store: DraftStore<unknown>; normalize: Normalize<unknown> }[] = [];
 
-/* ---------------- Mitschreiben ---------------- */
+/* ---------------- Persisting alongside ---------------- */
 
 /**
- * Entwürfe werden mitgeschrieben, damit ein Absturz nichts nimmt, was getippt
- * war — bei einem Eintrag leistet das der Autosave. In `drafts.json` im
- * Vault-Ordner, über Rust: der Aufruf kehrt zurück, wenn die Datei
- * geschrieben ist (das Fenster wartet beim Schließen darauf — der verzögert
- * schreibende Speicher des WebViews könnte das nicht zusagen), und der Inhalt
- * eines Vaults bleibt in seinem Ordner.
+ * Drafts are persisted as they are typed, so a crash takes nothing that had
+ * been typed — for an entry the autosave does that. In `drafts.json` in the
+ * vault folder, via Rust: the call returns once the file has been
+ * written (the window waits for it on close — the WebView's storage, which
+ * writes with a delay, could not promise that), and the content of a vault
+ * stays in its folder.
  */
-/** 2 seit v53: Vorlagen-Entwürfe tragen Tag-IDs statt Namen (eine 1 wird beim Lesen umgesetzt). */
+/** 2 since v53: template drafts carry tag IDs instead of names (a 1 is converted on read). */
 const DRAFTS_VERSION = 2;
 const PERSIST_DELAY_MS = 400;
 
 
-/** Der Vault, dessen Entwürfe im Speicher stehen — `null`, solange keiner geladen ist. Dann wird nichts geschrieben. */
+/** The vault whose drafts are in memory — `null` while none is loaded. Then nothing is written. */
 let draftVaultId: string | null = null;
-/** Während `restoreDrafts` die Stores füllt: das Füllen selbst schreibt nichts zurück. */
+/** While `restoreDrafts` fills the stores: the filling itself writes nothing back. */
 let hydrating = false;
 let persistTimer: ReturnType<typeof setTimeout> | null = null;
 let unwritten = false;
@@ -83,8 +83,8 @@ function schedulePersist(): void {
 }
 
 /**
- * Schreibt sofort, was noch aussteht, und wartet darauf — vor allem, was die
- * App beendet (Fenster zu, Update) oder den Vault wechselt.
+ * Writes immediately whatever is still pending, and waits for it — ahead of
+ * anything that ends the app (window close, update) or switches the vault.
  */
 export function flushDrafts(): Promise<void> {
   if (persistTimer) clearTimeout(persistTimer);
@@ -98,14 +98,14 @@ export function flushDrafts(): Promise<void> {
       .map(({ kind, store }) => [kind, store.getState().drafts] as const)
       .filter(([, drafts]) => Object.keys(drafts).length > 0),
   );
-  // Ohne Entwürfe ein leeres Objekt: Rust nimmt dann die Datei weg.
+  // An empty object without drafts: Rust then removes the file.
   const contents = JSON.stringify(Object.keys(byKind).length ? { version: DRAFTS_VERSION, ...byKind } : {});
   writing = writing
     .then(() => invoke<void>('write_vault_drafts', { vaultId, contents }))
     .catch((err: unknown) => {
-      // Der Entwurf bleibt im Speicher, und der nächste Anlass schreibt erneut
-      // — spätestens das Schließen des Fensters. Sonst stünde auf der Platte
-      // ein Entwurf, der längst verworfen ist.
+      // The draft stays in memory, and the next occasion writes again
+      // — at the latest the closing of the window. Otherwise the disk would
+      // hold a draft that was discarded long ago.
       if (draftVaultId === vaultId) unwritten = true;
       console.warn('[drafts] could not write drafts', err);
     });
@@ -117,10 +117,10 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
 }
 
 /**
- * Die Entwürfe einer Art aus der Datei — nur, was die Form eines Entwurfs hat.
- * Ein Entwurf ohne Namen auf beiden Seiten ist keiner, den diese App
- * geschrieben hat, und einer ohne Unterschied zum Stand beim Öffnen hat
- * nichts zu sichern: beide fallen weg, statt als leere Seite aufzutauchen.
+ * The drafts of one kind from the file — only what has the shape of a draft.
+ * A draft without a name on both sides is not one this app
+ * wrote, and one with no difference from the state on opening has
+ * nothing to preserve: both are dropped instead of showing up as an empty page.
  */
 function readKind(raw: unknown, normalize: Normalize<unknown>): Record<string, DraftEntry<unknown>> {
   const drafts: Record<string, DraftEntry<unknown>> = Object.create(null);
@@ -138,9 +138,9 @@ function readKind(raw: unknown, normalize: Normalize<unknown>): Record<string, D
 }
 
 /**
- * Eine Datei von vor v53: die Vorlagen-Entwürfe tragen Tag-Namen. Sie werden
- * IDs der Tags dieses Vaults (ohne Rücksicht auf Groß-/Kleinschreibung); ein
- * Name ohne Tag fällt weg.
+ * A file from before v53: the template drafts carry tag names. They become
+ * IDs of this vault's tags (case-insensitively); a name without
+ * a tag is dropped.
  */
 async function withTemplateTagIds(file: Record<string, unknown>): Promise<Record<string, unknown>> {
   if (!isPlainObject(file.templates)) return file;
@@ -160,8 +160,8 @@ async function withTemplateTagIds(file: Record<string, unknown>): Promise<Record
 }
 
 /**
- * Was in der Datei steht. `foreign`: sie stammt von einer neueren Version —
- * dann liest dieser Build sie nicht und rührt sie auch nicht an.
+ * What is in the file. `foreign`: it comes from a newer version —
+ * then this build neither reads it nor touches it.
  */
 async function readDraftsFile(vaultId: string): Promise<{ drafts: Record<string, unknown>; foreign: boolean }> {
   try {
@@ -179,14 +179,14 @@ async function readDraftsFile(vaultId: string): Promise<{ drafts: Record<string,
 }
 
 /**
- * Die Entwürfe des Vaults, der gerade geöffnet wird: was ein Absturz übrig
- * gelassen hat, steht danach wieder als „Ungespeichert" in den Listen, und
- * die Seite setzt dort fort. Die des vorigen Vaults gehen dabei nur aus dem
- * Speicher — ihre Datei bleibt, sie gehört zu jenem Vault.
+ * The drafts of the vault that is being opened right now: what a crash left
+ * behind then shows up again as "Unsaved" in the lists, and
+ * the page continues there. Those of the previous vault only leave
+ * memory — their file stays, it belongs to that vault.
  *
- * Nacheinander, nie nebeneinander: zwei Läufe, die sich überholen (der
- * doppelte Effekt im Dev-Modus), schrieben sonst den Stand des einen über die
- * Datei, während der andere sie noch liest.
+ * One after another, never side by side: two runs overtaking each other (the
+ * double effect in dev mode) would otherwise write one's state over the
+ * file while the other is still reading it.
  */
 export function restoreDrafts(vaultId: string): Promise<void> {
   restoring = restoring.then(async () => {
@@ -201,8 +201,8 @@ export function restoreDrafts(vaultId: string): Promise<void> {
       hydrating = false;
     }
     if (file.foreign) {
-      // Ohne `draftVaultId` wird nichts geschrieben: die Entwürfe der neueren
-      // Version bleiben liegen, neue leben in dieser Sitzung nur im Speicher.
+      // Without `draftVaultId` nothing is written: the drafts of the newer
+      // version stay put, new ones live only in memory in this session.
       console.warn('[drafts] drafts.json was written by a newer version, leaving it alone');
       return;
     }
@@ -212,8 +212,8 @@ export function restoreDrafts(vaultId: string): Promise<void> {
 }
 
 /**
- * Die Entwürfe aus dem Speicher nehmen, ohne ihre Datei anzufassen — bevor der
- * Vault wechselt oder entfernt wird. Was noch aussteht, wird vorher geschrieben.
+ * Take the drafts out of memory without touching their file — before the
+ * vault is switched or removed. Whatever is still pending is written first.
  */
 export async function detachDrafts(): Promise<void> {
   await flushDrafts();
@@ -224,11 +224,11 @@ export async function detachDrafts(): Promise<void> {
 /* ---------------- Stores ---------------- */
 
 /**
- * Die ungespeicherten Entwürfe der Seiten, die erst mit „Fertig" speichern —
- * eigene Blöcke und Vorlagen, je ein Store. Im Store statt in der Ansicht,
- * weil MainArea die Ansicht beim Wechsel in ein anderes Modul unmountet — ein
- * offener Tab verlöre sonst lautlos seine Arbeit. Die Listen lesen daraus
- * ihren „Ungespeichert"-Hinweis.
+ * The unsaved drafts of the pages that save only with "Done" —
+ * custom blocks and templates, one store each. In the store rather than in the view,
+ * because MainArea unmounts the view when switching to another module — an
+ * open tab would otherwise silently lose its work. The lists read their
+ * "Unsaved" hint from it.
  */
 function createDraftStore<T>(kind: DraftKind, normalize: Normalize<T>): DraftStore<T> {
   const store = create<DraftState<T>>((set) => ({
@@ -243,7 +243,7 @@ function createDraftStore<T>(kind: DraftKind, normalize: Normalize<T>): DraftSto
   }));
   store.subscribe(schedulePersist);
   stores.push({ kind, store: store as DraftStore<unknown>, normalize });
-  // Für Tabs im Hintergrund: ein Entwurf heißt ungesicherte Änderungen (`leaveGuardStore`).
+  // For background tabs: a draft means unsaved changes (`leaveGuardStore`).
   registerEditProbe((view) => view.type === kind && !!view.id && view.id in store.getState().drafts);
   return store;
 }
@@ -266,7 +266,7 @@ export const useTemplateDraftStore = createDraftStore<TemplateDraft>('templates'
   assignments: parseAssignments(raw.assignments),
 }));
 
-/** Alle Entwurfslisten leeren, auch die mitgeschriebenen — siehe `clearAll`. */
+/** Empty all draft lists, including the persisted ones — see `clearAll`. */
 export function clearAllDrafts(): void {
   for (const { store } of stores) store.getState().clearAll();
 }

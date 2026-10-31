@@ -12,37 +12,37 @@ import { clearSessionState } from './sessionStore';
 
 export const VIEW_MODES = ['list', 'cards', 'cards_wide', 'timeline'] as const;
 export type ViewMode = (typeof VIEW_MODES)[number];
-/** `count_desc` = „am häufigsten zuerst" — nur das Tags-Dashboard bietet ihn
- *  an (`sortModes`), die übrigen Listen haben nichts zu zählen. */
+/** `count_desc` = "most frequent first" — only the tags dashboard offers it
+ *  (`sortModes`), the other lists have nothing to count. */
 export const SORT_MODES = ['date_desc', 'date_asc', 'alpha_asc', 'alpha_desc', 'count_desc'] as const;
 export type SortMode = (typeof SORT_MODES)[number];
-/** Gruppierung als eigene Achse neben Ansicht und Sortierung. Früher war
- *  „Kategorie" ein SortMode — was zwei Entscheidungen in einen Knopf legte:
- *  wer nach Kategorien gruppieren wollte, verlor damit seine Sortierung. */
+/** Grouping as its own axis beside view and sorting. Formerly
+ *  "Category" was a SortMode — which put two decisions into one button:
+ *  anyone who wanted to group by category lost their sorting in the process. */
 export const GROUPING_MODES = ['grouped', 'flat'] as const;
 export type GroupingMode = (typeof GROUPING_MODES)[number];
 export interface ListPrefs { view: ViewMode; sort: SortMode; grouping: GroupingMode; }
 
-/** Die Regler der Altar-Bibliothek. Ein Ausschnitt der SortMode — Elemente
- *  haben kein „zuletzt bearbeitet", und die Kategorie ist dort die
- *  Gruppierung, keine Sortierung. Im Store, weil die Regler in der rechten
- *  Seitenleiste sitzen (AltarView) und der Abschnitt darunter sie liest
+/** The controls of the altar library. A subset of SortMode — items
+ *  have no "last edited", and the category there is the
+ *  grouping, not a sorting. In the store, because the controls sit in the right
+ *  sidebar (AltarView) and the section beneath reads them
  *  (AltarLibrarySection). */
 export type AltarLibrarySort = Extract<SortMode, 'alpha_asc' | 'alpha_desc' | 'date_desc'>;
 export interface AltarLibraryPrefs { sort: AltarLibrarySort; grouping: GroupingMode; }
 export const ALTAR_LIBRARY_SORTS: AltarLibrarySort[] = ['alpha_asc', 'alpha_desc', 'date_desc'];
 
-/** Die Sortierung des Tags-Dashboards: Tags haben kein Datum, dafür eine
- *  Häufigkeit. */
+/** The sorting of the tags dashboard: tags have no date, but they have a
+ *  frequency. */
 export type TagsSort = Extract<SortMode, 'alpha_asc' | 'alpha_desc' | 'count_desc'>;
 export const TAGS_SORTS: TagsSort[] = ['alpha_asc', 'alpha_desc', 'count_desc'];
 export const isTagsSort = (s: SortMode): s is TagsSort => (TAGS_SORTS as SortMode[]).includes(s);
 
-/** Die Sortierung der Home-Abschnitte — die Datums- und Alpha-Modi. */
+/** The sorting of the home sections — the date and alpha modes. */
 export type HomeSort = Exclude<SortMode, 'count_desc'>;
 export const HOME_VIEWS = ['list', 'cards'] as const;
 export type HomeView = (typeof HOME_VIEWS)[number];
-/** Wie viele Einträge ein Abschnitt der Startseite zeigt; 0 = alle. */
+/** How many entries a section of the home page shows; 0 = all. */
 export const HOME_COUNTS = [3, 5, 10, 25, 0] as const;
 export interface HomeSectionPrefs { sort: HomeSort; view: HomeView; count: number; } // count 0 = all
 
@@ -50,8 +50,8 @@ export interface EditActions {
   onSave: () => void | Promise<void>;
   onCancel: () => void | Promise<void>;
   onDelete?: () => void | Promise<void>;
-  /** Den aufgeschobenen Autosave sofort schreiben — für Aktionen der
-   *  Seitenleiste, die danach den Store-Stand des Eintrags lesen (Typwechsel). */
+  /** Write the deferred autosave immediately — for sidebar actions
+   *  that afterwards read the entry's store state (type change). */
   flush?: () => Promise<void>;
 }
 
@@ -59,39 +59,39 @@ interface UIState {
   activeView: ActiveView;
   tabs: OpenTab[];
   activeTabId: string | null;
-  /** Der Verlauf, solange kein Tab offen ist. Mit Tabs führt jeder Tab seinen
-   *  eigenen (`OpenTab.history`); `selectActiveHistory` wählt den passenden. */
+  /** The history while no tab is open. With tabs, each tab keeps its
+   *  own (`OpenTab.history`); `selectActiveHistory` picks the right one. */
   tablessHistory: NavHistory;
-  /** Wie `railOpen` und `leftListOpen` dauerhaft (localStorage). Gespeichert
-   *  wird nur, was der Nutzer selbst umschaltet — das erzwungene Aufklappen in
-   *  `setActiveView` nicht. */
+  /** Persistent like `railOpen` and `leftListOpen` (localStorage). Only what
+   *  the user toggles themself is saved — the forced expansion in
+   *  `setActiveView` is not. */
   rightSidebarOpen: boolean;
-  /** Das Portal-Ziel, das die rechte Seitenleiste in Listenansichten stellt.
-   *  Dashboard portalt seinen kompletten Kopf (Titel, Aktionen, Toolbar,
-   *  Filter) hinein; `null` heißt Leiste zu oder Detailansicht — dann hat
-   *  Dashboard keinen Kopf. Invariante: genau EIN Schreiber (der Host-Div in
-   *  RightSidebars Listen-Zweig) und genau ein Leser zur Zeit (`SidebarPortal`
-   *  — aus Dashboard oder der Seite eines eigenen Blocks); MainArea rendert
-   *  immer nur eine View, also portalt nie mehr als eine.
-   *  Bewusst nicht persistiert (DOM-Knoten). */
+  /** The portal target that the right sidebar provides in list views.
+   *  Dashboard portals its complete header (title, actions, toolbar,
+   *  filters) into it; `null` means sidebar closed or detail view — then
+   *  Dashboard has no header. Invariant: exactly ONE writer (the host div in
+   *  RightSidebar's list branch) and exactly one reader at a time (`SidebarPortal`
+   *  — from Dashboard or the page of a custom block); MainArea renders
+   *  only one view at a time, so never more than one portals.
+   *  Deliberately not persisted (DOM node). */
   listHeaderHost: HTMLElement | null;
-  /** Ob gerade ein `Dashboard` gemountet ist — es meldet sich selbst an.
-   *  RightSidebar stellt daran das Portal-Ziel, statt aus `activeView.id` zu
-   *  raten: Aufgaben zeigen ihre Liste auch mit einer id (Sprungziel, kein
-   *  offener Eintrag), und die id eines geloeschten Eintrags laesst Journal,
-   *  Wiki und Operationen ebenfalls auf ihr Dashboard zurueckfallen. */
+  /** Whether a `Dashboard` is currently mounted — it registers itself.
+   *  RightSidebar provides the portal target based on this, instead of
+   *  guessing from `activeView.id`: tasks show their list even with an id (jump target, no
+   *  open entry), and the id of a deleted entry also makes journal,
+   *  wiki and operations fall back to their dashboard. */
   dashboardMounted: boolean;
   editActions: EditActions | null;
-  /** Ein Typwechsel oder ein Abbrechen schreibt gerade (`withEditLock`): Fertig,
-   *  Löschen, Abbrechen und der Typ-Schalter des offenen Eintrags sind gesperrt,
-   *  und die Seite lässt sich nicht verlassen — ein Klick dazwischen träfe die
-   *  Ansicht, die dabei abgebaut wird, und die Rückfrage gälte ihr. */
+  /** A type change or a cancel is writing right now (`withEditLock`): Done,
+   *  Delete, Cancel and the type switch of the open entry are locked,
+   *  and the page cannot be left — a click in between would hit the
+   *  view that is being torn down, and the confirmation would apply to it. */
   editLocked: boolean;
-  /** Die Rail ganz links. Dauerhaft (localStorage), wie `leftListOpen`. */
+  /** The rail on the far left. Persistent (localStorage), like `leftListOpen`. */
   railOpen: boolean;
   leftListOpen: boolean;
-  /** „Ansicht sperren": die Breiten der Seitenleisten lassen sich nicht mehr
-   *  ziehen. Dauerhaft (localStorage), wie die Breiten selbst. */
+  /** "Lock view": the sidebar widths can no longer be
+   *  dragged. Persistent (localStorage), like the widths themselves. */
   viewLocked: boolean;
   searchQuery: string;
   journalPrefs: ListPrefs;
@@ -101,47 +101,47 @@ interface UIState {
   altarPrefs: ListPrefs;
   trashPrefs: ListPrefs;
   templatesPrefs: ListPrefs;
-  /** Die eigenen Blöcke in der Blöcke-Ansicht — die eingebauten darunter bleiben unberührt. */
+  /** The custom blocks in the blocks view — the built-in ones beneath stay untouched. */
   blocksPrefs: ListPrefs;
-  /** Die Sprachliste des Lexikons — das Übersetzen-Feld darunter bleibt unberührt. */
+  /** The language list of the lexicon — the translate field beneath stays untouched. */
   lexiconPrefs: ListPrefs;
   tagsSort: TagsSort;
   altarWindowFullscreen: boolean;
-  /** Altar-Dashboard: Vorschau der Leinwand auf den Karten und in der Liste.
-   *  Aus heißt Flammen-Icon statt Vorschau. */
+  /** Altar dashboard: preview of the canvas on the cards and in the list.
+   *  Off means a flame icon instead of a preview. */
   altarShowPreview: boolean;
-  /** Sortierung und Gruppierung der Bibliothek. */
+  /** Sorting and grouping of the library. */
   altarLibraryPrefs: AltarLibraryPrefs;
   homeJournalPrefs: HomeSectionPrefs;
   homeOpsPrefs: HomeSectionPrefs;
   homeWikiPrefs: HomeSectionPrefs;
-  /** Die vom Standard abweichenden Gruppen je Modul (siehe hooks/useCollapsedSet):
-   *  zugeklappte — bzw. in Scopes, die zugeklappt starten, aufgeklappte.
-   *  Im Store statt View-lokal, weil MainArea die Views beim Modulwechsel
-   *  unmountet. */
+  /** The groups per module that deviate from the default (see hooks/useCollapsedSet):
+   *  collapsed ones — or, in scopes that start collapsed, expanded ones.
+   *  In the store rather than view-local, because MainArea unmounts the views
+   *  on module switch. */
   collapsedGroups: Record<string, ReadonlySet<string>>;
-  /** Welche Abschnitte auf- oder zugeklappt sind (`usePersistedFlag`), je Schlüssel. */
+  /** Which sections are expanded or collapsed (`usePersistedFlag`), per key. */
   flags: Record<string, boolean>;
 
   setActiveView: (view: ActiveView) => void;
   toggleCollapsedGroup: (scope: string, id: string) => void;
-  /** Nimmt die ids aus dem Set eines Scopes. */
+  /** Removes the ids from the set of a scope. */
   removeCollapsedGroups: (scope: string, ids: string[]) => void;
-  /** Legt die ids ins Set eines Scopes — das Gegenstück zu removeCollapsedGroups. */
+  /** Puts the ids into the set of a scope — the counterpart to removeCollapsedGroups. */
   addCollapsedGroups: (scope: string, ids: string[]) => void;
   setFlag: (key: string, value: boolean) => void;
   closeAllTabs: () => void;
-  /** Ein Eintrag hat den Typ gewechselt: jeder Tab und jeder Verlauf, der ihn
-   *  unter `from` öffnet, öffnet ihn jetzt unter `to` — dieselbe id. Mit
-   *  `endEdit` steht die offene Seite danach im Lesen: Cancel nimmt einen
-   *  Typwechsel zurück, und die Ansicht des alten Typs soll gar nicht erst im
-   *  Bearbeiten erscheinen. Andere Tabs behalten ihren Modus. */
+  /** An entry has changed type: every tab and every history that opens it
+   *  under `from` now opens it under `to` — same id. With
+   *  `endEdit` the open page is then in read mode: Cancel reverts a
+   *  type change, and the view of the old type should not even appear in
+   *  edit mode. Other tabs keep their mode. */
   retypeEntryViews: (id: string, from: EntryModuleId, to: EntryModuleId, options?: { endEdit?: boolean }) => void;
   openViewInNewTab: (view: ActiveView) => void;
   addTab: (view?: ActiveView) => void;
   selectTab: (id: string) => void;
   setTabsOrder: (ids: string[]) => void;
-  /** Fragt vorher, wenn der Tab noch bearbeitet wird (`leaveGuardStore`). */
+  /** Asks first if the tab is still being edited (`leaveGuardStore`). */
   closeTab: (id: string) => void;
   navigateBack: () => void;
   navigateForward: () => void;
@@ -149,14 +149,14 @@ interface UIState {
   setListHeaderHost: (el: HTMLElement | null) => void;
   setDashboardMounted: (mounted: boolean) => void;
   setEditActions: (actions: EditActions | null) => void;
-  /** Beendet das Bearbeiten des Eintrags `id` in genau diesem Tab (`null` = die
-   *  Ansicht ohne Tab) — für ein Abbrechen, dessen Tab beim Zurückschreiben
-   *  nicht mehr der offene ist. Kein Schritt im Verlauf. */
+  /** Ends the editing of entry `id` in exactly this tab (`null` = the
+   *  view without a tab) — for a cancel whose tab is no longer the open one
+   *  when writing back. Not a step in the history. */
   endEditInTab: (tabId: string | null, id: string) => void;
   toggleRail: () => void;
   toggleLeftList: () => void;
   toggleViewLock: () => void;
-  /** Blendet Rail, linke Liste und rechte Leiste wieder ein — Teil von „Ansicht zurücksetzen". */
+  /** Shows rail, left list and right sidebar again — part of "Reset view". */
   showAllPanels: () => void;
   setSearchQuery: (q: string) => void;
   setJournalPrefs: (p: Partial<ListPrefs>) => void;
@@ -182,7 +182,7 @@ const LEFT_LIST_OPEN_KEY = 'left-list-open';
 const RIGHT_SIDEBAR_OPEN_KEY = 'right-sidebar-open';
 const VIEW_LOCKED_KEY = 'view-locked';
 
-/** Die drei Seitenleisten starten offen, solange nichts anderes gespeichert ist. */
+/** The three sidebars start open as long as nothing else is saved. */
 function loadOpenFlag(key: string): boolean {
   return localStorage.getItem(key) !== '0';
 }
@@ -195,11 +195,11 @@ function saveOpenFlag(key: string, open: boolean) {
 function normalizeSavedTab(tab: unknown): OpenTab | null {
   if (!tab || typeof tab !== 'object') return null;
   const candidate = tab as { id?: string; key?: string; view?: ActiveView; history?: unknown };
-  // isViewId: localStorage kann Tab-Typen aus älteren Versionen tragen —
-  // die fallen hier sauber weg, statt als Geister-View zu rendern.
+  // isViewId: localStorage may carry tab types from older versions —
+  // they are dropped cleanly here instead of rendering as a ghost view.
   if (!candidate.view?.type || !isViewId(candidate.view.type)) return null;
-  // isNew ist ein Sitzungs-Flag, kein Tab-Zustand: überlebte es den Neustart,
-  // würde Cancel einen längst autogespeicherten Eintrag endgültig löschen.
+  // isNew is a session flag, not tab state: if it survived a restart,
+  // Cancel would permanently delete an entry that was long since autosaved.
   const view = stripSessionFlags(candidate.view);
   return {
     id: candidate.id ?? candidate.key ?? createTabId(),
@@ -243,13 +243,13 @@ function viewNeedsSidebar(view: ActiveView): boolean {
   return (view.mode === 'edit' && usesEditorSidebar) || (isLibraryView(view.type) && !!view.id);
 }
 
-/** Der Verlauf, durch den Zurück und Vor gerade gehen: der des aktiven Tabs, sonst der tablose. */
+/** The history that Back and Forward currently walk through: that of the active tab, otherwise the tabless one. */
 export function selectActiveHistory(s: Pick<UIState, 'tabs' | 'activeTabId' | 'tablessHistory'>): NavHistory {
   if (!s.activeTabId) return s.tablessHistory;
   return s.tabs.find((tab) => tab.id === s.activeTabId)?.history ?? s.tablessHistory;
 }
 
-/** Ein Schritt durch den aktiven Verlauf; `{}`, wenn es in die Richtung nicht weitergeht. */
+/** One step through the active history; `{}` if it cannot go further in that direction. */
 function stepHistory(s: UIState, delta: -1 | 1): Partial<UIState> {
   const history = selectActiveHistory(s);
   const index = history.index + delta;
@@ -263,16 +263,16 @@ function stepHistory(s: UIState, delta: -1 | 1): Partial<UIState> {
 }
 
 /**
- * Führt `run` aus — sofort, oder erst nach der Frage, wenn die offene Seite
- * ungesicherte Änderungen trägt und `leaves` sie verlässt. Bei „Weiter
- * bearbeiten" entfällt `run`.
+ * Runs `run` — immediately, or only after the question if the open page
+ * carries unsaved changes and `leaves` leaves it. On "Keep
+ * editing", `run` is dropped.
  *
- * Ist die Bearbeitung gerade gesperrt (`editLocked`), entfällt ein Schritt, der
- * die Seite verließe, ganz — ohne Frage, wie ein Klick auf einen gesperrten
- * Knopf.
+ * If editing is currently locked (`editLocked`), a step that would
+ * leave the page is dropped entirely — without a question, like a click on a locked
+ * button.
  */
 function whenLeaveConfirmed(leaves: boolean, run: () => void): void {
-  // Die Frage ginge an eine Ansicht, die gerade abgebaut wird.
+  // The question would go to a view that is being torn down.
   if (leaves && useUIStore.getState().editLocked) return;
   if (!leaves || !leaveNeedsConfirm()) {
     run();
@@ -281,18 +281,18 @@ function whenLeaveConfirmed(leaves: boolean, run: () => void): void {
   void confirmLeave().then((ok) => { if (ok) run(); });
 }
 
-/** Zeigt irgendein Tab — oder die Ansicht ohne Tab — `type`/`id` im Bearbeiten? */
+/** Does any tab — or the view without a tab — show `type`/`id` in edit mode? */
 export function isInEdit(s: Pick<UIState, 'activeView' | 'tabs'>, type: string, id: string): boolean {
   return [s.activeView, ...s.tabs.map((tab) => tab.view)]
     .some((view) => view.type === type && view.id === id && view.mode === 'edit');
 }
 
 /**
- * Fragt nach der Bearbeitung im Tab `tabId`, wenn sie Änderungen trägt: erst
- * hinschauen — dorthin wechseln und warten, bis die Seite ihren Wächter
- * angemeldet hat (nach dem Wechsel montiert sie erst) —, dann fragen.
- * `true`: der Tab darf gehen. `false`: weiter bearbeiten, oder man ist
- * inzwischen woanders und die Frage gälte einer anderen Seite.
+ * Asks about the edit in tab `tabId` if it carries changes: first
+ * look — switch there and wait until the page has registered its guard
+ * (it only mounts after the switch) —, then ask.
+ * `true`: the tab may go. `false`: keep editing, or one is
+ * somewhere else by now and the question would concern another page.
  */
 export async function askInTab(tabId: string): Promise<boolean> {
   const { tabs, activeTabId, selectTab } = useUIStore.getState();
@@ -302,46 +302,46 @@ export async function askInTab(tabId: string): Promise<boolean> {
   if (activeTabId !== tabId) selectTab(tabId);
   const registered = await guardRegistered(key);
   if (useUIStore.getState().activeTabId !== tabId) return false;
-  // Meldet sich die Seite nicht, gibt es niemanden zu fragen — ihre Arbeit
-  // ist gespeichert (Autosave) oder mitgeschrieben (Entwurf).
+  // If the page does not register, there is nobody to ask — its work
+  // is saved (autosave) or persisted along (draft).
   if (!registered) return true;
   if (useLeaveGuardStore.getState().guard?.key !== key) return false;
-  // Gesperrt (`editLocked`): die Frage ginge an eine Seite, die gerade abgebaut wird.
+  // Locked (`editLocked`): the question would go to a page that is being torn down.
   if (useUIStore.getState().editLocked) return false;
   return confirmLeave();
 }
 
-/** Dieselbe Seite im selben Modus ist kein Verlassen. */
+/** The same page in the same mode is not leaving. */
 function leavesPage(current: ActiveView, next: ActiveView): boolean {
   return !(current.type === next.type && current.id === next.id && current.mode === next.mode);
 }
 
-/** `s` mit `history` als aktivem Verlauf — dem des aktiven Tabs, sonst dem tablosen. */
+/** `s` with `history` as the active history — that of the active tab, otherwise the tabless one. */
 function withActiveHistory(s: UIState, history: NavHistory): UIState {
   if (!s.activeTabId) return { ...s, tablessHistory: history };
   return { ...s, tabs: s.tabs.map((tab) => (tab.id === s.activeTabId ? { ...tab, history } : tab)) };
 }
 
 /**
- * Der Verlauf, von dem ein Zurück/Vor ausgeht (`stepGuarded`), solange seine
- * Rückfrage offen ist. Bei „Weiter bearbeiten" — und bei einem Schritt, der in
- * die Sperre fiel — bleibt er stehen, bis der nächste Schritt ihn ersetzt — gelesen wird er nur von dem, der ihn gesetzt hat.
+ * The history from which a Back/Forward proceeds (`stepGuarded`) while its
+ * confirmation is open. On "Keep editing" — and for a step that fell into
+ * the lock — it stays until the next step replaces it — it is read only by whoever set it.
  */
 let heldHistory: NavHistory | null = null;
 
 /**
- * Zurück oder Vor. Der Schritt geht vom Verlauf aus, wie er vor der Frage war:
- * „Speichern" und „Verwerfen" wechseln selbst die Seite (zurück zur Liste)
- * und hätten ihn sonst um genau diesen Schritt verschoben — man stünde wieder
- * auf der Seite, die man verlassen wollte.
+ * Back or Forward. The step proceeds from the history as it was before the question:
+ * "Save" and "Discard" switch the page themselves (back to the list)
+ * and would otherwise have shifted it by exactly that step — one would be back
+ * on the page one wanted to leave.
  *
- * Er liegt in `heldHistory`, nicht in der Closure: nimmt „Verwerfen" einen
- * Typwechsel zurück, schreibt `retypeEntryViews` ihn mit um — sonst führte
- * er den Eintrag weiter unter dem verworfenen Typ.
+ * It lives in `heldHistory`, not in the closure: if "Discard" reverts a
+ * type change, `retypeEntryViews` rewrites it too — otherwise it would
+ * keep leading to the entry under the discarded type.
  */
 function stepGuarded(delta: -1 | 1): void {
-  // Ein Schritt ins Leere fragt nicht nach ungesicherten Änderungen: die
-  // Pfeile sind dort grau, die Maustasten kommen trotzdem an.
+  // A step into the void does not ask about unsaved changes: the
+  // arrows are greyed out there, but the mouse buttons arrive anyway.
   const { views, index } = selectActiveHistory(useUIStore.getState());
   if (index + delta < 0 || index + delta >= views.length) return;
   const tabId = useUIStore.getState().activeTabId;
@@ -353,7 +353,7 @@ function stepGuarded(delta: -1 | 1): void {
   });
 }
 
-/** Schließt den Tab, ohne zu fragen — das Fragen erledigt `closeTab`. */
+/** Closes the tab without asking — `closeTab` handles the asking. */
 function closeTabNow(id: string): void {
   useUIStore.setState((s) => {
     const tabIndex = s.tabs.findIndex((tab) => tab.id === id);
@@ -366,7 +366,7 @@ function closeTabNow(id: string): void {
 
     const nextTab = tabs[Math.min(tabIndex, tabs.length - 1)] ?? tabs[tabIndex - 1];
     saveTabs(tabs, nextTab?.id ?? null);
-    // Der Verlauf des geschlossenen Tabs geht mit ihm; ohne Tab beginnt der tablose frisch.
+    // The closed tab's history goes with it; without a tab the tabless one starts fresh.
     if (!nextTab) {
       return { tabs, activeTabId: null, activeView: { type: 'home' }, tablessHistory: freshHistory({ type: 'home' }) };
     }
@@ -384,8 +384,8 @@ export const useUIStore = create<UIState>((set, get) => ({
   tabs: savedTabs.tabs,
   activeTabId: savedTabs.activeTabId,
   tablessHistory: freshHistory({ type: 'home' }),
-  // Ein wiederhergestellter Tab im Bearbeitungsmodus braucht die Leiste, auch
-  // wenn sie zuletzt zugeklappt war — dieselbe Regel wie in `setActiveView`.
+  // A restored tab in edit mode needs the sidebar, even
+  // if it was last collapsed — the same rule as in `setActiveView`.
   rightSidebarOpen: loadOpenFlag(RIGHT_SIDEBAR_OPEN_KEY) || viewNeedsSidebar(initialView),
   listHeaderHost: null,
   dashboardMounted: false,
@@ -393,35 +393,35 @@ export const useUIStore = create<UIState>((set, get) => ({
   editLocked: false,
   railOpen: loadOpenFlag(RAIL_OPEN_KEY),
   leftListOpen: loadOpenFlag(LEFT_LIST_OPEN_KEY),
-  // Anders als die Leisten: aus, solange nichts gespeichert ist.
+  // Unlike the sidebars: off as long as nothing is saved.
   viewLocked: localStorage.getItem(VIEW_LOCKED_KEY) === '1',
   searchQuery: '',
-  // Wo „Kategorie" bisher der Sortiermodus war (Wiki, Operationen,
-  // Aufgaben), steht jetzt `grouping: 'grouped'` — dieselbe Ansicht wie
-  // vorher. Innerhalb einer Gruppe verglich der alte Modus nur den
-  // Gruppennamen, war also für jede sichtbare Zeile gleich; die Reihenfolge
-  // kam faktisch aus dem Store. Der neue Sortierwert bildet genau die nach:
-  // Wiki lädt `ORDER BY title` (alpha_asc), Operationen `updated_at DESC`
-  // und Aufgaben `created_at DESC` (date_desc). Journal, Altar und
-  // Papierkorb waren nie gruppiert und bleiben 'flat'.
+  // Where "Category" used to be the sort mode (wiki, operations,
+  // tasks), it is now `grouping: 'grouped'` — the same view as
+  // before. Within a group the old mode compared only the
+  // group name, so it was equal for every visible row; the order
+  // actually came from the store. The new sort value reproduces exactly that:
+  // wiki loads `ORDER BY title` (alpha_asc), operations `updated_at DESC`
+  // and tasks `created_at DESC` (date_desc). Journal, altar and
+  // trash were never grouped and stay 'flat'.
   journalPrefs: { view: 'list', sort: 'date_desc', grouping: 'flat' },
   wikiPrefs: { view: 'cards', sort: 'alpha_asc', grouping: 'grouped' },
   operationsPrefs: { view: 'list', sort: 'date_desc', grouping: 'grouped' },
   tasksPrefs: { view: 'list', sort: 'date_desc', grouping: 'grouped' },
-  // `grouping` bleibt beim Altar ungenutzt: Altäre tragen keine Kategorien,
-  // das Dashboard reicht die Achse deshalb nicht an die Toolbar durch. Das
-  // Feld steht nur da, weil alle Module dieselbe ListPrefs teilen.
+  // `grouping` stays unused for the altar: altars carry no categories,
+  // so the dashboard does not pass the axis on to the toolbar. The
+  // field is only there because all modules share the same ListPrefs.
   altarPrefs: { view: 'cards', sort: 'date_desc', grouping: 'flat' },
   trashPrefs: { view: 'list', sort: 'date_desc', grouping: 'flat' },
-  // Vorlagen haben nichts zu gruppieren — wie beim Altar steht das Feld nur für die gemeinsame ListPrefs da.
+  // Templates have nothing to group — as with the altar, the field is only there for the shared ListPrefs.
   templatesPrefs: { view: 'list', sort: 'alpha_asc', grouping: 'flat' },
   blocksPrefs: { view: 'list', sort: 'alpha_asc', grouping: 'flat' },
-  // Sprachen tragen keine Kategorien — `grouping` steht hier wie beim Altar nur für die gemeinsame ListPrefs.
+  // Languages carry no categories — `grouping` is here, as with the altar, only for the shared ListPrefs.
   lexiconPrefs: { view: 'list', sort: 'alpha_asc', grouping: 'flat' },
   tagsSort: 'alpha_asc',
   altarWindowFullscreen: false,
-  // Die Vorlieben hier sind die Standards eines Vaults ohne eigene —
-  // `vaultPrefs` lädt beim Öffnen eines Vaults dessen gespeicherte darüber.
+  // The preferences here are the defaults of a vault without its own —
+  // `vaultPrefs` loads a vault's saved ones over them when it is opened.
   altarShowPreview: true,
   altarLibraryPrefs: { sort: 'alpha_asc', grouping: 'grouped' },
   homeJournalPrefs: { sort: 'date_desc', view: 'list', count: 5 },
@@ -466,8 +466,8 @@ export const useUIStore = create<UIState>((set, get) => ({
     if (activeTabId) {
       tabs = tabs.map((tab) => tab.id === activeTabId ? { ...tab, view, history: pushHistory(tab.history, view) } : tab);
     } else if (isContentView(view)) {
-      // Der automatisch geöffnete Tab setzt den Weg davor fort: Zurück führt
-      // dorthin, von wo aus der Eintrag geöffnet wurde.
+      // The automatically opened tab continues the path before it: Back leads
+      // to where the entry was opened from.
       activeTabId = createTabId();
       tabs = [{ id: activeTabId, view, history: pushHistory(s.tablessHistory, view) }];
       tablessHistory = freshHistory({ type: 'home' });
@@ -479,11 +479,11 @@ export const useUIStore = create<UIState>((set, get) => ({
     return { activeView: view, tabs, activeTabId, tablessHistory, ...openSidebar };
   })),
 
-  // Fuer Vault-Wechsel und Replace-Import: Tabs und History tragen Eintrags-IDs,
-  // die es in der neuen Datenbank nicht gibt — beides faellt auf den frischen
-  // Startzustand zurueck (keine Tabs, Home), wie beim allerersten Start. Der
-  // Arbeitszustand der Listen mit ihnen; die Vorlieben (auch die Klappzustände)
-  // gehören dem Vault und kommen mit `loadVaultPrefs`.
+  // For vault switch and replace import: tabs and history carry entry IDs
+  // that do not exist in the new database — both fall back to the fresh
+  // start state (no tabs, Home), as on the very first start. The
+  // working state of the lists goes with them; the preferences (including the collapse states)
+  // belong to the vault and come with `loadVaultPrefs`.
   closeAllTabs: () => {
     clearSessionState();
     saveTabs([], null);
@@ -499,7 +499,7 @@ export const useUIStore = create<UIState>((set, get) => ({
     const isEntry = (view: ActiveView) => view.type === from && view.id === id;
     const retype = (view: ActiveView): ActiveView => (isEntry(view) ? { ...view, type: to } : view);
     const retypeHistory = (history: NavHistory): NavHistory => ({ ...history, views: history.views.map(retype) });
-    // Die offene Seite: mit `endEdit` zugleich ins Lesen, wenn sie dieser Eintrag ist.
+    // The open page: with `endEdit` straight into read mode if it is this entry.
     const retypeOpenPage = (view: ActiveView): ActiveView => (
       endEdit && isEntry(view) ? { type: to, id, mode: 'view' } : retype(view)
     );
@@ -515,7 +515,7 @@ export const useUIStore = create<UIState>((set, get) => ({
     });
   },
 
-  // Ein neuer Tab beginnt mit einem frischen Verlauf.
+  // A new tab starts with a fresh history.
   openViewInNewTab: (view) => set((s) => {
     const id = createTabId();
     const tabs = [...s.tabs, { id, view, history: freshHistory(view) }];
@@ -530,7 +530,7 @@ export const useUIStore = create<UIState>((set, get) => ({
     return { activeView: view, tabs, activeTabId: id };
   }),
 
-  // Der Tabwechsel ist kein Schritt im Verlauf — er wechselt nur, welcher Verlauf gilt.
+  // Switching tabs is not a step in the history — it only changes which history applies.
   selectTab: (id) => set((s) => {
     const tab = s.tabs.find((candidate) => candidate.id === id);
     if (!tab) return {};
@@ -565,8 +565,8 @@ export const useUIStore = create<UIState>((set, get) => ({
       closeTabNow(id);
       return;
     }
-    // Ein Tab im Hintergrund mit ungesicherten Änderungen: fragen — und danach
-    // zurück in den Tab, aus dem heraus er geschlossen wurde.
+    // A background tab with unsaved changes: ask — and afterwards
+    // return to the tab from which it was closed.
     void askInTab(id).then((leave) => {
       if (!leave) return;
       closeTabNow(id);
@@ -582,8 +582,8 @@ export const useUIStore = create<UIState>((set, get) => ({
     return { rightSidebarOpen };
   }),
 
-  // Als Ref-Callback gedacht: React ruft ihn beim Unmount mit `null` auf,
-  // womit der Dashboard-Kopf mit der Leiste verschwindet.
+  // Meant as a ref callback: React calls it with `null` on unmount,
+  // whereby the dashboard header disappears with the sidebar.
   setListHeaderHost: (el) => set((s) => (s.listHeaderHost === el ? s : { listHeaderHost: el })),
   setDashboardMounted: (mounted) => set((s) => (s.dashboardMounted === mounted ? s : { dashboardMounted: mounted })),
   setEditActions: (actions) => set({ editActions: actions }),
@@ -635,25 +635,25 @@ export const useUIStore = create<UIState>((set, get) => ({
   setHomeWikiPrefs:    (p) => set((s) => ({ homeWikiPrefs:    { ...s.homeWikiPrefs,    ...p } })),
 }));
 
-/** Wie viele `withEditLock` gerade laufen. */
+/** How many `withEditLock` calls are running right now. */
 let editLocks = 0;
-/** Wie viele je begonnen haben. */
+/** How many have ever begun. */
 let editLocksStarted = 0;
 
 /**
- * Zählt jede begonnene Sperre. Wer über mehrere awaits hinweg liest (das
- * automatische Backup), merkt daran, dass dazwischen ein Typwechsel oder ein
- * Abbrechen geschrieben hat — auch wenn `editLocked` am Ende wieder aus ist.
+ * Counts every lock that has begun. Anyone reading across several awaits (the
+ * automatic backup) can tell from it that a type change or a
+ * cancel has written in between — even if `editLocked` is off again at the end.
  */
 export function editLockEpoch(): number {
   return editLocksStarted;
 }
 
 /**
- * Sperrt die Bearbeitung, solange `run` schreibt (`editLocked`): die Leiste,
- * den Typ-Schalter und das Verlassen der Seite. Gezählt, nicht geschaltet: ein
- * Abbrechen kann auf einen Typwechsel warten, der noch läuft — wer zuerst
- * fertig ist, gibt die Sperre des anderen nicht frei.
+ * Locks editing while `run` writes (`editLocked`): the sidebar,
+ * the type switch and leaving the page. Counted, not toggled: a
+ * cancel can wait for a type change that is still running — whichever finishes
+ * first does not release the other's lock.
  */
 export async function withEditLock<T>(run: () => Promise<T>): Promise<T> {
   editLocksStarted++;

@@ -1,19 +1,19 @@
 /**
- * Die Vorlagen des Vorlagen-Dashboards (Tabelle `templates`, seit v43). Eine
- * Vorlage wirkt nur beim Einsetzen — was ein Eintrag bekommt, ist eine Kopie
- * (siehe `lib/blocks/templates.ts`). Löschen, Wiederherstellen und Ändern
- * berühren deshalb keinen Eintrag.
+ * The templates of the templates dashboard (table `templates`, since v43). A
+ * template only takes effect on insertion — what an entry gets is a copy
+ * (see `lib/blocks/templates.ts`). Deleting, restoring and changing
+ * therefore touch no entry.
  *
- * Je Kombination (Eintragsart × Kategorie) gibt es höchstens einen Standard
- * unter den aktiven Vorlagen. Das hält dieser Store, nicht die Datenbank: wer
- * einen Stern setzt, nimmt ihn der bisherigen Vorlage weg; eine Vorlage aus
- * dem Papierkorb verliert ihren Stern, wenn inzwischen eine andere die
- * Kombination hält.
+ * Per combination (entry kind × category) there is at most one default
+ * among the active templates. This store enforces that, not the database: whoever
+ * sets a star takes it from the previous template; a template from
+ * the trash loses its star if another one has meanwhile taken the
+ * combination.
  *
- * Import-Regel wie `blockDefinitionStore`: keine Inhalts-Stores — die
- * importieren umgekehrt diesen, um beim Anlegen den Standard einzusetzen.
- * Alle Schreibzugriffe laufen unter einem gemeinsamen Schlüssel: ein Standard
- * betrifft immer mehrere Zeilen.
+ * Import rule as in `blockDefinitionStore`: no content stores — they
+ * conversely import this one, to apply the default on creation.
+ * All writes run under a shared key: a default
+ * always affects several rows.
  */
 import { create } from 'zustand';
 import type Database from '../lib/sqlite';
@@ -34,22 +34,22 @@ import { withUsableTags } from '../lib/templateTags';
 
 export type TemplatePatch = Partial<Pick<Template, 'name' | 'icon' | 'title' | 'content' | 'tags' | 'assignments'>>;
 
-/** Was eine neue Vorlage mitbringt. Sterne (`isDefault`) werden dabei verworfen — die setzt nur `updateTemplate`. */
+/** What a new template brings along. Stars (`isDefault`) are discarded in the process — only `updateTemplate` sets them. */
 export type TemplateInit = Omit<TemplatePatch, 'name'>;
 
 interface TemplateState {
-  /** Aktive Vorlagen in Anzeigereihenfolge. */
+  /** Active templates in display order. */
   templates: Template[];
 
   fetchTemplates: () => Promise<void>;
   createTemplate: (name: string, init?: TemplateInit) => Promise<Template>;
   /**
-   * Speichert die Änderung. Setzt sie einen Standard, verlieren andere aktive
-   * Vorlagen ihn für dieselbe Kombination.
+   * Saves the change. If it sets a default, other active
+   * templates lose it for the same combination.
    */
   updateTemplate: (id: string, patch: TemplatePatch, options?: WriteOptions) => Promise<void>;
   duplicateTemplate: (id: string) => Promise<Template | undefined>;
-  /** Soft-Delete. Einträge aus dieser Vorlage bleiben, wie sie sind. */
+  /** Soft delete. Entries from this template stay as they are. */
   deleteTemplate: (id: string) => Promise<void>;
   restoreTemplate: (id: string) => Promise<void>;
   permanentlyDeleteTemplate: (id: string) => Promise<void>;
@@ -64,7 +64,7 @@ async function selectActive(db: Database): Promise<Template[]> {
   return rows.map(fromRow.template);
 }
 
-/** Nimmt `others` den Standard für `keys` weg und schreibt die betroffenen Zeilen. */
+/** Takes the default for `keys` away from `others` and writes the affected rows. */
 async function clearDefaults(db: Database, others: readonly Template[], keys: ReadonlySet<string>): Promise<Template[]> {
   const changed: Template[] = [];
   if (keys.size === 0) return changed;
@@ -95,7 +95,7 @@ export const useTemplateStore = create<TemplateState>((set, get) => ({
       title: init.title ?? '',
       content: init.content ?? '',
       tags: init.tags ?? [],
-      // Eine neue Vorlage nimmt niemandem einen Standard weg — Sterne setzt nur `updateTemplate`.
+      // A new template takes no default from anyone — only `updateTemplate` sets stars.
       assignments: parseAssignments(init.assignments ?? []).map((a) => ({ ...a, isDefault: false })),
       sort_order: await nextTemplateSortOrder(db),
       created_at: now,
@@ -125,7 +125,7 @@ export const useTemplateStore = create<TemplateState>((set, get) => ({
         WHERE id=$8`,
       [row.name, row.icon, row.title, row.content, row.tags, row.assignments, row.updated_at, id]
     );
-    // Nur neu gesetzte Sterne verdrängen — ein unveränderter hält seine Kombination ohnehin schon.
+    // Only newly set stars displace others — an unchanged one already holds its combination anyway.
     const before = defaultKeys(current.assignments);
     const added = new Set([...defaultKeys(updated.assignments)].filter((key) => !before.has(key)));
     const replaced = await clearDefaults(db, get().templates.filter((t) => t.id !== id), added);
@@ -138,7 +138,7 @@ export const useTemplateStore = create<TemplateState>((set, get) => ({
   duplicateTemplate: async (id) => {
     const source = get().templates.find((t) => t.id === id);
     if (!source) return undefined;
-    // Ohne Sterne: zwei Standards für dieselbe Kombination gibt es nicht.
+    // Without stars: there are no two defaults for the same combination.
     return get().createTemplate(source.name + i18n.t('common.copySuffix'), {
       icon: source.icon,
       title: source.title,
@@ -158,10 +158,10 @@ export const useTemplateStore = create<TemplateState>((set, get) => ({
     const db = await getDb();
     const template = await templateById(db, id);
     if (!template) return;
-    // Sterne, die inzwischen eine andere Vorlage trägt, bleiben bei ihr.
+    // Stars that another template has taken in the meantime stay with it.
     const taken = new Set(get().templates.filter((t) => t.id !== id).flatMap((t) => [...defaultKeys(t.assignments)]));
     const assignments = withoutDefaultsFor(template.assignments, taken);
-    // Ans Ende der Liste: der alte Platz ist inzwischen womöglich vergeben.
+    // To the end of the list: the old slot may have been taken in the meantime.
     await db.execute(
       'UPDATE templates SET deleted_at=NULL, sort_order=$1, assignments=$2 WHERE id=$3',
       [await nextTemplateSortOrder(db), templateToRow({ ...template, assignments }).assignments, id]
@@ -171,17 +171,17 @@ export const useTemplateStore = create<TemplateState>((set, get) => ({
 
   permanentlyDeleteTemplate: async (id) => {
     const db = await getDb();
-    // Nur aus dem Papierkorb erreichbar — in `templates` (aktive) steht sie nicht.
+    // Reachable only from the trash — it is not in `templates` (active).
     await db.execute('DELETE FROM templates WHERE id=$1', [id]);
   },
 }));
 
 /**
- * Womit ein neuer Eintrag beginnt: der Standard seiner Kombination (siehe
- * `resolveDefaultTemplate`) — oder gar keine Vorlage: mit `blank`, oder wenn
- * der Vault Standards nicht von selbst einsetzt (Einstellung). Für die
- * `create*`-Aktionen der Inhalts-Stores; Importe und Duplikate übergeben
- * `blank`, sie überschreiben den Inhalt ohnehin.
+ * What a new entry starts with: the default of its combination (see
+ * `resolveDefaultTemplate`) — or no template at all: with `blank`, or if
+ * the vault does not apply defaults by itself (setting). For the
+ * `create*` actions of the content stores; imports and duplicates pass
+ * `blank`, since they overwrite the content anyway.
  */
 export function startOfNewEntry(
   entryType: TemplateEntryType,
@@ -193,7 +193,7 @@ export function startOfNewEntry(
   return withUsableTags(templateStart(template));
 }
 
-/** Eine gerade automatisch eingesetzte Vorlage — der Blockstapel des Eintrags zeigt dazu Rückgängig und „Andere Vorlage". */
+/** A template just applied automatically — the entry's block stack shows Undo and "Other template" for it. */
 export interface AppliedTemplateNotice {
   entryId: string;
   templateId: string;
@@ -202,15 +202,15 @@ export interface AppliedTemplateNotice {
 interface TemplateNoticeState {
   notice: AppliedTemplateNotice | null;
   show: (notice: AppliedTemplateNotice) => void;
-  /** Nur, wenn der Hinweis noch diesem Eintrag gehört. */
+  /** Only if the notice still belongs to this entry. */
   dismiss: (entryId: string) => void;
 }
 
 /**
- * Der eine Hinweis „Vorlage angewendet". Hier statt beim Blockstapel, weil die
- * Inhalts-Stores ihn beim Anlegen setzen und keine Komponente importieren
- * dürfen. Ein neuer Hinweis ersetzt den alten — es gibt immer nur einen
- * frisch angelegten Eintrag.
+ * The one "Template applied" notice. Here instead of at the block stack, because the
+ * content stores set it on creation and must not import a component.
+ * A new notice replaces the old one — there is only ever one
+ * freshly created entry.
  */
 export const useTemplateNoticeStore = create<TemplateNoticeState>((set, get) => ({
   notice: null,
@@ -221,8 +221,8 @@ export const useTemplateNoticeStore = create<TemplateNoticeState>((set, get) => 
 }));
 
 /**
- * Nimmt endgültig gelöschte Kategorien aus den Zuweisungen im Speicher — das
- * Gegenstück zu `dropCategoryFromTemplates` in der Datenbank.
+ * Removes permanently deleted categories from the assignments in memory — the
+ * counterpart to `dropCategoryFromTemplates` in the database.
  */
 export function dropCategoriesFromTemplatesInMemory(ids: ReadonlySet<string>): void {
   const dropped = (a: TemplateAssignment) => {

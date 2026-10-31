@@ -5,7 +5,7 @@ import { useSettingsStore } from '../../../store/settingsStore';
 import SettingsChoiceButton, { SettingsChoiceRow } from './SettingsChoiceButton';
 import SettingsSection from './SettingsSection';
 
-/** Wie groß eingefügte Bilder werden dürfen: erst verkleinert, dann geprüft. */
+/** How large inserted images may be: first scaled down, then checked. */
 export default function ImageLimitsSection() {
   const { t } = useTranslation();
   const images = useSettingsStore((s) => s.settings.images);

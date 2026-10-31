@@ -1,26 +1,26 @@
 /**
- * Legt Kategorien aus mehreren Quellen zu einer Liste zusammen — die eine
- * Regel dafür, wie aus den vier Modul-Tabellen von vor v38 die globale
- * `categories`-Tabelle wird. Drei Aufrufer teilen sie sich: die Migration v38,
- * der Baseline-Seed frischer Vaults (Builtins + Starter-Set) und das Heben
- * alter Sicherungen in `dbBackup.migrateBackupPayload`.
+ * Merges categories from several sources into one list — the one
+ * rule for how the four pre-v38 module tables become the global
+ * `categories` table. Three callers share it: migration v38,
+ * the baseline seed of fresh vaults (builtins + starter set) and the lifting
+ * of old backups in `dbBackup.migrateBackupPayload`.
  *
- * Bewusst pur: kein Tauri, kein React, keine i18n. Namen kommen hier schon
- * übersetzt an — wer eine eingebaute Kategorie von früher einspeist, hat sie
- * vorher über ihren Locale-Key aufgelöst (siehe `legacyBuiltinLabelKey`).
+ * Deliberately pure: no Tauri, no React, no i18n. Names arrive here already
+ * translated — whoever feeds in an old built-in category has resolved it
+ * beforehand via its locale key (see `legacyBuiltinLabelKey`).
  */
 import { FALLBACK_CATEGORY_ID, SIGIL_CATEGORY_ID, type CategorySeedRow } from './schema';
 
 /**
- * Die beiden Builtins, wie v38 sie kannte — eingefroren statt aus
- * `BUILTIN_CATEGORIES` gelesen.
+ * The two builtins as v38 knew them — frozen instead of read from
+ * `BUILTIN_CATEGORIES`.
  *
- * v39 hat `other` den Sonderstatus genommen; die Konstante in `schema.ts`
- * führt es deshalb nicht mehr. Diese Datei baut aber ausschließlich Daten von
- * *vor* v38 um, und dort war es eingebaut: Ein aufsteigender Vault muss erst
- * denselben Stand bekommen, den v38 immer erzeugt hat, damit v39 ihn danach
- * genauso degradiert wie jeden anderen. Zöge die Liste hier mit, verlöre der
- * Aufstieg das Zusammenlegen der vier Modul-„Sonstiges" in eine Zeile.
+ * v39 took the special status away from `other`; the constant in `schema.ts`
+ * therefore no longer lists it. This file, however, only converts data from
+ * *before* v38, and there it was built in: an upgrading vault must first
+ * reach the same state that v38 always produced, so that v39 afterwards
+ * demotes it like any other. If the list followed along here, the
+ * upgrade would lose the merging of the four modules' "Other" into one row.
  */
 const PRE_V39_BUILTINS: readonly [string, string, string][] = [
   [SIGIL_CATEGORY_ID, 'Sigils', '🔯'],
@@ -35,37 +35,37 @@ export interface CategorySourceRow {
 }
 
 export interface CategorySource {
-  /** Präfix im idMap-Schlüssel — eine der vier Legacy-Tabellen (`wiki_categories` …) oder `starter`. */
+  /** Prefix in the idMap key — one of the four legacy tables (`wiki_categories` …) or `starter`. */
   table: string;
-  /** In Anzeigereihenfolge — sie wird zur Reihenfolge der Ergebnisliste. */
+  /** In display order — it becomes the order of the result list. */
   rows: CategorySourceRow[];
 }
 
 export type MergedCategory = CategorySeedRow;
 
 export interface MergeOptions {
-  /** Anzeigename der beiden Builtins in der aktuellen Sprache — eine gleichnamige eigene Kategorie geht darin auf. */
+  /** Display name of the two builtins in the current language — a custom category of the same name is merged into it. */
   builtinName: (id: typeof FALLBACK_CATEGORY_ID | typeof SIGIL_CATEGORY_ID) => string;
-  /** Meldet jedes Paar, das zusammengelegt wurde. */
+  /** Reports each pair that was merged. */
   log?: (message: string) => void;
 }
 
 export interface MergeResult {
   rows: MergedCategory[];
-  /** `${table}:${oldId}` → ID in `rows`. Enthält jede Quellzeile, auch die, die ihre ID behielt. */
+  /** `${table}:${oldId}` → ID in `rows`. Contains every source row, including those that kept their ID. */
   idMap: Map<string, string>;
 }
 
 /**
- * Vergleichsschlüssel für Kategorienamen: getrimmt und kleingeschrieben. Auch
- * der Store und der Import prüfen Eindeutigkeit damit — ein „Kraut" und ein
- * „kraut" sind dieselbe Kategorie.
+ * Comparison key for category names: trimmed and lowercased. The store
+ * and the import also check uniqueness with it — an "Herb" and an
+ * "herb" are the same category.
  */
 export function categoryKey(name: string): string {
   return name.trim().toLowerCase();
 }
 
-/** Ob eine Quellzeile das Sammelbecken meint: `other` in jeder Tabelle, `general` bei Tasks. */
+/** Whether a source row means the catch-all: `other` in every table, `general` for tasks. */
 function isFallbackRow(table: string, id: string): boolean {
   return id === FALLBACK_CATEGORY_ID || (id === 'general' && table === 'task_categories');
 }
@@ -88,8 +88,8 @@ export function mergeCategoryRows(sources: CategorySource[], opts: MergeOptions)
     builtin.set(id, register({
       id, name, emoji, sort_order: 0, is_builtin: true, deleted_at: null,
     }));
-    // Der Schlüssel läuft über den *übersetzten* Namen: Was der Nutzer als
-    // „Sonstiges" angelegt hat, ist dasselbe wie das eingebaute Sonstiges.
+    // The key goes through the *translated* name: what the user created as
+    // "Other" is the same as the built-in Other.
     byKey.set(categoryKey(opts.builtinName(id as typeof FALLBACK_CATEGORY_ID)), builtin.get(id)!);
   }
 
@@ -111,16 +111,16 @@ export function mergeCategoryRows(sources: CategorySource[], opts: MergeOptions)
         if (target.id !== row.id) {
           opts.log?.(`Kategorie „${row.name}" (${mapKey}) geht in „${target.name}" (${target.id}) auf`);
         }
-        // Aktiv gewinnt: eine noch benutzte Kategorie darf durch das
-        // Zusammenlegen nicht im Papierkorb landen.
+        // Active wins: a category still in use must not end up in the trash
+        // through the merge.
         if (!row.deleted_at) target.deleted_at = null;
         else if (target.deleted_at && row.deleted_at > target.deleted_at) target.deleted_at = row.deleted_at;
         continue;
       }
 
-      // Eigene Zeile. Die ID bleibt, solange sie nicht schon einer anderen
-      // Kategorie gehört — dann gibt es eine frische, und die Inhalte werden
-      // über idMap umgehängt.
+      // A row of its own. The ID stays unless it already belongs to another
+      // category — then a fresh one is made, and the contents are re-pointed
+      // via idMap.
       const id = byId.has(row.id) ? crypto.randomUUID() : row.id;
       register({
         id,
@@ -134,7 +134,7 @@ export function mergeCategoryRows(sources: CategorySource[], opts: MergeOptions)
     }
   }
 
-  // Sigillen vorn, Sonstiges hinten, alles andere in Einspeisereihenfolge.
+  // Sigils first, Other last, everything else in feed-in order.
   const rows = [
     builtin.get(SIGIL_CATEGORY_ID)!,
     ...order.filter((r) => !r.is_builtin),

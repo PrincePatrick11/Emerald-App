@@ -1,14 +1,13 @@
 /**
- * Die eine Kategorienliste für Wiki, Operationen, Aufgaben und Altar-Elemente
- * (Tabelle `categories`, seit v38). Vorher hielt jeder der vier Stores seinen
- * eigenen Slice mit denselben fünf Aktionen.
+ * The one category list for wiki, operations, tasks and altar items
+ * (table `categories`, since v38). Previously each of the four stores held its
+ * own slice with the same five actions.
  *
- * Import-Regel: Dieser Store darf die Inhalts-Stores, den Vorlagen-Store und
- * `entryEdit` importieren — er hängt nach dem endgültigen Löschen einer
- * Kategorie deren Inhalte, Vorlagen-Zuweisungen und die Ausgangsstände
- * laufender Bearbeitungen auch im Speicher um; keiner von ihnen importiert
- * zurück. Alle Zugriffe laufen zur Laufzeit
- * über `getState()`.
+ * Import rule: this store may import the content stores, the template store and
+ * `entryEdit` — after permanently deleting a category it also reassigns
+ * its contents, template assignments and the baselines of running edits in
+ * memory; none of them imports back. All access goes
+ * through `getState()` at runtime.
  */
 import { create } from 'zustand';
 import { getDb } from '../lib/db';
@@ -23,22 +22,22 @@ import { useTaskStore } from './taskStore';
 import { useAltarStore } from './altarStore';
 import { dropCategoriesFromTemplatesInMemory, useTemplateStore } from './templateStore';
 
-/** Fehlermeldung von addCategory/updateCategory, wenn der Name schon vergeben ist. */
+/** Error message from addCategory/updateCategory when the name is already taken. */
 export const CATEGORY_NAME_TAKEN = 'CATEGORY_NAME_TAKEN';
 
 export interface CategoryState {
-  /** Aktive Kategorien in Anzeigereihenfolge. */
+  /** Active categories in display order. */
   categories: Category[];
 
   fetchCategories: () => Promise<void>;
   addCategory: (name: string, emoji: string) => Promise<Category>;
   updateCategory: (id: string, name: string, emoji: string) => Promise<void>;
-  /** Soft-Delete. `false`, wenn die Kategorie eingebaut ist. */
+  /** Soft delete. `false` if the category is built in. */
   deleteCategory: (id: string) => Promise<boolean>;
-  /** Die id der Kategorie, in der der Inhalt jetzt steht — die eigene, oder die gleichnamige, in der sie aufging. */
+  /** The id of the category the content now sits in — its own, or the same-named one it merged into. */
   restoreCategory: (id: string) => Promise<string>;
   permanentlyDeleteCategory: (id: string) => Promise<void>;
-  /** Schreibt die komplette Reihenfolge der aktiven Kategorien. */
+  /** Writes the complete order of the active categories. */
   reorderCategories: (ids: string[]) => Promise<void>;
   getCategory: (id: string) => Category | undefined;
 }
@@ -56,12 +55,12 @@ function nameTaken(categories: Category[], name: string, exceptId?: string): boo
 }
 
 /**
- * Hängt Inhalte, die auf eine der `ids` zeigen, in den geladenen Stores auf
- * `to` um (`null` = ohne Kategorie) — das Gegenstück zu
- * `reassignCategoryContent` für den Speicher. Auch vom Papierkorb-Leeren
- * benutzt; die vier Store-Formen sollen nur an einer Stelle stehen. Vorlagen
- * verlieren die Zuweisung nur ohne `to`; beim Zusammenlegen lädt
- * `mergeCategory` sie neu.
+ * Reassigns contents that point at one of the `ids` to `to` in the loaded
+ * stores (`null` = no category) — the in-memory counterpart to
+ * `reassignCategoryContent`. Also used when emptying the trash;
+ * the four store shapes should live in one place only. Templates
+ * lose the assignment only without `to`; on merging,
+ * `mergeCategory` reloads them.
  */
 export function reassignCategoriesInMemory(ids: ReadonlySet<string>, to: string | null = null): void {
   const move = <T extends { category_id: string | null }>(x: T): T =>
@@ -75,14 +74,14 @@ export function reassignCategoriesInMemory(ids: ReadonlySet<string>, to: string 
       Object.entries(s.previewPlacements).map(([k, list]) => [k, list.map(move)])
     ),
   }));
-  // Auch, was eine laufende Bearbeitung mit Cancel zurückschriebe.
+  // Also what a running edit would write back with Cancel.
   reassignBaselineCategories(ids, to);
   if (!to) dropCategoriesFromTemplatesInMemory(ids);
 }
 
 /**
- * Ein Name gehört einer Kategorie: `from` geht in `to` auf — ihr Inhalt und
- * ihre Vorlagen-Zuweisungen ziehen hinüber, die Zeile verschwindet.
+ * A name belongs to one category: `from` merges into `to` — its content and
+ * its template assignments move over, the row disappears.
  */
 async function mergeCategory(db: Awaited<ReturnType<typeof getDb>>, from: string, to: string): Promise<void> {
   await reassignCategoryContent(db, from, to);
@@ -104,23 +103,23 @@ export const useCategoryStore = create<CategoryState>((set, get) => ({
     const current = get().categories;
     if (nameTaken(current, trimmed)) throw new Error(CATEGORY_NAME_TAKEN);
 
-    // Ein Name gehört einer Kategorie — dieselbe Regel wie bei Tags. Liegt eine
-    // gleichnamige im Papierkorb, kommt sie zurück, samt dem, was noch in ihr
-    // steht, statt dass eine zweite entsteht. Das gewählte Emoji gilt.
+    // A name belongs to one category — the same rule as for tags. If a
+    // same-named one is in the trash, it comes back, along with what is still in
+    // it, instead of a second one being created. The chosen emoji applies.
     const db = await getDb();
     const trashed = (await db.select<DbRow[]>('SELECT * FROM categories WHERE deleted_at IS NOT NULL')).map(fromRow.category);
     const namesake = trashed.find((c) => categoryKey(c.name) === categoryKey(trimmed));
     if (namesake) {
-      // Eine aktive Gleichnamige gibt es nicht (oben geprüft) — sie kommt also als sie selbst zurück.
+      // There is no active same-named one (checked above) — so it comes back as itself.
       const restoredId = await get().restoreCategory(namesake.id);
       if (!namesake.is_builtin && namesake.emoji !== emoji) await get().updateCategory(restoredId, namesake.name, emoji);
       return get().categories.find((c) => c.id === restoredId)!;
     }
 
-    // Ans Ende. Bis v39 schob sich Neues vor das Sammelbecken `other`, damit
-    // das immer letztes blieb — seit es eine gewöhnliche Kategorie ist, gibt
-    // es dafür keinen Grund mehr, und die Reihenfolge gehört ohnehin dem
-    // Nutzer (Ziehen in der Kategorien-Ansicht).
+    // To the end. Until v39, new ones were inserted before the catch-all `other`
+    // so that it always stayed last — since it became an ordinary category, there
+    // is no reason for that any more, and the order belongs to the
+    // user anyway (dragging in the categories view).
     const last = get().categories[get().categories.length - 1];
     const sortOrder = (last?.sort_order ?? -1) + 1;
 
@@ -136,13 +135,13 @@ export const useCategoryStore = create<CategoryState>((set, get) => ({
   },
 
   updateCategory: async (id, name, emoji) => {
-    // Builtins heißen nach ihrem Locale-Key; ein gespeicherter Name wäre unsichtbar.
+    // Builtins are named after their locale key; a stored name would be invisible.
     if (get().categories.find((c) => c.id === id)?.is_builtin) return;
     const trimmed = name.trim();
     if (nameTaken(get().categories, trimmed, id)) throw new Error(CATEGORY_NAME_TAKEN);
     const db = await getDb();
-    // Wie beim Anlegen: eine gleichnamige im Papierkorb ist dieselbe und geht
-    // in dieser auf, statt beim Wiederherstellen später überraschend dazuzukommen.
+    // As when creating: a same-named one in the trash is the same and merges
+    // into this one, instead of surprisingly joining in when restored later.
     const trashed = (await db.select<DbRow[]>('SELECT * FROM categories WHERE deleted_at IS NOT NULL')).map(fromRow.category);
     for (const namesake of trashed.filter((c) => c.id !== id && categoryKey(c.name) === categoryKey(trimmed))) {
       await mergeCategory(db, namesake.id, id);
@@ -155,10 +154,10 @@ export const useCategoryStore = create<CategoryState>((set, get) => ({
     const cat = get().categories.find((c) => c.id === id);
     if (!cat || cat.is_builtin) return false;
     const db = await getDb();
-    // Beim Soft-Delete NICHT umhängen: die Inhalte behalten ihre category_id
-    // (die Zeile bleibt stehen, der Foreign Key ist zufrieden) und erscheinen
-    // unter „Ohne Kategorie". Ein Restore holt sie so verlustfrei zurück;
-    // umgehängt wird erst in permanentlyDeleteCategory.
+    // Do NOT reassign on soft delete: the contents keep their category_id
+    // (the row stays, the foreign key is satisfied) and appear
+    // under "No category". A restore thus brings them back losslessly;
+    // reassigning only happens in permanentlyDeleteCategory.
     await db.execute('UPDATE categories SET deleted_at=$1 WHERE id=$2', [nowIso(), id]);
     set((s) => ({ categories: s.categories.filter((c) => c.id !== id) }));
     return true;
@@ -169,18 +168,18 @@ export const useCategoryStore = create<CategoryState>((set, get) => ({
     const rows = await db.select<DbRow[]>('SELECT * FROM categories WHERE id=$1', [id]);
     if (!rows[0]) return id;
     const cat = fromRow.category(rows[0]);
-    // Schon wieder da — über ihren Namen zurückgeholt (addCategory), während
-    // das Rückgängig noch stand. Ein zweites Mal hinzufügen hieße doppelt.
+    // Already back — retrieved via its name (addCategory) while
+    // the undo was still pending. Adding it a second time would duplicate it.
     if (!cat.deleted_at || get().categories.some((c) => c.id === id)) return id;
-    // Inzwischen kann eine gleichnamige aktive Kategorie entstanden sein: die
-    // zurückgeholte geht in ihr auf, wie ein Tag in seinem gleichnamigen.
+    // A same-named active category may have appeared in the meantime: the
+    // restored one merges into it, like a tag into its same-named one.
     const active = get().categories;
     const namesake = active.find((c) => c.id !== id && categoryKey(c.name) === categoryKey(cat.name));
     if (namesake) {
       await mergeCategory(db, id, namesake.id);
       return namesake.id;
     }
-    // Ihr alter Platz ist inzwischen vergeben (addCategory zählt weiter), also ans Ende der Liste.
+    // Its old slot has been taken in the meantime (addCategory keeps counting), so to the end of the list.
     const sortOrder = (active[active.length - 1]?.sort_order ?? -1) + 1;
     await db.execute(
       'UPDATE categories SET deleted_at=NULL, sort_order=$1 WHERE id=$2',
@@ -196,8 +195,8 @@ export const useCategoryStore = create<CategoryState>((set, get) => ({
     const db = await getDb();
     await purgeCategory(db, id);
     set((s) => ({ categories: s.categories.filter((c) => c.id !== id) }));
-    // Auch im Speicher: ein späteres update* würde die gelöschte category_id
-    // sonst zurückschreiben und am Foreign Key scheitern.
+    // In memory too: a later update* would otherwise write the deleted category_id
+    // back and fail on the foreign key.
     reassignCategoriesInMemory(new Set([id]));
   },
 

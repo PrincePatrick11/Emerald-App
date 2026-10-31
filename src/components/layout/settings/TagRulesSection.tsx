@@ -4,7 +4,7 @@ import { useSettingsStore } from '../../../store/settingsStore';
 import SettingsChoiceButton, { SettingsChoiceRow } from './SettingsChoiceButton';
 import SettingsSection from './SettingsSection';
 
-/** Wo neue Tags entstehen dürfen: auch beim Eintippen, oder nur im Tags-Dashboard. */
+/** Where new tags may be created: also while typing, or only in the tags dashboard. */
 export default function TagRulesSection() {
   const { t } = useTranslation();
   const createInline = useSettingsStore((s) => s.settings.tags.createInline);

@@ -15,9 +15,9 @@ import WindowControls from './WindowControls';
 
 interface Props {
   tabs?: boolean;
-  /** Breite der linken Seitenleiste. */
+  /** Width of the left sidebar. */
   leadWidth?: number;
-  /** Aus, solange eine Seitenleiste per Drag in der Breite gezogen wird. */
+  /** Off while a sidebar is being dragged to a new width. */
   animate?: boolean;
 }
 
@@ -45,7 +45,7 @@ export default function TitleBar({ tabs = false, leadWidth = 0, animate = true }
   const { t } = useTranslation();
   const navigateBack = useUIStore((s) => s.navigateBack);
   const navigateForward = useUIStore((s) => s.navigateForward);
-  // Der Verlauf des aktiven Tabs — jeder Tab führt seinen eigenen.
+  // The history of the active tab — every tab keeps its own.
   const canGoBack = useUIStore((s) => selectActiveHistory(s).index > 0);
   const canGoForward = useUIStore((s) => {
     const history = selectActiveHistory(s);
@@ -57,16 +57,16 @@ export default function TitleBar({ tabs = false, leadWidth = 0, animate = true }
   // minimise or move the window — but drops the navigation and the search.
   const minimal = useUIStore(isAltarFullscreen);
 
-  // Ohne offenen Vault gibt es nichts zu durchsuchen — und mehr als das: die
-  // Stores behalten ihre Inhalte, wenn der letzte Vault geloescht wird
-  // (`vaultStore.removeVault`, Zweig ohne Nachfolger). Sidebar und Hauptbereich
-  // sind dann ungemountet, die Titelleiste bleibt stehen. Eine Suche hier
-  // waere die einzige Stelle, an der ein Nutzer den eben geloeschten Vault noch
-  // lesen koennte — auch nachdem er "Dateien loeschen" angehakt hat.
+  // Without an open vault there is nothing to search — and more than that: the
+  // stores keep their contents when the last vault is deleted
+  // (`vaultStore.removeVault`, branch without a successor). Sidebar and main
+  // area are then unmounted, the title bar stays. A search here
+  // would be the only place where a user could still read the vault just
+  // deleted — even after ticking "Delete files".
   const vaultOpen = useVaultStore(hasActiveVault);
   const [searchOpen, setSearchOpen] = useState(false);
-  // Geht die Lupe weg — Altar-Vollbild, letzter Vault geschlossen —, geht die
-  // Suche mit, statt beim Zurückkehren von selbst wieder aufzuspringen.
+  // When the magnifier goes away — altar fullscreen, last vault closed — the
+  // search goes with it, instead of popping open again by itself on return.
   if (searchOpen && (minimal || !vaultOpen)) setSearchOpen(false);
   const menus = useTitleBarMenus();
   const showTabs = tabs && !minimal;
@@ -76,10 +76,10 @@ export default function TitleBar({ tabs = false, leadWidth = 0, animate = true }
       data-tauri-drag-region
       className="titlebar relative flex-shrink-0 flex items-center h-10 select-none"
     >
-      {/* Mit Tabs mindestens so breit wie die linke Seitenleiste (border-box,
-          also samt Polsterung) und mit ihr animiert — die Tabs beginnen so an
-          der linken Kante des Blatts. Ist die Leiste schmaler als die Knoepfe
-          (Rail oder Liste ausgeblendet), beginnen sie eben dahinter. */}
+      {/* With tabs at least as wide as the left sidebar (border-box,
+          so including padding) and animated along with it — the tabs thus start
+          at the left edge of the sheet. If the bar is narrower than the buttons
+          (rail or list hidden), they simply start behind them. */}
       <div
         data-tauri-drag-region
         className={`flex items-center h-full flex-shrink-0${
@@ -87,24 +87,24 @@ export default function TitleBar({ tabs = false, leadWidth = 0, animate = true }
         }`}
         style={showTabs ? { minWidth: leadWidth } : undefined}
       >
-        {/* Reines Logo, kein Control: der Weg zum Dashboard sitzt jetzt in der
-            Rail, und `data-tauri-drag-region` gibt die Fensterecke ans Ziehen
-            zurueck, statt sie an einen Klick zu binden.
+        {/* A pure logo, not a control: the way to the dashboard now sits in the
+            rail, and `data-tauri-drag-region` gives the window corner back to
+            dragging instead of binding it to a click.
 
-            Das Attribut sitzt am Wrapper und nicht am <svg>: Tauri liest es
-            am Element unter dem Zeiger, und das waere je nach Stelle ein
-            <polygon> darin. `pointer-events-none` an der Marke schiebt die
-            Zeigerpruefung zuverlaessig auf den Wrapper zurueck — und erledigt
-            nebenbei, wofuer das fruehere <img> hier `draggable={false}`
-            brauchte: als Drag-Quelle startete es auf macOS beim zweiten Druck
-            eines Doppelklicks ein natives Bild-Drag, statt das Fenster zu
-            maximieren. Ein Inline-SVG ist keine.
+            The attribute sits on the wrapper and not on the <svg>: Tauri reads it
+            on the element under the pointer, and depending on the spot that would
+            be a <polygon> inside it. `pointer-events-none` on the mark reliably
+            pushes the pointer check back to the wrapper — and incidentally takes
+            care of what the earlier <img> needed `draggable={false}` for:
+            as a drag source it started a native image drag on macOS on the
+            second press of a double click, instead of maximizing the window.
+            An inline SVG is not one.
 
-            So breit wie die Rail und darin zentriert: das Logo steht in einer
-            Flucht mit deren Icons darunter. Der Menue-Knopf folgt mit `mr-1.5`,
-            sein Icon steht dann ueber denen der Eintragsliste (deren 4px
-            Rand neben der Rail in index.css) — deshalb traegt der Wrapper
-            kein `gap`, erst die Gruppen danach `ml-1`. */}
+            As wide as the rail and centred in it: the logo lines up
+            with the icons below it. The menu button follows with `mr-1.5`,
+            its icon then sits above those of the entry list (whose 4px
+            margin next to the rail is in index.css) — that is why the wrapper
+            carries no `gap`, only the groups after it `ml-1`. */}
         <div
           data-tauri-drag-region
           title="Emerald App"
@@ -144,8 +144,8 @@ export default function TitleBar({ tabs = false, leadWidth = 0, animate = true }
 
         {/* Not gated on `minimal`: on Windows and Linux this is the only
             route to the altar's image export, and distraction-free mode is
-            precisely where that export is wanted. Export trägt Download,
-            Import Upload — wie in Settings → Backup. */}
+            precisely where that export is wanted. Export carries Download,
+            Import Upload — as in Settings → Backup. */}
         {usesHtmlMenuBar && (
           <div className="ml-1 flex items-center gap-0.5 flex-shrink-0">
             <TitleBarMenuButton label={menus.exportMenu.label} icon={<Download size={16} />} nodes={menus.exportMenu.nodes} />
@@ -154,15 +154,15 @@ export default function TitleBar({ tabs = false, leadWidth = 0, animate = true }
         )}
       </div>
 
-      {/* Ohne Tabs: leerer Zwischenraum, der als Ziehflaeche frei bleibt. */}
+      {/* Without tabs: empty space that stays free as a drag area. */}
       {showTabs ? (
         <TabBar />
       ) : (
         <div data-tauri-drag-region className="flex-1 min-w-0 h-full" />
       )}
 
-      {/* `ml-auto` haelt die Fenstersteuerung auch dann am rechten Rand, wenn
-          die Tab-Leiste mangels Tabs nichts rendert. */}
+      {/* `ml-auto` keeps the window controls at the right edge even when
+          the tab bar renders nothing for lack of tabs. */}
       <div data-tauri-drag-region className="ml-auto flex items-center justify-end h-full flex-shrink-0">
         {usesCustomWindowControls && <WindowControls />}
       </div>

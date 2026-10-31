@@ -23,15 +23,15 @@ interface Props {
 }
 
 /**
- * Zuweisung und Standard einer Vorlage auf einen Blick: Journal als eine
- * Zeile, darunter Wiki und Operationen als Tabelle — „Alle Kategorien" (die
- * ganze Eintragsart), „Ohne Kategorie" und jede Kategorie. Jede Zelle wählt
- * zwischen nicht zugewiesen, zur Wahl und Standard; die letzte Spalte setzt
- * eine Kategorie für beide Eintragsarten zugleich.
+ * Assignment and default of a template at a glance: journal as a single
+ * row, below it wiki and operations as a table: "All categories" (the
+ * whole entry type), "No category" and each category. Each cell chooses
+ * between not assigned, selectable and default; the last column sets
+ * a category for both entry types at once.
  *
- * Bearbeitet wird eine Kopie; „Übernehmen" legt sie in den Entwurf der Seite,
- * gespeichert wird erst mit „Fertig". Zuweisungen zu Kategorien im Papierkorb
- * tauchen hier nicht auf und bleiben unberührt.
+ * A copy is edited; "Apply" puts it into the page's draft,
+ * and saving only happens with "Done". Assignments to categories in the trash
+ * do not appear here and stay untouched.
  */
 export default function TemplateAssignmentsModal({ templateId, name, assignments, onApply, onClose }: Props) {
   const { t } = useTranslation();
@@ -46,7 +46,7 @@ export default function TemplateAssignmentsModal({ templateId, name, assignments
   const setState = (cells: readonly [TemplateEntryType, string | null][], state: AssignmentState) =>
     setWorking((current) => cells.reduce((acc, [entryType, category]) => withAssignmentState(acc, entryType, category, state), current));
 
-  /** Eine Zelle: die Auswahl, darunter wer sonst Standard ist — oder wen der Stern hier ablöst. */
+  /** One cell: the selection, below it who else is default, or whom the star supersedes here. */
   const cell = (entryType: TemplateEntryType, category: string | null, rowLabel: string) => {
     const state = stateAt(entryType, category);
     const holder = defaultTemplateAt(others, entryType, category);
@@ -72,7 +72,7 @@ export default function TemplateAssignmentsModal({ templateId, name, assignments
     );
   };
 
-  /** Die Spalte „Beide": zeigt einen Stand nur, wenn Wiki und Operationen ihn teilen. */
+  /** The "Both" column: shows a state only if wiki and operations share it. */
   const bothCell = (category: string | null, rowLabel: string) => {
     const states = CATEGORY_TYPES.map((type) => stateAt(type, category));
     return (

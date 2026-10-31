@@ -12,38 +12,38 @@ import {
 } from './internalLinkHtml';
 
 /**
- * Migration v36 — die Journal-Spalten `linked_operation_ids` und
- * `linked_wiki_ids` werden zu Link-Chips im Inhalt.
+ * Migration v36 — the journal columns `linked_operation_ids` and
+ * `linked_wiki_ids` become link chips in the content.
  *
- * Vorher waren verknüpfte Operationen und Wiki-Artikel zwei eigene Felder am
- * Journal-Eintrag, gezeigt als Chips unter dem Titel. Beides ist weg: Was ein
- * Eintrag verlinkt, steht jetzt in seinem Text, und die rechte Seitenleiste
- * liest es von dort. Ohne diese Migration wären bestehende Verknüpfungen von
- * einem Tag auf den anderen unsichtbar.
+ * Before, linked operations and wiki articles were two fields of their own on the
+ * journal entry, shown as chips under the title. Both are gone: whatever an
+ * entry links now lives in its text, and the right sidebar
+ * reads it from there. Without this migration, existing links would be
+ * invisible overnight.
  *
- * Angehängt wird derselbe Block, den `appendEntryLink` schreibt (beide über
- * `internalLinkBlockHtml`): Trennlinie, Kategorie des Ziels als Überschrift,
- * dann der Chip.
+ * The same block that `appendEntryLink` writes is appended (both via
+ * `internalLinkBlockHtml`): separator line, category of the target as heading,
+ * then the chip.
  *
- * Die Umwandlung selbst (`linkedIdsToContent`) arbeitet auf einer Zeile und
- * einer Nachschlage-Quelle (`LegacyLinkSource`): die Migration schlägt in den
- * alten Tabellen nach, der Import einer Sicherung von vor v36 in der Datei
- * (`rowsLinkSource`). Seit v49 gibt es die Spalten nicht mehr — alte
- * Sicherungen gehen deshalb vor dem Einfügen durch dieselbe Funktion.
+ * The conversion itself (`linkedIdsToContent`) works on one row and
+ * a lookup source (`LegacyLinkSource`): the migration looks things up in the
+ * old tables, the import of a backup from before v36 in the file
+ * (`rowsLinkSource`). Since v49 the columns no longer exist — old
+ * backups therefore go through the same function before insertion.
  *
- * Zwei Dinge, die man beim Lesen wissen sollte:
- * - Die Überschrift wird in der Sprache geschrieben, die beim Migrationslauf
- *   geladen war. Sie ist ab dann Text im Eintrag des Nutzers und wandert bei
- *   einem Sprachwechsel nicht mit — wie jeder andere getippte Text auch.
- * - Wiederaufnahme: Das `WHERE` unten überspringt bereits geleerte Zeilen, und
- *   `alreadyLinked` fängt Ziele ab, die schon im Text stehen. Ein Abbruch
- *   mittendrin lässt v36 ungestempelt, der nächste Start macht sauber weiter.
+ * Two things worth knowing when reading:
+ * - The heading is written in the language that was loaded during the migration run.
+ *   From then on it is text in the user's entry and does not follow
+ *   a language switch — like any other typed text.
+ * - Resuming: the `WHERE` below skips rows that have already been emptied, and
+ *   `alreadyLinked` catches targets that are already in the text. An abort
+ *   midway leaves v36 unstamped, the next start carries on cleanly.
  */
 
-/** Die beiden Link-Arten, auf die die alten Journal-Felder zeigten. */
+/** The two link kinds the old journal fields pointed at. */
 export type LegacyLinkType = 'operation' | 'wiki';
 
-/** Ein Link-Ziel der alten Journal-Felder, wie die Umwandlung es braucht. */
+/** A link target of the old journal fields, as the conversion needs it. */
 export interface LegacyLinkTarget {
   id: string;
   title: string | null;
@@ -53,17 +53,17 @@ export interface LegacyLinkTarget {
 }
 
 /**
- * Wo die Umwandlung Ziele und Kategorien nachschlägt. Ein Ziel, das es nicht
- * gibt (gelöscht, im Papierkorb, nicht in der Datei), fällt weg — ein
- * verschwundenes Ziel wird nicht als Chip verewigt.
+ * Where the conversion looks up targets and categories. A target that does not
+ * exist (deleted, in the trash, not in the file) is dropped — a
+ * vanished target is not immortalized as a chip.
  */
 export interface LegacyLinkSource {
   target(type: LegacyLinkType, id: string): LegacyLinkTarget | undefined;
-  /** Überschrift und Emoji einer Kategorie; `undefined`, wenn es die Zeile nicht gibt. */
+  /** Heading and emoji of a category; `undefined` if the row does not exist. */
   category(type: LegacyLinkType, id: string): { label: string; emoji: string | null } | undefined;
 }
 
-/** Eine Kategoriezeile, wie beide Quellen sie lesen. */
+/** A category row, as both sources read it. */
 export interface LegacyCategoryRow {
   id: string;
   name: string;
@@ -74,9 +74,9 @@ export interface LegacyCategoryRow {
 const byId = <T extends { id: string }>(rows: T[]) => new Map(rows.map((r) => [r.id, r]));
 
 /**
- * Die Quelle der Migrationen v36/v37: Ziele und je Modul eine eigene
- * Kategorie-Tabelle aus der Zeit vor v38, eingebaute Kategorien mit dem
- * Anzeigenamen ihres Moduls (`legacyCategoryLabel`).
+ * The source of migrations v36/v37: targets and one category table
+ * per module from the time before v38, built-in categories with the
+ * display name of their module (`legacyCategoryLabel`).
  */
 export function tablesLinkSource(
   targets: Partial<Record<LegacyLinkType, LegacyLinkTarget[]>>,
@@ -99,10 +99,10 @@ export function tablesLinkSource(
 }
 
 /**
- * Die Quelle beim Import einer Sicherung: Ziele und Kategorien aus der Datei
- * selbst, die Kategorien schon als eine Liste (`categories`, seit Format 4 —
- * ältere hebt `migrateBackupPayload` vorher an). Einträge im Papierkorb der
- * Datei zählen wie in der Migration nicht als Ziel.
+ * The source when importing a backup: targets and categories from the file
+ * itself, the categories already as one list (`categories`, since format 4 —
+ * `migrateBackupPayload` lifts older ones beforehand). Entries in the file's
+ * trash do not count as targets, as in the migration.
  */
 export function rowsLinkSource(
   targets: Record<LegacyLinkType, readonly Record<string, unknown>[]>,
@@ -132,20 +132,20 @@ export function rowsLinkSource(
 }
 
 /**
- * Das Emoji, das im Chip gespeichert wird. Bilder gehören nicht in die
- * Node-Attrs: `icon` landet im gespeicherten HTML, und eine hochgeladene
- * data-URL bläht damit jeden Eintrag auf, der das Ziel verlinkt. Der Chip
- * holt sein Bild ohnehin live — hier steht nur der Emoji-Rückfall. (Dieselbe
- * Regel wie beim Altar-Zweig in useLinkItems.)
+ * The emoji that is stored in the chip. Images do not belong in the
+ * node attrs: `icon` lands in the stored HTML, and an uploaded
+ * data URL thereby inflates every entry that links the target. The chip
+ * fetches its image live anyway — only the emoji fallback is stored here. (The same
+ * rule as the altar branch in useLinkItems.)
  */
 export function legacyChipIcon(type: LegacyLinkType, target: LegacyLinkTarget, categoryEmoji: string | null | undefined): string {
   if (target.icon && !isImageIcon(target.icon)) return target.icon;
   if (categoryEmoji) return categoryEmoji;
-  // Ohne Kategorie-Zeile bleibt nur der Modul-Fallback.
+  // Without a category row only the module fallback remains.
   return type === 'wiki' ? legacyWikiCategoryEmoji(target.category_id ?? '') : DEFAULT_ENTRY_EMOJI.operation;
 }
 
-/** `null` statt `[]` bei kaputtem JSON — der Aufrufer lässt die Zeile dann in Ruhe. */
+/** `null` instead of `[]` for broken JSON — the caller then leaves the row alone. */
 function parseIds(value: unknown): string[] | null {
   if (Array.isArray(value)) return value.filter((v): v is string => typeof v === 'string');
   if (!value) return [];
@@ -157,7 +157,7 @@ function parseIds(value: unknown): string[] | null {
   }
 }
 
-/** Die beiden alten Spalten einer Journal-Zeile — als JSON-Text (Datenbank) oder schon als Liste (Datei). */
+/** The two old columns of a journal row — as JSON text (database) or already as a list (file). */
 export interface LinkedIdsRow {
   id: string;
   linked_operation_ids?: unknown;
@@ -165,12 +165,12 @@ export interface LinkedIdsRow {
 }
 
 /**
- * Der Inhalt mit den Verknüpfungen der alten Spalten als Link-Blöcke dahinter.
- * `null`, wenn eine Spalte kein gültiges JSON ist — dann bleibt die Zeile, wie
- * sie ist. Ohne Verknüpfungen kommt `content` unverändert zurück.
+ * The content with the links of the old columns as link blocks after it.
+ * `null` if a column is not valid JSON — then the row stays as
+ * it is. Without links, `content` comes back unchanged.
  */
 export function linkedIdsToContent(content: string, row: LinkedIdsRow, source: LegacyLinkSource): string | null {
-  /** Reihenfolge wie in den beiden abgelösten Feldern: erst Operationen, dann Wiki. */
+  /** Order as in the two replaced fields: operations first, then wiki. */
   const columns = [
     { column: 'linked_operation_ids', type: 'operation' },
     { column: 'linked_wiki_ids', type: 'wiki' },
@@ -178,8 +178,8 @@ export function linkedIdsToContent(content: string, row: LinkedIdsRow, source: L
 
   const alreadyLinked = new Set(extractInternalLinks(content).map(linkItemKey));
   let appended = '';
-  // Bei einem leeren Eintrag bleibt die erste Trennlinie weg — sie trennt
-  // Text von Links, und Text gibt es dort keinen.
+  // For an empty entry the first separator line is left out — it separates
+  // text from links, and there is no text there.
   let separator = !isBlankContent(content);
 
   for (const { column, type } of columns) {
@@ -191,9 +191,9 @@ export function linkedIdsToContent(content: string, row: LinkedIdsRow, source: L
 
     for (const id of ids) {
       const target = source.target(type, id);
-      if (!target) continue; // Ziel gelöscht oder im Papierkorb.
+      if (!target) continue; // Target deleted or in the trash.
       const key = linkItemKey({ id: target.id, entryType: type });
-      if (alreadyLinked.has(key)) continue; // Steht schon im Text.
+      if (alreadyLinked.has(key)) continue; // Already in the text.
       alreadyLinked.add(key);
 
       const cat = source.category(type, target.category_id ?? '');
@@ -204,7 +204,7 @@ export function linkedIdsToContent(content: string, row: LinkedIdsRow, source: L
         icon: legacyChipIcon(type, target, cat?.emoji),
         entry_number: target.entry_number,
       };
-      // Ohne Kategorie lieber gar keine Überschrift als ein „Keine".
+      // Without a category, better no heading at all than a "None".
       appended += internalLinkBlockHtml(chip, cat?.label ?? '', { separator });
       separator = true;
     }
@@ -228,8 +228,8 @@ export async function migrateLinkedIdsToContent(db: Database): Promise<void> {
   );
   if (entries.length === 0) return;
 
-  // Papierkorb bleibt draußen: ein gelöschtes Ziel würde als Chip dauerhaft im
-  // Text stehen, auch wenn der Papierkorb es später endgültig entfernt.
+  // The trash stays out: a deleted target would stay in the text permanently
+  // as a chip, even if the trash later removes it for good.
   const [operations, opCategories, articles, wikiCategories] = await Promise.all([
     db.select<LegacyLinkTarget[]>('SELECT id, title, icon, category_id, entry_number FROM operations WHERE deleted_at IS NULL'),
     db.select<LegacyCategoryRow[]>('SELECT id, name, emoji, is_builtin FROM operation_categories'),
@@ -244,8 +244,8 @@ export async function migrateLinkedIdsToContent(db: Database): Promise<void> {
   for (const entry of entries) {
     const nextContent = linkedIdsToContent(entry.content ?? '', entry, source);
     if (nextContent === null) continue;
-    // `updated_at` bleibt bewusst unangetastet: die Migration ist keine
-    // Bearbeitung durch den Nutzer und soll die Sortierung nicht umwerfen.
+    // `updated_at` is deliberately left untouched: the migration is not an
+    // edit by the user and should not upset the sort order.
     await db.execute(
       `UPDATE journal_entries SET content = $1, linked_operation_ids = '[]', linked_wiki_ids = '[]' WHERE id = $2`,
       [nextContent, entry.id]

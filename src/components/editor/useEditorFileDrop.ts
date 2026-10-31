@@ -5,10 +5,10 @@ import { copyImageFile, readImageFile, saveImage } from '../../lib/images';
 import { hasImageLimits, ImageTooLargeError, prepareImageDataUrl } from '../../lib/imageLimits';
 import { reportImageError, useImageNoticeStore } from '../../store/imageNoticeStore';
 
-/** Die Lesegrenze des Rust-Befehls samt ihrer Zahl (siehe `images.rs`). */
+/** The read limit of the Rust command along with its number (see `images.rs`). */
 const TOO_LARGE_TO_READ = /image file too large: (\d+)/;
 
-/** Liest die Datei ein; die Größengrenze des Rust-Befehls wird zur üblichen Meldung. */
+/** Reads the file in; the size limit of the Rust command becomes the usual notice. */
 async function readDroppedImage(path: string): Promise<string> {
   try {
     return await readImageFile(path);
@@ -20,10 +20,10 @@ async function readDroppedImage(path: string): Promise<string> {
 }
 
 /**
- * Bilder per Drag & Drop aus dem Datei-Explorer, über Tauris natives
- * Drag-Drop-Event. Das Event gilt dem ganzen Fenster, nicht einem Element —
- * es darf also nur EIN Zuhörer pro Eintrag hängen, sonst landet das Bild in
- * jedem Textblock. `getTarget` wählt den Editor, der es bekommt.
+ * Images via drag & drop from the file explorer, through Tauri's native
+ * drag-drop event. The event applies to the whole window, not to an element,
+ * so only ONE listener may hang per entry, otherwise the image lands in
+ * every text block. `getTarget` picks the editor that receives it.
  */
 export function useEditorFileDrop(enabled: boolean, getTarget: () => Editor | null) {
   const getTargetRef = useRef(getTarget);
@@ -54,7 +54,7 @@ export function useEditorFileDrop(enabled: boolean, getTarget: () => Editor | nu
 
           for (const path of imagePaths) {
             try {
-              // Ohne Grenzen direkt kopieren; mit ihnen erst einlesen, verkleinern und prüfen.
+              // Without limits copy directly; with them first read in, shrink and check.
               const src = hasImageLimits()
                 ? await saveImage(await prepareImageDataUrl(await readDroppedImage(path)))
                 : await copyImageFile(path);
@@ -65,8 +65,8 @@ export function useEditorFileDrop(enabled: boolean, getTarget: () => Editor | nu
           }
         }
       })
-      // Die Registrierung ist asynchron: endet der Effekt vorher, wird der
-      // Zuhörer gleich wieder abgemeldet statt liegenzubleiben.
+      // Registration is asynchronous: if the effect ends first, the
+      // listener is unregistered right away instead of being left behind.
       .then((fn) => { if (disposed) fn(); else unlisten = fn; })
       .catch((e) => console.error('[DnD] setup failed:', e));
 

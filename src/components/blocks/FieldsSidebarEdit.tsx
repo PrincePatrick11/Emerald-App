@@ -11,23 +11,23 @@ import { SwitchRow } from '../ui/Switch';
 import type { BlockSidebarEditProps } from './blockSidebarViews';
 
 /**
- * Die Einstellungen eines Feldblocks, aufgeklappt unter seiner Zeile im Bearbeitungsmodus: je
- * Element Beschriftung, bei einer Auswahl die Optionen, und ob es im
- * Lesemodus leer ausgeblendet wird; für den ganzen Block „komplett
- * schreibgeschützt". Jede Änderung schreibt den Block neu (JSON + Fallback) —
- * über den Stapel, Cancel dreht sie zurück. Beschriftungen und Eingaben im
- * Stil der Seitenleiste (`.panel-field-label`, `.panel-input`).
+ * The settings of a field block, expanded below its row in edit mode: per
+ * element the label, for a choice the options, and whether it is hidden when empty in
+ * read mode; for the whole block "completely
+ * read-only". Every change rewrites the block (JSON + fallback)
+ * via the stack, and Cancel rolls it back. Labels and inputs in the
+ * sidebar's style (`.panel-field-label`, `.panel-input`).
  */
 export default function FieldsSidebarEdit({ block, update }: BlockSidebarEditProps) {
   const { t } = useTranslation();
   const text = useFieldFallbackText();
-  // Eine Kopie eines eigenen Blocks trägt dessen Einstellungen: „Block
-  // aktualisieren" schriebe hier Geändertes still zurück. Geändert wird darum
-  // nur in der Definition — solange es sie gibt.
+  // A copy of a custom block carries its settings: "Update
+  // block" would silently write changes made here back. So changes are made
+  // only in the definition, as long as it exists.
   const originId = block.attrs[BLOCK_ATTR.origin];
   const origin = useBlockDefinitionStore((s) => (originId ? s.definitions.find((d) => d.id === originId) : undefined));
   const model = parseFields(block);
-  // Unlesbare Daten: keine Einstellungen — jede würde sie mit „leer" überschreiben.
+  // Unreadable data: no settings; any would overwrite it with "empty".
   if (model.broken) return null;
 
   const write = (next: FieldsModel) => update(serializeFields(block, next, text));
@@ -43,7 +43,7 @@ export default function FieldsSidebarEdit({ block, update }: BlockSidebarEditPro
         const hides = element.hideWhenEmpty ?? model.display.readHideEmpty;
         return (
           <div key={element.id} className="space-y-2">
-            {/* Mehrere Elemente: je ein leiser Unterabschnitt, ab dem zweiten mit Linie davor. */}
+            {/* Several elements: one quiet subsection each, from the second on with a line before it. */}
             {elements.length > 1 && (
               <p className={`panel-subheading${index > 0 ? ' panel-subheading--divided' : ''}`}>{elementLabel(t, element)}</p>
             )}
@@ -67,7 +67,7 @@ export default function FieldsSidebarEdit({ block, update }: BlockSidebarEditPro
                 checked={hides}
                 label={t('blocks.fields.hideEmpty')}
                 onChange={(checked) => patchElement(element.id, {
-                  // Gleich der Blockregel: kein eigener Wert — die Regel des Blocks gilt.
+                  // Same as the block rule: no value of its own; the block's rule applies.
                   hideWhenEmpty: checked === model.display.readHideEmpty ? undefined : checked,
                 })}
               />

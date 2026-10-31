@@ -1,17 +1,17 @@
 /**
- * Prüft die Doku (README, AGENTS, CONTRIBUTING, CHANGELOG, Documentation/**, tools/**):
+ * Checks the docs (README, AGENTS, CONTRIBUTING, CHANGELOG, Documentation/**, tools/**):
  *
- *   1. Zieldatei existiert — eine verschobene oder umbenannte Datei fällt sofort auf.
- *   2. Anker existiert — `datei.md#abschnitt` muss auf eine Überschrift der Zieldatei
- *      zeigen. Umbenannte Überschriften brechen sonst still die Querverweise.
+ *   1. Target file exists — a moved or renamed file is noticed immediately.
+ *   2. Anchor exists — `file.md#section` must point to a heading in the target file.
+ *      Renamed headings would otherwise silently break the cross-references.
  *
- * Anker werden wie bei GitHub gebildet (Kleinbuchstaben, Satzzeichen weg, Leerzeichen → `-`,
- * Duplikate bekommen `-1`, `-2`, …). Links auf http(s)/mailto und Pfade, die aus dem Repo
- * herausführen (README: `../../releases` ist GitHub-relativ), werden übersprungen.
+ * Anchors are built the way GitHub does it (lowercase, punctuation removed, spaces → `-`,
+ * duplicates get `-1`, `-2`, …). Links to http(s)/mailto and paths that lead out of the
+ * repo (README: `../../releases` is GitHub-relative) are skipped.
  *
- * Außerdem müssen Pfade in Backticks existieren, wenn sie ausgeschrieben mit einem Ordner
- * des Repos beginnen (`src/lib/db.ts`). Das fängt, was Links nicht fangen: Agents nennen
- * Dateien meist ohne Link. Das CHANGELOG ist ausgenommen, es beschreibt Vergangenes.
+ * In addition, paths in backticks must exist if they are written out starting with a folder
+ * of the repo (`src/lib/db.ts`). This catches what links do not: agents mostly name
+ * files without a link. The CHANGELOG is exempt, it describes the past.
  *
  *   npm run check:docs
  */
@@ -34,7 +34,7 @@ function markdownFiles(dir, recursive) {
   return out;
 }
 
-/** Text ohne Fenced-Code-Blöcke — Überschriften und Links darin zählen nicht. */
+/** Text without fenced code blocks — headings and links inside them do not count. */
 function stripFences(text) {
   return text.replace(/^(```|~~~)[^\n]*\n[\s\S]*?^\1[^\n]*$/gm, '');
 }
@@ -74,7 +74,7 @@ const anchorsFor = (file) => {
 
 const problems = [];
 for (const [file, text] of texts) {
-  // Inline-Code entfernen, damit `[a](b)` in Backticks nicht als Link zählt.
+  // Remove inline code so that `[a](b)` in backticks does not count as a link.
   const body = stripFences(text).replace(/`[^`\n]*`/g, '');
   for (const [, target] of body.matchAll(/\]\(<?([^)\s>]+)>?(?:\s+"[^"]*")?\)/g)) {
     if (/^[a-z][a-z0-9+.-]*:/i.test(target)) continue;
@@ -83,20 +83,20 @@ for (const [file, text] of texts) {
     if (relative(root, targetFile).startsWith('..')) continue;
     const where = relative(root, file).split(sep).join('/');
     if (!existsSync(targetFile)) {
-      problems.push(`${where}: Datei fehlt → ${target}`);
+      problems.push(`${where}: file missing →${target}`);
     } else if (anchor && targetFile.endsWith('.md') && !anchorsFor(targetFile).has(anchor.toLowerCase())) {
-      problems.push(`${where}: Anker fehlt → ${target}`);
+      problems.push(`${where}: anchor missing →${target}`);
     }
   }
   if (file.endsWith('CHANGELOG.md')) continue;
   const where = relative(root, file).split(sep).join('/');
   for (const [, path] of stripFences(text).matchAll(/`((?:src|src-tauri|scripts|tools|Documentation|\.github)\/[\w./-]+\.\w+)`/g)) {
-    if (!existsSync(join(root, path))) problems.push(`${where}: Pfad fehlt → ${path}`);
+    if (!existsSync(join(root, path))) problems.push(`${where}: path missing →${path}`);
   }
 }
 
 if (problems.length) {
-  console.error(`✗ ${problems.length} Probleme in der Doku:\n  ${problems.join('\n  ')}`);
+  console.error(`✗ ${problems.length} problems in the docs:\n  ${problems.join('\n  ')}`);
   process.exit(1);
 }
-console.log(`✓ Doku-Links und Pfade in ${files.length} Dateien in Ordnung`);
+console.log(`✓ Doc links and paths in ${files.length} files are fine`);

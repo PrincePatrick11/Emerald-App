@@ -24,7 +24,7 @@ export function getMoonPhase(date: Date = new Date()): MoonPhase {
   return 'waning_crescent';
 }
 
-/** Die acht Phasen in Zyklus-Reihenfolge — Journal-Gruppen, Filter-Chips, Mondphasen-Feld. */
+/** The eight phases in cycle order — journal groups, filter chips, moon phase field. */
 export const MOON_PHASE_ORDER: readonly MoonPhase[] = [
   'new', 'waxing_crescent', 'first_quarter', 'waxing_gibbous',
   'full', 'waning_gibbous', 'last_quarter', 'waning_crescent',
@@ -42,11 +42,11 @@ export const MOON_PHASE_SYMBOLS: Record<MoonPhase, string> = {
 };
 
 /**
- * Die Mondphase eines Journal-Eintrags: die des Tages, an dem er angelegt
- * wurde. Keine Spalte — ein gespeicherter Wert war nur eine Kopie davon, die
- * beim Import, Typwechsel und Duplizieren jeweils neu gesetzt werden musste.
- * `shown` ist die Vault-Einstellung `journal.moonPhase`: aus heißt, kein
- * Eintrag zeigt eine Phase, auch kein alter.
+ * The moon phase of a journal entry: that of the day it was created.
+ * No column — a stored value was only a copy of it, which had to be reset on
+ * import, type change and duplication.
+ * `shown` is the vault setting `journal.moonPhase`: off means no
+ * entry shows a phase, not even an old one.
  */
 export function entryMoonPhase(entry: { created_at: string }, shown: boolean): MoonPhase | null {
   if (!shown) return null;
@@ -54,7 +54,7 @@ export function entryMoonPhase(entry: { created_at: string }, shown: boolean): M
   return Number.isNaN(created.getTime()) ? null : getMoonPhase(created);
 }
 
-/** Das Icon eines Journal-Eintrags: seine Mondphase, sonst das Journal-Emoji. */
+/** The icon of a journal entry: its moon phase, otherwise the journal emoji. */
 export function journalIcon(entry: { created_at: string }, shown: boolean): string {
   const phase = entryMoonPhase(entry, shown);
   return phase ? MOON_PHASE_SYMBOLS[phase] : DEFAULT_ENTRY_EMOJI.journal;

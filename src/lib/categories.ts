@@ -1,7 +1,7 @@
 import { CATEGORY_MODULE_IDS, type CategoryModuleId } from './modules';
 import { LEGACY_ALTAR_CATEGORIES, LEGACY_WIKI_CATEGORIES } from './schemaV37';
 
-/** Ein Übersetzer — `i18n.t`, das `t` aus useTranslation oder ein durchgereichtes Prop. */
+/** A translator — `i18n.t`, the `t` from useTranslation or a prop passed down. */
 export type Translate = (key: string) => string;
 
 export interface LabelableCategory {
@@ -11,9 +11,9 @@ export interface LabelableCategory {
 }
 
 /**
- * Anzeigename einer Kategorie: Builtins (`other`, `sigils`) über den
- * Locale-Key `categories.builtin.<id>`, alle anderen über den gespeicherten
- * Namen. Seit v38 die eine Regel für alle vier Module.
+ * Display name of a category: builtins (`other`, `sigils`) via the
+ * locale key `categories.builtin.<id>`, all others via the stored
+ * name. Since v38 the one rule for all four modules.
  */
 export function categoryLabel(
   t: Translate,
@@ -25,16 +25,16 @@ export function categoryLabel(
 }
 
 /**
- * Die Kategorien, die in einer Ansicht als Chips, Gruppen oder Tabs stehen:
- * alle, auf die mindestens ein Eintrag zeigt, in der Reihenfolge der globalen
- * Liste. Die Volliste bleibt für Zuweisung und Auflösung; eine Kategorie, die
- * nur in einem anderen Modul benutzt wird, soll hier keinen leeren Kopf
- * bekommen — auch eine gerade angelegte nicht: verwaltet wird in der
- * Kategorien-Ansicht, zugewiesen am Eintrag.
+ * The categories that appear in a view as chips, groups or tabs:
+ * all that at least one entry points to, in the order of the global
+ * list. The full list stays for assignment and resolution; a category that
+ * is only used in another module should not get an empty header here —
+ * not even one just created: it is managed in the
+ * categories view and assigned on the entry.
  *
- * Bis v39 war das Sammelbecken `other` immer dabei, weil jeder Eintrag eine
- * Kategorie tragen musste und die Tab-Leiste ein Ziel brauchte. Einträge ohne
- * Kategorie sammelt jetzt der „Ohne Kategorie"-Bucket.
+ * Until v39 the catch-all `other` was always included, because every entry had to carry a
+ * category and the tab bar needed a target. Entries without a
+ * category are now collected by the "Uncategorized" bucket.
  */
 export function categoriesUsedBy<C extends { id: string }>(
   all: readonly C[],
@@ -46,10 +46,10 @@ export function categoriesUsedBy<C extends { id: string }>(
 }
 
 /**
- * Nachschlagen mit einer `category_id`, die `null` sein darf. Ergebnis ist
- * `undefined`, wenn der Eintrag keine Kategorie hat *oder* seine nicht mehr
- * auflöst (Papierkorb) — für den Leser derselbe Zustand, und `categoryLabel`
- * nimmt beides entgegen.
+ * Lookup with a `category_id` that may be `null`. The result is
+ * `undefined` if the entry has no category *or* its category no longer
+ * resolves (trash) — the same state for the reader, and `categoryLabel`
+ * accepts both.
  */
 export function lookupCategory<C>(byId: ReadonlyMap<string, C>, id: string | null | undefined): C | undefined;
 export function lookupCategory<C>(byId: Readonly<Record<string, C>>, id: string | null | undefined): C | undefined;
@@ -61,23 +61,23 @@ export function lookupCategory<C>(
   return byId instanceof Map ? byId.get(id) : (byId as Readonly<Record<string, C>>)[id];
 }
 
-/** Wie oft eine Kategorie je Modul benutzt wird. */
+/** How often a category is used per module. */
 export type CategoryUsage = Record<CategoryModuleId, number>;
 
-/** Die vier Eintragslisten, aus denen sich die Nutzung einer Kategorie ergibt. */
+/** The four entry lists from which a category's usage is derived. */
 export type CategorySources = Record<CategoryModuleId, readonly { category_id: string | null }[]>;
 
 export const emptyCategoryUsage = (): CategoryUsage => ({ wiki: 0, operations: 0, tasks: 0, altar: 0 });
 
 /**
- * Wie viele Einträge je Modul auf jede Kategorie zeigen — ein Durchlauf je
- * Liste statt einer Filterung je Kategorie. Kategorien ohne einen einzigen
- * Eintrag fehlen in der Map; `emptyCategoryUsage()` ist ihr Ersatzwert.
+ * How many entries per module point to each category — one pass per
+ * list instead of one filter per category. Categories without a single
+ * entry are missing from the map; `emptyCategoryUsage()` is their fallback value.
  *
- * Eine Wahrheit für die Kategorien-Ansicht (zeigt alle vier Zahlen) und die
- * globale Suche (nimmt nur die größte davon). Sonst gäbe ein fünftes
- * kategorisiertes Modul zwei Stellen zu pflegen, und beide widersprächen sich
- * über dieselbe Kategorie.
+ * One truth for the categories view (shows all four numbers) and the
+ * global search (takes only the largest of them). Otherwise a fifth
+ * categorized module would leave two places to maintain, and the two would contradict each other
+ * about the same category.
  */
 export function categoryUsageCounts(sources: CategorySources): Map<string, CategoryUsage> {
   const counts = new Map<string, CategoryUsage>();
@@ -93,8 +93,8 @@ export function categoryUsageCounts(sources: CategorySources): Map<string, Categ
 }
 
 /**
- * Das Modul, das eine Kategorie am meisten benutzt — undefined, wenn keines.
- * Bei Gleichstand gewinnt das in `ENTRY_MODULE_IDS` frühere.
+ * The module that uses a category the most — undefined if none does.
+ * On a tie the one earlier in `ENTRY_MODULE_IDS` wins.
  */
 export function dominantCategoryModule(usage: CategoryUsage | undefined): CategoryModuleId | undefined {
   if (!usage) return undefined;
@@ -102,13 +102,13 @@ export function dominantCategoryModule(usage: CategoryUsage | undefined): Catego
 }
 
 /**
- * Gibt es Einträge ohne Kategorie? Zwei Fälle, derselbe Bucket: Der Eintrag
- * trägt gar keine (`null` — seit v39 der Normalfall eines neuen), oder seine
- * Kategorie liegt im Papierkorb und löst nicht mehr auf.
+ * Are there entries without a category? Two cases, the same bucket: the entry
+ * carries none at all (`null` — since v39 the normal case for a new one), or its
+ * category is in the trash and no longer resolves.
  *
- * Das sind die, die `groupByCategory` in den „Ohne Kategorie"-Bucket sortiert.
- * Die Chip-Liste fragt hier, ob es den Chip überhaupt braucht — dieselbe Frage
- * wie `categoriesUsedBy` daneben, nur andersherum.
+ * These are the ones `groupByCategory` sorts into the "Uncategorized" bucket.
+ * The chip list asks here whether the chip is needed at all — the same question
+ * as `categoriesUsedBy` next to it, just the other way round.
  */
 export function hasUncategorized<C extends { id: string }>(
   all: readonly C[],
@@ -119,11 +119,11 @@ export function hasUncategorized<C extends { id: string }>(
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Vor v38: Kategorien je Modul mit modulbezogenen Locale-Keys. Gebraucht von
-// den Migrationen v36–v38, die auf alten Vaults vor dem Zusammenlegen laufen,
-// und vom Heben alter Sicherungen und `.emerald`-Dateien. Die Keys
+// Before v38: categories per module with module-specific locale keys. Needed by
+// migrations v36–v38, which run on old vaults before the merge,
+// and by the lifting of old backups and `.emerald` files. The keys
 // `wiki.categories.*`, `operations.categories.*`, `altar.categories.*`
-// bleiben genau dafür in den Locales.
+// stay in the locales for exactly that.
 // ─────────────────────────────────────────────────────────────────────────────
 
 export type LegacyCategoryTable =
@@ -139,7 +139,7 @@ const LEGACY_LABEL_MODULE: Record<LegacyCategoryTable, string | null> = {
   altar_categories: 'altar',
 };
 
-/** Locale-Key einer eingebauten Kategorie von vor v38 — null, wo es keine gab (Tasks). */
+/** Locale key of a built-in category from before v38 — null where there was none (tasks). */
 export function legacyBuiltinLabelKey(table: LegacyCategoryTable, id: string): string | null {
   const module = LEGACY_LABEL_MODULE[table];
   return module ? `${module}.categories.${id}` : null;
@@ -148,11 +148,11 @@ export function legacyBuiltinLabelKey(table: LegacyCategoryTable, id: string): s
 const LEGACY_ALTAR_SEED_NAMES = new Map(LEGACY_ALTAR_CATEGORIES.map(([id, name]) => [id, name]));
 
 /**
- * Der Anzeigename, den eine Kategorie bis v38 hatte: Builtins über ihren
- * Locale-Key in der aktuellen App-Sprache (v36 hat denselben Weg gewählt),
- * eigene über den gespeicherten Namen. Altar-Builtins tragen kein Flag — dort
- * zählt, ob der Seed-Name noch unverändert dasteht. Eine Regel für Migration
- * v38 und das Heben alter Sicherungen, damit beide beim selben Namen landen.
+ * The display name a category had up to v38: builtins via their
+ * locale key in the current app language (v36 chose the same way),
+ * custom ones via the stored name. Altar builtins carry no flag — there
+ * it matters whether the seed name still stands unchanged. One rule for migration
+ * v38 and the lifting of old backups, so both end up with the same name.
  */
 export function legacyDisplayName(
   i18n: { t: Translate; exists: (key: string) => boolean },
@@ -167,7 +167,7 @@ export function legacyDisplayName(
   return key && i18n.exists(key) ? i18n.t(key) : row.name;
 }
 
-/** Anzeigename einer Wiki-/Operations-Kategorie im Schema von vor v38. */
+/** Display name of a wiki/operations category in the pre-v38 schema. */
 export function legacyCategoryLabel(
   t: Translate,
   module: 'wiki' | 'operations',
@@ -180,7 +180,7 @@ export function legacyCategoryLabel(
 
 const LEGACY_WIKI_EMOJI = new Map(LEGACY_WIKI_CATEGORIES.map(([id, , emoji]) => [id, emoji]));
 
-/** Emoji einer eingebauten Wiki-Kategorie von vor v38, wenn ihre Zeile nicht zur Hand ist. */
+/** Emoji of a built-in wiki category from before v38, when its row is not at hand. */
 export function legacyWikiCategoryEmoji(id: string): string {
   return LEGACY_WIKI_EMOJI.get(id) ?? '📄';
 }

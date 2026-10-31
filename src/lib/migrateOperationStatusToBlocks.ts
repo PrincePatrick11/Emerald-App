@@ -5,19 +5,19 @@ import { definitionById, insertDefinitionRow, nextDefinitionSortOrder } from './
 import { convertLegacyStatusRows, STATUS_DEFINITION_ID } from './blocks/legacyStatus';
 
 /**
- * Migration v41 — Status, Enddatum und Version der Operationen werden ein
- * Block (siehe `lib/blocks/legacyStatus.ts`).
+ * Migration v41 — the status, end date and version of operations become a
+ * block (see `lib/blocks/legacyStatus.ts`).
  *
- * Betroffen ist jede Operation, die davon etwas gesetzt hatte — inaktiv, ein
- * Enddatum oder eine Version —, auch im Papierkorb. Sie bekommt die Kopie des
- * eigenen Blocks „Status" an den Anfang ihres Inhalts; die Definition wird nur
- * angelegt, wenn es eine solche Operation gibt. Die drei Spalten bleiben im
- * Schema (Backup-Wiederherstellung älterer Dateien kennt sie) und werden
- * geleert. `updated_at` bleibt — die Migration ist keine Bearbeitung.
+ * Affected is every operation that had any of these set — inactive, an
+ * end date or a version —, including those in the trash. It gets a copy of the
+ * custom block "Status" at the start of its content; the definition is only
+ * created if there is such an operation. The three columns stay in the
+ * schema (restoring backups of older files knows them) and are
+ * emptied. `updated_at` stays — the migration is not an edit.
  *
- * Wiederaufnahme nach einem Abbruch: eine schon umgeschriebene Zeile hat
- * geleerte Spalten und fällt aus der Auswahl; eine schon angelegte
- * Definition (auch im Papierkorb) wird weiterbenutzt.
+ * Resuming after an abort: a row that has already been rewritten has
+ * emptied columns and drops out of the selection; an already created
+ * definition (also in the trash) is reused.
  */
 export async function migrateOperationStatusToBlocks(db: Database): Promise<void> {
   const rows = await db.select<DbRow[]>(
@@ -34,9 +34,9 @@ export async function migrateOperationStatusToBlocks(db: Database): Promise<void
     await insertDefinitionRow(db, { ...definition, sort_order: await nextDefinitionSortOrder(db) });
   }
 
-  // Auch Zeilen, die nur Leerraum (Tab, Zeilenumbruch) trugen — SQLs TRIM sieht
-  // nur Leerzeichen, der Konverter mehr: sie bleiben ohne Block, die Spalten
-  // werden trotzdem geleert.
+  // Also rows that carried only whitespace (tab, line break) — SQL's TRIM sees
+  // only spaces, the converter more: they stay without a block, the columns
+  // are emptied anyway.
   for (const row of converted) {
     await db.execute(
       'UPDATE operations SET content=$1, is_active=1, end_date=NULL, version=NULL WHERE id=$2',

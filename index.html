@@ -6,42 +6,43 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Emerald App</title>
 
-    <!-- Die Stile des Ladebildschirms. Eine eigene Datei aus `public/` und
-         kein <style> im Dokument — warum, steht oben in `public/splash.css`;
-         es ist keine Geschmacksfrage. Als <link> im <head> blockiert sie das
-         Rendern und steht damit im allerersten Frame. -->
+    <!-- The styles of the loading screen. A separate file from `public/` and
+         not a <style> in the document — why is explained at the top of
+         `public/splash.css`; it is not a matter of taste. As a <link> in the
+         <head> it blocks rendering and so is present in the very first
+         frame. -->
     <link rel="stylesheet" href="/splash.css" />
 
     <script>
-      /* Zwei Dinge, die laufen muessen, bevor es das Bundle gibt.
+      /* Two things that have to run before the bundle exists.
 
-         1. Das gespeicherte Theme setzen, damit der Ladebildschirm gleich in
-            den richtigen Farben erscheint. Bewusste Kopie von
-            `normalizeThemeId()` aus `src/themes/theme.ts`: dieses Skript
-            laeuft vor dem Bundle und darf nichts importieren.
+         1. Set the saved theme so that the loading screen appears in the
+            right colors right away. A deliberate copy of
+            `normalizeThemeId()` from `src/themes/theme.ts`: this script
+            runs before the bundle and may not import anything.
 
-         2. Ein letztes Sicherheitsnetz aufspannen. Regulaer raeumt `AppShell`
-            den Bildschirm ab, ersatzweise der Timer aus `initSplash()`
-            (`lib/splash.ts`). Beides steckt im Bundle — laedt das nicht oder
-            wirft ein Import, laeuft keines von beiden. Der Bildschirm bliebe
-            dann fuer immer stehen, und weil er auf Windows und Linux die
-            eigenen Fensterknoepfe verdeckt (`decorations: false`), bliebe nur
-            noch Alt+F4. Deshalb liegt dieser eine Timer hier, wo ihn kein
-            Bundle-Fehler erreichen kann. Er raeumt hart ab, ohne Ausblenden,
-            und laeuft spaeter als der regulaere, damit er ihm nicht
-            zuvorkommt.
+         2. Set up a last safety net. Normally `AppShell` clears the
+            screen, with the timer from `initSplash()` (`lib/splash.ts`) as
+            the fallback. Both live in the bundle — if that fails to load or
+            an import throws, neither runs. The screen would then stay up
+            forever, and because on Windows and Linux it covers the
+            app's own window buttons (`decorations: false`), only Alt+F4
+            would be left. That is why this one timer lives here, where no
+            bundle error can reach it. It removes the screen hard, without
+            fading out, and fires later than the regular one so that it does
+            not get ahead of it.
 
-         Tauri hasht Inline-Skripte beim Bauen und haengt den sha256 an
-         `script-src`, dieses Skript laeuft also trotz `script-src 'self'`.
-         Einen Nonce bekommt es nicht — der Selektor dafuer ist
-         `script[src^='http']` und trifft hier nichts. Fuer `<style>` gilt das
-         nicht, siehe `public/splash.css`. */
+         Tauri hashes inline scripts at build time and appends the sha256 to
+         `script-src`, so this script runs despite `script-src 'self'`.
+         It gets no nonce — the selector for that is
+         `script[src^='http']` and matches nothing here. That does not hold
+         for `<style>`, see `public/splash.css`. */
       (function () {
         var raw = null;
         try {
           raw = localStorage.getItem('theme-id') || localStorage.getItem('theme');
         } catch (e) {
-          /* Kein Zugriff auf localStorage — dann eben das Standard-Theme. */
+          /* No access to localStorage — then the default theme it is. */
         }
         document.documentElement.dataset.theme =
           raw === 'emerald-parchment' || raw === 'light' ? 'emerald-parchment' : 'emerald-noctis';
@@ -56,20 +57,20 @@
 
   <body>
     <div id="splash" class="splash" data-tauri-drag-region>
-      <!-- Der Streifen, an dem das Fenster haengt. Das Attribut wird nicht
-           vererbt — Tauri liest es am Element unter dem Zeiger —, es steht
-           deshalb hier ein zweites Mal. Am Wurzelelement ihrer Kopie nimmt
-           die Menue-Vorschau es wieder weg, damit ein Klick sie schliessen
-           kann; dieser Streifen bleibt und traegt das Ziehen durch beide
-           Faelle. Warum, steht bei `.splash-drag` in `public/splash.css`. -->
+      <!-- The strip the window is dragged by. The attribute is not
+           inherited — Tauri reads it on the element under the pointer —, so
+           it appears a second time here. On the root element of its copy,
+           the menu preview removes it again so that a click can close it;
+           this strip stays and carries dragging through both cases. Why is
+           explained at `.splash-drag` in `public/splash.css`. -->
       <div class="splash-drag" data-tauri-drag-region></div>
       <svg class="splash-gem" viewBox="-128 -128 512 512" aria-hidden="true">
         <defs>
-          <!-- Die Farben aller Stops stehen in `splash.css`, nicht hier:
-               `var()` in einem SVG-Praesentationsattribut wird nicht von jeder
-               Engine ersetzt. Mehrstufiger Abfall statt zweier Stops, weil
-               eine Zweistop-Interpolation ueber so eine lange, flache Rampe in
-               8 Bit sichtbare Ringe zeigt. -->
+          <!-- The colors of all stops are in `splash.css`, not here:
+               `var()` in an SVG presentation attribute is not substituted by
+               every engine. A multi-stop falloff instead of two stops,
+               because two-stop interpolation over such a long, flat ramp
+               shows visible rings in 8 bit. -->
           <radialGradient id="splash-glow" gradientUnits="userSpaceOnUse" cx="128" cy="122" r="241">
             <stop offset="0%"   stop-opacity="0.22" />
             <stop offset="30%"  stop-opacity="0.15" />
@@ -77,7 +78,7 @@
             <stop offset="78%"  stop-opacity="0.02" />
             <stop offset="100%" stop-opacity="0" />
           </radialGradient>
-          <!-- Der Atem: helles Licht aus der Mitte des Steins. -->
+          <!-- The breath: bright light from the middle of the stone. -->
           <radialGradient id="splash-breath-grad" gradientUnits="userSpaceOnUse"
                           cx="128" cy="122" r="86">
             <stop offset="0%"   stop-opacity="0.20" />
@@ -98,11 +99,11 @@
           </clipPath>
         </defs>
 
-        <!-- Der Schein. r=241 liegt vollstaendig in der viewBox — siehe den
-             Kommentar an `.splash-gem` in `splash.css`. -->
+        <!-- The glow. r=241 lies entirely within the viewBox — see the
+             comment on `.splash-gem` in `splash.css`. -->
         <circle class="splash-halo" cx="128" cy="122" r="241" fill="url(#splash-glow)" />
 
-        <!-- Der Smaragd: Krone aus acht Facetten, Tafel, Stufenschliff -->
+        <!-- The emerald: crown of eight facets, table, step cut -->
         <g clip-path="url(#splash-clip)">
           <polygon class="splash-facet" points="74,77 97,54 105,71 91,89" />
           <polygon class="splash-facet" points="97,54 159,54 151,71 105,71" />
@@ -119,10 +120,10 @@
           <circle class="splash-breath" cx="128" cy="122" r="86"
                   fill="url(#splash-breath-grad)" />
 
-          <!-- Die Schliffkanten als eigene Linien. Ohne sie entstuenden sie
-               nur dort, wo zwei Facettenfuellungen aneinanderstossen — und so
-               eine Naht wird von beiden Seiten unabhaengig kantengeglaettet,
-               also weich. -->
+          <!-- The cut edges as lines of their own. Without them they would
+               only arise where two facet fills meet — and such a seam is
+               antialiased independently from both sides, so it comes out
+               soft. -->
           <path class="splash-cut" fill="none"
                 d="M74,77 L91,89 M97,54 L105,71 M159,54 L151,71 M182,77 L165,89
                    M182,167 L165,155 M159,190 L151,173 M97,190 L105,173 M74,167 L91,155
@@ -131,9 +132,10 @@
           <polygon class="splash-step" fill="none" stroke-width="1" opacity="0.28"
                    points="102,90 111,78 145,78 154,90 154,154 145,166 111,166 102,154" />
 
-          <!-- Die Neigung sitzt an dieser Gruppe und nicht am Rechteck: die
-               CSS-Animation auf `transform` wuerde ein `transform`-Attribut am
-               Rechteck selbst ersetzen, und das Band liefe aufrecht. -->
+          <!-- The tilt sits on this group and not on the rectangle: the
+               CSS animation on `transform` would replace a `transform`
+               attribute on the rectangle itself, and the band would run
+               upright. -->
           <g transform="rotate(18 128 122)">
             <rect class="splash-sheen" x="44" y="38" width="33" height="174"
                   fill="url(#splash-band)" opacity="0.5" />
@@ -144,8 +146,8 @@
                  stroke-linejoin="round" opacity="0.95"
                  points="74,77 97,54 159,54 182,77 182,167 159,190 97,190 74,167" />
 
-        <!-- Funken: Vierstrahler, gezeichnet als vier nach innen gebogene
-             Viertel um den Mittelpunkt. -->
+        <!-- Sparks: four-pointed stars, drawn as four inward-curved
+             quarters around the center. -->
         <path class="splash-spark"
               d="M51,41 Q51,51 61,51 Q51,51 51,61 Q51,51 41,51 Q51,51 51,41 Z" />
         <path class="splash-spark"

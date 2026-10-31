@@ -8,7 +8,7 @@ on:
 permissions:
   contents: read
 
-# Schnelle Folge-Pushes sollen den vorigen Lauf ablösen, nicht neben ihm laufen.
+# Quick follow-up pushes should replace the previous run, not run alongside it.
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
@@ -27,20 +27,20 @@ jobs:
 
       - run: npm ci
 
-      # Dieselbe Prüfung wie lokal. `build` ist tsc + vite — der Typecheck steckt darin.
+      # The same check as locally. `build` is tsc + vite, so the typecheck is included.
       - name: Schema, i18n, blocks, docs, typecheck and build
         run: npm run check
 
   rust:
-    # Der eigentliche Zweck dieser Datei: `src-tauri/src/pdf_export/` hat drei
-    # Implementierungen, je eine hinter `cfg(target_os)`. Wer auf Windows
-    # entwickelt, kompiliert `macos.rs` und `linux.rs` nie — Fehler darin fallen
-    # sonst erst beim Release-Build auf, wenn der Tag schon steht.
+    # The real purpose of this file: `src-tauri/src/pdf_export/` has three
+    # implementations, one behind each `cfg(target_os)`. Whoever develops on
+    # Windows never compiles `macos.rs` and `linux.rs`, so errors in them
+    # would only surface in the release build, once the tag already exists.
     name: cargo check (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
     strategy:
-      # Ein rotes Linux soll den macOS-Lauf nicht abwürgen; beide Ergebnisse
-      # sind interessant.
+      # A red Linux run should not kill the macOS run; both results
+      # are of interest.
       fail-fast: false
       matrix:
         os: [ubuntu-22.04, macos-15, windows-latest]
@@ -76,9 +76,9 @@ jobs:
 
       - run: npm ci
 
-      # `tauri-build` liest `frontendDist: "../dist"` und bricht ab, wenn das
-      # Verzeichnis fehlt — `cargo check` braucht das Frontend also, obwohl es
-      # nichts davon kompiliert.
+      # `tauri-build` reads `frontendDist: "../dist"` and aborts if the
+      # directory is missing, so `cargo check` needs the frontend even though
+      # it compiles none of it.
       - name: Build frontend
         run: npm run build
 

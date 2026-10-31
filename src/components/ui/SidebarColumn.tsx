@@ -3,13 +3,13 @@ import { useTranslation } from 'react-i18next';
 import { Check, Trash2, X } from 'lucide-react';
 
 /**
- * Die 56px-Leiste oben in der rechten Seitenleiste. Genauso hoch wie die
- * Suchzeile der Eintragsliste (`EntryListTab`, `h-14`), damit beide
- * Seitenleisten ihre Oberkante des Inhalts auf derselben Linie haben — beide
- * synchron halten. Nur diese Leiste zieht eine Linie darunter: sie liegt auf
- * dem Blatt, die Suchzeile links auf dem Rahmen. Die Linie sitzt am inneren
- * Element und reicht deshalb nur von Knopfkante zu Knopfkante, wie die
- * Trennlinien im Körper darunter (`.sidebar-divider`).
+ * The 56px bar at the top of the right sidebar. Exactly as tall as the
+ * search row of the entry list (`EntryListTab`, `h-14`), so that both
+ * sidebars have the top edge of their content on the same line; keep both
+ * in sync. Only this bar draws a line below it: it sits on
+ * the sheet, the search row on the left on the frame. The line sits on the inner
+ * element and therefore only reaches from button edge to button edge, like the
+ * dividers in the body below (`.sidebar-divider`).
  */
 export function SidebarActionBar({ children }: { children?: ReactNode }) {
   return (
@@ -22,16 +22,16 @@ export function SidebarActionBar({ children }: { children?: ReactNode }) {
 }
 
 /**
- * Fertig, Löschen, Abbrechen — die Leiste jedes Bearbeitungsmodus: ein
- * Eintrag (RightSidebar) und die Seiten der Bibliothek. „Fertig" ist die eine
- * gefüllte Primäraktion, Löschen und Abbrechen sind 30px-Quadrate daneben
- * (`.edit-bar-*`). Ohne `onDelete` fehlt der Löschen-Knopf; `busy` sperrt
- * Fertig, solange gespeichert wird, `locked` alle drei — solange etwas
- * schreibt, das die Seite gleich austauscht (`uiStore.editLocked`).
+ * Done, Delete, Cancel: the bar of every editing mode, for an
+ * entry (RightSidebar) and the library pages. "Done" is the one
+ * filled primary action, Delete and Cancel are 30px squares beside it
+ * (`.edit-bar-*`). Without `onDelete` the Delete button is absent; `busy` disables
+ * Done while saving is in progress, `locked` all three while something
+ * is writing that is about to replace the page (`uiStore.editLocked`).
  *
- * Eigene Klassen statt `Button`: dessen tone-Stufen sind getönte Knöpfe mit
- * 11px-Schrift für Zeilenaktionen; die Leiste des Bearbeitens hat genau eine
- * gefüllte Primäraktion mit 13px-Schrift. Die Höhe ist dieselbe (`--control-h`).
+ * Own classes instead of `Button`: its tone levels are tinted buttons with
+ * 11px type for row actions; the editing bar has exactly one
+ * filled primary action with 13px type. The height is the same (`--control-h`).
  */
 export function EditActionBar({ onDone, onDelete, onCancel, busy, locked }: {
   onDone: () => void;
@@ -60,19 +60,19 @@ export function EditActionBar({ onDone, onDelete, onCancel, busy, locked }: {
 }
 
 /**
- * Eine Spalte der rechten Seitenleiste: oben die Leiste (`bar`, meist eine
- * `SidebarActionBar`), darunter der scrollende Körper. Der waagrechte Einzug
- * lebt hier und nirgends sonst (design.md: eine Einzugsquelle pro Spalte) —
- * `p-3` passt zum `px-3` der Leiste, sodass die Zeilen darunter mit ihren
- * Knöpfen fluchten. Ein Panel mit eigenem `px-*` bräche das wieder.
+ * A column of the right sidebar: the bar at the top (`bar`, usually a
+ * `SidebarActionBar`), the scrolling body below. The horizontal indentation
+ * lives here and nowhere else (design.md: one indentation source per column);
+ * `p-3` matches the bar's `px-3`, so that the rows below line up with its
+ * buttons. A panel with its own `px-*` would break that again.
  *
- * Nutzer: RightSidebar (Eigenschaften eines Eintrags), der Kopf jedes
- * `Dashboard` und die Seite eines eigenen Blocks.
+ * Users: RightSidebar (an entry's properties), the header of every
+ * `Dashboard` and a custom block's page.
  */
 export default function SidebarColumn({ bar, children, bodyClassName = '' }: {
   bar?: ReactNode;
   children: ReactNode;
-  /** Wird angehängt — für den Abstand zwischen den Gruppen (Dashboard: `space-y-4`). */
+  /** Appended; for the spacing between the groups (dashboard: `space-y-4`). */
   bodyClassName?: string;
 }) {
   return (
@@ -84,10 +84,10 @@ export default function SidebarColumn({ bar, children, bodyClassName = '' }: {
 }
 
 /**
- * Ein beschrifteter Abschnitt im Körper der Seitenleiste: `label-xs`-
- * Überschrift, darunter der Inhalt. Die Dashboard-Leiste reiht sie
- * untereinander (Ansicht, Sortierung, Anzeige, Filter) — der Abstand
- * zwischen Überschrift und Inhalt lebt nur hier.
+ * A labelled section in the sidebar body: `label-xs`
+ * heading, content below. The dashboard sidebar stacks them
+ * (view, sorting, display, filter); the spacing
+ * between heading and content lives only here.
  */
 export function SidebarGroup({ label, children }: { label?: string; children: ReactNode }) {
   return (

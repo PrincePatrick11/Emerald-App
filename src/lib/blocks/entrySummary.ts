@@ -7,23 +7,23 @@ import { templateOriginsOf } from './templates';
 import { BLOCK_ATTR } from './types';
 
 /**
- * Was Listen, Seitenleiste, Menü und die Blöcke-Ansicht über die Blöcke eines
- * Eintrags wissen wollen, ohne ihn zu öffnen — aus dem `content`, den die
- * Stores ohnehin im Speicher halten, einmal pro Inhaltsstand (und Tag) geparst.
+ * What lists, sidebar, menu and the blocks view want to know about the blocks
+ * of an entry without opening it — parsed from the `content` that the stores
+ * keep in memory anyway, once per content state (and day).
  */
 export interface EntryBlockSummary {
-  /** Jede Kopie eines eigenen Blocks: Definition und Revision. */
+  /** Every copy of a custom block: definition and revision. */
   origins: { id: string; rev: number }[];
   /**
-   * Skalare Feldwerte der Kopien unter `"<Definition>:<Element>"` — die
-   * Grundlage für das spätere Filtern und Anzeigen von Blockwerten in Listen.
-   * Element-IDs sind in allen Kopien einer Definition gleich, also findet ein
-   * Filter jede Kopie, egal welcher Version.
+   * Scalar field values of the copies under `"<definition>:<element>"` — the
+   * basis for later filtering and showing block values in lists.
+   * Element IDs are the same in all copies of a definition, so a filter
+   * finds every copy, whatever its version.
    */
   fieldValues: Record<string, FieldValue>;
-  /** Die Vorlagen, aus denen Blöcke des Eintrags stammen — jede einmal. */
+  /** The templates that blocks of the entry come from — each one once. */
   templates: string[];
-  /** Sigille des Eintrags samt Dateiname der ersten sichtbaren, nicht verborgenen Zeichnung (Karten) — `null` ohne Sigillen-Blöcke. */
+  /** The entry's sigil together with the file name of the first visible, non-concealed drawing (cards) — `null` without sigil blocks. */
   sigil: (SigilState & { image: string | null }) | null;
 }
 
@@ -35,7 +35,7 @@ function summarize(content: string, today: string): EntryBlockSummary {
   const hasOrigins = content.includes(BLOCK_ATTR.origin);
   const hasSigil = mayHoldSigil(content);
   const hasTemplates = content.includes(BLOCK_ATTR.template);
-  // Die allermeisten Einträge haben weder eigene noch Sigillen-Blöcke noch eine Vorlage — dann gar nicht parsen.
+  // The vast majority of entries have neither custom nor sigil blocks nor a template — then do not parse at all.
   if (!hasOrigins && !hasSigil && !hasTemplates) return EMPTY;
   const blocks = parseBlocks(content);
 
@@ -61,7 +61,7 @@ function summarize(content: string, today: string): EntryBlockSummary {
     const units = sigilUnits(blocks);
     if (units.length > 0) {
       const state = sigilState(blocks, today);
-      // Die erste sichtbare Zeichnung, Block oder Teil — ein Teil gilt als sichtbar, wenn sein Block es ist.
+      // The first visible drawing, block or part — a part counts as visible if its block is.
       const canvas = units.find(({ block, part }) =>
         block.type === SIGIL_CANVAS_TYPE && !isBlockHidden(part?.parent ?? block) && !part?.element.archived
           && !state.concealed.has(block.id) && sigilImage(block));
@@ -71,7 +71,7 @@ function summarize(content: string, today: string): EntryBlockSummary {
   return { origins, fieldValues, templates: hasTemplates ? templateOriginsOf(blocks) : [], sigil };
 }
 
-/** Die Zusammenfassung eines Eintrags; derselbe Inhalt wird am selben Tag nicht zweimal geparst. */
+/** The summary of an entry; the same content is not parsed twice on the same day. */
 export function entryBlockSummary(id: string, content: string, today = todayIso()): EntryBlockSummary {
   const hit = cache.get(id);
   if (hit?.content === content && hit.day === today) return hit.summary;
@@ -80,7 +80,7 @@ export function entryBlockSummary(id: string, content: string, today = todayIso(
   return summary;
 }
 
-/** Beim Vault-Wechsel und nach einem Import: die IDs von vorher kommen nicht wieder. */
+/** On vault switch and after an import: the earlier IDs do not come back. */
 export function clearEntrySummaryCache(): void {
   cache.clear();
 }

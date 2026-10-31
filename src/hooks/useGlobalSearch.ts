@@ -32,9 +32,9 @@ function useSearchCorpus(): SearchCorpus {
   const languages = useLexiconStore((s) => s.languages);
   const lexiconEntries = useLexiconStore((s) => s.entries);
 
-  // Der Treffer öffnet die Kategorien-Ansicht; `module` beschriftet ihn bloß
-  // noch mit dem Modul, das die Kategorie am meisten benutzt. Dieselbe Zählung
-  // wie die Zahlenspalten dort — ein Helfer für beide.
+  // The hit opens the categories view; `module` merely labels it with the
+  // module that uses the category most. The same count as the number columns
+  // there — one helper for both.
   const categories = useMemo<SearchCategory[]>(() => {
     const counts = categoryUsageCounts({ wiki, operations, tasks, altar: altarItems });
     return allCategories.map((c) => ({

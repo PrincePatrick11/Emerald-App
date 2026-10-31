@@ -14,38 +14,38 @@ import {
 import { TEXT_BLOCK_TYPE, type BlockInstance } from './types';
 
 /**
- * Die Blöcke eines Eintrags als HTML für PDF und Markdown — ein Serializer je
- * Typ, nach denselben Regeln wie der Lesemodus:
- * - ausgeblendete Blöcke (das Auge) fehlen,
- * - Rechner und Zeichnungen, die eine geladene Sigille noch verbirgt, fehlen,
- * - ein Altar-Feld zeigt das Vorschaubild des Altars und seinen Link-Chip,
- * - Feldblöcke zeigen nur, was der Lesemodus zeigt (archivierte und — nach
- *   der Anzeigeregel — leere Felder nicht), Datum und Zahl formatiert,
- * - der Blocktitel steht als Überschrift, wo der Lesemodus ihn zeigt,
- * - ein Block, der dabei leer bleibt, fehlt ganz.
+ * The blocks of an entry as HTML for PDF and Markdown — one serializer per
+ * type, following the same rules as read mode:
+ * - hidden blocks (the eye) are missing,
+ * - calculators and drawings that a loaded sigil still conceals are missing,
+ * - an altar field shows the altar's preview image and its link chip,
+ * - field blocks show only what read mode shows (archived and — per
+ *   the display rule — empty fields do not appear), date and number formatted,
+ * - the block title appears as a heading where read mode shows it,
+ * - a block that ends up empty in the process is missing entirely.
  *
- * Heraus kommt schlichtes HTML ohne `<section>`: danach laufen die üblichen
- * Export-Schritte (DOMPurify, Bilder einbetten, Link-Chips, Turndown). Die
- * Bilder der Blöcke (Zeichnung, Bildfeld) tragen ihre Beschriftung als Alt-Text
- * und `data-export-placeholder` — im Markdown bleibt sie an ihrer Stelle stehen.
+ * What comes out is plain HTML without `<section>`: the usual export steps
+ * then run (DOMPurify, embedding images, link chips, Turndown). The images
+ * of the blocks (drawing, image field) carry their label as alt text
+ * and `data-export-placeholder` — in the Markdown it stays in its place.
  *
- * Rein und DOM-frei; die Texte (Sprache, Formate) reicht der Aufrufer herein.
+ * Pure and DOM-free; the caller passes in the texts (language, formats).
  */
 
 export interface ExportText {
-  /** Wie der Block heißt (`blockLabel` mit `t`). */
+  /** What the block is called (`blockLabel` with `t`). */
   title: (block: BlockInstance, meta: BlockTypeMeta | undefined) => string;
   fields: FallbackText;
-  /** Ein `YYYY-MM-DD` für Menschen. */
+  /** A `YYYY-MM-DD` for humans. */
   date: (iso: string) => string;
   number: (value: number) => string;
   targetDate: string;
   technique: string;
   loaded: string;
   notLoaded: string;
-  /** Beschriftung der Zeichnung — im Markdown der Platzhalter an ihrer Stelle. */
+  /** Label of the drawing — in the Markdown the placeholder in its place. */
   drawing: string;
-  /** Ein Altar mit seinem gespeicherten Vorschaubild (Dateiname oder data-URL) — `null`, wenn es ihn nicht mehr gibt. */
+  /** An altar with its stored preview image (file name or data URL) — `null` if it no longer exists. */
   altar: (altarId: string) => { title: string; image: string | null } | null;
 }
 
@@ -71,7 +71,7 @@ function fieldValue(element: ElementDef, model: FieldsModel, text: ExportText): 
     case 'altar': {
       const slot = model.slots[element.id];
       if (!slot) return null;
-      // Das Bild trägt den aktuellen Namen, wie der Lesemodus; ein gelöschter Altar bleibt beim Chip.
+      // The image carries the current name, like read mode; a deleted altar stays with the chip.
       const link = linkFromSlot(slot);
       const altar = link?.entryType === 'altar' ? text.altar(link.id) : null;
       const image = altar?.image ? imageHtml(altar.image, altar.title || link!.label) : '';
@@ -93,7 +93,7 @@ function fieldsHtml(block: BlockInstance, text: ExportText, concealed: ReadonlyM
     .filter((element) => !isHiddenInRead(element, model))
     .flatMap((element) => {
       if (!isSigilKind(element.kind)) return [row(text.fields.label(element), fieldValue(element, model, text) ?? '—')];
-      // Ein Sigillen-Teil wie der Block gleicher Art — verborgen fehlt er ganz.
+      // A sigil part like a block of the same kind — if concealed it is missing entirely.
       const part = sigilPartBlock(block, { ...element, kind: element.kind }, model);
       if (concealed.has(part.id)) return [];
       const body = sigilHtml(part, text);
@@ -102,7 +102,7 @@ function fieldsHtml(block: BlockInstance, text: ExportText, concealed: ReadonlyM
   return rows.length ? `<dl>${rows.join('')}</dl>` : '';
 }
 
-/** Rechner, Zeichnung oder Ladung — als Block wie als Teil eines eigenen Blocks. */
+/** Calculator, drawing or charge — as a block as well as a part of a custom block. */
 function sigilHtml(block: BlockInstance, text: ExportText): string {
   switch (block.type) {
     case SIGIL_CANVAS_TYPE: {
@@ -111,7 +111,7 @@ function sigilHtml(block: BlockInstance, text: ExportText): string {
     }
     case SIGIL_CHARGE_TYPE:
       return chargeHtml(block, text);
-    default: // Rechner: sein gespeicherter Fallback ist schon die Lesefassung (Absicht, Buchstaben).
+    default: // Calculator: its stored fallback is already the read version (intention, letters).
       return block.html;
   }
 }
@@ -138,7 +138,7 @@ function bodyHtml(
     case SIGIL_CHARGE_TYPE:
       return sigilHtml(block, text);
     case TEXT_BLOCK_TYPE:
-    default: // Unbekannter Typ oder zu neues Format: der gespeicherte Fallback.
+    default: // Unknown type or format too new: the stored fallback.
       return block.html;
   }
 }
@@ -149,7 +149,7 @@ export function renderBlocksForExport(content: string, text: ExportText, today =
   const parts: string[] = [];
   for (const original of blocks) {
     if (isBlockHidden(original) || concealed.has(original.id)) continue;
-    // Auch der Fallback eines Feldblocks (zu neues Format) ohne verborgene Teile.
+    // Also the fallback of a field block (format too new) without concealed parts.
     const block = withoutConcealedParts(original, concealed);
     const meta = resolveBlockType(block);
     const body = bodyHtml(block, meta, text, concealed);

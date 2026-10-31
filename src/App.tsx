@@ -2,12 +2,12 @@ import AppShell from './components/layout/AppShell';
 import EditContextMenu from './components/ui/EditContextMenu';
 
 export default function App() {
-  // Theme und Schriften setzt der settingsStore selbst, sobald ein Vault
-  // geladen ist (`applyAppearance`); vorher gilt der Boot-Spiegel aus `main.tsx`.
+  // The settingsStore applies theme and fonts itself once a vault is loaded
+  // (`applyAppearance`); until then the boot mirror from `main.tsx` applies.
   //
-  // Neben AppShell statt darin: AppShell steigt fuer den Vault-Einrichtungs-
-  // Bildschirm frueh aus, und auch dort — im Namensfeld des neuen Vaults —
-  // gehoert das Bearbeiten-Menue hin.
+  // Next to AppShell rather than inside it: AppShell returns early for the
+  // vault setup screen, and the edit menu belongs there too — in the name
+  // field of the new vault.
   return (
     <>
       <AppShell />

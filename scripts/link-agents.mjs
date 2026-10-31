@@ -1,18 +1,18 @@
 #!/usr/bin/env node
 /**
- * Macht die Review-Agents aus `tools/agents/` für Claude Code sichtbar, indem
- * es `.claude/agents` darauf zeigen lässt — ein Link statt einer Kopie, damit
- * der installierte Satz nicht hinter dem Repository zurückbleibt.
+ * Makes the review agents in `tools/agents/` visible to Claude Code by
+ * pointing `.claude/agents` at them — a link instead of a copy, so that
+ * the installed set does not fall behind the repository.
  *
- *   node scripts/link-agents.mjs            in diesem Checkout (.claude/agents)
- *   node scripts/link-agents.mjs --user     für alle Projekte (~/.claude/agents)
- *   node scripts/link-agents.mjs --remove   den Link wieder entfernen
+ *   node scripts/link-agents.mjs            in this checkout (.claude/agents)
+ *   node scripts/link-agents.mjs --user     for all projects (~/.claude/agents)
+ *   node scripts/link-agents.mjs --remove   remove the link again
  *
- * Unter Windows entsteht eine Junction, die keine Adminrechte braucht.
- * Ein vorhandener Ordner, der kein Link ist, wird nie angefasst.
+ * On Windows this creates a junction, which needs no admin rights.
+ * An existing folder that is not a link is never touched.
  *
- * Im Checkout legt es außerdem ein ignoriertes `CLAUDE.md` an, das auf
- * `AGENTS.md` verweist. Ein vorhandenes bleibt unverändert.
+ * In the checkout it also creates an ignored `CLAUDE.md` that points to
+ * `AGENTS.md`. An existing one is left unchanged.
  */
 import { existsSync, lstatSync, mkdirSync, readlinkSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
@@ -35,33 +35,33 @@ function existing() {
 
 const found = existing();
 if (found && !found.isSymbolicLink()) {
-  console.error(`${link} existiert und ist kein Link — nichts geändert. Verschiebe den Ordner, wenn er weg soll.`);
+  console.error(`${link} exists and is not a link — nothing changed. Move the folder if it should go.`);
   process.exit(1);
 }
 
 if (args.includes('--remove')) {
   if (found) rmSync(link);
-  console.log(found ? `Link entfernt: ${link}` : `Kein Link vorhanden: ${link}`);
+  console.log(found ? `Link removed: ${link}` : `No link present: ${link}`);
   process.exit(0);
 }
 
 const pointer = join(root, 'CLAUDE.md');
 if (!args.includes('--user') && !existsSync(pointer)) {
   writeFileSync(pointer, '@AGENTS.md\n');
-  console.log(`Angelegt: ${pointer}`);
+  console.log(`Created:${pointer}`);
 }
 
 if (found) {
   if (resolve(dirname(link), readlinkSync(link)) === source) {
-    console.log(`Schon verlinkt: ${link} -> ${source}`);
+    console.log(`Already linked:${link} -> ${source}`);
     process.exit(0);
   }
   rmSync(link);
 }
 if (!existsSync(source)) {
-  console.error(`${source} fehlt.`);
+  console.error(`${source} is missing.`);
   process.exit(1);
 }
 mkdirSync(dirname(link), { recursive: true });
 symlinkSync(source, link, 'junction');
-console.log(`Verlinkt: ${link} -> ${source}`);
+console.log(`Linked:${link} -> ${source}`);

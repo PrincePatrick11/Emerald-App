@@ -1,10 +1,10 @@
 /**
- * Bausteine für Migrationen, die Tabellen neu bauen — geteilt von v33
- * (`normalizeSchema.ts`), v38 (`mergeCategoryTables.ts`) und v39
+ * Building blocks for migrations that rebuild tables — shared by v33
+ * (`normalizeSchema.ts`), v38 (`mergeCategoryTables.ts`) and v39
  * (`nullableCategory.ts`).
  *
- * Warum es überhaupt einen Rebuild braucht und warum er ohne
- * `PRAGMA foreign_keys = OFF` auskommen muss, steht im Kopf von
+ * Why a rebuild is needed at all and why it has to work without
+ * `PRAGMA foreign_keys = OFF` is explained at the top of
  * `normalizeSchema.ts`.
  */
 import type Database from './sqlite';
@@ -24,11 +24,11 @@ export async function columnNames(db: Database, table: string): Promise<Set<stri
 }
 
 /**
- * `ALTER TABLE … DROP COLUMN` für jede der Spalten, die es noch gibt — so
- * setzt eine abgebrochene Migration einfach wieder an. Ohne Neubau: die
- * Foreign Keys anderer Tabellen *auf* `table` bleiben unberührt (ein DROP TABLE
- * risse über ON DELETE CASCADE ihre Zeilen mit). Die Spalte darf in keinem
- * Index, Fremdschlüssel oder CHECK stehen; SQLite lehnt das sonst ab.
+ * `ALTER TABLE … DROP COLUMN` for each of the columns that still exist — so
+ * an aborted migration simply picks up again. Without a rebuild: the
+ * foreign keys of other tables *pointing at* `table` stay untouched (a DROP TABLE
+ * would take their rows along via ON DELETE CASCADE). The column must not appear in any
+ * index, foreign key or CHECK; SQLite rejects it otherwise.
  */
 export async function dropColumnsIfPresent(db: Database, table: string, columns: readonly string[]): Promise<void> {
   const present = await columnNames(db, table);
@@ -37,35 +37,35 @@ export async function dropColumnsIfPresent(db: Database, table: string, columns:
   }
 }
 
-/** Die Tabellen, auf die Foreign Keys von `table` zeigen. */
+/** The tables that foreign keys of `table` point to. */
 export async function referencedTables(db: Database, table: string): Promise<Set<string>> {
   const rows = await db.select<{ table: string }[]>(`PRAGMA foreign_key_list(${table})`);
   return new Set(rows.map((r) => r.table));
 }
 
 /**
- * Vollständige Kopie der Datenbankdatei, bevor irgendetwas angefasst wird.
+ * A full copy of the database file before anything is touched.
  *
- * `VACUUM INTO` statt eines Datei-Kopierens über Rust: Die App hat nur
- * `read_file`/`write_file` auf String-Basis, was eine Binärdatei zerstören
- * würde. VACUUM INTO ist eine einzelne SQL-Anweisung und schreibt einen
- * konsistenten Snapshot.
+ * `VACUUM INTO` instead of copying the file via Rust: the app only has
+ * string-based `read_file`/`write_file`, which would corrupt a binary
+ * file. VACUUM INTO is a single SQL statement and writes a
+ * consistent snapshot.
  *
- * Der Zielname ist bewusst fest und trägt keinen Zeitstempel. Scheitert die
- * Migration, läuft sie beim nächsten Start erneut — mit einem eindeutigen
- * Namen entstünde bei jedem Versuch eine weitere Vollkopie, und da Emerald
- * Bilder als base64 in der Datenbank ablegt, sind die groß. `VACUUM INTO`
- * weigert sich, eine vorhandene Datei zu überschreiben, und genau das dient
- * hier als Erkennung: Liegt der Snapshot schon, ist er von einem früheren
- * Versuch und gültig, denn am Datenbestand hat sich seither nichts geändert.
+ * The target name is deliberately fixed and carries no timestamp. If the
+ * migration fails, it runs again at the next start — with a unique
+ * name, every attempt would create another full copy, and since Emerald
+ * stores images as base64 in the database, those are large. `VACUUM INTO`
+ * refuses to overwrite an existing file, and that is exactly what serves
+ * as detection here: if the snapshot already exists, it is from an earlier
+ * attempt and valid, because the data has not changed since.
  *
- * Jeder andere Fehler bricht die Migration ab. Das ist Absicht: Die Datenbank
- * ist dann noch unberührt und die Migration ungestempelt. Einen irreversiblen
- * Rebuild ohne Rückfahrkarte zu starten wäre die schlechtere Wahl.
+ * Any other error aborts the migration. That is intentional: the database
+ * is then still untouched and the migration unstamped. Starting an irreversible
+ * rebuild without a way back would be the worse choice.
  */
 export async function backupDatabaseFile(db: Database, tag: string): Promise<string> {
-  // Die Sicherung liegt neben der Datenbank, im Vault-Ordner: wer den Ordner
-  // kopiert, nimmt sie mit.
+  // The backup sits next to the database, in the vault folder: whoever copies
+  // the folder takes it along.
   const target = `${await getActiveDbFile()}.pre-${tag}.bak`;
   try {
     await db.execute(`VACUUM INTO '${target.replace(/'/g, "''")}'`);
@@ -80,12 +80,11 @@ export async function backupDatabaseFile(db: Database, tag: string): Promise<str
 }
 
 /**
- * Kopiert `from` spaltenweise nach `table`. Spalten, die es in der alten
- * Tabelle nicht gibt, werden ausgelassen — dann greift der Default aus dem
- * neuen DDL. Das macht den Rebuild robust gegen Vaults, in denen einzelne
- * Migrationen nie durchgelaufen sind, und davon gibt es in diesem Projekt
- * nachweislich welche. `overrides` liefert SQL-Ausdrücke je Zielspalte; die
- * Quelle heißt darin `o`.
+ * Copies `from` column by column into `table`. Columns that do not exist in the old
+ * table are left out — the default from the new DDL then applies. That makes the
+ * rebuild robust against vaults in which individual migrations never ran, and
+ * this project demonstrably has some. `overrides` supplies SQL expressions per
+ * target column; the source is called `o` in them.
  */
 export async function copyTable(
   db: Database,
@@ -116,7 +115,7 @@ export async function copyTable(
   );
 }
 
-/** Legt Indizes an, die es noch nicht gibt — für Nachhol-Pfade nach einem Abbruch. */
+/** Creates indexes that do not exist yet — for catch-up paths after an abort. */
 export async function createIndexesIfMissing(db: Database, ddl: readonly string[]): Promise<void> {
   for (const sql of ddl) {
     await db.execute(sql.replace('CREATE INDEX ', 'CREATE INDEX IF NOT EXISTS '));

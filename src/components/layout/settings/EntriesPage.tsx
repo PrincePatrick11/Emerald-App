@@ -5,7 +5,7 @@ import ImageLimitsSection from './ImageLimitsSection';
 import TagRulesSection from './TagRulesSection';
 import TemplateDefaultSection from './TemplateDefaultSection';
 
-/** Was beim Anlegen und Bearbeiten von Einträgen gilt. */
+/** What applies when creating and editing entries. */
 export default function EntriesPage() {
   return (
     <>

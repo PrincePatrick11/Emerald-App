@@ -8,38 +8,38 @@ import { isSigilFrozen, mayHoldSigil, sigilPartId, sigilState, todayIso } from '
 import { BLOCK_ATTR, type BlockInstance } from './types';
 
 /**
- * Eigene Blöcke (Blöcke-Ansicht, Tabelle `block_definitions`): eine Definition
- * ist die Vorlage, aus der ein Feldblock mit mehreren Elementen kopiert wird.
+ * Custom blocks (blocks view, table `block_definitions`): a definition
+ * is the template from which a field block with several elements is copied.
  *
- * Das Modell sind **Kopien, keine Live-Verweise** (Entscheidung des Nutzers):
- * ein eingefügter Block trägt Elemente, Anzeigeregeln, Name und Icon selbst —
- * gerendert wird immer aus der Kopie. Eine Änderung an der Definition ändert
- * deshalb keinen bestehenden Eintrag; fehlt die Definition (Papierkorb, Import
- * aus einem anderen Vault), funktioniert die Kopie trotzdem. Die Kopie merkt
- * sich nur, woher sie stammt (`data-block-origin`) und in welcher Revision
- * (`data-block-rev`) — daran erkennt die App eine „ältere Version" und bietet
- * das Aktualisieren an, einzeln im Eintrag oder gesammelt in der Blöcke-Ansicht.
+ * The model is **copies, not live references** (the user's decision):
+ * an inserted block carries elements, display rules, name and icon itself —
+ * rendering always comes from the copy. A change to the definition therefore
+ * changes no existing entry; if the definition is missing (trash, import
+ * from another vault), the copy works anyway. The copy only remembers
+ * where it came from (`data-block-origin`) and in which revision
+ * (`data-block-rev`) — that is how the app recognises an "older version" and
+ * offers to update it, individually in the entry or collectively in the blocks view.
  *
- * Element-IDs sind in Definition und allen Kopien dieselben. Werte bleiben so
- * über Umbenennen und Aktualisieren hinweg an ihrem Element, und ein späterer
- * Listenfilter findet sie in jeder Kopie, egal welcher Version.
+ * Element IDs are the same in the definition and all copies. Values thus
+ * stay with their element across renaming and updating, and a later
+ * list filter finds them in every copy, whatever its version.
  */
 
-/** Die Anzeigeregeln einer Definition: die des Feldblocks plus der Titel im Lesemodus. */
+/** The display rules of a definition: those of the field block plus the title in read mode. */
 export interface DefinitionDisplay extends DisplayRules {
-  /** Wird beim Einfügen zum Instanz-Attribut `data-block-show-title` — pro Block änderbar. */
+  /** Becomes the instance attribute `data-block-show-title` on insertion — changeable per block. */
   showTitle: boolean;
 }
 
 export const DEFAULT_DEFINITION_DISPLAY: DefinitionDisplay = { ...DEFAULT_DISPLAY, showTitle: true };
 
-/** Das Emoji einer neuen Definition — auch der Spalten-Default in `schema.ts`. */
+/** The emoji of a new definition — also the column default in `schema.ts`. */
 export const DEFAULT_DEFINITION_ICON = '🧩';
 
 /**
- * Eine Definitions-ID aus fremder Quelle (Backup, `.emerald`): sie landet in
- * `data-block-origin` jeder Kopie, also nur harmlose Zeichen. Eine gemeinsame
- * Regel für beide Importwege.
+ * A definition ID from a foreign source (backup, `.emerald`): it ends up in
+ * the `data-block-origin` of every copy, so only harmless characters. One
+ * shared rule for both import paths.
  */
 export function isDefinitionId(id: unknown): id is string {
   return typeof id === 'string' && /^[\w-]{1,100}$/.test(id);
@@ -50,10 +50,10 @@ export interface BlockDefinition {
   name: string;
   /** Emoji. */
   icon: string;
-  /** Mit archivierten Elementen: sie bleiben wiederherstellbar. */
+  /** Including archived elements: they remain restorable. */
   elements: ElementDef[];
   display: DefinitionDisplay;
-  /** Steigt mit jeder Änderung, die Kopien betrifft (Name, Icon, Elemente, Anzeige). */
+  /** Increases with every change that affects copies (name, icon, elements, display). */
   revision: number;
   sort_order: number;
   created_at: string;
@@ -61,25 +61,25 @@ export interface BlockDefinition {
   deleted_at: string | null;
 }
 
-/** Die Definition als Datenbankzeile — `elements`/`display` als JSON-Text. */
+/** The definition as a database row — `elements`/`display` as JSON text. */
 export function definitionToRow(def: BlockDefinition) {
   return { ...def, elements: JSON.stringify(def.elements), display: JSON.stringify(def.display) };
 }
 
-/** Was eine Definition an ihre Kopien weitergibt; `sameShape` entscheidet, was davon die Revision hebt. */
+/** What a definition passes on to its copies; `sameShape` decides which of it raises the revision. */
 export type DefinitionShape = Pick<BlockDefinition, 'name' | 'icon' | 'elements' | 'display'>;
 
-/** Das Element, wie eine Kopie es trägt: ohne Vorgabe — die ist dort schon Wert geworden. */
+/** The element as a copy carries it: without a default — that has already become a value there. */
 function elementForCopy(element: ElementDef): ElementDef {
   const { defaultValue: _defaultValue, ...rest } = element;
   return rest;
 }
 
-// Vergleich per JSON: hängt an der Schlüsselreihenfolge. Elemente entstehen
-// deshalb immer über `parseElement` bzw. als Kopie von dort — ein anders
-// sortiertes Objekt ergäbe eine Revision ohne echte Änderung. Vorgaben und
-// „Titel zeigen" zählen nicht: sie wirken nur auf neue Kopien, eine bestehende
-// hätte nichts zu aktualisieren (`updateInstanceToDefinition`).
+// Comparison via JSON: depends on key order. Elements are therefore always
+// created through `parseElement` or as a copy from there — an object sorted
+// differently would yield a revision without a real change. Defaults and
+// "show title" do not count: they only affect new copies, an existing one
+// would have nothing to update (`updateInstanceToDefinition`).
 export function sameShape(a: DefinitionShape, b: DefinitionShape): boolean {
   const shape = (d: DefinitionShape) => JSON.stringify([d.name, d.icon, d.elements.map(elementForCopy), blockDisplay(d.display)]);
   return shape(a) === shape(b);
@@ -94,7 +94,7 @@ function parseJsonText(raw: unknown): unknown {
   }
 }
 
-/** Die Elemente einer Definition aus ihrer JSON-Spalte — geprüft wie die Kopie im Inhalt. */
+/** The elements of a definition from its JSON column — validated like the copy in the content. */
 export function parseDefinitionElements(raw: unknown): ElementDef[] {
   return parseElements(parseJsonText(raw));
 }
@@ -111,9 +111,9 @@ export function parseDefinitionDisplay(raw: unknown): DefinitionDisplay {
 }
 
 /**
- * Die Bilddateien, die Vorgaben einer Definition nennen. Sie stehen in keinem
- * Inhalt, bis eine Kopie entsteht — Backup, `.emerald` und das Bild-Aufräumen
- * müssen sie deshalb eigens kennen.
+ * The image files that a definition's defaults name. They appear in no
+ * content until a copy is made — backup, `.emerald` and the image cleanup
+ * therefore have to know them specifically.
  */
 export function definitionImageRefs(elements: readonly ElementDef[]): string[] {
   return elements
@@ -121,15 +121,15 @@ export function definitionImageRefs(elements: readonly ElementDef[]): string[] {
     .map((e) => e.defaultValue as string);
 }
 
-/** Ein Link-Ziel, wie der Import es auflöst — `null` heißt: gibt es hier nicht. */
+/** A link target as the import resolves it — `null` means: does not exist here. */
 export type LinkDefaultResolver = (target: { id: string; entryType: string; label: string }) => { id: string; label: string; entryType?: string } | null;
 
 /**
- * Die `elements` einer Definitionszeile aus fremder Quelle mit umgeschriebenen
- * Vorgaben: Bildnamen nach `image`, Link-Ziele nach `link` (Merge-Import mit
- * Präfix, `.emerald` nach ID oder Titel). Findet `link` kein Ziel, fällt die
- * Vorgabe weg — sonst trüge jede neue Kopie einen Chip ins Leere. Unlesbares
- * kommt unverändert zurück; das Lesen prüft ohnehin.
+ * The `elements` of a definition row from a foreign source with rewritten
+ * defaults: image names via `image`, link targets via `link` (merge import
+ * with prefix, `.emerald` by ID or title). If `link` finds no target, the
+ * default is dropped — otherwise every new copy would carry a chip pointing
+ * nowhere. Unreadable input comes back unchanged; reading validates anyway.
  */
 export function remapDefinitionDefaults(
   rawElements: unknown,
@@ -160,7 +160,7 @@ export function remapDefinitionDefaults(
   return typeof rawElements === 'string' ? JSON.stringify(remapped) : remapped;
 }
 
-/** Herkunft einer Kopie, oder `null` für jeden anderen Block. */
+/** Origin of a copy, or `null` for any other block. */
 export function blockOrigin(block: BlockInstance): { id: string; rev: number } | null {
   if (block.type !== FIELDS_BLOCK_TYPE) return null;
   const id = block.attrs[BLOCK_ATTR.origin];
@@ -169,7 +169,7 @@ export function blockOrigin(block: BlockInstance): { id: string; rev: number } |
   return { id, rev: Number.isInteger(rev) && rev > 0 ? rev : 0 };
 }
 
-/** Ist der Block eine Kopie dieser Definition in einer älteren Revision — und lesbar genug, um sie zu aktualisieren? */
+/** Is the block a copy of this definition in an older revision — and readable enough to update it? */
 export function isOutdatedCopy(block: BlockInstance, def: BlockDefinition): boolean {
   const origin = blockOrigin(block);
   return !!origin && origin.id === def.id && origin.rev < def.revision && !parseFields(block).broken;
@@ -180,8 +180,8 @@ function blockDisplay(display: DefinitionDisplay): DisplayRules {
 }
 
 /**
- * Die Vorgaben der Elemente — was eine neue Kopie (oder ein neues Element in
- * ihr) mitbekommt: Skalare als Werte, Verknüpfung, Altar und Bild als Slot.
+ * The elements' defaults — what a new copy (or a new element in it)
+ * receives: scalars as values, link, altar and image as a slot.
  */
 function defaultsOf(elements: readonly ElementDef[], blockId: string): Pick<FieldsModel, 'values' | 'slots'> {
   const values: Record<string, FieldValue> = {};
@@ -189,7 +189,7 @@ function defaultsOf(elements: readonly ElementDef[], blockId: string): Pick<Fiel
   for (const element of elements) {
     if (element.defaultValue === undefined) continue;
     if (element.kind === 'sigilCharge') {
-      // Die Ladung ungeladen, mit Sperre und Zielen — die Ziele jetzt auf diesen Block.
+      // The charge unloaded, with lock and targets — the targets now pointing to this block.
       const { lock, targets } = element.defaultValue as ChargeDefault;
       values[element.id] = {
         loaded: false, revealDate: null, lock,
@@ -203,16 +203,16 @@ function defaultsOf(elements: readonly ElementDef[], blockId: string): Pick<Fiel
       continue;
     }
     const value = element.defaultValue as FieldValue;
-    // Eine Checkliste bekommt eigene Punkt-IDs, damit zwei Kopien nicht dieselben tragen.
+    // A checklist gets its own item IDs so that two copies do not carry the same ones.
     values[element.id] = Array.isArray(value) ? value.map((item) => ({ ...item, id: generateId() })) : value;
   }
   return { values, slots };
 }
 
 /**
- * Ein neuer Block als Kopie der Definition — ohne die archivierten Elemente,
- * vorbelegt mit den Vorgaben. `text` schreibt den lesbaren Fallback dieser
- * Werte, damit Suche und Export sie gleich finden.
+ * A new block as a copy of the definition — without the archived elements,
+ * prefilled with the defaults. `text` writes the readable fallback of these
+ * values so that search and export find them right away.
  */
 export function instantiateDefinition(def: BlockDefinition, text: FallbackText): BlockInstance {
   const elements = def.elements.filter((e) => !e.archived);
@@ -226,7 +226,7 @@ export function instantiateDefinition(def: BlockDefinition, text: FallbackText):
     [BLOCK_ATTR.origin]: def.id,
     [BLOCK_ATTR.rev]: String(def.revision),
   };
-  // Der Standard des Feldblocks ist „ohne Titel"; nur die Abweichung wird Attribut.
+  // The field block's default is "without title"; only the deviation becomes an attribute.
   if (def.display.showTitle) attrs[BLOCK_ATTR.showTitle] = '1';
   const block: BlockInstance = { id: generateId(), type: FIELDS_BLOCK_TYPE, html: '', attrs };
   const defaults = defaultsOf(elements, block.id);
@@ -240,20 +240,20 @@ export function instantiateDefinition(def: BlockDefinition, text: FallbackText):
 }
 
 /**
- * Die Kopie auf den Stand der Definition bringen:
- * - Werte bleiben, wo sie sind — an ihrer Element-ID.
- * - Neue Elemente kommen dazu, in der Reihenfolge der Definition — mit ihrer
- *   Vorgabe, sonst leer.
- * - Elemente, die die Definition nicht (mehr) zeigt, werden archiviert:
- *   unsichtbar, mit ihren Daten.
- * - Beschriftungen, Optionen, Anzeigeregeln, Name und Icon kommen aus der
- *   Definition. Was an der Instanz selbst hängt — eigener Titel, Auge, Titel
- *   im Lesemodus —, bleibt.
+ * Bring the copy up to the definition's state:
+ * - Values stay where they are — at their element ID.
+ * - New elements are added, in the definition's order — with their
+ *   default, otherwise empty.
+ * - Elements that the definition no longer shows are archived:
+ *   invisible, with their data.
+ * - Labels, options, display rules, name and icon come from the
+ *   definition. What belongs to the instance itself — own title, eye, title
+ *   in read mode — stays.
  *
- * Ein unlesbarer Block kommt unverändert zurück. Ein Element, dessen Art in
- * der Kopie eine andere ist als in der Definition (die Blöcke-Ansicht lässt
- * das nicht zu; nur eine präparierte Datei könnte es), behält seine Fassung —
- * die der Definition verwürfe seinen Wert.
+ * An unreadable block comes back unchanged. An element whose kind in the copy
+ * differs from the one in the definition (the blocks view does not allow
+ * that; only a doctored file could) keeps its own version — the
+ * definition's would discard its value.
  */
 export function updateInstanceToDefinition(block: BlockInstance, def: BlockDefinition, text: FallbackText): BlockInstance {
   const model = parseFields(block);
@@ -265,7 +265,7 @@ export function updateInstanceToDefinition(block: BlockInstance, def: BlockDefin
       const mine = own.get(e.id);
       return mine && mine.kind !== e.kind ? mine : elementForCopy(e);
     });
-  // Nur Elemente, die die Kopie nie kannte — weder als (auch archiviertes) Element noch als verwaisten Wert oder Slot.
+  // Only elements the copy never knew — neither as an (even archived) element nor as an orphaned value or slot.
   const added = def.elements.filter((e) =>
     !e.archived && !own.has(e.id) && !(e.id in model.orphans) && !(e.id in model.slots));
   const defaults = defaultsOf(added, block.id);
@@ -288,9 +288,9 @@ export function updateInstanceToDefinition(block: BlockInstance, def: BlockDefin
 }
 
 /**
- * Trägt der Inhalt eine Kopie der Definition, die eine geladene Sigille
- * festhält (`isSigilFrozen`)? Die bleibt beim Aktualisieren und Entfernen
- * stehen — der Aufrufer meldet sie als übersprungen.
+ * Does the content carry a copy of the definition that a loaded sigil
+ * holds fixed (`isSigilFrozen`)? It stays in place on updating and removing
+ * — the caller reports it as skipped.
  */
 export function hasFrozenCopy(content: string, defId: string, today = todayIso()): boolean {
   if (!mayHoldSigil(content)) return false;
@@ -299,7 +299,7 @@ export function hasFrozenCopy(content: string, defId: string, today = todayIso()
   return blocks.some((block) => blockOrigin(block)?.id === defId && isSigilFrozen(block, state));
 }
 
-/** Alle veralteten Kopien der Definition in einem Inhalt aktualisieren — `null`, wenn es keine gab. */
+/** Update all outdated copies of the definition in a content — `null` if there were none. */
 export function updateCopiesInContent(content: string, def: BlockDefinition, text: FallbackText): string | null {
   let changed = false;
   const blocks = parseBlocks(content);
@@ -312,7 +312,7 @@ export function updateCopiesInContent(content: string, def: BlockDefinition, tex
   return changed ? serializeBlocks(next) : null;
 }
 
-/** Alle Kopien der Definition aus einem Inhalt entfernen — `null`, wenn es keine gab. Gesperrte bleiben (siehe `hasFrozenCopy`). */
+/** Remove all copies of the definition from a content — `null` if there were none. Locked ones stay (see `hasFrozenCopy`). */
 export function removeCopiesFromContent(content: string, defId: string): string | null {
   const blocks = parseBlocks(content);
   const state = sigilState(blocks, todayIso());

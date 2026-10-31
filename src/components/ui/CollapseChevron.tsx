@@ -1,9 +1,9 @@
 import { ChevronDown, ChevronRight } from 'lucide-react';
 
 /**
- * Auf-/Zuklapp-Pfeil für Gruppenköpfe und Baumzeilen — eine Optik für alle
- * (Größe 14, stone-500 → stone-300). Roher Button statt btn-ghost: das Icon
- * soll bündig in der Textzeile sitzen, Button-Padding würde die Zeile aufblähen.
+ * Expand/collapse arrow for group headers and tree rows: one look for all
+ * (size 14, stone-500 → stone-300). Raw button instead of btn-ghost: the icon
+ * should sit flush in the text line, button padding would bloat the row.
  */
 export default function CollapseChevron({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => void }) {
   return (

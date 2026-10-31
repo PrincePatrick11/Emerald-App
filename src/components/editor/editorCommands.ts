@@ -9,18 +9,18 @@ import type { EntryLinkRequest } from '../../lib/links';
 import type { SuggestionItem } from './SuggestionList';
 
 /**
- * Befehle, die von außen in einen Editor schreiben: die Link-Bitten der
- * Seitenleiste (anhängen, entfernen, anspringen), ein Bild einfügen, einen
- * Link-Chip aus der Linkauswahl einsetzen. Sie lagen früher als private
- * Funktionen im RichEditor. Seit ein Eintrag mehrere Textblöcke haben kann,
- * entscheidet der `BlockStack`, WELCHER Editor eine Bitte bekommt, und ruft sie
- * von dort auf.
+ * Commands that write into an editor from outside: the sidebar's link
+ * requests (append, remove, jump to), inserting an image, inserting a
+ * link chip from the link picker. They used to be private
+ * functions in the RichEditor. Since an entry can have several text blocks,
+ * the `BlockStack` decides WHICH editor receives a request, and calls them
+ * from there.
  */
 
-/** Position des ERSTEN Link-Chips für `id`/`entryType` im Dokument, oder `null`.
- *  Ein zweifach verlinktes Ziel wird also immer an seiner ersten Stelle
- *  gefunden — für „ist das schon verlinkt?" und „zeig mir die Stelle" reicht
- *  das, ein zweiter Treffer bräuchte erst eine Bedienung dafür. */
+/** Position of the FIRST link chip for `id`/`entryType` in the document, or `null`.
+ *  A target linked twice is thus always found at its first spot;
+ *  for "is this already linked?" and "show me the spot" that is enough,
+ *  a second hit would first need a way to operate it. */
 export function findEntryLinkPos(doc: ProseMirrorNode, target: { id: string; entryType: string }): number | null {
   let found: number | null = null;
   doc.descendants((node, pos) => {
@@ -35,27 +35,27 @@ export function findEntryLinkPos(doc: ProseMirrorNode, target: { id: string; ent
 }
 
 /**
- * Hängt einen internen Link ganz unten an den Eintrag an, jedes Mal als
- * vollständiger Block: Trennlinie, Kategorie des Ziels als Überschrift, dann
- * der Link. Bewusst ohne Zusammenfassen — zwei Links derselben Kategorie
- * bekommen zwei Blöcke.
+ * Appends an internal link at the very bottom of the entry, each time as a
+ * complete block: divider, the target's category as a heading, then
+ * the link. Deliberately without merging: two links of the same category
+ * get two blocks.
  *
- * Wie der Block aussieht, sagt `internalLinkBlockHtml` — eine Definition für
- * das Einfügen hier und für die Migrationen v36/v37, die dieselben Blöcke ohne
- * Editor schreiben müssen.
+ * What the block looks like is defined by `internalLinkBlockHtml`, one definition for
+ * the insertion here and for the v36/v37 migrations, which have to write the same blocks without an
+ * editor.
  *
- * Ist der Eintrag noch leer, entfällt die Trennlinie und der leere Absatz wird
- * ersetzt: die Linie trennt den Text von den Links, und Text gibt es dann noch
- * keinen.
+ * If the entry is still empty, the divider is omitted and the empty paragraph is
+ * replaced: the line separates the text from the links, and there is no text
+ * yet.
  *
- * Ein bereits verlinktes Ziel wird nicht ein zweites Mal angehängt. Danach
- * springt die Ansicht zum neuen Link und hebt ihn kurz hervor — dieselbe
- * Bewegung wie beim Klick auf einen Chip im Verlinkungs-Feld. Das Feld in der
- * Seitenleiste verliert dabei den Fokus, was gewollt ist: man sieht, wo der
- * Link gelandet ist, statt blind weiterzuklicken.
+ * A target that is already linked is not appended a second time. Afterwards
+ * the view jumps to the new link and briefly highlights it, the same
+ * movement as when clicking a chip in the links field. The field in the
+ * sidebar loses focus in the process, which is intended: you see where the
+ * link landed instead of blindly clicking on.
  *
- * Der Cursor landet dabei am Ende des Link-Absatzes statt auf dem Chip —
- * warum, steht bei `caretAtBlockEnd` an `revealEntryLink`.
+ * The cursor lands at the end of the link paragraph instead of on the chip;
+ * why is explained at `caretAtBlockEnd` on `revealEntryLink`.
  */
 export function appendEntryLink(editor: Editor, item: EntryLinkRequest): void {
   const { doc } = editor.state;
@@ -70,15 +70,15 @@ export function appendEntryLink(editor: Editor, item: EntryLinkRequest): void {
     .focus()
     .run();
 
-  // Einen Frame später: der Absatz steht dann im DOM, und die React-NodeView
-  // des Chips ist gerendert — `revealEntryLink` braucht beides, um zu scrollen
-  // und die Markierung zu setzen.
+  // One frame later: the paragraph is then in the DOM and the chip's React
+  // NodeView is rendered; `revealEntryLink` needs both to scroll
+  // and set the highlight.
   requestAnimationFrame(() => {
     if (!editor.isDestroyed) revealEntryLink(editor, item, { caretAtBlockEnd: true });
   });
 }
 
-/** Trägt der Absatz nur diesen einen Chip (plus Leerraum)? */
+/** Does the paragraph carry only this one chip (plus whitespace)? */
 function holdsOnlyLink(paragraph: ProseMirrorNode, target: { id: string; entryType: string }): boolean {
   let only = true;
   paragraph.forEach((child) => {
@@ -93,13 +93,13 @@ function holdsOnlyLink(paragraph: ProseMirrorNode, target: { id: string; entryTy
 }
 
 /**
- * Entfernt einen Link aus dem Eintrag. Stand er in einem eigenen
- * Verlinkungs-Block — Trennlinie, Überschrift, Absatz nur mit diesem Chip, so
- * wie `appendEntryLink` ihn anlegt —, fällt der ganze Block weg. Steht er
- * mitten im Fließtext, verschwindet nur der Chip und der Satz bleibt stehen.
+ * Removes a link from the entry. If it stood in a link block of its
+ * own (divider, heading, paragraph with only this chip, as
+ * `appendEntryLink` creates it), the whole block goes away. If it sits
+ * in the middle of running text, only the chip disappears and the sentence stays.
  *
- * Gibt `false` zurück, wenn der Link nicht im Inhalt steht (etwa bei einer
- * Verknüpfung aus den alten Spalten).
+ * Returns `false` if the link is not in the content (for instance with a
+ * link from the old columns).
  */
 export function removeEntryLink(editor: Editor, target: EntryLinkRequest): boolean {
   const { doc } = editor.state;
@@ -109,13 +109,13 @@ export function removeEntryLink(editor: Editor, target: EntryLinkRequest): boole
   const $pos = doc.resolve(pos);
   const parent = $pos.parent;
 
-  // Ein Verlinkungs-Block ist NUR, was `appendEntryLink` anlegt: ein Absatz
-  // direkt im Dokument, der nichts als diesen Chip trägt, mit einer Trennlinie
-  // davor und höchstens einer Überschrift dazwischen — oder, als allererster
-  // Block eines zuvor leeren Eintrags, ohne Trennlinie. Alles andere — ein Chip
-  // in einer Liste, in einem Zitat, unter einer selbst getippten Überschrift —
-  // ist Fließtext, und dort wird nur der Chip entfernt. Ohne diese engen
-  // Grenzen risse das Löschen fremde Blöcke mit.
+  // A link block is ONLY what `appendEntryLink` creates: a paragraph
+  // directly in the document that carries nothing but this chip, with a divider
+  // before it and at most one heading in between, or, as the very first
+  // block of a previously empty entry, without a divider. Everything else (a chip
+  // in a list, in a quote, under a self-typed heading)
+  // is running text, and there only the chip is removed. Without these narrow
+  // limits, deleting would take foreign blocks with it.
   if ($pos.depth === 1 && parent.type.name === 'paragraph' && holdsOnlyLink(parent, target)) {
     const paragraphPos = $pos.before(1);
     const index = $pos.index(0);
@@ -128,15 +128,15 @@ export function removeEntryLink(editor: Editor, target: EntryLinkRequest): boole
     } else if (prev?.type.name === 'heading' && prevPrev?.type.name === 'horizontalRule') {
       from -= prev.nodeSize + prevPrev.nodeSize;
     } else if (
-      // Der erste Block in einem zuvor leeren Eintrag: er beginnt mit der
-      // Überschrift, ohne Trennlinie davor. Damit hier keine selbst getippte
-      // Überschrift mitgeht, muss ihr Text genau die Kategorie des Ziels sein.
+      // The first block in a previously empty entry: it begins with the
+      // heading, with no divider before it. So that no self-typed
+      // heading goes along here, its text must be exactly the target's category.
       prev?.type.name === 'heading' && index === 1 &&
       target.categoryLabel && prev.textContent === target.categoryLabel
     ) {
       from -= prev.nodeSize;
     } else {
-      from = -1; // keine eröffnende Trennlinie — also kein Block von uns
+      from = -1; // no opening divider, so not a block of ours
     }
 
     if (from >= 0) {
@@ -150,22 +150,22 @@ export function removeEntryLink(editor: Editor, target: EntryLinkRequest): boole
 }
 
 const REVEAL_CLASS = 'is-revealed';
-/** Muss zur Dauer von `internal-link-reveal` in index.css passen. */
+/** Must match the duration of `internal-link-reveal` in index.css. */
 const REVEAL_MS = 1600;
 
 /**
- * Springt zum Link-Chip im Inhalt und hebt ihn kurz hervor. Gibt `false`
- * zurück, wenn der Eintrag ihn nicht enthält — dann hat der Aufrufer die Wahl,
- * stattdessen zum Ziel zu navigieren.
+ * Jumps to the link chip in the content and briefly highlights it. Returns `false`
+ * if the entry does not contain it, in which case the caller can choose to
+ * navigate to the target instead.
  *
- * Scrollen und Aufblitzen übernimmt `lib/reveal.ts`: nur ein Chip ist je
- * markiert, und ein zweiter Klick auf denselben blitzt neu auf.
+ * Scrolling and flashing are handled by `lib/reveal.ts`: only one chip is
+ * highlighted at a time, and a second click on the same one flashes again.
  *
- * `caretAtBlockEnd` setzt den Cursor ans Ende des Absatzes, in dem der Chip
- * steht, statt den Chip selbst auszuwählen — für das frische Einfügen, nach dem
- * man weiterschreibt: eine Knotenauswahl würde der erste Tastendruck durch das
- * Getippte ersetzen. Beim Nachschlagen eines vorhandenen Links bleibt sie, dort
- * ist „das hier ist gemeint" die Aussage.
+ * `caretAtBlockEnd` puts the cursor at the end of the paragraph the chip
+ * sits in instead of selecting the chip itself, for a fresh insertion after which
+ * you keep writing: with a node selection the first keystroke would replace the chip with
+ * the typed text. When looking up an existing link the selection stays, since there
+ * the statement is "this one is meant".
  */
 export function revealEntryLink(
   editor: Editor,
@@ -175,13 +175,13 @@ export function revealEntryLink(
   const pos = findEntryLinkPos(editor.state.doc, target);
   if (pos === null) return false;
 
-  // Im Edit-Modus zusätzlich echt selektieren, damit der Cursor dort steht;
-  // im Lesemodus zeigt ProseMirror keine Selektion, dort trägt die Klasse.
+  // In edit mode also select for real so that the cursor is there;
+  // in read mode ProseMirror shows no selection, and there the class does the job.
   if (editor.isEditable) {
     const chain = editor.chain();
-    // `internalLink` ist ein Inline-Knoten, sein Elternteil also immer ein
-    // Textblock — `end()` ist damit das Ende des Absatzes: hinter dem Chip und
-    // hinter dem Leerzeichen, das `internalLinkBlockHtml` anhängt.
+    // `internalLink` is an inline node, so its parent is always a
+    // text block; `end()` is thus the end of the paragraph: after the chip and
+    // after the space that `internalLinkBlockHtml` appends.
     if (caretAtBlockEnd) chain.setTextSelection(editor.state.doc.resolve(pos).end());
     else chain.setNodeSelection(pos);
     chain.focus().run();
@@ -198,7 +198,7 @@ export function revealEntryLink(
   return true;
 }
 
-/** Bild aus der Toolbar: erst in den Vault-Bildordner, dann als Knoten mit dem Dateinamen. */
+/** Image from the toolbar: first into the vault image folder, then as a node with the file name. */
 export async function insertImageFromDataUrl(editor: Editor, dataUrl: string): Promise<void> {
   try {
     const src = await saveImage(await prepareImageDataUrl(dataUrl));
@@ -208,7 +208,7 @@ export async function insertImageFromDataUrl(editor: Editor, dataUrl: string): P
   }
 }
 
-/** Link-Chip aus der Linkauswahl (Toolbar-Knopf) an der Cursorstelle. */
+/** Link chip from the link picker (toolbar button) at the cursor position. */
 export function insertInternalLinkChip(editor: Editor, item: SuggestionItem): void {
   editor.chain().focus()
     .insertContent({ type: 'internalLink', attrs: toInternalLinkChip(item) })

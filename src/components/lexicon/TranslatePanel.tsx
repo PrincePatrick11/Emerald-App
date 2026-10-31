@@ -9,24 +9,24 @@ import Button from '../ui/Button';
 import EmptyState from '../ui/EmptyState';
 import Dropdown from '../ui/Dropdown';
 
-/** Wie lange „Kopiert" nach dem Klick stehen bleibt. */
+/** How long "Copied" stays after the click. */
 const COPIED_MS = 1500;
 
-/** Eingabe und Ergebnis stehen nebeneinander und sehen deshalb gleich aus. */
+/** Input and result stand side by side and therefore look the same. */
 const FIELD_CLASSES =
   'input-field selectable w-full h-40 rounded-md px-3 py-2 text-sm outline-none transition-colors';
 
 /**
- * Das Übersetzen-Feld unter der Sprachliste: Text hinein, Sprache und Richtung
- * wählen, Ergebnis daneben. Es übersetzt bei jedem Zeichen neu — bei einem
- * Lexikon dieser Größe ist das eine Schleife über ein paar hundert Wörter,
- * kein Grund für einen Knopf, der einen Zwischenzustand erzeugt.
+ * The translate field below the language list: text in, choose language and
+ * direction, result beside it. It translates anew on every character; for a
+ * lexicon of this size that is a loop over a few hundred words,
+ * no reason for a button that creates an intermediate state.
  *
- * Übersetzt wird ausschließlich aus dem Vault (`lib/lexicon.ts`): Wort für
- * Wort aus den Vokabeln, Zeichen für Zeichen aus dem Alphabet, oder beides
- * nacheinander. Was die Sprache nicht kennt, steht markiert im Ergebnis —
- * raten kann eine Wortliste nicht, und so zu tun als ob wäre schlimmer als
- * die Lücke zu zeigen.
+ * Translation uses the vault exclusively (`lib/lexicon.ts`): word by
+ * word from the vocabulary, character by character from the alphabet, or both
+ * in sequence. What the language does not know is marked in the result;
+ * a word list cannot guess, and pretending otherwise would be worse than
+ * showing the gap.
  */
 export default function TranslatePanel() {
   const { t } = useTranslation();
@@ -40,8 +40,8 @@ export default function TranslatePanel() {
   const [input, setInput] = useState('');
   const [copied, setCopied] = useState(false);
 
-  // Die erste Sprache, solange keine gewählt ist — und wieder, wenn die
-  // gewählte gelöscht wurde.
+  // The first language as long as none is chosen, and again when the
+  // chosen one was deleted.
   const language = languages.find((l) => l.id === languageId) ?? languages[0] ?? null;
 
   const entries = useMemo(
@@ -66,8 +66,8 @@ export default function TranslatePanel() {
       await navigator.clipboard.writeText(result.text);
       setCopied(true);
     } catch (err) {
-      // Kein Grund für ein Fenster: der Text steht sichtbar da und lässt sich
-      // von Hand markieren.
+      // No reason for a window: the text is visibly there and can be
+      // selected by hand.
       console.error('[TranslatePanel] copying the translation failed:', err);
     }
   };
@@ -76,7 +76,7 @@ export default function TranslatePanel() {
     <div className="mt-8">
       <GroupDivider label={t('lexicon.translate')} collapsed={collapsed} onToggleCollapse={toggleCollapsed} />
       {collapsed ? null : !language ? (
-        // Ohne Knopf: „Neue Sprache" steht schon im Abschnitt darüber.
+        // No button: "New language" is already in the section above.
         <EmptyState
           icon={ArrowRightLeft}
           title={t('emptyState.translate.title')}
@@ -135,16 +135,16 @@ export default function TranslatePanel() {
                   {copied ? t('lexicon.copied') : t('lexicon.copy')}
                 </Button>
               </div>
-              {/* Kein `.panel`: das Ergebnis ist das Gegenstück zum Feld links,
-                  kein Inhalts-Träger — also dasselbe Maß und derselbe Radius
-                  (design.md: was ein Element *ist*, entscheidet). */}
+              {/* No `.panel`: the result is the counterpart to the field on the left,
+                  not a content container, so the same size and the same radius
+                  (design.md: what an element *is* decides). */}
               <div className={`${FIELD_CLASSES} overflow-y-auto text-stone-300 whitespace-pre-wrap break-words`}>
                 {result && result.segments.length > 0 ? (
                   result.segments.map((segment, i) => (
                     segment.kind === 'unknown' ? (
-                      // Nicht gefunden: das eigene Wort bleibt stehen, gestrichelt
-                      // unterstrichen. So ist auf einen Blick zu sehen, was noch
-                      // ins Lexikon gehört.
+                      // Not found: the original word stays, underlined with
+                      // a dashed line. That way you can see at a glance what still
+                      // belongs in the lexicon.
                       <span
                         key={i}
                         title={t(mode === 'letters' ? 'lexicon.unmappedWord' : 'lexicon.unknownWord')}

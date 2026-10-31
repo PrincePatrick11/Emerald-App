@@ -4,13 +4,13 @@ import { BookOpen, CheckSquare, Flame, Library, Wand2, type LucideIcon } from 'l
 import type { ContentType } from '../../types';
 import type { SuggestionItem } from '../../lib/linkItems';
 
-/** Wohnt in `lib/linkItems.ts` bei `buildLinkItems`, das diese Werte erzeugt —
- *  hier nur weitergereicht für die Komponenten, die den Typ von hier holen. */
+/** Lives in `lib/linkItems.ts` alongside `buildLinkItems`, which produces these values;
+ *  only re-exported here for the components that take the type from here. */
 export type { SuggestionItem };
 
-/** Nicht die Registry (`MODULES`): die ist nach View-Typ (plural) verschlüsselt,
- *  hier zählt der Link-Typ. Eine Reihe für die Suggestion-Liste und
- *  LinkPickerModal (Tabs, Typ-Badges). */
+/** Not the registry (`MODULES`): that one is keyed by view type (plural),
+ *  whereas the link type counts here. One row for the suggestion list and
+ *  LinkPickerModal (tabs, type badges). */
 export const ENTRY_TYPE_ICONS: Record<ContentType, LucideIcon> = {
   journal: BookOpen,
   wiki: Library,
@@ -19,11 +19,11 @@ export const ENTRY_TYPE_ICONS: Record<ContentType, LucideIcon> = {
   altar: Flame,
 };
 
-/** Wohnt in `lib/modules.ts`, damit auch `lib/` sie erreicht — hier nur
- *  weitergereicht für die Komponenten, die sie von hier importieren. */
+/** Lives in `lib/modules.ts` so that `lib/` can reach it too; only
+ *  re-exported here for the components that import it from here. */
 export { DEFAULT_ENTRY_EMOJI } from '../../lib/modules';
 
-/** Übersetzte Typ-Labels — Tabs und Badges im LinkPicker, Badge hier. */
+/** Translated type labels: tabs and badges in the LinkPicker, badge here. */
 export const ENTRY_TYPE_LABEL_KEYS: Record<ContentType, string> = {
   journal: 'linkPicker.tabJournal',
   wiki: 'linkPicker.tabWiki',

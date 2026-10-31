@@ -4,15 +4,15 @@ import RailButton from '../../ui/RailButton';
 import MenuDropdown, { type MenuNode } from './MenuDropdown';
 
 interface Props {
-  /** Tooltip und Name für Screenreader — der Knopf zeigt nur sein Icon. */
+  /** Tooltip and name for screen readers — the button shows only its icon. */
   label: string;
   icon: ReactNode;
   nodes: MenuNode[];
 }
 
 /**
- * Ein Icon-Knopf der Titelleiste, der ein Menü aufklappt — im selben Stil wie
- * Zurück, Vor und die Lupe daneben (`RailButton`).
+ * An icon button of the title bar that opens a menu — in the same style as
+ * Back, Forward and the magnifier next to it (`RailButton`).
  */
 export default function TitleBarMenuButton({ label, icon, nodes }: Props) {
   const [open, setOpen] = useState(false);

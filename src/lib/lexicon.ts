@@ -1,51 +1,51 @@
 /**
- * Das Lexikon als Regelwerk: das Alphabet einer Sprache, das Nachschlagen
- * ihrer Vokabeln und das Übersetzen eines Textes damit.
+ * The lexicon as a rule set: the alphabet of a language, the lookup of
+ * its words and translating a text with them.
  *
- * Übersetzt wird ausschließlich aus dem, was im Vault steht — es geht kein
- * Wort ins Netz (siehe `Documentation/security.md`). Was das Lexikon nicht
- * kennt, bleibt unübersetzt stehen und wird als solches gemeldet, statt still
- * verschluckt oder geraten zu werden.
+ * Translation works exclusively from what is in the vault — no word
+ * goes to the network (see `Documentation/security.md`). What the lexicon does not
+ * know stays untranslated and is reported as such, instead of being silently
+ * swallowed or guessed.
  *
- * Import-Regel wie im übrigen `lib/`: keine Stores, keine Komponenten, kein
- * i18n — hier steht nur die Regel, die Oberfläche beschriftet sie.
+ * Import rule as in the rest of `lib/`: no stores, no components, no
+ * i18n — only the rule lives here, the UI labels it.
  */
 import type { AlphabetPair, Language, LexiconEntry } from '../types';
 
-/** Womit eine neue Sprache anfängt — das Emoji des Lexikon-Dashboards. */
+/** What a new language starts with — the emoji of the lexicon dashboard. */
 export const DEFAULT_LANGUAGE_ICON = '🗣️';
 
 /**
- * Richtung der Übersetzung. `toLanguage` schreibt den eigenen Text in die
- * Sprache um (Vokabel: `translation` → `term`), `fromLanguage` zurück.
+ * Direction of the translation. `toLanguage` rewrites the user's own text into the
+ * language (word: `translation` → `term`), `fromLanguage` the other way.
  */
 export type TranslateDirection = 'toLanguage' | 'fromLanguage';
 
 /**
- * Woraus die Übersetzung schöpft: die Vokabelliste, die Zeichentabelle oder
- * beides — wobei „beides" heißt, dass ein Wort zuerst als Vokabel gesucht und
- * erst danach Zeichen für Zeichen umgeschrieben wird.
+ * What the translation draws on: the word list, the character table or
+ * both — where "both" means that a word is first looked up as a word and
+ * only then rewritten character by character.
  */
 export type TranslateMode = 'words' | 'letters' | 'both';
 
 /**
- * Ein Stück Ergebnis. `source` ist, was im Eingabetext stand — die Oberfläche
- * zeigt es im Tooltip und markiert damit, was nicht getroffen wurde.
+ * A piece of the result. `source` is what was in the input text — the UI
+ * shows it in the tooltip and uses it to mark what was not matched.
  */
 export interface TranslationSegment {
   text: string;
   source: string;
-  /** `gap` ist alles zwischen den Wörtern: Leerzeichen, Satzzeichen, Zeilenumbrüche. */
+  /** `gap` is everything between the words: spaces, punctuation, line breaks. */
   kind: 'word' | 'letters' | 'unknown' | 'gap';
 }
 
 export interface TranslationResult {
   segments: TranslationSegment[];
-  /** Die Segmente zusammengesetzt — was der Kopieren-Knopf nimmt. */
+  /** The segments joined together — what the copy button takes. */
   text: string;
-  /** Wie viele Wörter der Eingabetext hatte (ohne Zwischenräume). */
+  /** How many words the input text had (not counting the gaps). */
   wordCount: number;
-  /** Wie viele davon das Lexikon nicht kennt. */
+  /** How many of those the lexicon does not know. */
   unknownCount: number;
 }
 
@@ -54,26 +54,26 @@ export interface TranslationResult {
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
- * Ein Zeichenpaar wirkt nur, wenn beide Seiten etwas tragen — die eine Regel
- * dafür, hier statt dreimal einzeln ausgeschrieben.
+ * A character pair only takes effect if both sides carry something — the one rule
+ * for that, here instead of spelled out three separate times.
  */
 export function isUsablePair(pair: AlphabetPair): boolean {
   return pair.from.trim() !== '' && pair.to.trim() !== '';
 }
 
 /**
- * Ob die Zeile überhaupt aufgehoben wird. Halb gefüllt ja — wer die linke
- * Seite noch nachträgt, soll die rechte beim nächsten Laden wiederfinden;
- * ganz leer nein, das ist eine Zeile, die es nie gab.
+ * Whether the row is kept at all. Half-filled yes — whoever still fills in the left
+ * side later should find the right one again on the next load;
+ * completely empty no, that is a row that never existed.
  */
 export function isFilledPair(pair: AlphabetPair): boolean {
   return pair.from.trim() !== '' || pair.to.trim() !== '';
 }
 
 /**
- * Das Alphabet aus der JSON-Spalte. Wie überall beim Lesen fremder Daten
- * (`row.ts`): kaputter Inhalt wird zu einer leeren Tabelle, nicht zu einem
- * Fehler — eine unlesbare Zeile darf nicht das ganze Lexikon aufhalten.
+ * The alphabet from the JSON column. As everywhere when reading foreign data
+ * (`row.ts`): broken content becomes an empty table, not an
+ * error — an unreadable row must not hold up the whole lexicon.
  */
 export function parseAlphabet(value: unknown): AlphabetPair[] {
   const raw = typeof value === 'string' ? safeParse(value) : value;
@@ -103,10 +103,10 @@ export function alphabetToJson(pairs: readonly AlphabetPair[]): string {
 }
 
 /**
- * Die Zeichentabelle als Nachschlagewerk, längste Folge zuerst.
+ * The character table as a lookup, longest sequence first.
  *
- * Die Sortierung ist der ganze Trick: steht „t" vor „th", fände die Umschrift
- * nie das „th", weil sie beim ersten Treffer weitergeht.
+ * The sorting is the whole trick: if "t" comes before "th", the transliteration
+ * would never find the "th", because it moves on at the first match.
  */
 function transliterationTable(
   pairs: readonly AlphabetPair[],
@@ -118,7 +118,7 @@ function transliterationTable(
     if (!isUsablePair(pair)) continue;
     const [from, to] = direction === 'toLanguage' ? [pair.from, pair.to] : [pair.to, pair.from];
     const key = from.toLowerCase();
-    // Zwei Zeilen mit derselben linken Seite: die erste gilt, wie bei den Vokabeln.
+    // Two rows with the same left side: the first one wins, as with the words.
     if (seen.has(key)) continue;
     seen.add(key);
     table.push([key, to]);
@@ -127,9 +127,9 @@ function transliterationTable(
 }
 
 /**
- * Schreibt `text` Zeichen für Zeichen um. Was in keiner Zeile der Tabelle
- * steht, bleibt unverändert stehen — ein Satzzeichen soll nicht verschwinden,
- * bloß weil das Alphabet es nicht kennt.
+ * Rewrites `text` character by character. Whatever is in no row of the table
+ * stays unchanged — a punctuation mark should not disappear
+ * just because the alphabet does not know it.
  */
 function transliterate(
   text: string,
@@ -142,10 +142,10 @@ function transliterate(
   let i = 0;
   outer: while (i < text.length) {
     for (const [from, to] of table) {
-      // Je Stelle kleinschreiben statt einmal für den ganzen Text: `İ` wird
-      // beim Kleinschreiben zwei Zeichen lang, und eine vorab gebaute Kopie
-      // liefe damit gegenüber `text` aus dem Takt — ab dort wäre jede
-      // Position falsch.
+      // Lower-case per position instead of once for the whole text: `İ` becomes
+      // two characters long when lower-cased, and a copy built in advance
+      // would drift out of step with `text` — from there on every
+      // position would be wrong.
       const slice = text.slice(i, i + from.length);
       if (slice.toLowerCase() === from) {
         out += to;
@@ -160,19 +160,19 @@ function transliterate(
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Vokabeln
+// Words
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
- * Beide Seiten jedes Vergleichs laufen hierdurch: Kleinschreibung, und die
- * typografischen Apostrophe auf den geraden zusammengezogen — sonst findet
- * ein mit „’" eingepflegtes Wort seine mit „'" getippte Eingabe nicht.
+ * Both sides of every comparison go through this: lower case, and the
+ * typographic apostrophes collapsed to the straight one — otherwise
+ * a word entered with "’" does not find its input typed with "'".
  */
 function fold(text: string): string {
   return text.toLowerCase().replace(/[’‘`´]/g, "'").replace(/\s+/g, ' ').trim();
 }
 
-/** Wortzeichen: Buchstaben, Ziffern, kombinierende Zeichen und der Wortapostroph. */
+/** Word characters: letters, digits, combining marks and the word apostrophe. */
 const WORD_RE = /[\p{L}\p{N}\p{M}'’]+/gu;
 
 interface Token {
@@ -181,9 +181,9 @@ interface Token {
 }
 
 /**
- * Zerlegt den Text in Wörter und alles dazwischen. Beides bleibt erhalten:
- * Zeilenumbrüche und Satzzeichen stehen im Ergebnis an derselben Stelle wie in
- * der Eingabe, damit eine übersetzte Anrufung ihre Form behält.
+ * Splits the text into words and everything in between. Both are kept:
+ * line breaks and punctuation appear in the result at the same place as in
+ * the input, so that a translated invocation keeps its shape.
  */
 function tokenize(text: string): Token[] {
   const tokens: Token[] = [];
@@ -199,19 +199,19 @@ function tokenize(text: string): Token[] {
 }
 
 interface VocabularyIndex {
-  /** Gefalteter Suchbegriff → Übersetzung. */
+  /** Folded search term → translation. */
   byKey: Map<string, string>;
-  /** Aus wie vielen Wörtern der längste Eintrag besteht — die Obergrenze der Phrasensuche. */
+  /** How many words the longest entry consists of — the upper bound of the phrase search. */
   maxWords: number;
 }
 
 /**
- * Die Vokabeln einer Sprache als Nachschlagewerk für eine Richtung.
+ * The words of a language as a lookup for one direction.
  *
- * Mehrwortige Einträge sind ausdrücklich erlaubt („guter Geist" → …): der
- * Index merkt sich die längste Wortzahl, und `translateText` probiert an jeder
- * Stelle die längste Phrase zuerst. Zwei Einträge mit derselben linken Seite:
- * der erste in der Liste gewinnt, also der mit der kleineren `sort_order`.
+ * Multi-word entries are explicitly allowed ("good spirit" → …): the
+ * index remembers the longest word count, and `translateText` tries the
+ * longest phrase first at each position. Two entries with the same left side:
+ * the first in the list wins, i.e. the one with the smaller `sort_order`.
  */
 function vocabularyIndex(
   entries: readonly LexiconEntry[],
@@ -233,9 +233,9 @@ function vocabularyIndex(
 }
 
 /**
- * Überträgt die Schreibweise der Vorlage auf das Ergebnis: GROSS bleibt groß,
- * Erstes groß bleibt erstes groß, alles andere bleibt, wie es eingepflegt
- * wurde. Ohne das käme ein Satzanfang klein aus der Übersetzung zurück.
+ * Carries the capitalization of the source over to the result: UPPER stays upper,
+ * a leading capital stays a leading capital, everything else stays as it was
+ * entered. Without this, a sentence start would come back in lower case from the translation.
  */
 function matchCase(source: string, translated: string): string {
   const letters = source.replace(/[^\p{L}]/gu, '');
@@ -250,16 +250,16 @@ function matchCase(source: string, translated: string): string {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Übersetzen
+// Translating
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
- * Übersetzt `text` mit dem, was die Sprache mitbringt.
+ * Translates `text` with what the language brings along.
  *
- * Wort für Wort, nicht Satz für Satz: eine Grammatik hat ein selbstgepflegtes
- * Lexikon nicht, und so zu tun, als hätte es eine, wäre die unehrlichere
- * Variante. Was nicht gefunden wird, steht unverändert und markiert im
- * Ergebnis — mit `both` erst, nachdem auch die Zeichentabelle danebenstand.
+ * Word by word, not sentence by sentence: a self-maintained lexicon has no
+ * grammar, and pretending it did would be the more dishonest
+ * option. What is not found stays unchanged and is marked in the
+ * result — with `both` only after the character table has been tried as well.
  */
 export function translateText(
   text: string,
@@ -274,8 +274,8 @@ export function translateText(
 
   if (!text.trim()) return { segments, text: '', wordCount, unknownCount };
 
-  // Reine Umschrift: das Lexikon spielt keine Rolle, der Text läuft als Ganzes
-  // durch die Tabelle — auch die Satzzeichen, die sie kennen darf.
+  // Pure transliteration: the lexicon plays no part, the text runs as a whole
+  // through the table — including the punctuation marks it may know.
   if (mode === 'letters') {
     for (const token of tokenize(text)) {
       if (!token.isWord) {
@@ -284,7 +284,7 @@ export function translateText(
       }
       wordCount += 1;
       const out = transliterate(token.text, language.alphabet, direction);
-      // Unverändert heißt: kein Zeichen des Wortes stand in der Tabelle.
+      // Unchanged means: no character of the word was in the table.
       if (out === token.text) unknownCount += 1;
       segments.push({ text: out, source: token.text, kind: out === token.text ? 'unknown' : 'letters' });
     }
@@ -313,8 +313,8 @@ export function translateText(
 
     wordCount += 1;
     i += 1;
-    // „Beides": erst das Lexikon, dann die Zeichentabelle. Kommt das Wort auch
-    // daraus unverändert zurück, kennt die Sprache es wirklich nicht.
+    // "Both": first the lexicon, then the character table. If the word comes back
+    // unchanged from that as well, the language really does not know it.
     if (mode === 'both') {
       const rewritten = transliterate(token.text, language.alphabet, direction);
       if (rewritten !== token.text) {
@@ -330,8 +330,8 @@ export function translateText(
 }
 
 /**
- * Der längste Vokabeltreffer ab `start` — Phrasen zuerst, damit „guter Geist"
- * nicht schon bei „guter" endet.
+ * The longest word match from `start` — phrases first, so that "good spirit"
+ * does not already end at "good".
  */
 function longestMatchAt(
   tokens: readonly Token[],
@@ -348,13 +348,13 @@ function longestMatchAt(
 }
 
 /**
- * Die `span` Wörter ab `start` als eine Phrase — samt dem, wie sie im
- * Eingabetext aussah, und der Stelle dahinter.
+ * The `span` words from `start` as one phrase — together with how it looked in
+ * the input text, and the position after it.
  *
- * Zwischen ihnen darf nur Zwischenraum **innerhalb einer Zeile** stehen: ein
- * Satzzeichen beendet die Phrase ohnehin, und ein Zeilenumbruch tut es auch.
- * Sonst verschwände er im Ergebnis — die Übersetzung tritt an die Stelle der
- * ganzen Phrase, und der Text verlöre eine Zeile, die er im Original hatte.
+ * Only whitespace **within a line** may stand between them: a
+ * punctuation mark ends the phrase anyway, and a line break does too.
+ * Otherwise it would vanish in the result — the translation takes the place of the
+ * whole phrase, and the text would lose a line it had in the original.
  */
 function phraseAt(
   tokens: readonly Token[],
@@ -382,9 +382,9 @@ function toResult(segments: TranslationSegment[], wordCount: number, unknownCoun
 }
 
 /**
- * Die Vokabeln einer Sprache in Anzeigereihenfolge — `sort_order`, bei
- * Gleichstand alphabetisch nach dem Begriff. Eine Wahrheit für die Tabelle auf
- * der Sprachseite, die Übersetzung und die Zählung im Dashboard.
+ * The words of a language in display order — `sort_order`, ties broken
+ * alphabetically by term. One source of truth for the table on the
+ * language page, the translation and the count in the dashboard.
  */
 export function entriesOfLanguage(
   entries: readonly LexiconEntry[],

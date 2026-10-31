@@ -12,37 +12,37 @@ import { BLOCK_ATTR, type BlockInstance } from './blocks/types';
 import { SIGIL_CATEGORY_ID } from './schema';
 
 /**
- * Migration v42 — die Sigillen-Operation wird ein Eintrag aus Blöcken.
+ * Migration v42 — the sigil operation becomes an entry made of blocks.
  *
- * Bis v41 hatte eine Operation der Kategorie „Sigillen" eine eigene Ansicht
- * und eigene Spalten: Absicht, Buchstabenbank, Zeichnung (Base64), geladen,
- * Zieldatum, Ladetechnik, Notizen. Daraus werden:
- * - Rechner (Absicht, Buchstaben), Zeichnung (als Bilddatei über `saveImage`,
- *   im Block nur der Dateiname), Ladung (geladen, Datum, Ladetechnik als
- *   Link-Chip; Sperre „ganzer Eintrag" wie bisher);
- * - die Notizen als Textblock, dahinter der bisherige Inhalt.
- * `show_sigil = 0` ohne Ladung wird ein ausgeblendeter Zeichnungs-Block; bei
- * einer geladenen Sigille war es nur der Verbergen-Mechanismus, den jetzt der
- * Ladung-Block übernimmt. Eine Operation ohne Sigillen-Daten mit Notizen
- * bekommt nur den Textblock.
+ * Up to v41 an operation of the "Sigils" category had a view of its own
+ * and columns of its own: intention, letter bank, drawing (Base64), loaded,
+ * target date, charging technique, notes. These become:
+ * - calculator (intention, letters), drawing (as an image file via `saveImage`,
+ *   only the filename in the block), charging (loaded, date, technique as a
+ *   link chip; "whole entry" lock as before);
+ * - the notes as a text block, followed by the existing content.
+ * `show_sigil = 0` without charging becomes a hidden drawing block; for
+ * a loaded sigil it was only the concealing mechanism, which the
+ * charging block now takes over. An operation without sigil data but with notes
+ * gets only the text block.
  *
- * Scheitert das Speichern einer Zeichnung, bleibt die Zeile ganz unberührt
- * (Spalten und Inhalt) — v49 (`unifyEntries`) holt sie nach, bevor es die
- * Spalten verwirft, und bricht ab, solange das nicht gelingt. Eine
- * Zeichnung, die gar kein Bild ist (oder übergroß), wird verworfen statt
- * endlos wiederholt. Die leeren Operationen der Kategorie „Sigillen" nehmen
- * nur v42 selbst und der Import von Sicherungen vor Version 7 mit — und
- * nur, solange ihr Inhalt noch keine
- * Sigillen-Blöcke trägt: ein abgebrochener und neu gestarteter v42-Lauf
- * setzt kein zweites Set davor, und das Nachholen fügt einem Eintrag, dem
- * der Nutzer die Blöcke bewusst genommen hat, sie nicht wieder hinzu.
+ * If saving a drawing fails, the row stays completely untouched
+ * (columns and content) — v49 (`unifyEntries`) catches up on it before it
+ * drops the columns, and aborts as long as that does not succeed. A
+ * drawing that is not an image at all (or oversized) is discarded instead of
+ * being retried endlessly. The empty operations of the "Sigils" category are picked up
+ * only by v42 itself and by the import of backups from before version 7 — and
+ * only as long as their content does not yet carry
+ * sigil blocks: an aborted and restarted v42 run
+ * does not put a second set in front, and catching up does not add the blocks
+ * again to an entry from which the user deliberately removed them.
  *
- * Die Spalten werden auf ihre Grundwerte gesetzt, `updated_at` bleibt. Die
- * Umwandlung einer Zeile (`sigilRowToContent`) nimmt auch der Import alter
- * Sicherungen — vor dem Einfügen, denn seit v49 gibt es die Spalten nicht mehr.
+ * The columns are set to their base values, `updated_at` stays. The
+ * conversion of a row (`sigilRowToContent`) is also used by the import of old
+ * backups — before insertion, since the columns no longer exist since v49.
  */
 
-/** Die Sigillen-Spalten einer Operationszeile — aus der Datenbank oder aus einer Sicherung. */
+/** The sigil columns of an operation row — from the database or from a backup. */
 export interface LegacySigilRow {
   id: string;
   content: string | null;
@@ -66,7 +66,7 @@ const LEGACY_DATA = `drawing_data IS NOT NULL
    OR charging_technique_wiki_id IS NOT NULL
    OR TRIM(description) != ''`;
 
-/** Eine Zeichnung, die sich als Bild speichern lässt: PNG/JPEG/GIF/WebP als Data-URL, höchstens ~25 MB. */
+/** A drawing that can be stored as an image: PNG/JPEG/GIF/WebP as a data URL, at most ~25 MB. */
 const DRAWING_DATA_URL = /^data:image\/(?:png|jpeg|gif|webp);base64,/;
 const MAX_DRAWING_CHARS = 25 * 1024 * 1024;
 
@@ -79,22 +79,22 @@ function jsonLetters(raw: unknown): string[] {
   }
 }
 
-/** Die Sigillen-Werte selbst — was `LEGACY_DATA` in SQL fragt, ohne die Notizen. */
+/** The sigil values themselves — what `LEGACY_DATA` asks in SQL, without the notes. */
 function hasSigilValues(row: LegacySigilRow): boolean {
   return !!row.drawing_data || !!row.intention_text?.trim()
     || jsonLetters(row.letter_bank).length > 0 || Number(row.is_loaded) === 1
     || !!row.target_reveal_date || !!row.charging_technique_wiki_id;
 }
 
-/** Bekommt die Zeile Rechner, Zeichnung und Ladung? */
+/** Does the row get calculator, drawing and charging? */
 function hasSigilData(row: LegacySigilRow): boolean {
   const inSigilCategory = row.category_id === SIGIL_CATEGORY_ID && !(row.content ?? '').includes(SIGIL_BLOCK_MARKER);
   return inSigilCategory || hasSigilValues(row);
 }
 
 /**
- * Die Zeichnung als gespeicherte Datei. `null` = keine (oder unbrauchbar, dann
- * verworfen); `undefined` = das Speichern scheiterte, später erneut versuchen.
+ * The drawing as a stored file. `null` = none (or unusable, then
+ * discarded); `undefined` = saving failed, try again later.
  */
 async function drawingFile(drawing: string | null): Promise<string | null | undefined> {
   if (!drawing) return null;
@@ -109,16 +109,16 @@ async function drawingFile(drawing: string | null): Promise<string | null | unde
 }
 
 /**
- * Trägt die Zeile Sigillen-Altdaten? Dieselbe Frage wie `LEGACY_DATA`, für
- * Zeilen, die nicht aus der Datenbank kommen (Import einer Sicherung).
- * `includeSigilCategory` zählt auch leere Operationen der Kategorie „Sigillen".
+ * Does the row carry legacy sigil data? The same question as `LEGACY_DATA`, for
+ * rows that do not come from the database (import of a backup).
+ * `includeSigilCategory` also counts empty operations of the "Sigils" category.
  */
 export function needsSigilConversion(row: LegacySigilRow, includeSigilCategory: boolean): boolean {
   return (includeSigilCategory && row.category_id === SIGIL_CATEGORY_ID)
     || hasSigilValues(row) || !!row.description?.trim();
 }
 
-/** Die Felder eines Wiki-Artikels, die der Ladetechnik-Chip braucht. */
+/** The fields of a wiki article that the charging-technique chip needs. */
 export interface SigilTechniqueArticle {
   title: string | null;
   icon: string | null;
@@ -126,9 +126,9 @@ export interface SigilTechniqueArticle {
 }
 
 /**
- * Der Inhalt einer Operationszeile mit ihren Sigillen-Altdaten als Blöcke
- * davor. `undefined`, wenn das Speichern der Zeichnung scheiterte — dann
- * bleibt die Zeile, wie sie ist, und ein späterer Lauf versucht es erneut.
+ * The content of an operation row with its legacy sigil data as blocks
+ * in front. `undefined` if saving the drawing failed — then
+ * the row stays as it is, and a later run tries again.
  */
 export async function sigilRowToContent(
   row: LegacySigilRow,
@@ -149,8 +149,8 @@ export async function sigilRowToContent(
     const hidden = Number(row.show_sigil) === 0 && !loaded;
     blocks.push(hidden ? { ...canvas, attrs: { ...canvas.attrs, [BLOCK_ATTR.hidden]: hiddenAttrValue(true)! } } : canvas);
 
-    // Fehlt der Artikel (etwa ein Import ohne Wiki), bleibt der Verweis als
-    // Chip mit seiner ID stehen — ein späterer Wiki-Import löst ihn wieder auf.
+    // If the article is missing (say, an import without a wiki), the reference stays as a
+    // chip with its ID — a later wiki import resolves it again.
     const techniqueId = row.charging_technique_wiki_id;
     const technique = techniqueId ? article(techniqueId) : undefined;
     const chip = techniqueId
@@ -175,7 +175,7 @@ export async function sigilRowToContent(
   return serializeBlocks([...blocks, ...parseBlocks(row.content ?? '')]);
 }
 
-/** Gibt es Zeilen, die die Umwandlung anfassen würde? Für die Sicherung vor v42. */
+/** Are there rows the conversion would touch? For the backup before v42. */
 export async function hasLegacySigilRows(db: Database): Promise<boolean> {
   const [row] = await db.select<{ n: number }[]>(
     `SELECT COUNT(*) AS n FROM operations WHERE category_id = $1 OR ${LEGACY_DATA}`,
@@ -185,8 +185,8 @@ export async function hasLegacySigilRows(db: Database): Promise<boolean> {
 }
 
 /**
- * Wandelt Operationszeilen mit Sigillen-Altdaten um. `includeSigilCategory`
- * nimmt auch leere Operationen der Kategorie „Sigillen" mit (nur v42).
+ * Converts operation rows with legacy sigil data. `includeSigilCategory`
+ * also picks up empty operations of the "Sigils" category (v42 only).
  */
 export async function convertLegacySigils(
   db: Database,

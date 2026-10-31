@@ -3,13 +3,13 @@ import { createPortal } from 'react-dom';
 import { useUIStore } from '../../store/uiStore';
 
 /**
- * Rendert in das Portal-Ziel der rechten Seitenleiste (`uiStore.listHeaderHost`).
- * Ist die Leiste zu, rendert es nichts — bewusst, wie beim Kopf der Dashboards:
- * wer die Leiste schließt, will die ganze Breite für den Inhalt.
+ * Renders into the portal target of the right sidebar (`uiStore.listHeaderHost`).
+ * If the sidebar is closed it renders nothing, deliberately, as with the dashboards' header:
+ * whoever closes the sidebar wants the full width for the content.
  *
- * Leser sind `Dashboard` (sein Kopf) und die Seite eines eigenen Blocks
- * (Speichern, Anzeige, Verwendung). MainArea rendert immer nur eine View, also
- * portalt nie mehr als einer von beiden.
+ * Readers are `Dashboard` (its header) and a custom block's page
+ * (save, display, usage). MainArea renders only one view at a time, so
+ * never more than one of the two portals.
  */
 export default function SidebarPortal({ children }: { children: ReactNode }) {
   const host = useUIStore((s) => s.listHeaderHost);

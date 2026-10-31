@@ -1,13 +1,13 @@
-// Sammelt aus einem Bundle-Verzeichnis die Signatur des Updater-Artefakts und
-// legt sie als Fragment ab. Jeder Plattform-Job im Release-Workflow ruft das
-// einmal auf; `updater-manifest.mjs` setzt die Fragmente spaeter zu einer
-// `latest.json` zusammen.
+// Collects the signature of the updater artifact from a bundle directory and
+// stores it as a fragment. Each platform job in the release workflow calls this
+// once; `updater-manifest.mjs` later assembles the fragments into a
+// `latest.json`.
 //
-// Warum ein Node-Skript und kein Shell-Einzeiler: die drei Runner bringen drei
-// Shells mit (bash, bash, pwsh). Node liegt auf allen dreien schon bereit, weil
-// der Build es braucht.
+// Why a Node script and not a shell one-liner: the three runners come with three
+// different shells (bash, bash, pwsh). Node is already available on all three, because
+// the build needs it.
 //
-// Aufruf:
+// Usage:
 //   node scripts/updater-fragment.mjs --platform darwin-aarch64 \
 //     --dir src-tauri/target/aarch64-apple-darwin/release/bundle/macos \
 //     [--suffix .app.tar.gz.sig]
@@ -41,9 +41,9 @@ try {
 
 const signatures = entries.filter((name) => name.endsWith(suffix));
 
-// Beides ist ein Fehler, den man am Release nicht mehr sieht: ohne Signatur
-// fehlt die Plattform im Manifest, bei zweien waere die Wahl zwischen ihnen
-// geraten. Lieber hier laut scheitern als ein halbes Manifest veroeffentlichen.
+// Both are errors that can no longer be seen in the release: without a signature
+// the platform is missing from the manifest, and with two the choice between them
+// would be a guess. Better to fail loudly here than to publish half a manifest.
 if (signatures.length !== 1) {
   console.error(
     `::error::expected exactly one '${suffix}' in ${dir}, found ${signatures.length}` +
@@ -55,8 +55,8 @@ if (signatures.length !== 1) {
 const signatureFile = signatures[0];
 const fragment = {
   platform,
-  // Der Name des Bundles selbst — ohne das `.sig`. Unter diesem Namen liegt es
-  // auch am Release, und darueber findet `updater-manifest.mjs` seine URL.
+  // The name of the bundle itself, without the `.sig`. It is stored under this name
+  // on the release too, and `updater-manifest.mjs` finds its URL through it.
   file: signatureFile.slice(0, -'.sig'.length),
   signature: readFileSync(join(dir, signatureFile), 'utf8').trim(),
 };

@@ -169,7 +169,7 @@ mod tests {
         let sealed = seal(&key, Context::Image("a.png"), b"pixels");
         assert!(is_sealed(&sealed));
         assert_eq!(open(&key, Context::Image("a.png"), &sealed).unwrap().as_slice(), b"pixels");
-        // Unter anderem Namen eingeschoben: öffnet nicht.
+        // Swapped in under another name: does not open.
         assert_eq!(open(&key, Context::Image("b.png"), &sealed), Err(OpenError::Corrupt));
     }
 

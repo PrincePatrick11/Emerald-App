@@ -30,7 +30,7 @@ type CtxTarget =
   | { kind: 'wiki'; id: string }
   | { kind: 'operation'; id: string };
 
-/** Der Rückgängig-Hinweis nach dem Löschen, je Eintragsart. */
+/** The undo notice after deleting, per entry type. */
 const UNDO_DELETED = {
   journal: 'undo.entryDeleted',
   wiki: 'undo.articleDeleted',
@@ -113,7 +113,7 @@ export default function HomeView() {
     if (copy) setActiveView({ type: viewTypeForEntryType(copy.type), id: copy.id, mode: 'view' });
   };
 
-  // Umbenennen an Ort und Stelle, wie in den Listen der Module.
+  // Renaming in place, as in the modules' lists.
   const [renaming, setRenaming] = useState<CtxTarget | null>(null);
   const [renameValue, setRenameValue] = useState('');
   const isRenaming = (kind: CtxTarget['kind'], id: string) => renaming?.kind === kind && renaming.id === id;
@@ -125,7 +125,7 @@ export default function HomeView() {
     setRenaming(target);
   };
 
-  /** Ein leerer Name ändert nichts, wie in den Listen der Module. */
+  /** An empty name changes nothing, as in the modules' lists. */
   const commitRename = async () => {
     if (!renaming) return;
     const title = renameValue.trim();
@@ -134,7 +134,7 @@ export default function HomeView() {
     await updateEntry(renaming.id, { title });
   };
 
-  /** Der Titel einer Zeile oder Karte — beim Umbenennen das Eingabefeld. */
+  /** The title of a row or card — while renaming, the input field. */
   const itemTitle = (kind: CtxTarget['kind'], id: string, title: string) => (isRenaming(kind, id)
     ? <RenameField value={renameValue} onChange={setRenameValue} onCommit={commitRename} onCancel={() => setRenaming(null)}
         className="home-item-title text-sm font-medium w-full bg-transparent outline-none selectable" />
@@ -160,10 +160,10 @@ export default function HomeView() {
   const opsItems     = applyCount(sortItems(operations, homeOpsPrefs.sort, { date: (o) => o.updated_at }), homeOpsPrefs.count);
   const wikiItems    = applyCount(sortItems(articles, homeWikiPrefs.sort, { date: (a) => a.updated_at }), homeWikiPrefs.count);
 
-  // Datum und Mondphase als Titel — zweizeilig, passt in die h-14-Kopfzeile.
-  // Über `Dashboard`, damit der Kopf wie in den Modulen in der rechten
-  // Seitenleiste steht; Toolbar gibt es keine, jede Sektion bringt ihre
-  // eigene mit.
+  // Date and moon phase as the title — two lines, fits in the h-14 header row.
+  // Via `Dashboard`, so the header sits in the right sidebar as in the
+  // modules; there is no toolbar, every section brings its
+  // own.
   const headerLeft = (
     <div className="min-w-0">
       <h1 className={`${ENTRY_TITLE_HEADING_CLASSES} leading-tight truncate`}>
@@ -348,8 +348,8 @@ export default function HomeView() {
                   {wikiItems.map((article) => {
                     const cat = categories.find((c) => c.id === article.category_id);
                     const icon = entryIcon('wiki', article, cat);
-                    // Kein Fallback auf die rohe category_id — bei gelöschter
-                    // Kategorie entfällt das Label.
+                    // No fallback to the raw category_id — for a deleted
+                    // category the label is omitted.
                     const catLabel = categoryLabel(t, cat);
                     return (
                       <DashboardItem

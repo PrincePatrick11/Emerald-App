@@ -9,42 +9,42 @@ import SigilCanvasBlock from './SigilCanvasBlock';
 import SigilChargeBlock from './SigilChargeBlock';
 
 /**
- * Welche Komponente einen Blocktyp darstellt — der Komponenten-Teil der
- * Registry (die Metadaten stehen in `lib/blocks/blockTypes.ts`).
+ * Which component renders a block type: the component part of the
+ * registry (the metadata is in `lib/blocks/blockTypes.ts`).
  *
- * Importregel: nur `BlockStack` (und später die Blöcke-Ansicht) importieren
- * diese Datei. Der Textblock zieht TipTap, und das darf nicht über die eager
- * geladene Seitenleiste mitkommen.
+ * Import rule: only `BlockStack` (and later the blocks view) import
+ * this file. The text block pulls in TipTap, and that must not come along via the eagerly
+ * loaded sidebar.
  */
 export interface BlockViewProps {
   /**
-   * Der Block. Beim Textblock ist `block.html` ein INITIALWERT: nach dem ersten
-   * Tastendruck steht der lebende Stand nur noch im Ref des Stapels — der
-   * Editor liest ihn einmal und verwaltet ihn danach selbst. Andere Typen sind
-   * kontrolliert und lesen den Block bei jedem Render.
+   * The block. For the text block `block.html` is an INITIAL VALUE: after the first
+   * keystroke the live state exists only in the stack's ref; the
+   * editor reads it once and manages it itself afterwards. Other types are
+   * controlled and read the block on every render.
    */
   block: BlockInstance;
   /**
-   * Alle Blöcke des Eintrags, Stand des letzten Strukturwechsels — für Typen,
-   * die auf andere Blöcke zeigen (die Ladung wählt ihre Rechner und
-   * Zeichnungen). Das HTML von Textblöcken darin kann veraltet sein.
+   * All blocks of the entry, as of the last structural change, for types
+   * that point at other blocks (the charge picks its calculators and
+   * drawings). The HTML of text blocks in it may be stale.
    */
   blocks: readonly BlockInstance[];
   isEditing: boolean;
-  /** Textblock: neues inneres HTML — nur in den Ref, kein Neu-Rendern pro Tastendruck. */
+  /** Text block: new inner HTML, into the ref only, no re-render per keystroke. */
   onHtmlChange: (html: string) => void;
-  /** Bearbeitungsmodus: den ganzen Block ersetzen (Strukturänderung, rendert neu). */
+  /** Edit mode: replace the whole block (structural change, re-renders). */
   onBlockChange: (next: BlockInstance) => void;
   /**
-   * Lesemodus: eine erlaubte Änderung (Checkliste abhaken, Ja/Nein, Sigille
-   * laden) sofort in den Eintrag schreiben. Fehlt, wenn der Eintrag das nicht erlaubt.
+   * Read mode: write a permitted change (tick a checklist, yes/no, charge a
+   * sigil) into the entry immediately. Absent if the entry does not allow it.
    */
   onPersist?: (next: BlockInstance) => void;
-  /** Was der Ladung-Block dem Eintrag gibt: gesperrt, verborgen (siehe `sigilState`). */
+  /** What the charge block gives the entry: locked, concealed (see `sigilState`). */
   sigil: SigilState;
   /**
-   * Nur für einen Sigillen-Teil eines eigenen Blocks (`SigilPart`): sein
-   * Element — mit den Einstellungen aus dem Baukasten (Rechner-Modus, Pinsel).
+   * Only for a sigil part of a custom block (`SigilPart`): its
+   * element, with the settings from the builder (calculator mode, brush).
    */
   part?: ElementDef;
 }

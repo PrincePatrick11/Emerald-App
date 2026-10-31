@@ -27,13 +27,13 @@ import {
 import type { Alignment } from './ResizableImageExtension';
 
 /**
- * Die Knotentypen, fuer die `TextAlign` in `RichEditor` konfiguriert ist. Steht
- * hier, damit die Toolbar die Buttons dort sperren kann, wo die Ausrichtung
- * nichts bewirken wuerde — in einem Codeblock etwa.
+ * The node types for which `TextAlign` is configured in `RichEditor`. Listed
+ * here so that the toolbar can disable the buttons where alignment
+ * would have no effect, in a code block for instance.
  */
 export const TEXT_ALIGN_TYPES = ['heading', 'paragraph'] as const;
 
-/** Alles ausser links: nur diese Werte stehen als Attribut im Dokument. */
+/** Everything except left: only these values appear as an attribute in the document. */
 const EXPLICIT_ALIGNMENTS = ['center', 'right', 'justify'] as const;
 
 interface Props {
@@ -57,9 +57,9 @@ export default function EditorToolbar({ editor, onInsertImage, onOpenLinkPicker 
     onOpenLinkPicker();
   };
 
-  // Dieselben drei Buttons bedienen zwei Ziele: ein ausgewaehltes Bild ist ein
-  // eigener Blocknode mit eigener Breite, `text-align` des Absatzes erreicht es
-  // nicht. Wie die beiden Seiten linksbuendig ablegen, steht bei `alignMargins`.
+  // The same three buttons serve two targets: a selected image is a
+  // block node of its own with its own width, which the paragraph's `text-align` does
+  // not reach. How the two sides store left alignment is described at `alignMargins`.
   const imageSelected = editor.isActive('image');
   const textAlignable = TEXT_ALIGN_TYPES.some((type) => editor.isActive(type));
   const alignDisabled = !imageSelected && !textAlignable;
@@ -79,8 +79,8 @@ export default function EditorToolbar({ editor, onInsertImage, onOpenLinkPicker 
   const isAlignActive = (align: Alignment) => {
     if (imageSelected) return editor.getAttributes('image').align === align;
     if (alignDisabled) return false;
-    // Ein Absatz ohne Attribut ist linksbuendig — und aelterer Inhalt traegt
-    // vielleicht ein ausgeschriebenes `left`. Beides muss den Button erhellen.
+    // A paragraph without the attribute is left-aligned, and older content may
+    // carry an explicit `left`. Both must light up the button.
     if (align === 'left') {
       return !EXPLICIT_ALIGNMENTS.some((a) => editor.isActive({ textAlign: a }));
     }
@@ -295,8 +295,8 @@ function ToolbarGroup({ children }: { children: React.ReactNode }) {
   return <div className="flex items-center gap-0.5">{children}</div>;
 }
 
-// Der schmale Rand ist Absicht: die Leiste bricht um, wenn der Editorbereich
-// eng wird, und jeder gesparte Pixel schiebt diesen Umbruch weiter hinaus.
+// The narrow margin is deliberate: the bar wraps when the editor area
+// gets tight, and every pixel saved pushes that wrap further out.
 function ToolbarDivider() {
   return <div className="w-px h-4 bg-stone-700/60 mx-0.5" />;
 }
@@ -314,8 +314,8 @@ function ToolbarBtn({
   title: string;
   disabled?: boolean;
 }) {
-  // `p-1` statt der sonst ueblichen 26px: die Leiste traegt inzwischen 18
-  // Buttons und bricht sonst schon bei geoeffneter rechter Spalte um.
+  // `p-1` instead of the otherwise usual 26px: the bar now carries 18
+  // buttons and would otherwise already wrap with the right column open.
   return (
     <button
       onClick={onClick}

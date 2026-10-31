@@ -16,22 +16,22 @@ import {
 } from '../../lib/blocks/templates';
 import { ASSIGNMENT_STATE_ICONS, CATEGORY_TYPES, EntryTypeHeading, useAssignmentStateLabels } from './assignmentParts';
 
-/** Der Abschnitt als Ganzes ist eine Einstellung — wie die Altar-Bibliothek. */
+/** The section as a whole is a setting, like the altar library. */
 const COLLAPSED_KEY = 'templates-defaults-collapsed';
 
-/** Kategorie-Spalte etwas breiter, Wiki und Operationen teilen sich den Rest. */
+/** Category column somewhat wider, wiki and operations share the rest. */
 const GRID = 'grid grid-cols-[minmax(9rem,1.3fr)_repeat(2,minmax(0,1fr))] items-center gap-x-6';
 
 /**
- * Die Gesamtübersicht unter der Vorlagenliste, nur zum Ansehen, in einem
- * Panel: oben Journal für sich — es hat keine Kategorien, als Spalte der
- * Tabelle stünde es fast leer —, darunter die Tabelle mit einer Zeile je
- * Kategorie („Alle Kategorien", „Ohne Kategorie", dann jede Kategorie) und
- * Wiki und Operationen als Spalten; derselbe Aufbau wie im Zuweisungs-Dialog.
- * Eine Zelle nennt den Standard und die Vorlagen, die dort zur Wahl stehen;
- * ohne eigenen Standard, was stattdessen greift. Der Standard steht ohne
- * Stern, eine Vorlage nur zur Wahl mit Häkchen. Ein Name öffnet die Vorlage —
- * geändert wird nur dort.
+ * The overall overview below the template list, view only, in a
+ * panel: at the top journal on its own (it has no categories, as a column of the
+ * table it would be almost empty), below it the table with one row per
+ * category ("All categories", "No category", then each category) and
+ * wiki and operations as columns; the same structure as in the assignment dialog.
+ * A cell names the default and the templates selectable there;
+ * without its own default, what applies instead. The default appears without a
+ * star, a template that is only selectable with a check mark. A name opens the template;
+ * changes are made only there.
  */
 export default function TemplateDefaultsOverview() {
   const { t } = useTranslation();
@@ -42,8 +42,8 @@ export default function TemplateDefaultsOverview() {
   const stateLabels = useAssignmentStateLabels();
   const [collapsed, toggle] = usePersistedFlag(COLLAPSED_KEY);
 
-  // Der Standard steht ohne Zeichen — er ist, was die Tabelle zeigt. Nur eine
-  // Vorlage, die dort bloß zur Wahl steht, trägt das leise Häkchen.
+  // The default appears without a mark; it is what the table shows. Only a
+  // template that is merely selectable there carries the quiet check mark.
   const link = (template: Template, state: AssignmentState) => (
     <button
       key={template.id}
@@ -63,9 +63,9 @@ export default function TemplateDefaultsOverview() {
   );
 
   /**
-   * Eine Zelle: Standard, dann die Vorlagen zur Wahl. Ohne eigenen Standard
-   * steht darunter, was stattdessen greift — auch neben Vorlagen zur Wahl, die
-   * beim Anlegen nichts einsetzen. Ganz leer bleibt ein Strich.
+   * One cell: default, then the selectable templates. Without its own default,
+   * what applies instead is shown below, even next to selectable templates that
+   * insert nothing on creation. Completely empty, a dash remains.
    */
   const cell = (entryType: TemplateEntryType, category: string | null) => {
     const current = defaultTemplateAt(templates, entryType, category);
@@ -90,8 +90,8 @@ export default function TemplateDefaultsOverview() {
     );
   };
 
-  // „Alle Kategorien" ist der Rückfall aller übrigen Zeilen und hebt sich
-  // deshalb mit fettem Namen ab — nur damit, eine hinterlegte Zeile war zu laut.
+  // "All categories" is the fallback of all other rows and therefore stands
+  // out with a bold name, and only that; a shaded row was too loud.
   const row = (category: string | null, label: ReactNode) => (
     <div key={category ?? ''} className={`${GRID} border-t border-[var(--border-soft)] py-2.5`}>
       <div
@@ -105,8 +105,8 @@ export default function TemplateDefaultsOverview() {
     </div>
   );
 
-  // Die feste Emoji-Spalte hält die Namen in einer Flucht; die beiden Zeilen
-  // ohne eigene Kategorie tragen dort ein Icon statt eines Emojis.
+  // The fixed emoji column keeps the names aligned; the two rows
+  // without a category of their own carry an icon there instead of an emoji.
   const named = (glyph: ReactNode, name: string) => (
     <>
       <span className="flex w-5 flex-shrink-0 justify-center text-[var(--text-muted)]">{glyph}</span>
@@ -123,7 +123,7 @@ export default function TemplateDefaultsOverview() {
             {t(applyDefault ? 'templates.overview.hint' : 'templates.overview.hintOff')}
           </p>
           <div className="panel px-4">
-            {/* Journal: eine Zeile, die Zelle über beide Spalten. */}
+            {/* Journal: one row, the cell spanning both columns. */}
             <div className="py-3">
               <EntryTypeHeading entryType="journal" />
             </div>

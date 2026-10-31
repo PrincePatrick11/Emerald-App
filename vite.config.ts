@@ -25,18 +25,18 @@ export default defineConfig(async () => ({
       output: {
         manualChunks(id) {
           if (!id.includes("node_modules")) return;
-          // React vor Tiptap: @tiptap/react importiert react-dom, und ohne
-          // eigene Regel zog Rollup react-dom in den tiptap-Chunk — den lud
-          // der Start dann mit, obwohl nur Editor und BlockStack (beide lazy)
-          // Tiptap brauchen.
+          // React before Tiptap: @tiptap/react imports react-dom, and without
+          // a rule of its own Rollup pulled react-dom into the tiptap chunk,
+          // which startup then loaded too, although only the editor and
+          // BlockStack (both lazy) need Tiptap.
           if (/[\\/]node_modules[\\/](react|react-dom|scheduler)[\\/]/.test(id)) return "react";
           if (id.includes("@tiptap") || id.includes("prosemirror")) return "tiptap";
           if (id.includes("@tauri-apps")) return "tauri";
           if (id.includes("i18next")) return "i18n";
-          // Kein "vendor"-Sammelchunk mehr: der zwang turndown, marked und
-          // framer-motion in einen eager geladenen Block, obwohl ihre
-          // Importeure inzwischen dynamisch nachgeladen werden. Ohne Regel
-          // teilt Rollup entlang der import()-Grenzen selbst auf.
+          // No catch-all "vendor" chunk any more: it forced turndown, marked
+          // and framer-motion into an eagerly loaded block, although their
+          // importers are now loaded dynamically. Without a rule, Rollup
+          // splits along the import() boundaries by itself.
         },
       },
     },

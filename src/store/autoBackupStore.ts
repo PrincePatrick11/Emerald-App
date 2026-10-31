@@ -2,36 +2,36 @@ import { create } from 'zustand';
 
 /** Mirrors `AutoBackupStatus` in `src-tauri/src/auto_backup.rs`. */
 export interface AutoBackupStatus {
-  /** Der selbst gewählte Ordner; `null`, solange der `backup/`-Ordner des Vaults gilt. */
+  /** The folder chosen by the user; `null` while the vault's `backup/` folder applies. */
   customDir: string | null;
   dir: string;
-  /** Der gewählte Ordner ist gerade nicht erreichbar. */
+  /** The chosen folder is currently unreachable. */
   missing: boolean;
-  /** Tag des jüngsten automatischen Backups dieses Vaults, `YYYY-MM-DD`. */
+  /** Day of this vault's most recent automatic backup, `YYYY-MM-DD`. */
   newest: string | null;
   today: string;
 }
 
-/** Als Code gehalten und erst beim Rendern übersetzt — so folgt die Meldung einem Sprachwechsel. */
+/** Kept as a code and translated only on render — so the message follows a language change. */
 export type AutoBackupError = 'dirMissing' | 'failed';
 
 interface AutoBackupState {
-  /** Der Vault, zu dem `status` und `error` gehören. */
+  /** The vault that `status` and `error` belong to. */
   vaultId: string | null;
   status: AutoBackupStatus | null;
   running: boolean;
-  /** „Jetzt sichern" wurde geklickt und wartet noch auf seinen Lauf (`backUpNow`). */
+  /** "Back up now" was clicked and is still waiting for its run (`backUpNow`). */
   requested: boolean;
   error: AutoBackupError | null;
-  /** Der Punkt am Zahnrad hat seine Aufgabe erfüllt; ein neuer Fehler nach einem Erfolg zeigt ihn wieder. */
+  /** The dot on the gear has done its job; a new error after a success shows it again. */
   errorSeen: boolean;
 }
 
 /**
- * Was das automatische Backup zuletzt getan hat. Geschrieben wird nur von
- * `lib/autoBackup.ts`; gelesen vom Abschnitt in den Einstellungen und vom
- * Zahnrad der Leiste. Eigener Store, damit die Leiste ihn kennen kann, ohne
- * `dbBackup` in den Haupt-Chunk zu ziehen.
+ * What the automatic backup did last. Written only by
+ * `lib/autoBackup.ts`; read by the section in the settings and by the
+ * gear in the bar. A store of its own, so the bar can know it without
+ * pulling `dbBackup` into the main chunk.
  */
 export const useAutoBackupStore = create<AutoBackupState>(() => ({
   vaultId: null,

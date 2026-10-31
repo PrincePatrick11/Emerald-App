@@ -4,10 +4,10 @@ import { useTranslation } from 'react-i18next';
 import { comparable, type SearchHit, type SearchKind, type SearchResults } from '../../../lib/globalSearch';
 import { AUX_VIEWS, MODULES } from '../../../lib/modules';
 
-/** Die Suche spricht Datenmodell-Vokabular ('operation' singular, 'task') —
- *  die Modul-Kinds ziehen Icon und nav-Label aus der Registry, die drei
- *  Nicht-Modul-Kinds haben eigene. Ein totales Record: ein neuer SearchKind
- *  ohne Eintrag hier ist ein Compile-Fehler, kein Laufzeit-Loch. */
+/** The search speaks data-model vocabulary ('operation' singular, 'task') —
+ *  the module kinds take icon and nav label from the registry, the three
+ *  non-module kinds have their own. A total record: a new SearchKind
+ *  without an entry here is a compile error, not a runtime hole. */
 const KIND_META: Record<SearchKind, { icon: LucideIcon; labelKey: string }> = {
   journal: { icon: MODULES.journal.icon, labelKey: MODULES.journal.navLabelKey },
   wiki: { icon: MODULES.wiki.icon, labelKey: MODULES.wiki.navLabelKey },
@@ -18,12 +18,12 @@ const KIND_META: Record<SearchKind, { icon: LucideIcon; labelKey: string }> = {
   tag: { icon: Tag, labelKey: 'nav.tags' },
   category: { icon: Folder, labelKey: 'search.categories' },
   language: { icon: AUX_VIEWS.lexicon.icon, labelKey: AUX_VIEWS.lexicon.navLabelKey },
-  // Eine Vokabel springt in ihre Sprache und trägt deshalb dasselbe Abzeichen.
+  // A vocabulary entry jumps to its language and therefore carries the same badge.
   lexiconEntry: { icon: AUX_VIEWS.lexicon.icon, labelKey: AUX_VIEWS.lexicon.navLabelKey },
 };
 
-/** Die Id einer Trefferzeile — `SearchModal` zeigt per
- *  `aria-activedescendant` auf dieselbe. */
+/** The id of a hit row — `SearchModal` points at the same one via
+ *  `aria-activedescendant`. */
 export const searchOptionId = (listboxId: string, index: number) => `${listboxId}-option-${index}`;
 
 function kindIcon(kind: SearchKind): ReactNode {
@@ -32,13 +32,13 @@ function kindIcon(kind: SearchKind): ReactNode {
 }
 
 /**
- * Hebt die Fundstelle im Titel hervor.
+ * Highlights the match in the title.
  *
- * Gesucht wird auf derselben gefalteten Kleinschreibung, mit der die Suche den
- * Treffer überhaupt gefunden hat — sonst bliebe ein Titel mit `don’t` bei der
- * Eingabe `don't` unmarkiert, obwohl er als Treffer in der Liste steht.
- * Geschnitten wird aus dem Original, was nur trägt, weil jede Faltung ein
- * Zeichen gegen ein Zeichen tauscht.
+ * The lookup uses the same case-folded form with which the search found the
+ * hit in the first place — otherwise a title with `don’t` would stay unmarked
+ * for the input `don't` although it is in the list as a hit.
+ * The cut is taken from the original, which only holds because every folding
+ * swaps one character for one character.
  */
 function highlight(text: string, query: string): ReactNode {
   if (!query) return text;
@@ -56,12 +56,12 @@ function highlight(text: string, query: string): ReactNode {
 
 interface Props {
   results: SearchResults;
-  /** Die Liste ist eine Anfrage alt, weil `useDeferredValue` noch nachzieht. */
+  /** The list is one query old because `useDeferredValue` is still catching up. */
   pending: boolean;
   query: string;
   activeIndex: number;
-  /** Die Id, mit der das Feld per `aria-controls` auf diese Liste zeigt; die
-   *  Zeilen leiten ihre eigenen Ids daraus ab. */
+  /** The id with which the field points at this list via `aria-controls`; the
+   *  rows derive their own ids from it. */
   listboxId: string;
   onActiveIndexChange: (index: number) => void;
   onSelect: (hit: SearchHit, inNewTab: boolean) => void;
@@ -69,7 +69,7 @@ interface Props {
 }
 
 /**
- * Die Trefferliste der globalen Suche, im Körper von `SearchModal`.
+ * The hit list of the global search, in the body of `SearchModal`.
  */
 export default function SearchResultList({
   results, pending, query, activeIndex, listboxId, onActiveIndexChange, onSelect, onShowMore,
@@ -77,8 +77,8 @@ export default function SearchResultList({
   const { t } = useTranslation();
   const panelRef = useRef<HTMLDivElement>(null);
 
-  // Die Tastaturauswahl in den Blick holen. `block: 'nearest'` scrollt nur,
-  // wenn die Zeile wirklich ausserhalb liegt.
+  // Bring the keyboard selection into view. `block: 'nearest'` only scrolls
+  // if the row really lies outside.
   useEffect(() => {
     panelRef.current
       ?.querySelector<HTMLElement>('[aria-selected="true"]')
@@ -92,10 +92,10 @@ export default function SearchResultList({
       {hits.length === 0 ? (
         <p className="search-result-meta">{query.trim() ? t('search.noResults') : t('search.hint')}</p>
       ) : (
-        // Waehrend `useDeferredValue` nachzieht, steht hier noch das Ergebnis
-        // der vorigen Eingabe. Auf einem kleinen Vault ist das kein Bild lang,
-        // auf einem grossen ist der erste Volltextlauf spürbar — und eine
-        // Liste, die stumm veraltet, liest sich wie eine, die schon passt.
+        // While `useDeferredValue` catches up, the result of the previous
+        // input is still shown here. On a small vault that lasts not a single
+        // frame, on a large one the first full-text run is noticeable — and a
+        // list that silently goes stale reads like one that already fits.
         <div
           id={listboxId}
           role="listbox"
@@ -112,8 +112,8 @@ export default function SearchResultList({
               aria-selected={index === activeIndex}
               className="search-result-row"
               onMouseMove={() => onActiveIndexChange(index)}
-              // Der Fokus bleibt im Eingabefeld: die Liste wird mit den
-              // Pfeiltasten bedient, ein Klick darf ihn nicht wegziehen.
+              // Focus stays in the input field: the list is operated with the
+              // arrow keys, a click must not pull it away.
               onMouseDown={(e) => e.preventDefault()}
               onClick={(e) => onSelect(hit, e.ctrlKey || e.metaKey)}
             >
@@ -135,14 +135,14 @@ export default function SearchResultList({
               <span className="search-result-badge mt-0.5">
                 {t(KIND_META[hit.kind].labelKey)}
                 {hit.entryNumber != null && <span>#{hit.entryNumber}</span>}
-                {/* Schliessen sich aus: eine Kategorie hat keine Eintragsnummer. */}
+                {/* Mutually exclusive: a category has no entry number. */}
                 {hit.module && (
                   <>
                     <span aria-hidden="true">·</span>
-                    {/* Nur Kategorien: das Modul, in dem sie am meisten benutzt
-                        wird. Kein Sprungziel — der Treffer oeffnet seit der
-                        eigenen Ansicht immer diese —, sondern der Hinweis,
-                        welche der gleichnamig wirkenden Kategorien gemeint ist. */}
+                    {/* Categories only: the module in which they are used most.
+                        Not a jump target — since the view of its own, the hit
+                        always opens that one —, but a hint as to
+                        which of the identically named categories is meant. */}
                     <span>{t(MODULES[hit.module].navLabelKey)}</span>
                   </>
                 )}
@@ -152,12 +152,12 @@ export default function SearchResultList({
         </div>
       )}
 
-      {/* Was die Kappung verschweigt, sagt die Liste selbst — eine stumm
-          abgeschnittene Trefferliste liest sich wie eine vollstaendige. Und
-          weil das Zurueckgehaltene ohnehin schon gesucht ist, sagt die Zeile
-          es nicht nur, sie gibt es auch heraus. Mit der Tastatur laeuft man
-          dafuer einfach weiter nach unten. `onMouseDown` aus demselben Grund
-          wie bei den Zeilen darueber. */}
+      {/* What the cap leaves unsaid, the list says itself — a silently
+          truncated hit list reads like a complete one. And because what was
+          held back has already been searched anyway, the row does not just
+          say it, it also hands it over. With the keyboard you simply keep
+          going down for that. `onMouseDown` for the same reason
+          as for the rows above. */}
       {total > hits.length && (
         <button
           type="button"

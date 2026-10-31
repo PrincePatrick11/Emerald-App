@@ -3,7 +3,7 @@ import RichEditor from '../editor/RichEditor';
 import { BlockStackContext } from './blockStackContext';
 import type { BlockViewProps } from './blockViews';
 
-/** Der Textblock: ein TipTap-Editor für Lese- und Bearbeitungsmodus zugleich. */
+/** The text block: a TipTap editor for read and edit mode alike. */
 export default function TextBlock({ block, isEditing, onHtmlChange }: BlockViewProps) {
   const stack = useContext(BlockStackContext);
   return (

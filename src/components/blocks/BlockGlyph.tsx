@@ -2,9 +2,9 @@ import type { GlyphSource } from '../../lib/blocks/presets';
 import { isImageIcon } from '../../lib/helpers';
 
 /**
- * Das Zeichen eines Blocks — ein lucide-Icon, oder das Icon eines eigenen
- * Blocks (Emoji oder Bild) in derselben Größe. Rahmen, Verwaltungsliste und
- * Blöcke-Ansicht zeigen es gleich.
+ * The glyph of a block: a lucide icon, or the icon of a custom
+ * block (emoji or image) at the same size. Frame, management list and
+ * blocks view show it the same way.
  */
 export default function BlockGlyph({ icon, size = 12 }: { icon: GlyphSource; size?: number }) {
   if (typeof icon === 'string') {

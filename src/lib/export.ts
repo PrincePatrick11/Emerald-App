@@ -40,7 +40,7 @@ async function embedImages(html: string): Promise<string> {
       try {
         resolved.set(ref, await readImageAsBase64(ref));
       } catch {
-        // Datei fehlt — leeres src statt eines toten Verweises im Export.
+        // File is missing — empty src instead of a dead reference in the export.
         resolved.set(ref, '');
       }
     })
@@ -50,9 +50,9 @@ async function embedImages(html: string): Promise<string> {
 }
 
 /**
- * Bilder fallen im Markdown weg. Die Bilder der Blöcke (Sigillen-Zeichnung,
- * Bildfeld; `data-export-placeholder`) lassen ihre Beschriftung als
- * Platzhalter stehen — Bilder im Text verschwinden wie bisher ganz.
+ * Images are dropped from the Markdown. The images of the blocks (sigil drawing,
+ * image field; `data-export-placeholder`) leave their caption behind as a
+ * placeholder — images in the text disappear entirely, as before.
  */
 function stripImages(html: string): string {
   return html.replace(/<img\b[^>]*>/gi, (tag) => {
@@ -90,13 +90,13 @@ function resolveInternalLinkIcons(html: string): string {
       const op = operations.find(o => o.id === id);
       if (op) icon = entryIcon('operation', op, categories.find(c => c.id === op.category_id));
     } else if (entryType === 'task') {
-      // Task-Chips aus Sidebar-Drags tragen kein data-icon — wie im
-      // Live-Lookup des Editors: Kategorie-Emoji, sonst der Chip-Fallback.
+      // Task chips from sidebar drags carry no data-icon — as in the
+      // editor's live lookup: category emoji, otherwise the chip fallback.
       const task = tasks.find(t => t.id === id);
       if (task) icon = categories.find(c => c.id === task.category_id)?.emoji ?? DEFAULT_ENTRY_EMOJI.task;
     } else if (entryType === 'altar') {
-      // Altar-Chips speichern icon_data bewusst nie in den Attrs (data-URL);
-      // erst hier im Export wird es aufgelöst.
+      // Altar chips deliberately never store icon_data in the attrs (data URL);
+      // it is only resolved here, in the export.
       const altar = altars.find(a => a.id === id);
       if (altar) icon = altar.icon_data ?? DEFAULT_ENTRY_EMOJI.altar;
     }
@@ -262,9 +262,9 @@ const PRINT_CSS = `
   .entry-content dt { font-size: 0.85em; font-weight: 600; color: #666; margin-top: 0.4em; }
   .entry-content dd { margin: 0 0 0.3em 0; }
   .entry-content dd ul { margin-bottom: 0; }
-  /* Die Ausrichtung eines Bildes steht als margin-left/-right in seinem
-     style-Attribut und schlaegt diese Kurzform — nur die vertikalen
-     Abstaende kommen von hier. */
+  /* An image's alignment is set as margin-left/-right in its
+     style attribute and beats this shorthand — only the vertical
+     spacing comes from here. */
   .entry-content img { display: block; max-width: 100%; height: auto; margin: 0.6em 0; border-radius: 4px; }
   .entry-content hr { border: 0; border-top: 1px solid #ccc; margin: 1.4em 0; }
   .entry-content pre {
@@ -389,10 +389,10 @@ export async function exportAsMarkdown(data: ExportData): Promise<void> {
     },
   });
 
-  // Feldblöcke kommen als `<dl>`: „**Beschriftung:** Wert", ein Absatz je Feld.
-  // Ein mehrzeiliger Wert (Checkliste) beginnt in eigener Zeile, sonst klebte
-  // sein erster Punkt an der Beschriftung. Turndown fügt Stücke mit der
-  // größeren Zahl Umbrüche an ihren Rändern zusammen — daher je zwei.
+  // Field blocks come as `<dl>`: "**Label:** Value", one paragraph per field.
+  // A multi-line value (checklist) starts on its own line, otherwise its
+  // first item would stick to the label. Turndown joins pieces using the
+  // larger number of line breaks at their edges — hence two each.
   td.addRule('definitionTerm', {
     filter: 'dt',
     replacement: (content) => `\n\n**${content.trim()}:** `,
@@ -404,7 +404,7 @@ export async function exportAsMarkdown(data: ExportData): Promise<void> {
       return value.includes('\n') ? `\n\n${value}\n\n` : `${value}\n\n`;
     },
   });
-  // Umgesetzte Buchstaben des Sigillen-Rechners.
+  // Struck-through letters of the sigil calculator.
   td.addRule('strikethrough', {
     filter: ['s', 'del'],
     replacement: (content) => `~~${content}~~`,

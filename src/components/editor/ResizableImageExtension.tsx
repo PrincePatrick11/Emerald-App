@@ -4,27 +4,27 @@ import type { NodeViewProps } from '@tiptap/react';
 import { useRef, useState } from 'react';
 import { imageSrc, storedImageName } from '../../lib/images';
 
-/** Gilt fuer Text wie fuer Bilder — die Toolbar bedient beides mit denselben Buttons. */
+/** Applies to text as to images; the toolbar serves both with the same buttons. */
 export type Alignment = 'left' | 'center' | 'right';
 
 declare module '@tiptap/core' {
   interface Commands<ReturnType> {
     resizableImage: {
-      /** Richtet das ausgewaehlte Bild links, mittig oder rechts aus. */
+      /** Aligns the selected image left, centre or right. */
       setImageAlign: (align: Alignment) => ReturnType;
     };
   }
 }
 
 /**
- * Ausrichtung eines Bildes als Randverteilung — das Bild ist ein Blocknode mit
- * eigener Breite, `text-align` des Absatzes greift bei ihm nicht.
+ * Alignment of an image as a margin distribution; the image is a block node with
+ * its own width, to which the paragraph's `text-align` does not apply.
  *
- * Die beiden Seiten der Ausrichtung legen "links" bewusst verschieden ab:
- * Text hat dafuer gar kein Attribut (die TextAlign-Erweiterung schreibt jeden
- * Wert ins HTML, den sie bekommt, `left` eingeschlossen), das Bild dagegen
- * traegt `align: 'left'` als Standard und schreibt es aus. Es braucht den Wert,
- * weil seine Raender sonst von der vorigen Ausrichtung stehen blieben.
+ * The two sides of the alignment deliberately store "left" differently:
+ * text has no attribute for it at all (the TextAlign extension writes every
+ * value it gets into the HTML, `left` included), whereas the image
+ * carries `align: 'left'` as its default and writes it out. It needs the value
+ * because otherwise its margins would stay as they were from the previous alignment.
  */
 function alignMargins(align: unknown) {
   if (align === 'center') return { marginLeft: 'auto', marginRight: 'auto' };
@@ -33,8 +33,8 @@ function alignMargins(align: unknown) {
 }
 
 /**
- * Gegenstueck zu `alignMargins` fuer Inhalt, der noch vor `data-align`
- * gespeichert wurde: dort verraet allein die Randverteilung die Ausrichtung.
+ * Counterpart to `alignMargins` for content that was saved before `data-align`:
+ * there only the margin distribution reveals the alignment.
  */
 function alignFromLegacyStyle(img: HTMLImageElement): Alignment {
   if (img.style.marginLeft !== 'auto') return 'left';
@@ -137,11 +137,11 @@ export const ResizableImage = Node.create({
           const img = el as HTMLImageElement;
           const src = img.getAttribute('src');
           return {
-            // Was hier ankommt, ist nicht immer ein gespeicherter Dateiname:
-            // wer ein Bild aus der Leseansicht kopiert und wieder einfuegt,
-            // bringt die aufgeloeste `emerald-img`-URL mit — samt Vault-ID.
-            // Die zurueck auf den Dateinamen zu reduzieren haelt die
-            // Vault-Zugehoerigkeit aus dem gespeicherten Inhalt heraus.
+            // What arrives here is not always a stored file name:
+            // whoever copies an image from the read view and pastes it again
+            // brings the resolved `emerald-img` URL along, vault ID included.
+            // Reducing that back to the file name keeps the
+            // vault affiliation out of the stored content.
             src:   storedImageName(src) ?? src,
             alt:   img.getAttribute('alt'),
             title: img.getAttribute('title'),

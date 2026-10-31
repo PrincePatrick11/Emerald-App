@@ -10,13 +10,13 @@ import { useSettingsStore } from '../../../store/settingsStore';
 import SettingsChoiceButton, { SettingsChoiceRow } from './SettingsChoiceButton';
 import SettingsSection, { SettingsStatus } from './SettingsSection';
 
-/** Was die App auf der Platte liegen hat, und was davon weg kann. */
+/** What the app has lying on the disk, and which of it can go. */
 export default function StoragePage() {
   const { t } = useTranslation();
   const retentionDays = useSettingsStore((s) => s.settings.trash.retentionDays);
   const update = useSettingsStore((s) => s.update);
 
-  // Aufraeumen der Bildablage: erst zaehlen, dann auf Bestaetigung loeschen.
+  // Cleaning up the image store: count first, then delete on confirmation.
   const [unused, setUnused] = useState<UnusedImages | null>(null);
   const [scanning, setScanning] = useState(false);
   const [cleanupFreed, setCleanupFreed] = useState<number | null>(null);

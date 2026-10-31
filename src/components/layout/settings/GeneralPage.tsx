@@ -8,7 +8,7 @@ import {
 import SettingsChoiceButton, { SettingsChoiceRow } from './SettingsChoiceButton';
 import SettingsSection, { SettingsDescription } from './SettingsSection';
 
-/** Sprache und Aussehen — was die App in diesem Vault spricht und wie sie aussieht. */
+/** Language and appearance — what the app speaks in this vault and how it looks. */
 export default function GeneralPage() {
   const { t } = useTranslation();
 

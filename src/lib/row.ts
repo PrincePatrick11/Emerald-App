@@ -1,19 +1,19 @@
 /**
- * Die Übersetzung zwischen SQLite-Zeilen und den Typen aus `src/types`.
+ * The translation between SQLite rows and the types from `src/types`.
  *
- * SQLite kennt weder Boolean noch Array: Booleans liegen als `INTEGER` 0/1,
- * Listen als JSON-Text. Die Typen versprechen `boolean` und `string[]`. Diese
- * Umrechnung muss also irgendwo passieren — und sie gehört an genau eine
- * Stelle, nämlich hierher.
+ * SQLite has neither boolean nor array: booleans are stored as `INTEGER` 0/1,
+ * lists as JSON text. The types promise `boolean` and `string[]`. This
+ * conversion therefore has to happen somewhere — and it belongs in exactly one
+ * place, namely here.
  *
- * Vorher war sie über acht Stores verteilt, in vier verschiedenen Schreibweisen
+ * Previously it was spread across eight stores, in four different spellings
  * (`boolToInt()`, `x ? 1 : 0`, `=== false ? 0 : 1`,
- * `(r.x as unknown as number) !== 0`), und an zwei Stellen fehlte sie ganz:
- * `OperationCategory.is_builtin` und `TaskCategory.is_builtin` hielten `0`/`1`,
- * obwohl als `boolean` deklariert — weshalb der Code sie an Verzweigungen
- * wieder zu `number` zurückcasten musste.
+ * `(r.x as unknown as number) !== 0`), and in two places it was missing entirely:
+ * `OperationCategory.is_builtin` and `TaskCategory.is_builtin` held `0`/`1`,
+ * although declared as `boolean` — which is why the code had to cast them
+ * back to `number` at branches.
  *
- * Beim Lesen `fromRow.*` benutzen, beim Schreiben `toInt` und `toJson`.
+ * Use `fromRow.*` when reading, `toInt` and `toJson` when writing.
  */
 import type {
   AltarItem,
@@ -34,13 +34,13 @@ import { DEFAULT_TEMPLATE_ICON, parseAssignments, type Template } from './blocks
 import { DEFAULT_LANGUAGE_ICON, parseAlphabet } from './lexicon';
 import { parseAltarSettings } from './altarSettings';
 
-/** Eine rohe Zeile, wie sie aus `db.select` kommt. */
+/** A raw row as it comes from `db.select`. */
 export type DbRow = Record<string, unknown>;
 
 /**
- * INTEGER 0/1 → boolean. `fallback` greift nur bei NULL/undefined, also für
- * Spalten, die vor ihrer Einführung keinen Wert hatten (Schalter, die
- * standardmäßig an sind).
+ * INTEGER 0/1 → boolean. `fallback` only applies to NULL/undefined, i.e. for
+ * columns that had no value before they were introduced (switches that are
+ * on by default).
  */
 export function bool(v: unknown, fallback = false): boolean {
   if (v === null || v === undefined) return fallback;
@@ -48,15 +48,15 @@ export function bool(v: unknown, fallback = false): boolean {
   return Number(v) !== 0;
 }
 
-/** boolean → INTEGER 0/1 für Parameterlisten. */
+/** boolean → INTEGER 0/1 for parameter lists. */
 export function toInt(v: boolean | null | undefined, fallback = false): 0 | 1 {
   return (v ?? fallback) ? 1 : 0;
 }
 
 /**
- * JSON-Text → Array. Fällt bei kaputtem Inhalt auf `[]` zurück, statt zu
- * werfen: Eine unlesbare Tag-Liste darf nicht das Laden des ganzen Journals
- * verhindern.
+ * JSON text → array. Falls back to `[]` on broken content instead of
+ * throwing: an unreadable tag list must not prevent the whole journal
+ * from loading.
  */
 export function jsonArray<T = string>(v: unknown): T[] {
   if (Array.isArray(v)) return v as T[];
@@ -71,7 +71,7 @@ export function jsonArray<T = string>(v: unknown): T[] {
   return [];
 }
 
-/** Array → JSON-Text für Parameterlisten. */
+/** Array → JSON text for parameter lists. */
 export function toJson(v: readonly unknown[] | null | undefined): string {
   return JSON.stringify(v ?? []);
 }
@@ -83,12 +83,12 @@ const num = (v: unknown, fallback: number): number =>
 const nullableNum = (v: unknown): number | null =>
   v == null || Number.isNaN(Number(v)) ? null : Number(v);
 
-/** Die Spalte hat einen CHECK — was sonst käme, landet im Journal statt die Liste zu sprengen. */
+/** The column has a CHECK — anything else ends up in the journal instead of blowing up the list. */
 const entryType = (v: unknown): EntryType => (v === 'wiki' || v === 'operation' ? v : 'journal');
 
 /**
- * Aufrufbar als `rows.map(fromRow.entry)` — die Mapper ignorieren die
- * zusätzlichen Argumente, die `Array.map` mitgibt.
+ * Callable as `rows.map(fromRow.entry)` — the mappers ignore the
+ * extra arguments that `Array.map` passes.
  */
 export const fromRow = {
   entry(r: DbRow): Entry {
@@ -135,7 +135,7 @@ export const fromRow = {
     };
   },
 
-  /** `elements`/`display` laufen durch dieselbe Prüfung wie die Kopie im Inhalt — die Zeile kann aus einem Import stammen. */
+  /** `elements`/`display` go through the same validation as the copy in the content — the row can come from an import. */
   blockDefinition(r: DbRow): BlockDefinition {
     return {
       id: str(r.id),
@@ -151,7 +151,7 @@ export const fromRow = {
     };
   },
 
-  /** `assignments` läuft durch `parseAssignments` — die Zeile kann aus einem Import stammen. */
+  /** `assignments` goes through `parseAssignments` — the row can come from an import. */
   template(r: DbRow): Template {
     return {
       id: str(r.id),

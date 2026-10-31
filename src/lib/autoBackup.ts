@@ -11,55 +11,55 @@ import { editLockEpoch, useUIStore } from '../store/uiStore';
 import { useAutoBackupStore, type AutoBackupError, type AutoBackupStatus } from '../store/autoBackupStore';
 
 /**
- * Das automatische Backup: wann eines fällig ist, und der Lauf selbst.
+ * The automatic backup: when one is due, and the run itself.
  *
- * Einen Hintergrunddienst gibt es nicht — geprüft wird, während die App offen
- * und der Vault entsperrt ist: kurz nach dem Öffnen eines Vaults, nach jeder
- * Änderung der Einstellung oder des Ordners, danach stündlich — und noch
- * einmal, wenn ein Versuch auf einen laufenden Lauf, einen Import oder einen
- * Typwechsel traf. Wohin geschrieben wird und unter welchem Namen, entscheidet
- * allein `auto_backup.rs`; von hier geht nie
- * ein Pfad hinüber.
+ * There is no background service — the check happens while the app is open
+ * and the vault is unlocked: shortly after a vault is opened, after every
+ * change of the setting or the folder, then hourly — and once more
+ * when an attempt hit a running run, an import or a
+ * type change. Where it is written and under which name is decided
+ * solely by `auto_backup.rs`; no path is ever passed
+ * over from here.
  */
 
-/** Abstand zum Öffnen des Vaults und zur letzten Änderung der Einstellung oder des Ordners: der
- *  Start gehört dem Laden, und wer Knöpfe durchprobiert, löst nur einen Lauf aus.
- *  Auch der Abstand, nach dem ein `'busy'` neu versucht wird. */
+/** Delay after opening the vault and after the last change of the setting or the folder: the
+ *  start belongs to loading, and anyone clicking through buttons only triggers one run.
+ *  Also the delay after which a `'busy'` is retried. */
 const SETTLE_MS = 5_000;
-/** Für Sitzungen, die über einen Tageswechsel offen bleiben. */
+/** For sessions that stay open across a change of day. */
 const RECHECK_MS = 60 * 60 * 1000;
 
-/** Erwartet von `auto_backup.rs`, wenn der gewählte Ordner fehlt. */
+/** Expected from `auto_backup.rs` when the chosen folder is missing. */
 const DIR_MISSING = 'AUTO_BACKUP_DIR_MISSING';
-/** Wirft `getDb()`, solange die Datenbank bewusst geschlossen ist (`withDbClosed`). */
+/** Thrown by `getDb()` while the database is deliberately closed (`withDbClosed`). */
 const DB_CLOSED = 'DB_CLOSED';
 
 /**
- * Ob ein Backup ansteht. `newest` und `today` sind lokale Tage (`YYYY-MM-DD`),
- * beide von derselben Uhr in Rust. Fällig heißt: seit dem letzten Termin gibt
- * es noch keines — ein verpasster Termin wird also beim nächsten Öffnen
- * nachgeholt, und ohne jedes Backup ist sofort eines fällig.
+ * Whether a backup is pending. `newest` and `today` are local days (`YYYY-MM-DD`),
+ * both from the same clock in Rust. Due means: since the last scheduled date there
+ * is none yet — so a missed date is made up at the next open,
+ * and with no backup at all one is due immediately.
  */
 export function isBackupDue(settings: Pick<BackupSettings, 'interval' | 'weekday'>, newest: string | null, today: string): boolean {
   if (!newest) return true;
   if (settings.interval === 'daily') return newest < today;
-  // Der Erste dieses Monats.
+  // The first of this month.
   if (settings.interval === 'monthly') return newest < `${today.slice(0, 8)}01`;
-  // Der letzte gewählte Wochentag, heute eingeschlossen.
+  // The most recent chosen weekday, today included.
   const [y, m, d] = today.split('-').map(Number);
   const day = new Date(y, m - 1, d);
   day.setDate(day.getDate() - ((day.getDay() - settings.weekday + 7) % 7));
   return newest < localIsoDay(day);
 }
 
-// `errorSeen` bedeutet nur etwas, solange `error` gesetzt ist — deshalb schreibt
-// nur diese Datei die beiden, und `error` nie ohne `errorSeen`.
+// `errorSeen` only means something while `error` is set — so only this file
+// writes the two, and never `error` without `errorSeen`.
 
 function setError(vaultId: string, error: AutoBackupError): void {
   useAutoBackupStore.setState((s) => {
-    // Der Stand eines anderen Vaults gehört nicht neben diesen Fehler.
+    // The state of another vault does not belong next to this error.
     if (s.vaultId !== vaultId) return { vaultId, status: null, error, errorSeen: false };
-    // Derselbe Fehler bei der stündlichen Wiederholung holt den Punkt nicht zurück.
+    // The same error on the hourly repeat does not bring the dot back.
     return { error, errorSeen: s.error === error ? s.errorSeen : false };
   });
 }
@@ -68,28 +68,28 @@ function clearError(vaultId: string): void {
   if (useAutoBackupStore.getState().vaultId === vaultId) useAutoBackupStore.setState({ error: null, errorSeen: false });
 }
 
-/** Der Punkt am Zahnrad hat seine Aufgabe erfüllt. */
+/** The dot on the gear has done its job. */
 export function markAutoBackupErrorSeen(): void {
   useAutoBackupStore.setState({ errorSeen: true });
 }
 
 /**
- * Liest Zielordner und jüngstes Backup des Vaults neu in den Store. Ist
- * inzwischen ein anderer Vault offen, bleibt der Store, wie er ist — sonst
- * überschriebe das Ende eines Laufs den Stand des Nachfolgers.
+ * Re-reads the target folder and the newest backup of the vault into the store.
+ * If another vault is open by now, the store stays as it is — otherwise
+ * the end of a run would overwrite the successor's state.
  */
 export async function refreshAutoBackupStatus(vaultId: string): Promise<AutoBackupStatus> {
   const status = await invoke<AutoBackupStatus>('auto_backup_status', { vaultId });
   if (useVaultStore.getState().activeVaultId !== vaultId) return status;
   useAutoBackupStore.setState((s) => {
     if (s.vaultId !== vaultId) return { vaultId, status, error: null, errorSeen: false };
-    // Der Ordner ist wieder da oder ein anderer gewählt: die Meldung dazu hat sich erledigt.
+    // The folder is back or another one was chosen: the message about it is obsolete.
     return !status.missing && s.error === 'dirMissing' ? { status, error: null, errorSeen: false } : { status };
   });
   return status;
 }
 
-/** Öffnet den Ordner-Dialog (in Rust) und merkt sich die Wahl. `false` bei Abbruch. */
+/** Opens the folder dialog (in Rust) and remembers the choice. `false` on cancel. */
 export async function pickAutoBackupDir(vaultId: string): Promise<boolean> {
   const picked = await invoke<string | null>('pick_auto_backup_dir', { vaultId });
   if (picked === null) return false;
@@ -97,51 +97,51 @@ export async function pickAutoBackupDir(vaultId: string): Promise<boolean> {
   return true;
 }
 
-/** Zurück zum `backup/`-Ordner des Vaults. */
+/** Back to the vault's `backup/` folder. */
 export async function resetAutoBackupDir(vaultId: string): Promise<void> {
   await invoke('reset_auto_backup_dir', { vaultId });
   await refreshAutoBackupStatus(vaultId);
 }
 
 /**
- * Schreibt ein Backup des offenen Vaults, wenn eines fällig ist — mit `force`
- * auch sonst („Jetzt sichern"). Tut still nichts, solange kein Vault offen
- * und entsperrt ist.
+ * Writes a backup of the open vault if one is due — with `force`
+ * otherwise too ("Back up now"). Silently does nothing while no vault is open
+ * and unlocked.
  *
- * `'done'`: für jetzt erledigt — geschrieben, nicht fällig, nicht zuständig oder
- * gescheitert (der Fehler steht dann im Store). `'busy'`: es ging gerade nicht —
- * ein Lauf ist unterwegs, ein Import hält die Datenbank, ein Typwechsel schreibt,
- * oder sie wurde während des Laufs geschlossen oder ersetzt — und ein neuer Versuch lohnt sich.
+ * `'done'`: finished for now — written, not due, not responsible or
+ * failed (the error is then in the store). `'busy'`: it did not work right now —
+ * a run is in progress, an import holds the database, a type change is writing,
+ * or it was closed or replaced during the run — and a new attempt is worthwhile.
  */
 export async function runAutoBackup({ force = false }: { force?: boolean } = {}): Promise<'done' | 'busy'> {
   const vaultState = useVaultStore.getState();
   const vaultId = vaultState.activeVaultId;
   if (!hasActiveVault(vaultState) || vaultState.locked) return 'done';
-  // Die Einstellungen eines anderen Vaults dürfen diesen nie sichern (wie `trashRetentionFor`).
+  // The settings of another vault must never back up this one (like `trashRetentionFor`).
   const settingsState = useSettingsStore.getState();
   if (settingsState.vaultId !== vaultId) return 'done';
   const { backup } = settingsState.settings;
   if (!force && !backup.auto) return 'done';
-  // `editorSavesSuspended`: ein Import läuft (siehe `editorLock.ts`).
+  // `editorSavesSuspended`: an import is running (see `editorLock.ts`).
   if (useAutoBackupStore.getState().running || editorSavesSuspended()) return 'busy';
-  // Ein Typwechsel oder ein Abbrechen, das einen zurücknimmt, schreibt über
-  // mehrere Tabellen und reiht das erst nach eigenen awaits ein — `drainSerialized`
-  // unten sähe es noch nicht. Die Bearbeitungssperre deckt die ganze Strecke
-  // (sie hält jedes Abbrechen, auch das einfache).
+  // A type change or a cancel that rolls one back writes across
+  // several tables and only queues that after its own awaits — `drainSerialized`
+  // below would not see it yet. The edit lock covers the whole stretch
+  // (it holds every cancel, the simple one too).
   if (useUIStore.getState().editLocked) return 'busy';
 
-  // Zählt jedes Schließen oder Ersetzen der Datenbank mit (`dbEpoch`): ein Passwortwechsel
-  // oder Import, der mitten im Lauf beginnt *und* endet, sähe am Schluss sonst aus wie Ruhe —
-  // und das Backup enthielte nur, was vor dem Austausch gelesen wurde.
+  // Counts every closing or replacing of the database (`dbEpoch`): a password change
+  // or import that begins *and* ends in the middle of the run would otherwise look like quiet at the end —
+  // and the backup would contain only what was read before the swap.
   const epoch = dbEpoch();
   const lockEpoch = editLockEpoch();
-  /** Der Vault ist noch derselbe, und was gelesen wurde, ist aus einem Guss. */
+  /** The vault is still the same, and what was read is all of a piece. */
   const stillCurrent = () => {
     const now = useVaultStore.getState();
     const sameVault = now.activeVaultId === vaultId && !now.locked;
     const sameDb = !editorSavesSuspended() && dbEpoch() === epoch;
-    // Der Zähler ist die eigentliche Probe: er fängt auch eine Sperre, die mitten
-    // im Lauf begann und endete — der Stand wäre dann halb umgeschrieben.
+    // The counter is the real test: it also catches a lock that began and ended
+    // in the middle of the run — the state would then be half rewritten.
     const noEditLock = !useUIStore.getState().editLocked && editLockEpoch() === lockEpoch;
     return sameVault && sameDb && noEditLock;
   };
@@ -157,7 +157,7 @@ export async function runAutoBackup({ force = false }: { force?: boolean } = {})
     if (!force && !isBackupDue(backup, status.newest, status.today)) return 'done';
 
     await drainSerialized();
-    // Dynamisch: `dbBackup` soll nicht in den Haupt-Chunk (siehe LeftSidebarRail).
+    // Dynamic: `dbBackup` should stay out of the main chunk (see LeftSidebarRail).
     const { buildBackup, FULL_BACKUP_OPTIONS } = await import('./dbBackup');
     const content = JSON.stringify(await buildBackup(FULL_BACKUP_OPTIONS));
     if (!stillCurrent()) return 'busy';
@@ -167,8 +167,8 @@ export async function runAutoBackup({ force = false }: { force?: boolean } = {})
     await refreshAutoBackupStatus(vaultId);
     return 'done';
   } catch (err) {
-    // Vault gesperrt oder gewechselt, mitten im Import, Passwort- oder
-    // Typwechsel: kein Fehler, der nächste Versuch liest wieder einen ruhigen Stand.
+    // Vault locked or switched, in the middle of an import, password or
+    // type change: not an error, the next attempt reads a quiet state again.
     if (!stillCurrent() || keyErrorOf(err).includes(DB_CLOSED)) return 'busy';
     console.error('[auto-backup] failed', err);
     setError(vaultId, keyErrorOf(err).includes(DIR_MISSING) ? 'dirMissing' : 'failed');
@@ -178,23 +178,23 @@ export async function runAutoBackup({ force = false }: { force?: boolean } = {})
   }
 }
 
-/** Wie lange „Jetzt sichern" auf einen Import, Typwechsel oder laufenden Lauf
- *  wartet: 30 Versuche im Abstand von einer Sekunde. */
+/** How long "Back up now" waits for an import, type change or running run:
+ *  30 attempts one second apart. */
 const NOW_RETRY_MS = 1_000;
 const NOW_ATTEMPTS = 30;
 
 /**
- * „Jetzt sichern": schreibt das Backup von heute, auch wenn keines fällig ist.
- * Trifft der Klick auf einen Import, einen Typwechsel oder einen laufenden
- * Lauf, wartet er das ab, statt zu verpuffen — und meldet einen Fehler, wenn
- * es nach einer halben Minute immer noch nicht ging.
+ * "Back up now": writes today's backup, even if none is due.
+ * If the click hits an import, a type change or a running
+ * run, it waits that out instead of fizzling — and reports an error if
+ * it still did not work after half a minute.
  */
 export async function backUpNow(): Promise<void> {
-  // Im Store und nicht im Knopf: der Auftrag überlebt ein geschlossenes
-  // Einstellungsfenster, und ein zweiter Klick startet keinen zweiten.
+  // In the store and not in the button: the job survives a closed
+  // settings window, and a second click does not start a second one.
   if (useAutoBackupStore.getState().requested) return;
   const vaultId = useVaultStore.getState().activeVaultId;
-  // Ein anderer Vault inzwischen: der Auftrag galt dem alten — weder ihn sichern noch ihm einen Fehler melden.
+  // Another vault by now: the job was for the old one — neither back it up nor report an error to it.
   const sameVault = () => useVaultStore.getState().activeVaultId === vaultId;
   useAutoBackupStore.setState({ requested: true });
   try {
@@ -209,35 +209,35 @@ export async function backUpNow(): Promise<void> {
   }
 }
 
-/** Der Auslöser der laufenden Sitzung, solange `startAutoBackup` aktiv ist. */
+/** The trigger of the running session, while `startAutoBackup` is active. */
 let scheduleCheck: (() => void) | null = null;
 
 /**
- * Prüft in ein paar Sekunden, ob ein Backup fällig ist — für Auslöser von
- * außerhalb (ein neuer Ordner), die auf einen laufenden Lauf treffen können.
- * Ohne laufende Sitzung (`startAutoBackup`) geschieht nichts.
+ * Checks in a few seconds whether a backup is due — for triggers from
+ * outside (a new folder) that may hit a running run.
+ * Without a running session (`startAutoBackup`) nothing happens.
  */
 export function requestAutoBackupCheck(): void {
   scheduleCheck?.();
 }
 
 /**
- * Startet die Prüfung für die Dauer der Sitzung; die Rückgabe beendet sie.
- * Der Auslöser ist der Einstellungs-Store: er meldet jeden geöffneten Vault
- * (`loadForVault`) und jede Änderung der Backup-Einstellung; ein neuer Ordner
- * kommt über `requestAutoBackupCheck`.
+ * Starts the check for the duration of the session; the return value stops it.
+ * The trigger is the settings store: it reports every opened vault
+ * (`loadForVault`) and every change of the backup setting; a new folder
+ * comes in via `requestAutoBackupCheck`.
  */
 export function startAutoBackup(): () => void {
   let timer: ReturnType<typeof setTimeout> | undefined;
   let stopped = false;
   const schedule = () => {
-    // Ein Lauf, der erst nach dem Beenden zurückkommt, stellt keinen Timer mehr.
+    // A run that only returns after stopping no longer sets a timer.
     if (stopped) return;
     clearTimeout(timer);
     timer = setTimeout(check, SETTLE_MS);
   };
-  // Ein Auslöser, der auf einen laufenden Lauf, einen Import oder einen
-  // Typwechsel trifft, ginge sonst verloren — bis zur nächsten vollen Stunde.
+  // A trigger that hits a running run, an import or a
+  // type change would otherwise be lost — until the next full hour.
   const check = () => void runAutoBackup().then((outcome) => { if (outcome === 'busy') schedule(); });
   const unsubscribe = useSettingsStore.subscribe((state, prev) => {
     if (state.vaultId !== prev.vaultId || state.settings.backup !== prev.settings.backup) schedule();
@@ -247,7 +247,7 @@ export function startAutoBackup(): () => void {
   schedule();
   return () => {
     stopped = true;
-    // Nur den eigenen: ein späterer Start hat ihn womöglich schon ersetzt.
+    // Only our own: a later start may have replaced it already.
     if (scheduleCheck === schedule) scheduleCheck = null;
     clearTimeout(timer);
     clearInterval(interval);

@@ -26,12 +26,12 @@ import BlockDefinitionEditor, { DeleteDefinitionModal } from '../blocks/BlockDef
 import { useSessionState } from '../../store/sessionStore';
 
 /**
- * Die Rail-Ansicht „Blöcke", gebaut wie die übrigen Dashboards: die Liste der
- * eigenen Blöcke, Kopf (Titel, „Neuer Block", Suche, Ansicht und Sortierung —
- * beide nur für die eigenen) in der rechten Seitenleiste. Ein Klick öffnet den Block als eigene Seite
- * (`{ type: 'blocks', id }`) — wie ein Eintrag, mit Speichern, Anzeige und
- * Verwendung in der Seitenleiste. Eingefügt werden eigene Blöcke in jedem
- * Eintrag über „Block hinzufügen".
+ * The rail view "Blocks", built like the other dashboards: the list of
+ * custom blocks, header (title, "New block", search, view and sorting —
+ * both only for the custom ones) in the right sidebar. A click opens the block as a page of its own
+ * (`{ type: 'blocks', id }`) — like an entry, with saving, display and
+ * usage in the sidebar. Custom blocks are inserted in every
+ * entry via "Add block".
  */
 export default function BlocksView() {
   const { t } = useTranslation();
@@ -44,12 +44,12 @@ export default function BlocksView() {
   const setActiveView = useUIStore((s) => s.setActiveView);
   const clearDraft = useBlockDraftStore((s) => s.clearDraft);
   const rows = useBlockContentRows();
-  /** Schnappschuss statt id: der Dialog zeigt nach dem Löschen noch seine Meldung. */
+  /** Snapshot instead of id: after deleting, the dialog still shows its message. */
   const [deleting, setDeleting] = useState<BlockDefinition | null>(null);
 
   const templates = useTemplateStore((s) => s.templates);
   const usage = useMemo(() => copyUsage(rows, templates, definitions), [rows, templates, definitions]);
-  // Eine id ohne Definition (gelöscht, anderer Vault im gemerkten Tab) fällt auf die Liste zurück.
+  // An id without a definition (deleted, another vault in the remembered tab) falls back to the list.
   const selected = activeView.id ? definitions.find((d) => d.id === activeView.id) ?? null : null;
 
   const backToList = () => setActiveView({ type: 'blocks' });
@@ -60,13 +60,13 @@ export default function BlocksView() {
   };
 
   /**
-   * Wie alles andere ohne Rückfrage in den Papierkorb, mit Rückgängig. Nur wo
-   * Kopien in Einträgen oder Vorlagen stecken, fragt der Dialog, ob sie mit
-   * entfernt werden sollen.
+   * To the trash without confirmation like everything else, with undo. Only
+   * where copies sit in entries or templates does the dialog ask whether they
+   * should be removed too.
    */
   const remove = async (def: BlockDefinition) => {
-    // Solange Inhalte nachladen (Start), zählt `usage` zu wenig Kopien — und
-    // ohne Kopien käme keine Rückfrage. Dann erst warten und frisch zählen.
+    // While content is still loading (startup), `usage` counts too few copies —
+    // and without copies no confirmation would appear. So wait first and count afresh.
     const fresh = useEntryStore.getState().pendingContent
       ? (await whenEntryContentLoaded(), copyUsage(allEntries(useEntryStore.getState().entries), useTemplateStore.getState().templates, definitions))
       : usage;
@@ -78,12 +78,12 @@ export default function BlocksView() {
     try {
       await deleteDefinition(def.id);
     } catch (err) {
-      // Nichts verloren: Block und Entwurf bleiben, wo sie waren.
+      // Nothing lost: block and draft stay where they were.
       console.error('[BlocksView] deleting the block failed:', err);
       return;
     }
     clearDraft(def.id);
-    // Der Stand nach dem Löschen — siehe TemplatesView.remove.
+    // The state after deleting — see TemplatesView.remove.
     if (useUIStore.getState().activeView.id === def.id) backToList();
     pushUndo({
       id: generateId(),
@@ -105,8 +105,8 @@ export default function BlocksView() {
     />
   );
 
-  // Ein Rückgabepfad für Seite und Liste: der Löschdialog muss den Wechsel
-  // von der gelöschten Seite zur Liste mit seinem Zustand überleben.
+  // One return path for page and list: the delete dialog has to survive the
+  // switch from the deleted page to the list with its state.
   return (
     <>
       {selected ? (
@@ -127,11 +127,11 @@ export default function BlocksView() {
 }
 
 /**
- * Die eingebauten Blöcke unter den eigenen, gebaut wie die Bibliothek unter
- * den Altären — dieselbe Liste wie „Block hinzufügen" im Eintrag. Nur zum
- * Nachschlagen: anlegen oder bearbeiten lässt sich an ihnen nichts, darum
- * ruhende Kacheln (Rahmen, drei Spalten, kein Hover) statt klickbarer
- * Dashboard-Zeilen. Die Suche filtert mit.
+ * The built-in blocks below the custom ones, built like the library below
+ * the altars — the same list as "Add block" in the entry. For reference
+ * only: nothing can be created or edited on them, hence
+ * resting tiles (frame, three columns, no hover) instead of clickable
+ * dashboard rows. The search filters them too.
  */
 function BuiltInBlocksSection({ query }: { query: string }) {
   const { t } = useTranslation();
@@ -149,13 +149,13 @@ function BuiltInBlocksSection({ query }: { query: string }) {
       />
       {!collapsed && (
         <>
-          {/* Bewusst die kleine Zeile statt `NoResults`: leer wird die Liste nur
-              durch die Suche, und das große „Keine Treffer" steht schon oben. */}
+          {/* Deliberately the small line instead of `NoResults`: the list only
+              becomes empty through the search, and the large "No results" is already above. */}
           {presets.length === 0
             ? <p className="text-xs text-stone-700 px-1 py-1">{t('search.noResults')}</p>
             : (
-              // Kacheln mit Rahmen, aber ohne Hover und Zeiger: anlegen oder
-              // öffnen lässt sich an ihnen nichts, sie zeigen nur, was es gibt.
+              // Tiles with a frame, but without hover and pointer: nothing can
+              // be created or opened on them, they only show what exists.
               <ul className="grid grid-cols-3 gap-2">
                 {presets.map((preset) => {
                   const Icon = preset.icon;
@@ -178,10 +178,10 @@ function BuiltInBlocksSection({ query }: { query: string }) {
   );
 }
 
-/** Wonach sich die eigenen Blöcke sortieren lassen: zuletzt geändert, Name, Verwendung. */
+/** What the custom blocks can be sorted by: last modified, name, usage. */
 const BLOCK_SORTS: readonly SortMode[] = ['date_desc', 'date_asc', 'alpha_asc', 'alpha_desc', 'count_desc'];
 
-/** Die Liste der eigenen Blöcke im gemeinsamen Dashboard-Gerüst. */
+/** The list of custom blocks in the shared dashboard scaffold. */
 function BlockList({ usage, onCreate, onDelete }: {
   usage: Map<string, CopyUsage>;
   onCreate: () => void;
@@ -189,7 +189,7 @@ function BlockList({ usage, onCreate, onDelete }: {
 }) {
   const { t } = useTranslation();
   const definitions = useBlockDefinitionStore((s) => s.definitions);
-  // Die Seite legt ungespeicherte Entwürfe im Store ab; hier nur der Hinweis darauf.
+  // The page keeps unsaved drafts in the store; here only the indication of them.
   const drafts = useBlockDraftStore((s) => s.drafts);
   const openInNewTabAction = useOpenInNewTabAction();
   const [search, setSearch] = useSessionState('blocks.search', '');
@@ -211,7 +211,7 @@ function BlockList({ usage, onCreate, onDelete }: {
       tiebreak: (a, b) => definitionLabel(t, a).localeCompare(definitionLabel(t, b)),
     },
   ), [definitions, query, sort, usage, t]);
-  // Zugeklappt eine leere Liste statt eines Sonderzweigs, wie im Altar-Dashboard.
+  // Collapsed means an empty list instead of a special branch, as in the altar dashboard.
   const shown = customCollapsed ? [] : sorted;
 
   const renderRow = (def: BlockDefinition) => {

@@ -10,34 +10,33 @@ import {
 } from '../layout/titlebar/editCommands';
 
 /**
- * Das Bearbeiten-Kontextmenue der App — und zugleich die Stelle, die das native
- * Menue der WebView ueberall unterdrueckt.
+ * The app's edit context menu, and at the same time the place that suppresses
+ * the WebView's native menu everywhere.
  *
- * Das native Menue ist in einer Desktop-App ein Fremdkoerper: es bietet "Neu
- * laden", "Zurueck" und "Bild speichern unter" an, Browser-Begriffe fuer eine
- * App, die keine Seiten hat. Hier gilt deshalb die Umkehrung der
- * Browser-Voreinstellung: kein Kontextmenue, ausser die App macht selbst eines
- * auf. In einem Textfeld ist das ab jetzt dieses hier — Ausschneiden, Kopieren,
- * Einfuegen und Alles auswaehlen, mit denselben Befehlen, die auch das
- * Bearbeiten-Menue der Titelleiste benutzt.
+ * In a desktop app the native menu is a foreign body: it offers "Reload",
+ * "Back" and "Save image as", browser terms for an
+ * app that has no pages. So the browser default is reversed here:
+ * no context menu unless the app opens one itself. In a text field that is
+ * now this one: Cut, Copy, Paste and Select all, with the same commands
+ * the title bar's Edit menu uses.
  *
- * Eine Ausnahme bleibt: der Editor. Die Rechtschreibvorschlaege haengen am
- * nativen Menue und sind aus JS nicht nachzubauen — wo Fliesstext entsteht,
- * wiegt das schwerer als eine einheitliche Menue-Optik. Dort laeuft der
- * Rechtsklick deshalb unangetastet durch. Einzeilige Felder tragen Namen und
- * Titel, keine Rechtschreibung; sie bekommen unser Menue.
+ * One exception remains: the editor. The spelling suggestions hang off the
+ * native menu and cannot be rebuilt from JS; where running text is written,
+ * that outweighs a uniform menu look. So there the right
+ * click passes through untouched. Single-line fields carry names and
+ * titles, not spelling; they get our menu.
  */
 const EDITABLE_SELECTOR = 'input, textarea, [contenteditable=""], [contenteditable="true"]';
 
-/** Alles andere — Datum, Checkbox, Farbe, Datei — ist kein Textfeld, auch wenn
- *  es ein <input> ist. Die Export-Filter haben zwei Datumsfelder. */
+/** Everything else (date, checkbox, colour, file) is not a text field, even if
+ *  it is an <input>. The export filters have two date fields. */
 const TEXT_INPUT_TYPES = new Set(['text', 'search', 'url', 'email', 'tel', 'password', 'number']);
 
 interface EditMenuState {
   x: number;
   y: number;
-  /** Das Textfeld, auf das sich das Menue bezieht — `null` bei markiertem Text
-   *  ausserhalb eines Feldes, wo es nur Kopieren gibt. */
+  /** The text field the menu refers to; `null` for selected text
+   *  outside a field, where there is only Copy. */
   field: HTMLElement | null;
   hasSelection: boolean;
   canWrite: boolean;
@@ -62,8 +61,8 @@ function documentHasSelection(): boolean {
 
 function fieldHasSelection(el: HTMLElement): boolean {
   if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) {
-    // selectionStart ist bei manchen Typen null; dann gibt es auch nichts zu
-    // kopieren. TEXT_INPUT_TYPES haelt die Faelle ohnehin schon draussen.
+    // selectionStart is null for some types; then there is nothing to
+    // copy either. TEXT_INPUT_TYPES already keeps those cases out anyway.
     const { selectionStart, selectionEnd } = el;
     return selectionStart !== null && selectionEnd !== null && selectionStart !== selectionEnd;
   }
@@ -80,21 +79,21 @@ export default function EditContextMenu() {
       const editable = target?.closest<HTMLElement>(EDITABLE_SELECTOR) ?? null;
       const field = editable && isTextField(editable) ? editable : null;
 
-      // Der Editor behaelt das native Menue, wegen der Rechtschreibvorschlaege
-      // (siehe oben). `isContentEditable` trifft nur den beschreibbaren
-      // Editor; im Lesemodus steht contenteditable auf "false", dort greift
-      // weiter unten der Zweig fuer markierten Text.
+      // The editor keeps the native menu, because of the spelling suggestions
+      // (see above). `isContentEditable` only matches the writable
+      // editor; in read mode contenteditable is "false", and there the branch
+      // for selected text further down applies.
       if (field?.isContentEditable) return;
 
-      // Jedes eigene Kontextmenue der App ruft in seinem Handler
-      // preventDefault — daran erkennt dieser Listener, dass die Stelle schon
-      // vergeben ist. Ein Textfeld gewinnt trotzdem: dort will niemand das
-      // Menue der Zeile, sondern Ausschneiden und Einfuegen. Heute
-      // ueberschneidet sich beides nirgends, die Reihenfolge ist Vorsorge.
+      // Every context menu of the app calls preventDefault in its handler;
+      // that is how this listener recognises that the spot is already
+      // taken. A text field wins anyway: there nobody wants the
+      // row's menu but Cut and Paste. Today
+      // the two overlap nowhere, the ordering is precaution.
       if (!field && event.defaultPrevented) return;
 
-      // Ab hier bleibt das native Menue in jedem Fall weg, auch wenn wir
-      // selbst nichts anzubieten haben.
+      // From here on the native menu stays away in every case, even if we
+      // have nothing to offer ourselves.
       event.preventDefault();
 
       if (field) {
@@ -144,9 +143,9 @@ export default function EditContextMenu() {
       label: t('menu.paste'),
       icon: <ClipboardPaste size={12} />,
       onClick: () => {
-        // pasteFromClipboard schickt sein Ereignis an document.activeElement.
-        // Normalerweise ist das Feld schon fokussiert — der Rechtsklick
-        // erledigt das —, aber ohne Fokus ginge das Eingefuegte ins Leere.
+        // pasteFromClipboard sends its event to document.activeElement.
+        // Normally the field is already focused (the right click
+        // takes care of that), but without focus the pasted text would go nowhere.
         const { field } = menu;
         if (field && !field.contains(document.activeElement)) field.focus();
         void pasteFromClipboard();

@@ -12,7 +12,7 @@ import VocabularyTable from './VocabularyTable';
 import AlphabetTable from './AlphabetTable';
 import type { Language } from '../../types';
 
-/** Wie lange nach dem letzten Tastendruck gewartet wird, bevor der Name gespeichert wird. */
+/** How long to wait after the last keystroke before the name is saved. */
 const SAVE_DELAY_MS = 500;
 
 interface Props {
@@ -22,13 +22,13 @@ interface Props {
 }
 
 /**
- * Die Seite einer Sprache: Name als Titel, darunter ihre Vokabeln und ihr
- * Alphabet. In der Seitenleiste Icon und Umfang.
+ * A language's page: name as title, below it its vocabulary and its
+ * alphabet. In the sidebar icon and size.
  *
- * Auf demselben `LibraryPageFrame` wie die Seite eines eigenen Blocks und die
- * einer Vorlage, aber ohne deren Entwurfs-Betrieb: hier wird jede Zeile sofort
- * gespeichert, es gibt also nichts zurückzunehmen. Statt Fertig/Löschen/
- * Abbrechen trägt die Leiste nur das Löschen.
+ * On the same `LibraryPageFrame` as the page of a custom block and that
+ * of a template, but without their draft mode: here every row is saved
+ * immediately, so there is nothing to take back. Instead of Done/Delete/
+ * Cancel the bar carries only Delete.
  */
 export default function LanguagePage({ language, onClose, onDelete }: Props) {
   const { t } = useTranslation();
@@ -80,23 +80,23 @@ export default function LanguagePage({ language, onClose, onDelete }: Props) {
 }
 
 /**
- * Ein Feld, das seinen Wert erst nach einer Tippause speichert.
+ * A field that only saves its value after a typing pause.
  *
- * Für den Namen einer Sprache: er gehört der Zeile, nicht einem Entwurf, und
- * jedes Zeichen sofort zu schreiben hieße, pro Wort ein halbes Dutzend UPDATEs
- * abzusetzen. Der lokale Stand wird nur nachgeführt, wenn der Wert von außen
- * ein anderer geworden ist — sonst risse jede eigene Speicherung den Cursor an
- * sich.
+ * For a language's name: it belongs to the row, not to a draft, and
+ * writing every character immediately would mean issuing half a dozen UPDATEs
+ * per word. The local state is only updated when the value has changed
+ * from outside; otherwise each of its own saves would yank the cursor
+ * away.
  */
 function useDebouncedField(value: string, onCommit: (value: string) => void) {
   const [draft, setDraft] = useState(value);
-  // Der Aufrufer reicht eine frische Funktion je Rendern herein; stünde sie in
-  // den Abhängigkeiten, begänne die Wartezeit bei jedem Rendern von vorn.
+  // The caller passes in a fresh function on every render; if it were in
+  // the dependencies, the wait would start over on every render.
   const commit = useRef(onCommit);
   commit.current = onCommit;
 
-  // Ein neuer Wert von außen (Sprachwechsel, Rückgängig) setzt das Feld; die
-  // eigene Speicherung liefert denselben Wert und lässt den Cursor in Ruhe.
+  // A new value from outside (language switch, undo) sets the field; its own
+  // save returns the same value and leaves the cursor alone.
   useEffect(() => {
     setDraft((current) => (current === value ? current : value));
   }, [value]);

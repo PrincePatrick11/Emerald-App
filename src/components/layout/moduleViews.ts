@@ -1,12 +1,12 @@
 /**
- * Komponenten-Schicht der Modul-Registry: View-Typ → lazy geladene View.
+ * Component layer of the module registry: view type → lazily loaded view.
  *
- * Import-Regel: diese Datei darf NUR von MainArea importiert werden. Jeder
- * weitere Importeur riskiert, die lazy-Chunks in sein eigenes Bundle zu ziehen
- * — Metadaten (Icon, Label) kommen aus `lib/modules.ts`, nicht von hier.
+ * Import rule: this file may ONLY be imported by MainArea. Any
+ * further importer risks pulling the lazy chunks into its own bundle
+ * — metadata (icon, label) comes from `lib/modules.ts`, not from here.
  *
- * Jede View als eigener Chunk: TipTap haengt an Journal/Wiki/Operations und
- * wuerde sonst bei jedem Start mitgeladen, auch wenn nur Home offen ist.
+ * Each view as a chunk of its own: TipTap hangs on Journal/Wiki/Operations and
+ * would otherwise be loaded on every start, even when only Home is open.
  */
 import { lazy, type ComponentType, type LazyExoticComponent } from 'react';
 import type { ViewId } from '../../lib/modules';

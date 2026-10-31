@@ -4,31 +4,31 @@ import Button from './Button';
 import CollapseChevron from './CollapseChevron';
 
 interface Props {
-  /** Ohne onToggleCollapse entfällt der Chevron — der Kopf ist dann nicht klappbar. */
+  /** Without onToggleCollapse the chevron is omitted; the header is then not collapsible. */
   onToggleCollapse?: () => void;
   collapsed?: boolean;
-  /** Feste w-5-Spalte wie in jeder Kategoriezeile — hält die Labels einer Liste bündig. */
+  /** Fixed w-5 column as in every category row; keeps the labels of a list aligned. */
   emoji?: string;
-  /** Statt des Emojis, in derselben w-5-Spalte (Tags: der Farbpunkt). */
+  /** Instead of the emoji, in the same w-5 column (tags: the colour dot). */
   leading?: ReactNode;
   label: string;
-  /** Der „(n)"-Zähler rechts vom Label — die eine Stelle für seine Klassenkette. */
+  /** The "(n)" counter right of the label; the one place for its class chain. */
   count?: number;
-  /** Rechts vom Label-Freiraum, hinter dem Zähler. */
+  /** Right of the label's free space, after the counter. */
   meta?: ReactNode;
-  /** Der „+"-Knopf: „Eintrag direkt in dieser Gruppe anlegen". Ein Paar, damit
-   *  der Knopf nicht ohne zugänglichen Namen entstehen kann. */
+  /** The "+" button: "create an entry directly in this group". A pair, so that
+   *  the button cannot come into being without an accessible name. */
   add?: { title: string; onClick: () => void };
-  /** Rechtsbündige Buttons, hinter dem „+". */
+  /** Right-aligned buttons, after the "+". */
   actions?: ReactNode;
 }
 
 /**
- * Der Kopf einer auf-/zuklappbaren Gruppe — Kategorien in Wiki, Operations,
- * Tasks und Altar ebenso wie die „Ohne Kategorie"-Buckets daneben, hinter
- * denen keine Kategorie steht, und die Tags. Verwaltet wird hier selbst
- * nichts: Kategorien verwaltet `CategoriesView`; die Tags-Ansicht, die ihre
- * eigene Verwaltung ist, reicht ihre Knöpfe über `leading`/`actions` herein.
+ * The header of a collapsible group: categories in wiki, operations,
+ * tasks and altar as well as the "No category" buckets next to them, behind
+ * which there is no category, and the tags. Nothing is managed
+ * here: `CategoriesView` manages categories; the tags view, which is its
+ * own management, passes in its buttons via `leading`/`actions`.
  */
 export default function CollapsibleGroupHeader({
   onToggleCollapse, collapsed = false, emoji, leading, label, count, meta, add, actions,
@@ -42,8 +42,8 @@ export default function CollapsibleGroupHeader({
       <p className="text-xs text-stone-600 font-semibold uppercase tracking-wider flex-1">{label}</p>
       {count != null && <span className="text-xs text-stone-500">({count})</span>}
       {meta}
-      {/* Getönte Row-Action in der 24px-small-Reihe — 30px würde die
-          Kopfzeile aufblähen. */}
+      {/* Tinted row action in the 24px small row; 30px would bloat the
+          header line. */}
       {add && (
         <Button tone="jade" compact small title={add.title} aria-label={add.title} onClick={add.onClick}>
           <Plus size={12} />

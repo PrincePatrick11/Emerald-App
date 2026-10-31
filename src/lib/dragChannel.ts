@@ -1,7 +1,7 @@
 /**
- * Modulweiter Kanal für HTML5-Drag-Payloads, die nicht durch dataTransfer
- * passen (React-Objekte). dragState/altarDragState sind dünne Adapter
- * hierüber und behalten ihre benannten Exporte.
+ * Module-wide channel for HTML5 drag payloads that do not fit through
+ * dataTransfer (React objects). dragState/altarDragState are thin adapters
+ * on top of it and keep their named exports.
  */
 export interface DragChannel<T> {
   set: (item: T | null) => void;

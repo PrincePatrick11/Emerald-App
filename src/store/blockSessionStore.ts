@@ -2,53 +2,53 @@ import { create } from 'zustand';
 import type { BlockAttrName, BlockInstance } from '../lib/blocks/types';
 
 /**
- * Die Brücke zwischen dem `BlockStack` im Hauptbereich und der Block-Verwaltung
- * in der rechten Seitenleiste. Die beiden sind Geschwister-Bäume und kennen
- * einander nicht — derselbe Grund, aus dem `uiStore.editActions` existiert.
+ * The bridge between the `BlockStack` in the main area and the block management
+ * in the right sidebar. The two are sibling trees and do not know
+ * each other — the same reason `uiStore.editActions` exists.
  *
- * Der Stapel veröffentlicht hier seine Blockstruktur (bei jeder
- * Strukturänderung, nicht pro Tastendruck) und die Handgriffe, mit denen die
- * Seitenleiste ihn bedient. Jede Änderung läuft damit durch den Stapel und
- * landet im Inhalt: Cancel dreht sie mit dem Text zurück.
+ * The stack publishes its block structure here (on every
+ * structural change, not per keystroke) and the handles the sidebar uses to
+ * operate it. Every change thus runs through the stack and ends up in
+ * the content: Cancel reverts it along with the text.
  *
- * Nur im Speicher, nie persistiert — die Wahrheit ist der Inhalt des Eintrags.
+ * In memory only, never persisted — the truth is the entry's content.
  */
 export interface BlockStackApi {
-  /** Einen neuen Block aus einer Voreinstellung (`BLOCK_PRESETS`) an `index` einfügen. */
+  /** Insert a new block from a preset (`BLOCK_PRESETS`) at `index`. */
   insert: (index: number, presetId: string) => void;
   duplicate: (id: string) => void;
   remove: (id: string) => void;
   reorder: (ids: string[]) => void;
-  /** Ein Instanz-Attribut aus `BLOCK_ATTR` setzen; `null` entfernt es. */
+  /** Set an instance attribute from `BLOCK_ATTR`; `null` removes it. */
   setAttr: (id: string, name: BlockAttrName, value: string | null) => void;
-  /** Den ganzen Block ersetzen — Seitenleisten-Abschnitte, deren Typ Fallback-HTML mitschreibt. */
+  /** Replace the whole block — sidebar sections whose type also writes fallback HTML. */
   update: (id: string, next: BlockInstance) => void;
-  /** Zum Block scrollen und ihn kurz hervorheben. */
+  /** Scroll to the block and highlight it briefly. */
   reveal: (id: string) => void;
-  /** Die Blöcke mit dem lebenden HTML der Textblöcke — `blocks` der Sitzung hinkt beim Tippen hinterher. */
+  /** The blocks with the live HTML of the text blocks — the session's `blocks` lags behind while typing. */
   liveBlocks: () => BlockInstance[];
-  /** Die Vorlagen-Auswahl des Stapels öffnen — nur in einem Stapel mit Vorlagen (`BlockSession.templates`). */
+  /** Open the stack's template picker — only in a stack with templates (`BlockSession.templates`). */
   openTemplatePicker: () => void;
 }
 
 export interface BlockSession {
-  /** Neu pro Montage des Stapels — die Seitenleiste setzt damit ihren eigenen Zustand zurück (Cancel montiert neu). */
+  /** New per mount of the stack — the sidebar resets its own state with it (Cancel remounts). */
   sessionId: string;
-  /** Der Eintrag, dem der Stapel gehört — die Seitenleiste zeigt nur die passende Sitzung. */
+  /** The entry the stack belongs to — the sidebar only shows the matching session. */
   entryId: string;
-  /** Struktur-Stand; `html` darin ist der Stand des letzten Strukturwechsels. */
+  /** Structure state; the `html` in it is the state at the last structural change. */
   blocks: BlockInstance[];
   isEditing: boolean;
-  /** Kann der Stapel Vorlagen einsetzen? Nur Einträge, nicht die Seite einer Vorlage. */
+  /** Can the stack insert templates? Only entries, not a template's page. */
   templates: boolean;
-  /** Nach dem Abbau des Stapels wirkungslos — ein veralteter Aufruf erreicht keinen fremden Eintrag. */
+  /** Ineffective after the stack is torn down — a stale call does not reach a foreign entry. */
   api: BlockStackApi;
 }
 
 interface BlockSessionState {
   session: BlockSession | null;
   publish: (session: BlockSession) => void;
-  /** Räumt nur, wenn die Sitzung noch diesem Stapel gehört — ein neuer darf schon übernommen haben. */
+  /** Clears only if the session still belongs to this stack — a new one may already have taken over. */
   clear: (api: BlockStackApi) => void;
 }
 

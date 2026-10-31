@@ -2,7 +2,7 @@ import { useSettingsStore } from '../store/settingsStore';
 import { scaleToMaxEdge } from './shrinkImage';
 import { isAcceptedImageFile, readFileAsDataUrl } from './helpers';
 
-/** Ein Bild, das auch nach dem Verkleinern über der Dateigröße des Vaults liegt. */
+/** An image that is still over the vault's file size limit even after downscaling. */
 export class ImageTooLargeError extends Error {
   constructor(readonly maxBytes: number) {
     super(`image larger than ${maxBytes} bytes`);
@@ -10,9 +10,9 @@ export class ImageTooLargeError extends Error {
   }
 }
 
-/** Formate, die beim Verkleinern etwas verlören: GIF die Animation, SVG die Vektoren. */
+/** Formats that would lose something when downscaled: GIF its animation, SVG its vectors. */
 const NOT_SCALED = new Set(['image/gif', 'image/svg+xml']);
-/** Ausgabeformate, die ihre Qualität als Zahl nehmen. */
+/** Output formats that take their quality as a number. */
 const LOSSY = new Set(['image/jpeg', 'image/webp']);
 const LOSSY_QUALITY = 0.92;
 
@@ -20,7 +20,7 @@ function mimeOf(dataUrl: string): string {
   return dataUrl.slice(5, dataUrl.indexOf(';')).toLowerCase();
 }
 
-/** Die Bytes hinter einer base64-Data-URL, ohne sie zu dekodieren. */
+/** The bytes behind a base64 data URL, without decoding it. */
 export function dataUrlBytes(dataUrl: string): number {
   const base64 = dataUrl.slice(dataUrl.indexOf(',') + 1);
   const padding = base64.endsWith('==') ? 2 : base64.endsWith('=') ? 1 : 0;
@@ -29,9 +29,9 @@ export function dataUrlBytes(dataUrl: string): number {
 
 const MIB = 1024 * 1024;
 
-/** „5 MB" — die Grenzen sind ganze MB-Stufen, ein Deckel wie 64 MB ebenso.
- *  Nicht `formatBytes`: das ginge bei kleinen Grenzen auf KB herunter, und
- *  „512 KB" neben lauter MB-Stufen läse sich wie eine andere Einstellung. */
+/** "5 MB" — the limits are whole MB steps, and so is a cap like 64 MB.
+ *  Not `formatBytes`: that would drop to KB for small limits, and
+ *  "512 KB" next to nothing but MB steps would read like a different setting. */
 export function imageSizeLabel(bytes: number, megabytesUnit: string): string {
   return `${Math.round((bytes / MIB) * 10) / 10} ${megabytesUnit}`;
 }
@@ -39,17 +39,17 @@ export function imageSizeLabel(bytes: number, megabytesUnit: string): string {
 async function scaleDown(dataUrl: string, maxEdge: number): Promise<string> {
   const mime = mimeOf(dataUrl);
   if (NOT_SCALED.has(mime)) return dataUrl;
-  // Das Format bleibt: ein JPEG-Foto als PNG würde größer statt kleiner.
-  // WebKit kann kein WebP schreiben und liefert dann PNG — auch das ist ein Bild.
+  // The format stays: a JPEG photo as PNG would get bigger instead of smaller.
+  // WebKit cannot write WebP and returns PNG then — that is an image too.
   return scaleToMaxEdge(dataUrl, maxEdge, { mime, quality: LOSSY.has(mime) ? LOSSY_QUALITY : undefined });
 }
 
 /**
- * Bringt ein eingefügtes Bild auf die Grenzen des Vaults: erst auf die größte
- * Kantenlänge verkleinern, dann die Dateigröße prüfen. `capBytes` ist ein
- * fester Deckel des Aufrufers (Altar-Bilder); es gilt die kleinere Grenze.
+ * Brings a pasted image within the vault's limits: first downscale to the largest
+ * edge length, then check the file size. `capBytes` is a fixed cap
+ * from the caller (altar images); the smaller limit applies.
  *
- * @throws ImageTooLargeError, wenn es danach noch zu groß ist — mit der Grenze, die griff.
+ * @throws ImageTooLargeError if it is still too large afterwards — with the limit that applied.
  */
 export async function prepareImageDataUrl(dataUrl: string, options: { capBytes?: number } = {}): Promise<string> {
   const limits = useSettingsStore.getState().settings.images;
@@ -64,19 +64,19 @@ export async function prepareImageDataUrl(dataUrl: string, options: { capBytes?:
 }
 
 /**
- * Eine gewählte Datei als Icon (Eintrag, Vorlage, Block, Altar): nur die
- * angenommenen Bildformate und kein SVG — Icons liegen inline in der Zeile —,
- * verkleinert wie jedes Bild. `null` für eine abgelehnte Datei; die
- * Fehlermeldung bleibt beim Aufrufer.
+ * A chosen file as an icon (entry, template, block, altar): only the
+ * accepted image formats and no SVG — icons sit inline in the row —,
+ * downscaled like any image. `null` for a rejected file; the
+ * error message is left to the caller.
  *
- * @throws wie `prepareImageDataUrl`, oder wenn das Lesen abbricht.
+ * @throws like `prepareImageDataUrl`, or if reading fails.
  */
 export async function readIconFile(file: File): Promise<string | null> {
   if (!isAcceptedImageFile(file) || file.type === 'image/svg+xml') return null;
   return prepareImageDataUrl(await readFileAsDataUrl(file));
 }
 
-/** Ob die Grenzen des Vaults überhaupt etwas an einem Bild ändern können. */
+/** Whether the vault's limits can change anything about an image at all. */
 export function hasImageLimits(): boolean {
   const limits = useSettingsStore.getState().settings.images;
   return limits.maxEdge !== null || limits.maxSizeMb !== null;

@@ -10,16 +10,16 @@ import FieldDropdown from './FieldDropdown';
 import { SwitchRow } from './Switch';
 import { SidebarGroup } from './SidebarColumn';
 
-/* Icon je Modus: die Ansicht steht als Icon-Leiste (Label in
-   title/aria-label), die Sortierung als Auswahl mit Icon und Text. */
+/* Icon per mode: the view appears as an icon bar (label in
+   title/aria-label), the sorting as a select with icon and text. */
 const VIEW_ICONS: Record<ViewMode, LucideIcon> = {
   list: List,
   cards: LayoutGrid,
   cards_wide: StretchHorizontal,
   timeline: CalendarRange,
 };
-/** Reihenfolge der Sortier-Auswahl, wenn der Aufrufer keine `sortModes`
- *  vorgibt. `count_desc` fehlt bewusst: nur Tags haben etwas zu zählen. */
+/** Order of the sort select when the caller specifies no `sortModes`.
+ *  `count_desc` is deliberately missing: only tags have anything to count. */
 const DEFAULT_SORT_MODES: readonly SortMode[] = ['date_desc', 'date_asc', 'alpha_asc', 'alpha_desc'];
 
 const SORT_ICONS: Record<SortMode, LucideIcon> = {
@@ -30,8 +30,8 @@ const SORT_ICONS: Record<SortMode, LucideIcon> = {
   count_desc: ArrowDown10,
 };
 
-/** Welches Datum die Datums-Sortierung einer Liste vergleicht — steht vorn
- *  in ihrem Label („Erstellt · neueste"). */
+/** Which date a list's date sort compares; it comes first
+ *  in its label ("Created · newest"). */
 export type SortDateField = 'created' | 'updated' | 'deleted';
 
 const SORT_DATE_KEYS: Record<SortDateField, string> = {
@@ -41,29 +41,29 @@ const SORT_DATE_KEYS: Record<SortDateField, string> = {
 };
 
 interface Props {
-  /** Ansicht und Sortierung sind Achsen wie `groupBy`: fehlt der Handler,
-   *  entfällt der Abschnitt. Die Kategorien-Ansicht hat weder das eine noch
-   *  das andere — ihre Ordnung ist die von Hand gezogene. */
+  /** View and sorting are axes like `groupBy`: if the handler is missing,
+   *  the section is omitted. The categories view has neither the one nor
+   *  the other; its order is the hand-dragged one. */
   view?: ViewMode;
   sort?: SortMode;
   onView?: (v: ViewMode) => void;
   onSort?: (s: SortMode) => void;
   viewOptions?: { value: ViewMode; label: string }[];
-  /** Welche Sortiermodi zur Wahl stehen, in dieser Reihenfolge. */
+  /** Which sort modes are on offer, in this order. */
   sortModes?: readonly SortMode[];
-  /** Welches Datum die Datums-Sortierung vergleicht; Default `created`. */
+  /** Which date the date sort compares; default `created`. */
   sortDate?: SortDateField;
-  /** Überschrift der Sortierung, wenn die Leiste mehr als eine hat
-   *  (Altar: „Sortierung · Altäre" über „Sortierung · Bibliothek"). */
+  /** Heading of the sorting when the bar has more than one
+   *  (altar: "Sort · Altars" above "Sort · Library"). */
   sortLabel?: string;
-  /** Die Gruppierungs-Achse; fehlt sie, entfällt der Schalter unter der
-   *  Sortierung. Siehe DashboardGroupBy. */
+  /** The grouping axis; if it is missing, the toggle below the
+   *  sorting is omitted. See DashboardGroupBy. */
   groupBy?: DashboardGroupBy;
 }
 
 /**
- * Das Suchfeld einer Liste, im Hauptbereich rechts neben dem Titel
- * (`Dashboard`); die Breite gibt der Aufrufer über `className`.
+ * The search field of a list, in the main area to the right of the title
+ * (`Dashboard`); the caller sets the width via `className`.
  */
 export function ListSearchField({ value, onChange, placeholder, className = '' }: {
   value: string;
@@ -90,27 +90,27 @@ export function ListSearchField({ value, onChange, placeholder, className = '' }
   );
 }
 
-/** Der Zeitstrahl gruppiert nach Monat über die *sortierte* Liste:
- *  Neueste/Älteste zuerst drehen ihn um und bleiben wählbar, die Alpha-Modi
- *  würden die Monatsreihenfolge verwürfeln und sind deshalb gesperrt. Die
- *  Gruppierung sperrt der Zeitstrahl ganz: dort gruppieren die Monate. */
+/** The timeline groups by month over the *sorted* list:
+ *  Newest/Oldest first reverse it and remain selectable, the alphabetical modes
+ *  would scramble the month order and are therefore disabled. The
+ *  timeline disables grouping entirely: there the months group. */
 const sortBlockedInTimeline = (v: SortMode) => v !== 'date_desc' && v !== 'date_asc';
 
 /**
- * Die Sortier-Auswahl der Dashboard-Seitenleiste: volle Breite, im Auslöser
- * Icon und Label des gewählten Modus („Erstellt · neueste") — ein
- * `FieldDropdown` mit `variant="sidebar"`. Exportiert für
- * die Altar-Bibliothek, die im selben Kopf ihre eigene Sortierung stellt.
+ * The sort select of the dashboard sidebar: full width, with icon
+ * and label of the chosen mode in the trigger ("Created · newest"), a
+ * `FieldDropdown` with `variant="sidebar"`. Exported for
+ * the altar library, which provides its own sorting in the same header.
  */
 export function SortSelect<S extends SortMode>({ label, value, modes, onChange, dateField = 'created', isDisabled, disabledHint }: {
-  /** aria-label des Auslösers, vor dem gewählten Modus. */
+  /** aria-label of the trigger, before the chosen mode. */
   label: string;
   value: S;
   modes: readonly S[];
   onChange: (s: S) => void;
   dateField?: SortDateField;
   isDisabled?: (s: S) => boolean;
-  /** Tooltip gesperrter Modi („Im Zeitstrahl nicht verfügbar"). */
+  /** Tooltip of disabled modes ("Not available in the timeline"). */
   disabledHint?: string;
 }) {
   const { t } = useTranslation();
@@ -145,9 +145,9 @@ export function SortSelect<S extends SortMode>({ label, value, modes, onChange, 
 }
 
 /**
- * Ansicht, Sortierung und Gruppierung als beschriftete Abschnitte — für den
- * Kopf in der rechten Seitenleiste (Dashboard-Portal). Die Suche steht im
- * Hauptbereich (`ListSearchField`).
+ * View, sorting and grouping as labelled sections, for the
+ * header in the right sidebar (dashboard portal). The search is in the
+ * main area (`ListSearchField`).
  */
 export default function ListToolbar({
   view, sort, onView, onSort, viewOptions: viewOptionsProp, sortModes = DEFAULT_SORT_MODES, sortDate, sortLabel, groupBy,
@@ -165,14 +165,14 @@ export default function ListToolbar({
   const showView = view !== undefined && onView !== undefined && viewOptions.length > 1;
   const showSort = sort !== undefined && onSort !== undefined;
   const timelineHint = t('listView.notAvailableInTimeline');
-  // Ohne Sortierung stünde der Gruppierungs-Schalter allein unter „Sortierung".
+  // Without sorting, the grouping toggle would stand alone under "Sort".
   const sortHeading = showSort ? (sortLabel ?? t('listView.sort')) : undefined;
 
   if (!showView && !showSort && !groupBy) return null;
 
   return (
-    // Ohne eigenes Streifen-Chrome: die p-3-Spalte der Seitenleiste liefert
-    // den Einzug (eine Einzugsquelle pro Spalte, design.md).
+    // Without strip chrome of its own: the sidebar's p-3 column provides
+    // the indentation (one indentation source per column, design.md).
     <div className="flex flex-col gap-4">
       {showView && (
         <SidebarGroup label={t('listView.view')}>
@@ -191,8 +191,8 @@ export default function ListToolbar({
           {showSort && (
             <SortSelect
               label={sortHeading!}
-              // Im Zeitstrahl gilt ein Datum (`groupByMonth`); die gespeicherte
-              // Sortierung bleibt und gilt wieder, sobald er verlassen wird.
+              // In the timeline a date applies (`groupByMonth`); the saved
+              // sorting stays and applies again as soon as it is left.
               value={inTimeline && sortBlockedInTimeline(sort!) ? 'date_desc' : sort!}
               modes={sortModes}
               onChange={onSort!}
@@ -201,8 +201,8 @@ export default function ListToolbar({
               disabledHint={timelineHint}
             />
           )}
-          {/* Im Zeitstrahl gruppieren die Monate; der Schalter hat dort keine
-              Wirkung und bleibt gesperrt stehen, statt zu verschwinden. */}
+          {/* In the timeline the months group; the toggle has no effect there
+              and stays disabled instead of disappearing. */}
           {groupBy && (
             <SwitchRow
               icon={Layers}

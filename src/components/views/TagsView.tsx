@@ -27,13 +27,13 @@ import ModuleCounts from '../ui/ModuleCounts';
 import type { ActiveView, Tag } from '../../types';
 import { useSessionState } from '../../store/sessionStore';
 
-/** Ein getaggter Eintrag, gleich welchen Moduls — die Zeile unter einem Tag. */
+/** A tagged entry, whatever module it belongs to — the row under a tag. */
 interface TaggedItem {
   module: TagModuleId;
   id: string;
   title: string;
   updated_at: string;
-  /** Nur Operationen zeigen ihre Kategorie statt des Modulnamens. */
+  /** Only operations show their category instead of the module name. */
   categoryId?: string | null;
 }
 
@@ -41,15 +41,15 @@ type TagUsage = Record<TagModuleId, number>;
 
 const emptyUsage = (): TagUsage => ({ journal: 0, operations: 0, wiki: 0 });
 
-/** Anlegen und Umbenennen schließen sich aus — ein Zustand statt zwei. */
+/** Creating and renaming exclude each other — one state instead of two. */
 type FormState = { mode: 'add' } | { mode: 'rename'; id: string };
 
-/** Wohin ein Klick auf die Zeile führt. */
+/** Where a click on the row leads. */
 function itemView(item: TaggedItem): ActiveView {
   return { type: item.module, id: item.id, mode: 'view' };
 }
 
-/** Der Farbpunkt eines Tags; mit `onPick` öffnet ein Klick die Palette. */
+/** A tag's colour dot; with `onPick`, a click opens the palette. */
 function TagColorDot({ color, onPick }: { color: string; onPick?: (color: string) => void }) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
@@ -85,7 +85,7 @@ function TagColorDot({ color, onPick }: { color: string; onPick?: (color: string
   );
 }
 
-/** Farbpunkt vor dem Namens-Editor — für Anlegen wie Umbenennen. */
+/** Colour dot in front of the name editor — for creating as well as renaming. */
 function TagEditRow({
   color, onColor, name, onName, error, onSave, onCancel,
 }: {
@@ -100,8 +100,8 @@ function TagEditRow({
   const { t } = useTranslation();
   return (
     <div className="flex items-center gap-2 mb-2">
-      {/* Platzhalter für den Chevron der Lesezeile — ohne ihn sprängen Punkt
-          und Name beim Wechsel in den Bearbeitungsmodus nach links. */}
+      {/* Placeholder for the read row's chevron — without it dot
+          and name would jump to the left when switching to edit mode. */}
       <span className="w-3.5 flex-shrink-0" />
       <span className="w-5 flex items-center justify-center flex-shrink-0">
         <TagColorDot color={color} onPick={onColor} />
@@ -113,13 +113,13 @@ function TagEditRow({
 }
 
 /**
- * Die Verwaltung der Tags, im selben Dashboard wie jedes Modul: Titel, „Neuer
- * Tag", Suche, Sortierung und Modul-Filter stehen in der rechten Seitenleiste;
- * im Hauptbereich ist jeder Tag eine Gruppe, die zugeklappt startet — die
- * Köpfe sind die Übersicht (Farbe, Name, wo er vorkommt), aufgeklappt stehen
- * die getaggten Einträge darunter.
+ * The management of tags, in the same dashboard as every module: title, "New
+ * tag", search, sorting and module filter sit in the right sidebar;
+ * in the main area every tag is a group that starts collapsed — the
+ * headers are the overview (colour, name, where it occurs), expanded, the
+ * tagged entries appear below.
  *
- * Einträge tragen Tag-IDs: gezählt, gruppiert und geklappt wird nach ID.
+ * Entries carry tag IDs: counting, grouping and collapsing are done by ID.
  */
 export default function TagsView() {
   const { t } = useTranslation();
@@ -133,8 +133,8 @@ export default function TagsView() {
     })),
   );
   const pushUndo = useUndoStore((s) => s.push);
-  // Kein fetch beim Mount: reloadAllStores() lädt Tags und Inhalte beim Start
-  // und beim Vault-Wechsel.
+  // No fetch on mount: reloadAllStores() loads tags and content at startup
+  // and on vault switch.
   const entries = useEntryStore((s) => s.entries.journal);
   const articles = useEntryStore((s) => s.entries.wiki);
   const operations = useEntryStore((s) => s.entries.operation);
@@ -152,8 +152,8 @@ export default function TagsView() {
   const [nameError, setNameError] = useState<string | null>(null);
   const [ctxMenu, setCtxMenu] = useState<{ tagId: string; x: number; y: number } | null>(null);
 
-  // Der Tiefenlink aus der globalen Suche klappt den Tag auf; Suche und
-  // Filter werden geleert, sonst stünde er womöglich gar nicht in der Liste.
+  // The deep link from the global search expands the tag; search and
+  // filter are cleared, otherwise it might not be in the list at all.
   const { scrollTo } = useDeepLink({
     type: 'tags',
     items: tags,
@@ -165,7 +165,7 @@ export default function TagsView() {
     },
   });
 
-  /** Tag-ID → getaggte Einträge, in Modul-Reihenfolge, darin nach Titel. */
+  /** Tag ID → tagged entries, in module order, within that by title. */
   const itemsByTag = useMemo(() => {
     const map = new Map<string, TaggedItem[]>();
     const add = (tagIds: string[] | undefined, item: TaggedItem) => {
@@ -195,7 +195,7 @@ export default function TagsView() {
     return map;
   }, [itemsByTag]);
 
-  /** Tag-ID → Anzahl Vorlagen, die ihn tragen. Ein Tag nur dort ist nicht unbenutzt. */
+  /** Tag ID → number of templates carrying it. A tag used only there is not unused. */
   const templateUsage = useMemo(() => {
     const map = new Map<string, number>();
     for (const template of templates) for (const tagId of template.tags) map.set(tagId, (map.get(tagId) ?? 0) + 1);
@@ -205,9 +205,9 @@ export default function TagsView() {
   const query = search.trim().toLowerCase();
   const filterActive = moduleFilter.length > 0;
 
-  /** Was die Suche von einem Tag übrig lässt: passt sein Name, alle seine
-   *  Einträge, sonst die, deren Titel passt. Liste und Modul-Anzahlen teilen
-   *  diese eine Regel, damit die Zahlen zur Liste passen. */
+  /** What the search leaves of a tag: if its name matches, all its
+   *  entries, otherwise those whose title matches. The list and the module
+   *  counts share this one rule so the numbers match the list. */
   const matchTag = useCallback((tag: Tag) => {
     const all = itemsByTag.get(tag.id) ?? [];
     const nameMatches = !query || tag.name.toLowerCase().includes(query);
@@ -215,10 +215,10 @@ export default function TagsView() {
   }, [itemsByTag, query]);
 
   /**
-   * Ein Tag steht in der Liste, wenn sein Name zur Suche passt oder Einträge
-   * darunter es tun; ein Modul-Filter blendet Tags ohne Treffer ganz aus.
-   * Trifft die Suche nur Einträge, steht der Tag mit genau denen da — und
-   * offen (`openBySearch`), sonst sähe man den Grund für den Treffer nicht.
+   * A tag is in the list if its name matches the search or entries under
+   * it do; a module filter hides tags without a hit entirely.
+   * If the search only hits entries, the tag appears with exactly those — and
+   * open (`openBySearch`), otherwise the reason for the hit would not be visible.
    */
   const { groups, openBySearch } = useMemo(() => {
     const openIds = new Set<string>();
@@ -232,8 +232,8 @@ export default function TagsView() {
     for (const tag of sortedTags) {
       const { nameMatches, items: matched } = matchTag(tag);
       const items = filterActive ? matched.filter((item) => moduleFilter.includes(item.module)) : matched;
-      // Ohne Treffer darunter bleibt ein Tag nur, wenn sein Name passt und kein
-      // Modul-Filter ihn leer zurücklässt.
+      // Without a hit underneath, a tag stays only if its name matches and no
+      // module filter leaves it empty.
       const keep = items.length > 0 || (nameMatches && !filterActive);
       if (!keep) continue;
       if (!nameMatches) openIds.add(tag.id);
@@ -243,9 +243,9 @@ export default function TagsView() {
   }, [tags, sort, itemsByTag, filterActive, moduleFilter, matchTag]);
 
   /**
-   * Anzahlen der Modul-Filter: wie viele Tags stünden da, wäre nur dieses
-   * Modul gewählt — nach derselben Regel wie die Liste, über die Suche, ohne
-   * den Modul-Filter selbst. `all` ist die Zahl ohne Modul-Filter.
+   * Counts for the module filters: how many tags would be there if only this
+   * module were chosen — by the same rule as the list, over the search, without
+   * the module filter itself. `all` is the number without a module filter.
    */
   const moduleCounts = useMemo(() => {
     const byModule = new Map<string, number>();
@@ -263,7 +263,7 @@ export default function TagsView() {
   const tagById = useMemo(() => new Map(tags.map((tag) => [tag.id, tag])), [tags]);
   const catById = useMemo(() => new Map(categories.map((c) => [c.id, c])), [categories]);
 
-  // ── Anlegen / Umbenennen / Löschen ────────────────────────────────────────
+  // ── Create / rename / delete ──────────────────────────────────────────────
   const openForm = (next: FormState, withName: string, withColor: string) => {
     setNameError(null);
     setName(withName);
@@ -271,7 +271,7 @@ export default function TagsView() {
     setForm(next);
   };
 
-  /** Ein neuer Tag startet mit einer Zufallsfarbe — wie ein im Editor angelegter. */
+  /** A new tag starts with a random colour — like one created in the editor. */
   const openAddForm = () => openForm({ mode: 'add' }, '', randomTagColor());
   const startRename = (tag: Tag) => openForm({ mode: 'rename', id: tag.id }, tag.name, tag.color);
 
@@ -286,7 +286,7 @@ export default function TagsView() {
     try {
       if (form.mode === 'add') {
         const tag = await createTag(trimmed, color);
-        // Suche und Filter könnten den neuen, noch unbenutzten Tag verbergen.
+        // Search and filter could hide the new, still unused tag.
         setSearch('');
         setModuleFilter([]);
         scrollTo(tag.id);
@@ -294,7 +294,7 @@ export default function TagsView() {
         await updateTag(form.id, { name: trimmed, color });
       }
     } catch (err) {
-      // Der Store wirft bei vergebenem Namen, statt einen Fehlerwert zu liefern.
+      // The store throws on a taken name instead of returning an error value.
       if (err instanceof Error && err.message === TAG_NAME_TAKEN) setNameError(t('tags.nameTaken'));
       else console.error('[TagsView] saving the tag failed:', err);
       return;
@@ -302,7 +302,7 @@ export default function TagsView() {
     closeForm();
   };
 
-  /** Ohne Rückfrage in den Papierkorb, wie alles andere — der Hinweis bietet Rückgängig. */
+  /** To the trash without confirmation, like everything else — the notice offers undo. */
   const handleDelete = async (tag: Tag) => {
     await deleteTag(tag.id);
     pushUndo({
@@ -312,13 +312,13 @@ export default function TagsView() {
     });
   };
 
-  /** Eine Zeile für Anlegen (oben im Inhalt) und Umbenennen (statt des Kopfes). */
+  /** One row for creating (at the top of the content) and renaming (in place of the header). */
   const editRow = (
     <TagEditRow color={color} onColor={setColor} name={name} onName={(v) => { setName(v); setNameError(null); }}
       error={nameError} onSave={submitForm} onCancel={closeForm} />
   );
 
-  // ── Gruppenkopf und Zeilen ────────────────────────────────────────────────
+  // ── Group header and rows ─────────────────────────────────────────────────
   const groupCollapsed = (group: DashboardGroup<TaggedItem>) =>
     !openBySearch.has(group.key!) && isCollapsed(group.key!);
 
@@ -347,7 +347,7 @@ export default function TagsView() {
                 {templateUsage.has(tag.id) ? t('tags.onlyInTemplates') : t('tags.unused')}
               </span>}
           actions={
-            // Dauerhaft sichtbar wie in der Kategorien-Ansicht.
+            // Permanently visible, as in the categories view.
             <span className="flex items-center gap-1.5 flex-shrink-0">
               <Button tone="amber" compact small title={t('contextMenu.rename')} aria-label={t('contextMenu.rename')}
                 onClick={() => startRename(tag)}>
@@ -420,7 +420,7 @@ export default function TagsView() {
         actionLabel: t('tags.new'),
         onAction: openAddForm,
       }}
-      // Bleibt keine Gruppe übrig, meldet der category-Modus das selbst.
+      // If no group is left, the category mode reports that itself.
       hasNoResults={false}
       grouping={{
         mode: 'category',
@@ -428,8 +428,8 @@ export default function TagsView() {
         renderGroupHeader: renderTagHeader,
         renderEmptyGroup: () => <p className="text-xs text-stone-700 px-1 py-1">{t('tags.unusedHint')}</p>,
         isGroupCollapsed: groupCollapsed,
-        // Die Auswahl oben hat schon entschieden, welche Tags stehen — ein
-        // unbenutzter Tag ist ohne Suche und Filter trotzdem einer.
+        // The selection above has already decided which tags are shown — an
+        // unused tag is still one without search and filter.
         keepEmptyGroups: true,
       }}
       contextMenuSlot={ctxMenu && ctxTag && (

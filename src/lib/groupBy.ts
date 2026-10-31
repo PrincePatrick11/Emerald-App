@@ -2,9 +2,9 @@ import type { DashboardGroup } from '../components/ui/Dashboard';
 import { formatMonthGroup } from './formatDate';
 
 /**
- * Gruppiert eine vorsortierte Liste in Dashboard-Gruppen. Die Gruppenreihenfolge
- * ist die Reihenfolge des ersten Auftretens — chronologisch also nur, wenn die
- * Liste bereits nach Datum sortiert ist.
+ * Groups a presorted list into dashboard groups. The group order
+ * is the order of first appearance — so chronological only if the
+ * list is already sorted by date.
  */
 export function groupBy<T>(items: readonly T[], keyFn: (item: T) => string): DashboardGroup<T>[] {
   const map = new Map<string, T[]>();
@@ -17,20 +17,20 @@ export function groupBy<T>(items: readonly T[], keyFn: (item: T) => string): Das
   return Array.from(map.entries()).map(([label, groupItems]) => ({ label, items: groupItems }));
 }
 
-/** Timeline-Gruppierung nach lokalisiertem Monat („August 2026"). */
+/** Timeline grouping by localized month ("August 2026"). */
 export function groupByMonth<T>(items: readonly T[], date: (item: T) => string): DashboardGroup<T>[] {
-  // Der Zeitstrahl geht nach Datum, gleich wie die Liste sonst sortiert ist:
-  // aufsteigend, wenn sie es schon ist, sonst neueste zuerst. Name oder
-  // Anzahl würfeln die Monate sonst durcheinander.
+  // The timeline goes by date, however the list is otherwise sorted:
+  // ascending if it already is, otherwise newest first. Name or
+  // count would otherwise jumble the months.
   const ascending = items.every((item, i) => i === 0 || date(items[i - 1]) <= date(item));
   const ordered = ascending ? items : [...items].sort((a, b) => (date(a) < date(b) ? 1 : date(a) > date(b) ? -1 : 0));
   return groupBy(ordered, (item) => formatMonthGroup(date(item)));
 }
 
-/** Gruppenschlüssel des Waisen-Buckets — nie als Kategorie-id vergeben. */
+/** Group key of the orphan bucket — never assigned as a category id. */
 export const UNCATEGORIZED_KEY = '__uncategorized__';
 
-/** Wie viele Einträge je Schlüssel — die Anzahlen der Filterliste. */
+/** How many entries per key — the counts of the filter list. */
 export function countBy<T>(items: readonly T[], keyFn: (item: T) => string): Map<string, number> {
   const counts = new Map<string, number>();
   for (const item of items) {
@@ -41,8 +41,8 @@ export function countBy<T>(items: readonly T[], keyFn: (item: T) => string): Map
 }
 
 /**
- * Anzahlen je Kategorie, mit derselben Waisen-Regel wie `groupByCategory`:
- * keine Kategorie oder eine, die `known` nicht (mehr) kennt, zählt unter
+ * Counts per category, with the same orphan rule as `groupByCategory`:
+ * no category, or one that `known` does not (or no longer) recognize, counts under
  * `UNCATEGORIZED_KEY`.
  */
 export function countByCategory<T>(
@@ -57,13 +57,13 @@ export function countByCategory<T>(
 }
 
 /**
- * Kategorie-Gruppierung mit Waisen-Bucket: eine Gruppe je Kategorie, dahinter
- * — nur wenn nötig — „Ohne Kategorie" für Einträge, deren Kategorie im
- * Papierkorb liegt. Kategorien behalten ihre Reihenfolge, die Einträge die der
- * übergebenen (vorsortierten) Liste.
+ * Category grouping with an orphan bucket: one group per category, followed
+ * — only if needed — by "No category" for entries whose category is in the
+ * trash. Categories keep their order, the entries that of the
+ * passed-in (presorted) list.
  *
- * Leere Gruppen entstehen hier weiterhin; das Dashboard wirft sie beim
- * Rendern weg.
+ * Empty groups are still produced here; the dashboard drops them when
+ * rendering.
  */
 export function groupByCategory<T, C extends { id: string }>(
   items: readonly T[],
@@ -77,8 +77,8 @@ export function groupByCategory<T, C extends { id: string }>(
     label: label(cat),
     items: items.filter((item) => categoryId(item) === cat.id),
   }));
-  // Ohne Kategorie (null) oder mit einer, die im Papierkorb liegt — beides
-  // landet im selben Bucket, weil es für den Leser dasselbe ist.
+  // Without a category (null) or with one that is in the trash — both
+  // end up in the same bucket, because to the reader they are the same.
   const orphans = items.filter((item) => {
     const id = categoryId(item);
     return !id || !categories.some((c) => c.id === id);

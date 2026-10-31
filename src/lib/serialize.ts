@@ -1,20 +1,20 @@
 /**
- * Reiht asynchrone Aufgaben mit demselben Schlüssel strikt hintereinander.
+ * Queues asynchronous tasks with the same key strictly one after another.
  *
- * Wozu: Die Update-Methoden der Content-Stores lesen einen Snapshot aus dem
- * Store, mischen den Patch ein und schreiben die KOMPLETTE Zeile zurück in die
- * Datenbank. Überlappen sich zwei Updates für denselben Eintrag (z. B.
- * Editor-Autosave und ein Property-Wechsel aus der Sidebar), holt der zweite
- * seinen Snapshot, bevor der erste den Store aktualisiert hat — sein UPDATE
- * überschreibt dann die frisch gespeicherten Felder des ersten mit dem alten
- * Stand. Serialisiert pro Eintrags-ID startet der zweite erst, wenn der erste
- * inklusive `set()` durch ist, und sieht dessen Ergebnis im Snapshot.
+ * Why: the update methods of the content stores read a snapshot from the
+ * store, mix in the patch and write the COMPLETE row back to the
+ * database. If two updates for the same entry overlap (e.g.
+ * editor autosave and a property change from the sidebar), the second
+ * takes its snapshot before the first has updated the store — its UPDATE
+ * then overwrites the first's freshly saved fields with the old
+ * state. Serialized per entry ID, the second only starts once the first
+ * is done including `set()`, and sees its result in the snapshot.
  *
- * Schlüssel kommen aus `serialKey`, damit dieselbe Domäne nicht unter zwei
- * Schreibweisen läuft. Eine Aufgabe darf unter ihrem eigenen Schlüssel keine
- * weitere serialisierte Aufgabe awaiten — das wartete auf sich selbst und
- * stünde für immer. Die Kette hat bewusst kein Timeout: eine Aufgabe, die nie
- * settlet, belegt ihren Schlüssel dauerhaft.
+ * Keys come from `serialKey`, so that the same domain does not run under two
+ * spellings. A task must not await another serialized task under its own
+ * key — it would wait for itself and
+ * stand forever. The chain deliberately has no timeout: a task that never
+ * settles occupies its key permanently.
  */
 const tails = new Map<string, Promise<void>>();
 
@@ -29,26 +29,26 @@ export function serialKey(
 }
 
 /**
- * Wartet, bis alle aktuell eingereihten Ketten leergelaufen sind. Für die
- * Momente, in denen die Datenbank unter den Stores ausgetauscht wird
- * (Vault-Wechsel, Replace-Import): Aufgaben, die danach noch einreihen, muss
- * der Aufrufer selbst unterbinden (Editor-Sperre, Navigation weg vom Eintrag).
+ * Waits until all currently queued chains have drained. For the
+ * moments when the database is swapped out from under the stores
+ * (vault switch, replace import): tasks that queue up afterwards must be
+ * prevented by the caller itself (editor lock, navigating away from the entry).
  */
 export function drainSerialized(): Promise<void> {
   return Promise.all([...tails.values()]).then(() => undefined);
 }
 
-/** Wartet, bis alles durch ist, was unter `key` gerade eingereiht ist — ohne selbst etwas zu schreiben. */
+/** Waits until everything currently queued under `key` is done — without writing anything itself. */
 export function settled(key: string): Promise<void> {
   return serialized(key, async () => {});
 }
 
 export function serialized<T>(key: string, task: () => Promise<T>): Promise<T> {
-  // Das gemerkte Kettenende ist fehlerbehandelt — ein gescheitertes Update darf
-  // die Nachfolger nicht mitreißen. Geloggt wird hier trotzdem: viele Aufrufer
-  // sind Fire-and-forget, und weil der Tail die Rejection „behandelt", gäbe es
-  // sonst nicht einmal mehr die Unhandled-Rejection-Meldung in der Konsole.
-  // Der Aufrufer selbst sieht die Ablehnung seiner eigenen Aufgabe unverändert.
+  // The remembered chain end is error-handled — a failed update must not
+  // drag its successors down. It is logged here anyway: many callers
+  // are fire-and-forget, and because the tail "handles" the rejection, there
+  // would otherwise not even be the unhandled-rejection message in the console.
+  // The caller itself sees the rejection of its own task unchanged.
   const prev = tails.get(key) ?? Promise.resolve();
   const run = prev.then(task);
   const tail = run.then(
@@ -56,8 +56,8 @@ export function serialized<T>(key: string, task: () => Promise<T>): Promise<T> {
     (err) => { console.error(`[serialized] ${key} failed:`, err); },
   );
   tails.set(key, tail);
-  // Abgearbeitete Ketten aus der Map räumen, sonst wächst sie mit jeder je
-  // angefassten ID weiter.
+  // Clear finished chains out of the map, otherwise it keeps growing with every
+  // ID ever touched.
   void tail.then(() => {
     if (tails.get(key) === tail) tails.delete(key);
   });

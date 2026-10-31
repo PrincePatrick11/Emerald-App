@@ -10,11 +10,11 @@ import {
 } from '../themes/theme';
 
 /**
- * Die Einstellungen eines Vaults, als `settings.json` in dessen Ordner.
+ * A vault's settings, as `settings.json` in its folder.
  *
- * Jede Gruppe ist eine Einheit, die ein Backup-Import beim Zusammenführen
- * einzeln übernehmen kann. Eine neue Einstellung heißt: Feld in ihrer Gruppe,
- * Standard in `DEFAULT_VAULT_SETTINGS`, Prüfung in `normalizeVaultSettings`.
+ * Each group is a unit that a backup import can adopt individually
+ * when merging. A new setting means: field in its group,
+ * default in `DEFAULT_VAULT_SETTINGS`, validation in `normalizeVaultSettings`.
  */
 export interface AppearanceSettings {
   language: AppLanguage;
@@ -25,7 +25,7 @@ export interface AppearanceSettings {
   editorFontSize: EditorFontSize;
 }
 
-/** Tage bis zum endgültigen Löschen; `null` = nie. */
+/** Days until permanent deletion; `null` = never. */
 export const TRASH_RETENTION_OPTIONS = [7, 14, 30, 60, 90, null] as const;
 export type TrashRetention = (typeof TRASH_RETENTION_OPTIONS)[number];
 export const DEFAULT_TRASH_RETENTION: TrashRetention = 30;
@@ -34,32 +34,32 @@ export interface TrashSettings {
   retentionDays: TrashRetention;
 }
 
-/** Einträge je Liste in der linken Seitenleiste; `null` = alle. */
+/** Entries per list in the left sidebar; `null` = all. */
 export const LEFT_LIST_LIMIT_OPTIONS = [10, 25, 50, 100, null] as const;
 export type LeftListLimit = (typeof LEFT_LIST_LIMIT_OPTIONS)[number];
 export const DEFAULT_LEFT_LIST_LIMIT: LeftListLimit = null;
 
 export interface LeftListSettings {
-  /** Welche Liste die Eintragsliste zeigt — alle Einträge oder die eines Moduls.
-   *  Ersetzt die frühere Tab-Auswahl `tabs`; ein altes `tabs` bleibt über das
-   *  Spread in `normalizeVaultSettings` in der Datei stehen, für ältere Builds. */
+  /** Which list the entry list shows — all entries or those of one module.
+   *  Replaces the former tab selection `tabs`; an old `tabs` stays in the file
+   *  via the spread in `normalizeVaultSettings`, for older builds. */
   list: LeftListTabId;
   limit: LeftListLimit;
 }
 
 export interface EmojiSettings {
-  /** Die Emojis, die jeder Picker ohne Suche anbietet; `null` = die eingebaute Auswahl. */
+  /** The emojis that every picker offers without a search; `null` = the built-in selection. */
   defaults: string[] | null;
 }
 
-/** Deckel für eine eigene Liste — gegen aufgeblähte Dateien, nicht für die Oberfläche. */
+/** Cap for a custom list — against bloated files, not for the UI. */
 const MAX_EMOJI_DEFAULTS = 500;
 const MAX_EMOJI_LENGTH = 32;
 
-/** Größte Kantenlänge eingefügter Bilder in px; `null` = Original. */
+/** Largest edge length of inserted images in px; `null` = original. */
 export const IMAGE_MAX_EDGE_OPTIONS = [1024, 1920, 2560, 3840, null] as const;
 export type ImageMaxEdge = (typeof IMAGE_MAX_EDGE_OPTIONS)[number];
-/** Größte Dateigröße nach dem Verkleinern in MB; `null` = unbegrenzt. */
+/** Largest file size after shrinking in MB; `null` = unlimited. */
 export const IMAGE_MAX_SIZE_MB_OPTIONS = [1, 2, 5, 10, 20, null] as const;
 export type ImageMaxSizeMb = (typeof IMAGE_MAX_SIZE_MB_OPTIONS)[number];
 
@@ -69,59 +69,59 @@ export interface ImageSettings {
 }
 
 export interface TagSettings {
-  /** Ob unbekannte Namen zu neuen Tags werden — getippt ins Tag-Feld, aus
-   *  einer Vorlage, aus einem `.emerald`-Import. Aus: neue Tags nur im
-   *  Tags-Dashboard. Eine Sicherung bringt ihre Tags immer mit. */
+  /** Whether unknown names become new tags — typed into the tag field, from
+   *  a template, from a `.emerald` import. Off: new tags only in the
+   *  tags dashboard. A backup always brings its tags along. */
   createInline: boolean;
 }
 
 export interface TemplateSettings {
-  /** Ob ein neuer Eintrag mit dem Standard seiner Art und Kategorie beginnt.
-   *  Aus: er beginnt leer und bietet die passenden Vorlagen zur Wahl an. Von
-   *  Hand einsetzen geht immer; ein Kategorie- oder Typwechsel setzt nie ein. */
+  /** Whether a new entry starts with the default for its kind and category.
+   *  Off: it starts empty and offers the matching templates to choose from. Applying
+   *  by hand always works; a category or type change never applies one. */
   applyDefault: boolean;
 }
 
-/** Was der Editor beim Tippen und Einfügen von selbst formatiert. Gilt für jeden Editor, der danach aufgeht. */
+/** What the editor formats by itself while typing and pasting. Applies to every editor opened afterwards. */
 export interface EditorSettings {
-  /** Markdown-Kürzel: `# ` Überschrift, `- ` und `1. ` Listen, `> ` Zitat, `[ ] ` Aufgabe, `**fett**`, `==markiert==` … */
+  /** Markdown shortcuts: `# ` heading, `- ` and `1. ` lists, `> ` quote, `[ ] ` task, `**bold**`, `==highlighted==` … */
   markdownShortcuts: boolean;
-  /** Typografie: „…"-Anführungszeichen, Gedankenstrich, Pfeile, Brüche, ©. */
+  /** Typography: typographic quotation marks, dashes, arrows, fractions, ©. */
   typography: boolean;
-  /** Eine getippte oder eingefügte Adresse wird zum Link. */
+  /** A typed or pasted address becomes a link. */
   autoLinks: boolean;
 }
 
 export interface JournalSettings {
-  /** Ob ein neuer Journal-Eintrag die Mondphase des Tages bekommt. */
+  /** Whether a new journal entry gets the day's moon phase. */
   moonPhase: boolean;
 }
 
-/** Wie oft das automatische Backup läuft — nur volle Tage, der Dateiname trägt das Datum. */
+/** How often the automatic backup runs — whole days only, the file name carries the date. */
 export const BACKUP_INTERVAL_OPTIONS = ['daily', 'weekly', 'monthly'] as const;
 export type BackupInterval = (typeof BACKUP_INTERVAL_OPTIONS)[number];
 export const BACKUP_WEEKDAY_OPTIONS = [0, 1, 2, 3, 4, 5, 6] as const satisfies readonly Weekday[];
-/** Wie viele automatische Backups liegen bleiben; `null` = alle. Die Zahlen
- *  prüft `KEEP_CHOICES` in `auto_backup.rs` noch einmal — beide zusammen ändern. */
+/** How many automatic backups are kept; `null` = all. The numbers
+ *  are checked once more by `KEEP_CHOICES` in `auto_backup.rs` — change both together. */
 export const BACKUP_KEEP_OPTIONS = [3, 5, 10, 30, null] as const;
 export type BackupKeep = (typeof BACKUP_KEEP_OPTIONS)[number];
 
-/** Das automatische Backup. Der Zielordner steht bewusst nicht hier: er gehört
- *  zur Installation (`auto_backup.rs`), nicht zum Vault — sonst brächte eine
- *  importierte Sicherung einen fremden Pfad mit. */
+/** The automatic backup. The target folder is deliberately not here: it belongs
+ *  to the installation (`auto_backup.rs`), not to the vault — otherwise an
+ *  imported backup would bring a foreign path along. */
 export interface BackupSettings {
   auto: boolean;
   interval: BackupInterval;
-  /** Gilt nur für `weekly`. */
+  /** Applies to `weekly` only. */
   weekday: Weekday;
   keep: BackupKeep;
 }
 
 export interface VaultSettings {
-  /** Nicht gelesen, wie `version` in `vaults.json`: erst eine Form, die eine
-   *  Umrechnung braucht, zählt ihn hoch. Eine höhere Zahl aus einem neueren
-   *  Build bleibt stehen — sonst bekäme der seine eigene Datei als ältere
-   *  zurück, obwohl ihre unbekannten Schlüssel noch drin sind. */
+  /** Not read, like `version` in `vaults.json`: only a shape that needs a
+   *  conversion increments it. A higher number from a newer
+   *  build stays — otherwise that build would get its own file back as an older
+   *  one, although its unknown keys are still in it. */
   version: number;
   appearance: AppearanceSettings;
   trash: TrashSettings;
@@ -137,7 +137,7 @@ export interface VaultSettings {
 
 export type SettingsGroup = Exclude<keyof VaultSettings, 'version'>;
 
-/** Jede Gruppe genau einmal — der Record erzwingt, dass eine neue nicht fehlt. */
+/** Each group exactly once — the record forces a new one not to be missing. */
 const GROUP_SET: Record<SettingsGroup, true> = {
   appearance: true, trash: true, leftList: true, emojis: true, images: true, tags: true, templates: true,
   editor: true, journal: true, backup: true,
@@ -207,18 +207,18 @@ function asString(value: unknown): string | null {
 function normalizeEmojiList(raw: unknown): string[] | null {
   if (!Array.isArray(raw)) return null;
   const valid = raw.filter((e): e is string => typeof e === 'string' && e.length > 0 && e.length <= MAX_EMOJI_LENGTH);
-  // Leer hieße: jeder Picker öffnet ohne Auswahl. Dann lieber die eingebaute.
+  // Empty would mean: every picker opens without a selection. Better the built-in one then.
   return valid.length ? [...new Set(valid)].slice(0, MAX_EMOJI_DEFAULTS) : null;
 }
 
 /**
- * Macht aus beliebigem JSON gültige Einstellungen: jedes Feld wird geprüft,
- * Ungültiges fällt auf den Standard. Schlüssel, die dieser Build nicht kennt,
- * bleiben stehen — eine neuere Version, die den Vault vorher geöffnet hat,
- * soll ihre Einstellungen nach einem Abstecher in eine ältere wiederfinden.
+ * Turns arbitrary JSON into valid settings: every field is validated,
+ * invalid values fall back to the default. Keys that this build does not know
+ * stay — a newer version that opened the vault earlier
+ * should find its settings again after a detour into an older one.
  */
-/** Ein Vault aus der Zeit der Tab-Auswahl, in dem genau ein Tab sichtbar war,
- *  zeigte praktisch nur diese Liste — die bleibt es. Sonst „Alle". */
+/** A vault from the time of the tab selection in which exactly one tab was visible
+ *  practically showed only that list — it stays that one. Otherwise "All". */
 function legacySingleList(tabs: unknown): LeftListTabId {
   if (!Array.isArray(tabs)) return DEFAULT_VAULT_SETTINGS.leftList.list;
   const valid = LEFT_LIST_TAB_IDS.filter((id) => tabs.includes(id));
@@ -301,12 +301,12 @@ export function normalizeVaultSettings(raw: unknown): VaultSettings {
 }
 
 /**
- * Die Einstellungen aus einer Sicherung — `null`, wenn sie keine mitbringt.
+ * The settings from a backup — `null` if it brings none.
  *
- * Anders als beim Lesen der eigenen `settings.json` fallen hier unbekannte
- * Schlüssel weg: eine fremde Datei könnte sie beliebig aufblähen, und der
- * Ballast landete über den Store in jedem späteren Schreiben (und scheiterte
- * dort an der Größengrenze) und im nächsten Export.
+ * Unlike when reading one's own `settings.json`, unknown keys are dropped
+ * here: a foreign file could bloat them arbitrarily, and the
+ * ballast would land via the store in every later write (and fail
+ * there at the size limit) and in the next export.
  */
 export function importableSettings(raw: unknown): VaultSettings | null {
   if (!isPlainObject(raw)) return null;
@@ -319,7 +319,7 @@ export function importableSettings(raw: unknown): VaultSettings | null {
   return known as unknown as VaultSettings;
 }
 
-/** `current` mit den gewählten Gruppen aus `incoming` — fürs Zusammenführen einer Sicherung. */
+/** `current` with the chosen groups from `incoming` — for merging a backup. */
 export function withSettingsGroups(current: VaultSettings, incoming: VaultSettings, groups: readonly SettingsGroup[]): VaultSettings {
   const next: Record<string, unknown> = { ...current };
   for (const group of groups) next[group] = incoming[group];
@@ -330,9 +330,9 @@ export function withSettingsGroups(current: VaultSettings, incoming: VaultSettin
 export type VaultFileRead = { kind: 'missing' } | { kind: 'found'; contents: string } | { kind: 'unreadable' };
 
 /**
- * `settings: null`, wenn der Vault keine brauchbare Datei hat. `corrupt` heißt:
- * da liegt etwas, nur nichts Lesbares — das wird nicht überschrieben, bevor der
- * Nutzer selbst etwas ändert. Den Vault sperrt es nie.
+ * `settings: null` if the vault has no usable file. `corrupt` means:
+ * something is there, just nothing readable — it is not overwritten before the
+ * user changes something themselves. It never locks the vault.
  */
 export async function readVaultSettings(vaultId: string): Promise<{ settings: VaultSettings | null; corrupt: boolean }> {
   const read = await invoke<VaultFileRead>('read_vault_settings', { vaultId });
@@ -353,14 +353,14 @@ export function writeVaultSettings(vaultId: string, settings: VaultSettings): Pr
   return invoke('write_vault_settings', { vaultId, contents: JSON.stringify(settings, null, 2) });
 }
 
-// ── Umstieg von den app-weiten Einstellungen ─────────────────────────────────
+// ── Transition from the app-wide settings ────────────────────────────────────
 
 /**
- * Vor den Vault-Einstellungen galten Sprache, Theme und Schriften app-weit
- * (localStorage). Damit nach dem Update nichts umspringt, merkt sich der erste
- * Start die damaligen Werte samt der damals bekannten Vaults — jeder davon
- * übernimmt sie, sobald er ohne `settings.json` geöffnet wird. Ein später
- * angelegter Vault kommt in der Liste nicht vor und startet mit den Standards.
+ * Before the vault settings, language, theme and fonts applied app-wide
+ * (localStorage). So that nothing jumps after the update, the first
+ * start remembers the values of that time together with the vaults known then — each of them
+ * adopts them as soon as it is opened without a `settings.json`. A vault
+ * created later is not in the list and starts with the defaults.
  */
 const LEGACY_SNAPSHOT_KEY = 'vault-settings-legacy';
 
@@ -370,10 +370,10 @@ interface LegacySnapshot {
 }
 
 /**
- * Die Schlüssel, unter denen die app-weiten Werte lagen. Sie bleiben als
- * Boot-Spiegel des zuletzt geöffneten Vaults in Gebrauch: `main.tsx` startet
- * damit, bevor ein Vault geladen ist. Das Boot-Skript in `index.html` liest
- * `theme-id` von Hand mit — es läuft vor dem Bundle.
+ * The keys under which the app-wide values were stored. They remain in use as
+ * the boot mirror of the most recently opened vault: `main.tsx` starts
+ * with them before a vault is loaded. The boot script in `index.html` reads
+ * `theme-id` by hand — it runs before the bundle.
  */
 export const APPEARANCE_MIRROR_KEYS = {
   language: LANGUAGE_STORAGE_KEY,
@@ -384,7 +384,7 @@ export const APPEARANCE_MIRROR_KEYS = {
   editorFontSize: 'editor-font-size',
 } as const;
 
-/** Das Aussehen laut Boot-Spiegel, geprüft wie eine Datei. */
+/** The appearance according to the boot mirror, validated like a file. */
 export function readAppearanceMirror(): AppearanceSettings {
   const read = (key: string) => {
     try {
@@ -396,7 +396,7 @@ export function readAppearanceMirror(): AppearanceSettings {
   return normalizeVaultSettings({
     appearance: {
       language: read(APPEARANCE_MIRROR_KEYS.language),
-      // `theme` ist der Schlüssel von vor den Theme-Ids ('light'/'dark').
+      // `theme` is the key from before the theme ids ('light'/'dark').
       theme: read(APPEARANCE_MIRROR_KEYS.theme) ?? read('theme'),
       uiFont: read(APPEARANCE_MIRROR_KEYS.uiFont),
       editorFont: read(APPEARANCE_MIRROR_KEYS.editorFont),
@@ -416,7 +416,7 @@ export function captureLegacySettings(vaultIds: string[]): void {
   }
 }
 
-/** Die Startwerte eines Vaults ohne `settings.json`. */
+/** The starting values of a vault without `settings.json`. */
 export function initialSettingsFor(vaultId: string): VaultSettings {
   try {
     const snapshot = JSON.parse(localStorage.getItem(LEGACY_SNAPSHOT_KEY) ?? 'null') as LegacySnapshot | null;
@@ -424,7 +424,7 @@ export function initialSettingsFor(vaultId: string): VaultSettings {
       return normalizeVaultSettings({ appearance: snapshot.appearance });
     }
   } catch {
-    // Kaputter Schnappschuss: dann eben die Standards.
+    // Broken snapshot: then the defaults, so be it.
   }
   return structuredClone(DEFAULT_VAULT_SETTINGS);
 }

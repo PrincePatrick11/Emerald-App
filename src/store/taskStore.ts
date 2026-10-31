@@ -46,7 +46,7 @@ async function selectAllTasks(db: Database): Promise<Task[]> {
   return rows.map(fromRow.task);
 }
 
-/** Die Verknüpfungen der Aufgaben außerhalb des Papierkorbs — die im Papierkorb behalten ihre für den Rückweg. */
+/** The links of the tasks outside the trash — those in the trash keep theirs for the way back. */
 async function selectLiveLinks(db: Database): Promise<TaskLink[]> {
   const rows = await db.select<DbRow[]>(
     'SELECT * FROM task_links WHERE task_id IN (SELECT id FROM tasks WHERE deleted_at IS NULL)'
@@ -55,9 +55,9 @@ async function selectLiveLinks(db: Database): Promise<TaskLink[]> {
 }
 
 /**
- * Die Aufgaben im Papierkorb, die für sich gingen — eine Unteraufgabe mit dem
- * Stempel ihrer Oberaufgabe gehört zu dieser (`deleteTask`) und kommt mit ihr
- * zurück (`restoreTask`). Für die Liste des Papierkorbs.
+ * The tasks in the trash that went on their own — a subtask with the
+ * stamp of its parent task belongs to that one (`deleteTask`) and comes back
+ * with it (`restoreTask`). For the trash list.
  */
 export async function selectTrashedTaskRoots(db: Database): Promise<{ id: string; title: string; deleted_at: string }[]> {
   return db.select(
@@ -68,9 +68,9 @@ export async function selectTrashedTaskRoots(db: Database): Promise<{ id: string
 }
 
 /**
- * `id` und ihre Unteraufgaben im Papierkorb, aus der Datenbank statt aus dem
- * Store, der nur die aktiven kennt. Mit `trashedWith` nur die, die mit diesem
- * Stempel dorthin kamen — also mit ihr, nicht schon vorher für sich.
+ * `id` and its subtasks in the trash, from the database instead of from the
+ * store, which knows only the active ones. With `trashedWith` only those that
+ * arrived there with this stamp — i.e. with it, not earlier on their own.
  */
 async function selectTrashedSubtree(db: Database, id: string, trashedWith?: string): Promise<string[]> {
   const rows = await db.select<{ id: string }[]>(
@@ -111,7 +111,7 @@ export const useTaskStore = create<TaskState>((set, get) => ({
     );
 
     const newTask: Task = {
-      // Leer — angezeigt wird „Unbenannte Aufgabe" (`displayTitle`).
+      // Empty — "Unnamed task" is shown (`displayTitle`).
       id, title: '', category_id: categoryId,
       priority: 'medium', completed: false,
       parent_task_id: parentTaskId, created_at: now, updated_at: now,
@@ -122,9 +122,9 @@ export const useTaskStore = create<TaskState>((set, get) => ({
     return newTask;
   },
 
-  // serialized: siehe lib/serialize.ts. Gleicher Schlüssel wie toggleComplete —
-  // updateTask schreibt die ganze Zeile aus einem Snapshot-Merge, toggleComplete
-  // liest den Zustand vor dem Kippen; überlappend überschriebe einer den anderen.
+  // serialized: see lib/serialize.ts. Same key as toggleComplete —
+  // updateTask writes the whole row from a snapshot merge, toggleComplete
+  // reads the state before flipping; overlapping, one would overwrite the other.
   updateTask: (id: string, patch: Partial<Task>, { touch }: WriteOptions = {}) => serialized(serialKey('task', id), async () => {
     const task = get().tasks.find((t) => t.id === id);
     if (!task || !needsWrite(task, patch, touch)) return;
@@ -148,9 +148,9 @@ export const useTaskStore = create<TaskState>((set, get) => ({
   }),
 
   /**
-   * Kippt `id` und bringt die Unteraufgaben auf denselben Stand. „Zuletzt
-   * geändert" springt nur an der abgehakten Aufgabe; an den Unteraufgaben ist
-   * es eine Folge (`lib/stamp.ts`), und wer schon so stand, wird nicht geschrieben.
+   * Toggles `id` and brings the subtasks to the same state. "Last
+   * modified" jumps only on the ticked task; on the subtasks it is
+   * a consequence (`lib/stamp.ts`), and any that already had that state are not written.
    */
   toggleComplete: (id: string) => serialized(serialKey('task', id), async () => {
     const db = await getDb();
@@ -168,9 +168,9 @@ export const useTaskStore = create<TaskState>((set, get) => ({
         'UPDATE tasks SET completed=$1, updated_at=$2 WHERE id=$3',
         [toInt(newCompleted), stamps.get(t.id), t.id]
       );
-      // Nachfahren über deren eigene Kette, damit ein gleichzeitiges updateTask
-      // auf ein Kind dessen completed-Spalte nicht zurückdreht. Die Wurzel
-      // selbst läuft schon unter diesem Schlüssel — einreihen wartete auf sich.
+      // Descendants through their own chain, so that a simultaneous updateTask
+      // on a child does not revert its completed column. The root
+      // itself already runs under this key — queueing would wait on itself.
       if (t.id === id) await write();
       else await serialized(serialKey('task', t.id), write);
     }
@@ -188,11 +188,11 @@ export const useTaskStore = create<TaskState>((set, get) => ({
     const now = nowIso();
     const idsToDelete = collectDescendantIds(get().tasks, id);
 
-    // Ein Stempel für alle: an ihm erkennt `restoreTask`, was zusammen ging.
+    // One stamp for all: `restoreTask` uses it to recognise what went together.
     await db.batch(idsToDelete.map((tid) => ['UPDATE tasks SET deleted_at=$1 WHERE id=$2', [now, tid]] as const));
-    // Die Verknüpfungen bleiben in der Datenbank, für den Rückweg; endgültig
-    // räumen sie permanentlyDeleteTask, das Leeren des Papierkorbs und — per
-    // ON DELETE CASCADE — `runPeriodicCleanup` ab.
+    // The links stay in the database, for the way back; they are cleared
+    // permanently by permanentlyDeleteTask, emptying the trash and — via
+    // ON DELETE CASCADE — `runPeriodicCleanup`.
     set((s) => ({
       tasks: s.tasks.filter((t) => !idsToDelete.includes(t.id)),
       links: s.links.filter((l) => !idsToDelete.includes(l.task_id)),
@@ -202,14 +202,14 @@ export const useTaskStore = create<TaskState>((set, get) => ({
   restoreTask: async (id: string) => {
     const db = await getDb();
     const [row] = await db.select<{ deleted_at: string | null }[]>('SELECT deleted_at FROM tasks WHERE id=$1', [id]);
-    // Schon zurück — über ihre Oberaufgabe oder ein zweites Rückgängig.
+    // Already back — via its parent task or a second undo.
     if (!row?.deleted_at) return;
-    // Mit den Unteraufgaben, die mit ihr gingen.
+    // Along with the subtasks that went with it.
     const subtree = await selectTrashedSubtree(db, id, row.deleted_at);
     await db.batch([
       ...subtree.map((tid) => ['UPDATE tasks SET deleted_at=NULL WHERE id=$1', [tid]] as const),
-      // Liegt die Oberaufgabe noch im Papierkorb, rückt die Aufgabe nach oben —
-      // unter einer unsichtbaren Oberaufgabe bliebe sie selbst unsichtbar.
+      // If the parent task is still in the trash, the task moves up —
+      // under an invisible parent task it would itself stay invisible.
       ['UPDATE tasks SET parent_task_id=NULL WHERE id=$1 AND parent_task_id IN (SELECT id FROM tasks WHERE deleted_at IS NOT NULL)', [id]],
     ]);
     set({ tasks: await selectAllTasks(db), links: await selectLiveLinks(db) });
@@ -217,8 +217,8 @@ export const useTaskStore = create<TaskState>((set, get) => ({
 
   permanentlyDeleteTask: async (id: string) => {
     const db = await getDb();
-    // Nur aus dem Papierkorb: alle Unteraufgaben darin mit, auch die, die
-    // schon vorher für sich gingen — ohne ihre Oberaufgabe wären sie Wurzeln.
+    // Only from the trash: all subtasks in it go too, including those that
+    // went on their own earlier — without their parent task they would be roots.
     const idsToDelete = await selectTrashedSubtree(db, id);
 
     await db.batch(idsToDelete.flatMap((tid) => [
@@ -234,7 +234,7 @@ export const useTaskStore = create<TaskState>((set, get) => ({
   getSubtasks: (parentId: string) => get().tasks.filter((t) => t.parent_task_id === parentId),
 
   addLink: async (taskId: string, targetId: string, targetType: ContentType) => {
-    // Schon verknüpft: nichts zu tun (die Tabelle hält jede Verknüpfung nur einmal).
+    // Already linked: nothing to do (the table holds each link only once).
     if (get().links.some((l) => l.task_id === taskId && l.target_id === targetId && l.target_type === targetType)) return;
     const db = await getDb();
     const id = generateId();

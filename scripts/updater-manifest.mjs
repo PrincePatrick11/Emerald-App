@@ -1,13 +1,13 @@
-// Setzt aus den Fragmenten der Plattform-Jobs die `latest.json` zusammen — das
-// Manifest, das der In-App-Updater abfragt.
+// Assembles `latest.json` from the platform jobs' fragments — the
+// manifest that the in-app updater queries.
 //
-// Die Download-Adressen werden NICHT geraten: GitHub schreibt Sonderzeichen in
-// Asset-Namen um (aus "Emerald App_0.2.0_x64-setup.exe" wird
-// "Emerald.App_0.2.0_x64-setup.exe"), eine selbst gebaute URL liefe also ins
-// Leere. Stattdessen werden die Assets des Releases gelesen und der lokale
-// Dateiname gegen ihre Namen aufgeloest.
+// The download addresses are NOT guessed: GitHub rewrites special characters in
+// asset names ("Emerald App_0.2.0_x64-setup.exe" becomes
+// "Emerald.App_0.2.0_x64-setup.exe"), so a self-built URL would lead
+// nowhere. Instead the release's assets are read and the local
+// file name is resolved against their names.
 //
-// Aufruf:
+// Usage:
 //   node scripts/updater-manifest.mjs --tag v0.3.0 --assets assets.json \
 //     --fragments updater-fragments --notes release-notes.md --out latest.json
 
@@ -30,9 +30,9 @@ if (!tag || !assetsFile) {
   process.exit(1);
 }
 
-/** Wie GitHub einen Asset-Namen schreibt: alles ausserhalb dieser Menge wird
- *  zum Punkt. Beide Seiten des Vergleichs laufen hier durch, damit der lokale
- *  Name und der veroeffentlichte auf derselben Form landen. */
+/** How GitHub writes an asset name: everything outside this set becomes
+ *  a dot. Both sides of the comparison go through here, so that the local
+ *  name and the published one end up in the same form. */
 function normalize(name) {
   return name.replace(/[^A-Za-z0-9._-]/g, '.');
 }

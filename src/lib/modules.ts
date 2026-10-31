@@ -1,17 +1,17 @@
 /**
- * Die Modul-Registry: eine Wahrheit für „welche Module gibt es und was gehört
- * zu jedem" — Icon, nav-Label, Untitled-Key, View-Typ-Vokabular.
+ * The module registry: one source of truth for "which modules exist and what belongs
+ * to each" — icon, nav label, untitled key, view type vocabulary.
  *
- * Import-Regel dieser Datei: nur lucide-react und Typ-Importe. Keine Stores,
- * keine React-Komponenten — Stores verdrahtet `store/moduleWiring.ts`, die
- * lazy geladenen Views hält `components/layout/moduleViews.ts`. Diese
- * Schichtung verhindert Import-Zyklen (uiStore braucht die Typen hier) und
- * hält die View-Chunks aus dem Start-Bundle.
+ * Import rule of this file: only lucide-react and type imports. No stores,
+ * no React components — `store/moduleWiring.ts` wires the stores, and the
+ * lazily loaded views are held by `components/layout/moduleViews.ts`. This
+ * layering prevents import cycles (uiStore needs the types here) and
+ * keeps the view chunks out of the startup bundle.
  *
- * Die Kante zu `types/index.ts` verläuft in beide Richtungen, aber nur auf
- * Typ-Ebene (`import type`) — sie wird beim Kompilieren gelöscht. Sobald eine
- * Seite einen Laufzeit-Wert der anderen importiert, wird daraus ein echter
- * Zyklus: nicht tun.
+ * The edge to `types/index.ts` runs in both directions, but only at
+ * type level (`import type`) — it is erased at compile time. As soon as one
+ * side imports a runtime value from the other, it becomes a real
+ * cycle: don't.
  */
 import {
   BookOpen,
@@ -34,12 +34,12 @@ import {
 import type { ContentType, EntryType } from '../types';
 
 /**
- * Emoji-Fallback je Link-Typ, wenn weder ein eigenes Icon noch ein
- * Kategorie-Emoji greift — eine Wahrheit für Chip-NodeView, Editor-Lookups,
- * Picker, Export und die Migration v36. Steht hier statt in `SuggestionList`,
- * weil auch `lib/`-Module (bis hinunter zu `db.ts`) sie brauchen und dorthin
- * keine Komponente importiert werden darf; `SuggestionList` re-exportiert sie
- * für die Komponenten, die sie schon von dort holen.
+ * Emoji fallback per link type, when neither a custom icon nor a
+ * category emoji applies — one source of truth for the chip NodeView, editor lookups,
+ * picker, export and migration v36. It lives here instead of in `SuggestionList`
+ * because `lib/` modules (down to `db.ts`) need it too and no component
+ * may be imported there; `SuggestionList` re-exports it
+ * for the components that already get it from there.
  */
 export const DEFAULT_ENTRY_EMOJI: Record<ContentType, string> = {
   journal: '📓',
@@ -50,10 +50,10 @@ export const DEFAULT_ENTRY_EMOJI: Record<ContentType, string> = {
 };
 
 /**
- * Das Icon eines Wiki-Artikels oder einer Operation in Listen, auf Home, in
- * der linken Liste und im Export: das eigene (Emoji oder Bild), sonst das
- * Emoji der Kategorie, sonst das des Moduls. Ein Emoji oder eine Bild-Adresse
- * — `isImageIcon` unterscheidet. Journal-Einträge zeigen ihre Mondphase.
+ * The icon of a wiki article or an operation in lists, on Home, in
+ * the left list and in the export: its own (emoji or image), otherwise the
+ * category's emoji, otherwise the module's. Either an emoji or an image address
+ * — `isImageIcon` tells them apart. Journal entries show their moon phase.
  */
 export function entryIcon(
   type: 'wiki' | 'operation',
@@ -64,11 +64,11 @@ export function entryIcon(
 }
 
 /**
- * Reihenfolge = Rail- und Eintragslisten-Tab-Reihenfolge. Über
- * `CATEGORY_MODULE_IDS` hängen zwei weitere Dinge daran: die Spaltenfolge der
- * Verwendungszähler in `CategoriesView` und, bei Gleichstand, welches Modul
- * `dominantCategoryModule` als Hinweis zu einem Suchtreffer nennt. Ein Umbau
- * hier benennt also auch Suchtreffer um.
+ * Order = rail and entry-list tab order. Via
+ * `CATEGORY_MODULE_IDS` two more things hang on it: the column order of the
+ * usage counters in `CategoriesView` and, on a tie, which module
+ * `dominantCategoryModule` names as the hint on a search hit. A rearrangement
+ * here therefore also renames search hits.
  */
 export const ENTRY_MODULE_IDS = ['journal', 'tasks', 'operations', 'wiki', 'altar'] as const;
 export type EntryModuleId = (typeof ENTRY_MODULE_IDS)[number];
@@ -77,14 +77,14 @@ export const AUX_VIEW_IDS = ['home', 'tags', 'categories', 'blocks', 'templates'
 export type AuxViewId = (typeof AUX_VIEW_IDS)[number];
 
 /**
- * Bibliotheken, deren Einträge als eigene Seite aufgehen (`{ type, id }`).
- * So eine Seite ist immer im Bearbeiten, bekommt einen eigenen Tab und
- * braucht die rechte Seitenleiste.
+ * Libraries whose entries open as a page of their own (`{ type, id }`).
+ * Such a page is always in edit mode, gets its own tab and
+ * needs the right sidebar.
  *
- * Zwei davon — eigene Blöcke und Vorlagen — speichern erst mit „Fertig"
- * (`LibraryPageFrame`, `useDraftPage`). Die Sprachseite des Lexikons nicht:
- * sie speichert jede Zeile sofort und hat keinen Entwurf. Was diese Liste
- * regelt, ist nur das Dreierlei oben, und das gilt für alle drei.
+ * Two of them — custom blocks and templates — only save on "Done"
+ * (`LibraryPageFrame`, `useDraftPage`). The lexicon's language page does not:
+ * it saves every row immediately and has no draft. What this list
+ * governs is only the three things above, and that holds for all three.
  */
 export const LIBRARY_VIEW_IDS = ['blocks', 'templates', 'lexicon'] as const;
 export type LibraryViewId = (typeof LIBRARY_VIEW_IDS)[number];
@@ -93,20 +93,20 @@ export function isLibraryView(viewType: string): viewType is LibraryViewId {
   return (LIBRARY_VIEW_IDS as readonly string[]).includes(viewType);
 }
 
-/** Alles, was `ActiveView.type` sein kann. */
+/** Everything `ActiveView.type` can be. */
 export type ViewId = EntryModuleId | AuxViewId;
 
 export type LeftListTabId = 'all' | EntryModuleId;
-/** Die Tabs der Eintragsliste in ihrer Reihenfolge — „Alle" zuerst. */
+/** The tabs of the entry list in their order — "All" first. */
 export const LEFT_LIST_TAB_IDS: readonly LeftListTabId[] = ['all', ...ENTRY_MODULE_IDS];
 
-/** Module, deren Einträge eine Kategorie tragen — alle außer Journal. */
+/** Modules whose entries carry a category — all except journal. */
 export const CATEGORY_MODULE_IDS: readonly Exclude<EntryModuleId, 'journal'>[] = ENTRY_MODULE_IDS.filter(
   (id): id is Exclude<EntryModuleId, 'journal'> => id !== 'journal',
 );
 export type CategoryModuleId = (typeof CATEGORY_MODULE_IDS)[number];
 
-/** Module, deren Einträge Tags tragen — alle außer Altar und Aufgaben. */
+/** Modules whose entries carry tags — all except altar and tasks. */
 export const TAG_MODULE_IDS: readonly Exclude<EntryModuleId, 'altar' | 'tasks'>[] = ENTRY_MODULE_IDS.filter(
   (id): id is Exclude<EntryModuleId, 'altar' | 'tasks'> => id !== 'altar' && id !== 'tasks',
 );
@@ -118,13 +118,13 @@ export interface ModuleMeta {
   navLabelKey: string;
   untitledKey: string;
   /**
-   * Das Datenmodell-Gegenstück in `task_links.target_type`/Drag-Payloads —
-   * `'operation'` singular! tasks/altar heißen dort `'task'`/`'altar'`.
+   * The data-model counterpart in `task_links.target_type`/drag payloads —
+   * `'operation'` singular! tasks/altar are called `'task'`/`'altar'` there.
    */
   entryType: ContentType;
-  /** Save/Cancel/Delete leben in der rechten Seitenleiste. */
+  /** Save/Cancel/Delete live in the right sidebar. */
   usesEditorSidebar: boolean;
-  /** Der Inhalt ist ein Blockstapel — die Seitenleiste zeigt die Block-Verwaltung. */
+  /** The content is a block stack — the sidebar shows the block management. */
   usesBlocks: boolean;
 }
 
@@ -138,7 +138,7 @@ export const MODULES: Record<EntryModuleId, ModuleMeta> = {
 
 export const MODULE_LIST: readonly ModuleMeta[] = ENTRY_MODULE_IDS.map((id) => MODULES[id]);
 
-/** Die Tabs der Eintragsliste samt Icon — „Alle" ist der einzige ohne Modul. */
+/** The tabs of the entry list with their icon — "All" is the only one without a module. */
 export const LEFT_LIST_TABS: ReadonlyArray<{ id: LeftListTabId; icon: LucideIcon }> = LEFT_LIST_TAB_IDS.map((id) => ({
   id,
   icon: id === 'all' ? LayoutList : MODULES[id].icon,
@@ -147,25 +147,25 @@ export const LEFT_LIST_TABS: ReadonlyArray<{ id: LeftListTabId; icon: LucideIcon
 export const AUX_VIEWS: Record<AuxViewId, { icon: LucideIcon; navLabelKey: string }> = {
   home: { icon: Home, navLabelKey: 'nav.home' },
   tags: { icon: Tag, navLabelKey: 'nav.tags' },
-  // Dieselbe Glyphe wie `TRASH_KIND_ICONS.category`: eine gelöschte Kategorie
-  // im Papierkorb und ihre Verwaltung sollen als dasselbe Ding lesbar sein.
+  // The same glyph as `TRASH_KIND_ICONS.category`: a deleted category
+  // in the trash and its management should read as the same thing.
   categories: { icon: FolderOpen, navLabelKey: 'nav.categories' },
   trash: { icon: Trash2, navLabelKey: 'nav.trash' },
   blocks: { icon: Box, navLabelKey: 'nav.blocks' },
-  // Dieselbe Glyphe wie `TRASH_KIND_ICONS.template`.
+  // The same glyph as `TRASH_KIND_ICONS.template`.
   templates: { icon: CopyPlus, navLabelKey: 'nav.templates' },
-  // Dieselbe Glyphe wie `TRASH_KIND_ICONS.language`.
+  // The same glyph as `TRASH_KIND_ICONS.language`.
   lexicon: { icon: Languages, navLabelKey: 'nav.lexicon' },
 };
 
 const VIEW_ID_SET: ReadonlySet<string> = new Set<string>([...ENTRY_MODULE_IDS, ...AUX_VIEW_IDS]);
 
-/** Guard für persistierte Tabs: veraltete oder fremde View-Typen fallen sauber weg. */
+/** Guard for persisted tabs: outdated or foreign view types drop out cleanly. */
 export function isViewId(value: unknown): value is ViewId {
   return typeof value === 'string' && VIEW_ID_SET.has(value);
 }
 
-/** ModuleMeta zu einem View-Typ — null für home/tags/categories/blocks/templates/trash. */
+/** ModuleMeta for a view type — null for home/tags/categories/blocks/templates/trash. */
 export function moduleMeta(viewType: string): ModuleMeta | null {
   return (MODULES as Record<string, ModuleMeta | undefined>)[viewType] ?? null;
 }
@@ -179,8 +179,8 @@ export function moduleMeta(viewType: string): ModuleMeta | null {
  * than the record. Journal and wiki spell both the same, which is why the
  * mismatch is easy to forget at exactly the fourth call site.
  *
- * Reverse-Lookup über die Registry statt eines eigenen Mappings — damit ist
- * `ModuleMeta.entryType` die eine Wahrheit für diese Zuordnung.
+ * A reverse lookup via the registry instead of a mapping of its own — which makes
+ * `ModuleMeta.entryType` the single source of truth for this assignment.
  */
 export function viewTypeForEntryType(entryType: ContentType): EntryModuleId {
   const mod = MODULE_LIST.find((meta) => meta.entryType === entryType);
@@ -189,16 +189,16 @@ export function viewTypeForEntryType(entryType: ContentType): EntryModuleId {
 }
 
 /**
- * Der Eintragstyp (`entries.type`) einer Ansicht — `undefined` für alles, was
- * kein Journal-, Wiki- oder Operationen-Eintrag ist. Wie `viewTypeForEntryType`
- * über `ModuleMeta.entryType`, nur in die andere Richtung.
+ * The entry type (`entries.type`) of a view — `undefined` for everything that is
+ * not a journal, wiki or operations entry. Like `viewTypeForEntryType`
+ * via `ModuleMeta.entryType`, only in the other direction.
  */
 export function entryTypeForView(viewType: string): EntryType | undefined {
   const entryType = (MODULES as Partial<Record<string, ModuleMeta>>)[viewType]?.entryType;
   return entryType === 'journal' || entryType === 'wiki' || entryType === 'operation' ? entryType : undefined;
 }
 
-/** Alle Papierkorb-Eintragstypen (`TrashedItem['type']`). */
+/** All trash item types (`TrashedItem['type']`). */
 export const TRASH_KINDS = [
   'journal', 'wiki', 'tag', 'operation', 'task', 'category', 'blockDefinition', 'template', 'language', 'altar',
   'altarItem',
@@ -210,8 +210,8 @@ export const TRASH_KIND_ICONS: Record<TrashKind, LucideIcon> = {
   wiki: Library,
   tag: Tag,
   operation: Wand2,
-  // Bewusst ListTodo statt des Rail-Icons CheckSquare: im Papierkorb steht die
-  // Liste, nicht die einzelne erledigte Aufgabe.
+  // Deliberately ListTodo instead of the rail icon CheckSquare: in the trash it is
+  // the list that stands, not the single completed task.
   task: ListTodo,
   category: FolderOpen,
   blockDefinition: Box,

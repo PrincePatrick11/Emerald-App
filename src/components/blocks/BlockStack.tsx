@@ -53,54 +53,54 @@ import UnknownBlock from './UnknownBlock';
 import BlockErrorBoundary from './BlockErrorBoundary';
 
 interface BlockStackProps {
-  /** Der Eintrag, dem der Stapel gehört — die Seitenleiste bedient nur die passende Sitzung. */
+  /** The entry the stack belongs to; the sidebar only serves the matching session. */
   entryId: string;
   /**
-   * Nur der INITIALWERT, wie bei RichEditor: der Stapel ist danach
-   * unkontrolliert. Die Views mounten ihn per `key` neu, wenn ein anderer
-   * Eintrag geladen oder Cancel gedrückt wird.
+   * Only the INITIAL VALUE, as with RichEditor: the stack is uncontrolled
+   * afterwards. The views remount it via `key` when another
+   * entry is loaded or Cancel is pressed.
    */
   initialContent: string;
   isEditing: boolean;
-  /** Platzhalter des ersten Textblocks — der modulspezifische Text. */
+  /** Placeholder of the first text block: the module-specific text. */
   placeholder: string;
-  /** Der komplette serialisierte Inhalt nach jeder Änderung (→ `useEntryEditor.handleContentChange`). */
+  /** The complete serialised content after every change (→ `useEntryEditor.handleContentChange`). */
   onChange: (content: string) => void;
   /**
-   * Lesemodus: eine erlaubte Änderung (Checkliste abhaken, Ja/Nein) sofort
-   * speichern — der Autosave von `useEntryEditor` läuft nur beim Bearbeiten.
-   * Fehlt die Prop, bleibt der Lesemodus schreibgeschützt.
+   * Read mode: save a permitted change (tick a checklist, yes/no) immediately;
+   * the autosave of `useEntryEditor` only runs while editing.
+   * If the prop is absent, read mode stays read-only.
    */
   onReadModeChange?: (content: string) => void | Promise<unknown>;
   /**
-   * Eintragsart und Kategorie — mit ihnen bietet der Stapel im Bearbeiten
-   * Vorlagen an (Auswahl, Vorschläge im leeren Eintrag, Hinweis nach dem
-   * automatischen Standard). Die Seite einer Vorlage lässt es weg.
+   * Entry type and category: with them the stack offers templates when
+   * editing (picker, suggestions in an empty entry, notice after the
+   * automatic default). A template's own page leaves it out.
    */
   templateTarget?: TemplateTarget;
 }
 
 const REVEAL_CLASS = 'block-stack-item--revealed';
-/** Muss zur Dauer von `block-reveal` in index.css passen. */
+/** Must match the duration of `block-reveal` in index.css. */
 const REVEAL_MS = 1600;
 
 /**
- * Der Inhalt eines Eintrags als Stapel von Blöcken — Lesen und Bearbeiten.
+ * The content of an entry as a stack of blocks, for reading and editing.
  *
- * Er ist auch der eine Ansprechpartner für alles, was von außen in den Eintrag
- * schreibt oder dokumentweit lauscht: Link-Bitten der Seitenleiste, Navigation
- * per Chip-Klick, Drops (Dateien, Einträge aus der linken Liste),
- * Toolbar und Linkauswahl. Das hing früher am einzelnen RichEditor; mit
- * mehreren Textblöcken würde sonst jede Bitte in jedem Block ausgeführt. Welcher
- * Editor eine Bitte bekommt, entscheidet `useTextEditorRegistry`. Die
- * Block-Verwaltung der Seitenleiste bedient ihn über `blockSessionStore`.
+ * It is also the one point of contact for everything that writes into the entry
+ * from outside or listens document-wide: the sidebar's link requests, navigation
+ * via chip click, drops (files, entries from the left list),
+ * toolbar and link picker. That used to hang on the individual RichEditor; with
+ * several text blocks every request would otherwise run in every block. Which
+ * editor receives a request is decided by `useTextEditorRegistry`. The
+ * sidebar's block management serves it via `blockSessionStore`.
  *
- * Text-Eingaben ändern keinen React-State: das neue HTML landet in `blocksRef`
- * und geht serialisiert an `onChange`. State wird es erst bei
- * Strukturänderungen (hinzufügen, entfernen, verschieben, Attribute), damit
- * nicht jeder Tastendruck den ganzen Stapel neu rendert. `blocks[i].html` im
- * State ist deshalb nur der Stand beim letzten Strukturwechsel — der lebende
- * Stand steht im Ref (und im Editor).
+ * Text input changes no React state: the new HTML lands in `blocksRef`
+ * and goes serialised to `onChange`. It only becomes state on
+ * structural changes (add, remove, move, attributes), so that
+ * not every keystroke re-renders the whole stack. `blocks[i].html` in
+ * state is therefore only the state at the last structural change; the live
+ * state is in the ref (and in the editor).
  */
 export default function BlockStack({
   entryId, initialContent, isEditing, placeholder, onChange, onReadModeChange, templateTarget,
@@ -112,12 +112,12 @@ export default function BlockStack({
   const onChangeRef = useRef(onChange);
   onChangeRef.current = onChange;
   const stackRef = useRef<HTMLDivElement>(null);
-  // Leer im Sinne der Vorlagen: dann stehen die Vorschläge da. Nur umgeschaltet,
-  // wenn es sich ändert — ein Tastendruck rendert den Stapel sonst nicht neu.
+  // Empty in the sense of templates: then the suggestions are shown. Only toggled
+  // when it changes; a keystroke does not otherwise re-render the stack.
   const [empty, setEmpty] = useState(() => areBlocksEmpty(blocks));
 
-  // Jede Änderung erledigt den Hinweis „Vorlage angewendet" — Rückgängig leerte
-  // sonst auch, was danach entstand. Wer eine Vorlage einsetzt, zeigt ihn danach neu.
+  // Every change dismisses the "Template applied" notice; Undo would otherwise
+  // also empty whatever arose afterwards. Whoever inserts a template shows it again afterwards.
   const emit = useCallback(() => {
     setEmpty(areBlocksEmpty(blocksRef.current));
     useTemplateNoticeStore.getState().dismiss(entryId);
@@ -133,33 +133,33 @@ export default function BlockStack({
   const updateHtml = useCallback((id: string, rawHtml: string) => {
     const html = neutralizeSectionTags(rawHtml);
     const current = blocksRef.current.find((b) => b.id === id);
-    // Derselbe Stand ist keine Änderung (etwa ein Umschalten zwischen Lesen und
-    // Bearbeiten) — er soll weder speichern noch den Vorlagen-Hinweis schließen.
+    // The same state is not a change (for instance toggling between reading and
+    // editing); it should neither save nor close the template notice.
     if (current?.html === html) return;
     blocksRef.current = blocksRef.current.map((b) => (b.id === id ? { ...b, html } : b));
     emit();
   }, [emit]);
 
-  // Absicherung, auf die sich nichts verlässt: beim Moduswechsel den State auf
-  // den Ref-Stand ziehen. Der Baum bleibt derselbe (siehe BlockFrame) — falls
-  // doch einmal etwas neu montiert, sieht es das zuletzt getippte HTML.
+  // A safeguard nothing relies on: on a mode switch pull the state to
+  // the ref state. The tree stays the same (see BlockFrame); if
+  // something does get remounted, it sees the most recently typed HTML.
   useEffect(() => {
     setBlocks(blocksRef.current);
-    // Im Lesemodus kann sich der Inhalt von außen geändert haben (useExternalContentReset).
+    // In read mode the content may have changed from outside (useExternalContentReset).
     setEmpty(areBlocksEmpty(blocksRef.current));
   }, [isEditing]);
 
   const resetEpoch = useExternalContentReset(initialContent, isEditing, blocksRef, setBlocks, onChangeRef);
 
-  // Gesperrt und verborgen kommt vom Ladung-Block der Sigille; alle Blöcke sehen denselben Stand.
+  // Locked and concealed come from the sigil's charge block; all blocks see the same state.
   const sigil = useMemo(() => sigilState(blocks, todayIso()), [blocks]);
 
   const definitions = useBlockDefinitionStore((s) => s.definitions);
-  /** Die Definition, wenn der Block eine veraltete Kopie von ihr ist — dann gibt es „Block aktualisieren". */
+  /** The definition, if the block is an outdated copy of it; then "Update block" is offered. */
   const outdatedDefinitionOf = (block: BlockInstance): BlockDefinition | undefined => {
     const origin = blockOrigin(block);
     const def = origin ? definitions.find((d) => d.id === origin.id) : undefined;
-    // Eine Kopie, die eine geladene Sigille festhält, wird nicht umgebaut (isSigilFrozen).
+    // A copy holding a charged sigil is not rebuilt (isSigilFrozen).
     return def && isOutdatedCopy(block, def) && !isSigilFrozen(block, sigil) ? def : undefined;
   };
 
@@ -168,8 +168,8 @@ export default function BlockStack({
 
   const context = useMemo<BlockStackContextValue>(() => ({
     registerTextEditor,
-    // Nur der erste Textblock trägt den Platzhalter des Moduls („Was ist heute
-    // passiert?"); weitere Textblöcke einen neutralen.
+    // Only the first text block carries the module's placeholder ("What happened
+    // today?"); further text blocks get a neutral one.
     placeholderFor: (blockId) =>
       blocksRef.current.find((b) => b.type === TEXT_BLOCK_TYPE)?.id === blockId
         ? placeholder
@@ -177,9 +177,9 @@ export default function BlockStack({
   }), [registerTextEditor, placeholder, t]);
 
   /**
-   * Einen Link anhängen — außer er steht schon irgendwo im Eintrag. Ziel ist
-   * der Editor, den die Registry wählt; gibt es gar keinen Textblock, entsteht
-   * einer mit dem Link als Inhalt.
+   * Append a link, unless it is already somewhere in the entry. The target is
+   * the editor the registry picks; if there is no text block at all, one is
+   * created with the link as its content.
    */
   const appendLinkOnce = useCallback((item: EntryLinkRequest) => {
     if (orderedEditors().some((ed) => findEntryLinkPos(ed.state.doc, item) !== null)) return;
@@ -193,7 +193,7 @@ export default function BlockStack({
     )]);
   }, [orderedEditors, targetEditor, commit]);
 
-  /* ---------------- Dokumentweite Zuhörer, einmal pro Eintrag ---------------- */
+  /* ---------------- Document-wide listeners, once per entry ---------------- */
 
   useInternalLinkNavigation(!isEditing);
   const fileDrop = useEditorFileDrop(isEditing, targetEditor);
@@ -204,10 +204,10 @@ export default function BlockStack({
   });
 
   /**
-   * Der Feldblock, dessen Verknüpfungs- oder Altar-Feld auf `target` zeigt,
-   * samt dem Block ohne diesen Verweis. Das Verlinkungs-Feld der Seitenleiste
-   * listet auch diese Links (es liest den ganzen Inhalt), also müssen
-   * Anspringen und Entfernen sie auch finden.
+   * The field block whose link or altar field points to `target`,
+   * along with the block without that reference. The sidebar's links field
+   * also lists these links (it reads the whole content), so
+   * jumping to and removing must find them too.
    */
   const fieldText = useFieldFallbackText();
   const fieldTextRef = useRef(fieldText);
@@ -219,11 +219,11 @@ export default function BlockStack({
       if (resolveBlockType(block)?.id !== FIELDS_BLOCK_TYPE) continue;
       const model = parseFields(block);
       if (model.broken) continue;
-      // Der rohe Chip, auch im Altar-Feld: die Seitenleiste listet jeden Link im Inhalt.
+      // The raw chip, in the altar field too: the sidebar lists every link in the content.
       const element = model.elements.find((el) =>
         (el.kind === 'link' || el.kind === 'altar') && matches(linkFromSlot(model.slots[el.id])));
-      // Ein Text-Element ohne montierten Editor (entfernt, aber mit Inhalt): dort
-      // fällt nur der Chip weg, nicht der ganze Text — sein Wort bleibt stehen.
+      // A text element without a mounted editor (removed, but with content): there
+      // only the chip goes away, not the whole text; its word stays.
       const text = element ? undefined : model.elements.find((el) =>
         el.kind === 'text' && extractInternalLinks(model.slots[el.id] ?? '').some(matches));
       if (!element && !text) continue;
@@ -240,8 +240,8 @@ export default function BlockStack({
     return null;
   }, []);
 
-  // Anhängen und Entfernen aus dem Verlinkungs-Feld — nur im Edit-Modus. Bleibt
-  // die Quittung aus, weiß das Feld, dass sein Klick ins Leere ging.
+  // Appending and removing from the links field, edit mode only. If
+  // the acknowledgement is missing, the field knows its click went nowhere.
   useEffect(() => {
     if (!isEditing) return;
     const off = [
@@ -260,9 +260,9 @@ export default function BlockStack({
     return () => off.forEach((fn) => fn());
   }, [isEditing, orderedEditors, appendLinkOnce, findBlockLink]);
 
-  // Klick auf einen Chip im Verlinkungs-Feld → zur Stelle springen. Auch im
-  // Lesemodus, dort ist es der Normalfall. Der erste Textblock mit dem Link
-  // gewinnt; steht er nur in einem Verknüpfungs- oder Altar-Feld, springt es dorthin.
+  // Click on a chip in the links field → jump to the spot. Also in
+  // read mode, where it is the normal case. The first text block with the link
+  // wins; if it only appears in a link or altar field, it jumps there.
   useEffect(() => subscribeEntryLinkRequest(
     REVEAL_ENTRY_LINK_EVENT,
     (target) => {
@@ -274,7 +274,7 @@ export default function BlockStack({
     },
   ), [orderedEditors, findBlockLink]);
 
-  /* ---------------- Strukturänderungen ---------------- */
+  /* ---------------- Structural changes ---------------- */
 
   const [menu, setMenu] = useState<{ x: number; y: number; actions: ContextMenuAction[] } | null>(null);
   const [linkPickerOpen, setLinkPickerOpen] = useState(false);
@@ -293,9 +293,9 @@ export default function BlockStack({
     if (index < 0) return;
     const source = blocksRef.current[index];
     const id2 = generateId();
-    // Eine geladene Sigille bleibt geladen: Ladung-Teile der Kopie zielen auf
-    // die Teile der Kopie, und jede Ladung anderswo, die das Original
-    // verdeckt, verdeckt auch die Kopie. Auch die Seitenleiste kommt hier vorbei.
+    // A charged sigil stays charged: charge parts of the copy target
+    // the parts of the copy, and any charge elsewhere that conceals the original
+    // also conceals the copy. The sidebar passes through here as well.
     const next = blocksRef.current.map((b) => (b.id === source.id ? b : withChargesCoveringCopy(b, source.id, id2)));
     next.splice(index + 1, 0, withRenamedPartTargets({ ...source, id: id2, attrs: { ...source.attrs } }, source.id, id2));
     commit(next);
@@ -306,37 +306,37 @@ export default function BlockStack({
   const reorder = (ids: string[]) => {
     const current = blocksRef.current;
     const byId = new Map(current.map((b) => [b.id, b]));
-    // Nur eine echte Umordnung übernehmen. Landet während eines Drags eine
-    // Strukturänderung (ein Link aus der Seitenleiste legt einen Block an),
-    // passt die ID-Liste des Drags nicht mehr — übernommen hieße das, einen
-    // Block stillschweigend zu verlieren.
+    // Only accept a genuine reorder. If a structural change lands during a drag
+    // (a link from the sidebar creates a block), the drag's ID list
+    // no longer fits; accepting it would mean silently losing a
+    // block.
     if (ids.length !== current.length || ids.some((id) => !byId.has(id))) return;
     commit(ids.map((id) => byId.get(id)!));
   };
 
   const setAttr = (id: string, name: BlockAttrName, value: string | null) => {
     const block = blocksRef.current.find((b) => b.id === id);
-    // Unveränderter Wert (Enter auf einem unveränderten Titel): kein Commit,
-    // also auch kein Autosave und kein Neu-Rendern.
+    // Unchanged value (Enter on an unchanged title): no commit,
+    // hence no autosave and no re-render either.
     if (!block || (block.attrs[name] ?? null) === value) return;
     commit(blocksRef.current.map((b) => (b.id === id ? withBlockAttr(b, name, value) : b)));
   };
 
-  /** Den ganzen Block ersetzen (Feldblock, Seitenleisten-Abschnitt). */
+  /** Replace the whole block (field block, sidebar section). */
   const updateBlock = (id: string, next: BlockInstance) => {
     if (next.id !== id) return;
     commit(blocksRef.current.map((b) => (b.id === id ? next : b)));
   };
 
   /**
-   * Lesemodus: eine erlaubte Änderung sofort speichern. `updateBlock` meldet sie
-   * AUCH an `onChange`, damit der Content-Mirror der View sie kennt — sonst
-   * schriebe „Fertig" nach einem späteren Bearbeiten ohne Änderung den Stand von
-   * vor dem Abhaken zurück.
+   * Read mode: save a permitted change immediately. `updateBlock` reports it
+   * ALSO to `onChange`, so that the view's content mirror knows it; otherwise
+   * "Done" after a later edit without changes would write back the state from
+   * before the tick.
    *
-   * Wie der Autosave nicht, solange Speichern ausgesetzt ist (Backup-Import
-   * ersetzt gerade den Vault). Die Store-Updates sind pro Eintrag serialisiert:
-   * schnelle Klicks landen in Reihenfolge, der letzte Stand gewinnt.
+   * Like the autosave, not while saving is suspended (a backup import
+   * is currently replacing the vault). The store updates are serialised per entry:
+   * quick clicks land in order, the last state wins.
    */
   const onReadModeChangeRef = useRef(onReadModeChange);
   onReadModeChangeRef.current = onReadModeChange;
@@ -355,15 +355,15 @@ export default function BlockStack({
     flashReveal(el, REVEAL_CLASS, REVEAL_MS);
   };
 
-  /* ---------------- Vorlagen ---------------- */
+  /* ---------------- Templates ---------------- */
 
   const [templatePickerOpen, setTemplatePickerOpen] = useState(false);
 
   /**
-   * Eine Vorlage einsetzen: ihre Blöcke anhängen oder den Inhalt ersetzen (ein
-   * leerer Stapel wird immer ersetzt) — wie jede Blockänderung über den
-   * Editor. Titel und Tags gehen über den Store des Eintrags, wie aus der
-   * Eigenschaften-Seitenleiste; Abbrechen dreht alles zurück.
+   * Insert a template: append its blocks or replace the content (an
+   * empty stack is always replaced), like any block change through the
+   * editor. Title and tags go through the entry's store, as from the
+   * properties sidebar; Cancel rolls everything back.
    */
   const applyTemplate = (template: Template, options: TemplateApplyOptions) => {
     if (!templateTarget || !isEditing) return;
@@ -374,7 +374,7 @@ export default function BlockStack({
     commit(next.length > 0 ? next : [createTextBlock()]);
     if (options.notice) useTemplateNoticeStore.getState().show({ entryId, templateId: template.id });
     const { entryType, flush } = templateTarget;
-    // Erst die aufgeschobene Eingabe speichern: Titel und Tags werden gegen den Store geprüft.
+    // Save the deferred input first: title and tags are checked against the store.
     void (async () => {
       await flush();
       if (options.replaces) await undoTemplateFields(entryType, entryId, options.replaces);
@@ -382,7 +382,7 @@ export default function BlockStack({
     })().catch((e: unknown) => console.error('[BlockStack] applying template fields failed:', e));
   };
 
-  /** Rückgängig nach dem automatischen Einsetzen: leerer Stapel, Titel und Tags der Vorlage zurück. */
+  /** Undo after the automatic insertion: empty stack, title and tags of the template reverted. */
   const undoTemplate = (template: Template) => {
     if (!templateTarget) return;
     commit([createTextBlock()]);
@@ -392,24 +392,24 @@ export default function BlockStack({
       .catch((e: unknown) => console.error('[BlockStack] undoing template fields failed:', e));
   };
 
-  // Der Hinweis gehört zum Bearbeiten, in dem die Vorlage kam — „Fertig" oder
-  // Abbrechen erledigen ihn. Einer, der einem anderen Eintrag gehört, ist dort
-  // liegen geblieben (weggewechselt im Bearbeiten) und verfällt, sobald ein
-  // anderer Eintrag bearbeitet wird; beim Abbau zu räumen ginge nicht — der
-  // StrictMode-Doppelmount nähme ihn dem frisch angelegten Eintrag gleich wieder.
+  // The notice belongs to the editing session in which the template arrived; "Done" or
+  // Cancel settle it. One that belongs to another entry was
+  // left behind there (switched away while editing) and expires as soon as another
+  // entry is edited; clearing it on teardown would not work, since the
+  // StrictMode double mount would take it away from a freshly created entry again.
   useEffect(() => {
     const notices = useTemplateNoticeStore.getState();
     if (!isEditing) notices.dismiss(entryId);
     else if (templateTarget && notices.notice && notices.notice.entryId !== entryId) notices.dismiss(notices.notice.entryId);
   }, [isEditing, entryId, templateTarget]);
 
-  /* ---------------- Sitzung für die Seitenleiste ---------------- */
+  /* ---------------- Session for the sidebar ---------------- */
 
-  // Die Handgriffe ändern sich pro Render (sie lesen die aktuelle Closure); die
-  // Seitenleiste bekommt ein stabiles Objekt, das an die jeweils neuesten
-  // weiterreicht. Stabil heißt: `clear` beim Unmount erkennt „seine" Sitzung.
-  // Nach dem Abbau reicht es nichts mehr weiter — ein veralteter Aufruf käme
-  // sonst über `onChange` im Eintrag an, der jetzt offen ist.
+  // The handles change on every render (they read the current closure); the
+  // sidebar gets a stable object that forwards to the latest ones.
+  // Stable means: `clear` on unmount recognises "its" session.
+  // After teardown it forwards nothing any more; a stale call would otherwise
+  // arrive via `onChange` in the entry that is now open.
   const apiRef = useRef<BlockStackApi>(null!);
   apiRef.current = {
     insert: insertAt, duplicate, remove, reorder, setAttr, update: updateBlock, reveal,
@@ -432,7 +432,7 @@ export default function BlockStack({
     };
   }, []);
   const [sessionId] = useState(generateId);
-  // Die Views reichen `templateTarget` pro Render als neues Objekt — die Sitzung braucht nur „ja/nein".
+  // The views pass `templateTarget` as a new object on every render; the session only needs "yes/no".
   const offersTemplates = !!templateTarget;
 
   useEffect(() => {
@@ -446,7 +446,7 @@ export default function BlockStack({
     };
   }, [api]);
 
-  /* ---------------- Menüs und Darstellung ---------------- */
+  /* ---------------- Menus and presentation ---------------- */
 
   const openAddMenu = (e: MouseEvent, index: number) => setMenu({
     x: e.clientX,
@@ -461,7 +461,7 @@ export default function BlockStack({
       x: e.clientX,
       y: e.clientY,
       actions: [
-        // Wie jede Blockänderung über den Editor — Abbrechen dreht sie zurück.
+        // Like any block change through the editor; Cancel rolls it back.
         ...(def
           ? [{
               label: t('blocks.update'),
@@ -482,8 +482,8 @@ export default function BlockStack({
     });
   };
 
-  /** Ein leerer Textblock verschwindet im Lesemodus, statt Leerzeilen zu zeigen.
-   *  Aus dem Ref: beim Wechsel nach „Fertig" hinkt der State einen Render hinterher. */
+  /** An empty text block disappears in read mode instead of showing blank lines.
+   *  From the ref: when switching after "Done" the state lags one render behind. */
   const isEmptyInRead = (blockId: string) => {
     const live = blocksRef.current.find((b) => b.id === blockId);
     return !!live && isTextBlockEmpty(live);
@@ -491,7 +491,7 @@ export default function BlockStack({
 
   const renderBody = (block: BlockInstance, meta: BlockTypeMeta | undefined) => {
     const View = meta ? BLOCK_VIEWS.get(meta.id) : undefined;
-    // Der Fallback zeigt gespeichertes HTML — ohne das, was eine Sigille verbirgt.
+    // The fallback shows stored HTML, without what a sigil conceals.
     if (!View) return <UnknownBlock block={withoutConcealedParts(block, sigil.concealed)} />;
     return (
       <BlockErrorBoundary block={block}>
@@ -501,10 +501,10 @@ export default function BlockStack({
           isEditing={isEditing}
           onHtmlChange={(html) => updateHtml(block.id, html)}
           onBlockChange={(next) => updateBlock(block.id, next)}
-          // Gesperrt „ganzer Eintrag": auch aus dem Lesemodus keine Änderung —
-          // entladen geht nur über die Ladung selbst (die sperrt sich nie aus).
-          // Ein eigener Block mit Ladung-Teil darf schreiben; er lässt dann
-          // selbst nur die Ladung zu (FieldsBlock).
+          // Locked "whole entry": no change even from read mode;
+          // discharging only works via the charge itself (which never locks itself out).
+          // A custom block with a charge part may write; it then itself
+          // allows only the charge (FieldsBlock).
           onPersist={!isEditing && onReadModeChange && (!sigil.lockEntry || holdsCharge(block))
             ? (next) => persistRead(block.id, next)
             : undefined}
@@ -538,8 +538,8 @@ export default function BlockStack({
         />
       )}
 
-      {/* Lese- und Bearbeitungsmodus teilen denselben Baum: Reorder.Group ist
-          im Lesemodus einfach träge, weil nur der Griff einen Drag startet. */}
+      {/* Read and edit mode share the same tree: Reorder.Group is simply
+          inert in read mode, because only the handle starts a drag. */}
       <Reorder.Group
         ref={stackRef}
         as="div"
@@ -590,29 +590,29 @@ export default function BlockStack({
   );
 }
 
-/** Ist der Block eine Ladung — oder ein eigener Block mit einem Ladung-Teil? */
+/** Is the block a charge, or a custom block with a charge part? */
 function holdsCharge(block: BlockInstance): boolean {
   return block.type === SIGIL_CHARGE_TYPE || sigilUnits([block]).some((u) => u.block.type === SIGIL_CHARGE_TYPE);
 }
 
-/** Die Blöcke eines Inhalts — ein leerer Eintrag bekommt einen leeren Textblock. */
+/** The blocks of a content; an empty entry gets an empty text block. */
 function blocksFromContent(content: string): BlockInstance[] {
   const parsed = parseBlocks(content);
   return parsed.length > 0 ? parsed : [createTextBlock()];
 }
 
 /**
- * Von außen geänderter Inhalt, während der Eintrag gelesen wird — „Alle
- * aktualisieren" oder „aus Einträgen entfernen" in der Blöcke-Ansicht. Der
- * Stapel ist unkontrolliert und sähe es sonst erst nach einem Neuladen;
- * schlimmer, der Content-Mirror der View behielte den alten Stand, und
- * „Fertig" nach einem späteren Bearbeiten schriebe ihn zurück.
+ * Content changed from outside while the entry is being read: "Update
+ * all" or "remove from entries" in the blocks view. The
+ * stack is uncontrolled and would otherwise only see it after a reload;
+ * worse, the view's content mirror would keep the old state, and
+ * "Done" after a later edit would write it back.
  *
- * Nur eine echte Änderung der Prop zählt, nie der Moduswechsel: nach „Fertig"
- * hinkt der Store kurz hinterher. Beim Bearbeiten gehört der Inhalt dem
- * Editor, und was der Stapel selbst geschrieben hat (Lesemodus-Abhaken), ist
- * schon sein Stand. Liefert eine Epoche für die Keys: ein Textblock liest sein
- * HTML nur beim Start und muss neu montieren.
+ * Only a genuine change of the prop counts, never the mode switch: after "Done"
+ * the store lags behind briefly. While editing the content belongs to the
+ * editor, and what the stack itself wrote (ticking in read mode) is
+ * already its state. Supplies an epoch for the keys: a text block reads its
+ * HTML only at startup and has to remount.
  */
 function useExternalContentReset(
   initialContent: string,
@@ -638,8 +638,8 @@ function useExternalContentReset(
   return epoch;
 }
 
-/** Ein Listenplatz im Stapel. Gezogen wird nur am Griff — sonst ließe sich im
- *  Textblock kein Text mehr markieren. */
+/** A list slot in the stack. Dragging happens only at the handle; otherwise no text
+ *  could be selected in the text block any more. */
 function StackItem({ id, children }: { id: string; children: (startDrag: (e: PointerEvent) => void) => ReactNode }) {
   const controls = useDragControls();
   return (
@@ -658,9 +658,9 @@ function StackItem({ id, children }: { id: string; children: (startDrag: (e: Poi
   );
 }
 
-/** Die eine Toolbar des Stapels, gebunden an den fokussierten Textblock. Sie
- *  steht außerhalb der Editor-Komponente und rendert deshalb nicht von selbst
- *  mit jeder Transaktion neu — das holt der Zuhörer hier nach. */
+/** The stack's one toolbar, bound to the focused text block. It
+ *  sits outside the editor component and therefore does not re-render by itself
+ *  with every transaction; the listener here makes up for that. */
 function StackToolbar({ editor, onOpenLinkPicker }: { editor: Editor; onOpenLinkPicker: () => void }) {
   const [, rerender] = useReducer((n: number) => n + 1, 0);
   useEffect(() => {
@@ -679,9 +679,9 @@ function StackToolbar({ editor, onOpenLinkPicker }: { editor: Editor; onOpenLink
   );
 }
 
-/** Die Einfügelinie zwischen Blöcken. Bewusst kein `Button`: sie ist Teil des
- *  Dokuments, kein Aktionsknopf in einer Leiste — zwischen zwei Blöcken nur ein
- *  „+", das beim Überfahren erscheint, am Ende eine leise Textzeile. */
+/** The insertion line between blocks. Deliberately not a `Button`: it is part of the
+ *  document, not an action button in a bar; between two blocks only a
+ *  "+" that appears on hover, at the end a quiet line of text. */
 function InsertLine({ always = false, onAdd }: { always?: boolean; onAdd: (e: MouseEvent) => void }) {
   const { t } = useTranslation();
   return (

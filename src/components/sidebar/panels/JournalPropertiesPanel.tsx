@@ -11,8 +11,8 @@ import { entryMoonPhase, MOON_PHASE_SYMBOLS } from '../../../lib/moonPhase';
 import type { MoonPhase } from '../../../types';
 
 /**
- * Die Mondphase als Eigenschaft — auch im Bearbeiten nur angezeigt: sie
- * folgt aus dem Tag, an dem der Eintrag angelegt wurde, und wird nicht gewählt.
+ * The moon phase as a property, only displayed even when editing: it
+ * follows from the day the entry was created and is not chosen.
  */
 function MoonPhaseRow({ phase }: { phase: MoonPhase }) {
   const { t } = useTranslation();
@@ -26,10 +26,10 @@ function MoonPhaseRow({ phase }: { phase: MoonPhase }) {
 }
 
 /**
- * Die Eigenschaften eines Journal-Eintrags: Typ und (nur angezeigt) Mondphase. Paradigma,
- * Bannung und Meditation waren drei feste Felder auf je eine Wiki-Kategorie
- * und sind seit Migration v37 gewöhnliche Verlinkungen im Inhalt (im Abschnitt
- * darunter nach Kategorie sortiert). Dazu Verlinkungen und Tags.
+ * The properties of a journal entry: type and (display only) moon phase. Paradigm,
+ * banishing and meditation were three fixed fields, one per wiki category,
+ * and since migration v37 are ordinary links in the content (sorted by
+ * category in the section below). Plus links and tags.
  */
 export default function JournalPropertiesPanel() {
   const { t } = useTranslation();

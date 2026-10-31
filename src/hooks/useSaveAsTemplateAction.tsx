@@ -6,9 +6,9 @@ import type { ContextMenuAction } from '../components/ui/ContextMenu';
 import type { TemplateEntryType } from '../lib/blocks/templates';
 
 /**
- * Der Kontextmenü-Eintrag „Als Vorlage speichern" — in jedem Menü, das einen
- * Eintrag mit Blockstapel trägt. Legt die Vorlage an und öffnet ihre Seite
- * zum Nachbearbeiten.
+ * The context menu item "Save as template" — in every menu that carries an
+ * entry with a block stack. Creates the template and opens its page
+ * for further editing.
  */
 export function useSaveAsTemplateAction(): (entryType: TemplateEntryType, id: string) => ContextMenuAction {
   const { t } = useTranslation();

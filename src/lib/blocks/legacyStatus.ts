@@ -5,20 +5,20 @@ import { instantiateDefinition, type BlockDefinition } from './definitions';
 import { parseFields, serializeFields } from './fields';
 
 /**
- * Status, Enddatum und Version der Operationen waren bis v40 feste Spalten
- * mit eigenem Filter, Punkt in der Liste und Chips unter dem Titel. Seit v41
- * sind sie ein Block: die Kopie des eigenen Blocks „Status" (Aktiv — Ja/Nein,
- * Enddatum, Version), ganz oben im Inhalt. Der Block entsteht nur bei
- * Operationen, die davon etwas gesetzt hatten; die Definition nur, wenn es
- * eine solche Operation gibt — danach ist sie ein eigener Block wie jeder
- * andere, umbenenn-, änderbar und löschbar.
+ * Status, end date and version of operations were fixed columns up to v40,
+ * with their own filter, a dot in the list and chips under the title. Since
+ * v41 they are a block: the copy of the custom block "Status" (Active — yes/no,
+ * end date, version), at the very top of the content. The block is only
+ * created for operations that had set any of these; the definition only if
+ * there is such an operation — after that it is a custom block like any
+ * other, renamable, editable and deletable.
  *
- * Ein Konverter für alle Wege, auf denen Altbestand hereinkommt: Migration
- * v41, Backup-Import (`.emeralddb` bis Version 6), `.emerald`- und
- * Markdown-Import. Rein und DOM-frei — die Migration läuft ohne Browser.
+ * One converter for all paths by which legacy data comes in: migration
+ * v41, backup import (`.emeralddb` up to version 6), `.emerald` and
+ * Markdown import. Pure and DOM-free — the migration runs without a browser.
  */
 
-/** Feste ID: Migration und Importe aus verschiedenen Vaults treffen dieselbe Definition. */
+/** Fixed ID: migration and imports from different vaults hit the same definition. */
 export const STATUS_DEFINITION_ID = 'core-status';
 
 export interface LegacyStatus {
@@ -27,16 +27,16 @@ export interface LegacyStatus {
   version: string | null;
 }
 
-/** Hatte die Operation etwas gesetzt? „Aktiv" ohne Enddatum und Version war der Normalzustand. */
+/** Had the operation set anything? "Active" without end date and version was the normal state. */
 export function hasLegacyStatus(status: LegacyStatus): boolean {
   return !status.isActive || !!status.endDate?.trim() || !!status.version?.trim();
 }
 
 /**
- * Die Definition „Status", beschriftet in der aktuellen Sprache — wie das
- * Starter-Set der Kategorien. Die Beschriftungen landen fest in Definition und
- * Kopien; ist i18n noch nicht bereit (`t` liefert den Schlüssel zurück), stünde
- * dort für immer „blocks.status.name". Dann lieber Englisch.
+ * The "Status" definition, labelled in the current language — like the
+ * starter set of categories. The labels end up permanently in the definition
+ * and copies; if i18n is not ready yet (`t` returns the key), "blocks.status.name"
+ * would stay there forever. Better English then.
  */
 export function statusDefinition(t: TFunction, now: string): BlockDefinition {
   const label = (key: string, fallback: string) => translatedOr(t, key, fallback);
@@ -59,9 +59,9 @@ export function statusDefinition(t: TFunction, now: string): BlockDefinition {
 }
 
 /**
- * Ein Datum, wie es der Datumsblock speichert (`YYYY-MM-DD`). Die Spalte hielt
- * ISO; ein Markdown-Import bringt „Sep 10, 2026" mit. Unlesbares bleibt roh
- * stehen — der Block zeigt es dann als Text, statt es zu verlieren.
+ * A date as the date block stores it (`YYYY-MM-DD`). The column held
+ * ISO; a Markdown import brings "Sep 10, 2026". Unreadable values stay
+ * raw — the block then shows it as text instead of losing it.
  */
 function isoDate(raw: string): string {
   const s = raw.trim();
@@ -72,7 +72,7 @@ function isoDate(raw: string): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
 
-/** Der Inhalt mit dem Status-Block davor — dort, wo die Chips unter dem Titel standen. */
+/** The content with the status block in front — where the chips under the title used to be. */
 export function withLegacyStatus(content: string, status: LegacyStatus, def: BlockDefinition, t: TFunction): string {
   const text = fieldFallbackText(t);
   const block = instantiateDefinition(def, text);
@@ -80,12 +80,12 @@ export function withLegacyStatus(content: string, status: LegacyStatus, def: Blo
   const values: Record<string, string | boolean> = { active: status.isActive };
   if (status.endDate?.trim()) values['end-date'] = isoDate(status.endDate);
   if (status.version?.trim()) values.version = status.version.trim();
-  // Über die Vorgaben der Definition: ein Feld, das jemand zum Status hinzugefügt hat, behält seine.
+  // On top of the definition's defaults: a field someone added to the status keeps its own.
   const filled = serializeFields(block, { ...model, values: { ...model.values, ...values } }, text);
   return serializeBlocks([filled, ...parseBlocks(content)]);
 }
 
-/** Der Altstatus einer Operationszeile — aus der Datenbank oder aus einer Sicherung (dann ungeprüft). */
+/** The legacy status of an operation row — from the database or from a backup (then unchecked). */
 export function legacyStatusOfRow(row: Record<string, unknown>): LegacyStatus {
   return {
     isActive: row.is_active == null ? true : Number(row.is_active) !== 0,
@@ -95,10 +95,10 @@ export function legacyStatusOfRow(row: Record<string, unknown>): LegacyStatus {
 }
 
 /**
- * Operationszeilen mit Altstatus umschreiben: Status-Block in den Inhalt,
- * Spalten auf ihre Grundwerte. Zeilen ohne Altstatus kommen unverändert
- * zurück. `definition` ist die benutzte Definition — `existing`, wenn es sie
- * schon gibt, sonst eine neue —, oder `null`, wenn keine Zeile sie brauchte.
+ * Rewrite operation rows with legacy status: status block into the content,
+ * columns to their base values. Rows without legacy status come back
+ * unchanged. `definition` is the definition used — `existing` if it
+ * already exists, otherwise a new one — or `null` if no row needed it.
  */
 export function convertLegacyStatusRows<T extends Record<string, unknown>>(
   rows: readonly T[],

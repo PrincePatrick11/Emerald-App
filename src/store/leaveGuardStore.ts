@@ -2,29 +2,29 @@ import { create } from 'zustand';
 import type { ActiveView } from '../types';
 
 /**
- * Eine Bearbeitung endet nur mit „Fertig" oder „Abbrechen". Wer sie mit
- * Änderungen anders verlässt — im selben Tab woanders hin, Tab zu, Vault
- * wechseln, Fenster schließen —, wird gefragt: speichern, verwerfen oder
- * weiter bearbeiten. Der Wechsel in einen anderen Tab fragt nicht, dort läuft
- * die Bearbeitung weiter.
+ * An edit ends only with "Done" or "Cancel". Anyone who leaves it with
+ * changes in any other way — elsewhere in the same tab, closing the tab, switching
+ * vault, closing the window — is asked: save, discard or
+ * keep editing. Switching to another tab does not ask, the
+ * edit simply continues there.
  *
- * Die Seite, die gerade bearbeitet wird, meldet hier ihren Wächter an
- * (`useEditActions`, `useDraftPage`). Wer die Seite verlassen will, fragt über
- * `confirmLeave()`; das Modal (`LeaveGuardModal`) beantwortet die Frage.
+ * The page currently being edited registers its guard here
+ * (`useEditActions`, `useDraftPage`). Whoever wants to leave the page asks via
+ * `confirmLeave()`; the modal (`LeaveGuardModal`) answers the question.
  *
- * Import-Regel: dieser Store importiert keinen anderen — die anderen lesen
- * ihn, nicht umgekehrt.
+ * Import rule: this store imports no other — the others read
+ * it, not the other way round.
  */
 export interface EditGuard {
-  /** Die Seite, der der Wächter gehört: `guardKey(View-Typ, id)`. */
+  /** The page the guard belongs to: `guardKey(view type, id)`. */
   key: string;
-  /** Der Name dessen, was bearbeitet wird — steht im Modal. */
+  /** The name of what is being edited — shown in the modal. */
   title: () => string;
-  /** Wurde seit dem Betreten etwas geändert, oder ist der Eintrag neu und nie bestätigt? */
+  /** Has anything changed since entering, or is the entry new and never confirmed? */
   isDirty: () => boolean;
-  /** Wie „Fertig". */
+  /** Like "Done". */
   save: () => void | Promise<void>;
-  /** Wie „Abbrechen". */
+  /** Like "Cancel". */
   discard: () => void | Promise<void>;
 }
 
@@ -38,10 +38,10 @@ interface LeaveQuestion {
 interface LeaveGuardState {
   guard: EditGuard | null;
   question: LeaveQuestion | null;
-  /** Zählt die Antworten „Weiter bearbeiten" — woran Fenster über der Seite merken, dass sie weichen sollen (`useCloseOnKeepEditing`). */
+  /** Counts the "Keep editing" answers — how windows above the page notice that they should give way (`useCloseOnKeepEditing`). */
   stays: number;
   setGuard: (guard: EditGuard) => void;
-  /** Räumt nur, wenn der Wächter noch dieser Seite gehört — die nächste darf schon übernommen haben. */
+  /** Clears only if the guard still belongs to this page — the next one may already have taken over. */
   clearGuard: (key: string) => void;
 }
 
@@ -58,15 +58,15 @@ export const useLeaveGuardStore = create<LeaveGuardState>((set, get) => ({
 export const guardKey = (type: string, id: string) => `${type}:${id}`;
 
 /**
- * Die Seiten, auf denen gerade „Fertig", „Abbrechen" oder „Löschen" läuft —
- * je Seite, nicht für alle: ein „Fertig", das noch schreibt, darf die Frage
- * nach einer anderen Seite nicht mit unterdrücken.
+ * The pages on which "Done", "Cancel" or "Delete" is currently running —
+ * per page, not for all: a "Done" that is still writing must not suppress
+ * the question for another page as well.
  */
 const ending = new Map<string, number>();
 
 /**
- * Führt das Ende der Bearbeitung von `key` aus, ohne dass die Navigation darin
- * nachfragt: „Fertig", „Abbrechen" und „Löschen" wechseln selbst die Seite.
+ * Runs the end of the edit of `key` without the navigation inside it
+ * asking: "Done", "Cancel" and "Delete" switch the page themselves.
  */
 export async function withoutLeaveGuard<T>(key: string, run: () => T | Promise<T>): Promise<T> {
   ending.set(key, (ending.get(key) ?? 0) + 1);
@@ -80,36 +80,36 @@ export async function withoutLeaveGuard<T>(key: string, run: () => T | Promise<T
 }
 
 /**
- * Läuft auf der Seite `key` gerade „Fertig", „Abbrechen" oder „Löschen"? Wer
- * sie dabei unter sich wegzöge — ein Typwechsel —, wartet das ab: ihr Schritt
- * zurück in die Liste oder ins Lesen fiele sonst in dessen Sperre
- * (`uiStore.editLocked`) und entfiele, oder träfe danach ein Paar aus Typ und
- * id, das es nicht mehr gibt.
+ * Is "Done", "Cancel" or "Delete" currently running on page `key`? Anyone who
+ * would pull it out from under it — a type change — waits for that: its step
+ * back to the list or to reading would otherwise fall into that lock
+ * (`uiStore.editLocked`) and be dropped, or afterwards hit a type and id
+ * pair that no longer exists.
  */
 export const isEnding = (key: string): boolean => ending.has(key);
 
-/** Müsste vor dem Verlassen der offenen Seite gefragt werden? */
+/** Would a question have to be asked before leaving the open page? */
 export function leaveNeedsConfirm(): boolean {
   const guard = useLeaveGuardStore.getState().guard;
   if (!guard || ending.has(guard.key)) return false;
   try {
     return guard.isDirty();
   } catch (e) {
-    // Ein Wächter, der nicht antworten kann, hält niemanden fest.
+    // A guard that cannot answer holds nobody back.
     console.error('[leaveGuard] asking the page failed:', e);
     return false;
   }
 }
 
 /**
- * Fragt, wenn die offene Seite ungesicherte Änderungen trägt, und führt die
- * Antwort aus. `true`: die Seite darf verlassen werden. `false`: weiter
- * bearbeiten — oder das Speichern ist gescheitert, dann bleibt man auch.
+ * Asks if the open page carries unsaved changes, and carries out the
+ * answer. `true`: the page may be left. `false`: keep
+ * editing — or saving failed, in which case one stays as well.
  */
 export async function confirmLeave(): Promise<boolean> {
   if (!leaveNeedsConfirm()) return true;
   const { guard, question } = useLeaveGuardStore.getState();
-  // Eine Frage steht schon: die zweite Navigation wartet nicht daneben, sie entfällt.
+  // A question is already open: the second navigation does not wait beside it, it is dropped.
   if (!guard || question) return false;
 
   try {
@@ -129,9 +129,9 @@ export async function confirmLeave(): Promise<boolean> {
 }
 
 /**
- * Wartet, bis die Seite `key` ihren Wächter angemeldet hat — nach einem
- * Tabwechsel montiert die Ansicht erst, und ihr Code wird vielleicht erst
- * geladen. `false`, wenn sie es in der Zeit nicht tut.
+ * Waits until page `key` has registered its guard — after a
+ * tab switch the view only mounts then, and its code may only be
+ * loaded then. `false` if it does not do so in time.
  */
 export function guardRegistered(key: string, timeoutMs = 3000): Promise<boolean> {
   if (useLeaveGuardStore.getState().guard?.key === key) return Promise.resolve(true);
@@ -149,11 +149,11 @@ export function guardRegistered(key: string, timeoutMs = 3000): Promise<boolean>
 }
 
 /**
- * Trägt eine Seite, die gerade nicht offen ist, ungesicherte Änderungen? Wer
- * Bearbeitungen außerhalb der Ansicht aufbewahrt, meldet hier eine Probe an
- * (`draftStore`: es gibt einen Entwurf; `entryEdit`: der gespeicherte
- * Stand weicht vom Ausgangsstand ab). So muss ein Tab im Hintergrund nicht
- * erst geöffnet werden, nur um festzustellen, dass es nichts zu fragen gibt.
+ * Does a page that is not currently open carry unsaved changes? Whoever
+ * keeps edits outside the view registers a probe here
+ * (`draftStore`: a draft exists; `entryEdit`: the saved
+ * state differs from the baseline). This way a background tab need not
+ * be opened first just to find out that there is nothing to ask.
  */
 type EditProbe = (view: ActiveView) => boolean;
 

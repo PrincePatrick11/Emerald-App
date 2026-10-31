@@ -414,9 +414,9 @@ pub async fn vault_key_status(app: tauri::AppHandle, vault_id: String) -> Result
         vault::directory_state(&dir)?;
         crate::reencrypt::recover_if_idle(&dir)?;
         let encrypted = is_encrypted_dir(&dir);
-        // Ein Schlüssel im Speicher, der nicht zu diesem Ordner passt — der
-        // Vault wurde neu verortet, oder ein Tausch wurde erst jetzt fertig —,
-        // ist keiner: weg damit, dann fragt das Frontend neu.
+        // A key in memory that does not fit this folder — the vault was
+        // relocated, or a swap only just finished — is no key: drop it, and
+        // the frontend asks again.
         let keys = app.state::<VaultKeys>();
         let unlocked = encrypted
             && match keys.get(&vault_id) {

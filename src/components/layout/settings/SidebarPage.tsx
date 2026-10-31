@@ -6,7 +6,7 @@ import { LEFT_LIST_TABS } from '../../../lib/modules';
 import SettingsChoiceButton, { SettingsChoiceRow } from './SettingsChoiceButton';
 import SettingsSection from './SettingsSection';
 
-/** Was die Eintragsliste links zeigt: welche Liste, und wie viele Einträge davon. */
+/** What the entry list on the left shows: which list, and how many entries of it. */
 export default function SidebarPage() {
   const { t } = useTranslation();
   const leftList = useSettingsStore((s) => s.settings.leftList);

@@ -1,45 +1,45 @@
 /**
- * Migration v38 — legt `wiki_categories`, `operation_categories`,
- * `task_categories` und `altar_categories` zur einen Tabelle `categories`
- * zusammen und hängt die vier Inhaltstabellen darauf um.
+ * Migration v38 — merges `wiki_categories`, `operation_categories`,
+ * `task_categories` and `altar_categories` into the one table `categories`
+ * and repoints the four content tables to it.
  *
- * Wie v33 ein Rebuild ohne `PRAGMA foreign_keys = OFF` (warum, steht im Kopf
- * von `normalizeSchema.ts`), aber mit einer Falle, die v33 nicht hatte: Seit
- * v33 gibt es Foreign Keys, und `ALTER TABLE altar_items RENAME TO
- * altar_items_old` schreibt den Verweis in `altar_placements` auf
- * `altar_items_old` um. Würde `altar_items_old` danach gelöscht, nähme das
- * CASCADE alle Platzierungen mit. Dasselbe gilt für `tasks` ← `task_links`.
- * Deshalb werden die beiden Kind-Tabellen mit umgebaut: **Kinder zuerst**
- * umbenennen (dann zeigt `altar_placements_old` auf `altar_items_old`, und
- * beide verschwinden zusammen), Eltern zuerst kopieren, Kinder zuerst löschen.
+ * Like v33 a rebuild without `PRAGMA foreign_keys = OFF` (why is explained in the header
+ * of `normalizeSchema.ts`), but with a trap that v33 did not have: since
+ * v33 there are foreign keys, and `ALTER TABLE altar_items RENAME TO
+ * altar_items_old` rewrites the reference in `altar_placements` to point at
+ * `altar_items_old`. If `altar_items_old` were dropped afterwards, the
+ * CASCADE would take all placements with it. The same goes for `tasks` ← `task_links`.
+ * That is why the two child tables are rebuilt as well: rename **children first**
+ * (then `altar_placements_old` points at `altar_items_old`, and
+ * both disappear together), copy parents first, drop children first.
  *
- *   1. Reste eines abgebrochenen Laufs zurückrollen
- *   2. Datei-Snapshot ziehen (VACUUM INTO)
- *   3. Die vier alten Tabellen lesen und zusammenlegen (`mergeCategoryRows`)
- *   4. `categories` anlegen und füllen, ID-Zuordnung in `_category_id_map`
- *      ablegen — eine echte Tabelle, keine TEMP-Tabelle: die wäre an eine
- *      Pool-Verbindung gebunden und für die nächste Anweisung womöglich weg
- *   5. Kinder zuerst auf `*_old` umbenennen
- *   6. Neue Tabellen anlegen (`ddlBeforeV49`), Eltern zuerst kopieren; die
- *      `category_id` läuft dabei durch die Zuordnung
- *   7. Kinder zuerst `*_old` löschen, dann die vier alten Kategorie-Tabellen
- *      und die Zuordnung
- *   8. Indizes anlegen, `PRAGMA foreign_key_check`
+ *   1. Roll back leftovers of an aborted run
+ *   2. Take a file snapshot (VACUUM INTO)
+ *   3. Read the four old tables and merge them (`mergeCategoryRows`)
+ *   4. Create and fill `categories`, store the ID mapping in `_category_id_map`
+ *      — a real table, not a TEMP table: that would be tied to a
+ *      pool connection and might be gone for the next statement
+ *   5. Rename children first to `*_old`
+ *   6. Create new tables (`ddlBeforeV49`), copy parents first; the
+ *      `category_id` runs through the mapping in the process
+ *   7. Drop `*_old` children first, then the four old category tables
+ *      and the mapping
+ *   8. Create indexes, `PRAGMA foreign_key_check`
  *
- * Woran man erkennt, wie weit ein abgebrochener Lauf kam: Nach Schritt 6
- * schreibt der Lauf eine Marke in `_category_id_map` — liegt sie vor, sind
- * alle sechs Tabellen kopiert und nur das Aufräumen (7–8) fehlt. Ohne Marke
- * war der Lauf mittendrin: Schritt 1 stellt den Ausgangszustand her. Die
- * Marke ist nötig, weil ein Zurückrollen nach Schritt 6 Daten kostet — ein
- * `DROP TABLE tasks` auf der fertigen Tabelle löscht per CASCADE alle Zeilen
- * aus dem ebenfalls fertigen `task_links`. Ist die Map schon weg (Abbruch
- * ganz am Ende), verrät der Foreign Key von `wiki_articles` den Stand.
+ * How to tell how far an aborted run got: after step 6
+ * the run writes a mark into `_category_id_map` — if it is there, all
+ * six tables are copied and only the cleanup (7–8) is missing. Without the mark
+ * the run was midway: step 1 restores the initial state. The
+ * mark is necessary because rolling back after step 6 costs data — a
+ * `DROP TABLE tasks` on the finished table deletes, via CASCADE, all rows
+ * from the likewise finished `task_links`. If the map is already gone (abort
+ * at the very end), the foreign key of `wiki_articles` reveals the state.
  */
 import type Database from './sqlite';
 import i18n from '../i18n';
-// INDEX_DDL_V38, nicht INDEX_DDL: in der Kette fehlen hier noch die Tabellen späterer Migrationen.
+// INDEX_DDL_V38, not INDEX_DDL: the chain here still lacks the tables of later migrations.
 import { TABLE_DDL, INDEX_DDL_V38, FALLBACK_CATEGORY_ID, insertCategoryRows } from './schema';
-// `wiki_articles`/`operations` in ihrer Form bis v48 — seit v49 stehen sie in `entries`.
+// `wiki_articles`/`operations` in their form up to v48 — since v49 they live in `entries`.
 import { ddlBeforeV49 } from './schemaV48';
 import { mergeCategoryRows, type CategorySource } from './categoryMerge';
 import { legacyDisplayName, type LegacyCategoryTable } from './categories';
@@ -59,7 +59,7 @@ const LEGACY_TABLES: readonly LegacyCategoryTable[] = [
   'altar_categories',
 ];
 
-/** Umbenennen und Löschen: Kinder vor Eltern. */
+/** Renaming and dropping: children before parents. */
 const REBUILT_CHILDREN_FIRST = [
   'task_links',
   'altar_placements',
@@ -69,11 +69,11 @@ const REBUILT_CHILDREN_FIRST = [
   'wiki_articles',
 ] as const;
 
-/** Anlegen und Kopieren: Eltern vor Kindern. */
+/** Creating and copying: parents before children. */
 const REBUILT_PARENTS_FIRST = [...REBUILT_CHILDREN_FIRST].reverse();
 
 const ID_MAP_TABLE = '_category_id_map';
-/** Zeile in der Map, die „alle sechs Inhaltstabellen sind kopiert" festhält. */
+/** Row in the map that records "all six content tables are copied". */
 const CONTENT_REBUILT_MARK = { src: '_state', oldId: 'content_rebuilt' };
 
 interface LegacyRow {
@@ -84,7 +84,7 @@ interface LegacyRow {
   deleted_at?: string | null;
 }
 
-/** Sind die Inhalte fertig umgebaut? Erst die Marke, sonst der Foreign Key (Map schon gelöscht). */
+/** Are the contents fully rebuilt? First the mark, otherwise the foreign key (map already dropped). */
 async function contentRebuilt(db: Database): Promise<boolean> {
   if (await tableExists(db, ID_MAP_TABLE)) {
     const rows = await db.select<{ n: number }[]>(
@@ -107,8 +107,8 @@ async function rollbackPartialRebuild(db: Database): Promise<void> {
     await db.execute(`ALTER TABLE ${table}_old RENAME TO ${table}`);
     rolledBack = true;
   }
-  // Eine halb gefüllte `categories` von vor dem Umbenennen: billig neu zu
-  // bauen, also weg damit — die Inhalte zeigen noch auf die alten Tabellen.
+  // A half-filled `categories` from before the renaming: cheap to rebuild,
+  // so get rid of it — the contents still point at the old tables.
   if (rolledBack || !(await referencedTables(db, 'wiki_articles')).has('categories')) {
     await db.execute('DROP TABLE IF EXISTS categories');
     await db.execute(`DROP TABLE IF EXISTS ${ID_MAP_TABLE}`);
@@ -159,7 +159,7 @@ async function renameOldTables(db: Database): Promise<void> {
   }
 }
 
-/** `category_id` durch die Zuordnung, Unbekanntes aufs Sammelbecken. */
+/** `category_id` through the mapping, unknown values to the catch-all. */
 function mappedCategory(src: LegacyCategoryTable): string {
   return `COALESCE(
     (SELECT m.new_id FROM ${ID_MAP_TABLE} m WHERE m.src = '${src}' AND m.old_id = o.category_id),
@@ -176,12 +176,12 @@ async function rebuildContentTables(db: Database): Promise<void> {
   };
   for (const table of REBUILT_PARENTS_FIRST) {
     await db.execute(ddlBeforeV49(table));
-    // `tasks` samt `parent_task_id` in einem INSERT … SELECT: SQLite prüft
-    // Foreign Keys am Ende der Anweisung, ein Kind darf im Ergebnis also vor
-    // seinem Elternteil stehen (v33 kopiert genauso).
+    // `tasks` including `parent_task_id` in one INSERT … SELECT: SQLite checks
+    // foreign keys at the end of the statement, so a child may come before
+    // its parent in the result (v33 copies the same way).
     await copyTable(db, table, `${table}_old`, overrides[table]);
   }
-  // Ab hier darf nichts mehr zurückgerollt werden (siehe Kopf).
+  // From here on nothing may be rolled back (see header).
   await db.execute(
     `INSERT INTO ${ID_MAP_TABLE} (src, old_id, new_id) VALUES ($1, $2, '1')`,
     [CONTENT_REBUILT_MARK.src, CONTENT_REBUILT_MARK.oldId]

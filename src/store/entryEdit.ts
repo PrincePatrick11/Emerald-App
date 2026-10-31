@@ -6,38 +6,38 @@ import { retypeInternalLinks } from '../lib/internalLinkHtml';
 import type { Entry, EntryType } from '../types';
 
 /**
- * Die Ausgangsstände der laufenden Bearbeitungen, je Ansicht und Eintrag — wie
- * der Eintrag aussah, als „Bearbeiten" gedrückt wurde. Außerhalb der
- * Komponente, weil eine Bearbeitung ihre View überlebt: wer mittendrin in
- * einen anderen Tab schaut, kommt in dieselbe Bearbeitung zurück, und Cancel
- * geht dann bis zu ihrem Anfang, nicht nur bis zum Tabwechsel.
+ * The baselines of the running edits, per view and entry — how
+ * the entry looked when "Edit" was pressed. Outside the
+ * component, because an edit outlives its view: anyone who looks at
+ * another tab in the middle comes back into the same edit, and Cancel
+ * then goes back to its beginning, not just to the tab switch.
  *
- * Ein Stand lebt, solange irgendein Tab den Eintrag im Bearbeiten zeigt.
- * „Fertig", Cancel, Löschen, das Schließen des Tabs und ein Wechsel der Seite
- * im selben Tab beenden die Bearbeitung — das liest der Abgleich unten am
- * `uiStore` ab, keine View muss es melden. Nur im Speicher: ein Neustart
- * beginnt mit dem, was gespeichert ist.
+ * A baseline lives as long as any tab shows the entry in edit mode.
+ * "Done", Cancel, delete, closing the tab and a page change
+ * in the same tab end the edit — the reconciliation below reads that off the
+ * `uiStore`, no view has to report it. In memory only: a restart
+ * begins with what is saved.
  *
- * Ein Typwechsel beendet die Bearbeitung nicht: der Stand zieht mit in die
- * neue Ansicht (`carryBaseline`) und merkt sich, woher der Eintrag kam — Cancel
- * bringt ihn dorthin zurück (`revertEntryType`).
+ * A type change does not end the edit: the baseline moves along into the
+ * new view (`carryBaseline`) and remembers where the entry came from — Cancel
+ * brings it back there (`revertEntryType`).
  */
 export interface EditBaseline {
   scope: ViewId;
   id: string;
   patch: BaselineFields;
-  /** „Zuletzt geändert" beim Betreten — Cancel stellt ihn mit dem Rest wieder her. */
+  /** "Last modified" on entering — Cancel restores it along with the rest. */
   stamp: string | undefined;
-  /** Der gespeicherte Stand, in der Form von `patch` — `null`, wenn es den Eintrag nicht mehr gibt. */
+  /** The saved state, in the shape of `patch` — `null` if the entry no longer exists. */
   stored: () => unknown;
-  /** Nur nach einem Typwechsel: was der Eintrag beim Betreten war. `patch` hat dann die Form jener Ansicht. */
+  /** Only after a type change: what the entry was on entering. `patch` then has the shape of that view. */
   origin?: EditOrigin;
 }
 
-/** Was ein Ausgangsstand festhält: ein Ausschnitt des Eintrags — das Journal nur die ersten drei Felder. */
+/** What a baseline holds: an excerpt of the entry — for the journal only the first three fields. */
 export type BaselineFields = Partial<Pick<Entry, 'title' | 'content' | 'tags' | 'category_id' | 'icon' | 'cover_image'>>;
 
-/** Typ und Nummer eines Eintrags, bevor er während der Bearbeitung den Typ wechselte. */
+/** Type and number of an entry before it changed type during the edit. */
 export interface EditOrigin {
   type: EntryType;
   entry_number: number | undefined;
@@ -48,11 +48,11 @@ export const baselines = new Map<string, EditBaseline>();
 export const baselineKey = guardKey;
 
 /**
- * Trägt eine Bearbeitung Änderungen? Die eine Regel für den Wächter der
- * offenen Seite und die Probe im Hintergrund: ein gelöschter Eintrag
- * (`stored === null`) hat nichts mehr zu sichern; ein neuer, nie bestätigter,
- * einer mit ausstehendem Autosave oder mit gewechseltem Typ immer; sonst
- * zählt, ob der gespeicherte Stand vom Ausgangsstand abweicht.
+ * Does an edit carry changes? The one rule for the guard of the
+ * open page and the probe in the background: a deleted entry
+ * (`stored === null`) has nothing left to preserve; a new, never confirmed one,
+ * one with a pending autosave or with a changed type always does; otherwise
+ * what counts is whether the saved state differs from the baseline.
  */
 export function editIsDirty(stored: unknown, baseline: EditBaseline | undefined, isNew: boolean, pending = false): boolean {
   if (stored === null) return false;
@@ -61,9 +61,9 @@ export function editIsDirty(stored: unknown, baseline: EditBaseline | undefined,
 }
 
 /**
- * Der Ausgangsstand der Bearbeitung von `id` — unter welcher Ansicht er auch
- * gerade liegt: nach einem Typwechsel ist das nicht mehr die, in der
- * „Bearbeiten" gedrückt wurde.
+ * The baseline of the edit of `id` — under whichever view it currently
+ * sits: after a type change that is no longer the one in which
+ * "Edit" was pressed.
  */
 export function baselineOf(id: string): EditBaseline | undefined {
   for (const baseline of baselines.values()) {
@@ -72,22 +72,22 @@ export function baselineOf(id: string): EditBaseline | undefined {
   return undefined;
 }
 
-/** Woher der Eintrag kam, wenn er in dieser Bearbeitung schon den Typ gewechselt hat. */
+/** Where the entry came from, if it has already changed type in this edit. */
 export function originOfEdit(id: string, type: EntryType): EditOrigin | undefined {
   return baselines.get(baselineKey(viewTypeForEntryType(type), id))?.origin;
 }
 
 /**
- * Nimmt den Ausgangsstand beim Typwechsel mit in die Ansicht des neuen Typs.
- * Beim ersten Wechsel merkt er sich `source` als Herkunft; führt der Wechsel
- * dorthin zurück, ist es wieder eine gewöhnliche Bearbeitung. Muss laufen,
- * bevor die Tabs umziehen (`retypeEntryViews`) — der Abgleich unten räumte den
- * Stand sonst weg.
+ * Carries the baseline along into the view of the new type on a type change.
+ * On the first change it remembers `source` as the origin; if the change leads
+ * back there, it is an ordinary edit again. Must run
+ * before the tabs move (`retypeEntryViews`) — the reconciliation below would
+ * otherwise clear the baseline.
  *
- * `stored` las bisher über die alte Ansicht und fände den Eintrag dort nicht
- * mehr („gelöscht"). Bis die neue Ansicht montiert und ihren Leser einsetzt
- * (`useEntryEditor`), sagt er nur, ob es den Eintrag gibt — in einem Tab, der
- * vorher in den Hintergrund ging, bleibt es dabei.
+ * `stored` used to read through the old view and would no longer find the entry
+ * there ("deleted"). Until the new view is mounted and installs its reader
+ * (`useEntryEditor`), it only says whether the entry exists — in a tab that
+ * went to the background beforehand, it stays that way.
  */
 export function carryBaseline(id: string, from: EntryType, to: EntryType, source: EditOrigin): void {
   const fromKey = baselineKey(viewTypeForEntryType(from), id);
@@ -100,16 +100,16 @@ export function carryBaseline(id: string, from: EntryType, to: EntryType, source
     ...baseline,
     scope,
     origin: origin.type === to ? undefined : origin,
-    // `{}` gleicht keinem Stand — mit `origin` zählt die Bearbeitung ohnehin als geändert.
+    // `{}` matches no baseline — with `origin` the edit counts as changed anyway.
     stored: () => (useEntryStore.getState().getEntry(id, to) ? {} : null),
   });
 }
 
 /**
- * Ein Eintrag hat den Typ gewechselt: die Chips auf ihn in den Ausgangsständen
- * ANDERER laufender Bearbeitungen ziehen mit. Die gespeicherten Inhalte
- * schreibt `entryTypeChange` um; ein Cancel dort schriebe sonst den Chip mit
- * dem alten Typ zurück — und der führt nirgends mehr hin.
+ * An entry has changed type: the chips pointing at it in the baselines of
+ * OTHER running edits move along. `entryTypeChange` rewrites the saved
+ * contents; a Cancel there would otherwise write the chip with the old type
+ * back — and that leads nowhere any more.
  */
 export function retypeBaselineLinks(id: string, to: EntryType): void {
   for (const baseline of baselines.values()) {
@@ -121,10 +121,10 @@ export function retypeBaselineLinks(id: string, to: EntryType): void {
 }
 
 /**
- * Kategorien wurden zusammengelegt oder endgültig gelöscht: was die
- * Ausgangsstände noch auf sie zeigen lassen, zieht mit (`null` = ohne
- * Kategorie). Cancel schriebe sonst eine Kategorie zurück, die es nicht mehr
- * gibt, und scheiterte am Fremdschlüssel.
+ * Categories were merged or permanently deleted: whatever the baselines
+ * still point at them moves along (`null` = no category). Cancel would
+ * otherwise write back a category that no longer exists, and fail on the
+ * foreign key.
  */
 export function reassignBaselineCategories(ids: ReadonlySet<string>, to: string | null): void {
   for (const baseline of baselines.values()) {
@@ -134,19 +134,19 @@ export function reassignBaselineCategories(ids: ReadonlySet<string>, to: string 
 }
 
 /**
- * Die Einträge, deren Bearbeitung Cancel gerade verwirft — nach einer
- * Rücknahme des Typs auch darüber hinaus, bis ihre nächste Bearbeitung
- * beginnt: die Views werden dann erst noch abgebaut. Was eine View jetzt
- * noch speichern würde — der Debounce, der Save beim Wegnavigieren oder beim
- * Abbau —, schriebe die verworfene Eingabe über den wiederhergestellten
- * Eintrag. Je Eintrag und nicht je View: nimmt Cancel einen Typwechsel zurück,
- * wird nicht nur die View abgebaut, in der es gedrückt wurde.
+ * The entries whose edit Cancel is discarding right now — after a
+ * type revert also beyond that, until their next edit
+ * begins: the views are only being torn down then. Whatever a view would
+ * still save now — the debounce, the save on navigating away or on
+ * teardown — would write the discarded input over the restored
+ * entry. Per entry and not per view: when Cancel reverts a type change,
+ * not only the view in which it was pressed is torn down.
  */
 const discarding = new Set<string>();
 
 export const isDiscarding = (id: string): boolean => discarding.has(id);
 
-/** Cancel beginnt. `endDiscard` hebt es auf — spätestens die nächste Bearbeitung des Eintrags. */
+/** Cancel begins. `endDiscard` lifts it — at the latest the next edit of the entry. */
 export function beginDiscard(id: string): void {
   discarding.add(id);
 }
@@ -161,8 +161,8 @@ useUIStore.subscribe((s) => {
   }
 });
 
-// Für Tabs im Hintergrund: trägt die Bearbeitung dort Änderungen? Beim
-// Wegschalten hat der Editor gespeichert, der gespeicherte Stand sagt also alles.
+// For background tabs: does the edit there carry changes? On switching
+// away the editor has saved, so the saved state says it all.
 registerEditProbe((view) => {
   if (view.mode !== 'edit' || !view.id) return false;
   const baseline = baselines.get(baselineKey(view.type, view.id));

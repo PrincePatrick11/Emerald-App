@@ -4,18 +4,18 @@ interface SidebarSectionHeaderProps {
   label: string;
   open: boolean;
   onToggle: () => void;
-  /** Zähler rechtsbündig im Kopf (die Abschnitte der Leseansicht, `SidebarSection`). */
+  /** Counter right-aligned in the header (the read view's sections, `SidebarSection`). */
   count?: number;
-  /** Abstand zum Vorgänger — der Wrapper um Kopf und Inhalt bleibt Sache des Aufrufers. */
+  /** Spacing to the predecessor; the wrapper around header and content remains the caller's business. */
   className?: string;
 }
 
 /**
- * Der Kopf eines einklappbaren Abschnitts in der rechten Seitenleiste: Chevron
- * plus kleines Großbuchstaben-Label, optional ein Zähler. Kontrolliert, weil
- * die Aufrufer ihren Zustand verschieden halten — der Altar alle Abschnitte pro
- * Altar in einem localStorage-Objekt, die Block-Verwaltung und `SidebarSection`
- * per `usePersistedFlag`.
+ * The header of a collapsible section in the right sidebar: chevron
+ * plus a small uppercase label, optionally a counter. Controlled, because
+ * the callers hold their state differently: the altar all sections per
+ * altar in one localStorage object, the block management and `SidebarSection`
+ * via `usePersistedFlag`.
  */
 export default function SidebarSectionHeader({ label, open, onToggle, count, className = '' }: SidebarSectionHeaderProps) {
   return (

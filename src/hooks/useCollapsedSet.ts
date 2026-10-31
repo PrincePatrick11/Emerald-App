@@ -6,17 +6,17 @@ export type CollapseScope = 'journal' | 'wiki' | 'operations' | 'tasks' | 'altar
 const EMPTY: ReadonlySet<string> = new Set();
 
 /**
- * Zuklapp-Zustand der Kategorie-Gruppen eines Moduls (Tasks, Wiki, Operations,
- * die Bibliothek im Altar-Dashboard und die Tags).
+ * Collapsed state of a module's category groups (tasks, wiki, operations,
+ * the library in the altar dashboard, and tags).
  *
- * Der Zustand liegt im uiStore, nicht View-lokal: MainArea unmountet die Views
- * beim Modulwechsel, ein useState wäre nach jedem Rail-Klick wieder leer. Er
- * ist eine Vorliebe und bleibt dauerhaft, je Vault (`vaultPrefs`) — die ids
- * sind die Kategorien dieses Vaults.
+ * The state lives in the uiStore, not in the view: MainArea unmounts the views
+ * on a module switch, so a useState would be empty again after every rail
+ * click. It is a preference and persists, per vault (`vaultPrefs`) — the ids
+ * are the categories of that vault.
  *
- * `defaultCollapsed` dreht den Standard um (Tags: viele Gruppen, die Liste der
- * Köpfe ist die Übersicht). Das Set im Store hält dann die *aufgeklappten*
- * ids; `isCollapsed` und `expand` verbergen das.
+ * `defaultCollapsed` inverts the default (tags: many groups, the list of
+ * headers is the overview). The set in the store then holds the *expanded*
+ * ids; `isCollapsed` and `expand` hide that.
  */
 export function useCollapsedSet(scope: CollapseScope, { defaultCollapsed = false }: { defaultCollapsed?: boolean } = {}) {
   const deviating = useUIStore((s) => s.collapsedGroups[scope]) ?? EMPTY;
@@ -29,7 +29,7 @@ export function useCollapsedSet(scope: CollapseScope, { defaultCollapsed = false
     (id: string) => deviating.has(id) !== defaultCollapsed,
     [deviating, defaultCollapsed],
   );
-  /** Öffnet gezielt (z. B. Tiefenlink aus der Suche). */
+  /** Expands specific groups (e.g. a deep link from search). */
   const expand = useCallback(
     (...ids: string[]) => (defaultCollapsed ? addInStore : removeInStore)(scope, ids),
     [addInStore, removeInStore, scope, defaultCollapsed],

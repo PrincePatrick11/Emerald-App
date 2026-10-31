@@ -8,9 +8,9 @@ import EntryReadSections, { CategoryPropertyRow, PropertiesSection } from '../fi
 import CategoryIconCoverRows from '../fields/CategoryIconCoverRows';
 
 /**
- * Die Eigenschaften einer Operation: Kategorie, Icon und Titelbild,
- * Verknüpfungen, Tags. Alles Weitere — Status, Sigille, Ladung — sind Blöcke
- * im Inhalt und bringen ihre Einstellungen selbst mit.
+ * The properties of an operation: category, icon and cover image,
+ * links, tags. Everything else (status, sigil, charge) is blocks
+ * in the content and brings its own settings.
  */
 export default function OperationPropertiesPanel() {
   const { t } = useTranslation();

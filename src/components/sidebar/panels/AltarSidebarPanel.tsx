@@ -36,20 +36,20 @@ import Favicon from '../fields/Favicon';
 import Modal from '../../ui/Modal';
 
 /**
- * Wohin ein entfernter Hintergrund fällt, eigenes Bild wie Verlauf: das erste
- * Bild. Nicht der Standard eines neuen Altars — der ist ein alter Verlauf und
- * sähe nach dem Entfernen aus, als wäre wieder einer aktiv.
+ * Where a removed background falls back to, custom image or gradient alike: the
+ * first image. Not the default of a new altar, which is an old gradient and
+ * would look, after removal, as if one were active again.
  */
 const BACKGROUND_AFTER_REMOVE = ALTAR_IMAGE_PRESETS[0];
 
 
-// Die Klappzustände lagen früher je Altar im localStorage — was davon übrig ist, geht.
+// The collapse states used to live per altar in localStorage; whatever is left of them goes.
 try {
   for (const key of Object.keys(localStorage)) {
     if (key.startsWith('altar-sidebar-sections-')) localStorage.removeItem(key);
   }
 } catch {
-  // Ohne Speicher gibt es nichts aufzuräumen.
+  // Without storage there is nothing to clean up.
 }
 
 export default function AltarSidebarPanel() {
@@ -75,7 +75,7 @@ export default function AltarSidebarPanel() {
   );
   const updateAltarGrid = useAltarStore((s) => s.updateAltarGrid);
   const pushUndo = useUndoStore((s) => s.push);
-  /** Ohne Rückfrage, wie jedes Löschen — der Hinweis bietet Rückgängig. */
+  /** Without confirmation, like every deletion; the notice offers Undo. */
   const removeWithUndo = async (id: string) => {
     const removed = await removePlacement(id);
     if (!removed) return;
@@ -89,9 +89,9 @@ export default function AltarSidebarPanel() {
   const backgroundInputRef = useRef<HTMLInputElement>(null);
 const noticeTimerRef = useRef<number | null>(null);
   const [backgroundNotice, setBackgroundNotice] = useState<string | null>(null);
-  /** Die Farbe im offenen Verlaufs-Fenster — `null`, solange es zu ist. Geschrieben wird erst mit ✓. */
+  /** The colour in the open gradient window, `null` while it is closed. Only written with ✓. */
   const [gradientDraft, setGradientDraft] = useState<string | null>(null);
-  // Klappzustände wie überall: eine Vorliebe des Vaults, gleich für jeden Altar.
+  // Collapse states as everywhere: a vault preference, the same for every altar.
   const [backgroundOpen, toggleBackground] = usePersistedFlag('altar-edit-background-open', true);
   const [overlayOpen, toggleOverlay] = usePersistedFlag('altar-edit-overlay-open', true);
   const [gridOpen, toggleGrid] = usePersistedFlag('altar-edit-grid-open', true);
@@ -572,7 +572,7 @@ const noticeTimerRef = useRef<number | null>(null);
                   </button>
                 ))}
               </div>
-              {/* Die Größe gilt auch fürs Einrasten am ausgeblendeten Raster; Deckkraft und Farbe nur fürs sichtbare. */}
+              {/* The size also applies to snapping to the hidden grid; opacity and colour only to the visible one. */}
               {(activeAltar.grid_enabled || activeAltar.snap_to_grid || activeAltar.snap_scale_to_grid) && (
                 <div className="mt-2 rounded-lg border border-stone-700/60 bg-stone-900/45 px-3 py-2 space-y-2">
                   <div className="space-y-1">

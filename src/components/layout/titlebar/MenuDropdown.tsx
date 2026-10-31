@@ -2,15 +2,15 @@ import { useEffect, useRef, useState } from 'react';
 import { Check, ChevronRight } from 'lucide-react';
 
 export type MenuNode =
-  /** `checked` macht den Eintrag zu einem Haekchen-Eintrag: gesetzt (auch auf
-   *  `false`) reserviert er den fuehrenden Slot, undefined laesst ihn weg. */
+  /** `checked` turns the entry into a checkmark entry: when set (even to
+   *  `false`) it reserves the leading slot, undefined leaves it out. */
   | { kind: 'item'; label: string; disabled?: boolean; checked?: boolean; onSelect: () => void }
   | { kind: 'separator' }
   | { kind: 'submenu'; label: string; disabled?: boolean; children: MenuNode[] };
 
-/** Breite des fuehrenden Haekchen-Slots. Sobald ein Eintrag eines Panels
- *  ankreuzbar ist, bekommen ihn alle — sonst stuenden die Labels desselben
- *  Panels auf zwei verschiedenen Kanten. */
+/** Width of the leading checkmark slot. As soon as one entry of a panel
+ *  is checkable, all of them get it — otherwise the labels of the same
+ *  panel would sit on two different edges. */
 const CHECK_SLOT_CLASSES = 'w-3.5 flex-shrink-0';
 
 interface Props {
@@ -110,9 +110,9 @@ export default function MenuDropdown({ nodes, positionClass, onClose, autoFocus 
           <button
             key={i}
             type="button"
-            // Ein ankreuzbarer Eintrag ist eine andere Rolle als ein
-            // ausloesender — ohne das bleibt das Haekchen rein optisch und ein
-            // Screenreader erfaehrt nichts vom Zustand.
+            // A checkable entry is a different role than a triggering
+            // one — without that, the checkmark stays purely visual and a
+            // screen reader learns nothing about the state.
             role={node.checked === undefined ? 'menuitem' : 'menuitemcheckbox'}
             aria-checked={node.checked}
             className="menu-item"

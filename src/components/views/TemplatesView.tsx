@@ -24,11 +24,11 @@ import TemplateDefaultsOverview from '../templates/TemplateDefaultsOverview';
 import { useSessionState } from '../../store/sessionStore';
 
 /**
- * Die Rail-Ansicht „Vorlagen", gebaut wie „Blöcke": die Liste der Vorlagen im
- * gemeinsamen Dashboard-Gerüst, ein Klick öffnet die Vorlage als eigene Seite
- * (`{ type: 'templates', id }`). Darunter die Gesamtübersicht der Standards
- * je Kombination. Löschen legt eine Vorlage in den Papierkorb (mit
- * Rückgängig) — Einträge aus ihr bleiben, wie sie sind.
+ * The rail view "Templates", built like "Blocks": the list of templates in the
+ * shared dashboard scaffold, a click opens the template as a page of its own
+ * (`{ type: 'templates', id }`). Below it the overall overview of the defaults
+ * per combination. Deleting moves a template to the trash (with
+ * undo) — entries created from it stay as they are.
  */
 export default function TemplatesView() {
   const { t } = useTranslation();
@@ -43,7 +43,7 @@ export default function TemplatesView() {
   const rows = useBlockContentRows();
   const entries = useMemo(() => templateEntries(rows), [rows]);
 
-  // Eine id ohne Vorlage (gelöscht, anderer Vault im gemerkten Tab) fällt auf die Liste zurück.
+  // An id without a template (deleted, another vault in the remembered tab) falls back to the list.
   const selected = activeView.id ? templates.find((tpl) => tpl.id === activeView.id) ?? null : null;
 
   const backToList = () => setActiveView({ type: 'templates' });
@@ -57,13 +57,13 @@ export default function TemplatesView() {
     try {
       await deleteTemplate(template.id);
     } catch (err) {
-      // Nichts verloren: Vorlage und Entwurf bleiben, wo sie waren.
+      // Nothing lost: template and draft stay where they were.
       console.error('[TemplatesView] deleting the template failed:', err);
       return;
     }
     clearDraft(template.id);
-    // Der Stand nach dem Löschen, nicht der beim Rendern: wer über die Frage
-    // beim Verlassen verworfen hat, ist inzwischen woanders und bleibt dort.
+    // The state after deleting, not the one at render time: whoever discarded
+    // via the question on leaving has meanwhile gone elsewhere and stays there.
     if (useUIStore.getState().activeView.id === template.id) backToList();
     pushUndo({
       id: generateId(),
@@ -86,7 +86,7 @@ export default function TemplatesView() {
   );
 }
 
-/** `.emerald`-Export einer Vorlage — das Format-Modul ist groß und wird erst hier geladen, wie im Menü. */
+/** `.emerald` export of a template — the format module is large and only loaded here, as in the menu. */
 async function exportTemplate(id: string): Promise<void> {
   const { exportErrorMessage } = await import('../../lib/export');
   try {
@@ -98,9 +98,9 @@ async function exportTemplate(id: string): Promise<void> {
 }
 
 /**
- * Die Liste der Vorlagen im gemeinsamen Dashboard-Gerüst — mit Ansicht und
- * Sortierung wie die anderen Dashboards, unter einer einklappbaren
- * Überschrift wie die Standardvorlagen darunter.
+ * The list of templates in the shared dashboard scaffold — with view and
+ * sorting like the other dashboards, under a collapsible
+ * heading like the default templates below.
  */
 function TemplateList({ entries, onCreate, onDelete }: {
   entries: Map<string, EntryContentRow[]>;
@@ -110,7 +110,7 @@ function TemplateList({ entries, onCreate, onDelete }: {
   const { t } = useTranslation();
   const templates = useTemplateStore((s) => s.templates);
   const duplicateTemplate = useTemplateStore((s) => s.duplicateTemplate);
-  // Die Seite legt ungespeicherte Entwürfe im Store ab; hier nur der Hinweis darauf.
+  // The page keeps unsaved drafts in the store; here only the indication of them.
   const drafts = useTemplateDraftStore((s) => s.drafts);
   const openInNewTabAction = useOpenInNewTabAction();
   const prefs = useUIStore((s) => s.templatesPrefs);
@@ -178,7 +178,7 @@ function TemplateList({ entries, onCreate, onDelete }: {
       onSort={(sort) => setPrefs({ sort })}
       search={search}
       onSearch={setSearch}
-      // Zugeklappt eine leere Liste statt eines Sonderzweigs — wie Altar und Blöcke.
+      // Collapsed means an empty list instead of a special branch — like altar and blocks.
       items={collapsed ? [] : sorted}
       itemKey={(tpl) => tpl.id}
       renderItem={renderItem}

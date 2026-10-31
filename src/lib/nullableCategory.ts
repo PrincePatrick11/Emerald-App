@@ -1,49 +1,49 @@
 /**
- * Migration v39 — macht `category_id` in den vier Inhaltstabellen nullable und
- * nimmt `other` den Sonderstatus.
+ * Migration v39 — makes `category_id` nullable in the four content tables and
+ * removes the special status of `other`.
  *
- * Bis v38 war die Spalte `NOT NULL DEFAULT 'other'`: jeder Eintrag *musste*
- * eine Kategorie haben, und wer keine wählte, bekam das Sammelbecken. „Ohne
- * Kategorie" gab es nur als Unfall — ein Eintrag, dessen Kategorie im
- * Papierkorb lag. Seit v39 ist es der Normalfall eines neuen Eintrags, und die
- * Spalte darf NULL sein.
+ * Up to v38 the column was `NOT NULL DEFAULT 'other'`: every entry *had* to
+ * have a category, and anyone who chose none got the catch-all. "No
+ * category" existed only by accident — an entry whose category was in the
+ * trash. Since v39 it is the normal state of a new entry, and the
+ * column may be NULL.
  *
- * `other` selbst bleibt stehen, verliert aber sein `is_builtin`: wer Inhalte
- * bewusst dort abgelegt hat, behält sie, und wer die Kategorie nicht will,
- * benennt sie um oder löscht sie wie jede andere. Frische Vaults legen sie gar
- * nicht mehr an (`BUILTIN_CATEGORIES` in `schema.ts`).
+ * `other` itself stays, but loses its `is_builtin`: anyone who deliberately
+ * put content there keeps it, and anyone who does not want the category
+ * renames or deletes it like any other. Fresh vaults no longer create it at all
+ * (`BUILTIN_CATEGORIES` in `schema.ts`).
  *
- * Dabei muss ihr *Name* mit: Eine eingebaute Kategorie heißt nach ihrem
- * Locale-Key (`categoryLabel`), ihre `name`-Spalte trägt nur den englischen
- * Seed „Other". Ohne das Flag stünde ab sofort genau der da — ein deutscher
- * Vault verlöre „Sonstiges". Der Lauf schreibt den übersetzten Namen deshalb
- * in die Zeile, so wie v38 es für die alten Modul-Builtins tat, und lässt ihn
- * in Ruhe, wenn der Name schon vergeben ist.
+ * Its *name* has to come along: a built-in category is named after its
+ * locale key (`categoryLabel`), its `name` column only carries the English
+ * seed "Other". Without the flag, exactly that would show from now on — a German
+ * vault would lose "Sonstiges". The run therefore writes the translated name
+ * into the row, as v38 did for the old module builtins, and leaves it
+ * alone if the name is already taken.
  *
- * Ein Rebuild wie v33 und v38 — SQLite kann eine Spalte nicht nachträglich
- * nullable machen — und damit mit derselben Foreign-Key-Falle: `ALTER TABLE
- * tasks RENAME TO tasks_old` schreibt den Verweis in `task_links` auf
- * `tasks_old` um, ein späteres `DROP TABLE tasks_old` nähme per CASCADE alle
- * Verknüpfungen mit. Deshalb werden die beiden Kind-Tabellen mitgebaut:
- * **Kinder zuerst** umbenennen und löschen, Eltern zuerst anlegen und kopieren.
+ * A rebuild like v33 and v38 — SQLite cannot make a column nullable after
+ * the fact — and thus with the same foreign key trap: `ALTER TABLE
+ * tasks RENAME TO tasks_old` rewrites the reference in `task_links` to point at
+ * `tasks_old`, a later `DROP TABLE tasks_old` would take all
+ * links with it via CASCADE. That is why the two child tables are rebuilt too:
+ * rename and drop **children first**, create and copy parents first.
  *
- * Die Daten ändern sich dabei nicht — jede `category_id` wird unverändert
- * übernommen. Eine Marke wie in v38 braucht es trotzdem, aber aus einem
- * anderen Grund: Sobald die neuen Tabellen gefüllt sind und das Aufräumen
- * beginnt, darf nicht mehr zurückgerollt werden. Stirbt der Prozess mitten im
- * Löschen der `*_old` — nachdem `task_links_old` und `altar_placements_old`
- * weg sind, aber `tasks_old` noch steht —, dann fände der nächste Start ein
- * `tasks_old` vor, würfe dafür das fertige `tasks` weg, und dessen
- * `ON DELETE CASCADE` nähme die ebenfalls fertigen `task_links` mit. Dasselbe
- * für `altar_items` und die Platzierungen. Die Marke sagt „ab hier nur noch
- * aufräumen".
+ * The data does not change in the process — every `category_id` is carried over
+ * unchanged. A mark as in v38 is still needed, but for a
+ * different reason: as soon as the new tables are filled and the cleanup
+ * begins, there must be no more rolling back. If the process dies in the middle of
+ * dropping the `*_old` tables — after `task_links_old` and `altar_placements_old`
+ * are gone, but `tasks_old` still exists —, the next start would find a
+ * `tasks_old`, drop the finished `tasks` for it, and its
+ * `ON DELETE CASCADE` would take the likewise finished `task_links` with it. The same
+ * for `altar_items` and the placements. The mark says "from here on only
+ * clean up".
  */
 import type Database from './sqlite';
 import i18n, { savedAppLanguage } from '../i18n';
-// INDEX_DDL_V38, nicht INDEX_DDL: in der Kette fehlen hier noch die Tabellen
-// späterer Migrationen (`block_definitions` kommt mit v40).
+// INDEX_DDL_V38, not INDEX_DDL: the chain here still lacks the tables of
+// later migrations (`block_definitions` arrives with v40).
 import { INDEX_DDL_V38, FALLBACK_CATEGORY_ID } from './schema';
-// `wiki_articles`/`operations` in ihrer Form bis v48 — seit v49 stehen sie in `entries`.
+// `wiki_articles`/`operations` in their form up to v48 — since v49 they live in `entries`.
 import { ddlBeforeV49 } from './schemaV48';
 import { categoryKey } from './categoryMerge';
 import {
@@ -54,7 +54,7 @@ import {
   tableExists,
 } from './dbRebuild';
 
-/** Umbenennen und Löschen: Kinder vor Eltern. */
+/** Renaming and dropping: children before parents. */
 const REBUILT_CHILDREN_FIRST = [
   'task_links',
   'altar_placements',
@@ -64,21 +64,21 @@ const REBUILT_CHILDREN_FIRST = [
   'wiki_articles',
 ] as const;
 
-/** Anlegen und Kopieren: Eltern vor Kindern. */
+/** Creating and copying: parents before children. */
 const REBUILT_PARENTS_FIRST = [...REBUILT_CHILDREN_FIRST].reverse();
 
 /**
- * Steht diese Tabelle, sind alle sechs Inhaltstabellen kopiert und es fehlt
- * nur das Aufräumen. Eine echte Tabelle, keine TEMP-Tabelle: die hinge an
- * einer Verbindung aus dem Pool und wäre für die nächste Anweisung womöglich
- * weg (dieselbe Überlegung wie bei v38s `_category_id_map`).
+ * If this table exists, all six content tables are copied and only the
+ * cleanup is missing. A real table, not a TEMP table: that would hang on
+ * a connection from the pool and might be gone for the next statement
+ * (the same consideration as with v38's `_category_id_map`).
  */
 const REBUILT_MARK_TABLE = '_v39_content_rebuilt';
 
 /**
- * Ist `category_id` schon nullable? Ein Vault, der von vor v38 kommt, hat die
- * Tabellen gerade erst aus dem aktuellen `TABLE_DDL` bekommen und braucht den
- * Rebuild nicht noch einmal.
+ * Is `category_id` already nullable? A vault coming from before v38 has just
+ * received the tables from the current `TABLE_DDL` and does not need the
+ * rebuild again.
  */
 async function alreadyNullable(db: Database): Promise<boolean> {
   const rows = await db.select<{ name: string; notnull: number }[]>('PRAGMA table_info(wiki_articles)');
@@ -102,22 +102,22 @@ async function dropOldTables(db: Database): Promise<void> {
 }
 
 /**
- * Nimmt `other` das `is_builtin` und friert seinen bis dahin übersetzten Namen
- * in der Zeile ein. Ist der schon von einer anderen Kategorie belegt, bleibt
- * der alte stehen — zwei gleichnamige wären verwirrender als ein englisches
- * „Other", und umbenennen kann der Nutzer sie jetzt selbst.
+ * Removes `is_builtin` from `other` and freezes its previously translated name
+ * in the row. If that name is already taken by another category, the old one
+ * stays — two identically named ones would be more confusing than an English
+ * "Other", and the user can rename them themselves now.
  *
- * Der Name wird nur geschrieben, wenn die aktive Sprache die gespeicherte ist.
- * `main.tsx` rendert nach spätestens zwei Sekunden auch dann, wenn der
- * Locale-Chunk noch nicht da ist — träfe die Migration dieses Fenster, brennte
- * sie einem deutschen Vault dauerhaft „Other" statt „Sonstiges" ein. Das Flag
- * fällt trotzdem, nur der Name bleibt dann der englische Seed.
+ * The name is only written if the active language is the stored one.
+ * `main.tsx` renders after two seconds at the latest even if the
+ * locale chunk is not there yet — if the migration hit that window, it would
+ * burn "Other" instead of "Sonstiges" permanently into a German vault. The flag
+ * is still dropped, only the name then stays the English seed.
  */
 /**
- * Die gespeicherte Sprache — oder die aktive, wo es keinen `localStorage`
- * gibt. Das ist der Schema-Check, der die Migration in Node fährt: dort ist
- * Englisch aktiv und richtig, und die Prüfung unten soll nicht daran
- * scheitern, dass es keinen Browser gibt.
+ * The stored language — or the active one where there is no `localStorage`.
+ * That is the schema check, which runs the migration in Node: there
+ * English is active and correct, and the check below should not fail
+ * because there is no browser.
  */
 function storedLanguage(): string {
   try {
@@ -170,25 +170,25 @@ export async function makeCategoryOptional(db: Database): Promise<void> {
       }
       for (const table of REBUILT_PARENTS_FIRST) {
         await db.execute(ddlBeforeV49(table));
-        // `tasks` samt `parent_task_id` in einem INSERT … SELECT: SQLite prüft
-        // Foreign Keys am Ende der Anweisung, ein Kind darf im Ergebnis also vor
-        // seinem Elternteil stehen (v33 und v38 kopieren genauso).
+        // `tasks` including `parent_task_id` in one INSERT … SELECT: SQLite checks
+        // foreign keys at the end of the statement, so a child may come before
+        // its parent in the result (v33 and v38 copy the same way).
         await copyTable(db, table, `${table}_old`);
       }
-      // Ab hier darf nichts mehr zurückgerollt werden (siehe Kopf).
+      // From here on nothing may be rolled back (see header).
       await db.execute(`CREATE TABLE IF NOT EXISTS ${REBUILT_MARK_TABLE} (done INTEGER)`);
     }
   }
 
   await dropOldTables(db);
-  // Außerhalb des Rebuild-Zweigs: ein Absturz zwischen dem Löschen der
-  // `*_old` und dem Anlegen der Indizes ließe sie sonst dauerhaft fehlen,
-  // während sich die Migration als erledigt stempelt. v38 hält es genauso.
+  // Outside the rebuild branch: a crash between dropping the
+  // `*_old` tables and creating the indexes would otherwise leave them missing permanently,
+  // while the migration stamps itself as done. v38 does it the same way.
   await createIndexesIfMissing(db, INDEX_DDL_V38);
   await db.execute(`DROP TABLE IF EXISTS ${REBUILT_MARK_TABLE}`);
 
-  // Getrennt vom Rebuild, damit es auch für einen Vault greift, der die
-  // Tabellen schon in der neuen Form bekam (Aufstieg von vor v38).
+  // Separate from the rebuild, so that it also applies to a vault that got the
+  // tables in the new form already (upgrade from before v38).
   await demoteFallbackCategory(db);
 
   await assertForeignKeysIntact(db, 'v39');

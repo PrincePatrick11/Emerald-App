@@ -2,7 +2,7 @@ import type { AltarRecord } from '../types';
 
 export const DEFAULT_ALTAR_BACKGROUND = 'midnight' as const;
 
-/** Fester Deckel für eigene Hintergründe, zusätzlich zu den Bildgrenzen des Vaults — beim Hochladen wie beim Import. */
+/** Fixed cap for custom backgrounds, in addition to the vault's image limits — on upload as on import. */
 export const ALTAR_BACKGROUND_MAX_BYTES = 5 * 1024 * 1024;
 
 export const DEFAULT_ALTAR_RESOLUTION = '1920x1080';
@@ -66,7 +66,7 @@ export function ratioFromResolution(res: string): AltarRatio | null {
 
 export const DEFAULT_BACKGROUND_OVERLAY = 0.2;
 
-/** Glyphe des „Ohne Kategorie"-Kopfs in der Altar-Bibliothek. */
+/** Glyph of the "Uncategorized" header in the altar library. */
 export const ALTAR_UNCATEGORIZED_EMOJI = '📦';
 
 export const DEFAULT_GRID_SIZE = 32;
@@ -110,22 +110,22 @@ export function generateGradientStyle(hex: string): string {
 
 
 export const ALTAR_IMAGE_PRESETS = [
-  // Wald & Natur
+  // Forest & nature
   'sacred_grove_light',
   'bamboo_grove_bench',
   'light_forest_mist',
 'world_tree_roots',
-  // Berge
+  // Mountains
   'mountain_altar_summit',
   'mountain_altar_night',
-  // Höhlen & Grotten
+  // Caves & grottoes
   'dark_grotto_shrine',
   'stalactite_cave_mosaic',
-  // Magie & Portale
+  // Magic & portals
   'light_gate_magic',
   'magic_arch_violet',
   'magic_hall_portal',
-  // Tempel & Hallen
+  // Temples & halls
   'marble_temple_arch',
   'temple_dark_arch',
   'temple_stairway',
@@ -186,10 +186,10 @@ export function getAltarBackgroundStyle(
 }
 
 /**
- * Ob ein Element als Kerze flackern soll. Hing bis v38 an der eingebauten
- * Altar-Kategorie `candle`; die ist seitdem eine normale, umbenenn- und
- * löschbare Kategorie, also entscheidet das Emoji des Elements. Der
- * Variationsselektor U+FE0F ist optional — beide Schreibweisen kommen vor.
+ * Whether an item should flicker like a candle. Until v38 this hung on the
+ * built-in altar category `candle`; since then that is an ordinary category
+ * that can be renamed and deleted, so the item's emoji decides. The variation
+ * selector U+FE0F is optional — both spellings occur.
  */
 export function isCandleEmoji(emoji: string | null | undefined): boolean {
   return (emoji ?? '').replace(/️/g, '') === '\u{1F56F}';

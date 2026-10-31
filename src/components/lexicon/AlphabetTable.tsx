@@ -8,7 +8,7 @@ import { OP_PROP_SELECT_CLASSES } from '../../lib/styleClasses';
 import Button from '../ui/Button';
 import type { AlphabetPair, Language } from '../../types';
 
-/** Eine Zeile im Formular: das Paar plus ein Schlüssel, den das Paar selbst nicht hat. */
+/** A row in the form: the pair plus a key that the pair itself does not have. */
 interface Row extends AlphabetPair {
   key: string;
 }
@@ -17,28 +17,28 @@ const toRows = (pairs: readonly AlphabetPair[]): Row[] =>
   pairs.map((pair) => ({ ...pair, key: generateId() }));
 
 /**
- * Das Alphabet einer Sprache: Zeichenpaare, mit denen das Übersetzen-Feld
- * umschreibt. Links steht die eigene Schrift, rechts die der Sprache — auch
- * mehrere Buchstaben sind erlaubt („th" → „ᚦ"), die Umschrift nimmt die
- * längste passende Folge zuerst (siehe `lib/lexicon.ts`).
+ * The alphabet of a language: character pairs with which the translate field
+ * transcribes. On the left is one's own script, on the right that of the language;
+ * several letters are also allowed ("th" → "ᚦ"), and the transcription takes the
+ * longest matching sequence first (see `lib/lexicon.ts`).
  *
- * Der Stand liegt lokal, nicht im Store: eine frische Zeile ist zunächst ganz
- * leer, und eine ganz leere Zeile wird nicht gespeichert (`isFilledPair`) —
- * sie käme also beim nächsten Rendern aus dem Store nicht zurück und wäre
- * wieder weg, sobald man hineintippt. Halb gefüllt wird dagegen gespeichert,
- * damit eine nachzutragende Seite nicht verlorengeht.
+ * The state is kept locally, not in the store: a fresh row is initially completely
+ * empty, and a completely empty row is not saved (`isFilledPair`), so
+ * it would not come back from the store on the next render and would be
+ * gone again as soon as you type into it. A half-filled row, however, is saved,
+ * so that a side still to be filled in is not lost.
  *
- * Ein Wechsel der Sprache setzt den Stand trotzdem: `LexiconView` hängt die
- * Seite an `key={id}` auf, sie entsteht also je Sprache neu.
+ * A change of language resets the state anyway: `LexiconView` keys the
+ * page on `key={id}`, so it is created anew for each language.
  */
 export default function AlphabetTable({ language }: { language: Language }) {
   const { t } = useTranslation();
   const updateLanguage = useLexiconStore((s) => s.updateLanguage);
   const [rows, setRows] = useState<Row[]>(() => toRows(language.alphabet));
-  /** Was zuletzt geschrieben wurde — ohne den Vergleich schriebe jedes Durchtabben die Sprache neu. */
+  /** What was written last; without the comparison, every tab-through would rewrite the language. */
   const saved = useRef(alphabetToJson(language.alphabet));
 
-  /** Die Zeilen, die es in die Spalte schaffen — und damit auch die, die gezählt werden. */
+  /** The rows that make it into the column, and thus also the ones that are counted. */
   const filled = rows.filter(isFilledPair);
 
   const save = (next: Row[]) => {

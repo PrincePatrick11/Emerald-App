@@ -1,13 +1,13 @@
 import type { ContentType } from '../types';
 
 /**
- * Lesen und Schreiben des gespeicherten HTML eines internen Link-Chips —
- * bewusst ohne DB-Import, damit auch die Migration in `db.ts` es benutzen kann,
- * ohne einen Zyklus über `lib/links.ts` (das `getDb` zieht) aufzumachen.
+ * Reading and writing the stored HTML of an internal link chip —
+ * deliberately without a DB import, so that the migration in `db.ts` can use it too,
+ * without opening a cycle through `lib/links.ts` (which pulls in `getDb`).
  *
- * Das Markup muss zu `InternalLinkExtension` passen: `parseHTML` erkennt den
- * Chip an `span[data-type="internalLink"]`, die Attribute an ihren
- * `data-*`-Namen. Weicht das hier ab, liest TipTap den Chip als Text ein.
+ * The markup has to match `InternalLinkExtension`: `parseHTML` recognizes the
+ * chip by `span[data-type="internalLink"]`, the attributes by their
+ * `data-*` names. If this deviates, TipTap reads the chip in as text.
  */
 
 const SPAN_TAG_RE = /<span\b[^>]*>/gi;
@@ -19,14 +19,14 @@ function tagAttr(tag: string, name: string): string | null {
 }
 
 /**
- * Alle internen Link-Ziele im Inhalt — nur `id` und `entryType`.
+ * All internal link targets in the content — only `id` and `entryType`.
  *
- * Bewusst ohne `DOMParser`: diese Funktion liegt auf dem Datenbankpfad
- * (Migration v36 und der Import) und muss auch ohne Browser laufen, sonst ist die
- * Migration im Schema-Harness (Node) nicht prüfbar. Für zwei Attribute reicht
- * das Lesen des Start-Tags — und beide sind Entity-frei: IDs sind UUIDs,
- * `entryType` ist ein festes Wort. Wer das Markup selbst umbaut, nimmt
- * `remapInternalLinks` weiter unten; das braucht einen echten DOM.
+ * Deliberately without `DOMParser`: this function sits on the database path
+ * (migration v36 and the import) and has to run without a browser too, otherwise the
+ * migration cannot be checked in the schema harness (Node). For two attributes,
+ * reading the start tag is enough — and both are entity-free: IDs are UUIDs,
+ * `entryType` is a fixed word. Anyone who rebuilds the markup themselves uses
+ * `remapInternalLinks` further down; that needs a real DOM.
  */
 export function extractInternalLinks(
   html: string
@@ -46,14 +46,14 @@ export function extractInternalLinks(
 const ENTRY_TYPE_ATTR_RE = /\bdata-entry-type=("[^"]*"|'[^']*')/i;
 
 /**
- * Setzt die Art aller Chips, die auf `id` zeigen, auf `entryType` — für einen
- * Eintrag, der seinen Typ gewechselt hat (`lib/entryTypeChange.ts`). Die ID
- * bleibt dabei dieselbe, also genügt das eine Attribut.
+ * Sets the type of all chips pointing at `id` to `entryType` — for an
+ * entry that has changed its type (`lib/entryTypeChange.ts`). The ID
+ * stays the same, so the one attribute is enough.
  *
- * Bewusst über den Start-Tag wie `extractInternalLinks` statt über
- * `remapInternalLinks`: das hier läuft über gespeicherte Inhalte des ganzen
- * Vaults, und ein DOM-Durchlauf serialisierte jeden davon neu — hier ändert
- * sich nur das eine Attribut, alles andere bleibt Byte für Byte stehen.
+ * Deliberately via the start tag like `extractInternalLinks` instead of via
+ * `remapInternalLinks`: this runs over the stored content of the whole
+ * vault, and a DOM pass would re-serialize every one of them — here only
+ * the one attribute changes, everything else stays byte for byte.
  */
 export function retypeInternalLinks(html: string, id: string, entryType: string): string {
   if (!html || !html.includes(id)) return html;
@@ -65,16 +65,16 @@ export function retypeInternalLinks(html: string, id: string, entryType: string)
 }
 
 /**
- * Trägt das gespeicherte HTML sichtbaren Inhalt? Ein frischer Eintrag ist
- * `<p></p>` — vor den ersten Verlinkungs-Block gehört dort keine Trennlinie,
- * denn sie trennt den Text von den Links, und Text gibt es noch keinen.
+ * Does the stored HTML carry visible content? A fresh entry is
+ * `<p></p>` — in front of the first link block there belongs no separator line,
+ * since it separates the text from the links, and there is no text yet.
  *
- * Wie `extractInternalLinks` bewusst ohne `DOMParser`: die Migrationen fragen
- * das ebenfalls, und die laufen im Schema-Harness unter Node.
+ * Like `extractInternalLinks`, deliberately without `DOMParser`: the migrations ask
+ * this too, and they run in the schema harness under Node.
  */
 export function isBlankContent(html: string): boolean {
   if (!html) return true;
-  // Elemente, die für sich stehen — ein Bild ohne ein Wort daneben ist Inhalt.
+  // Elements that stand on their own — an image without a word next to it is content.
   if (/<(img|hr|br|iframe|table|svg|video|audio|span)\b/i.test(html)) return false;
   return !html.replace(/<[^>]*>/g, '').replace(/&nbsp;/gi, ' ').trim();
 }
@@ -85,22 +85,22 @@ export interface ParsedInternalLink {
   label: string;
 }
 
-/** Wohin ein Chip nach dem Umschreiben zeigt. `label` überschreibt den
- *  gespeicherten Anzeigetext — ohne das könnte er nach einem Wechsel des Ziels
- *  etwas anderes behaupten, als der Link tatsächlich trifft. */
+/** Where a chip points after the rewrite. `label` overrides the
+ *  stored display text — without it, after a change of target it could
+ *  claim something other than what the link actually hits. */
 export interface ResolvedInternalLink {
   id: string;
   label?: string;
 }
 
 /**
- * Schreibt die Ziel-IDs der Link-Chips im Inhalt um — der Reparaturschritt beim
- * Import in einen fremden Vault, wo dieselbe Notiz eine andere ID hat.
+ * Rewrites the target IDs of the link chips in the content — the repair step on
+ * import into a foreign vault, where the same note has a different ID.
  *
- * `resolve` bekommt jeden Chip und gibt das Ziel im Ziel-Vault zurück, oder
- * `null`. Für `null` wird der Chip durch seinen Text ersetzt: ein Link, dessen
- * Ziel es hier nicht gibt, wäre sonst ein Chip, der beim Klick ins Nichts
- * führt — die Wörter, für die er stand, bleiben so wenigstens erhalten.
+ * `resolve` receives each chip and returns the target in the target vault, or
+ * `null`. For `null` the chip is replaced by its text: a link whose
+ * target does not exist here would otherwise be a chip that leads nowhere
+ * on click — this way the words it stood for are at least preserved.
  */
 export function remapInternalLinks(
   html: string,
@@ -130,16 +130,16 @@ export function remapInternalLinks(
 }
 
 const VALID_ENTRY_TYPES: readonly string[] = ['journal', 'wiki', 'operation', 'task', 'altar'];
-/** Standard-UUIDs und die beim Merge-Import vorangestellte 8-Zeichen-Kennung. */
+/** Standard UUIDs and the 8-character prefix put in front of them on merge import. */
 const LINK_ID_RE = /^([0-9a-z]{8}-)?[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /**
- * Ist das ein plausibles Link-Ziel? Die Link-Events reisen über
- * `document` und sind damit für jedes Skript im WebView erreichbar; die
- * Handler prüfen deshalb, was sie bekommen, bevor sie navigieren oder gar in
- * den Eintrag schreiben. Eine Prüfung für alle drei Events (Navigieren,
- * Anhängen, Anzeigen) — vorher hatte nur das Navigieren eine, als Kopie.
- * Dieselbe Prüfung gilt für die Link-Vorgaben eigener Blöcke.
+ * Is this a plausible link target? The link events travel via
+ * `document` and are thus reachable for any script in the WebView; the
+ * handlers therefore check what they receive before they navigate or even write into
+ * the entry. One check for all three events (navigate,
+ * append, reveal) — before, only navigating had one, as a copy.
+ * The same check applies to the link presets of custom blocks.
  */
 export function isValidLinkTarget(target: { id?: unknown; entryType?: unknown } | null | undefined): boolean {
   if (!target) return false;
@@ -164,8 +164,8 @@ export interface InternalLinkChip {
   entry_number?: number | null;
 }
 
-/** Die Chip-Attribute eines Link-Ziels — dieselben Namen wie die Node-Attribute
- *  der `InternalLinkExtension`, also auch direkt als `attrs` einsetzbar. */
+/** The chip attributes of a link target — the same names as the node attributes
+ *  of `InternalLinkExtension`, so also usable directly as `attrs`. */
 export function toInternalLinkChip(item: {
   id: string;
   entryType: ContentType;
@@ -183,8 +183,8 @@ export function toInternalLinkChip(item: {
 }
 
 /**
- * Der Chip so, wie TipTaps `renderHTML` ihn schreiben würde. Leere Attribute
- * bleiben weg — `mergeAttributes` lässt `null` ebenfalls fallen.
+ * The chip as TipTap's `renderHTML` would write it. Empty attributes
+ * are left out — `mergeAttributes` drops `null` too.
  */
 export function internalLinkChipHtml(chip: InternalLinkChip): string {
   const attrs: Array<[string, string]> = [
@@ -202,19 +202,19 @@ export function internalLinkChipHtml(chip: InternalLinkChip): string {
 }
 
 export interface LinkBlockOptions {
-  /** `false` lässt die Trennlinie weg — für den ersten Block in einem noch
-   *  leeren Eintrag, wo es nichts zu trennen gibt (siehe `isBlankContent`). */
+  /** `false` omits the separator line — for the first block in a still
+   *  empty entry, where there is nothing to separate (see `isBlankContent`). */
   separator?: boolean;
-  /** Text hinter dem Chip, im selben Absatz. Trägt die Meditationsdauer aus
-   *  dem abgelösten Journal-Feld („(20 min)"), die kein Link-Ziel hat. */
+  /** Text after the chip, in the same paragraph. Carries the meditation duration from
+   *  the replaced journal field ("(20 min)"), which has no link target. */
   suffix?: string;
 }
 
 /**
- * Ein angehängter Verlinkungs-Block: Trennlinie, Kategorie als Überschrift,
- * dann der Chip. Die eine Definition dieses Blocks — `appendEntryLink` im
- * RichEditor, die Migrationen v36/v37 und der `.emerald`-Import setzen alle
- * hier an.
+ * An appended link block: separator line, category as heading,
+ * then the chip. The one definition of this block — `appendEntryLink` in the
+ * RichEditor, the migrations v36/v37 and the `.emerald` import all build
+ * on it.
  */
 export function internalLinkBlockHtml(
   chip: InternalLinkChip,
@@ -228,9 +228,9 @@ export function internalLinkBlockHtml(
 }
 
 /**
- * Derselbe Block ohne Chip — für eine abgelöste Angabe, deren Ziel es nicht
- * (mehr) gibt: ein gesetztes `is_bannung` ohne Artikel etwa. Ohne das ginge bei
- * der Migration v37 die Information ersatzlos verloren.
+ * The same block without a chip — for a replaced value whose target does not
+ * (or no longer) exist: a set `is_bannung` without an article, say. Without this, migration
+ * v37 would lose the information without replacement.
  */
 export function plainBlockHtml(text: string, { separator = true }: LinkBlockOptions = {}): string {
   return `${separator ? '<hr>' : ''}<p>${escapeHtml(text)}</p>`;

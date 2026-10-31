@@ -9,16 +9,16 @@ import type { AltarPlacement, AltarRecord } from '../../types';
 import { LinkEditor } from './BlockLink';
 
 /**
- * Das Altar-Feld: ein verknüpfter Altar mit seinem Bild — das gespeicherte
- * Vorschaubild, das die Altar-Ansicht beim Verlassen rechnet; fehlt es (ein
- * Altar, der nie fertig bearbeitet wurde), die gezeichnete Vorschau der Karte.
- * Gespeichert ist nur der Link-Chip im Slot; das Bild kommt beim Anzeigen aus
- * dem Altar-Store, weil es sich mit jeder Bearbeitung des Altars ändert.
+ * The altar field: a linked altar with its image, the stored
+ * thumbnail that the altar view computes when it is left; if that is missing (an
+ * altar that was never finished editing), the card's drawn preview.
+ * Only the link chip is stored in the slot; the image comes from the altar
+ * store when displayed, because it changes with every edit of the altar.
  */
 
 const NO_PLACEMENTS: AltarPlacement[] = [];
 
-/** Der Altar, auf den der Chip im Slot zeigt — samt Platzierungen für die gezeichnete Vorschau. */
+/** The altar the chip in the slot points to, along with placements for the drawn preview. */
 function useLinkedAltar(slot: string | undefined) {
   const link = linkFromSlot(slot);
   const id = link?.entryType === 'altar' ? link.id : null;
@@ -33,7 +33,7 @@ function AltarPicture({ altar, placements }: { altar: AltarRecord; placements: A
   return <AltarCardPreview altar={altar} previewItems={placements} />;
 }
 
-/** Bearbeiten: die Altar-Suche, darunter das Bild des gewählten. `onChange(null)` entfernt ihn. */
+/** Editing: the altar search, below it the image of the chosen one. `onChange(null)` removes it. */
 export function AltarFieldEditor({ slot, onChange }: { slot: string | undefined; onChange: (html: string | null) => void }) {
   const { t } = useTranslation();
   const { altar, placements } = useLinkedAltar(slot);
@@ -45,7 +45,7 @@ export function AltarFieldEditor({ slot, onChange }: { slot: string | undefined;
   );
 }
 
-/** Lesen: das Bild mit dem Namen darunter; ein Klick öffnet den Altar. */
+/** Reading: the image with the name below it; a click opens the altar. */
 export function AltarFieldReader({ slot }: { slot: string | undefined }) {
   const { t } = useTranslation();
   const setActiveView = useUIStore((s) => s.setActiveView);

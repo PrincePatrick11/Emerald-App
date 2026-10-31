@@ -5,7 +5,7 @@ import type { EditorSettings } from '../../../lib/vaultSettings';
 import { SwitchRow } from '../../ui/Switch';
 import SettingsSection from './SettingsSection';
 
-/** Was der Editor beim Tippen und Einfügen von selbst formatiert — drei Schalter statt fester Regeln. */
+/** What the editor formats by itself while typing and pasting — three switches instead of fixed rules. */
 export default function EditorFormattingSection() {
   const { t } = useTranslation();
   const editor = useSettingsStore((s) => s.settings.editor);

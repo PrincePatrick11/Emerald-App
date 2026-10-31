@@ -11,18 +11,18 @@ import { viewTypeForEntryType } from '../../lib/modules';
 import type { ContentType } from '../../types';
 
 /**
- * Ein Verweis auf einen Eintrag innerhalb eines Blocks — gespeichert als
- * echter Link-Chip im Markup (Slot), damit Link-Tabelle, Backlinks und
- * Merge-Import ihn sehen. Geteilt vom Verknüpfungs-Feld des Feldblocks und der
- * Ladetechnik der Sigille.
+ * A reference to an entry inside a block, stored as
+ * a real link chip in the markup (slot), so that the link table, backlinks and
+ * merge import see it. Shared by the field block's link field and the
+ * sigil's charging technique.
  */
 
-/** So viele Vorschläge zeigt die Suche — wie das Verlinkungs-Feld der Seitenleiste. */
+/** This many suggestions the search shows, like the sidebar's links field. */
 const LINK_RESULT_LIMIT = 50;
 
 /**
- * Bearbeiten: der gewählte Eintrag mit „×", sonst die Suche. `onChange(null)`
- * entfernt ihn. `entryType` beschränkt die Suche auf eine Art (das Altar-Feld).
+ * Editing: the chosen entry with "×", otherwise the search. `onChange(null)`
+ * removes it. `entryType` restricts the search to one kind (the altar field).
  */
 export function LinkEditor({ slot, onChange, entryType, placeholder }: {
   slot: string | undefined;
@@ -62,7 +62,7 @@ export function LinkEditor({ slot, onChange, entryType, placeholder }: {
   );
 }
 
-/** Ein verknüpfter Eintrag — mit aktuellem Titel und Icon, solange es ihn gibt. */
+/** A linked entry, with current title and icon as long as it exists. */
 export function LinkTarget({ target, onRemove }: { target: { id: string; entryType: string; label: string }; onRemove?: () => void }) {
   const { t } = useTranslation();
   const items = useLinkItems();

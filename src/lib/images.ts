@@ -20,9 +20,9 @@ import { isWindows } from './platform';
 import { collectUsedImageFilenames, storedImageName } from './schema';
 import type Database from './sqlite';
 
-// Das Namensformat ist eine Eigenschaft der Spalten, nicht der Oberflaeche —
-// deshalb steht es in `schema.ts`. Hier nur weitergereicht, damit die UI eine
-// Anlaufstelle fuer alles Bildbezogene hat.
+// The name format is a property of the columns, not of the UI —
+// which is why it lives in `schema.ts`. Only passed on here, so that the UI has a
+// single point of contact for everything image-related.
 export { storedImageName };
 
 export function isStoredImage(ref: string | null | undefined): boolean {
@@ -51,15 +51,15 @@ export function imageSrc(ref: string | null | undefined): string {
 }
 
 /**
- * Bildverweise in HTML.
+ * Image references in HTML.
  *
- * Vier Stellen haben dieses `src`-Muster frueher jede fuer sich ausgeschrieben:
- * der Backup-Export, der `.emerald`-Export, `embedImages` fuer PDF/Markdown und
- * Migration v35. Sie unterscheiden sich nur darin, was sie mit dem Treffer tun.
+ * Four places used to each spell out this `src` pattern on their own:
+ * the backup export, the `.emerald` export, `embedImages` for PDF/Markdown and
+ * migration v35. They differ only in what they do with the match.
  */
 const SRC_ATTR_RE = /src="([^"]+)"/g;
 
-/** Jeder `src`-Wert eines Fragments, der auf ein gespeichertes Bild zeigt. */
+/** Every `src` value of a fragment that points at a stored image. */
 export function imageRefsInHtml(html: string): string[] {
   const refs: string[] = [];
   for (const match of html.matchAll(SRC_ATTR_RE)) {
@@ -69,8 +69,8 @@ export function imageRefsInHtml(html: string): string[] {
 }
 
 /**
- * Schreibt jedes `src` um, fuer das `replacement` einen Wert liefert. `null`
- * laesst den Treffer unangetastet — auch die Anfuehrungszeichen drumherum.
+ * Rewrites every `src` for which `replacement` returns a value. `null`
+ * leaves the match untouched — including the quotation marks around it.
  */
 export function rewriteImageRefs(
   html: string,
@@ -115,24 +115,24 @@ export async function readImageAsBase64(ref: string): Promise<string> {
 }
 
 /**
- * Dieselbe Quelle, aber fuer eine Zeichenflaeche.
+ * The same source, but for a canvas.
  *
- * Der Altar-Export malt seine Bilder auf ein Canvas und liest es mit
- * `toBlob()` wieder aus. Ein Bild, das der Browser als fremd ansieht,
- * verunreinigt das Canvas und laesst das Auslesen scheitern. Ueber
- * `emerald-img` gelieferte Bilder *sind* fremd — der Handler schickt zwar eine
- * CORS-Erlaubnis mit, aber ob WebKitGTK und WKWebView die fuer ein eigenes
- * Schema ueberhaupt auswerten, laesst sich unter Windows nicht pruefen, und ein
- * Fehlschlag waere still: der Export liefert dann einfach nichts.
+ * The altar export paints its images onto a canvas and reads it back with
+ * `toBlob()`. An image the browser considers foreign
+ * taints the canvas and makes the read-back fail. Images served over
+ * `emerald-img` *are* foreign — the handler does send a
+ * CORS permission along, but whether WebKitGTK and WKWebView evaluate it
+ * for a custom scheme at all cannot be checked on Windows, and a
+ * failure would be silent: the export would simply produce nothing.
  *
- * Deshalb geht dieser eine Pfad nicht ueber das Schema, sondern holt die Bytes
- * als Data-URL. Die gilt immer als eigene Quelle, auf jeder Engine. Der Preis
- * ist ein IPC-Roundtrip pro Bild — nur beim Export und beim Thumbnail, nie beim
- * normalen Anzeigen.
+ * That is why this one path does not go through the scheme but fetches the bytes
+ * as a data URL. That always counts as a same-origin source, on every engine. The price
+ * is one IPC round trip per image — only on export and for the thumbnail, never during
+ * normal display.
  */
 export async function canvasImageSrc(ref: string | null | undefined): Promise<string> {
   if (!ref) return '';
-  // Inline-Quellen und die Presets aus `public/` sind ohnehin unbedenklich.
+  // Inline sources and the presets from `public/` are harmless anyway.
   if (ref.startsWith('data:') || ref.startsWith('blob:') || ref.startsWith('/')) return ref;
   const name = storedImageName(ref);
   if (!name) return '';

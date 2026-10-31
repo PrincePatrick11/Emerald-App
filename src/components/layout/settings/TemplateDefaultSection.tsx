@@ -4,7 +4,7 @@ import { AUX_VIEWS } from '../../../lib/modules';
 import SettingsChoiceButton, { SettingsChoiceRow } from './SettingsChoiceButton';
 import SettingsSection from './SettingsSection';
 
-/** Ob ein neuer Eintrag mit seiner Standard-Vorlage beginnt, oder leer. */
+/** Whether a new entry begins with its default template, or empty. */
 export default function TemplateDefaultSection() {
   const { t } = useTranslation();
   const applyDefault = useSettingsStore((s) => s.settings.templates.applyDefault);

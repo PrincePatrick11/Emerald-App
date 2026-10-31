@@ -7,37 +7,37 @@ import { useOutsideClick } from '../../hooks/useOutsideClick';
 export interface DropdownOption<T extends string> {
   value: T;
   label: string;
-  /** Optionales führendes Emoji in der Menüzeile (CategorySelect). */
+  /** Optional leading emoji in the menu row (CategorySelect). */
   emoji?: string;
-  /** Optionales führendes Icon vor dem Label (TaskRow-Prioritätsmenü: Flag). */
+  /** Optional leading icon before the label (TaskRow priority menu: flag). */
   icon?: ReactNode;
-  /** Zusätzliche Klassen für die Menüzeile, z. B. eine Prioritätsfarbe auf der aktiven Zeile. */
+  /** Additional classes for the menu row, e.g. a priority colour on the active row. */
   className?: string;
-  /** Nicht wählbar in der aktuellen Kombination (ListToolbar: Alpha-/Kategorie-
-   *  Sortierung im Zeitstrahl); `title` erklärt warum. */
+  /** Not selectable in the current combination (ListToolbar: alphabetical/category
+   *  sorting in the timeline); `title` explains why. */
   disabled?: boolean;
   title?: string;
 }
 
 interface Props<T extends string> {
-  /** Chip-Präfix („Sortierung: "). Nur für den Standard-Trigger relevant. */
+  /** Chip prefix ("Sort: "). Only relevant for the default trigger. */
   label?: string;
   value: T;
   options: DropdownOption<T>[];
   onChange: (v: T) => void;
-  /** Ankerkante des Menüs; Standard 'left'. */
+  /** Anchor edge of the menu; default 'left'. */
   align?: 'left' | 'right';
   /**
-   * Portalt das Menü nach document.body (fixed) — nötig, wenn der Trigger in
-   * einem Overflow-Container sitzt (Properties-Panels), wo ein absolut
-   * positioniertes Menü abgeschnitten würde. Gleiches Muster wie ContextMenu.
+   * Portals the menu to document.body (fixed); needed when the trigger sits in
+   * an overflow container (properties panels), where an absolutely
+   * positioned menu would be clipped. Same pattern as ContextMenu.
    */
   portal?: boolean;
-  /** Ersetzt den Standard-Chip-Trigger (EmojiPicker-Konvention: das Popover ist vereinheitlicht, der Trigger nicht). */
+  /** Replaces the default chip trigger (EmojiPicker convention: the popover is unified, the trigger is not). */
   trigger?: (args: { open: boolean; toggle: () => void; selectedLabel: string }) => ReactNode;
 }
 
-/** Platz, ab dem das Menü nach oben klappt statt unten abgeschnitten zu werden. */
+/** Space below which the menu opens upwards instead of being clipped at the bottom. */
 const MENU_MAX_HEIGHT = 240;
 
 export default function Dropdown<T extends string>({
@@ -49,7 +49,7 @@ export default function Dropdown<T extends string>({
   const [portalPos, setPortalPos] = useState<CSSProperties | null>(null);
   const selected = options.find((o) => o.value === value)?.label ?? value;
 
-  // menuRef zusätzlich: im Portal-Modus ist das Menü kein Nachfahre des Wrappers.
+  // menuRef as well: in portal mode the menu is not a descendant of the wrapper.
   useOutsideClick(open, () => setOpen(false), { refs: [wrapRef, menuRef], escape: true });
 
   useLayoutEffect(() => {

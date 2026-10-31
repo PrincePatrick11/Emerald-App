@@ -39,11 +39,11 @@ async function insertAltarRow(altar: AltarRecord): Promise<void> {
   );
 }
 
-// name, emoji, category_id und image_data sind keine Spalten von
-// altar_placements — sie stammen aus dem zugehörigen altar_items-Eintrag.
-// Die Spalte `scale`, aus der frühere Versionen eine Ersatzgröße abgeleitet
-// haben, ist mit Migration v33 entfallen: width und height sind seitdem
-// NOT NULL und tragen ihren eigenen Default.
+// name, emoji, category_id and image_data are not columns of
+// altar_placements — they come from the associated altar_items entry.
+// The `scale` column, from which earlier versions derived a fallback size,
+// was dropped with migration v33: width and height have been
+// NOT NULL since then and carry their own default.
 function mapPlacementRows(rows: DbRow[], items: AltarItem[]): AltarPlacement[] {
   const itemsById = new Map(items.map((i) => [i.id, i]));
   return rows.map((r) => {
@@ -70,8 +70,8 @@ function mapPlacementRows(rows: DbRow[], items: AltarItem[]): AltarPlacement[] {
 }
 
 /**
- * Die Platzierungen, die zu sehen sind: ohne die von Elementen im Papierkorb.
- * Die bleiben in der Datenbank stehen und kommen mit dem Element zurück.
+ * The placements that are visible: without those of items in the trash.
+ * They stay in the database and come back with the item.
  */
 const LIVE_PLACEMENTS = `SELECT p.* FROM altar_placements p
   JOIN altar_items i ON i.id = p.item_id AND i.deleted_at IS NULL`;
@@ -106,31 +106,31 @@ interface AltarState {
   fetchAltars: () => Promise<void>;
   setActiveAltar: (id: string) => Promise<void>;
   clearActiveAltar: () => void;
-  /** `createdAt` nur für den Import, der das Datum der Datei übernimmt; sonst jetzt. */
+  /** `createdAt` only for the import, which takes the date from the file; otherwise now. */
   createAltar: (opts?: { createdAt?: string }) => Promise<AltarRecord>;
   duplicateAltar: (id: string) => Promise<AltarRecord | null>;
   updateAltar: (id: string, patch: Partial<Pick<AltarRecord, 'title' | 'background_preset' | 'background_image_data' | 'background_overlay' | 'background_overlay_color' | 'thumbnail_data' | 'icon_data'>>, options?: WriteOptions) => Promise<void>;
   updateAltarGrid: (id: string, patch: Partial<Pick<AltarRecord, 'grid_enabled' | 'grid_size' | 'grid_opacity' | 'grid_color' | 'snap_to_grid' | 'rotation_snap_enabled' | 'rotation_snap_angle' | 'snap_scale_to_grid'>>) => Promise<void>;
   updateAltarResolution: (id: string, resolution: string) => Promise<void>;
   bumpAltarUpdatedAt: (id: string) => Promise<void>;
-  /** Soft-Delete: in den Papierkorb. Platzierungen und Verknüpfungen auf den Altar bleiben, für den Rückweg. */
+  /** Soft delete: into the trash. Placements and links to the altar stay, for the way back. */
   deleteAltar: (id: string) => Promise<void>;
   restoreAltar: (id: string) => Promise<void>;
   /**
-   * Cancel im Altar (`altarEdit.ts`): schreibt den Altar und seine
-   * Platzierungen zurück, wie sie beim Betreten des Bearbeitens waren — samt
-   * Zeitstempel und Vorschaubild, damit er in den Listen steht, wo er stand.
-   * Wirft, wenn das Schreiben scheitert; ein zweiter Aufruf bringt es zu Ende.
+   * Cancel in the altar (`altarEdit.ts`): writes the altar and its
+   * placements back as they were on entering edit mode — including
+   * timestamp and thumbnail, so it sits in the lists where it was.
+   * Throws if the write fails; a second call finishes the job.
    */
-  /** `untouchedItemIds`: Elemente, deren Platzierungen nicht zum Stand gehören und bleiben. */
+  /** `untouchedItemIds`: items whose placements are not part of the snapshot and stay. */
   restoreAltarSnapshot: (altar: AltarRecord, placements: readonly AltarPlacement[], untouchedItemIds?: readonly string[]) => Promise<void>;
   permanentlyDeleteAltar: (id: string) => Promise<void>;
 
-  /** `createdAt` nur für den Import, der das Datum der Datei übernimmt;
-   *  sonst jetzt. */
+  /** `createdAt` only for the import, which takes the date from the file;
+   *  otherwise now. */
   addItem: (name: string, emoji: string, categoryId: string | null, note?: string, imageData?: string, createdAt?: string) => Promise<AltarItem>;
   updateItem: (id: string, patch: Partial<Pick<AltarItem, 'name' | 'emoji' | 'category_id' | 'note' | 'image_data'>>) => Promise<void>;
-  /** In den Papierkorb — samt Platzierungen aus dem Blick, nicht aus der Datenbank. */
+  /** Into the trash — placements go out of sight too, but not out of the database. */
   deleteItem: (id: string) => Promise<void>;
   restoreItem: (id: string) => Promise<void>;
   permanentlyDeleteItem: (id: string) => Promise<void>;
@@ -140,17 +140,17 @@ interface AltarState {
   savePlacementPosition: (id: string, x: number, y: number) => Promise<void>;
   updatePlacement: (id: string, patch: Partial<Pick<AltarPlacement, 'x' | 'y' | 'z_index' | 'width' | 'height' | 'rotation' | 'opacity' | 'locked' | 'hidden'>>) => Promise<void>;
   duplicatePlacement: (id: string) => Promise<void>;
-  /** Nimmt eine Platzierung vom Altar und gibt sie zurück — für das Rückgängig (`restorePlacement`). */
+  /** Takes a placement off the altar and returns it — for undo (`restorePlacement`). */
   removePlacement: (id: string) => Promise<AltarPlacement | undefined>;
-  /** Legt eine entfernte Platzierung wieder hin, wie sie war — sofern Altar und Element noch da sind. */
+  /** Puts a removed placement back as it was — provided the altar and item still exist. */
   restorePlacement: (placement: AltarPlacement) => Promise<void>;
 }
 
 /**
- * Verwirft die Vorschaubilder der Altäre, auf denen Element `itemId` liegt —
- * sie zeigten es noch, wie es war. Die Karte fällt bis zum nächsten Rechnen
- * auf die Live-Vorschau zurück. Eine Folge, keine Änderung am Altar: „Zuletzt
- * geändert" bleibt.
+ * Discards the thumbnails of the altars on which item `itemId` sits —
+ * they still showed it as it was. Until the next recomputation the card falls
+ * back to the live preview. A consequence, not a change to the altar: "Last
+ * modified" stays.
  */
 async function dropThumbnailsShowing(db: Awaited<ReturnType<typeof getDb>>, itemId: string): Promise<Set<string>> {
   const rows = await db.select<{ altar_id: string }[]>(
@@ -161,12 +161,12 @@ async function dropThumbnailsShowing(db: Awaited<ReturnType<typeof getDb>>, item
   return ids;
 }
 
-/** Die Altäre, deren Vorschaubild `stale` verworfen hat (`dropThumbnailsShowing`). */
+/** The altars whose thumbnail `stale` has discarded (`dropThumbnailsShowing`). */
 function withoutThumbnails(altars: AltarRecord[], stale: Set<string>): AltarRecord[] {
   return stale.size ? altars.map((a) => (stale.has(a.id) ? { ...a, thumbnail_data: null } : a)) : altars;
 }
 
-/** Der Store ohne das Element `id` und seine Platzierungen; `stale` = Altäre ohne gültiges Vorschaubild. */
+/** The store without item `id` and its placements; `stale` = altars without a valid thumbnail. */
 function withoutItem(s: AltarState, id: string, stale: Set<string>): Partial<AltarState> {
   return {
     altars: withoutThumbnails(s.altars, stale),
@@ -177,7 +177,7 @@ function withoutItem(s: AltarState, id: string, stale: Set<string>): Partial<Alt
   };
 }
 
-/** Der Store ohne den Altar `id` — in den Papierkorb gelegt oder endgültig gelöscht. */
+/** The store without altar `id` — moved to the trash or permanently deleted. */
 function withoutAltar(s: AltarState, id: string): Partial<AltarState> {
   const { [id]: _removed, ...previewPlacements } = s.previewPlacements;
   return {
@@ -213,8 +213,8 @@ export const useAltarStore = create<AltarState>((set, get) => ({
     }
     const activeAltarId = get().activeAltarId ?? null;
     const activeAltar = altars.find((altar) => altar.id === activeAltarId) ?? null;
-    // Eine Query fuer alle Altaere statt einer pro Altar — das lief frueher als
-    // N+1 bei jedem App-Start und jedem Mount der AltarView.
+    // One query for all altars instead of one per altar — this used to run as
+    // N+1 on every app start and every mount of the AltarView.
     const placementRows = await db.select<DbRow[]>(LIVE_PLACEMENTS);
     const allPlacements = mapPlacementRows(placementRows, items);
     const previewPlacements: Record<string, AltarPlacement[]> = Object.fromEntries(
@@ -250,9 +250,9 @@ export const useAltarStore = create<AltarState>((set, get) => ({
     const now = nowIso();
     const altar: AltarRecord = {
       id: generateId(),
-      // Leer — angezeigt wird „Unbenannter Altar" (`displayTitle`).
+      // Empty — "Unnamed altar" is shown (`displayTitle`).
       title: '',
-      // Ohne Vorgabe: lauter Standardwerte.
+      // Without a preset: all defaults.
       ...parseAltarSettings({}),
       background_image_data: null,
       created_at: createdAt ?? now,
@@ -264,7 +264,7 @@ export const useAltarStore = create<AltarState>((set, get) => ({
       activeAltarId: altar.id,
       placements: [],
       selectedPlacementId: null,
-      // Auch leer ein Eintrag: wer die Platzierungen eines Altars dort sucht, soll ihn finden.
+      // An entry even when empty: anyone looking up an altar's placements there should find it.
       previewPlacements: { ...s.previewPlacements, [altar.id]: [] },
     }));
     return altar;
@@ -302,8 +302,8 @@ export const useAltarStore = create<AltarState>((set, get) => ({
       locked: number | null;
       hidden: number | null;
     }[]>(
-      // Alle, auch die von Elementen im Papierkorb: kommt eines zurück, steht
-      // es auf der Kopie wie auf dem Original.
+      // All of them, including those of items in the trash: if one comes back,
+      // it sits on the copy just as on the original.
       'SELECT item_id, x, y, z_index, width, height, rotation, opacity, locked, hidden FROM altar_placements WHERE altar_id=$1',
       [id],
     );
@@ -326,8 +326,8 @@ export const useAltarStore = create<AltarState>((set, get) => ({
       ],
     ] as const));
 
-    // Samt den Platzierungen: ohne sie zeigte die Karte die Kopie leer, und
-    // wer sie dort nachschlägt (`altarEdit.ts`), hielte sie für leer.
+    // Along with the placements: without them the card would show the copy empty, and
+    // anyone looking it up there (`altarEdit.ts`) would take it for empty.
     const placements = await fetchPlacementsForAltar(copy.id, get().items);
     set((s) => ({
       altars: [copy, ...s.altars],
@@ -396,8 +396,8 @@ export const useAltarStore = create<AltarState>((set, get) => ({
     if (!needsWrite(altar, { resolution: safeRes })) return;
     const db = await getDb();
     const updated_at = stampFor(altar.updated_at);
-    // Das Vorschaubild bleibt: „Fertig" und das Verlassen rechnen es ohnehin
-    // neu, und ein Import brächte sonst sein passendes nicht mit.
+    // The thumbnail stays: "Done" and leaving recompute it anyway,
+    // and an import would otherwise not bring a matching one along.
     await db.execute(
       'UPDATE altars SET settings=$1, updated_at=$2 WHERE id=$3',
       [altarSettingsJson({ ...altar, resolution: safeRes }), updated_at, id],
@@ -425,17 +425,17 @@ export const useAltarStore = create<AltarState>((set, get) => ({
   deleteAltar: async (id) => {
     const db = await getDb();
     await db.execute('UPDATE altars SET deleted_at=$1 WHERE id=$2', [nowIso(), id]);
-    // Platzierungen und die Verknüpfungen, die auf den Altar zeigen, bleiben
-    // stehen — wie bei einer Aufgabe: der Soft-Delete ist umkehrbar, und
-    // `sweepDanglingTaskLinks` zählt Papierkorb-Inhalte als gültig.
+    // Placements and the links pointing at the altar stay in place —
+    // as with a task: the soft delete is reversible, and
+    // `sweepDanglingTaskLinks` counts trash contents as valid.
     set((s) => withoutAltar(s, id));
   },
 
   restoreAltar: async (id) => {
     const db = await getDb();
     await db.execute('UPDATE altars SET deleted_at=NULL WHERE id=$1', [id]);
-    // Nur diesen Altar nachladen, nicht `fetchAltars`: das setzte auch den
-    // Stand eines anderen zurück, der gerade bearbeitet wird.
+    // Reload only this altar, not `fetchAltars`: that would also reset the
+    // snapshot of another one that is currently being edited.
     const rows = await db.select<DbRow[]>('SELECT * FROM altars WHERE id=$1', [id]);
     if (!rows.length) return;
     const altar = fromRow.altar(rows[0]);
@@ -461,21 +461,21 @@ export const useAltarStore = create<AltarState>((set, get) => ({
       ],
     );
 
-    // Ein Element, das inzwischen aus der Bibliothek gelöscht wurde, hat
-    // keine Zeile mehr, an der seine Platzierung hängen könnte.
+    // An item that has since been deleted from the library has no
+    // row left for its placement to hang on.
     const items = get().items;
     const itemsById = new Map(items.map((item) => [item.id, item]));
     const restored = placements
       .filter((placement) => itemsById.has(placement.item_id))
-      // Name, Emoji und Bild in der heutigen Fassung des Elements.
+      // Name, emoji and image in the item's current version.
       .map((placement) => {
         const item = itemsById.get(placement.item_id)!;
         return { ...placement, name: item.name, emoji: item.emoji, category_id: item.category_id, image_data: item.image_data };
       });
-    // In einer Transaktion (`batch`): erst jede gemerkte Platzierung anlegen
-    // oder auf ihren Stand bringen, dann weg, was nicht dazugehört. Die
-    // Reihenfolge hält es auch wiederholbar — nie steht der Altar dazwischen
-    // ohne die Platzierungen da, die er hatte.
+    // In one transaction (`batch`): first create each remembered placement
+    // or bring it to its snapshot state, then remove whatever does not belong. The
+    // order also keeps it repeatable — the altar is never left in between
+    // without the placements it had.
     const upserts = restored.map((p) => [
       `INSERT INTO altar_placements (id, altar_id, item_id, x, y, z_index, width, height, rotation, opacity, locked, hidden)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
@@ -485,9 +485,9 @@ export const useAltarStore = create<AltarState>((set, get) => ({
          locked=excluded.locked, hidden=excluded.hidden`,
       [p.id, altar.id, p.item_id, p.x, p.y, p.z_index, p.width, p.height, p.rotation, p.opacity, toInt(p.locked), toInt(p.hidden)],
     ] as const);
-    // Die Platzierungen von Elementen im Papierkorb gehören nicht zum
-    // gemerkten Stand, und doch zum Altar: sie bleiben — auch die eines
-    // Elements, das beim Betreten dort lag und inzwischen zurück ist.
+    // The placements of items in the trash are not part of the remembered
+    // snapshot, yet belong to the altar: they stay — including those of an
+    // item that was in the trash on entering and has since come back.
     const keptIds = restored.map((p) => p.id);
     const params = [altar.id, ...keptIds, ...untouchedItemIds];
     const ph = (from: number, n: number) => Array.from({ length: n }, (_, i) => `$${from + i}`).join(', ');
@@ -516,11 +516,11 @@ export const useAltarStore = create<AltarState>((set, get) => ({
   permanentlyDeleteAltar: async (id) => {
     const db = await getDb();
     await db.execute('DELETE FROM altar_placements WHERE altar_id=$1', [id]);
-    // Altäre sind Link-Ziele von task_links (polymorph, ohne Foreign Key).
+    // Altars are link targets of task_links (polymorphic, no foreign key).
     await db.execute('DELETE FROM task_links WHERE target_id=$1', [id]);
     await db.execute('DELETE FROM altars WHERE id=$1', [id]);
-    // Nur aus dem Papierkorb oder beim Zurückrollen eines Imports erreichbar;
-    // steht er doch noch im Store, geht er dort mit.
+    // Reachable only from the trash or when rolling back an import;
+    // if it is still in the store, it goes from there too.
     if (get().altars.some((altar) => altar.id === id)) set((s) => withoutAltar(s, id));
   },
 
@@ -564,7 +564,7 @@ export const useAltarStore = create<AltarState>((set, get) => ({
   },
 
   restoreItem: async (id) => {
-    // Schon zurück (Rückgängig und Papierkorb nacheinander).
+    // Already back (undo and trash one after the other).
     if (get().items.some((i) => i.id === id)) return;
     const db = await getDb();
     await db.execute('UPDATE altar_items SET deleted_at=NULL WHERE id=$1', [id]);
@@ -572,8 +572,8 @@ export const useAltarStore = create<AltarState>((set, get) => ({
     if (!rows.length) return;
     const item = fromRow.altarItem(rows[0]);
     const stale = await dropThumbnailsShowing(db, id);
-    // Nur die Platzierungen dieses Elements nachladen, nicht `fetchAltars`:
-    // das setzte den Stand eines Altars zurück, der gerade bearbeitet wird.
+    // Reload only this item's placements, not `fetchAltars`:
+    // that would reset the snapshot of an altar that is currently being edited.
     const back = mapPlacementRows(
       await db.select<DbRow[]>('SELECT * FROM altar_placements WHERE item_id=$1', [id]),
       [item],
@@ -597,8 +597,8 @@ export const useAltarStore = create<AltarState>((set, get) => ({
     const stale = await dropThumbnailsShowing(db, id);
     await db.execute('DELETE FROM altar_placements WHERE item_id=$1', [id]);
     await db.execute('DELETE FROM altar_items WHERE id=$1', [id]);
-    // Aus dem Papierkorb steht es nicht mehr im Store; beim Zurückrollen eines
-    // Imports schon.
+    // From the trash it is no longer in the store; when rolling back an
+    // import it still is.
     set((s) => withoutItem(s, id, stale));
   },
 
@@ -678,7 +678,7 @@ export const useAltarStore = create<AltarState>((set, get) => ({
     const current = get().placements.find((entry) => entry.id === id);
     if (!current) return;
     const safePatch = clampPlacementPatch(patch);
-    // Nichts geändert (etwa ein Einrasten auf dieselbe Größe): nichts schreiben, nichts stempeln.
+    // Nothing changed (e.g. snapping to the same size): write nothing, stamp nothing.
     if (Object.entries(safePatch).every(([key, value]) => current[key as keyof AltarPlacement] === value)) return;
     const next = { ...current, ...safePatch };
     await db.execute(
@@ -756,14 +756,14 @@ export const useAltarStore = create<AltarState>((set, get) => ({
     const item = items.find((entry) => entry.id === placement.item_id);
     if (!altarId || !item || !altars.some((altar) => altar.id === altarId)) return;
     const db = await getDb();
-    // OR IGNORE: ein Abbrechen der Bearbeitung kann sie schon zurückgebracht haben.
+    // OR IGNORE: cancelling the edit may already have brought it back.
     const { rowsAffected } = await db.execute(
       'INSERT OR IGNORE INTO altar_placements (id, altar_id, item_id, x, y, z_index, width, height, rotation, opacity, locked, hidden) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)',
       [placement.id, altarId, placement.item_id, placement.x, placement.y, placement.z_index, placement.width,
         placement.height, placement.rotation, placement.opacity, toInt(placement.locked), toInt(placement.hidden)]
     );
     if (!rowsAffected) return;
-    // Name, Emoji und Bild in der heutigen Fassung des Elements.
+    // Name, emoji and image in the item's current version.
     const back = { ...placement, name: item.name, emoji: item.emoji, category_id: item.category_id, image_data: item.image_data };
     set((s) => ({
       placements: s.activeAltarId === altarId ? [...s.placements, back] : s.placements,

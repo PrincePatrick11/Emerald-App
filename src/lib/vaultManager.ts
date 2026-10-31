@@ -38,9 +38,9 @@ export const IMPORT_STAGING_FILE = 'emerald.db.import';
 
 export interface VaultProbe {
   exists: boolean;
-  /** Der Ordner ist da, aber Emerald darf nicht hineinsehen — auf macOS die
-   *  normale Antwort fuer `~/Documents`, `~/Desktop` und iCloud, solange der
-   *  Nutzer den Zugriff nicht erlaubt hat. */
+  /** The folder is there, but Emerald may not look inside — on macOS the
+   *  normal answer for `~/Documents`, `~/Desktop` and iCloud as long as the
+   *  user has not allowed access. */
   denied: boolean;
   has_db: boolean;
   is_empty: boolean;
@@ -48,11 +48,11 @@ export interface VaultProbe {
 
 let _cached: VaultsFile | null = null;
 /**
- * Der erste Aufruf laeuft, die uebrigen warten darauf.
+ * The first call runs, the others wait for it.
  *
- * `loadVaultsFile` stoesst inzwischen `migrate_vault_layout` an und schreibt
- * `vaults.json`. Ohne diese Serialisierung wuerden zwei gleichzeitige erste
- * Aufrufer beides doppelt tun — `db.ts` loest dasselbe Problem mit
+ * `loadVaultsFile` now triggers `migrate_vault_layout` and writes
+ * `vaults.json`. Without this serialization two simultaneous first
+ * callers would do both twice — `db.ts` solves the same problem with
  * `_initPromises`.
  */
 let _loading: Promise<VaultsFile> | null = null;
@@ -75,16 +75,16 @@ let _activeVaultIdSync = '';
 /**
  * Joins path segments with the platform's separator.
  *
- * Der Trenner kommt von der Plattform, nicht aus dem Pfad. Ein POSIX-Ordner
- * darf einen Backslash im Namen tragen; wer daraus auf Windows schliesst, baut
- * einen Pfad, unter dem SQLite eine neue leere Datenbank anlegt — waehrend die
- * Bild-Commands den Ordner weiter korrekt aus der Registry aufloesen und Bilder
- * anzeigen. Das sieht dann aus wie Datenverlust.
+ * The separator comes from the platform, not from the path. A POSIX folder
+ * may carry a backslash in its name; whoever concludes Windows from that builds
+ * a path under which SQLite creates a new empty database — while the
+ * image commands keep resolving the folder correctly from the registry and show images.
+ * That then looks like data loss.
  */
 export function joinPath(dir: string, ...segments: string[]): string {
   const sep = isWindows ? '\\' : '/';
-  // Nur auf `sep` pruefen, nicht auf beide Trenner: ein POSIX-Ordner, dessen
-  // Name auf einen Backslash endet, bekaeme sonst keinen Trenner angehaengt.
+  // Check only for `sep`, not for both separators: a POSIX folder whose
+  // name ends in a backslash would otherwise get no separator appended.
   return segments.reduce(
     (base, segment) => (base.endsWith(sep) ? `${base}${segment}` : `${base}${sep}${segment}`),
     dir,
@@ -146,18 +146,18 @@ export function vaultFolderName(name: string): string {
     // eslint-disable-next-line no-control-regex
     .replace(/[<>:"/\\|?*\u0000-\u001f]/g, ' ')
     .replace(/\s+/g, ' ')
-    // Windows legt weder Ordner mit Punkt noch mit Leerzeichen am Ende an.
+    // Windows creates neither folders ending in a dot nor in a space.
     .replace(/[\s.]+$/, '')
     .trim();
   if (!cleaned || /^\.+$/.test(cleaned)) return 'vault';
-  // Die Geraetenamen gelten unter Windows auch mit Endung — `CON.txt` ist
-  // ebenso wenig anlegbar wie `CON`. Geprueft wird deshalb der Stamm vor dem
-  // ersten Punkt, samt der beiden Konsolen-Streams.
+  // The device names apply on Windows even with an extension — `CON.txt` can
+  // no more be created than `CON`. So the stem before the
+  // first dot is checked, along with the two console streams.
   const reserved = /^(con|prn|aux|nul|com[1-9]|lpt[1-9]|conin\$|conout\$)(\.|$)/i.test(cleaned);
-  // Eine Pfadkomponente ist auf ext4 und APFS auf 255 *Bytes* begrenzt, unter
-  // NTFS auf 255 UTF-16-Einheiten. Ein Name aus Emoji reisst die Byte-Grenze
-  // lange vor der Zeichengrenze — deshalb wird in Bytes gemessen und der
-  // Rest so gekuerzt, dass kein Zeichen zerschnitten wird.
+  // A path component is limited to 255 *bytes* on ext4 and APFS, to
+  // 255 UTF-16 units on NTFS. A name made of emoji breaks the byte limit
+  // long before the character limit — so it is measured in bytes and the
+  // rest is shortened such that no character is cut apart.
   return capBytes(reserved ? `${cleaned}_vault` : cleaned, 200);
 }
 
@@ -166,8 +166,8 @@ function capBytes(value: string, max: number): string {
   if (new TextEncoder().encode(value).length <= max) return value;
   let out = '';
   let used = 0;
-  // Ueber den String iterieren, nicht ueber seine Code-Units: ein Emoji ist ein
-  // Surrogatpaar, und eine Haelfte davon ist kein gueltiger Dateiname.
+  // Iterate over the string, not over its code units: an emoji is a
+  // surrogate pair, and half of it is not a valid file name.
   for (const char of value) {
     const size = new TextEncoder().encode(char).length;
     if (used + size > max) break;
@@ -231,24 +231,24 @@ async function readVaultsFile(): Promise<VaultsFile> {
     // No file yet — first run, or an installation that predates multi-vault.
   }
 
-  // Kein `vaults.json` heisst zweierlei: entweder hat diese Installation noch
-  // nie eine Datenbank gehabt — dann fuehrt der Erststart durchs Vault-Modal —,
-  // oder sie stammt aus der Zeit vor Multi-Vault und ihre `emerald.db` liegt
-  // laengst da. Der Unterschied entscheidet zwischen Onboarding und einem
-  // Nutzer, der vor seinem eigenen, scheinbar leeren Journal sitzt.
+  // No `vaults.json` means one of two things: either this installation has never
+  // had a database — then the first start leads through the vault modal —,
+  // or it dates from the time before multi-vault and its `emerald.db` has
+  // long been there. The difference decides between onboarding and a
+  // user sitting in front of their own, apparently empty journal.
   if (parsed === null && !(await invoke<boolean>('legacy_default_db_exists'))) {
     const data: VaultsFile = { version: 2, vaults: [], activeVaultId: '' };
     _cached = data;
     _activeVaultIdSync = '';
     await syncRegistry(data);
-    // Bewusst nicht geschrieben: ein abgebrochener Erststart bleibt einer.
+    // Deliberately not written: an aborted first start stays a first start.
     return data;
   }
 
   const legacy = parsed?.vaults ?? [];
-  // Nur fuer die Legacy-Installation von oben. Eine vorhandene Datei mit leerer
-  // Liste ist jemand, der seine Vaults entfernt hat — dem einen `default`
-  // unterzuschieben, hiesse ihn samt leerem Ordner wieder auferstehen zu lassen.
+  // Only for the legacy installation from above. An existing file with an empty
+  // list is someone who removed their vaults — slipping a `default` in
+  // would mean resurrecting it along with an empty folder.
   if (parsed === null && !legacy.some((v) => v.id === 'default')) {
     legacy.unshift({ id: 'default', name: 'Emerald', dbName: 'emerald.db', createdAt: new Date(0).toISOString() });
   }
@@ -266,11 +266,11 @@ async function readVaultsFile(): Promise<VaultsFile> {
     migrated = true;
   }
 
-  // Der Rueckfall geht auf den ersten vorhandenen Vault, nicht auf `default`:
-  // seit der Erststart die Liste leer laesst, ist ein `default`-Eintrag nicht
-  // mehr garantiert. Eine Id zurueckzugeben, die die Registry nicht kennt,
-  // wuerde `getDb()` an `ensure_vault_dirs` scheitern lassen, waehrend
-  // `getActiveVaultPath()` munter den Pfad des ersten Vaults liefert.
+  // The fallback goes to the first existing vault, not to `default`:
+  // since the first start leaves the list empty, a `default` entry is no
+  // longer guaranteed. Returning an id the registry does not know
+  // would make `getDb()` fail at `ensure_vault_dirs`, while
+  // `getActiveVaultPath()` cheerfully delivers the first vault's path.
   const activeVaultId = vaults.some((v) => v.id === parsed?.activeVaultId)
     ? parsed!.activeVaultId!
     : (vaults[0]?.id ?? '');
@@ -279,8 +279,8 @@ async function readVaultsFile(): Promise<VaultsFile> {
   _cached = data;
   _activeVaultIdSync = activeVaultId;
 
-  // Nur schreiben, wenn sich wirklich etwas geaendert hat — ein Start auf einer
-  // bereits migrierten Installation fasst die Datei dann gar nicht an.
+  // Only write if something has really changed — a start on an
+  // already migrated installation then does not touch the file at all.
   if (migrated || parsed === null || parsed.activeVaultId !== activeVaultId) {
     await saveVaultsFile(data);
   } else {
@@ -302,9 +302,9 @@ export async function saveVaultsFile(data: VaultsFile): Promise<void> {
 export async function getActiveVaultPath(): Promise<string> {
   const data = await loadVaultsFile();
   const active = data.vaults.find((v) => v.id === data.activeVaultId);
-  // Kein Rueckfall auf `vaults[0]`: der wuerde eine fremde Datenbank unter der
-  // Id einer anderen oeffnen. Waehrend des Erststarts ist das der normale
-  // Zustand — deshalb montiert `AppShell` den Shell-Inhalt dann gar nicht erst.
+  // No fallback to `vaults[0]`: that would open someone else's database under the
+  // id of another. During the first start this is the normal
+  // state — which is why `AppShell` then does not even mount the shell content.
   if (!active) throw new Error('NO_ACTIVE_VAULT');
   return active.path;
 }
@@ -318,7 +318,7 @@ export async function getActiveDbFile(): Promise<string> {
   return joinPath(await getActiveVaultPath(), DB_FILE);
 }
 
-/** Die Arbeitskopie eines Backup-Imports im aktiven Vault (`importStaging.ts`). */
+/** The working copy of a backup import in the active vault (`importStaging.ts`). */
 export async function getActiveImportStagingFile(): Promise<string> {
   return joinPath(await getActiveVaultPath(), IMPORT_STAGING_FILE);
 }
@@ -345,10 +345,10 @@ export function probeVaultDir(path: string): Promise<VaultProbe> {
 
 /**
  * Where a vault that is about to be created will land. A self-picked folder
- * schlaegt den angebotenen Basis-Ordner aus dem Rennen; darunter wird der Name
- * zum Ordnernamen. Ohne Namen noch kein Ordner — der angehaengte Trenner
- * zeigt, dass dort gleich einer hinkommt. Committen laesst sich in dem Zustand
- * ohnehin nichts.
+ * beats the offered base folder out of the running; under that the name becomes
+ * the folder name. Without a name there is no folder yet — the appended separator
+ * shows that one is about to go there. Nothing can be committed in that state
+ * anyway.
  */
 export function newVaultTarget(
   baseDir: string | null,
@@ -378,19 +378,19 @@ export const NEW_VAULT_TARGET_ERROR_KEY: Record<NewVaultTargetProblem, string> =
 /**
  * Checks a folder a new vault is meant to be created in.
  *
- * `denied` zuerst: ein verweigerter Probe meldet `has_db=false` und
- * `is_empty=false` und ginge sonst als „kein Vault"/„nicht leer" durch. Ein
- * neuer Vault gehoert in einen leeren Ordner — sonst vermischen sich seine
- * Dateien mit fremden, und „Dateien loeschen" muesste spaeter entscheiden, was
- * davon ihm gehoert. Ein Ordner, den es noch gar nicht gibt, ist der
- * Normalfall; `create_vault_dirs` legt ihn an.
+ * `denied` first: a denied probe reports `has_db=false` and
+ * `is_empty=false` and would otherwise pass as "no vault"/"not empty". A
+ * new vault belongs in an empty folder — otherwise its files mix
+ * with foreign ones, and "Delete files" would later have to decide which
+ * of them belong to it. A folder that does not exist at all is the
+ * normal case; `create_vault_dirs` creates it.
  *
- * `alreadyOpen` faengt den Fall, den der Datei-Probe nicht sieht: der Ordner
- * ist bereits als Vault *registriert*, liegt aber gerade nicht auf der Platte
- * (geloescht, Laufwerk abgezogen — im Vault-Modal „Ordner nicht gefunden").
- * Ohne die Pruefung wuerde er hier als leer durchgehen, `create_vault_dirs`
- * legte ihn neu an, und zwei Vault-Ids teilten sich einen Ordner — worauf
- * „Dateien loeschen" beim einen dem anderen den Boden wegrisse.
+ * `alreadyOpen` catches the case that the file probe does not see: the folder
+ * is already *registered* as a vault but is currently not on the disk
+ * (deleted, drive unplugged — "Folder not found" in the vault modal).
+ * Without the check it would pass here as empty, `create_vault_dirs`
+ * would create it anew, and two vault ids would share one folder — whereupon
+ * "Delete files" on one would pull the rug out from under the other.
  */
 export async function probeNewVaultTarget(path: string): Promise<NewVaultTargetProblem | null> {
   const { vaults } = await loadVaultsFile();
@@ -436,8 +436,8 @@ export async function newVaultRecord(
     name,
     path: opts.path ?? (await defaultVaultDir(id)),
     createdAt: new Date().toISOString(),
-    // Bedingt gespreizt, damit `'icon' in vault` dasselbe bedeutet wie nach
-    // `applyVaultPatch(..., { icon: null })` — dort verschwindet der Key.
+    // Conditionally spread, so that `'icon' in vault` means the same as after
+    // `applyVaultPatch(..., { icon: null })` — there the key disappears.
     ...(opts.icon !== undefined && { icon: opts.icon }),
   };
 }
@@ -454,12 +454,12 @@ export async function addVault(vault: Vault): Promise<void> {
   try {
     await invoke('create_vault_dirs', { vaultId: vault.id });
   } catch (err) {
-    // Die Registrierung muss zuerst passieren — `create_vault_dirs` loest die
-    // Id gegen die Registry auf und kennt einen unregistrierten Vault nicht.
-    // Scheitert das Anlegen trotzdem (macOS verweigert den Ordner unter TCC,
-    // Windows den Namen, das Ziel ist schreibgeschuetzt), muss der Eintrag
-    // wieder weg: sonst stuende ein Vault in der Liste, dessen Ordner nie
-    // entstehen kann und an dem jedes `getDb()` scheitert.
+    // Registration has to happen first — `create_vault_dirs` resolves the
+    // id against the registry and does not know an unregistered vault.
+    // If creation fails anyway (macOS denies the folder under TCC,
+    // Windows the name, the target is write-protected), the entry has to
+    // go again: otherwise a vault would stand in the list whose folder can never
+    // come into being and on which every `getDb()` fails.
     await saveVaultsFile(data);
     throw err;
   }

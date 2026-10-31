@@ -4,13 +4,13 @@ import { FIELDS_BLOCK_TYPE } from './fields';
 import { SIGIL_CALC_TYPE, SIGIL_CANVAS_TYPE, SIGIL_CHARGE_TYPE } from './sigil';
 
 /**
- * Die Registry der Blocktypen — der reine Teil (Metadaten). Welche Komponente
- * einen Typ darstellt, steht in `components/blocks/blockViews.ts`; die
- * Trennung hält TipTap aus allem heraus, was nur wissen will, WAS ein Block ist
- * (Picker, Seitenleiste, Export, Migrationen).
+ * The registry of block types — the pure part (metadata). Which component
+ * renders a type is in `components/blocks/blockViews.ts`; the separation
+ * keeps TipTap out of everything that only wants to know WHAT a block is
+ * (picker, sidebar, export, migrations).
  *
- * Die Form ist die Keimzelle der späteren Erweiterungs-API: ein Plugin würde
- * genau so einen Eintrag registrieren, mit `origin: 'plugin'`.
+ * The shape is the seed of the later extension API: a plugin would
+ * register exactly such an entry, with `origin: 'plugin'`.
  */
 
 export type BlockGroup = 'text' | 'fields' | 'sigil' | 'media' | 'reference' | 'moon';
@@ -23,18 +23,18 @@ export interface BlockTypeMeta {
   descriptionKey: string;
   group: BlockGroup;
   /**
-   * Version des gespeicherten Datenformats (`data-block-v`, fehlt = 1). Ein
-   * Block mit höherer Version stammt aus einer neueren App und wird wie ein
-   * unbekannter Typ behandelt: angezeigt als Fallback, unverändert gespeichert.
+   * Version of the stored data format (`data-block-v`, missing = 1). A
+   * block with a higher version comes from a newer app and is treated like an
+   * unknown type: shown as a fallback, saved unchanged.
    */
   dataVersion: number;
-  /** Titel im Lesemodus zeigen, solange die Instanz nichts anderes sagt.
-   *  Text fließt ohne Überschrift, Feld- und Werkzeugblöcke tragen eine. */
+  /** Show the title in read mode unless the instance says otherwise.
+   *  Text flows without a heading, field and tool blocks carry one. */
   defaultShowTitle: boolean;
 }
 
-// Eine Map statt eines Objekts: der Typ kommt aus gespeichertem Inhalt, und
-// `BLOCK_TYPES['constructor']` fände sonst den Prototyp.
+// A Map instead of an object: the type comes from stored content, and
+// `BLOCK_TYPES['constructor']` would otherwise find the prototype.
 const BLOCK_TYPES = new Map<string, BlockTypeMeta>([
   [TEXT_BLOCK_TYPE, {
     id: TEXT_BLOCK_TYPE,
@@ -54,7 +54,7 @@ const BLOCK_TYPES = new Map<string, BlockTypeMeta>([
     descriptionKey: 'blocks.types.fields.description',
     group: 'fields',
     dataVersion: 1,
-    // Ein einzelnes Feld trägt seine Beschriftung ohnehin in der Zeile.
+    // A single field carries its label in the row anyway.
     defaultShowTitle: false,
   }],
   ...([
@@ -74,9 +74,9 @@ const BLOCK_TYPES = new Map<string, BlockTypeMeta>([
 ]);
 
 /**
- * Der Typ, mit dem die App diesen Block darstellen kann — oder `undefined` für
- * einen unbekannten Typ oder ein zu neues Datenformat. Beides wird als Fallback
- * angezeigt und unverändert zurückgeschrieben.
+ * The type with which the app can render this block — or `undefined` for
+ * an unknown type or a data format that is too new. Both are shown as a
+ * fallback and written back unchanged.
  */
 export function resolveBlockType(block: BlockInstance): BlockTypeMeta | undefined {
   const meta = BLOCK_TYPES.get(block.type);
