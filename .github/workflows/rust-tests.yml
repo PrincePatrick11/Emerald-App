@@ -1,13 +1,7 @@
 name: Rust tests
 
-# Eine eigene Datei statt einer Zeile in `ci.yml`: `cargo test` deckt eine
-# kleine, wechselnde Zahl von Dingen ab — die Uebernahme der Daten aus dem
-# Verzeichnis des vorigen Identifiers (`adopt_previous_identifier_dirs`), das
-# Lesen und Schreiben von `settings.json` und `drafts.json` (alle in
-# `src-tauri/src/vault.rs`) und den Waechter beim Fensterschliessen
-# (`CloseWatch` in `src-tauri/src/lib.rs`). Bleibt eines Tages nichts davon
-# uebrig, geht diese Datei in einem Zug mit, ohne dass jemand in `ci.yml`
-# herumschneiden muss.
+# A file of its own rather than a line in `ci.yml`: `cargo test` covers a small,
+# changing set of things, listed in Documentation/build.md under Known gaps.
 #
 # Was die Matrix bringt, und was nicht — der Unterschied ist wichtig genug fuer
 # eigene Zeilen, weil er sonst falsch erinnert wird:
@@ -28,7 +22,7 @@ name: Rust tests
 
 on:
   push:
-    branches: ['**']
+    branches: [main, 'version/**']
     # Nur wenn die Rust-Seite sich bewegt. Der Lauf kostet dieselbe
     # Vorbereitung wie `ci.yml` (Toolchain, Linux-Pakete, Frontend-Build, weil
     # `tauri-build` ohne `dist/` abbricht), und den Preis lohnt es nur zu

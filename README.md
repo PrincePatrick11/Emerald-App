@@ -27,6 +27,8 @@ npm run check         # everything the frontend CI job runs
 npm run tauri build   # production build
 ```
 
+`npm run tauri build` needs the updater signing key, see [Manual builds](Documentation/build.md#manual-builds--the-dress-rehearsal).
+
 Work happens on the branch of the version in progress, `version/x.y.z`, not on `main`. [`CONTRIBUTING.md`](CONTRIBUTING.md#branches-and-releases) has the rules. Coding assistants start at [`AGENTS.md`](AGENTS.md).
 
 ## Documentation

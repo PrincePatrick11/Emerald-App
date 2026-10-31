@@ -20,12 +20,12 @@ The steps of a release are in [Cutting a release](Documentation/build.md#cutting
 
 ## Development Setup
 
-**Prerequisites:** Node.js, Rust toolchain, [Tauri prerequisites](https://tauri.app/start/prerequisites/)
+**Prerequisites:** Node.js 22 or newer, Rust toolchain, [Tauri prerequisites](https://tauri.app/start/prerequisites/)
 
 The database is SQLCipher, built together with OpenSSL from source, and that build needs Perl and `make`. macOS and Debian/Ubuntu ship both; Fedora/RHEL need `dnf install perl-core make`; on Windows install [Strawberry Perl](https://strawberryperl.com/) (`winget install StrawberryPerl.StrawberryPerl`) — the Perl that comes with Git does not work. The first build takes several minutes longer because of OpenSSL.
 
 ```bash
-npm install --cache /tmp/npm-emerald-cache
+npm install
 npm run tauri:dev
 ```
 
@@ -41,7 +41,7 @@ The dev build uses a separate database and app identity (`com.emerald.app.dev`) 
 
 ## Continuous Integration
 
-Every push and pull request runs `ci.yml`: a frontend job (`npm run check`, which runs `check:schema`, `check:i18n`, `check:blocks` and `check:docs`, then the typecheck-carrying `build`) and a `cargo check --locked --all-targets` matrix across Linux, macOS, and Windows, since parts of the Rust side are platform-gated and only actually compile on their own OS. See [`Documentation/build.md`](Documentation/build.md#ci--the-smoke-detector) for the full pipeline, including what CI does *not* cover (bundling, signing, notarisation).
+Every push to `main` or a version branch and every pull request runs `ci.yml`: a frontend job (`npm run check`, which runs `check:schema`, `check:i18n`, `check:blocks` and `check:docs`, then the typecheck-carrying `build`) and a `cargo check --locked --all-targets` matrix across Linux, macOS, and Windows, with and without the `devbridge` feature, since parts of the Rust side are platform-gated and only actually compile on their own OS. `rust-tests.yml` runs `cargo test --lib` when `src-tauri/` changes. See [`Documentation/build.md`](Documentation/build.md#ci--the-smoke-detector) for the full pipeline, including what CI does *not* cover (bundling, signing, notarisation).
 
 ## Working with a Coding Assistant
 

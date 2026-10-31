@@ -3,7 +3,7 @@
  *
  * Das ist der Test, ohne den der Baseline-Squash nicht zu verantworten ist:
  * `db.ts` hat zwei Wege zum Schema — das DDL aus `schema.ts` für frische
- * Dateien, und 33 Migrationsschritte für bestehende. Laufen die auseinander,
+ * Dateien, und die Migrationsschritte für bestehende. Laufen die auseinander,
  * merkt es sonst niemand, bis ein Nutzer eine Fehlermeldung sieht.
  *
  * Läuft gegen `node:sqlite` statt gegen die App, damit der Durchlauf Sekunden

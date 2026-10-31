@@ -54,8 +54,8 @@ There is one instance. Two checkouts cannot be driven at the same time, and two 
 | --- | --- |
 | `status` | Which instance this session drives, whether it is running, and how a launch in progress is doing |
 | `snapshot` | The page as a compact outline, one line per element; elements that can be acted on carry a ref such as `@e7` |
-| `click`, `hover` | Real mouse input. `click` refuses an element that is disabled, hidden or covered, and names what covers it |
-| `type_text`, `press_key` | Real keyboard input, into inputs and the editor alike |
+| `click`, `hover` | Mouse input, real or dispatched in the page as in [the table above](#requirements). `click` refuses an element that is disabled, hidden or covered, and names what covers it |
+| `type_text`, `press_key` | Keyboard input, real or dispatched in the page as in [the table above](#requirements), into inputs and the editor alike |
 | `wait_for` | Waits until an element is visible, attached, hidden or detached |
 | `dialog` | Lists and answers native file pickers and message boxes |
 | `eval` | Runs JavaScript as in a DevTools console |

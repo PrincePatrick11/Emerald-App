@@ -1,8 +1,8 @@
 ---
 name: emerald-app-control
-description: Drives the Emerald Tauri/journal app through the emerald-devtools MCP server (CDP/WebView2). Covers Journal, Wiki, Operations, Altar, Tasks, Tags, Trash, Settings, export, theme and language switching.
+description: Drives the Emerald Tauri/journal app through the emerald-devtools MCP server Covers Journal, Wiki, Operations, Altar, Tasks, Tags, Trash, Settings, export, theme and language switching.
 version: 1.0.0
-platforms: [windows]
+platforms: [windows, macos, linux]
 metadata:
   hermes:
     tags: [tauri, cdp, webview2, emerald, journal]
@@ -26,8 +26,7 @@ Prerequisites:
 1. The MCP server is configured in your LLM client. It launches Emerald itself,
    so there is nothing to start by hand.
 2. Call `status` first. It reports the instance this session drives -
-   checkout, port, identifier. Port 9222 is the separate, manually started
-   regular dev instance; address it only deliberately.
+   checkout, port, identifier.
 
 Two things about that instance are intentional:
 - **You will not see a window.** On Windows it is moved off-screen and out of

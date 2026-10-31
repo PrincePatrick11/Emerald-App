@@ -6,16 +6,16 @@ How Emerald gets from a commit to a downloadable binary: what each GitHub Action
 
 | Workflow | Trigger | Purpose |
 |---|---|---|
-| [`ci.yml`](../.github/workflows/ci.yml) | every push, every pull request | Does it still compile — on all three operating systems? |
+| [`ci.yml`](../.github/workflows/ci.yml) | pushes to `main` and `version/**`, every pull request | Does it still compile — on all three operating systems? |
 | [`manual-desktop-builds.yml`](../.github/workflows/manual-desktop-builds.yml) | `workflow_dispatch` | Real bundles on demand, as downloadable artifacts. The dress rehearsal before a tag. |
 | [`release.yml`](../.github/workflows/release.yml) | pushing a `v*` tag | Creates the GitHub release and uploads the signed bundles to it. |
-| [`rust-tests.yml`](../.github/workflows/rust-tests.yml) | pushes and pull requests that touch `src-tauri/**` | `cargo test --lib` on all three. Its own file, not a line in `ci.yml`: what it runs has an expiry date — see [Known gaps](#known-gaps). |
+| [`rust-tests.yml`](../.github/workflows/rust-tests.yml) | pushes to `main` and `version/**` and pull requests that touch `src-tauri/**` | `cargo test --lib` on all three. Its own file, not a line in `ci.yml`: what it runs has an expiry date — see [Known gaps](#known-gaps). |
 
 All workflows pin **Node 22**, and `package.json` records the same floor under `engines`: `scripts/schema-check.mjs` imports `node:sqlite`, which Node 20 lacks.
 
 ## CI — the smoke detector
 
-Two jobs, on every push to every branch and on every pull request. `cancel-in-progress` is on, so a quick follow-up push supersedes the previous run rather than queueing behind it.
+Two jobs, on every push to `main` or a version branch and on every pull request. A short-lived work branch gets CI once it has a pull request. `cancel-in-progress` is on, so a quick follow-up push supersedes the previous run rather than queueing behind it.
 
 **`frontend`** (`ubuntu-latest`, once — the frontend build is platform-independent) runs `npm run check`, the same command as locally, which runs in this order and stops at the first failure:
 

@@ -5,6 +5,6 @@
 ## Checklist
 
 - [ ] Targets the current `version/x.y.z` branch, or `main` only for a finished version
-- [ ] `npm run check` passes
+- [ ] The [checks in AGENTS.md](../AGENTS.md#checks) that apply pass
 - [ ] `CHANGELOG.md` and `Documentation/` are updated where behaviour changed
 - [ ] Tested on: <!-- macOS / Windows / Linux -->

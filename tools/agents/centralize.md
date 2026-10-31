@@ -37,7 +37,7 @@ Where shared code lives in Emerald:
 
 - `src/lib/` — shared logic: `styleClasses.ts` (the established home for a repeated Tailwind chain — extend it rather than copying the chain again), `platform.ts` (the only permitted source of platform detection), `tabs.ts`, `helpers.ts`, `altarConstants.ts`.
 
-- `src/hooks/` — shared behaviour, for example `useCategoryEditor` (generic over the store, used by Tasks, Wiki and Operations) and `useGlobalSearch`.
+- `src/hooks/` — shared behaviour, for example `useGlobalSearch`.
 
 - Zustand stores and hooks as the shared state and behaviour layer. State two views need that lives in a component is in the wrong place.
 

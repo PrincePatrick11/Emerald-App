@@ -28,13 +28,13 @@ Scope policy:
 
 Release scope for Emerald:
 
-- `Documentation/build.md` describes the whole path from tag to binary — the three workflows, the platform matrix, the signing state, and the `Cutting a release` steps. Read it first and follow those steps; if it contradicts `.github/workflows/`, the workflow files win and the doc needs correcting.
+- `Documentation/build.md` describes the whole path from tag to binary — the four workflows, the platform matrix, the signing state, and the `Cutting a release` steps. Read it first and follow those steps; if it contradicts `.github/workflows/`, the workflow files win and the doc needs correcting.
 
-- That file lives in the public app repo, which excludes AI tooling on purpose, so it names no agents and phrases its step 1 as a manual chore. Step 1 is exactly this agent's job — do not read "manual step" as "not mine", and do not add agent references back into that doc.
+- That file phrases its step 1 as a manual chore. Step 1 is exactly this agent's job — do not read "manual step" as "not mine".
 
 - Version fields that must be character-identical: `package.json`, `src-tauri/tauri.conf.json`, `src-tauri/Cargo.toml`. Bumping the crate version also updates `src-tauri/Cargo.lock`.
 
-- `src/components/layout/SettingsModal.tsx` imports `package.json` directly and renders its version in the UI, so a mismatch between the fields ships a wrong version to users.
+- `src/components/layout/settings/AboutPage.tsx` imports `package.json` directly and renders its version in the UI, so a mismatch between the fields ships a wrong version to users.
 
 - `CHANGELOG.md`: rename `## [Unreleased]` (which may carry a `(targeting vX.Y.Z)` suffix) to `## [X.Y.Z] - YYYY-MM-DD`, and open a fresh empty `## [Unreleased]` above it. Keep a Changelog categories, plus the project's own `### Known Issues` category where it applies.
 
@@ -50,7 +50,7 @@ Release scope for Emerald:
 
 - Tag convention is `v` + version. Four-segment versions exist historically; recommend semver but don't force a renumbering.
 
-- Release branches are named after the version and merged back; check which branch the release is being prepared on.
+- Each version has its branch `version/x.y.z`, which reaches `main` through a pull request; check that the release is being prepared on the right one.
 
 Method:
 
@@ -60,13 +60,11 @@ Method:
 
 - Check that the working tree is clean and that the current branch is the intended one.
 
-- Ask whether `manual-desktop-builds.yml` has been run from this branch and whether all three platforms produced bundles. Never assume it has.
-
 - Output the findings table and wait for approval.
 
 - After approval: bump the three version fields, cut the CHANGELOG section, and make a single release commit describing what it finalizes.
 
-- Finally print the exact tag and push commands as text for the user to run.
+- Finally print the remaining steps of `Cutting a release` as text for the user to run: push, `manual-desktop-builds.yml` from the branch, the pull request to `main`, and the tag on the merge commit. Never assume a step has been done.
 
 Output format:
 

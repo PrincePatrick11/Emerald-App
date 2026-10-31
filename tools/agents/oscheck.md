@@ -47,7 +47,7 @@ Cross-OS scope for Emerald:
 
 - Frontend platform detection belongs in `src/lib/platform.ts` — a deliberately synchronous user-agent check — and branches through `html[data-platform]` CSS. Flag ad-hoc `navigator.userAgent` checks scattered elsewhere.
 
-- `Documentation/design.md` records the platform-dependent frontend decisions already taken, in `Appendix > Platform Quirks` and `Appendix > Shell Layout`: `MIN_PANEL_REM` sized in rem rather than px because WebKitGTK derives the root font size from the GTK text scaling, `.modal-card` deliberately without `overflow-hidden`, the window buttons existing only where `usesCustomWindowControls` applies, and a non-dismissible modal's backdrop starting at `top-10` there so the app's own title bar stays reachable. Read it before flagging one of these as an oversight, and check whether the change breaks one of them.
+- `Documentation/design.md` records the platform-dependent frontend decisions already taken, in `Appendix > Platform Quirks` and `Appendix > Shell Layout`: `.modal-card` deliberately without `overflow-hidden`, the window buttons existing only where `usesCustomWindowControls` applies, and a non-dismissible modal's backdrop starting at `top-10` there so the app's own title bar stays reachable. Read it before flagging one of these as an oversight, and check whether the change breaks one of them.
 
 - WebView engine differences: WebView2 on Windows, WKWebView on macOS, WebKitGTK on Linux. Clipboard access, `document.execCommand`, drag and drop, file pickers, and CSS support diverge between them.
 

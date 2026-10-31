@@ -1,5 +1,5 @@
 /**
- * Prüft die relativen Links der Doku (README, AGENTS, CONTRIBUTING, CHANGELOG, Documentation/**):
+ * Prüft die Doku (README, AGENTS, CONTRIBUTING, CHANGELOG, Documentation/**, tools/**):
  *
  *   1. Zieldatei existiert — eine verschobene oder umbenannte Datei fällt sofort auf.
  *   2. Anker existiert — `datei.md#abschnitt` muss auf eine Überschrift der Zieldatei
@@ -8,6 +8,10 @@
  * Anker werden wie bei GitHub gebildet (Kleinbuchstaben, Satzzeichen weg, Leerzeichen → `-`,
  * Duplikate bekommen `-1`, `-2`, …). Links auf http(s)/mailto und Pfade, die aus dem Repo
  * herausführen (README: `../../releases` ist GitHub-relativ), werden übersprungen.
+ *
+ * Außerdem müssen Pfade in Backticks existieren, wenn sie ausgeschrieben mit einem Ordner
+ * des Repos beginnen (`src/lib/db.ts`). Das fängt, was Links nicht fangen: Agents nennen
+ * Dateien meist ohne Link. Das CHANGELOG ist ausgenommen, es beschreibt Vergangenes.
  *
  *   npm run check:docs
  */
@@ -22,7 +26,7 @@ function markdownFiles(dir, recursive) {
   for (const name of readdirSync(dir)) {
     const path = join(dir, name);
     if (statSync(path).isDirectory()) {
-      if (recursive) out.push(...markdownFiles(path, true));
+      if (recursive && !name.startsWith('.') && name !== 'node_modules') out.push(...markdownFiles(path, true));
     } else if (name.endsWith('.md')) {
       out.push(path);
     }
@@ -56,7 +60,11 @@ function anchorsOf(text) {
   return anchors;
 }
 
-const files = [...markdownFiles(root, false), ...markdownFiles(join(root, 'Documentation'), true)];
+const files = [
+  ...markdownFiles(root, false),
+  ...markdownFiles(join(root, 'Documentation'), true),
+  ...markdownFiles(join(root, 'tools'), true),
+];
 const texts = new Map(files.map((f) => [f, readFileSync(f, 'utf8')]));
 const anchorCache = new Map();
 const anchorsFor = (file) => {
@@ -80,10 +88,15 @@ for (const [file, text] of texts) {
       problems.push(`${where}: Anker fehlt → ${target}`);
     }
   }
+  if (file.endsWith('CHANGELOG.md')) continue;
+  const where = relative(root, file).split(sep).join('/');
+  for (const [, path] of stripFences(text).matchAll(/`((?:src|src-tauri|scripts|tools|Documentation|\.github)\/[\w./-]+\.\w+)`/g)) {
+    if (!existsSync(join(root, path))) problems.push(`${where}: Pfad fehlt → ${path}`);
+  }
 }
 
 if (problems.length) {
-  console.error(`✗ ${problems.length} kaputte Doku-Links:\n  ${problems.join('\n  ')}`);
+  console.error(`✗ ${problems.length} Probleme in der Doku:\n  ${problems.join('\n  ')}`);
   process.exit(1);
 }
-console.log(`✓ Doku-Links in ${files.length} Dateien in Ordnung`);
+console.log(`✓ Doku-Links und Pfade in ${files.length} Dateien in Ordnung`);

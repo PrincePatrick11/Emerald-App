@@ -77,4 +77,4 @@ Rules:
 
 - Never claim a feature "works" without a state read (`snapshot` or `eval`) and a console-log check backing that specific claim.
 
-- If a feature can't be tested via CDP at all (native menu items, file dialogs, undo/redo), say so explicitly and name the untestable surface rather than skipping it silently.
+- If a feature can't be tested via MCP at all (native menu items, undo/redo), say so explicitly and name the untestable surface rather than skipping it silently.

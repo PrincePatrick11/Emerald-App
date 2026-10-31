@@ -10,7 +10,7 @@
 - `ViewId` (`EntryModuleId | AuxViewId`, with `AuxViewId` = `home`/`tags`/`categories`/`blocks`/ `templates`/`lexicon`/`trash`) is what `ActiveView['type']` is. `isViewId()` guards persisted tabs at load time, so a stored tab of an unknown view type is dropped rather than crashing the router.
 - `TRASH_KINDS`/`TRASH_KIND_ICONS` cover the larger set of trash-only kinds, including `category`, whose `FolderOpen` glyph `AUX_VIEWS.categories` reuses.
 
-`viewTypeForEntryType(entryType)` is the one place translating the data model's `operation` (singular — what `links.target_type`, drag payloads and the internal-link mark carry) into `ActiveView`'s `operations` (plural). It is a reverse lookup over `MODULES`, so `ModuleMeta.entryType` is the single source; `entryTypeForView` maps the other way.
+`viewTypeForEntryType(entryType)` is the one place translating the data model's `operation` (singular — what `task_links.target_type`, drag payloads and the internal-link mark carry) into `ActiveView`'s `operations` (plural). It is a reverse lookup over `MODULES`, so `ModuleMeta.entryType` is the single source; `entryTypeForView` maps the other way.
 
 **Titles and icons.** Two small rules live beside the registry so that no list decides them for itself:
 
