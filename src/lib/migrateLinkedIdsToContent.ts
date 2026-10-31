@@ -185,7 +185,7 @@ export function linkedIdsToContent(content: string, row: LinkedIdsRow, source: L
   for (const { column, type } of columns) {
     const ids = parseIds(row[column]);
     if (ids === null) {
-      console.warn(`[db] ${column} von Eintrag ${row.id} ist kein gültiges JSON — Zeile bleibt unverändert`, row[column]);
+      console.warn(`[db] ${column} of entry ${row.id} is not valid JSON — row left unchanged`, row[column]);
       return null;
     }
 

@@ -197,7 +197,7 @@ async function renumberBlockMigrations(db: Database): Promise<void> {
     "SELECT COUNT(*) AS n FROM schema_version WHERE name = 'category_optional' OR (name = 'baseline' AND version >= 39)"
   );
   if ((done[0]?.n ?? 0) > 0) return;
-  console.warn('[db] Blöcke-Migrationen umgestempelt, v39 category_optional wird nachgeholt');
+  console.warn('[db] Block migrations restamped, catching up on v39 category_optional');
   await makeCategoryOptional(db);
   await db.execute(
     'INSERT INTO schema_version (version, name, applied_at) VALUES ($1, $2, $3)',
@@ -212,8 +212,8 @@ export async function runMigrations(db: Database): Promise<void> {
   const latest = MIGRATIONS[MIGRATIONS.length - 1].version;
   if (latest !== BASELINE_VERSION) {
     throw new Error(
-      `[db] schema.ts steht auf BASELINE_VERSION ${BASELINE_VERSION}, die letzte Migration ist v${latest}. ` +
-        'Beide müssen zusammenpassen, sonst bekommen frische und migrierte Vaults unterschiedliche Schemata.'
+      `[db] schema.ts is at BASELINE_VERSION ${BASELINE_VERSION}, the last migration is v${latest}. ` +
+        'They must match, or fresh and migrated vaults get different schemas.'
     );
   }
 
@@ -1191,7 +1191,7 @@ export const MIGRATIONS: Migration[] = [
         try {
           await adoptLegacyImages([...adopt]);
         } catch (err) {
-          console.warn('[db] v35: Uebernahme aus der alten Bildablage fehlgeschlagen', err);
+          console.warn('[db] v35: adopting the old image store failed', err);
         }
       }
 

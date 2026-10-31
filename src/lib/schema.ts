@@ -572,7 +572,7 @@ export async function checkIntegrity(db: Database): Promise<Orphan[]> {
   for (const r of templates) {
     const assignments = rawAssignments(r.assignments);
     if (!assignments) {
-      orphans.push({ table: 'templates', column: 'assignments', id: r.id, missingTarget: '(kein gültiges JSON)' });
+      orphans.push({ table: 'templates', column: 'assignments', id: r.id, missingTarget: '(invalid JSON)' });
       continue;
     }
     for (const category of assignments.map(assignedCategory)) {

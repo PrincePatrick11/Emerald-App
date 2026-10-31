@@ -1364,7 +1364,7 @@ mod tests {
             std::fs::read_to_string(current.join("images").join("a.jpg")).unwrap(),
             "bild"
         );
-        assert!(previous.join(VAULTS_FILE).is_file(), "die Quelle bleibt");
+        assert!(previous.join(VAULTS_FILE).is_file(), "the source stays");
         let leftovers: Vec<_> = std::fs::read_dir(&current)
             .unwrap()
             .flatten()
@@ -1474,7 +1474,7 @@ mod tests {
         assert_eq!(
             std::fs::read_to_string(current.join("cookies")).unwrap(),
             "neue Kekse",
-            "das Webview-Profil bleibt unberuehrt"
+            "the webview profile stays untouched"
         );
         let _ = std::fs::remove_dir_all(&root);
     }

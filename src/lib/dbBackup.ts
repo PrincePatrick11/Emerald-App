@@ -475,7 +475,7 @@ export function entryRowsForInsert(journal: Row[], wiki: Row[], operations: Row[
     for (const row of rows) {
       const id = String(row.id);
       if (seen.has(id)) {
-        console.warn(`[backup] ${type}.${id} steht in der Datei schon unter einem anderen Typ — übersprungen`);
+        console.warn(`[backup] ${type}.${id} is already in the file under another type — skipped`);
         continue;
       }
       seen.add(id);
@@ -1422,10 +1422,10 @@ export async function assertPayloadReferencesResolve(
   }
 
   const checks = [
-    ['wikiArticles', 'Wiki-Artikel'],
-    ['operations', 'Operationen'],
-    ['tasks', 'Aufgaben'],
-    ['altarItems', 'Altar-Objekte'],
+    ['wikiArticles', 'wiki articles'],
+    ['operations', 'operations'],
+    ['tasks', 'tasks'],
+    ['altarItems', 'altar items'],
   ] as const;
 
   for (const [rowsKey, label] of checks) {
@@ -1437,13 +1437,13 @@ export async function assertPayloadReferencesResolve(
       // category. An empty *string* remains a miss.
       if (row.category_id == null) continue;
       const id = String(row.category_id);
-      if (!known.has(id)) missing.add(id || '(leer)');
+      if (!known.has(id)) missing.add(id || '(empty)');
     }
     if (missing.size) {
       throw new Error(
-        `Die Sicherung verweist bei ${label} auf Kategorien, die weder in der ` +
-          `Datei noch in diesem Vault existieren: ${[...missing].join(', ')}. ` +
-          'Der Import wurde abgebrochen, bevor etwas geändert wurde.'
+        `The backup's ${label} point to categories that exist neither in the ` +
+          `file nor in this vault: ${[...missing].join(', ')}. ` +
+          'The import was aborted before anything changed.'
       );
     }
   }

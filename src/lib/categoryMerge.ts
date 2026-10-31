@@ -109,7 +109,7 @@ export function mergeCategoryRows(sources: CategorySource[], opts: MergeOptions)
       if (target) {
         idMap.set(mapKey, target.id);
         if (target.id !== row.id) {
-          opts.log?.(`Kategorie „${row.name}" (${mapKey}) geht in „${target.name}" (${target.id}) auf`);
+          opts.log?.(`Category "${row.name}" (${mapKey}) merges into "${target.name}" (${target.id})`);
         }
         // Active wins: a category still in use must not end up in the trash
         // through the merge.

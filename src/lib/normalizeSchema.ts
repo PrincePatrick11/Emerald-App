@@ -61,7 +61,7 @@ const DROPPED = ['creations', 'altar_intentions'] as const;
 async function rollbackPartialRebuild(db: Database): Promise<void> {
   for (const table of REBUILT) {
     if (!(await tableExists(db, `${table}_old`))) continue;
-    console.warn(`[db] v33: Reste eines abgebrochenen Laufs für ${table} werden zurückgerollt`);
+    console.warn(`[db] v33: rolling back remains of an aborted run for ${table}`);
     if (await tableExists(db, table)) {
       await db.execute(`DROP TABLE ${table}`);
     }
@@ -299,7 +299,7 @@ export async function normalizeSchema(db: Database): Promise<void> {
   await rollbackPartialRebuild(db);
 
   if (await alreadyRebuilt(db)) {
-    console.info('[db] v33: Rebuild lag bereits vor, nur Indizes und Prüfung werden nachgeholt');
+    console.info('[db] v33: rebuild already done, catching up on indexes and verification only');
     await createIndexesIfMissing(db, V37_INDEX_DDL);
     await assertForeignKeysIntact(db, 'v33');
     return;

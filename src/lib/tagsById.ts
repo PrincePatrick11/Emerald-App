@@ -36,7 +36,7 @@ export async function tagsById(db: Database): Promise<void> {
   }
 
   for (const tag of resolver.created) {
-    console.info(`[db] v53: „${tag.name}" stand in Einträgen, aber in keiner Tag-Liste — als Tag angelegt`);
+    console.info(`[db] v53: "${tag.name}" was in entries but in no tag list — created as a tag`);
     await db.execute('INSERT OR IGNORE INTO tags (id, name) VALUES ($1, $2)', [tag.id, tag.name]);
   }
   for (const update of updates) {

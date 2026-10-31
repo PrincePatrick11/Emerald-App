@@ -72,10 +72,10 @@ export async function backupDatabaseFile(db: Database, tag: string): Promise<str
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     if (!/output file already exists/i.test(msg)) throw err;
-    console.info(`[db] ${tag}: Sicherung eines früheren Versuchs liegt bereits unter ${target}`);
+    console.info(`[db] ${tag}: backup of an earlier attempt already at ${target}`);
     return target;
   }
-  console.info(`[db] ${tag}: Sicherung angelegt unter ${target}`);
+  console.info(`[db] ${tag}: backup created at ${target}`);
   return target;
 }
 
@@ -126,8 +126,8 @@ export async function assertForeignKeysIntact(db: Database, tag: string): Promis
   const violations = await db.select<unknown[]>('PRAGMA foreign_key_check');
   if (violations.length > 0) {
     throw new Error(
-      `[db] ${tag}: ${violations.length} Foreign-Key-Verletzung(en) nach dem Rebuild. ` +
-        `Erste: ${JSON.stringify(violations[0])}`
+      `[db] ${tag}: ${violations.length} foreign key violation(s) after the rebuild. ` +
+        `First: ${JSON.stringify(violations[0])}`
     );
   }
 }

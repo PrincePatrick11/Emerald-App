@@ -25,7 +25,7 @@ Every fresh checkout or git worktree needs `npm install`, and its first Rust bui
 - Follow the code conventions in [`CONTRIBUTING.md`](CONTRIBUTING.md#guidelines).
 - A behaviour change updates `Documentation/` in the same change, following [Writing Docs](CONTRIBUTING.md#writing-docs), and adds a line under `[Unreleased]` in `CHANGELOG.md`.
 - The dev bridge never reaches a release build, see [The Dev Bridge](Documentation/security.md#the-dev-bridge).
-- Code, comments, commit messages and docs in new work are in English.
+- Code, comments, log messages, commit messages and docs are in English. `npm run check:english` guards comments and scripts.
 - Assistant-specific files stay local and ignored: `.claude/`, `.mcp.json`, `CLAUDE.md`.
 
 ## Where to Look First

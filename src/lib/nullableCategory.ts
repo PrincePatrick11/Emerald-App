@@ -89,7 +89,7 @@ async function alreadyNullable(db: Database): Promise<boolean> {
 async function rollbackPartialRebuild(db: Database): Promise<void> {
   for (const table of REBUILT_CHILDREN_FIRST) {
     if (!(await tableExists(db, `${table}_old`))) continue;
-    console.warn(`[db] v39: Reste eines abgebrochenen Laufs für ${table} werden zurückgerollt`);
+    console.warn(`[db] v39: rolling back remains of an aborted run for ${table}`);
     if (await tableExists(db, table)) await db.execute(`DROP TABLE ${table}`);
     await db.execute(`ALTER TABLE ${table}_old RENAME TO ${table}`);
   }
@@ -138,7 +138,7 @@ async function demoteFallbackCategory(db: Database): Promise<void> {
   const localeReady = i18n.language === storedLanguage();
   const translated = localeReady ? i18n.t(`categories.builtin.${FALLBACK_CATEGORY_ID}`) : '';
   if (!localeReady) {
-    console.warn('[db] v39: Locale noch nicht geladen — „other" behält seinen gespeicherten Namen');
+    console.warn('[db] v39: locale not loaded yet — "other" keeps its stored name');
   }
   const others = await db.select<{ name: string }[]>(
     'SELECT name FROM categories WHERE id != $1',
@@ -151,14 +151,14 @@ async function demoteFallbackCategory(db: Database): Promise<void> {
     'UPDATE categories SET is_builtin = 0, name = $1 WHERE id = $2',
     [name, FALLBACK_CATEGORY_ID]
   );
-  console.info(`[db] v39: „${name}" ist jetzt eine gewöhnliche Kategorie`);
+  console.info(`[db] v39: "${name}" is now an ordinary category`);
 }
 
 export async function makeCategoryOptional(db: Database): Promise<void> {
   const rebuilt = await tableExists(db, REBUILT_MARK_TABLE);
 
   if (rebuilt) {
-    console.info('[db] v39: Rebuild lag bereits vor, nur Aufräumen und Prüfung werden nachgeholt');
+    console.info('[db] v39: rebuild already done, catching up on cleanup and verification only');
   } else {
     await rollbackPartialRebuild(db);
 

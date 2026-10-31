@@ -90,7 +90,7 @@ export async function importViaStaging(db: Database, fill: (staging: Database) =
       await fill(staging);
     } finally {
       // An error while closing should not mask the import's own error.
-      await staging.close().catch((err: unknown) => console.warn('[backup] Arbeitskopie nicht geschlossen:', err));
+      await staging.close().catch((err: unknown) => console.warn('[backup] working copy not closed:', err));
     }
     await swapIn(db, stagingFile);
     // Anyone currently reading across several queries now has a mixed state (`dbEpoch`).
@@ -98,6 +98,6 @@ export async function importViaStaging(db: Database, fill: (staging: Database) =
   } finally {
     // After success it is just space on the disk — an error here must not
     // make the import fail retroactively. Step 1 catches up on it.
-    await discardStaging(vaultId).catch((err: unknown) => console.warn('[backup] Arbeitskopie bleibt liegen:', err));
+    await discardStaging(vaultId).catch((err: unknown) => console.warn('[backup] working copy left behind:', err));
   }
 }

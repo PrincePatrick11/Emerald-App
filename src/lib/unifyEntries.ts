@@ -57,13 +57,13 @@ async function copyInto(db: Database, { table, type, categorized }: (typeof SOUR
     `SELECT o.id FROM ${table} o JOIN entries e ON e.id = o.id WHERE e.type != '${type}'`
   );
   for (const { id } of skipped) {
-    console.warn(`[db] v49: ${table}.${id} stand schon in einer anderen Tabelle — die Kopie bleibt nur in der Sicherung`);
+    console.warn(`[db] v49: ${table}.${id} was already in another table — the copy stays in the backup only`);
   }
   const [missing] = await db.select<{ n: number }[]>(
     `SELECT COUNT(*) AS n FROM ${table} WHERE id NOT IN (SELECT id FROM entries)`
   );
   if ((missing?.n ?? 0) > 0) {
-    throw new Error(`[db] v49: ${missing.n} Zeile(n) aus ${table} fehlen in entries — ${table} bleibt stehen`);
+    throw new Error(`[db] v49: ${missing.n} row(s) from ${table} missing in entries — ${table} stays`);
   }
 }
 
@@ -77,7 +77,7 @@ export async function unifyEntries(db: Database): Promise<void> {
     if (await tableExists(db, 'operations')) {
       const { failed } = await convertLegacySigils(db, { includeSigilCategory: false });
       if (failed > 0) {
-        throw new Error(`[db] v49: ${failed} Sigillen-Zeichnung(en) ließen sich nicht speichern — v49 wartet, bis das gelingt`);
+        throw new Error(`[db] v49: ${failed} sigil drawing(s) could not be saved — v49 waits until that works`);
       }
     }
     await backupDatabaseFile(db, 'v49');

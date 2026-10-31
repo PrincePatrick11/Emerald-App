@@ -100,7 +100,7 @@ async function rollbackPartialRebuild(db: Database): Promise<void> {
   let rolledBack = false;
   for (const table of REBUILT_CHILDREN_FIRST) {
     if (!(await tableExists(db, `${table}_old`))) continue;
-    console.warn(`[db] v38: Reste eines abgebrochenen Laufs für ${table} werden zurückgerollt`);
+    console.warn(`[db] v38: rolling back remains of an aborted run for ${table}`);
     if (await tableExists(db, table)) {
       await db.execute(`DROP TABLE ${table}`);
     }
@@ -200,7 +200,7 @@ async function dropOldTables(db: Database): Promise<void> {
 
 export async function mergeCategoryTables(db: Database): Promise<void> {
   if (await contentRebuilt(db)) {
-    console.info('[db] v38: Rebuild lag bereits vor, nur Aufräumen und Prüfung werden nachgeholt');
+    console.info('[db] v38: rebuild already done, catching up on cleanup and verification only');
     await dropOldTables(db);
     await createIndexesIfMissing(db, INDEX_DDL_V38);
     await assertForeignKeysIntact(db, 'v38');
