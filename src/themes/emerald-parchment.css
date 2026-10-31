@@ -75,10 +75,11 @@ html[data-theme='emerald-parchment'] {
   --field-border: rgba(154, 117, 80, 0.42);
   --field-border-hover: rgba(131, 96, 62, 0.62);
   --field-inset-bg: #f3e8d4;
-  --primary-solid-bg: #008a57;
-  --primary-solid-border: #006941;
+  --primary-solid-bg: #006941;
+  --primary-solid-border: #00573a;
   --primary-solid-text: #f3fff9;
-  --primary-solid-hover-bg: #006941;
+  --primary-solid-hover-bg: #00573a;
+  --primary-solid-hover-text: #ffffff;
   --danger-soft-text: #b63f32;
   --danger-soft-border: rgba(182, 63, 50, 0.5);
   /* Frame + sheet (design.md, Shell Layout): title bar, rail and left
@@ -104,6 +105,31 @@ html[data-theme='emerald-parchment'] {
   --search-inset: inset 0 1px 0 rgba(255, 255, 255, 0.7);
   /* The entry list search: borderless on the frame. */
   --list-search-bg: rgba(130, 87, 44, 0.08);
+  /* Button's `tone` mode: tinted row actions. */
+  --tone-jade-bg: #006941;
+  --tone-jade-bg-hover: #00573a;
+  --tone-jade-border: rgba(0, 138, 87, 0.6);
+  --tone-jade-border-hover: rgba(0, 138, 87, 0.7);
+  --tone-jade-text: #f3fff9;
+  --tone-jade-text-hover: #f3fff9;
+  --tone-amber-bg: #a75924;
+  --tone-amber-bg-hover: #8f4c1e;
+  --tone-amber-border: rgba(168, 105, 24, 0.6);
+  --tone-amber-border-hover: rgba(168, 105, 24, 0.8);
+  --tone-amber-text: #fff6e6;
+  --tone-amber-text-hover: #fff6e6;
+  --tone-danger-bg: rgba(220, 76, 63, 0.09);
+  --tone-danger-bg-hover: rgba(220, 76, 63, 0.18);
+  --tone-danger-border: rgba(239, 68, 68, 0.2);
+  --tone-danger-border-hover: rgba(239, 68, 68, 0.34);
+  --tone-danger-text: #b63f32;
+  --tone-danger-text-hover: #b63f32;
+  --tone-neutral-bg: #f3e6cf;
+  --tone-neutral-bg-hover: #ebdcc5;
+  --tone-neutral-border: rgba(145, 108, 70, 0.42);
+  --tone-neutral-border-hover: rgba(145, 108, 70, 0.42);
+  --tone-neutral-text: #5b442e;
+  --tone-neutral-text-hover: #433121;
   /* Heights (design.md, Heights and Spacing). */
   --content-bar-h: 56px;
   --control-h: 30px;

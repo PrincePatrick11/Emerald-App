@@ -138,11 +138,11 @@ Size tokens in both theme files: `--tab-pill-h` (30px, `TabBar`), `--control-h` 
 
 Where the code contradicts the rules above today. No prioritisation — each point names the rule, the violation, and what resolving it would cost.
 
-**1. The primary colour is maintained independently in three places.** The `jade` Tailwind scale (`tailwind.config.js`), the per-theme `--accent` variables, and the bridge overrides in `index.css` that set yet another set of values for `.btn-primary` and friends (the `html[data-theme='emerald-noctis'] .btn-primary` and `html[data-theme='emerald-parchment'] .btn-primary` rule groups). Noctis's `--accent: #00c47f` happens to be exactly `jade-600`; Parchment's `#008a57` sits between no two steps of the scale. *Cost: move the bridge overrides onto `var(--accent*)` and check that the layer ordering still holds.*
+**1. The primary colour is still maintained independently in three places outside `Button`.** `Button` runs on `--primary-solid-*` and `--tone-*`. Raw `jade` utilities elsewhere still take their values from the `jade` Tailwind scale (`tailwind.config.js`) and from the bridge overrides in `index.css`, next to the per-theme `--accent` variables. Noctis's `--accent: #00c47f` happens to be exactly `jade-600`; Parchment's `#008a57` sits between no two steps of the scale. *Cost: resolved together with point 2; each bridge goes once its last raw utility has.*
 
 **2. 528 raw colour utilities across 67 `.tsx` files** (grep over `src/**/*.tsx` for a colour-utility prefix — `bg-`, `text-`, `border-`, `ring-`, … — followed by `stone|jade|red|amber|parchment` and a step). The largest single item, and the reason point 1 exists at all. *Cost: not doable in one pass — sensible only file by file or module by module, each verified in both themes.*
 
-**3. `amber` is a second accent tone with no theme equivalent.** It comes from Tailwind's default palette, not from an `--accent-*` variable and not from the `parchment` scale. Emerald Parchment needs its own overrides on the underlying utility classes (`.bg-amber-900\/30` and others). Uses beyond the edit action, without a deviation comment: the lock indicator in `PlacedElementRow` (`text-amber-400`), and `tone="amber"` on the Storage page's scan button and the Updates page's check button. *Cost: one token pair in both theme files, then switch `TONE_CLASSES` over.*
+**3. `amber` outside its one documented case.** `tone="amber"` runs on `--tone-amber-*`. Uses beyond the edit action, without a deviation comment: the lock indicator in `PlacedElementRow` (`text-amber-400`), and `tone="amber"` on the Storage page's scan button and the Updates page's check button. *Cost: decide those sites one by one.*
 
 **4. The `parchment` Tailwind scale carries eleven steps for a single shade.** It is used 9 times in 5 files, always as `text-parchment-500/70` for date text in list rows. The Parchment *theme* does not use it — it runs on its own CSS variables, whose values do not map onto this scale. The name suggests a connection that does not exist. *Cost: move those sites onto `--text-muted` or similar, then delete the scale.*
 
@@ -158,9 +158,9 @@ Where the code contradicts the rules above today. No prioritisation — each poi
 
 **10. `LinkPickerModal`'s six tabs are a hand-written button, not `TabIconButton`.** `TabIconButton`'s active state is wired to the stone tone the sidebars use; the picker needs the jade tone the modal is themed in, and the component has no tone variant for that yet. The deviation is commented at the definition (`LinkPickerModal.tsx`). *Cost: add a `tone` prop to `TabIconButton`, then switch the picker over.*
 
-**11. Contrast below the rule** (measured against the sheet or the surface named). Noctis: `--text-subtle` 3.71:1. Parchment: date text `text-parchment-500/70` on `--panel-bg` about 1.8:1 (see point 4), `--warning-text` 3.21:1, `--accent` as text 3.99:1, text on `.btn-primary` 3.84:1, text on `tone="amber"` 3.24:1, `--accent-contrast` on `--accent` 4.29:1. *Cost: token values in the theme files: `--text-subtle` `#8a837d` in Noctis (4.76:1), `--warning-text` `#a75924` in Parchment (4.64:1), accent text and solid fills on `--accent-strong` (6.14:1 and 6.61:1).*
+**11. Contrast below the rule** (measured against the sheet or the surface named). Noctis: `--text-subtle` 3.71:1. Parchment: date text `text-parchment-500/70` on `--panel-bg` about 1.8:1 (see point 4), `--warning-text` 3.21:1, `--accent` as text 3.99:1, `--accent-contrast` on `--accent` 4.29:1. *Cost: token values in the theme files: `--text-subtle` `#8a837d` in Noctis (4.76:1), `--warning-text` `#a75924` in Parchment (4.64:1), accent text and solid fills on `--accent-strong` (6.14:1 and 6.61:1).*
 
-**12. Parchment has three greens for the main action.** `.btn-primary` and active `tone` buttons are `#159165`, `--accent` and `--primary-solid-bg` (the edit bar's Done) are `#008a57`, the hover rule is `#0f7a54`. *Cost: resolved with point 1, onto the `--primary-solid-*` tokens.*
+**12. Parchment's raw jade fills differ from the main action.** `Button` uses `--primary-solid-bg` (`#006941`, 6.61:1); hand-written elements on `bg-jade-900/40` and similar still get the bridge's `#159165` (3.84:1). *Cost: resolved with point 2.*
 
 **13. Sizes and steps off the scale.** Bare `rounded` 42 times; `text-[10px]` 8 times and `text-[9px]` once; `shadow`, `shadow-lg` and `shadow-xl` on 15 floating surfaces instead of `--menu-shadow`; `duration-100` once. *Cost: mechanical, best per file when it is touched anyway.*
 
@@ -182,7 +182,7 @@ Where the code contradicts the rules above today. No prioritisation — each poi
 | `parchment` | `#ecc685` | `#d98c34` | `#c97229` | `#874824` | `#3b1d0f` |
 | `stone` | Tailwind default, only `950: #0f0e0c` overridden | | | | |
 
-**Theme variables** (`src/themes/emerald-noctis.css`, `emerald-parchment.css`). Both files define the same 97 properties, including the edit sidebar's `--field-*`, `--primary-solid-*` and `--danger-soft-*` tokens. Core values:
+**Theme variables** (`src/themes/emerald-noctis.css`, `emerald-parchment.css`). Both files define the same 122 properties, including the edit sidebar's `--field-*`, `--primary-solid-*` and `--danger-soft-*` tokens and `Button`'s `--tone-*`. Core values:
 
 | Property | Emerald Noctis (dark) | Emerald Parchment (light) |
 | --- | --- | --- |

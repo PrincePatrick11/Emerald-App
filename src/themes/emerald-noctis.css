@@ -83,6 +83,7 @@ html[data-theme='emerald-noctis'] {
   --primary-solid-border: rgba(0, 196, 127, 0.44);
   --primary-solid-text: #dcfff0;
   --primary-solid-hover-bg: rgba(0, 138, 87, 0.42);
+  --primary-solid-hover-text: #f2fff9;
   --danger-soft-text: #f4a7ad;
   --danger-soft-border: rgba(232, 100, 110, 0.5);
   /* Frame + sheet (design.md, Shell Layout): title bar, rail and left
@@ -108,6 +109,31 @@ html[data-theme='emerald-noctis'] {
   --search-inset: inset 0 1px 0 rgba(255, 241, 223, 0.06);
   /* The entry list search: borderless on the frame. */
   --list-search-bg: rgba(245, 245, 244, 0.05);
+  /* Button's `tone` mode: tinted row actions. */
+  --tone-jade-bg: rgba(0, 92, 58, 0.3);
+  --tone-jade-bg-hover: rgba(0, 92, 58, 0.5);
+  --tone-jade-border: rgba(0, 160, 102, 0.6);
+  --tone-jade-border-hover: rgba(0, 230, 153, 0.7);
+  --tone-jade-text: #70ffca;
+  --tone-jade-text-hover: #70ffca;
+  --tone-amber-bg: rgba(120, 53, 15, 0.3);
+  --tone-amber-bg-hover: rgba(120, 53, 15, 0.5);
+  --tone-amber-border: rgba(180, 83, 9, 0.6);
+  --tone-amber-border-hover: rgba(245, 158, 11, 0.7);
+  --tone-amber-text: #fcd34d;
+  --tone-amber-text-hover: #fcd34d;
+  --tone-danger-bg: rgba(69, 10, 10, 0.3);
+  --tone-danger-bg-hover: rgba(69, 10, 10, 0.5);
+  --tone-danger-border: rgba(185, 28, 28, 0.6);
+  --tone-danger-border-hover: #ef4444;
+  --tone-danger-text: #fecaca;
+  --tone-danger-text-hover: #fecaca;
+  --tone-neutral-bg: rgba(28, 25, 23, 0.45);
+  --tone-neutral-bg-hover: rgba(41, 37, 36, 0.6);
+  --tone-neutral-border: rgba(87, 83, 78, 0.7);
+  --tone-neutral-border-hover: rgba(87, 83, 78, 0.7);
+  --tone-neutral-text: #a8a29e;
+  --tone-neutral-text-hover: #e7e5e4;
   /* Heights (design.md, Heights and Spacing). */
   --content-bar-h: 56px;
   --control-h: 30px;
