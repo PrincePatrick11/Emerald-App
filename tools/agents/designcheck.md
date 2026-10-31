@@ -35,7 +35,7 @@ How the two design docs are structured:
 
 - `Documentation/design.md` is a specification, not an inventory. `Binding Rules` applies to new and touched code — that is what a finding is measured against. `Open Points` records where today's code contradicts those rules; the code wins there for now. `Appendix: Inventory and Traps` holds the actual values, the specificity traps, the overlay/portal and keyboard contracts, the shell layout, and the platform quirks.
 
-- `Documentation/components.md` answers "does this already exist?" and "may I deviate here?". Its `Catalogue` lists every shared building block with its extension point, `Chrome Principle` explains why using a documented escape hatch (`children`, `renderItem`, `renderRow`, `trigger`, appended `className`) is intended use and not a bypass, `When Deviating Is Right` holds three settled exceptions, `Known Duplication` five recorded ones.
+- `Documentation/components.md` answers "does this already exist?" and "may I deviate here?". Its `Catalogue` lists every shared building block with its extension point, `Chrome Principle` explains why using a documented escape hatch (`children`, `renderItem`, `renderRow`, `trigger`, appended `className`) is intended use and not a bypass, `When Deviating Is Right` holds three settled exceptions, `Known Duplication` the recorded ones.
 
 - Both files allow deviations — but a deviation needs a comment at the deviating place in the code. Before reporting one, check for that comment. If it is there and its reasoning holds, it is not a finding.
 
@@ -47,15 +47,15 @@ What to check:
 
 - Radius: four steps with responsibilities — `rounded-md` for small controls, `rounded-lg` for buttons and floating surfaces (menu, popover, toast, dropdown), `rounded-xl` for content-carrying surfaces (`.panel`, `.panel-interactive`, `.modal-card`), `rounded-full` only for genuinely round elements. `rounded-sm` is reserved for decorative miniatures below ~16px. What decides is what an element *is*, not how large it is.
 
-- Icon sizes: `18` for rail and title bar, `16` for modal headers and primary actions, `14` as the default, `12` for dense meta rows. Nothing in between. Icon colour is inherited from the surrounding text colour, not set through a `color` prop.
+- Icon sizes: `18` for the rail, `16` for the title bar, modal headers and primary actions, `14` as the default, `12` for dense meta rows. Nothing in between. Icon colour is inherited from the surrounding text colour, not set through a `color` prop.
 
-- Heights and spacing: `h-10` for window chrome (title bar, tab bar), `h-14` for content bars (entry list tabs, `RightSidebarActionBar`, dashboard topbar) — there is no third bar height. Horizontal padding has exactly one source per column; a panel that adds its own `px-*` inside the right sidebar's `p-3` container indents itself out of line with the action bar above it.
+- Heights and spacing: `h-10` for window chrome (title bar, tab bar), `h-14` for content bars (the entry list's search row, `SidebarActionBar`) — there is no third bar height. Horizontal padding has exactly one source per column; a panel that adds its own `px-*` inside the right sidebar's `p-3` container indents itself out of line with the action bar above it.
 
 - States: a new focusable element without a `:focus-visible` rule in both themes is unfinished. Disabled runs through the shared `:disabled` rule, not a colour of its own. Active/inactive toggles use `Button`'s `tone` mode rather than a ternary in a `className` template. Animations live as a class in the stylesheet and respect `prefers-reduced-motion` — an inline style beats the opt-out.
 
-- Specificity traps (`design.md`, `Appendix > Specificity Traps`): theme overrides beat single-class modifiers, and unlayered rules beat `@layer components` regardless of specificity. Any new state variant on `.panel`/`.panel-interactive` has to be either unlayered or forgo `.panel` entirely — otherwise it looks right in Noctis and does nothing in Parchment. This is the most common silent breakage in this codebase; treat it as `Must fix`.
+- Specificity traps (`design.md`, `Appendix > Specificity Traps`): theme overrides beat single-class modifiers, and at equal specificity unlayered rules beat `@layer components`. Any new state variant on `.panel`/`.panel-interactive` needs a selector outranking the theme override or a rule outside any `@layer`, or has to forgo `.panel` entirely — otherwise it looks right in Noctis and does nothing in Parchment. This is the most common silent breakage in this codebase; treat it as `Must fix`.
 
-- Overlays: anything floating (menu, popover, dropdown, toast, modal) belongs in a `createPortal` to `document.body` with `position: fixed`, because `.app-sidebar` and `.app-main` are sibling stacking contexts and no `z-index` inside the sidebar wins against the main area. Its outside-click handler must check trigger *and* popover, and it has to reposition on `resize` and on `scroll` with `capture: true`.
+- Overlays: anything floating (menu, popover, dropdown, modal) that can sit inside a sidebar or scroller belongs in a `createPortal` to `document.body` with `position: fixed`, because `.app-sidebar` and `.app-main` are sibling stacking contexts and no `z-index` inside the sidebar wins against the main area. Its outside-click handler must check trigger *and* popover, and it has to reposition on `resize` and on `scroll` with `capture: true`.
 
 - Component consistency: reuse of an existing shared building block from the `components.md` catalogue before introducing a new variant. Using a documented escape hatch is correct use; a shell overridden so heavily that half the variant is undone means a variant is missing in the shared component, not in the caller.
 
@@ -149,7 +149,7 @@ Rules:
 
 - A deviation that carries a comment at the deviating place in the code is not a finding — that is the documented way to deviate. Report it only when the stated reason does not hold, and never ask for that reason to be moved into `design.md`: the docs deliberately keep deviations in the code.
 
-- Do not re-report `design.md` `Open Points` as new findings. They are known contradictions between code and rules, recorded for a separate pass. Point 2 in particular (over a thousand raw colour utilities across 49 files) must never be raised as a bulk finding. Raise an open point only when the reviewed change touches, extends, or measurably worsens it, and name which point it is. Point 10 (tab strip vs. action bar height) is recorded as deliberate — never report it.
+- Do not re-report `design.md` `Open Points` as new findings. They are known contradictions between code and rules, recorded for a separate pass. Point 2 in particular (the raw colour utilities across many files) must never be raised as a bulk finding. Raise an open point only when the reviewed change touches, extends, or measurably worsens it, and name which point it is.
 
 - The same applies to `components.md` `When Deviating Is Right` (the `.vault-card` rebuild, `MenuDropdown` alongside `ContextMenu`, the free `EmojiPicker` trigger) and its `Known Duplication` list. They are settled; report one only when the change makes it worse or adds a further copy.
 
@@ -161,7 +161,7 @@ Rules:
 
 - If two variants exist, choose the wording already used in more places unless the user requested a rename campaign.
 
-- New CSS has to work in WebKit 16.2 — that is the macOS 13.0 floor recorded in `Documentation/build.md`. `color-mix()` is fine and already used throughout (both existing sites carry an `rgba()` fallback ahead of them); anything newer needs a fallback, and one dropped declaration inside a shorthand takes the whole shorthand with it. Flag the risk and hand the engine-level verdict to `oscheck`.
+- New CSS has to work in WebKit 16.2 — that is the macOS 13.0 floor recorded in `Documentation/build.md`. `color-mix()` is fine and already used throughout (only `.search-match` and `.task-row-target` carry an `rgba()` fallback); anything newer needs a fallback, and one dropped declaration inside a shorthand takes the whole shorthand with it. Flag the risk and hand the engine-level verdict to `oscheck`.
 
 - Terminology, microcopy quality, and i18n key reuse are yours; completeness and structure across the four locale files belong to `i18ncheck`. Do not restate its findings.
 

@@ -2,7 +2,7 @@
 
 ## Global Search
 
-The title bar's search field searches every module by title, tag and body text. It is a pure in-memory filter: `useGlobalSearch` (`src/hooks/useGlobalSearch.ts`) builds a `SearchCorpus` from the Zustand stores `AppShell` already loads, and `searchCorpus()` (`src/lib/globalSearch.ts`) scores and sorts it. There is no FTS5 table — the stores are the single source of truth (see [Data Flow](../architecture.md#data-flow)), and a second searchable copy would be one more thing to keep in sync.
+The search, opened from the title bar's magnifier, covers every module by title, tag and body text. It is a pure in-memory filter: `useGlobalSearch` (`src/hooks/useGlobalSearch.ts`) builds a `SearchCorpus` from the Zustand stores `AppShell` already loads, and `searchCorpus()` (`src/lib/globalSearch.ts`) scores and sorts it. There is no FTS5 table — the stores are the single source of truth (see [Data Flow](../architecture.md#data-flow)), and a second searchable copy would be one more thing to keep in sync.
 
 `globalSearch.ts` has no JSX: it decides *what* matched and how well; how a hit looks is `SearchResultList.tsx`'s job. `matchRecord()` tries, per record:
 

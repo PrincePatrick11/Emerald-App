@@ -26,7 +26,7 @@ For the *components* (which shared building blocks exist, when to use them) see 
 - **Editor**: `font-serif` — Lora by default, configured separately.
 - Applied through `data-ui-font`/`data-editor-font` on `<html>`, never through a direct `font-family` in a component.
 - Eight selectable fonts ship with the app — nothing is fetched from the network. `src/fonts.css` is **generated** (`npm run fonts`) and never edited by hand; another font or weight means the `FONTS` list in `scripts/make-fonts-css.mjs`, the package in `package.json`, **and** `FONT_OPTIONS` in `src/themes/theme.ts` — all three or none. See [Font System](architecture/appearance.md#font-system).
-- `public/splash.css` (the loading screen's styles, see [Loading Screen and Boot Order](architecture/shell.md#loading-screen-and-boot-order)) holds hand-kept copies: `--splash-bg` / `--splash-gem` / `--splash-text` mirror `--shell-bg` / `--accent` / `--text-subtle` from `src/themes/*.css` — change one, update the other. `--splash-bg` is copied once more as `backgroundColor` in `src-tauri/tauri.conf.json` and the three `tauri.{windows,macos,linux}.conf.json` (never `tauri.dev.conf.json` — see the traps in `CLAUDE.md`), so the window's pre-paint frame is dark instead of white.
+- `public/splash.css` (the loading screen's styles, see [Loading Screen and Boot Order](architecture/shell.md#loading-screen-and-boot-order)) holds hand-kept copies: `--splash-bg` / `--splash-gem` / `--splash-text` mirror `--shell-bg` / `--accent` / `--text-subtle` from `src/themes/*.css` — change one, update the other. `--splash-bg` is copied once more as `backgroundColor` in `src-tauri/tauri.conf.json` and the three `tauri.{windows,macos,linux}.conf.json` (never `tauri.dev.conf.json` — see [Per-platform Tauri configs](build.md#per-platform-tauri-configs)), so the window's pre-paint frame is dark instead of white.
 - `font-mono` does not resolve to its configured font, see [Open Points](#open-points).
 
 ### Border Radius
@@ -50,8 +50,8 @@ Four steps for UI icons (lucide-react `size` prop):
 
 | px | Level |
 | --- | --- |
-| `18` | rail and title bar — navigation level |
-| `16` | modal headers, primary actions |
+| `18` | rail — navigation level |
+| `16` | title bar, modal headers, primary actions |
 | `14` | default: lists, buttons, panels |
 | `12` | dense meta rows, chips, badges |
 
@@ -171,7 +171,7 @@ Consequence: a new "active" variant on a `.panel` card needs either a selector t
 
 ### Overlays and Portals
 
-**Everything floating hangs off `document.body` via `createPortal`** and positions itself with `position: fixed` in viewport coordinates: `Modal` (global search's `SearchModal`/`SearchResultList` render inside its body rather than portalling separately), `ContextMenu`, `EmojiPicker`, and `AltarCanvas`'s floating controls. `MenuDropdown` is the deliberate exception: it renders in place with `absolute` + `z-[9999]`, which works because the title bar sits above both stacking contexts described below.
+**Everything floating that can sit inside a sidebar or scroller hangs off `document.body` via `createPortal`** and positions itself with `position: fixed` in viewport coordinates: `Modal` (global search's `SearchModal`/`SearchResultList` render inside its body rather than portalling separately), `ContextMenu`, `EmojiPicker`, and `AltarCanvas`'s floating controls. `Dropdown` does so only with its `portal` prop, and `UndoToast`, which is global, renders in place with `position: fixed`. `MenuDropdown` is the deliberate exception: it renders in place with `absolute` + `z-[9999]`, which works because the title bar sits above both stacking contexts described below.
 
 The reason is the same for all of them: `.app-sidebar` and `.app-main` carry `position: relative; z-index: 1` in both themes and are therefore **sibling stacking contexts**. An overlay rendered inline in the sidebar loses against the later-painted main area no matter how high its `z-index`. On top of that, the nearest ancestor with `overflow` clips the popover — in the vault modal, for instance, the scrolling modal body.
 

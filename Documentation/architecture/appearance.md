@@ -24,7 +24,7 @@ Each theme file defines the same set of custom properties, and components refere
 | **Borders** | `--border-*` | Dividers and edges | `--border-soft`, `--border-strong` |
 | **Interactive** | `--interactive-*` | Hover and active backgrounds | `--interactive-hover`, `--interactive-active` |
 | **Accent** | `--accent*` | Primary action colour and contrast | `--accent`, `--accent-strong`, `--accent-contrast`, `--focus-ring` |
-| **Component** | `--<component>-*` | Per-component tokens for complex UI | `--link-chip-*`, `--editor-*`, `--menu-*`, `--panel-*`, `--tab-*`, `--settings-*`, `--danger-*`, `--select-option-*`, `--linked-chip-*` |
+| **Component** | `--<component>-*` | Per-component tokens for complex UI | `--link-chip-*`, `--editor-*`, `--menu-*`, `--panel-*`, `--tab-*`, `--danger-*`, `--select-option-*`, `--linked-chip-*` |
 | **Shell** | `--shell-*`, `--sheet-*` | The window frame and the rounded sheet on top of it | `--shell-bg`, `--sheet-bg`, `--sheet-border` |
 | **Utility** | `--scrollbar`, `--code-bg` | Shared utility tokens | `--scrollbar`, `--scrollbar-hover`, `--code-bg` |
 

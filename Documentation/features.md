@@ -130,7 +130,7 @@ The preview can be turned off — a switch in the filter panel's "Display" group
 
 **Altar library.** You keep a personal library of items. Each item has a name, an emoji, a category, an optional note, and an optional uploaded image.
 
-**Item categories** come from the shared category list — see [Categories](#categories). In the altar editor, the library strip shows one tab per category that holds at least one item, plus **Uncategorized** for items without one (a new item starts there, as do items whose category was deleted for good).
+**Item categories** come from the shared category list — see [Categories](#categories). In the altar editor, the library strip shows **All**, one tab per category that holds at least one item, and **Uncategorized** for items without one (a new item starts there, as do items whose category was deleted for good).
 
 - The tabs are not draggable: the strip shows only a subset of the categories, so a drag there would rearrange part of the app-wide order. Reorder in the Categories view.
 - With more categories than fit, the tab row scrolls horizontally; the scrollbar is hidden and fades at the edges show there is more.
@@ -339,7 +339,7 @@ A category found through the global search opens this view and briefly highlight
 
 ## Lexicon
 
-The Lexicon is where you keep **languages** — Enochian, runes, a tongue of your own — and translate with them. Everything it knows comes from your own vault; nothing is sent anywhere.
+The Lexicon is where you keep **languages** — Enochian, runes, a tongue of your own — and translate with them. Everything it knows comes from your own vault.
 
 **Dashboard.** The rail's Lexicon button opens the list of your languages on the same dashboard every module uses — icon, name, and how many words and characters each holds — with the usual search, view (List / Cards / Cards in full width / Timeline) and sort in the right sidebar. A row's context menu offers Open in new tab, Duplicate (copying the alphabet and every word) and Delete; deleting moves the language to the Trash with an undo toast, its words travelling with it both ways.
 

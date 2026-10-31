@@ -146,7 +146,7 @@ The one built-in, `sigils`, cannot be deleted: an operation in it is a sigil, an
 
 ## Tables
 
-Thirteen tables, listed in the dependency order `TABLES` declares — parents before children. The order is not cosmetic: inserts are checked against foreign keys immediately, so it governs the rebuilds and the import swap.
+Thirteen tables. `TABLES` in `schema.ts` declares the dependency order, parents before children; the sections below group related tables. The order is not cosmetic: inserts are checked against foreign keys immediately, so it governs the rebuilds and the import swap.
 
 ### schema_version
 
