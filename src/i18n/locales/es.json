@@ -660,7 +660,8 @@
     "progressImages": "Imágenes: {{done}} de {{total}}",
     "progressImagesPhase": "Cifrando las imágenes…",
     "progressChecking": "Comprobando la copia…",
-    "notEnoughSpace": "No hay suficiente espacio libre: hacen falta temporalmente {{needed}} más y hay {{free}} libres. No se ha cambiado nada."
+    "notEnoughSpace": "No hay suficiente espacio libre: hacen falta temporalmente {{needed}} más y hay {{free}} libres. No se ha cambiado nada.",
+    "syncConnected": "Primero desconecta esta bóveda del servidor (Ajustes → Sincronización)."
   },
   "security": {
     "rememberHint": "Guarda la clave en el llavero del sistema para que el vault se abra sin contraseña.",
@@ -881,7 +882,8 @@
     "storageHint": "Imágenes de la carpeta del vault que ya no usa ninguna entrada. «Buscar» muestra cuánto ocupan, «Eliminar» las borra definitivamente.",
     "updatesDesc": "Comprueba si existe una versión más reciente de Emerald y la instala.",
     "updateErrorInstall": "La instalación ha fallado.",
-    "pageSecurity": "Seguridad"
+    "pageSecurity": "Seguridad",
+    "pageSync": "Sincronización"
   },
   "contextMenu": {
     "openInNewTab": "Abrir en nueva pestaña",
@@ -1121,17 +1123,92 @@
     "unmappedCount_other": "{{count}} sin equivalencia"
   },
   "emptyState": {
-    "journal": { "title": "Aún no hay entradas", "description": "Registra lo que vives, sueñas y obras. Las entradas nuevas reciben la fase lunar del día.", "action": "Primera entrada" },
-    "wiki": { "title": "Aún no hay artículos", "description": "Reúne saber sobre hierbas, piedras y símbolos." },
-    "tasks": { "title": "Todo hecho", "description": "No hay tareas abiertas. Las nuevas aparecerán aquí." },
-    "operations": { "title": "Aún no hay operaciones", "description": "Planifica rituales con ingredientes, desarrollo y resultado." },
-    "altar": { "title": "Aún no hay altar", "description": "Diseña un altar con un fondo y elementos." },
-    "altarLibrary": { "title": "Aún no hay elementos", "description": "Velas, cristales, símbolos: con elementos construyes tus altares." },
-    "lexicon": { "title": "Aún no hay idiomas", "description": "Crea un idioma y llénalo de palabras y caracteres." },
-    "translate": { "title": "Aún no hay nada que traducir", "description": "Crea primero un idioma; luego este campo traduce con él." },
-    "templates": { "title": "Aún no hay plantillas", "description": "Guarda procesos recurrentes como plantilla." },
-    "blocks": { "title": "Aún no hay bloques", "description": "Piezas que reutilizas en tus entradas." },
-    "tags": { "title": "Aún no hay etiquetas", "description": "Asigna etiquetas al editar una entrada o crea una aquí." },
-    "trash": { "title": "La papelera está vacía" }
+    "journal": {
+      "title": "Aún no hay entradas",
+      "description": "Registra lo que vives, sueñas y obras. Las entradas nuevas reciben la fase lunar del día.",
+      "action": "Primera entrada"
+    },
+    "wiki": {
+      "title": "Aún no hay artículos",
+      "description": "Reúne saber sobre hierbas, piedras y símbolos."
+    },
+    "tasks": {
+      "title": "Todo hecho",
+      "description": "No hay tareas abiertas. Las nuevas aparecerán aquí."
+    },
+    "operations": {
+      "title": "Aún no hay operaciones",
+      "description": "Planifica rituales con ingredientes, desarrollo y resultado."
+    },
+    "altar": {
+      "title": "Aún no hay altar",
+      "description": "Diseña un altar con un fondo y elementos."
+    },
+    "altarLibrary": {
+      "title": "Aún no hay elementos",
+      "description": "Velas, cristales, símbolos: con elementos construyes tus altares."
+    },
+    "lexicon": {
+      "title": "Aún no hay idiomas",
+      "description": "Crea un idioma y llénalo de palabras y caracteres."
+    },
+    "translate": {
+      "title": "Aún no hay nada que traducir",
+      "description": "Crea primero un idioma; luego este campo traduce con él."
+    },
+    "templates": {
+      "title": "Aún no hay plantillas",
+      "description": "Guarda procesos recurrentes como plantilla."
+    },
+    "blocks": {
+      "title": "Aún no hay bloques",
+      "description": "Piezas que reutilizas en tus entradas."
+    },
+    "tags": {
+      "title": "Aún no hay etiquetas",
+      "description": "Asigna etiquetas al editar una entrada o crea una aquí."
+    },
+    "trash": {
+      "title": "La papelera está vacía"
+    }
+  },
+  "sync": {
+    "title": "Sincronización",
+    "description": "Mantiene esta bóveda igual en tus dispositivos mediante un servidor tuyo. El servidor solo la guarda cifrada; tu contraseña de la bóveda nunca le llega.",
+    "url": "Dirección del servidor",
+    "username": "Nombre de cuenta",
+    "password": "Contraseña de la cuenta",
+    "passwordHint": "Es tu cuenta en el servidor, no la contraseña de la bóveda. Al conectar, esta bóveda pasa al servidor como una bóveda propia.",
+    "signup": "Crear una cuenta nueva en este servidor",
+    "connect": "Conectar",
+    "login": "Iniciar sesión",
+    "connecting": "Conectando…",
+    "connectedTo": "Conectado a {{url}} como {{username}}",
+    "running": "Sincronizando…",
+    "last": "Última sincronización: {{time}}",
+    "notYet": "Aún sin sincronizar en esta sesión",
+    "now": "Sincronizar ahora",
+    "disconnect": "Desconectar",
+    "disconnectHint": "Desconectar detiene la sincronización en este dispositivo. La bóveda sigue aquí y su copia sigue en el servidor para tus otros dispositivos.",
+    "needsLogin": "Este dispositivo debe iniciar sesión de nuevo en el servidor.",
+    "conflicts_one": "{{count}} entrada se cambió en dos dispositivos. Se conservan ambas versiones: busca «(conflicto)» en el título.",
+    "conflicts_other": "{{count}} entradas se cambiaron en dos dispositivos. Se conservan ambas versiones: busca «(conflicto)» en el título.",
+    "conflictTitle": "{{title}} (conflicto)",
+    "fromServer": "Desde un servidor",
+    "fetch": "Obtener bóveda",
+    "vaultName": "Nombre en este dispositivo",
+    "noRemoteVaults": "Esta cuenta aún no tiene ninguna bóveda en el servidor.",
+    "pickRemote": "¿Qué bóveda debe venir a este dispositivo?",
+    "remoteVault": "Bóveda {{number}} ({{count}} cambios)",
+    "errorUnreachable": "El servidor no responde. La sincronización continuará cuando vuelva.",
+    "errorInsecure": "Esta dirección no es segura. Usa https, o http solo en este equipo, en una red privada o en una tailnet.",
+    "errorWrongLogin": "El nombre de cuenta o la contraseña son incorrectos.",
+    "errorOutdated": "La bóveda del servidor es de una versión más reciente de Emerald. Actualiza esta aplicación.",
+    "errorSignupClosed": "Este servidor no admite cuentas nuevas.",
+    "errorUsernameTaken": "Este nombre de cuenta ya existe.",
+    "errorBadPassword": "La contraseña necesita al menos 8 caracteres.",
+    "errorBadUsername": "Los nombres de cuenta pueden tener letras, dígitos y . _ - @",
+    "errorBusy": "Demasiados intentos. Espera un momento.",
+    "errorFailed": "La sincronización ha fallado."
   }
 }

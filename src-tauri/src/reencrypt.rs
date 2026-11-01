@@ -802,6 +802,9 @@ pub async fn vault_change_password(
     current_password: zeroize::Zeroizing<String>,
     new_password: zeroize::Zeroizing<String>,
 ) -> Result<keys::CreatedKey, String> {
+    if crate::sync::is_connected(&app, &vault_id) {
+        return Err(crate::sync::SYNC_CONNECTED.to_string());
+    }
     let _guard = RUNNING.lock().await;
     let dir = vault_dir_checked(&app, &vault_id)?;
     let old_key = tauri::async_runtime::spawn_blocking(move || {
@@ -861,6 +864,9 @@ pub async fn vault_recover(
     new_password: zeroize::Zeroizing<String>,
     remember_key: Option<bool>,
 ) -> Result<keys::CreatedKey, String> {
+    if crate::sync::is_connected(&app, &vault_id) {
+        return Err(crate::sync::SYNC_CONNECTED.to_string());
+    }
     let _guard = RUNNING.lock().await;
     let dir = vault_dir_checked(&app, &vault_id)?;
     let old_key = tauri::async_runtime::spawn_blocking(move || {

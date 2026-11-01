@@ -23,6 +23,7 @@ import ImageNoticeModal from '../ui/ImageNoticeModal';
 import LeaveGuardModal from './LeaveGuardModal';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { isTauri } from '../../lib/platform';
+import { prepareOpenedVault, startSync } from '../../lib/sync/engine';
 import { useMouseNavigation } from '../../hooks/useMouseNavigation';
 import { hasOpenEdits, settleBeforeExit } from '../../lib/openEdits';
 import { restoreDrafts } from '../../store/draftStore';
@@ -151,6 +152,7 @@ export default function AppShell() {
         loadVaultPrefs(vaultState.activeVaultId);
         return restoreDrafts(vaultState.activeVaultId)
           .then(() => useSettingsStore.getState().loadForVault(vaultState.activeVaultId))
+          .then(() => prepareOpenedVault(vaultState.activeVaultId))
           .then(reloadAllStores);
       }, (err: unknown) => {
         if (keyErrorOf(err) !== VAULT_KEY_CANCELLED) throw err;
@@ -205,6 +207,7 @@ export default function AppShell() {
 
   // The automatic backup checks for the duration of the session whether one is due.
   useEffect(() => (isTauri ? startAutoBackup() : undefined), []);
+  useEffect(() => (isTauri ? startSync(reloadAllStores) : undefined), []);
 
   // Sync menu bar labels with the current language
   useEffect(() => {

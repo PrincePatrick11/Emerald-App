@@ -1,6 +1,16 @@
 # Sync
 
-A vault can sync through a server that only sees ciphertext. This file describes the part inside the app: how changes are captured and how a device merges what others did. Nothing calls it yet: there is no transport, no encryption of changes and no settings page, so no vault is tracked. `npm run check:sync` tests it.
+A vault can sync through a server that only sees ciphertext ([Emerald Server](https://github.com/PrincePatrick11/Emerald-Server)). This file describes the part inside the app. `npm run check:sync` tests the capture and the merging.
+
+Users connect the open vault under Settings → Sync (`SyncPage`), which puts it on the server as a vault of its own, and fetch one onto another device from the vault window (`ServerVaultForm`).
+
+## The way to the server
+
+`src-tauri/src/sync.rs` holds the network and the sealing, so the vault key and the token stay out of the webview and the CSP stays closed. `{appDataDir}/sync.json` says which vault is connected where; the token in it is sealed under the vault key, and waits in memory while a vault being fetched has no key yet. Changes and snapshots are sealed with the `Sync` context under the `Files` subkey. Images travel as the sealed files they are. A vault's `vault.key` goes to the server too, still wrapped by the password: that is how another device unlocks the vault. Plain `http` is accepted only on this machine, a private address or a tailnet (`clean_url`). Requests time out per read, since a server that went away does not always say so.
+
+`lib/sync/engine.ts` decides when: every few seconds if the log holds something, every 15 seconds anyway, and at once on opening a vault that is being fetched. It does nothing while a vault waits for its password, since `getDb()` would fail on it and that failure sticks to the opening under way. It stands back while any page is in edit mode, changed or not: an editor holds its text from when it opened, and its next save would write that over a merge.
+
+**Not yet:** a password change on a connected vault is refused (`SYNC_CONNECTED`), so "forgot password" also needs disconnecting first, and a vault that is locked cannot get to that setting. `settings.json` does not sync. The server's live notifications are not used. The log on the server only shrinks when a snapshot is published, which nothing does on its own yet.
 
 ## Capture
 
@@ -46,4 +56,4 @@ Table and column names in a change come from decrypted data and end up in SQL: `
 
 `scripts/sync-check.mjs` runs devices against an ordered list standing in for the server, on the real schema and migration runner: one test per rule above, and 300 seeded runs of random work on three devices that must converge with no dangling reference and no duplicate entry number.
 
-It runs on `node:sqlite`, without SQLCipher and without the stores. A tracked vault in the running app, with an editor open while changes arrive, is not tested yet.
+It runs on `node:sqlite`, without SQLCipher and without the stores. Two running instances against a real server were driven by hand through the dev bridge, on macOS only: connecting, fetching, images, a conflict, editing while changes arrive, the server going away. That script is not in this repository.

@@ -30,6 +30,8 @@ export const KEY_ERRORS = {
   backupLocked: 'BACKUP_LOCKED',
   /** Not enough space for the copy; followed by `:<needed>:<free>` in bytes. */
   notEnoughSpace: 'NOT_ENOUGH_SPACE',
+  /** A password change on a vault connected to a sync server (`sync.rs`). */
+  syncConnected: 'SYNC_CONNECTED',
 } as const;
 
 /** How far a re-encryption has got (`reencrypt.rs`, `Progress`). */

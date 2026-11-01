@@ -789,6 +789,7 @@ pub fn delete_vault_files(app: tauri::AppHandle, vault_id: String) -> Result<boo
     if !dir.join(DB_FILE).is_file() {
         return Err("not a vault directory: no database found".to_string());
     }
+    crate::sync::forget(&app, &vault_id);
 
     // The database first: it is the only piece that can still be locked, and
     // a failure then at least leaves the images in place.

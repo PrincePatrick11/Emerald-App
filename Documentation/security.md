@@ -35,7 +35,7 @@ PDF export renders in a hidden window that the per-platform `export_pdf` command
 
 ## Command Surface
 
-`src-tauri/src/lib.rs` registers **59 commands**. The security-relevant ones are discussed in their own sections below; this inventory exists so a new command cannot hide among undocumented ones.
+`src-tauri/src/lib.rs` registers **72 commands**. The security-relevant ones are discussed in their own sections below; this inventory exists so a new command cannot hide among undocumented ones.
 
 | Command | Defined in | Notes |
 |---|---|---|
@@ -58,7 +58,8 @@ PDF export renders in a hidden window that the per-platform `export_pdf` command
 | `migrate_vault_layout` | `vault.rs` | moves a pre-0.2.1 flat `.db` into its own vault directory; the legacy name is validated with `is_valid_legacy_db_name` |
 | `close_request_seen` | `lib.rs` | no arguments: tells Rust the frontend is handling a close request (see [Closing the window](architecture/shell.md#closing-the-window)). All it can do is *prevent* the fallback that closes an unresponsive window |
 | `update_menu_labels`, `set_export_menu_enabled`, `set_altar_export_menu_enabled`, `set_view_menu_checked` | `lib.rs` | native-menu state sync; no-ops on Windows/Linux, where no native menu is installed |
-| `update_settings`, `set_update_settings`, `check_for_update`, `install_update` | `updates.rs` | the only commands that reach the network — see [In-App Updates](#in-app-updates) |
+| `update_settings`, `set_update_settings`, `check_for_update`, `install_update` | `updates.rs` | reach the network for updates — see [In-App Updates](#in-app-updates) |
+| `sync_status`, `sync_login`, `sync_remote_vaults`, `sync_create_remote`, `sync_adopt_remote`, `sync_disconnect`, `sync_push`, `sync_pull`, `sync_remote_state`, `sync_snapshot_put`, `sync_snapshot_get`, `sync_images`, `sync_images_delete` | `sync.rs` | reach a sync server the user connected a vault to, and nothing else. Take a vault id; none returns the token or a key. See [Sync](architecture/sync.md) |
 
 ## The Dev Bridge
 
@@ -78,7 +79,7 @@ The read-mode click opens the link directly; the link popup that shows the URL a
 
 ## In-App Updates
 
-`src-tauri/src/updates.rs` is the only part of the app that talks to the network. The design rests on one split: **the update source is variable, the public key is not.**
+`src-tauri/src/updates.rs` talks to the network only for updates; the other part that does is [`sync.rs`](architecture/sync.md), for a connected vault. The design rests on one split: **the update source is variable, the public key is not.**
 
 The key lives in `plugins.updater.pubkey` in `tauri.conf.json` and is compiled into every build; its private half exists only as a GitHub secret (see [Signing](build.md#signing)). `tauri-plugin-updater` verifies every downloaded bundle against it before touching the installed app. If the key were editable alongside the URL, the variable source would become a way to install arbitrary code — which is why `update.json` has no field for it.
 

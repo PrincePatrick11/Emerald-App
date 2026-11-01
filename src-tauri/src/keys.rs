@@ -281,6 +281,11 @@ pub(crate) fn read_key_file_named(dir: &Path, name: &str) -> Result<Option<KeyFi
     }
 }
 
+/// A `vault.key` fetched from a sync server, for a vault that has none yet.
+pub(crate) fn store_key_file(dir: &Path, file: &KeyFile) -> Result<(), String> {
+    write_key_file(dir, file)
+}
+
 fn write_key_file(dir: &Path, file: &KeyFile) -> Result<(), String> {
     vault::write_atomic(dir, KEY_FILE, KEY_TEMP_FILE, file.to_json().as_bytes())
 }

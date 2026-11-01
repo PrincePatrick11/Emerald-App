@@ -1,0 +1,322 @@
+import { invoke } from '@tauri-apps/api/core';
+import i18n from '../../i18n';
+import { dbEpoch, getDb } from '../db';
+import { editorSavesSuspended } from '../editorLock';
+import { hasOpenEdits } from '../openEdits';
+import { BASELINE_VERSION } from '../schema';
+import { drainSerialized } from '../serialize';
+import type Database from '../sqlite';
+import { useLeaveGuardStore } from '../../store/leaveGuardStore';
+import { useSyncStore } from '../../store/syncStore';
+import { useUIStore } from '../../store/uiStore';
+import { useVaultStore } from '../../store/vaultStore';
+import { applyRemoteChanges, readSnapshotRows, replaceWithSnapshot, type SnapshotRows } from './apply';
+import {
+  acknowledge,
+  clearSnapshotNeeded,
+  collectChanges,
+  isTracked,
+  markSnapshotNeeded,
+  needsSnapshot,
+  positionStatements,
+  readPosition,
+  startTracking,
+  stopTracking,
+  type SyncChange,
+} from './tracking';
+
+/**
+ * When a vault syncs, in which order. Pull, merge, push; the merging is in
+ * `apply.ts`, network and sealing are in `sync.rs`.
+ *
+ * It stands back while an entry is being edited: a merge between the store's
+ * snapshot and the editor's next save would be overwritten by that save. The
+ * edit stays in the log and goes out once it is done.
+ */
+
+export interface SyncStatus {
+  connected: boolean;
+  url?: string;
+  username?: string;
+  hasRemote?: boolean;
+  needsLogin?: boolean;
+}
+
+export interface RemoteVault {
+  id: string;
+  head: number;
+  hasSnapshot: boolean;
+}
+
+const OUTDATED = 'SYNC_SERVER:client_outdated';
+const TICK_MS = 4_000;
+const PULL_EVERY_MS = 15_000;
+const RETRY_AFTER_ERROR_MS = 30_000;
+const MAX_PUSH_TRIES = 10;
+
+export function syncErrorCode(err: unknown): string {
+  return typeof err === 'string' ? err : err instanceof Error ? err.message : 'SYNC_FAILED';
+}
+
+/** Not an error: somebody started editing, so this round ends here. */
+class Postponed extends Error {}
+
+/**
+ * Any page in edit mode counts, changed or not: an editor holds its text from
+ * when it opened, and its next save would write that over a merge.
+ */
+function mayMerge(): boolean {
+  const ui = useUIStore.getState();
+  return !hasOpenEdits()
+    && !useLeaveGuardStore.getState().guard
+    && !ui.tabs.some((tab) => tab.view.mode === 'edit')
+    && !editorSavesSuspended()
+    && !ui.editLocked;
+}
+
+export function syncStatus(vaultId: string): Promise<SyncStatus> {
+  return invoke<SyncStatus>('sync_status', { vaultId });
+}
+
+function deviceName(): string {
+  return `Emerald (${navigator.platform})`;
+}
+
+export function syncLogin(vaultId: string, url: string, username: string, password: string, signup: boolean): Promise<void> {
+  return invoke('sync_login', { vaultId, url, username, password, signup, device: deviceName() });
+}
+
+export function remoteVaults(vaultId: string): Promise<RemoteVault[]> {
+  return invoke<RemoteVault[]>('sync_remote_vaults', { vaultId });
+}
+
+export function adoptRemoteVault(vaultId: string, remoteId: string): Promise<void> {
+  return invoke('sync_adopt_remote', { vaultId, remoteId });
+}
+
+/** Ends a login that never became a connection, for a vault not created after all. */
+export function abandonLogin(vaultId: string): Promise<void> {
+  return invoke('sync_disconnect', { vaultId });
+}
+
+/** Puts the open vault on the server, as a place of its own. */
+export async function connectOpenVault(vaultId: string, name: string): Promise<void> {
+  await invoke('sync_create_remote', { vaultId, name });
+  await startTracking(await getDb());
+  await syncNow();
+}
+
+/** This device stops syncing. The vault stays here, and what is on the server stays there. */
+export async function disconnectOpenVault(vaultId: string): Promise<void> {
+  await stopTracking(await getDb());
+  await invoke('sync_disconnect', { vaultId });
+  useSyncStore.setState({ error: null, lastSync: null, conflicts: 0 });
+}
+
+async function restoreFromSnapshot(db: Database, vaultId: string, keepPending: boolean): Promise<void> {
+  const snapshot = await invoke<{ seq: number; epoch: number; schema: number; rows: string }>('sync_snapshot_get', { vaultId });
+  if (snapshot.schema > BASELINE_VERSION) throw OUTDATED;
+  const keep: SyncChange[] = keepPending ? (await collectChanges(db)).changes : [];
+  const rows = JSON.parse(snapshot.rows) as SnapshotRows;
+  await drainSerialized();
+  await replaceWithSnapshot(db, rows, keep, positionStatements({ cursor: snapshot.seq, epoch: snapshot.epoch }));
+}
+
+/** The vault as it is now becomes what everybody starts from. */
+async function publishSnapshot(db: Database, vaultId: string): Promise<void> {
+  await invoke('sync_images', { vaultId });
+  for (let tries = 0; tries < MAX_PUSH_TRIES; tries++) {
+    const remote = await invoke<{ head: number; epoch: number; hasSnapshot: boolean }>('sync_remote_state', { vaultId });
+    const epoch = remote.hasSnapshot ? remote.epoch + 1 : remote.epoch;
+    const rows = JSON.stringify(await readSnapshotRows(db));
+    const { lastSeq } = await collectChanges(db);
+    const answer = await invoke<{ status: string }>('sync_snapshot_put', {
+      vaultId,
+      base: remote.head,
+      epoch,
+      schema: BASELINE_VERSION,
+      rows,
+    });
+    if (answer.status === 'ok') {
+      await acknowledge(db, lastSeq);
+      await db.batch(positionStatements({ cursor: remote.head, epoch }));
+      await clearSnapshotNeeded(db);
+      return;
+    }
+    if (answer.status === 'client_outdated') throw OUTDATED;
+  }
+  throw 'SYNC_BUSY';
+}
+
+/** Applies everything new. Answers whether anything changed here. */
+async function pull(db: Database, vaultId: string, epochAtStart: number): Promise<boolean> {
+  let changed = false;
+  for (;;) {
+    const { cursor, epoch } = await readPosition(db);
+    const answer = await invoke<{ status: string; changes?: { seq: number; changes: string }[]; more?: boolean }>('sync_pull', {
+      vaultId,
+      after: cursor,
+      epoch,
+      schema: BASELINE_VERSION,
+    });
+    if (answer.status === 'epoch_changed' || answer.status === 'snapshot_required') {
+      if (!mayMerge() || dbEpoch() !== epochAtStart) throw new Postponed();
+      await restoreFromSnapshot(db, vaultId, true);
+      changed = true;
+      continue;
+    }
+    if (answer.status === 'client_outdated') throw OUTDATED;
+
+    for (const page of answer.changes ?? []) {
+      if (!mayMerge() || dbEpoch() !== epochAtStart) throw new Postponed();
+      await drainSerialized();
+      const { conflicts } = await applyRemoteChanges(db, JSON.parse(page.changes) as SyncChange[], {
+        newId: () => crypto.randomUUID(),
+        conflictTitle: (title) => i18n.t('sync.conflictTitle', { title }),
+        finally: positionStatements({ cursor: page.seq }),
+      });
+      if (conflicts.length) useSyncStore.setState((s) => ({ conflicts: s.conflicts + conflicts.length }));
+      changed = true;
+    }
+    if (!answer.more) return changed;
+  }
+}
+
+/** One round for a connected vault. Answers whether the stores need reloading. */
+async function round(db: Database, vaultId: string): Promise<boolean> {
+  const epochAtStart = dbEpoch();
+  let changed = false;
+
+  // A device fetching the vault. Should the first device have died before
+  // publishing, there is nothing to fetch: this one publishes instead.
+  if (!(await isTracked(db))) {
+    const remote = await invoke<{ hasSnapshot: boolean }>('sync_remote_state', { vaultId });
+    await startTracking(db);
+    if (remote.hasSnapshot) {
+      await restoreFromSnapshot(db, vaultId, false);
+      await clearSnapshotNeeded(db);
+      changed = true;
+    }
+  }
+  if (await needsSnapshot(db)) await publishSnapshot(db, vaultId);
+
+  let imagesDue = changed;
+  for (let tries = 0; ; tries++) {
+    if (await pull(db, vaultId, epochAtStart)) {
+      changed = true;
+      imagesDue = true;
+    }
+    const { changes, lastSeq } = await collectChanges(db);
+    if (!changes.length) {
+      await acknowledge(db, lastSeq);
+      break;
+    }
+    // Images first: the changes that name them must find them there.
+    await invoke('sync_images', { vaultId });
+    const { cursor, epoch } = await readPosition(db);
+    const answer = await invoke<{ status: string; seq?: number }>('sync_push', {
+      vaultId,
+      base: cursor,
+      epoch,
+      schema: BASELINE_VERSION,
+      batchId: crypto.randomUUID(),
+      changes: JSON.stringify(changes),
+    });
+    if (answer.status === 'ok') {
+      await acknowledge(db, lastSeq);
+      await db.batch(positionStatements({ cursor: answer.seq! }));
+      break;
+    }
+    if (answer.status === 'client_outdated') throw OUTDATED;
+    if (answer.status === 'snapshot_required') {
+      await markSnapshotNeeded(db);
+      await publishSnapshot(db, vaultId);
+      break;
+    }
+    // Somebody else was first: pull and try again.
+    if (tries >= MAX_PUSH_TRIES) throw 'SYNC_BUSY';
+  }
+  if (imagesDue) await invoke('sync_images', { vaultId });
+  return changed;
+}
+
+/**
+ * A vault still waiting for its password is none of this file's business:
+ * `getDb()` would fail on it, and that failure sticks to the opening under way.
+ */
+async function isUnlocked(vaultId: string): Promise<boolean> {
+  const status = await invoke<{ unlocked: boolean }>('vault_key_status', { vaultId });
+  return status.unlocked;
+}
+
+let reloadStores: () => Promise<void> = async () => {};
+let lastRun = 0;
+let lastError = 0;
+let inFlight: Promise<void> | null = null;
+
+async function run(reload: boolean): Promise<void> {
+  const vaultId = useVaultStore.getState().activeVaultId;
+  if (!vaultId || !mayMerge()) return;
+  const status = await syncStatus(vaultId);
+  if (!status.connected || !status.hasRemote || status.needsLogin || !(await isUnlocked(vaultId))) return;
+  useSyncStore.setState({ running: true });
+  try {
+    const db = await getDb();
+    await drainSerialized();
+    const changed = await round(db, vaultId);
+    lastRun = Date.now();
+    useSyncStore.setState({ error: null, lastSync: lastRun });
+    if (changed && reload && useVaultStore.getState().activeVaultId === vaultId) await reloadStores();
+  } catch (err) {
+    if (err instanceof Postponed) return;
+    lastError = Date.now();
+    const code = syncErrorCode(err);
+    console.warn('[sync]', code);
+    useSyncStore.setState({ error: code });
+  } finally {
+    useSyncStore.setState({ running: false });
+  }
+}
+
+function once(reload: boolean): Promise<void> {
+  inFlight ??= run(reload).finally(() => { inFlight = null; });
+  return inFlight;
+}
+
+export function syncNow(): Promise<void> {
+  lastError = 0;
+  return once(true);
+}
+
+/**
+ * Before the stores load a vault just opened: a device fetching it must not
+ * show the seeded starter content first. Offline, the vault opens as it is.
+ */
+export async function prepareOpenedVault(vaultId: string): Promise<void> {
+  const status = await syncStatus(vaultId).catch(() => null);
+  if (!status?.connected || !status.hasRemote) return;
+  if (!(await isTracked(await getDb()))) await once(false);
+}
+
+async function tick(): Promise<void> {
+  if (inFlight) return;
+  const vaultId = useVaultStore.getState().activeVaultId;
+  if (!vaultId || !mayMerge() || Date.now() - lastError < RETRY_AFTER_ERROR_MS) return;
+  const status = await syncStatus(vaultId);
+  if (!status.connected || !status.hasRemote || !(await isUnlocked(vaultId))) return;
+  const db = await getDb();
+  const due = Date.now() - lastRun >= PULL_EVERY_MS
+    || !(await isTracked(db))
+    || (await db.select<{ waiting: number }[]>('SELECT EXISTS (SELECT 1 FROM _sync_log) AS waiting'))[0].waiting === 1;
+  if (due) await once(true);
+}
+
+/** Started once by `AppShell`, which hands in how to reload the stores. */
+export function startSync(reload: () => Promise<void>): () => void {
+  reloadStores = reload;
+  const timer = setInterval(() => {
+    // A vault being switched or locked answers with an error here; the next tick is fine.
+    tick().catch((err: unknown) => console.debug('[sync] tick', err));
+  }, TICK_MS);
+  return () => clearInterval(timer);
+}

@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
+import ServerVaultForm from './ServerVaultForm';
 import { useTranslation } from 'react-i18next';
 import { open as openDialog } from '@tauri-apps/plugin-dialog';
-import { AlertTriangle, Check, FolderOpen, Loader2, Pencil, Plus, RotateCcw, Trash2, Vault, X } from 'lucide-react';
+import { AlertTriangle, Check, FolderOpen, Loader2, Pencil, Plus, RotateCcw, Trash2, Vault, X, Cloud } from 'lucide-react';
 import Modal from '../ui/Modal';
 import Button from '../ui/Button';
 import EmojiPicker from '../ui/EmojiPicker';
@@ -382,6 +383,7 @@ export default function VaultModal({ onClose, dismissible = true }: Props) {
   // The difference is that between "look elsewhere" and "allow access".
   const [unreachable, setUnreachable] = useState<Map<string, 'missing' | 'denied'>>(new Map());
   const [error, setError] = useState('');
+  const [fromServer, setFromServer] = useState(false);
 
 
   // Which vaults are still where vaults.json says they are. A folder on an
@@ -406,6 +408,16 @@ export default function VaultModal({ onClose, dismissible = true }: Props) {
   }, [vaults]);
 
   const closeEditor = () => setEditor({ kind: 'none' });
+
+  /** Where a vault fetched from a server goes: where a new one would. */
+  async function serverVaultTarget(name: string): Promise<string | undefined> {
+    const target = newVaultTarget(await newVaultBaseDir().catch(() => null), null, name);
+    if (target) {
+      const problem = await probeNewVaultTarget(target);
+      if (problem) throw new Error(problem);
+    }
+    return target ?? undefined;
+  }
 
   /** Resolves the default location before the row opens, so it shows a real
    *  path from the first frame instead of a placeholder. */
@@ -658,7 +670,13 @@ export default function VaultModal({ onClose, dismissible = true }: Props) {
           );
         })}
 
-        {editor.kind === 'create' ? (
+        {fromServer ? (
+          <ServerVaultForm
+            target={serverVaultTarget}
+            onCancel={() => setFromServer(false)}
+            onDone={() => { setFromServer(false); onClose(); }}
+          />
+        ) : editor.kind === 'create' ? (
           <CreateRow
             name={editor.name}
             icon={editor.icon}
@@ -683,6 +701,10 @@ export default function VaultModal({ onClose, dismissible = true }: Props) {
             <Button variant="secondary" className="flex-1 justify-center" onClick={handleOpenExisting}>
               <FolderOpen size={16} className="shrink-0" />
               {t('vault.open')}
+            </Button>
+            <Button variant="secondary" className="flex-1 justify-center" onClick={() => setFromServer(true)}>
+              <Cloud size={16} className="shrink-0" />
+              {t('sync.fromServer')}
             </Button>
           </div>
         )}

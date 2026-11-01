@@ -652,7 +652,8 @@
     "progressImages": "Images: {{done}} of {{total}}",
     "progressImagesPhase": "Encrypting the images …",
     "progressChecking": "Checking the copy …",
-    "notEnoughSpace": "Not enough free disk space: this temporarily needs {{needed}} more, and {{free}} is free. Nothing was changed."
+    "notEnoughSpace": "Not enough free disk space: this temporarily needs {{needed}} more, and {{free}} is free. Nothing was changed.",
+    "syncConnected": "Disconnect this vault from its sync server first (Settings → Sync)."
   },
   "security": {
     "rememberHint": "Keeps the key in the system keychain so the vault opens without a password.",
@@ -873,7 +874,8 @@
     "storageHint": "Images in the vault folder that no entry uses anymore. “Scan” shows how much space they take, “Remove” deletes them for good.",
     "updatesDesc": "Checks whether a newer version of Emerald exists, and installs it.",
     "updateErrorInstall": "The installation failed.",
-    "pageSecurity": "Security"
+    "pageSecurity": "Security",
+    "pageSync": "Sync"
   },
   "home": {
     "viewAll": "View all",
@@ -1121,17 +1123,92 @@
     "unmappedCount_other": "{{count}} unmapped"
   },
   "emptyState": {
-    "journal": { "title": "No entries yet", "description": "Record what you experience, dream and work. New entries get the day's moon phase.", "action": "First entry" },
-    "wiki": { "title": "No articles yet", "description": "Collect knowledge about herbs, stones and symbols." },
-    "tasks": { "title": "All done", "description": "No open tasks. New ones land here." },
-    "operations": { "title": "No operations yet", "description": "Plan rituals with ingredients, steps and outcome." },
-    "altar": { "title": "No altar yet", "description": "Design an altar from a background and elements." },
-    "altarLibrary": { "title": "No elements yet", "description": "Candles, crystals, symbols – elements are what you build your altars from." },
-    "lexicon": { "title": "No languages yet", "description": "Create a language and fill it with words and characters." },
-    "translate": { "title": "Nothing to translate yet", "description": "Create a language first – then this field translates with it." },
-    "templates": { "title": "No templates yet", "description": "Save recurring routines as a template." },
-    "blocks": { "title": "No blocks yet", "description": "Building blocks you reuse across entries." },
-    "tags": { "title": "No tags yet", "description": "Add tags while editing an entry, or create one here." },
-    "trash": { "title": "Trash is empty" }
+    "journal": {
+      "title": "No entries yet",
+      "description": "Record what you experience, dream and work. New entries get the day's moon phase.",
+      "action": "First entry"
+    },
+    "wiki": {
+      "title": "No articles yet",
+      "description": "Collect knowledge about herbs, stones and symbols."
+    },
+    "tasks": {
+      "title": "All done",
+      "description": "No open tasks. New ones land here."
+    },
+    "operations": {
+      "title": "No operations yet",
+      "description": "Plan rituals with ingredients, steps and outcome."
+    },
+    "altar": {
+      "title": "No altar yet",
+      "description": "Design an altar from a background and elements."
+    },
+    "altarLibrary": {
+      "title": "No elements yet",
+      "description": "Candles, crystals, symbols – elements are what you build your altars from."
+    },
+    "lexicon": {
+      "title": "No languages yet",
+      "description": "Create a language and fill it with words and characters."
+    },
+    "translate": {
+      "title": "Nothing to translate yet",
+      "description": "Create a language first – then this field translates with it."
+    },
+    "templates": {
+      "title": "No templates yet",
+      "description": "Save recurring routines as a template."
+    },
+    "blocks": {
+      "title": "No blocks yet",
+      "description": "Building blocks you reuse across entries."
+    },
+    "tags": {
+      "title": "No tags yet",
+      "description": "Add tags while editing an entry, or create one here."
+    },
+    "trash": {
+      "title": "Trash is empty"
+    }
+  },
+  "sync": {
+    "title": "Sync",
+    "description": "Keeps this vault the same on your devices through a server of yours. The server only ever stores it encrypted; your vault password never reaches it.",
+    "url": "Server address",
+    "username": "Account name",
+    "password": "Account password",
+    "passwordHint": "This is your account on the server, not your vault password. Connecting puts this vault on the server as a vault of its own.",
+    "signup": "Create a new account on this server",
+    "connect": "Connect",
+    "login": "Log in",
+    "connecting": "Connecting…",
+    "connectedTo": "Connected to {{url}} as {{username}}",
+    "running": "Syncing…",
+    "last": "Last synced: {{time}}",
+    "notYet": "Not synced yet in this session",
+    "now": "Sync now",
+    "disconnect": "Disconnect",
+    "disconnectHint": "Disconnecting stops syncing on this device. The vault stays here, and its copy stays on the server for your other devices.",
+    "needsLogin": "This device has to log in to the server again.",
+    "conflicts_one": "{{count}} entry was changed on two devices. Both versions are kept: look for \"(conflict)\" in the title.",
+    "conflicts_other": "{{count}} entries were changed on two devices. Both versions are kept: look for \"(conflict)\" in the title.",
+    "conflictTitle": "{{title}} (conflict)",
+    "fromServer": "From a server",
+    "fetch": "Fetch vault",
+    "vaultName": "Name on this device",
+    "noRemoteVaults": "This account has no vault on the server yet.",
+    "pickRemote": "Which vault should come to this device?",
+    "remoteVault": "Vault {{number}} ({{count}} changes)",
+    "errorUnreachable": "The server does not answer. Syncing goes on once it is back.",
+    "errorInsecure": "This address is not safe. Use https, or http only on this computer, a private network or a tailnet.",
+    "errorWrongLogin": "Account name or password is wrong.",
+    "errorOutdated": "The vault on the server is from a newer version of Emerald. Update this app.",
+    "errorSignupClosed": "This server takes no new accounts.",
+    "errorUsernameTaken": "This account name is taken.",
+    "errorBadPassword": "The password needs at least 8 characters.",
+    "errorBadUsername": "Account names can hold letters, digits and . _ - @",
+    "errorBusy": "Too many attempts. Please wait a moment.",
+    "errorFailed": "Syncing failed."
   }
 }

@@ -1,6 +1,6 @@
 import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Archive, FileText, HardDrive, Info, PanelLeft, RefreshCw, ShieldCheck, SlidersHorizontal } from 'lucide-react';
+import { Archive, FileText, HardDrive, Info, PanelLeft, RefreshCw, ShieldCheck, SlidersHorizontal, Cloud } from 'lucide-react';
 import Modal from '../../ui/Modal';
 import { useCloseOnKeepEditing } from '../../../hooks/useCloseOnKeepEditing';
 import GeneralPage from './GeneralPage';
@@ -10,15 +10,17 @@ import SecurityPage from './SecurityPage';
 import BackupPage from './BackupPage';
 import StoragePage from './StoragePage';
 import UpdatesPage from './UpdatesPage';
+import SyncPage from './SyncPage';
 import AboutPage from './AboutPage';
 
-export type SettingsPage = 'general' | 'sidebar' | 'entries' | 'security' | 'backup' | 'storage' | 'updates' | 'about';
+export type SettingsPage = 'general' | 'sidebar' | 'entries' | 'security' | 'sync' | 'backup' | 'storage' | 'updates' | 'about';
 
 const PAGES = [
   { id: 'general', labelKey: 'settings.pageGeneral', Icon: SlidersHorizontal },
   { id: 'sidebar', labelKey: 'settings.pageSidebar', Icon: PanelLeft },
   { id: 'entries', labelKey: 'settings.pageEntries', Icon: FileText },
   { id: 'security', labelKey: 'settings.pageSecurity', Icon: ShieldCheck },
+  { id: 'sync', labelKey: 'settings.pageSync', Icon: Cloud },
   { id: 'backup', labelKey: 'settings.backup', Icon: Archive },
   { id: 'storage', labelKey: 'settings.storage', Icon: HardDrive },
   { id: 'updates', labelKey: 'settings.updates', Icon: RefreshCw },
@@ -101,6 +103,7 @@ export default function SettingsModal({ onClose, initialPage = 'general' }: Prop
         {page === 'sidebar' && <SidebarPage />}
         {page === 'entries' && <EntriesPage />}
         {page === 'security' && <SecurityPage onClose={onClose} onBlockClose={blockClose} />}
+        {page === 'sync' && <SyncPage />}
         {page === 'backup' && <BackupPage />}
         {page === 'storage' && <StoragePage />}
         {page === 'updates' && <UpdatesPage />}

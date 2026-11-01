@@ -39,6 +39,8 @@ mod backup;
 mod auto_backup;
 /// The in-app updater: variable source, check, installation.
 mod updates;
+/// The way to a sync server.
+mod sync;
 /// Lets the MCP server in `tools/mcp` drive the app where the webview has no
 /// debug port. Dev builds only, and only when asked for.
 #[cfg(feature = "devbridge")]
@@ -908,6 +910,7 @@ pub fn run() {
         .manage(db::Databases::default())
         .manage(keys::VaultKeys::default())
         .manage(updates::PendingUpdate::default())
+        .manage(sync::SyncState::default())
         .manage(CloseWatch::default())
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::CloseRequested { .. } = event {
@@ -957,6 +960,19 @@ pub fn run() {
             images::delete_image_files,
             vault::register_vaults,
             vault::ensure_vault_dirs,
+            sync::sync_status,
+            sync::sync_login,
+            sync::sync_remote_vaults,
+            sync::sync_create_remote,
+            sync::sync_adopt_remote,
+            sync::sync_disconnect,
+            sync::sync_push,
+            sync::sync_pull,
+            sync::sync_remote_state,
+            sync::sync_snapshot_put,
+            sync::sync_snapshot_get,
+            sync::sync_images,
+            sync::sync_images_delete,
             vault::create_vault_dirs,
             vault::default_vault_dir,
             vault::new_vault_base_dir,

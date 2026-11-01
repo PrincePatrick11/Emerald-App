@@ -81,6 +81,7 @@ export function keyErrorText(t: TFunction, err: unknown, fallbackKey: string): s
   const code = keyErrorOf(err);
   if (code === KEY_ERRORS.wrongPassword) return t('vaultKey.wrongPassword');
   if (code === KEY_ERRORS.wrongRecoveryKey) return t('vaultKey.wrongRecoveryKey');
+  if (code === KEY_ERRORS.syncConnected) return t('vaultKey.syncConnected');
   if (code === KEY_ERRORS.passwordTooShort) return t('vaultKey.tooShort', { count: MIN_PASSWORD_LENGTH });
   const space = spaceShortfall(err);
   if (space) return t('vaultKey.notEnoughSpace', { needed: diskSize(space.needed), free: diskSize(space.free) });

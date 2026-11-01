@@ -154,6 +154,21 @@ export async function clearSnapshotNeeded(db: Database): Promise<void> {
   await db.execute("DELETE FROM _sync_meta WHERE key = 'needs_snapshot'");
 }
 
+/** This device's position on the server: `cursor` and `epoch`. */
+export async function readPosition(db: Database): Promise<{ cursor: number; epoch: number }> {
+  const rows = await db.select<{ key: string; value: string }[]>(
+    "SELECT key, value FROM _sync_meta WHERE key IN ('cursor', 'epoch')"
+  );
+  const value = (key: string) => Number(rows.find((r) => r.key === key)?.value ?? 0);
+  return { cursor: value('cursor'), epoch: value('epoch') };
+}
+
+export function positionStatements(position: { cursor?: number; epoch?: number }): (readonly [string, unknown[]])[] {
+  return Object.entries(position).map(
+    ([key, value]) => ['INSERT OR REPLACE INTO _sync_meta (key, value) VALUES ($1, $2)', [key, String(value)]] as const
+  );
+}
+
 /** Folds the log into one entry per row, in the order of each row's last change. */
 export async function pendingRows(db: Database): Promise<PendingRow[]> {
   const log = await db.select<LogRow[]>('SELECT seq, tbl, pk, op, cols FROM _sync_log ORDER BY seq');

@@ -82,6 +82,7 @@ const {
   SYNCED_TABLES, TABLES, TABLE_DDL, INDEX_DDL, BASELINE_VERSION,
   startTracking, stopTracking, isTracked, needsSnapshot, clearSnapshotNeeded, markSnapshotNeeded,
   collectChanges, acknowledge, pendingRows, dropTriggers, installTriggers, applyRemoteChanges, runMigrations,
+  readSnapshotRows, replaceWithSnapshot, positionStatements, readPosition,
 } = sync;
 
 const NOW = '2026-11-01T00:00:00.000Z';
@@ -408,6 +409,53 @@ await test('a failed apply leaves log and rows as they were', async () => {
   assert.deepEqual(a.db.raw.prepare('SELECT * FROM _sync_log').all(), before);
   assert.equal(a.get('SELECT count(*) c FROM tags').c, 0);
   assert.equal(a.get('SELECT applying FROM _sync_ctx').applying, 0);
+});
+
+console.log('Snapshots');
+
+await test('a new device starts from a snapshot and goes on from there', async () => {
+  const [server, a] = await pair();
+  entry_(a, 'e', 1, { title: 'T' });
+  await a.sync();
+  const b = await makeDevice(server);
+  b.run("INSERT INTO categories (id, name) VALUES ('seeded', 'Starter')");
+  await replaceWithSnapshot(b.db, JSON.parse(JSON.stringify(await readSnapshotRows(a.db))), [], positionStatements({ cursor: server.log.length, epoch: 3 }));
+  b.cursor = server.log.length;
+  assert.equal(b.get('SELECT count(*) c FROM categories').c, 0, 'the seeded row is gone');
+  assert.equal(b.get('SELECT count(*) c FROM _sync_log').c, 0, 'restoring logs nothing');
+  assert.deepEqual({ ...(await readPosition(b.db)) }, { cursor: server.log.length, epoch: 3 });
+  await assertConverged(a, b);
+  b.run("UPDATE entries SET title = 'later' WHERE id = 'e'");
+  await assertConverged(a, b);
+  assert.equal(a.get("SELECT title FROM entries WHERE id = 'e'").title, 'later');
+});
+
+await test('starting over keeps what this device had not pushed', async () => {
+  const [server, a, b] = await pair();
+  entry_(a, 'e', 1, { title: 'T' });
+  entry_(a, 'gone', 2);
+  await assertConverged(a, b);
+  a.run("UPDATE entries SET icon = 'from-snapshot' WHERE id = 'e'");
+  await a.sync();
+  b.run("UPDATE entries SET title = 'mine' WHERE id = 'e'");
+  entry_(b, 'new', 3);
+  b.run("DELETE FROM entries WHERE id = 'gone'");
+  const { changes } = await collectChanges(b.db);
+  await replaceWithSnapshot(b.db, await readSnapshotRows(a.db), changes, positionStatements({ cursor: server.log.length }));
+  b.cursor = server.log.length;
+  const row = b.get("SELECT title, icon FROM entries WHERE id = 'e'");
+  assert.deepEqual({ ...row }, { title: 'mine', icon: 'from-snapshot' });
+  await assertConverged(a, b);
+  assert.equal(a.get("SELECT count(*) c FROM entries WHERE id IN ('new', 'gone')").c, 1);
+});
+
+await test('a kept row that no longer fits gives way', async () => {
+  const [, a, b] = await pair();
+  a.run("INSERT INTO tags (id, name) VALUES ('ta', 'same')");
+  b.run("INSERT INTO tags (id, name) VALUES ('tb', 'same')");
+  const { changes } = await collectChanges(b.db);
+  await replaceWithSnapshot(b.db, await readSnapshotRows(a.db), changes, []);
+  assert.equal(b.get('SELECT count(*) c FROM tags').c, 1);
 });
 
 console.log('Migrations and untracked vaults');

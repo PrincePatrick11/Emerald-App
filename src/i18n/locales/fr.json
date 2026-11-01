@@ -660,7 +660,8 @@
     "progressImages": "Images : {{done}} sur {{total}}",
     "progressImagesPhase": "Chiffrement des images…",
     "progressChecking": "Vérification de la copie…",
-    "notEnoughSpace": "Pas assez d’espace disque libre : il faut temporairement {{needed}} de plus, et {{free}} sont libres. Rien n’a été modifié."
+    "notEnoughSpace": "Pas assez d’espace disque libre : il faut temporairement {{needed}} de plus, et {{free}} sont libres. Rien n’a été modifié.",
+    "syncConnected": "Déconnectez d'abord ce coffre du serveur (Paramètres → Synchronisation)."
   },
   "security": {
     "rememberHint": "Garde la clé dans le trousseau du système pour que le vault s’ouvre sans mot de passe.",
@@ -881,7 +882,8 @@
     "storageHint": "Images du dossier du vault qu'aucune entrée n'utilise plus. « Rechercher » montre la place occupée, « Supprimer » les efface définitivement.",
     "updatesDesc": "Vérifie s'il existe une version plus récente d'Emerald et l'installe.",
     "updateErrorInstall": "L'installation a échoué.",
-    "pageSecurity": "Sécurité"
+    "pageSecurity": "Sécurité",
+    "pageSync": "Synchronisation"
   },
   "contextMenu": {
     "openInNewTab": "Ouvrir dans un nouvel onglet",
@@ -1121,17 +1123,92 @@
     "unmappedCount_other": "{{count}} sans équivalent"
   },
   "emptyState": {
-    "journal": { "title": "Aucune entrée pour l'instant", "description": "Notez ce que vous vivez, rêvez et accomplissez. Les nouvelles entrées reçoivent la phase lunaire du jour.", "action": "Première entrée" },
-    "wiki": { "title": "Aucun article pour l'instant", "description": "Rassemblez votre savoir sur les herbes, les pierres et les symboles." },
-    "tasks": { "title": "Tout est fait", "description": "Aucune tâche ouverte. Les nouvelles arrivent ici." },
-    "operations": { "title": "Aucune opération pour l'instant", "description": "Planifiez des rituels avec ingrédients, déroulement et résultat." },
-    "altar": { "title": "Aucun autel pour l'instant", "description": "Composez un autel à partir d'un fond et d'éléments." },
-    "altarLibrary": { "title": "Aucun élément pour l'instant", "description": "Bougies, cristaux, symboles : les éléments composent vos autels." },
-    "lexicon": { "title": "Aucune langue pour l'instant", "description": "Créez une langue et remplissez-la de mots et de caractères." },
-    "translate": { "title": "Rien à traduire pour l'instant", "description": "Créez d'abord une langue, puis ce champ traduira avec elle." },
-    "templates": { "title": "Aucun modèle pour l'instant", "description": "Enregistrez des déroulements récurrents comme modèle." },
-    "blocks": { "title": "Aucun bloc pour l'instant", "description": "Des briques que vous réutilisez dans vos entrées." },
-    "tags": { "title": "Aucun tag pour l'instant", "description": "Attribuez des tags en modifiant une entrée, ou créez-en un ici." },
-    "trash": { "title": "La corbeille est vide" }
+    "journal": {
+      "title": "Aucune entrée pour l'instant",
+      "description": "Notez ce que vous vivez, rêvez et accomplissez. Les nouvelles entrées reçoivent la phase lunaire du jour.",
+      "action": "Première entrée"
+    },
+    "wiki": {
+      "title": "Aucun article pour l'instant",
+      "description": "Rassemblez votre savoir sur les herbes, les pierres et les symboles."
+    },
+    "tasks": {
+      "title": "Tout est fait",
+      "description": "Aucune tâche ouverte. Les nouvelles arrivent ici."
+    },
+    "operations": {
+      "title": "Aucune opération pour l'instant",
+      "description": "Planifiez des rituels avec ingrédients, déroulement et résultat."
+    },
+    "altar": {
+      "title": "Aucun autel pour l'instant",
+      "description": "Composez un autel à partir d'un fond et d'éléments."
+    },
+    "altarLibrary": {
+      "title": "Aucun élément pour l'instant",
+      "description": "Bougies, cristaux, symboles : les éléments composent vos autels."
+    },
+    "lexicon": {
+      "title": "Aucune langue pour l'instant",
+      "description": "Créez une langue et remplissez-la de mots et de caractères."
+    },
+    "translate": {
+      "title": "Rien à traduire pour l'instant",
+      "description": "Créez d'abord une langue, puis ce champ traduira avec elle."
+    },
+    "templates": {
+      "title": "Aucun modèle pour l'instant",
+      "description": "Enregistrez des déroulements récurrents comme modèle."
+    },
+    "blocks": {
+      "title": "Aucun bloc pour l'instant",
+      "description": "Des briques que vous réutilisez dans vos entrées."
+    },
+    "tags": {
+      "title": "Aucun tag pour l'instant",
+      "description": "Attribuez des tags en modifiant une entrée, ou créez-en un ici."
+    },
+    "trash": {
+      "title": "La corbeille est vide"
+    }
+  },
+  "sync": {
+    "title": "Synchronisation",
+    "description": "Garde ce coffre identique sur vos appareils grâce à votre propre serveur. Le serveur ne le stocke que chiffré ; le mot de passe du coffre ne lui parvient jamais.",
+    "url": "Adresse du serveur",
+    "username": "Nom du compte",
+    "password": "Mot de passe du compte",
+    "passwordHint": "Il s'agit de votre compte sur le serveur, pas du mot de passe du coffre. La connexion place ce coffre sur le serveur en tant que coffre distinct.",
+    "signup": "Créer un nouveau compte sur ce serveur",
+    "connect": "Connecter",
+    "login": "Se connecter",
+    "connecting": "Connexion…",
+    "connectedTo": "Connecté à {{url}} en tant que {{username}}",
+    "running": "Synchronisation…",
+    "last": "Dernière synchronisation : {{time}}",
+    "notYet": "Pas encore synchronisé dans cette session",
+    "now": "Synchroniser maintenant",
+    "disconnect": "Déconnecter",
+    "disconnectHint": "La déconnexion arrête la synchronisation sur cet appareil. Le coffre reste ici et sa copie reste sur le serveur pour vos autres appareils.",
+    "needsLogin": "Cet appareil doit se reconnecter au serveur.",
+    "conflicts_one": "{{count}} entrée a été modifiée sur deux appareils. Les deux versions sont conservées : cherchez « (conflit) » dans le titre.",
+    "conflicts_other": "{{count}} entrées ont été modifiées sur deux appareils. Les deux versions sont conservées : cherchez « (conflit) » dans le titre.",
+    "conflictTitle": "{{title}} (conflit)",
+    "fromServer": "Depuis un serveur",
+    "fetch": "Récupérer le coffre",
+    "vaultName": "Nom sur cet appareil",
+    "noRemoteVaults": "Ce compte n'a encore aucun coffre sur le serveur.",
+    "pickRemote": "Quel coffre doit venir sur cet appareil ?",
+    "remoteVault": "Coffre {{number}} ({{count}} modifications)",
+    "errorUnreachable": "Le serveur ne répond pas. La synchronisation reprendra à son retour.",
+    "errorInsecure": "Cette adresse n'est pas sûre. Utilisez https, ou http uniquement sur cet ordinateur, un réseau privé ou un tailnet.",
+    "errorWrongLogin": "Nom du compte ou mot de passe incorrect.",
+    "errorOutdated": "Le coffre du serveur provient d'une version plus récente d'Emerald. Mettez à jour cette application.",
+    "errorSignupClosed": "Ce serveur n'accepte pas de nouveaux comptes.",
+    "errorUsernameTaken": "Ce nom de compte est déjà pris.",
+    "errorBadPassword": "Le mot de passe doit contenir au moins 8 caractères.",
+    "errorBadUsername": "Les noms de compte peuvent contenir des lettres, des chiffres et . _ - @",
+    "errorBusy": "Trop de tentatives. Patientez un instant.",
+    "errorFailed": "La synchronisation a échoué."
   }
 }

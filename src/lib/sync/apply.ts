@@ -14,13 +14,15 @@ import { columnsOf, pendingRows, rowKey, SYNCED_TABLES, type PendingRow, type Sy
  * caller keeps writers away between the reads here and that batch.
  */
 
-type Statement = readonly [query: string, bindValues?: readonly unknown[]];
+export type Statement = readonly [query: string, bindValues?: readonly unknown[]];
 type Row = Record<string, unknown>;
 
 export interface ApplyOptions {
   newId: () => string;
   /** The title of the copy that keeps this device's text in a conflict. */
   conflictTitle: (title: string) => string;
+  /** Run in the same transaction, like the new log position: both or neither. */
+  finally?: readonly Statement[];
 }
 
 export interface ApplyResult {
@@ -37,7 +39,7 @@ const LOGGING: Statement = ['UPDATE _sync_ctx SET applying = 0'];
  * retry with it. An optional reference is cleared, a row that cannot exist
  * without its parent goes.
  */
-const REFERENCE_REPAIRS: readonly Statement[] = [
+export const REFERENCE_REPAIRS: readonly Statement[] = [
   ...CATEGORIZED_TABLES.map(
     (table): Statement => [
       `UPDATE ${table} SET category_id = NULL
@@ -96,7 +98,10 @@ export async function applyRemoteChanges(
   remote: readonly SyncChange[],
   options: ApplyOptions
 ): Promise<ApplyResult> {
-  if (!remote.length) return { conflicts: [] };
+  if (!remote.length) {
+    if (options.finally?.length) await db.batch(options.finally);
+    return { conflicts: [] };
+  }
   await assertKnownShape(db, remote);
 
   const pending = new Map<string, PendingRow>(
@@ -222,7 +227,55 @@ export async function applyRemoteChanges(
     }
   }
 
-  statements.push(LOGGING, ...REFERENCE_REPAIRS);
+  statements.push(LOGGING, ...REFERENCE_REPAIRS, ...(options.finally ?? []));
   await db.batch(statements);
   return { conflicts };
+}
+
+/** One table's rows, as a snapshot carries them. */
+export type SnapshotRows = Record<string, Row[]>;
+
+export async function readSnapshotRows(db: Database): Promise<SnapshotRows> {
+  const rows: SnapshotRows = {};
+  for (const table of SYNCED_TABLES) rows[table] = await db.select<Row[]>(`SELECT * FROM ${table}`);
+  return rows;
+}
+
+/**
+ * Replaces the vault's content with a snapshot, in one transaction. `keep` is
+ * what this device had not pushed: it goes back on top as ordinary local
+ * changes, so that starting over loses none of it. A kept row that no longer
+ * fits (its tag name taken meanwhile) gives way rather than block the vault.
+ */
+export async function replaceWithSnapshot(
+  db: Database,
+  snapshot: SnapshotRows,
+  keep: readonly SyncChange[],
+  finalStatements: readonly Statement[]
+): Promise<void> {
+  const changes = SYNCED_TABLES.flatMap((table) =>
+    (snapshot[table] ?? []).map(
+      (row): SyncChange => ({ table, id: String(row.id), op: 'upsert', changed: Object.keys(row), row })
+    )
+  );
+  await assertKnownShape(db, [...changes, ...keep]);
+
+  const statements: Statement[] = [['PRAGMA defer_foreign_keys = ON'], APPLYING, ['DELETE FROM _sync_log']];
+  for (const table of [...SYNCED_TABLES].reverse()) statements.push([`DELETE FROM ${table}`]);
+  for (const change of changes) if (change.op === 'upsert') statements.push(insertStatement(change.table, change.row));
+  statements.push(LOGGING);
+  for (const change of keep) {
+    if (change.op === 'delete') {
+      statements.push([`DELETE FROM ${change.table} WHERE id = $1`, [change.id]]);
+      continue;
+    }
+    const [query, values] = insertStatement(change.table, change.row);
+    const sets = change.changed.map((column) => `${column} = excluded.${column}`).join(', ');
+    statements.push([
+      `${query.replace('INSERT INTO', 'INSERT OR IGNORE INTO')} ON CONFLICT(id) DO UPDATE SET ${sets || 'id = id'}`,
+      values,
+    ]);
+  }
+  statements.push(...REFERENCE_REPAIRS, ...finalStatements);
+  await db.batch(statements);
 }

@@ -26,6 +26,7 @@ import { captureLegacySettings } from '../lib/vaultSettings';
 import { resolveOpenEdits } from '../lib/openEdits';
 import { changeVaultPassword, keyErrorOf, lockVault, type CreatedKey } from '../lib/vaultKeys';
 import { ensureVaultReady, VAULT_KEY_CANCELLED } from './vaultKeyStore';
+import { prepareOpenedVault } from '../lib/sync/engine';
 
 interface VaultStore {
   vaults: Vault[];
@@ -112,6 +113,7 @@ async function openActiveVault({ askPassword = false }: { askPassword?: boolean 
   // their text would be a leak that grows with every switch.
   clearSearchTextCache();
   clearEntrySummaryCache();
+  await prepareOpenedVault(useVaultStore.getState().activeVaultId);
   await reloadAllStores();
 }
 
