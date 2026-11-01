@@ -5,9 +5,8 @@ import type { Weekday } from './formatDate';
 import { LANGUAGE_OPTIONS, LANGUAGE_STORAGE_KEY, type AppLanguage } from '../i18n';
 import {
   DEFAULT_EDITOR_FONT_ID, DEFAULT_EDITOR_FONT_SIZE, DEFAULT_THEME_ID, DEFAULT_UI_FONT_ID, DEFAULT_UI_SCALE,
-  normalizeEditorFontId, normalizeEditorFontSize, normalizeThemeSelection, normalizeUIFontId, normalizeUIScale,
+  customThemeSelection, normalizeEditorFontId, normalizeEditorFontSize, normalizeThemeSelection, normalizeUIFontId, normalizeUIScale,
   type EditorFontSize, type FontId, type ThemeSelection, type UIScale,
-  customThemeSelection,
 } from '../themes/theme';
 import { MAX_CUSTOM_THEMES, normalizeCustomThemes, type CustomTheme } from '../themes/customTheme';
 
