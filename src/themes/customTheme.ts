@@ -277,6 +277,7 @@ export function customThemeTokens({ base, colors: c }: CustomTheme): Record<stri
     'secondary-text': secondary,
     'secondary-text-hover': c.text,
     'mark-accent': c.accent,
+    'mark-line': c.frame,
     'edge': borderSoft,
     'edge-strong': c.border,
     'edge-raise': borderStrong,

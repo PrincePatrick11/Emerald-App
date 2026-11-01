@@ -3580,7 +3580,7 @@ html[data-theme='emerald-parchment'] .altar-cat-scroll-fade {
 /* The mark takes its colour from `--mark-accent`, so a custom theme tints it.
    Classes, not `var()` on the SVG: see EmeraldMark.tsx. */
 .emerald-mark-stone { fill: color-mix(in srgb, var(--mark-accent) 56%, #000); }
-.emerald-mark-line { stroke: color-mix(in srgb, var(--mark-accent) 10%, #fff); }
+.emerald-mark-line { stroke: var(--mark-line); }
 .emerald-mark-table { fill: var(--mark-accent); }
 .emerald-mark-f1 { fill: color-mix(in srgb, var(--mark-accent) 70%, #000); }
 .emerald-mark-f2 { fill: color-mix(in srgb, var(--mark-accent) 48%, #000); }

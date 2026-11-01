@@ -133,7 +133,7 @@ html {
 #splash-table .splash-table-top    { stop-color: var(--splash-gem); }
 #splash-table .splash-table-bottom { stop-color: var(--splash-gem-deep); }
 
-.splash-line  { stroke: #e6fff5; }
+.splash-line  { stroke: #100d0a; }
 .splash-stone { fill: var(--splash-gem-deep); }
 .splash-spark   { fill: var(--splash-gem); }
 
