@@ -27,8 +27,8 @@ interface Props {
  * Windows and Linux run undecorated (`decorations: false`) and get their
  * minimise / maximise / close buttons here. macOS keeps its native traffic
  * lights (`titleBarStyle: "Overlay"`) and reserves room on the left for them
- * instead of the logo, via `html[data-platform='macos']` in index.css. The
- * menu buttons are the same everywhere; macOS has its native menu as well.
+ * instead of the logo, via `html[data-platform='macos']` in index.css. Edit
+ * and View live in its native menu bar; Export and Import are here everywhere.
  *
  * `data-tauri-drag-region` is not inherited: Tauri reads the attribute off the
  * element directly under the cursor. Every non-interactive wrapper that should
@@ -116,11 +116,13 @@ export default function TitleBar({ tabs = false, leadWidth = 0, animate = true }
           </div>
         )}
 
-        <TitleBarMenuButton
-          label={t('titlebar.menu')}
-          icon={<Menu size={16} />}
-          nodes={menus.appMenu}
-        />
+        {!isMacOS && (
+          <TitleBarMenuButton
+            label={t('titlebar.menu')}
+            icon={<Menu size={16} />}
+            nodes={menus.appMenu}
+          />
+        )}
 
         {!minimal && (
           <div className="ml-1 flex items-center gap-0.5 flex-shrink-0">

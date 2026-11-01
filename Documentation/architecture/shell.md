@@ -4,7 +4,7 @@
 
 The title bar is drawn by the app, not the OS: a 40px bar (`h-10`) in `src/components/layout/titlebar/`, above the three-column shell in `AppShell`. From left to right:
 
-- **Leading group** (`flex-shrink-0`): the Emerald logo (not on macOS, where the traffic lights sit), the application menu button, the global-search magnifier, back/forward, and the Export and Import buttons. With tabs shown it grows to the left sidebar's width, so the tabs start flush with the sheet below.
+- **Leading group** (`flex-shrink-0`): the Emerald logo and the application menu button (neither on macOS, which has the traffic lights and its native menu), the global-search magnifier, back/forward, and the Export and Import buttons. With tabs shown it grows to the left sidebar's width, so the tabs start flush with the sheet below.
 - **Middle**: the tab strip (`TabBar`, see [Tabs and Workspace State](navigation.md#tabs-and-workspace-state)), or — without tabs (no vault yet, boot still running) — an empty `flex-1` drag surface.
 - **Trailing group**: the window controls on Windows/Linux.
 
@@ -20,8 +20,8 @@ The logo (`EmeraldMark`, an inline SVG) is not a control. Its wrapper carries `d
 |---|---|---|
 | Window config | `decorations: false` | `decorations: true` + `titleBarStyle: "Overlay"` + `hiddenTitle` |
 | Min / max / close | `WindowControls` (46x40, Fluent geometry) | Native traffic lights, positioned by `trafficLightPosition` |
-| Application menu | `TitleBarMenuButton` | `TitleBarMenuButton`, and native in the system menu bar |
-| Title bar left | the logo | no logo, a 5rem inset for the traffic lights |
+| Application menu | `TitleBarMenuButton` | Native, in the system menu bar |
+| Title bar left | the logo | no logo, a 5.25rem inset for the traffic lights |
 
 Per-platform window settings live in `src-tauri/tauri.{windows,linux,macos}.conf.json`, which Tauri merges over `tauri.conf.json` — each repeats the complete window object, and `tauri.dev.conf.json` must never gain an `app.windows` key (why: [Per-platform Tauri configs](../build.md#per-platform-tauri-configs)). All four files set `minWidth` 720 and `minHeight` 600.
 
