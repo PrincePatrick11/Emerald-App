@@ -72,10 +72,10 @@ html[data-theme='emerald-parchment'] {
   --field-border: rgba(154, 117, 80, 0.42);
   --field-border-hover: rgba(131, 96, 62, 0.62);
   --field-inset-bg: #f3e8d4;
-  --primary-solid-bg: #006941;
-  --primary-solid-border: #00573a;
-  --primary-solid-text: #f3fff9;
-  --primary-solid-hover-bg: #00573a;
+  --primary-solid-bg: #159165;
+  --primary-solid-border: #127651;
+  --primary-solid-text: #ecfff7;
+  --primary-solid-hover-bg: #0f7a54;
   --primary-solid-hover-text: #ffffff;
   --danger-soft-text: #b63f32;
   --danger-soft-border: rgba(182, 63, 50, 0.5);
@@ -113,13 +113,14 @@ html[data-theme='emerald-parchment'] {
   --choice-active-border: rgba(0, 138, 87, 0.42);
   --choice-active-text: #075e3d;
   --modal-scrim: rgba(0, 0, 0, 0.5);
-  /* Button's `tone` mode: tinted row actions. */
-  --tone-jade-bg: #006941;
-  --tone-jade-bg-hover: #00573a;
+  /* Button's `tone` mode: tinted row actions. The solid jade stays at 3.84:1 with
+     its text, a deliberate choice over a darker green (design.md, Colour). */
+  --tone-jade-bg: #159165;
+  --tone-jade-bg-hover: #0f7a54;
   --tone-jade-border: rgba(0, 138, 87, 0.6);
   --tone-jade-border-hover: rgba(0, 138, 87, 0.7);
-  --tone-jade-text: #f3fff9;
-  --tone-jade-text-hover: #f3fff9;
+  --tone-jade-text: #ecfff7;
+  --tone-jade-text-hover: #ecfff7;
   --tone-amber-bg: #a75924;
   --tone-amber-bg-hover: #8f4c1e;
   --tone-amber-border: rgba(168, 105, 24, 0.6);
@@ -143,7 +144,7 @@ html[data-theme='emerald-parchment'] {
   /* Generic text, surfaces and edges behind the Tailwind colour names in tailwind.config.js. */
   --text-soft: #5b442e;
   --text-raise: #2c2014;
-  --text-on-accent: #f3fff9;
+  --text-on-accent: #ecfff7;
   --accent-text: #0a7a53;
   --accent-text-raise: #075c3f;
   --success-text: #1f7a43;
@@ -166,8 +167,8 @@ html[data-theme='emerald-parchment'] {
   --accent-wash: rgba(0, 138, 87, 0.1);
   --accent-wash-strong: rgba(0, 138, 87, 0.25);
   --accent-track: rgba(0, 138, 87, 0.6);
-  --accent-fill: #006941;
-  --accent-fill-strong: #006941;
+  --accent-fill: #159165;
+  --accent-fill-strong: #159165;
   --danger-wash: rgba(239, 68, 68, 0.1);
   --secondary-bg: #f6ead6;
   --secondary-bg-hover: rgba(130, 87, 44, 0.12);

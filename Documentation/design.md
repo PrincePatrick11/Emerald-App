@@ -20,7 +20,7 @@ For the *components* (which shared building blocks exist, when to use them) see 
 
 **Red means destructive, nothing else.** Via `Button variant="danger"` or `tone="danger"`, not via a per-site red treatment of its own.
 
-**Text holds 4.5:1 against its surface, in both themes.** Icons, control borders and focus rings that carry meaning hold 3:1. Remaining exceptions are [Open Point 5](#open-points).
+**Text holds 4.5:1 against its surface, in both themes.** Icons, control borders and focus rings that carry meaning hold 3:1. Remaining exceptions are [Open Point 5](#open-points). Parchment's solid jade (`#159165`) with its light text is 3.84:1, kept deliberately: a darker green looked worse, and the labels on it are short.
 
 **A new component adds its tokens to both theme files in the same commit.** It uses the general tokens first and adds its own only where a value really differs. New rules in `index.css` take tokens, not hex literals; the older per-theme rules there still hold some ([Open Point 2](#open-points)).
 
