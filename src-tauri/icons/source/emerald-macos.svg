@@ -3,7 +3,7 @@
 <linearGradient id="plate" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2a2018"/><stop offset="1" stop-color="#100d0a"/></linearGradient>
 </defs>
 <rect x="100" y="100" width="824" height="824" rx="185" fill="url(#plate)"/>
-<g transform="translate(98 98) scale(6.9)">
+<g transform="translate(170 170) scale(5.7)">
 <circle cx="60" cy="60" r="56" fill="#0b6e48"/>
 <path d="M60 4 L60 14 L70.33 45.79 L103.75 45.79 L113.26 42.7 A56 56 0 0 0 60 4 Z" fill="#0e8a5a"/>
 <path d="M113.26 42.7 L103.75 45.79 L76.71 65.43 L87.04 97.21 L92.92 105.3 A56 56 0 0 0 113.26 42.7 Z" fill="#075e3d"/>
