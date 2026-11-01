@@ -35,7 +35,10 @@ export default function CustomThemesSection() {
     }
     const result = parseCustomThemeFile(await file.text(), crypto.randomUUID());
     if ('error' in result) {
-      setStatus({ tone: 'error', text: t('settings.customThemeInvalid') });
+      setStatus({
+        tone: 'error',
+        text: t(result.error === 'unreadableText' ? 'settings.customThemeUnreadable' : 'settings.customThemeInvalid'),
+      });
       return;
     }
     const { theme } = result;

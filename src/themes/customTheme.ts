@@ -26,7 +26,7 @@ export interface CustomTheme {
   colors: CustomThemeColors;
 }
 
-export type CustomThemeError = 'invalidFile' | 'tooLarge';
+export type CustomThemeError = 'invalidFile' | 'tooLarge' | 'unreadableText';
 
 export const CUSTOM_THEME_FILE_VERSION = 1;
 export const MAX_CUSTOM_THEMES = 20;
@@ -73,10 +73,12 @@ function readTheme(raw: unknown, id: string): CustomTheme | null {
     if (!value) return null;
     result[key] = value;
   }
-  // Below this floor the controls that would remove the theme are unreadable too.
-  if (contrastRatio(result.text, result.sheet) < MIN_TEXT_CONTRAST) return null;
-  if (contrastRatio(result.text, result.panel) < MIN_TEXT_CONTRAST) return null;
   return { id, name, base: raw.base, colors: result };
+}
+
+/** Below this floor the controls that would remove the theme are unreadable too. */
+function hasReadableText({ text, sheet, panel }: CustomThemeColors): boolean {
+  return contrastRatio(text, sheet) >= MIN_TEXT_CONTRAST && contrastRatio(text, panel) >= MIN_TEXT_CONTRAST;
 }
 
 /** A theme file as text. The caller assigns the id. */
@@ -93,7 +95,8 @@ export function parseCustomThemeFile(
   }
   if (!isRecord(raw) || raw.emeraldTheme !== CUSTOM_THEME_FILE_VERSION) return { error: 'invalidFile' };
   const theme = readTheme(raw, id);
-  return theme ? { theme } : { error: 'invalidFile' };
+  if (!theme) return { error: 'invalidFile' };
+  return hasReadableText(theme.colors) ? { theme } : { error: 'unreadableText' };
 }
 
 /** Stored themes pass the same check as a file: settings can come from a backup. */
@@ -105,7 +108,7 @@ export function normalizeCustomThemes(raw: unknown): CustomTheme[] {
     if (!isRecord(item) || typeof item.id !== 'string' || !/^[\w-]{1,64}$/.test(item.id)) continue;
     if (seen.has(item.id)) continue;
     const theme = readTheme(item, item.id);
-    if (!theme) continue;
+    if (!theme || !hasReadableText(theme.colors)) continue;
     seen.add(theme.id);
     themes.push(theme);
     if (themes.length === MAX_CUSTOM_THEMES) break;

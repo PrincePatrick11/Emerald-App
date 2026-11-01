@@ -877,6 +877,7 @@
     "customThemeImport": "Importar tema …",
     "customThemeRemove": "Quitar «{{name}}»",
     "customThemeInvalid": "Este no es un archivo de tema válido.",
+    "customThemeUnreadable": "El texto de este tema sería ilegible: el color text tiene muy poco contraste con sheet o panel.",
     "customThemeTooMany": "Un vault admite como máximo {{count}} temas.",
     "customThemeImported": "«{{name}}» importado.",
     "customThemeContrast": "Importado, pero difícil de leer: {{pairs}}.",

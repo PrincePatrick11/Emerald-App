@@ -7,8 +7,9 @@ import {
   DEFAULT_EDITOR_FONT_ID, DEFAULT_EDITOR_FONT_SIZE, DEFAULT_THEME_ID, DEFAULT_UI_FONT_ID, DEFAULT_UI_SCALE,
   normalizeEditorFontId, normalizeEditorFontSize, normalizeThemeSelection, normalizeUIFontId, normalizeUIScale,
   type EditorFontSize, type FontId, type ThemeSelection, type UIScale,
+  customThemeSelection,
 } from '../themes/theme';
-import { normalizeCustomThemes, type CustomTheme } from '../themes/customTheme';
+import { MAX_CUSTOM_THEMES, normalizeCustomThemes, type CustomTheme } from '../themes/customTheme';
 
 /**
  * A vault's settings, as `settings.json` in its folder.
@@ -330,13 +331,18 @@ export function withSettingsGroups(current: VaultSettings, incoming: VaultSettin
   for (const group of groups) next[group] = incoming[group];
   if (groups.includes('appearance')) {
     // The vault's own themes stay: a backup adds to them, and its selection may name either.
-    const ownIds = new Set(current.appearance.customThemes.map((theme) => theme.id));
+    const own = current.appearance.customThemes;
+    const ownIds = new Set(own.map((theme) => theme.id));
+    // The backup's selected theme comes first, so the cap cuts others before it.
+    const selected = (theme: CustomTheme) => customThemeSelection(theme.id) === incoming.appearance.theme;
+    const added = incoming.appearance.customThemes.filter((theme) => !ownIds.has(theme.id));
+    const customThemes = [...own, ...added.filter(selected), ...added.filter((theme) => !selected(theme))]
+      .slice(0, MAX_CUSTOM_THEMES);
+    const fits = !incoming.appearance.theme.startsWith('custom:') || customThemes.some(selected);
     next.appearance = {
       ...incoming.appearance,
-      customThemes: [
-        ...current.appearance.customThemes,
-        ...incoming.appearance.customThemes.filter((theme) => !ownIds.has(theme.id)),
-      ],
+      customThemes,
+      theme: fits ? incoming.appearance.theme : current.appearance.theme,
     };
   }
   return next as unknown as VaultSettings;

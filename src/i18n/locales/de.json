@@ -869,6 +869,7 @@
     "customThemeImport": "Theme importieren …",
     "customThemeRemove": "„{{name}}\" entfernen",
     "customThemeInvalid": "Das ist keine gültige Theme-Datei.",
+    "customThemeUnreadable": "Der Text dieses Themes wäre unlesbar: Die Farbe text hat zu wenig Kontrast zu sheet oder panel.",
     "customThemeTooMany": "Es passen höchstens {{count}} Themes in einen Vault.",
     "customThemeImported": "„{{name}}\" importiert.",
     "customThemeContrast": "Importiert, aber schwer lesbar: {{pairs}}.",

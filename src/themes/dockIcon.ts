@@ -64,6 +64,7 @@ async function renderPng(svg: string): Promise<number[]> {
 
 /** What the Dock shows now: a theme's id and colours, or null for the bundle's icon. */
 let shown: string | null = null;
+const FAILED = 'failed';
 
 /** Follows the active theme; a built-in theme gets the bundle's icon back. */
 export function syncDockIcon(theme: CustomTheme | null): void {
@@ -76,6 +77,8 @@ export function syncDockIcon(theme: CustomTheme | null): void {
     // A later switch has taken over while this one was drawing.
     if (wanted === shown) await invoke('set_dock_icon', { png });
   })().catch((err: unknown) => {
+    // The Dock kept what it had: the same theme may try again.
+    if (wanted === shown) shown = FAILED;
     console.warn('[theme] could not set the dock icon', err);
   });
 }
