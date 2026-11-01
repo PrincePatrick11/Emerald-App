@@ -660,8 +660,7 @@
     "progressImages": "Imágenes: {{done}} de {{total}}",
     "progressImagesPhase": "Cifrando las imágenes…",
     "progressChecking": "Comprobando la copia…",
-    "notEnoughSpace": "No hay suficiente espacio libre: hacen falta temporalmente {{needed}} más y hay {{free}} libres. No se ha cambiado nada.",
-    "syncConnected": "Primero desconecta esta bóveda del servidor (Ajustes → Sincronización)."
+    "notEnoughSpace": "No hay suficiente espacio libre: hacen falta temporalmente {{needed}} más y hay {{free}} libres. No se ha cambiado nada."
   },
   "security": {
     "rememberHint": "Guarda la clave en el llavero del sistema para que el vault se abra sin contraseña.",
@@ -1209,6 +1208,9 @@
     "errorBadPassword": "La contraseña necesita al menos 8 caracteres.",
     "errorBadUsername": "Los nombres de cuenta pueden tener letras, dígitos y . _ - @",
     "errorBusy": "Demasiados intentos. Espera un momento.",
-    "errorFailed": "La sincronización ha fallado."
+    "errorFailed": "La sincronización ha fallado.",
+    "passwordChanged": "La contraseña de la bóveda se cambió en otro dispositivo. Introduce la nueva: esta copia se volverá a obtener con ella.",
+    "newVaultPassword": "Nueva contraseña de la bóveda",
+    "adoptPassword": "Volver a obtener con esta contraseña"
   }
 }

@@ -660,8 +660,7 @@
     "progressImages": "Images : {{done}} sur {{total}}",
     "progressImagesPhase": "Chiffrement des images…",
     "progressChecking": "Vérification de la copie…",
-    "notEnoughSpace": "Pas assez d’espace disque libre : il faut temporairement {{needed}} de plus, et {{free}} sont libres. Rien n’a été modifié.",
-    "syncConnected": "Déconnectez d'abord ce coffre du serveur (Paramètres → Synchronisation)."
+    "notEnoughSpace": "Pas assez d’espace disque libre : il faut temporairement {{needed}} de plus, et {{free}} sont libres. Rien n’a été modifié."
   },
   "security": {
     "rememberHint": "Garde la clé dans le trousseau du système pour que le vault s’ouvre sans mot de passe.",
@@ -1209,6 +1208,9 @@
     "errorBadPassword": "Le mot de passe doit contenir au moins 8 caractères.",
     "errorBadUsername": "Les noms de compte peuvent contenir des lettres, des chiffres et . _ - @",
     "errorBusy": "Trop de tentatives. Patientez un instant.",
-    "errorFailed": "La synchronisation a échoué."
+    "errorFailed": "La synchronisation a échoué.",
+    "passwordChanged": "Le mot de passe du coffre a été changé sur un autre appareil. Saisissez le nouveau : cette copie sera récupérée à nouveau avec lui.",
+    "newVaultPassword": "Nouveau mot de passe du coffre",
+    "adoptPassword": "Récupérer à nouveau avec ce mot de passe"
   }
 }

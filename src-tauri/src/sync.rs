@@ -30,7 +30,8 @@ const SETTINGS_TEMP_FILE: &str = "sync.json.tmp";
 
 const B64: base64::engine::GeneralPurpose = base64::engine::general_purpose::STANDARD;
 
-pub const SYNC_CONNECTED: &str = "SYNC_CONNECTED";
+/// The vault on the server is under a key this device does not have.
+const PASSWORD_CHANGED: &str = "SYNC_PASSWORD_CHANGED";
 const UNREACHABLE: &str = "SYNC_UNREACHABLE";
 const INSECURE: &str = "SYNC_INSECURE";
 const NOT_CONNECTED: &str = "SYNC_NOT_CONNECTED";
@@ -48,6 +49,9 @@ struct Connection {
     /// Base64 of the token, sealed under the vault key.
     #[serde(default)]
     token: Option<String>,
+    /// The password changed here and the server has not heard yet.
+    #[serde(default)]
+    rekeyed: bool,
 }
 
 type Connections = HashMap<String, Connection>;
@@ -86,8 +90,33 @@ fn connection(app: &tauri::AppHandle, vault_id: &str) -> Result<Connection, Stri
     read_all(app)?.remove(vault_id).ok_or_else(|| NOT_CONNECTED.to_string())
 }
 
-/// A vault with a connection. A password change would put it under a key the
-/// other devices do not know, so it has to be disconnected first.
+/// Before a password change: the sealed token would not open under the new key,
+/// so it waits in memory and is sealed again by the next `token()`.
+pub fn hold_token(app: &tauri::AppHandle, vault_id: &str, old_key: &Key) -> Result<(), String> {
+    let Some(sealed) = read_all(app)?.remove(vault_id).and_then(|c| c.token) else {
+        return Ok(());
+    };
+    let files = crypto::subkey(old_key, Purpose::Files);
+    if let Some(token) = B64.decode(sealed).ok().and_then(|bytes| open(&files, &bytes).ok()) {
+        let state = app.state::<SyncState>();
+        state.waiting.lock().map_err(|_| "sync state unavailable".to_string())?.insert(vault_id.to_string(), Zeroizing::new(token));
+    }
+    Ok(())
+}
+
+/// After a password change: the next round publishes the vault under the new key.
+pub fn note_rekeyed(app: &tauri::AppHandle, vault_id: &str) -> Result<(), String> {
+    if !is_connected(app, vault_id) {
+        return Ok(());
+    }
+    change_all(app, |all| {
+        if let Some(c) = all.get_mut(vault_id) {
+            c.rekeyed = true;
+        }
+    })?;
+    token(app, vault_id).map(|_| ())
+}
+
 pub fn is_connected(app: &tauri::AppHandle, vault_id: &str) -> bool {
     read_all(app).is_ok_and(|all| all.contains_key(vault_id))
 }
@@ -243,6 +272,7 @@ pub async fn sync_status(app: tauri::AppHandle, vault_id: String) -> Result<Valu
         "username": c.username,
         "hasRemote": c.remote.is_some(),
         "needsLogin": needs_login,
+        "rekeyed": c.rekeyed,
     }))
 }
 
@@ -279,7 +309,14 @@ pub async fn sync_login(
         let previous = all.remove(&vault_id).filter(|c| c.url == url);
         all.insert(
             vault_id.clone(),
-            Connection { url, username, remote: previous.and_then(|c| c.remote), device: device_id, token: None },
+            Connection {
+                url,
+                username,
+                rekeyed: previous.as_ref().is_some_and(|c| c.rekeyed),
+                remote: previous.and_then(|c| c.remote),
+                device: device_id,
+                token: None,
+            },
         );
     })?;
     // Seals it right away if the vault is unlocked.
@@ -447,12 +484,20 @@ pub async fn sync_snapshot_put(
     rows: String,
 ) -> Result<Value, String> {
     let target = remote(&app, &vault_id)?;
+    let rekeyed = connection(&app, &vault_id)?.rekeyed;
+    // A device that missed a password change must not put the old key back.
+    if !rekeyed && !same_key_as_server(&app, &vault_id, &target).await? {
+        return Err(PASSWORD_CHANGED.to_string());
+    }
+    let dir = vault::vault_dir(&app, &vault_id)?;
+    let key_file = keys::read_key_file(&dir)?.ok_or_else(|| LOCKED.to_string())?;
     let sealed = seal(&files_key(&app, &vault_id)?, &rows);
     let builder = target
         .call(Method::PUT, "/snapshot", LONG)?
         .header("x-base-seq", base)
         .header("x-epoch", epoch)
         .header("x-schema", schema)
+        .header("x-key-file", B64.encode(key_file.to_json()))
         .body(sealed);
     let response = send(builder).await?;
     if response.status().is_success() {
@@ -473,8 +518,83 @@ pub async fn sync_snapshot_get(app: tauri::AppHandle, vault_id: String) -> Resul
     };
     let (seq, epoch, schema) = (number("x-snapshot-seq"), number("x-epoch"), number("x-schema"));
     let bytes = response.bytes().await.map_err(|_| UNREACHABLE.to_string())?;
-    let rows = open(&files_key(&app, &vault_id)?, &bytes)?;
+    let rows = match open(&files_key(&app, &vault_id)?, &bytes) {
+        Ok(rows) => rows,
+        Err(err) => {
+            return Err(if same_key_as_server(&app, &vault_id, &target).await? { err } else { PASSWORD_CHANGED.to_string() });
+        }
+    };
     Ok(json!({ "seq": seq, "epoch": epoch, "schema": schema, "rows": rows }))
+}
+
+async fn server_key_file(target: &Remote) -> Result<keys::KeyFile, String> {
+    let response = send(target.call(Method::GET, "", SHORT)?).await?;
+    if !response.status().is_success() {
+        return Err(refused(response).await);
+    }
+    let answer: Value = response.json().await.map_err(|_| UNREACHABLE.to_string())?;
+    let bytes = B64.decode(answer["key_file"].as_str().unwrap_or_default()).map_err(|_| "SYNC_CANNOT_OPEN".to_string())?;
+    keys::KeyFile::from_json(&String::from_utf8(bytes).map_err(|_| "SYNC_CANNOT_OPEN".to_string())?)
+}
+
+async fn same_key_as_server(app: &tauri::AppHandle, vault_id: &str, target: &Remote) -> Result<bool, String> {
+    let dir = vault::vault_dir(app, vault_id)?;
+    let local = keys::read_key_file(&dir)?.ok_or_else(|| LOCKED.to_string())?;
+    Ok(server_key_file(target).await?.check() == local.check())
+}
+
+/// The password changed on another device. Its vault is under a new key, so the
+/// copy here starts over: the old one goes once the new password has been proven
+/// to open what is on the server. The database closes first, so a crash leaves
+/// a vault that asks again, never one whose key does not fit.
+#[tauri::command]
+pub async fn sync_adopt_new_password(app: tauri::AppHandle, vault_id: String, password: Zeroizing<String>) -> Result<(), String> {
+    let target = remote(&app, &vault_id)?;
+    let file = server_key_file(&target).await?;
+    let key = {
+        let file = file.clone();
+        tauri::async_runtime::spawn_blocking(move || file.unlock_with_password(&password)).await.map_err(|e| e.to_string())??
+    };
+    let response = send(target.call(Method::GET, "/snapshot", LONG)?).await?;
+    if !response.status().is_success() {
+        return Err(refused(response).await);
+    }
+    let snapshot = response.bytes().await.map_err(|_| UNREACHABLE.to_string())?;
+    open(&crypto::subkey(&key, Purpose::Files), &snapshot)?;
+
+    let old = keys::key_for(&app, &vault_id)?.ok_or_else(|| LOCKED.to_string())?;
+    hold_token(&app, &vault_id, &old)?;
+    let dir = vault::vault_dir(&app, &vault_id)?;
+    vault::remove_vault_content(&dir)?;
+    keys::store_key_file(&dir, &file)?;
+    let remembered = keys::is_remembered(&vault_id);
+    if remembered {
+        keys::apply_remember(&vault_id, &key, Some(true));
+    }
+    app.state::<keys::VaultKeys>().insert(&vault_id, key);
+    token(&app, &vault_id).map(|_| ())
+}
+
+/// The new key is on the server. Images still under old names are of no use to
+/// anybody now; the server drops them after its grace period.
+#[tauri::command]
+pub async fn sync_rekey_done(app: tauri::AppHandle, vault_id: String) -> Result<(), String> {
+    let target = remote(&app, &vault_id)?;
+    let folder = vault::vault_dir(&app, &vault_id)?.join("images");
+    let response = send(target.call(Method::GET, "/blobs", SHORT)?).await?;
+    if response.status().is_success() {
+        let listed: Vec<Value> = response.json().await.map_err(|_| UNREACHABLE.to_string())?;
+        for name in listed.iter().filter_map(|b| b["name"].as_str()) {
+            if images::is_valid_image_name(name) && !folder.join(name).exists() {
+                let _ = send(target.call(Method::DELETE, &format!("/blobs/{name}"), SHORT)?).await;
+            }
+        }
+    }
+    change_all(&app, |all| {
+        if let Some(c) = all.get_mut(&vault_id) {
+            c.rekeyed = false;
+        }
+    })
 }
 
 /// Images are sealed and named by a keyed hash already, so they travel as they

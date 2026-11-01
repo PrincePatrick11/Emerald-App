@@ -40,6 +40,8 @@ export interface SyncStatus {
   username?: string;
   hasRemote?: boolean;
   needsLogin?: boolean;
+  /** The password changed here and the server has not heard yet. */
+  rekeyed?: boolean;
 }
 
 export interface RemoteVault {
@@ -113,10 +115,25 @@ export async function disconnectOpenVault(vaultId: string): Promise<void> {
   useSyncStore.setState({ error: null, lastSync: null, conflicts: 0 });
 }
 
+/** What this device had not pushed when the vault started over under a new password. */
+const keptOverNewPassword: SyncChange[] = [];
+
+/**
+ * The password changed on another device: hand over what is waiting here to the
+ * vault as it comes back. Names of images saved since the last push no longer
+ * exist under the new key, so those images are lost.
+ */
+export async function keepPendingForNewPassword(): Promise<void> {
+  const db = await getDb();
+  // A wrong password before this one: the same changes again, once.
+  keptOverNewPassword.length = 0;
+  if (await isTracked(db)) keptOverNewPassword.push(...(await collectChanges(db)).changes);
+}
+
 async function restoreFromSnapshot(db: Database, vaultId: string, keepPending: boolean): Promise<void> {
   const snapshot = await invoke<{ seq: number; epoch: number; schema: number; rows: string }>('sync_snapshot_get', { vaultId });
   if (snapshot.schema > BASELINE_VERSION) throw OUTDATED;
-  const keep: SyncChange[] = keepPending ? (await collectChanges(db)).changes : [];
+  const keep: SyncChange[] = [...keptOverNewPassword.splice(0), ...(keepPending ? (await collectChanges(db)).changes : [])];
   const rows = JSON.parse(snapshot.rows) as SnapshotRows;
   await drainSerialized();
   await replaceWithSnapshot(db, rows, keep, positionStatements({ cursor: snapshot.seq, epoch: snapshot.epoch }));
@@ -183,7 +200,7 @@ async function pull(db: Database, vaultId: string, epochAtStart: number): Promis
 }
 
 /** One round for a connected vault. Answers whether the stores need reloading. */
-async function round(db: Database, vaultId: string): Promise<boolean> {
+async function round(db: Database, vaultId: string, status: SyncStatus): Promise<boolean> {
   const epochAtStart = dbEpoch();
   let changed = false;
 
@@ -198,7 +215,14 @@ async function round(db: Database, vaultId: string): Promise<boolean> {
       changed = true;
     }
   }
-  if (await needsSnapshot(db)) await publishSnapshot(db, vaultId);
+  // New key, new image names: this device's vault is what everybody starts from.
+  if (status.rekeyed) {
+    await markSnapshotNeeded(db);
+    await publishSnapshot(db, vaultId);
+    await invoke('sync_rekey_done', { vaultId });
+  } else if (await needsSnapshot(db)) {
+    await publishSnapshot(db, vaultId);
+  }
 
   let imagesDue = changed;
   for (let tries = 0; ; tries++) {
@@ -263,7 +287,7 @@ async function run(reload: boolean): Promise<void> {
   try {
     const db = await getDb();
     await drainSerialized();
-    const changed = await round(db, vaultId);
+    const changed = await round(db, vaultId, status);
     lastRun = Date.now();
     useSyncStore.setState({ error: null, lastSync: lastRun });
     if (changed && reload && useVaultStore.getState().activeVaultId === vaultId) await reloadStores();

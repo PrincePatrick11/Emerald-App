@@ -5,6 +5,8 @@ export function syncErrorKey(code: string): string {
     case 'SYNC_INSECURE': return 'sync.errorInsecure';
     case 'SYNC_WRONG_LOGIN': return 'sync.errorWrongLogin';
     case 'SYNC_NEEDS_LOGIN': return 'sync.needsLogin';
+    case 'SYNC_PASSWORD_CHANGED': return 'sync.passwordChanged';
+    case 'WRONG_PASSWORD': return 'vaultKey.wrongPassword';
     case 'SYNC_SERVER:client_outdated': return 'sync.errorOutdated';
     case 'SYNC_SERVER:signup_closed': return 'sync.errorSignupClosed';
     case 'SYNC_SERVER:username_taken': return 'sync.errorUsernameTaken';

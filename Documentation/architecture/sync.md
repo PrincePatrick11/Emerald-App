@@ -10,7 +10,9 @@ Users connect the open vault under Settings → Sync (`SyncPage`), which puts it
 
 `lib/sync/engine.ts` decides when: every few seconds if the log holds something, every 15 seconds anyway, and at once on opening a vault that is being fetched. It does nothing while a vault waits for its password, since `getDb()` would fail on it and that failure sticks to the opening under way. It stands back while any page is in edit mode, changed or not: an editor holds its text from when it opened, and its next save would write that over a merge.
 
-**Not yet:** a password change on a connected vault is refused (`SYNC_CONNECTED`), so "forgot password" also needs disconnecting first, and a vault that is locked cannot get to that setting. `settings.json` does not sync. The server's live notifications are not used. The log on the server only shrinks when a snapshot is published, which nothing does on its own yet.
+**A password change** puts the vault under a new key with new image names, so a log cannot carry it. The device changing it syncs first, then publishes its vault as a new epoch with the new `vault.key` and asks the server to drop the images under old names (`rekeyed` in `sync.json` survives a crash until that is done). What another device pushed in between is lost. The other device notices that the snapshot does not open under its key (`SYNC_PASSWORD_CHANGED`), and asks for the new password under Settings → Sync. It proves that password against the server's `vault.key` and snapshot, removes its local copy and fetches anew. What it had not pushed goes back on top, except images saved since its last push, whose names no longer exist. A device that missed a change cannot put the old key back: publishing compares the key files first.
+
+**Not yet:** `settings.json` does not sync. The server's live notifications are not used. The log on the server only shrinks when a snapshot is published, which nothing does on its own yet.
 
 ## Capture
 

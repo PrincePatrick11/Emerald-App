@@ -27,6 +27,8 @@ export default function SyncPage() {
   const [signup, setSignup] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const adoptServerPassword = useVaultStore((s) => s.adoptServerPassword);
 
   const refresh = useCallback(async () => {
     const next = await syncStatus(vaultId);
@@ -122,6 +124,31 @@ export default function SyncPage() {
           </div>
           {conflicts > 0 && <SettingsStatus tone="muted">{t('sync.conflicts', { count: conflicts })}</SettingsStatus>}
           {syncMessage && <SettingsStatus tone="error">{syncMessage}</SettingsStatus>}
+          {syncError === 'SYNC_PASSWORD_CHANGED' && (
+            <>
+              <KeyField label={t('sync.newVaultPassword')}>
+                <input
+                  type="password"
+                  autoComplete="current-password"
+                  className="input-field settings-field"
+                  value={newPassword}
+                  disabled={busy}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                />
+              </KeyField>
+              <Button
+                variant="primary"
+                disabled={busy || !newPassword}
+                onClick={() => act(async () => {
+                  await adoptServerPassword(newPassword);
+                  setNewPassword('');
+                  await syncNow();
+                })}
+              >
+                {t('sync.adoptPassword')}
+              </Button>
+            </>
+          )}
           <div className="flex items-center gap-2 flex-wrap">
             <Button onClick={() => act(syncNow)} disabled={busy || running}>{t('sync.now')}</Button>
             <Button tone="danger" onClick={() => act(() => disconnectOpenVault(vaultId))} disabled={busy || running}>{t('sync.disconnect')}</Button>

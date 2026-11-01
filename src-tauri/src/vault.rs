@@ -762,6 +762,26 @@ pub fn migrate_vault_layout(
     Ok(target_dir.to_string_lossy().into_owned())
 }
 
+/// Database, drafts and images go; the folder and its settings stay. For a vault
+/// that fetches itself anew from a sync server.
+pub(crate) fn remove_vault_content(dir: &Path) -> Result<(), String> {
+    let journal = format!("{DB_FILE}-journal");
+    for name in [DB_FILE, journal.as_str(), DRAFTS_FILE] {
+        let file = dir.join(name);
+        if file.is_file() {
+            std::fs::remove_file(&file).map_err(|e| format!("remove {}: {e}", file.display()))?;
+        }
+    }
+    if let Ok(entries) = std::fs::read_dir(dir.join(IMAGES_SUBDIR)) {
+        for entry in entries.flatten() {
+            if crate::images::is_valid_image_name(&entry.file_name().to_string_lossy()) {
+                std::fs::remove_file(entry.path()).ok();
+            }
+        }
+    }
+    Ok(())
+}
+
 /// Deletes a vault's files — the database, its journal, its images and its
 /// settings. Only ever reached through the vault modal's opt-in "delete files"
 /// checkbox.

@@ -652,8 +652,7 @@
     "progressImages": "Bilder: {{done}} von {{total}}",
     "progressImagesPhase": "Bilder werden verschlüsselt …",
     "progressChecking": "Kopie wird geprüft …",
-    "notEnoughSpace": "Zu wenig freier Speicherplatz: Dafür braucht der Vault vorübergehend {{needed}} zusätzlich, frei sind {{free}}. Es wurde nichts verändert.",
-    "syncConnected": "Trenne diesen Vault zuerst vom Sync-Server (Einstellungen → Synchronisation)."
+    "notEnoughSpace": "Zu wenig freier Speicherplatz: Dafür braucht der Vault vorübergehend {{needed}} zusätzlich, frei sind {{free}}. Es wurde nichts verändert."
   },
   "security": {
     "rememberHint": "Legt den Schlüssel in den Schlüsselbund des Systems, damit der Vault ohne Passwort öffnet.",
@@ -1209,6 +1208,9 @@
     "errorBadPassword": "Das Passwort braucht mindestens 8 Zeichen.",
     "errorBadUsername": "Kontonamen dürfen Buchstaben, Ziffern und . _ - @ enthalten.",
     "errorBusy": "Zu viele Versuche. Bitte warte einen Moment.",
-    "errorFailed": "Die Synchronisation ist fehlgeschlagen."
+    "errorFailed": "Die Synchronisation ist fehlgeschlagen.",
+    "passwordChanged": "Das Vault-Passwort wurde auf einem anderen Gerät geändert. Gib das neue ein: Diese Kopie wird damit neu geholt.",
+    "newVaultPassword": "Neues Vault-Passwort",
+    "adoptPassword": "Mit diesem Passwort neu holen"
   }
 }

@@ -26,7 +26,7 @@ import { captureLegacySettings } from '../lib/vaultSettings';
 import { resolveOpenEdits } from '../lib/openEdits';
 import { changeVaultPassword, keyErrorOf, lockVault, type CreatedKey } from '../lib/vaultKeys';
 import { ensureVaultReady, VAULT_KEY_CANCELLED } from './vaultKeyStore';
-import { prepareOpenedVault } from '../lib/sync/engine';
+import { keepPendingForNewPassword, prepareOpenedVault, syncNow } from '../lib/sync/engine';
 
 interface VaultStore {
   vaults: Vault[];
@@ -56,6 +56,8 @@ interface VaultStore {
    * reloaded — the images are named differently. `null` if a running
    * edit should continue.
    */
+  /** The password changed on another device: this copy starts over under it. */
+  adoptServerPassword: (password: string) => Promise<void>;
   changePassword: (currentPassword: string, newPassword: string) => Promise<(CreatedKey & { reopenFailed?: true }) | null>;
   /** Locks the open vault and asks for the password right away — even if it is remembered. */
   lockActive: () => Promise<void>;
@@ -282,11 +284,30 @@ export const useVaultStore = create<VaultStore>((set, get) => ({
     return dirRemoved;
   },
 
+  adoptServerPassword: async (password) => {
+    const id = get().activeVaultId;
+    if (!(await resolveOpenEdits())) return;
+    await drainSerialized();
+    await keepPendingForNewPassword();
+    await detachDrafts();
+    try {
+      await withDbClosed(() => invoke('sync_adopt_new_password', { vaultId: id, password }));
+    } catch (err) {
+      // A wrong password changed nothing: the vault opens with its old key.
+      await restoreDrafts(id);
+      throw err;
+    }
+    await openActiveVault();
+  },
+
   changePassword: async (currentPassword, newPassword) => {
     const id = get().activeVaultId;
     // Like a switch: settle open edits, write drafts out —
     // the re-encryption rewrites them under the new key.
     if (!(await resolveOpenEdits())) return null;
+    // What other devices did since the last round would be lost in the snapshot
+    // that follows. Offline it stays a risk, not a reason to refuse.
+    await syncNow();
     await drainSerialized();
     await detachDrafts();
     let result: CreatedKey;

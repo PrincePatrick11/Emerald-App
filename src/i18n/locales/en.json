@@ -652,8 +652,7 @@
     "progressImages": "Images: {{done}} of {{total}}",
     "progressImagesPhase": "Encrypting the images …",
     "progressChecking": "Checking the copy …",
-    "notEnoughSpace": "Not enough free disk space: this temporarily needs {{needed}} more, and {{free}} is free. Nothing was changed.",
-    "syncConnected": "Disconnect this vault from its sync server first (Settings → Sync)."
+    "notEnoughSpace": "Not enough free disk space: this temporarily needs {{needed}} more, and {{free}} is free. Nothing was changed."
   },
   "security": {
     "rememberHint": "Keeps the key in the system keychain so the vault opens without a password.",
@@ -1209,6 +1208,9 @@
     "errorBadPassword": "The password needs at least 8 characters.",
     "errorBadUsername": "Account names can hold letters, digits and . _ - @",
     "errorBusy": "Too many attempts. Please wait a moment.",
-    "errorFailed": "Syncing failed."
+    "errorFailed": "Syncing failed.",
+    "passwordChanged": "The vault password was changed on another device. Enter the new one: this copy is fetched again under it.",
+    "newVaultPassword": "New vault password",
+    "adoptPassword": "Fetch again with this password"
   }
 }
