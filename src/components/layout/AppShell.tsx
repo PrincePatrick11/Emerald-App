@@ -6,7 +6,7 @@ import { reloadAllStores } from '../../store/moduleWiring';
 import { activeVault, hasActiveVault, useVaultStore } from '../../store/vaultStore';
 import { useSettingsStore } from '../../store/settingsStore';
 import { invoke } from '@tauri-apps/api/core';
-import { computeMenuEnabledState, runMenuAction, SELF_CONTAINED_MENU_ACTIONS } from '../../lib/menuActions';
+import { runMenuAction, SELF_CONTAINED_MENU_ACTIONS } from '../../lib/menuActions';
 import { hideSplash } from '../../lib/splash';
 import TitleBar from './titlebar/TitleBar';
 import LeftSidebarRailBase, { RAIL_WIDTH } from './LeftSidebarRail';
@@ -97,7 +97,6 @@ export default function AppShell() {
   const leftListOpen = useUIStore((s) => s.leftListOpen);
   const railOpen = useUIStore((s) => s.railOpen);
   const viewLocked = useUIStore((s) => s.viewLocked);
-  const activeView = useUIStore((s) => s.activeView);
   const setAltarWindowFullscreen = useUIStore((s) => s.setAltarWindowFullscreen);
   const isAltarWindowFullscreen = useUIStore(isAltarFullscreen);
 
@@ -222,10 +221,7 @@ export default function AppShell() {
       exportPdf:       t('menu.exportPdf'),
       exportMarkdown:  t('menu.exportMarkdown'),
       exportEmerald:   t('menu.exportEmerald'),
-      exportAltarImage: t('menu.exportAltarImage'),
-      exportAltarJpeg: t('menu.exportAltarJpeg'),
       exportAltarPng:  t('menu.exportAltarPng'),
-      exportAltarWebp: t('menu.exportAltarWebp'),
       importMarkdown:  t('menu.importMarkdown'),
       importEmerald:   t('menu.importEmerald'),
       quit:            t('menu.quit'),
@@ -233,19 +229,6 @@ export default function AppShell() {
   }, [i18n.language, t]);
 
   // Keeps the native macOS menu's enabled states in sync with the current
-  // view. The rules live in `computeMenuEnabledState` so the HTML menu bar
-  // greys out exactly the same items. No-ops on Windows/Linux, where no
-  // native menu is installed and the Rust commands bail out early.
-  useEffect(() => {
-    const enabled = computeMenuEnabledState(activeView);
-    invoke('set_export_menu_enabled', {
-      entryEnabled: enabled.entryEnabled,
-      pdfEnabled: enabled.pdfEnabled,
-      emeraldEnabled: enabled.emeraldEnabled,
-    }).catch(() => {/* desktop-only, ignore in browser preview */});
-    invoke('set_altar_export_menu_enabled', { enabled: enabled.altarImageEnabled })
-      .catch(() => {/* desktop-only, ignore in browser preview */});
-  }, [activeView.type, activeView.id, activeView.mode]);
 
   // Same idea for the View menu's check items — this state also changes
   // without the menu ever being opened (`setActiveView` opens the right

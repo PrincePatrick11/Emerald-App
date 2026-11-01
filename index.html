@@ -95,7 +95,7 @@
             <stop offset="100%" stop-opacity="0" />
           </linearGradient>
           <clipPath id="splash-clip">
-            <polygon points="74,77 97,54 159,54 182,77 182,167 159,190 97,190 74,167" />
+            <circle cx="128" cy="122" r="68" />
           </clipPath>
         </defs>
 
@@ -103,34 +103,27 @@
              comment on `.splash-gem` in `splash.css`. -->
         <circle class="splash-halo" cx="128" cy="122" r="241" fill="url(#splash-glow)" />
 
-        <!-- The emerald: crown of eight facets, table, step cut -->
+        <!-- The emerald, in the mark's own 120-unit frame scaled to r=68 around
+             the glow's centre: ten facets, the table, then the star and ring. -->
         <g clip-path="url(#splash-clip)">
-          <polygon class="splash-facet" points="74,77 97,54 105,71 91,89" />
-          <polygon class="splash-facet" points="97,54 159,54 151,71 105,71" />
-          <polygon class="splash-facet" points="159,54 182,77 165,89 151,71" />
-          <polygon class="splash-facet" points="182,77 182,167 165,155 165,89" />
-          <polygon class="splash-facet" points="182,167 159,190 151,173 165,155" />
-          <polygon class="splash-facet" points="159,190 97,190 105,173 151,173" />
-          <polygon class="splash-facet" points="97,190 74,167 91,155 105,173" />
-          <polygon class="splash-facet" points="74,167 74,77 91,89 91,155" />
-
-          <polygon points="91,89 105,71 151,71 165,89 165,155 151,173 105,173 91,155"
-                   fill="url(#splash-table)" opacity="0.9" />
+          <g transform="translate(55.14 49.14) scale(1.2143)">
+            <circle class="splash-stone" cx="60" cy="60" r="56" />
+            <path class="splash-facet" d="M60 4 L60 14 L70.33 45.79 L103.75 45.79 L113.26 42.7 A56 56 0 0 0 60 4 Z" />
+            <path class="splash-facet" d="M113.26 42.7 L103.75 45.79 L76.71 65.43 L87.04 97.21 L92.92 105.3 A56 56 0 0 0 113.26 42.7 Z" />
+            <path class="splash-facet" d="M92.92 105.3 L87.04 97.21 L60 77.57 L32.96 97.21 L27.08 105.3 A56 56 0 0 0 92.92 105.3 Z" />
+            <path class="splash-facet" d="M27.08 105.3 L32.96 97.21 L43.29 65.43 L16.25 45.79 L6.74 42.7 A56 56 0 0 0 27.08 105.3 Z" />
+            <path class="splash-facet" d="M6.74 42.7 L16.25 45.79 L49.67 45.79 L60 14 L60 4 A56 56 0 0 0 6.74 42.7 Z" />
+            <polygon class="splash-facet" points="60,14 49.67,45.79 70.33,45.79" />
+            <polygon class="splash-facet" points="103.75,45.79 70.33,45.79 76.71,65.43" />
+            <polygon class="splash-facet" points="87.04,97.21 76.71,65.43 60,77.57" />
+            <polygon class="splash-facet" points="32.96,97.21 60,77.57 43.29,65.43" />
+            <polygon class="splash-facet" points="16.25,45.79 43.29,65.43 49.67,45.79" />
+            <polygon points="60,77.57 43.29,65.43 49.67,45.79 70.33,45.79 76.71,65.43"
+                     fill="url(#splash-table)" opacity="0.95" />
+          </g>
 
           <circle class="splash-breath" cx="128" cy="122" r="86"
                   fill="url(#splash-breath-grad)" />
-
-          <!-- The cut edges as lines of their own. Without them they would
-               only arise where two facet fills meet — and such a seam is
-               antialiased independently from both sides, so it comes out
-               soft. -->
-          <path class="splash-cut" fill="none"
-                d="M74,77 L91,89 M97,54 L105,71 M159,54 L151,71 M182,77 L165,89
-                   M182,167 L165,155 M159,190 L151,173 M97,190 L105,173 M74,167 L91,155
-                   M91,89 L105,71 L151,71 L165,89 L165,155 L151,173 L105,173 L91,155 Z" />
-
-          <polygon class="splash-step" fill="none" stroke-width="1" opacity="0.28"
-                   points="102,90 111,78 145,78 154,90 154,154 145,166 111,166 102,154" />
 
           <!-- The tilt sits on this group and not on the rectangle: the
                CSS animation on `transform` would replace a `transform`
@@ -142,9 +135,11 @@
           </g>
         </g>
 
-        <polygon class="splash-outline" fill="none" stroke-width="2"
-                 stroke-linejoin="round" opacity="0.95"
-                 points="74,77 97,54 159,54 182,77 182,167 159,190 97,190 74,167" />
+        <g transform="translate(55.14 49.14) scale(1.2143)">
+          <polygon class="splash-line" points="60,14 87.04,97.21 16.25,45.79 103.75,45.79 32.96,97.21"
+                   fill="none" stroke-width="4.5" stroke-linejoin="round" />
+          <circle class="splash-line" cx="60" cy="60" r="52.5" fill="none" stroke-width="2.5" />
+        </g>
 
         <!-- Sparks: four-pointed stars, drawn as four inward-curved
              quarters around the center. -->

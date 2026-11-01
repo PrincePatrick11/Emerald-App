@@ -42,7 +42,7 @@ Colours are `#rgb` or `#rrggbb`. Anything else makes the file invalid, as does a
 
 ## What the App Checks
 
-A file can only set validated hex values, never CSS, so a shared theme cannot load anything from outside or change anything but colour. Stored themes pass the same check when settings are read, since they can come from a backup.
+The Emerald mark takes the theme's `accent`; its shape stays, and so do the loading screen and the app icon. A file can only set validated hex values, never CSS, so a shared theme cannot load anything from outside or change anything but colour. Stored themes pass the same check when settings are read, since they can come from a backup.
 
 Pairs below the [contrast rule](design.md#colour) produce a warning after import; the theme is still added. A vault holds at most 20 themes. Removing the active theme falls back to Emerald Noctis.
 

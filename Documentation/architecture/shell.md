@@ -33,7 +33,7 @@ Per-platform window settings live in `src-tauri/tauri.{windows,linux,macos}.conf
 
 ### Why the native menu is macOS-only
 
-`install_native_menu` in `src-tauri/src/lib.rs` is gated to macOS. On Windows and Linux, `set_menu` attaches an in-window menu bar (an HMENU / a GTK menubar) regardless of `decorations`, which would sit beside the app's own title-bar menus. The menu commands (`update_menu_labels`, `set_export_menu_enabled`, `set_altar_export_menu_enabled`, `set_view_menu_checked`) all return early when `app.menu()` is `None`, so they are no-ops there without frontend branching.
+`install_native_menu` in `src-tauri/src/lib.rs` is gated to macOS. On Windows and Linux, `set_menu` attaches an in-window menu bar (an HMENU / a GTK menubar) regardless of `decorations`, which would sit beside the app's own title-bar menus. The menu commands (`update_menu_labels`, `set_export_menu_enabled`, `set_altar_export_menu_enabled`, `set_view_menu_checked`) all return early when `app.menu()` is `None`, so they are no-ops there without frontend branching. The native menu holds the app menu, Edit and View; Export and Import are only in the title bar.
 
 Both forms run the same code. `src/lib/menuActions.ts` owns the actions (`runMenuAction`) and the rules for which export items are available (`computeMenuEnabledState`). The native menu emits the event ids listed in [IPC Command Surface](../architecture.md#ipc-command-surface), which `AppShell` forwards; the HTML buttons call `dispatchMenuAction` directly. `View > Reset View` is the exception: it changes `AppShell`'s local sidebar widths, so the HTML menu re-emits `reset-sidebar-widths` and `AppShell`'s listener answers it on both platforms.
 
@@ -142,7 +142,7 @@ The hidden webview loads the HTML from a `file://` URL, which carries no CSP and
 
 ### Menu enablement gating
 
-The three "Export as …" items (`export-pdf`, `export-markdown`, `export-emerald`) share one submenu but are gated differently. `computeMenuEnabledState(activeView)` in `src/lib/menuActions.ts` is the single rule set, read by both the native menu and the HTML title-bar menus:
+The three "Export as …" items (`export-pdf`, `export-markdown`, `export-emerald`) share one menu but are gated differently. `computeMenuEnabledState(activeView)` in `src/lib/menuActions.ts` is the single rule set, read by the title bar's Export menu on every platform.
 
 | Item | Enabled for |
 |---|---|
@@ -151,7 +151,6 @@ The three "Export as …" items (`export-pdf`, `export-markdown`, `export-emeral
 | `export-emerald` | an entry, an altar in reading view, or an open template page |
 | `export-altar-image` submenu | an altar in reading view |
 
-On macOS the items start disabled (`install_native_menu`), and one `useEffect` in `AppShell`, keyed on `activeView.type`, `.id` and `.mode`, pushes the state through `set_export_menu_enabled` (the three items independently) and `set_altar_export_menu_enabled` (the submenu and its three children).
 
 There is one item per format, not one per content type: the handlers branch on what is open. `export-pdf` re-reads `useUIStore.getState().activeView` at click time and calls `saveAltarPDF()` (`src/lib/altarExport.ts`) for an altar in reading view, `exportAsPDF(data)` otherwise. `exportAsEmerald()` (`src/lib/emeraldFormat.ts`) branches the same way.
 

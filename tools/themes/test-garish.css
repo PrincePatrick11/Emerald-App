@@ -165,4 +165,5 @@ html[data-theme='test-garish'] {
   --secondary-border-hover: hsl(190, 90%, 55%);
   --secondary-text: hsl(60, 90%, 70%);
   --secondary-text-hover: hsl(60, 100%, 75%);
+  --mark-accent: hsl(300, 95%, 65%);
 }

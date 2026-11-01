@@ -179,4 +179,5 @@ html[data-theme='emerald-noctis'] {
   --secondary-border-hover: rgba(142, 121, 101, 0.58);
   --secondary-text: #b9a38e;
   --secondary-text-hover: #f3e9dd;
+  --mark-accent: #00c47f;
 }

@@ -274,7 +274,7 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
      yellow UA default of <mark> would otherwise remain here — under accent-coloured text
      in a dark theme. */
   .search-match {
-    background-color: rgba(0, 176, 118, 0.22);
+    background-color: color-mix(in srgb, var(--accent) 22%, transparent);
     background-color: color-mix(in srgb, var(--accent) 22%, transparent);
     color: var(--accent-text);
     border-radius: 2px;
@@ -1128,7 +1128,7 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
 
 /* Edit mode: [[Label(id)]] inline text representation */
 .internal-link-edit {
-  color: #00b87a;
+  color: var(--accent-text);
   font-style: italic;
   cursor: text;
   user-select: text;
@@ -1445,7 +1445,7 @@ html[data-theme] .sidebar-add-field input::placeholder,
 
 .tag-chip-remove:hover {
   /* Deliberately without a token: darkens the chip's tag colour, the same in both themes. */
-  background-color: rgba(0, 0, 0, 0.25);
+  background-color: var(--interactive-active);
 }
 
 /* An action as a row instead of a bordered button ("Update all"). */
@@ -2017,7 +2017,7 @@ button.block-altar:hover .block-altar-title {
   border: 1px solid var(--border-soft);
   border: 1px solid color-mix(in srgb, var(--accent) 35%, var(--border-soft));
   border-radius: 0.5rem;
-  background: rgba(0, 230, 153, 0.06);
+  background: var(--accent-wash);
   background: color-mix(in srgb, var(--accent) 8%, transparent);
   color: var(--text-secondary);
   font-size: 0.75rem;
@@ -2551,17 +2551,17 @@ html[data-theme] .block-manager-row--idle,
 }
 
 .tasks-linked-entry {
-  color: rgba(0, 230, 153, 0.78);
-  background: rgba(0, 122, 77, 0.2);
+  color: var(--link-chip-text);
+  background: var(--link-chip-bg);
 }
 
 .tasks-linked-entry:hover {
-  color: #b8ffe2;
-  background: rgba(0, 122, 77, 0.34);
+  color: var(--link-chip-text-hover);
+  background: var(--link-chip-bg-hover);
 }
 
 .tasks-category-trigger {
-  color: #a8a29e;
+  color: var(--text-muted);
 }
 
 .tasks-category-trigger:hover {
@@ -2570,17 +2570,17 @@ html[data-theme] .block-manager-row--idle,
 }
 
 .sigil-tool-toggle {
-  background-color: rgba(41, 37, 36, 0.72);
-  border-color: rgba(87, 83, 78, 0.5);
+  background-color: var(--well-tint);
+  border-color: var(--edge);
 }
 
 .sigil-tool-btn:hover {
-  background-color: rgba(87, 83, 78, 0.5);
+  background-color: var(--interactive-active);
 }
 
 .sigil-brush-controls {
-  background-color: rgba(41, 37, 36, 0.72);
-  border: 1px solid rgba(87, 83, 78, 0.5);
+  background-color: var(--well-tint);
+  border: 1px solid var(--edge);
   border-radius: 0.5rem;
   padding: 0.35rem 0.55rem;
 }
@@ -2674,21 +2674,21 @@ html[data-theme] .settings-about-link:focus-visible {
 }
 
 .task-priority-pill-high {
-  background: rgba(239, 68, 68, 0.14);
-  color: #fca5a5;
-  border-color: rgba(239, 68, 68, 0.34);
+  background: var(--danger-hover-bg);
+  color: var(--danger-hover-text);
+  border-color: var(--danger-hover-border);
 }
 
 .task-priority-pill-medium {
-  background: rgba(250, 204, 21, 0.14);
-  color: #facc15;
-  border-color: rgba(250, 204, 21, 0.3);
+  background: color-mix(in srgb, var(--warning-text) 14%, transparent);
+  color: var(--warning-text);
+  border-color: color-mix(in srgb, var(--warning-text) 30%, transparent);
 }
 
 .task-priority-pill-low {
-  background: rgba(74, 222, 128, 0.14);
-  color: #4ade80;
-  border-color: rgba(74, 222, 128, 0.3);
+  background: color-mix(in srgb, var(--success-text) 14%, transparent);
+  color: var(--success-text);
+  border-color: color-mix(in srgb, var(--success-text) 30%, transparent);
 }
 
 /* Entry list: light titles instead of the muted `.sidebar-item` colour of the
@@ -3577,25 +3577,58 @@ html[data-theme='emerald-parchment'] .altar-cat-scroll-fade {
    black, `stroke` to `none`. The mark would be a black octagon, without
    an error message. Exactly the reason `public/splash.css` colours the stone of the
    loading screen via classes instead of on the element. */
-/* The dimming is not the same in both themes, for a
-   reason that is easy to overlook when building: on the dark Noctis,
-   less opacity brings the mark closer to the background and takes away its
-   glare. On the light Parchment it does the same — and there "closer to the
-   background" means washed out. The stone therefore stands at full strength there;
-   dark green on parchment is calm enough on its own. */
-.emerald-mark { --mark-crown: 0.55; --mark-table: 0.5; }
-html[data-theme='emerald-parchment'] .emerald-mark { --mark-crown: 1; --mark-table: 0.9; }
+/* The mark takes its colour from `--mark-accent`, so a custom theme tints it.
+   Classes, not `var()` on the SVG: see EmeraldMark.tsx. */
+.emerald-mark-stone { fill: color-mix(in srgb, var(--mark-accent) 56%, #000); }
+.emerald-mark-line { stroke: color-mix(in srgb, var(--mark-accent) 10%, #fff); }
+.emerald-mark-table { fill: var(--mark-accent); }
+.emerald-mark-f1 { fill: color-mix(in srgb, var(--mark-accent) 70%, #000); }
+.emerald-mark-f2 { fill: color-mix(in srgb, var(--mark-accent) 48%, #000); }
+.emerald-mark-f3 { fill: color-mix(in srgb, var(--mark-accent) 39%, #000); }
+.emerald-mark-f4 { fill: color-mix(in srgb, var(--mark-accent) 50%, #000); }
+.emerald-mark-f5 { fill: color-mix(in srgb, var(--mark-accent) 82%, #000); }
+.emerald-mark-t1 { fill: color-mix(in srgb, var(--mark-accent) 82%, #fff); }
+.emerald-mark-t2 { fill: color-mix(in srgb, var(--mark-accent) 90%, #000); }
+.emerald-mark-t3 { fill: color-mix(in srgb, var(--mark-accent) 70%, #000); }
+.emerald-mark-t4 { fill: color-mix(in srgb, var(--mark-accent) 77%, #000); }
+.emerald-mark-t5 { fill: color-mix(in srgb, var(--mark-accent) 75%, #fff); }
 
-.emerald-mark-crown        { fill: var(--accent); opacity: var(--mark-crown); }
-.emerald-mark-table        { opacity: var(--mark-table); }
-.emerald-mark-outline      { stroke: var(--accent); }
-.emerald-mark-table-top    { stop-color: var(--accent-text); }
-.emerald-mark-table-bottom { stop-color: var(--accent-strong); }
 
-/* The step cut is a light reflection and not a theme colour — it always lies
-   on the tinted table, never on the app background. On the
-   lighter Parchment green it has to be stronger, otherwise it disappears;
-   the same gradation that `--splash-sheen` makes between the themes. */
-.emerald-mark-step { stroke: rgba(255, 255, 255, 0.26); }
-html[data-theme='emerald-parchment'] .emerald-mark-step { stroke: rgba(255, 255, 255, 0.42); }
+/* Active states whose look otherwise lives only in the per-theme rules above:
+   here for a theme that has no such rules, from the tokens alone. */
+html[data-theme='custom'] .rail-button.active,
+html[data-theme='custom'] .rail-button.active:hover,
+html[data-theme='custom'] .settings-nav-item-active,
+html[data-theme='custom'] .right-sidebar-tab-active,
+html[data-theme='custom'] .app-sidebar-right .bg-well-active.text-secondary,
+html[data-theme='custom'] .app-sidebar-left .bg-well-active.text-secondary,
+html[data-theme='custom'] .altar-category-chip.bg-well-active,
+html[data-theme='custom'] .sigil-tool-btn.bg-well-active {
+  background: var(--menu-item-active-bg);
+  border-color: var(--accent-edge);
+  color: var(--menu-item-active-text);
+}
 
+html[data-theme='custom'] .settings-nav-item-active,
+html[data-theme='custom'] .right-sidebar-tab-active {
+  border: 1px solid var(--accent-edge);
+}
+
+html[data-theme='custom'] .link-picker-tab-active {
+  background: var(--link-picker-tab-active-bg);
+  border-bottom-color: var(--accent-edge);
+  color: var(--link-picker-tab-active-text);
+}
+
+html[data-theme='custom'] .link-picker-tab-active .link-picker-tab-count {
+  color: var(--link-picker-tab-active-count);
+}
+
+html[data-theme='custom'] .editor-toolbar-btn-active {
+  background-color: var(--editor-toolbar-active-bg);
+  color: var(--editor-toolbar-active-text);
+}
+
+html[data-theme='custom'] .list-toolbar-option-active.text-danger {
+  color: var(--danger-text);
+}

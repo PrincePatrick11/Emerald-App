@@ -133,8 +133,8 @@ html {
 #splash-table .splash-table-top    { stop-color: var(--splash-gem); }
 #splash-table .splash-table-bottom { stop-color: var(--splash-gem-deep); }
 
-.splash-outline { stroke: var(--splash-gem); }
-.splash-step    { stroke: var(--splash-sheen); }
+.splash-line  { stroke: #e6fff5; }
+.splash-stone { fill: var(--splash-gem-deep); }
 .splash-spark   { fill: var(--splash-gem); }
 
 /* ── The glow ──────────────────────────────────────────────────────────────
@@ -197,15 +197,6 @@ html {
 .splash-facet:nth-of-type(6) { --o: 0.50; animation-delay: 2.25s; }
 .splash-facet:nth-of-type(7) { --o: 0.40; animation-delay: 2.7s; }
 .splash-facet:nth-of-type(8) { --o: 0.56; animation-delay: 3.15s; }
-
-/* The cut edges as lines of their own. Without them they arise only where
-   two facet fills meet — and such a seam is antialiased independently from
-   both sides, so it comes out soft. */
-.splash-cut {
-  stroke: var(--splash-gem);
-  stroke-width: 1;
-  opacity: 0.75;
-}
 
 /* `fill-box` instead of the default `view-box`: otherwise the spark scales
    around the center of the whole SVG and visibly drifts toward the stone,
