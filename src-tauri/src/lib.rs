@@ -531,15 +531,16 @@ fn apply_dock_icon(png: Option<&[u8]>) {
     use objc::{class, msg_send, sel, sel_impl};
     use std::sync::atomic::{AtomicUsize, Ordering};
 
-    // Retained on the first change and kept for the app's lifetime.
+    // Copied on the first change and kept for the app's lifetime: the getter
+    // hands out the one image that every later set overwrites.
     static ORIGINAL: AtomicUsize = AtomicUsize::new(0);
 
     autoreleasepool(|| unsafe {
         let ns_app: *mut Object = msg_send![class!(NSApplication), sharedApplication];
         if ORIGINAL.load(Ordering::Relaxed) == 0 {
             let current: *mut Object = msg_send![ns_app, applicationIconImage];
-            let retained: *mut Object = msg_send![current, retain];
-            ORIGINAL.store(retained as usize, Ordering::Relaxed);
+            let copy: *mut Object = msg_send![current, copy];
+            ORIGINAL.store(copy as usize, Ordering::Relaxed);
         }
         match png {
             Some(bytes) => {
