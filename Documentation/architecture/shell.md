@@ -33,7 +33,7 @@ Per-platform window settings live in `src-tauri/tauri.{windows,linux,macos}.conf
 
 ### Why the native menu is macOS-only
 
-`install_native_menu` in `src-tauri/src/lib.rs` is gated to macOS. On Windows and Linux, `set_menu` attaches an in-window menu bar (an HMENU / a GTK menubar) regardless of `decorations`, which would sit beside the app's own title-bar menus. The menu commands (`update_menu_labels`, `set_export_menu_enabled`, `set_altar_export_menu_enabled`, `set_view_menu_checked`) all return early when `app.menu()` is `None`, so they are no-ops there without frontend branching. The native menu holds the app menu, Edit and View; Export and Import are only in the title bar.
+`install_native_menu` in `src-tauri/src/lib.rs` is gated to macOS. On Windows and Linux, `set_menu` attaches an in-window menu bar (an HMENU / a GTK menubar) regardless of `decorations`, which would sit beside the app's own title-bar menus. The menu commands (`update_menu_labels`, `set_view_menu_checked`) return early when `app.menu()` is `None`, so they are no-ops there without frontend branching. The native menu holds the app menu, Edit and View; Export and Import are only in the title bar.
 
 Both forms run the same code. `src/lib/menuActions.ts` owns the actions (`runMenuAction`) and the rules for which export items are available (`computeMenuEnabledState`). The native menu emits the event ids listed in [IPC Command Surface](../architecture.md#ipc-command-surface), which `AppShell` forwards; the HTML buttons call `dispatchMenuAction` directly. `View > Reset View` is the exception: it changes `AppShell`'s local sidebar widths, so the HTML menu re-emits `reset-sidebar-widths` and `AppShell`'s listener answers it on both platforms.
 
