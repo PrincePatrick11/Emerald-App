@@ -58,6 +58,7 @@ PDF export renders in a hidden window that the per-platform `export_pdf` command
 | `migrate_vault_layout` | `vault.rs` | moves a pre-0.2.1 flat `.db` into its own vault directory; the legacy name is validated with `is_valid_legacy_db_name` |
 | `close_request_seen` | `lib.rs` | no arguments: tells Rust the frontend is handling a close request (see [Closing the window](architecture/shell.md#closing-the-window)). All it can do is *prevent* the fallback that closes an unresponsive window |
 | `update_menu_labels`, `set_view_menu_checked` | `lib.rs` | native-menu state sync; no-ops on Windows/Linux, where no native menu is installed |
+| `set_dock_icon` | `lib.rs` | a custom theme's Dock icon as a size-limited PNG the frontend draws; no-op on Windows/Linux |
 | `update_settings`, `set_update_settings`, `check_for_update`, `install_update` | `updates.rs` | the only commands that reach the network — see [In-App Updates](#in-app-updates) |
 
 ## The Dev Bridge

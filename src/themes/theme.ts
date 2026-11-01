@@ -2,6 +2,7 @@ import { getCurrentWebview } from '@tauri-apps/api/webview';
 import { isTauri } from '../lib/platform';
 import { oneOf } from '../lib/helpers';
 import { customThemeTokens, type CustomTheme } from './customTheme';
+import { syncDockIcon } from './dockIcon';
 
 export type ThemeId = 'emerald-noctis' | 'emerald-parchment';
 /** A built-in theme, or an imported one of this vault. */
@@ -80,6 +81,7 @@ export function applyTheme(selection: ThemeSelection, customThemes: CustomTheme[
   html.style.removeProperty('color-scheme');
 
   const custom = customThemes.find((theme) => customThemeSelection(theme.id) === selection);
+  syncDockIcon(custom ?? null);
   if (!custom) {
     html.dataset.theme = selection.startsWith('custom:') ? DEFAULT_THEME_ID : selection;
     return;

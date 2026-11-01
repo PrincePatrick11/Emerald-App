@@ -504,6 +504,61 @@ fn install_native_menu(app: &tauri::App) -> tauri::Result<()> {
     Ok(())
 }
 
+// ── macOS Dock icon of a custom theme ─────────────────────────────────────────
+
+/// Far above the 512 px icon the frontend draws (`src/themes/dockIcon.ts`).
+const MAX_DOCK_ICON_BYTES: usize = 4 * 1024 * 1024;
+
+/// Shows a PNG as the Dock icon, or with `None` the icon the app started with.
+/// Lasts only while the app runs. macOS only in effect.
+#[tauri::command]
+fn set_dock_icon(app: tauri::AppHandle, png: Option<Vec<u8>>) -> Result<(), String> {
+    if png.as_ref().is_some_and(|bytes| bytes.len() > MAX_DOCK_ICON_BYTES) {
+        return Err("dock icon too large".into());
+    }
+    #[cfg(target_os = "macos")]
+    app.run_on_main_thread(move || apply_dock_icon(png.as_deref()))
+        .map_err(|e| e.to_string())?;
+    #[cfg(not(target_os = "macos"))]
+    let _ = (app, png);
+    Ok(())
+}
+
+#[cfg(target_os = "macos")]
+fn apply_dock_icon(png: Option<&[u8]>) {
+    use objc::rc::autoreleasepool;
+    use objc::runtime::Object;
+    use objc::{class, msg_send, sel, sel_impl};
+    use std::sync::atomic::{AtomicUsize, Ordering};
+
+    // Retained on the first change and kept for the app's lifetime.
+    static ORIGINAL: AtomicUsize = AtomicUsize::new(0);
+
+    autoreleasepool(|| unsafe {
+        let ns_app: *mut Object = msg_send![class!(NSApplication), sharedApplication];
+        if ORIGINAL.load(Ordering::Relaxed) == 0 {
+            let current: *mut Object = msg_send![ns_app, applicationIconImage];
+            let retained: *mut Object = msg_send![current, retain];
+            ORIGINAL.store(retained as usize, Ordering::Relaxed);
+        }
+        match png {
+            Some(bytes) => {
+                let data: *mut Object = msg_send![class!(NSData), dataWithBytes: bytes.as_ptr() length: bytes.len()];
+                let image: *mut Object = msg_send![class!(NSImage), alloc];
+                let image: *mut Object = msg_send![image, initWithData: data];
+                if !image.is_null() {
+                    let _: () = msg_send![ns_app, setApplicationIconImage: image];
+                    let _: () = msg_send![image, release];
+                }
+            }
+            None => {
+                let original = ORIGINAL.load(Ordering::Relaxed) as *mut Object;
+                let _: () = msg_send![ns_app, setApplicationIconImage: original];
+            }
+        }
+    });
+}
+
 // ── macOS mouse back/forward button support ───────────────────────────────────
 
 #[cfg(target_os = "macos")]
@@ -788,6 +843,7 @@ pub fn run() {
             ensure_app_storage_dirs,
             export_pdf,
             set_view_menu_checked,
+            set_dock_icon,
             update_menu_labels,
             close_request_seen,
             updates::update_settings,
