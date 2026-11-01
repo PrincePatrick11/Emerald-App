@@ -1,9 +1,14 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
 <defs>
-<linearGradient id="plate" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2a2018"/><stop offset="1" stop-color="#100d0a"/></linearGradient>
+<clipPath id="plate"><rect x="100" y="100" width="824" height="824" rx="185"/></clipPath>
 </defs>
-<rect x="100" y="100" width="824" height="824" rx="185" fill="url(#plate)"/>
+<g clip-path="url(#plate)">
 <g transform="translate(170 170) scale(5.7)">
+<polygon points="60,60 60.00,-140.00 250.21,-1.80" fill="#0a5e3e"/>
+<polygon points="60,60 250.21,-1.80 177.56,221.80" fill="#053f29"/>
+<polygon points="60,60 177.56,221.80 -57.56,221.80" fill="#043321"/>
+<polygon points="60,60 -57.56,221.80 -130.21,-1.80" fill="#06432d"/>
+<polygon points="60,60 -130.21,-1.80 60.00,-140.00" fill="#0c6d48"/>
 <circle cx="60" cy="60" r="56" fill="#0b6e48"/>
 <path d="M60 4 L60 14 L70.33 45.79 L103.75 45.79 L113.26 42.7 A56 56 0 0 0 60 4 Z" fill="#0e8a5a"/>
 <path d="M113.26 42.7 L103.75 45.79 L76.71 65.43 L87.04 97.21 L92.92 105.3 A56 56 0 0 0 113.26 42.7 Z" fill="#075e3d"/>
@@ -18,5 +23,6 @@
 <polygon points="60,77.57 43.29,65.43 49.67,45.79 70.33,45.79 76.71,65.43" fill="#00c47f"/>
 <polygon points="60,14 87.04,97.21 16.25,45.79 103.75,45.79 32.96,97.21" fill="none" stroke="#c8f2e0" stroke-width="3.4" stroke-linejoin="round"/>
 <circle cx="60" cy="60" r="52.5" fill="none" stroke="#c8f2e0" stroke-width="1.9"/>
+</g>
 </g>
 </svg>
