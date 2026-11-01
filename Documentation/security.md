@@ -57,7 +57,7 @@ PDF export renders in a hidden window that the per-platform `export_pdf` command
 | `default_vault_dir`, `new_vault_base_dir`, `legacy_default_db_exists` | `vault.rs` | path/existence oracles for the vault modal and the backup import's add-vault mode; take no path |
 | `migrate_vault_layout` | `vault.rs` | moves a pre-0.2.1 flat `.db` into its own vault directory; the legacy name is validated with `is_valid_legacy_db_name` |
 | `close_request_seen` | `lib.rs` | no arguments: tells Rust the frontend is handling a close request (see [Closing the window](architecture/shell.md#closing-the-window)). All it can do is *prevent* the fallback that closes an unresponsive window |
-| `update_menu_labels`, `set_export_menu_enabled`, `set_altar_export_menu_enabled`, `set_view_menu_checked` | `lib.rs` | native-menu state sync; no-ops on Windows/Linux, where no native menu is installed |
+| `update_menu_labels`, `set_view_menu_checked` | `lib.rs` | native-menu state sync; no-ops on Windows/Linux, where no native menu is installed |
 | `update_settings`, `set_update_settings`, `check_for_update`, `install_update` | `updates.rs` | the only commands that reach the network — see [In-App Updates](#in-app-updates) |
 
 ## The Dev Bridge
@@ -122,7 +122,7 @@ The mechanics are in [`architecture/encryption.md`](architecture/encryption.md);
 - **No cross-process lock.** Two Emerald processes on one vault — the release build and a dev build, say — are not coordinated; a password change in one while the other has the vault open is unsupported.
 - **macOS builds are unsigned.** After an update the keychain may ask whether the app may read its entry again; the choice is the user's.
 - **Windows keychain entries are written with `CRED_PERSIST_ENTERPRISE`**, the `keyring` crate's setting, so on a domain profile with roaming enabled they may roam with the profile.
-- **`settings.json` is plain**, deliberately: it holds no content and is read before any vault is unlocked.
+- **`settings.json` is plain**, deliberately: it holds no entry content (appearance includes the names and colours of imported themes) and is read before any vault is unlocked.
 
 ## Vault Directories as a Trust Boundary
 

@@ -269,15 +269,18 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
   /* The match in the title or in the text excerpt. The same accent mix
      as `.vault-card-active .vault-badge` — the spot is tinted, not
      outlined, so that a result list does not turn into a patchwork. */
-  /* The first declaration is not a stylistic device but the fallback: if
-     `color-mix` is unsupported (WebKit before 16.2, WebKitGTK before 2.40), the
-     yellow UA default of <mark> would otherwise remain here — under accent-coloured text
-     in a dark theme. */
+  /* The `rgba()` is the fallback for an engine without `color-mix` (WebKitGTK
+     before 2.40). It takes `@supports`: a declaration with `var()` always parses,
+     so a second line would win and then fail at computed-value time. */
   .search-match {
-    background-color: color-mix(in srgb, var(--accent) 22%, transparent);
-    background-color: color-mix(in srgb, var(--accent) 22%, transparent);
+    background-color: rgba(0, 176, 118, 0.22);
     color: var(--accent-text);
     border-radius: 2px;
+  }
+  @supports (color: color-mix(in srgb, red 50%, blue)) {
+    .search-match {
+      background-color: color-mix(in srgb, var(--accent) 22%, transparent);
+    }
   }
 
   /* The task row that a hit of the global search is currently pointing at.
@@ -293,12 +296,13 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
      `outline-offset` pulls the ring inward so the row does not jump
      in the flow. */
   .task-row-target {
-    /* A fallback as above, but more necessary here: `outline` is a
-       shorthand, a `color-mix` that is not understood discards the
-       whole declaration — the ring would be gone without replacement and silently. */
     outline: 1px solid rgba(0, 176, 118, 0.55);
-    outline: 1px solid color-mix(in srgb, var(--accent) 55%, transparent);
     outline-offset: -1px;
+  }
+  @supports (color: color-mix(in srgb, red 50%, blue)) {
+    .task-row-target {
+      outline: 1px solid color-mix(in srgb, var(--accent) 55%, transparent);
+    }
   }
 
   /* Showing/hiding the sidebars (`AppShell`); `margin-left` pushes
@@ -3156,7 +3160,7 @@ html[data-theme='emerald-parchment'] textarea::placeholder {
 html[data-theme='emerald-parchment'] input:focus,
 html[data-theme='emerald-parchment'] textarea:focus,
 html[data-theme='emerald-parchment'] select:focus,
-button:focus-visible {
+html[data-theme='emerald-parchment'] button:focus-visible {
   outline: none;
   box-shadow: 0 0 0 2px var(--focus-ring);
 }
@@ -3561,10 +3565,6 @@ html[data-theme='emerald-parchment'] .tiptap :not(pre) > code {
   border: 1px solid rgba(0, 122, 77, 0.2);
 }
 
-/* ── Altar Sidebar control buttons ────────────────────────────────────────── */
-
-/* The dragged row (placed items, block management): a touch of accent instead of night green. */
-/* Sidebar action bar — amber "edit" tone, warmed up so it reads on the light parchment ground */
 html[data-theme='emerald-parchment'] .altar-cat-scroll-fade {
   width: 3.5rem;
 }
@@ -3631,4 +3631,34 @@ html[data-theme='custom'] .editor-toolbar-btn-active {
 
 html[data-theme='custom'] .list-toolbar-option-active.text-danger {
   color: var(--danger-text);
+}
+
+html[data-theme='custom'] button:focus-visible,
+html[data-theme='custom'] .menu-item:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--focus-ring);
+}
+
+html[data-theme='custom'] .sidebar-search-inner {
+  background: var(--search-bg);
+  border: 1px solid var(--search-border);
+  box-shadow: var(--search-inset);
+}
+
+html[data-theme='custom'] .sidebar-search-input {
+  color: var(--text-primary);
+}
+
+html[data-theme='custom'] .sidebar-search-input::placeholder {
+  color: var(--text-subtle);
+}
+
+html[data-theme='custom'] .link-picker-row:hover,
+html[data-theme='custom'] .link-picker-row:focus-visible {
+  background: var(--link-picker-row-hover-bg);
+}
+
+html[data-theme='custom'] .link-picker-row:hover .link-picker-label,
+html[data-theme='custom'] .link-picker-row:focus-visible .link-picker-label {
+  color: var(--link-picker-row-hover-text);
 }

@@ -23,11 +23,13 @@
    here: the window color is deliberately only the dark one, Parchment users
    see dark instead of light for the blink of an eye.
 
+   `.splash-line` is a copy of --mark-line.
+
    The others are not copies: --splash-text belongs with the logo's lines, a
    light emerald from the stone, and turns dark on Parchment's light ground;
-   --splash-gem-deep is --accent-strong in
-   Parchment; in Noctis that would be #00a066, and the gradient across the
-   stone's table would be too flat to read as a cut. --splash-sheen is a
+   --splash-gem-deep fills the stone and ends the gradient across its table; it is
+   --accent-strong in Parchment, in Noctis that would be #00a066 and too flat to
+   read as a cut. --splash-sheen is a
    freely chosen white, --splash-rail-track a tint of --splash-gem — so
    anyone who changes --accent has to touch the two rgba values as well. */
 
@@ -52,6 +54,10 @@ html[data-theme='emerald-parchment'] {
    It therefore has to match --shell-bg permanently, not just at startup. */
 html {
   background: var(--splash-bg);
+}
+/* A custom theme keeps the Noctis loading screen but has its own frame. */
+html[data-theme='custom'] {
+  background: var(--shell-bg);
 }
 
 .splash {

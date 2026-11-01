@@ -328,6 +328,17 @@ export function importableSettings(raw: unknown): VaultSettings | null {
 export function withSettingsGroups(current: VaultSettings, incoming: VaultSettings, groups: readonly SettingsGroup[]): VaultSettings {
   const next: Record<string, unknown> = { ...current };
   for (const group of groups) next[group] = incoming[group];
+  if (groups.includes('appearance')) {
+    // The vault's own themes stay: a backup adds to them, and its selection may name either.
+    const ownIds = new Set(current.appearance.customThemes.map((theme) => theme.id));
+    next.appearance = {
+      ...incoming.appearance,
+      customThemes: [
+        ...current.appearance.customThemes,
+        ...incoming.appearance.customThemes.filter((theme) => !ownIds.has(theme.id)),
+      ],
+    };
+  }
   return next as unknown as VaultSettings;
 }
 

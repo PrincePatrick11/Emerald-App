@@ -154,7 +154,7 @@ Where the code contradicts the rules above today. No prioritisation — each poi
 
 ### Colour Values
 
-**Theme variables** (`src/themes/emerald-noctis.css`, `emerald-parchment.css`). Both files define the same 161 properties, including the edit sidebar's `--field-*`, `--primary-solid-*` and `--danger-soft-*` tokens `Button`'s `--tone-*` and the Settings' `--choice-*`. Core values:
+**Theme variables** (`src/themes/emerald-noctis.css`, `emerald-parchment.css`). Both files define the same 163 properties, including the edit sidebar's `--field-*`, `--primary-solid-*` and `--danger-soft-*` tokens `Button`'s `--tone-*` and the Settings' `--choice-*`. Core values:
 
 | Property | Emerald Noctis (dark) | Emerald Parchment (light) |
 | --- | --- | --- |
@@ -189,7 +189,7 @@ Consequence: a new "active" variant on a `.panel` card needs either a selector t
 - `.vault-card*` forgoes `.panel` and rebuilds the look; the active card's accent border (`.vault-card.vault-card-active`) deliberately sits outside any `@layer` block, with a comment in place, rather than with the other `.vault-*` classes in `@layer components`.
 - `.task-row-target` marks the row a search hit points at using `outline` rather than `background`/`border`/`box-shadow` — all three would be overridden by `html[data-theme=…] .panel-interactive`.
 
-`.search-match` and `.task-row-target` carry an `rgba()` fallback line ahead of their `color-mix()`, for WebKit before 16.2 / WebKitGTK before 2.40. The other `color-mix()` sites (vault cards, emoji-picker search, `.input-field`, …) have none yet.
+`.search-match` and `.task-row-target` carry an `rgba()` fallback with their `color-mix()` behind `@supports`, for WebKitGTK before 2.40. The other `color-mix()` sites (vault cards, emoji-picker search, `.input-field`, …) have none yet.
 
 ### Overlays and Portals
 

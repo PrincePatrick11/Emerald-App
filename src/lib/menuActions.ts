@@ -5,12 +5,12 @@ import { showSplash } from './splash';
 import type { ActiveView } from '../types';
 
 /**
- * The application menu's actions, shared by the two menus that can trigger
- * them: the native macOS menu (built in `src-tauri/src/lib.rs`, which emits
- * these ids as Tauri events, picked up by `AppShell`) and the HTML menu bar
- * in the title bar on Windows and Linux, which calls `runMenuAction` directly.
+ * The application menu's actions, shared by the menus that can trigger them:
+ * the native macOS menu (built in `src-tauri/src/lib.rs`, which emits its ids as
+ * Tauri events, picked up by `AppShell`) and the title bar's HTML menus, which
+ * call `runMenuAction` directly. Export and Import exist only in the title bar.
  *
- * The ids are the same strings on both paths — keep them in sync with
+ * The native ids are the same strings on both paths — keep them in sync with
  * `install_native_menu` in `src-tauri/src/lib.rs`.
  */
 export type MenuActionId =
@@ -36,26 +36,29 @@ export type MenuActionId =
  */
 export type SelfContainedMenuActionId = Exclude<MenuActionId, 'reset-sidebar-widths'>;
 
+/** The actions only the title bar offers; every other one is a native menu event. */
+type TitleBarOnlyMenuActionId =
+  | 'export-pdf'
+  | 'export-markdown'
+  | 'export-emerald'
+  | 'export-altar-jpeg'
+  | 'export-altar-png'
+  | 'export-altar-webp'
+  | 'import-markdown'
+  | 'import-emerald';
+
 // Keyed rather than a plain array so that adding a `MenuActionId` without
 // listing it here is a compile error, not a menu item that silently stops
 // working on macOS.
-const SELF_CONTAINED: Record<SelfContainedMenuActionId, true> = {
+const NATIVE_EVENTS: Record<Exclude<SelfContainedMenuActionId, TitleBarOnlyMenuActionId>, true> = {
   'toggle-rail': true,
   'toggle-left-list': true,
   'toggle-right-sidebar': true,
   'toggle-view-lock': true,
   'show-splash': true,
-  'export-pdf': true,
-  'export-markdown': true,
-  'export-emerald': true,
-  'export-altar-jpeg': true,
-  'export-altar-png': true,
-  'export-altar-webp': true,
-  'import-markdown': true,
-  'import-emerald': true,
 };
 
-export const SELF_CONTAINED_MENU_ACTIONS = Object.keys(SELF_CONTAINED) as SelfContainedMenuActionId[];
+export const NATIVE_MENU_EVENTS = Object.keys(NATIVE_EVENTS) as (keyof typeof NATIVE_EVENTS)[];
 
 /** Runs a menu action. Errors surface as native dialogs, matching the previous behaviour. */
 export async function runMenuAction(id: SelfContainedMenuActionId): Promise<void> {

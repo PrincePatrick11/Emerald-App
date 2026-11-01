@@ -156,7 +156,7 @@ There is one item per format, not one per content type: the handlers branch on w
 
 **Blocks export through their own serializers, so there is no concealed-sigil gate.** `collectExportData` runs `renderBlocksForExport` (`lib/blocks/exportRender.ts`, pure, texts passed in as `ExportText`): one serializer per block type, by the read-mode rules — hidden blocks and a concealed sigil's calculator and drawing are left out, field blocks list only what `isHiddenInRead` lets through, titles become `<h3>` where `showsTitleInRead` says so, unknown types go out as their stored inner HTML. The result is plain HTML without `<section>`, so DOMPurify, `embedImages`, the link-chip transform and Turndown work unchanged (Turndown has rules for `<dt>`/`<dd>`; `stripImages` keeps a block image's alt text as a placeholder). The `.emerald` export keeps blocks as stored, hidden ones flagged, but drops concealed ones via `withoutConcealed`.
 
-**Altar "Export as Image" submenu.** `export-altar-image` (below a separator in `export-submenu`) holds `export-altar-jpeg`/`-png`/`-webp`; each reaches `runMenuAction`, which calls `saveAltarImage(format)` (`src/lib/altarExport.ts`). `update_menu_labels` descends into the nested submenu to relabel it on language change.
+**Altar "Export as Image" submenu.** The title bar's Export menu holds `export-altar-jpeg`/`-png`/`-webp`; each reaches `runMenuAction`, which calls `saveAltarImage(format)` (`src/lib/altarExport.ts`).
 
 ### Bridging imperative menu-event code to a React modal
 

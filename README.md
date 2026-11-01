@@ -10,7 +10,7 @@ Pre-built binaries are on the [Releases](../../releases) page.
 
 | Platform | What is built |
 |---|---|
-| macOS | Apple Silicon only, macOS 13 Ventura or newer |
+| macOS | Apple Silicon only, macOS 13.1 Ventura or newer |
 | Windows | x64, `.exe` (NSIS) and `.msi` |
 | Linux | x64, `.deb` and `.AppImage`, built on Ubuntu 22.04 |
 

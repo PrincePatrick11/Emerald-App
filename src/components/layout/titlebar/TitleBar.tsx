@@ -144,7 +144,7 @@ export default function TitleBar({ tabs = false, leadWidth = 0, animate = true }
           </div>
         )}
 
-        {/* Not gated on `minimal`: on Windows and Linux this is the only
+        {/* Not gated on `minimal`: this is the only
             route to the altar's image export, and distraction-free mode is
             precisely where that export is wanted. Export carries Download,
             Import Upload — as in Settings → Backup. */}

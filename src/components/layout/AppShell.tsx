@@ -6,7 +6,7 @@ import { reloadAllStores } from '../../store/moduleWiring';
 import { activeVault, hasActiveVault, useVaultStore } from '../../store/vaultStore';
 import { useSettingsStore } from '../../store/settingsStore';
 import { invoke } from '@tauri-apps/api/core';
-import { runMenuAction, SELF_CONTAINED_MENU_ACTIONS } from '../../lib/menuActions';
+import { runMenuAction, NATIVE_MENU_EVENTS } from '../../lib/menuActions';
 import { hideSplash } from '../../lib/splash';
 import TitleBar from './titlebar/TitleBar';
 import LeftSidebarRailBase, { RAIL_WIDTH } from './LeftSidebarRail';
@@ -210,25 +210,15 @@ export default function AppShell() {
     invoke('update_menu_labels', {
       edit:            t('menu.edit'),
       view:            t('menu.view'),
-      export:          t('menu.export'),
-      import:          t('menu.import'),
       resetView:       t('menu.resetView'),
       lockView:        t('menu.lockView'),
       showSplash:      t('menu.showSplash'),
       rail:            t('menu.rail'),
       entryList:       t('menu.entryList'),
       properties:      t('menu.properties'),
-      exportPdf:       t('menu.exportPdf'),
-      exportMarkdown:  t('menu.exportMarkdown'),
-      exportEmerald:   t('menu.exportEmerald'),
-      exportAltarPng:  t('menu.exportAltarPng'),
-      importMarkdown:  t('menu.importMarkdown'),
-      importEmerald:   t('menu.importEmerald'),
       quit:            t('menu.quit'),
     }).catch(() => {/* desktop-only, ignore in browser preview */});
   }, [i18n.language, t]);
-
-  // Keeps the native macOS menu's enabled states in sync with the current
 
   // Same idea for the View menu's check items — this state also changes
   // without the menu ever being opened (`setActiveView` opens the right
@@ -254,10 +244,10 @@ export default function AppShell() {
     return () => { unlisten.then(fn => fn()); };
   }, [setAltarWindowFullscreen]);
 
-  // The native macOS menu emits these; the HTML menu bar on Windows/Linux
-  // calls `runMenuAction` directly. Both go through the same implementation.
+  // The native macOS menu emits these; the title bar's menus call
+  // `runMenuAction` directly. Both go through the same implementation.
   useEffect(() => {
-    const unlisteners = SELF_CONTAINED_MENU_ACTIONS.map((id) =>
+    const unlisteners = NATIVE_MENU_EVENTS.map((id) =>
       listen(id, () => { void runMenuAction(id); })
     );
     return () => { unlisteners.forEach((p) => p.then((fn) => fn())); };

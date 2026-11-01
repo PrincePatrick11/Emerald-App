@@ -2,7 +2,7 @@ import { useRef, useState, type ChangeEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { AlertTriangle, Palette, Upload, X } from 'lucide-react';
 import { useSettingsStore } from '../../../store/settingsStore';
-import { customThemeSelection } from '../../../themes/theme';
+import { DEFAULT_THEME_ID, customThemeSelection } from '../../../themes/theme';
 import {
   MAX_CUSTOM_THEMES, MAX_CUSTOM_THEME_FILE_BYTES, customThemeContrastProblems, parseCustomThemeFile,
 } from '../../../themes/customTheme';
@@ -53,7 +53,7 @@ export default function CustomThemesSection() {
     const wasActive = appearance.theme === customThemeSelection(id);
     update('appearance', {
       customThemes: appearance.customThemes.filter((theme) => theme.id !== id),
-      ...(wasActive ? { theme: 'emerald-noctis' as const } : {}),
+      ...(wasActive ? { theme: DEFAULT_THEME_ID } : {}),
     });
     setStatus(null);
   };

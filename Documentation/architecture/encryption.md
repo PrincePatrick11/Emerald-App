@@ -37,7 +37,7 @@ The nonce is random per seal. The header, a **context** (vault key, image, draft
 
 - **Images** are sealed and named by a keyed hash (HMAC under the `ImageNames` subkey) instead of the SHA-256 of their bytes: the plain hash would let anyone holding a copy of a known picture confirm it is in the vault. The name stays 64 hex digits plus the extension, so nothing that reads names changes, and identical images still share one file. `images.rs` has two functions that touch image bytes, `store` and `load`. `load` returns an unsealed file as it is: the legacy shared pool the image handler falls back to is plain (see [Image Storage System](storage.md#image-storage-system)).
 - **`drafts.json`** is sealed under the `Files` subkey; a plain one written before the vault was encrypted is still read.
-- **`settings.json` stays plaintext.** It holds appearance and limits, no content, and the boot path reads it before any vault is unlocked.
+- **`settings.json` stays plaintext.** It holds appearance (with the names and colours of imported themes) and limits, no entry content, and the boot path reads it before any vault is unlocked.
 
 ## The SQL layer
 

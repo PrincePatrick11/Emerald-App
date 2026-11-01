@@ -488,7 +488,7 @@ const noticeTimerRef = useRef<number | null>(null);
               </div>
             </div>
           ))}
-          {backgroundNotice && <p className="mt-2 text-xs text-on-accent">{backgroundNotice}</p>}
+          {backgroundNotice && <p className="mt-2 text-xs text-accent">{backgroundNotice}</p>}
           </div>
           {isEditing && (
             <>

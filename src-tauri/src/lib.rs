@@ -382,7 +382,7 @@ async fn export_pdf(app: tauri::AppHandle, html: String, path: String, page_size
 /// in-window menu bar (HMENU / GTK menubar) that would collide with the
 /// app's own menu bar in `TitleBar` — those platforms render the same items
 /// in HTML instead (`src/components/layout/titlebar/useTitleBarMenus.ts`),
-/// firing the identical events listed below.
+/// running the same actions.
 ///
 /// `update_menu_labels` bails out on `app.menu()` returning `None`, so
 /// it becomes a no-op on the platforms that never get here.

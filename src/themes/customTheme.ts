@@ -42,6 +42,8 @@ const OPTIONAL_COLORS: Record<CustomTheme['base'], Pick<CustomThemeColors, 'dang
   light: { danger: '#b63f32', warning: '#a75924', success: '#1f7a43' },
 };
 
+const MIN_TEXT_CONTRAST = 2;
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
@@ -71,6 +73,9 @@ function readTheme(raw: unknown, id: string): CustomTheme | null {
     if (!value) return null;
     result[key] = value;
   }
+  // Below this floor the controls that would remove the theme are unreadable too.
+  if (contrastRatio(result.text, result.sheet) < MIN_TEXT_CONTRAST) return null;
+  if (contrastRatio(result.text, result.panel) < MIN_TEXT_CONTRAST) return null;
   return { id, name, base: raw.base, colors: result };
 }
 
@@ -157,8 +162,8 @@ export function customThemeTokens({ base, colors: c }: CustomTheme): Record<stri
     'accent-wash': fade(c.accent, 12),
     'accent-wash-strong': fade(c.accent, 25),
     'accent-track': fade(c.accent, 60),
-    'accent-fill': c.accent,
-    'accent-fill-strong': c.accent,
+    'accent-fill': accentSoft,
+    'accent-fill-strong': fade(c.accent, 35),
     'focus-ring': fade(c.accent, 45),
     'scrollbar': c.border,
     'scrollbar-hover': borderStrong,
@@ -315,6 +320,8 @@ export function customThemeContrastProblems({ colors: c }: CustomTheme): string[
     ['text / sheet', c.text, c.sheet],
     ['text / panel', c.text, c.panel],
     ['textMuted / sheet', c.textMuted, c.sheet],
+    ['textMuted / panel', c.textMuted, c.panel],
+    ['textMuted / frame', c.textMuted, c.frame],
     ['accent / sheet', c.accent, c.sheet],
     ['onAccent / accent', c.onAccent, c.accent],
     ['danger / sheet', c.danger, c.sheet],
