@@ -21,7 +21,7 @@ The logo (`EmeraldMark`, an inline SVG) is not a control. Its wrapper carries `d
 | Window config | `decorations: false` | `decorations: true` + `titleBarStyle: "Overlay"` + `hiddenTitle` |
 | Min / max / close | `WindowControls` (46x40, Fluent geometry) | Native traffic lights, positioned by `trafficLightPosition` |
 | Application menu | `TitleBarMenuButton` | Native, in the system menu bar |
-| Title bar left | the logo | no logo, a 5.25rem inset for the traffic lights |
+| Title bar left | the logo | no logo, a 5rem inset for the traffic lights |
 
 Per-platform window settings live in `src-tauri/tauri.{windows,linux,macos}.conf.json`, which Tauri merges over `tauri.conf.json` — each repeats the complete window object, and `tauri.dev.conf.json` must never gain an `app.windows` key (why: [Per-platform Tauri configs](../build.md#per-platform-tauri-configs)). All four files set `minWidth` 720 and `minHeight` 600.
 

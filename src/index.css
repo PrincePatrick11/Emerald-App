@@ -127,12 +127,13 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
     transition: min-width 200ms ease-out;
   }
 
-  /* Traffic lights sit at x:20 and span ~52px (see tauri.macos.conf.json).
+  /* Traffic lights span x 15-75 and are centred on the 40px bar, the red one over
+     the rail's icons (tauri.macos.conf.json; its `y` is not the top edge).
      The inset goes on the leading group, not the bar: that group is
      border-box, so with tabs its `min-width` (the left sidebar's width)
      already includes the inset and the tabs still start at the sheet's edge. */
   html[data-platform='macos'] .titlebar > :first-child {
-    padding-left: 5.25rem;
+    padding-left: 5rem;
   }
 
   /* A menu button of the title bar while its menu is open. With
