@@ -48,10 +48,10 @@ export default function EmeraldMark({ size, className }: { size: number; classNa
             className="emerald-mark-line"
             points="60,14 87.04,97.21 16.25,45.79 103.75,45.79 32.96,97.21"
             fill="none"
-            strokeWidth="4.5"
+            strokeWidth="3.4"
             strokeLinejoin="round"
           />
-          <circle className="emerald-mark-line" cx="60" cy="60" r="52.5" fill="none" strokeWidth="2.5" />
+          <circle className="emerald-mark-line" cx="60" cy="60" r="52.5" fill="none" strokeWidth="1.9" />
         </>
       )}
     </svg>

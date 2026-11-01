@@ -13,9 +13,9 @@
    first frame, before the bundle and before the theme files. A `<link>` in
    the `<head>` blocks rendering and satisfies that; the bundle does not.
 
-   --splash-bg, --splash-gem and --splash-text are copies of --shell-bg,
-   --accent and --text-subtle from `src/themes/*.css` — that way the loading
-   screen blends seamlessly into the app's frame. If they change there, they
+   --splash-bg and --splash-gem are copies of --shell-bg and --accent from
+   `src/themes/*.css` — that way the loading screen blends seamlessly into the
+   app's frame. If they change there, they
    have to be updated here. --splash-bg is additionally set as
    `backgroundColor` in `src-tauri/tauri.conf.json` and the three platform
    files next to it — not in `tauri.dev.conf.json`, which must not get an
@@ -23,7 +23,9 @@
    here: the window color is deliberately only the dark one, Parchment users
    see dark instead of light for the blink of an eye.
 
-   The other three are not copies: --splash-gem-deep is --accent-strong in
+   The others are not copies: --splash-text belongs with the logo's lines, a
+   light emerald from the stone, and turns dark on Parchment's light ground;
+   --splash-gem-deep is --accent-strong in
    Parchment; in Noctis that would be #00a066, and the gradient across the
    stone's table would be too flat to read as a cut. --splash-sheen is a
    freely chosen white, --splash-rail-track a tint of --splash-gem — so
@@ -33,7 +35,7 @@
   --splash-bg: #100d0a;
   --splash-gem: #00c47f;
   --splash-gem-deep: #007a4d;
-  --splash-text: #8a837d;
+  --splash-text: #a9d9c5;
   --splash-sheen: rgba(255, 255, 255, 0.55);
   --splash-rail-track: rgba(0, 196, 127, 0.18);
 }
@@ -41,7 +43,7 @@ html[data-theme='emerald-parchment'] {
   --splash-bg: #ecdec7;
   --splash-gem: #008a57;
   --splash-gem-deep: #006941;
-  --splash-text: #775c41;
+  --splash-text: #0b6e48;
   --splash-sheen: rgba(255, 255, 255, 0.85);
   --splash-rail-track: rgba(0, 138, 87, 0.22);
 }
@@ -133,7 +135,7 @@ html {
 #splash-table .splash-table-top    { stop-color: var(--splash-gem); }
 #splash-table .splash-table-bottom { stop-color: var(--splash-gem-deep); }
 
-.splash-line  { stroke: #100d0a; }
+.splash-line  { stroke: #c8f2e0; }
 .splash-stone { fill: var(--splash-gem-deep); }
 .splash-spark   { fill: var(--splash-gem); }
 

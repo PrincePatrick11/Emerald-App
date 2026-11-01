@@ -1,5 +1,5 @@
 /**
- * Generates all app icons from the two templates under
+ * Generates all app icons from the templates under
  * `src-tauri/icons/source/`.
  *
  * The script is needed because two templates meet in one folder:
@@ -50,9 +50,8 @@ try {
   // … then the one file that has to come from the plate.
   copyFileSync(join(macOut, 'icon.icns'), join(TARGET, 'icon.icns'));
 
-  // And the favicon that `index.html` shows in the dev browser. It comes out
-  // of this run too, instead of being a fifth hand-maintained copy of the geometry.
-  copyFileSync(`${SOURCE}/emerald.svg`, 'public/favicon.svg');
+  // And the favicon that `index.html` shows in the dev browser, in the small cut.
+  copyFileSync(`${SOURCE}/favicon.svg`, 'public/favicon.svg');
 
   console.log(`Icons generated: ${TARGET} (icon.icns from the macOS template), public/favicon.svg`);
 } finally {
