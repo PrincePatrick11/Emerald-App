@@ -1,18 +1,7 @@
 import type { ReactNode } from 'react';
-import type { LucideIcon } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import FilterList, { type FilterChip } from './FilterList';
-import { SwitchRow } from './Switch';
 import { SidebarGroup } from './SidebarColumn';
-
-/** A display toggle: a preference of the view, not a filter; it does not count
- *  towards `activeFilterCount` and stays put on reset. */
-export interface DisplayToggle {
-  label: string;
-  icon?: LucideIcon;
-  checked: boolean;
-  onChange: (next: boolean) => void;
-}
 
 export interface FilterPanelProps {
   chipLabel?: string;
@@ -24,9 +13,6 @@ export interface FilterPanelProps {
   onAllChips?: () => void;
   /** Count next to "All": the list after the search, without this filter. */
   allChipsCount?: number;
-  /** Separate "Display" group before the filters (tasks: "Show completed",
-   *  altar: "Altar preview"). */
-  displayToggles?: DisplayToggle[];
 
   /** Second filter group with its own heading; tasks: priorities. */
   statusChips?: FilterChip[];
@@ -51,7 +37,6 @@ export default function FilterPanel({
   onChipToggle,
   onAllChips,
   allChipsCount,
-  displayToggles,
   statusChips,
   selectedStatus = [],
   onStatusToggle,
@@ -71,14 +56,6 @@ export default function FilterPanel({
           {group.content}
         </SidebarGroup>
       ))}
-
-      {displayToggles && displayToggles.length > 0 && (
-        <SidebarGroup label={t('filters.display')}>
-          {displayToggles.map((toggle) => (
-            <SwitchRow key={toggle.label} {...toggle} />
-          ))}
-        </SidebarGroup>
-      )}
 
       {/* Primary filters (category / moon phase / module) */}
       {chips && chips.length > 0 && onChipToggle && (

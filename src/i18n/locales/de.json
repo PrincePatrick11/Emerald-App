@@ -63,6 +63,7 @@
     "sortAlphaDesc": "Name · Z → A",
     "sortCountDesc": "Nutzung · häufigste",
     "category": "Kategorie",
+    "grouping": "Gruppierung",
     "groupBy": "Nach {{label}} gruppieren",
     "type": "Typ",
     "notAvailableInTimeline": "Im Zeitstrahl nicht verfügbar"
@@ -571,7 +572,6 @@
   },
   "filters": {
     "all": "Alle",
-    "display": "Anzeige",
     "category": "Kategorie",
     "module": "Modul",
     "moonPhase": "Mondphase",
@@ -904,6 +904,7 @@
     "title": "Papierkorb",
     "emptyTrash": "Papierkorb leeren",
     "restore": "Wiederherstellen",
+    "restoreSelected": "Auswahl wiederherstellen",
     "deletePermanently": "Endgültig löschen",
     "retentionNote": "Elemente werden nach {{count}} Tag automatisch gelöscht.",
     "retentionNote_other": "Elemente werden nach {{count}} Tagen automatisch gelöscht.",

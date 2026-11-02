@@ -15,7 +15,7 @@ import { usePersistedFlag } from '../../hooks/usePersistedFlag';
 import { templateLabel } from '../../lib/blocks/blockAttrs';
 import type { Template } from '../../lib/blocks/templates';
 import Dashboard, { GroupDivider } from '../ui/Dashboard';
-import DashboardItem from '../ui/DashboardItem';
+import DashboardItem, { RowIcon } from '../ui/DashboardItem';
 import ContextMenu from '../ui/ContextMenu';
 import { useOpenInNewTabAction } from '../../hooks/useOpenInNewTabAction';
 import BlockGlyph from '../blocks/BlockGlyph';
@@ -152,7 +152,7 @@ function TemplateList({ entries, onCreate, onDelete }: {
           </>
         ) : (
           <>
-            <BlockGlyph icon={template.icon} size={14} />
+            <RowIcon><BlockGlyph icon={template.icon} size={14} /></RowIcon>
             <span className="flex-1 min-w-0 text-sm text-soft truncate">{templateLabel(t, template)}</span>
             {unsaved}
             {countLabel}

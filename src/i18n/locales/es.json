@@ -63,6 +63,7 @@
     "sortAlphaDesc": "Nombre · Z → A",
     "sortCountDesc": "Uso · más usado",
     "category": "Categoría",
+    "grouping": "Agrupación",
     "groupBy": "Agrupar por {{label, lowercase}}",
     "type": "Tipo",
     "notAvailableInTimeline": "No disponible en la línea de tiempo"
@@ -571,7 +572,6 @@
   },
   "filters": {
     "all": "Todas",
-    "display": "Visualización",
     "category": "Categoría",
     "module": "Módulo",
     "moonPhase": "Fase lunar",
@@ -904,6 +904,7 @@
     "title": "Papelera",
     "emptyTrash": "Vaciar papelera",
     "restore": "Restaurar",
+    "restoreSelected": "Restaurar selección",
     "deletePermanently": "Eliminar definitivamente",
     "retentionNote": "Los elementos se eliminan automáticamente después de {{count}} día.",
     "retentionNote_other": "Los elementos se eliminan automáticamente después de {{count}} días.",

@@ -114,6 +114,23 @@ Size tokens in both theme files: `--tab-pill-h` (30px, `TabBar`) and `--control-
 - `Reorder.Item`'s layout animation is active only while a tab is being dragged (plus `REORDER_SETTLE_MS`) — otherwise every tab would spring whenever the strip itself shifts.
 - Focus rings sit *inset*, since the scrolling list clips anything beyond a pill.
 
+**Dashboards share one structure.** Whatever a dashboard lists, the same four rules apply:
+
+- **One row:** symbol and name on the left, metadata on the right, 44px tall (`h-11`, `DashboardItem`/`DashboardRow` with `RowContent`), 6px apart. A row's second line does not exist; what would go there is metadata.
+- **One group heading:** `CollapsibleGroupHeader`, 24px, for a category, a month and a whole section alike.
+- **Actions in the context menu:** rename, duplicate, delete, restore. No row carries a permanently visible amber or red button. A permanent delete asks in the row (`InlineConfirm`).
+- **One sidebar order:** action, view, sort, grouping, filter. What a dashboard does not have falls away; preferences of the view (`displayToggles`) belong to the view section.
+
+The exceptions, each for a reason:
+
+- **Home** keeps view, sort and length in its section headings, because it has three lists and the sidebar has room for one. Its title is the date over the moon phase.
+- **Tasks** have no layout choice, since subtasks and inline editing have no card to live on; the view section holds only "Show completed". The checkbox and the subtask chevron come before the name, and category and priority appear on hover: they are values with no place in a menu.
+- **Categories** have a drag handle, because their order is the hand-dragged one, and no view or sort for the same reason. **Tags** have a chevron and a colour dot, because a tag opens in place and its colour is its value.
+- **Trash** rows carry a checkbox and select on click. Restoring stays reachable without a right-click through the selection's icon in the action bar.
+- **Altar** rows show the preview (32px) as their symbol, wider than the column; it fits the row. The Altar's sidebar has a second sort and grouping for its library, after the altars' own.
+- **Built-in blocks** are rows without hover, since nothing opens from them.
+- The **"+"** in a group heading stays visible: it is jade, creates rather than alters, and belongs to the group.
+
 **Horizontal padding has exactly one source per column.** The column's outer container sets it; the panels inside add no `px-*` of their own. In the right sidebar that is `SidebarColumn`'s scrolling body (`p-3`, with a comment in place) — if a panel adds its own padding again, its rows end up visibly indented differently from the button in the action bar above them.
 
 **Spacing scale:** 2, 4, 6, 8, 10, 12, 16, 20, 24 and 32px (Tailwind `0.5`, `1`, `1.5`, `2`, `2.5`, `3`, `4`, `5`, `6`, `8`). `2.5` is for icon-to-label in menu and list rows. An arbitrary value needs a comment. Usual places: `px-8` for main-area content columns (`Dashboard`'s content, `EntryDetailFrame`), `px-3`/`p-3` in the sidebars, `px-5 py-2.5` in modal bars (`.modal-header`, `.modal-footer`), `.modal-body` (`px-3.5 py-4`) in modal bodies.

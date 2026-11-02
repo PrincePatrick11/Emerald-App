@@ -126,7 +126,7 @@ The altar is a virtual arrangement of symbolic objects on a canvas.
 
 Cards and rows show a **thumbnail** of each altar, captured when you confirm an edit with Done — or leave a changed altar for another tab — and stored in the database. Cancel brings the previous thumbnail back with everything else. Without a stored thumbnail a live preview is drawn instead, leaving hidden elements out; changing a library element's picture or deleting it drops the thumbnails of the altars showing it until they are next confirmed with Done (their "last changed" date stays). Thumbnails keep the altar's proportions without cropping.
 
-The preview can be turned off — a switch in the filter panel's "Display" group — for a lighter list that shows each altar's own icon instead (or the altar icon, a candle on a table, for an altar with none).
+The preview can be turned off — a switch in the sidebar's "View" section — for a lighter list that shows each altar's own icon instead (or the altar icon, a candle on a table, for an altar with none).
 
 **Altar library.** You keep a personal library of items. Each item has a name, an emoji, a category, an optional note, and an optional uploaded image.
 
@@ -303,13 +303,13 @@ The Tasks module is a hierarchical task manager with categories, priorities, and
 
 **Toolbar.** Search, a sort ("Created · newest/oldest", "Name · A → Z/Z → A") and a separate Grouping switch (by category, or ungrouped). Only the List view is available.
 
-**Filter panel.** A "Display" group holds "Show completed" — a display preference, not a filter: off, it hides completed tasks and subtasks, it doesn't count toward the active-filter badge, and resetting filters leaves it alone. Below it come the category filter (see [Categories](#categories); for tasks the "Uncategorized" row looks at top-level tasks only, since that group lists only those) and a priority filter ("All" plus High/Medium/Low with a count each). Both are multi-select; "All" clears a list, and a "Reset filters" button appears once search and filters leave nothing to show.
+**Sidebar.** The "View" section holds "Show completed" — a display preference, not a filter: off, it hides completed tasks and subtasks, it doesn't count toward the active-filter badge, and resetting filters leaves it alone. The filters are the category filter (see [Categories](#categories); for tasks the "Uncategorized" row looks at top-level tasks only, since that group lists only those) and a priority filter ("All" plus High/Medium/Low with a count each). Both are multi-select; "All" clears a list, and a "Reset filters" button appears once search and filters leave nothing to show.
 
 **Grouped view.** Tasks sit under collapsible category headers; an "Uncategorized" section collects tasks without a category (including those whose category is in the Trash). It is not a category and can't be deleted. Empty groups are left out.
 
 **Inline editing.** Double-click a title to rename it, starting from the stored title. Enter saves, Escape cancels — on a task just created and never named, Escape puts it in the Trash with Undo.
 
-**Context menu.** Right-click a task to Mark as Completed/Active, Add Subtask, Link Entry, or Delete.
+**Context menu.** Right-click a task to Mark as Completed/Active, Add Subtask, Link Entry, Rename or Delete.
 
 **Trash integration.** Deleted tasks go to the Trash, where they can be restored or removed for good. A task deleted with its subtasks is one item there, its entry links staying with it. A subtask deleted on its own earlier is a separate item, and deleting its parent for good takes it along.
 
@@ -324,7 +324,7 @@ Each row shows the category's emoji, its name, and how many entries in each modu
 From here you can:
 
 - **Add** a category with the header button — pick an emoji, type a name, Enter saves. A name already in use is refused with a message under the field; the name of a category in the Trash brings that one back instead (with the emoji you picked), together with its entries.
-- **Rename and change the emoji** inline with the pencil; Enter saves, Escape cancels. The change shows everywhere immediately. Renaming to the name of a category in the Trash merges that one in — its entries and template assignments come along.
+- **Rename and change the emoji** inline, through Edit in the row's right-click menu; Enter saves, Escape cancels. The change shows everywhere immediately. Renaming to the name of a category in the Trash merges that one in — its entries and template assignments come along.
 - **Delete** without a question, undoable from the toast. A deleted category goes to the Trash; its entries keep pointing at it and appear under "Uncategorized" until it is restored (bringing them back) or deleted for good (leaving them uncategorized). If another category took its name meanwhile, restoring merges the two into the one with the name (a template keeps a default star only where the combination has none yet).
 - **Reorder** by dragging a row by its grip. This order is used everywhere — group headers, filter rows, the Altar tab strip, the category picker — and is saved immediately.
 
@@ -370,9 +370,9 @@ Deleting a journal entry, wiki article, operation, task, altar or altar library 
 
 From the Trash view you can:
 
-- **Restore** an item to its original section.
-- **Delete permanently** to remove it immediately.
-- Select several items and delete the selection.
+- **Restore** an item to its original section, from its right-click menu.
+- **Delete permanently** from the same menu, after a confirmation in the row.
+- Select several items by clicking them, then restore or delete the selection from the sidebar's action bar, where "Select all" sits too.
 - Empty the entire Trash at once (with confirmation).
 
 Tags, categories, your own blocks, templates and the Lexicon's languages also go to the Trash and can be restored; a language brings its words back with it, and deleted for good takes them along. Trashed wiki articles and operations without a category are grouped under "Uncategorized". Only the latest deletion can be undone from the toast — a new one replaces the previous Undo; older items are restored from the Trash.

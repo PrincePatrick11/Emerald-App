@@ -14,7 +14,7 @@ import { useUndoStore } from '../../store/undoStore';
 import BlockStack from '../blocks/BlockStack';
 import EntryDetailFrame from '../ui/EntryDetailFrame';
 import Dashboard, { type DashboardGroup } from '../ui/Dashboard';
-import DashboardItem from '../ui/DashboardItem';
+import DashboardItem, { CardContent, RENAME_INPUT_CLASS, RowContent } from '../ui/DashboardItem';
 import RenameField from '../ui/RenameField';
 import CollapsibleGroupHeader from '../ui/CollapsibleGroupHeader';
 import { useCollapsedSet } from '../../hooks/useCollapsedSet';
@@ -253,10 +253,10 @@ export default function JournalView() {
     const renderEntry = (e: Entry) => {
       const icon = journalIcon(e, showMoonPhase);
       const renaming = renamingId === e.id;
-      const renameInput = (className: string) => (
-        <RenameField value={renameValue} onChange={setRenameValue} onCommit={commitRename}
-          onCancel={() => setRenamingId(null)} className={className} />
-      );
+      const title = renaming
+        ? <RenameField value={renameValue} onChange={setRenameValue} onCommit={commitRename}
+            onCancel={() => setRenamingId(null)} className={RENAME_INPUT_CLASS} />
+        : displayTitle(t, 'journal', e.title);
       return (
         <DashboardItem
           view={{ type: 'journal', id: e.id, mode: 'view' }}
@@ -265,12 +265,7 @@ export default function JournalView() {
           onContextMenu={(ev) => openCtxMenu(ev, e.id)}
         >
           {isCardView(view) ? (
-            <>
-              <div className="text-2xl mb-2">{icon}</div>
-              {renaming
-                ? renameInput('text-sm font-medium text-secondary w-full bg-transparent outline-none selectable mb-1')
-                : <div className="text-sm font-medium text-secondary truncate mb-1">{displayTitle(t, 'journal', e.title)}</div>}
-              <div className="text-xs text-muted">{formatEntryDate(e.created_at)}</div>
+            <CardContent icon={icon} title={title} meta={formatEntryDate(e.created_at)}>
               {!renaming && visibleTags(e.tags, tagMap).length > 0 && (
                 <div className="flex flex-wrap gap-1 mt-2">
                   {visibleTags(e.tags, tagMap).slice(0, 3).map((tag) => (
@@ -278,15 +273,9 @@ export default function JournalView() {
                   ))}
                 </div>
               )}
-            </>
+            </CardContent>
           ) : (
-            <>
-              <span className="text-base flex-shrink-0">{icon}</span>
-              {renaming
-                ? renameInput('flex-1 bg-transparent text-sm text-soft outline-none selectable')
-                : <span className="flex-1 text-sm text-soft truncate">{displayTitle(t, 'journal', e.title)}</span>}
-              <span className="text-xs text-muted flex-shrink-0">{formatEntryDate(e.created_at)}</span>
-            </>
+            <RowContent icon={icon} title={title} meta={formatEntryDate(e.created_at)} />
           )}
         </DashboardItem>
       );

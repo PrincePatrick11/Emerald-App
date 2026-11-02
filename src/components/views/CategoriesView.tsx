@@ -11,7 +11,8 @@ import { useAltarStore } from '../../store/altarStore';
 import { useUndoStore } from '../../store/undoStore';
 import { useDeepLink } from '../../hooks/useDeepLink';
 import { generateId } from '../../lib/helpers';
-import Button from '../ui/Button';
+import ContextMenu from '../ui/ContextMenu';
+import { DashboardRow, RowContent } from '../ui/DashboardItem';
 import { NoResults } from '../ui/EmptyState';
 import Dashboard from '../ui/Dashboard';
 import EmojiPicker from '../ui/EmojiPicker';
@@ -53,7 +54,7 @@ function CategoryEditRow({
 }) {
   const { t } = useTranslation();
   return (
-    <div className="flex items-center gap-3 rounded-md border border-edge-strong bg-well-strong px-3 py-2">
+    <DashboardRow>
       {/* Placeholder for the read row's drag handle — without it emoji
           and name would jump to the left when switching to edit mode. */}
       <span className="w-3 flex-shrink-0" />
@@ -71,7 +72,7 @@ function CategoryEditRow({
       />
       <InlineNameEditor value={name} onChange={onName} error={error} onSave={onSave} onCancel={onCancel}
         placeholder={t('categories.name')} />
-    </div>
+    </DashboardRow>
   );
 }
 
@@ -116,6 +117,7 @@ export default function CategoriesView() {
   const [search, setSearch] = useSessionState('categories.search', '');
   /** Error message next to the name field — today only "Name already taken". */
   const [nameError, setNameError] = useState<string | null>(null);
+  const [ctxMenu, setCtxMenu] = useState<{ id: string; x: number; y: number } | null>(null);
 
   /**
    * The deep link from the global search scrolls to the row and briefly
@@ -273,18 +275,21 @@ export default function CategoriesView() {
     const isDragging = dragState?.fromId === cat.id;
 
     return (
-      <div
+      <DashboardRow
         key={cat.id}
         data-category-id={cat.id}
         title={cat.is_builtin ? t('categories.builtinHint') : undefined}
-        className={`flex items-center gap-3 rounded-md border px-3 py-2 transition-colors ${
-          isDragging
-            ? 'border-accent-edge bg-accent-fill text-on-accent opacity-50'
-            : highlightId === cat.id
-              ? 'border-accent-edge bg-accent-fill text-on-accent'
-              : 'border-edge bg-well hover:border-edge-raise'
-        }`}
+        // `task-row-target`: an outline, the one highlight the theme's panel rules leave alone.
+        className={isDragging ? 'task-row-target opacity-50' : highlightId === cat.id ? 'task-row-target' : ''}
+        // Sigils: not deletable, and a rename would lead nowhere — the name
+        // comes from the locale, not from the row. So no menu for them.
+        onContextMenu={cat.is_builtin ? undefined : (e) => {
+          e.preventDefault();
+          setCtxMenu({ id: cat.id, x: e.clientX, y: e.clientY });
+        }}
       >
+        {/* The handle is why this row has more than symbol and name: the
+            order of this list is the hand-dragged one. */}
         {query ? (
           // Hold the space so the filtered list does not jump by 12px.
           <span className="w-3 flex-shrink-0" />
@@ -296,35 +301,13 @@ export default function CategoriesView() {
             <GripVertical size={12} />
           </span>
         )}
-        <span className="w-5 text-center flex-shrink-0 text-base">{cat.emoji}</span>
-        <span className="flex-1 min-w-0 truncate text-sm text-secondary">{categoryLabel(t, cat)}</span>
-
+        <RowContent icon={cat.emoji} title={categoryLabel(t, cat)} />
         <ModuleCounts modules={CATEGORY_MODULE_IDS} counts={counts} />
-
-        {/* Sigils: not deletable, and a rename would lead nowhere — the
-            name comes from the locale, not from the row. The block stays
-            anyway, otherwise this one row's number column would shift out of
-            alignment by the width of the two buttons. */}
-        <span className="flex items-center justify-end gap-1.5 flex-shrink-0 min-w-[54px]">
-          {cat.is_builtin ? null : (
-            <>
-              <Button
-                tone="amber" compact small
-                title={t('editor.edit')} aria-label={t('editor.edit')}
-                onClick={() => openForm({ mode: 'edit', id: cat.id }, cat.name, cat.emoji)}
-              >
-                <Pencil size={12} />
-              </Button>
-              <Button tone="danger" compact small title={t('common.delete')} aria-label={t('common.delete')} onClick={() => handleDelete(cat.id)}>
-                <Trash2 size={12} />
-              </Button>
-            </>
-          )}
-        </span>
-      </div>
+      </DashboardRow>
     );
   };
 
+  const menuCategory = ctxMenu && categories.find((c) => c.id === ctxMenu.id);
 
   return (
     <Dashboard<Category>
@@ -340,19 +323,30 @@ export default function CategoriesView() {
           <div>
             {!query && <p className="text-xs text-subtle mb-3">{t('categories.dragHint')}</p>}
             {query && visualCategories.length === 0 && <NoResults query={search} onReset={() => setSearch('')} />}
-            <div ref={listRef} className="space-y-1">
+            <div ref={listRef} className="space-y-1.5">
               {visualCategories.map(renderRow)}
             </div>
             {/* The draft deliberately sits outside the list: it would otherwise
                 be one more child for the drag's index calculation to trip over. */}
             {form?.mode === 'add' && (
-              <div className="mt-1">
+              <div className="mt-1.5">
                 <CategoryEditRow {...formProps} />
               </div>
             )}
           </div>
         ),
       }}
+      contextMenuSlot={ctxMenu && menuCategory && (
+        <ContextMenu
+          x={ctxMenu.x}
+          y={ctxMenu.y}
+          onClose={() => setCtxMenu(null)}
+          actions={[
+            { label: t('editor.edit'), icon: <Pencil size={12} />, onClick: () => openForm({ mode: 'edit', id: menuCategory.id }, menuCategory.name, menuCategory.emoji) },
+            { label: t('common.delete'), icon: <Trash2 size={12} />, danger: true, onClick: () => void handleDelete(menuCategory.id) },
+          ]}
+        />
+      )}
     />
   );
 }

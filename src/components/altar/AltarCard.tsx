@@ -11,7 +11,7 @@ import { AltarCardPreview } from './AltarCardPreview';
 import RenameField from '../ui/RenameField';
 import { imageSrc } from '../../lib/images';
 import { FaviconGlyph } from '../sidebar/fields/Favicon';
-import DashboardItem from '../ui/DashboardItem';
+import DashboardItem, { RENAME_INPUT_CLASS, RowContent } from '../ui/DashboardItem';
 
 /** Reference size of the canvas preview per card width: a height cap for the
  *  thumbnail, a width cap for the live preview (which is an aspect-ratio box
@@ -146,14 +146,16 @@ export const AltarListRow = memo(function AltarListRow({
   if (isRenaming) {
     return (
       <DashboardItem view={altarView(altar)} layout="row" editing>
-        <RenameField
-          value={renameValue}
-          onChange={onChangeRename}
-          onCommit={onCommitRename}
-          onCancel={onCancelRename}
-          className="flex-1 bg-transparent text-sm text-soft outline-none selectable"
+        <RowContent
+          title={<RenameField
+            value={renameValue}
+            onChange={onChangeRename}
+            onCommit={onCommitRename}
+            onCancel={onCancelRename}
+            className={RENAME_INPUT_CLASS}
+          />}
+          meta={formatEntryDate(altar.updated_at)}
         />
-        <span className="text-xs text-muted">{formatEntryDate(altar.updated_at)}</span>
       </DashboardItem>
     );
   }
@@ -172,9 +174,7 @@ export const AltarListRow = memo(function AltarListRow({
 
   return (
     <DashboardItem view={altarView(altar)} layout="row" onContextMenu={onContextMenu}>
-      <span className="flex-shrink-0">{preview}</span>
-      <span className="flex-1 text-sm text-soft truncate">{displayTitle(t, 'altar', altar.title)}</span>
-      <span className="text-xs text-subtle">{formatEntryDate(altar.updated_at)}</span>
+      <RowContent icon={preview} title={displayTitle(t, 'altar', altar.title)} meta={formatEntryDate(altar.updated_at)} />
     </DashboardItem>
   );
 });

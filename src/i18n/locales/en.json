@@ -63,6 +63,7 @@
     "sortAlphaDesc": "Name · Z → A",
     "sortCountDesc": "Usage · most used",
     "category": "Category",
+    "grouping": "Grouping",
     "groupBy": "Group by {{label, lowercase}}",
     "type": "Type",
     "notAvailableInTimeline": "Not available in timeline view"
@@ -571,7 +572,6 @@
   },
   "filters": {
     "all": "All",
-    "display": "Display",
     "category": "Category",
     "module": "Module",
     "moonPhase": "Moon Phase",
@@ -904,6 +904,7 @@
     "title": "Trash",
     "emptyTrash": "Empty Trash",
     "restore": "Restore",
+    "restoreSelected": "Restore selected",
     "deletePermanently": "Delete permanently",
     "retentionNote": "Items are automatically deleted after {{count}} day.",
     "retentionNote_other": "Items are automatically deleted after {{count}} days.",

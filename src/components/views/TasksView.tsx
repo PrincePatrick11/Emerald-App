@@ -20,6 +20,7 @@ import { sortItems } from '../../lib/sortItems';
 import { countBy, countByCategory, UNCATEGORIZED_KEY } from '../../lib/groupBy';
 import Dashboard from '../ui/Dashboard';
 import Dropdown from '../ui/Dropdown';
+import { DashboardRow } from '../ui/DashboardItem';
 import ContextMenu, { type ContextMenuAction } from '../ui/ContextMenu';
 import LinkPickerModal from '../editor/LinkPickerModal';
 import CategorySelect from '../ui/CategorySelect';
@@ -27,8 +28,7 @@ import CollapseChevron from '../ui/CollapseChevron';
 import CollapsibleGroupHeader from '../ui/CollapsibleGroupHeader';
 import {
   Plus, Flag, Trash2,
-  CheckSquare, Square, Link2,
-} from 'lucide-react';
+  CheckSquare, Square, Link2, Pencil } from 'lucide-react';
 import type { Task, TaskPriority } from '../../types';
 import { useSessionState } from '../../store/sessionStore';
 
@@ -341,7 +341,15 @@ export default function TasksView() {
         onView={(v) => setTasksPrefs({ view: v })}
         onSort={(s) => setTasksPrefs({ sort: s })}
         groupBy={{ value: tasksPrefs.grouping, onChange: (g) => setTasksPrefs({ grouping: g }) }}
+        // Tasks are a list and nothing else: subtasks and inline editing have
+        // no card to live on. So the view section holds only this toggle.
         viewOptions={[{ value: 'list' as const, label: t('listView.list') }]}
+        displayToggles={[{
+          label: t('tasks.showCompleted'),
+          icon: CheckSquare,
+          checked: showCompleted,
+          onChange: setShowCompleted,
+        }]}
         search={searchQuery}
         onSearch={setSearchQuery}
         filters={{
@@ -362,14 +370,6 @@ export default function TasksView() {
               return next;
             }),
             onAllChips: () => setFilterCategory(new Set()),
-            // "Show completed" is a display toggle, not a filter:
-            // does not count in activeFilterCount, a reset leaves it alone.
-            displayToggles: [{
-              label: t('tasks.showCompleted'),
-              icon: CheckSquare,
-              checked: showCompleted,
-              onChange: setShowCompleted,
-            }],
             // Priorities as the FilterPanel's second filter group
             // (statusChips with their own label).
             statusLabel: t('tasks.filter.priority'),
@@ -501,9 +501,9 @@ const TaskRow = memo(function TaskRow({
 
   return (
     <div>
-      <div
+      <DashboardRow
         data-task-id={task.id}
-        className={`panel-interactive flex items-center gap-3 px-4 py-2 group ${task.completed ? 'opacity-50' : ''} ${isTarget ? 'task-row-target' : ''}`}
+        className={`${task.completed ? 'opacity-50' : ''} ${isTarget ? 'task-row-target' : ''}`}
         onContextMenu={(e) => {
           e.preventDefault();
           const actions: ContextMenuAction[] = [
@@ -521,6 +521,15 @@ const TaskRow = memo(function TaskRow({
               label: t('tasks.linkEntry'),
               icon: <Link2 size={14} />,
               onClick: () => { setLinkModal({ taskId: task.id }); setCtxMenu(null); },
+            },
+            {
+              label: t('contextMenu.rename'),
+              icon: <Pencil size={14} />,
+              onClick: () => {
+                setEditingId(task.id);
+                setEditValue(hasOwnTitle(task.title) ? task.title : '');
+                setCtxMenu(null);
+              },
             },
             {
               label: t('contextMenu.delete'),
@@ -567,7 +576,7 @@ const TaskRow = memo(function TaskRow({
           />
         ) : (
           <span
-            className={`flex-1 text-sm truncate cursor-default ${task.completed ? 'line-through text-subtle' : 'text-secondary'}`}
+            className={`flex-1 min-w-0 text-sm truncate cursor-default ${task.completed ? 'line-through text-subtle' : 'text-soft'}`}
             onDoubleClick={() => {
               setEditingId(task.id);
               setEditValue(hasOwnTitle(task.title) ? task.title : '');
@@ -594,15 +603,11 @@ const TaskRow = memo(function TaskRow({
           </div>
         )}
 
-        <div className="flex items-center gap-1.5 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
-          <button
-            onClick={handleCreateSubtaskLocal}
-            className="task-action-btn text-subtle hover:text-accent-raise p-0.5"
-            title={t('tasks.addSubtask')}
-          >
-            <Plus size={12} />
-          </button>
-
+        {/* Category and priority are values rather than actions and have no
+            place in the context menu; they show on hover. Everything that acts
+            on the task is in the menu. Not merely transparent: they would hold their
+            room at rest, and the linked entries would float away from the edge. */}
+        <div className="hidden group-hover:flex focus-within:flex items-center gap-1.5 flex-shrink-0">
           <CategorySelect
             categories={categories}
             value={task.category_id}
@@ -612,14 +617,6 @@ const TaskRow = memo(function TaskRow({
             align="right"
             title={t('filters.category')}
           />
-
-          <button
-            onClick={() => setLinkModal({ taskId: task.id })}
-            className="task-action-btn text-subtle hover:text-accent-raise p-0.5"
-            title={t('tasks.linkEntry')}
-          >
-            <Link2 size={12} />
-          </button>
 
           <Dropdown<TaskPriority>
             value={task.priority}
@@ -643,16 +640,8 @@ const TaskRow = memo(function TaskRow({
               </button>
             )}
           />
-
-          <button
-            onClick={handleDelete}
-            className="task-action-btn text-subtle hover:text-danger p-0.5"
-            title={t('contextMenu.delete')}
-          >
-            <Trash2 size={12} />
-          </button>
         </div>
-      </div>
+      </DashboardRow>
 
       {isExpanded && (
         <div className="ml-6 mt-1.5 space-y-1.5">
