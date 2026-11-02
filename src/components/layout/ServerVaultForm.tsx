@@ -1,53 +1,42 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import Button from '../ui/Button';
+import RemoteVaultList from './RemoteVaultList';
 import { KeyField, onEnter } from './vaultKeyParts';
-import { abandonPairing, adoptRemoteVault, remoteVaults, syncErrorCode, syncPair, type RemoteVault } from '../../lib/sync/engine';
+import { serverStatus, syncErrorCode, syncPair } from '../../lib/sync/engine';
 import { syncErrorKey } from '../../lib/sync/errors';
-import { formatBytes } from '../../lib/helpers';
-import { newVaultRecord, type Vault as VaultRecord } from '../../lib/vaultManager';
-import { VAULT_KEY_CANCELLED } from '../../store/vaultKeyStore';
-import { useVaultStore } from '../../store/vaultStore';
-import { keyErrorOf } from '../../lib/vaultKeys';
 
-/**
- * Fetches a vault from a sync server onto this device. Pairing comes first,
- * so nothing is left in the vault list if that fails. Then it is a vault like
- * any other with a `vault.key` and no database: the usual question for its
- * password opens it, and the first sync fills it.
- */
-export default function ServerVaultForm({ target, onCancel, onDone }: {
-  /** The folder for a vault of this name. */
-  target: (name: string) => Promise<string | undefined>;
+/** Fetching a vault from the vault window: connect the server if need be, then pick one. */
+export default function ServerVaultForm({ onCancel, onDone }: {
   onCancel: () => void;
   onDone: () => void;
 }) {
   const { t } = useTranslation();
-  const addVault = useVaultStore((s) => s.addVault);
-  const switchVault = useVaultStore((s) => s.switchVault);
-
-  const [name, setName] = useState('');
+  const [connected, setConnected] = useState<boolean | null>(null);
+  const [linked, setLinked] = useState<string[]>([]);
   const [url, setUrl] = useState('');
   const [key, setKey] = useState('');
-  const [record, setRecord] = useState<VaultRecord | null>(null);
-  const [remotes, setRemotes] = useState<RemoteVault[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
 
-  async function open(pending: VaultRecord, remote: RemoteVault) {
-    await addVault(pending);
-    await adoptRemoteVault(pending.id, remote.id);
-    await switchVault(pending.id);
-    onDone();
-  }
+  useEffect(() => {
+    serverStatus().then((status) => {
+      setConnected(status.url !== null);
+      setLinked(Object.values(status.links).map((link) => link.remote));
+      if (status.url) setUrl(status.url);
+    }, () => setConnected(false));
+  }, []);
 
-  async function act(action: () => Promise<void>) {
+  async function pair() {
+    if (!url.trim() || !key.trim()) return;
     setBusy(true);
     setError('');
     try {
-      await action();
+      await syncPair(url, key);
+      const status = await serverStatus();
+      setLinked(Object.values(status.links).map((link) => link.remote));
+      setConnected(true);
     } catch (e) {
-      if (keyErrorOf(e) === VAULT_KEY_CANCELLED) return;
       console.warn('[sync]', e);
       setError(t(syncErrorKey(syncErrorCode(e))));
     } finally {
@@ -55,60 +44,29 @@ export default function ServerVaultForm({ target, onCancel, onDone }: {
     }
   }
 
-  const login = () => act(async () => {
-    if (!name.trim() || !url.trim() || !key.trim()) return;
-    const pending = await newVaultRecord(name.trim(), { path: await target(name.trim()) });
-    await syncPair(pending.id, url, key);
-    const found = await remoteVaults(pending.id);
-    if (found.length === 1) {
-      await open(pending, found[0]);
-      return;
-    }
-    setRecord(pending);
-    setRemotes(found);
-  });
-
-  async function cancel() {
-    if (record) await abandonPairing(record.id).catch((e) => console.warn('[sync]', e));
-    onCancel();
-  }
-
+  if (connected === null) return null;
   return (
     <div className="space-y-3">
-      {record ? (
-        remotes.length === 0 ? (
-          <p className="text-sm text-secondary">{t('sync.noRemoteVaults')}</p>
-        ) : (
-          <div className="space-y-2">
-            <p className="text-sm text-secondary">{t('sync.pickRemote')}</p>
-            {remotes.map((remote, i) => (
-              <Button key={remote.id} className="w-full justify-center" disabled={busy} onClick={() => act(() => open(record, remote))}>
-                {t('sync.remoteVault', { number: i + 1, size: formatBytes(remote.storedBytes, [t('common.bytes'), t('common.kilobytes'), t('common.megabytes')]) })}
-              </Button>
-            ))}
-          </div>
-        )
+      {connected ? (
+        <RemoteVaultList exclude={linked} onFetched={onDone} />
       ) : (
         <>
-          <KeyField label={t('sync.vaultName')}>
-            <input type="text" autoFocus className="input-field settings-field" value={name} disabled={busy} onChange={(e) => setName(e.target.value)} />
-          </KeyField>
           <KeyField label={t('sync.url')}>
-            <input type="url" spellCheck={false} className="input-field settings-field" placeholder="https://sync.example.com" value={url} disabled={busy} onChange={(e) => setUrl(e.target.value)} />
+            <input type="url" autoFocus spellCheck={false} className="input-field settings-field" placeholder="https://sync.example.com" value={url} disabled={busy} onChange={(e) => setUrl(e.target.value)} />
           </KeyField>
           <KeyField label={t('sync.key')}>
-            <input type="password" spellCheck={false} autoComplete="off" className="input-field settings-field" value={key} disabled={busy} onChange={(e) => setKey(e.target.value)} onKeyDown={onEnter(login)} />
+            <input type="password" spellCheck={false} autoComplete="off" className="input-field settings-field" value={key} disabled={busy} onChange={(e) => setKey(e.target.value)} onKeyDown={onEnter(pair)} />
           </KeyField>
         </>
       )}
       {error && <p className="text-xs text-danger">{error}</p>}
       <div className="flex gap-2">
-        {!record && (
-          <Button variant="primary" className="flex-1 justify-center" disabled={busy || !name.trim() || !url.trim() || !key.trim()} onClick={login}>
-            {busy ? t('sync.connecting') : t('sync.fetch')}
+        {!connected && (
+          <Button variant="primary" className="flex-1 justify-center" disabled={busy || !url.trim() || !key.trim()} onClick={pair}>
+            {busy ? t('sync.connecting') : t('sync.connect')}
           </Button>
         )}
-        <Button variant="secondary" className="flex-1 justify-center" disabled={busy} onClick={cancel}>{t('common.cancel')}</Button>
+        <Button variant="secondary" className="flex-1 justify-center" disabled={busy} onClick={onCancel}>{t('common.cancel')}</Button>
       </div>
     </div>
   );

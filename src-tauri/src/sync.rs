@@ -6,9 +6,11 @@
 //! text and decides when to sync (`lib/sync/engine.ts`); what is merged how is
 //! not this file's business.
 //!
-//! `{appDataDir}/sync.json` says which vault is connected where. The token in it
-//! is sealed under the vault key. Until a vault has its key (one being fetched
-//! from the server) the token waits in memory.
+//! `{appDataDir}/sync.json` holds the one server this installation talks to, with
+//! its token, and each vault's place on it. Like `update.json` it belongs to the
+//! installation, not to a vault: a vault's backup must not bring a server along.
+//! No vault is unlocked when the list of vaults is read, so the token cannot be
+//! sealed under a vault key; the file is readable by its owner only.
 
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -38,27 +40,46 @@ const NOT_CONNECTED: &str = "SYNC_NOT_CONNECTED";
 const NEEDS_LOGIN: &str = "SYNC_NEEDS_LOGIN";
 const LOCKED: &str = "SYNC_VAULT_LOCKED";
 
-#[derive(Clone, Debug, Default, Serialize, Deserialize)]
-struct Connection {
+/// The one server this installation talks to.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+struct Server {
     url: String,
+    device: String,
+    token: String,
+    /// Derived from the sync key, so that devices can read vault names without
+    /// any vault's password, and the server, which only has the key's hash, cannot.
+    names_key: String,
+}
+
+/// A vault's place on the server. Stays when the vault is disconnected, so it
+/// can be connected again.
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+struct Link {
+    remote: String,
     #[serde(default)]
-    remote: Option<String>,
+    name: String,
     #[serde(default)]
-    device: Option<String>,
-    /// Base64 of the token, sealed under the vault key.
-    #[serde(default)]
-    token: Option<String>,
+    paused: bool,
     /// The password changed here and the server has not heard yet.
     #[serde(default)]
     rekeyed: bool,
 }
 
-type Connections = HashMap<String, Connection>;
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+struct SyncFile {
+    #[serde(default)]
+    server: Option<Server>,
+    #[serde(default)]
+    links: HashMap<String, Link>,
+    /// Which server the links belong to, also while none is connected: the
+    /// address and what its key derives.
+    #[serde(default)]
+    links_for: Option<String>,
+}
 
-/// Tokens of vaults that cannot seal them yet. Also serializes the settings file.
+/// Serializes the settings file; what a running sync holds in memory.
 #[derive(Default)]
 pub struct SyncState {
-    waiting: Mutex<HashMap<String, Zeroizing<String>>>,
     /// Where each frame of a fetched snapshot lies in its file.
     frames: Mutex<HashMap<String, Vec<(u64, u32)>>>,
     /// The vault listening for news from its server. One at a time: only the open vault syncs.
@@ -70,61 +91,46 @@ fn data_dir(app: &tauri::AppHandle) -> Result<PathBuf, String> {
     app.path().app_data_dir().map_err(|e| e.to_string())
 }
 
-fn read_all(app: &tauri::AppHandle) -> Result<Connections, String> {
+fn read_file(app: &tauri::AppHandle) -> Result<SyncFile, String> {
     match std::fs::read_to_string(data_dir(app)?.join(SETTINGS_FILE)) {
         Ok(text) => Ok(serde_json::from_str(&text).unwrap_or_default()),
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(Connections::new()),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(SyncFile::default()),
         Err(e) => Err(e.to_string()),
     }
 }
 
-fn change_all(app: &tauri::AppHandle, change: impl FnOnce(&mut Connections)) -> Result<(), String> {
+fn change_file(app: &tauri::AppHandle, change: impl FnOnce(&mut SyncFile)) -> Result<(), String> {
     let state = app.state::<SyncState>();
     let _guard = state.file.lock().map_err(|_| "sync settings unavailable".to_string())?;
-    let mut all = read_all(app)?;
-    change(&mut all);
-    let text = serde_json::to_vec_pretty(&all).map_err(|e| e.to_string())?;
+    let mut file = read_file(app)?;
+    change(&mut file);
+    let text = serde_json::to_vec_pretty(&file).map_err(|e| e.to_string())?;
     let dir = data_dir(app)?;
     std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
-    vault::write_atomic(&dir, SETTINGS_FILE, SETTINGS_TEMP_FILE, &text)
-}
-
-fn connection(app: &tauri::AppHandle, vault_id: &str) -> Result<Connection, String> {
-    read_all(app)?.remove(vault_id).ok_or_else(|| NOT_CONNECTED.to_string())
-}
-
-/// Before a password change: the sealed token would not open under the new key,
-/// so it waits in memory and is sealed again by the next `token()`.
-pub fn hold_token(app: &tauri::AppHandle, vault_id: &str, old_key: &Key) -> Result<(), String> {
-    let Some(sealed) = read_all(app)?.remove(vault_id).and_then(|c| c.token) else {
-        return Ok(());
-    };
-    let files = crypto::subkey(old_key, Purpose::Files);
-    if let Some(token) = B64.decode(sealed).ok().and_then(|bytes| open(&files, &bytes).ok()) {
-        let state = app.state::<SyncState>();
-        state.waiting.lock().map_err(|_| "sync state unavailable".to_string())?.insert(vault_id.to_string(), Zeroizing::new(token));
+    vault::write_atomic(&dir, SETTINGS_FILE, SETTINGS_TEMP_FILE, &text)?;
+    // The token opens the server to this device, though no vault. Only its owner reads it.
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        std::fs::set_permissions(dir.join(SETTINGS_FILE), std::fs::Permissions::from_mode(0o600)).map_err(|e| e.to_string())?;
     }
     Ok(())
 }
 
+fn server(app: &tauri::AppHandle) -> Result<Server, String> {
+    read_file(app)?.server.ok_or_else(|| NEEDS_LOGIN.to_string())
+}
+
 /// After a password change: the next round publishes the vault under the new key.
 pub fn note_rekeyed(app: &tauri::AppHandle, vault_id: &str) -> Result<(), String> {
-    if !is_connected(app, vault_id) {
-        return Ok(());
-    }
-    change_all(app, |all| {
-        if let Some(c) = all.get_mut(vault_id) {
-            c.rekeyed = true;
+    change_file(app, |file| {
+        if let Some(link) = file.links.get_mut(vault_id) {
+            link.rekeyed = true;
         }
-    })?;
-    token(app, vault_id).map(|_| ())
+    })
 }
 
-pub fn is_connected(app: &tauri::AppHandle, vault_id: &str) -> bool {
-    read_all(app).is_ok_and(|all| all.contains_key(vault_id))
-}
-
-/// Forgets the connection along with a vault's local files.
+/// Forgets a vault's link along with its local files. What is on the server stays.
 pub fn forget(app: &tauri::AppHandle, vault_id: &str) {
     stop_watching(app);
     if let Ok(dir) = vault::vault_dir(app, vault_id) {
@@ -132,16 +138,25 @@ pub fn forget(app: &tauri::AppHandle, vault_id: &str) {
             std::fs::remove_file(dir.join(name)).ok();
         }
     }
-    if is_connected(app, vault_id) {
-        if let Err(e) = change_all(app, |all| {
-            all.remove(vault_id);
-        }) {
-            eprintln!("[sync] forgetting the connection failed: {e}");
-        }
+    if let Err(e) = change_file(app, |file| {
+        file.links.remove(vault_id);
+    }) {
+        eprintln!("[sync] forgetting the link failed: {e}");
     }
-    if let Ok(mut waiting) = app.state::<SyncState>().waiting.lock() {
-        waiting.remove(vault_id);
-    }
+}
+
+/// Case and whatever separates the groups do not matter, as on the server.
+fn names_key_from(sync_key: &str) -> String {
+    use sha2::{Digest, Sha256};
+    let clean: String = sync_key.chars().filter(|c| c.is_alphanumeric()).flat_map(char::to_uppercase).collect();
+    let digest = Sha256::new().chain_update(b"emerald/sync-names\0").chain_update(clean.as_bytes()).finalize();
+    B64.encode(digest)
+}
+
+fn names_key(server: &Server) -> Result<Key, String> {
+    let bytes = B64.decode(&server.names_key).map_err(|_| NEEDS_LOGIN.to_string())?;
+    let bytes: [u8; 32] = bytes.try_into().map_err(|_| NEEDS_LOGIN.to_string())?;
+    Ok(Zeroizing::new(bytes))
 }
 
 fn files_key(app: &tauri::AppHandle, vault_id: &str) -> Result<Key, String> {
@@ -156,29 +171,6 @@ fn seal(key: &Key, text: &str) -> Vec<u8> {
 fn open(key: &Key, data: &[u8]) -> Result<String, String> {
     let plain = crypto::open(key, Context::Sync, data).map_err(|_| "SYNC_CANNOT_OPEN".to_string())?;
     String::from_utf8(plain.to_vec()).map_err(|_| "SYNC_CANNOT_OPEN".to_string())
-}
-
-/// The token, from memory or sealed in the settings. One waiting in memory is
-/// sealed as soon as the vault has its key.
-fn token(app: &tauri::AppHandle, vault_id: &str) -> Result<Zeroizing<String>, String> {
-    let state = app.state::<SyncState>();
-    let waiting = state.waiting.lock().map_err(|_| "sync state unavailable".to_string())?.get(vault_id).cloned();
-    if let Some(token) = waiting {
-        if let Ok(key) = files_key(app, vault_id) {
-            let sealed = B64.encode(seal(&key, &token));
-            change_all(app, |all| {
-                if let Some(c) = all.get_mut(vault_id) {
-                    c.token = Some(sealed);
-                }
-            })?;
-            state.waiting.lock().map_err(|_| "sync state unavailable".to_string())?.remove(vault_id);
-        }
-        return Ok(token);
-    }
-    let sealed = connection(app, vault_id)?.token.ok_or_else(|| NEEDS_LOGIN.to_string())?;
-    let key = files_key(app, vault_id)?;
-    let bytes = B64.decode(sealed).map_err(|_| NEEDS_LOGIN.to_string())?;
-    open(&key, &bytes).map(Zeroizing::new).map_err(|_| NEEDS_LOGIN.to_string())
 }
 
 /// `https`, or `http` where the traffic does not cross an open network: this
@@ -330,12 +322,10 @@ struct Remote {
 }
 
 fn remote(app: &tauri::AppHandle, vault_id: &str) -> Result<Remote, String> {
-    let c = connection(app, vault_id)?;
-    Ok(Remote {
-        token: token(app, vault_id)?,
-        remote: c.remote.ok_or_else(|| NOT_CONNECTED.to_string())?,
-        url: c.url,
-    })
+    let file = read_file(app)?;
+    let server = file.server.ok_or_else(|| NEEDS_LOGIN.to_string())?;
+    let link = file.links.get(vault_id).ok_or_else(|| NOT_CONNECTED.to_string())?;
+    Ok(Remote { url: server.url, remote: link.remote.clone(), token: Zeroizing::new(server.token) })
 }
 
 impl Remote {
@@ -344,31 +334,39 @@ impl Remote {
     }
 }
 
+/// One vault's standing. `connected` means it syncs.
 #[tauri::command]
 pub async fn sync_status(app: tauri::AppHandle, vault_id: String) -> Result<Value, String> {
-    let Some(c) = read_all(&app)?.remove(&vault_id) else {
-        return Ok(json!({ "connected": false }));
-    };
-    let needs_login = matches!(token(&app, &vault_id), Err(e) if e == NEEDS_LOGIN);
+    let file = read_file(&app)?;
+    let link = file.links.get(&vault_id);
     Ok(json!({
-        "connected": true,
-        "url": c.url,
-        "hasRemote": c.remote.is_some(),
-        "needsLogin": needs_login,
-        "rekeyed": c.rekeyed,
+        "connected": file.server.is_some() && link.is_some_and(|l| !l.paused),
+        "url": file.server.as_ref().map(|s| s.url.clone()),
+        "hasServer": file.server.is_some(),
+        "hasRemote": link.is_some(),
+        "paused": link.is_some_and(|l| l.paused),
+        "rekeyed": link.is_some_and(|l| l.rekeyed),
+        "remote": link.map(|l| l.remote.clone()),
+        "name": link.map(|l| l.name.clone()),
     }))
 }
 
-/// Trades the sync key for a token of this device's own and remembers the
-/// connection for this vault. The key is not kept. Nothing about the vault has
-/// reached the server yet.
+/// What the app is connected to, and each local vault's link.
 #[tauri::command]
-pub async fn sync_pair(
-    app: tauri::AppHandle,
-    vault_id: String,
-    url: String,
-    key: Zeroizing<String>,
-) -> Result<(), String> {
+pub async fn sync_server_status(app: tauri::AppHandle) -> Result<Value, String> {
+    let file = read_file(&app)?;
+    let links: HashMap<String, Value> = file
+        .links
+        .iter()
+        .map(|(id, l)| (id.clone(), json!({ "remote": l.remote, "paused": l.paused })))
+        .collect();
+    Ok(json!({ "url": file.server.map(|s| s.url), "links": links }))
+}
+
+/// Trades the sync key for a token of this device's own. The key is not kept.
+/// Another server than before means the old links lead nowhere.
+#[tauri::command]
+pub async fn sync_pair(app: tauri::AppHandle, url: String, key: Zeroizing<String>) -> Result<(), String> {
     let url = clean_url(&url)?;
     let device = gethostname::gethostname().to_string_lossy().split('.').next().unwrap_or_default().to_string();
     let body = json!({ "key": key.as_str(), "device": device });
@@ -380,147 +378,186 @@ pub async fn sync_pair(
         });
     }
     let answer: Value = response.json().await.map_err(|_| UNREACHABLE.to_string())?;
-    let token = Zeroizing::new(answer["token"].as_str().unwrap_or_default().to_string());
-    let device_id = answer["device"].as_str().map(str::to_owned);
-
-    let state = app.state::<SyncState>();
-    state.waiting.lock().map_err(|_| "sync state unavailable".to_string())?.insert(vault_id.clone(), token);
-    change_all(&app, |all| {
-        let previous = all.remove(&vault_id).filter(|c| c.url == url);
-        all.insert(
-            vault_id.clone(),
-            Connection {
-                url,
-                rekeyed: previous.as_ref().is_some_and(|c| c.rekeyed),
-                remote: previous.and_then(|c| c.remote),
-                device: device_id,
-                token: None,
-            },
-        );
-    })?;
-    // Seals it right away if the vault is unlocked.
-    self::token(&app, &vault_id).map(|_| ())
+    let token = answer["token"].as_str().unwrap_or_default().to_string();
+    let device = answer["device"].as_str().unwrap_or_default().to_string();
+    let names_key = names_key_from(&key);
+    stop_watching(&app);
+    change_file(&app, |file| {
+        let identity = format!("{url} {names_key}");
+        if file.links_for.as_deref() != Some(identity.as_str()) {
+            file.links.clear();
+        }
+        file.links_for = Some(identity);
+        file.server = Some(Server { url, device, token, names_key });
+    })
 }
 
-/// What the Sync page shows: what this vault takes up, and who is connected.
+/// This device leaves the server. Vaults stay there, and their links stay here,
+/// in case the same server is connected again.
 #[tauri::command]
-pub async fn sync_server_info(app: tauri::AppHandle, vault_id: String) -> Result<Value, String> {
-    let target = remote(&app, &vault_id)?;
-    let vault = send(target.call(Method::GET, "", SHORT)?).await?;
-    if !vault.status().is_success() {
-        return Err(refused(vault).await);
+pub async fn sync_unpair(app: tauri::AppHandle) -> Result<(), String> {
+    stop_watching(&app);
+    if let Ok(server) = server(&app) {
+        if let Ok(builder) = request(&server.url, Method::POST, "/unpair", SHORT) {
+            // Best effort: being offline must not stop anybody from disconnecting.
+            let _ = builder.bearer_auth(&server.token).send().await;
+        }
     }
-    let vault: Value = vault.json().await.map_err(|_| UNREACHABLE.to_string())?;
-    let devices = send(request(&target.url, Method::GET, "/devices", SHORT)?.bearer_auth(target.token.as_str())).await?;
-    if !devices.status().is_success() {
-        return Err(refused(devices).await);
+    change_file(&app, |file| file.server = None)
+}
+
+async fn server_get(server: &Server, path: &str) -> Result<Value, String> {
+    let response = send(request(&server.url, Method::GET, path, SHORT)?.bearer_auth(&server.token)).await?;
+    if !response.status().is_success() {
+        return Err(refused(response).await);
     }
-    let devices: Value = devices.json().await.map_err(|_| UNREACHABLE.to_string())?;
-    Ok(json!({
-        "storedBytes": vault["stored_bytes"],
-        "images": vault["images"],
-        "me": devices["me"],
-        "devices": devices["devices"],
-    }))
+    response.json().await.map_err(|_| UNREACHABLE.to_string())
+}
+
+#[tauri::command]
+pub async fn sync_devices(app: tauri::AppHandle) -> Result<Value, String> {
+    server_get(&server(&app)?, "/devices").await
 }
 
 /// Takes a device's token. Whoever still knows the sync key can connect again.
 #[tauri::command]
-pub async fn sync_remove_device(app: tauri::AppHandle, vault_id: String, device_id: String) -> Result<(), String> {
-    let target = remote(&app, &vault_id)?;
+pub async fn sync_remove_device(app: tauri::AppHandle, device_id: String) -> Result<(), String> {
+    let server = server(&app)?;
     // An id from the server's own list, but it ends up in a path.
     if uuid::Uuid::parse_str(&device_id).is_err() {
         return Err("invalid device id".to_string());
     }
     let path = format!("/devices/{device_id}");
-    let response = send(request(&target.url, Method::DELETE, &path, SHORT)?.bearer_auth(target.token.as_str())).await?;
+    let response = send(request(&server.url, Method::DELETE, &path, SHORT)?.bearer_auth(&server.token)).await?;
     if !response.status().is_success() && response.status() != StatusCode::NOT_FOUND {
         return Err(refused(response).await);
     }
     Ok(())
 }
 
-/// The vaults on the server, for opening one on a new device.
+/// The vaults on the server, with the names this device can open.
 #[tauri::command]
-pub async fn sync_remote_vaults(app: tauri::AppHandle, vault_id: String) -> Result<Value, String> {
-    let c = connection(&app, &vault_id)?;
-    let token = token(&app, &vault_id)?;
-    let response = send(request(&c.url, Method::GET, "/vaults", SHORT)?.bearer_auth(token.as_str())).await?;
-    if !response.status().is_success() {
-        return Err(refused(response).await);
-    }
-    let vaults: Vec<Value> = response.json().await.map_err(|_| UNREACHABLE.to_string())?;
-    Ok(Value::Array(
-        vaults
-            .iter()
-            .map(|v| json!({ "id": v["id"], "storedBytes": v["stored_bytes"], "hasSnapshot": v["has_snapshot"] }))
-            .collect(),
-    ))
+pub async fn sync_remote_vaults(app: tauri::AppHandle) -> Result<Value, String> {
+    let server = server(&app)?;
+    let key = names_key(&server)?;
+    let vaults = server_get(&server, "/vaults").await?;
+    let list = vaults.as_array().map_or(&[][..], Vec::as_slice).iter().map(|v| {
+        let name = B64
+            .decode(v["meta"].as_str().unwrap_or_default())
+            .ok()
+            .and_then(|bytes| open(&key, &bytes).ok())
+            .and_then(|text| serde_json::from_str::<Value>(&text).ok())
+            .and_then(|meta| meta["name"].as_str().map(str::to_owned));
+        json!({
+            "id": v["id"],
+            "name": name,
+            "storedBytes": v["stored_bytes"],
+            "images": v["images"],
+            "hasSnapshot": v["has_snapshot"],
+        })
+    });
+    Ok(Value::Array(list.collect()))
 }
 
 /// Makes this vault's place on the server. Its `vault.key` goes along: still
 /// wrapped by the password, it is what lets another device unlock the vault.
 #[tauri::command]
 pub async fn sync_create_remote(app: tauri::AppHandle, vault_id: String, name: String) -> Result<(), String> {
-    let c = connection(&app, &vault_id)?;
-    let token = token(&app, &vault_id)?;
+    let server = server(&app)?;
     let dir = vault::vault_dir(&app, &vault_id)?;
     let key_file = keys::read_key_file(&dir)?.ok_or_else(|| LOCKED.to_string())?;
-    let meta = seal(&files_key(&app, &vault_id)?, &json!({ "name": name }).to_string());
+    let meta = seal(&names_key(&server)?, &json!({ "name": name }).to_string());
     let body = json!({ "meta": B64.encode(meta), "key_file": B64.encode(key_file.to_json()) });
-    let builder = request(&c.url, Method::POST, "/vaults", SHORT)?.bearer_auth(token.as_str()).json(&body);
+    let builder = request(&server.url, Method::POST, "/vaults", SHORT)?.bearer_auth(&server.token).json(&body);
     let response = send(builder).await?;
     if !response.status().is_success() {
         return Err(refused(response).await);
     }
     let answer: Value = response.json().await.map_err(|_| UNREACHABLE.to_string())?;
-    let id = answer["id"].as_str().map(str::to_owned);
-    change_all(&app, |all| {
-        if let Some(c) = all.get_mut(&vault_id) {
-            c.remote = id;
-        }
+    let remote = answer["id"].as_str().unwrap_or_default().to_string();
+    change_file(&app, |file| {
+        file.links.insert(vault_id, Link { remote, name, ..Link::default() });
     })
 }
 
 /// Ties a new, empty local vault to one on the server and fetches its
 /// `vault.key`, so that the usual question for the password can open it.
 #[tauri::command]
-pub async fn sync_adopt_remote(app: tauri::AppHandle, vault_id: String, remote_id: String) -> Result<(), String> {
-    let c = connection(&app, &vault_id)?;
-    let token = token(&app, &vault_id)?;
+pub async fn sync_adopt_remote(app: tauri::AppHandle, vault_id: String, remote_id: String, name: String) -> Result<(), String> {
+    let server = server(&app)?;
     let dir = vault::vault_dir(&app, &vault_id)?;
     if keys::read_key_file(&dir)?.is_some() {
         return Err("SYNC_VAULT_NOT_EMPTY".to_string());
     }
-    let path = format!("/vaults/{remote_id}");
-    let response = send(request(&c.url, Method::GET, &path, SHORT)?.bearer_auth(token.as_str())).await?;
-    if !response.status().is_success() {
-        return Err(refused(response).await);
+    if uuid::Uuid::parse_str(&remote_id).is_err() {
+        return Err("invalid vault id".to_string());
     }
-    let answer: Value = response.json().await.map_err(|_| UNREACHABLE.to_string())?;
+    let answer = server_get(&server, &format!("/vaults/{remote_id}")).await?;
     let bytes = B64.decode(answer["key_file"].as_str().unwrap_or_default()).map_err(|_| "SYNC_CANNOT_OPEN".to_string())?;
     let text = String::from_utf8(bytes).map_err(|_| "SYNC_CANNOT_OPEN".to_string())?;
     let file = keys::KeyFile::from_json(&text)?;
     keys::store_key_file(&dir, &file)?;
-    change_all(&app, |all| {
-        if let Some(c) = all.get_mut(&vault_id) {
-            c.remote = Some(remote_id);
+    change_file(&app, |sync| {
+        sync.links.insert(vault_id, Link { remote: remote_id, name, ..Link::default() });
+    })
+}
+
+/// Stops or resumes syncing a vault. Its place on the server stays either way.
+#[tauri::command]
+pub async fn sync_set_paused(app: tauri::AppHandle, vault_id: String, paused: bool) -> Result<(), String> {
+    stop_watching(&app);
+    change_file(&app, |file| {
+        if let Some(link) = file.links.get_mut(&vault_id) {
+            link.paused = paused;
         }
     })
 }
 
-/// Ends the connection on this device. What is on the server stays, for the
-/// other devices.
+/// A vault's place is gone from the server: the local vault simply is local again.
 #[tauri::command]
-pub async fn sync_disconnect(app: tauri::AppHandle, vault_id: String) -> Result<(), String> {
-    if let (Ok(c), Ok(token)) = (connection(&app, &vault_id), token(&app, &vault_id)) {
-        if let Ok(builder) = request(&c.url, Method::POST, "/unpair", SHORT) {
-            // Best effort: being offline must not stop anybody from disconnecting.
-            let _ = builder.bearer_auth(token.as_str()).send().await;
-        }
+pub async fn sync_forget_link(app: tauri::AppHandle, vault_id: String) -> Result<(), String> {
+    stop_watching(&app);
+    change_file(&app, |file| {
+        file.links.remove(&vault_id);
+    })
+}
+
+/// Removes a vault from the server. Copies on devices are not touched.
+#[tauri::command]
+pub async fn sync_delete_remote(app: tauri::AppHandle, remote_id: String) -> Result<(), String> {
+    let server = server(&app)?;
+    if uuid::Uuid::parse_str(&remote_id).is_err() {
+        return Err("invalid vault id".to_string());
     }
-    forget(&app, &vault_id);
-    Ok(())
+    let path = format!("/vaults/{remote_id}");
+    let response = send(request(&server.url, Method::DELETE, &path, LONG)?.bearer_auth(&server.token)).await?;
+    if !response.status().is_success() && response.status() != StatusCode::NOT_FOUND {
+        return Err(refused(response).await);
+    }
+    change_file(&app, |file| file.links.retain(|_, link| link.remote != remote_id))
+}
+
+/// The vault was renamed here: the list on the server follows.
+#[tauri::command]
+pub async fn sync_rename(app: tauri::AppHandle, vault_id: String, name: String) -> Result<(), String> {
+    let server = server(&app)?;
+    let target = remote(&app, &vault_id)?;
+    let current = send(target.call(Method::GET, "", SHORT)?).await?;
+    if !current.status().is_success() {
+        return Err(refused(current).await);
+    }
+    let current: Value = current.json().await.map_err(|_| UNREACHABLE.to_string())?;
+    let meta = seal(&names_key(&server)?, &json!({ "name": name }).to_string());
+    let body = json!({ "meta": B64.encode(meta), "key_file": current["key_file"] });
+    let response = send(target.call(Method::PUT, "", SHORT)?.json(&body)).await?;
+    if !response.status().is_success() {
+        return Err(refused(response).await);
+    }
+    change_file(&app, |file| {
+        if let Some(link) = file.links.get_mut(&vault_id) {
+            link.name = name;
+        }
+    })
 }
 
 /// Sealed and sent. `behind`, `epoch_changed` and the like are answers for the
@@ -619,7 +656,7 @@ pub async fn sync_snapshot_put(
     schema: i64,
 ) -> Result<Value, String> {
     let target = remote(&app, &vault_id)?;
-    let rekeyed = connection(&app, &vault_id)?.rekeyed;
+    let rekeyed = read_file(&app)?.links.get(&vault_id).is_some_and(|l| l.rekeyed);
     // A device that missed a password change must not put the old key back.
     if !rekeyed && !same_key_as_server(&app, &vault_id, &target).await? {
         return Err(PASSWORD_CHANGED.to_string());
@@ -728,8 +765,6 @@ pub async fn sync_adopt_new_password(app: tauri::AppHandle, vault_id: String, pa
     tokio::fs::remove_file(&path).await.ok();
     proof?;
 
-    let old = keys::key_for(&app, &vault_id)?.ok_or_else(|| LOCKED.to_string())?;
-    hold_token(&app, &vault_id, &old)?;
     vault::remove_vault_content(&dir)?;
     keys::store_key_file(&dir, &file)?;
     let remembered = keys::is_remembered(&vault_id);
@@ -737,7 +772,7 @@ pub async fn sync_adopt_new_password(app: tauri::AppHandle, vault_id: String, pa
         keys::apply_remember(&vault_id, &key, Some(true));
     }
     app.state::<keys::VaultKeys>().insert(&vault_id, key);
-    token(&app, &vault_id).map(|_| ())
+    Ok(())
 }
 
 /// The new key is on the server. Images still under old names are of no use to
@@ -755,9 +790,9 @@ pub async fn sync_rekey_done(app: tauri::AppHandle, vault_id: String) -> Result<
             }
         }
     }
-    change_all(&app, |all| {
-        if let Some(c) = all.get_mut(&vault_id) {
-            c.rekeyed = false;
+    change_file(&app, |file| {
+        if let Some(link) = file.links.get_mut(&vault_id) {
+            link.rekeyed = false;
         }
     })
 }
@@ -855,7 +890,7 @@ fn take_events(buffer: &mut String) -> Vec<String> {
 /// One connection to the server's event stream, until it breaks.
 async fn listen_once(app: &tauri::AppHandle, vault_id: &str) -> Result<(), String> {
     let target = remote(app, vault_id)?;
-    let own = connection(app, vault_id)?.device.unwrap_or_default();
+    let own = server(app)?.device;
     // Only an upper bound on one connection: its keep-alives pass the read timeout.
     let mut response = send(target.call(Method::GET, "/events", Duration::from_secs(86_400))?).await?;
     if !response.status().is_success() {

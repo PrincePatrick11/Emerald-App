@@ -40,17 +40,29 @@ import {
  */
 
 export interface SyncStatus {
+  /** It syncs: there is a server, the vault has its place there, not paused. */
   connected: boolean;
-  url?: string;
+  url?: string | null;
+  hasServer?: boolean;
   hasRemote?: boolean;
-  needsLogin?: boolean;
+  paused?: boolean;
   /** The password changed here and the server has not heard yet. */
   rekeyed?: boolean;
+  remote?: string | null;
+  name?: string | null;
+}
+
+export interface ServerStatus {
+  url: string | null;
+  links: Record<string, { remote: string; paused: boolean }>;
 }
 
 export interface RemoteVault {
   id: string;
+  /** `null` if it was put there with another key. */
+  name: string | null;
   storedBytes: number;
+  images: number;
   hasSnapshot: boolean;
 }
 
@@ -90,53 +102,82 @@ export function syncStatus(vaultId: string): Promise<SyncStatus> {
   return invoke<SyncStatus>('sync_status', { vaultId });
 }
 
-export async function syncPair(vaultId: string, url: string, key: string): Promise<void> {
-  await invoke('sync_pair', { vaultId, url, key });
-  // A new token: the line to the server's events starts over with it.
-  watching = null;
+export function serverStatus(): Promise<ServerStatus> {
+  return invoke<ServerStatus>('sync_server_status');
 }
 
-export interface ServerInfo {
-  storedBytes: number;
-  images: number;
+export async function syncPair(url: string, key: string): Promise<void> {
+  await invoke('sync_pair', { url, key });
+  // A new token: the line to the server's events starts over with it.
+  watching = null;
+  lastError = 0;
+  useSyncStore.setState({ error: null });
+}
+
+export async function syncUnpair(): Promise<void> {
+  await invoke('sync_unpair');
+  watching = null;
+  useSyncStore.setState({ error: null, lastSync: null, conflicts: 0 });
+}
+
+export interface ServerDevices {
   me: string;
   devices: { id: string; name: string; created_at: number; last_seen: number }[];
 }
 
-export function serverInfo(vaultId: string): Promise<ServerInfo> {
-  return invoke<ServerInfo>('sync_server_info', { vaultId });
+export function serverDevices(): Promise<ServerDevices> {
+  return invoke<ServerDevices>('sync_devices');
 }
 
-export function removeDevice(vaultId: string, deviceId: string): Promise<void> {
-  return invoke('sync_remove_device', { vaultId, deviceId });
+export function removeDevice(deviceId: string): Promise<void> {
+  return invoke('sync_remove_device', { deviceId });
 }
 
-export function remoteVaults(vaultId: string): Promise<RemoteVault[]> {
-  return invoke<RemoteVault[]>('sync_remote_vaults', { vaultId });
+export function remoteVaults(): Promise<RemoteVault[]> {
+  return invoke<RemoteVault[]>('sync_remote_vaults');
 }
 
-export function adoptRemoteVault(vaultId: string, remoteId: string): Promise<void> {
-  return invoke('sync_adopt_remote', { vaultId, remoteId });
-}
-
-/** Ends a pairing that never became a connection, for a vault not created after all. */
-export function abandonPairing(vaultId: string): Promise<void> {
-  return invoke('sync_disconnect', { vaultId });
+export function adoptRemoteVault(vaultId: string, remoteId: string, name: string): Promise<void> {
+  return invoke('sync_adopt_remote', { vaultId, remoteId, name });
 }
 
 /** Puts the open vault on the server, as a place of its own. */
-export async function connectOpenVault(vaultId: string, name: string): Promise<void> {
+export async function uploadOpenVault(vaultId: string, name: string): Promise<void> {
   await invoke('sync_create_remote', { vaultId, name });
   await startTracking(await getDb());
   await syncNow();
 }
 
-/** This device stops syncing. The vault stays here, and what is on the server stays there. */
-export async function disconnectOpenVault(vaultId: string): Promise<void> {
-  await stopTracking(await getDb());
-  await invoke('sync_disconnect', { vaultId });
+/**
+ * This vault stops syncing and keeps its place on the server. The triggers go on
+ * noting what changes, so that connecting it again brings that along.
+ */
+export async function pauseVault(vaultId: string): Promise<void> {
+  await invoke('sync_set_paused', { vaultId, paused: true });
   watching = null;
-  useSyncStore.setState({ error: null, lastSync: null, conflicts: 0 });
+}
+
+export async function resumeVault(vaultId: string): Promise<void> {
+  await invoke('sync_set_paused', { vaultId, paused: false });
+  watching = null;
+  await syncNow();
+}
+
+/** Removes a vault from the server. Copies on devices stay as local vaults. */
+export async function deleteRemoteVault(remoteId: string, localVaultId: string | null): Promise<void> {
+  await invoke('sync_delete_remote', { remoteId });
+  if (localVaultId && localVaultId === useVaultStore.getState().activeVaultId) await stopTracking(await getDb());
+  watching = null;
+}
+
+/**
+ * Before this device's vault is replaced by what another device published: a
+ * mistake there must not be final here. Without this backup nothing is replaced.
+ */
+export async function backupBeforeReplacing(vaultId: string): Promise<void> {
+  const { buildBackup, FULL_BACKUP_OPTIONS } = await import('../dbBackup');
+  const content = JSON.stringify(await buildBackup(FULL_BACKUP_OPTIONS));
+  await invoke('write_auto_backup', { vaultId, content, keep: null });
 }
 
 /** What this device had not pushed when the vault started over under a new password. */
@@ -177,12 +218,13 @@ async function takeIncomingSettings(db: Database, vaultId: string, incoming: Fla
   await saveSettingsBase(db, merged.base);
 }
 
-async function restoreFromSnapshot(db: Database, vaultId: string, keepPending: boolean): Promise<void> {
+async function restoreFromSnapshot(db: Database, vaultId: string, keepPending: boolean, replacing = keepPending): Promise<void> {
   const keep: SyncChange[] = [...keptOverNewPassword.splice(0), ...(keepPending ? (await collectChanges(db)).changes : [])];
   const snapshot = await invoke<{ seq: number; epoch: number; schema: number; frames: number }>('sync_snapshot_fetch', { vaultId });
   try {
     if (snapshot.schema > BASELINE_VERSION) throw OUTDATED;
     await drainSerialized();
+    if (replacing) await backupBeforeReplacing(vaultId);
     await beginRestore(db);
     for (let index = 0; index < snapshot.frames; index++) {
       const text = await invoke<string>('sync_snapshot_frame', { vaultId, index });
@@ -372,11 +414,13 @@ async function run(reload: boolean): Promise<void> {
   const vaultId = useVaultStore.getState().activeVaultId;
   if (!vaultId || !mayMerge()) return;
   const status = await syncStatus(vaultId);
-  if (!status.connected || !status.hasRemote || status.needsLogin || !(await isUnlocked(vaultId))) return;
+  if (!status.connected || !(await isUnlocked(vaultId))) return;
   useSyncStore.setState({ running: true });
   try {
     const db = await getDb();
     await drainSerialized();
+    const name = useVaultStore.getState().vaults.find((vault) => vault.id === vaultId)?.name;
+    if (name && status.name !== name) await invoke('sync_rename', { vaultId, name });
     const changed = await round(db, vaultId, status);
     lastRun = Date.now();
     remoteChanged = false;
@@ -384,8 +428,16 @@ async function run(reload: boolean): Promise<void> {
     if (changed && reload && useVaultStore.getState().activeVaultId === vaultId) await reloadStores();
   } catch (err) {
     if (err instanceof Postponed) return;
-    lastError = Date.now();
     const code = syncErrorCode(err);
+    // Removed from the server, perhaps by another device: here it just is a local vault again.
+    if (code === 'SYNC_SERVER:not_found') {
+      await invoke('sync_forget_link', { vaultId });
+      await stopTracking(await getDb());
+      watching = null;
+      useSyncStore.setState({ error: code });
+      return;
+    }
+    lastError = Date.now();
     console.warn('[sync]', code);
     useSyncStore.setState({ error: code });
   } finally {
@@ -409,7 +461,7 @@ export function syncNow(): Promise<void> {
  */
 export async function prepareOpenedVault(vaultId: string): Promise<void> {
   const status = await syncStatus(vaultId).catch(() => null);
-  if (!status?.connected || !status.hasRemote) return;
+  if (!status?.connected) return;
   if (!(await isTracked(await getDb()))) await once(false);
 }
 
@@ -418,12 +470,14 @@ async function tick(): Promise<void> {
   const vaultId = useVaultStore.getState().activeVaultId;
   if (!vaultId) return;
   const status = await syncStatus(vaultId);
-  if (!status.connected || !status.hasRemote || !(await isUnlocked(vaultId))) {
+  if (!status.connected || !(await isUnlocked(vaultId))) {
     if (watching) await invoke('sync_unwatch');
     watching = null;
+    // Its place is gone (another server now): the log has nobody to go to.
+    if (!status.hasRemote && (await isUnlocked(vaultId)) && (await isTracked(await getDb()))) await stopTracking(await getDb());
     return;
   }
-  if (watching !== vaultId && !status.needsLogin) {
+  if (watching !== vaultId) {
     await invoke('sync_watch', { vaultId });
     watching = vaultId;
   }

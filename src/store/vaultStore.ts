@@ -26,7 +26,7 @@ import { captureLegacySettings } from '../lib/vaultSettings';
 import { resolveOpenEdits } from '../lib/openEdits';
 import { changeVaultPassword, keyErrorOf, lockVault, type CreatedKey } from '../lib/vaultKeys';
 import { ensureVaultReady, VAULT_KEY_CANCELLED } from './vaultKeyStore';
-import { keepPendingForNewPassword, prepareOpenedVault, syncNow } from '../lib/sync/engine';
+import { backupBeforeReplacing, keepPendingForNewPassword, prepareOpenedVault, syncNow } from '../lib/sync/engine';
 
 interface VaultStore {
   vaults: Vault[];
@@ -289,6 +289,7 @@ export const useVaultStore = create<VaultStore>((set, get) => ({
     if (!(await resolveOpenEdits())) return;
     await drainSerialized();
     await keepPendingForNewPassword();
+    await backupBeforeReplacing(id);
     await detachDrafts();
     try {
       await withDbClosed(() => invoke('sync_adopt_new_password', { vaultId: id, password }));

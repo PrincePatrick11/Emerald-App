@@ -409,16 +409,6 @@ export default function VaultModal({ onClose, dismissible = true }: Props) {
 
   const closeEditor = () => setEditor({ kind: 'none' });
 
-  /** Where a vault fetched from a server goes: where a new one would. */
-  async function serverVaultTarget(name: string): Promise<string | undefined> {
-    const target = newVaultTarget(await newVaultBaseDir().catch(() => null), null, name);
-    if (target) {
-      const problem = await probeNewVaultTarget(target);
-      if (problem) throw new Error(problem);
-    }
-    return target ?? undefined;
-  }
-
   /** Resolves the default location before the row opens, so it shows a real
    *  path from the first frame instead of a placeholder. */
   const openCreateRow = useCallback(async () => {
@@ -672,7 +662,6 @@ export default function VaultModal({ onClose, dismissible = true }: Props) {
 
         {fromServer ? (
           <ServerVaultForm
-            target={serverVaultTarget}
             onCancel={() => setFromServer(false)}
             onDone={() => { setFromServer(false); onClose(); }}
           />

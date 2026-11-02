@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { VAULT_KEY_CANCELLED } from '../../../store/vaultKeyStore';
 import { keyErrorOf } from '../../../lib/vaultKeys';
 import { useTranslation } from 'react-i18next';
@@ -31,6 +31,8 @@ import { resolveOpenEdits } from '../../../lib/openEdits';
 import AutoBackupSection from './AutoBackupSection';
 import SettingsChoiceButton from './SettingsChoiceButton';
 import SettingsSection, { SettingsCheckboxGrid, SettingsStatus } from './SettingsSection';
+import { useVaultStore } from '../../../store/vaultStore';
+import { syncStatus } from '../../../lib/sync/engine';
 
 /** Everything as in the automatic backup — except the trash, which is added by hand. */
 const DEFAULT_EXPORT_OPTIONS: BackupOptions = { ...FULL_BACKUP_OPTIONS, includeDeleted: false };
@@ -58,6 +60,12 @@ const SETTINGS_GROUP_LABEL_KEYS: Record<SettingsGroup, string> = {
  */
 export default function BackupPage() {
   const { t } = useTranslation();
+  // Replacing a vault that syncs replaces it on the other devices too.
+  const [syncsToOthers, setSyncsToOthers] = useState(false);
+  const syncVaultId = useVaultStore((s) => s.activeVaultId);
+  useEffect(() => {
+    syncStatus(syncVaultId).then((status) => setSyncsToOthers(status.connected), () => setSyncsToOthers(false));
+  }, [syncVaultId]);
 
 
   // Export
@@ -415,6 +423,7 @@ export default function BackupPage() {
                     {t('settings.modeReplaceWarning')}
                     {/* Replace is the one mode in which language and appearance
                         switch without a choice of their own. */}
+                    {syncsToOthers && ` ${t('sync.replaceWarning')}`}
                     {importedFile.preview.hasSettings && ` ${t('settings.modeReplaceSettingsWarning')}`}
                   </span>
                 </div>

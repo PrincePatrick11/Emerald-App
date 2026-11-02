@@ -828,7 +828,6 @@ pub async fn vault_change_password(
     })
     .await
     .map_err(|e| e.to_string())??;
-    crate::sync::hold_token(&app, &vault_id, &old_key)?;
     let created = rekey_command(&app, &vault_id, old_key, &new_password, None).await?;
     crate::sync::note_rekeyed(&app, &vault_id)?;
     Ok(created)
@@ -890,7 +889,6 @@ pub async fn vault_recover(
     })
     .await
     .map_err(|e| e.to_string())??;
-    crate::sync::hold_token(&app, &vault_id, &old_key)?;
     let created = rekey_command(&app, &vault_id, old_key, &new_password, remember_key).await?;
     crate::sync::note_rekeyed(&app, &vault_id)?;
     Ok(created)
