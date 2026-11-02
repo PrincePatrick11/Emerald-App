@@ -31,7 +31,7 @@ There is one formatting toolbar, pinned to the top while scrolling, acting on th
 
 All of this is part of the entry's text, so Cancel reverts it too.
 
-**Your own blocks.** The **Blocks** view (the row of buttons under the entry list, between Templates and Categories) lists the blocks you've built on the same dashboard every module uses — icon, name, field and entry count, an "outdated" dot, and "Unsaved" for a draft left open elsewhere. The right sidebar holds the header: title, count, "New block", search, view (list, cards, wide cards, or a timeline by month of last change) and sort (last changed, name, most used).
+**Your own blocks.** The **Blocks** view (rail, below Templates) lists the blocks you've built on the same dashboard every module uses — icon, name, field and entry count, an "outdated" dot, and "Unsaved" for a draft left open elsewhere. The right sidebar holds the header: title, count, "New block", search, view (list, cards, wide cards, or a timeline by month of last change) and sort (last changed, name, most used).
 
 The list opens with a collapsible "Your blocks" section; below it, laid out like the Altar library, a collapsible "Built-in blocks" section lists what "Add block" offers out of the box — text, every field kind and the three sigil blocks — as a plain, non-clickable list (text and the sigil blocks have a description tooltip). Search filters both sections. With none of your own yet, a hint invites you to build the first; the built-in section stays regardless.
 
