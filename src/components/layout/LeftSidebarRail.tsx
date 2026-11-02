@@ -107,25 +107,25 @@ export default function LeftSidebarRail() {
   return (
     <div
       // No divider to the list: both are part of the frame.
-      className="left-sidebar-rail flex flex-col items-center h-full flex-shrink-0"
+      // Scrolls without a bar when the window is too low for all the buttons.
+      className="left-sidebar-rail scrollbar-none overflow-y-auto flex flex-col items-center h-full flex-shrink-0"
       style={{ width: RAIL_WIDTH }}
     >
       {/* The two sidebars are toggled by the "View" menu (useTitleBarMenus,
           native on macOS) — buttons of their own up here were a second place
           for the same thing. */}
 
-      {/* Main nav icons — navigate only, never touch the entry-list panel */}
-      {/* Groups are set apart by space alone: lines would be more dividers in a
-          frame that has none. */}
-      <div className="w-full flex flex-col items-center gap-3 pb-2">
-        {/* The way to the dashboard. It used to hang on the Emerald logo in the
-            title bar, which nobody reads as a navigation target.
-            Mind the MCP selectors: lucide exports `Home` as an alias of
-            `House`, so the SVG carries `.lucide-house`, not `.lucide-home`. */}
+      {/* Main nav icons — they never touch the entry-list panel. Groups are set
+          apart by space alone: lines would be more dividers in a frame that has none. */}
+      <div className="w-full flex-shrink-0 flex flex-col items-center gap-3 pb-2">
         <div className={RAIL_GROUP}>
           <RailButton onClick={() => setCreateOpen(true)} title={t('createItem.title')}>
             <Plus size={18} />
           </RailButton>
+          {/* The way to the dashboard. It used to hang on the Emerald logo in the
+              title bar, which nobody reads as a navigation target.
+              Mind the MCP selectors: lucide exports `Home` as an alias of
+              `House`, so the SVG carries `.lucide-house`, not `.lucide-home`. */}
           {viewButton('home', AUX_VIEWS.home)}
         </div>
         <div className={RAIL_GROUP}>
@@ -133,8 +133,7 @@ export default function LeftSidebarRail() {
           {viewButton('tasks', MODULES.tasks)}
           {viewButton('operations', MODULES.operations)}
         </div>
-        {/* The lexicon is not an entry module, but sits here between wiki and
-            altar instead of at the bottom with templates and blocks. */}
+        {/* The lexicon is not an entry module, but belongs with wiki and altar. */}
         <div className={RAIL_GROUP}>
           {viewButton('wiki', MODULES.wiki)}
           {viewButton('lexicon', AUX_VIEWS.lexicon)}
@@ -148,7 +147,7 @@ export default function LeftSidebarRail() {
 
       {/* Bottom nav — always visible, read from the bottom: Settings, Vault,
           Trash, Tags, Categories */}
-      <div className="sidebar-bottom-bar w-full flex-1 flex flex-col items-center justify-end gap-3 py-2">
+      <div className="sidebar-bottom-bar w-full flex-[1_0_auto] flex flex-col items-center justify-end gap-3 py-2">
         <div className={RAIL_GROUP}>
           {viewButton('categories', AUX_VIEWS.categories)}
           {viewButton('tags', AUX_VIEWS.tags)}

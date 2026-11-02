@@ -61,12 +61,17 @@ export default function BlockSidebarArea() {
  * body right under the action bar, apart from the block list further down.
  */
 export function BlockAddActions() {
-  const { t } = useTranslation();
   const activeViewId = useUIStore((s) => s.activeView.id);
   const session = useBlockSessionStore((s) => s.session);
+  if (!session || session.entryId !== activeViewId || !session.isEditing) return null;
+  // As in `BlockSidebarArea`: an open menu belongs to this stack and this edit.
+  return <BlockAddButtons key={session.sessionId} session={session} />;
+}
+
+function BlockAddButtons({ session }: { session: BlockSession }) {
+  const { t } = useTranslation();
   const definitions = useBlockDefinitionStore((s) => s.definitions);
   const [menu, setMenu] = useState<{ x: number; y: number; actions: ContextMenuAction[] } | null>(null);
-  if (!session || session.entryId !== activeViewId || !session.isEditing) return null;
   const { api } = session;
 
   const openAddMenu = (e: MouseEvent) => setMenu({

@@ -30,8 +30,8 @@ const creators: Record<CreatableViewId, (categoryId?: string) => Promise<ActiveV
     const entry = await useEntryStore.getState().createEntry('journal');
     return { type: 'journal', id: entry.id, mode: 'edit', isNew: true };
   },
-  tasks: async () => {
-    const task = await useTaskStore.getState().createTask();
+  tasks: async (categoryId) => {
+    const task = await useTaskStore.getState().createTask(categoryId ?? null);
     taskToName = task.id;
     return { type: 'tasks', id: task.id };
   },
@@ -62,8 +62,9 @@ const creators: Record<CreatableViewId, (categoryId?: string) => Promise<ActiveV
 };
 
 /**
- * "New …": creates an item of this view and opens it, the one way there for the
- * views' own buttons and the rail's plus.
+ * "New …": creates an item of this view and opens it, for the rail's plus and the
+ * views' own buttons. Tasks' own button is the exception: it names the row in
+ * place and must not clear the search and filters of the page it is on.
  *
  * The question about an open edit comes first. `setActiveView` would ask too, but
  * only after the creating: "Keep editing" would leave an unasked-for item behind.

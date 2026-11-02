@@ -121,8 +121,12 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
     @apply flex items-center justify-center w-[30px] h-[30px] p-0 rounded-md;
   }
 
-  /* Drag handle of a sidebar: a 4px strip lying mostly on the sheet, rounded and
-     stopping short of the sheet's corners, in an 8px wide area to grab. */
+  /* Drag handle of a sidebar: an 8px area to grab, showing a 4px rounded strip
+     that lies mostly on the sheet and stops short of its corners. */
+  .sidebar-resize-handle {
+    @apply absolute top-0 w-2 h-full cursor-col-resize z-10;
+  }
+
   .sidebar-resize-handle::after {
     content: '';
     position: absolute;
@@ -132,7 +136,14 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
     width: 4px;
     border-radius: 9999px;
     background: transparent;
+    pointer-events: none;
     transition: background-color 150ms ease-out;
+  }
+
+  /* The right one grabs on the sidebar's side only: the main area's scrollbar
+     runs along that edge. Its strip still reaches over onto the main area. */
+  .sidebar-resize-handle--right::after {
+    left: -3px;
   }
 
   .sidebar-resize-handle:hover::after,
@@ -507,8 +518,9 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
     @apply px-3.5 py-4;
   }
 
-  /* A tile of `CreateItemModal`. The ring is the keyboard's only sign of where it
-     stands: arrow keys and Tab move through the grid. */
+  /* A tile of `CreateItemModal`. Arrow keys and Tab move through the grid, so the
+     focus has to show: the built-in themes ring `.panel-interactive` themselves,
+     the outline below is for custom themes, which do not. */
   .create-item-tile {
     @apply flex flex-col items-center justify-center gap-1.5 px-1 py-3 text-xs text-secondary;
   }
@@ -1634,18 +1646,7 @@ html[data-theme] .sidebar-add-field input::placeholder,
   box-shadow: 0 0 0 2px var(--focus-ring);
 }
 
-/* The buttons at the end of a section, below a line: full width,
-   centred, stacked — "Add block" and "Insert template"
-   below the blocks. */
-.sidebar-section-actions {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  margin-top: 10px;
-  padding-top: 10px;
-  border-top: 1px solid var(--field-border);
-}
-
+/* Full width, centred: "Add block" and "Insert template" (`BlockAddActions`). */
 .sidebar-section-button {
   display: flex;
   width: 100%;
@@ -1674,7 +1675,6 @@ html[data-theme] .sidebar-add-field input::placeholder,
   box-shadow: 0 0 0 2px var(--focus-ring);
 }
 
-html[data-theme] .sidebar-section-actions,
 html[data-theme] .sidebar-section-button {
   border-color: var(--field-border);
 }
@@ -2550,12 +2550,11 @@ html[data-theme] .block-manager-row--idle,
 
 /* The entry list's scrollbar stays out of sight unless the list is moving
    (`EntryListTab`) or the pointer is at its edge, so it can still be grabbed.
-   The list's `mr-1` keeps it off the sidebar's resize handle; `pr-1` instead of
-   `pr-2` gives the rows that width back. */
+   The list's `mr-1` keeps it off the sidebar's resize handle. */
 .entry-list-nav::-webkit-scrollbar-thumb {
   background-color: transparent;
 }
-.entry-list-nav.is-scrolling::-webkit-scrollbar-thumb {
+.entry-list-nav.scrollbar-shown::-webkit-scrollbar-thumb {
   background-color: var(--scrollbar);
 }
 .entry-list-nav::-webkit-scrollbar-thumb:hover {

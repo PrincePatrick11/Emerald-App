@@ -411,15 +411,15 @@ export default function AppShell() {
         {leftListOpen && !isAltarWindowFullscreen && !viewLocked && (
           <div
             onPointerDown={onLeftPointerDown}
-            className="sidebar-resize-handle absolute top-0 w-2 h-full cursor-col-resize z-10"
+            className="sidebar-resize-handle"
             style={{ left: leftSidebarWidth - 3 }}
           />
         )}
         {rightSidebarOpen && !isAltarWindowFullscreen && !viewLocked && (
           <div
             onPointerDown={onRightPointerDown}
-            className="sidebar-resize-handle absolute top-0 w-2 h-full cursor-col-resize z-10"
-            style={{ right: `calc(var(--sheet-inset) + ${rightWidth}px - 3px)` }}
+            className="sidebar-resize-handle sidebar-resize-handle--right"
+            style={{ right: `calc(var(--sheet-inset) + ${rightWidth}px - 8px)` }}
           />
         )}
 

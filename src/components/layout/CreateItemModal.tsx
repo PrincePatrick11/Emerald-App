@@ -1,10 +1,10 @@
 import { useRef, type KeyboardEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { createItem } from '../../lib/createItem';
-import { CREATABLE_VIEWS } from '../../lib/modules';
+import { CREATABLE_VIEWS, type CreatableViewId } from '../../lib/modules';
 import Modal from '../ui/Modal';
 
-/** Tiles per row; the arrow keys need it, and so does the grid below. */
+/** Tiles per row, for the arrow keys; keep in step with `grid-cols-4` below. */
 const COLUMNS = 4;
 
 const KEY_STEPS: Record<string, number> = {
@@ -29,7 +29,7 @@ export default function CreateItemModal({ onClose }: { onClose: () => void }) {
   };
 
   // The modal goes first: leaving an open edit may ask its own question.
-  const choose = (id: (typeof CREATABLE_VIEWS)[number]['id']) => {
+  const choose = (id: CreatableViewId) => {
     onClose();
     createItem(id).catch((err: unknown) => console.error('[CreateItemModal] creating failed:', err));
   };
@@ -48,7 +48,7 @@ export default function CreateItemModal({ onClose }: { onClose: () => void }) {
             onKeyDown={(e) => onKeyDown(e, index)}
             className="panel-interactive create-item-tile"
           >
-            <Icon size={18} />
+            <Icon size={16} />
             <span className="min-w-0 max-w-full truncate">{t(navLabelKey)}</span>
           </button>
         ))}

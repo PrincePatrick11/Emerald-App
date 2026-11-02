@@ -43,13 +43,13 @@ export interface EntryListTabProps<T> {
 
 /** How long the scrollbar stays after the last scroll event. */
 const SCROLLBAR_LINGER_MS = 800;
-/** How close to the list's right edge the pointer brings the scrollbar up. */
+/** How close to the list's right edge, from either side, brings the scrollbar up. */
 const SCROLLBAR_EDGE_PX = 12;
 
 /** WebKit does not repaint a custom scrollbar when only its colour rule changes:
  *  it has to be rebuilt, which taking the overflow away for one layout does. */
 function setScrollbarShown(nav: HTMLElement, shown: boolean) {
-  nav.classList.toggle('is-scrolling', shown);
+  nav.classList.toggle('scrollbar-shown', shown);
   nav.style.overflowY = 'hidden';
   void nav.offsetWidth;
   nav.style.overflowY = '';
@@ -89,14 +89,14 @@ export default function EntryListTab<T>({
   const scrollEndTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
   useEffect(() => () => clearTimeout(scrollEndTimer.current), []);
   // The scrollbar shows only while the list moves or the pointer is at its edge
-  // (`.is-scrolling` in index.css). `:hover` cannot do this: a hidden thumb is not
+  // (`.scrollbar-shown` in index.css). `:hover` cannot do this: a hidden thumb is not
   // repainted when the pointer reaches it. On the element, not in state: neither
   // a scroll nor a mouse move may re-render the whole list.
   const pointerAtEdge = useRef(false);
   const showScrollbarForNow = () => {
     const nav = navRef.current;
     if (!nav) return;
-    if (!nav.classList.contains('is-scrolling')) setScrollbarShown(nav, true);
+    if (!nav.classList.contains('scrollbar-shown')) setScrollbarShown(nav, true);
     clearTimeout(scrollEndTimer.current);
     scrollEndTimer.current = setTimeout(() => {
       if (!pointerAtEdge.current) setScrollbarShown(nav, false);
@@ -108,10 +108,11 @@ export default function EntryListTab<T>({
   useEffect(() => {
     const onMove = (e: globalThis.MouseEvent) => {
       const nav = navRef.current;
-      if (!nav) return;
+      // A held button may be dragging the thumb: hiding would rebuild the bar under it.
+      if (!nav || e.buttons) return;
       const rect = nav.getBoundingClientRect();
       const atEdge = e.clientY >= rect.top && e.clientY <= rect.bottom
-        && e.clientX >= rect.right - SCROLLBAR_EDGE_PX && e.clientX <= rect.right
+        && e.clientX >= rect.right - SCROLLBAR_EDGE_PX && e.clientX <= rect.right + SCROLLBAR_EDGE_PX
         && nav.scrollHeight > nav.clientHeight;
       if (atEdge === pointerAtEdge.current) return;
       pointerAtEdge.current = atEdge;
@@ -160,8 +161,8 @@ export default function EntryListTab<T>({
       {/* Right under the sheet's top edge: the 1px is the sheet's border, so the
           field starts where its surface does and shares a centre line with the
           rail's first button. No divider: the list sits directly on the frame.
-          Creating goes through the main action in the right panel, not through a
-          button here. */}
+          The 13px keep it clear of the list below. No create button here: see the
+          rail's plus and the dashboards. */}
       <div className="entry-list-search-row pt-px pb-[13px] px-3 flex-shrink-0 flex items-center">
         <div className="entry-list-search flex-1 flex items-center gap-2 rounded-md px-2.5 h-[30px] min-w-0">
           <Search size={14} className="text-subtle flex-shrink-0" />

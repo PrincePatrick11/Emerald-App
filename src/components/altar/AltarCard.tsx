@@ -55,7 +55,7 @@ type AltarCardProps = CommonProps & {
 type CommonProps = {
   altar: AltarRecord;
   previewItems: AltarPlacement[];
-  /** Off means: flame icon instead of the canvas preview. */
+  /** Off means: altar icon instead of the canvas preview. */
   showPreview: boolean;
   isRenaming: boolean;
   renameValue: string;
