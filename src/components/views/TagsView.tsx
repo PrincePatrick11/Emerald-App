@@ -337,8 +337,10 @@ export default function TagsView() {
         onClick={() => toggle(tag.id)}
         onContextMenu={(e) => { e.preventDefault(); setCtxMenu({ tagId: tag.id, x: e.clientX, y: e.clientY }); }}
       >
-        {/* The row's own click does the toggling; the chevron only shows it. */}
-        <CollapseChevron collapsed={collapsed} onToggle={() => {}} />
+        {/* A button of its own for the keyboard; the row's click is for the pointer. */}
+        <span onClick={(e) => e.stopPropagation()} className="flex flex-shrink-0">
+          <CollapseChevron collapsed={collapsed} onToggle={() => toggle(tag.id)} />
+        </span>
         <span onClick={(e) => e.stopPropagation()} className="w-5 flex items-center justify-center flex-shrink-0">
           <TagColorDot color={tag.color} onPick={(color) => updateTag(tag.id, { color })} />
         </span>

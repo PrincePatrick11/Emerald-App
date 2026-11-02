@@ -3,11 +3,13 @@ import { useUIStore } from '../../store/uiStore';
 import { isImageIcon } from '../../lib/helpers';
 import type { ActiveView } from '../../types';
 
-/** The one row of every dashboard: 44px, whatever it holds. The card carries
- *  `w-full` for the grid cell, the row `group` for hover details in the content. */
-const ROW_CLASS = 'panel-interactive w-full text-left flex items-center gap-3 px-4 h-11 group';
+/** The one row of every dashboard: 44px, whatever it holds. */
+export const ROW_GEOMETRY_CLASS = 'w-full text-left flex items-center gap-3 px-4 h-11';
 
-/** Frame per presentation. */
+/** `group` for the hover details in a row's content. */
+const ROW_CLASS = `panel-interactive ${ROW_GEOMETRY_CLASS} group`;
+
+/** Frame per presentation; the card's `w-full` is for the grid cell. */
 const LAYOUT_CLASS: Record<DashboardItemLayout, string> = {
   row: ROW_CLASS,
   card: 'panel-interactive w-full text-left px-4 py-4',
@@ -77,7 +79,7 @@ export function ItemGlyph({ icon, large }: { icon: string; large?: boolean }) {
 
 /** A row's symbol column, at least as wide as an emoji, so names line up across
  *  a list; an altar's preview is the one thing wider. */
-export function RowIcon({ children }: { children: ReactNode }) {
+export function RowSymbol({ children }: { children: ReactNode }) {
   return <span className="min-w-5 flex items-center justify-center flex-shrink-0 text-base">{children}</span>;
 }
 
@@ -85,11 +87,9 @@ export function RowIcon({ children }: { children: ReactNode }) {
 export function RowContent({ icon, title, meta }: { icon?: ReactNode; title: ReactNode; meta?: ReactNode }) {
   return (
     <>
-      {icon != null && <RowIcon>{icon}</RowIcon>}
+      {icon != null && <RowSymbol>{icon}</RowSymbol>}
       <span className="flex-1 min-w-0 truncate text-sm text-soft">{title}</span>
-      {meta != null && meta !== false && (
-        <span className="text-xs text-muted min-w-0 max-w-[60%] truncate flex-shrink-0">{meta}</span>
-      )}
+      {meta != null && <span className="text-xs text-muted max-w-[60%] truncate flex-shrink-0">{meta}</span>}
     </>
   );
 }

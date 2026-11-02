@@ -904,6 +904,7 @@
     "title": "Corbeille",
     "emptyTrash": "Vider la corbeille",
     "restore": "Restaurer",
+    "restoreFailed": "Certains éléments n'ont pas pu être restaurés et restent sélectionnés.",
     "restoreSelected": "Restaurer la sélection",
     "deletePermanently": "Supprimer définitivement",
     "retentionNote": "Les éléments sont automatiquement supprimés après {{count}} jour.",

@@ -279,8 +279,7 @@ export default function CategoriesView() {
         key={cat.id}
         data-category-id={cat.id}
         title={cat.is_builtin ? t('categories.builtinHint') : undefined}
-        // `task-row-target`: an outline, the one highlight the theme's panel rules leave alone.
-        className={isDragging ? 'task-row-target opacity-50' : highlightId === cat.id ? 'task-row-target' : ''}
+        className={`${isDragging || highlightId === cat.id ? 'row-target' : ''} ${isDragging ? 'opacity-50' : ''}`}
         // Sigils: not deletable, and a rename would lead nowhere — the name
         // comes from the locale, not from the row. So no menu for them.
         onContextMenu={cat.is_builtin ? undefined : (e) => {

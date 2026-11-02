@@ -23,8 +23,8 @@ export interface FilterPanelProps {
   /** Heading of the statusChips group; default t('filters.status'). */
   statusLabel?: string;
 
-  /** Further groups with their own heading, for controls that are neither filters
-   *  nor display toggles: the altar hangs the sorting of its
+  /** Further groups with their own heading, for controls that are not filters:
+   *  the altar hangs the sorting of its
    *  library here so that it sits with the rest of the dashboard header instead of
    *  in the content. They come first, directly below the sorting. */
   extraGroups?: { label: string; content: ReactNode }[];

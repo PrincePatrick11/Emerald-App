@@ -904,6 +904,7 @@
     "title": "Trash",
     "emptyTrash": "Empty Trash",
     "restore": "Restore",
+    "restoreFailed": "Some items could not be restored and stay selected.",
     "restoreSelected": "Restore selected",
     "deletePermanently": "Delete permanently",
     "retentionNote": "Items are automatically deleted after {{count}} day.",

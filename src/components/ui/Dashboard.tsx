@@ -137,7 +137,6 @@ interface DashboardBaseProps<T> {
   listClassName?: string;
   /** Spacing between groups; rows that are themselves the groups sit closer (tags). */
   groupsClassName?: string;
-  contentClassName?: string;
   /** <ContextMenu> stays caller-owned since its trigger is wired inside renderItem. */
   contextMenuSlot?: ReactNode;
 }
@@ -168,29 +167,10 @@ type DashboardContentProps<T> =
 
 export type DashboardProps<T> = DashboardBaseProps<T> & DashboardContentProps<T>;
 
-const DEFAULT_CONTENT_CLASSNAME = 'flex-1 overflow-y-auto px-8 py-6';
 const DEFAULT_CARDS_CLASSNAME = 'grid grid-cols-3 gap-3';
 const DEFAULT_WIDE_CARDS_CLASSNAME = 'grid grid-cols-1 gap-3';
 const DEFAULT_LIST_CLASSNAME = 'space-y-1.5';
 const DEFAULT_GROUPS_CLASSNAME = 'space-y-6';
-
-/**
- * The title of a dashboard in the main area: just the title. Dashboard renders
- * it itself from `title`; exported for headers that need something after it
- * (`children`, the trash its "Select all") and therefore build it as
- * `headerLeft`.
- */
-export function DashboardTitle({ title, children }: {
-  title: string;
-  children?: ReactNode;
-}) {
-  return (
-    <div className="flex items-center gap-3 min-w-0">
-      <h1 className={`${ENTRY_TITLE_HEADING_CLASSES} truncate`}>{title}</h1>
-      {children}
-    </div>
-  );
-}
 
 /**
  * The old name of the one heading, for the template and block sections
@@ -237,7 +217,6 @@ export default function Dashboard<T>({
   wideCardsClassName = DEFAULT_WIDE_CARDS_CLASSNAME,
   listClassName = DEFAULT_LIST_CLASSNAME,
   groupsClassName = DEFAULT_GROUPS_CLASSNAME,
-  contentClassName = DEFAULT_CONTENT_CLASSNAME,
   contextMenuSlot,
 }: DashboardProps<T>) {
   const { t } = useTranslation();
@@ -404,7 +383,7 @@ export default function Dashboard<T>({
           independently of the indentation a view sets for its content. */}
       <div className="px-8 pt-6 flex items-center gap-4 flex-shrink-0">
         <div className="flex-1 min-w-0">
-          {headerLeft ?? (title && <DashboardTitle title={title} />)}
+          {headerLeft ?? (title && <h1 className={`${ENTRY_TITLE_HEADING_CLASSES} truncate`}>{title}</h1>)}
         </div>
         {onSearch && (
           <ListSearchField
@@ -416,7 +395,7 @@ export default function Dashboard<T>({
         )}
       </div>
 
-      <div className={contentClassName}>
+      <div className="flex-1 overflow-y-auto px-8 py-6">
         {contentHeader}
         {renderContent()}
         {contentFooter}

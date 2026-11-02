@@ -904,6 +904,7 @@
     "title": "Papelera",
     "emptyTrash": "Vaciar papelera",
     "restore": "Restaurar",
+    "restoreFailed": "Algunos elementos no se pudieron restaurar y siguen seleccionados.",
     "restoreSelected": "Restaurar selección",
     "deletePermanently": "Eliminar definitivamente",
     "retentionNote": "Los elementos se eliminan automáticamente después de {{count}} día.",

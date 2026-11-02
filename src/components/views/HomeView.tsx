@@ -10,7 +10,7 @@ import ContextMenu from '../ui/ContextMenu';
 import Dashboard from '../ui/Dashboard';
 import CollapsibleGroupHeader from '../ui/CollapsibleGroupHeader';
 import { ENTRY_TITLE_HEADING_CLASSES } from '../ui/EntryDetailFrame';
-import DashboardItem, { CardContent, ItemGlyph, RENAME_INPUT_CLASS, RowContent } from '../ui/DashboardItem';
+import DashboardItem, { type DashboardItemLayout, CardContent, ItemGlyph, RENAME_INPUT_CLASS, RowContent } from '../ui/DashboardItem';
 import RenameField from '../ui/RenameField';
 import Dropdown from '../ui/Dropdown';
 import EmptyState from '../ui/EmptyState';
@@ -26,6 +26,7 @@ import { sortItems } from '../../lib/sortItems';
 import type { HomeSort, HomeView, HomeSectionPrefs } from '../../store/uiStore';
 import { useSettingsStore } from '../../store/settingsStore';
 import { createItem } from '../../lib/createItem';
+import type { Entry } from '../../types';
 
 type CtxTarget =
   | { kind: 'journal'; id: string }
@@ -69,6 +70,10 @@ function SectionToolbar({
   );
 }
 
+function applyCount<T>(items: T[], count: number): T[] {
+  return count === 0 ? items : items.slice(0, count);
+}
+
 // ── Section ───────────────────────────────────────────────────────────────────
 
 /**
@@ -87,7 +92,7 @@ function HomeSection<T>({
   items: T[];
   /** Shown when the module has nothing at all, not when `count` cuts the list. */
   empty: ReactNode;
-  renderItem: (item: T, layout: 'row' | 'card') => ReactNode;
+  renderItem: (item: T, layout: DashboardItemLayout) => ReactNode;
 }) {
   const { t } = useTranslation();
   const setActiveView = useUIStore((s) => s.setActiveView);
@@ -108,10 +113,6 @@ function HomeSection<T>({
         : <div className="grid grid-cols-3 gap-3">{items.map((item) => renderItem(item, 'card'))}</div>)}
     </section>
   );
-}
-
-function applyCount<T>(items: T[], count: number): T[] {
-  return count === 0 ? items : items.slice(0, count);
 }
 
 // ── Main component ────────────────────────────────────────────────────────────
@@ -179,7 +180,10 @@ export default function HomeView() {
     : displayTitle(t, kind, title));
 
   /** One item of a section: the same for all three kinds, in either layout. */
-  const renderHomeItem = (kind: CtxTarget['kind'], id: string, title: string, icon: string, meta: string, layout: 'row' | 'card') => {
+  const renderHomeItem = (
+    { kind, id, title, icon, meta }: { kind: CtxTarget['kind']; id: string; title: string; icon: string; meta: string },
+    layout: DashboardItemLayout,
+  ) => {
     const Content = layout === 'row' ? RowContent : CardContent;
     return (
       <DashboardItem
@@ -196,11 +200,11 @@ export default function HomeView() {
 
   /** A wiki article's or operation's item: category and date as the metadata.
    *  No fallback to the raw category_id, a deleted category's label is omitted. */
-  const renderCategorized = (kind: 'wiki' | 'operation') => (entry: typeof articles[number], layout: 'row' | 'card') => {
+  const renderCategorized = (kind: 'wiki' | 'operation') => (entry: Entry, layout: DashboardItemLayout) => {
     const cat = categories.find((c) => c.id === entry.category_id);
     const catLabel = categoryLabel(t, cat);
-    return renderHomeItem(kind, entry.id, entry.title, entryIcon(kind, entry, cat),
-      `${catLabel ? `${catLabel} · ` : ''}${formatEntryDate(entry.updated_at)}`, layout);
+    const meta = `${catLabel ? `${catLabel} · ` : ''}${formatEntryDate(entry.updated_at)}`;
+    return renderHomeItem({ kind, id: entry.id, title: entry.title, icon: entryIcon(kind, entry, cat), meta }, layout);
   };
 
   const handleDelete = async (target: CtxTarget) => {
@@ -270,8 +274,10 @@ export default function HomeView() {
                   onAction={handleNewEntry}
                 />
               )}
-              renderItem={(entry, layout) => renderHomeItem('journal', entry.id, entry.title,
-                journalIcon(entry, showMoonPhase), formatEntryDate(entry.created_at), layout)}
+              renderItem={(entry, layout) => renderHomeItem({
+                kind: 'journal', id: entry.id, title: entry.title,
+                icon: journalIcon(entry, showMoonPhase), meta: formatEntryDate(entry.created_at),
+              }, layout)}
             />
             <HomeSection
               icon={MODULES.operations.icon}

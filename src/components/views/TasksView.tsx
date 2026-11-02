@@ -28,7 +28,8 @@ import CollapseChevron from '../ui/CollapseChevron';
 import CollapsibleGroupHeader from '../ui/CollapsibleGroupHeader';
 import {
   Plus, Flag, Trash2,
-  CheckSquare, Square, Link2, Pencil } from 'lucide-react';
+  CheckSquare, Square, Link2, Pencil,
+} from 'lucide-react';
 import type { Task, TaskPriority } from '../../types';
 import { useSessionState } from '../../store/sessionStore';
 
@@ -471,6 +472,11 @@ const TaskRow = memo(function TaskRow({
     });
   };
 
+  const startRename = () => {
+    setEditingId(task.id);
+    setEditValue(hasOwnTitle(task.title) ? task.title : '');
+  };
+
   const handleCreateSubtaskLocal = async () => {
     const subtask = await createTask(task.category_id, task.id);
     freshTaskIds.add(subtask.id);
@@ -503,7 +509,7 @@ const TaskRow = memo(function TaskRow({
     <div>
       <DashboardRow
         data-task-id={task.id}
-        className={`${task.completed ? 'opacity-50' : ''} ${isTarget ? 'task-row-target' : ''}`}
+        className={`${task.completed ? 'opacity-50' : ''} ${isTarget ? 'row-target' : ''}`}
         onContextMenu={(e) => {
           e.preventDefault();
           const actions: ContextMenuAction[] = [
@@ -525,11 +531,7 @@ const TaskRow = memo(function TaskRow({
             {
               label: t('contextMenu.rename'),
               icon: <Pencil size={14} />,
-              onClick: () => {
-                setEditingId(task.id);
-                setEditValue(hasOwnTitle(task.title) ? task.title : '');
-                setCtxMenu(null);
-              },
+              onClick: startRename,
             },
             {
               label: t('contextMenu.delete'),
@@ -577,10 +579,7 @@ const TaskRow = memo(function TaskRow({
         ) : (
           <span
             className={`flex-1 min-w-0 text-sm truncate cursor-default ${task.completed ? 'line-through text-subtle' : 'text-soft'}`}
-            onDoubleClick={() => {
-              setEditingId(task.id);
-              setEditValue(hasOwnTitle(task.title) ? task.title : '');
-            }}
+            onDoubleClick={startRename}
           >
             {displayTitle(t, 'task', task.title)}
           </span>
@@ -604,10 +603,8 @@ const TaskRow = memo(function TaskRow({
         )}
 
         {/* The task's everyday controls show on hover: subtask, category, link,
-            priority. Rename and delete are in the context menu. Not merely
-            transparent: they would hold their room at rest, and the linked
-            entries would float away from the edge. */}
-        <div className="hidden group-hover:flex focus-within:flex items-center gap-1.5 flex-shrink-0">
+            priority. Rename and delete are in the context menu. */}
+        <div className="row-hover-controls items-center gap-1.5 flex-shrink-0">
           <button
             onClick={handleCreateSubtaskLocal}
             className="task-action-btn text-subtle hover:text-accent-raise p-0.5"

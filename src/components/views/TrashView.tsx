@@ -41,9 +41,12 @@ interface ItemSharedProps {
   t: TFunction<any>;
 }
 
-function SelectCheckbox({ selected, onToggle }: { selected: boolean; onToggle: () => void }) {
+function SelectCheckbox({ label, selected, onToggle }: { label: string; selected: boolean; onToggle: () => void }) {
   return (
     <button
+      role="checkbox"
+      aria-checked={selected}
+      aria-label={label}
       onClick={(e) => { e.stopPropagation(); onToggle(); }}
       className="flex-shrink-0 text-subtle hover:text-accent-raise transition-colors"
     >
@@ -74,6 +77,7 @@ function ItemRow({ item, confirmingId, setConfirmingId, restore, deleteNow, onCo
 } & ItemSharedProps) {
   const daysLeft = useDaysLeft(item.deleted_at);
   const selected = selectedIds.has(item.id);
+  const confirming = confirmingId === item.id;
 
   return (
     <DashboardRow
@@ -81,36 +85,29 @@ function ItemRow({ item, confirmingId, setConfirmingId, restore, deleteNow, onCo
       onClick={() => onToggleSelect(item.id)}
       onContextMenu={(e) => onContextMenu(e, item)}
     >
-      <SelectCheckbox selected={selected} onToggle={() => onToggleSelect(item.id)} />
-      {confirmingId === item.id ? (
-        <>
-          <RowContent icon={typeIcon(item.type)} title={item.title} />
-          <span className="flex items-center gap-1 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
-            <InlineConfirm small onConfirm={() => deleteNow(item)} onCancel={() => setConfirmingId(null)} />
-          </span>
-        </>
-      ) : (
-        <>
-          <RowContent
-            icon={typeIcon(item.type)}
-            title={item.title}
-            meta={(
-              <>
-                {t('trash.deletedAgo', { time: formatTimeDistance(item.deleted_at) })}
-                {daysLeft !== null && <> &middot; <DaysLeft days={daysLeft} t={t} /></>}
-              </>
-            )}
-          />
-          {/* Restoring is what this page is for, so it stays in the row, in jade.
-              Deleting for good is in the context menu. */}
-          <span className="flex-shrink-0" onClick={(e) => e.stopPropagation()}>
+      <SelectCheckbox label={item.title} selected={selected} onToggle={() => onToggleSelect(item.id)} />
+      <RowContent
+        icon={typeIcon(item.type)}
+        title={item.title}
+        meta={confirming ? undefined : (
+          <>
+            {t('trash.deletedAgo', { time: formatTimeDistance(item.deleted_at) })}
+            {daysLeft !== null && <> &middot; <DaysLeft days={daysLeft} t={t} /></>}
+          </>
+        )}
+      />
+      {/* Restoring is what this page is for, so it stays in the row, in jade.
+          Deleting for good is in the context menu and asks here. */}
+      <span className="flex items-center gap-1 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
+        {confirming
+          ? <InlineConfirm small onConfirm={() => deleteNow(item)} onCancel={() => setConfirmingId(null)} />
+          : (
             <Button tone="jade" small onClick={() => restore(item)}>
               <RotateCcw size={12} />
               {t('trash.restore')}
             </Button>
-          </span>
-        </>
-      )}
+          )}
+      </span>
     </DashboardRow>
   );
 }
@@ -128,7 +125,7 @@ function ItemCard({ item, confirmingId, setConfirmingId, restore, deleteNow, onC
       onContextMenu={(e) => onContextMenu(e, item)}
     >
       <div className="flex items-start gap-2">
-        <SelectCheckbox selected={selected} onToggle={() => onToggleSelect(item.id)} />
+        <SelectCheckbox label={item.title} selected={selected} onToggle={() => onToggleSelect(item.id)} />
         {typeIcon(item.type)}
         <p className="text-sm text-soft font-medium leading-snug line-clamp-2 flex-1">
           {item.title}
@@ -181,6 +178,7 @@ export default function TrashView() {
   const confirmArmedAt = useRef(0);
   const [search, setSearch] = useSessionState('trash.search', '');
   const [ctxMenu, setCtxMenu] = useState<{ item: TrashedItem; x: number; y: number } | null>(null);
+  const [restoreFailed, setRestoreFailed] = useState(false);
 
   useEffect(() => { fetchTrashed(); }, []);
 
@@ -207,6 +205,7 @@ export default function TrashView() {
       return next;
     });
     setConfirm(null);
+    setRestoreFailed(false);
   };
 
   const selectAll = () => {
@@ -240,13 +239,19 @@ export default function TrashView() {
     }
   };
 
-  const bulkRestoreNow = async () => {
-    setConfirm(null);
-    const toRestore = items.filter((i) => selectedIds.has(i.id));
-    setSelectedIds(new Set());
-    for (const item of toRestore) {
-      await restore(item);
+  /** One failure does not stop the rest; what failed stays selected, to try again. */
+  const restoreSelected = async () => {
+    const failed = new Set<string>();
+    for (const item of items.filter((i) => selectedIds.has(i.id))) {
+      try {
+        await restore(item);
+      } catch (err) {
+        console.error('[TrashView] restoring failed:', err);
+        failed.add(item.id);
+      }
     }
+    setSelectedIds(failed);
+    setRestoreFailed(failed.size > 0);
   };
 
   const openCtxMenu = (e: React.MouseEvent, item: TrashedItem) => {
@@ -290,23 +295,10 @@ export default function TrashView() {
       return catDef ? `${catDef.emoji} ${categoryLabel(t, catDef)}` : name || t('categories.uncategorized');
     };
 
-    const byCategory = (subset: TrashedItem[], grouped: { label: string; items: TrashedItem[] }[]) => (
-      grouped.length > 1
-        ? <div className="space-y-4">
-            {grouped.map(({ label: catName, items: catItems }) => (
-              <div key={catName}>
-                <CollapsibleGroupHeader label={categoryGroupLabel(catName)} />
-                {renderItems(catItems)}
-              </div>
-            ))}
-          </div>
-        : renderItems(subset)
-    );
-
-    const sections: { label: string; items: TrashedItem[]; body?: ReactNode }[] = [
+    const sections: { label: string; items: TrashedItem[]; groups?: { label: string; items: TrashedItem[] }[] }[] = [
       { label: t('nav.journal'), items: journal },
-      { label: t('nav.wiki'), items: wiki, body: byCategory(wiki, wikiByCategory) },
-      { label: t('nav.operations'), items: operations, body: byCategory(operations, opsByCategory) },
+      { label: t('nav.wiki'), items: wiki, groups: wikiByCategory },
+      { label: t('nav.operations'), items: operations, groups: opsByCategory },
       { label: t('nav.tasks'), items: tasks },
       { label: t('nav.altar'), items: altars },
       { label: t('trash.altarItems'), items: altarItems },
@@ -322,7 +314,16 @@ export default function TrashView() {
         {sections.filter((section) => section.items.length > 0).map((section) => (
           <div key={section.label}>
             <CollapsibleGroupHeader label={section.label} count={section.items.length} />
-            {section.body ?? renderItems(section.items)}
+            {section.groups && section.groups.length > 1
+              ? <div className="space-y-4">
+                  {section.groups.map((group) => (
+                    <div key={group.label}>
+                      <CollapsibleGroupHeader label={categoryGroupLabel(group.label)} />
+                      {renderItems(group.items)}
+                    </div>
+                  ))}
+                </div>
+              : renderItems(section.items)}
           </div>
         ))}
       </div>
@@ -377,18 +378,17 @@ export default function TrashView() {
   };
   // Beside it: while confirming only the way out, otherwise the selection's own
   // actions, as icons like every secondary action in this bar.
-  const extraActions = confirming
-    ? [{ label: t('common.cancel'), icon: <X size={14} />, onClick: () => setConfirm(null) }]
-    : [
-        ...(hasSelection
-          ? [{ label: t('trash.restoreSelected'), icon: <RotateCcw size={14} />, onClick: () => void bulkRestoreNow() }]
-          : []),
-        ...(items.length > 0
-          ? [allSelected
-              ? { label: t('trash.deselectAll'), icon: <Square size={14} />, onClick: deselectAll }
-              : { label: t('trash.selectAll'), icon: <CheckSquare size={14} />, onClick: selectAll }]
-          : []),
-      ];
+  const extraActions: { label: string; icon: ReactNode; onClick: () => void }[] = [];
+  if (confirming) {
+    extraActions.push({ label: t('common.cancel'), icon: <X size={14} />, onClick: () => setConfirm(null) });
+  } else {
+    if (hasSelection) extraActions.push({ label: t('trash.restoreSelected'), icon: <RotateCcw size={14} />, onClick: () => void restoreSelected() });
+    if (items.length > 0) {
+      extraActions.push(allSelected
+        ? { label: t('trash.deselectAll'), icon: <Square size={14} />, onClick: deselectAll }
+        : { label: t('trash.selectAll'), icon: <CheckSquare size={14} />, onClick: selectAll });
+    }
+  }
 
   const renderTrashContent = () => (
     <>
@@ -408,6 +408,7 @@ export default function TrashView() {
 
       {!loading && matching.length > 0 && (
         <div>
+          {restoreFailed && <p className="text-xs text-danger mb-3">{t('trash.restoreFailed')}</p>}
           <p className="text-xs text-subtle mb-3">
             {retentionDays === null ? t('trash.retentionNoteNever') : t('trash.retentionNote', { count: retentionDays })}
           </p>

@@ -324,12 +324,12 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
      rule needs no theme twin and no specificity race.
      `outline-offset` pulls the ring inward so the row does not jump
      in the flow. */
-  .task-row-target {
+  .row-target {
     outline: 1px solid rgba(0, 176, 118, 0.55);
     outline-offset: -1px;
   }
   @supports (color: color-mix(in srgb, red 50%, blue)) {
-    .task-row-target {
+    .row-target {
       outline: 1px solid color-mix(in srgb, var(--accent) 55%, transparent);
     }
   }
@@ -1093,7 +1093,6 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
     opacity: 0.25;
     cursor: not-allowed;
   }
-
 }
 
 /* Outside @layer on purpose: Tailwind 3 hoists @layer components to the top of
@@ -3558,4 +3557,30 @@ html[data-theme] .panel-interactive.row-selected,
 html[data-theme] .panel-interactive.row-selected:hover {
   background: var(--accent-wash);
   border-color: var(--accent);
+}
+
+/* A row's controls that show on hover. Takes no room at rest, so the row's
+   metadata keeps to the edge (-0.75rem undoes the row's gap), but stays in the
+   layout rather than `display: none`, or Tab could not reach it. */
+.row-hover-controls {
+  display: flex;
+  width: 0;
+  margin-left: -0.75rem;
+  overflow: hidden;
+  opacity: 0;
+}
+.group:hover > .row-hover-controls,
+.row-hover-controls:focus-within {
+  width: auto;
+  margin-left: 0;
+  overflow: visible;
+  opacity: 1;
+}
+/* Its own rule: an engine without :has() would drop a whole list. An open menu
+   lives inside the controls and must not vanish when the pointer leaves the row. */
+.row-hover-controls:has([aria-expanded='true']) {
+  width: auto;
+  margin-left: 0;
+  overflow: visible;
+  opacity: 1;
 }

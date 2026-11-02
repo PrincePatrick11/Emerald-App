@@ -18,7 +18,7 @@ import { isCardView } from '../../lib/viewMode';
 import { groupByMonth } from '../../lib/groupBy';
 import { usePersistedFlag } from '../../hooks/usePersistedFlag';
 import Dashboard, { GroupDivider } from '../ui/Dashboard';
-import DashboardItem, { RowContent, RowIcon } from '../ui/DashboardItem';
+import DashboardItem, { ROW_GEOMETRY_CLASS, RowContent, RowSymbol } from '../ui/DashboardItem';
 import ContextMenu from '../ui/ContextMenu';
 import { useOpenInNewTabAction } from '../../hooks/useOpenInNewTabAction';
 import BlockGlyph from '../blocks/BlockGlyph';
@@ -150,13 +150,16 @@ function BuiltInBlocksSection({ query }: { query: string }) {
           {presets.length === 0
             ? <p className="text-xs text-subtle px-1 py-1">{t('search.noResults')}</p>
             : (
-              // The same rows as the list above, without hover or pointer:
-              // nothing can be created or opened on them, they only show what exists.
               <ul className="space-y-1.5">
                 {presets.map((preset) => {
                   const Icon = preset.icon;
                   return (
-                    <li key={preset.id} className="panel flex min-w-0 items-center gap-3 rounded-xl px-4 h-11">
+                    <li
+                      key={preset.id}
+                      // The description is cut off in the row; here it can be read in full.
+                      title={preset.descriptionKey ? t(preset.descriptionKey) : undefined}
+                      className={`panel rounded-xl ${ROW_GEOMETRY_CLASS}`}
+                    >
                       <RowContent
                         icon={<Icon size={14} className="text-muted" />}
                         title={t(preset.labelKey)}
@@ -255,7 +258,7 @@ function BlockList({ usage, onCreate, onDelete }: {
           </>
         ) : (
           <>
-            <RowIcon><BlockGlyph icon={def.icon} size={14} /></RowIcon>
+            <RowSymbol><BlockGlyph icon={def.icon} size={14} /></RowSymbol>
             <span className="flex-1 min-w-0 text-sm text-soft truncate">{definitionLabel(t, def)}</span>
             {unsaved}
             {outdatedDot}

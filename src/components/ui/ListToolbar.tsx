@@ -177,13 +177,15 @@ export default function ListToolbar({
   const timelineHint = t('listView.notAvailableInTimeline');
   const sortHeading = sortLabel ?? t('listView.sort');
 
-  if (!showLayouts && displayToggles.length === 0 && !showSort && !groupBy) return null;
+  const showViewSection = showLayouts || displayToggles.length > 0;
+
+  if (!showViewSection && !showSort && !groupBy) return null;
 
   return (
     // Without strip chrome of its own: the sidebar's p-3 column provides
     // the indentation (one indentation source per column, design.md).
     <div className="flex flex-col gap-4">
-      {(showLayouts || displayToggles.length > 0) && (
+      {showViewSection && (
         <SidebarGroup label={t('listView.view')}>
           {showLayouts && (
             <IconToggleGroup

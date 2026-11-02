@@ -904,6 +904,7 @@
     "title": "Papierkorb",
     "emptyTrash": "Papierkorb leeren",
     "restore": "Wiederherstellen",
+    "restoreFailed": "Einige Einträge konnten nicht wiederhergestellt werden und bleiben ausgewählt.",
     "restoreSelected": "Auswahl wiederherstellen",
     "deletePermanently": "Endgültig löschen",
     "retentionNote": "Elemente werden nach {{count}} Tag automatisch gelöscht.",
