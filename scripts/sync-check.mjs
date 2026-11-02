@@ -519,6 +519,7 @@ await test('settings merge key by key, and this device keeps what it changed', a
   const base = flattenSettings(start);
   assert.equal('appearance.uiScale' in base, false, 'the scale belongs to the screen');
   assert.equal('version' in base, false);
+  assert.equal('backup.auto' in flattenSettings({ ...start, backup: { auto: true } }), false, 'backups belong to the device');
   const mine = structuredClone(start);
   mine.appearance.theme = 'mine';
   mine.appearance.uiScale = 150;

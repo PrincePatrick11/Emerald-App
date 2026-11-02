@@ -10,8 +10,11 @@ import type { VaultSettings } from '../vaultSettings';
 
 export const SETTINGS_TABLE = '_settings';
 
-/** What depends on the screen in front of you. */
-const THIS_DEVICE_ONLY = new Set(['appearance.uiScale']);
+/**
+ * What belongs to one device: the scale depends on the screen in front of you,
+ * and whether and how often a device backs up depends on that device.
+ */
+const THIS_DEVICE_ONLY = (path: string) => path === 'appearance.uiScale' || path.startsWith('backup.');
 
 export type FlatSettings = Record<string, unknown>;
 
@@ -21,7 +24,7 @@ export function flattenSettings(settings: VaultSettings): FlatSettings {
     if (typeof values !== 'object' || values === null) continue;
     for (const [key, value] of Object.entries(values)) {
       const path = `${group}.${key}`;
-      if (!THIS_DEVICE_ONLY.has(path)) flat[path] = value;
+      if (!THIS_DEVICE_ONLY(path)) flat[path] = value;
     }
   }
   return flat;
@@ -50,7 +53,7 @@ export function mergeIncomingSettings(
   const next = structuredClone(settings) as unknown as Record<string, Record<string, unknown>>;
   let changed = false;
   for (const [path, value] of Object.entries(incoming)) {
-    if (THIS_DEVICE_ONLY.has(path) || path in mine) continue;
+    if (THIS_DEVICE_ONLY(path) || path in mine) continue;
     const dot = path.indexOf('.');
     const [group, key] = [path.slice(0, dot), path.slice(dot + 1)];
     if (typeof next[group] !== 'object' || next[group] === null) next[group] = {};

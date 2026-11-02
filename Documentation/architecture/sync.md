@@ -14,7 +14,7 @@ Users connect the open vault under Settings → Sync (`SyncPage`), which puts it
 
 **Under load.** A push carries about 16 MB of JSON at most, so a long time offline becomes several pushes (`collectChanges`). Parents go first and deletes last, because a device applying the first part repairs any reference it cannot resolve; tasks stay together, since they point at each other. Once the log on the server holds more than 2000 changes, a device publishes a snapshot that replaces them; a device behind that fetches the snapshot and puts what it had not pushed back on top. A restore empties the vault and fills it frame by frame, so `_sync_meta.restoring` marks it until done, and a crash starts it over. What the device had not pushed is lost in that case.
 
-**Settings** (`lib/sync/settings.ts`) travel key by key next to the changes, so a theme picked on one device and a trash retention picked on another both stay. The last synced values are in `_sync_meta.settings_base`; a key this device changed since then stands against an incoming one. `appearance.uiScale` stays on the device, since it depends on the screen.
+**Settings** (`lib/sync/settings.ts`) travel key by key next to the changes, so a theme picked on one device and a trash retention picked on another both stay. The last synced values are in `_sync_meta.settings_base`; a key this device changed since then stands against an incoming one. `appearance.uiScale` and the `backup` group stay on the device: the scale depends on the screen, and whether a device backs up is that device's business.
 
 ## Capture
 
