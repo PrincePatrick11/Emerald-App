@@ -183,9 +183,9 @@ document.querySelector('.left-sidebar-rail button:has(.lucide-book-open)').click
 | Operations | `lucide-wand-sparkles` | `.left-sidebar-rail button:has(.lucide-wand-sparkles)` |
 | Wiki | `lucide-library` | `.left-sidebar-rail button:has(.lucide-library)` |
 | Altar | `lucide-altar` | `.left-sidebar-rail button:has(.lucide-altar)` |
-| Tags | `lucide-tag` | `.app-bottom-bar button:has(.lucide-tag)` |
-| Trash | `lucide-trash2` | `.app-bottom-bar button:has(.lucide-trash2)` |
-| Settings | `lucide-settings` | `.left-sidebar-footer button:has(.lucide-settings)` |
+| Tags | `lucide-tag` | `.left-sidebar-rail button:has(.lucide-tag)` |
+| Trash | `lucide-trash2` | `.left-sidebar-rail button:has(.lucide-trash2)` |
+| Settings | `lucide-settings` | `.left-sidebar-rail button:has(.lucide-settings)` |
 
 `:has()` is supported by WebView2 — verified against the running build.
 
@@ -256,7 +256,7 @@ await mcp.call_tool("eval", { expression: "[...document.querySelectorAll('button
 
 ### Switch language
 ```js
-await mcp.call_tool("eval", { expression: "document.querySelector('.left-sidebar-footer button:has(.lucide-settings)')?.click()" });
+await mcp.call_tool("eval", { expression: "document.querySelector('.left-sidebar-rail button:has(.lucide-settings)')?.click()" });
 // language names are shown natively, so the German option reads "Deutsch" in every language
 await mcp.call_tool("eval", { expression: "[...document.querySelectorAll('button')].find(b => b.innerText.trim() === 'Deutsch')?.click()" });
 // close
@@ -265,7 +265,7 @@ await mcp.call_tool("eval", { expression: "(() => { document.querySelectorAll('[
 
 ### Switch theme
 ```js
-await mcp.call_tool("eval", { expression: "document.querySelector('.left-sidebar-footer button:has(.lucide-settings)')?.click()" });
+await mcp.call_tool("eval", { expression: "document.querySelector('.left-sidebar-rail button:has(.lucide-settings)')?.click()" });
 await mcp.call_tool("eval", { expression: "[...document.querySelectorAll('button')].find(b => b.innerText.trim() === 'Emerald Parchment')?.click()" });
 ```
 
@@ -288,7 +288,7 @@ await mcp.call_tool("eval", {
 
 ### Trash → Restore
 ```js
-await mcp.call_tool("eval", { expression: "document.querySelector('.app-bottom-bar button:has(.lucide-trash2)')?.click()" });
+await mcp.call_tool("eval", { expression: "document.querySelector('.left-sidebar-rail button:has(.lucide-trash2)')?.click()" });
 await mcp.call_tool("eval", { expression: "[...document.querySelectorAll('button')].find(b => b.innerText.trim() === 'Restore')?.click()" });
 // Trash auto-deletes after 30 days
 ```
@@ -459,7 +459,7 @@ Then check the UI via `eval`:
 ```js
 (async () => {
   const icons = ['book-open','square-check-big','wand-sparkles','library',
-                 'altar'];
+                 'altar','tag','trash2','settings'];
   const missing = icons.filter(i =>
     !document.querySelector(`.left-sidebar-rail button:has(.lucide-${i})`));
   const view = () => document.querySelector('.app-main')?.innerText.trim().split('\n')[1] || '';
