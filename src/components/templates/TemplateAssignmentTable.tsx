@@ -136,8 +136,9 @@ export function AssignmentGrid({ templateId }: { templateId?: string }) {
     </div>
   );
 
+  // No frame of its own: the dashboard puts it in a panel, the window is one already.
   return (
-    <div className="panel px-4">
+    <div>
       {/* Journal: one row, the cell spanning both columns. */}
       <div className="py-3">
         <EntryTypeHeading entryType="journal" />
@@ -174,7 +175,9 @@ export default function TemplateAssignmentTable() {
       {!collapsed && (
         <>
           <p className="mb-3 text-xs text-[var(--text-muted)]">{t('templates.overview.hint')}</p>
-          <AssignmentGrid />
+          <div className="panel px-4">
+            <AssignmentGrid />
+          </div>
         </>
       )}
     </div>
