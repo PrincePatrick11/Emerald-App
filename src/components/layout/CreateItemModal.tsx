@@ -1,4 +1,4 @@
-import { useEffect, useRef, type KeyboardEvent } from 'react';
+import { useEffect, useRef, type FocusEvent, type KeyboardEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { createItem } from '../../lib/createItem';
 import { CREATABLE_VIEWS, type CreatableViewId } from '../../lib/modules';
@@ -19,6 +19,16 @@ export default function CreateItemModal({ onClose }: { onClose: () => void }) {
   const { t } = useTranslation();
   const tiles = useRef<(HTMLButtonElement | null)[]>([]);
 
+  // A press on the header or the padding takes the focus to nowhere, and with it
+  // the ring and the keys: it goes back to the tile. After the event, since the
+  // browser only then settles where the focus lands.
+  const keepFocus = (e: FocusEvent<HTMLButtonElement>) => {
+    const tile = e.currentTarget;
+    setTimeout(() => {
+      if (document.activeElement === document.body) tile.focus();
+    });
+  };
+
   const onKeyDown = (e: KeyboardEvent<HTMLButtonElement>, index: number) => {
     // Tab wraps as well: `Modal` holds no focus, and the page behind it is out of reach anyway.
     const step = e.key === 'Tab' ? (e.shiftKey ? -1 : 1) : KEY_STEPS[e.key];
@@ -38,7 +48,9 @@ export default function CreateItemModal({ onClose }: { onClose: () => void }) {
   useEffect(() => {
     const onNumber = (e: globalThis.KeyboardEvent) => {
       if (e.ctrlKey || e.metaKey || e.altKey || e.repeat) return;
-      const view = CREATABLE_VIEWS[Number(e.key) - 1];
+      // By the physical key first: on AZERTY the unshifted "1" key gives `&`.
+      const number = /^(?:Digit|Numpad)([1-8])$/.exec(e.code)?.[1] ?? e.key;
+      const view = CREATABLE_VIEWS[Number(number) - 1];
       if (!view) return;
       e.preventDefault();
       choose(view.id);
@@ -60,6 +72,7 @@ export default function CreateItemModal({ onClose }: { onClose: () => void }) {
             autoFocus={index === 0}
             onClick={() => choose(id)}
             onKeyDown={(e) => onKeyDown(e, index)}
+            onBlur={keepFocus}
             aria-keyshortcuts={String(index + 1)}
             className="panel-interactive create-item-tile"
           >
