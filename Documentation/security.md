@@ -122,7 +122,7 @@ The mechanics are in [`architecture/encryption.md`](architecture/encryption.md);
 - **Plaintext that left the vault is not recalled.** Backups exported before encryption and kept outside the vault folder, exports (`.emerald`, Markdown, PDF), and earlier copies in cloud version history stay as they are. Deleted plain files may be recoverable from an SSD or a snapshot; only full-disk encryption (BitLocker, FileVault, LUKS) closes that gap.
 - **Legacy images keep their old names.** An image adopted from the pre-per-vault shared pool into an encrypted vault is sealed but keeps its SHA-256 name until the next password change.
 - **No cross-process lock.** Two Emerald processes on one vault — the release build and a dev build, say — are not coordinated; a password change in one while the other has the vault open is unsupported.
-- **macOS builds are unsigned.** After an update the keychain may ask whether the app may read its entry again; the choice is the user's.
+- **macOS builds are unsigned.** After an update the keychain may ask whether the app may read its entry again; the choice is the user's. On a build the entry does not yet trust, macOS was measured asking twice for a single read.
 - **Windows keychain entries are written with `CRED_PERSIST_ENTERPRISE`**, the `keyring` crate's setting, so on a domain profile with roaming enabled they may roam with the profile.
 - **`settings.json` is plain**, deliberately: it holds no entry content (appearance includes the names and colours of imported themes) and is read before any vault is unlocked.
 
