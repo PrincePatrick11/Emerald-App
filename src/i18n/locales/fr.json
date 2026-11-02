@@ -83,6 +83,9 @@
     "wordDeleted": "Mot supprimé",
     "placementRemoved": "Élément retiré de l'autel"
   },
+  "createItem": {
+    "title": "Créer"
+  },
   "nav": {
     "home": "Accueil",
     "all": "Tout",

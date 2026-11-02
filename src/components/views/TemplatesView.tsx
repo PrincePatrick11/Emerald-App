@@ -22,6 +22,7 @@ import BlockGlyph from '../blocks/BlockGlyph';
 import TemplateEditor from '../templates/TemplateEditor';
 import TemplateDefaultsOverview from '../templates/TemplateDefaultsOverview';
 import { useSessionState } from '../../store/sessionStore';
+import { createItem } from '../../lib/createItem';
 
 /**
  * The rail view "Templates", built like "Blocks": the list of templates in the
@@ -33,7 +34,6 @@ import { useSessionState } from '../../store/sessionStore';
 export default function TemplatesView() {
   const { t } = useTranslation();
   const templates = useTemplateStore((s) => s.templates);
-  const createTemplate = useTemplateStore((s) => s.createTemplate);
   const deleteTemplate = useTemplateStore((s) => s.deleteTemplate);
   const restoreTemplate = useTemplateStore((s) => s.restoreTemplate);
   const activeView = useUIStore((s) => s.activeView);
@@ -48,10 +48,7 @@ export default function TemplatesView() {
 
   const backToList = () => setActiveView({ type: 'templates' });
 
-  const create = async () => {
-    const template = await createTemplate(t('templates.defaultName'));
-    setActiveView({ type: 'templates', id: template.id, isNew: true });
-  };
+  const create = () => createItem('templates');
 
   const remove = async (template: Template) => {
     try {

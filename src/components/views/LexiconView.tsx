@@ -19,6 +19,7 @@ import LanguagePage from '../lexicon/LanguagePage';
 import TranslatePanel from '../lexicon/TranslatePanel';
 import type { Language } from '../../types';
 import { useSessionState } from '../../store/sessionStore';
+import { createItem } from '../../lib/createItem';
 
 /**
  * The rail view "Lexicon", built like "Templates": the languages in the
@@ -33,7 +34,6 @@ import { useSessionState } from '../../store/sessionStore';
 export default function LexiconView() {
   const { t } = useTranslation();
   const languages = useLexiconStore((s) => s.languages);
-  const createLanguage = useLexiconStore((s) => s.createLanguage);
   const deleteLanguage = useLexiconStore((s) => s.deleteLanguage);
   const restoreLanguage = useLexiconStore((s) => s.restoreLanguage);
   const activeView = useUIStore((s) => s.activeView);
@@ -43,13 +43,9 @@ export default function LexiconView() {
   // An id without a language (deleted, another vault in the remembered tab) falls back to the list.
   const selected = activeView.id ? languages.find((l) => l.id === activeView.id) ?? null : null;
 
-  const open = (id: string) => setActiveView({ type: 'lexicon', id });
   const backToList = () => setActiveView({ type: 'lexicon' });
 
-  const create = async () => {
-    const language = await createLanguage(t('lexicon.defaultName'));
-    open(language.id);
-  };
+  const create = () => createItem('lexicon');
 
   const remove = async (language: Language) => {
     try {

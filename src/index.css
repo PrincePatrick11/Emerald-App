@@ -488,6 +488,22 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
     @apply px-3.5 py-4;
   }
 
+  /* A tile of `CreateItemModal`. The ring is the keyboard's only sign of where it
+     stands: arrow keys and Tab move through the grid. */
+  .create-item-tile {
+    @apply flex flex-col items-center justify-center gap-1.5 px-1 py-3 text-xs text-secondary;
+  }
+
+  .create-item-tile:hover,
+  .create-item-tile:focus-visible {
+    color: var(--text-primary);
+  }
+
+  .create-item-tile:focus-visible {
+    outline: 1px solid var(--accent);
+    outline-offset: -1px;
+  }
+
   .modal-footer {
     @apply flex items-center justify-end gap-2 px-5 py-2.5 shrink-0;
   }

@@ -83,6 +83,9 @@
     "wordDeleted": "Word deleted",
     "placementRemoved": "Element removed from altar"
   },
+  "createItem": {
+    "title": "Create new"
+  },
   "nav": {
     "home": "Home",
     "all": "All",

@@ -32,6 +32,7 @@ import { guardKey } from '../../store/leaveGuardStore';
 import BlockStack from '../blocks/BlockStack';
 import EntryDetailFrame from '../ui/EntryDetailFrame';
 import { useSessionState } from '../../store/sessionStore';
+import { createItem } from '../../lib/createItem';
 
 export default function OperationsView() {
   const { t } = useTranslation();
@@ -41,8 +42,8 @@ export default function OperationsView() {
   );
   const openInNewTabAction = useOpenInNewTabAction();
   const saveAsTemplateAction = useSaveAsTemplateAction();
-  const { operations, createEntry, duplicateEntry, updateEntry, deleteEntry, restoreEntry, getEntry } = useEntryStore(
-    useShallow((s) => ({ operations: s.entries.operation, createEntry: s.createEntry, duplicateEntry: s.duplicateEntry, updateEntry: s.updateEntry, deleteEntry: s.deleteEntry, restoreEntry: s.restoreEntry, getEntry: s.getEntry }))
+  const { operations, duplicateEntry, updateEntry, deleteEntry, restoreEntry, getEntry } = useEntryStore(
+    useShallow((s) => ({ operations: s.entries.operation, duplicateEntry: s.duplicateEntry, updateEntry: s.updateEntry, deleteEntry: s.deleteEntry, restoreEntry: s.restoreEntry, getEntry: s.getEntry }))
   );
   const categories = useCategoryStore((s) => s.categories);
   const pushUndo = useUndoStore((s) => s.push);
@@ -120,16 +121,10 @@ export default function OperationsView() {
     if (operation) setTitle(operation.title);
   }, [operation?.title]);
 
-  const handleNew = async () => {
-    const op = await createEntry('operation');
-    setActiveView({ type: 'operations', id: op.id, mode: 'edit', isNew: true });
-  };
+  const handleNew = () => createItem('operations');
 
   // The "+" button on the category header — like handleCreateTask(cat.id) in TasksView.
-  const handleNewInCategory = async (categoryId: string) => {
-    const op = await createEntry('operation', { categoryId });
-    setActiveView({ type: 'operations', id: op.id, mode: 'edit', isNew: true });
-  };
+  const handleNewInCategory = (categoryId: string) => createItem('operations', { categoryId });
 
   const openCtxMenu = (e: React.MouseEvent, id: string) => { e.preventDefault(); setCtxMenu({ id, x: e.clientX, y: e.clientY }); };
 

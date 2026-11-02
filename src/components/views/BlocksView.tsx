@@ -24,6 +24,7 @@ import { useOpenInNewTabAction } from '../../hooks/useOpenInNewTabAction';
 import BlockGlyph from '../blocks/BlockGlyph';
 import BlockDefinitionEditor, { DeleteDefinitionModal } from '../blocks/BlockDefinitionEditor';
 import { useSessionState } from '../../store/sessionStore';
+import { createItem } from '../../lib/createItem';
 
 /**
  * The rail view "Blocks", built like the other dashboards: the list of
@@ -36,7 +37,6 @@ import { useSessionState } from '../../store/sessionStore';
 export default function BlocksView() {
   const { t } = useTranslation();
   const definitions = useBlockDefinitionStore((s) => s.definitions);
-  const createDefinition = useBlockDefinitionStore((s) => s.createDefinition);
   const deleteDefinition = useBlockDefinitionStore((s) => s.deleteDefinition);
   const restoreDefinition = useBlockDefinitionStore((s) => s.restoreDefinition);
   const pushUndo = useUndoStore((s) => s.push);
@@ -54,10 +54,7 @@ export default function BlocksView() {
 
   const backToList = () => setActiveView({ type: 'blocks' });
 
-  const create = async () => {
-    const def = await createDefinition(t('blocks.library.defaultName'));
-    setActiveView({ type: 'blocks', id: def.id, isNew: true });
-  };
+  const create = () => createItem('blocks');
 
   /**
    * To the trash without confirmation like everything else, with undo. Only

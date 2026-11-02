@@ -32,6 +32,7 @@ import { useCollapsedSet } from '../../hooks/useCollapsedSet';
 import BlockStack from '../blocks/BlockStack';
 import EntryDetailFrame from '../ui/EntryDetailFrame';
 import { useSessionState } from '../../store/sessionStore';
+import { createItem } from '../../lib/createItem';
 
 export default function WikiView() {
   const { t } = useTranslation();
@@ -41,8 +42,8 @@ export default function WikiView() {
   );
   const openInNewTabAction = useOpenInNewTabAction();
   const saveAsTemplateAction = useSaveAsTemplateAction();
-  const { articles, createEntry, duplicateEntry, updateEntry, deleteEntry, restoreEntry, getEntry } = useEntryStore(
-    useShallow((s) => ({ articles: s.entries.wiki, createEntry: s.createEntry, duplicateEntry: s.duplicateEntry, updateEntry: s.updateEntry, deleteEntry: s.deleteEntry, restoreEntry: s.restoreEntry, getEntry: s.getEntry }))
+  const { articles, duplicateEntry, updateEntry, deleteEntry, restoreEntry, getEntry } = useEntryStore(
+    useShallow((s) => ({ articles: s.entries.wiki, duplicateEntry: s.duplicateEntry, updateEntry: s.updateEntry, deleteEntry: s.deleteEntry, restoreEntry: s.restoreEntry, getEntry: s.getEntry }))
   );
   const categories = useCategoryStore((s) => s.categories);
   const pushUndo = useUndoStore((s) => s.push);
@@ -174,10 +175,7 @@ export default function WikiView() {
 
   // Without an argument the article is created without a category; the "+"
   // button on the category header passes its category — like handleCreateTask(cat.id).
-  const handleNew = async (categoryId?: string) => {
-    const a = await createEntry('wiki', { categoryId });
-    setActiveView({ type: 'wiki', id: a.id, mode: 'edit', isNew: true });
-  };
+  const handleNew = (categoryId?: string) => createItem('wiki', { categoryId });
 
   const openCtxMenu = (e: React.MouseEvent, id: string) => { e.preventDefault(); setCtxMenu({ id, x: e.clientX, y: e.clientY }); };
 

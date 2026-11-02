@@ -24,6 +24,7 @@ import { formatDayHeading, formatEntryDate } from '../../lib/formatDate';
 import { sortItems } from '../../lib/sortItems';
 import type { HomeSort, HomeView, HomeSectionPrefs } from '../../store/uiStore';
 import { useSettingsStore } from '../../store/settingsStore';
+import { createItem } from '../../lib/createItem';
 
 type CtxTarget =
   | { kind: 'journal'; id: string }
@@ -82,10 +83,10 @@ export default function HomeView() {
   );
   const openInNewTabAction = useOpenInNewTabAction();
   const saveAsTemplateAction = useSaveAsTemplateAction();
-  const { entries, articles, operations, createEntry, duplicateEntry, updateEntry, deleteEntry, restoreEntry } = useEntryStore(
+  const { entries, articles, operations, duplicateEntry, updateEntry, deleteEntry, restoreEntry } = useEntryStore(
     useShallow((s) => ({
       entries: s.entries.journal, articles: s.entries.wiki, operations: s.entries.operation,
-      createEntry: s.createEntry, duplicateEntry: s.duplicateEntry, updateEntry: s.updateEntry,
+      duplicateEntry: s.duplicateEntry, updateEntry: s.updateEntry,
       deleteEntry: s.deleteEntry, restoreEntry: s.restoreEntry,
     }))
   );
@@ -98,10 +99,7 @@ export default function HomeView() {
   const today = new Date();
   const moonPhase = getMoonPhase(today);
 
-  const handleNewEntry = async () => {
-    const entry = await createEntry('journal');
-    setActiveView({ type: 'journal', id: entry.id, mode: 'edit', isNew: true });
-  };
+  const handleNewEntry = () => createItem('journal');
 
   const openCtx = (e: React.MouseEvent, target: CtxTarget) => {
     e.preventDefault();

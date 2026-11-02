@@ -31,6 +31,7 @@ import type { Entry, MoonPhase } from '../../types';
 import { useSaveAsTemplateAction } from '../../hooks/useSaveAsTemplateAction';
 import { useSessionState } from '../../store/sessionStore';
 import { useEntryContentReady } from '../../hooks/useEntryContentReady';
+import { createItem } from '../../lib/createItem';
 
 export default function JournalView() {
   const { t } = useTranslation();
@@ -39,8 +40,8 @@ export default function JournalView() {
   const { activeView, setActiveView, journalPrefs, setJournalPrefs } = useUIStore(
     useShallow((s) => ({ activeView: s.activeView, setActiveView: s.setActiveView, journalPrefs: s.journalPrefs, setJournalPrefs: s.setJournalPrefs }))
   );
-  const { entries, createEntry, duplicateEntry, updateEntry, deleteEntry, restoreEntry, getEntry } = useEntryStore(
-    useShallow((s) => ({ entries: s.entries.journal, createEntry: s.createEntry, duplicateEntry: s.duplicateEntry, updateEntry: s.updateEntry, deleteEntry: s.deleteEntry, restoreEntry: s.restoreEntry, getEntry: s.getEntry }))
+  const { entries, duplicateEntry, updateEntry, deleteEntry, restoreEntry, getEntry } = useEntryStore(
+    useShallow((s) => ({ entries: s.entries.journal, duplicateEntry: s.duplicateEntry, updateEntry: s.updateEntry, deleteEntry: s.deleteEntry, restoreEntry: s.restoreEntry, getEntry: s.getEntry }))
   );
   const pushUndo = useUndoStore((s) => s.push);
 
@@ -107,10 +108,7 @@ export default function JournalView() {
     if (entry) setTitle(entry.title);
   }, [entry?.title]);
 
-  const handleNew = async () => {
-    const e = await createEntry('journal');
-    setActiveView({ type: 'journal', id: e.id, mode: 'edit', isNew: true });
-  };
+  const handleNew = () => createItem('journal');
 
   const openCtxMenu = (e: React.MouseEvent, id: string) => { e.preventDefault(); setCtxMenu({ id, x: e.clientX, y: e.clientY }); };
 
