@@ -6,7 +6,7 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased] (targeting v0.2.0)
 
 ### Added
-- **A plus in the rail creates anything.** It opens a small window with a tile for each type — Journal, Tasks, Operations, Wiki, Altar, Lexicon, Templates and Blocks — and opens what you pick; the dashboards' own "New" buttons work the same way.
+- **A plus in the rail creates anything.** It opens a small window with a tile for each type — Journal, Tasks, Operations, Wiki, Altar, Lexicon, Templates and Blocks — and opens what you pick, by click, by keyboard or by the tile's number key; the dashboards' own "New" buttons work the same way.
 - **Altars have their own icon,** a candle on a table, instead of a flame.
 
 ### Changed
