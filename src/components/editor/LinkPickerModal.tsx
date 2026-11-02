@@ -73,7 +73,7 @@ export default function LinkPickerModal({ onSelect, onClose }: Props) {
       className="overflow-hidden h-[75vh]"
     >
         {/* Search */}
-        <div className="modal-rule px-5 py-3 border-b flex-shrink-0">
+        <div className="px-3.5 pt-3 flex-shrink-0">
           <div className="sidebar-search-inner flex items-center gap-2 rounded-md px-2.5 h-8 bg-well-raise">
             <Search size={14} className="text-subtle shrink-0" />
             <input
@@ -100,7 +100,7 @@ export default function LinkPickerModal({ onSelect, onClose }: Props) {
             is hard-wired to the stone tint of the sidebars, whereas here
             the picker's jade tint is needed; a tone variant is still missing
             there, and until then this remains the custom button. */}
-        <div role="tablist" className="modal-rule flex items-center gap-1 px-5 py-2 border-b flex-shrink-0">
+        <div role="tablist" className="modal-rule flex items-center gap-1 px-3.5 py-2.5 border-b flex-shrink-0">
           {tabs.map((tab) => (
             <button
               key={tab.id}

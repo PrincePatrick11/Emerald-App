@@ -449,23 +449,43 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
      Pass "overflow-hidden" via Modal's className prop for modals that don't have such a popover. */
   .modal-card {
     @apply border rounded-xl shadow-2xl;
-    background-color: var(--sheet-bg);
+    background-color: var(--shell-bg);
     border-color: var(--menu-border);
   }
 
-  /* The bars of a modal and any further divider inside it, on the sheet's line. */
+  /* A modal is built like the window: title and actions on the frame, the
+     content on a sheet inset into it. Clips its corners, so a popover from
+     inside has to portal, as design.md's Overlays and Portals asks anyway. */
+  .modal-sheet {
+    @apply flex flex-col flex-1 min-h-0 overflow-hidden border;
+    margin-inline: var(--sheet-inset);
+    background-color: var(--sheet-bg);
+    border-color: var(--sheet-border);
+    border-radius: var(--sheet-radius);
+  }
+
+  .modal-sheet:last-child {
+    margin-bottom: var(--sheet-inset);
+  }
+
+  /* A divider inside the sheet. */
   .modal-rule {
     border-color: var(--sheet-border);
   }
 
+  /* The header is the handle for moving the modal. min-h-12 keeps its height
+     without the close button of a dismissible modal. */
   .modal-header {
-    @apply flex items-center justify-between gap-3 px-5 py-3 border-b shrink-0;
-    border-color: var(--sheet-border);
+    @apply flex items-center justify-between gap-3 min-h-12 px-5 py-2.5 shrink-0 select-none;
+    cursor: grab;
+  }
+
+  .modal-header:active {
+    cursor: grabbing;
   }
 
   .modal-footer {
-    @apply flex items-center justify-end gap-2 px-5 py-3 border-t shrink-0;
-    border-color: var(--sheet-border);
+    @apply flex items-center justify-end gap-2 px-5 py-2.5 shrink-0;
   }
 
   /* Primary action button — jade accent (xs size, for toolbars & headers) */

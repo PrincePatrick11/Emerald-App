@@ -75,7 +75,7 @@ Four levels. Only what floats casts a shadow.
 | 0 | frame | `--shell-bg` | none |
 | 1 | sheet and panels | `--sheet-bg`, `--panel-bg`, with an edge | none |
 | 2 | menu, popover, toast | `--menu-bg`, with an edge | `--menu-shadow` |
-| 3 | modal | `--sheet-bg`, with `--menu-border`, solid over the scrim with no blur | `shadow-2xl` |
+| 3 | modal | `--shell-bg` with `--menu-border`, holding a sheet (`--sheet-bg`, `--sheet-border`) | `shadow-2xl` |
 
 Stacking is `z-10` within a column, `z-50` for modals and `z-[9999]` for overlays, nothing else.
 
@@ -114,7 +114,7 @@ Size tokens in both theme files: `--tab-pill-h` (30px, `TabBar`) and `--control-
 
 **Horizontal padding has exactly one source per column.** The column's outer container sets it; the panels inside add no `px-*` of their own. In the right sidebar that is `SidebarColumn`'s scrolling body (`p-3`, with a comment in place) — if a panel adds its own padding again, its rows end up visibly indented differently from the button in the action bar above them.
 
-**Spacing scale:** 2, 4, 6, 8, 10, 12, 16, 20, 24 and 32px (Tailwind `0.5`, `1`, `1.5`, `2`, `2.5`, `3`, `4`, `5`, `6`, `8`). `2.5` is for icon-to-label in menu and list rows. An arbitrary value needs a comment. Usual places: `px-8` for main-area content columns (`Dashboard`'s content, `EntryDetailFrame`), `px-3`/`p-3` in the sidebars, `px-5 py-3` in modal bars (`.modal-header`, `.modal-footer`), `px-5 py-4` in modal bodies.
+**Spacing scale:** 2, 4, 6, 8, 10, 12, 16, 20, 24 and 32px (Tailwind `0.5`, `1`, `1.5`, `2`, `2.5`, `3`, `4`, `5`, `6`, `8`). `2.5` is for icon-to-label in menu and list rows. An arbitrary value needs a comment. Usual places: `px-8` for main-area content columns (`Dashboard`'s content, `EntryDetailFrame`), `px-3`/`p-3` in the sidebars, `px-5 py-2.5` in modal bars (`.modal-header`, `.modal-footer`), `px-3.5 py-4` in modal bodies.
 
 ### States
 
@@ -231,6 +231,10 @@ Global search opens as `SearchModal` (`w-[560px]`, fixed `h-[70vh]`, matching `L
 **Left sidebar** (see [Left Sidebar](architecture/navigation.md#left-sidebar-rail--entry-list)): the 44px rail is part of the frame, with no divider against the entry list. `RAIL_WIDTH` is exported by the rail and never repeated as a literal — the right sidebar's default width and the title bar's logo box derive from it, so a mismatch would produce a clipped rail *and* wrong widths elsewhere. `.app-sidebar-left-with-rail` trims the entry list's left padding next to the rail, which already carries 6px of breathing room; otherwise the list's icons would sit further from the rail's icons than the title bar's alignment suggests.
 
 **Showing and hiding the sidebars is animated** (200ms). The content keeps its pixel width and is clipped by the `<aside>` rather than squeezing together mid-transition; the transition is a class (`.app-sidebar-animated`), not an inline style, so the `prefers-reduced-motion` opt-out after it still wins; `AppShell` removes the class during a resize drag so the edge doesn't lag the pointer.
+
+**A modal repeats frame and sheet.** Title and actions lie on `--shell-bg` with no dividers, the content on `.modal-sheet`, inset by `--sheet-inset` and rounded by `--sheet-radius`. Its bodies take `px-3.5`, off the spacing scale on purpose: 14px plus the 6px inset puts the content under the 20px of the title. Behind it the scrim (`--modal-scrim`) blurs the app (`backdrop-blur-sm`). The sheet clips, so a popover from inside it portals.
+
+**A modal moves by its header,** with the window as the limit: dragging, shrinking the window and a growing card all clamp it back inside. It is offset by `left`/`top`, not a transform, which would become the containing block of a `position: fixed` inside it. The position is not remembered.
 
 **A non-dismissible modal leaves the title bar clear.** The backdrop is `fixed inset-x-0 bottom-0` and starts at `top-10` instead of `top-0` as soon as `usesCustomWindowControls` applies (Windows and Linux). Otherwise the backdrop would lie over the app's own title bar, and with no X, Escape or backdrop click the only way out would be Alt+F4. A dismissible modal keeps the full overlay — there the way out is the modal itself.
 

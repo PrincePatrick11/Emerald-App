@@ -27,7 +27,7 @@ export default function ImageNoticeModal() {
       title={tooLarge ? t('common.imageTooLarge') : t('common.unsupportedImageFormatTitle')}
       onClose={dismiss}
       widthClassName="w-72"
-      bodyClassName="px-5 py-4"
+      bodyClassName="px-3.5 py-4"
       footer={<Button tone="neutral" onClick={dismiss}>{t('common.ok')}</Button>}
     >
       <div className="flex items-start gap-2 text-danger">

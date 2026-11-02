@@ -14,7 +14,7 @@ export default function LeaveGuardModal() {
   if (!question) return null;
 
   return (
-    <Modal title={t('leaveGuard.title')} onClose={() => question.answer('stay')} widthClassName="w-[420px]" bodyClassName="px-5 py-4" footer={
+    <Modal title={t('leaveGuard.title')} onClose={() => question.answer('stay')} widthClassName="w-[420px]" bodyClassName="px-3.5 py-4" footer={
       <>
         <Button tone="neutral" onClick={() => question.answer('stay')}>{t('leaveGuard.stay')}</Button>
         <Button tone="danger" onClick={() => question.answer('discard')}>{t('leaveGuard.discard')}</Button>
