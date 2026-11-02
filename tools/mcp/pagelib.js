@@ -322,11 +322,13 @@ function snapshot(o) {
 
 // -- pointer ------------------------------------------------------------------
 
-// Where to press, and whether a real press there would reach the element.
+// Null when hovering took the element away, which a hover may well do.
 function hovered(sel) {
-  return pick(sel).el.matches(':hover');
+  const el = find(sel)[0];
+  return el ? el.matches(':hover') : null;
 }
 
+// Where to press, and whether a real press there would reach the element.
 function aim(sel, force, probe) {
   const found = pick(sel);
   const el = found.el;

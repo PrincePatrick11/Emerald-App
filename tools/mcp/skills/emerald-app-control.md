@@ -83,7 +83,7 @@ mcp:
    reply of *"Emerald is still starting"* is that cold start, not a failure:
    retry in 15-30s. The first start in a new checkout also runs `npm install`
    and builds the test vault, so allow a few minutes.
-3. To check the port by hand, take it from `status` (9223 unless overridden):
+3. To check the port by hand, take it from `status`:
    `curl -s http://127.0.0.1:<port>/json/version`
    should return JSON containing `"Browser": "Edg/..."`.
 

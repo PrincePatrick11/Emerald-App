@@ -30,7 +30,7 @@ window is not hidden. On Linux it opens on screen.
 Environment (all optional):
   EMERALD_APP_DIR            force the checkout instead of discovering it
   EMERALD_CDP_HOST           default 127.0.0.1
-  EMERALD_CDP_PORT           default 9223
+  EMERALD_CDP_PORT           default 9223, in a linked worktree from 9300
   EMERALD_AUTO_ATTACH        default 1 — auto-attach to the main page target
   EMERALD_AUTO_LAUNCH        default 1 — launch Emerald if no target is found
   EMERALD_LAUNCHER_PATH      default <repo>/start_emerald_mcp.bat on Windows,
@@ -140,17 +140,21 @@ def _instance_brief(inst: Instance) -> dict:
     }
 
 
-async def _checkout_mismatch(inst: Instance) -> tuple[Path | None, str | None]:
-    """Which checkout the running instance came from, and a warning when that
-    is not the one this session would build: the port does not say whose
-    instance answers on it."""
-    running = await asyncio.to_thread(running_checkout, inst.cdp_port)
+def _foreign_warning(inst: Instance, running: Path | None) -> str | None:
+    """The port does not say whose instance answers on it."""
     if running is None or running.resolve() == inst.checkout.resolve():
-        return running, None
-    return running, (
+        return None
+    return (
         f"the instance on port {inst.cdp_port} runs from {running}, not from {inst.checkout} - "
         "what you see here is that checkout's code"
     )
+
+
+async def _attach_to(inst: Instance, chosen: dict) -> CDPTarget:
+    global _target, _attach_warning
+    _target = await _open(chosen)
+    _attach_warning = _foreign_warning(inst, await asyncio.to_thread(running_checkout, inst.cdp_port))
+    return _target
 
 
 def _pick_main(page_targets: list[dict], vite_port: int) -> dict | None:
@@ -194,7 +198,7 @@ async def _ensure_target() -> CDPTarget:
     If no target is reachable and AUTO_LAUNCH is on, launch Emerald and
     wait (bounded) for it to come up, raising an actionable retry error
     if the wait expires before the cold build/start finishes."""
-    global _target, _attach_warning
+    global _target
     inst = _instance()
     host, port = inst.cdp_host, inst.cdp_port
     async with _target_lock:
@@ -265,9 +269,7 @@ async def _ensure_target() -> CDPTarget:
             hide_instance_windows(inst)
         except Exception:
             log.warning("could not put the window out of sight", exc_info=True)
-        _target = await _open(chosen)
-        _attach_warning = (await _checkout_mismatch(inst))[1]
-        return _target
+        return await _attach_to(inst, chosen)
 
 
 def _text(payload: Any) -> list[types.TextContent]:
@@ -388,7 +390,7 @@ TOOLS = [
     _tool(
         "press_key",
         "Press a key or shortcut: `Enter`, `Escape`, `Tab`, `ArrowDown`, `Control+K`, `Shift+Tab`, `a`. "
-        "`Enter` and `Space` press a focused button.",
+        "`Enter` and `Space` press a focused control; pass `selector` to focus it, as a click may not.",
         {
             "key": {"type": "string"},
             "selector": {"type": "string", "description": "Focus this first. " + SELECTOR},
@@ -479,9 +481,10 @@ async def _status(_args: dict) -> Result:
         "instance": inst.to_dict(),
     }
     if payload["port_alive"]:
-        running, warning = await _checkout_mismatch(inst)
+        running = await asyncio.to_thread(running_checkout, inst.cdp_port)
         if running is not None:
             payload["running_checkout"] = str(running)
+        warning = _foreign_warning(inst, running)
         if warning:
             payload["warning"] = warning
     try:
@@ -512,14 +515,14 @@ async def _connect(_args: dict) -> Result:
     except Exception as e:
         payload["browser"] = f"unavailable ({type(e).__name__})"
     if "warning" not in payload:
-        warning = (await _checkout_mismatch(inst))[1]
+        warning = _foreign_warning(inst, await asyncio.to_thread(running_checkout, inst.cdp_port))
         if warning:
             payload["warning"] = warning
     return _text(payload)
 
 
 async def _attach(args: dict) -> Result:
-    global _target, _attach_warning
+    global _target
     async with _target_lock:
         inst = _instance()
         targets = await discover_targets(inst.cdp_host, inst.cdp_port)
@@ -530,8 +533,7 @@ async def _attach(args: dict) -> Result:
             with contextlib.suppress(Exception):
                 await _target.close()
             _target = None
-        _target = await _open(chosen)
-        _attach_warning = (await _checkout_mismatch(inst))[1]
+        await _attach_to(inst, chosen)
     return _text(f"attached to {chosen.get('title') or chosen.get('url')} ({chosen['id']})")
 
 

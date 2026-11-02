@@ -439,15 +439,17 @@ class CDPTarget:
         aim = await self.page("aim", selector, True, None)
         await self._mouse("mouseMoved", aim["x"], aim["y"])
         report = _report(aim)
-        # A real move can take a moment to reach the styles.
+        # A real move can take a moment to reach the styles. Only a clear "no"
+        # is worth saying: the move itself is done.
         for pause in (0.0, 0.1):
             await asyncio.sleep(pause)
-            if await self.page("hovered", selector):
+            try:
+                state = await self.page("hovered", selector)
+            except CDPError:
                 return report
-        report["note"] = (
-            "the page's mouse handlers got the move, but CSS :hover did not follow, "
-            "so hover styles do not show"
-        )
+            if state is not False:
+                return report
+        report["note"] = "CSS :hover is not active on the element, so hover styles do not show"
         return report
 
     async def type_text(self, selector: str, text: str, clear: bool = True) -> dict:
