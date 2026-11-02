@@ -56,8 +56,8 @@ export interface ServerStatus {
   url: string | null;
   /** A server is set, but what opens it is gone: no keychain, or it did not answer. */
   needsKey: boolean;
-  /** Otherwise the sync key is asked for again after a restart. */
-  inKeychain: boolean;
+  /** In the keychain or sealed under a vault's key. Otherwise a restart asks for the sync key. */
+  remembered: boolean;
   links: Record<string, { remote: string; paused: boolean }>;
 }
 

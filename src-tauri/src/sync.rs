@@ -9,9 +9,9 @@
 //! `{appDataDir}/sync.json` holds the one server this installation talks to and
 //! each vault's place on it. Like `update.json` it belongs to the installation,
 //! not to a vault: a vault's backup must not bring a server along. It holds no
-//! secret: no vault is unlocked when the list of vaults is read, so the token and
-//! the names key go to the OS keychain. Without one they stay in memory, and the
-//! sync key is asked for again after a restart.
+//! secret in the clear. The token and the names key go to the OS keychain, and each
+//! linked vault keeps a copy sealed under its own key: with no keychain, or one that
+//! said no, unlocking a linked vault brings the connection back.
 
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -85,6 +85,9 @@ struct Link {
     /// The password changed here and the server has not heard yet.
     #[serde(default)]
     rekeyed: bool,
+    /// Base64 of the credentials, sealed under this vault's key.
+    #[serde(default)]
+    sealed: Option<String>,
 }
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
@@ -184,9 +187,60 @@ fn forget_credentials(app: &tauri::AppHandle) {
     };
 }
 
+/// From the sealed copy of a vault that is unlocked right now.
+fn credentials_from_vaults(app: &tauri::AppHandle) -> Option<Credentials> {
+    let keys = app.state::<keys::VaultKeys>();
+    read_file(app).ok()?.links.iter().find_map(|(id, link)| {
+        let key = crypto::subkey(&keys.get(id)?, Purpose::Files);
+        let bytes = B64.decode(link.sealed.as_ref()?).ok()?;
+        serde_json::from_str::<Credentials>(&open(&key, &bytes).ok()?).ok()
+    })
+}
+
+/// Keeps a vault's sealed copy current. Runs while it is unlocked: a copy under
+/// an old key (the password changed) or of an old token gets replaced.
+fn seal_for_vault(app: &tauri::AppHandle, vault_id: &str) -> Result<(), String> {
+    let Some(credentials) = credentials(app) else {
+        return Ok(());
+    };
+    let Some(key) = app.state::<keys::VaultKeys>().get(vault_id) else {
+        return Ok(());
+    };
+    let key = crypto::subkey(&key, Purpose::Files);
+    let file = read_file(app)?;
+    let Some(link) = file.links.get(vault_id) else {
+        return Ok(());
+    };
+    let current = link
+        .sealed
+        .as_ref()
+        .and_then(|sealed| B64.decode(sealed).ok())
+        .and_then(|bytes| open(&key, &bytes).ok())
+        .and_then(|text| serde_json::from_str::<Credentials>(&text).ok())
+        .is_some_and(|sealed| sealed.token == credentials.token);
+    if current {
+        return Ok(());
+    }
+    let text = Zeroizing::new(serde_json::to_string(&credentials).map_err(|e| e.to_string())?);
+    let sealed = B64.encode(seal(&key, &text));
+    change_file(app, |file| {
+        if let Some(link) = file.links.get_mut(vault_id) {
+            link.sealed = Some(sealed);
+        }
+    })
+}
+
 fn credentials(app: &tauri::AppHandle) -> Option<Credentials> {
     let state = app.state::<SyncState>();
     let mut held = state.credentials.lock().ok()?;
+    // The keychain had nothing or said no: a vault unlocked since may have them.
+    // Only with a server set: after disconnecting nothing comes back by itself.
+    if matches!(*held, Some(None)) {
+        let found = read_file(app).ok()?.server.and_then(|_| credentials_from_vaults(app));
+        if found.is_some() {
+            *held = Some(found);
+        }
+    }
     if held.is_none() {
         let found = if keychain_allowed() {
             keychain_entry()
@@ -202,6 +256,7 @@ fn credentials(app: &tauri::AppHandle) -> Option<Credentials> {
                 *flag = true;
             }
         }
+        let found = found.or_else(|| read_file(app).ok()?.server.and_then(|_| credentials_from_vaults(app)));
         *held = Some(found);
     }
     let answer = held.clone().flatten();
@@ -436,6 +491,7 @@ impl Remote {
 /// One vault's standing. `connected` means it syncs.
 #[tauri::command]
 pub async fn sync_status(app: tauri::AppHandle, vault_id: String) -> Result<Value, String> {
+    seal_for_vault(&app, &vault_id)?;
     let file = read_file(&app)?;
     let link = file.links.get(&vault_id);
     Ok(json!({
@@ -461,9 +517,11 @@ pub async fn sync_server_status(app: tauri::AppHandle) -> Result<Value, String> 
         .collect();
     let has_credentials = credentials(&app).is_some();
     let in_keychain = app.state::<SyncState>().in_keychain.lock().is_ok_and(|flag| *flag);
+    let sealed = file.links.values().any(|link| link.sealed.is_some());
     Ok(json!({
         "needsKey": file.server.is_some() && !has_credentials,
-        "inKeychain": in_keychain,
+        // Either way it comes back without the sync key.
+        "remembered": in_keychain || sealed,
         "url": file.server.map(|s| s.url),
         "links": links,
     }))
@@ -495,6 +553,10 @@ pub async fn sync_pair(app: tauri::AppHandle, url: String, key: Zeroizing<String
         if file.links_for.as_deref() != Some(identity.as_str()) {
             file.links.clear();
         }
+        // A new token: what is sealed holds the old one.
+        for link in file.links.values_mut() {
+            link.sealed = None;
+        }
         file.links_for = Some(identity);
         file.server = Some(StoredServer { url, device });
     })?;
@@ -514,7 +576,12 @@ pub async fn sync_unpair(app: tauri::AppHandle) -> Result<(), String> {
         }
     }
     forget_credentials(&app);
-    change_file(&app, |file| file.server = None)
+    change_file(&app, |file| {
+        file.server = None;
+        for link in file.links.values_mut() {
+            link.sealed = None;
+        }
+    })
 }
 
 async fn server_get(server: &Server, path: &str) -> Result<Value, String> {

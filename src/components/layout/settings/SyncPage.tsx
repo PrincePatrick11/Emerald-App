@@ -119,7 +119,7 @@ export default function SyncPage() {
             <div className="text-xs text-muted">
               {running ? t('sync.running') : lastSync ? t('sync.last', { time: formatTimeDistance(new Date(lastSync)) }) : t('sync.notYet')}
             </div>
-            {!status.inKeychain && <SettingsStatus tone="muted">{t('sync.noKeychain')}</SettingsStatus>}
+            {!status.remembered && Object.keys(status.links).length > 0 && <SettingsStatus tone="muted">{t('sync.noKeychain')}</SettingsStatus>}
             {conflicts > 0 && <SettingsStatus tone="muted">{t('sync.conflicts', { count: conflicts })}</SettingsStatus>}
             {syncMessage && <SettingsStatus tone="error">{syncMessage}</SettingsStatus>}
             {syncError === 'SYNC_PASSWORD_CHANGED' && (
