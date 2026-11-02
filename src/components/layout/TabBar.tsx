@@ -1,4 +1,5 @@
-import { Flame, MoreHorizontal, Plus, X } from 'lucide-react';
+import { MoreHorizontal, Plus, X } from 'lucide-react';
+import { AltarIcon } from '../../lib/altarIcon';
 import { useShallow } from 'zustand/shallow';
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
@@ -37,7 +38,7 @@ function renderIconValue(icon: string | null | undefined, fallback: ReactNode) {
 }
 
 function AltarTabIcon({ iconData }: { iconData: string | null | undefined }) {
-  if (!iconData) return <Flame size={14} />;
+  if (!iconData) return <AltarIcon size={14} />;
   // `/` paths are presets from public/ and bypass imageSrc.
   const src = iconData.startsWith('/') ? iconData : imageSrc(iconData);
   if (src) return <img src={src} alt="" className="h-3.5 w-3.5 rounded-md object-cover" />;

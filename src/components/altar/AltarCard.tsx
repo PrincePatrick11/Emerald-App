@@ -1,7 +1,8 @@
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { displayTitle } from '../../lib/entryTitle';
-import { Copy, Flame, Pencil, Trash2 } from 'lucide-react';
+import { Copy, Pencil, Trash2 } from 'lucide-react';
+import { AltarIcon } from '../../lib/altarIcon';
 import { formatEntryDate } from '../../lib/formatDate';
 import type { TFunction } from 'i18next';
 import type { AltarPlacement, AltarRecord } from '../../types';
@@ -34,7 +35,7 @@ function PreviewFallback({ altar, wide }: { altar: AltarRecord; wide?: boolean }
     <div className={`flex items-center justify-center ${wide ? 'h-24' : 'h-20'}`}>
       {altar.icon_data
         ? <FaviconGlyph value={altar.icon_data} className={wide ? 'h-16 w-16 text-5xl' : 'h-12 w-12 text-4xl'} />
-        : <Flame size={32} className="text-subtle" />}
+        : <AltarIcon size={32} className="text-subtle" />}
     </div>
   );
 }
@@ -43,7 +44,7 @@ function PreviewFallback({ altar, wide }: { altar: AltarRecord; wide?: boolean }
 function ListPreviewFallback({ altar }: { altar: AltarRecord }) {
   return altar.icon_data
     ? <FaviconGlyph value={altar.icon_data} />
-    : <Flame size={14} className="text-subtle" />;
+    : <AltarIcon size={14} className="text-subtle" />;
 }
 
 type AltarCardProps = CommonProps & {

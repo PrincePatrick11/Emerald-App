@@ -18,7 +18,6 @@ import {
   Box,
   CheckSquare,
   CopyPlus,
-  Flame,
   FolderOpen,
   Home,
   Languages,
@@ -31,6 +30,7 @@ import {
   Wand2,
   type LucideIcon,
 } from 'lucide-react';
+import { AltarIcon } from './altarIcon';
 import type { ContentType, EntryType } from '../types';
 
 /**
@@ -133,7 +133,7 @@ export const MODULES: Record<EntryModuleId, ModuleMeta> = {
   tasks: { id: 'tasks', icon: CheckSquare, navLabelKey: 'nav.tasks', untitledKey: 'tasks.untitled', entryType: 'task', usesEditorSidebar: false, usesBlocks: false },
   operations: { id: 'operations', icon: Wand2, navLabelKey: 'nav.operations', untitledKey: 'operations.untitled', entryType: 'operation', usesEditorSidebar: true, usesBlocks: true },
   wiki: { id: 'wiki', icon: Library, navLabelKey: 'nav.wiki', untitledKey: 'wiki.untitled', entryType: 'wiki', usesEditorSidebar: true, usesBlocks: true },
-  altar: { id: 'altar', icon: Flame, navLabelKey: 'nav.altar', untitledKey: 'altar.untitled', entryType: 'altar', usesEditorSidebar: true, usesBlocks: false },
+  altar: { id: 'altar', icon: AltarIcon, navLabelKey: 'nav.altar', untitledKey: 'altar.untitled', entryType: 'altar', usesEditorSidebar: true, usesBlocks: false },
 };
 
 export const MODULE_LIST: readonly ModuleMeta[] = ENTRY_MODULE_IDS.map((id) => MODULES[id]);
@@ -217,6 +217,6 @@ export const TRASH_KIND_ICONS: Record<TrashKind, LucideIcon> = {
   blockDefinition: Box,
   template: CopyPlus,
   language: Languages,
-  altar: Flame,
+  altar: AltarIcon,
   altarItem: Sparkles,
 };

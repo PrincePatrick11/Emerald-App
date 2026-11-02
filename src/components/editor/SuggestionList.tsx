@@ -1,6 +1,7 @@
 import { forwardRef, useEffect, useImperativeHandle, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { BookOpen, CheckSquare, Flame, Library, Wand2, type LucideIcon } from 'lucide-react';
+import { BookOpen, CheckSquare, Library, Wand2, type LucideIcon } from 'lucide-react';
+import { AltarIcon } from '../../lib/altarIcon';
 import type { ContentType } from '../../types';
 import type { SuggestionItem } from '../../lib/linkItems';
 
@@ -16,7 +17,7 @@ export const ENTRY_TYPE_ICONS: Record<ContentType, LucideIcon> = {
   wiki: Library,
   operation: Wand2,
   task: CheckSquare,
-  altar: Flame,
+  altar: AltarIcon,
 };
 
 /** Lives in `lib/modules.ts` so that `lib/` can reach it too; only

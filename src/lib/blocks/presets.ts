@@ -1,7 +1,8 @@
 import {
-  Calendar, ChevronsUpDown, Flame, Hash, Image, Link2, ListChecks, Moon, PenTool, Sparkles, TextCursorInput, ToggleLeft, Type, Zap,
+  Calendar, ChevronsUpDown, Hash, Image, Link2, ListChecks, Moon, PenTool, Sparkles, TextCursorInput, ToggleLeft, Type, Zap,
   type LucideIcon,
 } from 'lucide-react';
+import { AltarIcon } from '../altarIcon';
 import { createSigilCalcBlock, createSigilCanvasBlock, createSigilChargeBlock } from './sigil';
 import { createTextBlock } from './blockHtml';
 import {
@@ -43,7 +44,7 @@ export const ELEMENT_KIND_ICONS: Record<ElementKind, LucideIcon> = {
   link: Link2,
   image: Image,
   moon: Moon,
-  altar: Flame,
+  altar: AltarIcon,
   sigilCalc: Sparkles,
   sigilCanvas: PenTool,
   sigilCharge: Zap,

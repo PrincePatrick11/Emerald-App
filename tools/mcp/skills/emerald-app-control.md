@@ -182,7 +182,7 @@ document.querySelector('.left-sidebar-rail button:has(.lucide-book-open)').click
 | Tasks | `lucide-square-check-big` | `.left-sidebar-rail button:has(.lucide-square-check-big)` |
 | Operations | `lucide-wand-sparkles` | `.left-sidebar-rail button:has(.lucide-wand-sparkles)` |
 | Wiki | `lucide-library` | `.left-sidebar-rail button:has(.lucide-library)` |
-| Altar | `lucide-flame` | `.left-sidebar-rail button:has(.lucide-flame)` |
+| Altar | `lucide-altar` | `.left-sidebar-rail button:has(.lucide-altar)` |
 | Tags | `lucide-tag` | `.left-sidebar-rail button:has(.lucide-tag)` |
 | Trash | `lucide-trash2` | `.left-sidebar-rail button:has(.lucide-trash2)` |
 | Settings | `lucide-settings` | `.left-sidebar-rail button:has(.lucide-settings)` |
@@ -463,7 +463,7 @@ Then check the UI via `eval`:
   const missing = icons.filter(i =>
     !document.querySelector(`.left-sidebar-rail button:has(.lucide-${i})`));
   const view = () => document.querySelector('.app-main')?.innerText.trim().split('\n')[1] || '';
-  document.querySelector('.left-sidebar-rail button:has(.lucide-flame)').click();
+  document.querySelector('.left-sidebar-rail button:has(.lucide-altar)').click();
   await new Promise(s => setTimeout(s, 700));
   const altar = view();
   document.querySelector('.left-sidebar-rail button:has(.lucide-book-open)').click();

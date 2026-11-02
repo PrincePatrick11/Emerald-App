@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useShallow } from 'zustand/shallow';
-import { Flame, Layers, Maximize2, Minimize2, PackagePlus } from 'lucide-react';
+import { Layers, Maximize2, Minimize2, PackagePlus } from 'lucide-react';
+import { AltarIcon } from '../../lib/altarIcon';
 import { sortItems } from '../../lib/sortItems';
 import { isCardView, isWideCardView } from '../../lib/viewMode';
 import { groupByMonth } from '../../lib/groupBy';
@@ -393,7 +394,7 @@ export default function AltarView() {
           panelProps: {
             displayToggles: [{
               label: t('altar.showPreview'),
-              icon: Flame,
+              icon: AltarIcon,
               checked: altarShowPreview,
               onChange: setAltarShowPreview,
             }],

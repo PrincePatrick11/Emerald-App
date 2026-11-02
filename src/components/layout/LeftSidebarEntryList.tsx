@@ -5,7 +5,8 @@ import { formatEntryDate } from '../../lib/formatDate';
 import { categoryLabel, lookupCategory } from '../../lib/categories';
 import { entryIcon, type LeftListTabId } from '../../lib/modules';
 import { displayTitle } from '../../lib/entryTitle';
-import { Flame, CheckSquare, Square, Copy, Pencil, Trash2 } from 'lucide-react';
+import { CheckSquare, Square, Copy, Pencil, Trash2 } from 'lucide-react';
+import { AltarIcon } from '../../lib/altarIcon';
 import { useUIStore } from '../../store/uiStore';
 import { useSettingsStore } from '../../store/settingsStore';
 import { useEntryStore } from '../../store/entryStore';
@@ -347,7 +348,7 @@ function useAltarConfig(): EntryListTabProps<AltarRecord> {
     getDateStr: (a) => formatEntryDate(a.updated_at),
     getIcon: (a) => (isImageIcon(a.icon_data)
       ? <img src={a.icon_data!} alt="" className="w-4 h-4 object-cover rounded-md flex-shrink-0" />
-      : <Flame size={14} className="flex-shrink-0 text-subtle" />),
+      : <AltarIcon size={14} className="flex-shrink-0 text-subtle" />),
     isActive: (a) => activeView.id === a.id,
     onOpen: (a) => setActiveView({ type: 'altar', id: a.id, mode: 'view' }),
     onOpenNewTab: (a) => openViewInNewTab({ type: 'altar', id: a.id, mode: 'view' }),
