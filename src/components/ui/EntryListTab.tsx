@@ -108,10 +108,12 @@ export default function EntryListTab<T>({
 
   return (
     <div className="flex flex-col h-full">
-      {/* 56px tall like the action bar on the right (`SidebarActionBar`), without
-          a divider: the list sits directly on the frame. Creating goes
-          through the main action in the right panel, not through a button here. */}
-      <div className="entry-list-search-row h-14 px-3 flex-shrink-0 flex items-center">
+      {/* Right under the sheet's top edge: the 1px is the sheet's border, so the
+          field starts where its surface does and shares a centre line with the
+          rail's first button. No divider: the list sits directly on the frame.
+          Creating goes through the main action in the right panel, not through a
+          button here. */}
+      <div className="entry-list-search-row pt-px pb-[13px] px-3 flex-shrink-0 flex items-center">
         <div className="entry-list-search flex-1 flex items-center gap-2 rounded-md px-2.5 h-[30px] min-w-0">
           <Search size={14} className="text-subtle flex-shrink-0" />
           <input

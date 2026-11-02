@@ -110,7 +110,7 @@ export default function LeftSidebarRail() {
           for the same thing. */}
 
       {/* Main nav icons — navigate only, never touch the entry-list panel */}
-      <div className="w-full flex flex-col items-center gap-1 py-2">
+      <div className="w-full flex flex-col items-center gap-1 pb-2">
         {/* The way to the dashboard. It used to hang on the Emerald logo in the
             title bar, which nobody reads as a navigation target.
             Mind the MCP selectors: lucide exports `Home` as an alias of

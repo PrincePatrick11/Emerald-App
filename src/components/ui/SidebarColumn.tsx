@@ -3,13 +3,11 @@ import { useTranslation } from 'react-i18next';
 import { Check, Trash2, X } from 'lucide-react';
 
 /**
- * The 56px bar at the top of the right sidebar. Exactly as tall as the
- * search row of the entry list (`EntryListTab`, `h-14`), so that both
- * sidebars have the top edge of their content on the same line; keep both
- * in sync. Only this bar draws a line below it: it sits on
- * the sheet, the search row on the left on the frame. The line sits on the inner
- * element and therefore only reaches from button edge to button edge, like the
- * dividers in the body below (`.sidebar-divider`).
+ * The 56px bar at the top of the right sidebar. It draws a line below it: it
+ * sits on the sheet, unlike the tighter search row of the entry list on the
+ * frame. The line sits on the inner element and therefore only reaches from
+ * button edge to button edge, like the dividers in the body below
+ * (`.sidebar-divider`).
  */
 export function SidebarActionBar({ children }: { children?: ReactNode }) {
   return (

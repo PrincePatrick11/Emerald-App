@@ -99,9 +99,11 @@ Colour is inherited from the surrounding text colour, not set through a `color` 
 **Bar heights:**
 
 - `h-10` (40px) — window chrome: the title bar, which also holds the tab strip.
-- `h-14` (56px) — content bars: the entry list's search row and the right sidebar's `SidebarActionBar`.
+- `h-14` (56px) — content bars: the right sidebar's `SidebarActionBar`.
 
-The split is deliberate: the title bar is window chrome, not a content header, and 56px feels heavy for that. Because it sits *above* the frame-and-sheet shell, it does not collide with the 56px bars below — the two sidebars must place their bottom divider at the same height.
+The split is deliberate: the title bar is window chrome, not a content header, and 56px feels heavy for that. Because it sits *above* the frame-and-sheet shell, it does not collide with the 56px bar below.
+
+The frame beside the sheet has no bar: the entry list's search field and the rail's first button start at the sheet's top edge, on one centre line.
 
 Size tokens in both theme files: `--tab-pill-h` (30px, `TabBar`) and `--control-h` (30px, the edit bar's buttons). `RailButton` is 32×32 (18px icon, `p-1.5`, a 1px frame holding room for the active accent); in the shorter title bar, `.titlebar .rail-button` is 30×30 with a 16px icon.
 
