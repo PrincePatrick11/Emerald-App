@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { holdSplash, resumeSplash } from '../lib/splash';
 import { unlockRemembered, vaultKeyStatus } from '../lib/vaultKeys';
 
 /**
@@ -64,6 +65,35 @@ function ask(request: VaultKeyRequest): Promise<void> {
   return promise;
 }
 
+const rememberedUnlocks = new Map<string, Promise<boolean>>();
+
+/**
+ * One keychain read per vault at a time. StrictMode runs the boot effect twice,
+ * and every read of an entry this build may not read yet is a prompt of its own:
+ * "Allow" would answer the first and the second would open right behind it.
+ *
+ * A keychain that does not respond is no reason to fail — then the password it is.
+ */
+function unlockRememberedOnce(vaultId: string): Promise<boolean> {
+  let unlock = rememberedUnlocks.get(vaultId);
+  if (!unlock) {
+    unlock = holdSplash(unlockRemembered(vaultId))
+      .catch(() => false)
+      .finally(() => rememberedUnlocks.delete(vaultId));
+    rememberedUnlocks.set(vaultId, unlock);
+  }
+  return unlock;
+}
+
+/**
+ * Asks, then puts the loading screen back up for what follows: the dialog took
+ * it away, and the vault's data is yet to load. On "Cancel" nothing loads.
+ */
+async function askThenLoad(request: VaultKeyRequest): Promise<void> {
+  await ask(request);
+  resumeSplash();
+}
+
 /**
  * The one gate in front of every database: afterwards the vault is encrypted and
  * unlocked.
@@ -86,11 +116,9 @@ export async function ensureVaultReady(
   const status = await vaultKeyStatus(vault.id);
   if (status.encrypted) {
     if (status.unlocked) return;
-    // A keychain that does not respond is no reason to fail —
-    // then the password it is. `askPassword`: explicitly locked, so do not
-    // silently unlock again right away.
-    if (!askPassword && (await unlockRemembered(vault.id).catch(() => false))) return;
-    return ask({ kind: 'unlock', vaultId: vault.id, vaultName: vault.name });
+    // `askPassword`: explicitly locked, so do not silently unlock again right away.
+    if (!askPassword && (await unlockRememberedOnce(vault.id))) return;
+    return askThenLoad({ kind: 'unlock', vaultId: vault.id, vaultName: vault.name });
   }
-  return ask({ kind: status.hasDatabase ? 'encrypt' : 'create', vaultId: vault.id, vaultName: vault.name });
+  return askThenLoad({ kind: status.hasDatabase ? 'encrypt' : 'create', vaultId: vault.id, vaultName: vault.name });
 }

@@ -1,6 +1,6 @@
 /**
- * The loading screen from `index.html` — clear it away at startup, and show
- * it once more on request.
+ * The loading screen from `index.html` — clear it away at startup, bring it
+ * back while an unlocked vault loads, and show it once more on request.
  *
  * The markup itself lives there and not in a component: it has to be in the
  * first frame, long before React has mounted — otherwise exactly the white
@@ -23,10 +23,17 @@ let template: HTMLElement | null = null;
  *  a second layer. */
 let openPreview: HTMLElement | null = null;
 
-/** Whether the original has already been handled. The DOM is no good for that: during
- *  fading out `#splash` is still in the DOM, a second call would find it and
- *  start a second fade-out. */
-let dismissed = false;
+/** The loading screen currently up, not yet fading out. The DOM is no good for
+ *  that: during fading out it is still in the DOM, a second call would find it
+ *  and start a second fade-out. */
+let current: HTMLElement | null = null;
+
+let fallback: ReturnType<typeof setTimeout> | undefined;
+
+function armFallback(): void {
+  clearTimeout(fallback);
+  fallback = setTimeout(hideSplash, FALLBACK_MS);
+}
 
 /**
  * Fades out a splash element and removes it. The fade duration comes from
@@ -51,8 +58,40 @@ function fadeOutAndRemove(el: HTMLElement): void {
  */
 export function initSplash(): void {
   const splash = document.getElementById('splash');
-  if (splash) template = splash.cloneNode(true) as HTMLElement;
-  setTimeout(hideSplash, FALLBACK_MS);
+  if (splash) {
+    // The bundle has loaded, so the timer here takes over from the one in
+    // `index.html`, which finds its target by this id. That one cannot be
+    // paused, and a keychain prompt may well outlast it.
+    splash.removeAttribute('id');
+    template = splash.cloneNode(true) as HTMLElement;
+    current = splash;
+  }
+  armFallback();
+}
+
+/**
+ * For as long as `wait` takes the user, not the app: a keychain prompt must not
+ * use up the time the safety net allows for loading.
+ */
+export async function holdSplash<T>(wait: Promise<T>): Promise<T> {
+  clearTimeout(fallback);
+  try {
+    return await wait;
+  } finally {
+    if (current) armFallback();
+  }
+}
+
+/**
+ * Brings the loading screen back after a question took it away: the vault is
+ * unlocked now, but its data is still loading. Whoever opens the vault ends
+ * this with `hideSplash()`.
+ */
+export function resumeSplash(): void {
+  if (current || !template) return;
+  current = template.cloneNode(true) as HTMLElement;
+  document.body.appendChild(current);
+  armFallback();
 }
 
 /**
@@ -61,10 +100,10 @@ export function initSplash(): void {
  * does nothing.
  */
 export function hideSplash(): void {
-  if (dismissed) return;
-  const splash = document.getElementById('splash');
+  const splash = current;
   if (!splash) return;
-  dismissed = true;
+  current = null;
+  clearTimeout(fallback);
   // No minimum display time: the loading screen stays exactly as long as
   // loading actually takes.
   fadeOutAndRemove(splash);
@@ -82,9 +121,7 @@ export function showSplash(): void {
   if (!template || openPreview) return;
   const el = template.cloneNode(true) as HTMLElement;
 
-  // The `id` belongs to the original — `hideSplash()` looks for it.
-  el.removeAttribute('id');
-  // And the drag region has to go: Tauri intercepts mousedown on it and
+  // The drag region has to go: Tauri intercepts mousedown on it and
   // drags the window with it — on all three platforms, not only where
   // the title bar itself is drawn. A `click` would never arrive, and
   // that is exactly what should close the preview. Only here on the root element; the
