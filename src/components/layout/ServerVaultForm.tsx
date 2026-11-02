@@ -21,7 +21,7 @@ export default function ServerVaultForm({ onCancel, onDone }: {
 
   useEffect(() => {
     serverStatus().then((status) => {
-      setConnected(status.url !== null);
+      setConnected(status.url !== null && !status.needsKey);
       setLinked(Object.values(status.links).map((link) => link.remote));
       if (status.url) setUrl(status.url);
     }, () => setConnected(false));

@@ -76,7 +76,7 @@ export default function SyncPage() {
   if (!status) return null;
   // The token here can look fine and still have been taken on the server.
   const removed = syncError === 'SYNC_NEEDS_LOGIN';
-  const showForm = !status.url || removed;
+  const showForm = !status.url || removed || status.needsKey;
   const syncMessage = syncError ? t(syncErrorKey(syncError)) : '';
 
   return (
@@ -84,7 +84,7 @@ export default function SyncPage() {
       <SettingsSection icon={<Cloud size={14} />} title={t('sync.title')} description={t('sync.description')}>
         {showForm ? (
           <div className="space-y-3">
-            {removed && <SettingsDescription>{t('sync.needsLogin')}</SettingsDescription>}
+            {(removed || status.needsKey) && <SettingsDescription>{t('sync.needsLogin')}</SettingsDescription>}
             <KeyField label={t('sync.url')}>
               <input
                 type="url"
@@ -110,7 +110,7 @@ export default function SyncPage() {
             </KeyField>
             <SettingsDescription>{t('sync.keyHint')}</SettingsDescription>
             <Button variant="primary" onClick={submit} disabled={busy || !url.trim() || !key.trim()}>
-              {busy ? t('sync.connecting') : removed ? t('sync.login') : t('sync.connect')}
+              {busy ? t('sync.connecting') : removed || status.needsKey ? t('sync.login') : t('sync.connect')}
             </Button>
           </div>
         ) : (
@@ -119,6 +119,7 @@ export default function SyncPage() {
             <div className="text-xs text-muted">
               {running ? t('sync.running') : lastSync ? t('sync.last', { time: formatTimeDistance(new Date(lastSync)) }) : t('sync.notYet')}
             </div>
+            {!status.inKeychain && <SettingsStatus tone="muted">{t('sync.noKeychain')}</SettingsStatus>}
             {conflicts > 0 && <SettingsStatus tone="muted">{t('sync.conflicts', { count: conflicts })}</SettingsStatus>}
             {syncMessage && <SettingsStatus tone="error">{syncMessage}</SettingsStatus>}
             {syncError === 'SYNC_PASSWORD_CHANGED' && (

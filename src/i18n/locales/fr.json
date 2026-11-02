@@ -1223,6 +1223,7 @@
     "nothingToFetch": "Aucun.",
     "unnamedVault": "Coffre {{number}}",
     "goneFromServer": "Ce coffre a été retiré du serveur. Il reste ici en tant que coffre local.",
-    "replaceWarning": "Ce coffre se synchronise : la sauvegarde le remplace aussi sur vos autres appareils, qui enregistrent d'abord leur propre sauvegarde."
+    "replaceWarning": "Ce coffre se synchronise : la sauvegarde le remplace aussi sur vos autres appareils, qui enregistrent d'abord leur propre sauvegarde.",
+    "noKeychain": "Cet ordinateur n'a pas de trousseau utilisable par l'application : la clé sera redemandée après un redémarrage."
   }
 }

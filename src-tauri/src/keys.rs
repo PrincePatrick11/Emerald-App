@@ -40,7 +40,7 @@ pub fn init_keychain(identifier: &str) {
     KEYRING_SERVICE.get_or_init(|| format!("Emerald ({identifier})"));
 }
 
-fn keyring_service() -> &'static str {
+pub(crate) fn keyring_service() -> &'static str {
     KEYRING_SERVICE.get().map(String::as_str).unwrap_or("Emerald")
 }
 

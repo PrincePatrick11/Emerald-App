@@ -6,11 +6,12 @@
 //! text and decides when to sync (`lib/sync/engine.ts`); what is merged how is
 //! not this file's business.
 //!
-//! `{appDataDir}/sync.json` holds the one server this installation talks to, with
-//! its token, and each vault's place on it. Like `update.json` it belongs to the
-//! installation, not to a vault: a vault's backup must not bring a server along.
-//! No vault is unlocked when the list of vaults is read, so the token cannot be
-//! sealed under a vault key; the file is readable by its owner only.
+//! `{appDataDir}/sync.json` holds the one server this installation talks to and
+//! each vault's place on it. Like `update.json` it belongs to the installation,
+//! not to a vault: a vault's backup must not bring a server along. It holds no
+//! secret: no vault is unlocked when the list of vaults is read, so the token and
+//! the names key go to the OS keychain. Without one they stay in memory, and the
+//! sync key is asked for again after a restart.
 
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -40,14 +41,35 @@ const NOT_CONNECTED: &str = "SYNC_NOT_CONNECTED";
 const NEEDS_LOGIN: &str = "SYNC_NEEDS_LOGIN";
 const LOCKED: &str = "SYNC_VAULT_LOCKED";
 
-/// The one server this installation talks to.
+/// The one server this installation talks to, as `sync.json` has it.
 #[derive(Clone, Debug, Serialize, Deserialize)]
+struct StoredServer {
+    url: String,
+    device: String,
+}
+
+/// What opens it. Never in a file.
+#[derive(Clone, Serialize, Deserialize)]
+struct Credentials {
+    token: String,
+    /// Derived from the sync key, so that devices can read vault names without
+    /// any vault's password, and the server, which only has the key's hash, cannot.
+    names_key: String,
+}
+
+impl Drop for Credentials {
+    fn drop(&mut self) {
+        use zeroize::Zeroize;
+        self.token.zeroize();
+        self.names_key.zeroize();
+    }
+}
+
+/// The server with what opens it.
 struct Server {
     url: String,
     device: String,
     token: String,
-    /// Derived from the sync key, so that devices can read vault names without
-    /// any vault's password, and the server, which only has the key's hash, cannot.
     names_key: String,
 }
 
@@ -68,11 +90,11 @@ struct Link {
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 struct SyncFile {
     #[serde(default)]
-    server: Option<Server>,
+    server: Option<StoredServer>,
     #[serde(default)]
     links: HashMap<String, Link>,
-    /// Which server the links belong to, also while none is connected: the
-    /// address and what its key derives.
+    /// Which server the links belong to, also while none is connected: a hash
+    /// of the address and what its key derives.
     #[serde(default)]
     links_for: Option<String>,
 }
@@ -85,6 +107,11 @@ pub struct SyncState {
     /// The vault listening for news from its server. One at a time: only the open vault syncs.
     watcher: Mutex<Option<tauri::async_runtime::JoinHandle<()>>>,
     file: Mutex<()>,
+    /// What the keychain answered, once: it is asked for nothing every two seconds,
+    /// and a question it refused is not put to the user over and over.
+    credentials: Mutex<Option<Option<Credentials>>>,
+    /// Whether the keychain took them, for saying so on the Sync page.
+    in_keychain: Mutex<bool>,
 }
 
 fn data_dir(app: &tauri::AppHandle) -> Result<PathBuf, String> {
@@ -108,17 +135,89 @@ fn change_file(app: &tauri::AppHandle, change: impl FnOnce(&mut SyncFile)) -> Re
     let dir = data_dir(app)?;
     std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
     vault::write_atomic(&dir, SETTINGS_FILE, SETTINGS_TEMP_FILE, &text)?;
-    // The token opens the server to this device, though no vault. Only its owner reads it.
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt;
-        std::fs::set_permissions(dir.join(SETTINGS_FILE), std::fs::Permissions::from_mode(0o600)).map_err(|e| e.to_string())?;
-    }
     Ok(())
 }
 
+/// A dev instance driven by the test tools stays out of the keychain: a rebuilt
+/// binary would put up a dialog nobody is there to answer. Compiled out of release builds.
+fn keychain_allowed() -> bool {
+    #[cfg(debug_assertions)]
+    if std::env::var_os("EMERALD_DEV_SEED_VAULT").is_some() {
+        return false;
+    }
+    true
+}
+
+fn keychain_entry() -> Result<keyring::Entry, String> {
+    keyring::Entry::new(keys::keyring_service(), "sync-server").map_err(|e| e.to_string())
+}
+
+fn store_credentials(app: &tauri::AppHandle, credentials: Credentials) {
+    let saved = keychain_allowed()
+        && serde_json::to_string(&credentials)
+            .map_err(|e| e.to_string())
+            .and_then(|text| keychain_entry()?.set_password(&Zeroizing::new(text)).map_err(|e| e.to_string()))
+            .map_err(|e| eprintln!("[sync] keychain: {e}"))
+            .is_ok();
+    let state = app.state::<SyncState>();
+    if let Ok(mut held) = state.credentials.lock() {
+        *held = Some(Some(credentials));
+    }
+    if let Ok(mut flag) = state.in_keychain.lock() {
+        *flag = saved;
+    };
+}
+
+fn forget_credentials(app: &tauri::AppHandle) {
+    if keychain_allowed() {
+        match keychain_entry().and_then(|entry| match entry.delete_credential() {
+            Ok(()) | Err(keyring::Error::NoEntry) => Ok(()),
+            Err(e) => Err(e.to_string()),
+        }) {
+            Ok(()) => {}
+            Err(e) => eprintln!("[sync] keychain: {e}"),
+        }
+    }
+    let state = app.state::<SyncState>();
+    if let Ok(mut held) = state.credentials.lock() {
+        *held = Some(None);
+    };
+}
+
+fn credentials(app: &tauri::AppHandle) -> Option<Credentials> {
+    let state = app.state::<SyncState>();
+    let mut held = state.credentials.lock().ok()?;
+    if held.is_none() {
+        let found = if keychain_allowed() {
+            keychain_entry()
+                .ok()
+                .and_then(|entry| entry.get_password().ok())
+                .map(Zeroizing::new)
+                .and_then(|text| serde_json::from_str::<Credentials>(&text).ok())
+        } else {
+            None
+        };
+        if found.is_some() {
+            if let Ok(mut flag) = state.in_keychain.lock() {
+                *flag = true;
+            }
+        }
+        *held = Some(found);
+    }
+    let answer = held.clone().flatten();
+    drop(held);
+    answer
+}
+
 fn server(app: &tauri::AppHandle) -> Result<Server, String> {
-    read_file(app)?.server.ok_or_else(|| NEEDS_LOGIN.to_string())
+    let stored = read_file(app)?.server.ok_or_else(|| NEEDS_LOGIN.to_string())?;
+    let credentials = credentials(app).ok_or_else(|| NEEDS_LOGIN.to_string())?;
+    Ok(Server {
+        url: stored.url,
+        device: stored.device,
+        token: credentials.token.clone(),
+        names_key: credentials.names_key.clone(),
+    })
 }
 
 /// After a password change: the next round publishes the vault under the new key.
@@ -322,8 +421,8 @@ struct Remote {
 }
 
 fn remote(app: &tauri::AppHandle, vault_id: &str) -> Result<Remote, String> {
+    let server = server(app)?;
     let file = read_file(app)?;
-    let server = file.server.ok_or_else(|| NEEDS_LOGIN.to_string())?;
     let link = file.links.get(vault_id).ok_or_else(|| NOT_CONNECTED.to_string())?;
     Ok(Remote { url: server.url, remote: link.remote.clone(), token: Zeroizing::new(server.token) })
 }
@@ -340,7 +439,7 @@ pub async fn sync_status(app: tauri::AppHandle, vault_id: String) -> Result<Valu
     let file = read_file(&app)?;
     let link = file.links.get(&vault_id);
     Ok(json!({
-        "connected": file.server.is_some() && link.is_some_and(|l| !l.paused),
+        "connected": file.server.is_some() && credentials(&app).is_some() && link.is_some_and(|l| !l.paused),
         "url": file.server.as_ref().map(|s| s.url.clone()),
         "hasServer": file.server.is_some(),
         "hasRemote": link.is_some(),
@@ -360,7 +459,14 @@ pub async fn sync_server_status(app: tauri::AppHandle) -> Result<Value, String> 
         .iter()
         .map(|(id, l)| (id.clone(), json!({ "remote": l.remote, "paused": l.paused })))
         .collect();
-    Ok(json!({ "url": file.server.map(|s| s.url), "links": links }))
+    let has_credentials = credentials(&app).is_some();
+    let in_keychain = app.state::<SyncState>().in_keychain.lock().is_ok_and(|flag| *flag);
+    Ok(json!({
+        "needsKey": file.server.is_some() && !has_credentials,
+        "inKeychain": in_keychain,
+        "url": file.server.map(|s| s.url),
+        "links": links,
+    }))
 }
 
 /// Trades the sync key for a token of this device's own. The key is not kept.
@@ -382,14 +488,18 @@ pub async fn sync_pair(app: tauri::AppHandle, url: String, key: Zeroizing<String
     let device = answer["device"].as_str().unwrap_or_default().to_string();
     let names_key = names_key_from(&key);
     stop_watching(&app);
+    let (for_file, for_keychain) = (names_key.clone(), names_key);
     change_file(&app, |file| {
-        let identity = format!("{url} {names_key}");
+        use sha2::{Digest, Sha256};
+        let identity = B64.encode(Sha256::new().chain_update(&url).chain_update(b"\0").chain_update(&for_file).finalize());
         if file.links_for.as_deref() != Some(identity.as_str()) {
             file.links.clear();
         }
         file.links_for = Some(identity);
-        file.server = Some(Server { url, device, token, names_key });
-    })
+        file.server = Some(StoredServer { url, device });
+    })?;
+    store_credentials(&app, Credentials { token, names_key: for_keychain });
+    Ok(())
 }
 
 /// This device leaves the server. Vaults stay there, and their links stay here,
@@ -403,6 +513,7 @@ pub async fn sync_unpair(app: tauri::AppHandle) -> Result<(), String> {
             let _ = builder.bearer_auth(&server.token).send().await;
         }
     }
+    forget_credentials(&app);
     change_file(&app, |file| file.server = None)
 }
 

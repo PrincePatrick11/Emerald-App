@@ -1223,6 +1223,7 @@
     "nothingToFetch": "None.",
     "unnamedVault": "Vault {{number}}",
     "goneFromServer": "This vault was removed from the server. It stays here as a local vault.",
-    "replaceWarning": "This vault syncs: the backup also replaces it on your other devices, which first save a backup of their own."
+    "replaceWarning": "This vault syncs: the backup also replaces it on your other devices, which first save a backup of their own.",
+    "noKeychain": "This computer has no keychain the app can use, so the sync key is asked for again after a restart."
   }
 }

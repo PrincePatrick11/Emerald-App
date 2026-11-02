@@ -54,6 +54,10 @@ export interface SyncStatus {
 
 export interface ServerStatus {
   url: string | null;
+  /** A server is set, but what opens it is gone: no keychain, or it did not answer. */
+  needsKey: boolean;
+  /** Otherwise the sync key is asked for again after a restart. */
+  inKeychain: boolean;
   links: Record<string, { remote: string; paused: boolean }>;
 }
 

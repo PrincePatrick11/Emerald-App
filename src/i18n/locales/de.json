@@ -1223,6 +1223,7 @@
     "nothingToFetch": "Keine.",
     "unnamedVault": "Vault {{number}}",
     "goneFromServer": "Dieser Vault wurde vom Server entfernt. Er bleibt hier als lokaler Vault.",
-    "replaceWarning": "Dieser Vault synchronisiert: Das Backup ersetzt ihn auch auf deinen anderen Geräten, die vorher selbst eine Sicherung anlegen."
+    "replaceWarning": "Dieser Vault synchronisiert: Das Backup ersetzt ihn auch auf deinen anderen Geräten, die vorher selbst eine Sicherung anlegen.",
+    "noKeychain": "Dieser Computer hat keinen Schlüsselbund, den die App nutzen kann. Der Sync-Key wird deshalb nach einem Neustart erneut abgefragt."
   }
 }

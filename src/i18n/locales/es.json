@@ -1223,6 +1223,7 @@
     "nothingToFetch": "Ninguna.",
     "unnamedVault": "Bóveda {{number}}",
     "goneFromServer": "Esta bóveda se eliminó del servidor. Sigue aquí como bóveda local.",
-    "replaceWarning": "Esta bóveda se sincroniza: la copia también la reemplaza en tus otros dispositivos, que antes guardan su propia copia."
+    "replaceWarning": "Esta bóveda se sincroniza: la copia también la reemplaza en tus otros dispositivos, que antes guardan su propia copia.",
+    "noKeychain": "Este equipo no tiene un llavero que la aplicación pueda usar, así que la clave se pedirá de nuevo tras reiniciar."
   }
 }
