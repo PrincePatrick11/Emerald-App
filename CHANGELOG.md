@@ -6,6 +6,8 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased] (targeting v0.2.0)
 
 ### Changed
+- **Modals are built like the window.** Title and actions sit on the frame, the content on an inset sheet, with a blurred backdrop and the action buttons pinned in a footer; a modal can be moved by its header within the window.
+- **Pickers and menus follow the theme.** The emoji picker, category picker, menus, date fields, the category chip and the tag colour popover use the theme's colours; the chosen emoji or menu row shows jade while hovering stays neutral, and Noctis menus are warm neutrals instead of grey.
 - **macOS title bar and menu.** The logo and the Menu button left the title bar and the traffic lights are aligned with it; Edit and View live only in the native menu, Export and Import only as title-bar buttons.
 - **Parchment's accent and border colours were adjusted** to meet the contrast rules.
 - **macOS 13.1 (Ventura) is now the minimum.**

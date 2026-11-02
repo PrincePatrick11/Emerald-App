@@ -126,7 +126,7 @@ Size tokens in both theme files: `--tab-pill-h` (30px, `TabBar`) and `--control-
 
 **Active/inactive toggles use `Button`'s `tone` mode**, not a ternary in the `className` template. The base variants (`primary`/`secondary`/`ghost`/`danger`) have no active state; `tone` does. Documented exceptions: `EditorToolbar`'s `ToolbarBtn` and `AltarCanvas`'s drag handles — neither is a generic action button.
 
-**Hover changes the surface, active also changes the meaning.** Active shows jade; something merely hovered stays neutral (`--interactive-hover`).
+**Hover changes the surface, active also changes the meaning.** Active shows jade; something merely hovered stays neutral (`--interactive-hover`). This holds for menu rows too: a hovered row is neutral (`--menu-item-hover-*`), the chosen one — the current emoji, the selected option — is jade (`--menu-item-active-*`).
 
 **Motion:** 150ms for colour changes and hover (`transition-colors duration-150`), 200ms for what changes the room, such as sidebars and fades. Nothing bounces or blinks for attention; dragging tabs is the exception.
 
