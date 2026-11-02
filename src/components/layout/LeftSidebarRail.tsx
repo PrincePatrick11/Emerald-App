@@ -1,8 +1,9 @@
 import { useTranslation } from 'react-i18next';
-import { Settings, type LucideIcon } from 'lucide-react';
+import { Plus, Settings, type LucideIcon } from 'lucide-react';
 import { Suspense, lazy, useEffect, useState } from 'react';
 import { AUX_VIEWS, MODULES, type ViewId } from '../../lib/modules';
 import { useUIStore } from '../../store/uiStore';
+import { useEntryStore } from '../../store/entryStore';
 import { useVaultStore } from '../../store/vaultStore';
 import { useAutoBackupStore } from '../../store/autoBackupStore';
 import { useSettingsStore } from '../../store/settingsStore';
@@ -89,6 +90,11 @@ export default function LeftSidebarRail() {
   // What the gear is currently reporting. The update takes precedence, it is the rarer message.
   const notice = updateVersion ? 'update' : backupFailed ? 'backup' : null;
 
+  const createJournalEntry = async () => {
+    const entry = await useEntryStore.getState().createEntry('journal');
+    setActiveView({ type: 'journal', id: entry.id, mode: 'edit', isNew: true });
+  };
+
   // One button per view; it is highlighted as long as its view is open —
   // also with an entry open inside it.
   const viewButton = (type: ViewId, meta: { icon: LucideIcon; navLabelKey: string }) => (
@@ -120,7 +126,12 @@ export default function LeftSidebarRail() {
             title bar, which nobody reads as a navigation target.
             Mind the MCP selectors: lucide exports `Home` as an alias of
             `House`, so the SVG carries `.lucide-house`, not `.lucide-home`. */}
-        {viewButton('home', AUX_VIEWS.home)}
+        <div className={RAIL_GROUP}>
+          {viewButton('home', AUX_VIEWS.home)}
+          <RailButton onClick={() => void createJournalEntry()} title={t('journal.newEntry')}>
+            <Plus size={18} />
+          </RailButton>
+        </div>
         <div className={RAIL_GROUP}>
           {viewButton('journal', MODULES.journal)}
           {viewButton('tasks', MODULES.tasks)}

@@ -337,7 +337,7 @@ export default function CategoriesView() {
       grouping={{
         mode: 'custom',
         render: () => (
-          <div className="max-w-2xl">
+          <div>
             {!query && <p className="text-xs text-subtle mb-3">{t('categories.dragHint')}</p>}
             {query && visualCategories.length === 0 && <NoResults query={search} onReset={() => setSearch('')} />}
             <div ref={listRef} className="space-y-1">
