@@ -193,7 +193,7 @@ The grid also appears in thumbnails and exported images.
 
 ## Navigation
 
-**Loading screen.** On startup, before the app is ready, a loading screen covers the window: a breathing emerald gem with twinkling facets, the wordmark and a progress rail, on the app's own dark background. It fades as soon as your vault's data (or, on a new install, vault setup) is ready, however fast that is. **View → Show Loading Screen** replays it; a click or Escape closes it.
+**Loading screen.** On startup, before the app is ready, a loading screen covers the window: a breathing emerald gem with twinkling facets, the wordmark and a progress rail, on the app's own dark background. It fades as soon as your vault's data (or, on a new install, vault setup) is ready, however fast that is. If a password question comes first, the loading screen returns after you answer it and stays until the vault has loaded; a keychain prompt does not count against its time limit. **View → Show Loading Screen** replays it; a click or Escape closes it.
 
 **Window title bar and frame.** The app draws its own title bar: the Emerald logo (decoration, centred above the rail), on Windows and Linux one menu button holding the Edit and View menus, a magnifier for [Search](#search) (hidden while no vault is open), back/forward through the view history, on Windows and Linux an Export and an Import menu button, the open tabs, and — on Windows and Linux — the minimise / maximise / close buttons. macOS keeps its native window buttons and menu bar, so its title bar shows only the logo, search and navigation. The minimum window width is 720px.
 
