@@ -1482,7 +1482,7 @@ console.log('\n8f. Migration v41: status, end date and version become a block\n'
   check(
     'the inactive operation has the status block before its text',
     // With two blocks the text gets its wrapper too.
-    s1.content.startsWith('<section data-block="core.fields"') && s1.content.includes('Status') &&
+    s1.content.startsWith('<section data-block="core.fields"') && s1.content.includes('data-block="core.fields"') && s1.content.includes('Status') &&
       s1.content.endsWith('<p>Text</p></section>'),
     s1.content
   );
@@ -1723,6 +1723,12 @@ console.log('\n8i. Migration v43: templates and the sigil template\n');
     !JSON.stringify(merged).includes('"alt"'), JSON.stringify(merged));
   check('merging: the combination already held stays, the free one moves',
     merged.m2.length === 1 && merged.m1.length === 1 && merged.m1[0].entryType === 'operation' && merged.m1[0].category === 'neu', JSON.stringify(merged));
+  await db.execute(`INSERT INTO categories (id,name,emoji,sort_order,is_builtin) VALUES ('alt2','Alt2','x',102,0), ('neu2','Neu2','x',103,0)`);
+  await insertTpl('m3', [{ entryType: 'wiki', category: 'alt2' }, { entryType: 'wiki', category: 'neu2' }]);
+  await reassignCategoryContent(db, 'alt2', 'neu2');
+  const [m3] = await db.select("SELECT assignments FROM templates WHERE id='m3'");
+  check('merging: a template with both categories keeps one assignment',
+    JSON.stringify(JSON.parse(m3.assignments)) === JSON.stringify([{ entryType: 'wiki', category: 'neu2' }]), m3.assignments);
   check('merging: no orphans', (await checkIntegrity(db)).filter((o) => o.table === 'templates' && o.missingTarget !== 'categories.fehlt').length === 0);
   db.close();
 }
@@ -1957,6 +1963,24 @@ console.log('\n8n. Migration v49: three entry tables become entries\n');
   // aborted run, the chain then catches up with v55.
   await MIGRATIONS.find((m) => m.version === 55).up(db);
   check('v49: schema identical to the baseline', JSON.stringify(await readSchema(db)) === JSON.stringify(schemaA));
+  db.close();
+}
+
+{
+  // v56: only what was a default stays an assignment; a trashed template holds none; the block revision goes.
+  const db = freshDb('v56.db');
+  await runMigrations(db);
+  await db.execute('ALTER TABLE block_definitions ADD COLUMN revision INTEGER NOT NULL DEFAULT 1');
+  const old = JSON.stringify([{ entryType: 'wiki', category: '*', isDefault: true }, { entryType: 'operation', category: '*', isDefault: false }]);
+  await db.execute(`INSERT INTO templates (id,name,content,assignments,created_at,updated_at,deleted_at) VALUES ('live','L','',?1,?2,?2,NULL), ('gone','G','',?1,?2,?2,?2)`, [old, now]);
+  const v56 = MIGRATIONS.find((m) => m.version === 56);
+  await v56.up(db);
+  await v56.up(db);
+  const rows = Object.fromEntries((await db.select("SELECT id, assignments FROM templates WHERE id IN ('live','gone')")).map((r) => [r.id, r.assignments]));
+  check('v56: a default stays without its flag, what was only offered goes',
+    rows.live === JSON.stringify([{ entryType: 'wiki', category: '*' }]), rows.live);
+  check('v56: a trashed template holds no assignments', rows.gone === '[]', rows.gone);
+  check('v56: repeatable, schema identical to the baseline', JSON.stringify(await readSchema(db)) === JSON.stringify(schemaA));
   db.close();
 }
 

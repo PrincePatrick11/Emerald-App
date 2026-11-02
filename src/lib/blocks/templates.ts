@@ -74,7 +74,7 @@ export function assignmentKey(entryType: TemplateEntryType, category: string | n
 }
 
 /** There are no more combinations than entry types × categories; anything above comes from a doctored file. */
-export const MAX_ASSIGNMENTS = 500;
+const MAX_ASSIGNMENTS = 500;
 
 /**
  * Assignments from JSON (row, backup, draft): unreadable entries are dropped,
@@ -127,7 +127,7 @@ export function assignedTemplateAt(
   return templates.find((t) => t.assignments.some((a) => matches(a, entryType, category)));
 }
 
-function matches(a: TemplateAssignment, entryType: TemplateEntryType, category: string | null): boolean {
+export function matches(a: TemplateAssignment, entryType: TemplateEntryType, category: string | null): boolean {
   return a.entryType === entryType && a.category === category;
 }
 

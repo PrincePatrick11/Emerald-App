@@ -31,7 +31,7 @@ There is one formatting toolbar, pinned to the top while scrolling, acting on th
 
 All of this is part of the entry's text, so Cancel reverts it too.
 
-**Your own blocks.** The **Blocks** view (rail, below Templates) lists the blocks you've built on the same dashboard every module uses — icon, name, field and entry count, an "outdated" dot, and "Unsaved" for a draft left open elsewhere. The right sidebar holds the header: title, count, "New block", search, view (list, cards, wide cards, or a timeline by month of last change) and sort (last changed, name, most used).
+**Your own blocks.** The **Blocks** view (rail, below Templates) lists the blocks you've built on the same dashboard every module uses — icon, name, field count, and "Unsaved" for a draft left open elsewhere. The right sidebar holds the header: title, count, "New block", search, view (list, cards, wide cards, or a timeline by month of last change) and sort (last changed, name).
 
 The list opens with a collapsible "Your blocks" section; below it, laid out like the Altar library, a collapsible "Built-in blocks" section lists what "Add block" offers out of the box — text, every field kind and the three sigil blocks — as a plain, non-clickable list (text and the sigil blocks have a description tooltip). Search filters both sections. With none of your own yet, a hint invites you to build the first; the built-in section stays regardless.
 
@@ -96,7 +96,7 @@ Operations track magical workings: rituals in progress, ongoing practices, servi
 
 ### Sigil Workflow
 
-A sigil is an operation with three blocks — **Sigil calculator**, **Sigil drawing** and **Charge** — alongside text and any other block. A new operation in the **Sigils** category starts with all three (through the built-in default template, see [Templates](#templates)); any other operation can add them via "Add block".
+A sigil is an operation with three blocks — **Sigil calculator**, **Sigil drawing** and **Charge** — alongside text and any other block. A new operation in the **Sigils** category starts with all three (through the built-in template assigned there, see [Templates](#templates)); any other operation can add them via "Add block".
 
 1. In the calculator, write the intention and use "Reduce automatically" (or "Reduce manually") to get the letter bank — each letter once. Tick letters off as you work them into the drawing.
 2. Draw the sigil in the drawing block: pen and eraser, brush size, seven colours, undo/redo, clear. It is saved as an image file.
@@ -274,7 +274,7 @@ Clicking one opens its page — name as the title, the title new entries get, an
 
 **Inserting one by hand.** "Insert template" in the blocks sidebar opens a searchable list of all templates. The blocks go below the content (into an empty entry they replace the empty text); an entry without a title takes the template's title, and the template's tags are added. Every entry's context menu offers **"Save as template"**, which creates one from the entry's current content (unsaved edits included) and opens it.
 
-**Duplicate** on a template makes an independent copy without assignments. Deleting a template moves it to the Trash with an Undo toast; it comes back without assignments. "New template" followed by Cancel puts it in the Trash with Undo; after Done it stays. Exporting a template as `.emerald` carries no assignments: which template fills new entries is this vault's decision.
+**Duplicate** on a template makes an independent copy without assignments. Deleting a template moves it to the Trash with an Undo toast and clears its assignments; it comes back without them. "New template" followed by Cancel puts it in the Trash with Undo; after Done it stays. Exporting a template as `.emerald` carries no assignments: which template fills new entries is this vault's decision.
 
 Routines from older vaults and `.emeralddb` backups are converted into templates on open or import (same content and tags, linked entries as link blocks, without assignments).
 
@@ -450,7 +450,7 @@ The Emerald format (`.emerald`) is a JSON file holding a full entry — or a ful
 
 **Entries.** On import, images are saved into the vault's image folder (an identical image is stored once) and go through the vault's image limits like inserted ones (an image that stays too large, or can't be scaled, is kept as it is). The content is sanitised, links are resolved by id and then by title, and tags are added to the vault. An entry or altar keeps the file's `createdAt` as both creation and "last changed" date, so it lands at its place in the timeline — provided it is a readable date with a four-digit year; otherwise it is created now. Old English default titles import as empty, and fields this version doesn't use are ignored.
 
-**Your own blocks.** An entry holding copies of Blocks-view blocks is written as `"version": "2"`, carrying those blocks in `meta.blockDefinitions`; everything else stays `"1"`, so older app versions keep accepting it. Import creates any missing block under its original id, so the copies are recognised and can be updated; an existing one (even in the Trash) is left as it is.
+**Your own blocks.** An entry carries its copies of Blocks-view blocks in its content; the blocks themselves do not travel. An older file (`"version": "2"`) may still carry them in `meta.blockDefinitions`: import creates any missing one under its original id, and leaves an existing one (even in the Trash) as it is.
 
 **Templates** export from their page or the templates list's context menu as `"version": "3"`, `"type": "template"` — a combination used only for templates, so an older app rejects the file instead of mistaking it for an operation. It carries the template's blocks, images and Blocks-view blocks like an entry, plus its icon, the title new entries get, its tags and its assignments. A built-in category in an assignment travels by id (its name depends on the language); any other by name and emoji, created on import if nothing matches (at most 20 new categories per file, so a crafted file can't flood the list). Which template is a *default* never travels — importing never displaces a default the vault already has.
 
@@ -473,7 +473,7 @@ The whole vault can be backed up and restored as one self-contained file (`.emer
 **Export.**
 
 - A "What to include" chip row picks the content: Journal, Wiki, Operations, Altars, Tasks, Tags, Lexicon and Settings. Templates and your own blocks travel whenever Journal, Wiki or Operations is included.
-- The Settings chip (on by default) exports the vault's settings — language, theme, fonts, sizes, trash retention, sidebar, emoji defaults, image limits, tag rule, template rule, automatic backup — independently of the content chips.
+- The Settings chip (on by default) exports the vault's settings — language, theme, fonts, sizes, trash retention, sidebar, emoji defaults, image limits, tag rule, automatic backup — independently of the content chips.
 - Optional from/to dates restrict entries to those created in that window (tags, categories, blocks, templates, languages and settings are not date-filtered).
 - Trashed items are left out unless **Include deleted** is ticked — tags included, since trashed entries carry their ids.
 - Images referenced by exported entries are embedded.
@@ -487,7 +487,7 @@ The whole vault can be backed up and restored as one self-contained file (`.emer
 - Three modes, from least to most invasive: **Add Vault** (into a new vault, then switch to it — the default, since it can't touch existing data), **Merge** (imported items get new ids, so nothing existing is overwritten), and **Replace** (overwrite the selected content in the current vault, with a warning).
 - Add Vault asks for the new vault's name **and folder**, with the same folder row as creating a vault (default `Documents/Emerald Vaults/{name}`). The folder is checked before anything is touched: it must be empty or not exist yet, must not hold a vault, and must be readable. The new vault then asks for its own password; cancelling that cancels the import and removes the empty vault.
 - A failed import — a corrupt file, a crash partway — leaves the vault exactly as it was: every mode fills a hidden copy of the database and swaps it in only once the import succeeded.
-- If the file carries settings, Add Vault and Replace apply them; Merge lists them as checkboxes (appearance, trash, sidebar, emoji, images, tag rule, templates, automatic formatting, journal, automatic backup) so only the ticked groups come in.
+- If the file carries settings, Add Vault and Replace apply them; Merge lists them as checkboxes (appearance, trash, sidebar, emoji, images, tag rule, automatic formatting, journal, automatic backup) so only the ticked groups come in.
 
 **Automatic backup.**
 
@@ -535,7 +535,7 @@ Settings are **per vault** — stored in the vault's own `settings.json`. Switch
 
 - **General** — language, theme, the two fonts, interface size and editor text size (see [Language](#language), [Typography](#typography), [Sizing](#sizing), [Theming](#theming)).
 - **Sidebar** — which list the left entry list shows (all items together, or one module's own), and how many entries it lists before "Show more".
-- **Entries** — the emoji picker's default set, size limits for inserted images, whether new tags may appear on the spot (typed, from a template, from an import), whether a new entry starts with its default template, **Automatic formatting** (Markdown shortcuts such as `# ` or `**bold**`; typography such as curly quotes, dashes, arrows and fractions; auto-links for typed or pasted addresses — each its own switch, applying to editors opened afterwards), and whether journal entries show their **moon phase** (see [Journal](#journal)).
+- **Entries** — the emoji picker's default set, size limits for inserted images, whether new tags may appear on the spot (typed, from a template, from an import), **Automatic formatting** (Markdown shortcuts such as `# ` or `**bold**`; typography such as curly quotes, dashes, arrows and fractions; auto-links for typed or pasted addresses — each its own switch, applying to editors opened afterwards), and whether journal entries show their **moon phase** (see [Journal](#journal)).
 - **Security** — remember on this device, lock now, change password (see [Vault Encryption](#vault-encryption)).
 - **Backup** — see [Vault Backup](#vault-backup-emeralddb).
 - **Storage** — how long the Trash keeps deleted items, and the unused-images cleanup (see [Image Storage and Cleanup](#image-storage-and-cleanup)).

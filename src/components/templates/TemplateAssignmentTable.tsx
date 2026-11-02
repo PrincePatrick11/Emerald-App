@@ -15,7 +15,7 @@ import { categoryLabel } from '../../lib/categories';
 import { MODULES, viewTypeForEntryType } from '../../lib/modules';
 import { ALL_CATEGORIES, assignedTemplateAt, TEMPLATE_ENTRY_TYPES, type TemplateEntryType } from '../../lib/blocks/templates';
 
-/** The section as a whole is a setting, like the altar library. */
+/** The section as a whole is a setting, like the altar library. The key keeps the state of the earlier overview. */
 const COLLAPSED_KEY = 'templates-defaults-collapsed';
 
 /** The entry types with categories: the columns of the table. */
@@ -37,126 +37,119 @@ function EntryTypeHeading({ entryType }: { entryType: TemplateEntryType }) {
 }
 
 /**
- * The table of where templates apply: at the top journal on its own (it has no
- * categories, as a column of the table it would be almost empty), below it one
- * row per category ("All categories", "No category", then each category) with
- * wiki and operations as columns. A cell shows the template new entries of that
- * combination start with, and a change applies at once. Without one of its own
- * it names what applies instead.
- *
- * With `templateId` (the template's own page) a click puts this template into
- * the cell or takes it out again; otherwise a cell chooses from all templates.
+ * One combination: the template new entries of it start with, or what applies
+ * instead. With `templateId` (the template's own page) a click puts this template
+ * into the cell or takes it out again; otherwise it chooses from all templates.
  */
-export function AssignmentGrid({ templateId }: { templateId?: string }) {
+function AssignmentCell({ entryType, category, rowLabel, templateId }: {
+  entryType: TemplateEntryType;
+  category: string | null;
+  rowLabel: string;
+  templateId?: string;
+}) {
   const { t } = useTranslation();
   const templates = useTemplateStore((s) => s.templates);
   const assignTemplate = useTemplateStore((s) => s.assignTemplate);
-  const categories = useCategoryStore((s) => s.categories);
 
-  const assign = (entryType: TemplateEntryType, category: string | null, id: string | null) => {
+  const assign = (id: string | null) => {
     assignTemplate(entryType, category, id).catch((e: unknown) => {
-      console.error('[AssignmentGrid] assigning failed:', e);
+      console.error('[AssignmentCell] assigning failed:', e);
     });
   };
 
-  const options = [
-    { value: '', label: t('templates.overview.none') },
-    ...templates.map((tpl) => ({ value: tpl.id, label: templateLabel(t, tpl), icon: <BlockGlyph icon={tpl.icon} size={14} /> })),
-  ];
-
-  const cell = (entryType: TemplateEntryType, category: string | null, rowLabel: string) => {
-    const current = assignedTemplateAt(templates, entryType, category);
-    const fallback = !current && category !== ALL_CATEGORIES ? assignedTemplateAt(templates, entryType, ALL_CATEGORIES) : undefined;
-    const label = `${rowLabel} – ${t(MODULES[viewTypeForEntryType(entryType)].navLabelKey)}: ${current ? templateLabel(t, current) : t('templates.overview.none')}`;
-    const content = current ? (
-      <>
-        <BlockGlyph icon={current.icon} size={14} />
-        <span className="truncate">{templateLabel(t, current)}</span>
-      </>
-    ) : fallback ? (
-      <span className="block-field-hint flex min-w-0 items-center gap-1.5" title={t('templates.overview.fallback', { name: templateLabel(t, fallback) })}>
-        <CornerDownRight size={12} className="flex-shrink-0" />
-        <span className="truncate">{templateLabel(t, fallback)}</span>
-      </span>
-    ) : (
-      <span className="block-field-hint" title={t('templates.overview.none')}>—</span>
-    );
-    if (templateId) {
-      const own = current?.id === templateId;
-      return (
-        <button
-          type="button"
-          className="template-assign-cell text-sm"
-          aria-label={label}
-          aria-pressed={own}
-          onClick={() => assign(entryType, category, own ? null : templateId)}
-        >
-          {content}
-          {own && <Check size={12} className="ml-auto flex-shrink-0 text-[var(--accent-text)]" />}
-        </button>
-      );
-    }
-    return (
-      <Dropdown
-        portal
-        value={current?.id ?? ''}
-        options={options}
-        onChange={(id) => assign(entryType, category, id || null)}
-        trigger={({ toggle: open }) => (
-          <button type="button" className="template-assign-cell text-sm" aria-label={label} onClick={open}>
-            {content}
-            <ChevronDown size={12} className="template-assign-chevron" />
-          </button>
-        )}
-      />
-    );
-  };
-
-  // The fixed emoji column keeps the names aligned; the two rows
-  // without a category of their own carry an icon there instead of an emoji.
-  const named = (glyph: ReactNode, name: string) => (
+  const current = assignedTemplateAt(templates, entryType, category);
+  const fallback = !current && category !== ALL_CATEGORIES ? assignedTemplateAt(templates, entryType, ALL_CATEGORIES) : undefined;
+  const label = `${rowLabel} – ${t(MODULES[viewTypeForEntryType(entryType)].navLabelKey)}: ${current ? templateLabel(t, current) : t('templates.overview.none')}`;
+  const content = current ? (
     <>
-      <span className="flex w-5 flex-shrink-0 justify-center text-[var(--text-muted)]">{glyph}</span>
-      <span className="truncate">{name}</span>
+      <BlockGlyph icon={current.icon} size={14} />
+      <span className="truncate">{templateLabel(t, current)}</span>
     </>
+  ) : fallback ? (
+    <span className="block-field-hint flex min-w-0 items-center gap-1.5" title={t('templates.overview.fallback', { name: templateLabel(t, fallback) })}>
+      <CornerDownRight size={12} className="flex-shrink-0" />
+      <span className="truncate">{templateLabel(t, fallback)}</span>
+    </span>
+  ) : (
+    <span className="block-field-hint" title={t('templates.overview.none')}>—</span>
   );
 
-  // "All categories" is the fallback of all other rows and therefore stands
-  // out with a bold name, and only that; a shaded row was too loud.
-  const row = (category: string | null, name: string, glyph: ReactNode) => (
-    <div key={category ?? ''} className={`${GRID} border-t border-[var(--border-soft)] py-1.5`}>
-      <div
-        className={`flex min-w-0 items-center gap-2 text-sm text-[var(--text-primary)]${
-          category === ALL_CATEGORIES ? ' font-semibold' : ''
-        }`}
+  if (templateId) {
+    const own = current?.id === templateId;
+    return (
+      <button
+        type="button"
+        className="template-assign-cell text-sm"
+        aria-label={label}
+        aria-pressed={own}
+        onClick={() => assign(own ? null : templateId)}
       >
-        {named(glyph, name)}
+        {content}
+        {own && <Check size={12} className="ml-auto flex-shrink-0 text-[var(--accent-text)]" />}
+      </button>
+    );
+  }
+  return (
+    <Dropdown
+      portal
+      value={current?.id ?? ''}
+      options={[
+        { value: '', label: t('templates.overview.none') },
+        ...templates.map((tpl) => ({ value: tpl.id, label: templateLabel(t, tpl), icon: <BlockGlyph icon={tpl.icon} size={14} /> })),
+      ]}
+      onChange={(id) => assign(id || null)}
+      trigger={({ toggle }) => (
+        <button type="button" className="template-assign-cell text-sm" aria-label={label} onClick={toggle}>
+          {content}
+          <ChevronDown size={12} className="template-assign-chevron" />
+        </button>
+      )}
+    />
+  );
+}
+
+/**
+ * The table of where templates apply: at the top journal on its own (it has no
+ * categories, as a column of the table it would be almost empty), below it one
+ * row per category ("All categories", "No category", then each category) with
+ * wiki and operations as columns. A change applies at once.
+ */
+function AssignmentGrid({ templateId }: { templateId?: string }) {
+  const { t } = useTranslation();
+  const categories = useCategoryStore((s) => s.categories);
+
+  // "All categories" is the fallback of all other rows and therefore stands
+  // out with a bold name, and only that; a shaded row was too loud. The fixed
+  // emoji column keeps the names aligned.
+  const row = (types: readonly TemplateEntryType[], category: string | null, name: string, glyph: ReactNode, bold = false) => (
+    <div key={category ?? ''} className={`${GRID} border-t border-[var(--border-soft)] py-1.5`}>
+      <div className={`flex min-w-0 items-center gap-2 text-sm text-primary${bold ? ' font-semibold' : ''}`}>
+        <span className="flex w-5 flex-shrink-0 justify-center text-muted">{glyph}</span>
+        <span className="truncate">{name}</span>
       </div>
-      {CATEGORY_TYPES.map((type) => <div key={type} className="min-w-0">{cell(type, category, name)}</div>)}
+      {types.map((type) => (
+        <div key={type} className="min-w-0">
+          <AssignmentCell entryType={type} category={category} rowLabel={name} templateId={templateId} />
+        </div>
+      ))}
     </div>
   );
 
   // No frame of its own: the dashboard puts it in a panel, the window is one already.
   return (
     <div>
-      {/* Journal: one row, the cell spanning both columns. */}
       <div className="py-3">
         <EntryTypeHeading entryType="journal" />
       </div>
-      <div className={`${GRID} border-t border-[var(--border-soft)] py-1.5`}>
-        <div className="flex min-w-0 items-center gap-2 text-sm text-[var(--text-primary)]">
-          {named(<FilePlus size={14} />, t('templates.overview.everyEntry'))}
-        </div>
-        <div className="min-w-0">{cell('journal', ALL_CATEGORIES, t('templates.overview.everyEntry'))}</div>
-      </div>
+      {row(['journal'], ALL_CATEGORIES, t('templates.overview.everyEntry'), <FilePlus size={14} />)}
 
       <div className={`${GRID} border-t border-[var(--border-soft)] pt-5 pb-3`}>
         <span className="label-xs">{t('templates.overview.category')}</span>
         {CATEGORY_TYPES.map((type) => <EntryTypeHeading key={type} entryType={type} />)}
       </div>
-      {row(ALL_CATEGORIES, t('templates.allCategories'), <Layers size={14} />)}
-      {row(null, t('categories.uncategorized'), <CircleDashed size={14} />)}
-      {categories.map((cat) => row(cat.id, categoryLabel(t, cat), cat.emoji))}
+      {row(CATEGORY_TYPES, ALL_CATEGORIES, t('templates.allCategories'), <Layers size={14} />, true)}
+      {row(CATEGORY_TYPES, null, t('categories.uncategorized'), <CircleDashed size={14} />)}
+      {categories.map((cat) => row(CATEGORY_TYPES, cat.id, categoryLabel(t, cat), cat.emoji))}
     </div>
   );
 }
@@ -174,7 +167,7 @@ export default function TemplateAssignmentTable() {
       <GroupDivider label={t('templates.overview.title')} collapsed={collapsed} onToggleCollapse={toggle} />
       {!collapsed && (
         <>
-          <p className="mb-3 text-xs text-[var(--text-muted)]">{t('templates.overview.hint')}</p>
+          <p className="mb-3 text-xs text-muted">{t('templates.overview.hint')}</p>
           <div className="panel px-4">
             <AssignmentGrid />
           </div>
@@ -195,7 +188,7 @@ export function TemplateAssignmentProperty({ templateId, name }: { templateId: s
   return (
     <>
       <EditPropertyRow icon={<SlidersHorizontal size={14} />} label={t('templates.overview.title')}>
-        <button type="button" className="prop-value-btn" aria-haspopup="dialog" onClick={() => setOpen(true)}>
+        <button type="button" className={`prop-value-btn${count > 0 ? '' : ' prop-value-btn--muted'}`} aria-haspopup="dialog" onClick={() => setOpen(true)}>
           <span className="min-w-0 truncate">{count > 0 ? count : '—'}</span>
         </button>
       </EditPropertyRow>

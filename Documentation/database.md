@@ -68,7 +68,7 @@ Per-migration detail lives in the code and in `CHANGELOG.md`. In short:
 | 53 | `tags_by_id` | Tag lists hold ids instead of names; `tags.affected_ids` dropped ([tags](#tags)) |
 | 54 | `drop_unused_descriptions` | Drops `tasks.description`/`due_date`, `block_definitions.description`, `templates.description` |
 | 55 | `entries_list_index` | `idx_entries_list` (the list columns) and the partial `idx_entries_decorated` replace `idx_entries_deleted` |
-| 56 | `simple_copies_and_assignments` | Drops `block_definitions.revision`; `templates.assignments` keeps only what was a default, without the flag |
+| 56 | `simple_copies_and_assignments` | Drops `block_definitions.revision`; `templates.assignments` keeps only what was a default, without the flag; trashed templates lose theirs |
 
 Column drops go through `dropColumnsIfPresent` (`dbRebuild.ts`), which skips columns already gone, so they are repeatable. Where a migration converts data, the same converter also runs on rows from an older `.emeralddb` file at import time — see [DB Backup / Restore](#db-backup--restore-emeralddb).
 
@@ -137,13 +137,13 @@ These are exactly the places where orphans accumulate. Three things stand in for
 
 ### Deleting a category never deletes its content
 
-`RESTRICT` deletes nothing; it refuses a delete that would leave a dangling reference. `reassignCategoryContent(db, categoryId)` in `schema.ts` is the other half: it sets `category_id` to `NULL` across `CATEGORIZED_TABLES` (`entries`, `tasks`, `altar_items`) so the delete becomes permissible, and calls `dropCategoryFromTemplates`, which strips the category out of every template's `assignments` (trashed ones too). A template isn't content and doesn't become "Uncategorized" — it simply stops offering itself for a combination that no longer exists. `templateStore`'s `dropCategoriesFromTemplatesInMemory` mirrors that trim in the loaded store.
+`RESTRICT` deletes nothing; it refuses a delete that would leave a dangling reference. `reassignCategoryContent(db, categoryId)` in `schema.ts` is the other half: it sets `category_id` to `NULL` across `CATEGORIZED_TABLES` (`entries`, `tasks`, `altar_items`) so the delete becomes permissible, and calls `dropCategoryFromTemplates`, which strips the category out of every template's `assignments` (trashed ones too). A template isn't content and doesn't become "Uncategorized" — it simply stops applying to a combination that no longer exists. `templateStore`'s `dropCategoriesFromTemplatesInMemory` mirrors that trim in the loaded store.
 
-When a category is merged into a namesake instead (`reassignCategoryContent(db, from, to)`, via `mergeCategory` from `categoryStore.restoreCategory` and `updateCategory`), content and assignments move to `to` (`moveCategoryInTemplates`): an assignment moves along only where no active template already holds that entry type and `to`; a trashed template needs no check, since it comes back without assignments.
+When a category is merged into a namesake instead (`reassignCategoryContent(db, from, to)`, via `mergeCategory` from `categoryStore.restoreCategory` and `updateCategory`), content and assignments move to `to` (`moveCategoryInTemplates`): an assignment moves along only where no template already holds that entry type and `to`.
 
 Only a **permanent** deletion reassigns: `categoryStore.permanentlyDeleteCategory`, `trashStore.emptyTrash`, and the periodic cleanup for an expired category (`purgeCategory`). That is why `categories` is **not in `CLEANUP_TABLES`** — it is purged separately, after its content is released. A *soft* delete never reassigns: content keeps pointing at the trashed category, the UI groups it under "Uncategorized", and restoring the category brings everything back. `reassignCategoriesInMemory` in `categoryStore.ts` applies the same move to the loaded content stores, so an in-memory row doesn't write back a `category_id` the foreign key would reject.
 
-The one built-in, `sigils`, cannot be deleted: an operation in it is a sigil, and a new one starts with the sigil blocks through the built-in `core-sigil` template, its default for Operations × Sigils.
+The one built-in, `sigils`, cannot be deleted: an operation in it is a sigil, and a new one starts with the sigil blocks through the built-in `core-sigil` template, assigned to Operations × Sigils.
 
 ## Tables
 
@@ -210,7 +210,7 @@ An element's `defaultValue` (the builder's "Prefill") is what a new copy starts 
 
 ### templates
 
-The templates dashboard's rows, behind Journal/Wiki/Operations' "insert a template" flow — see [Templates](architecture/templates.md#templates) for assignments, defaults and the routine conversion. Like `block_definitions`, a row is only ever copied into an entry's `content` with no link back, so deleting a row touches no entry.
+The templates dashboard's rows, behind Journal/Wiki/Operations' "insert a template" flow — see [Templates](architecture/templates.md#templates) for assignments and the routine conversion. Like `block_definitions`, a row is only ever copied into an entry's `content` with no link back, so deleting a row touches no entry.
 
 | Column | Type | Notes |
 |---|---|---|
@@ -220,12 +220,12 @@ The templates dashboard's rows, behind Journal/Wiki/Operations' "insert a templa
 | title | TEXT | NOT NULL DEFAULT `''`; the title a new entry gets — empty means the entry starts untitled |
 | content | TEXT | NOT NULL DEFAULT `''`; a block stack, same format as an entry's `content` |
 | tags | TEXT | JSON array of tag ids, NOT NULL DEFAULT `'[]'` |
-| assignments | TEXT | JSON array of `{entryType, category}`, NOT NULL DEFAULT `'[]'`; `category` is a category id, `null` (no category) or `'*'` (all categories). No assignments = offered everywhere |
+| assignments | TEXT | JSON array of `{entryType, category}`, NOT NULL DEFAULT `'[]'`; `category` is a category id, `null` (no category) or `'*'` (all categories). No assignments = no entry starts with it, it can still be inserted by hand; a template in the Trash has none |
 | sort_order | INTEGER | NOT NULL DEFAULT 0 |
 | created_at / updated_at | TEXT | ISO 8601 |
 | deleted_at | TEXT | NULL = active; purged after the retention period (`CLEANUP_TABLES`) |
 
-`core-sigil` is seeded with the three sigil blocks (`sigilBlockSet()` in `lib/blocks/sigil.ts`), assigned to Operations × Sigils; otherwise it is an ordinary row — editable, deletable, reassignable. `templateStore`, not the database, enforces "at most one template per combination" among *active* templates (`assignTemplate`); a restored template comes back without assignments. An `isDefault: false` in older data only offered a template for selection and is dropped by `parseAssignments`. A dangling category id in `assignments` has no foreign key to stop it (see [What foreign keys cannot cover](#what-foreign-keys-cannot-cover)) — `checkIntegrity` reports it.
+`core-sigil` is seeded with the three sigil blocks (`sigilBlockSet()` in `lib/blocks/sigil.ts`), assigned to Operations × Sigils; otherwise it is an ordinary row — editable, deletable, reassignable. `templateStore`, not the database, enforces "at most one template per combination" among *active* templates (`assignTemplate`); deleting a template clears its assignments, so it comes back without them. Older blocks in `content` may still carry `data-block-origin`, `data-block-rev` and `data-template-origin`, which nothing reads. An `isDefault: false` in older data only offered a template for selection and is dropped by `parseAssignments`. A dangling category id in `assignments` has no foreign key to stop it (see [What foreign keys cannot cover](#what-foreign-keys-cannot-cover)) — `checkIntegrity` reports it.
 
 ### languages
 
@@ -469,12 +469,13 @@ Full vault snapshots are exported and imported via Settings → Backup. The code
 
 ### Backup versions
 
-`BACKUP_VERSION` is `"12"`. A build rejects any file newer than itself before touching anything (`migrateBackupPayload` compares numerically — a string compare would think `"10"` older than `"4"`). That is why the version is bumped whenever an older build would otherwise import a file *wrongly* rather than fail: `insertRows` filters every row against `PRAGMA table_info` (to guard against crafted files), so an older build would silently drop a column it doesn't know.
+`BACKUP_VERSION` is `"13"`. A build rejects any file newer than itself before touching anything (`migrateBackupPayload` compares numerically — a string compare would think `"10"` older than `"4"`). That is why the version is bumped whenever an older build would otherwise import a file *wrongly* rather than fail: `insertRows` filters every row against `PRAGMA table_info` (to guard against crafted files), so an older build would silently drop a column it doesn't know.
 
 `migrateBackupPayload` lifts an older file on load; some conversions run later, row by row, before insertion. Each step is an ordered `version < N` test, so a newer file never runs an older step twice.
 
 | Version | Since | What changed | What import does with an older file |
 |---|---|---|---|
+| 13 | v56 | `assignments` without `isDefault`; `block_definitions` without `revision` | Nothing to lift: `parseAssignments` drops what was only offered, and `revision` is not read. An older build would read every assignment as merely offered, so it must refuse |
 | 12 | v51–v53 | altar `settings` JSON; altar items with `updated_at`/`deleted_at`; tag ids | Packs altar columns into `settings` (`altarSettingsJson`); gives items `updated_at = created_at`; `tagNamesToIds` converts entries', templates' and old routines' tag names by the v53 rule ([tags](#tags)) and drops `affected_ids` |
 | 11 | v49 | one `data.entries` array with `type` | A `"11"`+ file is split back into journal/wiki/operation arrays (`splitEntries`; unknown `type` dropped), so the import paths work on three arrays; `entryRowsForInsert` projects them onto `entries`, de-duplicating ids (journal, wiki, operation wins) |
 | 10 | v46 | altars carry `deleted_at` | Nothing; an older build would revive trashed altars, so it must refuse |
@@ -539,7 +540,7 @@ There is no category filter on import — the type ticks (`ImportTypeFilters`) a
 
 **Tags are resolved the same way, never deleted** — `importTagsAndRemap`, before anything else is written. A tag with a local tag's id is that tag; otherwise a case-insensitive name match (`tagNameKey`) maps it onto the local tag — a trashed local namesake is revived if the imported one is live, after its id is stripped from the rows still carrying it (the same rule as typing the name, see [Tags](architecture/modules.md#tags)). Anything left over is inserted with its own id, name trimmed to 100 characters and colour validated; rows without a valid id (`isTagId`) or name are skipped. In entry and template rows, an id the file has no tag row for (Tags unticked) survives only if that tag exists locally.
 
-**Block definitions are added, never replaced or deleted** — `insertBlockDefinitions`, `INSERT OR IGNORE` by id without the merge prefix, since copies in the imported content name their definition by exactly that id. It runs before `doReplace`'s first `DELETE` and normalises every row to the full column set (ids must pass `isDefinitionId`), so a malformed array in a crafted file can neither abort a half-done replace nor slip a partial row past `insertRows`, which takes its column list from the first row. A definition that exists locally (even trashed) keeps its local version.
+**Block definitions are added, never replaced or deleted** — `insertBlockDefinitions`, `INSERT OR IGNORE` by id without the merge prefix, so a block arriving twice stays one. It runs before `doReplace`'s first `DELETE` and normalises every row to the full column set (ids must pass `isDefinitionId`), so a malformed array in a crafted file can neither abort a half-done replace nor slip a partial row past `insertRows`, which takes its column list from the first row. A definition that exists locally (even trashed) keeps its local version.
 
 A definition's prefills need their own remap, since nothing else touches `elements` JSON: `remapDefinitionRows`/`remapDefinitionDefaults` rewrite an image default onto the image's local filename and a link/altar default onto the imported entry — by the merge prefix's new id in `doMerge`, by id-or-title (`resolveImportedTarget`, shared with the `.emerald` chip resolver) in replace and add-vault. A link default that resolves to nothing is dropped, so a fresh copy never starts with a chip into the void.
 

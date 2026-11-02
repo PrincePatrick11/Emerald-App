@@ -279,13 +279,13 @@ interface EmeraldMeta {
    */
   contentLinks?: Array<{ id: string; entryType: string; title: string }>;
   /**
-   * The custom blocks the content carries copies of (since '2'). The
-   * copies work without them — rendering happens from the copy. With them,
-   * the target vault recognizes the origin and offers "Update".
-   * Created by ID on import if they do not exist there.
+   * Custom blocks an older file ('2') brought along. Nothing writes them
+   * any more; on import they are created by ID if they do not exist there,
+   * so that the blocks in such a file are not lost.
    */
   blockDefinitions?: Array<Record<string, unknown>>;
-    newEntryTitle?: string;
+  /** A template: the title new entries get. */
+  newEntryTitle?: string;
   // altar — background_image_data is a stored image filename, so it's routed
   // through `images` like content images. icon_data, thumbnail_data, and item
   // images are already data: URLs (or a plain emoji, for icon) in the DB, so

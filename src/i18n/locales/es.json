@@ -824,7 +824,7 @@
     "uiFontHint": "Fuente de menús, listas y rótulos.",
     "editorFontHint": "Fuente de títulos y texto en las entradas.",
     "exportDbHint": "Guarda el vault como archivo .emeralddb, con las imágenes. Las opciones de abajo deciden qué se incluye.",
-    "includeSettingsHint": "Idioma, apariencia, barra lateral, papelera, emojis, imágenes, reglas de etiquetas y plantillas y copia automática de este vault",
+    "includeSettingsHint": "Idioma, apariencia, barra lateral, papelera, emojis, imágenes, reglas de etiquetas y copia automática de este vault",
     "importDbHint": "Recupera un archivo .emeralddb — como vault nuevo, junto a las entradas existentes o reemplazándolo todo. Las opciones aparecen al elegir un archivo.",
     "storageHint": "Imágenes de la carpeta del vault que ya no usa ninguna entrada. «Buscar» muestra cuánto ocupan, «Eliminar» las borra definitivamente.",
     "updatesDesc": "Comprueba si existe una versión más reciente de Emerald y la instala.",
@@ -1026,53 +1026,17 @@
     "unmappedCount_other": "{{count}} sin equivalencia"
   },
   "emptyState": {
-    "journal": {
-      "title": "Aún no hay entradas",
-      "description": "Registra lo que vives, sueñas y obras. Las entradas nuevas reciben la fase lunar del día.",
-      "action": "Primera entrada"
-    },
-    "wiki": {
-      "title": "Aún no hay artículos",
-      "description": "Reúne saber sobre hierbas, piedras y símbolos."
-    },
-    "tasks": {
-      "title": "Todo hecho",
-      "description": "No hay tareas abiertas. Las nuevas aparecerán aquí."
-    },
-    "operations": {
-      "title": "Aún no hay operaciones",
-      "description": "Planifica rituales con ingredientes, desarrollo y resultado."
-    },
-    "altar": {
-      "title": "Aún no hay altar",
-      "description": "Diseña un altar con un fondo y elementos."
-    },
-    "altarLibrary": {
-      "title": "Aún no hay elementos",
-      "description": "Velas, cristales, símbolos: con elementos construyes tus altares."
-    },
-    "lexicon": {
-      "title": "Aún no hay idiomas",
-      "description": "Crea un idioma y llénalo de palabras y caracteres."
-    },
-    "translate": {
-      "title": "Aún no hay nada que traducir",
-      "description": "Crea primero un idioma; luego este campo traduce con él."
-    },
-    "templates": {
-      "title": "Aún no hay plantillas",
-      "description": "Guarda procesos recurrentes como plantilla."
-    },
-    "blocks": {
-      "title": "Aún no hay bloques",
-      "description": "Piezas que reutilizas en tus entradas."
-    },
-    "tags": {
-      "title": "Aún no hay etiquetas",
-      "description": "Asigna etiquetas al editar una entrada o crea una aquí."
-    },
-    "trash": {
-      "title": "La papelera está vacía"
-    }
+    "journal": { "title": "Aún no hay entradas", "description": "Registra lo que vives, sueñas y obras. Las entradas nuevas reciben la fase lunar del día.", "action": "Primera entrada" },
+    "wiki": { "title": "Aún no hay artículos", "description": "Reúne saber sobre hierbas, piedras y símbolos." },
+    "tasks": { "title": "Todo hecho", "description": "No hay tareas abiertas. Las nuevas aparecerán aquí." },
+    "operations": { "title": "Aún no hay operaciones", "description": "Planifica rituales con ingredientes, desarrollo y resultado." },
+    "altar": { "title": "Aún no hay altar", "description": "Diseña un altar con un fondo y elementos." },
+    "altarLibrary": { "title": "Aún no hay elementos", "description": "Velas, cristales, símbolos: con elementos construyes tus altares." },
+    "lexicon": { "title": "Aún no hay idiomas", "description": "Crea un idioma y llénalo de palabras y caracteres." },
+    "translate": { "title": "Aún no hay nada que traducir", "description": "Crea primero un idioma; luego este campo traduce con él." },
+    "templates": { "title": "Aún no hay plantillas", "description": "Guarda procesos recurrentes como plantilla." },
+    "blocks": { "title": "Aún no hay bloques", "description": "Piezas que reutilizas en tus entradas." },
+    "tags": { "title": "Aún no hay etiquetas", "description": "Asigna etiquetas al editar una entrada o crea una aquí." },
+    "trash": { "title": "La papelera está vacía" }
   }
 }

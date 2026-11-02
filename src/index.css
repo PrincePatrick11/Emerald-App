@@ -2069,7 +2069,7 @@ button.block-altar:hover .block-altar-title {
   font-size: 0.75rem;
 }
 
-/* Assignment table on the templates dashboard: a cell as a quiet choice. */
+/* Assignment table: a cell as a quiet choice. */
 .template-assign-cell {
   display: flex;
   width: 100%;

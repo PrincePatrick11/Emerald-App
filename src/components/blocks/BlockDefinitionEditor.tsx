@@ -132,7 +132,6 @@ export default function BlockDefinitionEditor({ definition, onClose, onDelete, i
           onChange={(v) => patchDisplay({ readOnly: v })}
         />
       </SidebarSection>
-
     </EditSidebarBody>
   );
 

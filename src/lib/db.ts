@@ -1436,6 +1436,8 @@ export const MIGRATIONS: Migration[] = [
       await dropColumnsIfPresent(db, 'block_definitions', ['revision']);
       const rows = await db.select<{ id: string; assignments: string }[]>('SELECT id, assignments FROM templates');
       await db.batch(rows.map((row) => ['UPDATE templates SET assignments=$1 WHERE id=$2', [JSON.stringify(parseAssignments(row.assignments)), row.id]] as const));
+      // A trashed template holds no assignments any more.
+      await db.execute("UPDATE templates SET assignments='[]' WHERE deleted_at IS NOT NULL");
     },
   },
 ];

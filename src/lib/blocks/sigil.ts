@@ -322,14 +322,6 @@ export interface SigilState {
   locked: ReadonlySet<string>;
 }
 
-/** Does a loaded charge lock the block itself or one of its parts? */
-export function blockHoldsLocked(state: SigilState, blockId: string): boolean {
-  if (state.locked.has(blockId)) return true;
-  const prefix = `${blockId}:`;
-  for (const id of state.locked) if (id.startsWith(prefix)) return true;
-  return false;
-}
-
 /**
  * Rewrite the targets of every charge in the block — a charge block itself or
  * the charge parts of a field block. `map` receives each target (block ID or

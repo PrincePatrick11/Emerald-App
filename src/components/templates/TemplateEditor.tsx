@@ -50,7 +50,7 @@ export default function TemplateEditor({ template, onClose, onDelete, isNew }: P
     id: template.id,
     label: (current) => templateLabel(t, current),
     saved: draftOf(template),
-    save: (id, patch) => updateTemplate(id, patch),
+    save: updateTemplate,
     onClose,
     onCancelNew: isNew ? onDelete : undefined,
     logTag: 'TemplateEditor',

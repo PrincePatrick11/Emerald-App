@@ -623,8 +623,8 @@ function assignedCategory(a: unknown): string | null {
  * Removes a category from the assignments of all templates — including those in the
  * trash. `reassignCategoryContent` calls it on permanent deletion of a
  * category; do not call it in addition. Templates have no
- * foreign key that would enforce this, and an assignment pointing nowhere would offer
- * the template in a combination that no longer exists.
+ * foreign key that would enforce this, and an assignment pointing nowhere would apply
+ * the template to a combination that no longer exists.
  */
 export async function dropCategoryFromTemplates(db: Database, categoryId: string): Promise<void> {
   const rows = await db.select<{ id: string; assignments: string | null }[]>(
@@ -642,27 +642,22 @@ export async function dropCategoryFromTemplates(db: Database, categoryId: string
 
 /**
  * Re-attaches the assignments on `from` to `to` — when a category merges into
- * the one of the same name. If a template had both, one assignment remains. A
- * combination that an active template already holds stays with it: active
- * templates go first, and a trashed one needs no check, since it comes back
- * without assignments.
+ * the one of the same name. A combination already held stays with its holder.
  */
 async function moveCategoryInTemplates(db: Database, from: string, to: string): Promise<void> {
-  const rows = await db.select<{ id: string; assignments: string | null; deleted_at: string | null }[]>(
-    'SELECT id, assignments, deleted_at FROM templates ORDER BY deleted_at IS NOT NULL'
-  );
-  const parsed = rows.map((row) => ({ id: row.id, active: !row.deleted_at, assignments: rawAssignments(row.assignments) }));
+  const rows = await db.select<{ id: string; assignments: string | null }[]>('SELECT id, assignments FROM templates');
+  const parsed = rows.map((row) => ({ id: row.id, assignments: rawAssignments(row.assignments) }));
   const entryTypeOf = (a: unknown) => String((a as { entryType?: unknown } | null)?.entryType);
-  const held = new Set(parsed.filter((row) => row.active).flatMap(({ assignments }) =>
+  const held = new Set(parsed.flatMap(({ assignments }) =>
     (assignments ?? []).filter((a) => assignedCategory(a) === to).map(entryTypeOf)));
-  for (const { id, active, assignments } of parsed) {
+  for (const { id, assignments } of parsed) {
     if (!assignments?.some((a) => assignedCategory(a) === from)) continue;
     const next: unknown[] = [];
     for (const a of assignments) {
       if (assignedCategory(a) !== from) { next.push(a); continue; }
       const entryType = entryTypeOf(a);
-      if (active && held.has(entryType)) continue;
-      if (active) held.add(entryType);
+      if (held.has(entryType)) continue;
+      held.add(entryType);
       next.push({ ...(a as object), category: to });
     }
     await db.execute('UPDATE templates SET assignments=$1 WHERE id=$2', [JSON.stringify(next), id]);

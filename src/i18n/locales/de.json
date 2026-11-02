@@ -816,7 +816,7 @@
     "uiFontHint": "Schrift für Menüs, Listen und Beschriftungen.",
     "editorFontHint": "Schrift für Titel und Text in Einträgen.",
     "exportDbHint": "Speichert den Vault als .emeralddb-Datei samt Bildern. Die Auswahl darunter bestimmt, was hineinkommt.",
-    "includeSettingsHint": "Sprache, Aussehen, Seitenleiste, Papierkorb, Emojis, Bilder, Tags- und Vorlagen-Regel sowie das automatische Backup dieses Vaults",
+    "includeSettingsHint": "Sprache, Aussehen, Seitenleiste, Papierkorb, Emojis, Bilder, Tag-Regel sowie das automatische Backup dieses Vaults",
     "importDbHint": "Holt eine .emeralddb-Datei zurück — als neuer Vault, zusätzlich zu den vorhandenen Einträgen oder als Ersatz für alles. Nach der Dateiwahl erscheinen die Optionen.",
     "storageHint": "Bilder im Vault-Ordner, die kein Eintrag mehr benutzt. „Suchen“ zeigt, wie viel Platz sie belegen, „Entfernen“ löscht sie endgültig.",
     "updatesDesc": "Prüft, ob eine neuere Version von Emerald vorliegt, und installiert sie.",
@@ -1026,53 +1026,17 @@
     "unmappedCount_other": "{{count}} ohne Entsprechung"
   },
   "emptyState": {
-    "journal": {
-      "title": "Noch keine Einträge",
-      "description": "Halte fest, was du erlebst, träumst und wirkst. Neue Einträge bekommen die Mondphase des Tages.",
-      "action": "Erster Eintrag"
-    },
-    "wiki": {
-      "title": "Noch keine Artikel",
-      "description": "Sammle Wissen zu Kräutern, Steinen und Symbolen."
-    },
-    "tasks": {
-      "title": "Alles erledigt",
-      "description": "Keine offenen Aufgaben. Neue landen hier."
-    },
-    "operations": {
-      "title": "Noch keine Operationen",
-      "description": "Plane Rituale mit Zutaten, Ablauf und Ergebnis."
-    },
-    "altar": {
-      "title": "Noch kein Altar",
-      "description": "Gestalte einen Altar aus Hintergrund und Elementen."
-    },
-    "altarLibrary": {
-      "title": "Noch keine Elemente",
-      "description": "Kerzen, Kristalle, Symbole – aus Elementen baust du deine Altäre."
-    },
-    "lexicon": {
-      "title": "Noch keine Sprachen",
-      "description": "Leg eine Sprache an und füll sie mit Wörtern und Zeichen."
-    },
-    "translate": {
-      "title": "Noch nichts zu übersetzen",
-      "description": "Leg zuerst eine Sprache an – dann übersetzt dieses Feld damit."
-    },
-    "templates": {
-      "title": "Noch keine Vorlagen",
-      "description": "Speichere wiederkehrende Abläufe als Vorlage."
-    },
-    "blocks": {
-      "title": "Noch keine Blöcke",
-      "description": "Bausteine, die du in Einträgen wiederverwendest."
-    },
-    "tags": {
-      "title": "Noch keine Tags",
-      "description": "Vergib Tags beim Bearbeiten eines Eintrags oder leg hier einen an."
-    },
-    "trash": {
-      "title": "Papierkorb ist leer"
-    }
+    "journal": { "title": "Noch keine Einträge", "description": "Halte fest, was du erlebst, träumst und wirkst. Neue Einträge bekommen die Mondphase des Tages.", "action": "Erster Eintrag" },
+    "wiki": { "title": "Noch keine Artikel", "description": "Sammle Wissen zu Kräutern, Steinen und Symbolen." },
+    "tasks": { "title": "Alles erledigt", "description": "Keine offenen Aufgaben. Neue landen hier." },
+    "operations": { "title": "Noch keine Operationen", "description": "Plane Rituale mit Zutaten, Ablauf und Ergebnis." },
+    "altar": { "title": "Noch kein Altar", "description": "Gestalte einen Altar aus Hintergrund und Elementen." },
+    "altarLibrary": { "title": "Noch keine Elemente", "description": "Kerzen, Kristalle, Symbole – aus Elementen baust du deine Altäre." },
+    "lexicon": { "title": "Noch keine Sprachen", "description": "Leg eine Sprache an und füll sie mit Wörtern und Zeichen." },
+    "translate": { "title": "Noch nichts zu übersetzen", "description": "Leg zuerst eine Sprache an – dann übersetzt dieses Feld damit." },
+    "templates": { "title": "Noch keine Vorlagen", "description": "Speichere wiederkehrende Abläufe als Vorlage." },
+    "blocks": { "title": "Noch keine Blöcke", "description": "Bausteine, die du in Einträgen wiederverwendest." },
+    "tags": { "title": "Noch keine Tags", "description": "Vergib Tags beim Bearbeiten eines Eintrags oder leg hier einen an." },
+    "trash": { "title": "Papierkorb ist leer" }
   }
 }

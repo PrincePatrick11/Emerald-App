@@ -824,7 +824,7 @@
     "uiFontHint": "Police des menus, listes et libellés.",
     "editorFontHint": "Police des titres et du texte des entrées.",
     "exportDbHint": "Enregistre le vault dans un fichier .emeralddb, images comprises. Les choix ci-dessous décident du contenu.",
-    "includeSettingsHint": "Langue, apparence, barre latérale, corbeille, emojis, images, règles d'étiquettes et de modèles et sauvegarde automatique de ce vault",
+    "includeSettingsHint": "Langue, apparence, barre latérale, corbeille, emojis, images, règles d'étiquettes et sauvegarde automatique de ce vault",
     "importDbHint": "Restaure un fichier .emeralddb — comme nouveau vault, en plus des entrées existantes ou en remplaçant tout. Les options apparaissent une fois le fichier choisi.",
     "storageHint": "Images du dossier du vault qu'aucune entrée n'utilise plus. « Rechercher » montre la place occupée, « Supprimer » les efface définitivement.",
     "updatesDesc": "Vérifie s'il existe une version plus récente d'Emerald et l'installe.",
@@ -1026,53 +1026,17 @@
     "unmappedCount_other": "{{count}} sans équivalent"
   },
   "emptyState": {
-    "journal": {
-      "title": "Aucune entrée pour l'instant",
-      "description": "Notez ce que vous vivez, rêvez et accomplissez. Les nouvelles entrées reçoivent la phase lunaire du jour.",
-      "action": "Première entrée"
-    },
-    "wiki": {
-      "title": "Aucun article pour l'instant",
-      "description": "Rassemblez votre savoir sur les herbes, les pierres et les symboles."
-    },
-    "tasks": {
-      "title": "Tout est fait",
-      "description": "Aucune tâche ouverte. Les nouvelles arrivent ici."
-    },
-    "operations": {
-      "title": "Aucune opération pour l'instant",
-      "description": "Planifiez des rituels avec ingrédients, déroulement et résultat."
-    },
-    "altar": {
-      "title": "Aucun autel pour l'instant",
-      "description": "Composez un autel à partir d'un fond et d'éléments."
-    },
-    "altarLibrary": {
-      "title": "Aucun élément pour l'instant",
-      "description": "Bougies, cristaux, symboles : les éléments composent vos autels."
-    },
-    "lexicon": {
-      "title": "Aucune langue pour l'instant",
-      "description": "Créez une langue et remplissez-la de mots et de caractères."
-    },
-    "translate": {
-      "title": "Rien à traduire pour l'instant",
-      "description": "Créez d'abord une langue, puis ce champ traduira avec elle."
-    },
-    "templates": {
-      "title": "Aucun modèle pour l'instant",
-      "description": "Enregistrez des déroulements récurrents comme modèle."
-    },
-    "blocks": {
-      "title": "Aucun bloc pour l'instant",
-      "description": "Des briques que vous réutilisez dans vos entrées."
-    },
-    "tags": {
-      "title": "Aucun tag pour l'instant",
-      "description": "Attribuez des tags en modifiant une entrée, ou créez-en un ici."
-    },
-    "trash": {
-      "title": "La corbeille est vide"
-    }
+    "journal": { "title": "Aucune entrée pour l'instant", "description": "Notez ce que vous vivez, rêvez et accomplissez. Les nouvelles entrées reçoivent la phase lunaire du jour.", "action": "Première entrée" },
+    "wiki": { "title": "Aucun article pour l'instant", "description": "Rassemblez votre savoir sur les herbes, les pierres et les symboles." },
+    "tasks": { "title": "Tout est fait", "description": "Aucune tâche ouverte. Les nouvelles arrivent ici." },
+    "operations": { "title": "Aucune opération pour l'instant", "description": "Planifiez des rituels avec ingrédients, déroulement et résultat." },
+    "altar": { "title": "Aucun autel pour l'instant", "description": "Composez un autel à partir d'un fond et d'éléments." },
+    "altarLibrary": { "title": "Aucun élément pour l'instant", "description": "Bougies, cristaux, symboles : les éléments composent vos autels." },
+    "lexicon": { "title": "Aucune langue pour l'instant", "description": "Créez une langue et remplissez-la de mots et de caractères." },
+    "translate": { "title": "Rien à traduire pour l'instant", "description": "Créez d'abord une langue, puis ce champ traduira avec elle." },
+    "templates": { "title": "Aucun modèle pour l'instant", "description": "Enregistrez des déroulements récurrents comme modèle." },
+    "blocks": { "title": "Aucun bloc pour l'instant", "description": "Des briques que vous réutilisez dans vos entrées." },
+    "tags": { "title": "Aucun tag pour l'instant", "description": "Attribuez des tags en modifiant une entrée, ou créez-en un ici." },
+    "trash": { "title": "La corbeille est vide" }
   }
 }

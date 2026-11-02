@@ -29,7 +29,7 @@ writeFileSync(
    export { instantiateDefinition, parseDefinitionElements, parseDefinitionDisplay, remapDefinitionDefaults, definitionImageRefs } from '${root}/src/lib/blocks/definitions';
    export { entryBlockSummary } from '${root}/src/lib/blocks/entrySummary';
    export { withLegacyStatus, statusDefinition, hasLegacyStatus, convertLegacyStatusRows, STATUS_DEFINITION_ID } from '${root}/src/lib/blocks/legacyStatus';
-   export { extractUniqueLetters, parseSigilCalc, serializeSigilCalc, createSigilCalcBlock, createSigilCanvasBlock, createSigilChargeBlock, parseSigilCharge, serializeSigilCharge, sigilState, withoutConcealed, sigilImage, withSigilImage, letterList, sigilUnits, sigilPartBlock, sigilPartId, withSigilPart, blockHoldsLocked, withRenamedPartTargets } from '${root}/src/lib/blocks/sigil';
+   export { extractUniqueLetters, parseSigilCalc, serializeSigilCalc, createSigilCalcBlock, createSigilCanvasBlock, createSigilChargeBlock, parseSigilCharge, serializeSigilCharge, sigilState, withoutConcealed, sigilImage, withSigilImage, letterList, sigilUnits, sigilPartBlock, sigilPartId, withSigilPart, withRenamedPartTargets } from '${root}/src/lib/blocks/sigil';
    export { renderBlocksForExport } from '${root}/src/lib/blocks/exportRender';
    export { parseAssignments, resolveAssignedTemplate, instantiateTemplateBlocks, isContentEmpty, templateStart, mergeTemplateTags, assignedTemplateAt, areBlocksEmpty, fieldsWithTemplate, fieldsWithoutTemplate } from '${root}/src/lib/blocks/templates';
    export { internalLinkChipHtml } from '${root}/src/lib/internalLinkHtml';
@@ -61,7 +61,7 @@ const {
   extractUniqueLetters, parseSigilCalc, serializeSigilCalc, createSigilCalcBlock, createSigilCanvasBlock,
   createSigilChargeBlock, parseSigilCharge, serializeSigilCharge, sigilState, withoutConcealed,
   sigilImage, withSigilImage, letterList, renderBlocksForExport,
-  sigilUnits, sigilPartBlock, sigilPartId, withSigilPart, blockHoldsLocked,
+  sigilUnits, sigilPartBlock, sigilPartId, withSigilPart,
   remapDefinitionDefaults, definitionImageRefs, withRenamedPartTargets,
   parseAssignments, resolveAssignedTemplate, instantiateTemplateBlocks, isContentEmpty,
   templateStart, mergeTemplateTags, assignedTemplateAt, areBlocksEmpty,
@@ -351,9 +351,6 @@ console.log('\n4d. Custom blocks: copies\n');
 
   const filled = serializeFields(copy, { ...copyModel, values: { 'e-date': '2026-09-10', 'e-result': 'gut' } }, text);
   const content = serializeBlocks([createTextBlock('<p>a</p>'), filled, createFieldsBlock('number')]);
-  const edited = parseDefinitionElements(JSON.stringify([...def.elements, { id: 'e-new', kind: 'toggle', label: 'Neu' }]));
-  check('a changed definition leaves a copy as it is',
-    edited.length === 3 && parseFields(parseBlocks(content)[1]).elements.length === 2);
   check('a field archived by an earlier version is gone from the definition',
     parseDefinitionElements(JSON.stringify([{ id: 'a', kind: 'date', label: 'A', archived: true }, { id: 'b', kind: 'date', label: 'B' }])).map((e) => e.id).join() === 'b');
   check('a copy from before keeps working with its old markers',
@@ -634,7 +631,7 @@ console.log('\n4h. Sigils as parts of custom blocks\n');
   const before = sigilState(back, '2029-12-31');
   check('a loaded charge as a part hides and locks the parts, locks the entry',
     before.concealed.has(sigilPartId(block.id, 'calc')) && before.concealed.has(sigilPartId(block.id, 'draw'))
-      && before.lockEntry && blockHoldsLocked(before, block.id) && before.revealDate === '2030-01-01', before);
+      && before.lockEntry && before.revealDate === '2030-01-01', before);
   const content = serializeBlocks(back);
   const hidden = withoutConcealed(content, '2029-12-31');
   check('search and .emerald do not see hidden parts — the rest of the block stays',
@@ -730,7 +727,7 @@ console.log('\n5. What is derived from the content sees through the blocks\n');
   check('extractInternalLinks finds chips in wrapped text blocks', links.length === 1 && links[0].entryType === 'wiki', links);
 }
 
-console.log('\n6. Templates: assignment, default, insertion\n');
+console.log('\n6. Templates: assignment, insertion\n');
 {
   const assignments = parseAssignments(JSON.stringify([
     { entryType: 'journal', category: 'ritual', isDefault: true },

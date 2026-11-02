@@ -16,8 +16,7 @@ export type TemplateDraft = Required<TemplatePatch>;
 /**
  * An open draft: the state on opening (`base`) and the edit
  * (`draft`). "Done" saves only what has changed relative to `base` —
- * whatever other places have written in the meantime (a renamed tag, a
- * star that another template took over) stays in place.
+ * whatever other places have written in the meantime (a renamed tag) stays in place.
  */
 export interface DraftEntry<T> {
   base: T;

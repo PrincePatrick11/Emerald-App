@@ -11,8 +11,8 @@ interface Options<T extends { name: string }> {
   label: (draft: T) => string;
   /** The saved state, mapped onto the draft's fields. */
   saved: T;
-  /** Saves the changed fields — exactly those, nothing else. `base` is the state when opened. */
-  save: (id: string, patch: Partial<T>, base: T) => Promise<unknown>;
+  /** Saves the changed fields — exactly those, nothing else. */
+  save: (id: string, patch: Partial<T>) => Promise<unknown>;
   /** Back to the list. */
   onClose: () => void;
   /**
@@ -76,7 +76,7 @@ export function useDraftPage<T extends { name: string }>({ store, viewType, id, 
       if (dirty) {
         const changes: Partial<T> = {};
         for (const key of changed) changes[key] = draft[key];
-        await save(id, changes, base);
+        await save(id, changes);
       }
     } catch (err) {
       // Stay on the page: the draft is not saved.
@@ -111,5 +111,5 @@ export function useDraftPage<T extends { name: string }>({ store, viewType, id, 
     return () => useLeaveGuardStore.getState().clearGuard(key);
   }, [viewType, id, store]);
 
-  return { draft, setDraft, patch, dirty, busy, setBusy, finish, leave, cancel };
+  return { draft, setDraft, patch, dirty, busy, finish, leave, cancel };
 }

@@ -6,8 +6,8 @@
  *
  * Per combination (entry kind × category) at most one active template is
  * assigned. This store enforces that, not the database: `assignTemplate` takes
- * the combination from whoever held it. A template from the trash comes back
- * without assignments.
+ * the combination from whoever held it. Deleting a template clears its assignments,
+ * so it comes back from the trash without them.
  *
  * Import rule as in `blockDefinitionStore`: no content stores — they
  * conversely import this one, to apply a template on creation.
@@ -23,7 +23,7 @@ import { fromRow, type DbRow } from '../lib/row';
 import { serialized, serialKey } from '../lib/serialize';
 import { insertTemplateRow, nextTemplateSortOrder } from '../lib/templateRows';
 import {
-  DEFAULT_TEMPLATE_ICON, resolveAssignedTemplate, templateStart, templateToRow, assignedCategoryId,
+  DEFAULT_TEMPLATE_ICON, matches, resolveAssignedTemplate, templateStart, templateToRow, assignedCategoryId,
   type EntryStart, type Template, type TemplateAssignment, type TemplateEntryType,
 } from '../lib/blocks/templates';
 import i18n from '../i18n';
@@ -47,7 +47,7 @@ interface TemplateState {
    */
   assignTemplate: (entryType: TemplateEntryType, category: string | null, templateId: string | null) => Promise<void>;
   duplicateTemplate: (id: string) => Promise<Template | undefined>;
-  /** Soft delete. Entries from this template stay as they are. */
+  /** Soft delete, without assignments. Entries from this template stay as they are. */
   deleteTemplate: (id: string) => Promise<void>;
   restoreTemplate: (id: string) => Promise<void>;
   permanentlyDeleteTemplate: (id: string) => Promise<void>;
@@ -112,11 +112,10 @@ export const useTemplateStore = create<TemplateState>((set, get) => ({
   }),
 
   assignTemplate: (entryType, category, templateId) => serialized(WRITE_KEY, async () => {
-    const isHere = (a: TemplateAssignment) => a.entryType === entryType && a.category === category;
-    const changed = get().templates.flatMap((template) => {
-      const others = template.assignments.filter((a) => !isHere(a));
-      const assignments = template.id === templateId ? [...others, { entryType, category }] : others;
-      return assignments.length === template.assignments.length && template.id !== templateId ? [] : [{ ...template, assignments }];
+    const holdsIt = (t: Template) => t.assignments.some((a) => matches(a, entryType, category));
+    const changed = get().templates.flatMap((t): Template[] => {
+      if (t.id === templateId) return holdsIt(t) ? [] : [{ ...t, assignments: [...t.assignments, { entryType, category }] }];
+      return holdsIt(t) ? [{ ...t, assignments: t.assignments.filter((a) => !matches(a, entryType, category)) }] : [];
     });
     const db = await getDb();
     await db.batch(changed.map((t) => ['UPDATE templates SET assignments=$1 WHERE id=$2', [templateToRow(t).assignments, t.id]] as const));
@@ -137,7 +136,7 @@ export const useTemplateStore = create<TemplateState>((set, get) => ({
 
   deleteTemplate: (id) => serialized(WRITE_KEY, async () => {
     const db = await getDb();
-    await db.execute('UPDATE templates SET deleted_at=$1 WHERE id=$2', [nowIso(), id]);
+    await db.execute("UPDATE templates SET deleted_at=$1, assignments='[]' WHERE id=$2", [nowIso(), id]);
     set((s) => ({ templates: s.templates.filter((t) => t.id !== id) }));
   }),
 
@@ -145,7 +144,7 @@ export const useTemplateStore = create<TemplateState>((set, get) => ({
     const db = await getDb();
     // To the end of the list: the old slot may have been taken in the meantime.
     await db.execute(
-      "UPDATE templates SET deleted_at=NULL, sort_order=$1, assignments='[]' WHERE id=$2",
+      'UPDATE templates SET deleted_at=NULL, sort_order=$1 WHERE id=$2',
       [await nextTemplateSortOrder(db), id]
     );
     set({ templates: await selectActive(db) });

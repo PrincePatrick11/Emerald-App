@@ -148,6 +148,8 @@ type Row = Record<string, any>;
  * `data.lexiconEntries`, '10' = since v46 altars carry `deleted_at`, '11' =
  * since v49 journal, wiki and operations are in one `data.entries`
  * array, each row with `type` and without the columns that no longer exist,
+ * '13' = since v56 `assignments` carry no `isDefault` and `block_definitions` no `revision`;
+ * an older build would read every assignment as merely offered.
  * '12' = since v51 altars carry their appearance as a JSON column `settings`,
  * since v52 altar items `updated_at`/`deleted_at`, and since v53 entries and
  * templates tag IDs instead of tag names.
@@ -172,7 +174,7 @@ type Row = Record<string, any>;
  * "newer than me" check (`backup.version > BACKUP_VERSION`) honestly rejects the file
  * before anything happens.
  */
-const BACKUP_VERSION = '12' as const;
+const BACKUP_VERSION = '13' as const;
 
 /** The four category arrays of backups up to version 3. */
 interface LegacyCategoryArrays {
@@ -495,7 +497,7 @@ function presentEntryTypes(d: BackupFile['data']): EntryType[] {
 }
 
 interface BackupFile {
-  version: '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9' | '10' | '11' | '12';
+  version: '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9' | '10' | '11' | '12' | '13';
   /** The version the file was written with — `migrateBackupPayload` sets `version` to the current one. */
   sourceVersion?: number;
   type: 'backup';
@@ -751,8 +753,7 @@ export async function buildBackup(options: BackupOptions): Promise<BackupFile> {
   }
 
   // ── Custom blocks ────────────────────────────────────────────────────────
-  // The templates of the copies in the content. The copies manage without them, but
-  // without a definition there is no "Update" anymore. All of it, trash included —
+  // The vault's own blocks. All of it, trash included —
   // one list, no date question.
   if (options.includeJournal || options.includeWiki || options.includeOperations) {
     data.blockDefinitions = await db.select<Row[]>(`SELECT * FROM block_definitions`);
@@ -1235,7 +1236,7 @@ async function liftLegacySigilRows(operations: Row[], wikiArticles: Row[], backu
  * The "Status" definition by which old operation rows are rewritten:
  * the vault's (also in the trash), otherwise the file's — as in
  * migration v41. Otherwise the new copies would not match the "Status" that exists
- * in the vault afterwards, and would immediately show "Newer version".
+ * in the vault afterwards.
  */
 async function statusDefinitionForImport(
   db: Awaited<ReturnType<typeof getDb>>,
@@ -1715,7 +1716,7 @@ async function doMerge(db: Awaited<ReturnType<typeof getDb>>, backup: BackupFile
 
   // Categories and tags are already resolved (resolveImportedCategories,
   // importTagsAndRemap above).
-  // Without prefix: the copies in the content name their definition by exactly this ID.
+  // Without prefix, so that a block arriving twice stays one.
   // Link defaults point to the renamed entries, like the chips in the content.
   await insertBlockDefinitions(db, await withStatusDefinition(
     db, remapDefinitionRows(d.blockDefinitions, pathMap, (t) => ({ id: String(remapId(t.id)), label: t.label })),

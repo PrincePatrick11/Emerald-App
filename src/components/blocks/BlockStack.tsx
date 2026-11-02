@@ -113,7 +113,7 @@ export default function BlockStack({
   onChangeRef.current = onChange;
   const stackRef = useRef<HTMLDivElement>(null);
   // Every change dismisses the "Template applied" notice; Undo would otherwise
-  // also empty whatever arose afterwards. Whoever inserts a template shows it again afterwards.
+  // also empty whatever arose afterwards.
   const emit = useCallback(() => {
     useTemplateNoticeStore.getState().dismiss(entryId);
     onChangeRef.current(serializeBlocks(blocksRef.current));
