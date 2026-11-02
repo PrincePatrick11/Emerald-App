@@ -121,6 +121,25 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
     @apply flex items-center justify-center w-[30px] h-[30px] p-0 rounded-md;
   }
 
+  /* Drag handle of a sidebar: a quiet line in the frame's own neutrals, not a
+     coloured strip. It stops short of the sheet's rounded corners. */
+  .sidebar-resize-handle::after {
+    content: '';
+    position: absolute;
+    top: var(--sheet-radius);
+    bottom: var(--sheet-radius);
+    left: 1px;
+    width: 2px;
+    border-radius: 9999px;
+    background: transparent;
+    transition: background-color 150ms ease-out;
+  }
+
+  .sidebar-resize-handle:hover::after,
+  .sidebar-resize-handle:active::after {
+    background: var(--field-border-hover);
+  }
+
   /* The button area follows the width of the left sidebar —
      same duration as .app-sidebar-animated. */
   .titlebar-follow-animated {
