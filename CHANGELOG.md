@@ -10,6 +10,7 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - **Altars have their own icon,** a candle on a table, instead of a flame.
 
 ### Changed
+- **Every dashboard's main button reads the same:** "New entry", "New altar", "New category" and so on.
 - **Templates and blocks are simply copied.** What a template or block puts into an entry stays there unchanged: "Newer version", "Update block", "Update all", usage counts and "also remove from entries" are gone, and a copy's own settings can be edited in the entry. A removed field is simply gone from the block.
 - **One table for template assignments.** Below the template list, each cell picks the template new entries of that combination start with and applies at once. A template's page opens the same table, the "offered" level is gone, and deleting a template clears its assignments, Undo included. Older "offered" assignments are removed.
 - **Inserting a template asks nothing.** "Insert template" lists all templates; the blocks go below the content, an entry without a title takes the template's, and its tags are added. The "Default template" setting, the suggestions in an empty entry and "Other template" are gone, so a vault that had it switched off now fills new entries from its assignments; a template's assignments no longer travel in `.emerald` files, and `.emerald` files no longer carry block definitions.

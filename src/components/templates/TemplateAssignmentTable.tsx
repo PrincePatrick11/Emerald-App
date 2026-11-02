@@ -1,7 +1,7 @@
 import { useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Check, ChevronDown, CircleDashed, CornerDownRight, FilePlus, Layers, SlidersHorizontal } from 'lucide-react';
-import { GroupDivider } from '../ui/Dashboard';
+import DashboardSection from '../ui/DashboardSection';
 import Dropdown from '../ui/Dropdown';
 import Modal from '../ui/Modal';
 import Button from '../ui/Button';
@@ -9,14 +9,10 @@ import { EditPropertyRow } from '../sidebar/fields/EditProperties';
 import BlockGlyph from '../blocks/BlockGlyph';
 import { useTemplateStore } from '../../store/templateStore';
 import { useCategoryStore } from '../../store/categoryStore';
-import { usePersistedFlag } from '../../hooks/usePersistedFlag';
 import { templateLabel } from '../../lib/blocks/blockAttrs';
 import { categoryLabel } from '../../lib/categories';
 import { MODULES, viewTypeForEntryType } from '../../lib/modules';
 import { ALL_CATEGORIES, assignedTemplateAt, TEMPLATE_ENTRY_TYPES, type TemplateEntryType } from '../../lib/blocks/templates';
-
-/** The section as a whole is a setting, like the altar library. The key keeps the state of the earlier overview. */
-const COLLAPSED_KEY = 'templates-defaults-collapsed';
 
 /** The entry types with categories: the columns of the table. */
 const CATEGORY_TYPES = TEMPLATE_ENTRY_TYPES.filter((type) => type !== 'journal');
@@ -154,26 +150,18 @@ function AssignmentGrid({ templateId }: { templateId?: string }) {
   );
 }
 
-/** The table below the template list on the dashboard. */
+/** The table below the template list on the dashboard. The key keeps the state of the earlier overview. */
 export default function TemplateAssignmentTable() {
   const { t } = useTranslation();
   const hasTemplates = useTemplateStore((s) => s.templates.length > 0);
-  const [collapsed, toggle] = usePersistedFlag(COLLAPSED_KEY);
-
   if (!hasTemplates) return null;
-
   return (
-    <div className="mt-8">
-      <GroupDivider label={t('templates.overview.title')} collapsed={collapsed} onToggleCollapse={toggle} />
-      {!collapsed && (
-        <>
-          <p className="mb-3 text-xs text-muted">{t('templates.overview.hint')}</p>
-          <div className="panel px-4">
-            <AssignmentGrid />
-          </div>
-        </>
-      )}
-    </div>
+    <DashboardSection storageKey="templates-defaults-collapsed" label={t('templates.overview.title')}>
+      <p className="mb-3 text-xs text-muted">{t('templates.overview.hint')}</p>
+      <div className="panel px-4">
+        <AssignmentGrid />
+      </div>
+    </DashboardSection>
   );
 }
 

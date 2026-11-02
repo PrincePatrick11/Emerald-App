@@ -172,20 +172,6 @@ const DEFAULT_WIDE_CARDS_CLASSNAME = 'grid grid-cols-1 gap-3';
 const DEFAULT_LIST_CLASSNAME = 'space-y-1.5';
 const DEFAULT_GROUPS_CLASSNAME = 'space-y-6';
 
-/**
- * The old name of the one heading, for the template and block sections
- * that still import it; everything else uses `CollapsibleGroupHeader` directly.
- */
-export function GroupDivider({
-  label, collapsed, onToggleCollapse,
-}: {
-  label: string;
-  collapsed?: boolean;
-  onToggleCollapse?: () => void;
-}) {
-  return <CollapsibleGroupHeader label={label} collapsed={collapsed} onToggleCollapse={onToggleCollapse} />;
-}
-
 export default function Dashboard<T>({
   title,
   headerLeft,

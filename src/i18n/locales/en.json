@@ -24,7 +24,7 @@
     "acceptedImageFormats": "PNG, JPEG, GIF, WebP, SVG"
   },
   "categories": {
-    "add": "Add category",
+    "add": "New category",
     "name": "Category name…",
     "uncategorized": "Uncategorized",
     "nameTaken": "This category already exists",
@@ -114,7 +114,7 @@
     "showMore_other": "Show {{count}} more"
   },
   "operations": {
-    "new": "New Operation",
+    "new": "New operation",
     "untitled": "Untitled Operation",
     "placeholder": "Document your operation...",
     "all": "All",
@@ -230,7 +230,7 @@
   },
   "journal": {
     "title": "Journal",
-    "newEntry": "New Entry",
+    "newEntry": "New entry",
     "untitled": "Untitled Entry",
     "placeholder": "Begin your record...",
     "noPhase": "No moon phase"
@@ -262,7 +262,7 @@
   },
   "wiki": {
     "title": "Wiki",
-    "newArticle": "New Article",
+    "newArticle": "New article",
     "untitled": "Untitled Article",
     "placeholder": "Document your knowledge...",
     "categories": {
@@ -920,7 +920,7 @@
     "cancel": "Cancel"
   },
   "tasks": {
-    "newTask": "New Task",
+    "newTask": "New task",
     "filter": {
       "priority": "Priority"
     },

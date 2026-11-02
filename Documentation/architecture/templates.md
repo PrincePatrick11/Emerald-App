@@ -28,7 +28,7 @@ Creation is the only moment an assignment applies by itself. Changing an entry's
 
 ### The dashboard and the template page
 
-`TemplatesView` is a `Dashboard` of active templates under a collapsible `GroupDivider`, with view and sort in `uiStore.templatesPrefs` (a `ListPrefs` field, per vault — see [Tabs and Workspace State](navigation.md#tabs-and-workspace-state)). A row shows icon, name and an "Unsaved" marker; clicking opens `{ type: 'templates', id }`.
+`TemplatesView` is a `Dashboard` of active templates under a collapsible `CollapsibleGroupHeader`, with view and sort in `uiStore.templatesPrefs` (a `ListPrefs` field, per vault — see [Tabs and Workspace State](navigation.md#tabs-and-workspace-state)). A row shows icon, name and an "Unsaved" marker; clicking opens `{ type: 'templates', id }`.
 
 `TemplateEditor` renders that page on `LibraryPageFrame`, the shell it shares with `BlockDefinitionEditor` (back link, "Unsaved" marker, name-as-title input, `EditActionBar`/ `SidebarColumn` portalled into the right sidebar). Its draft lifecycle is `useDraftPage`:
 

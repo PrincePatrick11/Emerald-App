@@ -4,16 +4,15 @@ import { Copy, FileDown, Trash2 } from 'lucide-react';
 import { useTemplateStore } from '../../store/templateStore';
 import { useTemplateDraftStore } from '../../store/draftStore';
 import { useUIStore } from '../../store/uiStore';
-import { useUndoStore } from '../../store/undoStore';
 import { AUX_VIEWS } from '../../lib/modules';
-import { generateId } from '../../lib/helpers';
 import { sortItems } from '../../lib/sortItems';
 import { isCardView } from '../../lib/viewMode';
 import { groupByMonth } from '../../lib/groupBy';
 import { usePersistedFlag } from '../../hooks/usePersistedFlag';
 import { templateLabel } from '../../lib/blocks/blockAttrs';
 import type { Template } from '../../lib/blocks/templates';
-import Dashboard, { GroupDivider } from '../ui/Dashboard';
+import Dashboard from '../ui/Dashboard';
+import CollapsibleGroupHeader from '../ui/CollapsibleGroupHeader';
 import DashboardItem, { RowSymbol } from '../ui/DashboardItem';
 import ContextMenu from '../ui/ContextMenu';
 import { useOpenInNewTabAction } from '../../hooks/useOpenInNewTabAction';
@@ -22,6 +21,7 @@ import TemplateEditor from '../templates/TemplateEditor';
 import TemplateAssignmentTable from '../templates/TemplateAssignmentTable';
 import { useSessionState } from '../../store/sessionStore';
 import { createItem } from '../../lib/createItem';
+import { useLibraryItemRemove } from '../../hooks/useLibraryItemRemove';
 
 /**
  * The rail view "Templates", built like "Blocks": the list of templates in the
@@ -31,14 +31,12 @@ import { createItem } from '../../lib/createItem';
  * undo) — entries created from it stay as they are.
  */
 export default function TemplatesView() {
-  const { t } = useTranslation();
   const templates = useTemplateStore((s) => s.templates);
   const deleteTemplate = useTemplateStore((s) => s.deleteTemplate);
   const restoreTemplate = useTemplateStore((s) => s.restoreTemplate);
   const activeView = useUIStore((s) => s.activeView);
   const setActiveView = useUIStore((s) => s.setActiveView);
   const clearDraft = useTemplateDraftStore((s) => s.clearDraft);
-  const pushUndo = useUndoStore((s) => s.push);
 
   // An id without a template (deleted, another vault in the remembered tab) falls back to the list.
   const selected = activeView.id ? templates.find((tpl) => tpl.id === activeView.id) ?? null : null;
@@ -47,35 +45,20 @@ export default function TemplatesView() {
 
   const create = () => createItem('templates');
 
-  const remove = async (template: Template) => {
-    try {
-      await deleteTemplate(template.id);
-    } catch (err) {
-      // Nothing lost: template and draft stay where they were.
-      console.error('[TemplatesView] deleting the template failed:', err);
-      return;
-    }
-    clearDraft(template.id);
-    // The state after deleting, not the one at render time: whoever discarded
-    // via the question on leaving has meanwhile gone elsewhere and stays there.
-    if (useUIStore.getState().activeView.id === template.id) backToList();
-    pushUndo({
-      id: generateId(),
-      description: t('undo.templateDeleted'),
-      undo: () => restoreTemplate(template.id),
-    });
-  };
+  const remove = useLibraryItemRemove({
+    viewType: 'templates', remove: deleteTemplate, restore: restoreTemplate, clearDraft, undoKey: 'undo.templateDeleted', logTag: 'TemplatesView',
+  });
 
   return selected ? (
     <TemplateEditor
       key={selected.id}
       template={selected}
       onClose={backToList}
-      onDelete={() => void remove(selected)}
+      onDelete={() => void remove(selected.id)}
       isNew={activeView.isNew}
     />
   ) : (
-    <TemplateList onCreate={() => void create()} onDelete={(tpl) => void remove(tpl)} />
+    <TemplateList onCreate={() => void create()} onDelete={(tpl) => void remove(tpl.id)} />
   );
 }
 
@@ -183,7 +166,7 @@ function TemplateList({ onCreate, onDelete }: {
       }}
       hasNoResults={!collapsed && filtered.length === 0}
       contentHeader={
-        <GroupDivider
+        <CollapsibleGroupHeader
           label={t('nav.templates')}
           collapsed={collapsed}
           onToggleCollapse={toggleCollapsed}

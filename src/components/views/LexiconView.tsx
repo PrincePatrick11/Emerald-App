@@ -3,9 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { Copy, Trash2 } from 'lucide-react';
 import { useLexiconStore } from '../../store/lexiconStore';
 import { useUIStore } from '../../store/uiStore';
-import { useUndoStore } from '../../store/undoStore';
 import { AUX_VIEWS } from '../../lib/modules';
-import { generateId } from '../../lib/helpers';
 import { sortItems } from '../../lib/sortItems';
 import { isCardView } from '../../lib/viewMode';
 import { groupByMonth } from '../../lib/groupBy';
@@ -21,6 +19,7 @@ import TranslatePanel from '../lexicon/TranslatePanel';
 import type { Language } from '../../types';
 import { useSessionState } from '../../store/sessionStore';
 import { createItem } from '../../lib/createItem';
+import { useLibraryItemRemove } from '../../hooks/useLibraryItemRemove';
 
 /**
  * The rail view "Lexicon", built like "Templates": the languages in the
@@ -33,13 +32,11 @@ import { createItem } from '../../lib/createItem';
  * stays attached to it and comes back with it.
  */
 export default function LexiconView() {
-  const { t } = useTranslation();
   const languages = useLexiconStore((s) => s.languages);
   const deleteLanguage = useLexiconStore((s) => s.deleteLanguage);
   const restoreLanguage = useLexiconStore((s) => s.restoreLanguage);
   const activeView = useUIStore((s) => s.activeView);
   const setActiveView = useUIStore((s) => s.setActiveView);
-  const pushUndo = useUndoStore((s) => s.push);
 
   // An id without a language (deleted, another vault in the remembered tab) falls back to the list.
   const selected = activeView.id ? languages.find((l) => l.id === activeView.id) ?? null : null;
@@ -48,31 +45,19 @@ export default function LexiconView() {
 
   const create = () => createItem('lexicon');
 
-  const remove = async (language: Language) => {
-    try {
-      await deleteLanguage(language.id);
-    } catch (err) {
-      // Nothing lost: the language stays where it was.
-      console.error('[LexiconView] deleting the language failed:', err);
-      return;
-    }
-    if (activeView.id === language.id) backToList();
-    pushUndo({
-      id: generateId(),
-      description: t('undo.languageDeleted'),
-      undo: () => restoreLanguage(language.id),
-    });
-  };
+  const remove = useLibraryItemRemove({
+    viewType: 'lexicon', remove: deleteLanguage, restore: restoreLanguage, undoKey: 'undo.languageDeleted', logTag: 'LexiconView',
+  });
 
   return selected ? (
     <LanguagePage
       key={selected.id}
       language={selected}
       onClose={backToList}
-      onDelete={() => void remove(selected)}
+      onDelete={() => void remove(selected.id)}
     />
   ) : (
-    <LanguageList onCreate={() => void create()} onDelete={(language) => void remove(language)} />
+    <LanguageList onCreate={() => void create()} onDelete={(language) => void remove(language.id)} />
   );
 }
 

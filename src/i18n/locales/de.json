@@ -24,7 +24,7 @@
     "acceptedImageFormats": "PNG, JPEG, GIF, WebP, SVG"
   },
   "categories": {
-    "add": "Kategorie hinzufügen",
+    "add": "Neue Kategorie",
     "name": "Kategoriename…",
     "uncategorized": "Ohne Kategorie",
     "nameTaken": "Diese Kategorie gibt es schon",

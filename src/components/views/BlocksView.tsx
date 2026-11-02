@@ -4,8 +4,6 @@ import { Trash2 } from 'lucide-react';
 import { useBlockDefinitionStore } from '../../store/blockDefinitionStore';
 import { useUIStore } from '../../store/uiStore';
 import { useBlockDraftStore } from '../../store/draftStore';
-import { useUndoStore } from '../../store/undoStore';
-import { generateId } from '../../lib/helpers';
 import { AUX_VIEWS } from '../../lib/modules';
 import { definitionLabel } from '../../lib/blocks/blockAttrs';
 import type { BlockDefinition } from '../../lib/blocks/definitions';
@@ -14,7 +12,8 @@ import { sortItems } from '../../lib/sortItems';
 import { isCardView } from '../../lib/viewMode';
 import { groupByMonth } from '../../lib/groupBy';
 import { usePersistedFlag } from '../../hooks/usePersistedFlag';
-import Dashboard, { GroupDivider } from '../ui/Dashboard';
+import Dashboard from '../ui/Dashboard';
+import CollapsibleGroupHeader from '../ui/CollapsibleGroupHeader';
 import DashboardItem, { ROW_GEOMETRY_CLASS, RowContent, RowSymbol } from '../ui/DashboardItem';
 import ContextMenu from '../ui/ContextMenu';
 import { useOpenInNewTabAction } from '../../hooks/useOpenInNewTabAction';
@@ -22,6 +21,8 @@ import BlockGlyph from '../blocks/BlockGlyph';
 import BlockDefinitionEditor from '../blocks/BlockDefinitionEditor';
 import { useSessionState } from '../../store/sessionStore';
 import { createItem } from '../../lib/createItem';
+import { useLibraryItemRemove } from '../../hooks/useLibraryItemRemove';
+import DashboardSection from '../ui/DashboardSection';
 
 /**
  * The rail view "Blocks", built like the other dashboards: the list of
@@ -32,11 +33,9 @@ import { createItem } from '../../lib/createItem';
  * entry via "Add block".
  */
 export default function BlocksView() {
-  const { t } = useTranslation();
   const definitions = useBlockDefinitionStore((s) => s.definitions);
   const deleteDefinition = useBlockDefinitionStore((s) => s.deleteDefinition);
   const restoreDefinition = useBlockDefinitionStore((s) => s.restoreDefinition);
-  const pushUndo = useUndoStore((s) => s.push);
   const activeView = useUIStore((s) => s.activeView);
   const setActiveView = useUIStore((s) => s.setActiveView);
   const clearDraft = useBlockDraftStore((s) => s.clearDraft);
@@ -47,35 +46,21 @@ export default function BlocksView() {
 
   const create = () => createItem('blocks');
 
-  /** To the trash without confirmation like everything else, with undo. Inserted copies stay. */
-  const remove = async (def: BlockDefinition) => {
-    try {
-      await deleteDefinition(def.id);
-    } catch (err) {
-      // Nothing lost: block and draft stay where they were.
-      console.error('[BlocksView] deleting the block failed:', err);
-      return;
-    }
-    clearDraft(def.id);
-    // The state after deleting — see TemplatesView.remove.
-    if (useUIStore.getState().activeView.id === def.id) backToList();
-    pushUndo({
-      id: generateId(),
-      description: t('undo.blockDefinitionDeleted'),
-      undo: () => restoreDefinition(def.id),
-    });
-  };
+  // Inserted copies stay.
+  const remove = useLibraryItemRemove({
+    viewType: 'blocks', remove: deleteDefinition, restore: restoreDefinition, clearDraft, undoKey: 'undo.blockDefinitionDeleted', logTag: 'BlocksView',
+  });
 
   return selected ? (
     <BlockDefinitionEditor
       key={selected.id}
       definition={selected}
       onClose={backToList}
-      onDelete={() => void remove(selected)}
+      onDelete={() => void remove(selected.id)}
       isNew={activeView.isNew}
     />
   ) : (
-    <BlockList onCreate={() => void create()} onDelete={(def) => void remove(def)} />
+    <BlockList onCreate={() => void create()} onDelete={(def) => void remove(def.id)} />
   );
 }
 
@@ -87,20 +72,12 @@ export default function BlocksView() {
  */
 function BuiltInBlocksSection({ query }: { query: string }) {
   const { t } = useTranslation();
-  const [collapsed, toggleCollapsed] = usePersistedFlag('blocks-builtin-collapsed');
   const presets = query
     ? BLOCK_PRESETS.filter((p) => t(p.labelKey).toLowerCase().includes(query))
     : BLOCK_PRESETS;
 
   return (
-    <div className="mt-8">
-      <GroupDivider
-        label={t('blocks.library.builtIn')}
-        collapsed={collapsed}
-        onToggleCollapse={toggleCollapsed}
-      />
-      {!collapsed && (
-        <>
+    <DashboardSection storageKey="blocks-builtin-collapsed" label={t('blocks.library.builtIn')}>
           {/* Deliberately the small line instead of `NoResults`: the list only
               becomes empty through the search, and the large "No results" is already above. */}
           {presets.length === 0
@@ -126,9 +103,7 @@ function BuiltInBlocksSection({ query }: { query: string }) {
                 })}
               </ul>
             )}
-        </>
-      )}
-    </div>
+    </DashboardSection>
   );
 }
 
@@ -233,7 +208,7 @@ function BlockList({ onCreate, onDelete }: {
       }}
       hasNoResults={!customCollapsed && sorted.length === 0}
       contentHeader={
-        <GroupDivider
+        <CollapsibleGroupHeader
           label={t('blocks.library.custom')}
           collapsed={customCollapsed}
           onToggleCollapse={toggleCustom}

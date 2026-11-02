@@ -2,9 +2,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ArrowRightLeft, Check, Copy } from 'lucide-react';
 import { useLexiconStore } from '../../store/lexiconStore';
-import { usePersistedFlag } from '../../hooks/usePersistedFlag';
 import { entriesOfLanguage, translateText, type TranslateDirection, type TranslateMode } from '../../lib/lexicon';
-import CollapsibleGroupHeader from '../ui/CollapsibleGroupHeader';
+import DashboardSection from '../ui/DashboardSection';
 import Button from '../ui/Button';
 import EmptyState from '../ui/EmptyState';
 import Dropdown from '../ui/Dropdown';
@@ -32,7 +31,6 @@ export default function TranslatePanel() {
   const { t } = useTranslation();
   const languages = useLexiconStore((s) => s.languages);
   const allEntries = useLexiconStore((s) => s.entries);
-  const [collapsed, toggleCollapsed] = usePersistedFlag('lexicon-translate-collapsed');
 
   const [languageId, setLanguageId] = useState('');
   const [direction, setDirection] = useState<TranslateDirection>('toLanguage');
@@ -73,9 +71,8 @@ export default function TranslatePanel() {
   };
 
   return (
-    <div className="mt-8">
-      <CollapsibleGroupHeader label={t('lexicon.translate')} collapsed={collapsed} onToggleCollapse={toggleCollapsed} />
-      {collapsed ? null : !language ? (
+    <DashboardSection storageKey="lexicon-translate-collapsed" label={t('lexicon.translate')}>
+      {!language ? (
         // No button: "New language" is already in the section above.
         <EmptyState
           icon={ArrowRightLeft}
@@ -172,6 +169,6 @@ export default function TranslatePanel() {
           </div>
         </div>
       )}
-    </div>
+    </DashboardSection>
   );
 }
