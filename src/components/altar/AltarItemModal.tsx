@@ -13,6 +13,7 @@ import Modal from '../ui/Modal';
 import EmojiPicker from '../ui/EmojiPicker';
 import Button from '../ui/Button';
 import CategorySelect from '../ui/CategorySelect';
+import { OP_PROP_SELECT_CLASSES } from '../../lib/styleClasses';
 
 const IMAGE_MAX_BYTES = 2 * 1024 * 1024; // 2 MB
 
@@ -132,7 +133,7 @@ export function AltarItemModal({
             size="lg"
             wrapperClassName="relative flex-1"
             trigger={({ toggle }) => (
-              <button onClick={toggle} className="input-field w-full flex items-center gap-2 rounded-md px-2.5 py-1.5 text-sm transition-colors">
+              <button onClick={toggle} className={`${OP_PROP_SELECT_CLASSES} flex items-center gap-2`}>
                 {imageSrc(editImageData)
                   ? <img src={imageSrc(editImageData)} alt="" className="w-6 h-6 object-contain rounded-md" />
                   : <span className="text-xl">{editEmoji || getCategoryEmoji(editCategory)}</span>}
@@ -144,7 +145,7 @@ export function AltarItemModal({
         </div>
         {imageError && <p className="text-xs text-danger">{imageError}</p>}
         <input ref={imageInputRef} type="file" accept={ACCEPTED_IMAGE_MIME} className="hidden" onChange={handleImageChange} />
-        <input ref={nameInputRef} value={editName} onChange={(e) => setEditName(e.target.value)} placeholder={t('altar.elementName')} className="input-field w-full rounded-md px-2.5 py-1.5 text-sm outline-none selectable" />
+        <input ref={nameInputRef} value={editName} onChange={(e) => setEditName(e.target.value)} placeholder={t('altar.elementName')} className={`${OP_PROP_SELECT_CLASSES} selectable`} />
         <div>
           <p className="label-xs mb-1">{t('properties.category')}</p>
           <CategorySelect

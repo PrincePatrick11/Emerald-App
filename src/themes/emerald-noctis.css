@@ -36,10 +36,10 @@ html[data-theme='emerald-noctis'] {
   --editor-toolbar-active-text: #f5f5f4;
   --editor-mark-bg: #002e1d;
   --editor-mark-text: #70ffca;
-  --menu-bg: #1c1917;
-  --menu-border: rgba(87, 83, 78, 0.7);
+  --menu-bg: #211b16;
+  --menu-border: rgba(113, 94, 77, 0.55);
   --menu-shadow: 0 14px 36px rgba(0, 0, 0, 0.35);
-  --menu-item-hover-bg: rgba(87, 83, 78, 0.5);
+  --menu-item-hover-bg: rgba(113, 94, 77, 0.28);
   --menu-item-hover-text: #f5f5f4;
   --menu-item-active-bg: rgba(0, 122, 77, 0.2);
   --menu-item-active-text: #b8ffe2;
