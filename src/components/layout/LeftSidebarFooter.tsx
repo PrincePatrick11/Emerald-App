@@ -23,7 +23,7 @@ import RailButton from '../ui/RailButton';
 /** Icon size of the row; the rail above it has 18. */
 const FOOTER_ICON = 15;
 
-const FOOTER_VIEWS = ['trash', 'tags', 'categories'] as const;
+const FOOTER_VIEWS = ['categories', 'tags', 'trash'] as const;
 
 /**
  * The check at startup, once per app start: the bar is re-mounted,
@@ -52,8 +52,8 @@ function checkOnStart(): Promise<string | null> {
 
 /**
  * The narrow row under rail and entry list, for what is needed less often than
- * the modules: Settings, Trash, Tags and Categories side by side, the Vault in
- * the far corner. It takes the width of
+ * the modules: the Vault in the corner under the rail, Categories, Tags, Trash
+ * and Settings side by side at the far end. It takes the width of
  * the left side as a whole and wraps, so with the list hidden the buttons stack
  * in the width of the rail.
  */
@@ -92,6 +92,20 @@ export default function LeftSidebarFooter() {
 
   return (
     <div className="left-sidebar-footer sidebar-bottom-bar w-full flex-shrink-0 flex flex-wrap items-center gap-1 px-[9px] pt-1 pb-1.5">
+      <RailButton onClick={() => setVaultOpen(true)} title={t('nav.vaults')} className="mr-auto">
+        {/* 1px less only for the emoji: it carries no stroke width and otherwise
+            looks too large next to the lucide icons. The fallback glyph is
+            itself a lucide icon and stays at the size of its neighbours. */}
+        <VaultGlyph icon={activeVaultIcon} size={activeVaultIcon ? FOOTER_ICON - 1 : FOOTER_ICON} />
+      </RailButton>
+      {FOOTER_VIEWS.map((type) => {
+        const { icon: Icon, navLabelKey } = AUX_VIEWS[type];
+        return (
+          <RailButton key={type} active={activeViewType === type} onClick={() => setActiveView({ type })} title={t(navLabelKey)}>
+            <Icon size={FOOTER_ICON} />
+          </RailButton>
+        );
+      })}
       <RailButton
         // The target page is captured here and the dot cleared immediately:
         // it has done its job as soon as the window opens. The other way
@@ -121,20 +135,6 @@ export default function LeftSidebarFooter() {
             style={{ backgroundColor: notice === 'update' ? 'var(--accent)' : 'var(--danger-text)' }}
           />
         )}
-      </RailButton>
-      {FOOTER_VIEWS.map((type) => {
-        const { icon: Icon, navLabelKey } = AUX_VIEWS[type];
-        return (
-          <RailButton key={type} active={activeViewType === type} onClick={() => setActiveView({ type })} title={t(navLabelKey)}>
-            <Icon size={FOOTER_ICON} />
-          </RailButton>
-        );
-      })}
-      <RailButton onClick={() => setVaultOpen(true)} title={t('nav.vaults')} className="ml-auto">
-        {/* 1px less only for the emoji: it carries no stroke width and otherwise
-            looks too large next to the lucide icons. The fallback glyph is
-            itself a lucide icon and stays at the size of its neighbours. */}
-        <VaultGlyph icon={activeVaultIcon} size={activeVaultIcon ? FOOTER_ICON - 1 : FOOTER_ICON} />
       </RailButton>
 
       {vaultOpen && <VaultModal onClose={() => setVaultOpen(false)} />}
