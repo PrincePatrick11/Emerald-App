@@ -449,8 +449,23 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
      Pass "overflow-hidden" via Modal's className prop for modals that don't have such a popover. */
   .modal-card {
     @apply border rounded-xl shadow-2xl;
-    background-color: var(--bg-surface-2);
-    border-color: var(--border-soft);
+    background-color: var(--sheet-bg);
+    border-color: var(--menu-border);
+  }
+
+  /* The bars of a modal and any further divider inside it, on the sheet's line. */
+  .modal-rule {
+    border-color: var(--sheet-border);
+  }
+
+  .modal-header {
+    @apply flex items-center justify-between gap-3 px-5 py-3 border-b shrink-0;
+    border-color: var(--sheet-border);
+  }
+
+  .modal-footer {
+    @apply flex items-center justify-end gap-2 px-5 py-3 border-t shrink-0;
+    border-color: var(--sheet-border);
   }
 
   /* Primary action button — jade accent (xs size, for toolbars & headers) */
@@ -921,7 +936,7 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
   /* The size of the fields in the settings window; the colours come from
      `.input-field`, which this class is always used together with. */
   .settings-field {
-    @apply w-full rounded-lg px-3 py-2 text-sm outline-none transition-colors;
+    @apply w-full rounded-md px-3 py-2 text-sm outline-none transition-colors;
   }
 
   .settings-row {
@@ -2894,78 +2909,32 @@ html[data-theme='emerald-noctis'] textarea::placeholder {
   color: #9c8872;
 }
 
-html[data-theme='emerald-noctis'] .link-picker-modal .text-soft {
-  color: #e7ddd2;
+html[data-theme] .link-picker-tab-active {
+  background: var(--link-picker-tab-active-bg);
+  color: var(--link-picker-tab-active-text);
 }
 
-html[data-theme='emerald-noctis'] .link-picker-modal .text-subtle {
-  color: #9f8a75;
+html[data-theme] .link-picker-tab-active .link-picker-tab-count {
+  color: var(--link-picker-tab-active-count);
 }
 
-html[data-theme='emerald-noctis'] .link-picker-modal .text-subtle {
-  color: #87715e;
+html[data-theme] .link-picker-tab-idle {
+  color: var(--link-picker-tab-idle-text);
 }
 
-html[data-theme='emerald-noctis'] .link-picker-modal .bg-well-solid {
-  background: rgba(45, 36, 31, 0.9);
-  border-color: rgba(113, 94, 77, 0.48);
+html[data-theme] .link-picker-tab-idle:hover {
+  background: var(--link-picker-tab-idle-hover-bg);
+  color: var(--link-picker-tab-idle-hover-text);
 }
 
-html[data-theme='emerald-noctis'] .link-picker-modal input {
-  color: #ecdfd1;
+html[data-theme] .link-picker-row:hover,
+html[data-theme] .link-picker-row:focus-visible {
+  background: var(--link-picker-row-hover-bg);
 }
 
-html[data-theme='emerald-noctis'] .link-picker-modal input::placeholder {
-  color: #927e6a;
-}
-
-html[data-theme='emerald-noctis'] .link-picker-tab-active {
-  background: rgba(0, 138, 87, 0.24);
-  color: #a7ffd8;
-}
-
-html[data-theme='emerald-noctis'] .link-picker-tab-active .link-picker-tab-count {
-  color: #68f1bc;
-}
-
-html[data-theme='emerald-noctis'] .link-picker-tab-idle {
-  color: #ab957f;
-}
-
-html[data-theme='emerald-noctis'] .link-picker-tab-idle:hover {
-  background: rgba(88, 72, 58, 0.34);
-  color: #e8dccc;
-}
-
-html[data-theme='emerald-noctis'] .link-picker-row {
-  color: #d8cabb;
-}
-
-html[data-theme='emerald-noctis'] .link-picker-label {
-  color: #e8dbcd;
-}
-
-html[data-theme='emerald-noctis'] .link-picker-row .text-xs {
-  color: #9f8a75;
-}
-
-html[data-theme='emerald-noctis'] .link-picker-row .text-subtle {
-  color: #7f6a57;
-}
-
-html[data-theme='emerald-noctis'] .link-picker-row:hover,
-html[data-theme='emerald-noctis'] .link-picker-row:focus-visible {
-  background: rgba(82, 67, 54, 0.34);
-}
-
-html[data-theme='emerald-noctis'] .link-picker-row:hover .link-picker-label,
-html[data-theme='emerald-noctis'] .link-picker-row:focus-visible .link-picker-label {
-  color: #f8efe5;
-}
-
-html[data-theme='emerald-noctis'] .link-picker-row:hover .text-xs,
-html[data-theme='emerald-noctis'] .link-picker-row:focus-visible .text-xs {
-  color: #c0ab96;
+html[data-theme] .link-picker-row:hover .link-picker-label,
+html[data-theme] .link-picker-row:focus-visible .link-picker-label {
+  color: var(--link-picker-row-hover-text);
 }
 
 html[data-theme='emerald-noctis'] .home-item-title {
@@ -3314,25 +3283,6 @@ html[data-theme='emerald-parchment'] .emoji-picker-search::placeholder {
   color: #8d7154;
 }
 
-html[data-theme='emerald-parchment'] .link-picker-tab-active {
-  background: var(--link-picker-tab-active-bg);
-  color: var(--link-picker-tab-active-text);
-  border-bottom-color: transparent;
-}
-
-html[data-theme='emerald-parchment'] .link-picker-tab-active .link-picker-tab-count {
-  color: var(--link-picker-tab-active-count);
-}
-
-html[data-theme='emerald-parchment'] .link-picker-tab-idle {
-  color: var(--link-picker-tab-idle-text);
-}
-
-html[data-theme='emerald-parchment'] .link-picker-tab-idle:hover {
-  background: var(--link-picker-tab-idle-hover-bg);
-  color: var(--link-picker-tab-idle-hover-text);
-}
-
 /* Translate the priority colours of the active menu row (TaskRow priority menu on ui/Dropdown)
    into tones that are readable on Parchment. */
 html[data-theme='emerald-parchment'] .list-toolbar-option-active.text-danger {
@@ -3538,16 +3488,6 @@ html[data-theme='emerald-parchment'] .altar-category-chip.bg-well-active {
   border: 1px solid rgba(0, 138, 87, 0.32);
 }
 
-html[data-theme='emerald-parchment'] .link-picker-row:hover,
-html[data-theme='emerald-parchment'] .link-picker-row:focus-visible {
-  background: var(--link-picker-row-hover-bg);
-}
-
-html[data-theme='emerald-parchment'] .link-picker-row:hover .link-picker-label,
-html[data-theme='emerald-parchment'] .link-picker-row:focus-visible .link-picker-label {
-  color: var(--link-picker-row-hover-text);
-}
-
 html[data-theme='emerald-parchment'] .editor-toolbar-btn-active {
   background-color: var(--editor-toolbar-active-bg);
   color: var(--editor-toolbar-active-text);
@@ -3614,16 +3554,6 @@ html[data-theme='custom'] .right-sidebar-tab-active {
   border: 1px solid var(--accent-edge);
 }
 
-html[data-theme='custom'] .link-picker-tab-active {
-  background: var(--link-picker-tab-active-bg);
-  border-bottom-color: var(--accent-edge);
-  color: var(--link-picker-tab-active-text);
-}
-
-html[data-theme='custom'] .link-picker-tab-active .link-picker-tab-count {
-  color: var(--link-picker-tab-active-count);
-}
-
 html[data-theme='custom'] .editor-toolbar-btn-active {
   background-color: var(--editor-toolbar-active-bg);
   color: var(--editor-toolbar-active-text);
@@ -3653,12 +3583,3 @@ html[data-theme='custom'] .sidebar-search-input::placeholder {
   color: var(--text-subtle);
 }
 
-html[data-theme='custom'] .link-picker-row:hover,
-html[data-theme='custom'] .link-picker-row:focus-visible {
-  background: var(--link-picker-row-hover-bg);
-}
-
-html[data-theme='custom'] .link-picker-row:hover .link-picker-label,
-html[data-theme='custom'] .link-picker-row:focus-visible .link-picker-label {
-  color: var(--link-picker-row-hover-text);
-}

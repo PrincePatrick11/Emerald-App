@@ -24,7 +24,7 @@ export default function TemplatePickerModal({ templates, onSelect, onClose }: {
     : templates;
 
   return (
-    <Modal title={t('templates.insert.pickerTitle')} onClose={onClose} bodyClassName="p-4 space-y-3" maxHeightClassName="max-h-[70vh]">
+    <Modal title={t('templates.insert.pickerTitle')} onClose={onClose} bodyClassName="flex min-h-0 flex-1 flex-col gap-3 px-5 py-4" maxHeightClassName="max-h-[70vh]">
       <input
         autoFocus
         className={`${OP_PROP_SELECT_CLASSES} selectable`}
@@ -37,9 +37,9 @@ export default function TemplatePickerModal({ templates, onSelect, onClose }: {
         }}
       />
       {shown.length === 0 ? (
-        <p className="text-xs text-[var(--text-muted)]">{t('templates.insert.noTemplates')}</p>
+        <p className="text-sm text-muted">{t('templates.insert.noTemplates')}</p>
       ) : (
-        <ul className="space-y-0.5 overflow-y-auto">
+        <ul className="min-h-0 flex-1 space-y-0.5 overflow-y-auto">
           {shown.map((template) => (
             <li key={template.id}>
               {/* `.menu-item`: the same hover and focus colours as the menus, in both themes. */}

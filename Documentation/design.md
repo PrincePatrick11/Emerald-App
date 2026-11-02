@@ -75,7 +75,7 @@ Four levels. Only what floats casts a shadow.
 | 0 | frame | `--shell-bg` | none |
 | 1 | sheet and panels | `--sheet-bg`, `--panel-bg`, with an edge | none |
 | 2 | menu, popover, toast | `--menu-bg`, with an edge | `--menu-shadow` |
-| 3 | modal | `--bg-surface-2`, with an edge | `shadow-2xl` |
+| 3 | modal | `--sheet-bg`, with `--menu-border`, solid over the scrim with no blur | `shadow-2xl` |
 
 Stacking is `z-10` within a column, `z-50` for modals and `z-[9999]` for overlays, nothing else.
 
@@ -114,7 +114,7 @@ Size tokens in both theme files: `--tab-pill-h` (30px, `TabBar`) and `--control-
 
 **Horizontal padding has exactly one source per column.** The column's outer container sets it; the panels inside add no `px-*` of their own. In the right sidebar that is `SidebarColumn`'s scrolling body (`p-3`, with a comment in place) — if a panel adds its own padding again, its rows end up visibly indented differently from the button in the action bar above them.
 
-**Spacing scale:** 2, 4, 6, 8, 10, 12, 16, 20, 24 and 32px (Tailwind `0.5`, `1`, `1.5`, `2`, `2.5`, `3`, `4`, `5`, `6`, `8`). `2.5` is for icon-to-label in menu and list rows. An arbitrary value needs a comment. Usual places: `px-8` for main-area content columns (`Dashboard`'s content, `EntryDetailFrame`), `px-3`/`p-3` in the sidebars, `px-4 py-3` through `px-5 py-4` in modal headers and bodies.
+**Spacing scale:** 2, 4, 6, 8, 10, 12, 16, 20, 24 and 32px (Tailwind `0.5`, `1`, `1.5`, `2`, `2.5`, `3`, `4`, `5`, `6`, `8`). `2.5` is for icon-to-label in menu and list rows. An arbitrary value needs a comment. Usual places: `px-8` for main-area content columns (`Dashboard`'s content, `EntryDetailFrame`), `px-3`/`p-3` in the sidebars, `px-5 py-3` in modal bars (`.modal-header`, `.modal-footer`), `px-5 py-4` in modal bodies.
 
 ### States
 

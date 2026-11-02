@@ -27,15 +27,13 @@ export default function ImageNoticeModal() {
       title={tooLarge ? t('common.imageTooLarge') : t('common.unsupportedImageFormatTitle')}
       onClose={dismiss}
       widthClassName="w-72"
-      bodyClassName="px-4 py-3"
+      bodyClassName="px-5 py-4"
+      footer={<Button tone="neutral" onClick={dismiss}>{t('common.ok')}</Button>}
     >
-      <div className="flex items-start gap-2 text-danger mb-2">
+      <div className="flex items-start gap-2 text-danger">
         <AlertCircle size={14} className="shrink-0 mt-0.5" />
-        <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>{detail}</p>
+        <p className="text-sm text-secondary">{detail}</p>
       </div>
-      <Button onClick={dismiss} variant="secondary" className="w-full">
-        {t('common.ok')}
-      </Button>
     </Modal>
   );
 }

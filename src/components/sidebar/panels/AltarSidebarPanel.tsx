@@ -359,9 +359,15 @@ const noticeTimerRef = useRef<number | null>(null);
                         <Modal
                           title={t('altar.backgrounds.gradient')}
                           onClose={close}
-                          widthClassName="w-72"
-                          bodyClassName="p-4 space-y-3"
+                          widthClassName="w-80"
+                          bodyClassName="px-5 py-4 space-y-3"
                           className="overflow-hidden"
+                          footer={
+                            <>
+                              <Button tone="neutral" onClick={close}>{t('common.cancel')}</Button>
+                              <Button tone="jade" onClick={() => { applyGradient(draft); close(); }}>{t('common.save')}</Button>
+                            </>
+                          }
                         >
                               <div className="flex justify-center">
                                 <div
@@ -398,10 +404,6 @@ const noticeTimerRef = useRef<number | null>(null);
                                     <span className="text-[11px] leading-none text-muted pointer-events-none">+</span>
                                   )}
                                 </button>
-                              </div>
-                              <div className="flex items-center justify-end gap-1">
-                                <Button tone="neutral" onClick={close}>{t('common.cancel')}</Button>
-                                <Button tone="jade" onClick={() => { applyGradient(draft); close(); }}>{t('common.save')}</Button>
                               </div>
                         </Modal>
                       );

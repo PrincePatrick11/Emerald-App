@@ -473,20 +473,39 @@ export function DeleteDefinitionModal({ definition, usage, onClose, onDeleted }:
 
   if (step === 'done') {
     return (
-      <Modal title={title} onClose={onDeleted} bodyClassName="p-4 space-y-3">
-        <p className="text-xs text-muted">{notice}</p>
-        <div className="flex justify-end">
-          <Button tone="neutral" onClick={onDeleted}>{t('common.ok')}</Button>
-        </div>
+      <Modal
+        title={title}
+        onClose={onDeleted}
+        bodyClassName="px-5 py-4"
+        footer={<Button tone="neutral" onClick={onDeleted}>{t('common.ok')}</Button>}
+      >
+        <p className="text-sm text-muted">{notice}</p>
       </Modal>
     );
   }
 
   return (
-    <Modal title={title} onClose={onClose} dismissible={!busy} bodyClassName="p-4 space-y-3">
+    <Modal
+      title={title}
+      onClose={onClose}
+      dismissible={!busy}
+      bodyClassName="px-5 py-4 space-y-3"
+      footer={
+        <>
+          <Button tone="neutral" disabled={busy} onClick={onClose}>{t('common.cancel')}</Button>
+          <Button tone="danger" disabled={busy} onClick={() => void run()}>
+            {!alsoRemove
+              ? t('common.delete')
+              : step === 'choose'
+                ? t('blocks.library.continue')
+                : copies('removeAndDelete')}
+          </Button>
+        </>
+      }
+    >
       {step === 'choose' ? (
         <>
-          <p className="text-xs text-muted">{t('blocks.library.deleteKeeps')}</p>
+          <p className="text-sm text-muted">{t('blocks.library.deleteKeeps')}</p>
           {copyCount > 0 && (
             <BlockCheckbox
               checked={alsoRemove}
@@ -496,18 +515,8 @@ export function DeleteDefinitionModal({ definition, usage, onClose, onDeleted }:
           )}
         </>
       ) : (
-        <p className="text-xs text-[var(--danger-text)]">{copies('deleteFromEntriesWarning')}</p>
+        <p className="text-sm text-danger">{copies('deleteFromEntriesWarning')}</p>
       )}
-      <div className="flex justify-end gap-2 pt-1">
-        <Button tone="neutral" disabled={busy} onClick={onClose}>{t('common.cancel')}</Button>
-        <Button tone="danger" disabled={busy} onClick={() => void run()}>
-          {!alsoRemove
-            ? t('common.delete')
-            : step === 'choose'
-              ? t('blocks.library.continue')
-              : copies('removeAndDelete')}
-        </Button>
-      </div>
     </Modal>
   );
 }

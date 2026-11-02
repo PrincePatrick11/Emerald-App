@@ -32,7 +32,7 @@ interface Props {
   dismissible?: boolean;
 }
 
-const INPUT_CLASS = 'input-field flex-1 min-w-0 rounded-lg px-2.5 py-1.5 text-sm outline-none';
+const INPUT_CLASS = 'input-field flex-1 min-w-0 rounded-md px-2.5 py-1.5 text-sm outline-none';
 const CHECKBOX_CLASS =
   'mt-0.5 w-4 h-4 shrink-0 rounded-md border flex items-center justify-center transition-colors ' +
   'peer-focus-visible:ring-2 peer-focus-visible:ring-focus';
@@ -600,7 +600,7 @@ export default function VaultModal({ onClose, dismissible = true }: Props) {
       maxHeightClassName="max-h-[80vh]"
       bodyClassName="flex-1 overflow-y-auto px-5 py-4"
     >
-      <p className="text-xs mb-3" style={{ color: 'var(--text-muted)' }}>
+      <p className="text-sm text-muted mb-3">
         {t('vault.hint')}
       </p>
 
@@ -677,11 +677,11 @@ export default function VaultModal({ onClose, dismissible = true }: Props) {
         ) : (
           <div className="flex gap-2">
             <Button variant="primary" className="flex-1 justify-center" onClick={openCreateRow}>
-              <Plus size={16} className="shrink-0" />
+              <Plus size={14} className="shrink-0" />
               {t('vault.add')}
             </Button>
             <Button variant="secondary" className="flex-1 justify-center" onClick={handleOpenExisting}>
-              <FolderOpen size={16} className="shrink-0" />
+              <FolderOpen size={14} className="shrink-0" />
               {t('vault.open')}
             </Button>
           </div>

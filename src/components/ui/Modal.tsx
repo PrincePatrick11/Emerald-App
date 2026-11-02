@@ -13,6 +13,8 @@ interface ModalProps {
   maxHeightClassName?: string;
   bodyClassName?: string;
   className?: string;
+  /** The action row, pinned below the body whatever its height. */
+  footer?: React.ReactNode;
   /** `false` removes every way out — no X, no Escape, no backdrop click. For a
    *  modal the app cannot continue past, such as first-run vault setup. */
   dismissible?: boolean;
@@ -39,6 +41,7 @@ export default function Modal({
   maxHeightClassName,
   bodyClassName,
   className,
+  footer,
   dismissible = true,
 }: ModalProps) {
   const [self] = useState(() => Symbol('modal'));
@@ -68,7 +71,7 @@ export default function Modal({
 
   return createPortal(
     <div
-      className={`fixed inset-x-0 bottom-0 ${clearsTitleBar ? 'top-10' : 'top-0'} z-50 flex items-center justify-center modal-backdrop backdrop-blur-sm p-4`}
+      className={`fixed inset-x-0 bottom-0 ${clearsTitleBar ? 'top-10' : 'top-0'} z-50 flex items-center justify-center modal-backdrop p-4`}
       onMouseDown={(e) => {
         // A thumb button would otherwise close the modal and navigate back on release.
         if (dismissible && !isHistoryButton(e) && e.target === e.currentTarget) onClose();
@@ -77,20 +80,16 @@ export default function Modal({
       <div
         className={`modal-card ${widthClassName} ${maxHeightClassName ?? ''} flex flex-col${className ? ` ${className}` : ''}`}
       >
-        <div
-          className="flex items-center justify-between px-4 py-3 border-b shrink-0"
-          style={{ borderColor: 'var(--border-soft)' }}
-        >
-          <h2 className="text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>
-            {title}
-          </h2>
+        <div className="modal-header">
+          <h2 className="min-w-0 truncate text-sm font-semibold text-primary">{title}</h2>
           {dismissible && (
-            <Button onClick={onClose} variant="ghost">
+            <Button onClick={onClose} variant="ghost" className="-mr-1.5 shrink-0">
               <X size={16} />
             </Button>
           )}
         </div>
         <div className={bodyClassName ?? 'flex-1 overflow-y-auto'}>{children}</div>
+        {footer && <div className="modal-footer">{footer}</div>}
       </div>
     </div>,
     document.body,

@@ -112,7 +112,18 @@ export function AltarItemModal({
       title={item ? t('editor.edit') : t('altar.addElement')}
       onClose={onClose}
       widthClassName="w-full max-w-md"
-      bodyClassName="p-4 space-y-3"
+      bodyClassName="px-5 py-4 space-y-3"
+      footer={
+        <>
+          {item && (
+            <Button tone="danger" className="mr-auto" onClick={doDelete} title={t('common.delete')}>
+              <Trash2 size={14} /> {t('common.delete')}
+            </Button>
+          )}
+          <Button tone="neutral" onClick={onClose}>{t('common.cancel')}</Button>
+          <Button tone="jade" onClick={save} disabled={!editName.trim()}>{t('common.save')}</Button>
+        </>
+      }
     >
         <div className="flex items-center gap-2">
           <EmojiPicker
@@ -121,7 +132,7 @@ export function AltarItemModal({
             size="lg"
             wrapperClassName="relative flex-1"
             trigger={({ toggle }) => (
-              <button onClick={toggle} className="w-full flex items-center gap-2 bg-well-strong rounded-lg px-3 py-2 text-sm hover:bg-well-raise transition-colors">
+              <button onClick={toggle} className="input-field w-full flex items-center gap-2 rounded-md px-2.5 py-1.5 text-sm transition-colors">
                 {imageSrc(editImageData)
                   ? <img src={imageSrc(editImageData)} alt="" className="w-6 h-6 object-contain rounded-md" />
                   : <span className="text-xl">{editEmoji || getCategoryEmoji(editCategory)}</span>}
@@ -133,7 +144,7 @@ export function AltarItemModal({
         </div>
         {imageError && <p className="text-xs text-danger">{imageError}</p>}
         <input ref={imageInputRef} type="file" accept={ACCEPTED_IMAGE_MIME} className="hidden" onChange={handleImageChange} />
-        <input ref={nameInputRef} value={editName} onChange={(e) => setEditName(e.target.value)} placeholder={t('altar.elementName')} className="w-full bg-well-strong rounded-lg px-3 py-2 text-xs text-secondary outline-none selectable" />
+        <input ref={nameInputRef} value={editName} onChange={(e) => setEditName(e.target.value)} placeholder={t('altar.elementName')} className="input-field w-full rounded-md px-2.5 py-1.5 text-sm outline-none selectable" />
         <div>
           <p className="label-xs mb-1">{t('properties.category')}</p>
           <CategorySelect
@@ -143,17 +154,6 @@ export function AltarItemModal({
             getLabel={(c) => categoryLabel(t, c)}
             variant="field"
           />
-        </div>
-        <div className="flex items-center justify-between gap-2">
-          {item ? (
-            <Button tone="danger" onClick={doDelete} title={t('common.delete')}>
-              <Trash2 size={12} /> {t('common.delete')}
-            </Button>
-          ) : <span />}
-          <span className="flex items-center gap-2">
-            <Button tone="neutral" onClick={onClose}>{t('common.cancel')}</Button>
-            <Button tone="jade" onClick={save} disabled={!editName.trim()}>{t('common.save')}</Button>
-          </span>
         </div>
     </Modal>
   );

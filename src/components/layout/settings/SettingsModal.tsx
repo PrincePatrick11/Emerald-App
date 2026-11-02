@@ -61,8 +61,7 @@ export default function SettingsModal({ onClose, initialPage = 'general' }: Prop
       <nav
         role="tablist"
         aria-orientation="vertical"
-        className="w-[168px] shrink-0 border-r px-2 py-3 space-y-0.5"
-        style={{ borderColor: 'var(--border-soft)' }}
+        className="modal-rule w-[168px] shrink-0 border-r px-2 py-3 space-y-0.5"
       >
         {PAGES.map(({ id, labelKey, Icon }) => (
           <button

@@ -112,7 +112,7 @@ export default function SearchModal({ onClose }: { onClose: () => void }) {
       // vertically centred and would otherwise jump with the hit count on every keystroke.
       className="overflow-hidden h-[70vh]"
     >
-      <div className="px-4 py-2.5 border-b flex-shrink-0" style={{ borderColor: 'var(--border-soft)' }}>
+      <div className="modal-rule px-5 py-3 border-b flex-shrink-0">
         {/* In Parchment, `bg-well-raise` beats the `.sidebar-search-inner`
             override (Documentation/design.md, Known Fault Line). The entry
             list's search no longer carries the class; here it is the last

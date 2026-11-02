@@ -70,21 +70,21 @@ export default function LinkPickerModal({ onSelect, onClose }: Props) {
       // Fixed instead of maximum height: with max-h the modal grew and shrank
       // with the hit count of the active tab and, because it is vertically
       // centred, jumped up and down in height on every tab switch.
-      className="link-picker-modal overflow-hidden h-[75vh]"
+      className="overflow-hidden h-[75vh]"
     >
         {/* Search */}
-        <div className="px-4 py-2.5 border-b border-edge flex-shrink-0">
-          <div className="flex items-center gap-2 bg-well-solid rounded-lg px-3 py-1.5">
+        <div className="modal-rule px-5 py-3 border-b flex-shrink-0">
+          <div className="sidebar-search-inner flex items-center gap-2 rounded-md px-2.5 h-8 bg-well-raise">
             <Search size={14} className="text-subtle shrink-0" />
             <input
               ref={searchRef}
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder={t('linkPicker.searchPlaceholder')}
-              className="flex-1 bg-transparent text-sm text-secondary placeholder:text-subtle outline-none"
+              className="sidebar-search-input flex-1 min-w-0 bg-transparent text-xs outline-none"
             />
             {query && (
-              <button onClick={() => setQuery('')} className="text-subtle hover:text-muted">
+              <button onClick={() => setQuery('')} className="flex-shrink-0 opacity-70 hover:opacity-100">
                 <X size={12} />
               </button>
             )}
@@ -100,7 +100,7 @@ export default function LinkPickerModal({ onSelect, onClose }: Props) {
             is hard-wired to the stone tint of the sidebars, whereas here
             the picker's jade tint is needed; a tone variant is still missing
             there, and until then this remains the custom button. */}
-        <div role="tablist" className="flex items-center gap-1 px-4 py-2 border-b border-edge flex-shrink-0">
+        <div role="tablist" className="modal-rule flex items-center gap-1 px-5 py-2 border-b flex-shrink-0">
           {tabs.map((tab) => (
             <button
               key={tab.id}
@@ -111,12 +111,12 @@ export default function LinkPickerModal({ onSelect, onClose }: Props) {
               aria-label={`${tab.label}: ${tab.count}`}
               className={`flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-medium whitespace-nowrap flex-shrink-0 transition-colors ${
                 activeTab === tab.id
-                  ? 'link-picker-tab-active bg-accent-fill-strong text-on-accent'
-                  : 'link-picker-tab-idle text-subtle hover:text-raise hover:bg-well-raise'
+                  ? 'link-picker-tab-active'
+                  : 'link-picker-tab-idle'
               }`}
             >
               {tab.icon}
-              <span className={`link-picker-tab-count ${activeTab === tab.id ? 'text-accent' : 'text-subtle'}`}>
+              <span className="link-picker-tab-count">
                 {tab.count}
               </span>
             </button>
@@ -137,7 +137,7 @@ export default function LinkPickerModal({ onSelect, onClose }: Props) {
                   <button
                     key={item.id}
                     onClick={() => { onSelect(item); onClose(); }}
-                    className="link-picker-row w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-left hover:bg-well-raise group transition-colors"
+                    className="link-picker-row w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm text-left transition-colors"
                   >
                     {/* Icon */}
                     <span className="text-base w-5 flex-shrink-0 flex items-center justify-center">
@@ -155,7 +155,7 @@ export default function LinkPickerModal({ onSelect, onClose }: Props) {
                     <span className="link-picker-label flex-1 text-secondary truncate">{item.label}</span>
 
                     {/* Type badge */}
-                    <span className="text-xs text-subtle flex-shrink-0 flex items-center gap-1 group-hover:text-subtle">
+                    <span className="text-xs text-subtle flex-shrink-0 flex items-center gap-1">
                       <TypeIcon size={12} />
                       <span className="capitalize">{t(ENTRY_TYPE_LABEL_KEYS[item.entryType])}</span>
                     </span>

@@ -29,7 +29,14 @@ export default function TemplateApplyDialog({ template, onApply, onClose }: {
   const [tags, setTags] = useState(hasTags);
 
   return (
-    <Modal title={t('templates.insert.applyTitle', { name: templateLabel(t, template) })} onClose={onClose} bodyClassName="p-4 space-y-4">
+    <Modal title={t('templates.insert.applyTitle', { name: templateLabel(t, template) })} onClose={onClose} bodyClassName="px-5 py-4 space-y-4" footer={
+      <>
+        <Button tone="neutral" onClick={onClose}>{t('common.cancel')}</Button>
+        <Button tone="jade" onClick={() => onApply({ mode, title: hasTitle && title, tags: hasTags && tags })}>
+          {t('templates.insert.apply')}
+        </Button>
+      </>
+    }>
       <div className="space-y-2">
         <div className="flex gap-2" role="group" aria-label={t('templates.insert.modeLabel')}>
           {(['append', 'replace'] as const).map((value) => (
@@ -60,13 +67,6 @@ export default function TemplateApplyDialog({ template, onApply, onClose }: {
           onChange={setTags}
           label={hasTags ? t('templates.insert.addTags', { tags: shownTags.join(', ') }) : t('templates.insert.noTags')}
         />
-      </div>
-
-      <div className="flex justify-end gap-2 pt-1">
-        <Button tone="neutral" onClick={onClose}>{t('common.cancel')}</Button>
-        <Button tone="jade" onClick={() => onApply({ mode, title: hasTitle && title, tags: hasTags && tags })}>
-          {t('templates.insert.apply')}
-        </Button>
       </div>
     </Modal>
   );
