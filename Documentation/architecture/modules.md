@@ -5,7 +5,7 @@
 `src/lib/modules.ts` is the one source of truth for "which modules exist and what belongs to each": icon, nav-label key, untitled-placeholder key (for a tab and the title input — everywhere else `displayTitle` picks the text, see "Titles and icons" below), the module's `ContentType`, and the `usesEditorSidebar`/`usesBlocks` flags.
 
 - `ModuleMeta.entryType` is non-null for all five modules: Tasks and Altar are link *targets* (`'task'`/`'altar'`) even though, lacking an editor, they can never be a link's *source*.
-- `ENTRY_MODULE_IDS` (`journal`/`tasks`/`operations`/`wiki`/`altar`) is the canonical order. It drives the rail's icon order, the entry list's tab order and, through `CATEGORY_MODULE_IDS` (the same minus `journal`), the usage columns in `CategoriesView` and the module hint `dominantCategoryModule` gives a category search hit.
+- `ENTRY_MODULE_IDS` (`journal`/`tasks`/`operations`/`wiki`/`altar`) is the canonical order. It drives the entry list's tab order and, through `CATEGORY_MODULE_IDS` (the same minus `journal`), the usage columns in `CategoriesView` and the module hint `dominantCategoryModule` gives a category search hit.
 - `MODULES` is the `Record<EntryModuleId, ModuleMeta>` everything reads; `MODULE_LIST` is its array form.
 - `ViewId` (`EntryModuleId | AuxViewId`, with `AuxViewId` = `home`/`tags`/`categories`/`blocks`/ `templates`/`lexicon`/`trash`) is what `ActiveView['type']` is. `isViewId()` guards persisted tabs at load time, so a stored tab of an unknown view type is dropped rather than crashing the router.
 - `TRASH_KINDS`/`TRASH_KIND_ICONS` cover the larger set of trash-only kinds, including `category`, whose `FolderOpen` glyph `AUX_VIEWS.categories` reuses.

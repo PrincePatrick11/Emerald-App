@@ -1,7 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import { Settings, type LucideIcon } from 'lucide-react';
-import { Fragment, Suspense, lazy, useEffect, useState } from 'react';
-import { AUX_VIEWS, MODULE_LIST, type ViewId } from '../../lib/modules';
+import { Suspense, lazy, useEffect, useState } from 'react';
+import { AUX_VIEWS, MODULES, type ViewId } from '../../lib/modules';
 import { useUIStore } from '../../store/uiStore';
 import { useVaultStore } from '../../store/vaultStore';
 import { useAutoBackupStore } from '../../store/autoBackupStore';
@@ -27,6 +27,9 @@ import RailButton from '../ui/RailButton';
  *  it is a number here instead of a class below: two truths would yield
  *  a clipped rail *and* wrong widths next to it. */
 export const RAIL_WIDTH = 44;
+
+/** Buttons of one group sit tight; the gap between groups is three times that. */
+const RAIL_GROUP = 'w-full flex flex-col items-center gap-1';
 
 /**
  * The check at startup, once per app start: the bar is re-mounted,
@@ -110,66 +113,78 @@ export default function LeftSidebarRail() {
           for the same thing. */}
 
       {/* Main nav icons — navigate only, never touch the entry-list panel */}
-      <div className="w-full flex flex-col items-center gap-1 pb-2">
+      {/* Groups are set apart by space alone: lines would be more dividers in a
+          frame that has none. */}
+      <div className="w-full flex flex-col items-center gap-3 pb-2">
         {/* The way to the dashboard. It used to hang on the Emerald logo in the
             title bar, which nobody reads as a navigation target.
             Mind the MCP selectors: lucide exports `Home` as an alias of
             `House`, so the SVG carries `.lucide-house`, not `.lucide-home`. */}
         {viewButton('home', AUX_VIEWS.home)}
-        {MODULE_LIST.map((mod) => (
-          <Fragment key={mod.id}>
-            {/* The lexicon is not an entry module, but sits at the top between
-                wiki and altar instead of at the bottom with templates and blocks. */}
-            {mod.id === 'altar' && viewButton('lexicon', AUX_VIEWS.lexicon)}
-            {viewButton(mod.id, mod)}
-          </Fragment>
-        ))}
+        <div className={RAIL_GROUP}>
+          {viewButton('journal', MODULES.journal)}
+          {viewButton('tasks', MODULES.tasks)}
+          {viewButton('operations', MODULES.operations)}
+        </div>
+        {/* The lexicon is not an entry module, but sits here between wiki and
+            altar instead of at the bottom with templates and blocks. */}
+        <div className={RAIL_GROUP}>
+          {viewButton('wiki', MODULES.wiki)}
+          {viewButton('lexicon', AUX_VIEWS.lexicon)}
+          {viewButton('altar', MODULES.altar)}
+        </div>
       </div>
 
       {/* Bottom nav — always visible, read from the bottom: Settings, Vault,
           Trash, Tags, Categories, Blocks, Templates */}
-      <div className="sidebar-bottom-bar w-full flex-1 flex flex-col items-center justify-end gap-1 py-2">
-        {viewButton('templates', AUX_VIEWS.templates)}
-        {viewButton('blocks', AUX_VIEWS.blocks)}
-        {viewButton('categories', AUX_VIEWS.categories)}
-        {viewButton('tags', AUX_VIEWS.tags)}
-        {viewButton('trash', AUX_VIEWS.trash)}
-        <RailButton onClick={() => setVaultOpen(true)} title={t('nav.vaults')}>
-          {/* 17px only for the emoji: it carries no stroke width and otherwise
-              looks too large next to the lucide icons. The fallback glyph is
-              itself a lucide icon and stays at the 18 of its neighbours. */}
-          <VaultGlyph icon={activeVaultIcon} size={activeVaultIcon ? 17 : 18} />
-        </RailButton>
-        <RailButton
-          // The target page is captured here and the dot cleared immediately:
-          // it has done its job as soon as the window opens. The other way
-          // round, the gear would jump to "Updates" for the rest of the
-          // session — and clearing without this capture would mean the window
-          // opens on "General" again, because both state changes land in the
-          // same render.
-          onClick={() => {
-            setSettingsPage(notice === 'update' ? 'updates' : notice === 'backup' ? 'backup' : 'general');
-            setSettingsOpen(true);
-            setUpdateVersion(null);
-            if (notice === 'update') dotSeen = true;
-            if (notice === 'backup') markAutoBackupErrorSeen();
-          }}
-          title={
-            notice === 'update' ? t('settings.updateFound', { version: updateVersion })
-              : notice === 'backup' ? t('settings.autoBackupFailedDot')
-                : t('nav.settings')
-          }
-          className="relative"
-        >
-          <Settings size={18} />
-          {notice && (
-            <span
-              aria-hidden
-              className="absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full"
-              style={{ backgroundColor: notice === 'update' ? 'var(--accent)' : 'var(--danger-text)' }}
-            />
-          )}
-        </RailButton>
+      <div className="sidebar-bottom-bar w-full flex-1 flex flex-col items-center justify-end gap-3 py-2">
+        <div className={RAIL_GROUP}>
+          {viewButton('templates', AUX_VIEWS.templates)}
+          {viewButton('blocks', AUX_VIEWS.blocks)}
+        </div>
+        <div className={RAIL_GROUP}>
+          {viewButton('categories', AUX_VIEWS.categories)}
+          {viewButton('tags', AUX_VIEWS.tags)}
+        </div>
+        <div className={RAIL_GROUP}>
+          {viewButton('trash', AUX_VIEWS.trash)}
+          <RailButton onClick={() => setVaultOpen(true)} title={t('nav.vaults')}>
+            {/* 17px only for the emoji: it carries no stroke width and otherwise
+                looks too large next to the lucide icons. The fallback glyph is
+                itself a lucide icon and stays at the 18 of its neighbours. */}
+            <VaultGlyph icon={activeVaultIcon} size={activeVaultIcon ? 17 : 18} />
+          </RailButton>
+          <RailButton
+            // The target page is captured here and the dot cleared immediately:
+            // it has done its job as soon as the window opens. The other way
+            // round, the gear would jump to "Updates" for the rest of the
+            // session — and clearing without this capture would mean the window
+            // opens on "General" again, because both state changes land in the
+            // same render.
+            onClick={() => {
+              setSettingsPage(notice === 'update' ? 'updates' : notice === 'backup' ? 'backup' : 'general');
+              setSettingsOpen(true);
+              setUpdateVersion(null);
+              if (notice === 'update') dotSeen = true;
+              if (notice === 'backup') markAutoBackupErrorSeen();
+            }}
+            title={
+              notice === 'update' ? t('settings.updateFound', { version: updateVersion })
+                : notice === 'backup' ? t('settings.autoBackupFailedDot')
+                  : t('nav.settings')
+            }
+            className="relative"
+          >
+            <Settings size={18} />
+            {notice && (
+              <span
+                aria-hidden
+                className="absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full"
+                style={{ backgroundColor: notice === 'update' ? 'var(--accent)' : 'var(--danger-text)' }}
+              />
+            )}
+          </RailButton>
+        </div>
       </div>
 
       {vaultOpen && <VaultModal onClose={() => setVaultOpen(false)} />}
