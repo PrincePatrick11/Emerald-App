@@ -3,7 +3,7 @@ import { useShallow } from 'zustand/shallow';
 import { useTranslation } from 'react-i18next';
 import { formatEntryDate } from '../../lib/formatDate';
 import { categoryLabel, lookupCategory } from '../../lib/categories';
-import { entryIcon, type LeftListTabId } from '../../lib/modules';
+import { AUX_VIEWS, entryIcon, type LeftListTabId } from '../../lib/modules';
 import { displayTitle } from '../../lib/entryTitle';
 import { CheckSquare, Square, Copy, Pencil, Trash2 } from 'lucide-react';
 import { AltarIcon } from '../../lib/altarIcon';
@@ -19,6 +19,7 @@ import { generateId, isImageIcon } from '../../lib/helpers';
 import { journalIcon } from '../../lib/moonPhase';
 import type { AltarRecord, Entry, Task } from '../../types';
 import EntryListTab, { type EntryListTabProps } from '../ui/EntryListTab';
+import RailButton from '../ui/RailButton';
 import { useOpenInNewTabAction } from '../../hooks/useOpenInNewTabAction';
 import { useSaveAsTemplateAction } from '../../hooks/useSaveAsTemplateAction';
 
@@ -38,7 +39,35 @@ export default function LeftSidebarEntryList() {
   // under the sheet when narrowed.
   return (
     <div className="flex flex-col h-full flex-1 min-w-0">
-      <ActiveList key={vaultId} list={list} />
+      <div className="flex-1 min-h-0">
+        <ActiveList key={vaultId} list={list} />
+      </div>
+      <EntryListBar />
+    </div>
+  );
+}
+
+const ENTRY_LIST_BAR_VIEWS = ['templates', 'blocks', 'categories', 'tags'] as const;
+
+/**
+ * The views you set things up in, as a row under the list instead of in the
+ * rail. The buttons are the rail's, and `py-2` puts them on one line with its
+ * bottom button.
+ */
+function EntryListBar() {
+  const { t } = useTranslation();
+  const setActiveView = useUIStore((s) => s.setActiveView);
+  const activeViewType = useUIStore((s) => s.activeView.type);
+  return (
+    <div className="entry-list-bar sidebar-bottom-bar flex-shrink-0 flex items-center justify-between px-3 py-2">
+      {ENTRY_LIST_BAR_VIEWS.map((type) => {
+        const { icon: Icon, navLabelKey } = AUX_VIEWS[type];
+        return (
+          <RailButton key={type} active={activeViewType === type} onClick={() => setActiveView({ type })} title={t(navLabelKey)}>
+            <Icon size={18} />
+          </RailButton>
+        );
+      })}
     </div>
   );
 }

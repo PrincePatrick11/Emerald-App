@@ -136,16 +136,9 @@ export default function LeftSidebarRail() {
       </div>
 
       {/* Bottom nav — always visible, read from the bottom: Settings, Vault,
-          Trash, Tags, Categories, Blocks, Templates */}
+          Trash. Templates, Blocks, Categories and Tags sit under the entry list
+          (`LeftSidebarEntryList`). */}
       <div className="sidebar-bottom-bar w-full flex-1 flex flex-col items-center justify-end gap-3 py-2">
-        <div className={RAIL_GROUP}>
-          {viewButton('templates', AUX_VIEWS.templates)}
-          {viewButton('blocks', AUX_VIEWS.blocks)}
-        </div>
-        <div className={RAIL_GROUP}>
-          {viewButton('categories', AUX_VIEWS.categories)}
-          {viewButton('tags', AUX_VIEWS.tags)}
-        </div>
         <div className={RAIL_GROUP}>
           {viewButton('trash', AUX_VIEWS.trash)}
           <RailButton onClick={() => setVaultOpen(true)} title={t('nav.vaults')}>

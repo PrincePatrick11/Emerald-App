@@ -183,7 +183,7 @@ document.querySelector('.left-sidebar-rail button:has(.lucide-book-open)').click
 | Operations | `lucide-wand-sparkles` | `.left-sidebar-rail button:has(.lucide-wand-sparkles)` |
 | Wiki | `lucide-library` | `.left-sidebar-rail button:has(.lucide-library)` |
 | Altar | `lucide-altar` | `.left-sidebar-rail button:has(.lucide-altar)` |
-| Tags | `lucide-tag` | `.left-sidebar-rail button:has(.lucide-tag)` |
+| Tags | `lucide-tag` | `.entry-list-bar button:has(.lucide-tag)` |
 | Trash | `lucide-trash2` | `.left-sidebar-rail button:has(.lucide-trash2)` |
 | Settings | `lucide-settings` | `.left-sidebar-rail button:has(.lucide-settings)` |
 
@@ -459,7 +459,7 @@ Then check the UI via `eval`:
 ```js
 (async () => {
   const icons = ['book-open','square-check-big','wand-sparkles','library',
-                 'flame','tag','trash2','settings'];
+                 'altar','trash2','settings'];
   const missing = icons.filter(i =>
     !document.querySelector(`.left-sidebar-rail button:has(.lucide-${i})`));
   const view = () => document.querySelector('.app-main')?.innerText.trim().split('\n')[1] || '';

@@ -362,6 +362,7 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
      `mr-1.5` on the logo — change the values together). Without a rail the
      usual margins to the window remain. */
   .app-sidebar-left-with-rail .entry-list-search-row,
+  .app-sidebar-left-with-rail .entry-list-bar,
   .app-sidebar-left-with-rail .entry-list-nav {
     padding-left: 4px;
   }
