@@ -113,7 +113,7 @@ export function AltarItemModal({
       title={item ? t('editor.edit') : t('altar.addElement')}
       onClose={onClose}
       widthClassName="w-full max-w-md"
-      bodyClassName="px-3.5 py-4 space-y-3"
+      bodyClassName="modal-body space-y-3"
       footer={
         <>
           {item && (

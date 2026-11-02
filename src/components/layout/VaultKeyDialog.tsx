@@ -275,7 +275,7 @@ function VaultKeyDialogBody({ request }: { request: VaultKeyRequest }) {
       onClose={cancel}
       dismissible={cancelShown && !busy}
       widthClassName="w-[440px]"
-      bodyClassName="px-3.5 py-4 space-y-4"
+      bodyClassName="modal-body space-y-4"
       footer={
         <>
           {cancelShown && <Button tone="neutral" disabled={busy} onClick={cancel}>{t('common.cancel')}</Button>}

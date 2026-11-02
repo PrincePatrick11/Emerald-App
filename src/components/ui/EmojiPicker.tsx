@@ -4,7 +4,7 @@ import { useEmojiSearchData } from '../../hooks/useEmojiSearchData';
 import { useSettingsStore } from '../../store/settingsStore';
 import { useOutsideClick } from '../../hooks/useOutsideClick';
 import { createPortal } from 'react-dom';
-import { Search } from 'lucide-react';
+import SearchField from './SearchField';
 import { useTranslation } from 'react-i18next';
 
 // Every picker prefers this many emoji per row, shrinking down to MIN_COLUMNS when the
@@ -160,21 +160,14 @@ export default function EmojiPicker({
           className="emoji-picker-popover fixed z-[9999] border rounded-lg shadow-menu p-2 flex flex-col gap-2"
           style={{ ...placement, visibility: placement ? 'visible' : 'hidden' }}
         >
-          {/* The field of the global search; see the note on `bg-well-raise` in SearchModal. */}
-          <div
-            className="emoji-picker-search sidebar-search-inner box-border flex items-center gap-2 rounded-md px-2.5 h-8 bg-well-raise"
+          <SearchField
+            autoFocus
+            value={query}
+            onValueChange={setQuery}
+            placeholder={t('common.searchEmoji')}
+            aria-label={t('common.searchEmoji')}
             style={sizeStyle}
-          >
-            <Search size={14} className="text-subtle flex-shrink-0" />
-            <input
-              autoFocus
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder={t('common.searchEmoji')}
-              aria-label={t('common.searchEmoji')}
-              className="sidebar-search-input flex-1 min-w-0 bg-transparent text-xs outline-none"
-            />
-          </div>
+          />
           {/* overflow-x-hidden prevents a horizontal scrollbar on macOS when
               space-taking (non-overlay) scrollbars are in use. The grid is
               intentionally narrower than the container (gridStyle vs sizeStyle)

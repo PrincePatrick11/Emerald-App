@@ -44,7 +44,7 @@ function Body({ error, busy }: { error: string | null; busy: boolean }) {
       onClose={cancel}
       dismissible={!busy}
       widthClassName="w-[440px]"
-      bodyClassName="px-3.5 py-4 space-y-4"
+      bodyClassName="modal-body space-y-4"
       footer={
         <>
           <Button tone="neutral" disabled={busy} onClick={cancel}>{t('common.cancel')}</Button>

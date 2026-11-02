@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
-import { Search, LayoutList, X } from 'lucide-react';
+import { LayoutList } from 'lucide-react';
 import { MODULE_LIST } from '../../lib/modules';
 import { useLinkItems } from '../../hooks/useLinkItems';
 import { isImageIcon } from '../../lib/helpers';
@@ -7,6 +7,7 @@ import type { ContentType } from '../../types';
 import { ENTRY_TYPE_ICONS, ENTRY_TYPE_LABEL_KEYS, type SuggestionItem } from './SuggestionList';
 import { useTranslation } from 'react-i18next';
 import Modal from '../ui/Modal';
+import SearchField from '../ui/SearchField';
 
 type Tab = 'all' | ContentType;
 
@@ -74,21 +75,13 @@ export default function LinkPickerModal({ onSelect, onClose }: Props) {
     >
         {/* Search */}
         <div className="px-3.5 pt-3 flex-shrink-0">
-          <div className="sidebar-search-inner flex items-center gap-2 rounded-md px-2.5 h-8 bg-well-raise">
-            <Search size={14} className="text-subtle shrink-0" />
-            <input
-              ref={searchRef}
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder={t('linkPicker.searchPlaceholder')}
-              className="sidebar-search-input flex-1 min-w-0 bg-transparent text-xs outline-none"
-            />
-            {query && (
-              <button onClick={() => setQuery('')} className="flex-shrink-0 opacity-70 hover:opacity-100">
-                <X size={12} />
-              </button>
-            )}
-          </div>
+          <SearchField
+            inputRef={searchRef}
+            value={query}
+            onValueChange={setQuery}
+            placeholder={t('linkPicker.searchPlaceholder')}
+            aria-label={t('linkPicker.searchPlaceholder')}
+          />
         </div>
 
         {/* Tabs: only icon + counter, the label comes from the tooltip; six tabs

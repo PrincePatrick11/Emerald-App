@@ -476,7 +476,7 @@ export function DeleteDefinitionModal({ definition, usage, onClose, onDeleted }:
       <Modal
         title={title}
         onClose={onDeleted}
-        bodyClassName="px-3.5 py-4"
+        bodyClassName="modal-body"
         footer={<Button tone="neutral" onClick={onDeleted}>{t('common.ok')}</Button>}
       >
         <p className="text-sm text-muted">{notice}</p>
@@ -489,7 +489,7 @@ export function DeleteDefinitionModal({ definition, usage, onClose, onDeleted }:
       title={title}
       onClose={onClose}
       dismissible={!busy}
-      bodyClassName="px-3.5 py-4 space-y-3"
+      bodyClassName="modal-body space-y-3"
       footer={
         <>
           <Button tone="neutral" disabled={busy} onClick={onClose}>{t('common.cancel')}</Button>

@@ -29,7 +29,7 @@ export default function TemplateApplyDialog({ template, onApply, onClose }: {
   const [tags, setTags] = useState(hasTags);
 
   return (
-    <Modal title={t('templates.insert.applyTitle', { name: templateLabel(t, template) })} onClose={onClose} bodyClassName="px-3.5 py-4 space-y-4" footer={
+    <Modal title={t('templates.insert.applyTitle', { name: templateLabel(t, template) })} onClose={onClose} bodyClassName="modal-body space-y-4" footer={
       <>
         <Button tone="neutral" onClick={onClose}>{t('common.cancel')}</Button>
         <Button tone="jade" onClick={() => onApply({ mode, title: hasTitle && title, tags: hasTags && tags })}>

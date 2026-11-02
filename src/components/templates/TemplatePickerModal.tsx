@@ -24,7 +24,7 @@ export default function TemplatePickerModal({ templates, onSelect, onClose }: {
     : templates;
 
   return (
-    <Modal title={t('templates.insert.pickerTitle')} onClose={onClose} bodyClassName="flex min-h-0 flex-1 flex-col gap-3 px-3.5 py-4" maxHeightClassName="max-h-[70vh]">
+    <Modal title={t('templates.insert.pickerTitle')} onClose={onClose} bodyClassName="flex min-h-0 flex-1 flex-col gap-3 modal-body" maxHeightClassName="max-h-[70vh]">
       <input
         autoFocus
         className={`${OP_PROP_SELECT_CLASSES} selectable`}

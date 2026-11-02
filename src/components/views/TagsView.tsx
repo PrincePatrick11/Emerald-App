@@ -69,7 +69,7 @@ function TagColorDot({ color, onPick }: { color: string; onPick?: (color: string
         {dot}
       </button>
       {open && (
-        <div className="tag-color-popover absolute left-0 top-full mt-1.5 z-50 bg-well-solid border border-edge-default rounded-lg shadow-menu p-2 flex flex-wrap gap-1.5 w-40">
+        <div className="tag-color-popover absolute left-0 top-full mt-1.5 z-50 border rounded-lg shadow-menu p-2 flex flex-wrap gap-1.5 w-40">
           {TAG_COLORS.map((c) => (
             <button
               key={c}

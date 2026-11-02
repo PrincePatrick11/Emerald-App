@@ -22,7 +22,7 @@ export default function ImportDestinationModal() {
     <Modal title={t('importDestination.title')} onClose={cancel}
       widthClassName="w-[420px]"
       className="overflow-hidden"
-      bodyClassName="px-3.5 py-4 space-y-3"
+      bodyClassName="modal-body space-y-3"
       footer={<Button tone="neutral" onClick={cancel}>{t('importDestination.cancel')}</Button>}
     >
         <p className="text-sm text-muted">

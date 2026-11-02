@@ -598,7 +598,7 @@ export default function VaultModal({ onClose, dismissible = true }: Props) {
       dismissible={dismissible}
       widthClassName="w-[480px]"
       maxHeightClassName="max-h-[80vh]"
-      bodyClassName="flex-1 overflow-y-auto px-3.5 py-4"
+      bodyClassName="flex-1 overflow-y-auto modal-body"
     >
       <p className="text-sm text-muted mb-3">
         {t('vault.hint')}

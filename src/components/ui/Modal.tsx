@@ -36,12 +36,13 @@ export function hasOpenModal(): boolean {
 /**
  * Moves a modal by its header, with the window as the limit. Uses `left`/`top`
  * rather than a transform: a transform would become the containing block of any
- * `position: fixed` inside the modal.
+ * `position: fixed` inside the modal. Written straight to the element: the
+ * clamp measures the card, and through state a second move before the commit
+ * would measure a position the offset has already left behind.
  */
 function useModalDrag() {
   const cardRef = useRef<HTMLDivElement>(null);
-  const [offset, setOffset] = useState({ x: 0, y: 0 });
-  const offsetRef = useRef(offset);
+  const offsetRef = useRef({ x: 0, y: 0 });
 
   const moveTo = useCallback((x: number, y: number) => {
     const card = cardRef.current;
@@ -55,28 +56,27 @@ function useModalDrag() {
       y: Math.max(bounds.top - top, Math.min(bounds.bottom - top - rect.height, y)),
     };
     offsetRef.current = next;
-    setOffset(next);
+    card.style.left = `${next.x}px`;
+    card.style.top = `${next.y}px`;
   }, []);
 
-  // A smaller window or a taller card must not leave a moved modal outside.
+  // A smaller window, a taller card or a backdrop that clears the title bar
+  // must not leave a moved modal outside.
   useEffect(() => {
+    const card = cardRef.current;
     const clamp = () => moveTo(offsetRef.current.x, offsetRef.current.y);
     const observer = new ResizeObserver(clamp);
-    if (cardRef.current) observer.observe(cardRef.current);
-    window.addEventListener('resize', clamp);
-    return () => {
-      observer.disconnect();
-      window.removeEventListener('resize', clamp);
-    };
+    if (card) observer.observe(card);
+    if (card?.parentElement) observer.observe(card.parentElement);
+    return () => observer.disconnect();
   }, [moveTo]);
 
   const onPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
     if (e.button !== 0 || (e.target as HTMLElement).closest('button')) return;
     const header = e.currentTarget;
-    const { pointerId } = e;
     const startX = e.clientX - offsetRef.current.x;
     const startY = e.clientY - offsetRef.current.y;
-    header.setPointerCapture(pointerId);
+    header.setPointerCapture(e.pointerId);
     const onMove = (move: PointerEvent) => moveTo(move.clientX - startX, move.clientY - startY);
     const onEnd = () => {
       header.removeEventListener('pointermove', onMove);
@@ -88,7 +88,7 @@ function useModalDrag() {
     header.addEventListener('pointercancel', onEnd);
   };
 
-  return { cardRef, offset, onPointerDown };
+  return { cardRef, onPointerDown };
 }
 
 export default function Modal({
@@ -103,7 +103,7 @@ export default function Modal({
   dismissible = true,
 }: ModalProps) {
   const [self] = useState(() => Symbol('modal'));
-  const { cardRef, offset, onPointerDown } = useModalDrag();
+  const { cardRef, onPointerDown } = useModalDrag();
   useEffect(() => {
     openModals.push(self);
     return () => {
@@ -139,7 +139,6 @@ export default function Modal({
       <div
         ref={cardRef}
         className={`modal-card relative ${widthClassName} ${maxHeightClassName ?? ''} flex flex-col${className ? ` ${className}` : ''}`}
-        style={{ left: offset.x, top: offset.y }}
       >
         <div className="modal-header" onPointerDown={onPointerDown}>
           <h2 className="min-w-0 truncate text-sm font-semibold text-primary">{title}</h2>

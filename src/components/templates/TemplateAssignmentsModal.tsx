@@ -92,7 +92,7 @@ export default function TemplateAssignmentsModal({ templateId, name, assignments
       onClose={onClose}
       widthClassName="w-[640px] max-w-full"
       maxHeightClassName="max-h-[85vh]"
-      bodyClassName="min-h-0 flex-1 space-y-5 overflow-y-auto px-3.5 py-4"
+      bodyClassName="min-h-0 flex-1 space-y-5 overflow-y-auto modal-body"
       footer={
         <>
           <Button tone="neutral" onClick={onClose}>{t('common.cancel')}</Button>

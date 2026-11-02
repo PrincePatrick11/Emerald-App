@@ -114,13 +114,13 @@ Size tokens in both theme files: `--tab-pill-h` (30px, `TabBar`) and `--control-
 
 **Horizontal padding has exactly one source per column.** The column's outer container sets it; the panels inside add no `px-*` of their own. In the right sidebar that is `SidebarColumn`'s scrolling body (`p-3`, with a comment in place) — if a panel adds its own padding again, its rows end up visibly indented differently from the button in the action bar above them.
 
-**Spacing scale:** 2, 4, 6, 8, 10, 12, 16, 20, 24 and 32px (Tailwind `0.5`, `1`, `1.5`, `2`, `2.5`, `3`, `4`, `5`, `6`, `8`). `2.5` is for icon-to-label in menu and list rows. An arbitrary value needs a comment. Usual places: `px-8` for main-area content columns (`Dashboard`'s content, `EntryDetailFrame`), `px-3`/`p-3` in the sidebars, `px-5 py-2.5` in modal bars (`.modal-header`, `.modal-footer`), `px-3.5 py-4` in modal bodies.
+**Spacing scale:** 2, 4, 6, 8, 10, 12, 16, 20, 24 and 32px (Tailwind `0.5`, `1`, `1.5`, `2`, `2.5`, `3`, `4`, `5`, `6`, `8`). `2.5` is for icon-to-label in menu and list rows. An arbitrary value needs a comment. Usual places: `px-8` for main-area content columns (`Dashboard`'s content, `EntryDetailFrame`), `px-3`/`p-3` in the sidebars, `px-5 py-2.5` in modal bars (`.modal-header`, `.modal-footer`), `.modal-body` (`px-3.5 py-4`) in modal bodies.
 
 ### States
 
 **Focus must be visible in both themes.** A new focusable element without a `:focus-visible` rule in *both* theme blocks is unfinished. `--focus-ring` exists for exactly this.
 
-**Disabled runs through the shared `:disabled` rule** (`opacity-50 cursor-not-allowed pointer-events-none`), not through a colour of its own. Where theme rules are more specific than `:disabled` — `.menu-item`, for instance — the element is dimmed via `opacity`, because a colour declaration there would not get through.
+**Disabled runs through the shared `:disabled` rule** (`opacity-50 cursor-not-allowed pointer-events-none`), not through a colour of its own. A menu row is dimmed the same way, through `opacity`, rather than given a colour.
 
 **A tooltip for a disabled control sits on a wrapper.** A disabled `Button` carries `pointer-events-none`, so a `title` on the element itself never shows. When the reason is the point — the sigil-locked Edit button — the tooltip belongs on a wrapping `<span>`. (A hand-written button without that class, like the altar's snap buttons, can keep its own `title`.) A group of inputs locked as a whole (a locked placement's inspector, the read-only settings of a copy of one of your own blocks) is a disabled `<fieldset>` dimmed to `opacity-50` with its hint above or as its tooltip.
 
@@ -189,7 +189,7 @@ Consequence: a new "active" variant on a `.panel` card needs either a selector t
 - `.vault-card*` forgoes `.panel` and rebuilds the look; the active card's accent border (`.vault-card.vault-card-active`) deliberately sits outside any `@layer` block, with a comment in place, rather than with the other `.vault-*` classes in `@layer components`.
 - `.task-row-target` marks the row a search hit points at using `outline` rather than `background`/`border`/`box-shadow` — all three would be overridden by `html[data-theme=…] .panel-interactive`.
 
-`.search-match` and `.task-row-target` carry an `rgba()` fallback with their `color-mix()` behind `@supports`, for WebKitGTK before 2.40. The other `color-mix()` sites (vault cards, emoji-picker search, `.input-field`, …) have none yet.
+`.search-match` and `.task-row-target` carry an `rgba()` fallback with their `color-mix()` behind `@supports`, for WebKitGTK before 2.40. The other `color-mix()` sites (vault cards, `.input-field`, …) have none yet.
 
 ### Overlays and Portals
 
@@ -224,7 +224,7 @@ Two things follow that are easy to forget:
 
 **Title bar** (`TitleBar.tsx`, `h-10`; structure in [Window Chrome](architecture/shell.md#window-chrome)). Flexbox, not a centring grid: the left and right groups are `flex-shrink-0`, the space between holds the tab strip. Every trigger is an icon-only `.titlebar .rail-button`, so nothing has to fold or be measured as the window narrows — no `ResizeObserver`, no language-dependent breakpoint. The logo sits centred in a box exactly `RAIL_WIDTH` wide, lining up with the rail's icon column; the menu button follows with its own left margin rather than a shared `gap`, so its icon lines up with the entry list's icons below.
 
-Global search opens as `SearchModal` (`w-[560px]`, fixed `h-[70vh]`, matching `LinkPickerModal`'s geometry). Its field is the bordered pill `.sidebar-search-inner`; it shares only `.sidebar-search-input` with the entry list's borderless search field.
+Global search opens as `SearchModal` (`w-[560px]`, fixed `h-[70vh]`, matching `LinkPickerModal`'s geometry). Its field is `SearchField`, the bordered pill `.sidebar-search-inner`; it shares only `.sidebar-search-input` with the entry list's borderless search field.
 
 **Window buttons** (`WindowControls.tsx`, Windows and Linux only): 46×40px, square, no gap, flush into the window corner — the Windows Fluent geometry. The glyphs are inline SVG on a 10×10 grid with a 1px stroke rather than lucide icons, because lucide has no correct "restore" symbol (two offset squares, the rear one clipped).
 
@@ -232,7 +232,7 @@ Global search opens as `SearchModal` (`w-[560px]`, fixed `h-[70vh]`, matching `L
 
 **Showing and hiding the sidebars is animated** (200ms). The content keeps its pixel width and is clipped by the `<aside>` rather than squeezing together mid-transition; the transition is a class (`.app-sidebar-animated`), not an inline style, so the `prefers-reduced-motion` opt-out after it still wins; `AppShell` removes the class during a resize drag so the edge doesn't lag the pointer.
 
-**A modal repeats frame and sheet.** Title and actions lie on `--shell-bg` with no dividers, the content on `.modal-sheet`, inset by `--sheet-inset` and rounded by `--sheet-radius`. Its bodies take `px-3.5`, off the spacing scale on purpose: 14px plus the 6px inset puts the content under the 20px of the title. Behind it the scrim (`--modal-scrim`) blurs the app (`backdrop-blur-sm`). The sheet clips, so a popover from inside it portals.
+**A modal repeats frame and sheet.** Title and actions lie on `--shell-bg` with no dividers, the content on `.modal-sheet`, inset by `--sheet-inset` and rounded by `--sheet-radius`. Its bodies take `.modal-body` (`px-3.5`), off the spacing scale on purpose: 14px plus the 6px inset puts the content under the 20px of the title. Behind it the scrim (`--modal-scrim`) blurs the app (`backdrop-blur-sm`). The sheet clips, so a popover from inside it portals.
 
 **A modal moves by its header,** with the window as the limit: dragging, shrinking the window and a growing card all clamp it back inside. It is offset by `left`/`top`, not a transform, which would become the containing block of a `position: fixed` inside it. The position is not remembered.
 

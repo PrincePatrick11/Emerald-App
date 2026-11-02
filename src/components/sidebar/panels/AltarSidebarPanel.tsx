@@ -360,7 +360,7 @@ const noticeTimerRef = useRef<number | null>(null);
                           title={t('altar.backgrounds.gradient')}
                           onClose={close}
                           widthClassName="w-80"
-                          bodyClassName="px-3.5 py-4 space-y-3"
+                          bodyClassName="modal-body space-y-3"
                           className="overflow-hidden"
                           footer={
                             <>

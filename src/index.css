@@ -191,8 +191,7 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
     color: var(--menu-item-hover-text);
   }
 
-  /* Dimmed rather than recoloured: the per-theme `.menu-item` colour rules
-     outrank this one on specificity, so a `color` here would not survive. */
+  /* Dimmed rather than recoloured, like the shared `:disabled` rule. */
   .menu-item:disabled {
     opacity: 0.45;
     cursor: default;
@@ -482,6 +481,11 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
 
   .modal-header:active {
     cursor: grabbing;
+  }
+
+  /* 14px plus the sheet's inset puts the content under the title's 20px. */
+  .modal-body {
+    @apply px-3.5 py-4;
   }
 
   .modal-footer {
@@ -2653,7 +2657,7 @@ html[data-theme] .op-prop-select:focus {
 }
 
 /* The field holds the focus of the input inside it. */
-html[data-theme] .emoji-picker-search:focus-within {
+html[data-theme] .sidebar-search-inner:focus-within {
   border-color: var(--choice-active-border);
   box-shadow: 0 0 0 2px var(--focus-ring);
 }
@@ -2683,6 +2687,16 @@ html[data-theme] .emoji-picker-search:focus-within {
 }
 
 .linked-entry-menu {
+  background-color: var(--menu-bg);
+  border-color: var(--menu-border);
+  box-shadow: var(--menu-shadow);
+}
+
+.linked-entry-menu-item {
+  color: var(--text-secondary);
+}
+
+.tag-color-popover {
   background-color: var(--menu-bg);
   border-color: var(--menu-border);
   box-shadow: var(--menu-shadow);
@@ -3026,7 +3040,6 @@ html[data-theme='emerald-noctis'] .app-sidebar-left .bg-well-active.text-seconda
 html[data-theme='emerald-noctis'] .settings-nav-item-idle,
 html[data-theme='emerald-noctis'] .right-sidebar-tab-idle,
 html[data-theme='emerald-noctis'] .task-action-btn,
-html[data-theme='emerald-noctis'] .linked-entry-menu-item,
 html[data-theme='emerald-noctis'] .altar-category-chip {
   color: #b49d87;
 }
@@ -3236,12 +3249,6 @@ html[data-theme='emerald-parchment'] .list-toolbar-clear:hover {
   color: #503621;
 }
 
-html[data-theme='emerald-parchment'] .tag-color-popover {
-  background: #f8efdf;
-  border-color: rgba(146, 107, 68, 0.42);
-  box-shadow: 0 14px 28px rgba(94, 63, 30, 0.2);
-}
-
 html[data-theme='emerald-parchment'] .settings-nav-item-active,
 html[data-theme='emerald-parchment'] .right-sidebar-tab-active {
   background: #d8efe3;
@@ -3378,10 +3385,6 @@ html[data-theme='emerald-parchment'] .op-prop-select[type="date"]::-webkit-datet
 html[data-theme='emerald-parchment'] .op-prop-select[type="date"]::-webkit-datetime-edit-day-field,
 html[data-theme='emerald-parchment'] .op-prop-select[type="date"]::-webkit-datetime-edit-year-field {
   color: #3a2918;
-}
-
-html[data-theme='emerald-parchment'] .linked-entry-menu-item {
-  color: #5b432d;
 }
 
 html[data-theme='emerald-parchment'] .altar-bg-preset-label {

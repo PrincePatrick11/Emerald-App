@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
-import { Search, X } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useUIStore } from '../../../store/uiStore';
 import { useGlobalSearch } from '../../../hooks/useGlobalSearch';
 import { viewForSearchHit, type SearchHit } from '../../../lib/globalSearch';
 import Modal from '../../ui/Modal';
 import SearchResultList, { searchOptionId } from './SearchResultList';
+import SearchField from '../../ui/SearchField';
 
 /** The list and its rows need stable ids so that `aria-controls` and
  *  `aria-activedescendant` can point at them. */
@@ -20,8 +20,7 @@ const PAGE_SIZE = 50;
  * The app's global search, as a modal behind the magnifier in the title bar.
  *
  * Through `lib/globalSearch` it searches titles, tags and content of all modules
- * and lists the hits under the field. It has the outlined pill
- * (`sidebar-search-inner`) to itself; the entry list searches in a
+ * and lists the hits under the `SearchField`; the entry list searches in a
  * borderless field on the frame and only shares `sidebar-search-input`.
  *
  * Together with the hit list it forms a combobox pattern: focus stays
@@ -113,40 +112,22 @@ export default function SearchModal({ onClose }: { onClose: () => void }) {
       className="overflow-hidden h-[70vh]"
     >
       <div className="modal-rule px-3.5 py-3 border-b flex-shrink-0">
-        {/* In Parchment, `bg-well-raise` beats the `.sidebar-search-inner`
-            override (Documentation/design.md, Known Fault Line). The entry
-            list's search no longer carries the class; here it is the last
-            remnant and can go once someone checks the field in Parchment. */}
-        <div className="sidebar-search-inner flex items-center gap-2 rounded-md px-2.5 h-8 bg-well-raise">
-          <Search size={14} className="text-subtle flex-shrink-0" />
-          <input
-            ref={inputRef}
-            type="text"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            onKeyDown={onKeyDown}
-            placeholder={t('search.globalPlaceholder')}
-            aria-label={t('titlebar.search')}
-            role="combobox"
-            aria-autocomplete="list"
-            aria-expanded={hits.length > 0}
-            aria-controls={hits.length ? LISTBOX_ID : undefined}
-            // Focus never leaves the field; without this pointer the arrow
-            // keys move a selection that only sighted users learn about.
-            aria-activedescendant={hits[selectedIndex] ? searchOptionId(LISTBOX_ID, selectedIndex) : undefined}
-            className="sidebar-search-input flex-1 min-w-0 bg-transparent text-xs outline-none"
-          />
-          {query && (
-            <button
-              type="button"
-              onClick={() => { setQuery(''); inputRef.current?.focus(); }}
-              aria-label={t('search.clear')}
-              className="flex-shrink-0 opacity-70 hover:opacity-100"
-            >
-              <X size={12} />
-            </button>
-          )}
-        </div>
+        <SearchField
+          inputRef={inputRef}
+          type="text"
+          value={query}
+          onValueChange={setQuery}
+          onKeyDown={onKeyDown}
+          placeholder={t('search.globalPlaceholder')}
+          aria-label={t('titlebar.search')}
+          role="combobox"
+          aria-autocomplete="list"
+          aria-expanded={hits.length > 0}
+          aria-controls={hits.length ? LISTBOX_ID : undefined}
+          // Focus never leaves the field; without this pointer the arrow
+          // keys move a selection that only sighted users learn about.
+          aria-activedescendant={hits[selectedIndex] ? searchOptionId(LISTBOX_ID, selectedIndex) : undefined}
+        />
       </div>
 
       <SearchResultList

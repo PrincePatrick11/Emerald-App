@@ -6,6 +6,7 @@ import { DEFAULT_EMOJI_PICKER_EMOJIS, searchEmojis } from '../../../lib/emojiSea
 import { useEmojiSearchData } from '../../../hooks/useEmojiSearchData';
 import { useSettingsStore } from '../../../store/settingsStore';
 import SettingsSection from './SettingsSection';
+import SearchField from '../../ui/SearchField';
 
 /** From this many pixels of movement on, a press is a drag and no longer a click. */
 const DRAG_THRESHOLD = 4;
@@ -131,11 +132,12 @@ export default function EmojiDefaultsSection() {
         </div>
 
         <div className="flex items-center gap-2">
-          <input
+          <SearchField
             value={query}
-            onChange={(e) => setQuery(e.target.value)}
+            onValueChange={setQuery}
             placeholder={t('common.searchEmoji')}
-            className="emoji-picker-search flex-1 min-w-0 rounded-md px-2 py-1 text-xs outline-none"
+            aria-label={t('common.searchEmoji')}
+            className="flex-1 min-w-0"
           />
           {stored !== null && (
             <Button variant="secondary" onClick={() => update('emojis', { defaults: null })} className="shrink-0">
