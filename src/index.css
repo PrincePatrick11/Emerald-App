@@ -3070,6 +3070,7 @@ html[data-theme='emerald-noctis'] .app-sidebar-left .bg-well-active.text-seconda
 
 html[data-theme='emerald-noctis'] .settings-nav-item-idle,
 html[data-theme='emerald-noctis'] .right-sidebar-tab-idle,
+html[data-theme='emerald-noctis'] .task-action-btn,
 html[data-theme='emerald-noctis'] .altar-category-chip {
   color: #b49d87;
 }
@@ -3078,6 +3079,7 @@ html[data-theme='emerald-noctis'] .settings-nav-item-idle:hover,
 html[data-theme='emerald-noctis'] .right-sidebar-tab-idle:hover:not(:disabled),
 html[data-theme='emerald-noctis'] .app-sidebar-right .text-subtle.hover\:text-raise:hover,
 html[data-theme='emerald-noctis'] .app-sidebar-left .text-subtle.hover\:text-raise:hover,
+html[data-theme='emerald-noctis'] .task-action-btn:hover,
 html[data-theme='emerald-noctis'] .altar-category-chip:hover,
 html[data-theme='emerald-noctis'] .editor-toolbar-btn-idle:hover {
   color: #eadfce;
@@ -3333,6 +3335,14 @@ html[data-theme='emerald-parchment'] .task-priority-pill-low {
   background: rgba(18, 145, 92, 0.14);
   color: #0b6e48;
   border-color: rgba(18, 145, 92, 0.3);
+}
+
+html[data-theme='emerald-parchment'] .task-action-btn {
+  color: #8b6f52;
+}
+
+html[data-theme='emerald-parchment'] .task-action-btn:hover {
+  color: #2f2114;
 }
 
 html[data-theme='emerald-parchment'] .tasks-linked-entry {

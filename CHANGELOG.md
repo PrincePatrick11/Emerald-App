@@ -11,7 +11,7 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 - **All dashboards look alike.** Every list uses the same row (symbol and name on the left, details on the right, one height) and the same group heading; tags are rows now and open in place. The right sidebar always runs action, view, sort, grouping, filter.
-- **Rename, delete and restore moved to the right-click menu** on Categories, Tags, Tasks and Trash, replacing the coloured buttons in the rows. In the Trash, a selection can also be restored from the sidebar's action bar, where "Select all" now sits too.
+- **Rename and delete moved to the right-click menu** on Categories, Tags, Tasks and Trash, replacing the amber and red buttons in the rows. Restore stays on a Trash row, and a selection can also be restored from the sidebar's action bar, where "Select all" now sits too.
 - **The rail's buttons are grouped by space.** Home, then Journal/Tasks/Operations, Wiki/Lexicon/Altar and Templates/Blocks at the top; Categories/Tags/Trash and Vault/Settings at the bottom. It scrolls without a bar when the window is low, and the rail and the entry list's search start at the sheet's top edge.
 - **"Insert template" and "Add block" moved to the top of the right sidebar** while editing, "Insert template" first; the template editor has them too.
 - **The Categories page uses the full width.**

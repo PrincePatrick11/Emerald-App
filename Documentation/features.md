@@ -370,8 +370,8 @@ Deleting a journal entry, wiki article, operation, task, altar or altar library 
 
 From the Trash view you can:
 
-- **Restore** an item to its original section, from its right-click menu.
-- **Delete permanently** from the same menu, after a confirmation in the row.
+- **Restore** an item to its original section, with the button on its row or from its right-click menu.
+- **Delete permanently** from the right-click menu, after a confirmation in the row.
 - Select several items by clicking them, then restore or delete the selection from the sidebar's action bar, where "Select all" sits too.
 - Empty the entire Trash at once (with confirmation).
 

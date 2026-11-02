@@ -118,15 +118,15 @@ Size tokens in both theme files: `--tab-pill-h` (30px, `TabBar`) and `--control-
 
 - **One row:** symbol and name on the left, metadata on the right, 44px tall (`h-11`, `DashboardItem`/`DashboardRow` with `RowContent`), 6px apart. A row's second line does not exist; what would go there is metadata.
 - **One group heading:** `CollapsibleGroupHeader`, 24px, for a category, a month and a whole section alike.
-- **Actions in the context menu:** rename, duplicate, delete, restore. No row carries a permanently visible amber or red button. A permanent delete asks in the row (`InlineConfirm`).
+- **Actions in the context menu:** rename, duplicate, delete. No row carries a permanently visible amber or red button. A permanent delete asks in the row (`InlineConfirm`).
 - **One sidebar order:** action, view, sort, grouping, filter. What a dashboard does not have falls away; preferences of the view (`displayToggles`) belong to the view section.
 
 The exceptions, each for a reason:
 
 - **Home** keeps view, sort and length in its section headings, because it has three lists and the sidebar has room for one. Its title is the date over the moon phase.
-- **Tasks** have no layout choice, since subtasks and inline editing have no card to live on; the view section holds only "Show completed". The checkbox and the subtask chevron come before the name, and category and priority appear on hover: they are values with no place in a menu.
+- **Tasks** have no layout choice, since subtasks and inline editing have no card to live on; the view section holds only "Show completed". The checkbox and the subtask chevron come before the name. Add subtask, category, link and priority appear on hover, because a task is worked on from its row; rename and delete stay in the menu.
 - **Categories** have a drag handle, because their order is the hand-dragged one, and no view or sort for the same reason. **Tags** have a chevron and a colour dot, because a tag opens in place and its colour is its value.
-- **Trash** rows carry a checkbox and select on click. Restoring stays reachable without a right-click through the selection's icon in the action bar.
+- **Trash** rows carry a checkbox and select on click, and a jade Restore button, since restoring is what the page is for. Deleting for good stays in the menu.
 - **Altar** rows show the preview (32px) as their symbol, wider than the column; it fits the row. The Altar's sidebar has a second sort and grouping for its library, after the altars' own.
 - **Built-in blocks** are rows without hover, since nothing opens from them.
 - The **"+"** in a group heading stays visible: it is jade, creates rather than alters, and belongs to the group.

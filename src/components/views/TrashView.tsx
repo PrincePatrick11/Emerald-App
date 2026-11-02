@@ -16,6 +16,7 @@ import { groupBy, groupByMonth } from '../../lib/groupBy';
 import { categoryLabel } from '../../lib/categories';
 import Dashboard from '../ui/Dashboard';
 import CollapsibleGroupHeader from '../ui/CollapsibleGroupHeader';
+import Button from '../ui/Button';
 import ContextMenu from '../ui/ContextMenu';
 import { DashboardRow, RowContent } from '../ui/DashboardItem';
 import EmptyState, { NoResults } from '../ui/EmptyState';
@@ -31,6 +32,7 @@ function typeIcon(type: TrashedItem['type']) {
 interface ItemSharedProps {
   confirmingId: string | null;
   setConfirmingId: (id: string | null) => void;
+  restore: (item: TrashedItem) => Promise<void>;
   deleteNow: (item: TrashedItem) => Promise<void>;
   onContextMenu: (e: React.MouseEvent, item: TrashedItem) => void;
   selectedIds: Set<string>;
@@ -67,7 +69,7 @@ function DaysLeft({ days, t }: { days: number; t: ItemSharedProps['t'] }) {
   );
 }
 
-function ItemRow({ item, confirmingId, setConfirmingId, deleteNow, onContextMenu, selectedIds, onToggleSelect, t }: {
+function ItemRow({ item, confirmingId, setConfirmingId, restore, deleteNow, onContextMenu, selectedIds, onToggleSelect, t }: {
   item: TrashedItem;
 } & ItemSharedProps) {
   const daysLeft = useDaysLeft(item.deleted_at);
@@ -88,22 +90,32 @@ function ItemRow({ item, confirmingId, setConfirmingId, deleteNow, onContextMenu
           </span>
         </>
       ) : (
-        <RowContent
-          icon={typeIcon(item.type)}
-          title={item.title}
-          meta={(
-            <>
-              {t('trash.deletedAgo', { time: formatTimeDistance(item.deleted_at) })}
-              {daysLeft !== null && <> &middot; <DaysLeft days={daysLeft} t={t} /></>}
-            </>
-          )}
-        />
+        <>
+          <RowContent
+            icon={typeIcon(item.type)}
+            title={item.title}
+            meta={(
+              <>
+                {t('trash.deletedAgo', { time: formatTimeDistance(item.deleted_at) })}
+                {daysLeft !== null && <> &middot; <DaysLeft days={daysLeft} t={t} /></>}
+              </>
+            )}
+          />
+          {/* Restoring is what this page is for, so it stays in the row, in jade.
+              Deleting for good is in the context menu. */}
+          <span className="flex-shrink-0" onClick={(e) => e.stopPropagation()}>
+            <Button tone="jade" small onClick={() => restore(item)}>
+              <RotateCcw size={12} />
+              {t('trash.restore')}
+            </Button>
+          </span>
+        </>
       )}
     </DashboardRow>
   );
 }
 
-function ItemCard({ item, confirmingId, setConfirmingId, deleteNow, onContextMenu, selectedIds, onToggleSelect, t }: {
+function ItemCard({ item, confirmingId, setConfirmingId, restore, deleteNow, onContextMenu, selectedIds, onToggleSelect, t }: {
   item: TrashedItem;
 } & ItemSharedProps) {
   const daysLeft = useDaysLeft(item.deleted_at);
@@ -130,11 +142,16 @@ function ItemCard({ item, confirmingId, setConfirmingId, deleteNow, onContextMen
           <DaysLeft days={daysLeft} t={t} />
         </div>
       )}
-      {confirmingId === item.id && (
-        <div className="flex items-center gap-1 pt-1 border-t border-edge" onClick={(e) => e.stopPropagation()}>
-          <InlineConfirm small onConfirm={() => deleteNow(item)} onCancel={() => setConfirmingId(null)} />
-        </div>
-      )}
+      <div className="flex items-center gap-1 pt-1 border-t border-edge" onClick={(e) => e.stopPropagation()}>
+        {confirmingId === item.id
+          ? <InlineConfirm small onConfirm={() => deleteNow(item)} onCancel={() => setConfirmingId(null)} />
+          : (
+            <Button tone="jade" small onClick={() => restore(item)}>
+              <RotateCcw size={12} />
+              {t('trash.restore')}
+            </Button>
+          )}
+      </div>
     </div>
   );
 }
@@ -237,7 +254,7 @@ export default function TrashView() {
     setCtxMenu({ item, x: e.clientX, y: e.clientY });
   };
 
-  const itemProps: ItemSharedProps = { confirmingId, setConfirmingId, deleteNow, onContextMenu: openCtxMenu, selectedIds, onToggleSelect: toggleSelect, t };
+  const itemProps: ItemSharedProps = { confirmingId, setConfirmingId, restore, deleteNow, onContextMenu: openCtxMenu, selectedIds, onToggleSelect: toggleSelect, t };
 
   const sorted = sortItems(matching, trashPrefs.sort, { date: (i) => i.deleted_at });
 

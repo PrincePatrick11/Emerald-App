@@ -603,11 +603,20 @@ const TaskRow = memo(function TaskRow({
           </div>
         )}
 
-        {/* Category and priority are values rather than actions and have no
-            place in the context menu; they show on hover. Everything that acts
-            on the task is in the menu. Not merely transparent: they would hold their
-            room at rest, and the linked entries would float away from the edge. */}
+        {/* The task's everyday controls show on hover: subtask, category, link,
+            priority. Rename and delete are in the context menu. Not merely
+            transparent: they would hold their room at rest, and the linked
+            entries would float away from the edge. */}
         <div className="hidden group-hover:flex focus-within:flex items-center gap-1.5 flex-shrink-0">
+          <button
+            onClick={handleCreateSubtaskLocal}
+            className="task-action-btn text-subtle hover:text-accent-raise p-0.5"
+            title={t('tasks.addSubtask')}
+            aria-label={t('tasks.addSubtask')}
+          >
+            <Plus size={12} />
+          </button>
+
           <CategorySelect
             categories={categories}
             value={task.category_id}
@@ -617,6 +626,15 @@ const TaskRow = memo(function TaskRow({
             align="right"
             title={t('filters.category')}
           />
+
+          <button
+            onClick={() => setLinkModal({ taskId: task.id })}
+            className="task-action-btn text-subtle hover:text-accent-raise p-0.5"
+            title={t('tasks.linkEntry')}
+            aria-label={t('tasks.linkEntry')}
+          >
+            <Link2 size={12} />
+          </button>
 
           <Dropdown<TaskPriority>
             value={task.priority}
