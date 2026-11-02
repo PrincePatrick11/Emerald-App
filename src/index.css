@@ -518,21 +518,16 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
     @apply px-3.5 py-4;
   }
 
-  /* A tile of `CreateItemModal`. Arrow keys and Tab move through the grid, so the
-     focus has to show: the built-in themes ring `.panel-interactive` themselves,
-     the outline below is for custom themes, which do not. */
+  /* A tile of `CreateItemModal`. Arrow keys, Tab and Enter work on the focused one,
+     so it shows from the moment the modal opens, also after a mouse click, which
+     `:focus-visible` would not count: see the ring further down. */
   .create-item-tile {
     @apply flex flex-col items-center justify-center gap-1.5 px-1 py-3 text-xs text-secondary;
   }
 
   .create-item-tile:hover,
-  .create-item-tile:focus-visible {
+  .create-item-tile:focus {
     color: var(--text-primary);
-  }
-
-  .create-item-tile:focus-visible {
-    outline: 1px solid var(--accent);
-    outline-offset: -1px;
   }
 
   .modal-footer {
@@ -2546,6 +2541,12 @@ html[data-theme] .block-manager-row--idle,
 }
 ::-webkit-scrollbar-thumb:hover {
   background-color: var(--scrollbar-hover);
+}
+
+/* Unlayered and with the theme's specificity, or `.panel-interactive` would win. */
+html[data-theme] .create-item-tile:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--focus-ring);
 }
 
 /* The entry list's scrollbar stays out of sight unless the list is moving
