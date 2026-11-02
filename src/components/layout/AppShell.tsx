@@ -388,12 +388,6 @@ export default function AppShell() {
                 {leftListMounted && <LeftSidebarEntryList />}
               </div>
             </div>
-            {leftListOpen && !viewLocked && (
-              <div
-                onPointerDown={onLeftPointerDown}
-                className="sidebar-resize-handle absolute top-0 right-0 w-1 h-full cursor-col-resize z-10"
-              />
-            )}
           </aside>
         )}
 
@@ -410,6 +404,25 @@ export default function AppShell() {
           </div>
         </main>
 
+        {/* Resize handles — here in the frame and not in their sidebars, which clip:
+            they reach over onto the sheet. A closed sidebar has none, or it would
+            sit as a strip at the edge of the main area. With "Lock view" neither
+            exists. */}
+        {leftListOpen && !isAltarWindowFullscreen && !viewLocked && (
+          <div
+            onPointerDown={onLeftPointerDown}
+            className="sidebar-resize-handle absolute top-0 w-2 h-full cursor-col-resize z-10"
+            style={{ left: leftSidebarWidth - 3 }}
+          />
+        )}
+        {rightSidebarOpen && !isAltarWindowFullscreen && !viewLocked && (
+          <div
+            onPointerDown={onRightPointerDown}
+            className="sidebar-resize-handle absolute top-0 w-2 h-full cursor-col-resize z-10"
+            style={{ right: `calc(var(--sheet-inset) + ${rightWidth}px - 3px)` }}
+          />
+        )}
+
         {/* Right Sidebar — content anchored to the right edge, so it slides in
             from there when opening instead of unfolding from the left. */}
         {!isAltarWindowFullscreen && (
@@ -419,15 +432,6 @@ export default function AppShell() {
             }`}
             style={{ width: rightSidebarOpen ? rightWidth : 0 }}
           >
-            {/* Resize handle — with the bar closed it would otherwise sit as a
-                strip at the edge of the main area. With "Lock view" it does
-                not exist on either side. */}
-            {rightSidebarOpen && !viewLocked && (
-              <div
-                onPointerDown={onRightPointerDown}
-                className="sidebar-resize-handle absolute top-0 left-0 w-1 h-full cursor-col-resize z-10"
-              />
-            )}
             {/* The sheet, right half. Surface, border and radius sit on the
                 content, not on the <aside>: there the borders would remain as
                 a 2px line at width 0. This way they move out with the content
