@@ -13,6 +13,7 @@ import LeftSidebarRailBase, { RAIL_WIDTH } from './LeftSidebarRail';
 import LeftSidebarEntryListBase from './LeftSidebarEntryList';
 import RightSidebarBase from './RightSidebar';
 import MainAreaBase from './MainArea';
+import AppBottomBar from './AppBottomBar';
 import VaultModal from './VaultModal';
 import VaultKeyDialog from './VaultKeyDialog';
 import BackupUnlockDialog from './BackupUnlockDialog';
@@ -443,6 +444,13 @@ export default function AppShell() {
           </aside>
         )}
       </div>
+
+      {!isAltarWindowFullscreen && (
+        <AppBottomBar
+          className={resizing ? '' : SIDEBAR_ANIM_CLASS}
+          paddingRight={`calc(var(--sheet-inset) + ${rightSidebarOpen ? rightWidth : 0}px + 8px)`}
+        />
+      )}
 
       <UndoToast />
       <ImageNoticeModal />

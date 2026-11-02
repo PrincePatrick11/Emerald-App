@@ -121,9 +121,9 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
     @apply flex items-center justify-center w-[30px] h-[30px] p-0 rounded-md;
   }
 
-  /* The square at the bottom of the rail: four buttons in the space of one. */
-  .left-sidebar-footer-square .rail-button {
-    @apply flex items-center justify-center w-[15px] h-[15px] p-0 rounded-sm;
+  /* The line under everything: smaller than the rail's 32px. */
+  .app-bottom-bar .rail-button {
+    @apply flex items-center justify-center w-6 h-6 p-0 rounded-md;
   }
 
   /* The button area follows the width of the left sidebar —
@@ -315,7 +315,7 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
      there, which keeps the content mounted for that long.
      During a resize drag `AppShell` removes the class. */
   .app-sidebar-animated {
-    transition: width 200ms ease-out, margin-left 200ms ease-out, padding-left 200ms ease-out;
+    transition: width 200ms ease-out, margin-left 200ms ease-out, padding-left 200ms ease-out, padding-right 200ms ease-out;
   }
 
   /* Comes after and is equally specific, so it wins by

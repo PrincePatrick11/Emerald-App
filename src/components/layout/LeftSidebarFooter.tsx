@@ -1,8 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import { Settings } from 'lucide-react';
 import { Suspense, lazy, useEffect, useState } from 'react';
-import { AUX_VIEWS } from '../../lib/modules';
-import { useUIStore } from '../../store/uiStore';
 import { useVaultStore } from '../../store/vaultStore';
 import { useAutoBackupStore } from '../../store/autoBackupStore';
 import { useSettingsStore } from '../../store/settingsStore';
@@ -19,11 +17,6 @@ const SettingsModal = lazy(() => import('./settings/SettingsModal'));
 // the module back into the main chunk.
 import type { SettingsPage } from './settings/SettingsModal';
 import RailButton from '../ui/RailButton';
-
-/** Icon size in the square of small buttons; the rail's buttons have 18. */
-const FOOTER_ICON = 11;
-
-const FOOTER_VIEWS = ['categories', 'tags', 'trash'] as const;
 
 /**
  * The check at startup, once per app start: the bar is re-mounted,
@@ -50,15 +43,9 @@ function checkOnStart(): Promise<string | null> {
   return startupCheck;
 }
 
-/**
- * The bottom of the rail, for what is needed less often than the modules: four
- * small buttons in a square as large as one rail button (Categories, Tags, Trash,
- * Settings), below it the Vault at normal size.
- */
+/** The bottom of the rail: Vault, below it Settings. */
 export default function LeftSidebarFooter() {
   const { t } = useTranslation();
-  const setActiveView = useUIStore((s) => s.setActiveView);
-  const activeViewType = useUIStore((s) => s.activeView.type);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settingsPage, setSettingsPage] = useState<SettingsPage>('general');
   const [vaultOpen, setVaultOpen] = useState(false);
@@ -90,51 +77,42 @@ export default function LeftSidebarFooter() {
 
   return (
     <div className="left-sidebar-footer sidebar-bottom-bar w-full flex-1 flex flex-col items-center justify-end gap-1 py-2">
-      <div className="left-sidebar-footer-square grid grid-cols-2 gap-0.5 w-8 h-8">
-        {FOOTER_VIEWS.map((type) => {
-          const { icon: Icon, navLabelKey } = AUX_VIEWS[type];
-          return (
-            <RailButton key={type} active={activeViewType === type} onClick={() => setActiveView({ type })} title={t(navLabelKey)}>
-              <Icon size={FOOTER_ICON} />
-            </RailButton>
-          );
-        })}
-        <RailButton
-          // The target page is captured here and the dot cleared immediately:
-          // it has done its job as soon as the window opens. The other way
-          // round, the gear would jump to "Updates" for the rest of the
-          // session — and clearing without this capture would mean the window
-          // opens on "General" again, because both state changes land in the
-          // same render.
-          onClick={() => {
-            setSettingsPage(notice === 'update' ? 'updates' : notice === 'backup' ? 'backup' : 'general');
-            setSettingsOpen(true);
-            setUpdateVersion(null);
-            if (notice === 'update') dotSeen = true;
-            if (notice === 'backup') markAutoBackupErrorSeen();
-          }}
-          title={
-            notice === 'update' ? t('settings.updateFound', { version: updateVersion })
-              : notice === 'backup' ? t('settings.autoBackupFailedDot')
-                : t('nav.settings')
-          }
-          className="relative"
-        >
-          <Settings size={FOOTER_ICON} />
-          {notice && (
-            <span
-              aria-hidden
-              className="absolute top-0 right-0 w-1 h-1 rounded-full"
-              style={{ backgroundColor: notice === 'update' ? 'var(--accent)' : 'var(--danger-text)' }}
-            />
-          )}
-        </RailButton>
-      </div>
       <RailButton onClick={() => setVaultOpen(true)} title={t('nav.vaults')} className="flex items-center justify-center w-8 h-8 p-0">
         {/* 17px only for the emoji: it carries no stroke width and otherwise
             looks too large next to the lucide icons. The fallback glyph is
             itself a lucide icon and stays at the 18 of the rail. */}
         <VaultGlyph icon={activeVaultIcon} size={activeVaultIcon ? 17 : 18} />
+      </RailButton>
+
+      <RailButton
+        // The target page is captured here and the dot cleared immediately:
+        // it has done its job as soon as the window opens. The other way
+        // round, the gear would jump to "Updates" for the rest of the
+        // session — and clearing without this capture would mean the window
+        // opens on "General" again, because both state changes land in the
+        // same render.
+        onClick={() => {
+          setSettingsPage(notice === 'update' ? 'updates' : notice === 'backup' ? 'backup' : 'general');
+          setSettingsOpen(true);
+          setUpdateVersion(null);
+          if (notice === 'update') dotSeen = true;
+          if (notice === 'backup') markAutoBackupErrorSeen();
+        }}
+        title={
+          notice === 'update' ? t('settings.updateFound', { version: updateVersion })
+            : notice === 'backup' ? t('settings.autoBackupFailedDot')
+              : t('nav.settings')
+        }
+        className="relative"
+      >
+        <Settings size={18} />
+        {notice && (
+          <span
+            aria-hidden
+            className="absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full"
+            style={{ backgroundColor: notice === 'update' ? 'var(--accent)' : 'var(--danger-text)' }}
+          />
+        )}
       </RailButton>
 
       {vaultOpen && <VaultModal onClose={() => setVaultOpen(false)} />}

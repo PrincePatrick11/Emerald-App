@@ -183,8 +183,8 @@ document.querySelector('.left-sidebar-rail button:has(.lucide-book-open)').click
 | Operations | `lucide-wand-sparkles` | `.left-sidebar-rail button:has(.lucide-wand-sparkles)` |
 | Wiki | `lucide-library` | `.left-sidebar-rail button:has(.lucide-library)` |
 | Altar | `lucide-altar` | `.left-sidebar-rail button:has(.lucide-altar)` |
-| Tags | `lucide-tag` | `.left-sidebar-footer button:has(.lucide-tag)` |
-| Trash | `lucide-trash2` | `.left-sidebar-footer button:has(.lucide-trash2)` |
+| Tags | `lucide-tag` | `.app-bottom-bar button:has(.lucide-tag)` |
+| Trash | `lucide-trash2` | `.app-bottom-bar button:has(.lucide-trash2)` |
 | Settings | `lucide-settings` | `.left-sidebar-footer button:has(.lucide-settings)` |
 
 `:has()` is supported by WebView2 — verified against the running build.
@@ -288,7 +288,7 @@ await mcp.call_tool("eval", {
 
 ### Trash → Restore
 ```js
-await mcp.call_tool("eval", { expression: "document.querySelector('.left-sidebar-footer button:has(.lucide-trash2)')?.click()" });
+await mcp.call_tool("eval", { expression: "document.querySelector('.app-bottom-bar button:has(.lucide-trash2)')?.click()" });
 await mcp.call_tool("eval", { expression: "[...document.querySelectorAll('button')].find(b => b.innerText.trim() === 'Restore')?.click()" });
 // Trash auto-deletes after 30 days
 ```

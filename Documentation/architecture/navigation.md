@@ -94,7 +94,8 @@ The left sidebar is two independent components side by side in `AppShell`'s `app
 - The buttons stand in small groups set apart by space alone: Home; Journal/Tasks/Operations; Wiki/Lexicon/Altar, where Lexicon is an `AUX_VIEWS` entry, not a module (see [Module Registry](modules.md#module-registry)); Templates/Blocks. The groups are spelled out, not derived from `MODULE_LIST`, so a new module has to be placed here by hand.
 - Every view button comes from `viewButton(type, meta)`, which marks the button of the open view `active` — the accent border `.sidebar-item.active` uses in the entry lists.
 - The rail has no panel toggles: all three sidebars are toggled from the *View* menu (`useTitleBarMenus.ts` on Windows/Linux, native on macOS; `menu.rail`/`menu.entryList`/ `menu.properties`). Since Settings and Vault live only in the rail, hiding it hides them too.
-- **`LeftSidebarFooter`** is the bottom of the rail: Categories, Tags, Trash and Settings as four 15px buttons with 11px icons in a square as large as one rail button, below it Vault (opens `VaultModal`) at normal size.
+- **`LeftSidebarFooter`** is the bottom of the rail: Vault (opens `VaultModal`), below it Settings.
+- **`AppBottomBar`** is a 28px line under the whole shell, as wide as the window: Trash, Categories and Tags, ending at the right sidebar's left edge (`AppShell` passes that distance). It is gone in the Altar's full-window mode.
 - The update check (the dot on the gear) runs once per app start: its promise and "dot shown" flag are module-level, because the footer remounts when the Altar's full-window mode ends.
 - Logo, back/forward and the search button are in the title bar (see [Window Chrome](shell.md#window-chrome)), the logo centred in a `RAIL_WIDTH`-wide box above the rail.
 - Home's target is not a content view (`isContentView` is false), so it overwrites the active tab instead of opening a new one.
