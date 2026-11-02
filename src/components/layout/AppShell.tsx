@@ -11,7 +11,6 @@ import { hideSplash } from '../../lib/splash';
 import TitleBar from './titlebar/TitleBar';
 import LeftSidebarRailBase, { RAIL_WIDTH } from './LeftSidebarRail';
 import LeftSidebarEntryListBase from './LeftSidebarEntryList';
-import LeftSidebarFooterBase from './LeftSidebarFooter';
 import RightSidebarBase from './RightSidebar';
 import MainAreaBase from './MainArea';
 import VaultModal from './VaultModal';
@@ -36,7 +35,6 @@ import ImportDestinationModal from '../ui/ImportDestinationModal';
 // mouse move through the list, the sheet with its editors and the right sidebar.
 const LeftSidebarRail = memo(LeftSidebarRailBase);
 const LeftSidebarEntryList = memo(LeftSidebarEntryListBase);
-const LeftSidebarFooter = memo(LeftSidebarFooterBase);
 const RightSidebar = memo(RightSidebarBase);
 const MainArea = memo(MainAreaBase);
 
@@ -367,7 +365,7 @@ export default function AppShell() {
           <aside
             // A frame, not a divider: rail and list merge seamlessly into the
             // title bar, only the sheet next to them is set apart.
-            className={`app-sidebar app-sidebar-left flex-shrink-0 relative overflow-hidden flex flex-col${
+            className={`app-sidebar app-sidebar-left flex-shrink-0 relative overflow-hidden${
               railOpen ? ' app-sidebar-left-with-rail' : ''
             }${resizing ? '' : ` ${SIDEBAR_ANIM_CLASS}`}`}
             style={{ width: leftSidebarWidth }}
@@ -375,7 +373,7 @@ export default function AppShell() {
             {/* A hidden rail is pushed out of view to the left by the negative
                 margin, so the list moves into its place. */}
             <div
-              className={`flex flex-1 min-h-0${resizing ? '' : ` ${SIDEBAR_ANIM_CLASS}`}`}
+              className={`flex h-full${resizing ? '' : ` ${SIDEBAR_ANIM_CLASS}`}`}
               style={{ width: RAIL_WIDTH + entryListWidth, marginLeft: railOpen ? 0 : -RAIL_WIDTH }}
             >
               <div className="flex-shrink-0 h-full flex" inert={!railOpen} aria-hidden={!railOpen}>
@@ -389,9 +387,6 @@ export default function AppShell() {
               >
                 {leftListMounted && <LeftSidebarEntryList />}
               </div>
-            </div>
-            <div inert={leftSidebarWidth === 0} aria-hidden={leftSidebarWidth === 0}>
-              <LeftSidebarFooter />
             </div>
             {leftListOpen && !viewLocked && (
               <div

@@ -3,6 +3,7 @@ import type { LucideIcon } from 'lucide-react';
 import { AUX_VIEWS, MODULES, type ViewId } from '../../lib/modules';
 import { useUIStore } from '../../store/uiStore';
 import RailButton from '../ui/RailButton';
+import LeftSidebarFooter from './LeftSidebarFooter';
 
 /** Width of the rail: the 32px buttons with 6px of air each, tight, so the list
  *  moves close to the icons (`.app-sidebar-left-with-rail` in index.css).
@@ -69,6 +70,7 @@ export default function LeftSidebarRail() {
           {viewButton('blocks', AUX_VIEWS.blocks)}
         </div>
       </div>
+      <LeftSidebarFooter />
     </div>
   );
 }

@@ -121,9 +121,9 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
     @apply flex items-center justify-center w-[30px] h-[30px] p-0 rounded-md;
   }
 
-  /* The narrow row under rail and entry list: smaller than the rail's 32px. */
-  .left-sidebar-footer .rail-button {
-    @apply flex items-center justify-center w-[26px] h-[26px] p-0 rounded-md;
+  /* The square at the bottom of the rail: four buttons in the space of one. */
+  .left-sidebar-footer-square .rail-button {
+    @apply flex items-center justify-center w-[15px] h-[15px] p-0 rounded-sm;
   }
 
   /* The button area follows the width of the left sidebar —
