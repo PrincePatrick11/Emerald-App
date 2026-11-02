@@ -21,7 +21,7 @@
             `normalizeThemeId()` from `src/themes/theme.ts`: this script
             runs before the bundle and may not import anything.
 
-         2. Set up a last safety net. Normally `AppShell` clears the
+         2. Set up a last safety net. Normally the app clears the
             screen, with the timer from `initSplash()` (`lib/splash.ts`) as
             the fallback. Both live in the bundle — if that fails to load or
             an import throws, neither runs. The screen would then stay up
@@ -29,8 +29,8 @@
             app's own window buttons (`decorations: false`), only Alt+F4
             would be left. That is why this one timer lives here, where no
             bundle error can reach it. It removes the screen hard, without
-            fading out, and fires later than the regular one so that it does
-            not get ahead of it.
+            fading out. `initSplash()` removes the id it looks for, so it only
+            ever acts if the bundle never got that far.
 
          Tauri hashes inline scripts at build time and appends the sha256 to
          `script-src`, so this script runs despite `script-src 'self'`.

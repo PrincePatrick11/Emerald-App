@@ -5,7 +5,7 @@
  * The markup itself lives there and not in a component: it has to be in the
  * first frame, long before React has mounted — otherwise exactly the white
  * window it is meant to cover stays visible. From here it is only
- * removed and re-attached for the preview.
+ * removed and re-attached, for the return after a question and for the preview.
  */
 
 /** If the regular clearing never happens — render throws, database hangs —,
@@ -14,9 +14,14 @@
  *  the bundle does not load is in the inline script in `index.html`. */
 const FALLBACK_MS = 10_000;
 
+/** The same net while a keychain prompt is open: that runs on the user's time, but
+ *  a prompt nobody can reach must not leave the window buttons covered for good
+ *  (on Windows and Linux the screen lies over them). */
+const KEYCHAIN_WAIT_MS = 120_000;
+
 /** Copy of the original, taken while it is still in the DOM. Without it
- *  "Show loading screen" could no longer show anything — the original is
- *  removed after startup. */
+ *  neither `resumeSplash()` nor "Show loading screen" could show anything —
+ *  the original is removed after startup. */
 let template: HTMLElement | null = null;
 
 /** The preview currently open, so that a second menu call does not stack
@@ -30,9 +35,9 @@ let current: HTMLElement | null = null;
 
 let fallback: ReturnType<typeof setTimeout> | undefined;
 
-function armFallback(): void {
+function armFallback(ms = FALLBACK_MS): void {
   clearTimeout(fallback);
-  fallback = setTimeout(hideSplash, FALLBACK_MS);
+  fallback = setTimeout(hideSplash, ms);
 }
 
 /**
@@ -48,8 +53,8 @@ function fadeOutAndRemove(el: HTMLElement): void {
 }
 
 /**
- * Once at startup. Takes the copy for the preview and sets up the
- * safety net.
+ * Once at startup. Takes the copy, sets up the safety net and takes over
+ * from the one in `index.html`.
  *
  * Must run while the original is still in the DOM — so in the module body of
  * `main.tsx` and not in a component. If `main.tsx` ever got an
@@ -70,11 +75,11 @@ export function initSplash(): void {
 }
 
 /**
- * For as long as `wait` takes the user, not the app: a keychain prompt must not
- * use up the time the safety net allows for loading.
+ * Gives the safety net the longer limit until `wait` settles, then the regular
+ * one again: a keychain prompt must not use up the time allowed for loading.
  */
-export async function holdSplash<T>(wait: Promise<T>): Promise<T> {
-  clearTimeout(fallback);
+export async function extendSplashDuring<T>(wait: Promise<T>): Promise<T> {
+  if (current) armFallback(KEYCHAIN_WAIT_MS);
   try {
     return await wait;
   } finally {

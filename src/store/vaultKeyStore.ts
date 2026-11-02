@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { holdSplash, resumeSplash } from '../lib/splash';
+import { extendSplashDuring, resumeSplash } from '../lib/splash';
 import { unlockRemembered, vaultKeyStatus } from '../lib/vaultKeys';
 
 /**
@@ -69,15 +69,15 @@ const rememberedUnlocks = new Map<string, Promise<boolean>>();
 
 /**
  * One keychain read per vault at a time. StrictMode runs the boot effect twice,
- * and every read of an entry this build may not read yet is a prompt of its own:
- * "Allow" would answer the first and the second would open right behind it.
+ * and every concurrent read of an entry this build may not read yet would add
+ * its own prompts (macOS, see `Documentation/security.md`).
  *
  * A keychain that does not respond is no reason to fail — then the password it is.
  */
 function unlockRememberedOnce(vaultId: string): Promise<boolean> {
   let unlock = rememberedUnlocks.get(vaultId);
   if (!unlock) {
-    unlock = holdSplash(unlockRemembered(vaultId))
+    unlock = extendSplashDuring(unlockRemembered(vaultId))
       .catch(() => false)
       .finally(() => rememberedUnlocks.delete(vaultId));
     rememberedUnlocks.set(vaultId, unlock);
@@ -89,7 +89,7 @@ function unlockRememberedOnce(vaultId: string): Promise<boolean> {
  * Asks, then puts the loading screen back up for what follows: the dialog took
  * it away, and the vault's data is yet to load. On "Cancel" nothing loads.
  */
-async function askThenLoad(request: VaultKeyRequest): Promise<void> {
+async function askThenResumeSplash(request: VaultKeyRequest): Promise<void> {
   await ask(request);
   resumeSplash();
 }
@@ -108,6 +108,9 @@ async function askThenLoad(request: VaultKeyRequest): Promise<void> {
  * Startup, switching, creating, opening and import as a new vault all pass
  * through here, because they all end up in `openActiveVault` or the startup in `AppShell`.
  * Rust enforces the same: without a key, `db_load` opens nothing.
+ *
+ * After a question the loading screen is up again: the caller ends it with
+ * `hideSplash()` once the vault has loaded.
  */
 export async function ensureVaultReady(
   vault: { id: string; name: string },
@@ -118,7 +121,7 @@ export async function ensureVaultReady(
     if (status.unlocked) return;
     // `askPassword`: explicitly locked, so do not silently unlock again right away.
     if (!askPassword && (await unlockRememberedOnce(vault.id))) return;
-    return askThenLoad({ kind: 'unlock', vaultId: vault.id, vaultName: vault.name });
+    return askThenResumeSplash({ kind: 'unlock', vaultId: vault.id, vaultName: vault.name });
   }
-  return askThenLoad({ kind: status.hasDatabase ? 'encrypt' : 'create', vaultId: vault.id, vaultName: vault.name });
+  return askThenResumeSplash({ kind: status.hasDatabase ? 'encrypt' : 'create', vaultId: vault.id, vaultName: vault.name });
 }
