@@ -60,6 +60,8 @@ type Connections = HashMap<String, Connection>;
 #[derive(Default)]
 pub struct SyncState {
     waiting: Mutex<HashMap<String, Zeroizing<String>>>,
+    /// Where each frame of a fetched snapshot lies in its file.
+    frames: Mutex<HashMap<String, Vec<(u64, u32)>>>,
     file: Mutex<()>,
 }
 
@@ -123,6 +125,11 @@ pub fn is_connected(app: &tauri::AppHandle, vault_id: &str) -> bool {
 
 /// Forgets the connection along with a vault's local files.
 pub fn forget(app: &tauri::AppHandle, vault_id: &str) {
+    if let Ok(dir) = vault::vault_dir(app, vault_id) {
+        for name in [UPLOAD_FILE, DOWNLOAD_FILE] {
+            std::fs::remove_file(dir.join(name)).ok();
+        }
+    }
     if is_connected(app, vault_id) {
         if let Err(e) = change_all(app, |all| {
             all.remove(vault_id);
@@ -237,6 +244,81 @@ async fn refused(response: Response) -> String {
         return NEEDS_LOGIN.to_string();
     }
     format!("SYNC_SERVER:{}", code.unwrap_or_else(|| status.as_u16().to_string()))
+}
+
+/// Compressed, then sealed: encrypted data does not compress.
+fn seal_packed(key: &Key, text: &str) -> Result<Vec<u8>, String> {
+    use std::io::Write;
+    let mut encoder = flate2::write::DeflateEncoder::new(Vec::new(), flate2::Compression::new(3));
+    encoder.write_all(text.as_bytes()).map_err(|e| e.to_string())?;
+    let packed = encoder.finish().map_err(|e| e.to_string())?;
+    Ok(crypto::seal(key, Context::Sync, &packed))
+}
+
+/// Inflating stops here: a sealed frame comes from this vault's own devices, but
+/// nothing is gained by trusting its size.
+const MAX_UNPACKED: u64 = 1 << 30;
+
+fn open_packed(key: &Key, data: &[u8]) -> Result<String, String> {
+    use std::io::Read;
+    let packed = crypto::open(key, Context::Sync, data).map_err(|_| "SYNC_CANNOT_OPEN".to_string())?;
+    let mut text = String::new();
+    flate2::read::DeflateDecoder::new(&packed[..])
+        .take(MAX_UNPACKED)
+        .read_to_string(&mut text)
+        .map_err(|_| "SYNC_CANNOT_OPEN".to_string())?;
+    Ok(text)
+}
+
+const UPLOAD_FILE: &str = "sync-upload.tmp";
+const DOWNLOAD_FILE: &str = "sync-download.tmp";
+
+/// A frame: its length, then the sealed bytes. The server sees one opaque file.
+fn frame_offsets(path: &std::path::Path) -> Result<Vec<(u64, u32)>, String> {
+    use std::io::{Read, Seek, SeekFrom};
+    let mut file = std::fs::File::open(path).map_err(|e| e.to_string())?;
+    let size = file.metadata().map_err(|e| e.to_string())?.len();
+    let (mut at, mut offsets) = (0u64, Vec::new());
+    while at < size {
+        let mut length = [0u8; 4];
+        file.seek(SeekFrom::Start(at)).map_err(|e| e.to_string())?;
+        file.read_exact(&mut length).map_err(|_| "SYNC_CANNOT_OPEN".to_string())?;
+        let length = u32::from_le_bytes(length);
+        if at + 4 + u64::from(length) > size {
+            return Err("SYNC_CANNOT_OPEN".to_string());
+        }
+        offsets.push((at + 4, length));
+        at += 4 + u64::from(length);
+    }
+    Ok(offsets)
+}
+
+fn read_frame(path: &std::path::Path, key: &Key, offset: u64, length: u32) -> Result<String, String> {
+    use std::io::{Read, Seek, SeekFrom};
+    let mut file = std::fs::File::open(path).map_err(|e| e.to_string())?;
+    file.seek(SeekFrom::Start(offset)).map_err(|e| e.to_string())?;
+    let mut bytes = vec![0; length as usize];
+    file.read_exact(&mut bytes).map_err(|_| "SYNC_CANNOT_OPEN".to_string())?;
+    open_packed(key, &bytes)
+}
+
+/// The server's snapshot, written to a file as it comes rather than held in memory.
+async fn download_snapshot(target: &Remote, path: &std::path::Path) -> Result<(i64, i64, i64), String> {
+    use tokio::io::AsyncWriteExt;
+    let mut response = send(target.call(Method::GET, "/snapshot", LONG)?).await?;
+    if !response.status().is_success() {
+        return Err(refused(response).await);
+    }
+    let number = |name: &str| -> i64 {
+        response.headers().get(name).and_then(|v| v.to_str().ok()).and_then(|v| v.parse().ok()).unwrap_or(0)
+    };
+    let meta = (number("x-snapshot-seq"), number("x-epoch"), number("x-schema"));
+    let mut file = tokio::fs::File::create(path).await.map_err(|e| e.to_string())?;
+    while let Some(chunk) = response.chunk().await.map_err(|_| UNREACHABLE.to_string())? {
+        file.write_all(&chunk).await.map_err(|e| e.to_string())?;
+    }
+    file.flush().await.map_err(|e| e.to_string())?;
+    Ok(meta)
 }
 
 struct Remote {
@@ -420,7 +502,7 @@ pub async fn sync_push(
 ) -> Result<Value, String> {
     let target = remote(&app, &vault_id)?;
     let key = files_key(&app, &vault_id)?;
-    let payload = B64.encode(seal(&key, &changes));
+    let payload = B64.encode(seal_packed(&key, &changes)?);
     let body = json!({ "base": base, "epoch": epoch, "schema": schema, "batch_id": batch_id, "payload": payload });
     let response = send(target.call(Method::POST, "/changes", LONG)?.json(&body)).await?;
     if response.status().is_success() {
@@ -452,7 +534,7 @@ pub async fn sync_pull(app: tauri::AppHandle, vault_id: String, after: i64, epoc
     let mut changes = Vec::new();
     for change in answer["changes"].as_array().map_or(&[][..], Vec::as_slice) {
         let sealed = B64.decode(change["payload"].as_str().unwrap_or_default()).map_err(|_| "SYNC_CANNOT_OPEN".to_string())?;
-        changes.push(json!({ "seq": change["seq"], "changes": open(&key, &sealed)? }));
+        changes.push(json!({ "seq": change["seq"], "changes": open_packed(&key, &sealed)? }));
     }
     Ok(json!({ "status": "ok", "changes": changes, "more": answer["more"] }))
 }
@@ -471,7 +553,26 @@ pub async fn sync_remote_state(app: tauri::AppHandle, vault_id: String) -> Resul
         "epoch": answer["epoch"],
         "schema": answer["schema"],
         "hasSnapshot": answer["has_snapshot"],
+        "snapshotSeq": answer["snapshot_seq"],
     }))
+}
+
+/// Starts a snapshot on disk, next to the vault it is made of.
+#[tauri::command]
+pub async fn sync_snapshot_begin(app: tauri::AppHandle, vault_id: String) -> Result<(), String> {
+    let path = vault::vault_dir(&app, &vault_id)?.join(UPLOAD_FILE);
+    tokio::fs::write(path, b"").await.map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn sync_snapshot_add(app: tauri::AppHandle, vault_id: String, frame: String) -> Result<(), String> {
+    use tokio::io::AsyncWriteExt;
+    let sealed = seal_packed(&files_key(&app, &vault_id)?, &frame)?;
+    let path = vault::vault_dir(&app, &vault_id)?.join(UPLOAD_FILE);
+    let mut file = tokio::fs::OpenOptions::new().append(true).open(path).await.map_err(|e| e.to_string())?;
+    file.write_all(&(sealed.len() as u32).to_le_bytes()).await.map_err(|e| e.to_string())?;
+    file.write_all(&sealed).await.map_err(|e| e.to_string())?;
+    file.flush().await.map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -481,7 +582,6 @@ pub async fn sync_snapshot_put(
     base: i64,
     epoch: i64,
     schema: i64,
-    rows: String,
 ) -> Result<Value, String> {
     let target = remote(&app, &vault_id)?;
     let rekeyed = connection(&app, &vault_id)?.rekeyed;
@@ -491,40 +591,68 @@ pub async fn sync_snapshot_put(
     }
     let dir = vault::vault_dir(&app, &vault_id)?;
     let key_file = keys::read_key_file(&dir)?.ok_or_else(|| LOCKED.to_string())?;
-    let sealed = seal(&files_key(&app, &vault_id)?, &rows);
+    let path = dir.join(UPLOAD_FILE);
+    let file = tokio::fs::File::open(&path).await.map_err(|e| e.to_string())?;
+    let length = file.metadata().await.map_err(|e| e.to_string())?.len();
     let builder = target
         .call(Method::PUT, "/snapshot", LONG)?
         .header("x-base-seq", base)
         .header("x-epoch", epoch)
         .header("x-schema", schema)
         .header("x-key-file", B64.encode(key_file.to_json()))
-        .body(sealed);
-    let response = send(builder).await?;
+        .header(reqwest::header::CONTENT_LENGTH, length)
+        .body(reqwest::Body::wrap_stream(tokio_util::io::ReaderStream::new(file)));
+    let response = send(builder).await;
+    tokio::fs::remove_file(&path).await.ok();
+    let response = response?;
     if response.status().is_success() {
         return Ok(json!({ "status": "ok" }));
     }
     protocol_answer(response).await
 }
 
+/// Fetches the snapshot to disk and proves its first frame opens. The frames
+/// follow one by one through `sync_snapshot_frame`.
 #[tauri::command]
-pub async fn sync_snapshot_get(app: tauri::AppHandle, vault_id: String) -> Result<Value, String> {
+pub async fn sync_snapshot_fetch(app: tauri::AppHandle, vault_id: String) -> Result<Value, String> {
     let target = remote(&app, &vault_id)?;
-    let response = send(target.call(Method::GET, "/snapshot", LONG)?).await?;
-    if !response.status().is_success() {
-        return Err(refused(response).await);
-    }
-    let number = |name: &str| -> i64 {
-        response.headers().get(name).and_then(|v| v.to_str().ok()).and_then(|v| v.parse().ok()).unwrap_or(0)
-    };
-    let (seq, epoch, schema) = (number("x-snapshot-seq"), number("x-epoch"), number("x-schema"));
-    let bytes = response.bytes().await.map_err(|_| UNREACHABLE.to_string())?;
-    let rows = match open(&files_key(&app, &vault_id)?, &bytes) {
-        Ok(rows) => rows,
-        Err(err) => {
+    let path = vault::vault_dir(&app, &vault_id)?.join(DOWNLOAD_FILE);
+    let (seq, epoch, schema) = download_snapshot(&target, &path).await?;
+    let offsets = frame_offsets(&path)?;
+    if let Some((offset, length)) = offsets.first() {
+        if let Err(err) = read_frame(&path, &files_key(&app, &vault_id)?, *offset, *length) {
+            tokio::fs::remove_file(&path).await.ok();
             return Err(if same_key_as_server(&app, &vault_id, &target).await? { err } else { PASSWORD_CHANGED.to_string() });
         }
-    };
-    Ok(json!({ "seq": seq, "epoch": epoch, "schema": schema, "rows": rows }))
+    }
+    let frames = offsets.len();
+    app.state::<SyncState>().frames.lock().map_err(|_| "sync state unavailable".to_string())?.insert(vault_id, offsets);
+    Ok(json!({ "seq": seq, "epoch": epoch, "schema": schema, "frames": frames }))
+}
+
+#[tauri::command]
+pub async fn sync_snapshot_frame(app: tauri::AppHandle, vault_id: String, index: usize) -> Result<String, String> {
+    let (offset, length) = app
+        .state::<SyncState>()
+        .frames
+        .lock()
+        .map_err(|_| "sync state unavailable".to_string())?
+        .get(&vault_id)
+        .and_then(|offsets| offsets.get(index).copied())
+        .ok_or_else(|| "SYNC_CANNOT_OPEN".to_string())?;
+    let key = files_key(&app, &vault_id)?;
+    let path = vault::vault_dir(&app, &vault_id)?.join(DOWNLOAD_FILE);
+    tauri::async_runtime::spawn_blocking(move || read_frame(&path, &key, offset, length)).await.map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+pub async fn sync_snapshot_done(app: tauri::AppHandle, vault_id: String) -> Result<(), String> {
+    if let Ok(mut frames) = app.state::<SyncState>().frames.lock() {
+        frames.remove(&vault_id);
+    }
+    let path = vault::vault_dir(&app, &vault_id)?.join(DOWNLOAD_FILE);
+    tokio::fs::remove_file(path).await.ok();
+    Ok(())
 }
 
 async fn server_key_file(target: &Remote) -> Result<keys::KeyFile, String> {
@@ -555,16 +683,18 @@ pub async fn sync_adopt_new_password(app: tauri::AppHandle, vault_id: String, pa
         let file = file.clone();
         tauri::async_runtime::spawn_blocking(move || file.unlock_with_password(&password)).await.map_err(|e| e.to_string())??
     };
-    let response = send(target.call(Method::GET, "/snapshot", LONG)?).await?;
-    if !response.status().is_success() {
-        return Err(refused(response).await);
-    }
-    let snapshot = response.bytes().await.map_err(|_| UNREACHABLE.to_string())?;
-    open(&crypto::subkey(&key, Purpose::Files), &snapshot)?;
+    let dir = vault::vault_dir(&app, &vault_id)?;
+    let path = dir.join(DOWNLOAD_FILE);
+    download_snapshot(&target, &path).await?;
+    let proof = frame_offsets(&path).and_then(|offsets| match offsets.first() {
+        Some((offset, length)) => read_frame(&path, &crypto::subkey(&key, Purpose::Files), *offset, *length).map(|_| ()),
+        None => Err("SYNC_CANNOT_OPEN".to_string()),
+    });
+    tokio::fs::remove_file(&path).await.ok();
+    proof?;
 
     let old = keys::key_for(&app, &vault_id)?.ok_or_else(|| LOCKED.to_string())?;
     hold_token(&app, &vault_id, &old)?;
-    let dir = vault::vault_dir(&app, &vault_id)?;
     vault::remove_vault_content(&dir)?;
     keys::store_key_file(&dir, &file)?;
     let remembered = keys::is_remembered(&vault_id);

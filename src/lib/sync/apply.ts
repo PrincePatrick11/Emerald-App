@@ -139,14 +139,35 @@ export async function applyRemoteChanges(
     tagIdByName.delete(name as string);
   };
 
+  // Who holds which number. Asking the database per row would scan the table per
+  // row: `entry_number` has no index, and a long time offline is thousands of rows.
+  const numberOwner = new Map<string, string>();
+  const highest = new Map<string, number>();
+  const noteNumber = (type: unknown, number: unknown, id: string) => {
+    if (number === null || number === undefined) return;
+    numberOwner.set(`${type}:${number}`, id);
+    highest.set(String(type), Math.max(highest.get(String(type)) ?? 0, Number(number)));
+  };
+  const nextNumber = (type: unknown) => {
+    const next = (highest.get(String(type)) ?? 0) + 1;
+    highest.set(String(type), next);
+    return next;
+  };
+  if (remote.some((change) => change.table === 'entries')) {
+    const held = await db.select<{ id: string; type: string; entry_number: number | null }[]>('SELECT id, type, entry_number FROM entries');
+    for (const row of held) noteNumber(row.type, row.entry_number, row.id);
+  }
+
   /** Two devices gave out the same number: this device's entry takes the next free one. */
   const renumberOthers = (id: string, row: Row) => {
     if (row.entry_number === null || row.entry_number === undefined) return;
-    logged([
-      `UPDATE entries SET entry_number = (SELECT MAX(entry_number) + 1 FROM entries WHERE type = $1)
-       WHERE type = $1 AND entry_number = $2 AND id <> $3`,
-      [row.type, row.entry_number, id],
-    ]);
+    const other = numberOwner.get(`${row.type}:${row.entry_number}`);
+    if (other && other !== id) {
+      const next = nextNumber(row.type);
+      numberOwner.set(`${row.type}:${next}`, other);
+      logged(['UPDATE entries SET entry_number = $1 WHERE id = $2', [next, other]]);
+    }
+    noteNumber(row.type, row.entry_number, id);
   };
 
   for (const change of remote) {
@@ -167,6 +188,7 @@ export async function applyRemoteChanges(
       statements.push([`DELETE FROM ${change.table} WHERE id = $1`, [change.id]]);
       rows.delete(key);
       if (change.table === 'tags') tagIdByName.delete(String(row.name));
+      if (change.table === 'entries') numberOwner.delete(`${row.type}:${row.entry_number}`);
       continue;
     }
 
@@ -203,13 +225,14 @@ export async function applyRemoteChanges(
       // this device's value stands and goes out with its next push.
       if (change.table === 'entries' && column === 'content') {
         const copyId = options.newId();
-        logged(
-          insertStatement('entries', { ...row, id: copyId, title: options.conflictTitle(String(row.title ?? '')) }),
-          [
-            'UPDATE entries SET entry_number = (SELECT MAX(entry_number) + 1 FROM entries WHERE type = $1) WHERE id = $2',
-            [row.type, copyId],
-          ]
-        );
+        const number = nextNumber(row.type);
+        numberOwner.set(`${row.type}:${number}`, copyId);
+        logged(insertStatement('entries', {
+          ...row,
+          id: copyId,
+          title: options.conflictTitle(String(row.title ?? '')),
+          entry_number: number,
+        }));
         conflicts.push({ entryId: change.id, copyId });
         take.push(column);
       }
@@ -232,38 +255,88 @@ export async function applyRemoteChanges(
   return { conflicts };
 }
 
-/** One table's rows, as a snapshot carries them. */
-export type SnapshotRows = Record<string, Row[]>;
-
-export async function readSnapshotRows(db: Database): Promise<SnapshotRows> {
-  const rows: SnapshotRows = {};
-  for (const table of SYNCED_TABLES) rows[table] = await db.select<Row[]>(`SELECT * FROM ${table}`);
-  return rows;
+/** Part of one table: what one frame of a snapshot carries. */
+export interface SnapshotFrame {
+  table: string;
+  rows: Row[];
 }
 
 /**
- * Replaces the vault's content with a snapshot, in one transaction. `keep` is
- * what this device had not pushed: it goes back on top as ordinary local
- * changes, so that starting over loses none of it. A kept row that no longer
- * fits (its tag name taken meanwhile) gives way rather than block the vault.
+ * A snapshot in pieces, parents first, so that neither this device nor the one
+ * restoring it has to hold a whole vault in one string. Tasks stay in one frame:
+ * they point at each other.
  */
-export async function replaceWithSnapshot(
+export async function* snapshotFrames(db: Database, maxBytes: number): AsyncGenerator<SnapshotFrame> {
+  for (const table of SYNCED_TABLES) {
+    let rows: Row[] = [];
+    let bytes = 0;
+    let after = '';
+    for (;;) {
+      const page = await db.select<Row[]>(`SELECT * FROM ${table} WHERE id > $1 ORDER BY id LIMIT 200`, [after]);
+      if (!page.length) break;
+      after = String(page[page.length - 1].id);
+      for (const row of page) {
+        bytes += JSON.stringify(row).length;
+        rows.push(row);
+        if (bytes >= maxBytes && table !== 'tasks') {
+          yield { table, rows };
+          rows = [];
+          bytes = 0;
+        }
+      }
+    }
+    if (rows.length) yield { table, rows };
+  }
+}
+
+/** Empties the vault for a snapshot. Until `finishRestore` it only holds part of one. */
+export async function beginRestore(db: Database): Promise<void> {
+  const statements: Statement[] = [['PRAGMA defer_foreign_keys = ON'], APPLYING, ['DELETE FROM _sync_log']];
+  for (const table of [...SYNCED_TABLES].reverse()) statements.push([`DELETE FROM ${table}`]);
+  statements.push(LOGGING, ["INSERT OR REPLACE INTO _sync_meta (key, value) VALUES ('restoring', '1')"]);
+  await db.batch(statements);
+}
+
+/**
+ * Silently, since the device that made the snapshot had these rows change while
+ * it read them, and its log brings the row again: a parent read before a child
+ * that points at it arrived is the one case that leaves a reference open here.
+ */
+const FRAME_REPAIRS: Record<string, readonly Statement[]> = {
+  entries: [REFERENCE_REPAIRS[0]],
+  tasks: [REFERENCE_REPAIRS[1], REFERENCE_REPAIRS[3]],
+  altar_items: [REFERENCE_REPAIRS[2]],
+  task_links: [REFERENCE_REPAIRS[4]],
+  lexicon_entries: [REFERENCE_REPAIRS[5]],
+  altar_placements: [REFERENCE_REPAIRS[6]],
+};
+
+export async function restoreFrame(db: Database, frame: SnapshotFrame): Promise<void> {
+  const changes = frame.rows.map(
+    (row): SyncChange => ({ table: frame.table, id: String(row.id), op: 'upsert', changed: Object.keys(row), row })
+  );
+  await assertKnownShape(db, changes);
+  await db.batch([
+    ['PRAGMA defer_foreign_keys = ON'],
+    APPLYING,
+    ...frame.rows.map((row) => insertStatement(frame.table, row)),
+    ...(FRAME_REPAIRS[frame.table] ?? []),
+    LOGGING,
+  ]);
+}
+
+/**
+ * `keep` is what this device had not pushed: it goes back on top as ordinary
+ * local changes, so that starting over loses none of it. A kept row that no
+ * longer fits (its tag name taken meanwhile) gives way rather than block the vault.
+ */
+export async function finishRestore(
   db: Database,
-  snapshot: SnapshotRows,
   keep: readonly SyncChange[],
   finalStatements: readonly Statement[]
 ): Promise<void> {
-  const changes = SYNCED_TABLES.flatMap((table) =>
-    (snapshot[table] ?? []).map(
-      (row): SyncChange => ({ table, id: String(row.id), op: 'upsert', changed: Object.keys(row), row })
-    )
-  );
-  await assertKnownShape(db, [...changes, ...keep]);
-
-  const statements: Statement[] = [['PRAGMA defer_foreign_keys = ON'], APPLYING, ['DELETE FROM _sync_log']];
-  for (const table of [...SYNCED_TABLES].reverse()) statements.push([`DELETE FROM ${table}`]);
-  for (const change of changes) if (change.op === 'upsert') statements.push(insertStatement(change.table, change.row));
-  statements.push(LOGGING);
+  await assertKnownShape(db, keep);
+  const statements: Statement[] = [['PRAGMA defer_foreign_keys = ON']];
   for (const change of keep) {
     if (change.op === 'delete') {
       statements.push([`DELETE FROM ${change.table} WHERE id = $1`, [change.id]]);
@@ -276,6 +349,18 @@ export async function replaceWithSnapshot(
       values,
     ]);
   }
-  statements.push(...REFERENCE_REPAIRS, ...finalStatements);
+  statements.push(...REFERENCE_REPAIRS, ["DELETE FROM _sync_meta WHERE key = 'restoring'"], ...finalStatements);
   await db.batch(statements);
+}
+
+/** A snapshot all at once: for tests, and a vault small enough not to matter. */
+export async function replaceWithSnapshot(
+  db: Database,
+  frames: readonly SnapshotFrame[],
+  keep: readonly SyncChange[],
+  finalStatements: readonly Statement[]
+): Promise<void> {
+  await beginRestore(db);
+  for (const frame of frames) await restoreFrame(db, frame);
+  await finishRestore(db, keep, finalStatements);
 }

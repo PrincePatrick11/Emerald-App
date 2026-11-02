@@ -10,11 +10,13 @@ import { useLeaveGuardStore } from '../../store/leaveGuardStore';
 import { useSyncStore } from '../../store/syncStore';
 import { useUIStore } from '../../store/uiStore';
 import { useVaultStore } from '../../store/vaultStore';
-import { applyRemoteChanges, readSnapshotRows, replaceWithSnapshot, type SnapshotRows } from './apply';
+import { applyRemoteChanges, beginRestore, finishRestore, restoreFrame, snapshotFrames, type SnapshotFrame } from './apply';
 import {
   acknowledge,
+  acknowledgeChanges,
   clearSnapshotNeeded,
   collectChanges,
+  isRestoring,
   isTracked,
   markSnapshotNeeded,
   needsSnapshot,
@@ -55,6 +57,11 @@ const TICK_MS = 4_000;
 const PULL_EVERY_MS = 15_000;
 const RETRY_AFTER_ERROR_MS = 30_000;
 const MAX_PUSH_TRIES = 10;
+/** Of JSON, before compression. Well under what the server takes in one request. */
+const PUSH_BYTES = 16_000_000;
+const FRAME_BYTES = 8_000_000;
+/** A device new to the vault replays what is in the log. From here on a snapshot is shorter. */
+const LOG_LIMIT = 2_000;
 
 export function syncErrorCode(err: unknown): string {
   return typeof err === 'string' ? err : err instanceof Error ? err.message : 'SYNC_FAILED';
@@ -131,36 +138,47 @@ export async function keepPendingForNewPassword(): Promise<void> {
 }
 
 async function restoreFromSnapshot(db: Database, vaultId: string, keepPending: boolean): Promise<void> {
-  const snapshot = await invoke<{ seq: number; epoch: number; schema: number; rows: string }>('sync_snapshot_get', { vaultId });
-  if (snapshot.schema > BASELINE_VERSION) throw OUTDATED;
   const keep: SyncChange[] = [...keptOverNewPassword.splice(0), ...(keepPending ? (await collectChanges(db)).changes : [])];
-  const rows = JSON.parse(snapshot.rows) as SnapshotRows;
-  await drainSerialized();
-  await replaceWithSnapshot(db, rows, keep, positionStatements({ cursor: snapshot.seq, epoch: snapshot.epoch }));
+  const snapshot = await invoke<{ seq: number; epoch: number; schema: number; frames: number }>('sync_snapshot_fetch', { vaultId });
+  try {
+    if (snapshot.schema > BASELINE_VERSION) throw OUTDATED;
+    await drainSerialized();
+    await beginRestore(db);
+    for (let index = 0; index < snapshot.frames; index++) {
+      const text = await invoke<string>('sync_snapshot_frame', { vaultId, index });
+      await restoreFrame(db, JSON.parse(text) as SnapshotFrame);
+    }
+    await finishRestore(db, keep, positionStatements({ cursor: snapshot.seq, epoch: snapshot.epoch }));
+  } finally {
+    await invoke('sync_snapshot_done', { vaultId });
+  }
 }
 
-/** The vault as it is now becomes what everybody starts from. */
-async function publishSnapshot(db: Database, vaultId: string): Promise<void> {
+/**
+ * The vault as it is now becomes what everybody starts from, or, with
+ * `shorten`, only replaces the log before it.
+ */
+async function publishSnapshot(db: Database, vaultId: string, shorten = false): Promise<void> {
   await invoke('sync_images', { vaultId });
   for (let tries = 0; tries < MAX_PUSH_TRIES; tries++) {
     const remote = await invoke<{ head: number; epoch: number; hasSnapshot: boolean }>('sync_remote_state', { vaultId });
-    const epoch = remote.hasSnapshot ? remote.epoch + 1 : remote.epoch;
-    const rows = JSON.stringify(await readSnapshotRows(db));
-    const { lastSeq } = await collectChanges(db);
-    const answer = await invoke<{ status: string }>('sync_snapshot_put', {
-      vaultId,
-      base: remote.head,
-      epoch,
-      schema: BASELINE_VERSION,
-      rows,
-    });
+    const epoch = remote.hasSnapshot && !shorten ? remote.epoch + 1 : remote.epoch;
+    const { lastSeq } = await collectChanges(db, 0);
+    await invoke('sync_snapshot_begin', { vaultId });
+    for await (const frame of snapshotFrames(db, FRAME_BYTES)) {
+      await invoke('sync_snapshot_add', { vaultId, frame: JSON.stringify(frame) });
+    }
+    const answer = await invoke<{ status: string }>('sync_snapshot_put', { vaultId, base: remote.head, epoch, schema: BASELINE_VERSION });
     if (answer.status === 'ok') {
-      await acknowledge(db, lastSeq);
+      // What the log holds is in the snapshot too; shortening leaves it to go
+      // out as usual, since other devices keep applying changes on top.
+      if (!shorten) await acknowledge(db, lastSeq);
       await db.batch(positionStatements({ cursor: remote.head, epoch }));
-      await clearSnapshotNeeded(db);
+      if (!shorten) await clearSnapshotNeeded(db);
       return;
     }
     if (answer.status === 'client_outdated') throw OUTDATED;
+    if (shorten) return;
   }
   throw 'SYNC_BUSY';
 }
@@ -214,6 +232,10 @@ async function round(db: Database, vaultId: string, status: SyncStatus): Promise
       await clearSnapshotNeeded(db);
       changed = true;
     }
+  } else if (await isRestoring(db)) {
+    // A crash in the middle of a restore: only part of the vault is here.
+    await restoreFromSnapshot(db, vaultId, false);
+    changed = true;
   }
   // New key, new image names: this device's vault is what everybody starts from.
   if (status.rekeyed) {
@@ -230,7 +252,7 @@ async function round(db: Database, vaultId: string, status: SyncStatus): Promise
       changed = true;
       imagesDue = true;
     }
-    const { changes, lastSeq } = await collectChanges(db);
+    const { changes, lastSeq, done } = await collectChanges(db, PUSH_BYTES);
     if (!changes.length) {
       await acknowledge(db, lastSeq);
       break;
@@ -247,9 +269,15 @@ async function round(db: Database, vaultId: string, status: SyncStatus): Promise
       changes: JSON.stringify(changes),
     });
     if (answer.status === 'ok') {
-      await acknowledge(db, lastSeq);
+      await acknowledgeChanges(db, changes, lastSeq);
       await db.batch(positionStatements({ cursor: answer.seq! }));
-      break;
+      if (done) {
+        await acknowledge(db, lastSeq);
+        break;
+      }
+      // Not a failed try: the next part of a long time offline.
+      tries = -1;
+      continue;
     }
     if (answer.status === 'client_outdated') throw OUTDATED;
     if (answer.status === 'snapshot_required') {
@@ -260,6 +288,8 @@ async function round(db: Database, vaultId: string, status: SyncStatus): Promise
     // Somebody else was first: pull and try again.
     if (tries >= MAX_PUSH_TRIES) throw 'SYNC_BUSY';
   }
+  const remote = await invoke<{ head: number; snapshotSeq: number }>('sync_remote_state', { vaultId });
+  if (remote.head - remote.snapshotSeq > LOG_LIMIT) await publishSnapshot(db, vaultId, true);
   if (imagesDue) await invoke('sync_images', { vaultId });
   return changed;
 }

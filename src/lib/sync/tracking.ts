@@ -150,6 +150,12 @@ export async function needsSnapshot(db: Database): Promise<boolean> {
   return rows[0]?.value === '1';
 }
 
+/** A restore began and has not finished: the vault holds only part of a snapshot. */
+export async function isRestoring(db: Database): Promise<boolean> {
+  const rows = await db.select<{ value: string }[]>("SELECT value FROM _sync_meta WHERE key = 'restoring'");
+  return rows[0]?.value === '1';
+}
+
 export async function clearSnapshotNeeded(db: Database): Promise<void> {
   await db.execute("DELETE FROM _sync_meta WHERE key = 'needs_snapshot'");
 }
@@ -198,18 +204,38 @@ export async function pendingRows(db: Database): Promise<PendingRow[]> {
  * What to push, and the log position `acknowledge` takes once the server has
  * it. A row changed while this runs is logged after that position and goes
  * out again with the next push.
+ *
+ * `maxBytes` ends the list early, so a long time offline becomes several pushes
+ * instead of one no server takes and no memory holds: `done` says whether this
+ * was all. Parents go first, deletes last, since a device applying the first
+ * part must find what a row points at. Tasks stay together: they can point at
+ * each other, in any order.
  */
-export async function collectChanges(db: Database): Promise<{ changes: SyncChange[]; lastSeq: number }> {
+export async function collectChanges(
+  db: Database,
+  maxBytes = Infinity
+): Promise<{ changes: SyncChange[]; lastSeq: number; done: boolean }> {
   const seqRows = await db.select<{ seq: number | null }[]>('SELECT MAX(seq) AS seq FROM _sync_log');
-  const pending = await pendingRows(db);
+  const rank = (row: PendingRow) => {
+    const position = SYNCED_TABLES.indexOf(row.table);
+    return row.op === 'delete' ? 2 * SYNCED_TABLES.length - position : position;
+  };
+  const pending = (await pendingRows(db)).sort((a, b) => rank(a) - rank(b) || a.seq - b.seq);
   const changes: SyncChange[] = [];
+  let bytes = 0;
+  let done = true;
   for (const row of pending) {
+    if (bytes >= maxBytes && row.table !== 'tasks') {
+      done = false;
+      break;
+    }
     if (row.op === 'delete') {
       changes.push({ table: row.table, id: row.id, op: 'delete' });
       continue;
     }
     const found = await db.select<Record<string, unknown>[]>(`SELECT * FROM ${row.table} WHERE id = $1`, [row.id]);
     if (found.length) {
+      if (maxBytes !== Infinity) bytes += JSON.stringify(found[0]).length;
       changes.push({
         table: row.table,
         id: row.id,
@@ -222,7 +248,14 @@ export async function collectChanges(db: Database): Promise<{ changes: SyncChang
       changes.push({ table: row.table, id: row.id, op: 'delete' });
     }
   }
-  return { changes, lastSeq: seqRows[0]?.seq ?? 0 };
+  return { changes, lastSeq: seqRows[0]?.seq ?? 0, done };
+}
+
+/** The server has this part: only these rows leave the log. */
+export async function acknowledgeChanges(db: Database, changes: readonly SyncChange[], lastSeq: number): Promise<void> {
+  await db.batch(
+    changes.map((c) => ['DELETE FROM _sync_log WHERE tbl = $1 AND pk = $2 AND seq <= $3', [c.table, c.id, lastSeq]] as const)
+  );
 }
 
 export async function acknowledge(db: Database, lastSeq: number): Promise<void> {

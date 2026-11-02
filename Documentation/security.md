@@ -35,7 +35,7 @@ PDF export renders in a hidden window that the per-platform `export_pdf` command
 
 ## Command Surface
 
-`src-tauri/src/lib.rs` registers **74 commands**. The security-relevant ones are discussed in their own sections below; this inventory exists so a new command cannot hide among undocumented ones.
+`src-tauri/src/lib.rs` registers **78 commands**. The security-relevant ones are discussed in their own sections below; this inventory exists so a new command cannot hide among undocumented ones.
 
 | Command | Defined in | Notes |
 |---|---|---|
@@ -59,7 +59,7 @@ PDF export renders in a hidden window that the per-platform `export_pdf` command
 | `close_request_seen` | `lib.rs` | no arguments: tells Rust the frontend is handling a close request (see [Closing the window](architecture/shell.md#closing-the-window)). All it can do is *prevent* the fallback that closes an unresponsive window |
 | `update_menu_labels`, `set_export_menu_enabled`, `set_altar_export_menu_enabled`, `set_view_menu_checked` | `lib.rs` | native-menu state sync; no-ops on Windows/Linux, where no native menu is installed |
 | `update_settings`, `set_update_settings`, `check_for_update`, `install_update` | `updates.rs` | reach the network for updates — see [In-App Updates](#in-app-updates) |
-| `sync_status`, `sync_login`, `sync_remote_vaults`, `sync_create_remote`, `sync_adopt_remote`, `sync_disconnect`, `sync_push`, `sync_pull`, `sync_remote_state`, `sync_snapshot_put`, `sync_snapshot_get`, `sync_images`, `sync_images_delete`, `sync_adopt_new_password`, `sync_rekey_done` | `sync.rs` | reach a sync server the user connected a vault to, and nothing else. Take a vault id; none returns the token or a key. See [Sync](architecture/sync.md) |
+| `sync_status`, `sync_login`, `sync_remote_vaults`, `sync_create_remote`, `sync_adopt_remote`, `sync_disconnect`, `sync_push`, `sync_pull`, `sync_remote_state`, `sync_snapshot_begin`, `sync_snapshot_add`, `sync_snapshot_put`, `sync_snapshot_fetch`, `sync_snapshot_frame`, `sync_snapshot_done`, `sync_images`, `sync_images_delete`, `sync_adopt_new_password`, `sync_rekey_done` | `sync.rs` | reach a sync server the user connected a vault to, and nothing else. Take a vault id; none returns the token or a key. See [Sync](architecture/sync.md) |
 
 ## The Dev Bridge
 

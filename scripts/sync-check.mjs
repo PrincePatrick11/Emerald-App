@@ -82,10 +82,11 @@ const {
   SYNCED_TABLES, TABLES, TABLE_DDL, INDEX_DDL, BASELINE_VERSION,
   startTracking, stopTracking, isTracked, needsSnapshot, clearSnapshotNeeded, markSnapshotNeeded,
   collectChanges, acknowledge, pendingRows, dropTriggers, installTriggers, applyRemoteChanges, runMigrations,
-  readSnapshotRows, replaceWithSnapshot, positionStatements, readPosition,
+  snapshotFrames, replaceWithSnapshot, beginRestore, restoreFrame, isRestoring, acknowledgeChanges, positionStatements, readPosition,
 } = sync;
 
 const NOW = '2026-11-01T00:00:00.000Z';
+const allFrames = async (db, maxBytes = 1000) => { const out = []; for await (const f of snapshotFrames(db, maxBytes)) out.push(JSON.parse(JSON.stringify(f))); return out; };
 let copies = 0;
 const OPTIONS = { newId: () => `copy-${++copies}`, conflictTitle: (t) => `${t} (conflict)` };
 
@@ -110,12 +111,18 @@ class Device {
     const { log } = this.server;
     const result = await applyRemoteChanges(this.db, log.slice(this.cursor), OPTIONS);
     this.cursor = log.length;
-    const { changes, lastSeq } = await collectChanges(this.db);
-    log.push(...changes);
-    this.cursor = log.length;
-    await acknowledge(this.db, lastSeq);
-    return result;
+    for (;;) {
+      const { changes, lastSeq, done } = await collectChanges(this.db, this.maxBytes);
+      log.push(...changes);
+      this.cursor = log.length;
+      await acknowledgeChanges(this.db, changes, lastSeq);
+      if (done) {
+        await acknowledge(this.db, lastSeq);
+        return result;
+      }
+    }
   }
+  maxBytes = Infinity;
   dump() {
     return Object.fromEntries(SYNCED_TABLES.map((t) => [t, this.db.raw.prepare(`SELECT * FROM ${t} ORDER BY id`).all()]));
   }
@@ -419,7 +426,7 @@ await test('a new device starts from a snapshot and goes on from there', async (
   await a.sync();
   const b = await makeDevice(server);
   b.run("INSERT INTO categories (id, name) VALUES ('seeded', 'Starter')");
-  await replaceWithSnapshot(b.db, JSON.parse(JSON.stringify(await readSnapshotRows(a.db))), [], positionStatements({ cursor: server.log.length, epoch: 3 }));
+  await replaceWithSnapshot(b.db, await allFrames(a.db), [], positionStatements({ cursor: server.log.length, epoch: 3 }));
   b.cursor = server.log.length;
   assert.equal(b.get('SELECT count(*) c FROM categories').c, 0, 'the seeded row is gone');
   assert.equal(b.get('SELECT count(*) c FROM _sync_log').c, 0, 'restoring logs nothing');
@@ -441,7 +448,7 @@ await test('starting over keeps what this device had not pushed', async () => {
   entry_(b, 'new', 3);
   b.run("DELETE FROM entries WHERE id = 'gone'");
   const { changes } = await collectChanges(b.db);
-  await replaceWithSnapshot(b.db, await readSnapshotRows(a.db), changes, positionStatements({ cursor: server.log.length }));
+  await replaceWithSnapshot(b.db, await allFrames(a.db), changes, positionStatements({ cursor: server.log.length }));
   b.cursor = server.log.length;
   const row = b.get("SELECT title, icon FROM entries WHERE id = 'e'");
   assert.deepEqual({ ...row }, { title: 'mine', icon: 'from-snapshot' });
@@ -454,8 +461,85 @@ await test('a kept row that no longer fits gives way', async () => {
   a.run("INSERT INTO tags (id, name) VALUES ('ta', 'same')");
   b.run("INSERT INTO tags (id, name) VALUES ('tb', 'same')");
   const { changes } = await collectChanges(b.db);
-  await replaceWithSnapshot(b.db, await readSnapshotRows(a.db), changes, []);
+  await replaceWithSnapshot(b.db, await allFrames(a.db), changes, []);
   assert.equal(b.get('SELECT count(*) c FROM tags').c, 1);
+});
+
+await test('a large snapshot comes in pieces, parents first, tasks together', async () => {
+  const [, a] = await pair();
+  a.run("INSERT INTO categories (id, name) VALUES ('c', 'Cat')");
+  for (let i = 0; i < 50; i++) entry_(a, `e${i}`, i + 1, { content: 'x'.repeat(500) });
+  a.run("INSERT INTO tasks (id, title, created_at, updated_at) VALUES ('z-parent', 'P', ?, ?)", NOW, NOW);
+  a.run("INSERT INTO tasks (id, title, parent_task_id, created_at, updated_at) VALUES ('a-child', 'K', 'z-parent', ?, ?)", NOW, NOW);
+  const frames = await allFrames(a.db, 2000);
+  assert.ok(frames.filter((f) => f.table === 'entries').length > 5);
+  assert.equal(frames.filter((f) => f.table === 'tasks').length, 1);
+  const tables = frames.map((f) => f.table);
+  assert.ok(tables.indexOf('categories') < tables.indexOf('entries'));
+  const b = await makeDevice(new Server());
+  await replaceWithSnapshot(b.db, frames, [], []);
+  assert.deepEqual(b.dump(), a.dump());
+});
+
+await test('a restore that stops halfway says so', async () => {
+  const [, a] = await pair();
+  for (let i = 0; i < 20; i++) entry_(a, `e${i}`, i + 1, { content: 'x'.repeat(500) });
+  const frames = await allFrames(a.db, 2000);
+  const b = await makeDevice(new Server());
+  await beginRestore(b.db);
+  await restoreFrame(b.db, frames.find((f) => f.table === 'entries'));
+  assert.equal(await isRestoring(b.db), true);
+  await replaceWithSnapshot(b.db, frames, [], []);
+  assert.equal(await isRestoring(b.db), false);
+  assert.deepEqual(b.dump(), a.dump());
+});
+
+await test('a child read after its parent frame loses nothing once the log arrives', async () => {
+  const [server, a] = await pair();
+  a.run("INSERT INTO categories (id, name) VALUES ('old', 'Old')");
+  entry_(a, 'e', 1, { type: 'wiki' });
+  await a.sync();
+  const frames = await allFrames(a.db);
+  // Written while the snapshot was being read: the entry frame knows a category the categories frame does not.
+  a.run("INSERT INTO categories (id, name) VALUES ('new', 'New')");
+  a.run("UPDATE entries SET category_id = 'new' WHERE id = 'e'");
+  frames.find((f) => f.table === 'entries').rows[0].category_id = 'new';
+  const b = await makeDevice(server);
+  await replaceWithSnapshot(b.db, frames, [], []);
+  b.cursor = server.log.length;
+  await assertConverged(a, b);
+  assert.equal(b.get("SELECT category_id c FROM entries WHERE id = 'e'").c, 'new');
+});
+
+console.log('Long offline');
+
+await test('many changes go out in parts, and references survive every part', async () => {
+  const [server, a, b] = await pair();
+  a.maxBytes = 300;
+  a.run("INSERT INTO categories (id, name) VALUES ('c', 'Cat')");
+  for (let i = 0; i < 30; i++) entry_(a, `e${i}`, i + 1, { content: 'x'.repeat(100) });
+  a.db.raw.prepare("UPDATE entries SET category_id = 'c' WHERE id = 'e7'").run();
+  a.run("UPDATE categories SET name = 'Renamed' WHERE id = 'c'");
+  a.run("INSERT INTO tasks (id, title, created_at, updated_at) VALUES ('z', 'P', ?, ?)", NOW, NOW);
+  a.run("INSERT INTO tasks (id, title, parent_task_id, created_at, updated_at) VALUES ('k', 'K', 'z', ?, ?)", NOW, NOW);
+  a.run("INSERT INTO altars (id, title, created_at, updated_at) VALUES ('al', 'A', ?, ?)", NOW, NOW);
+  // Large enough to end a part: a parent after it would come too late.
+  a.run("INSERT INTO altar_items (id, name, created_at) VALUES ('it', ?, ?)", 'y'.repeat(400), NOW);
+  a.run("INSERT INTO altar_placements (id, altar_id, item_id) VALUES ('pl', 'al', 'it')");
+  // Applied part by part, as the server would hand them out one push at a time.
+  let parts = 0;
+  for (;;) {
+    const { changes, lastSeq, done } = await collectChanges(a.db, a.maxBytes);
+    await applyRemoteChanges(b.db, changes, OPTIONS);
+    await acknowledgeChanges(a.db, changes, lastSeq);
+    server.log.push(...changes);
+    parts++;
+    if (done) { await acknowledge(a.db, lastSeq); break; }
+  }
+  a.cursor = b.cursor = server.log.length;
+  assert.ok(parts > 3, `${parts} parts`);
+  assert.equal(b.get('SELECT count(*) c FROM _sync_log').c, 0, 'the receiver repaired nothing');
+  assert.deepEqual(b.dump(), a.dump());
 });
 
 console.log('Migrations and untracked vaults');
@@ -522,6 +606,7 @@ async function randomRun(seed) {
   const r = randomizer(seed);
   const server = new Server();
   const devices = [await makeDevice(server), await makeDevice(server), await makeDevice(server)];
+  if (seed % 2) for (const d of devices) d.maxBytes = 60;
   let counter = 0;
   const id = (kind) => `${kind}${seed}-${++counter}`;
   const ids = (d, table) => d.db.raw.prepare(`SELECT id FROM ${table}`).all().map((x) => x.id);
