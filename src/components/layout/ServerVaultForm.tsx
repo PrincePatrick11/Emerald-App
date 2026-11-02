@@ -2,15 +2,16 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import Button from '../ui/Button';
 import { KeyField, onEnter } from './vaultKeyParts';
-import { abandonLogin, adoptRemoteVault, remoteVaults, syncErrorCode, syncLogin, type RemoteVault } from '../../lib/sync/engine';
+import { abandonPairing, adoptRemoteVault, remoteVaults, syncErrorCode, syncPair, type RemoteVault } from '../../lib/sync/engine';
 import { syncErrorKey } from '../../lib/sync/errors';
+import { formatBytes } from '../../lib/helpers';
 import { newVaultRecord, type Vault as VaultRecord } from '../../lib/vaultManager';
 import { VAULT_KEY_CANCELLED } from '../../store/vaultKeyStore';
 import { useVaultStore } from '../../store/vaultStore';
 import { keyErrorOf } from '../../lib/vaultKeys';
 
 /**
- * Fetches a vault from a sync server onto this device. Logging in comes first,
+ * Fetches a vault from a sync server onto this device. Pairing comes first,
  * so nothing is left in the vault list if that fails. Then it is a vault like
  * any other with a `vault.key` and no database: the usual question for its
  * password opens it, and the first sync fills it.
@@ -27,8 +28,7 @@ export default function ServerVaultForm({ target, onCancel, onDone }: {
 
   const [name, setName] = useState('');
   const [url, setUrl] = useState('');
-  const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
+  const [key, setKey] = useState('');
   const [record, setRecord] = useState<VaultRecord | null>(null);
   const [remotes, setRemotes] = useState<RemoteVault[]>([]);
   const [busy, setBusy] = useState(false);
@@ -56,9 +56,9 @@ export default function ServerVaultForm({ target, onCancel, onDone }: {
   }
 
   const login = () => act(async () => {
-    if (!name.trim() || !url.trim() || !username.trim() || !password) return;
+    if (!name.trim() || !url.trim() || !key.trim()) return;
     const pending = await newVaultRecord(name.trim(), { path: await target(name.trim()) });
-    await syncLogin(pending.id, url, username, password, false);
+    await syncPair(pending.id, url, key);
     const found = await remoteVaults(pending.id);
     if (found.length === 1) {
       await open(pending, found[0]);
@@ -69,7 +69,7 @@ export default function ServerVaultForm({ target, onCancel, onDone }: {
   });
 
   async function cancel() {
-    if (record) await abandonLogin(record.id).catch((e) => console.warn('[sync]', e));
+    if (record) await abandonPairing(record.id).catch((e) => console.warn('[sync]', e));
     onCancel();
   }
 
@@ -83,7 +83,7 @@ export default function ServerVaultForm({ target, onCancel, onDone }: {
             <p className="text-sm text-secondary">{t('sync.pickRemote')}</p>
             {remotes.map((remote, i) => (
               <Button key={remote.id} className="w-full justify-center" disabled={busy} onClick={() => act(() => open(record, remote))}>
-                {t('sync.remoteVault', { number: i + 1, count: remote.head })}
+                {t('sync.remoteVault', { number: i + 1, size: formatBytes(remote.storedBytes, [t('common.bytes'), t('common.kilobytes'), t('common.megabytes')]) })}
               </Button>
             ))}
           </div>
@@ -96,18 +96,15 @@ export default function ServerVaultForm({ target, onCancel, onDone }: {
           <KeyField label={t('sync.url')}>
             <input type="url" spellCheck={false} className="input-field settings-field" placeholder="https://sync.example.com" value={url} disabled={busy} onChange={(e) => setUrl(e.target.value)} />
           </KeyField>
-          <KeyField label={t('sync.username')}>
-            <input type="text" spellCheck={false} autoComplete="username" className="input-field settings-field" value={username} disabled={busy} onChange={(e) => setUsername(e.target.value)} />
-          </KeyField>
-          <KeyField label={t('sync.password')}>
-            <input type="password" autoComplete="current-password" className="input-field settings-field" value={password} disabled={busy} onChange={(e) => setPassword(e.target.value)} onKeyDown={onEnter(login)} />
+          <KeyField label={t('sync.key')}>
+            <input type="password" spellCheck={false} autoComplete="off" className="input-field settings-field" value={key} disabled={busy} onChange={(e) => setKey(e.target.value)} onKeyDown={onEnter(login)} />
           </KeyField>
         </>
       )}
       {error && <p className="text-xs text-danger">{error}</p>}
       <div className="flex gap-2">
         {!record && (
-          <Button variant="primary" className="flex-1 justify-center" disabled={busy || !name.trim() || !url.trim() || !username.trim() || !password} onClick={login}>
+          <Button variant="primary" className="flex-1 justify-center" disabled={busy || !name.trim() || !url.trim() || !key.trim()} onClick={login}>
             {busy ? t('sync.connecting') : t('sync.fetch')}
           </Button>
         )}

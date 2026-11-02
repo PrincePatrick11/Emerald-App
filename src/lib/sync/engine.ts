@@ -42,7 +42,6 @@ import {
 export interface SyncStatus {
   connected: boolean;
   url?: string;
-  username?: string;
   hasRemote?: boolean;
   needsLogin?: boolean;
   /** The password changed here and the server has not heard yet. */
@@ -51,7 +50,7 @@ export interface SyncStatus {
 
 export interface RemoteVault {
   id: string;
-  head: number;
+  storedBytes: number;
   hasSnapshot: boolean;
 }
 
@@ -91,12 +90,25 @@ export function syncStatus(vaultId: string): Promise<SyncStatus> {
   return invoke<SyncStatus>('sync_status', { vaultId });
 }
 
-function deviceName(): string {
-  return `Emerald (${navigator.platform})`;
+export async function syncPair(vaultId: string, url: string, key: string): Promise<void> {
+  await invoke('sync_pair', { vaultId, url, key });
+  // A new token: the line to the server's events starts over with it.
+  watching = null;
 }
 
-export function syncLogin(vaultId: string, url: string, username: string, password: string, signup: boolean): Promise<void> {
-  return invoke('sync_login', { vaultId, url, username, password, signup, device: deviceName() });
+export interface ServerInfo {
+  storedBytes: number;
+  images: number;
+  me: string;
+  devices: { id: string; name: string; created_at: number; last_seen: number }[];
+}
+
+export function serverInfo(vaultId: string): Promise<ServerInfo> {
+  return invoke<ServerInfo>('sync_server_info', { vaultId });
+}
+
+export function removeDevice(vaultId: string, deviceId: string): Promise<void> {
+  return invoke('sync_remove_device', { vaultId, deviceId });
 }
 
 export function remoteVaults(vaultId: string): Promise<RemoteVault[]> {
@@ -107,8 +119,8 @@ export function adoptRemoteVault(vaultId: string, remoteId: string): Promise<voi
   return invoke('sync_adopt_remote', { vaultId, remoteId });
 }
 
-/** Ends a login that never became a connection, for a vault not created after all. */
-export function abandonLogin(vaultId: string): Promise<void> {
+/** Ends a pairing that never became a connection, for a vault not created after all. */
+export function abandonPairing(vaultId: string): Promise<void> {
   return invoke('sync_disconnect', { vaultId });
 }
 

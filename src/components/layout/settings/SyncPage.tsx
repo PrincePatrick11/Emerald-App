@@ -3,7 +3,8 @@ import { useTranslation } from 'react-i18next';
 import { Cloud } from 'lucide-react';
 import Button from '../../ui/Button';
 import { KeyField, onEnter } from '../vaultKeyParts';
-import { connectOpenVault, disconnectOpenVault, syncErrorCode, syncLogin, syncNow, syncStatus, type SyncStatus } from '../../../lib/sync/engine';
+import { connectOpenVault, disconnectOpenVault, removeDevice, serverInfo, syncErrorCode, syncNow, syncPair, syncStatus, type ServerInfo, type SyncStatus } from '../../../lib/sync/engine';
+import { formatBytes } from '../../../lib/helpers';
 import { syncErrorKey } from '../../../lib/sync/errors';
 import { formatTimeDistance } from '../../../lib/formatDate';
 import { useSyncStore } from '../../../store/syncStore';
@@ -22,9 +23,8 @@ export default function SyncPage() {
 
   const [status, setStatus] = useState<SyncStatus | null>(null);
   const [url, setUrl] = useState('');
-  const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
-  const [signup, setSignup] = useState(false);
+  const [key, setKey] = useState('');
+  const [info, setInfo] = useState<ServerInfo | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [newPassword, setNewPassword] = useState('');
@@ -34,12 +34,18 @@ export default function SyncPage() {
     const next = await syncStatus(vaultId);
     setStatus(next);
     if (next.url) setUrl(next.url);
-    if (next.username) setUsername(next.username);
+    if (next.connected && next.hasRemote && !next.needsLogin) {
+      serverInfo(vaultId).then(setInfo, (e) => console.warn('[sync] server info', e));
+    } else {
+      setInfo(null);
+    }
   }, [vaultId]);
 
   useEffect(() => {
     refresh().catch((e) => console.error('[sync] status', e));
   }, [refresh, running]);
+
+  const byteUnits: [string, string, string] = [t('common.bytes'), t('common.kilobytes'), t('common.megabytes')];
 
   async function act(action: () => Promise<void>) {
     setBusy(true);
@@ -47,7 +53,7 @@ export default function SyncPage() {
     try {
       await action();
       await refresh();
-      setPassword('');
+      setKey('');
     } catch (e) {
       console.warn('[sync]', e);
       setError(t(syncErrorKey(syncErrorCode(e))));
@@ -57,21 +63,24 @@ export default function SyncPage() {
   }
 
   const submit = () => act(async () => {
-    if (!url.trim() || !username.trim() || !password) return;
-    await syncLogin(vaultId, url, username, password, signup);
-    // A login that only renews a lost token: the vault is on the server already.
+    if (!url.trim() || !key.trim()) return;
+    await syncPair(vaultId, url, key);
+    // A pairing that only renews a lost token: the vault is on the server already.
     if (!status?.hasRemote) await connectOpenVault(vaultId, vault?.name ?? '');
+    else await syncNow();
   });
 
   if (!status) return null;
-  const showForm = !status.connected || status.needsLogin || !status.hasRemote;
+  // The token here can look fine and still have been taken on the server.
+  const removed = syncError === 'SYNC_NEEDS_LOGIN';
+  const showForm = !status.connected || status.needsLogin || removed || !status.hasRemote;
   const syncMessage = syncError ? t(syncErrorKey(syncError)) : '';
 
   return (
     <SettingsSection icon={<Cloud size={14} />} title={t('sync.title')} description={t('sync.description')}>
       {showForm ? (
         <div className="space-y-3">
-          {status.needsLogin && <SettingsDescription>{t('sync.needsLogin')}</SettingsDescription>}
+          {(status.needsLogin || removed) && <SettingsDescription>{t('sync.needsLogin')}</SettingsDescription>}
           <KeyField label={t('sync.url')}>
             <input
               type="url"
@@ -83,42 +92,26 @@ export default function SyncPage() {
               onChange={(e) => setUrl(e.target.value)}
             />
           </KeyField>
-          <KeyField label={t('sync.username')}>
-            <input
-              type="text"
-              autoComplete="username"
-              spellCheck={false}
-              className="input-field settings-field"
-              value={username}
-              disabled={busy}
-              onChange={(e) => setUsername(e.target.value)}
-            />
-          </KeyField>
-          <KeyField label={t('sync.password')}>
+          <KeyField label={t('sync.key')}>
             <input
               type="password"
-              autoComplete={signup ? 'new-password' : 'current-password'}
+              autoComplete="off"
+              spellCheck={false}
               className="input-field settings-field"
-              value={password}
+              value={key}
               disabled={busy}
-              onChange={(e) => setPassword(e.target.value)}
+              onChange={(e) => setKey(e.target.value)}
               onKeyDown={onEnter(submit)}
             />
           </KeyField>
-          <SettingsDescription>{t('sync.passwordHint')}</SettingsDescription>
-          {!status.connected && (
-            <label className="flex items-center gap-2 text-sm text-secondary">
-              <input type="checkbox" checked={signup} disabled={busy} onChange={(e) => setSignup(e.target.checked)} />
-              {t('sync.signup')}
-            </label>
-          )}
-          <Button variant="primary" onClick={submit} disabled={busy || !url.trim() || !username.trim() || !password}>
+          <SettingsDescription>{t('sync.keyHint')}</SettingsDescription>
+          <Button variant="primary" onClick={submit} disabled={busy || !url.trim() || !key.trim()}>
             {busy ? t('sync.connecting') : status.connected ? t('sync.login') : t('sync.connect')}
           </Button>
         </div>
       ) : (
         <div className="space-y-3">
-          <div className="text-sm text-secondary break-all">{t('sync.connectedTo', { url: status.url, username: status.username })}</div>
+          <div className="text-sm text-secondary break-all">{t('sync.connectedTo', { url: status.url })}</div>
           <div className="text-xs text-muted">
             {running ? t('sync.running') : lastSync ? t('sync.last', { time: formatTimeDistance(new Date(lastSync)) }) : t('sync.notYet')}
           </div>
@@ -148,6 +141,30 @@ export default function SyncPage() {
                 {t('sync.adoptPassword')}
               </Button>
             </>
+          )}
+          {info && (
+            <div className="space-y-2">
+              <div className="text-sm text-secondary">
+                {t('sync.stored', { size: formatBytes(info.storedBytes, byteUnits), count: info.images })}
+              </div>
+              <div className="label-xs">{t('sync.devices')}</div>
+              {info.devices.map((device) => (
+                <div key={device.id} className="settings-row">
+                  <span className="text-sm text-secondary min-w-0 truncate">
+                    {device.name || t('sync.unnamedDevice')}
+                    {device.id === info.me
+                      ? ` (${t('sync.thisDevice')})`
+                      : ` · ${t('sync.lastSeen', { time: formatTimeDistance(new Date(device.last_seen * 1000)) })}`}
+                  </span>
+                  {device.id !== info.me && (
+                    <Button tone="danger" className="shrink-0" disabled={busy} onClick={() => act(() => removeDevice(vaultId, device.id))}>
+                      {t('sync.removeDevice')}
+                    </Button>
+                  )}
+                </div>
+              ))}
+              <SettingsDescription>{t('sync.removeHint')}</SettingsDescription>
+            </div>
           )}
           <div className="flex items-center gap-2 flex-wrap">
             <Button onClick={() => act(syncNow)} disabled={busy || running}>{t('sync.now')}</Button>

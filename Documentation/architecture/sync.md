@@ -2,7 +2,7 @@
 
 A vault can sync through a server that only sees ciphertext ([Emerald Server](https://github.com/PrincePatrick11/Emerald-Server)). This file describes the part inside the app. `npm run check:sync` tests the capture and the merging.
 
-Users connect the open vault under Settings → Sync (`SyncPage`), which puts it on the server as a vault of its own, and fetch one onto another device from the vault window (`ServerVaultForm`).
+A server has one sync key. Users connect the open vault with its address and key under Settings → Sync (`SyncPage`), which puts it on the server as a vault of its own, and fetch one onto another device from the vault window (`ServerVaultForm`), with the key and the vault's password. The device trades the key for a token and does not keep it. The same page is the server's administration: what the vault takes up, the connected devices, removing one.
 
 ## The way to the server
 
@@ -14,7 +14,7 @@ Users connect the open vault under Settings → Sync (`SyncPage`), which puts it
 
 **Under load.** A push carries about 16 MB of JSON at most, so a long time offline becomes several pushes (`collectChanges`). Parents go first and deletes last, because a device applying the first part repairs any reference it cannot resolve; tasks stay together, since they point at each other. Once the log on the server holds more than 2000 changes, a device publishes a snapshot that replaces them; a device behind that fetches the snapshot and puts what it had not pushed back on top. A restore empties the vault and fills it frame by frame, so `_sync_meta.restoring` marks it until done, and a crash starts it over. What the device had not pushed is lost in that case.
 
-**Settings** (`lib/sync/settings.ts`) travel key by key next to the changes, so a theme picked on one device and a trash retention picked on another both stay. The last synced values are in `_sync_meta.settings_base`; a key this device changed since then stands against an incoming one. `appearance.uiScale` and the `backup` group stay on the device: the scale depends on the screen, and whether a device backs up is that device's business.
+**Settings** (`lib/sync/settings.ts`) travel key by key next to the changes, so a theme picked on one device and a trash retention picked on another both stay. The last synced values are in `_sync_meta.settings_base`; a key this device changed since then stands against an incoming one. The interface scale, editor font size, left list and the `backup` group stay on the device: sizes and lists depend on the screen, and whether a device backs up is that device's business.
 
 ## Capture
 

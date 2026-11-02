@@ -36,6 +36,8 @@ tauri-plugin-updater = "2"
 reqwest = { version = "0.13", default-features = false, features = ["json", "rustls", "stream"] }
 # Changes and snapshots are compressed before they are sealed; sealed data no longer compresses.
 flate2 = "1"
+# What a device is called in the list of connected devices.
+gethostname = "1"
 tokio-util = { version = "0.7", features = ["io"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"

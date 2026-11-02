@@ -11,10 +11,14 @@ import type { VaultSettings } from '../vaultSettings';
 export const SETTINGS_TABLE = '_settings';
 
 /**
- * What belongs to one device: the scale depends on the screen in front of you,
- * and whether and how often a device backs up depends on that device.
+ * What belongs to one device: sizes and lists depend on the screen in front of
+ * you, and whether and how often a device backs up depends on that device.
  */
-const THIS_DEVICE_ONLY = (path: string) => path === 'appearance.uiScale' || path.startsWith('backup.');
+const THIS_DEVICE_ONLY = (path: string) =>
+  path === 'appearance.uiScale'
+  || path === 'appearance.editorFontSize'
+  || path.startsWith('leftList.')
+  || path.startsWith('backup.');
 
 export type FlatSettings = Record<string, unknown>;
 

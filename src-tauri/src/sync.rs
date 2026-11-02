@@ -41,7 +41,6 @@ const LOCKED: &str = "SYNC_VAULT_LOCKED";
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 struct Connection {
     url: String,
-    username: String,
     #[serde(default)]
     remote: Option<String>,
     #[serde(default)]
@@ -354,33 +353,29 @@ pub async fn sync_status(app: tauri::AppHandle, vault_id: String) -> Result<Valu
     Ok(json!({
         "connected": true,
         "url": c.url,
-        "username": c.username,
         "hasRemote": c.remote.is_some(),
         "needsLogin": needs_login,
         "rekeyed": c.rekeyed,
     }))
 }
 
-/// Logs in, or makes the account, and remembers the connection for this vault.
-/// Nothing about the vault has reached the server yet.
+/// Trades the sync key for a token of this device's own and remembers the
+/// connection for this vault. The key is not kept. Nothing about the vault has
+/// reached the server yet.
 #[tauri::command]
-pub async fn sync_login(
+pub async fn sync_pair(
     app: tauri::AppHandle,
     vault_id: String,
     url: String,
-    username: String,
-    password: Zeroizing<String>,
-    signup: bool,
-    device: String,
+    key: Zeroizing<String>,
 ) -> Result<(), String> {
     let url = clean_url(&url)?;
-    let path = if signup { "/signup" } else { "/login" };
-    let body = json!({ "username": username, "password": password.as_str(), "device": device });
-    let response = send(request(&url, Method::POST, path, SHORT)?.json(&body)).await?;
+    let device = gethostname::gethostname().to_string_lossy().split('.').next().unwrap_or_default().to_string();
+    let body = json!({ "key": key.as_str(), "device": device });
+    let response = send(request(&url, Method::POST, "/pair", SHORT)?.json(&body)).await?;
     if !response.status().is_success() {
-        // A wrong password is not "log in again".
         return Err(match refused(response).await.as_str() {
-            NEEDS_LOGIN => "SYNC_WRONG_LOGIN".to_string(),
+            NEEDS_LOGIN => "SYNC_WRONG_KEY".to_string(),
             other => other.to_string(),
         });
     }
@@ -396,7 +391,6 @@ pub async fn sync_login(
             vault_id.clone(),
             Connection {
                 url,
-                username,
                 rekeyed: previous.as_ref().is_some_and(|c| c.rekeyed),
                 remote: previous.and_then(|c| c.remote),
                 device: device_id,
@@ -408,7 +402,45 @@ pub async fn sync_login(
     self::token(&app, &vault_id).map(|_| ())
 }
 
-/// The vaults this account has on the server, for opening one on a new device.
+/// What the Sync page shows: what this vault takes up, and who is connected.
+#[tauri::command]
+pub async fn sync_server_info(app: tauri::AppHandle, vault_id: String) -> Result<Value, String> {
+    let target = remote(&app, &vault_id)?;
+    let vault = send(target.call(Method::GET, "", SHORT)?).await?;
+    if !vault.status().is_success() {
+        return Err(refused(vault).await);
+    }
+    let vault: Value = vault.json().await.map_err(|_| UNREACHABLE.to_string())?;
+    let devices = send(request(&target.url, Method::GET, "/devices", SHORT)?.bearer_auth(target.token.as_str())).await?;
+    if !devices.status().is_success() {
+        return Err(refused(devices).await);
+    }
+    let devices: Value = devices.json().await.map_err(|_| UNREACHABLE.to_string())?;
+    Ok(json!({
+        "storedBytes": vault["stored_bytes"],
+        "images": vault["images"],
+        "me": devices["me"],
+        "devices": devices["devices"],
+    }))
+}
+
+/// Takes a device's token. Whoever still knows the sync key can connect again.
+#[tauri::command]
+pub async fn sync_remove_device(app: tauri::AppHandle, vault_id: String, device_id: String) -> Result<(), String> {
+    let target = remote(&app, &vault_id)?;
+    // An id from the server's own list, but it ends up in a path.
+    if uuid::Uuid::parse_str(&device_id).is_err() {
+        return Err("invalid device id".to_string());
+    }
+    let path = format!("/devices/{device_id}");
+    let response = send(request(&target.url, Method::DELETE, &path, SHORT)?.bearer_auth(target.token.as_str())).await?;
+    if !response.status().is_success() && response.status() != StatusCode::NOT_FOUND {
+        return Err(refused(response).await);
+    }
+    Ok(())
+}
+
+/// The vaults on the server, for opening one on a new device.
 #[tauri::command]
 pub async fn sync_remote_vaults(app: tauri::AppHandle, vault_id: String) -> Result<Value, String> {
     let c = connection(&app, &vault_id)?;
@@ -421,7 +453,7 @@ pub async fn sync_remote_vaults(app: tauri::AppHandle, vault_id: String) -> Resu
     Ok(Value::Array(
         vaults
             .iter()
-            .map(|v| json!({ "id": v["id"], "head": v["head"], "hasSnapshot": v["has_snapshot"] }))
+            .map(|v| json!({ "id": v["id"], "storedBytes": v["stored_bytes"], "hasSnapshot": v["has_snapshot"] }))
             .collect(),
     ))
 }
@@ -482,7 +514,7 @@ pub async fn sync_adopt_remote(app: tauri::AppHandle, vault_id: String, remote_i
 #[tauri::command]
 pub async fn sync_disconnect(app: tauri::AppHandle, vault_id: String) -> Result<(), String> {
     if let (Ok(c), Ok(token)) = (connection(&app, &vault_id), token(&app, &vault_id)) {
-        if let Ok(builder) = request(&c.url, Method::POST, "/logout", SHORT) {
+        if let Ok(builder) = request(&c.url, Method::POST, "/unpair", SHORT) {
             // Best effort: being offline must not stop anybody from disconnecting.
             let _ = builder.bearer_auth(token.as_str()).send().await;
         }
