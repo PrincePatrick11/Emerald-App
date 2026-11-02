@@ -127,10 +127,10 @@ export default function LeftSidebarRail() {
             Mind the MCP selectors: lucide exports `Home` as an alias of
             `House`, so the SVG carries `.lucide-house`, not `.lucide-home`. */}
         <div className={RAIL_GROUP}>
-          {viewButton('home', AUX_VIEWS.home)}
           <RailButton onClick={() => void createJournalEntry()} title={t('journal.newEntry')}>
             <Plus size={18} />
           </RailButton>
+          {viewButton('home', AUX_VIEWS.home)}
         </div>
         <div className={RAIL_GROUP}>
           {viewButton('journal', MODULES.journal)}

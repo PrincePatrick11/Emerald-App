@@ -2,7 +2,7 @@
 
 ## Home Dashboard
 
-The Home view (the rail's top button, also the default view of a fresh tab) is a dashboard over three sections — Journal, Operations, and Wiki. Each section has its own view mode (list or cards), sort, and item count (3, 5, 10, 25 or all; 5 by default), remembered per section.
+The Home view (near the top of the rail, also the default view of a fresh tab) is a dashboard over three sections — Journal, Operations, and Wiki. Each section has its own view mode (list or cards), sort, and item count (3, 5, 10, 25 or all; 5 by default), remembered per section.
 
 The header shows today's date with the current **moon phase** and a **New Entry** button; like the module lists' headers, it moves into the right sidebar while that is open. Rows and cards carry the same context menu as the module lists (Duplicate/Rename/Delete), and clicking an item opens it in its module. Rename edits the title in place, starting from the stored title (empty for an untitled entry); Enter saves, Escape cancels, an empty name changes nothing.
 
