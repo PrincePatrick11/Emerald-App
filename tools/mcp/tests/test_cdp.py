@@ -110,8 +110,9 @@ async def test_click_refuses_what_a_user_could_not_click(target):
 
 
 async def test_hover(target):
-    await target.hover("#del")
+    report = await target.hover("#del")
     assert "del:enter" in await page_log(target)
+    assert "note" not in report, "real mouse input takes :hover along"
 
 
 # -- typing -------------------------------------------------------------------

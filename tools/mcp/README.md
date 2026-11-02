@@ -177,13 +177,21 @@ Everything that looks at the DOM is in `pagelib.js`, which `cdp.py` sends along 
 
 ## Known limitations
 
+- **The port does not say whose instance answers on it.** Instances share port
+  9223 unless `EMERALD_CDP_PORT` says otherwise, and the server attaches to
+  whatever is there. On macOS and Linux it reads that process's checkout through
+  `lsof`: `status` and `connect` warn when it is not the session's, as does the
+  first answer after attaching. On Windows it cannot tell.
+
 - **macOS and Linux go through the dev bridge, which does less.** A left
   click, and a mouse move with the left button held (a drag, which selects
   text), is a real mouse event on macOS; everything else - typing, key presses,
   hovering, and every click on Linux - is events dispatched in the page: the
-  app's handlers and the editor see them, a `:hover` style does not follow.
-  `eval` returns the value of an expression; a list of statements runs but has
-  no value. Screenshots exist on macOS only. On macOS the bridge makes the
+  app's handlers and the editor see them, a `:hover` style does not follow, and
+  `hover` says so. Those events have no default action: the bridge itself lets
+  Enter and Space press a focused button, link or checkbox, but Enter does not
+  submit a form from a field. `eval` returns the value of an expression; a list
+  of statements runs, has no value, and the answer says so. Screenshots exist on macOS only. On macOS the bridge makes the
   window invisible where it stands rather than moving it away - WebKit stops
   rendering a page whose window is off the screen - and gives the keyboard
   back to the app that was in front; on Linux the window opens on screen.

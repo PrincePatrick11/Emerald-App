@@ -313,7 +313,7 @@ class CDPTarget:
         try:
             if "objectId" not in remote:
                 if remote.get("type") == "undefined":
-                    return "undefined"
+                    return STATEMENTS_NO_VALUE if remote.get("statements") else "undefined"
                 return remote.get("value", remote.get("unserializableValue"))
             try:
                 converted = await self.send(
@@ -438,7 +438,17 @@ class CDPTarget:
     async def hover(self, selector: str) -> dict:
         aim = await self.page("aim", selector, True, None)
         await self._mouse("mouseMoved", aim["x"], aim["y"])
-        return _report(aim)
+        report = _report(aim)
+        # A real move can take a moment to reach the styles.
+        for pause in (0.0, 0.1):
+            await asyncio.sleep(pause)
+            if await self.page("hovered", selector):
+                return report
+        report["note"] = (
+            "the page's mouse handlers got the move, but CSS :hover did not follow, "
+            "so hover styles do not show"
+        )
+        return report
 
     async def type_text(self, selector: str, text: str, clear: bool = True) -> dict:
         """Type into an input, a textarea or a contenteditable editor through
@@ -490,6 +500,14 @@ class CDPTarget:
                     return href
             await asyncio.sleep(0.1)
         raise CDPError(f"the page did not finish loading within {timeout:g}s")
+
+
+# Only the dev bridge marks this: a DevTools console gives a statement list the
+# value of its last expression.
+STATEMENTS_NO_VALUE = (
+    "undefined - the statements ran, but through the dev bridge only a single expression "
+    "has a value. To get one, wrap them: (async () => { ...; return value; })()"
+)
 
 
 def _report(found: dict, **extra: Any) -> dict:
