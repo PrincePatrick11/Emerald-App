@@ -21,12 +21,14 @@ import {
   collectChanges,
   isRestoring,
   isTracked,
+  markRestoring,
   markSnapshotNeeded,
   needsSnapshot,
   positionStatements,
   readPosition,
   startTracking,
   stopTracking,
+  wasMigrated,
   type SyncChange,
 } from './tracking';
 
@@ -56,8 +58,8 @@ export interface ServerStatus {
   url: string | null;
   /** A server is set, but what opens it is gone: no keychain, or it did not answer. */
   needsKey: boolean;
-  /** In the keychain or sealed under a vault's key. Otherwise a restart asks for the sync key. */
-  remembered: boolean;
+  /** The keychain would not take the token, so it lies in `sync.json`. */
+  unencrypted: boolean;
   links: Record<string, { remote: string; paused: boolean }>;
 }
 
@@ -71,6 +73,8 @@ export interface RemoteVault {
 }
 
 const OUTDATED = 'SYNC_SERVER:client_outdated';
+const SERVER_OLDER = 'SYNC_SNAPSHOT_OLDER';
+const CANNOT_OPEN = 'SYNC_CANNOT_OPEN';
 const TICK_MS = 2_000;
 /** The server says when something is new. This is for when that line is down. */
 const PULL_EVERY_MS = 60_000;
@@ -199,9 +203,19 @@ export async function keepPendingForNewPassword(): Promise<void> {
   if (await isTracked(db)) keptOverNewPassword.push(...(await collectChanges(db)).changes);
 }
 
-async function settingsBase(db: Database): Promise<FlatSettings> {
+async function storedSettingsBase(db: Database): Promise<FlatSettings | null> {
   const rows = await db.select<{ value: string }[]>("SELECT value FROM _sync_meta WHERE key = 'settings_base'");
-  return rows[0] ? (JSON.parse(rows[0].value) as FlatSettings) : {};
+  return rows[0] ? (JSON.parse(rows[0].value) as FlatSettings) : null;
+}
+
+async function settingsBase(db: Database): Promise<FlatSettings> {
+  return (await storedSettingsBase(db)) ?? {};
+}
+
+/** What a restore that broke off had not put back yet. */
+async function keptAtCrash(db: Database): Promise<SyncChange[]> {
+  const rows = await db.select<{ value: string }[]>("SELECT value FROM _sync_meta WHERE key = 'kept'");
+  return rows[0] ? (JSON.parse(rows[0].value) as SyncChange[]) : [];
 }
 
 function saveSettingsBase(db: Database, base: FlatSettings): Promise<number> {
@@ -217,19 +231,27 @@ function openSettings(vaultId: string) {
 async function takeIncomingSettings(db: Database, vaultId: string, incoming: FlatSettings): Promise<void> {
   const settings = openSettings(vaultId);
   if (!settings) return;
-  const merged = mergeIncomingSettings(settings, await settingsBase(db), incoming);
+  // No base yet: a device new to the vault, whose defaults are not changes of its own.
+  const base = (await storedSettingsBase(db)) ?? flattenSettings(settings);
+  const merged = mergeIncomingSettings(settings, base, incoming);
   if (merged.changed) await useSettingsStore.getState().replaceSettings(merged.settings);
   await saveSettingsBase(db, merged.base);
 }
 
 async function restoreFromSnapshot(db: Database, vaultId: string, keepPending: boolean, replacing = keepPending): Promise<void> {
-  const keep: SyncChange[] = [...keptOverNewPassword.splice(0), ...(keepPending ? (await collectChanges(db)).changes : [])];
+  const keep: SyncChange[] = (await isRestoring(db))
+    ? [...(await keptAtCrash(db)), ...keptOverNewPassword]
+    : [...keptOverNewPassword, ...(keepPending ? (await collectChanges(db)).changes : [])];
   const snapshot = await invoke<{ seq: number; epoch: number; schema: number; frames: number }>('sync_snapshot_fetch', { vaultId });
   try {
     if (snapshot.schema > BASELINE_VERSION) throw OUTDATED;
+    // Older rows would need the migrations in between: the device that made it updates first.
+    if (snapshot.schema < BASELINE_VERSION) throw SERVER_OLDER;
+    // Every vault has rows. Nothing here must not empty this one.
+    if (snapshot.frames === 0) throw CANNOT_OPEN;
     await drainSerialized();
     if (replacing) await backupBeforeReplacing(vaultId);
-    await beginRestore(db);
+    await beginRestore(db, keep);
     for (let index = 0; index < snapshot.frames; index++) {
       const text = await invoke<string>('sync_snapshot_frame', { vaultId, index });
       const frame = JSON.parse(text) as SnapshotFrame;
@@ -237,6 +259,7 @@ async function restoreFromSnapshot(db: Database, vaultId: string, keepPending: b
       else await restoreFrame(db, frame);
     }
     await finishRestore(db, keep, positionStatements({ cursor: snapshot.seq, epoch: snapshot.epoch }));
+    keptOverNewPassword.length = 0;
   } finally {
     await invoke('sync_snapshot_done', { vaultId });
   }
@@ -250,6 +273,11 @@ async function publishSnapshot(db: Database, vaultId: string, shorten = false): 
   await invoke('sync_images', { vaultId });
   for (let tries = 0; tries < MAX_PUSH_TRIES; tries++) {
     const remote = await invoke<{ head: number; epoch: number; hasSnapshot: boolean }>('sync_remote_state', { vaultId });
+    // Shortening puts this vault in place of the log: only when it has all of that log.
+    if (shorten) {
+      const { cursor } = await readPosition(db);
+      if (cursor !== remote.head) return;
+    }
     const epoch = remote.hasSnapshot && !shorten ? remote.epoch + 1 : remote.epoch;
     const { lastSeq } = await collectChanges(db, 0);
     await invoke('sync_snapshot_begin', { vaultId });
@@ -324,13 +352,15 @@ async function round(db: Database, vaultId: string, status: SyncStatus): Promise
     const remote = await invoke<{ hasSnapshot: boolean }>('sync_remote_state', { vaultId });
     await startTracking(db);
     if (remote.hasSnapshot) {
+      // Noted first: if the fetch fails, the seeded vault must never be published.
+      await markRestoring(db);
       await restoreFromSnapshot(db, vaultId, false);
-      await clearSnapshotNeeded(db);
       changed = true;
     }
   } else if (await isRestoring(db)) {
-    // A crash in the middle of a restore: only part of the vault is here.
+    // A fetch that failed or a crash in the middle of a restore.
     await restoreFromSnapshot(db, vaultId, false);
+    await clearSnapshotNeeded(db);
     changed = true;
   }
   // New key, new image names: this device's vault is what everybody starts from.
@@ -338,6 +368,18 @@ async function round(db: Database, vaultId: string, status: SyncStatus): Promise
     await markSnapshotNeeded(db);
     await publishSnapshot(db, vaultId);
     await invoke('sync_rekey_done', { vaultId });
+  } else if (await wasMigrated(db)) {
+    const remote = await invoke<{ hasSnapshot: boolean; schema: number }>('sync_remote_state', { vaultId });
+    if (remote.hasSnapshot && remote.schema >= BASELINE_VERSION) {
+      // Another device migrated first: what it published stands, with this one's changes on top.
+      await restoreFromSnapshot(db, vaultId, true);
+      await clearSnapshotNeeded(db);
+      changed = true;
+    } else {
+      // The first to migrate: not without what the others pushed meanwhile.
+      if (await pull(db, vaultId, epochAtStart)) changed = true;
+      await publishSnapshot(db, vaultId);
+    }
   } else if (await needsSnapshot(db)) {
     await publishSnapshot(db, vaultId);
   }
@@ -371,7 +413,8 @@ async function round(db: Database, vaultId: string, status: SyncStatus): Promise
         : changes),
     });
     if (answer.status === 'ok') {
-      await acknowledgeChanges(db, changes, lastSeq);
+      // Done: the whole log goes below.
+      if (!done) await acknowledgeChanges(db, changes, lastSeq);
       if (hasSettings) await saveSettingsBase(db, flat!);
       await db.batch(positionStatements({ cursor: answer.seq! }));
       if (done) {

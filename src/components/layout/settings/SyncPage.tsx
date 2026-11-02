@@ -11,6 +11,7 @@ import {
 import { syncErrorKey } from '../../../lib/sync/errors';
 import { formatTimeDistance } from '../../../lib/formatDate';
 import { useSyncStore } from '../../../store/syncStore';
+import { VAULT_KEY_CANCELLED } from '../../../store/vaultKeyStore';
 import { useVaultStore } from '../../../store/vaultStore';
 import SettingsSection, { SettingsDescription, SettingsStatus } from './SettingsSection';
 
@@ -59,6 +60,7 @@ export default function SyncPage() {
       await action();
       await refresh();
     } catch (e) {
+      if (e === VAULT_KEY_CANCELLED) return;
       console.warn('[sync]', e);
       setError(t(syncErrorKey(syncErrorCode(e))));
     } finally {
@@ -109,6 +111,7 @@ export default function SyncPage() {
               />
             </KeyField>
             <SettingsDescription>{t('sync.keyHint')}</SettingsDescription>
+            <SettingsDescription>{t('sync.keychainWarning')}</SettingsDescription>
             <Button variant="primary" onClick={submit} disabled={busy || !url.trim() || !key.trim()}>
               {busy ? t('sync.connecting') : removed || status.needsKey ? t('sync.login') : t('sync.connect')}
             </Button>
@@ -119,7 +122,7 @@ export default function SyncPage() {
             <div className="text-xs text-muted">
               {running ? t('sync.running') : lastSync ? t('sync.last', { time: formatTimeDistance(new Date(lastSync)) }) : t('sync.notYet')}
             </div>
-            {!status.remembered && Object.keys(status.links).length > 0 && <SettingsStatus tone="muted">{t('sync.noKeychain')}</SettingsStatus>}
+            {status.unencrypted && <SettingsStatus tone="muted">{t('sync.unencrypted')}</SettingsStatus>}
             {conflicts > 0 && <SettingsStatus tone="muted">{t('sync.conflicts', { count: conflicts })}</SettingsStatus>}
             {syncMessage && <SettingsStatus tone="error">{syncMessage}</SettingsStatus>}
             {syncError === 'SYNC_PASSWORD_CHANGED' && (

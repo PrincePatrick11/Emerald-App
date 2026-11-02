@@ -290,10 +290,15 @@ export async function* snapshotFrames(db: Database, maxBytes: number): AsyncGene
 }
 
 /** Empties the vault for a snapshot. Until `finishRestore` it only holds part of one. */
-export async function beginRestore(db: Database): Promise<void> {
+export async function beginRestore(db: Database, keep: readonly SyncChange[] = []): Promise<void> {
   const statements: Statement[] = [['PRAGMA defer_foreign_keys = ON'], APPLYING, ['DELETE FROM _sync_log']];
   for (const table of [...SYNCED_TABLES].reverse()) statements.push([`DELETE FROM ${table}`]);
-  statements.push(LOGGING, ["INSERT OR REPLACE INTO _sync_meta (key, value) VALUES ('restoring', '1')"]);
+  statements.push(
+    LOGGING,
+    ["INSERT OR REPLACE INTO _sync_meta (key, value) VALUES ('restoring', '1')"],
+    // The log is gone from here on: a crash must not take these along.
+    ["INSERT OR REPLACE INTO _sync_meta (key, value) VALUES ('kept', $1)", [JSON.stringify(keep)]],
+  );
   await db.batch(statements);
 }
 
@@ -343,13 +348,18 @@ export async function finishRestore(
       continue;
     }
     const [query, values] = insertStatement(change.table, change.row);
-    const sets = change.changed.map((column) => `${column} = excluded.${column}`).join(', ');
-    statements.push([
-      `${query.replace('INSERT INTO', 'INSERT OR IGNORE INTO')} ON CONFLICT(id) DO UPDATE SET ${sets || 'id = id'}`,
-      values,
-    ]);
+    statements.push([query.replace('INSERT INTO', 'INSERT OR IGNORE INTO'), values]);
+    // A statement of its own: `OR IGNORE` on an insert does not cover its `DO UPDATE`,
+    // and a name taken in the snapshot must not throw everything else away.
+    if (change.changed.length) {
+      const sets = change.changed.map((column, index) => `${column} = $${index + 2}`).join(', ');
+      statements.push([
+        `UPDATE OR IGNORE ${change.table} SET ${sets} WHERE id = $1`,
+        [change.id, ...change.changed.map((column) => change.row[column])],
+      ]);
+    }
   }
-  statements.push(...REFERENCE_REPAIRS, ["DELETE FROM _sync_meta WHERE key = 'restoring'"], ...finalStatements);
+  statements.push(...REFERENCE_REPAIRS, ["DELETE FROM _sync_meta WHERE key IN ('restoring', 'kept')"], ...finalStatements);
   await db.batch(statements);
 }
 

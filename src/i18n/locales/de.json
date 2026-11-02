@@ -1180,7 +1180,7 @@
     "connecting": "Verbinde …",
     "connectedTo": "Verbunden mit {{url}}",
     "running": "Synchronisiert …",
-    "last": "Zuletzt synchronisiert: {{time}}",
+    "last": "Zuletzt synchronisiert vor {{time}}",
     "notYet": "In dieser Sitzung noch nicht synchronisiert",
     "now": "Jetzt synchronisieren",
     "needsLogin": "Dieses Gerät ist nicht mehr verbunden. Gib den Sync-Key erneut ein.",
@@ -1192,6 +1192,8 @@
     "errorUnreachable": "Der Server antwortet nicht. Die Synchronisation geht weiter, sobald er wieder da ist.",
     "errorInsecure": "Diese Adresse ist nicht sicher. Nutze https, oder http nur auf diesem Computer, im privaten Netz oder im Tailnet.",
     "errorOutdated": "Der Vault auf dem Server stammt von einer neueren Emerald-Version. Aktualisiere diese App.",
+    "errorServerOlder": "Der Vault auf dem Server stammt aus einer älteren Version von Emerald. Aktualisiere zuerst das Gerät, das ihn dort abgelegt hat.",
+    "errorCannotOpen": "Was der Server geschickt hat, lässt sich mit dem Schlüssel dieses Vaults nicht öffnen.",
     "errorFailed": "Die Synchronisation ist fehlgeschlagen.",
     "passwordChanged": "Das Vault-Passwort wurde auf einem anderen Gerät geändert. Gib das neue ein: Diese Kopie wird damit neu geholt.",
     "newVaultPassword": "Neues Vault-Passwort",
@@ -1224,6 +1226,7 @@
     "unnamedVault": "Vault {{number}}",
     "goneFromServer": "Dieser Vault wurde vom Server entfernt. Er bleibt hier als lokaler Vault.",
     "replaceWarning": "Dieser Vault synchronisiert: Das Backup ersetzt ihn auch auf deinen anderen Geräten, die vorher selbst eine Sicherung anlegen.",
-    "noKeychain": "Noch kein Schlüsselbund und kein Vault, der die Verbindung aufbewahrt: Nach einem Neustart wird der Sync-Key erneut abgefragt."
+    "unencrypted": "Die Verbindung liegt unverschlüsselt auf diesem Gerät, weil der Schlüsselbund abgelehnt wurde oder fehlt. Verbinde dich neu und erlaube den Schlüsselbund, um das zu ändern.",
+    "keychainWarning": "Emerald bewahrt die Verbindung im Schlüsselbund des Systems auf. Lehnst du den Zugriff ab, liegt sie stattdessen unverschlüsselt auf diesem Gerät."
   }
 }

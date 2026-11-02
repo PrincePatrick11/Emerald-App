@@ -57,6 +57,7 @@ export default function ServerVaultForm({ onCancel, onDone }: {
           <KeyField label={t('sync.key')}>
             <input type="password" spellCheck={false} autoComplete="off" className="input-field settings-field" value={key} disabled={busy} onChange={(e) => setKey(e.target.value)} onKeyDown={onEnter(pair)} />
           </KeyField>
+          <p className="text-xs text-muted">{t('sync.keychainWarning')}</p>
         </>
       )}
       {error && <p className="text-xs text-danger">{error}</p>}

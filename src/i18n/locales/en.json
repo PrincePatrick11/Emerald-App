@@ -1180,7 +1180,7 @@
     "connecting": "Connecting…",
     "connectedTo": "Connected to {{url}}",
     "running": "Syncing…",
-    "last": "Last synced: {{time}}",
+    "last": "Last synced {{time}} ago",
     "notYet": "Not synced yet in this session",
     "now": "Sync now",
     "needsLogin": "This device is no longer connected. Enter the sync key again.",
@@ -1192,6 +1192,8 @@
     "errorUnreachable": "The server does not answer. Syncing goes on once it is back.",
     "errorInsecure": "This address is not safe. Use https, or http only on this computer, a private network or a tailnet.",
     "errorOutdated": "The vault on the server is from a newer version of Emerald. Update this app.",
+    "errorServerOlder": "The vault on the server is from an older version of Emerald. Update the device that put it there first.",
+    "errorCannotOpen": "What the server sent cannot be opened with this vault's key.",
     "errorFailed": "Syncing failed.",
     "passwordChanged": "The vault password was changed on another device. Enter the new one: this copy is fetched again under it.",
     "newVaultPassword": "New vault password",
@@ -1224,6 +1226,7 @@
     "unnamedVault": "Vault {{number}}",
     "goneFromServer": "This vault was removed from the server. It stays here as a local vault.",
     "replaceWarning": "This vault syncs: the backup also replaces it on your other devices, which first save a backup of their own.",
-    "noKeychain": "No keychain and no vault to keep the connection in yet: after a restart the sync key is asked for again."
+    "unencrypted": "The connection is stored unencrypted on this device, because the system keychain was refused or is missing. Connect again and allow the keychain to change that.",
+    "keychainWarning": "Emerald keeps the connection in the system keychain. If you refuse access, it is stored unencrypted on this device instead."
   }
 }

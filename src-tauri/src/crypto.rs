@@ -39,7 +39,7 @@ pub enum Context<'a> {
     Image(&'a str),
     Drafts,
     Backup,
-    /// What travels to a sync server: changes, snapshots, the token.
+    /// What travels to a sync server: changes, snapshots, vault names.
     Sync,
 }
 

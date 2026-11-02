@@ -1060,7 +1060,12 @@ fn write_json_in(dir: &Path, name: &str, temp_name: &str, max_bytes: u64, conten
 /// Writes `bytes` to `dir/name` through `dir/temp_name` and a rename, so a
 /// crash leaves either the old file or the new one, never half of either.
 pub(crate) fn write_atomic(dir: &Path, name: &str, temp_name: &str, bytes: &[u8]) -> Result<(), String> {
-    write_atomic_with(dir, name, temp_name, bytes, true)
+    write_atomic_with(dir, name, temp_name, bytes, true, false)
+}
+
+/// [`write_atomic`] for a file only this account may read, from its first byte on.
+pub(crate) fn write_atomic_private(dir: &Path, name: &str, temp_name: &str, bytes: &[u8]) -> Result<(), String> {
+    write_atomic_with(dir, name, temp_name, bytes, true, true)
 }
 
 /// [`write_atomic`] for a folder that is not the vault's: a volume that cannot
@@ -1068,7 +1073,7 @@ pub(crate) fn write_atomic(dir: &Path, name: &str, temp_name: &str, bytes: &[u8]
 /// backup that is the better answer; for `vault.key` it would not be. A flush
 /// that fails for any other reason still fails the write.
 pub(crate) fn write_atomic_anywhere(dir: &Path, name: &str, temp_name: &str, bytes: &[u8]) -> Result<(), String> {
-    write_atomic_with(dir, name, temp_name, bytes, false)
+    write_atomic_with(dir, name, temp_name, bytes, false, false)
 }
 
 /// Whether a failed flush only says "this volume cannot flush" — the one
@@ -1094,7 +1099,7 @@ fn sync_refusal_is_harmless(error: &std::io::Error) -> bool {
 }
 
 /// `must_sync`: whether a flush the volume refuses fails the write.
-fn write_atomic_with(dir: &Path, name: &str, temp_name: &str, bytes: &[u8], must_sync: bool) -> Result<(), String> {
+fn write_atomic_with(dir: &Path, name: &str, temp_name: &str, bytes: &[u8], must_sync: bool, private: bool) -> Result<(), String> {
     use std::io::Write;
 
     // Whatever lies under the temp name — a crash remnant or a planted
@@ -1103,9 +1108,16 @@ fn write_atomic_with(dir: &Path, name: &str, temp_name: &str, bytes: &[u8], must
     // link.
     let temp = dir.join(temp_name);
     std::fs::remove_file(&temp).ok();
-    let written = std::fs::OpenOptions::new()
-        .write(true)
-        .create_new(true)
+    let mut options = std::fs::OpenOptions::new();
+    options.write(true).create_new(true);
+    #[cfg(unix)]
+    if private {
+        use std::os::unix::fs::OpenOptionsExt;
+        options.mode(0o600);
+    }
+    #[cfg(not(unix))]
+    let _ = private;
+    let written = options
         .open(&temp)
         // First onto the disk, then rename: otherwise an empty file can sit under
         // the target name after a power failure — for `vault.key` that would mean the

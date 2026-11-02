@@ -138,6 +138,28 @@ export async function stopTracking(db: Database): Promise<void> {
  * the other devices start over from a snapshot, and what is logged so far is
  * part of it.
  */
+/**
+ * A migration: nothing is lost yet, and this device may be behind or not the first
+ * to migrate. What is logged stays, and `round` decides. Does not replace a
+ * snapshot already due, which has to go out as it is.
+ */
+export async function markMigrated(db: Database): Promise<void> {
+  await db.execute("INSERT OR IGNORE INTO _sync_meta (key, value) VALUES ('needs_snapshot', 'migration')");
+}
+
+export async function wasMigrated(db: Database): Promise<boolean> {
+  const rows = await db.select<{ value: string }[]>("SELECT value FROM _sync_meta WHERE key = 'needs_snapshot'");
+  return rows[0]?.value === 'migration';
+}
+
+/** Tracking starts on a vault that is to be fetched: until that is done, it holds nothing to publish. */
+export async function markRestoring(db: Database): Promise<void> {
+  await db.batch([
+    ["INSERT OR REPLACE INTO _sync_meta (key, value) VALUES ('restoring', '1')"],
+    ["DELETE FROM _sync_meta WHERE key = 'needs_snapshot'"],
+  ]);
+}
+
 export async function markSnapshotNeeded(db: Database): Promise<void> {
   await db.batch([
     ['DELETE FROM _sync_log'],
@@ -147,7 +169,7 @@ export async function markSnapshotNeeded(db: Database): Promise<void> {
 
 export async function needsSnapshot(db: Database): Promise<boolean> {
   const rows = await db.select<{ value: string }[]>("SELECT value FROM _sync_meta WHERE key = 'needs_snapshot'");
-  return rows[0]?.value === '1';
+  return rows.length > 0;
 }
 
 /** A restore began and has not finished: the vault holds only part of a snapshot. */
@@ -253,8 +275,11 @@ export async function collectChanges(
 
 /** The server has this part: only these rows leave the log. */
 export async function acknowledgeChanges(db: Database, changes: readonly SyncChange[], lastSeq: number): Promise<void> {
-  await db.batch(
-    changes.map((c) => ['DELETE FROM _sync_log WHERE tbl = $1 AND pk = $2 AND seq <= $3', [c.table, c.id, lastSeq]] as const)
+  await db.execute(
+    `DELETE FROM _sync_log WHERE seq <= $1 AND (tbl, pk) IN (
+       SELECT json_extract(value, '$[0]'), json_extract(value, '$[1]') FROM json_each($2)
+     )`,
+    [lastSeq, JSON.stringify(changes.map((c) => [c.table, c.id]))]
   );
 }
 

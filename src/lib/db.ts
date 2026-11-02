@@ -25,7 +25,7 @@ import { migrateRoutinesToTemplates } from './migrateRoutinesToTemplates';
 import i18n from '../i18n';
 import { LEGACY_UNTITLED_TITLES } from './entryTitle';
 import { useSettingsStore } from '../store/settingsStore';
-import { dropTriggers, installTriggers, isTracked, markSnapshotNeeded } from './sync/tracking';
+import { dropTriggers, installTriggers, isTracked, markMigrated } from './sync/tracking';
 
 // Per-vault DB cache: vault id → Database instance
 const _dbCache = new Map<string, Database>();
@@ -247,7 +247,7 @@ export async function runMigrations(db: Database): Promise<void> {
   // from a snapshot. Noted first: a crash in the chain must not lose that.
   const tracked = await isTracked(db);
   if (tracked && latest > currentVersion) {
-    await markSnapshotNeeded(db);
+    await markMigrated(db);
     await dropTriggers(db);
   }
 

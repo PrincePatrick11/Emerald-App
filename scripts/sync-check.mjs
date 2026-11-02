@@ -586,9 +586,43 @@ await test('a pending migration runs under tracking and asks for a snapshot', as
   db.raw.exec("INSERT INTO tags (id, name) VALUES ('t', 'before')");
   await runMigrations(db);
   assert.equal(await needsSnapshot(db), true);
-  assert.equal((await pendingRows(db)).length, 0);
+  assert.equal((await pendingRows(db)).length, 1, 'what waited to go out stays until it is known who goes first');
   db.raw.exec("INSERT INTO tags (id, name) VALUES ('u', 'after')");
-  assert.equal((await pendingRows(db)).length, 1, 'triggers are back after the chain');
+  assert.equal((await pendingRows(db)).length, 2, 'triggers are back after the chain');
+});
+
+await test('a kept rename onto a name the snapshot has gives way, and the rest of what was kept stays', async () => {
+  const db = new HarnessDb();
+  await runMigrations(db);
+  await startTracking(db);
+  db.raw.exec("INSERT INTO tags (id, name) VALUES ('a', 'taken'), ('b', 'other')");
+  await replaceWithSnapshot(db, await allFrames(db), [
+    { table: 'tags', id: 'b', op: 'upsert', changed: ['name'], row: { id: 'b', name: 'taken' } },
+    { table: 'tags', id: 'c', op: 'upsert', changed: ['name'], row: { id: 'c', name: 'new' } },
+  ], []);
+  const names = db.raw.prepare('SELECT id, name FROM tags ORDER BY id').all().map((r) => `${r.id}:${r.name}`);
+  assert.deepEqual(names, ['a:taken', 'b:other', 'c:new']);
+});
+
+await test('what a restore keeps survives a crash in the middle of it', async () => {
+  const db = new HarnessDb();
+  await runMigrations(db);
+  await startTracking(db);
+  const keep = [{ table: 'tags', id: 'k', op: 'upsert', changed: ['name'], row: { id: 'k', name: 'kept' } }];
+  await beginRestore(db, keep);
+  assert.equal(await isRestoring(db), true);
+  const stored = db.raw.prepare("SELECT value FROM _sync_meta WHERE key = 'kept'").get();
+  assert.deepEqual(JSON.parse(stored.value), keep);
+});
+
+await test('acknowledging a part takes only those rows from the log', async () => {
+  const db = new HarnessDb();
+  await runMigrations(db);
+  await startTracking(db);
+  db.raw.exec("INSERT INTO tags (id, name) VALUES ('a', 'a'), ('b', 'b')");
+  const { lastSeq } = await collectChanges(db, 0);
+  await acknowledgeChanges(db, [{ table: 'tags', id: 'a', op: 'delete' }], lastSeq);
+  assert.deepEqual((await pendingRows(db)).map((r) => r.id), ['b']);
 });
 
 await test('DROP COLUMN works once the triggers are out, and new columns are tracked after', async () => {

@@ -264,7 +264,21 @@ pub(crate) fn guarded_read_path(app: &tauri::AppHandle, path: &str) -> Result<Pa
     if !is_within_allowed_roots(&canonical, &allowed_roots) {
         return Err("access denied: path outside allowed directories".to_string());
     }
+    let app_data_dir = app.path().app_data_dir().ok().and_then(|dir| std::fs::canonicalize(dir).ok());
+    if app_data_dir.is_some_and(|dir| !app_data_read_allowed(&canonical, &dir)) {
+        return Err("access denied: this file is not for reading".to_string());
+    }
     Ok(canonical)
+}
+
+/// `sync.json` may hold the sync token, which the webview must never see. In any
+/// case: a file system that folds case would answer to another spelling.
+fn app_data_read_allowed(target: &Path, app_data_dir: &Path) -> bool {
+    target
+        .strip_prefix(app_data_dir)
+        .ok()
+        .and_then(|below| below.to_str())
+        .is_none_or(|below| !below.eq_ignore_ascii_case(sync::SETTINGS_FILE))
 }
 
 // ── commands ──────────────────────────────────────────────────────────────────
@@ -1048,6 +1062,18 @@ pub fn run() {
 #[cfg(test)]
 mod app_data_write_tests {
     use super::*;
+
+    #[test]
+    fn the_sync_settings_cannot_be_read_by_path() {
+        let data = Path::new("/home/u/.local/share/emerald");
+        for refused in ["sync.json", "SYNC.JSON", "Sync.Json"] {
+            assert!(!app_data_read_allowed(&data.join(refused), data), "{refused}");
+        }
+        for allowed in ["vaults.json", "vaults/sync.json"] {
+            assert!(app_data_read_allowed(&data.join(allowed), data), "{allowed}");
+        }
+        assert!(app_data_read_allowed(Path::new("/home/u/Documents/sync.json"), data));
+    }
 
     #[test]
     fn only_the_registry_and_the_vaults_folder_are_writable_in_the_app_data_dir() {
