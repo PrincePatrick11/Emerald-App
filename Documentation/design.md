@@ -232,7 +232,7 @@ Global search opens as `SearchModal` (`w-[560px]`, fixed `h-[70vh]`, matching `L
 
 **Left sidebar** (see [Left Sidebar](architecture/navigation.md#left-sidebar-rail--entry-list)): the 44px rail is part of the frame, with no divider against the entry list. `RAIL_WIDTH` is exported by the rail and never repeated as a literal — the right sidebar's default width and the title bar's logo box derive from it, so a mismatch would produce a clipped rail *and* wrong widths elsewhere. `.app-sidebar-left-with-rail` trims the entry list's left padding next to the rail, which already carries 6px of breathing room; otherwise the list's icons would sit further from the rail's icons than the title bar's alignment suggests.
 
-**Resizing a sidebar.** Its drag handle (`.sidebar-resize-handle`) shows on hover as a rounded 4px strip in `--accent-wash-strong`, mostly on the sheet and stopping short of its corners.
+**Resizing a sidebar.** Its drag handle (`.sidebar-resize-handle`) is an 8px grab area in the frame that shows on hover a rounded 4px strip in `--accent-wash-strong`, stopping short of the sheet's corners. The left one lies mostly on the sheet; the right one grabs on the sidebar's side only, so the main area's scrollbar stays usable, while its strip still reaches over onto the main area.
 
 **Showing and hiding the sidebars is animated** (200ms). The content keeps its pixel width and is clipped by the `<aside>` rather than squeezing together mid-transition; the transition is a class (`.app-sidebar-animated`), not an inline style, so the `prefers-reduced-motion` opt-out after it still wins; `AppShell` removes the class during a resize drag so the edge doesn't lag the pointer.
 

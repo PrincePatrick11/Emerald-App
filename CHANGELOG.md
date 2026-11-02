@@ -5,7 +5,16 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased] (targeting v0.2.0)
 
+### Added
+- **A plus in the rail creates anything.** It opens a small window with a tile for each type — Journal, Tasks, Operations, Wiki, Altar, Lexicon, Templates and Blocks — and opens what you pick; the dashboards' own "New" buttons work the same way.
+- **Altars have their own icon,** a candle on a table, instead of a flame.
+
 ### Changed
+- **The rail's buttons are grouped by space.** Home, then Journal/Tasks/Operations, Wiki/Lexicon/Altar and Templates/Blocks at the top; Categories/Tags/Trash and Vault/Settings at the bottom. It scrolls without a bar when the window is low, and the rail and the entry list's search start at the sheet's top edge.
+- **"Insert template" and "Add block" moved to the top of the right sidebar** while editing, "Insert template" first; the template editor has them too.
+- **The Categories page uses the full width.**
+- **The entry list's scrollbar appears only while scrolling or when the pointer is near its right edge,** and no longer sits on the resize handle.
+- **The sidebars' resize handles are a rounded green strip** on hover, stopping short of the sheet's corners; the right one leaves the main scrollbar usable.
 - **Modals are built like the window.** Title and actions sit on the frame, the content on an inset sheet, with a blurred backdrop and the action buttons pinned in a footer; a modal can be moved by its header within the window.
 - **Pickers and menus follow the theme.** The emoji picker, category picker, menus, date fields, the category chip and the tag colour popover use the theme's colours; the chosen emoji or menu row shows jade while hovering stays neutral, and Noctis menus are warm neutrals instead of grey.
 - **macOS title bar and menu.** The logo and the Menu button left the title bar and the traffic lights are aligned with it; Edit and View live only in the native menu, Export and Import only as title-bar buttons.
