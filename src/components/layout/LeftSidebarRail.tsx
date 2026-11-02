@@ -3,13 +3,13 @@ import { Plus, Settings, type LucideIcon } from 'lucide-react';
 import { Suspense, lazy, useEffect, useState } from 'react';
 import { AUX_VIEWS, MODULES, type ViewId } from '../../lib/modules';
 import { useUIStore } from '../../store/uiStore';
-import { useEntryStore } from '../../store/entryStore';
 import { useVaultStore } from '../../store/vaultStore';
 import { useAutoBackupStore } from '../../store/autoBackupStore';
 import { useSettingsStore } from '../../store/settingsStore';
 import { markAutoBackupErrorSeen } from '../../lib/autoBackup';
 import { asUpdateError, checkForUpdate, updateSettings } from '../../lib/updates';
 import VaultModal, { VaultGlyph } from './VaultModal';
+import CreateItemModal from './CreateItemModal';
 
 // SettingsModal drags the complete backup/restore machinery (dbBackup)
 // along with it — as a chunk of its own, only on first open.
@@ -64,6 +64,7 @@ export default function LeftSidebarRail() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settingsPage, setSettingsPage] = useState<SettingsPage>('general');
   const [vaultOpen, setVaultOpen] = useState(false);
+  const [createOpen, setCreateOpen] = useState(false);
   // Selector on a primitive, not on the vault record: otherwise `find` returns
   // an object on every store update that zustand reads as changed.
   const activeVaultIcon = useVaultStore((s) => s.vaults.find((v) => v.id === s.activeVaultId)?.icon);
@@ -89,11 +90,6 @@ export default function LeftSidebarRail() {
   const backupFailed = useAutoBackupStore((s) => s.error !== null && !s.errorSeen && s.vaultId === activeVaultId) && backupOn;
   // What the gear is currently reporting. The update takes precedence, it is the rarer message.
   const notice = updateVersion ? 'update' : backupFailed ? 'backup' : null;
-
-  const createJournalEntry = async () => {
-    const entry = await useEntryStore.getState().createEntry('journal');
-    setActiveView({ type: 'journal', id: entry.id, mode: 'edit', isNew: true });
-  };
 
   // One button per view; it is highlighted as long as its view is open —
   // also with an entry open inside it.
@@ -127,7 +123,7 @@ export default function LeftSidebarRail() {
             Mind the MCP selectors: lucide exports `Home` as an alias of
             `House`, so the SVG carries `.lucide-house`, not `.lucide-home`. */}
         <div className={RAIL_GROUP}>
-          <RailButton onClick={() => void createJournalEntry()} title={t('journal.newEntry')}>
+          <RailButton onClick={() => setCreateOpen(true)} title={t('createItem.title')}>
             <Plus size={18} />
           </RailButton>
           {viewButton('home', AUX_VIEWS.home)}
@@ -198,6 +194,7 @@ export default function LeftSidebarRail() {
         </div>
       </div>
 
+      {createOpen && <CreateItemModal onClose={() => setCreateOpen(false)} />}
       {vaultOpen && <VaultModal onClose={() => setVaultOpen(false)} />}
       {settingsOpen && (
         <Suspense fallback={null}>

@@ -83,6 +83,9 @@
     "wordDeleted": "Palabra eliminada",
     "placementRemoved": "Elemento retirado del altar"
   },
+  "createItem": {
+    "title": "Crear nuevo"
+  },
   "nav": {
     "home": "Inicio",
     "all": "Todo",

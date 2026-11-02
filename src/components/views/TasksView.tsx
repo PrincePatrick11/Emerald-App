@@ -5,6 +5,7 @@ import { useTaskStore } from '../../store/taskStore';
 import { useCategoryStore } from '../../store/categoryStore';
 import { useUIStore } from '../../store/uiStore';
 import { useUndoStore } from '../../store/undoStore';
+import { takeTaskToName } from '../../lib/createItem';
 import { generateId } from '../../lib/helpers';
 import { displayTitle, hasOwnTitle } from '../../lib/entryTitle';
 import { MODULES, viewTypeForEntryType } from '../../lib/modules';
@@ -137,11 +138,14 @@ export default function TasksView() {
   // The orphan block only appears if it contains something.
   const showUncatBlock = groupedTasks !== null && uncategorized.length > 0;
 
-  const handleCreateTask = async (categoryId?: string | null) => {
-    const task = await createTask(categoryId ?? null);
+  const startNaming = (task: Task) => {
     freshTaskIds.add(task.id);
     setEditingId(task.id);
     setEditValue(task.title);
+  };
+
+  const handleCreateTask = async (categoryId?: string | null) => {
+    startNaming(await createTask(categoryId ?? null));
   };
 
   const handleSaveEdit = async (id: string) => {
@@ -188,6 +192,9 @@ export default function TasksView() {
         parentId = tasks.find((task) => task.id === parentId)?.parent_task_id ?? null;
       }
       if (ancestors.length) setExpandedTasks((prev) => new Set([...prev, ...ancestors]));
+
+      // Created by the rail's plus: name it, as after this view's own button.
+      if (takeTaskToName(target.id)) startNaming(target);
     },
   });
 

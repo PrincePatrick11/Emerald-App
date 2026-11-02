@@ -36,6 +36,7 @@ import { AltarLibrarySection } from '../altar/AltarLibrarySection';
 import { AltarCard, AltarListRow, buildAltarContextMenuActions } from '../altar/AltarCard';
 import { imageSrc } from '../../lib/images';
 import { useSessionState } from '../../store/sessionStore';
+import { createItem } from '../../lib/createItem';
 
 
 export default function AltarView() {
@@ -43,9 +44,8 @@ export default function AltarView() {
   const altars = useAltarStore((s) => s.altars);
   const activeAltarId = useAltarStore((s) => s.activeAltarId);
   const previewPlacements = useAltarStore((s) => s.previewPlacements);
-  const { createAltar, duplicateAltar, setActiveAltar, clearActiveAltar, updateAltar, deleteAltar, restoreAltar } = useAltarStore(
+  const { duplicateAltar, setActiveAltar, clearActiveAltar, updateAltar, deleteAltar, restoreAltar } = useAltarStore(
     useShallow((s) => ({
-      createAltar: s.createAltar,
       duplicateAltar: s.duplicateAltar,
       setActiveAltar: s.setActiveAltar,
       clearActiveAltar: s.clearActiveAltar,
@@ -209,10 +209,7 @@ export default function AltarView() {
   const openNewElement = (categoryId?: string) =>
     setItemModal({ item: null, categoryId: categoryId ?? null });
 
-  const handleNew = async () => {
-    const altar = await createAltar();
-    setActiveView({ type: 'altar', id: altar.id, mode: 'edit', isNew: true });
-  };
+  const handleNew = () => createItem('altar');
 
   const startRename = (altar: AltarRecord) => {
     setRenamingId(altar.id);

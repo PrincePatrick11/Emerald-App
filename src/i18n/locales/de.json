@@ -83,6 +83,9 @@
     "wordDeleted": "Vokabel gelöscht",
     "placementRemoved": "Element vom Altar genommen"
   },
+  "createItem": {
+    "title": "Neu anlegen"
+  },
   "nav": {
     "home": "Start",
     "all": "Alle",
