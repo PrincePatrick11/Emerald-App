@@ -2514,7 +2514,7 @@ html[data-theme] .block-manager-row--idle,
 }
 
 /* The entry list's scrollbar stays out of sight unless the list is moving
-   (`EntryListTab`) or the pointer is on it, so it can still be grabbed. */
+   (`EntryListTab`) or the pointer is at its edge, so it can still be grabbed. */
 .entry-list-nav::-webkit-scrollbar-thumb {
   background-color: transparent;
 }

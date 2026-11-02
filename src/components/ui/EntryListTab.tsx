@@ -43,6 +43,8 @@ export interface EntryListTabProps<T> {
 
 /** How long the scrollbar stays after the last scroll event. */
 const SCROLLBAR_LINGER_MS = 800;
+/** How close to the list's right edge the pointer brings the scrollbar up. */
+const SCROLLBAR_EDGE_PX = 12;
 
 /** WebKit does not repaint a custom scrollbar when only its colour rule changes:
  *  it has to be rebuilt, which taking the overflow away for one layout does. */
@@ -86,15 +88,39 @@ export default function EntryListTab<T>({
   const navRef = useRef<HTMLElement>(null);
   const scrollEndTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
   useEffect(() => () => clearTimeout(scrollEndTimer.current), []);
-  // The scrollbar shows only while the list moves (`.is-scrolling` in index.css).
-  // On the element, not in state: a scroll must not re-render the whole list.
-  const onNavScroll = () => {
+  // The scrollbar shows only while the list moves or the pointer is at its edge
+  // (`.is-scrolling` in index.css). `:hover` cannot do this: a hidden thumb is not
+  // repainted when the pointer reaches it. On the element, not in state: neither
+  // a scroll nor a mouse move may re-render the whole list.
+  const pointerAtEdge = useRef(false);
+  const showScrollbarForNow = () => {
     const nav = navRef.current;
     if (!nav) return;
     if (!nav.classList.contains('is-scrolling')) setScrollbarShown(nav, true);
     clearTimeout(scrollEndTimer.current);
-    scrollEndTimer.current = setTimeout(() => setScrollbarShown(nav, false), SCROLLBAR_LINGER_MS);
+    scrollEndTimer.current = setTimeout(() => {
+      if (!pointerAtEdge.current) setScrollbarShown(nav, false);
+    }, SCROLLBAR_LINGER_MS);
   };
+  // On the window, not the list: over the scrollbar itself WebKit reports the
+  // pointer as having left the list and sends nothing more, so the state just
+  // stays "at the edge" until the pointer moves away from it elsewhere.
+  useEffect(() => {
+    const onMove = (e: globalThis.MouseEvent) => {
+      const nav = navRef.current;
+      if (!nav) return;
+      const rect = nav.getBoundingClientRect();
+      const atEdge = e.clientY >= rect.top && e.clientY <= rect.bottom
+        && e.clientX >= rect.right - SCROLLBAR_EDGE_PX && e.clientX <= rect.right
+        && nav.scrollHeight > nav.clientHeight;
+      if (atEdge === pointerAtEdge.current) return;
+      pointerAtEdge.current = atEdge;
+      showScrollbarForNow();
+    };
+    window.addEventListener('mousemove', onMove);
+    return () => window.removeEventListener('mousemove', onMove);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only touches refs
+  }, []);
   const sentinelRef = useRef<HTMLDivElement>(null);
   // Recreated on every growth: a fresh observer reports immediately whether the edge
   // is still visible, so even a tall screen fills up without
@@ -149,7 +175,7 @@ export default function EntryListTab<T>({
         </div>
       </div>
 
-      <nav ref={navRef} onScroll={onNavScroll} className="entry-list-nav flex-1 overflow-y-auto py-2 px-2">
+      <nav ref={navRef} onScroll={showScrollbarForNow} className="entry-list-nav flex-1 overflow-y-auto py-2 px-2">
         {matching.length === 0 ? (
           // Two lines in place of the first entry, without icon and button;
           // the dashboard next to it carries the large empty state.
