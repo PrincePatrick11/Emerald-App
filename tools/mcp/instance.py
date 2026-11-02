@@ -171,6 +171,27 @@ def resolve_checkout(cwd: Path | None = None) -> tuple[Path, str]:
     return APP_ROOT, "own-checkout"
 
 
+def running_checkout(port: int) -> Path | None:
+    """The checkout of whatever process listens on `port`: `tauri dev` runs the
+    app inside the checkout's src-tauri. None where that cannot be told, which
+    includes Windows, where a process's working directory is not readable."""
+    if sys.platform == "win32":
+        return None
+
+    def lsof(*args: str) -> list[str]:
+        out = subprocess.run(["lsof", "-nP", *args], capture_output=True, text=True, timeout=5)
+        return out.stdout.splitlines()
+
+    try:
+        pids = lsof("-t", f"-iTCP:{port}", "-sTCP:LISTEN")
+        if not pids:
+            return None
+        cwd = next((line[1:] for line in lsof("-a", "-p", pids[0], "-d", "cwd", "-Fn") if line.startswith("n")), None)
+    except (OSError, subprocess.SubprocessError):
+        return None
+    return _git_toplevel(Path(cwd)) if cwd else None
+
+
 # -- the instance ------------------------------------------------------------
 
 def _int_env(name: str, default: int) -> int:

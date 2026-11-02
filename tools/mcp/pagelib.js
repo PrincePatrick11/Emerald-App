@@ -323,6 +323,10 @@ function snapshot(o) {
 // -- pointer ------------------------------------------------------------------
 
 // Where to press, and whether a real press there would reach the element.
+function hovered(sel) {
+  return pick(sel).el.matches(':hover');
+}
+
 function aim(sel, force, probe) {
   const found = pick(sel);
   const el = found.el;
@@ -497,4 +501,4 @@ function plain(value) {
   return one(value);
 }
 
-const api = { snapshot, aim, landed, synthetic, focusForTyping, confirmTyped, focus, stateOf, rectOf, plain };
+const api = { snapshot, aim, hovered, landed, synthetic, focusForTyping, confirmTyped, focus, stateOf, rectOf, plain };
