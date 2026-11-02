@@ -43,7 +43,8 @@ function checkOnStart(): Promise<string | null> {
   return startupCheck;
 }
 
-/** The bottom of the rail: Vault, below it Settings. */
+/** The bottom of the rail: Vault, below it Settings on one line with `AppBottomBar`
+ *  (`pb-0.5` centres the 32px button on its 36px height). */
 export default function LeftSidebarFooter() {
   const { t } = useTranslation();
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -76,7 +77,7 @@ export default function LeftSidebarFooter() {
   const notice = updateVersion ? 'update' : backupFailed ? 'backup' : null;
 
   return (
-    <div className="left-sidebar-footer sidebar-bottom-bar w-full flex-1 flex flex-col items-center justify-end gap-1 py-2">
+    <div className="left-sidebar-footer sidebar-bottom-bar w-full flex-1 flex flex-col items-center justify-end gap-1 pt-2 pb-0.5">
       <RailButton onClick={() => setVaultOpen(true)} title={t('nav.vaults')} className="flex items-center justify-center w-8 h-8 p-0">
         {/* 17px only for the emoji: it carries no stroke width and otherwise
             looks too large next to the lucide icons. The fallback glyph is

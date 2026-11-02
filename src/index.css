@@ -121,9 +121,25 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
     @apply flex items-center justify-center w-[30px] h-[30px] p-0 rounded-md;
   }
 
-  /* The line under everything: smaller than the rail's 32px. */
+  /* The line under everything: smaller than the rail's 32px. It lies over the
+     frame, so rail and list run down to the window's edge beside its buttons;
+     only the sheet stops above it, by its height (`h-9`). */
+  .app-bottom-bar {
+    pointer-events: none;
+  }
+
   .app-bottom-bar .rail-button {
     @apply flex items-center justify-center w-6 h-6 p-0 rounded-md;
+    pointer-events: auto;
+  }
+
+  .app-sheet-frame-with-bar {
+    padding-bottom: 0;
+  }
+
+  .app-sheet-frame-with-bar .app-sheet-main,
+  .app-sheet-frame-with-bar .app-sidebar-right {
+    margin-bottom: 2.25rem;
   }
 
   /* The button area follows the width of the left sidebar —

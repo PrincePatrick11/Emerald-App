@@ -358,7 +358,7 @@ export default function AppShell() {
       <div
         className={`app-sheet-frame flex flex-1 min-h-0 overflow-hidden relative${
           leftFrameEmpty ? ' app-sheet-frame-free-left' : ''
-        }${resizing ? '' : ` ${SIDEBAR_ANIM_CLASS}`}`}
+        }${isAltarWindowFullscreen ? '' : ' app-sheet-frame-with-bar'}${resizing ? '' : ` ${SIDEBAR_ANIM_CLASS}`}`}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
       >

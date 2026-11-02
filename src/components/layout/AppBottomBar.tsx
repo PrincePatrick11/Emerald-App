@@ -15,7 +15,7 @@ export default function AppBottomBar({ paddingRight, className = '' }: { padding
   const setActiveView = useUIStore((s) => s.setActiveView);
   const activeViewType = useUIStore((s) => s.activeView.type);
   return (
-    <div className={`app-bottom-bar sidebar-bottom-bar flex-shrink-0 flex items-center justify-end gap-1 h-7 ${className}`} style={{ paddingRight }}>
+    <div className={`app-bottom-bar sidebar-bottom-bar absolute inset-x-0 bottom-0 z-10 flex items-center justify-end gap-1 h-9 ${className}`} style={{ paddingRight }}>
       {BOTTOM_BAR_VIEWS.map((type) => {
         const { icon: Icon, navLabelKey } = AUX_VIEWS[type];
         return (

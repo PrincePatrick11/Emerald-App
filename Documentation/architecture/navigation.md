@@ -95,7 +95,7 @@ The left sidebar is two independent components side by side in `AppShell`'s `app
 - Every view button comes from `viewButton(type, meta)`, which marks the button of the open view `active` — the accent border `.sidebar-item.active` uses in the entry lists.
 - The rail has no panel toggles: all three sidebars are toggled from the *View* menu (`useTitleBarMenus.ts` on Windows/Linux, native on macOS; `menu.rail`/`menu.entryList`/ `menu.properties`). Since Settings and Vault live only in the rail, hiding it hides them too.
 - **`LeftSidebarFooter`** is the bottom of the rail: Vault (opens `VaultModal`), below it Settings.
-- **`AppBottomBar`** is a 28px line under the whole shell, as wide as the window: Trash, Categories and Tags, ending at the right sidebar's left edge (`AppShell` passes that distance). It is gone in the Altar's full-window mode.
+- **`AppBottomBar`** is a 36px line along the window's bottom edge, as wide as the window: Trash, Categories and Tags, ending at the right sidebar's left edge (`AppShell` passes that distance). It lies over the frame: rail and entry list run down to the edge beside its buttons, with Settings on its centre line, and only the sheet stops above it. It is gone in the Altar's full-window mode.
 - The update check (the dot on the gear) runs once per app start: its promise and "dot shown" flag are module-level, because the footer remounts when the Altar's full-window mode ends.
 - Logo, back/forward and the search button are in the title bar (see [Window Chrome](shell.md#window-chrome)), the logo centred in a `RAIL_WIDTH`-wide box above the rail.
 - Home's target is not a content view (`isContentView` is false), so it overwrites the active tab instead of opening a new one.
