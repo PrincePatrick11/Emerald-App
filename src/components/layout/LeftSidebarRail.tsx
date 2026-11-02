@@ -146,6 +146,8 @@ export default function LeftSidebarRail() {
           {viewButton('categories', AUX_VIEWS.categories)}
           {viewButton('tags', AUX_VIEWS.tags)}
           {viewButton('trash', AUX_VIEWS.trash)}
+        </div>
+        <div className={RAIL_GROUP}>
           <RailButton onClick={() => setVaultOpen(true)} title={t('nav.vaults')}>
             {/* 17px only for the emoji: it carries no stroke width and otherwise
                 looks too large next to the lucide icons. The fallback glyph is
