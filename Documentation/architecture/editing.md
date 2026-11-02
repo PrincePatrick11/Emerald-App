@@ -116,7 +116,7 @@ The props and sections are documented in [`components.md`](../components.md) (`D
 - Every dashboard's main action is `primaryAction`; `danger: true` renders the red `btn-primary-danger` (Trash). `extraActions` are compact icon buttons on the same row; `contentFooter` renders below the content in every state, for a module's second area (Altar library, Blocks' built-in blocks, Templates' defaults overview, Lexicon's translate panel).
 - `ListToolbar` and `FilterPanel` have only the sidebar-column presentation; `FilterPanel` is always visible. Search sits in the main area next to the title (`ListSearchField`).
 - **Timeline.** `sortBlockedInTimeline` disables every non-date sort, and the grouping switch, with an explanatory tooltip — the timeline orders and groups by month on its own. The stored sort is not overwritten: the select *shows* newest first, `groupByMonth` orders by date (ascending only if the list already is), and the stored sort applies again with another layout.
-- `FilterPanel`'s `displayToggles` (view preferences like Tasks' "Show completed") are not counted in the active-filter badge and untouched by a reset. Each `FilterList`'s "All" row clears it; "Reset filters" in the shared no-results state clears search and every filter at once.
+- `Dashboard`'s `displayToggles` (view preferences, in the sidebar's view section, like Tasks' "Show completed") are not counted in the active-filter badge and untouched by a reset. Each `FilterList`'s "All" row clears it; "Reset filters" in the shared no-results state clears search and every filter at once.
 
 ## Auto-Save (the `useEntryEditor` hook)
 

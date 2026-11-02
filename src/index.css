@@ -324,12 +324,12 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
      rule needs no theme twin and no specificity race.
      `outline-offset` pulls the ring inward so the row does not jump
      in the flow. */
-  .task-row-target {
+  .row-target {
     outline: 1px solid rgba(0, 176, 118, 0.55);
     outline-offset: -1px;
   }
   @supports (color: color-mix(in srgb, red 50%, blue)) {
-    .task-row-target {
+    .row-target {
       outline: 1px solid color-mix(in srgb, var(--accent) 55%, transparent);
     }
   }
@@ -1092,18 +1092,6 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
   .input-field:disabled::-webkit-calendar-picker-indicator {
     opacity: 0.25;
     cursor: not-allowed;
-  }
-
-  .home-item-title {
-    color: var(--text-secondary);
-  }
-
-  .home-item-meta {
-    color: var(--text-muted);
-  }
-
-  .panel-interactive:hover .home-item-title {
-    color: var(--text-primary);
   }
 }
 
@@ -3001,18 +2989,6 @@ html[data-theme] .link-picker-row:focus-visible .link-picker-label {
   color: var(--link-picker-row-hover-text);
 }
 
-html[data-theme='emerald-noctis'] .home-item-title {
-  color: #ded0c1;
-}
-
-html[data-theme='emerald-noctis'] .home-item-meta {
-  color: #9b8571;
-}
-
-html[data-theme='emerald-noctis'] .panel-interactive:hover .home-item-title {
-  color: #f4e8db;
-}
-
 /* The settings section navigation shares its values with the
    sidebar tabs, but gets a name of its own: a nav row in a
    dialog is something different from a tab icon in the sidebar, and the
@@ -3202,18 +3178,6 @@ html[data-theme='emerald-parchment'] .tiptap code {
 html[data-theme='emerald-parchment'] .tiptap pre {
   background-color: rgba(134, 98, 62, 0.12);
   border-color: rgba(150, 112, 73, 0.34);
-}
-
-html[data-theme='emerald-parchment'] .home-item-title {
-  color: #3b2a19;
-}
-
-html[data-theme='emerald-parchment'] .home-item-meta {
-  color: #9f7f5f;
-}
-
-html[data-theme='emerald-parchment'] .panel-interactive:hover .home-item-title {
-  color: #22160d;
 }
 
 html[data-theme='emerald-parchment'] .list-toolbar-chip,
@@ -3524,3 +3488,36 @@ html[data-theme='custom'] .sidebar-search-input::placeholder {
   color: var(--text-subtle);
 }
 
+/* A selected dashboard row (trash). With a class more than the themes'
+   `.panel-interactive` rules, hover included, or they would win. */
+html[data-theme] .panel-interactive.row-selected,
+html[data-theme] .panel-interactive.row-selected:hover {
+  background: var(--accent-wash);
+  border-color: var(--accent);
+}
+
+/* A row's controls that show on hover. Takes no room at rest, so the row's
+   metadata keeps to the edge (-0.75rem undoes the row's gap), but stays in the
+   layout rather than `display: none`, or Tab could not reach it. */
+.row-hover-controls {
+  display: flex;
+  width: 0;
+  margin-left: -0.75rem;
+  overflow: hidden;
+  opacity: 0;
+}
+.group:hover > .row-hover-controls,
+.row-hover-controls:focus-within {
+  width: auto;
+  margin-left: 0;
+  overflow: visible;
+  opacity: 1;
+}
+/* Its own rule: an engine without :has() would drop a whole list. An open menu
+   lives inside the controls and must not vanish when the pointer leaves the row. */
+.row-hover-controls:has([aria-expanded='true']) {
+  width: auto;
+  margin-left: 0;
+  overflow: visible;
+  opacity: 1;
+}

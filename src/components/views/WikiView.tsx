@@ -7,10 +7,10 @@ import ContextMenu from '../ui/ContextMenu';
 import { useOpenInNewTabAction } from '../../hooks/useOpenInNewTabAction';
 import { useSaveAsTemplateAction } from '../../hooks/useSaveAsTemplateAction';
 import Dashboard, { type DashboardGroup } from '../ui/Dashboard';
-import DashboardItem from '../ui/DashboardItem';
+import DashboardItem, { CardContent, ItemGlyph, RENAME_INPUT_CLASS, RowContent } from '../ui/DashboardItem';
 import RenameField from '../ui/RenameField';
 import CollapsibleGroupHeader from '../ui/CollapsibleGroupHeader';
-import { generateId, isImageIcon } from '../../lib/helpers';
+import { generateId } from '../../lib/helpers';
 import { entryIcon, MODULES } from '../../lib/modules';
 import { displayTitle } from '../../lib/entryTitle';
 import { categoriesUsedBy, categoryLabel, hasUncategorized, lookupCategory } from '../../lib/categories';
@@ -250,16 +250,15 @@ export default function WikiView() {
     const renderArticle = (a: typeof articles[0]) => {
       const cat = lookupCategory(catById, a.category_id);
       const icon = entryIcon('wiki', a, cat);
-      const iconEl = isImageIcon(icon) ? <img src={icon} alt="" className="w-5 h-5 object-cover rounded-md inline" /> : icon;
       // No fallback to the raw category_id: for a deleted category its id
       // would otherwise appear here as the label (as in OperationsView it is then omitted).
       const catLabel = categoryLabel(t, cat);
       const dateStr = `${catLabel}${catLabel ? ' · ' : ''}${formatEntryDate(a.updated_at)}`;
       const renaming = renamingId === a.id;
-      const renameInput = (className: string) => (
-        <RenameField value={renameValue} onChange={setRenameValue} onCommit={commitRename}
-          onCancel={() => setRenamingId(null)} className={className} />
-      );
+      const title = renaming
+        ? <RenameField value={renameValue} onChange={setRenameValue} onCommit={commitRename}
+            onCancel={() => setRenamingId(null)} className={RENAME_INPUT_CLASS} />
+        : displayTitle(t, 'wiki', a.title);
       return (
         <DashboardItem
           view={{ type: 'wiki', id: a.id, mode: 'view' }}
@@ -267,25 +266,9 @@ export default function WikiView() {
           editing={renaming}
           onContextMenu={(e) => openCtxMenu(e, a.id)}
         >
-          {isCardView(view) ? (
-            <>
-              <div className="flex items-center gap-2 mb-2">
-                {isImageIcon(icon) ? <img src={icon} alt="" className="w-6 h-6 object-cover rounded-md" /> : <span className="text-xl">{icon}</span>}
-              </div>
-              {renaming
-                ? renameInput('text-sm font-medium text-secondary w-full bg-transparent outline-none selectable mb-1')
-                : <div className="text-sm font-medium text-secondary truncate mb-1">{displayTitle(t, 'wiki', a.title)}</div>}
-              <div className="text-xs text-muted">{dateStr}</div>
-            </>
-          ) : (
-            <>
-              <span className="text-base flex-shrink-0">{iconEl}</span>
-              {renaming
-                ? renameInput('flex-1 bg-transparent text-sm text-soft outline-none selectable')
-                : <span className="flex-1 text-sm text-soft truncate">{displayTitle(t, 'wiki', a.title)}</span>}
-              <span className="text-xs text-muted flex-shrink-0">{dateStr}</span>
-            </>
-          )}
+          {isCardView(view)
+            ? <CardContent icon={<ItemGlyph icon={icon} large />} title={title} meta={dateStr} />
+            : <RowContent icon={<ItemGlyph icon={icon} />} title={title} meta={dateStr} />}
         </DashboardItem>
       );
     };

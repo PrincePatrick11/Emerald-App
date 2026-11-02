@@ -4,7 +4,7 @@ import { ArrowRightLeft, Check, Copy } from 'lucide-react';
 import { useLexiconStore } from '../../store/lexiconStore';
 import { usePersistedFlag } from '../../hooks/usePersistedFlag';
 import { entriesOfLanguage, translateText, type TranslateDirection, type TranslateMode } from '../../lib/lexicon';
-import { GroupDivider } from '../ui/Dashboard';
+import CollapsibleGroupHeader from '../ui/CollapsibleGroupHeader';
 import Button from '../ui/Button';
 import EmptyState from '../ui/EmptyState';
 import Dropdown from '../ui/Dropdown';
@@ -74,7 +74,7 @@ export default function TranslatePanel() {
 
   return (
     <div className="mt-8">
-      <GroupDivider label={t('lexicon.translate')} collapsed={collapsed} onToggleCollapse={toggleCollapsed} />
+      <CollapsibleGroupHeader label={t('lexicon.translate')} collapsed={collapsed} onToggleCollapse={toggleCollapsed} />
       {collapsed ? null : !language ? (
         // No button: "New language" is already in the section above.
         <EmptyState

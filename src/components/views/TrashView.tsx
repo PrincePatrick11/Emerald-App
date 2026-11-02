@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { useShallow } from 'zustand/shallow';
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
@@ -14,8 +14,11 @@ import { sortItems } from '../../lib/sortItems';
 import { isCardView, isWideCardView } from '../../lib/viewMode';
 import { groupBy, groupByMonth } from '../../lib/groupBy';
 import { categoryLabel } from '../../lib/categories';
-import Dashboard, { DashboardTitle } from '../ui/Dashboard';
+import Dashboard from '../ui/Dashboard';
+import CollapsibleGroupHeader from '../ui/CollapsibleGroupHeader';
 import Button from '../ui/Button';
+import ContextMenu from '../ui/ContextMenu';
+import { DashboardRow, RowContent } from '../ui/DashboardItem';
 import EmptyState, { NoResults } from '../ui/EmptyState';
 import InlineConfirm from '../ui/InlineConfirm';
 import type { TrashedItem } from '../../types';
@@ -26,35 +29,24 @@ function typeIcon(type: TrashedItem['type']) {
   return <Icon size={14} className="text-subtle flex-shrink-0" />;
 }
 
-function SectionHeader({ label, count }: { label: string; count: number }) {
-  return (
-    <div className="flex items-center gap-2 mt-5 mb-2 first:mt-0">
-      <p className="text-xs font-semibold uppercase tracking-wider text-subtle">{label}</p>
-      <span className="text-xs text-subtle">{count}</span>
-    </div>
-  );
-}
-
-function SubSectionHeader({ label }: { label: string }) {
-  return (
-    <p className="text-xs text-subtle italic mt-3 mb-1.5 pl-1">{label}</p>
-  );
-}
-
 interface ItemSharedProps {
   confirmingId: string | null;
   setConfirmingId: (id: string | null) => void;
   restore: (item: TrashedItem) => Promise<void>;
   deleteNow: (item: TrashedItem) => Promise<void>;
+  onContextMenu: (e: React.MouseEvent, item: TrashedItem) => void;
   selectedIds: Set<string>;
   onToggleSelect: (id: string) => void;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   t: TFunction<any>;
 }
 
-function SelectCheckbox({ selected, onToggle }: { selected: boolean; onToggle: () => void }) {
+function SelectCheckbox({ label, selected, onToggle }: { label: string; selected: boolean; onToggle: () => void }) {
   return (
     <button
+      role="checkbox"
+      aria-checked={selected}
+      aria-label={label}
       onClick={(e) => { e.stopPropagation(); onToggle(); }}
       className="flex-shrink-0 text-subtle hover:text-accent-raise transition-colors"
     >
@@ -80,76 +72,66 @@ function DaysLeft({ days, t }: { days: number; t: ItemSharedProps['t'] }) {
   );
 }
 
-function ItemRow({ item, confirmingId, setConfirmingId, restore, deleteNow, selectedIds, onToggleSelect, t }: {
+function ItemRow({ item, confirmingId, setConfirmingId, restore, deleteNow, onContextMenu, selectedIds, onToggleSelect, t }: {
   item: TrashedItem;
 } & ItemSharedProps) {
   const daysLeft = useDaysLeft(item.deleted_at);
-  const confirming = confirmingId === item.id;
   const selected = selectedIds.has(item.id);
+  const confirming = confirmingId === item.id;
 
   return (
-    <div
-      className={`flex items-center gap-3 px-4 py-2.5 rounded-lg border transition-colors cursor-pointer
-        ${selected
-          ? 'bg-accent-wash border-accent-edge'
-          : 'bg-well border-edge hover:border-edge-strong'}`}
+    <DashboardRow
+      className={selected ? 'row-selected' : ''}
       onClick={() => onToggleSelect(item.id)}
+      onContextMenu={(e) => onContextMenu(e, item)}
     >
-      <SelectCheckbox selected={selected} onToggle={() => onToggleSelect(item.id)} />
-      {typeIcon(item.type)}
-      <div className="flex-1 min-w-0">
-        <div className="text-sm text-soft truncate">{item.title}</div>
-        <div className="text-xs text-subtle mt-0.5">
-          {t('trash.deletedAgo', { time: formatTimeDistance(item.deleted_at) })}
-          {daysLeft !== null && (
-            <>
-              {' '}&middot;{' '}
-              <DaysLeft days={daysLeft} t={t} />
-            </>
-          )}
-        </div>
-      </div>
-      <div className="flex items-center gap-1 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
-        {confirming ? (
-          <InlineConfirm onConfirm={() => deleteNow(item)} onCancel={() => setConfirmingId(null)} />
-        ) : (
+      <SelectCheckbox label={item.title} selected={selected} onToggle={() => onToggleSelect(item.id)} />
+      <RowContent
+        icon={typeIcon(item.type)}
+        title={item.title}
+        meta={confirming ? undefined : (
           <>
-            <Button tone="jade" onClick={() => restore(item)}>
+            {t('trash.deletedAgo', { time: formatTimeDistance(item.deleted_at) })}
+            {daysLeft !== null && <> &middot; <DaysLeft days={daysLeft} t={t} /></>}
+          </>
+        )}
+      />
+      {/* Restoring is what this page is for, so it stays in the row, in jade.
+          Deleting for good is in the context menu and asks here. */}
+      <span className="flex items-center gap-1 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
+        {confirming
+          ? <InlineConfirm small onConfirm={() => deleteNow(item)} onCancel={() => setConfirmingId(null)} />
+          : (
+            <Button tone="jade" small onClick={() => restore(item)}>
               <RotateCcw size={12} />
               {t('trash.restore')}
             </Button>
-            <Button tone="danger" compact title={t('trash.deletePermanently')} aria-label={t('trash.deletePermanently')}
-              onClick={() => setConfirmingId(item.id)}>
-              <Trash2 size={12} />
-            </Button>
-          </>
-        )}
-      </div>
-    </div>
+          )}
+      </span>
+    </DashboardRow>
   );
 }
 
-function ItemCard({ item, confirmingId, setConfirmingId, restore, deleteNow, selectedIds, onToggleSelect, t }: {
+function ItemCard({ item, confirmingId, setConfirmingId, restore, deleteNow, onContextMenu, selectedIds, onToggleSelect, t }: {
   item: TrashedItem;
 } & ItemSharedProps) {
   const daysLeft = useDaysLeft(item.deleted_at);
-  const confirming = confirmingId === item.id;
   const selected = selectedIds.has(item.id);
 
   return (
     <div
-      className={`panel p-4 flex flex-col gap-2 cursor-pointer transition-colors
-        ${selected ? 'ring-1 ring-focus bg-accent-wash' : ''}`}
+      className={`panel-interactive p-4 flex flex-col gap-2 ${selected ? 'row-selected' : ''}`}
       onClick={() => onToggleSelect(item.id)}
+      onContextMenu={(e) => onContextMenu(e, item)}
     >
       <div className="flex items-start gap-2">
-        <SelectCheckbox selected={selected} onToggle={() => onToggleSelect(item.id)} />
+        <SelectCheckbox label={item.title} selected={selected} onToggle={() => onToggleSelect(item.id)} />
         {typeIcon(item.type)}
         <p className="text-sm text-soft font-medium leading-snug line-clamp-2 flex-1">
           {item.title}
         </p>
       </div>
-      <div className="text-xs text-subtle">
+      <div className="text-xs text-muted">
         {t('trash.deletedAgo', { time: formatTimeDistance(item.deleted_at) })}
       </div>
       {daysLeft !== null && (
@@ -158,20 +140,14 @@ function ItemCard({ item, confirmingId, setConfirmingId, restore, deleteNow, sel
         </div>
       )}
       <div className="flex items-center gap-1 pt-1 border-t border-edge" onClick={(e) => e.stopPropagation()}>
-        {confirming ? (
-          <InlineConfirm small onConfirm={() => deleteNow(item)} onCancel={() => setConfirmingId(null)} />
-        ) : (
-          <>
+        {confirmingId === item.id
+          ? <InlineConfirm small onConfirm={() => deleteNow(item)} onCancel={() => setConfirmingId(null)} />
+          : (
             <Button tone="jade" small onClick={() => restore(item)}>
               <RotateCcw size={12} />
               {t('trash.restore')}
             </Button>
-            <Button tone="danger" compact small title={t('trash.deletePermanently')} aria-label={t('trash.deletePermanently')}
-              onClick={() => setConfirmingId(item.id)}>
-              <Trash2 size={12} />
-            </Button>
-          </>
-        )}
+          )}
       </div>
     </div>
   );
@@ -201,6 +177,8 @@ export default function TrashView() {
   // question — the second click of a double click would otherwise delete immediately.
   const confirmArmedAt = useRef(0);
   const [search, setSearch] = useSessionState('trash.search', '');
+  const [ctxMenu, setCtxMenu] = useState<{ item: TrashedItem; x: number; y: number } | null>(null);
+  const [restoreFailed, setRestoreFailed] = useState(false);
 
   useEffect(() => { fetchTrashed(); }, []);
 
@@ -227,6 +205,7 @@ export default function TrashView() {
       return next;
     });
     setConfirm(null);
+    setRestoreFailed(false);
   };
 
   const selectAll = () => {
@@ -260,7 +239,27 @@ export default function TrashView() {
     }
   };
 
-  const itemProps: ItemSharedProps = { confirmingId, setConfirmingId, restore, deleteNow, selectedIds, onToggleSelect: toggleSelect, t };
+  /** One failure does not stop the rest; what failed stays selected, to try again. */
+  const restoreSelected = async () => {
+    const failed = new Set<string>();
+    for (const item of items.filter((i) => selectedIds.has(i.id))) {
+      try {
+        await restore(item);
+      } catch (err) {
+        console.error('[TrashView] restoring failed:', err);
+        failed.add(item.id);
+      }
+    }
+    setSelectedIds(failed);
+    setRestoreFailed(failed.size > 0);
+  };
+
+  const openCtxMenu = (e: React.MouseEvent, item: TrashedItem) => {
+    e.preventDefault();
+    setCtxMenu({ item, x: e.clientX, y: e.clientY });
+  };
+
+  const itemProps: ItemSharedProps = { confirmingId, setConfirmingId, restore, deleteNow, onContextMenu: openCtxMenu, selectedIds, onToggleSelect: toggleSelect, t };
 
   const sorted = sortItems(matching, trashPrefs.sort, { date: (i) => i.deleted_at });
 
@@ -285,7 +284,7 @@ export default function TrashView() {
 
     const renderItems = (subset: TrashedItem[]) =>
       viewMode === 'list'
-        ? <div className="space-y-1">{subset.map((item) => <ItemRow key={item.id} item={item} {...itemProps} />)}</div>
+        ? <div className="space-y-1.5">{subset.map((item) => <ItemRow key={item.id} item={item} {...itemProps} />)}</div>
         : <div className={cardsGridClass}>{subset.map((item) => <ItemCard key={item.id} item={item} {...itemProps} />)}</div>;
 
     // '' = no category; trashStore joins c.name as category — the key is the name, not the id.
@@ -296,84 +295,37 @@ export default function TrashView() {
       return catDef ? `${catDef.emoji} ${categoryLabel(t, catDef)}` : name || t('categories.uncategorized');
     };
 
+    const sections: { label: string; items: TrashedItem[]; groups?: { label: string; items: TrashedItem[] }[] }[] = [
+      { label: t('nav.journal'), items: journal },
+      { label: t('nav.wiki'), items: wiki, groups: wikiByCategory },
+      { label: t('nav.operations'), items: operations, groups: opsByCategory },
+      { label: t('nav.tasks'), items: tasks },
+      { label: t('nav.altar'), items: altars },
+      { label: t('trash.altarItems'), items: altarItems },
+      { label: t('nav.tags'), items: tags },
+      { label: t('trash.categories'), items: cats },
+      { label: t('trash.blockDefinitions'), items: blockDefs },
+      { label: t('trash.templates'), items: templates },
+      { label: t('trash.languages'), items: languages },
+    ];
+
     return (
-      <div>
-        {journal.length > 0 && (
-          <>
-            <SectionHeader label={t('nav.journal')} count={journal.length} />
-            {renderItems(journal)}
-          </>
-        )}
-        {wiki.length > 0 && (
-          <>
-            <SectionHeader label={t('nav.wiki')} count={wiki.length} />
-            {wikiByCategory.map(({ label: catName, items: catItems }) => (
-              <div key={catName}>
-                {wikiByCategory.length > 1 && <SubSectionHeader label={categoryGroupLabel(catName)} />}
-                {renderItems(catItems)}
-              </div>
-            ))}
-          </>
-        )}
-        {operations.length > 0 && (
-          <>
-            <SectionHeader label={t('nav.operations')} count={operations.length} />
-            {opsByCategory.map(({ label: catName, items: catItems }) => (
-              <div key={catName}>
-                {opsByCategory.length > 1 && <SubSectionHeader label={categoryGroupLabel(catName)} />}
-                {renderItems(catItems)}
-              </div>
-            ))}
-          </>
-        )}
-        {tasks.length > 0 && (
-          <>
-            <SectionHeader label={t('nav.tasks')} count={tasks.length} />
-            {renderItems(tasks)}
-          </>
-        )}
-        {altars.length > 0 && (
-          <>
-            <SectionHeader label={t('nav.altar')} count={altars.length} />
-            {renderItems(altars)}
-          </>
-        )}
-        {altarItems.length > 0 && (
-          <>
-            <SectionHeader label={t('trash.altarItems')} count={altarItems.length} />
-            {renderItems(altarItems)}
-          </>
-        )}
-        {tags.length > 0 && (
-          <>
-            <SectionHeader label={t('nav.tags')} count={tags.length} />
-            {renderItems(tags)}
-          </>
-        )}
-        {cats.length > 0 && (
-          <>
-            <SectionHeader label={t('trash.categories')} count={cats.length} />
-            {renderItems(cats)}
-          </>
-        )}
-        {blockDefs.length > 0 && (
-          <>
-            <SectionHeader label={t('trash.blockDefinitions')} count={blockDefs.length} />
-            {renderItems(blockDefs)}
-          </>
-        )}
-        {templates.length > 0 && (
-          <>
-            <SectionHeader label={t('trash.templates')} count={templates.length} />
-            {renderItems(templates)}
-          </>
-        )}
-        {languages.length > 0 && (
-          <>
-            <SectionHeader label={t('trash.languages')} count={languages.length} />
-            {renderItems(languages)}
-          </>
-        )}
+      <div className="space-y-6">
+        {sections.filter((section) => section.items.length > 0).map((section) => (
+          <div key={section.label}>
+            <CollapsibleGroupHeader label={section.label} count={section.items.length} />
+            {section.groups && section.groups.length > 1
+              ? <div className="space-y-4">
+                  {section.groups.map((group) => (
+                    <div key={group.label}>
+                      <CollapsibleGroupHeader label={categoryGroupLabel(group.label)} />
+                      {renderItems(group.items)}
+                    </div>
+                  ))}
+                </div>
+              : renderItems(section.items)}
+          </div>
+        ))}
       </div>
     );
   };
@@ -382,11 +334,11 @@ export default function TrashView() {
   const renderTimeline = () => {
     const byMonth = groupByMonth(sorted, (i) => i.deleted_at);
     return (
-      <div className="space-y-5">
+      <div className="space-y-6">
         {byMonth.map(({ label, items: monthItems }) => (
           <div key={label}>
-            <p className="text-xs font-semibold uppercase tracking-wider text-subtle mb-2 px-1">{label}</p>
-            <div className="space-y-1">
+            <CollapsibleGroupHeader label={label} />
+            <div className="space-y-1.5">
               {monthItems.map((item) => <ItemRow key={item.id} item={item} {...itemProps} />)}
             </div>
           </div>
@@ -397,19 +349,6 @@ export default function TrashView() {
 
   const hasSelection = selectedIds.size > 0;
   const allSelected = matching.length > 0 && matching.every((i) => selectedIds.has(i.id));
-
-  const headerLeft = (
-    <DashboardTitle title={t('trash.title')}>
-      {items.length > 0 && (
-        <button
-          onClick={allSelected ? deselectAll : selectAll}
-          className="text-xs text-subtle hover:text-raise transition-colors whitespace-nowrap"
-        >
-          {allSelected ? t('trash.deselectAll') : t('trash.selectAll')}
-        </button>
-      )}
-    </DashboardTitle>
-  );
 
   // The trash's main action is red and sits at the top of the bar like "+ New …":
   // without a selection "Empty trash", with a selection "Delete
@@ -437,9 +376,19 @@ export default function TrashView() {
     // instead of disappearing on the last deletion.
     disabled: items.length === 0,
   };
-  const extraActions = confirming
-    ? [{ label: t('common.cancel'), icon: <X size={14} />, onClick: () => setConfirm(null) }]
-    : undefined;
+  // Beside it: while confirming only the way out, otherwise the selection's own
+  // actions, as icons like every secondary action in this bar.
+  const extraActions: { label: string; icon: ReactNode; onClick: () => void }[] = [];
+  if (confirming) {
+    extraActions.push({ label: t('common.cancel'), icon: <X size={14} />, onClick: () => setConfirm(null) });
+  } else {
+    if (hasSelection) extraActions.push({ label: t('trash.restoreSelected'), icon: <RotateCcw size={14} />, onClick: () => void restoreSelected() });
+    if (items.length > 0) {
+      extraActions.push(allSelected
+        ? { label: t('trash.deselectAll'), icon: <Square size={14} />, onClick: deselectAll }
+        : { label: t('trash.selectAll'), icon: <CheckSquare size={14} />, onClick: selectAll });
+    }
+  }
 
   const renderTrashContent = () => (
     <>
@@ -458,12 +407,13 @@ export default function TrashView() {
       )}
 
       {!loading && matching.length > 0 && (
-        <div className="space-y-1">
+        <div>
+          {restoreFailed && <p className="text-xs text-danger mb-3">{t('trash.restoreFailed')}</p>}
           <p className="text-xs text-subtle mb-3">
             {retentionDays === null ? t('trash.retentionNoteNever') : t('trash.retentionNote', { count: retentionDays })}
           </p>
           {trashPrefs.grouping === 'grouped' && trashPrefs.view !== 'timeline' && renderGrouped(trashPrefs.view)}
-          {trashPrefs.grouping !== 'grouped' && trashPrefs.view === 'list'     && <div className="space-y-1">{sorted.map((item) => <ItemRow key={item.id} item={item} {...itemProps} />)}</div>}
+          {trashPrefs.grouping !== 'grouped' && trashPrefs.view === 'list'     && <div className="space-y-1.5">{sorted.map((item) => <ItemRow key={item.id} item={item} {...itemProps} />)}</div>}
           {trashPrefs.grouping !== 'grouped' && isCardView(trashPrefs.view)  && <div className={cardsGridClass}>{sorted.map((item) => <ItemCard key={item.id} item={item} {...itemProps} />)}</div>}
           {trashPrefs.view === 'timeline' && renderTimeline()}
         </div>
@@ -474,7 +424,6 @@ export default function TrashView() {
   return (
     <Dashboard<TrashedItem>
       title={t('trash.title')}
-      headerLeft={headerLeft}
       primaryAction={primaryAction}
       extraActions={extraActions}
       search={search}
@@ -489,6 +438,18 @@ export default function TrashView() {
       items={items}
       itemKey={(item) => item.id}
       grouping={{ mode: 'custom', render: renderTrashContent }}
+      contextMenuSlot={ctxMenu && (
+        <ContextMenu
+          x={ctxMenu.x}
+          y={ctxMenu.y}
+          onClose={() => setCtxMenu(null)}
+          actions={[
+            { label: t('trash.restore'), icon: <RotateCcw size={12} />, onClick: () => void restore(ctxMenu.item) },
+            // Nothing can be undone from here, so the row asks first.
+            { label: t('trash.deletePermanently'), icon: <Trash2 size={12} />, danger: true, onClick: () => setConfirmingId(ctxMenu.item.id) },
+          ]}
+        />
+      )}
     />
   );
 }

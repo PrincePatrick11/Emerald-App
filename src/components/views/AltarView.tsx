@@ -22,7 +22,8 @@ import { usePersistedFlag } from '../../hooks/usePersistedFlag';
 import { useDisplayedAltar } from '../../hooks/useDisplayedAltar';
 import { getAltarBackgroundStyle, DEFAULT_ALTAR_RESOLUTION, parseResolution, isRatioFormat } from '../../lib/altarConstants';
 import type { AltarItem, AltarRecord } from '../../types';
-import Dashboard, { GroupDivider } from '../ui/Dashboard';
+import Dashboard from '../ui/Dashboard';
+import CollapsibleGroupHeader from '../ui/CollapsibleGroupHeader';
 import { SortSelect } from '../ui/ListToolbar';
 import { SwitchRow } from '../ui/Switch';
 import ContextMenu from '../ui/ContextMenu';
@@ -384,17 +385,16 @@ export default function AltarView() {
         onSort={(next) => setAltarPrefs({ sort: next })}
         search={search}
         onSearch={setSearch}
-        // Only a display toggle, not a filter: it does not count as an active
-        // filter, and there is nothing to reset.
+        displayToggles={[{
+          label: t('altar.showPreview'),
+          icon: AltarIcon,
+          checked: altarShowPreview,
+          onChange: setAltarShowPreview,
+        }]}
+        // No filter here, only the library's controls after the altars' own.
         filters={{
           activeFilterCount: 0,
           panelProps: {
-            displayToggles: [{
-              label: t('altar.showPreview'),
-              icon: AltarIcon,
-              checked: altarShowPreview,
-              onChange: setAltarShowPreview,
-            }],
             extraGroups: [{ label: t('altar.sortLibrary'), content: libraryControls }],
           },
         }}
@@ -414,7 +414,7 @@ export default function AltarView() {
         }}
         hasNoResults={!altarsCollapsed && filteredCount === 0}
         contentHeader={
-          <GroupDivider
+          <CollapsibleGroupHeader
             // Plural, not t('nav.altar'): this is the heading above a list,
             // not a module name in the bar.
             label={t('altar.sectionTitle')}

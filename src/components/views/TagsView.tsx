@@ -17,11 +17,10 @@ import { formatEntryDate } from '../../lib/formatDate';
 import { AUX_VIEWS, MODULES, TAG_MODULE_IDS, type TagModuleId } from '../../lib/modules';
 import { displayTitle } from '../../lib/entryTitle';
 import { sortItems } from '../../lib/sortItems';
-import Button from '../ui/Button';
-import CollapsibleGroupHeader from '../ui/CollapsibleGroupHeader';
+import CollapseChevron from '../ui/CollapseChevron';
 import ContextMenu from '../ui/ContextMenu';
 import Dashboard, { type DashboardGroup } from '../ui/Dashboard';
-import DashboardItem from '../ui/DashboardItem';
+import DashboardItem, { DashboardRow, RowContent } from '../ui/DashboardItem';
 import InlineNameEditor from '../ui/InlineNameEditor';
 import ModuleCounts from '../ui/ModuleCounts';
 import type { ActiveView, Tag } from '../../types';
@@ -99,7 +98,7 @@ function TagEditRow({
 }) {
   const { t } = useTranslation();
   return (
-    <div className="flex items-center gap-2 mb-2">
+    <DashboardRow>
       {/* Placeholder for the read row's chevron — without it dot
           and name would jump to the left when switching to edit mode. */}
       <span className="w-3.5 flex-shrink-0" />
@@ -108,16 +107,16 @@ function TagEditRow({
       </span>
       <InlineNameEditor value={name} onChange={onName} error={error} onSave={onSave} onCancel={onCancel}
         placeholder={t('tags.name')} />
-    </div>
+    </DashboardRow>
   );
 }
 
 /**
  * The management of tags, in the same dashboard as every module: title, "New
  * tag", search, sorting and module filter sit in the right sidebar;
- * in the main area every tag is a group that starts collapsed — the
- * headers are the overview (colour, name, where it occurs), expanded, the
- * tagged entries appear below.
+ * in the main area every tag is a row that starts collapsed — the rows are
+ * the overview (colour, name, where it occurs), a click on one opens the tagged
+ * entries below it, indented like a task's subtasks.
  *
  * Entries carry tag IDs: counting, grouping and collapsing are done by ID.
  */
@@ -312,13 +311,13 @@ export default function TagsView() {
     });
   };
 
-  /** One row for creating (at the top of the content) and renaming (in place of the header). */
+  /** One row for creating (at the top of the content) and renaming (in place of the read row). */
   const editRow = (
     <TagEditRow color={color} onColor={setColor} name={name} onName={(v) => { setName(v); setNameError(null); }}
       error={nameError} onSave={submitForm} onCancel={closeForm} />
   );
 
-  // ── Group header and rows ─────────────────────────────────────────────────
+  // ── Tag rows and tagged entries ─────────────────────────────────────────────────
   const groupCollapsed = (group: DashboardGroup<TaggedItem>) =>
     !openBySearch.has(group.key!) && isCollapsed(group.key!);
 
@@ -331,36 +330,27 @@ export default function TagsView() {
       );
     }
     const usage = usageByTag.get(tag.id);
+    const collapsed = groupCollapsed(group);
     return (
-      <div
+      <DashboardRow
         data-tag-id={tag.id}
+        onClick={() => toggle(tag.id)}
         onContextMenu={(e) => { e.preventDefault(); setCtxMenu({ tagId: tag.id, x: e.clientX, y: e.clientY }); }}
       >
-        <CollapsibleGroupHeader
-          collapsed={groupCollapsed(group)}
-          onToggleCollapse={() => toggle(tag.id)}
-          leading={<TagColorDot color={tag.color} onPick={(color) => updateTag(tag.id, { color })} />}
-          label={tag.name}
-          meta={usage
-            ? <ModuleCounts modules={TAG_MODULE_IDS} counts={usage} />
-            : <span className="text-xs text-subtle">
-                {templateUsage.has(tag.id) ? t('tags.onlyInTemplates') : t('tags.unused')}
-              </span>}
-          actions={
-            // Permanently visible, as in the categories view.
-            <span className="flex items-center gap-1.5 flex-shrink-0">
-              <Button tone="amber" compact small title={t('contextMenu.rename')} aria-label={t('contextMenu.rename')}
-                onClick={() => startRename(tag)}>
-                <Pencil size={12} />
-              </Button>
-              <Button tone="danger" compact small title={t('contextMenu.delete')} aria-label={t('contextMenu.delete')}
-                onClick={() => handleDelete(tag)}>
-                <Trash2 size={12} />
-              </Button>
-            </span>
-          }
-        />
-      </div>
+        {/* A button of its own for the keyboard; the row's click is for the pointer. */}
+        <span onClick={(e) => e.stopPropagation()} className="flex flex-shrink-0">
+          <CollapseChevron collapsed={collapsed} onToggle={() => toggle(tag.id)} />
+        </span>
+        <span onClick={(e) => e.stopPropagation()} className="w-5 flex items-center justify-center flex-shrink-0">
+          <TagColorDot color={tag.color} onPick={(color) => updateTag(tag.id, { color })} />
+        </span>
+        <RowContent title={tag.name} />
+        {usage
+          ? <ModuleCounts modules={TAG_MODULE_IDS} counts={usage} />
+          : <span className="text-xs text-muted flex-shrink-0">
+              {templateUsage.has(tag.id) ? t('tags.onlyInTemplates') : t('tags.unused')}
+            </span>}
+      </DashboardRow>
     );
   };
 
@@ -374,9 +364,11 @@ export default function TagsView() {
     }
     return (
       <DashboardItem view={itemView(item)} layout="row">
-        <Icon size={14} className="text-subtle flex-shrink-0" />
-        <span className="flex-1 text-sm text-soft truncate">{displayTitle(t, meta.entryType, item.title)}</span>
-        <span className="text-xs text-muted flex-shrink-0">{label} · {formatEntryDate(item.updated_at)}</span>
+        <RowContent
+          icon={<Icon size={14} className="text-subtle" />}
+          title={displayTitle(t, meta.entryType, item.title)}
+          meta={`${label} · ${formatEntryDate(item.updated_at)}`}
+        />
       </DashboardItem>
     );
   };
@@ -408,7 +400,7 @@ export default function TagsView() {
           allChipsCount: moduleCounts.all,
         },
       }}
-      contentHeader={form?.mode === 'add' && editRow}
+      contentHeader={form?.mode === 'add' && <div className="mb-1.5">{editRow}</div>}
       items={groups.flatMap((g) => g.items)}
       itemKey={(item) => `${item.module}:${item.id}`}
       renderItem={renderItem}
@@ -422,11 +414,13 @@ export default function TagsView() {
       }}
       // If no group is left, the category mode reports that itself.
       hasNoResults={false}
+      groupsClassName="space-y-1.5"
+      listClassName="ml-6 mt-1.5 space-y-1.5"
       grouping={{
         mode: 'category',
         groups,
         renderGroupHeader: renderTagHeader,
-        renderEmptyGroup: () => <p className="text-xs text-subtle px-1 py-1">{t('tags.unusedHint')}</p>,
+        renderEmptyGroup: () => <p className="ml-6 mt-1.5 text-xs text-subtle px-1 py-1">{t('tags.unusedHint')}</p>,
         isGroupCollapsed: groupCollapsed,
         // The selection above has already decided which tags are shown — an
         // unused tag is still one without search and filter.

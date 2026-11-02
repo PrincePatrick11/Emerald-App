@@ -15,7 +15,7 @@ import { isCardView } from '../../lib/viewMode';
 import { groupByMonth } from '../../lib/groupBy';
 import { usePersistedFlag } from '../../hooks/usePersistedFlag';
 import Dashboard, { GroupDivider } from '../ui/Dashboard';
-import DashboardItem from '../ui/DashboardItem';
+import DashboardItem, { ROW_GEOMETRY_CLASS, RowContent, RowSymbol } from '../ui/DashboardItem';
 import ContextMenu from '../ui/ContextMenu';
 import { useOpenInNewTabAction } from '../../hooks/useOpenInNewTabAction';
 import BlockGlyph from '../blocks/BlockGlyph';
@@ -83,8 +83,7 @@ export default function BlocksView() {
  * The built-in blocks below the custom ones, built like the library below
  * the altars — the same list as "Add block" in the entry. For reference
  * only: nothing can be created or edited on them, hence
- * resting tiles (frame, three columns, no hover) instead of clickable
- * dashboard rows. The search filters them too.
+ * resting rows (no hover, no pointer) instead of clickable ones. The search filters them too.
  */
 function BuiltInBlocksSection({ query }: { query: string }) {
   const { t } = useTranslation();
@@ -107,19 +106,21 @@ function BuiltInBlocksSection({ query }: { query: string }) {
           {presets.length === 0
             ? <p className="text-xs text-subtle px-1 py-1">{t('search.noResults')}</p>
             : (
-              // Tiles with a frame, but without hover and pointer: nothing can
-              // be created or opened on them, they only show what exists.
-              <ul className="grid grid-cols-3 gap-2">
+              <ul className="space-y-1.5">
                 {presets.map((preset) => {
                   const Icon = preset.icon;
                   return (
                     <li
                       key={preset.id}
+                      // The description is cut off in the row; here it can be read in full.
                       title={preset.descriptionKey ? t(preset.descriptionKey) : undefined}
-                      className="panel flex min-w-0 items-center gap-3 rounded-lg px-3 py-2.5"
+                      className={`panel rounded-xl ${ROW_GEOMETRY_CLASS}`}
                     >
-                      <Icon size={16} className="flex-shrink-0 text-muted" />
-                      <span className="truncate text-sm text-secondary">{t(preset.labelKey)}</span>
+                      <RowContent
+                        icon={<Icon size={14} className="text-muted" />}
+                        title={t(preset.labelKey)}
+                        meta={preset.descriptionKey ? t(preset.descriptionKey) : undefined}
+                      />
                     </li>
                   );
                 })}
@@ -192,7 +193,7 @@ function BlockList({ onCreate, onDelete }: {
           </>
         ) : (
           <>
-            <BlockGlyph icon={def.icon} size={14} />
+            <RowSymbol><BlockGlyph icon={def.icon} size={14} /></RowSymbol>
             <span className="flex-1 min-w-0 text-sm text-soft truncate">{definitionLabel(t, def)}</span>
             {unsaved}
             {counts}

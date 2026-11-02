@@ -6,10 +6,10 @@ import ContextMenu from '../ui/ContextMenu';
 import { useOpenInNewTabAction } from '../../hooks/useOpenInNewTabAction';
 import { useSaveAsTemplateAction } from '../../hooks/useSaveAsTemplateAction';
 import Dashboard, { type DashboardGroup } from '../ui/Dashboard';
-import DashboardItem from '../ui/DashboardItem';
+import DashboardItem, { CardContent, ItemGlyph, RENAME_INPUT_CLASS, RowContent } from '../ui/DashboardItem';
 import RenameField from '../ui/RenameField';
 import CollapsibleGroupHeader from '../ui/CollapsibleGroupHeader';
-import { generateId, isImageIcon } from '../../lib/helpers';
+import { generateId } from '../../lib/helpers';
 import { entryIcon, MODULES } from '../../lib/modules';
 import { displayTitle } from '../../lib/entryTitle';
 import { categoriesUsedBy, categoryLabel, hasUncategorized, lookupCategory } from '../../lib/categories';
@@ -258,10 +258,10 @@ export default function OperationsView() {
         revealDate ? `${t('creation.targetDate')}: ${formatEntryDate(revealDate)}` : '',
       ].filter(Boolean).join(' · ');
       const renaming = renamingId === op.id;
-      const renameInput = (className: string) => (
-        <RenameField value={renameValue} onChange={setRenameValue} onCommit={commitRename}
-          onCancel={() => setRenamingId(null)} className={className} />
-      );
+      const title = renaming
+        ? <RenameField value={renameValue} onChange={setRenameValue} onCommit={commitRename}
+            onCancel={() => setRenamingId(null)} className={RENAME_INPUT_CLASS} />
+        : displayTitle(t, 'operation', op.title);
       return (
         <DashboardItem
           view={{ type: 'operations', id: op.id, mode: 'view' }}
@@ -269,30 +269,9 @@ export default function OperationsView() {
           editing={renaming}
           onContextMenu={(e) => openCtxMenu(e, op.id)}
         >
-          {isCardView(view) ? (
-            <>
-              {isImageIcon(iconValue)
-                ? <img src={iconValue} alt="" className="w-6 h-6 object-cover rounded-md mb-2" />
-                : <div className="text-xl mb-2">{iconValue}</div>}
-              {renaming
-                ? renameInput('text-sm font-medium text-secondary w-full bg-transparent outline-none selectable mb-1')
-                : <div className="text-sm font-medium text-secondary truncate mb-1">{displayTitle(t, 'operation', op.title)}</div>}
-              <div className="mt-1">
-                <span className="text-xs text-muted">{dateStr}</span>
-              </div>
-            </>
-          ) : (
-            <>
-              {isImageIcon(iconValue)
-                ? <img src={iconValue} alt="" className="w-5 h-5 object-cover rounded-md flex-shrink-0" />
-                : <span className="text-base flex-shrink-0">{iconValue}</span>
-              }
-              {renaming
-                ? renameInput('flex-1 bg-transparent text-sm text-soft outline-none selectable')
-                : <span className="flex-1 text-sm text-soft truncate">{displayTitle(t, 'operation', op.title)}</span>}
-              <span className="text-xs text-muted min-w-0 max-w-[50%] truncate">{dateStr}</span>
-            </>
-          )}
+          {isCardView(view)
+            ? <CardContent icon={<ItemGlyph icon={iconValue} large />} title={title} meta={dateStr} />
+            : <RowContent icon={<ItemGlyph icon={iconValue} />} title={title} meta={dateStr} />}
         </DashboardItem>
       );
     };

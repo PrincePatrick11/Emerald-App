@@ -63,6 +63,7 @@
     "sortAlphaDesc": "Nom · Z → A",
     "sortCountDesc": "Utilisation · plus utilisé",
     "category": "Catégorie",
+    "grouping": "Regroupement",
     "groupBy": "Grouper par {{label, lowercase}}",
     "type": "Type",
     "notAvailableInTimeline": "Indisponible dans la chronologie"
@@ -515,7 +516,6 @@
   },
   "filters": {
     "all": "Toutes",
-    "display": "Affichage",
     "category": "Catégorie",
     "module": "Module",
     "moonPhase": "Phase lunaire",
@@ -841,6 +841,8 @@
     "title": "Corbeille",
     "emptyTrash": "Vider la corbeille",
     "restore": "Restaurer",
+    "restoreFailed": "Certains éléments n'ont pas pu être restaurés et restent sélectionnés.",
+    "restoreSelected": "Restaurer la sélection",
     "deletePermanently": "Supprimer définitivement",
     "retentionNote": "Les éléments sont automatiquement supprimés après {{count}} jour.",
     "retentionNote_other": "Les éléments sont automatiquement supprimés après {{count}} jours.",

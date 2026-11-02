@@ -11,8 +11,9 @@ import { isCardView } from '../../lib/viewMode';
 import { groupByMonth } from '../../lib/groupBy';
 import { usePersistedFlag } from '../../hooks/usePersistedFlag';
 import { useOpenInNewTabAction } from '../../hooks/useOpenInNewTabAction';
-import Dashboard, { GroupDivider } from '../ui/Dashboard';
-import DashboardItem from '../ui/DashboardItem';
+import Dashboard from '../ui/Dashboard';
+import CollapsibleGroupHeader from '../ui/CollapsibleGroupHeader';
+import DashboardItem, { CardContent, RowContent } from '../ui/DashboardItem';
 import ContextMenu from '../ui/ContextMenu';
 import BlockGlyph from '../blocks/BlockGlyph';
 import LanguagePage from '../lexicon/LanguagePage';
@@ -111,7 +112,7 @@ function LanguageList({ onCreate, onDelete }: {
   const cards = isCardView(prefs.view);
   const renderItem = (language: Language) => {
     const meta = (
-      <span className="text-xs text-subtle tabular-nums flex-shrink-0">
+      <span className="tabular-nums">
         {t('lexicon.wordCount', { count: wordCounts.get(language.id) ?? 0 })}
         {language.alphabet.length > 0 && (
           <> · {t('lexicon.letterCount', { count: language.alphabet.length })}</>
@@ -127,21 +128,9 @@ function LanguageList({ onCreate, onDelete }: {
           setCtxMenu({ id: language.id, x: e.clientX, y: e.clientY });
         }}
       >
-        {cards ? (
-          <>
-            <div className="flex items-center gap-2 mb-2">
-              <BlockGlyph icon={language.icon} size={16} />
-            </div>
-            <div className="text-sm font-medium text-secondary truncate mb-1">{language.name}</div>
-            {meta}
-          </>
-        ) : (
-          <>
-            <BlockGlyph icon={language.icon} size={14} />
-            <span className="flex-1 min-w-0 text-sm text-soft truncate">{language.name}</span>
-            {meta}
-          </>
-        )}
+        {cards
+          ? <CardContent icon={<BlockGlyph icon={language.icon} size={16} />} title={language.name} meta={meta} />
+          : <RowContent icon={<BlockGlyph icon={language.icon} size={14} />} title={language.name} meta={meta} />}
       </DashboardItem>
     );
   };
@@ -178,7 +167,7 @@ function LanguageList({ onCreate, onDelete }: {
       }}
       hasNoResults={!collapsed && filtered.length === 0}
       contentHeader={
-        <GroupDivider
+        <CollapsibleGroupHeader
           label={t('lexicon.languages')}
           collapsed={collapsed}
           onToggleCollapse={toggleCollapsed}
