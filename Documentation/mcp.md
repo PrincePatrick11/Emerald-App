@@ -35,7 +35,7 @@ Other clients register `tools/mcp/server.py` themselves; [`tools/mcp/README.md`]
 
 ## The Instance
 
-The server never touches the regular dev build. It builds and starts the checkout the session runs in as an instance of its own, on port 9223, with its own app identifier and build directory, so both can run at once. A session in a worktree drives that worktree. `status` reports checkout, port and identifier.
+The server never touches the regular dev build. It builds and starts the checkout the session runs in as an instance of its own, on port 9223, with its own app identifier and build directory, so both can run at once. A session in a worktree drives that worktree, also when its client started the server in the main checkout; on Windows that case needs `EMERALD_APP_DIR`. The server's own code still comes from the directory the client started it in. `status` reports checkout, port and identifier.
 
 The first tool call that needs the app starts the instance. A first build takes several minutes, and a call during that time answers that Emerald is still starting; later starts take seconds.
 

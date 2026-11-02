@@ -32,7 +32,7 @@ On macOS and Linux the webview has no debug port. The launcher there builds the 
 
 ## The instance
 
-The server drives the app checkout the session runs in: the git toplevel of the working directory, so a session in a worktree drives that worktree. `EMERALD_APP_DIR` forces another one.
+The server drives the app checkout the session runs in: the git toplevel of the working directory, so a session in a worktree drives that worktree. A client can start the server in the main checkout while its session works in a worktree of the same repository; on macOS and Linux the server then takes the worktree from the client's working directory, and `checkout_source` reads `client-cwd`. On Windows that directory is not readable, so such a session has to set `EMERALD_APP_DIR`, which forces a checkout on every platform.
 
 It builds and starts that checkout as an instance of its own, apart from the regular dev build, so both can run at once:
 

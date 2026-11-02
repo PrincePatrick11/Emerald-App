@@ -109,6 +109,10 @@ def target_dir() -> Path:
 
 # -- checkout discovery ------------------------------------------------------
 
+# How many processes up to look for the client: launcher, client, one spare.
+CLIENT_SEARCH_DEPTH = 3
+
+
 def looks_like_emerald(p: Path) -> bool:
     """True if `p` is an Emerald app checkout - not tools/mcp itself, and not
     some other project that happens to have a package.json."""
@@ -141,8 +145,9 @@ def _git_toplevel(cwd: Path) -> Path | None:
 def resolve_checkout(cwd: Path | None = None) -> tuple[Path, str]:
     """Find the Emerald app checkout this session belongs to.
 
-    First hit wins: explicit override, git toplevel (the worktree case), a
-    filesystem walk upward, then the checkout this file lives in.
+    First hit wins: explicit override, the worktree of the client that started
+    this server, git toplevel (the worktree case), a filesystem walk upward,
+    then the checkout this file lives in.
     """
     override = os.environ.get("EMERALD_APP_DIR")
     if override:
@@ -155,6 +160,11 @@ def resolve_checkout(cwd: Path | None = None) -> tuple[Path, str]:
         return p, "env"
 
     start = (cwd or Path.cwd()).absolute()
+
+    if cwd is None:
+        client = _client_worktree(start)
+        if client is not None:
+            return client, "client-cwd"
 
     top = _git_toplevel(start)
     if top is not None and looks_like_emerald(top):
@@ -171,25 +181,78 @@ def resolve_checkout(cwd: Path | None = None) -> tuple[Path, str]:
     return APP_ROOT, "own-checkout"
 
 
-def running_checkout(port: int) -> Path | None:
-    """The checkout of whatever process listens on `port`: `tauri dev` runs the
-    app inside the checkout's src-tauri. None where that cannot be told, which
-    includes Windows, where a process's working directory is not readable."""
+def _lsof(*args: str) -> list[str]:
+    out = subprocess.run(["lsof", "-nP", *args], capture_output=True, text=True, timeout=5)
+    return out.stdout.splitlines()
+
+
+def _process_cwd(pid: int) -> Path | None:
+    """A process's working directory. None where that cannot be told, which
+    includes Windows, where it is not readable."""
     if sys.platform == "win32":
         return None
-
-    def lsof(*args: str) -> list[str]:
-        out = subprocess.run(["lsof", "-nP", *args], capture_output=True, text=True, timeout=5)
-        return out.stdout.splitlines()
-
     try:
-        pids = lsof("-t", f"-iTCP:{port}", "-sTCP:LISTEN")
-        if not pids:
-            return None
-        cwd = next((line[1:] for line in lsof("-a", "-p", pids[0], "-d", "cwd", "-Fn") if line.startswith("n")), None)
+        lines = _lsof("-a", "-p", str(pid), "-d", "cwd", "-Fn")
     except (OSError, subprocess.SubprocessError):
         return None
-    return _git_toplevel(Path(cwd)) if cwd else None
+    return next((Path(line[1:]) for line in lines if line.startswith("n")), None)
+
+
+def _parent_pid(pid: int) -> int | None:
+    try:
+        out = subprocess.run(["ps", "-o", "ppid=", "-p", str(pid)], capture_output=True, text=True, timeout=5)
+        return int(out.stdout.strip())
+    except (OSError, subprocess.SubprocessError, ValueError):
+        return None
+
+
+def _git_common_dir(cwd: Path) -> Path | None:
+    try:
+        out = subprocess.run(
+            ["git", "-C", str(cwd), "rev-parse", "--path-format=absolute", "--git-common-dir"],
+            capture_output=True, text=True, timeout=5,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return None
+    line = out.stdout.strip()
+    return Path(line) if out.returncode == 0 and line else None
+
+
+def _client_worktree(start: Path) -> Path | None:
+    """The worktree of the session this server serves, when it was started
+    elsewhere: an MCP client that found its config in the main checkout can
+    start the server there while the session itself works in a worktree. The
+    next few processes up are this server's launcher and that client. Another
+    clone of the repository does not count."""
+    if sys.platform == "win32":
+        return None
+    own = _git_toplevel(start)
+    common = _git_common_dir(start)
+    if own is None or common is None:
+        return None
+    pid = os.getppid()
+    for _ in range(CLIENT_SEARCH_DEPTH):
+        if pid is None or pid <= 1:
+            return None
+        cwd = _process_cwd(pid)
+        top = _git_toplevel(cwd) if cwd else None
+        if top is not None and top != own and looks_like_emerald(top) and _git_common_dir(cwd) == common:
+            return top
+        pid = _parent_pid(pid)
+    return None
+
+
+def running_checkout(port: int) -> Path | None:
+    """The checkout of whatever process listens on `port`: `tauri dev` runs the
+    app inside the checkout's src-tauri."""
+    if sys.platform == "win32":
+        return None
+    try:
+        pids = _lsof("-t", f"-iTCP:{port}", "-sTCP:LISTEN")
+    except (OSError, subprocess.SubprocessError):
+        return None
+    cwd = _process_cwd(int(pids[0])) if pids else None
+    return _git_toplevel(cwd) if cwd else None
 
 
 # -- the instance ------------------------------------------------------------
