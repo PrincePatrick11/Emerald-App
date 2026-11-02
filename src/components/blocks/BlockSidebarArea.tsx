@@ -77,16 +77,16 @@ export function BlockAddActions() {
 
   return (
     <div className="flex flex-col gap-1.5">
-      <button type="button" className="sidebar-section-button" onClick={openAddMenu}>
-        <Plus size={14} className="flex-shrink-0" />
-        <span className="min-w-0 truncate">{t('blocks.add')}</span>
-      </button>
       {session.templates && (
         <button type="button" className="sidebar-section-button" onClick={api.openTemplatePicker}>
           <CopyPlus size={14} className="flex-shrink-0" />
           <span className="min-w-0 truncate">{t('templates.insert.button')}</span>
         </button>
       )}
+      <button type="button" className="sidebar-section-button" onClick={openAddMenu}>
+        <Plus size={14} className="flex-shrink-0" />
+        <span className="min-w-0 truncate">{t('blocks.add')}</span>
+      </button>
       {menu && <ContextMenu x={menu.x} y={menu.y} actions={menu.actions} onClose={() => setMenu(null)} />}
     </div>
   );
