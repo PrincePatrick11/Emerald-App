@@ -73,7 +73,7 @@ export default function ContextMenu({ x, y, actions, onClose, align = 'left', mi
       ref={ref}
       // `w-max`: at a click position near the window edge the menu would otherwise
       // shrink while being measured and end up wider than measured after being shifted.
-      className="context-menu fixed z-[9999] w-max border border-edge rounded-lg shadow-2xl py-1"
+      className="context-menu fixed z-[9999] w-max border rounded-lg shadow-menu py-1"
       style={{ left: pos.left, top: pos.top, minWidth }}
     >
       {actions.map((action, i) => (

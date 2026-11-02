@@ -2602,13 +2602,17 @@ html[data-theme] .block-manager-row--idle,
   background: var(--link-chip-bg-hover);
 }
 
-.tasks-category-trigger {
-  color: var(--text-muted);
+/* The attribute selector outranks the utilities on the trigger in CategorySelect. */
+html[data-theme] .tasks-category-trigger {
+  color: var(--text-secondary);
+  background: var(--field-bg);
+  border: 1px solid var(--field-border);
 }
 
-.tasks-category-trigger:hover {
-  color: var(--menu-item-hover-text);
-  background-color: var(--menu-item-hover-bg);
+html[data-theme] .tasks-category-trigger:hover {
+  color: var(--text-primary);
+  background: var(--field-bg-hover);
+  border-color: var(--field-border-hover);
 }
 
 .sigil-tool-toggle {
@@ -2691,6 +2695,15 @@ html[data-theme] .emoji-picker-search:focus-within {
 
 .context-menu {
   background-color: var(--menu-bg);
+  border-color: var(--menu-border);
+}
+
+.context-menu-item-default {
+  color: var(--text-secondary);
+}
+
+.context-menu-item-danger {
+  color: var(--danger-text);
 }
 
 /* The four links in the About section. Colour from --accent instead of a
@@ -3014,8 +3027,6 @@ html[data-theme='emerald-noctis'] .settings-nav-item-idle,
 html[data-theme='emerald-noctis'] .right-sidebar-tab-idle,
 html[data-theme='emerald-noctis'] .task-action-btn,
 html[data-theme='emerald-noctis'] .linked-entry-menu-item,
-html[data-theme='emerald-noctis'] .menu-item,
-html[data-theme='emerald-noctis'] .context-menu-item-default,
 html[data-theme='emerald-noctis'] .altar-category-chip {
   color: #b49d87;
 }
@@ -3042,7 +3053,6 @@ html[data-theme='emerald-noctis'] .tasks-linked-entry:hover {
   background: rgba(0, 122, 77, 0.34);
 }
 
-html[data-theme='emerald-noctis'] .tasks-category-trigger,
 html[data-theme='emerald-noctis'] .sigil-tool-toggle,
 html[data-theme='emerald-noctis'] .sigil-brush-controls,
 html[data-theme='emerald-noctis'] .altar-symbol-trigger,
@@ -3056,12 +3066,6 @@ html[data-theme='emerald-noctis'] .altar-item-name-input {
 html[data-theme='emerald-noctis'] .altar-symbol-trigger:hover,
 html[data-theme='emerald-noctis'] .altar-upload-item-btn:hover {
   border-color: rgba(142, 121, 101, 0.56);
-}
-
-html[data-theme='emerald-noctis'] .menu-item:hover:not(:disabled),
-html[data-theme='emerald-noctis'] .context-menu-item-default:hover {
-  background: rgba(0, 122, 77, 0.2);
-  color: #b8ffe2;
 }
 
 /* Light mode redesign: stronger structure and readability */
@@ -3327,18 +3331,6 @@ html[data-theme='emerald-parchment'] .tasks-linked-entry:hover {
   background: #c6e7d7;
 }
 
-html[data-theme='emerald-parchment'] .tasks-category-trigger {
-  color: #6d553d;
-  background: #e6d8c2;
-  border: 1px solid rgba(145, 108, 70, 0.3);
-}
-
-html[data-theme='emerald-parchment'] .tasks-category-trigger:hover {
-  color: #2f2114;
-  background: #efdfc8;
-  border-color: rgba(131, 96, 62, 0.42);
-}
-
 html[data-theme='emerald-parchment'] .sigil-tool-toggle {
   background: #eadcc6;
   border-color: rgba(145, 108, 70, 0.36);
@@ -3374,19 +3366,10 @@ html[data-theme='emerald-noctis'] .input-field[type="date"] {
 
 html[data-theme='emerald-parchment'] .op-prop-select[type="date"] {
   color-scheme: light;
-  background: #f6ead5;
 }
 
-html[data-theme='emerald-parchment'] .op-prop-select[type="date"]::-webkit-calendar-picker-indicator {
-  background-color: #d6eee1;
-  border: 1px solid rgba(0, 138, 87, 0.28);
-  border-radius: 0.35rem;
-  padding: 0.2rem;
-  cursor: pointer;
-}
-
-html[data-theme='emerald-parchment'] .op-prop-select[type="date"]::-webkit-calendar-picker-indicator:hover {
-  background-color: #c6e7d7;
+html[data-theme='emerald-noctis'] .op-prop-select[type="date"] {
+  color-scheme: dark;
 }
 
 html[data-theme='emerald-parchment'] .op-prop-select[type="date"]::-webkit-datetime-edit,
@@ -3399,26 +3382,6 @@ html[data-theme='emerald-parchment'] .op-prop-select[type="date"]::-webkit-datet
 
 html[data-theme='emerald-parchment'] .linked-entry-menu-item {
   color: #5b432d;
-}
-
-html[data-theme='emerald-parchment'] .menu-item,
-html[data-theme='emerald-parchment'] .context-menu-item-default {
-  color: #5b432d;
-}
-
-html[data-theme='emerald-parchment'] .menu-item:hover:not(:disabled),
-html[data-theme='emerald-parchment'] .context-menu-item-default:hover {
-  background: rgba(18, 145, 92, 0.12);
-  color: #0b6e48;
-}
-
-html[data-theme='emerald-parchment'] .context-menu-item-danger {
-  color: #b63f32;
-}
-
-html[data-theme='emerald-parchment'] .context-menu-item-danger:hover {
-  background: rgba(220, 76, 63, 0.14);
-  color: #8f2f26;
 }
 
 html[data-theme='emerald-parchment'] .altar-bg-preset-label {
