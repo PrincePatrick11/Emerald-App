@@ -41,6 +41,18 @@ export interface EntryListTabProps<T> {
   renderRow?: (args: RenderRowArgs<T>) => ReactNode;
 }
 
+/** How long the scrollbar stays after the last scroll event. */
+const SCROLLBAR_LINGER_MS = 800;
+
+/** WebKit does not repaint a custom scrollbar when only its colour rule changes:
+ *  it has to be rebuilt, which taking the overflow away for one layout does. */
+function setScrollbarShown(nav: HTMLElement, shown: boolean) {
+  nav.classList.toggle('is-scrolling', shown);
+  nav.style.overflowY = 'hidden';
+  void nav.offsetWidth;
+  nav.style.overflowY = '';
+}
+
 export default function EntryListTab<T>({
   items, getId, getTitle, getEditTitle = getTitle, getDateStr, getIcon, isActive, onOpen, onOpenNewTab, onDragStart,
   onRename, contextMenuActions, emptyMessage, renderRow,
@@ -72,6 +84,17 @@ export default function EntryListTab<T>({
   const hasUnrendered = limit === null && visible.length < matching.length;
 
   const navRef = useRef<HTMLElement>(null);
+  const scrollEndTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
+  useEffect(() => () => clearTimeout(scrollEndTimer.current), []);
+  // The scrollbar shows only while the list moves (`.is-scrolling` in index.css).
+  // On the element, not in state: a scroll must not re-render the whole list.
+  const onNavScroll = () => {
+    const nav = navRef.current;
+    if (!nav) return;
+    if (!nav.classList.contains('is-scrolling')) setScrollbarShown(nav, true);
+    clearTimeout(scrollEndTimer.current);
+    scrollEndTimer.current = setTimeout(() => setScrollbarShown(nav, false), SCROLLBAR_LINGER_MS);
+  };
   const sentinelRef = useRef<HTMLDivElement>(null);
   // Recreated on every growth: a fresh observer reports immediately whether the edge
   // is still visible, so even a tall screen fills up without
@@ -126,7 +149,7 @@ export default function EntryListTab<T>({
         </div>
       </div>
 
-      <nav ref={navRef} className="entry-list-nav flex-1 overflow-y-auto py-2 px-2">
+      <nav ref={navRef} onScroll={onNavScroll} className="entry-list-nav flex-1 overflow-y-auto py-2 px-2">
         {matching.length === 0 ? (
           // Two lines in place of the first entry, without icon and button;
           // the dashboard next to it carries the large empty state.

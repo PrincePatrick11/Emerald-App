@@ -2513,6 +2513,18 @@ html[data-theme] .block-manager-row--idle,
   background-color: var(--scrollbar-hover);
 }
 
+/* The entry list's scrollbar stays out of sight unless the list is moving
+   (`EntryListTab`) or the pointer is on it, so it can still be grabbed. */
+.entry-list-nav::-webkit-scrollbar-thumb {
+  background-color: transparent;
+}
+.entry-list-nav.is-scrolling::-webkit-scrollbar-thumb {
+  background-color: var(--scrollbar);
+}
+.entry-list-nav::-webkit-scrollbar-thumb:hover {
+  background-color: var(--scrollbar-hover);
+}
+
 /* Hide scrollbars for areas that still need mouse/touchpad scrolling. */
 .scrollbar-none {
   scrollbar-width: none;
