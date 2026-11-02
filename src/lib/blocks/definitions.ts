@@ -28,9 +28,8 @@ export const DEFAULT_DEFINITION_DISPLAY: DefinitionDisplay = { ...DEFAULT_DISPLA
 export const DEFAULT_DEFINITION_ICON = '🧩';
 
 /**
- * A definition ID from a foreign source (backup, `.emerald`): it ends up in
- * the `data-block-origin` of every copy, so only harmless characters. One
- * shared rule for both import paths.
+ * A definition ID from a foreign source (backup, `.emerald`): only harmless
+ * characters. One shared rule for both import paths.
  */
 export function isDefinitionId(id: unknown): id is string {
   return typeof id === 'string' && /^[\w-]{1,100}$/.test(id);

@@ -40,6 +40,7 @@ import { blockLabel, hiddenAttrValue, isBlockHidden, showsTitleInRead, withBlock
 import { BLOCK_ATTR, TEXT_BLOCK_TYPE, type BlockAttrName, type BlockInstance } from '../../lib/blocks/types';
 import { useBlockSessionStore, type BlockStackApi } from '../../store/blockSessionStore';
 import { useTemplateNoticeStore } from '../../store/templateStore';
+import { useUIStore } from '../../store/uiStore';
 import { applyTemplateFields, undoTemplateFields } from '../../store/templateApply';
 import { areBlocksEmpty, instantiateTemplateBlocks, isTextBlockEmpty, type Template } from '../../lib/blocks/templates';
 import TemplateInsertion, { type TemplateTarget } from '../templates/TemplateInsertion';
@@ -360,6 +361,12 @@ export default function BlockStack({
     // Save the deferred input first: title and tags are checked against the store.
     void flush()
       .then(() => applyTemplateFields(entryType, entryId, template))
+      .then(() => {
+        // A loaded sigil that locks the entry ends the edit: the entry can only be read until it is unloaded.
+        if (!sigilState(blocksRef.current, todayIso()).lockEntry) return;
+        const { activeView, setActiveView } = useUIStore.getState();
+        if (activeView.id === entryId) setActiveView({ type: activeView.type, id: entryId, mode: 'view' });
+      })
       .catch((e: unknown) => console.error('[BlockStack] applying template fields failed:', e));
   };
 

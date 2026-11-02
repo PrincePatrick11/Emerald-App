@@ -211,9 +211,8 @@ function legacyFieldTargets(fields: Array<{
 // ── File format ──────────────────────────────────────────────────────────────
 
 /**
- * '1' = up to v38; '2' = the file carries `meta.blockDefinitions`. Only then —
- * an entry without custom blocks (and every altar) stays '1', so that an
- * older app keeps accepting it. '3' = a template (`type: 'template'`,
+ * '1' = what entries and altars are written as; '2' = an older file that also
+ * carries `meta.blockDefinitions`, still read. '3' = a template (`type: 'template'`,
  * since v43): an older app does not know the type and would otherwise take the file
  * for an operation — with '3' it rejects it.
  */

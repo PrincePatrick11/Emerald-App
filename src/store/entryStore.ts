@@ -277,7 +277,7 @@ export const useEntryStore = create<EntryState>((set, get) => ({
     const now = nowIso();
     const category = type === 'journal' ? null : categoryId;
     // The "Sigils" category thus begins with calculator, drawing and charge
-    // (template `core-sigil`) — provided the vault applies defaults by itself.
+    // (template `core-sigil`), as long as it stays assigned there.
     const start = startOfNewEntry(type, category, blank);
     const entry: Entry = {
       id: generateId(),

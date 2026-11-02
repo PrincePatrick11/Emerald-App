@@ -1034,9 +1034,8 @@ function templateCategoryIds(rows: Row[] | undefined): string[] {
  * The file is foreign: every row runs through `fromRow.template` as on
  * reading. `content` gets the images stored here (and, on merge, the
  * renamed link targets), the assignments the local category IDs — whatever
- * points to no category is dropped. A default that an active template here
- * already holds is lost by an active imported one; one from the
- * trash keeps it as in the store and settles that on restore.
+ * points to no category is dropped. A combination that an active template here
+ * already holds stays with it, and one from the trash brings no assignments.
  */
 async function insertTemplates(
   db: Awaited<ReturnType<typeof getDb>>,
