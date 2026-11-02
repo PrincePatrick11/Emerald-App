@@ -175,7 +175,7 @@ export default function EntryListTab<T>({
         </div>
       </div>
 
-      <nav ref={navRef} onScroll={showScrollbarForNow} className="entry-list-nav flex-1 overflow-y-auto py-2 px-2">
+      <nav ref={navRef} onScroll={showScrollbarForNow} className="entry-list-nav flex-1 overflow-y-auto py-2 pl-2 pr-1 mr-1">
         {matching.length === 0 ? (
           // Two lines in place of the first entry, without icon and button;
           // the dashboard next to it carries the large empty state.

@@ -2514,7 +2514,9 @@ html[data-theme] .block-manager-row--idle,
 }
 
 /* The entry list's scrollbar stays out of sight unless the list is moving
-   (`EntryListTab`) or the pointer is at its edge, so it can still be grabbed. */
+   (`EntryListTab`) or the pointer is at its edge, so it can still be grabbed.
+   The list's `mr-1` keeps it off the sidebar's resize handle; `pr-1` instead of
+   `pr-2` gives the rows that width back. */
 .entry-list-nav::-webkit-scrollbar-thumb {
   background-color: transparent;
 }
