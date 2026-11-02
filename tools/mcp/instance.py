@@ -26,8 +26,10 @@ target dirs; nothing here hands them out.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
+import socket
 import subprocess
 import sys
 from dataclasses import dataclass, field
@@ -36,6 +38,10 @@ from pathlib import Path
 DEFAULT_CDP_PORT = 9223
 DEFAULT_VITE_PORT = 1430
 DEFAULT_IDENTIFIER = "com.emerald.mcp"
+# A linked worktree gets a pair of ports from these ranges: same offset in both.
+WORKTREE_CDP_BASE = 9300
+WORKTREE_VITE_BASE = 1500
+WORKTREE_PORTS = 100
 # Also the window title, and what the window handling matches on.
 PRODUCT_NAME = "Emerald MCP"
 
@@ -257,6 +263,39 @@ def running_checkout(port: int) -> Path | None:
 
 # -- the instance ------------------------------------------------------------
 
+def _worktree_key(checkout: Path) -> str | None:
+    """A short name for a linked git worktree, derived from its path, so it
+    stays the same across restarts without anything being recorded. None for a
+    repository's main checkout."""
+    common = _git_common_dir(checkout)
+    if common is None or common.resolve() == (checkout / ".git").resolve():
+        return None
+    return hashlib.sha1(str(checkout.resolve()).encode()).hexdigest()[:8]
+
+
+def _port_is_ours(port: int, checkout: Path) -> bool:
+    with socket.socket() as s:
+        s.settimeout(0.2)
+        if s.connect_ex(("127.0.0.1", port)) != 0:
+            return True
+    running = running_checkout(port)
+    return running is not None and running.resolve() == checkout.resolve()
+
+
+def _worktree_offset(key: str, checkout: Path) -> int:
+    """The worktree's own place in the port ranges, or the next one when
+    another checkout sits there. Windows cannot tell whose a port is, so there
+    the place is taken as it is."""
+    start = int(key, 16) % WORKTREE_PORTS
+    if sys.platform == "win32":
+        return start
+    for step in range(WORKTREE_PORTS):
+        offset = (start + step) % WORKTREE_PORTS
+        if _port_is_ours(WORKTREE_CDP_BASE + offset, checkout) and _port_is_ours(WORKTREE_VITE_BASE + offset, checkout):
+            return offset
+    return start
+
+
 def _int_env(name: str, default: int) -> int:
     raw = os.environ.get(name)
     if not raw:
@@ -273,20 +312,33 @@ def build_instance(cwd: Path | None = None) -> Instance:
     if not looks_like_emerald(checkout):
         warnings.append(str(checkout) + " does not look like an Emerald app checkout")
 
-    state_dir = mcp_home()
-    identifier = os.environ.get("EMERALD_MCP_IDENTIFIER", DEFAULT_IDENTIFIER)
+    # Every linked worktree is an instance of its own, so sessions in different
+    # worktrees run side by side. EMERALD_APP_DIR means a caller that arranges
+    # the instance itself; each setting below can still be forced one by one.
+    key = None if source == "env" else _worktree_key(checkout)
+    cdp_port, vite_port = DEFAULT_CDP_PORT, DEFAULT_VITE_PORT
+    identifier, state_dir, build_dir = DEFAULT_IDENTIFIER, mcp_home(), target_dir()
+    if key is not None:
+        offset = _worktree_offset(key, checkout)
+        cdp_port, vite_port = WORKTREE_CDP_BASE + offset, WORKTREE_VITE_BASE + offset
+        identifier = f"{DEFAULT_IDENTIFIER}.w{key}"
+        state_dir = mcp_home() / "worktrees" / key
+        if not os.environ.get("CARGO_TARGET_DIR"):
+            build_dir = _local_data() / f"emerald-mcp-target-{key}"
+
+    identifier = os.environ.get("EMERALD_MCP_IDENTIFIER", identifier)
     app_data_dir = app_data_root() / identifier
     return Instance(
         checkout=checkout,
         checkout_source=source,
         cdp_host=os.environ.get("EMERALD_CDP_HOST", "127.0.0.1"),
-        cdp_port=_int_env("EMERALD_CDP_PORT", DEFAULT_CDP_PORT),
-        vite_port=_int_env("EMERALD_MCP_VITE_PORT", DEFAULT_VITE_PORT),
+        cdp_port=_int_env("EMERALD_CDP_PORT", cdp_port),
+        vite_port=_int_env("EMERALD_MCP_VITE_PORT", vite_port),
         identifier=identifier,
         product_name=PRODUCT_NAME,
         app_data_dir=app_data_dir,
         seed_vault_dir=app_data_dir / "vaults" / "seed",
-        target_dir=target_dir(),
+        target_dir=build_dir,
         state_dir=state_dir,
         config_path=state_dir / "tauri.mcp.generated.conf.json",
         log_dir=state_dir / "logs",

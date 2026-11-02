@@ -128,9 +128,9 @@ The vault is created once. `seed/provision.mjs` stops as soon as the instance ha
 | --- | --- | --- |
 | `EMERALD_APP_DIR` | discovered | Force the app checkout instead of deriving it from the session's directory |
 | `EMERALD_CDP_HOST` | `127.0.0.1` | Debug host |
-| `EMERALD_CDP_PORT` | `9223` | Debug port; on macOS and Linux the port the dev bridge is told to answer on |
-| `EMERALD_MCP_VITE_PORT` | `1430` | Port of the instance's Vite dev server |
-| `EMERALD_MCP_IDENTIFIER` | `com.emerald.mcp` | App identifier, which decides where the instance keeps its data |
+| `EMERALD_CDP_PORT` | `9223`, in a linked worktree from `9300` | Debug port; on macOS and Linux the port the dev bridge is told to answer on |
+| `EMERALD_MCP_VITE_PORT` | `1430`, in a linked worktree from `1500` | Port of the instance's Vite dev server |
+| `EMERALD_MCP_IDENTIFIER` | `com.emerald.mcp`, in a linked worktree `com.emerald.mcp.w<key>` | App identifier, which decides where the instance keeps its data |
 | `EMERALD_MCP_HOME` | `%LOCALAPPDATA%\emerald-mcp`, elsewhere `~/.local/share/emerald-mcp` | Generated Tauri config, launch logs, screenshots |
 | `CARGO_TARGET_DIR` | see above | The instance's build directory |
 | `EMERALD_MCP_SEED` | unset | `force` rebuilds the test vault on the next start |
@@ -177,9 +177,8 @@ Everything that looks at the DOM is in `pagelib.js`, which `cdp.py` sends along 
 
 ## Known limitations
 
-- **The port does not say whose instance answers on it.** Instances share port
-  9223 unless `EMERALD_CDP_PORT` says otherwise, and the server attaches to
-  whatever is there. On macOS and Linux it reads that process's checkout through
+- **The port does not say whose instance answers on it.** The server attaches
+  to whatever is on its port. On macOS and Linux it reads that process's checkout through
   `lsof`: `status` and `connect` warn when it is not the session's, as does the
   first answer after attaching. On Windows it cannot tell.
 

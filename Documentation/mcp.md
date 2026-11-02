@@ -35,11 +35,11 @@ Other clients register `tools/mcp/server.py` themselves; [`tools/mcp/README.md`]
 
 ## The Instance
 
-The server never touches the regular dev build. It builds and starts the checkout the session runs in as an instance of its own, on port 9223, with its own app identifier and build directory, so both can run at once. A session in a worktree drives that worktree, also when its client started the server in the main checkout; on Windows that case needs `EMERALD_APP_DIR`. The server's own code still comes from the directory the client started it in. `status` reports checkout, port and identifier.
+The server never touches the regular dev build. It builds and starts the checkout the session runs in as an instance of its own, with its own app identifier and build directory, so both can run at once. The main checkout uses port 9223. Every linked git worktree gets its own ports, app identifier, test vault and build directory, derived from its path, so sessions in different worktrees run side by side; the first build of a worktree takes as long as any first build and its build directory takes several gigabytes. A session in a worktree drives that worktree, also when its client started the server in the main checkout; on Windows that case needs `EMERALD_APP_DIR`. The server's own code still comes from the directory the client started it in. `status` reports checkout, port and identifier.
 
 The first tool call that needs the app starts the instance. A first build takes several minutes, and a call during that time answers that Emerald is still starting; later starts take seconds.
 
-There is one instance. Two checkouts cannot be driven at the same time, and two sessions on the same checkout drive the same window.
+There is one instance per checkout: two sessions on the same checkout drive the same window. Instance data and build directories of a worktree stay behind when it is removed, under the names `status` reports.
 
 ## What to Know Before Reporting a Fault
 
