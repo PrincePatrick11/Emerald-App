@@ -6,7 +6,7 @@ import { useUIStore } from '../../store/uiStore';
 import { findEntry, useEntryStore } from '../../store/entryStore';
 import type { ActiveView } from '../../types';
 import { entryTypeForView, LIBRARY_VIEW_IDS, moduleMeta, type ViewId } from '../../lib/modules';
-import BlockSidebarArea from '../blocks/BlockSidebarArea';
+import BlockSidebarArea, { BlockAddActions } from '../blocks/BlockSidebarArea';
 import JournalPropertiesPanel from '../sidebar/panels/JournalPropertiesPanel';
 import WikiPropertiesPanel from '../sidebar/panels/WikiPropertiesPanel';
 import OperationPropertiesPanel from '../sidebar/panels/OperationPropertiesPanel';
@@ -136,6 +136,7 @@ export default function RightSidebar() {
   // line between them; the spacing comes from here.
   return (
     <SidebarColumn bar={<RightSidebarActionBar />} bodyClassName="flex flex-col gap-5">
+      {moduleMeta(activeView.type)?.usesBlocks && <BlockAddActions />}
       <PropertiesContent activeView={activeView} />
       {moduleMeta(activeView.type)?.usesBlocks && <BlockSidebarArea />}
     </SidebarColumn>

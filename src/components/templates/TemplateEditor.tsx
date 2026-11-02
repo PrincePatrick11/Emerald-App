@@ -7,7 +7,7 @@ import TagsField from '../sidebar/fields/TagsField';
 import { PropertiesSection } from '../sidebar/fields/EntryReadSections';
 import { EditSidebarBody, MediaPropertyRow } from '../sidebar/fields/EditProperties';
 import BlockStack from '../blocks/BlockStack';
-import BlockSidebarArea from '../blocks/BlockSidebarArea';
+import BlockSidebarArea, { BlockAddActions } from '../blocks/BlockSidebarArea';
 import TemplateAssignments from './TemplateAssignments';
 import TemplateUsage from './TemplateUsage';
 import { useTemplateStore } from '../../store/templateStore';
@@ -69,6 +69,8 @@ export default function TemplateEditor({ template, entries, onClose, onDelete, i
 
   const sidebar = (
     <EditSidebarBody>
+      <BlockAddActions />
+
       <PropertiesSection>
         <MediaPropertyRow
           rowIcon={<Smile size={14} />}
