@@ -522,7 +522,12 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
      so it shows from the moment the modal opens, also after a mouse click, which
      `:focus-visible` would not count: see the ring further down. */
   .create-item-tile {
-    @apply flex flex-col items-center justify-center gap-1.5 px-1 py-3 text-xs text-secondary;
+    @apply relative flex flex-col items-center justify-center gap-1.5 px-1 py-3 text-xs text-secondary;
+  }
+
+  /* The key that picks the tile. */
+  .create-item-tile-number {
+    @apply absolute top-1 left-2 text-[10px] leading-4 text-subtle;
   }
 
   .create-item-tile:hover,
