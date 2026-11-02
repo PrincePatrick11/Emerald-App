@@ -43,7 +43,6 @@ const SETTINGS_GROUP_LABEL_KEYS: Record<SettingsGroup, string> = {
   emojis: 'settings.groupEmojis',
   images: 'settings.groupImages',
   tags: 'settings.groupTags',
-  templates: 'settings.groupTemplates',
   editor: 'settings.groupEditor',
   journal: 'settings.groupJournal',
   backup: 'settings.groupBackup',

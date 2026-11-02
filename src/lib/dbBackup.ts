@@ -39,7 +39,7 @@ import {
   routineLinkResolver, routineToTemplate, vaultRoutineLinkSource, type RoutineCategoryRow, type RoutineTargetRow,
 } from './migrateRoutinesToTemplates';
 import {
-  assignedCategoryId, assignmentKey, defaultKeys, isTemplateId, parseAssignments, SIGIL_TEMPLATE_ID, templateToRow,
+  assignedCategoryId, assignmentKey, isTemplateId, parseAssignments, SIGIL_TEMPLATE_ID, templateToRow,
 } from './blocks/templates';
 import { fromRow } from './row';
 import { needsSigilConversion, sigilRowToContent, type LegacySigilRow } from './migrateLegacySigils';
@@ -1011,7 +1011,6 @@ async function insertBlockDefinitions(
       icon: text(r.icon, '') || DEFAULT_DEFINITION_ICON,
       elements: json(r.elements, '[]'),
       display: json(r.display, '{}'),
-      revision: Number.isInteger(r.revision) && (r.revision as number) > 0 ? r.revision : 1,
       sort_order: Number.isFinite(r.sort_order) ? r.sort_order : 0,
       created_at: text(r.created_at, now),
       updated_at: text(r.updated_at, now),
@@ -1049,7 +1048,8 @@ async function insertTemplates(
   if (!Array.isArray(rows)) return;
   const local = (await db.select<Row[]>('SELECT * FROM templates')).map(fromRow.template);
   const known = new Set(local.map((t) => t.id));
-  const taken = new Set(local.filter((t) => t.deleted_at === null).flatMap((t) => [...defaultKeys(t.assignments)]));
+  const taken = new Set(local.filter((t) => t.deleted_at === null)
+    .flatMap((t) => t.assignments.map((a) => assignmentKey(a.entryType, a.category))));
   const categories = new Set((await db.select<Row[]>('SELECT id FROM categories')).map((r) => String(r.id)));
 
   const now = nowIso();
@@ -1068,12 +1068,11 @@ async function insertTemplates(
       const category = catMap.get(id) ?? id;
       return categories.has(category) ? [{ ...a, category }] : [];
     }));
-    const assignments = remapped.map((a) => {
+    const assignments = !active ? [] : remapped.filter((a) => {
       const key = assignmentKey(a.entryType, a.category);
-      if (!a.isDefault || !active) return a;
-      if (taken.has(key)) return { ...a, isDefault: false };
+      if (taken.has(key)) return false;
       taken.add(key);
-      return a;
+      return true;
     });
     return templateToRow({
       ...t,
@@ -1723,7 +1722,7 @@ async function doMerge(db: Awaited<ReturnType<typeof getDb>>, backup: BackupFile
     db, remapDefinitionRows(d.blockDefinitions, pathMap, (t) => ({ id: String(remapId(t.id)), label: t.label })),
     mergeOps.definition, mergeStatus,
   ));
-  // Without prefix like the definitions: `data-template-origin` in the entries names exactly this ID.
+  // Without prefix, like the definitions.
   await insertTemplates(db, d.templates, pathMap, catMap,
     (content) => remapInternalLinks(content, (link) => ({ id: String(remapId(link.id)) })));
   // Without prefix like the two above: a language stands on its own, its ID
@@ -1861,7 +1860,7 @@ export async function importDatabase(
     // the file carries its templates along (from '8' — routines of older files do not
     // count, they do not know the sigil template), its version applies — including that the
     // template was changed or deleted there. Otherwise the fresh
-    // row would displace the brought-along one, star and all.
+    // row would displace the brought-along one, assignments and all.
     const types = typeFilters ?? ALL_TYPES_INCLUDED;
     const bringsTemplates = (backup.sourceVersion ?? Number(BACKUP_VERSION)) >= 8 && Array.isArray(backup.data.templates);
     // Via the working copy as with replace: an abort leaves the new vault empty rather than half filled.

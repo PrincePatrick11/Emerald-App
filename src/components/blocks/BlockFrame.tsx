@@ -1,5 +1,5 @@
 import type { PointerEvent, MouseEvent, ReactNode } from 'react';
-import { EyeOff, GripVertical, MoreHorizontal, RefreshCw } from 'lucide-react';
+import { EyeOff, GripVertical, MoreHorizontal } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import type { GlyphSource } from '../../lib/blocks/presets';
 import BlockGlyph from './BlockGlyph';
@@ -13,8 +13,6 @@ interface BlockFrameProps {
   hidden: boolean;
   /** Show the title in read mode (the block's display rule). */
   showReadTitle: boolean;
-  /** Copy of a custom block whose definition has since moved on; the menu offers "Update block". */
-  outdated?: boolean;
   onGripPointerDown: (e: PointerEvent) => void;
   onOpenMenu: (e: MouseEvent) => void;
   children: ReactNode;
@@ -32,7 +30,7 @@ interface BlockFrameProps {
  * omitted.
  */
 export default function BlockFrame({
-  isEditing, icon, label, hidden, showReadTitle, outdated = false, onGripPointerDown, onOpenMenu, children,
+  isEditing, icon, label, hidden, showReadTitle, onGripPointerDown, onOpenMenu, children,
 }: BlockFrameProps) {
   const { t } = useTranslation();
   const className = [
@@ -56,12 +54,6 @@ export default function BlockFrame({
           </button>
           <BlockGlyph icon={icon} />
           <span className="block-frame-label">{label}</span>
-          {outdated && (
-            <button type="button" className="block-frame-outdated" onClick={onOpenMenu} title={t('blocks.outdatedHint')}>
-              <RefreshCw size={12} />
-              <span>{t('blocks.outdated')}</span>
-            </button>
-          )}
           {hidden && (
             <span className="block-frame-hidden-mark" title={t('blocks.hiddenHint')}>
               <EyeOff size={12} />

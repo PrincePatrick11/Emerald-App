@@ -143,7 +143,6 @@ export const fromRow = {
       icon: str(r.icon) || DEFAULT_DEFINITION_ICON,
       elements: parseDefinitionElements(r.elements),
       display: parseDefinitionDisplay(r.display),
-      revision: Math.max(1, Math.trunc(num(r.revision, 1))),
       sort_order: num(r.sort_order, 0),
       created_at: str(r.created_at),
       updated_at: str(r.updated_at),

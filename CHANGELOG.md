@@ -10,6 +10,10 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - **Altars have their own icon,** a candle on a table, instead of a flame.
 
 ### Changed
+- **Templates and blocks are simply copied.** What a template or block puts into an entry stays there unchanged: "Newer version", "Update block", "Update all", usage counts and "also remove from entries" are gone, and a copy's own settings can be edited in the entry. A removed field is simply gone from the block.
+- **One table for template assignments.** Below the template list, each cell picks the template new entries of that combination start with and applies at once. Assignments are no longer set on the template's page, the "offered" level is gone, and a template from the Trash returns without assignments. Older "offered" assignments are removed.
+- **Inserting a template asks nothing.** "Insert template" lists all templates; the blocks go below the content, an entry without a title takes the template's, and its tags are added. The "Default template" setting, the suggestions in an empty entry and "Other template" are gone; a template's assignments no longer travel in `.emerald` files, and `.emerald` files no longer carry block definitions.
+- **A sigil in a template comes along as it is.** Saving an entry as a template and inserting a template keep what is drawn and loaded.
 - **The rail's buttons are grouped by space.** Home, then Journal/Tasks/Operations, Wiki/Lexicon/Altar and Templates/Blocks at the top; Categories/Tags/Trash and Vault/Settings at the bottom. It scrolls without a bar when the window is low, and the rail and the entry list's search start at the sheet's top edge.
 - **"Insert template" and "Add block" moved to the top of the right sidebar** while editing, "Insert template" first; the template editor has them too.
 - **The Categories page uses the full width.**

@@ -35,16 +35,11 @@ All of this is part of the entry's text, so Cancel reverts it too.
 
 The list opens with a collapsible "Your blocks" section; below it, laid out like the Altar library, a collapsible "Built-in blocks" section lists what "Add block" offers out of the box — text, every field kind and the three sigil blocks — as a plain, non-clickable list (text and the sigil blocks have a description tooltip). Search filters both sections. With none of your own yet, a hint invites you to build the first; the built-in section stays regardless.
 
-*Building one.* Clicking a block opens its page: a breadcrumb back to the list, icon and name as the title, and its fields below — add by kind (including **Text**, the same rich text editor as the Text block), label, reorder by the grip, remove. No code is needed — a "Ritual log" with date, choice and checklist, for example. The right sidebar holds the icon (emoji or image), the display rules (hide empty fields in read mode, show the block's title, fully read-only), its usage, and Done/Delete/Cancel; with the sidebar closed, Done and Cancel sit in the page's own top bar.
+*Building one.* Clicking a block opens its page: a breadcrumb back to the list, icon and name as the title, and its fields below — add by kind (including **Text**, the same rich text editor as the Text block), label, reorder by the grip, remove. No code is needed — a "Ritual log" with date, choice and checklist, for example. The right sidebar holds the icon (emoji or image), the display rules (hide empty fields in read mode, show the block's title, fully read-only) and Done/Delete/Cancel; with the sidebar closed, Done and Cancel sit in the page's own top bar.
 
 *Drafts.* Edits are a draft until Done; leaving the page with changes asks whether to save or discard (see "Leaving an edit" under [Navigation](#navigation)). A block left unfinished in another tab shows "Unsaved" in the list until you return. Drafts are written into the vault folder (`drafts.json`), so they survive a crash or restart. In a vault inside a sync service that file is re-uploaded after every pause in typing, and two devices editing the same vault can leave conflict copies of it, which Emerald ignores.
 
-*Copies and updates.* After Done the block appears under "Add block" in every entry, after the built-in ones. What lands in an entry is a **copy**: changing the block later leaves existing entries as they are.
-
-- The copy's labels, options and display rules are read-only in the entry — the sidebar shows them dimmed with a note to change them in the block itself, since "Update block" would overwrite a local edit without a word. Once the block itself is gone, the copy's settings become editable.
-- When the block has changed, the copy's frame shows "Newer version" while editing, and its "…" menu offers "Update block" (Cancel reverts it like any other change).
-- The block's page shows how many entries use it and how many carry an older version; "Update all" brings them up to date at once — except an entry open for editing right then, or one where a loaded sigil holds the copy (see below), which are reported and left alone.
-- Updating keeps every value; new fields arrive empty (or with their prefill). A field you removed keeps its data in the entries but stays hidden — the page lists removed fields and can bring them back.
+*Copies.* After Done the block appears under "Add block" in every entry, after the built-in ones. What lands in an entry is a **copy** with no link back: changing or deleting the block later changes nothing in existing entries or templates, and a copy's own labels, options and display rules can be edited in the entry.
 
 *Deleting.* Deleting a block moves it to the Trash with an Undo toast and no question, leaving every copy untouched. Only when copies exist in entries or templates does a dialog offer to remove them as well: tick "Also remove it from N entries" and confirm a second time — that part can only be undone from a backup. "New block" followed by Cancel puts the new block in the Trash with Undo, like a new entry.
 
@@ -110,7 +105,7 @@ A sigil is an operation with three blocks — **Sigil calculator**, **Sigil draw
 
 While charged, the calculators and drawings it covers are hidden (also in search) and left out of exports until the reveal date; a charge without a reveal date hides them until you unload it. From the reveal date on they show again, still locked. "Unload sigil" (with confirmation) lifts the lock. A charge that locks the whole entry disables Edit, with a tooltip saying why.
 
-Duplicating keeps the charge: a duplicated entry, or a duplicated block the charge hides or locks, comes out just as loaded, hidden until the same date. Saving an entry as a template, or inserting a template, brings the sigil unloaded — a template is a blueprint.
+Duplicating keeps the charge: a duplicated entry, or a duplicated block the charge hides or locks, comes out just as loaded, hidden until the same date. Saving an entry as a template, and inserting a template, work the same way: a drawn or loaded sigil comes along as it is. A new entry from a template whose loaded sigil locks the whole entry opens for reading until the sigil is unloaded.
 
 Sigils from older vaults are converted into these blocks on open (intention, letters, drawing, charge state, reveal date, technique, and notes as a text block), with a backup written next to the database first.
 
@@ -267,27 +262,21 @@ The window layout — open tabs, which sidebars are open, their widths — belon
 
 ## Templates
 
-A template is a pre-filled starting point for a Journal entry, Wiki article or Operation: an optional title, a block stack — the same content an entry has — and tags. The **Templates** button sits in the left rail next to Blocks. The dashboard lists templates under a collapsible "Templates" heading with its own view (List, Cards, Cards (full width), or Timeline by month) and sort (date or A–Z); each row or card shows the icon, name, "Unsaved" while a draft is open, and the entry count.
+A template is a pre-filled starting point for a Journal entry, Wiki article or Operation: an optional title, a block stack — the same content an entry has — and tags. The **Templates** button sits in the left rail next to Blocks. The dashboard lists templates under a collapsible "Templates" heading with its own view (List, Cards, Cards (full width), or Timeline by month) and sort (date or A–Z); each row or card shows the icon, the name, and "Unsaved" while a draft is open.
 
 Clicking one opens its page — name as the title, the title new entries get, and the block stack — which works like a block's own page (see "Your own blocks" under [Journal](#journal)): edits are a draft until Done, leaving with changes asks first, and an unfinished page in another tab shows "Unsaved" in the list.
 
-**Assignment and default** decide where a template shows up and which one a new entry starts with.
+**A template is copied, and that is all.** Whatever it puts into an entry stays there unchanged; changing or deleting the template later changes no entry, nothing asks about updates, and nothing counts where a template was used.
 
-- The template's sidebar has an "Assignment" property. Its value button reads "Everywhere" (nothing assigned — offered everywhere), the one combination it holds (a type — Journal, Wiki or Operations — and for Wiki/Operations a category or "All categories", with a star if it is the default), or the number of assignments, listed in its tooltip.
-- With nothing assigned the button opens the dialog straight away; otherwise a small menu offers **Assign** and **Clear**.
-- The dialog is one table: Journal as its own row, then Wiki and Operations as columns against "All categories", "Uncategorized" and every category. Each cell cycles **not assigned**, **offered** (available when inserting), and **default** (what a matching new entry starts with); a "Both" column sets a category for Wiki and Operations at once.
-- A cell about to become the default says "Replaces “…”", naming the current holder ("Default: …" on the others); the star changes hands only with **Apply**. Apply changes the page's draft only if something changed; the page still saves with Done.
-- A collapsible, read-only "Defaults" section under the template list mirrors the table: each cell names its default (star) and what else is offered (check), links to the template, and shows the fallback where a category has no default of its own, or "—".
+**Assignments** are set in one place: the collapsible "Assignments" table below the template list. Journal has one row, Wiki and Operations are columns against "All categories", "Uncategorized" and every category. Each cell picks the template new entries of that combination start with and applies at once; a template already holding the cell loses it. A cell without a template of its own names the "All categories" template that applies instead. The built-in template `core-sigil` (calculator, drawing, charge) starts assigned to Operations × Sigils; it can be edited, reassigned or deleted like any other.
 
-**Defaults apply when an entry is created.** A new entry starts with its combination's default: the exact category's first, then "All categories" for that type, or nothing. A notice above the block stack — Undo, or "Other template" — appears whenever a default just filled a new entry. The built-in template `core-sigil` (calculator, drawing, charge) is the default for Operations × Sigils; it can be edited, reassigned or deleted like any other. Changing an entry's category or type later never touches its content. Settings → Entries → **Default template** turns the automatic part off: new entries then start empty and offer the matching templates as buttons.
+**When an entry is created,** its combination's template is copied in: the exact category's first, then "All categories" for that type, or nothing. A notice above the block stack offers Undo. Changing an entry's category or type later never touches its content.
 
-**Inserting one by hand.** "Insert template" in the blocks sidebar opens a searchable list. Picking one into an entry with content asks whether to append its blocks or replace everything, and whether to bring its title and tags along; an empty entry lists matching templates as buttons instead. Every entry's context menu offers **"Save as template"**, which creates one from the entry's current content (unsaved edits included) and opens it. A block a template inserts remembers where it came from, which is how the dashboard counts a template's entries.
+**Inserting one by hand.** "Insert template" in the blocks sidebar opens a searchable list of all templates. The blocks go below the content (into an empty entry they replace the empty text); an entry without a title takes the template's title, and the template's tags are added. Every entry's context menu offers **"Save as template"**, which creates one from the entry's current content (unsaved edits included) and opens it.
 
-**Duplicate** on a template makes an independent copy without the original's stars, so it doesn't compete with itself for a default.
+**Duplicate** on a template makes an independent copy without assignments. Deleting a template moves it to the Trash with an Undo toast; it comes back without assignments. "New template" followed by Cancel puts it in the Trash with Undo; after Done it stays. Exporting a template as `.emerald` carries no assignments: which template fills new entries is this vault's decision.
 
-Deleting a template moves it to the Trash with an Undo toast; nothing it already inserted is affected, since insertion always makes a copy. "New template" followed by Cancel puts it in the Trash with Undo; after Done it stays.
-
-Routines from older vaults and `.emeralddb` backups are converted into templates on open or import (same content and tags, linked entries as link blocks, offered everywhere).
+Routines from older vaults and `.emeralddb` backups are converted into templates on open or import (same content and tags, linked entries as link blocks, without assignments).
 
 ## Tasks
 

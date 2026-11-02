@@ -35,12 +35,6 @@ export const BLOCK_ATTR = {
   config: 'data-block-config',
   /** JSON: scalar values of the block. References and images are in the markup (slots). */
   data: 'data-block-data',
-  /** ID of the custom block definition this block was copied from. */
-  origin: 'data-block-origin',
-  /** Revision of the definition at the time of the copy — lower than its current one means "older version". */
-  rev: 'data-block-rev',
-  /** ID of the template with which this block came into the entry — every block kind. */
-  template: 'data-template-origin',
 } as const;
 
 /**

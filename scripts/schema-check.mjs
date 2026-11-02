@@ -1482,7 +1482,7 @@ console.log('\n8f. Migration v41: status, end date and version become a block\n'
   check(
     'the inactive operation has the status block before its text',
     // With two blocks the text gets its wrapper too.
-    s1.content.startsWith('<section data-block="core.fields"') && s1.content.includes('data-block-origin="core-status"') &&
+    s1.content.startsWith('<section data-block="core.fields"') && s1.content.includes('Status') &&
       s1.content.endsWith('<p>Text</p></section>'),
     s1.content
   );
@@ -1657,9 +1657,9 @@ console.log('\n8i. Migration v43: templates and the sigil template\n');
     const rows = await sigilTemplate(db);
     const t = rows[0];
     check(
-      `${label}: exactly one sigil template, default for operation × sigils`,
+      `${label}: exactly one sigil template, assigned to operation × sigils`,
       rows.length === 1 &&
-        JSON.stringify(JSON.parse(t.assignments)) === JSON.stringify([{ entryType: 'operation', category: 'sigils', isDefault: true }]),
+        JSON.stringify(JSON.parse(t.assignments)) === JSON.stringify([{ entryType: 'operation', category: 'sigils' }]),
       JSON.stringify(rows)
     );
     check(
@@ -1685,9 +1685,9 @@ console.log('\n8i. Migration v43: templates and the sigil template\n');
     `INSERT INTO templates (id,name,content,assignments,created_at,updated_at)
      VALUES ('t1','Vorlage','<p><img src="${'d'.repeat(64)}.png"></p>',?1,?2,?2)`,
     [JSON.stringify([
-      { entryType: 'wiki', category: 'weg', isDefault: true },
-      { entryType: 'wiki', category: '*', isDefault: false },
-      { entryType: 'operation', category: 'fehlt', isDefault: false },
+      { entryType: 'wiki', category: 'weg' },
+      { entryType: 'wiki', category: '*' },
+      { entryType: 'operation', category: 'fehlt' },
     ]), now]
   );
   const orphans = await checkIntegrity(db);
@@ -1708,27 +1708,21 @@ console.log('\n8i. Migration v43: templates and the sigil template\n');
     (await collectUsedImageFilenames(db)).has(`${'d'.repeat(64)}.png`)
   );
 
-  // Merging: assignments move along, one star per type and category, active templates first.
+  // Merging: assignments move along, one template per type and category, the one holding it wins.
   await db.execute(`INSERT INTO categories (id,name,emoji,sort_order,is_builtin) VALUES ('alt','Alt','x',100,0), ('neu','Neu','x',101,0)`);
   const insertTpl = (id, assignments, deletedAt = null) => db.execute(
     `INSERT INTO templates (id,name,content,assignments,created_at,updated_at,deleted_at) VALUES (?1,?1,'',?2,?3,?3,?4)`,
     [id, JSON.stringify(assignments), now, deletedAt]
   );
-  await insertTpl('papierkorb', [{ entryType: 'operation', category: 'alt', isDefault: true }], now);
-  await insertTpl('m1', [{ entryType: 'wiki', category: 'alt', isDefault: true }, { entryType: 'operation', category: 'alt', isDefault: true }]);
-  await insertTpl('m2', [{ entryType: 'wiki', category: 'neu', isDefault: true }]);
-  await insertTpl('m3', [{ entryType: 'wiki', category: 'alt', isDefault: false }, { entryType: 'wiki', category: 'neu', isDefault: false }]);
+  await insertTpl('m1', [{ entryType: 'wiki', category: 'alt' }, { entryType: 'operation', category: 'alt' }]);
+  await insertTpl('m2', [{ entryType: 'wiki', category: 'neu' }]);
   await reassignCategoryContent(db, 'alt', 'neu');
-  const merged = Object.fromEntries((await db.select("SELECT id, assignments FROM templates WHERE id IN ('papierkorb','m1','m2','m3')"))
+  const merged = Object.fromEntries((await db.select("SELECT id, assignments FROM templates WHERE id IN ('m1','m2')"))
     .map((r) => [r.id, JSON.parse(r.assignments)]));
-  const stars = Object.values(merged).flat().filter((a) => a.category === 'neu' && a.isDefault).map((a) => a.entryType).sort();
   check('merging: no assignment stays on the old category',
     !JSON.stringify(merged).includes('"alt"'), JSON.stringify(merged));
-  check('merging: one star per type, the existing one wins, the active template before the one in the trash',
-    stars.join() === 'operation,wiki' && merged.m2[0].isDefault && merged.m1.find((a) => a.entryType === 'operation').isDefault
-      && !merged.papierkorb[0].isDefault, JSON.stringify(merged));
-  check('merging: a template with both categories keeps one assignment',
-    merged.m3.length === 1 && merged.m3[0].category === 'neu', JSON.stringify(merged.m3));
+  check('merging: the combination already held stays, the free one moves',
+    merged.m2.length === 1 && merged.m1.length === 1 && merged.m1[0].entryType === 'operation' && merged.m1[0].category === 'neu', JSON.stringify(merged));
   check('merging: no orphans', (await checkIntegrity(db)).filter((o) => o.table === 'templates' && o.missingTarget !== 'categories.fehlt').length === 0);
   db.close();
 }

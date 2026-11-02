@@ -68,7 +68,6 @@ src/
 │   ├── entryStore.ts            Journal, Wiki and Operations entries
 │   ├── taskStore.ts, altarStore.ts, tagStore.ts, categoryStore.ts
 │   ├── blockDefinitionStore.ts  user-built blocks
-│   ├── blockCopies.ts           updating/removing copies of a block
 │   ├── blockSessionStore.ts     BlockStack ↔ sidebar block manager bridge
 │   ├── templateStore.ts, templateApply.ts   templates; applying one
 │   ├── lexiconStore.ts          languages and their words

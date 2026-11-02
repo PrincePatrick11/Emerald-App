@@ -295,9 +295,6 @@
     "jumpTo": "Zum Block springen",
     "remove": "Block entfernen",
     "unknown": "Unbekannter Block ({{type}})",
-    "update": "Block aktualisieren",
-    "outdated": "Neuere Version",
-    "outdatedHint": "Der Block, aus dem das kopiert wurde, hat sich geändert — über das Menü aktualisieren",
     "types": {
       "text": {
         "label": "Text",
@@ -354,8 +351,7 @@
       "removeOption": "Option entfernen",
       "hideEmpty": "Leer im Lesemodus ausblenden",
       "readOnly": "Komplett schreibgeschützt",
-      "readOnlyHint": "Auch im Lesemodus nichts abhaken oder umschalten",
-      "fromDefinition": "Kommt aus dem Block „{{name}}“ — dort ändern, dann hier „Block aktualisieren“."
+      "readOnlyHint": "Auch im Lesemodus nichts abhaken oder umschalten"
     },
     "library": {
       "defaultName": "Neuer Block",
@@ -368,9 +364,6 @@
       "fields": "Felder",
       "addField": "Feld hinzufügen",
       "removeField": "Feld entfernen",
-      "removedFields": "Entfernte Felder",
-      "removedHint": "Einträge behalten ihre Werte. Ein zurückgeholtes Feld erscheint wieder.",
-      "restoreField": "Feld zurückholen",
       "prefill": "Vorbefüllen",
       "prefillHint": "Jede neue Kopie startet mit diesem Wert — bestehende Einträge behalten ihren.",
       "calcMode": "Buchstabenbank",
@@ -386,56 +379,7 @@
       "chargeNoTools": "Dieser Block hat noch keinen Rechner und keine Zeichnung.",
       "display": "Anzeige",
       "fieldCount": "{{count}} Feld",
-      "fieldCount_other": "{{count}} Felder",
-      "entryCount": "{{count}} Eintrag",
-      "entryCount_other": "{{count}} Einträge",
-      "usage": "Verwendung",
-      "usedIn": "In {{count}} Eintrag verwendet",
-      "usedIn_other": "In {{count}} Einträgen verwendet",
-      "unused": "Noch in keinem Eintrag verwendet",
-      "outdated": "{{count}} Eintrag mit älterer Version",
-      "outdated_other": "{{count}} Einträge mit älterer Version",
-      "updateAll": "Alle aktualisieren",
-      "updateAllConfirm": "{{count}} Eintrag auf diese Version bringen?",
-      "updateAllConfirm_other": "{{count}} Einträge auf diese Version bringen?",
-      "saveFirst": "Erst mit „Fertig“ speichern, dann den Block wieder öffnen",
-      "updated": "{{count}} Eintrag aktualisiert.",
-      "updated_other": "{{count}} Einträge aktualisiert.",
-      "removed": "Aus {{count}} Eintrag entfernt.",
-      "removed_other": "Aus {{count}} Einträgen entfernt.",
-      "skippedEditing": "{{count}} Eintrag ist gerade in Bearbeitung und blieb unverändert.",
-      "skippedEditing_other": "{{count}} Einträge sind gerade in Bearbeitung und blieben unverändert.",
-      "skippedLocked": "{{count}} Eintrag hält eine geladene Sigille und blieb unverändert — erst entladen.",
-      "skippedLocked_other": "{{count}} Einträge halten eine geladene Sigille und blieben unverändert — erst entladen.",
-      "failed": "{{count}} Eintrag ließ sich nicht ändern.",
-      "failed_other": "{{count}} Einträge ließen sich nicht ändern.",
-      "deleteTitle": "„{{name}}“ löschen?",
-      "deleteKeeps": "Einträge mit diesem Block behalten ihre Kopie — an ihnen ändert sich nichts. Der Block wandert in den Papierkorb.",
-      "deleteFromEntries": "Auch aus {{count}} Eintrag entfernen",
-      "deleteFromEntries_other": "Auch aus {{count}} Einträgen entfernen",
-      "deleteFromEntriesWarning": "Der Block wird samt Inhalt aus {{count}} Eintrag entfernt. Das lässt sich nur über ein Backup rückgängig machen.",
-      "deleteFromEntriesWarning_other": "Der Block wird samt Inhalt aus {{count}} Einträgen entfernt. Das lässt sich nur über ein Backup rückgängig machen.",
-      "continue": "Weiter",
-      "removeAndDelete": "Aus {{count}} Eintrag entfernen und löschen",
-      "removeAndDelete_other": "Aus {{count}} Einträgen entfernen und löschen",
-      "inTemplates": "in {{count}} Vorlage",
-      "inTemplates_other": "in {{count}} Vorlagen",
-      "outdatedTemplates": "{{count}} Vorlage mit älterer Version",
-      "outdatedTemplates_other": "{{count}} Vorlagen mit älterer Version",
-      "updateAllConfirmCopies": "{{count}} Eintrag oder Vorlage auf diese Version bringen?",
-      "updateAllConfirmCopies_other": "{{count}} Einträge und Vorlagen auf diese Version bringen?",
-      "updatedTemplates": "{{count}} Vorlage aktualisiert.",
-      "updatedTemplates_other": "{{count}} Vorlagen aktualisiert.",
-      "removedTemplates": "Aus {{count}} Vorlage entfernt.",
-      "removedTemplates_other": "Aus {{count}} Vorlagen entfernt.",
-      "skippedDrafts": "{{count}} Vorlage ist gerade offen oder hat ungespeicherte Änderungen und blieb unverändert.",
-      "skippedDrafts_other": "{{count}} Vorlagen sind gerade offen oder haben ungespeicherte Änderungen und blieben unverändert.",
-      "deleteFromCopies": "Auch aus {{count}} Eintrag oder Vorlage entfernen",
-      "deleteFromCopies_other": "Auch aus {{count}} Einträgen und Vorlagen entfernen",
-      "deleteFromCopiesWarning": "Der Block wird samt Inhalt aus {{count}} Eintrag oder Vorlage entfernt. Das lässt sich nur über ein Backup rückgängig machen.",
-      "deleteFromCopiesWarning_other": "Der Block wird samt Inhalt aus {{count}} Einträgen und Vorlagen entfernt. Das lässt sich nur über ein Backup rückgängig machen.",
-      "removeAndDeleteCopies": "Aus {{count}} Eintrag oder Vorlage entfernen und löschen",
-      "removeAndDeleteCopies_other": "Aus {{count}} Einträgen und Vorlagen entfernen und löschen"
+      "fieldCount_other": "{{count}} Felder"
     },
     "status": {
       "name": "Status",
@@ -828,13 +772,9 @@
     "tagCreateInline": "Auch im Tag-Feld",
     "tagCreateDashboardOnly": "Nur unter Tags",
     "groupTags": "Tags",
-    "groupTemplates": "Vorlagen",
     "groupEditor": "Formatierung",
     "groupJournal": "Journal",
     "groupBackup": "Automatisches Backup",
-    "templateDefault": "Standardvorlage",
-    "templateDefaultAuto": "Automatisch einsetzen",
-    "templateDefaultManual": "Nur von Hand",
     "uiScaleHint": "Vergrößert oder verkleinert die ganze Oberfläche — Text, Symbole und Abstände.",
     "editorFontSizeHint": "Schriftgröße in Einträgen und Feldwerten, unabhängig von der Größe der Oberfläche.",
     "sidebarListHint": "Welche Einträge die Seitenleiste links zeigt: alle oder die eines Moduls.",
@@ -848,9 +788,6 @@
     "tagCreationHint": "Wo neue Tags entstehen dürfen — beim Eintippen, aus Vorlagen und beim Import von .emerald-Dateien. Eine Sicherung bringt ihre Tags immer mit.",
     "tagCreateInlineHint": "Ein unbekannter Name — getippt, aus einer Vorlage oder einem Import — wird als neuer Tag angelegt",
     "tagCreateDashboardOnlyHint": "Tag-Feld, Vorlagen und Importe übernehmen nur vorhandene Tags. Neue Tags legst du unter Tags an.",
-    "templateDefaultHint": "Ob ein neuer Eintrag mit der Standardvorlage seiner Art und Kategorie beginnt. Von Hand einsetzen lässt sich eine Vorlage immer.",
-    "templateDefaultAutoHint": "Ein neuer Eintrag beginnt mit seiner Standardvorlage. Ein späterer Wechsel von Kategorie oder Art ändert den Inhalt nicht.",
-    "templateDefaultManualHint": "Neue Einträge beginnen leer und bieten die passenden Vorlagen zur Auswahl an.",
     "editorFormatting": "Automatische Formatierung",
     "editorFormattingHint": "Was der Editor beim Tippen und Einfügen von selbst umwandelt. Gilt für jeden Editor, der danach geöffnet wird.",
     "markdownShortcuts": "Markdown-Kürzel",
@@ -1016,43 +953,12 @@
     "entryTitlePlaceholder": "Leer lassen für den üblichen Titel",
     "content": "Inhalt",
     "contentPlaceholder": "Was jeder Eintrag aus dieser Vorlage mitbringt …",
-    "assign": {
-      "open": "Zuweisung & Standard festlegen …",
-      "assignShort": "Zuweisen",
-      "clearShort": "Lösen",
-      "title": "Zuweisung & Standard – {{name}}",
-      "hint": "Lege fest, wo die Vorlage zur Wahl steht und womit neue Einträge beginnen. Ohne jede Zuweisung steht sie in jedem Eintrag zur Wahl.",
-      "off": "Nicht zugewiesen",
-      "offHint": "nur ohne jede Zuweisung überall verfügbar",
-      "assigned": "Zur Wahl",
-      "assignedHint": "steht beim Einfügen oben",
-      "default": "Standard",
-      "defaultHint": "neue Einträge beginnen damit",
-      "both": "Beide",
-      "bothHint": "Setzt die Kategorie für Wiki und Operationen zugleich",
-      "allCategoriesHint": "Die ganze Eintragsart – greift, wo eine Kategorie keinen eigenen Standard hat",
-      "replaces": "Ersetzt „{{name}}“",
-      "heldBy": "Standard: {{name}}",
-      "apply": "Übernehmen"
-    },
     "allCategories": "Alle Kategorien",
-    "missingCategory": "Gelöschte Kategorie",
-    "availableEverywhere": "Überall",
-    "assignmentCount": "{{count}} Zuweisung",
-    "assignmentCount_other": "{{count}} Zuweisungen",
-    "assignment": "Zuweisung",
-    "usage": "Verwendung",
-    "unused": "Noch in keinem Eintrag verwendet",
-    "moreEntries": "und {{count}} weiterer",
-    "moreEntries_other": "und {{count}} weitere",
-    "entryCount": "{{count}} Eintrag",
-    "entryCount_other": "{{count}} Einträge",
     "overview": {
-      "title": "Standardvorlagen",
-      "hint": "Gilt für neue Einträge. Die Zeile „Alle Kategorien“ gilt immer dann, wenn eine Kategorie keinen eigenen Standard hat.",
-      "hintOff": "Unter Einstellungen → Einträge steht die Standardvorlage auf „Nur von Hand“: Neue Einträge beginnen leer und bieten ihre Vorlagen zur Auswahl an.",
+      "title": "Zuweisungen",
+      "hint": "Neue Einträge starten mit einer Kopie der zugewiesenen Vorlage. „Alle Kategorien“ gilt, wo eine Kategorie keine eigene hat.",
       "category": "Kategorie",
-      "none": "Kein Standard",
+      "none": "Keine Vorlage",
       "fallback": "Sonst: {{name}} (alle Kategorien)",
       "everyEntry": "Jeder neue Eintrag"
     },
@@ -1062,21 +968,7 @@
       "pickerTitle": "Vorlage einfügen",
       "searchPlaceholder": "Vorlagen suchen …",
       "noTemplates": "Keine Vorlagen gefunden",
-      "suggestionsLabel": "Mit einer Vorlage beginnen",
-      "allTemplates": "Alle Vorlagen …",
-      "applyTitle": "„{{name}}“ einfügen",
-      "modeLabel": "Wohin die Blöcke kommen",
-      "append": "Anhängen",
-      "replace": "Ersetzen",
-      "appendHint": "Die Blöcke der Vorlage kommen unter den vorhandenen Inhalt.",
-      "replaceHint": "Die Vorlage ersetzt den ganzen Inhalt. Abbrechen im Eintrag stellt ihn wieder her, wie er vor dem Bearbeiten war – samt Tags.",
-      "takeTitle": "Titel übernehmen: „{{title}}“",
-      "noTitle": "Die Vorlage hat keinen Titel",
-      "addTags": "Tags ergänzen: {{tags}}",
-      "noTags": "Die Vorlage hat keine Tags",
-      "apply": "Einfügen",
       "noticeApplied": "Vorlage „{{name}}“ angewendet",
-      "other": "Andere Vorlage",
       "dismiss": "Hinweis schließen"
     }
   },
@@ -1132,17 +1024,53 @@
     "unmappedCount_other": "{{count}} ohne Entsprechung"
   },
   "emptyState": {
-    "journal": { "title": "Noch keine Einträge", "description": "Halte fest, was du erlebst, träumst und wirkst. Neue Einträge bekommen die Mondphase des Tages.", "action": "Erster Eintrag" },
-    "wiki": { "title": "Noch keine Artikel", "description": "Sammle Wissen zu Kräutern, Steinen und Symbolen." },
-    "tasks": { "title": "Alles erledigt", "description": "Keine offenen Aufgaben. Neue landen hier." },
-    "operations": { "title": "Noch keine Operationen", "description": "Plane Rituale mit Zutaten, Ablauf und Ergebnis." },
-    "altar": { "title": "Noch kein Altar", "description": "Gestalte einen Altar aus Hintergrund und Elementen." },
-    "altarLibrary": { "title": "Noch keine Elemente", "description": "Kerzen, Kristalle, Symbole – aus Elementen baust du deine Altäre." },
-    "lexicon": { "title": "Noch keine Sprachen", "description": "Leg eine Sprache an und füll sie mit Wörtern und Zeichen." },
-    "translate": { "title": "Noch nichts zu übersetzen", "description": "Leg zuerst eine Sprache an – dann übersetzt dieses Feld damit." },
-    "templates": { "title": "Noch keine Vorlagen", "description": "Speichere wiederkehrende Abläufe als Vorlage." },
-    "blocks": { "title": "Noch keine Blöcke", "description": "Bausteine, die du in Einträgen wiederverwendest." },
-    "tags": { "title": "Noch keine Tags", "description": "Vergib Tags beim Bearbeiten eines Eintrags oder leg hier einen an." },
-    "trash": { "title": "Papierkorb ist leer" }
+    "journal": {
+      "title": "Noch keine Einträge",
+      "description": "Halte fest, was du erlebst, träumst und wirkst. Neue Einträge bekommen die Mondphase des Tages.",
+      "action": "Erster Eintrag"
+    },
+    "wiki": {
+      "title": "Noch keine Artikel",
+      "description": "Sammle Wissen zu Kräutern, Steinen und Symbolen."
+    },
+    "tasks": {
+      "title": "Alles erledigt",
+      "description": "Keine offenen Aufgaben. Neue landen hier."
+    },
+    "operations": {
+      "title": "Noch keine Operationen",
+      "description": "Plane Rituale mit Zutaten, Ablauf und Ergebnis."
+    },
+    "altar": {
+      "title": "Noch kein Altar",
+      "description": "Gestalte einen Altar aus Hintergrund und Elementen."
+    },
+    "altarLibrary": {
+      "title": "Noch keine Elemente",
+      "description": "Kerzen, Kristalle, Symbole – aus Elementen baust du deine Altäre."
+    },
+    "lexicon": {
+      "title": "Noch keine Sprachen",
+      "description": "Leg eine Sprache an und füll sie mit Wörtern und Zeichen."
+    },
+    "translate": {
+      "title": "Noch nichts zu übersetzen",
+      "description": "Leg zuerst eine Sprache an – dann übersetzt dieses Feld damit."
+    },
+    "templates": {
+      "title": "Noch keine Vorlagen",
+      "description": "Speichere wiederkehrende Abläufe als Vorlage."
+    },
+    "blocks": {
+      "title": "Noch keine Blöcke",
+      "description": "Bausteine, die du in Einträgen wiederverwendest."
+    },
+    "tags": {
+      "title": "Noch keine Tags",
+      "description": "Vergib Tags beim Bearbeiten eines Eintrags oder leg hier einen an."
+    },
+    "trash": {
+      "title": "Papierkorb ist leer"
+    }
   }
 }

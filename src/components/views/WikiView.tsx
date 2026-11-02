@@ -427,7 +427,7 @@ export default function WikiView() {
           onChange={handleContentChange}
           onReadModeChange={(content) => updateEntry(article.id, { content })}
           isEditing={isEditing}
-          templateTarget={{ entryType: 'wiki', categoryId: article.category_id, flush: flushAutoSave }}
+          templateTarget={{ entryType: 'wiki', flush: flushAutoSave }}
         />
       )}
     </EntryDetailFrame>

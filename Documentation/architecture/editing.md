@@ -66,7 +66,7 @@ The entry keeps its id and its row in `entries`. `changeEntryType`:
 
 Since the row never leaves its table, the entry never exists twice or not at all. Wiki and Operation keep category, icon and cover image across the move; converting to Journal drops them, and `typeChangeDropsProperties` makes the field ask first via `InlineConfirm` when any is set.
 
-The content is left alone: a default template applies only when an entry is created (see [Defaulting on create](templates.md#defaulting-on-create)).
+The content is left alone: a default template applies only when an entry is created (see [Defaulting on create](templates.md#starting-an-entry)).
 
 ### Cancel after a type change
 

@@ -295,9 +295,6 @@
     "jumpTo": "Ir al bloque",
     "remove": "Eliminar bloque",
     "unknown": "Bloque desconocido ({{type}})",
-    "update": "Actualizar bloque",
-    "outdated": "Versión más nueva",
-    "outdatedHint": "El bloque del que se copió ha cambiado — actualízalo desde el menú",
     "types": {
       "text": {
         "label": "Texto",
@@ -354,8 +351,7 @@
       "removeOption": "Eliminar opción",
       "hideEmpty": "Ocultar vacío en modo lectura",
       "readOnly": "Totalmente de solo lectura",
-      "readOnlyHint": "Tampoco marcar ni alternar en modo lectura",
-      "fromDefinition": "Viene del bloque «{{name}}»: cámbialo allí y luego «Actualizar bloque» aquí."
+      "readOnlyHint": "Tampoco marcar ni alternar en modo lectura"
     },
     "library": {
       "defaultName": "Nuevo bloque",
@@ -368,9 +364,6 @@
       "fields": "Campos",
       "addField": "Añadir campo",
       "removeField": "Quitar campo",
-      "removedFields": "Campos quitados",
-      "removedHint": "Las entradas conservan sus valores. Un campo restaurado vuelve a mostrarse.",
-      "restoreField": "Restaurar campo",
       "prefill": "Rellenar de antemano",
       "prefillHint": "Cada copia nueva empieza con este valor; las entradas existentes conservan el suyo.",
       "calcMode": "Banco de letras",
@@ -386,56 +379,7 @@
       "chargeNoTools": "Este bloque todavía no tiene calculadora ni dibujo.",
       "display": "Visualización",
       "fieldCount": "{{count}} campo",
-      "fieldCount_other": "{{count}} campos",
-      "entryCount": "{{count}} entrada",
-      "entryCount_other": "{{count}} entradas",
-      "usage": "Uso",
-      "usedIn": "Usado en {{count}} entrada",
-      "usedIn_other": "Usado en {{count}} entradas",
-      "unused": "Aún no se usa en ninguna entrada",
-      "outdated": "{{count}} entrada con una versión anterior",
-      "outdated_other": "{{count}} entradas con una versión anterior",
-      "updateAll": "Actualizar todas",
-      "updateAllConfirm": "¿Llevar {{count}} entrada a esta versión?",
-      "updateAllConfirm_other": "¿Llevar {{count}} entradas a esta versión?",
-      "saveFirst": "Guarda primero con «Listo» y vuelve a abrir el bloque",
-      "updated": "{{count}} entrada actualizada.",
-      "updated_other": "{{count}} entradas actualizadas.",
-      "removed": "Quitado de {{count}} entrada.",
-      "removed_other": "Quitado de {{count}} entradas.",
-      "skippedEditing": "{{count}} entrada está en edición y no se ha tocado.",
-      "skippedEditing_other": "{{count}} entradas están en edición y no se han tocado.",
-      "skippedLocked": "{{count}} entrada tiene un sigilo cargado y no se ha tocado; descárgalo primero.",
-      "skippedLocked_other": "{{count}} entradas tienen un sigilo cargado y no se han tocado; descárgalos primero.",
-      "failed": "{{count}} entrada no se pudo cambiar.",
-      "failed_other": "{{count}} entradas no se pudieron cambiar.",
-      "deleteTitle": "¿Eliminar «{{name}}»?",
-      "deleteKeeps": "Las entradas que contienen este bloque conservan su copia — en ellas no cambia nada. El bloque va a la papelera.",
-      "deleteFromEntries": "Quitarlo también de {{count}} entrada",
-      "deleteFromEntries_other": "Quitarlo también de {{count}} entradas",
-      "deleteFromEntriesWarning": "El bloque y todo su contenido se quitarán de {{count}} entrada. Solo se puede deshacer con una copia de seguridad.",
-      "deleteFromEntriesWarning_other": "El bloque y todo su contenido se quitarán de {{count}} entradas. Solo se puede deshacer con una copia de seguridad.",
-      "continue": "Continuar",
-      "removeAndDelete": "Quitar de {{count}} entrada y eliminar",
-      "removeAndDelete_other": "Quitar de {{count}} entradas y eliminar",
-      "inTemplates": "en {{count}} plantilla",
-      "inTemplates_other": "en {{count}} plantillas",
-      "outdatedTemplates": "{{count}} plantilla con una versión anterior",
-      "outdatedTemplates_other": "{{count}} plantillas con una versión anterior",
-      "updateAllConfirmCopies": "¿Llevar {{count}} entrada o plantilla a esta versión?",
-      "updateAllConfirmCopies_other": "¿Llevar {{count}} entradas y plantillas a esta versión?",
-      "updatedTemplates": "{{count}} plantilla actualizada.",
-      "updatedTemplates_other": "{{count}} plantillas actualizadas.",
-      "removedTemplates": "Quitado de {{count}} plantilla.",
-      "removedTemplates_other": "Quitado de {{count}} plantillas.",
-      "skippedDrafts": "{{count}} plantilla está abierta o tiene cambios sin guardar y no se ha tocado.",
-      "skippedDrafts_other": "{{count}} plantillas están abiertas o tienen cambios sin guardar y no se han tocado.",
-      "deleteFromCopies": "Quitarlo también de {{count}} entrada o plantilla",
-      "deleteFromCopies_other": "Quitarlo también de {{count}} entradas y plantillas",
-      "deleteFromCopiesWarning": "El bloque y todo su contenido se quitarán de {{count}} entrada o plantilla. Solo se puede deshacer con una copia de seguridad.",
-      "deleteFromCopiesWarning_other": "El bloque y todo su contenido se quitarán de {{count}} entradas y plantillas. Solo se puede deshacer con una copia de seguridad.",
-      "removeAndDeleteCopies": "Quitar de {{count}} entrada o plantilla y eliminar",
-      "removeAndDeleteCopies_other": "Quitar de {{count}} entradas y plantillas y eliminar"
+      "fieldCount_other": "{{count}} campos"
     },
     "status": {
       "name": "Estado",
@@ -836,13 +780,9 @@
     "tagCreateInline": "También en el campo de etiquetas",
     "tagCreateDashboardOnly": "Solo en Etiquetas",
     "groupTags": "Etiquetas",
-    "groupTemplates": "Plantillas",
     "groupEditor": "Formato",
     "groupJournal": "Diario",
     "groupBackup": "Copia automática",
-    "templateDefault": "Plantilla predeterminada",
-    "templateDefaultAuto": "Insertar automáticamente",
-    "templateDefaultManual": "Solo a mano",
     "uiScaleHint": "Escala toda la interfaz — texto, iconos y espacios.",
     "editorFontSizeHint": "Tamaño del texto en entradas y valores de campo, independiente del tamaño de la interfaz.",
     "sidebarListHint": "Qué entradas muestra la barra lateral izquierda: todas o las de un módulo.",
@@ -856,9 +796,6 @@
     "tagCreationHint": "Dónde pueden crearse etiquetas nuevas: al escribir, desde plantillas y al importar archivos .emerald. Una copia de seguridad siempre trae sus etiquetas.",
     "tagCreateInlineHint": "Un nombre desconocido —escrito, de una plantilla o de una importación— se crea como etiqueta nueva",
     "tagCreateDashboardOnlyHint": "El campo de etiquetas, las plantillas y las importaciones solo toman etiquetas existentes. Crea etiquetas nuevas en Etiquetas.",
-    "templateDefaultHint": "Si una entrada nueva empieza con la plantilla predeterminada de su tipo de entrada y categoría. Siempre se puede insertar una plantilla a mano.",
-    "templateDefaultAutoHint": "Una entrada nueva empieza con su plantilla predeterminada. Cambiar después la categoría o el tipo de entrada no altera el contenido.",
-    "templateDefaultManualHint": "Las entradas nuevas empiezan vacías y ofrecen las plantillas adecuadas para elegir.",
     "editorFormatting": "Formato automático",
     "editorFormattingHint": "Lo que el editor convierte por sí solo al escribir o pegar. Se aplica a cada editor que se abra después.",
     "markdownShortcuts": "Atajos de Markdown",
@@ -1016,43 +953,12 @@
     "entryTitlePlaceholder": "Déjalo vacío para el título habitual",
     "content": "Contenido",
     "contentPlaceholder": "Lo que trae cada entrada creada con esta plantilla …",
-    "assign": {
-      "open": "Definir asignación y predeterminada …",
-      "assignShort": "Asignar",
-      "clearShort": "Quitar",
-      "title": "Asignación y predeterminada – {{name}}",
-      "hint": "Elige dónde se ofrece la plantilla y con qué empiezan las entradas nuevas. Sin ninguna asignación, se ofrece en todas las entradas.",
-      "off": "Sin asignar",
-      "offHint": "disponible en todas partes solo sin ninguna asignación",
-      "assigned": "Ofrecida",
-      "assignedHint": "aparece primero al insertar",
-      "default": "Predeterminada",
-      "defaultHint": "las entradas nuevas empiezan con ella",
-      "both": "Ambos",
-      "bothHint": "Define la categoría para Wiki y Operaciones a la vez",
-      "allCategoriesHint": "Todo el tipo de entrada – se aplica donde una categoría no tiene predeterminada propia",
-      "replaces": "Sustituye a «{{name}}»",
-      "heldBy": "Predeterminada: {{name}}",
-      "apply": "Aplicar"
-    },
     "allCategories": "Todas las categorías",
-    "missingCategory": "Categoría eliminada",
-    "availableEverywhere": "En todas partes",
-    "assignmentCount": "{{count}} asignación",
-    "assignmentCount_other": "{{count}} asignaciones",
-    "assignment": "Asignación",
-    "usage": "Uso",
-    "unused": "Aún no se usa en ninguna entrada",
-    "moreEntries": "y {{count}} más",
-    "moreEntries_other": "y {{count}} más",
-    "entryCount": "{{count}} entrada",
-    "entryCount_other": "{{count}} entradas",
     "overview": {
-      "title": "Plantillas predeterminadas",
-      "hint": "Se aplica a las entradas nuevas. La fila «Todas las categorías» se aplica siempre que una categoría no tenga una predeterminada propia.",
-      "hintOff": "En Ajustes → Entradas, la plantilla predeterminada está en «Solo a mano»: las entradas nuevas empiezan vacías y ofrecen sus plantillas para elegir.",
+      "title": "Asignaciones",
+      "hint": "Las entradas nuevas empiezan con una copia de la plantilla asignada. «Todas las categorías» se aplica donde una categoría no tiene una propia.",
       "category": "Categoría",
-      "none": "Sin plantilla predeterminada",
+      "none": "Sin plantilla",
       "fallback": "Si no: {{name}} (todas las categorías)",
       "everyEntry": "Cada entrada nueva"
     },
@@ -1062,21 +968,7 @@
       "pickerTitle": "Insertar plantilla",
       "searchPlaceholder": "Buscar plantillas…",
       "noTemplates": "No se encontraron plantillas",
-      "suggestionsLabel": "Empezar con una plantilla",
-      "allTemplates": "Todas las plantillas…",
-      "applyTitle": "Insertar «{{name}}»",
-      "modeLabel": "Dónde van los bloques",
-      "append": "Añadir al final",
-      "replace": "Reemplazar",
-      "appendHint": "Los bloques de la plantilla van debajo del contenido existente.",
-      "replaceHint": "La plantilla reemplaza todo el contenido. Cancelar en la entrada la restaura tal como estaba antes de editarla, etiquetas incluidas.",
-      "takeTitle": "Usar su título: «{{title}}»",
-      "noTitle": "La plantilla no tiene título",
-      "addTags": "Añadir sus etiquetas: {{tags}}",
-      "noTags": "La plantilla no tiene etiquetas",
-      "apply": "Insertar",
       "noticeApplied": "Plantilla «{{name}}» aplicada",
-      "other": "Otra plantilla",
       "dismiss": "Cerrar aviso"
     }
   },
@@ -1132,17 +1024,53 @@
     "unmappedCount_other": "{{count}} sin equivalencia"
   },
   "emptyState": {
-    "journal": { "title": "Aún no hay entradas", "description": "Registra lo que vives, sueñas y obras. Las entradas nuevas reciben la fase lunar del día.", "action": "Primera entrada" },
-    "wiki": { "title": "Aún no hay artículos", "description": "Reúne saber sobre hierbas, piedras y símbolos." },
-    "tasks": { "title": "Todo hecho", "description": "No hay tareas abiertas. Las nuevas aparecerán aquí." },
-    "operations": { "title": "Aún no hay operaciones", "description": "Planifica rituales con ingredientes, desarrollo y resultado." },
-    "altar": { "title": "Aún no hay altar", "description": "Diseña un altar con un fondo y elementos." },
-    "altarLibrary": { "title": "Aún no hay elementos", "description": "Velas, cristales, símbolos: con elementos construyes tus altares." },
-    "lexicon": { "title": "Aún no hay idiomas", "description": "Crea un idioma y llénalo de palabras y caracteres." },
-    "translate": { "title": "Aún no hay nada que traducir", "description": "Crea primero un idioma; luego este campo traduce con él." },
-    "templates": { "title": "Aún no hay plantillas", "description": "Guarda procesos recurrentes como plantilla." },
-    "blocks": { "title": "Aún no hay bloques", "description": "Piezas que reutilizas en tus entradas." },
-    "tags": { "title": "Aún no hay etiquetas", "description": "Asigna etiquetas al editar una entrada o crea una aquí." },
-    "trash": { "title": "La papelera está vacía" }
+    "journal": {
+      "title": "Aún no hay entradas",
+      "description": "Registra lo que vives, sueñas y obras. Las entradas nuevas reciben la fase lunar del día.",
+      "action": "Primera entrada"
+    },
+    "wiki": {
+      "title": "Aún no hay artículos",
+      "description": "Reúne saber sobre hierbas, piedras y símbolos."
+    },
+    "tasks": {
+      "title": "Todo hecho",
+      "description": "No hay tareas abiertas. Las nuevas aparecerán aquí."
+    },
+    "operations": {
+      "title": "Aún no hay operaciones",
+      "description": "Planifica rituales con ingredientes, desarrollo y resultado."
+    },
+    "altar": {
+      "title": "Aún no hay altar",
+      "description": "Diseña un altar con un fondo y elementos."
+    },
+    "altarLibrary": {
+      "title": "Aún no hay elementos",
+      "description": "Velas, cristales, símbolos: con elementos construyes tus altares."
+    },
+    "lexicon": {
+      "title": "Aún no hay idiomas",
+      "description": "Crea un idioma y llénalo de palabras y caracteres."
+    },
+    "translate": {
+      "title": "Aún no hay nada que traducir",
+      "description": "Crea primero un idioma; luego este campo traduce con él."
+    },
+    "templates": {
+      "title": "Aún no hay plantillas",
+      "description": "Guarda procesos recurrentes como plantilla."
+    },
+    "blocks": {
+      "title": "Aún no hay bloques",
+      "description": "Piezas que reutilizas en tus entradas."
+    },
+    "tags": {
+      "title": "Aún no hay etiquetas",
+      "description": "Asigna etiquetas al editar una entrada o crea una aquí."
+    },
+    "trash": {
+      "title": "La papelera está vacía"
+    }
   }
 }

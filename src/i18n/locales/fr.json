@@ -295,9 +295,6 @@
     "jumpTo": "Aller au bloc",
     "remove": "Supprimer le bloc",
     "unknown": "Bloc inconnu ({{type}})",
-    "update": "Mettre à jour le bloc",
-    "outdated": "Version plus récente",
-    "outdatedHint": "Le bloc d'origine a changé — mettez-le à jour depuis le menu",
     "types": {
       "text": {
         "label": "Texte",
@@ -354,8 +351,7 @@
       "removeOption": "Supprimer l'option",
       "hideEmpty": "Masquer si vide en mode lecture",
       "readOnly": "Entièrement en lecture seule",
-      "readOnlyHint": "Pas de cochage ni de bascule en mode lecture non plus",
-      "fromDefinition": "Vient du bloc « {{name}} » — modifiez-le là-bas, puis « Mettre à jour le bloc » ici."
+      "readOnlyHint": "Pas de cochage ni de bascule en mode lecture non plus"
     },
     "library": {
       "defaultName": "Nouveau bloc",
@@ -368,9 +364,6 @@
       "fields": "Champs",
       "addField": "Ajouter un champ",
       "removeField": "Retirer le champ",
-      "removedFields": "Champs retirés",
-      "removedHint": "Les entrées conservent leurs valeurs. Un champ restauré réapparaît.",
-      "restoreField": "Restaurer le champ",
       "prefill": "Pré-remplir",
       "prefillHint": "Chaque nouvelle copie commence avec cette valeur — les entrées existantes gardent la leur.",
       "calcMode": "Banque de lettres",
@@ -386,56 +379,7 @@
       "chargeNoTools": "Ce bloc n'a encore ni calculateur ni dessin.",
       "display": "Affichage",
       "fieldCount": "{{count}} champ",
-      "fieldCount_other": "{{count}} champs",
-      "entryCount": "{{count}} entrée",
-      "entryCount_other": "{{count}} entrées",
-      "usage": "Utilisation",
-      "usedIn": "Utilisé dans {{count}} entrée",
-      "usedIn_other": "Utilisé dans {{count}} entrées",
-      "unused": "Utilisé dans aucune entrée pour l'instant",
-      "outdated": "{{count}} entrée avec une version antérieure",
-      "outdated_other": "{{count}} entrées avec une version antérieure",
-      "updateAll": "Tout mettre à jour",
-      "updateAllConfirm": "Mettre {{count}} entrée à cette version ?",
-      "updateAllConfirm_other": "Mettre {{count}} entrées à cette version ?",
-      "saveFirst": "Enregistrez d’abord avec « Terminé », puis rouvrez le bloc",
-      "updated": "{{count}} entrée mise à jour.",
-      "updated_other": "{{count}} entrées mises à jour.",
-      "removed": "Retiré de {{count}} entrée.",
-      "removed_other": "Retiré de {{count}} entrées.",
-      "skippedEditing": "{{count}} entrée est en cours de modification et n'a pas été touchée.",
-      "skippedEditing_other": "{{count}} entrées sont en cours de modification et n'ont pas été touchées.",
-      "skippedLocked": "{{count}} entrée contient un sigil chargé et n'a pas été touchée — déchargez-le d'abord.",
-      "skippedLocked_other": "{{count}} entrées contiennent un sigil chargé et n'ont pas été touchées — déchargez-les d'abord.",
-      "failed": "{{count}} entrée n'a pas pu être modifiée.",
-      "failed_other": "{{count}} entrées n'ont pas pu être modifiées.",
-      "deleteTitle": "Supprimer « {{name}} » ?",
-      "deleteKeeps": "Les entrées qui contiennent ce bloc gardent leur copie — rien n'y change. Le bloc part dans la corbeille.",
-      "deleteFromEntries": "Le retirer aussi de {{count}} entrée",
-      "deleteFromEntries_other": "Le retirer aussi de {{count}} entrées",
-      "deleteFromEntriesWarning": "Le bloc et tout son contenu seront retirés de {{count}} entrée. Cela ne peut être annulé qu'à partir d'une sauvegarde.",
-      "deleteFromEntriesWarning_other": "Le bloc et tout son contenu seront retirés de {{count}} entrées. Cela ne peut être annulé qu'à partir d'une sauvegarde.",
-      "continue": "Continuer",
-      "removeAndDelete": "Retirer de {{count}} entrée et supprimer",
-      "removeAndDelete_other": "Retirer de {{count}} entrées et supprimer",
-      "inTemplates": "dans {{count}} modèle",
-      "inTemplates_other": "dans {{count}} modèles",
-      "outdatedTemplates": "{{count}} modèle avec une version antérieure",
-      "outdatedTemplates_other": "{{count}} modèles avec une version antérieure",
-      "updateAllConfirmCopies": "Mettre {{count}} entrée ou modèle à cette version ?",
-      "updateAllConfirmCopies_other": "Mettre {{count}} entrées et modèles à cette version ?",
-      "updatedTemplates": "{{count}} modèle mis à jour.",
-      "updatedTemplates_other": "{{count}} modèles mis à jour.",
-      "removedTemplates": "Retiré de {{count}} modèle.",
-      "removedTemplates_other": "Retiré de {{count}} modèles.",
-      "skippedDrafts": "{{count}} modèle est ouvert ou a des modifications non enregistrées et n'a pas été touché.",
-      "skippedDrafts_other": "{{count}} modèles sont ouverts ou ont des modifications non enregistrées et n'ont pas été touchés.",
-      "deleteFromCopies": "Le retirer aussi de {{count}} entrée ou modèle",
-      "deleteFromCopies_other": "Le retirer aussi de {{count}} entrées et modèles",
-      "deleteFromCopiesWarning": "Le bloc et tout son contenu seront retirés de {{count}} entrée ou modèle. Cela ne peut être annulé qu'à partir d'une sauvegarde.",
-      "deleteFromCopiesWarning_other": "Le bloc et tout son contenu seront retirés de {{count}} entrées et modèles. Cela ne peut être annulé qu'à partir d'une sauvegarde.",
-      "removeAndDeleteCopies": "Retirer de {{count}} entrée ou modèle et supprimer",
-      "removeAndDeleteCopies_other": "Retirer de {{count}} entrées et modèles et supprimer"
+      "fieldCount_other": "{{count}} champs"
     },
     "status": {
       "name": "Statut",
@@ -836,13 +780,9 @@
     "tagCreateInline": "Aussi dans le champ d'étiquettes",
     "tagCreateDashboardOnly": "Uniquement dans Étiquettes",
     "groupTags": "Étiquettes",
-    "groupTemplates": "Modèles",
     "groupEditor": "Mise en forme",
     "groupJournal": "Journal",
     "groupBackup": "Sauvegarde automatique",
-    "templateDefault": "Modèle par défaut",
-    "templateDefaultAuto": "Insérer automatiquement",
-    "templateDefaultManual": "Uniquement à la main",
     "uiScaleHint": "Met à l'échelle toute l'interface — texte, icônes et espacements.",
     "editorFontSizeHint": "Taille du texte dans les entrées et les valeurs de champ, indépendante de la taille de l'interface.",
     "sidebarListHint": "Les entrées qu'affiche la barre latérale gauche : toutes, ou celles d'un module.",
@@ -856,9 +796,6 @@
     "tagCreationHint": "Où de nouvelles étiquettes peuvent être créées : à la saisie, depuis les modèles et à l’import de fichiers .emerald. Une sauvegarde apporte toujours ses étiquettes.",
     "tagCreateInlineHint": "Un nom inconnu — saisi, venant d’un modèle ou d’un import — devient une nouvelle étiquette",
     "tagCreateDashboardOnlyHint": "Le champ d’étiquettes, les modèles et les imports ne prennent que des étiquettes existantes. Créez-en de nouvelles dans Étiquettes.",
-    "templateDefaultHint": "Si une nouvelle entrée commence par le modèle par défaut de son type d’entrée et de sa catégorie. Un modèle peut toujours être inséré à la main.",
-    "templateDefaultAutoHint": "Une nouvelle entrée commence par son modèle par défaut. Changer ensuite de catégorie ou de type d’entrée ne modifie pas le contenu.",
-    "templateDefaultManualHint": "Les nouvelles entrées commencent vides et proposent les modèles adaptés.",
     "editorFormatting": "Mise en forme automatique",
     "editorFormattingHint": "Ce que l’éditeur convertit de lui-même à la saisie ou au collage. S’applique à chaque éditeur ouvert ensuite.",
     "markdownShortcuts": "Raccourcis Markdown",
@@ -1016,43 +953,12 @@
     "entryTitlePlaceholder": "Laisser vide pour le titre habituel",
     "content": "Contenu",
     "contentPlaceholder": "Ce que chaque entrée issue de ce modèle contient au départ …",
-    "assign": {
-      "open": "Définir l’affectation et le défaut …",
-      "assignShort": "Affecter",
-      "clearShort": "Retirer",
-      "title": "Affectation et défaut – {{name}}",
-      "hint": "Choisis où le modèle est proposé et avec quoi commencent les nouvelles entrées. Sans aucune affectation, il est proposé dans chaque entrée.",
-      "off": "Non affecté",
-      "offHint": "disponible partout seulement sans aucune affectation",
-      "assigned": "Proposé",
-      "assignedHint": "affiché en premier à l’insertion",
-      "default": "Par défaut",
-      "defaultHint": "les nouvelles entrées commencent avec lui",
-      "both": "Les deux",
-      "bothHint": "Définit la catégorie pour le Wiki et les Opérations à la fois",
-      "allCategoriesHint": "Tout le type d’entrée – s’applique là où une catégorie n’a pas de modèle par défaut propre",
-      "replaces": "Remplace « {{name}} »",
-      "heldBy": "Par défaut : {{name}}",
-      "apply": "Appliquer"
-    },
     "allCategories": "Toutes les catégories",
-    "missingCategory": "Catégorie supprimée",
-    "availableEverywhere": "Partout",
-    "assignmentCount": "{{count}} affectation",
-    "assignmentCount_other": "{{count}} affectations",
-    "assignment": "Affectation",
-    "usage": "Utilisation",
-    "unused": "Utilisé dans aucune entrée pour l'instant",
-    "moreEntries": "et {{count}} autre",
-    "moreEntries_other": "et {{count}} autres",
-    "entryCount": "{{count}} entrée",
-    "entryCount_other": "{{count}} entrées",
     "overview": {
-      "title": "Modèles par défaut",
-      "hint": "S'applique aux nouvelles entrées. La ligne « Toutes les catégories » s'applique chaque fois qu'une catégorie n'a pas de modèle par défaut propre.",
-      "hintOff": "Dans Paramètres → Entrées, le modèle par défaut est réglé sur « Uniquement à la main » : les nouvelles entrées commencent vides et proposent leurs modèles.",
+      "title": "Attributions",
+      "hint": "Les nouvelles entrées commencent par une copie du modèle attribué. « Toutes les catégories » s’applique lorsqu’une catégorie n’en a pas.",
       "category": "Catégorie",
-      "none": "Aucun modèle par défaut",
+      "none": "Aucun modèle",
       "fallback": "Sinon : {{name}} (toutes les catégories)",
       "everyEntry": "Chaque nouvelle entrée"
     },
@@ -1062,21 +968,7 @@
       "pickerTitle": "Insérer un modèle",
       "searchPlaceholder": "Rechercher des modèles…",
       "noTemplates": "Aucun modèle trouvé",
-      "suggestionsLabel": "Commencer avec un modèle",
-      "allTemplates": "Tous les modèles…",
-      "applyTitle": "Insérer « {{name}} »",
-      "modeLabel": "Où vont les blocs",
-      "append": "Ajouter à la fin",
-      "replace": "Remplacer",
-      "appendHint": "Les blocs du modèle vont sous le contenu existant.",
-      "replaceHint": "Le modèle remplace tout le contenu. Annuler dans l’entrée la rétablit telle qu’elle était avant la modification, étiquettes comprises.",
-      "takeTitle": "Reprendre son titre : « {{title}} »",
-      "noTitle": "Le modèle n’a pas de titre",
-      "addTags": "Ajouter ses étiquettes : {{tags}}",
-      "noTags": "Le modèle n’a pas d’étiquettes",
-      "apply": "Insérer",
       "noticeApplied": "Modèle « {{name}} » appliqué",
-      "other": "Autre modèle",
       "dismiss": "Fermer"
     }
   },
@@ -1132,17 +1024,53 @@
     "unmappedCount_other": "{{count}} sans équivalent"
   },
   "emptyState": {
-    "journal": { "title": "Aucune entrée pour l'instant", "description": "Notez ce que vous vivez, rêvez et accomplissez. Les nouvelles entrées reçoivent la phase lunaire du jour.", "action": "Première entrée" },
-    "wiki": { "title": "Aucun article pour l'instant", "description": "Rassemblez votre savoir sur les herbes, les pierres et les symboles." },
-    "tasks": { "title": "Tout est fait", "description": "Aucune tâche ouverte. Les nouvelles arrivent ici." },
-    "operations": { "title": "Aucune opération pour l'instant", "description": "Planifiez des rituels avec ingrédients, déroulement et résultat." },
-    "altar": { "title": "Aucun autel pour l'instant", "description": "Composez un autel à partir d'un fond et d'éléments." },
-    "altarLibrary": { "title": "Aucun élément pour l'instant", "description": "Bougies, cristaux, symboles : les éléments composent vos autels." },
-    "lexicon": { "title": "Aucune langue pour l'instant", "description": "Créez une langue et remplissez-la de mots et de caractères." },
-    "translate": { "title": "Rien à traduire pour l'instant", "description": "Créez d'abord une langue, puis ce champ traduira avec elle." },
-    "templates": { "title": "Aucun modèle pour l'instant", "description": "Enregistrez des déroulements récurrents comme modèle." },
-    "blocks": { "title": "Aucun bloc pour l'instant", "description": "Des briques que vous réutilisez dans vos entrées." },
-    "tags": { "title": "Aucun tag pour l'instant", "description": "Attribuez des tags en modifiant une entrée, ou créez-en un ici." },
-    "trash": { "title": "La corbeille est vide" }
+    "journal": {
+      "title": "Aucune entrée pour l'instant",
+      "description": "Notez ce que vous vivez, rêvez et accomplissez. Les nouvelles entrées reçoivent la phase lunaire du jour.",
+      "action": "Première entrée"
+    },
+    "wiki": {
+      "title": "Aucun article pour l'instant",
+      "description": "Rassemblez votre savoir sur les herbes, les pierres et les symboles."
+    },
+    "tasks": {
+      "title": "Tout est fait",
+      "description": "Aucune tâche ouverte. Les nouvelles arrivent ici."
+    },
+    "operations": {
+      "title": "Aucune opération pour l'instant",
+      "description": "Planifiez des rituels avec ingrédients, déroulement et résultat."
+    },
+    "altar": {
+      "title": "Aucun autel pour l'instant",
+      "description": "Composez un autel à partir d'un fond et d'éléments."
+    },
+    "altarLibrary": {
+      "title": "Aucun élément pour l'instant",
+      "description": "Bougies, cristaux, symboles : les éléments composent vos autels."
+    },
+    "lexicon": {
+      "title": "Aucune langue pour l'instant",
+      "description": "Créez une langue et remplissez-la de mots et de caractères."
+    },
+    "translate": {
+      "title": "Rien à traduire pour l'instant",
+      "description": "Créez d'abord une langue, puis ce champ traduira avec elle."
+    },
+    "templates": {
+      "title": "Aucun modèle pour l'instant",
+      "description": "Enregistrez des déroulements récurrents comme modèle."
+    },
+    "blocks": {
+      "title": "Aucun bloc pour l'instant",
+      "description": "Des briques que vous réutilisez dans vos entrées."
+    },
+    "tags": {
+      "title": "Aucun tag pour l'instant",
+      "description": "Attribuez des tags en modifiant une entrée, ou créez-en un ici."
+    },
+    "trash": {
+      "title": "La corbeille est vide"
+    }
   }
 }

@@ -2,8 +2,7 @@
  * The custom blocks of the blocks view (table `block_definitions`, since
  * v40). A definition is only the template — inserted blocks are copies in the
  * content of their entry (see `lib/blocks/definitions.ts`). Deleting,
- * restoring and renaming therefore touch no entry; what happens to the
- * copies is decided explicitly by `blockCopies.ts`.
+ * restoring and changing therefore touch no entry.
  *
  * Import rule as in `categoryStore`: no content stores, all access via
  * `getState()` at runtime.
@@ -19,7 +18,7 @@ import {
   insertDefinitionRow as insertDefinition, nextDefinitionSortOrder as nextSortOrder,
 } from '../lib/blockDefinitionRows';
 import {
-  DEFAULT_DEFINITION_DISPLAY, DEFAULT_DEFINITION_ICON, sameShape, type BlockDefinition,
+  DEFAULT_DEFINITION_DISPLAY, DEFAULT_DEFINITION_ICON, type BlockDefinition,
 } from '../lib/blocks/definitions';
 
 export type BlockDefinitionPatch = Partial<Pick<BlockDefinition, 'name' | 'icon' | 'elements' | 'display'>>;
@@ -30,16 +29,14 @@ interface BlockDefinitionState {
 
   fetchDefinitions: () => Promise<void>;
   createDefinition: (name: string) => Promise<BlockDefinition>;
-  /** Bumps the revision as soon as something changes that affects the copies (name, icon, elements, display). */
   updateDefinition: (id: string, patch: BlockDefinitionPatch) => Promise<void>;
   /** Soft delete. Copies in entries stay untouched. */
   deleteDefinition: (id: string) => Promise<void>;
   restoreDefinition: (id: string) => Promise<void>;
   permanentlyDeleteDefinition: (id: string) => Promise<void>;
   /**
-   * `.emerald` import: create definitions that are missing here with their ID —
-   * then the copies brought along recognise their origin again. An
-   * existing one (even in the trash) stays as it is.
+   * `.emerald` import: create definitions that are missing here with their ID.
+   * An existing one (even in the trash) stays as it is.
    */
   importDefinitions: (defs: readonly BlockDefinition[]) => Promise<void>;
 }
@@ -69,7 +66,6 @@ export const useBlockDefinitionStore = create<BlockDefinitionState>((set, get) =
       icon: DEFAULT_DEFINITION_ICON,
       elements: [],
       display: DEFAULT_DEFINITION_DISPLAY,
-      revision: 1,
       sort_order: await nextSortOrder(db),
       created_at: now,
       updated_at: now,
@@ -80,25 +76,24 @@ export const useBlockDefinitionStore = create<BlockDefinitionState>((set, get) =
     return def;
   },
 
-  // serialized: see lib/serialize.ts — two quick saves
-  // should bump the revision twice, not both from the same one.
+  // serialized: see lib/serialize.ts.
   updateDefinition: (id, patch) => serialized(serialKey('blockDefinition', id), async () => {
     const current = get().definitions.find((d) => d.id === id);
     if (!current || !needsWrite(current, patch)) return;
-    const merged: BlockDefinition = { ...current, ...patch, name: (patch.name ?? current.name).trim() };
     const updated: BlockDefinition = {
-      ...merged,
-      revision: sameShape(current, merged) ? current.revision : current.revision + 1,
+      ...current,
+      ...patch,
+      name: (patch.name ?? current.name).trim(),
       updated_at: stampFor(current.updated_at),
     };
     const db = await getDb();
     await db.execute(
       `UPDATE block_definitions
-          SET name=$1, icon=$2, elements=$3, display=$4, revision=$5, updated_at=$6
-        WHERE id=$7`,
+          SET name=$1, icon=$2, elements=$3, display=$4, updated_at=$5
+        WHERE id=$6`,
       [
         updated.name, updated.icon, JSON.stringify(updated.elements),
-        JSON.stringify(updated.display), updated.revision, updated.updated_at, id,
+        JSON.stringify(updated.display), updated.updated_at, id,
       ]
     );
     set((s) => ({ definitions: s.definitions.map((d) => (d.id === id ? updated : d)) }));

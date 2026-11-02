@@ -2053,42 +2053,7 @@ button.block-altar:hover .block-altar-title {
   line-height: 1;
 }
 
-/* "Newer version" in the frame of an outdated copy — a quiet hint
-   that opens the menu with "Update block". */
-.block-frame-outdated {
-  display: inline-flex;
-  flex-shrink: 0;
-  align-items: center;
-  gap: 0.25rem;
-  padding: 0 6px;
-  border-radius: 999px;
-  font-size: 10px;
-  color: var(--accent-text);
-  background: color-mix(in srgb, var(--accent) 12%, transparent);
-  transition: background-color 150ms;
-}
-
-.block-frame-outdated:hover {
-  background: color-mix(in srgb, var(--accent) 20%, transparent);
-}
-
-.block-frame-outdated:focus-visible {
-  outline: none;
-  box-shadow: 0 0 0 2px var(--focus-ring);
-}
-
-/* Blocks view: the "older versions in entries" dot and the field rows
-   of the block page. */
-.block-library-outdated-dot {
-  width: 6px;
-  height: 6px;
-  flex-shrink: 0;
-  border-radius: 999px;
-  background: var(--accent);
-}
-
-/* Templates in the entry: the "Template applied" notice above the stack and
-   the suggestions in the empty entry. */
+/* Templates in the entry: the "Template applied" notice above the stack. */
 .template-notice {
   display: flex;
   align-items: center;
@@ -2104,69 +2069,41 @@ button.block-altar:hover .block-altar-title {
   font-size: 0.75rem;
 }
 
-.template-suggestions {
+/* Assignment table on the templates dashboard: a cell as a quiet choice. */
+.template-assign-cell {
   display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-  margin-bottom: 0.75rem;
-}
-
-/* Templates: the "Default" star in the default templates overview and in the
-   sidebar of a template — in the accent like the dot above, in both themes. */
-.template-default-star {
-  display: flex;
-  flex-shrink: 0;
-  color: var(--accent-text);
-}
-
-/* Assignment table of a template (the dialog only, `AssignmentTable`):
-   label on the left; in the dialog fixed columns for wiki, operations and "both" —
-   fixed, so that the hint below a cell truncates instead of widening the
-   column. */
-.template-assign-row {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) repeat(3, 6.5rem);
-  column-gap: 0.75rem;
-  align-items: start;
-  padding: 0.25rem 0;
-}
-
-.template-assign-head {
-  align-items: end;
-  padding-bottom: 0.375rem;
-  border-bottom: 1px solid var(--border-soft);
-}
-
-/* The "available" tick before a template name — the default stands without a mark. */
-.template-overview-state {
-  display: flex;
-  flex-shrink: 0;
-  color: var(--text-subtle);
-}
-
-/* "Replaces X": the star takes something away from another template — in the accent. */
-.template-assign-replaces {
-  color: var(--accent-text);
-}
-
-/* Default templates overview in the dashboard: the name of a template as a link to its page. */
-.template-overview-link {
-  display: inline-flex;
-  max-width: 100%;
+  width: 100%;
+  min-width: 0;
   align-items: center;
   gap: 0.375rem;
+  padding: 0.25rem 0.5rem;
+  margin-left: -0.5rem;
   border-radius: 6px;
   color: var(--text-secondary);
-  transition: color 150ms;
+  transition: background-color 150ms, color 150ms;
 }
 
-.template-overview-link:hover {
+.template-assign-cell:hover {
+  background: var(--menu-item-hover-bg);
   color: var(--text-primary);
 }
 
-.template-overview-link:focus-visible {
+.template-assign-cell:focus-visible {
   outline: none;
   box-shadow: 0 0 0 2px var(--focus-ring);
+}
+
+.template-assign-chevron {
+  flex-shrink: 0;
+  margin-left: auto;
+  color: var(--text-subtle);
+  opacity: 0;
+  transition: opacity 150ms;
+}
+
+.template-assign-cell:hover .template-assign-chevron,
+.template-assign-cell:focus-visible .template-assign-chevron {
+  opacity: 1;
 }
 
 .block-def-element {

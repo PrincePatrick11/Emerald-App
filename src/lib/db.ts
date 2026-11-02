@@ -1,3 +1,4 @@
+import { parseAssignments } from './blocks/templates';
 import Database from './sqlite';
 import { invoke } from '@tauri-apps/api/core';
 import { getActiveVaultId } from './vaultManager';
@@ -1423,6 +1424,18 @@ export const MIGRATIONS: Migration[] = [
     up: async (db) => {
       await db.execute('DROP INDEX IF EXISTS idx_entries_deleted');
       await createIndexesIfMissing(db, ENTRIES_INDEX_DDL);
+    },
+  },
+  {
+    // A block in an entry no longer knows its definition, so the definition
+    // needs no revision. An assignment now always means "new entries start with
+    // it": what was only offered for selection goes (`parseAssignments`). Repeatable.
+    version: 56,
+    name: 'simple_copies_and_assignments',
+    up: async (db) => {
+      await dropColumnsIfPresent(db, 'block_definitions', ['revision']);
+      const rows = await db.select<{ id: string; assignments: string }[]>('SELECT id, assignments FROM templates');
+      await db.batch(rows.map((row) => ['UPDATE templates SET assignments=$1 WHERE id=$2', [JSON.stringify(parseAssignments(row.assignments)), row.id]] as const));
     },
   },
 ];

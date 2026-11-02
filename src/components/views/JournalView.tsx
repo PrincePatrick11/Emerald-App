@@ -392,7 +392,7 @@ export default function JournalView() {
           onChange={handleContentChange}
           onReadModeChange={(content) => updateEntry(entry.id, { content })}
           isEditing={isEditing}
-          templateTarget={{ entryType: 'journal', categoryId: null, flush: flushAutoSave }}
+          templateTarget={{ entryType: 'journal', flush: flushAutoSave }}
         />
       )}
     </EntryDetailFrame>

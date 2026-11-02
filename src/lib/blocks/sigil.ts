@@ -331,18 +331,6 @@ export function blockHoldsLocked(state: SigilState, blockId: string): boolean {
 }
 
 /**
- * Must the block not be rebuilt — updated to a new revision,
- * removed from entries? As long as it carries a locked part or is itself
- * or contains a loaded charge: if the charge were lost in the rebuild (an
- * archived part does not count), the sigil would be unloaded without anyone
- * having pressed "Unload".
- */
-export function isSigilFrozen(block: BlockInstance, state: SigilState): boolean {
-  return blockHoldsLocked(state, block.id)
-    || sigilUnits([block]).some((u) => u.block.type === SIGIL_CHARGE_TYPE && parseSigilCharge(u.block).loaded);
-}
-
-/**
  * Rewrite the targets of every charge in the block — a charge block itself or
  * the charge parts of a field block. `map` receives each target (block ID or
  * `<block ID>:<element ID>`) and returns the new one, or several; if none
@@ -459,38 +447,6 @@ export function withoutConcealed(content: string, today: string): string {
   const { concealed } = sigilState(blocks, today);
   if (concealed.size === 0) return content;
   return serializeBlocks(blocks.filter((b) => !concealed.has(b.id)).map((b) => withoutConcealedParts(b, concealed)));
-}
-
-/**
- * The content with the sigil unloaded — for templates: a blueprint carries no
- * charge, and an entry made from it does not start concealed. A duplicated
- * entry, on the other hand, stays loaded.
- */
-export function withChargeUnloaded(content: string): string {
-  if (!mayHoldCharge(content)) return content;
-  let changed = false;
-  const unload = (block: BlockInstance): BlockInstance | null => {
-    const charge = parseSigilCharge(block);
-    return charge.broken || !charge.loaded ? null : serializeSigilCharge(block, { ...charge, loaded: false });
-  };
-  const blocks = parseBlocks(content).map((block) => {
-    if (block.type === SIGIL_CHARGE_TYPE) {
-      const next = unload(block);
-      if (next) changed = true;
-      return next ?? block;
-    }
-    let result = block;
-    for (const unit of sigilUnits([block])) {
-      if (!unit.part || unit.block.type !== SIGIL_CHARGE_TYPE) continue;
-      const next = unload(unit.block);
-      if (!next) continue;
-      changed = true;
-      // Only the data JSON: "loaded" is not in the slot's read version.
-      result = withElementValue(result, unit.part.element.id, JSON.parse(next.attrs[BLOCK_ATTR.data]));
-    }
-    return result;
-  });
-  return changed ? serializeBlocks(blocks) : content;
 }
 
 /* ---------------- New ---------------- */

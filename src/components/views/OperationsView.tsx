@@ -430,7 +430,7 @@ export default function OperationsView() {
           onChange={handleContentChange}
           onReadModeChange={(content) => updateEntry(operation.id, { content })}
           isEditing={isEditing}
-          templateTarget={{ entryType: 'operation', categoryId: operation.category_id, flush: flushAutoSave }}
+          templateTarget={{ entryType: 'operation', flush: flushAutoSave }}
         />
       )}
     </EntryDetailFrame>

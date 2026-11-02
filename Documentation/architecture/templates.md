@@ -2,58 +2,48 @@
 
 ## Templates
 
-A **template** (`templates` table, v43, `store/templateStore.ts`) is a pre-filled entry: an optional title, a block stack in the entry `content` format, tags, and **assignments** — JSON `TemplateAssignment[]` (`lib/blocks/templates.ts`) of `{ entryType, category, isDefault }`. `category` is a category id, `null` for "no category", or `'*'` for "all categories" (Journal, which has no categories, only uses `'*'`). A template with no assignments is offered everywhere.
+A **template** (`templates` table, v43, `store/templateStore.ts`) is a pre-filled entry: an optional title, a block stack in the entry `content` format, tags, and **assignments** — JSON `TemplateAssignment[]` (`lib/blocks/templates.ts`) of `{ entryType, category }`. `category` is a category id, `null` for "no category", or `'*'` for "all categories" (Journal, which has no categories, only uses `'*'`).
 
-At most one active template is the default for a given `(entryType, category)`. `templateStore` enforces that itself (not the database, as with `block_definitions`): it clears the previous holder's star under one write key (`serialKey('template', '*')`), so a set-default touching two rows can't interleave with another write. `resolveDefaultTemplate` falls back from the exact category to `'*'` — one level for Journal, two for Wiki/Operations.
+An assignment means one thing: new entries of this combination start with a copy of the template. At most one active template holds a combination. `assignTemplate` in `templateStore` enforces that itself (not the database, as with `block_definitions`): it takes the combination from its holder under one write key (`serialKey('template', '*')`), so a change touching two rows can't interleave with another write. `resolveAssignedTemplate` falls back from the exact category to `'*'` — one level for Journal, two for Wiki/Operations.
 
 ### Insertion is a copy
 
-`instantiateTemplateBlocks` gives every block a fresh id (two insertions in one entry don't collide), remaps charge targets to the new ids, unloads sigils, and stamps `data-template-origin` (`BLOCK_ATTR.template`) on each block — the same mechanism as a user-built block's `data-block-origin`. So `entryBlockSummary` picks up template origins alongside block-copy origins, and `templateEntries()` (`store/blockCopies.ts`) groups entries by origin for a template page's usage list.
+`instantiateTemplateBlocks` gives every block a fresh id (two insertions in one entry don't collide) and remaps charge targets to the new ids. Everything else comes as it is, a drawn or loaded sigil too. Nothing in the entry remembers the template, and changing a template never touches entries it already filled. The same holds one level down: a block copy in a template stays as it was when the block changes.
 
-Changing a template never touches entries it already filled. A template can itself hold block copies that go stale: `copyUsage()` counts them (`templates`/`outdatedTemplates`), and `updateAllCopies`/`removeAllCopies` walk templates as a second content source, skipping one whose page is open or has an unsaved draft (`changedTemplates`/`skippedDrafts` on `CopyRunResult`).
+### Starting an entry
 
-### Defaulting on create
+`createEntry` starts from `startOfNewEntry(entryType, categoryId, blank)`, which resolves the assigned template and returns `{ title, content, tags, templateId }` via `templateStart`. Nothing applies with `blank` (imports and duplicates, which overwrite content anyway). The Sigils layout is no special case: `core-sigil` (`SIGIL_TEMPLATE_ID`) is a normal, editable, deletable template seeded for Operations × Sigils. `createItem` opens the new entry for editing, or for reading if the template's loaded sigil locks the whole entry.
 
-`createEntry` starts from `startOfNewEntry(entryType, categoryId, blank)`, which resolves the default and returns `{ title, content, tags, templateId }` via `templateStart`. Nothing applies with `blank` (imports and duplicates, which overwrite content anyway) or when the vault setting `templates.applyDefault` is off. The Sigils layout is no special case: `core-sigil` (`SIGIL_TEMPLATE_ID`) is a normal, editable, deletable template seeded as default for Operations × Sigils.
+`useTemplateNoticeStore` holds the "template applied" notice a new entry shows (Undo) — a store because the content stores set it and may not import a component. Undoing takes the template's title and tags back through `fieldsWithoutTemplate` (pure, no store reads).
 
-`useTemplateNoticeStore` holds the "template applied" notice a new entry shows (Undo / "Other template") — a store because the content stores set it and may not import a component. Taking a replaced template's title and tags back goes through `fieldsWithTemplate`/`fieldsWithoutTemplate`/ `mayTakeTemplateTitle` (pure, no store reads).
-
-Creation is the only moment a default applies by itself. Changing an entry's category or type never touches its content: deciding whether content is "still the default" would mean comparing it with the *current* template, which any template edit silently breaks for older entries.
+Creation is the only moment an assignment applies by itself. Changing an entry's category or type never touches its content.
 
 ### Manual insertion
 
-`TemplateInsertion` (blocks sidebar) opens `TemplatePickerModal` (name search, ordered by `templatesFor` — assigned templates first). For a non-empty entry, `TemplateApplyDialog` then asks append or replace and whether to take title/tags; an empty entry just inserts.
+`TemplateInsertion` (blocks sidebar) opens `TemplatePickerModal` (name search over all templates). The blocks go below the content; an empty stack is replaced.
 
-`store/templateApply.ts` is the seam between the block stack (which inserts the blocks itself, `BlockStackApi.applyTemplate`) and the rest: it flushes the editor's pending saves first, so a title typed a moment ago isn't clobbered, then applies title/tags through the entry's store.
+`store/templateApply.ts` is the seam between the block stack (which inserts the blocks itself, `BlockStackApi.applyTemplate`) and the rest: the stack flushes the editor's pending saves first, so a title typed a moment ago isn't clobbered, then title and tags go through the entry's store (`fieldsWithTemplate`: the template's title if the entry has none of its own, its tags added).
 
 `useSaveAsTemplateAction` is the reverse: "Save as template" creates a template from an entry's current (live, if being edited) content and opens it.
 
 ### The dashboard and the template page
 
-`TemplatesView` is a `Dashboard` of active templates under a collapsible `GroupDivider`, with view and sort in `uiStore.templatesPrefs` (a `ListPrefs` field, per vault — see [Tabs and Workspace State](navigation.md#tabs-and-workspace-state)). A row shows icon, name, an "Unsaved" marker and the entry count; clicking opens `{ type: 'templates', id }`.
+`TemplatesView` is a `Dashboard` of active templates under a collapsible `GroupDivider`, with view and sort in `uiStore.templatesPrefs` (a `ListPrefs` field, per vault — see [Tabs and Workspace State](navigation.md#tabs-and-workspace-state)). A row shows icon, name and an "Unsaved" marker; clicking opens `{ type: 'templates', id }`.
 
 `TemplateEditor` renders that page on `LibraryPageFrame`, the shell it shares with `BlockDefinitionEditor` (back link, "Unsaved" marker, name-as-title input, `EditActionBar`/ `SidebarColumn` portalled into the right sidebar). Its draft lifecycle is `useDraftPage`:
 
 - The draft lives in a `DraftStore<T>` (`createDraftStore<T>()` in `store/draftStore.ts`, behind `useBlockDraftStore` and `useTemplateDraftStore`), so edits survive `MainArea` unmounting the view on a module switch.
-- "Done" writes only the fields that changed since the page opened (names compared trimmed), so a tag renamed or a star taken by another template meanwhile isn't overwritten.
+- "Done" writes only the fields that changed since the page opened (names compared trimmed), so a tag renamed meanwhile isn't overwritten.
 
-Templates have no description; picker and suggestions match the name only. `useShrunkIcon` (shrink an image icon to 64px, last write wins) and `TagsField` (the edit-mode "Tags" section) are shared with the other pages.
+Templates have no description; the picker matches the name only. `useShrunkIcon` (shrink an image icon to 64px, last write wins) and `TagsField` (the edit-mode "Tags" section) are shared with the other pages.
 
-### Assignment and default
+### The assignment table
 
-A combination's `AssignmentState` is `'off' | 'assigned' | 'default'`. In `lib/blocks/templates.ts`, `assignmentStateAt` reads it, `withAssignmentState` sets it (removing the assignment for `off`, otherwise updating it in place), and `sameAssignments` compares lists ignoring order, so toggling a cell off and on again isn't a change.
-
-A default is set only in a template's `TemplateAssignmentsModal`, which edits a copy and calls `onChange` on "Apply" only if `sameAssignments` reports a change. Each cell is an `IconToggleGroup` over the three states, with `Star` when another template holds the default there or this cell would replace it. The "Both" column passes `value={null}` when Wiki and Operations disagree, so no option shows pressed rather than one side picked arbitrarily. Pending assignment edits are reconciled with other templates' edits via `mergeAssignmentChanges` (base → draft, replayed onto current).
-
-`assignmentParts.tsx` holds the modal's `AssignmentTable` plus what modal and overview share (`AssignmentLegend`, `EntryTypeHeading`, `ASSIGNMENT_STATE_ICONS`, `useAssignmentStateLabels`). `TemplateAssignments` is the sidebar's read-only "Assignment" property: a value button ("Everywhere", the count, or the single assignment) that opens the modal, with the full list — `TEMPLATE_ENTRY_TYPES` order, then category order — in its tooltip.
-
-### Defaults overview
-
-`TemplateDefaultsOverview` is the dashboard's read-only view of all assignments, with its own markup rather than `AssignmentTable`:
+`TemplateAssignmentTable` below the list is the one place assignments are read and set; it stays away while there are no templates.
 
 - Journal first on its own, as one "Every new entry" row — as a table column it would stand almost empty.
 - Then a table with Wiki/Operations as columns and one row per "All categories"/ "Uncategorized"/category. "All categories", every row's fallback, is set off by a bold name only (a tinted band was too loud).
-- No legend and no star: a cell names its default and, with a subtle check, every template merely offered there; a click opens the template. Without a default of its own it shows the fallback ("↳ name"), or "—".
+- A cell is a `Dropdown` of all templates and "No template"; a choice calls `assignTemplate` and is saved at once. Without a template of its own the cell shows the fallback ("↳ name"), or "—".
 
 ### Routines converted to templates
 

@@ -21,7 +21,7 @@ import type Database from './sqlite';
  * Must match the highest version in MIGRATIONS. `db.ts` checks this at
  * startup so that a new migration step cannot be forgotten.
  */
-export const BASELINE_VERSION = 55;
+export const BASELINE_VERSION = 56;
 
 /**
  * Tables in dependency order: parents before children.
@@ -89,11 +89,9 @@ export const TABLE_DDL: Record<TableName, string> = {
 
   // The custom blocks of the blocks view (since v40). A definition is the
   // template for copies: an inserted block carries elements and display rules
-  // itself in the `content` and remembers only origin and revision
-  // (`data-block-origin`/`-rev`). Hence no foreign key and no
-  // cleanup on deletion — the copies manage without their definition.
-  // `elements`/`display` are JSON (lib/blocks/definitions.ts); `revision`
-  // rises with every change that affects copies. The icon default is
+  // itself in the `content` and does not know where it came from. Hence no
+  // foreign key and no cleanup on deletion.
+  // `elements`/`display` are JSON (lib/blocks/definitions.ts). The icon default is
   // `DEFAULT_DEFINITION_ICON` — here as a literal so that the schema imports nothing from
   // the block logic.
   block_definitions: `
@@ -103,7 +101,6 @@ export const TABLE_DDL: Record<TableName, string> = {
       icon TEXT NOT NULL DEFAULT '🧩',
       elements TEXT NOT NULL DEFAULT '[]',
       display TEXT NOT NULL DEFAULT '{}',
-      revision INTEGER NOT NULL DEFAULT 1,
       sort_order INTEGER NOT NULL DEFAULT 0,
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL,
@@ -112,10 +109,9 @@ export const TABLE_DDL: Record<TableName, string> = {
 
   // The templates of the templates dashboard (since v43): title, block stack and
   // tags that an entry receives as a copy on creation or insertion. Like
-  // `block_definitions` without a foreign key — entries remember only the
-  // origin in the `content` (`data-template-origin`). `assignments` is JSON
-  // (lib/blocks/templates.ts): which entry kind × category the template
-  // offers and where it is the default; the category IDs in it are cleaned up by
+  // `block_definitions` without a foreign key — entries remember nothing of it.
+  // `assignments` is JSON (lib/blocks/templates.ts): which entry kind × category
+  // starts with the template; the category IDs in it are cleaned up by
   // `dropCategoryFromTemplates` when a category is permanently deleted.
   // The icon default is `DEFAULT_TEMPLATE_ICON`.
   templates: `
@@ -647,10 +643,9 @@ export async function dropCategoryFromTemplates(db: Database, categoryId: string
 /**
  * Re-attaches the assignments on `from` to `to` — when a category merges into
  * the one of the same name. If a template had both, one assignment remains. A
- * star only moves along if no active template carries one yet for this type
- * and `to`: there are not two defaults for the same combination. Stars
- * belong to active templates (as in `restoreTemplate`) — one in the trash
- * loses its star here.
+ * combination that an active template already holds stays with it: active
+ * templates go first, and a trashed one needs no check, since it comes back
+ * without assignments.
  */
 async function moveCategoryInTemplates(db: Database, from: string, to: string): Promise<void> {
   const rows = await db.select<{ id: string; assignments: string | null; deleted_at: string | null }[]>(
@@ -658,19 +653,17 @@ async function moveCategoryInTemplates(db: Database, from: string, to: string): 
   );
   const parsed = rows.map((row) => ({ id: row.id, active: !row.deleted_at, assignments: rawAssignments(row.assignments) }));
   const entryTypeOf = (a: unknown) => String((a as { entryType?: unknown } | null)?.entryType);
-  const isDefault = (a: unknown) => (a as { isDefault?: unknown } | null)?.isDefault === true;
-  const starred = new Set(parsed.filter((row) => row.active).flatMap(({ assignments }) =>
-    (assignments ?? []).filter((a) => assignedCategory(a) === to && isDefault(a)).map(entryTypeOf)));
+  const held = new Set(parsed.filter((row) => row.active).flatMap(({ assignments }) =>
+    (assignments ?? []).filter((a) => assignedCategory(a) === to).map(entryTypeOf)));
   for (const { id, active, assignments } of parsed) {
     if (!assignments?.some((a) => assignedCategory(a) === from)) continue;
     const next: unknown[] = [];
     for (const a of assignments) {
       if (assignedCategory(a) !== from) { next.push(a); continue; }
       const entryType = entryTypeOf(a);
-      if (assignments.some((b) => assignedCategory(b) === to && entryTypeOf(b) === entryType)) continue;
-      const star = active && isDefault(a) && !starred.has(entryType);
-      if (star) starred.add(entryType);
-      next.push({ ...(a as object), category: to, isDefault: star });
+      if (active && held.has(entryType)) continue;
+      if (active) held.add(entryType);
+      next.push({ ...(a as object), category: to });
     }
     await db.execute('UPDATE templates SET assignments=$1 WHERE id=$2', [JSON.stringify(next), id]);
   }

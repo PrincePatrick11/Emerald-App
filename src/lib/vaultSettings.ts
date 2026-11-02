@@ -77,13 +77,6 @@ export interface TagSettings {
   createInline: boolean;
 }
 
-export interface TemplateSettings {
-  /** Whether a new entry starts with the default for its kind and category.
-   *  Off: it starts empty and offers the matching templates to choose from. Applying
-   *  by hand always works; a category or type change never applies one. */
-  applyDefault: boolean;
-}
-
 /** What the editor formats by itself while typing and pasting. Applies to every editor opened afterwards. */
 export interface EditorSettings {
   /** Markdown shortcuts: `# ` heading, `- ` and `1. ` lists, `> ` quote, `[ ] ` task, `**bold**`, `==highlighted==` … */
@@ -131,7 +124,6 @@ export interface VaultSettings {
   emojis: EmojiSettings;
   images: ImageSettings;
   tags: TagSettings;
-  templates: TemplateSettings;
   editor: EditorSettings;
   journal: JournalSettings;
   backup: BackupSettings;
@@ -141,7 +133,7 @@ export type SettingsGroup = Exclude<keyof VaultSettings, 'version'>;
 
 /** Each group exactly once — the record forces a new one not to be missing. */
 const GROUP_SET: Record<SettingsGroup, true> = {
-  appearance: true, trash: true, leftList: true, emojis: true, images: true, tags: true, templates: true,
+  appearance: true, trash: true, leftList: true, emojis: true, images: true, tags: true,
   editor: true, journal: true, backup: true,
 };
 export const SETTINGS_GROUPS = Object.keys(GROUP_SET) as SettingsGroup[];
@@ -173,9 +165,6 @@ export const DEFAULT_VAULT_SETTINGS: VaultSettings = {
   },
   tags: {
     createInline: true,
-  },
-  templates: {
-    applyDefault: true,
   },
   editor: {
     markdownShortcuts: true,
@@ -237,7 +226,6 @@ export function normalizeVaultSettings(raw: unknown): VaultSettings {
   const emojis = asRecord(root.emojis);
   const images = asRecord(root.images);
   const tags = asRecord(root.tags);
-  const templates = asRecord(root.templates);
   const editor = asRecord(root.editor);
   const journal = asRecord(root.journal);
   const backup = asRecord(root.backup);
@@ -280,10 +268,6 @@ export function normalizeVaultSettings(raw: unknown): VaultSettings {
     tags: {
       ...tags,
       createInline: typeof tags.createInline === 'boolean' ? tags.createInline : DEFAULT_VAULT_SETTINGS.tags.createInline,
-    },
-    templates: {
-      ...templates,
-      applyDefault: typeof templates.applyDefault === 'boolean' ? templates.applyDefault : DEFAULT_VAULT_SETTINGS.templates.applyDefault,
     },
     editor: {
       ...editor,
