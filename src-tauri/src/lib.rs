@@ -979,6 +979,8 @@ pub fn run() {
             sync::sync_images_delete,
             sync::sync_adopt_new_password,
             sync::sync_rekey_done,
+            sync::sync_watch,
+            sync::sync_unwatch,
             vault::create_vault_dirs,
             vault::default_vault_dir,
             vault::new_vault_base_dir,

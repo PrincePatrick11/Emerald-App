@@ -1,4 +1,5 @@
 import { invoke } from '@tauri-apps/api/core';
+import { listen } from '@tauri-apps/api/event';
 import i18n from '../../i18n';
 import { dbEpoch, getDb } from '../db';
 import { editorSavesSuspended } from '../editorLock';
@@ -7,10 +8,12 @@ import { BASELINE_VERSION } from '../schema';
 import { drainSerialized } from '../serialize';
 import type Database from '../sqlite';
 import { useLeaveGuardStore } from '../../store/leaveGuardStore';
+import { useSettingsStore } from '../../store/settingsStore';
 import { useSyncStore } from '../../store/syncStore';
 import { useUIStore } from '../../store/uiStore';
 import { useVaultStore } from '../../store/vaultStore';
 import { applyRemoteChanges, beginRestore, finishRestore, restoreFrame, snapshotFrames, type SnapshotFrame } from './apply';
+import { flattenSettings, mergeIncomingSettings, SETTINGS_TABLE, settingsDiff, type FlatSettings } from './settings';
 import {
   acknowledge,
   acknowledgeChanges,
@@ -53,8 +56,9 @@ export interface RemoteVault {
 }
 
 const OUTDATED = 'SYNC_SERVER:client_outdated';
-const TICK_MS = 4_000;
-const PULL_EVERY_MS = 15_000;
+const TICK_MS = 2_000;
+/** The server says when something is new. This is for when that line is down. */
+const PULL_EVERY_MS = 60_000;
 const RETRY_AFTER_ERROR_MS = 30_000;
 const MAX_PUSH_TRIES = 10;
 /** Of JSON, before compression. Well under what the server takes in one request. */
@@ -119,6 +123,7 @@ export async function connectOpenVault(vaultId: string, name: string): Promise<v
 export async function disconnectOpenVault(vaultId: string): Promise<void> {
   await stopTracking(await getDb());
   await invoke('sync_disconnect', { vaultId });
+  watching = null;
   useSyncStore.setState({ error: null, lastSync: null, conflicts: 0 });
 }
 
@@ -137,6 +142,29 @@ export async function keepPendingForNewPassword(): Promise<void> {
   if (await isTracked(db)) keptOverNewPassword.push(...(await collectChanges(db)).changes);
 }
 
+async function settingsBase(db: Database): Promise<FlatSettings> {
+  const rows = await db.select<{ value: string }[]>("SELECT value FROM _sync_meta WHERE key = 'settings_base'");
+  return rows[0] ? (JSON.parse(rows[0].value) as FlatSettings) : {};
+}
+
+function saveSettingsBase(db: Database, base: FlatSettings): Promise<number> {
+  return db.batch([["INSERT OR REPLACE INTO _sync_meta (key, value) VALUES ('settings_base', $1)", [JSON.stringify(base)]]]);
+}
+
+/** This vault's settings, if they are the ones loaded. */
+function openSettings(vaultId: string) {
+  const store = useSettingsStore.getState();
+  return store.vaultId === vaultId ? store.settings : null;
+}
+
+async function takeIncomingSettings(db: Database, vaultId: string, incoming: FlatSettings): Promise<void> {
+  const settings = openSettings(vaultId);
+  if (!settings) return;
+  const merged = mergeIncomingSettings(settings, await settingsBase(db), incoming);
+  if (merged.changed) await useSettingsStore.getState().replaceSettings(merged.settings);
+  await saveSettingsBase(db, merged.base);
+}
+
 async function restoreFromSnapshot(db: Database, vaultId: string, keepPending: boolean): Promise<void> {
   const keep: SyncChange[] = [...keptOverNewPassword.splice(0), ...(keepPending ? (await collectChanges(db)).changes : [])];
   const snapshot = await invoke<{ seq: number; epoch: number; schema: number; frames: number }>('sync_snapshot_fetch', { vaultId });
@@ -146,7 +174,9 @@ async function restoreFromSnapshot(db: Database, vaultId: string, keepPending: b
     await beginRestore(db);
     for (let index = 0; index < snapshot.frames; index++) {
       const text = await invoke<string>('sync_snapshot_frame', { vaultId, index });
-      await restoreFrame(db, JSON.parse(text) as SnapshotFrame);
+      const frame = JSON.parse(text) as SnapshotFrame;
+      if (frame.table === SETTINGS_TABLE) await takeIncomingSettings(db, vaultId, frame.rows[0] as FlatSettings);
+      else await restoreFrame(db, frame);
     }
     await finishRestore(db, keep, positionStatements({ cursor: snapshot.seq, epoch: snapshot.epoch }));
   } finally {
@@ -165,6 +195,9 @@ async function publishSnapshot(db: Database, vaultId: string, shorten = false): 
     const epoch = remote.hasSnapshot && !shorten ? remote.epoch + 1 : remote.epoch;
     const { lastSeq } = await collectChanges(db, 0);
     await invoke('sync_snapshot_begin', { vaultId });
+    const settings = openSettings(vaultId);
+    const flat = settings ? flattenSettings(settings) : null;
+    if (flat) await invoke('sync_snapshot_add', { vaultId, frame: JSON.stringify({ table: SETTINGS_TABLE, rows: [flat] }) });
     for await (const frame of snapshotFrames(db, FRAME_BYTES)) {
       await invoke('sync_snapshot_add', { vaultId, frame: JSON.stringify(frame) });
     }
@@ -175,6 +208,7 @@ async function publishSnapshot(db: Database, vaultId: string, shorten = false): 
       if (!shorten) await acknowledge(db, lastSeq);
       await db.batch(positionStatements({ cursor: remote.head, epoch }));
       if (!shorten) await clearSnapshotNeeded(db);
+      if (flat) await saveSettingsBase(db, flat);
       return;
     }
     if (answer.status === 'client_outdated') throw OUTDATED;
@@ -205,7 +239,11 @@ async function pull(db: Database, vaultId: string, epochAtStart: number): Promis
     for (const page of answer.changes ?? []) {
       if (!mayMerge() || dbEpoch() !== epochAtStart) throw new Postponed();
       await drainSerialized();
-      const { conflicts } = await applyRemoteChanges(db, JSON.parse(page.changes) as SyncChange[], {
+      const incoming = JSON.parse(page.changes) as SyncChange[];
+      for (const change of incoming) {
+        if (change.table === SETTINGS_TABLE && change.op === 'upsert') await takeIncomingSettings(db, vaultId, change.row);
+      }
+      const { conflicts } = await applyRemoteChanges(db, incoming.filter((change) => change.table !== SETTINGS_TABLE), {
         newId: () => crypto.randomUUID(),
         conflictTitle: (title) => i18n.t('sync.conflictTitle', { title }),
         finally: positionStatements({ cursor: page.seq }),
@@ -253,7 +291,11 @@ async function round(db: Database, vaultId: string, status: SyncStatus): Promise
       imagesDue = true;
     }
     const { changes, lastSeq, done } = await collectChanges(db, PUSH_BYTES);
-    if (!changes.length) {
+    const settings = openSettings(vaultId);
+    const flat = settings ? flattenSettings(settings) : null;
+    const settingsPatch = flat ? settingsDiff(await settingsBase(db), flat) : {};
+    const hasSettings = Object.keys(settingsPatch).length > 0;
+    if (!changes.length && !hasSettings) {
       await acknowledge(db, lastSeq);
       break;
     }
@@ -266,10 +308,13 @@ async function round(db: Database, vaultId: string, status: SyncStatus): Promise
       epoch,
       schema: BASELINE_VERSION,
       batchId: crypto.randomUUID(),
-      changes: JSON.stringify(changes),
+      changes: JSON.stringify(hasSettings
+        ? [...changes, { table: SETTINGS_TABLE, id: 'settings', op: 'upsert', changed: Object.keys(settingsPatch), row: settingsPatch }]
+        : changes),
     });
     if (answer.status === 'ok') {
       await acknowledgeChanges(db, changes, lastSeq);
+      if (hasSettings) await saveSettingsBase(db, flat!);
       await db.batch(positionStatements({ cursor: answer.seq! }));
       if (done) {
         await acknowledge(db, lastSeq);
@@ -307,6 +352,9 @@ let reloadStores: () => Promise<void> = async () => {};
 let lastRun = 0;
 let lastError = 0;
 let inFlight: Promise<void> | null = null;
+/** The server said something is new, and it has not been fetched yet. */
+let remoteChanged = false;
+let watching: string | null = null;
 
 async function run(reload: boolean): Promise<void> {
   const vaultId = useVaultStore.getState().activeVaultId;
@@ -319,6 +367,7 @@ async function run(reload: boolean): Promise<void> {
     await drainSerialized();
     const changed = await round(db, vaultId, status);
     lastRun = Date.now();
+    remoteChanged = false;
     useSyncStore.setState({ error: null, lastSync: lastRun });
     if (changed && reload && useVaultStore.getState().activeVaultId === vaultId) await reloadStores();
   } catch (err) {
@@ -355,12 +404,24 @@ export async function prepareOpenedVault(vaultId: string): Promise<void> {
 async function tick(): Promise<void> {
   if (inFlight) return;
   const vaultId = useVaultStore.getState().activeVaultId;
-  if (!vaultId || !mayMerge() || Date.now() - lastError < RETRY_AFTER_ERROR_MS) return;
+  if (!vaultId) return;
   const status = await syncStatus(vaultId);
-  if (!status.connected || !status.hasRemote || !(await isUnlocked(vaultId))) return;
+  if (!status.connected || !status.hasRemote || !(await isUnlocked(vaultId))) {
+    if (watching) await invoke('sync_unwatch');
+    watching = null;
+    return;
+  }
+  if (watching !== vaultId && !status.needsLogin) {
+    await invoke('sync_watch', { vaultId });
+    watching = vaultId;
+  }
+  if (!mayMerge() || Date.now() - lastError < RETRY_AFTER_ERROR_MS) return;
   const db = await getDb();
-  const due = Date.now() - lastRun >= PULL_EVERY_MS
+  const settings = openSettings(vaultId);
+  const due = remoteChanged
+    || Date.now() - lastRun >= PULL_EVERY_MS
     || !(await isTracked(db))
+    || (settings !== null && Object.keys(settingsDiff(await settingsBase(db), flattenSettings(settings))).length > 0)
     || (await db.select<{ waiting: number }[]>('SELECT EXISTS (SELECT 1 FROM _sync_log) AS waiting'))[0].waiting === 1;
   if (due) await once(true);
 }
@@ -368,9 +429,20 @@ async function tick(): Promise<void> {
 /** Started once by `AppShell`, which hands in how to reload the stores. */
 export function startSync(reload: () => Promise<void>): () => void {
   reloadStores = reload;
-  const timer = setInterval(() => {
-    // A vault being switched or locked answers with an error here; the next tick is fine.
-    tick().catch((err: unknown) => console.debug('[sync] tick', err));
-  }, TICK_MS);
-  return () => clearInterval(timer);
+  // A vault being switched or locked answers with an error here; the next tick is fine.
+  const beat = () => { tick().catch((err: unknown) => console.debug('[sync] tick', err)); };
+  const timer = setInterval(beat, TICK_MS);
+  const unlisten = listen<{ vaultId: string }>('sync-remote-changed', (event) => {
+    if (event.payload.vaultId !== useVaultStore.getState().activeVaultId) return;
+    remoteChanged = true;
+    // The server is plainly there, so no reason to sit out an earlier failure.
+    lastError = 0;
+    beat();
+  });
+  return () => {
+    clearInterval(timer);
+    void unlisten.then((stop) => stop());
+    void invoke('sync_unwatch').catch(() => {});
+    watching = null;
+  };
 }

@@ -70,7 +70,8 @@ writeFileSync(
   `export { runMigrations } from '${root}/src/lib/db';
    export { BASELINE_VERSION, TABLES, TABLE_DDL, INDEX_DDL } from '${root}/src/lib/schema';
    export * from '${root}/src/lib/sync/tracking';
-   export * from '${root}/src/lib/sync/apply';`
+   export * from '${root}/src/lib/sync/apply';
+   export * from '${root}/src/lib/sync/settings';`
 );
 const bundlePath = join(workDir, 'bundle.mjs');
 await build({ entryPoints: [entry], bundle: true, format: 'esm', platform: 'node', outfile: bundlePath, plugins: [stubPlugin], logLevel: 'warning' });
@@ -82,7 +83,7 @@ const {
   SYNCED_TABLES, TABLES, TABLE_DDL, INDEX_DDL, BASELINE_VERSION,
   startTracking, stopTracking, isTracked, needsSnapshot, clearSnapshotNeeded, markSnapshotNeeded,
   collectChanges, acknowledge, pendingRows, dropTriggers, installTriggers, applyRemoteChanges, runMigrations,
-  snapshotFrames, replaceWithSnapshot, beginRestore, restoreFrame, isRestoring, acknowledgeChanges, positionStatements, readPosition,
+  flattenSettings, settingsDiff, mergeIncomingSettings, snapshotFrames, replaceWithSnapshot, beginRestore, restoreFrame, isRestoring, acknowledgeChanges, positionStatements, readPosition,
 } = sync;
 
 const NOW = '2026-11-01T00:00:00.000Z';
@@ -509,6 +510,27 @@ await test('a child read after its parent frame loses nothing once the log arriv
   b.cursor = server.log.length;
   await assertConverged(a, b);
   assert.equal(b.get("SELECT category_id c FROM entries WHERE id = 'e'").c, 'new');
+});
+
+console.log('Settings');
+
+await test('settings merge key by key, and this device keeps what it changed', async () => {
+  const start = { version: 1, appearance: { theme: 'a', uiFont: 'x', uiScale: 100 }, trash: { retentionDays: 30 } };
+  const base = flattenSettings(start);
+  assert.equal('appearance.uiScale' in base, false, 'the scale belongs to the screen');
+  assert.equal('version' in base, false);
+  const mine = structuredClone(start);
+  mine.appearance.theme = 'mine';
+  mine.appearance.uiScale = 150;
+  assert.deepEqual(settingsDiff(base, flattenSettings(mine)), { 'appearance.theme': 'mine' });
+  const merged = mergeIncomingSettings(mine, base, { 'appearance.theme': 'theirs', 'appearance.uiFont': 'y', 'trash.retentionDays': null, 'appearance.uiScale': 90 });
+  assert.equal(merged.changed, true);
+  assert.equal(merged.settings.appearance.theme, 'mine');
+  assert.equal(merged.settings.appearance.uiFont, 'y');
+  assert.equal(merged.settings.appearance.uiScale, 150);
+  assert.equal(merged.settings.trash.retentionDays, null);
+  assert.deepEqual(settingsDiff(merged.base, flattenSettings(merged.settings)), { 'appearance.theme': 'mine' }, 'still goes out');
+  assert.equal(mergeIncomingSettings(start, base, base).changed, false);
 });
 
 console.log('Long offline');

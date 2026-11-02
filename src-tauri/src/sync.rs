@@ -19,7 +19,7 @@ use base64::Engine;
 use reqwest::{Method, RequestBuilder, Response, StatusCode};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
-use tauri::Manager;
+use tauri::{Emitter, Manager};
 use zeroize::Zeroizing;
 
 use crate::crypto::{self, Context, Key, Purpose};
@@ -62,6 +62,8 @@ pub struct SyncState {
     waiting: Mutex<HashMap<String, Zeroizing<String>>>,
     /// Where each frame of a fetched snapshot lies in its file.
     frames: Mutex<HashMap<String, Vec<(u64, u32)>>>,
+    /// The vault listening for news from its server. One at a time: only the open vault syncs.
+    watcher: Mutex<Option<tauri::async_runtime::JoinHandle<()>>>,
     file: Mutex<()>,
 }
 
@@ -125,6 +127,7 @@ pub fn is_connected(app: &tauri::AppHandle, vault_id: &str) -> bool {
 
 /// Forgets the connection along with a vault's local files.
 pub fn forget(app: &tauri::AppHandle, vault_id: &str) {
+    stop_watching(app);
     if let Ok(dir) = vault::vault_dir(app, vault_id) {
         for name in [UPLOAD_FILE, DOWNLOAD_FILE] {
             std::fs::remove_file(dir.join(name)).ok();
@@ -794,9 +797,95 @@ pub async fn sync_images_delete(app: tauri::AppHandle, vault_id: String, names: 
     Ok(())
 }
 
+fn stop_watching(app: &tauri::AppHandle) {
+    if let Ok(mut watcher) = app.state::<SyncState>().watcher.lock() {
+        if let Some(task) = watcher.take() {
+            task.abort();
+        }
+    }
+}
+
+/// What a stream of server-sent events has so far: the `data` of each finished
+/// event, with the rest left in the buffer for the next chunk.
+fn take_events(buffer: &mut String) -> Vec<String> {
+    let mut events = Vec::new();
+    while let Some(end) = buffer.find("\n\n") {
+        let block: String = buffer.drain(..end + 2).collect();
+        for line in block.lines() {
+            if let Some(data) = line.strip_prefix("data:") {
+                events.push(data.trim().to_string());
+            }
+        }
+    }
+    events
+}
+
+/// One connection to the server's event stream, until it breaks.
+async fn listen_once(app: &tauri::AppHandle, vault_id: &str) -> Result<(), String> {
+    let target = remote(app, vault_id)?;
+    let own = connection(app, vault_id)?.device.unwrap_or_default();
+    // Only an upper bound on one connection: its keep-alives pass the read timeout.
+    let mut response = send(target.call(Method::GET, "/events", Duration::from_secs(86_400))?).await?;
+    if !response.status().is_success() {
+        return Err(refused(response).await);
+    }
+    let mut buffer = String::new();
+    while let Some(chunk) = response.chunk().await.map_err(|_| UNREACHABLE.to_string())? {
+        buffer.push_str(&String::from_utf8_lossy(&chunk));
+        for data in take_events(&mut buffer) {
+            let device = serde_json::from_str::<Value>(&data).ok().and_then(|v| v["device"].as_str().map(str::to_owned));
+            // The first event says where the server stands, and this device's
+            // own changes are nothing new to it.
+            if device.as_deref() != Some(own.as_str()) {
+                let _ = app.emit("sync-remote-changed", json!({ "vaultId": vault_id }));
+            }
+        }
+    }
+    Ok(())
+}
+
+/// Listens for news on the open vault, reconnecting for as long as it is wanted.
+#[tauri::command]
+pub async fn sync_watch(app: tauri::AppHandle, vault_id: String) -> Result<(), String> {
+    stop_watching(&app);
+    let handle = app.clone();
+    let task = tauri::async_runtime::spawn(async move {
+        let mut wait = 2;
+        loop {
+            let started = std::time::Instant::now();
+            let _ = listen_once(&handle, &vault_id).await;
+            // A connection that stood for a while says nothing about the next.
+            if started.elapsed() > Duration::from_secs(60) {
+                wait = 2;
+            }
+            tokio::time::sleep(Duration::from_secs(wait)).await;
+            wait = (wait * 2).min(60);
+        }
+    });
+    if let Ok(mut watcher) = app.state::<SyncState>().watcher.lock() {
+        *watcher = Some(task);
+    }
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn sync_unwatch(app: tauri::AppHandle) -> Result<(), String> {
+    stop_watching(&app);
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
-    use super::clean_url;
+    use super::{clean_url, take_events};
+
+    #[test]
+    fn server_sent_events_survive_being_cut_anywhere() {
+        let mut buffer = String::from("event: head\ndata: {\"head\":1}\n\n: keep-alive\n\nevent: head\ndata: {\"he");
+        assert_eq!(take_events(&mut buffer), ["{\"head\":1}"]);
+        buffer.push_str("ad\":2}\n\n");
+        assert_eq!(take_events(&mut buffer), ["{\"head\":2}"]);
+        assert!(buffer.is_empty());
+    }
 
     #[test]
     fn plain_http_only_where_no_open_network_is_crossed() {
