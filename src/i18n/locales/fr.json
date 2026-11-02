@@ -970,7 +970,9 @@
       "noTemplates": "Aucun modèle trouvé",
       "noticeApplied": "Modèle « {{name}} » appliqué",
       "dismiss": "Fermer"
-    }
+    },
+    "assignTitle": "Attributions – {{name}}",
+    "assignHint": "Cliquez sur une cellule pour que les nouvelles entrées commencent par ce modèle ; un second clic l’annule. S’applique aussitôt."
   },
   "lexicon": {
     "languages": "Langues",

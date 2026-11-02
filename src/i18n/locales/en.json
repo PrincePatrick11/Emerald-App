@@ -970,7 +970,9 @@
       "noTemplates": "No templates found",
       "noticeApplied": "Template “{{name}}” applied",
       "dismiss": "Dismiss"
-    }
+    },
+    "assignTitle": "Assignments – {{name}}",
+    "assignHint": "Click a cell to make new entries start with this template, click it again to take it back. Applies at once."
   },
   "lexicon": {
     "languages": "Languages",

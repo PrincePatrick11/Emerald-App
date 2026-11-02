@@ -970,7 +970,9 @@
       "noTemplates": "No se encontraron plantillas",
       "noticeApplied": "Plantilla «{{name}}» aplicada",
       "dismiss": "Cerrar aviso"
-    }
+    },
+    "assignTitle": "Asignaciones – {{name}}",
+    "assignHint": "Haz clic en una celda para que las entradas nuevas empiecen con esta plantilla; otro clic lo deshace. Se aplica al instante."
   },
   "lexicon": {
     "languages": "Idiomas",

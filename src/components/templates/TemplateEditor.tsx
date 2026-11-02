@@ -8,6 +8,7 @@ import { PropertiesSection } from '../sidebar/fields/EntryReadSections';
 import { EditSidebarBody, MediaPropertyRow } from '../sidebar/fields/EditProperties';
 import BlockStack from '../blocks/BlockStack';
 import BlockSidebarArea, { BlockAddActions } from '../blocks/BlockSidebarArea';
+import { TemplateAssignmentProperty } from './TemplateAssignmentTable';
 import { useTemplateStore } from '../../store/templateStore';
 import { useTemplateDraftStore, type TemplateDraft } from '../../store/draftStore';
 import { templateLabel } from '../../lib/blocks/blockAttrs';
@@ -34,8 +35,8 @@ interface Props {
  * A template's page (`LibraryPageFrame`, like a custom block): name
  * as title, the title of new entries and the block stack,
  * the same editor as in an entry, always in edit mode. In the sidebar:
- * icon, linked entries, tags and the block management. Where a template
- * applies is set in the table on the dashboard.
+ * icon, assignments (applied at once), linked entries, tags and the block
+ * management.
  *
  * A draft is edited (`useDraftPage`); only "Done" saves the
  * changed fields. Entries never change: they carry copies.
@@ -71,6 +72,7 @@ export default function TemplateEditor({ template, onClose, onDelete, isNew }: P
           onChange={(icon) => void setIcon(icon)}
           fallback={DEFAULT_TEMPLATE_ICON}
         />
+        <TemplateAssignmentProperty templateId={template.id} name={templateLabel(t, draft)} />
       </PropertiesSection>
 
       <LinkedEntriesField content={draft.content} />

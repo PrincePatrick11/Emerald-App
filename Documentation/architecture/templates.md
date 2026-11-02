@@ -39,11 +39,11 @@ Templates have no description; the picker matches the name only. `useShrunkIcon`
 
 ### The assignment table
 
-`TemplateAssignmentTable` below the list is the one place assignments are read and set; it stays away while there are no templates.
+`AssignmentGrid` is the one table assignments are read and set in. `TemplateAssignmentTable` shows it below the list and stays away while there are no templates; `TemplateAssignmentProperty` opens it in a modal from a template's page, where a click toggles that template in a cell. Both apply at once, outside the page's draft.
 
 - Journal first on its own, as one "Every new entry" row — as a table column it would stand almost empty.
 - Then a table with Wiki/Operations as columns and one row per "All categories"/ "Uncategorized"/category. "All categories", every row's fallback, is set off by a bold name only (a tinted band was too loud).
-- A cell is a `Dropdown` of all templates and "No template"; a choice calls `assignTemplate` and is saved at once. Without a template of its own the cell shows the fallback ("↳ name"), or "—".
+- On the dashboard a cell is a `Dropdown` of all templates and "No template"; a choice calls `assignTemplate` and is saved at once. Without a template of its own the cell shows the fallback ("↳ name"), or "—".
 
 ### Routines converted to templates
 

@@ -1,8 +1,11 @@
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ChevronDown, CircleDashed, CornerDownRight, FilePlus, Layers } from 'lucide-react';
+import { Check, ChevronDown, CircleDashed, CornerDownRight, FilePlus, Layers, SlidersHorizontal } from 'lucide-react';
 import { GroupDivider } from '../ui/Dashboard';
 import Dropdown from '../ui/Dropdown';
+import Modal from '../ui/Modal';
+import Button from '../ui/Button';
+import { EditPropertyRow } from '../sidebar/fields/EditProperties';
 import BlockGlyph from '../blocks/BlockGlyph';
 import { useTemplateStore } from '../../store/templateStore';
 import { useCategoryStore } from '../../store/categoryStore';
@@ -34,21 +37,27 @@ function EntryTypeHeading({ entryType }: { entryType: TemplateEntryType }) {
 }
 
 /**
- * The one place that says where a template applies, below the template list: at
- * the top journal on its own (it has no categories, as a column of the table it
- * would be almost empty), below it one row per category ("All categories", "No
- * category", then each category) with wiki and operations as columns. A cell
- * chooses the template new entries of that combination start with, and applies
- * at once. Without one of its own it names what applies instead.
+ * The table of where templates apply: at the top journal on its own (it has no
+ * categories, as a column of the table it would be almost empty), below it one
+ * row per category ("All categories", "No category", then each category) with
+ * wiki and operations as columns. A cell shows the template new entries of that
+ * combination start with, and a change applies at once. Without one of its own
+ * it names what applies instead.
+ *
+ * With `templateId` (the template's own page) a click puts this template into
+ * the cell or takes it out again; otherwise a cell chooses from all templates.
  */
-export default function TemplateAssignmentTable() {
+export function AssignmentGrid({ templateId }: { templateId?: string }) {
   const { t } = useTranslation();
   const templates = useTemplateStore((s) => s.templates);
   const assignTemplate = useTemplateStore((s) => s.assignTemplate);
   const categories = useCategoryStore((s) => s.categories);
-  const [collapsed, toggle] = usePersistedFlag(COLLAPSED_KEY);
 
-  if (templates.length === 0) return null;
+  const assign = (entryType: TemplateEntryType, category: string | null, id: string | null) => {
+    assignTemplate(entryType, category, id).catch((e: unknown) => {
+      console.error('[AssignmentGrid] assigning failed:', e);
+    });
+  };
 
   const options = [
     { value: '', label: t('templates.overview.none') },
@@ -58,36 +67,44 @@ export default function TemplateAssignmentTable() {
   const cell = (entryType: TemplateEntryType, category: string | null, rowLabel: string) => {
     const current = assignedTemplateAt(templates, entryType, category);
     const fallback = !current && category !== ALL_CATEGORIES ? assignedTemplateAt(templates, entryType, ALL_CATEGORIES) : undefined;
+    const label = `${rowLabel} – ${t(MODULES[viewTypeForEntryType(entryType)].navLabelKey)}: ${current ? templateLabel(t, current) : t('templates.overview.none')}`;
+    const content = current ? (
+      <>
+        <BlockGlyph icon={current.icon} size={14} />
+        <span className="truncate">{templateLabel(t, current)}</span>
+      </>
+    ) : fallback ? (
+      <span className="block-field-hint flex min-w-0 items-center gap-1.5" title={t('templates.overview.fallback', { name: templateLabel(t, fallback) })}>
+        <CornerDownRight size={12} className="flex-shrink-0" />
+        <span className="truncate">{templateLabel(t, fallback)}</span>
+      </span>
+    ) : (
+      <span className="block-field-hint" title={t('templates.overview.none')}>—</span>
+    );
+    if (templateId) {
+      const own = current?.id === templateId;
+      return (
+        <button
+          type="button"
+          className="template-assign-cell text-sm"
+          aria-label={label}
+          aria-pressed={own}
+          onClick={() => assign(entryType, category, own ? null : templateId)}
+        >
+          {content}
+          {own && <Check size={12} className="ml-auto flex-shrink-0 text-[var(--accent-text)]" />}
+        </button>
+      );
+    }
     return (
       <Dropdown
         portal
         value={current?.id ?? ''}
         options={options}
-        onChange={(id) => {
-          assignTemplate(entryType, category, id || null).catch((e: unknown) => {
-            console.error('[TemplateAssignmentTable] assigning failed:', e);
-          });
-        }}
+        onChange={(id) => assign(entryType, category, id || null)}
         trigger={({ toggle: open }) => (
-          <button
-            type="button"
-            className="template-assign-cell text-sm"
-            aria-label={`${rowLabel} – ${t(MODULES[viewTypeForEntryType(entryType)].navLabelKey)}: ${current ? templateLabel(t, current) : t('templates.overview.none')}`}
-            onClick={open}
-          >
-            {current ? (
-              <>
-                <BlockGlyph icon={current.icon} size={14} />
-                <span className="truncate">{templateLabel(t, current)}</span>
-              </>
-            ) : fallback ? (
-              <span className="block-field-hint flex min-w-0 items-center gap-1.5" title={t('templates.overview.fallback', { name: templateLabel(t, fallback) })}>
-                <CornerDownRight size={12} className="flex-shrink-0" />
-                <span className="truncate">{templateLabel(t, fallback)}</span>
-              </span>
-            ) : (
-              <span className="block-field-hint" title={t('templates.overview.none')}>—</span>
-            )}
+          <button type="button" className="template-assign-cell text-sm" aria-label={label} onClick={open}>
+            {content}
             <ChevronDown size={12} className="template-assign-chevron" />
           </button>
         )}
@@ -120,33 +137,78 @@ export default function TemplateAssignmentTable() {
   );
 
   return (
+    <div className="panel px-4">
+      {/* Journal: one row, the cell spanning both columns. */}
+      <div className="py-3">
+        <EntryTypeHeading entryType="journal" />
+      </div>
+      <div className={`${GRID} border-t border-[var(--border-soft)] py-1.5`}>
+        <div className="flex min-w-0 items-center gap-2 text-sm text-[var(--text-primary)]">
+          {named(<FilePlus size={14} />, t('templates.overview.everyEntry'))}
+        </div>
+        <div className="min-w-0">{cell('journal', ALL_CATEGORIES, t('templates.overview.everyEntry'))}</div>
+      </div>
+
+      <div className={`${GRID} border-t border-[var(--border-soft)] pt-5 pb-3`}>
+        <span className="label-xs">{t('templates.overview.category')}</span>
+        {CATEGORY_TYPES.map((type) => <EntryTypeHeading key={type} entryType={type} />)}
+      </div>
+      {row(ALL_CATEGORIES, t('templates.allCategories'), <Layers size={14} />)}
+      {row(null, t('categories.uncategorized'), <CircleDashed size={14} />)}
+      {categories.map((cat) => row(cat.id, categoryLabel(t, cat), cat.emoji))}
+    </div>
+  );
+}
+
+/** The table below the template list on the dashboard. */
+export default function TemplateAssignmentTable() {
+  const { t } = useTranslation();
+  const hasTemplates = useTemplateStore((s) => s.templates.length > 0);
+  const [collapsed, toggle] = usePersistedFlag(COLLAPSED_KEY);
+
+  if (!hasTemplates) return null;
+
+  return (
     <div className="mt-8">
       <GroupDivider label={t('templates.overview.title')} collapsed={collapsed} onToggleCollapse={toggle} />
       {!collapsed && (
         <>
           <p className="mb-3 text-xs text-[var(--text-muted)]">{t('templates.overview.hint')}</p>
-          <div className="panel px-4">
-            {/* Journal: one row, the cell spanning both columns. */}
-            <div className="py-3">
-              <EntryTypeHeading entryType="journal" />
-            </div>
-            <div className={`${GRID} border-t border-[var(--border-soft)] py-1.5`}>
-              <div className="flex min-w-0 items-center gap-2 text-sm text-[var(--text-primary)]">
-                {named(<FilePlus size={14} />, t('templates.overview.everyEntry'))}
-              </div>
-              <div className="min-w-0">{cell('journal', ALL_CATEGORIES, t('templates.overview.everyEntry'))}</div>
-            </div>
-
-            <div className={`${GRID} border-t border-[var(--border-soft)] pt-5 pb-3`}>
-              <span className="label-xs">{t('templates.overview.category')}</span>
-              {CATEGORY_TYPES.map((type) => <EntryTypeHeading key={type} entryType={type} />)}
-            </div>
-            {row(ALL_CATEGORIES, t('templates.allCategories'), <Layers size={14} />)}
-            {row(null, t('categories.uncategorized'), <CircleDashed size={14} />)}
-            {categories.map((cat) => row(cat.id, categoryLabel(t, cat), cat.emoji))}
-          </div>
+          <AssignmentGrid />
         </>
       )}
     </div>
+  );
+}
+
+/**
+ * The template's own "Assignments" property: the count, and the same table in a
+ * window, where a click assigns this template. Applies at once, not with "Done".
+ */
+export function TemplateAssignmentProperty({ templateId, name }: { templateId: string; name: string }) {
+  const { t } = useTranslation();
+  const count = useTemplateStore((s) => s.templates.find((tpl) => tpl.id === templateId)?.assignments.length ?? 0);
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <EditPropertyRow icon={<SlidersHorizontal size={14} />} label={t('templates.overview.title')}>
+        <button type="button" className="prop-value-btn" aria-haspopup="dialog" onClick={() => setOpen(true)}>
+          <span className="min-w-0 truncate">{count > 0 ? count : '—'}</span>
+        </button>
+      </EditPropertyRow>
+      {open && (
+        <Modal
+          title={t('templates.assignTitle', { name })}
+          onClose={() => setOpen(false)}
+          widthClassName="w-[640px] max-w-full"
+          maxHeightClassName="max-h-[85vh]"
+          bodyClassName="min-h-0 flex-1 space-y-3 overflow-y-auto modal-body"
+          footer={<Button tone="jade" onClick={() => setOpen(false)}>{t('common.ok')}</Button>}
+        >
+          <p className="block-field-hint">{t('templates.assignHint')}</p>
+          <AssignmentGrid templateId={templateId} />
+        </Modal>
+      )}
+    </>
   );
 }

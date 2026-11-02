@@ -970,7 +970,9 @@
       "noTemplates": "Keine Vorlagen gefunden",
       "noticeApplied": "Vorlage „{{name}}“ angewendet",
       "dismiss": "Hinweis schließen"
-    }
+    },
+    "assignTitle": "Zuweisungen – {{name}}",
+    "assignHint": "Klicke eine Zelle an, damit neue Einträge mit dieser Vorlage starten, ein zweiter Klick nimmt es zurück. Gilt sofort."
   },
   "lexicon": {
     "languages": "Sprachen",
