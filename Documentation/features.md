@@ -405,7 +405,7 @@ New vaults are not switched to automatically — except while no vault is open, 
 
 A vault can sync with your other devices through a server of your own, which only ever stores it encrypted; how that works is in [Sync](architecture/sync.md). Everything about the server is in the vault picker, so it works with no vault open — on a new device that is how the first vault arrives:
 
-- **Connect** with the server's address and its sync key. The key is asked for once and not kept; the connection goes to the system keychain, and the form warns beforehand that refusing the keychain leaves it unencrypted on this device. The picker says so while that is the case.
+- **Connect** with the server's address and its sync key. The key is asked for once and not kept; the connection goes to the system keychain, and the form warns beforehand that refusing the keychain leaves it in a file on this device, only obscured, not securely encrypted. The picker says so while that is the case.
 - **Other vaults on the server**, with their size: **Fetch** creates a local copy, asks for that vault's password and opens it; **Delete from server** removes it there after a confirmation, leaving every device's copy as a local vault.
 - **Connected devices**, each with when it was last seen, can be removed. Whoever still knows the key can connect again.
 - **Disconnect server** stops syncing on this device; vaults stay here and on the server, and connecting the same server again resumes them.
