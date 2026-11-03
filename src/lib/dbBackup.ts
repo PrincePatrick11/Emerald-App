@@ -120,7 +120,7 @@ interface BackupFile {
 
 const LOCAL_PATH_RE = /src="([^"]+)"/g;
 
-function extractImagePaths(html: string): string[] {
+function extractMediaPaths(html: string): string[] {
   const paths: string[] = [];
   LOCAL_PATH_RE.lastIndex = 0;
   let m;
@@ -172,7 +172,7 @@ function idsInClause(rows: Row[], field: string = 'id'): string {
 export async function exportDatabase(options: BackupOptions): Promise<void> {
   const db = await getDb();
   const data: BackupFile['data'] = {};
-  const allImagePaths = new Set<string>();
+  const allMediaPaths = new Set<string>();
 
   const { clause: dateClause, params: dateParams } = buildDateFilter(options.dateFrom, options.dateTo);
   const deletedClause = deletedFilter(options.includeDeleted);
@@ -195,7 +195,7 @@ export async function exportDatabase(options: BackupOptions): Promise<void> {
       data.links = [...(data.links ?? []), ...lnks];
     }
     for (const r of data.journalEntries) {
-      if (r.content) extractImagePaths(r.content as string).forEach((p) => allImagePaths.add(p));
+      if (r.content) extractMediaPaths(r.content as string).forEach((p) => allMediaPaths.add(p));
     }
   }
 
@@ -220,9 +220,9 @@ export async function exportDatabase(options: BackupOptions): Promise<void> {
       data.links = [...(data.links ?? []), ...lnks];
     }
     for (const r of data.wikiArticles) {
-      if (r.content) extractImagePaths(r.content as string).forEach((p) => allImagePaths.add(p));
-      if (r.icon && !r.icon.startsWith('data:') && !r.icon.startsWith('http')) allImagePaths.add(r.icon as string);
-      if (r.cover_image && !r.cover_image.startsWith('data:') && !r.cover_image.startsWith('http')) allImagePaths.add(r.cover_image as string);
+      if (r.content) extractMediaPaths(r.content as string).forEach((p) => allMediaPaths.add(p));
+      if (r.icon && !r.icon.startsWith('data:') && !r.icon.startsWith('http')) allMediaPaths.add(r.icon as string);
+      if (r.cover_image && !r.cover_image.startsWith('data:') && !r.cover_image.startsWith('http')) allMediaPaths.add(r.cover_image as string);
     }
   }
 
@@ -247,11 +247,11 @@ export async function exportDatabase(options: BackupOptions): Promise<void> {
       data.links = [...(data.links ?? []), ...lnks];
     }
     for (const r of data.operations) {
-      if (r.content) extractImagePaths(r.content as string).forEach((p) => allImagePaths.add(p));
-      if (r.icon && !r.icon.startsWith('data:') && !r.icon.startsWith('http')) allImagePaths.add(r.icon as string);
-      if (r.cover_image && !r.cover_image.startsWith('data:') && !r.cover_image.startsWith('http')) allImagePaths.add(r.cover_image as string);
-      if (r.drawing_data && !r.drawing_data.startsWith('data:')) allImagePaths.add(r.drawing_data as string);
-      if (r.thumbnail_data && !r.thumbnail_data.startsWith('data:')) allImagePaths.add(r.thumbnail_data as string);
+      if (r.content) extractMediaPaths(r.content as string).forEach((p) => allMediaPaths.add(p));
+      if (r.icon && !r.icon.startsWith('data:') && !r.icon.startsWith('http')) allMediaPaths.add(r.icon as string);
+      if (r.cover_image && !r.cover_image.startsWith('data:') && !r.cover_image.startsWith('http')) allMediaPaths.add(r.cover_image as string);
+      if (r.drawing_data && !r.drawing_data.startsWith('data:')) allMediaPaths.add(r.drawing_data as string);
+      if (r.thumbnail_data && !r.thumbnail_data.startsWith('data:')) allMediaPaths.add(r.thumbnail_data as string);
     }
   }
 
@@ -293,18 +293,18 @@ export async function exportDatabase(options: BackupOptions): Promise<void> {
     }
     for (const r of data.altars) {
       if (r.background_image_data && !r.background_image_data.startsWith('data:') && !r.background_image_data.startsWith('http')) {
-        allImagePaths.add(r.background_image_data as string);
+        allMediaPaths.add(r.background_image_data as string);
       }
       if (r.thumbnail_data && !r.thumbnail_data.startsWith('data:') && !r.thumbnail_data.startsWith('http')) {
-        allImagePaths.add(r.thumbnail_data as string);
+        allMediaPaths.add(r.thumbnail_data as string);
       }
       if (r.icon_data && !r.icon_data.startsWith('data:') && !r.icon_data.startsWith('http')) {
-        allImagePaths.add(r.icon_data as string);
+        allMediaPaths.add(r.icon_data as string);
       }
     }
     for (const r of data.altarItems) {
       if (r.image_data && !r.image_data.startsWith('data:') && !r.image_data.startsWith('http')) {
-        allImagePaths.add(r.image_data as string);
+        allMediaPaths.add(r.image_data as string);
       }
     }
   }
@@ -335,10 +335,8 @@ export async function exportDatabase(options: BackupOptions): Promise<void> {
 
   // ── Embed images ─────────────────────────────────────────────────────────
   const images: Record<string, string> = {};
-  for (const path of allImagePaths) {
+  for (const path of allMediaPaths) {
     try {
-      // Embedded sound files are collected with the images (both are `src`
-      // paths in content) and stored in the same map.
       const dataUrl = await readMediaAsBase64(path);
       images[path] = dataUrl;
     } catch {
@@ -404,7 +402,7 @@ export async function openBackupFile(): Promise<{ path: string; backup: BackupFi
 // Image restore helpers
 // ─────────────────────────────────────────────────────────────────────────────
 
-async function restoreImages(backup: BackupFile): Promise<Map<string, string>> {
+async function restoreMedia(backup: BackupFile): Promise<Map<string, string>> {
   const pathMap = new Map<string, string>();
   for (const [oldPath, dataUrl] of Object.entries(backup.images)) {
     try {
@@ -525,7 +523,7 @@ function applyCategoryFilters(d: BackupFile['data'], filters: ImportCategoryFilt
 }
 
 async function doReplace(db: Awaited<ReturnType<typeof getDb>>, backup: BackupFile, filters: ImportCategoryFilters): Promise<void> {
-  const pathMap = await restoreImages(backup);
+  const pathMap = await restoreMedia(backup);
   const d = applyCategoryFilters(backup.data, filters);
 
   // Remap image paths
@@ -611,7 +609,7 @@ async function doReplace(db: Awaited<ReturnType<typeof getDb>>, backup: BackupFi
 // ─────────────────────────────────────────────────────────────────────────────
 
 async function doMerge(db: Awaited<ReturnType<typeof getDb>>, backup: BackupFile, filters: ImportCategoryFilters): Promise<void> {
-  const pathMap = await restoreImages(backup);
+  const pathMap = await restoreMedia(backup);
   const d = applyCategoryFilters(backup.data, filters);
 
   // Prefix = base36 encoding of current timestamp (8 chars, unique per merge)

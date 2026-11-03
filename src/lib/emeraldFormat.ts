@@ -218,7 +218,6 @@ export async function exportAsEmerald(target?: ExportTarget, compression: ImageC
     const src = m[1];
     if (!src.startsWith('data:') && !src.startsWith('http') && !src.startsWith('blob:')) {
       try {
-        // Sound files ride along in the same map; compression leaves them alone.
         images[src] = await compressDataUrl(await readMediaAsBase64(src), compression);
       } catch { /* skip missing files */ }
     }
@@ -317,7 +316,7 @@ async function ensureTagNames(names: string[]): Promise<string[]> {
 }
 
 /** Re-saves images into local storage and returns content with updated paths. */
-async function remapImages(content: string, images: Record<string, string>): Promise<string> {
+async function remapMedia(content: string, images: Record<string, string>): Promise<string> {
   let result = content;
   for (const [oldPath, dataUrl] of Object.entries(images)) {
     if (!dataUrl) continue;
@@ -398,7 +397,7 @@ export async function importFromEmerald(): Promise<void> {
     return;
   }
 
-  const remapped = await remapImages(file.content, file.images ?? {});
+  const remapped = await remapMedia(file.content, file.images ?? {});
   // Sanitize imported HTML — strip scripts and event handlers while preserving
   // TipTap-specific data-* attributes (internal link chips) and inline styles (image widths).
   const content = DOMPurify.sanitize(remapped, {

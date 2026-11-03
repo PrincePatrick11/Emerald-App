@@ -10,7 +10,7 @@
     "unsupportedImageFormat": "Format non supporté. Autorisé : PNG, JPEG, GIF, WebP, SVG",
     "searchEmoji": "Rechercher un emoji…",
     "noEmojiResults": "Aucun résultat",
-    "unsupportedAudioFormat": "Format non supporté. Autorisé : MP3, M4A, AAC, WAV, OGG, Opus, FLAC",
+    "unsupportedAudioFormat": "Format non supporté. Autorisé : MP3, M4A, AAC, WAV, OGG, Opus, FLAC, WebM",
     "unsupportedDropFormat": "Format non supporté"
   },
   "listView": {
@@ -312,7 +312,13 @@
     "edit": "Modifier",
     "editing": "en cours de modification…",
     "doubleClickEdit": "Double-cliquez pour modifier",
-    "insertAudio": "Insérer un fichier audio"
+    "insertAudio": "Insérer un fichier audio",
+    "audio": {
+      "play": "Lire",
+      "pause": "Pause",
+      "position": "Position",
+      "loadFailed": "n'a pas pu être chargé"
+    }
   },
   "moonPhase": {
     "new": "Nouvelle lune",

@@ -323,7 +323,7 @@ mark.hit { background: var(--mark); color: inherit; border-radius: 2px; padding:
 .footer a { color: var(--accent-text); text-decoration: none; }
 .footer a:hover { text-decoration: underline; }
 .entry-content figure.audio-embed {
-  margin: 1em 0; padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--bg);
+  max-width: 100%; margin: 1em 0; padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--bg);
   font-family: system-ui, sans-serif;
 }
 .entry-content figure.audio-embed figcaption { font-size: 13px; color: var(--muted); margin-bottom: 6px; }

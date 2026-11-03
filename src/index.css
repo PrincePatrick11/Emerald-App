@@ -156,6 +156,16 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
     background: linear-gradient(to right, var(--accent) 0 var(--audio-progress, 0%), var(--border-soft) var(--audio-progress, 0%) 100%);
   }
   .audio-player-progress:disabled { cursor: default; }
+  .audio-player-progress:focus-visible {
+    outline: 2px solid var(--focus-ring);
+    outline-offset: 3px;
+  }
+  .audio-player-selected {
+    box-shadow: 0 0 0 2px var(--accent);
+  }
+  .audio-player-error {
+    color: var(--danger-text);
+  }
   .audio-player-progress::-webkit-slider-thumb {
     -webkit-appearance: none;
     width: 10px;

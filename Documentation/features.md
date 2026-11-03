@@ -324,7 +324,7 @@ For the on-disk JSON structure and per-mode semantics, see [DB Backup / Restore 
 
 Journal entries, wiki articles and operations can embed sound files. In edit mode the editor toolbar has a **Insert sound file** button (music note) next to the image button; dropping a sound file from Finder / Explorer onto the editor inserts it as well. Accepted formats: MP3, M4A, AAC, WAV, OGG, Opus, FLAC and WebM audio.
 
-A sound file appears as a small player in the entry: play / pause, a progress bar that can be dragged to seek, the elapsed and total time, and the file name. Like images, the file is copied into the app's own storage (`audio/` in the app-data folder, named by its content hash, so the same file is stored once); the entry only references it.
+A sound file appears as a small player in the entry: play / pause, a progress bar that can be dragged to seek, the elapsed and total time, and the file name. Like an image it starts at a fixed width (360 px) instead of filling the editor, and in edit mode it can be resized with the handle in its corner; the width is saved with the entry and carried into the HTML export. Like images, the file is copied into the app's own storage (`audio/` in the app-data folder, named by its content hash, so the same file is stored once); the entry only references it.
 
 In exports: the interactive HTML export embeds the sound file and shows it with the browser's own player and the file name; PDF and Markdown, which can't play audio, show a 🔊 note with the file name instead. `.emerald` exports and `.emeralddb` backups carry the sound file along with the images, so it comes back on import.
 

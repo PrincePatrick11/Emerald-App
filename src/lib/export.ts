@@ -9,7 +9,7 @@ import { useOperationStore } from '../store/operationStore';
 import { getCategoryEmoji } from '../components/wiki/WikiList';
 import { compressImagesInHtml, type ImageCompression } from './imageCompression';
 import i18n from '../i18n';
-import { readMediaAsBase64 } from './media';
+import { audioTitle, readMediaAsBase64 } from './media';
 
 // ── helpers ────────────────────────────────────────────────────────────────
 
@@ -30,7 +30,8 @@ export function sanitizeDataImageUrl(value: string | null | undefined): string |
 
 const FILE_SRC_RE = /src="([^"]+)"/g;
 
-async function embedImages(html: string): Promise<string> {
+/** Replaces every local `src` path (images and sound files) with its data URL. */
+async function embedMedia(html: string): Promise<string> {
   const paths: string[] = [];
   FILE_SRC_RE.lastIndex = 0;
   let m;
@@ -63,7 +64,7 @@ async function embedImages(html: string): Promise<string> {
 /**
  * Prepares embedded sound files for an export. `embed` (interactive HTML)
  * keeps a playable `<audio controls>` under a caption with the file name —
- * `embedImages` turns its path into a data URL afterwards. `placeholder`
+ * `embedMedia` turns its path into a data URL afterwards. `placeholder`
  * (PDF, which can't play anything) replaces it with a note naming the file,
  * before anything is read from disk.
  */
@@ -72,9 +73,11 @@ function transformAudio(html: string, mode: 'embed' | 'placeholder'): string {
   const doc = new DOMParser().parseFromString(html, 'text/html');
   for (const el of Array.from(doc.querySelectorAll('audio'))) {
     const src = el.getAttribute('src') ?? '';
-    const title = el.getAttribute('data-title') || src.split(/[\\/]/).pop() || 'Audio';
+    const title = audioTitle(src, el.getAttribute('data-title'));
     const figure = doc.createElement('figure');
     figure.className = mode === 'embed' ? 'audio-embed' : 'audio-placeholder';
+    // Keep the width the player was given in the editor.
+    if (mode === 'embed' && el.style.width) figure.style.width = el.style.width;
     const caption = doc.createElement('figcaption');
     caption.textContent = `🔊 ${title}`;
     figure.appendChild(caption);
@@ -490,8 +493,10 @@ export async function renderEntryArticle(
   footerHtml = '',
   audio: 'embed' | 'placeholder' = 'placeholder',
 ): Promise<string> {
+  // Audio first: a placeholder must replace the <audio> before embedMedia
+  // would read the sound file from disk.
   const resolvedContent  = transformAudio(resolveInternalLinkIcons(data.content), audio);
-  const embeddedContent  = await compressImagesInHtml(await embedImages(resolvedContent), compression);
+  const embeddedContent  = await compressImagesInHtml(await embedMedia(resolvedContent), compression);
   // Pre-render the internal-link chips in TS — the new webview's CSP
   // (`script-src 'self'`) blocks inline scripts, so the JS that used to
   // live in `TRANSFORM_LINKS_JS` now has to run before we hand the HTML
@@ -572,7 +577,7 @@ function entryToMarkdown(data: ExportData): string {
     filter: 'audio',
     replacement: (_content, node) => {
       const el = node as HTMLElement;
-      const title = el.getAttribute('data-title') || (el.getAttribute('src') ?? '').split(/[\\/]/).pop() || 'Audio';
+      const title = audioTitle(el.getAttribute('src'), el.getAttribute('data-title'));
       return `\n\n🔊 ${title}\n\n`;
     },
   });

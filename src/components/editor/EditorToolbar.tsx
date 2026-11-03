@@ -2,7 +2,7 @@ import { useRef, useState } from 'react';
 import type { Editor } from '@tiptap/react';
 import { useTranslation } from 'react-i18next';
 import { ACCEPTED_IMAGE_MIME, isAcceptedImageFile } from '../../lib/helpers';
-import { ACCEPTED_AUDIO, isAcceptedAudioFile } from '../../lib/media';
+import { ACCEPTED_AUDIO, audioDataUrlFor, isAcceptedAudioFile } from '../../lib/media';
 import {
   Bold,
   Italic,
@@ -28,7 +28,8 @@ import {
 interface Props {
   editor: Editor;
   onInsertImage: (src: string) => void;
-  onInsertAudio: (dataUrl: string, fileName: string) => void;
+  /** Resolves to whether the file was saved and inserted. */
+  onInsertAudio: (dataUrl: string, fileName: string) => Promise<boolean>;
   onOpenLinkPicker: () => void;
 }
 
@@ -38,7 +39,7 @@ export default function EditorToolbar({ editor, onInsertImage, onInsertAudio, on
   const audioInputRef = useRef<HTMLInputElement>(null);
   const [linkInputOpen, setLinkInputOpen] = useState(false);
   const [linkHref, setLinkHref] = useState('');
-  const [imageError, setImageError] = useState<string | null>(null);
+  const [mediaError, setMediaError] = useState<string | null>(null);
   const linkInputRef = useRef<HTMLInputElement>(null);
 
   const handleLinkButtonClick = () => {
@@ -68,12 +69,16 @@ export default function EditorToolbar({ editor, onInsertImage, onInsertAudio, on
   };
 
 
+  const showMediaError = (message: string) => {
+    setMediaError(message);
+    window.setTimeout(() => setMediaError(null), 2500);
+  };
+
   const handleImageFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     if (!isAcceptedImageFile(file)) {
-      setImageError(t('common.unsupportedImageFormat'));
-      window.setTimeout(() => setImageError(null), 2500);
+      showMediaError(t('common.unsupportedImageFormat'));
       e.target.value = '';
       return;
     }
@@ -88,12 +93,14 @@ export default function EditorToolbar({ editor, onInsertImage, onInsertAudio, on
     e.target.value = '';
     if (!file) return;
     if (!isAcceptedAudioFile(file)) {
-      setImageError(t('common.unsupportedAudioFormat'));
-      window.setTimeout(() => setImageError(null), 2500);
+      showMediaError(t('common.unsupportedAudioFormat'));
       return;
     }
     const reader = new FileReader();
-    reader.onload = () => onInsertAudio(reader.result as string, file.name);
+    reader.onload = async () => {
+      const inserted = await onInsertAudio(audioDataUrlFor(file.name, reader.result as string), file.name);
+      if (!inserted) showMediaError(t('common.unsupportedAudioFormat'));
+    };
     reader.readAsDataURL(file);
   };
 
@@ -275,8 +282,8 @@ export default function EditorToolbar({ editor, onInsertImage, onInsertAudio, on
         </ToolbarBtn>
       </ToolbarGroup>
 
-      {imageError && (
-        <span className="ml-auto text-[10px] text-red-400">{imageError}</span>
+      {mediaError && (
+        <span className="ml-auto text-[10px] text-red-400">{mediaError}</span>
       )}
     </div>
   );
