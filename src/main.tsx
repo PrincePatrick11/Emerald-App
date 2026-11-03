@@ -15,7 +15,7 @@ import { initSplash } from "./lib/splash";
 
 // Theme and fonts of the last opened vault before the first render — the
 // settingsStore only applies its own settings once the vault is loaded, and
-// nothing should flash until then (not even in the vault setup).
+// nothing should flash until then (not even in the vault picker).
 const bootAppearance = readAppearanceMirror();
 applyTheme(bootAppearance.theme);
 applyUIFont(bootAppearance.uiFont);

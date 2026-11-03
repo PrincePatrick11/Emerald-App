@@ -19,6 +19,9 @@ interface Props {
   leadWidth?: number;
   /** Off while a sidebar is being dragged to a new width. */
   animate?: boolean;
+  /** Over the vault picker: only the logo and the window buttons, without
+   *  maximising — the picker's window has one fixed size. */
+  picker?: boolean;
 }
 
 /**
@@ -41,7 +44,7 @@ interface Props {
  * Without `tabs` (no vault yet, boot still running) the shell content is
  * unmounted and there are no tabs to show.
  */
-export default function TitleBar({ tabs = false, leadWidth = 0, animate = true }: Props) {
+export default function TitleBar({ tabs = false, leadWidth = 0, animate = true, picker = false }: Props) {
   const { t } = useTranslation();
   const navigateBack = useUIStore((s) => s.navigateBack);
   const navigateForward = useUIStore((s) => s.navigateForward);
@@ -55,7 +58,8 @@ export default function TitleBar({ tabs = false, leadWidth = 0, animate = true }
   // The altar's distraction-free mode hides the sidebars and the tab bar. The
   // title bar stays — on Windows and Linux it holds the only way to close,
   // minimise or move the window — but drops the navigation and the search.
-  const minimal = useUIStore(isAltarFullscreen);
+  const altarFullscreen = useUIStore(isAltarFullscreen);
+  const minimal = altarFullscreen || picker;
 
   // Without an open vault there is nothing to search — and more than that: the
   // stores keep their contents when the last vault is deleted
@@ -114,7 +118,7 @@ export default function TitleBar({ tabs = false, leadWidth = 0, animate = true }
           <EmeraldMark size={20} className="pointer-events-none" />
         </div>
 
-        {usesHtmlMenuBar && (
+        {usesHtmlMenuBar && !picker && (
           <TitleBarMenuButton
             label={t('titlebar.menu')}
             icon={<Menu size={16} />}
@@ -146,7 +150,7 @@ export default function TitleBar({ tabs = false, leadWidth = 0, animate = true }
             route to the altar's image export, and distraction-free mode is
             precisely where that export is wanted. Export carries Download,
             Import Upload — as in Settings → Backup. */}
-        {usesHtmlMenuBar && (
+        {usesHtmlMenuBar && !picker && (
           <div className="ml-1 flex items-center gap-0.5 flex-shrink-0">
             <TitleBarMenuButton label={menus.exportMenu.label} icon={<Download size={16} />} nodes={menus.exportMenu.nodes} />
             <TitleBarMenuButton label={menus.importMenu.label} icon={<Upload size={16} />} nodes={menus.importMenu.nodes} />
@@ -164,7 +168,7 @@ export default function TitleBar({ tabs = false, leadWidth = 0, animate = true }
       {/* `ml-auto` keeps the window controls at the right edge even when
           the tab bar renders nothing for lack of tabs. */}
       <div data-tauri-drag-region className="ml-auto flex items-center justify-end h-full flex-shrink-0">
-        {usesCustomWindowControls && <WindowControls />}
+        {usesCustomWindowControls && <WindowControls canMaximize={!picker} />}
       </div>
 
       {searchOpen && <SearchModal onClose={() => setSearchOpen(false)} />}

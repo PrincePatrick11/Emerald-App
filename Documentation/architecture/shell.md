@@ -5,14 +5,16 @@
 The title bar is drawn by the app, not the OS: a 40px bar (`h-10`) in `src/components/layout/titlebar/`, above the three-column shell in `AppShell`. From left to right:
 
 - **Leading group** (`flex-shrink-0`): the Emerald logo, the application menu button, the global-search magnifier, back/forward, and on Windows/Linux the Export and Import buttons. With tabs shown it grows to the left sidebar's width, so the tabs start flush with the sheet below.
-- **Middle**: the tab strip (`TabBar`, see [Tabs and Workspace State](navigation.md#tabs-and-workspace-state)), or — without tabs (no vault yet, boot still running) — an empty `flex-1` drag surface.
+- **Middle**: the tab strip (`TabBar`, see [Tabs and Workspace State](navigation.md#tabs-and-workspace-state)), or — without tabs (vault picker, boot still running) — an empty `flex-1` drag surface.
+
+Over the [vault picker](#vault-picker) (`TitleBar picker`) the bar keeps only the logo and the window controls, and `WindowControls` drops maximise: the picker's window has one fixed size.
 - **Trailing group**: the window controls on Windows/Linux.
 
 Every trigger is an icon-only `RailButton`, so nothing has to shrink, wrap or fold as the window narrows.
 
 The logo (`EmeraldMark`, an inline SVG) is not a control. Its wrapper carries `data-tauri-drag-region` and the mark `pointer-events-none`, since the element under the cursor could otherwise be a `<polygon>` inside the SVG (see **Dragging** below).
 
-**The application menu is a menu-icon button, not a bar.** `TitleBarMenuButton` (`RailButton` + an in-place `MenuDropdown`, dismissed via `useOutsideClick`) renders once for the app menu — Edit and View as submenus, built in `useTitleBarMenus.ts` — and once each for Export and Import, with their own icons (`Download`/`Upload`, matching Settings → Backup). Each opens independently; there is no shared `role="menubar"`.
+**The application menu is a menu-icon button, not a bar.** `TitleBarMenuButton` (`RailButton` + an in-place `MenuDropdown`, dismissed via `useOutsideClick`) renders once for the app menu — **Switch Vault…** (`switch-vault`, as in the macOS app menu), then Edit and View as submenus, built in `useTitleBarMenus.ts` — and once each for Export and Import, with their own icons (`Download`/`Upload`, matching Settings → Backup). Each opens independently; there is no shared `role="menubar"`.
 
 **The split is per platform, and deliberately not uniform.** `src/lib/platform.ts` decides at module-eval time (a synchronous user-agent check, so the first paint is already right) and `main.tsx` mirrors the result onto `html[data-platform]` for CSS. `usesCustomWindowControls` additionally requires `isTauri` (`'__TAURI_INTERNALS__' in window`): in a plain browser the window APIs do not exist, and `getCurrentWindow()` would throw during render.
 
@@ -68,8 +70,9 @@ The earliest step is `adopt_previous_identifier_dirs` (see [Adopting a previous 
 The loading screen's markup (`#splash` in `index.html`) and styles (`public/splash.css`, linked from `<head>`) live outside the React tree on purpose: until the bundle has loaded and `main.tsx` has run the window would be blank, and a render-blocking `<link>` plus inline markup is the only way to show something in the first frame. `src/lib/splash.ts` owns everything after that:
 
 - **`initSplash()`** runs at the top level of `main.tsx`, while `#splash` is still in the DOM. It clones `#splash` for `showSplash()` and arms a 10 s fallback timer that calls `hideSplash()` regardless.
-- **`hideSplash()`** is called from `AppShell`'s initial-load effect once the vault's data has loaded (or vault setup is showing) — success or failure, so a failed load still uncovers a usable screen. `VaultKeyDialog` calls it on mount as well: the password question comes before the load, and the loading screen would otherwise cover it until the fallback timer fires. There is no minimum display time: it fades out as soon as loading is done, then is removed. Idempotent, since both the effect and the fallback timer call it.
+- **`hideSplash()`** is called from `AppShell`'s initial-load effect once the vault's data has loaded — success or failure, so a failed load still uncovers a usable screen. When the start ends in the vault picker, the picker calls it instead, once the window has shrunk to the picker's size, so the large empty window is never seen shrinking. `VaultKeyDialog` calls it on mount as well: the password question comes before the load, and the loading screen would otherwise cover it until the fallback timer fires. There is no minimum display time: it fades out as soon as loading is done, then is removed. Idempotent, since both the effect and the fallback timer call it.
 - **`showSplash()`** shows a fresh clone as a preview, dismissed by click or Escape — the View menu's **Show Loading Screen** (`show-splash`).
+- **`showLoadingScreen()` / `hideLoadingScreen()`** put up a fresh clone without the click to dismiss while a vault chosen in the vault picker opens, and take it down once the window is back at its size.
 
 The initial-load effect loads the active vault's settings (`loadForVault`) *before* `reloadAllStores()` — the trash purge needs the retention setting and migration v39 the language — and `AppShell` renders its content only after that (`bootSettled`), so nothing calls `getDb()` on a vault whose settings haven't loaded (a restored tab pointing straight at Trash, for one).
 
@@ -78,6 +81,18 @@ The initial-load effect loads the active vault's settings (`loadForVault`) *befo
 **Two safety nets** cover different failures: the 10 s timer in `initSplash()` handles a stuck data load; a 15 s timer in the inline `<script>` in `index.html` handles a bundle that never loads or throws on import, where the first timer never runs. The second skips the fade and deliberately outlasts the first. A stuck loading screen would be unrecoverable on Windows and Linux, where it covers the app's own window chrome and so the only close button.
 
 The inline boot script also sets `html[data-theme]` from `localStorage` before the first paint, so the loading screen appears in the right theme instead of flashing from one to the other. It is a deliberate, comment-flagged copy of `normalizeThemeId()` from `src/themes/theme.ts`, which lives in the bundle the script runs before.
+
+### Vault Picker
+
+`VaultPicker` is a view in the main window, not a modal and not a second window: there is one set of stores, and the question about unsaved edits stays in the window that holds the edits. `AppShell` renders it in place of the shell — `TitleBar picker`, the picker, `VaultKeyDialog` — whenever no vault is open (`hasActiveVault`) or `vaultPickerStore.open` is set. AppShell itself stays mounted, so its effects (sync, automatic backup, menu listeners, the close guard) keep running; the shell's content unmounts and mounts again on return, with tabs and history still in `uiStore`.
+
+- **Ways in.** `openVaultPicker()` settles the open edits first (`resolveOpenEdits`, as `switchVault` does) and then sets `open`; menu Emerald → Switch Vault… (`switch-vault`: the native macOS item emits it, the HTML menu calls `runMenuAction`) and the rail's Vault button both go through it. On start, `AppShell`'s initial-load effect falls back to the picker (`closeToSetup`) when the password is cancelled or the vault fails to open; the second case sets `vaultPickerStore.notice`, shown above the list. `vaults.json` keeps that vault as the active one for the next start.
+- **Choosing.** `choose` in `VaultPicker` keeps `open` set throughout, also where the picker only showed for want of a vault: `switchVault` makes a vault active before opening it, and the shell must not mount on a database that is still locked. The password comes first (`ensureVaultReady`, inside the picker), then `showLoadingScreen()`, `switchVault(id, { editsResolved: true })`, `closeVaultPicker()`, the window back to its size, and two frames later `hideLoadingScreen()`. A cancelled password leaves the picker as it was; a failed switch shows its error there. Choosing the open vault, or **Back to …**, only closes the picker.
+- **The window.** `lib/pickerWindow.ts`: entering remembers the inner size, the outer position and whether the window was maximised or fullscreen (leaving both first), lowers the minimum size, sets 560 × 680 logical pixels centred on where the window was, and makes it not resizable, which also stops Tauri's double-click on a drag region from maximising it. Leaving puts all of it back, the 720 × 600 minimum from `tauri.conf.json` included. The two steps run one after the other, never interleaved (React's StrictMode mounts the picker twice). The permissions are in `capabilities/default.json` (`set-size`, `set-min-size`, `set-position`, `set-resizable`, `maximize`, `unmaximize`, `set-fullscreen`).
+- **While it is up**, `runMenuAction` ignores the vault actions (export, import) as it does without a vault: the macOS menu stays in the menu bar, but no view is there to act on.
+- **The server** is part of the picker (`PickerServerSection`, see [Sync](sync.md)): nothing in it needs an open vault.
+
+Only macOS has been run. On Windows and Linux the window calls are the same Tauri API, but the result — especially leaving maximised and fullscreen states and restoring them — has not been checked there.
 
 ## PDF Export
 

@@ -173,7 +173,7 @@ Consequence: a new "active" variant on a `.panel` card needs either a selector t
 
 **Everything floating that can sit inside a sidebar or scroller hangs off `document.body` via `createPortal`** and positions itself with `position: fixed` in viewport coordinates: `Modal` (global search's `SearchModal`/`SearchResultList` render inside its body rather than portalling separately), `ContextMenu`, `EmojiPicker`, and `AltarCanvas`'s floating controls. `Dropdown` does so only with its `portal` prop, and `UndoToast`, which is global, renders in place with `position: fixed`. `MenuDropdown` is the deliberate exception: it renders in place with `absolute` + `z-[9999]`, which works because the title bar sits above both stacking contexts described below.
 
-The reason is the same for all of them: `.app-sidebar` and `.app-main` carry `position: relative; z-index: 1` in both themes and are therefore **sibling stacking contexts**. An overlay rendered inline in the sidebar loses against the later-painted main area no matter how high its `z-index`. On top of that, the nearest ancestor with `overflow` clips the popover — in the vault modal, for instance, the scrolling modal body.
+The reason is the same for all of them: `.app-sidebar` and `.app-main` carry `position: relative; z-index: 1` in both themes and are therefore **sibling stacking contexts**. An overlay rendered inline in the sidebar loses against the later-painted main area no matter how high its `z-index`. On top of that, the nearest ancestor with `overflow` clips the popover — in the vault picker, for instance, the scrolling modal body.
 
 The overlay layer is uniformly `z-[9999]`, one step above modals (`z-50`).
 

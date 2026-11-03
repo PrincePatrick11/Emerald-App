@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { CalendarClock, DatabaseBackup, Folder, History, Layers } from 'lucide-react';
 import Button from '../../ui/Button';
 import { SwitchRow } from '../../ui/Switch';
-import { VaultLocationRow } from '../VaultModal';
+import { VaultLocationRow } from '../VaultPicker';
 import {
   backUpNow, pickAutoBackupDir, refreshAutoBackupStatus, requestAutoBackupCheck, resetAutoBackupDir,
 } from '../../../lib/autoBackup';

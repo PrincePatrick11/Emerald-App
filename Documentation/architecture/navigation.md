@@ -91,7 +91,7 @@ The left sidebar is two independent components side by side in `AppShell`'s `app
 
 **`LeftSidebarRail`** (`src/components/layout/LeftSidebarRail.tsx`) is a fixed 44px icon column (`RAIL_WIDTH`, exported for `AppShell` and `TitleBar`):
 
-- Top group: Home, then the modules from `MODULE_LIST`, with Lexicon (an `AUX_VIEWS` entry, not a module) inserted before Altar (see [Module Registry](modules.md#module-registry)). Bottom group: Templates/Blocks/Categories/Tags/Trash, then Vault (opens `VaultModal`) and Settings.
+- Top group: Home, then the modules from `MODULE_LIST`, with Lexicon (an `AUX_VIEWS` entry, not a module) inserted before Altar (see [Module Registry](modules.md#module-registry)). Bottom group: Templates/Blocks/Categories/Tags/Trash, then Vault (opens the [vault picker](shell.md#vault-picker)) and Settings.
 - Every view button comes from `viewButton(type, meta)`, which marks the button of the open view `active` — the accent border `.sidebar-item.active` uses in the entry lists.
 - The rail has no panel toggles: all three sidebars are toggled from the *View* menu (`useTitleBarMenus.ts` on Windows/Linux, native on macOS; `menu.rail`/`menu.entryList`/ `menu.properties`). Since Settings and Vault live only in the rail, hiding it hides them too.
 - The update check (the dot on the gear) runs once per app start: its promise and "dot shown" flag are module-level, because the rail remounts when the Altar's full-window mode ends.

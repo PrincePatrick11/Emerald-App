@@ -598,7 +598,7 @@
     "cancel": "Annuler",
     "deleteHint": "Le vault disparaît de la liste.",
     "deleteActiveHint": "Le vault suivant devient ensuite le vault actif.",
-    "deleteLastHint": "La configuration des vaults recommence ensuite.",
+    "deleteLastHint": "Ensuite, il ne reste que le sélecteur de vaults.",
     "switchFailed": "Impossible de changer de vault.",
     "saveFailed": "Impossible d'enregistrer la modification.",
     "open": "Ouvrir un vault",
@@ -615,7 +615,9 @@
     "deleteFiles": "Supprimer aussi les fichiers :",
     "deleteFilesWarning": "La base de données et ses images seront supprimées définitivement.",
     "folderNotEmpty": "Le dossier n’est pas vide. Un nouveau vault demande un dossier vide.",
-    "deleteFilesLeftover": "La base de données et les images ont été supprimées. Le dossier contenait d’autres fichiers et a été conservé."
+    "deleteFilesLeftover": "La base de données et les images ont été supprimées. Le dossier contenait d’autres fichiers et a été conservé.",
+    "backTo": "Retour à {{name}}",
+    "openFailed": "Le dernier vault n'a pas pu être ouvert. Choisissez-le à nouveau ou un autre."
   },
   "vaultKey": {
     "unlockTitle": "Déverrouiller « {{name}} »",
@@ -942,7 +944,8 @@
     "exportAltarWebp": "WebP…",
     "importMarkdown": "Depuis Markdown…",
     "importEmerald": "Depuis Emerald…",
-    "quit": "Quitter Emerald App"
+    "quit": "Quitter Emerald App",
+    "switchVault": "Changer de vault…"
   },
   "titlebar": {
     "minimize": "Réduire",
@@ -1187,7 +1190,6 @@
     "conflicts_one": "{{count}} entrée a été modifiée sur deux appareils. Les deux versions sont conservées : cherchez « (conflit) » dans le titre.",
     "conflicts_other": "{{count}} entrées ont été modifiées sur deux appareils. Les deux versions sont conservées : cherchez « (conflit) » dans le titre.",
     "conflictTitle": "{{title}} (conflit)",
-    "fromServer": "Depuis un serveur",
     "fetch": "Récupérer",
     "errorUnreachable": "Le serveur ne répond pas. La synchronisation reprendra à son retour.",
     "errorInsecure": "Cette adresse n'est pas sûre. Utilisez https, ou http uniquement sur cet ordinateur, un réseau privé ou un tailnet.",
@@ -1209,12 +1211,10 @@
     "lastSeen": "vu il y a {{time}}",
     "disconnectServer": "Déconnecter le serveur",
     "disconnectServerHint": "Cet appareil ne synchronise plus. Les vaults restent ici et sur le serveur.",
-    "vaultsHere": "Vaults sur cet appareil",
     "vaultsHereHint": "Seul le vault ouvert se synchronise ; les autres rattrapent à l'ouverture. Déconnecter laisse le vault sur le serveur, et les modifications faites entre-temps suivent à la reconnexion. Supprimer du serveur laisse les copies sur vos appareils.",
     "stateLocal": "ici seulement",
     "statePaused": "déconnecté",
     "stateSynced": "synchronisé",
-    "openVault": "Ouvrir",
     "upload": "Mettre sur le serveur",
     "pause": "Déconnecter",
     "resume": "Reconnecter",
@@ -1227,6 +1227,11 @@
     "goneFromServer": "Ce vault a été retiré du serveur. Il reste ici en tant que vault local.",
     "replaceWarning": "Ce vault se synchronise : la sauvegarde le remplace aussi sur vos autres appareils, qui enregistrent d'abord leur propre sauvegarde.",
     "unencrypted": "La connexion n'est pas dans le trousseau du système sur cet appareil, car il a été refusé ou est absent. Elle est seulement masquée dans un fichier, sans chiffrement sûr. Reconnectez-vous et autorisez le trousseau pour changer cela.",
-    "keychainWarning": "Emerald conserve la connexion dans le trousseau du système. Si vous refusez l'accès, elle sera seulement masquée dans un fichier sur cet appareil."
+    "keychainWarning": "Emerald conserve la connexion dans le trousseau du système. Si vous refusez l'accès, elle sera seulement masquée dans un fichier sur cet appareil.",
+    "server": "Serveur",
+    "deleteFromServerConfirm": "Retirer du serveur ?",
+    "noServer": "Aucun serveur connecté.",
+    "pickerHint": "Connecter le serveur, en récupérer des vaults et ses appareils se trouvent dans le sélecteur de vaults, qui fonctionne aussi sans vault ouvert.",
+    "openPicker": "Serveur et vaults…"
   }
 }

@@ -68,7 +68,7 @@ interface VaultStore {
  *
  * Membership, not list length: `switchVault` rolls `activeVaultId` back to `''`
  * when a vault cannot be opened, and then the list is not empty but nothing is
- * active either. Both mean "no database" and both belong in vault setup.
+ * active either. Both mean "no database" and both belong in the vault picker.
  */
 export function hasActiveVault(state: Pick<VaultStore, 'vaults' | 'activeVaultId'>): boolean {
   return state.vaults.some((v) => v.id === state.activeVaultId);
@@ -120,11 +120,11 @@ async function openActiveVault({ askPassword = false }: { askPassword?: boolean 
 }
 
 /**
- * No vault is open: the vault window takes over, settings and
+ * No vault is open: the vault picker takes over, settings and
  * lists revert to the defaults. `vaults.json` keeps the active vault —
  * the next start asks for it again.
  */
-async function closeToSetup(): Promise<void> {
+export async function closeToSetup(): Promise<void> {
   useVaultStore.setState({ activeVaultId: '' });
   await useSettingsStore.getState().clear();
   detachVaultPrefs();
@@ -255,7 +255,7 @@ export const useVaultStore = create<VaultStore>((set, get) => ({
     }
 
     // The neighbour moves up — the same expectation as when closing a
-    // tab. Without a neighbour the app falls into the vault setup.
+    // tab. Without a neighbour the app falls into the vault picker.
     const successor = remaining[Math.min(Math.max(index, 0), remaining.length - 1)];
     if (!successor) {
       set({ vaults: remaining, activeVaultId: '' });
@@ -270,7 +270,7 @@ export const useVaultStore = create<VaultStore>((set, get) => ({
     // including the modal in which the deletion is currently happening.
     set({ vaults: remaining, activeVaultId: successor.id });
     // If opening fails, the successor still remains the active one: it is in
-    // the list, the vault modal stays up and shows the error, and from
+    // the list, the vault picker stays up and shows the error, and from
     // there it can be relocated or another chosen. Falling back to ''
     // would mean throwing the user into the setup without a word.
     // Different if the user themself cancels unlocking the successor:
@@ -344,7 +344,7 @@ export const useVaultStore = create<VaultStore>((set, get) => ({
       await openActiveVault({ askPassword: true });
     } catch (err) {
       // Not unlocked — cancelled or failed: no vault is open,
-      // the vault window takes over. Never back to the old content without a database.
+      // the vault picker takes over. Never back to the old content without a database.
       if (keyErrorOf(err) !== VAULT_KEY_CANCELLED) console.error('[vault] lock failed', err);
       await closeToSetup();
     } finally {

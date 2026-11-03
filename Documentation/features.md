@@ -193,9 +193,9 @@ The grid also appears in thumbnails and exported images.
 
 ## Navigation
 
-**Loading screen.** On startup, before the app is ready, a loading screen covers the window: a breathing emerald gem with twinkling facets, the wordmark and a progress rail, on the app's own dark background. It fades as soon as your vault's data (or, on a new install, vault setup) is ready, however fast that is. **View → Show Loading Screen** replays it; a click or Escape closes it.
+**Loading screen.** On startup, before the app is ready, a loading screen covers the window: a breathing emerald gem with twinkling facets, the wordmark and a progress rail, on the app's own dark background. It fades as soon as your vault's data (or, without one, the [vault picker](#vaults)) is ready, however fast that is, and comes back while a vault chosen in the picker opens. **View → Show Loading Screen** replays it; a click or Escape closes it.
 
-**Window title bar and frame.** The app draws its own title bar: the Emerald logo (decoration, centred above the rail), on Windows and Linux one menu button holding the Edit and View menus, a magnifier for [Search](#search) (hidden while no vault is open), back/forward through the view history, on Windows and Linux an Export and an Import menu button, the open tabs, and — on Windows and Linux — the minimise / maximise / close buttons. macOS keeps its native window buttons and menu bar, so its title bar shows only the logo, search and navigation. The minimum window width is 720px.
+**Window title bar and frame.** The app draws its own title bar: the Emerald logo (decoration, centred above the rail), on Windows and Linux one menu button holding Switch Vault… and the Edit and View menus, a magnifier for [Search](#search) (hidden while no vault is open), back/forward through the view history, on Windows and Linux an Export and an Import menu button, the open tabs, and — on Windows and Linux — the minimise / maximise / close buttons. macOS keeps its native window buttons and menu bar, so its title bar shows only the logo, search and navigation. The minimum window width is 720px. Over the [vault picker](#vaults) the title bar holds only the logo and, on Windows and Linux, minimise and close.
 
 The title bar, the rail and the left entry list share one plain background with no dividers, framing the window; the main content and the right sidebar form a rounded surface on top of it, so an entry's content and its properties read as one while the navigation stays in the background.
 
@@ -381,19 +381,36 @@ Tags, categories, your own blocks, templates and the Lexicon's languages also go
 
 A vault is a **folder** you choose, holding its own encrypted database and its own images — see [Vault Layout](architecture/storage.md#vault-layout) for the on-disk layout and [Vault Encryption](#vault-encryption) for the password. Because nothing inside it refers to a location, a vault folder can be copied to another machine and opened there. A vault can carry its own icon — any emoji, shown on its card and on the Vault rail button while it is active; without one, both show the plain vault glyph.
 
-**First start.** A new installation has no vault. Emerald opens straight into the vault modal below — with no way to close it — until you create or open one. An installation from before multi-vault support has its existing database adopted as a vault named "Emerald".
+**The vault picker.** Emerald normally opens the vault that was open last, straight away; with a single vault you never see a choice. The picker is a view of its own in the same window: the window shrinks to a fixed small size and shows only the picker, and once you choose a vault the loading screen covers the switch and the window returns to its earlier size and place (maximised or fullscreen included).
 
-Vault management lives in its own modal, opened from the Vault icon in the left rail (above Settings):
+- It comes up by itself when there is no vault (a new installation, or after the last one was removed), when the last vault cannot be opened — it then says so above the list — and when you cancel the password question on start.
+- By hand it opens from the menu: **Emerald → Switch Vault…**, in the macOS menu bar or behind the three-line button in the title bar on Windows and Linux, or from the Vault icon in the left rail (above Settings). Open edits are settled first, as for any switch: save, discard or keep editing.
+- **Back to {vault}** at the top, or clicking the open vault's card, returns to the open vault without switching. With no vault open there is no way back, only a choice.
 
-- Each vault is a card with its name and folder. Clicking a card switches to that vault; the active vault's card is disabled and highlighted.
+An installation from before multi-vault support has its existing database adopted as a vault named "Emerald".
+
+The picker holds the vaults on this device and the [sync server](#sync-server):
+
+- Each vault is a card with its name and folder, and a cloud mark if it is on the server (crossed out while disconnected). Clicking a card switches to that vault; the active vault's card is highlighted. Opening a locked vault asks for its password first, in the picker; cancelling leaves you there.
 - **New Vault** creates an empty one. Give it a name and optionally an icon; the row shows live where it will land — by default `Documents/Emerald Vaults/{name}`, with a folder picker to choose elsewhere and a reset button. The target folder has to be empty: sharing it with unrelated files would make deleting them ambiguous later. Opening the new vault asks for its password.
 - **Open vault** adds a vault that already exists on disk: pick its `emerald.db` file (not the folder — a folder dialog can't show whether one is there), and it joins the list under its folder's name. This is how you take over a vault from another machine or re-add one you removed.
-- **Edit** and **Delete** are inline states on the card. Edit changes name and icon together. Delete asks for confirmation and offers **"Delete the files as well"** (off by default, showing the folder). It removes the vault's own files — database, its journal, images, the key file, and an empty `backup/` — but leaves anything else (an exported backup, a stray system file) and with it the folder; the modal then says so, making clear the database is gone either way. A folder that stayed can't host a *new* vault until it is emptied. Any vault can be deleted, including the active one (Emerald switches to another) and the last one (back to vault setup).
+- **Edit** and **Delete** are inline states on the card. Edit changes name and icon together. Delete asks for confirmation and offers **"Delete the files as well"** (off by default, showing the folder). It removes the vault's own files — database, its journal, images, the key file, and an empty `backup/` — but leaves anything else (an exported backup, a stray system file) and with it the folder; the picker then says so, making clear the database is gone either way. A folder that stayed can't host a *new* vault until it is emptied. Any vault can be deleted, including the active one (Emerald switches to another) and the last one (the picker then has nothing to go back to).
 - A vault whose folder moved or is on a disconnected drive is marked **Folder not found** and can't be switched to; a folder button lets you point it at the new location (again via its `emerald.db`). Emerald deliberately doesn't recreate a missing folder — SQLite would put a fresh, empty database in it, and the vault would come back looking empty instead of telling you something is wrong.
 - A vault Emerald is not *allowed* to read is marked **No access** and gets no relocate button — the folder is where you left it. On macOS this is what `~/Documents`, `~/Desktop` and iCloud folders look like until you grant access in System Settings › Privacy & Security; picking the `.db` file in the open dialog does not grant it.
 - A vault in iCloud Drive, Dropbox or OneDrive works, but SQLite in a synchronised folder can be damaged if the sync client touches the file mid-write.
 
-New vaults are not switched to automatically — except during first-start setup, where the first one becomes active. Importing a `.emeralddb` backup in Add Vault mode also creates a vault, filled from the backup — see [Vault Backup](#vault-backup-emeralddb).
+New vaults are not switched to automatically — except while no vault is open, where the new one is opened right away. Importing a `.emeralddb` backup in Add Vault mode also creates a vault, filled from the backup — see [Vault Backup](#vault-backup-emeralddb).
+
+### Sync Server
+
+A vault can sync with your other devices through a server of your own, which only ever stores it encrypted; how that works is in [Sync](architecture/sync.md). Everything about the server is in the vault picker, so it works with no vault open — on a new device that is how the first vault arrives:
+
+- **Connect** with the server's address and its sync key. The key is asked for once and not kept; the connection goes to the system keychain, and the form warns beforehand that refusing the keychain leaves it unencrypted on this device. The picker says so while that is the case.
+- **Other vaults on the server**, with their size: **Fetch** creates a local copy, asks for that vault's password and opens it; **Delete from server** removes it there after a confirmation, leaving every device's copy as a local vault.
+- **Connected devices**, each with when it was last seen, can be removed. Whoever still knows the key can connect again.
+- **Disconnect server** stops syncing on this device; vaults stay here and on the server, and connecting the same server again resumes them.
+
+Settings → Sync covers only the open vault: **Put on server** (it has to be open for that), **Disconnect** and **Connect again** for that vault, **Delete from server**, its state, when it last synced, **Sync now**, and fetching it anew when its password was changed on another device. A button there opens the picker for the rest.
 
 ## Vault Encryption
 

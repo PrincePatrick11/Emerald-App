@@ -48,7 +48,7 @@ function CloseGlyph() {
  * 46x40 px per button with square corners and no gap is the Windows Fluent
  * geometry; matching it is what makes the bar read as a real title bar.
  */
-export default function WindowControls() {
+export default function WindowControls({ canMaximize = true }: { canMaximize?: boolean }) {
   const { t } = useTranslation();
   const maximized = useIsMaximized();
   const appWindow = getCurrentWindow();
@@ -66,15 +66,18 @@ export default function WindowControls() {
       >
         <MinimizeGlyph />
       </button>
-      <button
-        type="button"
-        className="window-control"
-        onClick={() => appWindow.toggleMaximize().catch(ignore)}
-        title={maximized ? t('titlebar.restore') : t('titlebar.maximize')}
-        aria-label={maximized ? t('titlebar.restore') : t('titlebar.maximize')}
-      >
-        {maximized ? <RestoreGlyph /> : <MaximizeGlyph />}
-      </button>
+      {/* Not over the vault picker: its window has one fixed size. */}
+      {canMaximize && (
+        <button
+          type="button"
+          className="window-control"
+          onClick={() => appWindow.toggleMaximize().catch(ignore)}
+          title={maximized ? t('titlebar.restore') : t('titlebar.maximize')}
+          aria-label={maximized ? t('titlebar.restore') : t('titlebar.maximize')}
+        >
+          {maximized ? <RestoreGlyph /> : <MaximizeGlyph />}
+        </button>
+      )}
       <button
         type="button"
         className="window-control window-control-close"

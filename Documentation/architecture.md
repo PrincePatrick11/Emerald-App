@@ -50,7 +50,7 @@ src/
 │   │   ├── AppShell, MainArea, TabBar          app frame, view router, tabs
 │   │   ├── LeftSidebarRail, LeftSidebarEntryList   rail and entry list
 │   │   ├── RightSidebar                        properties panels, edit action bar
-│   │   ├── LeaveGuardModal, VaultModal         leave-an-edit question, vault manager
+│   │   ├── LeaveGuardModal, VaultPicker        leave-an-edit question, vault picker (start view)
 │   │   ├── VaultKeyDialog, BackupUnlockDialog, RecoveryKeyBox, vaultKeyParts   password, unlock, recovery key
 │   │   ├── moduleViews.ts                      ViewId → lazy view (MainArea only)
 │   │   ├── settings/                           SettingsModal, one *Page per tab, sections
@@ -279,4 +279,4 @@ Tauri menu events (not `invoke`) come from the native menu and are received in `
 
 Only `reset-sidebar-widths` is emitted from the frontend as well — the HTML menu re-emits it so `AppShell`'s listener handles it identically on both platforms; the other menu actions run directly through `runMenuAction`.
 
-The three sidebar toggles, `toggle-view-lock` and `show-splash` are handled at the very top of `runMenuAction`, above its no-active-vault guard: none touches a database, and the loading screen should be viewable during vault setup too. For the four check items there is a second reason: muda (Tauri's menu crate) flips a native check item's tick *itself* before emitting the event, and falling through to the guard would leave macOS showing a tick with no state behind it, which the visibility-keyed sync effect would never correct.
+The three sidebar toggles, `toggle-view-lock`, `show-splash` and `switch-vault` are handled at the very top of `runMenuAction`, above its guard against running without an open vault or over the vault picker: none touches a database, and the loading screen should be viewable in the picker too. For the four check items there is a second reason: muda (Tauri's menu crate) flips a native check item's tick *itself* before emitting the event, and falling through to the guard would leave macOS showing a tick with no state behind it, which the visibility-keyed sync effect would never correct.

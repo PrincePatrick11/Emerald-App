@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import Button from '../ui/Button';
+import InlineConfirm from '../ui/InlineConfirm';
 import { formatBytes } from '../../lib/helpers';
 import { adoptRemoteVault, deleteRemoteVault, remoteVaults, syncErrorCode, type RemoteVault } from '../../lib/sync/engine';
 import { syncErrorKey } from '../../lib/sync/errors';
@@ -25,15 +26,16 @@ async function freeTarget(name: string): Promise<{ name: string; path: string | 
  * The vaults on the server that are not on this device: fetch one, or remove it
  * from the server. A fetched vault is one with a `vault.key` and no database: the
  * usual question for its password opens it, and the first sync fills it.
+ *
+ * Needs no open vault. `onOpen` is the vault picker's way of opening one.
  */
-export default function RemoteVaultList({ exclude = [], onFetched, onChange }: {
+export default function RemoteVaultList({ exclude = [], onOpen, onChange }: {
   exclude?: readonly string[];
-  onFetched?: () => void;
+  onOpen: (vaultId: string) => Promise<void>;
   onChange?: () => void;
 }) {
   const { t } = useTranslation();
   const addVault = useVaultStore((s) => s.addVault);
-  const switchVault = useVaultStore((s) => s.switchVault);
   const [remotes, setRemotes] = useState<RemoteVault[] | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -69,9 +71,8 @@ export default function RemoteVaultList({ exclude = [], onFetched, onChange }: {
     const record = await newVaultRecord(target.name, { path: target.path });
     await addVault(record);
     await adoptRemoteVault(record.id, remote.id, target.name);
-    await switchVault(record.id);
-    onFetched?.();
     onChange?.();
+    await onOpen(record.id);
   });
 
   const remove = (remote: RemoteVault) => act(async () => {
@@ -94,10 +95,12 @@ export default function RemoteVaultList({ exclude = [], onFetched, onChange }: {
             </span>
             <span className="flex items-center gap-2 shrink-0">
               {confirming === remote.id ? (
-                <>
-                  <Button tone="danger" disabled={busy} onClick={() => remove(remote)}>{t('sync.reallyDelete')}</Button>
-                  <Button disabled={busy} onClick={() => setConfirming(null)}>{t('common.cancel')}</Button>
-                </>
+                <InlineConfirm
+                  message={t('sync.deleteFromServerConfirm')}
+                  confirmLabel={t('sync.reallyDelete')}
+                  onConfirm={() => { if (!busy) void remove(remote); }}
+                  onCancel={() => setConfirming(null)}
+                />
               ) : (
                 <>
                   <Button disabled={busy} onClick={() => fetchVault(remote, label)}>{t('sync.fetch')}</Button>

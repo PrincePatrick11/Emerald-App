@@ -3,7 +3,8 @@ import { listen } from '@tauri-apps/api/event';
 import { useTranslation } from 'react-i18next';
 import { isAltarFullscreen, useUIStore } from '../../store/uiStore';
 import { reloadAllStores } from '../../store/moduleWiring';
-import { activeVault, hasActiveVault, useVaultStore } from '../../store/vaultStore';
+import { activeVault, closeToSetup, hasActiveVault, useVaultStore } from '../../store/vaultStore';
+import { useVaultPickerStore } from '../../store/vaultPickerStore';
 import { useSettingsStore } from '../../store/settingsStore';
 import { invoke } from '@tauri-apps/api/core';
 import { computeMenuEnabledState, runMenuAction, SELF_CONTAINED_MENU_ACTIONS } from '../../lib/menuActions';
@@ -13,11 +14,11 @@ import LeftSidebarRailBase, { RAIL_WIDTH } from './LeftSidebarRail';
 import LeftSidebarEntryListBase from './LeftSidebarEntryList';
 import RightSidebarBase from './RightSidebar';
 import MainAreaBase from './MainArea';
-import VaultModal from './VaultModal';
+import VaultPicker from './VaultPicker';
 import VaultKeyDialog from './VaultKeyDialog';
 import BackupUnlockDialog from './BackupUnlockDialog';
 import { ensureVaultReady, VAULT_KEY_CANCELLED } from '../../store/vaultKeyStore';
-import { keyErrorOf } from '../../lib/vaultKeys';
+import { keyErrorOf, lockVault } from '../../lib/vaultKeys';
 import UndoToast from '../ui/UndoToast';
 import ImageNoticeModal from '../ui/ImageNoticeModal';
 import LeaveGuardModal from './LeaveGuardModal';
@@ -60,10 +61,6 @@ const SIDEBAR_ANIM_MS = 200;
 const ENTRY_LIST_WIDTH_KEY = 'entry-list-width';
 const RIGHT_WIDTH_KEY = 'sidebar-right-width';
 
-/** Vault setup has nowhere to close to. `Modal` requires the prop but never
- *  calls it while `dismissible={false}` — there is no X, no Escape, no backdrop. */
-const NEVER_CLOSE = () => {};
-
 /**
  * Keeps a sidebar's content mounted through the fade-out animation and only
  * unmounts it afterwards. Leaving it mounted permanently would be simpler but
@@ -94,6 +91,7 @@ export default function AppShell() {
   const vaults = useVaultStore((s) => s.vaults);
   const activeVaultId = useVaultStore((s) => s.activeVaultId);
   const vaultLocked = useVaultStore((s) => s.locked);
+  const pickerOpen = useVaultPickerStore((s) => s.open);
   const rightSidebarOpen = useUIStore((s) => s.rightSidebarOpen);
   const leftListOpen = useUIStore((s) => s.leftListOpen);
   const railOpen = useUIStore((s) => s.railOpen);
@@ -143,7 +141,7 @@ export default function AppShell() {
       if (!active) return;
       // Before anything else: an encrypted vault has to be unlocked before
       // drafts or the database are read. Whoever cancels picks another one in
-      // the vault window — the saved active vault stays until it is switched
+      // the vault picker — the saved active vault stays until it is switched
       // there.
       return ensureVaultReady(active).then(() => {
         // As in `openActiveVault`: the settings before the database. Before
@@ -154,20 +152,28 @@ export default function AppShell() {
           .then(() => useSettingsStore.getState().loadForVault(vaultState.activeVaultId))
           .then(() => prepareOpenedVault(vaultState.activeVaultId))
           .then(reloadAllStores);
-      }, (err: unknown) => {
-        if (keyErrorOf(err) !== VAULT_KEY_CANCELLED) throw err;
-        useVaultStore.setState({ activeVaultId: '' });
+      }).catch(async (err: unknown) => {
+        // Cancelled, or the vault would not open (folder gone, a failing
+        // migration): the picker comes up instead, and says why unless it
+        // was the user's own choice. `vaults.json` keeps the vault for the
+        // next start.
+        if (keyErrorOf(err) !== VAULT_KEY_CANCELLED) {
+          console.error('[boot] opening the vault failed', err);
+          useVaultPickerStore.setState({ notice: 'vault.openFailed' });
+          void lockVault(active.id).catch(() => {});
+        }
+        await closeToSetup();
       });
     })
       // Without a `catch` the error would stay an unhandled rejection in the
       // console — visible only if someone looks.
       .catch((err) => console.error('[boot] initial load failed', err))
       .finally(() => setBootSettled(true))
-      // From here on there is either the loaded content or — on first start —
-      // the vault setup. Both are a finished screen, so the loading screen can
-      // go. Also on failure: an empty interface is still better than a loading
-      // screen that never ends.
-      .finally(hideSplash);
+      // From here on there is either the loaded content or the vault picker.
+      // The picker clears the loading screen itself once the window has its
+      // size (`VaultPicker`); otherwise it goes now — also on failure: an
+      // empty interface is still better than a loading screen that never ends.
+      .finally(() => { if (hasActiveVault(useVaultStore.getState())) hideSplash(); });
   }, []);
 
   // Window closing: first settle what happens to edits in progress. The
@@ -231,6 +237,7 @@ export default function AppShell() {
       exportAltarWebp: t('menu.exportAltarWebp'),
       importMarkdown:  t('menu.importMarkdown'),
       importEmerald:   t('menu.importEmerald'),
+      switchVault:     t('menu.switchVault'),
       quit:            t('menu.quit'),
     }).catch(() => {/* desktop-only, ignore in browser preview */});
   }, [i18n.language, t]);
@@ -330,9 +337,9 @@ export default function AppShell() {
   }, [viewLocked]);
 
   // Window frame and title bar — everything that stands even without an open vault.
-  const chrome = (children: React.ReactNode) => (
+  const chrome = (children: React.ReactNode, picker = false) => (
     <div className="app-shell flex flex-col h-screen w-screen overflow-hidden relative">
-      <TitleBar />
+      <TitleBar picker={picker} />
       {children}
       <VaultKeyDialog />
     </div>
@@ -343,18 +350,15 @@ export default function AppShell() {
   // NO_ACTIVE_VAULT error from `getActiveVaultPath()`.
   //
   // Three separate exits so the reason stays visible: while `loaded` is still
-  // false, it is merely not yet known whether a vault exists — the setup modal
+  // false, it is merely not yet known whether a vault exists — the picker
   // must not flash up then. And with a vault but before the end of the start,
   // its settings are still missing (see `bootSettled`).
+  //
+  // The picker replaces the shell rather than covering it: asked for by hand
+  // (`openVaultPicker`), the open edits are settled first, and the stores stay
+  // as they are, so going back mounts the same tabs again.
   if (!vaultsLoaded) return chrome(<main className="app-main flex-1 min-h-0" />);
-  if (needsVault) {
-    return chrome(
-      <>
-        <main className="app-main flex-1 min-h-0" />
-        <VaultModal dismissible={false} onClose={NEVER_CLOSE} />
-      </>
-    );
-  }
+  if (needsVault || pickerOpen) return chrome(<VaultPicker />, true);
   if (!bootSettled) return chrome(<main className="app-main flex-1 min-h-0" />);
   // Locked: none of the content stays standing behind the password prompt.
   if (vaultLocked) return chrome(<main className="app-main flex-1 min-h-0" />);

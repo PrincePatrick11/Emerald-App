@@ -412,6 +412,9 @@ fn install_native_menu(app: &tauri::App) -> tauri::Result<()> {
     let app_submenu = Submenu::with_items(app, "Emerald App", true, &[
         &PredefinedMenuItem::about(app, None, None)?,
         &PredefinedMenuItem::separator(app)?,
+        // Opens the vault picker in this same window (`openVaultPicker`).
+        &MenuItem::with_id(app, "switch-vault", "Switch Vault…", true, None::<&str>)?,
+        &PredefinedMenuItem::separator(app)?,
         &PredefinedMenuItem::hide(app, None)?,
         &PredefinedMenuItem::hide_others(app, None)?,
         &PredefinedMenuItem::separator(app)?,
@@ -593,6 +596,7 @@ fn install_native_menu(app: &tauri::App) -> tauri::Result<()> {
         match event.id().as_ref() {
             "reset-sidebar-widths" => { app.emit("reset-sidebar-widths", ()).ok(); }
             "show-splash"          => { app.emit("show-splash", ()).ok(); }
+            "switch-vault"         => { app.emit("switch-vault", ()).ok(); }
             "toggle-rail"          => { app.emit("toggle-rail", ()).ok(); }
             "toggle-left-list"     => { app.emit("toggle-left-list", ()).ok(); }
             "toggle-right-sidebar" => { app.emit("toggle-right-sidebar", ()).ok(); }
@@ -775,6 +779,7 @@ fn update_menu_labels(
     export_altar_webp: String,
     import_markdown: String,
     import_emerald: String,
+    switch_vault: String,
     quit: String,
 ) {
     use tauri::menu::MenuItemKind;
@@ -820,6 +825,7 @@ fn update_menu_labels(
                         "export-emerald"       => Some(export_emerald.as_str()),
                         "import-markdown"      => Some(import_markdown.as_str()),
                         "import-emerald"       => Some(import_emerald.as_str()),
+                        "switch-vault"         => Some(switch_vault.as_str()),
                         "quit"                 => Some(quit.as_str()),
                         _ => None,
                     };
