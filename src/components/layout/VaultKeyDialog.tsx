@@ -18,7 +18,7 @@ import { hideSplash } from '../../lib/splash';
  * Set a password, unlock, set a new password with the recovery key —
  * the questions of `ensureVaultReady`.
  *
- * Sits above everything, including the vault setup: a vault that is about to
+ * Sits above everything, including the vault picker: a vault that is about to
  * be opened cannot go any further without this answer.
  */
 export default function VaultKeyDialog() {

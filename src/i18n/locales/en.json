@@ -590,7 +590,7 @@
     "cancel": "Cancel",
     "deleteHint": "The vault disappears from the list.",
     "deleteActiveHint": "The next vault becomes the active one.",
-    "deleteLastHint": "Vault setup starts over afterwards.",
+    "deleteLastHint": "Afterwards only the vault picker is left.",
     "switchFailed": "Could not switch vault.",
     "saveFailed": "Could not save the change.",
     "open": "Open Vault",
@@ -607,7 +607,9 @@
     "deleteFiles": "Delete the files as well:",
     "deleteFilesWarning": "This will permanently delete the database and its images.",
     "folderNotEmpty": "The folder is not empty. A new vault needs an empty folder.",
-    "deleteFilesLeftover": "The database and images were deleted. The folder held other files and was kept."
+    "deleteFilesLeftover": "The database and images were deleted. The folder held other files and was kept.",
+    "backTo": "Back to {{name}}",
+    "openFailed": "The last vault could not be opened. Choose it again or another one."
   },
   "vaultKey": {
     "unlockTitle": "Unlock “{{name}}”",
@@ -942,7 +944,8 @@
     "exportAltarWebp": "WebP…",
     "importMarkdown": "From Markdown…",
     "importEmerald": "From Emerald…",
-    "quit": "Quit Emerald App"
+    "quit": "Quit Emerald App",
+    "switchVault": "Switch Vault…"
   },
   "titlebar": {
     "minimize": "Minimize",
@@ -1187,7 +1190,6 @@
     "conflicts_one": "{{count}} entry was changed on two devices. Both versions are kept: look for \"(conflict)\" in the title.",
     "conflicts_other": "{{count}} entries were changed on two devices. Both versions are kept: look for \"(conflict)\" in the title.",
     "conflictTitle": "{{title}} (conflict)",
-    "fromServer": "From a server",
     "fetch": "Fetch",
     "errorUnreachable": "The server does not answer. Syncing goes on once it is back.",
     "errorInsecure": "This address is not safe. Use https, or http only on this computer, a private network or a tailnet.",
@@ -1209,12 +1211,10 @@
     "lastSeen": "seen {{time}} ago",
     "disconnectServer": "Disconnect server",
     "disconnectServerHint": "This device stops syncing. Vaults stay here and on the server.",
-    "vaultsHere": "Vaults on this device",
     "vaultsHereHint": "Only the open vault syncs; the others catch up when opened. Disconnecting keeps a vault on the server, and changes made meanwhile come along when you connect it again. Deleting from the server leaves the copies on your devices.",
     "stateLocal": "only here",
     "statePaused": "disconnected",
     "stateSynced": "syncing",
-    "openVault": "Open",
     "upload": "Put on server",
     "pause": "Disconnect",
     "resume": "Connect again",
@@ -1227,6 +1227,11 @@
     "goneFromServer": "This vault was removed from the server. It stays here as a local vault.",
     "replaceWarning": "This vault syncs: the backup also replaces it on your other devices, which first save a backup of their own.",
     "unencrypted": "The connection is stored unencrypted on this device, because the system keychain was refused or is missing. Connect again and allow the keychain to change that.",
-    "keychainWarning": "Emerald keeps the connection in the system keychain. If you refuse access, it is stored unencrypted on this device instead."
+    "keychainWarning": "Emerald keeps the connection in the system keychain. If you refuse access, it is stored unencrypted on this device instead.",
+    "server": "Server",
+    "deleteFromServerConfirm": "Remove from the server?",
+    "noServer": "No server is connected.",
+    "pickerHint": "Connecting the server, fetching vaults from it and its devices are in the vault picker, which also works with no vault open.",
+    "openPicker": "Server and vaults…"
   }
 }

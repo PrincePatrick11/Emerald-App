@@ -94,7 +94,7 @@ Top-level keys of `en.json`, with the conventions worth knowing:
 | `tags` | Tags view (`new`, `name`, `nameTaken`, `color`, `unused`, `onlyInTemplates`) |
 | `properties` | Right sidebar Properties panel |
 | `filters` | Filter panel; `all` is the "All" row every `FilterList` shows on top |
-| `vault` | `VaultModal`: list/switch, edit, create, open/relocate, delete. Some keys (`chooseFolder`, `defaultFolder`, `alreadyOpen`, `accessDenied`, `folderHasVault`, `folderNotEmpty`) also serve the backup import's add-vault mode via `VaultLocationRow` and `NEW_VAULT_TARGET_ERROR_KEY` |
+| `vault` | `VaultPicker`: list/switch, edit, create, open/relocate, delete, the way back. Some keys (`chooseFolder`, `defaultFolder`, `alreadyOpen`, `accessDenied`, `folderHasVault`, `folderNotEmpty`) also serve the backup import's add-vault mode via `VaultLocationRow` and `NEW_VAULT_TARGET_ERROR_KEY` |
 | `settings` | Settings modal |
 | `vaultKey` | `VaultKeyDialog` and its shared parts: unlock, create, encrypt, recover, the recovery-key box, the "remember on this device" switch and the failure texts (`wrongPassword`, `tooShort` with `{{count}}`, …) |
 | `security` | Settings → Security: remember, lock, change password, each with a hint and a tooltip |

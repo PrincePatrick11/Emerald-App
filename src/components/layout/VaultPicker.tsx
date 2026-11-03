@@ -1,16 +1,18 @@
 import { useCallback, useEffect, useState } from 'react';
-import ServerVaultForm from './ServerVaultForm';
 import { useTranslation } from 'react-i18next';
 import { open as openDialog } from '@tauri-apps/plugin-dialog';
-import { AlertTriangle, Check, FolderOpen, Loader2, Pencil, Plus, RotateCcw, Trash2, Vault, X, Cloud } from 'lucide-react';
-import Modal from '../ui/Modal';
+import { AlertTriangle, ArrowLeft, Check, Cloud, CloudOff, FolderOpen, Loader2, Pencil, Plus, RotateCcw, Trash2, Vault, X } from 'lucide-react';
 import Button from '../ui/Button';
 import EmojiPicker from '../ui/EmojiPicker';
 import { DEFAULT_EMOJI_PICKER_EMOJIS } from '../../lib/emojiSearch';
-import { hasActiveVault, useVaultStore } from '../../store/vaultStore';
-import { VAULT_KEY_CANCELLED } from '../../store/vaultKeyStore';
+import { activeVault, hasActiveVault, useVaultStore } from '../../store/vaultStore';
+import { ensureVaultReady, VAULT_KEY_CANCELLED } from '../../store/vaultKeyStore';
+import { closeVaultPicker, useVaultPickerStore } from '../../store/vaultPickerStore';
 import { keyErrorOf } from '../../lib/vaultKeys';
-import { useCloseOnKeepEditing } from '../../hooks/useCloseOnKeepEditing';
+import { enterPickerWindow, leavePickerWindow } from '../../lib/pickerWindow';
+import { hideLoadingScreen, hideSplash, showLoadingScreen } from '../../lib/splash';
+import { serverStatus, type ServerStatus } from '../../lib/sync/engine';
+import PickerServerSection from './PickerServerSection';
 import {
   DB_FILE,
   NEW_VAULT_TARGET_ERROR_KEY,
@@ -24,14 +26,6 @@ import {
   splitPath,
   type Vault as VaultRecord,
 } from '../../lib/vaultManager';
-
-interface Props {
-  onClose: () => void;
-  /** `false` while no vault exists: there is no app behind this modal to
-   *  return to. Nothing else changes — the setup state is this same modal with
-   *  an empty list. See the gate in `AppShell`. */
-  dismissible?: boolean;
-}
 
 const INPUT_CLASS = 'input-field flex-1 min-w-0 rounded-lg px-2.5 py-1.5 text-sm outline-none';
 const CHECKBOX_CLASS =
@@ -242,11 +236,13 @@ function DeleteConfirmRow({
 }
 
 function VaultRow({
-  vault, isActive, unreachable, isSwitching, busy, onSwitch, onEdit, onRelocate, onDelete,
+  vault, isActive, unreachable, sync, isSwitching, busy, onSwitch, onEdit, onRelocate, onDelete,
 }: {
   vault: VaultRecord;
   isActive: boolean;
   unreachable: 'missing' | 'denied' | null;
+  /** Its place on the server, if it has one. */
+  sync: 'synced' | 'paused' | null;
   isSwitching: boolean;
   busy: boolean;
   onSwitch: () => void;
@@ -260,9 +256,10 @@ function VaultRow({
     <div className={isActive ? 'vault-card vault-card-active' : 'vault-card vault-card-idle'}>
       <button
         type="button"
-        disabled={isActive || busy || isUnreachable}
+        // The open vault stays clickable: choosing it is the way back to it.
+        disabled={busy || (isUnreachable && !isActive)}
         onClick={onSwitch}
-        title={isActive || isUnreachable ? undefined : t('vault.switch')}
+        title={isUnreachable ? undefined : isActive ? t('vault.backTo', { name: vault.name }) : t('vault.switch')}
         className="flex items-center gap-3 flex-1 min-w-0 text-left"
       >
         {/* Status beats identity: during a switch and with an unreachable
@@ -275,7 +272,14 @@ function VaultRow({
               : <VaultGlyph icon={vault.icon} size={16} />}
         </div>
         <div className="flex-1 min-w-0">
-          <div className="vault-name">{vault.name}</div>
+          <div className="vault-name flex items-center gap-1.5 min-w-0">
+            <span className="truncate">{vault.name}</span>
+            {sync && (
+              <span className="shrink-0 flex" title={t(sync === 'paused' ? 'sync.statePaused' : 'sync.stateSynced')}>
+                {sync === 'paused' ? <CloudOff size={12} /> : <Cloud size={12} />}
+              </span>
+            )}
+          </div>
           <div className={`vault-meta truncate${isUnreachable ? ' text-danger' : ''}`} title={vault.path}>
             {isSwitching
               ? t('vault.switching')
@@ -363,18 +367,30 @@ function CreateRow({
   );
 }
 
-// ── modal ────────────────────────────────────────────────────────────────────
+// ── picker ───────────────────────────────────────────────────────────────────
 
-export default function VaultModal({ onClose, dismissible = true }: Props) {
+/**
+ * The start view for choosing a vault: its own view in the main window, not a
+ * modal and not a second window, so there is one set of stores and the
+ * question about unsaved edits stays where the edits are.
+ *
+ * `AppShell` shows it instead of the shell when no vault is open (first start,
+ * the last vault removed, the vault to start with did not open or its password
+ * was cancelled) and when it is asked for (`openVaultPicker`). Meanwhile the
+ * window has a small fixed size (`pickerWindow.ts`); a choice brings the
+ * loading screen, then the window's own size again.
+ */
+export default function VaultPicker() {
   const { t } = useTranslation();
   const vaults = useVaultStore((s) => s.vaults);
   const activeVaultId = useVaultStore((s) => s.activeVaultId);
+  const current = useVaultStore(activeVault);
   const switchVault = useVaultStore((s) => s.switchVault);
   const addVault = useVaultStore((s) => s.addVault);
   const updateVault = useVaultStore((s) => s.updateVault);
   const relocateVault = useVaultStore((s) => s.relocateVault);
   const removeVault = useVaultStore((s) => s.removeVault);
-  useCloseOnKeepEditing(onClose);
+  const notice = useVaultPickerStore((s) => s.notice);
 
   const [editor, setEditor] = useState<Editor>({ kind: 'none' });
   const [switchingId, setSwitchingId] = useState<string | null>(null);
@@ -383,8 +399,21 @@ export default function VaultModal({ onClose, dismissible = true }: Props) {
   // The difference is that between "look elsewhere" and "allow access".
   const [unreachable, setUnreachable] = useState<Map<string, 'missing' | 'denied'>>(new Map());
   const [error, setError] = useState('');
-  const [fromServer, setFromServer] = useState(false);
+  const [server, setServer] = useState<ServerStatus | null>(null);
 
+  // The window takes the picker's size; the loading screen of a start that
+  // ends here goes only once it has (`AppShell` leaves it to this effect), so
+  // the large empty window is never seen shrinking. Leaving restores it — on
+  // a choice that already happened while the loading screen covered it.
+  useEffect(() => {
+    void enterPickerWindow().finally(hideSplash);
+    return () => { void leavePickerWindow(); };
+  }, []);
+
+  const refreshServer = useCallback(() => {
+    serverStatus().then(setServer, (e) => console.warn('[sync] status', e));
+  }, []);
+  useEffect(refreshServer, [refreshServer]);
 
   // Which vaults are still where vaults.json says they are. A folder on an
   // unplugged drive, or one that was renamed, has to be visible as such rather
@@ -417,6 +446,50 @@ export default function VaultModal({ onClose, dismissible = true }: Props) {
   }, []);
 
   /**
+   * Opens a vault and leaves the picker. The password comes first, in the
+   * picker; then the loading screen covers the switch and the window growing
+   * back to its own size, so neither the empty shell nor the resize is seen.
+   *
+   * The picker stays up through all of it (`open`), also where it only showed
+   * for want of a vault: `switchVault` makes the vault active before it is
+   * opened, and the shell must not mount on a database that is still locked.
+   */
+  async function choose(id: string): Promise<void> {
+    if (switchingId) return;
+    const state = useVaultStore.getState();
+    const vault = state.vaults.find((v) => v.id === id);
+    if (!vault) return;
+    if (id === state.activeVaultId) {
+      closeVaultPicker();
+      return;
+    }
+    setSwitchingId(id);
+    setError('');
+    useVaultPickerStore.setState({ open: true, notice: null });
+    try {
+      await ensureVaultReady(vault);
+      showLoadingScreen();
+      // The open edits were settled when the picker opened (`openVaultPicker`).
+      await switchVault(id, { editsResolved: true });
+    } catch (e) {
+      hideLoadingScreen();
+      setSwitchingId(null);
+      // Cancelling is not an error: the user did not want to enter the password.
+      if (keyErrorOf(e) === VAULT_KEY_CANCELLED) return;
+      console.error('[vault] switch failed', e);
+      setError(t('vault.switchFailed'));
+      return;
+    }
+    closeVaultPicker();
+    await leavePickerWindow();
+    // Two frames: the shell has painted at its own size before the cover goes.
+    // With a timer beside them: a hidden or covered window gets no frames,
+    // and the cover must not wait until someone looks at it.
+    requestAnimationFrame(() => requestAnimationFrame(hideLoadingScreen));
+    setTimeout(hideLoadingScreen, 250);
+  }
+
+  /**
    * Every action here has the same shape: clear the previous message, do the
    * thing, and show one shared message if it throws. Without the clearing step
    * a stale error outlives the next successful action.
@@ -426,8 +499,6 @@ export default function VaultModal({ onClose, dismissible = true }: Props) {
     try {
       await action();
     } catch (e) {
-      // Creating and opening end in a switch — cancelling at the password is
-      // not an error.
       if (keyErrorOf(e) === VAULT_KEY_CANCELLED) return;
       console.error(`[vault] ${label} failed`, e);
       setError(t('vault.saveFailed'));
@@ -484,30 +555,12 @@ export default function VaultModal({ onClose, dismissible = true }: Props) {
     return true;
   }
 
-  /** Adds a vault to the list, and during first-run setup activates it — that
-   *  is what fills the empty stores and lets the app shell take over. */
+  /** Adds a vault to the list. With no vault open it is opened right away —
+   *  there is nothing else to go back to. */
   async function adoptVault(record: VaultRecord) {
-    const hadActive = hasActiveVault({ vaults, activeVaultId });
+    const hadActive = hasActiveVault(useVaultStore.getState());
     await addVault(record);
-    if (!hadActive) await switchVault(record.id);
-  }
-
-  async function handleSwitch(id: string) {
-    if (id === activeVaultId || switchingId) return;
-    setSwitchingId(id);
-    setError('');
-    try {
-      await switchVault(id);
-      onClose();
-    } catch (e) {
-      // Cancelling is not an error: the user did not want to enter the password.
-      if (keyErrorOf(e) !== VAULT_KEY_CANCELLED) {
-        console.error('[vault] switch failed', e);
-        setError(t('vault.switchFailed'));
-      }
-    } finally {
-      setSwitchingId(null);
-    }
+    if (!hadActive) await choose(record.id);
   }
 
   async function commitEdit(id: string, name: string, icon?: string) {
@@ -590,116 +643,124 @@ export default function VaultModal({ onClose, dismissible = true }: Props) {
       closeEditor();
     } finally {
       setRemovingId(null);
+      refreshServer();
     }
   }
 
+  const syncState = (id: string): 'synced' | 'paused' | null => {
+    const link = server?.url ? server.links[id] : undefined;
+    return link ? (link.paused ? 'paused' : 'synced') : null;
+  };
+
   return (
-    <Modal
-      title={t('vault.title')}
-      onClose={onClose}
-      dismissible={dismissible}
-      widthClassName="w-[480px]"
-      maxHeightClassName="max-h-[80vh]"
-      bodyClassName="flex-1 overflow-y-auto px-5 py-4"
-    >
-      <p className="text-xs mb-3" style={{ color: 'var(--text-muted)' }}>
-        {t('vault.hint')}
-      </p>
+    <div className="app-sheet-frame app-sheet-frame-free-left flex flex-1 min-h-0">
+      <main className="app-main app-sheet-main flex-1 min-w-0 overflow-y-auto">
+        <div className="px-5 py-4 space-y-6">
+          <section>
+            <div className="flex items-center justify-between gap-3 mb-1">
+              <h1 className="text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>{t('vault.title')}</h1>
+              {current && (
+                <Button tone="neutral" disabled={switchingId !== null} onClick={closeVaultPicker}>
+                  <ArrowLeft size={12} className="shrink-0" />
+                  <span className="truncate">{t('vault.backTo', { name: current.name })}</span>
+                </Button>
+              )}
+            </div>
+            <p className="text-xs mb-3" style={{ color: 'var(--text-muted)' }}>
+              {t('vault.hint')}
+            </p>
+            {notice && <p className="text-xs mb-3 text-danger">{t(notice)}</p>}
 
-      <div className="space-y-2">
-        {vaults.map((v) => {
-          if (editor.kind === 'edit' && editor.id === v.id) {
-            return (
-              <EditRow
-                key={v.id}
-                name={editor.name}
-                icon={editor.icon}
-                onChangeName={(name) => setEditor({ ...editor, name })}
-                onChangeIcon={(icon) => setEditor({ ...editor, icon })}
-                onCommit={() => commitEdit(v.id, editor.name, editor.icon)}
-                onCancel={closeEditor}
-              />
-            );
-          }
-
-          if (editor.kind === 'confirmDelete' && editor.id === v.id) {
-            return (
-              <DeleteConfirmRow
-                key={v.id}
-                vault={v}
-                deleteFiles={editor.deleteFiles}
-                busy={removingId === v.id}
-                hintKey={
-                  vaults.length === 1
-                    ? 'vault.deleteLastHint'
-                    : v.id === activeVaultId
-                      ? 'vault.deleteActiveHint'
-                      : 'vault.deleteHint'
+            <div className="space-y-2">
+              {vaults.map((v) => {
+                if (editor.kind === 'edit' && editor.id === v.id) {
+                  return (
+                    <EditRow
+                      key={v.id}
+                      name={editor.name}
+                      icon={editor.icon}
+                      onChangeName={(name) => setEditor({ ...editor, name })}
+                      onChangeIcon={(icon) => setEditor({ ...editor, icon })}
+                      onCommit={() => commitEdit(v.id, editor.name, editor.icon)}
+                      onCancel={closeEditor}
+                    />
+                  );
                 }
-                onToggleFiles={(deleteFiles) => setEditor({ kind: 'confirmDelete', id: v.id, deleteFiles })}
-                onConfirm={() => handleRemove(v.id, editor.deleteFiles)}
-                onCancel={closeEditor}
-              />
-            );
-          }
 
-          const isActive = v.id === activeVaultId;
-          return (
-            <VaultRow
-              key={v.id}
-              vault={v}
-              isActive={isActive}
-              unreachable={unreachable.get(v.id) ?? null}
-              isSwitching={switchingId === v.id}
-              busy={switchingId !== null}
-              onSwitch={() => handleSwitch(v.id)}
-              onEdit={() => setEditor({ kind: 'edit', id: v.id, name: v.name, icon: v.icon })}
-              onRelocate={() => handleRelocate(v.id)}
-              onDelete={() => setEditor({ kind: 'confirmDelete', id: v.id, deleteFiles: false })}
-            />
-          );
-        })}
+                if (editor.kind === 'confirmDelete' && editor.id === v.id) {
+                  return (
+                    <DeleteConfirmRow
+                      key={v.id}
+                      vault={v}
+                      deleteFiles={editor.deleteFiles}
+                      busy={removingId === v.id}
+                      hintKey={
+                        vaults.length === 1
+                          ? 'vault.deleteLastHint'
+                          : v.id === activeVaultId
+                            ? 'vault.deleteActiveHint'
+                            : 'vault.deleteHint'
+                      }
+                      onToggleFiles={(deleteFiles) => setEditor({ kind: 'confirmDelete', id: v.id, deleteFiles })}
+                      onConfirm={() => handleRemove(v.id, editor.deleteFiles)}
+                      onCancel={closeEditor}
+                    />
+                  );
+                }
 
-        {fromServer ? (
-          <ServerVaultForm
-            onCancel={() => setFromServer(false)}
-            onDone={() => { setFromServer(false); onClose(); }}
-          />
-        ) : editor.kind === 'create' ? (
-          <CreateRow
-            name={editor.name}
-            icon={editor.icon}
-            baseDir={editor.baseDir}
-            customPath={editor.customPath}
-            onChangeName={(name) => setEditor({ ...editor, name })}
-            onChangeIcon={(icon) => setEditor({ ...editor, icon })}
-            onPickFolder={async () => {
-              const customPath = await pickFolder();
-              if (customPath) setEditor({ ...editor, customPath });
-            }}
-            onResetFolder={() => setEditor({ ...editor, customPath: null })}
-            onCommit={() => commitCreate(editor)}
-            onCancel={closeEditor}
-          />
-        ) : (
-          <div className="flex gap-2">
-            <Button variant="primary" className="flex-1 justify-center" onClick={openCreateRow}>
-              <Plus size={16} className="shrink-0" />
-              {t('vault.add')}
-            </Button>
-            <Button variant="secondary" className="flex-1 justify-center" onClick={handleOpenExisting}>
-              <FolderOpen size={16} className="shrink-0" />
-              {t('vault.open')}
-            </Button>
-            <Button variant="secondary" className="flex-1 justify-center" onClick={() => setFromServer(true)}>
-              <Cloud size={16} className="shrink-0" />
-              {t('sync.fromServer')}
-            </Button>
-          </div>
-        )}
-      </div>
+                return (
+                  <VaultRow
+                    key={v.id}
+                    vault={v}
+                    isActive={v.id === activeVaultId}
+                    unreachable={unreachable.get(v.id) ?? null}
+                    sync={syncState(v.id)}
+                    isSwitching={switchingId === v.id}
+                    busy={switchingId !== null}
+                    onSwitch={() => { void choose(v.id); }}
+                    onEdit={() => setEditor({ kind: 'edit', id: v.id, name: v.name, icon: v.icon })}
+                    onRelocate={() => handleRelocate(v.id)}
+                    onDelete={() => setEditor({ kind: 'confirmDelete', id: v.id, deleteFiles: false })}
+                  />
+                );
+              })}
 
-      {error && <p className="text-xs mt-3 text-danger">{error}</p>}
-    </Modal>
+              {editor.kind === 'create' ? (
+                <CreateRow
+                  name={editor.name}
+                  icon={editor.icon}
+                  baseDir={editor.baseDir}
+                  customPath={editor.customPath}
+                  onChangeName={(name) => setEditor({ ...editor, name })}
+                  onChangeIcon={(icon) => setEditor({ ...editor, icon })}
+                  onPickFolder={async () => {
+                    const customPath = await pickFolder();
+                    if (customPath) setEditor({ ...editor, customPath });
+                  }}
+                  onResetFolder={() => setEditor({ ...editor, customPath: null })}
+                  onCommit={() => commitCreate(editor)}
+                  onCancel={closeEditor}
+                />
+              ) : (
+                <div className="flex gap-2">
+                  <Button variant="primary" className="flex-1 justify-center" onClick={openCreateRow}>
+                    <Plus size={16} className="shrink-0" />
+                    {t('vault.add')}
+                  </Button>
+                  <Button variant="secondary" className="flex-1 justify-center" onClick={handleOpenExisting}>
+                    <FolderOpen size={16} className="shrink-0" />
+                    {t('vault.open')}
+                  </Button>
+                </div>
+              )}
+            </div>
+
+            {error && <p className="text-xs mt-3 text-danger">{error}</p>}
+          </section>
+
+          <PickerServerSection onOpen={choose} onChange={refreshServer} />
+        </div>
+      </main>
+    </div>
   );
 }

@@ -148,7 +148,7 @@ export default function EmojiPicker({
     <div ref={ref} className={wrapperClassName}>
       {trigger({ open, toggle: () => setOpen((o) => !o) })}
       {/* In a portal instead of in the trigger: otherwise the first ancestor with
-          `overflow` clips the popover, in the vault modal for example the scrolling body,
+          `overflow` clips the popover, in the vault picker for example the scrolling body,
           in which there is not even anything to scroll. Positioning is done
           by itself, in viewport coordinates (see `place`), and `z-[9999]`
           is the level that ContextMenu and MenuDropdown use for overlays above

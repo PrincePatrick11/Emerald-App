@@ -54,7 +54,7 @@ PDF export renders in a hidden window that the per-platform `export_pdf` command
 | `register_vaults`, `ensure_vault_dirs`, `create_vault_dirs`, `ensure_backup_dir`, `probe_vault_dir`, `delete_vault_files`, `discard_import_staging`, `prune_migration_backups` | `vault.rs` | see [Vault Directories as a Trust Boundary](#vault-directories-as-a-trust-boundary) |
 | `read_vault_drafts`, `write_vault_drafts` | `vault.rs` | the vault's `drafts.json`, see [Vault JSON files](#vault-json-files) |
 | `read_vault_settings`, `write_vault_settings` | `vault.rs` | the vault's `settings.json`, see [Vault JSON files](#vault-json-files) |
-| `default_vault_dir`, `new_vault_base_dir`, `legacy_default_db_exists` | `vault.rs` | path/existence oracles for the vault modal and the backup import's add-vault mode; take no path |
+| `default_vault_dir`, `new_vault_base_dir`, `legacy_default_db_exists` | `vault.rs` | path/existence oracles for the vault picker and the backup import's add-vault mode; take no path |
 | `migrate_vault_layout` | `vault.rs` | moves a pre-0.2.1 flat `.db` into its own vault directory; the legacy name is validated with `is_valid_legacy_db_name` |
 | `close_request_seen` | `lib.rs` | no arguments: tells Rust the frontend is handling a close request (see [Closing the window](architecture/shell.md#closing-the-window)). All it can do is *prevent* the fallback that closes an unresponsive window |
 | `update_menu_labels`, `set_export_menu_enabled`, `set_altar_export_menu_enabled`, `set_view_menu_checked` | `lib.rs` | native-menu state sync; no-ops on Windows/Linux, where no native menu is installed |
@@ -168,7 +168,7 @@ The directories go last with plain `remove_dir`, which fails while anything else
 
 **`probe_vault_dir` is a deliberate exception:** it takes a raw path and is not confined to any root, because it answers "what is in the folder the user just picked?" before that folder is registered. It returns four booleans — exists, access denied, holds a database, is empty — and reads no content: an existence oracle for arbitrary paths and nothing more.
 
-**macOS: picking a file does not grant access to its folder.** "Open vault" and "Locate again" use a file dialog filtered to `.db` (a folder dialog lists no files, so nothing would show whether a folder holds a vault), and the vault directory is the file's parent. Under TCC, choosing a file inside `~/Documents`, `~/Desktop` or an iCloud-synced folder grants access to that file only, not to listing its parent. `probe_vault_dir` then reports `denied`, and the vault modal says "no access to the folder" rather than "no vault here"; `images_dir()` behaves the same afterwards. No Rust-side work gets around it — only the user can grant the permission.
+**macOS: picking a file does not grant access to its folder.** "Open vault" and "Locate again" use a file dialog filtered to `.db` (a folder dialog lists no files, so nothing would show whether a folder holds a vault), and the vault directory is the file's parent. Under TCC, choosing a file inside `~/Documents`, `~/Desktop` or an iCloud-synced folder grants access to that file only, not to listing its parent. `probe_vault_dir` then reports `denied`, and the vault picker says "no access to the folder" rather than "no vault here"; `images_dir()` behaves the same afterwards. No Rust-side work gets around it — only the user can grant the permission.
 
 ### Vault JSON files
 

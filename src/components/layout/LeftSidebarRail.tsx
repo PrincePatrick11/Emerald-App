@@ -8,12 +8,11 @@ import { useAutoBackupStore } from '../../store/autoBackupStore';
 import { useSettingsStore } from '../../store/settingsStore';
 import { markAutoBackupErrorSeen } from '../../lib/autoBackup';
 import { asUpdateError, checkForUpdate, updateSettings } from '../../lib/updates';
-import VaultModal, { VaultGlyph } from './VaultModal';
+import { VaultGlyph } from './VaultPicker';
+import { openVaultPicker } from '../../store/vaultPickerStore';
 
 // SettingsModal drags the complete backup/restore machinery (dbBackup)
 // along with it — as a chunk of its own, only on first open.
-// VaultModal stays eager: VaultGlyph is needed for the rail button,
-// and AppShell renders it on first start anyway.
 const SettingsModal = lazy(() => import('./settings/SettingsModal'));
 // Only the type — `import type` disappears on compilation and does not pull
 // the module back into the main chunk.
@@ -59,7 +58,6 @@ export default function LeftSidebarRail() {
   const activeViewType = useUIStore((s) => s.activeView.type);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settingsPage, setSettingsPage] = useState<SettingsPage>('general');
-  const [vaultOpen, setVaultOpen] = useState(false);
   // Selector on a primitive, not on the vault record: otherwise `find` returns
   // an object on every store update that zustand reads as changed.
   const activeVaultIcon = useVaultStore((s) => s.vaults.find((v) => v.id === s.activeVaultId)?.icon);
@@ -134,7 +132,7 @@ export default function LeftSidebarRail() {
         {viewButton('categories', AUX_VIEWS.categories)}
         {viewButton('tags', AUX_VIEWS.tags)}
         {viewButton('trash', AUX_VIEWS.trash)}
-        <RailButton onClick={() => setVaultOpen(true)} title={t('nav.vaults')}>
+        <RailButton onClick={() => { void openVaultPicker(); }} title={t('nav.vaults')}>
           {/* 17px only for the emoji: it carries no stroke width and otherwise
               looks too large next to the lucide icons. The fallback glyph is
               itself a lucide icon and stays at the 18 of its neighbours. */}
@@ -172,7 +170,6 @@ export default function LeftSidebarRail() {
         </RailButton>
       </div>
 
-      {vaultOpen && <VaultModal onClose={() => setVaultOpen(false)} />}
       {settingsOpen && (
         <Suspense fallback={null}>
           <SettingsModal

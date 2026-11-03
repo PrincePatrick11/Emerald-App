@@ -6,7 +6,7 @@ import { AlertTriangle, Download, FolderOpen, Upload } from 'lucide-react';
 import { open as openDialog } from '@tauri-apps/plugin-dialog';
 import Button from '../../ui/Button';
 import BlockCheckbox from '../../blocks/BlockCheckbox';
-import { VaultLocationRow } from '../VaultModal';
+import { VaultLocationRow } from '../VaultPicker';
 import {
   NEW_VAULT_TARGET_ERROR_KEY,
   newVaultBaseDir,
@@ -85,7 +85,7 @@ export default function BackupPage() {
   // existing data.
   const [importMode, setImportMode] = useState<ImportMode>('add-vault');
   const [newVaultName, setNewVaultName] = useState('');
-  // Target folder of the new vault — the same mechanism as in the vault modal:
+  // Target folder of the new vault — the same mechanism as in the vault picker:
   // `{Documents}/Emerald Vaults` as the base, a folder chosen by hand
   // overrides it.
   const [vaultBaseDir, setVaultBaseDir] = useState<string | null>(null);
@@ -126,7 +126,7 @@ export default function BackupPage() {
       setImportedFile({ backup: result.backup, preview: result.preview });
       setNewVaultName(t('settings.importedVault'));
       setVaultCustomPath(null);
-      // Like `openCreateRow` in the vault modal: resolve once so the row shows
+      // Like `openCreateRow` in the vault picker: resolve once so the row shows
       // a real path from the start — and before the import becomes clickable,
       // otherwise a quick click runs into the fallback
       // `{appDataDir}/vaults/{id}`. If resolving fails, that fallback stays.
@@ -384,7 +384,7 @@ export default function BackupPage() {
                         const picked = await openDialog({ directory: true, multiple: false });
                         if (typeof picked !== 'string') return;
                         setVaultCustomPath(picked);
-                        // Like `pickFolder` in the vault modal: the correction
+                        // Like `pickFolder` in the vault picker: the correction
                         // takes the old error message away immediately.
                         setImportError('');
                       }}

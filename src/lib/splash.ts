@@ -70,6 +70,29 @@ export function hideSplash(): void {
   fadeOutAndRemove(splash);
 }
 
+/** The loading screen standing in while a vault chosen in the picker opens. */
+let openLoading: HTMLElement | null = null;
+
+/**
+ * Covers the window with the loading screen while a vault chosen in the
+ * picker opens, until {@link hideLoadingScreen}. A fresh copy like the
+ * preview, but without its click to dismiss: it goes once the vault is there.
+ */
+export function showLoadingScreen(): void {
+  if (!template || openLoading) return;
+  const el = template.cloneNode(true) as HTMLElement;
+  el.removeAttribute('id');
+  openLoading = el;
+  document.body.appendChild(el);
+}
+
+/** Idempotent, like {@link hideSplash}. */
+export function hideLoadingScreen(): void {
+  const el = openLoading;
+  openLoading = null;
+  if (el) fadeOutAndRemove(el);
+}
+
 /**
  * Shows the loading screen once more, until a click anywhere (or
  * Escape) — so that one can look at it in peace instead of catching it
@@ -79,6 +102,7 @@ export function hideSplash(): void {
  * animations from the beginning, including the one-off run-up of the lettering.
  */
 export function showSplash(): void {
+  if (openLoading) return;
   if (!template || openPreview) return;
   const el = template.cloneNode(true) as HTMLElement;
 

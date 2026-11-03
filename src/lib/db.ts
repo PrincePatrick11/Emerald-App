@@ -56,7 +56,7 @@ export function markDbReplaced(): void {
  * Dropping the JavaScript reference is not enough: the connection pool lives in
  * Rust (`db.rs`), and an open pool keeps the file locked. On Windows that
  * means the vault's folder cannot be moved, relocated, or deleted for the rest
- * of the session — which is exactly what the vault modal's "delete files"
+ * of the session — which is exactly what the vault picker's "delete files"
  * checkbox tries to do.
  */
 export async function resetDbCache(): Promise<void> {

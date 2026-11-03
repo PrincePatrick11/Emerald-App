@@ -1,6 +1,7 @@
 import { emit } from '@tauri-apps/api/event';
 import { useUIStore } from '../store/uiStore';
 import { hasActiveVault, useVaultStore } from '../store/vaultStore';
+import { openVaultPicker, useVaultPickerStore } from '../store/vaultPickerStore';
 import { showSplash } from './splash';
 import type { ActiveView } from '../types';
 
@@ -20,6 +21,7 @@ export type MenuActionId =
   | 'toggle-right-sidebar'
   | 'toggle-view-lock'
   | 'show-splash'
+  | 'switch-vault'
   | 'export-pdf'
   | 'export-markdown'
   | 'export-emerald'
@@ -45,6 +47,7 @@ const SELF_CONTAINED: Record<SelfContainedMenuActionId, true> = {
   'toggle-right-sidebar': true,
   'toggle-view-lock': true,
   'show-splash': true,
+  'switch-vault': true,
   'export-pdf': true,
   'export-markdown': true,
   'export-emerald': true,
@@ -80,20 +83,27 @@ export async function runMenuAction(id: SelfContainedMenuActionId): Promise<void
       return;
     // Shows the loading screen once more, until somewhere is clicked.
     // Sits up here with the toggles because, like them, it needs no
-    // vault — it should be viewable during vault setup too,
+    // vault — it should be viewable in the vault picker too,
     // which is the moment when one is most likely to look for it.
     case 'show-splash':
       showSplash();
       return;
+    // Emerald → "Switch vault…". With no vault open the picker is up already.
+    case 'switch-vault':
+      void openVaultPicker();
+      return;
   }
 
-  // During vault setup there is no database, but the menu bar
-  // is there — it sits in the title bar, which stays visible so that
-  // the window can be operated. Without this guard, "Export" would run into a
-  // raw NO_ACTIVE_VAULT dialog, and "Import Markdown" would wait for a
-  // target modal that is not even mounted during setup: the promise would never
-  // resolve and would pop up as soon as the first vault was ready.
-  if (!hasActiveVault(useVaultStore.getState())) return;
+  // In the vault picker without a vault there is no database, but the macOS
+  // menu bar is still there (the HTML menu is not drawn over the picker).
+  // Without this guard, "Export" would run into a raw NO_ACTIVE_VAULT dialog,
+  // and "Import Markdown" would wait for a target modal that is not even
+  // mounted then: the promise would never resolve and would pop up as soon as
+  // the first vault was ready.
+  //
+  // The same holds while the picker is up over an open vault: no view of the
+  // vault is there to act on.
+  if (!hasActiveVault(useVaultStore.getState()) || useVaultPickerStore.getState().open) return;
 
   // The export/import modules (including turndown and marked) are only loaded on the
   // first menu call — otherwise they would hang on the startup path via AppShell.
