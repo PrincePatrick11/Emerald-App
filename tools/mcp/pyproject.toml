@@ -1,0 +1,21 @@
+[project]
+name = "emerald-devtools-mcp"
+version = "0.1.0"
+description = "MCP server that drives a running Tauri/Emerald app via Chromium DevTools Protocol."
+requires-python = ">=3.10"
+dependencies = [
+    "mcp>=1.10,<2",
+    "aiohttp>=3.9.0",
+]
+
+[project.scripts]
+emerald-devtools-mcp = "server:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+py-modules = ["server", "cdp", "dialogs", "instance", "launcher", "tauri_config", "window"]
+# cdp.py reads pagelib.js from its own directory, so this runs from the source
+# tree or an editable install (pip install -e .), not from a built wheel.

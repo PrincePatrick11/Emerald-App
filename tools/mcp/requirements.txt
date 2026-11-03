@@ -1,0 +1,4 @@
+# MCP server runtime
+mcp>=1.10,<2
+# Async HTTP + WebSocket client (CDP uses WebSocket; /json endpoint is HTTP)
+aiohttp>=3.9.0

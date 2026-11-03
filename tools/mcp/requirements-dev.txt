@@ -1,0 +1,4 @@
+# Running the tests (see README, Development)
+-r requirements.txt
+pytest>=8
+pytest-asyncio>=0.23

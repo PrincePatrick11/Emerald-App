@@ -1,0 +1,123 @@
+{
+  "_comment": [
+    "Test data for an MCP instance's seed vault (Emerald 0.1.3.x schema).",
+    "Rows are inserted table by table in the order of this file; within a table",
+    "in file order. Columns are filtered against PRAGMA table_info, so a column",
+    "the app drops later is skipped instead of failing the build.",
+    "",
+    "Placeholders, expanded by build_seed.mjs:",
+    "  @@chip(id,entryType,Label)@@  an internal-link chip as the editor writes it",
+    "  @@img(name)@@                 absolute path of a generated test image in",
+    "                                the instance's images dir (see IMAGES there)",
+    "",
+    "The data is shaped for the export features: a journal entry with paradigm,",
+    "banishing and meditation types, linked operations and wiki articles, inline",
+    "links, a custom property and a large image; entries that link onwards so",
+    "'including indirect' finds more than 'directly linked'; a Sigil operation",
+    "(excluded from export); trashed items; and an altar."
+  ],
+  "tags": [
+    { "id": "seed-tag-ritual", "name": "ritual", "color": "#8347ff" },
+    { "id": "seed-tag-moon", "name": "moon", "color": "#3b82f6" },
+    { "id": "seed-tag-research", "name": "research", "color": "#10b981" }
+  ],
+  "wiki_articles": [
+    {
+      "id": "seed-wiki-chaos", "title": "Chaos Magic", "slug": "chaos-magic", "category": "paradigm", "entry_number": 1,
+      "content": "<h2>Belief as a tool</h2><p>Adopt a belief for as long as it is useful, then drop it. Practical starting point: @@chip(seed-wiki-sigil,wiki,Sigil Method)@@.</p>",
+      "tags": "[\"research\"]", "created_at": "2026-08-01T10:00:00.000Z", "updated_at": "2026-08-01T10:00:00.000Z"
+    },
+    {
+      "id": "seed-wiki-sigil", "title": "Sigil Method", "slug": "sigil-method", "category": "spell", "entry_number": 2,
+      "content": "<h2>Steps</h2><ol><li>Write the statement of intent.</li><li>Strike repeated letters.</li><li>Combine the rest into a glyph.</li></ol><p>Time the charging with the @@chip(seed-wiki-moon,wiki,Moon Phases)@@.</p><img src=\"@@img(diagram)@@\" style=\"width: 300px;\"><h2>Charging</h2><p>Gnosis, then forget.</p>",
+      "tags": "[\"research\"]", "created_at": "2026-08-02T10:00:00.000Z", "updated_at": "2026-08-02T10:00:00.000Z"
+    },
+    {
+      "id": "seed-wiki-moon", "title": "Moon Phases", "slug": "moon-phases", "category": "concept", "entry_number": 3,
+      "content": "<p>Eight phases, from new moon to waning crescent.</p><ul><li>New moon &mdash; beginnings</li><li>Full moon &mdash; charging</li></ul>",
+      "tags": "[\"moon\",\"research\"]", "created_at": "2026-08-03T10:00:00.000Z", "updated_at": "2026-08-03T10:00:00.000Z"
+    },
+    {
+      "id": "seed-wiki-banishing", "title": "Banishing Ritual", "slug": "banishing-ritual", "category": "bannung", "entry_number": 4,
+      "content": "<p>Clear the space before and after every working.</p>",
+      "tags": "[\"ritual\"]", "created_at": "2026-08-04T10:00:00.000Z", "updated_at": "2026-08-04T10:00:00.000Z"
+    },
+    {
+      "id": "seed-wiki-breath", "title": "Breath Meditation", "slug": "breath-meditation", "category": "meditation", "entry_number": 5,
+      "content": "<p>Count four in, hold four, four out, hold four.</p>",
+      "tags": "[]", "created_at": "2026-08-05T10:00:00.000Z", "updated_at": "2026-08-05T10:00:00.000Z"
+    },
+    {
+      "id": "seed-wiki-trashed", "title": "Old Notes (trashed)", "slug": "old-notes", "category": "other", "entry_number": 6,
+      "content": "<p>Superseded.</p>", "tags": "[]",
+      "created_at": "2026-07-01T10:00:00.000Z", "updated_at": "2026-07-01T10:00:00.000Z", "deleted_at": "2026-11-01T10:00:00.000Z"
+    }
+  ],
+  "operations": [
+    {
+      "id": "seed-op-guardian", "title": "House Guardian", "category_id": "servitors", "entry_number": 1, "icon": "🛡️",
+      "is_active": 1, "version": "2", "end_date": null,
+      "content": "<p>A servitor that keeps the flat quiet. Fed after every @@chip(seed-wiki-banishing,wiki,Banishing Ritual)@@.</p>",
+      "tags": "[\"ritual\"]", "created_at": "2026-08-10T10:00:00.000Z", "updated_at": "2026-08-10T10:00:00.000Z"
+    },
+    {
+      "id": "seed-op-sigil", "title": "Prosperity Sigil", "category_id": "sigils", "entry_number": 2,
+      "description": "Standing sigil, charged at the full moon.", "intention_text": "It is my will to keep steady work",
+      "content": "<p>Sigils are excluded from export for now.</p>",
+      "tags": "[]", "created_at": "2026-08-11T10:00:00.000Z", "updated_at": "2026-08-11T10:00:00.000Z"
+    }
+  ],
+  "journal_entries": [
+    {
+      "id": "seed-journal-full", "title": "Full Moon Working", "entry_number": 1, "moon_phase": "full",
+      "paradigm_id": "seed-wiki-chaos",
+      "is_bannung": 1, "bannung_type_wiki_id": "seed-wiki-banishing",
+      "is_meditation": 1, "meditation_type_wiki_id": "seed-wiki-breath", "meditation_duration": 20,
+      "linked_operation_ids": "[\"seed-op-guardian\"]", "linked_wiki_ids": "[\"seed-wiki-moon\"]",
+      "content": "<h2>Preparation</h2><p>Followed the notes from @@chip(seed-journal-prep,journal,Preparation Notes)@@ and fed the @@chip(seed-op-guardian,operation,House Guardian)@@.</p><img src=\"@@img(photo)@@\" style=\"width: 300px;\"><h2>Working</h2><p>Charged the glyph made with the @@chip(seed-wiki-sigil,wiki,Sigil Method)@@. The focus held well.</p><h3>Afterwards</h3><p>Closed with a banishing.</p>",
+      "tags": "[\"ritual\",\"moon\"]", "created_at": "2026-09-08T20:00:00.000Z", "updated_at": "2026-09-08T22:00:00.000Z"
+    },
+    {
+      "id": "seed-journal-prep", "title": "Preparation Notes", "entry_number": 2, "moon_phase": "waxing_gibbous",
+      "content": "<p>Candles, incense, the glyph drawn on paper. Plan for @@chip(seed-journal-full,journal,Full Moon Working)@@.</p><img src=\"@@img(diagram)@@\" style=\"width: 300px;\">",
+      "tags": "[\"ritual\"]", "created_at": "2026-09-06T18:00:00.000Z", "updated_at": "2026-09-06T18:00:00.000Z"
+    },
+    {
+      "id": "seed-journal-quiet", "title": "Quiet Evening", "entry_number": 3, "moon_phase": "waning_crescent",
+      "content": "<p>No working today, only reading.</p>",
+      "tags": "[]", "created_at": "2026-09-15T21:00:00.000Z", "updated_at": "2026-09-15T21:00:00.000Z"
+    },
+    {
+      "id": "seed-journal-trashed", "title": "Discarded Draft (trashed)", "entry_number": 4, "moon_phase": "new",
+      "content": "<p>Nothing to see.</p>", "tags": "[]",
+      "created_at": "2026-09-20T21:00:00.000Z", "updated_at": "2026-09-20T21:00:00.000Z", "deleted_at": "2026-11-01T10:00:00.000Z"
+    }
+  ],
+  "links": [
+    { "source_id": "seed-wiki-chaos", "source_type": "wiki", "target_id": "seed-wiki-sigil", "target_type": "wiki" },
+    { "source_id": "seed-wiki-sigil", "source_type": "wiki", "target_id": "seed-wiki-moon", "target_type": "wiki" },
+    { "source_id": "seed-op-guardian", "source_type": "operation", "target_id": "seed-wiki-banishing", "target_type": "wiki" },
+    { "source_id": "seed-journal-full", "source_type": "journal", "target_id": "seed-journal-prep", "target_type": "journal" },
+    { "source_id": "seed-journal-full", "source_type": "journal", "target_id": "seed-op-guardian", "target_type": "operation" },
+    { "source_id": "seed-journal-full", "source_type": "journal", "target_id": "seed-wiki-sigil", "target_type": "wiki" },
+    { "source_id": "seed-journal-prep", "source_type": "journal", "target_id": "seed-journal-full", "target_type": "journal" }
+  ],
+  "custom_properties": [
+    {
+      "id": "seed-prop-weather", "entry_id": "seed-journal-full", "entry_type": "journal",
+      "name": "Weather", "type": "text", "value": "Clear", "show_in_entry": 1, "sort_order": 0
+    }
+  ],
+  "altars": [
+    {
+      "id": "seed-altar-1", "title": "Working Altar", "intention": "Steady work, clear head.", "background_preset": "midnight",
+      "grid_enabled": 1, "snap_to_grid": 1, "created_at": "2026-09-03T17:00:00.000Z", "updated_at": "2026-09-06T17:00:00.000Z"
+    }
+  ],
+  "altar_items": [
+    { "id": "seed-item-candle", "name": "Black Candle", "emoji": "🕯️", "category": "other", "note": "Used for banishing.", "created_at": "2026-09-03T17:00:00.000Z" }
+  ],
+  "altar_placements": [
+    { "id": "seed-place-1", "altar_id": "seed-altar-1", "item_id": "seed-item-candle", "x": 40, "y": 50, "z_index": 1, "width": 10, "height": 10 }
+  ]
+}

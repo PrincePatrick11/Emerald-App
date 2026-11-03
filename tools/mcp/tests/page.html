@@ -1,0 +1,41 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>emcp fixture</title>
+<style>
+  .hidden { display: none; }
+  .row { cursor: pointer; }
+  #cover { position: fixed; inset: 0; background: rgba(0,0,0,.3); display: none; }
+  #tall { height: 2000px; }
+</style></head>
+<body>
+<header class="titlebar"><button title="Journal" class="btn-ghost"><svg class="lucide lucide-book-open" width="16" height="16"></svg></button>
+  <button id="save" class="btn-primary">Save</button><button id="off" disabled>Off</button></header>
+<nav aria-label="Sections"><div><div><span class="row" id="row1">First row</span></div></div>
+  <div class="row" id="row2">Second <b>row</b></div></nav>
+<main>
+  <h1>Entries</h1>
+  <p>Some <em>plain</em> text that is not interactive.</p>
+  <label for="title">Title</label><input id="title" placeholder="Untitled Entry" value="old">
+  <textarea id="notes"></textarea>
+  <input id="pw" type="password" value="secret">
+  <select id="lang"><option>EN</option><option selected>DE</option></select>
+  <div id="editor" contenteditable="true"><p>hello</p></div>
+  <button class="hidden" id="ghost">Ghost</button>
+  <ul><li>One</li><li>Two <button id="del">Delete</button></li></ul>
+  <div id="log"></div>
+  <div id="tall"></div><button id="far">Far away</button>
+</main>
+<div id="cover"></div>
+<script>
+  const log = (m) => { document.getElementById('log').textContent += m + ';'; };
+  for (const id of ['save', 'row1', 'row2', 'del', 'far']) {
+    const el = document.getElementById(id);
+    el.addEventListener('mousedown', (e) => log(id + ':down:' + e.isTrusted));
+    el.addEventListener('click', () => log(id + ':click'));
+    el.addEventListener('dblclick', () => log(id + ':dbl'));
+    el.addEventListener('contextmenu', (e) => { e.preventDefault(); log(id + ':menu'); });
+    el.addEventListener('mouseenter', () => log(id + ':enter'));
+  }
+  document.getElementById('title').addEventListener('input', (e) => log('title:input:' + e.target.value));
+  document.addEventListener('keydown', (e) => log('key:' + (e.ctrlKey ? 'C-' : '') + (e.shiftKey ? 'S-' : '') + e.key));
+</script>
+</body></html>
