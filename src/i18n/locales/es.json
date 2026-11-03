@@ -9,7 +9,9 @@
     "deleteConfirm": "¿Eliminar?",
     "unsupportedImageFormat": "Formato no compatible. Permitido: PNG, JPEG, GIF, WebP, SVG",
     "searchEmoji": "Buscar emoji…",
-    "noEmojiResults": "Sin resultados"
+    "noEmojiResults": "Sin resultados",
+    "unsupportedAudioFormat": "Formato no compatible. Permitido: MP3, M4A, AAC, WAV, OGG, Opus, FLAC",
+    "unsupportedDropFormat": "Formato no compatible"
   },
   "listView": {
     "view": "Vista",
@@ -309,7 +311,8 @@
     "delete": "Eliminar",
     "edit": "Editar",
     "editing": "editando…",
-    "doubleClickEdit": "Doble clic para editar"
+    "doubleClickEdit": "Doble clic para editar",
+    "insertAudio": "Insertar archivo de sonido"
   },
   "moonPhase": {
     "new": "Luna nueva",
@@ -608,7 +611,7 @@
       "print": "Imprimir",
       "toggleTheme": "Claro / Oscuro",
       "toggleSidebar": "Barra lateral",
-      "exportedOn": "Exportado desde Emerald el {{date}}"
+      "exportedOn": "Exportado desde {{app}} el {{date}}"
     },
     "noEntry": "Abre primero una entrada del diario, un artículo de la wiki o una operación.",
     "exportFailed": "Error al exportar",

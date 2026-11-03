@@ -9,11 +9,12 @@
  * checkout that changed the schema therefore gets a seed for *its* schema.
  *
  * Test images are generated as PNG files into `--images`, the instance's
- * images dir: `read_image_as_base64` only reads from there, and entry content
- * references images by absolute path.
+ * images dir, and a test tone as a WAV file into `--audio`: the read commands
+ * only read from those dirs, and entry content references media by absolute
+ * path.
  *
  *   node build_seed.mjs --checkout <dir> --out <emerald.db> --images <dir>
- *                       [--fixture f.json] [--force]
+ *                       --audio <dir> [--fixture f.json] [--force]
  */
 import { DatabaseSync } from 'node:sqlite';
 import { mkdtempSync, mkdirSync, rmSync, existsSync, writeFileSync, readFileSync, renameSync } from 'node:fs';
@@ -35,12 +36,13 @@ export function parseArgs(argv) {
     if (a === '--force') out.force = true;
     else if (a.startsWith('--')) out[a.slice(2)] = argv[++i];
   }
-  for (const required of ['checkout', 'out', 'images']) {
+  for (const required of ['checkout', 'out', 'images', 'audio']) {
     if (!out[required]) throw new Error(`--${required} is required`);
   }
   out.checkout = resolve(out.checkout);
   out.out = resolve(out.out);
   out.images = resolve(out.images);
+  out.audio = resolve(out.audio);
   return out;
 }
 
@@ -199,6 +201,28 @@ const IMAGES = {
   }),
 };
 
+/** A 16-bit mono PCM WAV: three seconds of a 440 Hz tone that fades out. */
+function toneWav() {
+  const rate = 8000, seconds = 3, n = rate * seconds;
+  const buf = Buffer.alloc(44 + n * 2);
+  buf.write('RIFF', 0); buf.writeUInt32LE(36 + n * 2, 4); buf.write('WAVE', 8);
+  buf.write('fmt ', 12); buf.writeUInt32LE(16, 16); buf.writeUInt16LE(1, 20); buf.writeUInt16LE(1, 22);
+  buf.writeUInt32LE(rate, 24); buf.writeUInt32LE(rate * 2, 28); buf.writeUInt16LE(2, 32); buf.writeUInt16LE(16, 34);
+  buf.write('data', 36); buf.writeUInt32LE(n * 2, 40);
+  for (let i = 0; i < n; i++) {
+    const sample = Math.sin((2 * Math.PI * 440 * i) / rate) * (1 - i / n) * 0.4;
+    buf.writeInt16LE(Math.round(sample * 32767), 44 + i * 2);
+  }
+  return buf;
+}
+
+function writeAudio(dir) {
+  mkdirSync(dir, { recursive: true });
+  const path = join(dir, 'seed-tone.wav');
+  writeFileSync(path, toneWav());
+  return { tone: path };
+}
+
 function writeImages(dir) {
   mkdirSync(dir, { recursive: true });
   const paths = {};
@@ -222,9 +246,9 @@ function expand(value, images) {
   if (typeof value !== 'string') return value;
   return value
     .replace(/@@chip\(([^,]+),([^,]+),([^)]*)\)@@/g, (_, id, type, label) => chipHtml(id.trim(), type.trim(), label.trim()))
-    .replace(/@@img\(([^)]+)\)@@/g, (_, name) => {
-      const path = images[name.trim()];
-      if (!path) throw new Error(`fixture references unknown image "${name}"`);
+    .replace(/@@(img|audio)\(([^)]+)\)@@/g, (_, kind, name) => {
+      const path = images[`${kind}:${name.trim()}`];
+      if (!path) throw new Error(`fixture references unknown ${kind} "${name}"`);
       return path;
     });
 }
@@ -282,7 +306,9 @@ export async function buildSeed(opts) {
     // The real first start: every migration, the built-in categories, cleanup.
     await app.getDb();
 
-    const images = writeImages(opts.images);
+    const images = {};
+    for (const [name, path] of Object.entries(writeImages(opts.images))) images[`img:${name}`] = path;
+    for (const [name, path] of Object.entries(writeAudio(opts.audio))) images[`audio:${name}`] = path;
     const report = { counts: {}, dropped: {}, skipped_tables: [] };
     for (const [table, rows] of Object.entries(fixture)) {
       if (table.startsWith('_') || !Array.isArray(rows)) continue;

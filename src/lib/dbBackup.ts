@@ -22,6 +22,7 @@ import { useTagStore } from '../store/tagStore';
 import { useRoutineStore } from '../store/routineStore';
 import { useAltarStore } from '../store/altarStore';
 import { useTaskStore } from '../store/taskStore';
+import { readMediaAsBase64, saveMediaDataUrl } from './media';
 import { useUIStore } from '../store/uiStore';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -336,7 +337,9 @@ export async function exportDatabase(options: BackupOptions): Promise<void> {
   const images: Record<string, string> = {};
   for (const path of allImagePaths) {
     try {
-      const dataUrl = await invoke<string>('read_image_as_base64', { path });
+      // Embedded sound files are collected with the images (both are `src`
+      // paths in content) and stored in the same map.
+      const dataUrl = await readMediaAsBase64(path);
       images[path] = dataUrl;
     } catch {
       // Image file missing — skip silently
@@ -405,7 +408,7 @@ async function restoreImages(backup: BackupFile): Promise<Map<string, string>> {
   const pathMap = new Map<string, string>();
   for (const [oldPath, dataUrl] of Object.entries(backup.images)) {
     try {
-      const newPath = await invoke<string>('save_image', { dataUrl });
+      const newPath = await saveMediaDataUrl(dataUrl);
       pathMap.set(oldPath, newPath);
     } catch {
       // skip

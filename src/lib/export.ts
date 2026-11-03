@@ -9,6 +9,7 @@ import { useOperationStore } from '../store/operationStore';
 import { getCategoryEmoji } from '../components/wiki/WikiList';
 import { compressImagesInHtml, type ImageCompression } from './imageCompression';
 import i18n from '../i18n';
+import { readMediaAsBase64 } from './media';
 
 // ── helpers ────────────────────────────────────────────────────────────────
 
@@ -44,7 +45,7 @@ async function embedImages(html: string): Promise<string> {
   const resolved = await Promise.all(
     paths.map(async (path) => {
       try {
-        const dataUrl = await invoke<string>('read_image_as_base64', { path });
+        const dataUrl = await readMediaAsBase64(path);
         return { path, dataUrl };
       } catch {
         return { path, dataUrl: '' };
@@ -57,6 +58,36 @@ async function embedImages(html: string): Promise<string> {
     result = result.split(`src="${path}"`).join(dataUrl ? `src="${dataUrl}"` : 'src=""');
   }
   return result;
+}
+
+/**
+ * Prepares embedded sound files for an export. `embed` (interactive HTML)
+ * keeps a playable `<audio controls>` under a caption with the file name —
+ * `embedImages` turns its path into a data URL afterwards. `placeholder`
+ * (PDF, which can't play anything) replaces it with a note naming the file,
+ * before anything is read from disk.
+ */
+function transformAudio(html: string, mode: 'embed' | 'placeholder'): string {
+  if (!html.includes('<audio')) return html;
+  const doc = new DOMParser().parseFromString(html, 'text/html');
+  for (const el of Array.from(doc.querySelectorAll('audio'))) {
+    const src = el.getAttribute('src') ?? '';
+    const title = el.getAttribute('data-title') || src.split(/[\\/]/).pop() || 'Audio';
+    const figure = doc.createElement('figure');
+    figure.className = mode === 'embed' ? 'audio-embed' : 'audio-placeholder';
+    const caption = doc.createElement('figcaption');
+    caption.textContent = `🔊 ${title}`;
+    figure.appendChild(caption);
+    if (mode === 'embed' && src) {
+      const audio = doc.createElement('audio');
+      audio.setAttribute('src', src);
+      audio.setAttribute('controls', '');
+      audio.setAttribute('preload', 'metadata');
+      figure.appendChild(audio);
+    }
+    el.replaceWith(figure);
+  }
+  return doc.body.innerHTML;
 }
 
 function stripImages(html: string): string {
@@ -380,6 +411,10 @@ const PRINT_CSS = `
   .entry-content h1, .entry-content h2, .entry-content h3 { margin-top: 1.3em; margin-bottom: 0.4em; }
   .entry-content p  { margin-bottom: 0.8em; }
   .entry-content img { display: block; max-width: 100%; height: auto; margin: 0.6em 0; border-radius: 4px; }
+  .entry-content figure.audio-placeholder {
+    margin: 0.8em 0; padding: 0.5em 0.9em; border: 1px dashed #ccc; border-radius: 6px;
+    font-family: system-ui, sans-serif; font-size: 0.85em; color: #555;
+  }
   .entry-content pre {
     background: #f5f5f5; padding: 0.8em 1em; border-radius: 4px;
     white-space: pre-wrap; font-size: 0.85em; margin: 0.8em 0;
@@ -453,8 +488,9 @@ export async function renderEntryArticle(
   bundleIds?: ReadonlySet<string>,
   compression: ImageCompression = 'none',
   footerHtml = '',
+  audio: 'embed' | 'placeholder' = 'placeholder',
 ): Promise<string> {
-  const resolvedContent  = resolveInternalLinkIcons(data.content);
+  const resolvedContent  = transformAudio(resolveInternalLinkIcons(data.content), audio);
   const embeddedContent  = await compressImagesInHtml(await embedImages(resolvedContent), compression);
   // Pre-render the internal-link chips in TS — the new webview's CSP
   // (`script-src 'self'`) blocks inline scripts, so the JS that used to
@@ -531,6 +567,15 @@ function entryToMarkdown(data: ExportData): string {
   const stripped = stripImages(data.content);
 
   const td = new TurndownService({ headingStyle: 'atx', codeBlockStyle: 'fenced' });
+
+  td.addRule('audio', {
+    filter: 'audio',
+    replacement: (_content, node) => {
+      const el = node as HTMLElement;
+      const title = el.getAttribute('data-title') || (el.getAttribute('src') ?? '').split(/[\\/]/).pop() || 'Audio';
+      return `\n\n🔊 ${title}\n\n`;
+    },
+  });
 
   td.addRule('internalLink', {
     filter: (node) =>

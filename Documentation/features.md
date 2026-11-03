@@ -250,7 +250,7 @@ The chosen format, compression and bundling options are remembered for the next 
 
 ### Interactive HTML Export
 
-Writes one self-contained `.html` file that opens in any browser and works fully offline — images are embedded as data URLs and the file's own Content-Security-Policy forbids any network access. Features: a sidebar listing bundled entries grouped by module, full-text search (press `/`) with per-entry hit counts and highlighting, clickable internal links between bundled entries (hash-based, so browser back/forward works; links to entries outside the bundle are shown greyed with a dashed border), "Links to" / "Linked from" sections at the end of each entry, a heading outline on wide screens, a light/dark toggle that follows the OS by default, and a print button that prints every bundled entry on its own page. A single-entry export has the same layout without the sidebar.
+Writes one self-contained `.html` file that opens in any browser and works fully offline — images and sound files are embedded as data URLs and the file's own Content-Security-Policy forbids any network access. Features: a sidebar listing bundled entries grouped by module, full-text search (press `/`) with per-entry hit counts and highlighting, clickable internal links between bundled entries (hash-based, so browser back/forward works; links to entries outside the bundle are shown greyed with a dashed border), "Links to" / "Linked from" sections at the end of each entry, a heading outline on wide screens, a light/dark toggle that follows the OS by default, a print button that prints every bundled entry on its own page, and a footer "Exported from Emerald App on …" linking to the project page. A single-entry export has the same layout without the sidebar.
 
 > **Sigil-category Operations export is temporarily disabled.** Export (Markdown, PDF, Emerald) works for Journal and Wiki entries, for altars, and for Operations in any category *except* Sigils. Opening a Sigil (an Operations entry in the `sigils` category) leaves all three "Export as …" menu items greyed out — export for that category isn't wired up correctly yet, so the items are disabled rather than left to produce a broken result. This is a temporary state, not a permanent design decision; the menu items will re-enable for Sigils once that export path is implemented. Import (Markdown and Emerald) is unaffected and still supports Operations, including Sigils, as a destination.
 
@@ -320,6 +320,14 @@ The full vault can be backed up and restored as a single self-contained JSON fil
 
 For the on-disk JSON structure and per-mode semantics, see [DB Backup / Restore (`.emeralddb`) in `database.md`](database.md#db-backup--restore-emeralddb).
 
+## Sound Files in Entries
+
+Journal entries, wiki articles and operations can embed sound files. In edit mode the editor toolbar has a **Insert sound file** button (music note) next to the image button; dropping a sound file from Finder / Explorer onto the editor inserts it as well. Accepted formats: MP3, M4A, AAC, WAV, OGG, Opus, FLAC and WebM audio.
+
+A sound file appears as a small player in the entry: play / pause, a progress bar that can be dragged to seek, the elapsed and total time, and the file name. Like images, the file is copied into the app's own storage (`audio/` in the app-data folder, named by its content hash, so the same file is stored once); the entry only references it.
+
+In exports: the interactive HTML export embeds the sound file and shows it with the browser's own player and the file name; PDF and Markdown, which can't play audio, show a 🔊 note with the file name instead. `.emerald` exports and `.emeralddb` backups carry the sound file along with the images, so it comes back on import.
+
 ## Image Upload Validation
 
 All image upload inputs across the app accept only these MIME types: **PNG**, **JPEG**, **GIF**, **WebP**, and **SVG**. Files with any other MIME type are rejected before being processed. This applies to:
@@ -329,7 +337,7 @@ All image upload inputs across the app accept only these MIME types: **PNG**, **
 - Operation and wiki article icons and cover images (`OpPropertiesPanel`)
 - Editor image insert via the toolbar (`EditorToolbar`)
 - Paste events in the rich-text editor (`RichEditor`)
-- Finder drag-and-drop into the rich-text editor (`RichEditor`)
+- Finder drag-and-drop into the rich-text editor (`RichEditor`) — which also accepts sound files, see [Sound Files in Entries](#sound-files-in-entries)
 
 When a rejected file is selected via a file picker, an inline error message appears near the upload control and clears automatically after 2.5 seconds. When all files dragged from Finder into the rich editor have unsupported formats, a modal popup appears (backdrop-blur overlay, alert icon, list of allowed formats, OK button) instead of silently ignoring the drop.
 

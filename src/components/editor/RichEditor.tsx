@@ -7,6 +7,8 @@ import Highlight from '@tiptap/extension-highlight';
 import TaskList from '@tiptap/extension-task-list';
 import TaskItem from '@tiptap/extension-task-item';
 import { ResizableImage } from './ResizableImageExtension';
+import { Audio } from './AudioExtension';
+import { isAudioPath } from '../../lib/media';
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { getCurrentWebview } from '@tauri-apps/api/webview';
 import { invoke } from '@tauri-apps/api/core';
@@ -157,6 +159,7 @@ export default function RichEditor({
       ),
       ExternalDropExtension,
       ResizableImage,
+      Audio,
     ],
     content: content || '',
     editable,
@@ -354,16 +357,23 @@ export default function RichEditor({
         if (type === 'drop') {
           setFileDragOver(false);
           const { paths } = event.payload;
-          const imagePaths = paths.filter((p) => /\.(png|jpe?g|gif|webp|svg)$/i.test(p));
-          if (!imagePaths.length) { setDragFormatError(true); return; }
+          const isImage = (p: string) => /\.(png|jpe?g|gif|webp|svg)$/i.test(p);
+          const mediaPaths = paths.filter((p) => isImage(p) || isAudioPath(p));
+          if (!mediaPaths.length) { setDragFormatError(true); return; }
 
           const ed = editorRef.current;
           if (!ed) return;
 
-          for (const path of imagePaths) {
+          for (const path of mediaPaths) {
             try {
-              const src = await invoke<string>('copy_image_file', { source: path });
-              ed.chain().focus().insertContent({ type: 'image', attrs: { src } }).run();
+              if (isImage(path)) {
+                const src = await invoke<string>('copy_image_file', { source: path });
+                ed.chain().focus().insertContent({ type: 'image', attrs: { src } }).run();
+              } else {
+                const src = await invoke<string>('copy_audio_file', { source: path });
+                const title = path.split(/[\\/]/).pop() ?? null;
+                ed.chain().focus().insertContent({ type: 'audio', attrs: { src, title } }).run();
+              }
             } catch (e) {
               console.error('[DnD] failed:', path, e);
             }
@@ -443,6 +453,14 @@ export default function RichEditor({
               editor.chain().focus().insertContent({ type: 'image', attrs: { src } }).run();
             } catch (e) {
               console.error('Failed to save image:', e);
+            }
+          }}
+          onInsertAudio={async (dataUrl, fileName) => {
+            try {
+              const src = await invoke<string>('save_audio', { dataUrl });
+              editor.chain().focus().insertContent({ type: 'audio', attrs: { src, title: fileName } }).run();
+            } catch (e) {
+              console.error('Failed to save audio:', e);
             }
           }}
           onOpenLinkPicker={() => setLinkPickerOpen(true)}
@@ -531,14 +549,14 @@ export default function RichEditor({
       {/* Drag-drop format error modal */}
       {dragFormatError && (
         <Modal
-          title={t('common.unsupportedImageFormat')}
+          title={t('common.unsupportedDropFormat')}
           onClose={() => setDragFormatError(false)}
           widthClassName="w-72"
           bodyClassName="px-4 py-3"
         >
           <div className="flex items-center gap-2 text-red-400 mb-2">
             <AlertCircle size={14} />
-            <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>PNG, JPEG, GIF, WebP, SVG</p>
+            <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>PNG, JPEG, GIF, WebP, SVG · MP3, M4A, WAV, OGG, FLAC</p>
           </div>
           <Button onClick={() => setDragFormatError(false)} variant="secondary" className="w-full">
             OK

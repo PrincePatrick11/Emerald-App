@@ -353,6 +353,9 @@ All Rust commands are registered in `src-tauri/src/lib.rs` and invoked from Type
 |---|---|
 | `save_image(data_url)` | Decode base64 data-URL, write `{sha256}.{ext}`, skip if exists. Returns absolute path. |
 | `copy_image_file(source)` | Read a file from an arbitrary path, write to images dir with SHA-256 name. Accepts png/jpg/gif/webp/svg only. Rejects symlinks, canonicalizes the source path, and verifies it falls within allowed storage roots (home, documents, downloads, desktop, app data, app config). |
+| `save_audio(data_url)` | Decode a base64 audio data-URL and write it to the `audio/` dir in app data with a SHA-256 name. Accepts the audio MIME types of `AUDIO_EXTENSIONS` (mp3/m4a/aac/wav/ogg/opus/flac/webm). Used by the editor's sound-file button and when restoring audio from `.emerald` / `.emeralddb` files. |
+| `copy_audio_file(source)` | Copy a dropped sound file into the `audio/` dir with a SHA-256 name. Same extension allowlist, symlink rejection and allowed-roots confinement as `copy_image_file`. |
+| `read_audio_as_base64(path)` | Read a file from the `audio/` dir as a data-URL (playback in the editor, embedding in exports and backups). Path must be within the audio directory (checked via `canonicalize`). |
 | `read_image_as_base64(path)` | Read a file from the images dir and return it as a base64 data-URL. Path must be within the images directory (checked via `canonicalize`). |
 | `export_image(path, data_url)` | Decode a base64 data-URL and write the binary image bytes to a user-chosen path. Permitted extensions: `.png`, `.jpg`, `.jpeg`, `.webp`. Same symlink rejection, allowed-roots confinement, and `canonicalize`-before-write checks as `write_file`. |
 | `write_file(path, content)` | Write UTF-8 text to a user-selected path. Permitted extensions: `.md`, `.html`, `.emerald`, `.emeralddb`, `.json`, `.txt`. Path must resolve within allowed storage roots. |

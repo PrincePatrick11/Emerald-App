@@ -9,6 +9,8 @@
     "  @@chip(id,entryType,Label)@@  an internal-link chip as the editor writes it",
     "  @@img(name)@@                 absolute path of a generated test image in",
     "                                the instance's images dir (see IMAGES there)",
+    "  @@audio(name)@@               absolute path of the generated test tone in",
+    "                                the instance's audio dir",
     "",
     "The data is shaped for the export features: a journal entry with paradigm,",
     "banishing and meditation types, linked operations and wiki articles, inline",
@@ -74,7 +76,7 @@
       "is_bannung": 1, "bannung_type_wiki_id": "seed-wiki-banishing",
       "is_meditation": 1, "meditation_type_wiki_id": "seed-wiki-breath", "meditation_duration": 20,
       "linked_operation_ids": "[\"seed-op-guardian\"]", "linked_wiki_ids": "[\"seed-wiki-moon\"]",
-      "content": "<h2>Preparation</h2><p>Followed the notes from @@chip(seed-journal-prep,journal,Preparation Notes)@@ and fed the @@chip(seed-op-guardian,operation,House Guardian)@@.</p><img src=\"@@img(photo)@@\" style=\"width: 300px;\"><h2>Working</h2><p>Charged the glyph made with the @@chip(seed-wiki-sigil,wiki,Sigil Method)@@. The focus held well.</p><h3>Afterwards</h3><p>Closed with a banishing.</p>",
+      "content": "<h2>Preparation</h2><p>Followed the notes from @@chip(seed-journal-prep,journal,Preparation Notes)@@ and fed the @@chip(seed-op-guardian,operation,House Guardian)@@.</p><img src=\"@@img(photo)@@\" style=\"width: 300px;\"><h2>Working</h2><p>Charged the glyph made with the @@chip(seed-wiki-sigil,wiki,Sigil Method)@@. The focus held well.</p><h3>Afterwards</h3><p>Closed with a banishing. Recording of the bell:</p><audio src=\"@@audio(tone)@@\" data-title=\"Closing bell.wav\" controls=\"true\" preload=\"none\"></audio>",
       "tags": "[\"ritual\",\"moon\"]", "created_at": "2026-09-08T20:00:00.000Z", "updated_at": "2026-09-08T22:00:00.000Z"
     },
     {

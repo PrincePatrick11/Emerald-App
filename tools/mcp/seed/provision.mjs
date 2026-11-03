@@ -61,6 +61,7 @@ async function provision(opts) {
     checkout: opts.checkout,
     out: join(configDir(appData), dbName),
     images: join(appData, 'images'),
+    audio: join(appData, 'audio'),
     fixture: opts.fixture,
     force: true,
   });

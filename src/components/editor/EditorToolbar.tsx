@@ -2,6 +2,7 @@ import { useRef, useState } from 'react';
 import type { Editor } from '@tiptap/react';
 import { useTranslation } from 'react-i18next';
 import { ACCEPTED_IMAGE_MIME, isAcceptedImageFile } from '../../lib/helpers';
+import { ACCEPTED_AUDIO, isAcceptedAudioFile } from '../../lib/media';
 import {
   Bold,
   Italic,
@@ -19,6 +20,7 @@ import {
   Redo,
   Link,
   ImagePlus,
+  Music,
   Check,
   X,
 } from 'lucide-react';
@@ -26,12 +28,14 @@ import {
 interface Props {
   editor: Editor;
   onInsertImage: (src: string) => void;
+  onInsertAudio: (dataUrl: string, fileName: string) => void;
   onOpenLinkPicker: () => void;
 }
 
-export default function EditorToolbar({ editor, onInsertImage, onOpenLinkPicker }: Props) {
+export default function EditorToolbar({ editor, onInsertImage, onInsertAudio, onOpenLinkPicker }: Props) {
   const { t } = useTranslation();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const audioInputRef = useRef<HTMLInputElement>(null);
   const [linkInputOpen, setLinkInputOpen] = useState(false);
   const [linkHref, setLinkHref] = useState('');
   const [imageError, setImageError] = useState<string | null>(null);
@@ -77,6 +81,20 @@ export default function EditorToolbar({ editor, onInsertImage, onOpenLinkPicker 
     reader.onload = () => onInsertImage(reader.result as string);
     reader.readAsDataURL(file);
     e.target.value = '';
+  };
+
+  const handleAudioFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    if (!isAcceptedAudioFile(file)) {
+      setImageError(t('common.unsupportedAudioFormat'));
+      window.setTimeout(() => setImageError(null), 2500);
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => onInsertAudio(reader.result as string, file.name);
+    reader.readAsDataURL(file);
   };
 
   return (
@@ -193,6 +211,9 @@ export default function EditorToolbar({ editor, onInsertImage, onOpenLinkPicker 
         <ToolbarBtn onClick={() => fileInputRef.current?.click()} active={false} title="Bild einfügen">
           <ImagePlus size={14} />
         </ToolbarBtn>
+        <ToolbarBtn onClick={() => audioInputRef.current?.click()} active={false} title={t('editor.insertAudio')}>
+          <Music size={14} />
+        </ToolbarBtn>
       </ToolbarGroup>
 
       {/* Inline external-link input — appears via link popup's edit button */}
@@ -224,6 +245,13 @@ export default function EditorToolbar({ editor, onInsertImage, onOpenLinkPicker 
         accept={ACCEPTED_IMAGE_MIME}
         className="hidden"
         onChange={handleImageFile}
+      />
+      <input
+        ref={audioInputRef}
+        type="file"
+        accept={ACCEPTED_AUDIO}
+        className="hidden"
+        onChange={handleAudioFile}
       />
 
       <ToolbarDivider />

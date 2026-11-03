@@ -22,6 +22,7 @@ import type { CustomPropertyType } from '../types';
 import { loadCustomProps, type ExportTarget } from './exportData';
 import { exportFilename, noEntryMessage } from './export';
 import { compressDataUrl, type ImageCompression } from './imageCompression';
+import { readMediaAsBase64, saveMediaDataUrl } from './media';
 
 // ── File format ──────────────────────────────────────────────────────────────
 
@@ -217,7 +218,8 @@ export async function exportAsEmerald(target?: ExportTarget, compression: ImageC
     const src = m[1];
     if (!src.startsWith('data:') && !src.startsWith('http') && !src.startsWith('blob:')) {
       try {
-        images[src] = await compressDataUrl(await invoke<string>('read_image_as_base64', { path: src }), compression);
+        // Sound files ride along in the same map; compression leaves them alone.
+        images[src] = await compressDataUrl(await readMediaAsBase64(src), compression);
       } catch { /* skip missing files */ }
     }
   }
@@ -320,7 +322,7 @@ async function remapImages(content: string, images: Record<string, string>): Pro
   for (const [oldPath, dataUrl] of Object.entries(images)) {
     if (!dataUrl) continue;
     try {
-      const newPath = await invoke<string>('save_image', { dataUrl });
+      const newPath = await saveMediaDataUrl(dataUrl);
       result = result.split(`src="${oldPath}"`).join(`src="${newPath}"`);
     } catch { /* skip */ }
   }

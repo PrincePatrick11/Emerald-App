@@ -127,7 +127,8 @@ function ExportModalBody({ target, initialFormat }: { target: ExportTarget; init
       toggleTheme: t('exportModal.html.toggleTheme'),
       toggleSidebar: t('exportModal.html.toggleSidebar'),
       entryCount: t('exportModal.entryCount', { count }),
-      exportedOn: t('exportModal.html.exportedOn', { date: formatDate(new Date(), 'dd.MM.yyyy') }),
+      // `{{app}}` stays in so the export can turn it into a link.
+      exportedOn: t('exportModal.html.exportedOn', { date: formatDate(new Date(), 'dd.MM.yyyy'), app: '{{app}}' }),
       groups: {
         journal: t(TYPE_LABEL_KEYS.journal),
         wiki: t(TYPE_LABEL_KEYS.wiki),

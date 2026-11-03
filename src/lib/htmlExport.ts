@@ -28,11 +28,14 @@ export interface HtmlExportLabels {
   toggleTheme: string;
   toggleSidebar: string;
   entryCount: string;      // already interpolated, e.g. "4 entries"
-  exportedOn: string;      // already interpolated, e.g. "Exported from Emerald on …"
+  exportedOn: string;      // date interpolated, `{{app}}` left in: "Exported from {{app}} on …"
   groups: Record<ExportEntryType, string>;
 }
 
 const GROUP_ORDER: ExportEntryType[] = ['journal', 'wiki', 'operations'];
+
+/** Where "Emerald App" in the export's footer links to. */
+const EMERALD_URL = 'https://github.com/PrincePatrick11/Emerald-App';
 
 function navIcon(data: ExportData): string {
   const safe = sanitizeDataImageUrl(data.entryIcon);
@@ -104,7 +107,7 @@ export async function buildInteractiveHtml(
   const outgoing = new Map(entries.map(e => [e.id, outgoingIds(e)]));
   // The references section goes inside the article so it's shown / hidden with it.
   const articles = await Promise.all(entries.map(e =>
-    renderEntryArticle(e, bundleIds, compression, buildRefs(e, entries, outgoing, labels))
+    renderEntryArticle(e, bundleIds, compression, buildRefs(e, entries, outgoing, labels), 'embed')
   ));
 
   return `<!DOCTYPE html>
@@ -112,7 +115,7 @@ export async function buildInteractiveHtml(
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src data:; style-src 'unsafe-inline'; script-src 'unsafe-inline'; form-action 'none'; base-uri 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src data:; media-src data:; style-src 'unsafe-inline'; script-src 'unsafe-inline'; form-action 'none'; base-uri 'none'">
 <meta name="generator" content="Emerald">
 <title>${htmlEscape(main.title)}</title>
 <style>${HTML_CSS}</style>
@@ -138,7 +141,7 @@ export async function buildInteractiveHtml(
     <div class="content-wrap">
       <div class="doc" id="doc">
         ${articles.join('\n')}
-        <footer class="footer">${htmlEscape(labels.exportedOn)}</footer>
+        <footer class="footer">${htmlEscape(labels.exportedOn).replace('{{app}}', `<a href="${EMERALD_URL}" target="_blank" rel="noopener noreferrer">Emerald App</a>`)}</footer>
       </div>
       <aside class="outline" id="outline" hidden>
         <div class="outline-title">${htmlEscape(labels.outline)}</div>
@@ -317,6 +320,14 @@ mark.hit { background: var(--mark); color: inherit; border-radius: 2px; padding:
 }
 .ref:hover { border-color: var(--accent); color: var(--accent-text); }
 .footer { text-align: center; color: var(--faint); font-size: 12px; margin-top: 24px; }
+.footer a { color: var(--accent-text); text-decoration: none; }
+.footer a:hover { text-decoration: underline; }
+.entry-content figure.audio-embed {
+  margin: 1em 0; padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--bg);
+  font-family: system-ui, sans-serif;
+}
+.entry-content figure.audio-embed figcaption { font-size: 13px; color: var(--muted); margin-bottom: 6px; }
+.entry-content figure.audio-embed audio { display: block; width: 100%; }
 
 /* Outline */
 .outline { width: 220px; flex-shrink: 0; position: sticky; top: 76px; align-self: flex-start; max-height: calc(100vh - 100px); overflow-y: auto; }

@@ -37,6 +37,48 @@ fn images_dir(app: &tauri::AppHandle) -> Result<std::path::PathBuf, String> {
     Ok(dir)
 }
 
+/// Where embedded sound files live, next to `images/`.
+fn audio_dir(app: &tauri::AppHandle) -> Result<std::path::PathBuf, String> {
+    let dir = app
+        .path()
+        .app_data_dir()
+        .map_err(|e| e.to_string())?
+        .join("audio");
+    std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    Ok(dir)
+}
+
+/// Sound formats the editor embeds; every webview the app runs on plays these.
+const AUDIO_EXTENSIONS: &[&str] = &["mp3", "m4a", "aac", "wav", "ogg", "oga", "opus", "flac", "webm"];
+
+fn audio_ext_for_mime(mime: &str) -> Option<&'static str> {
+    Some(match mime {
+        "audio/mpeg" | "audio/mp3" => "mp3",
+        "audio/mp4" | "audio/x-m4a" | "audio/m4a" => "m4a",
+        "audio/aac" => "aac",
+        "audio/wav" | "audio/x-wav" | "audio/wave" | "audio/vnd.wave" => "wav",
+        "audio/ogg" => "ogg",
+        "audio/opus" => "opus",
+        "audio/flac" | "audio/x-flac" => "flac",
+        "audio/webm" => "webm",
+        _ => return None,
+    })
+}
+
+fn audio_mime_for_ext(ext: &str) -> &'static str {
+    match ext {
+        "mp3" => "audio/mpeg",
+        "m4a" => "audio/mp4",
+        "aac" => "audio/aac",
+        "wav" => "audio/wav",
+        "ogg" | "oga" => "audio/ogg",
+        "opus" => "audio/opus",
+        "flac" => "audio/flac",
+        "webm" => "audio/webm",
+        _ => "application/octet-stream",
+    }
+}
+
 fn ext_for_mime(mime: &str) -> &'static str {
     match mime {
         "image/png"     => "png",
@@ -159,6 +201,72 @@ fn read_image_as_base64(app: tauri::AppHandle, path: String) -> Result<String, S
         "svg"  => "image/svg+xml",
         _      => "image/png",
     };
+    Ok(format!("data:{};base64,{}", mime, general_purpose::STANDARD.encode(&bytes)))
+}
+
+/// Saves a base64 data-URL sound file into the audio dir, named by the
+/// SHA-256 of its bytes like images. Used for files picked in the editor and
+/// for audio restored from `.emerald` / `.emeralddb` files.
+#[tauri::command]
+fn save_audio(app: tauri::AppHandle, data_url: String) -> Result<String, String> {
+    let (mime_part, b64) = data_url
+        .strip_prefix("data:")
+        .and_then(|s| s.split_once(','))
+        .ok_or("Invalid data URL")?;
+    let ext = audio_ext_for_mime(mime_part.split(';').next().unwrap_or(""))
+        .ok_or("unsupported file type")?;
+    let bytes = general_purpose::STANDARD.decode(b64).map_err(|e| e.to_string())?;
+    let path = audio_dir(&app)?.join(format!("{}.{}", sha256_hex(&bytes), ext));
+    if !path.exists() {
+        std::fs::write(&path, &bytes).map_err(|e| e.to_string())?;
+    }
+    Ok(path.to_string_lossy().into_owned())
+}
+
+/// Copies a sound file dropped onto the editor into the audio dir. Same
+/// confinement as `copy_image_file`: allowed roots only, no symlinks.
+#[tauri::command]
+fn copy_audio_file(app: tauri::AppHandle, source: String) -> Result<String, String> {
+    let ext = ext_for_path(&source);
+    if !AUDIO_EXTENSIONS.contains(&ext.as_str()) {
+        return Err("unsupported file type".to_string());
+    }
+
+    let allowed_roots = resolve_allowed_roots(&app)?;
+    let source_path = PathBuf::from(&source);
+    let metadata = std::fs::symlink_metadata(&source_path).map_err(|_| "file not found".to_string())?;
+    if metadata.file_type().is_symlink() {
+        return Err("access denied: symlink targets are not allowed".to_string());
+    }
+    let canonical_source = std::fs::canonicalize(&source_path).map_err(|_| "unable to resolve path".to_string())?;
+    if !is_within_allowed_roots(&canonical_source, &allowed_roots) {
+        return Err("access denied: path outside allowed directories".to_string());
+    }
+
+    let bytes = std::fs::read(&canonical_source).map_err(|e| format!("read {source}: {e}"))?;
+    let path = audio_dir(&app)?.join(format!("{}.{}", sha256_hex(&bytes), ext));
+    if !path.exists() {
+        std::fs::write(&path, &bytes).map_err(|e| e.to_string())?;
+    }
+    Ok(path.to_string_lossy().into_owned())
+}
+
+/// Reads a sound file from the audio dir as a data URL — for playback in the
+/// editor and for embedding in exports and backups. Confined to the audio dir
+/// like `read_image_as_base64` is to the images dir.
+#[tauri::command]
+fn read_audio_as_base64(app: tauri::AppHandle, path: String) -> Result<String, String> {
+    let allowed_dir = std::fs::canonicalize(audio_dir(&app)?).map_err(|e| e.to_string())?;
+    let path_buf = PathBuf::from(&path);
+    if !path_buf.exists() {
+        return Err("file not found".to_string());
+    }
+    let canon = std::fs::canonicalize(&path_buf).map_err(|_| "invalid path".to_string())?;
+    if !canon.starts_with(&allowed_dir) {
+        return Err("access denied: path outside audio directory".to_string());
+    }
+    let bytes = std::fs::read(&canon).map_err(|e| format!("read: {e}"))?;
+    let mime = audio_mime_for_ext(&ext_for_path(&path));
     Ok(format!("data:{};base64,{}", mime, general_purpose::STANDARD.encode(&bytes)))
 }
 
@@ -503,6 +611,9 @@ pub fn run() {
                 save_image,
                 copy_image_file,
                 read_image_as_base64,
+                save_audio,
+                copy_audio_file,
+                read_audio_as_base64,
                 export_image,
                 write_file,
                 read_file,

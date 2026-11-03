@@ -31,7 +31,9 @@ PDF export runs in a hidden window built and torn down by the per-platform `expo
 
 ## Path Confinement
 
-Three Rust commands enforce path restrictions:
+Several Rust commands enforce path restrictions:
+
+**`read_audio_as_base64`** does the same for the `audio/` directory, and **`copy_audio_file`** applies `copy_image_file`'s rules (extension allowlist, no symlinks, allowed roots only) to sound files.
 
 **`read_image_as_base64`** resolves the requested path and the images directory to their canonical forms using `std::fs::canonicalize`, then checks that the canonical path starts with the canonical images directory. Any path that escapes the images directory (including symlink traversal) returns an `"access denied: path outside images directory"` error.
 
@@ -109,9 +111,11 @@ All HTML that enters the app from outside is sanitised with DOMPurify before bei
 
 The main window has CSP enabled through Tauri's default configuration. The export HTML for PDF export is written to a unique file in the OS temp directory and loaded by a hidden webview over a `file://` URL — it never fetches external resources and is removed from disk as soon as the export finishes. Because the hidden webview inherits the same CSP as the main window (`script-src 'self'` — see `tauri.conf.json`), inline scripts in the export HTML are blocked; the frontend therefore pre-renders the internal-link chip transformation in TypeScript (`transformInternalLinks` in `src/lib/export.ts`) before handing the HTML to the backend.
 
+The main window's CSP allows `media-src 'self' data: blob:` so the editor can play embedded sound files: they are read as data URLs and played from a blob URL. The interactive HTML export's own CSP allows `media-src data:` for the same reason.
+
 ## Interactive HTML Export
 
-The HTML export (`src/lib/htmlExport.ts`) writes a file that the user opens in their own browser, outside the app and its CSP. It contains one inline script for navigation, search and theming. That script reads everything from the DOM (`textContent`, `getAttribute`, `createElement`) and never interpolates entry data into script source; entry content is DOMPurify-sanitised as the last step of rendering, so it can't contribute scripts or event handlers. The file carries its own CSP: `default-src 'none'; img-src data:; style-src 'unsafe-inline'; script-src 'unsafe-inline'; form-action 'none'; base-uri 'none'` — no network loads, no form submission (a form inside imported content can't post anywhere), no `<base>` rewriting. Plain link navigation (clicking an external link in an entry) is still possible, as in any document.
+The HTML export (`src/lib/htmlExport.ts`) writes a file that the user opens in their own browser, outside the app and its CSP. It contains one inline script for navigation, search and theming. That script reads everything from the DOM (`textContent`, `getAttribute`, `createElement`) and never interpolates entry data into script source; entry content is DOMPurify-sanitised as the last step of rendering, so it can't contribute scripts or event handlers. The file carries its own CSP: `default-src 'none'; img-src data:; media-src data:; style-src 'unsafe-inline'; script-src 'unsafe-inline'; form-action 'none'; base-uri 'none'` — no network loads, no form submission (a form inside imported content can't post anywhere), no `<base>` rewriting. Plain link navigation (clicking an external link in an entry) is still possible, as in any document.
 
 The Rust `write_file` command accepts `.html` for this export; `read_file` does not, since the app never reads HTML back.
 

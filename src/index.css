@@ -134,6 +134,36 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
     color: var(--menu-item-active-text);
   }
 
+  /* Embedded sound file in the editor (AudioExtension) */
+  .audio-player {
+    background-color: var(--bg-surface-1);
+    border-color: var(--border-soft);
+  }
+  .audio-player-btn {
+    background-color: var(--link-chip-bg);
+    color: var(--link-chip-text);
+  }
+  .audio-player-btn:not(:disabled):hover {
+    background-color: var(--link-chip-bg-hover);
+    color: var(--link-chip-text-hover);
+  }
+  .audio-player-progress {
+    -webkit-appearance: none;
+    appearance: none;
+    height: 4px;
+    border-radius: 9999px;
+    cursor: pointer;
+    background: linear-gradient(to right, var(--accent) 0 var(--audio-progress, 0%), var(--border-soft) var(--audio-progress, 0%) 100%);
+  }
+  .audio-player-progress:disabled { cursor: default; }
+  .audio-player-progress::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 10px;
+    height: 10px;
+    border-radius: 9999px;
+    background: var(--accent);
+  }
+
   /* Primary action button — jade accent (xs size, for toolbars & headers) */
   .btn-primary {
     @apply flex items-center gap-1.5 px-3 py-1.5
