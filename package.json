@@ -13,6 +13,8 @@
   "scripts": {
     "dev": "vite --configLoader runner",
     "build": "tsc && vite build --configLoader runner",
+    "agents:link": "node scripts/link-agents.mjs",
+    "mcp:register": "node scripts/register-mcp.mjs",
     "preview": "vite preview --configLoader runner",
     "tauri": "tauri",
     "tauri:dev": "tauri dev --config src-tauri/tauri.dev.conf.json"

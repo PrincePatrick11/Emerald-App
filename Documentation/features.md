@@ -233,7 +233,24 @@ Tags and categories also support soft-delete and restoration.
 
 ## Export and Import
 
-All export and import actions are in the native application menu.
+All export and import actions are in the native application menu. Exporting a Journal, Wiki or Operations entry opens the **export modal** — via **Export → Export…**, or via **Export as PDF / HTML / Markdown / Emerald…**, which open the same modal with that format preselected. Altar exports (PDF, Emerald, image) still run directly from the menu.
+
+### Export Modal
+
+The modal offers four formats — **PDF**, **Interactive HTML**, **Markdown** and **Emerald** — and an option to **also export linked entries**. Linked entries are everything the entry points to: inline internal links in its text and, for journal entries, the linked operations and wiki articles plus the paradigm, banishing and meditation types. When linked entries link further, a toggle switches between *directly linked* and *including indirect* (the full link graph). Each found entry is listed and can be unchecked. All selected entries end up in **one file**, main entry first:
+
+- **PDF** — each entry starts on a new page on Windows and Linux; on macOS every PDF export is one continuous page (a WKWebView limitation, see the CHANGELOG's Known Issues), so bundled entries are separated by a rule there. Links between bundled entries jump within the document.
+- **Interactive HTML** — see below.
+- **Markdown** — entries are written one after another, separated by horizontal rules; links stay `[[Title]]` wiki links.
+- **Emerald** — always a single entry (the format holds exactly one), so bundling isn't offered.
+
+**Images** (PDF, HTML, Emerald — Markdown drops images): *Original* embeds them unchanged, *Compressed* (default) scales them to max. 1600 px on the long side at quality 0.8, *Strongly compressed* to max. 1000 px at quality 0.6. Images are re-encoded as WebP; where the webview has no WebP encoder (macOS, some Linux WebKitGTK builds), opaque images become JPEG and transparent ones a downscaled PNG. An image is only replaced if the result is smaller; SVG and GIF are left as they are. The originals in the vault are never changed — but an Emerald file exported with compression re-imports with the compressed images.
+
+The chosen format, compression and bundling options are remembered for the next export. Sigil operations are never included as linked entries (see note below).
+
+### Interactive HTML Export
+
+Writes one self-contained `.html` file that opens in any browser and works fully offline — images are embedded as data URLs and the file's own Content-Security-Policy forbids any network access. Features: a sidebar listing bundled entries grouped by module, full-text search (press `/`) with per-entry hit counts and highlighting, clickable internal links between bundled entries (hash-based, so browser back/forward works; links to entries outside the bundle are shown greyed with a dashed border), "Links to" / "Linked from" sections at the end of each entry, a heading outline on wide screens, a light/dark toggle that follows the OS by default, and a print button that prints every bundled entry on its own page. A single-entry export has the same layout without the sidebar.
 
 > **Sigil-category Operations export is temporarily disabled.** Export (Markdown, PDF, Emerald) works for Journal and Wiki entries, for altars, and for Operations in any category *except* Sigils. Opening a Sigil (an Operations entry in the `sigils` category) leaves all three "Export as …" menu items greyed out — export for that category isn't wired up correctly yet, so the items are disabled rather than left to produce a broken result. This is a temporary state, not a permanent design decision; the menu items will re-enable for Sigils once that export path is implemented. Import (Markdown and Emerald) is unaffected and still supports Operations, including Sigils, as a destination.
 

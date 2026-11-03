@@ -13,6 +13,13 @@ use tauri::menu::{Menu, MenuItem, PredefinedMenuItem, Submenu};
 /// plan that replaced the old bundled `wkhtmltopdf.exe` subprocess with
 /// driving the app's own webview).
 mod pdf_export;
+/// Lets the MCP server in `tools/mcp` drive the app where the webview has no
+/// debug port. Dev builds only, and only when asked for.
+#[cfg(feature = "devbridge")]
+mod devbridge;
+
+#[cfg(all(feature = "devbridge", not(debug_assertions)))]
+compile_error!("the `devbridge` feature opens the app to local scripting and must not be part of a release build");
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
@@ -146,7 +153,7 @@ fn read_image_as_base64(app: tauri::AppHandle, path: String) -> Result<String, S
     let bytes = std::fs::read(&canon).map_err(|e| format!("read: {e}"))?;
     let mime = match ext_for_path(&path).as_str() {
         "png"  => "image/png",
-        "jpg"  => "image/jpeg",
+        "jpg" | "jpeg" => "image/jpeg",
         "gif"  => "image/gif",
         "webp" => "image/webp",
         "svg"  => "image/svg+xml",
@@ -156,11 +163,11 @@ fn read_image_as_base64(app: tauri::AppHandle, path: String) -> Result<String, S
 }
 
 /// Writes text content to a user-selected file path.
-/// Only .md, .emerald, .emeralddb, .json, and .txt extensions are permitted.
+/// Only .md, .html, .emerald, .emeralddb, .json, and .txt extensions are permitted.
 #[tauri::command]
 fn write_file(app: tauri::AppHandle, path: String, content: String) -> Result<(), String> {
     let ext = ext_for_path(&path);
-    if !matches!(ext.as_str(), "md" | "emerald" | "emeralddb" | "json" | "txt") {
+    if !matches!(ext.as_str(), "md" | "html" | "emerald" | "emeralddb" | "json" | "txt") {
         return Err("unsupported file type".to_string());
     }
 
@@ -343,7 +350,7 @@ fn install_mouse_nav_monitor(app_handle: tauri::AppHandle) {
 }
 
 /// Toggles the enabled state of the "Export to …" menu items. `entry_enabled`
-/// covers Markdown (journal / wiki / operations only); `pdf_enabled` covers
+/// covers "Export…", HTML and Markdown (journal / wiki / operations only); `pdf_enabled` covers
 /// PDF, which is also available while an Altar's reading view is open (it
 /// exports the rendered altar image instead of entry content in that case);
 /// `emerald_enabled` covers the shared Emerald export, also available for an
@@ -359,7 +366,9 @@ fn set_export_menu_enabled(app: tauri::AppHandle, entry_enabled: bool, pdf_enabl
             for child in sub.items().unwrap_or_default() {
                 if let MenuItemKind::MenuItem(item) = &child {
                     match item.id().0.as_str() {
+                        "export-entry" => { item.set_enabled(entry_enabled).ok(); }
                         "export-pdf" => { item.set_enabled(pdf_enabled).ok(); }
+                        "export-html" => { item.set_enabled(entry_enabled).ok(); }
                         "export-markdown" => { item.set_enabled(entry_enabled).ok(); }
                         "export-emerald" => { item.set_enabled(emerald_enabled).ok(); }
                         _ => {}
@@ -407,7 +416,9 @@ fn update_menu_labels(
     export: String,
     import: String,
     reset_view: String,
+    export_entry: String,
     export_pdf: String,
+    export_html: String,
     export_markdown: String,
     export_emerald: String,
     export_altar_image: String,
@@ -440,7 +451,9 @@ fn update_menu_labels(
                     let child_id = item.id().0.as_str().to_owned();
                     let new_child_text = match child_id.as_str() {
                         "reset-sidebar-widths" => Some(reset_view.as_str()),
+                        "export-entry"         => Some(export_entry.as_str()),
                         "export-pdf"           => Some(export_pdf.as_str()),
+                        "export-html"          => Some(export_html.as_str()),
                         "export-markdown"      => Some(export_markdown.as_str()),
                         "export-emerald"       => Some(export_emerald.as_str()),
                         "import-markdown"      => Some(import_markdown.as_str()),
@@ -474,23 +487,40 @@ fn update_menu_labels(
 }
 
 pub fn run() {
-    tauri::Builder::default()
+    let builder = tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
-        .plugin(tauri_plugin_sql::Builder::new().build())
-        .invoke_handler(tauri::generate_handler![
-            save_image,
-            copy_image_file,
-            read_image_as_base64,
-            export_image,
-            write_file,
-            read_file,
-            ensure_app_storage_dirs,
-            export_pdf,
-            set_export_menu_enabled,
-            set_altar_export_menu_enabled,
-            update_menu_labels,
-        ])
+        .plugin(tauri_plugin_sql::Builder::new().build());
+
+    #[cfg(feature = "devbridge")]
+    let builder = builder.plugin(devbridge::plugin());
+
+    // The command list as a macro, so the dev bridge can add its two commands
+    // without the list existing twice.
+    macro_rules! commands {
+        ($($extra:path,)*) => {
+            tauri::generate_handler![
+                save_image,
+                copy_image_file,
+                read_image_as_base64,
+                export_image,
+                write_file,
+                read_file,
+                ensure_app_storage_dirs,
+                export_pdf,
+                set_export_menu_enabled,
+                set_altar_export_menu_enabled,
+                update_menu_labels,
+                $($extra,)*
+            ]
+        };
+    }
+    #[cfg(not(feature = "devbridge"))]
+    let builder = builder.invoke_handler(commands!());
+    #[cfg(feature = "devbridge")]
+    let builder = builder.invoke_handler(commands!(devbridge::devbridge_reply, devbridge::devbridge_event,));
+
+    builder
         .setup(|app| {
             #[cfg(target_os = "macos")]
             install_mouse_nav_monitor(app.handle().clone());
@@ -528,10 +558,26 @@ pub fn run() {
             // Export items start disabled — the frontend enables them once a
             // journal / wiki / operations entry is actually open (PDF is also
             // enabled while an Altar's reading view is open).
+            // "Export…" opens the export modal (format choice, linked
+            // entries); the per-format items below open it preselected.
+            let export_entry_item = MenuItem::with_id(
+                app,
+                "export-entry",
+                "Export…",
+                false,
+                None::<&str>,
+            )?;
             let export_pdf_item = MenuItem::with_id(
                 app,
                 "export-pdf",
                 "Export as PDF…",
+                false,
+                None::<&str>,
+            )?;
+            let export_html_item = MenuItem::with_id(
+                app,
+                "export-html",
+                "Export as HTML…",
                 false,
                 None::<&str>,
             )?;
@@ -585,7 +631,10 @@ pub fn run() {
                 "Export",
                 true,
                 &[
+                    &export_entry_item,
+                    &PredefinedMenuItem::separator(app)?,
                     &export_pdf_item,
+                    &export_html_item,
                     &export_md_item,
                     &export_emerald_item,
                     &PredefinedMenuItem::separator(app)?,
@@ -619,7 +668,9 @@ pub fn run() {
             app.on_menu_event(|app, event| {
                 match event.id().as_ref() {
                     "reset-sidebar-widths" => { app.emit("reset-sidebar-widths", ()).ok(); }
+                    "export-entry"         => { app.emit("export-entry", ()).ok(); }
                     "export-pdf"           => { app.emit("export-pdf", ()).ok(); }
+                    "export-html"          => { app.emit("export-html", ()).ok(); }
                     "export-markdown"      => { app.emit("export-markdown", ()).ok(); }
                     "export-emerald"       => { app.emit("export-emerald", ()).ok(); }
                     "export-altar-jpeg"    => { app.emit("export-altar-jpeg", ()).ok(); }

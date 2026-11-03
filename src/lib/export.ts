@@ -7,6 +7,8 @@ import type { ExportData, ChipData } from './exportData';
 import { useWikiStore } from '../store/wikiStore';
 import { useOperationStore } from '../store/operationStore';
 import { getCategoryEmoji } from '../components/wiki/WikiList';
+import { compressImagesInHtml, type ImageCompression } from './imageCompression';
+import i18n from '../i18n';
 
 // ── helpers ────────────────────────────────────────────────────────────────
 
@@ -19,7 +21,7 @@ export function htmlEscape(str: string): string {
     .replace(/'/g, '&#39;');
 }
 
-function sanitizeDataImageUrl(value: string | null | undefined): string | null {
+export function sanitizeDataImageUrl(value: string | null | undefined): string | null {
   if (!value) return null;
   const trimmed = value.trim();
   return /^data:image\/[a-zA-Z0-9.+-]+;base64,[A-Za-z0-9+/=]+$/.test(trimmed) ? trimmed : null;
@@ -116,8 +118,12 @@ function resolveInternalLinkIcons(html: string): string {
  * chip identical to the live app and lets us drop the inline script (and
  * the `img.emoji` rasterization CSS that came with the old wkhtmltopdf
  * path) entirely.
+ *
+ * Links whose target is part of `bundleIds` (a multi-entry export) become
+ * `<a href="#entry-<id>">` anchors so they jump to the bundled copy; links
+ * to entries outside the bundle stay plain chips, marked `il-external`.
  */
-function transformInternalLinks(html: string): string {
+function transformInternalLinks(html: string, bundleIds?: ReadonlySet<string>): string {
   const doc = new DOMParser().parseFromString(html, 'text/html');
   const links = doc.querySelectorAll<HTMLElement>('span[data-type="internalLink"]');
   if (!links.length) return html;
@@ -145,28 +151,55 @@ function transformInternalLinks(html: string): string {
     const lbl = doc.createElement('span');
     lbl.textContent = label;
     el.appendChild(lbl);
+
+    if (!bundleIds) continue;
+    const targetId = el.getAttribute('data-id') ?? '';
+    if (bundleIds.has(targetId)) {
+      const a = doc.createElement('a');
+      for (const attr of Array.from(el.attributes)) a.setAttribute(attr.name, attr.value);
+      a.setAttribute('href', `#${entryAnchor(targetId)}`);
+      while (el.firstChild) a.appendChild(el.firstChild);
+      el.replaceWith(a);
+    } else {
+      el.classList.add('il-external');
+    }
   }
 
   return doc.body.innerHTML;
 }
 
+/** DOM id of a bundled entry — shared by the PDF / HTML exports and their link rewriting. */
+export function entryAnchor(id: string): string {
+  return `entry-${id.replace(/[^\w-]/g, '')}`;
+}
+
+/** DOMPurify config for entry content: keeps the internal-link data attributes. */
+const CONTENT_PURIFY_CONFIG = {
+  ADD_ATTR: ['data-type', 'data-id', 'data-entry-type', 'data-label', 'data-icon', 'data-entry-number', 'data-href'],
+};
+
 function safeFilename(title: string): string {
   return title.replace(/[^\w\s\-äöüÄÖÜß]/g, '').trim().replace(/\s+/g, '_') || 'export';
 }
 
-function exportFilename(title: string, date: string, ext: string): string {
+export function exportFilename(title: string, date: string, ext: string): string {
   const base = safeFilename(title);
   const dateStr = format(new Date(date), 'yyyy-MM-dd');
   return `${base}_${dateStr}.${ext}`;
 }
 
-// Render a chip for the metadata header (icon can be data-URL or emoji)
-function chip(data: ChipData, extra = ''): string {
+// Render a chip for the metadata header (icon can be data-URL or emoji).
+// Chips pointing at an entry that's part of the export bundle become links.
+function chip(data: ChipData, extra = '', bundleIds?: ReadonlySet<string>): string {
   const safeIconDataUrl = sanitizeDataImageUrl(data.icon);
   const iconHtml = safeIconDataUrl
     ? `<img src="${safeIconDataUrl}" class="chip-img">`
     : data.icon ? `<span class="chip-emoji">${htmlEscape(data.icon)}</span>` : '';
-  return `<span class="chip${extra ? ' ' + extra : ''}">${iconHtml}<span class="chip-label">${htmlEscape(data.label)}</span></span>`;
+  const inner = `${iconHtml}<span class="chip-label">${htmlEscape(data.label)}</span>`;
+  if (data.id && bundleIds?.has(data.id)) {
+    return `<a href="#${entryAnchor(data.id)}" class="chip chip-link${extra ? ' ' + extra : ''}">${inner}</a>`;
+  }
+  return `<span class="chip${extra ? ' ' + extra : ''}">${inner}</span>`;
 }
 
 function formatCustomPropValue(prop: { type: string; value: string | null; meta: string | null }): string {
@@ -222,16 +255,18 @@ function buildTopBar(data: ExportData): string {
 }
 
 // Build the metadata section HTML below the top bar
-function buildMetaHtml(data: ExportData): string {
+function buildMetaHtml(data: ExportData, bundleIds?: ReadonlySet<string>): string {
   const parts: string[] = [];
 
   // Journal: paradigma / bannung / meditation
   const propChips: string[] = [];
-  if (data.paradigma) propChips.push(chip(data.paradigma));
-  if (data.bannung)   propChips.push(chip(data.bannung));
+  if (data.paradigma) propChips.push(chip(data.paradigma, '', bundleIds));
+  if (data.bannung)   propChips.push(chip(data.bannung, '', bundleIds));
   if (data.meditation) {
-    const dur = data.meditation.duration ? ` <span class="chip-badge">${data.meditation.duration} min</span>` : '';
-    propChips.push(chip(data.meditation) + dur);
+    // Number() so a non-numeric value from an imported file can't inject markup.
+    const minutes = Number(data.meditation.duration);
+    const dur = Number.isFinite(minutes) && minutes > 0 ? ` <span class="chip-badge">${minutes} min</span>` : '';
+    propChips.push(chip(data.meditation, '', bundleIds) + dur);
   }
   // wikiCategory and opCategory are shown in the topbar, not here
   if (data.isActive !== undefined) {
@@ -243,11 +278,11 @@ function buildMetaHtml(data: ExportData): string {
 
   // Linked ops
   if (data.linkedOps?.length) {
-    parts.push(`<div class="meta-row">${data.linkedOps.map(o => chip(o)).join('')}</div>`);
+    parts.push(`<div class="meta-row">${data.linkedOps.map(o => chip(o, '', bundleIds)).join('')}</div>`);
   }
   // Linked wiki
   if (data.linkedWiki?.length) {
-    parts.push(`<div class="meta-row">${data.linkedWiki.map(w => chip(w)).join('')}</div>`);
+    parts.push(`<div class="meta-row">${data.linkedWiki.map(w => chip(w, '', bundleIds)).join('')}</div>`);
   }
   // Tags
   if (data.tagNames?.length) {
@@ -358,25 +393,28 @@ const PRINT_CSS = `
   .entry-content ul, .entry-content ol { padding-left: 1.6em; margin-bottom: 0.8em; }
   .entry-content li { margin-bottom: 0.2em; }
   /* Internal link chips — jade accent like in the app */
-  .entry-content span[data-type="internalLink"] {
+  .entry-content [data-type="internalLink"] {
     display: inline-flex; align-items: baseline; gap: 4px;
     font-family: system-ui,sans-serif; font-size: 0.82em;
     background: #e6faf3; border: 1px solid #99dfc0; border-radius: 5px;
     padding: 1px 7px; color: #006b42; vertical-align: middle;
     font-weight: 500;
   }
-  .entry-content span[data-type="internalLink"] .il-icon-img {
+  .entry-content a[data-type="internalLink"], a.chip-link { text-decoration: none; }
+  .entry-content [data-type="internalLink"].il-external { opacity: 0.75; }
+  .entry-content [data-type="internalLink"] .il-icon-img {
     width: 13px; height: 13px; object-fit: cover; border-radius: 2px;
   }
-  .entry-content span[data-type="internalLink"] .il-icon-emoji { font-size: 0.9em; line-height: 1; }
+  .entry-content [data-type="internalLink"] .il-icon-emoji { font-size: 0.9em; line-height: 1; }
   @page { margin: 2cm 2.5cm; }
   @media print {
     body { background: #fff; }
     #toolbar { display: none; }
     #page { margin: 0; padding: 0; box-shadow: none; max-width: none; }
     /* Prevent WKWebView from avoiding page breaks inside elements,
-       which causes large whitespace gaps before page boundaries. */
-    * {
+       which causes large whitespace gaps before page boundaries.
+       Bundled entries are the exception: each one starts on a new page. */
+    *:not(.entry-article) {
       page-break-inside: auto !important;
       break-inside:      auto !important;
       page-break-before: auto !important;
@@ -384,7 +422,10 @@ const PRINT_CSS = `
       break-before:      auto !important;
       break-after:       auto !important;
     }
+    .entry-article + .entry-article { page-break-before: always !important; break-before: page !important; }
   }
+  .entry-article + .entry-article { margin-top: 3em; padding-top: 2em; border-top: 2px solid #eee; }
+  @media print { .entry-article + .entry-article { margin-top: 0; padding-top: 0; border-top: none; } }
 `;
 
 // JS that used to run in the print window to transform internal link
@@ -401,49 +442,76 @@ const PRINT_CSS = `
 // side — no print dialog, no printer selection, no extra window. Same UX
 // shape as the Markdown / Emerald exports.
 
-export async function exportAsPDF(data: ExportData): Promise<void> {
+/**
+ * Renders one entry as an `<article>`: top bar, title, metadata and content,
+ * with images embedded and internal links pre-rendered as chips. Shared by
+ * the PDF and interactive HTML exports; `footerHtml` is appended inside the
+ * article (the HTML export's references section).
+ */
+export async function renderEntryArticle(
+  data: ExportData,
+  bundleIds?: ReadonlySet<string>,
+  compression: ImageCompression = 'none',
+  footerHtml = '',
+): Promise<string> {
   const resolvedContent  = resolveInternalLinkIcons(data.content);
-  const embeddedContent  = await embedImages(resolvedContent);
+  const embeddedContent  = await compressImagesInHtml(await embedImages(resolvedContent), compression);
   // Pre-render the internal-link chips in TS — the new webview's CSP
   // (`script-src 'self'`) blocks inline scripts, so the JS that used to
   // live in `TRANSFORM_LINKS_JS` now has to run before we hand the HTML
   // to the backend.
-  const transformedContent = transformInternalLinks(embeddedContent);
+  const transformedContent = transformInternalLinks(embeddedContent, bundleIds);
 
-  const topBarHtml = buildTopBar(data);
-  const metaHtml   = buildMetaHtml(data);
-  const numStr     = data.entryNumber ? `<span class="entry-number">#${data.entryNumber}</span>` : '';
+  const numStr = data.entryNumber ? `<span class="entry-number">#${data.entryNumber}</span>` : '';
+  return `<article class="entry-article" id="${entryAnchor(data.id)}" data-title="${htmlEscape(data.title)}">
+    ${buildTopBar(data)}
+    <h1 class="entry-title">${htmlEscape(data.title)}${numStr}</h1>
+    ${buildMetaHtml(data, bundleIds)}
+    <div class="entry-content">${DOMPurify.sanitize(transformedContent, CONTENT_PURIFY_CONFIG)}</div>
+    ${footerHtml}
+  </article>`;
+}
 
-  const escapedTitle = htmlEscape(data.title);
+/**
+ * Exports one or more entries into a single PDF. The first entry is the
+ * main one (it names the file); further entries — linked entries bundled
+ * by the export modal — each start on a new page.
+ */
+export async function exportAsPDF(entries: ExportData[], compression: ImageCompression = 'none'): Promise<boolean> {
+  const [main] = entries;
+  if (!main) return false;
+  const bundleIds = entries.length > 1 ? new Set(entries.map(e => e.id)) : undefined;
+  const articles = (await Promise.all(entries.map(e => renderEntryArticle(e, bundleIds, compression))))
+    // The PDF is rendered in a hidden, viewport-sized webview right after
+    // the page reports "loaded". WebKit decodes large images lazily, so
+    // images further down could still be undecoded when the PDF is captured
+    // and come out blank. Force eager loading and synchronous decoding.
+    .map(html => html.replace(/<img /g, '<img loading="eager" decoding="sync" '));
+
   const fullHtml = `<!DOCTYPE html>
 <html lang="de">
 <head>
   <meta charset="utf-8">
-  <title>${escapedTitle}</title>
+  <title>${htmlEscape(main.title)}</title>
   <style>${PRINT_CSS}</style>
 </head>
 <body>
   <div id="page">
-    ${topBarHtml}
-    <h1 class="entry-title">${escapedTitle}${numStr}</h1>
-    ${metaHtml}
-    <div class="entry-content">${DOMPurify.sanitize(transformedContent, {
-      ADD_ATTR: ['data-type', 'data-id', 'data-entry-type', 'data-label', 'data-icon', 'data-entry-number', 'data-href'],
-    })}</div>
+    ${articles.join('\n')}
   </div>
 </body>
 </html>`;
 
   // Same UX as Markdown / Emerald: native save dialog first, then render.
   const path = await save({
-    defaultPath: exportFilename(data.title, data.createdAt, 'pdf'),
+    defaultPath: exportFilename(main.title, main.createdAt, 'pdf'),
     filters: [{ name: 'PDF', extensions: ['pdf'] }],
   });
-  if (!path) return;
+  if (!path) return false;
 
   try {
     await invoke('export_pdf', { html: fullHtml, path });
-    await message(`PDF saved:\n${path}`, { title: 'Export', kind: 'info' });
+    return true;
   } catch (err) {
     console.error('[emerald] export_pdf: failed', err);
     throw err; // re-throw so the caller's exportErrorMessage shows a toast
@@ -459,7 +527,7 @@ function mdIcon(icon?: string | null, fallbackIcon?: string | null): string {
   return icon + ' ';
 }
 
-export async function exportAsMarkdown(data: ExportData): Promise<void> {
+function entryToMarkdown(data: ExportData): string {
   const stripped = stripImages(data.content);
 
   const td = new TurndownService({ headingStyle: 'atx', codeBlockStyle: 'fenced' });
@@ -501,26 +569,38 @@ export async function exportAsMarkdown(data: ExportData): Promise<void> {
   lines.push('', '---', '');
   lines.push(td.turndown(stripped), '');
 
-  const markdown = lines.join('\n');
+  return lines.join('\n');
+}
+
+/**
+ * Exports one or more entries into a single Markdown file. Bundled entries
+ * follow the main entry, separated by a horizontal rule; `[[wiki links]]`
+ * between them keep working in tools like Obsidian since titles match.
+ */
+export async function exportAsMarkdown(entries: ExportData[]): Promise<boolean> {
+  const [main] = entries;
+  if (!main) return false;
+  const markdown = entries.map(entryToMarkdown).join('\n\n---\n\n');
 
   const path = await save({
-    defaultPath: exportFilename(data.title, data.createdAt, 'md'),
+    defaultPath: exportFilename(main.title, main.createdAt, 'md'),
     filters: [{ name: 'Markdown', extensions: ['md'] }],
   });
-  if (!path) return;
+  if (!path) return false;
   await invoke('write_file', { path, content: markdown });
+  return true;
 }
 
 // ── guard ──────────────────────────────────────────────────────────────────
 
 export async function noEntryMessage(): Promise<void> {
-  await message('Please open a journal entry, wiki article, or operation first.', {
-    title: 'Export', kind: 'info',
+  await message(i18n.t('exportModal.noEntry'), {
+    title: i18n.t('exportModal.title'), kind: 'info',
   });
 }
 
-/** Show a non-blocking error toast for an export failure. */
-export async function exportErrorMessage(err: unknown, kind: string): Promise<void> {
+/** Show an error dialog for a failed export or import. */
+export async function exportErrorMessage(err: unknown, kind: 'export' | 'import'): Promise<void> {
   const detail = err instanceof Error ? err.message : String(err);
-  await message(detail, { title: `${kind} failed`, kind: 'error' });
+  await message(detail, { title: i18n.t(kind === 'export' ? 'exportModal.exportFailed' : 'exportModal.importFailed'), kind: 'error' });
 }

@@ -766,4 +766,18 @@ const MIGRATIONS: Migration[] = [
       await tryAdd('ALTER TABLE altar_placements ADD COLUMN altar_id TEXT');
     },
   },
+  {
+    // On a database created fresh, v1 already has `custom_properties.meta`, so
+    // v11's first statement fails as "duplicate column", v11 is marked applied
+    // and its second statement never runs: such databases have no
+    // `show_in_entry`. Add it where it is missing; older databases have it.
+    version: 32,
+    name: 'custom_properties_show_in_entry_repair',
+    up: async (db) => {
+      const cols = await db.select<{ name: string }[]>('PRAGMA table_info(custom_properties)');
+      if (!cols.some((c) => c.name === 'show_in_entry')) {
+        await db.execute('ALTER TABLE custom_properties ADD COLUMN show_in_entry INTEGER NOT NULL DEFAULT 0');
+      }
+    },
+  },
 ];

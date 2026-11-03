@@ -18,6 +18,8 @@ The current schema version is **31**. New schema changes must be added as a new 
 
 **Upgrades from older versions.** Vaults that predate the `schema_version` table will see all migrations run on first open. `ALTER TABLE … ADD COLUMN` against an already-present column raises a "duplicate column" error; this is detected by `isAlreadyAppliedError` (matches `duplicate column name`, `already exists`, or a pre-existing table) and the migration is marked applied anyway. The data migrations themselves are idempotent and re-run safely: `entry_number` is only backfilled where `NULL`, the UUID → fixed-string category ID rewrite is a no-op once the fixed IDs exist, and the `custom_properties.type = 'checkbox' → 'toggle'` rename is a single `UPDATE` that is a no-op once the migration has run.
 
+The flip side: when the *first* statement of a multi-statement migration hits an already-present column, the remaining statements never run. That happened to v11 on databases created fresh — v1 already creates `custom_properties.meta`, so v11 stopped before adding `show_in_entry`. Migration v32 (`custom_properties_show_in_entry_repair`) adds `show_in_entry` where `PRAGMA table_info` shows it missing. New migrations should either make each statement idempotent on its own or check the schema first, as v30–v32 do.
+
 ## Tables
 
 ### journal_entries

@@ -2,7 +2,7 @@ import { useJournalStore } from '../store/journalStore';
 import { useWikiStore } from '../store/wikiStore';
 import { useOperationStore } from '../store/operationStore';
 import { useUIStore } from '../store/uiStore';
-import { useCustomPropertyStore } from '../store/customPropertyStore';
+import { getDb } from './db';
 import { getCategoryEmoji } from '../components/wiki/WikiList';
 import { MOON_PHASE_SYMBOLS } from './moonPhase';
 import type { CustomProperty, WikiCategoryDef } from '../types';
@@ -14,8 +14,17 @@ export interface ChipData {
   fallbackIcon?: string;  // plain emoji to use when icon is a data-URL (markdown export)
 }
 
+export type ExportEntryType = 'journal' | 'wiki' | 'operations';
+
+/** Identifies one exportable entry, independent of what's open in the UI. */
+export interface ExportTarget {
+  type: ExportEntryType;
+  id: string;
+}
+
 export interface ExportData {
-  type: 'journal' | 'wiki' | 'operations';
+  id: string;
+  type: ExportEntryType;
   title: string;
   entryNumber?: number;
   content: string;
@@ -51,9 +60,39 @@ function moonLabel(phase: string): string {
   return phase.split('_').map(w => w[0].toUpperCase() + w.slice(1)).join(' ');
 }
 
-export async function collectExportData(): Promise<ExportData | null> {
+export type ExportCustomProp = Pick<CustomProperty, 'name' | 'value' | 'type' | 'meta' | 'show_in_entry' | 'sort_order'>;
+
+/**
+ * Reads an entry's custom properties straight from the DB, for exports.
+ * Deliberately bypasses `useCustomPropertyStore.fetchProperties`, which
+ * replaces the store's state — exporting an entry that isn't open (e.g. a
+ * bundled linked entry) would otherwise swap the open entry's properties panel.
+ */
+export async function loadCustomProps(entryId: string, entryType: string): Promise<ExportCustomProp[]> {
+  const db = await getDb();
+  const rows = await db.select<Array<Omit<ExportCustomProp, 'show_in_entry'> & { show_in_entry: number }>>(
+    `SELECT name, value, type, meta, show_in_entry, sort_order FROM custom_properties
+     WHERE entry_id = $1 AND entry_type = $2 ORDER BY sort_order ASC`,
+    [entryId, entryType]
+  );
+  return rows.map(r => ({ ...r, show_in_entry: r.show_in_entry !== 0 }));
+}
+
+async function loadVisibleCustomProps(entryId: string, entryType: string): Promise<ExportData['customProps']> {
+  return (await loadCustomProps(entryId, entryType)).filter(p => p.show_in_entry);
+}
+
+/** The entry open in the active view, if it's an exportable journal / wiki / operations entry. */
+export function activeExportTarget(): ExportTarget | null {
   const view = useUIStore.getState().activeView;
   if (!view.id) return null;
+  if (view.type === 'journal' || view.type === 'wiki' || view.type === 'operations') {
+    return { type: view.type, id: view.id };
+  }
+  return null;
+}
+
+export async function collectExportDataFor(view: ExportTarget): Promise<ExportData | null> {
 
   const { entries }                     = useJournalStore.getState();
   const { articles, wikiCategories }    = useWikiStore.getState();
@@ -65,8 +104,7 @@ export async function collectExportData(): Promise<ExportData | null> {
     const entry = entries.find(e => e.id === view.id);
     if (!entry) return null;
 
-    await useCustomPropertyStore.getState().fetchProperties(entry.id, 'journal');
-    const customProps = useCustomPropertyStore.getState().properties.filter(p => p.show_in_entry);
+    const customProps = await loadVisibleCustomProps(entry.id, 'journal');
 
     const paradigmaArt   = entry.paradigm_id            ? articles.find(a => a.id === entry.paradigm_id)            : undefined;
     const bannungArt     = entry.bannung_type_wiki_id    ? articles.find(a => a.id === entry.bannung_type_wiki_id)    : undefined;
@@ -95,6 +133,7 @@ export async function collectExportData(): Promise<ExportData | null> {
       : undefined;
 
     return {
+      id: entry.id,
       type: 'journal',
       title: entry.title || 'Untitled',
       entryNumber: entry.entry_number,
@@ -104,14 +143,16 @@ export async function collectExportData(): Promise<ExportData | null> {
       paradigma: paradigmaArt ? (() => {
         const cat = wikiCategories.find(c => c.id === paradigmaArt.category);
         const fallback = cat?.emoji ?? getCategoryEmoji(paradigmaArt.category);
-        return { label: paradigmaArt.title, icon: wikiIcon(paradigmaArt, wikiCategories), fallbackIcon: fallback };
+        return { id: paradigmaArt.id, label: paradigmaArt.title, icon: wikiIcon(paradigmaArt, wikiCategories), fallbackIcon: fallback };
       })() : undefined,
       bannung: entry.is_bannung ? {
+        id: bannungArt?.id,
         label: bannungArt?.title ?? 'Bannung',
         icon: bannungArt ? wikiIcon(bannungArt, wikiCategories) : '🚫',
         fallbackIcon: '🚫',
       } : undefined,
       meditation: entry.is_meditation ? {
+        id: meditationArt?.id,
         label: meditationArt?.title ?? 'Meditation',
         icon: meditationArt ? wikiIcon(meditationArt, wikiCategories) : '🧘',
         fallbackIcon: '🧘',
@@ -129,12 +170,12 @@ export async function collectExportData(): Promise<ExportData | null> {
     const article = articles.find(a => a.id === view.id);
     if (!article) return null;
 
-    await useCustomPropertyStore.getState().fetchProperties(article.id, 'wiki');
-    const customProps = useCustomPropertyStore.getState().properties.filter(p => p.show_in_entry);
+    const customProps = await loadVisibleCustomProps(article.id, 'wiki');
 
     const cat = wikiCategories.find(c => c.id === article.category);
 
     return {
+      id: article.id,
       type: 'wiki',
       title: article.title || 'Untitled',
       entryNumber: article.entry_number,
@@ -152,12 +193,12 @@ export async function collectExportData(): Promise<ExportData | null> {
     const op = operations.find(o => o.id === view.id);
     if (!op) return null;
 
-    await useCustomPropertyStore.getState().fetchProperties(op.id, 'operation');
-    const customProps = useCustomPropertyStore.getState().properties.filter(p => p.show_in_entry);
+    const customProps = await loadVisibleCustomProps(op.id, 'operation');
 
     const cat = opCats.find(c => c.id === op.category_id);
 
     return {
+      id: op.id,
       type: 'operations',
       title: op.title || 'Untitled',
       entryNumber: op.entry_number,
@@ -174,4 +215,106 @@ export async function collectExportData(): Promise<ExportData | null> {
   }
 
   return null;
+}
+
+// ── Linked entries ──────────────────────────────────────────────────────────
+
+/** Sigil operations have their own view (`OperationSigilView`) and their export isn't implemented yet. */
+function isExportableOperation(id: string): boolean {
+  const op = useOperationStore.getState().operations.find(o => o.id === id);
+  return !!op && op.category_id !== 'sigils';
+}
+
+function targetExists(t: ExportTarget): boolean {
+  if (t.type === 'journal') return useJournalStore.getState().entries.some(e => e.id === t.id);
+  if (t.type === 'wiki') return useWikiStore.getState().articles.some(a => a.id === t.id);
+  return isExportableOperation(t.id);
+}
+
+function normalizeLinkType(entryType: string | null): ExportEntryType | null {
+  if (entryType === 'journal' || entryType === 'wiki') return entryType;
+  if (entryType === 'operation' || entryType === 'operations') return 'operations';
+  return null;
+}
+
+/** Targets of the inline internal links in an entry's HTML content. */
+export function internalLinksIn(html: string): ExportTarget[] {
+  if (!html) return [];
+  const out: ExportTarget[] = [];
+  const doc = new DOMParser().parseFromString(html, 'text/html');
+  for (const el of doc.querySelectorAll('span[data-type="internalLink"]')) {
+    const id = el.getAttribute('data-id');
+    const type = normalizeLinkType(el.getAttribute('data-entry-type'));
+    if (id && type) out.push({ type, id });
+  }
+  return out;
+}
+
+/** All entries one target points to: inline links in its content plus the journal's property links. */
+function directLinks(t: ExportTarget): ExportTarget[] {
+  let content = '';
+  const out: ExportTarget[] = [];
+
+  if (t.type === 'journal') {
+    const entry = useJournalStore.getState().entries.find(e => e.id === t.id);
+    if (!entry) return [];
+    content = entry.content;
+    for (const id of [entry.paradigm_id, entry.bannung_type_wiki_id, entry.meditation_type_wiki_id, ...(entry.linked_wiki_ids ?? [])]) {
+      if (id) out.push({ type: 'wiki', id });
+    }
+    for (const id of entry.linked_operation_ids ?? []) out.push({ type: 'operations', id });
+  } else if (t.type === 'wiki') {
+    content = useWikiStore.getState().articles.find(a => a.id === t.id)?.content ?? '';
+  } else {
+    content = useOperationStore.getState().operations.find(o => o.id === t.id)?.content ?? '';
+  }
+
+  return [...out, ...internalLinksIn(content)];
+}
+
+/**
+ * Collects the entries linked from `root`, in discovery order (breadth-first),
+ * without duplicates and without `root` itself. With `recursive`, links of
+ * linked entries are followed too, so the bundle is closed under linking.
+ */
+export function collectLinkedTargets(root: ExportTarget, recursive: boolean): ExportTarget[] {
+  const key = (t: ExportTarget) => `${t.type}:${t.id}`;
+  const seen = new Set<string>([key(root)]);
+  const result: ExportTarget[] = [];
+  let frontier: ExportTarget[] = [root];
+
+  while (frontier.length) {
+    const next: ExportTarget[] = [];
+    for (const t of frontier) {
+      for (const link of directLinks(t)) {
+        const k = key(link);
+        if (seen.has(k) || !targetExists(link)) continue;
+        seen.add(k);
+        result.push(link);
+        next.push(link);
+      }
+    }
+    if (!recursive) break;
+    frontier = next;
+  }
+  return result;
+}
+
+/** Display info for a target, used by the export modal's entry list. */
+export function describeTarget(t: ExportTarget): { title: string; icon: string } {
+  if (t.type === 'journal') {
+    const entry = useJournalStore.getState().entries.find(e => e.id === t.id);
+    const phase = entry?.moon_phase as keyof typeof MOON_PHASE_SYMBOLS | null | undefined;
+    return { title: entry?.title || 'Untitled', icon: (phase && MOON_PHASE_SYMBOLS[phase]) || '📓' };
+  }
+  if (t.type === 'wiki') {
+    const { articles, wikiCategories } = useWikiStore.getState();
+    const a = articles.find(x => x.id === t.id);
+    if (!a) return { title: 'Untitled', icon: '📖' };
+    return { title: a.title || 'Untitled', icon: wikiIcon(a, wikiCategories) };
+  }
+  const { operations, categories } = useOperationStore.getState();
+  const op = operations.find(o => o.id === t.id);
+  const cat = op ? categories.find(c => c.id === op.category_id) : undefined;
+  return { title: op?.title || 'Untitled', icon: op?.icon || cat?.emoji || '⚡' };
 }

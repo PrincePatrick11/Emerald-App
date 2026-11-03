@@ -37,7 +37,7 @@ Three Rust commands enforce path restrictions:
 
 **`write_file` and `read_file`** enforce two layers of confinement:
 
-1. **Extension allowlist.** Only `.md`, `.emerald`, `.emeralddb`, `.json`, and `.txt` are permitted. Any other extension returns an `"unsupported file type"` error. This prevents these commands from being used as a general filesystem read/write primitive.
+1. **Extension allowlist.** Only `.md`, `.emerald`, `.emeralddb`, `.json`, and `.txt` are permitted; `write_file` additionally allows `.html` for the interactive HTML export (reading HTML is never needed, so `read_file` doesn't accept it). Any other extension returns an `"unsupported file type"` error. This prevents these commands from being used as a general filesystem read/write primitive.
 2. **Root directory confinement.** The target path's parent (resolved to an absolute, canonical form) must fall within one of the allowed storage roots: home, documents, downloads, desktop, app data, or app config directories. If the resolved path escapes these roots, the command returns `"access denied: path outside allowed directories"`. For existing files, `write_file` additionally rejects symlinks and verifies the canonical target is within allowed roots.
 
 **`export_image`** enforces three layers of validation before writing:
@@ -80,7 +80,7 @@ Several validation rules protect against malformed, oversized, or untrusted data
 
 ## HTML Escaping in Exports
 
-All user-provided text that is interpolated into the PDF export HTML template is passed through `htmlEscape()`, exported from `src/lib/export.ts` and reused by `src/lib/altarExport.ts` for the altar PDF export's title. This function replaces `&`, `<`, `>`, `"`, and `'` with their corresponding HTML entities. It is applied to:
+All user-provided text that is interpolated into the PDF and interactive HTML export templates is passed through `htmlEscape()`, exported from `src/lib/export.ts` and reused by `src/lib/altarExport.ts` for the altar PDF export's title. This function replaces `&`, `<`, `>`, `"`, and `'` with their corresponding HTML entities. It is applied to:
 
 - Entry titles (in the `<title>` element, toolbar display, and `<h1>` heading)
 - Chip labels (paradigma, bannung, meditation, linked ops/wiki, category names)
@@ -88,6 +88,8 @@ All user-provided text that is interpolated into the PDF export HTML template is
 - Custom property names and values
 - Version strings
 - Icon emoji characters (when not a data-URL image)
+
+Numeric metadata is rendered through `Number()` instead: the meditation duration is only shown when it is a finite number, and `.emerald` import only accepts a finite number for it, so a crafted file can't smuggle markup in through that field.
 
 The content HTML itself (the TipTap editor output) is not re-escaped — it is trusted HTML already produced by the editor and sanitised on import. Image `src` attributes that are file paths are resolved to base64 data-URLs via `embedImages()` before the HTML is handed to the export backend.
 
@@ -106,6 +108,23 @@ All HTML that enters the app from outside is sanitised with DOMPurify before bei
 ## Content Security Policy
 
 The main window has CSP enabled through Tauri's default configuration. The export HTML for PDF export is written to a unique file in the OS temp directory and loaded by a hidden webview over a `file://` URL — it never fetches external resources and is removed from disk as soon as the export finishes. Because the hidden webview inherits the same CSP as the main window (`script-src 'self'` — see `tauri.conf.json`), inline scripts in the export HTML are blocked; the frontend therefore pre-renders the internal-link chip transformation in TypeScript (`transformInternalLinks` in `src/lib/export.ts`) before handing the HTML to the backend.
+
+## Interactive HTML Export
+
+The HTML export (`src/lib/htmlExport.ts`) writes a file that the user opens in their own browser, outside the app and its CSP. It contains one inline script for navigation, search and theming. That script reads everything from the DOM (`textContent`, `getAttribute`, `createElement`) and never interpolates entry data into script source; entry content is DOMPurify-sanitised as the last step of rendering, so it can't contribute scripts or event handlers. The file carries its own CSP: `default-src 'none'; img-src data:; style-src 'unsafe-inline'; script-src 'unsafe-inline'; form-action 'none'; base-uri 'none'` — no network loads, no form submission (a form inside imported content can't post anywhere), no `<base>` rewriting. Plain link navigation (clicking an external link in an entry) is still possible, as in any document.
+
+The Rust `write_file` command accepts `.html` for this export; `read_file` does not, since the app never reads HTML back.
+
+## The Dev Bridge
+
+`src-tauri/src/devbridge.rs` lets the MCP server in `tools/mcp` drive the app on macOS and Linux, where the webview has no debug port (see [`mcp.md`](mcp.md)). It opens a local port through which a client runs JavaScript in the main window, reads the console, takes screenshots, sends mouse events and answers the app's dialogs — everything the webview can do, the client can do. With the bridge in the build and listening, the app's file dialogs and message boxes are held back and answered by the client instead of being shown, so such an instance is for the MCP and not for working in. It is therefore fenced in:
+
+- **Not in a release build.** The module, its two commands (`devbridge_reply`, `devbridge_event`) and the script it injects exist only with the cargo feature `devbridge`, which is off by default, and `lib.rs` refuses to compile the feature without debug assertions.
+- **Closed unless asked for.** A build that has the feature still listens only when `EMERALD_DEVBRIDGE_PORT` names a port. The MCP launcher sets it; `npm run tauri dev` and `npm run tauri:dev` do not even enable the feature.
+- **Loopback only.** The listener binds `127.0.0.1`.
+- **It runs the session's checkout.** The tools that start the app run `npm install` and `tauri dev` from the checkout the session works in, as the server's user and outside any restriction the client puts on the session's own commands. Whoever can edit that checkout and call those tools can run code that way.
+- **Invisible only when told.** On macOS the bridge can make the app's windows transparent and keep the app out of the Dock (the activation policy is set once the app is ready, as the windowing layer would overwrite it earlier), so an instance driven by an agent stays out of the way. It does so only while it listens and `EMERALD_DEVBRIDGE_HIDE_WINDOW=1` is set, which the MCP launcher does.
+- **No web pages.** A WebSocket handshake that carries an `Origin` header is refused, so a page open in a browser on the same machine cannot connect. Any other local process can, as it can to the WebView2 debug port on Windows.
 
 ## File Dialog Safety
 

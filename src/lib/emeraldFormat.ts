@@ -1,6 +1,5 @@
 import { invoke } from '@tauri-apps/api/core';
 import { open as openDialog, save, message } from '@tauri-apps/plugin-dialog';
-import { format } from 'date-fns';
 import { marked } from 'marked';
 import DOMPurify from 'dompurify';
 import { useUIStore } from '../store/uiStore';
@@ -20,6 +19,9 @@ import {
 import { MOON_PHASE_SYMBOLS } from './moonPhase';
 import { noAltarOpenMessage } from './altarExport';
 import type { CustomPropertyType } from '../types';
+import { loadCustomProps, type ExportTarget } from './exportData';
+import { exportFilename, noEntryMessage } from './export';
+import { compressDataUrl, type ImageCompression } from './imageCompression';
 
 // ── File format ──────────────────────────────────────────────────────────────
 
@@ -109,26 +111,21 @@ interface EmeraldMeta {
   }>;
 }
 
-function safeFilename(title: string): string {
-  return title.replace(/[^\w\s\-äöüÄÖÜß]/g, '').trim().replace(/\s+/g, '_') || 'export';
-}
-
-function exportFilename(title: string, date: string, ext: string): string {
-  const base = safeFilename(title);
-  const dateStr = format(new Date(date), 'yyyy-MM-dd');
-  return `${base}_${dateStr}.${ext}`;
-}
-
 // ── Export ───────────────────────────────────────────────────────────────────
 
-export async function exportAsEmerald(): Promise<void> {
-  const view = useUIStore.getState().activeView;
+/**
+ * Exports `target` — or, when omitted, whatever is open in the active view
+ * (including an Altar) — as a single-entry `.emerald` file. Resolves to
+ * `false` when the user cancels the save dialog.
+ */
+export async function exportAsEmerald(target?: ExportTarget, compression: ImageCompression = 'none'): Promise<boolean> {
+  const view = target ?? useUIStore.getState().activeView;
   if (view.type === 'altar') {
     return exportAltarAsEmerald();
   }
   if (!view.id) {
-    await message('Please open a journal entry, wiki article, or operation first.', { title: 'Export', kind: 'info' });
-    return;
+    await noEntryMessage();
+    return false;
   }
 
   const { entries }                           = useJournalStore.getState();
@@ -139,10 +136,11 @@ export async function exportAsEmerald(): Promise<void> {
   let createdAt = '';
   let type: EmeraldFile['type'] = 'journal';
   const meta: EmeraldMeta = {};
+  let propsKey: { id: string; type: string } | null = null;
 
   if (view.type === 'journal') {
     const entry = entries.find(e => e.id === view.id);
-    if (!entry) return;
+    if (!entry) return false;
     type      = 'journal';
     title     = entry.title || 'Untitled';
     content   = entry.content || '';
@@ -169,11 +167,11 @@ export async function exportAsEmerald(): Promise<void> {
       meta.linkedWiki = linkedWikiIds.map(id => ({ id, title: articles.find(a => a.id === id)?.title ?? '' }));
 
     meta.tags = (entry.tags ?? []) as string[];
-    await useCustomPropertyStore.getState().fetchProperties(entry.id, 'journal');
+    propsKey = { id: entry.id, type: 'journal' };
 
   } else if (view.type === 'wiki') {
     const article = articles.find(a => a.id === view.id);
-    if (!article) return;
+    if (!article) return false;
     type      = 'wiki';
     title     = article.title || 'Untitled';
     content   = article.content || '';
@@ -184,11 +182,11 @@ export async function exportAsEmerald(): Promise<void> {
     meta.wikiCategoryName = cat?.name ?? article.category;
     meta.icon             = article.icon ?? undefined;
     meta.tags             = (article.tags ?? []) as string[];
-    await useCustomPropertyStore.getState().fetchProperties(article.id, 'wiki');
+    propsKey = { id: article.id, type: 'wiki' };
 
   } else if (view.type === 'operations') {
     const op = operations.find(o => o.id === view.id);
-    if (!op) return;
+    if (!op) return false;
     type      = 'operations';
     title     = op.title || 'Untitled';
     content   = op.content || '';
@@ -201,13 +199,15 @@ export async function exportAsEmerald(): Promise<void> {
     meta.version   = op.version;
     meta.icon      = op.icon ?? undefined;
     meta.tags      = (op.tags ?? []) as string[];
-    await useCustomPropertyStore.getState().fetchProperties(op.id, 'operation');
+    propsKey = { id: op.id, type: 'operation' };
   }
 
-  meta.customProps = useCustomPropertyStore.getState().properties.map(p => ({
-    name: p.name, type: p.type, value: p.value, meta: p.meta,
-    showInEntry: p.show_in_entry, sortOrder: p.sort_order,
-  }));
+  if (propsKey) {
+    meta.customProps = (await loadCustomProps(propsKey.id, propsKey.type)).map(p => ({
+      name: p.name, type: p.type, value: p.value, meta: p.meta,
+      showInEntry: p.show_in_entry, sortOrder: p.sort_order,
+    }));
+  }
 
   // Embed all local images from content as base64
   const images: Record<string, string> = {};
@@ -217,7 +217,7 @@ export async function exportAsEmerald(): Promise<void> {
     const src = m[1];
     if (!src.startsWith('data:') && !src.startsWith('http') && !src.startsWith('blob:')) {
       try {
-        images[src] = await invoke<string>('read_image_as_base64', { path: src });
+        images[src] = await compressDataUrl(await invoke<string>('read_image_as_base64', { path: src }), compression);
       } catch { /* skip missing files */ }
     }
   }
@@ -228,16 +228,17 @@ export async function exportAsEmerald(): Promise<void> {
     defaultPath: exportFilename(title, createdAt, 'emerald'),
     filters: [{ name: 'Emerald', extensions: ['emerald'] }],
   });
-  if (!savePath) return;
+  if (!savePath) return false;
   await invoke('write_file', { path: savePath, content: JSON.stringify(file, null, 2) });
+  return true;
 }
 
-async function exportAltarAsEmerald(): Promise<void> {
+async function exportAltarAsEmerald(): Promise<boolean> {
   const { altars, activeAltarId, items, placements, categories } = useAltarStore.getState();
   const altar = altars.find(a => a.id === activeAltarId);
   if (!altar) {
     await noAltarOpenMessage();
-    return;
+    return false;
   }
 
   // Only background_image_data is a local file path — read it via Rust like
@@ -297,8 +298,9 @@ async function exportAltarAsEmerald(): Promise<void> {
     defaultPath: exportFilename(file.title, file.createdAt, 'emerald'),
     filters: [{ name: 'Emerald', extensions: ['emerald'] }],
   });
-  if (!savePath) return;
+  if (!savePath) return false;
   await invoke('write_file', { path: savePath, content: JSON.stringify(file, null, 2) });
+  return true;
 }
 
 // ── Import helpers ───────────────────────────────────────────────────────────
@@ -462,7 +464,10 @@ async function importJournalEntry(file: EmeraldFile, content: string, tagNames: 
     bannung_type_wiki_id: bannungId,
     is_meditation: file.meta.isMeditation ?? false,
     meditation_type_wiki_id: meditationId,
-    meditation_duration: file.meta.meditationDuration ?? null,
+    // The file is untrusted — keep only a real number, never a string that
+    // could end up as markup in an export.
+    meditation_duration: Number.isFinite(file.meta.meditationDuration)
+      ? Math.round(file.meta.meditationDuration as number) : null,
     linked_operation_ids: linkedOpIds,
     linked_wiki_ids: linkedWikiIds,
   });

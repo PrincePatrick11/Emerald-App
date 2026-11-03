@@ -107,6 +107,33 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
     border-color: var(--border-soft);
   }
 
+  /* Export modal — selectable format cards and the direct / indirect segmented toggle.
+     Built on theme variables rather than bg-jade-* utilities, which Parchment
+     repaints as solid jade buttons. */
+  .export-option {
+    @apply rounded-lg border transition-colors duration-150;
+    border-color: var(--border-soft);
+  }
+  .export-option:hover {
+    border-color: var(--border-strong);
+    background-color: var(--interactive-hover);
+  }
+  .export-option-active,
+  .export-option-active:hover {
+    border-color: var(--accent-strong);
+    background-color: var(--link-chip-bg);
+  }
+  .export-segment {
+    @apply px-2.5 py-1 rounded-md text-xs transition-colors duration-150;
+    color: var(--text-muted);
+  }
+  .export-segment:hover { color: var(--text-secondary); }
+  .export-segment-active,
+  .export-segment-active:hover {
+    background-color: var(--menu-item-active-bg);
+    color: var(--menu-item-active-text);
+  }
+
   /* Primary action button — jade accent (xs size, for toolbars & headers) */
   .btn-primary {
     @apply flex items-center gap-1.5 px-3 py-1.5

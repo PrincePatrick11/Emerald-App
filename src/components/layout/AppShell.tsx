@@ -4,14 +4,16 @@ import { useTranslation } from 'react-i18next';
 import { useJournalStore } from '../../store/journalStore';
 import { useWikiStore } from '../../store/wikiStore';
 import { useUIStore } from '../../store/uiStore';
+import type { ActiveView } from '../../types';
 import { useTagStore } from '../../store/tagStore';
 import { useOperationStore } from '../../store/operationStore';
 import { useAltarStore } from '../../store/altarStore';
 import { useRoutineStore } from '../../store/routineStore';
 import { useVaultStore } from '../../store/vaultStore';
 import { invoke } from '@tauri-apps/api/core';
-import { exportAsPDF, exportAsMarkdown, noEntryMessage, exportErrorMessage } from '../../lib/export';
-import { collectExportData } from '../../lib/exportData';
+import { noEntryMessage, exportErrorMessage } from '../../lib/export';
+import { activeExportTarget } from '../../lib/exportData';
+import { useExportStore, type ExportFormat } from '../../store/exportStore';
 import { exportAsEmerald, importFromEmerald, importFromMarkdown } from '../../lib/emeraldFormat';
 import { saveAltarImage, saveAltarPDF } from '../../lib/altarExport';
 import LeftSidebar from './LeftSidebar';
@@ -20,11 +22,17 @@ import MainArea from './MainArea';
 import TabBar from './TabBar';
 import UndoToast from '../ui/UndoToast';
 import ImportDestinationModal from '../ui/ImportDestinationModal';
+import ExportModal from '../ui/ExportModal';
 
 const LEFT_MIN = 180;
 const RIGHT_MIN = 180;
 const LEFT_DEFAULT = 220;
 const RIGHT_DEFAULT = 300;
+
+/** An Altar open in reading view — where PDF / Emerald export the altar instead of an entry. */
+function isAltarReadingView(view: ActiveView): boolean {
+  return view.type === 'altar' && !!view.id && view.mode !== 'edit';
+}
 
 function loadSavedWidth(key: string, min: number, fallback: number): number {
   const saved = localStorage.getItem(key);
@@ -80,7 +88,9 @@ export default function AppShell() {
       export:          t('menu.export'),
       import:          t('menu.import'),
       resetView:       t('menu.resetView'),
+      exportEntry:     t('menu.exportEntry'),
       exportPdf:       t('menu.exportPdf'),
+      exportHtml:      t('menu.exportHtml'),
       exportMarkdown:  t('menu.exportMarkdown'),
       exportEmerald:   t('menu.exportEmerald'),
       exportAltarImage: t('menu.exportAltarImage'),
@@ -110,14 +120,13 @@ export default function AppShell() {
        activeView.type === 'wiki' ||
        (activeView.type === 'operations' && !isSigilOperation)) &&
       !!activeView.id;
-    const isAltarReadingView =
-      activeView.type === 'altar' && !!activeView.id && activeView.mode !== 'edit';
+    const altarReading = isAltarReadingView(activeView);
     invoke('set_export_menu_enabled', {
       entryEnabled: isEntryView,
-      pdfEnabled: isEntryView || isAltarReadingView,
-      emeraldEnabled: isEntryView || isAltarReadingView,
+      pdfEnabled: isEntryView || altarReading,
+      emeraldEnabled: isEntryView || altarReading,
     }).catch(() => {/* desktop-only, ignore in browser preview */});
-    invoke('set_altar_export_menu_enabled', { enabled: isAltarReadingView })
+    invoke('set_altar_export_menu_enabled', { enabled: altarReading })
       .catch(() => {/* desktop-only, ignore in browser preview */});
   }, [activeView.type, activeView.id, activeView.mode]);
 
@@ -142,50 +151,61 @@ export default function AppShell() {
   }, [setAltarWindowFullscreen]);
 
   useEffect(() => {
-    const unlistenPdf = listen('export-pdf', async () => {
-      const view = useUIStore.getState().activeView;
-      const isAltarReadingView = view.type === 'altar' && !!view.id && view.mode !== 'edit';
-      if (isAltarReadingView) {
-        saveAltarPDF().catch(err => exportErrorMessage(err, 'PDF export'));
+    // Journal / wiki / operations entries always go through the export modal
+    // (format choice, bundling linked entries); the per-format menu items just
+    // preselect their format. Altars keep their direct exports.
+    const openEntryExport = (format?: ExportFormat) => {
+      const target = activeExportTarget();
+      if (!target) { noEntryMessage(); return; }
+      useExportStore.getState().openExport(target, format);
+    };
+
+    const unlistenEntry = listen('export-entry', () => openEntryExport());
+
+    const unlistenPdf = listen('export-pdf', () => {
+      if (isAltarReadingView(useUIStore.getState().activeView)) {
+        saveAltarPDF().catch(err => exportErrorMessage(err, 'export'));
         return;
       }
-      const data = await collectExportData();
-      if (!data) { noEntryMessage(); return; }
-      exportAsPDF(data).catch(err => exportErrorMessage(err, 'PDF export'));
+      openEntryExport('pdf');
     });
 
-    const unlistenMd = listen('export-markdown', async () => {
-      const data = await collectExportData();
-      if (!data) { noEntryMessage(); return; }
-      exportAsMarkdown(data).catch(err => exportErrorMessage(err, 'Markdown export'));
-    });
+    const unlistenHtml = listen('export-html', () => openEntryExport('html'));
+
+    const unlistenMd = listen('export-markdown', () => openEntryExport('markdown'));
 
     const unlistenEmerald = listen('export-emerald', () => {
-      exportAsEmerald().catch(err => exportErrorMessage(err, 'Emerald export'));
+      if (isAltarReadingView(useUIStore.getState().activeView)) {
+        exportAsEmerald().catch(err => exportErrorMessage(err, 'export'));
+        return;
+      }
+      openEntryExport('emerald');
     });
 
     const unlistenAltarJpeg = listen('export-altar-jpeg', () => {
-      saveAltarImage('jpeg').catch(err => exportErrorMessage(err, 'Image export'));
+      saveAltarImage('jpeg').catch(err => exportErrorMessage(err, 'export'));
     });
 
     const unlistenAltarPng = listen('export-altar-png', () => {
-      saveAltarImage('png').catch(err => exportErrorMessage(err, 'Image export'));
+      saveAltarImage('png').catch(err => exportErrorMessage(err, 'export'));
     });
 
     const unlistenAltarWebp = listen('export-altar-webp', () => {
-      saveAltarImage('webp').catch(err => exportErrorMessage(err, 'Image export'));
+      saveAltarImage('webp').catch(err => exportErrorMessage(err, 'export'));
     });
 
     const unlistenImportEmerald = listen('import-emerald', () => {
-      importFromEmerald().catch(err => exportErrorMessage(err, 'Emerald import'));
+      importFromEmerald().catch(err => exportErrorMessage(err, 'import'));
     });
 
     const unlistenImportMd = listen('import-markdown', () => {
-      importFromMarkdown().catch(err => exportErrorMessage(err, 'Markdown import'));
+      importFromMarkdown().catch(err => exportErrorMessage(err, 'import'));
     });
 
     return () => {
+      unlistenEntry.then(fn => fn());
       unlistenPdf.then(fn => fn());
+      unlistenHtml.then(fn => fn());
       unlistenMd.then(fn => fn());
       unlistenEmerald.then(fn => fn());
       unlistenAltarJpeg.then(fn => fn());
@@ -281,6 +301,7 @@ export default function AppShell() {
       )}
       <UndoToast />
       <ImportDestinationModal />
+      <ExportModal />
     </div>
   );
 }

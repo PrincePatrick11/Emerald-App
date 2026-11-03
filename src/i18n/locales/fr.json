@@ -484,7 +484,9 @@
     "export": "Exporter",
     "import": "Importer",
     "resetView": "Réinitialiser la vue",
+    "exportEntry": "Exporter…",
     "exportPdf": "Exporter en PDF…",
+    "exportHtml": "Exporter en HTML…",
     "exportMarkdown": "Exporter en Markdown…",
     "exportEmerald": "Exporter en Emerald…",
     "exportAltarImage": "Exporter en image",
@@ -546,5 +548,70 @@
     "showCompleted": "Afficher terminées",
     "emptyCategory": "Aucune tâche dans cette catégorie",
     "uncategorized": "Non classé"
+  },
+  "exportModal": {
+    "title": "Exporter",
+    "format": "Format de fichier",
+    "formats": {
+      "pdf": {
+        "name": "PDF",
+        "desc": "Document prêt à imprimer avec images intégrées."
+      },
+      "html": {
+        "name": "HTML interactif",
+        "desc": "Un fichier pour tout navigateur – avec navigation, recherche et liens cliquables."
+      },
+      "markdown": {
+        "name": "Markdown",
+        "desc": "Texte brut pour d'autres applis de notes comme Obsidian."
+      },
+      "emerald": {
+        "name": "Emerald",
+        "desc": "Copie complète pour réimporter dans Emerald."
+      }
+    },
+    "images": "Images",
+    "compression": {
+      "none": {
+        "name": "Original",
+        "desc": "Les images sont intégrées sans modification."
+      },
+      "balanced": {
+        "name": "Compressées",
+        "desc": "Max. 1600 px, différence à peine visible – fichier bien plus léger."
+      },
+      "strong": {
+        "name": "Très compressées",
+        "desc": "Max. 1000 px, qualité réduite – fichier le plus léger possible."
+      }
+    },
+    "linkedEntries": "Entrées liées",
+    "includeLinked": "Exporter aussi les entrées liées",
+    "noLinked": "Cette entrée ne renvoie vers aucune autre entrée.",
+    "emeraldSingle": "Les fichiers Emerald contiennent toujours une seule entrée. Choisissez PDF, HTML ou Markdown pour regrouper les entrées liées dans le fichier.",
+    "depthDirect": "Liens directs ({{count}})",
+    "depthAll": "Aussi indirects ({{count}})",
+    "bundleHintHtml": "Toutes les entrées sont réunies dans un seul fichier HTML. Les liens entre elles sont cliquables et la barre latérale liste chaque entrée.",
+    "bundleHintPdf": "Toutes les entrées sont réunies dans un seul PDF, chacune commençant sur une nouvelle page.",
+    "bundleHintMarkdown": "Toutes les entrées sont écrites l'une après l'autre dans un seul fichier Markdown.",
+    "entryCount_one": "{{count}} entrée",
+    "entryCount_other": "{{count}} entrées",
+    "cancel": "Annuler",
+    "export": "Exporter…",
+    "exporting": "Export en cours…",
+    "saved": "Export enregistré.",
+    "html": {
+      "search": "Rechercher…  ( / )",
+      "linkedFrom": "Lié depuis",
+      "linksTo": "Lie vers",
+      "outline": "Plan",
+      "print": "Imprimer",
+      "toggleTheme": "Clair / Sombre",
+      "toggleSidebar": "Barre latérale",
+      "exportedOn": "Exporté depuis Emerald le {{date}}"
+    },
+    "noEntry": "Ouvrez d'abord une entrée du journal, un article du wiki ou une opération.",
+    "exportFailed": "Échec de l'export",
+    "importFailed": "Échec de l'import"
   }
 }

@@ -484,7 +484,9 @@
     "export": "Export",
     "import": "Import",
     "resetView": "Reset View",
+    "exportEntry": "Export…",
     "exportPdf": "Export as PDF…",
+    "exportHtml": "Export as HTML…",
     "exportMarkdown": "Export as Markdown…",
     "exportEmerald": "Export as Emerald…",
     "exportAltarImage": "Export as Image",
@@ -546,5 +548,70 @@
     "showCompleted": "Show completed",
     "emptyCategory": "No tasks in this category",
     "uncategorized": "Uncategorized"
+  },
+  "exportModal": {
+    "title": "Export",
+    "format": "File format",
+    "formats": {
+      "pdf": {
+        "name": "PDF",
+        "desc": "Print-ready document with embedded images."
+      },
+      "html": {
+        "name": "Interactive HTML",
+        "desc": "One file for any browser – with navigation, search and clickable links."
+      },
+      "markdown": {
+        "name": "Markdown",
+        "desc": "Plain text for other note apps like Obsidian."
+      },
+      "emerald": {
+        "name": "Emerald",
+        "desc": "Complete copy for re-importing into Emerald."
+      }
+    },
+    "images": "Images",
+    "compression": {
+      "none": {
+        "name": "Original",
+        "desc": "Images are embedded unchanged."
+      },
+      "balanced": {
+        "name": "Compressed",
+        "desc": "Max. 1600 px, barely visible difference – much smaller file."
+      },
+      "strong": {
+        "name": "Strongly compressed",
+        "desc": "Max. 1000 px, lower quality – smallest possible file."
+      }
+    },
+    "linkedEntries": "Linked entries",
+    "includeLinked": "Also export linked entries",
+    "noLinked": "This entry doesn't link to any other entries.",
+    "emeraldSingle": "Emerald files always contain exactly one entry. Choose PDF, HTML or Markdown to bundle linked entries into the file.",
+    "depthDirect": "Directly linked ({{count}})",
+    "depthAll": "Including indirect ({{count}})",
+    "bundleHintHtml": "All entries go into one HTML file. Links between them are clickable and the sidebar lists every entry.",
+    "bundleHintPdf": "All entries go into one PDF, each starting on a new page.",
+    "bundleHintMarkdown": "All entries are written one after another into a single Markdown file.",
+    "entryCount_one": "{{count}} entry",
+    "entryCount_other": "{{count}} entries",
+    "cancel": "Cancel",
+    "export": "Export…",
+    "exporting": "Exporting…",
+    "saved": "Export saved.",
+    "html": {
+      "search": "Search…  ( / )",
+      "linkedFrom": "Linked from",
+      "linksTo": "Links to",
+      "outline": "Outline",
+      "print": "Print",
+      "toggleTheme": "Light / Dark",
+      "toggleSidebar": "Sidebar",
+      "exportedOn": "Exported from Emerald on {{date}}"
+    },
+    "noEntry": "Please open a journal entry, wiki article, or operation first.",
+    "exportFailed": "Export failed",
+    "importFailed": "Import failed"
   }
 }
