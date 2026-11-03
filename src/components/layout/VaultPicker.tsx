@@ -1,18 +1,19 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { open as openDialog } from '@tauri-apps/plugin-dialog';
-import { AlertTriangle, ArrowLeft, Check, Cloud, CloudOff, FolderOpen, Loader2, Pencil, Plus, RotateCcw, Trash2, Vault, X } from 'lucide-react';
+import { ArrowLeft, FolderOpen, Plus } from 'lucide-react';
 import Button from '../ui/Button';
-import EmojiPicker from '../ui/EmojiPicker';
-import { DEFAULT_EMOJI_PICKER_EMOJIS } from '../../lib/emojiSearch';
 import { activeVault, hasActiveVault, useVaultStore } from '../../store/vaultStore';
 import { ensureVaultReady, VAULT_KEY_CANCELLED } from '../../store/vaultKeyStore';
 import { closeVaultPicker, useVaultPickerStore } from '../../store/vaultPickerStore';
 import { keyErrorOf } from '../../lib/vaultKeys';
 import { enterPickerWindow, leavePickerWindow } from '../../lib/pickerWindow';
 import { hideLoadingScreen, hideSplash, showLoadingScreen } from '../../lib/splash';
-import { serverStatus, type ServerStatus } from '../../lib/sync/engine';
-import PickerServerSection from './PickerServerSection';
+import { adoptRemoteVault, deleteRemoteVault, syncErrorCode, type RemoteVault } from '../../lib/sync/engine';
+import { syncErrorKey } from '../../lib/sync/errors';
+import { formatBytes } from '../../lib/helpers';
+import PickerServerPanel, { useServerState } from './PickerServerPanel';
+import { CreateRow, DeleteConfirmRow, EditRow, RemoteRow, VaultRow, type VaultState } from './PickerRows';
 import {
   DB_FILE,
   NEW_VAULT_TARGET_ERROR_KEY,
@@ -27,10 +28,7 @@ import {
   type Vault as VaultRecord,
 } from '../../lib/vaultManager';
 
-const INPUT_CLASS = 'input-field flex-1 min-w-0 rounded-lg px-2.5 py-1.5 text-sm outline-none';
-const CHECKBOX_CLASS =
-  'mt-0.5 w-4 h-4 shrink-0 rounded border flex items-center justify-center transition-colors ' +
-  'peer-focus-visible:ring-2 peer-focus-visible:ring-jade-500/35';
+export { VaultGlyph, VaultLocationRow } from './PickerRows';
 
 /** The one open editor, if any — edit, delete confirmation and the create row
     are mutually exclusive, so they share a single state. */
@@ -38,6 +36,7 @@ type Editor =
   | { kind: 'none' }
   | { kind: 'edit'; id: string; name: string; icon?: string }
   | { kind: 'confirmDelete'; id: string; deleteFiles: boolean }
+  | { kind: 'confirmRemote'; id: string }
   | {
       kind: 'create';
       name: string;
@@ -48,323 +47,16 @@ type Editor =
       customPath: string | null;
     };
 
-/**
- * Choose-folder button plus the folder the vault will actually land in.
- * Shared by the create row here and the add-vault backup import in the
- * settings modal — same choice, same display, same reset.
- */
-export function VaultLocationRow({
-  target, customPath, onPickFolder, onResetFolder,
-}: {
-  target: string | null;
-  customPath: string | null;
-  onPickFolder: () => void;
-  onResetFolder: () => void;
-}) {
-  const { t } = useTranslation();
-  const { parent: targetParent, leaf: targetLeaf } = splitPath(target ?? '');
-  // The path appears in full length on a line of its own — `break-all`,
-  // because a Windows path needs no spaces at which `break-words`
-  // could wrap. Nothing is cut off: where the vault goes
-  // has to be fully readable.
-  return (
-    <div className="space-y-1 min-w-0">
-      <div className="flex items-center gap-2">
-        <Button variant="secondary" className="shrink-0" onClick={onPickFolder}>
-          <FolderOpen size={14} />
-          {t('vault.chooseFolder')}
-        </Button>
-        {customPath && (
-          <Button variant="ghost" className="shrink-0" title={t('vault.defaultFolder')} onClick={onResetFolder}>
-            <RotateCcw size={14} />
-          </Button>
-        )}
-      </div>
-      <span className="block text-xs break-all">
-        <span style={{ color: 'var(--text-subtle)' }}>{targetParent}</span>
-        <span style={{ color: 'var(--text-muted)' }}>{targetLeaf}</span>
-      </span>
-    </div>
-  );
-}
-
-/** A vault's own emoji, or the generic glyph while it has none. */
-export function VaultGlyph({ icon, size }: { icon?: string; size: number }) {
-  return icon
-    ? <span className="leading-none" style={{ fontSize: size }}>{icon}</span>
-    : <Vault size={size} />;
-}
-
-// ── rows ─────────────────────────────────────────────────────────────────────
-
-/** The badge doubles as the icon picker; the reset appears once one is set. */
-function IconField({ icon, onChange }: { icon?: string; onChange: (icon?: string) => void }) {
-  const { t } = useTranslation();
-  return (
-    <>
-      {/* The built-in selection, not the open vault's: here the icon of another
-          vault is edited too — or of one that does not exist yet. */}
-      <EmojiPicker
-        value={icon ?? ''}
-        onChange={onChange}
-        emojis={DEFAULT_EMOJI_PICKER_EMOJIS}
-        trigger={({ toggle }) => (
-          <button type="button" className="vault-badge vault-badge-interactive" title={t('vault.icon')} onClick={toggle}>
-            <VaultGlyph icon={icon} size={16} />
-          </button>
-        )}
-      />
-      {icon && (
-        <Button variant="ghost" title={t('vault.resetIcon')} onClick={() => onChange(undefined)}>
-          <RotateCcw size={14} />
-        </Button>
-      )}
-    </>
-  );
-}
-
-/**
- * Name and icon in one editor, committed together by the check button.
- *
- * Deliberately no commit on blur: the emoji picker's trigger and its search
- * field both take the focus away from this input, so a blur commit would close
- * the row mid-click and take the picker with it.
- */
-function EditRow({
-  name, icon, onChangeName, onChangeIcon, onCommit, onCancel,
-}: {
-  name: string;
-  icon?: string;
-  onChangeName: (name: string) => void;
-  onChangeIcon: (icon?: string) => void;
-  onCommit: () => void;
-  onCancel: () => void;
-}) {
-  const { t } = useTranslation();
-  return (
-    <div className="vault-card">
-      <IconField icon={icon} onChange={onChangeIcon} />
-      <input
-        autoFocus
-        className={INPUT_CLASS}
-        value={name}
-        onChange={(e) => onChangeName(e.target.value)}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter') onCommit();
-          if (e.key === 'Escape') onCancel();
-        }}
-      />
-      <div className="flex items-center gap-0.5">
-        <Button
-          tone="jade"
-          compact
-          title={t('vault.save')}
-          aria-label={t('vault.save')}
-          disabled={!name.trim()}
-          onClick={onCommit}
-        >
-          <Check size={14} />
-        </Button>
-        <Button tone="neutral" compact title={t('vault.cancel')} aria-label={t('vault.cancel')} onClick={onCancel}>
-          <X size={14} />
-        </Button>
-      </div>
-    </div>
-  );
-}
-
-function DeleteConfirmRow({
-  vault, deleteFiles, hintKey, busy, onToggleFiles, onConfirm, onCancel,
-}: {
-  vault: VaultRecord;
-  deleteFiles: boolean;
-  /** What happens afterwards — for the active and the last vault that is more
-   *  than "disappears from the list". */
-  hintKey: 'vault.deleteHint' | 'vault.deleteActiveHint' | 'vault.deleteLastHint';
-  busy: boolean;
-  onToggleFiles: (next: boolean) => void;
-  onConfirm: () => void;
-  onCancel: () => void;
-}) {
-  const { t } = useTranslation();
-  return (
-    <div className="vault-card flex-col items-stretch gap-2">
-      <div className="flex items-center gap-3">
-        <div className="vault-badge"><Trash2 size={16} /></div>
-        <div className="flex-1 min-w-0">
-          <div className="vault-name">{vault.name}</div>
-          <div className="vault-meta">{t(hintKey)}</div>
-        </div>
-        {/* The tinted row-action buttons of the Button component — the same
-            30px row as Edit/Delete on the vault cards, without
-            hand-written padding chains. */}
-        <Button onClick={onConfirm} tone="danger" className="shrink-0" disabled={busy}>
-          {busy ? <Loader2 size={12} className="animate-spin" /> : t('common.confirmYes')}
-        </Button>
-        <Button onClick={onCancel} tone="neutral" className="shrink-0">
-          {t('common.confirmNo')}
-        </Button>
-      </div>
-
-      <label className="flex items-start gap-2 text-xs cursor-pointer" style={{ color: 'var(--text-muted)' }}>
-        {/* A real input for keyboard and screen readers, visually the checkbox
-            that the export panel already uses. */}
-        <input
-          type="checkbox"
-          className="sr-only peer"
-          checked={deleteFiles}
-          onChange={(e) => onToggleFiles(e.target.checked)}
-        />
-        <span
-          aria-hidden
-          className={`${CHECKBOX_CLASS} ${
-            deleteFiles ? 'bg-jade-500/30 border-jade-500/60' : 'border-stone-600 hover:border-stone-400'
-          }`}
-        >
-          {deleteFiles && <Check size={10} className="text-jade-400" />}
-        </span>
-        <span className="min-w-0">
-          {t('vault.deleteFiles')}
-          <span className="block truncate" title={vault.path}>{vault.path}</span>
-          {deleteFiles && (
-            <span className="block mt-1 text-danger">{t('vault.deleteFilesWarning')}</span>
-          )}
-        </span>
-      </label>
-    </div>
-  );
-}
-
-function VaultRow({
-  vault, isActive, unreachable, sync, isSwitching, busy, onSwitch, onEdit, onRelocate, onDelete,
-}: {
-  vault: VaultRecord;
-  isActive: boolean;
-  unreachable: 'missing' | 'denied' | null;
-  /** Its place on the server, if it has one. */
-  sync: 'synced' | 'paused' | null;
-  isSwitching: boolean;
-  busy: boolean;
-  onSwitch: () => void;
-  onEdit: () => void;
-  onRelocate: () => void;
-  onDelete: () => void;
-}) {
-  const { t } = useTranslation();
-  const isUnreachable = unreachable !== null;
-  return (
-    <div className={isActive ? 'vault-card vault-card-active' : 'vault-card vault-card-idle'}>
-      <button
-        type="button"
-        // The open vault stays clickable: choosing it is the way back to it.
-        disabled={busy || (isUnreachable && !isActive)}
-        onClick={onSwitch}
-        title={isUnreachable ? undefined : isActive ? t('vault.backTo', { name: vault.name }) : t('vault.switch')}
-        className="flex items-center gap-3 flex-1 min-w-0 text-left"
-      >
-        {/* Status beats identity: during a switch and with an unreachable
-            folder, what is going on matters, not which vault it is. */}
-        <div className="vault-badge">
-          {isSwitching
-            ? <Loader2 size={16} className="animate-spin" />
-            : isUnreachable
-              ? <AlertTriangle size={16} className="text-danger" />
-              : <VaultGlyph icon={vault.icon} size={16} />}
-        </div>
-        <div className="flex-1 min-w-0">
-          <div className="vault-name flex items-center gap-1.5 min-w-0">
-            <span className="truncate">{vault.name}</span>
-            {sync && (
-              <span className="shrink-0 flex" title={t(sync === 'paused' ? 'sync.statePaused' : 'sync.stateSynced')}>
-                {sync === 'paused' ? <CloudOff size={12} /> : <Cloud size={12} />}
-              </span>
-            )}
-          </div>
-          <div className={`vault-meta truncate${isUnreachable ? ' text-danger' : ''}`} title={vault.path}>
-            {isSwitching
-              ? t('vault.switching')
-              : unreachable
-                ? t(unreachable === 'denied' ? 'vault.accessDenied' : 'vault.missing')
-                : vault.path}
-          </div>
-        </div>
-      </button>
-
-      <div className="flex items-center gap-0.5">
-        {unreachable === 'missing' && (
-          <Button variant="ghost" title={t('vault.relocate')} onClick={onRelocate}>
-            <FolderOpen size={14} />
-          </Button>
-        )}
-        <Button tone="amber" compact title={t('vault.edit')} aria-label={t('vault.edit')} onClick={onEdit}>
-          <Pencil size={14} />
-        </Button>
-        <Button tone="danger" compact title={t('vault.delete')} aria-label={t('vault.delete')} onClick={onDelete}>
-          <Trash2 size={14} />
-        </Button>
-      </div>
-    </div>
-  );
-}
-
-function CreateRow({
-  name, icon, baseDir, customPath, onChangeName, onChangeIcon, onPickFolder, onResetFolder,
-  onCommit, onCancel,
-}: {
-  name: string;
-  icon?: string;
-  baseDir: string | null;
-  customPath: string | null;
-  onChangeName: (name: string) => void;
-  onChangeIcon: (icon?: string) => void;
-  onPickFolder: () => void;
-  onResetFolder: () => void;
-  onCommit: () => void;
-  onCancel: () => void;
-}) {
-  const { t } = useTranslation();
-  // The row shows the folder the vault actually ends up in — not
-  // merely the prompt to choose one.
-  const target = newVaultTarget(baseDir, customPath, name);
-  return (
-    <div className="vault-card flex-col items-stretch gap-2">
-      <div className="flex items-center gap-3">
-        <IconField icon={icon} onChange={onChangeIcon} />
-        <input
-          autoFocus
-          className={INPUT_CLASS}
-          placeholder={t('vault.namePlaceholder')}
-          value={name}
-          onChange={(e) => onChangeName(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') onCommit();
-            if (e.key === 'Escape') onCancel();
-          }}
-        />
-        <div className="flex items-center gap-0.5">
-          <Button
-            tone="jade"
-            compact
-            title={t('vault.create')}
-            aria-label={t('vault.create')}
-            disabled={!name.trim()}
-            onClick={onCommit}
-          >
-            <Check size={14} />
-          </Button>
-          <Button tone="neutral" compact title={t('vault.cancel')} aria-label={t('vault.cancel')} onClick={onCancel}>
-            <X size={14} />
-          </Button>
-        </div>
-      </div>
-      <VaultLocationRow
-        target={target}
-        customPath={customPath}
-        onPickFolder={onPickFolder}
-        onResetFolder={onResetFolder}
-      />
-    </div>
-  );
+/** A folder for a vault of this name that is not taken. */
+async function freeTarget(name: string): Promise<{ name: string; path: string | undefined }> {
+  const base = await newVaultBaseDir().catch(() => null);
+  for (let n = 1; n < 100; n++) {
+    const candidate = n === 1 ? name : `${name} ${n}`;
+    const path = newVaultTarget(base, null, candidate);
+    if (!path) return { name: candidate, path: undefined };
+    if (!(await probeNewVaultTarget(path))) return { name: candidate, path };
+  }
+  throw new Error('no free folder');
 }
 
 // ── picker ───────────────────────────────────────────────────────────────────
@@ -399,7 +91,8 @@ export default function VaultPicker() {
   // The difference is that between "look elsewhere" and "allow access".
   const [unreachable, setUnreachable] = useState<Map<string, 'missing' | 'denied'>>(new Map());
   const [error, setError] = useState('');
-  const [server, setServer] = useState<ServerStatus | null>(null);
+  const [fetchingId, setFetchingId] = useState<string | null>(null);
+  const server = useServerState();
 
   // The window takes the picker's size; the loading screen of a start that
   // ends here goes only once it has (`AppShell` leaves it to this effect), so
@@ -409,11 +102,6 @@ export default function VaultPicker() {
     void enterPickerWindow().finally(hideSplash);
     return () => { void leavePickerWindow(); };
   }, []);
-
-  const refreshServer = useCallback(() => {
-    serverStatus().then(setServer, (e) => console.warn('[sync] status', e));
-  }, []);
-  useEffect(refreshServer, [refreshServer]);
 
   // Which vaults are still where vaults.json says they are. A folder on an
   // unplugged drive, or one that was renamed, has to be visible as such rather
@@ -643,124 +331,181 @@ export default function VaultPicker() {
       closeEditor();
     } finally {
       setRemovingId(null);
-      refreshServer();
+      void server.refresh();
     }
   }
 
-  const syncState = (id: string): 'synced' | 'paused' | null => {
-    const link = server?.url ? server.links[id] : undefined;
-    return link ? (link.paused ? 'paused' : 'synced') : null;
+  /**
+   * A vault only on the server: a new local vault holding its `vault.key`,
+   * opened like any other — the password, then the first sync fills it.
+   */
+  async function fetchRemote(remote: RemoteVault, label: string) {
+    if (fetchingId || switchingId) return;
+    setFetchingId(remote.id);
+    setError('');
+    try {
+      const target = await freeTarget(label);
+      const record = await newVaultRecord(target.name, { path: target.path });
+      await addVault(record);
+      await adoptRemoteVault(record.id, remote.id, target.name);
+      await server.refresh();
+      await choose(record.id);
+    } catch (e) {
+      if (keyErrorOf(e) !== VAULT_KEY_CANCELLED) {
+        console.warn('[sync] fetch', e);
+        setError(t(syncErrorKey(syncErrorCode(e))));
+      }
+    } finally {
+      setFetchingId(null);
+    }
+  }
+
+  async function removeRemote(remote: RemoteVault) {
+    setError('');
+    try {
+      await deleteRemoteVault(remote.id, null);
+      closeEditor();
+      await server.refresh();
+    } catch (e) {
+      console.warn('[sync] delete', e);
+      setError(t(syncErrorKey(syncErrorCode(e))));
+    }
+  }
+
+  // Links outlast a disconnected server (connecting it again resumes them):
+  // without one, a linked vault shows as paused rather than as local.
+  const links = server.status?.links ?? {};
+  const online = !!server.status?.url && !server.loggedOut;
+  const stateOf = (id: string): VaultState => {
+    const link = links[id];
+    return !link ? 'local' : link.paused || !online ? 'paused' : 'synced';
   };
+  // On the server and not here. A vault removed from the list keeps its link in
+  // `sync.json`, so only links of vaults still in the list count.
+  const here = new Set(vaults.flatMap((v) => (links[v.id] ? [links[v.id].remote] : [])));
+  const remoteOnly = server.remotes.filter((remote) => !here.has(remote.id));
+  const units: [string, string, string] = [t('common.bytes'), t('common.kilobytes'), t('common.megabytes')];
+  const busy = switchingId !== null || fetchingId !== null;
 
   return (
-    <div className="app-sheet-frame app-sheet-frame-free-left flex flex-1 min-h-0">
-      <main className="app-main app-sheet-main flex-1 min-w-0 overflow-y-auto">
-        <div className="px-5 py-4 space-y-6">
-          <section>
-            <div className="flex items-center justify-between gap-3 mb-1">
-              <h1 className="text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>{t('vault.title')}</h1>
-              {current && (
-                <Button tone="neutral" disabled={switchingId !== null} onClick={closeVaultPicker}>
-                  <ArrowLeft size={12} className="shrink-0" />
-                  <span className="truncate">{t('vault.backTo', { name: current.name })}</span>
-                </Button>
-              )}
+    <div className="picker-frame flex flex-1 min-h-0">
+      <main className="app-main app-sheet-main picker-sheet flex flex-col min-w-0">
+        <div className="flex items-center justify-between gap-3 px-5 pt-4 pb-3">
+          <h1 className="picker-heading">{t('vault.title')}</h1>
+          <div className="flex items-center gap-1">
+            <Button tone="neutral" compact title={t('vault.open')} aria-label={t('vault.open')} onClick={handleOpenExisting}>
+              <FolderOpen size={14} />
+            </Button>
+            <Button tone="jade" compact title={t('vault.add')} aria-label={t('vault.add')} onClick={openCreateRow}>
+              <Plus size={14} />
+            </Button>
+          </div>
+        </div>
+
+        {(notice || error) && (
+          <p className="px-5 pb-2 text-xs text-danger">{notice ? t(notice) : error}</p>
+        )}
+
+        <div className="flex-1 min-h-0 overflow-y-auto px-3 pb-3">
+          {editor.kind === 'create' && (
+            <CreateRow
+              name={editor.name}
+              icon={editor.icon}
+              baseDir={editor.baseDir}
+              customPath={editor.customPath}
+              onChangeName={(name) => setEditor({ ...editor, name })}
+              onChangeIcon={(icon) => setEditor({ ...editor, icon })}
+              onPickFolder={async () => {
+                const customPath = await pickFolder();
+                if (customPath) setEditor({ ...editor, customPath });
+              }}
+              onResetFolder={() => setEditor({ ...editor, customPath: null })}
+              onCommit={() => commitCreate(editor)}
+              onCancel={closeEditor}
+            />
+          )}
+
+          {vaults.length === 0 && remoteOnly.length === 0 && editor.kind !== 'create' && (
+            <div className="picker-empty">
+              <p>{t('vault.empty')}</p>
+              <Button variant="primary" onClick={openCreateRow}>
+                <Plus size={14} />
+                {t('vault.add')}
+              </Button>
             </div>
-            <p className="text-xs mb-3" style={{ color: 'var(--text-muted)' }}>
-              {t('vault.hint')}
-            </p>
-            {notice && <p className="text-xs mb-3 text-danger">{t(notice)}</p>}
+          )}
 
-            <div className="space-y-2">
-              {vaults.map((v) => {
-                if (editor.kind === 'edit' && editor.id === v.id) {
-                  return (
-                    <EditRow
-                      key={v.id}
-                      name={editor.name}
-                      icon={editor.icon}
-                      onChangeName={(name) => setEditor({ ...editor, name })}
-                      onChangeIcon={(icon) => setEditor({ ...editor, icon })}
-                      onCommit={() => commitEdit(v.id, editor.name, editor.icon)}
-                      onCancel={closeEditor}
-                    />
-                  );
-                }
-
-                if (editor.kind === 'confirmDelete' && editor.id === v.id) {
-                  return (
-                    <DeleteConfirmRow
-                      key={v.id}
-                      vault={v}
-                      deleteFiles={editor.deleteFiles}
-                      busy={removingId === v.id}
-                      hintKey={
-                        vaults.length === 1
-                          ? 'vault.deleteLastHint'
-                          : v.id === activeVaultId
-                            ? 'vault.deleteActiveHint'
-                            : 'vault.deleteHint'
-                      }
-                      onToggleFiles={(deleteFiles) => setEditor({ kind: 'confirmDelete', id: v.id, deleteFiles })}
-                      onConfirm={() => handleRemove(v.id, editor.deleteFiles)}
-                      onCancel={closeEditor}
-                    />
-                  );
-                }
-
-                return (
+          <ul className="space-y-0.5">
+            {vaults.map((v) => (
+              <li key={v.id}>
+                {editor.kind === 'edit' && editor.id === v.id ? (
+                  <EditRow
+                    name={editor.name}
+                    icon={editor.icon}
+                    onChangeName={(name) => setEditor({ ...editor, name })}
+                    onChangeIcon={(icon) => setEditor({ ...editor, icon })}
+                    onCommit={() => commitEdit(v.id, editor.name, editor.icon)}
+                    onCancel={closeEditor}
+                  />
+                ) : editor.kind === 'confirmDelete' && editor.id === v.id ? (
+                  <DeleteConfirmRow
+                    vault={v}
+                    deleteFiles={editor.deleteFiles}
+                    busy={removingId === v.id}
+                    onToggleFiles={(deleteFiles) => setEditor({ kind: 'confirmDelete', id: v.id, deleteFiles })}
+                    onConfirm={() => handleRemove(v.id, editor.deleteFiles)}
+                    onCancel={closeEditor}
+                  />
+                ) : (
                   <VaultRow
-                    key={v.id}
                     vault={v}
                     isActive={v.id === activeVaultId}
                     unreachable={unreachable.get(v.id) ?? null}
-                    sync={syncState(v.id)}
+                    state={stateOf(v.id)}
                     isSwitching={switchingId === v.id}
-                    busy={switchingId !== null}
+                    busy={busy}
                     onSwitch={() => { void choose(v.id); }}
                     onEdit={() => setEditor({ kind: 'edit', id: v.id, name: v.name, icon: v.icon })}
                     onRelocate={() => handleRelocate(v.id)}
                     onDelete={() => setEditor({ kind: 'confirmDelete', id: v.id, deleteFiles: false })}
                   />
-                );
-              })}
-
-              {editor.kind === 'create' ? (
-                <CreateRow
-                  name={editor.name}
-                  icon={editor.icon}
-                  baseDir={editor.baseDir}
-                  customPath={editor.customPath}
-                  onChangeName={(name) => setEditor({ ...editor, name })}
-                  onChangeIcon={(icon) => setEditor({ ...editor, icon })}
-                  onPickFolder={async () => {
-                    const customPath = await pickFolder();
-                    if (customPath) setEditor({ ...editor, customPath });
-                  }}
-                  onResetFolder={() => setEditor({ ...editor, customPath: null })}
-                  onCommit={() => commitCreate(editor)}
-                  onCancel={closeEditor}
-                />
-              ) : (
-                <div className="flex gap-2">
-                  <Button variant="primary" className="flex-1 justify-center" onClick={openCreateRow}>
-                    <Plus size={16} className="shrink-0" />
-                    {t('vault.add')}
-                  </Button>
-                  <Button variant="secondary" className="flex-1 justify-center" onClick={handleOpenExisting}>
-                    <FolderOpen size={16} className="shrink-0" />
-                    {t('vault.open')}
-                  </Button>
-                </div>
-              )}
-            </div>
-
-            {error && <p className="text-xs mt-3 text-danger">{error}</p>}
-          </section>
-
-          <PickerServerSection onOpen={choose} onChange={refreshServer} />
+                )}
+              </li>
+            ))}
+            {remoteOnly.map((remote, i) => {
+              const label = remote.name ?? t('sync.unnamedVault', { number: i + 1 });
+              return (
+                <li key={remote.id}>
+                  <RemoteRow
+                    name={label}
+                    size={formatBytes(remote.storedBytes, units)}
+                    isFetching={fetchingId === remote.id}
+                    busy={busy}
+                    confirming={editor.kind === 'confirmRemote' && editor.id === remote.id}
+                    onFetch={() => { void fetchRemote(remote, label); }}
+                    onDelete={() => setEditor({ kind: 'confirmRemote', id: remote.id })}
+                    onConfirmDelete={() => { void removeRemote(remote); }}
+                    onCancelDelete={closeEditor}
+                  />
+                </li>
+              );
+            })}
+          </ul>
         </div>
+
+        {current && (
+          <div className="picker-footer">
+            <Button tone="neutral" disabled={busy} onClick={closeVaultPicker}>
+              <ArrowLeft size={12} className="shrink-0" />
+              <span className="truncate">{t('vault.backTo', { name: current.name })}</span>
+            </Button>
+          </div>
+        )}
       </main>
+
+      <aside className="picker-side">
+        <PickerServerPanel server={server} />
+      </aside>
     </div>
   );
 }

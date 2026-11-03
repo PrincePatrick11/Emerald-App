@@ -10,9 +10,9 @@ import { isTauri } from './platform';
  * window's frame changes.
  */
 
-/** Logical pixels. Wide enough for the unlock dialog (440px) with its margins. */
-export const PICKER_WIDTH = 560;
-export const PICKER_HEIGHT = 680;
+/** Logical pixels: two columns, vaults and server, wider than tall. */
+export const PICKER_WIDTH = 880;
+export const PICKER_HEIGHT = 560;
 
 /** The main window's minimum, as in `tauri.conf.json` and the three platform files. */
 const MAIN_MIN_WIDTH = 720;

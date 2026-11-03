@@ -14,7 +14,7 @@ import { useSyncStore } from '../../../store/syncStore';
 import { VAULT_KEY_CANCELLED } from '../../../store/vaultKeyStore';
 import { activeVault, useVaultStore } from '../../../store/vaultStore';
 import { openVaultPicker } from '../../../store/vaultPickerStore';
-import SettingsSection, { SettingsDescription, SettingsStatus } from './SettingsSection';
+import SettingsSection, { SettingsStatus } from './SettingsSection';
 
 /**
  * The open vault and the server: whether it is there, how it stands, syncing
@@ -67,8 +67,7 @@ export default function SyncPage() {
   const syncMessage = syncError && syncError !== 'SYNC_NEEDS_LOGIN' ? t(syncErrorKey(syncError)) : '';
 
   const pointer = (
-    <div className="space-y-2">
-      <SettingsDescription>{t('sync.pickerHint')}</SettingsDescription>
+    <div>
       <Button onClick={() => { void openVaultPicker(); }}>
         <Vault size={14} />
         {t('sync.openPicker')}
@@ -78,7 +77,7 @@ export default function SyncPage() {
 
   return (
     <>
-      <SettingsSection icon={<Cloud size={14} />} title={t('sync.title')} description={t('sync.description')}>
+      <SettingsSection icon={<Cloud size={14} />} title={t('sync.title')}>
         {!connected ? (
           <div className="space-y-3">
             <SettingsStatus tone="muted">{loggedOut ? t('sync.needsLogin') : t('sync.noServer')}</SettingsStatus>
@@ -113,7 +112,6 @@ export default function SyncPage() {
                 )}
               </span>
             </div>
-            <SettingsDescription>{t('sync.vaultsHereHint')}</SettingsDescription>
             {syncMessage && <SettingsStatus tone="error">{syncMessage}</SettingsStatus>}
             {link && (
               <>

@@ -114,7 +114,7 @@ Each entry: what it is and when to use it, then its extension points (*Ext.*).
 
 **Other**
 
-- **`VaultLocationRow`** (in `layout/VaultPicker.tsx`) — choose-folder button plus the folder a new vault will land in, the path in full on its own wrapping line. The vault picker's create row, the Settings add-vault import and the automatic backup's folder (`settings/AutoBackupSection.tsx`), where the reset goes back to the vault's own `backup/` folder.
+- **`VaultLocationRow`** (in `layout/PickerRows.tsx`) — choose-folder button plus the folder a new vault will land in, the path in full on its own wrapping line. The vault picker's create row, the Settings add-vault import and the automatic backup's folder (`settings/AutoBackupSection.tsx`), where the reset goes back to the vault's own `backup/` folder.
 - **`IconField`** (`sidebar/fields/`) — the icon row of a language's page: "Icon" heading over `Favicon`, with a remove that falls back to the module's default icon. *Ext.:* `value`/`onChange`, `fallback`.
 - **`EmeraldMark`** — the static brand mark: the title bar's logo (20px) and the About card's header (30px). Colours are class names in `src/index.css` (`.emerald-mark*`), not `var()` on the SVG — a presentation-attribute `var()` silently falls back to black on engines that don't substitute it (the trap `public/splash.css` avoids too). The coordinates are kept identical to the loading screen's gem and the two `src-tauri/icons/source/*.svg` templates, none of which can import this component — changing the cut means updating all four by hand. *Ext.:* `size` (required), `className`.
 
@@ -294,7 +294,7 @@ They exist so that raw Tailwind chains do not get copied around. A new class her
 | `.switch*`, `.switch-row*` | `Switch` and `SwitchRow` |
 | `.edit-bar-*`, `.prop-value-btn*`, `.prop-segment*`, `.sidebar-add-field`, `.sidebar-row-*`, `.tag-chip-remove`, `.sidebar-action-row`, `.block-settings-panel`, `.panel-field-label`, `.panel-input`, `.panel-subheading*`, `.panel-add-row`, `.sidebar-section-button`, `.sidebar-section-actions` | the right sidebar's edit mode — colours from the `--field-*`, `--primary-solid-*` and `--danger-soft-*` tokens; border colours are repeated under `html[data-theme]`, since Parchment's `*` border rule would win otherwise |
 | `.search-result-*` / `.search-match` | results list of the global search |
-| `.vault-*` | vault picker (a deliberate deviation, see below) |
+| `.picker-*` | vault picker (a deliberate deviation, see below) |
 | `.sidebar-item` | **a list row, not navigation.** The name suggests the opposite; the class is the row styling of the entry lists |
 | `.titlebar`, `.left-sidebar-rail`, `.window-control*` | window chrome — the frame (see [Shell Layout](design.md#shell-layout)) |
 | `.app-sheet-frame`, `.app-sheet-main`, `.app-sheet-side` | the rounded sheet — main area and right sidebar — on the frame |
@@ -311,7 +311,7 @@ They exist so that raw Tailwind chains do not get copied around. A new class her
 
 Three cases that have been examined and settled. They are not sloppiness and should not be "tidied up".
 
-**`.vault-card` instead of `.panel`.** The vault picker deliberately rebuilds the panel look, because `.panel` demonstrably does not work here: theme overrides beat modifier classes, and unlayered rules come later in the output than `@layer components`. Both traps are described in [`design.md`](design.md#specificity-traps) — they hit **every** new "active" variant on an existing `.panel` card, not just the vault picker.
+**`.picker-row` instead of `.panel`.** The vault picker's rows are list rows of their own rather than `.panel` cards, because `.panel` does not take an active tint: theme overrides beat modifier classes, and unlayered rules come later in the output than `@layer components`. Both traps are described in [`design.md`](design.md#specificity-traps) — they hit **every** new "active" variant on an existing `.panel` card, not just the vault picker.
 
 **`MenuDropdown` alongside `ContextMenu`.** Two dropdown implementations, on purpose. `ContextMenu` positions itself at a cursor coordinate, has a timing trick to survive the right-click that opened it, and knows disabled entries but no submenus. The title bar's menu buttons need submenus too.
 

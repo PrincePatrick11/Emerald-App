@@ -266,7 +266,7 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
   }
 
   /* The match in the title or in the text excerpt. The same accent mix
-     as `.vault-card-active .vault-badge` — the spot is tinted, not
+     as `.picker-row-active .picker-badge` — the spot is tinted, not
      outlined, so that a result list does not turn into a patchwork. */
   /* The first declaration is not a stylistic device but the fallback: if
      `color-mix` is unsupported (WebKit before 16.2, WebKitGTK before 2.40), the
@@ -536,62 +536,199 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
     border-color: var(--border-strong);
   }
 
-  /* Vault picker cards. Deliberately NOT built on .panel/.panel-interactive:
-     those carry per-theme overrides (html[data-theme=…] .panel, specificity
-     0-2-1) that outrank any single-class modifier layered on top, so the
-     accent tint below would never render. Same tokens, own selectors. */
-  .vault-card {
-    @apply flex items-center gap-3 rounded-xl border px-3 py-2.5 transition-all duration-150;
+  /* ── Vault picker ───────────────────────────────────────────────────────
+     Two columns in the picker's small window: the vaults on the sheet, the
+     server on the frame beside it — the shell's own frame and sheet, so the
+     picker reads as the same app. The rows are list rows (rounded-md), not
+     cards, and deliberately not .panel/.panel-interactive: those carry
+     per-theme overrides (html[data-theme=…] .panel, 0-2-1) that outrank any
+     modifier on top (design.md, Specificity Traps). */
+  .picker-frame {
+    padding: 0 var(--sheet-inset) var(--sheet-inset) var(--sheet-inset);
+  }
+
+  .picker-sheet {
+    flex: 1 1 0%;
+  }
+
+  .picker-side {
+    @apply flex flex-col min-h-0 overflow-y-auto;
+    width: 300px;
+    flex-shrink: 0;
+    /* The sheet's border plus its header's padding: both headings on one line. */
+    padding: 17px 14px 14px 20px;
+  }
+
+  .picker-heading {
+    @apply text-sm font-medium;
+    color: var(--text-primary);
+  }
+
+  .picker-label {
+    @apply block text-xs mb-1.5;
+    color: var(--text-muted);
+  }
+
+  .picker-row {
+    @apply relative flex items-center gap-2 rounded-md px-2 py-1.5 transition-colors duration-150;
+  }
+
+  .picker-row:hover,
+  .picker-row:focus-within {
+    background-color: var(--interactive-hover);
+  }
+
+  /* An editor or a confirmation in place of a row: a quiet surface, so it
+     stands out from the list without becoming a card. */
+  .picker-row-open,
+  .picker-row-open:hover,
+  .picker-row-open:focus-within {
     background-color: var(--bg-surface-1);
-    border-color: var(--border-soft);
   }
 
-  .vault-card-idle {
-    @apply cursor-pointer;
-  }
-
-  .vault-card-idle:hover {
-    background-color: var(--bg-surface-2);
-    border-color: var(--border-strong);
-  }
-
-  .vault-card-active {
+  .picker-row-active,
+  .picker-row-active:hover,
+  .picker-row-active:focus-within {
     background-color: color-mix(in srgb, var(--accent) 12%, transparent);
-    border-color: color-mix(in srgb, var(--accent) 40%, transparent);
   }
 
-  .vault-badge {
-    @apply flex items-center justify-center w-9 h-9 rounded-lg shrink-0;
+  .picker-row-main {
+    @apply flex items-center gap-3 flex-1 min-w-0 text-left rounded-md;
+  }
+
+  .picker-row-main:focus-visible {
+    outline: 2px solid var(--focus-ring);
+    outline-offset: 2px;
+  }
+
+  .picker-badge {
+    @apply flex items-center justify-center w-8 h-8 rounded-md shrink-0;
     background-color: var(--interactive-active);
     color: var(--text-muted);
   }
 
-  /* The badge was purely decorative as long as it sat inside the row button
-     and inherited its hover. As a trigger of its own for the emoji picker it stands
-     among nothing but .btn-ghost buttons and needs the same feedback. */
-  .vault-badge-interactive:hover {
+  .picker-badge-interactive:hover {
     background-color: var(--interactive-hover);
     color: var(--text-primary);
   }
 
-  .vault-card-active .vault-badge {
+  .picker-row-active .picker-badge {
     background-color: color-mix(in srgb, var(--accent) 22%, transparent);
     color: var(--accent);
   }
 
-  .vault-name {
-    @apply text-sm truncate;
+  /* Only on the server: present, but not yet here. */
+  .picker-row-remote .picker-badge {
+    background-color: transparent;
+    border: 1px dashed var(--border-soft);
+    color: var(--text-subtle);
+  }
+
+  .picker-row-name {
+    @apply block text-sm truncate;
     color: var(--text-secondary);
   }
 
-  .vault-card-active .vault-name,
-  .vault-card-idle:hover .vault-name {
+  .picker-row:hover .picker-row-name,
+  .picker-row-active .picker-row-name {
     color: var(--text-primary);
   }
 
-  .vault-meta {
-    @apply text-xs;
+  .picker-row-remote .picker-row-name {
+    color: var(--text-muted);
+  }
+
+  .picker-row-meta {
+    @apply block text-xs truncate;
     color: var(--text-subtle);
+  }
+
+  /* Edit and delete only where the pointer or the focus is. */
+  .picker-row-actions {
+    @apply flex items-center gap-1 shrink-0 opacity-0 transition-opacity duration-150;
+  }
+
+  .picker-row:hover .picker-row-actions,
+  .picker-row:focus-within .picker-row-actions {
+    opacity: 1;
+  }
+
+  .picker-state {
+    @apply flex items-center justify-center w-5 shrink-0;
+    color: var(--text-subtle);
+  }
+
+  .picker-state.picker-state-synced {
+    color: var(--accent);
+  }
+
+  .picker-dot {
+    @apply inline-block w-1.5 h-1.5 rounded-full shrink-0;
+    background-color: var(--text-subtle);
+  }
+
+  /* Compound: Tailwind emits a rule that uses @apply after plain ones, so a
+     single-class modifier would lose to `.picker-dot`. */
+  .picker-dot.picker-dot-up {
+    background-color: var(--accent);
+  }
+
+  .picker-dot.picker-dot-down {
+    background-color: var(--danger-text);
+  }
+
+  .picker-stats {
+    @apply grid gap-x-4 gap-y-1.5 text-xs;
+    grid-template-columns: auto 1fr;
+  }
+
+  .picker-stats dt {
+    color: var(--text-subtle);
+  }
+
+  .picker-stats dd {
+    @apply text-right tabular-nums;
+    color: var(--text-secondary);
+  }
+
+  .picker-device {
+    @apply flex items-center justify-between gap-2 text-sm rounded-md px-2 py-1;
+  }
+
+  .picker-device:hover {
+    background-color: var(--interactive-hover);
+  }
+
+  .picker-device-remove {
+    @apply flex items-center justify-center w-5 h-5 rounded-md opacity-0 transition-opacity duration-150;
+    color: var(--text-subtle);
+  }
+
+  .picker-device:hover .picker-device-remove,
+  .picker-device-remove:focus-visible {
+    opacity: 1;
+  }
+
+  .picker-device-remove:hover {
+    color: var(--danger-text);
+  }
+
+  .picker-footer {
+    @apply flex items-center px-3 py-2.5 border-t;
+    border-color: var(--sheet-border);
+  }
+
+  .picker-empty {
+    @apply flex flex-col items-center justify-center gap-3 py-16 text-sm text-center;
+    color: var(--text-muted);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .picker-row,
+    .picker-row-actions,
+    .picker-device-remove {
+      transition: none;
+    }
   }
 
   /* Consistent small section label (JOURNAL, PROPERTIES, etc.) */
@@ -911,14 +1048,6 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
   .panel-interactive:hover .home-item-title {
     color: var(--text-primary);
   }
-}
-
-/* Outside @layer on purpose: Tailwind 3 hoists @layer components to the top of
-   the output, so the unlayered theme overrides further down would win over the
-   accent edge at equal specificity. Here it comes after them (design.md,
-   Specificity Traps). */
-.vault-card.vault-card-active {
-  border-color: color-mix(in srgb, var(--accent) 40%, transparent);
 }
 
 /* TipTap Editor Styles */
