@@ -1226,7 +1226,7 @@
     "unnamedVault": "Vault {{number}}",
     "goneFromServer": "This vault was removed from the server. It stays here as a local vault.",
     "replaceWarning": "This vault syncs: the backup also replaces it on your other devices, which first save a backup of their own.",
-    "unencrypted": "The connection is stored unencrypted on this device, because the system keychain was refused or is missing. Connect again and allow the keychain to change that.",
-    "keychainWarning": "Emerald keeps the connection in the system keychain. If you refuse access, it is stored unencrypted on this device instead."
+    "unencrypted": "The connection is not in the system keychain on this device, because it was refused or is missing. It is only obscured in a file, not securely encrypted. Connect again and allow the keychain to change that.",
+    "keychainWarning": "Emerald keeps the connection in the system keychain. If you refuse access, it is only obscured in a file on this device instead."
   }
 }

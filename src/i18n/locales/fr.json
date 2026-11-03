@@ -1226,7 +1226,7 @@
     "unnamedVault": "Vault {{number}}",
     "goneFromServer": "Ce vault a été retiré du serveur. Il reste ici en tant que vault local.",
     "replaceWarning": "Ce vault se synchronise : la sauvegarde le remplace aussi sur vos autres appareils, qui enregistrent d'abord leur propre sauvegarde.",
-    "unencrypted": "La connexion est stockée sans chiffrement sur cet appareil, car le trousseau du système a été refusé ou est absent. Reconnectez-vous et autorisez le trousseau pour changer cela.",
-    "keychainWarning": "Emerald conserve la connexion dans le trousseau du système. Si vous refusez l'accès, elle sera stockée sans chiffrement sur cet appareil."
+    "unencrypted": "La connexion n'est pas dans le trousseau du système sur cet appareil, car il a été refusé ou est absent. Elle est seulement masquée dans un fichier, sans chiffrement sûr. Reconnectez-vous et autorisez le trousseau pour changer cela.",
+    "keychainWarning": "Emerald conserve la connexion dans le trousseau du système. Si vous refusez l'accès, elle sera seulement masquée dans un fichier sur cet appareil."
   }
 }

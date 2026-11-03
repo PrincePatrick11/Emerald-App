@@ -1226,7 +1226,7 @@
     "unnamedVault": "Vault {{number}}",
     "goneFromServer": "Este vault se eliminó del servidor. Sigue aquí como vault local.",
     "replaceWarning": "Este vault se sincroniza: la copia de seguridad también lo reemplaza en tus otros dispositivos, que antes guardan su propia copia de seguridad.",
-    "unencrypted": "La conexión se guarda sin cifrar en este dispositivo porque se rechazó el llavero del sistema o no existe. Vuelve a conectar y permite el llavero para cambiarlo.",
-    "keychainWarning": "Emerald guarda la conexión en el llavero del sistema. Si rechazas el acceso, se guardará sin cifrar en este dispositivo."
+    "unencrypted": "La conexión no está en el llavero del sistema de este dispositivo porque se rechazó o no existe. Solo está ofuscada en un archivo, no cifrada de forma segura. Vuelve a conectar y permite el llavero para cambiarlo.",
+    "keychainWarning": "Emerald guarda la conexión en el llavero del sistema. Si rechazas el acceso, solo quedará ofuscada en un archivo de este dispositivo."
   }
 }

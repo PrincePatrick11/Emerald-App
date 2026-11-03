@@ -10,8 +10,10 @@
 //! each vault's place on it. Like `update.json` it belongs to the installation,
 //! not to a vault: a vault's backup must not bring a server along. The token and
 //! the names key go to the OS keychain. With no keychain, or one that said no, they
-//! stay in this file unencrypted: the connect form warns of that beforehand, and the
-//! Sync page says so while it is the case.
+//! stay in this file, sealed under a key built into the app: that keeps them from
+//! lying there in plain sight, but anyone with the file and Emerald's source opens
+//! them. The connect form warns of that beforehand, and the Sync page says so while
+//! it is the case.
 
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -92,7 +94,7 @@ struct SyncFile {
     #[serde(default)]
     server: Option<StoredServer>,
     /// Only when the keychain would not take them.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none", with = "obscured")]
     credentials: Option<Credentials>,
     #[serde(default)]
     links: HashMap<String, Link>,
@@ -100,6 +102,38 @@ struct SyncFile {
     /// of the address and what its key derives.
     #[serde(default)]
     links_for: Option<String>,
+}
+
+/// Credentials in `sync.json`, sealed under a key every copy of Emerald has. Not a
+/// secret: it only keeps the token from being readable at a glance, or by a tool
+/// that looks for tokens in files.
+mod obscured {
+    use super::{Credentials, B64};
+    use crate::crypto::{self, Context, Key};
+    use base64::Engine;
+    use serde::{Deserialize, Deserializer, Serialize, Serializer};
+    use zeroize::Zeroizing;
+
+    const KEY: [u8; 32] = *b"emerald/sync.json/not-a-secret/1";
+
+    pub fn serialize<S: Serializer>(value: &Option<Credentials>, out: S) -> Result<S::Ok, S::Error> {
+        let Some(credentials) = value else { return out.serialize_none() };
+        let text = Zeroizing::new(serde_json::to_vec(credentials).map_err(serde::ser::Error::custom)?);
+        B64.encode(crypto::seal(&Key::new(KEY), Context::SyncCredentials, &text)).serialize(out)
+    }
+
+    /// What does not open counts as not there, so that it costs a login and not the
+    /// rest of the file. Earlier builds wrote them in the clear; those still read.
+    pub fn deserialize<'de, D: Deserializer<'de>>(input: D) -> Result<Option<Credentials>, D::Error> {
+        Ok(match serde_json::Value::deserialize(input)? {
+            serde_json::Value::String(text) => B64
+                .decode(text)
+                .ok()
+                .and_then(|sealed| crypto::open(&Key::new(KEY), Context::SyncCredentials, &sealed).ok())
+                .and_then(|plain| serde_json::from_slice(&plain).ok()),
+            other => serde_json::from_value(other).ok(),
+        })
+    }
 }
 
 /// Serializes the settings file; what a running sync holds in memory.
@@ -1055,7 +1089,27 @@ pub async fn sync_unwatch(app: tauri::AppHandle) -> Result<(), String> {
 
 #[cfg(test)]
 mod tests {
-    use super::{clean_url, take_events};
+    use super::{clean_url, take_events, Credentials, SyncFile};
+
+    #[test]
+    fn credentials_in_the_file_are_not_in_plain_sight() {
+        let file = SyncFile {
+            credentials: Some(Credentials { token: "tok-secret".into(), names_key: "names-secret".into() }),
+            ..SyncFile::default()
+        };
+        let text = serde_json::to_string(&file).unwrap();
+        assert!(!text.contains("secret"), "{text}");
+        let back: SyncFile = serde_json::from_str(&text).unwrap();
+        assert_eq!(back.credentials.as_ref().map(|c| c.token.as_str()), Some("tok-secret"));
+
+        let plain: SyncFile =
+            serde_json::from_str(r#"{"credentials":{"token":"t","names_key":"n"},"links":{}}"#).unwrap();
+        assert_eq!(plain.credentials.map(|c| c.token.clone()), Some("t".into()));
+        let damaged: SyncFile =
+            serde_json::from_str(r#"{"credentials":"bm9wZQ==","links":{"a":{"remote":"r"}}}"#).unwrap();
+        assert!(damaged.credentials.is_none());
+        assert_eq!(damaged.links["a"].remote, "r");
+    }
 
     #[test]
     fn server_sent_events_survive_being_cut_anywhere() {
