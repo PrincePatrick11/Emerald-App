@@ -43,7 +43,6 @@ function foldToggle(pos: number, folded: boolean, label: string): HTMLElement {
   button.className = 'editor-fold-toggle';
   button.setAttribute('aria-expanded', String(!folded));
   button.setAttribute('aria-label', label);
-  button.title = label;
   button.dataset.foldPos = String(pos);
   return button;
 }

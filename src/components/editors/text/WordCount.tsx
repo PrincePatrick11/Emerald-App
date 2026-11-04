@@ -14,7 +14,8 @@ export function countText(doc: ProseMirrorNode): { words: number; characters: nu
 
 /**
  * Words and characters across all editors of a host, as a quiet line under
- * them. It follows every change itself, so typing re-renders only this.
+ * them. It follows every change itself, so typing re-renders only this, and
+ * counts at most once per frame however fast the keystrokes come.
  */
 export default function WordCount({ getEditors }: { getEditors: () => Editor[] }) {
   const { t } = useTranslation();
@@ -23,8 +24,15 @@ export default function WordCount({ getEditors }: { getEditors: () => Editor[] }
   const editorKey = editors.map((ed) => ed.instanceId).join(',');
 
   useEffect(() => {
-    editors.forEach((ed) => ed.on('update', rerender));
-    return () => editors.forEach((ed) => ed.off('update', rerender));
+    let frame = 0;
+    const schedule = () => {
+      if (!frame) frame = requestAnimationFrame(() => { frame = 0; rerender(); });
+    };
+    editors.forEach((ed) => ed.on('update', schedule));
+    return () => {
+      cancelAnimationFrame(frame);
+      editors.forEach((ed) => ed.off('update', schedule));
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- `editorKey` stands for the list of editors
   }, [editorKey]);
 

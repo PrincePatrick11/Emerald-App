@@ -356,7 +356,8 @@ export default function TextEditor({
   return (
     <div className="relative">
       <EditorContent editor={editor} />
-      {editor && <SelectionMenus editor={editor} />}
+      {/* Only while editing: each menu is a plugin of its own and follows every transaction. */}
+      {editor && editable && <SelectionMenus editor={editor} />}
 
       {/* Link popup — shown in edit mode when cursor is inside an external link */}
       {editable && linkPopup && (

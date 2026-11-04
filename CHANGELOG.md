@@ -22,6 +22,8 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 - **Resizing an image** uses a handle on the side that moves (both sides for a centred image), snaps to common widths and shows the width while dragging. The size is kept in pixels, so the image no longer grows and shrinks with the window; only full width follows it. Images sized in percent before are converted the next time the entry is edited.
+- **Tables look like the rest of the app:** a rounded frame, quiet lines, the header row on the panel colour and a hover on rows.
+- **Long entries with large images stay smooth:** images are decoded in the background and loaded as they come into view, the selection menus exist only while editing, and the word count recounts at most once per frame.
 - **The formatting bar is a rounded bar of its own** instead of a dark strip, with larger buttons; what is active shows in jade, in Noctis too.
 - **The rail's buttons are grouped by space.** Home, then Journal/Tasks/Operations, Wiki/Lexicon/Altar and Templates/Blocks at the top; Categories/Tags/Trash and Vault/Settings at the bottom. It scrolls without a bar when the window is low, and the rail and the entry list's search start at the sheet's top edge.
 - **"Insert template" and "Add block" moved to the top of the right sidebar** while editing, "Insert template" first; the template editor has them too.

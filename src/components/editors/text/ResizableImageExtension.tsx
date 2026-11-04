@@ -183,6 +183,10 @@ function ResizableImageView({ node, updateAttributes, selected, editor, getPos }
           ref={imgRef}
           src={displaySrc}
           alt={node.attrs.alt ?? ''}
+          // Off the main thread and only once near the view: a photo straight
+          // from a phone is decoded at full size, whatever it is shown at.
+          loading="lazy"
+          decoding="async"
           draggable={false}
           onPointerDown={onImagePointerDown}
           className={`block w-full rounded-lg object-contain${selected ? ' ring-2 ring-focus ring-offset-1 ring-offset-well-page' : ''}${editable ? ' cursor-grab' : ''}${moving ? ' opacity-40' : ''}`}
