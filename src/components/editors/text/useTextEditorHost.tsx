@@ -4,6 +4,7 @@ import EditorToolbar from './EditorToolbar';
 import LinkPickerModal from './LinkPickerModal';
 import DragGhost from './DragGhost';
 import FindBar from './FindBar';
+import WordCount from './WordCount';
 import { useEditorFileDrop } from './useEditorFileDrop';
 import { useEditorPointerDrops } from './useEditorPointerDrops';
 import { useInternalLinkNavigation } from './useInternalLinkNavigation';
@@ -31,8 +32,8 @@ interface TextEditorHostOptions {
  * bar (⌘F / Ctrl+F) across all its editors.
  *
  * The host provides `context` through `TextEditorHostContext`; each
- * `TextEditor` inside with a `hostKey` then reports itself. `toolbar` and
- * `overlays` are rendered wherever the host wants them, `dropActive` says
+ * `TextEditor` inside with a `hostKey` then reports itself. `toolbar`,
+ * `wordCount` and `overlays` are rendered wherever the host wants them, `dropActive` says
  * whether a drop could land right now (for highlighting).
  *
  * Requests that depend on the host's content, such as the sidebar's link
@@ -115,10 +116,14 @@ export function useTextEditorHost({ isEditing, getOrder, getContainer }: TextEdi
     </>
   );
 
+  /** Words and characters of all editors, while editing. */
+  const wordCount: ReactNode = isEditing ? <WordCount getEditors={orderedEditors} /> : null;
+
   return {
     context,
     toolbar,
     overlays,
+    wordCount,
     dropActive: fileDrop.fileDragOver || pointerDropActive,
     orderedEditors,
     targetEditor,

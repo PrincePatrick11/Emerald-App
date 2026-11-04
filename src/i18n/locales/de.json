@@ -540,6 +540,12 @@
       "replaceAll": "Alle ersetzen",
       "close": "Schließen"
     },
+    "count": {
+      "words_one": "{{count}} Wort",
+      "words_other": "{{count}} Wörter",
+      "characters_one": "{{count}} Zeichen",
+      "characters_other": "{{count}} Zeichen"
+    },
     "unsaved": "Ungespeicherte Änderungen"
   },
   "moonPhase": {

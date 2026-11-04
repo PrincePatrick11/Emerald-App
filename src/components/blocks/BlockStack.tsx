@@ -558,6 +558,7 @@ export default function BlockStack({
         })}
       </Reorder.Group>
       {isEditing && blocks.length === 0 && <InsertLine always onAdd={(e) => openAddMenu(e, 0)} />}
+      {textHost.wordCount}
 
       {menu && <ContextMenu x={menu.x} y={menu.y} actions={menu.actions} onClose={() => setMenu(null)} />}
       {textHost.overlays}
