@@ -1,8 +1,8 @@
 import { useEffect } from 'react';
-import { useUIStore } from '../../store/uiStore';
-import { isValidLinkTarget } from '../../lib/links';
-import { viewTypeForEntryType } from '../../lib/modules';
-import type { ContentType } from '../../types';
+import { useUIStore } from '../../../store/uiStore';
+import { isValidLinkTarget } from '../../../lib/links';
+import { viewTypeForEntryType } from '../../../lib/modules';
+import type { ContentType } from '../../../types';
 
 /**
  * Click on a link chip in read mode → navigate to the target. The chip

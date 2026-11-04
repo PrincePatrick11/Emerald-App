@@ -1,4 +1,4 @@
-import { useEditor, EditorContent, type Editor } from '@tiptap/react';
+import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Link from '@tiptap/extension-link';
 import Placeholder from '@tiptap/extension-placeholder';
@@ -8,35 +8,37 @@ import TaskList from '@tiptap/extension-task-list';
 import TaskItem from '@tiptap/extension-task-item';
 import TextAlign from '@tiptap/extension-text-align';
 import { ResizableImage } from './ResizableImageExtension';
-import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
-import { saveImage } from '../../lib/images';
+import { useContext, useEffect, useMemo, useRef, useState, useCallback } from 'react';
+import { saveImage } from '../../../lib/images';
 import { openUrl } from '@tauri-apps/plugin-opener';
 import { ExternalLink, Pencil, Trash2, Check, X } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 import { TEXT_ALIGN_TYPES } from './EditorToolbar';
-import Button from '../ui/Button';
+import { FULL_TEXT_FEATURES, type TextFeatures } from './features';
+import { TextEditorHostContext, editorHas } from './hostContext';
+import Button from '../../ui/Button';
 import { createInternalLinkExtension } from './InternalLinkExtension';
 import { ExternalDropExtension } from './ExternalDropExtension';
 import type { SuggestionItem } from './SuggestionList';
-import { useLinkItems } from '../../hooks/useLinkItems';
-import { linkItemKey, linkItemsByKey } from '../../lib/linkItems';
-import { isAcceptedImageFile, readFileAsDataUrl } from '../../lib/helpers';
-import { prepareImageDataUrl } from '../../lib/imageLimits';
-import { reportImageError } from '../../store/imageNoticeStore';
-import { useSettingsStore } from '../../store/settingsStore';
-import type { EditorSettings } from '../../lib/vaultSettings';
+import { useLinkItems } from '../../../hooks/useLinkItems';
+import { linkItemKey, linkItemsByKey } from '../../../lib/linkItems';
+import { isAcceptedImageFile, readFileAsDataUrl } from '../../../lib/helpers';
+import { prepareImageDataUrl } from '../../../lib/imageLimits';
+import { reportImageError } from '../../../store/imageNoticeStore';
+import { useSettingsStore } from '../../../store/settingsStore';
+import type { EditorSettings } from '../../../lib/vaultSettings';
 
 interface LinkPopupState {
   href: string;
   rect: DOMRect;
 }
 
-interface RichEditorProps {
+interface TextEditorProps {
   /**
-   * Only the INITIAL VALUE: the editor is uncontrolled afterwards. The stack
-   * remounts it via `key` when another entry is loaded or Cancel is
-   * pressed. The former sync effect, which compared `getHTML()` with the prop
+   * Only the INITIAL VALUE: the editor is uncontrolled afterwards. Its owner
+   * remounts it via `key` when other content is loaded (another entry,
+   * Cancel). The former sync effect, which compared `getHTML()` with the prop
    * on every render, amounted together with `onUpdate` to a
    * double serialisation of the entire document per keystroke.
    */
@@ -44,8 +46,14 @@ interface RichEditorProps {
   placeholder?: string;
   onChange: (content: string) => void;
   editable?: boolean;
-  /** Reports the editor instance once it exists, and `null` on teardown. */
-  onEditorReady?: (editor: Editor | null) => void;
+  /** What this editor offers; all of it by default. Read at creation, like the settings below. */
+  features?: TextFeatures;
+  /**
+   * The key under which the editor reports itself to the surrounding host
+   * (`useTextEditorHost`), which then binds toolbar, link picker and drops to it.
+   * Without a host or key the editor stands alone.
+   */
+  hostKey?: string;
 }
 
 /** `Link` without linking pasted addresses, for "Automatic links" off. */
@@ -60,16 +68,19 @@ const LinkWithoutPasteRule = Link.extend({ addPasteRules: () => [] });
  * | typography        | `Typography` is missing entirely                                 |
  * | autoLinks         | `Link` without `autolink`, `linkOnPaste` and paste rule          |
  */
-function formattingOptions(format: EditorSettings) {
+function formattingOptions(format: EditorSettings, withLinks: boolean) {
+  const autoLinks = withLinks && format.autoLinks;
   const ownInputRules = format.typography ? ['typography'] : [];
-  const ownPasteRules = format.autoLinks ? ['link'] : [];
+  const ownPasteRules = autoLinks ? ['link'] : [];
   return {
-    link: (format.autoLinks ? Link : LinkWithoutPasteRule).configure({
-      openOnClick: false,
-      HTMLAttributes: { class: 'external-link' },
-      autolink: format.autoLinks,
-      linkOnPaste: format.autoLinks,
-    }),
+    link: withLinks
+      ? [(autoLinks ? Link : LinkWithoutPasteRule).configure({
+          openOnClick: false,
+          HTMLAttributes: { class: 'external-link' },
+          autolink: autoLinks,
+          linkOnPaste: autoLinks,
+        })]
+      : [],
     typography: format.typography ? [Typography] : [],
     enableInputRules: format.markdownShortcuts || ownInputRules,
     enablePasteRules: format.markdownShortcuts || ownPasteRules,
@@ -77,26 +88,26 @@ function formattingOptions(format: EditorSettings) {
 }
 
 /**
- * The writing surface of a text block.
+ * The writing surface: one TipTap editor, saving HTML.
  *
- * Everything that may exist only ONCE per opened entry is held by the
- * `BlockStack`: toolbar, link picker, the sidebar's link requests,
- * navigation via chip click, drops (files from the explorer, entries from the
- * left list) and the drag tag. That used to hang here, and thus
- * on the `document` per editor; with several text blocks every request would have
- * hit every block.
+ * Everything that may exist only ONCE per document is held by the host
+ * (`useTextEditorHost`): toolbar, link picker, navigation via chip click,
+ * drops (files from the explorer, entries from the left list) and the drag
+ * tag. Hung on the `document` per editor, with several editors every request
+ * would hit every one of them.
  *
  * What stays here is whatever hangs on exactly this editor: extensions and chip lookups,
  * the popup for external links and inserting via paste.
  */
-export default function RichEditor({
+export default function TextEditor({
   initialContent,
   // No English default: the stack passes in the localised placeholder.
   placeholder = '',
   onChange,
   editable = true,
-  onEditorReady,
-}: RichEditorProps) {
+  features: featuresProp = FULL_TEXT_FEATURES,
+  hostKey,
+}: TextEditorProps) {
   const { t } = useTranslation();
 
   // Link popup state (edit mode only)
@@ -125,33 +136,45 @@ export default function RichEditor({
   // What the editor formats by itself while typing and pasting
   // (Settings → Entries). Read at creation: an open editor
   // keeps what it opened with; a new one would otherwise get different rules mid-typing.
-  const [format] = useState(() => formattingOptions(useSettingsStore.getState().settings.editor));
+  // The features too: the schema cannot change on an open editor.
+  const [features] = useState(featuresProp);
+  const [format] = useState(() => formattingOptions(useSettingsStore.getState().settings.editor, features.links));
 
   const editor = useEditor({
     extensions: [
-      StarterKit,
-      format.link,
+      StarterKit.configure({
+        heading: features.structure ? undefined : false,
+        blockquote: features.structure ? undefined : false,
+        horizontalRule: features.structure ? undefined : false,
+        bulletList: features.lists ? undefined : false,
+        orderedList: features.lists ? undefined : false,
+        listItem: features.lists ? undefined : false,
+      }),
+      ...format.link,
       Placeholder.configure({ placeholder }),
       ...format.typography,
-      Highlight.configure({ multicolor: false }),
-      TaskList,
-      TaskItem.configure({ nested: true }),
+      ...(features.highlight ? [Highlight.configure({ multicolor: false })] : []),
+      ...(features.tasks ? [TaskList, TaskItem.configure({ nested: true })] : []),
       // Images are left out: they align via their own
       // `align` attribute (block node with its own width), see
       // `alignMargins` in ResizableImageExtension.
-      TextAlign.configure({ types: [...TEXT_ALIGN_TYPES] }),
-      createInternalLinkExtension(
-        (query) => {
-          const q = query.toLowerCase();
-          return itemsRef.current.filter((item) =>
-            item.label.toLowerCase().includes(q)
-          );
-        },
-        (id, entryType) => getIconRef.current(id, entryType),
-        (id, entryType) => getLabelRef.current(id, entryType)
-      ),
-      ExternalDropExtension,
-      ResizableImage,
+      ...(features.align ? [TextAlign.configure({ types: [...TEXT_ALIGN_TYPES] })] : []),
+      ...(features.entryLinks
+        ? [
+            createInternalLinkExtension(
+              (query) => {
+                const q = query.toLowerCase();
+                return itemsRef.current.filter((item) =>
+                  item.label.toLowerCase().includes(q)
+                );
+              },
+              (id, entryType) => getIconRef.current(id, entryType),
+              (id, entryType) => getLabelRef.current(id, entryType)
+            ),
+            ExternalDropExtension,
+          ]
+        : []),
+      ...(features.images ? [ResizableImage] : []),
     ],
     enableInputRules: format.enableInputRules,
     enablePasteRules: format.enablePasteRules,
@@ -167,6 +190,7 @@ export default function RichEditor({
     },
     editorProps: {
       handlePaste(view, event) {
+        if (!view.state.schema.nodes['image']) return false;
         const items = Array.from(event.clipboardData?.items ?? []);
         const imageItem = items.find((item) => item.type.startsWith('image/'));
         if (!imageItem) return false;
@@ -188,17 +212,16 @@ export default function RichEditor({
     },
   });
 
-  const onEditorReadyRef = useRef(onEditorReady);
-  onEditorReadyRef.current = onEditorReady;
+  const host = useContext(TextEditorHostContext);
   useEffect(() => {
-    if (!editor) return;
-    onEditorReadyRef.current?.(editor);
-    return () => onEditorReadyRef.current?.(null);
-  }, [editor]);
+    if (!editor || !host || hostKey === undefined) return;
+    host.register(hostKey, editor);
+    return () => host.register(hostKey, null);
+  }, [editor, host, hostKey]);
 
   // Track cursor position to show link popup in edit mode
   const updateLinkPopup = useCallback(() => {
-    if (!editor || !editable) return;
+    if (!editor || !editable || !editorHas(editor, 'link')) return;
     const { state } = editor;
     const { from } = state.selection;
     const marks = state.doc.resolve(from).marks();

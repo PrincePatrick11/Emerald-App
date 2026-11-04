@@ -8,7 +8,7 @@ import SuggestionList, {
   type SuggestionItem,
   type SuggestionListRef,
 } from './SuggestionList';
-import type { ContentType } from '../../types';
+import type { ContentType } from '../../../types';
 
 function getDefaultIcon(entryType: string): string {
   return DEFAULT_ENTRY_EMOJI[entryType as ContentType] ?? DEFAULT_ENTRY_EMOJI.operation;

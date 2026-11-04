@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next';
-import TagInput from '../../editor/TagInput';
+import TagInput from '../../ui/TagInput';
 import { useTagMap, visibleTags } from '../../../store/tagStore';
 import SidebarSection, { SidebarEmpty } from './SidebarSection';
 

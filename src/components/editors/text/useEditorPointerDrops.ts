@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { Editor } from '@tiptap/react';
-import { getDragItem, setDragItem, subscribeDrag } from '../../lib/dragState';
-import { toInternalLinkChip } from '../../lib/internalLinkHtml';
+import { getDragItem, setDragItem, subscribeDrag } from '../../../lib/dragState';
+import { toInternalLinkChip } from '../../../lib/internalLinkHtml';
 import type { SuggestionItem } from './SuggestionList';
 
 interface PointerDropOptions {

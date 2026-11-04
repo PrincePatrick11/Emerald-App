@@ -1,19 +1,18 @@
 import type { Editor } from '@tiptap/react';
 import type { Node as ProseMirrorNode } from '@tiptap/pm/model';
-import { saveImage } from '../../lib/images';
-import { prepareImageDataUrl } from '../../lib/imageLimits';
-import { reportImageError } from '../../store/imageNoticeStore';
-import { flashReveal, scrollIntoViewCentered } from '../../lib/reveal';
-import { internalLinkBlockHtml, toInternalLinkChip } from '../../lib/internalLinkHtml';
-import type { EntryLinkRequest } from '../../lib/links';
+import { saveImage } from '../../../lib/images';
+import { prepareImageDataUrl } from '../../../lib/imageLimits';
+import { reportImageError } from '../../../store/imageNoticeStore';
+import { flashReveal, scrollIntoViewCentered } from '../../../lib/reveal';
+import { internalLinkBlockHtml, toInternalLinkChip } from '../../../lib/internalLinkHtml';
+import type { EntryLinkRequest } from '../../../lib/links';
 import type { SuggestionItem } from './SuggestionList';
 
 /**
  * Commands that write into an editor from outside: the sidebar's link
  * requests (append, remove, jump to), inserting an image, inserting a
- * link chip from the link picker. They used to be private
- * functions in the RichEditor. Since an entry can have several text blocks,
- * the `BlockStack` decides WHICH editor receives a request, and calls them
+ * link chip from the link picker. Since a document can have several
+ * editors, their host decides WHICH editor receives a request, and calls them
  * from there.
  */
 

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { subscribeDrag } from '../../lib/dragState';
+import { subscribeDrag } from '../../../lib/dragState';
 import type { SuggestionItem } from './SuggestionList';
 
 /**

@@ -1,9 +1,9 @@
 import { forwardRef, useEffect, useImperativeHandle, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { BookOpen, CheckSquare, Library, Wand2, type LucideIcon } from 'lucide-react';
-import { AltarIcon } from '../../lib/altarIcon';
-import type { ContentType } from '../../types';
-import type { SuggestionItem } from '../../lib/linkItems';
+import { AltarIcon } from '../../../lib/altarIcon';
+import type { ContentType } from '../../../types';
+import type { SuggestionItem } from '../../../lib/linkItems';
 
 /** Lives in `lib/linkItems.ts` alongside `buildLinkItems`, which produces these values;
  *  only re-exported here for the components that take the type from here. */
@@ -22,7 +22,7 @@ export const ENTRY_TYPE_ICONS: Record<ContentType, LucideIcon> = {
 
 /** Lives in `lib/modules.ts` so that `lib/` can reach it too; only
  *  re-exported here for the components that import it from here. */
-export { DEFAULT_ENTRY_EMOJI } from '../../lib/modules';
+export { DEFAULT_ENTRY_EMOJI } from '../../../lib/modules';
 
 /** Translated type labels: tabs and badges in the LinkPicker, badge here. */
 export const ENTRY_TYPE_LABEL_KEYS: Record<ContentType, string> = {

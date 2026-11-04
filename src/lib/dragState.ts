@@ -1,4 +1,4 @@
-import type { SuggestionItem } from '../components/editor/SuggestionList';
+import type { SuggestionItem } from '../components/editors/text/SuggestionList';
 import { createDragChannel } from './dragChannel';
 
 const channel = createDragChannel<SuggestionItem>();

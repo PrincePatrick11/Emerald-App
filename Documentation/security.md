@@ -74,7 +74,7 @@ PDF export renders in a hidden window that the per-platform `export_pdf` command
 
 ## External Links
 
-The capability includes `opener:default`. In read mode, clicking an external link in the editor calls `openUrl(href)` (`RichEditor.tsx`) with an `href` from stored content — content that can arrive via an imported backup. The click handler passes only `http://` and `https://` URLs; anything else is ignored. Beyond that, the `opener` plugin's default configuration is the only filter before the URL reaches the system browser.
+The capability includes `opener:default`. In read mode, clicking an external link in the editor calls `openUrl(href)` (`TextEditor.tsx`) with an `href` from stored content — content that can arrive via an imported backup. The click handler passes only `http://` and `https://` URLs; anything else is ignored. Beyond that, the `opener` plugin's default configuration is the only filter before the URL reaches the system browser.
 
 The read-mode click opens the link directly; the link popup that shows the URL appears only while editing. Look-alike links are therefore not mitigated in read mode.
 

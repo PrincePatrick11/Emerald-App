@@ -2,7 +2,7 @@ import { Node, mergeAttributes } from '@tiptap/core';
 import { ReactNodeViewRenderer, NodeViewWrapper } from '@tiptap/react';
 import type { NodeViewProps } from '@tiptap/react';
 import { useRef, useState } from 'react';
-import { imageSrc, storedImageName } from '../../lib/images';
+import { imageSrc, storedImageName } from '../../../lib/images';
 
 /** Applies to text as to images; the toolbar serves both with the same buttons. */
 export type Alignment = 'left' | 'center' | 'right';

@@ -126,7 +126,7 @@ Each entry: what it is and when to use it, then its extension points (*Ext.*).
 
 See [`architecture.md` → Content Blocks](architecture/blocks.md#content-blocks) for the stored format.
 
-- **`BlockStack`** — an entry's body as a stack of blocks (Journal, Wiki, Operations). Owns everything that may exist only once per open entry: the sticky `EditorToolbar`, `LinkPickerModal`, the `lib/links.ts` link requests, chip navigation, file and pointer drops, the drag ghost. *Ext.:* `initialContent` (initial value only — remount via `key`), `isEditing`, `placeholder`, `onChange(content)`.
+- **`BlockStack`** — an entry's body as a stack of blocks (Journal, Wiki, Operations). Hosts the entry's text editors (`useTextEditorHost`: the sticky toolbar, `LinkPickerModal`, chip navigation, file and pointer drops, the drag ghost) and handles the `lib/links.ts` link requests. *Ext.:* `initialContent` (initial value only — remount via `key`), `isEditing`, `placeholder`, `onChange(content)`.
 - **`BlockFrame`** — a block's shell: invisible in read mode; in edit mode a subtle frame with grip, type label and "…" menu, plus a "Newer version" pill on an outdated copy of a user-built block. Keeps its body at one tree position across modes, so a mode switch never remounts a block. *Ext.:* `icon`, `label`, `outdated`, `onGripPointerDown`, `onOpenMenu`, `children`.
 - **`blockViews.ts`** — type → component (`BLOCK_VIEWS`). Every view gets `block`, `blocks` (all of the entry's blocks, for a type that points at others), `isEditing`, `onHtmlChange`/`onBlockChange`/`onPersist`, the entry's `sigil` state, and `part` (only for a sigil part rendered through `SigilPart`). Imported only by `BlockStack` — the text block pulls in TipTap. *Ext.:* new block types register here, their metadata in `lib/blocks/blockTypes.ts`.
 - **`blockSidebarViews.ts`** — type → `{ Read?, Edit? }` settings a block type brings, looked up by the *resolved* type (a too-new data version gets none); only `Edit` receives `setAttr`. Must not import TipTap (the sidebar is eager). *Ext.:* new types register their settings here.
@@ -140,7 +140,7 @@ See [`architecture.md` → Content Blocks](architecture/blocks.md#content-blocks
 
 **Fields block**
 
-- **`FieldsBlock`** — the fields block (`core.fields`): read mode a quiet label/value list in the editor font; edit mode `FieldValueEditor`/`FieldSlotEditor` per element. Sigil elements render through `SigilPart`; a `text` element renders `RichEditor` directly, registered with the stack under `<blockId>:<elementId>`. Controlled — writes through `onBlockChange`/`onPersist`.
+- **`FieldsBlock`** — the fields block (`core.fields`): read mode a quiet label/value list in the editor font; edit mode `FieldValueEditor`/`FieldSlotEditor` per element. Sigil elements render through `SigilPart`; a `text` element renders `TextEditor` directly, with `hostKey` `<blockId>:<elementId>`. Controlled — writes through `onBlockChange`/`onPersist`.
 - **`FieldValueEditor`** — the input for a kind whose value lives in the block's data JSON (text/number/date, `Dropdown` for choice and moon phase, `ToggleSwitch` for yes/no, a checklist). Shared with the builder's "Prefill". *Ext.:* `element`, `value`, `onChange`.
 - **`FieldSlotEditor`** — the input for a kind whose value lives in the block's markup slot (`LinkEditor` for `link`, `AltarFieldEditor` for `altar`, an image picker for `image`). Shared with the builder's "Prefill". *Ext.:* `element`, `slot`, `onChange`.
 - **`AltarField`** — the `altar` kind: `AltarFieldEditor` (an altar-only `LinkEditor` plus the altar's picture) and `AltarFieldReader` (the picture as a button that opens the altar). The picture is the altar's saved thumbnail, falling back to `AltarCardPreview`'s live render; read from `altarStore`, not stored on the element, since it changes with the altar. *Ext.:* `slot`/`onChange`.
@@ -160,7 +160,7 @@ See [`architecture.md` → Content Blocks](architecture/blocks.md#content-blocks
 - **`SigilDrawingCanvas`** — the 1200×800 drawing surface; reports a data URL after each stroke. `initialData` must be a data URL — an `emerald-img:` image would taint it. *Ext.:* `initialData`, `mode`, `brushColor`, `brushSize`, `clearVersion`, `editable`, `onChange`.
 - **`SigilConcealed`** — the quiet "hidden until …" line. *Ext.:* `revealDate`.
 
-The editor helpers `BlockStack` composes live in `src/components/editor/`: `editorCommands.ts` (`appendEntryLink`/`removeEntryLink`/`revealEntryLink`/ `findEntryLinkPos`, `insertImageFromDataUrl`, `insertInternalLinkChip`), `useEditorFileDrop`, `useEditorPointerDrops`, `useInternalLinkNavigation`, `DragGhost`. Image inserts report failures through `ImageNoticeModal` (above). `RichEditor` is a text block's writing surface only; its `onEditorReady` reports the instance to the stack.
+The text editor `BlockStack` hosts lives in `src/components/editors/text/` (see [`architecture/editors.md`](architecture/editors.md#text-editor)). Image inserts report failures through `ImageNoticeModal` (above).
 
 ### `src/components/sidebar/fields/` — Property Panel Building Blocks
 

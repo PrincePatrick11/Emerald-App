@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import type { Editor } from '@tiptap/react';
 import { getCurrentWebview } from '@tauri-apps/api/webview';
-import { copyImageFile, readImageFile, saveImage } from '../../lib/images';
-import { hasImageLimits, ImageTooLargeError, prepareImageDataUrl } from '../../lib/imageLimits';
-import { reportImageError, useImageNoticeStore } from '../../store/imageNoticeStore';
+import { copyImageFile, readImageFile, saveImage } from '../../../lib/images';
+import { hasImageLimits, ImageTooLargeError, prepareImageDataUrl } from '../../../lib/imageLimits';
+import { reportImageError, useImageNoticeStore } from '../../../store/imageNoticeStore';
 
 /** The read limit of the Rust command along with its number (see `images.rs`). */
 const TOO_LARGE_TO_READ = /image file too large: (\d+)/;

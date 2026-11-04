@@ -6,7 +6,7 @@ import { useAltarStore } from '../store/altarStore';
 import { useCategoryStore } from '../store/categoryStore';
 import { useSettingsStore } from '../store/settingsStore';
 import { buildLinkItems } from '../lib/linkItems';
-import type { SuggestionItem } from '../components/editor/SuggestionList';
+import type { SuggestionItem } from '../components/editors/text/SuggestionList';
 
 /** The last result together with its inputs — shared across all callers. */
 let shared: { deps: readonly unknown[]; items: SuggestionItem[] } | null = null;

@@ -9,6 +9,7 @@ This file is the overview: tech stack, module map, data flow and the IPC surface
 | [`architecture/modules.md`](architecture/modules.md) | Module registry, entry store, store selectors, categories, tags, moon phase, lexicon |
 | [`architecture/editing.md`](architecture/editing.md) | Edit mode, Cancel, leaving an edit, type change, auto-save, sidebar action bar, internal links |
 | [`architecture/blocks.md`](architecture/blocks.md) | Content blocks: stored format, fields, sigils, user-built blocks |
+| [`architecture/editors.md`](architecture/editors.md) | Editors shared across modules: the text editor, its host and features |
 | [`architecture/templates.md`](architecture/templates.md) | Templates: assignments, defaults, insertion |
 | [`architecture/navigation.md`](architecture/navigation.md) | Global search, drag and drop, tabs, navigation history, left sidebar |
 | [`architecture/altar.md`](architecture/altar.md) | Altar UI composition |
@@ -54,7 +55,8 @@ src/
 │   │   ├── moduleViews.ts                      ViewId → lazy view (MainArea only)
 │   │   ├── settings/                           SettingsModal, one *Page per tab, sections
 │   │   └── titlebar/                           custom title bar, menus, SearchModal
-│   ├── editor/       RichEditor and its TipTap extensions, toolbar, link picker, TagInput
+│   ├── editors/
+│   │   └── text/     TextEditor, its host (toolbar, link picker, drops), TipTap extensions
 │   ├── blocks/       BlockStack, block views, fields/sigil blocks, block editor
 │   ├── views/        one view per module and aux view (Home … Trash)
 │   ├── sidebar/

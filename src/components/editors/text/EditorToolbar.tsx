@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react';
 import type { Editor } from '@tiptap/react';
 import { useTranslation } from 'react-i18next';
-import { ACCEPTED_IMAGE_MIME, isAcceptedImageFile, readFileAsDataUrl } from '../../lib/helpers';
+import { ACCEPTED_IMAGE_MIME, isAcceptedImageFile, readFileAsDataUrl } from '../../../lib/helpers';
 import {
   Bold,
   Italic,
@@ -25,9 +25,10 @@ import {
   AlignRight,
 } from 'lucide-react';
 import type { Alignment } from './ResizableImageExtension';
+import { editorHas } from './hostContext';
 
 /**
- * The node types for which `TextAlign` is configured in `RichEditor`. Listed
+ * The node types for which `TextAlign` is configured in `TextEditor`. Listed
  * here so that the toolbar can disable the buttons where alignment
  * would have no effect, in a code block for instance.
  */
@@ -42,8 +43,13 @@ interface Props {
   onOpenLinkPicker: () => void;
 }
 
+/**
+ * The formatting bar of a text editor. It shows only what the editor's schema
+ * has, so an editor with fewer features (see `features.ts`) gets a shorter bar.
+ */
 export default function EditorToolbar({ editor, onInsertImage, onOpenLinkPicker }: Props) {
   const { t } = useTranslation();
+  const has = (name: string) => editorHas(editor, name);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [imageError, setImageError] = useState<string | null>(null);
 
@@ -127,13 +133,15 @@ export default function EditorToolbar({ editor, onInsertImage, onOpenLinkPicker 
         >
           <Strikethrough size={14} />
         </ToolbarBtn>
-        <ToolbarBtn
-          onClick={() => editor.chain().focus().toggleHighlight().run()}
-          active={editor.isActive('highlight')}
-          title={t('editor.toolbar.highlight')}
-        >
-          <Highlighter size={14} />
-        </ToolbarBtn>
+        {has('highlight') && (
+          <ToolbarBtn
+            onClick={() => editor.chain().focus().toggleHighlight().run()}
+            active={editor.isActive('highlight')}
+            title={t('editor.toolbar.highlight')}
+          >
+            <Highlighter size={14} />
+          </ToolbarBtn>
+        )}
         <ToolbarBtn
           onClick={() => editor.chain().focus().toggleCode().run()}
           active={editor.isActive('code')}
@@ -143,6 +151,7 @@ export default function EditorToolbar({ editor, onInsertImage, onOpenLinkPicker 
         </ToolbarBtn>
       </ToolbarGroup>
 
+      {has('heading') && (<>
       <ToolbarDivider />
 
       <ToolbarGroup>
@@ -188,7 +197,9 @@ export default function EditorToolbar({ editor, onInsertImage, onOpenLinkPicker 
           <Minus size={14} />
         </ToolbarBtn>
       </ToolbarGroup>
+      </>)}
 
+      {has('textAlign') && (<>
       <ToolbarDivider />
 
       <ToolbarGroup>
@@ -217,10 +228,13 @@ export default function EditorToolbar({ editor, onInsertImage, onOpenLinkPicker 
           <AlignRight size={14} />
         </ToolbarBtn>
       </ToolbarGroup>
+      </>)}
 
+      {(has('bulletList') || has('taskList')) && (<>
       <ToolbarDivider />
 
       <ToolbarGroup>
+        {has('bulletList') && (<>
         <ToolbarBtn
           onClick={() => editor.chain().focus().toggleBulletList().run()}
           active={editor.isActive('bulletList')}
@@ -235,25 +249,36 @@ export default function EditorToolbar({ editor, onInsertImage, onOpenLinkPicker 
         >
           <ListOrdered size={14} />
         </ToolbarBtn>
-        <ToolbarBtn
-          onClick={() => editor.chain().focus().toggleTaskList().run()}
-          active={editor.isActive('taskList')}
-          title={t('editor.toolbar.taskList')}
-        >
-          <CheckSquare size={14} />
-        </ToolbarBtn>
+        </>)}
+        {has('taskList') && (
+          <ToolbarBtn
+            onClick={() => editor.chain().focus().toggleTaskList().run()}
+            active={editor.isActive('taskList')}
+            title={t('editor.toolbar.taskList')}
+          >
+            <CheckSquare size={14} />
+          </ToolbarBtn>
+        )}
       </ToolbarGroup>
+      </>)}
 
+      {(has('internalLink') || has('image')) && (<>
       <ToolbarDivider />
 
       <ToolbarGroup>
-        <ToolbarBtn onClick={handleLinkButtonClick} active={editor.isActive('link')} title={t('editor.toolbar.insertLink')}>
-          <Link size={14} />
-        </ToolbarBtn>
-        <ToolbarBtn onClick={() => fileInputRef.current?.click()} active={false} title={t('editor.toolbar.insertImage')}>
-          <ImagePlus size={14} />
-        </ToolbarBtn>
+        {/* The button picks an entry; on an external link it removes that link instead. */}
+        {has('internalLink') && (
+          <ToolbarBtn onClick={handleLinkButtonClick} active={editor.isActive('link')} title={t('editor.toolbar.insertLink')}>
+            <Link size={14} />
+          </ToolbarBtn>
+        )}
+        {has('image') && (
+          <ToolbarBtn onClick={() => fileInputRef.current?.click()} active={false} title={t('editor.toolbar.insertImage')}>
+            <ImagePlus size={14} />
+          </ToolbarBtn>
+        )}
       </ToolbarGroup>
+      </>)}
 
       <input
         ref={fileInputRef}

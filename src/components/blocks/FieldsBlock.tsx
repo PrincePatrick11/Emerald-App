@@ -1,4 +1,4 @@
-import { useContext, useRef } from 'react';
+import { useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { elementLabel } from '../../lib/blocks/blockAttrs';
 import {
@@ -8,8 +8,7 @@ import {
 } from '../../lib/blocks/fields';
 import { isBlankContent } from '../../lib/internalLinkHtml';
 import { formatIsoDateLong } from '../../lib/formatDate';
-import RichEditor from '../editor/RichEditor';
-import { BlockStackContext } from './blockStackContext';
+import { TextEditor } from '../editors/text';
 import UnknownBlock from './UnknownBlock';
 import { LinkTarget } from './BlockLink';
 import { AltarFieldReader } from './AltarField';
@@ -128,7 +127,7 @@ export default function FieldsBlock({ block, blocks, isEditing, onBlockChange, o
 /* ---------------- Text ---------------- */
 
 /**
- * The text element: the text block's editor, registered with the stack under
+ * The text element: the text block's editor, reporting to the stack's host under
  * `<block ID>:<element ID>`, so it gets toolbar, link requests
  * and drops like a text block. Uncontrolled as there: `initialContent` is read
  * once; `onChange` goes via a ref because the editor keeps the
@@ -141,16 +140,15 @@ function FieldText({ editorKey, initialContent, isEditing, onChange }: {
   onChange: (html: string) => void;
 }) {
   const { t } = useTranslation();
-  const stack = useContext(BlockStackContext);
   const onChangeRef = useRef(onChange);
   onChangeRef.current = onChange;
   return (
-    <RichEditor
+    <TextEditor
       initialContent={initialContent}
       placeholder={t('blocks.types.text.placeholder')}
       onChange={(html) => onChangeRef.current(html)}
       editable={isEditing}
-      onEditorReady={(editor) => stack?.registerTextEditor(editorKey, editor)}
+      hostKey={editorKey}
     />
   );
 }
