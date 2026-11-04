@@ -44,13 +44,22 @@ function alignFromLegacyStyle(img: HTMLImageElement): Alignment {
 
 /** Past this much travel, a press on an image becomes a move. */
 const DRAG_THRESHOLD_PX = 4;
-/** Widths a resize snaps to when it comes this close (in percentage points). */
-const SNAP_WIDTHS = [25, 33, 50, 66, 75, 100];
+/** Fractions of the editor's width a resize snaps to when it comes this close (in percentage points). */
+const SNAP_WIDTHS = [25, 33, 50, 66, 75];
 const SNAP_RANGE = 2;
 
-function snapWidth(percent: number): number {
+/**
+ * The width a resize stores: pixels, so the image keeps its size when the
+ * window changes (`max-width` only shrinks it where the text gets narrower),
+ * snapped to common fractions of the editor's current width. Dragged to the
+ * full width it becomes `100%`, which is meant to follow the text.
+ */
+function resizedWidth(px: number, editorW: number): { width: string; label: string } {
+  const percent = (px / editorW) * 100;
+  if (percent >= 100 - SNAP_RANGE) return { width: '100%', label: '100 %' };
   const near = SNAP_WIDTHS.find((w) => Math.abs(w - percent) <= SNAP_RANGE);
-  return near ?? Math.round(percent);
+  const snapped = Math.round(near !== undefined ? (editorW * near) / 100 : px);
+  return { width: `${snapped}px`, label: near !== undefined ? `${near} % · ${snapped} px` : `${snapped} px` };
 }
 
 /**
@@ -89,16 +98,14 @@ function ResizableImageView({ node, updateAttributes, selected, editor, getPos }
     const editorW =
       imgRef.current?.closest('.ProseMirror')?.getBoundingClientRect().width ?? 600;
 
-    const widthAt = (clientX: number) => {
-      const px = Math.max(80, Math.min(editorW, startW + (clientX - startX) * factor));
-      return snapWidth((px / editorW) * 100);
-    };
-    setResizeLabel(`${widthAt(startX)}%`);
+    const widthAt = (clientX: number) =>
+      resizedWidth(Math.max(80, Math.min(editorW, startW + (clientX - startX) * factor)), editorW);
+    setResizeLabel(widthAt(startX).label);
 
     const onMove = (ev: PointerEvent) => {
-      const percent = widthAt(ev.clientX);
-      setResizeLabel(`${percent}%`);
-      updateAttributes({ width: `${percent}%` });
+      const { width, label } = widthAt(ev.clientX);
+      setResizeLabel(label);
+      updateAttributes({ width });
     };
     const onUp = () => {
       setResizeLabel(null);
@@ -145,6 +152,7 @@ function ResizableImageView({ node, updateAttributes, selected, editor, getPos }
       style={{
         display: 'block',
         width: node.attrs.width ?? '100%',
+        maxWidth: '100%',
         ...alignMargins(node.attrs.align),
       }}
       onMouseEnter={() => setHovered(true)}
@@ -230,7 +238,7 @@ export const ResizableImage = Node.create({
       'img',
       mergeAttributes(rest, {
         'data-align': align,
-        style: `width:${width ?? '100%'};display:block;margin-left:${marginLeft};margin-right:${marginRight}`,
+        style: `width:${width ?? '100%'};max-width:100%;display:block;margin-left:${marginLeft};margin-right:${marginRight}`,
       }),
     ];
   },

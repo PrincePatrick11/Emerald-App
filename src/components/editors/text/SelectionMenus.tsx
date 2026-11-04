@@ -15,8 +15,16 @@ import { editorHas } from './hostContext';
 import type { Alignment } from './ResizableImageExtension';
 import { TEXT_COLORS, type TextColor } from './TextColorExtension';
 
-/** The widths the image menu offers, in percent of the editor's width. */
+/**
+ * The widths the image menu offers, in percent of the editor's width. Stored
+ * like a resize: in pixels at the width of the moment, full width as `100%`.
+ */
 const IMAGE_WIDTHS = [25, 50, 100] as const;
+
+function presetWidth(editor: Editor, percent: number): string {
+  if (percent === 100) return '100%';
+  return `${Math.round((editor.view.dom.getBoundingClientRect().width * percent) / 100)}px`;
+}
 
 /**
  * The small menus at a selection, beside the toolbar: one over selected text
@@ -234,7 +242,13 @@ function ImageMenu({ editor }: { editor: Editor }) {
   });
 
   const setAlign = (align: Alignment) => editor.chain().focus().setImageAlign(align).run();
-  const setWidth = (percent: number) => editor.chain().focus().updateAttributes('image', { width: `${percent}%` }).run();
+  const setWidth = (percent: number) => editor.chain().focus().updateAttributes('image', { width: presetWidth(editor, percent) }).run();
+  // A preset counts as set while the stored width matches it at the current width, to the pixel.
+  const isWidth = (percent: number) => {
+    const preset = presetWidth(editor, percent);
+    if (!state?.width || !preset.endsWith('px') || !state.width.endsWith('px')) return state?.width === preset;
+    return Math.abs(parseFloat(state.width) - parseFloat(preset)) <= 1;
+  };
 
   return (
     <BubbleMenu
@@ -267,7 +281,7 @@ function ImageMenu({ editor }: { editor: Editor }) {
       <ToolbarDivider />
       <ToolbarGroup>
         {IMAGE_WIDTHS.map((w) => (
-          <ToolbarBtn key={w} onClick={() => setWidth(w)} active={state?.width === `${w}%`} title={t('editor.menu.width', { value: w })}>
+          <ToolbarBtn key={w} onClick={() => setWidth(w)} active={isWidth(w)} title={t('editor.menu.width', { value: w })}>
             <span className="text-[11px] tabular-nums px-0.5">{w}%</span>
           </ToolbarBtn>
         ))}

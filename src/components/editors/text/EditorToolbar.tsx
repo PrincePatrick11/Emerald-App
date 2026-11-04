@@ -116,7 +116,7 @@ export default function EditorToolbar({ editor, onInsertImage, onOpenLinkPicker 
   };
 
   return (
-    <div className="flex items-center gap-0.5 px-4 py-2 border-b border-edge flex-wrap">
+    <div className="editor-toolbar">
       <ToolbarGroup>
         <ToolbarBtn
           onClick={() => editor.chain().focus().toggleBold().run()}
@@ -340,7 +340,7 @@ export function ToolbarGroup({ children }: { children: React.ReactNode }) {
 // The narrow margin is deliberate: the bar wraps when the editor area
 // gets tight, and every pixel saved pushes that wrap further out.
 export function ToolbarDivider() {
-  return <div className="w-px h-4 bg-well-raise mx-0.5" />;
+  return <div className="editor-toolbar-divider" />;
 }
 
 export function ToolbarBtn({
@@ -356,19 +356,15 @@ export function ToolbarBtn({
   title: string;
   disabled?: boolean;
 }) {
-  // `p-1` instead of the otherwise usual 26px: the bar now carries 18
-  // buttons and would otherwise already wrap with the right column open.
+  // Size and states in index.css (`.editor-toolbar-btn`); disabled goes through
+  // the shared `:disabled` rule.
   return (
     <button
       onClick={onClick}
       title={title}
       disabled={disabled}
-      className={`editor-toolbar-btn p-1 rounded-md transition-colors duration-150 ${
-        active
-          ? 'editor-toolbar-btn-active bg-well-active text-primary'
-          : disabled
-          ? 'editor-toolbar-btn-disabled text-subtle opacity-50 cursor-not-allowed'
-          : 'editor-toolbar-btn-idle text-subtle hover:text-raise hover:bg-well-raise'
+      className={`editor-toolbar-btn ${
+        active ? 'editor-toolbar-btn-active' : disabled ? 'editor-toolbar-btn-disabled' : 'editor-toolbar-btn-idle'
       }`}
     >
       {children}
