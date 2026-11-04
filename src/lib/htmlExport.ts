@@ -54,7 +54,7 @@ function navIcon(data: ExportData): string {
 /** IDs of all entries `data` links to — inline content links and property links. */
 function outgoingIds(data: ExportData): Set<string> {
   const ids = new Set(internalLinksIn(data.content).map(t => t.id));
-  const chips = [data.paradigma, data.bannung, data.meditation, ...(data.linkedOps ?? []), ...(data.linkedWiki ?? [])];
+  const chips = [data.paradigma, data.bannung, data.meditation, data.sigil?.chargingTechnique, ...(data.linkedOps ?? []), ...(data.linkedWiki ?? [])];
   for (const c of chips) {
     if (c?.id) ids.add(c.id);
   }
@@ -126,6 +126,7 @@ export async function buildInteractiveHtml(
     renderEntryArticle(e, {
       bundleIds,
       ...mediaFor(e, opts),
+      sigil: 'interactive',
       footerHtml: buildRefs(e, entries, outgoing, labels),
     })
   ));
@@ -341,6 +342,43 @@ a.chip-link:hover { border-color: var(--accent); }
 .il-icon-img { width: 13px; height: 13px; object-fit: cover; border-radius: 2px; }
 mark.hit { background: var(--mark); color: inherit; border-radius: 2px; padding: 0 1px; }
 
+/* Sigil */
+.sigil { margin: 0 0 24px; padding-bottom: 18px; border-bottom: 1px solid var(--border); }
+.sigil-badge {
+  display: inline-block; font-size: 12px; font-weight: 500; color: var(--accent-text); background: var(--accent-soft);
+  border: 1px solid var(--accent-border); border-radius: 999px; padding: 2px 10px; margin-bottom: 14px;
+}
+.sigil-part { margin-bottom: 16px; }
+.sigil-part-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 6px; }
+.sigil-label { font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--faint); margin-bottom: 6px; }
+.sigil-part-head .sigil-label { margin-bottom: 0; }
+.sigil-toggle {
+  font: inherit; font-size: 12px; color: var(--accent-text); background: transparent; border: 1px solid var(--accent-border);
+  border-radius: 6px; padding: 2px 10px; cursor: pointer;
+}
+.sigil-toggle:hover { background: var(--accent-soft); }
+.sigil-toggle:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--accent-soft); border-color: var(--accent); }
+.sigil-part[data-hidden="true"] .sigil-content,
+.sigil-part[data-hidden="false"] .sigil-cover { display: none; }
+.sigil-cover {
+  font-size: 13px; color: var(--muted); background: var(--chip); border: 1px dashed var(--border);
+  border-radius: 8px; padding: 12px 14px;
+}
+/* White behind the drawing in both themes: sigils are drawn dark on a transparent canvas. */
+.sigil-img { display: block; max-width: 100%; max-height: 420px; border-radius: 10px; border: 1px solid var(--border); background: #fff; }
+.sigil-intention { font-family: Georgia, "Times New Roman", serif; font-size: 17px; font-style: italic; margin: 0; }
+.sigil-letters { display: flex; flex-wrap: wrap; gap: 6px; }
+.sigil-letter {
+  min-width: 34px; height: 34px; display: inline-flex; align-items: center; justify-content: center; font-weight: 600;
+  border: 1px solid var(--border); border-radius: 6px; background: var(--chip);
+}
+.sigil-letter.done { color: var(--accent-text); background: var(--accent-soft); border-color: var(--accent-border); }
+.sigil-details { display: flex; flex-wrap: wrap; gap: 8px 22px; font-size: 13px; margin-bottom: 12px; }
+.sigil-detail { display: flex; align-items: center; gap: 8px; }
+.sigil-detail-label { color: var(--muted); }
+.sigil-notes { white-space: pre-wrap; margin: 0; font-size: 14px; }
+.sigil-empty { color: var(--faint); font-size: 13px; margin: 0; }
+
 /* References */
 .refs { margin-top: 36px; padding-top: 18px; border-top: 1px solid var(--border); display: grid; gap: 16px; }
 .refs h2 { font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--faint); margin: 0 0 8px; }
@@ -388,7 +426,7 @@ mark.hit { background: var(--mark); color: inherit; border-radius: 2px; padding:
 
 @media print {
   body { background: #fff; color: #111; }
-  .sidebar, .toolbar, .outline, .footer, .refs { display: none !important; }
+  .sidebar, .toolbar, .outline, .footer, .refs, .sigil-toggle { display: none !important; }
   .content-wrap { padding: 0; display: block; }
   .doc { max-width: none; }
   body.has-sidebar .entry-article:not(.active) { display: block; }
@@ -454,7 +492,12 @@ const HTML_JS = `
   function markHits(el, q) {
     clearMarks(el);
     if (!q) return null;
-    var walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT, null);
+    // Hidden sigil parts, their covers and the toggle labels are not content to hit.
+    var skip = function (node) {
+      return node.parentElement && node.parentElement.closest('.sigil-toggle, .sigil-cover, .sigil-part[data-hidden="true"] .sigil-content')
+        ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT;
+    };
+    var walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT, { acceptNode: skip });
     var nodes = [];
     while (walker.nextNode()) nodes.push(walker.currentNode);
     var first = null;
@@ -536,6 +579,18 @@ const HTML_JS = `
   window.addEventListener('hashchange', function () { show(location.hash.slice(1)); });
   show(location.hash.slice(1), false);
 
+  // ── Sigil parts: shown or hidden like in the app, switchable here ──
+  Array.prototype.forEach.call(document.querySelectorAll('.sigil-toggle'), function (btn) {
+    btn.addEventListener('click', function () {
+      var part = btn.closest('.sigil-part');
+      var hide = part.getAttribute('data-hidden') !== 'true';
+      part.setAttribute('data-hidden', hide ? 'true' : 'false');
+      btn.setAttribute('aria-expanded', hide ? 'false' : 'true');
+      btn.textContent = btn.getAttribute(hide ? 'data-show' : 'data-hide');
+      document.dispatchEvent(new Event('sigil-toggled'));
+    });
+  });
+
   // ── Sidebar order by date: flips each module's list ──
   var sortBtn = document.getElementById('sort-btn');
   if (sortBtn) {
@@ -562,7 +617,17 @@ const HTML_JS = `
   // ── Sidebar search over titles and full text ──
   if (search) {
     var texts = {};
-    articles.forEach(function (a) { texts[a.id] = a.textContent.toLowerCase(); });
+    // Hidden sigil parts don't count: a hit would give away what is hidden.
+    // Recomputed when a part is shown or hidden.
+    var indexTexts = function () {
+      articles.forEach(function (a) {
+        var copy = a.cloneNode(true);
+        Array.prototype.forEach.call(copy.querySelectorAll('.sigil-toggle, .sigil-cover, .sigil-part[data-hidden="true"] .sigil-content'), function (el) { el.remove(); });
+        texts[a.id] = copy.textContent.toLowerCase();
+      });
+    };
+    indexTexts();
+    document.addEventListener('sigil-toggled', function () { indexTexts(); search.dispatchEvent(new Event('input')); });
     var noResults = document.getElementById('no-results');
     search.addEventListener('input', function () {
       query = search.value.trim().toLowerCase();

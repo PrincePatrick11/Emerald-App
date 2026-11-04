@@ -21,7 +21,7 @@ import { noAltarOpenMessage } from './altarExport';
 import type { CustomPropertyType } from '../types';
 import { loadCustomProps, type ExportTarget } from './exportData';
 import {
-  DEFAULT_EXPORT_OPTIONS, exportFilename, localMediaElements, noEntryMessage, splitImageOption, transformMedia,
+  DEFAULT_EXPORT_OPTIONS, exportFilename, localMediaElements, noEntryMessage, sanitizeDataImageUrl, splitImageOption, transformMedia,
   type ExportOptions,
 } from './export';
 import { compressDataUrl } from './imageCompression';
@@ -63,6 +63,21 @@ interface EmeraldMeta {
   version?: string | null;
   // wiki / operations entry icon (emoji or data-URL)
   icon?: string;
+  // sigil operations (category `sigils`) — written since 0.1.3.7
+  opCategoryId?: string;
+  sigil?: {
+    drawingData: string | null;   // PNG data URL
+    intentionText: string;
+    letterBank: string[];
+    implementedLetters: string[];
+    description: string;
+    targetRevealDate: string | null;
+    chargingTechniqueTitle?: string;
+    isLoaded: boolean;
+    showSigil: boolean;
+    showIntention: boolean;
+    showLetterBank: boolean;
+  };
   // common
   tags?: string[];
   customProps?: Array<{
@@ -203,6 +218,28 @@ export async function exportAsEmerald(target?: ExportTarget, opts: ExportOptions
     meta.version   = op.version;
     meta.icon      = op.icon ?? undefined;
     meta.tags      = (op.tags ?? []) as string[];
+    meta.opCategoryId = op.category_id;
+    if (op.category_id === 'sigils') {
+      // The whole sigil, as stored — visibility included — so a re-import is
+      // exactly what was exported. The charging technique travels by title,
+      // like the other wiki references in this format.
+      // The drawing follows the image option like content images do.
+      const { mode: drawingMode, compression: drawingCompression } = splitImageOption(opts.images);
+      meta.sigil = {
+        drawingData: op.drawing_data && drawingMode === 'keep' ? await compressDataUrl(op.drawing_data, drawingCompression) : null,
+        intentionText: op.intention_text ?? '',
+        letterBank: op.letter_bank ?? [],
+        implementedLetters: op.implemented_letters ?? [],
+        description: op.description ?? '',
+        targetRevealDate: op.target_reveal_date ?? null,
+        chargingTechniqueTitle: op.charging_technique_wiki_id
+          ? articles.find(a => a.id === op.charging_technique_wiki_id)?.title : undefined,
+        isLoaded: !!op.is_loaded,
+        showSigil: op.show_sigil !== false,
+        showIntention: op.show_intention_in_properties !== false,
+        showLetterBank: op.show_letter_bank_in_properties !== false,
+      };
+    }
     propsKey = { id: op.id, type: 'operation' };
   }
 
@@ -513,7 +550,10 @@ async function importOperationEntry(file: EmeraldFile, content: string, tagNames
   const { createOperation, updateOperation, categories: opCats, addCategory } = useOperationStore.getState();
 
   let categoryId: string;
-  const existing = opCats.find(c => c.name === file.meta.opCategoryName);
+  // Built-in categories (sigils, servitors) have fixed ids; match those first —
+  // their names may differ between vaults.
+  const existing = opCats.find(c => c.is_builtin && c.id === file.meta.opCategoryId)
+    ?? opCats.find(c => c.name === file.meta.opCategoryName);
   if (existing) {
     categoryId = existing.id;
   } else if (file.meta.opCategoryName) {
@@ -534,6 +574,29 @@ async function importOperationEntry(file: EmeraldFile, content: string, tagNames
     version: file.meta.version ?? null,
     icon: file.meta.icon ?? undefined,
   });
+  const sigil = file.meta.sigil;
+  if (sigil && categoryId === 'sigils') {
+    // The file is untrusted: keep only well-formed values.
+    const strings = (v: unknown) => (Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : []);
+    const drawing = typeof sigil.drawingData === 'string' ? sanitizeDataImageUrl(sigil.drawingData) : null;
+    const technique = sigil.chargingTechniqueTitle
+      ? useWikiStore.getState().articles.find(a => a.title === sigil.chargingTechniqueTitle)?.id ?? null
+      : null;
+    await updateOperation(op.id, {
+      drawing_data: drawing,
+      thumbnail_data: drawing,
+      intention_text: typeof sigil.intentionText === 'string' ? sigil.intentionText : '',
+      letter_bank: strings(sigil.letterBank),
+      implemented_letters: strings(sigil.implementedLetters),
+      description: typeof sigil.description === 'string' ? sigil.description : '',
+      target_reveal_date: typeof sigil.targetRevealDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(sigil.targetRevealDate) ? sigil.targetRevealDate : null,
+      charging_technique_wiki_id: technique,
+      is_loaded: !!sigil.isLoaded,
+      show_sigil: sigil.showSigil !== false,
+      show_intention_in_properties: sigil.showIntention !== false,
+      show_letter_bank_in_properties: sigil.showLetterBank !== false,
+    });
+  }
   await importCustomProps(op.id, 'operation', file.meta.customProps);
   return op.id;
 }

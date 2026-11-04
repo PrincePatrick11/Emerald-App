@@ -676,6 +676,13 @@
       "desc": "Newest first"
     },
     "linkedMedia_one": "Separate settings for the linked entry",
-    "linkedMedia_other": "Separate settings for linked entries ({{count}})"
+    "linkedMedia_other": "Separate settings for linked entries ({{count}})",
+    "sigil": {
+      "drawing": "Sigil",
+      "hidden": "Hidden – the sigil is loaded",
+      "hiddenUntil": "Hidden until {{date}} – the sigil is loaded",
+      "show": "Show",
+      "hide": "Hide"
+    }
   }
 }

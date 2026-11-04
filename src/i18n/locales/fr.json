@@ -676,6 +676,13 @@
       "desc": "Plus récentes d'abord"
     },
     "linkedMedia_one": "Réglages propres pour l'entrée liée",
-    "linkedMedia_other": "Réglages propres pour les entrées liées ({{count}})"
+    "linkedMedia_other": "Réglages propres pour les entrées liées ({{count}})",
+    "sigil": {
+      "drawing": "Sigil",
+      "hidden": "Masqué – le sigil est chargé",
+      "hiddenUntil": "Masqué jusqu'au {{date}} – le sigil est chargé",
+      "show": "Afficher",
+      "hide": "Masquer"
+    }
   }
 }

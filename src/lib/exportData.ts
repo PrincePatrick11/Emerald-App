@@ -4,6 +4,7 @@ import { useWikiStore } from '../store/wikiStore';
 import { useOperationStore } from '../store/operationStore';
 import { useUIStore } from '../store/uiStore';
 import { getDb } from './db';
+import { isAutoHiddenSigil, todayIso } from './sigil';
 import { getCategoryEmoji } from '../components/wiki/WikiList';
 import { MOON_PHASE_SYMBOLS } from './moonPhase';
 import type { CustomProperty, WikiCategoryDef } from '../types';
@@ -16,6 +17,27 @@ export interface ChipData {
 }
 
 export type ExportEntryType = 'journal' | 'wiki' | 'operations';
+
+/**
+ * A sigil as the export shows it. `show*` already apply the app's rule: a
+ * loaded sigil hides drawing, intention and letter bank until its reveal date
+ * (or until shown again by hand), and is revealed once that date has passed.
+ */
+export interface SigilData {
+  drawing: string | null;        // PNG data URL
+  intention: string;
+  letterBank: string[];
+  implementedLetters: string[];
+  notes: string;
+  revealDate: string | null;     // yyyy-MM-dd
+  /** Set while the sigil is hidden automatically until its reveal date (the app's rule). */
+  hiddenUntil: string | null;
+  chargingTechnique?: ChipData;  // a wiki article
+  loaded: boolean;
+  showDrawing: boolean;
+  showIntention: boolean;
+  showLetterBank: boolean;
+}
 
 /** Identifies one exportable entry, independent of what's open in the UI. */
 export interface ExportTarget {
@@ -46,6 +68,8 @@ export interface ExportData {
   isActive?: boolean;
   endDate?: string | null;
   version?: string | null;
+  // sigil operation (category `sigils`)
+  sigil?: SigilData;
   // common
   tagNames?: string[];
   customProps?: Pick<CustomProperty, 'name' | 'value' | 'type' | 'meta'>[];
@@ -198,6 +222,29 @@ export async function collectExportDataFor(view: ExportTarget): Promise<ExportDa
 
     const cat = opCats.find(c => c.id === op.category_id);
 
+    let sigil: SigilData | undefined;
+    if (op.category_id === 'sigils') {
+      // Same rule as OperationSigilView: a loaded sigil hidden in all three
+      // places reveals itself once its reveal date has come.
+      const autoHidden = isAutoHiddenSigil(op);
+      const revealed = autoHidden && op.target_reveal_date! <= todayIso();
+      const technique = op.charging_technique_wiki_id ? articles.find(a => a.id === op.charging_technique_wiki_id) : undefined;
+      sigil = {
+        drawing: op.drawing_data ?? null,
+        intention: op.intention_text ?? '',
+        letterBank: op.letter_bank ?? [],
+        implementedLetters: op.implemented_letters ?? [],
+        notes: op.description ?? '',
+        revealDate: op.target_reveal_date ?? null,
+        hiddenUntil: autoHidden && !revealed ? op.target_reveal_date! : null,
+        chargingTechnique: technique ? { id: technique.id, label: technique.title, icon: wikiIcon(technique, wikiCategories) } : undefined,
+        loaded: !!op.is_loaded,
+        showDrawing: revealed || op.show_sigil !== false,
+        showIntention: revealed || op.show_intention_in_properties !== false,
+        showLetterBank: revealed || op.show_letter_bank_in_properties !== false,
+      };
+    }
+
     return {
       id: op.id,
       type: 'operations',
@@ -210,6 +257,7 @@ export async function collectExportDataFor(view: ExportTarget): Promise<ExportDa
       isActive: !!op.is_active,
       endDate: op.end_date,
       version: op.version,
+      sigil,
       tagNames: (op.tags ?? []) as string[],
       customProps,
     };
@@ -220,16 +268,10 @@ export async function collectExportDataFor(view: ExportTarget): Promise<ExportDa
 
 // ── Linked entries ──────────────────────────────────────────────────────────
 
-/** Sigil operations have their own view (`OperationSigilView`) and their export isn't implemented yet. */
-function isExportableOperation(id: string): boolean {
-  const op = useOperationStore.getState().operations.find(o => o.id === id);
-  return !!op && op.category_id !== 'sigils';
-}
-
 function targetExists(t: ExportTarget): boolean {
   if (t.type === 'journal') return useJournalStore.getState().entries.some(e => e.id === t.id);
   if (t.type === 'wiki') return useWikiStore.getState().articles.some(a => a.id === t.id);
-  return isExportableOperation(t.id);
+  return useOperationStore.getState().operations.some(o => o.id === t.id);
 }
 
 function normalizeLinkType(entryType: string | null): ExportEntryType | null {
@@ -267,7 +309,10 @@ function directLinks(t: ExportTarget): ExportTarget[] {
   } else if (t.type === 'wiki') {
     content = useWikiStore.getState().articles.find(a => a.id === t.id)?.content ?? '';
   } else {
-    content = useOperationStore.getState().operations.find(o => o.id === t.id)?.content ?? '';
+    const op = useOperationStore.getState().operations.find(o => o.id === t.id);
+    content = op?.content ?? '';
+    // A sigil's charging technique is a wiki article it points to.
+    if (op?.charging_technique_wiki_id) out.push({ type: 'wiki', id: op.charging_technique_wiki_id });
   }
 
   return [...out, ...internalLinksIn(content)];
@@ -313,8 +358,7 @@ export function collectLinkedTargets(
 /**
  * Every exportable entry of the given modules created within `[from, to]`
  * (inclusive days; `null` means unbounded), oldest first — for the bulk
- * export. Trashed entries are never in the stores; Sigil operations are left
- * out like everywhere else in export.
+ * export. Trashed entries are never in the stores.
  */
 export function collectTargetsInRange(types: readonly ExportEntryType[], from: Date | null, to: Date | null): ExportTarget[] {
   const start = from ? startOfDay(from).getTime() : -Infinity;
@@ -332,7 +376,7 @@ export function collectTargetsInRange(types: readonly ExportEntryType[], from: D
   }
   if (types.includes('operations')) {
     for (const o of useOperationStore.getState().operations) {
-      if (o.category_id !== 'sigils' && inRange(o.created_at)) found.push({ type: 'operations', id: o.id, createdAt: o.created_at });
+      if (inRange(o.created_at)) found.push({ type: 'operations', id: o.id, createdAt: o.created_at });
     }
   }
   if (types.includes('wiki')) {

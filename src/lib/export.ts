@@ -7,7 +7,7 @@ import type { ExportData, ChipData } from './exportData';
 import { useWikiStore } from '../store/wikiStore';
 import { useOperationStore } from '../store/operationStore';
 import { getCategoryEmoji } from '../components/wiki/WikiList';
-import { compressImagesInHtml, type ImageCompression } from './imageCompression';
+import { compressDataUrl, compressImagesInHtml, type ImageCompression } from './imageCompression';
 import i18n from '../i18n';
 import { audioTitle, readMediaAsBase64 } from './media';
 
@@ -465,6 +465,21 @@ const PRINT_CSS = `
   .entry-content h1, .entry-content h2, .entry-content h3 { margin-top: 1.3em; margin-bottom: 0.4em; }
   .entry-content p  { margin-bottom: 0.8em; }
   .entry-content img { display: block; max-width: 100%; height: auto; margin: 0.6em 0; border-radius: 4px; }
+  .sigil { margin: 0 0 1.4em; padding-bottom: 1em; border-bottom: 1px solid #eee; font-family: system-ui, sans-serif; }
+  .sigil-badge { display: inline-block; font-size: 0.75em; color: #006b42; background: #e6faf3; border: 1px solid #99dfc0; border-radius: 10px; padding: 1px 9px; margin-bottom: 0.8em; }
+  .sigil-part { margin-bottom: 0.9em; }
+  .sigil-label { font-size: 0.7em; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: #888; margin-bottom: 0.3em; }
+  .sigil-img { display: block; max-width: 60%; border: 1px solid #ddd; border-radius: 6px; }
+  .sigil-cover { font-size: 0.85em; color: #555; background: #f6f6f6; border: 1px dashed #ccc; border-radius: 6px; padding: 0.5em 0.8em; }
+  .sigil-intention { font-family: Georgia, serif; font-style: italic; }
+  .sigil-letters { display: flex; flex-wrap: wrap; gap: 4px; }
+  .sigil-letter { display: inline-block; min-width: 1.8em; text-align: center; font-weight: 600; border: 1px solid #ccc; border-radius: 4px; padding: 2px 4px; }
+  .sigil-letter.done { color: #006b42; background: #e6faf3; border-color: #99dfc0; }
+  .sigil-details { display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 0.85em; margin-bottom: 0.6em; }
+  .sigil-detail { display: flex; align-items: center; gap: 6px; }
+  .sigil-detail-label { color: #888; }
+  .sigil-notes { white-space: pre-wrap; }
+  .sigil-empty { color: #999; font-size: 0.85em; }
   .entry-content figure.image-placeholder,
   .entry-content figure.audio-placeholder {
     margin: 0.8em 0; padding: 0.55em 0.9em; border: 1px dashed #99dfc0; border-radius: 6px;
@@ -532,6 +547,117 @@ const PRINT_CSS = `
 // side — no print dialog, no printer selection, no extra window. Same UX
 // shape as the Markdown / Emerald exports.
 
+// ── Sigils ──────────────────────────────────────────────────────────────────
+
+/**
+ * The block a sigil operation gets above its content: drawing, intention,
+ * letter bank, then charging technique, reveal date and notes.
+ *
+ * `interactive` (HTML): a loaded sigil's three parts each carry a toggle and
+ * start shown or hidden exactly as in the app — the reader can switch them,
+ * the file never changes the vault. `static` (PDF): a hidden part is replaced
+ * by a note saying so.
+ */
+async function buildSigilHtml(
+  data: ExportData,
+  mode: 'interactive' | 'static',
+  images: ExportOptions['images'],
+  bundleIds?: ReadonlySet<string>,
+): Promise<string> {
+  const sigil = data.sigil;
+  if (!sigil) return '';
+  const t = (key: string, opts?: Record<string, unknown>) => i18n.t(key, opts);
+  const hiddenNote = sigilHiddenNote(sigil);
+
+  // In the HTML file, hidden parts are hidden on screen only (they are in the
+  // page source); the toggle is a reading aid. PDF and Markdown leave them out.
+  const part = (label: string, shown: boolean, body: string) => {
+    const head = `<div class="sigil-label">${htmlEscape(label)}</div>`;
+    if (mode === 'interactive' && (sigil.loaded || !shown)) {
+      return `<div class="sigil-part" data-hidden="${shown ? 'false' : 'true'}">
+        <div class="sigil-part-head">${head}
+          <button type="button" class="sigil-toggle" aria-expanded="${shown}" data-show="${htmlEscape(t('exportModal.sigil.show'))}" data-hide="${htmlEscape(t('exportModal.sigil.hide'))}">${htmlEscape(shown ? t('exportModal.sigil.hide') : t('exportModal.sigil.show'))}</button>
+        </div>
+        <div class="sigil-cover">🔒 ${htmlEscape(hiddenNote)}</div>
+        <div class="sigil-content">${body}</div>
+      </div>`;
+    }
+    if (!shown) return `<div class="sigil-part">${head}<div class="sigil-cover">🔒 ${htmlEscape(hiddenNote)}</div></div>`;
+    return `<div class="sigil-part">${head}<div class="sigil-content">${body}</div></div>`;
+  };
+
+  let drawing: string;
+  if (!sigil.drawing) drawing = `<p class="sigil-empty">—</p>`;
+  else if (images === 'placeholder') {
+    drawing = `<figure class="image-placeholder">🖼 ${htmlEscape(t('exportModal.placeholder.notExported', { name: t('exportModal.sigil.drawing') }))}</figure>`;
+  } else {
+    const src = sanitizeDataImageUrl(await compressDataUrl(sigil.drawing, images)) ?? '';
+    drawing = src ? `<img class="sigil-img" src="${src}" alt="${htmlEscape(t('exportModal.sigil.drawing'))}">` : `<p class="sigil-empty">—</p>`;
+  }
+
+  const intention = sigil.intention
+    ? `<p class="sigil-intention">${htmlEscape(sigil.intention)}</p>`
+    : `<p class="sigil-empty">${htmlEscape(t('creation.intentionEmpty'))}</p>`;
+
+  const done = new Set(sigil.implementedLetters);
+  const letters = sigil.letterBank.length
+    ? `<div class="sigil-letters">${sigil.letterBank.map(l =>
+        `<span class="sigil-letter${done.has(l) ? ' done' : ''}">${htmlEscape(l)}</span>`).join('')}</div>`
+    : `<p class="sigil-empty">${htmlEscape(t('creation.noLetters'))}</p>`;
+
+  const details: string[] = [];
+  if (sigil.chargingTechnique) details.push(`<span class="sigil-detail-label">${htmlEscape(t('creation.chargingTechnique'))}</span>${chip(sigil.chargingTechnique, '', bundleIds)}`);
+  if (sigil.revealDate) details.push(`<span class="sigil-detail-label">${htmlEscape(t('creation.targetDate'))}</span><span>${htmlEscape(sigil.revealDate)}</span>`);
+  const notes = sigil.notes
+    ? `<div class="sigil-part"><div class="sigil-label">${htmlEscape(t('creation.description'))}</div><p class="sigil-notes">${htmlEscape(sigil.notes)}</p></div>`
+    : '';
+
+  return `<section class="sigil">
+    ${sigil.loaded ? `<div class="sigil-badge">✦ ${htmlEscape(t('creation.sigilLoaded'))}</div>` : ''}
+    ${part(t('exportModal.sigil.drawing'), sigil.showDrawing, drawing)}
+    ${part(t('creation.intention'), sigil.showIntention, intention)}
+    ${part(t('creation.letterBank'), sigil.showLetterBank, letters)}
+    ${details.length ? `<div class="sigil-details">${details.map(d => `<div class="sigil-detail">${d}</div>`).join('')}</div>` : ''}
+    ${notes}
+  </section>`;
+}
+
+/**
+ * What a hidden sigil part says: "hidden until …" only while the app hides
+ * it automatically until a coming date, "the sigil is loaded" only when it is.
+ */
+function sigilHiddenNote(sigil: NonNullable<ExportData['sigil']>): string {
+  if (sigil.hiddenUntil) return i18n.t('exportModal.sigil.hiddenUntil', { date: sigil.hiddenUntil });
+  return sigil.loaded ? i18n.t('exportModal.sigil.hidden') : i18n.t('creation.hidden');
+}
+
+/**
+ * The sigil as a Markdown section for the body — not the header, whose
+ * `Key: value` lines the Markdown import reads as metadata. Hidden parts say so.
+ */
+function sigilMarkdown(data: ExportData): string[] {
+  const sigil = data.sigil;
+  if (!sigil) return [];
+  const t = (key: string, opts?: Record<string, unknown>) => i18n.t(key, opts);
+  const hidden = `🔒 ${sigilHiddenNote(sigil)}`;
+  const lines: string[] = [`## ${t('exportModal.sigil.drawing')}`, ''];
+  if (sigil.loaded) lines.push(`✦ ${t('creation.sigilLoaded')}`, '');
+  lines.push(`- ${t('exportModal.sigil.drawing')}: ${sigil.showDrawing
+    ? (sigil.drawing ? `🖼 ${t('exportModal.placeholder.notExported', { name: t('exportModal.sigil.drawing') })}` : '—')
+    : hidden}`);
+  lines.push(`- ${t('creation.intention')}: ${sigil.showIntention ? (sigil.intention || '—') : hidden}`);
+  if (sigil.showLetterBank) {
+    const done = new Set(sigil.implementedLetters);
+    lines.push(`- ${t('creation.letterBank')}: ${sigil.letterBank.map(l => (done.has(l) ? `~~${l}~~` : l)).join(' ') || '—'}`);
+  } else {
+    lines.push(`- ${t('creation.letterBank')}: ${hidden}`);
+  }
+  if (sigil.chargingTechnique) lines.push(`- ${t('creation.chargingTechnique')}: [[${sigil.chargingTechnique.label}]]`);
+  if (sigil.revealDate) lines.push(`- ${t('creation.targetDate')}: ${sigil.revealDate}`);
+  if (sigil.notes) lines.push('', `### ${t('creation.description')}`, '', sigil.notes);
+  return [...lines, ''];
+}
+
 /**
  * Renders one entry as an `<article>`: top bar, title, metadata and content,
  * with images embedded and internal links pre-rendered as chips. Shared by
@@ -545,6 +671,8 @@ export async function renderEntryArticle(
     images: ExportOptions['images'];
     audio: MediaModes['audio'];
     footerHtml?: string;
+    /** How a sigil's hidden parts are shown: switchable (HTML) or as a note (PDF). */
+    sigil?: 'interactive' | 'static';
   },
 ): Promise<string> {
   const { bundleIds, footerHtml = '' } = opts;
@@ -564,6 +692,7 @@ export async function renderEntryArticle(
     ${buildTopBar(data)}
     <h1 class="entry-title">${htmlEscape(data.title)}${numStr}</h1>
     ${buildMetaHtml(data, bundleIds)}
+    ${await buildSigilHtml(data, opts.sigil ?? 'static', opts.images, bundleIds)}
     <div class="entry-content">${DOMPurify.sanitize(transformedContent, CONTENT_PURIFY_CONFIG)}</div>
     ${footerHtml}
   </article>`;
@@ -666,6 +795,7 @@ function entryToMarkdown(data: ExportData): string {
     for (const p of data.customProps) lines.push(`${p.name}: ${formatCustomPropValue(p)}`);
   }
   lines.push('', '---', '');
+  lines.push(...sigilMarkdown(data));
   lines.push(td.turndown(stripped), '');
 
   return lines.join('\n');

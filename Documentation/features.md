@@ -246,7 +246,7 @@ The modal offers four formats — **PDF**, **Interactive HTML**, **Markdown** an
 
 **Images** (PDF, HTML, Emerald — Markdown drops images): *Original* embeds them unchanged, *Compressed* (default) scales them to max. 1600 px on the long side at quality 0.8, *Strongly compressed* to max. 1000 px at quality 0.6. Images are re-encoded as WebP; where the webview has no WebP encoder (macOS, some Linux WebKitGTK builds), opaque images become JPEG and transparent ones a downscaled PNG. An image is only replaced if the result is smaller; SVG and GIF are left as they are. The originals in the vault are never changed — but an Emerald file exported with compression re-imports with the compressed images.
 
-The chosen format, compression and bundling options are remembered for the next export. Sigil operations are never included as linked entries (see note below).
+The chosen format, compression and bundling options are remembered for the next export.
 
 ### Attachments in Exports
 
@@ -267,19 +267,27 @@ When linked entries are exported too, **Own settings for the linked entries** gi
 - **Modules:** Journal, Operations and/or Wiki.
 - **Period:** last 7 days, last 30 days, this month, all, or a custom from–to range (whole days, by creation date).
 
-The matching entries are listed (oldest first, with date and module) and can be unchecked one by one. **Also export linked entries** adds what those entries link to — e.g. the wiki articles and operations referenced from the journal entries of a week, when only Journal was picked — directly linked or including indirect, each uncheckable; entries already in the selection are not listed again. Everything selected goes into **one** PDF, interactive HTML or Markdown file — the entries of the period, followed by the linked entries, each by date in the chosen **order** (*oldest first* or *newest first*; a single entry exported with its linked entries stays first); the attachment options apply as for a single entry. Emerald is not available here, since an Emerald file holds exactly one entry. The file and document are named after the selection, e.g. `Emerald_Journal-Operations_2026-09-01_2026-09-10.html` / "Emerald – Journal, Operations – 01.09.2026–10.09.2026". Sigil operations and trashed entries are never included.
+The matching entries are listed (oldest first, with date and module) and can be unchecked one by one. **Also export linked entries** adds what those entries link to — e.g. the wiki articles and operations referenced from the journal entries of a week, when only Journal was picked — directly linked or including indirect, each uncheckable; entries already in the selection are not listed again. Everything selected goes into **one** PDF, interactive HTML or Markdown file — the entries of the period, followed by the linked entries, each by date in the chosen **order** (*oldest first* or *newest first*; a single entry exported with its linked entries stays first); the attachment options apply as for a single entry. Emerald is not available here, since an Emerald file holds exactly one entry. The file and document are named after the selection, e.g. `Emerald_Journal-Operations_2026-09-01_2026-09-10.html` / "Emerald – Journal, Operations – 01.09.2026–10.09.2026". Trashed entries are never included.
 
 ### Interactive HTML Export
 
 Writes one self-contained `.html` file that opens in any browser and works fully offline — images and sound files are embedded as data URLs and the file's own Content-Security-Policy forbids any network access. Features: a sidebar listing bundled entries grouped by module, full-text search (press `/`) with per-entry hit counts and highlighting, clickable internal links between bundled entries (hash-based, so browser back/forward works; links to entries outside the bundle are shown greyed with a dashed border), "Links to" / "Linked from" sections at the end of each entry, a heading outline on wide screens, a light/dark toggle that follows the OS by default, a print button that prints every bundled entry on its own page, and a footer "Exported from Emerald App on …" linking to the-emerald-app.com. A sort button (⇅) next to the entry count flips each module's list in the sidebar between oldest and newest first; it starts at the order chosen in the export modal. In the sidebar, entries that contain images or sound files (embedded or as placeholders) carry a 🖼 / 🔊 marker, so they can be found among many similar titles. A single-entry export has the same layout without the sidebar.
 
-> **Sigil-category Operations export is temporarily disabled.** Export (Markdown, PDF, Emerald) works for Journal and Wiki entries, for altars, and for Operations in any category *except* Sigils. Opening a Sigil (an Operations entry in the `sigils` category) leaves all three "Export as …" menu items greyed out — export for that category isn't wired up correctly yet, so the items are disabled rather than left to produce a broken result. This is a temporary state, not a permanent design decision; the menu items will re-enable for Sigils once that export path is implemented. Import (Markdown and Emerald) is unaffected and still supports Operations, including Sigils, as a destination.
+### Sigil Export
+
+Sigil operations export like any other operation, and their block shows what the sigil view shows: the drawing, the intention, the letter bank (implemented letters marked), the charging technique (a link to its wiki article, bundled like other links), the reveal date and the notes, plus a "Sigil loaded" badge.
+
+Drawing, intention and letter bank are shown or hidden exactly as in the app (hidden in all three places until the reveal date, or as set by hand; past the reveal date they show):
+
+- **Interactive HTML** — each hidden (or, on a loaded sigil, each) part has a **Show / Hide** toggle that starts as in the app, so the reader can look and put it away again. It only changes the view in that file, never the vault. Hidden text is left out of the file's search, and printing keeps hidden parts hidden. Note that this hides on screen only: the hidden parts are in the HTML source, so a reader who opens it there can see them. For a file that really doesn't contain them, use PDF or Markdown.
+- **PDF / Markdown** — a hidden part is left out and replaced by a note: "Hidden until 2027-03-01 – the sigil is loaded" while it is hidden automatically until a coming reveal date, otherwise "Hidden – the sigil is loaded" (or just "Hidden" for a sigil that isn't loaded). In Markdown the sigil is a section of the body, the drawing a placeholder as for images.
+- **Emerald** — the file carries the complete sigil, including its visibility and the charging technique (by title), and the import restores it. The drawing follows the image option (compressed, or left out with *Placeholder*).
 
 ### PDF Export
 
 Prompts a native save dialog for the destination and writes the PDF directly to disk — there is no preview window and no system print dialog. The PDF is rendered by the app's own webview (WebView2 on Windows, WKWebView on macOS, WebKitGTK on Linux), so emoji render as proper colored glyphs (Segoe UI Emoji / Apple Color Emoji / Noto Color Emoji) without any frontend rasterisation. The suggested filename is `<Title>_YYYY-MM-DD.pdf`; the user picks the actual location in the OS save dialog. Images in the entry are embedded as base64 before the PDF is generated; internal link chips are rendered as styled spans inside the content.
 
-The **Export → Export as PDF…** menu item is available while a Journal / Wiki / non-Sigil Operations entry is open, or while an Altar is open in **reading view** (not while editing it) — it is disabled on the home view, the tag manager, the trash, and (for now, see note above) while a Sigil-category Operations entry is open. For Journal/Wiki/Operations it exports the entry text as described above; for an open Altar it instead exports the rendered altar image as a single-page PDF (see Altar PDF Export below).
+The **Export → Export as PDF…** menu item is available while a Journal / Wiki / Operations entry is open, or while an Altar is open in **reading view** (not while editing it) — it is disabled on the home view, the tag manager and the trash. For Journal/Wiki/Operations it exports the entry text as described above; for an open Altar it instead exports the rendered altar image as a single-page PDF (see Altar PDF Export below).
 
 ### Altar PDF Export
 
@@ -297,7 +305,7 @@ Saves a `.md` file with a frontmatter block followed by the entry body. Frontmat
 
 The Emerald format (`.emerald` file extension) is a JSON file that captures the full entry — or, for altars, the full altar — including all metadata and embedded images. It is designed for lossless transfer between Emerald installations.
 
-The single **Export → Export as Emerald…** menu item is shared between Journal/Wiki/Operations entries and altars: it is enabled whenever a Journal / Wiki / non-Sigil Operations entry is open, or an Altar is open in reading view, and exports whichever is currently active. (Sigil-category Operations entries are temporarily excluded — see the note at the top of this section.)
+The single **Export → Export as Emerald…** menu item is shared between Journal/Wiki/Operations entries and altars: it is enabled whenever a Journal / Wiki / Operations entry is open, or an Altar is open in reading view, and exports whichever is currently active.
 
 The file structure:
 

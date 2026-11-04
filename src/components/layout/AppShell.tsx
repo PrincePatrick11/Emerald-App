@@ -107,18 +107,11 @@ export default function AppShell() {
   // between those entry types and an Altar's reading view (not while
   // editing it — matches where the Save Image UI used to live): for an open
   // Altar, PDF exports the rendered altar image instead of entry content.
-  // "Export as Image" is altar-only.
-  // Sigil operations are excluded — that category has its own dedicated
-  // view (OperationSigilView) and export isn't wired up for it yet, so its
-  // menu items stay disabled to avoid a broken action being visible.
+  // "Export as Image" is altar-only. Sigil operations export like any other
+  // operation (with their drawing, intention and letter bank).
   useEffect(() => {
-    const isSigilOperation =
-      activeView.type === 'operations' && !!activeView.id &&
-      useOperationStore.getState().operations.find((o) => o.id === activeView.id)?.category_id === 'sigils';
     const isEntryView =
-      (activeView.type === 'journal' ||
-       activeView.type === 'wiki' ||
-       (activeView.type === 'operations' && !isSigilOperation)) &&
+      (activeView.type === 'journal' || activeView.type === 'wiki' || activeView.type === 'operations') &&
       !!activeView.id;
     const altarReading = isAltarReadingView(activeView);
     invoke('set_export_menu_enabled', {
@@ -161,13 +154,7 @@ export default function AppShell() {
     };
 
     // "Export…" works anywhere: on the open entry, or as a bulk export.
-    const unlistenEntry = listen('export-entry', () => {
-      const target = activeExportTarget();
-      // Sigil export isn't implemented yet: start on the bulk export instead.
-      const isSigil = target?.type === 'operations'
-        && useOperationStore.getState().operations.find((o) => o.id === target.id)?.category_id === 'sigils';
-      useExportStore.getState().openExport(isSigil ? null : target);
-    });
+    const unlistenEntry = listen('export-entry', () => useExportStore.getState().openExport(activeExportTarget()));
 
     const unlistenPdf = listen('export-pdf', () => {
       if (isAltarReadingView(useUIStore.getState().activeView)) {

@@ -676,6 +676,13 @@
       "desc": "Neueste zuerst"
     },
     "linkedMedia_one": "Eigene Einstellungen für den verlinkten Eintrag",
-    "linkedMedia_other": "Eigene Einstellungen für verlinkte Einträge ({{count}})"
+    "linkedMedia_other": "Eigene Einstellungen für verlinkte Einträge ({{count}})",
+    "sigil": {
+      "drawing": "Sigill",
+      "hidden": "Verborgen – das Sigill ist geladen",
+      "hiddenUntil": "Verborgen bis {{date}} – das Sigill ist geladen",
+      "show": "Anzeigen",
+      "hide": "Verbergen"
+    }
   }
 }

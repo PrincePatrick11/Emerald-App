@@ -676,6 +676,13 @@
       "desc": "Más recientes primero"
     },
     "linkedMedia_one": "Ajustes propios para la entrada enlazada",
-    "linkedMedia_other": "Ajustes propios para las entradas enlazadas ({{count}})"
+    "linkedMedia_other": "Ajustes propios para las entradas enlazadas ({{count}})",
+    "sigil": {
+      "drawing": "Sigilo",
+      "hidden": "Oculto: el sigilo está cargado",
+      "hiddenUntil": "Oculto hasta el {{date}}: el sigilo está cargado",
+      "show": "Mostrar",
+      "hide": "Ocultar"
+    }
   }
 }

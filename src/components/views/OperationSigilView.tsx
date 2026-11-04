@@ -1,3 +1,4 @@
+import { isAutoHiddenSigil as isAutoHidden, todayIso } from '../../lib/sigil';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -292,13 +293,7 @@ export default function OperationSigilView({ operation }: { operation: Operation
     };
   }, []);
 
-  const isAutoHiddenSigil = useMemo(() => (
-    operation.is_loaded
-    && !!operation.target_reveal_date
-    && operation.show_sigil === false
-    && operation.show_intention_in_properties === false
-    && operation.show_letter_bank_in_properties === false
-  ), [
+  const isAutoHiddenSigil = useMemo(() => isAutoHidden(operation), [
     operation.is_loaded,
     operation.target_reveal_date,
     operation.show_sigil,
@@ -308,8 +303,7 @@ export default function OperationSigilView({ operation }: { operation: Operation
 
   useEffect(() => {
     if (!isAutoHiddenSigil || !operation.target_reveal_date) return;
-    const today = new Date().toISOString().slice(0, 10);
-    if (operation.target_reveal_date <= today) {
+    if (operation.target_reveal_date <= todayIso()) {
       updateOperation(operation.id, {
         show_sigil: true,
         show_intention_in_properties: true,

@@ -246,6 +246,11 @@ function expand(value, images) {
   if (typeof value !== 'string') return value;
   return value
     .replace(/@@chip\(([^,]+),([^,]+),([^)]*)\)@@/g, (_, id, type, label) => chipHtml(id.trim(), type.trim(), label.trim()))
+    .replace(/@@dataurl\(([^)]+)\)@@/g, (_, name) => {
+      const path = images[`img:${name.trim()}`];
+      if (!path) throw new Error(`fixture references unknown image "${name}"`);
+      return `data:image/png;base64,${readFileSync(path).toString('base64')}`;
+    })
     .replace(/@@(img|audio)\(([^)]+)\)@@/g, (_, kind, name) => {
       const path = images[`${kind}:${name.trim()}`];
       if (!path) throw new Error(`fixture references unknown ${kind} "${name}"`);
