@@ -498,6 +498,7 @@
       "horizontalRule": "Línea divisoria",
       "insertLink": "Insertar enlace",
       "insertImage": "Insertar imagen",
+      "insertTable": "Insertar tabla",
       "undo": "Deshacer",
       "redo": "Rehacer"
     },
@@ -506,6 +507,16 @@
       "webLink": "Enlazar a una dirección web",
       "width": "Ancho {{value}} %",
       "removeImage": "Quitar imagen"
+    },
+    "table": {
+      "addRowBefore": "Fila arriba",
+      "addRowAfter": "Fila abajo",
+      "addColumnBefore": "Columna a la izquierda",
+      "addColumnAfter": "Columna a la derecha",
+      "deleteRow": "Eliminar fila",
+      "deleteColumn": "Eliminar columna",
+      "toggleHeaderRow": "Fila de encabezado",
+      "deleteTable": "Eliminar tabla"
     },
     "unsaved": "Cambios sin guardar"
   },

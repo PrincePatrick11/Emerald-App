@@ -498,6 +498,7 @@
       "horizontalRule": "Trennlinie",
       "insertLink": "Link einfügen",
       "insertImage": "Bild einfügen",
+      "insertTable": "Tabelle einfügen",
       "undo": "Rückgängig",
       "redo": "Wiederholen"
     },
@@ -506,6 +507,16 @@
       "webLink": "Mit Webadresse verlinken",
       "width": "Breite {{value}} %",
       "removeImage": "Bild entfernen"
+    },
+    "table": {
+      "addRowBefore": "Zeile darüber",
+      "addRowAfter": "Zeile darunter",
+      "addColumnBefore": "Spalte links",
+      "addColumnAfter": "Spalte rechts",
+      "deleteRow": "Zeile löschen",
+      "deleteColumn": "Spalte löschen",
+      "toggleHeaderRow": "Kopfzeile",
+      "deleteTable": "Tabelle löschen"
     },
     "unsaved": "Ungespeicherte Änderungen"
   },

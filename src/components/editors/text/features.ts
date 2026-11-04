@@ -23,6 +23,8 @@ export interface TextFeatures {
   entryLinks: boolean;
   /** Images: paste, file drops, the toolbar's image button. */
   images: boolean;
+  /** Tables with a header row and adjustable column widths. */
+  tables: boolean;
   /** The `/` menu, offering what else is switched on. */
   commands: boolean;
 }
@@ -37,5 +39,6 @@ export const FULL_TEXT_FEATURES: TextFeatures = {
   links: true,
   entryLinks: true,
   images: true,
+  tables: true,
   commands: true,
 };

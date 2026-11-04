@@ -7,6 +7,7 @@ import Highlight from '@tiptap/extension-highlight';
 import TaskList from '@tiptap/extension-task-list';
 import TaskItem from '@tiptap/extension-task-item';
 import TextAlign from '@tiptap/extension-text-align';
+import { TableKit } from '@tiptap/extension-table';
 import { ResizableImage } from './ResizableImageExtension';
 import { useContext, useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import { saveImage } from '../../../lib/images';
@@ -184,6 +185,7 @@ export default function TextEditor({
           ]
         : []),
       ...(features.images ? [ResizableImage] : []),
+      ...(features.tables ? [TableKit.configure({ table: { resizable: true } })] : []),
       // The labels in the language of the moment, not of the editor's creation.
       ...(features.commands ? [createSlashCommands((key) => i18n.t(key))] : []),
     ],

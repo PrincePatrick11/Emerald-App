@@ -341,7 +341,7 @@ export async function exportAsPDF(data: ExportData): Promise<void> {
     <h1 class="entry-title">${escapedTitle}${numStr}</h1>
     ${metaHtml}
     <div class="entry-content">${DOMPurify.sanitize(transformedContent, {
-      ADD_ATTR: ['data-type', 'data-id', 'data-entry-type', 'data-label', 'data-icon', 'data-entry-number', 'data-href'],
+      ADD_ATTR: ['data-type', 'data-id', 'data-entry-type', 'data-label', 'data-icon', 'data-entry-number', 'data-href', 'colwidth'],
     })}</div>
   </div>
 </body>
@@ -372,9 +372,8 @@ function mdIcon(icon?: string | null, fallbackIcon?: string | null): string {
   return icon + ' ';
 }
 
-export async function exportAsMarkdown(data: ExportData): Promise<void> {
-  const stripped = stripImages(data.content);
-
+/** HTML of the content to Markdown, with the rules for what the app's content holds beyond plain HTML. */
+export function createMarkdownConverter(): TurndownService {
   const td = new TurndownService({ headingStyle: 'atx', codeBlockStyle: 'fenced' });
 
   td.addRule('internalLink', {
@@ -404,11 +403,32 @@ export async function exportAsMarkdown(data: ExportData): Promise<void> {
       return value.includes('\n') ? `\n\n${value}\n\n` : `${value}\n\n`;
     },
   });
+  // Tables as GFM pipe tables; the first row is the header, as GFM requires
+  // one. A cell's paragraphs are joined by `<br>`, pipes escaped.
+  td.addRule('table', {
+    filter: 'table',
+    replacement: (_content, node) => {
+      const rows = Array.from((node as HTMLTableElement).rows).map((row) =>
+        Array.from(row.cells).map((cell) =>
+          td.turndown(cell.innerHTML).trim().replace(/\n+/g, '<br>').replace(/\|/g, '\\|')));
+      if (rows.length === 0) return '';
+      const width = Math.max(...rows.map((r) => r.length));
+      const line = (cells: string[]) =>
+        `| ${Array.from({ length: width }, (_, i) => cells[i] ?? '').join(' | ')} |`;
+      return `\n\n${[line(rows[0]), line(Array(width).fill('---')), ...rows.slice(1).map(line)].join('\n')}\n\n`;
+    },
+  });
   // Struck-through letters of the sigil calculator.
   td.addRule('strikethrough', {
     filter: ['s', 'del'],
     replacement: (content) => `~~${content}~~`,
   });
+  return td;
+}
+
+export async function exportAsMarkdown(data: ExportData): Promise<void> {
+  const stripped = stripImages(data.content);
+  const td = createMarkdownConverter();
 
   // Build frontmatter / header block
   const lines: string[] = [`# ${data.title}`, ''];

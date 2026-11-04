@@ -23,6 +23,7 @@ import {
   AlignLeft,
   AlignCenter,
   AlignRight,
+  Table,
 } from 'lucide-react';
 import type { Alignment } from './ResizableImageExtension';
 import { editorHas } from './hostContext';
@@ -33,6 +34,9 @@ import { editorHas } from './hostContext';
  * would have no effect, in a code block for instance.
  */
 export const TEXT_ALIGN_TYPES = ['heading', 'paragraph'] as const;
+
+/** What "Insert table" creates, from the toolbar and from the `/` menu. */
+export const NEW_TABLE = { rows: 3, cols: 3, withHeaderRow: true } as const;
 
 /** Everything except left: only these values appear as an attribute in the document. */
 const EXPLICIT_ALIGNMENTS = ['center', 'right', 'justify'] as const;
@@ -264,7 +268,7 @@ export default function EditorToolbar({ editor, onInsertImage, onOpenLinkPicker 
       </ToolbarGroup>
       </>)}
 
-      {(has('internalLink') || has('image')) && (<>
+      {(has('internalLink') || has('image') || has('table')) && (<>
       <ToolbarDivider />
 
       <ToolbarGroup>
@@ -277,6 +281,16 @@ export default function EditorToolbar({ editor, onInsertImage, onOpenLinkPicker 
         {has('image') && (
           <ToolbarBtn onClick={() => fileInputRef.current?.click()} active={false} title={t('editor.toolbar.insertImage')}>
             <ImagePlus size={14} />
+          </ToolbarBtn>
+        )}
+        {has('table') && (
+          <ToolbarBtn
+            onClick={() => editor.chain().focus().insertTable(NEW_TABLE).run()}
+            active={editor.isActive('table')}
+            disabled={!editor.can().insertTable(NEW_TABLE)}
+            title={t('editor.toolbar.insertTable')}
+          >
+            <Table size={14} />
           </ToolbarBtn>
         )}
       </ToolbarGroup>

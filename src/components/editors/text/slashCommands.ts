@@ -2,12 +2,13 @@ import { Extension, type Editor, type Range } from '@tiptap/core';
 import Suggestion from '@tiptap/suggestion';
 import { PluginKey } from '@tiptap/pm/state';
 import {
-  CheckSquare, Heading1, Heading2, Heading3, ImagePlus, Link, List, ListOrdered, Minus, Pilcrow, Quote,
+  CheckSquare, Heading1, Heading2, Heading3, ImagePlus, Link, List, ListOrdered, Minus, Pilcrow, Quote, Table,
   type LucideIcon,
 } from 'lucide-react';
 import { ACCEPTED_IMAGE_MIME, isAcceptedImageFile, readFileAsDataUrl } from '../../../lib/helpers';
 import { insertImageFromDataUrl } from './editorCommands';
 import { editorHas } from './hostContext';
+import { NEW_TABLE } from './EditorToolbar';
 import CommandList from './CommandList';
 import { suggestionPopup } from './suggestionPopup';
 
@@ -84,6 +85,11 @@ export const SLASH_COMMANDS: SlashCommand[] = [
       ed.chain().focus().deleteRange(range).run();
       pickImages(ed);
     },
+  },
+  {
+    id: 'table', labelKey: 'editor.toolbar.insertTable', icon: Table, keywords: ['table', 'grid'],
+    available: (ed) => editorHas(ed, 'table'),
+    run: (ed, range) => ed.chain().focus().deleteRange(range).insertTable(NEW_TABLE).run(),
   },
   {
     // Typing `[[` opens the link suggestion in place.

@@ -498,6 +498,7 @@
       "horizontalRule": "Horizontal rule",
       "insertLink": "Insert link",
       "insertImage": "Insert image",
+      "insertTable": "Insert table",
       "undo": "Undo",
       "redo": "Redo"
     },
@@ -506,6 +507,16 @@
       "webLink": "Link to a web address",
       "width": "Width {{value}} %",
       "removeImage": "Remove image"
+    },
+    "table": {
+      "addRowBefore": "Add row above",
+      "addRowAfter": "Add row below",
+      "addColumnBefore": "Add column left",
+      "addColumnAfter": "Add column right",
+      "deleteRow": "Delete row",
+      "deleteColumn": "Delete column",
+      "toggleHeaderRow": "Header row",
+      "deleteTable": "Delete table"
     },
     "unsaved": "Unsaved changes"
   },

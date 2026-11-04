@@ -3,9 +3,12 @@ import type { Editor } from '@tiptap/react';
 import { useEditorState } from '@tiptap/react';
 import { BubbleMenu } from '@tiptap/react/menus';
 import { NodeSelection } from '@tiptap/pm/state';
+import { CellSelection } from '@tiptap/pm/tables';
 import { useTranslation } from 'react-i18next';
 import {
-  AlignCenter, AlignLeft, AlignRight, Bold, Check, Code, Globe, Highlighter, Italic, Strikethrough, Trash2, Unlink, X,
+  AlignCenter, AlignLeft, AlignRight, BetweenHorizontalEnd, BetweenHorizontalStart, BetweenVerticalEnd,
+  BetweenVerticalStart, Bold, Check, Code, Globe, Grid2x2X, Highlighter, Italic, PanelTop, Strikethrough,
+  TableColumnsSplit, TableRowsSplit, Trash2, Unlink, X,
 } from 'lucide-react';
 import { ToolbarBtn, ToolbarDivider, ToolbarGroup } from './EditorToolbar';
 import { editorHas } from './hostContext';
@@ -17,15 +20,71 @@ const IMAGE_WIDTHS = [25, 50, 100] as const;
 /**
  * The small menus at a selection, beside the toolbar: one over selected text
  * (marks and a web link), one over a selected image (alignment, width,
- * removing). Each shows only what the editor's schema has, like the toolbar,
- * and only while editing.
+ * removing), one over a table the cursor is in (rows, columns, header).
+ * Each shows only what the editor's schema has, like the toolbar, and only
+ * while editing.
  */
 export default function SelectionMenus({ editor }: { editor: Editor }) {
   return (
     <>
       <TextMenu editor={editor} />
       {editorHas(editor, 'image') && <ImageMenu editor={editor} />}
+      {editorHas(editor, 'table') && <TableMenu editor={editor} />}
     </>
+  );
+}
+
+/** The table element around the selection, for anchoring its menu. */
+function selectedTable(editor: Editor): HTMLElement | null {
+  const { $from } = editor.state.selection;
+  for (let depth = $from.depth; depth > 0; depth--) {
+    if ($from.node(depth).type.name !== 'table') continue;
+    const dom = editor.view.nodeDOM($from.before(depth));
+    if (!(dom instanceof HTMLElement)) return null;
+    return dom.querySelector('table') ?? dom;
+  }
+  return null;
+}
+
+function TableMenu({ editor }: { editor: Editor }) {
+  const { t } = useTranslation();
+  const run = (command: (chain: ReturnType<Editor['chain']>) => ReturnType<Editor['chain']>) =>
+    command(editor.chain().focus()).run();
+  const actions = [
+    { key: 'addRowBefore', icon: BetweenHorizontalStart, run: () => run((c) => c.addRowBefore()) },
+    { key: 'addRowAfter', icon: BetweenHorizontalEnd, run: () => run((c) => c.addRowAfter()) },
+    { key: 'deleteRow', icon: TableRowsSplit, run: () => run((c) => c.deleteRow()) },
+    null,
+    { key: 'addColumnBefore', icon: BetweenVerticalStart, run: () => run((c) => c.addColumnBefore()) },
+    { key: 'addColumnAfter', icon: BetweenVerticalEnd, run: () => run((c) => c.addColumnAfter()) },
+    { key: 'deleteColumn', icon: TableColumnsSplit, run: () => run((c) => c.deleteColumn()) },
+    null,
+    { key: 'toggleHeaderRow', icon: PanelTop, run: () => run((c) => c.toggleHeaderRow()) },
+    { key: 'deleteTable', icon: Grid2x2X, run: () => run((c) => c.deleteTable()) },
+  ];
+  return (
+    <BubbleMenu
+      editor={editor}
+      pluginKey="tableMenu"
+      // A selected text in a cell gets its own menu above the text.
+      shouldShow={({ editor: ed, state: s }) =>
+        ed.isEditable && ed.isActive('table') && (s.selection.empty || s.selection instanceof CellSelection)}
+      getReferencedVirtualElement={() => {
+        const table = selectedTable(editor);
+        return table ? { getBoundingClientRect: () => table.getBoundingClientRect() } : null;
+      }}
+      options={{ placement: 'top-start', offset: 6 }}
+      className="editor-selection-menu"
+      onMouseDown={(e) => e.preventDefault()}
+    >
+      {actions.map((action, i) => action
+        ? (
+          <ToolbarBtn key={action.key} onClick={action.run} active={false} title={t(`editor.table.${action.key}`)}>
+            <action.icon size={14} />
+          </ToolbarBtn>
+        )
+        : <ToolbarDivider key={`divider-${i}`} />)}
+    </BubbleMenu>
   );
 }
 
@@ -59,7 +118,8 @@ function TextMenu({ editor }: { editor: Editor }) {
       editor={editor}
       pluginKey="textSelectionMenu"
       shouldShow={({ editor: ed, state: s }) =>
-        ed.isEditable && !s.selection.empty && !(s.selection instanceof NodeSelection) && !ed.isActive('codeBlock')}
+        ed.isEditable && !s.selection.empty && !(s.selection instanceof NodeSelection)
+        && !(s.selection instanceof CellSelection) && !ed.isActive('codeBlock')}
       options={{ placement: 'top', offset: 8 }}
       className="editor-selection-menu"
       onMouseDown={(e) => { if (href === null) e.preventDefault(); }}
