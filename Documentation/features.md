@@ -244,9 +244,13 @@ The modal offers four formats — **PDF**, **Interactive HTML**, **Markdown** an
 - **Markdown** — entries are written one after another, separated by horizontal rules; links stay `[[Title]]` wiki links.
 - **Emerald** — always a single entry (the format holds exactly one), so bundling isn't offered.
 
-**Images** (PDF, HTML, Emerald — Markdown drops images): *Original* embeds them unchanged, *Compressed* (default) scales them to max. 1600 px on the long side at quality 0.8, *Strongly compressed* to max. 1000 px at quality 0.6. Images are re-encoded as WebP; where the webview has no WebP encoder (macOS, some Linux WebKitGTK builds), opaque images become JPEG and transparent ones a downscaled PNG. An image is only replaced if the result is smaller; SVG and GIF are left as they are. The originals in the vault are never changed — but an Emerald file exported with compression re-imports with the compressed images.
+**Images** (PDF, HTML, Emerald — Markdown shows a note instead, see [Attachments in Exports](#attachments-in-exports)): *Original* embeds them unchanged, *Compressed* (default) scales them to max. 1600 px on the long side at quality 0.8, *Strongly compressed* to max. 1000 px at quality 0.6. Images are re-encoded as WebP; where the webview has no WebP encoder (macOS, some Linux WebKitGTK builds), opaque images become JPEG and transparent ones a downscaled PNG. An image is only replaced if the result is smaller; SVG and GIF are left as they are. The originals in the vault are never changed — but an Emerald file exported with compression re-imports with the compressed images.
 
 The chosen format, compression and bundling options are remembered for the next export.
+
+Dates — in the modal's entry lists and in the exported PDF and HTML (entry date, an operation's end date, date custom properties, the HTML footer, a bulk export's title) — are written in the app language; an operation's status chip (Active / Inactive) is translated too. The Markdown header is the exception: it stays English with fixed date formats, because the [Markdown import](#import-from-markdown) reads it back.
+
+Exports read the entries as last auto-saved: an edit made within the auto-save delay (about 1.5 s) before exporting may not be in the file yet.
 
 ### Attachments in Exports
 
@@ -254,7 +258,7 @@ The export modal's **Attachments** section decides what happens to files embedde
 
 - **Images:** *Original*, *Compressed*, *Strongly compressed* (see above) or *Placeholder* — the image is left out and replaced by a note that says so: "🖼 Image – not exported" (or the image's alt text instead of "Image").
 - **Sound files:** *Embed* or *Placeholder* — "🔊 <file name> – not exported". A PDF can't play anything, so there *Placeholder* is preselected and *Embed* is unavailable.
-- **Markdown** carries no files at all: images and sound files always appear as notes (images used to be dropped silently).
+- **Markdown** carries no files at all: images and sound files always appear as notes.
 
 An Emerald file exported with placeholders keeps the notes as text and does not contain the files.
 
@@ -267,7 +271,9 @@ When linked entries are exported too, **Own settings for the linked entries** gi
 - **Modules:** Journal, Operations and/or Wiki.
 - **Period:** last 7 days, last 30 days, this month, all, or a custom from–to range (whole days, by creation date).
 
-The matching entries are listed (oldest first, with date and module) and can be unchecked one by one. **Also export linked entries** adds what those entries link to — e.g. the wiki articles and operations referenced from the journal entries of a week, when only Journal was picked — directly linked or including indirect, each uncheckable; entries already in the selection are not listed again. Everything selected goes into **one** PDF, interactive HTML or Markdown file — the entries of the period, followed by the linked entries, each by date in the chosen **order** (*oldest first* or *newest first*; a single entry exported with its linked entries stays first); the attachment options apply as for a single entry. Emerald is not available here, since an Emerald file holds exactly one entry. The file and document are named after the selection, e.g. `Emerald_Journal-Operations_2026-09-01_2026-09-10.html` / "Emerald – Journal, Operations – 01.09.2026–10.09.2026". Trashed entries are never included.
+The matching entries are listed (oldest first, with date and module) and can be unchecked one by one. **Also export linked entries** adds what those entries link to — e.g. the wiki articles and operations referenced from the journal entries of a week, when only Journal was picked — directly linked or including indirect, each uncheckable; entries already in the selection are not listed again. Everything selected goes into **one** PDF, interactive HTML or Markdown file — the entries of the period, followed by the linked entries, each by date in the chosen **order** (*oldest first* or *newest first*; a single entry exported with its linked entries stays first); the attachment options apply as for a single entry. Emerald is not available here, since an Emerald file holds exactly one entry. The file and document are named after the selection, e.g. `Emerald_Journal-Operations_2026-09-01_2026-09-10.html` / "Emerald – Journal, Operations – Sep 1, 2026–Sep 10, 2026" (the dates in the title follow the app language; the file name keeps the sortable ISO form). Trashed entries are never included.
+
+Entries are rendered one after another, and at most four files (`MEDIA_CONCURRENCY`) are read from disk and compressed at once, so a bulk export of hundreds of entries with images stays within bounded memory; it takes correspondingly longer.
 
 ### Interactive HTML Export
 
@@ -301,7 +307,7 @@ A nested **Export as Image** submenu (Export → Export as Image → JPEG… / P
 
 ### Markdown Export
 
-Saves a `.md` file with a frontmatter block followed by the entry body. Frontmatter includes date, moon phase, paradigm, banishing, meditation, linked operations, linked wiki articles, category, status, end date, version, tags, and custom properties. Images are stripped (not included). Internal link chips become `[[Title]]` wiki-link syntax. Linked operations and wiki articles include their UUID: `Operations: Title [uuid]`.
+Saves a `.md` file with a frontmatter block followed by the entry body. Frontmatter includes date, moon phase, paradigm, banishing, meditation, linked operations, linked wiki articles, category, status, end date, version, tags, and custom properties. Images and sound files appear as notes (see [Attachments in Exports](#attachments-in-exports)). The header stays in English with fixed date formats whatever the app language, so the [Markdown import](#import-from-markdown) can read it. Internal link chips become `[[Title]]` wiki-link syntax. Linked operations and wiki articles include their UUID: `Operations: Title [uuid]`.
 
 ### Emerald Format
 
@@ -346,14 +352,14 @@ Note: this path is parser-based (Markdown -> HTML) and is not identical to Emera
 
 The full vault can be backed up and restored as a single self-contained JSON file (`.emeralddb`), separate from per-entry Emerald-format exports. The Backup section in **Settings** exposes two flows:
 
-- **Export.** A "What to include" checkbox list lets you pick which modules go into the backup: Journal, Wiki, Operations, Routines, Altars, Tasks, and Tags. Optional `dateFrom` / `dateTo` fields restrict the export to entries created in that window (Altars, Routines, and Tasks are date-filtered; soft-deleted tasks and task categories are excluded). Embedded image files referenced from any exported entry are inlined as data-URLs.
+- **Export.** A "What to include" checkbox list lets you pick which modules go into the backup: Journal, Wiki, Operations, Routines, Altars, Tasks, and Tags. Optional `dateFrom` / `dateTo` fields restrict the export to entries created in that window (Altars, Routines, and Tasks are date-filtered; soft-deleted tasks and task categories are excluded). Embedded image and sound files referenced from any exported entry are inlined as data-URLs.
 - **Import.** Before importing, the modal shows a preview line summarising the counts per type (e.g. `12 J, 5 W, 3 O, 2 R, 1 A, 4 T`). The same checkbox list is then used to choose which types to actually apply; categories can also be filtered. Three import modes are available: **Replace** (overwrite selected tables in the current vault), **Merge** (imported entries are prefixed with a timestamp so existing IDs never collide), and **Add Vault** (import into a brand new vault and switch to it).
 
 For the on-disk JSON structure and per-mode semantics, see [DB Backup / Restore (`.emeralddb`) in `database.md`](database.md#db-backup--restore-emeralddb).
 
 ## Sound Files in Entries
 
-Journal entries, wiki articles and operations can embed sound files. In edit mode the editor toolbar has a **Insert sound file** button (music note) next to the image button; dropping a sound file from Finder / Explorer onto the editor inserts it as well. Accepted formats: MP3, M4A, AAC, WAV, OGG, Opus, FLAC and WebM audio.
+Journal entries, wiki articles and operations can embed sound files. In edit mode the editor toolbar has a **Insert sound file** button (music note) next to the image button; dropping a sound file from Finder / Explorer onto the editor inserts it as well. Accepted formats: MP3, M4A, AAC, WAV, OGG, Opus, FLAC and WebM audio. Which of them actually play depends on the system's media support: WKWebView on older macOS versions plays no Ogg / Opus, and on Linux it depends on the installed GStreamer plugins (AAC / M4A need `gst-libav`; the AppImage brings no media framework of its own). A file that can't be played is still stored, exported and backed up; its player shows "format not playable on this system" (as opposed to "could not be loaded" for a missing file).
 
 A sound file appears as a small player in the entry: play / pause, a progress bar that can be dragged to seek, the elapsed and total time, and the file name. Like an image it starts at a fixed width (360 px) instead of filling the editor, and in edit mode it can be resized with the handle in its corner; the width is saved with the entry and carried into the HTML export. Like images, the file is copied into the app's own storage (`audio/` in the app-data folder, named by its content hash, so the same file is stored once); the entry only references it.
 

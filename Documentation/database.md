@@ -14,7 +14,7 @@ Emerald uses a single SQLite file, `emerald.db`, located in the OS application d
 4. After each successful migration, writes a row into `schema_version` with the version, name, and ISO timestamp.
 5. Calls the separate `runPeriodicCleanup(db)` function, which auto-purges trashed rows older than 30 days across all soft-delete-aware tables. This is **not** a migration — it is idempotent and time-dependent, so it runs on every vault open.
 
-The current schema version is **31**. New schema changes must be added as a new entry in the `MIGRATIONS` array with a strictly higher version number and a unique `name`.
+The current schema version is **32**. New schema changes must be added as a new entry in the `MIGRATIONS` array with a strictly higher version number and a unique `name`.
 
 **Upgrades from older versions.** Vaults that predate the `schema_version` table will see all migrations run on first open. `ALTER TABLE … ADD COLUMN` against an already-present column raises a "duplicate column" error; this is detected by `isAlreadyAppliedError` (matches `duplicate column name`, `already exists`, or a pre-existing table) and the migration is marked applied anyway. The data migrations themselves are idempotent and re-run safely: `entry_number` is only backfilled where `NULL`, the UUID → fixed-string category ID rewrite is a no-op once the fixed IDs exist, and the `custom_properties.type = 'checkbox' → 'toggle'` rename is a single `UPDATE` that is a no-op once the migration has run.
 
@@ -356,7 +356,7 @@ Indexes: `idx_task_links_task` on `task_id`, `idx_task_links_target` on `target_
 
 ## Image Storage
 
-Handled natively in `src-tauri/src/lib.rs`. Images are SHA-256-deduplicated — identical images are stored only once regardless of how many entries reference them. The UI may hold a data-URL for display, but persistence always uses file paths.
+Handled natively in `src-tauri/src/lib.rs`. Images are SHA-256-deduplicated — identical images are stored only once regardless of how many entries reference them. The UI may hold a data-URL for display, but persistence always uses file paths. Sound files embedded in entries are stored the same way in `{appDataDir}/audio/` by `save_audio` / `copy_audio_file` and read with `read_audio_as_base64`; entry HTML references them as `<audio src="/abs/path">`, see [IPC Command Surface](architecture.md#ipc-command-surface).
 
 | Command | Behaviour |
 |---|---|
@@ -418,7 +418,7 @@ Full vault snapshots are exported and imported via Settings → Backup.
 | `merge` | Generates an 8-char base36 timestamp prefix (`Date.now().toString(36).slice(-8)`). All entry IDs are prefixed; all cross-references and wiki slugs are remapped. Categories and tags use `INSERT OR IGNORE` by original ID/name. |
 | `add-vault` | Creates a new vault DB → `switchVault()` → runs replace logic on the empty DB. User ends up in the new vault. |
 
-Images are restored via `save_image` (SHA-256 dedup — identical images are written to disk only once). The path-remap covers all image-bearing columns: journal `content`; wiki `content` / `icon` / `cover_image`; operation `content` / `icon` / `cover_image` / `drawing_data` / `thumbnail_data`; altar `background_image_data` / `thumbnail_data` / `icon_data`; altar library item `image_data`. Absolute paths from the backup are rewritten to point at the local image directory.
+The `images` map holds sound files too (keyed by path like images; `data:audio/…` values). Paths are collected from the `<img>` / `<audio>` elements of the entry HTML, so the keys are unescaped attribute values. Media are restored via `save_image` or, for `data:audio/` values, `save_audio` (SHA-256 dedup — identical files are written to disk only once); the path remap also replaces the HTML-escaped form of a path that contains `&`. The path-remap covers all image-bearing columns: journal `content`; wiki `content` / `icon` / `cover_image`; operation `content` / `icon` / `cover_image` / `drawing_data` / `thumbnail_data`; altar `background_image_data` / `thumbnail_data` / `icon_data`; altar library item `image_data`. Absolute paths from the backup are rewritten to point at the local image directory.
 
 ## Rules for Future Schema Changes
 

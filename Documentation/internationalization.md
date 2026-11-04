@@ -84,7 +84,7 @@ The translation files follow this top-level structure (from `en.json`):
 | `journal` | Journal UI strings |
 | `creation` | Sigil editor strings (shown for sigil operations) |
 | `wiki` | Wiki UI strings, including `categories.*` for all built-in wiki category IDs |
-| `editor` | Shared editor button labels (Save, Done, Cancel, Edit, Delete) |
+| `editor` | Shared editor button labels (Save, Done, Cancel, Edit, Delete), and `editor.audio.*` for the sound-file player (`play`, `pause`, `position`, `loadFailed`, `notPlayableHere`, `saveFailed`) |
 | `moonPhase` | Display names for all eight moon phase keys |
 | `search` | Search bar placeholders and no-results messages |
 | `routines` | Routines panel strings |
@@ -98,6 +98,7 @@ The translation files follow this top-level structure (from `en.json`):
 | `trash` | Trash view strings |
 | `linkPicker` | Internal link picker modal (title, search placeholder, tab labels, no-results message) |
 | `importDestination` | Markdown-import destination-picker modal (`title`, `description` — interpolates `{{title}}`, `cancel`); reuses `linkPicker.tabJournal` / `tabWiki` / `tabOperations` for the option labels rather than duplicating them |
+| `exportModal` | Export modal and exported documents: format, attachment, order and bulk-export labels (`bulk.*`, incl. `fileTitle` for a bulk export's document title), the interactive HTML file's own UI strings (`html.*`), sigil hiding notes (`sigil.*`, `sigilHidden.*`), metadata chips (`meta.ends`), success / error messages. Strings that end up in an exported file are resolved with `i18n.t` in `src/lib/export.ts` / `htmlExport.ts` at export time, so the file is in the app language; dates there are formatted with `Intl.DateTimeFormat` for `i18n.language` (`exportDate()`), except the Markdown header, which stays English for the Markdown import |
 | `menu` | Native menu item labels (Edit, View, Export, Import submenus and their items), including the nested `exportAltarImage` submenu (`exportAltarJpeg`, `exportAltarPng`, `exportAltarWebp`) |
 
 ## Interpolation

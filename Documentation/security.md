@@ -33,9 +33,9 @@ PDF export runs in a hidden window built and torn down by the per-platform `expo
 
 Several Rust commands enforce path restrictions:
 
-**`read_image_as_base64`** resolves the requested path and the images directory to their canonical forms using `std::fs::canonicalize`, then checks that the canonical path starts with the canonical images directory. Any path that escapes the images directory (including symlink traversal) returns an `"access denied: path outside media directory"` error. `read_audio_as_base64` does the same against the audio directory; both share one helper (`read_confined_data_url`).
+**`read_image_as_base64` and `read_audio_as_base64`** resolve the requested path and their media directory (`images/` or `audio/` in app data) to their canonical forms using `std::fs::canonicalize`, then check that the canonical path starts with the canonical directory. Any path that escapes it (including symlink traversal) returns an `"access denied: path outside media directory"` error. Both go through one helper in `src-tauri/src/lib.rs`, `read_confined_data_url`.
 
-**`read_audio_as_base64`** does the same for the `audio/` directory, and **`copy_audio_file`** applies `copy_image_file`'s rules (extension allowlist, no symlinks, allowed roots only) to sound files.
+**`copy_audio_file`** applies `copy_image_file`'s rules (below: extension allowlist, no symlinks, allowed roots only) to sound files; both read the picked file through the shared `read_confined_source` helper. `save_image`, `save_audio` and both copy commands write through `store_deduped` (SHA-256 file name, written only if missing), so image and sound files follow exactly the same rules.
 
 **`write_file` and `read_file`** enforce two layers of confinement:
 
@@ -93,7 +93,7 @@ All user-provided text that is interpolated into the PDF and interactive HTML ex
 
 Numeric metadata is rendered through `Number()` instead: the meditation duration is only shown when it is a finite number, and `.emerald` import only accepts a finite number for it, so a crafted file can't smuggle markup in through that field.
 
-The content HTML itself (the TipTap editor output) is not re-escaped — it is trusted HTML already produced by the editor and sanitised on import. Image `src` attributes that are file paths are resolved to base64 data-URLs via `embedImages()` before the HTML is handed to the export backend.
+The content HTML itself (the TipTap editor output) is not re-escaped — it is trusted HTML already produced by the editor and sanitised on import. Image and sound-file `src` attributes that are file paths are resolved to base64 data-URLs via `embedMedia()` before the HTML is handed to the export backend.
 
 ## HTML Sanitisation
 
@@ -109,7 +109,7 @@ All HTML that enters the app from outside is sanitised with DOMPurify before bei
 
 ## Content Security Policy
 
-The main window has CSP enabled through Tauri's default configuration. The export HTML for PDF export is written to a unique file in the OS temp directory and loaded by a hidden webview over a `file://` URL — it never fetches external resources and is removed from disk as soon as the export finishes. Because the hidden webview inherits the same CSP as the main window (`script-src 'self'` — see `tauri.conf.json`), inline scripts in the export HTML are blocked; the frontend therefore pre-renders the internal-link chip transformation in TypeScript (`transformInternalLinks` in `src/lib/export.ts`) before handing the HTML to the backend.
+The main window's CSP is set in `tauri.conf.json` (`app.security.csp`, with `script-src 'self'`). The export HTML for PDF export is written to a unique file in the OS temp directory and loaded by a hidden webview as an external `file://` URL (`WebviewUrl::External` in `src-tauri/src/pdf_export/{macos,windows,linux}.rs`) — it never fetches external resources and is removed from disk as soon as the export finishes. The app's CSP does **not** apply to that document: Tauri adds it only to the content it serves itself, and the export HTML carries no CSP of its own. What keeps the PDF document inert is its content instead: it contains no script (the internal-link chips are pre-rendered in TypeScript by `transformInternalLinks` in `src/lib/export.ts`), all media are inlined as data URLs, and the entry content is DOMPurify-sanitised as described above.
 
 The main window's CSP allows `media-src 'self' data: blob:` so the editor can play embedded sound files: they are read as data URLs and played from a blob URL. The interactive HTML export's own CSP allows `media-src data:` for the same reason.
 

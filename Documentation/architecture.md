@@ -28,7 +28,7 @@ src/
 ├── components/
 │   ├── layout/       AppShell, LeftSidebar, RightSidebar, MainArea, SettingsModal, TabBar
 │   ├── editor/       RichEditor, InternalLinkExtension, EntryCustomProperties,
-│   │                 TagInput, ResizableImageExtension, ExternalDropExtension,
+│   │                 TagInput, ResizableImageExtension, AudioExtension, ExternalDropExtension,
 │   │                 EditorToolbar, LinkPickerModal, SuggestionList
 │   ├── views/        HomeView, JournalView, WikiView, TagsView, AltarView,
 │   │                 OperationsView, OperationSigilView, TrashView, TasksView
@@ -40,15 +40,17 @@ src/
 │   └── ui/           ListToolbar, FilterPanel, UndoToast, ContextMenu, ImportDestinationModal,
 │                     Modal (shared modal wrapper), EmojiPicker (shared emoji-picker popover),
 │                     Button (shared primary/secondary/ghost/danger button),
-│                     Dashboard (shared module-overview chrome: topbar/toolbar/filter/grouping)
+│                     Dashboard (shared module-overview chrome: topbar/toolbar/filter/grouping),
+│                     ExportModal (export dialog: single entry / bulk, format, attachments)
 ├── store/            journalStore, wikiStore, uiStore, tagStore, operationStore, taskStore,
 │                     altarStore, routineStore, customPropertyStore, undoStore,
-│                     trashStore, vaultStore, importStore
+│                     trashStore, vaultStore, importStore, exportStore
 ├── hooks/            useCategoryEditor (shared add/edit/delete-with-confirm category logic,
 │                                      used by TasksView, WikiView, OperationsView)
 ├── lib/              db.ts, links.ts, tabs.ts, dragState.ts, altarDragState.ts,
 │                     routineDragState.ts, moonPhase.ts, export.ts,
-│                     exportData.ts, emeraldFormat.ts, vaultManager.ts, dbBackup.ts,
+│                     exportData.ts, htmlExport.ts, imageCompression.ts, media.ts,
+│                     emeraldFormat.ts, vaultManager.ts, dbBackup.ts,
 │                     helpers.ts (incl. isImageIcon, safeParseArray, generateId,
 │                                      hexToRgb, isValidHexColor, readFileAsDataUrl,
 │                                      ACCEPTED_IMAGE_MIME, isAcceptedImageFile),
@@ -179,8 +181,9 @@ Images are content-addressed and stored outside SQLite:
 
 - **Location**: `{appDataDir}/images/{sha256}.{ext}` — for macOS this is typically `~/Library/Application Support/com.emerald.magical-journal/images/`.
 - **Insert path**: when an image is added (toolbar button, paste, Finder drop), the Rust `save_image` command decodes the base64 data-URL, computes SHA-256, and writes the file only if it does not already exist. The absolute file path is stored in the HTML `src` attribute.
-- **Display path**: `ResizableImageExtension.tsx` detects that a `src` value is a file path (not `data:` or `http`), calls `read_image_as_base64` via IPC, and caches the returned data-URL in a module-level `Map`.
+- **Display path**: `ResizableImageExtension.tsx` detects that a `src` value is a file path (`isLocalMediaPath()` in `src/lib/media.ts`: not `data:`, `http` or `blob:`), calls `read_image_as_base64` via IPC, and caches the returned data-URL in a module-level `Map`.
 - **Deduplication**: because the filename is the SHA-256 of the raw bytes, uploading the same image twice produces one file.
+- **Sound files**: stored the same way in `{appDataDir}/audio/{sha256}.{ext}` via `save_audio` / `copy_audio_file`, and read back with `read_audio_as_base64`; `AudioExtension.tsx` plays them from a cached blob URL. In `lib.rs` both media kinds share the helpers `media_dir`, `store_deduped`, `decode_data_url`, `read_confined_source` and `read_confined_data_url`; on the frontend, `readMediaAsBase64` / `saveMediaDataUrl` (`src/lib/media.ts`) pick the image or audio command by extension or MIME type. Which accepted sound formats play depends on the webview (WKWebView on older macOS has no Ogg / Opus, WebKitGTK depends on the installed GStreamer plugins); `canPlayAudioPath()` asks the webview (`canPlayType`) so a player can say "format not playable on this system" instead of only "could not be loaded".
 - **Cleanup**: none. There is no automatic deletion of files in the images directory — a prior "delete unreferenced images on startup" routine (`cleanup_unused_images`) was removed because the images directory is shared across all vaults while the used-paths set was built from only the currently active vault's loaded content, causing images belonging to other vaults to be deleted as false "unused" positives.
 
 ## Theming System
@@ -389,7 +392,7 @@ The same command backs two distinct export flows, distinguished by what's curren
 
 ```
 frontend export.ts:exportAsPDF
-    ↓  build full HTML (DOMPurify, transformInternalLinks, embedImages)
+    ↓  build full HTML (DOMPurify, transformInternalLinks, embedMedia)
 frontend save() dialog → user picks destination path
     ↓  invoke('export_pdf', { html, path })   // no page_size → default Letter/Portrait
 src-tauri/src/lib.rs:export_pdf
@@ -434,10 +437,10 @@ All three platforms share the same shape — hidden webview, oneshot-coordinated
 
 ### Frontend responsibilities
 
-Because the hidden webview inherits the app CSP (`script-src 'self'`, see `tauri.conf.json`), the frontend does everything that the old print-window approach did with inline JavaScript before it hands the HTML to Rust:
+The export document contains no script: the frontend finishes it before it hands the HTML to Rust. The hidden webview loads it as an external `file://` URL, to which the app CSP from `tauri.conf.json` does not apply (see [Content Security Policy](security.md#content-security-policy)), so the document's safety rests on what the frontend puts into it:
 
-- `transformInternalLinks(html)` in `src/lib/export.ts` walks every `<span data-type="internalLink">` and bakes the chip (icon `<img>`/`<span>` + label `<span>`) into the DOM. This replaces the `TRANSFORM_LINKS_JS` inline `<script>` that the old print window ran, and is required because the new webview's CSP blocks inline scripts.
-- `embedImages(html)` resolves every file-backed `src="…"` to a base64 data-URL via the `read_image_as_base64` IPC command before export. The hidden webview runs on a `file://` URL and would otherwise not have access to images stored outside the document directory.
+- `transformInternalLinks(html)` in `src/lib/export.ts` walks every `<span data-type="internalLink">` and bakes the chip (icon `<img>`/`<span>` + label `<span>`) into the DOM, so the document needs no script to render chips as in the app.
+- `embedMedia(html)` resolves every file-backed `src="…"` of an `<img>` or `<audio>` element to a base64 data-URL via `read_image_as_base64` / `read_audio_as_base64` before export, at most `MEDIA_CONCURRENCY` (4) files at a time. The hidden webview runs on a `file://` URL and would otherwise not have access to files stored outside the document directory.
 - `resolveInternalLinkIcons(html)` fills in missing `data-icon` attributes from the live store state at export time, so chips saved without an icon still render correctly.
 - DOMPurify sanitisation runs in TypeScript before the HTML is passed to the backend, with the TipTap internal-link attributes explicitly allowlisted so chips survive the pass intact.
 
@@ -450,7 +453,7 @@ The three "Export as …" menu items (`export-pdf`, `export-markdown`, `export-e
 
   Sigil-category Operations export like other operations (the temporary exclusion of 0.1.3.5 is gone); `collectExportDataFor` adds a `sigil` block (`SigilData`) with the visibility already resolved, which `buildSigilHtml` renders as switchable parts (HTML) or notes (PDF).
 
-**Export modal.** For Journal / Wiki / Operations entries, none of these items export directly any more: `export-entry` ("Export…") is always enabled and opens the export modal via `useExportStore.openExport(activeExportTarget())` — `null` (no entry open) starts it on a bulk export; `export-html` is gated by `entry_enabled` like Markdown; and `export-pdf` / `export-html` / `export-markdown` / `export-emerald` open it with their format preselected. The menu is currently the only entry point. Only when the active view is an Altar reading view do `export-pdf` and `export-emerald` still run `saveAltarPDF()` / `exportAsEmerald()` directly. The modal (`src/components/ui/ExportModal.tsx`) is mounted once in `AppShell` and works on an explicit `ExportTarget` (`{ type, id }`), so other entry points (e.g. context menus) can be added later for entries that aren't open. Embedded images pass through `compressImagesInHtml` / `compressDataUrl` (`src/lib/imageCompression.ts`) according to the chosen level. Data collection (`collectExportDataFor`, `collectLinkedTargets` in `src/lib/exportData.ts`) reads from the stores and the DB without touching UI state; `renderEntryArticle` in `src/lib/export.ts` renders one entry for both PDF and HTML, rewriting internal links to bundled entries into `#entry-<id>` anchors. The interactive HTML file is built in `src/lib/htmlExport.ts` — its inline script reads only from the DOM, so no entry data is ever interpolated into script source.
+**Export modal.** For Journal / Wiki / Operations entries, none of these items export directly any more: `export-entry` ("Export…") is always enabled and opens the export modal via `useExportStore.openExport(activeExportTarget())` — `null` (no entry open) starts it on a bulk export; `export-html` is gated by `entry_enabled` like Markdown; and `export-pdf` / `export-html` / `export-markdown` / `export-emerald` open it with their format preselected. The menu is currently the only entry point. Only when the active view is an Altar reading view do `export-pdf` and `export-emerald` still run `saveAltarPDF()` / `exportAsEmerald()` directly. The modal (`src/components/ui/ExportModal.tsx`) is mounted once in `AppShell` and works on an explicit `ExportTarget` (`{ type, id }`), so other entry points (e.g. context menus) can be added later for entries that aren't open. Embedded images pass through `compressImagesInHtml` / `compressDataUrl` (`src/lib/imageCompression.ts`) according to the chosen level. Data collection (`collectExportDataFor`, `collectLinkedTargets` in `src/lib/exportData.ts`) reads from the stores and the DB without touching UI state; `renderEntryArticle` in `src/lib/export.ts` renders one entry for both PDF and HTML, rewriting internal links to bundled entries into `#entry-<id>` anchors. The interactive HTML file is built in `src/lib/htmlExport.ts` — its inline script reads only from the DOM, so no entry data is ever interpolated into script source. PDF and HTML render a bundle's entries one after another (`renderSequentially`), and embedding and compression handle at most four files at once (`mapLimit` in `src/lib/helpers.ts`), so a bulk export of hundreds of entries never holds all their images in memory. Dates in exported documents and in the modal go through `exportDate()` (`Intl.DateTimeFormat` with the app language); the Markdown header keeps a fixed English format because the Markdown import parses it. Data collection reads the stores, i.e. the last auto-saved state of an entry.
 
 There is still only one `export-emerald` menu item — it is not duplicated per content type; `exportAsEmerald()` in `src/lib/emeraldFormat.ts` branches internally on `activeView.type` to export either the open entry or the open altar. The same one-menu-item-branches-internally pattern now also applies to `export-pdf`.
 

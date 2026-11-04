@@ -177,9 +177,8 @@ function resolveInternalLinkIcons(html: string): string {
  * strips the now-redundant `data-icon` / `data-label` attributes.
  *
  * This used to run as an inline `<script>` in the export HTML
- * (`TRANSFORM_LINKS_JS`). The native-webview PDF path drives the app's own
- * webview, which applies the app CSP — `script-src 'self'` blocks inline
- * scripts. Doing the transformation in TypeScript here keeps the rendered
+ * (`TRANSFORM_LINKS_JS`). Doing the transformation in TypeScript keeps the
+ * PDF and HTML exports free of script for it, and keeps the rendered
  * chip identical to the live app and lets us drop the inline script (and
  * the `img.emoji` rasterization CSS that came with the old wkhtmltopdf
  * path) entirely.
@@ -316,7 +315,8 @@ export function exportDate(value: string | number | Date, style: 'medium' | 'lon
   return new Intl.DateTimeFormat(i18n.language, { dateStyle: style }).format(date);
 }
 
-function formatCustomPropValue(prop: { type: string; value: string | null; meta: string | null }): string {
+/** `localized` dates follow the app language; the Markdown header keeps a fixed English format for the import. */
+function formatCustomPropValue(prop: { type: string; value: string | null; meta: string | null }, localized = true): string {
   if (prop.value === null || prop.value === '') return '—';
   if (prop.type === 'checkbox' || prop.type === 'toggle') {
     let trueLabel = 'Yes', falseLabel = 'No';
@@ -330,6 +330,7 @@ function formatCustomPropValue(prop: { type: string; value: string | null; meta:
     return prop.value === 'true' ? trueLabel : falseLabel;
   }
   if (prop.type === 'date') {
+    if (localized) return exportDate(prop.value) || prop.value;
     try { return format(new Date(prop.value), 'MMM d, yyyy'); } catch { return prop.value; }
   }
   return prop.value;
@@ -568,9 +569,9 @@ const PRINT_CSS = `
 // JS that used to run in the print window to transform internal link
 // nodes into chips. Removed in Phase 4 of the native-webview migration —
 // the equivalent transformation now runs in TypeScript via
-// `transformInternalLinks` before the HTML is handed to the backend,
-// because the new webview's CSP blocks inline scripts. The function is
-// kept (translated to TS) so the rendered chip matches the live app.
+// `transformInternalLinks` before the HTML is handed to the backend, so
+// the PDF needs no script at all. The function is kept (translated to TS)
+// so the rendered chip matches the live app.
 
 // ── PDF export ──────────────────────────────────────────────────────────────
 //
@@ -725,10 +726,8 @@ export async function renderEntryArticle(
   // would read its file from disk.
   const resolvedContent = transformMedia(resolveInternalLinkIcons(data.content), { images: imageMode, audio: opts.audio });
   const embeddedContent  = await compressImagesInHtml(await embedMedia(resolvedContent), compression);
-  // Pre-render the internal-link chips in TS — the new webview's CSP
-  // (`script-src 'self'`) blocks inline scripts, so the JS that used to
-  // live in `TRANSFORM_LINKS_JS` now has to run before we hand the HTML
-  // to the backend.
+  // Pre-render the internal-link chips in TS, so the exported HTML needs no
+  // script for them (the JS that used to live in `TRANSFORM_LINKS_JS`).
   const transformedContent = transformInternalLinks(embeddedContent, bundleIds);
 
   const numStr = data.entryNumber ? `<span class="entry-number">#${data.entryNumber}</span>` : '';
@@ -837,7 +836,7 @@ function entryToMarkdown(data: ExportData): string {
   if (data.version)             lines.push(`Version: ${data.version}`);
   if (data.tagNames?.length)    lines.push(`Tags: ${data.tagNames.join(', ')}`);
   if (data.customProps?.length) {
-    for (const p of data.customProps) lines.push(`${p.name}: ${formatCustomPropValue(p)}`);
+    for (const p of data.customProps) lines.push(`${p.name}: ${formatCustomPropValue(p, false)}`);
   }
   lines.push('', '---', '');
   lines.push(...sigilMarkdown(data));
