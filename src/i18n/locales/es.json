@@ -552,6 +552,10 @@
       "expand": "Desplegar la sección",
       "collapse": "Plegar la sección"
     },
+    "fold": {
+      "expand": "Desplegar la sección",
+      "collapse": "Plegar la sección"
+    },
     "unsaved": "Cambios sin guardar"
   },
   "moonPhase": {

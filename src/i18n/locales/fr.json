@@ -552,6 +552,10 @@
       "expand": "Déplier la section",
       "collapse": "Replier la section"
     },
+    "fold": {
+      "expand": "Déplier la section",
+      "collapse": "Replier la section"
+    },
     "unsaved": "Modifications non enregistrées"
   },
   "moonPhase": {

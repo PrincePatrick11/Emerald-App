@@ -6,6 +6,7 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased] (targeting v0.2.0)
 
 ### Added
+- **Headings fold:** a chevron beside a heading hides everything under it up to the next heading of the same level, while reading and editing.
 - **Collapsible sections** from the `/` menu: a heading line that opens and closes the text under it, also while reading. The PDF export prints them open.
 - **Word and character count** under the text while editing, across all text blocks.
 - **Find and replace in an entry** with ⌘F / Ctrl+F: hits light up across all text blocks, Enter and Shift+Enter step through them; while editing, one or all can be replaced.
@@ -20,7 +21,7 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - **Altars have their own icon,** a candle on a table, instead of a flame.
 
 ### Changed
-- **Resizing an image** uses a handle on the side that moves (both sides for a centred image), snaps to common widths and shows the width while dragging. The size is kept in pixels, so the image no longer grows and shrinks with the window; only full width follows it.
+- **Resizing an image** uses a handle on the side that moves (both sides for a centred image), snaps to common widths and shows the width while dragging. The size is kept in pixels, so the image no longer grows and shrinks with the window; only full width follows it. Images sized in percent before are converted the next time the entry is edited.
 - **The formatting bar is a rounded bar of its own** instead of a dark strip, with larger buttons; what is active shows in jade, in Noctis too.
 - **The rail's buttons are grouped by space.** Home, then Journal/Tasks/Operations, Wiki/Lexicon/Altar and Templates/Blocks at the top; Categories/Tags/Trash and Vault/Settings at the bottom. It scrolls without a bar when the window is low, and the rail and the entry list's search start at the sheet's top edge.
 - **"Insert template" and "Add block" moved to the top of the right sidebar** while editing, "Insert template" first; the template editor has them too.

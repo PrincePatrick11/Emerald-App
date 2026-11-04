@@ -1286,22 +1286,80 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
   @apply max-w-full rounded-lg;
 }
 
+/* Folding by headings (HeadingFoldExtension): the chevron in the margin left of a
+   heading, shown on hover and while folded; what is folded away is not displayed.
+   Narrow enough for the frame's 12px inner padding while editing, with room to its edge. */
+.tiptap h1,
+.tiptap h2,
+.tiptap h3 {
+  position: relative;
+}
+.editor-fold-toggle {
+  position: absolute;
+  left: -11px;
+  top: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 8px;
+  /* One line of the heading tall, so the chevron sits on its middle;
+     `em` first for WebViews without the `lh` unit. */
+  height: 1.4em;
+  height: 1lh;
+  padding: 0;
+  /* The heading's size and leading: `lh` and the chevron's `em` follow them. */
+  font: inherit;
+  color: var(--text-subtle);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 150ms, color 150ms;
+}
+.tiptap h1:hover > .editor-fold-toggle,
+.tiptap h2:hover > .editor-fold-toggle,
+.tiptap h3:hover > .editor-fold-toggle,
+.editor-fold-toggle[aria-expanded="false"],
+.editor-fold-toggle:focus-visible {
+  opacity: 1;
+}
+.editor-fold-toggle:hover {
+  color: var(--text-primary);
+}
+.tiptap .editor-folded {
+  display: none;
+}
+.tiptap .editor-heading--folded::after {
+  content: ' …';
+  font-weight: 400;
+  color: var(--text-subtle);
+}
+
 /* Collapsible sections: the toggle beside the heading line, the content under it. */
 .tiptap div[data-type="details"] {
   @apply flex gap-1.5 my-3 rounded-lg px-2 py-1.5;
   border: 1px solid var(--border-soft);
 }
+/* One line of the heading tall (the editor's leading-relaxed), so the
+   chevron sits on the middle of the heading's first line. */
 .tiptap div[data-type="details"] > button {
-  @apply flex-shrink-0 w-5 h-5 mt-[0.2em] rounded-md cursor-pointer;
+  @apply flex-shrink-0 flex items-center justify-center rounded-md cursor-pointer;
+  width: 1.25em;
+  height: 1.625em;
   color: var(--text-subtle);
 }
-.tiptap div[data-type="details"] > button::before {
-  content: '▸';
-  display: inline-block;
+.tiptap div[data-type="details"] > button::before,
+.editor-fold-toggle::before {
+  content: '';
+  width: 0.36em;
+  height: 0.36em;
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  /* Pointing right; open points down. The shift keeps the rotated square centred. */
+  transform: translateX(-0.06em) rotate(-45deg);
   transition: transform 150ms;
 }
-.tiptap div[data-type="details"].is-open > button::before {
-  transform: rotate(90deg);
+.tiptap div[data-type="details"].is-open > button::before,
+.editor-fold-toggle[aria-expanded="true"]::before {
+  transform: translateY(-0.08em) rotate(45deg);
 }
 .tiptap div[data-type="details"] > button:hover {
   color: var(--text-primary);

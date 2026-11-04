@@ -6,6 +6,7 @@ import { scrollIntoViewCentered } from '../../../lib/reveal';
 import { ToolbarBtn } from './EditorToolbar';
 import { editorHas } from './hostContext';
 import { findMatches, setSearch, type SearchMatch } from './SearchExtension';
+import { revealFolded } from './HeadingFoldExtension';
 
 interface Hit {
   editor: Editor;
@@ -53,6 +54,8 @@ export default function FindBar({ getEditors, isEditing, initialQuery, onClose }
   // Mark the hits in every editor, the current one in its own.
   useEffect(() => {
     const hit = current === null ? null : hits[current];
+    // A hit inside a folded section unfolds it, or there would be nothing to see.
+    if (hit) revealFolded(hit.editor, hit.match.from);
     for (const editor of editors) setSearch(editor, query, hit?.editor === editor ? hit.local : null);
     const el = hit?.editor.view.dom.querySelector<HTMLElement>('.editor-search-match--current');
     if (el) scrollIntoViewCentered(el);

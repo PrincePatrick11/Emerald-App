@@ -552,6 +552,10 @@
       "expand": "Abschnitt aufklappen",
       "collapse": "Abschnitt zuklappen"
     },
+    "fold": {
+      "expand": "Abschnitt aufklappen",
+      "collapse": "Abschnitt zuklappen"
+    },
     "unsaved": "Ungespeicherte Änderungen"
   },
   "moonPhase": {

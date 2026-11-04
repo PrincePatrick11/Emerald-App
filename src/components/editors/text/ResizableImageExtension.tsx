@@ -1,4 +1,4 @@
-import { Node, mergeAttributes } from '@tiptap/core';
+import { Node, mergeAttributes, type Editor } from '@tiptap/core';
 import { ReactNodeViewRenderer, NodeViewWrapper } from '@tiptap/react';
 import type { NodeViewProps } from '@tiptap/react';
 import { useRef, useState } from 'react';
@@ -60,6 +60,26 @@ function resizedWidth(px: number, editorW: number): { width: string; label: stri
   const near = SNAP_WIDTHS.find((w) => Math.abs(w - percent) <= SNAP_RANGE);
   const snapped = Math.round(near !== undefined ? (editorW * near) / 100 : px);
   return { width: `${snapped}px`, label: near !== undefined ? `${near} % · ${snapped} px` : `${snapped} px` };
+}
+
+/**
+ * Images resized before widths were stored in pixels carry a percentage of the
+ * editor's width and so grow and shrink with the window. Converted once to the
+ * pixels of the moment, in one step outside the undo history; full width
+ * (`100%`) is meant to follow and stays. Called when an editor starts editing:
+ * it is a change of the content, which belongs to an edit.
+ */
+export function pinPercentImageWidths(editor: Editor): void {
+  const editorW = editor.view.dom.getBoundingClientRect().width;
+  if (!editorW) return;
+  const tr = editor.state.tr;
+  editor.state.doc.descendants((node, pos) => {
+    if (node.type.name !== 'image') return;
+    const match = /^(\d+(?:\.\d+)?)%$/.exec(String(node.attrs.width ?? ''));
+    if (!match || Number(match[1]) >= 100) return;
+    tr.setNodeMarkup(pos, undefined, { ...node.attrs, width: `${Math.round((editorW * Number(match[1])) / 100)}px` });
+  });
+  if (tr.docChanged) editor.view.dispatch(tr.setMeta('addToHistory', false));
 }
 
 /**

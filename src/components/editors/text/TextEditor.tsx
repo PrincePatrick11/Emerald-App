@@ -9,9 +9,10 @@ import TaskItem from '@tiptap/extension-task-item';
 import TextAlign from '@tiptap/extension-text-align';
 import { TableKit } from '@tiptap/extension-table';
 import { Details, DetailsContent, DetailsSummary } from '@tiptap/extension-details';
-import { ResizableImage } from './ResizableImageExtension';
+import { ResizableImage, pinPercentImageWidths } from './ResizableImageExtension';
 import { TextColorMark } from './TextColorExtension';
 import { SearchExtension } from './SearchExtension';
+import { createHeadingFold } from './HeadingFoldExtension';
 import { useContext, useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import { saveImage } from '../../../lib/images';
 import { openUrl } from '@tauri-apps/plugin-opener';
@@ -173,6 +174,9 @@ export default function TextEditor({
       }),
       SearchExtension,
       ...format.typography,
+      ...(features.structure && features.folding
+        ? [createHeadingFold(() => ({ expand: i18n.t('editor.fold.expand'), collapse: i18n.t('editor.fold.collapse') }))]
+        : []),
       ...(features.highlight ? [Highlight.configure({ multicolor: false })] : []),
       ...(features.colors ? [TextColorMark] : []),
       ...(features.tasks ? [TaskList, TaskItem.configure({ nested: true })] : []),
@@ -309,6 +313,7 @@ export default function TextEditor({
   // event here would reach the block stack as a supposed change.
   useEffect(() => {
     editor?.setEditable(editable, false);
+    if (editor && editable && features.images) pinPercentImageWidths(editor);
   }, [editable, editor]);
 
   // Open external links in browser (read mode only)

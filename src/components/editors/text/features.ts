@@ -10,6 +10,8 @@
 export interface TextFeatures {
   /** Headings (levels 1–3), block quote and horizontal rule. */
   structure: boolean;
+  /** Folding a heading's section away, while reading and editing; needs `structure`. */
+  folding: boolean;
   /** Bulleted and numbered lists. */
   lists: boolean;
   /** Checklists. */
@@ -36,6 +38,7 @@ export interface TextFeatures {
 /** Everything; what an entry's text blocks use. */
 export const FULL_TEXT_FEATURES: TextFeatures = {
   structure: true,
+  folding: true,
   lists: true,
   tasks: true,
   highlight: true,
