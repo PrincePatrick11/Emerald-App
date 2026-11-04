@@ -143,6 +143,12 @@ export default function TextEditor({
   const editor = useEditor({
     extensions: [
       StarterKit.configure({
+        // Since TipTap 3 part of the kit. `Link` is configured below by
+        // feature and settings; underline is not part of the schema; the
+        // trailing node would add a paragraph on loading, which counts as a change.
+        link: false,
+        underline: false,
+        trailingNode: false,
         heading: features.structure ? undefined : false,
         blockquote: features.structure ? undefined : false,
         horizontalRule: features.structure ? undefined : false,

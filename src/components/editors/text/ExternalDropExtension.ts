@@ -1,5 +1,5 @@
 import { Extension } from '@tiptap/core';
-import { Plugin } from 'prosemirror-state';
+import { Plugin } from '@tiptap/pm/state';
 import { getDragItem, setDragItem } from '../../../lib/dragState';
 
 export const ExternalDropExtension = Extension.create({
