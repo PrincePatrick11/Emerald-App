@@ -502,6 +502,7 @@
       "redo": "Wiederholen"
     },
     "menu": {
+      "paragraph": "Text",
       "webLink": "Mit Webadresse verlinken",
       "width": "Breite {{value}} %",
       "removeImage": "Bild entfernen"

@@ -23,6 +23,8 @@ export interface TextFeatures {
   entryLinks: boolean;
   /** Images: paste, file drops, the toolbar's image button. */
   images: boolean;
+  /** The `/` menu, offering what else is switched on. */
+  commands: boolean;
 }
 
 /** Everything; what an entry's text blocks use. */
@@ -35,4 +37,5 @@ export const FULL_TEXT_FEATURES: TextFeatures = {
   links: true,
   entryLinks: true,
   images: true,
+  commands: true,
 };

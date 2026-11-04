@@ -502,6 +502,7 @@
       "redo": "Redo"
     },
     "menu": {
+      "paragraph": "Text",
       "webLink": "Link to a web address",
       "width": "Width {{value}} %",
       "removeImage": "Remove image"

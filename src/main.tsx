@@ -5,7 +5,6 @@ import { changeAppLanguage } from "./i18n";
 import "./themes/emerald-noctis.css";
 import "./themes/emerald-parchment.css";
 import "./index.css";
-import "tippy.js/dist/tippy.css";
 // The fonts ship with the app (`npm run fonts`) — nothing is loaded from the network.
 import "./fonts.css";
 import { applyEditorFont, applyEditorFontSize, applyTheme, applyUIFont, applyUIScale } from "./themes/theme";

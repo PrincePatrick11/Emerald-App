@@ -12,6 +12,8 @@ Editors that more than one place embeds live in `src/components/editors/`, one f
 - **`useTextEditorHost`** — what may exist only once for a set of editors shown together: the one toolbar, bound to the focused editor; `LinkPickerModal`; chip-click navigation in read mode; OS file drops; pointer drops from the entry list; `DragGhost`. It returns `context` for `TextEditorHostContext`, the `toolbar` and `overlays` to render, `dropActive` for highlighting, and `orderedEditors`/`targetEditor`/`focusOnMount` for requests the host handles itself.
 - **`useTextEditorRegistry`** — the host's bookkeeping: which editors exist under which key, in what order (`getOrder`), which was focused last. The focused editor, else the last one, gets the toolbar and receives requests from outside.
 - **`SelectionMenus`** — the small menus at a selection, rendered by each `TextEditor` through TipTap's `BubbleMenu`: over selected text the marks and a web link (typed into the menu itself), over a selected image alignment, three widths and removing; the image menu is anchored to the picture, not to the node's full-width element. Like the toolbar they show what the schema has, and they subscribe to the editor state with `useEditorState`, since the editor does not re-render per transaction.
+- **`slashCommands.ts`** — the `/` menu (`CommandList`): typed at the start of a line or after a space, it lists what the editor's schema has (text, headings, lists, checklist, quote, rule, image, entry link) and filters by the translated label and English keywords. The entry link types `[[`, which opens the link suggestion in place; the image opens a file picker for several files.
+- **`suggestionPopup.ts`** — the popup both suggestions (`[[`, `/`) render in. The suggestion plugin mounts and places it at the caret (`props.mount`, Floating UI) and closes it on Escape and on a click outside.
 - **`features.ts`** — `TextFeatures`, the switches an embedding place sets, and `FULL_TEXT_FEATURES`.
 - **`editorCommands.ts`** — commands on an editor: appending, finding, revealing and removing a link chip; inserting an image or a chip.
 
@@ -23,7 +25,7 @@ Requests that depend on the place's content stay with the place. `BlockStack` ha
 
 ### Features
 
-`TextFeatures` switches parts of the editor on or off: `structure` (headings, quote, horizontal rule), `lists`, `tasks`, `highlight`, `align`, `links` (external), `entryLinks` (chips, `[[`, link picker, drops from the entry list) and `images` (paste, file drops, image button). The default is everything, which is what entries use.
+`TextFeatures` switches parts of the editor on or off: `structure` (headings, quote, horizontal rule), `lists`, `tasks`, `highlight`, `align`, `links` (external), `entryLinks` (chips, `[[`, link picker, drops from the entry list) `images` (paste, file drops, image button) and `commands` (the `/` menu). The default is everything, which is what entries use.
 
 A switched-off feature is missing from the schema, not only from the toolbar. Content that uses it is dropped when the editor loads it, and the next change saves the content without it, so features are switched off only where such content cannot exist yet. The toolbar asks the editor's schema (`editorHas`), not the feature set, so it always matches what the editor can do. The host also sends file drops only to an editor with images and pointer drops only to editors with link chips.
 

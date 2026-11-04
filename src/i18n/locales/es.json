@@ -502,6 +502,7 @@
       "redo": "Rehacer"
     },
     "menu": {
+      "paragraph": "Texto",
       "webLink": "Enlazar a una dirección web",
       "width": "Ancho {{value}} %",
       "removeImage": "Quitar imagen"

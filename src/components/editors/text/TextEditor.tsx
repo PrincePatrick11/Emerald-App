@@ -18,6 +18,8 @@ import { TEXT_ALIGN_TYPES } from './EditorToolbar';
 import { FULL_TEXT_FEATURES, type TextFeatures } from './features';
 import { TextEditorHostContext, editorHas } from './hostContext';
 import SelectionMenus from './SelectionMenus';
+import { createSlashCommands } from './slashCommands';
+import i18n from '../../../i18n';
 import Button from '../../ui/Button';
 import { createInternalLinkExtension } from './InternalLinkExtension';
 import { ExternalDropExtension } from './ExternalDropExtension';
@@ -182,6 +184,8 @@ export default function TextEditor({
           ]
         : []),
       ...(features.images ? [ResizableImage] : []),
+      // The labels in the language of the moment, not of the editor's creation.
+      ...(features.commands ? [createSlashCommands((key) => i18n.t(key))] : []),
     ],
     enableInputRules: format.enableInputRules,
     enablePasteRules: format.enablePasteRules,

@@ -1774,6 +1774,11 @@ html[data-theme] .prop-segment--active {
   box-shadow: inset 0 0 0 1px var(--focus-ring);
 }
 
+/* A suggestion popup at the caret (`[[` links, `/` commands); placed by the suggestion plugin. */
+.editor-suggestion-popup {
+  z-index: 60;
+}
+
 /* The small menu over a text editor's selection (SelectionMenus). */
 .editor-selection-menu {
   z-index: 50;

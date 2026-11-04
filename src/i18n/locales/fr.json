@@ -502,6 +502,7 @@
       "redo": "Rétablir"
     },
     "menu": {
+      "paragraph": "Texte",
       "webLink": "Lier à une adresse web",
       "width": "Largeur {{value}} %",
       "removeImage": "Retirer l’image"
