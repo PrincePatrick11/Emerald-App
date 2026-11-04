@@ -546,6 +546,12 @@
       "characters_one": "{{count}} caractère",
       "characters_other": "{{count}} caractères"
     },
+    "details": {
+      "insert": "Section repliable",
+      "summaryPlaceholder": "Titre de la section",
+      "expand": "Déplier la section",
+      "collapse": "Replier la section"
+    },
     "unsaved": "Modifications non enregistrées"
   },
   "moonPhase": {

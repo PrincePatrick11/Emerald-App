@@ -546,6 +546,12 @@
       "characters_one": "{{count}} carácter",
       "characters_other": "{{count}} caracteres"
     },
+    "details": {
+      "insert": "Sección plegable",
+      "summaryPlaceholder": "Título de la sección",
+      "expand": "Desplegar la sección",
+      "collapse": "Plegar la sección"
+    },
     "unsaved": "Cambios sin guardar"
   },
   "moonPhase": {

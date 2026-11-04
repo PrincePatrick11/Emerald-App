@@ -8,6 +8,7 @@ import TaskList from '@tiptap/extension-task-list';
 import TaskItem from '@tiptap/extension-task-item';
 import TextAlign from '@tiptap/extension-text-align';
 import { TableKit } from '@tiptap/extension-table';
+import { Details, DetailsContent, DetailsSummary } from '@tiptap/extension-details';
 import { ResizableImage } from './ResizableImageExtension';
 import { TextColorMark } from './TextColorExtension';
 import { SearchExtension } from './SearchExtension';
@@ -163,7 +164,13 @@ export default function TextEditor({
         listItem: features.lists ? undefined : false,
       }),
       ...format.link,
-      Placeholder.configure({ placeholder }),
+      // Nested nodes get the class too (`includeChildren`), so that an empty
+      // section heading can show its own; the stylesheet shows the editor's
+      // placeholder only for an empty editor, as before.
+      Placeholder.configure({
+        includeChildren: true,
+        placeholder: ({ node }) => (node.type.name === 'detailsSummary' ? i18n.t('editor.details.summaryPlaceholder') : placeholder),
+      }),
       SearchExtension,
       ...format.typography,
       ...(features.highlight ? [Highlight.configure({ multicolor: false })] : []),
@@ -190,6 +197,20 @@ export default function TextEditor({
         : []),
       ...(features.images ? [ResizableImage] : []),
       ...(features.tables ? [TableKit.configure({ table: { resizable: true } })] : []),
+      // The open state is not stored: it would be a change of the content
+      // while reading. Every section opens closed.
+      ...(features.details
+        ? [
+            Details.configure({
+              persist: false,
+              renderToggleButton: ({ element, isOpen }) => {
+                element.setAttribute('aria-label', i18n.t(isOpen ? 'editor.details.collapse' : 'editor.details.expand'));
+              },
+            }),
+            DetailsSummary,
+            DetailsContent,
+          ]
+        : []),
       // The labels in the language of the moment, not of the editor's creation.
       ...(features.commands ? [createSlashCommands((key) => i18n.t(key))] : []),
     ],

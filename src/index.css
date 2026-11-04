@@ -1286,6 +1286,52 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
   @apply max-w-full rounded-lg;
 }
 
+/* Collapsible sections: the toggle beside the heading line, the content under it. */
+.tiptap div[data-type="details"] {
+  @apply flex gap-1.5 my-3 rounded-lg px-2 py-1.5;
+  border: 1px solid var(--border-soft);
+}
+.tiptap div[data-type="details"] > button {
+  @apply flex-shrink-0 w-5 h-5 mt-[0.2em] rounded-md cursor-pointer;
+  color: var(--text-subtle);
+}
+.tiptap div[data-type="details"] > button::before {
+  content: '▸';
+  display: inline-block;
+  transition: transform 150ms;
+}
+.tiptap div[data-type="details"].is-open > button::before {
+  transform: rotate(90deg);
+}
+.tiptap div[data-type="details"] > button:hover {
+  color: var(--text-primary);
+  background-color: var(--well-raise);
+}
+.tiptap div[data-type="details"] > div {
+  @apply flex-1 min-w-0;
+}
+.tiptap div[data-type="details"] summary {
+  @apply font-semibold list-none;
+  color: var(--text-primary);
+}
+.tiptap div[data-type="details"] summary::-webkit-details-marker {
+  display: none;
+}
+.tiptap div[data-type="detailsContent"] {
+  @apply mt-1.5;
+}
+.tiptap div[data-type="detailsContent"][hidden] {
+  display: none;
+}
+.tiptap div[data-type="detailsContent"] > :last-child {
+  @apply mb-0;
+}
+.tiptap summary.is-empty::before {
+  content: attr(data-placeholder);
+  @apply float-left h-0 pointer-events-none font-normal;
+  color: var(--text-subtle);
+}
+
 .tiptap p.is-editor-empty:first-child::before {
   content: attr(data-placeholder);
   @apply float-left h-0 pointer-events-none;

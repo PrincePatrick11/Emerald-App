@@ -27,6 +27,8 @@ export interface TextFeatures {
   images: boolean;
   /** Tables with a header row and adjustable column widths. */
   tables: boolean;
+  /** Collapsible sections: a heading line that opens and closes what is under it. */
+  details: boolean;
   /** The `/` menu, offering what else is switched on. */
   commands: boolean;
 }
@@ -43,5 +45,6 @@ export const FULL_TEXT_FEATURES: TextFeatures = {
   entryLinks: true,
   images: true,
   tables: true,
+  details: true,
   commands: true,
 };

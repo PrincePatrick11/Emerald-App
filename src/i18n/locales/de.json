@@ -546,6 +546,12 @@
       "characters_one": "{{count}} Zeichen",
       "characters_other": "{{count}} Zeichen"
     },
+    "details": {
+      "insert": "Aufklappbarer Abschnitt",
+      "summaryPlaceholder": "Überschrift des Abschnitts",
+      "expand": "Abschnitt aufklappen",
+      "collapse": "Abschnitt zuklappen"
+    },
     "unsaved": "Ungespeicherte Änderungen"
   },
   "moonPhase": {

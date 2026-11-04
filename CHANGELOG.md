@@ -6,6 +6,7 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased] (targeting v0.2.0)
 
 ### Added
+- **Collapsible sections** from the `/` menu: a heading line that opens and closes the text under it, also while reading. The PDF export prints them open.
 - **Word and character count** under the text while editing, across all text blocks.
 - **Find and replace in an entry** with ⌘F / Ctrl+F: hits light up across all text blocks, Enter and Shift+Enter step through them; while editing, one or all can be replaced.
 - **Text colours:** six colours in the selection menu, whose shade each theme sets, so coloured text stays readable in light and dark themes; the PDF export prints them too.

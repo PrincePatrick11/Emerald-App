@@ -546,6 +546,12 @@
       "characters_one": "{{count}} character",
       "characters_other": "{{count}} characters"
     },
+    "details": {
+      "insert": "Collapsible section",
+      "summaryPlaceholder": "Heading of the section",
+      "expand": "Expand section",
+      "collapse": "Collapse section"
+    },
     "unsaved": "Unsaved changes"
   },
   "moonPhase": {

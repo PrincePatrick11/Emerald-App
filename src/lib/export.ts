@@ -276,6 +276,8 @@ const PRINT_CSS = `
     border-left: 3px solid #bbb; padding-left: 1em; color: #555; margin: 0.8em 0;
   }
   .entry-content table { border-collapse: collapse; width: 100%; margin: 0.8em 0; }
+  .entry-content details { margin: 0.6em 0; padding: 0.3em 0.6em; border: 1px solid #ddd; border-radius: 4px; }
+  .entry-content summary { font-weight: 600; list-style: none; }
   .entry-content span[data-color="red"] { color: #b4372c; }
   .entry-content span[data-color="orange"] { color: #a85a17; }
   .entry-content span[data-color="yellow"] { color: #8a6d00; }
@@ -327,7 +329,8 @@ export async function exportAsPDF(data: ExportData): Promise<void> {
   const embeddedContent  = await embedImages(resolvedContent);
   // Pre-render the internal-link chips here, so the export document stays
   // script-free (see `transformInternalLinks`).
-  const transformedContent = transformInternalLinks(embeddedContent);
+  // Collapsible sections print open, or their content would be missing on paper.
+  const transformedContent = transformInternalLinks(embeddedContent).replace(/<details(?![^>]*\sopen)/g, '<details open');
 
   const topBarHtml = buildTopBar(data);
   const metaHtml   = buildMetaHtml(data);
@@ -423,6 +426,11 @@ export function createMarkdownConverter(): TurndownService {
         `| ${Array.from({ length: width }, (_, i) => cells[i] ?? '').join(' | ')} |`;
       return `\n\n${[line(rows[0]), line(Array(width).fill('---')), ...rows.slice(1).map(line)].join('\n')}\n\n`;
     },
+  });
+  // A collapsible section's heading line in bold; its content follows as usual.
+  td.addRule('detailsSummary', {
+    filter: 'summary',
+    replacement: (content) => `\n\n**${content.trim()}**\n\n`,
   });
   // Struck-through letters of the sigil calculator.
   td.addRule('strikethrough', {

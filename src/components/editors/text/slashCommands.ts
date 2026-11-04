@@ -2,7 +2,7 @@ import { Extension, type Editor, type Range } from '@tiptap/core';
 import Suggestion from '@tiptap/suggestion';
 import { PluginKey } from '@tiptap/pm/state';
 import {
-  CheckSquare, Heading1, Heading2, Heading3, ImagePlus, Link, List, ListOrdered, Minus, Pilcrow, Quote, Table,
+  CheckSquare, ChevronsDownUp, Heading1, Heading2, Heading3, ImagePlus, Link, List, ListOrdered, Minus, Pilcrow, Quote, Table,
   type LucideIcon,
 } from 'lucide-react';
 import { ACCEPTED_IMAGE_MIME, isAcceptedImageFile, readFileAsDataUrl } from '../../../lib/helpers';
@@ -85,6 +85,11 @@ export const SLASH_COMMANDS: SlashCommand[] = [
       ed.chain().focus().deleteRange(range).run();
       pickImages(ed);
     },
+  },
+  {
+    id: 'details', labelKey: 'editor.details.insert', icon: ChevronsDownUp, keywords: ['collapse', 'toggle', 'details', 'fold'],
+    available: (ed) => editorHas(ed, 'details'),
+    run: (ed, range) => ed.chain().focus().deleteRange(range).setDetails().run(),
   },
   {
     id: 'table', labelKey: 'editor.toolbar.insertTable', icon: Table, keywords: ['table', 'grid'],
