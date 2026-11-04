@@ -904,6 +904,8 @@
     "sidebarLimitHint": "Nombre d'entrées affichées au départ. Le reste se charge en dessous via « Afficher plus ».",
     "emojiDefaultsHint": "Les emojis proposés par chaque sélecteur de ce vault avant toute recherche. Cliquer pour retirer, glisser pour trier, rechercher pour en ajouter.",
     "imagesHint": "S'applique aux images nouvellement insérées. Les plus grandes sont d'abord réduites et refusées seulement si elles restent trop lourdes.",
+    "imageOptimizePhotos": "Optimiser les photos",
+    "imageOptimizePhotosHint": "Une photo qui arrive en PNG (collée depuis le presse-papiers, par exemple) est enregistrée en JPEG à pleine taille : environ un cinquième de la place, sans différence visible. Les captures d’écran, graphiques et tout ce qui est transparent restent en PNG.",
     "imageMaxEdgeOption": "Les images plus grandes sont réduites à {{value}} px sur leur plus grand côté",
     "imageMaxEdgeOriginalHint": "Les images gardent leurs dimensions d'origine",
     "imageMaxSizeOption": "Les images de plus de {{max}} sont refusées",

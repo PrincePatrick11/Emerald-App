@@ -896,6 +896,8 @@
     "sidebarLimitHint": "How many entries a list shows at first. The rest loads below via “Show more”.",
     "emojiDefaultsHint": "The emojis every emoji picker in this vault offers before you search. Click to remove, drag to reorder, search to add new ones.",
     "imagesHint": "Applies to newly inserted images. Larger ones are scaled down first and only rejected if they are still too large.",
+    "imageOptimizePhotos": "Optimise photos",
+    "imageOptimizePhotosHint": "A photo that arrives as PNG (pasted from the clipboard, for instance) is stored as JPEG at full size, about a fifth of the space and no visible difference. Screenshots, graphics and anything transparent stay PNG.",
     "imageMaxEdgeOption": "Larger images are scaled down to {{value}} px on their longest side",
     "imageMaxEdgeOriginalHint": "Images keep their original dimensions",
     "imageMaxSizeOption": "Images over {{max}} are rejected",

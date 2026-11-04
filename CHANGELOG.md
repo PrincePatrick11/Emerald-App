@@ -14,6 +14,7 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - **Tables in the text,** from the toolbar or `/`: a header row, columns whose width can be dragged, and a menu at the table for adding and removing rows and columns. Markdown export writes them as tables.
 - **Typing `/` opens a list of what to insert:** text, headings, lists, a checklist, quote, divider, an image or a link to an entry; typing on filters it, arrow keys and Enter pick.
 - **A small menu appears over selected text** for bold, italic, strikethrough, highlight, code and a link to a web address; over a selected image it offers alignment, 25/50/100 % width and removing it.
+- **Photos take about a fifth of the space.** A photo that arrives as PNG — pasted from the clipboard, for instance — is stored as JPEG at full size, without visible difference (a 12-megapixel photo: 11.1 MB → 2.4 MB). Screenshots, graphics and anything transparent stay PNG; it applies wherever images are added, and can be switched off under Settings → Entries → Images. The conversion runs in the background, so the window does not freeze.
 - **Images in the text can be moved by dragging them,** within a text block and into another one; Undo puts them back.
 - **Files dragged in from the explorer land where you drop them,** between the paragraphs under the pointer, and a line shows the spot beforehand; entries dragged in from the list show where they will land as well.
 - **Several images at once** through paste or the image button.

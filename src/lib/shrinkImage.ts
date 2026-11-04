@@ -1,3 +1,5 @@
+import { isPhoto } from './photoCheck';
+
 /**
  * Draw an image as a data URL at no more than `maxEdge` pixels edge length.
  * If it already fits, it comes back unchanged.
@@ -30,6 +32,54 @@ function drawScaled(img: HTMLImageElement, scale: number, options: { mime?: stri
   ctx.imageSmoothingQuality = 'high';
   ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
   return canvas.toDataURL(options.mime, options.quality);
+}
+
+/** The page-side photo check (`photoCheck.ts`), for when no worker is available. */
+export function looksLikePhoto(img: HTMLImageElement): boolean {
+  return isPhoto({
+    width: img.naturalWidth,
+    height: img.naturalHeight,
+    read: (sx, sy, sw, sh, dw, dh, smooth) => {
+      const canvas = document.createElement('canvas');
+      canvas.width = dw;
+      canvas.height = dh;
+      const ctx = canvas.getContext('2d', { willReadFrequently: true });
+      if (!ctx) return null;
+      ctx.imageSmoothingEnabled = smooth;
+      ctx.drawImage(img, sx, sy, sw, sh, 0, 0, dw, dh);
+      return ctx.getImageData(0, 0, dw, dh).data;
+    },
+  });
+}
+
+/** A data URL as a decoded image, for callers that look at it more than once. */
+export async function decodeImage(dataUrl: string): Promise<HTMLImageElement> {
+  const img = new Image();
+  img.src = dataUrl;
+  await img.decode();
+  return img;
+}
+
+/**
+ * The image again at full size in another format, e.g. a photo PNG as JPEG.
+ * Encoded through `toBlob`, which does not hold up the window: a phone photo
+ * takes seconds to encode, and `toDataURL` would freeze typing for that long.
+ */
+export async function reencodeImage(img: HTMLImageElement, mime: string, quality?: number): Promise<string> {
+  const canvas = document.createElement('canvas');
+  canvas.width = img.naturalWidth;
+  canvas.height = img.naturalHeight;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) throw new Error('No 2D canvas context');
+  ctx.drawImage(img, 0, 0);
+  const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, mime, quality));
+  if (!blob) throw new Error('Image could not be encoded');
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(blob);
+  });
 }
 
 /**

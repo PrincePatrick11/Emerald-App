@@ -1,11 +1,12 @@
 import { useTranslation } from 'react-i18next';
-import { Image, Maximize2, Weight } from 'lucide-react';
+import { Image, Maximize2, Sparkles, Weight } from 'lucide-react';
 import { IMAGE_MAX_EDGE_OPTIONS, IMAGE_MAX_SIZE_MB_OPTIONS } from '../../../lib/vaultSettings';
 import { useSettingsStore } from '../../../store/settingsStore';
 import SettingsChoiceButton, { SettingsChoiceRow } from './SettingsChoiceButton';
 import SettingsSection from './SettingsSection';
+import { SwitchRow } from '../../ui/Switch';
 
-/** How large inserted images may be: first scaled down, then checked. */
+/** How inserted images are stored: photos as JPEG, then scaled down and checked. */
 export default function ImageLimitsSection() {
   const { t } = useTranslation();
   const images = useSettingsStore((s) => s.settings.images);
@@ -14,6 +15,14 @@ export default function ImageLimitsSection() {
   return (
     <SettingsSection icon={<Image size={14} />} title={t('settings.images')} description={t('settings.imagesHint')}>
       <div className="space-y-3">
+        <SwitchRow
+          variant="panel"
+          icon={Sparkles}
+          label={t('settings.imageOptimizePhotos')}
+          hint={t('settings.imageOptimizePhotosHint')}
+          checked={images.optimizePhotos}
+          onChange={(value) => update('images', { optimizePhotos: value })}
+        />
         <div>
           <p className="label-xs flex items-center gap-2 mb-2">
             <Maximize2 size={14} />

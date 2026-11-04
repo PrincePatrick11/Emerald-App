@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { Editor } from '@tiptap/react';
 import { getCurrentWebview } from '@tauri-apps/api/webview';
 import { copyImageFile, readImageFile, saveImage } from '../../../lib/images';
-import { hasImageLimits, ImageTooLargeError, prepareImageDataUrl } from '../../../lib/imageLimits';
+import { ImageTooLargeError, needsPreparing, prepareImageDataUrl } from '../../../lib/imageLimits';
 import { reportImageError, useImageNoticeStore } from '../../../store/imageNoticeStore';
 import { editorAtPoint, lineSpot, type DropSpot } from './dropSpot';
 import { editorHas } from './hostContext';
@@ -88,8 +88,9 @@ export function useEditorFileDrop({ enabled, getEditors, getContainer, getFallba
 
           for (const path of imagePaths) {
             try {
-              // Without limits copy directly; with them first read in, shrink and check.
-              const src = hasImageLimits()
+              // Copied as it is when nothing could change it; otherwise read in and
+              // prepared like any other image (limits, photo as JPEG).
+              const src = needsPreparing(path)
                 ? await saveImage(await prepareImageDataUrl(await readDroppedImage(path)))
                 : await copyImageFile(path);
               if (editor.isDestroyed) return;

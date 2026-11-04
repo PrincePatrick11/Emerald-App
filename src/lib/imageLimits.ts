@@ -1,5 +1,5 @@
 import { useSettingsStore } from '../store/settingsStore';
-import { scaleToMaxEdge } from './shrinkImage';
+import { decodeImage, looksLikePhoto, reencodeImage, scaleToMaxEdge } from './shrinkImage';
 import { isAcceptedImageFile, readFileAsDataUrl } from './helpers';
 
 /** An image that is still over the vault's file size limit even after downscaling. */
@@ -36,24 +36,139 @@ export function imageSizeLabel(bytes: number, megabytesUnit: string): string {
   return `${Math.round((bytes / MIB) * 10) / 10} ${megabytesUnit}`;
 }
 
-async function scaleDown(dataUrl: string, maxEdge: number): Promise<string> {
-  const mime = mimeOf(dataUrl);
-  if (NOT_SCALED.has(mime)) return dataUrl;
-  // The format stays: a JPEG photo as PNG would get bigger instead of smaller.
-  // WebKit cannot write WebP and returns PNG then — that is an image too.
+/** Below this a PNG is left as it is: an icon or a small graphic gains next to nothing. */
+const PHOTO_MIN_BYTES = 512 * 1024;
+
+/**
+ * Is this image a candidate for JPEG: a PNG of some size, with "Optimise
+ * photos" on. Photos copied to the clipboard arrive as PNG, lossless and four
+ * to five times the size of a JPEG nobody can tell apart from it. Whether it
+ * really is a photo, `isPhoto` decides. A JPEG is not encoded again, GIF and
+ * SVG never change.
+ */
+function photoCandidate(dataUrl: string): boolean {
+  return useSettingsStore.getState().settings.images.optimizePhotos
+    && mimeOf(dataUrl) === 'image/png' && dataUrlBytes(dataUrl) >= PHOTO_MIN_BYTES;
+}
+
+/** The decoded image if it is a photo, on the page: the way without a worker. */
+async function photoOnPage(dataUrl: string): Promise<HTMLImageElement | null> {
+  const img = await decodeImage(dataUrl);
+  return looksLikePhoto(img) ? img : null;
+}
+
+/* ---------------- The photo worker ---------------- */
+
+type WorkerReply = { id: number; jpeg: Blob | null; scaled?: boolean } | { id: number; error: string };
+
+let worker: Worker | null | undefined;
+let nextRequest = 0;
+const pending = new Map<number, (reply: WorkerReply) => void>();
+
+/** The one worker, started on first use; `null` where a WebView has no worker with `OffscreenCanvas`. */
+function photoWorker(): Worker | null {
+  if (worker !== undefined) return worker;
+  try {
+    worker = typeof Worker !== 'undefined' && typeof OffscreenCanvas !== 'undefined'
+      ? new Worker(new URL('./photoWorker.ts', import.meta.url), { type: 'module' })
+      : null;
+  } catch {
+    worker = null;
+  }
+  if (worker) {
+    worker.onmessage = (event: MessageEvent<WorkerReply>) => {
+      pending.get(event.data.id)?.(event.data);
+      pending.delete(event.data.id);
+    };
+    // A worker that cannot start (or dies) answers every open request, and is not used again.
+    worker.onerror = () => {
+      for (const [id, reply] of pending) reply({ id, error: 'photo worker failed' });
+      pending.clear();
+      worker = null;
+    };
+  }
+  return worker;
+}
+
+/**
+ * The photo as a JPEG data URL from the worker, scaled to `maxEdge` if larger;
+ * `null` if it is no photo. Throws when the worker is missing or fails, so the
+ * caller takes the way on the page.
+ */
+async function photoInWorker(dataUrl: string, maxEdge: number | null): Promise<{ jpeg: string; scaled: boolean } | null> {
+  const w = photoWorker();
+  if (!w) throw new Error('no photo worker');
+  const id = nextRequest++;
+  const reply = await new Promise<WorkerReply>((resolve) => {
+    pending.set(id, resolve);
+    w.postMessage({ id, dataUrl, maxEdge, quality: LOSSY_QUALITY });
+  });
+  if ('error' in reply) throw new Error(reply.error);
+  return reply.jpeg ? { jpeg: await blobToDataUrl(reply.jpeg), scaled: !!reply.scaled } : null;
+}
+
+function blobToDataUrl(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(blob);
+  });
+}
+
+/* ---------------- Preparing an image ---------------- */
+
+async function scaleDown(dataUrl: string, maxEdge: number, mime: string): Promise<string> {
+  if (NOT_SCALED.has(mimeOf(dataUrl))) return dataUrl;
+  // The format stays unless it is a photo going to JPEG: a JPEG photo as PNG
+  // would get bigger instead of smaller. WebKit cannot write WebP and returns
+  // PNG then — that is an image too.
   return scaleToMaxEdge(dataUrl, maxEdge, { mime, quality: LOSSY.has(mime) ? LOSSY_QUALITY : undefined });
 }
 
 /**
- * Brings a pasted image within the vault's limits: first downscale to the largest
- * edge length, then check the file size. `capBytes` is a fixed cap
- * from the caller (altar images); the smaller limit applies.
+ * Downscaled to `maxEdge` and, for a photo, as JPEG. In the worker where there
+ * is one (decoding and encoding a phone photo would otherwise hold up the
+ * window for seconds), else on the page; each in one pass, so a photo is
+ * compressed only once. A conversion is kept only if it is smaller, unless it
+ * was scaled down as well.
+ */
+async function scaledAndConverted(dataUrl: string, maxEdge: number | null): Promise<string> {
+  const candidate = photoCandidate(dataUrl);
+  if (candidate) {
+    try {
+      const photo = await photoInWorker(dataUrl, maxEdge);
+      if (!photo) return maxEdge === null ? dataUrl : scaleDown(dataUrl, maxEdge, mimeOf(dataUrl));
+      return photo.scaled || dataUrlBytes(photo.jpeg) < dataUrlBytes(dataUrl) ? photo.jpeg : dataUrl;
+    } catch {
+      // No worker: the same on the page.
+    }
+  }
+  const photo = candidate ? await photoOnPage(dataUrl).catch(() => null) : null;
+  const mime = photo ? 'image/jpeg' : mimeOf(dataUrl);
+  const scaled = maxEdge === null ? dataUrl : await scaleDown(dataUrl, maxEdge, mime);
+  // Small enough already, so not drawn yet: the change of format alone.
+  if (photo && scaled === dataUrl) {
+    const converted = await reencodeImage(photo, 'image/jpeg', LOSSY_QUALITY).catch(() => dataUrl);
+    if (dataUrlBytes(converted) < dataUrlBytes(dataUrl)) return converted;
+  }
+  return scaled;
+}
+
+/**
+ * The one step every image goes through before it is stored (editor, image
+ * fields, covers and icons, the altar, `.emerald` imports): a photo PNG becomes
+ * a JPEG, then everything is brought within the vault's limits — downscaled to
+ * the largest edge length, then the file size checked. Downscaling and the
+ * change of format happen in one pass, so a photo is compressed only once.
+ * `capBytes` is a fixed cap from the caller (altar images); the smaller limit
+ * applies. Backups and sigil drawings do not come through here.
  *
  * @throws ImageTooLargeError if it is still too large afterwards — with the limit that applied.
  */
 export async function prepareImageDataUrl(dataUrl: string, options: { capBytes?: number } = {}): Promise<string> {
   const limits = useSettingsStore.getState().settings.images;
-  const scaled = limits.maxEdge === null ? dataUrl : await scaleDown(dataUrl, limits.maxEdge);
+  const scaled = await scaledAndConverted(dataUrl, limits.maxEdge);
   const candidates = [limits.maxSizeMb === null ? null : limits.maxSizeMb * MIB, options.capBytes ?? null]
     .filter((bytes): bytes is number => bytes !== null);
   if (candidates.length) {
@@ -80,4 +195,13 @@ export async function readIconFile(file: File): Promise<string | null> {
 export function hasImageLimits(): boolean {
   const limits = useSettingsStore.getState().settings.images;
   return limits.maxEdge !== null || limits.maxSizeMb !== null;
+}
+
+/**
+ * Whether a file at `path` has to be read in and go through
+ * `prepareImageDataUrl`, or may be copied as it is: with limits always, and a
+ * PNG also when photos are optimised.
+ */
+export function needsPreparing(path: string): boolean {
+  return hasImageLimits() || (useSettingsStore.getState().settings.images.optimizePhotos && /\.png$/i.test(path));
 }
