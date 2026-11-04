@@ -683,6 +683,13 @@
       "hiddenUntil": "Oculto hasta el {{date}}: el sigilo está cargado",
       "show": "Mostrar",
       "hide": "Ocultar"
+    },
+    "sigilHidden": {
+      "label": "Partes ocultas del sigilo",
+      "toggle": "Alternables",
+      "omit": "Omitir",
+      "toggleDesc": "Empiezan ocultas como en la app y se pueden mostrar en el archivo; para ello están en el código fuente del archivo.",
+      "omitDesc": "Las partes ocultas no se incluyen en el archivo, solo una nota."
     }
   }
 }

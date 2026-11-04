@@ -683,6 +683,13 @@
       "hiddenUntil": "Verborgen bis {{date}} – das Sigill ist geladen",
       "show": "Anzeigen",
       "hide": "Verbergen"
+    },
+    "sigilHidden": {
+      "label": "Verborgene Sigill-Teile",
+      "toggle": "Umschaltbar",
+      "omit": "Weglassen",
+      "toggleDesc": "Starten verborgen wie in der App und lassen sich in der Datei einblenden – sie stehen dafür im Quelltext der Datei.",
+      "omitDesc": "Verborgene Teile kommen gar nicht in die Datei, nur ein Hinweis."
     }
   }
 }

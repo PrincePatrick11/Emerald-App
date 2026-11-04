@@ -250,6 +250,11 @@ export interface ExportOptions {
   bundleTitle?: string;
   /** Suggested file name of a bulk export, without extension. */
   bundleFilename?: string;
+  /**
+   * Interactive HTML: a sigil's hidden parts get a Show / Hide toggle (`toggle`,
+   * hidden on screen only — they are in the file) or are left out (`omit`).
+   */
+  sigilHidden?: 'toggle' | 'omit';
   /** Date order the entries were put in — the HTML export's sort button starts from it. */
   order?: 'asc' | 'desc';
   /** Entries bundled because they are linked, when their attachments are handled differently. */
@@ -469,7 +474,7 @@ const PRINT_CSS = `
   .sigil-badge { display: inline-block; font-size: 0.75em; color: #006b42; background: #e6faf3; border: 1px solid #99dfc0; border-radius: 10px; padding: 1px 9px; margin-bottom: 0.8em; }
   .sigil-part { margin-bottom: 0.9em; }
   .sigil-label { font-size: 0.7em; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: #888; margin-bottom: 0.3em; }
-  .sigil-img { display: block; max-width: 60%; border: 1px solid #ddd; border-radius: 6px; }
+  .sigil-img { display: block; max-width: 60%; border: 1px solid #ddd; border-radius: 6px; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   .sigil-cover { font-size: 0.85em; color: #555; background: #f6f6f6; border: 1px dashed #ccc; border-radius: 6px; padding: 0.5em 0.8em; }
   .sigil-intention { font-family: Georgia, serif; font-style: italic; }
   .sigil-letters { display: flex; flex-wrap: wrap; gap: 4px; }
@@ -550,6 +555,16 @@ const PRINT_CSS = `
 // ── Sigils ──────────────────────────────────────────────────────────────────
 
 /**
+ * The surface sigils are drawn on in the app (`.sigil-canvas-shell`): dark in
+ * Emerald Noctis, parchment in Emerald Parchment. The drawing is shown on the
+ * one of the theme it was exported from — its default ink is white, so it
+ * can't follow the export file's own light / dark theme.
+ */
+function sigilCanvasColor(): string {
+  return document.documentElement.getAttribute('data-theme') === 'emerald-parchment' ? '#ece2d1' : '#0c0a09';
+}
+
+/**
  * The block a sigil operation gets above its content: drawing, intention,
  * letter bank, then charging technique, reveal date and notes.
  *
@@ -592,7 +607,9 @@ async function buildSigilHtml(
     drawing = `<figure class="image-placeholder">🖼 ${htmlEscape(t('exportModal.placeholder.notExported', { name: t('exportModal.sigil.drawing') }))}</figure>`;
   } else {
     const src = sanitizeDataImageUrl(await compressDataUrl(sigil.drawing, images)) ?? '';
-    drawing = src ? `<img class="sigil-img" src="${src}" alt="${htmlEscape(t('exportModal.sigil.drawing'))}">` : `<p class="sigil-empty">—</p>`;
+    drawing = src
+      ? `<img class="sigil-img" src="${src}" alt="${htmlEscape(t('exportModal.sigil.drawing'))}" style="background-color: ${sigilCanvasColor()}">`
+      : `<p class="sigil-empty">—</p>`;
   }
 
   const intention = sigil.intention
@@ -671,7 +688,7 @@ export async function renderEntryArticle(
     images: ExportOptions['images'];
     audio: MediaModes['audio'];
     footerHtml?: string;
-    /** How a sigil's hidden parts are shown: switchable (HTML) or as a note (PDF). */
+    /** How a sigil's hidden parts are shown: switchable (HTML) or left out with a note (PDF, or HTML with `omit`). */
     sigil?: 'interactive' | 'static';
   },
 ): Promise<string> {

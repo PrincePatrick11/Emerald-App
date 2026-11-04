@@ -12,6 +12,7 @@ import { exportAsMarkdown, exportAsPDF, exportErrorMessage, type ExportOptions }
 import { exportAsHTML, type HtmlExportLabels } from '../../lib/htmlExport';
 import { exportAsEmerald } from '../../lib/emeraldFormat';
 import { OP_PROP_SELECT_CLASSES } from '../../lib/styleClasses';
+import { useOperationStore } from '../../store/operationStore';
 import Modal from './Modal';
 import Button from './Button';
 
@@ -35,6 +36,7 @@ type Period = 'last7' | 'last30' | 'thisMonth' | 'all' | 'custom';
 type Order = 'asc' | 'desc';
 const PERIODS: Period[] = ['last7', 'last30', 'thisMonth', 'all', 'custom'];
 const ORDERS: Order[] = ['asc', 'desc'];
+const SIGIL_HIDDEN: NonNullable<ExportOptions['sigilHidden']>[] = ['toggle', 'omit'];
 
 const TYPE_LABEL_KEYS: Record<ExportTarget['type'], string> = {
   journal: 'linkPicker.tabJournal',
@@ -64,6 +66,8 @@ interface Prefs {
   linkedMediaOwn: boolean;
   linkedImages: ExportOptions['images'];
   linkedAudio: ExportOptions['audio'];
+  /** Interactive HTML: hidden sigil parts switchable (but in the file) or left out. */
+  sigilHidden: NonNullable<ExportOptions['sigilHidden']>;
 }
 
 function loadPrefs(): Prefs {
@@ -72,7 +76,7 @@ function loadPrefs(): Prefs {
     format: 'pdf', includeLinked: false, bulkIncludeLinked: false, recursive: false, images: 'balanced', audio: 'embed',
     bulkModules: ['journal'], bulkPeriod: 'last7',
     bulkFrom: formatDate(subDays(today, 6), DAY), bulkTo: formatDate(today, DAY),
-    order: 'asc', linkedMediaOwn: false, linkedImages: 'placeholder', linkedAudio: 'placeholder',
+    order: 'asc', linkedMediaOwn: false, linkedImages: 'placeholder', linkedAudio: 'placeholder', sigilHidden: 'toggle',
   };
   try {
     const raw = localStorage.getItem(PREFS_KEY);
@@ -322,6 +326,9 @@ function ExportModalBody({ openTarget, initialFormat }: { openTarget: ExportTarg
   const selected: ExportTarget[] = [...orderedRoots, ...linkedSelected];
 
   const audioPlaceholderOnly = format === 'pdf';
+  const operations = useOperationStore((s) => s.operations);
+  const hasSigil = selected.some((s) => s.type === 'operations'
+    && operations.find((o) => o.id === s.id)?.category_id === 'sigils');
   const linkedOwnMedia = linkedSelected.length > 0 && prefs.linkedMediaOwn;
 
   const toggleModule = (type: ExportEntryType) => {
@@ -376,6 +383,7 @@ function ExportModalBody({ openTarget, initialFormat }: { openTarget: ExportTarg
       images: prefs.images,
       audio: prefs.audio,
       order: prefs.order,
+      sigilHidden: prefs.sigilHidden,
       bundleTitle: bulk ? bundleTitle() : undefined,
       bundleFilename: bulk ? bundleFilename() : undefined,
       linked: linkedOwnMedia
@@ -601,6 +609,16 @@ function ExportModalBody({ openTarget, initialFormat }: { openTarget: ExportTarg
               <Row label={t('exportModal.audio.label')} note={audioNote(prefs.audio)}>
                 {audioControl(prefs.audio, (v) => update({ audio: v }))}
               </Row>
+              {format === 'html' && hasSigil && (
+                <Row label={t('exportModal.sigilHidden.label')} note={t(`exportModal.sigilHidden.${prefs.sigilHidden}Desc`)}>
+                  <Segmented
+                    options={SIGIL_HIDDEN}
+                    value={prefs.sigilHidden}
+                    onChange={(v) => update({ sigilHidden: v })}
+                    label={(v) => t(`exportModal.sigilHidden.${v}`)}
+                  />
+                </Row>
+              )}
               {linkedSelected.length > 0 && (
                 <div className="space-y-3 pt-1">
                   <CheckRow checked={prefs.linkedMediaOwn} onToggle={() => update({ linkedMediaOwn: !prefs.linkedMediaOwn })}>

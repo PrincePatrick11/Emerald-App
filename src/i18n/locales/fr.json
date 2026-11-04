@@ -683,6 +683,13 @@
       "hiddenUntil": "Masqué jusqu'au {{date}} – le sigil est chargé",
       "show": "Afficher",
       "hide": "Masquer"
+    },
+    "sigilHidden": {
+      "label": "Parties masquées du sigil",
+      "toggle": "Basculables",
+      "omit": "Omettre",
+      "toggleDesc": "Commencent masquées comme dans l'app et peuvent être affichées dans le fichier – elles figurent donc dans son code source.",
+      "omitDesc": "Les parties masquées ne sont pas incluses dans le fichier, seulement une note."
     }
   }
 }

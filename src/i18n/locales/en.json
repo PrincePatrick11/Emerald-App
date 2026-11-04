@@ -683,6 +683,13 @@
       "hiddenUntil": "Hidden until {{date}} – the sigil is loaded",
       "show": "Show",
       "hide": "Hide"
+    },
+    "sigilHidden": {
+      "label": "Hidden sigil parts",
+      "toggle": "Switchable",
+      "omit": "Leave out",
+      "toggleDesc": "Start hidden as in the app and can be shown in the file – for that they are in the file's source.",
+      "omitDesc": "Hidden parts are not put into the file at all, only a note."
     }
   }
 }

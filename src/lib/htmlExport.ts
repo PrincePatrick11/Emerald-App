@@ -126,7 +126,7 @@ export async function buildInteractiveHtml(
     renderEntryArticle(e, {
       bundleIds,
       ...mediaFor(e, opts),
-      sigil: 'interactive',
+      sigil: opts.sigilHidden === 'omit' ? 'static' : 'interactive',
       footerHtml: buildRefs(e, entries, outgoing, labels),
     })
   ));
@@ -364,8 +364,8 @@ mark.hit { background: var(--mark); color: inherit; border-radius: 2px; padding:
   font-size: 13px; color: var(--muted); background: var(--chip); border: 1px dashed var(--border);
   border-radius: 8px; padding: 12px 14px;
 }
-/* White behind the drawing in both themes: sigils are drawn dark on a transparent canvas. */
-.sigil-img { display: block; max-width: 100%; max-height: 420px; border-radius: 10px; border: 1px solid var(--border); background: #fff; }
+/* The background colour comes inline: the app canvas the sigil was drawn on. */
+.sigil-img { display: block; max-width: 100%; max-height: 420px; border-radius: 10px; border: 1px solid var(--border); -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 .sigil-intention { font-family: Georgia, "Times New Roman", serif; font-size: 17px; font-style: italic; margin: 0; }
 .sigil-letters { display: flex; flex-wrap: wrap; gap: 6px; }
 .sigil-letter {
