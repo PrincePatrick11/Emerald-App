@@ -329,22 +329,38 @@ export interface SigilState {
  * changes, the charge is left untouched.
  */
 export function withMappedChargeTargets(block: BlockInstance, map: (target: string) => string | readonly string[]): BlockInstance {
-  const mapped = (charge: SigilCharge): string[] | null => {
-    if (charge.broken || !charge.targets) return null;
+  return withChargesRewritten(block, (charge) => {
+    if (!charge.targets) return null;
     const before = charge.targets;
     const targets = before.flatMap(map);
     return targets.length !== before.length || targets.some((id, i) => id !== before[i]) ? targets : null;
-  };
+  });
+}
+
+/**
+ * Blocks that join an entry which already has content (a template appended):
+ * a charge covering "every sigil in the entry" (`targets: null`) covers only
+ * the calculators and drawings among these blocks — it would otherwise
+ * conceal what the entry already held.
+ */
+export function withChargesCoveringOnly(blocks: readonly BlockInstance[]): BlockInstance[] {
+  const tools = sigilUnits(blocks).filter(({ block }) => isSigilToolType(block.type)).map(({ block }) => block.id);
+  return blocks.map((block) => withChargesRewritten(block, (charge) => (charge.targets ? null : tools)));
+}
+
+/** Every charge in the block — a charge block itself or the charge parts of a field block — with the targets `rewrite` returns; `null` leaves a charge as it is. */
+function withChargesRewritten(block: BlockInstance, rewrite: (charge: SigilCharge) => string[] | null): BlockInstance {
+  const targetsOf = (charge: SigilCharge) => (charge.broken ? null : rewrite(charge));
   if (block.type === SIGIL_CHARGE_TYPE) {
     const charge = parseSigilCharge(block);
-    const targets = mapped(charge);
+    const targets = targetsOf(charge);
     return targets ? serializeSigilCharge(block, { ...charge, targets }) : block;
   }
   let result = block;
   for (const unit of sigilUnits([block])) {
     if (!unit.part || unit.block.type !== SIGIL_CHARGE_TYPE) continue;
     const charge = parseSigilCharge(unit.block);
-    const targets = mapped(charge);
+    const targets = targetsOf(charge);
     if (!targets) continue;
     const next = serializeSigilCharge(unit.block, { ...charge, targets });
     result = withElementValue(result, unit.part.element.id, JSON.parse(next.attrs[BLOCK_ATTR.data]));

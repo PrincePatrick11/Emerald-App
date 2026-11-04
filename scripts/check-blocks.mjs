@@ -29,7 +29,7 @@ writeFileSync(
    export { instantiateDefinition, parseDefinitionElements, parseDefinitionDisplay, remapDefinitionDefaults, definitionImageRefs } from '${root}/src/lib/blocks/definitions';
    export { entryBlockSummary } from '${root}/src/lib/blocks/entrySummary';
    export { withLegacyStatus, statusDefinition, hasLegacyStatus, convertLegacyStatusRows, STATUS_DEFINITION_ID } from '${root}/src/lib/blocks/legacyStatus';
-   export { extractUniqueLetters, parseSigilCalc, serializeSigilCalc, createSigilCalcBlock, createSigilCanvasBlock, createSigilChargeBlock, parseSigilCharge, serializeSigilCharge, sigilState, withoutConcealed, sigilImage, withSigilImage, letterList, sigilUnits, sigilPartBlock, sigilPartId, withSigilPart, withRenamedPartTargets } from '${root}/src/lib/blocks/sigil';
+   export { extractUniqueLetters, parseSigilCalc, serializeSigilCalc, createSigilCalcBlock, createSigilCanvasBlock, createSigilChargeBlock, parseSigilCharge, serializeSigilCharge, sigilState, withoutConcealed, sigilImage, withSigilImage, letterList, sigilUnits, sigilPartBlock, sigilPartId, withSigilPart, withChargesCoveringOnly, withRenamedPartTargets } from '${root}/src/lib/blocks/sigil';
    export { renderBlocksForExport } from '${root}/src/lib/blocks/exportRender';
    export { parseAssignments, resolveAssignedTemplate, instantiateTemplateBlocks, isContentEmpty, templateStart, mergeTemplateTags, assignedTemplateAt, areBlocksEmpty, fieldsWithTemplate, fieldsWithoutTemplate } from '${root}/src/lib/blocks/templates';
    export { internalLinkChipHtml } from '${root}/src/lib/internalLinkHtml';
@@ -61,7 +61,7 @@ const {
   extractUniqueLetters, parseSigilCalc, serializeSigilCalc, createSigilCalcBlock, createSigilCanvasBlock,
   createSigilChargeBlock, parseSigilCharge, serializeSigilCharge, sigilState, withoutConcealed,
   sigilImage, withSigilImage, letterList, renderBlocksForExport,
-  sigilUnits, sigilPartBlock, sigilPartId, withSigilPart,
+  sigilUnits, sigilPartBlock, sigilPartId, withSigilPart, withChargesCoveringOnly,
   remapDefinitionDefaults, definitionImageRefs, withRenamedPartTargets,
   parseAssignments, resolveAssignedTemplate, instantiateTemplateBlocks, isContentEmpty,
   templateStart, mergeTemplateTags, assignedTemplateAt, areBlocksEmpty,
@@ -773,6 +773,14 @@ console.log('\n6. Templates: assignment, insertion\n');
     first.every((b, i) => b.id !== parseBlocks(sigilTpl.content)[i].id && b.id !== second[i].id));
   check('insertion: the charge targets the new drawing and stays loaded, the drawing comes along',
     firstCharge.loaded && firstCharge.targets.join() === first[2].id && sigilImage(first[2]) === `${'ef'.repeat(32)}.png`, firstCharge);
+  const allCharge = serializeSigilCharge(createSigilChargeBlock(), { loaded: true, revealDate: null, lock: 'entry', technique: null, targets: null });
+  const appended = withChargesCoveringOnly([calc, allCharge]);
+  const appendedCharge = parseSigilCharge(appended[1]);
+  check('appended: a charge for "all sigils" covers only the blocks that came with it',
+    appendedCharge.loaded && appendedCharge.targets.join() === calc.id, appendedCharge);
+  const existing = createSigilCanvasBlock();
+  check('appended: the entry\'s own drawing stays visible',
+    !sigilState([existing, ...appended], '2029-12-31').concealed.has(existing.id));
   // A charge as part of a custom block targets `<block ID>:<element ID>` — that is carried along too.
   const partText = { label: (el) => el.label || el.kind, yes: 'Ja', no: 'Nein', moonName: (ph) => ph };
   const partDef = {

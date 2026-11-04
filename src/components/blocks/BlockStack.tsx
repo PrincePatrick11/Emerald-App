@@ -33,7 +33,7 @@ import { resolveBlockType, type BlockTypeMeta } from '../../lib/blocks/blockType
 import { blockIcon, createFromPreset } from '../../lib/blocks/presets';
 import { useBlockDefinitionStore } from '../../store/blockDefinitionStore';
 import {
-  SIGIL_CHARGE_TYPE, sigilState, sigilUnits, todayIso, withChargesCoveringCopy, withoutConcealedParts,
+  SIGIL_CHARGE_TYPE, withChargesCoveringOnly, sigilState, sigilUnits, todayIso, withChargesCoveringCopy, withoutConcealedParts,
   withRenamedPartTargets,
 } from '../../lib/blocks/sigil';
 import { blockLabel, hiddenAttrValue, isBlockHidden, showsTitleInRead, withBlockAttr } from '../../lib/blocks/blockAttrs';
@@ -355,7 +355,8 @@ export default function BlockStack({
   const applyTemplate = (template: Template) => {
     if (!templateTarget || !isEditing) return;
     const added = instantiateTemplateBlocks(template);
-    const next = areBlocksEmpty(blocksRef.current) ? added : [...blocksRef.current, ...added];
+    // Appended, its sigil conceals only its own calculators and drawings.
+    const next = areBlocksEmpty(blocksRef.current) ? added : [...blocksRef.current, ...withChargesCoveringOnly(added)];
     commit(next.length > 0 ? next : [createTextBlock()]);
     const { entryType, flush } = templateTarget;
     // Save the deferred input first: title and tags are checked against the store.

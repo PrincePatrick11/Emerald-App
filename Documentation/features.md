@@ -105,7 +105,7 @@ A sigil is an operation with three blocks — **Sigil calculator**, **Sigil draw
 
 While charged, the calculators and drawings it covers are hidden (also in search) and left out of exports until the reveal date; a charge without a reveal date hides them until you unload it. From the reveal date on they show again, still locked. "Unload sigil" (with confirmation) lifts the lock. A charge that locks the whole entry disables Edit, with a tooltip saying why.
 
-Duplicating keeps the charge: a duplicated entry, or a duplicated block the charge hides or locks, comes out just as loaded, hidden until the same date. Saving an entry as a template, and inserting a template, work the same way: a drawn or loaded sigil comes along as it is. A new entry from a template whose loaded sigil locks the whole entry opens for reading until the sigil is unloaded.
+Duplicating keeps the charge: a duplicated entry, or a duplicated block the charge hides or locks, comes out just as loaded, hidden until the same date. Saving an entry as a template, and inserting a template, work the same way: a drawn or loaded sigil comes along as it is. A new entry from a template whose loaded sigil locks the whole entry opens for reading until the sigil is unloaded. Inserted into an entry that already has content, a template's charge covers only the calculators and drawings the template brought.
 
 Sigils from older vaults are converted into these blocks on open (intention, letters, drawing, charge state, reveal date, technique, and notes as a text block), with a backup written next to the database first.
 
