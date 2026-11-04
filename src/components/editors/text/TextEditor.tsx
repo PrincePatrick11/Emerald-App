@@ -197,20 +197,23 @@ export default function TextEditor({
     editorProps: {
       handlePaste(view, event) {
         if (!view.state.schema.nodes['image']) return false;
-        const items = Array.from(event.clipboardData?.items ?? []);
-        const imageItem = items.find((item) => item.type.startsWith('image/'));
-        if (!imageItem) return false;
+        // Every image of the clipboard, in its order; anything else pastes as usual.
+        const files = Array.from(event.clipboardData?.items ?? [])
+          .filter((item) => item.type.startsWith('image/'))
+          .map((item) => item.getAsFile())
+          .filter((file): file is File => !!file && isAcceptedImageFile(file));
+        if (files.length === 0) return false;
         event.preventDefault();
-        const file = imageItem.getAsFile();
-        if (!file || !isAcceptedImageFile(file)) return false;
         void (async () => {
-          try {
-            const src = await saveImage(await prepareImageDataUrl(await readFileAsDataUrl(file)));
-            const nodeType = view.state.schema.nodes['image'];
-            if (!nodeType) return;
-            view.dispatch(view.state.tr.replaceSelectionWith(nodeType.create({ src })));
-          } catch (e) {
-            reportImageError(e, 'paste');
+          for (const file of files) {
+            try {
+              const src = await saveImage(await prepareImageDataUrl(await readFileAsDataUrl(file)));
+              const nodeType = view.state.schema.nodes['image'];
+              if (!nodeType || view.isDestroyed) return;
+              view.dispatch(view.state.tr.replaceSelectionWith(nodeType.create({ src })));
+            } catch (e) {
+              reportImageError(e, 'paste');
+            }
           }
         })();
         return true;

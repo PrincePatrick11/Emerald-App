@@ -1774,6 +1774,54 @@ html[data-theme] .prop-segment--active {
   box-shadow: inset 0 0 0 1px var(--focus-ring);
 }
 
+/* Where a drag into a text editor would land (DropIndicator). */
+.editor-drop-line,
+.editor-drop-caret {
+  position: fixed;
+  z-index: 60;
+  pointer-events: none;
+  border-radius: 1px;
+  background: var(--accent);
+}
+.editor-drop-line { height: 2px; }
+.editor-drop-caret { width: 2px; }
+
+/* An editor image's resize handles: a slim bar at the middle of the side that moves. */
+.editor-image-handle {
+  position: absolute;
+  top: 50%;
+  width: 6px;
+  height: 36px;
+  margin-top: -18px;
+  border-radius: 3px;
+  background: var(--accent);
+  box-shadow: 0 0 0 2px var(--well-page);
+  cursor: ew-resize;
+  touch-action: none;
+}
+.editor-image-handle--left { left: 6px; }
+.editor-image-handle--right { right: 6px; }
+
+/* The width while resizing, in the image's corner. */
+.editor-image-size {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 11px;
+  background: var(--well-solid);
+  color: var(--text-secondary);
+  pointer-events: none;
+}
+
+/* While an image is dragged, nothing gets selected along the way. */
+.editor-image-dragging,
+.editor-image-dragging * {
+  user-select: none !important;
+  cursor: grabbing !important;
+}
+
 /* The stack's one toolbar stays at the top while scrolling. */
 .block-stack-toolbar {
   position: sticky;

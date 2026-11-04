@@ -4,6 +4,8 @@ import { getCurrentWebview } from '@tauri-apps/api/webview';
 import { copyImageFile, readImageFile, saveImage } from '../../../lib/images';
 import { hasImageLimits, ImageTooLargeError, prepareImageDataUrl } from '../../../lib/imageLimits';
 import { reportImageError, useImageNoticeStore } from '../../../store/imageNoticeStore';
+import { editorAtPoint, lineSpot, type DropSpot } from './dropSpot';
+import { editorHas } from './hostContext';
 
 /** The read limit of the Rust command along with its number (see `images.rs`). */
 const TOO_LARGE_TO_READ = /image file too large: (\d+)/;
@@ -19,15 +21,37 @@ async function readDroppedImage(path: string): Promise<string> {
   }
 }
 
+interface FileDropOptions {
+  enabled: boolean;
+  /** The host's editors, in order. */
+  getEditors: () => Editor[];
+  /** The area that counts as a target, also between the editors. */
+  getContainer: () => HTMLElement | null;
+  /** Where a drop outside every editor goes, at its cursor; `null` for nowhere. */
+  getFallback: () => Editor | null;
+  /** Where the dragged files would land, for the indicator. */
+  onSpot: (spot: DropSpot | null) => void;
+}
+
 /**
  * Images via drag & drop from the file explorer, through Tauri's native
  * drag-drop event. The event applies to the whole window, not to an element,
- * so only ONE listener may hang per entry, otherwise the image lands in
- * every text block. `getTarget` picks the editor that receives it.
+ * so only ONE listener may hang per host, otherwise the image lands in
+ * every editor. The images land between the blocks under the pointer, in the
+ * order of the files; dropped beside all editors, at the cursor of `getFallback`.
  */
-export function useEditorFileDrop(enabled: boolean, getTarget: () => Editor | null) {
-  const getTargetRef = useRef(getTarget);
-  getTargetRef.current = getTarget;
+export function useEditorFileDrop({ enabled, getEditors, getContainer, getFallback, onSpot }: FileDropOptions) {
+  const optionsRef = useRef({ getEditors, getContainer, getFallback, onSpot });
+  optionsRef.current = { getEditors, getContainer, getFallback, onSpot };
+
+  /** The spot at a position of the event: physical pixels of the webview. */
+  const spotAt = (position: { x: number; y: number }): DropSpot | null => {
+    const { getEditors, getContainer } = optionsRef.current;
+    const x = position.x / window.devicePixelRatio;
+    const y = position.y / window.devicePixelRatio;
+    const target = editorAtPoint(getEditors().filter((ed) => editorHas(ed, 'image')), getContainer(), x, y);
+    return target ? lineSpot(target.editor, target.y) : null;
+  };
 
   const [fileDragOver, setFileDragOver] = useState(false);
 
@@ -40,17 +64,27 @@ export function useEditorFileDrop(enabled: boolean, getTarget: () => Editor | nu
       .onDragDropEvent(async (event) => {
         const { type } = event.payload;
 
-        if (type === 'enter' || type === 'over') { setFileDragOver(true); return; }
-        if (type === 'leave') { setFileDragOver(false); return; }
+        if (type === 'enter' || type === 'over') {
+          setFileDragOver(true);
+          optionsRef.current.onSpot(spotAt(event.payload.position));
+          return;
+        }
+        if (type === 'leave') { setFileDragOver(false); optionsRef.current.onSpot(null); return; }
 
         if (type === 'drop') {
           setFileDragOver(false);
-          const { paths } = event.payload;
+          optionsRef.current.onSpot(null);
+          const { paths, position } = event.payload;
           const imagePaths = paths.filter((p) => /\.(png|jpe?g|gif|webp|svg)$/i.test(p));
           if (!imagePaths.length) { useImageNoticeStore.getState().show({ kind: 'format' }); return; }
 
-          const editor = getTargetRef.current();
+          const spot = spotAt(position);
+          const fallback = optionsRef.current.getFallback();
+          const editor = spot?.editor ?? (fallback && editorHas(fallback, 'image') ? fallback : null);
           if (!editor) return;
+          // Each image after the previous one. Saving takes a moment; should the
+          // document have shrunk in between, the spot is held to its end.
+          let at = spot ? spot.pos : null;
 
           for (const path of imagePaths) {
             try {
@@ -58,7 +92,15 @@ export function useEditorFileDrop(enabled: boolean, getTarget: () => Editor | nu
               const src = hasImageLimits()
                 ? await saveImage(await prepareImageDataUrl(await readDroppedImage(path)))
                 : await copyImageFile(path);
-              editor.chain().focus().insertContent({ type: 'image', attrs: { src } }).run();
+              if (editor.isDestroyed) return;
+              const node = { type: 'image', attrs: { src } };
+              if (at === null) {
+                editor.chain().focus().insertContent(node).run();
+                continue;
+              }
+              const before = editor.state.doc.content.size;
+              editor.chain().focus().insertContentAt(Math.min(at, before), node).run();
+              at = Math.min(at, before) + (editor.state.doc.content.size - before);
             } catch (e) {
               reportImageError(e, `drop ${path}`);
             }
@@ -74,6 +116,7 @@ export function useEditorFileDrop(enabled: boolean, getTarget: () => Editor | nu
       disposed = true;
       unlisten?.();
       setFileDragOver(false);
+      optionsRef.current.onSpot(null);
     };
   }, [enabled]);
 

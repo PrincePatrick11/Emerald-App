@@ -6,10 +6,14 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased] (targeting v0.2.0)
 
 ### Added
+- **Images in the text can be moved by dragging them,** within a text block and into another one; Undo puts them back.
+- **Files dragged in from the explorer land where you drop them,** between the paragraphs under the pointer, and a line shows the spot beforehand; entries dragged in from the list show where they will land as well.
+- **Several images at once** through paste or the image button.
 - **A plus in the rail creates anything.** It opens a small window with a tile for each type — Journal, Tasks, Operations, Wiki, Altar, Lexicon, Templates and Blocks — and opens what you pick, by click, by keyboard or by the tile's number key; the dashboards' own "New" buttons work the same way.
 - **Altars have their own icon,** a candle on a table, instead of a flame.
 
 ### Changed
+- **Resizing an image** uses a handle on the side that moves (both sides for a centred image), snaps to common widths and shows the width while dragging.
 - **The rail's buttons are grouped by space.** Home, then Journal/Tasks/Operations, Wiki/Lexicon/Altar and Templates/Blocks at the top; Categories/Tags/Trash and Vault/Settings at the bottom. It scrolls without a bar when the window is low, and the rail and the entry list's search start at the sheet's top edge.
 - **"Insert template" and "Add block" moved to the top of the right sidebar** while editing, "Insert template" first; the template editor has them too.
 - **The Categories page uses the full width.**

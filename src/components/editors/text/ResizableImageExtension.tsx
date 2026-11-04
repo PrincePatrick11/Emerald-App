@@ -3,6 +3,7 @@ import { ReactNodeViewRenderer, NodeViewWrapper } from '@tiptap/react';
 import type { NodeViewProps } from '@tiptap/react';
 import { useRef, useState } from 'react';
 import { imageSrc, storedImageName } from '../../../lib/images';
+import { getImageDrag, setImageDrag } from './imageDrag';
 
 /** Applies to text as to images; the toolbar serves both with the same buttons. */
 export type Alignment = 'left' | 'center' | 'right';
@@ -41,11 +42,36 @@ function alignFromLegacyStyle(img: HTMLImageElement): Alignment {
   return img.style.marginRight === 'auto' ? 'center' : 'right';
 }
 
-function ResizableImageView({ node, updateAttributes, selected, editor }: NodeViewProps) {
+/** Past this much travel, a press on an image becomes a move. */
+const DRAG_THRESHOLD_PX = 4;
+/** Widths a resize snaps to when it comes this close (in percentage points). */
+const SNAP_WIDTHS = [25, 33, 50, 66, 75, 100];
+const SNAP_RANGE = 2;
+
+function snapWidth(percent: number): number {
+  const near = SNAP_WIDTHS.find((w) => Math.abs(w - percent) <= SNAP_RANGE);
+  return near ?? Math.round(percent);
+}
+
+/**
+ * Which side the resize handles sit on, and how far the width changes per
+ * pixel of pointer travel. A left-aligned image grows to the right, a
+ * right-aligned one to the left, a centred one on both sides at once,
+ * which is why there the width changes twice as fast as the pointer.
+ */
+function resizeSides(align: unknown): { side: 'left' | 'right'; factor: number }[] {
+  if (align === 'center') return [{ side: 'left', factor: -2 }, { side: 'right', factor: 2 }];
+  if (align === 'right') return [{ side: 'left', factor: -1 }];
+  return [{ side: 'right', factor: 1 }];
+}
+
+function ResizableImageView({ node, updateAttributes, selected, editor, getPos }: NodeViewProps) {
   const imgRef = useRef<HTMLImageElement>(null);
   const [hovered, setHovered] = useState(false);
-  const [resizing, setResizing] = useState(false);
+  const [resizeLabel, setResizeLabel] = useState<string | null>(null);
+  const [moving, setMoving] = useState(false);
   const editable = editor.isEditable;
+  const resizing = resizeLabel !== null;
   const showHandle = editable && (selected || hovered || resizing);
 
   // The stored `src` is a filename; `emerald-img://` resolves it. No load step,
@@ -53,7 +79,7 @@ function ResizableImageView({ node, updateAttributes, selected, editor }: NodeVi
   // can be cached forever.
   const displaySrc = imageSrc(node.attrs.src as string);
 
-  const onPointerDown = (e: React.PointerEvent) => {
+  const startResize = (e: React.PointerEvent, factor: number) => {
     e.preventDefault();
     e.stopPropagation();
 
@@ -63,16 +89,52 @@ function ResizableImageView({ node, updateAttributes, selected, editor }: NodeVi
     const editorW =
       imgRef.current?.closest('.ProseMirror')?.getBoundingClientRect().width ?? 600;
 
-    setResizing(true);
+    const widthAt = (clientX: number) => {
+      const px = Math.max(80, Math.min(editorW, startW + (clientX - startX) * factor));
+      return snapWidth((px / editorW) * 100);
+    };
+    setResizeLabel(`${widthAt(startX)}%`);
 
     const onMove = (ev: PointerEvent) => {
-      const newW = Math.max(80, Math.min(editorW, startW + (ev.clientX - startX)));
-      updateAttributes({ width: `${Math.round((newW / editorW) * 100)}%` });
+      const percent = widthAt(ev.clientX);
+      setResizeLabel(`${percent}%`);
+      updateAttributes({ width: `${percent}%` });
     };
     const onUp = () => {
-      setResizing(false);
+      setResizeLabel(null);
       document.removeEventListener('pointermove', onMove);
       document.removeEventListener('pointerup', onUp);
+    };
+    document.addEventListener('pointermove', onMove);
+    document.addEventListener('pointerup', onUp);
+  };
+
+  /**
+   * A press on the image itself: a click selects it as before; once the
+   * pointer travels, it becomes a move, which the host's drop listener
+   * finishes (`useEditorPointerDrops`).
+   */
+  const onImagePointerDown = (e: React.PointerEvent) => {
+    if (!editable || e.button !== 0) return;
+    const startX = e.clientX;
+    const startY = e.clientY;
+    let started = false;
+
+    const onMove = (ev: PointerEvent) => {
+      if (started || Math.hypot(ev.clientX - startX, ev.clientY - startY) < DRAG_THRESHOLD_PX) return;
+      started = true;
+      setMoving(true);
+      document.body.classList.add('editor-image-dragging');
+      setImageDrag({ editor, getPos: () => (typeof getPos === 'function' ? getPos() : undefined) });
+    };
+    const onUp = () => {
+      document.removeEventListener('pointermove', onMove);
+      document.removeEventListener('pointerup', onUp);
+      if (!started) return;
+      setMoving(false);
+      document.body.classList.remove('editor-image-dragging');
+      // A host has finished the move by now; without one nobody would clear it.
+      window.setTimeout(() => { if (getImageDrag()?.editor === editor) setImageDrag(null); }, 0);
     };
     document.addEventListener('pointermove', onMove);
     document.addEventListener('pointerup', onUp);
@@ -94,20 +156,18 @@ function ResizableImageView({ node, updateAttributes, selected, editor }: NodeVi
           src={displaySrc}
           alt={node.attrs.alt ?? ''}
           draggable={false}
-          className={`block w-full rounded-lg object-contain${selected ? ' ring-2 ring-focus ring-offset-1 ring-offset-well-page' : ''}`}
+          onPointerDown={onImagePointerDown}
+          className={`block w-full rounded-lg object-contain${selected ? ' ring-2 ring-focus ring-offset-1 ring-offset-well-page' : ''}${editable ? ' cursor-grab' : ''}${moving ? ' opacity-40' : ''}`}
           style={{ maxHeight: 600 }}
         />
-        {showHandle && (
+        {showHandle && resizeSides(node.attrs.align).map(({ side, factor }) => (
           <div
-            className="absolute bottom-1.5 right-1.5 w-3.5 h-3.5 rounded-sm cursor-se-resize"
-            style={{
-              touchAction: 'none',
-              background: 'rgba(210,210,210,0.85)',
-              border: '1px solid rgba(255,255,255,0.5)',
-            }}
-            onPointerDown={onPointerDown}
+            key={side}
+            className={`editor-image-handle editor-image-handle--${side}`}
+            onPointerDown={(e) => startResize(e, factor)}
           />
-        )}
+        ))}
+        {resizeLabel && <div className="editor-image-size">{resizeLabel}</div>}
       </div>
     </NodeViewWrapper>
   );
@@ -117,7 +177,8 @@ export const ResizableImage = Node.create({
   name: 'image',
   group: 'block',
   atom: true,
-  draggable: true,
+  // Moved by the node view's own pointer drag: the WebView has no HTML5 drag.
+  draggable: false,
 
   addAttributes() {
     return {

@@ -27,3 +27,14 @@ Requests that depend on the place's content stay with the place. `BlockStack` ha
 A switched-off feature is missing from the schema, not only from the toolbar. Content that uses it is dropped when the editor loads it, and the next change saves the content without it, so features are switched off only where such content cannot exist yet. The toolbar asks the editor's schema (`editorHas`), not the feature set, so it always matches what the editor can do. The host also sends file drops only to an editor with images and pointer drops only to editors with link chips.
 
 `features` is read once, when the editor is created, like the formatting settings under Settings → Entries ([Vault Settings](storage.md#vault-settings)).
+
+### Images and drops
+
+Every drag into the host's editors goes through one geometry (`dropSpot.ts`): `editorAtPoint` finds the editor under the pointer, or the nearest one when the pointer is between them; `lineSpot` gives the position between two top-level blocks, `caretSpot` the one between two characters. `DropIndicator` draws a line or a caret there while the drag runs. It listens to its own channel, so a pointer move does not re-render the host.
+
+- **Files from the explorer** (`useEditorFileDrop`) land between the blocks under the pointer, several in the order of the files. Tauri reports the position in physical pixels; it is divided by `devicePixelRatio`. Dropped beside all editors, they go to the cursor of the focused editor.
+- **Entries from the list** (`useEditorPointerDrops`) become a link chip at the caret.
+- **Images in the text** are moved by dragging them. The WebView has no HTML5 drag, so the image node is not `draggable` for ProseMirror; its node view starts a pointer drag after a few pixels (`imageDrag.ts`), and the host's listener moves it at `pointerup`. Within one editor that is one transaction and one undo step; into another editor of the host it is inserted there and then removed at the source. The moved image ends up selected.
+- **Paste and the image button** take several images at once, in their order.
+
+Resizing drags a handle on the side that moves: right for a left-aligned image, left for a right-aligned one, both for a centred one, where the width changes twice as fast as the pointer. The width is stored in percent of the editor's width, snaps to 25, 33, 50, 66, 75 and 100 % within two points, and shows in the image's corner while dragging.

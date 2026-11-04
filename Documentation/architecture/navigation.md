@@ -32,7 +32,7 @@ Tauri's WKWebView does not pass HTML5 drag events to JavaScript, so all drag-and
 2. The drop target registers `pointermove` and `pointerup` listeners on `document` while a drag is in progress.
 3. On `pointerup`, the target reads the drag state and applies the drop.
 
-Drops into an entry's text use exactly one such listener per open entry (`useEditorPointerDrops`, mounted by `BlockStack`): it hit-tests the text blocks' editors and clears the drag whether or not one was hit. One listener per text block would let the first clear the drag before the block under the pointer saw it.
+Drops into an entry's text use exactly one such listener per open entry (`useEditorPointerDrops`, mounted by the text editor host in `BlockStack`): it hit-tests the text blocks' editors and clears the drag whether or not one was hit, in read mode too. One listener per text block would let the first clear the drag before the block under the pointer saw it. The same listener moves images between and within the text blocks; see [Images and drops](editors.md#images-and-drops).
 
 ## Tabs and Workspace State
 

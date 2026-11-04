@@ -8,7 +8,10 @@ import { useEditorPointerDrops } from './useEditorPointerDrops';
 import { useInternalLinkNavigation } from './useInternalLinkNavigation';
 import { useTextEditorRegistry } from './useTextEditorRegistry';
 import { insertImageFromDataUrl, insertInternalLinkChip } from './editorCommands';
-import { editorHas, type TextEditorHostContextValue } from './hostContext';
+import { type TextEditorHostContextValue } from './hostContext';
+import DropIndicator from './DropIndicator';
+import type { DropSpot } from './dropSpot';
+import { createDragChannel } from '../../../lib/dragChannel';
 
 interface TextEditorHostOptions {
   isEditing: boolean;
@@ -22,7 +25,8 @@ interface TextEditorHostOptions {
  * Everything that may exist only ONCE for a set of text editors shown
  * together, such as the text blocks of an entry: the one toolbar, bound to the
  * focused editor; the link picker; chip-click navigation in read mode; file
- * drops from the explorer and pointer drops from the entry list; the drag tag.
+ * drops from the explorer, pointer drops from the entry list and images moved
+ * by dragging, with the indicator of where they land; the drag tag.
  *
  * The host provides `context` through `TextEditorHostContext`; each
  * `TextEditor` inside with a `hostKey` then reports itself. `toolbar` and
@@ -38,15 +42,20 @@ export function useTextEditorHost({ isEditing, getOrder, getContainer }: TextEdi
     useTextEditorRegistry(getOrder);
 
   useInternalLinkNavigation(!isEditing);
-  // Only to an editor that has the feature at all; otherwise the drop goes nowhere.
-  const fileDrop = useEditorFileDrop(isEditing, () => {
-    const target = targetEditor();
-    return target && editorHas(target, 'image') ? target : null;
+  // Both drops only reach editors that have the feature (image, link chip).
+  const [spots] = useState(() => createDragChannel<DropSpot>());
+  const fileDrop = useEditorFileDrop({
+    enabled: isEditing,
+    getEditors: orderedEditors,
+    getContainer,
+    getFallback: targetEditor,
+    onSpot: spots.set,
   });
   const pointerDropActive = useEditorPointerDrops({
     enabled: isEditing,
-    getEditors: () => orderedEditors().filter((ed) => editorHas(ed, 'internalLink')),
+    getEditors: orderedEditors,
     getContainer,
+    onSpot: spots.set,
   });
 
   const [linkPickerOpen, setLinkPickerOpen] = useState(false);
@@ -66,6 +75,7 @@ export function useTextEditorHost({ isEditing, getOrder, getContainer }: TextEdi
         />
       )}
       <DragGhost />
+      <DropIndicator spots={spots} />
     </>
   );
 
@@ -94,7 +104,7 @@ function HostToolbar({ editor, onOpenLinkPicker }: { editor: Editor; onOpenLinkP
     <div className="block-stack-toolbar">
       <EditorToolbar
         editor={editor}
-        onInsertImage={(dataUrl) => { void insertImageFromDataUrl(editor, dataUrl); }}
+        onInsertImage={(dataUrl) => insertImageFromDataUrl(editor, dataUrl)}
         onOpenLinkPicker={onOpenLinkPicker}
       />
     </div>

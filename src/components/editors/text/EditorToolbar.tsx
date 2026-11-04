@@ -39,7 +39,8 @@ const EXPLICIT_ALIGNMENTS = ['center', 'right', 'justify'] as const;
 
 interface Props {
   editor: Editor;
-  onInsertImage: (src: string) => void;
+  /** One image as a data URL; awaited, so several land in the order chosen. */
+  onInsertImage: (src: string) => Promise<void>;
   onOpenLinkPicker: () => void;
 }
 
@@ -93,19 +94,20 @@ export default function EditorToolbar({ editor, onInsertImage, onOpenLinkPicker 
     return editor.isActive({ textAlign: align });
   };
 
-  const handleImageFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
+  const handleImageFiles = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files ?? []);
     e.target.value = '';
-    if (!file) return;
-    if (!isAcceptedImageFile(file)) {
+    const accepted = files.filter(isAcceptedImageFile);
+    if (accepted.length < files.length) {
       setImageError(t('common.unsupportedImageFormat'));
       window.setTimeout(() => setImageError(null), 2500);
-      return;
     }
-    try {
-      onInsertImage(await readFileAsDataUrl(file));
-    } catch (err) {
-      console.error('Failed to read image:', err);
+    for (const file of accepted) {
+      try {
+        await onInsertImage(await readFileAsDataUrl(file));
+      } catch (err) {
+        console.error('Failed to read image:', err);
+      }
     }
   };
 
@@ -284,8 +286,9 @@ export default function EditorToolbar({ editor, onInsertImage, onOpenLinkPicker 
         ref={fileInputRef}
         type="file"
         accept={ACCEPTED_IMAGE_MIME}
+        multiple
         className="hidden"
-        onChange={handleImageFile}
+        onChange={handleImageFiles}
       />
 
       <ToolbarDivider />
