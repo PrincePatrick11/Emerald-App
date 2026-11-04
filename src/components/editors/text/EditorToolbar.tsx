@@ -319,17 +319,17 @@ export default function EditorToolbar({ editor, onInsertImage, onOpenLinkPicker 
   );
 }
 
-function ToolbarGroup({ children }: { children: React.ReactNode }) {
+export function ToolbarGroup({ children }: { children: React.ReactNode }) {
   return <div className="flex items-center gap-0.5">{children}</div>;
 }
 
 // The narrow margin is deliberate: the bar wraps when the editor area
 // gets tight, and every pixel saved pushes that wrap further out.
-function ToolbarDivider() {
+export function ToolbarDivider() {
   return <div className="w-px h-4 bg-well-raise mx-0.5" />;
 }
 
-function ToolbarBtn({
+export function ToolbarBtn({
   children,
   onClick,
   active,

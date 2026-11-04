@@ -501,6 +501,11 @@
       "undo": "Deshacer",
       "redo": "Rehacer"
     },
+    "menu": {
+      "webLink": "Enlazar a una dirección web",
+      "width": "Ancho {{value}} %",
+      "removeImage": "Quitar imagen"
+    },
     "unsaved": "Cambios sin guardar"
   },
   "moonPhase": {

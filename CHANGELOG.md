@@ -6,6 +6,7 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased] (targeting v0.2.0)
 
 ### Added
+- **A small menu appears over selected text** for bold, italic, strikethrough, highlight, code and a link to a web address; over a selected image it offers alignment, 25/50/100 % width and removing it.
 - **Images in the text can be moved by dragging them,** within a text block and into another one; Undo puts them back.
 - **Files dragged in from the explorer land where you drop them,** between the paragraphs under the pointer, and a line shows the spot beforehand; entries dragged in from the list show where they will land as well.
 - **Several images at once** through paste or the image button.

@@ -501,6 +501,11 @@
       "undo": "Undo",
       "redo": "Redo"
     },
+    "menu": {
+      "webLink": "Link to a web address",
+      "width": "Width {{value}} %",
+      "removeImage": "Remove image"
+    },
     "unsaved": "Unsaved changes"
   },
   "moonPhase": {

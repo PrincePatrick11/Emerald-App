@@ -17,6 +17,7 @@ import { useTranslation } from 'react-i18next';
 import { TEXT_ALIGN_TYPES } from './EditorToolbar';
 import { FULL_TEXT_FEATURES, type TextFeatures } from './features';
 import { TextEditorHostContext, editorHas } from './hostContext';
+import SelectionMenus from './SelectionMenus';
 import Button from '../../ui/Button';
 import { createInternalLinkExtension } from './InternalLinkExtension';
 import { ExternalDropExtension } from './ExternalDropExtension';
@@ -97,7 +98,7 @@ function formattingOptions(format: EditorSettings, withLinks: boolean) {
  * would hit every one of them.
  *
  * What stays here is whatever hangs on exactly this editor: extensions and chip lookups,
- * the popup for external links and inserting via paste.
+ * the menus at a selection, the popup for external links and inserting via paste.
  */
 export default function TextEditor({
   initialContent,
@@ -319,6 +320,7 @@ export default function TextEditor({
   return (
     <div className="relative">
       <EditorContent editor={editor} />
+      {editor && <SelectionMenus editor={editor} />}
 
       {/* Link popup — shown in edit mode when cursor is inside an external link */}
       {editable && linkPopup && (

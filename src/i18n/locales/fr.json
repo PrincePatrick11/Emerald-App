@@ -501,6 +501,11 @@
       "undo": "Annuler",
       "redo": "Rétablir"
     },
+    "menu": {
+      "webLink": "Lier à une adresse web",
+      "width": "Largeur {{value}} %",
+      "removeImage": "Retirer l’image"
+    },
     "unsaved": "Modifications non enregistrées"
   },
   "moonPhase": {
