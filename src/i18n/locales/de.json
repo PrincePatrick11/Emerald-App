@@ -638,7 +638,8 @@
       "markdownNote": "Markdown enthält keine Dateien: Bilder und Sounddateien erscheinen als Hinweis."
     },
     "placeholder": {
-      "image": "Bild"
+      "image": "Bild",
+      "notExported": "{{name}} – nicht exportiert"
     },
     "bulk": {
       "title": "Mehrere Einträge exportieren",
@@ -660,7 +661,8 @@
       "emeraldUnavailable": "Enthält immer genau einen Eintrag – für mehrere Einträge PDF, HTML oder Markdown wählen.",
       "fileTitle": "Emerald – {{modules}} – {{range}}",
       "noModules": "Mindestens ein Modul auswählen.",
-      "invalidDate": "Datum unvollständig oder ungültig (Format JJJJ-MM-TT)."
+      "invalidDate": "Datum unvollständig oder ungültig (Format JJJJ-MM-TT).",
+      "noLinked": "Die ausgewählten Einträge verlinken auf keine weiteren Einträge."
     },
     "largePdfHint": "{{count}} Einträge sind ein großes PDF – das Erzeugen kann dauern, und unter macOS wird es eine einzige sehr lange Seite. Für große Pakete eignet sich HTML besser."
   }

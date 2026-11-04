@@ -5,7 +5,7 @@ import { format as formatDate, isValid, parseISO, subDays, startOfMonth } from '
 import { Check, FileText, Gem, Globe, Hash, Loader2 } from 'lucide-react';
 import { useExportStore, type ExportFormat } from '../../store/exportStore';
 import {
-  collectExportDataFor, collectLinkedTargets, collectTargetsInRange, describeTarget,
+  collectExportDataFor, collectLinkedTargets, collectTargetsInRange, describeTarget, targetKey,
   type ExportData, type ExportEntryType, type ExportTarget,
 } from '../../lib/exportData';
 import { exportAsMarkdown, exportAsPDF, exportErrorMessage, type ExportOptions } from '../../lib/export';
@@ -46,6 +46,8 @@ const DAY = 'yyyy-MM-dd';
 interface Prefs {
   format: ExportFormat;
   includeLinked: boolean;
+  /** Bulk exports keep their own choice, off by default: linked entries are an opt-in there. */
+  bulkIncludeLinked: boolean;
   recursive: boolean;
   images: ExportOptions['images'];
   audio: ExportOptions['audio'];
@@ -59,7 +61,7 @@ interface Prefs {
 function loadPrefs(): Prefs {
   const today = new Date();
   const fallback: Prefs = {
-    format: 'pdf', includeLinked: false, recursive: false, images: 'balanced', audio: 'embed',
+    format: 'pdf', includeLinked: false, bulkIncludeLinked: false, recursive: false, images: 'balanced', audio: 'embed',
     bulkModules: ['journal'], bulkPeriod: 'last7',
     bulkFrom: formatDate(subDays(today, 6), DAY), bulkTo: formatDate(today, DAY),
   };
@@ -107,8 +109,6 @@ function periodRange(period: Period, fromText: string, toText: string): { from: 
   }
 }
 
-const targetKey = (t: ExportTarget) => `${t.type}:${t.id}`;
-
 function TargetIcon({ icon }: { icon: string }) {
   return icon.startsWith('data:')
     ? <img src={icon} alt="" className="w-4 h-4 rounded object-cover shrink-0" />
@@ -127,11 +127,13 @@ function Checkbox({ checked, disabled }: { checked: boolean; disabled?: boolean 
   );
 }
 
-function Segmented<T extends string>({ options, value, onChange, label }: {
+function Segmented<T extends string>({ options, value, onChange, label, disabled }: {
   options: readonly T[];
   value: T;
   onChange: (value: T) => void;
   label: (value: T) => string;
+  /** Options shown but not selectable. */
+  disabled?: readonly T[];
 }) {
   return (
     <div className="flex flex-wrap gap-1 p-0.5 rounded-lg border w-fit" style={{ borderColor: 'var(--border-soft)' }}>
@@ -140,7 +142,8 @@ function Segmented<T extends string>({ options, value, onChange, label }: {
           key={option}
           type="button"
           onClick={() => onChange(option)}
-          className={`export-segment${value === option ? ' export-segment-active' : ''}`}
+          disabled={disabled?.includes(option)}
+          className={`export-segment disabled:opacity-50 disabled:cursor-not-allowed${value === option ? ' export-segment-active' : ''}`}
         >
           {label(option)}
         </button>
@@ -226,14 +229,7 @@ function ExportModalBody({ target, initialFormat }: { target: ExportTarget | nul
   // An Emerald file holds exactly one entry, so a bulk export can't use it.
   const format: ExportFormat = bulk && prefs.format === 'emerald' ? 'pdf' : prefs.format;
 
-  // ── Single entry: its linked entries ──
   const main = useMemo(() => (target ? describeTarget(target) : null), [target]);
-  const directTargets = useMemo(() => (target ? collectLinkedTargets(target, false) : []), [target]);
-  const allTargets = useMemo(() => (target ? collectLinkedTargets(target, true) : []), [target]);
-  const linked = prefs.recursive ? allTargets : directTargets;
-  const hasIndirect = allTargets.length > directTargets.length;
-  const bundleSupported = format !== 'emerald';
-  const bundling = !bulk && bundleSupported && prefs.includeLinked && linked.length > 0;
 
   // ── Bulk: entries of the chosen modules and period ──
   const range = useMemo(
@@ -245,9 +241,30 @@ function ExportModalBody({ target, initialFormat }: { target: ExportTarget | nul
     [bulk, prefs.bulkModules, range],
   );
 
-  const selected: ExportTarget[] = target
-    ? [target, ...(bundling ? linked.filter((l) => !excluded.has(targetKey(l))) : [])]
-    : bulkTargets.filter((b) => !excluded.has(targetKey(b)));
+  const bulkSelected = useMemo(
+    () => bulkTargets.filter((b) => !excluded.has(targetKey(b))),
+    [bulkTargets, excluded],
+  );
+
+  // ── Linked entries: of the one entry, or of the bulk selection ──
+  // (in bulk mode, e.g. wiki articles linked from the journal entries when
+  // only Journal was picked; entries already in the selection don't repeat)
+  const roots = useMemo(() => (target ? [target] : bulkSelected), [target, bulkSelected]);
+  const includeLinked = bulk ? prefs.bulkIncludeLinked : prefs.includeLinked;
+  // Unchecked bulk entries are skipped, so they never reappear as "linked".
+  const skipped = useMemo(() => bulkTargets.filter((b) => excluded.has(targetKey(b))), [bulkTargets, excluded]);
+  // In bulk mode the link graph of a whole period is only walked once asked for.
+  const wantLinks = !bulk || includeLinked;
+  const directTargets = useMemo(() => (wantLinks ? collectLinkedTargets(roots, false, skipped) : []), [wantLinks, roots, skipped]);
+  const allTargets = useMemo(() => (wantLinks ? collectLinkedTargets(roots, true, skipped) : []), [wantLinks, roots, skipped]);
+  const linked = prefs.recursive ? allTargets : directTargets;
+  const hasIndirect = allTargets.length > directTargets.length;
+  const bundleSupported = format !== 'emerald';
+  const bundling = bundleSupported && includeLinked && linked.length > 0;
+  const audioPlaceholderOnly = format === 'pdf';
+  const linkedSelected = bundling ? linked.filter((l) => !excluded.has(targetKey(l))) : [];
+
+  const selected: ExportTarget[] = [...roots, ...linkedSelected];
 
   const toggleModule = (type: ExportEntryType) => {
     const has = prefs.bulkModules.includes(type);
@@ -453,29 +470,27 @@ function ExportModalBody({ target, initialFormat }: { target: ExportTarget | nul
               </div>
               <div>
                 <p className="text-xs text-stone-500 mb-1.5">{t('exportModal.audio.label')}</p>
-                {format === 'pdf' ? (
-                  <p className="text-xs text-stone-500 leading-snug">{t('exportModal.audio.alwaysPlaceholder')}</p>
-                ) : (
-                  <>
-                    <Segmented
-                      options={AUDIO_OPTIONS}
-                      value={prefs.audio}
-                      onChange={(v) => update({ audio: v })}
-                      label={(v) => t(`exportModal.audio.${v}`)}
-                    />
-                    <p className="text-xs text-stone-500 mt-1.5 leading-snug">{t(`exportModal.audio.${prefs.audio}Desc`)}</p>
-                  </>
-                )}
+                <Segmented
+                  options={AUDIO_OPTIONS}
+                  value={audioPlaceholderOnly ? 'placeholder' : prefs.audio}
+                  // A PDF's fixed choice must not overwrite the one saved for HTML / Emerald.
+                  onChange={(v) => { if (!audioPlaceholderOnly) update({ audio: v }); }}
+                  label={(v) => t(`exportModal.audio.${v}`)}
+                  disabled={audioPlaceholderOnly ? ['embed'] : undefined}
+                />
+                <p className="text-xs text-stone-500 mt-1.5 leading-snug">
+                  {audioPlaceholderOnly ? t('exportModal.audio.alwaysPlaceholder') : t(`exportModal.audio.${prefs.audio}Desc`)}
+                </p>
               </div>
             </>
           )}
         </div>
 
-        {/* Single entry: linked entries */}
-        {!bulk && (
+        {/* Linked entries — of the one entry, or of the bulk selection */}
+        {(!bulk || roots.length > 0) && (
           <div>
             <p className="text-xs text-stone-500 mb-2">{t('exportModal.linkedEntries')}</p>
-            {directTargets.length === 0 ? (
+            {wantLinks && directTargets.length === 0 && !(bulk && includeLinked) ? (
               <p className="text-xs text-stone-500 italic">{t('exportModal.noLinked')}</p>
             ) : !bundleSupported ? (
               <p className="text-xs text-stone-500">{t('exportModal.emeraldSingle')}</p>
@@ -483,14 +498,17 @@ function ExportModalBody({ target, initialFormat }: { target: ExportTarget | nul
               <div className="space-y-3">
                 <button
                   type="button"
-                  onClick={() => update({ includeLinked: !prefs.includeLinked })}
+                  onClick={() => update(bulk ? { bulkIncludeLinked: !includeLinked } : { includeLinked: !includeLinked })}
                   className="flex items-center gap-2 text-left"
                 >
-                  <Checkbox checked={prefs.includeLinked} />
+                  <Checkbox checked={includeLinked} />
                   <span className="text-xs text-stone-300">{t('exportModal.includeLinked')}</span>
                 </button>
 
-                {prefs.includeLinked && (
+                {includeLinked && bulk && directTargets.length === 0 && (
+                  <p className="text-xs text-stone-500 italic">{t('exportModal.bulk.noLinked')}</p>
+                )}
+                {includeLinked && directTargets.length > 0 && (
                   <>
                     {hasIndirect && (
                       <Segmented

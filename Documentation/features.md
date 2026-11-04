@@ -252,8 +252,8 @@ The chosen format, compression and bundling options are remembered for the next 
 
 The export modal's **Attachments** section decides what happens to files embedded in the exported entries:
 
-- **Images:** *Original*, *Compressed*, *Strongly compressed* (see above) or *Placeholder* — the image is left out and replaced by a note ("🖼 Image", or the image's alt text).
-- **Sound files:** *Embed* or *Placeholder* (a note with the file name), for interactive HTML and Emerald. A PDF can't play anything, so sound files are always a placeholder there.
+- **Images:** *Original*, *Compressed*, *Strongly compressed* (see above) or *Placeholder* — the image is left out and replaced by a note that says so: "🖼 Image – not exported" (or the image's alt text instead of "Image").
+- **Sound files:** *Embed* or *Placeholder* — "🔊 <file name> – not exported". A PDF can't play anything, so there *Placeholder* is preselected and *Embed* is unavailable.
 - **Markdown** carries no files at all: images and sound files always appear as notes (images used to be dropped silently).
 
 An Emerald file exported with placeholders keeps the notes as text and does not contain the files.
@@ -265,7 +265,7 @@ An Emerald file exported with placeholders keeps the notes as text and does not 
 - **Modules:** Journal, Operations and/or Wiki.
 - **Period:** last 7 days, last 30 days, this month, all, or a custom from–to range (whole days, by creation date).
 
-The matching entries are listed (oldest first, with date and module) and can be unchecked one by one. Everything selected goes into **one** PDF, interactive HTML or Markdown file, in chronological order; the attachment options apply as for a single entry. Emerald is not available here, since an Emerald file holds exactly one entry. The file and document are named after the selection, e.g. `Emerald_Journal-Operations_2026-09-01_2026-09-10.html` / "Emerald – Journal, Operations – 01.09.2026–10.09.2026". Sigil operations and trashed entries are never included.
+The matching entries are listed (oldest first, with date and module) and can be unchecked one by one. **Also export linked entries** adds what those entries link to — e.g. the wiki articles and operations referenced from the journal entries of a week, when only Journal was picked — directly linked or including indirect, each uncheckable; entries already in the selection are not listed again. Everything selected goes into **one** PDF, interactive HTML or Markdown file — the entries of the period in chronological order, followed by the linked entries; the attachment options apply as for a single entry. Emerald is not available here, since an Emerald file holds exactly one entry. The file and document are named after the selection, e.g. `Emerald_Journal-Operations_2026-09-01_2026-09-10.html` / "Emerald – Journal, Operations – 01.09.2026–10.09.2026". Sigil operations and trashed entries are never included.
 
 ### Interactive HTML Export
 

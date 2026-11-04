@@ -83,7 +83,8 @@ export function transformMedia(html: string, modes: MediaModes): string {
     for (const img of Array.from(doc.querySelectorAll('img'))) {
       const figure = doc.createElement('figure');
       figure.className = 'image-placeholder';
-      figure.textContent = `🖼 ${img.getAttribute('alt') || img.getAttribute('title') || i18n.t('exportModal.placeholder.image')}`;
+      const name = img.getAttribute('alt') || img.getAttribute('title') || i18n.t('exportModal.placeholder.image');
+      figure.textContent = `🖼 ${i18n.t('exportModal.placeholder.notExported', { name })}`;
       img.replaceWith(figure);
     }
   }
@@ -97,7 +98,9 @@ export function transformMedia(html: string, modes: MediaModes): string {
       // Keep the width the player was given in the editor.
       if (embed && el.style.width) figure.style.width = el.style.width;
       const caption = doc.createElement('figcaption');
-      caption.textContent = `🔊 ${audioTitle(src, el.getAttribute('data-title'))}`;
+      const title = audioTitle(src, el.getAttribute('data-title'));
+      // A placeholder says plainly that the file was left out on purpose.
+      caption.textContent = `🔊 ${embed ? title : i18n.t('exportModal.placeholder.notExported', { name: title })}`;
       figure.appendChild(caption);
       if (embed && src) {
         const audio = doc.createElement('audio');

@@ -638,7 +638,8 @@
       "markdownNote": "Markdown carries no files: images and sound files appear as notes."
     },
     "placeholder": {
-      "image": "Image"
+      "image": "Image",
+      "notExported": "{{name}} – not exported"
     },
     "bulk": {
       "title": "Export Multiple Entries",
@@ -660,7 +661,8 @@
       "emeraldUnavailable": "Always holds exactly one entry – choose PDF, HTML or Markdown for several entries.",
       "fileTitle": "Emerald – {{modules}} – {{range}}",
       "noModules": "Select at least one module.",
-      "invalidDate": "Date incomplete or invalid (format YYYY-MM-DD)."
+      "invalidDate": "Date incomplete or invalid (format YYYY-MM-DD).",
+      "noLinked": "The selected entries don't link to any other entries."
     },
     "largePdfHint": "{{count}} entries make a large PDF – creating it can take a while, and on macOS it becomes one very long page. HTML suits large bundles better."
   }

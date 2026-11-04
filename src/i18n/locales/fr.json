@@ -638,7 +638,8 @@
       "markdownNote": "Markdown ne contient pas de fichiers : les images et les fichiers audio apparaissent comme des notes."
     },
     "placeholder": {
-      "image": "Image"
+      "image": "Image",
+      "notExported": "{{name}} – non exporté"
     },
     "bulk": {
       "title": "Exporter plusieurs entrées",
@@ -660,7 +661,8 @@
       "emeraldUnavailable": "Contient toujours exactement une entrée – choisissez PDF, HTML ou Markdown pour plusieurs entrées.",
       "fileTitle": "Emerald – {{modules}} – {{range}}",
       "noModules": "Sélectionnez au moins un module.",
-      "invalidDate": "Date incomplète ou invalide (format AAAA-MM-JJ)."
+      "invalidDate": "Date incomplète ou invalide (format AAAA-MM-JJ).",
+      "noLinked": "Les entrées sélectionnées ne renvoient vers aucune autre entrée."
     },
     "largePdfHint": "{{count}} entrées donnent un PDF volumineux : sa création peut prendre du temps et, sous macOS, il devient une seule page très longue. Le HTML convient mieux aux gros lots."
   }

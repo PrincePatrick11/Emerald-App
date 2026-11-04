@@ -273,16 +273,25 @@ function directLinks(t: ExportTarget): ExportTarget[] {
   return [...out, ...internalLinksIn(content)];
 }
 
+/** Identity of a target across modules, e.g. for sets of selected entries. */
+export const targetKey = (t: ExportTarget) => `${t.type}:${t.id}`;
+
 /**
- * Collects the entries linked from `root`, in discovery order (breadth-first),
- * without duplicates and without `root` itself. With `recursive`, links of
- * linked entries are followed too, so the bundle is closed under linking.
+ * Collects the entries linked from `roots` — one entry, or the entries of a
+ * bulk selection — in discovery order (breadth-first), without duplicates and
+ * without the roots themselves or anything in `skip` (a bulk export's
+ * unchecked entries). With `recursive`, links of linked entries are followed
+ * too, so the bundle is closed under linking.
  */
-export function collectLinkedTargets(root: ExportTarget, recursive: boolean): ExportTarget[] {
-  const key = (t: ExportTarget) => `${t.type}:${t.id}`;
-  const seen = new Set<string>([key(root)]);
+export function collectLinkedTargets(
+  roots: readonly ExportTarget[],
+  recursive: boolean,
+  skip: readonly ExportTarget[] = [],
+): ExportTarget[] {
+  const key = targetKey;
+  const seen = new Set<string>([...roots, ...skip].map(key));
   const result: ExportTarget[] = [];
-  let frontier: ExportTarget[] = [root];
+  let frontier: ExportTarget[] = [...roots];
 
   while (frontier.length) {
     const next: ExportTarget[] = [];
