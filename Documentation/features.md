@@ -8,11 +8,17 @@ The header shows today's date with the current **moon phase** and a **New Entry*
 
 ## Journal
 
-The journal is the primary day-to-day writing space. Each entry has a title and a rich-text body. Besides the usual formatting (headings, lists, quotes, code, images, links), the toolbar inserts a horizontal rule and aligns paragraphs, headings and images left, center or right — an image aligns on its own, since it is a block with its own width. Wiki and Operations use the same editor.
+The journal is the primary day-to-day writing space. Each entry has a title and a rich-text body. Besides the usual formatting (headings, lists, checklists, quotes, code, images, links), the toolbar inserts a horizontal rule and a table and aligns paragraphs, headings and images left, center or right — an image aligns on its own, since it is a block with its own width. Wiki and Operations use the same editor.
+
+**Writing.** Typing `/` at the start of a line or after a space opens a list of what to insert — text, headings, lists, a checklist, quote, divider, a collapsible section, a table, images or a link to an entry; typing on filters it. Selected text gets a small menu above it for bold, italic, strikethrough, highlight, code, one of six text colours and a link to a web address; the colours follow the theme, so coloured text stays readable in light and dark ones. A table gets a menu at its top edge for rows, columns and the header row, and its columns can be dragged wider or narrower. ⌘F (Ctrl+F) finds text across all of the entry's text blocks, while reading too; while editing it also replaces one hit or all of them. While editing, the words and characters of the entry show under the text.
+
+**Folding.** Every heading can be folded: a chevron beside it hides everything below up to the next heading of the same or a higher level. A collapsible section from the `/` menu does the same for its own content under a heading line. Both work while reading, start open or closed again the next time, and change nothing in the entry; the PDF export prints sections open.
+
+**Images in the text.** Images can be pasted, chosen (several at once) or dragged in from the file explorer, where they land between the paragraphs under the pointer. Dragging an image moves it, also into another text block of the entry. A selected image gets a menu for alignment, 25/50/100 % width and removing it; its handles resize it, keeping the size in pixels, so an image no longer grows and shrinks with the window. A photo that arrives as PNG is stored as JPEG — see [Image Storage and Cleanup](#image-storage-and-cleanup).
 
 **Blocks.** An entry's body is a stack of blocks — text blocks, each with the full editor, and field blocks (below). In edit mode every block shows a subtle frame: a grip to drag it up or down, its type, and a "…" menu to duplicate or remove it. Hovering between two blocks reveals a "+" that inserts a new one there; "+ Add block" below the last block is always visible. Read mode shows none of this — the blocks flow like one document.
 
-There is one formatting toolbar, pinned to the top while scrolling, acting on the text block you are typing in. A link added from "Linked entries", an image dropped from the file explorer, or an entry dragged in from the left list lands in the text block you last worked in (a drag: the one under the pointer). Cancel reverts block changes along with the text. All of this applies to Wiki articles and Operations too, sigils included.
+There is one formatting toolbar, pinned to the top while scrolling, acting on the text block you are typing in. A link added from "Linked entries" lands in the text block you last worked in; an image dropped from the file explorer or an entry dragged in from the left list lands where the pointer is, shown by a line or caret while dragging. Cancel reverts block changes along with the text. All of this applies to Wiki articles and Operations too, sigils included.
 
 **Field blocks.** "Add block" offers ten kinds of field besides text: short text, number, date, choice, yes/no, checklist, link (to any entry), image, moon phase, and altar — a link restricted to altars, shown full width with the altar's picture; clicking it opens the altar.
 
@@ -516,6 +522,8 @@ For the file structure and per-mode semantics, see [DB Backup / Restore (`.emera
 
 Images are written into the vault's own `images/` folder, named after a hash of their content, so the same picture added twice is stored once. Entries refer to them by filename alone, which keeps a vault folder portable.
 
+Wherever an image is added — the text, an image field, covers and icons, the altar, an import — a photo that arrives as PNG (a photo pasted from the clipboard, for instance) is stored as JPEG at full size, with no visible difference and about a fifth of the space. Screenshots, graphics and anything with transparency stay PNG. Settings → Entries → Images can switch this off and set a largest edge length and file size for inserted images. Backups and sigil drawings are stored as they are.
+
 Nothing deletes an image automatically. **Settings → Storage → Unused images** scans on demand: *Scan* reports how many images nothing points at and how much space they take, *Remove* deletes exactly those. It is manual on purpose — an image just inserted but not yet saved would otherwise look unused.
 
 A vault from before per-vault image folders has its images copied into its own folder the first time it is opened. The cleanup never deletes from the old shared pool, since a vault not yet opened may still read from it.
@@ -546,7 +554,7 @@ Settings are **per vault** — stored in the vault's own `settings.json`. Switch
 
 - **General** — language, theme, the two fonts, interface size and editor text size (see [Language](#language), [Typography](#typography), [Sizing](#sizing), [Theming](#theming)).
 - **Sidebar** — which list the left entry list shows (all items together, or one module's own), and how many entries it lists before "Show more".
-- **Entries** — the emoji picker's default set, size limits for inserted images, whether new tags may appear on the spot (typed, from a template, from an import), whether a new entry starts with its default template, **Automatic formatting** (Markdown shortcuts such as `# ` or `**bold**`; typography such as curly quotes, dashes, arrows and fractions; auto-links for typed or pasted addresses — each its own switch, applying to editors opened afterwards), and whether journal entries show their **moon phase** (see [Journal](#journal)).
+- **Entries** — the emoji picker's default set, how inserted images are stored (photos as JPEG, size limits), whether new tags may appear on the spot (typed, from a template, from an import), whether a new entry starts with its default template, **Automatic formatting** (Markdown shortcuts such as `# ` or `**bold**`; typography such as curly quotes, dashes, arrows and fractions; auto-links for typed or pasted addresses — each its own switch, applying to editors opened afterwards), and whether journal entries show their **moon phase** (see [Journal](#journal)).
 - **Security** — remember on this device, lock now, change password (see [Vault Encryption](#vault-encryption)).
 - **Backup** — see [Vault Backup](#vault-backup-emeralddb).
 - **Storage** — how long the Trash keeps deleted items, and the unused-images cleanup (see [Image Storage and Cleanup](#image-storage-and-cleanup)).

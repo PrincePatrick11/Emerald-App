@@ -1,4 +1,4 @@
-import { useEditor, EditorContent } from '@tiptap/react';
+import { useEditor, EditorContent, type Editor } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Link from '@tiptap/extension-link';
 import Placeholder from '@tiptap/extension-placeholder';
@@ -14,26 +14,24 @@ import { TextColorMark } from './TextColorExtension';
 import { SearchExtension } from './SearchExtension';
 import { createHeadingFold } from './HeadingFoldExtension';
 import { useContext, useEffect, useMemo, useRef, useState, useCallback } from 'react';
-import { saveImage } from '../../../lib/images';
 import { openUrl } from '@tauri-apps/plugin-opener';
-import { ExternalLink, Pencil, Trash2, Check, X } from 'lucide-react';
+import { ExternalLink, Pencil, Unlink } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
-import { TEXT_ALIGN_TYPES } from './EditorToolbar';
+import { TEXT_ALIGN_TYPES } from './formatActions';
+import { applyLinkHref, insertImageFiles } from './editorCommands';
+import LinkHrefForm from './LinkHrefForm';
+import { ToolbarBtn } from './toolbarParts';
 import { FULL_TEXT_FEATURES, type TextFeatures } from './features';
 import { TextEditorHostContext, editorHas } from './hostContext';
 import SelectionMenus from './SelectionMenus';
 import { createSlashCommands } from './slashCommands';
 import i18n from '../../../i18n';
-import Button from '../../ui/Button';
 import { createInternalLinkExtension } from './InternalLinkExtension';
-import { ExternalDropExtension } from './ExternalDropExtension';
 import type { SuggestionItem } from './SuggestionList';
 import { useLinkItems } from '../../../hooks/useLinkItems';
 import { linkItemKey, linkItemsByKey } from '../../../lib/linkItems';
-import { isAcceptedImageFile, readFileAsDataUrl } from '../../../lib/helpers';
-import { prepareImageDataUrl } from '../../../lib/imageLimits';
-import { reportImageError } from '../../../store/imageNoticeStore';
+import { isAcceptedImageFile } from '../../../lib/helpers';
 import { useSettingsStore } from '../../../store/settingsStore';
 import type { EditorSettings } from '../../../lib/vaultSettings';
 
@@ -120,7 +118,7 @@ export default function TextEditor({
 
   // Link popup state (edit mode only)
   const [linkPopup, setLinkPopup] = useState<LinkPopupState | null>(null);
-  const [editingHref, setEditingHref] = useState<string | null>(null);
+  const [editingLink, setEditingLink] = useState(false);
   const linkPopupRef = useRef<HTMLDivElement>(null);
 
   // Always-fresh items ref so the extension closure never goes stale.
@@ -148,6 +146,8 @@ export default function TextEditor({
   const [features] = useState(featuresProp);
   const [format] = useState(() => formattingOptions(useSettingsStore.getState().settings.editor, features.links));
 
+  // For the paste handler, which is configured before the editor exists.
+  const editorRef = useRef<Editor | null>(null);
   const editor = useEditor({
     extensions: [
       StarterKit.configure({
@@ -196,7 +196,6 @@ export default function TextEditor({
               (id, entryType) => getIconRef.current(id, entryType),
               (id, entryType) => getLabelRef.current(id, entryType)
             ),
-            ExternalDropExtension,
           ]
         : []),
       ...(features.images ? [ResizableImage] : []),
@@ -238,24 +237,16 @@ export default function TextEditor({
           .filter((item) => item.type.startsWith('image/'))
           .map((item) => item.getAsFile())
           .filter((file): file is File => !!file && isAcceptedImageFile(file));
-        if (files.length === 0) return false;
+        const current = editorRef.current;
+        if (files.length === 0 || !current) return false;
         event.preventDefault();
-        void (async () => {
-          for (const file of files) {
-            try {
-              const src = await saveImage(await prepareImageDataUrl(await readFileAsDataUrl(file)));
-              const nodeType = view.state.schema.nodes['image'];
-              if (!nodeType || view.isDestroyed) return;
-              view.dispatch(view.state.tr.replaceSelectionWith(nodeType.create({ src })));
-            } catch (e) {
-              reportImageError(e, 'paste');
-            }
-          }
-        })();
+        void insertImageFiles(current, files);
         return true;
       },
     },
   });
+
+  editorRef.current = editor;
 
   const host = useContext(TextEditorHostContext);
   useEffect(() => {
@@ -297,7 +288,7 @@ export default function TextEditor({
       setTimeout(() => {
         if (!linkPopupRef.current?.contains(document.activeElement)) {
           setLinkPopup(null);
-          setEditingHref(null);
+          setEditingLink(false);
         }
       }, 150);
     };
@@ -313,8 +304,13 @@ export default function TextEditor({
   // event here would reach the block stack as a supposed change.
   useEffect(() => {
     editor?.setEditable(editable, false);
-    if (editor && editable && features.images) pinPercentImageWidths(editor);
   }, [editable, editor]);
+
+  // Old percentage widths become pixels once editing starts (see
+  // `pinPercentImageWidths`); they are saved with the first real change.
+  useEffect(() => {
+    if (editor && editable && features.images) pinPercentImageWidths(editor);
+  }, [editable, editor, features.images]);
 
   // Open external links in browser (read mode only)
   useEffect(() => {
@@ -334,23 +330,9 @@ export default function TextEditor({
     return () => el.removeEventListener('click', handleClick);
   }, [editable, editor]);
 
-  const handleLinkEditConfirm = () => {
-    if (!editor || editingHref === null) return;
-    const href = editingHref.trim();
-    if (href) {
-      editor.chain().focus().extendMarkRange('link').setLink({ href }).run();
-    } else {
-      editor.chain().focus().extendMarkRange('link').unsetLink().run();
-    }
-    setEditingHref(null);
+  const closeLinkPopup = () => {
+    setEditingLink(false);
     setLinkPopup(null);
-  };
-
-  const handleLinkRemove = () => {
-    if (!editor) return;
-    editor.chain().focus().extendMarkRange('link').unsetLink().run();
-    setLinkPopup(null);
-    setEditingHref(null);
   };
 
   return (
@@ -363,52 +345,34 @@ export default function TextEditor({
       {editable && linkPopup && (
         <div
           ref={linkPopupRef}
-          className="fixed z-50 flex items-center gap-1 px-2 py-1.5 bg-well-solid border border-edge-strong rounded-lg shadow-menu text-xs"
+          // The same surface as the selection menus.
+          className="editor-selection-menu fixed"
           style={{
             left: linkPopup.rect.left,
             top: linkPopup.rect.bottom + 6,
           }}
           onMouseDown={(e) => e.preventDefault()}
         >
-          {editingHref !== null ? (
-            <>
-              <input
-                autoFocus
-                value={editingHref}
-                onChange={(e) => setEditingHref(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') handleLinkEditConfirm();
-                  if (e.key === 'Escape') { setEditingHref(null); }
-                }}
-                className="bg-well-page border border-edge-strong rounded-md px-2 py-0.5 text-secondary w-64 outline-none focus:border-accent-edge"
-                placeholder="https://"
-              />
-              <button onClick={handleLinkEditConfirm} className="p-1 text-accent hover:text-accent-raise" title={t('editor.confirm')}>
-                <Check size={12} />
-              </button>
-              <button onClick={() => setEditingHref(null)} className="p-1 text-subtle hover:text-raise" title={t('editor.cancel')}>
-                <X size={12} />
-              </button>
-            </>
+          {editingLink ? (
+            <LinkHrefForm
+              initial={linkPopup.href}
+              onConfirm={(href) => { if (editor) applyLinkHref(editor, href); closeLinkPopup(); }}
+              onCancel={() => { setEditingLink(false); editor?.commands.focus(); }}
+            />
           ) : (
             <>
-              <ExternalLink size={12} className="text-subtle shrink-0" />
-              <span className="text-muted max-w-[220px] truncate">{linkPopup.href}</span>
-              <button
-                onClick={() => setEditingHref(linkPopup.href)}
-                className="p-1 text-subtle hover:text-raise ml-1"
-                title={t('editor.editLink')}
-              >
-                <Pencil size={12} />
-              </button>
-              <Button
-                onClick={handleLinkRemove}
-                variant="danger"
-                className="p-1"
+              <ExternalLink size={12} className="text-subtle shrink-0 ml-1" />
+              <span className="text-xs text-muted max-w-[220px] truncate">{linkPopup.href}</span>
+              <ToolbarBtn onClick={() => setEditingLink(true)} active={false} title={t('editor.editLink')}>
+                <Pencil size={14} />
+              </ToolbarBtn>
+              <ToolbarBtn
+                onClick={() => { if (editor) applyLinkHref(editor, ''); closeLinkPopup(); }}
+                active={false}
                 title={t('editor.removeLink')}
               >
-                <Trash2 size={12} />
-              </Button>
+                <Unlink size={14} />
+              </ToolbarBtn>
             </>
           )}
         </div>

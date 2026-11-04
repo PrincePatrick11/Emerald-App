@@ -38,7 +38,8 @@ export function isAcceptedImageFile(file: File): boolean {
   return (ACCEPTED_IMAGE_MIME_LIST as readonly string[]).includes(file.type);
 }
 
-export function readFileAsDataUrl(file: File): Promise<string> {
+/** A file, or any Blob (an encoded canvas, a worker's result), as a data URL. */
+export function readFileAsDataUrl(file: Blob): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onloadend = () => resolve(reader.result as string);

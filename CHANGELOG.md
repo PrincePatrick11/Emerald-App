@@ -9,7 +9,7 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - **Headings fold:** a chevron beside a heading hides everything under it up to the next heading of the same level, while reading and editing.
 - **Collapsible sections** from the `/` menu: a heading line that opens and closes the text under it, also while reading. The PDF export prints them open.
 - **Word and character count** under the text while editing, across all text blocks.
-- **Find and replace in an entry** with ⌘F / Ctrl+F: hits light up across all text blocks, Enter and Shift+Enter step through them; while editing, one or all can be replaced.
+- **Find and replace in an entry** with ⌘F (Ctrl+F on Windows and Linux): hits light up across all text blocks, Enter and Shift+Enter step through them, and a hit in a folded heading or a closed section opens it; while editing, one or all can be replaced.
 - **Text colours:** six colours in the selection menu, whose shade each theme sets, so coloured text stays readable in light and dark themes; the PDF export prints them too.
 - **Tables in the text,** from the toolbar or `/`: a header row, columns whose width can be dragged, and a menu at the table for adding and removing rows and columns. Markdown export writes them as tables.
 - **Typing `/` opens a list of what to insert:** text, headings, lists, a checklist, quote, divider, an image or a link to an entry; typing on filters it, arrow keys and Enter pick.
@@ -22,7 +22,7 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - **Altars have their own icon,** a candle on a table, instead of a flame.
 
 ### Changed
-- **Resizing an image** uses a handle on the side that moves (both sides for a centred image), snaps to common widths and shows the width while dragging. The size is kept in pixels, so the image no longer grows and shrinks with the window; only full width follows it. Images sized in percent before are converted the next time the entry is edited.
+- **Resizing an image** uses a handle on the side that moves (both sides for a centred image), snaps to common widths and shows the width while dragging. The size is kept in pixels, so the image no longer grows and shrinks with the window; only full width follows it. Images sized in percent before are converted the next time the entry is edited, without counting as a change on their own.
 - **Tables look like the rest of the app:** a rounded frame, quiet lines, the header row on the panel colour and a hover on rows.
 - **Long entries with large images stay smooth:** images are decoded in the background and loaded as they come into view, the selection menus exist only while editing, and the word count recounts at most once per frame.
 - **The formatting bar is a rounded bar of its own** instead of a dark strip, with larger buttons; what is active shows in jade, in Noctis too.
@@ -96,6 +96,7 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - **The edit-mode sidebar now mirrors the read-mode one** for Journal, Wiki, Operations, templates and your own blocks: the same collapsible sections with counts, where only the values become editable. Properties are rows with a small value button on the right: Type as a segmented control (Journal's moon phase stays a plain read-only row, since it isn't something you choose), Category, and Icon and Cover image as a small preview that opens a menu (Choose image / Emoji / Remove) — an empty cover instead opens the file dialog directly. Linked entries are a flat list with an × per row and a “Link entry …” field below; tags are chips with an × and an “Add tag …” field. A template's "Assignment" is now a property row too, next to its other properties, rather than its own section: the value button shows "Everywhere", the single assignment (starred if it's a default) or a count, with the full list in its tooltip; an unassigned template opens the assignment dialog straight from the button, an assigned one gets a short menu to reassign or clear it instead. A block's own page shows its display rules as switches instead of checkboxes, and a template's and a block's usage are collapsible sections too. The block list lost its frames around idle rows; “Add block” and “Insert template” sit below it under a divider as full-width buttons. “Done”, Delete and Cancel got a calmer look.
 
 ### Fixed
+- **"Show link" from the sidebar opens a folded heading or a closed section** around the link instead of scrolling to something hidden.
 - **The green ring around blocks sits on the block's frame again** — when jumping to a block from the sidebar and while something can be dropped into the text; it used to sit a little inside the frame.
 - **A dev build reads the remembered key once at start,** not twice at once, which doubled the keychain prompts on macOS.
 - **The loading screen stays up until an unlocked vault has loaded,** instead of showing the empty window after the password; a keychain prompt no longer counts against its timeout.

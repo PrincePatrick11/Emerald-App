@@ -12,7 +12,7 @@ export interface SearchMatch {
 
 interface SearchState {
   query: string;
-  /** Index into the matches of this editor, or `null` when the current hit is elsewhere. */
+  /** Where the current hit starts, or `null` when it is in another editor. */
   current: number | null;
   decorations: DecorationSet;
 }
@@ -20,12 +20,26 @@ interface SearchState {
 const searchKey = new PluginKey<SearchState>('textSearch');
 
 /**
+ * Lower case one character at a time, keeping the length: positions in the
+ * text are then positions in the document. A character whose lower case is
+ * longer ("İ" becomes "i" with a dot above) stays as it is.
+ */
+function foldCase(text: string): string {
+  let out = '';
+  for (let i = 0; i < text.length; i++) {
+    const lower = text[i].toLowerCase();
+    out += lower.length === 1 ? lower : text[i];
+  }
+  return out;
+}
+
+/**
  * Every place `query` occurs, case-insensitively, per textblock: a hit may
  * run across marks (bold in the middle of a word), not across paragraphs.
  * A link chip or another inline node counts as one character that matches nothing.
  */
 export function findMatches(doc: ProseMirrorNode, query: string): SearchMatch[] {
-  const needle = query.toLocaleLowerCase();
+  const needle = foldCase(query);
   if (!needle) return [];
   const matches: SearchMatch[] = [];
   doc.descendants((node, pos) => {
@@ -37,7 +51,7 @@ export function findMatches(doc: ProseMirrorNode, query: string): SearchMatch[] 
       for (let i = 0; i < piece.length; i++) starts.push(pos + 1 + offset + i);
       text += piece;
     });
-    const haystack = text.toLocaleLowerCase();
+    const haystack = foldCase(text);
     for (let at = haystack.indexOf(needle); at >= 0; at = haystack.indexOf(needle, at + needle.length)) {
       matches.push({ from: starts[at], to: starts[at + needle.length - 1] + 1 });
     }
@@ -48,11 +62,11 @@ export function findMatches(doc: ProseMirrorNode, query: string): SearchMatch[] 
 
 function decorate(doc: ProseMirrorNode, query: string, current: number | null): DecorationSet {
   const matches = findMatches(doc, query);
-  return DecorationSet.create(doc, matches.map((m, i) =>
-    Decoration.inline(m.from, m.to, { class: i === current ? 'editor-search-match editor-search-match--current' : 'editor-search-match' })));
+  return DecorationSet.create(doc, matches.map((m) =>
+    Decoration.inline(m.from, m.to, { class: m.from === current ? 'editor-search-match editor-search-match--current' : 'editor-search-match' })));
 }
 
-/** Show the hits of `query` in this editor, `current` of them as the current one. */
+/** Show the hits of `query` in this editor, the one starting at `current` as the current one. */
 export function setSearch(editor: Editor, query: string, current: number | null): void {
   if (editor.isDestroyed) return;
   editor.view.dispatch(editor.state.tr.setMeta(searchKey, { query, current }).setMeta('addToHistory', false));
@@ -76,7 +90,8 @@ export const SearchExtension = Extension.create({
             const meta = tr.getMeta(searchKey) as { query: string; current: number | null } | undefined;
             if (meta) return { ...meta, decorations: decorate(state.doc, meta.query, meta.current) };
             if (!tr.docChanged || !prev.query) return prev;
-            return { ...prev, decorations: decorate(state.doc, prev.query, prev.current) };
+            const current = prev.current === null ? null : tr.mapping.map(prev.current);
+            return { query: prev.query, current, decorations: decorate(state.doc, prev.query, current) };
           },
         },
         props: {

@@ -65,7 +65,8 @@ export function lineSpot(editor: Editor, y: number): DropSpot {
   state.doc.forEach((_node, offset) => {
     if (found) return;
     const el = view.nodeDOM(offset);
-    if (!(el instanceof HTMLElement)) return;
+    // A folded-away block has no box; it would pull the line to the top.
+    if (!(el instanceof HTMLElement) || el.getClientRects().length === 0) return;
     const r = el.getBoundingClientRect();
     if (y < r.top + r.height / 2) {
       pos = offset;

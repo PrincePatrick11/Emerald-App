@@ -1,9 +1,10 @@
-import { forwardRef, useEffect, useImperativeHandle, useState } from 'react';
+import { forwardRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { BookOpen, CheckSquare, Library, Wand2, type LucideIcon } from 'lucide-react';
 import { AltarIcon } from '../../../lib/altarIcon';
 import type { ContentType } from '../../../types';
 import type { SuggestionItem } from '../../../lib/linkItems';
+import { useListKeys, type SuggestionListHandle } from './suggestionPopup';
 
 /** Lives in `lib/linkItems.ts` alongside `buildLinkItems`, which produces these values;
  *  only re-exported here for the components that take the type from here. */
@@ -38,39 +39,10 @@ interface Props {
   command: (item: SuggestionItem) => void;
 }
 
-export interface SuggestionListRef {
-  onKeyDown: (event: KeyboardEvent) => boolean;
-}
-
-const SuggestionList = forwardRef<SuggestionListRef, Props>(
+const SuggestionList = forwardRef<SuggestionListHandle, Props>(
   ({ items, command }, ref) => {
     const { t } = useTranslation();
-    const [selectedIndex, setSelectedIndex] = useState(0);
-
-    useEffect(() => setSelectedIndex(0), [items]);
-
-    const selectItem = (index: number) => {
-      const item = items[index];
-      if (item) command(item);
-    };
-
-    useImperativeHandle(ref, () => ({
-      onKeyDown: (event: KeyboardEvent) => {
-        if (event.key === 'ArrowUp') {
-          setSelectedIndex((i) => (i + items.length - 1) % items.length);
-          return true;
-        }
-        if (event.key === 'ArrowDown') {
-          setSelectedIndex((i) => (i + 1) % items.length);
-          return true;
-        }
-        if (event.key === 'Enter' || event.key === 'Tab') {
-          selectItem(selectedIndex);
-          return true;
-        }
-        return false;
-      },
-    }));
+    const { selectedIndex } = useListKeys(ref, items, command);
 
     if (items.length === 0) {
       return (
@@ -87,7 +59,9 @@ const SuggestionList = forwardRef<SuggestionListRef, Props>(
           return (
             <button
               key={item.id}
-              onClick={() => selectItem(index)}
+              // Keep the editor's focus and selection: the click would otherwise take them away.
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => command(item)}
               className={`w-full text-left flex items-center gap-2 px-3 py-2 text-sm transition-colors ${
                 index === selectedIndex
                   ? 'bg-accent-fill-strong text-on-accent'

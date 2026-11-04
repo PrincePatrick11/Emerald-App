@@ -65,9 +65,11 @@ function resizedWidth(px: number, editorW: number): { width: string; label: stri
 /**
  * Images resized before widths were stored in pixels carry a percentage of the
  * editor's width and so grow and shrink with the window. Converted once to the
- * pixels of the moment, in one step outside the undo history; full width
- * (`100%`) is meant to follow and stays. Called when an editor starts editing:
- * it is a change of the content, which belongs to an edit.
+ * pixels of the moment, outside the undo history; full width (`100%`) is meant
+ * to follow and stays. Called when an editor starts editing. Without an
+ * `update` event: merely opening an entry for editing must not count as a
+ * change (autosave, the leave question); the new widths are written with the
+ * first real change, and until then the stored content keeps its percentages.
  */
 export function pinPercentImageWidths(editor: Editor): void {
   const editorW = editor.view.dom.getBoundingClientRect().width;
@@ -79,7 +81,7 @@ export function pinPercentImageWidths(editor: Editor): void {
     if (!match || Number(match[1]) >= 100) return;
     tr.setNodeMarkup(pos, undefined, { ...node.attrs, width: `${Math.round((editorW * Number(match[1])) / 100)}px` });
   });
-  if (tr.docChanged) editor.view.dispatch(tr.setMeta('addToHistory', false));
+  if (tr.docChanged) editor.view.dispatch(tr.setMeta('addToHistory', false).setMeta('preventUpdate', true));
 }
 
 /**
@@ -127,13 +129,16 @@ function ResizableImageView({ node, updateAttributes, selected, editor, getPos }
       setResizeLabel(label);
       updateAttributes({ width });
     };
+    // A cancelled pointer (touch panning, a native drag) ends it like a release.
     const onUp = () => {
       setResizeLabel(null);
       document.removeEventListener('pointermove', onMove);
       document.removeEventListener('pointerup', onUp);
+      document.removeEventListener('pointercancel', onUp);
     };
     document.addEventListener('pointermove', onMove);
     document.addEventListener('pointerup', onUp);
+    document.addEventListener('pointercancel', onUp);
   };
 
   /**
@@ -154,17 +159,23 @@ function ResizableImageView({ node, updateAttributes, selected, editor, getPos }
       document.body.classList.add('editor-image-dragging');
       setImageDrag({ editor, getPos: () => (typeof getPos === 'function' ? getPos() : undefined) });
     };
-    const onUp = () => {
+    const end = (cancelled: boolean) => {
       document.removeEventListener('pointermove', onMove);
       document.removeEventListener('pointerup', onUp);
+      document.removeEventListener('pointercancel', onCancel);
       if (!started) return;
       setMoving(false);
       document.body.classList.remove('editor-image-dragging');
-      // A host has finished the move by now; without one nobody would clear it.
-      window.setTimeout(() => { if (getImageDrag()?.editor === editor) setImageDrag(null); }, 0);
+      // Cancelled (touch panning, a native drag), nothing is moved. Released,
+      // a host has finished the move by now; without one nobody would clear it.
+      if (cancelled) setImageDrag(null);
+      else window.setTimeout(() => { if (getImageDrag()?.editor === editor) setImageDrag(null); }, 0);
     };
+    const onUp = () => end(false);
+    const onCancel = () => end(true);
     document.addEventListener('pointermove', onMove);
     document.addEventListener('pointerup', onUp);
+    document.addEventListener('pointercancel', onCancel);
   };
 
   return (
@@ -190,7 +201,8 @@ function ResizableImageView({ node, updateAttributes, selected, editor, getPos }
           draggable={false}
           onPointerDown={onImagePointerDown}
           className={`block w-full rounded-lg object-contain${selected ? ' ring-2 ring-focus ring-offset-1 ring-offset-well-page' : ''}${editable ? ' cursor-grab' : ''}${moving ? ' opacity-40' : ''}`}
-          style={{ maxHeight: 600 }}
+          // While editing a touch drag moves the image instead of scrolling the page.
+          style={{ maxHeight: 600, touchAction: editable ? 'none' : undefined }}
         />
         {showHandle && resizeSides(node.attrs.align).map(({ side, factor }) => (
           <div

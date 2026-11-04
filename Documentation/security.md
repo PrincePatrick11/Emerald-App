@@ -222,7 +222,7 @@ On top of the guards, each command allowlists extensions and returns `"unsupport
 | `export_image` | `.png`, `.jpg`, `.jpeg`, `.webp` | the base64 payload is decoded in Rust before writing, so no text encoding or newline handling can alter the bytes |
 | `copy_image_file`, `read_image_file` | `png`, `jpg`, `jpeg`, `gif`, `webp`, `svg` | shared helper `checked_image_source` |
 
-**`read_image_file`** never writes into a vault: it reads a validated external file and returns it as a base64 data-URL, for the frontend to scale and check against the vault's image limits (Settings → Entries, `src/lib/imageLimits.ts`) *before* handing it to `save_image`. It adds a hard **64 MB cap** (`MAX_EXTERNAL_IMAGE_BYTES`) checked via `fs::metadata` before reading — the bytes cross IPC as base64 and are decoded onto a canvas, so an arbitrarily large file would stall the webview before any vault limit could reject it. The vault's own maximum (if smaller) is enforced afterwards in TypeScript, which is why the 64 MB number lives only in Rust.
+**`read_image_file`** never writes into a vault: it reads a validated external file and returns it as a base64 data-URL, for the frontend to scale and check against the vault's image limits (Settings → Entries, `src/lib/imageLimits.ts`), and to store a photo PNG as JPEG while "Optimise photos" is on, *before* handing it to `save_image`. A dropped file goes this way whenever one of these could change it (`needsPreparing`); otherwise `copy_image_file` copies it as it is. It adds a hard **64 MB cap** (`MAX_EXTERNAL_IMAGE_BYTES`) checked via `fs::metadata` before reading — the bytes cross IPC as base64 and are decoded onto a canvas, so an arbitrarily large file would stall the webview before any vault limit could reject it. The vault's own maximum (if smaller) is enforced afterwards in TypeScript, which is why the 64 MB number lives only in Rust.
 
 For `copy_image_file` the *destination* is not a path at all — it is the vault's `images/` folder, resolved from the vault id.
 
@@ -259,9 +259,9 @@ An image icon is passed through `sanitizeDataImageUrl` instead. The content HTML
 
 All HTML that enters the app from outside is sanitised with DOMPurify before being stored or displayed.
 
-**PDF export (`src/lib/export.ts`).** Before the content HTML is handed to `export_pdf`, it passes through `DOMPurify.sanitize` with an allowlist for the internal-link attributes — `data-type`, `data-id`, `data-entry-type`, `data-label`, `data-icon`, `data-entry-number`, `data-href` — so internal-link chips survive. This closes an injection path if an editor extension or import produces unexpected HTML.
+**PDF export (`src/lib/export.ts`).** Before the content HTML is handed to `export_pdf`, it passes through `DOMPurify.sanitize` with an allowlist for the internal-link attributes — `data-type`, `data-id`, `data-entry-type`, `data-label`, `data-icon`, `data-entry-number`, `data-href` — so internal-link chips survive, plus `colwidth` (table column widths) and `data-color` (one of six colour names; the print CSS matches only those). This closes an injection path if an editor extension or import produces unexpected HTML.
 
-**Emerald import (`src/lib/emeraldFormat.ts`).** After image paths are remapped, content passes through `sanitizeImportedHtml` — the last step of every import that writes HTML to the database. It keeps TipTap's own attributes (`data-type`, `data-id`, `data-entry-type`, `data-label`, `data-icon`, `data-entry-number`, `data-align`) and strips everything DOMPurify removes by default (script tags, event handlers, …). `data-align` is intentionally not in the PDF allowlist: that path never reads it, and alignment survives through the image's inline margins.
+**Emerald import (`src/lib/emeraldFormat.ts`).** After image paths are remapped, content passes through `sanitizeImportedHtml` — the last step of every import that writes HTML to the database. It keeps TipTap's own attributes (`data-type`, `data-id`, `data-entry-type`, `data-label`, `data-icon`, `data-entry-number`, `data-align`, `colwidth`, `data-color`) and strips everything DOMPurify removes by default (script tags, event handlers, …). `data-align` is intentionally not in the PDF allowlist: that path never reads it, and alignment survives through the image's inline margins.
 
 **Markdown import.** `marked` converts the body to HTML in `emeraldFormat.ts`, and `sanitizeImportedHtml` runs as the very last step — the legacy link chips of a Journal entry and the status block of an operation are appended before it, so nothing added along the way skips the filter. (In the `.emerald` path, the Journal's legacy links are added in the `beforeSanitize` hook for the same reason.)
 
@@ -285,7 +285,8 @@ The main window has an **explicit, hand-written CSP** in `tauri.conf.json` (`app
 
 - `default-src 'self'`; `script-src 'self'`; `style-src 'self' 'unsafe-inline'`; `font-src 'self' data:`.
 - `img-src 'self' data: blob: emerald-img: http://emerald-img.localhost` — the image scheme in both forms the platforms serve it as (WebView2 maps custom schemes onto `http`, the other engines do not).
-- `connect-src 'self'` plus the Tauri IPC origins.
+- `connect-src 'self'` plus the Tauri IPC origins. It has no `data:`, so a data URL cannot be read with `fetch()`; the photo worker decodes it itself.
+- No `worker-src`: workers fall back to `script-src 'self'`. The one worker (`src/lib/photoWorker.ts`) is a file Vite emits next to the bundle, never a `blob:` or `data:` URL, and only decodes and encodes images.
 - `object-src 'none'`, `frame-src 'none'`, and `form-action 'none'`. The app has no HTML form that posts anywhere, and `default-src` does not cover form targets — without it, a form that slipped into rendered content could send what the user types to a remote server.
 
 The eight typefaces ship with the app (`@fontsource` woff2 files bundled by Vite, `src/fonts.css`), so nothing is fetched for typography and the app looks the same offline. The only network code is the updater in Rust (see [In-App Updates](#in-app-updates)), which the page's CSP does not govern.

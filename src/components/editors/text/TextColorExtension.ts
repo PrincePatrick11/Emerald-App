@@ -1,16 +1,7 @@
 import { Mark, mergeAttributes } from '@tiptap/core';
+import { isTextColor, type TextColor } from '../../../lib/textColors';
 
-/**
- * The colours text can take. Stored by name only (`data-color`), never as a
- * value: each theme sets the shade (`--editor-color-<name>`), so coloured text
- * stays readable on a dark and on a light sheet alike.
- */
-export const TEXT_COLORS = ['red', 'orange', 'yellow', 'green', 'blue', 'purple'] as const;
-export type TextColor = (typeof TEXT_COLORS)[number];
-
-function isTextColor(value: unknown): value is TextColor {
-  return (TEXT_COLORS as readonly unknown[]).includes(value);
-}
+/* The names and their shades: `lib/textColors.ts`. */
 
 declare module '@tiptap/core' {
   interface Commands<ReturnType> {

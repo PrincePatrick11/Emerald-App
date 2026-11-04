@@ -1,11 +1,13 @@
-import { useEffect, useReducer } from 'react';
+import { useReducer } from 'react';
 import type { Editor } from '@tiptap/react';
 import type { Node as ProseMirrorNode } from '@tiptap/pm/model';
 import { useTranslation } from 'react-i18next';
+import { useEditorsUpdate } from './useEditorsUpdate';
 
-/** Words and characters of a document; a link chip counts with its label. */
+/** Words and characters of a document; a link chip counts with its label, a line break separates words. */
 export function countText(doc: ProseMirrorNode): { words: number; characters: number } {
-  const text = doc.textBetween(0, doc.content.size, '\n', (node) => (node.attrs.label as string | undefined) ?? '');
+  const text = doc.textBetween(0, doc.content.size, '\n', (node) =>
+    node.type.name === 'hardBreak' ? '\n' : (node.attrs.label as string | undefined) ?? '');
   return {
     words: text.match(/\S+/g)?.length ?? 0,
     characters: text.replace(/\n/g, '').length,
@@ -21,20 +23,7 @@ export default function WordCount({ getEditors }: { getEditors: () => Editor[] }
   const { t } = useTranslation();
   const [, rerender] = useReducer((n: number) => n + 1, 0);
   const editors = getEditors();
-  const editorKey = editors.map((ed) => ed.instanceId).join(',');
-
-  useEffect(() => {
-    let frame = 0;
-    const schedule = () => {
-      if (!frame) frame = requestAnimationFrame(() => { frame = 0; rerender(); });
-    };
-    editors.forEach((ed) => ed.on('update', schedule));
-    return () => {
-      cancelAnimationFrame(frame);
-      editors.forEach((ed) => ed.off('update', schedule));
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- `editorKey` stands for the list of editors
-  }, [editorKey]);
+  useEditorsUpdate(editors, rerender, { perFrame: true });
 
   const total = editors.reduce((sum, ed) => {
     const { words, characters } = countText(ed.state.doc);

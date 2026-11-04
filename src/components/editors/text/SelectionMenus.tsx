@@ -6,14 +6,15 @@ import { NodeSelection } from '@tiptap/pm/state';
 import { CellSelection } from '@tiptap/pm/tables';
 import { useTranslation } from 'react-i18next';
 import {
-  AlignCenter, AlignLeft, AlignRight, BetweenHorizontalEnd, BetweenHorizontalStart, BetweenVerticalEnd,
-  BetweenVerticalStart, Bold, Check, Code, Globe, Grid2x2X, Highlighter, Italic, PanelTop, Strikethrough,
-  Palette, TableColumnsSplit, TableRowsSplit, Trash2, Unlink, X,
+  BetweenHorizontalEnd, BetweenHorizontalStart, BetweenVerticalEnd, BetweenVerticalStart, Globe, Grid2x2X,
+  PanelTop, Palette, TableColumnsSplit, TableRowsSplit, Trash2, Unlink, X,
 } from 'lucide-react';
-import { ToolbarBtn, ToolbarDivider, ToolbarGroup } from './EditorToolbar';
+import { ToolbarBtn, ToolbarDivider, ToolbarGroup } from './toolbarParts';
 import { editorHas } from './hostContext';
-import type { Alignment } from './ResizableImageExtension';
-import { TEXT_COLORS, type TextColor } from './TextColorExtension';
+import { ALIGN_ACTIONS, applyAlign, markActionsOf } from './formatActions';
+import { applyLinkHref } from './editorCommands';
+import LinkHrefForm from './LinkHrefForm';
+import { TEXT_COLORS, type TextColor } from '../../../lib/textColors';
 
 /**
  * The widths the image menu offers, in percent of the editor's width. Stored
@@ -100,22 +101,19 @@ function TableMenu({ editor }: { editor: Editor }) {
 function TextMenu({ editor }: { editor: Editor }) {
   const { t } = useTranslation();
   const has = (name: string) => editorHas(editor, name);
+  const marks = markActionsOf(editor);
   // The editor does not re-render its component per transaction; the menu
   // subscribes to exactly what its buttons show.
   const state = useEditorState({
     editor,
     selector: ({ editor: ed }) => ({
-      bold: ed.isActive('bold'),
-      italic: ed.isActive('italic'),
-      strike: ed.isActive('strike'),
-      highlight: ed.isActive('highlight'),
-      code: ed.isActive('code'),
+      active: Object.fromEntries(marks.map(({ key }) => [key, ed.isActive(key)])) as Record<string, boolean>,
       link: ed.isActive('link'),
       color: (ed.getAttributes('textColor').color as TextColor | undefined) ?? null,
     }),
   });
   // Typing a web address replaces the buttons until confirmed or cancelled.
-  const [href, setHref] = useState<string | null>(null);
+  const [typingLink, setTypingLink] = useState(false);
   // Choosing a colour replaces them too, until one is picked.
   const [choosingColor, setChoosingColor] = useState(false);
   // Another selection starts with the buttons again.
@@ -130,11 +128,6 @@ function TextMenu({ editor }: { editor: Editor }) {
     setChoosingColor(false);
   };
 
-  const confirmLink = () => {
-    const value = href?.trim();
-    if (value) editor.chain().focus().extendMarkRange('link').setLink({ href: value }).run();
-    setHref(null);
-  };
 
   return (
     <BubbleMenu
@@ -145,7 +138,7 @@ function TextMenu({ editor }: { editor: Editor }) {
         && !(s.selection instanceof CellSelection) && !ed.isActive('codeBlock')}
       options={{ placement: 'top', offset: 8 }}
       className="editor-selection-menu"
-      onMouseDown={(e) => { if (href === null) e.preventDefault(); }}
+      onMouseDown={(e) => { if (!typingLink) e.preventDefault(); }}
     >
       {choosingColor ? (
         <div className="flex items-center gap-1 px-1">
@@ -167,44 +160,20 @@ function TextMenu({ editor }: { editor: Editor }) {
           ))}
           <ToolbarBtn onClick={() => setChoosingColor(false)} active={false} title={t('editor.cancel')}><X size={14} /></ToolbarBtn>
         </div>
-      ) : href !== null ? (
-        <div className="flex items-center gap-1 px-1">
-          <input
-            autoFocus
-            value={href}
-            onChange={(e) => setHref(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') { e.preventDefault(); confirmLink(); }
-              if (e.key === 'Escape') { e.preventDefault(); setHref(null); editor.commands.focus(); }
-            }}
-            className="bg-well-page border border-edge-strong rounded-md px-2 py-0.5 text-xs text-secondary w-56 outline-none focus:border-accent-edge"
-            placeholder="https://"
-          />
-          <ToolbarBtn onClick={confirmLink} active={false} title={t('editor.confirm')}><Check size={14} /></ToolbarBtn>
-          <ToolbarBtn onClick={() => { setHref(null); editor.commands.focus(); }} active={false} title={t('editor.cancel')}>
-            <X size={14} />
-          </ToolbarBtn>
-        </div>
+      ) : typingLink ? (
+        <LinkHrefForm
+          initial=""
+          onConfirm={(href) => { applyLinkHref(editor, href); setTypingLink(false); }}
+          onCancel={() => { setTypingLink(false); editor.commands.focus(); }}
+        />
       ) : (
         <>
           <ToolbarGroup>
-            <ToolbarBtn onClick={() => editor.chain().focus().toggleBold().run()} active={!!state?.bold} title={t('editor.toolbar.bold')}>
-              <Bold size={14} />
-            </ToolbarBtn>
-            <ToolbarBtn onClick={() => editor.chain().focus().toggleItalic().run()} active={!!state?.italic} title={t('editor.toolbar.italic')}>
-              <Italic size={14} />
-            </ToolbarBtn>
-            <ToolbarBtn onClick={() => editor.chain().focus().toggleStrike().run()} active={!!state?.strike} title={t('editor.toolbar.strikethrough')}>
-              <Strikethrough size={14} />
-            </ToolbarBtn>
-            {has('highlight') && (
-              <ToolbarBtn onClick={() => editor.chain().focus().toggleHighlight().run()} active={!!state?.highlight} title={t('editor.toolbar.highlight')}>
-                <Highlighter size={14} />
+            {marks.map(({ key, labelKey, icon: Icon, toggle }) => (
+              <ToolbarBtn key={key} onClick={() => toggle(editor)} active={!!state?.active[key]} title={t(labelKey)}>
+                <Icon size={14} />
               </ToolbarBtn>
-            )}
-            <ToolbarBtn onClick={() => editor.chain().focus().toggleCode().run()} active={!!state?.code} title={t('editor.toolbar.inlineCode')}>
-              <Code size={14} />
-            </ToolbarBtn>
+            ))}
             {has('textColor') && (
               <ToolbarBtn onClick={() => setChoosingColor(true)} active={!!state?.color} title={t('editor.menu.textColor')}>
                 <Palette size={14} style={state?.color ? { color: `var(--editor-color-${state.color})` } : undefined} />
@@ -219,7 +188,7 @@ function TextMenu({ editor }: { editor: Editor }) {
                   <Unlink size={14} />
                 </ToolbarBtn>
               ) : (
-                <ToolbarBtn onClick={() => setHref('')} active={false} title={t('editor.menu.webLink')}>
+                <ToolbarBtn onClick={() => setTypingLink(true)} active={false} title={t('editor.menu.webLink')}>
                   <Globe size={14} />
                 </ToolbarBtn>
               )}
@@ -237,11 +206,10 @@ function ImageMenu({ editor }: { editor: Editor }) {
     editor,
     selector: ({ editor: ed }) => {
       const attrs = ed.getAttributes('image');
-      return { align: attrs.align as Alignment | undefined, width: attrs.width as string | undefined };
+      return { align: attrs.align as string | undefined, width: attrs.width as string | undefined };
     },
   });
 
-  const setAlign = (align: Alignment) => editor.chain().focus().setImageAlign(align).run();
   const setWidth = (percent: number) => editor.chain().focus().updateAttributes('image', { width: presetWidth(editor, percent) }).run();
   // A preset counts as set while the stored width matches it at the current width, to the pixel.
   const isWidth = (percent: number) => {
@@ -268,15 +236,11 @@ function ImageMenu({ editor }: { editor: Editor }) {
       onMouseDown={(e) => e.preventDefault()}
     >
       <ToolbarGroup>
-        <ToolbarBtn onClick={() => setAlign('left')} active={state?.align === 'left'} title={t('editor.toolbar.alignLeft')}>
-          <AlignLeft size={14} />
-        </ToolbarBtn>
-        <ToolbarBtn onClick={() => setAlign('center')} active={state?.align === 'center'} title={t('editor.toolbar.alignCenter')}>
-          <AlignCenter size={14} />
-        </ToolbarBtn>
-        <ToolbarBtn onClick={() => setAlign('right')} active={state?.align === 'right'} title={t('editor.toolbar.alignRight')}>
-          <AlignRight size={14} />
-        </ToolbarBtn>
+        {ALIGN_ACTIONS.map(({ align, labelKey, icon: Icon }) => (
+          <ToolbarBtn key={align} onClick={() => applyAlign(editor, align)} active={state?.align === align} title={t(labelKey)}>
+            <Icon size={14} />
+          </ToolbarBtn>
+        ))}
       </ToolbarGroup>
       <ToolbarDivider />
       <ToolbarGroup>

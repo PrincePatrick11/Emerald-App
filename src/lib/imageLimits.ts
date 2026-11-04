@@ -1,5 +1,5 @@
 import { useSettingsStore } from '../store/settingsStore';
-import { decodeImage, looksLikePhoto, reencodeImage, scaleToMaxEdge } from './shrinkImage';
+import { decodeImage, encodeScaled, looksLikePhoto, scaleToMaxEdge } from './shrinkImage';
 import { isAcceptedImageFile, readFileAsDataUrl } from './helpers';
 
 /** An image that is still over the vault's file size limit even after downscaling. */
@@ -51,15 +51,24 @@ function photoCandidate(dataUrl: string): boolean {
     && mimeOf(dataUrl) === 'image/png' && dataUrlBytes(dataUrl) >= PHOTO_MIN_BYTES;
 }
 
-/** The decoded image if it is a photo, on the page: the way without a worker. */
-async function photoOnPage(dataUrl: string): Promise<HTMLImageElement | null> {
-  const img = await decodeImage(dataUrl);
-  return looksLikePhoto(img) ? img : null;
+/** A photo as JPEG, and whether it was scaled down on the way. */
+interface PhotoJpeg {
+  jpeg: string;
+  scaled: boolean;
 }
+
+/**
+ * What the photo step came to: the JPEG, no photo, or `unsupported` (no worker
+ * that can do it here) and `failed` (the image itself would not decode or encode).
+ */
+type PhotoResult = PhotoJpeg | 'none' | 'unsupported' | 'failed';
 
 /* ---------------- The photo worker ---------------- */
 
-type WorkerReply = { id: number; jpeg: Blob | null; scaled?: boolean } | { id: number; error: string };
+type WorkerReply =
+  | { id: number; jpeg: Blob | null; scaled?: boolean }
+  | { id: number; unsupported: true }
+  | { id: number; error: string };
 
 let worker: Worker | null | undefined;
 let nextRequest = 0;
@@ -80,9 +89,10 @@ function photoWorker(): Worker | null {
       pending.get(event.data.id)?.(event.data);
       pending.delete(event.data.id);
     };
-    // A worker that cannot start (or dies) answers every open request, and is not used again.
+    // A worker that cannot start (or dies) leaves the open requests to the
+    // page, and is not used again.
     worker.onerror = () => {
-      for (const [id, reply] of pending) reply({ id, error: 'photo worker failed' });
+      for (const [id, reply] of pending) reply({ id, unsupported: true });
       pending.clear();
       worker = null;
     };
@@ -90,69 +100,55 @@ function photoWorker(): Worker | null {
   return worker;
 }
 
-/**
- * The photo as a JPEG data URL from the worker, scaled to `maxEdge` if larger;
- * `null` if it is no photo. Throws when the worker is missing or fails, so the
- * caller takes the way on the page.
- */
-async function photoInWorker(dataUrl: string, maxEdge: number | null): Promise<{ jpeg: string; scaled: boolean } | null> {
+async function photoInWorker(dataUrl: string, maxEdge: number | null): Promise<PhotoResult> {
   const w = photoWorker();
-  if (!w) throw new Error('no photo worker');
+  if (!w) return 'unsupported';
   const id = nextRequest++;
   const reply = await new Promise<WorkerReply>((resolve) => {
     pending.set(id, resolve);
     w.postMessage({ id, dataUrl, maxEdge, quality: LOSSY_QUALITY });
   });
-  if ('error' in reply) throw new Error(reply.error);
-  return reply.jpeg ? { jpeg: await blobToDataUrl(reply.jpeg), scaled: !!reply.scaled } : null;
+  if ('unsupported' in reply) return 'unsupported';
+  if ('error' in reply) return 'failed';
+  return reply.jpeg ? { jpeg: await readFileAsDataUrl(reply.jpeg), scaled: !!reply.scaled } : 'none';
 }
 
-function blobToDataUrl(blob: Blob): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result as string);
-    reader.onerror = () => reject(reader.error);
-    reader.readAsDataURL(blob);
-  });
+/** The same on the page, where no worker can: decoded once for check and conversion. */
+async function photoOnPage(dataUrl: string, maxEdge: number | null): Promise<PhotoResult> {
+  try {
+    const img = await decodeImage(dataUrl);
+    if (!looksLikePhoto(img)) return 'none';
+    const scale = maxEdge === null ? 1 : Math.min(1, maxEdge / Math.max(img.naturalWidth, img.naturalHeight));
+    return { jpeg: await encodeScaled(img, scale, 'image/jpeg', LOSSY_QUALITY), scaled: scale < 1 };
+  } catch {
+    return 'failed';
+  }
 }
 
 /* ---------------- Preparing an image ---------------- */
 
-async function scaleDown(dataUrl: string, maxEdge: number, mime: string): Promise<string> {
-  if (NOT_SCALED.has(mimeOf(dataUrl))) return dataUrl;
-  // The format stays unless it is a photo going to JPEG: a JPEG photo as PNG
-  // would get bigger instead of smaller. WebKit cannot write WebP and returns
-  // PNG then — that is an image too.
+async function scaleDown(dataUrl: string, maxEdge: number): Promise<string> {
+  const mime = mimeOf(dataUrl);
+  if (NOT_SCALED.has(mime)) return dataUrl;
+  // The format stays: a JPEG photo as PNG would get bigger instead of smaller.
+  // WebKit cannot write WebP and returns PNG then — that is an image too.
   return scaleToMaxEdge(dataUrl, maxEdge, { mime, quality: LOSSY.has(mime) ? LOSSY_QUALITY : undefined });
 }
 
 /**
- * Downscaled to `maxEdge` and, for a photo, as JPEG. In the worker where there
+ * Downscaled to `maxEdge` and, for a photo, as JPEG — in the worker where there
  * is one (decoding and encoding a phone photo would otherwise hold up the
- * window for seconds), else on the page; each in one pass, so a photo is
- * compressed only once. A conversion is kept only if it is smaller, unless it
- * was scaled down as well.
+ * window), else on the page, each in one pass so a photo is compressed only
+ * once. A JPEG is kept if it is smaller or was scaled down too.
  */
 async function scaledAndConverted(dataUrl: string, maxEdge: number | null): Promise<string> {
-  const candidate = photoCandidate(dataUrl);
-  if (candidate) {
-    try {
-      const photo = await photoInWorker(dataUrl, maxEdge);
-      if (!photo) return maxEdge === null ? dataUrl : scaleDown(dataUrl, maxEdge, mimeOf(dataUrl));
-      return photo.scaled || dataUrlBytes(photo.jpeg) < dataUrlBytes(dataUrl) ? photo.jpeg : dataUrl;
-    } catch {
-      // No worker: the same on the page.
-    }
+  let photo: PhotoResult = 'none';
+  if (photoCandidate(dataUrl)) {
+    photo = await photoInWorker(dataUrl, maxEdge);
+    if (photo === 'unsupported') photo = await photoOnPage(dataUrl, maxEdge);
   }
-  const photo = candidate ? await photoOnPage(dataUrl).catch(() => null) : null;
-  const mime = photo ? 'image/jpeg' : mimeOf(dataUrl);
-  const scaled = maxEdge === null ? dataUrl : await scaleDown(dataUrl, maxEdge, mime);
-  // Small enough already, so not drawn yet: the change of format alone.
-  if (photo && scaled === dataUrl) {
-    const converted = await reencodeImage(photo, 'image/jpeg', LOSSY_QUALITY).catch(() => dataUrl);
-    if (dataUrlBytes(converted) < dataUrlBytes(dataUrl)) return converted;
-  }
-  return scaled;
+  if (typeof photo === 'object' && (photo.scaled || dataUrlBytes(photo.jpeg) < dataUrlBytes(dataUrl))) return photo.jpeg;
+  return maxEdge === null ? dataUrl : scaleDown(dataUrl, maxEdge);
 }
 
 /**

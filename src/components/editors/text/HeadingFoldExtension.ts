@@ -47,9 +47,9 @@ function foldToggle(pos: number, folded: boolean, label: string): HTMLElement {
   return button;
 }
 
-function decorate(doc: ProseMirrorNode, folded: number[], labels: FoldLabels): DecorationSet {
+function decorate(doc: ProseMirrorNode, all: Section[], folded: number[], labels: FoldLabels): DecorationSet {
   const decorations: Decoration[] = [];
-  for (const section of sections(doc)) {
+  for (const section of all) {
     // A heading with nothing under it has nothing to fold.
     if (section.from >= section.to) continue;
     const isFolded = folded.includes(section.pos);
@@ -95,7 +95,7 @@ export function createHeadingFold(labels: () => FoldLabels) {
         new Plugin<FoldState>({
           key: foldKey,
           state: {
-            init: (_config, state) => ({ folded: [], decorations: decorate(state.doc, [], labels()) }),
+            init: (_config, state) => ({ folded: [], decorations: decorate(state.doc, sections(state.doc), [], labels()) }),
             apply(tr, prev, _old, state) {
               const meta = tr.getMeta(foldKey) as FoldMeta | undefined;
               let folded = prev.folded
@@ -106,7 +106,9 @@ export function createHeadingFold(labels: () => FoldLabels) {
               if (meta && 'toggle' in meta) {
                 folded = folded.includes(meta.toggle) ? folded.filter((p) => p !== meta.toggle) : [...folded, meta.toggle];
               }
-              const hidden = (pos: number) => sections(state.doc).filter((s) => folded.includes(s.pos) && pos >= s.from && pos < s.to);
+              // Once per change, for unfolding and drawing alike; nothing to do while nothing is folded.
+              const all = folded.length || tr.docChanged || meta ? sections(state.doc) : [];
+              const hidden = (pos: number) => all.filter((s) => folded.includes(s.pos) && pos >= s.from && pos < s.to);
               const revealAt = meta && 'reveal' in meta ? meta.reveal : tr.selectionSet ? state.selection.from : null;
               if (revealAt !== null) {
                 const hiding = hidden(revealAt).map((s) => s.pos);
@@ -114,7 +116,7 @@ export function createHeadingFold(labels: () => FoldLabels) {
               }
               const same = folded.length === prev.folded.length && folded.every((p, i) => p === prev.folded[i]);
               if (same && !tr.docChanged) return prev;
-              return { folded, decorations: decorate(state.doc, folded, labels()) };
+              return { folded, decorations: decorate(state.doc, all, folded, labels()) };
             },
           },
           props: {

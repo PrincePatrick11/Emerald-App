@@ -9,11 +9,12 @@ import { useEditorFileDrop } from './useEditorFileDrop';
 import { useEditorPointerDrops } from './useEditorPointerDrops';
 import { useInternalLinkNavigation } from './useInternalLinkNavigation';
 import { useTextEditorRegistry } from './useTextEditorRegistry';
-import { insertImageFromDataUrl, insertInternalLinkChip } from './editorCommands';
+import { insertInternalLinkChip } from './editorCommands';
 import { type TextEditorHostContextValue } from './hostContext';
 import DropIndicator from './DropIndicator';
 import type { DropSpot } from './dropSpot';
 import { createDragChannel } from '../../../lib/dragChannel';
+import { isMacOS } from '../../../lib/platform';
 
 interface TextEditorHostOptions {
   isEditing: boolean;
@@ -70,7 +71,9 @@ export function useTextEditorHost({ isEditing, getOrder, getContainer }: TextEdi
   getContainerRef.current = getContainer;
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key.toLowerCase() !== 'f' || !(e.metaKey || e.ctrlKey) || e.shiftKey || e.altKey) return;
+      // ⌘ on the Mac: there Ctrl+F is the system's "one character forward".
+      const modifier = isMacOS ? e.metaKey && !e.ctrlKey : e.ctrlKey && !e.metaKey;
+      if (e.key.toLowerCase() !== 'f' || !modifier || e.shiftKey || e.altKey) return;
       const container = getContainerRef.current();
       if (!container || container.getClientRects().length === 0) return;
       e.preventDefault();
@@ -142,10 +145,6 @@ function HostToolbar({ editor, onOpenLinkPicker }: { editor: Editor; onOpenLinkP
   }, [editor]);
   if (editor.isDestroyed) return null;
   return (
-    <EditorToolbar
-      editor={editor}
-      onInsertImage={(dataUrl) => insertImageFromDataUrl(editor, dataUrl)}
-      onOpenLinkPicker={onOpenLinkPicker}
-    />
+    <EditorToolbar editor={editor} onOpenLinkPicker={onOpenLinkPicker} />
   );
 }

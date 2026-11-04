@@ -1,4 +1,5 @@
 import { isPhoto } from './photoCheck';
+import { readFileAsDataUrl } from './helpers';
 
 /**
  * Draw an image as a data URL at no more than `maxEdge` pixels edge length.
@@ -15,9 +16,7 @@ export async function scaleToMaxEdge(
   maxEdge: number,
   options: { mime?: string; quality?: number } = {},
 ): Promise<string> {
-  const img = new Image();
-  img.src = dataUrl;
-  await img.decode();
+  const img = await decodeImage(dataUrl);
   const longest = Math.max(img.naturalWidth, img.naturalHeight);
   if (longest <= maxEdge) return dataUrl;
   return drawScaled(img, maxEdge / longest, options);
@@ -61,25 +60,22 @@ export async function decodeImage(dataUrl: string): Promise<HTMLImageElement> {
 }
 
 /**
- * The image again at full size in another format, e.g. a photo PNG as JPEG.
- * Encoded through `toBlob`, which does not hold up the window: a phone photo
- * takes seconds to encode, and `toDataURL` would freeze typing for that long.
+ * The image drawn at `scale` (1 = full size) and encoded as `mime`, e.g. a photo
+ * PNG as JPEG. Encoded through `toBlob`, which does not wait for the encoder on
+ * the page's thread the way `toDataURL` does: a phone photo takes over half a
+ * second to encode.
  */
-export async function reencodeImage(img: HTMLImageElement, mime: string, quality?: number): Promise<string> {
+export async function encodeScaled(img: HTMLImageElement, scale: number, mime: string, quality?: number): Promise<string> {
   const canvas = document.createElement('canvas');
-  canvas.width = img.naturalWidth;
-  canvas.height = img.naturalHeight;
+  canvas.width = Math.max(1, Math.round(img.naturalWidth * scale));
+  canvas.height = Math.max(1, Math.round(img.naturalHeight * scale));
   const ctx = canvas.getContext('2d');
   if (!ctx) throw new Error('No 2D canvas context');
-  ctx.drawImage(img, 0, 0);
+  ctx.imageSmoothingQuality = 'high';
+  ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
   const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, mime, quality));
   if (!blob) throw new Error('Image could not be encoded');
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result as string);
-    reader.onerror = () => reject(reader.error);
-    reader.readAsDataURL(blob);
-  });
+  return readFileAsDataUrl(blob);
 }
 
 /**
@@ -91,9 +87,7 @@ export async function reencodeImage(img: HTMLImageElement, mime: string, quality
  * every copy in every entry, a full-size photo would bloat every one of them.
  */
 export async function shrinkImageDataUrl(dataUrl: string, maxEdge: number): Promise<string> {
-  const img = new Image();
-  img.src = dataUrl;
-  await img.decode();
+  const img = await decodeImage(dataUrl);
   const longest = Math.max(img.naturalWidth, img.naturalHeight);
   // Small but heavy (embedded metadata, long GIF animation): that too
   // is re-encoded. The limit lies above a 64px PNG.

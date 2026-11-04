@@ -4,15 +4,15 @@
  * No DOM here, so both can use it.
  */
 
-/** Pixels of a region, drawn to `dw`×`dh`; `null` when no canvas is available. */
+/** Pixels of a region, drawn to `dw`×`dh`; `null` when no canvas is available (the page's adapter). */
 export interface PixelSource {
   width: number;
   height: number;
   read: (sx: number, sy: number, sw: number, sh: number, dw: number, dh: number, smooth: boolean) => Uint8ClampedArray | null;
 }
 
-/** The copy the transparency check runs on: its longest edge. */
-const ALPHA_EDGE = 256;
+/** Rows read at a time for the transparency check, which looks at every pixel. */
+const ALPHA_STRIP = 256;
 /** Edge of the 1:1 patches the flatness is measured on, and where they sit. */
 const PATCH = 256;
 const PATCH_SPOTS = [[0.5, 0.5], [0.25, 0.25], [0.75, 0.75], [0.25, 0.75], [0.75, 0.25]] as const;
@@ -31,11 +31,15 @@ const PHOTO_MAX_FLATNESS = 0.5;
  * side of the mistake.
  */
 export function isPhoto({ width: W, height: H, read }: PixelSource): boolean {
-  // Transparency anywhere, on a small copy drawn without smoothing.
-  const scale = Math.min(1, ALPHA_EDGE / Math.max(W, H));
-  const alpha = read(0, 0, W, H, Math.max(1, Math.round(W * scale)), Math.max(1, Math.round(H * scale)), false);
-  if (!alpha) return false;
-  for (let i = 3; i < alpha.length; i += 4) if (alpha[i] < 255) return false;
+  // Transparency anywhere, at full resolution: a small copy would step over
+  // narrow transparent parts such as rounded corners. In strips, so a phone
+  // photo never needs its whole bitmap read out at once.
+  for (let y = 0; y < H; y += ALPHA_STRIP) {
+    const h = Math.min(ALPHA_STRIP, H - y);
+    const alpha = read(0, y, W, h, W, h, false);
+    if (!alpha) return false;
+    for (let i = 3; i < alpha.length; i += 4) if (alpha[i] < 255) return false;
+  }
 
   // Flatness on a few patches at full resolution, where the noise is.
   const w = Math.min(PATCH, W);

@@ -3,15 +3,14 @@ import type { Editor } from '@tiptap/react';
 import { useTranslation } from 'react-i18next';
 import { ChevronDown, ChevronUp, Replace, ReplaceAll, X } from 'lucide-react';
 import { scrollIntoViewCentered } from '../../../lib/reveal';
-import { ToolbarBtn } from './EditorToolbar';
+import { ToolbarBtn } from './toolbarParts';
 import { editorHas } from './hostContext';
 import { findMatches, setSearch, type SearchMatch } from './SearchExtension';
-import { revealFolded } from './HeadingFoldExtension';
+import { revealPosition } from './editorCommands';
+import { useEditorsUpdate } from './useEditorsUpdate';
 
 interface Hit {
   editor: Editor;
-  /** Index among the hits of its editor. */
-  local: number;
   match: SearchMatch;
 }
 
@@ -37,26 +36,42 @@ export default function FindBar({ getEditors, isEditing, initialQuery, onClose }
   // A change in any editor finds the hits anew.
   const [version, bump] = useReducer((n: number) => n + 1, 0);
   const editors = getEditors().filter((ed) => editorHas(ed, 'textSearch'));
+  useEditorsUpdate(editors, bump);
   const editorKey = editors.map((ed) => ed.instanceId).join(',');
-  useEffect(() => {
-    editors.forEach((ed) => ed.on('update', bump));
-    return () => editors.forEach((ed) => ed.off('update', bump));
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- `editorKey` stands for the list of editors
-  }, [editorKey]);
 
   const hits = useMemo<Hit[]>(() => editors.flatMap((editor) =>
-    findMatches(editor.state.doc, query).map((match, local) => ({ editor, local, match }))),
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- `version` stands for the documents
+    findMatches(editor.state.doc, query).map((match) => ({ editor, match }))),
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- `editorKey` and `version` stand for editors and documents
   [editorKey, query, version]);
+
+  // After a replace, the next hit is the first behind the replaced text — not
+  // the same spot again when the replacement still matches ("cat" → "cats").
+  const [after, setAfter] = useState<{ editor: Editor; pos: number } | null>(null);
+  useEffect(() => {
+    if (!after) return;
+    setAfter(null);
+    const order = editors.indexOf(after.editor);
+    const next = hits.findIndex((h) => {
+      const e = editors.indexOf(h.editor);
+      return e > order || (e === order && h.match.from >= after.pos);
+    });
+    setIndex(next >= 0 ? next : 0);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- runs once per replace, on the hits after it
+  }, [hits]);
 
   const current = hits.length === 0 ? null : Math.min(index, hits.length - 1);
 
   // Mark the hits in every editor, the current one in its own.
   useEffect(() => {
     const hit = current === null ? null : hits[current];
-    // A hit inside a folded section unfolds it, or there would be nothing to see.
-    if (hit) revealFolded(hit.editor, hit.match.from);
-    for (const editor of editors) setSearch(editor, query, hit?.editor === editor ? hit.local : null);
+    // A hit in a folded or closed section opens it, or there would be nothing
+    // to see; opening a section moves the focus, which goes back to the field.
+    if (hit) {
+      const focused = document.activeElement;
+      revealPosition(hit.editor, hit.match.from);
+      if (focused instanceof HTMLElement && focused !== document.activeElement) focused.focus();
+    }
+    for (const editor of editors) setSearch(editor, query, hit?.editor === editor ? hit.match.from : null);
     const el = hit?.editor.view.dom.querySelector<HTMLElement>('.editor-search-match--current');
     if (el) scrollIntoViewCentered(el);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- `hits` already follows editors and query
@@ -76,8 +91,8 @@ export default function FindBar({ getEditors, isEditing, initialQuery, onClose }
     const hit = current === null ? null : hits[current];
     if (!hit) return;
     const { from, to } = hit.match;
+    setAfter({ editor: hit.editor, pos: from + replacement.length });
     hit.editor.view.dispatch(hit.editor.state.tr.insertText(replacement, from, to));
-    // The next hit moves up into this index.
   };
 
   const replaceAll = () => {
@@ -106,7 +121,7 @@ export default function FindBar({ getEditors, isEditing, initialQuery, onClose }
             if (e.key === 'Escape') { e.preventDefault(); onClose(); }
           }}
           placeholder={t('editor.find.placeholder')}
-          className="editor-find-input"
+          className="editor-inline-input w-60"
         />
         <span className="text-[11px] text-subtle tabular-nums min-w-[64px] text-center">
           {query ? (hits.length ? t('editor.find.count', { current: (current ?? 0) + 1, total: hits.length }) : t('editor.find.none')) : ''}
@@ -136,7 +151,7 @@ export default function FindBar({ getEditors, isEditing, initialQuery, onClose }
               if (e.key === 'Escape') { e.preventDefault(); onClose(); }
             }}
             placeholder={t('editor.find.replacePlaceholder')}
-            className="editor-find-input"
+            className="editor-inline-input w-60"
           />
           <ToolbarBtn onClick={replaceCurrent} active={false} disabled={current === null} title={t('editor.find.replace')}>
             <Replace size={14} />

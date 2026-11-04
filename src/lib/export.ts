@@ -2,6 +2,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { imageRefsInHtml, readImageAsBase64, rewriteImageRefs } from './images';
 import { save, message } from '@tauri-apps/plugin-dialog';
 import TurndownService from 'turndown';
+import { TEXT_COLORS, TEXT_COLOR_SHADES } from './textColors';
 import { format } from 'date-fns';
 import DOMPurify from 'dompurify';
 import type { ExportData } from './exportData';
@@ -275,15 +276,14 @@ const PRINT_CSS = `
   .entry-content blockquote {
     border-left: 3px solid #bbb; padding-left: 1em; color: #555; margin: 0.8em 0;
   }
-  .entry-content table { border-collapse: collapse; width: 100%; margin: 0.8em 0; }
+  /* A table whose columns were resized carries a pixel width inline; on the
+     page it is the text column, or the right columns would be cut off. */
+  .entry-content table { border-collapse: collapse; width: 100% !important; max-width: 100%; table-layout: fixed; margin: 0.8em 0; }
+  .entry-content col { width: auto !important; }
   .entry-content details { margin: 0.6em 0; padding: 0.3em 0.6em; border: 1px solid #ddd; border-radius: 4px; }
   .entry-content summary { font-weight: 600; list-style: none; }
-  .entry-content span[data-color="red"] { color: #b4372c; }
-  .entry-content span[data-color="orange"] { color: #a85a17; }
-  .entry-content span[data-color="yellow"] { color: #8a6d00; }
-  .entry-content span[data-color="green"] { color: #23794a; }
-  .entry-content span[data-color="blue"] { color: #2b5fa8; }
-  .entry-content span[data-color="purple"] { color: #6d47b0; }
+  .entry-content summary::-webkit-details-marker { display: none; }
+  ${TEXT_COLORS.map((c) => `.entry-content span[data-color="${c}"] { color: ${TEXT_COLOR_SHADES.light[c]}; }`).join('\n  ')}
   .entry-content td, .entry-content th { border: 1px solid #ccc; padding: 0.4em 0.6em; }
   .entry-content ul, .entry-content ol { padding-left: 1.6em; margin-bottom: 0.8em; }
   .entry-content li { margin-bottom: 0.2em; }

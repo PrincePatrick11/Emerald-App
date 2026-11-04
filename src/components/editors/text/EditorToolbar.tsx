@@ -1,312 +1,151 @@
-import { useRef, useState } from 'react';
 import type { Editor } from '@tiptap/react';
 import { useTranslation } from 'react-i18next';
-import { ACCEPTED_IMAGE_MIME, isAcceptedImageFile, readFileAsDataUrl } from '../../../lib/helpers';
 import {
-  Bold,
-  Italic,
-  Strikethrough,
-  List,
-  ListOrdered,
-  CheckSquare,
-  Heading1,
-  Heading2,
-  Heading3,
-  Quote,
-  Code,
-  Highlighter,
-  Undo,
-  Redo,
-  Link,
-  ImagePlus,
-  Minus,
-  AlignLeft,
-  AlignCenter,
-  AlignRight,
-  Table,
+  CheckSquare, Heading1, Heading2, Heading3, ImagePlus, Link, List, ListOrdered, Minus, Quote, Redo, Table, Undo,
 } from 'lucide-react';
-import type { Alignment } from './ResizableImageExtension';
 import { editorHas } from './hostContext';
-
-/**
- * The node types for which `TextAlign` is configured in `TextEditor`. Listed
- * here so that the toolbar can disable the buttons where alignment
- * would have no effect, in a code block for instance.
- */
-export const TEXT_ALIGN_TYPES = ['heading', 'paragraph'] as const;
-
-/** What "Insert table" creates, from the toolbar and from the `/` menu. */
-export const NEW_TABLE = { rows: 3, cols: 3, withHeaderRow: true } as const;
-
-/** Everything except left: only these values appear as an attribute in the document. */
-const EXPLICIT_ALIGNMENTS = ['center', 'right', 'justify'] as const;
-
-interface Props {
-  editor: Editor;
-  /** One image as a data URL; awaited, so several land in the order chosen. */
-  onInsertImage: (src: string) => Promise<void>;
-  onOpenLinkPicker: () => void;
-}
+import { ALIGN_ACTIONS, applyAlign, canAlign, isAlignActive, markActionsOf } from './formatActions';
+import { NEW_TABLE, pickImageFiles } from './editorCommands';
+import { ToolbarBtn, ToolbarDivider, ToolbarGroup } from './toolbarParts';
 
 /**
  * The formatting bar of a text editor. It shows only what the editor's schema
  * has, so an editor with fewer features (see `features.ts`) gets a shorter bar.
+ * Marks and alignment come from `formatActions.ts`, shared with the selection menu.
  */
-export default function EditorToolbar({ editor, onInsertImage, onOpenLinkPicker }: Props) {
+export default function EditorToolbar({ editor, onOpenLinkPicker }: {
+  editor: Editor;
+  onOpenLinkPicker: () => void;
+}) {
   const { t } = useTranslation();
   const has = (name: string) => editorHas(editor, name);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const [imageError, setImageError] = useState<string | null>(null);
 
+  // The button picks an entry; on an external link it removes that link instead.
   const handleLinkButtonClick = () => {
-    if (editor.isActive('link')) {
-      // If cursor is already on an external link, unset it
-      editor.chain().focus().extendMarkRange('link').unsetLink().run();
-      return;
-    }
-    // Open the link picker modal for selecting internal links
-    onOpenLinkPicker();
+    if (editor.isActive('link')) editor.chain().focus().extendMarkRange('link').unsetLink().run();
+    else onOpenLinkPicker();
   };
 
-  // The same three buttons serve two targets: a selected image is a
-  // block node of its own with its own width, which the paragraph's `text-align` does
-  // not reach. How the two sides store left alignment is described at `alignMargins`.
-  const imageSelected = editor.isActive('image');
-  const textAlignable = TEXT_ALIGN_TYPES.some((type) => editor.isActive(type));
-  const alignDisabled = !imageSelected && !textAlignable;
-
-  const applyAlign = (align: Alignment) => {
-    if (imageSelected) {
-      editor.chain().focus().setImageAlign(align).run();
-      return;
-    }
-    if (align === 'left') {
-      editor.chain().focus().unsetTextAlign().run();
-      return;
-    }
-    editor.chain().focus().setTextAlign(align).run();
-  };
-
-  const isAlignActive = (align: Alignment) => {
-    if (imageSelected) return editor.getAttributes('image').align === align;
-    if (alignDisabled) return false;
-    // A paragraph without the attribute is left-aligned, and older content may
-    // carry an explicit `left`. Both must light up the button.
-    if (align === 'left') {
-      return !EXPLICIT_ALIGNMENTS.some((a) => editor.isActive({ textAlign: a }));
-    }
-    return editor.isActive({ textAlign: align });
-  };
-
-  const handleImageFiles = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files ?? []);
-    e.target.value = '';
-    const accepted = files.filter(isAcceptedImageFile);
-    if (accepted.length < files.length) {
-      setImageError(t('common.unsupportedImageFormat'));
-      window.setTimeout(() => setImageError(null), 2500);
-    }
-    for (const file of accepted) {
-      try {
-        await onInsertImage(await readFileAsDataUrl(file));
-      } catch (err) {
-        console.error('Failed to read image:', err);
-      }
-    }
-  };
+  const alignDisabled = !canAlign(editor);
 
   return (
     <div className="editor-toolbar">
       <ToolbarGroup>
-        <ToolbarBtn
-          onClick={() => editor.chain().focus().toggleBold().run()}
-          active={editor.isActive('bold')}
-          title={t('editor.toolbar.bold')}
-        >
-          <Bold size={14} />
-        </ToolbarBtn>
-        <ToolbarBtn
-          onClick={() => editor.chain().focus().toggleItalic().run()}
-          active={editor.isActive('italic')}
-          title={t('editor.toolbar.italic')}
-        >
-          <Italic size={14} />
-        </ToolbarBtn>
-        <ToolbarBtn
-          onClick={() => editor.chain().focus().toggleStrike().run()}
-          active={editor.isActive('strike')}
-          title={t('editor.toolbar.strikethrough')}
-        >
-          <Strikethrough size={14} />
-        </ToolbarBtn>
-        {has('highlight') && (
-          <ToolbarBtn
-            onClick={() => editor.chain().focus().toggleHighlight().run()}
-            active={editor.isActive('highlight')}
-            title={t('editor.toolbar.highlight')}
-          >
-            <Highlighter size={14} />
+        {markActionsOf(editor).map(({ key, labelKey, icon: Icon, toggle }) => (
+          <ToolbarBtn key={key} onClick={() => toggle(editor)} active={editor.isActive(key)} title={t(labelKey)}>
+            <Icon size={14} />
           </ToolbarBtn>
-        )}
-        <ToolbarBtn
-          onClick={() => editor.chain().focus().toggleCode().run()}
-          active={editor.isActive('code')}
-          title={t('editor.toolbar.inlineCode')}
-        >
-          <Code size={14} />
-        </ToolbarBtn>
+        ))}
       </ToolbarGroup>
 
       {has('heading') && (<>
-      <ToolbarDivider />
-
-      <ToolbarGroup>
-        <ToolbarBtn
-          onClick={() =>
-            editor.chain().focus().toggleHeading({ level: 1 }).run()
-          }
-          active={editor.isActive('heading', { level: 1 })}
-          title={t('editor.toolbar.heading1')}
-        >
-          <Heading1 size={14} />
-        </ToolbarBtn>
-        <ToolbarBtn
-          onClick={() =>
-            editor.chain().focus().toggleHeading({ level: 2 }).run()
-          }
-          active={editor.isActive('heading', { level: 2 })}
-          title={t('editor.toolbar.heading2')}
-        >
-          <Heading2 size={14} />
-        </ToolbarBtn>
-        <ToolbarBtn
-          onClick={() =>
-            editor.chain().focus().toggleHeading({ level: 3 }).run()
-          }
-          active={editor.isActive('heading', { level: 3 })}
-          title={t('editor.toolbar.heading3')}
-        >
-          <Heading3 size={14} />
-        </ToolbarBtn>
-        <ToolbarBtn
-          onClick={() => editor.chain().focus().toggleBlockquote().run()}
-          active={editor.isActive('blockquote')}
-          title={t('editor.toolbar.blockquote')}
-        >
-          <Quote size={14} />
-        </ToolbarBtn>
-        <ToolbarBtn
-          onClick={() => editor.chain().focus().setHorizontalRule().run()}
-          active={false}
-          title={t('editor.toolbar.horizontalRule')}
-        >
-          <Minus size={14} />
-        </ToolbarBtn>
-      </ToolbarGroup>
+        <ToolbarDivider />
+        <ToolbarGroup>
+          {([1, 2, 3] as const).map((level) => {
+            const Icon = [Heading1, Heading2, Heading3][level - 1];
+            return (
+              <ToolbarBtn
+                key={level}
+                onClick={() => editor.chain().focus().toggleHeading({ level }).run()}
+                active={editor.isActive('heading', { level })}
+                title={t(`editor.toolbar.heading${level}`)}
+              >
+                <Icon size={14} />
+              </ToolbarBtn>
+            );
+          })}
+          <ToolbarBtn
+            onClick={() => editor.chain().focus().toggleBlockquote().run()}
+            active={editor.isActive('blockquote')}
+            title={t('editor.toolbar.blockquote')}
+          >
+            <Quote size={14} />
+          </ToolbarBtn>
+          <ToolbarBtn
+            onClick={() => editor.chain().focus().setHorizontalRule().run()}
+            active={false}
+            title={t('editor.toolbar.horizontalRule')}
+          >
+            <Minus size={14} />
+          </ToolbarBtn>
+        </ToolbarGroup>
       </>)}
 
       {has('textAlign') && (<>
-      <ToolbarDivider />
-
-      <ToolbarGroup>
-        <ToolbarBtn
-          onClick={() => applyAlign('left')}
-          active={isAlignActive('left')}
-          disabled={alignDisabled}
-          title={t('editor.toolbar.alignLeft')}
-        >
-          <AlignLeft size={14} />
-        </ToolbarBtn>
-        <ToolbarBtn
-          onClick={() => applyAlign('center')}
-          active={isAlignActive('center')}
-          disabled={alignDisabled}
-          title={t('editor.toolbar.alignCenter')}
-        >
-          <AlignCenter size={14} />
-        </ToolbarBtn>
-        <ToolbarBtn
-          onClick={() => applyAlign('right')}
-          active={isAlignActive('right')}
-          disabled={alignDisabled}
-          title={t('editor.toolbar.alignRight')}
-        >
-          <AlignRight size={14} />
-        </ToolbarBtn>
-      </ToolbarGroup>
+        <ToolbarDivider />
+        <ToolbarGroup>
+          {ALIGN_ACTIONS.map(({ align, labelKey, icon: Icon }) => (
+            <ToolbarBtn
+              key={align}
+              onClick={() => applyAlign(editor, align)}
+              active={isAlignActive(editor, align)}
+              disabled={alignDisabled}
+              title={t(labelKey)}
+            >
+              <Icon size={14} />
+            </ToolbarBtn>
+          ))}
+        </ToolbarGroup>
       </>)}
 
       {(has('bulletList') || has('taskList')) && (<>
-      <ToolbarDivider />
-
-      <ToolbarGroup>
-        {has('bulletList') && (<>
-        <ToolbarBtn
-          onClick={() => editor.chain().focus().toggleBulletList().run()}
-          active={editor.isActive('bulletList')}
-          title={t('editor.toolbar.bulletList')}
-        >
-          <List size={14} />
-        </ToolbarBtn>
-        <ToolbarBtn
-          onClick={() => editor.chain().focus().toggleOrderedList().run()}
-          active={editor.isActive('orderedList')}
-          title={t('editor.toolbar.numberedList')}
-        >
-          <ListOrdered size={14} />
-        </ToolbarBtn>
-        </>)}
-        {has('taskList') && (
-          <ToolbarBtn
-            onClick={() => editor.chain().focus().toggleTaskList().run()}
-            active={editor.isActive('taskList')}
-            title={t('editor.toolbar.taskList')}
-          >
-            <CheckSquare size={14} />
-          </ToolbarBtn>
-        )}
-      </ToolbarGroup>
+        <ToolbarDivider />
+        <ToolbarGroup>
+          {has('bulletList') && (<>
+            <ToolbarBtn
+              onClick={() => editor.chain().focus().toggleBulletList().run()}
+              active={editor.isActive('bulletList')}
+              title={t('editor.toolbar.bulletList')}
+            >
+              <List size={14} />
+            </ToolbarBtn>
+            <ToolbarBtn
+              onClick={() => editor.chain().focus().toggleOrderedList().run()}
+              active={editor.isActive('orderedList')}
+              title={t('editor.toolbar.numberedList')}
+            >
+              <ListOrdered size={14} />
+            </ToolbarBtn>
+          </>)}
+          {has('taskList') && (
+            <ToolbarBtn
+              onClick={() => editor.chain().focus().toggleTaskList().run()}
+              active={editor.isActive('taskList')}
+              title={t('editor.toolbar.taskList')}
+            >
+              <CheckSquare size={14} />
+            </ToolbarBtn>
+          )}
+        </ToolbarGroup>
       </>)}
 
       {(has('internalLink') || has('image') || has('table')) && (<>
-      <ToolbarDivider />
-
-      <ToolbarGroup>
-        {/* The button picks an entry; on an external link it removes that link instead. */}
-        {has('internalLink') && (
-          <ToolbarBtn onClick={handleLinkButtonClick} active={editor.isActive('link')} title={t('editor.toolbar.insertLink')}>
-            <Link size={14} />
-          </ToolbarBtn>
-        )}
-        {has('image') && (
-          <ToolbarBtn onClick={() => fileInputRef.current?.click()} active={false} title={t('editor.toolbar.insertImage')}>
-            <ImagePlus size={14} />
-          </ToolbarBtn>
-        )}
-        {has('table') && (
-          <ToolbarBtn
-            onClick={() => editor.chain().focus().insertTable(NEW_TABLE).run()}
-            active={editor.isActive('table')}
-            disabled={!editor.can().insertTable(NEW_TABLE)}
-            title={t('editor.toolbar.insertTable')}
-          >
-            <Table size={14} />
-          </ToolbarBtn>
-        )}
-      </ToolbarGroup>
+        <ToolbarDivider />
+        <ToolbarGroup>
+          {has('internalLink') && (
+            <ToolbarBtn onClick={handleLinkButtonClick} active={editor.isActive('link')} title={t('editor.toolbar.insertLink')}>
+              <Link size={14} />
+            </ToolbarBtn>
+          )}
+          {has('image') && (
+            <ToolbarBtn onClick={() => pickImageFiles(editor)} active={false} title={t('editor.toolbar.insertImage')}>
+              <ImagePlus size={14} />
+            </ToolbarBtn>
+          )}
+          {has('table') && (
+            <ToolbarBtn
+              onClick={() => editor.chain().focus().insertTable(NEW_TABLE).run()}
+              active={editor.isActive('table')}
+              disabled={!editor.can().insertTable(NEW_TABLE)}
+              title={t('editor.toolbar.insertTable')}
+            >
+              <Table size={14} />
+            </ToolbarBtn>
+          )}
+        </ToolbarGroup>
       </>)}
 
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept={ACCEPTED_IMAGE_MIME}
-        multiple
-        className="hidden"
-        onChange={handleImageFiles}
-      />
-
       <ToolbarDivider />
-
       <ToolbarGroup>
         <ToolbarBtn
           onClick={() => editor.chain().focus().undo().run()}
@@ -325,49 +164,6 @@ export default function EditorToolbar({ editor, onInsertImage, onOpenLinkPicker 
           <Redo size={14} />
         </ToolbarBtn>
       </ToolbarGroup>
-
-      {imageError && (
-        <span className="ml-auto text-[11px] text-danger">{imageError}</span>
-      )}
     </div>
-  );
-}
-
-export function ToolbarGroup({ children }: { children: React.ReactNode }) {
-  return <div className="flex items-center gap-0.5">{children}</div>;
-}
-
-// The narrow margin is deliberate: the bar wraps when the editor area
-// gets tight, and every pixel saved pushes that wrap further out.
-export function ToolbarDivider() {
-  return <div className="editor-toolbar-divider" />;
-}
-
-export function ToolbarBtn({
-  children,
-  onClick,
-  active,
-  title,
-  disabled = false,
-}: {
-  children: React.ReactNode;
-  onClick: () => void;
-  active: boolean;
-  title: string;
-  disabled?: boolean;
-}) {
-  // Size and states in index.css (`.editor-toolbar-btn`); disabled goes through
-  // the shared `:disabled` rule.
-  return (
-    <button
-      onClick={onClick}
-      title={title}
-      disabled={disabled}
-      className={`editor-toolbar-btn ${
-        active ? 'editor-toolbar-btn-active' : disabled ? 'editor-toolbar-btn-disabled' : 'editor-toolbar-btn-idle'
-      }`}
-    >
-      {children}
-    </button>
   );
 }

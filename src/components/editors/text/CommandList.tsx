@@ -1,59 +1,32 @@
-import { forwardRef, useEffect, useImperativeHandle, useState } from 'react';
+import { forwardRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { SuggestionProps } from '@tiptap/suggestion';
 import type { SlashCommand } from './slashCommands';
-import type { SuggestionListHandle } from './suggestionPopup';
+import { useListKeys, type SuggestionListHandle } from './suggestionPopup';
 
 /** The `/` menu: the matching commands, chosen by arrow keys and Enter, or a click. */
 const CommandList = forwardRef<SuggestionListHandle, SuggestionProps<SlashCommand, SlashCommand>>(
   ({ items, command }, ref) => {
     const { t } = useTranslation();
-    const [selectedIndex, setSelectedIndex] = useState(0);
-
-    useEffect(() => setSelectedIndex(0), [items]);
-
-    useImperativeHandle(ref, () => ({
-      onKeyDown: (event: KeyboardEvent) => {
-        if (items.length === 0) return false;
-        if (event.key === 'ArrowUp') {
-          setSelectedIndex((i) => (i + items.length - 1) % items.length);
-          return true;
-        }
-        if (event.key === 'ArrowDown') {
-          setSelectedIndex((i) => (i + 1) % items.length);
-          return true;
-        }
-        if (event.key === 'Enter' || event.key === 'Tab') {
-          const item = items[selectedIndex];
-          if (item) command(item);
-          return true;
-        }
-        return false;
-      },
-    }));
+    const { selectedIndex, setSelectedIndex } = useListKeys(ref, items, command);
 
     if (items.length === 0) {
-      return (
-        <div className="bg-well-solid border border-edge-default rounded-lg px-3 py-2 text-xs text-subtle shadow-menu">
-          {t('search.noResultsShort')}
-        </div>
-      );
+      return <div className="menu-surface px-3 py-2 text-xs text-subtle">{t('search.noResultsShort')}</div>;
     }
 
     return (
-      <div className="bg-well-solid border border-edge-default rounded-lg overflow-hidden shadow-menu min-w-[200px] max-h-72 overflow-y-auto py-1">
+      <div className="menu-surface min-w-[200px] max-h-72 overflow-y-auto py-1">
         {items.map((item, index) => {
           const Icon = item.icon;
           return (
             <button
               key={item.id}
+              type="button"
               // Keep the editor's focus and selection: the click would otherwise take them away.
               onMouseDown={(e) => e.preventDefault()}
               onClick={() => command(item)}
               onMouseEnter={() => setSelectedIndex(index)}
-              className={`w-full text-left flex items-center gap-2.5 px-3 py-1.5 text-sm transition-colors ${
-                index === selectedIndex ? 'bg-well-active text-primary' : 'text-soft'
-              }`}
+              className={`menu-item${index === selectedIndex ? ' menu-item--current' : ''}`}
             >
               <Icon size={14} className="text-subtle flex-shrink-0" />
               <span className="flex-1 truncate">{t(item.labelKey)}</span>

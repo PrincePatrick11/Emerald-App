@@ -216,7 +216,8 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
     color: var(--text-secondary);
   }
 
-  .menu-item:hover:not(:disabled) {
+  .menu-item:hover:not(:disabled),
+  .menu-item--current {
     background: var(--menu-item-hover-bg);
     color: var(--menu-item-hover-text);
   }
@@ -2020,7 +2021,8 @@ html[data-theme] .prop-segment--active {
   box-shadow: 0 0 0 2px var(--well-solid), 0 0 0 3px var(--accent);
 }
 
-/* The find bar above the toolbar (FindBar) and the hits it marks. */
+/* The find bar above the toolbar (FindBar), the small inline field it shares with
+   the link form (LinkHrefForm), and the hits it marks. */
 .editor-find-bar {
   display: flex;
   flex-direction: column;
@@ -2028,8 +2030,7 @@ html[data-theme] .prop-segment--active {
   padding: 6px 16px;
   border-bottom: 1px solid var(--edge);
 }
-.editor-find-input {
-  width: 240px;
+.editor-inline-input {
   padding: 2px 8px;
   font-size: 12px;
   border-radius: 6px;
@@ -2038,7 +2039,7 @@ html[data-theme] .prop-segment--active {
   color: var(--text-secondary);
   outline: none;
 }
-.editor-find-input:focus { border-color: var(--accent-edge); }
+.editor-inline-input:focus { border-color: var(--accent-edge); }
 .tiptap .editor-search-match {
   border-radius: 2px;
   background-color: var(--accent-wash);

@@ -2,11 +2,13 @@ import type { Editor } from '@tiptap/react';
 import type { Node as ProseMirrorNode } from '@tiptap/pm/model';
 import { saveImage } from '../../../lib/images';
 import { prepareImageDataUrl } from '../../../lib/imageLimits';
-import { reportImageError } from '../../../store/imageNoticeStore';
+import { reportImageError, useImageNoticeStore } from '../../../store/imageNoticeStore';
+import { ACCEPTED_IMAGE_MIME, isAcceptedImageFile, readFileAsDataUrl } from '../../../lib/helpers';
 import { flashReveal, scrollIntoViewCentered } from '../../../lib/reveal';
 import { internalLinkBlockHtml, toInternalLinkChip } from '../../../lib/internalLinkHtml';
 import type { EntryLinkRequest } from '../../../lib/links';
 import type { SuggestionItem } from './SuggestionList';
+import { revealFolded } from './HeadingFoldExtension';
 
 /**
  * Commands that write into an editor from outside: the sidebar's link
@@ -153,6 +155,23 @@ const REVEAL_CLASS = 'is-revealed';
 const REVEAL_MS = 1600;
 
 /**
+ * Make `pos` visible: unfold the headings that hide it and open the closed
+ * collapsible sections around it. Their open state is not stored, so a
+ * section opens through its own toggle, which also moves the focus into the
+ * editor; a caller that keeps the focus elsewhere (the find bar) takes it back.
+ */
+export function revealPosition(editor: Editor, pos: number): void {
+  revealFolded(editor, pos);
+  const $pos = editor.state.doc.resolve(Math.min(pos, editor.state.doc.content.size));
+  for (let depth = 1; depth <= $pos.depth; depth++) {
+    if ($pos.node(depth).type.name !== 'details') continue;
+    const dom = editor.view.nodeDOM($pos.before(depth));
+    if (!(dom instanceof HTMLElement) || dom.classList.contains('is-open')) continue;
+    dom.querySelector<HTMLButtonElement>(':scope > button')?.click();
+  }
+}
+
+/**
  * Jumps to the link chip in the content and briefly highlights it. Returns `false`
  * if the entry does not contain it, in which case the caller can choose to
  * navigate to the target instead.
@@ -173,6 +192,7 @@ export function revealEntryLink(
 ): boolean {
   const pos = findEntryLinkPos(editor.state.doc, target);
   if (pos === null) return false;
+  revealPosition(editor, pos);
 
   // In edit mode also select for real so that the cursor is there;
   // in read mode ProseMirror shows no selection, and there the class does the job.
@@ -197,14 +217,48 @@ export function revealEntryLink(
   return true;
 }
 
-/** Image from the toolbar: first into the vault image folder, then as a node with the file name. */
-export async function insertImageFromDataUrl(editor: Editor, dataUrl: string): Promise<void> {
-  try {
-    const src = await saveImage(await prepareImageDataUrl(dataUrl));
-    editor.chain().focus().insertContent({ type: 'image', attrs: { src } }).run();
-  } catch (e) {
-    reportImageError(e, 'toolbar');
+/** What "Insert table" creates, from the toolbar and from the `/` menu. */
+export const NEW_TABLE = { rows: 3, cols: 3, withHeaderRow: true } as const;
+
+/**
+ * Chosen or pasted image files into the editor at the cursor, one after
+ * another in their order: each prepared (limits, photo as JPEG) and stored
+ * first. Files of another format are left out with the notice saying so;
+ * one that fails does not stop the others.
+ */
+export async function insertImageFiles(editor: Editor, files: File[]): Promise<void> {
+  const accepted = files.filter(isAcceptedImageFile);
+  if (accepted.length < files.length) useImageNoticeStore.getState().show({ kind: 'format' });
+  for (const file of accepted) {
+    try {
+      const src = await saveImage(await prepareImageDataUrl(await readFileAsDataUrl(file)));
+      if (editor.isDestroyed) return;
+      editor.chain().focus().insertContent({ type: 'image', attrs: { src } }).run();
+    } catch (e) {
+      reportImageError(e, 'insert');
+    }
   }
+}
+
+/** The file picker for images (toolbar button, `/` menu), several at once. */
+export function pickImageFiles(editor: Editor): void {
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = ACCEPTED_IMAGE_MIME;
+  input.multiple = true;
+  input.onchange = () => { void insertImageFiles(editor, Array.from(input.files ?? [])); };
+  input.click();
+}
+
+/**
+ * Set the web address of the link at the selection, or take the link away
+ * when the address is empty — in the selection menu and in the link popup alike.
+ */
+export function applyLinkHref(editor: Editor, href: string): void {
+  const value = href.trim();
+  const chain = editor.chain().focus().extendMarkRange('link');
+  if (value) chain.setLink({ href: value }).run();
+  else chain.unsetLink().run();
 }
 
 /** Link chip from the link picker (toolbar button) at the cursor position. */

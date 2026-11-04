@@ -39,6 +39,12 @@ html[data-theme='test-garish'] {
   --editor-toolbar-active-text: hsl(60, 95%, 72%);
   --editor-mark-bg: hsl(240, 80%, 22%);
   --editor-mark-text: hsl(60, 95%, 72%);
+  --editor-color-red: hsl(330, 100%, 60%);
+  --editor-color-orange: hsl(20, 100%, 60%);
+  --editor-color-yellow: hsl(75, 100%, 60%);
+  --editor-color-green: hsl(150, 100%, 60%);
+  --editor-color-blue: hsl(200, 100%, 60%);
+  --editor-color-purple: hsl(280, 100%, 60%);
   --menu-bg: hsl(240, 80%, 22%);
   --menu-border: hsl(190, 90%, 45%);
   --menu-shadow: 0 14px 36px hsla(240, 90%, 5%, 0.5);

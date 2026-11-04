@@ -5,10 +5,8 @@ import {
   CheckSquare, ChevronsDownUp, Heading1, Heading2, Heading3, ImagePlus, Link, List, ListOrdered, Minus, Pilcrow, Quote, Table,
   type LucideIcon,
 } from 'lucide-react';
-import { ACCEPTED_IMAGE_MIME, isAcceptedImageFile, readFileAsDataUrl } from '../../../lib/helpers';
-import { insertImageFromDataUrl } from './editorCommands';
+import { NEW_TABLE, pickImageFiles } from './editorCommands';
 import { editorHas } from './hostContext';
-import { NEW_TABLE } from './EditorToolbar';
 import CommandList from './CommandList';
 import { suggestionPopup } from './suggestionPopup';
 
@@ -23,21 +21,6 @@ export interface SlashCommand {
   /** Whether the editor has what the command needs. */
   available: (editor: Editor) => boolean;
   run: (editor: Editor, range: Range) => void;
-}
-
-/** Choose image files and insert them one after another at the cursor. */
-function pickImages(editor: Editor): void {
-  const input = document.createElement('input');
-  input.type = 'file';
-  input.accept = ACCEPTED_IMAGE_MIME;
-  input.multiple = true;
-  input.onchange = async () => {
-    for (const file of Array.from(input.files ?? []).filter(isAcceptedImageFile)) {
-      if (editor.isDestroyed) return;
-      await insertImageFromDataUrl(editor, await readFileAsDataUrl(file));
-    }
-  };
-  input.click();
 }
 
 /** The commands in menu order; each removes the typed `/…` first. */
@@ -83,7 +66,7 @@ export const SLASH_COMMANDS: SlashCommand[] = [
     available: (ed) => editorHas(ed, 'image'),
     run: (ed, range) => {
       ed.chain().focus().deleteRange(range).run();
-      pickImages(ed);
+      pickImageFiles(ed);
     },
   },
   {
