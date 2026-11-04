@@ -3,6 +3,7 @@ import { ReactNodeViewRenderer, NodeViewWrapper } from '@tiptap/react';
 import type { NodeViewProps } from '@tiptap/react';
 import { useRef, useState, useEffect } from 'react';
 import { invoke } from '@tauri-apps/api/core';
+import { isLocalMediaPath } from '../../lib/media';
 
 // Module-level cache: file path → data URL. Each image is read from disk only once per session.
 const imageDisplayCache = new Map<string, string>();
@@ -44,12 +45,12 @@ function ResizableImageView({ node, updateAttributes, selected, editor }: NodeVi
   const [displaySrc, setDisplaySrc] = useState<string>(() => {
     // Sync init for already-cached or inline sources
     if (!rawSrc) return '';
-    if (rawSrc.startsWith('data:') || rawSrc.startsWith('http')) return rawSrc;
+    if (!isLocalMediaPath(rawSrc)) return rawSrc;
     return imageDisplayCache.get(rawSrc) ?? '';
   });
 
   useEffect(() => {
-    if (!rawSrc || rawSrc.startsWith('data:') || rawSrc.startsWith('http')) return;
+    if (!isLocalMediaPath(rawSrc)) return;
     // Check cache first — may have been populated since the useState initializer ran
     const cached = imageDisplayCache.get(rawSrc);
     if (cached) { setDisplaySrc(cached); return; }

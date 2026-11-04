@@ -24,8 +24,34 @@ const IMAGE_PATH_RE = /\.(png|jpe?g|gif|webp|svg)$/i;
 /** `accept` value for a file input that picks sound files. */
 export const ACCEPTED_AUDIO = AUDIO_EXTENSIONS.map((e) => `.${e}`).join(',');
 
+/** How each format is written for people; `oga` is just another Ogg extension. */
+const AUDIO_FORMAT_NAMES: Partial<Record<keyof typeof AUDIO_MIME_BY_EXT, string>> = { ogg: 'OGG', opus: 'Opus', flac: 'FLAC', webm: 'WebM' };
+
 /** The accepted formats as a display list, e.g. for an error message. */
-export const AUDIO_FORMATS_LABEL = ['MP3', 'M4A', 'AAC', 'WAV', 'OGG', 'Opus', 'FLAC', 'WebM'].join(', ');
+export const AUDIO_FORMATS_LABEL = AUDIO_EXTENSIONS
+  .filter((e) => e !== 'oga')
+  .map((e) => AUDIO_FORMAT_NAMES[e] ?? e.toUpperCase())
+  .join(', ');
+
+/**
+ * Whether this webview can play a stored sound file — accepted formats differ
+ * by platform (older macOS WebKit has no Ogg/Opus, WebKitGTK depends on the
+ * installed GStreamer plugins). Feature detection, not a platform guess.
+ */
+export function canPlayAudioPath(path: string): boolean {
+  const ext = path.split('.').pop()?.toLowerCase() as keyof typeof AUDIO_MIME_BY_EXT | undefined;
+  const mime = ext && AUDIO_MIME_BY_EXT[ext];
+  if (!mime) return false;
+  return document.createElement('audio').canPlayType(mime) !== '';
+}
+
+/**
+ * Whether an `src` points at a file in the vault's media dirs — as opposed to
+ * an inline data URL, a web address or a blob URL, which need no reading.
+ */
+export function isLocalMediaPath(src: string | null | undefined): src is string {
+  return !!src && !src.startsWith('data:') && !src.startsWith('http') && !src.startsWith('blob:');
+}
 
 export function isAudioPath(path: string): boolean {
   return AUDIO_PATH_RE.test(path);

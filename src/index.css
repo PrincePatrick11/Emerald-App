@@ -140,6 +140,23 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
     color: var(--menu-item-active-text);
   }
 
+  .export-check {
+    @apply w-4 h-4 rounded border flex items-center justify-center shrink-0 transition-colors;
+    border-color: var(--border-strong);
+  }
+  .export-check-on {
+    border-color: var(--accent-strong);
+    background-color: var(--link-chip-bg);
+    color: var(--accent);
+  }
+  .export-segment:focus-visible,
+  .export-option:focus-visible,
+  .export-row:focus-visible,
+  .audio-player-btn:focus-visible {
+    outline: 2px solid var(--focus-ring);
+    outline-offset: 2px;
+  }
+
   /* Embedded sound file in the editor (AudioExtension) */
   .audio-player {
     background-color: var(--bg-surface-1);

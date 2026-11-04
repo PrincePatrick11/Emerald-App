@@ -10,7 +10,7 @@
     "unsupportedImageFormat": "Format nicht unterstützt. Erlaubt: PNG, JPEG, GIF, WebP, SVG",
     "searchEmoji": "Emoji suchen…",
     "noEmojiResults": "Keine Treffer",
-    "unsupportedAudioFormat": "Format nicht unterstützt. Erlaubt: MP3, M4A, AAC, WAV, OGG, Opus, FLAC, WebM",
+    "unsupportedAudioFormat": "Format nicht unterstützt. Erlaubt: {{formats}}",
     "unsupportedDropFormat": "Format nicht unterstützt"
   },
   "listView": {
@@ -255,7 +255,7 @@
     "unloadSigil": "Sigill entladen",
     "timerLabel": "Timer:",
     "timerSeconds": "Sekunden",
-    "hidden": "Hidden",
+    "hidden": "Ausgeblendet",
     "chargingTechnique": "Ladetechnik",
     "letterBank": "Buchstabensatz",
     "lettersComplete": "Buchstaben markiert",
@@ -317,7 +317,9 @@
       "play": "Abspielen",
       "pause": "Pause",
       "position": "Position",
-      "loadFailed": "konnte nicht geladen werden"
+      "loadFailed": "konnte nicht geladen werden",
+      "saveFailed": "Sounddatei konnte nicht gespeichert werden.",
+      "notPlayableHere": "Format wird auf diesem System nicht abgespielt"
     }
   },
   "moonPhase": {
@@ -659,7 +661,8 @@
       "fileTitle": "Emerald – {{modules}} – {{range}}",
       "noModules": "Mindestens ein Modul auswählen.",
       "invalidDate": "Datum unvollständig oder ungültig (Format JJJJ-MM-TT).",
-      "noLinked": "Die ausgewählten Einträge verlinken auf keine weiteren Einträge."
+      "noLinked": "Die ausgewählten Einträge verlinken auf keine weiteren Einträge.",
+      "datePlaceholder": "JJJJ-MM-TT"
     },
     "largePdfHint": "{{count}} Einträge sind ein großes PDF – das Erzeugen kann dauern, und unter macOS wird es eine einzige sehr lange Seite. Für große Pakete eignet sich HTML besser.",
     "mode": {
@@ -679,17 +682,20 @@
     "linkedMedia_other": "Eigene Einstellungen für verlinkte Einträge ({{count}})",
     "sigil": {
       "drawing": "Sigill",
-      "hidden": "Verborgen – das Sigill ist geladen",
-      "hiddenUntil": "Verborgen bis {{date}} – das Sigill ist geladen",
+      "hidden": "Ausgeblendet – das Sigill ist geladen",
+      "hiddenUntil": "Ausgeblendet bis {{date}} – das Sigill ist geladen",
       "show": "Anzeigen",
-      "hide": "Verbergen"
+      "hide": "Ausblenden"
     },
     "sigilHidden": {
-      "label": "Verborgene Sigill-Teile",
+      "label": "Ausgeblendete Sigill-Teile",
       "toggle": "Umschaltbar",
       "omit": "Weglassen",
-      "toggleDesc": "Starten verborgen wie in der App und lassen sich in der Datei einblenden – sie stehen dafür im Quelltext der Datei.",
-      "omitDesc": "Verborgene Teile kommen gar nicht in die Datei, nur ein Hinweis."
+      "toggleDesc": "Starten ausgeblendet wie in der App und lassen sich in der Datei einblenden – sie stehen dafür im Quelltext der Datei.",
+      "omitDesc": "Ausgeblendete Teile kommen gar nicht in die Datei, nur ein Hinweis."
+    },
+    "meta": {
+      "ends": "Endet am {{date}}"
     }
   }
 }

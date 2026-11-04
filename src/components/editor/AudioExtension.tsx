@@ -4,7 +4,7 @@ import type { NodeViewProps } from '@tiptap/react';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Music, Pause, Play } from 'lucide-react';
-import { audioTitle, dataUrlToBlob, formatDuration } from '../../lib/media';
+import { audioTitle, canPlayAudioPath, dataUrlToBlob, formatDuration } from '../../lib/media';
 import { invoke } from '@tauri-apps/api/core';
 
 // Module-level cache: file path → blob URL. A sound file is read from disk
@@ -131,7 +131,11 @@ function AudioView({ node, selected, updateAttributes, editor }: NodeViewProps) 
           <div className="flex items-center gap-1.5 text-xs mb-1" style={{ color: 'var(--text-secondary)' }}>
             <Music size={11} className="shrink-0 opacity-70" />
             <span className="truncate">{title}</span>
-            {failed && <span className="audio-player-error shrink-0">· {t('editor.audio.loadFailed')}</span>}
+            {failed && (
+              <span className="audio-player-error shrink-0">
+                · {t(rawSrc && !rawSrc.startsWith('data:') && !canPlayAudioPath(rawSrc) ? 'editor.audio.notPlayableHere' : 'editor.audio.loadFailed')}
+              </span>
+            )}
           </div>
           <input
             type="range"

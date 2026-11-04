@@ -5,6 +5,8 @@
 // helpers downscale and re-encode embedded images on a canvas before they're
 // written. The original images in the vault are never touched.
 
+import { mapLimit } from './helpers';
+
 export type ImageCompression = 'none' | 'balanced' | 'strong';
 
 const PRESETS: Record<Exclude<ImageCompression, 'none'>, { maxSide: number; quality: number }> = {
@@ -82,9 +84,10 @@ export async function compressImagesInHtml(html: string, level: ImageCompression
   if (!sources.size) return html;
 
   const replacements = new Map<string, string>();
-  await Promise.all([...sources].map(async (src) => {
+  // Bounded: each decode holds a full-size bitmap.
+  await mapLimit([...sources], 4, async (src) => {
     replacements.set(src, await compressDataUrl(src, level));
-  }));
+  });
   return html.replace(DATA_SRC_RE, (whole, src: string) => {
     const next = replacements.get(src);
     return next && next !== src ? `src="${next}"` : whole;

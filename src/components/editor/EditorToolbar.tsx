@@ -2,7 +2,7 @@ import { useRef, useState } from 'react';
 import type { Editor } from '@tiptap/react';
 import { useTranslation } from 'react-i18next';
 import { ACCEPTED_IMAGE_MIME, isAcceptedImageFile } from '../../lib/helpers';
-import { ACCEPTED_AUDIO, audioDataUrlFor, isAcceptedAudioFile } from '../../lib/media';
+import { ACCEPTED_AUDIO, AUDIO_FORMATS_LABEL, audioDataUrlFor, isAcceptedAudioFile } from '../../lib/media';
 import {
   Bold,
   Italic,
@@ -93,13 +93,14 @@ export default function EditorToolbar({ editor, onInsertImage, onInsertAudio, on
     e.target.value = '';
     if (!file) return;
     if (!isAcceptedAudioFile(file)) {
-      showMediaError(t('common.unsupportedAudioFormat'));
+      showMediaError(t('common.unsupportedAudioFormat', { formats: AUDIO_FORMATS_LABEL }));
       return;
     }
     const reader = new FileReader();
     reader.onload = async () => {
       const inserted = await onInsertAudio(audioDataUrlFor(file.name, reader.result as string), file.name);
-      if (!inserted) showMediaError(t('common.unsupportedAudioFormat'));
+      // The extension was checked above, so a failure here is a save error, not the format.
+      if (!inserted) showMediaError(t('editor.audio.saveFailed'));
     };
     reader.readAsDataURL(file);
   };

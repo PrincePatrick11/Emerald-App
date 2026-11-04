@@ -1,9 +1,8 @@
 import { invoke } from '@tauri-apps/api/core';
 import { save } from '@tauri-apps/plugin-dialog';
-import { format } from 'date-fns';
 import { internalLinksIn, type ExportData, type ExportEntryType } from './exportData';
 import {
-  DEFAULT_EXPORT_OPTIONS, defaultFilename, documentTitle, entryAnchor, htmlEscape, mediaFor, renderEntryArticle,
+  DEFAULT_EXPORT_OPTIONS, defaultFilename, documentTitle, exportDate, entryAnchor, htmlEscape, mediaFor, renderEntryArticle, renderSequentially,
   sanitizeDataImageUrl, type ExportOptions,
 } from './export';
 
@@ -97,7 +96,7 @@ function buildNav(entries: ExportData[], labels: HtmlExportLabels): string {
     const group = entries.filter(e => e.type === type);
     if (!group.length) return '';
     const items = group.map(e => {
-      const date = format(new Date(e.createdAt), 'dd.MM.yyyy');
+      const date = htmlEscape(exportDate(e.createdAt));
       return `<a class="nav-item" href="#${entryAnchor(e.id)}" data-target="${entryAnchor(e.id)}" data-ts="${new Date(e.createdAt).getTime() || 0}">
         <span class="nav-icon">${navIcon(e)}</span>
         <span class="nav-text"><span class="nav-title">${htmlEscape(e.title)}</span>${type === 'journal' ? `<span class="nav-sub">${date}</span>` : ''}</span>
@@ -122,14 +121,14 @@ export async function buildInteractiveHtml(
 
   const outgoing = new Map(entries.map(e => [e.id, outgoingIds(e)]));
   // The references section goes inside the article so it's shown / hidden with it.
-  const articles = await Promise.all(entries.map(e =>
+  const articles = await renderSequentially(entries, e =>
     renderEntryArticle(e, {
       bundleIds,
       ...mediaFor(e, opts),
       sigil: opts.sigilHidden === 'omit' ? 'static' : 'interactive',
       footerHtml: buildRefs(e, entries, outgoing, labels),
     })
-  ));
+  );
 
   return `<!DOCTYPE html>
 <html lang="${htmlEscape(lang)}">

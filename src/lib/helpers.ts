@@ -53,3 +53,21 @@ export function hexToRgb(hex: string): { r: number; g: number; b: number } {
     b: parseInt(normalized.slice(4, 6), 16),
   };
 }
+
+/**
+ * `Promise.all(items.map(fn))` with at most `limit` calls running at once —
+ * for work that holds a lot of memory per item, such as reading and
+ * re-encoding images during a bulk export. Results keep the input order.
+ */
+export async function mapLimit<T, R>(items: readonly T[], limit: number, fn: (item: T, index: number) => Promise<R>): Promise<R[]> {
+  const results = new Array<R>(items.length);
+  let next = 0;
+  const worker = async () => {
+    while (next < items.length) {
+      const i = next++;
+      results[i] = await fn(items[i], i);
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
+  return results;
+}

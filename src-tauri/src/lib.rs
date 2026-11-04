@@ -27,28 +27,78 @@ fn sha256_hex(data: &[u8]) -> String {
     format!("{:x}", Sha256::digest(data))
 }
 
-fn images_dir(app: &tauri::AppHandle) -> Result<std::path::PathBuf, String> {
+/// A media dir in app data (`images` or `audio`), created on first use.
+fn media_dir(app: &tauri::AppHandle, name: &str) -> Result<std::path::PathBuf, String> {
     let dir = app
         .path()
         .app_data_dir()
         .map_err(|e| e.to_string())?
-        .join("images");
+        .join(name);
     std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
     Ok(dir)
+}
+
+fn images_dir(app: &tauri::AppHandle) -> Result<std::path::PathBuf, String> {
+    media_dir(app, "images")
 }
 
 /// Where embedded sound files live, next to `images/`.
 fn audio_dir(app: &tauri::AppHandle) -> Result<std::path::PathBuf, String> {
-    let dir = app
-        .path()
-        .app_data_dir()
-        .map_err(|e| e.to_string())?
-        .join("audio");
-    std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
-    Ok(dir)
+    media_dir(app, "audio")
 }
 
-/// Sound formats the editor embeds; every webview the app runs on plays these.
+/// Writes `bytes` into `dir` named by their SHA-256, so identical files share
+/// one copy, and returns the path.
+fn store_deduped(dir: &Path, bytes: &[u8], ext: &str) -> Result<String, String> {
+    let path = dir.join(format!("{}.{}", sha256_hex(bytes), ext));
+    if !path.exists() {
+        std::fs::write(&path, bytes).map_err(|e| e.to_string())?;
+    }
+    Ok(path.to_string_lossy().into_owned())
+}
+
+/// Splits a base64 data URL into its MIME type and decoded bytes.
+fn decode_data_url(data_url: &str) -> Result<(&str, Vec<u8>), String> {
+    let (mime_part, b64) = data_url
+        .strip_prefix("data:")
+        .and_then(|s| s.split_once(','))
+        .ok_or("Invalid data URL")?;
+    let bytes = general_purpose::STANDARD.decode(b64).map_err(|e| e.to_string())?;
+    Ok((mime_part.split(';').next().unwrap_or(""), bytes))
+}
+
+/// Reads a file the user picked or dropped: allowed roots only, no symlinks.
+fn read_confined_source(app: &tauri::AppHandle, source: &str) -> Result<Vec<u8>, String> {
+    let allowed_roots = resolve_allowed_roots(app)?;
+    let source_path = PathBuf::from(source);
+    let metadata = std::fs::symlink_metadata(&source_path).map_err(|_| "file not found".to_string())?;
+    if metadata.file_type().is_symlink() {
+        return Err("access denied: symlink targets are not allowed".to_string());
+    }
+    let canonical_source = std::fs::canonicalize(&source_path).map_err(|_| "unable to resolve path".to_string())?;
+    if !is_within_allowed_roots(&canonical_source, &allowed_roots) {
+        return Err("access denied: path outside allowed directories".to_string());
+    }
+    std::fs::read(&canonical_source).map_err(|e| format!("read {source}: {e}"))
+}
+
+/// Reads a stored media file as a data URL; the path must resolve into `dir`.
+fn read_confined_data_url(dir: &Path, path: &str, mime: &str) -> Result<String, String> {
+    let allowed_dir = std::fs::canonicalize(dir).map_err(|e| e.to_string())?;
+    let path_buf = PathBuf::from(path);
+    if !path_buf.exists() {
+        return Err("file not found".to_string());
+    }
+    let canon = std::fs::canonicalize(&path_buf).map_err(|_| "invalid path".to_string())?;
+    if !canon.starts_with(&allowed_dir) {
+        return Err("access denied: path outside media directory".to_string());
+    }
+    let bytes = std::fs::read(&canon).map_err(|e| format!("read: {e}"))?;
+    Ok(format!("data:{};base64,{}", mime, general_purpose::STANDARD.encode(&bytes)))
+}
+
+/// Sound formats the editor embeds. Which of them play depends on the webview:
+/// WKWebView on older macOS has no Ogg/Opus, WebKitGTK needs GStreamer plugins.
 const AUDIO_EXTENSIONS: &[&str] = &["mp3", "m4a", "aac", "wav", "ogg", "oga", "opus", "flac", "webm"];
 
 fn audio_ext_for_mime(mime: &str) -> Option<&'static str> {
@@ -132,19 +182,8 @@ fn is_within_allowed_roots(path: &Path, allowed_roots: &[PathBuf]) -> bool {
 /// Uses SHA-256 of the raw bytes as filename → identical images share one file.
 #[tauri::command]
 fn save_image(app: tauri::AppHandle, data_url: String) -> Result<String, String> {
-    let (mime_part, b64) = data_url
-        .strip_prefix("data:")
-        .and_then(|s| s.split_once(','))
-        .ok_or("Invalid data URL")?;
-
-    let ext = ext_for_mime(mime_part.split(';').next().unwrap_or(""));
-    let bytes = general_purpose::STANDARD.decode(b64).map_err(|e| e.to_string())?;
-    let path = images_dir(&app)?.join(format!("{}.{}", sha256_hex(&bytes), ext));
-
-    if !path.exists() {
-        std::fs::write(&path, &bytes).map_err(|e| e.to_string())?;
-    }
-    Ok(path.to_string_lossy().into_owned())
+    let (mime, bytes) = decode_data_url(&data_url)?;
+    store_deduped(&images_dir(&app)?, &bytes, ext_for_mime(mime))
 }
 
 /// Copies a file from an arbitrary location into the images dir.
@@ -156,43 +195,14 @@ fn copy_image_file(app: tauri::AppHandle, source: String) -> Result<String, Stri
     if !matches!(ext.as_str(), "png" | "jpg" | "jpeg" | "gif" | "webp" | "svg") {
         return Err("unsupported file type".to_string());
     }
-
-    let allowed_roots = resolve_allowed_roots(&app)?;
-    let source_path = PathBuf::from(&source);
-    let metadata = std::fs::symlink_metadata(&source_path).map_err(|_| "file not found".to_string())?;
-    if metadata.file_type().is_symlink() {
-        return Err("access denied: symlink targets are not allowed".to_string());
-    }
-    let canonical_source = std::fs::canonicalize(&source_path).map_err(|_| "unable to resolve path".to_string())?;
-    if !is_within_allowed_roots(&canonical_source, &allowed_roots) {
-        return Err("access denied: path outside allowed directories".to_string());
-    }
-
-    let bytes = std::fs::read(&canonical_source).map_err(|e| format!("read {source}: {e}"))?;
-    let path = images_dir(&app)?.join(format!("{}.{}", sha256_hex(&bytes), ext));
-
-    if !path.exists() {
-        std::fs::write(&path, &bytes).map_err(|e| e.to_string())?;
-    }
-    Ok(path.to_string_lossy().into_owned())
+    let bytes = read_confined_source(&app, &source)?;
+    store_deduped(&images_dir(&app)?, &bytes, &ext)
 }
 
 /// Reads a local image file and returns it as a base64 data-URL for display.
 /// Path must resolve to within the app images directory.
 #[tauri::command]
 fn read_image_as_base64(app: tauri::AppHandle, path: String) -> Result<String, String> {
-    let allowed_dir = std::fs::canonicalize(images_dir(&app)?)
-        .map_err(|e| e.to_string())?;
-    let path_buf = PathBuf::from(&path);
-    if !path_buf.exists() {
-        return Err("file not found".to_string());
-    }
-    let canon = std::fs::canonicalize(&path_buf)
-        .map_err(|_| "invalid path".to_string())?;
-    if !canon.starts_with(&allowed_dir) {
-        return Err("access denied: path outside images directory".to_string());
-    }
-    let bytes = std::fs::read(&canon).map_err(|e| format!("read: {e}"))?;
     let mime = match ext_for_path(&path).as_str() {
         "png"  => "image/png",
         "jpg" | "jpeg" => "image/jpeg",
@@ -201,7 +211,7 @@ fn read_image_as_base64(app: tauri::AppHandle, path: String) -> Result<String, S
         "svg"  => "image/svg+xml",
         _      => "image/png",
     };
-    Ok(format!("data:{};base64,{}", mime, general_purpose::STANDARD.encode(&bytes)))
+    read_confined_data_url(&images_dir(&app)?, &path, mime)
 }
 
 /// Saves a base64 data-URL sound file into the audio dir, named by the
@@ -209,18 +219,9 @@ fn read_image_as_base64(app: tauri::AppHandle, path: String) -> Result<String, S
 /// for audio restored from `.emerald` / `.emeralddb` files.
 #[tauri::command]
 fn save_audio(app: tauri::AppHandle, data_url: String) -> Result<String, String> {
-    let (mime_part, b64) = data_url
-        .strip_prefix("data:")
-        .and_then(|s| s.split_once(','))
-        .ok_or("Invalid data URL")?;
-    let ext = audio_ext_for_mime(mime_part.split(';').next().unwrap_or(""))
-        .ok_or("unsupported file type")?;
-    let bytes = general_purpose::STANDARD.decode(b64).map_err(|e| e.to_string())?;
-    let path = audio_dir(&app)?.join(format!("{}.{}", sha256_hex(&bytes), ext));
-    if !path.exists() {
-        std::fs::write(&path, &bytes).map_err(|e| e.to_string())?;
-    }
-    Ok(path.to_string_lossy().into_owned())
+    let (mime, bytes) = decode_data_url(&data_url)?;
+    let ext = audio_ext_for_mime(mime).ok_or("unsupported file type")?;
+    store_deduped(&audio_dir(&app)?, &bytes, ext)
 }
 
 /// Copies a sound file dropped onto the editor into the audio dir. Same
@@ -231,24 +232,8 @@ fn copy_audio_file(app: tauri::AppHandle, source: String) -> Result<String, Stri
     if !AUDIO_EXTENSIONS.contains(&ext.as_str()) {
         return Err("unsupported file type".to_string());
     }
-
-    let allowed_roots = resolve_allowed_roots(&app)?;
-    let source_path = PathBuf::from(&source);
-    let metadata = std::fs::symlink_metadata(&source_path).map_err(|_| "file not found".to_string())?;
-    if metadata.file_type().is_symlink() {
-        return Err("access denied: symlink targets are not allowed".to_string());
-    }
-    let canonical_source = std::fs::canonicalize(&source_path).map_err(|_| "unable to resolve path".to_string())?;
-    if !is_within_allowed_roots(&canonical_source, &allowed_roots) {
-        return Err("access denied: path outside allowed directories".to_string());
-    }
-
-    let bytes = std::fs::read(&canonical_source).map_err(|e| format!("read {source}: {e}"))?;
-    let path = audio_dir(&app)?.join(format!("{}.{}", sha256_hex(&bytes), ext));
-    if !path.exists() {
-        std::fs::write(&path, &bytes).map_err(|e| e.to_string())?;
-    }
-    Ok(path.to_string_lossy().into_owned())
+    let bytes = read_confined_source(&app, &source)?;
+    store_deduped(&audio_dir(&app)?, &bytes, &ext)
 }
 
 /// Reads a sound file from the audio dir as a data URL — for playback in the
@@ -256,18 +241,7 @@ fn copy_audio_file(app: tauri::AppHandle, source: String) -> Result<String, Stri
 /// like `read_image_as_base64` is to the images dir.
 #[tauri::command]
 fn read_audio_as_base64(app: tauri::AppHandle, path: String) -> Result<String, String> {
-    let allowed_dir = std::fs::canonicalize(audio_dir(&app)?).map_err(|e| e.to_string())?;
-    let path_buf = PathBuf::from(&path);
-    if !path_buf.exists() {
-        return Err("file not found".to_string());
-    }
-    let canon = std::fs::canonicalize(&path_buf).map_err(|_| "invalid path".to_string())?;
-    if !canon.starts_with(&allowed_dir) {
-        return Err("access denied: path outside audio directory".to_string());
-    }
-    let bytes = std::fs::read(&canon).map_err(|e| format!("read: {e}"))?;
-    let mime = audio_mime_for_ext(&ext_for_path(&path));
-    Ok(format!("data:{};base64,{}", mime, general_purpose::STANDARD.encode(&bytes)))
+    read_confined_data_url(&audio_dir(&app)?, &path, audio_mime_for_ext(&ext_for_path(&path)))
 }
 
 /// Writes text content to a user-selected file path.

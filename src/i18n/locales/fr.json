@@ -10,7 +10,7 @@
     "unsupportedImageFormat": "Format non supporté. Autorisé : PNG, JPEG, GIF, WebP, SVG",
     "searchEmoji": "Rechercher un emoji…",
     "noEmojiResults": "Aucun résultat",
-    "unsupportedAudioFormat": "Format non supporté. Autorisé : MP3, M4A, AAC, WAV, OGG, Opus, FLAC, WebM",
+    "unsupportedAudioFormat": "Format non supporté. Autorisé : {{formats}}",
     "unsupportedDropFormat": "Format non supporté"
   },
   "listView": {
@@ -250,12 +250,12 @@
     "showSigil": "Afficher le sigil",
     "sigilHidden": "Le sigil est actuellement masqué.",
     "hiddenUntilDate": "Le sigil reste masque jusqu'au {{date}}.",
-    "sigilLoaded": "Sigil charge",
+    "sigilLoaded": "Sigil chargé",
     "loadSigille": "Load Sigille",
     "unloadSigil": "Decharger le sigil",
     "timerLabel": "Timer:",
     "timerSeconds": "Secondes",
-    "hidden": "Hidden",
+    "hidden": "Masqué",
     "chargingTechnique": "Technique de chargement",
     "letterBank": "Jeu de lettres",
     "lettersComplete": "lettres marquées",
@@ -317,7 +317,9 @@
       "play": "Lire",
       "pause": "Pause",
       "position": "Position",
-      "loadFailed": "n'a pas pu être chargé"
+      "loadFailed": "n'a pas pu être chargé",
+      "saveFailed": "Le fichier audio n'a pas pu être enregistré.",
+      "notPlayableHere": "format non lisible sur ce système"
     }
   },
   "moonPhase": {
@@ -659,7 +661,8 @@
       "fileTitle": "Emerald – {{modules}} – {{range}}",
       "noModules": "Sélectionnez au moins un module.",
       "invalidDate": "Date incomplète ou invalide (format AAAA-MM-JJ).",
-      "noLinked": "Les entrées sélectionnées ne renvoient vers aucune autre entrée."
+      "noLinked": "Les entrées sélectionnées ne renvoient vers aucune autre entrée.",
+      "datePlaceholder": "AAAA-MM-JJ"
     },
     "largePdfHint": "{{count}} entrées donnent un PDF volumineux : sa création peut prendre du temps et, sous macOS, il devient une seule page très longue. Le HTML convient mieux aux gros lots.",
     "mode": {
@@ -690,6 +693,9 @@
       "omit": "Omettre",
       "toggleDesc": "Commencent masquées comme dans l'app et peuvent être affichées dans le fichier – elles figurent donc dans son code source.",
       "omitDesc": "Les parties masquées ne sont pas incluses dans le fichier, seulement une note."
+    },
+    "meta": {
+      "ends": "Se termine le {{date}}"
     }
   }
 }

@@ -8,7 +8,7 @@ import {
   collectExportDataFor, collectLinkedTargets, collectTargetsInRange, describeTarget, targetKey,
   type ExportData, type ExportEntryType, type ExportTarget,
 } from '../../lib/exportData';
-import { exportAsMarkdown, exportAsPDF, exportErrorMessage, type ExportOptions } from '../../lib/export';
+import { exportAsMarkdown, exportAsPDF, exportDate, exportErrorMessage, type ExportOptions } from '../../lib/export';
 import { exportAsHTML, type HtmlExportLabels } from '../../lib/htmlExport';
 import { exportAsEmerald } from '../../lib/emeraldFormat';
 import { OP_PROP_SELECT_CLASSES } from '../../lib/styleClasses';
@@ -130,12 +130,8 @@ function TargetIcon({ icon }: { icon: string }) {
 
 function Checkbox({ checked, disabled }: { checked: boolean; disabled?: boolean }) {
   return (
-    <div
-      className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 transition-colors ${
-        checked ? 'bg-jade-500/30 border-jade-500/60' : 'border-stone-600'
-      } ${disabled ? 'opacity-40' : ''}`}
-    >
-      {checked && <Check size={10} className="text-jade-400" />}
+    <div aria-hidden className={`export-check${checked ? ' export-check-on' : ''}${disabled ? ' opacity-40' : ''}`}>
+      {checked && <Check size={10} />}
     </div>
   );
 }
@@ -156,6 +152,7 @@ function Segmented<T extends string>({ options, value, onChange, label, disabled
           type="button"
           onClick={() => onChange(option)}
           disabled={disabled?.includes(option)}
+          aria-pressed={value === option}
           className={`export-segment disabled:opacity-50 disabled:cursor-not-allowed${value === option ? ' export-segment-active' : ''}`}
         >
           {label(option)}
@@ -184,13 +181,15 @@ function EntryList({ targets, excluded, onToggle, showDate }: {
             key={key}
             type="button"
             onClick={() => onToggle(key)}
-            className="context-menu-item-default w-full flex items-center gap-2.5 px-3 py-1.5 text-left hover:bg-stone-700/30 transition-colors"
+            role="checkbox"
+            aria-checked={checked}
+            className="export-row context-menu-item-default w-full flex items-center gap-2.5 px-3 py-1.5 text-left transition-colors"
           >
             <Checkbox checked={checked} />
             <TargetIcon icon={info.icon} />
-            <span className={`text-xs truncate ${checked ? 'text-stone-300' : 'text-stone-500'}`}>{info.title}</span>
-            <span className="ml-auto text-[10px] text-stone-500 shrink-0">
-              {showDate && info.createdAt ? `${formatDate(new Date(info.createdAt), 'dd.MM.yyyy')} · ` : ''}
+            <span className="text-xs truncate" style={{ color: checked ? 'var(--text-secondary)' : 'var(--text-subtle)' }}>{info.title}</span>
+            <span className="ml-auto text-[10px] shrink-0" style={{ color: 'var(--text-subtle)' }}>
+              {showDate && info.createdAt ? `${exportDate(info.createdAt)} · ` : ''}
               {t(TYPE_LABEL_KEYS[target.type])}
             </span>
           </button>
@@ -204,7 +203,7 @@ function EntryList({ targets, excluded, onToggle, showDate }: {
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <section className="py-4 space-y-3 border-t first:border-t-0" style={{ borderColor: 'var(--border-soft)' }}>
-      <h3 className="text-[11px] font-semibold uppercase tracking-wider text-stone-500">{title}</h3>
+      <h3 className="label-xs !text-[11px]">{title}</h3>
       {children}
     </section>
   );
@@ -213,11 +212,11 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 /** A labelled control inside a section: label on the left, control (and its note) on the right. */
 function Row({ label, note, children }: { label: string; note?: string; children: React.ReactNode }) {
   return (
-    <div className="grid grid-cols-[104px_1fr] gap-3 items-start">
-      <span className="text-xs text-stone-500 pt-1.5">{label}</span>
+    <div className="grid grid-cols-[120px_1fr] gap-3 items-start">
+      <span className="text-xs pt-1.5" style={{ color: 'var(--text-subtle)' }}>{label}</span>
       <div className="min-w-0">
         {children}
-        {note && <p className="text-xs text-stone-500 mt-1.5 leading-snug">{note}</p>}
+        {note && <p className="text-xs mt-1.5 leading-snug" style={{ color: 'var(--text-subtle)' }}>{note}</p>}
       </div>
     </div>
   );
@@ -225,9 +224,9 @@ function Row({ label, note, children }: { label: string; note?: string; children
 
 function CheckRow({ checked, onToggle, children }: { checked: boolean; onToggle: () => void; children: React.ReactNode }) {
   return (
-    <button type="button" onClick={onToggle} className="flex items-center gap-2 text-left">
+    <button type="button" onClick={onToggle} role="checkbox" aria-checked={checked} className="export-row flex items-center gap-2 text-left rounded">
       <Checkbox checked={checked} />
-      <span className="text-xs text-stone-300">{children}</span>
+      <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>{children}</span>
     </button>
   );
 }
@@ -338,7 +337,7 @@ function ExportModalBody({ openTarget, initialFormat }: { openTarget: ExportTarg
 
   function bundleTitle(): string {
     const modules = prefs.bulkModules.map((m) => t(TYPE_LABEL_KEYS[m])).join(', ');
-    const day = (d: Date) => formatDate(d, 'dd.MM.yyyy');
+    const day = (d: Date) => exportDate(d);
     const span = range.from && range.to ? `${day(range.from)}–${day(range.to)}`
       : range.from ? t('exportModal.bulk.since', { date: day(range.from) })
       : range.to ? t('exportModal.bulk.until', { date: day(range.to) })
@@ -367,7 +366,7 @@ function ExportModalBody({ openTarget, initialFormat }: { openTarget: ExportTarg
       sortNewest: t('exportModal.order.desc'),
       entryCount: t('exportModal.entryCount', { count }),
       // `{{app}}` stays in so the export can turn it into a link.
-      exportedOn: t('exportModal.html.exportedOn', { date: formatDate(new Date(), 'dd.MM.yyyy'), app: '{{app}}' }),
+      exportedOn: t('exportModal.html.exportedOn', { date: exportDate(new Date()), app: '{{app}}' }),
       groups: {
         journal: t(TYPE_LABEL_KEYS.journal),
         wiki: t(TYPE_LABEL_KEYS.wiki),
@@ -460,6 +459,7 @@ function ExportModalBody({ openTarget, initialFormat }: { openTarget: ExportTarg
               onClick={() => { setMode(m); setExcluded(new Set()); }}
               disabled={m === 'entry' && !openTarget}
               title={m === 'entry' && !openTarget ? t('exportModal.mode.noEntry') : undefined}
+              aria-pressed={mode === m}
               className={`export-segment py-1.5 disabled:opacity-50 disabled:cursor-not-allowed${mode === m ? ' export-segment-active' : ''}`}
             >
               {t(`exportModal.mode.${m}`)}
@@ -498,22 +498,22 @@ function ExportModalBody({ openTarget, initialFormat }: { openTarget: ExportTarg
                   label={(p) => t(`exportModal.bulk.periods.${p}`)}
                 />
                 {prefs.bulkPeriod === 'custom' && (
-                  <div className="flex flex-wrap items-center gap-3 mt-2 text-xs text-stone-500">
+                  <div className="flex flex-wrap items-center gap-3 mt-2 text-xs text-[var(--text-subtle)]">
                     <label className="flex items-center gap-1.5">
                       {t('exportModal.bulk.from')}
-                      <input type="date" value={prefs.bulkFrom} max={prefs.bulkTo || undefined} placeholder="yyyy-mm-dd"
+                      <input type="date" value={prefs.bulkFrom} max={prefs.bulkTo || undefined} placeholder={t('exportModal.bulk.datePlaceholder')}
                         onChange={(e) => update({ bulkFrom: e.target.value })} className={dateInputClass} />
                     </label>
                     <label className="flex items-center gap-1.5">
                       {t('exportModal.bulk.to')}
-                      <input type="date" value={prefs.bulkTo} min={prefs.bulkFrom || undefined} placeholder="yyyy-mm-dd"
+                      <input type="date" value={prefs.bulkTo} min={prefs.bulkFrom || undefined} placeholder={t('exportModal.bulk.datePlaceholder')}
                         onChange={(e) => update({ bulkTo: e.target.value })} className={dateInputClass} />
                     </label>
                   </div>
                 )}
               </Row>
               {bulkTargets.length === 0 ? (
-                <p className="text-xs text-stone-500 italic">{emptyHint}</p>
+                <p className="text-xs text-[var(--text-subtle)] italic">{emptyHint}</p>
               ) : (
                 <EntryList targets={shownBulk} excluded={excluded} onToggle={toggleExcluded} showDate />
               )}
@@ -523,9 +523,9 @@ function ExportModalBody({ openTarget, initialFormat }: { openTarget: ExportTarg
           {/* Linked entries — of the one entry, or of the bulk selection */}
           {(!bulk || roots.length > 0) && (
             wantLinks && directTargets.length === 0 && !(bulk && includeLinked) ? (
-              <p className="text-xs text-stone-500 italic">{t('exportModal.noLinked')}</p>
+              <p className="text-xs text-[var(--text-subtle)] italic">{t('exportModal.noLinked')}</p>
             ) : !bundleSupported ? (
-              <p className="text-xs text-stone-500">{t('exportModal.emeraldSingle')}</p>
+              <p className="text-xs text-[var(--text-subtle)]">{t('exportModal.emeraldSingle')}</p>
             ) : (
               <div className="space-y-2.5">
                 <CheckRow
@@ -535,7 +535,7 @@ function ExportModalBody({ openTarget, initialFormat }: { openTarget: ExportTarg
                   {t('exportModal.includeLinked')}
                 </CheckRow>
                 {includeLinked && bulk && directTargets.length === 0 && (
-                  <p className="text-xs text-stone-500 italic">{t('exportModal.bulk.noLinked')}</p>
+                  <p className="text-xs text-[var(--text-subtle)] italic">{t('exportModal.bulk.noLinked')}</p>
                 )}
                 {includeLinked && directTargets.length > 0 && (
                   <>
@@ -561,7 +561,7 @@ function ExportModalBody({ openTarget, initialFormat }: { openTarget: ExportTarg
               <Row label={t('exportModal.order.label')}>
                 <Segmented options={ORDERS} value={prefs.order} onChange={(o) => update({ order: o })} label={(o) => t(`exportModal.order.${o}`)} />
               </Row>
-              <p className="text-xs text-stone-500 leading-snug">{bundleHint}</p>
+              <p className="text-xs text-[var(--text-subtle)] leading-snug">{bundleHint}</p>
             </>
           )}
         </Section>
@@ -578,14 +578,15 @@ function ExportModalBody({ openTarget, initialFormat }: { openTarget: ExportTarg
                   type="button"
                   onClick={() => update({ format: f.id })}
                   disabled={unavailable}
+                  aria-pressed={active}
                   className={`export-option text-left px-3 py-2.5${active ? ' export-option-active' : ''}`}
                 >
                   <div className="flex items-center gap-2">
-                    <span className={active ? 'text-jade-400' : 'text-stone-400'}>{f.icon}</span>
-                    <span className="text-sm text-stone-200">{t(`exportModal.formats.${f.id}.name`)}</span>
-                    <span className="ml-auto text-[10px] font-mono text-stone-500">{f.ext}</span>
+                    <span className={active ? 'text-[var(--accent)]' : 'text-[var(--text-muted)]'}>{f.icon}</span>
+                    <span className="text-sm text-[var(--text-primary)]">{t(`exportModal.formats.${f.id}.name`)}</span>
+                    <span className="ml-auto text-[10px] font-mono text-[var(--text-subtle)]">{f.ext}</span>
                   </div>
-                  <p className="text-xs text-stone-500 mt-1 leading-snug">
+                  <p className="text-xs text-[var(--text-subtle)] mt-1 leading-snug">
                     {unavailable ? t('exportModal.bulk.emeraldUnavailable') : t(`exportModal.formats.${f.id}.desc`)}
                   </p>
                 </button>
@@ -593,14 +594,14 @@ function ExportModalBody({ openTarget, initialFormat }: { openTarget: ExportTarg
             })}
           </div>
           {format === 'pdf' && selected.length >= LARGE_PDF && (
-            <p className="text-xs text-stone-500 leading-snug">{t('exportModal.largePdfHint', { count: selected.length })}</p>
+            <p className="text-xs text-[var(--text-subtle)] leading-snug">{t('exportModal.largePdfHint', { count: selected.length })}</p>
           )}
         </Section>
 
         {/* ── Attachments ── */}
         <Section title={t('exportModal.attachments')}>
           {format === 'markdown' ? (
-            <p className="text-xs text-stone-500 leading-snug">{t('exportModal.audio.markdownNote')}</p>
+            <p className="text-xs text-[var(--text-subtle)] leading-snug">{t('exportModal.audio.markdownNote')}</p>
           ) : (
             <>
               <Row label={t('exportModal.images')} note={t(`exportModal.compression.${prefs.images}.desc`)}>
@@ -643,7 +644,7 @@ function ExportModalBody({ openTarget, initialFormat }: { openTarget: ExportTarg
       </div>
 
       <div className="flex items-center gap-2 px-5 py-3 border-t shrink-0" style={{ borderColor: 'var(--border-soft)' }}>
-        <span className="text-xs text-stone-500 mr-auto">
+        <span className="text-xs text-[var(--text-subtle)] mr-auto">
           {t('exportModal.entryCount', { count: selected.length })} · {t(`exportModal.formats.${format}.name`)}
         </span>
         <Button onClick={close} variant="secondary" disabled={busy}>

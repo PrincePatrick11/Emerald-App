@@ -7,6 +7,7 @@ import { getDb } from './db';
 import { isAutoHiddenSigil, todayIso } from './sigil';
 import { getCategoryEmoji } from '../components/wiki/WikiList';
 import { MOON_PHASE_SYMBOLS } from './moonPhase';
+import i18n from '../i18n';
 import type { CustomProperty, WikiCategoryDef } from '../types';
 
 export interface ChipData {
@@ -393,16 +394,16 @@ export function describeTarget(t: ExportTarget): { title: string; icon: string; 
   if (t.type === 'journal') {
     const entry = useJournalStore.getState().entries.find(e => e.id === t.id);
     const phase = entry?.moon_phase as keyof typeof MOON_PHASE_SYMBOLS | null | undefined;
-    return { title: entry?.title || 'Untitled', icon: (phase && MOON_PHASE_SYMBOLS[phase]) || '📓', createdAt: entry?.created_at };
+    return { title: entry?.title || i18n.t('journal.untitled'), icon: (phase && MOON_PHASE_SYMBOLS[phase]) || '📓', createdAt: entry?.created_at };
   }
   if (t.type === 'wiki') {
     const { articles, wikiCategories } = useWikiStore.getState();
     const a = articles.find(x => x.id === t.id);
-    if (!a) return { title: 'Untitled', icon: '📖' };
-    return { title: a.title || 'Untitled', icon: wikiIcon(a, wikiCategories), createdAt: a.created_at };
+    if (!a) return { title: i18n.t('wiki.untitled'), icon: '📖' };
+    return { title: a.title || i18n.t('wiki.untitled'), icon: wikiIcon(a, wikiCategories), createdAt: a.created_at };
   }
   const { operations, categories } = useOperationStore.getState();
   const op = operations.find(o => o.id === t.id);
   const cat = op ? categories.find(c => c.id === op.category_id) : undefined;
-  return { title: op?.title || 'Untitled', icon: op?.icon || cat?.emoji || '⚡', createdAt: op?.created_at };
+  return { title: op?.title || i18n.t('operations.untitled'), icon: op?.icon || cat?.emoji || '⚡', createdAt: op?.created_at };
 }

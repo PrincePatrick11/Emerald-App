@@ -22,7 +22,8 @@ import { useTagStore } from '../store/tagStore';
 import { useRoutineStore } from '../store/routineStore';
 import { useAltarStore } from '../store/altarStore';
 import { useTaskStore } from '../store/taskStore';
-import { readMediaAsBase64, saveMediaDataUrl } from './media';
+import { isLocalMediaPath, readMediaAsBase64, saveMediaDataUrl } from './media';
+import { htmlEscape, localMediaElements } from './export';
 import { useUIStore } from '../store/uiStore';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -118,19 +119,11 @@ interface BackupFile {
 // Helpers
 // ─────────────────────────────────────────────────────────────────────────────
 
-const LOCAL_PATH_RE = /src="([^"]+)"/g;
-
+/** Local paths of the images and sound files in entry HTML — read from the elements, so a `src="…"` typed as text is never picked up. */
 function extractMediaPaths(html: string): string[] {
-  const paths: string[] = [];
-  LOCAL_PATH_RE.lastIndex = 0;
-  let m;
-  while ((m = LOCAL_PATH_RE.exec(html)) !== null) {
-    const src = m[1];
-    if (src && !src.startsWith('data:') && !src.startsWith('http') && !src.startsWith('blob:')) {
-      paths.push(src);
-    }
-  }
-  return paths;
+  if (!html.includes('src=')) return [];
+  const doc = new DOMParser().parseFromString(html, 'text/html');
+  return localMediaElements(doc).map((el) => el.getAttribute('src')!);
 }
 
 /**
@@ -221,8 +214,8 @@ export async function exportDatabase(options: BackupOptions): Promise<void> {
     }
     for (const r of data.wikiArticles) {
       if (r.content) extractMediaPaths(r.content as string).forEach((p) => allMediaPaths.add(p));
-      if (r.icon && !r.icon.startsWith('data:') && !r.icon.startsWith('http')) allMediaPaths.add(r.icon as string);
-      if (r.cover_image && !r.cover_image.startsWith('data:') && !r.cover_image.startsWith('http')) allMediaPaths.add(r.cover_image as string);
+      if (isLocalMediaPath(r.icon)) allMediaPaths.add(r.icon as string);
+      if (isLocalMediaPath(r.cover_image)) allMediaPaths.add(r.cover_image as string);
     }
   }
 
@@ -248,10 +241,10 @@ export async function exportDatabase(options: BackupOptions): Promise<void> {
     }
     for (const r of data.operations) {
       if (r.content) extractMediaPaths(r.content as string).forEach((p) => allMediaPaths.add(p));
-      if (r.icon && !r.icon.startsWith('data:') && !r.icon.startsWith('http')) allMediaPaths.add(r.icon as string);
-      if (r.cover_image && !r.cover_image.startsWith('data:') && !r.cover_image.startsWith('http')) allMediaPaths.add(r.cover_image as string);
-      if (r.drawing_data && !r.drawing_data.startsWith('data:')) allMediaPaths.add(r.drawing_data as string);
-      if (r.thumbnail_data && !r.thumbnail_data.startsWith('data:')) allMediaPaths.add(r.thumbnail_data as string);
+      if (isLocalMediaPath(r.icon)) allMediaPaths.add(r.icon as string);
+      if (isLocalMediaPath(r.cover_image)) allMediaPaths.add(r.cover_image as string);
+      if (isLocalMediaPath(r.drawing_data)) allMediaPaths.add(r.drawing_data as string);
+      if (isLocalMediaPath(r.thumbnail_data)) allMediaPaths.add(r.thumbnail_data as string);
     }
   }
 
@@ -292,18 +285,18 @@ export async function exportDatabase(options: BackupOptions): Promise<void> {
         : [];
     }
     for (const r of data.altars) {
-      if (r.background_image_data && !r.background_image_data.startsWith('data:') && !r.background_image_data.startsWith('http')) {
+      if (isLocalMediaPath(r.background_image_data)) {
         allMediaPaths.add(r.background_image_data as string);
       }
-      if (r.thumbnail_data && !r.thumbnail_data.startsWith('data:') && !r.thumbnail_data.startsWith('http')) {
+      if (isLocalMediaPath(r.thumbnail_data)) {
         allMediaPaths.add(r.thumbnail_data as string);
       }
-      if (r.icon_data && !r.icon_data.startsWith('data:') && !r.icon_data.startsWith('http')) {
+      if (isLocalMediaPath(r.icon_data)) {
         allMediaPaths.add(r.icon_data as string);
       }
     }
     for (const r of data.altarItems) {
-      if (r.image_data && !r.image_data.startsWith('data:') && !r.image_data.startsWith('http')) {
+      if (isLocalMediaPath(r.image_data)) {
         allMediaPaths.add(r.image_data as string);
       }
     }
@@ -420,6 +413,9 @@ function remapPaths(value: unknown, pathMap: Map<string, string>): unknown {
   let result = value;
   for (const [oldPath, newPath] of pathMap) {
     result = result.split(oldPath).join(newPath);
+    // In entry HTML a path with `&` is stored escaped; the backup keys it as
+    // the element's (unescaped) attribute value.
+    if (oldPath.includes('&')) result = result.split(htmlEscape(oldPath)).join(htmlEscape(newPath));
   }
   return result;
 }

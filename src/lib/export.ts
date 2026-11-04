@@ -9,7 +9,8 @@ import { useOperationStore } from '../store/operationStore';
 import { getCategoryEmoji } from '../components/wiki/WikiList';
 import { compressDataUrl, compressImagesInHtml, type ImageCompression } from './imageCompression';
 import i18n from '../i18n';
-import { audioTitle, readMediaAsBase64 } from './media';
+import { audioTitle, isLocalMediaPath, readMediaAsBase64 } from './media';
+import { mapLimit } from './helpers';
 
 // ── helpers ────────────────────────────────────────────────────────────────
 
@@ -28,12 +29,24 @@ export function sanitizeDataImageUrl(value: string | null | undefined): string |
   return /^data:image\/[a-zA-Z0-9.+-]+;base64,[A-Za-z0-9+/=]+$/.test(trimmed) ? trimmed : null;
 }
 
-/** Local file paths of the `<img>` / `<audio>` elements in `doc` — never `src="…"` that only appears in text. */
+/** The `<img>` / `<audio>` elements in `doc` whose `src` is a local path — never a `src="…"` that only appears in text. */
 export function localMediaElements(doc: Document): HTMLElement[] {
-  return Array.from(doc.querySelectorAll<HTMLElement>('img[src], audio[src]')).filter((el) => {
-    const src = el.getAttribute('src') ?? '';
-    return src && !src.startsWith('data:') && !src.startsWith('http') && !src.startsWith('blob:');
-  });
+  return Array.from(doc.querySelectorAll<HTMLElement>('img[src], audio[src]'))
+    .filter((el) => isLocalMediaPath(el.getAttribute('src')));
+}
+
+/**
+ * Files read from disk at once while embedding or compressing — each holds a
+ * full-size base64 copy (and a decoded bitmap) in memory until it's done.
+ */
+export const MEDIA_CONCURRENCY = 4;
+
+/**
+ * Renders the entries of a bundle one after another, so a bulk export of
+ * hundreds of entries never has all their images in memory at once.
+ */
+export function renderSequentially<T>(entries: readonly T[], render: (entry: T) => Promise<string>): Promise<string[]> {
+  return mapLimit(entries, 1, render);
 }
 
 /** Replaces every local `src` path (images and sound files) with its data URL. */
@@ -41,13 +54,13 @@ async function embedMedia(html: string): Promise<string> {
   const doc = new DOMParser().parseFromString(html, 'text/html');
   const elements = localMediaElements(doc);
   if (!elements.length) return html;
-  await Promise.all(elements.map(async (el) => {
+  await mapLimit(elements, MEDIA_CONCURRENCY, async (el) => {
     try {
       el.setAttribute('src', await readMediaAsBase64(el.getAttribute('src')!));
     } catch {
       el.setAttribute('src', '');
     }
-  }));
+  });
   return doc.body.innerHTML;
 }
 
@@ -292,6 +305,17 @@ function chip(data: ChipData, extra = '', bundleIds?: ReadonlySet<string>): stri
   return `<span class="chip${extra ? ' ' + extra : ''}">${inner}</span>`;
 }
 
+/**
+ * A date in the app language — "4. Nov. 2026" / "Nov 4, 2026" (`medium`) or
+ * with the month spelled out (`long`). For exported documents and the export
+ * modal; the Markdown header keeps its fixed English format for the import.
+ */
+export function exportDate(value: string | number | Date, style: 'medium' | 'long' = 'medium'): string {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  return new Intl.DateTimeFormat(i18n.language, { dateStyle: style }).format(date);
+}
+
 function formatCustomPropValue(prop: { type: string; value: string | null; meta: string | null }): string {
   if (prop.value === null || prop.value === '') return '—';
   if (prop.type === 'checkbox' || prop.type === 'toggle') {
@@ -313,7 +337,7 @@ function formatCustomPropValue(prop: { type: string; value: string | null; meta:
 
 // Top bar: exactly like the main view — 🌕 January 15, 2026 · Full Moon
 function buildTopBar(data: ExportData): string {
-  const dateStr = format(new Date(data.createdAt), 'MMMM d, yyyy');
+  const dateStr = htmlEscape(exportDate(data.createdAt, 'long'));
 
   // Pick a left icon
   let icon = '📓'; // journal default
@@ -360,9 +384,12 @@ function buildMetaHtml(data: ExportData, bundleIds?: ReadonlySet<string>): strin
   }
   // wikiCategory and opCategory are shown in the topbar, not here
   if (data.isActive !== undefined) {
-    propChips.push(`<span class="chip chip-${data.isActive ? 'active' : 'stone'}">${data.isActive ? 'Active' : 'Inactive'}</span>`);
+    const status = i18n.t(data.isActive ? 'operations.active' : 'operations.inactive');
+    propChips.push(`<span class="chip chip-${data.isActive ? 'active' : 'stone'}">${htmlEscape(status)}</span>`);
   }
-  if (data.endDate) propChips.push(`<span class="chip chip-stone">Ends ${format(new Date(data.endDate), 'MMM d, yyyy')}</span>`);
+  if (data.endDate) {
+    propChips.push(`<span class="chip chip-stone">${htmlEscape(i18n.t('exportModal.meta.ends', { date: exportDate(data.endDate) }))}</span>`);
+  }
   if (data.version)  propChips.push(`<span class="chip chip-stone">v${htmlEscape(data.version)}</span>`);
   if (propChips.length) parts.push(`<div class="meta-row">${propChips.join('')}</div>`);
 
@@ -725,7 +752,7 @@ export async function exportAsPDF(entries: ExportData[], opts: ExportOptions = D
   if (!main) return false;
   const bundleIds = entries.length > 1 ? new Set(entries.map(e => e.id)) : undefined;
   // A PDF can't play sound: always a placeholder.
-  const articles = (await Promise.all(entries.map(e => renderEntryArticle(e, { bundleIds, images: mediaFor(e, opts).images, audio: 'placeholder' }))))
+  const articles = (await renderSequentially(entries, e => renderEntryArticle(e, { bundleIds, images: mediaFor(e, opts).images, audio: 'placeholder' })))
     // The PDF is rendered in a hidden, viewport-sized webview right after
     // the page reports "loaded". WebKit decodes large images lazily, so
     // images further down could still be undecoded when the PDF is captured
@@ -792,6 +819,7 @@ function entryToMarkdown(data: ExportData): string {
   // Build frontmatter / header block
   const lines: string[] = [`# ${data.title}`, ''];
   lines.push(`Type: ${data.type}`);
+  // The header stays English with fixed date formats: the Markdown import parses it.
   lines.push(`*${format(new Date(data.createdAt), 'MMMM d, yyyy')}*`);
   if (data.moonPhase)   lines.push(`Moon: ${data.moonPhase}`);
   if (data.paradigma)   lines.push(`Paradigma: ${mdIcon(data.paradigma.icon, data.paradigma.fallbackIcon)}${data.paradigma.label}`.trim());

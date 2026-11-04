@@ -10,7 +10,7 @@
     "unsupportedImageFormat": "Unsupported format. Allowed: PNG, JPEG, GIF, WebP, SVG",
     "searchEmoji": "Search emoji…",
     "noEmojiResults": "No matches",
-    "unsupportedAudioFormat": "Unsupported format. Allowed: MP3, M4A, AAC, WAV, OGG, Opus, FLAC, WebM",
+    "unsupportedAudioFormat": "Unsupported format. Allowed: {{formats}}",
     "unsupportedDropFormat": "Unsupported format"
   },
   "listView": {
@@ -317,7 +317,9 @@
       "play": "Play",
       "pause": "Pause",
       "position": "Position",
-      "loadFailed": "could not be loaded"
+      "loadFailed": "could not be loaded",
+      "saveFailed": "The sound file could not be saved.",
+      "notPlayableHere": "format not playable on this system"
     }
   },
   "moonPhase": {
@@ -659,7 +661,8 @@
       "fileTitle": "Emerald – {{modules}} – {{range}}",
       "noModules": "Select at least one module.",
       "invalidDate": "Date incomplete or invalid (format YYYY-MM-DD).",
-      "noLinked": "The selected entries don't link to any other entries."
+      "noLinked": "The selected entries don't link to any other entries.",
+      "datePlaceholder": "YYYY-MM-DD"
     },
     "largePdfHint": "{{count}} entries make a large PDF – creating it can take a while, and on macOS it becomes one very long page. HTML suits large bundles better.",
     "mode": {
@@ -690,6 +693,9 @@
       "omit": "Leave out",
       "toggleDesc": "Start hidden as in the app and can be shown in the file – for that they are in the file's source.",
       "omitDesc": "Hidden parts are not put into the file at all, only a note."
+    },
+    "meta": {
+      "ends": "Ends {{date}}"
     }
   }
 }

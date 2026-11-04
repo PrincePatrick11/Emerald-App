@@ -21,11 +21,11 @@ import { noAltarOpenMessage } from './altarExport';
 import type { CustomPropertyType } from '../types';
 import { loadCustomProps, type ExportTarget } from './exportData';
 import {
-  DEFAULT_EXPORT_OPTIONS, exportFilename, localMediaElements, noEntryMessage, sanitizeDataImageUrl, splitImageOption, transformMedia,
+  DEFAULT_EXPORT_OPTIONS, exportFilename, htmlEscape, localMediaElements, noEntryMessage, sanitizeDataImageUrl, splitImageOption, transformMedia,
   type ExportOptions,
 } from './export';
 import { compressDataUrl } from './imageCompression';
-import { readMediaAsBase64, saveMediaDataUrl } from './media';
+import { isLocalMediaPath, readMediaAsBase64, saveMediaDataUrl } from './media';
 
 // ── File format ──────────────────────────────────────────────────────────────
 
@@ -287,7 +287,7 @@ async function exportAltarAsEmerald(): Promise<boolean> {
   // data: URLs (or a plain emoji for icon_data) straight from the DB.
   const images: Record<string, string> = {};
   const bgPath = altar.background_image_data;
-  if (bgPath && !bgPath.startsWith('data:') && !bgPath.startsWith('http')) {
+  if (isLocalMediaPath(bgPath)) {
     try {
       images[bgPath] = await invoke<string>('read_image_as_base64', { path: bgPath });
     } catch { /* skip missing file */ }
@@ -355,17 +355,27 @@ async function ensureTagNames(names: string[]): Promise<string[]> {
   return names;
 }
 
-/** Re-saves images into local storage and returns content with updated paths. */
+/**
+ * Re-saves embedded images and sound files into local storage and points the
+ * content's `<img>` / `<audio>` elements at the new paths. Matched on the
+ * elements' attribute values, so a path with `&` (stored escaped in the HTML)
+ * is found too.
+ */
 async function remapMedia(content: string, images: Record<string, string>): Promise<string> {
-  let result = content;
-  for (const [oldPath, dataUrl] of Object.entries(images)) {
+  if (!Object.keys(images).length) return content;
+  const doc = new DOMParser().parseFromString(content, 'text/html');
+  const saved = new Map<string, string>();
+  for (const el of localMediaElements(doc)) {
+    const src = el.getAttribute('src')!;
+    // Files written before this was DOM-based keyed the escaped attribute text.
+    const dataUrl = images[src] ?? images[htmlEscape(src)];
     if (!dataUrl) continue;
     try {
-      const newPath = await saveMediaDataUrl(dataUrl);
-      result = result.split(`src="${oldPath}"`).join(`src="${newPath}"`);
+      if (!saved.has(dataUrl)) saved.set(dataUrl, await saveMediaDataUrl(dataUrl));
+      el.setAttribute('src', saved.get(dataUrl)!);
     } catch { /* skip */ }
   }
-  return result;
+  return doc.body.innerHTML;
 }
 
 async function importCustomProps(

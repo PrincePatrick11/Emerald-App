@@ -33,7 +33,7 @@ PDF export runs in a hidden window built and torn down by the per-platform `expo
 
 Several Rust commands enforce path restrictions:
 
-**`read_image_as_base64`** resolves the requested path and the images directory to their canonical forms using `std::fs::canonicalize`, then checks that the canonical path starts with the canonical images directory. Any path that escapes the images directory (including symlink traversal) returns an `"access denied: path outside images directory"` error.
+**`read_image_as_base64`** resolves the requested path and the images directory to their canonical forms using `std::fs::canonicalize`, then checks that the canonical path starts with the canonical images directory. Any path that escapes the images directory (including symlink traversal) returns an `"access denied: path outside media directory"` error. `read_audio_as_base64` does the same against the audio directory; both share one helper (`read_confined_data_url`).
 
 **`read_audio_as_base64`** does the same for the `audio/` directory, and **`copy_audio_file`** applies `copy_image_file`'s rules (extension allowlist, no symlinks, allowed roots only) to sound files.
 
