@@ -503,6 +503,8 @@
       "redo": "Rehacer"
     },
     "menu": {
+      "textColor": "Color del texto",
+      "defaultColor": "Color predeterminado",
       "paragraph": "Texto",
       "webLink": "Enlazar a una dirección web",
       "width": "Ancho {{value}} %",
@@ -517,6 +519,14 @@
       "deleteColumn": "Eliminar columna",
       "toggleHeaderRow": "Fila de encabezado",
       "deleteTable": "Eliminar tabla"
+    },
+    "colors": {
+      "red": "Rojo",
+      "orange": "Naranja",
+      "yellow": "Amarillo",
+      "green": "Verde",
+      "blue": "Azul",
+      "purple": "Morado"
     },
     "unsaved": "Cambios sin guardar"
   },

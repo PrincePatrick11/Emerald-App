@@ -503,6 +503,8 @@
       "redo": "Redo"
     },
     "menu": {
+      "textColor": "Text colour",
+      "defaultColor": "Default colour",
       "paragraph": "Text",
       "webLink": "Link to a web address",
       "width": "Width {{value}} %",
@@ -517,6 +519,14 @@
       "deleteColumn": "Delete column",
       "toggleHeaderRow": "Header row",
       "deleteTable": "Delete table"
+    },
+    "colors": {
+      "red": "Red",
+      "orange": "Orange",
+      "yellow": "Yellow",
+      "green": "Green",
+      "blue": "Blue",
+      "purple": "Purple"
     },
     "unsaved": "Unsaved changes"
   },

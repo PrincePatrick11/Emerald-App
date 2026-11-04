@@ -9,6 +9,7 @@ import TaskItem from '@tiptap/extension-task-item';
 import TextAlign from '@tiptap/extension-text-align';
 import { TableKit } from '@tiptap/extension-table';
 import { ResizableImage } from './ResizableImageExtension';
+import { TextColorMark } from './TextColorExtension';
 import { useContext, useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import { saveImage } from '../../../lib/images';
 import { openUrl } from '@tauri-apps/plugin-opener';
@@ -164,6 +165,7 @@ export default function TextEditor({
       Placeholder.configure({ placeholder }),
       ...format.typography,
       ...(features.highlight ? [Highlight.configure({ multicolor: false })] : []),
+      ...(features.colors ? [TextColorMark] : []),
       ...(features.tasks ? [TaskList, TaskItem.configure({ nested: true })] : []),
       // Images are left out: they align via their own
       // `align` attribute (block node with its own width), see

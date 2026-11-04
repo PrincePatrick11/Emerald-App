@@ -1251,6 +1251,14 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
   color: var(--editor-mark-text);
 }
 
+/* Text colours: the mark stores the name, the theme the shade. */
+.tiptap span[data-color="red"] { color: var(--editor-color-red); }
+.tiptap span[data-color="orange"] { color: var(--editor-color-orange); }
+.tiptap span[data-color="yellow"] { color: var(--editor-color-yellow); }
+.tiptap span[data-color="green"] { color: var(--editor-color-green); }
+.tiptap span[data-color="blue"] { color: var(--editor-color-blue); }
+.tiptap span[data-color="purple"] { color: var(--editor-color-purple); }
+
 .tiptap a.external-link {
   @apply text-accent underline underline-offset-2 cursor-pointer hover:text-accent-raise;
 }
@@ -1837,6 +1845,21 @@ html[data-theme] .prop-segment--active {
   border: 1px solid var(--edge-strong);
   background: var(--well-solid);
   box-shadow: var(--menu-shadow);
+}
+
+/* A colour in the selection menu's colour row; "none" is the default colour, struck through. */
+.editor-color-swatch {
+  width: 18px;
+  height: 18px;
+  border-radius: 9999px;
+  border: 1px solid var(--edge-strong);
+  cursor: pointer;
+}
+.editor-color-swatch--none {
+  background: linear-gradient(135deg, transparent 45%, var(--text-muted) 45%, var(--text-muted) 55%, transparent 55%);
+}
+.editor-color-swatch--active {
+  box-shadow: 0 0 0 2px var(--well-solid), 0 0 0 3px var(--accent);
 }
 
 /* Where a drag into a text editor would land (DropIndicator). */

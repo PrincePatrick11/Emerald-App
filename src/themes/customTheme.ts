@@ -44,6 +44,12 @@ const OPTIONAL_COLORS: Record<CustomTheme['base'], Pick<CustomThemeColors, 'dang
 
 const MIN_TEXT_CONTRAST = 2;
 
+/** The editor's text colours, the same as in the built-in theme of the same base. */
+const EDITOR_TEXT_COLORS: Record<CustomTheme['base'], Record<'red' | 'orange' | 'yellow' | 'green' | 'blue' | 'purple', string>> = {
+  dark: { red: '#f2837b', orange: '#f0a35e', yellow: '#e6cf6a', green: '#6fd69a', blue: '#7fb2f0', purple: '#b99af0' },
+  light: { red: '#b4372c', orange: '#a85a17', yellow: '#8a6d00', green: '#23794a', blue: '#2b5fa8', purple: '#6d47b0' },
+};
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
@@ -121,6 +127,7 @@ export function customThemeTokens({ base, colors: c }: CustomTheme): Record<stri
   const mix = (a: string, percent: number, b: string) => `color-mix(in srgb, ${a} ${percent}%, ${b})`;
   const fade = (a: string, percent: number) => mix(a, percent, 'transparent');
   const shadow = base === 'dark' ? 'rgba(0, 0, 0, 0.35)' : 'rgba(0, 0, 0, 0.18)';
+  const textColors = EDITOR_TEXT_COLORS[base];
 
   const subtle = mix(c.textMuted, 80, c.sheet);
   const secondary = mix(c.text, 85, c.textMuted);
@@ -179,6 +186,12 @@ export function customThemeTokens({ base, colors: c }: CustomTheme): Record<stri
     'editor-code-text': accentText,
     'editor-mark-bg': accentSoft,
     'editor-mark-text': c.text,
+    'editor-color-red': textColors.red,
+    'editor-color-orange': textColors.orange,
+    'editor-color-yellow': textColors.yellow,
+    'editor-color-green': textColors.green,
+    'editor-color-blue': textColors.blue,
+    'editor-color-purple': textColors.purple,
     'editor-toolbar-active-bg': accentSoft,
     'editor-toolbar-active-text': accentText,
     'link-picker-tab-active-bg': accentSoft,

@@ -503,6 +503,8 @@
       "redo": "Wiederholen"
     },
     "menu": {
+      "textColor": "Textfarbe",
+      "defaultColor": "Standardfarbe",
       "paragraph": "Text",
       "webLink": "Mit Webadresse verlinken",
       "width": "Breite {{value}} %",
@@ -517,6 +519,14 @@
       "deleteColumn": "Spalte löschen",
       "toggleHeaderRow": "Kopfzeile",
       "deleteTable": "Tabelle löschen"
+    },
+    "colors": {
+      "red": "Rot",
+      "orange": "Orange",
+      "yellow": "Gelb",
+      "green": "Grün",
+      "blue": "Blau",
+      "purple": "Violett"
     },
     "unsaved": "Ungespeicherte Änderungen"
   },

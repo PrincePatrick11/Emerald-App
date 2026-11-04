@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { Editor } from '@tiptap/react';
 import { useEditorState } from '@tiptap/react';
 import { BubbleMenu } from '@tiptap/react/menus';
@@ -8,11 +8,12 @@ import { useTranslation } from 'react-i18next';
 import {
   AlignCenter, AlignLeft, AlignRight, BetweenHorizontalEnd, BetweenHorizontalStart, BetweenVerticalEnd,
   BetweenVerticalStart, Bold, Check, Code, Globe, Grid2x2X, Highlighter, Italic, PanelTop, Strikethrough,
-  TableColumnsSplit, TableRowsSplit, Trash2, Unlink, X,
+  Palette, TableColumnsSplit, TableRowsSplit, Trash2, Unlink, X,
 } from 'lucide-react';
 import { ToolbarBtn, ToolbarDivider, ToolbarGroup } from './EditorToolbar';
 import { editorHas } from './hostContext';
 import type { Alignment } from './ResizableImageExtension';
+import { TEXT_COLORS, type TextColor } from './TextColorExtension';
 
 /** The widths the image menu offers, in percent of the editor's width. */
 const IMAGE_WIDTHS = [25, 50, 100] as const;
@@ -102,10 +103,24 @@ function TextMenu({ editor }: { editor: Editor }) {
       highlight: ed.isActive('highlight'),
       code: ed.isActive('code'),
       link: ed.isActive('link'),
+      color: (ed.getAttributes('textColor').color as TextColor | undefined) ?? null,
     }),
   });
   // Typing a web address replaces the buttons until confirmed or cancelled.
   const [href, setHref] = useState<string | null>(null);
+  // Choosing a colour replaces them too, until one is picked.
+  const [choosingColor, setChoosingColor] = useState(false);
+  // Another selection starts with the buttons again.
+  useEffect(() => {
+    const reset = () => setChoosingColor(false);
+    editor.on('selectionUpdate', reset);
+    return () => { editor.off('selectionUpdate', reset); };
+  }, [editor]);
+
+  const pickColor = (color: TextColor | null) => {
+    editor.chain().focus().setTextColor(color).run();
+    setChoosingColor(false);
+  };
 
   const confirmLink = () => {
     const value = href?.trim();
@@ -124,7 +139,27 @@ function TextMenu({ editor }: { editor: Editor }) {
       className="editor-selection-menu"
       onMouseDown={(e) => { if (href === null) e.preventDefault(); }}
     >
-      {href !== null ? (
+      {choosingColor ? (
+        <div className="flex items-center gap-1 px-1">
+          <button
+            type="button"
+            className={`editor-color-swatch editor-color-swatch--none${state?.color === null ? ' editor-color-swatch--active' : ''}`}
+            title={t('editor.menu.defaultColor')}
+            onClick={() => pickColor(null)}
+          />
+          {TEXT_COLORS.map((color) => (
+            <button
+              key={color}
+              type="button"
+              className={`editor-color-swatch${state?.color === color ? ' editor-color-swatch--active' : ''}`}
+              style={{ background: `var(--editor-color-${color})` }}
+              title={t(`editor.colors.${color}`)}
+              onClick={() => pickColor(color)}
+            />
+          ))}
+          <ToolbarBtn onClick={() => setChoosingColor(false)} active={false} title={t('editor.cancel')}><X size={14} /></ToolbarBtn>
+        </div>
+      ) : href !== null ? (
         <div className="flex items-center gap-1 px-1">
           <input
             autoFocus
@@ -162,6 +197,11 @@ function TextMenu({ editor }: { editor: Editor }) {
             <ToolbarBtn onClick={() => editor.chain().focus().toggleCode().run()} active={!!state?.code} title={t('editor.toolbar.inlineCode')}>
               <Code size={14} />
             </ToolbarBtn>
+            {has('textColor') && (
+              <ToolbarBtn onClick={() => setChoosingColor(true)} active={!!state?.color} title={t('editor.menu.textColor')}>
+                <Palette size={14} style={state?.color ? { color: `var(--editor-color-${state.color})` } : undefined} />
+              </ToolbarBtn>
+            )}
           </ToolbarGroup>
           {has('link') && (
             <>

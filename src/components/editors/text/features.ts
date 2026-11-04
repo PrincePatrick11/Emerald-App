@@ -15,6 +15,8 @@ export interface TextFeatures {
   /** Checklists. */
   tasks: boolean;
   highlight: boolean;
+  /** Text colours from the theme (`TextColorMark`). */
+  colors: boolean;
   /** Left, centred and right alignment of paragraphs, headings and images. */
   align: boolean;
   /** External links (`http://`, `https://`). */
@@ -35,6 +37,7 @@ export const FULL_TEXT_FEATURES: TextFeatures = {
   lists: true,
   tasks: true,
   highlight: true,
+  colors: true,
   align: true,
   links: true,
   entryLinks: true,

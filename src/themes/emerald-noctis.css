@@ -36,6 +36,13 @@ html[data-theme='emerald-noctis'] {
   --editor-toolbar-active-text: #f5f5f4;
   --editor-mark-bg: #002e1d;
   --editor-mark-text: #70ffca;
+  /* Text colours in the editor (TextColor mark): light enough on the dark sheet. */
+  --editor-color-red: #f2837b;
+  --editor-color-orange: #f0a35e;
+  --editor-color-yellow: #e6cf6a;
+  --editor-color-green: #6fd69a;
+  --editor-color-blue: #7fb2f0;
+  --editor-color-purple: #b99af0;
   --menu-bg: #211b16;
   --menu-border: rgba(113, 94, 77, 0.55);
   --menu-shadow: 0 14px 36px rgba(0, 0, 0, 0.35);

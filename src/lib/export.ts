@@ -276,6 +276,12 @@ const PRINT_CSS = `
     border-left: 3px solid #bbb; padding-left: 1em; color: #555; margin: 0.8em 0;
   }
   .entry-content table { border-collapse: collapse; width: 100%; margin: 0.8em 0; }
+  .entry-content span[data-color="red"] { color: #b4372c; }
+  .entry-content span[data-color="orange"] { color: #a85a17; }
+  .entry-content span[data-color="yellow"] { color: #8a6d00; }
+  .entry-content span[data-color="green"] { color: #23794a; }
+  .entry-content span[data-color="blue"] { color: #2b5fa8; }
+  .entry-content span[data-color="purple"] { color: #6d47b0; }
   .entry-content td, .entry-content th { border: 1px solid #ccc; padding: 0.4em 0.6em; }
   .entry-content ul, .entry-content ol { padding-left: 1.6em; margin-bottom: 0.8em; }
   .entry-content li { margin-bottom: 0.2em; }
@@ -341,7 +347,7 @@ export async function exportAsPDF(data: ExportData): Promise<void> {
     <h1 class="entry-title">${escapedTitle}${numStr}</h1>
     ${metaHtml}
     <div class="entry-content">${DOMPurify.sanitize(transformedContent, {
-      ADD_ATTR: ['data-type', 'data-id', 'data-entry-type', 'data-label', 'data-icon', 'data-entry-number', 'data-href', 'colwidth'],
+      ADD_ATTR: ['data-type', 'data-id', 'data-entry-type', 'data-label', 'data-icon', 'data-entry-number', 'data-href', 'colwidth', 'data-color'],
     })}</div>
   </div>
 </body>

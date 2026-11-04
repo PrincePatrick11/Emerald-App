@@ -503,6 +503,8 @@
       "redo": "Rétablir"
     },
     "menu": {
+      "textColor": "Couleur du texte",
+      "defaultColor": "Couleur par défaut",
       "paragraph": "Texte",
       "webLink": "Lier à une adresse web",
       "width": "Largeur {{value}} %",
@@ -517,6 +519,14 @@
       "deleteColumn": "Supprimer la colonne",
       "toggleHeaderRow": "Ligne d’en-tête",
       "deleteTable": "Supprimer le tableau"
+    },
+    "colors": {
+      "red": "Rouge",
+      "orange": "Orange",
+      "yellow": "Jaune",
+      "green": "Vert",
+      "blue": "Bleu",
+      "purple": "Violet"
     },
     "unsaved": "Modifications non enregistrées"
   },
