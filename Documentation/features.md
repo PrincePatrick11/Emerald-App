@@ -233,7 +233,7 @@ Tags and categories also support soft-delete and restoration.
 
 ## Export and Import
 
-All export and import actions are in the native application menu. Exporting a Journal, Wiki or Operations entry opens the **export modal** — via **Export → Export…**, or via **Export as PDF / HTML / Markdown / Emerald…**, which open the same modal with that format preselected. Altar exports (PDF, Emerald, image) still run directly from the menu.
+All export and import actions are in the native application menu. Exporting a Journal, Wiki or Operations entry opens the **export modal** — via **Export → Export…**, or via **Export as PDF / HTML / Markdown / Emerald…**, which open the same modal with that format preselected. **Export Multiple Entries…** opens it for a [bulk export](#bulk-export). Altar exports (PDF, Emerald, image) still run directly from the menu.
 
 ### Export Modal
 
@@ -247,6 +247,25 @@ The modal offers four formats — **PDF**, **Interactive HTML**, **Markdown** an
 **Images** (PDF, HTML, Emerald — Markdown drops images): *Original* embeds them unchanged, *Compressed* (default) scales them to max. 1600 px on the long side at quality 0.8, *Strongly compressed* to max. 1000 px at quality 0.6. Images are re-encoded as WebP; where the webview has no WebP encoder (macOS, some Linux WebKitGTK builds), opaque images become JPEG and transparent ones a downscaled PNG. An image is only replaced if the result is smaller; SVG and GIF are left as they are. The originals in the vault are never changed — but an Emerald file exported with compression re-imports with the compressed images.
 
 The chosen format, compression and bundling options are remembered for the next export. Sigil operations are never included as linked entries (see note below).
+
+### Attachments in Exports
+
+The export modal's **Attachments** section decides what happens to files embedded in the exported entries:
+
+- **Images:** *Original*, *Compressed*, *Strongly compressed* (see above) or *Placeholder* — the image is left out and replaced by a note ("🖼 Image", or the image's alt text).
+- **Sound files:** *Embed* or *Placeholder* (a note with the file name), for interactive HTML and Emerald. A PDF can't play anything, so sound files are always a placeholder there.
+- **Markdown** carries no files at all: images and sound files always appear as notes (images used to be dropped silently).
+
+An Emerald file exported with placeholders keeps the notes as text and does not contain the files.
+
+### Bulk Export
+
+**Export → Export Multiple Entries…** exports many entries at once, without opening any of them. The modal picks:
+
+- **Modules:** Journal, Operations and/or Wiki.
+- **Period:** last 7 days, last 30 days, this month, all, or a custom from–to range (whole days, by creation date).
+
+The matching entries are listed (oldest first, with date and module) and can be unchecked one by one. Everything selected goes into **one** PDF, interactive HTML or Markdown file, in chronological order; the attachment options apply as for a single entry. Emerald is not available here, since an Emerald file holds exactly one entry. The file and document are named after the selection, e.g. `Emerald_Journal-Operations_2026-09-01_2026-09-10.html` / "Emerald – Journal, Operations – 01.09.2026–10.09.2026". Sigil operations and trashed entries are never included.
 
 ### Interactive HTML Export
 

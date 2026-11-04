@@ -20,8 +20,11 @@ import { MOON_PHASE_SYMBOLS } from './moonPhase';
 import { noAltarOpenMessage } from './altarExport';
 import type { CustomPropertyType } from '../types';
 import { loadCustomProps, type ExportTarget } from './exportData';
-import { exportFilename, noEntryMessage } from './export';
-import { compressDataUrl, type ImageCompression } from './imageCompression';
+import {
+  DEFAULT_EXPORT_OPTIONS, exportFilename, localMediaElements, noEntryMessage, splitImageOption, transformMedia,
+  type ExportOptions,
+} from './export';
+import { compressDataUrl } from './imageCompression';
 import { readMediaAsBase64, saveMediaDataUrl } from './media';
 
 // ── File format ──────────────────────────────────────────────────────────────
@@ -119,7 +122,7 @@ interface EmeraldMeta {
  * (including an Altar) — as a single-entry `.emerald` file. Resolves to
  * `false` when the user cancels the save dialog.
  */
-export async function exportAsEmerald(target?: ExportTarget, compression: ImageCompression = 'none'): Promise<boolean> {
+export async function exportAsEmerald(target?: ExportTarget, opts: ExportOptions = DEFAULT_EXPORT_OPTIONS): Promise<boolean> {
   const view = target ?? useUIStore.getState().activeView;
   if (view.type === 'altar') {
     return exportAltarAsEmerald();
@@ -210,17 +213,17 @@ export async function exportAsEmerald(target?: ExportTarget, compression: ImageC
     }));
   }
 
-  // Embed all local images from content as base64
+  // Files the export modal asked to leave out become notes in the content;
+  // the rest — images and sound files — are embedded as base64 below.
+  const { mode: imageMode, compression } = splitImageOption(opts.images);
+  content = transformMedia(content, { images: imageMode, audio: opts.audio === 'placeholder' ? 'placeholder' : 'keep' });
   const images: Record<string, string> = {};
-  const re = /src="([^"]+)"/g;
-  let m;
-  while ((m = re.exec(content)) !== null) {
-    const src = m[1];
-    if (!src.startsWith('data:') && !src.startsWith('http') && !src.startsWith('blob:')) {
-      try {
-        images[src] = await compressDataUrl(await readMediaAsBase64(src), compression);
-      } catch { /* skip missing files */ }
-    }
+  // Only real <img>/<audio> elements — a `src="…"` that merely appears in text must not read a file.
+  const paths = new Set(localMediaElements(new DOMParser().parseFromString(content, 'text/html')).map((el) => el.getAttribute('src')!));
+  for (const src of paths) {
+    try {
+      images[src] = await compressDataUrl(await readMediaAsBase64(src), compression);
+    } catch { /* skip missing files */ }
   }
 
   const file: EmeraldFile = { version: '1', type, title, createdAt, content, images, meta };

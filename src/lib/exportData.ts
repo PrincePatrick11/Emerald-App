@@ -1,3 +1,4 @@
+import { addDays, startOfDay } from 'date-fns';
 import { useJournalStore } from '../store/journalStore';
 import { useWikiStore } from '../store/wikiStore';
 import { useOperationStore } from '../store/operationStore';
@@ -300,21 +301,55 @@ export function collectLinkedTargets(root: ExportTarget, recursive: boolean): Ex
   return result;
 }
 
+/**
+ * Every exportable entry of the given modules created within `[from, to]`
+ * (inclusive days; `null` means unbounded), oldest first — for the bulk
+ * export. Trashed entries are never in the stores; Sigil operations are left
+ * out like everywhere else in export.
+ */
+export function collectTargetsInRange(types: readonly ExportEntryType[], from: Date | null, to: Date | null): ExportTarget[] {
+  const start = from ? startOfDay(from).getTime() : -Infinity;
+  const end = to ? addDays(startOfDay(to), 1).getTime() : Infinity;
+  const inRange = (createdAt: string) => {
+    const t = new Date(createdAt).getTime();
+    return t >= start && t < end;
+  };
+
+  const found: Array<ExportTarget & { createdAt: string }> = [];
+  if (types.includes('journal')) {
+    for (const e of useJournalStore.getState().entries) {
+      if (inRange(e.created_at)) found.push({ type: 'journal', id: e.id, createdAt: e.created_at });
+    }
+  }
+  if (types.includes('operations')) {
+    for (const o of useOperationStore.getState().operations) {
+      if (o.category_id !== 'sigils' && inRange(o.created_at)) found.push({ type: 'operations', id: o.id, createdAt: o.created_at });
+    }
+  }
+  if (types.includes('wiki')) {
+    for (const a of useWikiStore.getState().articles) {
+      if (inRange(a.created_at)) found.push({ type: 'wiki', id: a.id, createdAt: a.created_at });
+    }
+  }
+  found.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+  return found.map(({ type, id }) => ({ type, id }));
+}
+
 /** Display info for a target, used by the export modal's entry list. */
-export function describeTarget(t: ExportTarget): { title: string; icon: string } {
+export function describeTarget(t: ExportTarget): { title: string; icon: string; createdAt?: string } {
   if (t.type === 'journal') {
     const entry = useJournalStore.getState().entries.find(e => e.id === t.id);
     const phase = entry?.moon_phase as keyof typeof MOON_PHASE_SYMBOLS | null | undefined;
-    return { title: entry?.title || 'Untitled', icon: (phase && MOON_PHASE_SYMBOLS[phase]) || '📓' };
+    return { title: entry?.title || 'Untitled', icon: (phase && MOON_PHASE_SYMBOLS[phase]) || '📓', createdAt: entry?.created_at };
   }
   if (t.type === 'wiki') {
     const { articles, wikiCategories } = useWikiStore.getState();
     const a = articles.find(x => x.id === t.id);
     if (!a) return { title: 'Untitled', icon: '📖' };
-    return { title: a.title || 'Untitled', icon: wikiIcon(a, wikiCategories) };
+    return { title: a.title || 'Untitled', icon: wikiIcon(a, wikiCategories), createdAt: a.created_at };
   }
   const { operations, categories } = useOperationStore.getState();
   const op = operations.find(o => o.id === t.id);
   const cat = op ? categories.find(c => c.id === op.category_id) : undefined;
-  return { title: op?.title || 'Untitled', icon: op?.icon || cat?.emoji || '⚡' };
+  return { title: op?.title || 'Untitled', icon: op?.icon || cat?.emoji || '⚡', createdAt: op?.created_at };
 }

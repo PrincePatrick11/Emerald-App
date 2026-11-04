@@ -89,6 +89,7 @@ export default function AppShell() {
       import:          t('menu.import'),
       resetView:       t('menu.resetView'),
       exportEntry:     t('menu.exportEntry'),
+      exportBulk:      t('menu.exportBulk'),
       exportPdf:       t('menu.exportPdf'),
       exportHtml:      t('menu.exportHtml'),
       exportMarkdown:  t('menu.exportMarkdown'),
@@ -162,6 +163,8 @@ export default function AppShell() {
 
     const unlistenEntry = listen('export-entry', () => openEntryExport());
 
+    const unlistenBulk = listen('export-bulk', () => useExportStore.getState().openBulkExport());
+
     const unlistenPdf = listen('export-pdf', () => {
       if (isAltarReadingView(useUIStore.getState().activeView)) {
         saveAltarPDF().catch(err => exportErrorMessage(err, 'export'));
@@ -204,6 +207,7 @@ export default function AppShell() {
 
     return () => {
       unlistenEntry.then(fn => fn());
+      unlistenBulk.then(fn => fn());
       unlistenPdf.then(fn => fn());
       unlistenHtml.then(fn => fn());
       unlistenMd.then(fn => fn());

@@ -525,6 +525,7 @@ fn update_menu_labels(
     import: String,
     reset_view: String,
     export_entry: String,
+    export_bulk: String,
     export_pdf: String,
     export_html: String,
     export_markdown: String,
@@ -560,6 +561,7 @@ fn update_menu_labels(
                     let new_child_text = match child_id.as_str() {
                         "reset-sidebar-widths" => Some(reset_view.as_str()),
                         "export-entry"         => Some(export_entry.as_str()),
+                        "export-bulk"          => Some(export_bulk.as_str()),
                         "export-pdf"           => Some(export_pdf.as_str()),
                         "export-html"          => Some(export_html.as_str()),
                         "export-markdown"      => Some(export_markdown.as_str()),
@@ -678,6 +680,15 @@ pub fn run() {
                 false,
                 None::<&str>,
             )?;
+            // Bulk export works on the whole vault, not the open entry, so
+            // it is always enabled.
+            let export_bulk_item = MenuItem::with_id(
+                app,
+                "export-bulk",
+                "Export Multiple Entries…",
+                true,
+                None::<&str>,
+            )?;
             let export_pdf_item = MenuItem::with_id(
                 app,
                 "export-pdf",
@@ -743,6 +754,7 @@ pub fn run() {
                 true,
                 &[
                     &export_entry_item,
+                    &export_bulk_item,
                     &PredefinedMenuItem::separator(app)?,
                     &export_pdf_item,
                     &export_html_item,
@@ -780,6 +792,7 @@ pub fn run() {
                 match event.id().as_ref() {
                     "reset-sidebar-widths" => { app.emit("reset-sidebar-widths", ()).ok(); }
                     "export-entry"         => { app.emit("export-entry", ()).ok(); }
+                    "export-bulk"          => { app.emit("export-bulk", ()).ok(); }
                     "export-pdf"           => { app.emit("export-pdf", ()).ok(); }
                     "export-html"          => { app.emit("export-html", ()).ok(); }
                     "export-markdown"      => { app.emit("export-markdown", ()).ok(); }

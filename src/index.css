@@ -118,6 +118,12 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
     border-color: var(--border-strong);
     background-color: var(--interactive-hover);
   }
+  .export-option:disabled,
+  .export-option:disabled:hover {
+    @apply opacity-50 cursor-not-allowed;
+    border-color: var(--border-soft);
+    background-color: transparent;
+  }
   .export-option-active,
   .export-option-active:hover {
     border-color: var(--accent-strong);

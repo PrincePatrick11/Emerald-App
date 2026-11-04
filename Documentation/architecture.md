@@ -369,6 +369,7 @@ Tauri menu events (not `invoke`) are emitted by the native menu and received in 
 | Event ID | Trigger |
 |---|---|
 | `export-entry` | Export > Export… (opens the export modal) |
+| `export-bulk` | Export > Export Multiple Entries… (opens the export modal for a bulk export; always enabled) |
 | `export-pdf` | Export > Export as PDF… |
 | `export-html` | Export > Export as HTML… (opens the export modal with HTML preselected) |
 | `export-markdown` | Export > Export as Markdown… |

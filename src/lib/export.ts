@@ -28,73 +28,88 @@ export function sanitizeDataImageUrl(value: string | null | undefined): string |
   return /^data:image\/[a-zA-Z0-9.+-]+;base64,[A-Za-z0-9+/=]+$/.test(trimmed) ? trimmed : null;
 }
 
-const FILE_SRC_RE = /src="([^"]+)"/g;
+/** Local file paths of the `<img>` / `<audio>` elements in `doc` — never `src="…"` that only appears in text. */
+export function localMediaElements(doc: Document): HTMLElement[] {
+  return Array.from(doc.querySelectorAll<HTMLElement>('img[src], audio[src]')).filter((el) => {
+    const src = el.getAttribute('src') ?? '';
+    return src && !src.startsWith('data:') && !src.startsWith('http') && !src.startsWith('blob:');
+  });
+}
 
 /** Replaces every local `src` path (images and sound files) with its data URL. */
 async function embedMedia(html: string): Promise<string> {
-  const paths: string[] = [];
-  FILE_SRC_RE.lastIndex = 0;
-  let m;
-  while ((m = FILE_SRC_RE.exec(html)) !== null) {
-    const src = m[1];
-    if (!src.startsWith('data:') && !src.startsWith('http') && !src.startsWith('blob:')) {
-      paths.push(src);
-    }
-  }
-  if (paths.length === 0) return html;
-
-  const resolved = await Promise.all(
-    paths.map(async (path) => {
-      try {
-        const dataUrl = await readMediaAsBase64(path);
-        return { path, dataUrl };
-      } catch {
-        return { path, dataUrl: '' };
-      }
-    })
-  );
-
-  let result = html;
-  for (const { path, dataUrl } of resolved) {
-    result = result.split(`src="${path}"`).join(dataUrl ? `src="${dataUrl}"` : 'src=""');
-  }
-  return result;
-}
-
-/**
- * Prepares embedded sound files for an export. `embed` (interactive HTML)
- * keeps a playable `<audio controls>` under a caption with the file name —
- * `embedMedia` turns its path into a data URL afterwards. `placeholder`
- * (PDF, which can't play anything) replaces it with a note naming the file,
- * before anything is read from disk.
- */
-function transformAudio(html: string, mode: 'embed' | 'placeholder'): string {
-  if (!html.includes('<audio')) return html;
   const doc = new DOMParser().parseFromString(html, 'text/html');
-  for (const el of Array.from(doc.querySelectorAll('audio'))) {
-    const src = el.getAttribute('src') ?? '';
-    const title = audioTitle(src, el.getAttribute('data-title'));
-    const figure = doc.createElement('figure');
-    figure.className = mode === 'embed' ? 'audio-embed' : 'audio-placeholder';
-    // Keep the width the player was given in the editor.
-    if (mode === 'embed' && el.style.width) figure.style.width = el.style.width;
-    const caption = doc.createElement('figcaption');
-    caption.textContent = `🔊 ${title}`;
-    figure.appendChild(caption);
-    if (mode === 'embed' && src) {
-      const audio = doc.createElement('audio');
-      audio.setAttribute('src', src);
-      audio.setAttribute('controls', '');
-      audio.setAttribute('preload', 'metadata');
-      figure.appendChild(audio);
+  const elements = localMediaElements(doc);
+  if (!elements.length) return html;
+  await Promise.all(elements.map(async (el) => {
+    try {
+      el.setAttribute('src', await readMediaAsBase64(el.getAttribute('src')!));
+    } catch {
+      el.setAttribute('src', '');
     }
-    el.replaceWith(figure);
-  }
+  }));
   return doc.body.innerHTML;
 }
 
-function stripImages(html: string): string {
-  return html.replace(/<img[^>]*>/gi, '');
+/** What an export does with each kind of embedded file. */
+export interface MediaModes {
+  /** `keep` leaves `<img>` as it is; `placeholder` replaces it with a note. */
+  images: 'keep' | 'placeholder';
+  /**
+   * `keep` leaves `<audio>` as it is (Emerald), `embed` turns it into a
+   * captioned `<audio controls>` (interactive HTML), `placeholder` into a note
+   * naming the file (PDF, Markdown, or when chosen in the export modal).
+   */
+  audio: 'keep' | 'embed' | 'placeholder';
+}
+
+/** Splits the modal's image choice into "replace by a note?" and the compression for embedded ones. */
+export function splitImageOption(images: ExportOptions['images']): { mode: MediaModes['images']; compression: ImageCompression } {
+  return images === 'placeholder' ? { mode: 'placeholder', compression: 'none' } : { mode: 'keep', compression: images };
+}
+
+/**
+ * Prepares embedded files for an export, before anything is read from disk —
+ * a placeholder must replace the element before `embedMedia` would load the
+ * file. A player keeps its `src`, which `embedMedia` then turns into a data URL.
+ */
+export function transformMedia(html: string, modes: MediaModes): string {
+  const wantImages = modes.images === 'placeholder' && html.includes('<img');
+  const wantAudio = modes.audio !== 'keep' && html.includes('<audio');
+  if (!wantImages && !wantAudio) return html;
+  const doc = new DOMParser().parseFromString(html, 'text/html');
+
+  if (wantImages) {
+    for (const img of Array.from(doc.querySelectorAll('img'))) {
+      const figure = doc.createElement('figure');
+      figure.className = 'image-placeholder';
+      figure.textContent = `🖼 ${img.getAttribute('alt') || img.getAttribute('title') || i18n.t('exportModal.placeholder.image')}`;
+      img.replaceWith(figure);
+    }
+  }
+
+  if (wantAudio) {
+    const embed = modes.audio === 'embed';
+    for (const el of Array.from(doc.querySelectorAll('audio'))) {
+      const src = el.getAttribute('src') ?? '';
+      const figure = doc.createElement('figure');
+      figure.className = embed ? 'audio-embed' : 'audio-placeholder';
+      // Keep the width the player was given in the editor.
+      if (embed && el.style.width) figure.style.width = el.style.width;
+      const caption = doc.createElement('figcaption');
+      caption.textContent = `🔊 ${audioTitle(src, el.getAttribute('data-title'))}`;
+      figure.appendChild(caption);
+      if (embed && src) {
+        const audio = doc.createElement('audio');
+        audio.setAttribute('src', src);
+        audio.setAttribute('controls', '');
+        audio.setAttribute('preload', 'metadata');
+        figure.appendChild(audio);
+      }
+      el.replaceWith(figure);
+    }
+  }
+  return doc.body.innerHTML;
 }
 
 /**
@@ -213,13 +228,36 @@ const CONTENT_PURIFY_CONFIG = {
 };
 
 function safeFilename(title: string): string {
-  return title.replace(/[^\w\s\-äöüÄÖÜß]/g, '').trim().replace(/\s+/g, '_') || 'export';
+  return title.replace(/[^\p{L}\p{N}\s_-]/gu, '').trim().replace(/\s+/g, '_') || 'export';
 }
 
 export function exportFilename(title: string, date: string, ext: string): string {
   const base = safeFilename(title);
   const dateStr = format(new Date(date), 'yyyy-MM-dd');
   return `${base}_${dateStr}.${ext}`;
+}
+
+/** How an export treats the files embedded in entries. */
+export interface ExportOptions {
+  /** Embed images (optionally compressed), or show a placeholder instead. */
+  images: ImageCompression | 'placeholder';
+  /** Embed sound files where the format can play them (HTML, Emerald), or show a placeholder. */
+  audio: 'embed' | 'placeholder';
+  /** Title of a bulk export's document, instead of its first entry's title. */
+  bundleTitle?: string;
+  /** Suggested file name of a bulk export, without extension. */
+  bundleFilename?: string;
+}
+
+export const DEFAULT_EXPORT_OPTIONS: ExportOptions = { images: 'none', audio: 'embed' };
+
+/** The suggested file name: a bulk export's own, else the first entry's title and date. */
+export function defaultFilename(main: ExportData, opts: ExportOptions, ext: string): string {
+  return opts.bundleFilename ? `${safeFilename(opts.bundleFilename)}.${ext}` : exportFilename(main.title, main.createdAt, ext);
+}
+
+export function documentTitle(main: ExportData, opts: ExportOptions): string {
+  return opts.bundleTitle ?? main.title;
 }
 
 // Render a chip for the metadata header (icon can be data-URL or emoji).
@@ -414,6 +452,7 @@ const PRINT_CSS = `
   .entry-content h1, .entry-content h2, .entry-content h3 { margin-top: 1.3em; margin-bottom: 0.4em; }
   .entry-content p  { margin-bottom: 0.8em; }
   .entry-content img { display: block; max-width: 100%; height: auto; margin: 0.6em 0; border-radius: 4px; }
+  .entry-content figure.image-placeholder,
   .entry-content figure.audio-placeholder {
     margin: 0.8em 0; padding: 0.5em 0.9em; border: 1px dashed #ccc; border-radius: 6px;
     font-family: system-ui, sans-serif; font-size: 0.85em; color: #555;
@@ -488,14 +527,18 @@ const PRINT_CSS = `
  */
 export async function renderEntryArticle(
   data: ExportData,
-  bundleIds?: ReadonlySet<string>,
-  compression: ImageCompression = 'none',
-  footerHtml = '',
-  audio: 'embed' | 'placeholder' = 'placeholder',
+  opts: {
+    bundleIds?: ReadonlySet<string>;
+    images: ExportOptions['images'];
+    audio: MediaModes['audio'];
+    footerHtml?: string;
+  },
 ): Promise<string> {
-  // Audio first: a placeholder must replace the <audio> before embedMedia
-  // would read the sound file from disk.
-  const resolvedContent  = transformAudio(resolveInternalLinkIcons(data.content), audio);
+  const { bundleIds, footerHtml = '' } = opts;
+  const { mode: imageMode, compression } = splitImageOption(opts.images);
+  // Placeholders first: they must replace an element before embedMedia
+  // would read its file from disk.
+  const resolvedContent = transformMedia(resolveInternalLinkIcons(data.content), { images: imageMode, audio: opts.audio });
   const embeddedContent  = await compressImagesInHtml(await embedMedia(resolvedContent), compression);
   // Pre-render the internal-link chips in TS — the new webview's CSP
   // (`script-src 'self'`) blocks inline scripts, so the JS that used to
@@ -518,11 +561,12 @@ export async function renderEntryArticle(
  * main one (it names the file); further entries — linked entries bundled
  * by the export modal — each start on a new page.
  */
-export async function exportAsPDF(entries: ExportData[], compression: ImageCompression = 'none'): Promise<boolean> {
+export async function exportAsPDF(entries: ExportData[], opts: ExportOptions = DEFAULT_EXPORT_OPTIONS): Promise<boolean> {
   const [main] = entries;
   if (!main) return false;
   const bundleIds = entries.length > 1 ? new Set(entries.map(e => e.id)) : undefined;
-  const articles = (await Promise.all(entries.map(e => renderEntryArticle(e, bundleIds, compression))))
+  // A PDF can't play sound: always a placeholder.
+  const articles = (await Promise.all(entries.map(e => renderEntryArticle(e, { bundleIds, images: opts.images, audio: 'placeholder' }))))
     // The PDF is rendered in a hidden, viewport-sized webview right after
     // the page reports "loaded". WebKit decodes large images lazily, so
     // images further down could still be undecoded when the PDF is captured
@@ -533,7 +577,7 @@ export async function exportAsPDF(entries: ExportData[], compression: ImageCompr
 <html lang="de">
 <head>
   <meta charset="utf-8">
-  <title>${htmlEscape(main.title)}</title>
+  <title>${htmlEscape(documentTitle(main, opts))}</title>
   <style>${PRINT_CSS}</style>
 </head>
 <body>
@@ -545,7 +589,7 @@ export async function exportAsPDF(entries: ExportData[], compression: ImageCompr
 
   // Same UX as Markdown / Emerald: native save dialog first, then render.
   const path = await save({
-    defaultPath: exportFilename(main.title, main.createdAt, 'pdf'),
+    defaultPath: defaultFilename(main, opts, 'pdf'),
     filters: [{ name: 'PDF', extensions: ['pdf'] }],
   });
   if (!path) return false;
@@ -569,18 +613,10 @@ function mdIcon(icon?: string | null, fallbackIcon?: string | null): string {
 }
 
 function entryToMarkdown(data: ExportData): string {
-  const stripped = stripImages(data.content);
+  // Markdown carries no files: images and sound files become notes.
+  const stripped = transformMedia(data.content, { images: 'placeholder', audio: 'placeholder' });
 
   const td = new TurndownService({ headingStyle: 'atx', codeBlockStyle: 'fenced' });
-
-  td.addRule('audio', {
-    filter: 'audio',
-    replacement: (_content, node) => {
-      const el = node as HTMLElement;
-      const title = audioTitle(el.getAttribute('src'), el.getAttribute('data-title'));
-      return `\n\n🔊 ${title}\n\n`;
-    },
-  });
 
   td.addRule('internalLink', {
     filter: (node) =>
@@ -627,13 +663,13 @@ function entryToMarkdown(data: ExportData): string {
  * follow the main entry, separated by a horizontal rule; `[[wiki links]]`
  * between them keep working in tools like Obsidian since titles match.
  */
-export async function exportAsMarkdown(entries: ExportData[]): Promise<boolean> {
+export async function exportAsMarkdown(entries: ExportData[], opts: ExportOptions = DEFAULT_EXPORT_OPTIONS): Promise<boolean> {
   const [main] = entries;
   if (!main) return false;
   const markdown = entries.map(entryToMarkdown).join('\n\n---\n\n');
 
   const path = await save({
-    defaultPath: exportFilename(main.title, main.createdAt, 'md'),
+    defaultPath: defaultFilename(main, opts, 'md'),
     filters: [{ name: 'Markdown', extensions: ['md'] }],
   });
   if (!path) return false;

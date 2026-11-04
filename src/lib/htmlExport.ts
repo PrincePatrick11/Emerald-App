@@ -2,8 +2,10 @@ import { invoke } from '@tauri-apps/api/core';
 import { save } from '@tauri-apps/plugin-dialog';
 import { format } from 'date-fns';
 import { internalLinksIn, type ExportData, type ExportEntryType } from './exportData';
-import { entryAnchor, exportFilename, htmlEscape, renderEntryArticle, sanitizeDataImageUrl } from './export';
-import type { ImageCompression } from './imageCompression';
+import {
+  DEFAULT_EXPORT_OPTIONS, defaultFilename, documentTitle, entryAnchor, htmlEscape, renderEntryArticle,
+  sanitizeDataImageUrl, type ExportOptions,
+} from './export';
 
 // ── Interactive HTML export ─────────────────────────────────────────────────
 //
@@ -98,16 +100,22 @@ export async function buildInteractiveHtml(
   entries: ExportData[],
   labels: HtmlExportLabels,
   lang: string,
-  compression: ImageCompression = 'none',
+  opts: ExportOptions = DEFAULT_EXPORT_OPTIONS,
 ): Promise<string> {
   const [main] = entries;
   const bundleIds = new Set(entries.map(e => e.id));
   const multi = entries.length > 1;
+  const title = documentTitle(main, opts);
 
   const outgoing = new Map(entries.map(e => [e.id, outgoingIds(e)]));
   // The references section goes inside the article so it's shown / hidden with it.
   const articles = await Promise.all(entries.map(e =>
-    renderEntryArticle(e, bundleIds, compression, buildRefs(e, entries, outgoing, labels), 'embed')
+    renderEntryArticle(e, {
+      bundleIds,
+      images: opts.images,
+      audio: opts.audio,
+      footerHtml: buildRefs(e, entries, outgoing, labels),
+    })
   ));
 
   return `<!DOCTYPE html>
@@ -117,14 +125,14 @@ export async function buildInteractiveHtml(
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src data:; media-src data:; style-src 'unsafe-inline'; script-src 'unsafe-inline'; form-action 'none'; base-uri 'none'">
 <meta name="generator" content="Emerald">
-<title>${htmlEscape(main.title)}</title>
+<title>${htmlEscape(title)}</title>
 <style>${HTML_CSS}</style>
 </head>
 <body class="${multi ? 'has-sidebar' : 'single'}">
 <div class="app">
   ${multi ? `<aside class="sidebar" id="sidebar">
     <div class="sidebar-head">
-      <div class="bundle-title">${htmlEscape(main.title)}</div>
+      <div class="bundle-title">${htmlEscape(title)}</div>
       <div class="bundle-sub">${htmlEscape(labels.entryCount)}</div>
       <input type="search" id="search" class="search" placeholder="${htmlEscape(labels.search)}" autocomplete="off" spellcheck="false">
     </div>
@@ -160,13 +168,13 @@ export async function exportAsHTML(
   entries: ExportData[],
   labels: HtmlExportLabels,
   lang: string,
-  compression: ImageCompression = 'none',
+  opts: ExportOptions = DEFAULT_EXPORT_OPTIONS,
 ): Promise<boolean> {
   const [main] = entries;
   if (!main) return false;
-  const html = await buildInteractiveHtml(entries, labels, lang, compression);
+  const html = await buildInteractiveHtml(entries, labels, lang, opts);
   const path = await save({
-    defaultPath: exportFilename(main.title, main.createdAt, 'html'),
+    defaultPath: defaultFilename(main, opts, 'html'),
     filters: [{ name: 'HTML', extensions: ['html'] }],
   });
   if (!path) return false;
@@ -326,6 +334,12 @@ mark.hit { background: var(--mark); color: inherit; border-radius: 2px; padding:
   max-width: 100%; margin: 1em 0; padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--bg);
   font-family: system-ui, sans-serif;
 }
+.entry-content figure.image-placeholder,
+.entry-content figure.audio-placeholder {
+  margin: 1em 0; padding: 8px 12px; border: 1px dashed var(--border); border-radius: 8px;
+  font-family: system-ui, sans-serif; font-size: 13px; color: var(--muted);
+}
+.entry-content figure.audio-placeholder figcaption { margin: 0; }
 .entry-content figure.audio-embed figcaption { font-size: 13px; color: var(--muted); margin-bottom: 6px; }
 .entry-content figure.audio-embed audio { display: block; width: 100%; }
 

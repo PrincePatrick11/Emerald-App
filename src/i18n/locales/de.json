@@ -494,6 +494,7 @@
     "import": "Importieren",
     "resetView": "Ansicht zurücksetzen",
     "exportEntry": "Exportieren…",
+    "exportBulk": "Mehrere Einträge exportieren…",
     "exportPdf": "Als PDF exportieren…",
     "exportHtml": "Als HTML exportieren…",
     "exportMarkdown": "Als Markdown exportieren…",
@@ -592,6 +593,10 @@
       "strong": {
         "name": "Stark komprimiert",
         "desc": "Max. 1000 px, geringere Qualität – möglichst kleine Datei."
+      },
+      "placeholder": {
+        "name": "Platzhalter",
+        "desc": "Bilder werden nicht eingebettet, sondern durch einen Hinweis ersetzt – kleinste Datei."
       }
     },
     "linkedEntries": "Verlinkte Einträge",
@@ -621,6 +626,42 @@
     },
     "noEntry": "Bitte öffne zuerst einen Tagebucheintrag, Wiki-Artikel oder eine Operation.",
     "exportFailed": "Export fehlgeschlagen",
-    "importFailed": "Import fehlgeschlagen"
+    "importFailed": "Import fehlgeschlagen",
+    "attachments": "Anhänge",
+    "audio": {
+      "label": "Sounddateien",
+      "embed": "Einbetten",
+      "placeholder": "Platzhalter",
+      "embedDesc": "Die Sounddateien sind in der Datei enthalten und lassen sich abspielen.",
+      "placeholderDesc": "Sounddateien werden durch einen Hinweis mit dem Dateinamen ersetzt.",
+      "alwaysPlaceholder": "Ein PDF kann nichts abspielen – Sounddateien erscheinen dort immer als Hinweis mit dem Dateinamen.",
+      "markdownNote": "Markdown enthält keine Dateien: Bilder und Sounddateien erscheinen als Hinweis."
+    },
+    "placeholder": {
+      "image": "Bild"
+    },
+    "bulk": {
+      "title": "Mehrere Einträge exportieren",
+      "modules": "Module",
+      "period": "Zeitraum",
+      "periods": {
+        "last7": "Letzte 7 Tage",
+        "last30": "Letzte 30 Tage",
+        "thisMonth": "Dieser Monat",
+        "all": "Alle",
+        "custom": "Benutzerdefiniert"
+      },
+      "from": "Von",
+      "to": "Bis",
+      "since": "ab {{date}}",
+      "until": "bis {{date}}",
+      "allTime": "alle",
+      "noMatches": "Keine Einträge in diesem Zeitraum.",
+      "emeraldUnavailable": "Enthält immer genau einen Eintrag – für mehrere Einträge PDF, HTML oder Markdown wählen.",
+      "fileTitle": "Emerald – {{modules}} – {{range}}",
+      "noModules": "Mindestens ein Modul auswählen.",
+      "invalidDate": "Datum unvollständig oder ungültig (Format JJJJ-MM-TT)."
+    },
+    "largePdfHint": "{{count}} Einträge sind ein großes PDF – das Erzeugen kann dauern, und unter macOS wird es eine einzige sehr lange Seite. Für große Pakete eignet sich HTML besser."
   }
 }
