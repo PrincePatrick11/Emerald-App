@@ -5,9 +5,10 @@ import type { Weekday } from './formatDate';
 import { LANGUAGE_OPTIONS, LANGUAGE_STORAGE_KEY, type AppLanguage } from '../i18n';
 import {
   DEFAULT_EDITOR_FONT_ID, DEFAULT_EDITOR_FONT_SIZE, DEFAULT_THEME_ID, DEFAULT_UI_FONT_ID, DEFAULT_UI_SCALE,
-  normalizeEditorFontId, normalizeEditorFontSize, normalizeThemeId, normalizeUIFontId, normalizeUIScale,
-  type EditorFontSize, type FontId, type ThemeId, type UIScale,
+  customThemeSelection, normalizeEditorFontId, normalizeEditorFontSize, normalizeThemeSelection, normalizeUIFontId, normalizeUIScale,
+  type EditorFontSize, type FontId, type ThemeSelection, type UIScale,
 } from '../themes/theme';
+import { MAX_CUSTOM_THEMES, normalizeCustomThemes, type CustomTheme } from '../themes/customTheme';
 
 /**
  * A vault's settings, as `settings.json` in its folder.
@@ -18,7 +19,8 @@ import {
  */
 export interface AppearanceSettings {
   language: AppLanguage;
-  theme: ThemeId;
+  theme: ThemeSelection;
+  customThemes: CustomTheme[];
   uiFont: FontId;
   editorFont: FontId;
   uiScale: UIScale;
@@ -149,6 +151,7 @@ export const DEFAULT_VAULT_SETTINGS: VaultSettings = {
   appearance: {
     language: 'en',
     theme: DEFAULT_THEME_ID,
+    customThemes: [],
     uiFont: DEFAULT_UI_FONT_ID,
     editorFont: DEFAULT_EDITOR_FONT_ID,
     uiScale: DEFAULT_UI_SCALE,
@@ -242,13 +245,15 @@ export function normalizeVaultSettings(raw: unknown): VaultSettings {
   const version = typeof root.version === 'number' && Number.isInteger(root.version) && root.version > 1
     ? root.version
     : 1;
+  const customThemes = normalizeCustomThemes(appearance.customThemes);
   return {
     ...root,
     version,
     appearance: {
       ...appearance,
       language: language && LANGUAGES.has(language) ? (language as AppLanguage) : DEFAULT_VAULT_SETTINGS.appearance.language,
-      theme: normalizeThemeId(asString(appearance.theme)),
+      theme: normalizeThemeSelection(asString(appearance.theme), customThemes),
+      customThemes,
       uiFont: normalizeUIFontId(asString(appearance.uiFont)),
       editorFont: normalizeEditorFontId(asString(appearance.editorFont)),
       uiScale: normalizeUIScale(appearance.uiScale),
@@ -323,6 +328,22 @@ export function importableSettings(raw: unknown): VaultSettings | null {
 export function withSettingsGroups(current: VaultSettings, incoming: VaultSettings, groups: readonly SettingsGroup[]): VaultSettings {
   const next: Record<string, unknown> = { ...current };
   for (const group of groups) next[group] = incoming[group];
+  if (groups.includes('appearance')) {
+    // The vault's own themes stay: a backup adds to them, and its selection may name either.
+    const own = current.appearance.customThemes;
+    const ownIds = new Set(own.map((theme) => theme.id));
+    // The backup's selected theme comes first, so the cap cuts others before it.
+    const selected = (theme: CustomTheme) => customThemeSelection(theme.id) === incoming.appearance.theme;
+    const added = incoming.appearance.customThemes.filter((theme) => !ownIds.has(theme.id));
+    const customThemes = [...own, ...added.filter(selected), ...added.filter((theme) => !selected(theme))]
+      .slice(0, MAX_CUSTOM_THEMES);
+    const fits = !incoming.appearance.theme.startsWith('custom:') || customThemes.some(selected);
+    next.appearance = {
+      ...incoming.appearance,
+      customThemes,
+      theme: fits ? incoming.appearance.theme : current.appearance.theme,
+    };
+  }
   return next as unknown as VaultSettings;
 }
 
@@ -378,11 +399,20 @@ interface LegacySnapshot {
 export const APPEARANCE_MIRROR_KEYS = {
   language: LANGUAGE_STORAGE_KEY,
   theme: 'theme-id',
+  customThemes: 'custom-themes',
   uiFont: 'ui-font-id',
   editorFont: 'editor-font-id',
   uiScale: 'ui-scale',
   editorFontSize: 'editor-font-size',
 } as const;
+
+function parseMirrorList(raw: string | null): unknown {
+  try {
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+}
 
 /** The appearance according to the boot mirror, validated like a file. */
 export function readAppearanceMirror(): AppearanceSettings {
@@ -398,6 +428,7 @@ export function readAppearanceMirror(): AppearanceSettings {
       language: read(APPEARANCE_MIRROR_KEYS.language),
       // `theme` is the key from before the theme ids ('light'/'dark').
       theme: read(APPEARANCE_MIRROR_KEYS.theme) ?? read('theme'),
+      customThemes: parseMirrorList(read(APPEARANCE_MIRROR_KEYS.customThemes)),
       uiFont: read(APPEARANCE_MIRROR_KEYS.uiFont),
       editorFont: read(APPEARANCE_MIRROR_KEYS.editorFont),
       uiScale: read(APPEARANCE_MIRROR_KEYS.uiScale),

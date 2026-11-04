@@ -32,20 +32,20 @@ On macOS and Linux the webview has no debug port. The launcher there builds the 
 
 ## The instance
 
-The server drives the app checkout the session runs in: the git toplevel of the working directory, so a session in a worktree drives that worktree. `EMERALD_APP_DIR` forces another one.
+The server drives the app checkout the session runs in: the git toplevel of the working directory, so a session in a worktree drives that worktree. A client can start the server in the main checkout while its session works in a worktree of the same repository; on macOS and Linux the server then takes the worktree from the client's working directory, and `checkout_source` reads `client-cwd`. On Windows that directory is not readable, so such a session has to set `EMERALD_APP_DIR`. That variable forces a checkout on every platform and means the caller arranges the instance: nothing is derived for a worktree then, and the other settings below fall to their defaults unless set too.
 
 It builds and starts that checkout as an instance of its own, apart from the regular dev build, so both can run at once:
 
 | | Regular dev build | MCP instance |
 | --- | --- | --- |
-| Debug port | none | 9223 (macOS, Linux: the dev bridge) |
-| Vite port | 1420 | 1430 |
-| App identifier | `com.emerald.app.dev` | `com.emerald.mcp` |
-| Cargo target dir | `src-tauri/target` | `%LOCALAPPDATA%\emerald-mcp-target`, elsewhere `~/.local/share/emerald-mcp-target` |
+| Debug port | none | 9223 (macOS, Linux: the dev bridge), in a linked worktree from 9300 |
+| Vite port | 1420 | 1430, in a linked worktree from 1500 |
+| App identifier | `com.emerald.app.dev` | `com.emerald.mcp`, in a linked worktree `com.emerald.mcp.w<key>` |
+| Cargo target dir | `src-tauri/target` | `%LOCALAPPDATA%\emerald-mcp-target`, elsewhere `~/.local/share/emerald-mcp-target`, in a linked worktree `emerald-mcp-worktree-<key>` there |
 
 The identifier of its own gives the instance its own app data and therefore its own vaults; see [Test data](#test-data). The build directory of its own is needed because Windows refuses to overwrite an `.exe` that is running.
 
-`status` reports the instance; `python instance.py` prints the same without starting anything.
+`status` reports the instance; `python instance.py` prints the same without starting anything, as far as it runs from the same place.
 
 ## Setup
 
@@ -85,21 +85,21 @@ Set `EMERALD_AUTO_LAUNCH=0` to start it yourself. Run by hand, the launcher scri
 To check the debug port:
 
 ```bash
-curl http://127.0.0.1:9223/json/version
+curl http://127.0.0.1:<port>/json/version
 ```
 
 ## Tools
 
 | Tool | What it does |
 | --- | --- |
-| `status` | Which instance this session drives, whether it is running and attached, and how a launch in progress is doing |
+| `status` | Which instance this session drives, whether it is running and attached, and how a launch in progress is doing. On macOS and Linux it names the checkout of the running instance and warns when that is another one |
 | `connect` | List the CDP targets (WebView pages) of the instance |
 | `attach` | Attach to a specific target instead of the main window |
 | `snapshot` | The page as a compact outline: one line per element that is structure or can be acted on, with role, name, value and state. Actionable elements carry a ref (`@e7`). Options: `selector` (a subtree), `interactive` (flat list of what can be acted on), `classes` |
 | `click` | Click with real mouse events - left, right, double. Refuses an element that is disabled, hidden or covered, and names what covers it; `force` clicks anyway |
-| `hover` | Move the mouse over an element |
+| `hover` | Move the mouse over an element; says when CSS `:hover` is not active on it |
 | `type_text` | Type into an input, textarea or contenteditable editor (Tiptap) through the keyboard path; reports what the field reads afterwards |
-| `press_key` | Press a key or shortcut (`Enter`, `Escape`, `Control+K`) |
+| `press_key` | Press a key or shortcut (`Enter`, `Escape`, `Control+K`); `Enter` and `Space` press a focused control |
 | `wait_for` | Wait until an element is `visible` (default), `attached`, `hidden` or `detached` |
 | `eval` | Run JavaScript as in a DevTools console - top-level `await` works, DOM nodes come back as outerHTML, the result is capped at `max_chars` |
 | `console_logs` | Console output and uncaught exceptions; `level`, `limit`, `clear` |
@@ -126,12 +126,12 @@ The vault is created once. `seed/provision.mjs` stops as soon as the instance ha
 
 | Var | Default | Description |
 | --- | --- | --- |
-| `EMERALD_APP_DIR` | discovered | Force the app checkout instead of deriving it from the session's directory |
+| `EMERALD_APP_DIR` | discovered | Force the app checkout instead of deriving it from the session's directory. Nothing is then derived for a worktree |
 | `EMERALD_CDP_HOST` | `127.0.0.1` | Debug host |
-| `EMERALD_CDP_PORT` | `9223` | Debug port; on macOS and Linux the port the dev bridge is told to answer on |
-| `EMERALD_MCP_VITE_PORT` | `1430` | Port of the instance's Vite dev server |
-| `EMERALD_MCP_IDENTIFIER` | `com.emerald.mcp` | App identifier, which decides where the instance keeps its data |
-| `EMERALD_MCP_HOME` | `%LOCALAPPDATA%\emerald-mcp`, elsewhere `~/.local/share/emerald-mcp` | Generated Tauri config, launch logs, screenshots |
+| `EMERALD_CDP_PORT` | `9223`, in a linked worktree from `9300` | Debug port; on macOS and Linux the port the dev bridge is told to answer on |
+| `EMERALD_MCP_VITE_PORT` | `1430`, in a linked worktree from `1500` | Port of the instance's Vite dev server |
+| `EMERALD_MCP_IDENTIFIER` | `com.emerald.mcp`, in a linked worktree `com.emerald.mcp.w<key>` | App identifier, which decides where the instance keeps its data |
+| `EMERALD_MCP_HOME` | `%LOCALAPPDATA%\emerald-mcp`, elsewhere `~/.local/share/emerald-mcp` | Generated Tauri config, launch logs, screenshots; a linked worktree's are in `worktrees/<key>` below it |
 | `CARGO_TARGET_DIR` | see above | The instance's build directory |
 | `EMERALD_MCP_SEED` | unset | `force` rebuilds the test vault on the next start |
 | `EMERALD_MCP_OFFSCREEN_XY` | off-screen | Windows: `40,40` keeps the window on screen, for watching a run |
@@ -177,13 +177,21 @@ Everything that looks at the DOM is in `pagelib.js`, which `cdp.py` sends along 
 
 ## Known limitations
 
+- **The port does not say whose instance answers on it.** The server attaches
+  to whatever is on its port. On macOS and Linux it reads that process's checkout through
+  `lsof`: `status` and `connect` warn when it is not the session's, as does the
+  first answer after attaching. On Windows it cannot tell.
+
 - **macOS and Linux go through the dev bridge, which does less.** A left
   click, and a mouse move with the left button held (a drag, which selects
   text), is a real mouse event on macOS; everything else - typing, key presses,
   hovering, and every click on Linux - is events dispatched in the page: the
-  app's handlers and the editor see them, a `:hover` style does not follow.
-  `eval` returns the value of an expression; a list of statements runs but has
-  no value. Screenshots exist on macOS only. On macOS the bridge makes the
+  app's handlers and the editor see them, a `:hover` style does not follow, and
+  `hover` says so. Those events have no default action: the bridge itself lets
+  Enter press a focused button or link and Space a focused button, checkbox or
+  radio, but Enter does not submit a form from a field, and a click may not
+  focus what it clicks, so pass `selector` to `press_key`. `eval` returns the value of an expression; a list
+  of statements runs, has no value, and the answer says so. Screenshots exist on macOS only. On macOS the bridge makes the
   window invisible where it stands rather than moving it away - WebKit stops
   rendering a page whose window is off the screen - and gives the keyboard
   back to the app that was in front; on Linux the window opens on screen.
@@ -198,9 +206,11 @@ Everything that looks at the DOM is in `pagelib.js`, which `cdp.py` sends along 
   backups, asks the bridge as well (`devbridge::pick_folder`); another one
   added there without that would be native and, on macOS, could only be
   listed, cancelled or accepted as it stands.
-- **One instance.** Port, identifier and build directory are fixed, so two
-  checkouts cannot be driven at the same time without overriding them by hand,
-  and two sessions on one checkout drive the same window.
+- **One instance per checkout.** Two sessions on one checkout drive the same
+  window. Without `lsof`, and always on Windows, a worktree stays on the ports
+  its path gives, so two that land on the same pair share an instance. Two
+  servers that start while neither instance listens yet can also pick the same
+  pair; the later one then only gets the warning.
 - **The test vault is created, never reset.** It is built when the instance
   is new and then keeps what runs put into it. A running instance's database
   cannot be replaced from outside: the app holds `emerald.db` open.

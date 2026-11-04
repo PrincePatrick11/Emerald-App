@@ -67,7 +67,7 @@ export default function EntryTypeField({ id, type, properties }: {
                 onClick={() => select(value)}
                 className={`prop-segment${active ? ' prop-segment--active' : ''}`}
               >
-                <Icon size={13} />
+                <Icon size={14} />
               </button>
             );
           })}

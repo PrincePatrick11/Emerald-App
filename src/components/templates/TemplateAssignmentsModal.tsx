@@ -92,9 +92,14 @@ export default function TemplateAssignmentsModal({ templateId, name, assignments
       onClose={onClose}
       widthClassName="w-[640px] max-w-full"
       maxHeightClassName="max-h-[85vh]"
-      bodyClassName="flex min-h-0 flex-1 flex-col"
+      bodyClassName="min-h-0 flex-1 space-y-5 overflow-y-auto modal-body"
+      footer={
+        <>
+          <Button tone="neutral" onClick={onClose}>{t('common.cancel')}</Button>
+          <Button tone="jade" onClick={() => onApply(working)}>{t('templates.assign.apply')}</Button>
+        </>
+      }
     >
-      <div className="min-h-0 flex-1 space-y-5 overflow-y-auto p-4">
         <div className="space-y-2">
           <p className="block-field-hint">{t('templates.assign.hint')}</p>
           <AssignmentLegend states={ASSIGNMENT_STATES} />
@@ -107,12 +112,6 @@ export default function TemplateAssignmentsModal({ templateId, name, assignments
             cell: bothCell,
           }}
         />
-      </div>
-
-      <div className="flex shrink-0 items-center justify-end gap-2 border-t px-4 py-3" style={{ borderColor: 'var(--border-soft)' }}>
-        <Button tone="neutral" onClick={onClose}>{t('common.cancel')}</Button>
-        <Button tone="jade" onClick={() => onApply(working)}>{t('templates.assign.apply')}</Button>
-      </div>
     </Modal>
   );
 }

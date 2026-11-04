@@ -3,20 +3,17 @@ html[data-theme='emerald-noctis'] {
   --bg-app: #15110d;
   --bg-surface-1: rgba(35, 29, 24, 0.64);
   --bg-surface-2: rgba(29, 24, 20, 0.9);
-  --bg-elevated: rgba(27, 23, 19, 0.97);
   --text-primary: #f5f5f4;
   --text-secondary: #e7e5e4;
   --text-muted: #a8a29e;
-  --text-subtle: #78716c;
+  --text-subtle: #8a837d;
   --border-soft: rgba(87, 83, 78, 0.62);
-  --border-subtle: rgba(87, 83, 78, 0.5);
   --border-strong: rgba(120, 113, 108, 0.72);
   --interactive-hover: rgba(245, 245, 244, 0.06);
   --interactive-active: rgba(245, 245, 244, 0.1);
   --code-bg: rgba(41, 37, 36, 0.95);
   --accent: #00c47f;
   --accent-strong: #00a066;
-  --accent-contrast: #003322;
   --focus-ring: rgba(0, 196, 127, 0.42);
   --scrollbar: rgba(120, 113, 108, 0.9);
   --scrollbar-hover: rgba(168, 162, 158, 0.95);
@@ -39,10 +36,10 @@ html[data-theme='emerald-noctis'] {
   --editor-toolbar-active-text: #f5f5f4;
   --editor-mark-bg: #002e1d;
   --editor-mark-text: #70ffca;
-  --menu-bg: #1c1917;
-  --menu-border: rgba(87, 83, 78, 0.7);
+  --menu-bg: #211b16;
+  --menu-border: rgba(113, 94, 77, 0.55);
   --menu-shadow: 0 14px 36px rgba(0, 0, 0, 0.35);
-  --menu-item-hover-bg: rgba(87, 83, 78, 0.5);
+  --menu-item-hover-bg: rgba(113, 94, 77, 0.28);
   --menu-item-hover-text: #f5f5f4;
   --menu-item-active-bg: rgba(0, 122, 77, 0.2);
   --menu-item-active-text: #b8ffe2;
@@ -70,7 +67,7 @@ html[data-theme='emerald-noctis'] {
      on the muted jade track when on. */
   --switch-thumb: #f5f5f4;
   --switch-thumb-on: #9dffd5;
-  /* Controls of the edit sidebar (design.md, Edit Sidebar):
+  /* Controls of the edit sidebar (components.md, `SidebarActionBar`):
      value buttons and inputs (`--field-*`), the inset search fields
      (`--field-inset-bg`) and the primary action "Done" (`--primary-solid-*`,
      built like `--danger-solid-*`). */
@@ -83,6 +80,7 @@ html[data-theme='emerald-noctis'] {
   --primary-solid-border: rgba(0, 196, 127, 0.44);
   --primary-solid-text: #dcfff0;
   --primary-solid-hover-bg: rgba(0, 138, 87, 0.42);
+  --primary-solid-hover-text: #f2fff9;
   --danger-soft-text: #f4a7ad;
   --danger-soft-border: rgba(232, 100, 110, 0.5);
   /* Frame + sheet (design.md, Shell Layout): title bar, rail and left
@@ -108,8 +106,79 @@ html[data-theme='emerald-noctis'] {
   --search-inset: inset 0 1px 0 rgba(255, 241, 223, 0.06);
   /* The entry list search: borderless on the frame. */
   --list-search-bg: rgba(245, 245, 244, 0.05);
+  /* Settings' choice buttons, and the dimming behind a modal. */
+  --choice-bg: rgba(46, 38, 32, 0.82);
+  --choice-bg-hover: rgba(58, 48, 41, 0.9);
+  --choice-border: rgba(113, 94, 77, 0.48);
+  --choice-border-hover: rgba(141, 119, 99, 0.54);
+  --choice-text: #c9b5a1;
+  --choice-text-hover: #f2e7da;
+  --choice-active-bg: rgba(0, 138, 87, 0.28);
+  --choice-active-border: rgba(0, 196, 127, 0.44);
+  --choice-active-text: #d9ffef;
+  --modal-scrim: rgba(0, 0, 0, 0.5);
+  /* Button's `tone` mode: tinted row actions. */
+  --tone-jade-bg: rgba(0, 92, 58, 0.3);
+  --tone-jade-bg-hover: rgba(0, 92, 58, 0.5);
+  --tone-jade-border: rgba(0, 160, 102, 0.6);
+  --tone-jade-border-hover: rgba(0, 230, 153, 0.7);
+  --tone-jade-text: #70ffca;
+  --tone-jade-text-hover: #70ffca;
+  --tone-amber-bg: rgba(120, 53, 15, 0.3);
+  --tone-amber-bg-hover: rgba(120, 53, 15, 0.5);
+  --tone-amber-border: rgba(180, 83, 9, 0.6);
+  --tone-amber-border-hover: rgba(245, 158, 11, 0.7);
+  --tone-amber-text: #fcd34d;
+  --tone-amber-text-hover: #fcd34d;
+  --tone-danger-bg: rgba(69, 10, 10, 0.3);
+  --tone-danger-bg-hover: rgba(69, 10, 10, 0.5);
+  --tone-danger-border: rgba(185, 28, 28, 0.6);
+  --tone-danger-border-hover: #ef4444;
+  --tone-danger-text: #fecaca;
+  --tone-danger-text-hover: #fecaca;
+  --tone-neutral-bg: rgba(28, 25, 23, 0.45);
+  --tone-neutral-bg-hover: rgba(41, 37, 36, 0.6);
+  --tone-neutral-border: rgba(87, 83, 78, 0.7);
+  --tone-neutral-border-hover: rgba(87, 83, 78, 0.7);
+  --tone-neutral-text: #a8a29e;
+  --tone-neutral-text-hover: #e7e5e4;
   /* Heights (design.md, Heights and Spacing). */
-  --content-bar-h: 56px;
   --control-h: 30px;
-  --control-h-sm: 24px;
+  /* Generic text, surfaces and edges behind the Tailwind colour names in tailwind.config.js. */
+  --text-soft: #d6d3d1;
+  --text-raise: #d6d3d1;
+  --text-on-accent: #70ffca;
+  --accent-text: #00c47f;
+  --accent-text-raise: #70ffca;
+  --success-text: #4ade80;
+  --border-default: #44403c;
+  --edge: rgba(68, 64, 60, 0.5);
+  --edge-strong: #57534e;
+  --edge-raise: rgba(120, 113, 108, 0.7);
+  --accent-edge: rgba(0, 196, 127, 0.7);
+  --well: rgba(41, 37, 36, 0.5);
+  --well-strong: rgba(41, 37, 36, 0.6);
+  --well-raise: rgba(68, 64, 60, 0.5);
+  --well-solid: #292524;
+  --well-active: #44403c;
+  --well-sunk: rgba(28, 25, 23, 0.45);
+  --well-deep: rgba(15, 14, 12, 0.35);
+  --well-tint: rgba(41, 37, 36, 0.8);
+  --well-page: #1c1917;
+  --overlay: rgba(15, 14, 12, 0.85);
+  --canvas: rgba(15, 14, 12, 0.8);
+  --accent-wash: rgba(0, 92, 58, 0.2);
+  --accent-wash-strong: rgba(0, 230, 153, 0.25);
+  --accent-track: rgba(0, 196, 127, 0.6);
+  --accent-fill: rgba(0, 138, 87, 0.3);
+  --accent-fill-strong: rgba(0, 92, 58, 0.7);
+  --danger-wash: rgba(127, 29, 29, 0.2);
+  --secondary-bg: rgba(46, 38, 32, 0.76);
+  --secondary-bg-hover: rgba(58, 47, 40, 0.9);
+  --secondary-border: rgba(113, 94, 77, 0.48);
+  --secondary-border-hover: rgba(142, 121, 101, 0.58);
+  --secondary-text: #b9a38e;
+  --secondary-text-hover: #f3e9dd;
+  --mark-accent: #00c47f;
+  --mark-line: #c8f2e0;
 }

@@ -34,7 +34,7 @@ function BlockSettingsBox({ children, className = '' }: { children: ReactNode; c
 /**
  * The block management of the opened entry in the right sidebar:
  * in edit mode a list with handle, eye and menu (rename, title in
- * read mode, duplicate, remove) plus "Add block"; in read mode
+ * read mode, duplicate, remove); in read mode
  * an outline of the visible blocks (`BlockOutline`), whose rows jump to the
  * block, and only if there is more than one. If a
  * block type brings settings (`blockSidebarViews.ts`), a click on
@@ -54,6 +54,47 @@ export default function BlockSidebarArea() {
     return <BlockOutline key={session.sessionId} session={session} />;
   }
   return <BlockManager key={session.sessionId} session={session} />;
+}
+
+/**
+ * "Add block" and "Insert template" while editing, at the top of the sidebar
+ * body right under the action bar, apart from the block list further down.
+ */
+export function BlockAddActions() {
+  const activeViewId = useUIStore((s) => s.activeView.id);
+  const session = useBlockSessionStore((s) => s.session);
+  if (!session || session.entryId !== activeViewId || !session.isEditing) return null;
+  // As in `BlockSidebarArea`: an open menu belongs to this stack and this edit.
+  return <BlockAddButtons key={session.sessionId} session={session} />;
+}
+
+function BlockAddButtons({ session }: { session: BlockSession }) {
+  const { t } = useTranslation();
+  const definitions = useBlockDefinitionStore((s) => s.definitions);
+  const [menu, setMenu] = useState<{ x: number; y: number; actions: ContextMenuAction[] } | null>(null);
+  const { api } = session;
+
+  const openAddMenu = (e: MouseEvent) => setMenu({
+    x: e.clientX,
+    y: e.clientY,
+    actions: addBlockActions(t, (presetId) => api.insert(session.blocks.length, presetId), definitions),
+  });
+
+  return (
+    <div className="flex flex-col gap-1.5">
+      {session.templates && (
+        <button type="button" className="sidebar-section-button" onClick={api.openTemplatePicker}>
+          <CopyPlus size={14} className="flex-shrink-0" />
+          <span className="min-w-0 truncate">{t('templates.insert.button')}</span>
+        </button>
+      )}
+      <button type="button" className="sidebar-section-button" onClick={openAddMenu}>
+        <Plus size={14} className="flex-shrink-0" />
+        <span className="min-w-0 truncate">{t('blocks.add')}</span>
+      </button>
+      {menu && <ContextMenu x={menu.x} y={menu.y} actions={menu.actions} onClose={() => setMenu(null)} />}
+    </div>
+  );
 }
 
 /**
@@ -99,13 +140,6 @@ function BlockManager({ session }: { session: BlockSession }) {
   const { api } = session;
   // Without animation, like the altar's placed elements.
   const { listRef, visualItems, draggingId, startDrag } = usePointerReorder(session.blocks, (ordered) => api.reorder(ordered.map((b) => b.id)));
-  const definitions = useBlockDefinitionStore((s) => s.definitions);
-
-  const openAddMenu = (e: MouseEvent) => setMenu({
-    x: e.clientX,
-    y: e.clientY,
-    actions: addBlockActions(t, (presetId) => api.insert(session.blocks.length, presetId), definitions),
-  });
 
   const openRowMenu = (e: MouseEvent, block: BlockInstance, meta: BlockTypeMeta | undefined) => {
     const showsTitle = showsTitleInRead(block, meta);
@@ -163,19 +197,6 @@ function BlockManager({ session }: { session: BlockSession }) {
             );
           })}
         </div>
-        {/* Set off below a line: the buttons belong to the list but are not rows in it. */}
-        <div className="sidebar-section-actions">
-          <button type="button" className="sidebar-section-button" onClick={openAddMenu}>
-            <Plus size={13} className="flex-shrink-0" />
-            <span className="min-w-0 truncate">{t('blocks.add')}</span>
-          </button>
-          {session.templates && (
-            <button type="button" className="sidebar-section-button" onClick={api.openTemplatePicker}>
-              <CopyPlus size={13} className="flex-shrink-0" />
-              <span className="min-w-0 truncate">{t('templates.insert.button')}</span>
-            </button>
-          )}
-        </div>
       </SidebarSection>
 
       {menu && <ContextMenu x={menu.x} y={menu.y} actions={menu.actions} onClose={() => setMenu(null)} />}
@@ -220,7 +241,7 @@ function ManagerRow({
       <div
         onContextMenu={(e) => { e.preventDefault(); onOpenMenu(e); }}
         // 32px tall, 13px and 14px icons like the other rows of the sidebar.
-        className={`w-full flex items-center gap-2 h-8 rounded border pl-1 pr-1 text-[13px] transition-all select-none ${
+        className={`w-full flex items-center gap-2 h-8 rounded-md border pl-1 pr-1 text-[13px] transition-all select-none ${
           // Without a border as long as it is neither selected nor dragged; the
           // states above it are shared with the altar's elements.
           isDragging || selected ? sidebarRowStateClasses({ dragging: isDragging, selected }) : 'block-manager-row--idle'
@@ -246,7 +267,7 @@ function ManagerRow({
                 if (e.key === 'Enter') e.currentTarget.blur();
                 if (e.key === 'Escape') { cancelledRef.current = true; e.currentTarget.blur(); }
               }}
-              className="block-row-rename flex-1 min-w-0 bg-transparent text-[13px] text-stone-200 outline-none selectable"
+              className="block-row-rename flex-1 min-w-0 bg-transparent text-[13px] text-secondary outline-none selectable"
             />
           </>
         ) : (

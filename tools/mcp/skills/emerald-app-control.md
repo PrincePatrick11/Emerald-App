@@ -83,7 +83,7 @@ mcp:
    reply of *"Emerald is still starting"* is that cold start, not a failure:
    retry in 15-30s. The first start in a new checkout also runs `npm install`
    and builds the test vault, so allow a few minutes.
-3. To check the port by hand, take it from `status` (9223 unless overridden):
+3. To check the port by hand, take it from `status`:
    `curl -s http://127.0.0.1:<port>/json/version`
    should return JSON containing `"Browser": "Edg/..."`.
 
@@ -182,7 +182,7 @@ document.querySelector('.left-sidebar-rail button:has(.lucide-book-open)').click
 | Tasks | `lucide-square-check-big` | `.left-sidebar-rail button:has(.lucide-square-check-big)` |
 | Operations | `lucide-wand-sparkles` | `.left-sidebar-rail button:has(.lucide-wand-sparkles)` |
 | Wiki | `lucide-library` | `.left-sidebar-rail button:has(.lucide-library)` |
-| Altar | `lucide-flame` | `.left-sidebar-rail button:has(.lucide-flame)` |
+| Altar | `lucide-altar` | `.left-sidebar-rail button:has(.lucide-altar)` |
 | Tags | `lucide-tag` | `.left-sidebar-rail button:has(.lucide-tag)` |
 | Trash | `lucide-trash2` | `.left-sidebar-rail button:has(.lucide-trash2)` |
 | Settings | `lucide-settings` | `.left-sidebar-rail button:has(.lucide-settings)` |
@@ -459,11 +459,11 @@ Then check the UI via `eval`:
 ```js
 (async () => {
   const icons = ['book-open','square-check-big','wand-sparkles','library',
-                 'flame','tag','trash2','settings'];
+                 'altar','tag','trash2','settings'];
   const missing = icons.filter(i =>
     !document.querySelector(`.left-sidebar-rail button:has(.lucide-${i})`));
   const view = () => document.querySelector('.app-main')?.innerText.trim().split('\n')[1] || '';
-  document.querySelector('.left-sidebar-rail button:has(.lucide-flame)').click();
+  document.querySelector('.left-sidebar-rail button:has(.lucide-altar)').click();
   await new Promise(s => setTimeout(s, 700));
   const altar = view();
   document.querySelector('.left-sidebar-rail button:has(.lucide-book-open)').click();

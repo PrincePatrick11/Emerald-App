@@ -32,6 +32,7 @@ import { guardKey } from '../../store/leaveGuardStore';
 import BlockStack from '../blocks/BlockStack';
 import EntryDetailFrame from '../ui/EntryDetailFrame';
 import { useSessionState } from '../../store/sessionStore';
+import { createItem } from '../../lib/createItem';
 
 export default function OperationsView() {
   const { t } = useTranslation();
@@ -41,8 +42,8 @@ export default function OperationsView() {
   );
   const openInNewTabAction = useOpenInNewTabAction();
   const saveAsTemplateAction = useSaveAsTemplateAction();
-  const { operations, createEntry, duplicateEntry, updateEntry, deleteEntry, restoreEntry, getEntry } = useEntryStore(
-    useShallow((s) => ({ operations: s.entries.operation, createEntry: s.createEntry, duplicateEntry: s.duplicateEntry, updateEntry: s.updateEntry, deleteEntry: s.deleteEntry, restoreEntry: s.restoreEntry, getEntry: s.getEntry }))
+  const { operations, duplicateEntry, updateEntry, deleteEntry, restoreEntry, getEntry } = useEntryStore(
+    useShallow((s) => ({ operations: s.entries.operation, duplicateEntry: s.duplicateEntry, updateEntry: s.updateEntry, deleteEntry: s.deleteEntry, restoreEntry: s.restoreEntry, getEntry: s.getEntry }))
   );
   const categories = useCategoryStore((s) => s.categories);
   const pushUndo = useUndoStore((s) => s.push);
@@ -120,16 +121,10 @@ export default function OperationsView() {
     if (operation) setTitle(operation.title);
   }, [operation?.title]);
 
-  const handleNew = async () => {
-    const op = await createEntry('operation');
-    setActiveView({ type: 'operations', id: op.id, mode: 'edit', isNew: true });
-  };
+  const handleNew = () => createItem('operations');
 
   // The "+" button on the category header — like handleCreateTask(cat.id) in TasksView.
-  const handleNewInCategory = async (categoryId: string) => {
-    const op = await createEntry('operation', { categoryId });
-    setActiveView({ type: 'operations', id: op.id, mode: 'edit', isNew: true });
-  };
+  const handleNewInCategory = (categoryId: string) => createItem('operations', { categoryId });
 
   const openCtxMenu = (e: React.MouseEvent, id: string) => { e.preventDefault(); setCtxMenu({ id, x: e.clientX, y: e.clientY }); };
 
@@ -277,25 +272,25 @@ export default function OperationsView() {
           {isCardView(view) ? (
             <>
               {isImageIcon(iconValue)
-                ? <img src={iconValue} alt="" className="w-6 h-6 object-cover rounded mb-2" />
+                ? <img src={iconValue} alt="" className="w-6 h-6 object-cover rounded-md mb-2" />
                 : <div className="text-xl mb-2">{iconValue}</div>}
               {renaming
-                ? renameInput('text-sm font-medium text-stone-200 w-full bg-transparent outline-none selectable mb-1')
-                : <div className="text-sm font-medium text-stone-200 truncate mb-1">{displayTitle(t, 'operation', op.title)}</div>}
+                ? renameInput('text-sm font-medium text-secondary w-full bg-transparent outline-none selectable mb-1')
+                : <div className="text-sm font-medium text-secondary truncate mb-1">{displayTitle(t, 'operation', op.title)}</div>}
               <div className="mt-1">
-                <span className="text-xs text-parchment-500/70">{dateStr}</span>
+                <span className="text-xs text-muted">{dateStr}</span>
               </div>
             </>
           ) : (
             <>
               {isImageIcon(iconValue)
-                ? <img src={iconValue} alt="" className="w-5 h-5 object-cover rounded flex-shrink-0" />
+                ? <img src={iconValue} alt="" className="w-5 h-5 object-cover rounded-md flex-shrink-0" />
                 : <span className="text-base flex-shrink-0">{iconValue}</span>
               }
               {renaming
-                ? renameInput('flex-1 bg-transparent text-sm text-stone-300 outline-none selectable')
-                : <span className="flex-1 text-sm text-stone-300 truncate">{displayTitle(t, 'operation', op.title)}</span>}
-              <span className="text-xs text-parchment-500/70 min-w-0 max-w-[50%] truncate">{dateStr}</span>
+                ? renameInput('flex-1 bg-transparent text-sm text-soft outline-none selectable')
+                : <span className="flex-1 text-sm text-soft truncate">{displayTitle(t, 'operation', op.title)}</span>}
+              <span className="text-xs text-muted min-w-0 max-w-[50%] truncate">{dateStr}</span>
             </>
           )}
         </DashboardItem>
@@ -421,7 +416,7 @@ export default function OperationsView() {
       // Cover image — read mode hero (deliberately after the title, unlike in the wiki)
       belowTitle={!isEditing && operation.cover_image && (
         <div className="flex-shrink-0 px-8 pt-5">
-          <img src={operation.cover_image} alt="" className="w-full max-h-48 object-cover rounded-lg border border-stone-700/40" />
+          <img src={operation.cover_image} alt="" className="w-full max-h-48 object-cover rounded-lg border border-edge" />
         </div>
       )}
       tags={{ value: tags, onChange: (newTags) => { setTags(newTags); triggerAutoSave(); } }}

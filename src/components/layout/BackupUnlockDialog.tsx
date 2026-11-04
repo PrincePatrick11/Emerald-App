@@ -44,7 +44,16 @@ function Body({ error, busy }: { error: string | null; busy: boolean }) {
       onClose={cancel}
       dismissible={!busy}
       widthClassName="w-[440px]"
-      bodyClassName="px-5 py-4 space-y-4"
+      bodyClassName="modal-body space-y-4"
+      footer={
+        <>
+          <Button tone="neutral" disabled={busy} onClick={cancel}>{t('common.cancel')}</Button>
+          <Button tone="jade" disabled={!value.trim() || busy} onClick={submit}>
+            {busy ? <Loader2 size={14} className="animate-spin" /> : <KeyRound size={14} />}
+            {t('backupKey.open')}
+          </Button>
+        </>
+      }
     >
       <p className="text-sm text-secondary">{t('backupKey.hint')}</p>
       <KeyField label={useRecovery ? t('vaultKey.recoveryKey') : t('backupKey.password')}>
@@ -81,13 +90,6 @@ function Body({ error, busy }: { error: string | null; busy: boolean }) {
         </Button>
       </div>
       {shownError && <p className="text-xs text-danger" role="alert">{shownError}</p>}
-      <div className="flex justify-end gap-2 pt-1">
-        <Button tone="neutral" disabled={busy} onClick={cancel}>{t('common.cancel')}</Button>
-        <Button tone="jade" disabled={!value.trim() || busy} onClick={submit}>
-          {busy ? <Loader2 size={14} className="animate-spin" /> : <KeyRound size={14} />}
-          {t('backupKey.open')}
-        </Button>
-      </div>
     </Modal>
   );
 }

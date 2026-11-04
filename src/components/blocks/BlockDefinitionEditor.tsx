@@ -262,7 +262,7 @@ export default function BlockDefinitionEditor({ definition, usage, onClose, onDe
               {archived.map((element) => {
                 const Icon = ELEMENT_KIND_ICONS[element.kind];
                 return (
-                  <div key={element.id} className="flex items-center gap-2 text-xs text-stone-500">
+                  <div key={element.id} className="flex items-center gap-2 text-xs text-subtle">
                     <Icon size={12} className="flex-shrink-0" />
                     <span className="flex-1 truncate">{elementLabel(t, element)}</span>
                     <button
@@ -473,20 +473,39 @@ export function DeleteDefinitionModal({ definition, usage, onClose, onDeleted }:
 
   if (step === 'done') {
     return (
-      <Modal title={title} onClose={onDeleted} bodyClassName="p-4 space-y-3">
-        <p className="text-xs text-stone-400">{notice}</p>
-        <div className="flex justify-end">
-          <Button tone="neutral" onClick={onDeleted}>{t('common.ok')}</Button>
-        </div>
+      <Modal
+        title={title}
+        onClose={onDeleted}
+        bodyClassName="modal-body"
+        footer={<Button tone="neutral" onClick={onDeleted}>{t('common.ok')}</Button>}
+      >
+        <p className="text-sm text-muted">{notice}</p>
       </Modal>
     );
   }
 
   return (
-    <Modal title={title} onClose={onClose} dismissible={!busy} bodyClassName="p-4 space-y-3">
+    <Modal
+      title={title}
+      onClose={onClose}
+      dismissible={!busy}
+      bodyClassName="modal-body space-y-3"
+      footer={
+        <>
+          <Button tone="neutral" disabled={busy} onClick={onClose}>{t('common.cancel')}</Button>
+          <Button tone="danger" disabled={busy} onClick={() => void run()}>
+            {!alsoRemove
+              ? t('common.delete')
+              : step === 'choose'
+                ? t('blocks.library.continue')
+                : copies('removeAndDelete')}
+          </Button>
+        </>
+      }
+    >
       {step === 'choose' ? (
         <>
-          <p className="text-xs text-stone-400">{t('blocks.library.deleteKeeps')}</p>
+          <p className="text-sm text-muted">{t('blocks.library.deleteKeeps')}</p>
           {copyCount > 0 && (
             <BlockCheckbox
               checked={alsoRemove}
@@ -496,18 +515,8 @@ export function DeleteDefinitionModal({ definition, usage, onClose, onDeleted }:
           )}
         </>
       ) : (
-        <p className="text-xs text-[var(--danger-text)]">{copies('deleteFromEntriesWarning')}</p>
+        <p className="text-sm text-danger">{copies('deleteFromEntriesWarning')}</p>
       )}
-      <div className="flex justify-end gap-2 pt-1">
-        <Button tone="neutral" disabled={busy} onClick={onClose}>{t('common.cancel')}</Button>
-        <Button tone="danger" disabled={busy} onClick={() => void run()}>
-          {!alsoRemove
-            ? t('common.delete')
-            : step === 'choose'
-              ? t('blocks.library.continue')
-              : copies('removeAndDelete')}
-        </Button>
-      </div>
     </Modal>
   );
 }

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 import Button from './Button';
@@ -13,6 +13,8 @@ interface ModalProps {
   maxHeightClassName?: string;
   bodyClassName?: string;
   className?: string;
+  /** The action row, pinned below the body whatever its height. */
+  footer?: React.ReactNode;
   /** `false` removes every way out — no X, no Escape, no backdrop click. For a
    *  modal the app cannot continue past, such as the vault picker without a vault. */
   dismissible?: boolean;
@@ -31,6 +33,64 @@ export function hasOpenModal(): boolean {
   return openModals.length > 0;
 }
 
+/**
+ * Moves a modal by its header, with the window as the limit. Uses `left`/`top`
+ * rather than a transform: a transform would become the containing block of any
+ * `position: fixed` inside the modal. Written straight to the element: the
+ * clamp measures the card, and through state a second move before the commit
+ * would measure a position the offset has already left behind.
+ */
+function useModalDrag() {
+  const cardRef = useRef<HTMLDivElement>(null);
+  const offsetRef = useRef({ x: 0, y: 0 });
+
+  const moveTo = useCallback((x: number, y: number) => {
+    const card = cardRef.current;
+    const bounds = card?.parentElement?.getBoundingClientRect();
+    if (!card || !bounds) return;
+    const rect = card.getBoundingClientRect();
+    const left = rect.left - offsetRef.current.x;
+    const top = rect.top - offsetRef.current.y;
+    const next = {
+      x: Math.max(bounds.left - left, Math.min(bounds.right - left - rect.width, x)),
+      y: Math.max(bounds.top - top, Math.min(bounds.bottom - top - rect.height, y)),
+    };
+    offsetRef.current = next;
+    card.style.left = `${next.x}px`;
+    card.style.top = `${next.y}px`;
+  }, []);
+
+  // A smaller window, a taller card or a backdrop that clears the title bar
+  // must not leave a moved modal outside.
+  useEffect(() => {
+    const card = cardRef.current;
+    const clamp = () => moveTo(offsetRef.current.x, offsetRef.current.y);
+    const observer = new ResizeObserver(clamp);
+    if (card) observer.observe(card);
+    if (card?.parentElement) observer.observe(card.parentElement);
+    return () => observer.disconnect();
+  }, [moveTo]);
+
+  const onPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (e.button !== 0 || (e.target as HTMLElement).closest('button')) return;
+    const header = e.currentTarget;
+    const startX = e.clientX - offsetRef.current.x;
+    const startY = e.clientY - offsetRef.current.y;
+    header.setPointerCapture(e.pointerId);
+    const onMove = (move: PointerEvent) => moveTo(move.clientX - startX, move.clientY - startY);
+    const onEnd = () => {
+      header.removeEventListener('pointermove', onMove);
+      header.removeEventListener('pointerup', onEnd);
+      header.removeEventListener('pointercancel', onEnd);
+    };
+    header.addEventListener('pointermove', onMove);
+    header.addEventListener('pointerup', onEnd);
+    header.addEventListener('pointercancel', onEnd);
+  };
+
+  return { cardRef, onPointerDown };
+}
+
 export default function Modal({
   title,
   onClose,
@@ -39,9 +99,11 @@ export default function Modal({
   maxHeightClassName,
   bodyClassName,
   className,
+  footer,
   dismissible = true,
 }: ModalProps) {
   const [self] = useState(() => Symbol('modal'));
+  const { cardRef, onPointerDown } = useModalDrag();
   useEffect(() => {
     openModals.push(self);
     return () => {
@@ -68,29 +130,28 @@ export default function Modal({
 
   return createPortal(
     <div
-      className={`fixed inset-x-0 bottom-0 ${clearsTitleBar ? 'top-10' : 'top-0'} z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4`}
+      className={`fixed inset-x-0 bottom-0 ${clearsTitleBar ? 'top-10' : 'top-0'} z-50 flex items-center justify-center modal-backdrop backdrop-blur-sm p-4`}
       onMouseDown={(e) => {
         // A thumb button would otherwise close the modal and navigate back on release.
         if (dismissible && !isHistoryButton(e) && e.target === e.currentTarget) onClose();
       }}
     >
       <div
-        className={`modal-card ${widthClassName} ${maxHeightClassName ?? ''} flex flex-col${className ? ` ${className}` : ''}`}
+        ref={cardRef}
+        className={`modal-card relative ${widthClassName} ${maxHeightClassName ?? ''} flex flex-col${className ? ` ${className}` : ''}`}
       >
-        <div
-          className="flex items-center justify-between px-4 py-3 border-b shrink-0"
-          style={{ borderColor: 'var(--border-soft)' }}
-        >
-          <h2 className="text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>
-            {title}
-          </h2>
+        <div className="modal-header" onPointerDown={onPointerDown}>
+          <h2 className="min-w-0 truncate text-sm font-semibold text-primary">{title}</h2>
           {dismissible && (
-            <Button onClick={onClose} variant="ghost">
+            <Button onClick={onClose} variant="ghost" className="-mr-1.5 shrink-0">
               <X size={16} />
             </Button>
           )}
         </div>
-        <div className={bodyClassName ?? 'flex-1 overflow-y-auto'}>{children}</div>
+        <div className="modal-sheet">
+          <div className={bodyClassName ?? 'flex-1 overflow-y-auto'}>{children}</div>
+        </div>
+        {footer && <div className="modal-footer">{footer}</div>}
       </div>
     </div>,
     document.body,

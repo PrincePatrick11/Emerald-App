@@ -33,9 +33,3 @@ export const isTauri = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in
  */
 export const usesCustomWindowControls = !isMacOS && isTauri;
 
-/**
- * The native menu is only installed on macOS (see `install_native_menu` in
- * `src-tauri/src/lib.rs`); Windows and Linux render the same items in the
- * title bar instead.
- */
-export const usesHtmlMenuBar = !isMacOS;

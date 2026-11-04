@@ -108,7 +108,7 @@ interface UIState {
   tagsSort: TagsSort;
   altarWindowFullscreen: boolean;
   /** Altar dashboard: preview of the canvas on the cards and in the list.
-   *  Off means a flame icon instead of a preview. */
+   *  Off means a altar icon instead of a preview. */
   altarShowPreview: boolean;
   /** Sorting and grouping of the library. */
   altarLibraryPrefs: AltarLibraryPrefs;

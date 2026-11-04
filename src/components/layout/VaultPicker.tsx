@@ -160,7 +160,10 @@ export default function VaultPicker() {
       // The open edits were settled when the picker opened (`openVaultPicker`).
       await switchVault(id, { editsResolved: true });
     } catch (e) {
+      // Both covers: `ensureVaultReady` puts the loading screen back after a
+      // question (`resumeSplash`), and a switch that fails early never ends it.
       hideLoadingScreen();
+      hideSplash();
       setSwitchingId(null);
       // Cancelling is not an error: the user did not want to enter the password.
       if (keyErrorOf(e) === VAULT_KEY_CANCELLED) return;

@@ -14,6 +14,18 @@
   // that turns out to be statements fails to parse, and that is no error of
   // the app's.
   var probing = false;
+  // The control a Space went down on: it is pressed when the key comes up.
+  var spaceDownOn = null;
+
+  function pressedByEnter(el) {
+    if (el.tagName === 'INPUT') return /^(button|submit|reset|image)$/.test(el.type);
+    return /^(BUTTON|SUMMARY)$/.test(el.tagName) || (el.tagName === 'A' && el.hasAttribute('href'));
+  }
+
+  function pressedBySpace(el) {
+    if (el.tagName === 'INPUT') return /^(button|submit|reset|image|checkbox|radio)$/.test(el.type);
+    return /^(BUTTON|SUMMARY)$/.test(el.tagName);
+  }
 
   function invoke(command, args) {
     try {
@@ -357,8 +369,12 @@
         key: p.key, code: p.code, bubbles: true, cancelable: true, composed: true, view: window,
         altKey: !!(modifiers & 1), ctrlKey: !!(modifiers & 2), metaKey: !!(modifiers & 4), shiftKey: !!(modifiers & 8),
       };
+      var plain = !(modifiers & 7);
       if (p.type === 'keyUp') {
-        target.dispatchEvent(new KeyboardEvent('keyup', init));
+        var armed = spaceDownOn === target;
+        spaceDownOn = null;
+        var kept = target.dispatchEvent(new KeyboardEvent('keyup', init));
+        if (kept && armed && p.key === ' ') target.click();
         return {};
       }
       var event = new KeyboardEvent('keydown', init);
@@ -368,8 +384,16 @@
       Object.defineProperty(event, 'which', { get: function () { return code; } });
       if (!target.dispatchEvent(event)) return {};
 
-      // A dispatched key event has no default action, so the editing a real
-      // key press would do is done here.
+      // A dispatched key event has no default action, so what a real key
+      // press would do is done here: pressing a control, or editing.
+      if (plain && p.key === 'Enter' && pressedByEnter(target)) {
+        target.click();
+        return {};
+      }
+      if (plain && p.key === ' ' && pressedBySpace(target)) {
+        spaceDownOn = target;
+        return {};
+      }
       if (p.commands && p.commands.length) {
         p.commands.forEach(function (command) { document.execCommand(command); });
         return {};

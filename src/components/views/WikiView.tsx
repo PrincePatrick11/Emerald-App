@@ -32,6 +32,7 @@ import { useCollapsedSet } from '../../hooks/useCollapsedSet';
 import BlockStack from '../blocks/BlockStack';
 import EntryDetailFrame from '../ui/EntryDetailFrame';
 import { useSessionState } from '../../store/sessionStore';
+import { createItem } from '../../lib/createItem';
 
 export default function WikiView() {
   const { t } = useTranslation();
@@ -41,8 +42,8 @@ export default function WikiView() {
   );
   const openInNewTabAction = useOpenInNewTabAction();
   const saveAsTemplateAction = useSaveAsTemplateAction();
-  const { articles, createEntry, duplicateEntry, updateEntry, deleteEntry, restoreEntry, getEntry } = useEntryStore(
-    useShallow((s) => ({ articles: s.entries.wiki, createEntry: s.createEntry, duplicateEntry: s.duplicateEntry, updateEntry: s.updateEntry, deleteEntry: s.deleteEntry, restoreEntry: s.restoreEntry, getEntry: s.getEntry }))
+  const { articles, duplicateEntry, updateEntry, deleteEntry, restoreEntry, getEntry } = useEntryStore(
+    useShallow((s) => ({ articles: s.entries.wiki, duplicateEntry: s.duplicateEntry, updateEntry: s.updateEntry, deleteEntry: s.deleteEntry, restoreEntry: s.restoreEntry, getEntry: s.getEntry }))
   );
   const categories = useCategoryStore((s) => s.categories);
   const pushUndo = useUndoStore((s) => s.push);
@@ -174,10 +175,7 @@ export default function WikiView() {
 
   // Without an argument the article is created without a category; the "+"
   // button on the category header passes its category — like handleCreateTask(cat.id).
-  const handleNew = async (categoryId?: string) => {
-    const a = await createEntry('wiki', { categoryId });
-    setActiveView({ type: 'wiki', id: a.id, mode: 'edit', isNew: true });
-  };
+  const handleNew = (categoryId?: string) => createItem('wiki', { categoryId });
 
   const openCtxMenu = (e: React.MouseEvent, id: string) => { e.preventDefault(); setCtxMenu({ id, x: e.clientX, y: e.clientY }); };
 
@@ -252,7 +250,7 @@ export default function WikiView() {
     const renderArticle = (a: typeof articles[0]) => {
       const cat = lookupCategory(catById, a.category_id);
       const icon = entryIcon('wiki', a, cat);
-      const iconEl = isImageIcon(icon) ? <img src={icon} alt="" className="w-5 h-5 object-cover rounded inline" /> : icon;
+      const iconEl = isImageIcon(icon) ? <img src={icon} alt="" className="w-5 h-5 object-cover rounded-md inline" /> : icon;
       // No fallback to the raw category_id: for a deleted category its id
       // would otherwise appear here as the label (as in OperationsView it is then omitted).
       const catLabel = categoryLabel(t, cat);
@@ -272,20 +270,20 @@ export default function WikiView() {
           {isCardView(view) ? (
             <>
               <div className="flex items-center gap-2 mb-2">
-                {isImageIcon(icon) ? <img src={icon} alt="" className="w-6 h-6 object-cover rounded" /> : <span className="text-xl">{icon}</span>}
+                {isImageIcon(icon) ? <img src={icon} alt="" className="w-6 h-6 object-cover rounded-md" /> : <span className="text-xl">{icon}</span>}
               </div>
               {renaming
-                ? renameInput('text-sm font-medium text-stone-200 w-full bg-transparent outline-none selectable mb-1')
-                : <div className="text-sm font-medium text-stone-200 truncate mb-1">{displayTitle(t, 'wiki', a.title)}</div>}
-              <div className="text-xs text-parchment-500/70">{dateStr}</div>
+                ? renameInput('text-sm font-medium text-secondary w-full bg-transparent outline-none selectable mb-1')
+                : <div className="text-sm font-medium text-secondary truncate mb-1">{displayTitle(t, 'wiki', a.title)}</div>}
+              <div className="text-xs text-muted">{dateStr}</div>
             </>
           ) : (
             <>
               <span className="text-base flex-shrink-0">{iconEl}</span>
               {renaming
-                ? renameInput('flex-1 bg-transparent text-sm text-stone-300 outline-none selectable')
-                : <span className="flex-1 text-sm text-stone-300 truncate">{displayTitle(t, 'wiki', a.title)}</span>}
-              <span className="text-xs text-parchment-500/70 flex-shrink-0">{dateStr}</span>
+                ? renameInput('flex-1 bg-transparent text-sm text-soft outline-none selectable')
+                : <span className="flex-1 text-sm text-soft truncate">{displayTitle(t, 'wiki', a.title)}</span>}
+              <span className="text-xs text-muted flex-shrink-0">{dateStr}</span>
             </>
           )}
         </DashboardItem>
@@ -412,7 +410,7 @@ export default function WikiView() {
           <img
             src={coverImage}
             alt=""
-            className="w-full max-h-48 object-cover rounded-lg border border-stone-700/40"
+            className="w-full max-h-48 object-cover rounded-lg border border-edge"
           />
         </div>
       )}

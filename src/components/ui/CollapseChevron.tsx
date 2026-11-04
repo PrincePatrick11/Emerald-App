@@ -7,7 +7,7 @@ import { ChevronDown, ChevronRight } from 'lucide-react';
  */
 export default function CollapseChevron({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => void }) {
   return (
-    <button onClick={onToggle} className="text-stone-500 hover:text-stone-300 flex-shrink-0">
+    <button onClick={onToggle} className="text-subtle hover:text-raise flex-shrink-0">
       {collapsed ? <ChevronRight size={14} /> : <ChevronDown size={14} />}
     </button>
   );

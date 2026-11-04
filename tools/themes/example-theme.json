@@ -1,0 +1,15 @@
+{
+  "emeraldTheme": 1,
+  "name": "Midnight",
+  "base": "dark",
+  "colors": {
+    "frame": "#0d1017",
+    "sheet": "#141923",
+    "panel": "#1c2331",
+    "text": "#eef1f7",
+    "textMuted": "#a3adc2",
+    "border": "#3a4458",
+    "accent": "#7c9cff",
+    "onAccent": "#0d1017"
+  }
+}

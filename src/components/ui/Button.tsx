@@ -11,19 +11,17 @@ const VARIANT_CLASS: Record<ButtonVariant, string> = {
   danger: 'btn-danger',
 };
 
-/* Tone classes follow the Altar fullscreen-button look: soft tinted fill, matching
-   border, brighter on hover. Parchment overrides for these utilities live in index.css. */
+/* Soft tinted fill, matching border, brighter on hover. Colours are the
+   `--tone-*` tokens of the theme files. */
 const TONE_CLASSES: Record<ButtonTone, string> = {
-  jade: 'border-jade-700/60 bg-jade-900/30 text-jade-300 hover:bg-jade-900/50 hover:border-jade-500/70',
-  amber: 'border-amber-700/60 bg-amber-900/30 text-amber-300 hover:bg-amber-900/50 hover:border-amber-500/70',
-  danger: 'border-red-700/60 bg-red-950/30 text-red-200 hover:bg-red-950/50 hover:border-red-500',
-  // border-stone-600/70 instead of -700/60: next to a jade button the
-  // neutral border looked almost invisible (both themes have bridges for it).
-  neutral: 'border-stone-600/70 bg-stone-900/45 text-stone-400 hover:bg-stone-800/60 hover:text-stone-200',
+  jade: 'btn-tone-jade',
+  amber: 'btn-tone-amber',
+  danger: 'btn-tone-danger',
+  neutral: 'btn-tone-neutral',
 };
 
 const ACTIVE_TONE_CLASSES: Partial<Record<ButtonTone, string>> = {
-  jade: 'border-jade-600/60 bg-jade-900/40 text-jade-200 hover:bg-jade-900/60',
+  jade: 'btn-tone-active',
 };
 
 interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
@@ -60,7 +58,7 @@ export default function Button({
 }: ButtonProps) {
   const toneClass = tone && ((active && ACTIVE_TONE_CLASSES[tone]) || TONE_CLASSES[tone]);
   const baseClass = toneClass
-    ? `sidebar-action-btn flex ${small ? 'h-6' : 'h-[30px]'} items-center justify-center gap-1.5 rounded-md border text-[11px] font-semibold transition-colors duration-150 disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none ${
+    ? `sidebar-action-btn flex ${small ? 'h-6' : 'h-[30px]'} items-center justify-center gap-1.5 rounded-md text-[11px] font-semibold transition-colors duration-150 disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none ${
         compact ? `${small ? 'w-6' : 'w-[30px]'} flex-shrink-0` : `min-w-0 px-2 ${fill ? 'flex-1' : ''}`
       } ${toneClass}`
     : VARIANT_CLASS[variant];

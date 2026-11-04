@@ -477,7 +477,7 @@ export function AltarCanvas({
       )}
 
       {editable && sidebarDragItem && (
-        <div className="absolute inset-2 border border-dashed border-stone-600/40 rounded-lg pointer-events-none z-10" />
+        <div className="absolute inset-2 border border-dashed border-edge-strong rounded-lg pointer-events-none z-10" />
       )}
 
       {sortedPlacements.map((p) => (
@@ -503,7 +503,7 @@ export function AltarCanvas({
           style={{ left: ghostPos.x, top: ghostPos.y, transform: 'translate(-50%, -50%)' }}
         >
           <AltarItemVisual item={sidebarDragItem} size={32} />
-          <span className="text-xs text-stone-400 whitespace-nowrap">{sidebarDragItem.name}</span>
+          <span className="text-xs text-muted whitespace-nowrap">{sidebarDragItem.name}</span>
         </div>,
         document.body,
       )}
@@ -635,9 +635,9 @@ const PlacedItem = memo(function PlacedItem({ placement, editable, selected, rot
       <div style={{ opacity: placement.opacity ?? 1 }}>
         <AltarItemVisual item={placement} size={Math.max(displayWidth, displayHeight)} candleAnimate={isCandleEmoji(placement.emoji)} />
       </div>
-      {(selected || (editable && hovered)) && <span className="absolute inset-0 rounded border border-jade-500/50 pointer-events-none" />}
+      {(selected || (editable && hovered)) && <span className="absolute inset-0 rounded-md border border-accent-edge pointer-events-none" />}
       {editable && isRotating && (
-        <span style={{ top: tooltipTopOffset, fontSize: Math.round(14 / safeScale), padding: `${Math.round(4 / safeScale)}px ${Math.round(10 / safeScale)}px` }} className="absolute left-1/2 -translate-x-1/2 rounded bg-stone-950 border border-jade-500/60 font-semibold text-jade-200 shadow-lg pointer-events-none whitespace-nowrap">
+        <span style={{ top: tooltipTopOffset, fontSize: Math.round(14 / safeScale), padding: `${Math.round(4 / safeScale)}px ${Math.round(10 / safeScale)}px` }} className="absolute left-1/2 -translate-x-1/2 rounded-md bg-overlay border border-accent-edge font-semibold text-on-accent shadow-menu pointer-events-none whitespace-nowrap">
           {Math.round((placement.rotation ?? 0) * 10) / 10}°
         </span>
       )}
@@ -645,7 +645,7 @@ const PlacedItem = memo(function PlacedItem({ placement, editable, selected, rot
         <button
           onMouseDown={startRotate}
           style={{ width: btnSize, height: btnSize, top: rotateTopOffset, left: '50%', transform: 'translateX(-50%)' }}
-          className="absolute bg-stone-800 border border-stone-600 rounded-full text-stone-300 hover:text-jade-300 hover:border-jade-600 transition-colors z-10 flex items-center justify-center"
+          className="absolute bg-well-solid border border-edge-strong rounded-full text-soft hover:text-accent-raise hover:border-accent-edge transition-colors z-10 flex items-center justify-center"
           title={t('altar.rotate')}
         >
           <RotateCw size={iconSize} />
@@ -655,7 +655,7 @@ const PlacedItem = memo(function PlacedItem({ placement, editable, selected, rot
         <button
           onMouseDown={startResize}
           style={{ width: btnSize, height: btnSize, bottom: resizeEdgeOffset, right: resizeEdgeOffset }}
-          className="absolute bg-stone-800 border border-stone-600 rounded-full text-stone-300 hover:text-jade-300 hover:border-jade-600 transition-colors z-10 flex items-center justify-center"
+          className="absolute bg-well-solid border border-edge-strong rounded-full text-soft hover:text-accent-raise hover:border-accent-edge transition-colors z-10 flex items-center justify-center"
           title={t('altar.scale')}
         >
           <MoveDiagonal2 size={iconSize} />

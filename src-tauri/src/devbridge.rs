@@ -449,14 +449,15 @@ async fn page_call(app: &AppHandle, function: &str, params: &Value) -> Result<Va
 /// The source is tried as an expression first, so its value can be returned.
 /// A script that does not parse fails without a trace, which is why each
 /// attempt is followed by a second script that reports when the first never
-/// started. Statements run on the second attempt and have no value.
+/// started. Statements run on the second attempt and have no value, which the
+/// answer marks, since it would otherwise read like an expression's `undefined`.
 async fn evaluate(app: &AppHandle, source: &str, by_value: bool) -> Result<Value, String> {
     let window = main_window(app)?;
     let bridge = app.state::<Bridge>();
     let source = source.trim().trim_end_matches(';');
     let options = json!({ "returnByValue": by_value });
 
-    for body in [format!("return (\n{source}\n);"), format!("{source}\n")] {
+    for (attempt, body) in [format!("return (\n{source}\n);"), format!("{source}\n")].into_iter().enumerate() {
         let id = bridge.next_id.fetch_add(1, Ordering::Relaxed);
         let (reply_tx, reply) = oneshot::channel();
         bridge.pending.lock().unwrap().insert(id, reply_tx);
@@ -483,9 +484,14 @@ async fn evaluate(app: &AppHandle, source: &str, by_value: bool) -> Result<Value
                 return Err("the page did not answer — it may be loading".to_string());
             }
         };
-        let outcome: Value = serde_json::from_str(&payload).map_err(|e| format!("unreadable answer from the page: {e}"))?;
+        let mut outcome: Value = serde_json::from_str(&payload).map_err(|e| format!("unreadable answer from the page: {e}"))?;
         match outcome.get("bridgeError").and_then(Value::as_str) {
-            None => return Ok(outcome),
+            None => {
+                if attempt == 1 && outcome.pointer("/result/type").and_then(Value::as_str) == Some("undefined") {
+                    outcome["result"]["statements"] = json!(true);
+                }
+                return Ok(outcome);
+            }
             Some("parse") => continue,
             Some(_) => return Err("the page has not loaded the dev bridge yet".to_string()),
         }

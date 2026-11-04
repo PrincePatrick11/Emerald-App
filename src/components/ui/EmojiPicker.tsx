@@ -4,6 +4,7 @@ import { useEmojiSearchData } from '../../hooks/useEmojiSearchData';
 import { useSettingsStore } from '../../store/settingsStore';
 import { useOutsideClick } from '../../hooks/useOutsideClick';
 import { createPortal } from 'react-dom';
+import SearchField from './SearchField';
 import { useTranslation } from 'react-i18next';
 
 // Every picker prefers this many emoji per row, shrinking down to MIN_COLUMNS when the
@@ -118,7 +119,7 @@ export default function EmojiPicker({
   const cell = size === 'lg' ? '2.25rem' : '1.75rem';
   const gap = '0.25rem';
   // Sized on the grid itself (not the padded/bordered popover box) so the column math is exact —
-  // computing this against the outer box's border-box width previously rounded 5 columns down to 4.
+  // computing this against the outer box's border-box width previously rounded-md 5 columns down to 4.
   const colsWidth = (n: number) => `calc(${cell} * ${n} + ${gap} * ${n - 1})`;
   // Space reserved on the right for the macOS overlay scrollbar. The scroll container (and the
   // search input) remain at colsWidth(COLUMNS); the grid is narrowed by this amount so the
@@ -156,15 +157,15 @@ export default function EmojiPicker({
       {open && createPortal(
         <div
           ref={popoverRef}
-          className="emoji-picker-popover fixed z-[9999] border rounded-lg shadow-xl p-2 flex flex-col gap-1.5"
+          className="emoji-picker-popover fixed z-[9999] border rounded-lg shadow-menu p-2 flex flex-col gap-2"
           style={{ ...placement, visibility: placement ? 'visible' : 'hidden' }}
         >
-          <input
+          <SearchField
             autoFocus
             value={query}
-            onChange={(e) => setQuery(e.target.value)}
+            onValueChange={setQuery}
             placeholder={t('common.searchEmoji')}
-            className="emoji-picker-search box-border rounded px-2 py-1 text-xs outline-none"
+            aria-label={t('common.searchEmoji')}
             style={sizeStyle}
           />
           {/* overflow-x-hidden prevents a horizontal scrollbar on macOS when
@@ -184,7 +185,7 @@ export default function EmojiPicker({
                   <button
                     key={emoji}
                     onClick={() => { onChange(emoji); setOpen(false); }}
-                    className={`emoji-picker-item ${emojiSizeClass} aspect-square flex items-center justify-center rounded transition-colors ${value === emoji ? 'emoji-picker-item-active' : 'emoji-picker-item-idle'}`}
+                    className={`emoji-picker-item ${emojiSizeClass} aspect-square flex items-center justify-center rounded-md transition-colors ${value === emoji ? 'emoji-picker-item-active' : 'emoji-picker-item-idle'}`}
                   >
                     {emoji}
                   </button>

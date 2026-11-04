@@ -7,7 +7,7 @@ import { activeVault, closeToSetup, hasActiveVault, useVaultStore } from '../../
 import { useVaultPickerStore } from '../../store/vaultPickerStore';
 import { useSettingsStore } from '../../store/settingsStore';
 import { invoke } from '@tauri-apps/api/core';
-import { computeMenuEnabledState, runMenuAction, SELF_CONTAINED_MENU_ACTIONS } from '../../lib/menuActions';
+import { runMenuAction, NATIVE_MENU_EVENTS } from '../../lib/menuActions';
 import { hideSplash } from '../../lib/splash';
 import TitleBar from './titlebar/TitleBar';
 import LeftSidebarRailBase, { RAIL_WIDTH } from './LeftSidebarRail';
@@ -96,7 +96,6 @@ export default function AppShell() {
   const leftListOpen = useUIStore((s) => s.leftListOpen);
   const railOpen = useUIStore((s) => s.railOpen);
   const viewLocked = useUIStore((s) => s.viewLocked);
-  const activeView = useUIStore((s) => s.activeView);
   const setAltarWindowFullscreen = useUIStore((s) => s.setAltarWindowFullscreen);
   const isAltarWindowFullscreen = useUIStore(isAltarFullscreen);
 
@@ -220,42 +219,16 @@ export default function AppShell() {
     invoke('update_menu_labels', {
       edit:            t('menu.edit'),
       view:            t('menu.view'),
-      export:          t('menu.export'),
-      import:          t('menu.import'),
       resetView:       t('menu.resetView'),
       lockView:        t('menu.lockView'),
       showSplash:      t('menu.showSplash'),
       rail:            t('menu.rail'),
       entryList:       t('menu.entryList'),
       properties:      t('menu.properties'),
-      exportPdf:       t('menu.exportPdf'),
-      exportMarkdown:  t('menu.exportMarkdown'),
-      exportEmerald:   t('menu.exportEmerald'),
-      exportAltarImage: t('menu.exportAltarImage'),
-      exportAltarJpeg: t('menu.exportAltarJpeg'),
-      exportAltarPng:  t('menu.exportAltarPng'),
-      exportAltarWebp: t('menu.exportAltarWebp'),
-      importMarkdown:  t('menu.importMarkdown'),
-      importEmerald:   t('menu.importEmerald'),
       switchVault:     t('menu.switchVault'),
       quit:            t('menu.quit'),
     }).catch(() => {/* desktop-only, ignore in browser preview */});
   }, [i18n.language, t]);
-
-  // Keeps the native macOS menu's enabled states in sync with the current
-  // view. The rules live in `computeMenuEnabledState` so the HTML menu bar
-  // greys out exactly the same items. No-ops on Windows/Linux, where no
-  // native menu is installed and the Rust commands bail out early.
-  useEffect(() => {
-    const enabled = computeMenuEnabledState(activeView);
-    invoke('set_export_menu_enabled', {
-      entryEnabled: enabled.entryEnabled,
-      pdfEnabled: enabled.pdfEnabled,
-      emeraldEnabled: enabled.emeraldEnabled,
-    }).catch(() => {/* desktop-only, ignore in browser preview */});
-    invoke('set_altar_export_menu_enabled', { enabled: enabled.altarImageEnabled })
-      .catch(() => {/* desktop-only, ignore in browser preview */});
-  }, [activeView.type, activeView.id, activeView.mode]);
 
   // Same idea for the View menu's check items — this state also changes
   // without the menu ever being opened (`setActiveView` opens the right
@@ -281,10 +254,10 @@ export default function AppShell() {
     return () => { unlisten.then(fn => fn()); };
   }, [setAltarWindowFullscreen]);
 
-  // The native macOS menu emits these; the HTML menu bar on Windows/Linux
-  // calls `runMenuAction` directly. Both go through the same implementation.
+  // The native macOS menu emits these; the title bar's menus call
+  // `runMenuAction` directly. Both go through the same implementation.
   useEffect(() => {
-    const unlisteners = SELF_CONTAINED_MENU_ACTIONS.map((id) =>
+    const unlisteners = NATIVE_MENU_EVENTS.map((id) =>
       listen(id, () => { void runMenuAction(id); })
     );
     return () => { unlisteners.forEach((p) => p.then((fn) => fn())); };
@@ -366,7 +339,7 @@ export default function AppShell() {
   const leftSidebarWidth = (railOpen ? RAIL_WIDTH : 0) + (leftListOpen ? entryListWidth : 0);
   // With nothing to its left, the sheet keeps its distance from the window
   // edge there too — it always floats, instead of sticking to the edge with a
-  // rounded corner.
+  // rounded-md corner.
   const leftFrameEmpty = isAltarWindowFullscreen || leftSidebarWidth === 0;
   // Tied to the deferred unmount instead of `rightSidebarOpen`: when
   // collapsing, the main area only gets its right edge once the bar is gone,
@@ -422,12 +395,6 @@ export default function AppShell() {
                 {leftListMounted && <LeftSidebarEntryList />}
               </div>
             </div>
-            {leftListOpen && !viewLocked && (
-              <div
-                onPointerDown={onLeftPointerDown}
-                className="absolute top-0 right-0 w-1 h-full cursor-col-resize z-10 hover:bg-jade-500/20 transition-colors"
-              />
-            )}
           </aside>
         )}
 
@@ -444,6 +411,25 @@ export default function AppShell() {
           </div>
         </main>
 
+        {/* Resize handles — here in the frame and not in their sidebars, which clip:
+            they reach over onto the sheet. A closed sidebar has none, or it would
+            sit as a strip at the edge of the main area. With "Lock view" neither
+            exists. */}
+        {leftListOpen && !isAltarWindowFullscreen && !viewLocked && (
+          <div
+            onPointerDown={onLeftPointerDown}
+            className="sidebar-resize-handle"
+            style={{ left: leftSidebarWidth - 3 }}
+          />
+        )}
+        {rightSidebarOpen && !isAltarWindowFullscreen && !viewLocked && (
+          <div
+            onPointerDown={onRightPointerDown}
+            className="sidebar-resize-handle sidebar-resize-handle--right"
+            style={{ right: `calc(var(--sheet-inset) + ${rightWidth}px - 8px)` }}
+          />
+        )}
+
         {/* Right Sidebar — content anchored to the right edge, so it slides in
             from there when opening instead of unfolding from the left. */}
         {!isAltarWindowFullscreen && (
@@ -453,15 +439,6 @@ export default function AppShell() {
             }`}
             style={{ width: rightSidebarOpen ? rightWidth : 0 }}
           >
-            {/* Resize handle — with the bar closed it would otherwise sit as a
-                strip at the edge of the main area. With "Lock view" it does
-                not exist on either side. */}
-            {rightSidebarOpen && !viewLocked && (
-              <div
-                onPointerDown={onRightPointerDown}
-                className="absolute top-0 left-0 w-1 h-full cursor-col-resize z-10 hover:bg-jade-500/20 transition-colors"
-              />
-            )}
             {/* The sheet, right half. Surface, border and radius sit on the
                 content, not on the <aside>: there the borders would remain as
                 a 2px line at width 0. This way they move out with the content

@@ -34,13 +34,14 @@ interface SettingsState {
  * first and then switch.
  */
 async function applyAppearance(appearance: AppearanceSettings): Promise<void> {
-  applyTheme(appearance.theme);
+  applyTheme(appearance.theme, appearance.customThemes);
   applyUIFont(appearance.uiFont);
   applyEditorFont(appearance.editorFont);
   applyUIScale(appearance.uiScale);
   applyEditorFontSize(appearance.editorFontSize);
   try {
     localStorage.setItem(APPEARANCE_MIRROR_KEYS.theme, appearance.theme);
+    localStorage.setItem(APPEARANCE_MIRROR_KEYS.customThemes, JSON.stringify(appearance.customThemes));
     localStorage.setItem(APPEARANCE_MIRROR_KEYS.uiFont, appearance.uiFont);
     localStorage.setItem(APPEARANCE_MIRROR_KEYS.editorFont, appearance.editorFont);
     localStorage.setItem(APPEARANCE_MIRROR_KEYS.uiScale, String(appearance.uiScale));

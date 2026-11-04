@@ -41,6 +41,20 @@ export interface EntryListTabProps<T> {
   renderRow?: (args: RenderRowArgs<T>) => ReactNode;
 }
 
+/** How long the scrollbar stays after the last scroll event. */
+const SCROLLBAR_LINGER_MS = 800;
+/** How close to the list's right edge, from either side, brings the scrollbar up. */
+const SCROLLBAR_EDGE_PX = 12;
+
+/** WebKit does not repaint a custom scrollbar when only its colour rule changes:
+ *  it has to be rebuilt, which taking the overflow away for one layout does. */
+function setScrollbarShown(nav: HTMLElement, shown: boolean) {
+  nav.classList.toggle('scrollbar-shown', shown);
+  nav.style.overflowY = 'hidden';
+  void nav.offsetWidth;
+  nav.style.overflowY = '';
+}
+
 export default function EntryListTab<T>({
   items, getId, getTitle, getEditTitle = getTitle, getDateStr, getIcon, isActive, onOpen, onOpenNewTab, onDragStart,
   onRename, contextMenuActions, emptyMessage, renderRow,
@@ -72,6 +86,42 @@ export default function EntryListTab<T>({
   const hasUnrendered = limit === null && visible.length < matching.length;
 
   const navRef = useRef<HTMLElement>(null);
+  const scrollEndTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
+  useEffect(() => () => clearTimeout(scrollEndTimer.current), []);
+  // The scrollbar shows only while the list moves or the pointer is at its edge
+  // (`.scrollbar-shown` in index.css). `:hover` cannot do this: a hidden thumb is not
+  // repainted when the pointer reaches it. On the element, not in state: neither
+  // a scroll nor a mouse move may re-render the whole list.
+  const pointerAtEdge = useRef(false);
+  const showScrollbarForNow = () => {
+    const nav = navRef.current;
+    if (!nav) return;
+    if (!nav.classList.contains('scrollbar-shown')) setScrollbarShown(nav, true);
+    clearTimeout(scrollEndTimer.current);
+    scrollEndTimer.current = setTimeout(() => {
+      if (!pointerAtEdge.current) setScrollbarShown(nav, false);
+    }, SCROLLBAR_LINGER_MS);
+  };
+  // On the window, not the list: over the scrollbar itself WebKit reports the
+  // pointer as having left the list and sends nothing more, so the state just
+  // stays "at the edge" until the pointer moves away from it elsewhere.
+  useEffect(() => {
+    const onMove = (e: globalThis.MouseEvent) => {
+      const nav = navRef.current;
+      // A held button may be dragging the thumb: hiding would rebuild the bar under it.
+      if (!nav || e.buttons) return;
+      const rect = nav.getBoundingClientRect();
+      const atEdge = e.clientY >= rect.top && e.clientY <= rect.bottom
+        && e.clientX >= rect.right - SCROLLBAR_EDGE_PX && e.clientX <= rect.right + SCROLLBAR_EDGE_PX
+        && nav.scrollHeight > nav.clientHeight;
+      if (atEdge === pointerAtEdge.current) return;
+      pointerAtEdge.current = atEdge;
+      showScrollbarForNow();
+    };
+    window.addEventListener('mousemove', onMove);
+    return () => window.removeEventListener('mousemove', onMove);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only touches refs
+  }, []);
   const sentinelRef = useRef<HTMLDivElement>(null);
   // Recreated on every growth: a fresh observer reports immediately whether the edge
   // is still visible, so even a tall screen fills up without
@@ -108,31 +158,33 @@ export default function EntryListTab<T>({
 
   return (
     <div className="flex flex-col h-full">
-      {/* 56px tall like the action bar on the right (`SidebarActionBar`), without
-          a divider: the list sits directly on the frame. Creating goes
-          through the main action in the right panel, not through a button here. */}
-      <div className="entry-list-search-row h-14 px-3 flex-shrink-0 flex items-center">
+      {/* Right under the sheet's top edge: the 1px is the sheet's border, so the
+          field starts where its surface does and shares a centre line with the
+          rail's first button. No divider: the list sits directly on the frame.
+          The 13px keep it clear of the list below. No create button here: see the
+          rail's plus and the dashboards. */}
+      <div className="entry-list-search-row pt-px pb-[13px] px-3 flex-shrink-0 flex items-center">
         <div className="entry-list-search flex-1 flex items-center gap-2 rounded-md px-2.5 h-[30px] min-w-0">
-          <Search size={14} className="text-stone-500 flex-shrink-0" />
+          <Search size={14} className="text-subtle flex-shrink-0" />
           <input
             type="text"
             placeholder={t('search.placeholder')}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="sidebar-search-input bg-transparent text-sm text-stone-300 placeholder-stone-600 outline-none w-full selectable"
+            className="sidebar-search-input bg-transparent text-sm text-soft placeholder:text-subtle outline-none w-full selectable"
           />
         </div>
       </div>
 
-      <nav ref={navRef} className="entry-list-nav flex-1 overflow-y-auto py-2 px-2">
+      <nav ref={navRef} onScroll={showScrollbarForNow} className="entry-list-nav flex-1 overflow-y-auto py-2 pl-2 pr-1 mr-1">
         {matching.length === 0 ? (
           // Two lines in place of the first entry, without icon and button;
           // the dashboard next to it carries the large empty state.
           <div className="px-2 py-1.5">
-            <p className="text-[13px] text-stone-400">
+            <p className="text-[13px] text-muted">
               {items.length > 0 ? t('sidebar.noResultsFor', { query: searchQuery.trim() }) : emptyMessage}
             </p>
-            <p className="text-xs text-stone-600">
+            <p className="text-xs text-subtle">
               {items.length > 0 ? t('sidebar.noResultsHint') : t('sidebar.emptyHint')}
             </p>
           </div>
@@ -175,7 +227,7 @@ export default function EntryListTab<T>({
                         onChange={(e) => setRenameValue(e.target.value)}
                         onBlur={commitRename}
                         onKeyDown={(e) => { if (e.key === 'Enter') commitRename(); if (e.key === 'Escape') setRenamingId(null); }}
-                        className="w-full bg-transparent text-sm text-stone-300 outline-none selectable truncate"
+                        className="w-full bg-transparent text-sm text-soft outline-none selectable truncate"
                       />
                       {dateStr && <div className="entry-list-date text-xs">{dateStr}</div>}
                     </div>

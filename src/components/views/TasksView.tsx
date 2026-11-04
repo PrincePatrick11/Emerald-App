@@ -5,6 +5,7 @@ import { useTaskStore } from '../../store/taskStore';
 import { useCategoryStore } from '../../store/categoryStore';
 import { useUIStore } from '../../store/uiStore';
 import { useUndoStore } from '../../store/undoStore';
+import { takeTaskToName } from '../../lib/createItem';
 import { generateId } from '../../lib/helpers';
 import { displayTitle, hasOwnTitle } from '../../lib/entryTitle';
 import { MODULES, viewTypeForEntryType } from '../../lib/modules';
@@ -32,9 +33,9 @@ import type { Task, TaskPriority } from '../../types';
 import { useSessionState } from '../../store/sessionStore';
 
 const TASK_PRIORITY_COLORS: Record<string, string> = {
-  high: 'text-red-400',
-  medium: 'text-yellow-400',
-  low: 'text-green-400',
+  high: 'text-danger',
+  medium: 'text-warning',
+  low: 'text-success',
 };
 
 const TASK_PRIORITY_PILL_CLASSES: Record<string, string> = {
@@ -137,11 +138,14 @@ export default function TasksView() {
   // The orphan block only appears if it contains something.
   const showUncatBlock = groupedTasks !== null && uncategorized.length > 0;
 
-  const handleCreateTask = async (categoryId?: string | null) => {
-    const task = await createTask(categoryId ?? null);
+  const startNaming = (task: Task) => {
     freshTaskIds.add(task.id);
     setEditingId(task.id);
     setEditValue(task.title);
+  };
+
+  const handleCreateTask = async (categoryId?: string | null) => {
+    startNaming(await createTask(categoryId ?? null));
   };
 
   const handleSaveEdit = async (id: string) => {
@@ -188,6 +192,9 @@ export default function TasksView() {
         parentId = tasks.find((task) => task.id === parentId)?.parent_task_id ?? null;
       }
       if (ancestors.length) setExpandedTasks((prev) => new Set([...prev, ...ancestors]));
+
+      // Created by the rail's plus: name it, as after this view's own button.
+      if (takeTaskToName(target.id)) startNaming(target);
     },
   });
 
@@ -527,10 +534,10 @@ const TaskRow = memo(function TaskRow({
       >
         <button
           onClick={() => toggleComplete(task.id)}
-          className="text-stone-400 hover:text-jade-400 flex-shrink-0"
+          className="text-muted hover:text-accent-raise flex-shrink-0"
         >
           {task.completed ? (
-            <CheckSquare size={16} className="text-jade-400" />
+            <CheckSquare size={16} className="text-accent" />
           ) : (
             <Square size={16} />
           )}
@@ -555,12 +562,12 @@ const TaskRow = memo(function TaskRow({
                 if (freshTaskIds.delete(task.id)) void handleDelete();
               }
             }}
-            className="flex-1 bg-stone-800 border border-stone-600 rounded px-2 py-0.5 text-sm text-stone-200 outline-none focus:border-jade-500"
+            className="flex-1 bg-well-solid border border-edge-strong rounded-md px-2 py-0.5 text-sm text-secondary outline-none focus:border-accent-edge"
             autoFocus
           />
         ) : (
           <span
-            className={`flex-1 text-sm truncate cursor-default ${task.completed ? 'line-through text-stone-500' : 'text-stone-200'}`}
+            className={`flex-1 text-sm truncate cursor-default ${task.completed ? 'line-through text-subtle' : 'text-secondary'}`}
             onDoubleClick={() => {
               setEditingId(task.id);
               setEditValue(hasOwnTitle(task.title) ? task.title : '');
@@ -575,7 +582,7 @@ const TaskRow = memo(function TaskRow({
             {resolvedLinks.map((link) => (
               <span
                 key={link.id}
-                className="tasks-linked-entry text-xs cursor-pointer px-1.5 py-0.5 rounded transition-colors"
+                className="tasks-linked-entry text-xs cursor-pointer px-1.5 py-0.5 rounded-md transition-colors"
                 title={`${link.target_type}: ${link.title}`}
                 onClick={() => {
                   useUIStore.getState().setActiveView({ type: viewTypeForEntryType(link.target_type), id: link.target_id, mode: 'view' });
@@ -590,7 +597,7 @@ const TaskRow = memo(function TaskRow({
         <div className="flex items-center gap-1.5 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
           <button
             onClick={handleCreateSubtaskLocal}
-            className="task-action-btn text-stone-500 hover:text-jade-400 p-0.5"
+            className="task-action-btn text-subtle hover:text-accent-raise p-0.5"
             title={t('tasks.addSubtask')}
           >
             <Plus size={12} />
@@ -608,7 +615,7 @@ const TaskRow = memo(function TaskRow({
 
           <button
             onClick={() => setLinkModal({ taskId: task.id })}
-            className="task-action-btn text-stone-500 hover:text-jade-400 p-0.5"
+            className="task-action-btn text-subtle hover:text-accent-raise p-0.5"
             title={t('tasks.linkEntry')}
           >
             <Link2 size={12} />
@@ -629,7 +636,7 @@ const TaskRow = memo(function TaskRow({
                 onClick={toggle}
                 aria-haspopup="listbox"
                 aria-expanded={open}
-                className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-xs ${TASK_PRIORITY_PILL_CLASSES[task.priority]}`}
+                className={`flex items-center gap-1 px-1.5 py-0.5 rounded-md text-xs ${TASK_PRIORITY_PILL_CLASSES[task.priority]}`}
                 title={t('tasks.priority.' + task.priority)}
               >
                 <Flag size={12} />
@@ -639,7 +646,7 @@ const TaskRow = memo(function TaskRow({
 
           <button
             onClick={handleDelete}
-            className="task-action-btn text-stone-500 hover:text-red-400 p-0.5"
+            className="task-action-btn text-subtle hover:text-danger p-0.5"
             title={t('contextMenu.delete')}
           >
             <Trash2 size={12} />

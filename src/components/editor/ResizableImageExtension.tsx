@@ -94,7 +94,7 @@ function ResizableImageView({ node, updateAttributes, selected, editor }: NodeVi
           src={displaySrc}
           alt={node.attrs.alt ?? ''}
           draggable={false}
-          className={`block w-full rounded-lg object-contain${selected ? ' ring-2 ring-jade-500 ring-offset-1 ring-offset-stone-900' : ''}`}
+          className={`block w-full rounded-lg object-contain${selected ? ' ring-2 ring-focus ring-offset-1 ring-offset-well-page' : ''}`}
           style={{ maxHeight: 600 }}
         />
         {showHandle && (

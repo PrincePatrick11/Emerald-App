@@ -14,16 +14,17 @@ export default function LeaveGuardModal() {
   if (!question) return null;
 
   return (
-    <Modal title={t('leaveGuard.title')} onClose={() => question.answer('stay')} widthClassName="w-[420px]" bodyClassName="p-4 space-y-4">
-      <p className="text-sm text-[var(--text-secondary)]">
-        {t('leaveGuard.message', { name: question.title })}
-      </p>
-      <div className="flex justify-end gap-2 pt-1">
+    <Modal title={t('leaveGuard.title')} onClose={() => question.answer('stay')} widthClassName="w-[420px]" bodyClassName="modal-body" footer={
+      <>
         <Button tone="neutral" onClick={() => question.answer('stay')}>{t('leaveGuard.stay')}</Button>
         <Button tone="danger" onClick={() => question.answer('discard')}>{t('leaveGuard.discard')}</Button>
         {/* Focus here: the modal has no input field, and Enter would otherwise hit the editor behind it. */}
         <Button tone="jade" autoFocus onClick={() => question.answer('save')}>{t('common.save')}</Button>
-      </div>
+      </>
+    }>
+      <p className="text-sm text-secondary">
+        {t('leaveGuard.message', { name: question.title })}
+      </p>
     </Modal>
   );
 }

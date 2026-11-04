@@ -49,7 +49,7 @@ What to check:
 
 - Icon sizes: `18` for the rail, `16` for the title bar, modal headers and primary actions, `14` as the default, `12` for dense meta rows. Nothing in between. Icon colour is inherited from the surrounding text colour, not set through a `color` prop.
 
-- Heights and spacing: `h-10` for window chrome (title bar, tab bar), `h-14` for content bars (the entry list's search row, `SidebarActionBar`) — there is no third bar height. Horizontal padding has exactly one source per column; a panel that adds its own `px-*` inside the right sidebar's `p-3` container indents itself out of line with the action bar above it.
+- Heights and spacing: `h-10` for window chrome (title bar, tab bar), `h-14` for content bars (`SidebarActionBar`) — there is no third bar height. Horizontal padding has exactly one source per column; a panel that adds its own `px-*` inside the right sidebar's `p-3` container indents itself out of line with the action bar above it.
 
 - States: a new focusable element without a `:focus-visible` rule in both themes is unfinished. Disabled runs through the shared `:disabled` rule, not a colour of its own. Active/inactive toggles use `Button`'s `tone` mode rather than a ternary in a `className` template. Animations live as a class in the stylesheet and respect `prefers-reduced-motion` — an inline style beats the opt-out.
 

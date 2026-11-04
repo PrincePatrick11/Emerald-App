@@ -114,3 +114,26 @@ jobs:
       # conftest.py skips the browser tests when it finds no browser, so a
       # missing browser would not fail this job.
       - run: python -m pytest
+
+  mcp-instance:
+    name: MCP instance tests (${{ matrix.os }})
+    # Which checkout and ports an instance gets: no browser needed, and the
+    # process lookups only exist here.
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        working-directory: tools/mcp
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - run: pip install -r requirements-dev.txt
+
+      - run: python -m pytest tests/test_instance.py

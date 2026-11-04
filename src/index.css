@@ -12,7 +12,7 @@
   }
 
   * {
-    @apply border-stone-700;
+    border-color: var(--border-default);
   }
 
   body {
@@ -121,13 +121,44 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
     @apply flex items-center justify-center w-[30px] h-[30px] p-0 rounded-md;
   }
 
+  /* Drag handle of a sidebar: an 8px area to grab, showing a 4px rounded strip
+     that lies mostly on the sheet and stops short of its corners. */
+  .sidebar-resize-handle {
+    @apply absolute top-0 w-2 h-full cursor-col-resize z-10;
+  }
+
+  .sidebar-resize-handle::after {
+    content: '';
+    position: absolute;
+    top: var(--sheet-radius);
+    bottom: var(--sheet-radius);
+    left: 2px;
+    width: 4px;
+    border-radius: 9999px;
+    background: transparent;
+    pointer-events: none;
+    transition: background-color 150ms ease-out;
+  }
+
+  /* The right one grabs on the sidebar's side only: the main area's scrollbar
+     runs along that edge. Its strip still reaches over onto the main area. */
+  .sidebar-resize-handle--right::after {
+    left: -3px;
+  }
+
+  .sidebar-resize-handle:hover::after,
+  .sidebar-resize-handle:active::after {
+    background: var(--accent-wash-strong);
+  }
+
   /* The button area follows the width of the left sidebar —
      same duration as .app-sidebar-animated. */
   .titlebar-follow-animated {
     transition: min-width 200ms ease-out;
   }
 
-  /* Traffic lights sit at x:14 and span ~52px (see tauri.macos.conf.json).
+  /* Traffic lights span x 15-75 and are centred on the 40px bar, the red one over
+     the rail's icons (tauri.macos.conf.json; its `y` is not the top edge).
      The inset goes on the leading group, not the bar: that group is
      border-box, so with tabs its `min-width` (the left sidebar's width)
      already includes the inset and the tabs still start at the sheet's edge. */
@@ -190,8 +221,7 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
     color: var(--menu-item-hover-text);
   }
 
-  /* Dimmed rather than recoloured: the per-theme `.menu-item` colour rules
-     outrank this one on specificity, so a `color` here would not survive. */
+  /* Dimmed rather than recoloured, like the shared `:disabled` rule. */
   .menu-item:disabled {
     opacity: 0.45;
     cursor: default;
@@ -268,15 +298,18 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
   /* The match in the title or in the text excerpt. The same accent mix
      as `.picker-row-active .picker-badge` — the spot is tinted, not
      outlined, so that a result list does not turn into a patchwork. */
-  /* The first declaration is not a stylistic device but the fallback: if
-     `color-mix` is unsupported (WebKit before 16.2, WebKitGTK before 2.40), the
-     yellow UA default of <mark> would otherwise remain here — under accent-coloured text
-     in a dark theme. */
+  /* The `rgba()` is the fallback for an engine without `color-mix` (WebKitGTK
+     before 2.40). It takes `@supports`: a declaration with `var()` always parses,
+     so a second line would win and then fail at computed-value time. */
   .search-match {
     background-color: rgba(0, 176, 118, 0.22);
-    background-color: color-mix(in srgb, var(--accent) 22%, transparent);
-    color: var(--accent);
+    color: var(--accent-text);
     border-radius: 2px;
+  }
+  @supports (color: color-mix(in srgb, red 50%, blue)) {
+    .search-match {
+      background-color: color-mix(in srgb, var(--accent) 22%, transparent);
+    }
   }
 
   /* The task row that a hit of the global search is currently pointing at.
@@ -292,12 +325,13 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
      `outline-offset` pulls the ring inward so the row does not jump
      in the flow. */
   .task-row-target {
-    /* A fallback as above, but more necessary here: `outline` is a
-       shorthand, a `color-mix` that is not understood discards the
-       whole declaration — the ring would be gone without replacement and silently. */
     outline: 1px solid rgba(0, 176, 118, 0.55);
-    outline: 1px solid color-mix(in srgb, var(--accent) 55%, transparent);
     outline-offset: -1px;
+  }
+  @supports (color: color-mix(in srgb, red 50%, blue)) {
+    .task-row-target {
+      outline: 1px solid color-mix(in srgb, var(--accent) 55%, transparent);
+    }
   }
 
   /* Showing/hiding the sidebars (`AppShell`); `margin-left` pushes
@@ -402,7 +436,7 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
   }
 
   .sidebar-item {
-    @apply flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm cursor-pointer transition-colors duration-150;
+    @apply flex items-center gap-2.5 px-3 py-2 rounded-md text-sm cursor-pointer transition-colors duration-150;
     color: var(--text-muted);
   }
 
@@ -444,16 +478,149 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
      Pass "overflow-hidden" via Modal's className prop for modals that don't have such a popover. */
   .modal-card {
     @apply border rounded-xl shadow-2xl;
-    background-color: var(--bg-surface-2);
-    border-color: var(--border-soft);
+    background-color: var(--shell-bg);
+    border-color: var(--menu-border);
+  }
+
+  /* A modal is built like the window: title and actions on the frame, the
+     content on a sheet inset into it. Clips its corners, so a popover from
+     inside has to portal, as design.md's Overlays and Portals asks anyway. */
+  .modal-sheet {
+    @apply flex flex-col flex-1 min-h-0 overflow-hidden border;
+    margin-inline: var(--sheet-inset);
+    background-color: var(--sheet-bg);
+    border-color: var(--sheet-border);
+    border-radius: var(--sheet-radius);
+  }
+
+  .modal-sheet:last-child {
+    margin-bottom: var(--sheet-inset);
+  }
+
+  /* A divider inside the sheet. */
+  .modal-rule {
+    border-color: var(--sheet-border);
+  }
+
+  /* The header is the handle for moving the modal. min-h-12 keeps its height
+     without the close button of a dismissible modal. */
+  .modal-header {
+    @apply flex items-center justify-between gap-3 min-h-12 px-5 py-2.5 shrink-0 select-none;
+    cursor: grab;
+  }
+
+  .modal-header:active {
+    cursor: grabbing;
+  }
+
+  /* 14px plus the sheet's inset puts the content under the title's 20px. */
+  .modal-body {
+    @apply px-3.5 py-4;
+  }
+
+  /* A tile of `CreateItemModal`. Arrow keys, Tab and Enter work on the focused one,
+     so it shows from the moment the modal opens, also after a mouse click, which
+     `:focus-visible` would not count: see the ring further down. */
+  .create-item-tile {
+    @apply relative flex flex-col items-center justify-center gap-1.5 px-1 py-3 text-xs text-secondary;
+  }
+
+  /* The key that picks the tile. */
+  .create-item-tile-number {
+    @apply absolute top-1 left-2 text-[10px] leading-4 text-subtle;
+  }
+
+  .create-item-tile:hover,
+  .create-item-tile:focus {
+    color: var(--text-primary);
+  }
+
+  .modal-footer {
+    @apply flex items-center justify-end gap-2 px-5 py-2.5 shrink-0;
   }
 
   /* Primary action button — jade accent (xs size, for toolbars & headers) */
   .btn-primary {
-    @apply flex items-center gap-1.5 px-3 py-1.5
-           bg-jade-900/40 hover:bg-jade-900/60
-           text-jade-400 text-xs font-medium rounded-lg
-           border border-jade-800/40 transition-colors duration-150;
+    @apply flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border transition-colors duration-150;
+    background-color: var(--primary-solid-bg);
+    color: var(--primary-solid-text);
+  }
+
+  .btn-primary {
+    border-color: var(--primary-solid-border);
+  }
+
+  .btn-primary:hover {
+    background-color: var(--primary-solid-hover-bg);
+    color: var(--primary-solid-hover-text);
+  }
+
+  /* Button's `tone` mode. An active jade tone is the primary look. */
+  .sidebar-action-btn.btn-tone-jade,
+  .sidebar-action-btn.btn-tone-amber,
+  .sidebar-action-btn.btn-tone-danger,
+  .sidebar-action-btn.btn-tone-neutral,
+  .sidebar-action-btn.btn-tone-active {
+    border-width: 1px;
+  }
+
+  .sidebar-action-btn.btn-tone-jade {
+    background-color: var(--tone-jade-bg);
+    border-color: var(--tone-jade-border);
+    color: var(--tone-jade-text);
+  }
+
+  .sidebar-action-btn.btn-tone-jade:hover {
+    background-color: var(--tone-jade-bg-hover);
+    border-color: var(--tone-jade-border-hover);
+    color: var(--tone-jade-text-hover);
+  }
+
+  .sidebar-action-btn.btn-tone-amber {
+    background-color: var(--tone-amber-bg);
+    border-color: var(--tone-amber-border);
+    color: var(--tone-amber-text);
+  }
+
+  .sidebar-action-btn.btn-tone-amber:hover {
+    background-color: var(--tone-amber-bg-hover);
+    border-color: var(--tone-amber-border-hover);
+    color: var(--tone-amber-text-hover);
+  }
+
+  .sidebar-action-btn.btn-tone-danger {
+    background-color: var(--tone-danger-bg);
+    border-color: var(--tone-danger-border);
+    color: var(--tone-danger-text);
+  }
+
+  .sidebar-action-btn.btn-tone-danger:hover {
+    background-color: var(--tone-danger-bg-hover);
+    border-color: var(--tone-danger-border-hover);
+    color: var(--tone-danger-text-hover);
+  }
+
+  .sidebar-action-btn.btn-tone-neutral {
+    background-color: var(--tone-neutral-bg);
+    border-color: var(--tone-neutral-border);
+    color: var(--tone-neutral-text);
+  }
+
+  .sidebar-action-btn.btn-tone-neutral:hover {
+    background-color: var(--tone-neutral-bg-hover);
+    border-color: var(--tone-neutral-border-hover);
+    color: var(--tone-neutral-text-hover);
+  }
+
+  .sidebar-action-btn.btn-tone-active {
+    background-color: var(--primary-solid-bg);
+    border-color: var(--primary-solid-border);
+    color: var(--primary-solid-text);
+  }
+
+  .sidebar-action-btn.btn-tone-active:hover {
+    background-color: var(--primary-solid-hover-bg);
+    color: var(--primary-solid-hover-text);
   }
 
   /* The primary action in red — the same shape as .btn-primary, for a
@@ -478,15 +645,15 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
   /* Secondary action button — neutral stone */
   .btn-secondary {
     @apply flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border transition-colors duration-150;
-    background-color: var(--bg-surface-2);
-    color: var(--text-secondary);
-    border-color: var(--border-soft);
+    background-color: var(--secondary-bg);
+    color: var(--secondary-text);
+    border-color: var(--secondary-border);
   }
 
   .btn-secondary:hover {
-    background-color: var(--interactive-hover);
-    color: var(--text-primary);
-    border-color: var(--border-strong);
+    background-color: var(--secondary-bg-hover);
+    color: var(--secondary-text-hover);
+    border-color: var(--secondary-border-hover);
   }
 
   /* Danger text — a warning or a broken state that is not a button.
@@ -614,7 +781,7 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
 
   .picker-row-active .picker-badge {
     background-color: color-mix(in srgb, var(--accent) 22%, transparent);
-    color: var(--accent);
+    color: var(--accent-text);
   }
 
   /* Only on the server: present, but not yet here. */
@@ -733,7 +900,8 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
 
   /* Consistent small section label (JOURNAL, PROPERTIES, etc.) */
   .label-xs {
-    @apply text-xs font-semibold uppercase tracking-wider text-stone-500;
+    @apply text-xs font-semibold uppercase tracking-wider;
+    color: var(--text-subtle);
   }
 
   .list-toolbar-chip {
@@ -771,7 +939,21 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
   }
 
   .list-toolbar-option-active {
+    background-color: var(--menu-item-active-bg);
     color: var(--menu-item-active-text);
+  }
+
+  /* A priority row keeps its own colour; red or amber on jade would say two things. */
+  .list-toolbar-option-active.text-danger,
+  .list-toolbar-option-active.text-warning {
+    background-color: var(--menu-item-hover-bg);
+  }
+
+  .list-toolbar-option-active:focus-visible,
+  .list-toolbar-option-idle:focus-visible,
+  .emoji-picker-item:focus-visible {
+    outline: none;
+    box-shadow: inset 0 0 0 2px var(--focus-ring);
   }
 
   .list-toolbar-option-idle {
@@ -847,7 +1029,6 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
     box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 55%, transparent);
   }
 
-
   .switch-thumb {
     position: absolute;
     top: 2px;
@@ -919,29 +1100,42 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
     box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 40%, transparent);
   }
 
+  .settings-choice-btn.settings-choice-btn-idle {
+    border-width: 1px;
+    background-color: var(--choice-bg);
+    border-color: var(--choice-border);
+    color: var(--choice-text);
+  }
+
+  .settings-choice-btn.settings-choice-btn-idle:hover {
+    background-color: var(--choice-bg-hover);
+    border-color: var(--choice-border-hover);
+    color: var(--choice-text-hover);
+  }
+
+  .settings-choice-btn.settings-choice-btn-active {
+    border-width: 1px;
+    background-color: var(--choice-active-bg);
+    border-color: var(--choice-active-border);
+    color: var(--choice-active-text);
+  }
+
+  .modal-backdrop {
+    background-color: var(--modal-scrim);
+  }
+
   .emoji-picker-popover {
     background-color: var(--menu-bg);
     border-color: var(--menu-border);
   }
 
-  .emoji-picker-item-idle:hover,
-  .emoji-picker-item-active {
+  .emoji-picker-item-idle:hover {
     background-color: var(--menu-item-hover-bg);
   }
 
-  .emoji-picker-search {
-    background-color: color-mix(in srgb, var(--bg-surface-1) 80%, transparent);
-    border: 1px solid var(--border-soft);
-    color: var(--text-secondary);
-  }
-
-  .emoji-picker-search::placeholder {
-    color: var(--text-muted);
-  }
-
-  .emoji-picker-search:focus {
-    border-color: var(--accent);
-    box-shadow: 0 0 0 2px var(--focus-ring);
+  .emoji-picker-item-active {
+    background-color: var(--menu-item-active-bg);
+    box-shadow: inset 0 0 0 1px var(--choice-active-border);
   }
 
   /* ── Settings window ───────────────────────────────────────────────────
@@ -953,7 +1147,7 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
   /* The size of the fields in the settings window; the colours come from
      `.input-field`, which this class is always used together with. */
   .settings-field {
-    @apply w-full rounded-lg px-3 py-2 text-sm outline-none transition-colors;
+    @apply w-full rounded-md px-3 py-2 text-sm outline-none transition-colors;
   }
 
   .settings-row {
@@ -1021,7 +1215,7 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
   /* The same focus as `.emoji-picker-search`, so that every field in the app
      shows it — until now each caller brought it along itself, or not. */
   .input-field:focus {
-    border-color: var(--accent);
+    border-color: var(--accent-text);
     box-shadow: 0 0 0 2px var(--focus-ring);
   }
 
@@ -1092,12 +1286,12 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
 }
 
 .tiptap ul[data-type="taskList"] li > label input[type="checkbox"] {
-  @apply w-4 h-4 rounded border border-stone-600 bg-stone-700
-         cursor-pointer accent-jade-500;
+  @apply w-4 h-4 rounded border border-edge-strong bg-well-active
+         cursor-pointer accent-accent;
 }
 
 .tiptap ul[data-type="taskList"] li[data-checked="true"] > div {
-  @apply line-through text-stone-500;
+  @apply line-through text-subtle;
 }
 
 .tiptap blockquote {
@@ -1114,7 +1308,7 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
 /* The divider is a block node without text — without a selection state of its own
    it would stay invisible that it is the one meant when deleting. */
 .tiptap hr.ProseMirror-selectednode {
-  border-color: var(--accent);
+  border-color: var(--accent-text);
 }
 
 .tiptap code {
@@ -1140,13 +1334,13 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
 }
 
 .tiptap a.external-link {
-  @apply text-jade-500 underline underline-offset-2 cursor-pointer hover:text-jade-400;
+  @apply text-accent underline underline-offset-2 cursor-pointer hover:text-accent-raise;
 }
 
 /* Edit mode: show a subtle ↗ indicator after external links */
 .ProseMirror[contenteditable="true"] a.external-link::after {
   content: '↗';
-  @apply text-jade-700 text-[0.6em] ml-0.5 align-super;
+  @apply text-accent text-[0.6em] ml-0.5 align-super;
   text-decoration: none;
 }
 
@@ -1156,7 +1350,7 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
 
 /* Edit mode: [[Label(id)]] inline text representation */
 .internal-link-edit {
-  color: #00b87a;
+  color: var(--accent-text);
   font-style: italic;
   cursor: text;
   user-select: text;
@@ -1473,7 +1667,7 @@ html[data-theme] .sidebar-add-field input::placeholder,
 
 .tag-chip-remove:hover {
   /* Deliberately without a token: darkens the chip's tag colour, the same in both themes. */
-  background-color: rgba(0, 0, 0, 0.25);
+  background-color: var(--interactive-active);
 }
 
 /* An action as a row instead of a bordered button ("Update all"). */
@@ -1581,18 +1775,7 @@ html[data-theme] .sidebar-add-field input::placeholder,
   box-shadow: 0 0 0 2px var(--focus-ring);
 }
 
-/* The buttons at the end of a section, below a line: full width,
-   centred, stacked — "Add block" and "Insert template"
-   below the blocks. */
-.sidebar-section-actions {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  margin-top: 10px;
-  padding-top: 10px;
-  border-top: 1px solid var(--field-border);
-}
-
+/* Full width, centred: "Add block" and "Insert template" (`BlockAddActions`). */
 .sidebar-section-button {
   display: flex;
   width: 100%;
@@ -1621,7 +1804,6 @@ html[data-theme] .sidebar-add-field input::placeholder,
   box-shadow: 0 0 0 2px var(--focus-ring);
 }
 
-html[data-theme] .sidebar-section-actions,
 html[data-theme] .sidebar-section-button {
   border-color: var(--field-border);
 }
@@ -1656,9 +1838,6 @@ html[data-theme] .panel-subheading--divided {
   border-color: var(--field-border);
 }
 
-/* Parchment sets every border with `html[data-theme='emerald-parchment'] *`
-   (see `.settings-nav-item-idle`) — the border colours here therefore need
-   the attribute selector in front, otherwise `--border-soft` would apply there. */
 html[data-theme] .edit-bar-done {
   border-color: var(--primary-solid-border);
 }
@@ -1850,7 +2029,7 @@ html[data-theme] .prop-segment--active {
 }
 
 .block-insert-btn:hover {
-  color: var(--accent);
+  color: var(--accent-text);
   background: var(--interactive-hover);
 }
 
@@ -1938,7 +2117,7 @@ button.block-altar:hover .block-altar-title {
 }
 
 .block-sigil-status--loaded {
-  color: var(--accent);
+  color: var(--accent-text);
 }
 
 /* The letter bank: tiles that switch between "open" and "used" —
@@ -1960,7 +2139,7 @@ button.block-altar:hover .block-altar-title {
 }
 
 .block-sigil-letter--on {
-  color: var(--accent);
+  color: var(--accent-text);
   border-color: color-mix(in srgb, var(--accent) 45%, transparent);
   background: color-mix(in srgb, var(--accent) 12%, transparent);
 }
@@ -2013,7 +2192,7 @@ button.block-altar:hover .block-altar-title {
   padding: 0 6px;
   border-radius: 999px;
   font-size: 10px;
-  color: var(--accent);
+  color: var(--accent-text);
   background: color-mix(in srgb, var(--accent) 12%, transparent);
   transition: background-color 150ms;
 }
@@ -2048,7 +2227,7 @@ button.block-altar:hover .block-altar-title {
   border: 1px solid var(--border-soft);
   border: 1px solid color-mix(in srgb, var(--accent) 35%, var(--border-soft));
   border-radius: 0.5rem;
-  background: rgba(0, 230, 153, 0.06);
+  background: var(--accent-wash);
   background: color-mix(in srgb, var(--accent) 8%, transparent);
   color: var(--text-secondary);
   font-size: 0.75rem;
@@ -2066,7 +2245,7 @@ button.block-altar:hover .block-altar-title {
 .template-default-star {
   display: flex;
   flex-shrink: 0;
-  color: var(--accent);
+  color: var(--accent-text);
 }
 
 /* Assignment table of a template (the dialog only, `AssignmentTable`):
@@ -2096,7 +2275,7 @@ button.block-altar:hover .block-altar-title {
 
 /* "Replaces X": the star takes something away from another template — in the accent. */
 .template-assign-replaces {
-  color: var(--accent);
+  color: var(--accent-text);
 }
 
 /* Default templates overview in the dashboard: the name of a template as a link to its page. */
@@ -2327,7 +2506,7 @@ html[data-theme] .block-manager-row--idle,
 
 .block-toggle--on,
 .block-check--on {
-  color: var(--accent);
+  color: var(--accent-text);
 }
 
 .block-toggle:not(:disabled):hover,
@@ -2377,12 +2556,12 @@ html[data-theme] .block-manager-row--idle,
 }
 
 .block-checkbox:hover {
-  border-color: var(--accent);
+  border-color: var(--accent-text);
 }
 
 .block-checkbox:checked {
-  background-color: var(--accent);
-  border-color: var(--accent);
+  background-color: var(--accent-text);
+  border-color: var(--accent-text);
 }
 
 /* The tick itself, cut out as a shape: in the app's surface colour,
@@ -2482,17 +2661,6 @@ html[data-theme] .block-manager-row--idle,
 }
 
 /* ── Light Mode Tailwind bridge ───────────────────────────────────────────── */
-html[data-theme='emerald-parchment'] .bg-stone-900 { background-color: var(--bg-app); }
-html[data-theme='emerald-parchment'] .bg-stone-800 { background-color: var(--bg-surface-1); }
-html[data-theme='emerald-parchment'] .text-stone-100 { color: var(--text-primary); }
-html[data-theme='emerald-parchment'] .text-stone-200 { color: var(--text-secondary); }
-html[data-theme='emerald-parchment'] .text-stone-300,
-html[data-theme='emerald-parchment'] .text-stone-400 { color: var(--text-muted); }
-html[data-theme='emerald-parchment'] .text-stone-500,
-html[data-theme='emerald-parchment'] .text-stone-600 { color: var(--text-subtle); }
-html[data-theme='emerald-parchment'] .border-stone-700,
-html[data-theme='emerald-parchment'] .border-stone-600 { border-color: var(--border-soft); }
-
 /* Scrollbar */
 ::-webkit-scrollbar {
   width: 6px;
@@ -2506,6 +2674,25 @@ html[data-theme='emerald-parchment'] .border-stone-600 { border-color: var(--bor
   background-color: var(--scrollbar);
 }
 ::-webkit-scrollbar-thumb:hover {
+  background-color: var(--scrollbar-hover);
+}
+
+/* Unlayered and with the theme's specificity, or `.panel-interactive` would win. */
+html[data-theme] .create-item-tile:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--focus-ring);
+}
+
+/* The entry list's scrollbar stays out of sight unless the list is moving
+   (`EntryListTab`) or the pointer is at its edge, so it can still be grabbed.
+   The list's `mr-1` keeps it off the sidebar's resize handle. */
+.entry-list-nav::-webkit-scrollbar-thumb {
+  background-color: transparent;
+}
+.entry-list-nav.scrollbar-shown::-webkit-scrollbar-thumb {
+  background-color: var(--scrollbar);
+}
+.entry-list-nav::-webkit-scrollbar-thumb:hover {
   background-color: var(--scrollbar-hover);
 }
 
@@ -2593,43 +2780,69 @@ html[data-theme='emerald-parchment'] .border-stone-600 { border-color: var(--bor
 }
 
 .tasks-linked-entry {
-  color: rgba(0, 230, 153, 0.78);
-  background: rgba(0, 122, 77, 0.2);
+  color: var(--link-chip-text);
+  background: var(--link-chip-bg);
 }
 
 .tasks-linked-entry:hover {
-  color: #b8ffe2;
-  background: rgba(0, 122, 77, 0.34);
+  color: var(--link-chip-text-hover);
+  background: var(--link-chip-bg-hover);
 }
 
-.tasks-category-trigger {
-  color: #a8a29e;
+/* The attribute selector outranks the utilities on the trigger in CategorySelect. */
+html[data-theme] .tasks-category-trigger {
+  color: var(--text-secondary);
+  background: var(--field-bg);
+  border: 1px solid var(--field-border);
 }
 
-.tasks-category-trigger:hover {
-  color: var(--menu-item-hover-text);
-  background-color: var(--menu-item-hover-bg);
+html[data-theme] .tasks-category-trigger:hover {
+  color: var(--text-primary);
+  background: var(--field-bg-hover);
+  border-color: var(--field-border-hover);
 }
-
 
 .sigil-tool-toggle {
-  background-color: rgba(41, 37, 36, 0.72);
-  border-color: rgba(87, 83, 78, 0.5);
+  background-color: var(--well-tint);
+  border-color: var(--edge);
 }
 
 .sigil-tool-btn:hover {
-  background-color: rgba(87, 83, 78, 0.5);
+  background-color: var(--interactive-active);
 }
 
 .sigil-brush-controls {
-  background-color: rgba(41, 37, 36, 0.72);
-  border: 1px solid rgba(87, 83, 78, 0.5);
+  background-color: var(--well-tint);
+  border: 1px solid var(--edge);
   border-radius: 0.5rem;
   padding: 0.35rem 0.55rem;
 }
 
 .sigil-brush-slider {
   width: 8.5rem;
+}
+
+/* The attribute selector outranks the `bg-well-*` and `border-edge` utilities in the callers. */
+html[data-theme] .op-prop-select {
+  background: var(--field-bg);
+  border-color: var(--field-border);
+  color: var(--text-secondary);
+}
+
+html[data-theme] .op-prop-select:hover {
+  background: var(--field-bg-hover);
+  border-color: var(--field-border-hover);
+}
+
+html[data-theme] .op-prop-select:focus {
+  border-color: var(--choice-active-border);
+  box-shadow: 0 0 0 2px var(--focus-ring);
+}
+
+/* The field holds the focus of the input inside it. */
+html[data-theme] .sidebar-search-inner:focus-within {
+  border-color: var(--choice-active-border);
+  box-shadow: 0 0 0 2px var(--focus-ring);
 }
 
 .op-prop-select option {
@@ -2662,6 +2875,16 @@ html[data-theme='emerald-parchment'] .border-stone-600 { border-color: var(--bor
   box-shadow: var(--menu-shadow);
 }
 
+.linked-entry-menu-item {
+  color: var(--text-secondary);
+}
+
+.tag-color-popover {
+  background-color: var(--menu-bg);
+  border-color: var(--menu-border);
+  box-shadow: var(--menu-shadow);
+}
+
 .linked-entry-menu-item:hover {
   background-color: var(--menu-item-hover-bg);
   color: var(--menu-item-hover-text);
@@ -2669,19 +2892,23 @@ html[data-theme='emerald-parchment'] .border-stone-600 { border-color: var(--bor
 
 .context-menu {
   background-color: var(--menu-bg);
+  border-color: var(--menu-border);
+}
+
+.context-menu-item-default {
+  color: var(--text-secondary);
+}
+
+.context-menu-item-danger {
+  color: var(--danger-text);
 }
 
 /* The four links in the About section. Colour from --accent instead of a
    jade utility, so that Parchment need not carry another bridge for it; the
    hover mixes toward the text colour and thereby gets lighter in Noctis and
-   darker in Parchment. The focus ring is mandatory, not optional: Noctis has no
-   generic button:focus-visible rule. */
+   darker in Parchment. */
 /* The border of the inactive row is purely a placeholder for the width of the
-   active one — it is not meant to become visible. Parchment pre-colours
-   every border with `html[data-theme='emerald-parchment'] *`, and against that
-   both the border-transparent utility and a simple
-   class rule lose: same specificity, the later one wins. Hence the
-   attribute selector in front — 0-2-0 instead of 0-1-0. */
+   active one — it is not meant to become visible. */
 html[data-theme] .settings-nav-item-idle {
   border-color: transparent;
 }
@@ -2693,7 +2920,7 @@ html[data-theme] .settings-nav-item-idle {
    specificity the later rule wins. The focus ring is mandatory — Noctis
    has no generic button:focus-visible rule. */
 html[data-theme] .settings-about-link {
-  color: var(--accent);
+  color: var(--accent-text);
 }
 
 html[data-theme] .settings-about-link:hover {
@@ -2722,21 +2949,21 @@ html[data-theme] .settings-about-link:focus-visible {
 }
 
 .task-priority-pill-high {
-  background: rgba(239, 68, 68, 0.14);
-  color: #fca5a5;
-  border-color: rgba(239, 68, 68, 0.34);
+  background: var(--danger-hover-bg);
+  color: var(--danger-hover-text);
+  border-color: var(--danger-hover-border);
 }
 
 .task-priority-pill-medium {
-  background: rgba(250, 204, 21, 0.14);
-  color: #facc15;
-  border-color: rgba(250, 204, 21, 0.3);
+  background: color-mix(in srgb, var(--warning-text) 14%, transparent);
+  color: var(--warning-text);
+  border-color: color-mix(in srgb, var(--warning-text) 30%, transparent);
 }
 
 .task-priority-pill-low {
-  background: rgba(74, 222, 128, 0.14);
-  color: #4ade80;
-  border-color: rgba(74, 222, 128, 0.3);
+  background: color-mix(in srgb, var(--success-text) 14%, transparent);
+  color: var(--success-text);
+  border-color: color-mix(in srgb, var(--success-text) 30%, transparent);
 }
 
 /* Entry list: light titles instead of the muted `.sidebar-item` colour of the
@@ -2752,16 +2979,14 @@ html[data-theme] .entry-list-nav .sidebar-item.active {
 
 /* The horizontal dividers of the right sidebar — below the bar
    (`SidebarActionBar`) and between the sections below it. As quiet as the
-   border of the sheet. `html[data-theme]` keeps the specificity above Parchment's
-   `* { border-color }`. */
+   border of the sheet. */
 html[data-theme] .sidebar-divider {
   border-color: var(--sheet-border);
 }
 
 /* The search field of a dashboard in the main area (`ListSearchField`): the
    light fill of the entry list search with the quiet border of the sheet.
-   `html[data-theme]` keeps the specificity above Parchment's
-   `* { border-color }`. */
+   */
 html[data-theme] .list-search-field {
   background: var(--list-search-bg);
   border: 1px solid var(--sheet-border);
@@ -2783,8 +3008,8 @@ html[data-theme] .app-main {
   z-index: 1;
 }
 
-/* The placeholder border of `.rail-button` stays invisible — Parchment's
-   `* { border-color }` would otherwise win over the class and frame every button
+/* The placeholder border of `.rail-button` stays invisible — the base
+   border colour would otherwise win over the class and frame every button
    in the rail and title bar. The active view colours it in more specifically. */
 html[data-theme] .rail-button {
   border-color: transparent;
@@ -2910,20 +3135,8 @@ html[data-theme='emerald-noctis'] .rail-button.active:hover {
   box-shadow: inset 0 0 0 1px rgba(0, 196, 127, 0.24);
 }
 
-html[data-theme='emerald-noctis'] .btn-ghost,
-html[data-theme='emerald-noctis'] .btn-secondary {
+html[data-theme='emerald-noctis'] .btn-ghost {
   color: #b9a38e;
-}
-
-html[data-theme='emerald-noctis'] .btn-secondary {
-  background: rgba(46, 38, 32, 0.76);
-  border-color: rgba(113, 94, 77, 0.48);
-}
-
-html[data-theme='emerald-noctis'] .btn-secondary:hover {
-  color: #f3e9dd;
-  background: rgba(58, 47, 40, 0.9);
-  border-color: rgba(142, 121, 101, 0.58);
 }
 
 html[data-theme='emerald-noctis'] .btn-ghost:hover {
@@ -2952,96 +3165,32 @@ html[data-theme='emerald-noctis'] textarea::placeholder {
   color: #9c8872;
 }
 
-html[data-theme='emerald-noctis'] .settings-choice-btn-idle {
-  background: rgba(46, 38, 32, 0.82);
-  border-color: rgba(113, 94, 77, 0.48);
-  color: #c9b5a1;
+html[data-theme] .link-picker-tab-active {
+  background: var(--link-picker-tab-active-bg);
+  color: var(--link-picker-tab-active-text);
 }
 
-html[data-theme='emerald-noctis'] .settings-choice-btn-idle:hover {
-  background: rgba(58, 48, 41, 0.9);
-  border-color: rgba(141, 119, 99, 0.54);
-  color: #f2e7da;
+html[data-theme] .link-picker-tab-active .link-picker-tab-count {
+  color: var(--link-picker-tab-active-count);
 }
 
-html[data-theme='emerald-noctis'] .settings-choice-btn-active {
-  background: rgba(0, 138, 87, 0.28);
-  border-color: rgba(0, 196, 127, 0.44);
-  color: #d9ffef;
+html[data-theme] .link-picker-tab-idle {
+  color: var(--link-picker-tab-idle-text);
 }
 
-html[data-theme='emerald-noctis'] .link-picker-modal .text-stone-300 {
-  color: #e7ddd2;
+html[data-theme] .link-picker-tab-idle:hover {
+  background: var(--link-picker-tab-idle-hover-bg);
+  color: var(--link-picker-tab-idle-hover-text);
 }
 
-html[data-theme='emerald-noctis'] .link-picker-modal .text-stone-500 {
-  color: #9f8a75;
+html[data-theme] .link-picker-row:hover,
+html[data-theme] .link-picker-row:focus-visible {
+  background: var(--link-picker-row-hover-bg);
 }
 
-html[data-theme='emerald-noctis'] .link-picker-modal .text-stone-600 {
-  color: #87715e;
-}
-
-html[data-theme='emerald-noctis'] .link-picker-modal .bg-stone-800 {
-  background: rgba(45, 36, 31, 0.9);
-  border-color: rgba(113, 94, 77, 0.48);
-}
-
-html[data-theme='emerald-noctis'] .link-picker-modal input {
-  color: #ecdfd1;
-}
-
-html[data-theme='emerald-noctis'] .link-picker-modal input::placeholder {
-  color: #927e6a;
-}
-
-html[data-theme='emerald-noctis'] .link-picker-tab-active {
-  background: rgba(0, 138, 87, 0.24);
-  color: #a7ffd8;
-}
-
-html[data-theme='emerald-noctis'] .link-picker-tab-active .link-picker-tab-count {
-  color: #68f1bc;
-}
-
-html[data-theme='emerald-noctis'] .link-picker-tab-idle {
-  color: #ab957f;
-}
-
-html[data-theme='emerald-noctis'] .link-picker-tab-idle:hover {
-  background: rgba(88, 72, 58, 0.34);
-  color: #e8dccc;
-}
-
-html[data-theme='emerald-noctis'] .link-picker-row {
-  color: #d8cabb;
-}
-
-html[data-theme='emerald-noctis'] .link-picker-label {
-  color: #e8dbcd;
-}
-
-html[data-theme='emerald-noctis'] .link-picker-row .text-xs {
-  color: #9f8a75;
-}
-
-html[data-theme='emerald-noctis'] .link-picker-row .text-stone-700 {
-  color: #7f6a57;
-}
-
-html[data-theme='emerald-noctis'] .link-picker-row:hover,
-html[data-theme='emerald-noctis'] .link-picker-row:focus-visible {
-  background: rgba(82, 67, 54, 0.34);
-}
-
-html[data-theme='emerald-noctis'] .link-picker-row:hover .link-picker-label,
-html[data-theme='emerald-noctis'] .link-picker-row:focus-visible .link-picker-label {
-  color: #f8efe5;
-}
-
-html[data-theme='emerald-noctis'] .link-picker-row:hover .text-xs,
-html[data-theme='emerald-noctis'] .link-picker-row:focus-visible .text-xs {
-  color: #c0ab96;
+html[data-theme] .link-picker-row:hover .link-picker-label,
+html[data-theme] .link-picker-row:focus-visible .link-picker-label {
+  color: var(--link-picker-row-hover-text);
 }
 
 html[data-theme='emerald-noctis'] .home-item-title {
@@ -3064,8 +3213,8 @@ html[data-theme='emerald-noctis'] .panel-interactive:hover .home-item-title {
    of both themes is guaranteed by construction. */
 html[data-theme='emerald-noctis'] .settings-nav-item-active,
 html[data-theme='emerald-noctis'] .right-sidebar-tab-active,
-html[data-theme='emerald-noctis'] .app-sidebar-right .bg-stone-700.text-stone-200,
-html[data-theme='emerald-noctis'] .app-sidebar-left .bg-stone-700.text-stone-200 {
+html[data-theme='emerald-noctis'] .app-sidebar-right .bg-well-active.text-secondary,
+html[data-theme='emerald-noctis'] .app-sidebar-left .bg-well-active.text-secondary {
   background: rgba(0, 138, 87, 0.24);
   color: #b8ffe2;
   border: 1px solid rgba(0, 196, 127, 0.34);
@@ -3074,39 +3223,19 @@ html[data-theme='emerald-noctis'] .app-sidebar-left .bg-stone-700.text-stone-200
 html[data-theme='emerald-noctis'] .settings-nav-item-idle,
 html[data-theme='emerald-noctis'] .right-sidebar-tab-idle,
 html[data-theme='emerald-noctis'] .task-action-btn,
-html[data-theme='emerald-noctis'] .linked-entry-menu-item,
-html[data-theme='emerald-noctis'] .menu-item,
-html[data-theme='emerald-noctis'] .context-menu-item-default,
 html[data-theme='emerald-noctis'] .altar-category-chip {
   color: #b49d87;
 }
 
 html[data-theme='emerald-noctis'] .settings-nav-item-idle:hover,
 html[data-theme='emerald-noctis'] .right-sidebar-tab-idle:hover:not(:disabled),
-html[data-theme='emerald-noctis'] .app-sidebar-right .text-stone-500.hover\:text-stone-300:hover,
-html[data-theme='emerald-noctis'] .app-sidebar-left .text-stone-500.hover\:text-stone-300:hover,
+html[data-theme='emerald-noctis'] .app-sidebar-right .text-subtle.hover\:text-raise:hover,
+html[data-theme='emerald-noctis'] .app-sidebar-left .text-subtle.hover\:text-raise:hover,
 html[data-theme='emerald-noctis'] .task-action-btn:hover,
 html[data-theme='emerald-noctis'] .altar-category-chip:hover,
 html[data-theme='emerald-noctis'] .editor-toolbar-btn-idle:hover {
   color: #eadfce;
   background: rgba(104, 84, 68, 0.18);
-}
-
-html[data-theme='emerald-noctis'] .btn-primary,
-html[data-theme='emerald-noctis'] .bg-jade-900\/40,
-html[data-theme='emerald-noctis'] .bg-jade-500\/20,
-html[data-theme='emerald-noctis'] .bg-jade-500\/10 {
-  background: rgba(0, 138, 87, 0.3);
-  border-color: rgba(0, 196, 127, 0.44);
-  color: #dcfff0;
-}
-
-html[data-theme='emerald-noctis'] .btn-primary:hover,
-html[data-theme='emerald-noctis'] .hover\:bg-jade-900\/60:hover,
-html[data-theme='emerald-noctis'] .hover\:bg-jade-500\/30:hover,
-html[data-theme='emerald-noctis'] .hover\:bg-jade-500\/20:hover {
-  background: rgba(0, 138, 87, 0.42);
-  color: #f2fff9;
 }
 
 html[data-theme='emerald-noctis'] .tasks-linked-entry {
@@ -3120,10 +3249,8 @@ html[data-theme='emerald-noctis'] .tasks-linked-entry:hover {
   background: rgba(0, 122, 77, 0.34);
 }
 
-html[data-theme='emerald-noctis'] .tasks-category-trigger,
 html[data-theme='emerald-noctis'] .sigil-tool-toggle,
 html[data-theme='emerald-noctis'] .sigil-brush-controls,
-html[data-theme='emerald-noctis'] .op-prop-select,
 html[data-theme='emerald-noctis'] .altar-symbol-trigger,
 html[data-theme='emerald-noctis'] .altar-upload-item-btn,
 html[data-theme='emerald-noctis'] .altar-item-name-input {
@@ -3132,21 +3259,9 @@ html[data-theme='emerald-noctis'] .altar-item-name-input {
   color: #d8c8b8;
 }
 
-html[data-theme='emerald-noctis'] .op-prop-select:hover,
 html[data-theme='emerald-noctis'] .altar-symbol-trigger:hover,
 html[data-theme='emerald-noctis'] .altar-upload-item-btn:hover {
   border-color: rgba(142, 121, 101, 0.56);
-}
-
-html[data-theme='emerald-noctis'] .op-prop-select:focus {
-  border-color: rgba(0, 196, 127, 0.44);
-  box-shadow: 0 0 0 2px rgba(0, 196, 127, 0.18);
-}
-
-html[data-theme='emerald-noctis'] .menu-item:hover:not(:disabled),
-html[data-theme='emerald-noctis'] .context-menu-item-default:hover {
-  background: rgba(0, 122, 77, 0.2);
-  color: #b8ffe2;
 }
 
 /* Light mode redesign: stronger structure and readability */
@@ -3281,24 +3396,6 @@ html[data-theme='emerald-parchment'] .tiptap pre {
   border-color: rgba(150, 112, 73, 0.34);
 }
 
-html[data-theme='emerald-parchment'] .settings-choice-btn-idle {
-  background: #f6e9d3;
-  border-color: rgba(150, 112, 74, 0.36);
-  color: #5f4730;
-}
-
-html[data-theme='emerald-parchment'] .settings-choice-btn-idle:hover {
-  background: #f8eddc;
-  border-color: rgba(132, 94, 56, 0.48);
-  color: #2f2114;
-}
-
-html[data-theme='emerald-parchment'] .settings-choice-btn-active {
-  background: #d6eee1;
-  border-color: rgba(0, 138, 87, 0.42);
-  color: #075e3d;
-}
-
 html[data-theme='emerald-parchment'] .home-item-title {
   color: #3b2a19;
 }
@@ -3335,36 +3432,6 @@ html[data-theme='emerald-parchment'] .list-toolbar-clear:hover {
   color: #503621;
 }
 
-html[data-theme='emerald-parchment'] .list-toolbar-menu {
-  background: #f9f1e2;
-  border-color: rgba(146, 107, 68, 0.42);
-  box-shadow: 0 18px 36px rgba(96, 63, 30, 0.2);
-}
-
-html[data-theme='emerald-parchment'] .list-toolbar-option-active {
-  color: #006b42;
-}
-
-html[data-theme='emerald-parchment'] .list-toolbar-option-idle {
-  color: #5b432d;
-}
-
-html[data-theme='emerald-parchment'] .list-toolbar-option-idle:hover {
-  color: #2f2114;
-  background: rgba(142, 102, 63, 0.12);
-}
-
-html[data-theme='emerald-parchment'] .emoji-picker-popover {
-  background: #f8eedc;
-  border-color: rgba(146, 106, 67, 0.42);
-}
-
-html[data-theme='emerald-parchment'] .tag-color-popover {
-  background: #f8efdf;
-  border-color: rgba(146, 107, 68, 0.42);
-  box-shadow: 0 14px 28px rgba(94, 63, 30, 0.2);
-}
-
 html[data-theme='emerald-parchment'] .settings-nav-item-active,
 html[data-theme='emerald-parchment'] .right-sidebar-tab-active {
   background: #d8efe3;
@@ -3379,59 +3446,17 @@ html[data-theme='emerald-parchment'] .right-sidebar-tab-idle {
 
 html[data-theme='emerald-parchment'] .settings-nav-item-idle:hover,
 html[data-theme='emerald-parchment'] .right-sidebar-tab-idle:hover:not(:disabled),
-html[data-theme='emerald-parchment'] .app-sidebar-right .text-stone-500.hover\:text-stone-300:hover,
-html[data-theme='emerald-parchment'] .app-sidebar-left .text-stone-500.hover\:text-stone-300:hover {
+html[data-theme='emerald-parchment'] .app-sidebar-right .text-subtle.hover\:text-raise:hover,
+html[data-theme='emerald-parchment'] .app-sidebar-left .text-subtle.hover\:text-raise:hover {
   color: #2f2114;
   background: rgba(136, 97, 57, 0.12);
 }
 
-html[data-theme='emerald-parchment'] .app-sidebar-right .bg-stone-700.text-stone-200,
-html[data-theme='emerald-parchment'] .app-sidebar-left .bg-stone-700.text-stone-200 {
+html[data-theme='emerald-parchment'] .app-sidebar-right .bg-well-active.text-secondary,
+html[data-theme='emerald-parchment'] .app-sidebar-left .bg-well-active.text-secondary {
   background: #d8efe3;
   color: #0b5a3a;
   border: 1px solid rgba(0, 138, 87, 0.34);
-}
-
-html[data-theme='emerald-parchment'] .btn-primary,
-html[data-theme='emerald-parchment'] .bg-jade-900\/40 {
-  background: #159165;
-  border-color: #127651;
-  color: #ecfff7;
-}
-
-html[data-theme='emerald-parchment'] button.bg-jade-900\/40,
-html[data-theme='emerald-parchment'] button.bg-jade-900\/50,
-html[data-theme='emerald-parchment'] button.bg-jade-900\/30,
-html[data-theme='emerald-parchment'] button.bg-jade-500\/20,
-html[data-theme='emerald-parchment'] button.bg-jade-500\/10,
-html[data-theme='emerald-parchment'] .btn-primary {
-  color: #ecfff7;
-}
-
-html[data-theme='emerald-parchment'] .btn-primary:hover,
-html[data-theme='emerald-parchment'] .hover\:bg-jade-900\/60:hover {
-  background: #0f7a54;
-  color: #ffffff;
-}
-
-html[data-theme='emerald-parchment'] button.hover\:bg-jade-900\/60:hover,
-html[data-theme='emerald-parchment'] button.hover\:bg-jade-500\/30:hover,
-html[data-theme='emerald-parchment'] button.hover\:bg-jade-500\/20:hover {
-  color: #ffffff;
-}
-
-html[data-theme='emerald-parchment'] .text-jade-400 {
-  color: #0a7a53;
-}
-
-html[data-theme='emerald-parchment'] .hover\:text-jade-300:hover {
-  color: #075c3f;
-}
-
-html[data-theme='emerald-parchment'] .bg-jade-500\/20,
-html[data-theme='emerald-parchment'] .bg-jade-500\/10 {
-  background: #159165;
-  border-color: #127651;
 }
 
 html[data-theme='emerald-parchment'] .sigil-canvas-shell {
@@ -3446,82 +3471,16 @@ html[data-theme='emerald-parchment'] .sigil-canvas {
   background-size: 30px 30px;
 }
 
-html[data-theme='emerald-parchment'] .bg-stone-800\/50,
-html[data-theme='emerald-parchment'] .bg-stone-800\/40,
-html[data-theme='emerald-parchment'] .bg-stone-900\/40,
-html[data-theme='emerald-parchment'] .bg-stone-900\/70 {
-  background-color: #f1e4cf;
-}
-
-html[data-theme='emerald-parchment'] .bg-stone-700\/40,
-html[data-theme='emerald-parchment'] .bg-stone-700\/50,
-html[data-theme='emerald-parchment'] .bg-stone-700\/60,
-html[data-theme='emerald-parchment'] .bg-stone-700\/70,
-html[data-theme='emerald-parchment'] .bg-stone-800\/60,
-html[data-theme='emerald-parchment'] .bg-stone-800\/70,
-html[data-theme='emerald-parchment'] .bg-stone-950\/80 {
-  background-color: #ebdcc5;
-}
-
-html[data-theme='emerald-parchment'] .hover\:bg-stone-800\/60:hover,
-html[data-theme='emerald-parchment'] .hover\:bg-stone-700\/40:hover,
-html[data-theme='emerald-parchment'] .hover\:bg-stone-700\/60:hover,
-html[data-theme='emerald-parchment'] .hover\:bg-stone-700\/70:hover {
-  background-color: #ebdcc5;
-}
-
-html[data-theme='emerald-parchment'] .emoji-picker-item-idle:hover,
-html[data-theme='emerald-parchment'] .emoji-picker-item-active {
-  background-color: rgba(140, 99, 58, 0.14);
-}
-
 html[data-theme='emerald-parchment'] .input-field {
   background: rgba(252, 244, 229, 0.95);
   border-color: rgba(145, 108, 70, 0.38);
   color: #342416;
 }
 
-html[data-theme='emerald-parchment'] .emoji-picker-search {
-  background: rgba(252, 244, 229, 0.95);
-  border-color: rgba(145, 108, 70, 0.38);
-  color: #342416;
-}
-
-html[data-theme='emerald-parchment'] .emoji-picker-search::placeholder {
-  color: #8d7154;
-}
-
-html[data-theme='emerald-parchment'] .link-picker-tab-active {
-  background: var(--link-picker-tab-active-bg);
-  color: var(--link-picker-tab-active-text);
-  border-bottom-color: transparent;
-}
-
-html[data-theme='emerald-parchment'] .link-picker-tab-active .link-picker-tab-count {
-  color: var(--link-picker-tab-active-count);
-}
-
-html[data-theme='emerald-parchment'] .link-picker-tab-idle {
-  color: var(--link-picker-tab-idle-text);
-}
-
-html[data-theme='emerald-parchment'] .link-picker-tab-idle:hover {
-  background: var(--link-picker-tab-idle-hover-bg);
-  color: var(--link-picker-tab-idle-hover-text);
-}
-
 /* Translate the priority colours of the active menu row (TaskRow priority menu on ui/Dropdown)
    into tones that are readable on Parchment. */
-html[data-theme='emerald-parchment'] .list-toolbar-option-active.text-red-400 {
+html[data-theme='emerald-parchment'] .list-toolbar-option-active.text-danger {
   color: #b63f32;
-}
-
-html[data-theme='emerald-parchment'] .list-toolbar-option-active.text-yellow-400 {
-  color: #9a5c00;
-}
-
-html[data-theme='emerald-parchment'] .list-toolbar-option-active.text-green-400 {
-  color: #0b6e48;
 }
 
 html[data-theme='emerald-parchment'] .task-priority-pill-high {
@@ -3562,24 +3521,12 @@ html[data-theme='emerald-parchment'] .tasks-linked-entry:hover {
   background: #c6e7d7;
 }
 
-html[data-theme='emerald-parchment'] .tasks-category-trigger {
-  color: #6d553d;
-  background: #e6d8c2;
-  border: 1px solid rgba(145, 108, 70, 0.3);
-}
-
-html[data-theme='emerald-parchment'] .tasks-category-trigger:hover {
-  color: #2f2114;
-  background: #efdfc8;
-  border-color: rgba(131, 96, 62, 0.42);
-}
-
 html[data-theme='emerald-parchment'] .sigil-tool-toggle {
   background: #eadcc6;
   border-color: rgba(145, 108, 70, 0.36);
 }
 
-html[data-theme='emerald-parchment'] .sigil-tool-btn.bg-stone-700 {
+html[data-theme='emerald-parchment'] .sigil-tool-btn.bg-well-active {
   background: #d6eee1;
   color: #075e3d;
 }
@@ -3599,12 +3546,6 @@ html[data-theme='emerald-parchment'] .sigil-brush-slider {
   accent-color: #159165;
 }
 
-html[data-theme='emerald-parchment'] .op-prop-select {
-  background: #f3e6cf;
-  border-color: rgba(145, 108, 70, 0.34);
-  color: #3a2918;
-}
-
 html[data-theme='emerald-parchment'] .input-field[type="date"] {
   color-scheme: light;
 }
@@ -3615,24 +3556,10 @@ html[data-theme='emerald-noctis'] .input-field[type="date"] {
 
 html[data-theme='emerald-parchment'] .op-prop-select[type="date"] {
   color-scheme: light;
-  background: #f6ead5;
 }
 
-html[data-theme='emerald-parchment'] .op-prop-select:hover {
-  border-color: rgba(131, 96, 62, 0.46);
-  background: #f6ead5;
-}
-
-html[data-theme='emerald-parchment'] .op-prop-select[type="date"]::-webkit-calendar-picker-indicator {
-  background-color: #d6eee1;
-  border: 1px solid rgba(0, 138, 87, 0.28);
-  border-radius: 0.35rem;
-  padding: 0.2rem;
-  cursor: pointer;
-}
-
-html[data-theme='emerald-parchment'] .op-prop-select[type="date"]::-webkit-calendar-picker-indicator:hover {
-  background-color: #c6e7d7;
+html[data-theme='emerald-noctis'] .op-prop-select[type="date"] {
+  color-scheme: dark;
 }
 
 html[data-theme='emerald-parchment'] .op-prop-select[type="date"]::-webkit-datetime-edit,
@@ -3641,35 +3568,6 @@ html[data-theme='emerald-parchment'] .op-prop-select[type="date"]::-webkit-datet
 html[data-theme='emerald-parchment'] .op-prop-select[type="date"]::-webkit-datetime-edit-day-field,
 html[data-theme='emerald-parchment'] .op-prop-select[type="date"]::-webkit-datetime-edit-year-field {
   color: #3a2918;
-}
-
-html[data-theme='emerald-parchment'] .op-prop-select:focus {
-  border-color: rgba(0, 138, 87, 0.44);
-  box-shadow: 0 0 0 2px rgba(0, 138, 87, 0.18);
-}
-
-html[data-theme='emerald-parchment'] .linked-entry-menu-item {
-  color: #5b432d;
-}
-
-html[data-theme='emerald-parchment'] .menu-item,
-html[data-theme='emerald-parchment'] .context-menu-item-default {
-  color: #5b432d;
-}
-
-html[data-theme='emerald-parchment'] .menu-item:hover:not(:disabled),
-html[data-theme='emerald-parchment'] .context-menu-item-default:hover {
-  background: rgba(18, 145, 92, 0.12);
-  color: #0b6e48;
-}
-
-html[data-theme='emerald-parchment'] .context-menu-item-danger {
-  color: #b63f32;
-}
-
-html[data-theme='emerald-parchment'] .context-menu-item-danger:hover {
-  background: rgba(220, 76, 63, 0.14);
-  color: #8f2f26;
 }
 
 html[data-theme='emerald-parchment'] .altar-bg-preset-label {
@@ -3717,20 +3615,10 @@ html[data-theme='emerald-parchment'] .altar-category-chip:hover {
   background: #efdfc8;
 }
 
-html[data-theme='emerald-parchment'] .altar-category-chip.bg-stone-700 {
+html[data-theme='emerald-parchment'] .altar-category-chip.bg-well-active {
   background: #d6eee1;
   color: #0b5a3a;
   border: 1px solid rgba(0, 138, 87, 0.32);
-}
-
-html[data-theme='emerald-parchment'] .link-picker-row:hover,
-html[data-theme='emerald-parchment'] .link-picker-row:focus-visible {
-  background: var(--link-picker-row-hover-bg);
-}
-
-html[data-theme='emerald-parchment'] .link-picker-row:hover .link-picker-label,
-html[data-theme='emerald-parchment'] .link-picker-row:focus-visible .link-picker-label {
-  color: var(--link-picker-row-hover-text);
 }
 
 html[data-theme='emerald-parchment'] .editor-toolbar-btn-active {
@@ -3750,153 +3638,6 @@ html[data-theme='emerald-parchment'] .tiptap :not(pre) > code {
   border: 1px solid rgba(0, 122, 77, 0.2);
 }
 
-/* ── Altar Sidebar control buttons ────────────────────────────────────────── */
-
-html[data-theme='emerald-parchment'] .bg-stone-900\/45 {
-  background-color: #f3e6cf;
-}
-
-html[data-theme='emerald-parchment'] .border-stone-700\/40,
-html[data-theme='emerald-parchment'] .border-stone-700\/50,
-html[data-theme='emerald-parchment'] .border-stone-700\/60 {
-  border-color: rgba(145, 108, 70, 0.34);
-}
-
-html[data-theme='emerald-parchment'] .border-stone-600\/70 {
-  border-color: rgba(145, 108, 70, 0.42);
-}
-
-html[data-theme='emerald-parchment'] .hover\:border-stone-500\/60:hover,
-html[data-theme='emerald-parchment'] .hover\:border-stone-500\/70:hover {
-  border-color: rgba(131, 96, 62, 0.48);
-}
-
-html[data-theme='emerald-parchment'] .hover\:border-stone-400:hover {
-  border-color: rgba(131, 96, 62, 0.56);
-}
-
-html[data-theme='emerald-parchment'] .text-jade-300 {
-  color: #ecfff7;
-}
-
-html[data-theme='emerald-parchment'] .border-jade-600\/70 {
-  border-color: rgba(0, 138, 87, 0.6);
-}
-
-html[data-theme='emerald-parchment'] .ring-jade-700\/40 {
-  --tw-ring-color: rgba(0, 138, 87, 0.4);
-}
-
-html[data-theme='emerald-parchment'] .bg-stone-700,
-html[data-theme='emerald-parchment'] .hover\:bg-stone-700:hover {
-  background-color: var(--interactive-active);
-}
-
-html[data-theme='emerald-parchment'] .bg-red-950\/30 {
-  background-color: rgba(220, 76, 63, 0.09);
-}
-
-html[data-theme='emerald-parchment'] .text-red-200 {
-  color: var(--danger-text);
-}
-
-html[data-theme='emerald-parchment'] .border-red-700\/60 {
-  border-color: var(--danger-border);
-}
-
-html[data-theme='emerald-parchment'] .hover\:border-red-500:hover {
-  border-color: var(--danger-hover-border);
-}
-
-html[data-theme='emerald-parchment'] .bg-jade-900\/30,
-html[data-theme='emerald-parchment'] .bg-jade-900\/50 {
-  background: #159165;
-  border-color: rgba(0, 138, 87, 0.6);
-  color: #ecfff7;
-}
-
-html[data-theme='emerald-parchment'] .hover\:bg-jade-900\/50:hover {
-  background: #0f7a54;
-}
-
-html[data-theme='emerald-parchment'] .border-jade-500\/60,
-html[data-theme='emerald-parchment'] .border-jade-600\/60,
-html[data-theme='emerald-parchment'] .border-jade-700\/60 {
-  border-color: rgba(0, 138, 87, 0.6);
-}
-
-/* The dragged row (placed items, block management): a touch of accent instead of night green. */
-html[data-theme='emerald-parchment'] .bg-jade-900\/20 {
-  background-color: rgba(0, 138, 87, 0.1);
-}
-
-html[data-theme='emerald-parchment'] .hover\:border-jade-500\/70:hover {
-  border-color: rgba(0, 138, 87, 0.7);
-}
-
-html[data-theme='emerald-parchment'] .text-jade-200 {
-  color: #ecfff7;
-}
-
-/* Sidebar action bar — amber "edit" tone, warmed up so it reads on the light parchment ground */
-html[data-theme='emerald-parchment'] .bg-amber-900\/30 {
-  background: #c07a1e;
-  border-color: rgba(168, 105, 24, 0.6);
-  color: #fff6e6;
-}
-
-html[data-theme='emerald-parchment'] .hover\:bg-amber-900\/50:hover {
-  background: #a5661a;
-}
-
-html[data-theme='emerald-parchment'] .border-amber-700\/60 {
-  border-color: rgba(168, 105, 24, 0.6);
-}
-
-html[data-theme='emerald-parchment'] .hover\:border-amber-500\/70:hover {
-  border-color: rgba(168, 105, 24, 0.8);
-}
-
-/* Two Parchment idle overrides sit at (0,2,1) and so outrank Tailwind's unprefixed
-   hover: variants at (0,2,0): .bg-red-950/30 swallows Delete's hover fill, and
-   .text-stone-400 (line 406) swallows Cancel's hover text. The bg/border hovers that
-   do have a themed rule of their own are fine — those land at (0,3,1) and win.
-   Scoped to .sidebar-action-btn to keep other users of those utilities untouched. */
-html[data-theme='emerald-parchment'] .sidebar-action-btn.bg-red-950\/30:hover {
-  background-color: rgba(220, 76, 63, 0.18);
-}
-
-html[data-theme='emerald-parchment'] .sidebar-action-btn.text-stone-400:hover {
-  color: var(--text-secondary);
-}
-
-html[data-theme='emerald-parchment'] .ring-jade-500\/60 {
-  --tw-ring-color: rgba(0, 138, 87, 0.44);
-}
-
-html[data-theme='emerald-parchment'] .bg-stone-800\/80 {
-  background-color: rgba(145, 108, 70, 0.2);
-}
-
-html[data-theme='emerald-parchment'] .hover\:bg-stone-800\/40:hover {
-  background-color: #f1e4cf;
-}
-
-html[data-theme='emerald-parchment'] .hover\:text-stone-100:hover,
-html[data-theme='emerald-parchment'] .hover\:text-stone-300:hover {
-  color: var(--text-primary);
-}
-
-html[data-theme='emerald-parchment'] .bg-stone-950\/35 {
-  background-color: rgba(145, 108, 70, 0.1);
-}
-
-html[data-theme='emerald-parchment'] .from-stone-900 {
-  --tw-gradient-from: #d8c4a0 var(--tw-gradient-from-position);
-  --tw-gradient-to: rgba(216, 196, 160, 0) var(--tw-gradient-to-position);
-  --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to);
-}
-
 html[data-theme='emerald-parchment'] .altar-cat-scroll-fade {
   width: 3.5rem;
 }
@@ -3909,24 +3650,69 @@ html[data-theme='emerald-parchment'] .altar-cat-scroll-fade {
    black, `stroke` to `none`. The mark would be a black octagon, without
    an error message. Exactly the reason `public/splash.css` colours the stone of the
    loading screen via classes instead of on the element. */
-/* The dimming is not the same in both themes, for a
-   reason that is easy to overlook when building: on the dark Noctis,
-   less opacity brings the mark closer to the background and takes away its
-   glare. On the light Parchment it does the same — and there "closer to the
-   background" means washed out. The stone therefore stands at full strength there;
-   dark green on parchment is calm enough on its own. */
-.emerald-mark { --mark-crown: 0.55; --mark-table: 0.5; }
-html[data-theme='emerald-parchment'] .emerald-mark { --mark-crown: 1; --mark-table: 0.9; }
+/* The mark takes its colour from `--mark-accent`, so a custom theme tints it.
+   Classes, not `var()` on the SVG: see EmeraldMark.tsx. */
+.emerald-mark-stone { fill: color-mix(in srgb, var(--mark-accent) 56%, #000); }
+.emerald-mark-line { stroke: var(--mark-line); }
+.emerald-mark-table { fill: var(--mark-accent); }
+.emerald-mark-f1 { fill: color-mix(in srgb, var(--mark-accent) 70%, #000); }
+.emerald-mark-f2 { fill: color-mix(in srgb, var(--mark-accent) 48%, #000); }
+.emerald-mark-f3 { fill: color-mix(in srgb, var(--mark-accent) 39%, #000); }
+.emerald-mark-f4 { fill: color-mix(in srgb, var(--mark-accent) 50%, #000); }
+.emerald-mark-f5 { fill: color-mix(in srgb, var(--mark-accent) 82%, #000); }
+.emerald-mark-t1 { fill: color-mix(in srgb, var(--mark-accent) 82%, #fff); }
+.emerald-mark-t2 { fill: color-mix(in srgb, var(--mark-accent) 90%, #000); }
+.emerald-mark-t3 { fill: color-mix(in srgb, var(--mark-accent) 70%, #000); }
+.emerald-mark-t4 { fill: color-mix(in srgb, var(--mark-accent) 77%, #000); }
+.emerald-mark-t5 { fill: color-mix(in srgb, var(--mark-accent) 75%, #fff); }
 
-.emerald-mark-crown        { fill: var(--accent); opacity: var(--mark-crown); }
-.emerald-mark-table        { opacity: var(--mark-table); }
-.emerald-mark-outline      { stroke: var(--accent); }
-.emerald-mark-table-top    { stop-color: var(--accent); }
-.emerald-mark-table-bottom { stop-color: var(--accent-strong); }
 
-/* The step cut is a light reflection and not a theme colour — it always lies
-   on the tinted table, never on the app background. On the
-   lighter Parchment green it has to be stronger, otherwise it disappears;
-   the same gradation that `--splash-sheen` makes between the themes. */
-.emerald-mark-step { stroke: rgba(255, 255, 255, 0.26); }
-html[data-theme='emerald-parchment'] .emerald-mark-step { stroke: rgba(255, 255, 255, 0.42); }
+/* Active states whose look otherwise lives only in the per-theme rules above:
+   here for a theme that has no such rules, from the tokens alone. */
+html[data-theme='custom'] .rail-button.active,
+html[data-theme='custom'] .rail-button.active:hover,
+html[data-theme='custom'] .settings-nav-item-active,
+html[data-theme='custom'] .right-sidebar-tab-active,
+html[data-theme='custom'] .app-sidebar-right .bg-well-active.text-secondary,
+html[data-theme='custom'] .app-sidebar-left .bg-well-active.text-secondary,
+html[data-theme='custom'] .altar-category-chip.bg-well-active,
+html[data-theme='custom'] .sigil-tool-btn.bg-well-active {
+  background: var(--menu-item-active-bg);
+  border-color: var(--accent-edge);
+  color: var(--menu-item-active-text);
+}
+
+html[data-theme='custom'] .settings-nav-item-active,
+html[data-theme='custom'] .right-sidebar-tab-active {
+  border: 1px solid var(--accent-edge);
+}
+
+html[data-theme='custom'] .editor-toolbar-btn-active {
+  background-color: var(--editor-toolbar-active-bg);
+  color: var(--editor-toolbar-active-text);
+}
+
+html[data-theme='custom'] .list-toolbar-option-active.text-danger {
+  color: var(--danger-text);
+}
+
+html[data-theme='custom'] button:focus-visible,
+html[data-theme='custom'] .menu-item:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--focus-ring);
+}
+
+html[data-theme='custom'] .sidebar-search-inner {
+  background: var(--search-bg);
+  border: 1px solid var(--search-border);
+  box-shadow: var(--search-inset);
+}
+
+html[data-theme='custom'] .sidebar-search-input {
+  color: var(--text-primary);
+}
+
+html[data-theme='custom'] .sidebar-search-input::placeholder {
+  color: var(--text-subtle);
+}
+

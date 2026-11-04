@@ -3,7 +3,7 @@ import { ArrowLeft, ArrowRight, Download, Menu, Search, Upload } from 'lucide-re
 import { useTranslation } from 'react-i18next';
 import { isAltarFullscreen, selectActiveHistory, useUIStore } from '../../../store/uiStore';
 import { hasActiveVault, useVaultStore } from '../../../store/vaultStore';
-import { usesCustomWindowControls, usesHtmlMenuBar } from '../../../lib/platform';
+import { isMacOS, usesCustomWindowControls } from '../../../lib/platform';
 import EmeraldMark from '../../ui/EmeraldMark';
 import { RAIL_WIDTH } from '../LeftSidebarRail';
 import TabBar from '../TabBar';
@@ -28,10 +28,10 @@ interface Props {
  * The window's title bar.
  *
  * Windows and Linux run undecorated (`decorations: false`) and get their
- * minimise / maximise / close buttons plus the application menu here. macOS
- * keeps its native traffic lights (`titleBarStyle: "Overlay"`) and its native
- * menu bar at the screen edge, so it renders neither — it only reserves room
- * on the left for the lights, via `html[data-platform='macos']` in index.css.
+ * minimise / maximise / close buttons here. macOS keeps its native traffic
+ * lights (`titleBarStyle: "Overlay"`) and reserves room on the left for them
+ * instead of the logo, via `html[data-platform='macos']` in index.css. Edit
+ * and View live in its native menu bar; Export and Import are here everywhere.
  *
  * `data-tauri-drag-region` is not inherited: Tauri reads the attribute off the
  * element directly under the cursor. Every non-interactive wrapper that should
@@ -109,16 +109,18 @@ export default function TitleBar({ tabs = false, leadWidth = 0, animate = true, 
             its icon then sits above those of the entry list (whose 4px
             margin next to the rail is in index.css) — that is why the wrapper
             carries no `gap`, only the groups after it `ml-1`. */}
-        <div
-          data-tauri-drag-region
-          title="Emerald App"
-          className="flex-shrink-0 flex items-center justify-center mr-1.5"
-          style={{ width: RAIL_WIDTH }}
-        >
-          <EmeraldMark size={20} className="pointer-events-none" />
-        </div>
+        {!isMacOS && (
+          <div
+            data-tauri-drag-region
+            title="Emerald App"
+            className="flex-shrink-0 flex items-center justify-center mr-1.5"
+            style={{ width: RAIL_WIDTH }}
+          >
+            <EmeraldMark size={20} className="pointer-events-none" />
+          </div>
+        )}
 
-        {usesHtmlMenuBar && !picker && (
+        {!isMacOS && !picker && (
           <TitleBarMenuButton
             label={t('titlebar.menu')}
             icon={<Menu size={16} />}
@@ -146,11 +148,11 @@ export default function TitleBar({ tabs = false, leadWidth = 0, animate = true, 
           </div>
         )}
 
-        {/* Not gated on `minimal`: on Windows and Linux this is the only
+        {/* Not gated on `minimal`: this is the only
             route to the altar's image export, and distraction-free mode is
             precisely where that export is wanted. Export carries Download,
             Import Upload — as in Settings → Backup. */}
-        {usesHtmlMenuBar && !picker && (
+        {!picker && (
           <div className="ml-1 flex items-center gap-0.5 flex-shrink-0">
             <TitleBarMenuButton label={menus.exportMenu.label} icon={<Download size={16} />} nodes={menus.exportMenu.nodes} />
             <TitleBarMenuButton label={menus.importMenu.label} icon={<Upload size={16} />} nodes={menus.importMenu.nodes} />

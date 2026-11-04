@@ -27,6 +27,7 @@ import { resolveOpenEdits } from '../lib/openEdits';
 import { changeVaultPassword, keyErrorOf, lockVault, type CreatedKey } from '../lib/vaultKeys';
 import { ensureVaultReady, VAULT_KEY_CANCELLED } from './vaultKeyStore';
 import { backupBeforeReplacing, keepPendingForNewPassword, prepareOpenedVault, syncNow } from '../lib/sync/engine';
+import { hideSplash } from '../lib/splash';
 
 interface VaultStore {
   vaults: Vault[];
@@ -95,6 +96,11 @@ async function openActiveVault({ askPassword = false }: { askPassword?: boolean 
   // cancels here ends up in the caller's error branch.
   const active = activeVault(useVaultStore.getState());
   if (active) await ensureVaultReady(active, { askPassword });
+  await loadActiveVault().finally(hideSplash);
+}
+
+/** What `openActiveVault` does past the password: the loading screen covers this part. */
+async function loadActiveVault(): Promise<void> {
   // Before getDb(): the migrations on opening already need the new vault's
   // language (see `loadForVault`). A missing vault folder already fails
   // here.

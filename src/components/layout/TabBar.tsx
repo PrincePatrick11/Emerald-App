@@ -1,4 +1,5 @@
-import { Flame, MoreHorizontal, Plus, X } from 'lucide-react';
+import { MoreHorizontal, Plus, X } from 'lucide-react';
+import { AltarIcon } from '../../lib/altarIcon';
 import { useShallow } from 'zustand/shallow';
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
@@ -31,16 +32,16 @@ function getFallbackTitle(view: ActiveView, t: TFunction) {
 function renderIconValue(icon: string | null | undefined, fallback: ReactNode) {
   if (!icon) return fallback;
   if (icon.startsWith('data:') || icon.startsWith('blob:') || icon.startsWith('http') || icon.startsWith('/')) {
-    return <img src={icon} alt="" className="h-3.5 w-3.5 rounded object-cover" />;
+    return <img src={icon} alt="" className="h-3.5 w-3.5 rounded-md object-cover" />;
   }
   return <span className="text-sm leading-none">{icon}</span>;
 }
 
 function AltarTabIcon({ iconData }: { iconData: string | null | undefined }) {
-  if (!iconData) return <Flame size={14} />;
+  if (!iconData) return <AltarIcon size={14} />;
   // `/` paths are presets from public/ and bypass imageSrc.
   const src = iconData.startsWith('/') ? iconData : imageSrc(iconData);
-  if (src) return <img src={src} alt="" className="h-3.5 w-3.5 rounded object-cover" />;
+  if (src) return <img src={src} alt="" className="h-3.5 w-3.5 rounded-md object-cover" />;
   return <span className="text-sm leading-none">{iconData}</span>;
 }
 

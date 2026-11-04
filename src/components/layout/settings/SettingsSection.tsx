@@ -56,7 +56,7 @@ export function SettingsStatus({ tone, icon, children, className }: {
 }
 
 const STATUS_TONE_CLASS = {
-  success: 'text-jade-400',
+  success: 'text-accent',
   error: 'text-danger',
   muted: 'text-muted',
 } as const;

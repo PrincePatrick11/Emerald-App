@@ -4,11 +4,12 @@
 
 The title bar is drawn by the app, not the OS: a 40px bar (`h-10`) in `src/components/layout/titlebar/`, above the three-column shell in `AppShell`. From left to right:
 
-- **Leading group** (`flex-shrink-0`): the Emerald logo, the application menu button, the global-search magnifier, back/forward, and on Windows/Linux the Export and Import buttons. With tabs shown it grows to the left sidebar's width, so the tabs start flush with the sheet below.
+- **Leading group** (`flex-shrink-0`): the Emerald logo and the application menu button (neither on macOS, which has the traffic lights and its native menu), the global-search magnifier, back/forward, and the Export and Import buttons. With tabs shown it grows to the left sidebar's width, so the tabs start flush with the sheet below.
 - **Middle**: the tab strip (`TabBar`, see [Tabs and Workspace State](navigation.md#tabs-and-workspace-state)), or — without tabs (vault picker, boot still running) — an empty `flex-1` drag surface.
 
-Over the [vault picker](#vault-picker) (`TitleBar picker`) the bar keeps only the logo and the window controls, and `WindowControls` drops maximise: the picker's window has one fixed size.
 - **Trailing group**: the window controls on Windows/Linux.
+
+Over the [vault picker](#vault-picker) (`TitleBar picker`) the bar keeps only the logo and the window controls (on macOS only the traffic lights), without Export, Import or the menu, and `WindowControls` drops maximise: the picker's window has one fixed size.
 
 Every trigger is an icon-only `RailButton`, so nothing has to shrink, wrap or fold as the window narrows.
 
@@ -22,8 +23,8 @@ The logo (`EmeraldMark`, an inline SVG) is not a control. Its wrapper carries `d
 |---|---|---|
 | Window config | `decorations: false` | `decorations: true` + `titleBarStyle: "Overlay"` + `hiddenTitle` |
 | Min / max / close | `WindowControls` (46x40, Fluent geometry) | Native traffic lights, positioned by `trafficLightPosition` |
-| Application menu | `TitleBarMenuButton` (HTML, `usesHtmlMenuBar`) | Native, in the system menu bar |
-| Title bar left inset | none | 5rem, reserved for the traffic lights |
+| Application menu | `TitleBarMenuButton` | Native, in the system menu bar |
+| Title bar left | the logo | no logo, a 5rem inset for the traffic lights |
 
 Per-platform window settings live in `src-tauri/tauri.{windows,linux,macos}.conf.json`, which Tauri merges over `tauri.conf.json` — each repeats the complete window object, and `tauri.dev.conf.json` must never gain an `app.windows` key (why: [Per-platform Tauri configs](../build.md#per-platform-tauri-configs)). All four files set `minWidth` 720 and `minHeight` 600.
 
@@ -35,7 +36,7 @@ Per-platform window settings live in `src-tauri/tauri.{windows,linux,macos}.conf
 
 ### Why the native menu is macOS-only
 
-`install_native_menu` in `src-tauri/src/lib.rs` is gated to macOS. On Windows and Linux, `set_menu` attaches an in-window menu bar (an HMENU / a GTK menubar) regardless of `decorations`, which would sit beside the app's own title-bar menus. The menu commands (`update_menu_labels`, `set_export_menu_enabled`, `set_altar_export_menu_enabled`, `set_view_menu_checked`) all return early when `app.menu()` is `None`, so they are no-ops there without frontend branching.
+`install_native_menu` in `src-tauri/src/lib.rs` is gated to macOS. On Windows and Linux, `set_menu` attaches an in-window menu bar (an HMENU / a GTK menubar) regardless of `decorations`, which would sit beside the app's own title-bar menus. The menu commands (`update_menu_labels`, `set_view_menu_checked`) return early when `app.menu()` is `None`, so they are no-ops there without frontend branching. The native menu holds the app menu, Edit and View; Export and Import are only in the title bar.
 
 Both forms run the same code. `src/lib/menuActions.ts` owns the actions (`runMenuAction`) and the rules for which export items are available (`computeMenuEnabledState`). The native menu emits the event ids listed in [IPC Command Surface](../architecture.md#ipc-command-surface), which `AppShell` forwards; the HTML buttons call `dispatchMenuAction` directly. `View > Reset View` is the exception: it changes `AppShell`'s local sidebar widths, so the HTML menu re-emits `reset-sidebar-widths` and `AppShell`'s listener answers it on both platforms.
 
@@ -69,8 +70,10 @@ The earliest step is `adopt_previous_identifier_dirs` (see [Adopting a previous 
 
 The loading screen's markup (`#splash` in `index.html`) and styles (`public/splash.css`, linked from `<head>`) live outside the React tree on purpose: until the bundle has loaded and `main.tsx` has run the window would be blank, and a render-blocking `<link>` plus inline markup is the only way to show something in the first frame. `src/lib/splash.ts` owns everything after that:
 
-- **`initSplash()`** runs at the top level of `main.tsx`, while `#splash` is still in the DOM. It clones `#splash` for `showSplash()` and arms a 10 s fallback timer that calls `hideSplash()` regardless.
-- **`hideSplash()`** is called from `AppShell`'s initial-load effect once the vault's data has loaded — success or failure, so a failed load still uncovers a usable screen. When the start ends in the vault picker, the picker calls it instead, once the window has shrunk to the picker's size, so the large empty window is never seen shrinking. `VaultKeyDialog` calls it on mount as well: the password question comes before the load, and the loading screen would otherwise cover it until the fallback timer fires. There is no minimum display time: it fades out as soon as loading is done, then is removed. Idempotent, since both the effect and the fallback timer call it.
+- **`initSplash()`** runs at the top level of `main.tsx`, while `#splash` is still in the DOM. It clones `#splash` for `showSplash()` and removes the original's `id` (which disarms the 15 s timer in `index.html`, see below) and arms a 10 s fallback timer that calls `hideSplash()` regardless.
+- **`hideSplash()`** is called from `AppShell`'s initial-load effect once the vault's data has loaded — success or failure, so a failed load still uncovers a usable screen. When the start ends in the vault picker, the picker calls it instead, once the window has shrunk to the picker's size, so the large empty window is never seen shrinking. `VaultKeyDialog` calls it on mount as well: the password question comes before the load, and the loading screen would otherwise cover it until the fallback timer fires. `openActiveVault` calls it after the vault has loaded, for every later open or switch. There is no minimum display time: it fades out as soon as loading is done, then is removed. Idempotent, since several callers and the fallback timer may reach it.
+- **`resumeSplash()`** puts a fresh clone back up after the key dialog has been answered, because the vault's data is still to load and the empty window would show meanwhile. `hideSplash()` ends it again, from `AppShell`'s boot or `openActiveVault`. After Cancel nothing loads, so it is not called.
+- **`extendSplashDuring(promise)`** gives the fallback timer a 2 minute limit while a keychain read is pending, then the regular 10 s again: a keychain prompt waits on the user and must not use up the loading time.
 - **`showSplash()`** shows a fresh clone as a preview, dismissed by click or Escape — the View menu's **Show Loading Screen** (`show-splash`).
 - **`showLoadingScreen()` / `hideLoadingScreen()`** put up a fresh clone without the click to dismiss while a vault chosen in the vault picker opens, and take it down once the window is back at its size.
 
@@ -78,7 +81,7 @@ The initial-load effect loads the active vault's settings (`loadForVault`) *befo
 
 **Dragging the loading screen.** The root carries `data-tauri-drag-region`, and a `.splash-drag` strip across the top (2.5rem, the title bar's height) repeats it, because the root's attribute is lost wherever a child takes the click: `showSplash()` removes it from the preview's root so a click can dismiss it, and `.splash-gem` (animated via `transform`, its 512px box reaching into the strip at minimum height) needs `pointer-events: none` to stay out of the strip's way.
 
-**Two safety nets** cover different failures: the 10 s timer in `initSplash()` handles a stuck data load; a 15 s timer in the inline `<script>` in `index.html` handles a bundle that never loads or throws on import, where the first timer never runs. The second skips the fade and deliberately outlasts the first. A stuck loading screen would be unrecoverable on Windows and Linux, where it covers the app's own window chrome and so the only close button.
+**Two safety nets** cover different failures: the 10 s timer in `initSplash()` handles a stuck data load; a 15 s timer in the inline `<script>` in `index.html` handles a bundle that never loads or throws on import, where the first timer never runs. The second skips the fade; it finds `#splash` by its id, which `initSplash()` removes once the bundle has run, so it acts only when the bundle never got that far and cannot cut short a keychain prompt. A stuck loading screen would be unrecoverable on Windows and Linux, where it covers the app's own window chrome and so the only close button.
 
 The inline boot script also sets `html[data-theme]` from `localStorage` before the first paint, so the loading screen appears in the right theme instead of flashing from one to the other. It is a deliberate, comment-flagged copy of `normalizeThemeId()` from `src/themes/theme.ts`, which lives in the bundle the script runs before.
 
@@ -89,7 +92,7 @@ The inline boot script also sets `html[data-theme]` from `localStorage` before t
 - **Ways in.** `openVaultPicker()` settles the open edits first (`resolveOpenEdits`, as `switchVault` does) and then sets `open`; menu Emerald → Switch Vault… (`switch-vault`: the native macOS item emits it, the HTML menu calls `runMenuAction`) and the rail's Vault button both go through it. On start, `AppShell`'s initial-load effect falls back to the picker (`closeToSetup`) when the password is cancelled or the vault fails to open; the second case sets `vaultPickerStore.notice`, shown above the list. `vaults.json` keeps that vault as the active one for the next start.
 - **Choosing.** `choose` in `VaultPicker` keeps `open` set throughout, also where the picker only showed for want of a vault: `switchVault` makes a vault active before opening it, and the shell must not mount on a database that is still locked. The password comes first (`ensureVaultReady`, inside the picker), then `showLoadingScreen()`, `switchVault(id, { editsResolved: true })`, `closeVaultPicker()`, the window back to its size, and two frames later `hideLoadingScreen()`. A cancelled password leaves the picker as it was; a failed switch shows its error there. Choosing the open vault, or **Back to …**, only closes the picker.
 - **The window.** `lib/pickerWindow.ts`: entering remembers the inner size, the outer position and whether the window was maximised or fullscreen (leaving both first), lowers the minimum size, sets 880 × 560 logical pixels centred on where the window was, and makes it not resizable, which also stops Tauri's double-click on a drag region from maximising it. Leaving puts all of it back, the 720 × 600 minimum from `tauri.conf.json` included. The two steps run one after the other, never interleaved (React's StrictMode mounts the picker twice). The permissions are in `capabilities/default.json` (`set-size`, `set-min-size`, `set-position`, `set-resizable`, `maximize`, `unmaximize`, `set-fullscreen`).
-- **While it is up**, `runMenuAction` ignores the vault actions (export, import) as it does without a vault: the macOS menu stays in the menu bar, but no view is there to act on.
+- **While it is up**, the title bar leaves out Export and Import, and `runMenuAction` ignores them as it does without a vault; the macOS menu's Edit and View stay.
 - **Layout.** Two columns on the shell's frame: `VaultPicker` puts the list on the sheet (`.picker-sheet`), `PickerServerPanel` the server on the frame beside it (`.picker-side`, 300px). The list is one list: the vaults in `vaults.json`, each marked from `sync.json`'s links (local, synced, paused), then the server's vaults that no vault in the list is linked to (`useServerState`, from `sync_remote_vaults`). A link left behind by a vault removed from the list does not hide its server copy. The rows (`PickerRows.tsx`) are list rows, not cards: edit and delete show on hover or focus, confirmations are `InlineConfirm`, and only the open vault is tinted.
 - **The server** is part of the picker (`PickerServerPanel`, see [Sync](sync.md)): nothing in it needs an open vault. `useServerState` asks for the status, the vaults and the devices together; a failed request makes the dot read "not reachable", a refused token "signed out".
 
@@ -158,7 +161,7 @@ The hidden webview loads the HTML from a `file://` URL, which carries no CSP and
 
 ### Menu enablement gating
 
-The three "Export as …" items (`export-pdf`, `export-markdown`, `export-emerald`) share one submenu but are gated differently. `computeMenuEnabledState(activeView)` in `src/lib/menuActions.ts` is the single rule set, read by both the native menu and the HTML title-bar menus:
+The three "Export as …" items (`export-pdf`, `export-markdown`, `export-emerald`) share one menu but are gated differently. `computeMenuEnabledState(activeView)` in `src/lib/menuActions.ts` is the single rule set, read by the title bar's Export menu on every platform.
 
 | Item | Enabled for |
 |---|---|
@@ -167,13 +170,12 @@ The three "Export as …" items (`export-pdf`, `export-markdown`, `export-emeral
 | `export-emerald` | an entry, an altar in reading view, or an open template page |
 | `export-altar-image` submenu | an altar in reading view |
 
-On macOS the items start disabled (`install_native_menu`), and one `useEffect` in `AppShell`, keyed on `activeView.type`, `.id` and `.mode`, pushes the state through `set_export_menu_enabled` (the three items independently) and `set_altar_export_menu_enabled` (the submenu and its three children).
 
 There is one item per format, not one per content type: the handlers branch on what is open. `export-pdf` re-reads `useUIStore.getState().activeView` at click time and calls `saveAltarPDF()` (`src/lib/altarExport.ts`) for an altar in reading view, `exportAsPDF(data)` otherwise. `exportAsEmerald()` (`src/lib/emeraldFormat.ts`) branches the same way.
 
 **Blocks export through their own serializers, so there is no concealed-sigil gate.** `collectExportData` runs `renderBlocksForExport` (`lib/blocks/exportRender.ts`, pure, texts passed in as `ExportText`): one serializer per block type, by the read-mode rules — hidden blocks and a concealed sigil's calculator and drawing are left out, field blocks list only what `isHiddenInRead` lets through, titles become `<h3>` where `showsTitleInRead` says so, unknown types go out as their stored inner HTML. The result is plain HTML without `<section>`, so DOMPurify, `embedImages`, the link-chip transform and Turndown work unchanged (Turndown has rules for `<dt>`/`<dd>`; `stripImages` keeps a block image's alt text as a placeholder). The `.emerald` export keeps blocks as stored, hidden ones flagged, but drops concealed ones via `withoutConcealed`.
 
-**Altar "Export as Image" submenu.** `export-altar-image` (below a separator in `export-submenu`) holds `export-altar-jpeg`/`-png`/`-webp`; each reaches `runMenuAction`, which calls `saveAltarImage(format)` (`src/lib/altarExport.ts`). `update_menu_labels` descends into the nested submenu to relabel it on language change.
+**Altar "Export as Image" submenu.** The title bar's Export menu holds `export-altar-jpeg`/`-png`/`-webp`; each reaches `runMenuAction`, which calls `saveAltarImage(format)` (`src/lib/altarExport.ts`).
 
 ### Bridging imperative menu-event code to a React modal
 

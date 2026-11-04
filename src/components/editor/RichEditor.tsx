@@ -292,7 +292,7 @@ export default function RichEditor({
       {editable && linkPopup && (
         <div
           ref={linkPopupRef}
-          className="fixed z-50 flex items-center gap-1 px-2 py-1.5 bg-stone-800 border border-stone-600 rounded-lg shadow-xl text-xs"
+          className="fixed z-50 flex items-center gap-1 px-2 py-1.5 bg-well-solid border border-edge-strong rounded-lg shadow-menu text-xs"
           style={{
             left: linkPopup.rect.left,
             top: linkPopup.rect.bottom + 6,
@@ -309,26 +309,26 @@ export default function RichEditor({
                   if (e.key === 'Enter') handleLinkEditConfirm();
                   if (e.key === 'Escape') { setEditingHref(null); }
                 }}
-                className="bg-stone-900 border border-stone-600 rounded px-2 py-0.5 text-stone-200 w-64 outline-none focus:border-jade-600"
+                className="bg-well-page border border-edge-strong rounded-md px-2 py-0.5 text-secondary w-64 outline-none focus:border-accent-edge"
                 placeholder="https://"
               />
-              <button onClick={handleLinkEditConfirm} className="p-1 text-jade-400 hover:text-jade-300" title={t('editor.confirm')}>
+              <button onClick={handleLinkEditConfirm} className="p-1 text-accent hover:text-accent-raise" title={t('editor.confirm')}>
                 <Check size={12} />
               </button>
-              <button onClick={() => setEditingHref(null)} className="p-1 text-stone-500 hover:text-stone-300" title={t('editor.cancel')}>
+              <button onClick={() => setEditingHref(null)} className="p-1 text-subtle hover:text-raise" title={t('editor.cancel')}>
                 <X size={12} />
               </button>
             </>
           ) : (
             <>
-              <ExternalLink size={11} className="text-stone-500 shrink-0" />
-              <span className="text-stone-400 max-w-[220px] truncate">{linkPopup.href}</span>
+              <ExternalLink size={12} className="text-subtle shrink-0" />
+              <span className="text-muted max-w-[220px] truncate">{linkPopup.href}</span>
               <button
                 onClick={() => setEditingHref(linkPopup.href)}
-                className="p-1 text-stone-500 hover:text-stone-300 ml-1"
+                className="p-1 text-subtle hover:text-raise ml-1"
                 title={t('editor.editLink')}
               >
-                <Pencil size={11} />
+                <Pencil size={12} />
               </button>
               <Button
                 onClick={handleLinkRemove}
@@ -336,7 +336,7 @@ export default function RichEditor({
                 className="p-1"
                 title={t('editor.removeLink')}
               >
-                <Trash2 size={11} />
+                <Trash2 size={12} />
               </Button>
             </>
           )}

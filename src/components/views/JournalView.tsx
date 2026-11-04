@@ -31,6 +31,7 @@ import type { Entry, MoonPhase } from '../../types';
 import { useSaveAsTemplateAction } from '../../hooks/useSaveAsTemplateAction';
 import { useSessionState } from '../../store/sessionStore';
 import { useEntryContentReady } from '../../hooks/useEntryContentReady';
+import { createItem } from '../../lib/createItem';
 
 export default function JournalView() {
   const { t } = useTranslation();
@@ -39,8 +40,8 @@ export default function JournalView() {
   const { activeView, setActiveView, journalPrefs, setJournalPrefs } = useUIStore(
     useShallow((s) => ({ activeView: s.activeView, setActiveView: s.setActiveView, journalPrefs: s.journalPrefs, setJournalPrefs: s.setJournalPrefs }))
   );
-  const { entries, createEntry, duplicateEntry, updateEntry, deleteEntry, restoreEntry, getEntry } = useEntryStore(
-    useShallow((s) => ({ entries: s.entries.journal, createEntry: s.createEntry, duplicateEntry: s.duplicateEntry, updateEntry: s.updateEntry, deleteEntry: s.deleteEntry, restoreEntry: s.restoreEntry, getEntry: s.getEntry }))
+  const { entries, duplicateEntry, updateEntry, deleteEntry, restoreEntry, getEntry } = useEntryStore(
+    useShallow((s) => ({ entries: s.entries.journal, duplicateEntry: s.duplicateEntry, updateEntry: s.updateEntry, deleteEntry: s.deleteEntry, restoreEntry: s.restoreEntry, getEntry: s.getEntry }))
   );
   const pushUndo = useUndoStore((s) => s.push);
 
@@ -107,10 +108,7 @@ export default function JournalView() {
     if (entry) setTitle(entry.title);
   }, [entry?.title]);
 
-  const handleNew = async () => {
-    const e = await createEntry('journal');
-    setActiveView({ type: 'journal', id: e.id, mode: 'edit', isNew: true });
-  };
+  const handleNew = () => createItem('journal');
 
   const openCtxMenu = (e: React.MouseEvent, id: string) => { e.preventDefault(); setCtxMenu({ id, x: e.clientX, y: e.clientY }); };
 
@@ -270,13 +268,13 @@ export default function JournalView() {
             <>
               <div className="text-2xl mb-2">{icon}</div>
               {renaming
-                ? renameInput('text-sm font-medium text-stone-200 w-full bg-transparent outline-none selectable mb-1')
-                : <div className="text-sm font-medium text-stone-200 truncate mb-1">{displayTitle(t, 'journal', e.title)}</div>}
-              <div className="text-xs text-parchment-500/70">{formatEntryDate(e.created_at)}</div>
+                ? renameInput('text-sm font-medium text-secondary w-full bg-transparent outline-none selectable mb-1')
+                : <div className="text-sm font-medium text-secondary truncate mb-1">{displayTitle(t, 'journal', e.title)}</div>}
+              <div className="text-xs text-muted">{formatEntryDate(e.created_at)}</div>
               {!renaming && visibleTags(e.tags, tagMap).length > 0 && (
                 <div className="flex flex-wrap gap-1 mt-2">
                   {visibleTags(e.tags, tagMap).slice(0, 3).map((tag) => (
-                    <span key={tag.id} className="px-1.5 py-0.5 rounded text-xs bg-stone-700/60 text-stone-500">{tag.name}</span>
+                    <span key={tag.id} className="px-1.5 py-0.5 rounded-md text-xs bg-well-raise text-subtle">{tag.name}</span>
                   ))}
                 </div>
               )}
@@ -285,9 +283,9 @@ export default function JournalView() {
             <>
               <span className="text-base flex-shrink-0">{icon}</span>
               {renaming
-                ? renameInput('flex-1 bg-transparent text-sm text-stone-300 outline-none selectable')
-                : <span className="flex-1 text-sm text-stone-300 truncate">{displayTitle(t, 'journal', e.title)}</span>}
-              <span className="text-xs text-parchment-500/70 flex-shrink-0">{formatEntryDate(e.created_at)}</span>
+                ? renameInput('flex-1 bg-transparent text-sm text-soft outline-none selectable')
+                : <span className="flex-1 text-sm text-soft truncate">{displayTitle(t, 'journal', e.title)}</span>}
+              <span className="text-xs text-muted flex-shrink-0">{formatEntryDate(e.created_at)}</span>
             </>
           )}
         </DashboardItem>

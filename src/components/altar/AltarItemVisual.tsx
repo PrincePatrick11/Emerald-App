@@ -20,7 +20,7 @@ export const AltarItemVisual = memo(function AltarItemVisual({
         src={src}
         alt=""
         style={{ width: size, height: size }}
-        className="object-contain rounded"
+        className="object-contain rounded-md"
         draggable={false}
       />
     );

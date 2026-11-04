@@ -35,7 +35,7 @@ PDF export renders in a hidden window that the per-platform `export_pdf` command
 
 ## Command Surface
 
-`src-tauri/src/lib.rs` registers **87 commands**. The security-relevant ones are discussed in their own sections below; this inventory exists so a new command cannot hide among undocumented ones.
+`src-tauri/src/lib.rs` registers **86 commands**. The security-relevant ones are discussed in their own sections below; this inventory exists so a new command cannot hide among undocumented ones.
 
 | Command | Defined in | Notes |
 |---|---|---|
@@ -57,7 +57,8 @@ PDF export renders in a hidden window that the per-platform `export_pdf` command
 | `default_vault_dir`, `new_vault_base_dir`, `legacy_default_db_exists` | `vault.rs` | path/existence oracles for the vault picker and the backup import's add-vault mode; take no path |
 | `migrate_vault_layout` | `vault.rs` | moves a pre-0.2.1 flat `.db` into its own vault directory; the legacy name is validated with `is_valid_legacy_db_name` |
 | `close_request_seen` | `lib.rs` | no arguments: tells Rust the frontend is handling a close request (see [Closing the window](architecture/shell.md#closing-the-window)). All it can do is *prevent* the fallback that closes an unresponsive window |
-| `update_menu_labels`, `set_export_menu_enabled`, `set_altar_export_menu_enabled`, `set_view_menu_checked` | `lib.rs` | native-menu state sync; no-ops on Windows/Linux, where no native menu is installed |
+| `update_menu_labels`, `set_view_menu_checked` | `lib.rs` | native-menu state sync; no-ops on Windows/Linux, where no native menu is installed |
+| `set_dock_icon` | `lib.rs` | a custom theme's Dock icon as a size-limited image the frontend draws; no-op on Windows/Linux |
 | `update_settings`, `set_update_settings`, `check_for_update`, `install_update` | `updates.rs` | reach the network for updates — see [In-App Updates](#in-app-updates) |
 | `sync_status`, `sync_server_status`, `sync_pair`, `sync_unpair`, `sync_devices`, `sync_remove_device`, `sync_set_paused`, `sync_forget_link`, `sync_delete_remote`, `sync_rename`, `sync_remote_vaults`, `sync_create_remote`, `sync_adopt_remote`, `sync_push`, `sync_pull`, `sync_remote_state`, `sync_snapshot_begin`, `sync_snapshot_add`, `sync_snapshot_put`, `sync_snapshot_fetch`, `sync_snapshot_frame`, `sync_snapshot_done`, `sync_images`, `sync_images_delete`, `sync_adopt_new_password`, `sync_rekey_done`, `sync_watch`, `sync_unwatch` | `sync.rs` | reach a sync server the user connected a vault to, and nothing else. Take a vault id; none returns the token or a key. See [Sync](architecture/sync.md) |
 
@@ -68,6 +69,7 @@ PDF export renders in a hidden window that the per-platform `export_pdf` command
 - **Not in a release build.** The module, its two commands (`devbridge_reply`, `devbridge_event`) and the script it injects exist only with the cargo feature `devbridge`, which is off by default, and `lib.rs` refuses to compile the feature without debug assertions. The command count above is the one of a build without it.
 - **Closed unless asked for.** A build that has the feature still listens only when `EMERALD_DEVBRIDGE_PORT` names a port. The MCP launcher sets it; `npm run tauri:dev` does not even enable the feature.
 - **Loopback only.** The listener binds `127.0.0.1`.
+- **It runs the session's checkout.** The tools that start the app run `npm install` and `tauri dev` from the checkout the session works in, as the server's user and outside any restriction the client puts on the session's own commands. Whoever can edit that checkout and call those tools can run code that way.
 - **Invisible only when told.** On macOS the bridge can make the app's windows transparent and keep the app out of the Dock (the activation policy is set once the app is ready, as the windowing layer would overwrite it earlier), so an instance driven by an agent stays out of the way. It does so only while it listens and `EMERALD_DEVBRIDGE_HIDE_WINDOW=1` is set, which the MCP launcher does.
 - **No web pages.** A WebSocket handshake that carries an `Origin` header is refused, so a page open in a browser on the same machine cannot connect. Any other local process can, as it can to the WebView2 debug port on Windows.
 
@@ -122,9 +124,9 @@ The mechanics are in [`architecture/encryption.md`](architecture/encryption.md);
 - **Legacy images keep their old names.** An image adopted from the pre-per-vault shared pool into an encrypted vault is sealed but keeps its SHA-256 name until the next password change.
 - **No cross-process lock.** Two Emerald processes on one vault — the release build and a dev build, say — are not coordinated; a password change in one while the other has the vault open is unsupported.
 - **The sync token** goes to the OS keychain. With no keychain, or one that refused, it and the key for vault names lie in `{appDataDir}/sync.json`, sealed under a key built into the app. That keeps them from being read at a glance or found by a tool that scans files for tokens, and is otherwise worth nothing, since the key is in the public source: the connect form warns of that and the Sync page says so while it is the case. Whoever reads the file can use the server as this device, and can see vault names, but opens no vault without its password. `guarded_read_path` refuses the file, so the webview cannot read it, and on Unix it is for this account only.
-- **macOS builds are unsigned.** After an update the keychain may ask whether the app may read its entry again; the choice is the user's.
+- **macOS builds are unsigned.** After an update the keychain may ask whether the app may read its entry again; the choice is the user's. On a build the entry does not yet trust, macOS was measured asking twice for a single read. "Allow" holds for that read only; "Always Allow" in both prompts holds until the binary changes.
 - **Windows keychain entries are written with `CRED_PERSIST_ENTERPRISE`**, the `keyring` crate's setting, so on a domain profile with roaming enabled they may roam with the profile.
-- **`settings.json` is plain**, deliberately: it holds no content and is read before any vault is unlocked.
+- **`settings.json` is plain**, deliberately: it holds no entry content (appearance includes the names and colours of imported themes) and is read before any vault is unlocked.
 
 ## Vault Directories as a Trust Boundary
 

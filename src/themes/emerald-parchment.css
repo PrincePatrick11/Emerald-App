@@ -2,20 +2,17 @@ html[data-theme='emerald-parchment'] {
   --bg-app: #f7efdf;
   --bg-surface-1: rgba(255, 249, 238, 0.9);
   --bg-surface-2: rgba(247, 236, 217, 0.97);
-  --bg-elevated: rgba(255, 252, 246, 0.99);
   --text-primary: #2c2014;
   --text-secondary: #433121;
   --text-muted: #5b442e;
   --text-subtle: #775c41;
   --border-soft: rgba(166, 129, 91, 0.35);
-  --border-subtle: rgba(145, 108, 70, 0.32);
   --border-strong: rgba(141, 104, 68, 0.52);
   --interactive-hover: rgba(130, 87, 44, 0.12);
   --interactive-active: rgba(130, 87, 44, 0.18);
   --code-bg: rgba(133, 95, 58, 0.12);
   --accent: #008a57;
   --accent-strong: #006941;
-  --accent-contrast: #f3fff9;
   --focus-ring: rgba(0, 138, 87, 0.34);
   --scrollbar: rgba(166, 129, 91, 0.72);
   --scrollbar-hover: rgba(141, 104, 68, 0.86);
@@ -49,7 +46,7 @@ html[data-theme='emerald-parchment'] {
   --linked-chip-border: rgba(145, 108, 70, 0.3);
   --linked-chip-text: #5b432d;
   /* Warnton: Schrift wie Flaeche (siehe .block-checkbox--warning). */
-  --warning-text: #c97229;
+  --warning-text: #a75924;
   --danger-text: #b63f32;
   --danger-bg: rgba(239, 68, 68, 0.08);
   --danger-border: rgba(239, 68, 68, 0.2);
@@ -75,10 +72,11 @@ html[data-theme='emerald-parchment'] {
   --field-border: rgba(154, 117, 80, 0.42);
   --field-border-hover: rgba(131, 96, 62, 0.62);
   --field-inset-bg: #f3e8d4;
-  --primary-solid-bg: #008a57;
-  --primary-solid-border: #006941;
-  --primary-solid-text: #f3fff9;
-  --primary-solid-hover-bg: #006941;
+  --primary-solid-bg: #159165;
+  --primary-solid-border: #127651;
+  --primary-solid-text: #ecfff7;
+  --primary-solid-hover-bg: #0f7a54;
+  --primary-solid-hover-text: #ffffff;
   --danger-soft-text: #b63f32;
   --danger-soft-border: rgba(182, 63, 50, 0.5);
   /* Frame + sheet (design.md, Shell Layout): title bar, rail and left
@@ -104,8 +102,80 @@ html[data-theme='emerald-parchment'] {
   --search-inset: inset 0 1px 0 rgba(255, 255, 255, 0.7);
   /* The entry list search: borderless on the frame. */
   --list-search-bg: rgba(130, 87, 44, 0.08);
+  /* Settings' choice buttons, and the dimming behind a modal. */
+  --choice-bg: #f6e9d3;
+  --choice-bg-hover: #f8eddc;
+  --choice-border: rgba(150, 112, 74, 0.36);
+  --choice-border-hover: rgba(132, 94, 56, 0.48);
+  --choice-text: #5f4730;
+  --choice-text-hover: #2f2114;
+  --choice-active-bg: #d6eee1;
+  --choice-active-border: rgba(0, 138, 87, 0.42);
+  --choice-active-text: #075e3d;
+  --modal-scrim: rgba(0, 0, 0, 0.5);
+  /* Button's `tone` mode: tinted row actions. The solid jade stays at 3.84:1 with
+     its text, a deliberate choice over a darker green (design.md, Colour). */
+  --tone-jade-bg: #159165;
+  --tone-jade-bg-hover: #0f7a54;
+  --tone-jade-border: rgba(0, 138, 87, 0.6);
+  --tone-jade-border-hover: rgba(0, 138, 87, 0.7);
+  --tone-jade-text: #ecfff7;
+  --tone-jade-text-hover: #ecfff7;
+  --tone-amber-bg: #a75924;
+  --tone-amber-bg-hover: #8f4c1e;
+  --tone-amber-border: rgba(168, 105, 24, 0.6);
+  --tone-amber-border-hover: rgba(168, 105, 24, 0.8);
+  --tone-amber-text: #fff6e6;
+  --tone-amber-text-hover: #fff6e6;
+  --tone-danger-bg: rgba(220, 76, 63, 0.09);
+  --tone-danger-bg-hover: rgba(220, 76, 63, 0.18);
+  --tone-danger-border: rgba(239, 68, 68, 0.2);
+  --tone-danger-border-hover: rgba(239, 68, 68, 0.34);
+  --tone-danger-text: #b63f32;
+  --tone-danger-text-hover: #b63f32;
+  --tone-neutral-bg: #f3e6cf;
+  --tone-neutral-bg-hover: #ebdcc5;
+  --tone-neutral-border: rgba(145, 108, 70, 0.42);
+  --tone-neutral-border-hover: rgba(145, 108, 70, 0.42);
+  --tone-neutral-text: #5b442e;
+  --tone-neutral-text-hover: #433121;
   /* Heights (design.md, Heights and Spacing). */
-  --content-bar-h: 56px;
   --control-h: 30px;
-  --control-h-sm: 24px;
+  /* Generic text, surfaces and edges behind the Tailwind colour names in tailwind.config.js. */
+  --text-soft: #5b442e;
+  --text-raise: #2c2014;
+  --text-on-accent: #ecfff7;
+  --accent-text: #0a7a53;
+  --accent-text-raise: #075c3f;
+  --success-text: #1f7a43;
+  --border-default: rgba(166, 129, 91, 0.35);
+  --edge: rgba(145, 108, 70, 0.34);
+  --edge-strong: rgba(145, 108, 70, 0.42);
+  --edge-raise: rgba(131, 96, 62, 0.48);
+  --accent-edge: rgba(0, 138, 87, 0.6);
+  --well: #f1e4cf;
+  --well-strong: #ebdcc5;
+  --well-raise: #ebdcc5;
+  --well-solid: rgba(255, 249, 238, 0.9);
+  --well-active: rgba(130, 87, 44, 0.18);
+  --well-sunk: #f3e6cf;
+  --well-deep: rgba(145, 108, 70, 0.1);
+  --well-tint: rgba(145, 108, 70, 0.2);
+  --well-page: #f7efdf;
+  --overlay: rgba(28, 25, 23, 0.8);
+  --canvas: #ebdcc5;
+  --accent-wash: rgba(0, 138, 87, 0.1);
+  --accent-wash-strong: rgba(0, 138, 87, 0.25);
+  --accent-track: rgba(0, 138, 87, 0.6);
+  --accent-fill: #159165;
+  --accent-fill-strong: #159165;
+  --danger-wash: rgba(239, 68, 68, 0.1);
+  --secondary-bg: #f6ead6;
+  --secondary-bg-hover: rgba(130, 87, 44, 0.12);
+  --secondary-border: rgba(152, 114, 75, 0.32);
+  --secondary-border-hover: rgba(141, 104, 68, 0.52);
+  --secondary-text: #6d553d;
+  --secondary-text-hover: #2c2014;
+  --mark-accent: #00c47f;
+  --mark-line: #c8f2e0;
 }

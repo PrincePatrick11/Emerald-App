@@ -398,11 +398,10 @@ async fn export_pdf(app: tauri::AppHandle, html: String, path: String, page_size
 /// in-window menu bar (HMENU / GTK menubar) that would collide with the
 /// app's own menu bar in `TitleBar` — those platforms render the same items
 /// in HTML instead (`src/components/layout/titlebar/useTitleBarMenus.ts`),
-/// firing the identical events listed below.
+/// running the same actions.
 ///
-/// `set_export_menu_enabled`, `set_altar_export_menu_enabled` and
-/// `update_menu_labels` all bail out on `app.menu()` returning `None`, so
-/// they become no-ops on the platforms that never get here.
+/// `update_menu_labels` bails out on `app.menu()` returning `None`, so
+/// it becomes a no-op on the platforms that never get here.
 #[cfg(target_os = "macos")]
 fn install_native_menu(app: &tauri::App) -> tauri::Result<()> {
     // The application's name in the macOS menu bar. Tied to `productName` in
@@ -501,95 +500,7 @@ fn install_native_menu(app: &tauri::App) -> tauri::Result<()> {
         &lock_view_item,
         &show_splash_item,
     ])?;
-    // Export items start disabled — the frontend enables them once a
-    // journal / wiki / operations entry is actually open (PDF is also
-    // enabled while an Altar's reading view is open).
-    let export_pdf_item = MenuItem::with_id(
-        app,
-        "export-pdf",
-        "Export as PDF…",
-        false,
-        None::<&str>,
-    )?;
-    let export_md_item = MenuItem::with_id(
-        app,
-        "export-markdown",
-        "Export as Markdown…",
-        false,
-        None::<&str>,
-    )?;
-    let export_emerald_item = MenuItem::with_id(
-        app,
-        "export-emerald",
-        "Export as Emerald…",
-        false,
-        None::<&str>,
-    )?;
-    // Altar image export — starts disabled, the frontend enables it
-    // only while an Altar's reading view is open.
-    let export_altar_jpeg_item = MenuItem::with_id(
-        app,
-        "export-altar-jpeg",
-        "JPEG…",
-        false,
-        None::<&str>,
-    )?;
-    let export_altar_png_item = MenuItem::with_id(
-        app,
-        "export-altar-png",
-        "PNG…",
-        false,
-        None::<&str>,
-    )?;
-    let export_altar_webp_item = MenuItem::with_id(
-        app,
-        "export-altar-webp",
-        "WebP…",
-        false,
-        None::<&str>,
-    )?;
-    let export_altar_image_submenu = Submenu::with_id_and_items(
-        app,
-        "export-altar-image",
-        "Export as Image",
-        false,
-        &[&export_altar_jpeg_item, &export_altar_png_item, &export_altar_webp_item],
-    )?;
-    let export_submenu = Submenu::with_id_and_items(
-        app,
-        "export-submenu",
-        "Export",
-        true,
-        &[
-            &export_pdf_item,
-            &export_md_item,
-            &export_emerald_item,
-            &PredefinedMenuItem::separator(app)?,
-            &export_altar_image_submenu,
-        ],
-    )?;
-    let import_md_item = MenuItem::with_id(
-        app,
-        "import-markdown",
-        "From Markdown…",
-        true,
-        None::<&str>,
-    )?;
-    let import_emerald_item = MenuItem::with_id(
-        app,
-        "import-emerald",
-        "From Emerald…",
-        true,
-        None::<&str>,
-    )?;
-    let import_submenu = Submenu::with_id_and_items(
-        app,
-        "import-submenu",
-        "Import",
-        true,
-        &[&import_md_item, &import_emerald_item],
-    )?;
-    let menu = Menu::with_items(app, &[&app_submenu, &edit_submenu, &view_submenu, &export_submenu, &import_submenu])?;
+    let menu = Menu::with_items(app, &[&app_submenu, &edit_submenu, &view_submenu])?;
     app.set_menu(menu)?;
 
     app.on_menu_event(|app, event| {
@@ -601,14 +512,6 @@ fn install_native_menu(app: &tauri::App) -> tauri::Result<()> {
             "toggle-left-list"     => { app.emit("toggle-left-list", ()).ok(); }
             "toggle-right-sidebar" => { app.emit("toggle-right-sidebar", ()).ok(); }
             "toggle-view-lock"     => { app.emit("toggle-view-lock", ()).ok(); }
-            "export-pdf"           => { app.emit("export-pdf", ()).ok(); }
-            "export-markdown"      => { app.emit("export-markdown", ()).ok(); }
-            "export-emerald"       => { app.emit("export-emerald", ()).ok(); }
-            "export-altar-jpeg"    => { app.emit("export-altar-jpeg", ()).ok(); }
-            "export-altar-png"     => { app.emit("export-altar-png", ()).ok(); }
-            "export-altar-webp"    => { app.emit("export-altar-webp", ()).ok(); }
-            "import-markdown"      => { app.emit("import-markdown", ()).ok(); }
-            "import-emerald"       => { app.emit("import-emerald", ()).ok(); }
             // Via the window: `close()` triggers the close request, which the
             // frontend answers. The app ends with the last window.
             "quit" => match app.get_webview_window("main") {
@@ -619,6 +522,62 @@ fn install_native_menu(app: &tauri::App) -> tauri::Result<()> {
         }
     });
     Ok(())
+}
+
+// ── macOS Dock icon of a custom theme ─────────────────────────────────────────
+
+/// Far above the 512 px icon the frontend draws (`src/themes/dockIcon.ts`).
+const MAX_DOCK_ICON_BYTES: usize = 4 * 1024 * 1024;
+
+/// Shows a PNG as the Dock icon, or with `None` the icon the app started with.
+/// Lasts only while the app runs. macOS only in effect.
+#[tauri::command]
+fn set_dock_icon(app: tauri::AppHandle, png: Option<Vec<u8>>) -> Result<(), String> {
+    if png.as_ref().is_some_and(|bytes| bytes.len() > MAX_DOCK_ICON_BYTES) {
+        return Err("dock icon too large".into());
+    }
+    #[cfg(target_os = "macos")]
+    app.run_on_main_thread(move || apply_dock_icon(png.as_deref()))
+        .map_err(|e| e.to_string())?;
+    #[cfg(not(target_os = "macos"))]
+    let _ = (app, png);
+    Ok(())
+}
+
+#[cfg(target_os = "macos")]
+fn apply_dock_icon(png: Option<&[u8]>) {
+    use objc::rc::autoreleasepool;
+    use objc::runtime::Object;
+    use objc::{class, msg_send, sel, sel_impl};
+    use std::sync::atomic::{AtomicUsize, Ordering};
+
+    // Copied on the first change and kept for the app's lifetime: the getter
+    // hands out the one image that every later set overwrites.
+    static ORIGINAL: AtomicUsize = AtomicUsize::new(0);
+
+    autoreleasepool(|| unsafe {
+        let ns_app: *mut Object = msg_send![class!(NSApplication), sharedApplication];
+        if ORIGINAL.load(Ordering::Relaxed) == 0 {
+            let current: *mut Object = msg_send![ns_app, applicationIconImage];
+            let copy: *mut Object = msg_send![current, copy];
+            ORIGINAL.store(copy as usize, Ordering::Relaxed);
+        }
+        match png {
+            Some(bytes) => {
+                let data: *mut Object = msg_send![class!(NSData), dataWithBytes: bytes.as_ptr() length: bytes.len()];
+                let image: *mut Object = msg_send![class!(NSImage), alloc];
+                let image: *mut Object = msg_send![image, initWithData: data];
+                if !image.is_null() {
+                    let _: () = msg_send![ns_app, setApplicationIconImage: image];
+                    let _: () = msg_send![image, release];
+                }
+            }
+            None => {
+                let original = ORIGINAL.load(Ordering::Relaxed) as *mut Object;
+                let _: () = msg_send![ns_app, setApplicationIconImage: original];
+            }
+        }
+    });
 }
 
 // ── macOS mouse back/forward button support ───────────────────────────────────
@@ -672,34 +631,6 @@ fn install_mouse_nav_monitor(app_handle: tauri::AppHandle) {
     }
 }
 
-/// Toggles the enabled state of the "Export to …" menu items. `entry_enabled`
-/// covers Markdown (journal / wiki / operations only); `pdf_enabled` covers
-/// PDF, which is also available while an Altar's reading view is open (it
-/// exports the rendered altar image instead of entry content in that case);
-/// `emerald_enabled` covers the shared Emerald export, also available for an
-/// open Altar and an open template page. Called by the frontend on every view change.
-#[tauri::command]
-fn set_export_menu_enabled(app: tauri::AppHandle, entry_enabled: bool, pdf_enabled: bool, emerald_enabled: bool) {
-    use tauri::menu::MenuItemKind;
-    let Some(menu) = app.menu() else { return };
-
-    for kind in menu.items().unwrap_or_default() {
-        if let MenuItemKind::Submenu(sub) = &kind {
-            if sub.id().0.as_str() != "export-submenu" { continue; }
-            for child in sub.items().unwrap_or_default() {
-                if let MenuItemKind::MenuItem(item) = &child {
-                    match item.id().0.as_str() {
-                        "export-pdf" => { item.set_enabled(pdf_enabled).ok(); }
-                        "export-markdown" => { item.set_enabled(entry_enabled).ok(); }
-                        "export-emerald" => { item.set_enabled(emerald_enabled).ok(); }
-                        _ => {}
-                    }
-                }
-            }
-        }
-    }
-}
-
 /// Mirrors the frontend's sidebar visibility and view lock onto the View
 /// menu's check items. Called on every change, because the rail's own toggle buttons can
 /// flip the same state without the menu ever being opened.
@@ -726,35 +657,6 @@ fn set_view_menu_checked(app: tauri::AppHandle, rail: bool, left_list: bool, rig
     }
 }
 
-/// Toggles the enabled state of the "Export as Image" submenu (and its
-/// JPEG/PNG/WebP children). Called by the frontend whenever the active
-/// view changes, so it's only clickable while an Altar's reading view is open.
-#[tauri::command]
-fn set_altar_export_menu_enabled(app: tauri::AppHandle, enabled: bool) {
-    use tauri::menu::MenuItemKind;
-    let Some(menu) = app.menu() else { return };
-
-    for kind in menu.items().unwrap_or_default() {
-        if let MenuItemKind::Submenu(sub) = &kind {
-            if sub.id().0.as_str() != "export-submenu" { continue; }
-            for child in sub.items().unwrap_or_default() {
-                if let MenuItemKind::Submenu(image_sub) = &child {
-                    if image_sub.id().0.as_str() != "export-altar-image" { continue; }
-                    image_sub.set_enabled(enabled).ok();
-                    for leaf in image_sub.items().unwrap_or_default() {
-                        if let MenuItemKind::MenuItem(item) = &leaf {
-                            let leaf_id = item.id().0.as_str();
-                            if matches!(leaf_id, "export-altar-jpeg" | "export-altar-png" | "export-altar-webp") {
-                                item.set_enabled(enabled).ok();
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
 // One argument per menu label: the frontend passes them by name.
 #[allow(clippy::too_many_arguments)]
 #[tauri::command]
@@ -762,23 +664,12 @@ fn update_menu_labels(
     app: tauri::AppHandle,
     edit: String,
     view: String,
-    export: String,
-    import: String,
     reset_view: String,
     lock_view: String,
     show_splash: String,
     rail: String,
     entry_list: String,
     properties: String,
-    export_pdf: String,
-    export_markdown: String,
-    export_emerald: String,
-    export_altar_image: String,
-    export_altar_jpeg: String,
-    export_altar_png: String,
-    export_altar_webp: String,
-    import_markdown: String,
-    import_emerald: String,
     switch_vault: String,
     quit: String,
 ) {
@@ -792,8 +683,6 @@ fn update_menu_labels(
             let new_text = match id.as_str() {
                 "edit-submenu"   => Some(edit.as_str()),
                 "view-submenu"   => Some(view.as_str()),
-                "export-submenu" => Some(export.as_str()),
-                "import-submenu" => Some(import.as_str()),
                 _ => None,
             };
             if let Some(text) = new_text {
@@ -820,34 +709,12 @@ fn update_menu_labels(
                     let new_child_text = match child_id.as_str() {
                         "reset-sidebar-widths" => Some(reset_view.as_str()),
                         "show-splash"          => Some(show_splash.as_str()),
-                        "export-pdf"           => Some(export_pdf.as_str()),
-                        "export-markdown"      => Some(export_markdown.as_str()),
-                        "export-emerald"       => Some(export_emerald.as_str()),
-                        "import-markdown"      => Some(import_markdown.as_str()),
-                        "import-emerald"       => Some(import_emerald.as_str()),
                         "switch-vault"         => Some(switch_vault.as_str()),
                         "quit"                 => Some(quit.as_str()),
                         _ => None,
                     };
                     if let Some(text) = new_child_text {
                         item.set_text(text).ok();
-                    }
-                } else if let MenuItemKind::Submenu(image_sub) = &child {
-                    if image_sub.id().0.as_str() != "export-altar-image" { continue; }
-                    image_sub.set_text(export_altar_image.as_str()).ok();
-                    for leaf in image_sub.items().unwrap_or_default() {
-                        if let MenuItemKind::MenuItem(item) = &leaf {
-                            let leaf_id = item.id().0.as_str().to_owned();
-                            let new_leaf_text = match leaf_id.as_str() {
-                                "export-altar-jpeg" => Some(export_altar_jpeg.as_str()),
-                                "export-altar-png"  => Some(export_altar_png.as_str()),
-                                "export-altar-webp" => Some(export_altar_webp.as_str()),
-                                _ => None,
-                            };
-                            if let Some(text) = new_leaf_text {
-                                item.set_text(text).ok();
-                            }
-                        }
                     }
                 }
             }
@@ -1027,9 +894,8 @@ pub fn run() {
             read_file,
             ensure_app_storage_dirs,
             export_pdf,
-            set_export_menu_enabled,
-            set_altar_export_menu_enabled,
             set_view_menu_checked,
+            set_dock_icon,
             update_menu_labels,
             close_request_seen,
             updates::update_settings,

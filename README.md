@@ -10,7 +10,7 @@ Pre-built binaries are on the [Releases](../../releases) page.
 
 | Platform | What is built |
 |---|---|
-| macOS | Apple Silicon only, macOS 13 Ventura or newer |
+| macOS | Apple Silicon only, macOS 13.1 Ventura or newer |
 | Windows | x64, `.exe` (NSIS) and `.msi` |
 | Linux | x64, `.deb` and `.AppImage`, built on Ubuntu 22.04 |
 
@@ -40,6 +40,7 @@ Work happens on the branch of the version in progress, `version/x.y.z`, not on `
 | [Documentation/architecture/](Documentation/architecture/) | Per-area patterns: modules, editing, blocks, templates, navigation, altar, storage, appearance, window shell |
 | [Documentation/design.md](Documentation/design.md) | Design tokens, component patterns, and known inconsistencies |
 | [Documentation/components.md](Documentation/components.md) | Shared UI building blocks and when to use them |
+| [Documentation/themes.md](Documentation/themes.md) | Custom theme format |
 | [Documentation/database.md](Documentation/database.md) | SQLite schema and conventions |
 | [Documentation/internationalization.md](Documentation/internationalization.md) | Adding and managing translations |
 | [Documentation/security.md](Documentation/security.md) | Capability model and sandboxing |

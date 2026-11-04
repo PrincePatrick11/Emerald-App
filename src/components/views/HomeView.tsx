@@ -24,6 +24,7 @@ import { formatDayHeading, formatEntryDate } from '../../lib/formatDate';
 import { sortItems } from '../../lib/sortItems';
 import type { HomeSort, HomeView, HomeSectionPrefs } from '../../store/uiStore';
 import { useSettingsStore } from '../../store/settingsStore';
+import { createItem } from '../../lib/createItem';
 
 type CtxTarget =
   | { kind: 'journal'; id: string }
@@ -82,10 +83,10 @@ export default function HomeView() {
   );
   const openInNewTabAction = useOpenInNewTabAction();
   const saveAsTemplateAction = useSaveAsTemplateAction();
-  const { entries, articles, operations, createEntry, duplicateEntry, updateEntry, deleteEntry, restoreEntry } = useEntryStore(
+  const { entries, articles, operations, duplicateEntry, updateEntry, deleteEntry, restoreEntry } = useEntryStore(
     useShallow((s) => ({
       entries: s.entries.journal, articles: s.entries.wiki, operations: s.entries.operation,
-      createEntry: s.createEntry, duplicateEntry: s.duplicateEntry, updateEntry: s.updateEntry,
+      duplicateEntry: s.duplicateEntry, updateEntry: s.updateEntry,
       deleteEntry: s.deleteEntry, restoreEntry: s.restoreEntry,
     }))
   );
@@ -98,10 +99,7 @@ export default function HomeView() {
   const today = new Date();
   const moonPhase = getMoonPhase(today);
 
-  const handleNewEntry = async () => {
-    const entry = await createEntry('journal');
-    setActiveView({ type: 'journal', id: entry.id, mode: 'edit', isNew: true });
-  };
+  const handleNewEntry = () => createItem('journal');
 
   const openCtx = (e: React.MouseEvent, target: CtxTarget) => {
     e.preventDefault();
@@ -169,7 +167,7 @@ export default function HomeView() {
       <h1 className={`${ENTRY_TITLE_HEADING_CLASSES} leading-tight truncate`}>
         {formatDayHeading(today)}
       </h1>
-      <p className="text-xs text-stone-500 truncate">
+      <p className="text-xs text-subtle truncate">
         {MOON_PHASE_SYMBOLS[moonPhase]}{' '}{t(`moonPhase.${moonPhase}`)}
       </p>
     </div>
@@ -197,11 +195,11 @@ export default function HomeView() {
             <section className="mb-8">
               <div className="flex items-center gap-2 mb-3">
                 <button onClick={() => setActiveView({ type: 'journal' })} className="flex items-center gap-2 group flex-shrink-0">
-                  <h2 className="text-xs font-semibold uppercase tracking-wider text-stone-500 group-hover:text-stone-400 flex items-center gap-2 transition-colors">
+                  <h2 className="text-xs font-semibold uppercase tracking-wider text-subtle group-hover:text-muted flex items-center gap-2 transition-colors">
                     <BookOpen size={12} />
                     {t('nav.journal')}
                   </h2>
-                  <span className="text-xs text-stone-600 group-hover:text-stone-400 transition-colors">{t('home.viewAll')}</span>
+                  <span className="text-xs text-subtle group-hover:text-muted transition-colors">{t('home.viewAll')}</span>
                 </button>
                 <div className="ml-auto flex-shrink-0">
                   <SectionToolbar prefs={homeJournalPrefs} setPrefs={setHomeJournalPrefs} />
@@ -260,11 +258,11 @@ export default function HomeView() {
             <section className="mb-8">
               <div className="flex items-center gap-2 mb-3">
                 <button onClick={() => setActiveView({ type: 'operations' })} className="flex items-center gap-2 group flex-shrink-0">
-                  <h2 className="text-xs font-semibold uppercase tracking-wider text-stone-500 group-hover:text-stone-400 flex items-center gap-2 transition-colors">
+                  <h2 className="text-xs font-semibold uppercase tracking-wider text-subtle group-hover:text-muted flex items-center gap-2 transition-colors">
                     <Wand2 size={12} />
                     {t('nav.operations')}
                   </h2>
-                  <span className="text-xs text-stone-600 group-hover:text-stone-400 transition-colors">{t('home.viewAll')}</span>
+                  <span className="text-xs text-subtle group-hover:text-muted transition-colors">{t('home.viewAll')}</span>
                 </button>
                 <div className="ml-auto flex-shrink-0">
                   <SectionToolbar prefs={homeOpsPrefs} setPrefs={setHomeOpsPrefs} />
@@ -286,7 +284,7 @@ export default function HomeView() {
                         onContextMenu={(e) => openCtx(e, { kind: 'operation', id: op.id })}
                       >
                         {isImageIcon(icon)
-                          ? <img src={icon} alt="" className="w-6 h-6 object-cover rounded flex-shrink-0" />
+                          ? <img src={icon} alt="" className="w-6 h-6 object-cover rounded-md flex-shrink-0" />
                           : <span className="text-xl">{icon}</span>
                         }
                         <div className="flex-1 min-w-0">
@@ -313,7 +311,7 @@ export default function HomeView() {
                         onContextMenu={(e) => openCtx(e, { kind: 'operation', id: op.id })}
                       >
                         {isImageIcon(icon)
-                          ? <img src={icon} alt="" className="w-6 h-6 object-cover rounded mb-1" />
+                          ? <img src={icon} alt="" className="w-6 h-6 object-cover rounded-md mb-1" />
                           : <div className="text-lg mb-1">{icon}</div>
                         }
                         {itemTitle('operation', op.id, op.title)}
@@ -331,11 +329,11 @@ export default function HomeView() {
             <section>
               <div className="flex items-center gap-2 mb-3">
                 <button onClick={() => setActiveView({ type: 'wiki' })} className="flex items-center gap-2 group flex-shrink-0">
-                  <h2 className="text-xs font-semibold uppercase tracking-wider text-stone-500 group-hover:text-stone-400 flex items-center gap-2 transition-colors">
+                  <h2 className="text-xs font-semibold uppercase tracking-wider text-subtle group-hover:text-muted flex items-center gap-2 transition-colors">
                     <Library size={12} />
                     {t('nav.wiki')}
                   </h2>
-                  <span className="text-xs text-stone-600 group-hover:text-stone-400 transition-colors">{t('home.viewAll')}</span>
+                  <span className="text-xs text-subtle group-hover:text-muted transition-colors">{t('home.viewAll')}</span>
                 </button>
                 <div className="ml-auto flex-shrink-0">
                   <SectionToolbar prefs={homeWikiPrefs} setPrefs={setHomeWikiPrefs} />
@@ -360,7 +358,7 @@ export default function HomeView() {
                         onContextMenu={(e) => openCtx(e, { kind: 'wiki', id: article.id })}
                       >
                         {isImageIcon(icon)
-                          ? <img src={icon} alt="" className="w-6 h-6 object-cover rounded flex-shrink-0" />
+                          ? <img src={icon} alt="" className="w-6 h-6 object-cover rounded-md flex-shrink-0" />
                           : <span className="text-xl flex-shrink-0">{icon}</span>
                         }
                         <div className="flex-1 min-w-0">
@@ -388,7 +386,7 @@ export default function HomeView() {
                         onContextMenu={(e) => openCtx(e, { kind: 'wiki', id: article.id })}
                       >
                         {isImageIcon(icon)
-                          ? <img src={icon} alt="" className="w-6 h-6 object-cover rounded mb-1" />
+                          ? <img src={icon} alt="" className="w-6 h-6 object-cover rounded-md mb-1" />
                           : <div className="text-lg mb-1">{icon}</div>
                         }
                         {itemTitle('wiki', article.id, article.title)}

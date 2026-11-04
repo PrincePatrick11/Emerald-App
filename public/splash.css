@@ -13,9 +13,9 @@
    first frame, before the bundle and before the theme files. A `<link>` in
    the `<head>` blocks rendering and satisfies that; the bundle does not.
 
-   --splash-bg, --splash-gem and --splash-text are copies of --shell-bg,
-   --accent and --text-subtle from `src/themes/*.css` — that way the loading
-   screen blends seamlessly into the app's frame. If they change there, they
+   --splash-bg and --splash-gem are copies of --shell-bg and --accent from
+   `src/themes/*.css` — that way the loading screen blends seamlessly into the
+   app's frame. If they change there, they
    have to be updated here. --splash-bg is additionally set as
    `backgroundColor` in `src-tauri/tauri.conf.json` and the three platform
    files next to it — not in `tauri.dev.conf.json`, which must not get an
@@ -23,9 +23,13 @@
    here: the window color is deliberately only the dark one, Parchment users
    see dark instead of light for the blink of an eye.
 
-   The other three are not copies: --splash-gem-deep is --accent-strong in
-   Parchment; in Noctis that would be #00a066, and the gradient across the
-   stone's table would be too flat to read as a cut. --splash-sheen is a
+   `.splash-line` is a copy of --mark-line.
+
+   The others are not copies: --splash-text belongs with the logo's lines, a
+   light emerald from the stone, and turns dark on Parchment's light ground;
+   --splash-gem-deep fills the stone and ends the gradient across its table; it is
+   --accent-strong in Parchment, in Noctis that would be #00a066 and too flat to
+   read as a cut. --splash-sheen is a
    freely chosen white, --splash-rail-track a tint of --splash-gem — so
    anyone who changes --accent has to touch the two rgba values as well. */
 
@@ -33,7 +37,7 @@
   --splash-bg: #100d0a;
   --splash-gem: #00c47f;
   --splash-gem-deep: #007a4d;
-  --splash-text: #78716c;
+  --splash-text: #a9d9c5;
   --splash-sheen: rgba(255, 255, 255, 0.55);
   --splash-rail-track: rgba(0, 196, 127, 0.18);
 }
@@ -41,7 +45,7 @@ html[data-theme='emerald-parchment'] {
   --splash-bg: #ecdec7;
   --splash-gem: #008a57;
   --splash-gem-deep: #006941;
-  --splash-text: #775c41;
+  --splash-text: #0b6e48;
   --splash-sheen: rgba(255, 255, 255, 0.85);
   --splash-rail-track: rgba(0, 138, 87, 0.22);
 }
@@ -50,6 +54,10 @@ html[data-theme='emerald-parchment'] {
    It therefore has to match --shell-bg permanently, not just at startup. */
 html {
   background: var(--splash-bg);
+}
+/* A custom theme keeps the Noctis loading screen but has its own frame. */
+html[data-theme='custom'] {
+  background: var(--shell-bg);
 }
 
 .splash {
@@ -133,8 +141,8 @@ html {
 #splash-table .splash-table-top    { stop-color: var(--splash-gem); }
 #splash-table .splash-table-bottom { stop-color: var(--splash-gem-deep); }
 
-.splash-outline { stroke: var(--splash-gem); }
-.splash-step    { stroke: var(--splash-sheen); }
+.splash-line  { stroke: #c8f2e0; }
+.splash-stone { fill: var(--splash-gem-deep); }
 .splash-spark   { fill: var(--splash-gem); }
 
 /* ── The glow ──────────────────────────────────────────────────────────────
@@ -197,15 +205,6 @@ html {
 .splash-facet:nth-of-type(6) { --o: 0.50; animation-delay: 2.25s; }
 .splash-facet:nth-of-type(7) { --o: 0.40; animation-delay: 2.7s; }
 .splash-facet:nth-of-type(8) { --o: 0.56; animation-delay: 3.15s; }
-
-/* The cut edges as lines of their own. Without them they arise only where
-   two facet fills meet — and such a seam is antialiased independently from
-   both sides, so it comes out soft. */
-.splash-cut {
-  stroke: var(--splash-gem);
-  stroke-width: 1;
-  opacity: 0.75;
-}
 
 /* `fill-box` instead of the default `view-box`: otherwise the spark scales
    around the center of the whole SVG and visibly drifts toward the stone,

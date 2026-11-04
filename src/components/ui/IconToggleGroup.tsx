@@ -30,7 +30,7 @@ export default function IconToggleGroup<T extends string>({ label, options, icon
   return (
     // gap-px keeps the row as narrow as possible without `fill` (cells in the
     // assignment dialog, entry-type choice).
-    <div role="group" aria-label={label} className={`${fill ? 'flex w-full' : 'inline-flex'} gap-px p-0.5 rounded-md border border-stone-700/60 bg-stone-800/60`}>
+    <div role="group" aria-label={label} className={`${fill ? 'flex w-full' : 'inline-flex'} gap-px p-0.5 rounded-md border border-edge bg-well-strong`}>
       {options.map((option) => {
         const Icon: LucideIcon = icons[option.value];
         const disabled = isDisabled?.(option.value) ?? false;

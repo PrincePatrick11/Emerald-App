@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
-import { Search, LayoutList, X } from 'lucide-react';
+import { LayoutList } from 'lucide-react';
 import { MODULE_LIST } from '../../lib/modules';
 import { useLinkItems } from '../../hooks/useLinkItems';
 import { isImageIcon } from '../../lib/helpers';
@@ -7,6 +7,7 @@ import type { ContentType } from '../../types';
 import { ENTRY_TYPE_ICONS, ENTRY_TYPE_LABEL_KEYS, type SuggestionItem } from './SuggestionList';
 import { useTranslation } from 'react-i18next';
 import Modal from '../ui/Modal';
+import SearchField from '../ui/SearchField';
 
 type Tab = 'all' | ContentType;
 
@@ -70,25 +71,17 @@ export default function LinkPickerModal({ onSelect, onClose }: Props) {
       // Fixed instead of maximum height: with max-h the modal grew and shrank
       // with the hit count of the active tab and, because it is vertically
       // centred, jumped up and down in height on every tab switch.
-      className="link-picker-modal overflow-hidden h-[75vh]"
+      className="overflow-hidden h-[75vh]"
     >
         {/* Search */}
-        <div className="px-4 py-2.5 border-b border-stone-700/40 flex-shrink-0">
-          <div className="flex items-center gap-2 bg-stone-800 rounded-lg px-3 py-1.5">
-            <Search size={13} className="text-stone-500 shrink-0" />
-            <input
-              ref={searchRef}
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder={t('linkPicker.searchPlaceholder')}
-              className="flex-1 bg-transparent text-sm text-stone-200 placeholder-stone-600 outline-none"
-            />
-            {query && (
-              <button onClick={() => setQuery('')} className="text-stone-600 hover:text-stone-400">
-                <X size={11} />
-              </button>
-            )}
-          </div>
+        <div className="px-3.5 pt-3 flex-shrink-0">
+          <SearchField
+            inputRef={searchRef}
+            value={query}
+            onValueChange={setQuery}
+            placeholder={t('linkPicker.searchPlaceholder')}
+            aria-label={t('linkPicker.searchPlaceholder')}
+          />
         </div>
 
         {/* Tabs: only icon + counter, the label comes from the tooltip; six tabs
@@ -100,7 +93,7 @@ export default function LinkPickerModal({ onSelect, onClose }: Props) {
             is hard-wired to the stone tint of the sidebars, whereas here
             the picker's jade tint is needed; a tone variant is still missing
             there, and until then this remains the custom button. */}
-        <div role="tablist" className="flex items-center gap-1 px-4 py-2 border-b border-stone-700/40 flex-shrink-0">
+        <div role="tablist" className="modal-rule flex items-center gap-1 px-3.5 py-2.5 border-b flex-shrink-0">
           {tabs.map((tab) => (
             <button
               key={tab.id}
@@ -111,12 +104,12 @@ export default function LinkPickerModal({ onSelect, onClose }: Props) {
               aria-label={`${tab.label}: ${tab.count}`}
               className={`flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-medium whitespace-nowrap flex-shrink-0 transition-colors ${
                 activeTab === tab.id
-                  ? 'link-picker-tab-active bg-jade-900/60 text-jade-300'
-                  : 'link-picker-tab-idle text-stone-500 hover:text-stone-300 hover:bg-stone-800'
+                  ? 'link-picker-tab-active'
+                  : 'link-picker-tab-idle'
               }`}
             >
               {tab.icon}
-              <span className={`link-picker-tab-count ${activeTab === tab.id ? 'text-jade-500' : 'text-stone-600'}`}>
+              <span className="link-picker-tab-count">
                 {tab.count}
               </span>
             </button>
@@ -126,7 +119,7 @@ export default function LinkPickerModal({ onSelect, onClose }: Props) {
         {/* Results list */}
         <div className="flex-1 overflow-y-auto p-2">
           {filtered.length === 0 ? (
-            <div className="flex items-center justify-center h-24 text-sm text-stone-600">
+            <div className="flex items-center justify-center h-24 text-sm text-subtle">
               {t('linkPicker.noResults')}
             </div>
           ) : (
@@ -137,7 +130,7 @@ export default function LinkPickerModal({ onSelect, onClose }: Props) {
                   <button
                     key={item.id}
                     onClick={() => { onSelect(item); onClose(); }}
-                    className="link-picker-row w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-left hover:bg-stone-800 group transition-colors"
+                    className="link-picker-row w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm text-left transition-colors"
                   >
                     {/* Icon */}
                     <span className="text-base w-5 flex-shrink-0 flex items-center justify-center">
@@ -152,16 +145,16 @@ export default function LinkPickerModal({ onSelect, onClose }: Props) {
                     </span>
 
                     {/* Title */}
-                    <span className="link-picker-label flex-1 text-stone-200 truncate">{item.label}</span>
+                    <span className="link-picker-label flex-1 text-secondary truncate">{item.label}</span>
 
                     {/* Type badge */}
-                    <span className="text-xs text-stone-600 flex-shrink-0 flex items-center gap-1 group-hover:text-stone-500">
-                      <TypeIcon size={10} />
+                    <span className="text-xs text-subtle flex-shrink-0 flex items-center gap-1">
+                      <TypeIcon size={12} />
                       <span className="capitalize">{t(ENTRY_TYPE_LABEL_KEYS[item.entryType])}</span>
                     </span>
 
                     {item.entry_number != null && (
-                      <span className="text-xs text-stone-700 flex-shrink-0">#{item.entry_number}</span>
+                      <span className="text-xs text-subtle flex-shrink-0">#{item.entry_number}</span>
                     )}
                   </button>
                 );

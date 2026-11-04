@@ -83,6 +83,9 @@
     "wordDeleted": "Vokabel gelöscht",
     "placementRemoved": "Element vom Altar genommen"
   },
+  "createItem": {
+    "title": "Neu anlegen"
+  },
   "nav": {
     "home": "Start",
     "all": "Alle",
@@ -863,6 +866,14 @@
     "appearanceHint": "Farbschema, Schriften und Größen dieses Vaults.",
     "themeDarkHint": "Dunkles Farbschema",
     "themeLightHint": "Helles Farbschema",
+    "customThemesHint": "Importiere eine Theme-Datei (.json). Sie legt nur Farben fest, Abstände und Aufbau bleiben gleich.",
+    "customThemeImport": "Theme importieren …",
+    "customThemeRemove": "„{{name}}\" entfernen",
+    "customThemeInvalid": "Das ist keine gültige Theme-Datei.",
+    "customThemeUnreadable": "Der Text dieses Themes wäre unlesbar: Die Farbe text hat zu wenig Kontrast zu sheet oder panel.",
+    "customThemeTooMany": "Es passen höchstens {{count}} Themes in einen Vault.",
+    "customThemeImported": "„{{name}}\" importiert.",
+    "customThemeContrast": "Importiert, aber schwer lesbar: {{pairs}}.",
     "uiFontHint": "Schrift für Menüs, Listen und Beschriftungen.",
     "editorFontHint": "Schrift für Titel und Text in Einträgen.",
     "exportDbHint": "Speichert den Vault als .emeralddb-Datei samt Bildern. Die Auswahl darunter bestimmt, was hineinkommt.",

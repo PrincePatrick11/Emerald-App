@@ -21,7 +21,7 @@ export default function OperationPropertiesPanel() {
 
   const op = activeView.id ? operations.find((o) => o.id === activeView.id) : null;
   if (!op) {
-    return <p className="text-xs text-stone-600 px-2 py-3">{t('properties.noEntry')}</p>;
+    return <p className="text-xs text-subtle px-2 py-3">{t('properties.noEntry')}</p>;
   }
 
   if (!isEditing) {

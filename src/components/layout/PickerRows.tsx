@@ -16,8 +16,8 @@ import { newVaultTarget, splitPath, type Vault as VaultRecord } from '../../lib/
 
 const INPUT_CLASS = 'input-field flex-1 min-w-0 rounded-md px-2.5 py-1.5 text-sm outline-none';
 const CHECKBOX_CLASS =
-  'mt-0.5 w-4 h-4 shrink-0 rounded border flex items-center justify-center transition-colors ' +
-  'peer-focus-visible:ring-2 peer-focus-visible:ring-jade-500/35';
+  'mt-0.5 w-4 h-4 shrink-0 rounded-md border flex items-center justify-center transition-colors ' +
+  'peer-focus-visible:ring-2 peer-focus-visible:ring-focus';
 
 export type VaultState = 'local' | 'synced' | 'paused' | 'remote';
 
@@ -247,10 +247,10 @@ export function DeleteConfirmRow({
         <span
           aria-hidden
           className={`${CHECKBOX_CLASS} ${
-            deleteFiles ? 'bg-jade-500/30 border-jade-500/60' : 'border-stone-600 hover:border-stone-400'
+            deleteFiles ? 'bg-accent-wash-strong border-accent-edge' : 'border-edge-strong hover:border-edge-raise'
           }`}
         >
-          {deleteFiles && <Check size={10} className="text-jade-400" />}
+          {deleteFiles && <Check size={12} className="text-accent" />}
         </span>
         <span className="min-w-0">
           {t('vault.deleteFiles')}

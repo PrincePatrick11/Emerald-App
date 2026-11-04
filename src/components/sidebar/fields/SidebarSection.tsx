@@ -125,7 +125,7 @@ export function SidebarRowRemove({ title, onClick }: { title: string; onClick?: 
   if (!onClick) return <span className="w-6 flex-shrink-0" />;
   return (
     <button type="button" onClick={onClick} className="sidebar-row-remove" title={title} aria-label={title}>
-      <X size={13} />
+      <X size={14} />
     </button>
   );
 }

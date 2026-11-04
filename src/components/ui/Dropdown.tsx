@@ -84,7 +84,7 @@ export default function Dropdown<T extends string>({
           onClick={() => { onChange(o.value); setOpen(false); }}
           disabled={o.disabled}
           title={o.title}
-          className={`w-full text-left flex items-center gap-2 px-3 py-1.5 text-xs transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
+          className={`w-full text-left flex items-center gap-2.5 px-3 py-2 text-xs transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
             value === o.value
               ? 'list-toolbar-option-active'
               : 'list-toolbar-option-idle'
@@ -111,7 +111,7 @@ export default function Dropdown<T extends string>({
         >
           {label && <span className="list-toolbar-chip-label mr-0.5">{label}</span>}
           {selected}
-          <ChevronDown size={11} className="list-toolbar-chip-label" />
+          <ChevronDown size={12} className="list-toolbar-chip-label" />
         </button>
       )}
       {open && (portal ? createPortal(menu, document.body) : menu)}

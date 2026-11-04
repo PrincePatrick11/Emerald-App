@@ -200,14 +200,14 @@ export function GroupDivider({
   collapsed?: boolean;
   onToggleCollapse?: () => void;
 }) {
-  const labelClass = 'text-xs font-semibold text-stone-500 uppercase tracking-wider whitespace-nowrap';
+  const labelClass = 'text-xs font-semibold text-subtle uppercase tracking-wider whitespace-nowrap';
   return (
     <div className="flex items-center gap-3 mb-3">
       {onToggleCollapse && <CollapseChevron collapsed={!!collapsed} onToggle={onToggleCollapse} />}
       {onToggleCollapse
-        ? <button onClick={onToggleCollapse} className={`${labelClass} transition-colors hover:text-stone-300`}>{label}</button>
+        ? <button onClick={onToggleCollapse} className={`${labelClass} transition-colors hover:text-raise`}>{label}</button>
         : <span className={labelClass}>{label}</span>}
-      <div className="flex-1 h-px bg-stone-700/50" />
+      <div className="flex-1 h-px bg-well-raise" />
     </div>
   );
 }
@@ -316,7 +316,7 @@ export default function Dashboard<T>({
             {grouping.isGroupCollapsed?.(group)
               ? null
               : group.items.length === 0
-                ? (grouping.renderEmptyGroup?.(group) ?? <p className="text-xs text-stone-700 px-1 py-1">—</p>)
+                ? (grouping.renderEmptyGroup?.(group) ?? <p className="text-xs text-subtle px-1 py-1">—</p>)
                 : renderItems(group.items)}
           </div>
         ))}

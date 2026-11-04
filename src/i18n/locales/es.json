@@ -83,6 +83,9 @@
     "wordDeleted": "Palabra eliminada",
     "placementRemoved": "Elemento retirado del altar"
   },
+  "createItem": {
+    "title": "Crear nuevo"
+  },
   "nav": {
     "home": "Inicio",
     "all": "Todo",
@@ -871,6 +874,14 @@
     "appearanceHint": "Esquema de colores, fuentes y tamaños de este vault.",
     "themeDarkHint": "Esquema de colores oscuro",
     "themeLightHint": "Esquema de colores claro",
+    "customThemesHint": "Importa un archivo de tema (.json). Solo define colores; los espacios y la estructura no cambian.",
+    "customThemeImport": "Importar tema …",
+    "customThemeRemove": "Quitar «{{name}}»",
+    "customThemeInvalid": "Este no es un archivo de tema válido.",
+    "customThemeUnreadable": "El texto de este tema sería ilegible: el color text tiene muy poco contraste con sheet o panel.",
+    "customThemeTooMany": "Un vault admite como máximo {{count}} temas.",
+    "customThemeImported": "«{{name}}» importado.",
+    "customThemeContrast": "Importado, pero difícil de leer: {{pairs}}.",
     "uiFontHint": "Fuente de menús, listas y rótulos.",
     "editorFontHint": "Fuente de títulos y texto en las entradas.",
     "exportDbHint": "Guarda el vault como archivo .emeralddb, con las imágenes. Las opciones de abajo deciden qué se incluye.",

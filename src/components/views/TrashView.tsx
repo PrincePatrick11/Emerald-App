@@ -23,21 +23,21 @@ import { useSessionState } from '../../store/sessionStore';
 
 function typeIcon(type: TrashedItem['type']) {
   const Icon = TRASH_KIND_ICONS[type];
-  return <Icon size={14} className="text-stone-500 flex-shrink-0" />;
+  return <Icon size={14} className="text-subtle flex-shrink-0" />;
 }
 
 function SectionHeader({ label, count }: { label: string; count: number }) {
   return (
     <div className="flex items-center gap-2 mt-5 mb-2 first:mt-0">
-      <p className="text-xs font-semibold uppercase tracking-wider text-stone-500">{label}</p>
-      <span className="text-xs text-stone-700">{count}</span>
+      <p className="text-xs font-semibold uppercase tracking-wider text-subtle">{label}</p>
+      <span className="text-xs text-subtle">{count}</span>
     </div>
   );
 }
 
 function SubSectionHeader({ label }: { label: string }) {
   return (
-    <p className="text-xs text-stone-600 italic mt-3 mb-1.5 pl-1">{label}</p>
+    <p className="text-xs text-subtle italic mt-3 mb-1.5 pl-1">{label}</p>
   );
 }
 
@@ -56,11 +56,11 @@ function SelectCheckbox({ selected, onToggle }: { selected: boolean; onToggle: (
   return (
     <button
       onClick={(e) => { e.stopPropagation(); onToggle(); }}
-      className="flex-shrink-0 text-stone-500 hover:text-jade-400 transition-colors"
+      className="flex-shrink-0 text-subtle hover:text-accent-raise transition-colors"
     >
       {selected
-        ? <CheckSquare size={15} className="text-jade-400" />
-        : <Square size={15} />}
+        ? <CheckSquare size={14} className="text-accent" />
+        : <Square size={14} />}
     </button>
   );
 }
@@ -74,7 +74,7 @@ function useDaysLeft(deletedAt: string): number | null {
 
 function DaysLeft({ days, t }: { days: number; t: ItemSharedProps['t'] }) {
   return (
-    <span className={days <= 3 ? 'text-red-400' : 'text-stone-600'}>
+    <span className={days <= 3 ? 'text-danger' : 'text-subtle'}>
       {t('trash.daysLeft', { count: days })}
     </span>
   );
@@ -91,15 +91,15 @@ function ItemRow({ item, confirmingId, setConfirmingId, restore, deleteNow, sele
     <div
       className={`flex items-center gap-3 px-4 py-2.5 rounded-lg border transition-colors cursor-pointer
         ${selected
-          ? 'bg-jade-500/8 border-jade-500/30'
-          : 'bg-stone-800/50 border-stone-700/40 hover:border-stone-600/40'}`}
+          ? 'bg-accent-wash border-accent-edge'
+          : 'bg-well border-edge hover:border-edge-strong'}`}
       onClick={() => onToggleSelect(item.id)}
     >
       <SelectCheckbox selected={selected} onToggle={() => onToggleSelect(item.id)} />
       {typeIcon(item.type)}
       <div className="flex-1 min-w-0">
-        <div className="text-sm text-stone-300 truncate">{item.title}</div>
-        <div className="text-xs text-stone-600 mt-0.5">
+        <div className="text-sm text-soft truncate">{item.title}</div>
+        <div className="text-xs text-subtle mt-0.5">
           {t('trash.deletedAgo', { time: formatTimeDistance(item.deleted_at) })}
           {daysLeft !== null && (
             <>
@@ -139,17 +139,17 @@ function ItemCard({ item, confirmingId, setConfirmingId, restore, deleteNow, sel
   return (
     <div
       className={`panel p-4 flex flex-col gap-2 cursor-pointer transition-colors
-        ${selected ? 'ring-1 ring-jade-500/40 bg-jade-500/5' : ''}`}
+        ${selected ? 'ring-1 ring-focus bg-accent-wash' : ''}`}
       onClick={() => onToggleSelect(item.id)}
     >
       <div className="flex items-start gap-2">
         <SelectCheckbox selected={selected} onToggle={() => onToggleSelect(item.id)} />
         {typeIcon(item.type)}
-        <p className="text-sm text-stone-300 font-medium leading-snug line-clamp-2 flex-1">
+        <p className="text-sm text-soft font-medium leading-snug line-clamp-2 flex-1">
           {item.title}
         </p>
       </div>
-      <div className="text-xs text-stone-600">
+      <div className="text-xs text-subtle">
         {t('trash.deletedAgo', { time: formatTimeDistance(item.deleted_at) })}
       </div>
       {daysLeft !== null && (
@@ -157,7 +157,7 @@ function ItemCard({ item, confirmingId, setConfirmingId, restore, deleteNow, sel
           <DaysLeft days={daysLeft} t={t} />
         </div>
       )}
-      <div className="flex items-center gap-1 pt-1 border-t border-stone-700/40" onClick={(e) => e.stopPropagation()}>
+      <div className="flex items-center gap-1 pt-1 border-t border-edge" onClick={(e) => e.stopPropagation()}>
         {confirming ? (
           <InlineConfirm small onConfirm={() => deleteNow(item)} onCancel={() => setConfirmingId(null)} />
         ) : (
@@ -385,7 +385,7 @@ export default function TrashView() {
       <div className="space-y-5">
         {byMonth.map(({ label, items: monthItems }) => (
           <div key={label}>
-            <p className="text-xs font-semibold uppercase tracking-wider text-stone-500 mb-2 px-1">{label}</p>
+            <p className="text-xs font-semibold uppercase tracking-wider text-subtle mb-2 px-1">{label}</p>
             <div className="space-y-1">
               {monthItems.map((item) => <ItemRow key={item.id} item={item} {...itemProps} />)}
             </div>
@@ -403,7 +403,7 @@ export default function TrashView() {
       {items.length > 0 && (
         <button
           onClick={allSelected ? deselectAll : selectAll}
-          className="text-xs text-stone-500 hover:text-stone-300 transition-colors whitespace-nowrap"
+          className="text-xs text-subtle hover:text-raise transition-colors whitespace-nowrap"
         >
           {allSelected ? t('trash.deselectAll') : t('trash.selectAll')}
         </button>
@@ -443,7 +443,7 @@ export default function TrashView() {
 
   const renderTrashContent = () => (
     <>
-      {loading && <p className="text-sm text-stone-600">{t('common.loading')}</p>}
+      {loading && <p className="text-sm text-subtle">{t('common.loading')}</p>}
 
       {!loading && items.length === 0 && (
         <EmptyState
@@ -459,7 +459,7 @@ export default function TrashView() {
 
       {!loading && matching.length > 0 && (
         <div className="space-y-1">
-          <p className="text-xs text-stone-600 mb-3">
+          <p className="text-xs text-subtle mb-3">
             {retentionDays === null ? t('trash.retentionNoteNever') : t('trash.retentionNote', { count: retentionDays })}
           </p>
           {trashPrefs.grouping === 'grouped' && trashPrefs.view !== 'timeline' && renderGrouped(trashPrefs.view)}

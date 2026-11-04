@@ -251,9 +251,8 @@ All Rust commands are *registered* in `src-tauri/src/lib.rs` and invoked from Ty
 | `export_pdf(html, path, page_size?)` | Render HTML to a PDF at a path the frontend obtained from the `dialog` plugin, by driving the app's own webview. `page_size` (inches) overrides the default Letter page — used by the Altar export only. See [PDF Export](architecture/shell.md#pdf-export). |
 | `close_request_seen()` | The frontend's acknowledgement of a close request — see [Closing the window](architecture/shell.md#closing-the-window). |
 | `update_menu_labels(...)` | Translate the native menu's labels. macOS only in effect — see [Window Chrome](architecture/shell.md#window-chrome). |
+| `set_dock_icon(png?)` | Show a custom theme's Dock icon, or with none the one the app started with. Lasts while the app runs. macOS only in effect. |
 | `set_view_menu_checked(rail, left_list, right_sidebar, view_locked)` | Mirror sidebar visibility and the view lock onto the View menu's check items, on every change (not only menu-triggered ones). macOS only in effect. |
-| `set_export_menu_enabled(entry, pdf, emerald)` | Enable/disable the native "Export as …" items for the current view (`computeMenuEnabledState`). macOS only in effect. |
-| `set_altar_export_menu_enabled(enabled)` | Enable/disable the native "Export as Image" submenu. macOS only in effect. |
 | `sync_status`, `sync_server_status`, `sync_pair`, `sync_unpair`, `sync_devices`, `sync_remove_device`, `sync_set_paused`, `sync_forget_link`, `sync_delete_remote`, `sync_rename`, `sync_remote_vaults`, `sync_create_remote`, `sync_adopt_remote`, `sync_push`, `sync_pull`, `sync_remote_state`, `sync_snapshot_begin`, `sync_snapshot_add`, `sync_snapshot_put`, `sync_snapshot_fetch`, `sync_snapshot_frame`, `sync_snapshot_done`, `sync_images`, `sync_images_delete`, `sync_adopt_new_password`, `sync_rekey_done`, `sync_watch`, `sync_unwatch` | The way to a sync server, see [`architecture/sync.md`](architecture/sync.md). |
 | `update_settings()` / `set_update_settings(endpoint, auto_check)` | Read/write `{appDataDir}/update.json`, an installation-level setting like the automatic backup's `auto-backup.json`; the endpoint must be a complete `https` URL. See [`security.md` → In-App Updates](security.md#in-app-updates). |
 | `check_for_update()` / `install_update()` | Reach the network for updates — `tauri-plugin-updater`, driven from `updates.rs` rather than the plugin's JS API so the CSP needs no update host. `install_update` installs only the result `check_for_update` holds, then restarts. See [`security.md` → In-App Updates](security.md#in-app-updates). |
@@ -262,12 +261,6 @@ Tauri menu events (not `invoke`) come from the native menu and are received in `
 
 | Event ID | Trigger |
 |---|---|
-| `export-pdf` | Export > Export as PDF… |
-| `export-markdown` | Export > Export as Markdown… |
-| `export-emerald` | Export > Export as Emerald… |
-| `import-markdown` | Import > From Markdown… |
-| `import-emerald` | Import > From Emerald… |
-| `export-altar-jpeg` / `-png` / `-webp` | Export > Export as Image > JPEG… / PNG… / WebP… |
 | `toggle-rail` | View > Navigation Rail |
 | `toggle-left-list` | View > Entry List |
 | `toggle-right-sidebar` | View > Properties |

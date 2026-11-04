@@ -30,7 +30,7 @@ window is not hidden. On Linux it opens on screen.
 Environment (all optional):
   EMERALD_APP_DIR            force the checkout instead of discovering it
   EMERALD_CDP_HOST           default 127.0.0.1
-  EMERALD_CDP_PORT           default 9223
+  EMERALD_CDP_PORT           default 9223, in a linked worktree from 9300
   EMERALD_AUTO_ATTACH        default 1 — auto-attach to the main page target
   EMERALD_AUTO_LAUNCH        default 1 — launch Emerald if no target is found
   EMERALD_LAUNCHER_PATH      default <repo>/start_emerald_mcp.bat on Windows,
@@ -69,7 +69,7 @@ from mcp.server import Server
 import dialogs
 import launcher
 from cdp import CDPError, CDPTarget, ConsoleBuffer, browser_version, discover_targets
-from instance import Instance, resolve_instance
+from instance import Instance, resolve_instance, running_checkout
 from window import hide_instance_windows
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s", stream=sys.stderr)
@@ -114,6 +114,7 @@ def _instance() -> Instance:
 # via the `attach` tool using the target's id.
 _target: CDPTarget | None = None
 _target_lock = asyncio.Lock()
+_attach_warning: str | None = None
 # One buffer for the life of the server, handed to every target in turn.
 _console = ConsoleBuffer()
 
@@ -137,6 +138,23 @@ def _instance_brief(inst: Instance) -> dict:
         "cdp_port": inst.cdp_port,
         "vite_port": inst.vite_port,
     }
+
+
+def _foreign_warning(inst: Instance, running: Path | None) -> str | None:
+    """The port does not say whose instance answers on it."""
+    if running is None or running.resolve() == inst.checkout.resolve():
+        return None
+    return (
+        f"the instance on port {inst.cdp_port} runs from {running}, not from {inst.checkout} - "
+        "what you see here is that checkout's code"
+    )
+
+
+async def _attach_to(inst: Instance, chosen: dict) -> CDPTarget:
+    global _target, _attach_warning
+    _target = await _open(chosen)
+    _attach_warning = _foreign_warning(inst, await asyncio.to_thread(running_checkout, inst.cdp_port))
+    return _target
 
 
 def _pick_main(page_targets: list[dict], vite_port: int) -> dict | None:
@@ -251,8 +269,7 @@ async def _ensure_target() -> CDPTarget:
             hide_instance_windows(inst)
         except Exception:
             log.warning("could not put the window out of sight", exc_info=True)
-        _target = await _open(chosen)
-        return _target
+        return await _attach_to(inst, chosen)
 
 
 def _text(payload: Any) -> list[types.TextContent]:
@@ -355,7 +372,7 @@ TOOLS = [
     ),
     _tool(
         "hover",
-        "Move the mouse over an element, for tooltips and hover-only controls.",
+        "Move the mouse over an element, for tooltips and hover-only controls. Says so when CSS `:hover` did not follow.",
         {"selector": {"type": "string", "description": SELECTOR}},
         ["selector"],
     ),
@@ -372,7 +389,8 @@ TOOLS = [
     ),
     _tool(
         "press_key",
-        "Press a key or shortcut: `Enter`, `Escape`, `Tab`, `ArrowDown`, `Control+K`, `Shift+Tab`, `a`.",
+        "Press a key or shortcut: `Enter`, `Escape`, `Tab`, `ArrowDown`, `Control+K`, `Shift+Tab`, `a`. "
+        "`Enter` and `Space` press a focused control; pass `selector` to focus it, as a click may not.",
         {
             "key": {"type": "string"},
             "selector": {"type": "string", "description": "Focus this first. " + SELECTOR},
@@ -393,7 +411,9 @@ TOOLS = [
     _tool(
         "eval",
         "Run JavaScript in the page, as in a DevTools console: top-level `await` works. Returns the "
-        "value of the last expression; DOM nodes come back as outerHTML. Prefer `snapshot` for reading the UI.",
+        "value of the last expression; on macOS and Linux only a single expression has a value, so wrap "
+        "statements in `(async () => { ...; return value; })()`. DOM nodes come back as outerHTML. "
+        "Prefer `snapshot` for reading the UI.",
         {
             "expression": {"type": "string"},
             "timeout": {"type": "number", "description": "Seconds (default 30)."},
@@ -460,6 +480,13 @@ async def _status(_args: dict) -> Result:
         "auto_launch": AUTO_LAUNCH,
         "instance": inst.to_dict(),
     }
+    if payload["port_alive"]:
+        running = await asyncio.to_thread(running_checkout, inst.cdp_port)
+        if running is not None:
+            payload["running_checkout"] = str(running)
+        warning = _foreign_warning(inst, running)
+        if warning:
+            payload["warning"] = warning
     try:
         payload["window"] = hide_instance_windows(inst)
     except Exception as e:
@@ -487,6 +514,10 @@ async def _connect(_args: dict) -> Result:
             )
     except Exception as e:
         payload["browser"] = f"unavailable ({type(e).__name__})"
+    if "warning" not in payload:
+        warning = _foreign_warning(inst, await asyncio.to_thread(running_checkout, inst.cdp_port))
+        if warning:
+            payload["warning"] = warning
     return _text(payload)
 
 
@@ -502,7 +533,7 @@ async def _attach(args: dict) -> Result:
             with contextlib.suppress(Exception):
                 await _target.close()
             _target = None
-        _target = await _open(chosen)
+        await _attach_to(inst, chosen)
     return _text(f"attached to {chosen.get('title') or chosen.get('url')} ({chosen['id']})")
 
 
@@ -536,7 +567,8 @@ async def _click(args: dict) -> Result:
 async def _hover(args: dict) -> Result:
     t = await _ensure_target()
     report = await t.hover(args["selector"])
-    return _text(f"hovering {report['target']}{_ambiguity(report)}")
+    note = f" - {report['note']}" if "note" in report else ""
+    return _text(f"hovering {report['target']}{_ambiguity(report)}{note}")
 
 
 async def _type_text(args: dict) -> Result:
@@ -660,11 +692,18 @@ async def list_tools() -> list[types.Tool]:
 
 @app.call_tool()
 async def call_tool(name: str, arguments: dict) -> Result:
+    global _attach_warning
     handler = HANDLERS.get(name)
     if handler is None:
         raise ValueError(f"unknown tool: {name}")
     try:
-        return await handler(arguments or {})
+        result = await handler(arguments or {})
+        # Said once, with the first answer after attaching, so a session that
+        # never asks for `status` hears it too.
+        if _attach_warning:
+            result = [*result, types.TextContent(type="text", text="warning: " + _attach_warning)]
+            _attach_warning = None
+        return result
     except Exception as e:
         # Raised, not returned as text: the SDK turns it into a result with
         # isError set, which is how a client tells a failure from an answer.

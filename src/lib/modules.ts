@@ -18,7 +18,6 @@ import {
   Box,
   CheckSquare,
   CopyPlus,
-  Flame,
   FolderOpen,
   Home,
   Languages,
@@ -31,6 +30,7 @@ import {
   Wand2,
   type LucideIcon,
 } from 'lucide-react';
+import { AltarIcon } from './altarIcon';
 import type { ContentType, EntryType } from '../types';
 
 /**
@@ -93,6 +93,9 @@ export function isLibraryView(viewType: string): viewType is LibraryViewId {
   return (LIBRARY_VIEW_IDS as readonly string[]).includes(viewType);
 }
 
+/** What can be newly created: the entry modules and the libraries. */
+export type CreatableViewId = EntryModuleId | LibraryViewId;
+
 /** Everything `ActiveView.type` can be. */
 export type ViewId = EntryModuleId | AuxViewId;
 
@@ -133,7 +136,7 @@ export const MODULES: Record<EntryModuleId, ModuleMeta> = {
   tasks: { id: 'tasks', icon: CheckSquare, navLabelKey: 'nav.tasks', untitledKey: 'tasks.untitled', entryType: 'task', usesEditorSidebar: false, usesBlocks: false },
   operations: { id: 'operations', icon: Wand2, navLabelKey: 'nav.operations', untitledKey: 'operations.untitled', entryType: 'operation', usesEditorSidebar: true, usesBlocks: true },
   wiki: { id: 'wiki', icon: Library, navLabelKey: 'nav.wiki', untitledKey: 'wiki.untitled', entryType: 'wiki', usesEditorSidebar: true, usesBlocks: true },
-  altar: { id: 'altar', icon: Flame, navLabelKey: 'nav.altar', untitledKey: 'altar.untitled', entryType: 'altar', usesEditorSidebar: true, usesBlocks: false },
+  altar: { id: 'altar', icon: AltarIcon, navLabelKey: 'nav.altar', untitledKey: 'altar.untitled', entryType: 'altar', usesEditorSidebar: true, usesBlocks: false },
 };
 
 export const MODULE_LIST: readonly ModuleMeta[] = ENTRY_MODULE_IDS.map((id) => MODULES[id]);
@@ -157,6 +160,14 @@ export const AUX_VIEWS: Record<AuxViewId, { icon: LucideIcon; navLabelKey: strin
   // The same glyph as `TRASH_KIND_ICONS.language`.
   lexicon: { icon: Languages, navLabelKey: 'nav.lexicon' },
 };
+
+/** What the rail's plus offers, in this order: the modules, Journal first as the most common choice, then the libraries. */
+export const CREATABLE_VIEWS: ReadonlyArray<{ id: CreatableViewId; icon: LucideIcon; navLabelKey: string }> = [
+  ...MODULE_LIST,
+  { id: 'lexicon', ...AUX_VIEWS.lexicon },
+  { id: 'templates', ...AUX_VIEWS.templates },
+  { id: 'blocks', ...AUX_VIEWS.blocks },
+];
 
 const VIEW_ID_SET: ReadonlySet<string> = new Set<string>([...ENTRY_MODULE_IDS, ...AUX_VIEW_IDS]);
 
@@ -217,6 +228,6 @@ export const TRASH_KIND_ICONS: Record<TrashKind, LucideIcon> = {
   blockDefinition: Box,
   template: CopyPlus,
   language: Languages,
-  altar: Flame,
+  altar: AltarIcon,
   altarItem: Sparkles,
 };

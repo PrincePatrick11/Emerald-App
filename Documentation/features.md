@@ -2,7 +2,7 @@
 
 ## Home Dashboard
 
-The Home view (the rail's top button, also the default view of a fresh tab) is a dashboard over three sections — Journal, Operations, and Wiki. Each section has its own view mode (list or cards), sort, and item count (3, 5, 10, 25 or all; 5 by default), remembered per section.
+The Home view (near the top of the rail, also the default view of a fresh tab) is a dashboard over three sections — Journal, Operations, and Wiki. Each section has its own view mode (list or cards), sort, and item count (3, 5, 10, 25 or all; 5 by default), remembered per section.
 
 The header shows today's date with the current **moon phase** and a **New Entry** button; like the module lists' headers, it moves into the right sidebar while that is open. Rows and cards carry the same context menu as the module lists (Duplicate/Rename/Delete), and clicking an item opens it in its module. Rename edits the title in place, starting from the stored title (empty for an untitled entry); Enter saves, Escape cancels, an empty name changes nothing.
 
@@ -22,7 +22,7 @@ There is one formatting toolbar, pinned to the top while scrolling, acting on th
 - Checklist items and yes/no switches can be toggled straight from read mode, unless the block is fully read-only.
 - A field's value is part of the entry: search finds it, links in a link field count as the entry's links (and show in "Linked entries"), and images in an image field are kept by the unused-image cleanup.
 
-**Managing blocks in the sidebar.** While editing, a collapsible "Blocks" section below the Properties panel lists the entry's blocks: drag a row by its grip to reorder (no animation — the row jumps into place), the eye hides a block, and the "…" menu renames, shows the title as a small read-mode heading, duplicates or removes it; "+ Add block" appends one. Clicking a row selects the block and jumps to it; its own settings, if any, open in a box right under the row, like the Altar's placed elements.
+**Managing blocks in the sidebar.** While editing, a collapsible "Blocks" section below the Properties panel lists the entry's blocks: drag a row by its grip to reorder (no animation — the row jumps into place), the eye hides a block, and the "…" menu renames, shows the title as a small read-mode heading, duplicates or removes it. "Add block" (and, where templates apply, "Insert template") sit at the top of the sidebar body in edit mode, "Insert template" first, in the template editor too; "Add block" appends one. Clicking a row selects the block and jumps to it; its own settings, if any, open in a box right under the row, like the Altar's placed elements.
 
 - A **hidden** block keeps everything in it — greyed out and marked while editing, absent in read mode.
 - A text block with no real content (only empty paragraphs or line breaks) is also absent from read mode, without being marked hidden; while editing it keeps its blank space so it can still be written into.
@@ -31,7 +31,7 @@ There is one formatting toolbar, pinned to the top while scrolling, acting on th
 
 All of this is part of the entry's text, so Cancel reverts it too.
 
-**Your own blocks.** The **Blocks** view (rail, between Templates and Categories) lists the blocks you've built on the same dashboard every module uses — icon, name, field and entry count, an "outdated" dot, and "Unsaved" for a draft left open elsewhere. The right sidebar holds the header: title, count, "New block", search, view (list, cards, wide cards, or a timeline by month of last change) and sort (last changed, name, most used).
+**Your own blocks.** The **Blocks** view (rail, below Templates) lists the blocks you've built on the same dashboard every module uses — icon, name, field and entry count, an "outdated" dot, and "Unsaved" for a draft left open elsewhere. The right sidebar holds the header: title, count, "New block", search, view (list, cards, wide cards, or a timeline by month of last change) and sort (last changed, name, most used).
 
 The list opens with a collapsible "Your blocks" section; below it, laid out like the Altar library, a collapsible "Built-in blocks" section lists what "Add block" offers out of the box — text, every field kind and the three sigil blocks — as a plain, non-clickable list (text and the sigil blocks have a description tooltip). Search filters both sections. With none of your own yet, a hint invites you to build the first; the built-in section stays regardless.
 
@@ -126,7 +126,7 @@ The altar is a virtual arrangement of symbolic objects on a canvas.
 
 Cards and rows show a **thumbnail** of each altar, captured when you confirm an edit with Done — or leave a changed altar for another tab — and stored in the database. Cancel brings the previous thumbnail back with everything else. Without a stored thumbnail a live preview is drawn instead, leaving hidden elements out; changing a library element's picture or deleting it drops the thumbnails of the altars showing it until they are next confirmed with Done (their "last changed" date stays). Thumbnails keep the altar's proportions without cropping.
 
-The preview can be turned off — a switch in the filter panel's "Display" group — for a lighter list that shows each altar's own icon instead (or a flame, for an altar with none).
+The preview can be turned off — a switch in the filter panel's "Display" group — for a lighter list that shows each altar's own icon instead (or the altar icon, a candle on a table, for an altar with none).
 
 **Altar library.** You keep a personal library of items. Each item has a name, an emoji, a category, an optional note, and an optional uploaded image.
 
@@ -158,7 +158,7 @@ Adding, editing and deleting items happens in a modal. Deleting moves the item t
 
 **Selecting elements.** Clicking a row highlights its element on the canvas with a jade border, in view and edit mode. Clicking the same row again, or an empty area of the canvas or sidebar, deselects (and closes the inspector).
 
-**Favicon.** Each altar can have its own icon, shown in its tab and as the first row of the view-mode summary. Set it in edit mode in the collapsible "Favicon" section at the top of the sidebar: pick an emoji from the shared emoji picker (the vault's default grid from Settings → Entries, searchable across the full emoji set) or upload an image. Without one, the tab shows a flame.
+**Favicon.** Each altar can have its own icon, shown in its tab and as the first row of the view-mode summary. Set it in edit mode in the collapsible "Favicon" section at the top of the sidebar: pick an emoji from the shared emoji picker (the vault's default grid from Settings → Entries, searchable across the full emoji set) or upload an image. Without one, the tab shows the altar icon, a candle on a table.
 
 **Sidebar in view mode.** Outside edit mode, the action bar shows Edit and a Fullscreen toggle, and below it a compact **summary panel**:
 
@@ -193,7 +193,7 @@ The grid also appears in thumbnails and exported images.
 
 ## Navigation
 
-**Loading screen.** On startup, before the app is ready, a loading screen covers the window: a breathing emerald gem with twinkling facets, the wordmark and a progress rail, on the app's own dark background. It fades as soon as your vault's data (or, without one, the [vault picker](#vaults)) is ready, however fast that is, and comes back while a vault chosen in the picker opens. **View → Show Loading Screen** replays it; a click or Escape closes it.
+**Loading screen.** On startup, before the app is ready, a loading screen covers the window: a breathing emerald gem with twinkling facets, the wordmark and a progress rail, on the app's own dark background. It fades as soon as your vault's data (or, without one, the [vault picker](#vaults)) is ready, however fast that is, and comes back while a vault chosen in the picker opens. If a password question comes first, the loading screen returns after you answer it and stays until the vault has loaded; a keychain prompt does not count against its time limit. **View → Show Loading Screen** replays it; a click or Escape closes it.
 
 **Window title bar and frame.** The app draws its own title bar: the Emerald logo (decoration, centred above the rail), on Windows and Linux one menu button holding Switch Vault… and the Edit and View menus, a magnifier for [Search](#search) (hidden while no vault is open), back/forward through the view history, on Windows and Linux an Export and an Import menu button, the open tabs, and — on Windows and Linux — the minimise / maximise / close buttons. macOS keeps its native window buttons and menu bar, so its title bar shows only the logo, search and navigation. The minimum window width is 720px. Over the [vault picker](#vaults) the title bar holds only the logo and, on Windows and Linux, minimise and close.
 
@@ -201,8 +201,8 @@ The title bar, the rail and the left entry list share one plain background with 
 
 **Left sidebar structure.** The left sidebar has two parts side by side:
 
-1. A narrow icon **rail**: Home, Journal, Tasks, Operations, Wiki, Lexicon and Altar at the top; at the bottom, Templates, Blocks, Categories, Tags and Trash, then Vault and Settings. Clicking a navigation icon switches the main view of the active tab — it never opens a new tab. The open view's icon is highlighted (also while an entry inside it is open). The Vault button opens [vault management](#vaults).
-2. A resizable, collapsible **entry list** showing either every module's items together (**All**, by last change) or one module's own — chosen in Settings → Sidebar. It has its own search, inline rename (from the context menu, starting from the stored title) and a context menu (Open in new tab/Duplicate/Rename/Delete where they apply — Altar offers Open in new tab, Rename and Delete, duplicating an altar lives in the dashboard's card menu; Tasks offers Rename/Delete). Task rows show a completion checkbox (in the All list a static checkbox icon). Every row can be dragged into an editor to insert an internal link — Tasks and Altars included. The list caps how many entries it shows (Settings → Sidebar: 10/25/50/100 or all); a "Show more" row reveals the next batch. With "all" it fills in as you scroll, so a vault with thousands of entries opens it at once. Creating items happens in each module's own dashboard.
+1. A narrow icon **rail**: a plus, then Home, then Journal, Tasks and Operations, then Wiki, Lexicon and Altar, then Templates and Blocks at the top, the groups set apart by space; at the bottom, Categories, Tags and Trash, then Vault and Settings. The rail scrolls without a bar when the window is too low. Clicking a navigation icon switches the main view of the active tab — it never opens a new tab. The open view's icon is highlighted (also while an entry inside it is open). The Vault button opens [vault management](#vaults). The plus opens a small window with a tile each for Journal, Tasks, Operations, Wiki, Altar, Lexicon, Templates and Blocks; the choice is created and opened right away, a task as a new row ready to be named in the Tasks view. Arrow keys and Tab move between the tiles, the focused one shows a ring from the start, Enter picks it (Journal is preselected), and each tile's number key picks it directly, and Escape or a click beside the window closes it.
+2. A resizable, collapsible **entry list** showing either every module's items together (**All**, by last change) or one module's own — chosen in Settings → Sidebar. It has its own search, inline rename (from the context menu, starting from the stored title) and a context menu (Open in new tab/Duplicate/Rename/Delete where they apply — Altar offers Open in new tab, Rename and Delete, duplicating an altar lives in the dashboard's card menu; Tasks offers Rename/Delete). Task rows show a completion checkbox (in the All list a static checkbox icon). Every row can be dragged into an editor to insert an internal link — Tasks and Altars included. The list caps how many entries it shows (Settings → Sidebar: 10/25/50/100 or all); a "Show more" row reveals the next batch. With "all" it fills in as you scroll, so a vault with thousands of entries opens it at once. Creating items happens through the rail's plus and each module's own dashboard; the entry list has no "New" button.
 
 The rail has no toggle buttons: **View → Entry List** and **View → Properties** collapse and expand the two sidebars (with a checkmark for their state), animating their width. **View → Reset View** restores the sidebar widths and the altar library height, ends the altar's full-window mode, and brings back a hidden rail, entry list or right sidebar — without the rail, Settings and the Vault button would be out of reach. **View → Lock View** (with a checkmark while on) fixes the widths of the entry list and the right sidebar: their edges can no longer be dragged. Hiding and showing the sidebars and Reset View keep working, and the lock survives a restart.
 
@@ -611,5 +611,7 @@ Emerald ships with two themes, selectable in Settings → General:
 
 - **Emerald Noctis** — dark, with warm stone tones and jade green accents. The default.
 - **Emerald Parchment** — light, with warm parchment backgrounds, flat bordered panels and adapted accents.
+
+**Custom themes:** import a theme file under Settings → General. It sets colours only; see [Custom Themes](themes.md).
 
 The whole UI, the Altar included, follows the chosen theme. For how themes are built and how to add one, see [Architecture → Theming System](architecture/appearance.md#theming-system).

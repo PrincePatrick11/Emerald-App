@@ -160,7 +160,7 @@ function CanvasEditor({ filename, startColor, startSize, onDrawn }: {
       <div className="flex flex-wrap items-center gap-3">
         {/* The toggle from the former sigil view, with a parchment bridge
             (.sigil-tool-*); deliberately not a Button: two states of one tool. */}
-        <div className="sigil-tool-toggle flex items-center gap-1 rounded-lg border border-stone-700/40 bg-stone-800/70 p-1">
+        <div className="sigil-tool-toggle flex items-center gap-1 rounded-lg border border-edge bg-well-strong p-1">
           {(['draw', 'erase'] as const).map((m) => {
             const Icon = m === 'draw' ? PenTool : Eraser;
             return (
@@ -170,7 +170,7 @@ function CanvasEditor({ filename, startColor, startSize, onDrawn }: {
                 onClick={() => setMode(m)}
                 aria-pressed={mode === m}
                 className={`sigil-tool-btn flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs transition-colors ${
-                  mode === m ? 'bg-stone-700 text-stone-100' : 'text-stone-400 hover:text-stone-200'
+                  mode === m ? 'bg-well-active text-primary' : 'text-muted hover:text-secondary'
                 }`}
               >
                 <Icon size={12} />

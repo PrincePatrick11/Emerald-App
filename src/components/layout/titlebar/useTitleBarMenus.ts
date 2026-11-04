@@ -10,16 +10,11 @@ export interface TitleBarMenu {
 }
 
 /**
- * The application menu's content for Windows and Linux, where the title bar
- * renders it in HTML.
+ * The content of the title bar's menus.
  *
- * macOS never renders this — there the native menu sits in the system menu
- * bar (`install_native_menu` in `src-tauri/src/lib.rs`), and that is the only
- * platform where the native menu is installed at all: an in-window HMENU or
- * GTK menubar would otherwise sit alongside this one.
- *
- * The items mirror the native menu exactly, down to which items are
- * disabled — both sides read that from `computeMenuEnabledState`.
+ * On macOS, Edit and View are in the system menu bar instead
+ * (`install_native_menu` in `src-tauri/src/lib.rs`, the only platform with a
+ * native menu); Export and Import are in the title bar everywhere.
  *
  * Content only: where the four menus sit is decided by `TitleBar` —
  * Edit and View behind the three-line button, Export and

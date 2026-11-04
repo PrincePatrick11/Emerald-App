@@ -1,6 +1,7 @@
 import { forwardRef, useEffect, useImperativeHandle, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { BookOpen, CheckSquare, Flame, Library, Wand2, type LucideIcon } from 'lucide-react';
+import { BookOpen, CheckSquare, Library, Wand2, type LucideIcon } from 'lucide-react';
+import { AltarIcon } from '../../lib/altarIcon';
 import type { ContentType } from '../../types';
 import type { SuggestionItem } from '../../lib/linkItems';
 
@@ -16,7 +17,7 @@ export const ENTRY_TYPE_ICONS: Record<ContentType, LucideIcon> = {
   wiki: Library,
   operation: Wand2,
   task: CheckSquare,
-  altar: Flame,
+  altar: AltarIcon,
 };
 
 /** Lives in `lib/modules.ts` so that `lib/` can reach it too; only
@@ -73,14 +74,14 @@ const SuggestionList = forwardRef<SuggestionListRef, Props>(
 
     if (items.length === 0) {
       return (
-        <div className="bg-stone-800 border border-stone-700 rounded-lg px-3 py-2 text-xs text-stone-500 shadow-xl">
+        <div className="bg-well-solid border border-edge-default rounded-lg px-3 py-2 text-xs text-subtle shadow-menu">
           {t('search.noResultsShort')}
         </div>
       );
     }
 
     return (
-      <div className="bg-stone-800 border border-stone-700 rounded-lg overflow-hidden shadow-xl min-w-[220px] max-h-64 overflow-y-auto">
+      <div className="bg-well-solid border border-edge-default rounded-lg overflow-hidden shadow-menu min-w-[220px] max-h-64 overflow-y-auto">
         {items.map((item, index) => {
           const TypeIcon = ENTRY_TYPE_ICONS[item.entryType];
           return (
@@ -89,13 +90,13 @@ const SuggestionList = forwardRef<SuggestionListRef, Props>(
               onClick={() => selectItem(index)}
               className={`w-full text-left flex items-center gap-2 px-3 py-2 text-sm transition-colors ${
                 index === selectedIndex
-                  ? 'bg-jade-900/70 text-stone-100'
-                  : 'text-stone-300 hover:bg-stone-700/60'
+                  ? 'bg-accent-fill-strong text-on-accent'
+                  : 'text-soft hover:bg-well-raise'
               }`}
             >
-              <TypeIcon size={12} className="text-stone-500 flex-shrink-0" />
+              <TypeIcon size={12} className="text-subtle flex-shrink-0" />
               <span className="flex-1 truncate">{item.label}</span>
-              <span className="text-xs text-stone-600 flex-shrink-0 capitalize">
+              <span className="text-xs text-subtle flex-shrink-0 capitalize">
                 {t(ENTRY_TYPE_LABEL_KEYS[item.entryType])}
               </span>
             </button>

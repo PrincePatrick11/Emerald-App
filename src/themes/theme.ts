@@ -1,8 +1,12 @@
 import { getCurrentWebview } from '@tauri-apps/api/webview';
 import { isTauri } from '../lib/platform';
 import { oneOf } from '../lib/helpers';
+import { customThemeTokens, type CustomTheme } from './customTheme';
+import { syncDockIcon } from './dockIcon';
 
 export type ThemeId = 'emerald-noctis' | 'emerald-parchment';
+/** A built-in theme, or an imported one of this vault. */
+export type ThemeSelection = ThemeId | `custom:${string}`;
 export type FontId = 'inter' | 'source-sans-3' | 'nunito' | 'ibm-plex-sans' | 'alegreya' | 'cormorant-garamond' | 'lora' | 'merriweather';
 
 export const DEFAULT_THEME_ID: ThemeId = 'emerald-noctis';
@@ -52,8 +56,41 @@ export function normalizeThemeId(raw: string | null): ThemeId {
   return DEFAULT_THEME_ID;
 }
 
-export function applyTheme(themeId: ThemeId) {
-  document.documentElement.dataset.theme = themeId;
+export function customThemeSelection(id: string): ThemeSelection {
+  return `custom:${id}`;
+}
+
+/** A selection pointing at a theme that no longer exists falls back to the default. */
+export function normalizeThemeSelection(raw: string | null, customThemes: CustomTheme[]): ThemeSelection {
+  if (raw?.startsWith('custom:')) {
+    return customThemes.some((theme) => customThemeSelection(theme.id) === raw)
+      ? (raw as ThemeSelection)
+      : DEFAULT_THEME_ID;
+  }
+  return normalizeThemeId(raw);
+}
+
+let appliedCustomTokens: string[] = [];
+
+/** A custom theme's values go through `style.setProperty`: a `<style>` element would
+ *  collide with the release build's CSP nonce (see `public/splash.css`). */
+export function applyTheme(selection: ThemeSelection, customThemes: CustomTheme[] = []) {
+  const html = document.documentElement;
+  for (const name of appliedCustomTokens) html.style.removeProperty(`--${name}`);
+  appliedCustomTokens = [];
+  html.style.removeProperty('color-scheme');
+
+  const custom = customThemes.find((theme) => customThemeSelection(theme.id) === selection);
+  syncDockIcon(custom ?? null);
+  if (!custom) {
+    html.dataset.theme = selection.startsWith('custom:') ? DEFAULT_THEME_ID : selection;
+    return;
+  }
+  const tokens = customThemeTokens(custom);
+  for (const [name, value] of Object.entries(tokens)) html.style.setProperty(`--${name}`, value);
+  appliedCustomTokens = Object.keys(tokens);
+  html.style.setProperty('color-scheme', custom.base);
+  html.dataset.theme = 'custom';
 }
 
 export function normalizeUIFontId(raw: string | null): FontId {
