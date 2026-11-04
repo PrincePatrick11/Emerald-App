@@ -6,6 +6,7 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased] (targeting v0.2.0)
 
 ### Added
+- **Find and replace in an entry** with ⌘F / Ctrl+F: hits light up across all text blocks, Enter and Shift+Enter step through them; while editing, one or all can be replaced.
 - **Text colours:** six colours in the selection menu, whose shade each theme sets, so coloured text stays readable in light and dark themes; the PDF export prints them too.
 - **Tables in the text,** from the toolbar or `/`: a header row, columns whose width can be dragged, and a menu at the table for adding and removing rows and columns. Markdown export writes them as tables.
 - **Typing `/` opens a list of what to insert:** text, headings, lists, a checklist, quote, divider, an image or a link to an entry; typing on filters it, arrow keys and Enter pick.

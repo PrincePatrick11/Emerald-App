@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useReducer, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useReducer, useRef, useState, type ReactNode } from 'react';
 import type { Editor } from '@tiptap/react';
 import EditorToolbar from './EditorToolbar';
 import LinkPickerModal from './LinkPickerModal';
 import DragGhost from './DragGhost';
+import FindBar from './FindBar';
 import { useEditorFileDrop } from './useEditorFileDrop';
 import { useEditorPointerDrops } from './useEditorPointerDrops';
 import { useInternalLinkNavigation } from './useInternalLinkNavigation';
@@ -26,7 +27,8 @@ interface TextEditorHostOptions {
  * together, such as the text blocks of an entry: the one toolbar, bound to the
  * focused editor; the link picker; chip-click navigation in read mode; file
  * drops from the explorer, pointer drops from the entry list and images moved
- * by dragging, with the indicator of where they land; the drag tag.
+ * by dragging, with the indicator of where they land; the drag tag; the find
+ * bar (⌘F / Ctrl+F) across all its editors.
  *
  * The host provides `context` through `TextEditorHostContext`; each
  * `TextEditor` inside with a `hostKey` then reports itself. `toolbar` and
@@ -60,11 +62,45 @@ export function useTextEditorHost({ isEditing, getOrder, getContainer }: TextEdi
 
   const [linkPickerOpen, setLinkPickerOpen] = useState(false);
 
+  // ⌘F / Ctrl+F while this host is on screen, in reading as in editing; the
+  // selected text, if any, is what is searched for first.
+  const [find, setFind] = useState<{ query: string; key: number } | null>(null);
+  const getContainerRef = useRef(getContainer);
+  getContainerRef.current = getContainer;
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key.toLowerCase() !== 'f' || !(e.metaKey || e.ctrlKey) || e.shiftKey || e.altKey) return;
+      const container = getContainerRef.current();
+      if (!container || container.getClientRects().length === 0) return;
+      e.preventDefault();
+      const focused = toolbarEditor ?? targetEditor();
+      const selected = focused && !focused.state.selection.empty
+        ? focused.state.doc.textBetween(focused.state.selection.from, focused.state.selection.to, ' ')
+        : '';
+      setFind((prev) => ({ query: selected || prev?.query || '', key: (prev?.key ?? 0) + 1 }));
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [toolbarEditor, targetEditor]);
+
   const context = useMemo<TextEditorHostContextValue>(() => ({ register: registerTextEditor }), [registerTextEditor]);
 
-  const toolbar: ReactNode = isEditing && toolbarEditor
-    ? <HostToolbar editor={toolbarEditor} onOpenLinkPicker={() => setLinkPickerOpen(true)} />
-    : null;
+  // Find bar and toolbar share the one sticky strip at the top of the host.
+  const showToolbar = isEditing && !!toolbarEditor;
+  const toolbar: ReactNode = find || showToolbar ? (
+    <div className="block-stack-toolbar">
+      {find && (
+        <FindBar
+          key={find.key}
+          getEditors={orderedEditors}
+          isEditing={isEditing}
+          initialQuery={find.query}
+          onClose={() => { setFind(null); toolbarEditor?.commands.focus(); }}
+        />
+      )}
+      {showToolbar && <HostToolbar editor={toolbarEditor} onOpenLinkPicker={() => setLinkPickerOpen(true)} />}
+    </div>
+  ) : null;
 
   const overlays: ReactNode = (
     <>
@@ -101,12 +137,10 @@ function HostToolbar({ editor, onOpenLinkPicker }: { editor: Editor; onOpenLinkP
   }, [editor]);
   if (editor.isDestroyed) return null;
   return (
-    <div className="block-stack-toolbar">
-      <EditorToolbar
-        editor={editor}
-        onInsertImage={(dataUrl) => insertImageFromDataUrl(editor, dataUrl)}
-        onOpenLinkPicker={onOpenLinkPicker}
-      />
-    </div>
+    <EditorToolbar
+      editor={editor}
+      onInsertImage={(dataUrl) => insertImageFromDataUrl(editor, dataUrl)}
+      onOpenLinkPicker={onOpenLinkPicker}
+    />
   );
 }

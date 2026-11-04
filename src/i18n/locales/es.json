@@ -528,6 +528,18 @@
       "blue": "Azul",
       "purple": "Morado"
     },
+    "find": {
+      "placeholder": "Buscar en la entrada",
+      "replacePlaceholder": "Reemplazar por",
+      "count": "{{current}} de {{total}}",
+      "none": "Sin resultados",
+      "previous": "Resultado anterior",
+      "next": "Resultado siguiente",
+      "toggleReplace": "Reemplazar",
+      "replace": "Reemplazar este resultado",
+      "replaceAll": "Reemplazar todo",
+      "close": "Cerrar"
+    },
     "unsaved": "Cambios sin guardar"
   },
   "moonPhase": {

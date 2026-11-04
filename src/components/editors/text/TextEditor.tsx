@@ -10,6 +10,7 @@ import TextAlign from '@tiptap/extension-text-align';
 import { TableKit } from '@tiptap/extension-table';
 import { ResizableImage } from './ResizableImageExtension';
 import { TextColorMark } from './TextColorExtension';
+import { SearchExtension } from './SearchExtension';
 import { useContext, useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import { saveImage } from '../../../lib/images';
 import { openUrl } from '@tauri-apps/plugin-opener';
@@ -163,6 +164,7 @@ export default function TextEditor({
       }),
       ...format.link,
       Placeholder.configure({ placeholder }),
+      SearchExtension,
       ...format.typography,
       ...(features.highlight ? [Highlight.configure({ multicolor: false })] : []),
       ...(features.colors ? [TextColorMark] : []),

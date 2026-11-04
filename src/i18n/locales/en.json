@@ -528,6 +528,18 @@
       "blue": "Blue",
       "purple": "Purple"
     },
+    "find": {
+      "placeholder": "Find in entry",
+      "replacePlaceholder": "Replace with",
+      "count": "{{current}} of {{total}}",
+      "none": "No matches",
+      "previous": "Previous match",
+      "next": "Next match",
+      "toggleReplace": "Replace",
+      "replace": "Replace this match",
+      "replaceAll": "Replace all",
+      "close": "Close"
+    },
     "unsaved": "Unsaved changes"
   },
   "moonPhase": {

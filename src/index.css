@@ -1862,6 +1862,34 @@ html[data-theme] .prop-segment--active {
   box-shadow: 0 0 0 2px var(--well-solid), 0 0 0 3px var(--accent);
 }
 
+/* The find bar above the toolbar (FindBar) and the hits it marks. */
+.editor-find-bar {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 6px 16px;
+  border-bottom: 1px solid var(--edge);
+}
+.editor-find-input {
+  width: 240px;
+  padding: 2px 8px;
+  font-size: 12px;
+  border-radius: 6px;
+  border: 1px solid var(--edge-strong);
+  background: var(--well-page);
+  color: var(--text-secondary);
+  outline: none;
+}
+.editor-find-input:focus { border-color: var(--accent-edge); }
+.tiptap .editor-search-match {
+  border-radius: 2px;
+  background-color: var(--accent-wash);
+}
+.tiptap .editor-search-match--current {
+  background-color: var(--accent-wash-strong);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+
 /* Where a drag into a text editor would land (DropIndicator). */
 .editor-drop-line,
 .editor-drop-caret {
