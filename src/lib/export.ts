@@ -457,8 +457,8 @@ const PRINT_CSS = `
   .entry-content img { display: block; max-width: 100%; height: auto; margin: 0.6em 0; border-radius: 4px; }
   .entry-content figure.image-placeholder,
   .entry-content figure.audio-placeholder {
-    margin: 0.8em 0; padding: 0.5em 0.9em; border: 1px dashed #ccc; border-radius: 6px;
-    font-family: system-ui, sans-serif; font-size: 0.85em; color: #555;
+    margin: 0.8em 0; padding: 0.55em 0.9em; border: 1px dashed #99dfc0; border-radius: 6px;
+    background: #f1fbf6; font-family: system-ui, sans-serif; font-size: 0.85em; color: #333;
   }
   .entry-content pre {
     background: #f5f5f5; padding: 0.8em 1em; border-radius: 4px;

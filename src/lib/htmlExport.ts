@@ -37,7 +37,7 @@ export interface HtmlExportLabels {
 const GROUP_ORDER: ExportEntryType[] = ['journal', 'wiki', 'operations'];
 
 /** Where "Emerald App" in the export's footer links to. */
-const EMERALD_URL = 'https://github.com/PrincePatrick11/Emerald-App';
+const EMERALD_URL = 'https://the-emerald-app.com/';
 
 function navIcon(data: ExportData): string {
   const safe = sanitizeDataImageUrl(data.entryIcon);
@@ -80,6 +80,15 @@ function buildRefs(
   return `<section class="refs">${block(labels.linksTo, linksTo)}${block(labels.linkedFrom, linkedFrom)}</section>`;
 }
 
+/**
+ * Small markers for the entries that carry images or sound files — embedded
+ * or as placeholders — so a bundle of many similar titles shows where they are.
+ */
+function mediaMarks(data: ExportData): string {
+  const marks = [/<img\b/.test(data.content) ? '🖼' : '', /<audio\b/.test(data.content) ? '🔊' : ''].join('');
+  return marks ? `<span class="nav-media">${marks}</span>` : '';
+}
+
 function buildNav(entries: ExportData[], labels: HtmlExportLabels): string {
   return GROUP_ORDER.map(type => {
     const group = entries.filter(e => e.type === type);
@@ -89,6 +98,7 @@ function buildNav(entries: ExportData[], labels: HtmlExportLabels): string {
       return `<a class="nav-item" href="#${entryAnchor(e.id)}" data-target="${entryAnchor(e.id)}">
         <span class="nav-icon">${navIcon(e)}</span>
         <span class="nav-text"><span class="nav-title">${htmlEscape(e.title)}</span>${type === 'journal' ? `<span class="nav-sub">${date}</span>` : ''}</span>
+        ${mediaMarks(e)}
         <span class="nav-hits" hidden></span>
       </a>`;
     }).join('');
@@ -240,6 +250,7 @@ a { color: inherit; }
 .nav-text { display: flex; flex-direction: column; min-width: 0; flex: 1; }
 .nav-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .nav-sub { font-size: 11px; color: var(--faint); }
+.nav-media { font-size: 11px; flex-shrink: 0; opacity: .8; letter-spacing: 1px; }
 .nav-hits {
   font-size: 11px; background: var(--accent); color: #fff; border-radius: 10px; padding: 0 7px; line-height: 18px;
 }
@@ -336,8 +347,8 @@ mark.hit { background: var(--mark); color: inherit; border-radius: 2px; padding:
 }
 .entry-content figure.image-placeholder,
 .entry-content figure.audio-placeholder {
-  margin: 1em 0; padding: 8px 12px; border: 1px dashed var(--border); border-radius: 8px;
-  font-family: system-ui, sans-serif; font-size: 13px; color: var(--muted);
+  margin: 1em 0; padding: 10px 14px; border: 1px dashed var(--accent-border); border-radius: 8px;
+  background: var(--accent-soft); font-family: system-ui, sans-serif; font-size: 13px; color: var(--text);
 }
 .entry-content figure.audio-placeholder figcaption { margin: 0; }
 .entry-content figure.audio-embed figcaption { font-size: 13px; color: var(--muted); margin-bottom: 6px; }
