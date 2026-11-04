@@ -32,7 +32,9 @@ const MODULE_FILE_NAMES: Record<ExportEntryType, string> = { journal: 'Journal',
 const LARGE_PDF = 25;
 
 type Period = 'last7' | 'last30' | 'thisMonth' | 'all' | 'custom';
+type Order = 'asc' | 'desc';
 const PERIODS: Period[] = ['last7', 'last30', 'thisMonth', 'all', 'custom'];
+const ORDERS: Order[] = ['asc', 'desc'];
 
 const TYPE_LABEL_KEYS: Record<ExportTarget['type'], string> = {
   journal: 'linkPicker.tabJournal',
@@ -56,6 +58,12 @@ interface Prefs {
   /** Custom period, as yyyy-MM-dd. */
   bulkFrom: string;
   bulkTo: string;
+  /** Date order of the exported entries (a single entry stays first, its linked ones follow). */
+  order: Order;
+  /** Linked entries get their own attachment handling instead of the main entries'. */
+  linkedMediaOwn: boolean;
+  linkedImages: ExportOptions['images'];
+  linkedAudio: ExportOptions['audio'];
 }
 
 function loadPrefs(): Prefs {
@@ -64,6 +72,7 @@ function loadPrefs(): Prefs {
     format: 'pdf', includeLinked: false, bulkIncludeLinked: false, recursive: false, images: 'balanced', audio: 'embed',
     bulkModules: ['journal'], bulkPeriod: 'last7',
     bulkFrom: formatDate(subDays(today, 6), DAY), bulkTo: formatDate(today, DAY),
+    order: 'asc', linkedMediaOwn: false, linkedImages: 'placeholder', linkedAudio: 'placeholder',
   };
   try {
     const raw = localStorage.getItem(PREFS_KEY);
@@ -187,27 +196,56 @@ function EntryList({ targets, excluded, onToggle, showDate }: {
   );
 }
 
+/** A titled block of the modal, separated from the next by a rule. */
+function Section({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <section className="py-4 space-y-3 border-t first:border-t-0" style={{ borderColor: 'var(--border-soft)' }}>
+      <h3 className="text-[11px] font-semibold uppercase tracking-wider text-stone-500">{title}</h3>
+      {children}
+    </section>
+  );
+}
+
+/** A labelled control inside a section: label on the left, control (and its note) on the right. */
+function Row({ label, note, children }: { label: string; note?: string; children: React.ReactNode }) {
+  return (
+    <div className="grid grid-cols-[104px_1fr] gap-3 items-start">
+      <span className="text-xs text-stone-500 pt-1.5">{label}</span>
+      <div className="min-w-0">
+        {children}
+        {note && <p className="text-xs text-stone-500 mt-1.5 leading-snug">{note}</p>}
+      </div>
+    </div>
+  );
+}
+
+function CheckRow({ checked, onToggle, children }: { checked: boolean; onToggle: () => void; children: React.ReactNode }) {
+  return (
+    <button type="button" onClick={onToggle} className="flex items-center gap-2 text-left">
+      <Checkbox checked={checked} />
+      <span className="text-xs text-stone-300">{children}</span>
+    </button>
+  );
+}
+
 export default function ExportModal() {
   const request = useExportStore((s) => s.request);
   if (!request) return null;
   // Remount per request so the state below starts fresh for each export —
   // also when a menu item is picked while the modal is already open.
-  return (
-    <ExportModalBody
-      key={request.seq}
-      target={request.kind === 'entry' ? request.target : null}
-      initialFormat={request.format}
-    />
-  );
+  return <ExportModalBody key={request.seq} openTarget={request.target} initialFormat={request.format} />;
 }
 
-/** `target` is the entry to export, or `null` for a bulk export. */
-function ExportModalBody({ target, initialFormat }: { target: ExportTarget | null; initialFormat?: ExportFormat }) {
+/** `openTarget` is the entry open when the modal was asked for, if any. */
+function ExportModalBody({ openTarget, initialFormat }: { openTarget: ExportTarget | null; initialFormat?: ExportFormat }) {
   const { t, i18n } = useTranslation();
   const close = useExportStore((s) => s.close);
   const busy = useExportStore((s) => s.busy);
   const setBusy = useExportStore((s) => s.setBusy);
-  const bulk = target === null;
+
+  const [mode, setMode] = useState<'entry' | 'bulk'>(openTarget ? 'entry' : 'bulk');
+  const target = mode === 'entry' ? openTarget : null;
+  const bulk = mode === 'bulk';
 
   const [prefs, setPrefs] = useState<Prefs>(() => {
     const p = loadPrefs();
@@ -240,11 +278,11 @@ function ExportModalBody({ target, initialFormat }: { target: ExportTarget | nul
     () => (bulk && !range.invalid ? collectTargetsInRange(prefs.bulkModules, range.from, range.to) : []),
     [bulk, prefs.bulkModules, range],
   );
-
   const bulkSelected = useMemo(
     () => bulkTargets.filter((b) => !excluded.has(targetKey(b))),
     [bulkTargets, excluded],
   );
+  // (bulkTargets come oldest first; the order setting flips the shown list)
 
   // ── Linked entries: of the one entry, or of the bulk selection ──
   // (in bulk mode, e.g. wiki articles linked from the journal entries when
@@ -257,14 +295,34 @@ function ExportModalBody({ target, initialFormat }: { target: ExportTarget | nul
   const wantLinks = !bulk || includeLinked;
   const directTargets = useMemo(() => (wantLinks ? collectLinkedTargets(roots, false, skipped) : []), [wantLinks, roots, skipped]);
   const allTargets = useMemo(() => (wantLinks ? collectLinkedTargets(roots, true, skipped) : []), [wantLinks, roots, skipped]);
-  const linked = prefs.recursive ? allTargets : directTargets;
   const hasIndirect = allTargets.length > directTargets.length;
   const bundleSupported = format !== 'emerald';
-  const bundling = bundleSupported && includeLinked && linked.length > 0;
-  const audioPlaceholderOnly = format === 'pdf';
-  const linkedSelected = bundling ? linked.filter((l) => !excluded.has(targetKey(l))) : [];
 
-  const selected: ExportTarget[] = [...roots, ...linkedSelected];
+  // ── Order by date: the period's entries, then the linked ones ──
+  const byDate = useMemo(() => {
+    const dates = new Map<string, string>();
+    const dateOf = (x: ExportTarget) => {
+      const key = targetKey(x);
+      if (!dates.has(key)) dates.set(key, describeTarget(x).createdAt ?? '');
+      return dates.get(key)!;
+    };
+    return (list: readonly ExportTarget[]) => {
+      const sorted = [...list].sort((a, b) => dateOf(a).localeCompare(dateOf(b)));
+      return prefs.order === 'desc' ? sorted.reverse() : sorted;
+    };
+  }, [prefs.order]);
+  const linked = useMemo(
+    () => byDate(prefs.recursive ? allTargets : directTargets),
+    [byDate, prefs.recursive, allTargets, directTargets],
+  );
+  const bundling = bundleSupported && includeLinked && linked.length > 0;
+  const linkedSelected = bundling ? linked.filter((l) => !excluded.has(targetKey(l))) : [];
+  const orderedRoots = useMemo(() => (bulk && prefs.order === 'desc' ? [...roots].reverse() : roots), [bulk, prefs.order, roots]);
+  const shownBulk = useMemo(() => (prefs.order === 'desc' ? [...bulkTargets].reverse() : bulkTargets), [prefs.order, bulkTargets]);
+  const selected: ExportTarget[] = [...orderedRoots, ...linkedSelected];
+
+  const audioPlaceholderOnly = format === 'pdf';
+  const linkedOwnMedia = linkedSelected.length > 0 && prefs.linkedMediaOwn;
 
   const toggleModule = (type: ExportEntryType) => {
     const has = prefs.bulkModules.includes(type);
@@ -298,6 +356,8 @@ function ExportModalBody({ target, initialFormat }: { target: ExportTarget | nul
       print: t('exportModal.html.print'),
       toggleTheme: t('exportModal.html.toggleTheme'),
       toggleSidebar: t('exportModal.html.toggleSidebar'),
+      sortOldest: t('exportModal.order.asc'),
+      sortNewest: t('exportModal.order.desc'),
       entryCount: t('exportModal.entryCount', { count }),
       // `{{app}}` stays in so the export can turn it into a link.
       exportedOn: t('exportModal.html.exportedOn', { date: formatDate(new Date(), 'dd.MM.yyyy'), app: '{{app}}' }),
@@ -315,8 +375,12 @@ function ExportModalBody({ target, initialFormat }: { target: ExportTarget | nul
     const options: ExportOptions = {
       images: prefs.images,
       audio: prefs.audio,
+      order: prefs.order,
       bundleTitle: bulk ? bundleTitle() : undefined,
       bundleFilename: bulk ? bundleFilename() : undefined,
+      linked: linkedOwnMedia
+        ? { ids: new Set(linkedSelected.map((l) => l.id)), images: prefs.linkedImages, audio: prefs.linkedAudio }
+        : undefined,
     };
     try {
       let saved: boolean;
@@ -350,77 +414,152 @@ function ExportModalBody({ target, initialFormat }: { target: ExportTarget | nul
     : range.invalid ? t('exportModal.bulk.invalidDate')
     : t('exportModal.bulk.noMatches');
 
+  const imageControl = (value: ExportOptions['images'], onChange: (v: ExportOptions['images']) => void) => (
+    <Segmented options={IMAGE_OPTIONS} value={value} onChange={onChange} label={(v) => t(`exportModal.compression.${v}.name`)} />
+  );
+  const audioControl = (value: ExportOptions['audio'], onChange: (v: ExportOptions['audio']) => void) => (
+    <Segmented
+      options={AUDIO_OPTIONS}
+      value={audioPlaceholderOnly ? 'placeholder' : value}
+      // A PDF's fixed choice must not overwrite the one saved for HTML / Emerald.
+      onChange={(v) => { if (!audioPlaceholderOnly) onChange(v); }}
+      label={(v) => t(`exportModal.audio.${v}`)}
+      disabled={audioPlaceholderOnly ? ['embed'] : undefined}
+    />
+  );
+  const audioNote = (value: ExportOptions['audio']) =>
+    audioPlaceholderOnly ? t('exportModal.audio.alwaysPlaceholder') : t(`exportModal.audio.${value}Desc`);
+
   return (
     <Modal
-      title={bulk ? t('exportModal.bulk.title') : t('exportModal.title')}
+      title={t('exportModal.title')}
       onClose={busy ? () => {} : close}
-      widthClassName="w-[540px]"
-      maxHeightClassName="max-h-[85vh]"
+      widthClassName="w-[560px]"
+      maxHeightClassName="max-h-[88vh]"
       className="overflow-hidden"
+      bodyClassName="flex flex-col min-h-0 flex-1"
     >
-      <div className="px-4 py-4 space-y-5">
-        {/* Entry being exported */}
-        {main && target && (
-          <div className="flex items-center gap-2.5 text-sm">
-            <TargetIcon icon={main.icon} />
-            <span className="truncate font-medium" style={{ color: 'var(--text-primary)' }}>{main.title}</span>
-            <span className="text-xs shrink-0" style={{ color: 'var(--text-subtle)' }}>{t(TYPE_LABEL_KEYS[target.type])}</span>
-          </div>
-        )}
+      {/* Sections scroll; the footer with the export button stays in view. */}
+      <div className="flex-1 min-h-0 overflow-y-auto">
+      <div className="px-5 pt-4">
+        {/* One entry or many */}
+        <div className="grid grid-cols-2 gap-1 p-0.5 rounded-lg border" style={{ borderColor: 'var(--border-soft)' }}>
+          {(['entry', 'bulk'] as const).map((m) => (
+            <button
+              key={m}
+              type="button"
+              // The two modes list different entries; a selection from one means nothing in the other.
+              onClick={() => { setMode(m); setExcluded(new Set()); }}
+              disabled={m === 'entry' && !openTarget}
+              title={m === 'entry' && !openTarget ? t('exportModal.mode.noEntry') : undefined}
+              className={`export-segment py-1.5 disabled:opacity-50 disabled:cursor-not-allowed${mode === m ? ' export-segment-active' : ''}`}
+            >
+              {t(`exportModal.mode.${m}`)}
+            </button>
+          ))}
+        </div>
+      </div>
 
-        {/* Bulk: which entries */}
-        {bulk && (
-          <div className="space-y-3">
-            <div>
-              <p className="text-xs text-stone-500 mb-2">{t('exportModal.bulk.modules')}</p>
-              <div className="flex gap-3">
-                {MODULES.map((m) => (
-                  <button key={m} type="button" onClick={() => toggleModule(m)} className="flex items-center gap-2 text-left">
-                    <Checkbox checked={prefs.bulkModules.includes(m)} />
-                    <span className="text-xs text-stone-300">{t(TYPE_LABEL_KEYS[m])}</span>
-                  </button>
-                ))}
-              </div>
+      <div className="px-5">
+        {/* ── What is exported ── */}
+        <Section title={t('exportModal.sections.content')}>
+          {main && target && (
+            <div className="flex items-center gap-2.5 text-sm">
+              <TargetIcon icon={main.icon} />
+              <span className="truncate font-medium" style={{ color: 'var(--text-primary)' }}>{main.title}</span>
+              <span className="text-xs shrink-0" style={{ color: 'var(--text-subtle)' }}>{t(TYPE_LABEL_KEYS[target.type])}</span>
             </div>
-            <div>
-              <p className="text-xs text-stone-500 mb-2">{t('exportModal.bulk.period')}</p>
-              <Segmented
-                options={PERIODS}
-                value={prefs.bulkPeriod}
-                onChange={(p) => update({ bulkPeriod: p })}
-                label={(p) => t(`exportModal.bulk.periods.${p}`)}
-              />
-              {prefs.bulkPeriod === 'custom' && (
-                <div className="flex items-center gap-3 mt-2 text-xs text-stone-500">
-                  <label className="flex items-center gap-1.5">
-                    {t('exportModal.bulk.from')}
-                    <input type="date" value={prefs.bulkFrom} max={prefs.bulkTo || undefined} placeholder="yyyy-mm-dd"
-                      onChange={(e) => update({ bulkFrom: e.target.value })}
-                      className={dateInputClass} />
-                  </label>
-                  <label className="flex items-center gap-1.5">
-                    {t('exportModal.bulk.to')}
-                    <input type="date" value={prefs.bulkTo} min={prefs.bulkFrom || undefined} placeholder="yyyy-mm-dd"
-                      onChange={(e) => update({ bulkTo: e.target.value })}
-                      className={dateInputClass} />
-                  </label>
+          )}
+
+          {bulk && (
+            <>
+              <Row label={t('exportModal.bulk.modules')}>
+                <div className="flex flex-wrap gap-x-4 gap-y-1.5 pt-1">
+                  {MODULES.map((m) => (
+                    <CheckRow key={m} checked={prefs.bulkModules.includes(m)} onToggle={() => toggleModule(m)}>
+                      {t(TYPE_LABEL_KEYS[m])}
+                    </CheckRow>
+                  ))}
                 </div>
+              </Row>
+              <Row label={t('exportModal.bulk.period')}>
+                <Segmented
+                  options={PERIODS}
+                  value={prefs.bulkPeriod}
+                  onChange={(p) => update({ bulkPeriod: p })}
+                  label={(p) => t(`exportModal.bulk.periods.${p}`)}
+                />
+                {prefs.bulkPeriod === 'custom' && (
+                  <div className="flex flex-wrap items-center gap-3 mt-2 text-xs text-stone-500">
+                    <label className="flex items-center gap-1.5">
+                      {t('exportModal.bulk.from')}
+                      <input type="date" value={prefs.bulkFrom} max={prefs.bulkTo || undefined} placeholder="yyyy-mm-dd"
+                        onChange={(e) => update({ bulkFrom: e.target.value })} className={dateInputClass} />
+                    </label>
+                    <label className="flex items-center gap-1.5">
+                      {t('exportModal.bulk.to')}
+                      <input type="date" value={prefs.bulkTo} min={prefs.bulkFrom || undefined} placeholder="yyyy-mm-dd"
+                        onChange={(e) => update({ bulkTo: e.target.value })} className={dateInputClass} />
+                    </label>
+                  </div>
+                )}
+              </Row>
+              {bulkTargets.length === 0 ? (
+                <p className="text-xs text-stone-500 italic">{emptyHint}</p>
+              ) : (
+                <EntryList targets={shownBulk} excluded={excluded} onToggle={toggleExcluded} showDate />
               )}
-            </div>
-            {bulkTargets.length === 0 ? (
-              <p className="text-xs text-stone-500 italic">{emptyHint}</p>
-            ) : (
-              <>
-                <EntryList targets={bulkTargets} excluded={excluded} onToggle={toggleExcluded} showDate />
-                <p className="text-xs text-stone-500 leading-snug">{bundleHint}</p>
-              </>
-            )}
-          </div>
-        )}
+            </>
+          )}
 
-        {/* Format */}
-        <div>
-          <p className="text-xs text-stone-500 mb-2">{t('exportModal.format')}</p>
+          {/* Linked entries — of the one entry, or of the bulk selection */}
+          {(!bulk || roots.length > 0) && (
+            wantLinks && directTargets.length === 0 && !(bulk && includeLinked) ? (
+              <p className="text-xs text-stone-500 italic">{t('exportModal.noLinked')}</p>
+            ) : !bundleSupported ? (
+              <p className="text-xs text-stone-500">{t('exportModal.emeraldSingle')}</p>
+            ) : (
+              <div className="space-y-2.5">
+                <CheckRow
+                  checked={includeLinked}
+                  onToggle={() => update(bulk ? { bulkIncludeLinked: !includeLinked } : { includeLinked: !includeLinked })}
+                >
+                  {t('exportModal.includeLinked')}
+                </CheckRow>
+                {includeLinked && bulk && directTargets.length === 0 && (
+                  <p className="text-xs text-stone-500 italic">{t('exportModal.bulk.noLinked')}</p>
+                )}
+                {includeLinked && directTargets.length > 0 && (
+                  <>
+                    {hasIndirect && (
+                      <Segmented
+                        options={['direct', 'all'] as const}
+                        value={prefs.recursive ? 'all' : 'direct'}
+                        onChange={(v) => update({ recursive: v === 'all' })}
+                        label={(v) => v === 'all'
+                          ? t('exportModal.depthAll', { count: allTargets.length })
+                          : t('exportModal.depthDirect', { count: directTargets.length })}
+                      />
+                    )}
+                    <EntryList targets={linked} excluded={excluded} onToggle={toggleExcluded} showDate={bulk} />
+                  </>
+                )}
+              </div>
+            )
+          )}
+
+          {selected.length > 1 && (
+            <>
+              <Row label={t('exportModal.order.label')}>
+                <Segmented options={ORDERS} value={prefs.order} onChange={(o) => update({ order: o })} label={(o) => t(`exportModal.order.${o}`)} />
+              </Row>
+              <p className="text-xs text-stone-500 leading-snug">{bundleHint}</p>
+            </>
+          )}
+        </Section>
+
+        {/* ── Format ── */}
+        <Section title={t('exportModal.format')}>
           <div className="grid grid-cols-2 gap-2">
             {FORMATS.map((f) => {
               const active = format === f.id;
@@ -445,92 +584,47 @@ function ExportModalBody({ target, initialFormat }: { target: ExportTarget | nul
               );
             })}
           </div>
-        </div>
+          {format === 'pdf' && selected.length >= LARGE_PDF && (
+            <p className="text-xs text-stone-500 leading-snug">{t('exportModal.largePdfHint', { count: selected.length })}</p>
+          )}
+        </Section>
 
-        {format === 'pdf' && selected.length >= LARGE_PDF && (
-          <p className="text-xs text-stone-500 leading-snug">{t('exportModal.largePdfHint', { count: selected.length })}</p>
-        )}
-
-        {/* Attachments */}
-        <div className="space-y-3">
-          <p className="text-xs text-stone-500">{t('exportModal.attachments')}</p>
+        {/* ── Attachments ── */}
+        <Section title={t('exportModal.attachments')}>
           {format === 'markdown' ? (
             <p className="text-xs text-stone-500 leading-snug">{t('exportModal.audio.markdownNote')}</p>
           ) : (
             <>
-              <div>
-                <p className="text-xs text-stone-500 mb-1.5">{t('exportModal.images')}</p>
-                <Segmented
-                  options={IMAGE_OPTIONS}
-                  value={prefs.images}
-                  onChange={(v) => update({ images: v })}
-                  label={(v) => t(`exportModal.compression.${v}.name`)}
-                />
-                <p className="text-xs text-stone-500 mt-1.5 leading-snug">{t(`exportModal.compression.${prefs.images}.desc`)}</p>
-              </div>
-              <div>
-                <p className="text-xs text-stone-500 mb-1.5">{t('exportModal.audio.label')}</p>
-                <Segmented
-                  options={AUDIO_OPTIONS}
-                  value={audioPlaceholderOnly ? 'placeholder' : prefs.audio}
-                  // A PDF's fixed choice must not overwrite the one saved for HTML / Emerald.
-                  onChange={(v) => { if (!audioPlaceholderOnly) update({ audio: v }); }}
-                  label={(v) => t(`exportModal.audio.${v}`)}
-                  disabled={audioPlaceholderOnly ? ['embed'] : undefined}
-                />
-                <p className="text-xs text-stone-500 mt-1.5 leading-snug">
-                  {audioPlaceholderOnly ? t('exportModal.audio.alwaysPlaceholder') : t(`exportModal.audio.${prefs.audio}Desc`)}
-                </p>
-              </div>
+              <Row label={t('exportModal.images')} note={t(`exportModal.compression.${prefs.images}.desc`)}>
+                {imageControl(prefs.images, (v) => update({ images: v }))}
+              </Row>
+              <Row label={t('exportModal.audio.label')} note={audioNote(prefs.audio)}>
+                {audioControl(prefs.audio, (v) => update({ audio: v }))}
+              </Row>
+              {linkedSelected.length > 0 && (
+                <div className="space-y-3 pt-1">
+                  <CheckRow checked={prefs.linkedMediaOwn} onToggle={() => update({ linkedMediaOwn: !prefs.linkedMediaOwn })}>
+                    {t('exportModal.linkedMedia', { count: linkedSelected.length })}
+                  </CheckRow>
+                  {prefs.linkedMediaOwn && (
+                    <div className="space-y-3 pl-6">
+                      <Row label={t('exportModal.images')} note={t(`exportModal.compression.${prefs.linkedImages}.desc`)}>
+                        {imageControl(prefs.linkedImages, (v) => update({ linkedImages: v }))}
+                      </Row>
+                      <Row label={t('exportModal.audio.label')} note={audioNote(prefs.linkedAudio)}>
+                        {audioControl(prefs.linkedAudio, (v) => update({ linkedAudio: v }))}
+                      </Row>
+                    </div>
+                  )}
+                </div>
+              )}
             </>
           )}
-        </div>
-
-        {/* Linked entries — of the one entry, or of the bulk selection */}
-        {(!bulk || roots.length > 0) && (
-          <div>
-            <p className="text-xs text-stone-500 mb-2">{t('exportModal.linkedEntries')}</p>
-            {wantLinks && directTargets.length === 0 && !(bulk && includeLinked) ? (
-              <p className="text-xs text-stone-500 italic">{t('exportModal.noLinked')}</p>
-            ) : !bundleSupported ? (
-              <p className="text-xs text-stone-500">{t('exportModal.emeraldSingle')}</p>
-            ) : (
-              <div className="space-y-3">
-                <button
-                  type="button"
-                  onClick={() => update(bulk ? { bulkIncludeLinked: !includeLinked } : { includeLinked: !includeLinked })}
-                  className="flex items-center gap-2 text-left"
-                >
-                  <Checkbox checked={includeLinked} />
-                  <span className="text-xs text-stone-300">{t('exportModal.includeLinked')}</span>
-                </button>
-
-                {includeLinked && bulk && directTargets.length === 0 && (
-                  <p className="text-xs text-stone-500 italic">{t('exportModal.bulk.noLinked')}</p>
-                )}
-                {includeLinked && directTargets.length > 0 && (
-                  <>
-                    {hasIndirect && (
-                      <Segmented
-                        options={['direct', 'all'] as const}
-                        value={prefs.recursive ? 'all' : 'direct'}
-                        onChange={(v) => update({ recursive: v === 'all' })}
-                        label={(v) => v === 'all'
-                          ? t('exportModal.depthAll', { count: allTargets.length })
-                          : t('exportModal.depthDirect', { count: directTargets.length })}
-                      />
-                    )}
-                    <EntryList targets={linked} excluded={excluded} onToggle={toggleExcluded} />
-                    <p className="text-xs text-stone-500 leading-snug">{bundleHint}</p>
-                  </>
-                )}
-              </div>
-            )}
-          </div>
-        )}
+        </Section>
+      </div>
       </div>
 
-      <div className="flex items-center gap-2 px-4 py-3 border-t" style={{ borderColor: 'var(--border-soft)' }}>
+      <div className="flex items-center gap-2 px-5 py-3 border-t shrink-0" style={{ borderColor: 'var(--border-soft)' }}>
         <span className="text-xs text-stone-500 mr-auto">
           {t('exportModal.entryCount', { count: selected.length })} · {t(`exportModal.formats.${format}.name`)}
         </span>

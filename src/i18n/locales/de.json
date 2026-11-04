@@ -494,7 +494,6 @@
     "import": "Importieren",
     "resetView": "Ansicht zurücksetzen",
     "exportEntry": "Exportieren…",
-    "exportBulk": "Mehrere Einträge exportieren…",
     "exportPdf": "Als PDF exportieren…",
     "exportHtml": "Als HTML exportieren…",
     "exportMarkdown": "Als Markdown exportieren…",
@@ -599,7 +598,6 @@
         "desc": "Bilder werden nicht eingebettet, sondern durch einen Hinweis ersetzt – kleinste Datei."
       }
     },
-    "linkedEntries": "Verlinkte Einträge",
     "includeLinked": "Verlinkte Einträge mitexportieren",
     "noLinked": "Dieser Eintrag verlinkt auf keine anderen Einträge.",
     "emeraldSingle": "Emerald-Dateien enthalten immer genau einen Eintrag. Wähle PDF, HTML oder Markdown, um verlinkte Einträge mit in die Datei zu packen.",
@@ -642,7 +640,6 @@
       "notExported": "{{name}} – nicht exportiert"
     },
     "bulk": {
-      "title": "Mehrere Einträge exportieren",
       "modules": "Module",
       "period": "Zeitraum",
       "periods": {
@@ -664,6 +661,21 @@
       "invalidDate": "Datum unvollständig oder ungültig (Format JJJJ-MM-TT).",
       "noLinked": "Die ausgewählten Einträge verlinken auf keine weiteren Einträge."
     },
-    "largePdfHint": "{{count}} Einträge sind ein großes PDF – das Erzeugen kann dauern, und unter macOS wird es eine einzige sehr lange Seite. Für große Pakete eignet sich HTML besser."
+    "largePdfHint": "{{count}} Einträge sind ein großes PDF – das Erzeugen kann dauern, und unter macOS wird es eine einzige sehr lange Seite. Für große Pakete eignet sich HTML besser.",
+    "mode": {
+      "entry": "Dieser Eintrag",
+      "bulk": "Mehrere Einträge",
+      "noEntry": "Kein Eintrag geöffnet"
+    },
+    "sections": {
+      "content": "Inhalt"
+    },
+    "order": {
+      "label": "Reihenfolge",
+      "asc": "Älteste zuerst",
+      "desc": "Neueste zuerst"
+    },
+    "linkedMedia_one": "Eigene Einstellungen für den verlinkten Eintrag",
+    "linkedMedia_other": "Eigene Einstellungen für verlinkte Einträge ({{count}})"
   }
 }

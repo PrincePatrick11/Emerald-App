@@ -3,7 +3,7 @@ import { save } from '@tauri-apps/plugin-dialog';
 import { format } from 'date-fns';
 import { internalLinksIn, type ExportData, type ExportEntryType } from './exportData';
 import {
-  DEFAULT_EXPORT_OPTIONS, defaultFilename, documentTitle, entryAnchor, htmlEscape, renderEntryArticle,
+  DEFAULT_EXPORT_OPTIONS, defaultFilename, documentTitle, entryAnchor, htmlEscape, mediaFor, renderEntryArticle,
   sanitizeDataImageUrl, type ExportOptions,
 } from './export';
 
@@ -29,6 +29,9 @@ export interface HtmlExportLabels {
   print: string;
   toggleTheme: string;
   toggleSidebar: string;
+  /** Tooltips of the sidebar's sort button, by the order it switches to. */
+  sortOldest: string;
+  sortNewest: string;
   entryCount: string;      // already interpolated, e.g. "4 entries"
   exportedOn: string;      // date interpolated, `{{app}}` left in: "Exported from {{app}} on …"
   groups: Record<ExportEntryType, string>;
@@ -95,7 +98,7 @@ function buildNav(entries: ExportData[], labels: HtmlExportLabels): string {
     if (!group.length) return '';
     const items = group.map(e => {
       const date = format(new Date(e.createdAt), 'dd.MM.yyyy');
-      return `<a class="nav-item" href="#${entryAnchor(e.id)}" data-target="${entryAnchor(e.id)}">
+      return `<a class="nav-item" href="#${entryAnchor(e.id)}" data-target="${entryAnchor(e.id)}" data-ts="${new Date(e.createdAt).getTime() || 0}">
         <span class="nav-icon">${navIcon(e)}</span>
         <span class="nav-text"><span class="nav-title">${htmlEscape(e.title)}</span>${type === 'journal' ? `<span class="nav-sub">${date}</span>` : ''}</span>
         ${mediaMarks(e)}
@@ -122,8 +125,7 @@ export async function buildInteractiveHtml(
   const articles = await Promise.all(entries.map(e =>
     renderEntryArticle(e, {
       bundleIds,
-      images: opts.images,
-      audio: opts.audio,
+      ...mediaFor(e, opts),
       footerHtml: buildRefs(e, entries, outgoing, labels),
     })
   ));
@@ -143,7 +145,11 @@ export async function buildInteractiveHtml(
   ${multi ? `<aside class="sidebar" id="sidebar">
     <div class="sidebar-head">
       <div class="bundle-title">${htmlEscape(title)}</div>
-      <div class="bundle-sub">${htmlEscape(labels.entryCount)}</div>
+      <div class="bundle-sub">
+        <span>${htmlEscape(labels.entryCount)}</span>
+        <button class="sort-btn" id="sort-btn" aria-label="${htmlEscape(labels.sortOldest)} / ${htmlEscape(labels.sortNewest)}" data-order="${opts.order ?? 'asc'}"
+          data-label-asc="${htmlEscape(labels.sortOldest)}" data-label-desc="${htmlEscape(labels.sortNewest)}">⇅</button>
+      </div>
       <input type="search" id="search" class="search" placeholder="${htmlEscape(labels.search)}" autocomplete="off" spellcheck="false">
     </div>
     <nav class="nav" id="nav">${buildNav(entries, labels)}</nav>
@@ -226,7 +232,13 @@ a { color: inherit; }
 }
 .sidebar-head { padding: 20px 16px 12px; border-bottom: 1px solid var(--border); }
 .bundle-title { font-weight: 600; font-size: 15px; line-height: 1.3; overflow-wrap: anywhere; }
-.bundle-sub { color: var(--muted); font-size: 12px; margin: 2px 0 12px; }
+.bundle-sub { color: var(--muted); font-size: 12px; margin: 2px 0 12px; display: flex; align-items: center; justify-content: space-between; }
+.sort-btn {
+  font: inherit; font-size: 12px; color: var(--muted); background: transparent; border: 1px solid var(--border);
+  border-radius: 6px; padding: 1px 8px; cursor: pointer;
+}
+.sort-btn:hover { color: var(--text); background: var(--chip); }
+.sort-btn:focus-visible { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
 .search {
   width: 100%; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--border);
   background: var(--surface); color: var(--text); font: inherit; font-size: 13px; outline: none;
@@ -523,6 +535,29 @@ const HTML_JS = `
   }
   window.addEventListener('hashchange', function () { show(location.hash.slice(1)); });
   show(location.hash.slice(1), false);
+
+  // ── Sidebar order by date: flips each module's list ──
+  var sortBtn = document.getElementById('sort-btn');
+  if (sortBtn) {
+    var order = sortBtn.getAttribute('data-order') === 'desc' ? 'desc' : 'asc';
+    var label = function () {
+      // The tooltip names the order a click switches to.
+      sortBtn.title = sortBtn.getAttribute(order === 'asc' ? 'data-label-desc' : 'data-label-asc');
+    };
+    label();
+    sortBtn.addEventListener('click', function () {
+      order = order === 'asc' ? 'desc' : 'asc';
+      Array.prototype.forEach.call(document.querySelectorAll('.nav-group'), function (g) {
+        var items = Array.prototype.slice.call(g.querySelectorAll('.nav-item'));
+        items.sort(function (a, b) {
+          var d = Number(a.getAttribute('data-ts')) - Number(b.getAttribute('data-ts'));
+          return order === 'asc' ? d : -d;
+        });
+        items.forEach(function (it) { g.appendChild(it); });
+      });
+      label();
+    });
+  }
 
   // ── Sidebar search over titles and full text ──
   if (search) {

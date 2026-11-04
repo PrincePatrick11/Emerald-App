@@ -458,7 +458,8 @@ fn install_mouse_nav_monitor(app_handle: tauri::AppHandle) {
 }
 
 /// Toggles the enabled state of the "Export to …" menu items. `entry_enabled`
-/// covers "Export…", HTML and Markdown (journal / wiki / operations only); `pdf_enabled` covers
+/// covers HTML and Markdown (journal / wiki / operations only; "Export…" is
+/// always enabled, it falls back to a bulk export); `pdf_enabled` covers
 /// PDF, which is also available while an Altar's reading view is open (it
 /// exports the rendered altar image instead of entry content in that case);
 /// `emerald_enabled` covers the shared Emerald export, also available for an
@@ -474,7 +475,6 @@ fn set_export_menu_enabled(app: tauri::AppHandle, entry_enabled: bool, pdf_enabl
             for child in sub.items().unwrap_or_default() {
                 if let MenuItemKind::MenuItem(item) = &child {
                     match item.id().0.as_str() {
-                        "export-entry" => { item.set_enabled(entry_enabled).ok(); }
                         "export-pdf" => { item.set_enabled(pdf_enabled).ok(); }
                         "export-html" => { item.set_enabled(entry_enabled).ok(); }
                         "export-markdown" => { item.set_enabled(entry_enabled).ok(); }
@@ -525,7 +525,6 @@ fn update_menu_labels(
     import: String,
     reset_view: String,
     export_entry: String,
-    export_bulk: String,
     export_pdf: String,
     export_html: String,
     export_markdown: String,
@@ -561,7 +560,6 @@ fn update_menu_labels(
                     let new_child_text = match child_id.as_str() {
                         "reset-sidebar-widths" => Some(reset_view.as_str()),
                         "export-entry"         => Some(export_entry.as_str()),
-                        "export-bulk"          => Some(export_bulk.as_str()),
                         "export-pdf"           => Some(export_pdf.as_str()),
                         "export-html"          => Some(export_html.as_str()),
                         "export-markdown"      => Some(export_markdown.as_str()),
@@ -671,21 +669,13 @@ pub fn run() {
             // Export items start disabled — the frontend enables them once a
             // journal / wiki / operations entry is actually open (PDF is also
             // enabled while an Altar's reading view is open).
-            // "Export…" opens the export modal (format choice, linked
-            // entries); the per-format items below open it preselected.
+            // "Export…" opens the export modal — on the open entry, or as a
+            // bulk export when none is open, so it is always enabled. The
+            // per-format items below open it with their format preselected.
             let export_entry_item = MenuItem::with_id(
                 app,
                 "export-entry",
                 "Export…",
-                false,
-                None::<&str>,
-            )?;
-            // Bulk export works on the whole vault, not the open entry, so
-            // it is always enabled.
-            let export_bulk_item = MenuItem::with_id(
-                app,
-                "export-bulk",
-                "Export Multiple Entries…",
                 true,
                 None::<&str>,
             )?;
@@ -754,7 +744,6 @@ pub fn run() {
                 true,
                 &[
                     &export_entry_item,
-                    &export_bulk_item,
                     &PredefinedMenuItem::separator(app)?,
                     &export_pdf_item,
                     &export_html_item,
@@ -792,7 +781,6 @@ pub fn run() {
                 match event.id().as_ref() {
                     "reset-sidebar-widths" => { app.emit("reset-sidebar-widths", ()).ok(); }
                     "export-entry"         => { app.emit("export-entry", ()).ok(); }
-                    "export-bulk"          => { app.emit("export-bulk", ()).ok(); }
                     "export-pdf"           => { app.emit("export-pdf", ()).ok(); }
                     "export-html"          => { app.emit("export-html", ()).ok(); }
                     "export-markdown"      => { app.emit("export-markdown", ()).ok(); }

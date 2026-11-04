@@ -494,7 +494,6 @@
     "import": "Importer",
     "resetView": "Réinitialiser la vue",
     "exportEntry": "Exporter…",
-    "exportBulk": "Exporter plusieurs entrées…",
     "exportPdf": "Exporter en PDF…",
     "exportHtml": "Exporter en HTML…",
     "exportMarkdown": "Exporter en Markdown…",
@@ -599,7 +598,6 @@
         "desc": "Les images ne sont pas intégrées mais remplacées par une note – fichier le plus léger."
       }
     },
-    "linkedEntries": "Entrées liées",
     "includeLinked": "Exporter aussi les entrées liées",
     "noLinked": "Cette entrée ne renvoie vers aucune autre entrée.",
     "emeraldSingle": "Les fichiers Emerald contiennent toujours une seule entrée. Choisissez PDF, HTML ou Markdown pour regrouper les entrées liées dans le fichier.",
@@ -642,7 +640,6 @@
       "notExported": "{{name}} – non exporté"
     },
     "bulk": {
-      "title": "Exporter plusieurs entrées",
       "modules": "Modules",
       "period": "Période",
       "periods": {
@@ -664,6 +661,21 @@
       "invalidDate": "Date incomplète ou invalide (format AAAA-MM-JJ).",
       "noLinked": "Les entrées sélectionnées ne renvoient vers aucune autre entrée."
     },
-    "largePdfHint": "{{count}} entrées donnent un PDF volumineux : sa création peut prendre du temps et, sous macOS, il devient une seule page très longue. Le HTML convient mieux aux gros lots."
+    "largePdfHint": "{{count}} entrées donnent un PDF volumineux : sa création peut prendre du temps et, sous macOS, il devient une seule page très longue. Le HTML convient mieux aux gros lots.",
+    "mode": {
+      "entry": "Cette entrée",
+      "bulk": "Plusieurs entrées",
+      "noEntry": "Aucune entrée ouverte"
+    },
+    "sections": {
+      "content": "Contenu"
+    },
+    "order": {
+      "label": "Ordre",
+      "asc": "Plus anciennes d'abord",
+      "desc": "Plus récentes d'abord"
+    },
+    "linkedMedia_one": "Réglages propres pour l'entrée liée",
+    "linkedMedia_other": "Réglages propres pour les entrées liées ({{count}})"
   }
 }

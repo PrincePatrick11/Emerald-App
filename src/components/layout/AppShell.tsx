@@ -89,7 +89,6 @@ export default function AppShell() {
       import:          t('menu.import'),
       resetView:       t('menu.resetView'),
       exportEntry:     t('menu.exportEntry'),
-      exportBulk:      t('menu.exportBulk'),
       exportPdf:       t('menu.exportPdf'),
       exportHtml:      t('menu.exportHtml'),
       exportMarkdown:  t('menu.exportMarkdown'),
@@ -161,9 +160,14 @@ export default function AppShell() {
       useExportStore.getState().openExport(target, format);
     };
 
-    const unlistenEntry = listen('export-entry', () => openEntryExport());
-
-    const unlistenBulk = listen('export-bulk', () => useExportStore.getState().openBulkExport());
+    // "Export…" works anywhere: on the open entry, or as a bulk export.
+    const unlistenEntry = listen('export-entry', () => {
+      const target = activeExportTarget();
+      // Sigil export isn't implemented yet: start on the bulk export instead.
+      const isSigil = target?.type === 'operations'
+        && useOperationStore.getState().operations.find((o) => o.id === target.id)?.category_id === 'sigils';
+      useExportStore.getState().openExport(isSigil ? null : target);
+    });
 
     const unlistenPdf = listen('export-pdf', () => {
       if (isAltarReadingView(useUIStore.getState().activeView)) {
@@ -207,7 +211,6 @@ export default function AppShell() {
 
     return () => {
       unlistenEntry.then(fn => fn());
-      unlistenBulk.then(fn => fn());
       unlistenPdf.then(fn => fn());
       unlistenHtml.then(fn => fn());
       unlistenMd.then(fn => fn());

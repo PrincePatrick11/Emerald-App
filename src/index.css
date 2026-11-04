@@ -133,7 +133,7 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
     @apply px-2.5 py-1 rounded-md text-xs transition-colors duration-150;
     color: var(--text-muted);
   }
-  .export-segment:hover { color: var(--text-secondary); }
+  .export-segment:not(:disabled):hover { color: var(--text-secondary); }
   .export-segment-active,
   .export-segment-active:hover {
     background-color: var(--menu-item-active-bg);

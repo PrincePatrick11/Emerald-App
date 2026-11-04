@@ -250,9 +250,19 @@ export interface ExportOptions {
   bundleTitle?: string;
   /** Suggested file name of a bulk export, without extension. */
   bundleFilename?: string;
+  /** Date order the entries were put in — the HTML export's sort button starts from it. */
+  order?: 'asc' | 'desc';
+  /** Entries bundled because they are linked, when their attachments are handled differently. */
+  linked?: { ids: ReadonlySet<string>; images: ExportOptions['images']; audio: ExportOptions['audio'] };
 }
 
 export const DEFAULT_EXPORT_OPTIONS: ExportOptions = { images: 'none', audio: 'embed' };
+
+/** The attachment handling for one entry of an export: its own, or the linked entries'. */
+export function mediaFor(entry: ExportData, opts: ExportOptions): Pick<ExportOptions, 'images' | 'audio'> {
+  const m = opts.linked?.ids.has(entry.id) ? opts.linked : opts;
+  return { images: m.images, audio: m.audio };
+}
 
 /** The suggested file name: a bulk export's own, else the first entry's title and date. */
 export function defaultFilename(main: ExportData, opts: ExportOptions, ext: string): string {
@@ -569,7 +579,7 @@ export async function exportAsPDF(entries: ExportData[], opts: ExportOptions = D
   if (!main) return false;
   const bundleIds = entries.length > 1 ? new Set(entries.map(e => e.id)) : undefined;
   // A PDF can't play sound: always a placeholder.
-  const articles = (await Promise.all(entries.map(e => renderEntryArticle(e, { bundleIds, images: opts.images, audio: 'placeholder' }))))
+  const articles = (await Promise.all(entries.map(e => renderEntryArticle(e, { bundleIds, images: mediaFor(e, opts).images, audio: 'placeholder' }))))
     // The PDF is rendered in a hidden, viewport-sized webview right after
     // the page reports "loaded". WebKit decodes large images lazily, so
     // images further down could still be undecoded when the PDF is captured

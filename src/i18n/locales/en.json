@@ -494,7 +494,6 @@
     "import": "Import",
     "resetView": "Reset View",
     "exportEntry": "Export…",
-    "exportBulk": "Export Multiple Entries…",
     "exportPdf": "Export as PDF…",
     "exportHtml": "Export as HTML…",
     "exportMarkdown": "Export as Markdown…",
@@ -599,7 +598,6 @@
         "desc": "Images are not embedded but replaced by a note – smallest file."
       }
     },
-    "linkedEntries": "Linked entries",
     "includeLinked": "Also export linked entries",
     "noLinked": "This entry doesn't link to any other entries.",
     "emeraldSingle": "Emerald files always contain exactly one entry. Choose PDF, HTML or Markdown to bundle linked entries into the file.",
@@ -642,7 +640,6 @@
       "notExported": "{{name}} – not exported"
     },
     "bulk": {
-      "title": "Export Multiple Entries",
       "modules": "Modules",
       "period": "Period",
       "periods": {
@@ -664,6 +661,21 @@
       "invalidDate": "Date incomplete or invalid (format YYYY-MM-DD).",
       "noLinked": "The selected entries don't link to any other entries."
     },
-    "largePdfHint": "{{count}} entries make a large PDF – creating it can take a while, and on macOS it becomes one very long page. HTML suits large bundles better."
+    "largePdfHint": "{{count}} entries make a large PDF – creating it can take a while, and on macOS it becomes one very long page. HTML suits large bundles better.",
+    "mode": {
+      "entry": "This entry",
+      "bulk": "Multiple entries",
+      "noEntry": "No entry open"
+    },
+    "sections": {
+      "content": "Content"
+    },
+    "order": {
+      "label": "Order",
+      "asc": "Oldest first",
+      "desc": "Newest first"
+    },
+    "linkedMedia_one": "Separate settings for the linked entry",
+    "linkedMedia_other": "Separate settings for linked entries ({{count}})"
   }
 }
