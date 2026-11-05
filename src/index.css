@@ -9,11 +9,12 @@
     --font-editor: 'Lora', Georgia, serif;
     /* Adjustable (settingsStore); 17px is the default. */
     --editor-font-size: 17px;
-    /* Marked text, in the theme's accent rather than the system's colour, so
-       that it matches what the editor draws itself (marked images). */
-    --selection-bg: color-mix(in srgb, var(--accent) 32%, transparent);
   }
 
+  /* Marked text, in the theme's colour rather than the system's, so that it
+     matches what the editor draws itself (marked images). The token holds a
+     plain colour: WebKit resolves a `color-mix()` held in a custom property to
+     transparent here, and then shows the system colour after all. */
   ::selection {
     background-color: var(--selection-bg);
   }
@@ -1186,50 +1187,33 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
 }
 
 /* The box sits on the middle of the item's first line, whatever the text size:
-   the label is one line tall and centres it. */
+   the label is one line tall and centres it (`em` first for WebViews without `lh`). */
 .tiptap ul[data-type="taskList"] li > label {
   @apply flex flex-shrink-0 items-center cursor-pointer;
+  height: 1.625em;
   height: 1lh;
 }
 
-/* A box of the theme instead of the system's white one: an edge while open,
-   jade with a tick when done. */
+/* The app's checkbox (`.block-checkbox`, below, shares its rules with this
+   one): TipTap renders the input itself, so only the size is set here, in
+   `em` to grow with the editor's text. While reading the box cannot be
+   changed, so it does not invite a click. */
 .tiptap ul[data-type="taskList"] li > label input[type="checkbox"] {
-  appearance: none;
-  display: grid;
-  place-content: center;
   width: 1em;
   height: 1em;
   margin: 0;
-  border-radius: 0.3em;
-  border: 1.5px solid var(--edge-strong);
-  background: var(--well-page);
-  cursor: pointer;
-  transition: background-color 150ms, border-color 150ms;
-}
-.tiptap ul[data-type="taskList"] li > label input[type="checkbox"]:hover {
-  border-color: var(--accent-edge);
-}
-.tiptap ul[data-type="taskList"] li > label input[type="checkbox"]:checked {
-  border-color: var(--accent);
-  background: var(--accent);
-}
-.tiptap ul[data-type="taskList"] li > label input[type="checkbox"]::after {
-  content: '';
-  width: 0.3em;
-  height: 0.55em;
-  margin-top: -0.1em;
-  border: solid var(--well-page);
-  border-width: 0 2px 2px 0;
-  transform: rotate(45deg) scale(0);
-  transition: transform 120ms;
+  border-radius: 0.25em;
 }
 .tiptap ul[data-type="taskList"] li > label input[type="checkbox"]:checked::after {
-  transform: rotate(45deg) scale(1);
+  width: 0.6em;
+  height: 0.6em;
 }
-.tiptap ul[data-type="taskList"] li > label input[type="checkbox"]:focus-visible {
-  outline: none;
-  box-shadow: 0 0 0 2px var(--focus-ring);
+.tiptap:not([contenteditable="true"]) ul[data-type="taskList"] li > label,
+.tiptap:not([contenteditable="true"]) ul[data-type="taskList"] li > label input[type="checkbox"] {
+  cursor: default;
+}
+.tiptap:not([contenteditable="true"]) ul[data-type="taskList"] li > label input[type="checkbox"]:not(:checked):hover {
+  border-color: var(--border-strong);
 }
 
 /* Done: the item's own text struck through and quieter, not what is nested in it. */
@@ -1394,6 +1378,7 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
   box-shadow: 0 0 0 2px var(--accent-edge);
   filter: brightness(0.8) saturate(0.85);
 }
+.tiptap.editor-marking-images::selection,
 .tiptap.editor-marking-images ::selection { background: transparent; }
 .tiptap .editor-text--marked { background-color: var(--selection-bg); }
 
@@ -1418,7 +1403,7 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
   border-radius: 0.375rem;
   /* One line of the heading tall, so the chevron sits on its middle;
      `em` first for WebViews without the `lh` unit. */
-  height: 1.4em;
+  height: 1.3em;
   height: 1lh;
   padding: 0;
   /* The heading's size and leading, which `lh` follows. */
@@ -2100,6 +2085,10 @@ html[data-theme] .prop-segment--active {
 .editor-color-swatch--none {
   background: linear-gradient(135deg, transparent 45%, var(--text-muted) 45%, var(--text-muted) 55%, transparent 55%);
 }
+.editor-color-swatch:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
 .editor-color-swatch--active {
   box-shadow: 0 0 0 2px var(--well-solid), 0 0 0 3px var(--accent);
 }
@@ -2133,7 +2122,7 @@ html[data-theme] .prop-segment--active {
   margin-right: 2px;
   padding: 0 8px;
   border-radius: 0.375rem;
-  border: 1px solid transparent;
+  border: 1px solid var(--edge-strong);
   background: var(--well-page);
   cursor: text;
   transition: border-color 150ms;
@@ -2165,12 +2154,18 @@ html[data-theme] .prop-segment--active {
   display: flex;
   margin-left: auto;
 }
-/* A small panel hanging under a toolbar button (web link, text colour). */
+/* A small panel hanging under a toolbar button (web link, text colour), in
+   place rather than in a portal: the bar is sticky at the top of the main
+   column, so there is always room below it. A button in the bar's right half
+   opens it towards the left (`--end`), so it stays on the sheet. */
 .editor-toolbar-popover {
   position: absolute;
   top: calc(100% + 6px);
   left: 0;
-  z-index: 50;
+}
+.editor-toolbar-popover--end {
+  left: auto;
+  right: 0;
 }
 .editor-inline-input {
   padding: 2px 8px;
@@ -3083,7 +3078,8 @@ html[data-theme] .block-manager-row--idle,
 .block-toggle:focus-visible,
 .block-check:focus-visible,
 .block-checklist-input:focus-visible,
-.block-checkbox:focus-visible {
+.block-checkbox:focus-visible,
+.tiptap ul[data-type="taskList"] li > label input[type="checkbox"]:focus-visible {
   outline: none;
   box-shadow: 0 0 0 2px var(--focus-ring);
 }
@@ -3092,8 +3088,9 @@ html[data-theme] .block-manager-row--idle,
    settings. Drawn by hand instead of native — a native checkbox brings
    its own colours and edges and looked out of place next to the fields and buttons.
    Everything comes from theme variables, so Parchment needs no
-   bridge of its own. */
-.block-checkbox {
+   bridge of its own. The editor's checklist uses it too, sized there. */
+.block-checkbox,
+.tiptap ul[data-type="taskList"] li > label input[type="checkbox"] {
   appearance: none;
   -webkit-appearance: none;
   width: 0.875rem;
@@ -3108,18 +3105,21 @@ html[data-theme] .block-manager-row--idle,
   transition: background-color 150ms, border-color 150ms;
 }
 
-.block-checkbox:hover {
+.block-checkbox:hover,
+.tiptap ul[data-type="taskList"] li > label input[type="checkbox"]:hover {
   border-color: var(--accent-text);
 }
 
-.block-checkbox:checked {
+.block-checkbox:checked,
+.tiptap ul[data-type="taskList"] li > label input[type="checkbox"]:checked {
   background-color: var(--accent-text);
   border-color: var(--accent-text);
 }
 
 /* The tick itself, cut out as a shape: in the app's surface colour,
    which provides the contrast to the accent in both themes. */
-.block-checkbox:checked::after {
+.block-checkbox:checked::after,
+.tiptap ul[data-type="taskList"] li > label input[type="checkbox"]:checked::after {
   content: '';
   width: 0.5rem;
   height: 0.5rem;
@@ -3931,12 +3931,9 @@ html[data-theme='emerald-parchment'] .tiptap {
 }
 
 html[data-theme='emerald-parchment'] .tiptap h1,
-html[data-theme='emerald-parchment'] .tiptap h2 {
-  color: #25180f;
-}
-
+html[data-theme='emerald-parchment'] .tiptap h2,
 html[data-theme='emerald-parchment'] .tiptap h3 {
-  color: #43301e;
+  color: #25180f;
 }
 
 html[data-theme='emerald-parchment'] .tiptap code {

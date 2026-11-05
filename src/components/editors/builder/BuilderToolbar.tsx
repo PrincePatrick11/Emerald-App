@@ -7,7 +7,8 @@ import {
   Hexagon, ImageDown, Italic, Layers2, Maximize, PaintBucket, Redo2, SendToBack, Shapes, Square, SquareDashed, Star,
   Trash2, Triangle, Type, Undo2, ZoomIn, ZoomOut,
 } from 'lucide-react';
-import { PopoverButton, ToolbarBtn, ToolbarDivider, ToolbarGroup } from '../text/toolbarParts';
+import { ToolbarBtn, ToolbarDivider, ToolbarGroup } from '../shared/toolbarParts';
+import PopoverButton from '../shared/PopoverButton';
 import type { BuilderController } from './BuilderEditor';
 import {
   BUILDER_FONTS, BUILDER_SHAPES, type BuilderShapeElement, type BuilderShapeType,

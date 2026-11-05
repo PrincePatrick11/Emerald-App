@@ -161,6 +161,7 @@ html[data-theme='test-garish'] {
   --canvas: hsl(240, 85%, 12%);
   --accent-wash: hsla(300, 90%, 40%, 0.2);
   --accent-wash-strong: hsla(300, 90%, 50%, 0.3);
+  --selection-bg: hsla(60, 100%, 50%, 0.45);
   --accent-track: hsla(300, 95%, 65%, 0.6);
   --accent-fill: hsl(300, 90%, 35%);
   --accent-fill-strong: hsl(300, 90%, 30%);

@@ -177,6 +177,7 @@ html[data-theme='emerald-noctis'] {
   --canvas: rgba(15, 14, 12, 0.8);
   --accent-wash: rgba(0, 92, 58, 0.2);
   --accent-wash-strong: rgba(0, 230, 153, 0.25);
+  --selection-bg: rgba(0, 230, 153, 0.25);
   --accent-track: rgba(0, 196, 127, 0.6);
   --accent-fill: rgba(0, 138, 87, 0.3);
   --accent-fill-strong: rgba(0, 92, 58, 0.7);

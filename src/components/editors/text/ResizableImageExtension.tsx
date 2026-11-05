@@ -1,11 +1,12 @@
 import { Node, mergeAttributes, type Editor } from '@tiptap/core';
-import { NodeSelection, Selection, TextSelection } from '@tiptap/pm/state';
+import { NodeSelection, TextSelection } from '@tiptap/pm/state';
 import { ReactNodeViewRenderer, NodeViewWrapper } from '@tiptap/react';
 import type { NodeViewProps } from '@tiptap/react';
 import { useRef, useState } from 'react';
 import { imageSrc, storedImageName } from '../../../lib/images';
 import { getImageDrag, setImageDrag } from './imageDrag';
-import { headOverImage, imageSelectionPlugin } from './imageSelection';
+import { besideImage, headOverImage, imageSelectionPlugin } from './imageSelection';
+import { DRAG_THRESHOLD_PX, trackPointerDrag } from '../../../lib/pointerDrag';
 
 /** Applies to text as to images; the toolbar serves both with the same buttons. */
 export type Alignment = 'left' | 'center' | 'right';
@@ -44,8 +45,6 @@ function alignFromLegacyStyle(img: HTMLImageElement): Alignment {
   return img.style.marginRight === 'auto' ? 'center' : 'right';
 }
 
-/** Past this much travel, a press on an image becomes a move. */
-const DRAG_THRESHOLD_PX = 4;
 /** Fractions of the editor's width a resize snaps to when it comes this close (in percentage points). */
 const SNAP_WIDTHS = [25, 33, 50, 66, 75];
 const SNAP_RANGE = 2;
@@ -126,22 +125,18 @@ function ResizableImageView({ node, updateAttributes, selected, editor, getPos }
       resizedWidth(Math.max(80, Math.min(editorW, startW + (clientX - startX) * factor)), editorW);
     setResizeLabel(widthAt(startX).label);
 
-    const onMove = (ev: PointerEvent) => {
-      const { width, label } = widthAt(ev.clientX);
-      setResizeLabel(label);
-      updateAttributes({ width });
-    };
     // A cancelled pointer (touch panning, a native drag) ends it like a release.
-    const onUp = () => {
-      setResizeLabel(null);
-      document.removeEventListener('pointermove', onMove);
-      document.removeEventListener('pointerup', onUp);
-      document.removeEventListener('pointercancel', onUp);
-    };
-    document.addEventListener('pointermove', onMove);
-    document.addEventListener('pointerup', onUp);
-    document.addEventListener('pointercancel', onUp);
+    trackPointerDrag(e, {
+      onMove: (ev) => {
+        const { width, label } = widthAt(ev.clientX);
+        setResizeLabel(label);
+        updateAttributes({ width });
+      },
+      onEnd: () => setResizeLabel(null),
+    });
   };
+
+  const imagePos = () => (typeof getPos === 'function' ? getPos() : undefined);
 
   /**
    * A press on an image not yet selected: a click selects it; once the
@@ -151,43 +146,37 @@ function ResizableImageView({ node, updateAttributes, selected, editor, getPos }
    */
   const startSelecting = (e: React.PointerEvent) => {
     e.preventDefault();
-    const startX = e.clientX;
-    const startY = e.clientY;
-    let started = false;
-    const imagePos = () => (typeof getPos === 'function' ? getPos() : undefined);
-
-    const onMove = (ev: PointerEvent) => {
-      if (!started && Math.hypot(ev.clientX - startX, ev.clientY - startY) < DRAG_THRESHOLD_PX) return;
-      started = true;
-      const from = imagePos();
-      const { view } = editor;
-      const at = view.posAtCoords({ left: ev.clientX, top: ev.clientY });
-      if (from === undefined || !at) return;
-      const { doc } = editor.state;
-      const to = from + node.nodeSize;
-      if (at.inside === from) return; // still over this image
-      // The far side of the image is the anchor: the text position just
-      // before it when marking downwards, just after it when marking upwards.
-      const forward = at.pos >= to || (at.inside >= to);
-      const anchor = forward
-        ? Selection.findFrom(doc.resolve(from), -1, true)?.from ?? from
-        : Selection.findFrom(doc.resolve(to), 1, true)?.from ?? to;
-      // Over another image, that one is in at once (`headOverImage`).
-      const head = headOverImage(view, ev.clientX, ev.clientY, anchor) ?? at.pos;
-      view.dispatch(editor.state.tr.setSelection(TextSelection.create(doc, anchor, head)).scrollIntoView());
-    };
-    const onUp = () => {
-      document.removeEventListener('pointermove', onMove);
-      document.removeEventListener('pointerup', onUp);
-      document.removeEventListener('pointercancel', onUp);
-      if (started) return;
-      const pos = imagePos();
-      if (pos !== undefined) editor.view.dispatch(editor.state.tr.setSelection(NodeSelection.create(editor.state.doc, pos)));
-    };
     editor.view.focus();
-    document.addEventListener('pointermove', onMove);
-    document.addEventListener('pointerup', onUp);
-    document.addEventListener('pointercancel', onUp);
+    trackPointerDrag(e, {
+      threshold: DRAG_THRESHOLD_PX,
+      onMove: (ev) => {
+        const from = imagePos();
+        const { view } = editor;
+        const at = view.posAtCoords({ left: ev.clientX, top: ev.clientY });
+        if (from === undefined || !at) return;
+        const { doc } = editor.state;
+        const to = from + node.nodeSize;
+        // Back on this image: it alone, as a click would select it.
+        if (at.inside === from) {
+          if (!(editor.state.selection instanceof NodeSelection)) view.dispatch(editor.state.tr.setSelection(NodeSelection.create(doc, from)));
+          return;
+        }
+        const forward = at.pos >= to || at.inside >= to;
+        // Over another image, that one is in at once (`headOverImage`).
+        const provisional = forward ? from : to;
+        const head = headOverImage(view, ev.clientX, ev.clientY, provisional) ?? at.pos;
+        // The far side of the image is the anchor: in the text just before it
+        // when marking downwards, just after it when marking upwards, never
+        // past a neighbouring image (`besideImage`).
+        const anchor = besideImage(doc, provisional, !forward, head);
+        view.dispatch(editor.state.tr.setSelection(TextSelection.create(doc, anchor, head)).scrollIntoView());
+      },
+      onEnd: ({ started }) => {
+        if (started) return;
+        const pos = imagePos();
+        if (pos !== undefined) editor.view.dispatch(editor.state.tr.setSelection(NodeSelection.create(editor.state.doc, pos)));
+      },
+    });
   };
 
   /**
@@ -200,34 +189,23 @@ function ResizableImageView({ node, updateAttributes, selected, editor, getPos }
   const onImagePointerDown = (e: React.PointerEvent) => {
     if (!editable || e.button !== 0) return;
     if (!selected) { startSelecting(e); return; }
-    const startX = e.clientX;
-    const startY = e.clientY;
-    let started = false;
-
-    const onMove = (ev: PointerEvent) => {
-      if (started || Math.hypot(ev.clientX - startX, ev.clientY - startY) < DRAG_THRESHOLD_PX) return;
-      started = true;
-      setMoving(true);
-      document.body.classList.add('editor-image-dragging');
-      setImageDrag({ editor, getPos: () => (typeof getPos === 'function' ? getPos() : undefined) });
-    };
-    const end = (cancelled: boolean) => {
-      document.removeEventListener('pointermove', onMove);
-      document.removeEventListener('pointerup', onUp);
-      document.removeEventListener('pointercancel', onCancel);
-      if (!started) return;
-      setMoving(false);
-      document.body.classList.remove('editor-image-dragging');
-      // Cancelled (touch panning, a native drag), nothing is moved. Released,
-      // a host has finished the move by now; without one nobody would clear it.
-      if (cancelled) setImageDrag(null);
-      else window.setTimeout(() => { if (getImageDrag()?.editor === editor) setImageDrag(null); }, 0);
-    };
-    const onUp = () => end(false);
-    const onCancel = () => end(true);
-    document.addEventListener('pointermove', onMove);
-    document.addEventListener('pointerup', onUp);
-    document.addEventListener('pointercancel', onCancel);
+    trackPointerDrag(e, {
+      threshold: DRAG_THRESHOLD_PX,
+      onStart: () => {
+        setMoving(true);
+        document.body.classList.add('editor-image-dragging');
+        setImageDrag({ editor, getPos: imagePos });
+      },
+      onEnd: ({ started, cancelled }) => {
+        if (!started) return;
+        setMoving(false);
+        document.body.classList.remove('editor-image-dragging');
+        // Cancelled (touch panning, a native drag), nothing is moved. Released,
+        // a host has finished the move by now; without one nobody would clear it.
+        if (cancelled) setImageDrag(null);
+        else window.setTimeout(() => { if (getImageDrag()?.editor === editor) setImageDrag(null); }, 0);
+      },
+    });
   };
 
   return (

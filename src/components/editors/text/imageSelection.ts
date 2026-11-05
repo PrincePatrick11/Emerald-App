@@ -1,5 +1,6 @@
 import type { Node as ProseMirrorNode } from '@tiptap/pm/model';
-import { Plugin, PluginKey, TextSelection, type EditorState } from '@tiptap/pm/state';
+import type { ResolvedPos } from '@tiptap/pm/model';
+import { AllSelection, Plugin, PluginKey, TextSelection, type EditorState } from '@tiptap/pm/state';
 import { Decoration, DecorationSet, type EditorView } from '@tiptap/pm/view';
 
 /**
@@ -10,10 +11,33 @@ import { Decoration, DecorationSet, type EditorView } from '@tiptap/pm/view';
  * images inside a selection are shown as marked.
  */
 
+/** Whether a position lies in a table cell. */
+export function inTableCell($pos: ResolvedPos): boolean {
+  for (let depth = $pos.depth; depth > 0; depth--) {
+    const role = $pos.node(depth).type.spec.tableRole as string | undefined;
+    if (role === 'cell' || role === 'header_cell') return true;
+  }
+  return false;
+}
+
+/**
+ * A selection end beside a block image: into the neighbouring text block when
+ * there is one (`forward`: the one after, else the one before), so the
+ * selection reads as text; between the blocks otherwise. Also between the
+ * blocks when the other end is in a table cell: prosemirror-tables would
+ * shrink a selection from a cell to the start of a text block to that cell.
+ */
+export function besideImage(doc: ProseMirrorNode, pos: number, forward: boolean, otherEnd: number): number {
+  if (inTableCell(doc.resolve(otherEnd))) return pos;
+  const $pos = doc.resolve(pos);
+  if (forward && $pos.nodeAfter?.isTextblock) return pos + 1;
+  if (!forward && $pos.nodeBefore?.isTextblock) return pos - 1;
+  return pos;
+}
+
 /**
  * Where the selection ends when the pointer is over an image: past its far
- * side as seen from `anchor`, so the image is in. Into the text block that
- * follows (or precedes) it when there is one, else between the blocks.
+ * side as seen from `anchor`, so the image is in (`besideImage`).
  * `null` when the pointer is not over an image.
  */
 export function headOverImage(view: EditorView, x: number, y: number, anchor: number): number | null {
@@ -23,11 +47,7 @@ export function headOverImage(view: EditorView, x: number, y: number, anchor: nu
   const node = doc.nodeAt(hit.inside);
   if (node?.type.name !== 'image') return null;
   const forward = anchor <= hit.inside;
-  const head = forward ? hit.inside + node.nodeSize : hit.inside;
-  const $head = doc.resolve(head);
-  if (forward && $head.nodeAfter?.isTextblock) return head + 1;
-  if (!forward && $head.nodeBefore?.isTextblock) return head - 1;
-  return head;
+  return besideImage(doc, forward ? hit.inside + node.nodeSize : hit.inside, forward, anchor);
 }
 
 /**
@@ -46,7 +66,7 @@ function markedImages(state: EditorState): DecorationSet {
 
 function findMarked(state: EditorState): DecorationSet {
   const { selection, doc } = state;
-  if (selection.empty || !(selection instanceof TextSelection)) return DecorationSet.empty;
+  if (selection.empty || !(selection instanceof TextSelection || selection instanceof AllSelection)) return DecorationSet.empty;
   const images: Decoration[] = [];
   const text: Decoration[] = [];
   doc.nodesBetween(selection.from, selection.to, (node: ProseMirrorNode, pos: number) => {
@@ -77,6 +97,11 @@ const imageSelectionKey = new PluginKey('imageSelection');
 export function imageSelectionPlugin(): Plugin {
   let dragging = false;
   let pointer: { x: number; y: number } | null = null;
+  // Seen the button held during this drag: a later move without it means the
+  // release was lost (a system menu, switching apps). Moves synthesised by the
+  // dev bridge carry no buttons at all, so a drag only ends this way once it
+  // has seen them.
+  let pressed = false;
 
   return new Plugin({
     key: imageSelectionKey,
@@ -85,14 +110,17 @@ export function imageSelectionPlugin(): Plugin {
       attributes: (state): Record<string, string> =>
         (markedImages(state) === DecorationSet.empty ? {} : { class: 'editor-marking-images' }),
       createSelectionBetween(view, $anchor) {
-        if (!dragging || !pointer) return null;
+        if (!dragging || !pointer || !(view.state.selection instanceof TextSelection)) return null;
         const head = headOverImage(view, pointer.x, pointer.y, $anchor.pos);
         return head === null ? null : TextSelection.create(view.state.doc, $anchor.pos, head);
       },
       handleDOMEvents: {
         mousedown(_view, event) {
-          dragging = event.button === 0 && !event.shiftKey;
+          // A press on an image is the image's own (selecting, moving).
+          const onImage = (event.target as Element | null)?.closest?.('img') != null;
+          dragging = event.button === 0 && !event.shiftKey && !onImage;
           pointer = null;
+          pressed = false;
           return false;
         },
       },
@@ -101,14 +129,17 @@ export function imageSelectionPlugin(): Plugin {
       let frame = 0;
       const onMove = (e: MouseEvent) => {
         // Ended by the release, which the page delivers here even outside
-        // the window once a drag began in it.
+        // the window once a drag began in it, or by a release that was lost.
         if (!dragging) return;
+        if (e.buttons & 1) pressed = true;
+        else if (pressed) { dragging = false; pointer = null; return; }
         pointer = { x: e.clientX, y: e.clientY };
         // After the page has handled the move, so its own reading comes first.
         cancelAnimationFrame(frame);
         frame = requestAnimationFrame(() => {
           if (!pointer || !view.editable) return;
           const { selection } = view.state;
+          if (!(selection instanceof TextSelection)) return;
           const head = headOverImage(view, pointer.x, pointer.y, selection.anchor);
           if (head === null || head === selection.head) return;
           view.dispatch(view.state.tr.setSelection(TextSelection.create(view.state.doc, selection.anchor, head)));
@@ -117,11 +148,13 @@ export function imageSelectionPlugin(): Plugin {
       const onUp = () => { dragging = false; pointer = null; };
       document.addEventListener('mousemove', onMove);
       document.addEventListener('mouseup', onUp);
+      window.addEventListener('blur', onUp);
       return {
         destroy() {
           cancelAnimationFrame(frame);
           document.removeEventListener('mousemove', onMove);
           document.removeEventListener('mouseup', onUp);
+          window.removeEventListener('blur', onUp);
         },
       };
     },
