@@ -221,23 +221,54 @@ export function revealEntryLink(
 export const NEW_TABLE = { rows: 3, cols: 3, withHeaderRow: true } as const;
 
 /**
- * Chosen or pasted image files into the editor at the cursor, one after
- * another in their order: each prepared (limits, photo as JPEG) and stored
- * first. Files of another format are left out with the notice saying so;
- * one that fails does not stop the others.
+ * Images into the editor one after another, each behind the one before, from
+ * `at` on (`null`: the cursor). Storing a photo takes a moment and typing goes
+ * on meanwhile, so the spot follows every change of the document and moves
+ * past each image inserted there; inserting at the selection instead would
+ * replace the image just put in. One that fails does not stop the others.
+ */
+export async function insertImagesInOrder<T>(
+  editor: Editor,
+  at: number | null,
+  items: T[],
+  store: (item: T) => Promise<string>,
+  report: (e: unknown, item: T) => void,
+): Promise<void> {
+  let spot = at ?? editor.state.selection.to;
+  const follow = ({ transaction }: { transaction: { mapping: { map: (pos: number, assoc?: number) => number } } }) => {
+    spot = transaction.mapping.map(spot, 1);
+  };
+  editor.on('transaction', follow);
+  try {
+    for (const item of items) {
+      try {
+        const src = await store(item);
+        if (editor.isDestroyed) return;
+        editor.chain().focus()
+          .insertContentAt(Math.min(spot, editor.state.doc.content.size), { type: 'image', attrs: { src } })
+          .run();
+      } catch (e) {
+        report(e, item);
+      }
+    }
+  } finally {
+    editor.off('transaction', follow);
+  }
+}
+
+/**
+ * Chosen or pasted image files into the editor at the cursor, in their order:
+ * each prepared (limits, photo as JPEG) and stored first. Files of another
+ * format are left out with the notice saying so.
  */
 export async function insertImageFiles(editor: Editor, files: File[]): Promise<void> {
   const accepted = files.filter(isAcceptedImageFile);
   if (accepted.length < files.length) useImageNoticeStore.getState().show({ kind: 'format' });
-  for (const file of accepted) {
-    try {
-      const src = await saveImage(await prepareImageDataUrl(await readFileAsDataUrl(file)));
-      if (editor.isDestroyed) return;
-      editor.chain().focus().insertContent({ type: 'image', attrs: { src } }).run();
-    } catch (e) {
-      reportImageError(e, 'insert');
-    }
-  }
+  await insertImagesInOrder(
+    editor, null, accepted,
+    async (file) => saveImage(await prepareImageDataUrl(await readFileAsDataUrl(file))),
+    (e) => reportImageError(e, 'insert'),
+  );
 }
 
 /** The file picker for images (toolbar button, `/` menu), several at once. */
@@ -252,13 +283,17 @@ export function pickImageFiles(editor: Editor): void {
 
 /**
  * Set the web address of the link at the selection, or take the link away
- * when the address is empty — in the selection menu and in the link popup alike.
+ * when the address is empty — in the selection menu, the link popup and the
+ * toolbar alike. With nothing selected and no link at the cursor, the
+ * address itself goes in as the link's text.
  */
 export function applyLinkHref(editor: Editor, href: string): void {
   const value = href.trim();
   const chain = editor.chain().focus().extendMarkRange('link');
-  if (value) chain.setLink({ href: value }).run();
-  else chain.unsetLink().run();
+  if (!value) chain.unsetLink().run();
+  else if (editor.state.selection.empty && !editor.isActive('link')) {
+    chain.insertContent({ type: 'text', text: value, marks: [{ type: 'link', attrs: { href: value } }] }).run();
+  } else chain.setLink({ href: value }).run();
 }
 
 /** Link chip from the link picker (toolbar button) at the cursor position. */

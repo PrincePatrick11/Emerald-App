@@ -8,6 +8,7 @@ import { useSettingsStore } from '../../../store/settingsStore';
 import { reportImageError, useImageNoticeStore } from '../../../store/imageNoticeStore';
 import { editorAtPoint, lineSpot, type DropSpot } from './dropSpot';
 import { editorHas } from './hostContext';
+import { insertImagesInOrder } from './editorCommands';
 
 /** The read limit of the Rust command along with its number (see `images.rs`). */
 const TOO_LARGE_TO_READ = /image file too large: (\d+)/;
@@ -105,29 +106,8 @@ export function useEditorFileDrop({ enabled, getEditors, getContainer, getFallba
           const fallback = optionsRef.current.getFallback();
           const editor = spot?.editor ?? (fallback && editorHas(fallback, 'image') ? fallback : null);
           if (!editor) return;
-          // Each image after the previous one. Preparing a photo takes a moment
-          // and typing goes on meanwhile, so the spot follows every change of
-          // the document, and moves past each image inserted there.
-          let at = spot ? spot.pos : null;
-          const follow = ({ transaction }: { transaction: { mapping: { map: (pos: number, assoc?: number) => number } } }) => {
-            if (at !== null) at = transaction.mapping.map(at, 1);
-          };
-          editor.on('transaction', follow);
-          try {
-            for (const path of imagePaths) {
-              try {
-                const src = await storeDroppedImage(path);
-                if (editor.isDestroyed) return;
-                const node = { type: 'image', attrs: { src } };
-                if (at === null) editor.chain().focus().insertContent(node).run();
-                else editor.chain().focus().insertContentAt(Math.min(at, editor.state.doc.content.size), node).run();
-              } catch (e) {
-                reportImageError(e, `drop ${path}`);
-              }
-            }
-          } finally {
-            editor.off('transaction', follow);
-          }
+          await insertImagesInOrder(editor, spot ? spot.pos : null, imagePaths, storeDroppedImage,
+            (e, path) => reportImageError(e, `drop ${path}`));
         }
       })
       // Registration is asynchronous: if the effect ends first, the

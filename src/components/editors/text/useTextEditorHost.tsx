@@ -1,5 +1,4 @@
-import { useEffect, useMemo, useReducer, useRef, useState, type ReactNode } from 'react';
-import type { Editor } from '@tiptap/react';
+import { useCallback, useEffect, useMemo, useReducer, useRef, useState, type ComponentProps, type ReactNode } from 'react';
 import EditorToolbar from './EditorToolbar';
 import LinkPickerModal from './LinkPickerModal';
 import DragGhost from './DragGhost';
@@ -67,6 +66,14 @@ export function useTextEditorHost({ isEditing, getOrder, getContainer }: TextEdi
   // ⌘F / Ctrl+F while this host is on screen, in reading as in editing; the
   // selected text, if any, is what is searched for first.
   const [find, setFind] = useState<{ query: string; key: number } | null>(null);
+  const openFind = useCallback(() => {
+    const focused = toolbarEditor ?? targetEditor();
+    const selected = focused && !focused.state.selection.empty
+      ? focused.state.doc.textBetween(focused.state.selection.from, focused.state.selection.to, ' ')
+      : '';
+    setFind((prev) => ({ query: selected || prev?.query || '', key: (prev?.key ?? 0) + 1 }));
+  }, [toolbarEditor, targetEditor]);
+  const closeFind = () => { setFind(null); toolbarEditor?.commands.focus(); };
   const getContainerRef = useRef(getContainer);
   getContainerRef.current = getContainer;
   useEffect(() => {
@@ -77,15 +84,11 @@ export function useTextEditorHost({ isEditing, getOrder, getContainer }: TextEdi
       const container = getContainerRef.current();
       if (!container || container.getClientRects().length === 0) return;
       e.preventDefault();
-      const focused = toolbarEditor ?? targetEditor();
-      const selected = focused && !focused.state.selection.empty
-        ? focused.state.doc.textBetween(focused.state.selection.from, focused.state.selection.to, ' ')
-        : '';
-      setFind((prev) => ({ query: selected || prev?.query || '', key: (prev?.key ?? 0) + 1 }));
+      openFind();
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [toolbarEditor, targetEditor]);
+  }, [openFind]);
 
   const context = useMemo<TextEditorHostContextValue>(() => ({ register: registerTextEditor }), [registerTextEditor]);
 
@@ -99,10 +102,17 @@ export function useTextEditorHost({ isEditing, getOrder, getContainer }: TextEdi
           getEditors={orderedEditors}
           isEditing={isEditing}
           initialQuery={find.query}
-          onClose={() => { setFind(null); toolbarEditor?.commands.focus(); }}
+          onClose={closeFind}
         />
       )}
-      {showToolbar && <HostToolbar editor={toolbarEditor} onOpenLinkPicker={() => setLinkPickerOpen(true)} />}
+      {showToolbar && (
+        <HostToolbar
+          editor={toolbarEditor}
+          onOpenLinkPicker={() => setLinkPickerOpen(true)}
+          findOpen={!!find}
+          onToggleFind={() => (find ? closeFind() : openFind())}
+        />
+      )}
     </div>
   ) : null;
 
@@ -137,7 +147,8 @@ export function useTextEditorHost({ isEditing, getOrder, getContainer }: TextEdi
 /** The host's one toolbar, bound to the focused editor. It
  *  sits outside the editor component and therefore does not re-render by itself
  *  with every transaction; the listener here makes up for that. */
-function HostToolbar({ editor, onOpenLinkPicker }: { editor: Editor; onOpenLinkPicker: () => void }) {
+function HostToolbar(props: ComponentProps<typeof EditorToolbar>) {
+  const { editor } = props;
   const [, rerender] = useReducer((n: number) => n + 1, 0);
   useEffect(() => {
     editor.on('transaction', rerender);
@@ -145,6 +156,6 @@ function HostToolbar({ editor, onOpenLinkPicker }: { editor: Editor; onOpenLinkP
   }, [editor]);
   if (editor.isDestroyed) return null;
   return (
-    <EditorToolbar editor={editor} onOpenLinkPicker={onOpenLinkPicker} />
+    <EditorToolbar {...props} />
   );
 }

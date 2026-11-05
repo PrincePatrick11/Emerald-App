@@ -1129,10 +1129,13 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
 }
 
 /* Relative to the editor text (em) instead of the root, so that they grow with its
-   setting: 1.5rem, 1.25rem and 1.125rem at the former 17px. */
-.tiptap h1 { @apply font-semibold mb-3 mt-6; font-size: 1.412em; line-height: 1.33; color: var(--text-primary); }
-.tiptap h2 { @apply font-semibold mb-2 mt-5; font-size: 1.176em; line-height: 1.4; color: var(--text-primary); }
-.tiptap h3 { @apply font-semibold mb-2 mt-4; font-size: 1.059em; line-height: 1.55; color: var(--text-secondary); }
+   setting. Three clear steps in size and space above, so the levels read as a
+   hierarchy; the space above is larger than below, binding a heading to its text.
+   At the top of the text a heading needs no space above. */
+.tiptap h1 { @apply font-semibold; font-size: 1.6em; line-height: 1.25; margin: 1.4em 0 0.5em; letter-spacing: -0.01em; color: var(--text-primary); }
+.tiptap h2 { @apply font-semibold; font-size: 1.3em; line-height: 1.3; margin: 1.3em 0 0.45em; color: var(--text-primary); }
+.tiptap h3 { @apply font-semibold; font-size: 1.1em; line-height: 1.4; margin: 1.2em 0 0.4em; color: var(--text-primary); }
+.tiptap > :first-child { margin-top: 0; }
 .entry-view-title {
   font-family: var(--font-editor);
 }
@@ -1141,29 +1144,92 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
   font-family: var(--font-editor);
 }
 
-.tiptap ul:not([data-type="taskList"]) { @apply list-disc pl-5 mb-3 space-y-1; }
-.tiptap ol { @apply list-decimal pl-5 mb-3 space-y-1; }
+/* Lists: the items close together (their paragraphs without the paragraph
+   gap), a nested list tight under its item, and the markers quieter than the
+   text, the numbers in even widths. Nested bullets change shape per level. */
+.tiptap ul:not([data-type="taskList"]) { @apply list-disc pl-6 mb-3; }
+.tiptap ol { @apply list-decimal pl-6 mb-3; }
+.tiptap ul:not([data-type="taskList"]) ul:not([data-type="taskList"]) { list-style-type: circle; }
+.tiptap ul:not([data-type="taskList"]) ul:not([data-type="taskList"]) ul:not([data-type="taskList"]) { list-style-type: square; }
+.tiptap li { padding-left: 0.15em; }
+.tiptap li + li { margin-top: 0.25em; }
+.tiptap li > p,
+.tiptap ul[data-type="taskList"] li > div > p { margin-bottom: 0; }
+.tiptap li > ul:not([data-type="taskList"]),
+.tiptap li > ol { margin-top: 0.25em; margin-bottom: 0; }
+.tiptap li::marker { color: var(--text-subtle); }
+.tiptap ol > li::marker { font-variant-numeric: tabular-nums; }
 
 /* Task List */
 .tiptap ul[data-type="taskList"] {
-  @apply list-none pl-0 mb-3 space-y-1;
+  @apply list-none pl-0 mb-3;
+}
+.tiptap ul[data-type="taskList"] ul[data-type="taskList"] {
+  margin: 0.25em 0 0;
 }
 
 .tiptap ul[data-type="taskList"] li {
-  @apply flex items-start gap-2;
+  @apply flex items-start;
+  gap: 0.55em;
+  padding-left: 0;
+}
+.tiptap ul[data-type="taskList"] li > div {
+  flex: 1;
+  min-width: 0;
 }
 
+/* The box sits on the middle of the item's first line, whatever the text size:
+   the label is one line tall and centres it. */
 .tiptap ul[data-type="taskList"] li > label {
-  @apply flex-shrink-0 mt-0.5 cursor-pointer;
+  @apply flex flex-shrink-0 items-center cursor-pointer;
+  height: 1lh;
 }
 
+/* A box of the theme instead of the system's white one: an edge while open,
+   jade with a tick when done. */
 .tiptap ul[data-type="taskList"] li > label input[type="checkbox"] {
-  @apply w-4 h-4 rounded border border-edge-strong bg-well-active
-         cursor-pointer accent-accent;
+  appearance: none;
+  display: grid;
+  place-content: center;
+  width: 1em;
+  height: 1em;
+  margin: 0;
+  border-radius: 0.3em;
+  border: 1.5px solid var(--edge-strong);
+  background: var(--well-page);
+  cursor: pointer;
+  transition: background-color 150ms, border-color 150ms;
+}
+.tiptap ul[data-type="taskList"] li > label input[type="checkbox"]:hover {
+  border-color: var(--accent-edge);
+}
+.tiptap ul[data-type="taskList"] li > label input[type="checkbox"]:checked {
+  border-color: var(--accent);
+  background: var(--accent);
+}
+.tiptap ul[data-type="taskList"] li > label input[type="checkbox"]::after {
+  content: '';
+  width: 0.3em;
+  height: 0.55em;
+  margin-top: -0.1em;
+  border: solid var(--well-page);
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg) scale(0);
+  transition: transform 120ms;
+}
+.tiptap ul[data-type="taskList"] li > label input[type="checkbox"]:checked::after {
+  transform: rotate(45deg) scale(1);
+}
+.tiptap ul[data-type="taskList"] li > label input[type="checkbox"]:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--focus-ring);
 }
 
-.tiptap ul[data-type="taskList"] li[data-checked="true"] > div {
-  @apply line-through text-subtle;
+/* Done: the item's own text struck through and quieter, not what is nested in it. */
+.tiptap ul[data-type="taskList"] li[data-checked="true"] > div > p {
+  @apply line-through;
+  color: var(--text-subtle);
+  text-decoration-color: color-mix(in srgb, var(--text-subtle) 70%, transparent);
 }
 
 .tiptap blockquote {
@@ -1264,7 +1330,8 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
 }
 
 .tiptap pre {
-  @apply rounded-lg p-4 my-4 overflow-x-auto;
+  @apply rounded-lg px-4 py-3 my-4 overflow-x-auto;
+  line-height: 1.6;
   background-color: var(--code-bg);
   border: 1px solid var(--border-soft);
 }
@@ -2026,9 +2093,62 @@ html[data-theme] .prop-segment--active {
 .editor-find-bar {
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  padding: 6px 16px;
-  border-bottom: 1px solid var(--edge);
+  gap: 2px;
+  margin-bottom: 4px;
+  padding: 3px;
+  border-radius: 0.5rem;
+  border: 1px solid var(--panel-border);
+  background: var(--panel-bg);
+}
+.editor-find-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px;
+}
+/* A field of the find bar, as tall as the bar's buttons, with its icon and the count inside. */
+.editor-find-field {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1 1 14rem;
+  max-width: 22rem;
+  height: 1.75rem;
+  margin-right: 2px;
+  padding: 0 8px;
+  border-radius: 0.375rem;
+  border: 1px solid transparent;
+  background: var(--well-page);
+  cursor: text;
+  transition: border-color 150ms;
+}
+.editor-find-field:focus-within { border-color: var(--accent-edge); }
+.editor-find-field input {
+  flex: 1;
+  min-width: 0;
+  font-size: 12px;
+  color: var(--text-primary);
+  background: transparent;
+  outline: none;
+}
+.editor-find-field input::placeholder { color: var(--text-subtle); }
+.editor-find-count {
+  flex-shrink: 0;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-subtle);
+}
+.editor-find-count--none { color: var(--text-muted); }
+/* A button of the bar with a word instead of an icon. */
+.editor-toolbar-btn-label {
+  padding: 0 0.25rem;
+  font-size: 12px;
+}
+/* A small form hanging under a toolbar button (the web link). */
+.editor-toolbar-popover {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
 }
 .editor-inline-input {
   padding: 2px 8px;
@@ -3888,6 +4008,12 @@ html[data-theme='emerald-parchment'] .tiptap :not(pre) > code {
   background-color: var(--editor-code-bg);
   color: var(--editor-code-text);
   border: 1px solid rgba(0, 122, 77, 0.2);
+}
+
+/* In a code block the block is the surface: no chip on every line. */
+html[data-theme='emerald-parchment'] .tiptap pre code {
+  background-color: transparent;
+  border: 0;
 }
 
 html[data-theme='emerald-parchment'] .altar-cat-scroll-fade {

@@ -496,7 +496,8 @@
       "alignCenter": "Centrar",
       "alignRight": "Alinear a la derecha",
       "horizontalRule": "Línea divisoria",
-      "insertLink": "Insertar enlace",
+      "insertLink": "Enlazar una entrada",
+      "find": "Buscar y reemplazar",
       "insertImage": "Insertar imagen",
       "insertTable": "Insertar tabla",
       "undo": "Deshacer",
@@ -537,6 +538,7 @@
       "next": "Resultado siguiente",
       "toggleReplace": "Reemplazar",
       "replace": "Reemplazar este resultado",
+      "replaceShort": "Reemplazar",
       "replaceAll": "Reemplazar todo",
       "close": "Cerrar"
     },

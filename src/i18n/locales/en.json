@@ -496,7 +496,8 @@
       "alignCenter": "Align center",
       "alignRight": "Align right",
       "horizontalRule": "Horizontal rule",
-      "insertLink": "Insert link",
+      "insertLink": "Link an entry",
+      "find": "Find and replace",
       "insertImage": "Insert image",
       "insertTable": "Insert table",
       "undo": "Undo",
@@ -537,6 +538,7 @@
       "next": "Next match",
       "toggleReplace": "Replace",
       "replace": "Replace this match",
+      "replaceShort": "Replace",
       "replaceAll": "Replace all",
       "close": "Close"
     },

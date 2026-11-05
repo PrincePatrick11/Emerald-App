@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import type { Editor } from '@tiptap/react';
 import { useTranslation } from 'react-i18next';
-import { ChevronDown, ChevronUp, Replace, ReplaceAll, X } from 'lucide-react';
+import { ChevronDown, ChevronUp, CornerDownRight, Replace, Search, X } from 'lucide-react';
 import { scrollIntoViewCentered } from '../../../lib/reveal';
-import { ToolbarBtn } from './toolbarParts';
+import { ToolbarBtn, ToolbarDivider, ToolbarGroup } from './toolbarParts';
 import { editorHas } from './hostContext';
 import { findMatches, setSearch, type SearchMatch } from './SearchExtension';
 import { revealPosition } from './editorCommands';
@@ -108,57 +108,73 @@ export default function FindBar({ getEditors, isEditing, initialQuery, onClose }
 
   const canReplace = isEditing && showReplace;
 
+  const countText = query
+    ? (hits.length ? t('editor.find.count', { current: (current ?? 0) + 1, total: hits.length }) : t('editor.find.none'))
+    : '';
+
+  // One surface like the toolbar under it: the field with its count inside,
+  // the arrows, the switch for replacing and the close; replacing adds a
+  // second row of the same shape.
   return (
     <div className="editor-find-bar">
-      <div className="flex items-center gap-1">
-        <input
-          ref={inputRef}
-          autoFocus
-          value={query}
-          onChange={(e) => { setQuery(e.target.value); setIndex(0); }}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') { e.preventDefault(); step(e.shiftKey ? -1 : 1); }
-            if (e.key === 'Escape') { e.preventDefault(); onClose(); }
-          }}
-          placeholder={t('editor.find.placeholder')}
-          className="editor-inline-input w-60"
-        />
-        <span className="text-[11px] text-subtle tabular-nums min-w-[64px] text-center">
-          {query ? (hits.length ? t('editor.find.count', { current: (current ?? 0) + 1, total: hits.length }) : t('editor.find.none')) : ''}
-        </span>
-        <ToolbarBtn onClick={() => step(-1)} active={false} disabled={hits.length === 0} title={t('editor.find.previous')}>
-          <ChevronUp size={14} />
-        </ToolbarBtn>
-        <ToolbarBtn onClick={() => step(1)} active={false} disabled={hits.length === 0} title={t('editor.find.next')}>
-          <ChevronDown size={14} />
-        </ToolbarBtn>
-        {isEditing && (
-          <ToolbarBtn onClick={() => setShowReplace((v) => !v)} active={showReplace} title={t('editor.find.toggleReplace')}>
-            <Replace size={14} />
-          </ToolbarBtn>
-        )}
-        <ToolbarBtn onClick={onClose} active={false} title={t('editor.find.close')}>
-          <X size={14} />
-        </ToolbarBtn>
-      </div>
-      {canReplace && (
-        <div className="flex items-center gap-1">
+      <div className="editor-find-row">
+        <label className="editor-find-field">
+          <Search size={13} className="text-subtle flex-shrink-0" />
           <input
-            value={replacement}
-            onChange={(e) => setReplacement(e.target.value)}
+            ref={inputRef}
+            autoFocus
+            value={query}
+            onChange={(e) => { setQuery(e.target.value); setIndex(0); }}
             onKeyDown={(e) => {
-              if (e.key === 'Enter') { e.preventDefault(); replaceCurrent(); }
+              if (e.key === 'Enter') { e.preventDefault(); step(e.shiftKey ? -1 : 1); }
               if (e.key === 'Escape') { e.preventDefault(); onClose(); }
             }}
-            placeholder={t('editor.find.replacePlaceholder')}
-            className="editor-inline-input w-60"
+            placeholder={t('editor.find.placeholder')}
           />
-          <ToolbarBtn onClick={replaceCurrent} active={false} disabled={current === null} title={t('editor.find.replace')}>
-            <Replace size={14} />
+          <span className={`editor-find-count${query && hits.length === 0 ? ' editor-find-count--none' : ''}`}>{countText}</span>
+        </label>
+        <ToolbarGroup>
+          <ToolbarBtn onClick={() => step(-1)} active={false} disabled={hits.length === 0} title={t('editor.find.previous')}>
+            <ChevronUp size={14} />
           </ToolbarBtn>
-          <ToolbarBtn onClick={replaceAll} active={false} disabled={hits.length === 0} title={t('editor.find.replaceAll')}>
-            <ReplaceAll size={14} />
+          <ToolbarBtn onClick={() => step(1)} active={false} disabled={hits.length === 0} title={t('editor.find.next')}>
+            <ChevronDown size={14} />
           </ToolbarBtn>
+        </ToolbarGroup>
+        <ToolbarDivider />
+        <ToolbarGroup>
+          {isEditing && (
+            <ToolbarBtn onClick={() => setShowReplace((v) => !v)} active={showReplace} title={t('editor.find.toggleReplace')}>
+              <Replace size={14} />
+            </ToolbarBtn>
+          )}
+          <ToolbarBtn onClick={onClose} active={false} title={t('editor.find.close')}>
+            <X size={14} />
+          </ToolbarBtn>
+        </ToolbarGroup>
+      </div>
+      {canReplace && (
+        <div className="editor-find-row">
+          <label className="editor-find-field">
+            <CornerDownRight size={13} className="text-subtle flex-shrink-0" />
+            <input
+              value={replacement}
+              onChange={(e) => setReplacement(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') { e.preventDefault(); replaceCurrent(); }
+                if (e.key === 'Escape') { e.preventDefault(); onClose(); }
+              }}
+              placeholder={t('editor.find.replacePlaceholder')}
+            />
+          </label>
+          <ToolbarGroup>
+            <ToolbarBtn onClick={replaceCurrent} active={false} disabled={current === null} title={t('editor.find.replace')}>
+              <span className="editor-toolbar-btn-label">{t('editor.find.replaceShort')}</span>
+            </ToolbarBtn>
+            <ToolbarBtn onClick={replaceAll} active={false} disabled={hits.length === 0} title={t('editor.find.replaceAll')}>
+              <span className="editor-toolbar-btn-label">{t('editor.find.replaceAll')}</span>
+            </ToolbarBtn>
+          </ToolbarGroup>
         </div>
       )}
     </div>

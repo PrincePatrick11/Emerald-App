@@ -1,11 +1,14 @@
+import { useEffect, useRef, useState } from 'react';
 import type { Editor } from '@tiptap/react';
 import { useTranslation } from 'react-i18next';
 import {
-  CheckSquare, Heading1, Heading2, Heading3, ImagePlus, Link, List, ListOrdered, Minus, Quote, Redo, Table, Undo,
+  CheckSquare, Globe, Heading1, Heading2, Heading3, ImagePlus, Link, List, ListOrdered, Minus, Quote, Redo, Search, Table,
+  Undo, Unlink,
 } from 'lucide-react';
 import { editorHas } from './hostContext';
 import { ALIGN_ACTIONS, applyAlign, canAlign, isAlignActive, markActionsOf } from './formatActions';
-import { NEW_TABLE, pickImageFiles } from './editorCommands';
+import { applyLinkHref, NEW_TABLE, pickImageFiles } from './editorCommands';
+import LinkHrefForm from './LinkHrefForm';
 import { ToolbarBtn, ToolbarDivider, ToolbarGroup } from './toolbarParts';
 
 /**
@@ -13,18 +16,14 @@ import { ToolbarBtn, ToolbarDivider, ToolbarGroup } from './toolbarParts';
  * has, so an editor with fewer features (see `features.ts`) gets a shorter bar.
  * Marks and alignment come from `formatActions.ts`, shared with the selection menu.
  */
-export default function EditorToolbar({ editor, onOpenLinkPicker }: {
+export default function EditorToolbar({ editor, onOpenLinkPicker, findOpen, onToggleFind }: {
   editor: Editor;
   onOpenLinkPicker: () => void;
+  findOpen: boolean;
+  onToggleFind: () => void;
 }) {
   const { t } = useTranslation();
   const has = (name: string) => editorHas(editor, name);
-
-  // The button picks an entry; on an external link it removes that link instead.
-  const handleLinkButtonClick = () => {
-    if (editor.isActive('link')) editor.chain().focus().extendMarkRange('link').unsetLink().run();
-    else onOpenLinkPicker();
-  };
 
   const alignDisabled = !canAlign(editor);
 
@@ -119,14 +118,15 @@ export default function EditorToolbar({ editor, onOpenLinkPicker }: {
         </ToolbarGroup>
       </>)}
 
-      {(has('internalLink') || has('image') || has('table')) && (<>
+      {(has('internalLink') || has('link') || has('image') || has('table')) && (<>
         <ToolbarDivider />
         <ToolbarGroup>
           {has('internalLink') && (
-            <ToolbarBtn onClick={handleLinkButtonClick} active={editor.isActive('link')} title={t('editor.toolbar.insertLink')}>
+            <ToolbarBtn onClick={onOpenLinkPicker} active={false} title={t('editor.toolbar.insertLink')}>
               <Link size={14} />
             </ToolbarBtn>
           )}
+          {has('link') && <WebLinkButton editor={editor} />}
           {has('image') && (
             <ToolbarBtn onClick={() => pickImageFiles(editor)} active={false} title={t('editor.toolbar.insertImage')}>
               <ImagePlus size={14} />
@@ -147,6 +147,11 @@ export default function EditorToolbar({ editor, onOpenLinkPicker }: {
 
       <ToolbarDivider />
       <ToolbarGroup>
+        {has('textSearch') && (
+          <ToolbarBtn onClick={onToggleFind} active={findOpen} title={t('editor.toolbar.find')}>
+            <Search size={14} />
+          </ToolbarBtn>
+        )}
         <ToolbarBtn
           onClick={() => editor.chain().focus().undo().run()}
           active={false}
@@ -164,6 +169,51 @@ export default function EditorToolbar({ editor, onOpenLinkPicker }: {
           <Redo size={14} />
         </ToolbarBtn>
       </ToolbarGroup>
+    </div>
+  );
+}
+
+/**
+ * A web link from the bar: the address typed in a small form under the
+ * button, for the selection, for the link at the cursor (to change it), or,
+ * with nothing selected, as new text. A click elsewhere closes it.
+ */
+function WebLinkButton({ editor }: { editor: Editor }) {
+  const { t } = useTranslation();
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  const active = editor.isActive('link');
+
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e: MouseEvent) => { if (!ref.current?.contains(e.target as Node)) setOpen(false); };
+    document.addEventListener('mousedown', onDown);
+    return () => document.removeEventListener('mousedown', onDown);
+  }, [open]);
+
+  return (
+    <div ref={ref} className="relative">
+      <ToolbarBtn onClick={() => setOpen((v) => !v)} active={active || open} title={t('editor.menu.webLink')}>
+        <Globe size={14} />
+      </ToolbarBtn>
+      {open && (
+        <div className="editor-selection-menu editor-toolbar-popover">
+          <LinkHrefForm
+            initial={active ? (editor.getAttributes('link').href as string) ?? '' : ''}
+            onConfirm={(href) => { applyLinkHref(editor, href); setOpen(false); }}
+            onCancel={() => { setOpen(false); editor.commands.focus(); }}
+          />
+          {active && (
+            <ToolbarBtn
+              onClick={() => { editor.chain().focus().extendMarkRange('link').unsetLink().run(); setOpen(false); }}
+              active={false}
+              title={t('editor.removeLink')}
+            >
+              <Unlink size={14} />
+            </ToolbarBtn>
+          )}
+        </div>
+      )}
     </div>
   );
 }

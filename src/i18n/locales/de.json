@@ -496,7 +496,8 @@
       "alignCenter": "Zentriert",
       "alignRight": "Rechtsbündig",
       "horizontalRule": "Trennlinie",
-      "insertLink": "Link einfügen",
+      "insertLink": "Eintrag verlinken",
+      "find": "Suchen und ersetzen",
       "insertImage": "Bild einfügen",
       "insertTable": "Tabelle einfügen",
       "undo": "Rückgängig",
@@ -537,6 +538,7 @@
       "next": "Nächster Treffer",
       "toggleReplace": "Ersetzen",
       "replace": "Diesen Treffer ersetzen",
+      "replaceShort": "Ersetzen",
       "replaceAll": "Alle ersetzen",
       "close": "Schließen"
     },
