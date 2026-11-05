@@ -9,13 +9,14 @@
     --font-editor: 'Lora', Georgia, serif;
     /* Adjustable (settingsStore); 17px is the default. */
     --editor-font-size: 17px;
-    /* Marked text, in the theme's accent rather than the system's colour, so
-       that it matches what the editor draws itself (marked images). */
-    --selection-bg: color-mix(in srgb, var(--accent) 32%, transparent);
   }
 
+  /* Marked text, in the theme's accent rather than the system's colour, so
+     that it matches what the editor draws itself (marked images). The theme
+     token directly: WebKit resolves a `color-mix()` held in a custom property
+     to transparent here, and then shows the system colour after all. */
   ::selection {
-    background-color: var(--selection-bg);
+    background-color: var(--accent-wash-strong);
   }
 
   * {
@@ -1395,7 +1396,7 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
   filter: brightness(0.8) saturate(0.85);
 }
 .tiptap.editor-marking-images ::selection { background: transparent; }
-.tiptap .editor-text--marked { background-color: var(--selection-bg); }
+.tiptap .editor-text--marked { background-color: var(--accent-wash-strong); }
 
 /* Folding by headings (HeadingFoldExtension): the chevron in the margin left of a
    heading, shown on hover and while folded; what is folded away is not displayed.
