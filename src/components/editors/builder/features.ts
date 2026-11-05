@@ -1,14 +1,9 @@
 /**
- * What a builder offers. Each place that embeds it picks its set; the toolbar
- * and the keys show only what is switched on. Elements of a kind that is
- * switched off are still drawn and can still be moved, they just cannot be
- * added.
+ * What a builder offers besides its element types (which come from the
+ * registry, `BuilderElementType`). Each place picks its set; the toolbar and
+ * the keys show only what is switched on.
  */
 export interface BuilderFeatures {
-  /** Rectangles, ellipses, triangles, stars and hexagons. */
-  shapes: boolean;
-  /** Text boxes, edited in place. */
-  text: boolean;
   /** Bring forward, send backward, to front, to back. */
   arrange: boolean;
   /** Aligning and distributing several elements. */
@@ -19,13 +14,11 @@ export interface BuilderFeatures {
   zoom: boolean;
   /** Undo and redo inside the builder. */
   history: boolean;
-  /** Saving the artboard as a PNG file. */
+  /** Saving the artboard as an image (needs the place's `onExport`). */
   export: boolean;
 }
 
 export const FULL_BUILDER_FEATURES: BuilderFeatures = {
-  shapes: true,
-  text: true,
   arrange: true,
   align: true,
   guides: true,

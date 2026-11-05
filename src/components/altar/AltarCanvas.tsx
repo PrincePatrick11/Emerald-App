@@ -139,18 +139,14 @@ async function _renderAltar(
   outW: number,
 ): Promise<HTMLCanvasElement | null> {
   const { w: refW, h: refH } = resolveResolutionPixels(altar.resolution ?? DEFAULT_ALTAR_RESOLUTION);
-  const imageData = new Map(placements.map((p) => [p.id, p.image_data]));
+  // The items' pictures as data URLs, not the on-screen `emerald-img` ones, so `toBlob` can read the canvas.
+  const sources = new Map(await Promise.all(placements.map(async (p) => [p.id, (await canvasImageSrc(p.image_data)) || null] as const)));
   return renderBuilderImage({
     width: refW,
     height: refH,
-    // No on-screen sources: the images come from `resolveImage`, readable by `toBlob`.
-    elements: placements.map((p) => placementToElement(p, refW, refH, () => null)),
+    elements: placements.map((p) => placementToElement(p, refW, refH, () => sources.get(p.id) ?? null)),
     outWidth: outW,
     drawBackground: (ctx, w, h) => _drawBackground(ctx, altar, backgroundSrc, w, h),
-    resolveImage: async (el) => {
-      const src = await canvasImageSrc(imageData.get(el.id));
-      return src ? _loadImg(src) : null;
-    },
   });
 }
 

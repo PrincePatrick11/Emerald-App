@@ -1,4 +1,4 @@
-import type { BuilderElement } from '../editors/builder';
+import type { BuilderElement, ImageProps, ShapeProps, TextProps } from '../editors/builder';
 import { BASE_RESOLUTION_WIDTH, isCandleEmoji } from '../../lib/altarConstants';
 import type { AltarPlacement } from '../../types';
 
@@ -28,7 +28,7 @@ export function placementToElement(
 ): BuilderElement {
   const unit = unitPx(refW);
   const k = pxScale(refW);
-  const base = {
+  const frame = {
     id: p.id,
     x: (p.x / 100) * refW,
     y: (p.y / 100) * refH,
@@ -41,19 +41,23 @@ export function placementToElement(
     z: p.z_index,
   };
   if (p.kind === 'shape' && p.shape) {
-    return {
-      ...base, kind: 'shape', shape: p.shape.type, fill: p.shape.fill, stroke: p.shape.stroke,
+    const props: ShapeProps = {
+      shape: p.shape.type, fill: p.shape.fill, stroke: p.shape.stroke,
       strokeWidth: p.shape.stroke_width * k, cornerRadius: p.shape.corner_radius * k,
     };
+    return { ...frame, type: 'shape', props };
   }
   if (p.kind === 'text' && p.text) {
-    return {
-      ...base, kind: 'text', text: p.text.content, font: p.text.font, fontSize: p.text.size * k,
+    const props: TextProps = {
+      text: p.text.content, font: p.text.font, fontSize: p.text.size * k,
       color: p.text.color, align: p.text.align, bold: p.text.bold, italic: p.text.italic,
     };
+    return { ...frame, type: 'text', props };
   }
   const src = imageSrcFor(p.image_data);
-  return { ...base, kind: 'image', src, emoji: p.emoji, flame: !src && isCandleEmoji(p.emoji), ref: p.item_id };
+  // A candle without a picture flickers, as it always did.
+  const props: ImageProps = { src, emoji: p.emoji, glow: !src && isCandleEmoji(p.emoji) };
+  return { ...frame, type: 'image', ref: p.item_id, props };
 }
 
 const round = (n: number, digits = 3) => Math.round(n * 10 ** digits) / 10 ** digits;
@@ -73,10 +77,10 @@ export function elementToPlacement(
   const base: AltarPlacement = {
     id: el.id,
     altar_id: previous?.altar_id,
-    kind: el.kind === 'image' ? 'item' : el.kind,
-    item_id: el.kind === 'image' ? el.ref ?? previous?.item_id ?? '' : '',
+    kind: el.type === 'shape' || el.type === 'text' ? el.type : 'item',
+    item_id: el.type === 'image' ? el.ref ?? previous?.item_id ?? '' : '',
     name: previous?.name ?? '',
-    emoji: previous?.emoji ?? (el.kind === 'image' ? el.emoji : ''),
+    emoji: previous?.emoji ?? (el.type === 'image' ? (el.props as ImageProps).emoji : ''),
     category_id: previous?.category_id ?? null,
     image_data: previous?.image_data,
     x: round((el.x / refW) * 100),
@@ -89,16 +93,18 @@ export function elementToPlacement(
     locked: el.locked,
     hidden: el.hidden,
   };
-  if (el.kind === 'shape') {
+  if (el.type === 'shape') {
+    const p = el.props as ShapeProps;
     base.shape = {
-      type: el.shape, fill: el.fill, stroke: el.stroke,
-      stroke_width: round(el.strokeWidth / k, 2), corner_radius: round(el.cornerRadius / k, 2),
+      type: p.shape, fill: p.fill, stroke: p.stroke,
+      stroke_width: round(p.strokeWidth / k, 2), corner_radius: round(p.cornerRadius / k, 2),
     };
   }
-  if (el.kind === 'text') {
+  if (el.type === 'text') {
+    const p = el.props as TextProps;
     base.text = {
-      content: el.text, font: el.font, size: round(el.fontSize / k, 2), color: el.color,
-      align: el.align, bold: el.bold, italic: el.italic,
+      content: p.text, font: p.font, size: round(p.fontSize / k, 2), color: p.color,
+      align: p.align, bold: p.bold, italic: p.italic,
     };
   }
   return base;

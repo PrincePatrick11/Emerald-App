@@ -1,28 +1,42 @@
-import { drawPlaced, fontString } from './draw';
-import { byZ, type BuilderElement, type BuilderImageElement } from './types';
+import { drawPlaced, resourcesOf } from './draw';
+import { BUILTIN_BUILDER_TYPES } from './elements';
+import { byZ, type BuilderElement, type BuilderTypes } from './types';
 
 export interface RenderOptions {
   /** The artboard in its own pixels. */
   width: number;
   height: number;
   elements: readonly BuilderElement[];
+  /** The registry; default the built-in types. */
+  types?: BuilderTypes;
   /** Width of the picture; the height follows the artboard. Default: the artboard's. */
   outWidth?: number;
   /** Paints what lies behind the elements, in output pixels. */
   drawBackground?: (ctx: CanvasRenderingContext2D, outWidth: number, outHeight: number) => Promise<void> | void;
   /**
-   * The picture of an image element. For a canvas that is read back
-   * (`toBlob`), it must not come from a foreign origin.
+   * Loads a picture source the elements name. For a canvas that is read back
+   * (`toBlob`), the sources must not be foreign: the place hands in elements
+   * whose sources are data URLs.
    */
-  resolveImage: (element: BuilderImageElement) => Promise<CanvasImageSource | null>;
+  loadImage?: (src: string) => Promise<CanvasImageSource | null>;
+}
+
+function loadPlain(src: string): Promise<HTMLImageElement | null> {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = () => resolve(null);
+    img.src = src;
+  });
 }
 
 /**
  * Draws the artboard onto a fresh canvas, without the editor: the same drawing
- * as on the stage (`drawPlaced`), with flames standing still. For previews,
- * thumbnails and saving as a file.
+ * as on the stage, with moving types standing still. For previews, thumbnails
+ * and saving as a file.
  */
 export async function renderBuilderImage(options: RenderOptions): Promise<HTMLCanvasElement | null> {
+  const types = options.types ?? BUILTIN_BUILDER_TYPES;
   const outW = Math.max(1, Math.round(options.outWidth ?? options.width));
   const scale = outW / options.width;
   const outH = Math.max(1, Math.round(options.height * scale));
@@ -34,17 +48,15 @@ export async function renderBuilderImage(options: RenderOptions): Promise<HTMLCa
   await options.drawBackground?.(ctx, outW, outH);
 
   const visible = byZ(options.elements).filter((el) => !el.hidden);
+  const { sources, fonts } = resourcesOf(visible, types);
   // Text needs its font before measuring and drawing, or the fallback is drawn.
-  await Promise.all(
-    visible.filter((el) => el.kind === 'text').map((el) => document.fonts?.load(fontString(el)).catch(() => [])),
-  );
-  const images = await Promise.all(
-    visible.map((el) => (el.kind === 'image' ? options.resolveImage(el).catch(() => null) : Promise.resolve(null))),
-  );
+  await Promise.all(fonts.map((font) => document.fonts?.load(font).catch(() => [])));
+  const load = options.loadImage ?? loadPlain;
+  const images = new Map(await Promise.all(sources.map(async (src) => [src, await load(src).catch(() => null)] as const)));
 
   ctx.save();
   ctx.scale(scale, scale);
-  visible.forEach((el, i) => drawPlaced(ctx, el, { image: images[i], time: null }));
+  for (const el of visible) drawPlaced(ctx, el, types, { image: (src) => images.get(src) ?? null, time: null });
   ctx.restore();
   return canvas;
 }
