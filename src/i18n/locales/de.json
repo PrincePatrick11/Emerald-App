@@ -607,7 +607,6 @@
     "deleteFilesLeftover": "Datenbank und Bilder wurden gelöscht. Der Ordner enthielt weitere Dateien und blieb deshalb bestehen.",
     "backTo": "Zurück zu {{name}}",
     "openFailed": "Der zuletzt geöffnete Vault ließ sich nicht öffnen. Wähle ihn erneut oder einen anderen.",
-    "empty": "Noch keine Vaults.",
     "removeConfirm": "Aus der Liste entfernen?",
     "deleteConfirmFiles": "Vault samt Dateien löschen?"
   },
@@ -1213,6 +1212,7 @@
     "goneFromServer": "Dieser Vault wurde vom Server entfernt. Er bleibt hier als lokaler Vault.",
     "replaceWarning": "Dieser Vault synchronisiert: Das Backup ersetzt ihn auch auf deinen anderen Geräten, die vorher selbst eine Sicherung anlegen.",
     "keychainWarning": "Emerald bewahrt die Verbindung im Schlüsselbund des Systems auf. Lehnst du den Zugriff ab, liegt sie stattdessen nur verschleiert in einer Datei auf diesem Gerät.",
+    "keychainShort": "Die Verbindung liegt im Schlüsselbund des Systems.",
     "deleteFromServerConfirm": "Vom Server entfernen?",
     "noServer": "Kein Server verbunden.",
     "openPicker": "Server und Vaults…",
@@ -1233,6 +1233,7 @@
     "appearance": "Aussehen",
     "links": "Links",
     "updateSettings": "Update-Server",
-    "version": "Version {{version}}"
+    "version": "Version {{version}}",
+    "opened": "geöffnet"
   }
 }

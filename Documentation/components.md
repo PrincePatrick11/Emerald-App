@@ -116,7 +116,7 @@ Each entry: what it is and when to use it, then its extension points (*Ext.*).
 **Other**
 
 - **`CreateItemModal`** (`layout/CreateItemModal.tsx`) — what the rail's plus opens: a grid of `.create-item-tile`s from `CREATABLE_VIEWS`, Journal focused first, arrow keys and Tab moving through it, the number keys 1–8 picking a tile directly. A choice goes through `createItem` (`lib/createItem.ts`), like every view's own "New" button, except Tasks', which stays on `createTask` and names the row in place.
-- **`PickerRows`** (`layout/PickerRows.tsx`) — the vault picker's rows: `VaultRow` (a vault here, its state mark at the end), `RemoteRow` (only on the server, fetched by choosing it), `EditRow`, `CreateRow`, `DeleteConfirmRow` (with `InlineConfirm` and a danger `BlockCheckbox` for the files), plus `VaultGlyph` and `VaultLocationRow`.
+- **`PickerRows`** (`layout/PickerRows.tsx`) — the vault picker's tiles and the rows that open in their place: `VaultRow` (a vault here as a tile, its state in words under the name), `RemoteRow` (only on the server, fetched by choosing it), `CreateTile` (the last tile), `EditRow`, `CreateRow`, `DeleteConfirmRow` (with `InlineConfirm` and a danger `BlockCheckbox` for the files), plus `VaultGlyph` and `VaultLocationRow`.
 - **`PickerServerPanel`** (`layout/PickerServerPanel.tsx`) — the start page's Server section and `useServerState`, which the vault list shares for the server's vaults.
 - **`StartBrand`, `StartLanguage`, `StartSection`, `StartAppearance`, `StartUpdates`** (`layout/start/`) — the start page's left column on the frame (mark, name, tagline, links, version and author), the language menu at the left of the sheet's foot, the section frame of the sheet (Home's heading: label, icon, actions on the right; no box), its Appearance, and the right of its foot (check, install, the update server dialog).
 - **`VaultLocationRow`** (in `layout/PickerRows.tsx`) — choose-folder button plus the folder a new vault will land in, the path in full on its own wrapping line. The vault picker's create row, the Settings add-vault import and the automatic backup's folder (`settings/AutoBackupSection.tsx`), where the reset goes back to the vault's own `backup/` folder.
@@ -303,7 +303,7 @@ They exist so that raw Tailwind chains do not get copied around. A new class her
 | `.edit-bar-*`, `.prop-value-btn*`, `.prop-segment*`, `.sidebar-add-field`, `.sidebar-row-*`, `.tag-chip-remove`, `.sidebar-action-row`, `.block-settings-panel`, `.panel-field-label`, `.panel-input`, `.panel-subheading*`, `.panel-add-row`, `.sidebar-section-button` | the right sidebar's edit mode — colours from the `--field-*`, `--primary-solid-*` and `--danger-soft-*` tokens; border colours are repeated under `html[data-theme]`, since Parchment's `*` border rule would win otherwise |
 | `.search-result-*` / `.search-match` | results list of the global search |
 | `.picker-*` | vault picker (a deliberate deviation, see below) |
-| `.start-*` | the start page's brand, sections, stats, foot and its actions, theme list and notes (`components/layout/start/`) |
+| `.start-*` | the start page's brand, sections, panel, stats, vault grid, theme cards, foot and its actions, notes (`components/layout/start/`) |
 | `.sidebar-item` | **a list row, not navigation.** The name suggests the opposite; the class is the row styling of the entry lists |
 | `.titlebar`, `.left-sidebar-rail`, `.window-control*` | window chrome — the frame (see [Shell Layout](design.md#shell-layout)) |
 | `.app-sheet-frame`, `.app-sheet-main`, `.app-sheet-side` | the rounded sheet — main area and right sidebar — on the frame |
@@ -319,7 +319,7 @@ They exist so that raw Tailwind chains do not get copied around. A new class her
 
 Three cases that have been examined and settled. They are not sloppiness and should not be "tidied up".
 
-**`.picker-row` instead of `.panel-interactive`.** The vault picker's rows (and the start page's theme rows, `.start-option`) look like `.panel-interactive` and take its tokens, but are classes of their own, because `.panel` does not take an active tint: theme overrides beat modifier classes, and unlayered rules come later in the output than `@layer components`. Both traps are described in [`design.md`](design.md#specificity-traps) — they hit **every** new "active" variant on an existing `.panel` card, not just the vault picker.
+**`.picker-tile` instead of `.panel-interactive`.** The vault picker's tiles (and the start page's theme cards, `.start-theme`) look like `.panel-interactive` and take its tokens, but are classes of their own, because `.panel` does not take an active tint: theme overrides beat modifier classes, and unlayered rules come later in the output than `@layer components`. Both traps are described in [`design.md`](design.md#specificity-traps) — they hit **every** new "active" variant on an existing `.panel` card, not just the vault picker.
 
 **`MenuDropdown` alongside `ContextMenu`.** Two dropdown implementations, on purpose. `ContextMenu` positions itself at a cursor coordinate, has a timing trick to survive the right-click that opened it, and knows disabled entries but no submenus. The title bar's menu buttons need submenus too.
 

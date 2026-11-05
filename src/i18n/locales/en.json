@@ -607,7 +607,6 @@
     "deleteFilesLeftover": "The database and images were deleted. The folder held other files and was kept.",
     "backTo": "Back to {{name}}",
     "openFailed": "The last vault could not be opened. Choose it again or another one.",
-    "empty": "No vaults yet.",
     "removeConfirm": "Remove from the list?",
     "deleteConfirmFiles": "Delete the vault and its files?"
   },
@@ -1213,6 +1212,7 @@
     "goneFromServer": "This vault was removed from the server. It stays here as a local vault.",
     "replaceWarning": "This vault syncs: the backup also replaces it on your other devices, which first save a backup of their own.",
     "keychainWarning": "Emerald keeps the connection in the system keychain. If you refuse access, it is only obscured in a file on this device instead.",
+    "keychainShort": "The connection is kept in the system keychain.",
     "deleteFromServerConfirm": "Remove from the server?",
     "noServer": "No server is connected.",
     "openPicker": "Server and vaults…",
@@ -1233,6 +1233,7 @@
     "appearance": "Appearance",
     "links": "Links",
     "updateSettings": "Update server",
-    "version": "Version {{version}}"
+    "version": "Version {{version}}",
+    "opened": "open"
   }
 }

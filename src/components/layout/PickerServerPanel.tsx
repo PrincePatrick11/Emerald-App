@@ -129,74 +129,84 @@ export default function PickerServerPanel({ server }: { server: ServerState }) {
           : t('sync.unreachable');
   const used = remotes.reduce((sum, remote) => sum + remote.storedBytes, 0);
 
-  return (
-    <StartSection
-      id="start-server-heading"
-      icon={<Cloud size={12} />}
-      label={t('start.server')}
-      aside={
-        <span className="flex items-center gap-1.5 text-xs text-muted">
-          <span className={`picker-dot picker-dot-${tone}`} aria-hidden />
-          {stateLabel}
-        </span>
-      }
-    >
+  const stateMark = (
+    <span className="flex items-center gap-1.5 text-xs shrink-0 text-muted">
+      <span className={`picker-dot picker-dot-${tone}`} aria-hidden />
+      {stateLabel}
+    </span>
+  );
 
+  return (
+    <StartSection id="start-server-heading" icon={<Cloud size={12} />} label={t('start.server')}>
       {!connected ? (
-        <div className="space-y-3">
-          <label className="block">
-            <span className="picker-label">{t('sync.url')}</span>
-            <input
-              type="url"
-              className="input-field settings-field"
-              placeholder="https://sync.example.com"
-              spellCheck={false}
-              value={url}
-              disabled={busy}
-              onChange={(e) => setUrl(e.target.value)}
-            />
-          </label>
-          <label className="block">
-            <span className="picker-label">{t('sync.key')}</span>
-            <input
-              type="password"
-              autoComplete="off"
-              spellCheck={false}
-              className="input-field settings-field"
-              value={key}
-              disabled={busy}
-              onChange={(e) => setKey(e.target.value)}
-              onKeyDown={onEnter(submit)}
-            />
-          </label>
-          <p className="text-xs leading-relaxed text-subtle">{t('sync.keychainWarning')}</p>
-          <Button variant="primary" className="w-full justify-center" onClick={submit} disabled={busy || !url.trim() || !key.trim()}>
-            {busy ? t('sync.connecting') : loggedOut ? t('sync.login') : t('sync.connect')}
-          </Button>
-        </div>
+        <>
+          <div className="start-panel space-y-3">
+            {status.url ? (
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-sm truncate text-primary">{status.url}</span>
+                {stateMark}
+              </div>
+            ) : (
+              <input
+                type="url"
+                className="input-field settings-field"
+                placeholder="https://sync.example.com"
+                aria-label={t('sync.url')}
+                spellCheck={false}
+                value={url}
+                disabled={busy}
+                onChange={(e) => setUrl(e.target.value)}
+              />
+            )}
+            <div className="flex items-center gap-2">
+              <input
+                type="password"
+                autoComplete="off"
+                spellCheck={false}
+                className="input-field settings-field flex-1 min-w-0"
+                placeholder={t('sync.key')}
+                aria-label={t('sync.key')}
+                value={key}
+                disabled={busy}
+                onChange={(e) => setKey(e.target.value)}
+                onKeyDown={onEnter(submit)}
+              />
+              <Button tone="jade" className="shrink-0" onClick={submit} disabled={busy || !url.trim() || !key.trim()}>
+                {busy ? t('sync.connecting') : loggedOut ? t('sync.login') : t('sync.connect')}
+              </Button>
+            </div>
+          </div>
+          {/* The whole story on pointing at it; one line is enough to read. */}
+          <p className="text-xs mt-2 px-0.5 text-subtle" title={t('sync.keychainWarning')}>{t('sync.keychainShort')}</p>
+        </>
       ) : (
         <div className="flex flex-col">
-          <div className="text-sm break-all mb-4 text-soft">{status.url}</div>
-          <dl className="start-stats">
-            <div>
-              <dt>{t('sync.statLastSync')}</dt>
-              <dd>{lastSync ? formatTimeAgo(new Date(lastSync)) : '–'}</dd>
+          <div className="start-panel">
+            <div className="flex items-center justify-between gap-3 mb-4">
+              <span className="text-sm truncate text-primary">{status.url}</span>
+              {stateMark}
             </div>
-            <div>
-              <dt>{t('sync.statDevices')}</dt>
-              <dd>{devices ? devices.devices.length : '–'}</dd>
-            </div>
-            <div>
-              <dt>{t('sync.statSpace')}</dt>
-              <dd>{reachable ? formatBytes(used, units) : '–'}</dd>
-            </div>
-          </dl>
+            <dl className="start-stats">
+              <div>
+                <dt>{t('sync.statLastSync')}</dt>
+                <dd>{lastSync ? formatTimeAgo(new Date(lastSync)) : '–'}</dd>
+              </div>
+              <div>
+                <dt>{t('sync.statDevices')}</dt>
+                <dd>{devices ? devices.devices.length : '–'}</dd>
+              </div>
+              <div>
+                <dt>{t('sync.statSpace')}</dt>
+                <dd>{reachable ? formatBytes(used, units) : '–'}</dd>
+              </div>
+            </dl>
+          </div>
           {status.unencrypted && <p className="text-xs mt-3 text-warning">{t('sync.unencryptedShort')}</p>}
 
           {devices && devices.devices.length > 0 && (
-            <div className="start-rule mt-4 pt-3">
-              <div className="picker-label px-2">{t('sync.devices')}</div>
-              <ul className="space-y-0.5">
+            <div className="mt-4">
+              <div className="picker-label">{t('sync.devices')}</div>
+              <ul className="space-y-0.5 -mx-2">
                 {devices.devices.map((device) => {
                   const me = device.id === devices.me;
                   return (
@@ -236,7 +246,7 @@ export default function PickerServerPanel({ server }: { server: ServerState }) {
             </div>
           )}
 
-          <div className="pt-4">
+          <div className="pt-3">
             {confirming === 'disconnect' ? (
               <InlineConfirm
                 message={t('sync.disconnectServerConfirm')}
@@ -245,7 +255,9 @@ export default function PickerServerPanel({ server }: { server: ServerState }) {
                 onCancel={() => setConfirming(null)}
               />
             ) : (
-              <Button tone="neutral" disabled={busy} onClick={() => setConfirming('disconnect')}>{t('sync.disconnectServer')}</Button>
+              <button type="button" className="start-foot-action -ml-2" disabled={busy} onClick={() => setConfirming('disconnect')}>
+                {t('sync.disconnectServer')}
+              </button>
             )}
           </div>
         </div>

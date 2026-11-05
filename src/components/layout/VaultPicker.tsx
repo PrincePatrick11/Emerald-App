@@ -1,8 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { open as openDialog } from '@tauri-apps/plugin-dialog';
-import { ChevronLeft, FolderOpen, Plus, Vault } from 'lucide-react';
-import Button from '../ui/Button';
+import { ChevronLeft, FolderOpen, Vault } from 'lucide-react';
 import { activeVault, hasActiveVault, useVaultStore } from '../../store/vaultStore';
 import { ensureVaultReady, VAULT_KEY_CANCELLED } from '../../store/vaultKeyStore';
 import { closeVaultPicker, useVaultPickerStore } from '../../store/vaultPickerStore';
@@ -17,7 +16,7 @@ import { adoptRemoteVault, deleteRemoteVault, syncErrorCode, type RemoteVault } 
 import { syncErrorKey } from '../../lib/sync/errors';
 import { formatBytes } from '../../lib/helpers';
 import PickerServerPanel, { useServerState } from './PickerServerPanel';
-import { CreateRow, DeleteConfirmRow, EditRow, RemoteRow, VaultRow, type VaultState } from './PickerRows';
+import { CreateRow, CreateTile, DeleteConfirmRow, EditRow, RemoteRow, VaultRow, type VaultState } from './PickerRows';
 import {
   DB_FILE,
   NEW_VAULT_TARGET_ERROR_KEY,
@@ -130,7 +129,7 @@ export default function VaultPicker() {
   // the heading when there is none — not on whatever had it in the shell.
   const headingRef = useRef<HTMLHeadingElement>(null);
   useEffect(() => {
-    const row = document.querySelector<HTMLElement>('.picker-row-active .picker-row-main');
+    const row = document.querySelector<HTMLElement>('.picker-tile-active .picker-tile-main');
     (row ?? headingRef.current)?.focus();
   }, []);
 
@@ -484,21 +483,17 @@ export default function VaultPicker() {
           )}
         </div>
 
-        <div className="start-grid">
+        <div className="start-content">
           <StartSection
             id="start-vaults-heading"
             icon={<Vault size={12} />}
             label={t('vault.title')}
             headingRef={headingRef}
             aside={
-              <div className="flex items-center gap-1">
-                <Button tone="neutral" compact small title={t('vault.open')} aria-label={t('vault.open')} onClick={handleOpenExisting}>
-                  <FolderOpen size={12} />
-                </Button>
-                <Button tone="jade" compact small title={t('vault.add')} aria-label={t('vault.add')} onClick={openCreateRow}>
-                  <Plus size={12} />
-                </Button>
-              </div>
+              <button type="button" className="start-foot-action" onClick={handleOpenExisting}>
+                <FolderOpen size={12} />
+                {t('vault.open')}
+              </button>
             }
           >
             {(notice || error) && (
@@ -506,35 +501,7 @@ export default function VaultPicker() {
             )}
 
             <div>
-              {editor.kind === 'create' && (
-                <CreateRow
-                  name={editor.name}
-                  icon={editor.icon}
-                  baseDir={editor.baseDir}
-                  customPath={editor.customPath}
-                  onChangeName={(name) => setEditor({ ...editor, name })}
-                  onChangeIcon={(icon) => setEditor({ ...editor, icon })}
-                  onPickFolder={async () => {
-                    const customPath = await pickFolder();
-                    if (customPath) setEditor({ ...editor, customPath });
-                  }}
-                  onResetFolder={() => setEditor({ ...editor, customPath: null })}
-                  onCommit={() => commitCreate(editor)}
-                  onCancel={closeEditor}
-                />
-              )}
-
-              {vaults.length === 0 && remoteOnly.length === 0 && editor.kind !== 'create' && (
-                <div className="picker-empty">
-                  <p>{t('vault.empty')}</p>
-                  <Button variant="primary" onClick={openCreateRow}>
-                    <Plus size={14} />
-                    {t('vault.add')}
-                  </Button>
-                </div>
-              )}
-
-              <ul className="space-y-2">
+              <ul className="start-tiles">
                 {vaults.map((v) => (
                   <li key={v.id}>
                     {editor.kind === 'edit' && editor.id === v.id ? (
@@ -589,11 +556,32 @@ export default function VaultPicker() {
                     </li>
                   );
                 })}
+                <li>
+                  {editor.kind === 'create' ? (
+                    <CreateRow
+                      name={editor.name}
+                      icon={editor.icon}
+                      baseDir={editor.baseDir}
+                      customPath={editor.customPath}
+                      onChangeName={(name) => setEditor({ ...editor, name })}
+                      onChangeIcon={(icon) => setEditor({ ...editor, icon })}
+                      onPickFolder={async () => {
+                        const customPath = await pickFolder();
+                        if (customPath) setEditor({ ...editor, customPath });
+                      }}
+                      onResetFolder={() => setEditor({ ...editor, customPath: null })}
+                      onCommit={() => commitCreate(editor)}
+                      onCancel={closeEditor}
+                    />
+                  ) : (
+                    <CreateTile onClick={openCreateRow} />
+                  )}
+                </li>
               </ul>
             </div>
           </StartSection>
 
-          <div className="start-column">
+          <div className="start-columns">
             <PickerServerPanel server={server} />
             <StartAppearance />
           </div>

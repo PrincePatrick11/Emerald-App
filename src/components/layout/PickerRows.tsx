@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import {
-  AlertTriangle, Check, Cloud, CloudDownload, CloudOff, FolderOpen, HardDrive, Loader2, Pencil, RotateCcw, Trash2, Vault, X,
+  AlertTriangle, Check, CloudDownload, FolderOpen, Loader2, Pencil, Plus, RotateCcw, Trash2, Vault, X,
 } from 'lucide-react';
 import Button from '../ui/Button';
 import BlockCheckbox from '../blocks/BlockCheckbox';
@@ -10,16 +10,16 @@ import { DEFAULT_EMOJI_PICKER_EMOJIS } from '../../lib/emojiSearch';
 import { newVaultTarget, splitPath, type Vault as VaultRecord } from '../../lib/vaultManager';
 
 /**
- * The rows of the vault picker's list. One shape for every kind of vault —
- * here, synced, paused, only on the server — so the list reads as one list;
- * the kind is the quiet mark at the row's end.
+ * The tiles of the vault picker's grid, and the rows that open in their place
+ * (edit, create, confirm). One shape for every kind of vault — here, synced,
+ * paused, only on the server — so the grid reads as one list; the kind is the
+ * line under the name.
  */
 
 const INPUT_CLASS = 'input-field flex-1 min-w-0 rounded-md px-2.5 py-1.5 text-sm outline-none';
 
 export type VaultState = 'local' | 'synced' | 'paused' | 'remote';
 
-const STATE_ICON = { local: HardDrive, synced: Cloud, paused: CloudOff, remote: CloudDownload } as const;
 const STATE_LABEL = {
   local: 'sync.stateLocal',
   synced: 'sync.stateSynced',
@@ -74,13 +74,14 @@ export function VaultGlyph({ icon, size }: { icon?: string; size: number }) {
     : <Vault size={size} />;
 }
 
-/** The mark at the end of a row: where the vault lives. */
-function StateMark({ state }: { state: VaultState }) {
+/** The line under a tile's name: where the vault lives, in words, with a dot
+ *  in the state's colour. */
+function StateLine({ state, extra }: { state: VaultState; extra?: string }) {
   const { t } = useTranslation();
-  const Icon = STATE_ICON[state];
   return (
-    <span role="img" className={`picker-state picker-state-${state}`} title={t(STATE_LABEL[state])} aria-label={t(STATE_LABEL[state])}>
-      <Icon size={14} />
+    <span className={`picker-tile-state picker-tile-state-${state}`}>
+      <span className="picker-tile-dot" aria-hidden />
+      <span className="truncate">{extra ? `${t(STATE_LABEL[state])} · ${extra}` : t(STATE_LABEL[state])}</span>
     </span>
   );
 }
@@ -246,7 +247,9 @@ export function DeleteConfirmRow({
   );
 }
 
-/** A vault on this device. The open one is tinted; choosing it goes back to it. */
+/** A vault on this device, as a tile. The open one is tinted and says so;
+ *  choosing it goes back to it. Edit and delete show in its corner on hover or
+ *  focus. */
 export function VaultRow({
   vault, isActive, unreachable, state, isSwitching, busy, onSwitch, onEdit, onRelocate, onDelete,
 }: {
@@ -264,10 +267,10 @@ export function VaultRow({
   const { t } = useTranslation();
   const isUnreachable = unreachable !== null;
   return (
-    <div className={`picker-row group${isActive ? ' picker-row-active' : ''}`}>
+    <div className={`picker-tile group${isActive ? ' picker-tile-active' : ''}`}>
       <button
         type="button"
-        className="picker-row-main"
+        className="picker-tile-main"
         disabled={busy || (isUnreachable && !isActive)}
         onClick={onSwitch}
         title={isUnreachable ? undefined : isActive ? t('vault.backTo', { name: vault.name }) : vault.path}
@@ -276,40 +279,44 @@ export function VaultRow({
             folder, what is going on matters, not which vault it is. */}
         <span className="picker-badge">
           {isSwitching
-            ? <Loader2 size={16} className="animate-spin" />
+            ? <Loader2 size={18} className="animate-spin" />
             : isUnreachable
-              ? <AlertTriangle size={16} className="text-danger" />
-              : <VaultGlyph icon={vault.icon} size={16} />}
+              ? <AlertTriangle size={18} className="text-danger" />
+              : <VaultGlyph icon={vault.icon} size={18} />}
         </span>
-        <span className="flex-1 min-w-0">
+        <span className="block min-w-0">
           <span className="picker-row-name">{vault.name}</span>
-          {unreachable && (
-            <span className="picker-row-meta text-danger">
-              {t(unreachable === 'denied' ? 'vault.accessDenied' : 'vault.missing')}
+          {unreachable ? (
+            <span className="picker-tile-state text-danger">
+              <span className="truncate">{t(unreachable === 'denied' ? 'vault.accessDenied' : 'vault.missing')}</span>
             </span>
+          ) : (
+            <StateLine state={state} />
           )}
         </span>
       </button>
 
-      <span className="picker-row-actions">
-        {unreachable === 'missing' && (
-          <Button tone="neutral" compact small title={t('vault.relocate')} aria-label={t('vault.relocate')} onClick={onRelocate}>
-            <FolderOpen size={12} />
+      <span className="picker-tile-corner">
+        {isActive && <span className="picker-tile-open">{t('start.opened')}</span>}
+        <span className="picker-row-actions">
+          {unreachable === 'missing' && (
+            <Button tone="neutral" compact small title={t('vault.relocate')} aria-label={t('vault.relocate')} onClick={onRelocate}>
+              <FolderOpen size={12} />
+            </Button>
+          )}
+          <Button tone="neutral" compact small title={t('vault.edit')} aria-label={t('vault.edit')} onClick={onEdit}>
+            <Pencil size={12} />
           </Button>
-        )}
-        <Button tone="neutral" compact small title={t('vault.edit')} aria-label={t('vault.edit')} onClick={onEdit}>
-          <Pencil size={12} />
-        </Button>
-        <Button tone="danger" compact small title={t('vault.delete')} aria-label={t('vault.delete')} onClick={onDelete}>
-          <Trash2 size={12} />
-        </Button>
+          <Button tone="danger" compact small title={t('vault.delete')} aria-label={t('vault.delete')} onClick={onDelete}>
+            <Trash2 size={12} />
+          </Button>
+        </span>
       </span>
-      <StateMark state={state} />
     </div>
   );
 }
 
-/** A vault only on the server: choosing it fetches it. */
+/** A vault only on the server, as a tile with a dashed edge: choosing it fetches it. */
 export function RemoteRow({
   name, size, isFetching, busy, confirming, onFetch, onDelete, onConfirmDelete, onCancelDelete,
 }: {
@@ -338,22 +345,34 @@ export function RemoteRow({
     );
   }
   return (
-    <div className="picker-row picker-row-remote group">
-      <button type="button" className="picker-row-main" disabled={busy} onClick={onFetch} title={t('sync.fetch')}>
+    <div className="picker-tile picker-tile-remote group">
+      <button type="button" className="picker-tile-main" disabled={busy} onClick={onFetch} title={t('sync.fetch')}>
         <span className="picker-badge">
-          {isFetching ? <Loader2 size={16} className="animate-spin" /> : <Vault size={16} />}
+          {isFetching ? <Loader2 size={18} className="animate-spin" /> : <CloudDownload size={18} />}
         </span>
-        <span className="flex-1 min-w-0">
+        <span className="block min-w-0">
           <span className="picker-row-name">{name}</span>
-          <span className="picker-row-meta">{size}</span>
+          <StateLine state="remote" extra={size} />
         </span>
       </button>
-      <span className="picker-row-actions">
-        <Button tone="danger" compact small title={t('sync.deleteFromServer')} aria-label={t('sync.deleteFromServer')} onClick={onDelete}>
-          <Trash2 size={12} />
-        </Button>
+      <span className="picker-tile-corner">
+        <span className="picker-row-actions">
+          <Button tone="danger" compact small title={t('sync.deleteFromServer')} aria-label={t('sync.deleteFromServer')} onClick={onDelete}>
+            <Trash2 size={12} />
+          </Button>
+        </span>
       </span>
-      <StateMark state="remote" />
     </div>
+  );
+}
+
+/** The last tile: a new vault. */
+export function CreateTile({ onClick }: { onClick: () => void }) {
+  const { t } = useTranslation();
+  return (
+    <button type="button" className="picker-tile-new" onClick={onClick}>
+      <Plus size={16} />
+      {t('vault.add')}
+    </button>
   );
 }

@@ -705,13 +705,12 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
 
   /* ── Start page (the vault picker) ─────────────────────────────────────
      The whole window, as the shell is: the brand on the frame at the left,
-     one sheet beside it with the sections (vaults; server and appearance),
-     headed as Home heads its own, and the version at its foot. What a
-     section lists (vaults, themes, the server's figures) are panels as
-     Home's items are, drawn here with the same tokens as
-     `.panel-interactive` rather than with it: it carries per-theme
-     overrides (html[data-theme=…] .panel-interactive, 0-2-1) that outrank an
-     active tint on top (design.md, Specificity Traps). */
+     one sheet beside it. On the sheet the vaults as tiles across the width,
+     server and appearance side by side below, each headed as Home heads its
+     sections, and at its foot language and updates. Tiles and panels take
+     the tokens of `.panel-interactive` rather than the class: it carries
+     per-theme overrides (html[data-theme=…] .panel-interactive, 0-2-1) that
+     outrank an active tint on top (design.md, Specificity Traps). */
   .picker-frame {
     padding: 0 var(--sheet-inset) var(--sheet-inset) 0;
   }
@@ -723,44 +722,42 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
   /* Its width is the picker's (`VaultPicker`, dragged at the handle). */
   .start-brand {
     @apply flex flex-col shrink-0 overflow-y-auto;
-    padding: 40px 40px 24px 48px;
+    padding: 48px 40px 24px 48px;
   }
 
   .start-brand-title {
-    @apply font-serif font-medium;
+    @apply font-serif font-medium whitespace-nowrap;
     font-size: 44px;
     line-height: 1.05;
     color: var(--text-primary);
   }
 
   .start-brand-tagline {
-    @apply font-serif text-lg;
-    max-width: 22rem;
+    @apply font-serif;
+    font-size: 17px;
+    max-width: 17rem;
     color: var(--text-muted);
   }
 
   .start-back-row {
-    @apply flex items-center shrink-0 px-8 pt-5;
+    @apply flex items-center shrink-0 px-10 pt-5;
     min-height: 2.75rem;
   }
 
-  /* Vaults beside server and appearance; one column below 1080px. Only
-     this scrolls, the foot stays. */
-  .start-grid {
-    @apply grid flex-1 min-h-0 gap-x-10 gap-y-8 overflow-y-auto px-8 pt-4 pb-6;
-    grid-template-columns: minmax(0, 3fr) minmax(300px, 2fr);
-    align-content: start;
+  /* Only this scrolls, the foot stays. The width is held so the tiles and the
+     two columns do not drift apart on a wide window. */
+  .start-content {
+    @apply flex flex-col flex-1 min-h-0 gap-10 overflow-y-auto px-10 pt-5 pb-8;
+  }
+
+  .start-content > * {
+    max-width: 1080px;
+  }
+
+  .start-columns {
+    @apply grid gap-10;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
     align-items: start;
-  }
-
-  @media (max-width: 1080px) {
-    .start-grid {
-      grid-template-columns: minmax(0, 1fr);
-    }
-  }
-
-  .start-column {
-    @apply flex flex-col gap-8 min-w-0;
   }
 
   .start-section {
@@ -768,7 +765,7 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
   }
 
   .start-section-head {
-    @apply flex items-center justify-between gap-3 mb-3 min-h-6;
+    @apply flex items-center justify-between gap-3 mb-3.5 min-h-7;
   }
 
   .start-section-label {
@@ -776,23 +773,22 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
     color: var(--text-subtle);
   }
 
-  .start-rule {
-    @apply border-t;
-    border-color: var(--edge);
+  /* A panel that is no choice: the server's state and its fields. */
+  .start-panel {
+    @apply rounded-xl border p-4;
+    background-color: var(--bg-surface-1);
+    border-color: var(--border-soft);
   }
 
   .start-stats {
-    @apply grid grid-cols-3 gap-2;
+    @apply grid grid-cols-3 gap-3;
   }
 
   /* Value first to the eye, its name under it, with the name still first in
      the markup for screen readers. */
   .start-stats > div {
-    @apply flex flex-col-reverse gap-0.5 min-w-0 rounded-xl border px-3 py-2.5;
-    background-color: var(--bg-surface-1);
-    border-color: var(--border-soft);
+    @apply flex flex-col-reverse gap-0.5 min-w-0;
   }
-
 
   .start-stats dt {
     @apply text-[11px] truncate;
@@ -800,11 +796,211 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
   }
 
   .start-stats dd {
-    @apply text-lg font-medium tabular-nums truncate;
+    @apply text-base font-medium tabular-nums truncate;
     color: var(--text-primary);
   }
 
-  /* Language on the left, version and updates on the right. */
+  /* ── The vault tiles ── */
+  .start-tiles {
+    @apply grid gap-3;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  }
+
+  /* An editor or a confirmation takes the whole width. */
+  .start-tiles > li:has(.picker-row-open) {
+    grid-column: 1 / -1;
+  }
+
+  .picker-tile {
+    @apply relative rounded-xl border transition-colors duration-150;
+    background-color: var(--bg-surface-1);
+    border-color: var(--border-soft);
+  }
+
+  .picker-tile:hover,
+  .picker-tile:focus-within {
+    background-color: var(--bg-surface-2);
+    border-color: var(--border-strong);
+  }
+
+  .picker-tile-active,
+  .picker-tile-active:hover,
+  .picker-tile-active:focus-within {
+    background-color: color-mix(in srgb, var(--accent) 12%, transparent);
+    border-color: var(--choice-active-border);
+  }
+
+  /* Only on the server: a dashed edge, present but not yet here. */
+  .picker-tile.picker-tile-remote {
+    background-color: transparent;
+    border-style: dashed;
+  }
+
+  .picker-tile-main {
+    @apply flex flex-col justify-between gap-3 w-full h-28 px-4 py-3.5 text-left rounded-xl;
+  }
+
+  .picker-tile-main:focus-visible {
+    outline: 2px solid var(--focus-ring);
+    outline-offset: -2px;
+  }
+
+  .picker-tile-main .picker-badge {
+    @apply w-9 h-9;
+  }
+
+  .picker-tile-active .picker-badge {
+    background-color: color-mix(in srgb, var(--accent) 22%, transparent);
+    color: var(--accent-text);
+  }
+
+  .picker-tile-remote .picker-badge {
+    background-color: transparent;
+    border: 1px dashed var(--border-soft);
+    color: var(--text-subtle);
+  }
+
+  .picker-tile .picker-row-name {
+    @apply font-medium;
+    color: var(--text-primary);
+  }
+
+  .picker-tile-remote .picker-row-name {
+    color: var(--text-muted);
+  }
+
+  /* Top right: "open" on the open vault, edit and delete in its place on
+     hover or focus. */
+  .picker-tile-corner {
+    @apply absolute top-3 right-3 flex items-center;
+  }
+
+  .picker-tile-open {
+    @apply text-[11px] font-medium transition-opacity duration-150;
+    color: var(--accent-text);
+  }
+
+  .picker-tile-corner .picker-row-actions {
+    @apply absolute right-0;
+  }
+
+  .picker-tile:hover .picker-tile-open,
+  .picker-tile:focus-within .picker-tile-open {
+    opacity: 0;
+  }
+
+  .picker-tile:hover .picker-row-actions,
+  .picker-tile:focus-within .picker-row-actions {
+    opacity: 1;
+  }
+
+  .picker-tile-state {
+    @apply flex items-center gap-1.5 mt-0.5 text-xs min-w-0;
+    color: var(--text-subtle);
+  }
+
+  .picker-tile-dot {
+    @apply w-1.5 h-1.5 rounded-full shrink-0;
+    background-color: currentColor;
+  }
+
+  .picker-tile-state.picker-tile-state-synced {
+    color: var(--accent-text);
+  }
+
+  .picker-tile-state.picker-tile-state-paused {
+    color: var(--warning-text);
+  }
+
+  .picker-tile-state-remote .picker-tile-dot {
+    background-color: transparent;
+    border: 1px solid currentColor;
+  }
+
+  .picker-tile-new,
+  .start-theme-new {
+    @apply flex flex-col items-center justify-center gap-2 w-full rounded-xl border border-dashed text-xs transition-colors duration-150;
+    border-color: var(--border-soft);
+    color: var(--text-muted);
+  }
+
+  .picker-tile-new {
+    @apply h-28 text-[13px];
+  }
+
+  .picker-tile-new:hover,
+  .start-theme-new:hover {
+    border-color: var(--border-strong);
+    color: var(--text-primary);
+  }
+
+  .picker-tile-new:focus-visible,
+  .start-theme-new:focus-visible,
+  .start-theme:focus-visible,
+  .start-theme-remove:focus-visible,
+  .picker-device-remove:focus-visible,
+  .picker-badge-interactive:focus-visible {
+    outline: 2px solid var(--focus-ring);
+    outline-offset: 1px;
+  }
+
+  /* ── The theme cards ── */
+  .start-themes {
+    @apply grid gap-3;
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  }
+
+  .start-theme {
+    @apply flex flex-col gap-2.5 w-full rounded-xl border p-2 pb-2.5 text-xs text-left transition-colors duration-150;
+    background-color: var(--bg-surface-1);
+    border-color: var(--border-soft);
+    color: var(--text-secondary);
+  }
+
+  .start-theme:hover {
+    background-color: var(--bg-surface-2);
+    border-color: var(--border-strong);
+    color: var(--text-primary);
+  }
+
+  .start-theme.start-theme-active {
+    background-color: color-mix(in srgb, var(--accent) 12%, transparent);
+    border-color: var(--choice-active-border);
+    color: var(--text-primary);
+  }
+
+  .start-theme-preview {
+    @apply flex h-16 rounded-lg p-1.5 pl-5;
+  }
+
+  .start-theme-sheet {
+    @apply flex flex-col gap-1 flex-1 rounded p-1.5;
+  }
+
+  .start-theme-sheet > span {
+    @apply block rounded-full;
+  }
+
+  .start-theme-new {
+    @apply h-full min-h-[104px];
+  }
+
+  .start-theme-remove {
+    @apply absolute top-3 right-3 flex items-center justify-center w-5 h-5 rounded-md opacity-0 transition-opacity duration-150;
+    background-color: var(--bg-surface-2);
+    color: var(--text-subtle);
+  }
+
+  .group:hover .start-theme-remove,
+  .start-theme-remove:focus-visible {
+    opacity: 1;
+  }
+
+  .start-theme-remove:hover {
+    color: var(--danger-text);
+  }
+
+  /* Language on the left, updates on the right. */
   .start-foot {
     @apply flex items-center justify-between gap-4 shrink-0 px-6 pb-3 pt-1 text-xs;
     color: var(--text-subtle);
@@ -814,6 +1010,7 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
     @apply flex items-center justify-end gap-2 min-w-0;
   }
 
+  /* A quiet text button: the foot's, and the sections' own actions. */
   .start-foot-action {
     @apply inline-flex items-center gap-1.5 h-7 px-2 rounded-md shrink-0 text-xs transition-colors duration-150;
     color: var(--text-muted);
@@ -834,70 +1031,10 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
     outline-offset: 1px;
   }
 
-  .start-option:focus-visible,
-  .start-option-remove:focus-visible,
-  .picker-device-remove:focus-visible,
-  .picker-badge-interactive:focus-visible {
-    outline: 2px solid var(--focus-ring);
-    outline-offset: 1px;
-  }
-
-  /* A choice with more to say: a list of rows, the chosen one tinted. */
-  .start-option-row {
-    @apply relative flex items-center;
-  }
-
-  .start-option {
-    @apply flex items-center gap-3 w-full min-w-0 rounded-xl border px-4 py-2.5 text-sm text-left transition-colors duration-150;
-    background-color: var(--bg-surface-1);
-    border-color: var(--border-soft);
-    color: var(--text-secondary);
-  }
-
-  .start-option:hover {
-    background-color: var(--bg-surface-2);
-    border-color: var(--border-strong);
-    color: var(--text-primary);
-  }
-
-  /* Room for the remove button, so a long name ends before it. */
-  .start-option-removable {
-    @apply pr-8;
-  }
-
-  .start-option.start-option-active {
-    background-color: color-mix(in srgb, var(--accent) 12%, transparent);
-    border-color: var(--choice-active-border);
-    color: var(--text-primary);
-  }
-
-  .start-option.start-option-active svg {
-    color: var(--accent);
-  }
-
-  .start-option-remove {
-    @apply absolute right-2.5 flex items-center justify-center w-5 h-5 rounded-md opacity-0 transition-opacity duration-150;
-    color: var(--text-subtle);
-  }
-
-  .start-option-row:hover .start-option-remove,
-  .start-option-remove:focus-visible {
-    opacity: 1;
-  }
-
-  .start-option-remove:hover {
-    color: var(--danger-text);
-  }
-
   .start-notes {
     @apply text-xs whitespace-pre-wrap font-sans max-h-32 overflow-y-auto rounded-md p-2;
     background-color: var(--bg-surface-1);
     color: var(--text-muted);
-  }
-
-  .picker-heading {
-    @apply text-sm font-medium;
-    color: var(--text-primary);
   }
 
   .picker-label {
@@ -905,46 +1042,14 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
     color: var(--text-muted);
   }
 
+  /* The rows that open in a tile's place: edit, create, confirm. */
   .picker-row {
-    @apply relative flex items-center gap-2 rounded-xl border px-3 py-2.5 transition-colors duration-150;
-    background-color: var(--bg-surface-1);
-    border-color: var(--border-soft);
+    @apply relative flex items-center gap-2 rounded-xl border px-3 py-2.5;
   }
 
-  .picker-row:hover,
-  .picker-row:focus-within {
+  .picker-row-open {
     background-color: var(--bg-surface-2);
     border-color: var(--border-strong);
-  }
-
-  /* An editor or a confirmation in place of a row: the raised surface, so it
-     stands out while it is open. */
-  .picker-row-open,
-  .picker-row-open:hover,
-  .picker-row-open:focus-within {
-    background-color: var(--bg-surface-2);
-    border-color: var(--border-strong);
-  }
-
-  .picker-row-active,
-  .picker-row-active:hover,
-  .picker-row-active:focus-within {
-    background-color: color-mix(in srgb, var(--accent) 12%, transparent);
-    border-color: var(--choice-active-border);
-  }
-
-  /* Only on the server: a dashed edge, present but not yet here. */
-  .picker-row.picker-row-remote {
-    border-style: dashed;
-  }
-
-  .picker-row-main {
-    @apply flex items-center gap-3 flex-1 min-w-0 text-left rounded-md;
-  }
-
-  .picker-row-main:focus-visible {
-    outline: 2px solid var(--focus-ring);
-    outline-offset: 2px;
   }
 
   .picker-badge {
@@ -958,54 +1063,14 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
     color: var(--text-primary);
   }
 
-  .picker-row-active .picker-badge {
-    background-color: color-mix(in srgb, var(--accent) 22%, transparent);
-    color: var(--accent-text);
-  }
-
-  /* Only on the server: present, but not yet here. */
-  .picker-row-remote .picker-badge {
-    background-color: transparent;
-    border: 1px dashed var(--border-soft);
-    color: var(--text-subtle);
-  }
-
   .picker-row-name {
     @apply block text-sm truncate;
     color: var(--text-secondary);
   }
 
-  .picker-row:hover .picker-row-name,
-  .picker-row-active .picker-row-name {
-    color: var(--text-primary);
-  }
-
-  .picker-row-remote .picker-row-name {
-    color: var(--text-muted);
-  }
-
-  .picker-row-meta {
-    @apply block text-xs truncate;
-    color: var(--text-subtle);
-  }
-
   /* Edit and delete only where the pointer or the focus is. */
   .picker-row-actions {
     @apply flex items-center gap-1 shrink-0 opacity-0 transition-opacity duration-150;
-  }
-
-  .picker-row:hover .picker-row-actions,
-  .picker-row:focus-within .picker-row-actions {
-    opacity: 1;
-  }
-
-  .picker-state {
-    @apply flex items-center justify-center w-5 shrink-0;
-    color: var(--text-subtle);
-  }
-
-  .picker-state.picker-state-synced {
-    color: var(--accent);
   }
 
   .picker-dot {
@@ -1021,20 +1086,6 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
 
   .picker-dot.picker-dot-down {
     background-color: var(--danger-text);
-  }
-
-  .picker-stats {
-    @apply grid gap-x-4 gap-y-1.5 text-xs;
-    grid-template-columns: auto 1fr;
-  }
-
-  .picker-stats dt {
-    color: var(--text-subtle);
-  }
-
-  .picker-stats dd {
-    @apply text-right tabular-nums;
-    color: var(--text-secondary);
   }
 
   .picker-device {
@@ -1059,18 +1110,16 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
     color: var(--danger-text);
   }
 
-  .picker-empty {
-    @apply flex flex-col items-center justify-center gap-3 py-16 text-sm text-center;
-    color: var(--text-muted);
-  }
-
   @media (prefers-reduced-motion: reduce) {
-    .picker-row,
+    .picker-tile,
+    .picker-tile-open,
+    .picker-tile-new,
     .picker-row-actions,
     .picker-device-remove,
     .start-foot-action,
-    .start-option,
-    .start-option-remove {
+    .start-theme,
+    .start-theme-new,
+    .start-theme-remove {
       transition: none;
     }
   }

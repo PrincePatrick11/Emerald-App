@@ -615,7 +615,6 @@
     "deleteFilesLeftover": "La base de données et les images ont été supprimées. Le dossier contenait d’autres fichiers et a été conservé.",
     "backTo": "Retour à {{name}}",
     "openFailed": "Le dernier vault n'a pas pu être ouvert. Choisissez-le à nouveau ou un autre.",
-    "empty": "Aucun vault pour l’instant.",
     "removeConfirm": "Retirer de la liste ?",
     "deleteConfirmFiles": "Supprimer le vault et ses fichiers ?"
   },
@@ -1213,6 +1212,7 @@
     "goneFromServer": "Ce vault a été retiré du serveur. Il reste ici en tant que vault local.",
     "replaceWarning": "Ce vault se synchronise : la sauvegarde le remplace aussi sur vos autres appareils, qui enregistrent d'abord leur propre sauvegarde.",
     "keychainWarning": "Emerald conserve la connexion dans le trousseau du système. Si vous refusez l'accès, elle sera seulement masquée dans un fichier sur cet appareil.",
+    "keychainShort": "La connexion est conservée dans le trousseau du système.",
     "deleteFromServerConfirm": "Retirer du serveur ?",
     "noServer": "Aucun serveur connecté.",
     "openPicker": "Serveur et vaults…",
@@ -1233,6 +1233,7 @@
     "appearance": "Apparence",
     "links": "Liens",
     "updateSettings": "Serveur de mises à jour",
-    "version": "Version {{version}}"
+    "version": "Version {{version}}",
+    "opened": "ouvert"
   }
 }

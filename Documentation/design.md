@@ -150,7 +150,7 @@ Where the code contradicts the rules above today. No prioritisation — each poi
 
 **5. Contrast of `--accent` as a fill mark.** `--accent` itself stays `#008a57` in Parchment (3.99:1 against the sheet), which holds 3:1 for icons and marks. Text uses `--accent-text`. *Cost: none unless it gets used for text again.*
 
-**6. The start page's choices are hand-written.** The theme list (`.start-option`, a row with its icon and, for a custom theme, a remove button) sets its active state through a `className` ternary rather than `Button`'s `tone`: it is no generic action button, and `SettingsChoiceButton`'s chips do not fit a list of rows with a remove action. The language choice uses `.prop-segments`. *Cost: a list-row variant of `SettingsChoiceButton`, then switch the theme list over.*
+**6. The start page's choices are hand-written.** The theme cards (`.start-theme`, a small picture of the theme and, for a custom theme, a remove button) and the vault tiles (`.picker-tile`) set their active state through a `className` ternary rather than `Button`'s `tone`: neither is a generic action button, and `SettingsChoiceButton`'s chips do not fit a card with a picture and a remove action. *Cost: a card variant of `SettingsChoiceButton`, then switch the theme cards over.*
 
 ---
 
@@ -190,7 +190,7 @@ Two traps of the theming system, both verified through computed styles in both t
 
 Consequence: a new "active" variant on a `.panel` card needs either a selector that outranks the theme override, a rule placed after it outside any `@layer` block, or must forgo `.panel` entirely. Two examples:
 
-- The vault picker's `.picker-row*` forgo `.panel` and are list rows of their own, so the open vault's tint applies in both themes.
+- The vault picker's `.picker-tile*` forgo `.panel-interactive` and are classes of their own on its tokens, so the open vault's tint applies in both themes.
 - `.task-row-target` marks the row a search hit points at using `outline` rather than `background`/`border`/`box-shadow` — all three would be overridden by `html[data-theme=…] .panel-interactive`.
 
 `.search-match` and `.task-row-target` carry an `rgba()` fallback with their `color-mix()` behind `@supports`, for WebKitGTK before 2.40. The other `color-mix()` sites (vault picker rows, `.input-field`, …) have none yet.

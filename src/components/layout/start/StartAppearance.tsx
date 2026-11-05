@@ -1,22 +1,46 @@
-import { useRef, useState, type ChangeEvent, type ReactNode } from 'react';
+import { useRef, useState, type ChangeEvent } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Moon, Palette, Sun, Upload, X } from 'lucide-react';
-import Button from '../../ui/Button';
+import { Palette, Plus, X } from 'lucide-react';
 import StartSection from './StartSection';
 import { useDeviceStore } from '../../../store/deviceStore';
-import { THEME_OPTIONS, customThemeSelection, type ThemeSelection } from '../../../themes/theme';
+import { THEME_OPTIONS, customThemeSelection, type ThemeId, type ThemeSelection } from '../../../themes/theme';
 import {
   MAX_CUSTOM_THEMES, MAX_CUSTOM_THEME_FILE_BYTES, customThemeContrastProblems, parseCustomThemeFile,
 } from '../../../themes/customTheme';
 
-const THEME_ICONS = { 'emerald-noctis': Moon, 'emerald-parchment': Sun } as const;
+/** What a theme card draws: its frame, its sheet, a line of its accent and
+ *  two of its edge colour. */
+interface Preview { frame: string; sheet: string; accent: string; line: string }
+
+/** The built-in themes' own colours (`emerald-noctis.css`, `emerald-parchment.css`:
+ *  `--shell-bg`, `--sheet-bg`, `--accent`, `--border-default` and a Parchment
+ *  line of the same weight). A card shows another theme than the one around
+ *  it, so these are values, not tokens. */
+const BUILT_IN_PREVIEWS: Record<ThemeId, Preview> = {
+  'emerald-noctis': { frame: '#100d0a', sheet: '#1c1712', accent: '#00c47f', line: '#44403c' },
+  'emerald-parchment': { frame: '#ecdec7', sheet: '#faf3e6', accent: '#008a57', line: '#e2d2b8' },
+};
+
+/** A theme in small: the frame with the sheet on it, a heading in the accent
+ *  and two lines of text. */
+function ThemePreview({ frame, sheet, accent, line }: Preview) {
+  return (
+    <span className="start-theme-preview" style={{ background: frame }} aria-hidden>
+      <span className="start-theme-sheet" style={{ background: sheet }}>
+        <span style={{ background: accent, width: '50%', height: 4 }} />
+        <span style={{ background: line, width: '80%', height: 3 }} />
+        <span style={{ background: line, width: '62%', height: 3 }} />
+      </span>
+    </span>
+  );
+}
 
 type Status = { tone: 'error' | 'muted'; text: string } | null;
 
 /**
- * The start page's Appearance: the theme of this installation (`deviceStore`),
- * custom themes included: import one from a JSON file, pick it, remove it.
- * The language sits at the foot of the brand (`StartLanguage`).
+ * The start page's Appearance: the theme of this installation (`deviceStore`)
+ * as cards that show it in small, custom themes included: import one from a
+ * JSON file (the last card), pick it, remove it.
  */
 export default function StartAppearance() {
   const { t } = useTranslation();
@@ -53,21 +77,21 @@ export default function StartAppearance() {
     setStatus(problems.length ? { tone: 'muted', text: t('settings.customThemeContrast', { pairs: problems.join(', ') }) } : null);
   };
 
-  const option = (selection: ThemeSelection, label: string, icon: ReactNode, onRemove?: () => void) => (
-    <li key={selection} className="start-option-row group">
+  const card = (selection: ThemeSelection, label: string, preview: Preview, onRemove?: () => void) => (
+    <li key={selection} className="relative group">
       <button
         type="button"
-        className={`start-option${onRemove ? ' start-option-removable' : ''}${settings.theme === selection ? ' start-option-active' : ''}`}
+        className={`start-theme${settings.theme === selection ? ' start-theme-active' : ''}`}
         aria-pressed={settings.theme === selection}
         onClick={() => setTheme(selection)}
       >
-        {icon}
-        <span className="truncate">{label}</span>
+        <ThemePreview {...preview} />
+        <span className="block truncate px-0.5">{label}</span>
       </button>
       {onRemove && (
         <button
           type="button"
-          className="start-option-remove"
+          className="start-theme-remove"
           title={t('settings.customThemeRemove', { name: label })}
           aria-label={t('settings.customThemeRemove', { name: label })}
           onClick={onRemove}
@@ -80,34 +104,36 @@ export default function StartAppearance() {
 
   return (
     <StartSection id="start-appearance-heading" icon={<Palette size={12} />} label={t('start.appearance')}>
-      <div>
-        <ul className="space-y-2">
-          {THEME_OPTIONS.map(({ id, label }) => {
-            const Icon = THEME_ICONS[id];
-            return option(id, label, <Icon size={14} className="shrink-0" />);
-          })}
-          {settings.customThemes.map((theme) =>
-            option(customThemeSelection(theme.id), theme.name, <Palette size={14} className="shrink-0" />, () => {
+      <ul className="start-themes">
+        {THEME_OPTIONS.map(({ id, label }) => card(id, label.replace(/^Emerald /, ''), BUILT_IN_PREVIEWS[id]))}
+        {settings.customThemes.map((theme) =>
+          card(
+            customThemeSelection(theme.id),
+            theme.name,
+            { frame: theme.colors.frame, sheet: theme.colors.sheet, accent: theme.colors.accent, line: theme.colors.border },
+            () => {
               removeCustomTheme(theme.id);
               setStatus(null);
-            }),
-          )}
-        </ul>
-        <input
-          ref={fileInput}
-          type="file"
-          accept=".json,application/json"
-          className="hidden"
-          onChange={(e) => void importFile(e)}
-        />
-        <Button tone="neutral" className="mt-2" onClick={() => fileInput.current?.click()}>
-          <Upload size={12} />
-          {t('settings.customThemeImport')}
-        </Button>
-        {status && (
-          <p className={`text-xs mt-2 ${status.tone === 'error' ? 'text-danger' : 'text-muted'}`}>{status.text}</p>
+            },
+          ),
         )}
-      </div>
+        <li>
+          <button type="button" className="start-theme-new" onClick={() => fileInput.current?.click()}>
+            <Plus size={14} />
+            {t('settings.customThemeImport')}
+          </button>
+        </li>
+      </ul>
+      <input
+        ref={fileInput}
+        type="file"
+        accept=".json,application/json"
+        className="hidden"
+        onChange={(e) => void importFile(e)}
+      />
+      {status && (
+        <p className={`text-xs mt-2 ${status.tone === 'error' ? 'text-danger' : 'text-muted'}`}>{status.text}</p>
+      )}
     </StartSection>
   );
 }

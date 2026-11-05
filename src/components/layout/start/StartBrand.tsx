@@ -38,21 +38,22 @@ export default function StartBrand({ width }: { width: number }) {
   return (
     <aside className="start-brand" style={{ width }}>
       <div className="flex flex-col gap-7">
-        <EmeraldMark size={112} />
+        <EmeraldMark size={96} />
         <div className="space-y-3">
           <h1 className="start-brand-title">Emerald App</h1>
           <p className="start-brand-tagline">{t('settings.tagline')}</p>
         </div>
-        <nav className="flex flex-wrap gap-1 -ml-2.5" aria-label={t('start.links')}>
+        <nav className="flex flex-col items-start gap-0.5 -ml-2.5" aria-label={t('start.links')}>
           <BrandLink icon={<Globe size={14} />} label={t('settings.website')} url={`${WEBSITE_BASE}/${language}/`} />
           <BrandLink icon={<GithubMark size={14} />} label="GitHub" url={packageJson.homepage} />
           <BrandLink icon={<PatreonMark size={14} />} label="Patreon" url={PATREON_URL} />
           <BrandLink icon={<DiscordMark size={14} />} label="Discord" url={DISCORD_URL} />
         </nav>
       </div>
-      <p className="mt-auto pt-8 text-xs text-subtle tabular-nums">
-        {t('start.version', { version: packageJson.version })} · {packageJson.author}
-      </p>
+      <div className="mt-auto pt-8 flex items-center justify-between gap-3 text-xs text-subtle">
+        <span className="truncate">{packageJson.author}</span>
+        <span className="shrink-0 tabular-nums">{t('start.version', { version: packageJson.version })}</span>
+      </div>
     </aside>
   );
 }
