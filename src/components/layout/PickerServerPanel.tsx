@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { X } from 'lucide-react';
 import Button from '../ui/Button';
@@ -12,6 +12,7 @@ import { syncErrorKey } from '../../lib/sync/errors';
 import { formatBytes } from '../../lib/helpers';
 import { formatTimeAgo } from '../../lib/formatDate';
 import { useSyncStore } from '../../store/syncStore';
+import { takeStartFocus, useVaultPickerStore } from '../../store/vaultPickerStore';
 
 /**
  * The server as the vault picker sees it: whether one is set and answers, the
@@ -62,10 +63,13 @@ export function useServerState(): ServerState {
   return { status, remotes, devices, reachable, loggedOut, refresh };
 }
 
-/** The start page's server section: connect, or how the server stands. */
+/** The start page's server card: connect, or how the server stands. Settings →
+ *  Sync's way here (`focus` 'server') puts the focus into it. */
 export default function PickerServerPanel({ server }: { server: ServerState }) {
   const { t } = useTranslation();
   const lastSync = useSyncStore((s) => s.lastSync);
+  const focus = useVaultPickerStore((s) => s.focus);
+  const cardRef = useRef<HTMLElement>(null);
   const { status, remotes, devices, reachable, loggedOut, refresh } = server;
   const [url, setUrl] = useState('');
   const [key, setKey] = useState('');
@@ -102,6 +106,15 @@ export default function PickerServerPanel({ server }: { server: ServerState }) {
     await syncNow();
   });
 
+  useEffect(() => {
+    if (focus !== 'server' || !status) return;
+    takeStartFocus();
+    const card = cardRef.current;
+    card?.scrollIntoView({ block: 'nearest' });
+    // The address field to connect; the heading once connected.
+    (card?.querySelector<HTMLElement>('input') ?? card?.querySelector<HTMLElement>('h2'))?.focus();
+  }, [focus, status]);
+
   if (!status) return null;
   const connected = !!status.url && !loggedOut;
   const tone = !connected ? 'off' : reachable === false ? 'down' : reachable ? 'up' : 'off';
@@ -117,10 +130,13 @@ export default function PickerServerPanel({ server }: { server: ServerState }) {
   const used = remotes.reduce((sum, remote) => sum + remote.storedBytes, 0);
 
   return (
-    <div className="flex flex-col h-full min-h-0">
-      <div className="flex items-center gap-1.5 text-xs mb-4 text-muted">
-        <span className={`picker-dot picker-dot-${tone}`} aria-hidden />
-        {stateLabel}
+    <section ref={cardRef} className="start-card" aria-labelledby="start-server-heading">
+      <div className="start-card-head">
+        <h2 id="start-server-heading" tabIndex={-1} className="picker-heading outline-none">{t('start.server')}</h2>
+        <span className="flex items-center gap-1.5 text-xs text-muted">
+          <span className={`picker-dot picker-dot-${tone}`} aria-hidden />
+          {stateLabel}
+        </span>
       </div>
 
       {!connected ? (
@@ -156,20 +172,26 @@ export default function PickerServerPanel({ server }: { server: ServerState }) {
           </Button>
         </div>
       ) : (
-        <div className="flex flex-col flex-1 min-h-0">
-          <div className="text-sm break-all mb-4 text-secondary">{status.url}</div>
-          <dl className="picker-stats">
-            <dt>{t('sync.statLastSync')}</dt>
-            <dd>{lastSync ? formatTimeAgo(new Date(lastSync)) : '–'}</dd>
-            <dt>{t('sync.statDevices')}</dt>
-            <dd>{devices ? devices.devices.length : '–'}</dd>
-            <dt>{t('sync.statSpace')}</dt>
-            <dd>{reachable ? formatBytes(used, units) : '–'}</dd>
+        <div className="flex flex-col">
+          <div className="text-sm break-all mb-4 text-soft">{status.url}</div>
+          <dl className="start-stats">
+            <div>
+              <dt>{t('sync.statLastSync')}</dt>
+              <dd>{lastSync ? formatTimeAgo(new Date(lastSync)) : '–'}</dd>
+            </div>
+            <div>
+              <dt>{t('sync.statDevices')}</dt>
+              <dd>{devices ? devices.devices.length : '–'}</dd>
+            </div>
+            <div>
+              <dt>{t('sync.statSpace')}</dt>
+              <dd>{reachable ? formatBytes(used, units) : '–'}</dd>
+            </div>
           </dl>
           {status.unencrypted && <p className="text-xs mt-3 text-warning">{t('sync.unencryptedShort')}</p>}
 
           {devices && devices.devices.length > 0 && (
-            <div className="mt-5 -mx-2 min-h-0 overflow-y-auto overflow-x-hidden">
+            <div className="start-card-rule mt-4 pt-3 -mx-2">
               <div className="picker-label px-2">{t('sync.devices')}</div>
               <ul className="space-y-0.5">
                 {devices.devices.map((device) => {
@@ -211,7 +233,7 @@ export default function PickerServerPanel({ server }: { server: ServerState }) {
             </div>
           )}
 
-          <div className="mt-auto pt-5">
+          <div className="pt-4">
             {confirming === 'disconnect' ? (
               <InlineConfirm
                 message={t('sync.disconnectServerConfirm')}
@@ -226,6 +248,6 @@ export default function PickerServerPanel({ server }: { server: ServerState }) {
         </div>
       )}
       {error && <p className="text-xs mt-3 text-danger">{error}</p>}
-    </div>
+    </section>
   );
 }

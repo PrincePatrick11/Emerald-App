@@ -19,8 +19,7 @@ interface Props {
   leadWidth?: number;
   /** Off while a sidebar is being dragged to a new width. */
   animate?: boolean;
-  /** Over the vault picker: only the logo and the window buttons, without
-   *  maximising — the picker's window has one fixed size. */
+  /** Over the vault picker: only the logo and the window buttons. */
   picker?: boolean;
 }
 
@@ -170,7 +169,7 @@ export default function TitleBar({ tabs = false, leadWidth = 0, animate = true, 
       {/* `ml-auto` keeps the window controls at the right edge even when
           the tab bar renders nothing for lack of tabs. */}
       <div data-tauri-drag-region className="ml-auto flex items-center justify-end h-full flex-shrink-0">
-        {usesCustomWindowControls && <WindowControls canMaximize={!picker} />}
+        {usesCustomWindowControls && <WindowControls />}
       </div>
 
       {searchOpen && <SearchModal onClose={() => setSearchOpen(false)} />}

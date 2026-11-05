@@ -150,7 +150,7 @@ Where the code contradicts the rules above today. No prioritisation — each poi
 
 **5. Contrast of `--accent` as a fill mark.** `--accent` itself stays `#008a57` in Parchment (3.99:1 against the sheet), which holds 3:1 for icons and marks. Text uses `--accent-text`. *Cost: none unless it gets used for text again.*
 
-**6. The start page's choices are hand-written.** The theme list (`.start-option`, a row with its icon and, for a custom theme, a remove button) and the section tabs (`.start-tab`) set their active state through a `className` ternary rather than `Button`'s `tone`: neither is a generic action button, and `SettingsChoiceButton`'s chips do not fit a list of rows with a remove action. The language choice uses `.prop-segments`. *Cost: a list-row variant of `SettingsChoiceButton`, then switch the theme list over.*
+**6. The start page's choices are hand-written.** The theme list (`.start-option`, a row with its icon and, for a custom theme, a remove button) sets its active state through a `className` ternary rather than `Button`'s `tone`: it is no generic action button, and `SettingsChoiceButton`'s chips do not fit a list of rows with a remove action. The language choice uses `.prop-segments`. *Cost: a list-row variant of `SettingsChoiceButton`, then switch the theme list over.*
 
 ---
 

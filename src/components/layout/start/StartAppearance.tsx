@@ -14,8 +14,9 @@ const THEME_ICONS = { 'emerald-noctis': Moon, 'emerald-parchment': Sun } as cons
 type Status = { tone: 'error' | 'muted'; text: string } | null;
 
 /**
- * Language and theme of this installation (`deviceStore`), custom themes
- * included: import one from a JSON file, pick it, remove it.
+ * The start page's Appearance card: language and theme of this installation
+ * (`deviceStore`), custom themes included: import one from a JSON file, pick
+ * it, remove it.
  */
 export default function StartAppearance() {
   const { t } = useTranslation();
@@ -79,9 +80,10 @@ export default function StartAppearance() {
   );
 
   return (
-    <div className="space-y-6">
-      <section>
-        <h2 className="start-label">{t('settings.language')}</h2>
+    <section className="start-card space-y-4" aria-labelledby="start-appearance-heading">
+      <h2 id="start-appearance-heading" className="picker-heading">{t('start.appearance')}</h2>
+      <div>
+        <h3 className="start-label">{t('settings.language')}</h3>
         <div className="prop-segments prop-segments--fill" role="group" aria-label={t('settings.language')}>
           {LANGUAGE_OPTIONS.map(({ code, label }) => (
             <button
@@ -95,10 +97,10 @@ export default function StartAppearance() {
             </button>
           ))}
         </div>
-      </section>
+      </div>
 
-      <section>
-        <h2 className="start-label">{t('settings.theme')}</h2>
+      <div>
+        <h3 className="start-label">{t('settings.theme')}</h3>
         <ul className="space-y-0.5">
           {THEME_OPTIONS.map(({ id, label }) => {
             const Icon = THEME_ICONS[id];
@@ -125,7 +127,7 @@ export default function StartAppearance() {
         {status && (
           <p className={`text-xs mt-2 ${status.tone === 'error' ? 'text-danger' : 'text-muted'}`}>{status.text}</p>
         )}
-      </section>
-    </div>
+      </div>
+    </section>
   );
 }

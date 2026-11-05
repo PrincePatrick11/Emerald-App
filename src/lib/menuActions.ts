@@ -99,9 +99,9 @@ export async function runMenuAction(id: SelfContainedMenuActionId): Promise<void
     case 'switch-vault':
       void openVaultPicker();
       return;
-    // About and the updates are sections of the start page.
+    // About and the updates are on the start page.
     case 'show-about':
-      void openVaultPicker('about');
+      void openVaultPicker();
       return;
     case 'check-updates':
       void openVaultPicker('updates');

@@ -1231,8 +1231,8 @@
   "start": {
     "server": "Serveur",
     "appearance": "Apparence",
-    "updates": "Mises à jour",
-    "about": "À propos",
-    "sections": "Page d’accueil"
+    "links": "Liens",
+    "updateSettings": "Paramètres de mise à jour",
+    "version": "Version {{version}}"
   }
 }

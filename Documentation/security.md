@@ -16,13 +16,6 @@ Tauri 2 uses capability files to declare which permissions each window receives.
     "core:window:allow-destroy",
     "core:window:allow-unminimize",
     "core:window:allow-set-focus",
-    "core:window:allow-set-size",
-    "core:window:allow-set-min-size",
-    "core:window:allow-set-position",
-    "core:window:allow-set-resizable",
-    "core:window:allow-maximize",
-    "core:window:allow-unmaximize",
-    "core:window:allow-set-fullscreen",
     "core:webview:allow-set-webview-zoom",
     "dialog:allow-save",
     "dialog:allow-open",
@@ -34,7 +27,6 @@ Tauri 2 uses capability files to declare which permissions each window receives.
 
 - **`allow-start-dragging`, `allow-minimize`, `allow-toggle-maximize`, `allow-close`** serve the custom title bar: on Windows and Linux the window is undecorated, the HTML window buttons (`WindowControls.tsx`) drive it over IPC, and the bar starts window dragging. They widen what a compromised frontend could do only marginally (annoyance-level window manipulation, no data access).
 - **`allow-destroy`, `allow-unminimize`, `allow-set-focus`** serve the question about unsaved edits (see [Leaving an edit](architecture/editing.md#leaving-an-edit)). The last two make sure the question, asked while the window is minimised, is seen. `allow-destroy` is needed because with an `onCloseRequested` handler registered (`AppShell.tsx`), Tauri's JS API closes the window through `destroy()` once the handler returns without preventing it. `destroy` reaches the same windows `close` does and only skips the close-requested event — nothing a frontend that may already `close` could not do.
-- **`allow-set-size`, `allow-set-min-size`, `allow-set-position`, `allow-set-resizable`, `allow-maximize`, `allow-unmaximize`, `allow-set-fullscreen`** serve the start page (`lib/pickerWindow.ts`): it shrinks the window to a fixed size while it is up, leaving maximised or fullscreen first, and puts size, place and state back afterwards — fullscreen is needed for that way back. They let a compromised frontend move, resize and maximise its own window, or make it fullscreen: a window covering the whole screen could imitate the system or another app (a fake password prompt, say). That is the one risk here beyond annoyance; it reaches no data, and the frontend could draw such a prompt inside the window anyway.
 - **`core:webview:allow-set-webview-zoom`** backs the interface-size setting: `applyUIScale()` in `src/themes/theme.ts` calls `getCurrentWebview().setZoom(scale / 100)`. It only scales rendering — no data access.
 - **`dialog:allow-message`** backs the native success/error popups (`message()` from `@tauri-apps/plugin-dialog`) that export/import report through (`src/lib/export.ts`, `src/lib/emeraldFormat.ts`, `src/lib/altarExport.ts`).
 - **No SQL permissions.** The database is reached through the app's own commands (`db_*`), which need no capability entry, not through a plugin. What the webview can do with SQL is bounded in Rust instead: by vault id instead of path, and by an authorizer on every connection (see [Vault Encryption](#vault-encryption)).

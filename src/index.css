@@ -703,56 +703,104 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
     border-color: var(--border-strong);
   }
 
-  /* ── Vault picker ───────────────────────────────────────────────────────
-     Two columns in the picker's small window: the vaults on the sheet, the
-     server on the frame beside it — the shell's own frame and sheet, so the
-     picker reads as the same app. The rows are list rows (rounded-md), not
-     cards, and deliberately not .panel/.panel-interactive: those carry
-     per-theme overrides (html[data-theme=…] .panel, 0-2-1) that outrank any
-     modifier on top (design.md, Specificity Traps). */
+  /* ── Start page (the vault picker) ─────────────────────────────────────
+     The whole window, as the shell is: the brand on the frame at the left,
+     one sheet beside it with the cards (vaults; server and appearance) and
+     the version at its foot. The cards are `.start-card`, not `.panel`:
+     `.panel` carries per-theme overrides (html[data-theme=…] .panel, 0-2-1)
+     that outrank any modifier on top (design.md, Specificity Traps). The
+     vault rows are list rows (rounded-md), not cards. */
   .picker-frame {
-    padding: 0 var(--sheet-inset) var(--sheet-inset) var(--sheet-inset);
+    padding: 0 var(--sheet-inset) var(--sheet-inset) 0;
   }
 
   .picker-sheet {
-    flex: 1 1 0%;
+    @apply flex-1 min-h-0;
   }
 
-  .picker-side {
-    @apply flex flex-col min-h-0;
-    width: 340px;
-    flex-shrink: 0;
-    /* The sheet's border plus its header's padding: the tabs and the list's
-       heading on one line. */
-    padding: 17px 14px 14px 20px;
+  .start-brand {
+    @apply flex flex-col shrink-0 overflow-y-auto;
+    width: clamp(260px, 30vw, 440px);
+    padding: 40px 40px 24px 48px;
   }
 
-  /* One section at a time; it scrolls on its own, the tabs stay. */
-  .picker-side-body {
-    @apply flex flex-col flex-1 min-h-0 overflow-y-auto overflow-x-hidden pt-5;
-  }
-
-  /* The sections of the start page: pills like the tab strip's, on the frame. */
-  .start-tabs {
-    @apply flex items-center gap-0.5 h-[30px];
-  }
-
-  .start-tab {
-    @apply h-[26px] px-2.5 rounded-md text-xs transition-colors duration-150;
-    color: var(--text-subtle);
-  }
-
-  .start-tab:hover {
-    background-color: var(--tab-pill-hover);
-    color: var(--text-secondary);
-  }
-
-  .start-tab.start-tab-active {
-    background-color: var(--tab-pill-active);
+  .start-brand-title {
+    @apply font-serif font-medium;
+    font-size: 44px;
+    line-height: 1.05;
     color: var(--text-primary);
   }
 
-  .start-tab:focus-visible,
+  .start-brand-tagline {
+    @apply font-serif text-lg;
+    max-width: 22rem;
+    color: var(--text-muted);
+  }
+
+  .start-back-row {
+    @apply flex items-center shrink-0 px-8 pt-5;
+    min-height: 2.75rem;
+  }
+
+  /* Vaults beside server and appearance; one column below 1080px. Only
+     this scrolls, the foot stays. */
+  .start-grid {
+    @apply grid flex-1 min-h-0 gap-5 overflow-y-auto px-8 pt-3 pb-5;
+    grid-template-columns: minmax(0, 3fr) minmax(300px, 2fr);
+    align-content: start;
+    align-items: start;
+  }
+
+  @media (max-width: 1080px) {
+    .start-grid {
+      grid-template-columns: minmax(0, 1fr);
+    }
+  }
+
+  .start-column {
+    @apply flex flex-col gap-5 min-w-0;
+  }
+
+  .start-card {
+    @apply rounded-xl p-5 min-w-0 border;
+    background-color: var(--panel-bg);
+    border-color: var(--panel-border);
+  }
+
+  .start-card-head {
+    @apply flex items-center justify-between gap-3 mb-4;
+  }
+
+  .start-card-rule {
+    @apply border-t;
+    border-color: var(--edge);
+  }
+
+  .start-stats {
+    @apply grid grid-cols-3 gap-3;
+  }
+
+  /* Value first to the eye, its name under it, with the name still first in
+     the markup for screen readers. */
+  .start-stats > div {
+    @apply flex flex-col-reverse gap-0.5 min-w-0;
+  }
+
+  .start-stats dt {
+    @apply text-[11px] truncate;
+    color: var(--text-subtle);
+  }
+
+  .start-stats dd {
+    @apply text-lg font-medium tabular-nums truncate;
+    color: var(--text-primary);
+  }
+
+  .start-foot {
+    @apply flex items-center justify-end gap-2 shrink-0 px-8 pb-4 pt-1 text-xs;
+    color: var(--text-subtle);
+  }
+
   .start-option:focus-visible,
   .start-option-remove:focus-visible,
   .picker-device-remove:focus-visible,
@@ -813,10 +861,6 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
     @apply text-xs whitespace-pre-wrap font-sans max-h-32 overflow-y-auto rounded-md p-2;
     background-color: var(--bg-surface-1);
     color: var(--text-muted);
-  }
-
-  .start-link {
-    @apply flex items-center justify-center w-8 h-8 rounded-md transition-colors;
   }
 
   .picker-heading {
@@ -973,11 +1017,6 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
     color: var(--danger-text);
   }
 
-  .picker-footer {
-    @apply flex items-center px-3 py-2.5 border-t;
-    border-color: var(--sheet-border);
-  }
-
   .picker-empty {
     @apply flex flex-col items-center justify-center gap-3 py-16 text-sm text-center;
     color: var(--text-muted);
@@ -987,7 +1026,6 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
     .picker-row,
     .picker-row-actions,
     .picker-device-remove,
-    .start-tab,
     .start-option,
     .start-option-remove {
       transition: none;
@@ -3011,24 +3049,38 @@ html[data-theme] .settings-nav-item-idle {
   border-color: transparent;
 }
 
-/* The four icon links in the About section. Everything from theme tokens instead of
-   stone-/jade utilities, otherwise every colour here drags along another
-   Parchment bridge. The attribute selector in front for the same reason as a
-   rule further up: Parchment pre-colours every border, and at equal
-   specificity the later rule wins. The focus ring is mandatory — Noctis
-   has no generic button:focus-visible rule. */
-html[data-theme] .settings-about-link {
-  color: var(--accent-text);
+/* The four links under the start page's brand. Everything from theme tokens
+   instead of stone-/jade utilities, otherwise every colour here drags along
+   another Parchment bridge. The attribute selector in front for the same
+   reason as a rule further up: Parchment pre-colours every border, and at
+   equal specificity the later rule wins. The focus ring is mandatory —
+   Noctis has no generic button:focus-visible rule. */
+html[data-theme] .start-brand-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 30px;
+  padding: 0 10px;
+  border-radius: 8px;
+  font-size: 13px;
+  color: var(--text-muted);
+  transition: color 150ms, background-color 150ms;
 }
 
-html[data-theme] .settings-about-link:hover {
-  color: color-mix(in srgb, var(--accent) 78%, var(--text-primary));
+html[data-theme] .start-brand-link:hover {
+  color: var(--text-primary);
+  background-color: var(--interactive-hover);
 }
 
-html[data-theme] .settings-about-link:focus-visible {
+html[data-theme] .start-brand-link:focus-visible {
   outline: none;
-  border-radius: 4px;
   box-shadow: 0 0 0 2px var(--focus-ring);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html[data-theme] .start-brand-link {
+    transition: none;
+  }
 }
 
 .context-menu-item-default:hover {
