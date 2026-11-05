@@ -720,13 +720,12 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
   }
 
   /* Its width is the picker's (`VaultPicker`, dragged at the handle). */
-  /* Top and bottom line up with the sheet beside it: the mark starts where
-     the way back does (the sheet's 1px border, then `.start-back-row`), the
-     foot sits on the line of the sheet's foot (its border and 12px under a
-     28px row; the frame's inset is below both). */
+  /* The bottom padding lines its foot up with the sheet's: the frame's inset
+     is below both, then the sheet's 1px border and the foot's own 12px under
+     a 28px row. */
   .start-brand {
     @apply flex flex-col shrink-0 overflow-y-auto;
-    padding: 24px 32px 13px 32px;
+    padding: 40px 32px 13px 32px;
   }
 
   .start-brand-title {
