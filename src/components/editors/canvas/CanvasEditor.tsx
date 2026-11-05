@@ -20,7 +20,8 @@ import { byZ, type CanvasAddition, type CanvasElement, type CanvasGrid, type Can
 import CanvasToolbar, { CanvasZoom } from './CanvasToolbar';
 import TextEditOverlay from './TextEditOverlay';
 import PaintSurface from './paint/PaintSurface';
-import PaintToolbar, { PAINT_TOOL_DEFS, toolEnabled } from './paint/PaintToolbar';
+import PaintToolbar, { PAINT_TOOL_DEFS, PaintToolRail, toolEnabled } from './paint/PaintToolbar';
+import LayerPanel from './paint/LayerPanel';
 import { isSelectTool, usePaintBrush, usePaintControls } from './paint/usePaintTools';
 import { FULL_PAINT_FEATURES, type PaintFeatures } from './paint/features';
 import { emptyPaintDoc, type PaintDoc } from '../../../lib/paint/document';
@@ -152,6 +153,8 @@ const CanvasEditor = forwardRef<CanvasEditorHandle, CanvasEditorProps>(function 
   const [marquee, setMarquee] = useState<Box | null>(null);
   const [editingTextId, setEditingTextId] = useState<string | null>(null);
   const [paintingIdState, setPaintingId] = useState<string | null>(null);
+  /** The layer panel of the paint mode, open or not; it stays so between drawings. */
+  const [layersOpen, setLayersOpen] = useState(false);
   const paintingId = paintElementId ?? paintingIdState;
   const [spaceDown, setSpaceDown] = useState(false);
   const [hoveredId, setHoveredId] = useState<string | null>(null);
@@ -770,6 +773,8 @@ const CanvasEditor = forwardRef<CanvasEditorHandle, CanvasEditorProps>(function 
               api={paintControls}
               features={paintFeatures}
               palette={paint.palette}
+              layersOpen={layersOpen}
+              onToggleLayers={() => setLayersOpen((v) => !v)}
               end={!paintElementId && (
                 <ToolbarBtn onClick={() => setPaintingId(null)} active={false} title={t('canvas.donePainting')}>
                   <Check size={14} />
@@ -935,6 +940,10 @@ const CanvasEditor = forwardRef<CanvasEditorHandle, CanvasEditorProps>(function 
             images={layerImages}
             editable={layerImages.size >= paintControls.doc.layers.filter((l) => l.image).length}
           />
+        )}
+        {editable && painting && paintType && <PaintToolRail api={paintControls} features={paintFeatures} />}
+        {editable && painting && paintType && paintFeatures.layers && layersOpen && (
+          <LayerPanel api={paintControls} images={layerImages} onClose={() => setLayersOpen(false)} />
         )}
         {editable && features.zoom && <CanvasZoom controller={controller} />}
         {overlay}

@@ -9,7 +9,6 @@ import {
 } from '../../../../lib/paint/document';
 import PopoverButton from '../../shared/PopoverButton';
 import { ToolbarBtn, ToolbarDivider, ToolbarGroup } from '../../shared/toolbarParts';
-import LayerPanel from './LayerPanel';
 import type { PaintFeatures } from './features';
 import type { EditorTool, PaintControls } from './usePaintTools';
 
@@ -53,23 +52,56 @@ export function toolEnabled(tool: EditorTool, features: PaintFeatures): boolean 
   }
 }
 
+/** The tools in a column, laid over the drawing's left edge: what works on the drawing, what draws, and the bucket, eraser and picker. */
+export function PaintToolRail({ api, features }: { api: PaintControls; features: PaintFeatures }) {
+  const { t } = useTranslation();
+  const groups = [
+    EDIT_TOOL_DEFS,
+    DRAW_TOOL_DEFS.filter((d) => d.tool !== 'fill' && d.tool !== 'eraser' && d.tool !== 'picker'),
+    DRAW_TOOL_DEFS.filter((d) => d.tool === 'fill' || d.tool === 'eraser' || d.tool === 'picker'),
+  ].map((defs) => defs.filter((d) => toolEnabled(d.tool, features))).filter((defs) => defs.length);
+  return (
+    <div className="editor-toolbar paint-rail" role="toolbar" aria-orientation="vertical" aria-label={t('editor.paint.toolsLabel')}>
+      {groups.map((defs, i) => (
+        <div key={i} className="paint-rail-group">
+          {i > 0 && <div className="paint-rail-divider" />}
+          {defs.map(({ tool, icon: Icon, key }) => (
+            <ToolbarBtn
+              key={tool}
+              onClick={() => api.setTool(tool)}
+              active={api.tool === tool}
+              title={`${t(`editor.paint.tools.${tool}`)} (${key.toUpperCase()})`}
+            >
+              <Icon size={15} />
+            </ToolbarBtn>
+          ))}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 /**
  * The canvas editor's bar in the paint mode, in the app's toolbar style
- * (`.editor-toolbar`, shared buttons from `editors/shared/`). It shows what
- * the paint features switch on, in the order of drawing: undo and redo, the
- * tools that select and move, the drawing tools and the picker, colour and
- * size of the brush, the layers, and emptying and leaving the paint mode at
- * the far end.
+ * (`.editor-toolbar`, shared buttons from `editors/shared/`); the tools
+ * themselves are in `PaintToolRail`. What is always there keeps its place:
+ * undo and redo, colour and size of the brush, symmetry and the layer
+ * panel's switch. What only the picked tool has (filled or outlined, the
+ * corners of a polygon or points of a star) comes after them, so showing it
+ * moves nothing; emptying and leaving the paint mode are at the far end.
  */
-export default function PaintToolbar({ api, features, palette, end }: {
+export default function PaintToolbar({ api, features, palette, layersOpen, onToggleLayers, end }: {
   api: PaintControls;
   features: PaintFeatures;
   palette: readonly string[];
+  layersOpen: boolean;
+  onToggleLayers: () => void;
   /** At the far end, after clearing: leaving the paint mode. */
   end?: ReactNode;
 }) {
   const { t } = useTranslation();
-  const shortcut = (label: string, key: string) => `${label} (${key.toUpperCase()})`;
+  const boxShape = features.shapes && isBoxShape(api.tool);
+  const cornered = features.shapes && (api.tool === 'polygon' || api.tool === 'star');
 
   return (
     <div className="editor-toolbar paint-toolbar">
@@ -81,68 +113,6 @@ export default function PaintToolbar({ api, features, palette, end }: {
           <Redo size={14} />
         </ToolbarBtn>
       </ToolbarGroup>
-
-      {features.select && (<>
-        <ToolbarDivider />
-        <ToolbarGroup>
-          {EDIT_TOOL_DEFS.filter((d) => toolEnabled(d.tool, features)).map(({ tool, icon: Icon, key }) => (
-            <ToolbarBtn
-              key={tool}
-              onClick={() => api.setTool(tool)}
-              active={api.tool === tool}
-              title={shortcut(t(`editor.paint.tools.${tool}`), key)}
-            >
-              <Icon size={14} />
-            </ToolbarBtn>
-          ))}
-        </ToolbarGroup>
-      </>)}
-      <ToolbarDivider />
-      <ToolbarGroup>
-        {DRAW_TOOL_DEFS.filter((d) => toolEnabled(d.tool, features)).map(({ tool, icon: Icon, key }) => (
-          <ToolbarBtn
-            key={tool}
-            onClick={() => api.setTool(tool)}
-            active={api.tool === tool}
-            title={shortcut(t(`editor.paint.tools.${tool}`), key)}
-          >
-            <Icon size={14} />
-          </ToolbarBtn>
-        ))}
-      </ToolbarGroup>
-
-      {((features.shapes && isBoxShape(api.tool)) || features.symmetry) && (<>
-        <ToolbarDivider />
-        <ToolbarGroup>
-          {features.shapes && isBoxShape(api.tool) && (
-            <ToolbarBtn
-              onClick={() => api.setFilled(!api.filled)}
-              active={api.filled}
-              title={t(api.filled ? 'editor.paint.filled' : 'editor.paint.outlined')}
-            >
-              {api.filled ? <Square size={14} fill="currentColor" /> : <SquareDashed size={14} />}
-            </ToolbarBtn>
-          )}
-          {features.shapes && (api.tool === 'polygon' || api.tool === 'star') && (
-            <Stepper
-              value={api.sides}
-              min={MIN_SIDES}
-              max={MAX_SIDES}
-              onChange={api.setSides}
-              label={t(api.tool === 'star' ? 'editor.paint.points' : 'editor.paint.corners')}
-            />
-          )}
-          {features.symmetry && (
-            <PopoverButton
-              icon={<FlipHorizontal2 size={14} />}
-              title={t('editor.paint.symmetry.title')}
-              active={api.symmetry.kind !== 'off'}
-            >
-              {(close) => <SymmetryPanel value={api.symmetry} onChange={api.setSymmetry} close={close} />}
-            </PopoverButton>
-          )}
-        </ToolbarGroup>
-      </>)}
 
       <ToolbarDivider />
       <ToolbarGroup>
@@ -200,11 +170,47 @@ export default function PaintToolbar({ api, features, palette, end }: {
         </PopoverButton>
       </ToolbarGroup>
 
-      {features.layers && (<>
+      {(features.symmetry || features.layers) && (<>
         <ToolbarDivider />
-        <PopoverButton icon={<Layers size={14} />} title={t('editor.paint.layers')} active={api.doc.layers.length > 1}>
-          {() => <LayerPanel api={api} />}
-        </PopoverButton>
+        <ToolbarGroup>
+          {features.symmetry && (
+            <PopoverButton
+              icon={<FlipHorizontal2 size={14} />}
+              title={t('editor.paint.symmetry.title')}
+              active={api.symmetry.kind !== 'off'}
+            >
+              {(close) => <SymmetryPanel value={api.symmetry} onChange={api.setSymmetry} close={close} />}
+            </PopoverButton>
+          )}
+          {features.layers && (
+            <ToolbarBtn onClick={onToggleLayers} active={layersOpen} title={t('editor.paint.layers')}>
+              <Layers size={14} />
+              {api.doc.layers.length > 1 && <span className="editor-toolbar-btn-label tabular-nums">{api.doc.layers.length}</span>}
+            </ToolbarBtn>
+          )}
+        </ToolbarGroup>
+      </>)}
+
+      {boxShape && (<>
+        <ToolbarDivider />
+        <ToolbarGroup>
+          <ToolbarBtn
+            onClick={() => api.setFilled(!api.filled)}
+            active={api.filled}
+            title={t(api.filled ? 'editor.paint.filled' : 'editor.paint.outlined')}
+          >
+            {api.filled ? <Square size={14} fill="currentColor" /> : <SquareDashed size={14} />}
+          </ToolbarBtn>
+          {cornered && (
+            <Stepper
+              value={api.sides}
+              min={MIN_SIDES}
+              max={MAX_SIDES}
+              onChange={api.setSides}
+              label={t(api.tool === 'star' ? 'editor.paint.points' : 'editor.paint.corners')}
+            />
+          )}
+        </ToolbarGroup>
       </>)}
 
       <div className="editor-toolbar-end">
