@@ -31,6 +31,8 @@ export default defineConfig(async () => ({
           // BlockStack (both lazy) need Tiptap.
           if (/[\\/]node_modules[\\/](react|react-dom|scheduler)[\\/]/.test(id)) return "react";
           if (id.includes("@tiptap") || id.includes("prosemirror")) return "tiptap";
+          // The builder's canvas (Konva with its React renderer), only for the altar.
+          if (/[\\/]node_modules[\\/](konva|react-konva|react-reconciler|its-fine)[\\/]/.test(id)) return "konva";
           if (id.includes("@tauri-apps")) return "tauri";
           if (id.includes("i18next")) return "i18n";
           // No catch-all "vendor" chunk any more: it forced turndown, marked

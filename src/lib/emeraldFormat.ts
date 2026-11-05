@@ -32,6 +32,7 @@ import {
 import { definitionById } from './blockDefinitionRows';
 import { entryBlockSummary } from './blocks/entrySummary';
 import { generateId, nowIso } from './helpers';
+import { altarElementsJson, isDrawn, withNewElementIds } from './altarElements';
 import i18n from '../i18n';
 import { buildLinkItems, linkItemKey, linkItemsByKey } from './linkItems';
 import {
@@ -354,6 +355,8 @@ interface EmeraldMeta {
     locked: boolean;
     hidden: boolean;
   }>;
+  /** The shapes and text drawn on the altar, as in `altars.elements` (`lib/altarElements.ts`). */
+  altarElements?: unknown[];
 }
 
 /** The file types that open a module — everything except the template. */
@@ -567,7 +570,7 @@ async function exportAltarAsEmerald(): Promise<void> {
     } catch { /* skip missing file */ }
   }
 
-  const placedItemIds = new Set(placements.map(p => p.item_id));
+  const placedItemIds = new Set(placements.filter(p => !isDrawn(p)).map(p => p.item_id));
   const altarItems = items.filter(i => placedItemIds.has(i.id));
   const usedCategoryIds = new Set(altarItems.map(i => i.category_id));
   const usedCategories = categories.filter(c => usedCategoryIds.has(c.id));
@@ -601,7 +604,8 @@ async function exportAltarAsEmerald(): Promise<void> {
       imageData: i.image_data ?? undefined,
       createdAt: i.created_at,
     })),
-    altarPlacements: placements.map(p => ({
+    altarElements: JSON.parse(altarElementsJson(placements)) as unknown[],
+    altarPlacements: placements.filter(p => !isDrawn(p)).map(p => ({
       itemId: p.item_id, x: p.x, y: p.y, z_index: p.z_index, width: p.width, height: p.height,
       rotation: p.rotation, opacity: p.opacity, locked: p.locked, hidden: p.hidden,
     })),
@@ -1222,6 +1226,10 @@ async function importAltarEntry(file: EmeraldFile): Promise<string> {
           toInt(placementMeta.hidden),
         ],
       );
+    }
+
+    if (meta.altarElements?.length) {
+      await db.execute('UPDATE altars SET elements=$1 WHERE id=$2', [withNewElementIds(meta.altarElements, altar.id), altar.id]);
     }
 
     // Grid and format stamp "now" when writing — in the end, as with the

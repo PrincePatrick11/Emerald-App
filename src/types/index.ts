@@ -109,9 +109,41 @@ export interface AltarItem {
   updated_at: string;
 }
 
+/**
+ * What sits on an altar: an item from the library (a row of
+ * `altar_placements`), or a shape or text drawn on the altar itself (kept in
+ * `altars.elements`, see `lib/altarElements.ts`). The store holds both in one
+ * list so stacking, the sidebar and the edit snapshot treat them alike.
+ */
+export type AltarPlacementKind = 'item' | 'shape' | 'text';
+
+export type AltarShapeType = 'rect' | 'ellipse' | 'triangle' | 'star' | 'hexagon';
+
+/** A drawn shape. Sizes in pixels at the reference width of 1920. */
+export interface AltarShapeStyle {
+  type: AltarShapeType;
+  fill: string | null;
+  stroke: string | null;
+  stroke_width: number;
+  corner_radius: number;
+}
+
+/** A drawn text. The size in pixels at the reference width of 1920. */
+export interface AltarTextStyle {
+  content: string;
+  font: 'serif' | 'book' | 'sans';
+  size: number;
+  color: string;
+  align: 'left' | 'center' | 'right';
+  bold: boolean;
+  italic: boolean;
+}
+
 export interface AltarPlacement {
   id: string;
   altar_id?: string;
+  kind: AltarPlacementKind;
+  /** The library item; empty for a shape or text. */
   item_id: string;
   // name, emoji, category_id and image_data come from altar_items and are
   // joined in on load — they are not columns of altar_placements.
@@ -129,6 +161,10 @@ export interface AltarPlacement {
   locked: boolean;
   hidden: boolean;
   image_data?: string;
+  /** Only for `kind: 'shape'`. */
+  shape?: AltarShapeStyle;
+  /** Only for `kind: 'text'`. */
+  text?: AltarTextStyle;
 }
 
 export type TaskPriority = 'low' | 'medium' | 'high';

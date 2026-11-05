@@ -560,6 +560,56 @@
     },
     "unsaved": "Unsaved changes"
   },
+  "builder": {
+    "newText": "Text",
+    "addShape": "Add shape",
+    "addText": "Add text",
+    "shape": {
+      "rect": "Rectangle",
+      "ellipse": "Ellipse",
+      "triangle": "Triangle",
+      "star": "Star",
+      "hexagon": "Hexagon"
+    },
+    "fill": "Fill",
+    "outline": "Outline",
+    "outlineWidth": "Width",
+    "cornerRadius": "Corners",
+    "noColor": "None",
+    "customColor": "Other colour…",
+    "fontTitle": "Font",
+    "fontMixed": "Fonts",
+    "font": {
+      "serif": "Garamond",
+      "book": "Lora",
+      "sans": "Inter"
+    },
+    "fontSize": "Font size",
+    "textColor": "Text colour",
+    "arrange": "Arrange",
+    "toFront": "Bring to front",
+    "forward": "Bring forward",
+    "backward": "Send backward",
+    "toBack": "Send to back",
+    "alignSelection": "Align selection",
+    "alignArtboard": "Align on the canvas",
+    "align": {
+      "left": "Left edges",
+      "hcenter": "Centres across",
+      "right": "Right edges",
+      "top": "Top edges",
+      "vcenter": "Centres down",
+      "bottom": "Bottom edges"
+    },
+    "distributeHorizontal": "Even gaps across",
+    "distributeVertical": "Even gaps down",
+    "duplicate": "Duplicate",
+    "remove": "Remove",
+    "zoomIn": "Zoom in",
+    "zoomOut": "Zoom out",
+    "fit": "Fit to view",
+    "export": "Save as PNG"
+  },
   "moonPhase": {
     "new": "New Moon",
     "waxing_crescent": "Waxing Crescent",

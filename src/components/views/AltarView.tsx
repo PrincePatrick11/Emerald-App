@@ -20,7 +20,6 @@ import {
 } from '../../store/altarEdit';
 import { usePersistedFlag } from '../../hooks/usePersistedFlag';
 import { useDisplayedAltar } from '../../hooks/useDisplayedAltar';
-import { getAltarBackgroundStyle, DEFAULT_ALTAR_RESOLUTION, parseResolution, isRatioFormat } from '../../lib/altarConstants';
 import type { AltarItem, AltarRecord } from '../../types';
 import Dashboard, { GroupDivider } from '../ui/Dashboard';
 import { SortSelect } from '../ui/ListToolbar';
@@ -35,6 +34,7 @@ import { AltarItemModal } from '../altar/AltarItemModal';
 import { AltarLibrarySection } from '../altar/AltarLibrarySection';
 import { AltarCard, AltarListRow, buildAltarContextMenuActions } from '../altar/AltarCard';
 import { imageSrc } from '../../lib/images';
+import { saveAltarImage } from '../../lib/altarExport';
 import { useSessionState } from '../../store/sessionStore';
 import { createItem } from '../../lib/createItem';
 
@@ -80,10 +80,6 @@ export default function AltarView() {
   // The library in the dashboard: the element modal lives here because its
   // button sits in the dashboard header.
   const [itemModal, setItemModal] = useState<{ item: AltarItem | null; categoryId: string | null } | null>(null);
-  const viewportRef = useRef<HTMLDivElement>(null);
-  // ref keeps ResizeObserver callback current without re-observing on fullscreen toggle
-  const altarWindowFullscreenRef = useRef(altarWindowFullscreen);
-  const [canvasTransform, setCanvasTransform] = useState<{ scale: number; offsetX: number; offsetY: number; nativeW: number; nativeH: number }>({ scale: 1, offsetX: 0, offsetY: 0, nativeW: 1920, nativeH: 1080 });
   // Set while "Done" or Cancel end the edit: its end then belongs to the
   // handler, and the teardown of the editing effect below (saving the title,
   // capturing the thumbnail) does nothing.
@@ -164,8 +160,6 @@ export default function AltarView() {
     if (isEditing && activeAltar) void beginAltarEdit(activeAltar.id);
   }, [isEditing, activeAltar?.id]);
 
-  useEffect(() => { altarWindowFullscreenRef.current = altarWindowFullscreen; }, [altarWindowFullscreen]);
-
   // Fullscreen applies to the one altar being viewed: editing, the dashboard
   // and any navigating away end it — otherwise the next altar visit (even the
   // dashboard, with no button to leave) would be in it again.
@@ -182,29 +176,6 @@ export default function AltarView() {
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
   }, [altarWindowFullscreen, setAltarWindowFullscreen]);
-
-  useEffect(() => {
-    const el = viewportRef.current;
-    if (!el) return;
-    const res = activeAltar?.resolution ?? DEFAULT_ALTAR_RESOLUTION;
-    const obs = new ResizeObserver(([entry]) => {
-      const { width, height } = entry.contentRect;
-      if (isRatioFormat(res)) {
-        const [rw, rh] = res.split(':').map(Number);
-        const fitW = Math.min(width, height * rw / rh);
-        const fitH = fitW * rh / rw;
-        const nativeW = Math.round(fitW);
-        const nativeH = Math.round(fitH);
-        setCanvasTransform({ scale: 1, offsetX: (width - nativeW) / 2, offsetY: altarWindowFullscreenRef.current ? (height - nativeH) / 2 : 0, nativeW, nativeH });
-      } else {
-        const { w, h } = parseResolution(res);
-        const s = Math.min(width / w, height / h);
-        setCanvasTransform({ scale: s, offsetX: (width - w * s) / 2, offsetY: altarWindowFullscreenRef.current ? (height - h * s) / 2 : 0, nativeW: w, nativeH: h });
-      }
-    });
-    obs.observe(el);
-    return () => obs.disconnect();
-  }, [activeAltar?.id, activeAltar?.resolution]);
 
   const openNewElement = (categoryId?: string) =>
     setItemModal({ item: null, categoryId: categoryId ?? null });
@@ -495,7 +466,7 @@ export default function AltarView() {
         </div>
       )}
 
-      <div ref={viewportRef} className="flex-1 relative overflow-hidden min-h-0">
+      <div className="flex-1 relative overflow-hidden min-h-0">
         {/* The fullscreen button sits at the top of the right sidebar.
             Floating here only where the bar is missing:
             in fullscreen (otherwise there would be no way back) and with
@@ -513,32 +484,14 @@ export default function AltarView() {
             </Button>
           </div>
         )}
-        <div style={{
-          position: 'absolute',
-          width: canvasTransform.nativeW,
-          height: canvasTransform.nativeH,
-          transformOrigin: '0 0',
-          transform: `translate(${canvasTransform.offsetX}px, ${canvasTransform.offsetY}px) scale(${canvasTransform.scale})`,
-        }}>
-          <AltarCanvas
-            altar={activeAltar}
-            backgroundSrc={backgroundSrc}
-            editable={isEditing}
-            showGrid={activeAltar.grid_enabled}
-            gridSize={activeAltar.grid_size}
-            gridOpacity={activeAltar.grid_opacity}
-            gridColor={activeAltar.grid_color}
-            snapToGrid={activeAltar.snap_to_grid}
-            rotationSnapEnabled={activeAltar.rotation_snap_enabled}
-            rotationSnapAngle={activeAltar.rotation_snap_angle}
-            snapScaleToGrid={activeAltar.snap_scale_to_grid}
-            resolution={activeAltar.resolution}
-            nativeW={canvasTransform.nativeW}
-            nativeH={canvasTransform.nativeH}
-            cssScale={canvasTransform.scale}
-            getBackgroundStyle={getAltarBackgroundStyle}
-          />
-        </div>
+        <AltarCanvas
+          key={activeAltar.id}
+          altar={activeAltar}
+          backgroundSrc={backgroundSrc || null}
+          editable={isEditing}
+          readAlign={altarWindowFullscreen ? 'center' : 'top'}
+          onExport={() => { void saveAltarImage('png').catch(console.error); }}
+        />
       </div>
 
       {isEditing && !altarWindowFullscreen && <AltarLibraryStrip editable={isEditing} />}

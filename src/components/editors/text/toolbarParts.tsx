@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 
 /** The buttons of the toolbar, the selection menus and the find bar. */
 export function ToolbarGroup({ children }: { children: ReactNode }) {
@@ -37,5 +37,35 @@ export function ToolbarBtn({
     >
       {children}
     </button>
+  );
+}
+
+/**
+ * A toolbar button with a small panel hanging under it (`.editor-toolbar-popover`).
+ * A click elsewhere closes it; the panel gets `close` to close itself.
+ */
+export function PopoverButton({ icon, title, active, children }: {
+  icon: ReactNode;
+  title: string;
+  active: boolean;
+  children: (close: () => void) => ReactNode;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e: MouseEvent) => { if (!ref.current?.contains(e.target as Node)) setOpen(false); };
+    document.addEventListener('mousedown', onDown);
+    return () => document.removeEventListener('mousedown', onDown);
+  }, [open]);
+
+  return (
+    <div ref={ref} className="relative">
+      <ToolbarBtn onClick={() => setOpen((v) => !v)} active={active || open} title={title}>
+        {icon}
+      </ToolbarBtn>
+      {open && <div className="editor-selection-menu editor-toolbar-popover">{children(() => setOpen(false))}</div>}
+    </div>
   );
 }

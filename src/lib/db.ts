@@ -1425,6 +1425,17 @@ export const MIGRATIONS: Migration[] = [
       await createIndexesIfMissing(db, ENTRIES_INDEX_DDL);
     },
   },
+  {
+    // Shapes and text drawn on an altar (`lib/altarElements.ts`): a JSON list,
+    // since they hang on no library item. Additive and repeatable.
+    version: 56,
+    name: 'altar_elements',
+    up: async (db) => {
+      if (!(await columnNames(db, 'altars')).has('elements')) {
+        await db.execute("ALTER TABLE altars ADD COLUMN elements TEXT NOT NULL DEFAULT '[]'");
+      }
+    },
+  },
 ];
 
 async function altarSettingsToJson(db: Database): Promise<void> {

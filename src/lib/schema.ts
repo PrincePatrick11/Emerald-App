@@ -21,7 +21,7 @@ import type Database from './sqlite';
  * Must match the highest version in MIGRATIONS. `db.ts` checks this at
  * startup so that a new migration step cannot be forgotten.
  */
-export const BASELINE_VERSION = 55;
+export const BASELINE_VERSION = 56;
 
 /**
  * Tables in dependency order: parents before children.
@@ -135,7 +135,9 @@ export const TABLE_DDL: Record<TableName, string> = {
 
   // `settings` (since v51) is JSON: background, grid, snapping and
   // resolution (`lib/altarSettings.ts`) — formerly twelve columns of their own. The
-  // image columns remain columns, the image cleanup looks there.
+  // image columns remain columns, the image cleanup looks there. `elements`
+  // (since v56) is JSON too: the shapes and text drawn on the altar
+  // (`lib/altarElements.ts`).
   altars: `
     CREATE TABLE altars (
       id TEXT PRIMARY KEY,
@@ -146,7 +148,8 @@ export const TABLE_DDL: Record<TableName, string> = {
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL,
       deleted_at TEXT,
-      settings TEXT NOT NULL DEFAULT '{}'
+      settings TEXT NOT NULL DEFAULT '{}',
+      elements TEXT NOT NULL DEFAULT '[]'
     )`,
 
   // Journal entries, wiki articles and operations in one table (since v49;

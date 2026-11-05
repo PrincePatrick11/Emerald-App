@@ -65,11 +65,13 @@
     "dompurify": "^3.4.0",
     "framer-motion": "^12.39.0",
     "i18next": "^25.2.1",
+    "konva": "^10.9.1",
     "lucide-react": "^0.511.0",
     "marked": "^17.0.4",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "react-i18next": "^15.5.2",
+    "react-konva": "~19.2.7",
     "react-router-dom": "^7.6.2",
     "turndown": "^7.2.0",
     "zustand": "^5.0.5"

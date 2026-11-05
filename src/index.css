@@ -2312,6 +2312,160 @@ html[data-theme] .prop-segment--active {
   background: var(--border-soft);
 }
 
+/* ── Builder (editors/builder) ──────────────────────────────────────────────
+   The stage fills the place it is embedded in: the toolbar strip on top while
+   editing, below it the viewport with the artboard. The artboard's background
+   is DOM behind the canvas; the canvas draws the grid, the elements and the
+   handles. While editing, the area around the artboard is a quiet well. */
+.builder-editor {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  outline: none;
+}
+.builder-toolbar-strip {
+  flex-shrink: 0;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--edge);
+}
+.builder-viewport {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  touch-action: none;
+}
+.builder-editor-editing .builder-viewport {
+  background: var(--well-sunk);
+}
+.builder-artboard {
+  position: absolute;
+  overflow: hidden;
+  pointer-events: none;
+}
+.builder-editor-editing .builder-artboard {
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35);
+}
+.builder-artboard-inner {
+  position: absolute;
+  left: 0;
+  top: 0;
+  transform-origin: 0 0;
+}
+.builder-stage {
+  position: absolute;
+  inset: 0;
+}
+/* While an item from the library is dragged over the altar. */
+.builder-drop-hint {
+  position: absolute;
+  inset: 8px;
+  border: 1px dashed var(--edge-strong);
+  border-radius: 0.5rem;
+  pointer-events: none;
+}
+/* Typing into a text element: laid over it in its own font and colour. */
+.builder-text-input {
+  position: absolute;
+  z-index: 5;
+  margin: 0;
+  padding: 0;
+  border: none;
+  outline: 1px dashed var(--accent);
+  outline-offset: 2px;
+  background: transparent;
+  resize: none;
+  overflow: hidden;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+}
+.builder-panel {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+  padding: 4px;
+  min-width: 11rem;
+}
+.builder-swatches {
+  display: grid;
+  grid-template-columns: repeat(7, 20px);
+  gap: 5px;
+  padding: 4px;
+}
+.builder-swatch {
+  position: relative;
+  width: 20px;
+  height: 20px;
+  border-radius: 9999px;
+  border: 1px solid var(--edge-strong);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+}
+.builder-swatch-active {
+  box-shadow: 0 0 0 2px var(--well-solid), 0 0 0 3px var(--accent);
+}
+/* The system's colour picker behind a rainbow swatch. */
+.builder-swatch-custom {
+  background: conic-gradient(#e5484d, #f5d90a, #46a758, #0090ff, #8e4ec6, #e5484d);
+  overflow: hidden;
+}
+.builder-swatch-custom input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+.builder-number-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 0 4px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.builder-size-input {
+  width: 3.5rem;
+  height: 1.75rem;
+  text-align: right;
+}
+.builder-font-option {
+  padding: 4px 10px;
+  border-radius: 6px;
+  text-align: left;
+  font-size: 15px;
+  color: var(--text-secondary);
+}
+.builder-font-option:hover {
+  background: var(--interactive-hover);
+}
+.builder-font-option-active {
+  color: var(--editor-toolbar-active-text);
+  background: var(--editor-toolbar-active-bg);
+}
+.builder-color-dot {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border-radius: 9999px;
+  border: 1px solid var(--edge-strong);
+}
+/* A drawn text in the altar's lists: a serif "T" in the text's colour. */
+.altar-text-glyph {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  font-family: "Cormorant Garamond", Georgia, serif;
+  font-weight: 600;
+  line-height: 1;
+}
+
 /* The negative outer margin cancels the inner padding horizontally: the text
    stays flush under the title in edit mode, exactly where it sits in
    read mode — the frame wraps around the outside, into the page's px-8. */

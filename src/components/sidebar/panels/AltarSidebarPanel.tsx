@@ -55,10 +55,11 @@ try {
 export default function AltarSidebarPanel() {
   const { t } = useTranslation();
   const placements = useAltarStore((s) => s.placements);
-  const selectedPlacementId = useAltarStore((s) => s.selectedPlacementId);
+  const selectedPlacementIds = useAltarStore((s) => s.selectedPlacementIds);
   const {
     updateAltar,
     selectPlacement,
+    selectPlacements,
     updatePlacement,
     duplicatePlacement,
     removePlacement,
@@ -67,6 +68,7 @@ export default function AltarSidebarPanel() {
     useShallow((s) => ({
       updateAltar: s.updateAltar,
       selectPlacement: s.selectPlacement,
+      selectPlacements: s.selectPlacements,
       updatePlacement: s.updatePlacement,
       duplicatePlacement: s.duplicatePlacement,
       removePlacement: s.removePlacement,
@@ -110,10 +112,18 @@ const noticeTimerRef = useRef<number | null>(null);
     () => [...placements].sort((a, b) => b.z_index - a.z_index),
     [placements],
   );
+  // The inspector is for one element; with several selected the builder's bar applies to all.
   const selectedPlacement = useMemo(
-    () => sortedPlacements.find((p) => p.id === selectedPlacementId) ?? null,
-    [sortedPlacements, selectedPlacementId],
+    () => (selectedPlacementIds.length === 1 ? sortedPlacements.find((p) => p.id === selectedPlacementIds[0]) ?? null : null),
+    [sortedPlacements, selectedPlacementIds],
   );
+  const selectRow = (id: string, additive: boolean) => {
+    if (additive) {
+      selectPlacements(selectedPlacementIds.includes(id) ? selectedPlacementIds.filter((sel) => sel !== id) : [...selectedPlacementIds, id]);
+    } else {
+      selectPlacement(selectedPlacementIds.length === 1 && selectedPlacementIds[0] === id ? null : id);
+    }
+  };
   const { listRef, visualItems: visualPlacements, draggingId, startDrag } = usePointerReorder(sortedPlacements, (ordered) => {
     const maxZ = ordered.length - 1;
     ordered.forEach((p, i) => {
@@ -684,16 +694,16 @@ const noticeTimerRef = useRef<number | null>(null);
                 <PlacedElementRow
                   placement={placement}
                   isEditing={isEditing}
-                  isSelected={selectedPlacementId === placement.id}
+                  isSelected={selectedPlacementIds.includes(placement.id)}
                   isDragging={draggingId === placement.id}
-                  onSelect={() => selectPlacement(selectedPlacementId === placement.id ? null : placement.id)}
+                  onSelect={(additive) => selectRow(placement.id, additive)}
                   onToggleHidden={() => updatePlacement(placement.id, { hidden: !placement.hidden })}
                   onToggleLocked={() => updatePlacement(placement.id, { locked: !placement.locked })}
                   onDuplicate={() => duplicatePlacement(placement.id)}
                   onRemove={() => void removeWithUndo(placement.id)}
                   onGripPointerDown={(e) => startDrag(e, placement.id)}
                 />
-                {isEditing && selectedPlacementId === placement.id && selectedPlacement && (
+                {isEditing && selectedPlacement?.id === placement.id && (
                   <PlacedElementInspector
                     placement={selectedPlacement}
                     onUpdate={(patch) => updatePlacement(placement.id, patch)}

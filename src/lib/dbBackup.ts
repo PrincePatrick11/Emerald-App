@@ -47,6 +47,7 @@ import { linkedIdsToContent, rowsLinkSource } from './migrateLinkedIdsToContent'
 import { journalFieldsToContent } from './migrateJournalFieldsToContent';
 import { IMAGE_FIELDS, imageColumns } from './schema';
 import { ALTAR_SETTING_KEYS, altarSettingsJson } from './altarSettings';
+import { withNewElementIds } from './altarElements';
 import { isTagId, rewriteTagRefs, stripTagIds, tagIdList, tagNameKey, tagNameResolver, type LegacyTagRow } from './tagRefs';
 import { randomTagColor } from '../store/tagStore';
 import { categoryKey, mergeCategoryRows, type CategorySource } from './categoryMerge';
@@ -150,7 +151,12 @@ type Row = Record<string, any>;
  * array, each row with `type` and without the columns that no longer exist,
  * '12' = since v51 altars carry their appearance as a JSON column `settings`,
  * since v52 altar items `updated_at`/`deleted_at`, and since v53 entries and
- * templates tag IDs instead of tag names.
+ * templates tag IDs instead of tag names, '13' = since v56 altars carry the
+ * shapes and text drawn on them as a JSON column `elements`.
+ *
+ * The '13' is needed because an older build has no `elements` column:
+ * `insertRows` would drop it, and the drawn shapes and text would be gone
+ * without a word. With the '13' it rejects the file.
  *
  * The '12' is needed because an older build looks for the twelve individual columns:
  * `insertRows` would drop `settings`, and every altar would arrive with the
@@ -172,7 +178,7 @@ type Row = Record<string, any>;
  * "newer than me" check (`backup.version > BACKUP_VERSION`) honestly rejects the file
  * before anything happens.
  */
-const BACKUP_VERSION = '12' as const;
+const BACKUP_VERSION = '13' as const;
 
 /** The four category arrays of backups up to version 3. */
 interface LegacyCategoryArrays {
@@ -495,7 +501,7 @@ function presentEntryTypes(d: BackupFile['data']): EntryType[] {
 }
 
 interface BackupFile {
-  version: '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9' | '10' | '11' | '12';
+  version: '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9' | '10' | '11' | '12' | '13';
   /** The version the file was written with — `migrateBackupPayload` sets `version` to the current one. */
   sourceVersion?: number;
   type: 'backup';
@@ -1689,13 +1695,15 @@ async function doMerge(db: Awaited<ReturnType<typeof getDb>>, backup: BackupFile
     withContentLinks(remapEntry(r, IMAGE_FIELDS_OP, ['charging_technique_wiki_id'], [], 'operation'))
   ), catMap), i18n.t, nowIso(), mergeStatus);
   const operations = await liftLegacySigilRows(mergeOps.rows, wikiArticles, backup);
-  const altars = (d.altars ?? []).map((r: Row) =>
+  const altars = (d.altars ?? []).map((r: Row) => {
     // The same three columns as in doReplace. As long as thumbnail_data and
     // icon_data hold data URLs, the difference is harmless — but the
     // export collects both as soon as they carry a file name, and then
     // merge would be the variant that does not carry it along.
-    remapEntry(r, ['background_image_data', 'thumbnail_data', 'icon_data'], [], [])
-  );
+    const row = remapEntry(r, ['background_image_data', 'thumbnail_data', 'icon_data'], [], []);
+    // Drawn shapes and text get new ids like the placements: ids are unique across all altars.
+    return r.elements === undefined ? row : { ...row, elements: withNewElementIds(r.elements, String(row.id)) };
+  });
   const altarItems = remapCategoryIds((d.altarItems ?? []).map((r: Row) =>
     remapEntry(r, ['image_data'], [], [])
   ), catMap);

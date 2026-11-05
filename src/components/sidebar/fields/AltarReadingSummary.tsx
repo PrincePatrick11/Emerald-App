@@ -11,11 +11,10 @@ import {
   LEGACY_GRADIENT_COLORS,
   generateGradientStyle,
   getGradientColor,
-  isCandleEmoji,
   isGradientPreset,
 } from '../../../lib/altarConstants';
 import { imageSrc } from '../../../lib/images';
-import { AltarItemVisual } from '../../altar/AltarItemVisual';
+import { AltarPlacementVisual, placementLabel } from '../../altar/AltarPlacementVisual';
 import { FaviconGlyph } from './Favicon';
 import SidebarSection, { SidebarEmpty, SidebarItemRow, SidebarPropertyRow } from './SidebarSection';
 import { PropertiesSection } from './EntryReadSections';
@@ -29,7 +28,7 @@ export default function AltarReadingSummary() {
   const { t } = useTranslation();
   const activeAltar = useDisplayedAltar();
   const placements = useAltarStore((s) => s.placements);
-  const selectedPlacementId = useAltarStore((s) => s.selectedPlacementId);
+  const selectedPlacementIds = useAltarStore((s) => s.selectedPlacementIds);
   const selectPlacement = useAltarStore((s) => s.selectPlacement);
   // What is visible on the altar, frontmost on top, like the list when editing.
   const visiblePlacements = useMemo(
@@ -123,10 +122,10 @@ export default function AltarReadingSummary() {
         {visiblePlacements.map((placement) => (
           <SidebarItemRow
             key={placement.id}
-            icon={<AltarItemVisual item={placement} size={16} candleAnimate={isCandleEmoji(placement.emoji)} />}
-            label={placement.name}
-            active={selectedPlacementId === placement.id}
-            onClick={() => selectPlacement(selectedPlacementId === placement.id ? null : placement.id)}
+            icon={<AltarPlacementVisual placement={placement} size={16} />}
+            label={placementLabel(placement, t)}
+            active={selectedPlacementIds.includes(placement.id)}
+            onClick={() => selectPlacement(selectedPlacementIds.length === 1 && selectedPlacementIds[0] === placement.id ? null : placement.id)}
           />
         ))}
       </SidebarSection>

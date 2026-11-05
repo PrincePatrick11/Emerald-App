@@ -560,6 +560,56 @@
     },
     "unsaved": "Ungespeicherte Änderungen"
   },
+  "builder": {
+    "newText": "Text",
+    "addShape": "Form hinzufügen",
+    "addText": "Text hinzufügen",
+    "shape": {
+      "rect": "Rechteck",
+      "ellipse": "Ellipse",
+      "triangle": "Dreieck",
+      "star": "Stern",
+      "hexagon": "Sechseck"
+    },
+    "fill": "Füllung",
+    "outline": "Kontur",
+    "outlineWidth": "Stärke",
+    "cornerRadius": "Ecken",
+    "noColor": "Keine",
+    "customColor": "Andere Farbe …",
+    "fontTitle": "Schrift",
+    "fontMixed": "Schriften",
+    "font": {
+      "serif": "Garamond",
+      "book": "Lora",
+      "sans": "Inter"
+    },
+    "fontSize": "Schriftgröße",
+    "textColor": "Textfarbe",
+    "arrange": "Anordnen",
+    "toFront": "Ganz nach vorne",
+    "forward": "Eine Ebene nach vorne",
+    "backward": "Eine Ebene nach hinten",
+    "toBack": "Ganz nach hinten",
+    "alignSelection": "Auswahl ausrichten",
+    "alignArtboard": "Auf der Fläche ausrichten",
+    "align": {
+      "left": "Linke Kanten",
+      "hcenter": "Mitten waagerecht",
+      "right": "Rechte Kanten",
+      "top": "Obere Kanten",
+      "vcenter": "Mitten senkrecht",
+      "bottom": "Untere Kanten"
+    },
+    "distributeHorizontal": "Gleiche Abstände waagerecht",
+    "distributeVertical": "Gleiche Abstände senkrecht",
+    "duplicate": "Duplizieren",
+    "remove": "Entfernen",
+    "zoomIn": "Vergrößern",
+    "zoomOut": "Verkleinern",
+    "fit": "Einpassen",
+    "export": "Als PNG speichern"
+  },
   "moonPhase": {
     "new": "Neumond",
     "waxing_crescent": "Zunehmende Sichel",

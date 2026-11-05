@@ -10,6 +10,7 @@ import { bool, fromRow, toInt, type DbRow } from '../lib/row';
 import type { AltarItem, AltarPlacement, AltarRecord } from '../types';
 import i18n from '../i18n';
 import { displayTitle } from '../lib/entryTitle';
+import { altarElementsJson, isDrawn, parseAltarElements, withNewElementIds } from '../lib/altarElements';
 
 const DEFAULT_PLACEMENT_SIZE = 40;
 
@@ -51,6 +52,7 @@ function mapPlacementRows(rows: DbRow[], items: AltarItem[]): AltarPlacement[] {
     return {
       id: String(r.id),
       altar_id: String(r.altar_id),
+      kind: 'item' as const,
       item_id: String(r.item_id),
       name: item?.name ?? '?',
       emoji: item?.emoji ?? '✨',
@@ -76,11 +78,34 @@ function mapPlacementRows(rows: DbRow[], items: AltarItem[]): AltarPlacement[] {
 const LIVE_PLACEMENTS = `SELECT p.* FROM altar_placements p
   JOIN altar_items i ON i.id = p.item_id AND i.deleted_at IS NULL`;
 
+/** Everything on an altar: the placements of library items and the drawn shapes and text. */
 async function fetchPlacementsForAltar(altarId: string, items: AltarItem[]): Promise<AltarPlacement[]> {
   const db = await getDb();
   const rows = await db.select<DbRow[]>(`${LIVE_PLACEMENTS} WHERE p.altar_id=$1`, [altarId]);
-  return mapPlacementRows(rows, items);
+  const [altar] = await db.select<{ elements: string }[]>('SELECT elements FROM altars WHERE id=$1', [altarId]);
+  return [...mapPlacementRows(rows, items), ...parseAltarElements(altar?.elements, altarId)];
 }
+
+/** The placements of an altar as the store holds them — the active list for the open altar. */
+function placementsOf(s: Pick<AltarState, 'activeAltarId' | 'placements' | 'previewPlacements'>, altarId: string): AltarPlacement[] {
+  return s.activeAltarId === altarId ? s.placements : s.previewPlacements[altarId] ?? [];
+}
+
+/** Writes the drawn shapes and text of an altar from the store into `altars.elements`. */
+async function writeAltarElements(altarId: string, placements: readonly AltarPlacement[]): Promise<void> {
+  const db = await getDb();
+  await db.execute('UPDATE altars SET elements=$1 WHERE id=$2', [altarElementsJson(placements), altarId]);
+}
+
+/** A placement's row values, in the column order of the INSERT statements below. */
+const placementValues = (p: AltarPlacement, altarId: string) => [
+  p.id, altarId, p.item_id, p.x, p.y, p.z_index, p.width, p.height, p.rotation, p.opacity, toInt(p.locked), toInt(p.hidden),
+];
+const INSERT_PLACEMENT = 'INSERT INTO altar_placements (id, altar_id, item_id, x, y, z_index, width, height, rotation, opacity, locked, hidden) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)';
+const UPDATE_PLACEMENT = 'UPDATE altar_placements SET x=$1, y=$2, z_index=$3, width=$4, height=$5, rotation=$6, opacity=$7, locked=$8, hidden=$9 WHERE id=$10';
+const placementUpdateValues = (p: AltarPlacement) => [
+  p.x, p.y, p.z_index, p.width, p.height, p.rotation, p.opacity, toInt(p.locked), toInt(p.hidden), p.id,
+];
 
 
 function clampPlacementPatch(patch: Partial<Pick<AltarPlacement, 'x' | 'y' | 'z_index' | 'width' | 'height' | 'rotation' | 'opacity' | 'locked' | 'hidden'>>): Partial<AltarPlacement> {
@@ -100,7 +125,8 @@ interface AltarState {
   activeAltarId: string | null;
   items: AltarItem[];
   placements: AltarPlacement[];
-  selectedPlacementId: string | null;
+  /** The selected placements of the open altar, in the order they were selected. */
+  selectedPlacementIds: string[];
   previewPlacements: Record<string, AltarPlacement[]>;
 
   fetchAltars: () => Promise<void>;
@@ -136,6 +162,13 @@ interface AltarState {
   permanentlyDeleteItem: (id: string) => Promise<void>;
   placeItem: (item: AltarItem, x: number, y: number) => Promise<void>;
   selectPlacement: (id: string | null) => void;
+  selectPlacements: (ids: string[]) => void;
+  /**
+   * The open altar's placements as the builder hands them back: all at once,
+   * in the store right away, then written — rows for items, `altars.elements`
+   * for shapes and text. New item placements need their `item_id`.
+   */
+  applyPlacements: (next: AltarPlacement[]) => Promise<void>;
   movePlacement: (id: string, x: number, y: number) => void;
   savePlacementPosition: (id: string, x: number, y: number) => Promise<void>;
   updatePlacement: (id: string, patch: Partial<Pick<AltarPlacement, 'x' | 'y' | 'z_index' | 'width' | 'height' | 'rotation' | 'opacity' | 'locked' | 'hidden'>>) => Promise<void>;
@@ -173,7 +206,7 @@ function withoutItem(s: AltarState, id: string, stale: Set<string>): Partial<Alt
     items: s.items.filter((i) => i.id !== id),
     placements: s.placements.filter((p) => p.item_id !== id),
     previewPlacements: filterEachPreview(s.previewPlacements, (p) => p.item_id !== id),
-    ...(s.placements.some((p) => p.id === s.selectedPlacementId && p.item_id === id) ? { selectedPlacementId: null } : {}),
+    selectedPlacementIds: s.selectedPlacementIds.filter((sel) => !s.placements.some((p) => p.id === sel && p.item_id === id)),
   };
 }
 
@@ -183,7 +216,7 @@ function withoutAltar(s: AltarState, id: string): Partial<AltarState> {
   return {
     altars: s.altars.filter((altar) => altar.id !== id),
     previewPlacements,
-    ...(s.activeAltarId === id ? { activeAltarId: null, placements: [], selectedPlacementId: null } : {}),
+    ...(s.activeAltarId === id ? { activeAltarId: null, placements: [], selectedPlacementIds: [] } : {}),
   };
 }
 
@@ -192,7 +225,7 @@ export const useAltarStore = create<AltarState>((set, get) => ({
   activeAltarId: null,
   items: [],
   placements: [],
-  selectedPlacementId: null,
+  selectedPlacementIds: [],
   previewPlacements: {},
 
   fetchAltars: async () => {
@@ -223,13 +256,16 @@ export const useAltarStore = create<AltarState>((set, get) => ({
     for (const placement of allPlacements) {
       if (placement.altar_id) previewPlacements[placement.altar_id]?.push(placement);
     }
+    for (const row of altarRows) {
+      previewPlacements[String(row.id)]?.push(...parseAltarElements(row.elements, String(row.id)));
+    }
     const placements = activeAltar ? previewPlacements[activeAltar.id] ?? [] : [];
     set({
       items,
       altars,
       activeAltarId: activeAltar?.id ?? null,
       placements,
-      selectedPlacementId: null,
+      selectedPlacementIds: [],
       previewPlacements,
     });
   },
@@ -239,11 +275,11 @@ export const useAltarStore = create<AltarState>((set, get) => ({
     const active = altars.find((altar) => altar.id === id);
     if (!active) return;
     const placements = await fetchPlacementsForAltar(id, items);
-    set({ activeAltarId: id, placements, selectedPlacementId: null });
+    set({ activeAltarId: id, placements, selectedPlacementIds: [] });
   },
 
   clearActiveAltar: () => {
-    set({ activeAltarId: null, placements: [], selectedPlacementId: null });
+    set({ activeAltarId: null, placements: [], selectedPlacementIds: [] });
   },
 
   createAltar: async ({ createdAt } = {}) => {
@@ -263,7 +299,7 @@ export const useAltarStore = create<AltarState>((set, get) => ({
       altars: [altar, ...s.altars],
       activeAltarId: altar.id,
       placements: [],
-      selectedPlacementId: null,
+      selectedPlacementIds: [],
       // An entry even when empty: anyone looking up an altar's placements there should find it.
       previewPlacements: { ...s.previewPlacements, [altar.id]: [] },
     }));
@@ -307,6 +343,9 @@ export const useAltarStore = create<AltarState>((set, get) => ({
       'SELECT item_id, x, y, z_index, width, height, rotation, opacity, locked, hidden FROM altar_placements WHERE altar_id=$1',
       [id],
     );
+
+    const [sourceRow] = await db.select<{ elements: string }[]>('SELECT elements FROM altars WHERE id=$1', [id]);
+    await db.execute('UPDATE altars SET elements=$1 WHERE id=$2', [withNewElementIds(sourceRow?.elements, copy.id), copy.id]);
 
     await db.batch(sourcePlacements.map((placement) => [
       'INSERT INTO altar_placements (id, altar_id, item_id, x, y, z_index, width, height, rotation, opacity, locked, hidden) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)',
@@ -465,8 +504,10 @@ export const useAltarStore = create<AltarState>((set, get) => ({
     // row left for its placement to hang on.
     const items = get().items;
     const itemsById = new Map(items.map((item) => [item.id, item]));
+    const drawn = placements.filter(isDrawn);
+    await writeAltarElements(altar.id, drawn);
     const restored = placements
-      .filter((placement) => itemsById.has(placement.item_id))
+      .filter((placement) => !isDrawn(placement) && itemsById.has(placement.item_id))
       // Name, emoji and image in the item's current version.
       .map((placement) => {
         const item = itemsById.get(placement.item_id)!;
@@ -506,9 +547,9 @@ export const useAltarStore = create<AltarState>((set, get) => ({
       altars: s.altars
         .map((entry) => (entry.id === altar.id ? altar : entry))
         .sort((a, b) => b.updated_at.localeCompare(a.updated_at)),
-      previewPlacements: { ...s.previewPlacements, [altar.id]: restored },
+      previewPlacements: { ...s.previewPlacements, [altar.id]: [...restored, ...drawn] },
       ...(s.activeAltarId === altar.id
-        ? { placements: restored, selectedPlacementId: null }
+        ? { placements: [...restored, ...drawn], selectedPlacementIds: [] }
         : {}),
     }));
   }),
@@ -609,13 +650,10 @@ export const useAltarStore = create<AltarState>((set, get) => ({
     const id = generateId();
     const maxZ = get().placements.reduce((max, p) => Math.max(max, p.z_index), -1);
     const nextZ = maxZ + 1;
-    await db.execute(
-      'INSERT INTO altar_placements (id, altar_id, item_id, x, y, z_index, width, height, rotation, opacity, locked, hidden) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)',
-      [id, altarId, item.id, x, y, nextZ, DEFAULT_PLACEMENT_SIZE, DEFAULT_PLACEMENT_SIZE, 0, 1, 0, 0]
-    );
     const placement: AltarPlacement = {
       id,
       altar_id: altarId,
+      kind: 'item',
       item_id: item.id,
       name: item.name,
       emoji: item.emoji,
@@ -631,9 +669,10 @@ export const useAltarStore = create<AltarState>((set, get) => ({
       hidden: false,
       image_data: item.image_data,
     };
+    await db.execute(INSERT_PLACEMENT, placementValues(placement, altarId));
     set((s) => ({
       placements: [...s.placements, placement],
-      selectedPlacementId: id,
+      selectedPlacementIds: [id],
       previewPlacements: {
         ...s.previewPlacements,
         [altarId]: [...(s.previewPlacements[altarId] ?? []), placement],
@@ -642,15 +681,61 @@ export const useAltarStore = create<AltarState>((set, get) => ({
     await get().bumpAltarUpdatedAt(altarId);
   },
 
-  selectPlacement: (id) => set({ selectedPlacementId: id }),
+  selectPlacement: (id) => set({ selectedPlacementIds: id ? [id] : [] }),
+
+  selectPlacements: (ids) => set({ selectedPlacementIds: ids }),
+
+  applyPlacements: (next) => {
+    const altarId = get().activeAltarId;
+    if (!altarId) return Promise.resolve();
+    const items = new Map(get().items.map((item) => [item.id, item]));
+    const clamped = next
+      // An item placement whose item is gone (or that never had one) has no row to stand on.
+      .filter((p) => isDrawn(p) || items.has(p.item_id))
+      .map((p) => {
+        const safe = { ...p, ...clampPlacementPatch(p), altar_id: altarId };
+        const item = items.get(p.item_id);
+        return item && !isDrawn(p)
+          ? { ...safe, name: item.name, emoji: item.emoji, category_id: item.category_id, image_data: item.image_data }
+          : safe;
+      });
+    const before = new Map(get().placements.map((p) => [p.id, p]));
+    const after = new Map(clamped.map((p) => [p.id, p]));
+    const statements: [string, unknown[]][] = [];
+    for (const p of clamped) {
+      if (isDrawn(p)) continue;
+      const old = before.get(p.id);
+      if (!old) statements.push([INSERT_PLACEMENT, placementValues(p, altarId)]);
+      else if (placementUpdateValues(old).some((v, i) => v !== placementUpdateValues(p)[i])) {
+        statements.push([UPDATE_PLACEMENT, placementUpdateValues(p)]);
+      }
+    }
+    for (const old of before.values()) {
+      if (!isDrawn(old) && !after.has(old.id)) statements.push(['DELETE FROM altar_placements WHERE id=$1', [old.id]]);
+    }
+    const drawnBefore = altarElementsJson([...before.values()]);
+    const drawnAfter = altarElementsJson(clamped);
+    if (!statements.length && drawnBefore === drawnAfter) return Promise.resolve();
+    // In the store at once: the builder shows the new state in the same frame.
+    set((s) => ({
+      placements: clamped,
+      selectedPlacementIds: s.selectedPlacementIds.filter((id) => after.has(id)),
+      previewPlacements: { ...s.previewPlacements, [altarId]: clamped },
+    }));
+    return serialized(serialKey('altar', altarId), async () => {
+      const db = await getDb();
+      if (drawnBefore !== drawnAfter) statements.push(['UPDATE altars SET elements=$1 WHERE id=$2', [drawnAfter, altarId]]);
+      await db.batch(statements);
+    }).then(() => get().bumpAltarUpdatedAt(altarId));
+  },
 
   movePlacement: (id, x, y) => {
     const safePatch = clampPlacementPatch({ x, y });
-    // Only update the live `placements` slice used by AltarCanvas.
+    // Only update the live `placements` slice.
     // `previewPlacements` (used by AltarCard thumbnails) is intentionally NOT
-    // updated here because movePlacement fires at 60-120 Hz during drag and
+    // updated here because movePlacement may fire at pointer rate, and
     // rebuilding the entire previewPlacements map every frame causes AltarView
-    // to re-render at pointer rate. The preview is synced on mouse-up via
+    // to re-render at pointer rate. The preview is synced on release via
     // savePlacementPosition, which is sufficient for thumbnail accuracy.
     set((s) => ({
       placements: s.placements.map((p) => (p.id === id ? { ...p, ...safePatch } : p)),
@@ -660,75 +745,76 @@ export const useAltarStore = create<AltarState>((set, get) => ({
   savePlacementPosition: async (id, x, y) => {
     const db = await getDb();
     const safe = clampPlacementPatch({ x, y });
-    await db.execute('UPDATE altar_placements SET x=$1, y=$2 WHERE id=$3', [safe.x, safe.y, id]);
+    const altarId = get().activeAltarId;
+    const current = get().placements.find((p) => p.id === id);
+    if (current && isDrawn(current)) {
+      if (altarId) await writeAltarElements(altarId, get().placements.map((p) => (p.id === id ? { ...p, ...safe } : p)));
+    } else {
+      await db.execute('UPDATE altar_placements SET x=$1, y=$2 WHERE id=$3', [safe.x, safe.y, id]);
+    }
     // Sync the final drag position into previewPlacements now that the drag is
     // complete. This is the only place we need to pay the per-altar map rebuild
-    // cost, and it runs at most once per drag gesture (on mouse-up).
+    // cost, and it runs at most once per drag gesture (on release).
     set((s) => ({
       previewPlacements: mapEachPreview(s.previewPlacements, (p) => p.id === id ? { ...p, ...safe } : p),
     }));
-    const activeAltarId = get().activeAltarId;
-    if (activeAltarId) await get().bumpAltarUpdatedAt(activeAltarId);
+    if (altarId) await get().bumpAltarUpdatedAt(altarId);
   },
 
   // serialized: see lib/serialize.ts. bumpAltarUpdatedAt at the end stays
   // outside any chain — it only writes updated_at, which cannot collide.
-  updatePlacement: (id, patch) => serialized(serialKey('placement', id), async () => {
-    const db = await getDb();
+  // Drawn shapes and text share the altar's chain: they are one column of it.
+  updatePlacement: (id, patch) => {
     const current = get().placements.find((entry) => entry.id === id);
-    if (!current) return;
-    const safePatch = clampPlacementPatch(patch);
-    // Nothing changed (e.g. snapping to the same size): write nothing, stamp nothing.
-    if (Object.entries(safePatch).every(([key, value]) => current[key as keyof AltarPlacement] === value)) return;
-    const next = { ...current, ...safePatch };
-    await db.execute(
-      'UPDATE altar_placements SET x=$1, y=$2, z_index=$3, width=$4, height=$5, rotation=$6, opacity=$7, locked=$8, hidden=$9 WHERE id=$10',
-      [next.x, next.y, next.z_index, next.width, next.height, next.rotation, next.opacity, toInt(next.locked), toInt(next.hidden), id]
-    );
-    set((s) => ({
-      placements: s.placements.map((p) => (p.id === id ? { ...p, ...safePatch } : p)),
-      previewPlacements: mapEachPreview(s.previewPlacements, (p) => p.id === id ? { ...p, ...safePatch } : p),
-    }));
-    const activeAltarId = get().activeAltarId;
-    if (activeAltarId) await get().bumpAltarUpdatedAt(activeAltarId);
-  }),
+    const drawn = !!current && isDrawn(current);
+    const altarId = current?.altar_id ?? get().activeAltarId;
+    return serialized(drawn && altarId ? serialKey('altar', altarId) : serialKey('placement', id), async () => {
+      const latest = get().placements.find((entry) => entry.id === id);
+      if (!latest) return;
+      const safePatch = clampPlacementPatch(patch);
+      // Nothing changed (e.g. snapping to the same size): write nothing, stamp nothing.
+      if (Object.entries(safePatch).every(([key, value]) => latest[key as keyof AltarPlacement] === value)) return;
+      const next = { ...latest, ...safePatch };
+      if (drawn && altarId) {
+        await writeAltarElements(altarId, get().placements.map((p) => (p.id === id ? next : p)));
+      } else {
+        const db = await getDb();
+        await db.execute(UPDATE_PLACEMENT, placementUpdateValues(next));
+      }
+      set((s) => ({
+        placements: s.placements.map((p) => (p.id === id ? { ...p, ...safePatch } : p)),
+        previewPlacements: mapEachPreview(s.previewPlacements, (p) => p.id === id ? { ...p, ...safePatch } : p),
+      }));
+      const activeAltarId = get().activeAltarId;
+      if (activeAltarId) await get().bumpAltarUpdatedAt(activeAltarId);
+    });
+  },
 
   duplicatePlacement: async (id) => {
-    const db = await getDb();
     const altarId = get().activeAltarId;
     if (!altarId) return;
     const source = get().placements.find((p) => p.id === id);
     if (!source) return;
-    const newId = generateId();
     const maxZ = get().placements.reduce((max, p) => Math.max(max, p.z_index), -1);
-    const nextZ = maxZ + 1;
-    const newX = Math.min(100, source.x + 2);
-    const newY = Math.min(100, source.y + 2);
-    await db.execute(
-      'INSERT INTO altar_placements (id, altar_id, item_id, x, y, z_index, width, height, rotation, opacity, locked, hidden) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)',
-      [newId, altarId, source.item_id, newX, newY, nextZ, source.width, source.height, source.rotation, source.opacity, 0, 0]
-    );
     const copy: AltarPlacement = {
-      id: newId,
+      ...source,
+      id: generateId(),
       altar_id: altarId,
-      item_id: source.item_id,
-      name: source.name,
-      emoji: source.emoji,
-      category_id: source.category_id,
-      x: newX,
-      y: newY,
-      z_index: nextZ,
-      width: source.width,
-      height: source.height,
-      rotation: source.rotation,
-      opacity: source.opacity,
+      x: Math.min(100, source.x + 2),
+      y: Math.min(100, source.y + 2),
+      z_index: maxZ + 1,
       locked: false,
       hidden: false,
-      image_data: source.image_data,
     };
+    if (isDrawn(copy)) {
+      await writeAltarElements(altarId, [...get().placements, copy]);
+    } else {
+      const db = await getDb();
+      await db.execute(INSERT_PLACEMENT, placementValues(copy, altarId));
+    }
     set((s) => ({
       placements: [...s.placements, copy],
-      selectedPlacementId: newId,
+      selectedPlacementIds: [copy.id],
       previewPlacements: {
         ...s.previewPlacements,
         [altarId]: [...(s.previewPlacements[altarId] ?? []), copy],
@@ -739,11 +825,15 @@ export const useAltarStore = create<AltarState>((set, get) => ({
 
   removePlacement: async (id) => {
     const removed = get().placements.find((p) => p.id === id);
-    const db = await getDb();
-    await db.execute('DELETE FROM altar_placements WHERE id=$1', [id]);
+    if (removed && isDrawn(removed) && removed.altar_id) {
+      await writeAltarElements(removed.altar_id, get().placements.filter((p) => p.id !== id));
+    } else {
+      const db = await getDb();
+      await db.execute('DELETE FROM altar_placements WHERE id=$1', [id]);
+    }
     set((s) => ({
       placements: s.placements.filter((p) => p.id !== id),
-      selectedPlacementId: s.selectedPlacementId === id ? null : s.selectedPlacementId,
+      selectedPlacementIds: s.selectedPlacementIds.filter((sel) => sel !== id),
       previewPlacements: filterEachPreview(s.previewPlacements, (p) => p.id !== id),
     }));
     if (removed?.altar_id) await get().bumpAltarUpdatedAt(removed.altar_id);
@@ -753,18 +843,27 @@ export const useAltarStore = create<AltarState>((set, get) => ({
   restorePlacement: async (placement) => {
     const { altars, items } = get();
     const altarId = placement.altar_id;
-    const item = items.find((entry) => entry.id === placement.item_id);
-    if (!altarId || !item || !altars.some((altar) => altar.id === altarId)) return;
-    const db = await getDb();
-    // OR IGNORE: cancelling the edit may already have brought it back.
-    const { rowsAffected } = await db.execute(
-      'INSERT OR IGNORE INTO altar_placements (id, altar_id, item_id, x, y, z_index, width, height, rotation, opacity, locked, hidden) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)',
-      [placement.id, altarId, placement.item_id, placement.x, placement.y, placement.z_index, placement.width,
-        placement.height, placement.rotation, placement.opacity, toInt(placement.locked), toInt(placement.hidden)]
-    );
-    if (!rowsAffected) return;
-    // Name, emoji and image in the item's current version.
-    const back = { ...placement, name: item.name, emoji: item.emoji, category_id: item.category_id, image_data: item.image_data };
+    if (!altarId || !altars.some((altar) => altar.id === altarId)) return;
+    let back: AltarPlacement;
+    if (isDrawn(placement)) {
+      const current = placementsOf(get(), altarId);
+      // Cancelling the edit may already have brought it back.
+      if (current.some((p) => p.id === placement.id)) return;
+      await writeAltarElements(altarId, [...current, placement]);
+      back = placement;
+    } else {
+      const item = items.find((entry) => entry.id === placement.item_id);
+      if (!item) return;
+      const db = await getDb();
+      // OR IGNORE: cancelling the edit may already have brought it back.
+      const { rowsAffected } = await db.execute(
+        INSERT_PLACEMENT.replace('INSERT INTO', 'INSERT OR IGNORE INTO'),
+        placementValues(placement, altarId),
+      );
+      if (!rowsAffected) return;
+      // Name, emoji and image in the item's current version.
+      back = { ...placement, name: item.name, emoji: item.emoji, category_id: item.category_id, image_data: item.image_data };
+    }
     set((s) => ({
       placements: s.activeAltarId === altarId ? [...s.placements, back] : s.placements,
       previewPlacements: s.previewPlacements[altarId]

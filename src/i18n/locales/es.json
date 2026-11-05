@@ -560,6 +560,56 @@
     },
     "unsaved": "Cambios sin guardar"
   },
+  "builder": {
+    "newText": "Texto",
+    "addShape": "Añadir forma",
+    "addText": "Añadir texto",
+    "shape": {
+      "rect": "Rectángulo",
+      "ellipse": "Elipse",
+      "triangle": "Triángulo",
+      "star": "Estrella",
+      "hexagon": "Hexágono"
+    },
+    "fill": "Relleno",
+    "outline": "Contorno",
+    "outlineWidth": "Grosor",
+    "cornerRadius": "Esquinas",
+    "noColor": "Ninguno",
+    "customColor": "Otro color…",
+    "fontTitle": "Fuente",
+    "fontMixed": "Fuentes",
+    "font": {
+      "serif": "Garamond",
+      "book": "Lora",
+      "sans": "Inter"
+    },
+    "fontSize": "Tamaño de fuente",
+    "textColor": "Color del texto",
+    "arrange": "Organizar",
+    "toFront": "Traer al frente",
+    "forward": "Traer adelante",
+    "backward": "Enviar atrás",
+    "toBack": "Enviar al fondo",
+    "alignSelection": "Alinear la selección",
+    "alignArtboard": "Alinear en el lienzo",
+    "align": {
+      "left": "Bordes izquierdos",
+      "hcenter": "Centros en horizontal",
+      "right": "Bordes derechos",
+      "top": "Bordes superiores",
+      "vcenter": "Centros en vertical",
+      "bottom": "Bordes inferiores"
+    },
+    "distributeHorizontal": "Espacios iguales en horizontal",
+    "distributeVertical": "Espacios iguales en vertical",
+    "duplicate": "Duplicar",
+    "remove": "Quitar",
+    "zoomIn": "Acercar",
+    "zoomOut": "Alejar",
+    "fit": "Ajustar a la vista",
+    "export": "Guardar como PNG"
+  },
   "moonPhase": {
     "new": "Luna nueva",
     "waxing_crescent": "Cuarto creciente",
