@@ -11,12 +11,12 @@
     --editor-font-size: 17px;
   }
 
-  /* Marked text, in the theme's accent rather than the system's colour, so
-     that it matches what the editor draws itself (marked images). The theme
-     token directly: WebKit resolves a `color-mix()` held in a custom property
-     to transparent here, and then shows the system colour after all. */
+  /* Marked text, in the theme's colour rather than the system's, so that it
+     matches what the editor draws itself (marked images). The token holds a
+     plain colour: WebKit resolves a `color-mix()` held in a custom property to
+     transparent here, and then shows the system colour after all. */
   ::selection {
-    background-color: var(--accent-wash-strong);
+    background-color: var(--selection-bg);
   }
 
   * {
@@ -1396,7 +1396,7 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
   filter: brightness(0.8) saturate(0.85);
 }
 .tiptap.editor-marking-images ::selection { background: transparent; }
-.tiptap .editor-text--marked { background-color: var(--accent-wash-strong); }
+.tiptap .editor-text--marked { background-color: var(--selection-bg); }
 
 /* Folding by headings (HeadingFoldExtension): the chevron in the margin left of a
    heading, shown on hover and while folded; what is folded away is not displayed.

@@ -168,6 +168,7 @@ export function customThemeTokens({ base, colors: c }: CustomTheme): Record<stri
     'accent-edge': accentEdge,
     'accent-wash': fade(c.accent, 12),
     'accent-wash-strong': fade(c.accent, 25),
+    'selection-bg': fade(c.accent, 25),
     'accent-track': fade(c.accent, 60),
     'accent-fill': accentSoft,
     'accent-fill-strong': fade(c.accent, 35),
