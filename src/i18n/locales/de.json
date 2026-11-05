@@ -1232,7 +1232,7 @@
     "server": "Server",
     "appearance": "Aussehen",
     "links": "Links",
-    "updateSettings": "Update-Einstellungen",
+    "updateSettings": "Update-Server",
     "version": "Version {{version}}"
   }
 }

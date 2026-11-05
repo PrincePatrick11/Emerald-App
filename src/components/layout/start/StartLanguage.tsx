@@ -1,4 +1,6 @@
 import { useTranslation } from 'react-i18next';
+import { ChevronDown } from 'lucide-react';
+import Dropdown from '../../ui/Dropdown';
 import { LANGUAGE_OPTIONS, type AppLanguage } from '../../../i18n';
 import { useDeviceStore } from '../../../store/deviceStore';
 
@@ -6,29 +8,35 @@ import { useDeviceStore } from '../../../store/deviceStore';
  *  flag emoji as their two letters, which still tells them apart. */
 const FLAGS: Record<AppLanguage, string> = { en: '🇬🇧', de: '🇩🇪', es: '🇪🇸', fr: '🇫🇷' };
 
-/** The language of this installation (`deviceStore`), at the foot of the
- *  start page's brand: one flag per language, its name as the tooltip. */
+const OPTIONS = LANGUAGE_OPTIONS.map(({ code, label }) => ({ value: code, label, emoji: FLAGS[code] }));
+
+/** The language of this installation (`deviceStore`), at the left of the start
+ *  page's foot: the flag and name of the chosen one, the others in a menu. */
 export default function StartLanguage() {
   const { t } = useTranslation();
   const language = useDeviceStore((s) => s.settings.language);
   const setLanguage = useDeviceStore((s) => s.setLanguage);
 
   return (
-    <div className="flex items-center gap-1 -ml-1.5" role="group" aria-label={t('settings.language')}>
-      {LANGUAGE_OPTIONS.map(({ code, label }) => (
+    <Dropdown<AppLanguage>
+      value={language}
+      options={OPTIONS}
+      onChange={setLanguage}
+      portal
+      trigger={({ open, toggle, selectedLabel }) => (
         <button
-          key={code}
           type="button"
-          lang={code}
-          title={label}
-          aria-label={label}
-          aria-pressed={language === code}
-          className={`start-flag${language === code ? ' start-flag-active' : ''}`}
-          onClick={() => setLanguage(code)}
+          className="start-foot-action"
+          aria-haspopup="listbox"
+          aria-expanded={open}
+          aria-label={`${t('settings.language')}: ${selectedLabel}`}
+          onClick={toggle}
         >
-          <span aria-hidden>{FLAGS[code]}</span>
+          <span aria-hidden className="text-sm leading-none">{FLAGS[language]}</span>
+          {selectedLabel}
+          <ChevronDown size={12} />
         </button>
-      ))}
-    </div>
+      )}
+    />
   );
 }

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Download, RefreshCw, RotateCcw, Settings2 } from 'lucide-react';
+import { Download, RefreshCw, RotateCcw, Server } from 'lucide-react';
 import Button from '../../ui/Button';
 import Modal from '../../ui/Modal';
 import ProgressBar from '../../ui/ProgressBar';
@@ -38,9 +38,9 @@ const CALM_CODES = new Set(['unreachable', 'unsupported-target']);
 type SourceFeedback = { kind: 'saved' } | { kind: 'error'; code: string } | null;
 
 /**
- * The start page's foot, bottom right: the version, a check, and installing
- * what it found. The source and the check on start sit behind the gear, in a
- * dialog with the release notes. All of it belongs to the installation
+ * The right half of the start page's foot: the version, a check, and
+ * installing what it found. "Update server" opens a dialog with the source,
+ * the check on start and the release notes. All of it belongs to the installation
  * (`{appDataDir}/update.json`, `updates.rs`). "Check for Updates…" and the
  * update dot open the page with a check already running (`focus`).
  */
@@ -157,7 +157,7 @@ export default function StartUpdates() {
         : null;
 
   return (
-    <footer className="start-foot">
+    <div className="start-foot-updates">
       <span className="min-w-0 truncate" role="status">{message}</span>
       {found && !installable && <span className="min-w-0 truncate">{t('settings.updateUnsupported')}</span>}
       {status === 'installing' && (
@@ -174,19 +174,15 @@ export default function StartUpdates() {
           {status === 'installing' ? t('settings.updateInstalling') : t('settings.updateInstall')}
         </Button>
       ) : (
-        <Button variant="ghost" className="flex items-center gap-1.5 px-2 disabled:opacity-50" onClick={check} disabled={busy}>
+        <button type="button" className="start-foot-action" onClick={check} disabled={busy}>
           <RefreshCw size={12} className={status === 'checking' ? 'animate-spin' : undefined} />
           {status === 'checking' ? t('settings.updateChecking') : t('settings.updateCheck')}
-        </Button>
+        </button>
       )}
-      <Button
-        variant="ghost"
-        title={t('start.updateSettings')}
-        aria-label={t('start.updateSettings')}
-        onClick={() => setSettingsOpen(true)}
-      >
-        <Settings2 size={12} />
-      </Button>
+      <button type="button" className="start-foot-action" onClick={() => setSettingsOpen(true)}>
+        <Server size={12} />
+        {t('start.updateSettings')}
+      </button>
       <span className="shrink-0 tabular-nums text-muted">{t('start.version', { version: packageJson.version })}</span>
 
       {settingsOpen && (
@@ -238,6 +234,6 @@ export default function StartUpdates() {
           </div>
         </Modal>
       )}
-    </footer>
+    </div>
   );
 }

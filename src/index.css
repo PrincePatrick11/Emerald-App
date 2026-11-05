@@ -720,9 +720,9 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
     @apply flex-1 min-h-0;
   }
 
+  /* Its width is the picker's (`VaultPicker`, dragged at the handle). */
   .start-brand {
     @apply flex flex-col shrink-0 overflow-y-auto;
-    width: clamp(260px, 30vw, 440px);
     padding: 40px 40px 24px 48px;
   }
 
@@ -793,26 +793,6 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
     border-color: var(--border-soft);
   }
 
-  /* The flags at the foot of the brand: the chosen one on a quiet well. */
-  .start-flag {
-    @apply flex items-center justify-center w-8 h-8 rounded-md text-lg leading-none transition-colors duration-150;
-    opacity: 0.55;
-  }
-
-  .start-flag:hover {
-    background-color: var(--interactive-hover);
-    opacity: 1;
-  }
-
-  .start-flag.start-flag-active {
-    background-color: var(--interactive-active);
-    opacity: 1;
-  }
-
-  .start-flag:focus-visible {
-    outline: 2px solid var(--focus-ring);
-    outline-offset: 1px;
-  }
 
   .start-stats dt {
     @apply text-[11px] truncate;
@@ -824,9 +804,34 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
     color: var(--text-primary);
   }
 
+  /* Language on the left, version and updates on the right. */
   .start-foot {
-    @apply flex items-center justify-end gap-2 shrink-0 px-8 pb-4 pt-1 text-xs;
+    @apply flex items-center justify-between gap-4 shrink-0 px-6 pb-3 pt-1 text-xs;
     color: var(--text-subtle);
+  }
+
+  .start-foot-updates {
+    @apply flex items-center justify-end gap-2 min-w-0;
+  }
+
+  .start-foot-action {
+    @apply inline-flex items-center gap-1.5 h-7 px-2 rounded-md shrink-0 text-xs transition-colors duration-150;
+    color: var(--text-muted);
+  }
+
+  .start-foot-action:hover,
+  .start-foot-action[aria-expanded="true"] {
+    color: var(--text-primary);
+    background-color: var(--interactive-hover);
+  }
+
+  .start-foot-action:disabled {
+    @apply opacity-50 cursor-not-allowed pointer-events-none;
+  }
+
+  .start-foot-action:focus-visible {
+    outline: 2px solid var(--focus-ring);
+    outline-offset: 1px;
   }
 
   .start-option:focus-visible,
@@ -1063,6 +1068,7 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
     .picker-row,
     .picker-row-actions,
     .picker-device-remove,
+    .start-foot-action,
     .start-option,
     .start-option-remove {
       transition: none;

@@ -1232,7 +1232,7 @@
     "server": "Servidor",
     "appearance": "Apariencia",
     "links": "Enlaces",
-    "updateSettings": "Ajustes de actualización",
+    "updateSettings": "Servidor de actualizaciones",
     "version": "Versión {{version}}"
   }
 }

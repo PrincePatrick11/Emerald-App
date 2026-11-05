@@ -10,6 +10,7 @@ import StartBrand from './start/StartBrand';
 import StartSection from './start/StartSection';
 import StartAppearance from './start/StartAppearance';
 import StartUpdates from './start/StartUpdates';
+import StartLanguage from './start/StartLanguage';
 import { keyErrorOf } from '../../lib/vaultKeys';
 import { hideLoadingScreen, hideSplash, showLoadingScreen } from '../../lib/splash';
 import { adoptRemoteVault, deleteRemoteVault, syncErrorCode, type RemoteVault } from '../../lib/sync/engine';
@@ -62,6 +63,24 @@ async function freeTarget(name: string): Promise<{ name: string; path: string | 
   throw new Error('no free folder');
 }
 
+/** The brand column's width, dragged as the entry list's is, kept the same way
+ *  (`AppShell`): in `localStorage`, for this installation. */
+const BRAND_WIDTH_KEY = 'start-brand-width';
+/** The name stays on one line. */
+const BRAND_MIN = 340;
+const BRAND_MAX = 560;
+const BRAND_DEFAULT = 360;
+/** What the sheet keeps however far the handle goes. */
+const SHEET_MIN = 480;
+
+const clampBrand = (width: number) =>
+  Math.round(Math.max(BRAND_MIN, Math.min(BRAND_MAX, window.innerWidth - SHEET_MIN, width)));
+
+function loadBrandWidth(): number {
+  const saved = Number(localStorage.getItem(BRAND_WIDTH_KEY));
+  return clampBrand(saved > 0 ? saved : BRAND_DEFAULT);
+}
+
 // ── picker ───────────────────────────────────────────────────────────────────
 
 /**
@@ -98,6 +117,10 @@ export default function VaultPicker() {
   const [error, setError] = useState('');
   const [fetchingId, setFetchingId] = useState<string | null>(null);
   const server = useServerState();
+  const [brandWidth, setBrandWidth] = useState(loadBrandWidth);
+  const drag = useRef<{ x: number; width: number } | null>(null);
+  // Set together with the state: the release may come before the render.
+  const brandWidthRef = useRef(brandWidth);
 
   // The loading screen of a start that ends here goes once the picker is
   // there (`AppShell` leaves it to this effect).
@@ -427,8 +450,29 @@ export default function VaultPicker() {
   const busy = switchingId !== null || fetchingId !== null;
 
   return (
-    <div className="picker-frame flex flex-1 min-h-0">
-      <StartBrand />
+    <div
+      className="picker-frame relative flex flex-1 min-h-0"
+      onPointerMove={(e) => {
+        if (!drag.current) return;
+        brandWidthRef.current = clampBrand(drag.current.width + e.clientX - drag.current.x);
+        setBrandWidth(brandWidthRef.current);
+      }}
+      onPointerUp={() => {
+        if (!drag.current) return;
+        drag.current = null;
+        localStorage.setItem(BRAND_WIDTH_KEY, String(brandWidthRef.current));
+      }}
+    >
+      <StartBrand width={brandWidth} />
+      {/* In the frame, not in the brand: it reaches over onto the sheet. */}
+      <div
+        className="sidebar-resize-handle"
+        style={{ left: brandWidth - 3 }}
+        onPointerDown={(e) => {
+          drag.current = { x: e.clientX, width: brandWidth };
+          (e.target as HTMLElement).setPointerCapture(e.pointerId);
+        }}
+      />
       <main className="app-main app-sheet-main picker-sheet flex flex-col min-w-0">
         {/* The way back as in an open entry: the row above, chevron and name. */}
         <div className="start-back-row">
@@ -555,7 +599,10 @@ export default function VaultPicker() {
           </div>
         </div>
 
-        <StartUpdates />
+        <footer className="start-foot">
+          <StartLanguage />
+          <StartUpdates />
+        </footer>
       </main>
     </div>
   );
