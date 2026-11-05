@@ -6,6 +6,8 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased] (targeting v0.2.0)
 
 ### Added
+- **The altar canvas is a real editor now:** handles to scale and rotate, several elements at once (Shift-click or a frame), guides that snap to the edges and middles of the canvas and the other elements, zoom and pan, undo and redo, arrow keys, copy and paste, and a toolbar with arranging, aligning and saving as PNG.
+- **Shapes and text on an altar:** rectangles, ellipses, triangles, stars and hexagons with fill and outline, and text typed in place in three fonts, with size, style, alignment and colour. Backups from this version need this version to restore.
 - **Headings fold:** a chevron beside a heading hides everything under it up to the next heading of the same level, while reading and editing.
 - **Collapsible sections** from the `/` menu: a heading line that opens and closes the text under it, also while reading. The PDF export prints them open.
 - **Word and character count** under the text while editing, across all text blocks.

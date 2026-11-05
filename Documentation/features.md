@@ -152,9 +152,21 @@ Adding, editing and deleting items happens in a modal. Deleting moves the item t
 - The dashboard's search matches item names too: if only items match, the altar list shows "No results" while the library shows its matches.
 - There is no drag-and-drop here — a category is changed in the edit modal, and items are dragged onto a canvas only in the editor's own strip.
 
-**Placing items.** In edit mode, drag items from the library onto the canvas. Placed items can be moved, scaled with a handle, rotated, layered, faded, hidden and locked. A click only selects: dragging starts after a few pixels of movement and the element keeps the spot where it was grabbed. A placement change that changes nothing is not written and does not re-date the altar. The mouse wheel does not scale — the handle and the inspector do. Locked elements are click-through, so clicks reach the items behind them.
+**Placing items.** In edit mode, drag items from the library onto the canvas. Placed items can be moved, scaled, rotated, layered, faded, hidden and locked. A click only selects: dragging starts after a few pixels of movement and the element keeps the spot where it was grabbed. A placement change that changes nothing is not written and does not re-date the altar. Locked elements are click-through, so clicks reach the items behind them.
 
-**Inspector and placement controls.** The right sidebar has a placed-elements list with an inline inspector under the selected row: x and y (%), rotation (°), scale (%), and an opacity slider. The inspector of a locked element is locked too (dimmed, with a tooltip). The delete button sits in the row; it removes the element without a question, and the toast that follows puts it back.
+**Editing the canvas.** In edit mode a toolbar sits above the canvas and the canvas works like a design tool:
+
+- **Handles.** A selected element shows a frame with handles: the corners scale it (pictures and text keep their proportions, Shift frees them), the round handle above rotates it (snapping near the right angles, with Shift to 15°, or to the altar's rotation snap when it is on).
+- **Several at once.** Shift-, ⌘- or Ctrl-click adds to the selection, a drag on an empty spot draws a frame around what to select, ⌘A selects everything. Moving, scaling, rotating and the toolbar then apply to all of them.
+- **Guides.** While moving, edges and centres snap to the canvas's edges and middle and to the other elements, and a pink line shows where; Alt moves freely. With "Snap" in the grid options the centre snaps to the grid instead, and with "Scale" sizes snap to whole cells.
+- **Shapes and text.** The toolbar adds rectangles, ellipses, triangles, stars and hexagons, and text boxes. A shape gets a fill and an outline from twelve colours or any other, a rectangle rounded corners. Text is typed in place (double-click or Enter to change it), wraps at its box, and takes one of three fonts, a size, bold, italic, alignment and a colour; its side handles change the width, its corners the size. Shapes and text appear in the placed-elements list like items.
+- **Arrange and align.** Bring to front, forward, backward, to back (also ⌘] and ⌘[ with and without Shift); align edges or centres of the selection, or of one element on the canvas; even gaps between three or more.
+- **Undo** (⌘Z, ⇧⌘Z) covers everything done on the canvas and in the sidebar during the edit; Cancel still returns to the state before it.
+- **Keys.** Arrows nudge (Shift: further), Delete removes, ⌘D duplicates, ⌘C/⌘X/⌘V copy, cut and paste, Escape clears the selection.
+- **Zoom.** Pinch or ⌘ with the wheel zooms at the pointer, the wheel pans, Space or the middle button with a drag pans too; the toolbar zooms and fits the canvas again (⌘0).
+- **Save as PNG** from the toolbar, at the altar's full resolution.
+
+**Inspector and placement controls.** The right sidebar has a placed-elements list with an inline inspector under the selected row: x and y (%), rotation (°), scale (%, not for text, which is sized by its font), and an opacity slider. It opens while exactly one element is selected; Shift-, ⌘- or Ctrl-click on rows selects several. The inspector of a locked element is locked too (dimmed, with a tooltip). The delete button sits in the row; it removes the element without a question, and the toast that follows puts it back.
 
 **Duplicate.** In edit mode, each placed-element row has a Duplicate button (also in its right-click menu). The copy has the same size, rotation and opacity, is offset by 2% in both axes, placed on top, unlocked, visible, and selected.
 

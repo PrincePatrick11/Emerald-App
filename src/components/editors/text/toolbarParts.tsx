@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 
-/** The buttons of the toolbar, the selection menus and the find bar. */
+/** The buttons of the toolbar, the selection menus and the find bar; the builder (`editors/builder`) uses them too. */
 export function ToolbarGroup({ children }: { children: ReactNode }) {
   return <div className="flex items-center gap-0.5">{children}</div>;
 }

@@ -68,6 +68,7 @@ Per-migration detail lives in the code and in `CHANGELOG.md`. In short:
 | 53 | `tags_by_id` | Tag lists hold ids instead of names; `tags.affected_ids` dropped ([tags](#tags)) |
 | 54 | `drop_unused_descriptions` | Drops `tasks.description`/`due_date`, `block_definitions.description`, `templates.description` |
 | 55 | `entries_list_index` | `idx_entries_list` (the list columns) and the partial `idx_entries_decorated` replace `idx_entries_deleted` |
+| 56 | `altar_elements` | Additive: `altars.elements`, the drawn shapes and text as JSON ([altars](#altars)) |
 
 Column drops go through `dropColumnsIfPresent` (`dbRebuild.ts`), which skips columns already gone, so they are repeatable. Where a migration converts data, the same converter also runs on rows from an older `.emeralddb` file at import time — see [DB Backup / Restore](#db-backup--restore-emeralddb).
 
@@ -269,8 +270,11 @@ How words are matched when translating lives in `src/lib/lexicon.ts` — see [Le
 | created_at / updated_at | TEXT | ISO 8601 |
 | deleted_at | TEXT | NULL = active. `altarStore` holds only altars without it; a trashed altar keeps its placements (`ON DELETE CASCADE` takes them once the row goes); purged after the retention period (`CLEANUP_TABLES`) |
 | settings | TEXT | NOT NULL DEFAULT `'{}'`; JSON with the twelve display keys (`ALTAR_SETTING_KEYS`): `background_preset`, `background_overlay`, `background_overlay_color`, `grid_enabled`, `grid_size`, `grid_opacity`, `grid_color`, `snap_to_grid`, `rotation_snap_enabled`, `rotation_snap_angle`, `snap_scale_to_grid`, `resolution` |
+| elements | TEXT | NOT NULL DEFAULT `'[]'`; JSON list of the shapes and text drawn on the altar (since v56) |
 
 The display settings are one JSON column because they are only ever read and written together and no query filters by them; the image columns stay columns because the image cleanup looks for references in columns.
+
+`elements` holds what is drawn on an altar rather than taken from the library: shapes (`rect`, `ellipse`, `triangle`, `star`, `hexagon` with fill, outline, outline width and corner radius) and text (content, font, size, colour, alignment, bold, italic). They hang on no library item, so they cannot be rows of `altar_placements`, whose `item_id` is required. Each entry carries the same `id`, `x`/`y`, `z_index`, `width`/`height`, `rotation`, `opacity`, `locked` and `hidden` as a placement, plus `kind` (`shape` or `text`) and its `shape` or `text` object; sizes of fonts, outlines and corners are pixels at the reference width of 1920. `parseAltarElements` and `altarElementsJson` (`src/lib/altarElements.ts`) read and write it, validating like `parseAltarSettings`; the store holds the entries as placements with that `kind` and an empty `item_id`. A copied altar, a merged backup and an imported `.emerald` file give them new ids (`withNewElementIds`), since ids are unique across all altars in the store.
 
 `AltarRecord` stays flat: `fromRow.altar` unpacks `settings` through `parseAltarSettings`, and every write packs it through `altarSettingsJson` (`src/lib/altarSettings.ts`), which always normalizes — every key present, in a fixed order, a missing or invalid value replaced by its `DEFAULT_*` from `altarConstants.ts` (a non-hex grid colour, an unknown resolution, a non-finite number). `parseAltarSettings` also accepts a row with the individual columns (flags as 0/1), which is how v51 and pre-`"12"` backups are converted.
 
@@ -469,12 +473,13 @@ Full vault snapshots are exported and imported via Settings → Backup. The code
 
 ### Backup versions
 
-`BACKUP_VERSION` is `"12"`. A build rejects any file newer than itself before touching anything (`migrateBackupPayload` compares numerically — a string compare would think `"10"` older than `"4"`). That is why the version is bumped whenever an older build would otherwise import a file *wrongly* rather than fail: `insertRows` filters every row against `PRAGMA table_info` (to guard against crafted files), so an older build would silently drop a column it doesn't know.
+`BACKUP_VERSION` is `"13"`. A build rejects any file newer than itself before touching anything (`migrateBackupPayload` compares numerically — a string compare would think `"10"` older than `"4"`). That is why the version is bumped whenever an older build would otherwise import a file *wrongly* rather than fail: `insertRows` filters every row against `PRAGMA table_info` (to guard against crafted files), so an older build would silently drop a column it doesn't know.
 
 `migrateBackupPayload` lifts an older file on load; some conversions run later, row by row, before insertion. Each step is an ordered `version < N` test, so a newer file never runs an older step twice.
 
 | Version | Since | What changed | What import does with an older file |
 |---|---|---|---|
+| 13 | v56 | altars carry `elements` | Nothing; an older build would drop the drawn shapes and text, so it must refuse |
 | 12 | v51–v53 | altar `settings` JSON; altar items with `updated_at`/`deleted_at`; tag ids | Packs altar columns into `settings` (`altarSettingsJson`); gives items `updated_at = created_at`; `tagNamesToIds` converts entries', templates' and old routines' tag names by the v53 rule ([tags](#tags)) and drops `affected_ids` |
 | 11 | v49 | one `data.entries` array with `type` | A `"11"`+ file is split back into journal/wiki/operation arrays (`splitEntries`; unknown `type` dropped), so the import paths work on three arrays; `entryRowsForInsert` projects them onto `entries`, de-duplicating ids (journal, wiki, operation wins) |
 | 10 | v46 | altars carry `deleted_at` | Nothing; an older build would revive trashed altars, so it must refuse |
