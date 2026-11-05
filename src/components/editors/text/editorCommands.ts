@@ -307,6 +307,30 @@ export function applyLinkHref(editor: Editor, href: string): void {
   } else chain.setLink({ href: value }).run();
 }
 
+/**
+ * The toolbar's collapsible section: wraps the selected blocks in one, or,
+ * inside one, unwraps it again. An empty summary would stay behind as an
+ * empty paragraph, which goes too.
+ */
+export function toggleDetails(editor: Editor): void {
+  if (!editor.isActive('details')) {
+    editor.chain().focus().setDetails().run();
+    return;
+  }
+  const { $from } = editor.state.selection;
+  let at = -1;
+  for (let depth = $from.depth; depth > 0; depth--) {
+    if ($from.node(depth).type.name !== 'details') continue;
+    at = $from.before(depth);
+    break;
+  }
+  editor.chain().focus().unsetDetails().command(({ tr }) => {
+    const left = at >= 0 ? tr.doc.nodeAt(at) : null;
+    if (left?.type.name === 'paragraph' && left.content.size === 0) tr.delete(at, at + left.nodeSize);
+    return true;
+  }).run();
+}
+
 /** Take the link at the selection away. */
 export function removeLink(editor: Editor): void {
   editor.chain().focus().extendMarkRange('link').unsetLink().run();
