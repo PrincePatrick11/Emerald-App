@@ -1038,12 +1038,6 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
     outline-offset: 1px;
   }
 
-  .start-notes {
-    @apply text-xs whitespace-pre-wrap font-sans max-h-32 overflow-y-auto rounded-md p-2;
-    background-color: var(--bg-surface-1);
-    color: var(--text-muted);
-  }
-
   .picker-label {
     @apply block text-xs mb-1.5;
     color: var(--text-muted);

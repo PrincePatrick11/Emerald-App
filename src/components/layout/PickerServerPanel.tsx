@@ -137,27 +137,26 @@ export default function PickerServerPanel({ server }: { server: ServerState }) {
   );
 
   return (
-    <StartSection id="start-server-heading" icon={<Cloud size={12} />} label={t('start.server')}>
+    <StartSection
+      id="start-server-heading"
+      icon={<Cloud size={12} />}
+      label={t('start.server')}
+      aside={connected ? undefined : stateMark}
+    >
       {!connected ? (
         <>
+          {/* Both fields, also once signed out: the address may have moved. */}
           <div className="start-panel space-y-3">
-            {status.url ? (
-              <div className="flex items-center justify-between gap-3">
-                <span className="text-sm truncate text-primary">{status.url}</span>
-                {stateMark}
-              </div>
-            ) : (
-              <input
-                type="url"
-                className="input-field settings-field"
-                placeholder="https://sync.example.com"
-                aria-label={t('sync.url')}
-                spellCheck={false}
-                value={url}
-                disabled={busy}
-                onChange={(e) => setUrl(e.target.value)}
-              />
-            )}
+            <input
+              type="url"
+              className="input-field settings-field"
+              placeholder="https://sync.example.com"
+              aria-label={t('sync.url')}
+              spellCheck={false}
+              value={url}
+              disabled={busy}
+              onChange={(e) => setUrl(e.target.value)}
+            />
             <div className="flex items-center gap-2">
               <input
                 type="password"

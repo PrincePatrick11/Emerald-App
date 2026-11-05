@@ -1232,8 +1232,9 @@
     "server": "Serveur",
     "appearance": "Apparence",
     "links": "Liens",
-    "updateSettings": "Serveur de mises à jour",
     "version": "Version {{version}}",
-    "opened": "ouvert"
+    "opened": "ouvert",
+    "byAuthor": "par {{name}}",
+    "updates": "Mises à jour"
   }
 }

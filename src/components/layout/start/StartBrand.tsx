@@ -57,8 +57,8 @@ export default function StartBrand({ width }: { width: number }) {
         </nav>
       </div>
       <div className="mt-auto pt-8 flex items-center justify-between gap-3 text-xs text-subtle">
-        <span className="truncate">{packageJson.author}</span>
         <span className="shrink-0 tabular-nums">{t('start.version', { version: packageJson.version })}</span>
+        <span className="truncate">{t('start.byAuthor', { name: packageJson.author })}</span>
       </div>
     </aside>
   );

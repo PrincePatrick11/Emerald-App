@@ -1232,8 +1232,9 @@
     "server": "Server",
     "appearance": "Aussehen",
     "links": "Links",
-    "updateSettings": "Update-Server",
     "version": "Version {{version}}",
-    "opened": "geöffnet"
+    "opened": "geöffnet",
+    "byAuthor": "von {{name}}",
+    "updates": "Updates"
   }
 }

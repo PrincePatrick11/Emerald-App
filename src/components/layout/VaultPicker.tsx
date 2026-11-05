@@ -9,6 +9,7 @@ import StartBrand from './start/StartBrand';
 import StartSection from './start/StartSection';
 import StartAppearance from './start/StartAppearance';
 import StartUpdates from './start/StartUpdates';
+import StartUpdateSource from './start/StartUpdateSource';
 import StartLanguage from './start/StartLanguage';
 import { keyErrorOf } from '../../lib/vaultKeys';
 import { hideLoadingScreen, hideSplash, showLoadingScreen } from '../../lib/splash';
@@ -117,6 +118,7 @@ export default function VaultPicker() {
   const [fetchingId, setFetchingId] = useState<string | null>(null);
   const server = useServerState();
   const [brandWidth, setBrandWidth] = useState(loadBrandWidth);
+  const [updateSource, setUpdateSource] = useState(0);
   const drag = useRef<{ x: number; width: number } | null>(null);
   // Set together with the state: the release may come before the render.
   const brandWidthRef = useRef(brandWidth);
@@ -584,12 +586,14 @@ export default function VaultPicker() {
           <div className="start-columns">
             <PickerServerPanel server={server} />
             <StartAppearance />
+            <StartUpdateSource onSourceChanged={() => setUpdateSource((n) => n + 1)} />
           </div>
         </div>
 
         <footer className="start-foot">
           <StartLanguage />
-          <StartUpdates />
+          {/* A new source drops the result of the old one. */}
+          <StartUpdates key={updateSource} />
         </footer>
       </main>
     </div>

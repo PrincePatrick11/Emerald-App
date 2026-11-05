@@ -1232,8 +1232,9 @@
     "server": "Server",
     "appearance": "Appearance",
     "links": "Links",
-    "updateSettings": "Update server",
     "version": "Version {{version}}",
-    "opened": "open"
+    "opened": "open",
+    "byAuthor": "by {{name}}",
+    "updates": "Updates"
   }
 }
