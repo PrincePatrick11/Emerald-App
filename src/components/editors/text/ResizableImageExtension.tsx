@@ -1,4 +1,5 @@
 import { Node, mergeAttributes, type Editor } from '@tiptap/core';
+import { NodeSelection, Selection, TextSelection } from '@tiptap/pm/state';
 import { ReactNodeViewRenderer, NodeViewWrapper } from '@tiptap/react';
 import type { NodeViewProps } from '@tiptap/react';
 import { useRef, useState } from 'react';
@@ -142,12 +143,58 @@ function ResizableImageView({ node, updateAttributes, selected, editor, getPos }
   };
 
   /**
-   * A press on the image itself: a click selects it as before; once the
-   * pointer travels, it becomes a move, which the host's drop listener
-   * finishes (`useEditorPointerDrops`).
+   * A press on an image not yet selected: a click selects it; once the
+   * pointer travels, it marks text, as a drag that starts in the text does —
+   * from the image's edge to the pointer, the image included. The page
+   * would start no selection from it, since the image is not editable.
+   */
+  const startSelecting = (e: React.PointerEvent) => {
+    e.preventDefault();
+    const startX = e.clientX;
+    const startY = e.clientY;
+    let started = false;
+    const imagePos = () => (typeof getPos === 'function' ? getPos() : undefined);
+
+    const onMove = (ev: PointerEvent) => {
+      if (!started && Math.hypot(ev.clientX - startX, ev.clientY - startY) < DRAG_THRESHOLD_PX) return;
+      started = true;
+      const from = imagePos();
+      const head = editor.view.posAtCoords({ left: ev.clientX, top: ev.clientY })?.pos;
+      if (from === undefined || head === undefined) return;
+      const { doc } = editor.state;
+      const to = from + node.nodeSize;
+      // The far side of the image is the anchor: the text position just
+      // before it when marking downwards, just after it when marking upwards.
+      let anchor: number;
+      if (head >= to) anchor = Selection.findFrom(doc.resolve(from), -1, true)?.from ?? from;
+      else if (head <= from) anchor = Selection.findFrom(doc.resolve(to), 1, true)?.from ?? to;
+      else return;
+      editor.view.dispatch(editor.state.tr.setSelection(TextSelection.create(doc, anchor, head)));
+    };
+    const onUp = () => {
+      document.removeEventListener('pointermove', onMove);
+      document.removeEventListener('pointerup', onUp);
+      document.removeEventListener('pointercancel', onUp);
+      if (started) return;
+      const pos = imagePos();
+      if (pos !== undefined) editor.view.dispatch(editor.state.tr.setSelection(NodeSelection.create(editor.state.doc, pos)));
+    };
+    editor.view.focus();
+    document.addEventListener('pointermove', onMove);
+    document.addEventListener('pointerup', onUp);
+    document.addEventListener('pointercancel', onUp);
+  };
+
+  /**
+   * A press on the image itself. Not yet selected, it selects or marks
+   * (`startSelecting`); selected, a click keeps it so, and once the pointer
+   * travels it becomes a move, which the host's drop listener finishes
+   * (`useEditorPointerDrops`) — as dragging a selected picture moves it in a
+   * word processor.
    */
   const onImagePointerDown = (e: React.PointerEvent) => {
     if (!editable || e.button !== 0) return;
+    if (!selected) { startSelecting(e); return; }
     const startX = e.clientX;
     const startY = e.clientY;
     let started = false;
@@ -200,7 +247,7 @@ function ResizableImageView({ node, updateAttributes, selected, editor, getPos }
           decoding="async"
           draggable={false}
           onPointerDown={onImagePointerDown}
-          className={`block w-full rounded-lg object-contain${selected ? ' ring-2 ring-focus ring-offset-1 ring-offset-well-page' : ''}${editable ? ' cursor-grab' : ''}${moving ? ' opacity-40' : ''}`}
+          className={`block w-full rounded-lg object-contain${selected ? ' ring-2 ring-focus ring-offset-1 ring-offset-well-page' : ''}${editable && selected ? ' cursor-grab' : ''}${moving ? ' opacity-40' : ''}`}
           // While editing a touch drag moves the image instead of scrolling the page.
           style={{ maxHeight: 600, touchAction: editable ? 'none' : undefined }}
         />
