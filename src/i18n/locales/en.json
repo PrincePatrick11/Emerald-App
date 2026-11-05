@@ -250,14 +250,7 @@
     "letterBank": "Letter Bank",
     "noLetters": "No letters prepared yet.",
     "targetDate": "Target date",
-    "brushSize": "Brush",
-    "undo": "Undo",
-    "redo": "Redo",
-    "clear": "Clear canvas",
-    "tools": {
-      "draw": "Draw",
-      "erase": "Erase"
-    }
+    "brushSize": "Brush"
   },
   "wiki": {
     "title": "Wiki",
@@ -558,7 +551,30 @@
       "expand": "Expand section",
       "collapse": "Collapse section"
     },
-    "unsaved": "Unsaved changes"
+    "unsaved": "Unsaved changes",
+    "paint": {
+      "tools": {
+        "pen": "Pen",
+        "line": "Line",
+        "ellipse": "Ellipse",
+        "rect": "Rectangle",
+        "eraser": "Eraser"
+      },
+      "color": "Colour",
+      "customColor": "Any colour",
+      "size": "Brush size",
+      "layers": "Layers",
+      "layerN": "Layer {{n}}",
+      "addLayer": "Add layer",
+      "removeLayer": "Remove layer",
+      "layerUp": "Move up",
+      "layerDown": "Move down",
+      "showLayer": "Show layer",
+      "hideLayer": "Hide layer",
+      "renameHint": "Click to draw on it, double-click to rename",
+      "clear": "Clear drawing",
+      "loadFailed": "Couldn't load the drawing — close and reopen the entry to try again"
+    }
   },
   "moonPhase": {
     "new": "New Moon",

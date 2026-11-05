@@ -1,0 +1,136 @@
+import { getStroke } from 'perfect-freehand';
+import { isShapeTool, PAINT_HEIGHT, PAINT_WIDTH, type PaintDoc, type PaintLayer, type PaintStroke } from '../../../lib/paint/document';
+
+/**
+ * Drawing a document onto a canvas. A pen or eraser stroke is a filled
+ * outline from `perfect-freehand` (its width follows the pen's pressure, or
+ * the speed for a mouse or finger); a shape is a stroked path of the brush's
+ * width. The eraser cuts its outline out of its own layer only
+ * (`destination-out`), which is why every layer is drawn on its own canvas
+ * first and the layers are stacked afterwards.
+ */
+
+/** Loaded layer images by file name; a missing one is simply not drawn yet. */
+export type LayerImages = ReadonlyMap<string, HTMLImageElement>;
+
+// A stroke never changes once committed, so its path is computed once.
+const paths = new WeakMap<PaintStroke, Path2D>();
+
+function freehandOptions(stroke: Pick<PaintStroke, 'tool' | 'size' | 'pressure'>, last: boolean) {
+  const eraser = stroke.tool === 'eraser';
+  return {
+    size: stroke.size,
+    thinning: eraser ? 0 : stroke.pressure ? 0.65 : 0.5,
+    smoothing: 0.6,
+    streamline: stroke.pressure ? 0.4 : 0.5,
+    simulatePressure: !stroke.pressure && !eraser,
+    last,
+    start: { cap: true, taper: 0 },
+    end: { cap: true, taper: 0 },
+  };
+}
+
+function triples(points: readonly number[]): number[][] {
+  const out: number[][] = [];
+  for (let i = 0; i + 2 < points.length; i += 3) out.push([points[i], points[i + 1], points[i + 2]]);
+  return out;
+}
+
+/** The outline as a closed path of quadratic curves through the midpoints (perfect-freehand's README). */
+function outlinePath(outline: number[][]): Path2D {
+  const path = new Path2D();
+  if (outline.length < 2) return path;
+  const [first, second] = outline;
+  path.moveTo(first[0], first[1]);
+  path.quadraticCurveTo(second[0], second[1], (first[0] + second[0]) / 2, (first[1] + second[1]) / 2);
+  for (let i = 1; i < outline.length - 1; i++) {
+    const a = outline[i], b = outline[i + 1];
+    path.quadraticCurveTo(a[0], a[1], (a[0] + b[0]) / 2, (a[1] + b[1]) / 2);
+  }
+  path.closePath();
+  return path;
+}
+
+/** The shape between two corners (or the two ends of a line). */
+export function shapePath(tool: PaintStroke['tool'], points: readonly number[]): Path2D {
+  const path = new Path2D();
+  const [x0, y0, , x1 = x0, y1 = y0] = points;
+  if (tool === 'line') {
+    path.moveTo(x0, y0);
+    path.lineTo(x1, y1);
+  } else if (tool === 'rect') {
+    path.rect(Math.min(x0, x1), Math.min(y0, y1), Math.abs(x1 - x0), Math.abs(y1 - y0));
+  } else {
+    path.ellipse((x0 + x1) / 2, (y0 + y1) / 2, Math.abs(x1 - x0) / 2, Math.abs(y1 - y0) / 2, 0, 0, Math.PI * 2);
+  }
+  return path;
+}
+
+/** The path of a stroke; `live` while it is still being drawn (not cached, the end not yet final). */
+export function strokePath(stroke: PaintStroke, live = false): Path2D {
+  if (!live) {
+    const cached = paths.get(stroke);
+    if (cached) return cached;
+  }
+  const path = isShapeTool(stroke.tool)
+    ? shapePath(stroke.tool, stroke.points)
+    : outlinePath(getStroke(triples(stroke.points), freehandOptions(stroke, !live)));
+  if (!live) paths.set(stroke, path);
+  return path;
+}
+
+export function drawStroke(ctx: CanvasRenderingContext2D, stroke: PaintStroke, live = false): void {
+  const path = strokePath(stroke, live);
+  ctx.globalCompositeOperation = stroke.tool === 'eraser' ? 'destination-out' : 'source-over';
+  if (isShapeTool(stroke.tool)) {
+    ctx.strokeStyle = stroke.color;
+    ctx.lineWidth = stroke.size;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.stroke(path);
+  } else {
+    ctx.fillStyle = stroke.color;
+    ctx.fill(path);
+  }
+  ctx.globalCompositeOperation = 'source-over';
+}
+
+/**
+ * One layer onto a canvas whose transform maps the document's units; the
+ * canvas is cleared first. `extra` is a stroke still being drawn.
+ */
+export function drawLayer(ctx: CanvasRenderingContext2D, layer: PaintLayer, images: LayerImages, extra?: PaintStroke): void {
+  ctx.save();
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+  ctx.restore();
+  const image = layer.image ? images.get(layer.image) : undefined;
+  if (image) ctx.drawImage(image, 0, 0, PAINT_WIDTH, PAINT_HEIGHT);
+  for (const stroke of layer.strokes) drawStroke(ctx, stroke);
+  if (extra) drawStroke(ctx, extra, true);
+}
+
+function canvasOf(width: number, height: number): HTMLCanvasElement {
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = height;
+  return canvas;
+}
+
+/**
+ * The document as a PNG data URL at its own size, on a transparent ground,
+ * hidden layers left out — what read mode, the entry's card and the exports
+ * show. The layer images must be loaded.
+ */
+export function renderPaintPng(doc: PaintDoc, images: LayerImages): string {
+  const out = canvasOf(PAINT_WIDTH, PAINT_HEIGHT);
+  const layer = canvasOf(PAINT_WIDTH, PAINT_HEIGHT);
+  const octx = out.getContext('2d')!;
+  const lctx = layer.getContext('2d')!;
+  for (const l of doc.layers) {
+    if (l.hidden) continue;
+    drawLayer(lctx, l, images);
+    octx.drawImage(layer, 0, 0);
+  }
+  return out.toDataURL('image/png');
+}

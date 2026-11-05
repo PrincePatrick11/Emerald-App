@@ -250,14 +250,7 @@
     "letterBank": "Banco de letras",
     "noLetters": "Aún no hay letras preparadas.",
     "targetDate": "Fecha objetivo",
-    "brushSize": "Pincel",
-    "undo": "Deshacer",
-    "redo": "Rehacer",
-    "clear": "Limpiar lienzo",
-    "tools": {
-      "draw": "Dibujar",
-      "erase": "Borrar"
-    }
+    "brushSize": "Pincel"
   },
   "wiki": {
     "title": "Wiki",
@@ -558,7 +551,30 @@
       "expand": "Desplegar la sección",
       "collapse": "Plegar la sección"
     },
-    "unsaved": "Cambios sin guardar"
+    "unsaved": "Cambios sin guardar",
+    "paint": {
+      "tools": {
+        "pen": "Lápiz",
+        "line": "Línea",
+        "ellipse": "Elipse",
+        "rect": "Rectángulo",
+        "eraser": "Borrador"
+      },
+      "color": "Color",
+      "customColor": "Cualquier color",
+      "size": "Tamaño del pincel",
+      "layers": "Capas",
+      "layerN": "Capa {{n}}",
+      "addLayer": "Añadir capa",
+      "removeLayer": "Quitar capa",
+      "layerUp": "Subir",
+      "layerDown": "Bajar",
+      "showLayer": "Mostrar capa",
+      "hideLayer": "Ocultar capa",
+      "renameHint": "Clic para dibujar en ella, doble clic para renombrar",
+      "clear": "Vaciar dibujo",
+      "loadFailed": "No se pudo cargar el dibujo: cierra y vuelve a abrir la entrada"
+    }
   },
   "moonPhase": {
     "new": "Luna nueva",

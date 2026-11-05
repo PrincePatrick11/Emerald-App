@@ -2312,6 +2312,145 @@ html[data-theme] .prop-segment--active {
   background: var(--border-soft);
 }
 
+/* The paint editor (components/editors/paint): its bar over the drawing. */
+.paint-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  outline: none;
+}
+/* A panel of the bar that lists rather than lines up (the layers). */
+.editor-toolbar-popover--column {
+  flex-direction: column;
+  align-items: stretch;
+}
+.paint-color-chip {
+  width: 14px;
+  height: 14px;
+  border-radius: 9999px;
+  border: 1px solid var(--edge-strong);
+}
+.paint-size-label {
+  min-width: 1.25rem;
+  font-variant-numeric: tabular-nums;
+}
+.paint-custom-color {
+  position: relative;
+  width: 18px;
+  height: 18px;
+  overflow: hidden;
+  border-radius: 9999px;
+  border: 1px solid var(--edge-strong);
+  background: conic-gradient(#ef4444, #f59e0b, #00e699, #60a5fa, #a78bfa, #ef4444);
+  cursor: pointer;
+}
+.paint-custom-color input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+.paint-size-panel {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0 0.375rem;
+}
+.paint-size-preview {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+}
+.paint-size-preview span {
+  min-width: 1px;
+  min-height: 1px;
+  border-radius: 9999px;
+  border: 1px solid var(--edge-strong);
+}
+.paint-size-slider { width: 9rem; }
+.paint-size-value {
+  width: 1.75rem;
+  text-align: right;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-subtle);
+}
+.paint-layers {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 16rem;
+}
+.paint-layer {
+  display: flex;
+  align-items: center;
+  gap: 1px;
+  border-radius: 0.375rem;
+}
+.paint-layer--active { background: var(--interactive-hover); }
+.paint-layer-name {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  align-items: center;
+  gap: 0.375rem;
+  height: 1.75rem;
+  padding: 0 0.375rem;
+  border-radius: 0.375rem;
+  font-size: 12px;
+  text-align: left;
+  color: var(--text-secondary);
+}
+.paint-layer--active .paint-layer-name { color: var(--editor-toolbar-active-text); }
+.paint-layer-name--hidden { opacity: 0.55; }
+input.paint-layer-name { display: block; }
+.paint-layer-add {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  height: 1.75rem;
+  margin-top: 2px;
+  padding: 0 0.5rem;
+  border-top: 1px solid var(--border-soft);
+  font-size: 12px;
+  color: var(--text-subtle);
+}
+.paint-layer-add:enabled:hover { color: var(--text-primary); }
+.paint-layer-add:disabled { opacity: 0.5; cursor: not-allowed; }
+/* The drawing surface: the sheet's canvas colour, 3:2 like the document. */
+.paint-canvas-shell {
+  position: relative;
+  overflow: hidden;
+  border-radius: 0.75rem;
+  border: 1px solid var(--edge);
+  background: var(--canvas);
+  outline: none;
+}
+.paint-canvas {
+  display: block;
+  width: 100%;
+  aspect-ratio: 3 / 2;
+  background: transparent;
+}
+.paint-canvas--editable {
+  touch-action: none;
+  cursor: none;
+}
+/* The brush's outline under the pointer (PaintCanvas places it). */
+.paint-cursor {
+  position: absolute;
+  top: 0;
+  left: 0;
+  border-radius: 9999px;
+  border: 1px solid var(--text-primary);
+  box-shadow: 0 0 0 1px var(--well-solid);
+  opacity: 0;
+  pointer-events: none;
+}
+.paint-cursor--eraser { border-style: dashed; }
+
 /* The negative outer margin cancels the inner padding horizontally: the text
    stays flush under the title in edit mode, exactly where it sits in
    read mode — the frame wraps around the outside, into the page's px-8. */

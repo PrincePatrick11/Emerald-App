@@ -3,7 +3,7 @@ import type { Editor } from '@tiptap/react';
 import { useTranslation } from 'react-i18next';
 import { ChevronDown, ChevronUp, CornerDownRight, Replace, Search, X } from 'lucide-react';
 import { scrollIntoViewCentered } from '../../../lib/reveal';
-import { ToolbarBtn, ToolbarDivider, ToolbarGroup } from './toolbarParts';
+import { ToolbarBtn, ToolbarDivider, ToolbarGroup } from '../toolbarParts';
 import { editorHas } from './hostContext';
 import { findMatches, setSearch, type SearchMatch } from './SearchExtension';
 import { revealPosition } from './editorCommands';

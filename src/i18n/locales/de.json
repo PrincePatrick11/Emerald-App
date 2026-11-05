@@ -250,14 +250,7 @@
     "letterBank": "Buchstabensatz",
     "noLetters": "Noch keine Buchstaben vorbereitet.",
     "targetDate": "Zieldatum",
-    "brushSize": "Pinsel",
-    "undo": "Rückgängig",
-    "redo": "Wiederholen",
-    "clear": "Leinwand leeren",
-    "tools": {
-      "draw": "Zeichnen",
-      "erase": "Radieren"
-    }
+    "brushSize": "Pinsel"
   },
   "wiki": {
     "title": "Wiki",
@@ -558,7 +551,30 @@
       "expand": "Abschnitt aufklappen",
       "collapse": "Abschnitt zuklappen"
     },
-    "unsaved": "Ungespeicherte Änderungen"
+    "unsaved": "Ungespeicherte Änderungen",
+    "paint": {
+      "tools": {
+        "pen": "Stift",
+        "line": "Linie",
+        "ellipse": "Ellipse",
+        "rect": "Rechteck",
+        "eraser": "Radierer"
+      },
+      "color": "Farbe",
+      "customColor": "Beliebige Farbe",
+      "size": "Pinselgröße",
+      "layers": "Ebenen",
+      "layerN": "Ebene {{n}}",
+      "addLayer": "Ebene hinzufügen",
+      "removeLayer": "Ebene entfernen",
+      "layerUp": "Nach oben",
+      "layerDown": "Nach unten",
+      "showLayer": "Ebene einblenden",
+      "hideLayer": "Ebene ausblenden",
+      "renameHint": "Klicken, um darauf zu zeichnen; Doppelklick zum Umbenennen",
+      "clear": "Zeichnung leeren",
+      "loadFailed": "Die Zeichnung konnte nicht geladen werden – Eintrag schließen und erneut öffnen"
+    }
   },
   "moonPhase": {
     "new": "Neumond",

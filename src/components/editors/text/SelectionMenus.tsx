@@ -9,7 +9,7 @@ import {
   BetweenHorizontalEnd, BetweenHorizontalStart, BetweenVerticalEnd, BetweenVerticalStart, Globe, Grid2x2X,
   PanelTop, Palette, TableColumnsSplit, TableRowsSplit, Trash2, Unlink, X,
 } from 'lucide-react';
-import { ToolbarBtn, ToolbarDivider, ToolbarGroup } from './toolbarParts';
+import { ToolbarBtn, ToolbarDivider, ToolbarGroup } from '../toolbarParts';
 import { editorHas } from './hostContext';
 import { ALIGN_ACTIONS, applyAlign, markActionsOf } from './formatActions';
 import { applyLinkHref } from './editorCommands';

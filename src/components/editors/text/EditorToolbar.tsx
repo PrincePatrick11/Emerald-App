@@ -1,4 +1,3 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react';
 import type { Editor } from '@tiptap/react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -11,7 +10,7 @@ import { applyLinkHref, NEW_TABLE, pickImageFiles } from './editorCommands';
 import LinkHrefForm from './LinkHrefForm';
 import TextColorSwatches from './TextColorSwatches';
 import type { TextColor } from '../../../lib/textColors';
-import { ToolbarBtn, ToolbarDivider, ToolbarGroup } from './toolbarParts';
+import { PopoverButton, ToolbarBtn, ToolbarDivider, ToolbarGroup } from '../toolbarParts';
 
 /**
  * The formatting bar of a text editor. It shows only what the editor's schema
@@ -181,36 +180,6 @@ export default function EditorToolbar({ editor, onOpenLinkPicker, findOpen, onTo
           </ToolbarBtn>
         </div>
       )}
-    </div>
-  );
-}
-
-/**
- * A toolbar button with a small panel hanging under it (`.editor-toolbar-popover`).
- * A click elsewhere closes it; the panel gets `close` to close itself.
- */
-function PopoverButton({ icon, title, active, children }: {
-  icon: ReactNode;
-  title: string;
-  active: boolean;
-  children: (close: () => void) => ReactNode;
-}) {
-  const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!open) return;
-    const onDown = (e: MouseEvent) => { if (!ref.current?.contains(e.target as Node)) setOpen(false); };
-    document.addEventListener('mousedown', onDown);
-    return () => document.removeEventListener('mousedown', onDown);
-  }, [open]);
-
-  return (
-    <div ref={ref} className="relative">
-      <ToolbarBtn onClick={() => setOpen((v) => !v)} active={active || open} title={title}>
-        {icon}
-      </ToolbarBtn>
-      {open && <div className="editor-selection-menu editor-toolbar-popover">{children(() => setOpen(false))}</div>}
     </div>
   );
 }
