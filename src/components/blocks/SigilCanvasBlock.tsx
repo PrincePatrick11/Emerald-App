@@ -106,7 +106,11 @@ export default function SigilCanvasBlock({ block, isEditing, onBlockChange, onPe
   );
 }
 
-/** `startColor`/`startSize`: what is drawn with until you switch; a custom block can specify it. */
+/**
+ * The adapter between block and paint editor: the document the block holds
+ * (an old image as its first layer), the sigil palette, and the brush a
+ * custom block may start with (`startColor`/`startSize`).
+ */
 function CanvasEditor({ block, startColor, startSize, onChange, onClose }: {
   block: BlockViewProps['block'];
   startColor: string;
@@ -117,8 +121,10 @@ function CanvasEditor({ block, startColor, startSize, onChange, onClose }: {
   // The drawing it was opened with; afterwards the editor itself is the truth.
   const [initial] = useState(() => parseSigilDrawing(block).doc ?? emptyPaintDoc());
   useEffect(() => onClose, [onClose]);
+  const { t } = useTranslation();
   return (
     <PaintEditor
+      loadFailedText={t('blocks.sigil.loadFailed')}
       initial={initial}
       onChange={onChange}
       palette={SIGIL_COLORS}

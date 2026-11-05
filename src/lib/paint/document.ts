@@ -8,7 +8,7 @@
  * document keeps it where image references are found (an `<img src>`), and
  * hands it back by layer ID.
  *
- * Pure and DOM-free: `lib/blocks/sigil.ts` and the block checks use it.
+ * Pure and DOM-free, so that storage code and checks running under Node can use it.
  */
 
 /** The document's own coordinate space; a stroke's points are in it. */
@@ -97,7 +97,7 @@ const round2 = (n: number) => Math.round(n * 100) / 100;
 
 /**
  * The JSON of a document. Short keys: a drawing holds thousands of points,
- * and the JSON sits in an attribute of the entry. Coordinates are rounded to
+ * and the JSON is stored inside other content. Coordinates are rounded to
  * a tenth, pressure to a hundredth. Layer images are left out (see above).
  */
 export function paintDocToJson(doc: PaintDoc): Record<string, unknown> {

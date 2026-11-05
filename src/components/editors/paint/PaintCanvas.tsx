@@ -272,7 +272,7 @@ export default function PaintCanvas({ doc, activeLayer, tool, color, size, image
   }, [schedule]);
 
   return (
-    <div ref={shellRef} tabIndex={-1} className="paint-canvas-shell sigil-canvas-shell">
+    <div ref={shellRef} tabIndex={-1} className="paint-canvas-shell">
       <canvas
         ref={canvasRef}
         width={backing.width}
@@ -282,7 +282,7 @@ export default function PaintCanvas({ doc, activeLayer, tool, color, size, image
         onPointerUp={(e) => finish(e, true)}
         onPointerCancel={(e) => finish(e, false)}
         onPointerLeave={(e) => placeCursor(e, false)}
-        className={`paint-canvas sigil-canvas${editable ? ' paint-canvas--editable' : ''}`}
+        className={`paint-canvas${editable ? ' paint-canvas--editable' : ''}`}
       />
       {editable && <div ref={cursorRef} className={`paint-cursor${tool === 'eraser' ? ' paint-cursor--eraser' : ''}`} aria-hidden />}
     </div>

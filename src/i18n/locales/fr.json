@@ -573,7 +573,7 @@
       "hideLayer": "Masquer le calque",
       "renameHint": "Cliquer pour dessiner dessus, double-cliquer pour renommer",
       "clear": "Vider le dessin",
-      "loadFailed": "Impossible de charger le dessin — fermez et rouvrez l'entrée"
+      "loadFailed": "Impossible de charger une image de ce dessin"
     }
   },
   "moonPhase": {

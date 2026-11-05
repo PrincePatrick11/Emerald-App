@@ -573,7 +573,7 @@
       "hideLayer": "Hide layer",
       "renameHint": "Click to draw on it, double-click to rename",
       "clear": "Clear drawing",
-      "loadFailed": "Couldn't load the drawing — close and reopen the entry to try again"
+      "loadFailed": "Couldn't load an image of this drawing"
     }
   },
   "moonPhase": {

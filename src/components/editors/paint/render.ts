@@ -119,8 +119,8 @@ function canvasOf(width: number, height: number): HTMLCanvasElement {
 
 /**
  * The document as a PNG data URL at its own size, on a transparent ground,
- * hidden layers left out — what read mode, the entry's card and the exports
- * show. The layer images must be loaded.
+ * hidden layers left out — for wherever the drawing is shown without the
+ * editor. The layer images must be loaded (`loadLayerImages`).
  */
 export function renderPaintPng(doc: PaintDoc, images: LayerImages): string {
   const out = canvasOf(PAINT_WIDTH, PAINT_HEIGHT);
@@ -133,4 +133,46 @@ export function renderPaintPng(doc: PaintDoc, images: LayerImages): string {
     octx.drawImage(layer, 0, 0);
   }
   return out.toDataURL('image/png');
+}
+
+/**
+ * The document onto a canvas of any size, scaled to fit its width, hidden
+ * layers left out — for a place that shows a drawing inside its own canvas
+ * (another editor, a thumbnail) without the paint editor.
+ */
+export function drawPaintDoc(target: CanvasRenderingContext2D, doc: PaintDoc, images: LayerImages): void {
+  const { width, height } = target.canvas;
+  const layer = canvasOf(width, height);
+  const lctx = layer.getContext('2d')!;
+  const scale = width / PAINT_WIDTH;
+  lctx.setTransform(scale, 0, 0, scale, 0, 0);
+  for (const l of doc.layers) {
+    if (l.hidden) continue;
+    drawLayer(lctx, l, images);
+    target.drawImage(layer, 0, 0);
+  }
+}
+
+/**
+ * Turns an image reference into a source a canvas can read back from, by
+ * default a stored image of the vault as a data URL (`canvasImageSrc`): an
+ * image over the `emerald-img` scheme could taint the canvas, and the PNG
+ * export would then fail.
+ */
+export type ImageLoader = (ref: string) => Promise<string>;
+
+/** Loads the layer images a document names; rejects if one cannot be loaded. */
+export async function loadLayerImages(refs: readonly string[], load: ImageLoader): Promise<Map<string, HTMLImageElement>> {
+  const loaded = await Promise.all([...new Set(refs)].map(async (ref) => {
+    const img = new Image();
+    img.src = await load(ref);
+    await img.decode();
+    return [ref, img] as const;
+  }));
+  return new Map(loaded);
+}
+
+/** The image references of a document's layers. */
+export function layerImageRefs(doc: PaintDoc): string[] {
+  return doc.layers.map((l) => l.image).filter((ref): ref is string => !!ref);
 }

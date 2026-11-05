@@ -16,7 +16,7 @@ export interface PaintFeatures {
   clear: boolean;
 }
 
-/** Everything; what the sigil drawings use. */
+/** Everything. */
 export const FULL_PAINT_FEATURES: PaintFeatures = {
   shapes: true,
   eraser: true,

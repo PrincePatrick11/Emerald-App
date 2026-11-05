@@ -573,7 +573,7 @@
       "hideLayer": "Ebene ausblenden",
       "renameHint": "Klicken, um darauf zu zeichnen; Doppelklick zum Umbenennen",
       "clear": "Zeichnung leeren",
-      "loadFailed": "Die Zeichnung konnte nicht geladen werden – Eintrag schließen und erneut öffnen"
+      "loadFailed": "Ein Bild dieser Zeichnung ließ sich nicht laden"
     }
   },
   "moonPhase": {

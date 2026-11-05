@@ -2450,6 +2450,10 @@ input.paint-layer-name { display: block; }
   pointer-events: none;
 }
 .paint-cursor--eraser { border-style: dashed; }
+.paint-error {
+  font-size: 12px;
+  color: var(--danger-text);
+}
 
 /* The negative outer margin cancels the inner padding horizontally: the text
    stays flush under the title in edit mode, exactly where it sits in
@@ -3340,15 +3344,6 @@ html[data-theme] .tasks-category-trigger:hover {
   border-color: var(--field-border-hover);
 }
 
-.sigil-tool-toggle {
-  background-color: var(--well-tint);
-  border-color: var(--edge);
-}
-
-.sigil-tool-btn:hover {
-  background-color: var(--interactive-active);
-}
-
 .sigil-brush-controls {
   background-color: var(--well-tint);
   border: 1px solid var(--edge);
@@ -3787,7 +3782,6 @@ html[data-theme='emerald-noctis'] .tasks-linked-entry:hover {
   background: rgba(0, 122, 77, 0.34);
 }
 
-html[data-theme='emerald-noctis'] .sigil-tool-toggle,
 html[data-theme='emerald-noctis'] .sigil-brush-controls,
 html[data-theme='emerald-noctis'] .altar-symbol-trigger,
 html[data-theme='emerald-noctis'] .altar-upload-item-btn,
@@ -3997,12 +3991,12 @@ html[data-theme='emerald-parchment'] .app-sidebar-left .bg-well-active.text-seco
   border: 1px solid rgba(0, 138, 87, 0.34);
 }
 
-html[data-theme='emerald-parchment'] .sigil-canvas-shell {
+html[data-theme='emerald-parchment'] .paint-canvas-shell {
   background: #ece2d1;
   border-color: rgba(145, 108, 70, 0.34);
 }
 
-html[data-theme='emerald-parchment'] .sigil-canvas {
+html[data-theme='emerald-parchment'] .paint-canvas {
   background-image:
     linear-gradient(rgba(152, 117, 81, 0.18) 1px, transparent 1px),
     linear-gradient(90deg, rgba(152, 117, 81, 0.18) 1px, transparent 1px);
@@ -4057,21 +4051,6 @@ html[data-theme='emerald-parchment'] .tasks-linked-entry {
 html[data-theme='emerald-parchment'] .tasks-linked-entry:hover {
   color: #07593b;
   background: #c6e7d7;
-}
-
-html[data-theme='emerald-parchment'] .sigil-tool-toggle {
-  background: #eadcc6;
-  border-color: rgba(145, 108, 70, 0.36);
-}
-
-html[data-theme='emerald-parchment'] .sigil-tool-btn.bg-well-active {
-  background: #d6eee1;
-  color: #075e3d;
-}
-
-html[data-theme='emerald-parchment'] .sigil-tool-btn:hover {
-  background: #efdfc8;
-  color: #2f2114;
 }
 
 html[data-theme='emerald-parchment'] .sigil-brush-controls {
@@ -4214,8 +4193,7 @@ html[data-theme='custom'] .settings-nav-item-active,
 html[data-theme='custom'] .right-sidebar-tab-active,
 html[data-theme='custom'] .app-sidebar-right .bg-well-active.text-secondary,
 html[data-theme='custom'] .app-sidebar-left .bg-well-active.text-secondary,
-html[data-theme='custom'] .altar-category-chip.bg-well-active,
-html[data-theme='custom'] .sigil-tool-btn.bg-well-active {
+html[data-theme='custom'] .altar-category-chip.bg-well-active {
   background: var(--menu-item-active-bg);
   border-color: var(--accent-edge);
   color: var(--menu-item-active-text);

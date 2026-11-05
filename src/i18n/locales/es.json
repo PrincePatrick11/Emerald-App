@@ -573,7 +573,7 @@
       "hideLayer": "Ocultar capa",
       "renameHint": "Clic para dibujar en ella, doble clic para renombrar",
       "clear": "Vaciar dibujo",
-      "loadFailed": "No se pudo cargar el dibujo: cierra y vuelve a abrir la entrada"
+      "loadFailed": "No se pudo cargar una imagen de este dibujo"
     }
   },
   "moonPhase": {
