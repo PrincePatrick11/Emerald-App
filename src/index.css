@@ -1381,6 +1381,15 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
   @apply max-w-full rounded-lg;
 }
 
+/* An image inside a text selection (imageSelection.ts): tinted like marked
+   text, since the page's own highlight does not reach into the picture. */
+.tiptap .editor-image--marked img {
+  box-shadow: 0 0 0 2px var(--accent-edge);
+  filter: brightness(0.8) saturate(0.85);
+}
+.tiptap.editor-marking-images ::selection { background: transparent; }
+.tiptap .editor-text--marked { background-color: var(--accent-wash-strong); }
+
 /* Folding by headings (HeadingFoldExtension): the chevron in the margin left of a
    heading, shown on hover and while folded; what is folded away is not displayed.
    While reading it has the page's margin; while editing only the frame's 12px

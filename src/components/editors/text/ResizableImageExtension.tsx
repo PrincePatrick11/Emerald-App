@@ -5,6 +5,7 @@ import type { NodeViewProps } from '@tiptap/react';
 import { useRef, useState } from 'react';
 import { imageSrc, storedImageName } from '../../../lib/images';
 import { getImageDrag, setImageDrag } from './imageDrag';
+import { headOverImage, imageSelectionPlugin } from './imageSelection';
 
 /** Applies to text as to images; the toolbar serves both with the same buttons. */
 export type Alignment = 'left' | 'center' | 'right';
@@ -159,17 +160,21 @@ function ResizableImageView({ node, updateAttributes, selected, editor, getPos }
       if (!started && Math.hypot(ev.clientX - startX, ev.clientY - startY) < DRAG_THRESHOLD_PX) return;
       started = true;
       const from = imagePos();
-      const head = editor.view.posAtCoords({ left: ev.clientX, top: ev.clientY })?.pos;
-      if (from === undefined || head === undefined) return;
+      const { view } = editor;
+      const at = view.posAtCoords({ left: ev.clientX, top: ev.clientY });
+      if (from === undefined || !at) return;
       const { doc } = editor.state;
       const to = from + node.nodeSize;
+      if (at.inside === from) return; // still over this image
       // The far side of the image is the anchor: the text position just
       // before it when marking downwards, just after it when marking upwards.
-      let anchor: number;
-      if (head >= to) anchor = Selection.findFrom(doc.resolve(from), -1, true)?.from ?? from;
-      else if (head <= from) anchor = Selection.findFrom(doc.resolve(to), 1, true)?.from ?? to;
-      else return;
-      editor.view.dispatch(editor.state.tr.setSelection(TextSelection.create(doc, anchor, head)));
+      const forward = at.pos >= to || (at.inside >= to);
+      const anchor = forward
+        ? Selection.findFrom(doc.resolve(from), -1, true)?.from ?? from
+        : Selection.findFrom(doc.resolve(to), 1, true)?.from ?? to;
+      // Over another image, that one is in at once (`headOverImage`).
+      const head = headOverImage(view, ev.clientX, ev.clientY, anchor) ?? at.pos;
+      view.dispatch(editor.state.tr.setSelection(TextSelection.create(doc, anchor, head)).scrollIntoView());
     };
     const onUp = () => {
       document.removeEventListener('pointermove', onMove);
@@ -270,6 +275,10 @@ export const ResizableImage = Node.create({
   atom: true,
   // Moved by the node view's own pointer drag: the WebView has no HTML5 drag.
   draggable: false,
+
+  addProseMirrorPlugins() {
+    return [imageSelectionPlugin()];
+  },
 
   addAttributes() {
     return {
