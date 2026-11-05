@@ -52,6 +52,9 @@ export const imageType: BuilderElementType<ImageProps> = {
         return;
       }
     }
+    // Opaque: WebKit draws a colour emoji with the alpha of the current fill,
+    // which may still be whatever the caller painted last (an overlay).
+    ctx.fillStyle = '#000000';
     ctx.font = `${Math.round(Math.max(w, h) * 0.8)}px serif`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';

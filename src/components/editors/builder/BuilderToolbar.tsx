@@ -3,8 +3,7 @@ import { useTranslation } from 'react-i18next';
 import {
   AlignHorizontalDistributeCenter, AlignHorizontalJustifyCenter, AlignHorizontalJustifyEnd,
   AlignHorizontalJustifyStart, AlignVerticalDistributeCenter, AlignVerticalJustifyCenter, AlignVerticalJustifyEnd,
-  AlignVerticalJustifyStart, ArrowDown, ArrowUp, BringToFront, Copy, ImageDown, Layers2, Maximize, Redo2,
-  SendToBack, Trash2, Undo2, ZoomIn, ZoomOut,
+  AlignVerticalJustifyStart, ArrowDown, ArrowUp, BringToFront, Copy, ImageDown, Layers2, Redo2, SendToBack, Trash2, Undo2, ZoomIn, ZoomOut,
 } from 'lucide-react';
 import { ToolbarBtn, ToolbarDivider, ToolbarGroup } from '../shared/toolbarParts';
 import PopoverButton from '../shared/PopoverButton';
@@ -25,7 +24,8 @@ const ALIGN_ICONS: Record<AlignEdge, ReactNode> = {
  * in the order of working, undo; what can be added (each registered type's
  * additions, several of one type behind one button); the controls of the
  * selected elements' types; where the selection sits (stacking, aligning),
- * duplicating and removing; and the view at the far end.
+ * duplicating and removing; and saving as an image at the far end. Zoom
+ * sits on the stage itself (`BuilderZoom`), so the bar stays one row.
  */
 export default function BuilderToolbar({ controller: c, end }: { controller: BuilderController; end?: ReactNode }) {
   const { t } = useTranslation();
@@ -130,22 +130,25 @@ export default function BuilderToolbar({ controller: c, end }: { controller: Bui
       )}
 
       <div className="editor-toolbar-end">
-        {f.zoom && (
-          <ToolbarGroup>
-            <ToolbarBtn onClick={c.zoomOut} active={false} title={t('builder.zoomOut')}><ZoomOut size={14} /></ToolbarBtn>
-            <ToolbarBtn onClick={c.fit} active={false} title={t('builder.fit')}>
-              <span className="editor-toolbar-btn-label tabular-nums">{Math.round(c.zoom * 100)}%</span>
-            </ToolbarBtn>
-            <ToolbarBtn onClick={c.zoomIn} active={false} title={t('builder.zoomIn')}><ZoomIn size={14} /></ToolbarBtn>
-            <ToolbarBtn onClick={c.fit} active={false} title={t('builder.fit')}><Maximize size={14} /></ToolbarBtn>
-          </ToolbarGroup>
-        )}
-        {f.export && c.onExport && (<>
-          <ToolbarDivider />
+        {f.export && c.onExport && (
           <ToolbarBtn onClick={c.onExport} active={false} title={t('builder.export')}><ImageDown size={14} /></ToolbarBtn>
-        </>)}
+        )}
         {end}
       </div>
+    </div>
+  );
+}
+
+/** Zoom out, the level (a click fits the view), zoom in: a small bar in the stage's corner. */
+export function BuilderZoom({ controller: c }: { controller: BuilderController }) {
+  const { t } = useTranslation();
+  return (
+    <div className="editor-toolbar builder-zoom">
+      <ToolbarBtn onClick={c.zoomOut} active={false} title={t('builder.zoomOut')}><ZoomOut size={14} /></ToolbarBtn>
+      <ToolbarBtn onClick={c.fit} active={false} title={t('builder.fit')}>
+        <span className="editor-toolbar-btn-label tabular-nums">{Math.round(c.zoom * 100)}%</span>
+      </ToolbarBtn>
+      <ToolbarBtn onClick={c.zoomIn} active={false} title={t('builder.zoomIn')}><ZoomIn size={14} /></ToolbarBtn>
     </div>
   );
 }

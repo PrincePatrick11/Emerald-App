@@ -17,7 +17,7 @@ import {
   align, arrange, clamp, copiesOf, distribute, nudge, type AlignEdge, type ArrangeMove,
 } from './builderActions';
 import { byZ, type BuilderAddition, type BuilderElement, type BuilderGrid, type BuilderTypes } from './types';
-import BuilderToolbar from './BuilderToolbar';
+import BuilderToolbar, { BuilderZoom } from './BuilderToolbar';
 import TextEditOverlay from './TextEditOverlay';
 
 /** How close, on screen, an edge has to come to a guide to snap. */
@@ -520,7 +520,11 @@ const BuilderEditor = forwardRef<BuilderEditorHandle, BuilderEditorProps>(functi
   }, [commit, editableIds, patched, fitted]);
 
   const add = useCallback((type: string, addition: BuilderAddition) => {
-    const centre = visibleCentre();
+    // Something already sits there: a step down and to the right, so the new one shows.
+    let centre = visibleCentre();
+    while (live.current.elements.some((e) => Math.abs(e.x - centre.x) < 1 && Math.abs(e.y - centre.y) < 1)) {
+      centre = { x: centre.x + PASTE_OFFSET, y: centre.y + PASTE_OFFSET };
+    }
     const made = addition.create(centre, { width, height }, t);
     const el: BuilderElement = {
       id: createId(), type, x: centre.x, y: centre.y, rotation: 0, opacity: 1, locked: false, hidden: false,
@@ -794,6 +798,7 @@ const BuilderEditor = forwardRef<BuilderEditorHandle, BuilderEditorProps>(functi
             onDone={(text) => finishTextEdit(editingText.id, text)}
           />
         )}
+        {editable && features.zoom && <BuilderZoom controller={controller} />}
         {overlay}
       </div>
     </div>

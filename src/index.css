@@ -2352,7 +2352,16 @@ html[data-theme] .prop-segment--active {
   position: absolute;
   inset: 0;
 }
-/* While an item from the library is dragged over the altar. */
+/* Zoom in the stage's corner, a small bar of its own. */
+.builder-zoom {
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+  z-index: 4;
+  flex-wrap: nowrap;
+  box-shadow: var(--menu-shadow);
+}
+/* While something is dragged over the stage from outside. */
 .builder-drop-hint {
   position: absolute;
   inset: 8px;

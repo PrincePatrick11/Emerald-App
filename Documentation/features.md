@@ -163,7 +163,7 @@ Adding, editing and deleting items happens in a modal. Deleting moves the item t
 - **Arrange and align.** Bring to front, forward, backward, to back (also ⌘] and ⌘[ with and without Shift); align edges or centres of the selection, or of one element on the canvas; even gaps between three or more.
 - **Undo** (⌘Z, ⇧⌘Z) covers everything done on the canvas and in the sidebar during the edit; Cancel still returns to the state before it.
 - **Keys.** Arrows nudge (Shift: further), Delete removes, ⌘D duplicates, ⌘C/⌘X/⌘V copy, cut and paste, Escape clears the selection.
-- **Zoom.** Pinch or ⌘ with the wheel zooms at the pointer, the wheel pans, Space or the middle button with a drag pans too; the toolbar zooms and fits the canvas again (⌘0).
+- **Zoom.** Pinch or ⌘ with the wheel zooms at the pointer, the wheel pans, Space or the middle button with a drag pans too; the small bar in the canvas's corner zooms, and a click on its percentage fits the canvas again (⌘0).
 - **Save as PNG** from the toolbar, at the altar's full resolution.
 
 **Inspector and placement controls.** The right sidebar has a placed-elements list with an inline inspector under the selected row: x and y (%), rotation (°), scale (%, not for text, which is sized by its font), and an opacity slider. It opens while exactly one element is selected; Shift-, ⌘- or Ctrl-click on rows selects several. The inspector of a locked element is locked too (dimmed, with a tooltip). The delete button sits in the row; it removes the element without a question, and the toast that follows puts it back.
