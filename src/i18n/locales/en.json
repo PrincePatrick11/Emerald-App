@@ -558,7 +558,11 @@
         "line": "Line",
         "ellipse": "Ellipse",
         "rect": "Rectangle",
-        "eraser": "Eraser"
+        "eraser": "Eraser",
+        "select": "Select",
+        "lasso": "Lasso",
+        "move": "Move layer",
+        "picker": "Pick colour"
       },
       "color": "Colour",
       "customColor": "Any colour",
@@ -573,7 +577,14 @@
       "hideLayer": "Hide layer",
       "renameHint": "Click to draw on it, double-click to rename",
       "clear": "Clear drawing",
-      "loadFailed": "Couldn't load an image of this drawing"
+      "loadFailed": "Couldn't load an image of this drawing",
+      "lockLayer": "Lock layer",
+      "unlockLayer": "Unlock layer",
+      "layerOpacity": "Opacity",
+      "duplicateLayer": "Duplicate layer",
+      "mergeDown": "Merge down",
+      "mergeDownBlocked": "Can't merge: this layer has an image or eraser strokes",
+      "dragLayer": "Drag to reorder"
     }
   },
   "canvas": {

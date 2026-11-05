@@ -21,7 +21,8 @@ const NOTHING: CanvasFeatures = {
 };
 
 /**
- * Only painting: the drawing type alone, none of the editor's tools but undo.
+ * Only painting: the drawing type alone, none of the editor's tools but undo
+ * and zooming into the drawing.
  * With `paintElementId` set to the one drawing, it is a plain paint editor.
  */
 export function paintOnlyProfile(drawing: DrawingTypeOptions = {}, paint: Partial<PaintFeatures> = {}): CanvasProfile {
@@ -29,7 +30,7 @@ export function paintOnlyProfile(drawing: DrawingTypeOptions = {}, paint: Partia
   // Nothing to add: the place gives the one drawing.
   return {
     types: { drawing: { ...type, additions: undefined } },
-    features: NOTHING,
+    features: { ...NOTHING, zoom: true },
     paint: { features: { ...FULL_PAINT_FEATURES, ...paint } },
   };
 }

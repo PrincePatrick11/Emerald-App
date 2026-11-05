@@ -21,7 +21,7 @@ import CanvasToolbar, { CanvasZoom } from './CanvasToolbar';
 import TextEditOverlay from './TextEditOverlay';
 import PaintSurface from './paint/PaintSurface';
 import PaintToolbar, { PAINT_TOOL_DEFS, toolEnabled } from './paint/PaintToolbar';
-import { usePaintBrush, usePaintControls } from './paint/usePaintTools';
+import { isSelectTool, usePaintBrush, usePaintControls } from './paint/usePaintTools';
 import { FULL_PAINT_FEATURES, type PaintFeatures } from './paint/features';
 import { emptyPaintDoc, type PaintDoc } from '../../../lib/paint/document';
 import { ToolbarBtn } from '../shared/toolbarParts';
@@ -254,19 +254,23 @@ const CanvasEditor = forwardRef<CanvasEditorHandle, CanvasEditorProps>(function 
     const el = viewportRef.current;
     if (!el || !editable || !features.zoom) return;
     const onWheel = (e: WheelEvent) => {
-      e.preventDefault();
       const rect = el.getBoundingClientRect();
       if (e.ctrlKey || e.metaKey) {
+        e.preventDefault();
         const factor = Math.exp(-e.deltaY * (e.ctrlKey && !e.metaKey ? 0.01 : 0.002));
         zoomTo(live.current.view.zoom * factor, { x: e.clientX - rect.left, y: e.clientY - rect.top });
+      } else if (layout === 'inline' && fittedRef.current) {
+        // In the flow of a page the wheel scrolls the page until the view is zoomed.
+        return;
       } else {
         fittedRef.current = false;
+        e.preventDefault();
         setView((v) => ({ ...v, x: v.x - e.deltaX, y: v.y - e.deltaY }));
       }
     };
     el.addEventListener('wheel', onWheel, { passive: false });
     return () => el.removeEventListener('wheel', onWheel);
-  }, [editable, features.zoom, zoomTo]);
+  }, [editable, features.zoom, zoomTo, layout]);
 
   // ── Selection and transformer ─────────────────────────────────────────
 
@@ -468,11 +472,6 @@ const CanvasEditor = forwardRef<CanvasEditorHandle, CanvasEditorProps>(function 
       if (!paintElementId) setPaintingId(null);
       return;
     }
-    if (evt.button === 1 || (evt.button === 0 && spaceDown && features.zoom)) {
-      evt.preventDefault();
-      startPan(evt);
-      return;
-    }
     if (evt.button !== 0) return;
     // The transformer's own handles.
     if (e.target.getParent() instanceof Konva.Transformer) return;
@@ -618,9 +617,31 @@ const CanvasEditor = forwardRef<CanvasEditorHandle, CanvasEditorProps>(function 
     const handled = () => { e.preventDefault(); e.stopPropagation(); };
     // The paint mode's keys: undo, the tools' letters, `[` and `]` for the size, Escape to leave.
     if (paintingId) {
+      const pc = paintControls;
+      const selecting = pc.selection.length > 0;
+      if (e.code === 'Space' && !mod && features.zoom) { setSpaceDown(true); handled(); return; }
       if (mod && key === 'z') { handled(); if (e.shiftKey) history.redo(); else history.undo(); return; }
       if (mod && key === 'y') { handled(); history.redo(); return; }
-      if (e.key === 'Escape' && !paintElementId) { handled(); setPaintingId(null); return; }
+      if (mod && key === '0' && features.zoom) { handled(); fit(); return; }
+      if (mod && key === 'a' && paintFeatures.select) { handled(); if (!isSelectTool(pc.tool)) pc.setTool('select'); pc.selectAll(); return; }
+      if (mod && key === 'd' && selecting) { handled(); pc.duplicateSelection(); return; }
+      if (mod && key === 'c' && selecting) { handled(); pc.copySelection(); return; }
+      if (mod && key === 'x' && selecting) { handled(); pc.copySelection(); pc.removeSelection(); return; }
+      if (mod && key === 'v' && paintFeatures.select) { handled(); if (!isSelectTool(pc.tool)) pc.setTool('select'); pc.paste(); return; }
+      if (e.key === 'Escape') {
+        if (selecting) { handled(); pc.select([]); return; }
+        if (!paintElementId) { handled(); setPaintingId(null); }
+        return;
+      }
+      if ((e.key === 'Delete' || e.key === 'Backspace') && selecting) { handled(); pc.removeSelection(); return; }
+      const arrows: Record<string, [number, number]> = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] };
+      const arrow = arrows[e.key];
+      if (arrow && selecting) {
+        handled();
+        const step = e.shiftKey ? 10 : 1;
+        pc.transform({ dx: arrow[0] * step, dy: arrow[1] * step, scale: 1, angle: 0, cx: 0, cy: 0 });
+        return;
+      }
       if (mod || e.altKey) return;
       if (key === '[') { handled(); brush.setSize(brush.size - (brush.size > 10 ? 2 : 1)); return; }
       if (key === ']') { handled(); brush.setSize(brush.size + (brush.size >= 10 ? 2 : 1)); return; }
@@ -766,6 +787,14 @@ const CanvasEditor = forwardRef<CanvasEditorHandle, CanvasEditorProps>(function 
         className="canvas-viewport"
         style={{ cursor: spaceDown ? 'grab' : undefined, aspectRatio: layout === 'inline' ? `${width} / ${height}` : undefined }}
         onContextMenu={(e) => { if (editable) e.preventDefault(); }}
+        onPointerDownCapture={(e) => {
+          // The middle button or Space pans, over the elements and the paint surface alike.
+          if (!editable || !features.zoom || !(e.button === 1 || (e.button === 0 && spaceDown))) return;
+          e.preventDefault();
+          e.stopPropagation();
+          rootRef.current?.focus({ preventScroll: true });
+          startPan(e.nativeEvent);
+        }}
       >
         <div
           className="canvas-artboard"
@@ -902,14 +931,9 @@ const CanvasEditor = forwardRef<CanvasEditorHandle, CanvasEditorProps>(function 
               height: painting.height * view.zoom,
               rotation: painting.rotation,
             }}
-            doc={paintControls.doc}
-            activeLayer={paintControls.activeLayer}
-            tool={paintControls.tool}
-            color={paintControls.color}
-            size={paintControls.size}
+            api={paintControls}
             images={layerImages}
             editable={layerImages.size >= paintControls.doc.layers.filter((l) => l.image).length}
-            onStroke={paintControls.addStroke}
           />
         )}
         {editable && features.zoom && <CanvasZoom controller={controller} />}

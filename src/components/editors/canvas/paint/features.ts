@@ -14,6 +14,10 @@ export interface PaintFeatures {
   customColor: boolean;
   /** Emptying the whole drawing in one step. */
   clear: boolean;
+  /** Selecting strokes (rectangle, lasso) to move, scale, turn, copy or remove them, and moving a whole layer. */
+  select: boolean;
+  /** Taking a colour from the drawing. */
+  picker: boolean;
 }
 
 /** Everything. */
@@ -23,4 +27,6 @@ export const FULL_PAINT_FEATURES: PaintFeatures = {
   layers: true,
   customColor: true,
   clear: true,
+  select: true,
+  picker: true,
 };

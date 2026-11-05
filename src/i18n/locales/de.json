@@ -558,7 +558,11 @@
         "line": "Linie",
         "ellipse": "Ellipse",
         "rect": "Rechteck",
-        "eraser": "Radierer"
+        "eraser": "Radierer",
+        "select": "Auswählen",
+        "lasso": "Lasso",
+        "move": "Ebene verschieben",
+        "picker": "Farbe aufnehmen"
       },
       "color": "Farbe",
       "customColor": "Beliebige Farbe",
@@ -573,7 +577,14 @@
       "hideLayer": "Ebene ausblenden",
       "renameHint": "Klicken, um darauf zu zeichnen; Doppelklick zum Umbenennen",
       "clear": "Zeichnung leeren",
-      "loadFailed": "Ein Bild dieser Zeichnung ließ sich nicht laden"
+      "loadFailed": "Ein Bild dieser Zeichnung ließ sich nicht laden",
+      "lockLayer": "Ebene sperren",
+      "unlockLayer": "Ebene entsperren",
+      "layerOpacity": "Deckkraft",
+      "duplicateLayer": "Ebene duplizieren",
+      "mergeDown": "Nach unten zusammenführen",
+      "mergeDownBlocked": "Zusammenführen geht nicht: Die Ebene hat ein Bild oder Radierstriche",
+      "dragLayer": "Ziehen, um die Reihenfolge zu ändern"
     }
   },
   "canvas": {

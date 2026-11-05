@@ -558,7 +558,11 @@
         "line": "Ligne",
         "ellipse": "Ellipse",
         "rect": "Rectangle",
-        "eraser": "Gomme"
+        "eraser": "Gomme",
+        "select": "Sélectionner",
+        "lasso": "Lasso",
+        "move": "Déplacer le calque",
+        "picker": "Prélever une couleur"
       },
       "color": "Couleur",
       "customColor": "Toute couleur",
@@ -573,7 +577,14 @@
       "hideLayer": "Masquer le calque",
       "renameHint": "Cliquer pour dessiner dessus, double-cliquer pour renommer",
       "clear": "Vider le dessin",
-      "loadFailed": "Impossible de charger une image de ce dessin"
+      "loadFailed": "Impossible de charger une image de ce dessin",
+      "lockLayer": "Verrouiller le calque",
+      "unlockLayer": "Déverrouiller le calque",
+      "layerOpacity": "Opacité",
+      "duplicateLayer": "Dupliquer le calque",
+      "mergeDown": "Fusionner vers le bas",
+      "mergeDownBlocked": "Fusion impossible : le calque contient une image ou des traits de gomme",
+      "dragLayer": "Glisser pour réordonner"
     }
   },
   "canvas": {

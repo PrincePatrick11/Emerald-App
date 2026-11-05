@@ -37,6 +37,16 @@ export interface PaintStroke {
   points: number[];
   /** Pressure came from a pen; otherwise the width follows the speed. */
   pressure: boolean;
+  /** Ellipse and rectangle only: turned by this many radians around their centre. */
+  rotation: number;
+}
+
+/** Where a layer's image lies, in document units; by default the whole page. */
+export interface PaintRect {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
 }
 
 export interface PaintLayer {
@@ -44,10 +54,17 @@ export interface PaintLayer {
   /** Empty: the editor numbers it. */
   name: string;
   hidden: boolean;
-  /** A stored image under the strokes, filling the document. */
+  /** Nothing is drawn on, selected in or moved on a locked layer. */
+  locked: boolean;
+  /** 0–1, applied when the layers are stacked. */
+  opacity: number;
+  /** A stored image under the strokes. */
   image: string | null;
+  imageRect: PaintRect;
   strokes: PaintStroke[];
 }
+
+export const FULL_PAGE: PaintRect = { x: 0, y: 0, width: PAINT_WIDTH, height: PAINT_HEIGHT };
 
 export interface PaintDoc {
   layers: PaintLayer[];
@@ -70,7 +87,7 @@ export function paintId(): string {
 }
 
 export function emptyLayer(name = ''): PaintLayer {
-  return { id: paintId(), name, hidden: false, image: null, strokes: [] };
+  return { id: paintId(), name, hidden: false, locked: false, opacity: 1, image: null, imageRect: FULL_PAGE, strokes: [] };
 }
 
 export function emptyPaintDoc(): PaintDoc {
@@ -107,13 +124,22 @@ export function paintDocToJson(doc: PaintDoc): Record<string, unknown> {
       const out: Record<string, unknown> = { id: layer.id };
       if (layer.name) out.name = layer.name;
       if (layer.hidden) out.hidden = true;
-      if (layer.image) out.image = true;
+      if (layer.locked) out.locked = true;
+      if (layer.opacity < 1) out.opacity = round2(layer.opacity);
+      if (layer.image) {
+        out.image = true;
+        const r = layer.imageRect;
+        if (r.x !== 0 || r.y !== 0 || r.width !== PAINT_WIDTH || r.height !== PAINT_HEIGHT) {
+          out.imageRect = [round1(r.x), round1(r.y), round1(r.width), round1(r.height)];
+        }
+      }
       out.strokes = layer.strokes.map((s) => {
         const p: number[] = [];
         for (let i = 0; i + 2 < s.points.length; i += 3) p.push(round1(s.points[i]), round1(s.points[i + 1]), round2(s.points[i + 2]));
         const stroke: Record<string, unknown> = { id: s.id, t: s.tool, s: round1(s.size), p };
         if (s.tool !== 'eraser') stroke.c = s.color;
         if (s.pressure) stroke.pr = true;
+        if (s.rotation) stroke.r = Math.round(s.rotation * 10_000) / 10_000;
         return stroke;
       });
       return out;
@@ -148,7 +174,10 @@ export function paintDocFromJson(value: unknown, images: ReadonlyMap<string, str
       id: raw.id,
       name: typeof raw.name === 'string' ? raw.name.slice(0, MAX_NAME) : '',
       hidden: raw.hidden === true,
+      locked: raw.locked === true,
+      opacity: Number.isFinite(raw.opacity) ? clamp(raw.opacity as number, 0, 1) : 1,
       image: raw.image === true ? images.get(raw.id) ?? null : null,
+      imageRect: rectFromJson(raw.imageRect),
       strokes,
     });
   }
@@ -168,9 +197,9 @@ function strokeFromJson(raw: unknown, pointsLeft: number): PaintStroke | null {
   for (let i = 0; i < count; i += 3) {
     const x = Number(raw.p[i]), y = Number(raw.p[i + 1]), p = Number(raw.p[i + 2]);
     if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(p)) return null;
-    // Room around the page: a stroke may start or end outside it.
-    points[i] = clamp(x, -PAINT_WIDTH, PAINT_WIDTH * 2);
-    points[i + 1] = clamp(y, -PAINT_HEIGHT, PAINT_HEIGHT * 2);
+    // Room around the page: a stroke may start, end or be moved outside it.
+    points[i] = clamp(x, -PAINT_WIDTH * 4, PAINT_WIDTH * 4);
+    points[i + 1] = clamp(y, -PAINT_HEIGHT * 4, PAINT_HEIGHT * 4);
     points[i + 2] = clamp(p, 0, 1);
   }
   return {
@@ -180,6 +209,19 @@ function strokeFromJson(raw: unknown, pointsLeft: number): PaintStroke | null {
     size: clamp(size, PAINT_SIZE_MIN, PAINT_SIZE_MAX),
     points,
     pressure: raw.pr === true,
+    rotation: (tool === 'rect' || tool === 'ellipse') && Number.isFinite(raw.r) ? (raw.r as number) % (Math.PI * 2) : 0,
+  };
+}
+
+function rectFromJson(raw: unknown): PaintRect {
+  if (!Array.isArray(raw) || raw.length !== 4 || !raw.every((n) => Number.isFinite(n))) return FULL_PAGE;
+  const [x, y, width, height] = raw as number[];
+  if (width < 1 || height < 1) return FULL_PAGE;
+  return {
+    x: clamp(x, -PAINT_WIDTH * 4, PAINT_WIDTH * 4),
+    y: clamp(y, -PAINT_HEIGHT * 4, PAINT_HEIGHT * 4),
+    width: Math.min(width, PAINT_WIDTH * 8),
+    height: Math.min(height, PAINT_HEIGHT * 8),
   };
 }
 
@@ -226,4 +268,155 @@ export function thinPoints(points: readonly number[], min = 0.6): number[] {
   }
   out.push(points[points.length - 3], points[points.length - 2], points[points.length - 1]);
   return out;
+}
+
+/* ---------------- Geometry ---------------- */
+
+/** A move, a uniform scale and a turn around a pivot, in that order of thought: scale and turn around the pivot, then move. */
+export interface PaintTransform {
+  dx: number;
+  dy: number;
+  scale: number;
+  angle: number;
+  cx: number;
+  cy: number;
+}
+
+export const IDENTITY: PaintTransform = { dx: 0, dy: 0, scale: 1, angle: 0, cx: 0, cy: 0 };
+
+export function applyTransform(t: PaintTransform, x: number, y: number): [number, number] {
+  const cos = Math.cos(t.angle) * t.scale, sin = Math.sin(t.angle) * t.scale;
+  const px = x - t.cx, py = y - t.cy;
+  return [t.cx + px * cos - py * sin + t.dx, t.cy + px * sin + py * cos + t.dy];
+}
+
+/**
+ * The stroke with the transform baked in: its points move, its width
+ * scales. A rectangle or ellipse keeps its two corners around its centre
+ * unturned and carries the turn in `rotation`, so it stays one shape.
+ */
+export function transformStroke(stroke: PaintStroke, t: PaintTransform): PaintStroke {
+  const size = clamp(stroke.size * t.scale, PAINT_SIZE_MIN, PAINT_SIZE_MAX);
+  if (stroke.tool === 'rect' || stroke.tool === 'ellipse') {
+    const [x0, y0, p0, x1, y1, p1] = stroke.points;
+    const [cx, cy] = applyTransform(t, (x0 + x1) / 2, (y0 + y1) / 2);
+    const hw = (Math.abs(x1 - x0) / 2) * t.scale, hh = (Math.abs(y1 - y0) / 2) * t.scale;
+    return { ...stroke, id: stroke.id, size, points: [cx - hw, cy - hh, p0, cx + hw, cy + hh, p1], rotation: stroke.rotation + t.angle };
+  }
+  const points = [...stroke.points];
+  for (let i = 0; i + 2 < points.length; i += 3) [points[i], points[i + 1]] = applyTransform(t, points[i], points[i + 1]);
+  return { ...stroke, size, points };
+}
+
+/** The box around a stroke, its width included. */
+export function strokeBounds(stroke: PaintStroke): PaintRect {
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  const add = (x: number, y: number) => {
+    minX = Math.min(minX, x); minY = Math.min(minY, y); maxX = Math.max(maxX, x); maxY = Math.max(maxY, y);
+  };
+  if ((stroke.tool === 'rect' || stroke.tool === 'ellipse') && stroke.rotation) {
+    for (const [x, y] of shapeCorners(stroke)) add(x, y);
+  } else {
+    for (let i = 0; i + 2 < stroke.points.length; i += 3) add(stroke.points[i], stroke.points[i + 1]);
+  }
+  const pad = stroke.size / 2;
+  return { x: minX - pad, y: minY - pad, width: maxX - minX + stroke.size, height: maxY - minY + stroke.size };
+}
+
+/** The four corners of a rectangle or ellipse's box, turned with it. */
+export function shapeCorners(stroke: PaintStroke): [number, number][] {
+  const [x0, y0, , x1, y1] = stroke.points;
+  const t: PaintTransform = { ...IDENTITY, angle: stroke.rotation, cx: (x0 + x1) / 2, cy: (y0 + y1) / 2 };
+  return [[x0, y0], [x1, y0], [x1, y1], [x0, y1]].map(([x, y]) => applyTransform(t, x, y));
+}
+
+export function unionRects(rects: readonly PaintRect[]): PaintRect | null {
+  if (!rects.length) return null;
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  for (const r of rects) {
+    minX = Math.min(minX, r.x); minY = Math.min(minY, r.y);
+    maxX = Math.max(maxX, r.x + r.width); maxY = Math.max(maxY, r.y + r.height);
+  }
+  return { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
+}
+
+/** The whole layer moved: its strokes and its image. */
+export function translateLayer(layer: PaintLayer, dx: number, dy: number): PaintLayer {
+  const t: PaintTransform = { ...IDENTITY, dx, dy };
+  return {
+    ...layer,
+    imageRect: { ...layer.imageRect, x: layer.imageRect.x + dx, y: layer.imageRect.y + dy },
+    strokes: layer.strokes.map((s) => transformStroke(s, t)),
+  };
+}
+
+/**
+ * Points along a stroke for picking it with a rectangle or a lasso: a
+ * freehand stroke's own points, a shape's ends, corners and edge midpoints
+ * (an ellipse: points around it).
+ */
+export function strokeSamples(stroke: PaintStroke): [number, number][] {
+  const [x0, y0, , x1 = x0, y1 = y0] = stroke.points;
+  if (stroke.tool === 'line') return [[x0, y0], [(x0 + x1) / 2, (y0 + y1) / 2], [x1, y1]];
+  if (stroke.tool === 'rect' || stroke.tool === 'ellipse') {
+    const t: PaintTransform = { ...IDENTITY, angle: stroke.rotation, cx: (x0 + x1) / 2, cy: (y0 + y1) / 2 };
+    const rx = Math.abs(x1 - x0) / 2, ry = Math.abs(y1 - y0) / 2;
+    const out: [number, number][] = [];
+    for (let i = 0; i < 16; i++) {
+      const a = (i / 16) * Math.PI * 2;
+      // A rectangle's outline: the ellipse's directions pushed out to the box.
+      const k = stroke.tool === 'rect' ? 1 / Math.max(Math.abs(Math.cos(a)), Math.abs(Math.sin(a))) : 1;
+      out.push(applyTransform(t, t.cx + Math.cos(a) * rx * k, t.cy + Math.sin(a) * ry * k));
+    }
+    return out;
+  }
+  const out: [number, number][] = [];
+  for (let i = 0; i + 2 < stroke.points.length; i += 3) out.push([stroke.points[i], stroke.points[i + 1]]);
+  return out;
+}
+
+/** Is the point inside the polygon (even-odd)? */
+export function inPolygon(x: number, y: number, polygon: readonly number[]): boolean {
+  let inside = false;
+  for (let i = 0, j = polygon.length - 2; i < polygon.length; j = i, i += 2) {
+    const xi = polygon[i], yi = polygon[i + 1], xj = polygon[j], yj = polygon[j + 1];
+    if ((yi > y) !== (yj > y) && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) inside = !inside;
+  }
+  return inside;
+}
+
+/** A copy of the layer, with new IDs for it and its strokes. */
+export function copyLayer(layer: PaintLayer): PaintLayer {
+  return { ...layer, id: paintId(), strokes: layer.strokes.map((s) => ({ ...s, id: paintId() })) };
+}
+
+/**
+ * Can the layer go into the one below without its look changing? Not when it
+ * holds an image (that would lie under the lower layer's strokes) or eraser
+ * strokes (they would cut the lower layer too).
+ */
+export function canMergeDown(doc: PaintDoc, id: string): boolean {
+  const i = doc.layers.findIndex((l) => l.id === id);
+  const layer = doc.layers[i];
+  return i > 0 && !!layer && !layer.image && !layer.strokes.some((s) => s.tool === 'eraser');
+}
+
+/** The layer's strokes onto the end of the one below, the layer gone. */
+export function mergeDown(doc: PaintDoc, id: string): PaintDoc {
+  if (!canMergeDown(doc, id)) return doc;
+  const i = doc.layers.findIndex((l) => l.id === id);
+  const upper = doc.layers[i];
+  const layers = doc.layers.filter((l) => l.id !== id);
+  layers[i - 1] = { ...layers[i - 1], strokes: [...layers[i - 1].strokes, ...upper.strokes] };
+  return { layers };
+}
+
+/** The layer moved to `index` (counted from the bottom). */
+export function moveLayerTo(doc: PaintDoc, id: string, index: number): PaintDoc {
+  const from = doc.layers.findIndex((l) => l.id === id);
+  if (from < 0) return doc;
+  const layers = [...doc.layers];
+  const [layer] = layers.splice(from, 1);
+  layers.splice(clamp(index, 0, layers.length), 0, layer);
+  return { layers };
 }

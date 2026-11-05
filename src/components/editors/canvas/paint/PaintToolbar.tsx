@@ -1,43 +1,58 @@
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
-  Circle, Eraser, Layers, Minus, PenTool, Redo, Square, Trash2, Undo, type LucideIcon,
+  Circle, Eraser, Lasso, Layers, Minus, Move, MousePointer2, PenTool, Pipette, Redo, Square, Trash2, Undo, type LucideIcon,
 } from 'lucide-react';
-import { PAINT_SIZE_MAX, PAINT_SIZE_MIN, type PaintTool } from '../../../../lib/paint/document';
+import { PAINT_SIZE_MAX, PAINT_SIZE_MIN } from '../../../../lib/paint/document';
 import PopoverButton from '../../shared/PopoverButton';
 import { ToolbarBtn, ToolbarDivider, ToolbarGroup } from '../../shared/toolbarParts';
 import LayerPanel from './LayerPanel';
 import type { PaintFeatures } from './features';
-import type { PaintControls } from './usePaintTools';
+import type { EditorTool, PaintControls } from './usePaintTools';
 
 interface ToolDef {
-  tool: PaintTool;
+  tool: EditorTool;
   icon: LucideIcon;
   /** The key that picks it while the drawing has the focus. */
   key: string;
 }
 
-export const PAINT_TOOL_DEFS: readonly ToolDef[] = [
+/** The tools that work on what is drawn, before the ones that draw. */
+export const EDIT_TOOL_DEFS: readonly ToolDef[] = [
+  { tool: 'select', icon: MousePointer2, key: 'v' },
+  { tool: 'lasso', icon: Lasso, key: 'q' },
+  { tool: 'move', icon: Move, key: 'm' },
+];
+
+export const DRAW_TOOL_DEFS: readonly ToolDef[] = [
   { tool: 'pen', icon: PenTool, key: 'p' },
   { tool: 'line', icon: Minus, key: 'l' },
   { tool: 'ellipse', icon: Circle, key: 'o' },
   { tool: 'rect', icon: Square, key: 'r' },
   { tool: 'eraser', icon: Eraser, key: 'e' },
+  { tool: 'picker', icon: Pipette, key: 'i' },
 ];
 
+export const PAINT_TOOL_DEFS: readonly ToolDef[] = [...EDIT_TOOL_DEFS, ...DRAW_TOOL_DEFS];
+
 /** Is the tool offered with these features? */
-export function toolEnabled(tool: PaintTool, features: PaintFeatures): boolean {
-  if (tool === 'eraser') return features.eraser;
-  if (tool === 'pen') return true;
-  return features.shapes;
+export function toolEnabled(tool: EditorTool, features: PaintFeatures): boolean {
+  switch (tool) {
+    case 'pen': return true;
+    case 'eraser': return features.eraser;
+    case 'picker': return features.picker;
+    case 'select': case 'lasso': case 'move': return features.select;
+    default: return features.shapes;
+  }
 }
 
 /**
  * The canvas editor's bar in the paint mode, in the app's toolbar style
  * (`.editor-toolbar`, shared buttons from `editors/shared/`). It shows what
  * the paint features switch on, in the order of drawing: undo and redo, the
- * tools, colour and size of the brush, the layers, and emptying and leaving
- * the paint mode at the far end.
+ * tools that select and move, the drawing tools and the picker, colour and
+ * size of the brush, the layers, and emptying and leaving the paint mode at
+ * the far end.
  */
 export default function PaintToolbar({ api, features, palette, end }: {
   api: PaintControls;
@@ -60,9 +75,24 @@ export default function PaintToolbar({ api, features, palette, end }: {
         </ToolbarBtn>
       </ToolbarGroup>
 
+      {features.select && (<>
+        <ToolbarDivider />
+        <ToolbarGroup>
+          {EDIT_TOOL_DEFS.filter((d) => toolEnabled(d.tool, features)).map(({ tool, icon: Icon, key }) => (
+            <ToolbarBtn
+              key={tool}
+              onClick={() => api.setTool(tool)}
+              active={api.tool === tool}
+              title={shortcut(t(`editor.paint.tools.${tool}`), key)}
+            >
+              <Icon size={14} />
+            </ToolbarBtn>
+          ))}
+        </ToolbarGroup>
+      </>)}
       <ToolbarDivider />
       <ToolbarGroup>
-        {PAINT_TOOL_DEFS.filter((d) => toolEnabled(d.tool, features)).map(({ tool, icon: Icon, key }) => (
+        {DRAW_TOOL_DEFS.filter((d) => toolEnabled(d.tool, features)).map(({ tool, icon: Icon, key }) => (
           <ToolbarBtn
             key={tool}
             onClick={() => api.setTool(tool)}

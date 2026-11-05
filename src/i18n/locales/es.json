@@ -558,7 +558,11 @@
         "line": "Línea",
         "ellipse": "Elipse",
         "rect": "Rectángulo",
-        "eraser": "Borrador"
+        "eraser": "Borrador",
+        "select": "Seleccionar",
+        "lasso": "Lazo",
+        "move": "Mover capa",
+        "picker": "Tomar color"
       },
       "color": "Color",
       "customColor": "Cualquier color",
@@ -573,7 +577,14 @@
       "hideLayer": "Ocultar capa",
       "renameHint": "Clic para dibujar en ella, doble clic para renombrar",
       "clear": "Vaciar dibujo",
-      "loadFailed": "No se pudo cargar una imagen de este dibujo"
+      "loadFailed": "No se pudo cargar una imagen de este dibujo",
+      "lockLayer": "Bloquear capa",
+      "unlockLayer": "Desbloquear capa",
+      "layerOpacity": "Opacidad",
+      "duplicateLayer": "Duplicar capa",
+      "mergeDown": "Combinar hacia abajo",
+      "mergeDownBlocked": "No se puede combinar: la capa tiene una imagen o trazos de borrador",
+      "dragLayer": "Arrastrar para reordenar"
     }
   },
   "canvas": {

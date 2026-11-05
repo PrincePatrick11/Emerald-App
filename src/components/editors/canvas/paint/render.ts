@@ -51,17 +51,26 @@ function outlinePath(outline: number[][]): Path2D {
   return path;
 }
 
-/** The shape between two corners (or the two ends of a line). */
-export function shapePath(tool: PaintStroke['tool'], points: readonly number[]): Path2D {
+/** The shape between two corners (or the two ends of a line), a rectangle or ellipse turned by `rotation` around its centre. */
+export function shapePath(tool: PaintStroke['tool'], points: readonly number[], rotation = 0): Path2D {
   const path = new Path2D();
   const [x0, y0, , x1 = x0, y1 = y0] = points;
   if (tool === 'line') {
     path.moveTo(x0, y0);
     path.lineTo(x1, y1);
   } else if (tool === 'rect') {
-    path.rect(Math.min(x0, x1), Math.min(y0, y1), Math.abs(x1 - x0), Math.abs(y1 - y0));
+    if (!rotation) {
+      path.rect(Math.min(x0, x1), Math.min(y0, y1), Math.abs(x1 - x0), Math.abs(y1 - y0));
+    } else {
+      const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2, cos = Math.cos(rotation), sin = Math.sin(rotation);
+      const corners = [[x0, y0], [x1, y0], [x1, y1], [x0, y1]].map(([x, y]) =>
+        [cx + (x - cx) * cos - (y - cy) * sin, cy + (x - cx) * sin + (y - cy) * cos]);
+      path.moveTo(corners[0][0], corners[0][1]);
+      for (const [x, y] of corners.slice(1)) path.lineTo(x, y);
+      path.closePath();
+    }
   } else {
-    path.ellipse((x0 + x1) / 2, (y0 + y1) / 2, Math.abs(x1 - x0) / 2, Math.abs(y1 - y0) / 2, 0, 0, Math.PI * 2);
+    path.ellipse((x0 + x1) / 2, (y0 + y1) / 2, Math.abs(x1 - x0) / 2, Math.abs(y1 - y0) / 2, rotation, 0, Math.PI * 2);
   }
   return path;
 }
@@ -73,7 +82,7 @@ export function strokePath(stroke: PaintStroke, live = false): Path2D {
     if (cached) return cached;
   }
   const path = isShapeTool(stroke.tool)
-    ? shapePath(stroke.tool, stroke.points)
+    ? shapePath(stroke.tool, stroke.points, stroke.rotation)
     : outlinePath(getStroke(triples(stroke.points), freehandOptions(stroke, !live)));
   if (!live) paths.set(stroke, path);
   return path;
@@ -105,7 +114,8 @@ export function drawLayer(ctx: CanvasRenderingContext2D, layer: PaintLayer, imag
   ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
   ctx.restore();
   const image = layer.image ? images.get(layer.image) : undefined;
-  if (image) ctx.drawImage(image, 0, 0, PAINT_WIDTH, PAINT_HEIGHT);
+  const r = layer.imageRect;
+  if (image) ctx.drawImage(image, r.x, r.y, r.width, r.height);
   for (const stroke of layer.strokes) drawStroke(ctx, stroke);
   if (extra) drawStroke(ctx, extra, true);
 }
@@ -130,8 +140,10 @@ export function renderPaintPng(doc: PaintDoc, images: LayerImages): string {
   for (const l of doc.layers) {
     if (l.hidden) continue;
     drawLayer(lctx, l, images);
+    octx.globalAlpha = l.opacity;
     octx.drawImage(layer, 0, 0);
   }
+  octx.globalAlpha = 1;
   return out.toDataURL('image/png');
 }
 
@@ -166,8 +178,10 @@ export function drawPaintDoc(
   for (const l of doc.layers) {
     if (l.hidden) continue;
     drawLayer(lctx, l, images);
+    sctx.globalAlpha = l.opacity;
     sctx.drawImage(layer, 0, 0);
   }
+  sctx.globalAlpha = 1;
   if (box) target.drawImage(stack, 0, 0, width, height);
   else {
     target.save();

@@ -30,7 +30,7 @@ writeFileSync(
    export { entryBlockSummary } from '${root}/src/lib/blocks/entrySummary';
    export { withLegacyStatus, statusDefinition, hasLegacyStatus, convertLegacyStatusRows, STATUS_DEFINITION_ID } from '${root}/src/lib/blocks/legacyStatus';
    export { extractUniqueLetters, parseSigilCalc, serializeSigilCalc, createSigilCalcBlock, createSigilCanvasBlock, createSigilChargeBlock, parseSigilCharge, serializeSigilCharge, sigilState, withoutConcealed, withChargeUnloaded, sigilImage, withSigilImage, letterList, sigilUnits, sigilPartBlock, sigilPartId, withSigilPart, blockHoldsLocked, withRenamedPartTargets, parseSigilDrawing, withSigilDrawing } from '${root}/src/lib/blocks/sigil';
-   export { paintDocFromJson, paintDocToJson, emptyPaintDoc, isPaintDocEmpty, thinPoints } from '${root}/src/lib/paint/document';
+   export { paintDocFromJson, paintDocToJson, emptyPaintDoc, isPaintDocEmpty, thinPoints, transformStroke, mergeDown, canMergeDown, strokeSamples, inPolygon } from '${root}/src/lib/paint/document';
    export { renderBlocksForExport } from '${root}/src/lib/blocks/exportRender';
    export { parseAssignments, resolveDefaultTemplate, templatesFor, instantiateTemplateBlocks, isContentEmpty, templateOriginsOf, templateStart, mergeTemplateTags, mergeAssignmentChanges, withAssignmentState, assignmentStateAt, sameAssignments, defaultTemplateAt, contentForTemplate, areBlocksEmpty, fieldsWithTemplate, fieldsWithoutTemplate } from '${root}/src/lib/blocks/templates';
    export { internalLinkChipHtml } from '${root}/src/lib/internalLinkHtml';
@@ -63,7 +63,7 @@ const {
   extractUniqueLetters, parseSigilCalc, serializeSigilCalc, createSigilCalcBlock, createSigilCanvasBlock,
   createSigilChargeBlock, parseSigilCharge, serializeSigilCharge, sigilState, withoutConcealed, withChargeUnloaded,
   sigilImage, withSigilImage, letterList, renderBlocksForExport, parseSigilDrawing, withSigilDrawing,
-  paintDocFromJson, paintDocToJson, emptyPaintDoc, isPaintDocEmpty, thinPoints,
+  paintDocFromJson, paintDocToJson, emptyPaintDoc, isPaintDocEmpty, thinPoints, transformStroke, mergeDown, canMergeDown, strokeSamples, inPolygon,
   sigilUnits, sigilPartBlock, sigilPartId, withSigilPart, blockHoldsLocked,
   remapDefinitionDefaults, definitionImageRefs, hasFrozenCopy, withRenamedPartTargets,
   parseAssignments, resolveDefaultTemplate, templatesFor, instantiateTemplateBlocks, isContentEmpty,
@@ -560,6 +560,32 @@ console.log('\n4f. Sigil blocks\n');
     check('drawing: not a document', paintDocFromJson({ v: 2, layers: [] }) === null && paintDocFromJson('x') === null);
     const thin = thinPoints([0, 0, 0.5, 0.1, 0.1, 0.5, 0.2, 0.2, 0.5, 5, 5, 0.5, 5.1, 5.1, 0.5]);
     check('drawing: thinning drops close points, keeps the ends', isDeepStrictEqual(thin, [0, 0, 0.5, 5, 5, 0.5, 5.1, 5.1, 0.5]), thin);
+
+    // Layer extras and turned shapes: stored only when they differ, older documents read with the defaults.
+    const extras = paintDocFromJson(paintDocToJson({ layers: [
+      { id: 'a', name: '', hidden: false, locked: true, opacity: 0.456, image: null, imageRect: { x: 0, y: 0, width: 1200, height: 800 },
+        strokes: [{ id: 'r', tool: 'rect', color: '#112233', size: 4, points: [10, 10, 0.5, 50, 30, 0.5], pressure: false, rotation: 0.5 }] },
+    ] }));
+    check('drawing: lock, opacity and a turned rectangle survive the round trip',
+      extras?.layers[0].locked && extras.layers[0].opacity === 0.46 && extras.layers[0].strokes[0].rotation === 0.5, extras);
+    const plain = paintDocFromJson({ v: 1, layers: [{ id: 'a', strokes: [{ t: 'pen', s: 2, p: [1, 2, 0.5] }] }] });
+    check('drawing: an older layer is unlocked, opaque, its image the whole page, its strokes unturned',
+      plain?.layers[0].locked === false && plain.layers[0].opacity === 1 && plain.layers[0].imageRect.width === 1200
+        && plain.layers[0].strokes[0].rotation === 0, plain);
+    const pen = { id: 'p', tool: 'pen', color: '#000000', size: 10, points: [0, 0, 0.5, 10, 0, 0.5], pressure: false, rotation: 0 };
+    const scaled = transformStroke(pen, { dx: 5, dy: 0, scale: 2, angle: 0, cx: 0, cy: 0 });
+    check('drawing: a transform moves and scales points and width', isDeepStrictEqual(scaled.points, [5, 0, 0.5, 25, 0, 0.5]) && scaled.size === 20, scaled);
+    const layerOf = (id, strokes, image = null) => ({ id, name: '', hidden: false, locked: false, opacity: 1, image, imageRect: { x: 0, y: 0, width: 1200, height: 800 }, strokes });
+    const two = { layers: [layerOf('low', [pen]), layerOf('up', [{ ...pen, id: 'q' }])] };
+    const merged = mergeDown(two, 'up');
+    check('drawing: merging down appends the strokes to the layer below',
+      merged.layers.length === 1 && merged.layers[0].strokes.map((x) => x.id).join() === 'p,q', merged);
+    check('drawing: a layer with eraser strokes or an image does not merge',
+      !canMergeDown({ layers: [layerOf('low', []), layerOf('up', [{ ...pen, tool: 'eraser' }])] }, 'up')
+        && !canMergeDown({ layers: [layerOf('low', []), layerOf('up', [], 'x.png')] }, 'up') && !canMergeDown(two, 'low'));
+    check('drawing: a lasso takes a stroke with a point inside it',
+      inPolygon(5, 5, [0, 0, 10, 0, 10, 10, 0, 10]) && !inPolygon(15, 5, [0, 0, 10, 0, 10, 10, 0, 10])
+        && strokeSamples({ ...pen, tool: 'ellipse', points: [0, 0, 0.5, 20, 10, 0.5] }).length === 16);
   }
 
   const odd = parseSigilCharge({ ...createSigilChargeBlock(), attrs: { 'data-block-data': JSON.stringify({ loaded: 'ja', revealDate: 'morgen', lock: 'alles' }) } });
