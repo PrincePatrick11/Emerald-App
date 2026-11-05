@@ -14,7 +14,8 @@ import { editorHas } from './hostContext';
 import { ALIGN_ACTIONS, applyAlign, markActionsOf } from './formatActions';
 import { applyLinkHref } from './editorCommands';
 import LinkHrefForm from './LinkHrefForm';
-import { TEXT_COLORS, type TextColor } from '../../../lib/textColors';
+import type { TextColor } from '../../../lib/textColors';
+import TextColorSwatches from './TextColorSwatches';
 
 /**
  * The widths the image menu offers, in percent of the editor's width. Stored
@@ -141,23 +142,8 @@ function TextMenu({ editor }: { editor: Editor }) {
       onMouseDown={(e) => { if (!typingLink) e.preventDefault(); }}
     >
       {choosingColor ? (
-        <div className="flex items-center gap-1 px-1">
-          <button
-            type="button"
-            className={`editor-color-swatch editor-color-swatch--none${state?.color === null ? ' editor-color-swatch--active' : ''}`}
-            title={t('editor.menu.defaultColor')}
-            onClick={() => pickColor(null)}
-          />
-          {TEXT_COLORS.map((color) => (
-            <button
-              key={color}
-              type="button"
-              className={`editor-color-swatch${state?.color === color ? ' editor-color-swatch--active' : ''}`}
-              style={{ background: `var(--editor-color-${color})` }}
-              title={t(`editor.colors.${color}`)}
-              onClick={() => pickColor(color)}
-            />
-          ))}
+        <div className="flex items-center gap-1">
+          <TextColorSwatches current={state?.color ?? null} onPick={pickColor} />
           <ToolbarBtn onClick={() => setChoosingColor(false)} active={false} title={t('editor.cancel')}><X size={14} /></ToolbarBtn>
         </div>
       ) : typingLink ? (

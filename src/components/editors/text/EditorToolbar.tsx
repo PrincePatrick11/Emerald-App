@@ -1,20 +1,27 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import type { Editor } from '@tiptap/react';
 import { useTranslation } from 'react-i18next';
 import {
-  CheckSquare, Globe, Heading1, Heading2, Heading3, ImagePlus, Link, List, ListOrdered, Minus, Quote, Redo, Search, Table,
-  Undo, Unlink,
+  CheckSquare, Globe, Heading1, Heading2, Heading3, ImagePlus, Link, List, ListOrdered, Minus, Palette, Quote, Redo,
+  Search, Table, Undo, Unlink,
 } from 'lucide-react';
 import { editorHas } from './hostContext';
 import { ALIGN_ACTIONS, applyAlign, canAlign, isAlignActive, markActionsOf } from './formatActions';
 import { applyLinkHref, NEW_TABLE, pickImageFiles } from './editorCommands';
 import LinkHrefForm from './LinkHrefForm';
+import TextColorSwatches from './TextColorSwatches';
+import type { TextColor } from '../../../lib/textColors';
 import { ToolbarBtn, ToolbarDivider, ToolbarGroup } from './toolbarParts';
 
 /**
  * The formatting bar of a text editor. It shows only what the editor's schema
  * has, so an editor with fewer features (see `features.ts`) gets a shorter bar.
  * Marks and alignment come from `formatActions.ts`, shared with the selection menu.
+ *
+ * In the order of writing: undo, what a line is (headings), how text looks
+ * (marks and colour), how it sits (alignment), the block shapes (lists,
+ * checklist, quote), what is put in (links, image, table, divider), and
+ * finding at the far end.
  */
 export default function EditorToolbar({ editor, onOpenLinkPicker, findOpen, onToggleFind }: {
   editor: Editor;
@@ -24,17 +31,27 @@ export default function EditorToolbar({ editor, onOpenLinkPicker, findOpen, onTo
 }) {
   const { t } = useTranslation();
   const has = (name: string) => editorHas(editor, name);
-
   const alignDisabled = !canAlign(editor);
 
   return (
     <div className="editor-toolbar">
       <ToolbarGroup>
-        {markActionsOf(editor).map(({ key, labelKey, icon: Icon, toggle }) => (
-          <ToolbarBtn key={key} onClick={() => toggle(editor)} active={editor.isActive(key)} title={t(labelKey)}>
-            <Icon size={14} />
-          </ToolbarBtn>
-        ))}
+        <ToolbarBtn
+          onClick={() => editor.chain().focus().undo().run()}
+          active={false}
+          title={t('editor.toolbar.undo')}
+          disabled={!editor.can().undo()}
+        >
+          <Undo size={14} />
+        </ToolbarBtn>
+        <ToolbarBtn
+          onClick={() => editor.chain().focus().redo().run()}
+          active={false}
+          title={t('editor.toolbar.redo')}
+          disabled={!editor.can().redo()}
+        >
+          <Redo size={14} />
+        </ToolbarBtn>
       </ToolbarGroup>
 
       {has('heading') && (<>
@@ -53,22 +70,18 @@ export default function EditorToolbar({ editor, onOpenLinkPicker, findOpen, onTo
               </ToolbarBtn>
             );
           })}
-          <ToolbarBtn
-            onClick={() => editor.chain().focus().toggleBlockquote().run()}
-            active={editor.isActive('blockquote')}
-            title={t('editor.toolbar.blockquote')}
-          >
-            <Quote size={14} />
-          </ToolbarBtn>
-          <ToolbarBtn
-            onClick={() => editor.chain().focus().setHorizontalRule().run()}
-            active={false}
-            title={t('editor.toolbar.horizontalRule')}
-          >
-            <Minus size={14} />
-          </ToolbarBtn>
         </ToolbarGroup>
       </>)}
+
+      <ToolbarDivider />
+      <ToolbarGroup>
+        {markActionsOf(editor).map(({ key, labelKey, icon: Icon, toggle }) => (
+          <ToolbarBtn key={key} onClick={() => toggle(editor)} active={editor.isActive(key)} title={t(labelKey)}>
+            <Icon size={14} />
+          </ToolbarBtn>
+        ))}
+        {has('textColor') && <TextColorButton editor={editor} />}
+      </ToolbarGroup>
 
       {has('textAlign') && (<>
         <ToolbarDivider />
@@ -87,7 +100,7 @@ export default function EditorToolbar({ editor, onOpenLinkPicker, findOpen, onTo
         </ToolbarGroup>
       </>)}
 
-      {(has('bulletList') || has('taskList')) && (<>
+      {(has('bulletList') || has('taskList') || has('blockquote')) && (<>
         <ToolbarDivider />
         <ToolbarGroup>
           {has('bulletList') && (<>
@@ -115,31 +128,13 @@ export default function EditorToolbar({ editor, onOpenLinkPicker, findOpen, onTo
               <CheckSquare size={14} />
             </ToolbarBtn>
           )}
-        </ToolbarGroup>
-      </>)}
-
-      {(has('internalLink') || has('link') || has('image') || has('table')) && (<>
-        <ToolbarDivider />
-        <ToolbarGroup>
-          {has('internalLink') && (
-            <ToolbarBtn onClick={onOpenLinkPicker} active={false} title={t('editor.toolbar.insertLink')}>
-              <Link size={14} />
-            </ToolbarBtn>
-          )}
-          {has('link') && <WebLinkButton editor={editor} />}
-          {has('image') && (
-            <ToolbarBtn onClick={() => pickImageFiles(editor)} active={false} title={t('editor.toolbar.insertImage')}>
-              <ImagePlus size={14} />
-            </ToolbarBtn>
-          )}
-          {has('table') && (
+          {has('blockquote') && (
             <ToolbarBtn
-              onClick={() => editor.chain().focus().insertTable(NEW_TABLE).run()}
-              active={editor.isActive('table')}
-              disabled={!editor.can().insertTable(NEW_TABLE)}
-              title={t('editor.toolbar.insertTable')}
+              onClick={() => editor.chain().focus().toggleBlockquote().run()}
+              active={editor.isActive('blockquote')}
+              title={t('editor.toolbar.blockquote')}
             >
-              <Table size={14} />
+              <Quote size={14} />
             </ToolbarBtn>
           )}
         </ToolbarGroup>
@@ -147,42 +142,61 @@ export default function EditorToolbar({ editor, onOpenLinkPicker, findOpen, onTo
 
       <ToolbarDivider />
       <ToolbarGroup>
-        {has('textSearch') && (
+        {has('internalLink') && (
+          <ToolbarBtn onClick={onOpenLinkPicker} active={false} title={t('editor.toolbar.insertLink')}>
+            <Link size={14} />
+          </ToolbarBtn>
+        )}
+        {has('link') && <WebLinkButton editor={editor} />}
+        {has('image') && (
+          <ToolbarBtn onClick={() => pickImageFiles(editor)} active={false} title={t('editor.toolbar.insertImage')}>
+            <ImagePlus size={14} />
+          </ToolbarBtn>
+        )}
+        {has('table') && (
+          <ToolbarBtn
+            onClick={() => editor.chain().focus().insertTable(NEW_TABLE).run()}
+            active={editor.isActive('table')}
+            disabled={!editor.can().insertTable(NEW_TABLE)}
+            title={t('editor.toolbar.insertTable')}
+          >
+            <Table size={14} />
+          </ToolbarBtn>
+        )}
+        {has('horizontalRule') && (
+          <ToolbarBtn
+            onClick={() => editor.chain().focus().setHorizontalRule().run()}
+            active={false}
+            title={t('editor.toolbar.horizontalRule')}
+          >
+            <Minus size={14} />
+          </ToolbarBtn>
+        )}
+      </ToolbarGroup>
+
+      {has('textSearch') && (
+        <div className="editor-toolbar-end">
           <ToolbarBtn onClick={onToggleFind} active={findOpen} title={t('editor.toolbar.find')}>
             <Search size={14} />
           </ToolbarBtn>
-        )}
-        <ToolbarBtn
-          onClick={() => editor.chain().focus().undo().run()}
-          active={false}
-          title={t('editor.toolbar.undo')}
-          disabled={!editor.can().undo()}
-        >
-          <Undo size={14} />
-        </ToolbarBtn>
-        <ToolbarBtn
-          onClick={() => editor.chain().focus().redo().run()}
-          active={false}
-          title={t('editor.toolbar.redo')}
-          disabled={!editor.can().redo()}
-        >
-          <Redo size={14} />
-        </ToolbarBtn>
-      </ToolbarGroup>
+        </div>
+      )}
     </div>
   );
 }
 
 /**
- * A web link from the bar: the address typed in a small form under the
- * button, for the selection, for the link at the cursor (to change it), or,
- * with nothing selected, as new text. A click elsewhere closes it.
+ * A toolbar button with a small panel hanging under it (`.editor-toolbar-popover`).
+ * A click elsewhere closes it; the panel gets `close` to close itself.
  */
-function WebLinkButton({ editor }: { editor: Editor }) {
-  const { t } = useTranslation();
+function PopoverButton({ icon, title, active, children }: {
+  icon: ReactNode;
+  title: string;
+  active: boolean;
+  children: (close: () => void) => ReactNode;
+}) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
-  const active = editor.isActive('link');
 
   useEffect(() => {
     if (!open) return;
@@ -193,27 +207,63 @@ function WebLinkButton({ editor }: { editor: Editor }) {
 
   return (
     <div ref={ref} className="relative">
-      <ToolbarBtn onClick={() => setOpen((v) => !v)} active={active || open} title={t('editor.menu.webLink')}>
-        <Globe size={14} />
+      <ToolbarBtn onClick={() => setOpen((v) => !v)} active={active || open} title={title}>
+        {icon}
       </ToolbarBtn>
-      {open && (
-        <div className="editor-selection-menu editor-toolbar-popover">
-          <LinkHrefForm
-            initial={active ? (editor.getAttributes('link').href as string) ?? '' : ''}
-            onConfirm={(href) => { applyLinkHref(editor, href); setOpen(false); }}
-            onCancel={() => { setOpen(false); editor.commands.focus(); }}
-          />
-          {active && (
-            <ToolbarBtn
-              onClick={() => { editor.chain().focus().extendMarkRange('link').unsetLink().run(); setOpen(false); }}
-              active={false}
-              title={t('editor.removeLink')}
-            >
-              <Unlink size={14} />
-            </ToolbarBtn>
-          )}
-        </div>
-      )}
+      {open && <div className="editor-selection-menu editor-toolbar-popover">{children(() => setOpen(false))}</div>}
     </div>
+  );
+}
+
+/**
+ * A web link from the bar: the address typed in a small form under the
+ * button, for the selection, for the link at the cursor (to change it), or,
+ * with nothing selected, as new text.
+ */
+function WebLinkButton({ editor }: { editor: Editor }) {
+  const { t } = useTranslation();
+  const active = editor.isActive('link');
+  return (
+    <PopoverButton icon={<Globe size={14} />} title={t('editor.menu.webLink')} active={active}>
+      {(close) => (<>
+        <LinkHrefForm
+          initial={active ? (editor.getAttributes('link').href as string) ?? '' : ''}
+          onConfirm={(href) => { applyLinkHref(editor, href); close(); }}
+          onCancel={() => { close(); editor.commands.focus(); }}
+        />
+        {active && (
+          <ToolbarBtn
+            onClick={() => { editor.chain().focus().extendMarkRange('link').unsetLink().run(); close(); }}
+            active={false}
+            title={t('editor.removeLink')}
+          >
+            <Unlink size={14} />
+          </ToolbarBtn>
+        )}
+      </>)}
+    </PopoverButton>
+  );
+}
+
+/**
+ * The text colour from the bar, for the selection or, with nothing selected,
+ * for what is typed next. The icon takes the colour at the cursor.
+ */
+function TextColorButton({ editor }: { editor: Editor }) {
+  const { t } = useTranslation();
+  const color = (editor.getAttributes('textColor').color as TextColor | undefined) ?? null;
+  return (
+    <PopoverButton
+      icon={<Palette size={14} style={color ? { color: `var(--editor-color-${color})` } : undefined} />}
+      title={t('editor.menu.textColor')}
+      active={!!color}
+    >
+      {(close) => (
+        <TextColorSwatches
+          current={color}
+          onPick={(picked) => { editor.chain().focus().setTextColor(picked).run(); close(); }}
+        />
+      )}
+    </PopoverButton>
   );
 }
