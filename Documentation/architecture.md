@@ -188,7 +188,7 @@ The schema itself lives in `src/lib/schema.ts`, not in `db.ts`: fresh vaults exe
 
 Two details of what the stores load:
 
-- **Sigil drawings are files, not columns.** A drawing is an image file referenced from the canvas block's `<img src>`, so the entry rows stay small. `entryBlockSummary(...).sigil` resolves the first visible, unconcealed drawing (`image`) and the target date; the Operations dashboard shows only the target date, in row and card alike.
+- **Sigil drawings are files, not columns.** A drawing's rendered image is a file referenced from the canvas block's `<img src>`, next to its vector strokes as block data (see [Editors](architecture/editors.md#paint-editor)), so the entry rows stay small. `entryBlockSummary(...).sigil` resolves the first visible, unconcealed drawing (`image`) and the target date; the Operations dashboard shows only the target date, in row and card alike.
 - **`altar_placements` load in one query.** `fetchAltars` selects the whole table once (`LIVE_PLACEMENTS`, joined to the live `altar_items` so placements of trashed elements stay hidden) and groups rows by `altar_id` in JS (`mapPlacementRows`).
 
 ### Store write serialization

@@ -59,7 +59,7 @@ The right sidebar and the main area are sibling trees, so `BlockStack` publishes
 
 ### Sigils
 
-**Sigil blocks (`lib/blocks/sigil.ts`)**: calculator, drawing, charge; migration v42 (`migrateLegacySigils.ts`) converts the old sigil rows into them. The drawing is an image file (`saveImage`) referenced by `<img src>`, loaded into the canvas as a data URL (`readImageAsBase64`) — an `emerald-img:` URL would taint the canvas and `toDataURL` would throw. The save may finish after Done: `SigilCanvasBlock` keeps it in the part that stays mounted, writes through `onPersist` if editing has ended, and drops the result if the stack was unmounted.
+**Sigil blocks (`lib/blocks/sigil.ts`)**: calculator, drawing, charge; migration v42 (`migrateLegacySigils.ts`) converts the old sigil rows into them. The drawing is the paint editor's vector document as block data plus its rendered image (`saveImage`) referenced by `<img src>`; `parseSigilDrawing` and `withSigilDrawing` read and write both, and a drawing from before the vector format opens with its image as the first layer (see [Editors](editors.md#paint-editor)). The save may finish after Done: `SigilCanvasBlock` keeps it in the part that stays mounted, writes through `onPersist` if editing has ended, and drops the result if the stack was unmounted.
 
 **Charges.** A `SigilCharge`'s `targets` are the block ids it covers, or `null` for every calculator and drawing in the entry, including later ones (the default); `chargeCovers` is the one check. `chargeConceals(charge, today)` is true for a loaded charge until its `revealDate` — and indefinitely without one, so a charge loaded without a date stays hidden until unloaded. `sigilState(blocks, today)` folds all loaded charges into one `SigilState`:
 
