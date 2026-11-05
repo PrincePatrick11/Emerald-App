@@ -1,5 +1,6 @@
 import type { ComponentType, CSSProperties, ReactNode } from 'react';
 import type { TFunction } from 'i18next';
+import type { PaintDoc } from '../../../lib/paint/document';
 
 /**
  * What a canvas editor edits: a scene of elements on an artboard, in artboard pixels.
@@ -108,6 +109,16 @@ export interface CanvasElementType<P = unknown> {
     set: (el: CanvasElement<P>, text: string) => P;
     /** The field's look at zoom 1: font, size, colour, alignment, line height. */
     style: (el: CanvasElement<P>) => CSSProperties;
+  };
+  /**
+   * Painting in place, on double-click or Enter: the paint mode, with the
+   * paint tools in the toolbar and a drawing surface over the element.
+   */
+  paint?: {
+    get: (el: CanvasElement<P>) => PaintDoc;
+    set: (el: CanvasElement<P>, doc: PaintDoc) => P;
+    /** A layer image's reference as a source the canvas can load. */
+    resolveImage: (ref: string) => string;
   };
   /** Entries for the toolbar's "add" group. */
   additions?: CanvasAddition<P>[];

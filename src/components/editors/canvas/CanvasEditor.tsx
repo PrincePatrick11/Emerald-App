@@ -19,6 +19,13 @@ import {
 import { byZ, type CanvasAddition, type CanvasElement, type CanvasGrid, type CanvasTypes } from './types';
 import CanvasToolbar, { CanvasZoom } from './CanvasToolbar';
 import TextEditOverlay from './TextEditOverlay';
+import PaintSurface from './paint/PaintSurface';
+import PaintToolbar, { PAINT_TOOL_DEFS, toolEnabled } from './paint/PaintToolbar';
+import { usePaintBrush, usePaintControls } from './paint/usePaintTools';
+import { FULL_PAINT_FEATURES, type PaintFeatures } from './paint/features';
+import { emptyPaintDoc, type PaintDoc } from '../../../lib/paint/document';
+import { ToolbarBtn } from '../shared/toolbarParts';
+import { Check } from 'lucide-react';
 
 /** How close, on screen, an edge has to come to a guide to snap. */
 const GUIDE_SNAP_PX = 6;
@@ -70,7 +77,30 @@ export interface CanvasEditorProps {
   overlay?: ReactNode;
   /** Extra controls at the end of the toolbar. */
   toolbarEnd?: ReactNode;
+  /** The paint tools of the paint mode: which there are, the palette, the brush to start with. */
+  paint?: CanvasPaintOptions;
+  /**
+   * An element the editor is fixed in the paint mode of: it starts there and
+   * stays, with nothing else to select or add. To the user it is a paint editor.
+   */
+  paintElementId?: string;
+  /**
+   * `fill`: the editor fills its positioned parent. `inline`: it sits in the
+   * flow, as wide as its parent, the stage as high as the artboard's shape asks.
+   */
+  layout?: 'fill' | 'inline';
 }
+
+export interface CanvasPaintOptions {
+  features?: PaintFeatures;
+  palette: readonly string[];
+  startColor: string;
+  startSize: number;
+}
+
+/** No drawing open: the paint hooks still need a document. */
+const NO_DOC: PaintDoc = emptyPaintDoc();
+const DEFAULT_PAINT: CanvasPaintOptions = { palette: ['#000000', '#ffffff'], startColor: '#000000', startSize: 6 };
 
 interface View {
   zoom: number;
@@ -105,6 +135,7 @@ const CanvasEditor = forwardRef<CanvasEditorHandle, CanvasEditorProps>(function 
   width, height, elements, onChange, selectedIds, onSelectionChange, editable,
   types = BUILTIN_CANVAS_TYPES, features = FULL_CANVAS_FEATURES, background, grid = null, rotationSnap = null,
   historyKey = '', readAlign = 'center', createId = () => crypto.randomUUID(), onEditElement, onExport, overlay, toolbarEnd,
+  paint = DEFAULT_PAINT, paintElementId, layout = 'fill',
 }, ref) {
   const { t } = useTranslation();
   const rootRef = useRef<HTMLDivElement>(null);
@@ -120,6 +151,8 @@ const CanvasEditor = forwardRef<CanvasEditorHandle, CanvasEditorProps>(function 
   const [guides, setGuides] = useState<Guide[]>([]);
   const [marquee, setMarquee] = useState<Box | null>(null);
   const [editingTextId, setEditingTextId] = useState<string | null>(null);
+  const [paintingIdState, setPaintingId] = useState<string | null>(null);
+  const paintingId = paintElementId ?? paintingIdState;
   const [spaceDown, setSpaceDown] = useState(false);
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const [gesture, setGesture] = useState(false);
@@ -129,6 +162,7 @@ const CanvasEditor = forwardRef<CanvasEditorHandle, CanvasEditorProps>(function 
   live.current = { elements, selectedIds, view, onChange, onSelectionChange, grid, types };
 
   const history = useCanvasHistory(elements, onChange, `${historyKey}:${editable}`);
+  const brush = usePaintBrush(paint.startColor, paint.startSize);
   const commit = useCallback((next: CanvasElement[]) => {
     history.markLocal();
     live.current.onChange(next);
@@ -151,12 +185,12 @@ const CanvasEditor = forwardRef<CanvasEditorHandle, CanvasEditorProps>(function 
   // ── View ──────────────────────────────────────────────────────────────
 
   const fitView = useCallback((viewport: { width: number; height: number }, isEditing: boolean): View => {
-    const pad = isEditing ? EDIT_PADDING : 0;
+    const pad = isEditing && !paintElementId ? EDIT_PADDING : 0;
     const zoom = clamp(Math.min((viewport.width - 2 * pad) / width, (viewport.height - 2 * pad) / height), MIN_ZOOM, MAX_ZOOM);
     const x = (viewport.width - width * zoom) / 2;
     const y = !isEditing && readAlign === 'top' ? 0 : (viewport.height - height * zoom) / 2;
     return { zoom: zoom > 0 ? zoom : 1, x, y };
-  }, [width, height, readAlign]);
+  }, [width, height, readAlign, paintElementId]);
 
   useLayoutEffect(() => {
     const el = viewportRef.current;
@@ -252,8 +286,8 @@ const CanvasEditor = forwardRef<CanvasEditorHandle, CanvasEditorProps>(function 
   }, [selectedIds, byId, select]);
 
   const handleable = useMemo(
-    () => (editable ? selected.filter((el) => !el.locked && !el.hidden && el.id !== editingTextId) : []),
-    [editable, selected, editingTextId],
+    () => (editable && !paintingId ? selected.filter((el) => !el.locked && !el.hidden && el.id !== editingTextId) : []),
+    [editable, selected, editingTextId, paintingId],
   );
 
   useEffect(() => {
@@ -429,6 +463,11 @@ const CanvasEditor = forwardRef<CanvasEditorHandle, CanvasEditorProps>(function 
       return;
     }
     rootRef.current?.focus({ preventScroll: true });
+    // The drawing surface takes the presses on the drawing; one beside it ends the paint mode.
+    if (paintingId) {
+      if (!paintElementId) setPaintingId(null);
+      return;
+    }
     if (evt.button === 1 || (evt.button === 0 && spaceDown && features.zoom)) {
       evt.preventDefault();
       startPan(evt);
@@ -533,12 +572,16 @@ const CanvasEditor = forwardRef<CanvasEditorHandle, CanvasEditorProps>(function 
     };
     commit([...live.current.elements, el]);
     select([el.id]);
+    // A new text is typed into at once, a new drawing painted in.
     if (live.current.types[type]?.textEdit) setEditingTextId(el.id);
+    else if (live.current.types[type]?.paint) setPaintingId(el.id);
   }, [visibleCentre, width, height, t, createId, commit, select]);
 
   const openElement = useCallback((el: CanvasElement) => {
     if (el.locked) return;
-    if (live.current.types[el.type]?.textEdit) setEditingTextId(el.id);
+    const type = live.current.types[el.type];
+    if (type?.textEdit) setEditingTextId(el.id);
+    else if (type?.paint) setPaintingId(el.id);
     else onEditElement?.(el);
   }, [onEditElement]);
 
@@ -573,6 +616,18 @@ const CanvasEditor = forwardRef<CanvasEditorHandle, CanvasEditorProps>(function 
     const mod = e.metaKey || e.ctrlKey;
     const key = e.key.toLowerCase();
     const handled = () => { e.preventDefault(); e.stopPropagation(); };
+    // The paint mode's keys: undo, the tools' letters, `[` and `]` for the size, Escape to leave.
+    if (paintingId) {
+      if (mod && key === 'z') { handled(); if (e.shiftKey) history.redo(); else history.undo(); return; }
+      if (mod && key === 'y') { handled(); history.redo(); return; }
+      if (e.key === 'Escape' && !paintElementId) { handled(); setPaintingId(null); return; }
+      if (mod || e.altKey) return;
+      if (key === '[') { handled(); brush.setSize(brush.size - (brush.size > 10 ? 2 : 1)); return; }
+      if (key === ']') { handled(); brush.setSize(brush.size + (brush.size >= 10 ? 2 : 1)); return; }
+      const def = PAINT_TOOL_DEFS.find((d) => d.key === key && toolEnabled(d.tool, paintFeatures));
+      if (def) { handled(); brush.setTool(def.tool); }
+      return;
+    }
     if (e.code === 'Space' && !mod) { setSpaceDown(true); handled(); return; }
     if (mod && key === 'z' && features.history) { handled(); if (e.shiftKey) history.redo(); else history.undo(); return; }
     if (mod && key === 'y' && features.history) { handled(); history.redo(); return; }
@@ -639,6 +694,32 @@ const CanvasEditor = forwardRef<CanvasEditorHandle, CanvasEditorProps>(function 
     else nodes.current.delete(id);
   }, []);
 
+  const painting = paintingId ? byId.get(paintingId) : undefined;
+  const paintType = painting ? types[painting.type]?.paint : undefined;
+  const paintFeatures = paint.features ?? FULL_PAINT_FEATURES;
+  const commitDoc = useCallback((doc: PaintDoc) => {
+    const el = live.current.elements.find((e) => e.id === paintingId);
+    const type = el && live.current.types[el.type]?.paint;
+    if (!el || !type) return;
+    commit(patched(new Map([[el.id, { ...el, props: type.set(el, doc) }]])));
+  }, [paintingId, commit, patched]);
+  const paintControls = usePaintControls(painting && paintType ? paintType.get(painting) : NO_DOC, brush, commitDoc, history);
+  // The paint mode ends when its element goes (removed, undone) or hides.
+  useEffect(() => {
+    if (paintingIdState && (!painting || painting.hidden || !editable)) setPaintingId(null);
+  }, [paintingIdState, painting, editable]);
+  const layerImages = useMemo(() => {
+    const map = new Map<string, HTMLImageElement>();
+    if (!painting || !paintType) return map;
+    for (const layer of paintType.get(painting).layers) {
+      if (!layer.image) continue;
+      const image = cachedCanvasImage(paintType.resolveImage(layer.image));
+      if (image) map.set(layer.image, image);
+    }
+    return map;
+    // `resourceVersion`: a layer image that arrived.
+  }, [painting, paintType, resourceVersion]);
+
   const editingText = editingTextId ? byId.get(editingTextId) : undefined;
   const editingType = editingText ? types[editingText.type]?.textEdit : undefined;
   // Outlines: while reading the selection (there are no handles), while editing what the pointer is over.
@@ -657,19 +738,33 @@ const CanvasEditor = forwardRef<CanvasEditorHandle, CanvasEditorProps>(function 
   return (
     <div
       ref={rootRef}
-      className={`canvas-editor ${editable ? 'canvas-editor-editing' : ''}`}
+      className={`canvas-editor canvas-editor-${layout} ${editable ? 'canvas-editor-editing' : ''} ${paintingId ? 'canvas-editor-painting' : ''}`}
       tabIndex={editable ? -1 : undefined}
       onKeyDown={onKeyDown}
     >
       {editable && (
         <div className="canvas-toolbar-strip">
-          <CanvasToolbar controller={controller} end={toolbarEnd} />
+          {painting && paintType ? (
+            <PaintToolbar
+              api={paintControls}
+              features={paintFeatures}
+              palette={paint.palette}
+              end={!paintElementId && (
+                <ToolbarBtn onClick={() => setPaintingId(null)} active={false} title={t('canvas.donePainting')}>
+                  <Check size={14} />
+                  <span className="editor-toolbar-btn-label">{t('canvas.donePainting')}</span>
+                </ToolbarBtn>
+              )}
+            />
+          ) : (
+            <CanvasToolbar controller={controller} end={toolbarEnd} />
+          )}
         </div>
       )}
       <div
         ref={viewportRef}
         className="canvas-viewport"
-        style={{ cursor: spaceDown ? 'grab' : undefined }}
+        style={{ cursor: spaceDown ? 'grab' : undefined, aspectRatio: layout === 'inline' ? `${width} / ${height}` : undefined }}
         onContextMenu={(e) => { if (editable) e.preventDefault(); }}
       >
         <div
@@ -700,7 +795,7 @@ const CanvasEditor = forwardRef<CanvasEditorHandle, CanvasEditorProps>(function 
                     el={el}
                     types={types}
                     editable={editable}
-                    editing={el.id === editingTextId}
+                    editing={el.id === editingTextId || el.id === paintingId}
                     resourceVersion={resourceVersion}
                     register={register}
                     onHover={setHoveredId}
@@ -796,6 +891,25 @@ const CanvasEditor = forwardRef<CanvasEditorHandle, CanvasEditorProps>(function 
             style={editingType.style(editingText)}
             view={view}
             onDone={(text) => finishTextEdit(editingText.id, text)}
+          />
+        )}
+        {editable && painting && paintType && (
+          <PaintSurface
+            box={{
+              left: view.x + (painting.x - painting.width / 2) * view.zoom,
+              top: view.y + (painting.y - painting.height / 2) * view.zoom,
+              width: painting.width * view.zoom,
+              height: painting.height * view.zoom,
+              rotation: painting.rotation,
+            }}
+            doc={paintControls.doc}
+            activeLayer={paintControls.activeLayer}
+            tool={paintControls.tool}
+            color={paintControls.color}
+            size={paintControls.size}
+            images={layerImages}
+            editable={layerImages.size >= paintControls.doc.layers.filter((l) => l.image).length}
+            onStroke={paintControls.addStroke}
           />
         )}
         {editable && features.zoom && <CanvasZoom controller={controller} />}

@@ -161,7 +161,7 @@ export const PlacedElementInspector = memo(function PlacedElementInspector({
     if (Number.isNaN(percent)) return;
     const normalized = (Math.max(10, Math.min(1250, percent)) / 100) * 40;
     // A drawn shape keeps its proportions; an item stays square, as it always was.
-    if (placement.kind === 'shape') {
+    if (placement.kind === 'shape' || placement.kind === 'drawing') {
       const factor = normalized / ((placement.width + placement.height) / 2);
       onUpdate({ width: placement.width * factor, height: placement.height * factor });
       return;

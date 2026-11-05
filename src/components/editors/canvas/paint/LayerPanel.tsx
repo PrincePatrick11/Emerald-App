@@ -1,9 +1,9 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ChevronDown, ChevronUp, Eye, EyeOff, ImageIcon, Plus, Trash2 } from 'lucide-react';
-import { MAX_LAYERS, type PaintLayer } from '../../../lib/paint/document';
-import { ToolbarBtn } from '../shared/toolbarParts';
-import type { PaintEditorApi } from './usePaintEditor';
+import { MAX_LAYERS, type PaintLayer } from '../../../../lib/paint/document';
+import { ToolbarBtn } from '../../shared/toolbarParts';
+import type { PaintControls } from './usePaintTools';
 
 /** A layer's name as shown: its own, or its place counted from the bottom. */
 export function layerLabel(t: (key: string, opts?: Record<string, unknown>) => string, layer: PaintLayer, index: number): string {
@@ -15,7 +15,7 @@ export function layerLabel(t: (key: string, opts?: Record<string, unknown>) => s
  * on the page. A click picks the layer drawn on, a double click renames it.
  * A layer that holds an older drawing's image shows the image mark.
  */
-export default function LayerPanel({ api }: { api: PaintEditorApi }) {
+export default function LayerPanel({ api }: { api: PaintControls }) {
   const { t } = useTranslation();
   const [renaming, setRenaming] = useState<string | null>(null);
   const { layers } = api.doc;

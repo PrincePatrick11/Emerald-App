@@ -1,5 +1,6 @@
 import { memo } from 'react';
 import type { TFunction } from 'i18next';
+import { PenTool } from 'lucide-react';
 import { isCandleEmoji } from '../../lib/altarConstants';
 import { drawnLabel } from '../../lib/altarElements';
 import type { AltarPlacement, AltarShapeType } from '../../types';
@@ -35,6 +36,7 @@ export const AltarPlacementVisual = memo(function AltarPlacementVisual({ placeme
       </svg>
     );
   }
+  if (placement.kind === 'drawing') return <PenTool size={size} className="flex-shrink-0 text-muted" aria-hidden />;
   if (placement.kind === 'text') {
     return (
       <span
@@ -52,5 +54,5 @@ export const AltarPlacementVisual = memo(function AltarPlacementVisual({ placeme
 /** The name of what sits on an altar: the item's, a text's first line, or the kind of shape. */
 export function placementLabel(placement: AltarPlacement, t: TFunction): string {
   if (placement.kind === 'item') return placement.name;
-  return drawnLabel(placement, (type) => t(`canvas.shape.${type}`));
+  return drawnLabel(placement, (type) => t(`canvas.shape.${type}`), t('canvas.drawing'));
 }

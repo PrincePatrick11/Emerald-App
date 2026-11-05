@@ -2307,7 +2307,7 @@ html[data-theme] .prop-segment--active {
   background: var(--border-soft);
 }
 
-/* The paint editor (components/editors/paint): its bar over the drawing. */
+/* The paint mode of the canvas editor (components/editors/canvas/paint). */
 .paint-editor {
   display: flex;
   flex-direction: column;
@@ -2410,18 +2410,23 @@ input.paint-layer-name { display: block; }
 .paint-layer-add:enabled:hover { color: var(--text-primary); }
 .paint-layer-add:disabled { opacity: 0.5; cursor: not-allowed; }
 /* The drawing surface: the sheet's canvas colour, 3:2 like the document. */
-.paint-canvas-shell {
-  position: relative;
-  overflow: hidden;
-  border-radius: 0.75rem;
-  border: 1px solid var(--edge);
-  background: var(--canvas);
-  outline: none;
+/* The drawing surface of the canvas editor's paint mode, laid over the
+   drawing element (PaintSurface places and turns it). */
+.paint-surface {
+  position: absolute;
+  z-index: 3;
+  transform-origin: 50% 50%;
+}
+/* On a scene of several elements the drawing's edge shows while it is painted;
+   fixed in the paint mode (a sigil) the drawing is the whole sheet. */
+.canvas-editor-painting:not(.canvas-editor-inline) .paint-surface {
+  outline: 1px dashed var(--accent);
+  outline-offset: 2px;
 }
 .paint-canvas {
   display: block;
   width: 100%;
-  aspect-ratio: 3 / 2;
+  height: 100%;
   background: transparent;
 }
 .paint-canvas--editable {
@@ -2489,6 +2494,31 @@ input.paint-layer-name { display: block; }
 .canvas-stage {
   position: absolute;
   inset: 0;
+}
+/* In the flow (a sigil drawing in an entry): the bar, then the stage as a
+   rounded sheet in the artboard's shape. */
+.canvas-editor-inline {
+  position: relative;
+  inset: auto;
+  gap: 0.5rem;
+}
+.canvas-editor-inline .canvas-toolbar-strip {
+  padding: 0;
+  border-bottom: none;
+}
+.canvas-editor-inline .canvas-viewport {
+  flex: none;
+  width: 100%;
+  border-radius: 0.75rem;
+  border: 1px solid var(--edge);
+  background: transparent;
+}
+.canvas-editor-inline .canvas-artboard {
+  box-shadow: none;
+}
+/* The sheet a drawing lies on. */
+.canvas-paper {
+  background: var(--canvas);
 }
 /* Zoom in the stage's corner, a small bar of its own. */
 .canvas-zoom {
@@ -4146,12 +4176,8 @@ html[data-theme='emerald-parchment'] .app-sidebar-left .bg-well-active.text-seco
   border: 1px solid rgba(0, 138, 87, 0.34);
 }
 
-html[data-theme='emerald-parchment'] .paint-canvas-shell {
-  background: #ece2d1;
-  border-color: rgba(145, 108, 70, 0.34);
-}
-
-html[data-theme='emerald-parchment'] .paint-canvas {
+html[data-theme='emerald-parchment'] .canvas-paper {
+  background-color: #ece2d1;
   background-image:
     linear-gradient(rgba(152, 117, 81, 0.18) 1px, transparent 1px),
     linear-gradient(90deg, rgba(152, 117, 81, 0.18) 1px, transparent 1px);

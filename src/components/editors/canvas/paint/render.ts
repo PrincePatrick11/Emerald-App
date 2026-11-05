@@ -1,5 +1,5 @@
 import { getStroke } from 'perfect-freehand';
-import { isShapeTool, PAINT_HEIGHT, PAINT_WIDTH, type PaintDoc, type PaintLayer, type PaintStroke } from '../../../lib/paint/document';
+import { isShapeTool, PAINT_HEIGHT, PAINT_WIDTH, type PaintDoc, type PaintLayer, type PaintStroke } from '../../../../lib/paint/document';
 
 /**
  * Drawing a document onto a canvas. A pen or eraser stroke is a filled

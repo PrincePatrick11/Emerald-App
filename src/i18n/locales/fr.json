@@ -577,6 +577,9 @@
     }
   },
   "canvas": {
+    "drawing": "Dessin",
+    "addDrawing": "Ajouter un dessin",
+    "donePainting": "Terminé",
     "newText": "Texte",
     "addShape": "Ajouter une forme",
     "addText": "Ajouter du texte",

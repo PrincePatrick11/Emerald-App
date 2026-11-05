@@ -1,3 +1,4 @@
+import type { PaintDoc } from '../lib/paint/document';
 import type { TrashKind, ViewId } from '../lib/modules';
 
 export type ContentType = 'journal' | 'wiki' | 'operation' | 'task' | 'altar';
@@ -115,7 +116,7 @@ export interface AltarItem {
  * `altars.elements`, see `lib/altarElements.ts`). The store holds both in one
  * list so stacking, the sidebar and the edit snapshot treat them alike.
  */
-export type AltarPlacementKind = 'item' | 'shape' | 'text';
+export type AltarPlacementKind = 'item' | 'shape' | 'text' | 'drawing';
 
 export type AltarShapeType = 'rect' | 'ellipse' | 'triangle' | 'star' | 'hexagon';
 
@@ -161,6 +162,8 @@ export interface AltarPlacement {
   locked: boolean;
   hidden: boolean;
   image_data?: string;
+  /** Only for `kind: 'drawing'`: the painted document (`lib/paint/document.ts`). */
+  drawing?: PaintDoc;
   /** Only for `kind: 'shape'`. */
   shape?: AltarShapeStyle;
   /** Only for `kind: 'text'`. */

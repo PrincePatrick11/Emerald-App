@@ -1,13 +1,14 @@
+import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Circle, Eraser, Layers, Minus, PenTool, Redo, Square, Trash2, Undo, type LucideIcon,
 } from 'lucide-react';
-import { PAINT_SIZE_MAX, PAINT_SIZE_MIN, type PaintTool } from '../../../lib/paint/document';
-import PopoverButton from '../shared/PopoverButton';
-import { ToolbarBtn, ToolbarDivider, ToolbarGroup } from '../shared/toolbarParts';
+import { PAINT_SIZE_MAX, PAINT_SIZE_MIN, type PaintTool } from '../../../../lib/paint/document';
+import PopoverButton from '../../shared/PopoverButton';
+import { ToolbarBtn, ToolbarDivider, ToolbarGroup } from '../../shared/toolbarParts';
 import LayerPanel from './LayerPanel';
 import type { PaintFeatures } from './features';
-import type { PaintEditorApi } from './usePaintEditor';
+import type { PaintControls } from './usePaintTools';
 
 interface ToolDef {
   tool: PaintTool;
@@ -32,15 +33,18 @@ export function toolEnabled(tool: PaintTool, features: PaintFeatures): boolean {
 }
 
 /**
- * The paint editor's bar, in the app's toolbar style (`.editor-toolbar`,
- * shared buttons from `editors/shared/`). It shows what the features
- * switch on, in the order of drawing: undo and redo, the tools, colour and
- * size of the brush, the layers, and emptying at the far end.
+ * The canvas editor's bar in the paint mode, in the app's toolbar style
+ * (`.editor-toolbar`, shared buttons from `editors/shared/`). It shows what
+ * the paint features switch on, in the order of drawing: undo and redo, the
+ * tools, colour and size of the brush, the layers, and emptying and leaving
+ * the paint mode at the far end.
  */
-export default function PaintToolbar({ api, features, palette }: {
-  api: PaintEditorApi;
+export default function PaintToolbar({ api, features, palette, end }: {
+  api: PaintControls;
   features: PaintFeatures;
   palette: readonly string[];
+  /** At the far end, after clearing: leaving the paint mode. */
+  end?: ReactNode;
 }) {
   const { t } = useTranslation();
   const shortcut = (label: string, key: string) => `${label} (${key.toUpperCase()})`;
@@ -133,13 +137,14 @@ export default function PaintToolbar({ api, features, palette }: {
         </PopoverButton>
       </>)}
 
-      {features.clear && (
-        <div className="editor-toolbar-end">
+      <div className="editor-toolbar-end">
+        {features.clear && (
           <ToolbarBtn onClick={api.clear} active={false} title={t('editor.paint.clear')}>
             <Trash2 size={14} />
           </ToolbarBtn>
-        </div>
-      )}
+        )}
+        {end}
+      </div>
     </div>
   );
 }

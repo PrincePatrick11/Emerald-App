@@ -1,16 +1,18 @@
 import type { AltarPlacement, AltarShapeStyle, AltarShapeType, AltarTextStyle } from '../types';
 import { generateId, isValidHexColor } from './helpers';
+import { emptyPaintDoc, paintDocFromJson, paintDocToJson } from './paint/document';
 
 /**
- * Shapes and text drawn on an altar. They hang on no library item, so they
- * are not rows of `altar_placements` (whose `item_id` is required) but a JSON
- * list in `altars.elements` (since v56). In the store they are placements with
- * `kind` 'shape' or 'text', with the same position, size, stacking and
- * switches as an item's placement; `item_id` is empty.
+ * Shapes, text and drawings made on an altar. They hang on no library item,
+ * so they are not rows of `altar_placements` (whose `item_id` is required) but
+ * a JSON list in `altars.elements` (since v56). In the store they are
+ * placements with `kind` 'shape', 'text' or 'drawing', with the same position,
+ * size, stacking and switches as an item's placement; `item_id` is empty.
  *
  * Positions and box sizes in the units of a placement (`x`/`y` in percent of
- * the altar, `width`/`height` as in `altarCanvas.ts`), font size, outline
- * width and corner radius in pixels at the reference width of 1920.
+ * the altar, `width`/`height` as in `altarScene.ts`), font size, outline
+ * width and corner radius in pixels at the reference width of 1920. A
+ * drawing is stored as the paint document's JSON (`paintDocToJson`).
  */
 
 const SHAPES: readonly AltarShapeType[] = ['rect', 'ellipse', 'triangle', 'star', 'hexagon'];
@@ -68,11 +70,13 @@ export function parseAltarElements(raw: unknown, altarId: string): AltarPlacemen
   for (const entry of list) {
     if (!entry || typeof entry !== 'object') continue;
     const e = entry as Record<string, unknown>;
-    if (e.kind !== 'shape' && e.kind !== 'text') continue;
+    if (e.kind !== 'shape' && e.kind !== 'text' && e.kind !== 'drawing') continue;
     const id = typeof e.id === 'string' && e.id && !seen.has(e.id) ? e.id : generateId();
     seen.add(id);
     const shape = e.kind === 'shape' ? shapeStyle(e.shape) : undefined;
     const text = e.kind === 'text' ? textStyle(e.text) : undefined;
+    // A drawing without layer images: those come only from old sigil drawings.
+    const drawing = e.kind === 'drawing' ? paintDocFromJson(e.drawing) ?? emptyPaintDoc() : undefined;
     result.push({
       id,
       altar_id: altarId,
@@ -92,12 +96,13 @@ export function parseAltarElements(raw: unknown, altarId: string): AltarPlacemen
       hidden: e.hidden === true,
       ...(shape ? { shape } : {}),
       ...(text ? { text } : {}),
+      ...(drawing ? { drawing } : {}),
     });
   }
   return result;
 }
 
-export const isDrawn = (p: Pick<AltarPlacement, 'kind'>): boolean => p.kind === 'shape' || p.kind === 'text';
+export const isDrawn = (p: Pick<AltarPlacement, 'kind'>): boolean => p.kind !== 'item';
 
 /** The content of `altars.elements` for the drawn ones among `placements`, in a fixed key order. */
 export function altarElementsJson(placements: readonly AltarPlacement[]): string {
@@ -116,6 +121,7 @@ export function altarElementsJson(placements: readonly AltarPlacement[]): string
       hidden: p.hidden,
       ...(p.kind === 'shape' ? { shape: p.shape ?? shapeStyle({}) } : {}),
       ...(p.kind === 'text' ? { text: p.text ?? textStyle({}) } : {}),
+      ...(p.kind === 'drawing' ? { drawing: paintDocToJson(p.drawing ?? emptyPaintDoc()) } : {}),
     })),
   );
 }
@@ -125,8 +131,9 @@ export function withNewElementIds(raw: unknown, altarId: string): string {
   return altarElementsJson(parseAltarElements(raw, altarId).map((p) => ({ ...p, id: generateId() })));
 }
 
-/** What the sidebar calls a drawn element: its text, or the kind of shape. */
-export function drawnLabel(p: AltarPlacement, shapeName: (type: AltarShapeType) => string): string {
+/** What the sidebar calls a drawn element: its text, the kind of shape, or `drawingName`. */
+export function drawnLabel(p: AltarPlacement, shapeName: (type: AltarShapeType) => string, drawingName = ''): string {
+  if (p.kind === 'drawing') return drawingName;
   if (p.kind === 'text') return p.text?.content.split('\n')[0].trim() || '…';
   return shapeName(p.shape?.type ?? 'rect');
 }

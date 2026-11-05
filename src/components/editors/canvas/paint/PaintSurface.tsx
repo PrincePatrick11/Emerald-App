@@ -1,13 +1,14 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import {
   isShapeTool, PAINT_HEIGHT, PAINT_WIDTH, paintId, thinPoints, type PaintDoc, type PaintLayer, type PaintStroke, type PaintTool,
-} from '../../../lib/paint/document';
+} from '../../../../lib/paint/document';
 import { drawLayer, drawStroke, type LayerImages } from './render';
 
 /**
- * The drawing surface. The canvas has the pixels of its box on screen
- * (times the device's pixel ratio), the document is scaled onto it, so
- * strokes stay sharp at every size.
+ * The drawing surface of the paint mode, laid over the drawing element being
+ * painted: its box on screen (`box`, turned with the element), with the
+ * canvas at the pixels of that box (times the device's pixel ratio) and the
+ * document scaled onto it, so strokes stay sharp at every zoom.
  *
  * Every layer keeps a canvas of its own: a new stroke is drawn onto its
  * layer's canvas alone, and the layers are stacked onto the visible canvas.
@@ -48,7 +49,17 @@ function constrain(tool: PaintTool, x0: number, y0: number, x: number, y: number
   return [x0 + Math.sign(dx || 1) * side, y0 + Math.sign(dy || 1) * side];
 }
 
-export default function PaintCanvas({ doc, activeLayer, tool, color, size, images, editable, onStroke }: {
+/** Where the surface lies in its positioned parent, in CSS pixels, and how it is turned (degrees). */
+export interface SurfaceBox {
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+  rotation: number;
+}
+
+export default function PaintSurface({ box, doc, activeLayer, tool, color, size, images, editable, onStroke }: {
+  box: SurfaceBox;
   doc: PaintDoc;
   activeLayer: string;
   tool: PaintTool;
@@ -70,23 +81,16 @@ export default function PaintCanvas({ doc, activeLayer, tool, color, size, image
   const [backing, setBacking] = useState({ width: PAINT_WIDTH, height: PAINT_HEIGHT });
 
   // The latest props for the pointer handlers and the frame callback.
-  const props = useRef({ doc, activeLayer, tool, color, size, images, editable, onStroke });
-  props.current = { doc, activeLayer, tool, color, size, images, editable, onStroke };
+  const props = useRef({ box, doc, activeLayer, tool, color, size, images, editable, onStroke });
+  props.current = { box, doc, activeLayer, tool, color, size, images, editable, onStroke };
 
+  // Bounded: a huge zoom must not ask for a canvas the browser refuses.
   useLayoutEffect(() => {
-    const shell = shellRef.current;
-    if (!shell) return;
-    const measure = () => {
-      const dpr = window.devicePixelRatio || 1;
-      const width = Math.max(1, Math.round(shell.clientWidth * dpr));
-      const height = Math.max(1, Math.round((width * PAINT_HEIGHT) / PAINT_WIDTH));
-      setBacking((b) => (b.width === width && b.height === height ? b : { width, height }));
-    };
-    measure();
-    const observer = new ResizeObserver(measure);
-    observer.observe(shell);
-    return () => observer.disconnect();
-  }, []);
+    const dpr = window.devicePixelRatio || 1;
+    const width = Math.max(1, Math.min(4096, Math.round(box.width * dpr)));
+    const height = Math.max(1, Math.min(4096, Math.round(box.height * dpr)));
+    setBacking((b) => (b.width === width && b.height === height ? b : { width, height }));
+  }, [box.width, box.height]);
 
   /** The layer's own canvas, brought up to date: one new stroke is added, anything else redrawn. */
   const layerCanvas = useCallback((layer: PaintLayer): HTMLCanvasElement => {
@@ -101,8 +105,7 @@ export default function PaintCanvas({ doc, activeLayer, tool, color, size, image
       canvas.height = backing.height;
     }
     const ctx = canvas.getContext('2d')!;
-    const scale = backing.width / PAINT_WIDTH;
-    ctx.setTransform(scale, 0, 0, scale, 0, 0);
+    ctx.setTransform(backing.width / PAINT_WIDTH, 0, 0, backing.height / PAINT_HEIGHT, 0, 0);
     const prev = cached?.layer.strokes;
     const appended = sameBase && prev && layer.strokes.length === prev.length + 1
       && (prev.length === 0 || layer.strokes[prev.length - 1] === prev[prev.length - 1]);
@@ -139,8 +142,7 @@ export default function PaintCanvas({ doc, activeLayer, tool, color, size, image
       sctx.setTransform(1, 0, 0, 1, 0, 0);
       sctx.clearRect(0, 0, scratch.width, scratch.height);
       sctx.drawImage(source, 0, 0);
-      const scale = canvas.width / PAINT_WIDTH;
-      sctx.setTransform(scale, 0, 0, scale, 0, 0);
+      sctx.setTransform(canvas.width / PAINT_WIDTH, 0, 0, canvas.height / PAINT_HEIGHT, 0, 0);
       drawStroke(sctx, drawing.stroke, true);
       ctx.drawImage(scratch, 0, 0);
     }
@@ -159,26 +161,37 @@ export default function PaintCanvas({ doc, activeLayer, tool, color, size, image
 
   useEffect(() => () => cancelAnimationFrame(frame.current), []);
 
+  /** A pointer in the surface's own, unturned coordinates (CSS pixels from its top-left corner). */
+  const toLocal = (e: { clientX: number; clientY: number }): [number, number] => {
+    const rect = shellRef.current!.getBoundingClientRect();
+    const { width, height, rotation } = props.current.box;
+    // The bounding box of a turned element shares its centre.
+    const dx = e.clientX - (rect.left + rect.width / 2);
+    const dy = e.clientY - (rect.top + rect.height / 2);
+    const rad = (-rotation * Math.PI) / 180;
+    return [dx * Math.cos(rad) - dy * Math.sin(rad) + width / 2, dx * Math.sin(rad) + dy * Math.cos(rad) + height / 2];
+  };
+
   const toDoc = (e: { clientX: number; clientY: number }): [number, number] => {
-    const rect = canvasRef.current!.getBoundingClientRect();
-    return [((e.clientX - rect.left) / rect.width) * PAINT_WIDTH, ((e.clientY - rect.top) / rect.height) * PAINT_HEIGHT];
+    const [x, y] = toLocal(e);
+    const { width, height } = props.current.box;
+    return [(x / width) * PAINT_WIDTH, (y / height) * PAINT_HEIGHT];
   };
 
   /** The brush's outline under the pointer, at the brush's size on screen. */
   const placeCursor = (e: React.PointerEvent, show: boolean) => {
     const cursor = cursorRef.current;
-    const canvas = canvasRef.current;
-    if (!cursor || !canvas) return;
+    if (!cursor) return;
     if (!show || e.pointerType === 'touch') {
       cursor.style.opacity = '0';
       return;
     }
-    const rect = canvas.getBoundingClientRect();
-    const diameter = Math.max(4, (props.current.size * rect.width) / PAINT_WIDTH);
+    const [x, y] = toLocal(e);
+    const diameter = Math.max(4, (props.current.size * props.current.box.width) / PAINT_WIDTH);
     cursor.style.opacity = '1';
     cursor.style.width = `${diameter}px`;
     cursor.style.height = `${diameter}px`;
-    cursor.style.transform = `translate(${e.clientX - rect.left - diameter / 2}px, ${e.clientY - rect.top - diameter / 2}px)`;
+    cursor.style.transform = `translate(${x - diameter / 2}px, ${y - diameter / 2}px)`;
   };
 
   const layerHidden = () => {
@@ -194,7 +207,6 @@ export default function PaintCanvas({ doc, activeLayer, tool, color, size, image
     else if (e.pointerType === 'touch' && penSeen.current) return;
     if (layerHidden()) return;
     e.preventDefault();
-    shellRef.current?.focus({ preventScroll: true });
     // Throws for pointer IDs without a real OS pointer session (synthetic
     // events); drawing works without the capture too.
     try {
@@ -272,7 +284,14 @@ export default function PaintCanvas({ doc, activeLayer, tool, color, size, image
   }, [schedule]);
 
   return (
-    <div ref={shellRef} tabIndex={-1} className="paint-canvas-shell">
+    <div
+      ref={shellRef}
+      className="paint-surface"
+      style={{
+        left: box.left, top: box.top, width: box.width, height: box.height,
+        transform: box.rotation ? `rotate(${box.rotation}deg)` : undefined,
+      }}
+    >
       <canvas
         ref={canvasRef}
         width={backing.width}

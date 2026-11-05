@@ -1,4 +1,5 @@
-import type { CanvasElement, ImageProps, ShapeProps, TextProps } from '../editors/canvas';
+import type { CanvasElement, DrawingProps, ImageProps, ShapeProps, TextProps } from '../editors/canvas';
+import { emptyPaintDoc } from '../../lib/paint/document';
 import { BASE_RESOLUTION_WIDTH, isCandleEmoji } from '../../lib/altarConstants';
 import type { AltarPlacement } from '../../types';
 
@@ -54,6 +55,10 @@ export function placementToElement(
     };
     return { ...frame, type: 'text', props };
   }
+  if (p.kind === 'drawing') {
+    const props: DrawingProps = { doc: p.drawing ?? emptyPaintDoc() };
+    return { ...frame, type: 'drawing', props };
+  }
   const src = imageSrcFor(p.image_data);
   // A candle without a picture flickers, as it always did.
   const props: ImageProps = { src, emoji: p.emoji, glow: !src && isCandleEmoji(p.emoji) };
@@ -77,7 +82,7 @@ export function elementToPlacement(
   const base: AltarPlacement = {
     id: el.id,
     altar_id: previous?.altar_id,
-    kind: el.type === 'shape' || el.type === 'text' ? el.type : 'item',
+    kind: el.type === 'shape' || el.type === 'text' || el.type === 'drawing' ? el.type : 'item',
     item_id: el.type === 'image' ? el.ref ?? previous?.item_id ?? '' : '',
     name: previous?.name ?? '',
     emoji: previous?.emoji ?? (el.type === 'image' ? (el.props as ImageProps).emoji : ''),
@@ -100,6 +105,7 @@ export function elementToPlacement(
       stroke_width: round(p.strokeWidth / k, 2), corner_radius: round(p.cornerRadius / k, 2),
     };
   }
+  if (el.type === 'drawing') base.drawing = (el.props as DrawingProps).doc;
   if (el.type === 'text') {
     const p = el.props as TextProps;
     base.text = {

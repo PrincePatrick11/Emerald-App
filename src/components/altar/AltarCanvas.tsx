@@ -19,8 +19,21 @@ import { AltarItemVisual } from './AltarItemVisual';
 import { canvasImageSrc, imageSrc } from '../../lib/images';
 import { THUMBNAIL_W, canvasToCappedThumbnail } from '../../lib/thumbnail';
 import {
-  CanvasEditor, canvasToDataUrl, renderCanvasImage, type CanvasEditorHandle, type CanvasElement, type CanvasGrid,
+  CANVAS_SWATCHES, CanvasEditor, canvasToDataUrl, fullProfile, renderCanvasImage, type CanvasEditorHandle,
+  type CanvasElement, type CanvasGrid, type CanvasPaintOptions,
 } from '../editors/canvas';
+
+/**
+ * What the altar offers in the canvas editor: everything — library images,
+ * shapes, text and drawings. Drawings on an altar carry no layer images.
+ */
+const ALTAR_PROFILE = fullProfile();
+const ALTAR_PAINT: CanvasPaintOptions = {
+  ...ALTAR_PROFILE.paint,
+  palette: CANVAS_SWATCHES,
+  startColor: CANVAS_SWATCHES[0],
+  startSize: 8,
+};
 import { elementToPlacement, placementToElement } from './altarScene';
 
 // ---------------------------------------------------------------------------
@@ -142,6 +155,7 @@ async function _renderAltar(
   // The items' pictures as data URLs, not the on-screen `emerald-img` ones, so `toBlob` can read the canvas.
   const sources = new Map(await Promise.all(placements.map(async (p) => [p.id, (await canvasImageSrc(p.image_data)) || null] as const)));
   return renderCanvasImage({
+    types: ALTAR_PROFILE.types,
     width: refW,
     height: refH,
     elements: placements.map((p) => placementToElement(p, refW, refH, () => sources.get(p.id) ?? null)),
@@ -284,6 +298,9 @@ export function AltarCanvas({ altar, backgroundSrc, editable, readAlign, onExpor
   return (
     <CanvasEditor
       ref={editorRef}
+      types={ALTAR_PROFILE.types}
+      features={ALTAR_PROFILE.features}
+      paint={ALTAR_PAINT}
       width={refW}
       height={refH}
       elements={elements}
