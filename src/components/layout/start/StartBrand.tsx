@@ -56,7 +56,7 @@ export default function StartBrand({ width }: { width: number }) {
           <BrandLink icon={<DiscordMark size={14} />} label="Discord" url={DISCORD_URL} />
         </nav>
       </div>
-      <div className="mt-auto pt-8 flex items-center justify-between gap-3 h-7 box-content text-xs text-subtle">
+      <div className="mt-auto pt-8 flex items-center justify-between gap-3 text-xs text-subtle">
         <span className="shrink-0 tabular-nums">{t('start.version', { version: packageJson.version })}</span>
         <span className="truncate">{t('start.byAuthor', { name: packageJson.author })}</span>
       </div>
