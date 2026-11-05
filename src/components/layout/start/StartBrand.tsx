@@ -38,9 +38,11 @@ export default function StartBrand({ width }: { width: number }) {
   return (
     <aside className="start-brand" style={{ width }}>
       <div className="flex flex-col gap-7">
-        <EmeraldMark size={96} />
-        <div className="space-y-3">
-          <h1 className="start-brand-title">Emerald App</h1>
+        <div className="space-y-4">
+          <div className="flex items-center gap-3.5">
+            <EmeraldMark size={56} />
+            <h1 className="start-brand-title">Emerald App</h1>
+          </div>
           <p className="start-brand-tagline">{t('settings.tagline')}</p>
         </div>
         <nav className="flex flex-col items-start gap-0.5 -ml-2.5" aria-label={t('start.links')}>

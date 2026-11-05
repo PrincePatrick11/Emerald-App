@@ -10,8 +10,8 @@ import { DEFAULT_EMOJI_PICKER_EMOJIS } from '../../lib/emojiSearch';
 import { newVaultTarget, splitPath, type Vault as VaultRecord } from '../../lib/vaultManager';
 
 /**
- * The tiles of the vault picker's grid, and the rows that open in their place
- * (edit, create, confirm). One shape for every kind of vault — here, synced,
+ * The tiles of the vault picker's grid, editing included, and the rows that
+ * open across it (create, confirm). One shape for every kind of vault — here, synced,
  * paused, only on the server — so the grid reads as one list; the kind is the
  * line under the name.
  */
@@ -112,27 +112,31 @@ function IconField({ icon, onChange }: { icon?: string; onChange: (icon?: string
   );
 }
 
-function CommitButtons({ label, disabled, onCommit, onCancel }: {
+function CommitButtons({ label, disabled, small, onCommit, onCancel }: {
   label: string;
   disabled: boolean;
+  /** 24px, for the tile. */
+  small?: boolean;
   onCommit: () => void;
   onCancel: () => void;
 }) {
   const { t } = useTranslation();
+  const size = small ? 12 : 14;
   return (
     <div className="flex items-center gap-1 shrink-0">
-      <Button tone="jade" compact title={label} aria-label={label} disabled={disabled} onClick={onCommit}>
-        <Check size={14} />
+      <Button tone="jade" compact small={small} title={label} aria-label={label} disabled={disabled} onClick={onCommit}>
+        <Check size={size} />
       </Button>
-      <Button tone="neutral" compact title={t('vault.cancel')} aria-label={t('vault.cancel')} onClick={onCancel}>
-        <X size={14} />
+      <Button tone="neutral" compact small={small} title={t('vault.cancel')} aria-label={t('vault.cancel')} onClick={onCancel}>
+        <X size={size} />
       </Button>
     </div>
   );
 }
 
 /**
- * Name and icon in one editor, committed together by the check button.
+ * Name and icon in one editor, committed together by the check button. It
+ * stays a tile: the badge picks the icon, the field below takes the name.
  *
  * Deliberately no commit on blur: the emoji picker's trigger and its search
  * field both take the focus away from this input, so a blur commit would close
@@ -150,11 +154,17 @@ export function EditRow({
 }) {
   const { t } = useTranslation();
   return (
-    <div className="picker-row picker-row-open">
-      <IconField icon={icon} onChange={onChangeIcon} />
+    <div className="picker-tile picker-tile-editing">
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-1">
+          <IconField icon={icon} onChange={onChangeIcon} />
+        </div>
+        <CommitButtons small label={t('vault.save')} disabled={!name.trim()} onCommit={onCommit} onCancel={onCancel} />
+      </div>
       <input
         autoFocus
-        className={INPUT_CLASS}
+        className="input-field w-full min-w-0 rounded-md px-2.5 py-1 text-sm outline-none"
+        aria-label={t('vault.namePlaceholder')}
         value={name}
         onChange={(e) => onChangeName(e.target.value)}
         onKeyDown={(e) => {
@@ -162,7 +172,6 @@ export function EditRow({
           if (e.key === 'Escape') onCancel();
         }}
       />
-      <CommitButtons label={t('vault.save')} disabled={!name.trim()} onCommit={onCommit} onCancel={onCancel} />
     </div>
   );
 }

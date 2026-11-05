@@ -66,9 +66,9 @@ async function freeTarget(name: string): Promise<{ name: string; path: string | 
  *  (`AppShell`): in `localStorage`, for this installation. */
 const BRAND_WIDTH_KEY = 'start-brand-width';
 /** The name stays on one line. */
-const BRAND_MIN = 340;
+const BRAND_MIN = 360;
 const BRAND_MAX = 560;
-const BRAND_DEFAULT = 360;
+const BRAND_DEFAULT = 380;
 /** What the sheet keeps however far the handle goes. */
 const SHEET_MIN = 480;
 

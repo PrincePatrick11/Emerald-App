@@ -727,7 +727,7 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
 
   .start-brand-title {
     @apply font-serif font-medium whitespace-nowrap;
-    font-size: 44px;
+    font-size: 36px;
     line-height: 1.05;
     color: var(--text-primary);
   }
@@ -828,6 +828,13 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
   .picker-tile-active:focus-within {
     background-color: color-mix(in srgb, var(--accent) 12%, transparent);
     border-color: var(--choice-active-border);
+  }
+
+  /* Name and icon edited in the tile itself. */
+  .picker-tile.picker-tile-editing {
+    @apply flex flex-col justify-between gap-2 h-28 px-4 py-3;
+    background-color: var(--bg-surface-2);
+    border-color: var(--border-strong);
   }
 
   /* Only on the server: a dashed edge, present but not yet here. */
