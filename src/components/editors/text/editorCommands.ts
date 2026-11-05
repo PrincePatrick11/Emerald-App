@@ -7,6 +7,7 @@ import { ACCEPTED_IMAGE_MIME, isAcceptedImageFile, readFileAsDataUrl } from '../
 import { flashReveal, scrollIntoViewCentered } from '../../../lib/reveal';
 import { internalLinkBlockHtml, toInternalLinkChip } from '../../../lib/internalLinkHtml';
 import type { EntryLinkRequest } from '../../../lib/links';
+import type { TextColor } from '../../../lib/textColors';
 import type { SuggestionItem } from './SuggestionList';
 import { revealFolded } from './HeadingFoldExtension';
 
@@ -225,7 +226,8 @@ export const NEW_TABLE = { rows: 3, cols: 3, withHeaderRow: true } as const;
  * `at` on (`null`: the cursor). Storing a photo takes a moment and typing goes
  * on meanwhile, so the spot follows every change of the document and moves
  * past each image inserted there; inserting at the selection instead would
- * replace the image just put in. One that fails does not stop the others.
+ * replace the image just put in. At the cursor, the first image replaces what
+ * the user had selected, as typing would. One that fails does not stop the others.
  */
 export async function insertImagesInOrder<T>(
   editor: Editor,
@@ -234,9 +236,16 @@ export async function insertImagesInOrder<T>(
   store: (item: T) => Promise<string>,
   report: (e: unknown, item: T) => void,
 ): Promise<void> {
-  let spot = at ?? editor.state.selection.to;
+  const { selection } = editor.state;
+  let spot = at ?? selection.to;
+  // At the cursor, a selection of the user's (text, an image) is replaced by the first image.
+  let replace = at === null && !selection.empty ? { from: selection.from, to: selection.to } : null;
   const follow = ({ transaction }: { transaction: { mapping: { map: (pos: number, assoc?: number) => number } } }) => {
     spot = transaction.mapping.map(spot, 1);
+    if (replace) {
+      replace = { from: transaction.mapping.map(replace.from, 1), to: transaction.mapping.map(replace.to, -1) };
+      if (replace.from >= replace.to) replace = null;
+    }
   };
   editor.on('transaction', follow);
   try {
@@ -244,9 +253,10 @@ export async function insertImagesInOrder<T>(
       try {
         const src = await store(item);
         if (editor.isDestroyed) return;
-        editor.chain().focus()
-          .insertContentAt(Math.min(spot, editor.state.doc.content.size), { type: 'image', attrs: { src } })
-          .run();
+        const image = { type: 'image', attrs: { src } };
+        const target = replace ?? Math.min(spot, editor.state.doc.content.size);
+        replace = null;
+        editor.chain().focus().insertContentAt(target, image).run();
       } catch (e) {
         report(e, item);
       }
@@ -292,8 +302,24 @@ export function applyLinkHref(editor: Editor, href: string): void {
   const chain = editor.chain().focus().extendMarkRange('link');
   if (!value) chain.unsetLink().run();
   else if (editor.state.selection.empty && !editor.isActive('link')) {
-    chain.insertContent({ type: 'text', text: value, marks: [{ type: 'link', attrs: { href: value } }] }).run();
+    // Then out of the link again: typing on is plain text, even where links are inclusive.
+    chain.insertContent({ type: 'text', text: value, marks: [{ type: 'link', attrs: { href: value } }] }).unsetMark('link').run();
   } else chain.setLink({ href: value }).run();
+}
+
+/** Take the link at the selection away. */
+export function removeLink(editor: Editor): void {
+  editor.chain().focus().extendMarkRange('link').unsetLink().run();
+}
+
+/** The text colour at the cursor or the selection's start, `null` for the default. */
+export function currentTextColor(editor: Editor): TextColor | null {
+  return (editor.getAttributes('textColor').color as TextColor | undefined) ?? null;
+}
+
+/** Colour the selection, or what is typed next; `null` gives the default colour back. */
+export function applyTextColor(editor: Editor, color: TextColor | null): void {
+  editor.chain().focus().setTextColor(color).run();
 }
 
 /** Link chip from the link picker (toolbar button) at the cursor position. */

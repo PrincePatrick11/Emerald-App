@@ -3,7 +3,7 @@ import type { Editor } from '@tiptap/react';
 import { useTranslation } from 'react-i18next';
 import { ChevronDown, ChevronUp, CornerDownRight, Replace, Search, X } from 'lucide-react';
 import { scrollIntoViewCentered } from '../../../lib/reveal';
-import { ToolbarBtn, ToolbarDivider, ToolbarGroup } from '../toolbarParts';
+import { ToolbarBtn, ToolbarDivider, ToolbarGroup } from '../shared/toolbarParts';
 import { editorHas } from './hostContext';
 import { findMatches, setSearch, type SearchMatch } from './SearchExtension';
 import { revealPosition } from './editorCommands';
@@ -119,7 +119,7 @@ export default function FindBar({ getEditors, isEditing, initialQuery, onClose }
     <div className="editor-find-bar">
       <div className="editor-find-row">
         <label className="editor-find-field">
-          <Search size={13} className="text-subtle flex-shrink-0" />
+          <Search size={14} className="text-subtle flex-shrink-0" />
           <input
             ref={inputRef}
             autoFocus
@@ -156,7 +156,7 @@ export default function FindBar({ getEditors, isEditing, initialQuery, onClose }
       {canReplace && (
         <div className="editor-find-row">
           <label className="editor-find-field">
-            <CornerDownRight size={13} className="text-subtle flex-shrink-0" />
+            <CornerDownRight size={14} className="text-subtle flex-shrink-0" />
             <input
               value={replacement}
               onChange={(e) => setReplacement(e.target.value)}

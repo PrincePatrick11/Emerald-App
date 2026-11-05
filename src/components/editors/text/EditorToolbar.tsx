@@ -1,16 +1,16 @@
 import type { Editor } from '@tiptap/react';
 import { useTranslation } from 'react-i18next';
 import {
-  CheckSquare, Globe, Heading1, Heading2, Heading3, ImagePlus, Link, List, ListOrdered, Minus, Palette, Quote, Redo,
+  CheckSquare, Globe, Heading1, Heading2, Heading3, ImagePlus, Link, List, ListOrdered, Minus, Quote, Redo,
   Search, Table, Undo, Unlink,
 } from 'lucide-react';
 import { editorHas } from './hostContext';
 import { ALIGN_ACTIONS, applyAlign, canAlign, isAlignActive, markActionsOf } from './formatActions';
-import { applyLinkHref, NEW_TABLE, pickImageFiles } from './editorCommands';
+import { applyLinkHref, applyTextColor, currentTextColor, NEW_TABLE, pickImageFiles, removeLink } from './editorCommands';
 import LinkHrefForm from './LinkHrefForm';
-import TextColorSwatches from './TextColorSwatches';
-import type { TextColor } from '../../../lib/textColors';
-import { PopoverButton, ToolbarBtn, ToolbarDivider, ToolbarGroup } from '../toolbarParts';
+import TextColorSwatches, { TextColorIcon } from './TextColorSwatches';
+import PopoverButton from '../shared/PopoverButton';
+import { ToolbarBtn, ToolbarDivider, ToolbarGroup } from '../shared/toolbarParts';
 
 /**
  * The formatting bar of a text editor. It shows only what the editor's schema
@@ -139,6 +139,7 @@ export default function EditorToolbar({ editor, onOpenLinkPicker, findOpen, onTo
         </ToolbarGroup>
       </>)}
 
+      {(has('internalLink') || has('link') || has('image') || has('table') || has('horizontalRule')) && (<>
       <ToolbarDivider />
       <ToolbarGroup>
         {has('internalLink') && (
@@ -172,6 +173,7 @@ export default function EditorToolbar({ editor, onOpenLinkPicker, findOpen, onTo
           </ToolbarBtn>
         )}
       </ToolbarGroup>
+      </>)}
 
       {has('textSearch') && (
         <div className="editor-toolbar-end">
@@ -193,7 +195,12 @@ function WebLinkButton({ editor }: { editor: Editor }) {
   const { t } = useTranslation();
   const active = editor.isActive('link');
   return (
-    <PopoverButton icon={<Globe size={14} />} title={t('editor.menu.webLink')} active={active}>
+    <PopoverButton
+      icon={<Globe size={14} />}
+      title={t('editor.menu.webLink')}
+      active={active}
+      onDismiss={() => editor.commands.focus()}
+    >
       {(close) => (<>
         <LinkHrefForm
           initial={active ? (editor.getAttributes('link').href as string) ?? '' : ''}
@@ -202,7 +209,7 @@ function WebLinkButton({ editor }: { editor: Editor }) {
         />
         {active && (
           <ToolbarBtn
-            onClick={() => { editor.chain().focus().extendMarkRange('link').unsetLink().run(); close(); }}
+            onClick={() => { removeLink(editor); close(); }}
             active={false}
             title={t('editor.removeLink')}
           >
@@ -220,17 +227,18 @@ function WebLinkButton({ editor }: { editor: Editor }) {
  */
 function TextColorButton({ editor }: { editor: Editor }) {
   const { t } = useTranslation();
-  const color = (editor.getAttributes('textColor').color as TextColor | undefined) ?? null;
+  const color = currentTextColor(editor);
   return (
     <PopoverButton
-      icon={<Palette size={14} style={color ? { color: `var(--editor-color-${color})` } : undefined} />}
+      icon={<TextColorIcon color={color} />}
       title={t('editor.menu.textColor')}
       active={!!color}
+      onDismiss={() => editor.commands.focus()}
     >
       {(close) => (
         <TextColorSwatches
           current={color}
-          onPick={(picked) => { editor.chain().focus().setTextColor(picked).run(); close(); }}
+          onPick={(picked) => { applyTextColor(editor, picked); close(); }}
         />
       )}
     </PopoverButton>

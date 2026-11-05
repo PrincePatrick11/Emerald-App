@@ -7,15 +7,15 @@ import { CellSelection } from '@tiptap/pm/tables';
 import { useTranslation } from 'react-i18next';
 import {
   BetweenHorizontalEnd, BetweenHorizontalStart, BetweenVerticalEnd, BetweenVerticalStart, Globe, Grid2x2X,
-  PanelTop, Palette, TableColumnsSplit, TableRowsSplit, Trash2, Unlink, X,
+  PanelTop, TableColumnsSplit, TableRowsSplit, Trash2, Unlink, X,
 } from 'lucide-react';
-import { ToolbarBtn, ToolbarDivider, ToolbarGroup } from '../toolbarParts';
+import { ToolbarBtn, ToolbarDivider, ToolbarGroup } from '../shared/toolbarParts';
 import { editorHas } from './hostContext';
 import { ALIGN_ACTIONS, applyAlign, markActionsOf } from './formatActions';
-import { applyLinkHref } from './editorCommands';
+import { applyLinkHref, applyTextColor, currentTextColor, removeLink } from './editorCommands';
 import LinkHrefForm from './LinkHrefForm';
 import type { TextColor } from '../../../lib/textColors';
-import TextColorSwatches from './TextColorSwatches';
+import TextColorSwatches, { TextColorIcon } from './TextColorSwatches';
 
 /**
  * The widths the image menu offers, in percent of the editor's width. Stored
@@ -110,7 +110,7 @@ function TextMenu({ editor }: { editor: Editor }) {
     selector: ({ editor: ed }) => ({
       active: Object.fromEntries(marks.map(({ key }) => [key, ed.isActive(key)])) as Record<string, boolean>,
       link: ed.isActive('link'),
-      color: (ed.getAttributes('textColor').color as TextColor | undefined) ?? null,
+      color: currentTextColor(ed),
     }),
   });
   // Typing a web address replaces the buttons until confirmed or cancelled.
@@ -125,7 +125,7 @@ function TextMenu({ editor }: { editor: Editor }) {
   }, [editor]);
 
   const pickColor = (color: TextColor | null) => {
-    editor.chain().focus().setTextColor(color).run();
+    applyTextColor(editor, color);
     setChoosingColor(false);
   };
 
@@ -162,7 +162,7 @@ function TextMenu({ editor }: { editor: Editor }) {
             ))}
             {has('textColor') && (
               <ToolbarBtn onClick={() => setChoosingColor(true)} active={!!state?.color} title={t('editor.menu.textColor')}>
-                <Palette size={14} style={state?.color ? { color: `var(--editor-color-${state.color})` } : undefined} />
+                <TextColorIcon color={state?.color ?? null} />
               </ToolbarBtn>
             )}
           </ToolbarGroup>
@@ -170,7 +170,7 @@ function TextMenu({ editor }: { editor: Editor }) {
             <>
               <ToolbarDivider />
               {state?.link ? (
-                <ToolbarBtn onClick={() => editor.chain().focus().extendMarkRange('link').unsetLink().run()} active title={t('editor.removeLink')}>
+                <ToolbarBtn onClick={() => removeLink(editor)} active title={t('editor.removeLink')}>
                   <Unlink size={14} />
                 </ToolbarBtn>
               ) : (

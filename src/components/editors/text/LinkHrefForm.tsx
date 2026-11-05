@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Check, X } from 'lucide-react';
-import { ToolbarBtn } from '../toolbarParts';
+import { ToolbarBtn } from '../shared/toolbarParts';
 
 /**
  * The web address of a link, typed in place: in the selection menu for a new

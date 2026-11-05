@@ -3,7 +3,8 @@ import {
   Circle, Eraser, Layers, Minus, PenTool, Redo, Square, Trash2, Undo, type LucideIcon,
 } from 'lucide-react';
 import { PAINT_SIZE_MAX, PAINT_SIZE_MIN, type PaintTool } from '../../../lib/paint/document';
-import { PopoverButton, ToolbarBtn, ToolbarDivider, ToolbarGroup } from '../toolbarParts';
+import PopoverButton from '../shared/PopoverButton';
+import { ToolbarBtn, ToolbarDivider, ToolbarGroup } from '../shared/toolbarParts';
 import LayerPanel from './LayerPanel';
 import type { PaintFeatures } from './features';
 import type { PaintEditorApi } from './usePaintEditor';
@@ -32,7 +33,7 @@ export function toolEnabled(tool: PaintTool, features: PaintFeatures): boolean {
 
 /**
  * The paint editor's bar, in the app's toolbar style (`.editor-toolbar`,
- * shared buttons from `toolbarParts.tsx`). It shows what the features
+ * shared buttons from `editors/shared/`). It shows what the features
  * switch on, in the order of drawing: undo and redo, the tools, colour and
  * size of the brush, the layers, and emptying at the far end.
  */
@@ -127,7 +128,7 @@ export default function PaintToolbar({ api, features, palette }: {
 
       {features.layers && (<>
         <ToolbarDivider />
-        <PopoverButton icon={<Layers size={14} />} title={t('editor.paint.layers')} active={api.doc.layers.length > 1} column>
+        <PopoverButton icon={<Layers size={14} />} title={t('editor.paint.layers')} active={api.doc.layers.length > 1}>
           {() => <LayerPanel api={api} />}
         </PopoverButton>
       </>)}

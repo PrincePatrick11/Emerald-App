@@ -173,6 +173,7 @@ html[data-theme='emerald-parchment'] {
   --canvas: #ebdcc5;
   --accent-wash: rgba(0, 138, 87, 0.1);
   --accent-wash-strong: rgba(0, 138, 87, 0.25);
+  --selection-bg: rgba(0, 138, 87, 0.22);
   --accent-track: rgba(0, 138, 87, 0.6);
   --accent-fill: #159165;
   --accent-fill-strong: #159165;

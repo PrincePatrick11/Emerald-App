@@ -168,6 +168,8 @@ export function customThemeTokens({ base, colors: c }: CustomTheme): Record<stri
     'accent-edge': accentEdge,
     'accent-wash': fade(c.accent, 12),
     'accent-wash-strong': fade(c.accent, 25),
+    // A plain colour: WebKit resolves a `color-mix()` here to transparent inside `::selection`.
+    'selection-bg': hexAlpha(c.accent, 0.25),
     'accent-track': fade(c.accent, 60),
     'accent-fill': accentSoft,
     'accent-fill-strong': fade(c.accent, 35),
@@ -313,8 +315,20 @@ export function customThemeTokens({ base, colors: c }: CustomTheme): Record<stri
   };
 }
 
+/** `#rgb` as `#rrggbb`; the colours are validated against `HEX` on reading. */
+function fullHex(hex: string): string {
+  return hex.length === 4 ? `#${hex[1]}${hex[1]}${hex[2]}${hex[2]}${hex[3]}${hex[3]}` : hex;
+}
+
+/** A validated hex colour as `rgba()` with the given opacity. */
+function hexAlpha(hex: string, alpha: number): string {
+  const full = fullHex(hex);
+  const [r, g, b] = [1, 3, 5].map((i) => parseInt(full.slice(i, i + 2), 16));
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
 function luminance(hex: string): number {
-  const full = hex.length === 4 ? `#${hex[1]}${hex[1]}${hex[2]}${hex[2]}${hex[3]}${hex[3]}` : hex;
+  const full = fullHex(hex);
   const [r, g, b] = [1, 3, 5].map((i) => {
     const channel = parseInt(full.slice(i, i + 2), 16) / 255;
     return channel <= 0.03928 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4;

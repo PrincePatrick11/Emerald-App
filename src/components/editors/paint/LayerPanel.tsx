@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ChevronDown, ChevronUp, Eye, EyeOff, ImageIcon, Plus, Trash2 } from 'lucide-react';
 import { MAX_LAYERS, type PaintLayer } from '../../../lib/paint/document';
-import { ToolbarBtn } from '../toolbarParts';
+import { ToolbarBtn } from '../shared/toolbarParts';
 import type { PaintEditorApi } from './usePaintEditor';
 
 /** A layer's name as shown: its own, or its place counted from the bottom. */

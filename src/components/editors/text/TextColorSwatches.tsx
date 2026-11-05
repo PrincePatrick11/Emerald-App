@@ -1,4 +1,5 @@
 import { useTranslation } from 'react-i18next';
+import { Palette } from 'lucide-react';
 import { TEXT_COLORS, type TextColor } from '../../../lib/textColors';
 
 /**
@@ -31,4 +32,9 @@ export default function TextColorSwatches({ current, onPick }: {
       ))}
     </div>
   );
+}
+
+/** The colour button's icon, in the colour at the cursor. */
+export function TextColorIcon({ color }: { color: TextColor | null }) {
+  return <Palette size={14} style={color ? { color: `var(--editor-color-${color})` } : undefined} />;
 }

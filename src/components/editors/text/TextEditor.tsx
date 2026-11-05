@@ -21,7 +21,7 @@ import { useTranslation } from 'react-i18next';
 import { TEXT_ALIGN_TYPES } from './formatActions';
 import { applyLinkHref, insertImageFiles } from './editorCommands';
 import LinkHrefForm from './LinkHrefForm';
-import { ToolbarBtn } from '../toolbarParts';
+import { ToolbarBtn } from '../shared/toolbarParts';
 import { FULL_TEXT_FEATURES, type TextFeatures } from './features';
 import { TextEditorHostContext, editorHas } from './hostContext';
 import SelectionMenus from './SelectionMenus';
