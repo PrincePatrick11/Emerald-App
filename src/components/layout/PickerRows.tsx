@@ -3,6 +3,7 @@ import {
   AlertTriangle, Check, Cloud, CloudDownload, CloudOff, FolderOpen, HardDrive, Loader2, Pencil, RotateCcw, Trash2, Vault, X,
 } from 'lucide-react';
 import Button from '../ui/Button';
+import BlockCheckbox from '../blocks/BlockCheckbox';
 import EmojiPicker from '../ui/EmojiPicker';
 import InlineConfirm from '../ui/InlineConfirm';
 import { DEFAULT_EMOJI_PICKER_EMOJIS } from '../../lib/emojiSearch';
@@ -15,9 +16,6 @@ import { newVaultTarget, splitPath, type Vault as VaultRecord } from '../../lib/
  */
 
 const INPUT_CLASS = 'input-field flex-1 min-w-0 rounded-md px-2.5 py-1.5 text-sm outline-none';
-const CHECKBOX_CLASS =
-  'mt-0.5 w-4 h-4 shrink-0 rounded-md border flex items-center justify-center transition-colors ' +
-  'peer-focus-visible:ring-2 peer-focus-visible:ring-focus';
 
 export type VaultState = 'local' | 'synced' | 'paused' | 'remote';
 
@@ -56,14 +54,14 @@ export function VaultLocationRow({
           {t('vault.chooseFolder')}
         </Button>
         {customPath && (
-          <Button variant="ghost" className="shrink-0" title={t('vault.defaultFolder')} onClick={onResetFolder}>
+          <Button variant="ghost" className="shrink-0" title={t('vault.defaultFolder')} aria-label={t('vault.defaultFolder')} onClick={onResetFolder}>
             <RotateCcw size={14} />
           </Button>
         )}
       </div>
       <span className="block text-xs break-all">
-        <span style={{ color: 'var(--text-subtle)' }}>{targetParent}</span>
-        <span style={{ color: 'var(--text-muted)' }}>{targetLeaf}</span>
+        <span className="text-subtle">{targetParent}</span>
+        <span className="text-muted">{targetLeaf}</span>
       </span>
     </div>
   );
@@ -81,7 +79,7 @@ function StateMark({ state }: { state: VaultState }) {
   const { t } = useTranslation();
   const Icon = STATE_ICON[state];
   return (
-    <span className={`picker-state picker-state-${state}`} title={t(STATE_LABEL[state])} aria-label={t(STATE_LABEL[state])}>
+    <span role="img" className={`picker-state picker-state-${state}`} title={t(STATE_LABEL[state])} aria-label={t(STATE_LABEL[state])}>
       <Icon size={14} />
     </span>
   );
@@ -99,13 +97,13 @@ function IconField({ icon, onChange }: { icon?: string; onChange: (icon?: string
         onChange={onChange}
         emojis={DEFAULT_EMOJI_PICKER_EMOJIS}
         trigger={({ toggle }) => (
-          <button type="button" className="picker-badge picker-badge-interactive" title={t('vault.icon')} onClick={toggle}>
+          <button type="button" className="picker-badge picker-badge-interactive" title={t('vault.icon')} aria-label={t('vault.icon')} onClick={toggle}>
             <VaultGlyph icon={icon} size={16} />
           </button>
         )}
       />
       {icon && (
-        <Button variant="ghost" title={t('vault.resetIcon')} onClick={() => onChange(undefined)}>
+        <Button variant="ghost" title={t('vault.resetIcon')} aria-label={t('vault.resetIcon')} onClick={() => onChange(undefined)}>
           <RotateCcw size={14} />
         </Button>
       )}
@@ -228,35 +226,22 @@ export function DeleteConfirmRow({
         <div className="picker-badge">{busy ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}</div>
         <div className="picker-row-name flex-1 min-w-0">{vault.name}</div>
         <InlineConfirm
-          message={t('vault.removeConfirm')}
+          message={t(deleteFiles ? 'vault.deleteConfirmFiles' : 'vault.removeConfirm')}
           confirmLabel={t('vault.delete')}
           onConfirm={() => { if (!busy) onConfirm(); }}
           onCancel={onCancel}
         />
       </div>
 
-      <label className="flex items-start gap-2 text-xs cursor-pointer pl-12" style={{ color: 'var(--text-muted)' }}>
-        {/* A real input for keyboard and screen readers, visually the checkbox
-            that the export panel already uses. */}
-        <input
-          type="checkbox"
-          className="sr-only peer"
+      <div className="pl-12">
+        <BlockCheckbox
           checked={deleteFiles}
-          onChange={(e) => onToggleFiles(e.target.checked)}
+          onChange={onToggleFiles}
+          label={t('vault.deleteFiles')}
+          hint={deleteFiles ? t('vault.deleteFilesWarning') : undefined}
+          tone="danger"
         />
-        <span
-          aria-hidden
-          className={`${CHECKBOX_CLASS} ${
-            deleteFiles ? 'bg-accent-wash-strong border-accent-edge' : 'border-edge-strong hover:border-edge-raise'
-          }`}
-        >
-          {deleteFiles && <Check size={12} className="text-accent" />}
-        </span>
-        <span className="min-w-0">
-          {t('vault.deleteFiles')}
-          {deleteFiles && <span className="block mt-1 text-danger">{t('vault.deleteFilesWarning')}</span>}
-        </span>
-      </label>
+      </div>
     </div>
   );
 }

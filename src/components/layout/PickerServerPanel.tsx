@@ -118,7 +118,7 @@ export default function PickerServerPanel({ server }: { server: ServerState }) {
 
   return (
     <div className="flex flex-col h-full min-h-0">
-      <div className="flex items-center gap-1.5 text-xs mb-4" style={{ color: 'var(--text-muted)' }}>
+      <div className="flex items-center gap-1.5 text-xs mb-4 text-muted">
         <span className={`picker-dot picker-dot-${tone}`} aria-hidden />
         {stateLabel}
       </div>
@@ -150,14 +150,14 @@ export default function PickerServerPanel({ server }: { server: ServerState }) {
               onKeyDown={onEnter(submit)}
             />
           </label>
-          <p className="text-xs leading-relaxed" style={{ color: 'var(--text-subtle)' }}>{t('sync.keychainWarning')}</p>
+          <p className="text-xs leading-relaxed text-subtle">{t('sync.keychainWarning')}</p>
           <Button variant="primary" className="w-full justify-center" onClick={submit} disabled={busy || !url.trim() || !key.trim()}>
             {busy ? t('sync.connecting') : loggedOut ? t('sync.login') : t('sync.connect')}
           </Button>
         </div>
       ) : (
         <div className="flex flex-col flex-1 min-h-0">
-          <div className="text-sm break-all mb-4" style={{ color: 'var(--text-secondary)' }}>{status.url}</div>
+          <div className="text-sm break-all mb-4 text-secondary">{status.url}</div>
           <dl className="picker-stats">
             <dt>{t('sync.statLastSync')}</dt>
             <dd>{lastSync ? formatTimeAgo(new Date(lastSync)) : '–'}</dd>
@@ -166,7 +166,7 @@ export default function PickerServerPanel({ server }: { server: ServerState }) {
             <dt>{t('sync.statSpace')}</dt>
             <dd>{reachable ? formatBytes(used, units) : '–'}</dd>
           </dl>
-          {status.unencrypted && <p className="text-xs mt-3" style={{ color: 'var(--warning-text)' }}>{t('sync.unencryptedShort')}</p>}
+          {status.unencrypted && <p className="text-xs mt-3 text-warning">{t('sync.unencryptedShort')}</p>}
 
           {devices && devices.devices.length > 0 && (
             <div className="mt-5 -mx-2 min-h-0 overflow-y-auto overflow-x-hidden">
@@ -176,7 +176,7 @@ export default function PickerServerPanel({ server }: { server: ServerState }) {
                   const me = device.id === devices.me;
                   return (
                     <li key={device.id} className="picker-device group">
-                      <span className="min-w-0 truncate" style={{ color: 'var(--text-secondary)' }}>{device.name || t('sync.unnamedDevice')}</span>
+                      <span className="min-w-0 truncate text-secondary">{device.name || t('sync.unnamedDevice')}</span>
                       {confirming === device.id ? (
                         <InlineConfirm
                           small
@@ -187,7 +187,7 @@ export default function PickerServerPanel({ server }: { server: ServerState }) {
                         />
                       ) : (
                         <span className="flex items-center gap-1 shrink-0">
-                          <span className="text-xs" style={{ color: 'var(--text-subtle)' }}>
+                          <span className="text-xs text-subtle">
                             {me ? t('sync.thisDevice') : formatTimeAgo(new Date(device.last_seen * 1000))}
                           </span>
                           {!me && (

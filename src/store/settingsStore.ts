@@ -66,9 +66,11 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
     const fallback = initialSettingsFor(vaultId);
     const settings = stored ?? (corrupt ? { ...fallback, trash: { ...fallback.trash, retentionDays: null } } : fallback);
     set({ vaultId, settings });
-    // The first start after language and theme moved to the device, with no
-    // mirror to take them from: this vault's old values become the device's.
-    useDeviceStore.getState().adoptFromVault(stored?.appearance);
+    // What this vault still holds from when language and theme were vault
+    // settings: its custom themes join the device's, once; on the first start
+    // without a mirror its language and theme too. Awaited: migration v39
+    // needs the language.
+    await useDeviceStore.getState().adoptFromVault(vaultId, stored?.appearance);
     await applyAppearance(settings.appearance);
     // Persist the initial values right away: otherwise the vault would get the
     // migration snapshot again on the next open instead of what applied.

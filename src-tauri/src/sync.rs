@@ -31,7 +31,9 @@ use crate::crypto::{self, Context, Key, Purpose};
 use crate::{images, keys, vault};
 
 pub(crate) const SETTINGS_FILE: &str = "sync.json";
-const SETTINGS_TEMP_FILE: &str = "sync.json.tmp";
+pub(crate) const SETTINGS_TEMP_FILE: &str = "sync.json.tmp";
+/// Where a `sync.json` that does not parse is moved, instead of being overwritten.
+pub(crate) const BAD_FILE: &str = "sync.json.bad";
 
 const B64: base64::engine::GeneralPurpose = base64::engine::general_purpose::STANDARD;
 
@@ -93,9 +95,14 @@ struct Link {
 struct SyncFile {
     #[serde(default)]
     server: Option<StoredServer>,
-    /// Only when the keychain would not take them.
+    /// Only when the keychain would not take them. A field of its own: a build
+    /// from before reads `credentials` as a plain object, and a sealed string
+    /// there would make it throw the whole file away.
     #[serde(default, skip_serializing_if = "Option::is_none", with = "obscured")]
-    credentials: Option<Credentials>,
+    credentials_sealed: Option<Credentials>,
+    /// Where earlier builds put them, in the clear or sealed. Read, never written.
+    #[serde(default, rename = "credentials", skip_serializing, deserialize_with = "obscured::deserialize")]
+    legacy_credentials: Option<Credentials>,
     #[serde(default)]
     links: HashMap<String, Link>,
     /// Which server the links belong to, also while none is connected: a hash
@@ -153,9 +160,37 @@ fn data_dir(app: &tauri::AppHandle) -> Result<PathBuf, String> {
     app.path().app_data_dir().map_err(|e| e.to_string())
 }
 
+impl SyncFile {
+    /// What the file holds, under either name.
+    fn stored_credentials(&self) -> Option<&Credentials> {
+        self.credentials_sealed.as_ref().or(self.legacy_credentials.as_ref())
+    }
+
+    fn set_credentials(&mut self, credentials: Option<Credentials>) {
+        self.credentials_sealed = credentials;
+        self.legacy_credentials = None;
+    }
+}
+
 fn read_file(app: &tauri::AppHandle) -> Result<SyncFile, String> {
-    match std::fs::read_to_string(data_dir(app)?.join(SETTINGS_FILE)) {
-        Ok(text) => Ok(serde_json::from_str(&text).unwrap_or_default()),
+    read_file_in(&data_dir(app)?)
+}
+
+/// A file that does not parse is moved aside as `sync.json.bad` rather than
+/// read as empty: the next write would otherwise replace server, links and
+/// their identity with nothing. What is left is a fresh start that costs a
+/// login, and the old file to look at.
+fn read_file_in(dir: &std::path::Path) -> Result<SyncFile, String> {
+    let path = dir.join(SETTINGS_FILE);
+    match std::fs::read_to_string(&path) {
+        Ok(text) => match serde_json::from_str(&text) {
+            Ok(file) => Ok(file),
+            Err(e) => {
+                eprintln!("[sync] {} does not parse ({e}); moved aside", path.display());
+                std::fs::rename(&path, dir.join(BAD_FILE)).map_err(|e| e.to_string())?;
+                Ok(SyncFile::default())
+            }
+        },
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(SyncFile::default()),
         Err(e) => Err(e.to_string()),
     }
@@ -197,7 +232,7 @@ fn store_credentials(app: &tauri::AppHandle, credentials: Credentials) -> Result
             .and_then(|text| keychain_entry()?.set_password(&Zeroizing::new(text)).map_err(|e| e.to_string()))
             .map_err(|e| eprintln!("[sync] keychain: {e}"))
             .is_ok();
-    change_file(app, |file| file.credentials = (!in_keychain).then(|| credentials.clone()))?;
+    change_file(app, |file| file.set_credentials((!in_keychain).then(|| credentials.clone())))?;
     if let Ok(mut held) = app.state::<SyncState>().credentials.lock() {
         *held = Some(Some(credentials));
     }
@@ -224,7 +259,7 @@ fn credentials(app: &tauri::AppHandle) -> Option<Credentials> {
     let mut held = state.credentials.lock().ok()?;
     if held.is_none() {
         // The file first: where they lie there, the keychain has already said no.
-        let found = read_file(app).ok()?.credentials.or_else(|| {
+        let found = read_file(app).ok()?.stored_credentials().cloned().or_else(|| {
             keychain_allowed()
                 .then(keychain_entry)?
                 .ok()?
@@ -493,7 +528,7 @@ pub async fn sync_server_status(app: tauri::AppHandle) -> Result<Value, String> 
     let has_credentials = credentials(&app).is_some();
     Ok(json!({
         "needsKey": file.server.is_some() && !has_credentials,
-        "unencrypted": file.credentials.is_some(),
+        "unencrypted": file.stored_credentials().is_some(),
         "url": file.server.map(|s| s.url),
         "links": links,
     }))
@@ -544,7 +579,7 @@ pub async fn sync_unpair(app: tauri::AppHandle) -> Result<(), String> {
     forget_credentials(&app);
     change_file(&app, |file| {
         file.server = None;
-        file.credentials = None;
+        file.set_credentials(None);
     })
 }
 
@@ -1089,26 +1124,56 @@ pub async fn sync_unwatch(app: tauri::AppHandle) -> Result<(), String> {
 
 #[cfg(test)]
 mod tests {
-    use super::{clean_url, take_events, Credentials, SyncFile};
+    use super::{clean_url, read_file_in, take_events, Credentials, SyncFile, BAD_FILE, SETTINGS_FILE};
 
     #[test]
     fn credentials_in_the_file_are_not_in_plain_sight() {
-        let file = SyncFile {
-            credentials: Some(Credentials { token: "tok-secret".into(), names_key: "names-secret".into() }),
-            ..SyncFile::default()
-        };
+        let mut file = SyncFile::default();
+        file.set_credentials(Some(Credentials { token: "tok-secret".into(), names_key: "names-secret".into() }));
         let text = serde_json::to_string(&file).unwrap();
         assert!(!text.contains("secret"), "{text}");
+        assert!(!text.contains("\"credentials\""), "the old name is never written: {text}");
         let back: SyncFile = serde_json::from_str(&text).unwrap();
-        assert_eq!(back.credentials.as_ref().map(|c| c.token.as_str()), Some("tok-secret"));
+        assert_eq!(back.stored_credentials().map(|c| c.token.as_str()), Some("tok-secret"));
 
         let plain: SyncFile =
             serde_json::from_str(r#"{"credentials":{"token":"t","names_key":"n"},"links":{}}"#).unwrap();
-        assert_eq!(plain.credentials.map(|c| c.token.clone()), Some("t".into()));
+        assert_eq!(plain.stored_credentials().map(|c| c.token.clone()), Some("t".into()));
         let damaged: SyncFile =
             serde_json::from_str(r#"{"credentials":"bm9wZQ==","links":{"a":{"remote":"r"}}}"#).unwrap();
-        assert!(damaged.credentials.is_none());
+        assert!(damaged.stored_credentials().is_none());
         assert_eq!(damaged.links["a"].remote, "r");
+    }
+
+    /// What a build from before the sealed field reads: the plain shape.
+    #[derive(serde::Deserialize)]
+    struct OlderFile {
+        #[serde(default)]
+        credentials: Option<Credentials>,
+        #[serde(default)]
+        links: std::collections::HashMap<String, serde_json::Value>,
+    }
+
+    #[test]
+    fn an_older_build_still_reads_the_file_and_keeps_its_links() {
+        let mut file = SyncFile::default();
+        file.set_credentials(Some(Credentials { token: "t".into(), names_key: "n".into() }));
+        file.links.insert("v".into(), super::Link { remote: "r".into(), ..super::Link::default() });
+        let older: OlderFile = serde_json::from_str(&serde_json::to_string(&file).unwrap()).unwrap();
+        assert!(older.credentials.is_none(), "a login, not a lost file");
+        assert!(older.links.contains_key("v"));
+    }
+
+    #[test]
+    fn a_file_that_does_not_parse_is_moved_aside_not_emptied() {
+        let dir = std::env::temp_dir().join(format!("emerald-sync-bad-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(dir.join(SETTINGS_FILE), "{ not json").unwrap();
+        let file = read_file_in(&dir).unwrap();
+        assert!(file.server.is_none() && file.links.is_empty());
+        assert!(!dir.join(SETTINGS_FILE).exists());
+        assert_eq!(std::fs::read_to_string(dir.join(BAD_FILE)).unwrap(), "{ not json");
+        std::fs::remove_dir_all(&dir).ok();
     }
 
     #[test]

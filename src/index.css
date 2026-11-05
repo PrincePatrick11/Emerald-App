@@ -753,9 +753,10 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
   }
 
   .start-tab:focus-visible,
-  .start-segment:focus-visible,
   .start-option:focus-visible,
-  .start-option-remove:focus-visible {
+  .start-option-remove:focus-visible,
+  .picker-device-remove:focus-visible,
+  .picker-badge-interactive:focus-visible {
     outline: 2px solid var(--focus-ring);
     outline-offset: 1px;
   }
@@ -763,26 +764,6 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
   .start-label {
     @apply text-xs mb-2;
     color: var(--text-muted);
-  }
-
-  /* A choice of a few short words: one framed row, the chosen one filled. */
-  .start-segments {
-    @apply flex gap-px p-0.5 rounded-md border;
-    border-color: var(--border-soft);
-  }
-
-  .start-segment {
-    @apply flex-1 h-[26px] rounded text-xs transition-colors duration-150;
-    color: var(--text-muted);
-  }
-
-  .start-segment:hover {
-    color: var(--text-primary);
-  }
-
-  .start-segment.start-segment-active {
-    background-color: var(--tab-pill-active);
-    color: var(--text-primary);
   }
 
   /* A choice with more to say: a list of rows, the chosen one tinted. */
@@ -798,6 +779,11 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
   .start-option:hover {
     background-color: var(--interactive-hover);
     color: var(--text-primary);
+  }
+
+  /* Room for the remove button, so a long name ends before it. */
+  .start-option-removable {
+    @apply pr-8;
   }
 
   .start-option.start-option-active {
@@ -1002,7 +988,6 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
     .picker-row-actions,
     .picker-device-remove,
     .start-tab,
-    .start-segment,
     .start-option,
     .start-option-remove {
       transition: none;
@@ -1264,17 +1249,6 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
   .settings-row {
     @apply flex items-center justify-between gap-3 rounded-md border px-3 py-2;
     background-color: color-mix(in srgb, var(--bg-surface-1) 70%, transparent);
-    border-color: var(--border-soft);
-  }
-
-  /* The dividers of the About page. */
-  .settings-divider-bottom {
-    @apply border-b;
-    border-color: var(--border-soft);
-  }
-
-  .settings-divider-top {
-    @apply border-t;
     border-color: var(--border-soft);
   }
 
@@ -1657,7 +1631,8 @@ button.sidebar-section-title:focus-visible {
   object-fit: cover;
 }
 
-/* Type as segments: inset track, the active segment in jade. */
+/* Type as segments: inset track, the active segment in jade. Also the start
+   page's language choice, with words instead of icons (`--text`). */
 .prop-segments {
   display: flex;
   flex-shrink: 0;
@@ -1678,6 +1653,18 @@ button.sidebar-section-title:focus-visible {
   border: 1px solid transparent;
   color: var(--text-muted);
   transition: color 150ms, background-color 150ms;
+}
+
+.prop-segments--fill {
+  flex-shrink: 1;
+}
+
+.prop-segment--text {
+  flex: 1 1 0%;
+  width: auto;
+  height: 26px;
+  padding: 0 8px;
+  font-size: 12px;
 }
 
 .prop-segment:hover:not(:disabled) {

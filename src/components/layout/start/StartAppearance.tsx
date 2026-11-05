@@ -57,7 +57,7 @@ export default function StartAppearance() {
     <li key={selection} className="start-option-row group">
       <button
         type="button"
-        className={`start-option${settings.theme === selection ? ' start-option-active' : ''}`}
+        className={`start-option${onRemove ? ' start-option-removable' : ''}${settings.theme === selection ? ' start-option-active' : ''}`}
         aria-pressed={settings.theme === selection}
         onClick={() => setTheme(selection)}
       >
@@ -81,13 +81,13 @@ export default function StartAppearance() {
   return (
     <div className="space-y-6">
       <section>
-        <h3 className="start-label">{t('settings.language')}</h3>
-        <div className="start-segments" role="group" aria-label={t('settings.language')}>
+        <h2 className="start-label">{t('settings.language')}</h2>
+        <div className="prop-segments prop-segments--fill" role="group" aria-label={t('settings.language')}>
           {LANGUAGE_OPTIONS.map(({ code, label }) => (
             <button
               key={code}
               type="button"
-              className={`start-segment${settings.language === code ? ' start-segment-active' : ''}`}
+              className={`prop-segment prop-segment--text${settings.language === code ? ' prop-segment--active' : ''}`}
               aria-pressed={settings.language === code}
               onClick={() => setLanguage(code)}
             >
@@ -98,7 +98,7 @@ export default function StartAppearance() {
       </section>
 
       <section>
-        <h3 className="start-label">{t('settings.theme')}</h3>
+        <h2 className="start-label">{t('settings.theme')}</h2>
         <ul className="space-y-0.5">
           {THEME_OPTIONS.map(({ id, label }) => {
             const Icon = THEME_ICONS[id];

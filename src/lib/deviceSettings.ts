@@ -19,13 +19,23 @@ export interface DeviceSettings {
   language: AppLanguage;
   theme: ThemeSelection;
   customThemes: CustomTheme[];
+  /**
+   * The vaults whose old custom themes (from when themes were vault settings)
+   * have joined this list. Each is taken over once, so a theme removed here
+   * does not come back the next time its vault opens.
+   */
+  adoptedFrom: string[];
 }
+
+/** A guard against a runaway list, not a limit anybody meets. */
+const MAX_ADOPTED = 500;
 
 export const DEFAULT_DEVICE_SETTINGS: DeviceSettings = {
   version: 1,
   language: 'en',
   theme: DEFAULT_THEME_ID,
   customThemes: [],
+  adoptedFrom: [],
 };
 
 const LANGUAGES = new Set<string>(LANGUAGE_OPTIONS.map((o) => o.code));
@@ -58,6 +68,9 @@ export function normalizeDeviceSettings(raw: unknown): DeviceSettings {
     language: language && LANGUAGES.has(language) ? (language as AppLanguage) : DEFAULT_DEVICE_SETTINGS.language,
     theme: normalizeThemeSelection(asString(root.theme), customThemes),
     customThemes,
+    adoptedFrom: Array.isArray(root.adoptedFrom)
+      ? [...new Set(root.adoptedFrom.filter((id): id is string => typeof id === 'string'))].slice(0, MAX_ADOPTED)
+      : [],
   };
 }
 
@@ -100,18 +113,27 @@ export function writeDeviceMirror(settings: DeviceSettings): void {
   }
 }
 
-/** `null` while the file does not exist yet: the first start with this version. */
-export async function readDeviceSettings(): Promise<DeviceSettings | null> {
+/**
+ * `missing`: the first start with this version. `corrupt`: the file did not
+ * read as settings — Rust has set it aside as `device.json.bad`, and the caller
+ * stays on the mirror without writing anything until the user chooses.
+ */
+export type DeviceSettingsRead =
+  | { kind: 'missing' }
+  | { kind: 'found'; settings: DeviceSettings }
+  | { kind: 'corrupt' };
+
+export async function readDeviceSettings(): Promise<DeviceSettingsRead> {
   const read = await invoke<VaultFileRead>('read_device_settings');
-  if (read.kind === 'missing') return null;
+  if (read.kind === 'missing') return { kind: 'missing' };
   if (read.kind === 'found') {
     try {
-      return normalizeDeviceSettings(JSON.parse(read.contents));
+      return { kind: 'found', settings: normalizeDeviceSettings(JSON.parse(read.contents)) };
     } catch (err) {
-      console.warn('[device] unreadable device.json, using defaults', err);
+      console.warn('[device] unreadable device.json', err);
     }
   }
-  return structuredClone(DEFAULT_DEVICE_SETTINGS);
+  return { kind: 'corrupt' };
 }
 
 export function writeDeviceSettings(settings: DeviceSettings): Promise<void> {

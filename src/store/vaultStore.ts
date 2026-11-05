@@ -53,6 +53,14 @@ interface VaultStore {
    */
   locked: boolean;
   /**
+   * The active vault did not open: a successor after the open one was removed.
+   * It stays active, so the picker can relocate or retry it, but there is no
+   * way back to it until it opens (`retryOpen`).
+   */
+  openFailed: boolean;
+  /** Opens the active vault again, after `openFailed`. */
+  retryOpen: () => Promise<void>;
+  /**
    * New password, new vault key (`reencrypt.rs`). Afterwards everything is
    * reloaded — the images are named differently. `null` if a running
    * edit should continue.
@@ -144,6 +152,12 @@ export const useVaultStore = create<VaultStore>((set, get) => ({
   activeVaultId: '',
   loaded: false,
   locked: false,
+  openFailed: false,
+
+  retryOpen: async () => {
+    await openActiveVault();
+    set({ openFailed: false });
+  },
 
   loadVaults: async () => {
     const data = await loadVaultsFile();
@@ -190,6 +204,7 @@ export const useVaultStore = create<VaultStore>((set, get) => ({
       void lockVault(id).catch((e) => console.warn('[vault] lock failed', e));
       throw err;
     }
+    set({ openFailed: false });
     // The vault being left is locked: its key does not stay in
     // memory while another one is open.
     if (previous) void lockVault(previous).catch((e) => console.warn('[vault] lock failed', e));
@@ -284,7 +299,10 @@ export const useVaultStore = create<VaultStore>((set, get) => ({
     try {
       await openActiveVault();
     } catch (err) {
-      if (keyErrorOf(err) !== VAULT_KEY_CANCELLED) throw err;
+      if (keyErrorOf(err) !== VAULT_KEY_CANCELLED) {
+        set({ openFailed: true });
+        throw err;
+      }
       await closeToSetup();
     }
     return dirRemoved;

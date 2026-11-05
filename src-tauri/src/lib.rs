@@ -271,14 +271,19 @@ pub(crate) fn guarded_read_path(app: &tauri::AppHandle, path: &str) -> Result<Pa
     Ok(canonical)
 }
 
-/// `sync.json` may hold the sync token, which the webview must never see. In any
-/// case: a file system that folds case would answer to another spelling.
+/// `sync.json` may hold the sync token, which the webview must never see — and
+/// so may its temp file and a copy set aside as unreadable. In any case: a file
+/// system that folds case would answer to another spelling.
 fn app_data_read_allowed(target: &Path, app_data_dir: &Path) -> bool {
     target
         .strip_prefix(app_data_dir)
         .ok()
         .and_then(|below| below.to_str())
-        .is_none_or(|below| !below.eq_ignore_ascii_case(sync::SETTINGS_FILE))
+        .is_none_or(|below| {
+            ![sync::SETTINGS_FILE, sync::SETTINGS_TEMP_FILE, sync::BAD_FILE]
+                .iter()
+                .any(|name| below.eq_ignore_ascii_case(name))
+        })
 }
 
 // ── commands ──────────────────────────────────────────────────────────────────
@@ -394,11 +399,12 @@ async fn export_pdf(app: tauri::AppHandle, html: String, path: String, page_size
 /// Builds and installs the native application menu.
 ///
 /// macOS only: there the menu lives in the system menu bar at the top of the
-/// screen, where it belongs. On Windows and Linux `set_menu` would attach an
-/// in-window menu bar (HMENU / GTK menubar) that would collide with the
-/// app's own menu bar in `TitleBar` — those platforms render the same items
-/// in HTML instead (`src/components/layout/titlebar/useTitleBarMenus.ts`),
-/// running the same actions.
+/// screen, where it belongs — the app menu (About, Check for Updates, Switch
+/// Vault, Hide, Quit), Edit and View. On Windows and Linux `set_menu` would
+/// attach an in-window menu bar (HMENU / GTK menubar) that would collide with
+/// the title bar's own menu, which holds the same items in HTML
+/// (`src/components/layout/titlebar/useTitleBarMenus.ts`) and runs the same
+/// actions. Export and Import are title-bar buttons on every platform.
 ///
 /// `update_menu_labels` bails out on `app.menu()` returning `None`, so
 /// it becomes a no-op on the platforms that never get here.
@@ -949,7 +955,7 @@ mod app_data_write_tests {
     #[test]
     fn the_sync_settings_cannot_be_read_by_path() {
         let data = Path::new("/home/u/.local/share/emerald");
-        for refused in ["sync.json", "SYNC.JSON", "Sync.Json"] {
+        for refused in ["sync.json", "SYNC.JSON", "Sync.Json", "sync.json.bad", "sync.json.tmp"] {
             assert!(!app_data_read_allowed(&data.join(refused), data), "{refused}");
         }
         for allowed in ["vaults.json", "vaults/sync.json"] {

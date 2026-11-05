@@ -350,8 +350,8 @@ export default function BackupPage() {
                     className="block w-full text-left px-3 py-2"
                   >
                     {/* Active only through the colouring of the button itself
-                        (settings-choice-btn), as with the theme and language
-                        choice — no checkmark. */}
+                        (settings-choice-btn), as with the sizes on the
+                        General page — no checkmark. */}
                     <span className="block text-xs font-medium">{t(labelKey)}</span>
                     <span className="block text-xs mt-0.5 text-muted">{t(descKey)}</span>
                   </SettingsChoiceButton>

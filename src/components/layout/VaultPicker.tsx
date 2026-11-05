@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { open as openDialog } from '@tauri-apps/plugin-dialog';
 import { ArrowLeft, FolderOpen, Plus } from 'lucide-react';
@@ -6,7 +6,7 @@ import Button from '../ui/Button';
 import { activeVault, hasActiveVault, useVaultStore } from '../../store/vaultStore';
 import { ensureVaultReady, VAULT_KEY_CANCELLED } from '../../store/vaultKeyStore';
 import { closeVaultPicker, useVaultPickerStore } from '../../store/vaultPickerStore';
-import StartTabs from './start/StartTabs';
+import StartTabs, { START_PANEL_ID, startTabId } from './start/StartTabs';
 import StartAppearance from './start/StartAppearance';
 import StartUpdates from './start/StartUpdates';
 import StartAbout from './start/StartAbout';
@@ -81,6 +81,7 @@ export default function VaultPicker() {
   const vaults = useVaultStore((s) => s.vaults);
   const activeVaultId = useVaultStore((s) => s.activeVaultId);
   const current = useVaultStore(activeVault);
+  const openFailed = useVaultStore((s) => s.openFailed);
   const switchVault = useVaultStore((s) => s.switchVault);
   const addVault = useVaultStore((s) => s.addVault);
   const updateVault = useVaultStore((s) => s.updateVault);
@@ -107,6 +108,31 @@ export default function VaultPicker() {
     void enterPickerWindow().finally(hideSplash);
     return () => { void leavePickerWindow(); };
   }, []);
+
+  // Focus starts where the picker is about: on the open vault's row, or on
+  // the heading when there is none — not on whatever had it in the shell.
+  const headingRef = useRef<HTMLHeadingElement>(null);
+  useEffect(() => {
+    const row = document.querySelector<HTMLElement>('.picker-row-active .picker-row-main');
+    (row ?? headingRef.current)?.focus();
+  }, []);
+
+  // Escape goes back to the open vault, as "Back to …" does — not while a
+  // row is being edited or confirmed, a dialog is up or a field has the key.
+  const canGoBack = !!current && !openFailed && switchingId === null;
+  const editorOpen = editor.kind !== 'none';
+  useEffect(() => {
+    if (!canGoBack || editorOpen) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape' || e.defaultPrevented) return;
+      const target = e.target as HTMLElement | null;
+      if (target?.closest('input, textarea, select, [contenteditable="true"]')) return;
+      if (document.querySelector('.modal-card')) return;
+      closeVaultPicker();
+    };
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [canGoBack, editorOpen]);
 
   // Which vaults are still where vaults.json says they are. A folder on an
   // unplugged drive, or one that was renamed, has to be visible as such rather
@@ -152,7 +178,10 @@ export default function VaultPicker() {
     const state = useVaultStore.getState();
     const vault = state.vaults.find((v) => v.id === id);
     if (!vault) return;
-    if (id === state.activeVaultId) {
+    // The open vault: back to it — unless it is one that failed to open,
+    // which is tried again instead.
+    const retry = id === state.activeVaultId && state.openFailed;
+    if (id === state.activeVaultId && !retry) {
       closeVaultPicker();
       return;
     }
@@ -163,7 +192,8 @@ export default function VaultPicker() {
       await ensureVaultReady(vault);
       showLoadingScreen();
       // The open edits were settled when the picker opened (`openVaultPicker`).
-      await switchVault(id, { editsResolved: true });
+      if (retry) await useVaultStore.getState().retryOpen();
+      else await switchVault(id, { editsResolved: true });
     } catch (e) {
       // Both covers: `ensureVaultReady` puts the loading screen back after a
       // question (`resumeSplash`), and a switch that fails early never ends it.
@@ -355,7 +385,15 @@ export default function VaultPicker() {
       const target = await freeTarget(label);
       const record = await newVaultRecord(target.name, { path: target.path });
       await addVault(record);
-      await adoptRemoteVault(record.id, remote.id, target.name);
+      try {
+        await adoptRemoteVault(record.id, remote.id, target.name);
+      } catch (e) {
+        // No half-fetched vault in the list: the record and the folder made
+        // for it go again.
+        await removeVault(record.id, true).catch((err: unknown) => console.warn('[sync] could not remove the new vault', err));
+        void server.refresh();
+        throw e;
+      }
       await server.refresh();
       await choose(record.id);
     } catch (e) {
@@ -399,7 +437,7 @@ export default function VaultPicker() {
     <div className="picker-frame flex flex-1 min-h-0">
       <main className="app-main app-sheet-main picker-sheet flex flex-col min-w-0">
         <div className="flex items-center justify-between gap-3 px-5 pt-4 pb-3">
-          <h1 className="picker-heading">{t('vault.title')}</h1>
+          <h1 ref={headingRef} tabIndex={-1} className="picker-heading outline-none">{t('vault.title')}</h1>
           <div className="flex items-center gap-1">
             <Button tone="neutral" compact title={t('vault.open')} aria-label={t('vault.open')} onClick={handleOpenExisting}>
               <FolderOpen size={14} />
@@ -501,7 +539,7 @@ export default function VaultPicker() {
           </ul>
         </div>
 
-        {current && (
+        {current && !openFailed && (
           <div className="picker-footer">
             <Button tone="neutral" disabled={busy} onClick={closeVaultPicker}>
               <ArrowLeft size={12} className="shrink-0" />
@@ -513,7 +551,7 @@ export default function VaultPicker() {
 
       <aside className="picker-side">
         <StartTabs section={section} />
-        <div className="picker-side-body">
+        <div className="picker-side-body" id={START_PANEL_ID} role="tabpanel" aria-labelledby={startTabId(section)}>
           {section === 'server' && <PickerServerPanel server={server} />}
           {section === 'appearance' && <StartAppearance />}
           {section === 'updates' && <StartUpdates />}

@@ -608,7 +608,8 @@
     "backTo": "Zurück zu {{name}}",
     "openFailed": "Der zuletzt geöffnete Vault ließ sich nicht öffnen. Wähle ihn erneut oder einen anderen.",
     "empty": "Noch keine Vaults.",
-    "removeConfirm": "Aus der Liste entfernen?"
+    "removeConfirm": "Aus der Liste entfernen?",
+    "deleteConfirmFiles": "Vault samt Dateien löschen?"
   },
   "vaultKey": {
     "unlockTitle": "„{{name}}“ entsperren",
@@ -786,7 +787,7 @@
     "updateErrorWrite": "Die Einstellung konnte nicht gespeichert werden.",
     "includeSettings": "Einstellungen",
     "importSettings": "Einstellungen aus dem Backup übernehmen",
-    "groupAppearance": "Sprache & Aussehen",
+    "groupAppearance": "Schriften & Größen",
     "uiScale": "UI-Größe",
     "editorFontSize": "Editor-Textgröße",
     "modeReplaceSettingsWarning": "Auch die Einstellungen dieses Vaults werden durch die aus dem Backup ersetzt.",
@@ -853,16 +854,16 @@
     "moonPhaseShow": "Bei Journal-Einträgen zeigen",
     "moonPhaseShowHint": "Gilt für alle Einträge, auch für alte. Aus: keine Mondphase als Icon, in der Seitenleiste, im Export und kein Filtern oder Gruppieren danach.",
     "trashRetentionHint": "So lange bleibt Gelöschtes im Papierkorb. Danach wird es beim Öffnen des Vaults endgültig gelöscht.",
-    "customThemeImport": "Theme importieren …",
-    "customThemeRemove": "„{{name}}\" entfernen",
+    "customThemeImport": "Theme importieren…",
+    "customThemeRemove": "„{{name}}“ entfernen",
     "customThemeInvalid": "Das ist keine gültige Theme-Datei.",
     "customThemeUnreadable": "Der Text dieses Themes wäre unlesbar: Die Farbe text hat zu wenig Kontrast zu sheet oder panel.",
-    "customThemeTooMany": "Es passen höchstens {{count}} Themes in einen Vault.",
+    "customThemeTooMany": "Es passen höchstens {{count}} Themes auf dieses Gerät.",
     "customThemeContrast": "Importiert, aber schwer lesbar: {{pairs}}.",
     "uiFontHint": "Schrift für Menüs, Listen und Beschriftungen.",
     "editorFontHint": "Schrift für Titel und Text in Einträgen.",
     "exportDbHint": "Speichert den Vault als .emeralddb-Datei samt Bildern. Die Auswahl darunter bestimmt, was hineinkommt.",
-    "includeSettingsHint": "Sprache, Aussehen, Seitenleiste, Papierkorb, Emojis, Bilder, Tags- und Vorlagen-Regel sowie das automatische Backup dieses Vaults",
+    "includeSettingsHint": "Schriften und Größen, Seitenleiste, Papierkorb, Emojis, Bilder, Tags- und Vorlagen-Regel sowie das automatische Backup dieses Vaults",
     "importDbHint": "Holt eine .emeralddb-Datei zurück — als neuer Vault, zusätzlich zu den vorhandenen Einträgen oder als Ersatz für alles. Nach der Dateiwahl erscheinen die Optionen.",
     "storageHint": "Bilder im Vault-Ordner, die kein Eintrag mehr benutzt. „Suchen“ zeigt, wie viel Platz sie belegen, „Entfernen“ löscht sie endgültig.",
     "updateErrorInstall": "Die Installation ist fehlgeschlagen.",
@@ -1229,7 +1230,7 @@
   },
   "start": {
     "server": "Server",
-    "appearance": "Darstellung",
+    "appearance": "Aussehen",
     "updates": "Updates",
     "about": "Über",
     "sections": "Startseite"

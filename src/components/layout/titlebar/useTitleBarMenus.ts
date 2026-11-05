@@ -78,8 +78,8 @@ export function useTitleBarMenus() {
     ],
   };
 
-  // The three-line button is the Emerald menu: "Switch vault…" as on macOS,
-  // then Edit and View as submenus.
+  // The three-line button is the Emerald menu, as on macOS: Switch Vault…,
+  // Check for Updates…, About Emerald App, then Edit and View as submenus.
   const appMenu: MenuNode[] = [
     { kind: 'item', label: t('menu.switchVault'), onSelect: () => dispatchMenuAction('switch-vault') },
     { kind: 'item', label: t('menu.checkUpdates'), onSelect: () => dispatchMenuAction('check-updates') },

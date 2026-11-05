@@ -45,6 +45,8 @@ const SETTINGS_MAX_BYTES: u64 = 256 * 1024;
 /// owns its shape (`deviceSettings.ts`).
 const DEVICE_FILE: &str = "device.json";
 const DEVICE_TEMP_FILE: &str = "device.json.tmp";
+/// Where an unreadable [`DEVICE_FILE`] is moved, instead of being overwritten.
+const DEVICE_BAD_FILE: &str = "device.json.bad";
 /// The unsaved drafts of the vault's block and template pages, written along
 /// while they are being edited so that a crash takes nothing that was typed.
 /// The frontend owns the shape; Rust only moves the text.
@@ -789,7 +791,7 @@ pub(crate) fn remove_vault_content(dir: &Path) -> Result<(), String> {
 }
 
 /// Deletes a vault's files — the database, its journal, its images and its
-/// settings. Only ever reached through the vault modal's opt-in "delete files"
+/// settings. Only ever reached through the vault picker's opt-in "delete files"
 /// checkbox.
 ///
 /// Deliberately **not** `remove_dir_all`. A vault directory is one the user
@@ -912,7 +914,28 @@ pub fn write_vault_settings(app: tauri::AppHandle, vault_id: String, contents: S
 #[tauri::command(async)]
 pub fn read_device_settings(app: tauri::AppHandle) -> Result<VaultFileRead, String> {
     let dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
-    Ok(read_json_in(&dir, DEVICE_FILE, SETTINGS_MAX_BYTES))
+    Ok(read_device_in(&dir))
+}
+
+/// A file that is no JSON object, too large or no plain file is moved aside as
+/// `device.json.bad` — renamed, never removed — and answered as unreadable: the
+/// frontend then stays on its mirror and writes nothing until the user chooses.
+fn read_device_in(dir: &Path) -> VaultFileRead {
+    let read = read_json_in(dir, DEVICE_FILE, SETTINGS_MAX_BYTES);
+    let bad = match &read {
+        VaultFileRead::Found { contents } => {
+            !matches!(serde_json::from_str::<serde_json::Value>(contents), Ok(serde_json::Value::Object(_)))
+        }
+        VaultFileRead::Unreadable => true,
+        VaultFileRead::Missing => false,
+    };
+    if !bad {
+        return read;
+    }
+    if let Err(e) = std::fs::rename(dir.join(DEVICE_FILE), dir.join(DEVICE_BAD_FILE)) {
+        eprintln!("[device] could not set device.json aside: {e}");
+    }
+    VaultFileRead::Unreadable
 }
 
 /// Replaces `{appDataDir}/device.json`; a JSON object, like the vault's settings.
@@ -1360,6 +1383,19 @@ mod tests {
         let big = scratch();
         write(&big.join(SETTINGS_FILE), &"a".repeat(SETTINGS_MAX_BYTES as usize + 1));
         assert_eq!(read_settings_in(&big), VaultFileRead::Unreadable);
+    }
+
+    #[test]
+    fn an_unreadable_device_file_is_set_aside_not_overwritten() {
+        let dir = scratch();
+        write(&dir.join(DEVICE_FILE), "[1, 2]");
+        assert_eq!(read_device_in(&dir), VaultFileRead::Unreadable);
+        assert!(!dir.join(DEVICE_FILE).exists());
+        assert_eq!(std::fs::read_to_string(dir.join(DEVICE_BAD_FILE)).unwrap(), "[1, 2]");
+        assert_eq!(read_device_in(&dir), VaultFileRead::Missing);
+
+        write(&dir.join(DEVICE_FILE), r#"{"theme":"emerald-parchment"}"#);
+        assert!(matches!(read_device_in(&dir), VaultFileRead::Found { .. }));
     }
 
     #[test]

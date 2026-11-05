@@ -149,7 +149,7 @@ export default function StartUpdates() {
         )}
         {result?.available && (
           <div className="mt-3 space-y-2">
-            <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
+            <p className="text-sm text-secondary">
               {t('settings.updateFound', { version: result.version })}
             </p>
             {result.notes && (

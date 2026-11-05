@@ -41,7 +41,7 @@ export default function StartAbout() {
       <div className="flex items-center gap-3">
         <EmeraldMark size={36} />
         <div className="min-w-0">
-          <div className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>Emerald App</div>
+          <div className="text-sm font-medium text-primary">Emerald App</div>
           <div className="text-xs text-muted">{t('settings.tagline')}</div>
         </div>
       </div>

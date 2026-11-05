@@ -68,7 +68,7 @@ export default function SyncPage() {
 
   const pointer = (
     <div>
-      <Button onClick={() => { void openVaultPicker(); }}>
+      <Button onClick={() => { void openVaultPicker('server'); }}>
         <Vault size={14} />
         {t('sync.openPicker')}
       </Button>

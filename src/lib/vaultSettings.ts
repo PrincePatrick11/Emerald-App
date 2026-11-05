@@ -315,6 +315,19 @@ export function importableSettings(raw: unknown): VaultSettings | null {
   return known as unknown as VaultSettings;
 }
 
+/**
+ * The settings without the keys a `settings.json` from before still carries of
+ * language and theme (`appearance.language`, `.theme`, `.customThemes`): they
+ * belong to the device now, and an export must not carry them on.
+ */
+export function withoutDeviceKeys(settings: VaultSettings): VaultSettings {
+  const appearance = { ...settings.appearance } as Record<string, unknown>;
+  delete appearance.language;
+  delete appearance.theme;
+  delete appearance.customThemes;
+  return { ...settings, appearance: appearance as unknown as VaultSettings['appearance'] };
+}
+
 /** `current` with the chosen groups from `incoming` — for merging a backup. */
 export function withSettingsGroups(current: VaultSettings, incoming: VaultSettings, groups: readonly SettingsGroup[]): VaultSettings {
   const next: Record<string, unknown> = { ...current };

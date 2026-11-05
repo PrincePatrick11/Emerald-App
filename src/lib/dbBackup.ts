@@ -64,7 +64,7 @@ import { clearAltarEdits } from '../store/altarEdit';
 import { resumeEditorSaves, suspendEditorSaves } from './editorLock';
 import { drainSerialized } from './serialize';
 import { importViaStaging } from './importStaging';
-import { importableSettings, isPlainObject, withSettingsGroups, writeVaultSettings, type SettingsGroup } from './vaultSettings';
+import { importableSettings, isPlainObject, withSettingsGroups, withoutDeviceKeys, writeVaultSettings, type SettingsGroup } from './vaultSettings';
 import { useSettingsStore } from '../store/settingsStore';
 import { useDeviceStore } from '../store/deviceStore';
 
@@ -798,7 +798,9 @@ export async function buildBackup(options: BackupOptions): Promise<BackupFile> {
     filters: options,
     data,
     images,
-    ...(options.includeSettings && { settings: useSettingsStore.getState().settings }),
+    // Without what a `settings.json` from before still carries of language and
+    // theme: those belong to the device, and a backup must not bring them back.
+    ...(options.includeSettings && { settings: withoutDeviceKeys(useSettingsStore.getState().settings) }),
   };
 }
 
@@ -1836,7 +1838,6 @@ export async function importDatabase(
 
     // Before switching into the folder: then the new vault opens right away with
     // the backup's fonts, instead of the defaults first.
-    if (backupThemes) useDeviceStore.getState().adoptCustomThemes(backupThemes);
     if (backupSettings) {
       // Just a nicety: if writing fails, the vault starts with the
       // defaults — the import itself should not get stuck on that.
@@ -1879,6 +1880,8 @@ export async function importDatabase(
       }
       await doReplace(staging, filteredBackup);
     });
+    // Only once the import went through, as with replace and merge below.
+    if (backupThemes) useDeviceStore.getState().adoptCustomThemes(backupThemes);
   } else {
     // Never directly against the vault: `doReplace` deletes before it inserts, and
     // an aborted merge would leave half-imported data behind (see `importStaging.ts`).
