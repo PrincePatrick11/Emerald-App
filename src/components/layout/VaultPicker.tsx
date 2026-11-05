@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { open as openDialog } from '@tauri-apps/plugin-dialog';
-import { ChevronLeft, FolderOpen, Plus } from 'lucide-react';
+import { ChevronLeft, FolderOpen, Plus, Vault } from 'lucide-react';
 import Button from '../ui/Button';
 import { activeVault, hasActiveVault, useVaultStore } from '../../store/vaultStore';
 import { ensureVaultReady, VAULT_KEY_CANCELLED } from '../../store/vaultKeyStore';
 import { closeVaultPicker, useVaultPickerStore } from '../../store/vaultPickerStore';
 import StartBrand from './start/StartBrand';
+import StartSection from './start/StartSection';
 import StartAppearance from './start/StartAppearance';
 import StartUpdates from './start/StartUpdates';
 import { keyErrorOf } from '../../lib/vaultKeys';
@@ -440,24 +441,27 @@ export default function VaultPicker() {
         </div>
 
         <div className="start-grid">
-          <section className="start-card start-vaults" aria-labelledby="start-vaults-heading">
-            <div className="start-card-head">
-              <h2 id="start-vaults-heading" ref={headingRef} tabIndex={-1} className="picker-heading outline-none">{t('vault.title')}</h2>
+          <StartSection
+            id="start-vaults-heading"
+            icon={<Vault size={12} />}
+            label={t('vault.title')}
+            headingRef={headingRef}
+            aside={
               <div className="flex items-center gap-1">
-                <Button tone="neutral" compact title={t('vault.open')} aria-label={t('vault.open')} onClick={handleOpenExisting}>
-                  <FolderOpen size={14} />
+                <Button tone="neutral" compact small title={t('vault.open')} aria-label={t('vault.open')} onClick={handleOpenExisting}>
+                  <FolderOpen size={12} />
                 </Button>
-                <Button tone="jade" compact title={t('vault.add')} aria-label={t('vault.add')} onClick={openCreateRow}>
-                  <Plus size={14} />
+                <Button tone="jade" compact small title={t('vault.add')} aria-label={t('vault.add')} onClick={openCreateRow}>
+                  <Plus size={12} />
                 </Button>
               </div>
-            </div>
-
+            }
+          >
             {(notice || error) && (
               <p className="pb-2 text-xs text-danger">{notice ? t(notice) : error}</p>
             )}
 
-            <div className="-mx-2">
+            <div>
               {editor.kind === 'create' && (
                 <CreateRow
                   name={editor.name}
@@ -486,7 +490,7 @@ export default function VaultPicker() {
                 </div>
               )}
 
-              <ul className="space-y-0.5">
+              <ul className="space-y-2">
                 {vaults.map((v) => (
                   <li key={v.id}>
                     {editor.kind === 'edit' && editor.id === v.id ? (
@@ -543,7 +547,7 @@ export default function VaultPicker() {
                 })}
               </ul>
             </div>
-          </section>
+          </StartSection>
 
           <div className="start-column">
             <PickerServerPanel server={server} />

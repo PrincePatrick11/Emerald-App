@@ -2,7 +2,7 @@
 
 Emerald supports four languages: English (`en`), German (`de`), Spanish (`es`), and French (`fr`).
 
-The language belongs to the **installation**, not to a vault: the start page's Appearance sets it, `store/deviceStore.ts` applies it and writes `{appDataDir}/device.json` (see [Device Settings](architecture/storage.md#device-settings)). It does not sync, and a vault's `settings.json` from before still holding it under `appearance` is no longer read.
+The language belongs to the **installation**, not to a vault: the flags at the foot of the start page set it, `store/deviceStore.ts` applies it and writes `{appDataDir}/device.json` (see [Device Settings](architecture/storage.md#device-settings)). It does not sync, and a vault's `settings.json` from before still holding it under `appearance` is no longer read.
 
 It is mirrored into `localStorage` (`app-language`) as a boot-time starting point: `main.tsx` reads the mirror before the bundle can read `device.json`, so the app doesn't flash English. Once `device.json` is read, it is authoritative.
 
@@ -95,8 +95,8 @@ Top-level keys of `en.json`, with the conventions worth knowing:
 | `properties` | Right sidebar Properties panel |
 | `filters` | Filter panel; `all` is the "All" row every `FilterList` shows on top |
 | `vault` | `VaultPicker`: list/switch, edit, create, open/relocate, delete, the way back. Some keys (`chooseFolder`, `defaultFolder`, `alreadyOpen`, `accessDenied`, `folderHasVault`, `folderNotEmpty`) also serve the backup import's add-vault mode via `VaultLocationRow` and `NEW_VAULT_TARGET_ERROR_KEY` |
-| `settings` | Settings modal, and on the start page the keys its cards share with it (language, theme, custom themes, updates, tagline, website) |
-| `start` | The start page's own: card headings, links, version, update settings |
+| `settings` | Settings modal, and on the start page the keys its sections share with it (language, theme, custom themes, updates, tagline, website) |
+| `start` | The start page's own: section headings, links, version, update settings |
 | `createItem` | The rail's plus: `CreateItemModal` |
 | `sync` | The sync server: the start page's server section, Settings → Sync, the vault list's state marks, sync errors |
 | `vaultKey` | `VaultKeyDialog` and its shared parts: unlock, create, encrypt, recover, the recovery-key box, the "remember on this device" switch and the failure texts (`wrongPassword`, `tooShort` with `{{count}}`, …) |

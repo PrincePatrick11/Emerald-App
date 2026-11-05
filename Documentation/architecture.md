@@ -53,8 +53,8 @@ src/
 │   │   ├── LeaveGuardModal, VaultPicker        leave-an-edit question, vault picker (start view)
 │   │   ├── VaultKeyDialog, BackupUnlockDialog, RecoveryKeyBox, vaultKeyParts   password, unlock, recovery key
 │   │   ├── moduleViews.ts                      ViewId → lazy view (MainArea only)
-│   │   ├── PickerRows, PickerServerPanel       the start page's vault rows and server card
-│   │   ├── start/                              the start page's brand, Appearance card, version and updates
+│   │   ├── PickerRows, PickerServerPanel       the start page's vault rows and server section
+│   │   ├── start/                              the start page's brand, language, sections, Appearance, version and updates
 │   │   ├── settings/                           SettingsModal, one *Page per tab, sections
 │   │   └── titlebar/                           custom title bar, menus, SearchModal
 │   ├── editor/       RichEditor and its TipTap extensions, toolbar, link picker, TagInput

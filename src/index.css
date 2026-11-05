@@ -705,11 +705,13 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
 
   /* ── Start page (the vault picker) ─────────────────────────────────────
      The whole window, as the shell is: the brand on the frame at the left,
-     one sheet beside it with the cards (vaults; server and appearance) and
-     the version at its foot. The cards are `.start-card`, not `.panel`:
-     `.panel` carries per-theme overrides (html[data-theme=…] .panel, 0-2-1)
-     that outrank any modifier on top (design.md, Specificity Traps). The
-     vault rows are list rows (rounded-md), not cards. */
+     one sheet beside it with the sections (vaults; server and appearance),
+     headed as Home heads its own, and the version at its foot. What a
+     section lists (vaults, themes, the server's figures) are panels as
+     Home's items are, drawn here with the same tokens as
+     `.panel-interactive` rather than with it: it carries per-theme
+     overrides (html[data-theme=…] .panel-interactive, 0-2-1) that outrank an
+     active tint on top (design.md, Specificity Traps). */
   .picker-frame {
     padding: 0 var(--sheet-inset) var(--sheet-inset) 0;
   }
@@ -745,7 +747,7 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
   /* Vaults beside server and appearance; one column below 1080px. Only
      this scrolls, the foot stays. */
   .start-grid {
-    @apply grid flex-1 min-h-0 gap-5 overflow-y-auto px-8 pt-3 pb-5;
+    @apply grid flex-1 min-h-0 gap-x-10 gap-y-8 overflow-y-auto px-8 pt-4 pb-6;
     grid-template-columns: minmax(0, 3fr) minmax(300px, 2fr);
     align-content: start;
     align-items: start;
@@ -758,32 +760,58 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
   }
 
   .start-column {
-    @apply flex flex-col gap-5 min-w-0;
+    @apply flex flex-col gap-8 min-w-0;
   }
 
-  .start-card {
-    @apply rounded-xl p-5 min-w-0 border;
-    background-color: var(--panel-bg);
-    border-color: var(--panel-border);
+  .start-section {
+    @apply min-w-0;
   }
 
-  .start-card-head {
-    @apply flex items-center justify-between gap-3 mb-4;
+  .start-section-head {
+    @apply flex items-center justify-between gap-3 mb-3 min-h-6;
   }
 
-  .start-card-rule {
+  .start-section-label {
+    @apply flex items-center gap-2 text-xs font-semibold uppercase tracking-wider outline-none;
+    color: var(--text-subtle);
+  }
+
+  .start-rule {
     @apply border-t;
     border-color: var(--edge);
   }
 
   .start-stats {
-    @apply grid grid-cols-3 gap-3;
+    @apply grid grid-cols-3 gap-2;
   }
 
   /* Value first to the eye, its name under it, with the name still first in
      the markup for screen readers. */
   .start-stats > div {
-    @apply flex flex-col-reverse gap-0.5 min-w-0;
+    @apply flex flex-col-reverse gap-0.5 min-w-0 rounded-xl border px-3 py-2.5;
+    background-color: var(--bg-surface-1);
+    border-color: var(--border-soft);
+  }
+
+  /* The flags at the foot of the brand: the chosen one on a quiet well. */
+  .start-flag {
+    @apply flex items-center justify-center w-8 h-8 rounded-md text-lg leading-none transition-colors duration-150;
+    opacity: 0.55;
+  }
+
+  .start-flag:hover {
+    background-color: var(--interactive-hover);
+    opacity: 1;
+  }
+
+  .start-flag.start-flag-active {
+    background-color: var(--interactive-active);
+    opacity: 1;
+  }
+
+  .start-flag:focus-visible {
+    outline: 2px solid var(--focus-ring);
+    outline-offset: 1px;
   }
 
   .start-stats dt {
@@ -809,23 +837,21 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
     outline-offset: 1px;
   }
 
-  .start-label {
-    @apply text-xs mb-2;
-    color: var(--text-muted);
-  }
-
   /* A choice with more to say: a list of rows, the chosen one tinted. */
   .start-option-row {
     @apply relative flex items-center;
   }
 
   .start-option {
-    @apply flex items-center gap-2.5 w-full min-w-0 rounded-md px-2 py-1.5 text-sm text-left transition-colors duration-150;
+    @apply flex items-center gap-3 w-full min-w-0 rounded-xl border px-4 py-2.5 text-sm text-left transition-colors duration-150;
+    background-color: var(--bg-surface-1);
+    border-color: var(--border-soft);
     color: var(--text-secondary);
   }
 
   .start-option:hover {
-    background-color: var(--interactive-hover);
+    background-color: var(--bg-surface-2);
+    border-color: var(--border-strong);
     color: var(--text-primary);
   }
 
@@ -836,6 +862,7 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
 
   .start-option.start-option-active {
     background-color: color-mix(in srgb, var(--accent) 12%, transparent);
+    border-color: var(--choice-active-border);
     color: var(--text-primary);
   }
 
@@ -844,7 +871,7 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
   }
 
   .start-option-remove {
-    @apply absolute right-1.5 flex items-center justify-center w-5 h-5 rounded-md opacity-0 transition-opacity duration-150;
+    @apply absolute right-2.5 flex items-center justify-center w-5 h-5 rounded-md opacity-0 transition-opacity duration-150;
     color: var(--text-subtle);
   }
 
@@ -874,26 +901,36 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
   }
 
   .picker-row {
-    @apply relative flex items-center gap-2 rounded-md px-2 py-1.5 transition-colors duration-150;
+    @apply relative flex items-center gap-2 rounded-xl border px-3 py-2.5 transition-colors duration-150;
+    background-color: var(--bg-surface-1);
+    border-color: var(--border-soft);
   }
 
   .picker-row:hover,
   .picker-row:focus-within {
-    background-color: var(--interactive-hover);
+    background-color: var(--bg-surface-2);
+    border-color: var(--border-strong);
   }
 
-  /* An editor or a confirmation in place of a row: a quiet surface, so it
-     stands out from the list without becoming a card. */
+  /* An editor or a confirmation in place of a row: the raised surface, so it
+     stands out while it is open. */
   .picker-row-open,
   .picker-row-open:hover,
   .picker-row-open:focus-within {
-    background-color: var(--bg-surface-1);
+    background-color: var(--bg-surface-2);
+    border-color: var(--border-strong);
   }
 
   .picker-row-active,
   .picker-row-active:hover,
   .picker-row-active:focus-within {
     background-color: color-mix(in srgb, var(--accent) 12%, transparent);
+    border-color: var(--choice-active-border);
+  }
+
+  /* Only on the server: a dashed edge, present but not yet here. */
+  .picker-row.picker-row-remote {
+    border-style: dashed;
   }
 
   .picker-row-main {

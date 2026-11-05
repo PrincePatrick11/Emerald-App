@@ -6,6 +6,7 @@ import EmeraldMark from '../../ui/EmeraldMark';
 import { LANGUAGE_OPTIONS } from '../../../i18n';
 import packageJson from '../../../../package.json';
 import { DiscordMark, GithubMark, PatreonMark } from '../settings/BrandIcons';
+import StartLanguage from './StartLanguage';
 
 /** The website offers the same four languages as the app, under the same
  *  codes. A fifth language in LANGUAGE_OPTIONS needs a page there too —
@@ -30,7 +31,7 @@ function BrandLink({ icon, label, url }: { icon: ReactNode; label: string; url: 
 }
 
 /** The start page's left column, on the frame: the mark, the name, the
- *  tagline, the links, and at the foot author and licence. */
+ *  tagline, the links, and at the foot the language, author and licence. */
 export default function StartBrand() {
   const { t, i18n } = useTranslation();
   const language = LANGUAGE_OPTIONS.some((o) => o.code === i18n.resolvedLanguage) ? i18n.resolvedLanguage : 'en';
@@ -50,7 +51,10 @@ export default function StartBrand() {
           <BrandLink icon={<DiscordMark size={14} />} label="Discord" url={DISCORD_URL} />
         </nav>
       </div>
-      <p className="mt-auto pt-8 text-xs text-subtle">{packageJson.author} · {packageJson.license}</p>
+      <div className="mt-auto pt-8 space-y-3">
+        <StartLanguage />
+        <p className="text-xs text-subtle">{packageJson.author} · {packageJson.license}</p>
+      </div>
     </aside>
   );
 }

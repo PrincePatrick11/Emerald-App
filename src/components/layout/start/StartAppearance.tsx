@@ -2,7 +2,7 @@ import { useRef, useState, type ChangeEvent, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Moon, Palette, Sun, Upload, X } from 'lucide-react';
 import Button from '../../ui/Button';
-import { LANGUAGE_OPTIONS } from '../../../i18n';
+import StartSection from './StartSection';
 import { useDeviceStore } from '../../../store/deviceStore';
 import { THEME_OPTIONS, customThemeSelection, type ThemeSelection } from '../../../themes/theme';
 import {
@@ -14,14 +14,13 @@ const THEME_ICONS = { 'emerald-noctis': Moon, 'emerald-parchment': Sun } as cons
 type Status = { tone: 'error' | 'muted'; text: string } | null;
 
 /**
- * The start page's Appearance card: language and theme of this installation
- * (`deviceStore`), custom themes included: import one from a JSON file, pick
- * it, remove it.
+ * The start page's Appearance: the theme of this installation (`deviceStore`),
+ * custom themes included: import one from a JSON file, pick it, remove it.
+ * The language sits at the foot of the brand (`StartLanguage`).
  */
 export default function StartAppearance() {
   const { t } = useTranslation();
   const settings = useDeviceStore((s) => s.settings);
-  const setLanguage = useDeviceStore((s) => s.setLanguage);
   const setTheme = useDeviceStore((s) => s.setTheme);
   const addCustomTheme = useDeviceStore((s) => s.addCustomTheme);
   const removeCustomTheme = useDeviceStore((s) => s.removeCustomTheme);
@@ -80,28 +79,9 @@ export default function StartAppearance() {
   );
 
   return (
-    <section className="start-card space-y-4" aria-labelledby="start-appearance-heading">
-      <h2 id="start-appearance-heading" className="picker-heading">{t('start.appearance')}</h2>
+    <StartSection id="start-appearance-heading" icon={<Palette size={12} />} label={t('start.appearance')}>
       <div>
-        <h3 className="start-label">{t('settings.language')}</h3>
-        <div className="prop-segments prop-segments--fill" role="group" aria-label={t('settings.language')}>
-          {LANGUAGE_OPTIONS.map(({ code, label }) => (
-            <button
-              key={code}
-              type="button"
-              className={`prop-segment prop-segment--text${settings.language === code ? ' prop-segment--active' : ''}`}
-              aria-pressed={settings.language === code}
-              onClick={() => setLanguage(code)}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <div>
-        <h3 className="start-label">{t('settings.theme')}</h3>
-        <ul className="space-y-0.5">
+        <ul className="space-y-2">
           {THEME_OPTIONS.map(({ id, label }) => {
             const Icon = THEME_ICONS[id];
             return option(id, label, <Icon size={14} className="shrink-0" />);
@@ -128,6 +108,6 @@ export default function StartAppearance() {
           <p className={`text-xs mt-2 ${status.tone === 'error' ? 'text-danger' : 'text-muted'}`}>{status.text}</p>
         )}
       </div>
-    </section>
+    </StartSection>
   );
 }

@@ -389,7 +389,7 @@ A vault is a **folder** you choose, holding its own encrypted database and its o
 
 An installation from before multi-vault support has its existing database adopted as a vault named "Emerald".
 
-The start page is one page without tabs. On the left the name, the tagline, links to the website, GitHub, Patreon and Discord, author and licence. Beside it cards: **Vaults**, one list of every vault, and next to it **Server** (the [sync server](#sync-server)) and **Appearance** ([language](#language) and [theme](#theming), custom themes included). At the bottom right the version and the [updates](#updates). **Emerald → About Emerald App** opens it.
+The start page is one page without tabs. On the left the name, the tagline, links to the website, GitHub, Patreon and Discord, and at the bottom a flag for each [language](#language), author and licence. Beside it, headed as Home's sections are: **Vaults**, one list of every vault, and next to it **Server** (the [sync server](#sync-server)) and **Appearance** (the [theme](#theming), custom themes included). At the bottom right the version and the [updates](#updates). **Emerald → About Emerald App** opens it.
 
 - Each row is a vault, with a quiet mark at its end for where it lives: only here (a drive), syncing (a cloud in the accent colour), disconnected (a crossed-out cloud), or only on the server (a cloud with an arrow, its size under the name). Clicking a row opens that vault; the open vault's row is tinted. A vault only on the server is fetched: a local copy is made, its password asked for, and the first sync fills it. Opening a locked vault asks for its password first, in the picker; cancelling leaves you there. The folder shows when you point at a row.
 - **New Vault** (the + at the top) creates an empty one. Give it a name and optionally an icon; the row shows live where it will land — by default `Documents/Emerald Vaults/{name}`, with a folder picker to choose elsewhere and a reset button. The target folder has to be empty: sharing it with unrelated files would make deleting them ambiguous later. Opening the new vault asks for its password.
@@ -585,7 +585,7 @@ A `.deb` install is not offered updates and says so — the new version comes fr
 
 ## Language
 
-The start page's **Appearance** switches the language between English, German, Spanish and French. It belongs to the installation, not to a vault: every vault opens in it, and it does not sync. English is the default and fallback; the other languages load the first time they are selected.
+The flags at the bottom left of the start page switch the language between English, German, Spanish and French; the language's name shows when you point at one. It belongs to the installation, not to a vault: every vault opens in it, and it does not sync. English is the default and fallback; the other languages load the first time they are selected.
 
 ## Typography
 

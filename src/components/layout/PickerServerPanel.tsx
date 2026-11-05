@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { X } from 'lucide-react';
+import { Cloud, X } from 'lucide-react';
 import Button from '../ui/Button';
 import InlineConfirm from '../ui/InlineConfirm';
 import { onEnter } from './vaultKeyParts';
+import StartSection from './start/StartSection';
 import {
   remoteVaults, removeDevice, serverDevices, serverStatus, syncErrorCode, syncNow, syncPair, syncUnpair,
   type RemoteVault, type ServerDevices, type ServerStatus,
@@ -69,7 +70,6 @@ export default function PickerServerPanel({ server }: { server: ServerState }) {
   const { t } = useTranslation();
   const lastSync = useSyncStore((s) => s.lastSync);
   const focus = useVaultPickerStore((s) => s.focus);
-  const cardRef = useRef<HTMLElement>(null);
   const { status, remotes, devices, reachable, loggedOut, refresh } = server;
   const [url, setUrl] = useState('');
   const [key, setKey] = useState('');
@@ -109,7 +109,7 @@ export default function PickerServerPanel({ server }: { server: ServerState }) {
   useEffect(() => {
     if (focus !== 'server' || !status) return;
     takeStartFocus();
-    const card = cardRef.current;
+    const card = document.getElementById('start-server-heading')?.closest('section');
     card?.scrollIntoView({ block: 'nearest' });
     // The address field to connect; the heading once connected.
     (card?.querySelector<HTMLElement>('input') ?? card?.querySelector<HTMLElement>('h2'))?.focus();
@@ -130,14 +130,17 @@ export default function PickerServerPanel({ server }: { server: ServerState }) {
   const used = remotes.reduce((sum, remote) => sum + remote.storedBytes, 0);
 
   return (
-    <section ref={cardRef} className="start-card" aria-labelledby="start-server-heading">
-      <div className="start-card-head">
-        <h2 id="start-server-heading" tabIndex={-1} className="picker-heading outline-none">{t('start.server')}</h2>
+    <StartSection
+      id="start-server-heading"
+      icon={<Cloud size={12} />}
+      label={t('start.server')}
+      aside={
         <span className="flex items-center gap-1.5 text-xs text-muted">
           <span className={`picker-dot picker-dot-${tone}`} aria-hidden />
           {stateLabel}
         </span>
-      </div>
+      }
+    >
 
       {!connected ? (
         <div className="space-y-3">
@@ -191,7 +194,7 @@ export default function PickerServerPanel({ server }: { server: ServerState }) {
           {status.unencrypted && <p className="text-xs mt-3 text-warning">{t('sync.unencryptedShort')}</p>}
 
           {devices && devices.devices.length > 0 && (
-            <div className="start-card-rule mt-4 pt-3 -mx-2">
+            <div className="start-rule mt-4 pt-3">
               <div className="picker-label px-2">{t('sync.devices')}</div>
               <ul className="space-y-0.5">
                 {devices.devices.map((device) => {
@@ -248,6 +251,6 @@ export default function PickerServerPanel({ server }: { server: ServerState }) {
         </div>
       )}
       {error && <p className="text-xs mt-3 text-danger">{error}</p>}
-    </section>
+    </StartSection>
   );
 }
