@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next';
-import { LayoutDashboard, Plus, Settings, type LucideIcon } from 'lucide-react';
+import { LayoutGrid, Plus, Settings, type LucideIcon } from 'lucide-react';
 import { Suspense, lazy, useEffect, useState } from 'react';
 import { AUX_VIEWS, MODULES, type ViewId } from '../../lib/modules';
 import { useUIStore } from '../../store/uiStore';
@@ -186,7 +186,7 @@ export default function LeftSidebarRail() {
             title={updateVersion ? t('settings.updateFound', { version: updateVersion }) : t('nav.startPage')}
             className="relative"
           >
-            <LayoutDashboard size={18} />
+            <LayoutGrid size={18} />
             {updateVersion && <RailDot tone="accent" />}
           </RailButton>
         </div>
