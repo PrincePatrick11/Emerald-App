@@ -2,13 +2,11 @@ import { invoke } from '@tauri-apps/api/core';
 import { LEFT_LIST_TAB_IDS, type LeftListTabId } from './modules';
 import { oneOf } from './helpers';
 import type { Weekday } from './formatDate';
-import { LANGUAGE_OPTIONS, LANGUAGE_STORAGE_KEY, type AppLanguage } from '../i18n';
 import {
-  DEFAULT_EDITOR_FONT_ID, DEFAULT_EDITOR_FONT_SIZE, DEFAULT_THEME_ID, DEFAULT_UI_FONT_ID, DEFAULT_UI_SCALE,
-  customThemeSelection, normalizeEditorFontId, normalizeEditorFontSize, normalizeThemeSelection, normalizeUIFontId, normalizeUIScale,
-  type EditorFontSize, type FontId, type ThemeSelection, type UIScale,
+  DEFAULT_EDITOR_FONT_ID, DEFAULT_EDITOR_FONT_SIZE, DEFAULT_UI_FONT_ID, DEFAULT_UI_SCALE,
+  normalizeEditorFontId, normalizeEditorFontSize, normalizeUIFontId, normalizeUIScale,
+  type EditorFontSize, type FontId, type UIScale,
 } from '../themes/theme';
-import { MAX_CUSTOM_THEMES, normalizeCustomThemes, type CustomTheme } from '../themes/customTheme';
 
 /**
  * A vault's settings, as `settings.json` in its folder.
@@ -16,11 +14,13 @@ import { MAX_CUSTOM_THEMES, normalizeCustomThemes, type CustomTheme } from '../t
  * Each group is a unit that a backup import can adopt individually
  * when merging. A new setting means: field in its group,
  * default in `DEFAULT_VAULT_SETTINGS`, validation in `normalizeVaultSettings`.
+ *
+ * Language and theme are not here: they belong to the installation
+ * (`deviceSettings.ts`). A `settings.json` from before still holds them under
+ * `appearance`; they are carried along unread, and the first start took them
+ * over for the device.
  */
 export interface AppearanceSettings {
-  language: AppLanguage;
-  theme: ThemeSelection;
-  customThemes: CustomTheme[];
   uiFont: FontId;
   editorFont: FontId;
   uiScale: UIScale;
@@ -149,9 +149,6 @@ export const SETTINGS_GROUPS = Object.keys(GROUP_SET) as SettingsGroup[];
 export const DEFAULT_VAULT_SETTINGS: VaultSettings = {
   version: 1,
   appearance: {
-    language: 'en',
-    theme: DEFAULT_THEME_ID,
-    customThemes: [],
     uiFont: DEFAULT_UI_FONT_ID,
     editorFont: DEFAULT_EDITOR_FONT_ID,
     uiScale: DEFAULT_UI_SCALE,
@@ -193,7 +190,6 @@ export const DEFAULT_VAULT_SETTINGS: VaultSettings = {
   },
 };
 
-const LANGUAGES = new Set<string>(LANGUAGE_OPTIONS.map((o) => o.code));
 
 export function isPlainObject(value: unknown): value is Record<string, unknown> {
   return !!value && typeof value === 'object' && !Array.isArray(value);
@@ -231,7 +227,6 @@ function legacySingleList(tabs: unknown): LeftListTabId {
 export function normalizeVaultSettings(raw: unknown): VaultSettings {
   const root = asRecord(raw);
   const appearance = asRecord(root.appearance);
-  const language = asString(appearance.language);
   const trash = asRecord(root.trash);
   const leftList = asRecord(root.leftList);
   const emojis = asRecord(root.emojis);
@@ -245,15 +240,11 @@ export function normalizeVaultSettings(raw: unknown): VaultSettings {
   const version = typeof root.version === 'number' && Number.isInteger(root.version) && root.version > 1
     ? root.version
     : 1;
-  const customThemes = normalizeCustomThemes(appearance.customThemes);
   return {
     ...root,
     version,
     appearance: {
       ...appearance,
-      language: language && LANGUAGES.has(language) ? (language as AppLanguage) : DEFAULT_VAULT_SETTINGS.appearance.language,
-      theme: normalizeThemeSelection(asString(appearance.theme), customThemes),
-      customThemes,
       uiFont: normalizeUIFontId(asString(appearance.uiFont)),
       editorFont: normalizeEditorFontId(asString(appearance.editorFont)),
       uiScale: normalizeUIScale(appearance.uiScale),
@@ -328,22 +319,6 @@ export function importableSettings(raw: unknown): VaultSettings | null {
 export function withSettingsGroups(current: VaultSettings, incoming: VaultSettings, groups: readonly SettingsGroup[]): VaultSettings {
   const next: Record<string, unknown> = { ...current };
   for (const group of groups) next[group] = incoming[group];
-  if (groups.includes('appearance')) {
-    // The vault's own themes stay: a backup adds to them, and its selection may name either.
-    const own = current.appearance.customThemes;
-    const ownIds = new Set(own.map((theme) => theme.id));
-    // The backup's selected theme comes first, so the cap cuts others before it.
-    const selected = (theme: CustomTheme) => customThemeSelection(theme.id) === incoming.appearance.theme;
-    const added = incoming.appearance.customThemes.filter((theme) => !ownIds.has(theme.id));
-    const customThemes = [...own, ...added.filter(selected), ...added.filter((theme) => !selected(theme))]
-      .slice(0, MAX_CUSTOM_THEMES);
-    const fits = !incoming.appearance.theme.startsWith('custom:') || customThemes.some(selected);
-    next.appearance = {
-      ...incoming.appearance,
-      customThemes,
-      theme: fits ? incoming.appearance.theme : current.appearance.theme,
-    };
-  }
   return next as unknown as VaultSettings;
 }
 
@@ -392,27 +367,16 @@ interface LegacySnapshot {
 
 /**
  * The keys under which the app-wide values were stored. They remain in use as
- * the boot mirror of the most recently opened vault: `main.tsx` starts
- * with them before a vault is loaded. The boot script in `index.html` reads
- * `theme-id` by hand — it runs before the bundle.
+ * the boot mirror of the most recently opened vault's fonts: `main.tsx` starts
+ * with them before a vault is loaded. Language and theme have a mirror of
+ * their own (`DEVICE_MIRROR_KEYS` in `deviceSettings.ts`).
  */
 export const APPEARANCE_MIRROR_KEYS = {
-  language: LANGUAGE_STORAGE_KEY,
-  theme: 'theme-id',
-  customThemes: 'custom-themes',
   uiFont: 'ui-font-id',
   editorFont: 'editor-font-id',
   uiScale: 'ui-scale',
   editorFontSize: 'editor-font-size',
 } as const;
-
-function parseMirrorList(raw: string | null): unknown {
-  try {
-    return raw ? JSON.parse(raw) : [];
-  } catch {
-    return [];
-  }
-}
 
 /** The appearance according to the boot mirror, validated like a file. */
 export function readAppearanceMirror(): AppearanceSettings {
@@ -425,10 +389,6 @@ export function readAppearanceMirror(): AppearanceSettings {
   };
   return normalizeVaultSettings({
     appearance: {
-      language: read(APPEARANCE_MIRROR_KEYS.language),
-      // `theme` is the key from before the theme ids ('light'/'dark').
-      theme: read(APPEARANCE_MIRROR_KEYS.theme) ?? read('theme'),
-      customThemes: parseMirrorList(read(APPEARANCE_MIRROR_KEYS.customThemes)),
       uiFont: read(APPEARANCE_MIRROR_KEYS.uiFont),
       editorFont: read(APPEARANCE_MIRROR_KEYS.editorFont),
       uiScale: read(APPEARANCE_MIRROR_KEYS.uiScale),

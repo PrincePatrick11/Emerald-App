@@ -381,7 +381,7 @@ Tags, categories, your own blocks, templates and the Lexicon's languages also go
 
 A vault is a **folder** you choose, holding its own encrypted database and its own images — see [Vault Layout](architecture/storage.md#vault-layout) for the on-disk layout and [Vault Encryption](#vault-encryption) for the password. Because nothing inside it refers to a location, a vault folder can be copied to another machine and opened there. A vault can carry its own icon — any emoji, shown on its card and on the Vault rail button while it is active; without one, both show the plain vault glyph.
 
-**The vault picker.** Emerald normally opens the vault that was open last, straight away; with a single vault you never see a choice. The picker is a view of its own in the same window: the window takes a fixed small size and shows only the picker — the open vault's pages stay out of sight while you choose — and once you choose a vault the loading screen covers the switch and the window returns to its earlier size and place (maximised or fullscreen included).
+**The start page.** Emerald normally opens the vault that was open last, straight away; with a single vault you never see a choice. The start page (the vault picker) is a view of its own in the same window: the window takes a fixed small size and shows only the start page — the open vault's pages stay out of sight while you choose — and once you choose a vault the loading screen covers the switch and the window returns to its earlier size and place (maximised or fullscreen included).
 
 - It comes up by itself when there is no vault (a new installation, or after the last one was removed), when the last vault cannot be opened — it then says so above the list — and when you cancel the password question on start.
 - By hand it opens from the menu: **Emerald → Switch Vault…**, in the macOS menu bar or behind the three-line button in the title bar on Windows and Linux, or from the Vault icon in the left rail (above Settings). Open edits are settled first, as for any switch: save, discard or keep editing.
@@ -389,7 +389,7 @@ A vault is a **folder** you choose, holding its own encrypted database and its o
 
 An installation from before multi-vault support has its existing database adopted as a vault named "Emerald".
 
-The picker has two columns: on the left one list of every vault, on the right the [sync server](#sync-server).
+The start page has two columns: on the left one list of every vault, on the right one section at a time, chosen by quiet tabs: **Server** (the [sync server](#sync-server)), **Appearance** ([language](#language) and [theme](#theming), custom themes included), **Updates** ([Updates](#updates)) and **About** (version, author, licence and links). **Emerald → About Emerald App** opens it on About.
 
 - Each row is a vault, with a quiet mark at its end for where it lives: only here (a drive), syncing (a cloud in the accent colour), disconnected (a crossed-out cloud), or only on the server (a cloud with an arrow, its size under the name). Clicking a row opens that vault; the open vault's row is tinted. A vault only on the server is fetched: a local copy is made, its password asked for, and the first sync fills it. Opening a locked vault asks for its password first, in the picker; cancelling leaves you there. The folder shows when you point at a row.
 - **New Vault** (the + at the top) creates an empty one. Give it a name and optionally an icon; the row shows live where it will land — by default `Documents/Emerald Vaults/{name}`, with a folder picker to choose elsewhere and a reset button. The target folder has to be empty: sharing it with unrelated files would make deleting them ambiguous later. Opening the new vault asks for its password.
@@ -559,26 +559,24 @@ Right-click any entry in the left sidebar or in any list view (List, Cards, Card
 
 ## Settings
 
-Settings are **per vault** — stored in the vault's own `settings.json`. Switching vaults switches the whole configuration, and a vault folder copied to another machine keeps its settings; a new vault starts with the defaults. The window has eight pages:
+Settings are **per vault** — stored in the vault's own `settings.json`. Switching vaults switches the whole configuration, and a vault folder copied to another machine keeps its settings; a new vault starts with the defaults. Language, theme, updates and About belong to the installation and live on the [start page](#vaults). The window has seven pages:
 
-- **General** — language, theme, the two fonts, interface size and editor text size (see [Language](#language), [Typography](#typography), [Sizing](#sizing), [Theming](#theming)).
+- **General** — the two fonts, interface size and editor text size (see [Typography](#typography), [Sizing](#sizing)).
 - **Sidebar** — which list the left entry list shows (all items together, or one module's own), and how many entries it lists before "Show more".
 - **Entries** — the emoji picker's default set, size limits for inserted images, whether new tags may appear on the spot (typed, from a template, from an import), whether a new entry starts with its default template, **Automatic formatting** (Markdown shortcuts such as `# ` or `**bold**`; typography such as curly quotes, dashes, arrows and fractions; auto-links for typed or pasted addresses — each its own switch, applying to editors opened afterwards), and whether journal entries show their **moon phase** (see [Journal](#journal)).
 - **Security** — remember on this device, lock now, change password (see [Vault Encryption](#vault-encryption)).
 - **Backup** — see [Vault Backup](#vault-backup-emeralddb).
 - **Storage** — how long the Trash keeps deleted items, and the unused-images cleanup (see [Image Storage and Cleanup](#image-storage-and-cleanup)).
-- **Updates** — see [Updates](#updates). The one page that is *not* per vault: the update source and the check on start belong to the installation (see [In-App Updates](security.md#in-app-updates)).
-- **About** — version, author, license and links.
 
 Each section has a short description under its heading, and a tooltip where useful.
 
 ## Updates
 
-**Settings → Updates** shows the installed version, checks for a new one, and installs it. A check ends in one of three states: a newer version is offered, Emerald is up to date, or the source could not be reached. A source that *answers* without offering anything — including a 404, which every source returns until a release carries a manifest — counts as up to date; only a request that doesn't get through reports as unreachable. Technical error text goes to the console, not the window.
+The start page's **Updates** shows the installed version, checks for a new one, and installs it; **Emerald → Check for Updates…** opens it. A check ends in one of three states: a newer version is offered, Emerald is up to date, or the source could not be reached. A source that *answers* without offering anything — including a 404, which every source returns until a release carries a manifest — counts as up to date; only a request that doesn't get through reports as unreachable. Technical error text goes to the console, not the window.
 
 Finding an update downloads nothing by itself: the version, its changelog section and a **Download and install** button appear, with a progress bar during the download, and the app restarts into the new version. Vault data is untouched — an update replaces the application, not its content.
 
-With **Check for updates on start** on (the default), the app checks once per launch. A find only shows a small dot on the gear in the left rail; clicking it opens Settings on the Updates page. Nothing opens or installs on its own.
+With **Check for updates on start** on (the default), the app checks once per launch. A find only shows a small dot on the gear in the left rail; clicking it opens the start page on Updates. Nothing opens or installs on its own.
 
 **Update source** is a free-text address field. Empty — the normal state — uses the built-in addresses: `the-emerald-app.de` first, the GitHub release manifest as a fallback. It exists so a moved address can be fixed without a new build; the signing key is *not* editable, so a wrong address can only fail to deliver, never deliver something else (see [In-App Updates](security.md#in-app-updates)). Only complete `https` addresses are accepted, and changing the source clears the last result. Ticking **Check for updates on start** saves just that checkbox, leaving an unsaved address in the field as it is; the field's Reset clears it.
 
@@ -586,7 +584,7 @@ A `.deb` install is not offered updates and says so — the new version comes fr
 
 ## Language
 
-Settings → General → Language switches the vault's language between English, German, Spanish and French. English is the default and fallback; the other languages load the first time they are selected.
+The start page's **Appearance** switches the language between English, German, Spanish and French. It belongs to the installation, not to a vault: every vault opens in it, and it does not sync. English is the default and fallback; the other languages load the first time they are selected.
 
 ## Typography
 
@@ -607,11 +605,11 @@ There is no separate heading font: headings in the editor and entry titles use t
 
 ## Theming
 
-Emerald ships with two themes, selectable in Settings → General:
+Emerald ships with two themes, selectable on the start page's **Appearance**. Like the language, the theme belongs to the installation and does not sync:
 
 - **Emerald Noctis** — dark, with warm stone tones and jade green accents. The default.
 - **Emerald Parchment** — light, with warm parchment backgrounds, flat bordered panels and adapted accents.
 
-**Custom themes:** import a theme file under Settings → General. It sets colours only; see [Custom Themes](themes.md).
+**Custom themes:** **Import theme** on the same page adds a theme file to this installation and selects it; pointing at one offers to remove it. It sets colours only; see [Custom Themes](themes.md).
 
 The whole UI, the Altar included, follows the chosen theme. For how themes are built and how to add one, see [Architecture → Theming System](architecture/appearance.md#theming-system).

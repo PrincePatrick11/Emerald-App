@@ -22,6 +22,8 @@ export type MenuActionId =
   | 'toggle-view-lock'
   | 'show-splash'
   | 'switch-vault'
+  | 'show-about'
+  | 'check-updates'
   | 'export-pdf'
   | 'export-markdown'
   | 'export-emerald'
@@ -59,6 +61,8 @@ const NATIVE_EVENTS: Record<Exclude<SelfContainedMenuActionId, TitleBarOnlyMenuA
   'toggle-view-lock': true,
   'show-splash': true,
   'switch-vault': true,
+  'show-about': true,
+  'check-updates': true,
 };
 
 export const NATIVE_MENU_EVENTS = Object.keys(NATIVE_EVENTS) as (keyof typeof NATIVE_EVENTS)[];
@@ -94,6 +98,13 @@ export async function runMenuAction(id: SelfContainedMenuActionId): Promise<void
     // Emerald → "Switch vault…". With no vault open the picker is up already.
     case 'switch-vault':
       void openVaultPicker();
+      return;
+    // About and the updates are sections of the start page.
+    case 'show-about':
+      void openVaultPicker('about');
+      return;
+    case 'check-updates':
+      void openVaultPicker('updates');
       return;
   }
 

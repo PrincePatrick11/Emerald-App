@@ -10,14 +10,17 @@ import "tippy.js/dist/tippy.css";
 import "./fonts.css";
 import { applyEditorFont, applyEditorFontSize, applyTheme, applyUIFont, applyUIScale } from "./themes/theme";
 import { readAppearanceMirror } from "./lib/vaultSettings";
+import { readDeviceMirror } from "./lib/deviceSettings";
 import { platformName } from "./lib/platform";
 import { initSplash } from "./lib/splash";
 
-// Theme and fonts of the last opened vault before the first render — the
-// settingsStore only applies its own settings once the vault is loaded, and
-// nothing should flash until then (not even in the vault picker).
+// The device's theme and the last opened vault's fonts before the first
+// render, from their localStorage mirrors: `device.json` and the vault's
+// settings are only read once the app runs, and nothing should flash until
+// then (not even on the start page).
+const bootDevice = readDeviceMirror();
 const bootAppearance = readAppearanceMirror();
-applyTheme(bootAppearance.theme, bootAppearance.customThemes);
+applyTheme(bootDevice.theme, bootDevice.customThemes);
 applyUIFont(bootAppearance.uiFont);
 applyEditorFont(bootAppearance.editorFont);
 applyUIScale(bootAppearance.uiScale);
@@ -32,7 +35,7 @@ document.documentElement.dataset.platform = platformName;
 // above, so the app does not flash English briefly and then switch.
 // English is in the bundle; anything else loads a local chunk, which takes
 // single-digit milliseconds. If that fails, the app starts in English.
-const savedLanguage = bootAppearance.language;
+const savedLanguage = bootDevice.language;
 const languageReady =
   savedLanguage === "en" ? Promise.resolve() : changeAppLanguage(savedLanguage).catch(() => {});
 // Safety net: if the locale chunk unexpectedly never settles, the app

@@ -159,17 +159,19 @@ export default function LeftSidebarRail() {
             <VaultGlyph icon={activeVaultIcon} size={activeVaultIcon ? 17 : 18} />
           </RailButton>
           <RailButton
-            // The target page is captured here and the dot cleared immediately:
-            // it has done its job as soon as the window opens. The other way
-            // round, the gear would jump to "Updates" for the rest of the
-            // session — and clearing without this capture would mean the window
-            // opens on "General" again, because both state changes land in the
-            // same render.
+            // The target is captured here and the dot cleared immediately: it
+            // has done its job as soon as something opens. A found update
+            // leads to the start page's Updates, which is where installing
+            // lives now; a failed backup to the settings' Backup page.
             onClick={() => {
-              setSettingsPage(notice === 'update' ? 'updates' : notice === 'backup' ? 'backup' : 'general');
-              setSettingsOpen(true);
               setUpdateVersion(null);
-              if (notice === 'update') dotSeen = true;
+              if (notice === 'update') {
+                dotSeen = true;
+                void openVaultPicker('updates');
+                return;
+              }
+              setSettingsPage(notice === 'backup' ? 'backup' : 'general');
+              setSettingsOpen(true);
               if (notice === 'backup') markAutoBackupErrorSeen();
             }}
             title={

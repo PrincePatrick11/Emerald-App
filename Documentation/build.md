@@ -63,7 +63,7 @@ What remains for testing an update before shipping one:
 
 Pushing a `v*` tag runs `prepare-release` first; every build job hangs off it via `needs`, so a failure there costs no build minutes and leaves no half-finished release on GitHub. It does two things, in order:
 
-1. **Verifies the tag against all three version sites** — `package.json`, `src-tauri/tauri.conf.json` and `src-tauri/Cargo.toml` must be character-identical to the tag. `settings/AboutPage.tsx` imports `package.json` to show the version, while the bundle filename comes from `Cargo.toml`. A mismatch fails the job with an annotation naming the files.
+1. **Verifies the tag against all three version sites** — `package.json`, `src-tauri/tauri.conf.json` and `src-tauri/Cargo.toml` must be character-identical to the tag. `start/StartAbout.tsx` and `start/StartUpdates.tsx` import `package.json` to show the version, while the bundle filename comes from `Cargo.toml`. A mismatch fails the job with an annotation naming the files.
 2. **Extracts the changelog section for the version.** An `awk` pass pulls `## [<version>]` out of `CHANGELOG.md` as the release body. It does not fail on an empty result — if the section is still headed `## [Unreleased]`, the release is created with no notes and no complaint.
 
 After all three build jobs, **`publish-manifest` writes the `latest.json` the in-app updater reads** and attaches it to the release. It runs last on purpose: the manifest is the switch that makes a version visible to installed apps, so it must not exist before the bundles it points at. If a platform build fails, no manifest is written and installed apps keep seeing the previous release.

@@ -719,11 +719,118 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
   }
 
   .picker-side {
-    @apply flex flex-col min-h-0 overflow-y-auto;
-    width: 300px;
+    @apply flex flex-col min-h-0;
+    width: 340px;
     flex-shrink: 0;
-    /* The sheet's border plus its header's padding: both headings on one line. */
+    /* The sheet's border plus its header's padding: the tabs and the list's
+       heading on one line. */
     padding: 17px 14px 14px 20px;
+  }
+
+  /* One section at a time; it scrolls on its own, the tabs stay. */
+  .picker-side-body {
+    @apply flex flex-col flex-1 min-h-0 overflow-y-auto overflow-x-hidden pt-5;
+  }
+
+  /* The sections of the start page: pills like the tab strip's, on the frame. */
+  .start-tabs {
+    @apply flex items-center gap-0.5 h-[30px];
+  }
+
+  .start-tab {
+    @apply h-[26px] px-2.5 rounded-md text-xs transition-colors duration-150;
+    color: var(--text-subtle);
+  }
+
+  .start-tab:hover {
+    background-color: var(--tab-pill-hover);
+    color: var(--text-secondary);
+  }
+
+  .start-tab.start-tab-active {
+    background-color: var(--tab-pill-active);
+    color: var(--text-primary);
+  }
+
+  .start-tab:focus-visible,
+  .start-segment:focus-visible,
+  .start-option:focus-visible,
+  .start-option-remove:focus-visible {
+    outline: 2px solid var(--focus-ring);
+    outline-offset: 1px;
+  }
+
+  .start-label {
+    @apply text-xs mb-2;
+    color: var(--text-muted);
+  }
+
+  /* A choice of a few short words: one framed row, the chosen one filled. */
+  .start-segments {
+    @apply flex gap-px p-0.5 rounded-md border;
+    border-color: var(--border-soft);
+  }
+
+  .start-segment {
+    @apply flex-1 h-[26px] rounded text-xs transition-colors duration-150;
+    color: var(--text-muted);
+  }
+
+  .start-segment:hover {
+    color: var(--text-primary);
+  }
+
+  .start-segment.start-segment-active {
+    background-color: var(--tab-pill-active);
+    color: var(--text-primary);
+  }
+
+  /* A choice with more to say: a list of rows, the chosen one tinted. */
+  .start-option-row {
+    @apply relative flex items-center;
+  }
+
+  .start-option {
+    @apply flex items-center gap-2.5 w-full min-w-0 rounded-md px-2 py-1.5 text-sm text-left transition-colors duration-150;
+    color: var(--text-secondary);
+  }
+
+  .start-option:hover {
+    background-color: var(--interactive-hover);
+    color: var(--text-primary);
+  }
+
+  .start-option.start-option-active {
+    background-color: color-mix(in srgb, var(--accent) 12%, transparent);
+    color: var(--text-primary);
+  }
+
+  .start-option.start-option-active svg {
+    color: var(--accent);
+  }
+
+  .start-option-remove {
+    @apply absolute right-1.5 flex items-center justify-center w-5 h-5 rounded-md opacity-0 transition-opacity duration-150;
+    color: var(--text-subtle);
+  }
+
+  .start-option-row:hover .start-option-remove,
+  .start-option-remove:focus-visible {
+    opacity: 1;
+  }
+
+  .start-option-remove:hover {
+    color: var(--danger-text);
+  }
+
+  .start-notes {
+    @apply text-xs whitespace-pre-wrap font-sans max-h-32 overflow-y-auto rounded-md p-2;
+    background-color: var(--bg-surface-1);
+    color: var(--text-muted);
+  }
+
+  .start-link {
+    @apply flex items-center justify-center w-8 h-8 rounded-md transition-colors;
   }
 
   .picker-heading {
@@ -893,7 +1000,11 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
   @media (prefers-reduced-motion: reduce) {
     .picker-row,
     .picker-row-actions,
-    .picker-device-remove {
+    .picker-device-remove,
+    .start-tab,
+    .start-segment,
+    .start-option,
+    .start-option-remove {
       transition: none;
     }
   }

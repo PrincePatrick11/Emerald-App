@@ -2,9 +2,9 @@
 
 Emerald supports four languages: English (`en`), German (`de`), Spanish (`es`), and French (`fr`).
 
-The language is a **per-vault setting** (Settings → General → Language, part of `appearance` in the vault's `settings.json` — see [`database.md`](database.md#multi-vault-system) and [Vault Settings](architecture/storage.md#vault-settings)), applied through `settingsStore.loadForVault`/`update`.
+The language belongs to the **installation**, not to a vault: the start page's Appearance sets it, `store/deviceStore.ts` applies it and writes `{appDataDir}/device.json` (see [Device Settings](architecture/storage.md#device-settings)). It does not sync, and a vault's `settings.json` from before still holding it under `appearance` is no longer read.
 
-It is mirrored into `localStorage` (`app-language`) only as a boot-time starting point: `main.tsx` reads the mirror before any vault is open, so the app doesn't flash English while the vault's settings load. Once a vault has loaded, its `settings.json` is authoritative.
+It is mirrored into `localStorage` (`app-language`) as a boot-time starting point: `main.tsx` reads the mirror before the bundle can read `device.json`, so the app doesn't flash English. Once `device.json` is read, it is authoritative.
 
 ## Setup
 

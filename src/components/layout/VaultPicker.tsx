@@ -6,6 +6,10 @@ import Button from '../ui/Button';
 import { activeVault, hasActiveVault, useVaultStore } from '../../store/vaultStore';
 import { ensureVaultReady, VAULT_KEY_CANCELLED } from '../../store/vaultKeyStore';
 import { closeVaultPicker, useVaultPickerStore } from '../../store/vaultPickerStore';
+import StartTabs from './start/StartTabs';
+import StartAppearance from './start/StartAppearance';
+import StartUpdates from './start/StartUpdates';
+import StartAbout from './start/StartAbout';
 import { keyErrorOf } from '../../lib/vaultKeys';
 import { enterPickerWindow, leavePickerWindow } from '../../lib/pickerWindow';
 import { hideLoadingScreen, hideSplash, showLoadingScreen } from '../../lib/splash';
@@ -83,6 +87,7 @@ export default function VaultPicker() {
   const relocateVault = useVaultStore((s) => s.relocateVault);
   const removeVault = useVaultStore((s) => s.removeVault);
   const notice = useVaultPickerStore((s) => s.notice);
+  const section = useVaultPickerStore((s) => s.section);
 
   const [editor, setEditor] = useState<Editor>({ kind: 'none' });
   const [switchingId, setSwitchingId] = useState<string | null>(null);
@@ -507,7 +512,13 @@ export default function VaultPicker() {
       </main>
 
       <aside className="picker-side">
-        <PickerServerPanel server={server} />
+        <StartTabs section={section} />
+        <div className="picker-side-body">
+          {section === 'server' && <PickerServerPanel server={server} />}
+          {section === 'appearance' && <StartAppearance />}
+          {section === 'updates' && <StartUpdates />}
+          {section === 'about' && <StartAbout />}
+        </div>
       </aside>
     </div>
   );

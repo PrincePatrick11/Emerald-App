@@ -5,6 +5,7 @@ import { isAltarFullscreen, useUIStore } from '../../store/uiStore';
 import { reloadAllStores } from '../../store/moduleWiring';
 import { activeVault, closeToSetup, hasActiveVault, useVaultStore } from '../../store/vaultStore';
 import { useVaultPickerStore } from '../../store/vaultPickerStore';
+import { useDeviceStore } from '../../store/deviceStore';
 import { useSettingsStore } from '../../store/settingsStore';
 import { invoke } from '@tauri-apps/api/core';
 import { runMenuAction, NATIVE_MENU_EVENTS } from '../../lib/menuActions';
@@ -130,8 +131,10 @@ export default function AppShell() {
   const needsVault = !hasActiveVault({ vaults, activeVaultId });
 
   useEffect(() => {
-    // Load vault metadata first so getDb() knows which DB file to open
-    loadVaults().then(() => {
+    // Load vault metadata first so getDb() knows which DB file to open. The
+    // device's language and theme alongside: the start page shows them, and
+    // the first vault's settings may still have to lend them (`adoptFromVault`).
+    Promise.all([loadVaults(), useDeviceStore.getState().load()]).then(() => {
       // First start: there is no database yet to load anything from. The first
       // vault is activated through `switchVault`, which ends in
       // `reloadAllStores()` — this effect does not run again for that.
@@ -226,6 +229,8 @@ export default function AppShell() {
       entryList:       t('menu.entryList'),
       properties:      t('menu.properties'),
       switchVault:     t('menu.switchVault'),
+      about:           t('menu.about'),
+      checkUpdates:    t('menu.checkUpdates'),
       quit:            t('menu.quit'),
     }).catch(() => {/* desktop-only, ignore in browser preview */});
   }, [i18n.language, t]);

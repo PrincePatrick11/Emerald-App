@@ -1,67 +1,22 @@
 import { useTranslation } from 'react-i18next';
-import { ALargeSmall, Globe, Moon, Sun, Type } from 'lucide-react';
-import { LANGUAGE_OPTIONS } from '../../../i18n';
+import { ALargeSmall, Type } from 'lucide-react';
 import { useSettingsStore } from '../../../store/settingsStore';
 import {
-  EDITOR_FONT_SIZE_OPTIONS, FONT_OPTIONS, THEME_OPTIONS, UI_SCALE_OPTIONS, type FontId,
+  EDITOR_FONT_SIZE_OPTIONS, FONT_OPTIONS, UI_SCALE_OPTIONS, type FontId,
 } from '../../../themes/theme';
-import CustomThemesSection from './CustomThemesSection';
 import SettingsChoiceButton, { SettingsChoiceRow } from './SettingsChoiceButton';
 import SettingsSection, { SettingsDescription } from './SettingsSection';
 
-/** Language and appearance — what the app speaks in this vault and how it looks. */
+/** The vault's fonts and sizes. Language and theme belong to the device, on the start page. */
 export default function GeneralPage() {
   const { t } = useTranslation();
 
   const appearance = useSettingsStore((s) => s.settings.appearance);
   const update = useSettingsStore((s) => s.update);
 
-  const themeHintKeys = {
-    'emerald-noctis': 'settings.themeDarkHint',
-    'emerald-parchment': 'settings.themeLightHint',
-  } as const;
-
-  const themeIcons = {
-    'emerald-noctis': Moon,
-    'emerald-parchment': Sun,
-  } as const;
-
   return (
-    <>
-      <SettingsSection icon={<Globe size={14} />} title={t('settings.language')} description={t('settings.languageHint')}>
-        <SettingsChoiceRow>
-          {LANGUAGE_OPTIONS.map(({ code, label }) => (
-            <SettingsChoiceButton
-              key={code}
-              active={appearance.language === code}
-              onClick={() => update('appearance', { language: code })}
-            >
-              {label}
-            </SettingsChoiceButton>
-          ))}
-        </SettingsChoiceRow>
-      </SettingsSection>
-
-      <SettingsSection icon={<Sun size={14} />} title={t('settings.appearance')} description={t('settings.appearanceHint')}>
-        <div className="flex gap-2">
-          {THEME_OPTIONS.map(({ id, label }) => {
-            const Icon = themeIcons[id];
-            return (
-            <SettingsChoiceButton
-              key={id}
-              active={appearance.theme === id}
-              onClick={() => update('appearance', { theme: id })}
-              title={t(themeHintKeys[id])}
-              className="flex items-center gap-2"
-            >
-              <Icon size={14} />
-              {label}
-            </SettingsChoiceButton>
-            );
-          })}
-        </div>
-        <CustomThemesSection />
-        <div className="mt-4 space-y-3">
+      <SettingsSection icon={<Type size={14} />} title={t('settings.text')}>
+        <div className="space-y-3">
           <div>
             <label className="label-xs flex items-center gap-2 mb-1">
               <Type size={14} />
@@ -134,6 +89,5 @@ export default function GeneralPage() {
           </div>
         </div>
       </SettingsSection>
-    </>
   );
 }

@@ -1,6 +1,6 @@
 # Custom Themes
 
-A custom theme is a small JSON file. It sets colours and nothing else: spacing, layout, radius and fonts stay as they are, so any theme still works and still reads as Emerald. Settings → General → Import theme adds it to the open vault, and it travels with that vault's settings in a backup.
+A custom theme is a small JSON file. It sets colours and nothing else: spacing, layout, radius and fonts stay as they are, so any theme still works and still reads as Emerald. **Import theme** on the start page's Appearance adds it to this installation (`device.json`) and selects it. A backup from before themes moved to the installation still brings its custom themes along: importing it adds them to the list.
 
 ## Format
 

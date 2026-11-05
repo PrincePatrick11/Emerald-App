@@ -515,23 +515,33 @@ await test('a child read after its parent frame loses nothing once the log arriv
 console.log('Settings');
 
 await test('settings merge key by key, and this device keeps what it changed', async () => {
-  const start = { version: 1, appearance: { theme: 'a', uiFont: 'x', uiScale: 100 }, trash: { retentionDays: 30 } };
+  const start = { version: 1, appearance: { editorFont: 'a', uiFont: 'x', uiScale: 100 }, trash: { retentionDays: 30 } };
   const base = flattenSettings(start);
   assert.equal('appearance.uiScale' in base, false, 'the scale belongs to the screen');
   assert.equal('version' in base, false);
-  const deviceOnly = flattenSettings({ ...start, backup: { auto: true }, leftList: { limit: 5 }, appearance: { editorFontSize: 16 } });
+  const deviceOnly = flattenSettings({
+    ...start,
+    backup: { auto: true },
+    leftList: { limit: 5 },
+    appearance: { editorFontSize: 16, language: 'de', theme: 'emerald-parchment', customThemes: [] },
+  });
   assert.deepEqual(Object.keys(deviceOnly).filter((path) => !path.startsWith('trash.')), [], 'these belong to the device');
   const mine = structuredClone(start);
-  mine.appearance.theme = 'mine';
+  mine.appearance.editorFont = 'mine';
   mine.appearance.uiScale = 150;
-  assert.deepEqual(settingsDiff(base, flattenSettings(mine)), { 'appearance.theme': 'mine' });
-  const merged = mergeIncomingSettings(mine, base, { 'appearance.theme': 'theirs', 'appearance.uiFont': 'y', 'trash.retentionDays': null, 'appearance.uiScale': 90 });
+  assert.deepEqual(settingsDiff(base, flattenSettings(mine)), { 'appearance.editorFont': 'mine' });
+  const merged = mergeIncomingSettings(mine, base, {
+    'appearance.editorFont': 'theirs', 'appearance.uiFont': 'y', 'trash.retentionDays': null, 'appearance.uiScale': 90,
+    'appearance.theme': 'theirs', 'appearance.language': 'fr',
+  });
   assert.equal(merged.changed, true);
-  assert.equal(merged.settings.appearance.theme, 'mine');
+  assert.equal(merged.settings.appearance.editorFont, 'mine');
   assert.equal(merged.settings.appearance.uiFont, 'y');
   assert.equal(merged.settings.appearance.uiScale, 150);
+  assert.equal('theme' in merged.settings.appearance, false, 'a theme from an older device stays out');
+  assert.equal('language' in merged.settings.appearance, false, 'so does its language');
   assert.equal(merged.settings.trash.retentionDays, null);
-  assert.deepEqual(settingsDiff(merged.base, flattenSettings(merged.settings)), { 'appearance.theme': 'mine' }, 'still goes out');
+  assert.deepEqual(settingsDiff(merged.base, flattenSettings(merged.settings)), { 'appearance.editorFont': 'mine' }, 'still goes out');
   assert.equal(mergeIncomingSettings(start, base, base).changed, false);
 });
 

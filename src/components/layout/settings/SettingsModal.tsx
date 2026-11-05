@@ -1,6 +1,6 @@
 import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Archive, FileText, HardDrive, Info, PanelLeft, RefreshCw, ShieldCheck, SlidersHorizontal, Cloud } from 'lucide-react';
+import { Archive, FileText, HardDrive, PanelLeft, ShieldCheck, SlidersHorizontal, Cloud } from 'lucide-react';
 import Modal from '../../ui/Modal';
 import { useCloseOnKeepEditing } from '../../../hooks/useCloseOnKeepEditing';
 import GeneralPage from './GeneralPage';
@@ -9,11 +9,9 @@ import EntriesPage from './EntriesPage';
 import SecurityPage from './SecurityPage';
 import BackupPage from './BackupPage';
 import StoragePage from './StoragePage';
-import UpdatesPage from './UpdatesPage';
 import SyncPage from './SyncPage';
-import AboutPage from './AboutPage';
 
-export type SettingsPage = 'general' | 'sidebar' | 'entries' | 'security' | 'sync' | 'backup' | 'storage' | 'updates' | 'about';
+export type SettingsPage = 'general' | 'sidebar' | 'entries' | 'security' | 'sync' | 'backup' | 'storage';
 
 const PAGES = [
   { id: 'general', labelKey: 'settings.pageGeneral', Icon: SlidersHorizontal },
@@ -23,14 +21,13 @@ const PAGES = [
   { id: 'sync', labelKey: 'settings.pageSync', Icon: Cloud },
   { id: 'backup', labelKey: 'settings.backup', Icon: Archive },
   { id: 'storage', labelKey: 'settings.storage', Icon: HardDrive },
-  { id: 'updates', labelKey: 'settings.updates', Icon: RefreshCw },
-  { id: 'about', labelKey: 'settings.about', Icon: Info },
 ] as const;
 
 interface Props {
   onClose: () => void;
   /** Area the window opens with. The rail uses it to jump straight to
-   *  "Updates" when the check at startup has found something. */
+   *  "Backup" when an automatic backup failed. Updates and About are on the
+   *  start page (`VaultPicker`), with language and theme. */
   initialPage?: SettingsPage;
 }
 
@@ -100,8 +97,6 @@ export default function SettingsModal({ onClose, initialPage = 'general' }: Prop
         {page === 'sync' && <SyncPage />}
         {page === 'backup' && <BackupPage />}
         {page === 'storage' && <StoragePage />}
-        {page === 'updates' && <UpdatesPage />}
-        {page === 'about' && <AboutPage />}
       </div>
     </Modal>
   );

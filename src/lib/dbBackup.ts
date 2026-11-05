@@ -66,6 +66,7 @@ import { drainSerialized } from './serialize';
 import { importViaStaging } from './importStaging';
 import { importableSettings, isPlainObject, withSettingsGroups, writeVaultSettings, type SettingsGroup } from './vaultSettings';
 import { useSettingsStore } from '../store/settingsStore';
+import { useDeviceStore } from '../store/deviceStore';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Public types
@@ -1797,6 +1798,12 @@ export async function importDatabase(
 ): Promise<void> {
   // Unchecked from the file — from here on only in checked form.
   const backupSettings = importableSettings(backup.settings);
+  // A backup from before language and theme moved to the device may hold
+  // custom themes; they join this device's list (`adoptCustomThemes` checks
+  // them), while its language and selection do not apply here.
+  const backupThemes = isPlainObject(backup.settings) && isPlainObject(backup.settings.appearance)
+    ? backup.settings.appearance.customThemes
+    : undefined;
 
   // For the duration of the import the automatic editor saves are suspended,
   // in all three modes. replace keeps the original IDs and add-vault switches
@@ -1828,7 +1835,8 @@ export async function importDatabase(
     invalidateVaultCache();
 
     // Before switching into the folder: then the new vault opens right away with
-    // the backup's language and appearance, instead of the defaults first.
+    // the backup's fonts, instead of the defaults first.
+    if (backupThemes) useDeviceStore.getState().adoptCustomThemes(backupThemes);
     if (backupSettings) {
       // Just a nicety: if writing fails, the vault starts with the
       // defaults — the import itself should not get stuck on that.
@@ -1879,6 +1887,9 @@ export async function importDatabase(
 
     // Only after a successful swap: an aborted import leaves the
     // settings as they were, too.
+    if (backupThemes && (mode === 'replace' || settingsGroups.includes('appearance'))) {
+      useDeviceStore.getState().adoptCustomThemes(backupThemes);
+    }
     if (backupSettings) {
       const settingsStore = useSettingsStore.getState();
       if (mode === 'replace') {

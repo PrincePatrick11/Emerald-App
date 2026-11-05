@@ -34,7 +34,7 @@ Release scope for Emerald:
 
 - Version fields that must be character-identical: `package.json`, `src-tauri/tauri.conf.json`, `src-tauri/Cargo.toml`. Bumping the crate version also updates `src-tauri/Cargo.lock`.
 
-- `src/components/layout/settings/AboutPage.tsx` imports `package.json` directly and renders its version in the UI, so a mismatch between the fields ships a wrong version to users.
+- `src/components/layout/start/StartAbout.tsx` and `StartUpdates.tsx` import `package.json` directly and render its version in the UI, so a mismatch between the fields ships a wrong version to users.
 
 - `CHANGELOG.md`: rename `## [Unreleased]` (which may carry a `(targeting vX.Y.Z)` suffix) to `## [X.Y.Z] - YYYY-MM-DD`, and open a fresh empty `## [Unreleased]` above it. Keep a Changelog categories, plus the project's own `### Known Issues` category where it applies.
 

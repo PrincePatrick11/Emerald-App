@@ -13,9 +13,14 @@ export const SETTINGS_TABLE = '_settings';
 /**
  * What belongs to one device: sizes and lists depend on the screen in front of
  * you, and whether and how often a device backs up depends on that device.
+ * Language and theme left the vault for the device (`deviceSettings.ts`); a
+ * `settings.json` from before still carries them, and they must not travel.
  */
 const THIS_DEVICE_ONLY = (path: string) =>
-  path === 'appearance.uiScale'
+  path === 'appearance.language'
+  || path === 'appearance.theme'
+  || path === 'appearance.customThemes'
+  || path === 'appearance.uiScale'
   || path === 'appearance.editorFontSize'
   || path.startsWith('leftList.')
   || path.startsWith('backup.');

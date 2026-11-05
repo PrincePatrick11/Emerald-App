@@ -82,6 +82,8 @@ export function useTitleBarMenus() {
   // then Edit and View as submenus.
   const appMenu: MenuNode[] = [
     { kind: 'item', label: t('menu.switchVault'), onSelect: () => dispatchMenuAction('switch-vault') },
+    { kind: 'item', label: t('menu.checkUpdates'), onSelect: () => dispatchMenuAction('check-updates') },
+    { kind: 'item', label: t('menu.about'), onSelect: () => dispatchMenuAction('show-about') },
     { kind: 'separator' },
     ...[edit, view].map((menu): MenuNode => ({ kind: 'submenu', label: menu.label, children: menu.nodes })),
   ];

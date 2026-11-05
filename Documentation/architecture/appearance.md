@@ -34,10 +34,10 @@ A new themed component defines its own tokens (e.g. `--my-component-bg`) in both
 
 ### Normalization Flow
 
-Theme, fonts, interface size and editor text size are the open vault's **appearance settings** (`AppearanceSettings` in `src/lib/vaultSettings.ts`, see [Vault Settings](storage.md#vault-settings)). Each value is normalized before it is applied:
+Fonts, interface size and editor text size are the open vault's **appearance settings** (`AppearanceSettings` in `src/lib/vaultSettings.ts`, see [Vault Settings](storage.md#vault-settings)); the theme and the language belong to the installation (`DeviceSettings` in `src/lib/deviceSettings.ts`, see [Device Settings](storage.md#device-settings)). Each value is normalized before it is applied:
 
 ```
-settings.json ('appearance.theme'), or the localStorage boot mirror before a vault is open
+device.json ('theme'), or the localStorage boot mirror before it is read
     ↓
 normalizeThemeId(raw)
     ├─ raw is a valid ThemeId → return as-is
@@ -51,17 +51,16 @@ applyTheme(themeId)  →  document.documentElement.dataset.theme = themeId
 
 ### Theme and appearance application
 
-`applyAppearance(appearance)` in `store/settingsStore.ts` applies every appearance field the moment it changes — called from `loadForVault`, `update`, `clear` and `replaceSettings`, not from a `useEffect` in `App.tsx`:
+`applyAppearance(appearance)` in `store/settingsStore.ts` applies the vault's fonts and sizes the moment they change — called from `loadForVault`, `update`, `clear` and `replaceSettings`, not from a `useEffect` in `App.tsx`. Theme and language go the same way through `store/deviceStore.ts` (`applyTheme`, `changeAppLanguage`):
 
 ```ts
 // store/settingsStore.ts
 async function applyAppearance(appearance: AppearanceSettings) {
-  applyTheme(appearance.theme);
   applyUIFont(appearance.uiFont);
   applyEditorFont(appearance.editorFont);
   applyUIScale(appearance.uiScale);
   applyEditorFontSize(appearance.editorFontSize);
-  // …mirrors into localStorage, then changeAppLanguage(appearance.language)
+  // …then mirrors them into localStorage
 }
 ```
 

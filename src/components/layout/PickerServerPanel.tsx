@@ -62,7 +62,7 @@ export function useServerState(): ServerState {
   return { status, remotes, devices, reachable, loggedOut, refresh };
 }
 
-/** The right column of the picker: connect, or how the server stands. */
+/** The start page's server section: connect, or how the server stands. */
 export default function PickerServerPanel({ server }: { server: ServerState }) {
   const { t } = useTranslation();
   const lastSync = useSyncStore((s) => s.lastSync);
@@ -118,12 +118,9 @@ export default function PickerServerPanel({ server }: { server: ServerState }) {
 
   return (
     <div className="flex flex-col h-full min-h-0">
-      <div className="flex items-center justify-between gap-3 h-[30px] mb-4">
-        <h2 className="picker-heading">{t('sync.server')}</h2>
-        <span className="flex items-center gap-1.5 text-xs" style={{ color: 'var(--text-muted)' }}>
-          <span className={`picker-dot picker-dot-${tone}`} aria-hidden />
-          {stateLabel}
-        </span>
+      <div className="flex items-center gap-1.5 text-xs mb-4" style={{ color: 'var(--text-muted)' }}>
+        <span className={`picker-dot picker-dot-${tone}`} aria-hidden />
+        {stateLabel}
       </div>
 
       {!connected ? (

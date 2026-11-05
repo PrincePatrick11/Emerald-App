@@ -409,9 +409,12 @@ fn install_native_menu(app: &tauri::App) -> tauri::Result<()> {
     // the suffix from `tauri.dev.conf.json`: in the dev build the app is called
     // "Emerald App Dev", but the menu here is still just "Emerald App".
     let app_submenu = Submenu::with_items(app, "Emerald App", true, &[
-        &PredefinedMenuItem::about(app, None, None)?,
+        // Not `PredefinedMenuItem::about`: About, like the updates, is a
+        // section of the start page (`openVaultPicker` in the frontend).
+        &MenuItem::with_id(app, "show-about", "About Emerald App", true, None::<&str>)?,
+        &MenuItem::with_id(app, "check-updates", "Check for Updates…", true, None::<&str>)?,
         &PredefinedMenuItem::separator(app)?,
-        // Opens the vault picker in this same window (`openVaultPicker`).
+        // Opens the start page in this same window (`openVaultPicker`).
         &MenuItem::with_id(app, "switch-vault", "Switch Vault…", true, None::<&str>)?,
         &PredefinedMenuItem::separator(app)?,
         &PredefinedMenuItem::hide(app, None)?,
@@ -508,6 +511,8 @@ fn install_native_menu(app: &tauri::App) -> tauri::Result<()> {
             "reset-sidebar-widths" => { app.emit("reset-sidebar-widths", ()).ok(); }
             "show-splash"          => { app.emit("show-splash", ()).ok(); }
             "switch-vault"         => { app.emit("switch-vault", ()).ok(); }
+            "show-about"           => { app.emit("show-about", ()).ok(); }
+            "check-updates"        => { app.emit("check-updates", ()).ok(); }
             "toggle-rail"          => { app.emit("toggle-rail", ()).ok(); }
             "toggle-left-list"     => { app.emit("toggle-left-list", ()).ok(); }
             "toggle-right-sidebar" => { app.emit("toggle-right-sidebar", ()).ok(); }
@@ -671,6 +676,8 @@ fn update_menu_labels(
     entry_list: String,
     properties: String,
     switch_vault: String,
+    about: String,
+    check_updates: String,
     quit: String,
 ) {
     use tauri::menu::MenuItemKind;
@@ -710,6 +717,8 @@ fn update_menu_labels(
                         "reset-sidebar-widths" => Some(reset_view.as_str()),
                         "show-splash"          => Some(show_splash.as_str()),
                         "switch-vault"         => Some(switch_vault.as_str()),
+                        "show-about"           => Some(about.as_str()),
+                        "check-updates"        => Some(check_updates.as_str()),
                         "quit"                 => Some(quit.as_str()),
                         _ => None,
                     };
@@ -887,6 +896,8 @@ pub fn run() {
             vault::prune_migration_backups,
             vault::read_vault_settings,
             vault::write_vault_settings,
+            vault::read_device_settings,
+            vault::write_device_settings,
             vault::read_vault_drafts,
             vault::write_vault_drafts,
             export_image,

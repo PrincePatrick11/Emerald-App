@@ -1,7 +1,7 @@
 import { create } from 'zustand';
-import { changeAppLanguage } from '../i18n';
-import { applyEditorFont, applyEditorFontSize, applyTheme, applyUIFont, applyUIScale } from '../themes/theme';
+import { applyEditorFont, applyEditorFontSize, applyUIFont, applyUIScale } from '../themes/theme';
 import { serialized } from '../lib/serialize';
+import { useDeviceStore } from './deviceStore';
 import {
   APPEARANCE_MIRROR_KEYS, DEFAULT_VAULT_SETTINGS, initialSettingsFor, normalizeVaultSettings,
   readVaultSettings, writeVaultSettings,
@@ -28,31 +28,23 @@ interface SettingsState {
 }
 
 /**
- * The appearance applies immediately — and is additionally stored under the old
- * localStorage keys. Startup reads those before a vault is open
- * (`index.html`, `main.tsx`), so the app does not flash Noctis and English
- * first and then switch.
+ * The vault's fonts and sizes apply immediately — and are additionally stored
+ * under the old localStorage keys, which startup reads before a vault is open
+ * (`main.tsx`). Language and theme belong to the device (`deviceStore`).
  */
 async function applyAppearance(appearance: AppearanceSettings): Promise<void> {
-  applyTheme(appearance.theme, appearance.customThemes);
   applyUIFont(appearance.uiFont);
   applyEditorFont(appearance.editorFont);
   applyUIScale(appearance.uiScale);
   applyEditorFontSize(appearance.editorFontSize);
   try {
-    localStorage.setItem(APPEARANCE_MIRROR_KEYS.theme, appearance.theme);
-    localStorage.setItem(APPEARANCE_MIRROR_KEYS.customThemes, JSON.stringify(appearance.customThemes));
     localStorage.setItem(APPEARANCE_MIRROR_KEYS.uiFont, appearance.uiFont);
     localStorage.setItem(APPEARANCE_MIRROR_KEYS.editorFont, appearance.editorFont);
     localStorage.setItem(APPEARANCE_MIRROR_KEYS.uiScale, String(appearance.uiScale));
     localStorage.setItem(APPEARANCE_MIRROR_KEYS.editorFontSize, String(appearance.editorFontSize));
   } catch {
-    // Without the mirror, at worst the default theme flashes on the next start.
+    // Without the mirror, at worst the default fonts flash on the next start.
   }
-  // Writes its mirror itself once the bundle is loaded.
-  await changeAppLanguage(appearance.language).catch((err) => {
-    console.error('[settings] language switch failed', err);
-  });
 }
 
 /** Write jobs run one after another, otherwise an early state overtakes a later one. */
@@ -74,6 +66,9 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
     const fallback = initialSettingsFor(vaultId);
     const settings = stored ?? (corrupt ? { ...fallback, trash: { ...fallback.trash, retentionDays: null } } : fallback);
     set({ vaultId, settings });
+    // The first start after language and theme moved to the device, with no
+    // mirror to take them from: this vault's old values become the device's.
+    useDeviceStore.getState().adoptFromVault(stored?.appearance);
     await applyAppearance(settings.appearance);
     // Persist the initial values right away: otherwise the vault would get the
     // migration snapshot again on the next open instead of what applied.

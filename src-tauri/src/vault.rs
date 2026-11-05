@@ -39,6 +39,12 @@ const SETTINGS_TEMP_FILE: &str = "settings.json.tmp";
 /// Far above anything the settings page can produce — a guard against a
 /// runaway write, not a format limit.
 const SETTINGS_MAX_BYTES: u64 = 256 * 1024;
+/// The installation's own settings — language and theme, custom themes
+/// included — in the app data directory, beside [`VAULTS_FILE`]: there before
+/// any vault is unlocked, and no vault or backup brings it along. The frontend
+/// owns its shape (`deviceSettings.ts`).
+const DEVICE_FILE: &str = "device.json";
+const DEVICE_TEMP_FILE: &str = "device.json.tmp";
 /// The unsaved drafts of the vault's block and template pages, written along
 /// while they are being edited so that a crash takes nothing that was typed.
 /// The frontend owns the shape; Rust only moves the text.
@@ -900,6 +906,21 @@ pub fn write_vault_settings(app: tauri::AppHandle, vault_id: String, contents: S
     let dir = vault_dir(&app, &vault_id)?;
     directory_state(&dir)?;
     write_settings_in(&dir, &contents)
+}
+
+/// `{appDataDir}/device.json` — same answers as [`read_vault_settings`].
+#[tauri::command(async)]
+pub fn read_device_settings(app: tauri::AppHandle) -> Result<VaultFileRead, String> {
+    let dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
+    Ok(read_json_in(&dir, DEVICE_FILE, SETTINGS_MAX_BYTES))
+}
+
+/// Replaces `{appDataDir}/device.json`; a JSON object, like the vault's settings.
+#[tauri::command(async)]
+pub fn write_device_settings(app: tauri::AppHandle, contents: String) -> Result<(), String> {
+    let dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
+    std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    write_json_in(&dir, DEVICE_FILE, DEVICE_TEMP_FILE, SETTINGS_MAX_BYTES, &contents)
 }
 
 /// The vault's `drafts.json` — same answers as [`read_vault_settings`]. In an
