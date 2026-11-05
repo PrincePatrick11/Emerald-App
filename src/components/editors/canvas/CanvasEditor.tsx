@@ -851,11 +851,13 @@ const CanvasEditor = forwardRef<CanvasEditorHandle, CanvasEditorProps>(function 
             </Layer>
             {editable && (
               <Layer>
-                {/* Where a selection reaches past the artboard, a quiet outline shows its edge. */}
-                <Rect
-                  x={view.x} y={view.y} width={width * view.zoom} height={height * view.zoom}
-                  stroke={accent} strokeWidth={1} opacity={0.25} listening={false}
-                />
+                {/* Where a selection reaches past the artboard, a quiet outline shows its edge; fixed on one drawing, its frame is the edge. */}
+                {!paintElementId && (
+                  <Rect
+                    x={view.x} y={view.y} width={width * view.zoom} height={height * view.zoom}
+                    stroke={accent} strokeWidth={1} opacity={0.25} listening={false}
+                  />
+                )}
                 <Group x={view.x} y={view.y} scaleX={view.zoom} scaleY={view.zoom} listening={false}>
                   {guides.map((g, i) => (
                     <Line

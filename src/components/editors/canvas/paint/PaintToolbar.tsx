@@ -85,7 +85,8 @@ export function PaintToolRail({ api, features }: { api: PaintControls; features:
  * The canvas editor's bar in the paint mode, in the app's toolbar style
  * (`.editor-toolbar`, shared buttons from `editors/shared/`); the tools
  * themselves are in `PaintToolRail`. What is always there keeps its place:
- * undo and redo, colour and size of the brush, symmetry and the layer
+ * undo and redo, the colours and the size slider of the brush (right in the
+ * bar, no click to open them), symmetry and the layer
  * panel's switch. What only the picked tool has (filled or outlined, the
  * corners of a polygon or points of a star) comes after them, so showing it
  * moves nothing; emptying and leaving the paint mode are at the far end.
@@ -116,58 +117,48 @@ export default function PaintToolbar({ api, features, palette, layersOpen, onTog
 
       <ToolbarDivider />
       <ToolbarGroup>
-        <PopoverButton
-          icon={<span className="paint-color-chip" style={{ backgroundColor: api.color }} />}
-          title={t('editor.paint.color')}
-          active={false}
-        >
-          {(close) => (
-            <div className="flex items-center gap-1 px-1">
-              {palette.map((c) => (
-                <button
-                  key={c}
-                  type="button"
-                  className={`editor-color-swatch${api.color === c ? ' editor-color-swatch--active' : ''}`}
-                  style={{ background: c }}
-                  title={c}
-                  onClick={() => { api.setColor(c); close(); }}
-                />
-              ))}
-              {features.customColor && (
-                <label className="paint-custom-color" title={t('editor.paint.customColor')}>
-                  <input
-                    type="color"
-                    value={api.color}
-                    onChange={(e) => api.setColor(e.target.value.toLowerCase())}
-                  />
-                </label>
-              )}
-            </div>
+        <div className="paint-swatches" role="radiogroup" aria-label={t('editor.paint.color')}>
+          {palette.map((c) => (
+            <button
+              key={c}
+              type="button"
+              role="radio"
+              aria-checked={api.color === c}
+              className={`editor-color-swatch${api.color === c ? ' editor-color-swatch--active' : ''}`}
+              style={{ background: c }}
+              title={c}
+              onClick={() => api.setColor(c)}
+            />
+          ))}
+          {features.customColor && (
+            <label
+              className={`paint-custom-color${palette.includes(api.color) ? '' : ' paint-custom-color--active'}`}
+              title={t('editor.paint.customColor')}
+              style={palette.includes(api.color) ? undefined : { background: api.color }}
+            >
+              <input type="color" value={api.color} onChange={(e) => api.setColor(e.target.value.toLowerCase())} />
+            </label>
           )}
-        </PopoverButton>
-        <PopoverButton
-          icon={<span className="editor-toolbar-btn-label paint-size-label">{api.size}</span>}
-          title={t('editor.paint.size')}
-          active={false}
-        >
-          {() => (
-            <div className="paint-size-panel">
-              <span className="paint-size-preview">
-                <span style={{ width: Math.min(api.size, 40), height: Math.min(api.size, 40), backgroundColor: api.tool === 'eraser' ? undefined : api.color }} />
-              </span>
-              <input
-                type="range"
-                min={PAINT_SIZE_MIN}
-                max={PAINT_SIZE_MAX}
-                value={api.size}
-                onChange={(e) => api.setSize(Number(e.target.value))}
-                className="paint-size-slider accent-accent"
-                aria-label={t('editor.paint.size')}
-              />
-              <span className="paint-size-value">{api.size}</span>
-            </div>
-          )}
-        </PopoverButton>
+        </div>
+      </ToolbarGroup>
+
+      <ToolbarDivider />
+      <ToolbarGroup>
+        <label className="paint-size-inline" title={t('editor.paint.size')}>
+          <span className="paint-size-dot">
+            <span style={{ width: Math.max(2, Math.min(api.size, 18)), height: Math.max(2, Math.min(api.size, 18)), backgroundColor: api.tool === 'eraser' ? undefined : api.color }} />
+          </span>
+          <input
+            type="range"
+            min={PAINT_SIZE_MIN}
+            max={PAINT_SIZE_MAX}
+            value={api.size}
+            onChange={(e) => api.setSize(Number(e.target.value))}
+            className="paint-size-slider accent-accent"
+            aria-label={t('editor.paint.size')}
+          />
+          <span className="paint-size-value">{api.size}</span>
+        </label>
       </ToolbarGroup>
 
       {(features.symmetry || features.layers) && (<>
