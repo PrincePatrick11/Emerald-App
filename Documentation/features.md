@@ -195,7 +195,7 @@ The grid also appears in thumbnails and exported images.
 
 **Loading screen.** On startup, before the app is ready, a loading screen covers the window: a breathing emerald gem with twinkling facets, the wordmark and a progress rail, on the app's own dark background. It fades as soon as your vault's data (or, without one, the [vault picker](#vaults)) is ready, however fast that is, and comes back while a vault chosen in the picker opens. If a password question comes first, the loading screen returns after you answer it and stays until the vault has loaded; a keychain prompt does not count against its time limit. **View → Show Loading Screen** replays it; a click or Escape closes it.
 
-**Window title bar and frame.** The app draws its own title bar: the Emerald logo (decoration, centred above the rail), on Windows and Linux one menu button holding Switch Vault… and the Edit and View menus, a magnifier for [Search](#search) (hidden while no vault is open), back/forward through the view history, on Windows and Linux an Export and an Import menu button, the open tabs, and — on Windows and Linux — the minimise / maximise / close buttons. macOS keeps its native window buttons and menu bar, so its title bar shows only the logo, search and navigation. The minimum window width is 720px. Over the [vault picker](#vaults) the title bar holds only the logo and, on Windows and Linux, minimise and close.
+**Window title bar and frame.** The app draws its own title bar: the Emerald logo (decoration, centred above the rail), on Windows and Linux one menu button holding Switch Vault…, Check for Updates…, About Emerald App and the Edit and View menus, a magnifier for [Search](#search) (hidden while no vault is open), back/forward through the view history, on Windows and Linux an Export and an Import menu button, the open tabs, and — on Windows and Linux — the minimise / maximise / close buttons. macOS keeps its native window buttons and menu bar, so its title bar shows only the logo, search and navigation. The minimum window width is 720px. Over the [vault picker](#vaults) the title bar holds only the logo and, on Windows and Linux, minimise and close.
 
 The title bar, the rail and the left entry list share one plain background with no dividers, framing the window; the main content and the right sidebar form a rounded surface on top of it, so an entry's content and its properties read as one while the navigation stays in the background.
 
@@ -219,7 +219,7 @@ If the entry was just created and never confirmed with Done, Cancel moves it to 
 - **Save** (like Done), **Discard** (like Cancel — a brand-new entry goes to the Trash), or **Keep editing**. Escape, the X and a click beside the dialog mean Keep editing.
 - Switching to another tab does not ask — the edit simply continues there. Closing a background tab with changes brings it to the front first, so you see what the question is about.
 - Without changes, nothing asks.
-- If the question came from the Settings or Vaults window (an import, an update, a vault switch), **Keep editing** closes that window too.
+- If the question came from the Settings window or on the way to the start page (an import, an update, a vault switch), **Keep editing** closes the Settings window too and stays on the page.
 
 The same applies to an altar and to the page of one of your own blocks or a template.
 
@@ -379,7 +379,7 @@ Tags, categories, your own blocks, templates and the Lexicon's languages also go
 
 ## Vaults
 
-A vault is a **folder** you choose, holding its own encrypted database and its own images — see [Vault Layout](architecture/storage.md#vault-layout) for the on-disk layout and [Vault Encryption](#vault-encryption) for the password. Because nothing inside it refers to a location, a vault folder can be copied to another machine and opened there. A vault can carry its own icon — any emoji, shown on its card and on the Vault rail button while it is active; without one, both show the plain vault glyph.
+A vault is a **folder** you choose, holding its own encrypted database and its own images — see [Vault Layout](architecture/storage.md#vault-layout) for the on-disk layout and [Vault Encryption](#vault-encryption) for the password. Because nothing inside it refers to a location, a vault folder can be copied to another machine and opened there. A vault can carry its own icon — any emoji, shown on its row on the start page and on the Vault rail button while it is active; without one, both show the plain vault glyph.
 
 **The start page.** Emerald normally opens the vault that was open last, straight away; with a single vault you never see a choice. The start page (the vault picker) is a view of its own in the same window: the window takes a fixed small size and shows only the start page — the open vault's pages stay out of sight while you choose — and once you choose a vault the loading screen covers the switch and the window returns to its earlier size and place (maximised or fullscreen included).
 
@@ -406,7 +406,7 @@ New vaults are not switched to automatically — except while no vault is open, 
 A vault can sync with your other devices through a server of your own, which only ever stores it encrypted; how that works is in [Sync](architecture/sync.md). Everything about the server is in the vault picker, so it works with no vault open — on a new device that is how the first vault arrives:
 
 - **Connect** with the server's address and its sync key. The key is asked for once and not kept; the connection goes to the system keychain, and one line warns that refusing the keychain leaves it in a file on this device, only obscured, not securely encrypted. The panel says so while that is the case.
-- Connected, the panel shows the address, whether the server answers (a dot beside its name), the last sync of this session, how many devices are connected and the space the server holds. The vaults on it are in the list on the left.
+- Connected, the panel shows the address, whether the server answers (a dot beside the status line), the last sync of this session, how many devices are connected and the space the server holds. The vaults on it are in the list on the left.
 - **Devices**, each with when it was last seen; pointing at one offers to remove it. Whoever still knows the key can connect again.
 - **Disconnect server** (after a confirmation) stops syncing on this device; vaults stay here and on the server, and connecting the same server again resumes them.
 
@@ -414,7 +414,7 @@ Settings → Sync covers only the open vault: **Put on server** (it has to be op
 
 ## Vault Encryption
 
-Every vault is encrypted: entries, images, drafts and backups are unreadable without the vault's password. Someone who gets hold of the vault folder — a lost laptop, a cloud folder, a copied backup drive — sees nothing of your practice. Settings (theme, fonts, limits) are the one thing left readable; they hold no content.
+Every vault is encrypted: entries, images, drafts and backups are unreadable without the vault's password. Someone who gets hold of the vault folder — a lost laptop, a cloud folder, a copied backup drive — sees nothing of your practice. Settings are the one thing left readable — the vault's `settings.json` (fonts, limits, rules) and the installation's `device.json` (language, theme, custom themes); they hold no content.
 
 **A new vault** asks for a password (at least eight characters, entered twice) before it opens, and then shows its **recovery key**. The recovery key is the only way back in if the password is forgotten. It is shown once; write it down or keep it in a password manager — not inside the vault itself — and tick the box that says it is stored before continuing.
 
@@ -501,7 +501,7 @@ The whole vault can be backed up and restored as one self-contained file (`.emer
 **Export.**
 
 - A "What to include" chip row picks the content: Journal, Wiki, Operations, Altars, Tasks, Tags, Lexicon and Settings. Templates and your own blocks travel whenever Journal, Wiki or Operations is included.
-- The Settings chip (on by default) exports the vault's settings — language, theme, fonts, sizes, trash retention, sidebar, emoji defaults, image limits, tag rule, template rule, automatic backup — independently of the content chips.
+- The Settings chip (on by default) exports the vault's settings — fonts, sizes, trash retention, sidebar, emoji defaults, image limits, tag rule, template rule, automatic backup — independently of the content chips. Language and theme belong to the installation and are not part of it; the custom themes an older backup still carries join this installation's list when it is imported.
 - Optional from/to dates restrict entries to those created in that window (tags, categories, blocks, templates, languages and settings are not date-filtered).
 - Trashed items are left out unless **Include deleted** is ticked — tags included, since trashed entries carry their ids.
 - Images referenced by exported entries are embedded.
@@ -565,6 +565,7 @@ Settings are **per vault** — stored in the vault's own `settings.json`. Switch
 - **Sidebar** — which list the left entry list shows (all items together, or one module's own), and how many entries it lists before "Show more".
 - **Entries** — the emoji picker's default set, size limits for inserted images, whether new tags may appear on the spot (typed, from a template, from an import), whether a new entry starts with its default template, **Automatic formatting** (Markdown shortcuts such as `# ` or `**bold**`; typography such as curly quotes, dashes, arrows and fractions; auto-links for typed or pasted addresses — each its own switch, applying to editors opened afterwards), and whether journal entries show their **moon phase** (see [Journal](#journal)).
 - **Security** — remember on this device, lock now, change password (see [Vault Encryption](#vault-encryption)).
+- **Sync** — the open vault on the server: put it there, disconnect or connect it again, delete it there, its state and last sync, Sync now; the server itself is on the start page (see [Sync Server](#sync-server)).
 - **Backup** — see [Vault Backup](#vault-backup-emeralddb).
 - **Storage** — how long the Trash keeps deleted items, and the unused-images cleanup (see [Image Storage and Cleanup](#image-storage-and-cleanup)).
 

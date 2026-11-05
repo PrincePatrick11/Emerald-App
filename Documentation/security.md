@@ -16,6 +16,13 @@ Tauri 2 uses capability files to declare which permissions each window receives.
     "core:window:allow-destroy",
     "core:window:allow-unminimize",
     "core:window:allow-set-focus",
+    "core:window:allow-set-size",
+    "core:window:allow-set-min-size",
+    "core:window:allow-set-position",
+    "core:window:allow-set-resizable",
+    "core:window:allow-maximize",
+    "core:window:allow-unmaximize",
+    "core:window:allow-set-fullscreen",
     "core:webview:allow-set-webview-zoom",
     "dialog:allow-save",
     "dialog:allow-open",
@@ -27,6 +34,7 @@ Tauri 2 uses capability files to declare which permissions each window receives.
 
 - **`allow-start-dragging`, `allow-minimize`, `allow-toggle-maximize`, `allow-close`** serve the custom title bar: on Windows and Linux the window is undecorated, the HTML window buttons (`WindowControls.tsx`) drive it over IPC, and the bar starts window dragging. They widen what a compromised frontend could do only marginally (annoyance-level window manipulation, no data access).
 - **`allow-destroy`, `allow-unminimize`, `allow-set-focus`** serve the question about unsaved edits (see [Leaving an edit](architecture/editing.md#leaving-an-edit)). The last two make sure the question, asked while the window is minimised, is seen. `allow-destroy` is needed because with an `onCloseRequested` handler registered (`AppShell.tsx`), Tauri's JS API closes the window through `destroy()` once the handler returns without preventing it. `destroy` reaches the same windows `close` does and only skips the close-requested event — nothing a frontend that may already `close` could not do.
+- **`allow-set-size`, `allow-set-min-size`, `allow-set-position`, `allow-set-resizable`, `allow-maximize`, `allow-unmaximize`, `allow-set-fullscreen`** serve the start page (`lib/pickerWindow.ts`): it shrinks the window to a fixed size while it is up, leaving maximised or fullscreen first, and puts size, place and state back afterwards — fullscreen is needed for that way back. They let a compromised frontend move, resize and maximise its own window, or make it fullscreen: a window covering the whole screen could imitate the system or another app (a fake password prompt, say). That is the one risk here beyond annoyance; it reaches no data, and the frontend could draw such a prompt inside the window anyway.
 - **`core:webview:allow-set-webview-zoom`** backs the interface-size setting: `applyUIScale()` in `src/themes/theme.ts` calls `getCurrentWebview().setZoom(scale / 100)`. It only scales rendering — no data access.
 - **`dialog:allow-message`** backs the native success/error popups (`message()` from `@tauri-apps/plugin-dialog`) that export/import report through (`src/lib/export.ts`, `src/lib/emeraldFormat.ts`, `src/lib/altarExport.ts`).
 - **No SQL permissions.** The database is reached through the app's own commands (`db_*`), which need no capability entry, not through a plugin. What the webview can do with SQL is bounded in Rust instead: by vault id instead of path, and by an authorizer on every connection (see [Vault Encryption](#vault-encryption)).
@@ -124,10 +132,10 @@ The mechanics are in [`architecture/encryption.md`](architecture/encryption.md);
 - **Plaintext that left the vault is not recalled.** Backups exported before encryption and kept outside the vault folder, exports (`.emerald`, Markdown, PDF), and earlier copies in cloud version history stay as they are. Deleted plain files may be recoverable from an SSD or a snapshot; only full-disk encryption (BitLocker, FileVault, LUKS) closes that gap.
 - **Legacy images keep their old names.** An image adopted from the pre-per-vault shared pool into an encrypted vault is sealed but keeps its SHA-256 name until the next password change.
 - **No cross-process lock.** Two Emerald processes on one vault — the release build and a dev build, say — are not coordinated; a password change in one while the other has the vault open is unsupported.
-- **The sync token** goes to the OS keychain. With no keychain, or one that refused, it and the key for vault names lie in `{appDataDir}/sync.json`, sealed under a key built into the app. That keeps them from being read at a glance or found by a tool that scans files for tokens, and is otherwise worth nothing, since the key is in the public source: the connect form warns of that and the Sync page says so while it is the case. Whoever reads the file can use the server as this device, and can see vault names, but opens no vault without its password. `guarded_read_path` refuses the file, so the webview cannot read it, and on Unix it is for this account only.
+- **The sync token** goes to the OS keychain. With no keychain, or one that refused, it and the key for vault names lie in `{appDataDir}/sync.json`, sealed under a key built into the app. That keeps them from being read at a glance or found by a tool that scans files for tokens, and is otherwise worth nothing, since the key is in the public source: the connect form warns of that and the start page's server section says so while it is the case. Whoever reads the file can use the server as this device, and can see vault names, but opens no vault without its password. `guarded_read_path` refuses the file, so the webview cannot read it, and on Unix it is for this account only.
 - **macOS builds are unsigned.** After an update the keychain may ask whether the app may read its entry again; the choice is the user's. On a build the entry does not yet trust, macOS was measured asking twice for a single read. "Allow" holds for that read only; "Always Allow" in both prompts holds until the binary changes.
 - **Windows keychain entries are written with `CRED_PERSIST_ENTERPRISE`**, the `keyring` crate's setting, so on a domain profile with roaming enabled they may roam with the profile.
-- **`settings.json` is plain**, deliberately: it holds no entry content (appearance includes the names and colours of imported themes) and is read before any vault is unlocked.
+- **`settings.json` and `device.json` are plain**, deliberately: neither holds entry content. A vault's `settings.json` holds its fonts, sizes, limits and rules, and is read before the database opens; `{appDataDir}/device.json` holds the installation's language, theme and custom themes (their names and colours) and is read before any vault is unlocked. A `settings.json` written before still carries the language and theme it had, unread.
 
 ## Vault Directories as a Trust Boundary
 
@@ -175,7 +183,7 @@ The directories go last with plain `remove_dir`, which fails while anything else
 
 ### Vault JSON files
 
-`settings.json` and `drafts.json` are read and written by vault id, through the same registry, never by path. `drafts.json` is sealed in an encrypted vault ([Vault Encryption](#vault-encryption)); `settings.json` is plain.
+`settings.json` and `drafts.json` are read and written by vault id, through the same registry, never by path; `device.json` by no argument at all, in the app data directory. An unreadable `device.json` (no JSON object, too large, no plain file) is renamed to `device.json.bad`, never removed, and so is a `sync.json` that does not parse (`sync.json.bad`, which `guarded_read_path` refuses like `sync.json`). `drafts.json` is sealed in an encrypted vault ([Vault Encryption](#vault-encryption)); `settings.json` is plain.
 
 - **Writes** accept only a JSON object, at most 256 KB for settings (`SETTINGS_MAX_BYTES`, far above what the settings page produces — a guard against a runaway write) and 4 MiB for drafts (`DRAFTS_MAX_BYTES`). They write a `.tmp` file, `fsync` it and `rename` it over the real one, so a crash mid-write leaves the previous file (`vault.key` is written the same way). A symlink is never followed under either name: the temp name is cleared and opened with `create_new`, and `rename` replaces a link at the target without following it. An empty drafts object removes `drafts.json` instead.
 - **Reads** use `symlink_metadata` (matching `guarded_read_path`) and return a tagged `Missing`/`Found`/`Unreadable` result. Only "the vault directory itself is gone" is an error: a file that exists but isn't a plain, readable, size-capped file must not block opening the vault, so the frontend falls back to defaults and leaves it alone.

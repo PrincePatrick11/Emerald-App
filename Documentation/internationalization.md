@@ -10,7 +10,7 @@ It is mirrored into `localStorage` (`app-language`) as a boot-time starting poin
 
 Translations are managed with `react-i18next`; the setup lives in `src/i18n/index.ts`. Only `en` — the startup and fallback language — is imported statically. `de`/`es`/`fr` load on demand as their own chunks, like the emoji search data (`src/lib/emojiSearch.ts`). `LANGUAGE_OPTIONS` in the same file is the one list of available languages.
 
-**Always switch languages through `changeAppLanguage(lang)`.** It loads the bundle (and the matching date-fns locale) before calling `i18n.changeLanguage`, then writes the `localStorage` mirror and `<html lang>`, and lets the last of two racing switches win. A direct `i18n.changeLanguage` would switch to a not-yet-registered locale and render the English fallback. The callers are `settingsStore`'s `applyAppearance` and the startup path in `main.tsx`.
+**Always switch languages through `changeAppLanguage(lang)`.** It loads the bundle (and the matching date-fns locale) before calling `i18n.changeLanguage`, then writes the `localStorage` mirror and `<html lang>`, and lets the last of two racing switches win. A direct `i18n.changeLanguage` would switch to a not-yet-registered locale and render the English fallback. The callers are `deviceStore`'s `apply` and the startup path in `main.tsx`.
 
 Weekday names (the automatic backup's weekday chips) come from `formatWeekday` and `weekdaysInLocaleOrder` in `lib/formatDate.ts`, i.e. from the date-fns locale, so they need no keys of their own.
 
@@ -95,7 +95,10 @@ Top-level keys of `en.json`, with the conventions worth knowing:
 | `properties` | Right sidebar Properties panel |
 | `filters` | Filter panel; `all` is the "All" row every `FilterList` shows on top |
 | `vault` | `VaultPicker`: list/switch, edit, create, open/relocate, delete, the way back. Some keys (`chooseFolder`, `defaultFolder`, `alreadyOpen`, `accessDenied`, `folderHasVault`, `folderNotEmpty`) also serve the backup import's add-vault mode via `VaultLocationRow` and `NEW_VAULT_TARGET_ERROR_KEY` |
-| `settings` | Settings modal |
+| `settings` | Settings modal, and on the start page the keys its sections share with it (language, theme, custom themes, updates, About) |
+| `start` | The start page's section tabs |
+| `createItem` | The rail's plus: `CreateItemModal` |
+| `sync` | The sync server: the start page's server section, Settings → Sync, the vault list's state marks, sync errors |
 | `vaultKey` | `VaultKeyDialog` and its shared parts: unlock, create, encrypt, recover, the recovery-key box, the "remember on this device" switch and the failure texts (`wrongPassword`, `tooShort` with `{{count}}`, …) |
 | `security` | Settings → Security: remember, lock, change password, each with a hint and a tooltip |
 | `backupKey` | `BackupUnlockDialog`: opening an encrypted backup |

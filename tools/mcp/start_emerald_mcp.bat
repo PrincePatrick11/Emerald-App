@@ -73,13 +73,13 @@ if not exist "node_modules\.bin\tauri.cmd" (
 REM Give a brand-new instance a vault with test data in it. Skips an instance
 REM that already has a vaults.json, so one you have been working in is never
 REM touched. Failure here is not fatal: the app then simply starts into its
-REM normal first-run vault setup.
+REM normal first-run vault picker.
 set "EMERALD_MCP_SEED_ARGS="
 if /i "%EMERALD_MCP_SEED%"=="force" set "EMERALD_MCP_SEED_ARGS=--force"
 if defined EMERALD_MCP_APP_DATA (
     echo Provisioning seed vault ...
     call node "%~dp0seed\provision.mjs" --checkout "%EMERALD_APP_DIR%" --app-data "%EMERALD_MCP_APP_DATA%" %EMERALD_MCP_SEED_ARGS%
-    if errorlevel 1 echo WARNING: seed provisioning failed - the app will start with its own vault setup
+    if errorlevel 1 echo WARNING: seed provisioning failed - the app will start with its vault picker
     echo.
 )
 

@@ -37,14 +37,19 @@ A new themed component defines its own tokens (e.g. `--my-component-bg`) in both
 Fonts, interface size and editor text size are the open vault's **appearance settings** (`AppearanceSettings` in `src/lib/vaultSettings.ts`, see [Vault Settings](storage.md#vault-settings)); the theme and the language belong to the installation (`DeviceSettings` in `src/lib/deviceSettings.ts`, see [Device Settings](storage.md#device-settings)). Each value is normalized before it is applied:
 
 ```
-device.json ('theme'), or the localStorage boot mirror before it is read
+device.json ('theme', 'customThemes'), or the localStorage boot mirror before it is read
     ↓
-normalizeThemeId(raw)
-    ├─ raw is a valid ThemeId → return as-is
-    ├─ raw === 'light'        → 'emerald-parchment' (value from before theme ids)
-    └─ anything else          → DEFAULT_THEME_ID ('emerald-noctis')
+normalizeThemeSelection(raw, customThemes)
+    ├─ raw is 'custom:<id>' of a theme in the list → return as-is
+    ├─ raw is 'custom:<id>' of no theme here       → DEFAULT_THEME_ID ('emerald-noctis')
+    └─ otherwise normalizeThemeId(raw)
+         ├─ raw is a valid ThemeId → return as-is
+         ├─ raw === 'light'        → 'emerald-parchment' (value from before theme ids)
+         └─ anything else          → DEFAULT_THEME_ID
     ↓
-applyTheme(themeId)  →  document.documentElement.dataset.theme = themeId
+applyTheme(selection, customThemes)
+    ├─ a built-in theme → document.documentElement.dataset.theme = selection
+    └─ a custom theme   → dataset.theme = 'custom', its tokens set on documentElement.style
 ```
 
 `normalizeUIFontId`/`normalizeEditorFontId`/`normalizeUIScale`/`normalizeEditorFontSize` follow the same shape, the last two via the shared `oneOf(raw, options, fallback)` helper (`lib/helpers.ts`).
@@ -70,7 +75,7 @@ async function applyAppearance(appearance: AppearanceSettings) {
 
 ### Theme, font and size options
 
-`ThemeId`, `FontId`, `UIScale`, `EditorFontSize` and their option lists (`THEME_OPTIONS`, `FONT_OPTIONS`, `UI_SCALE_OPTIONS` — 90/100/110/120 — and `EDITOR_FONT_SIZE_OPTIONS` — 14/15/16/17/18/20/22) live in `src/themes/theme.ts`. Settings → General renders every picker from these lists.
+`ThemeId`, `FontId`, `UIScale`, `EditorFontSize` and their option lists (`THEME_OPTIONS`, `FONT_OPTIONS`, `UI_SCALE_OPTIONS` — 90/100/110/120 — and `EDITOR_FONT_SIZE_OPTIONS` — 14/15/16/17/18/20/22) live in `src/themes/theme.ts`. The start page's Appearance renders the theme choice from them, Settings → General the fonts and sizes.
 
 ### Tailwind bridge
 
