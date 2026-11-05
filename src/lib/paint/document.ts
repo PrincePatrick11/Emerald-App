@@ -528,3 +528,31 @@ export function symmetricCopies(stroke: PaintStroke, symmetry: Symmetry): PaintS
       return [];
   }
 }
+
+/**
+ * A freehand stroke cut where it leaves an area: the runs of its points
+ * inside (`inside`) and outside (`outside`), in drawing order, each run
+ * reaching one point into its neighbour so the pieces still meet. `null`
+ * when the stroke cannot be cut there: a shape, a fill, or a stroke with
+ * fewer than two points inside.
+ */
+export function splitStroke(stroke: PaintStroke, isInside: (x: number, y: number) => boolean): { pieces: PaintStroke[]; inside: PaintStroke[] } | null {
+  if (isShapeTool(stroke.tool) || stroke.tool === 'fill') return null;
+  const n = stroke.points.length / 3;
+  const flags: boolean[] = [];
+  for (let i = 0; i < n; i++) flags.push(isInside(stroke.points[i * 3], stroke.points[i * 3 + 1]));
+  if (flags.filter(Boolean).length < 2) return null;
+  const pieces: PaintStroke[] = [];
+  const inside: PaintStroke[] = [];
+  let start = 0;
+  for (let i = 1; i <= n; i++) {
+    if (i < n && flags[i] === flags[start]) continue;
+    // The run [start, i), one point into each neighbour.
+    const from = Math.max(0, start - 1), to = Math.min(n, i + 1);
+    const piece: PaintStroke = { ...stroke, id: paintId(), points: stroke.points.slice(from * 3, to * 3) };
+    pieces.push(piece);
+    if (flags[start]) inside.push(piece);
+    start = i;
+  }
+  return { pieces, inside };
+}

@@ -30,7 +30,7 @@ writeFileSync(
    export { entryBlockSummary } from '${root}/src/lib/blocks/entrySummary';
    export { withLegacyStatus, statusDefinition, hasLegacyStatus, convertLegacyStatusRows, STATUS_DEFINITION_ID } from '${root}/src/lib/blocks/legacyStatus';
    export { extractUniqueLetters, parseSigilCalc, serializeSigilCalc, createSigilCalcBlock, createSigilCanvasBlock, createSigilChargeBlock, parseSigilCharge, serializeSigilCharge, sigilState, withoutConcealed, withChargeUnloaded, sigilImage, withSigilImage, letterList, sigilUnits, sigilPartBlock, sigilPartId, withSigilPart, blockHoldsLocked, withRenamedPartTargets, parseSigilDrawing, withSigilDrawing } from '${root}/src/lib/blocks/sigil';
-   export { paintDocFromJson, paintDocToJson, emptyPaintDoc, isPaintDocEmpty, thinPoints, transformStroke, mergeDown, canMergeDown, strokeSamples, inPolygon, symmetricCopies, mirrorStroke } from '${root}/src/lib/paint/document';
+   export { paintDocFromJson, paintDocToJson, emptyPaintDoc, isPaintDocEmpty, thinPoints, transformStroke, mergeDown, canMergeDown, strokeSamples, inPolygon, symmetricCopies, mirrorStroke, splitStroke } from '${root}/src/lib/paint/document';
    export { renderBlocksForExport } from '${root}/src/lib/blocks/exportRender';
    export { parseAssignments, resolveDefaultTemplate, templatesFor, instantiateTemplateBlocks, isContentEmpty, templateOriginsOf, templateStart, mergeTemplateTags, mergeAssignmentChanges, withAssignmentState, assignmentStateAt, sameAssignments, defaultTemplateAt, contentForTemplate, areBlocksEmpty, fieldsWithTemplate, fieldsWithoutTemplate } from '${root}/src/lib/blocks/templates';
    export { internalLinkChipHtml } from '${root}/src/lib/internalLinkHtml';
@@ -63,7 +63,7 @@ const {
   extractUniqueLetters, parseSigilCalc, serializeSigilCalc, createSigilCalcBlock, createSigilCanvasBlock,
   createSigilChargeBlock, parseSigilCharge, serializeSigilCharge, sigilState, withoutConcealed, withChargeUnloaded,
   sigilImage, withSigilImage, letterList, renderBlocksForExport, parseSigilDrawing, withSigilDrawing,
-  paintDocFromJson, paintDocToJson, emptyPaintDoc, isPaintDocEmpty, thinPoints, transformStroke, mergeDown, canMergeDown, strokeSamples, inPolygon, symmetricCopies, mirrorStroke,
+  paintDocFromJson, paintDocToJson, emptyPaintDoc, isPaintDocEmpty, thinPoints, transformStroke, mergeDown, canMergeDown, strokeSamples, inPolygon, symmetricCopies, mirrorStroke, splitStroke,
   sigilUnits, sigilPartBlock, sigilPartId, withSigilPart, blockHoldsLocked,
   remapDefinitionDefaults, definitionImageRefs, hasFrozenCopy, withRenamedPartTargets,
   parseAssignments, resolveDefaultTemplate, templatesFor, instantiateTemplateBlocks, isContentEmpty,
@@ -599,6 +599,12 @@ console.log('\n4f. Sigil blocks\n');
         && symmetricCopies(left, { kind: 'off' }).length === 0);
     check('drawing: a mirrored polygon mirrors its turn',
       mirrorStroke({ ...pen, tool: 'polygon', rotation: 0.3, points: [0, 0, 0.5, 10, 10, 0.5] }, 'x', 600).rotation === -0.3);
+    const long = { ...pen, points: [0, 0, 0.5, 10, 0, 0.5, 20, 0, 0.5, 30, 0, 0.5, 40, 0, 0.5, 50, 0, 0.5] };
+    const split = splitStroke(long, (x) => x >= 15 && x <= 35);
+    check('drawing: a freehand stroke is cut where it leaves the area, the pieces meeting',
+      split?.pieces.length === 3 && split.inside.length === 1
+        && isDeepStrictEqual(split.inside[0].points, [10, 0, 0.5, 20, 0, 0.5, 30, 0, 0.5, 40, 0, 0.5])
+        && split.pieces[0].points.length === 9 && splitStroke({ ...pen, tool: 'line', points: [0, 0, 0.5, 50, 0, 0.5] }, () => true) === null, split);
     check('drawing: a lasso takes a stroke with a point inside it',
       inPolygon(5, 5, [0, 0, 10, 0, 10, 10, 0, 10]) && !inPolygon(15, 5, [0, 0, 10, 0, 10, 10, 0, 10])
         && strokeSamples({ ...pen, tool: 'ellipse', points: [0, 0, 0.5, 20, 10, 0.5] }).length === 16);

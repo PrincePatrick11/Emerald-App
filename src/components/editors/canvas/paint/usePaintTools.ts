@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useState } from 'react';
 import {
-  canMergeDown, clamp, copyLayer, emptyLayer, emptyPaintDoc, IDENTITY, MAX_LAYERS, mergeDown, moveLayer as moveLayerIn,
+  canMergeDown, clamp, copyLayer, emptyLayer, emptyPaintDoc, IDENTITY, MAX_LAYERS, mergeDown, moveLayer as moveLayerIn, splitStroke, strokeSamples,
   MAX_SIDES, MIN_SIDES, moveLayerTo, PAINT_SIZE_MAX, PAINT_SIZE_MIN, paintId, symmetricCopies, transformStroke,
   translateLayer, updateLayer, type PaintDoc, type PaintStroke, type PaintTool, type PaintTransform, type Symmetry,
 } from '../../../../lib/paint/document';
@@ -64,6 +64,12 @@ export interface PaintControls {
   redo: () => void;
   addStroke: (stroke: PaintStroke) => void;
   select: (ids: string[]) => void;
+  /**
+   * Selects what lies inside an area (a rectangle or a lasso), added to
+   * `base`: a stroke wholly inside, and of a freehand stroke reaching out of
+   * it the part inside, cut off from the rest (one step of its own).
+   */
+  selectArea: (isInside: (x: number, y: number) => boolean, base: string[]) => void;
   selectAll: () => void;
   /** The selected strokes, or with `layer` the whole active layer, moved, scaled and turned. */
   transform: (t: PaintTransform, layer?: boolean) => void;
@@ -149,6 +155,25 @@ export function usePaintControls(
         onLayer((strokes) => [...strokes, stroke, ...copies]);
       },
       select: (ids: string[]) => setSelection(ids),
+      selectArea: (isInside: (x: number, y: number) => boolean, base: string[]) => {
+        const picked: string[] = [];
+        let cut = false;
+        const strokes = layer.strokes.flatMap((s) => {
+          if (s.tool === 'eraser') return [s];
+          if (strokeSamples(s).every(([x, y]) => isInside(x, y))) {
+            picked.push(s.id);
+            return [s];
+          }
+          // A selected stroke stays whole: it is already chosen as it is.
+          const split = layer.locked || base.includes(s.id) ? null : splitStroke(s, isInside);
+          if (!split) return [s];
+          cut = true;
+          picked.push(...split.inside.map((piece) => piece.id));
+          return split.pieces;
+        });
+        if (cut) commit(updateLayer(doc, active, (l) => ({ ...l, strokes })));
+        setSelection([...new Set([...base, ...picked])]);
+      },
       selectAll: () => setSelection(layer.strokes.filter((s) => s.tool !== 'eraser').map((s) => s.id)),
       transform: (t: PaintTransform, whole = false) => {
         if (layer.locked) return;

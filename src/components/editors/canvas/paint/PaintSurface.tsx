@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import {
   applyTransform, IDENTITY, inPolygon, isBoxShape, isShapeTool, PAINT_HEIGHT, PAINT_WIDTH, paintId, strokeBounds,
-  strokeSamples, symmetricCopies, thinPoints, transformStroke, translateLayer, unionRects,
+  symmetricCopies, thinPoints, transformStroke, translateLayer, unionRects,
   type PaintLayer, type PaintRect, type PaintStroke, type PaintTool, type PaintTransform,
 } from '../../../../lib/paint/document';
 import { drawLayer, drawStroke, strokePath, type LayerImages } from './render';
@@ -22,7 +22,7 @@ import { isDrawTool, isSelectTool, type EditorTool, type PaintControls } from '.
  * document when the pointer lifts, as one step.
  *
  * The tools besides drawing: selecting strokes of the layer drawn on with a
- * rectangle or a lasso (a stroke lying wholly inside), or by clicking one (Shift adds), with a frame whose
+ * rectangle or a lasso (what lies inside: a freehand stroke reaching out is cut there), or by clicking one (Shift adds), with a frame whose
  * corners scale and whose knob turns; moving the whole layer; taking a
  * colour from the drawing (the picker, or Alt with the pen or the bucket);
  * and the bucket, which fills the area around a spot as a vector
@@ -281,20 +281,12 @@ export default function PaintSurface({ box, api, images, editable }: {
     return null;
   };
 
-  /** The strokes the rectangle or lasso takes: those lying wholly inside it. */
-  const strokesIn = (lasso: boolean, points: number[]): string[] => {
-    const layer = props.current.api.doc.layers.find((l) => l.id === props.current.api.activeLayer);
-    if (!layer) return [];
-    let inside: (x: number, y: number) => boolean;
-    if (lasso) {
-      if (points.length < 6) return [];
-      inside = (x, y) => inPolygon(x, y, points);
-    } else {
-      const [x0, y0] = points, x1 = points[points.length - 2], y1 = points[points.length - 1];
-      const [l, r, t, b] = [Math.min(x0, x1), Math.max(x0, x1), Math.min(y0, y1), Math.max(y0, y1)];
-      inside = (x, y) => x >= l && x <= r && y >= t && y <= b;
-    }
-    return layer.strokes.filter((s) => s.tool !== 'eraser' && strokeSamples(s).every(([x, y]) => inside(x, y))).map((s) => s.id);
+  /** Is a point inside the rectangle (from its first to its last point) or the lasso? */
+  const areaTest = (lasso: boolean, points: number[]): ((x: number, y: number) => boolean) | null => {
+    if (lasso) return points.length < 6 ? null : (x, y) => inPolygon(x, y, points);
+    const [x0, y0] = points, x1 = points[points.length - 2], y1 = points[points.length - 1];
+    const [l, r, t, b] = [Math.min(x0, x1), Math.max(x0, x1), Math.min(y0, y1), Math.max(y0, y1)];
+    return (x, y) => x >= l && x <= r && y >= t && y <= b;
   };
 
   /** Takes the drawing's colour under the pointer as the brush's. */
@@ -511,7 +503,9 @@ export default function PaintSurface({ box, api, images, editable }: {
     if (g.kind === 'pick') {
       setPickPath(null);
       if (!keep) return;
-      a.select(g.moved ? [...new Set([...g.base, ...strokesIn(g.lasso, g.points)])] : g.base);
+      const test = g.moved ? areaTest(g.lasso, g.points) : null;
+      if (test) a.selectArea(test, g.base);
+      else a.select(g.base);
       return;
     }
     if (g.kind === 'transform') {
