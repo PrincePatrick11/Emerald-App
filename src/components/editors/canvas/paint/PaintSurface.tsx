@@ -21,7 +21,7 @@ import { isDrawTool, isSelectTool, type PaintControls } from './usePaintTools';
  * document when the pointer lifts, as one step.
  *
  * The tools besides drawing: selecting strokes of the layer drawn on with a
- * rectangle or a lasso, or by clicking one (Shift adds), with a frame whose
+ * rectangle or a lasso (a stroke lying wholly inside), or by clicking one (Shift adds), with a frame whose
  * corners scale and whose knob turns; moving the whole layer; and taking a
  * colour from the drawing (the picker, or Alt with a drawing tool).
  *
@@ -275,7 +275,7 @@ export default function PaintSurface({ box, api, images, editable }: {
     return null;
   };
 
-  /** The strokes the rectangle or lasso takes: any of their points inside it. */
+  /** The strokes the rectangle or lasso takes: those lying wholly inside it. */
   const strokesIn = (lasso: boolean, points: number[]): string[] => {
     const layer = props.current.api.doc.layers.find((l) => l.id === props.current.api.activeLayer);
     if (!layer) return [];
@@ -288,7 +288,7 @@ export default function PaintSurface({ box, api, images, editable }: {
       const [l, r, t, b] = [Math.min(x0, x1), Math.max(x0, x1), Math.min(y0, y1), Math.max(y0, y1)];
       inside = (x, y) => x >= l && x <= r && y >= t && y <= b;
     }
-    return layer.strokes.filter((s) => s.tool !== 'eraser' && strokeSamples(s).some(([x, y]) => inside(x, y))).map((s) => s.id);
+    return layer.strokes.filter((s) => s.tool !== 'eraser' && strokeSamples(s).every(([x, y]) => inside(x, y))).map((s) => s.id);
   };
 
   /** Takes the drawing's colour under the pointer as the brush's. */
