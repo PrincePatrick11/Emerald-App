@@ -1,13 +1,15 @@
 import { useTranslation } from 'react-i18next';
 import { BRUSH_SIZE_MAX, BRUSH_SIZE_MIN } from '../../lib/blocks/fields';
-import { SIGIL_COLORS } from './SigilDrawingCanvas';
+
+/** The palette of the sigil drawing; a custom block's drawing may start with one of them. */
+export const SIGIL_COLORS = ['#f8fafc', '#00e699', '#f59e0b', '#ef4444', '#60a5fa', '#a78bfa', '#111827'];
 
 /** What drawing starts with when a custom block specifies nothing. */
 export const DEFAULT_BRUSH_SIZE = 8;
 
 /**
- * Colour and brush size of the sigil drawing, shared by the drawing canvas
- * and by the defaults of a drawing part in the builder.
+ * Colour and brush size at the start of a drawing part, set in the builder;
+ * the drawing itself picks them in the paint editor's toolbar.
  */
 
 export function SigilColorSwatches({ value, onChange }: { value: string; onChange: (color: string) => void }) {

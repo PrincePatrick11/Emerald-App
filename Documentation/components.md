@@ -152,12 +152,11 @@ See [`architecture.md` → Content Blocks](architecture/blocks.md#content-blocks
 **Sigils**
 
 - **`SigilCalcBlock`** — intention, manual/automatic reduction to the letter bank, implemented letters; read-only while charged, hidden while concealed. Its `part` restricts which reduction modes are offered.
-- **`SigilCanvasBlock`** — the drawing: `SigilDrawingCanvas` with pen/eraser, brush, colours, undo/redo/clear (history in memory); each stroke saved as an image file, the block keeps only the name. Its `part` supplies the starting brush.
+- **`SigilCanvasBlock`** — the drawing: the adapter between the block and the [paint editor](architecture/editors.md#paint-editor) (`PaintEditor` with the sigil palette); saves the vector document as block data and its rendered image as a file, 300 ms after the last stroke and once more when editing ends. Its `part` supplies the starting brush.
 - **`SigilChargeBlock`** — reveal date (optional — without one, loading hides what it covers until unload), charging technique (`BlockLink`), lock scope, and — with more than one calculator/drawing — which of them it covers (`chargeCovers`); in read mode load (optional timer) and unload, each with an inline confirmation.
 - **`SigilPart`** — a sigil element inside a user-built block, rendered through the matching standalone component on a virtual block (`sigilPartBlock`); writes go back into the fields block's model (`withSigilPart`). *Ext.:* `element`, `block`, `model`, `write`, `persist`.
 - **`SigilPartSettings`** — what the builder lets a sigil element configure: letter-bank mode, optional starting brush, optional lock-and-coverage preset (`ChargeDefault`) over the block's own visible calculators/drawings. *Ext.:* `element`, `siblings`, `onPatch`.
-- **`SigilBrushControls`** — `SigilColorSwatches` and `SigilBrushSize`, shared by the drawing surface and `SigilPartSettings`' brush preset. *Ext.:* `value`/`onChange`.
-- **`SigilDrawingCanvas`** — the 1200×800 drawing surface; reports a data URL after each stroke. `initialData` must be a data URL — an `emerald-img:` image would taint it. *Ext.:* `initialData`, `mode`, `brushColor`, `brushSize`, `clearVersion`, `editable`, `onChange`.
+- **`SigilBrushControls`** — the sigil palette (`SIGIL_COLORS`), `SigilColorSwatches` and `SigilBrushSize` for `SigilPartSettings`' brush preset. *Ext.:* `value`/`onChange`.
 - **`SigilConcealed`** — the quiet "hidden until …" line. *Ext.:* `revealDate`.
 
 The text editor `BlockStack` hosts lives in `src/components/editors/text/` (see [`architecture/editors.md`](architecture/editors.md#text-editor)). Image inserts report failures through `ImageNoticeModal` (above).

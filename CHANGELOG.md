@@ -22,6 +22,7 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - **Several images at once** through paste or the image button.
 - **A plus in the rail creates anything.** It opens a small window with a tile for each type — Journal, Tasks, Operations, Wiki, Altar, Lexicon, Templates and Blocks — and opens what you pick, by click, by keyboard or by the tile's number key; the dashboards' own "New" buttons work the same way.
 - **Altars have their own icon,** a candle on a table, instead of a flame.
+- **A new paint editor for sigil drawings:** a pen that follows a stylus's pressure, line, ellipse and rectangle (Shift for straight angles, circles and squares), an eraser, any colour besides the seven, layers that can be added, hidden, reordered, renamed and removed, and keyboard shortcuts. Strokes are kept as lines, so they stay sharp at any size; drawings from before open with their picture as the first layer and lose nothing.
 
 ### Changed
 - **Resizing an image** uses a handle on the side that moves (both sides for a centred image), snaps to common widths and shows the width while dragging. The size is kept in pixels, so the image no longer grows and shrinks with the window; only full width follows it. Images sized in percent before are converted the next time the entry is edited, without counting as a change on their own.

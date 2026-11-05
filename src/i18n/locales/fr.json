@@ -250,14 +250,7 @@
     "letterBank": "Jeu de lettres",
     "noLetters": "Aucune lettre préparée pour le moment.",
     "targetDate": "Date cible",
-    "brushSize": "Pinceau",
-    "undo": "Annuler",
-    "redo": "Rétablir",
-    "clear": "Effacer la toile",
-    "tools": {
-      "draw": "Dessiner",
-      "erase": "Effacer"
-    }
+    "brushSize": "Pinceau"
   },
   "wiki": {
     "title": "Wiki",
@@ -558,7 +551,30 @@
       "expand": "Déplier la section",
       "collapse": "Replier la section"
     },
-    "unsaved": "Modifications non enregistrées"
+    "unsaved": "Modifications non enregistrées",
+    "paint": {
+      "tools": {
+        "pen": "Stylo",
+        "line": "Ligne",
+        "ellipse": "Ellipse",
+        "rect": "Rectangle",
+        "eraser": "Gomme"
+      },
+      "color": "Couleur",
+      "customColor": "Toute couleur",
+      "size": "Taille du pinceau",
+      "layers": "Calques",
+      "layerN": "Calque {{n}}",
+      "addLayer": "Ajouter un calque",
+      "removeLayer": "Retirer le calque",
+      "layerUp": "Monter",
+      "layerDown": "Descendre",
+      "showLayer": "Afficher le calque",
+      "hideLayer": "Masquer le calque",
+      "renameHint": "Cliquer pour dessiner dessus, double-cliquer pour renommer",
+      "clear": "Vider le dessin",
+      "loadFailed": "Impossible de charger une image de ce dessin"
+    }
   },
   "builder": {
     "newText": "Texte",
