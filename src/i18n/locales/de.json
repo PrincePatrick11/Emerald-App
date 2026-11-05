@@ -101,7 +101,7 @@
     "operations": "Operationen",
     "tasks": "Aufgaben",
     "settings": "Einstellungen",
-    "vaults": "Vaults"
+    "startPage": "Startseite"
   },
   "sidebar": {
     "allEmpty": "Noch keine Einträge",
@@ -1235,6 +1235,6 @@
     "version": "Version {{version}}",
     "opened": "geöffnet",
     "byAuthor": "von {{name}}",
-    "updates": "Updates"
+    "updateServer": "Update-Server"
   }
 }

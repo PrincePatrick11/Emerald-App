@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Download, RefreshCw } from 'lucide-react';
+import { Download, RefreshCw, Server } from 'lucide-react';
 import Button from '../../ui/Button';
 import ProgressBar from '../../ui/ProgressBar';
 import { formatBytes } from '../../../lib/helpers';
@@ -9,6 +9,8 @@ import {
   type UpdateCheck, type UpdateError, type UpdateProgress,
 } from '../../../lib/updates';
 import { settleBeforeExit } from '../../../lib/openEdits';
+import { useOutsideClick } from '../../../hooks/useOutsideClick';
+import StartUpdateSource from './StartUpdateSource';
 import { takeStartFocus, useVaultPickerStore } from '../../../store/vaultPickerStore';
 
 type Status = 'idle' | 'checking' | 'done' | 'failed' | 'installing';
@@ -28,9 +30,9 @@ const CALM_CODES = new Set(['unreachable', 'unsupported-target']);
 
 /**
  * The right half of the start page's foot: a check, and installing what it
- * found, its release notes on pointing at the find. The version is under the
- * brand, the source in the Updates section (`StartUpdateSource`), which
- * remounts this when the source changes. "Check for Updates…" and the update
+ * found, its release notes on pointing at the find, and "Update server": a
+ * popover above it with the source and the check on start
+ * (`StartUpdateSource`). The version is under the brand. "Check for Updates…" and the update
  * dot open the page with a check already running (`focus`).
  */
 export default function StartUpdates() {
@@ -40,6 +42,10 @@ export default function StartUpdates() {
   const [result, setResult] = useState<UpdateCheck | null>(null);
   const [progress, setProgress] = useState<UpdateProgress | null>(null);
   const [error, setError] = useState<UpdateError | null>(null);
+  const [sourceOpen, setSourceOpen] = useState(false);
+  const sourceRef = useRef<HTMLDivElement>(null);
+  // Escape in the capture phase: it closes the popover, not the start page.
+  useOutsideClick(sourceOpen, () => setSourceOpen(false), { refs: [sourceRef], escape: 'capture' });
   const units: [string, string, string] = [t('common.bytes'), t('common.kilobytes'), t('common.megabytes')];
 
   // Subscribed on mount, not on click: the first chunk may arrive before a
@@ -127,6 +133,29 @@ export default function StartUpdates() {
           {status === 'checking' ? t('settings.updateChecking') : t('settings.updateCheck')}
         </button>
       )}
+      <div className="relative" ref={sourceRef}>
+        <button
+          type="button"
+          className="start-foot-action"
+          aria-expanded={sourceOpen}
+          aria-haspopup="dialog"
+          onClick={() => setSourceOpen((open) => !open)}
+        >
+          <Server size={12} />
+          {t('start.updateServer')}
+        </button>
+        {sourceOpen && (
+          <div className="start-popover" role="dialog" aria-label={t('start.updateServer')}>
+            <StartUpdateSource
+              onSourceChanged={() => {
+                // A result from another source is worthless now.
+                setResult(null);
+                setStatus('idle');
+              }}
+            />
+          </div>
+        )}
+      </div>
     </div>
   );
 }

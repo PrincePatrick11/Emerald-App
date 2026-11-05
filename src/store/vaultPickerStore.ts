@@ -11,8 +11,8 @@ export type StartFocus = 'server' | 'updates';
  * Without an open vault `AppShell` shows it anyway — on a first start, after
  * the last vault was removed, or when the vault to start with could not be
  * opened. `open` is only the way in by hand: menu Emerald → "Switch vault…",
- * "About Emerald App", "Check for Updates…", the vault button in the rail and
- * the update dot on the gear.
+ * "About Emerald App", "Check for Updates…", and the start page button at the
+ * bottom of the rail (with its update dot, the page opens checking).
  */
 interface VaultPickerStore {
   open: boolean;

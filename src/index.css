@@ -1017,6 +1017,14 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
     @apply flex items-center justify-end gap-2 min-w-0;
   }
 
+  /* "Update server": opens upwards from the foot, at its right edge. */
+  .start-popover {
+    @apply absolute bottom-full right-0 mb-2 z-50 w-[360px] rounded-lg border p-3;
+    background-color: var(--menu-bg);
+    border-color: var(--menu-border);
+    box-shadow: var(--menu-shadow);
+  }
+
   /* A quiet text button: the foot's, and the sections' own actions. */
   .start-foot-action {
     @apply inline-flex items-center gap-1.5 h-7 px-2 rounded-md shrink-0 text-xs transition-colors duration-150;

@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next';
-import { Plus, Settings, type LucideIcon } from 'lucide-react';
+import { Gauge, Plus, Settings, type LucideIcon } from 'lucide-react';
 import { Suspense, lazy, useEffect, useState } from 'react';
 import { AUX_VIEWS, MODULES, type ViewId } from '../../lib/modules';
 import { useUIStore } from '../../store/uiStore';
@@ -8,7 +8,6 @@ import { useAutoBackupStore } from '../../store/autoBackupStore';
 import { useSettingsStore } from '../../store/settingsStore';
 import { markAutoBackupErrorSeen } from '../../lib/autoBackup';
 import { asUpdateError, checkForUpdate, updateSettings } from '../../lib/updates';
-import { VaultGlyph } from './VaultPicker';
 import { openVaultPicker } from '../../store/vaultPickerStore';
 import CreateItemModal from './CreateItemModal';
 
@@ -36,7 +35,7 @@ const RAIL_GROUP = 'w-full flex flex-col items-center gap-1';
  * e.g. after the altar's fullscreen, and would otherwise check again every time.
  */
 let startupCheck: Promise<string | null> | undefined;
-/** The dot on the gear has done its job — re-mounting does not show it again. */
+/** The update dot has done its job — re-mounting does not show it again. */
 let dotSeen = false;
 
 function checkOnStart(): Promise<string | null> {
@@ -56,6 +55,17 @@ function checkOnStart(): Promise<string | null> {
   return startupCheck;
 }
 
+/** A small dot on a rail button: an update found (accent), a failed backup (danger). */
+function RailDot({ tone }: { tone: 'accent' | 'danger' }) {
+  return (
+    <span
+      aria-hidden
+      className="absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full"
+      style={{ backgroundColor: tone === 'accent' ? 'var(--accent)' : 'var(--danger-text)' }}
+    />
+  );
+}
+
 export default function LeftSidebarRail() {
   const { t } = useTranslation();
   const setActiveView = useUIStore((s) => s.setActiveView);
@@ -63,13 +73,10 @@ export default function LeftSidebarRail() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settingsPage, setSettingsPage] = useState<SettingsPage>('general');
   const [createOpen, setCreateOpen] = useState(false);
-  // Selector on a primitive, not on the vault record: otherwise `find` returns
-  // an object on every store update that zustand reads as changed.
-  const activeVaultIcon = useVaultStore((s) => s.vaults.find((v) => v.id === s.activeVaultId)?.icon);
   const activeVaultId = useVaultStore((s) => s.activeVaultId);
 
   // The check at startup lives here and not in App.tsx because its only
-  // visible result is the dot on the gear below. Found or not:
+  // visible result is the dot on the start page button below. Found or not:
   // it never announces itself — a window that opens unprompted would be
   // the kind of interruption a local app should not have.
   const [updateVersion, setUpdateVersion] = useState<string | null>(null);
@@ -86,8 +93,6 @@ export default function LeftSidebarRail() {
   // dot would lead to a page that shows nothing about it.
   const backupOn = useSettingsStore((s) => s.settings.backup.auto);
   const backupFailed = useAutoBackupStore((s) => s.error !== null && !s.errorSeen && s.vaultId === activeVaultId) && backupOn;
-  // What the gear is currently reporting. The update takes precedence, it is the rarer message.
-  const notice = updateVersion ? 'update' : backupFailed ? 'backup' : null;
 
   // One button per view; it is highlighted as long as its view is open —
   // also with an entry open inside it.
@@ -143,8 +148,8 @@ export default function LeftSidebarRail() {
         </div>
       </div>
 
-      {/* Bottom nav — always visible, read from the bottom: Settings, Vault,
-          Trash, Tags, Categories */}
+      {/* Bottom nav — always visible, read from the bottom: start page,
+          Settings, Trash, Tags, Categories */}
       <div className="sidebar-bottom-bar w-full flex-[1_0_auto] flex flex-col items-center justify-end gap-3 py-2">
         <div className={RAIL_GROUP}>
           {viewButton('categories', AUX_VIEWS.categories)}
@@ -152,43 +157,37 @@ export default function LeftSidebarRail() {
           {viewButton('trash', AUX_VIEWS.trash)}
         </div>
         <div className={RAIL_GROUP}>
-          <RailButton onClick={() => { void openVaultPicker(); }} title={t('nav.vaults')}>
-            {/* 17px only for the emoji: it carries no stroke width and otherwise
-                looks too large next to the lucide icons. The fallback glyph is
-                itself a lucide icon and stays at the 18 of its neighbours. */}
-            <VaultGlyph icon={activeVaultIcon} size={activeVaultIcon ? 17 : 18} />
-          </RailButton>
           <RailButton
             // The target is captured here and the dot cleared immediately: it
-            // has done its job as soon as something opens. A found update
-            // leads to the start page's Updates, which is where installing
-            // lives now; a failed backup to the settings' Backup page.
+            // has done its job as soon as something opens.
             onClick={() => {
-              setUpdateVersion(null);
-              if (notice === 'update') {
+              setSettingsPage(backupFailed ? 'backup' : 'general');
+              setSettingsOpen(true);
+              if (backupFailed) markAutoBackupErrorSeen();
+            }}
+            title={backupFailed ? t('settings.autoBackupFailedDot') : t('nav.settings')}
+            className="relative"
+          >
+            <Settings size={18} />
+            {backupFailed && <RailDot tone="danger" />}
+          </RailButton>
+          {/* Last, at the very bottom: the start page, the app's cockpit.
+              A found update shows here, since installing lives there. */}
+          <RailButton
+            onClick={() => {
+              if (updateVersion) {
+                setUpdateVersion(null);
                 dotSeen = true;
                 void openVaultPicker('updates');
                 return;
               }
-              setSettingsPage(notice === 'backup' ? 'backup' : 'general');
-              setSettingsOpen(true);
-              if (notice === 'backup') markAutoBackupErrorSeen();
+              void openVaultPicker();
             }}
-            title={
-              notice === 'update' ? t('settings.updateFound', { version: updateVersion })
-                : notice === 'backup' ? t('settings.autoBackupFailedDot')
-                  : t('nav.settings')
-            }
+            title={updateVersion ? t('settings.updateFound', { version: updateVersion }) : t('nav.startPage')}
             className="relative"
           >
-            <Settings size={18} />
-            {notice && (
-              <span
-                aria-hidden
-                className="absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full"
-                style={{ backgroundColor: notice === 'update' ? 'var(--accent)' : 'var(--danger-text)' }}
-              />
-            )}
+            <Gauge size={18} />
+            {updateVersion && <RailDot tone="accent" />}
           </RailButton>
         </div>
       </div>
