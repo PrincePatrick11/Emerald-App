@@ -586,6 +586,12 @@
       "mergeDownBlocked": "Fusion impossible : le calque contient une image ou des traits de gomme",
       "toolsLabel": "Outils de dessin",
       "layerHint": "Cliquer pour dessiner dessus, glisser pour réordonner, double-cliquer sur le nom pour renommer",
+      "grid": {
+        "title": "Grille",
+        "show": "Afficher la grille",
+        "snap": "Aimanter à la grille",
+        "cells": "Cases en largeur"
+      },
       "closeLayers": "Fermer les calques",
       "filled": "Rempli (clic pour le contour)",
       "outlined": "Contour (clic pour remplir)",

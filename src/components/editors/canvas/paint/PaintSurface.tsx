@@ -242,6 +242,13 @@ export default function PaintSurface({ box, api, images, editable }: {
   /** Document units per screen pixel. */
   const unit = () => PAINT_WIDTH / props.current.box.width;
 
+  /** The grid's cell, in document units (square: as many across as `cells`). */
+  const gridStep = () => PAINT_WIDTH / props.current.api.grid.cells;
+  const snapStep = (n: number) => Math.round(n / gridStep()) * gridStep();
+  /** A point on the nearest grid crossing while snapping is on. */
+  const snapPoint = (x: number, y: number): [number, number] =>
+    (props.current.api.grid.snap ? [snapStep(x), snapStep(y)] : [x, y]);
+
   // ── The selection's frame ──────────────────────────────────────────────
 
   const activeLayer = doc.layers.find((l) => l.id === api.activeLayer);
@@ -358,6 +365,7 @@ export default function PaintSurface({ box, api, images, editable }: {
       /* see above */
     }
     const [x, y] = toDoc(e);
+    const [gx, gy] = snapPoint(x, y);
 
     if (tool === 'picker') {
       gesture.current = { kind: 'color', pointerId: e.pointerId };
@@ -419,12 +427,12 @@ export default function PaintSurface({ box, api, images, editable }: {
       kind: 'draw',
       pointerId: e.pointerId,
       layerId: p.api.activeLayer,
-      anchor: [x, y],
+      anchor: isShapeTool(tool) ? [gx, gy] : [x, y],
       stroke: {
         ...base,
         id: paintId(),
         tool,
-        points: isShapeTool(tool) ? [x, y, pressure, x, y, pressure] : [x, y, pressure],
+        points: isShapeTool(tool) ? [gx, gy, pressure, gx, gy, pressure] : [x, y, pressure],
         pressure: pen,
       },
     };
@@ -453,6 +461,8 @@ export default function PaintSurface({ box, api, images, editable }: {
         let dx = x - sx, dy = y - sy;
         // Shift: along one axis.
         if (e.shiftKey) { if (Math.abs(dx) > Math.abs(dy)) dy = 0; else dx = 0; }
+        // On the grid: moved by whole cells.
+        if (props.current.api.grid.snap) [dx, dy] = [snapStep(dx), snapStep(dy)];
         g.t = { ...g.t, dx, dy };
       } else if (g.mode === 'scale') {
         const [px, py] = g.pivot, [cx, cy] = g.corner;
@@ -477,6 +487,7 @@ export default function PaintSurface({ box, api, images, editable }: {
     if (isShapeTool(stroke.tool)) {
       const [ax, ay] = g.anchor;
       if (e.shiftKey) [x, y] = constrain(stroke.tool, ax, ay, x, y);
+      else [x, y] = snapPoint(x, y);
       // Alt: from the middle out, the start mirrored through it.
       [pts[0], pts[1]] = e.altKey ? [2 * ax - x, 2 * ay - y] : [ax, ay];
       pts[3] = x;
@@ -554,6 +565,16 @@ export default function PaintSurface({ box, api, images, editable }: {
   const tool = altDown && (api.tool === 'pen' || api.tool === 'fill') ? 'picker' : api.tool;
   // The symmetry's axes or rays, from the middle of the page, while drawing.
   const guides: [number, number][][] = [];
+  // The grid's lines as one path, the middle lines apart (stronger).
+  let gridPath = '';
+  let middlePath = '';
+  if (api.grid.visible) {
+    const step = PAINT_WIDTH / api.grid.cells;
+    const sx = box.width / PAINT_WIDTH, sy = box.height / PAINT_HEIGHT;
+    for (let x = step; x < PAINT_WIDTH - 0.5; x += step) gridPath += `M${x * sx} 0V${box.height}`;
+    for (let y = step; y < PAINT_HEIGHT - 0.5; y += step) gridPath += `M0 ${y * sy}H${box.width}`;
+    middlePath = `M${box.width / 2} 0V${box.height}M0 ${box.height / 2}H${box.width}`;
+  }
   if (isDrawTool(api.tool) && api.symmetry.kind !== 'off') {
     const cx = PAINT_WIDTH / 2, cy = PAINT_HEIGHT / 2;
     if (api.symmetry.kind === 'radial') {
@@ -596,8 +617,10 @@ export default function PaintSurface({ box, api, images, editable }: {
         className={`paint-canvas${editable ? ' paint-canvas--editable' : ''}`}
         style={{ cursor }}
       />
-      {(selFrame || pickPath || guides.length > 0) && (
+      {(selFrame || pickPath || guides.length > 0 || gridPath) && (
         <svg className="paint-overlay" width={box.width} height={box.height} aria-hidden>
+          {gridPath && <path className="paint-grid" d={gridPath} />}
+          {middlePath && <path className="paint-grid paint-grid--middle" d={middlePath} />}
           {guides.map((line, i) => <polyline key={i} className="paint-guide" points={pointsAttr(line)} />)}
           {selFrame && (<>
             <polygon className="paint-frame" points={pointsAttr(selFrame.corners)} />

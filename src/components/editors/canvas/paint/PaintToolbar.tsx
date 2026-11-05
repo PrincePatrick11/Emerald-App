@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
-  Circle, Eraser, FlipHorizontal2, Hexagon, Lasso, Layers, Minus, Move, MousePointer2, PaintBucket, PenTool, Pipette, Redo,
+  Circle, Eraser, FlipHorizontal2, Grid3x3, Hexagon, Lasso, Layers, Minus, Move, MousePointer2, PaintBucket, PenTool, Pipette, Redo,
   Square, SquareDashed, Star, Trash2, Undo, type LucideIcon,
 } from 'lucide-react';
 import {
@@ -10,7 +10,7 @@ import {
 import PopoverButton from '../../shared/PopoverButton';
 import { ToolbarBtn, ToolbarDivider, ToolbarGroup } from '../../shared/toolbarParts';
 import type { PaintFeatures } from './features';
-import type { EditorTool, PaintControls } from './usePaintTools';
+import { MAX_GRID_CELLS, MIN_GRID_CELLS, type EditorTool, type PaintControls, type PaintGrid } from './usePaintTools';
 
 interface ToolDef {
   tool: EditorTool;
@@ -161,26 +161,27 @@ export default function PaintToolbar({ api, features, palette, layersOpen, onTog
         </label>
       </ToolbarGroup>
 
-      {(features.symmetry || features.layers) && (<>
-        <ToolbarDivider />
-        <ToolbarGroup>
-          {features.symmetry && (
-            <PopoverButton
-              icon={<FlipHorizontal2 size={14} />}
-              title={t('editor.paint.symmetry.title')}
-              active={api.symmetry.kind !== 'off'}
-            >
-              {(close) => <SymmetryPanel value={api.symmetry} onChange={api.setSymmetry} close={close} />}
-            </PopoverButton>
-          )}
-          {features.layers && (
-            <ToolbarBtn onClick={onToggleLayers} active={layersOpen} title={t('editor.paint.layers')}>
-              <Layers size={14} />
-              {api.doc.layers.length > 1 && <span className="editor-toolbar-btn-label tabular-nums">{api.doc.layers.length}</span>}
-            </ToolbarBtn>
-          )}
-        </ToolbarGroup>
-      </>)}
+      <ToolbarDivider />
+      <ToolbarGroup>
+        {features.symmetry && (
+          <PopoverButton
+            icon={<FlipHorizontal2 size={14} />}
+            title={t('editor.paint.symmetry.title')}
+            active={api.symmetry.kind !== 'off'}
+          >
+            {(close) => <SymmetryPanel value={api.symmetry} onChange={api.setSymmetry} close={close} />}
+          </PopoverButton>
+        )}
+        <PopoverButton icon={<Grid3x3 size={14} />} title={t('editor.paint.grid.title')} active={api.grid.visible || api.grid.snap}>
+          {() => <GridPanel value={api.grid} onChange={api.setGrid} />}
+        </PopoverButton>
+        {features.layers && (
+          <ToolbarBtn onClick={onToggleLayers} active={layersOpen} title={t('editor.paint.layers')}>
+            <Layers size={14} />
+            {api.doc.layers.length > 1 && <span className="editor-toolbar-btn-label tabular-nums">{api.doc.layers.length}</span>}
+          </ToolbarBtn>
+        )}
+      </ToolbarGroup>
 
       {boxShape && (<>
         <ToolbarDivider />
@@ -264,6 +265,33 @@ function SymmetryPanel({ value, onChange, close }: { value: Symmetry; onChange: 
           <Stepper value={rays} min={MIN_RAYS} max={MAX_RAYS} onChange={(n) => onChange({ kind: 'radial', rays: n })} label={t('editor.paint.symmetry.rays')} />
         </div>
       )}
+    </div>
+  );
+}
+
+/** Showing the grid, snapping to it, and its cells across. */
+function GridPanel({ value, onChange }: { value: PaintGrid; onChange: (value: PaintGrid) => void }) {
+  const { t } = useTranslation();
+  return (
+    <div className="paint-symmetry">
+      <label className="paint-check">
+        <input type="checkbox" checked={value.visible} onChange={(e) => onChange({ ...value, visible: e.target.checked })} className="accent-accent" />
+        <span>{t('editor.paint.grid.show')}</span>
+      </label>
+      <label className="paint-check">
+        <input type="checkbox" checked={value.snap} onChange={(e) => onChange({ ...value, snap: e.target.checked })} className="accent-accent" />
+        <span>{t('editor.paint.grid.snap')}</span>
+      </label>
+      <div className="paint-symmetry-rays">
+        <span>{t('editor.paint.grid.cells')}</span>
+        <Stepper
+          value={value.cells}
+          min={MIN_GRID_CELLS}
+          max={MAX_GRID_CELLS}
+          onChange={(cells) => onChange({ ...value, cells })}
+          label={t('editor.paint.grid.cells')}
+        />
+      </div>
     </div>
   );
 }

@@ -586,6 +586,12 @@
       "mergeDownBlocked": "Can't merge: this layer has an image or eraser strokes",
       "toolsLabel": "Paint tools",
       "layerHint": "Click to draw on it, drag to reorder, double-click the name to rename",
+      "grid": {
+        "title": "Grid",
+        "show": "Show grid",
+        "snap": "Snap to grid",
+        "cells": "Cells across"
+      },
       "closeLayers": "Close layers",
       "filled": "Filled (click for outline)",
       "outlined": "Outline (click to fill)",

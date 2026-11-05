@@ -586,6 +586,12 @@
       "mergeDownBlocked": "Zusammenführen geht nicht: Die Ebene hat ein Bild oder Radierstriche",
       "toolsLabel": "Malwerkzeuge",
       "layerHint": "Klicken, um darauf zu malen; ziehen, um die Reihenfolge zu ändern; Doppelklick auf den Namen zum Umbenennen",
+      "grid": {
+        "title": "Raster",
+        "show": "Raster zeigen",
+        "snap": "Am Raster einrasten",
+        "cells": "Felder quer"
+      },
       "closeLayers": "Ebenen schließen",
       "filled": "Gefüllt (Klick für Umriss)",
       "outlined": "Umriss (Klick zum Füllen)",

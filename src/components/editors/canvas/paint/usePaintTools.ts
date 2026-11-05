@@ -15,6 +15,16 @@ export type EditorTool = PaintTool | 'select' | 'lasso' | 'move' | 'picker';
 
 export type { Symmetry };
 
+/** A grid over the drawing in the paint mode: shown or not, shapes and moves snapping to it or not, and how many cells across. */
+export interface PaintGrid {
+  visible: boolean;
+  snap: boolean;
+  cells: number;
+}
+
+export const MIN_GRID_CELLS = 4;
+export const MAX_GRID_CELLS = 48;
+
 export function isDrawTool(tool: EditorTool): tool is PaintTool {
   return tool !== 'select' && tool !== 'lasso' && tool !== 'move' && tool !== 'picker';
 }
@@ -52,6 +62,7 @@ export interface PaintControls {
   sides: number;
   /** Every new stroke gets its symmetric copies. */
   symmetry: Symmetry;
+  grid: PaintGrid;
   canUndo: boolean;
   canRedo: boolean;
   setTool: (tool: EditorTool) => void;
@@ -60,6 +71,7 @@ export interface PaintControls {
   setFilled: (filled: boolean) => void;
   setSides: (sides: number) => void;
   setSymmetry: (symmetry: Symmetry) => void;
+  setGrid: (grid: PaintGrid) => void;
   undo: () => void;
   redo: () => void;
   addStroke: (stroke: PaintStroke) => void;
@@ -102,6 +114,10 @@ export function usePaintBrush(startColor: string, startSize: number) {
   const [filled, setFilled] = useState(false);
   const [sides, setSidesRaw] = useState(5);
   const [symmetry, setSymmetry] = useState<Symmetry>({ kind: 'off' });
+  const [grid, setGridRaw] = useState<PaintGrid>({ visible: false, snap: false, cells: 12 });
+  const setGrid = useCallback((next: PaintGrid) => setGridRaw({
+    ...next, cells: Math.round(clamp(next.cells, MIN_GRID_CELLS, MAX_GRID_CELLS)),
+  }), []);
   const setSides = useCallback((next: number) => setSidesRaw(Math.round(clamp(next, MIN_SIDES, MAX_SIDES))), []);
   const setSize = useCallback((next: number) => setSizeRaw(Math.round(clamp(next, PAINT_SIZE_MIN, PAINT_SIZE_MAX))), []);
   // A drawing tool lets the selection go; a selection tool keeps it.
@@ -111,7 +127,7 @@ export function usePaintBrush(startColor: string, startSize: number) {
   }, []);
   return {
     tool, setTool, color, setColor, size, setSize, wantedLayer, setWantedLayer, selection, setSelection,
-    filled, setFilled, sides, setSides, symmetry, setSymmetry,
+    filled, setFilled, sides, setSides, symmetry, setSymmetry, grid, setGrid,
   };
 }
 
@@ -264,6 +280,8 @@ export function usePaintControls(
     setFilled: brush.setFilled,
     setSides: brush.setSides,
     setSymmetry: brush.setSymmetry,
+    grid: brush.grid,
+    setGrid: brush.setGrid,
     ...history,
     ...actions,
   };

@@ -586,6 +586,12 @@
       "mergeDownBlocked": "No se puede combinar: la capa tiene una imagen o trazos de borrador",
       "toolsLabel": "Herramientas de dibujo",
       "layerHint": "Clic para dibujar en ella, arrastrar para reordenar, doble clic en el nombre para renombrar",
+      "grid": {
+        "title": "Cuadrícula",
+        "show": "Mostrar cuadrícula",
+        "snap": "Ajustar a la cuadrícula",
+        "cells": "Celdas a lo ancho"
+      },
       "closeLayers": "Cerrar capas",
       "filled": "Relleno (clic para contorno)",
       "outlined": "Contorno (clic para rellenar)",
