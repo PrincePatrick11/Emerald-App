@@ -3,22 +3,27 @@ import { useTranslation } from 'react-i18next';
 import { Palette, Plus, X } from 'lucide-react';
 import StartSection from './StartSection';
 import { useDeviceStore } from '../../../store/deviceStore';
+import noctisCss from '../../../themes/emerald-noctis.css?raw';
+import parchmentCss from '../../../themes/emerald-parchment.css?raw';
 import { THEME_OPTIONS, customThemeSelection, type ThemeId, type ThemeSelection } from '../../../themes/theme';
 import {
   MAX_CUSTOM_THEMES, MAX_CUSTOM_THEME_FILE_BYTES, customThemeContrastProblems, parseCustomThemeFile,
 } from '../../../themes/customTheme';
 
 /** What a theme card draws: its frame, its sheet, a line of its accent and
- *  two of its edge colour. */
+ *  two of its edge colour. Custom themes give theirs in their file. */
 interface Preview { frame: string; sheet: string; accent: string; line: string }
 
-/** The built-in themes' own colours (`emerald-noctis.css`, `emerald-parchment.css`:
- *  `--shell-bg`, `--sheet-bg`, `--accent`, `--border-default` and a Parchment
- *  line of the same weight). A card shows another theme than the one around
- *  it, so these are values, not tokens. */
+/** A built-in theme's card, read from its own stylesheet: a card shows
+ *  another theme than the one around it, so its tokens cannot be asked for. */
+function previewOf(css: string): Preview {
+  const token = (name: string) => css.match(new RegExp(`--${name}:\\s*([^;]+);`))?.[1].trim() ?? 'transparent';
+  return { frame: token('shell-bg'), sheet: token('sheet-bg'), accent: token('accent'), line: token('border-strong') };
+}
+
 const BUILT_IN_PREVIEWS: Record<ThemeId, Preview> = {
-  'emerald-noctis': { frame: '#100d0a', sheet: '#1c1712', accent: '#00c47f', line: '#44403c' },
-  'emerald-parchment': { frame: '#ecdec7', sheet: '#faf3e6', accent: '#008a57', line: '#e2d2b8' },
+  'emerald-noctis': previewOf(noctisCss),
+  'emerald-parchment': previewOf(parchmentCss),
 };
 
 /** A theme in small: the frame with the sheet on it, a heading in the accent

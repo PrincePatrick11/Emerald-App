@@ -39,9 +39,13 @@ export default function StartBrand({ width }: { width: number }) {
     <aside className="start-brand" style={{ width }}>
       <div className="flex flex-col gap-7">
         <div className="space-y-4">
-          <div className="flex items-center gap-3.5">
-            <EmeraldMark size={56} />
-            <h1 className="start-brand-title">Emerald App</h1>
+          <div className="flex items-center gap-4">
+            <EmeraldMark size={84} />
+            {/* Two lines beside the mark, as tall as it is. */}
+            <h1 className="start-brand-title">
+              <span className="block">Emerald</span>
+              <span className="block">App</span>
+            </h1>
           </div>
           <p className="start-brand-tagline">{t('settings.tagline')}</p>
         </div>

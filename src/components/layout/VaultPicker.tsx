@@ -65,10 +65,10 @@ async function freeTarget(name: string): Promise<{ name: string; path: string | 
 /** The brand column's width, dragged as the entry list's is, kept the same way
  *  (`AppShell`): in `localStorage`, for this installation. */
 const BRAND_WIDTH_KEY = 'start-brand-width';
-/** The name stays on one line. */
-const BRAND_MIN = 360;
+/** Room for the mark beside the name. */
+const BRAND_MIN = 300;
 const BRAND_MAX = 560;
-const BRAND_DEFAULT = 380;
+const BRAND_DEFAULT = 340;
 /** What the sheet keeps however far the handle goes. */
 const SHEET_MIN = 480;
 

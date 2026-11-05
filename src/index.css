@@ -722,13 +722,13 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
   /* Its width is the picker's (`VaultPicker`, dragged at the handle). */
   .start-brand {
     @apply flex flex-col shrink-0 overflow-y-auto;
-    padding: 48px 40px 24px 48px;
+    padding: 40px 32px 24px 32px;
   }
 
   .start-brand-title {
     @apply font-serif font-medium whitespace-nowrap;
-    font-size: 36px;
-    line-height: 1.05;
+    font-size: 38px;
+    line-height: 1.02;
     color: var(--text-primary);
   }
 
