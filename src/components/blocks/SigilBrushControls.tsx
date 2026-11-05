@@ -9,7 +9,7 @@ export const DEFAULT_BRUSH_SIZE = 8;
 
 /**
  * Colour and brush size at the start of a drawing part, set in the builder;
- * the drawing itself picks them in the paint editor's toolbar.
+ * the drawing itself picks them in the paint bar of the canvas editor.
  */
 
 export function SigilColorSwatches({ value, onChange }: { value: string; onChange: (color: string) => void }) {

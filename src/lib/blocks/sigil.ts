@@ -12,7 +12,7 @@ import { paintDocFromImage, paintDocFromJson, paintDocToJson, type PaintDoc } fr
  * The three sigil blocks (since v42; previously a separate view with its own
  * columns on `operations`):
  * - Calculator (`core.sigil.calc`): intention, letter bank, implemented letters.
- * - Drawing (`core.sigil.canvas`): the paint editor's vector document as data
+ * - Drawing (`core.sigil.canvas`): the canvas editor's paint document as data
  *   JSON, its rendered image and layer images as `<img src="{sha}.png">` in the
  *   inner HTML so that the image cleanup sees them (`parseSigilDrawing`).
  * - Charge (`core.sigil.charge`): loaded, target date, charging technique (as a

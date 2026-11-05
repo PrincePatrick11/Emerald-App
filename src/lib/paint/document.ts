@@ -1,5 +1,5 @@
 /**
- * The paint editor's document: layers of vector strokes, stored as JSON.
+ * The paint document of the canvas editor's drawings: layers of vector strokes, stored as JSON.
  *
  * A layer may carry an image under its strokes: a drawing from before the
  * vector format becomes the image of the first layer, so nothing of it is

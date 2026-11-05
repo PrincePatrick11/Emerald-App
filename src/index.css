@@ -2308,12 +2308,6 @@ html[data-theme] .prop-segment--active {
 }
 
 /* The paint mode of the canvas editor (components/editors/canvas/paint). */
-.paint-editor {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-  outline: none;
-}
 .paint-color-chip {
   width: 14px;
   height: 14px;
@@ -2433,7 +2427,7 @@ input.paint-layer-name { display: block; }
   touch-action: none;
   cursor: none;
 }
-/* The brush's outline under the pointer (PaintCanvas places it). */
+/* The brush's outline under the pointer (PaintSurface places it). */
 .paint-cursor {
   position: absolute;
   top: 0;
