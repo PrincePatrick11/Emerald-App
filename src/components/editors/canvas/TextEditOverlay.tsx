@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from 'react';
-import type { BuilderElement } from './types';
+import type { CanvasElement } from './types';
 
 /**
  * Typing into an element whose type edits text in place: a text field laid
@@ -8,7 +8,7 @@ import type { BuilderElement } from './types';
  * ⌘/Ctrl+Enter and a click elsewhere end it and keep what was typed.
  */
 export default function TextEditOverlay({ element, initial, style, view, onDone }: {
-  element: BuilderElement;
+  element: CanvasElement;
   initial: string;
   /** The look at zoom 1; a numeric `fontSize` is scaled with the view. */
   style: CSSProperties;
@@ -44,7 +44,7 @@ export default function TextEditOverlay({ element, initial, style, view, onDone 
   return (
     <textarea
       ref={ref}
-      className="builder-text-input"
+      className="canvas-text-input"
       value={text}
       spellCheck={false}
       onChange={(e) => setText(e.target.value)}

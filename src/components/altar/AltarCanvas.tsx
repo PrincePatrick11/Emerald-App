@@ -19,14 +19,14 @@ import { AltarItemVisual } from './AltarItemVisual';
 import { canvasImageSrc, imageSrc } from '../../lib/images';
 import { THUMBNAIL_W, canvasToCappedThumbnail } from '../../lib/thumbnail';
 import {
-  BuilderEditor, canvasToDataUrl, renderBuilderImage, type BuilderEditorHandle, type BuilderElement, type BuilderGrid,
-} from '../editors/builder';
-import { elementToPlacement, placementToElement } from './altarBuilder';
+  CanvasEditor, canvasToDataUrl, renderCanvasImage, type CanvasEditorHandle, type CanvasElement, type CanvasGrid,
+} from '../editors/canvas';
+import { elementToPlacement, placementToElement } from './altarScene';
 
 // ---------------------------------------------------------------------------
 // Altar picture renderer — draws directly to a Canvas 2D context from store
-// data, for thumbnails and file export, with the builder's own drawing for
-// the elements (`renderBuilderImage`), so the picture matches the stage.
+// data, for thumbnails and file export, with the canvas editor's own drawing for
+// the elements (`renderCanvasImage`), so the picture matches the stage.
 // ---------------------------------------------------------------------------
 
 const PRESET_GRAD: Record<string, { cx: number; cy: number; stops: [string, number][] }> = {
@@ -141,7 +141,7 @@ async function _renderAltar(
   const { w: refW, h: refH } = resolveResolutionPixels(altar.resolution ?? DEFAULT_ALTAR_RESOLUTION);
   // The items' pictures as data URLs, not the on-screen `emerald-img` ones, so `toBlob` can read the canvas.
   const sources = new Map(await Promise.all(placements.map(async (p) => [p.id, (await canvasImageSrc(p.image_data)) || null] as const)));
-  return renderBuilderImage({
+  return renderCanvasImage({
     width: refW,
     height: refH,
     elements: placements.map((p) => placementToElement(p, refW, refH, () => sources.get(p.id) ?? null)),
@@ -194,11 +194,11 @@ export async function captureCurrentAltar(): Promise<string | null> {
 }
 
 // ---------------------------------------------------------------------------
-// The altar on screen: the builder editor (`editors/builder`), fed from the store.
+// The altar on screen: the canvas editor (`editors/canvas`), fed from the store.
 // ---------------------------------------------------------------------------
 
-/** The altar's grid in the builder's terms; `null` when nothing uses it. */
-function altarGrid(altar: AltarRecord): BuilderGrid | null {
+/** The altar's grid in the canvas editor's terms; `null` when nothing uses it. */
+function altarGrid(altar: AltarRecord): CanvasGrid | null {
   const size = altar.grid_size ?? 0;
   if (size <= 0 || !(altar.grid_enabled || altar.snap_to_grid || altar.snap_scale_to_grid)) return null;
   const { w, h } = resolveResolutionPixels(altar.resolution ?? DEFAULT_ALTAR_RESOLUTION);
@@ -221,7 +221,7 @@ export function AltarCanvas({ altar, backgroundSrc, editable, readAlign, onExpor
   editable: boolean;
   /** Where the altar sits while reading: at the top of the view, or (fullscreen) in the middle. */
   readAlign: 'top' | 'center';
-  /** Saving the altar as an image, from the builder's toolbar. */
+  /** Saving the altar as an image, from the canvas editor's toolbar. */
   onExport?: () => void;
 }) {
   const placements = useAltarStore((s) => s.placements);
@@ -229,7 +229,7 @@ export function AltarCanvas({ altar, backgroundSrc, editable, readAlign, onExpor
   const { placeItem, applyPlacements, selectPlacements } = useAltarStore(
     useShallow((s) => ({ placeItem: s.placeItem, applyPlacements: s.applyPlacements, selectPlacements: s.selectPlacements })),
   );
-  const builderRef = useRef<BuilderEditorHandle>(null);
+  const editorRef = useRef<CanvasEditorHandle>(null);
 
   const { w: refW, h: refH } = useMemo(
     () => resolveResolutionPixels(altar.resolution ?? DEFAULT_ALTAR_RESOLUTION),
@@ -242,7 +242,7 @@ export function AltarCanvas({ altar, backgroundSrc, editable, readAlign, onExpor
     [placements, refW, refH],
   );
 
-  const handleChange = useCallback((next: BuilderElement[]) => {
+  const handleChange = useCallback((next: CanvasElement[]) => {
     const previous = new Map(useAltarStore.getState().placements.map((p) => [p.id, p]));
     void applyPlacements(next.map((el) => elementToPlacement(el, refW, refH, previous.get(el.id)))).catch(console.error);
   }, [applyPlacements, refW, refH]);
@@ -263,7 +263,7 @@ export function AltarCanvas({ altar, backgroundSrc, editable, readAlign, onExpor
       const item = getAltarDragItem();
       setAltarDragItem(null);
       if (!item) return;
-      const point = builderRef.current?.clientToArtboard(e.clientX, e.clientY);
+      const point = editorRef.current?.clientToArtboard(e.clientX, e.clientY);
       if (!point || point.x < 0 || point.y < 0 || point.x > refW || point.y > refH) return;
       let x = (point.x / refW) * 100;
       let y = (point.y / refH) * 100;
@@ -282,8 +282,8 @@ export function AltarCanvas({ altar, backgroundSrc, editable, readAlign, onExpor
   }, [editable, dragItem, placeItem, refW, refH, grid]);
 
   return (
-    <BuilderEditor
-      ref={builderRef}
+    <CanvasEditor
+      ref={editorRef}
       width={refW}
       height={refH}
       elements={elements}
@@ -300,7 +300,7 @@ export function AltarCanvas({ altar, backgroundSrc, editable, readAlign, onExpor
       background={<div className="h-full w-full" style={{ background: getAltarBackgroundStyle(altar, backgroundSrc) }} />}
       overlay={editable && dragItem ? (
         <>
-          <div className="builder-drop-hint" />
+          <div className="canvas-drop-hint" />
           {ghostPos && createPortal(
             <div
               className="fixed pointer-events-none z-50 flex flex-col items-center gap-0.5 opacity-75"

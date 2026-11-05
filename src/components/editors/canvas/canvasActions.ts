@@ -1,5 +1,5 @@
 import { elementBounds, unionBounds } from './geometry';
-import { byZ, type BuilderElement } from './types';
+import { byZ, type CanvasElement } from './types';
 
 /**
  * Changes to a list of elements that toolbar and keys share. Each returns a
@@ -10,7 +10,7 @@ import { byZ, type BuilderElement } from './types';
 export type ArrangeMove = 'forward' | 'backward' | 'front' | 'back';
 
 /** New stacking for the selected elements; every element gets its index as `z`. */
-export function arrange(elements: readonly BuilderElement[], ids: readonly string[], move: ArrangeMove): BuilderElement[] {
+export function arrange(elements: readonly CanvasElement[], ids: readonly string[], move: ArrangeMove): CanvasElement[] {
   const selected = new Set(ids);
   const order = byZ(elements);
   if (move === 'front' || move === 'back') {
@@ -31,7 +31,7 @@ export function arrange(elements: readonly BuilderElement[], ids: readonly strin
   return withIndexZ(elements, list);
 }
 
-function withIndexZ(elements: readonly BuilderElement[], order: readonly BuilderElement[]): BuilderElement[] {
+function withIndexZ(elements: readonly CanvasElement[], order: readonly CanvasElement[]): CanvasElement[] {
   const z = new Map(order.map((el, i) => [el.id, i]));
   return elements.map((el) => (el.z === z.get(el.id) ? el : { ...el, z: z.get(el.id)! }));
 }
@@ -43,8 +43,8 @@ export type AlignEdge = 'left' | 'hcenter' | 'right' | 'top' | 'vcenter' | 'bott
  * or of the artboard when only one is selected.
  */
 export function align(
-  elements: readonly BuilderElement[], ids: readonly string[], edge: AlignEdge, artboard: { width: number; height: number },
-): BuilderElement[] {
+  elements: readonly CanvasElement[], ids: readonly string[], edge: AlignEdge, artboard: { width: number; height: number },
+): CanvasElement[] {
   const picked = elements.filter((el) => ids.includes(el.id) && !el.locked);
   const target = picked.length > 1
     ? unionBounds(picked.map(elementBounds))!
@@ -64,7 +64,7 @@ export function align(
 }
 
 /** Equal gaps between three or more selected elements, across or down. */
-export function distribute(elements: readonly BuilderElement[], ids: readonly string[], axis: 'horizontal' | 'vertical'): BuilderElement[] {
+export function distribute(elements: readonly CanvasElement[], ids: readonly string[], axis: 'horizontal' | 'vertical'): CanvasElement[] {
   const picked = elements.filter((el) => ids.includes(el.id) && !el.locked);
   if (picked.length < 3) return [...elements];
   const horizontal = axis === 'horizontal';
@@ -90,16 +90,16 @@ export function distribute(elements: readonly BuilderElement[], ids: readonly st
 
 /** Copies of `source`, shifted by `offset`, on top of everything, unlocked and visible. */
 export function copiesOf(
-  source: readonly BuilderElement[], elements: readonly BuilderElement[], offset: number, createId: () => string,
-): BuilderElement[] {
+  source: readonly CanvasElement[], elements: readonly CanvasElement[], offset: number, createId: () => string,
+): CanvasElement[] {
   let z = elements.reduce((max, el) => Math.max(max, el.z), -1);
   return byZ(source).map((el) => ({ ...el, id: createId(), x: el.x + offset, y: el.y + offset, z: ++z, locked: false, hidden: false }));
 }
 
 /** The same elements moved by (`dx`, `dy`), with their centres kept on the artboard. */
 export function nudge(
-  elements: readonly BuilderElement[], ids: readonly string[], dx: number, dy: number, artboard: { width: number; height: number },
-): BuilderElement[] {
+  elements: readonly CanvasElement[], ids: readonly string[], dx: number, dy: number, artboard: { width: number; height: number },
+): CanvasElement[] {
   return elements.map((el) => (ids.includes(el.id) && !el.locked
     ? { ...el, x: clamp(el.x + dx, 0, artboard.width), y: clamp(el.y + dy, 0, artboard.height) }
     : el));

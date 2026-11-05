@@ -1,4 +1,4 @@
-import type { BuilderElement, BuilderElementType } from '../types';
+import type { CanvasElement, CanvasElementType } from '../types';
 
 /** A picture, contained in its box; without a loaded source, the emoji. */
 export interface ImageProps {
@@ -8,7 +8,7 @@ export interface ImageProps {
   glow?: boolean;
 }
 
-export type ImageElement = BuilderElement<ImageProps>;
+export type ImageElement = CanvasElement<ImageProps>;
 
 /**
  * The flicker of a flame at `time` (ms): small changes of height, width and
@@ -23,7 +23,7 @@ function flicker(time: number): { sx: number; sy: number; alpha: number } {
   };
 }
 
-export const imageType: BuilderElementType<ImageProps> = {
+export const imageType: CanvasElementType<ImageProps> = {
   type: 'image',
   keepRatio: true,
   handles: 'corners',

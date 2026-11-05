@@ -2,14 +2,14 @@ import { useTranslation } from 'react-i18next';
 import { Circle, Hexagon, PaintBucket, Shapes, Square, SquareDashed, Star, Triangle } from 'lucide-react';
 import PopoverButton from '../../shared/PopoverButton';
 import { ToolbarGroup } from '../../shared/toolbarParts';
-import type { BuilderAddition, BuilderElement, BuilderElementType } from '../types';
+import type { CanvasAddition, CanvasElement, CanvasElementType } from '../types';
 import { ColorPanel, NumberField, common } from './controlParts';
 
-export const BUILDER_SHAPES = ['rect', 'ellipse', 'triangle', 'star', 'hexagon'] as const;
-export type BuilderShape = (typeof BUILDER_SHAPES)[number];
+export const CANVAS_SHAPES = ['rect', 'ellipse', 'triangle', 'star', 'hexagon'] as const;
+export type CanvasShape = (typeof CANVAS_SHAPES)[number];
 
 export interface ShapeProps {
-  shape: BuilderShape;
+  shape: CanvasShape;
   /** `#rrggbb`, or `null` for no fill. */
   fill: string | null;
   /** `#rrggbb`, or `null` for no outline. */
@@ -19,7 +19,7 @@ export interface ShapeProps {
   cornerRadius: number;
 }
 
-export type ShapeElement = BuilderElement<ShapeProps>;
+export type ShapeElement = CanvasElement<ShapeProps>;
 
 export const DEFAULT_FILL = '#d4af37';
 
@@ -68,7 +68,7 @@ export function shapePath(ctx: CanvasRenderingContext2D, props: Pick<ShapeProps,
   }
 }
 
-const SHAPE_ICONS: Record<BuilderShape, React.ReactNode> = {
+const SHAPE_ICONS: Record<CanvasShape, React.ReactNode> = {
   rect: <Square size={14} />,
   ellipse: <Circle size={14} />,
   triangle: <Triangle size={14} />,
@@ -76,10 +76,10 @@ const SHAPE_ICONS: Record<BuilderShape, React.ReactNode> = {
   hexagon: <Hexagon size={14} />,
 };
 
-const additions: BuilderAddition<ShapeProps>[] = BUILDER_SHAPES.map((shape) => ({
+const additions: CanvasAddition<ShapeProps>[] = CANVAS_SHAPES.map((shape) => ({
   key: shape,
   icon: SHAPE_ICONS[shape],
-  label: (t) => t(`builder.shape.${shape}`),
+  label: (t) => t(`canvas.shape.${shape}`),
   create: (_centre, artboard) => {
     const side = Math.round(Math.min(artboard.width, artboard.height) * 0.22);
     return {
@@ -100,15 +100,15 @@ function ShapeControls({ elements, update }: {
   const stroke = common(elements, (el) => el.props.stroke);
   return (
     <ToolbarGroup>
-      <PopoverButton icon={<PaintBucket size={14} style={fill ? { color: fill } : undefined} />} title={t('builder.fill')} active={false}>
+      <PopoverButton icon={<PaintBucket size={14} style={fill ? { color: fill } : undefined} />} title={t('canvas.fill')} active={false}>
         {(close) => <ColorPanel value={fill} allowNone onPick={(color) => { set({ fill: color }); close(); }} />}
       </PopoverButton>
-      <PopoverButton icon={<SquareDashed size={14} style={stroke ? { color: stroke } : undefined} />} title={t('builder.outline')} active={false}>
+      <PopoverButton icon={<SquareDashed size={14} style={stroke ? { color: stroke } : undefined} />} title={t('canvas.outline')} active={false}>
         {(close) => (
-          <div className="builder-panel">
+          <div className="canvas-panel">
             <ColorPanel value={stroke} allowNone onPick={(color) => { set({ stroke: color }); if (!color) close(); }} />
             <NumberField
-              label={t('builder.outlineWidth')}
+              label={t('canvas.outlineWidth')}
               value={common(elements, (el) => el.props.strokeWidth)}
               min={0}
               max={80}
@@ -116,7 +116,7 @@ function ShapeControls({ elements, update }: {
             />
             {elements.every((el) => el.props.shape === 'rect') && (
               <NumberField
-                label={t('builder.cornerRadius')}
+                label={t('canvas.cornerRadius')}
                 value={common(elements, (el) => el.props.cornerRadius)}
                 min={0}
                 max={400}
@@ -130,7 +130,7 @@ function ShapeControls({ elements, update }: {
   );
 }
 
-export const shapeType: BuilderElementType<ShapeProps> = {
+export const shapeType: CanvasElementType<ShapeProps> = {
   type: 'shape',
   handles: 'all',
   draw: (ctx, el) => {
@@ -151,6 +151,6 @@ export const shapeType: BuilderElementType<ShapeProps> = {
     props: { ...el.props, strokeWidth: el.props.strokeWidth * Math.sqrt(sx * sy), cornerRadius: el.props.cornerRadius * Math.min(sx, sy) },
   }),
   additions,
-  additionsGroup: { icon: <Shapes size={14} />, label: (t) => t('builder.addShape') },
+  additionsGroup: { icon: <Shapes size={14} />, label: (t) => t('canvas.addShape') },
   controls: ShapeControls,
 };

@@ -2,7 +2,7 @@ import { useTranslation } from 'react-i18next';
 import { Ban } from 'lucide-react';
 
 /** Colours for shapes and text: metals, parchment, and a few deep colours. */
-export const BUILDER_SWATCHES = [
+export const CANVAS_SWATCHES = [
   '#d4af37', '#c0c0c0', '#b87333', '#f4ecd8', '#ffffff',
   '#8b1e2d', '#c65d1e', '#2e7d5b', '#1e3a6e', '#5b3a7a',
   '#0b0b0f', '#3a3a44',
@@ -23,23 +23,23 @@ export function ColorPanel({ value, allowNone = false, onPick }: {
 }) {
   const { t } = useTranslation();
   return (
-    <div className="builder-swatches">
+    <div className="canvas-swatches">
       {allowNone && (
-        <button type="button" className={`builder-swatch builder-swatch-none ${value === null ? 'builder-swatch-active' : ''}`} title={t('builder.noColor')} onClick={() => onPick(null)}>
+        <button type="button" className={`canvas-swatch canvas-swatch-none ${value === null ? 'canvas-swatch-active' : ''}`} title={t('canvas.noColor')} onClick={() => onPick(null)}>
           <Ban size={12} />
         </button>
       )}
-      {BUILDER_SWATCHES.map((color) => (
+      {CANVAS_SWATCHES.map((color) => (
         <button
           key={color}
           type="button"
-          className={`builder-swatch ${value === color ? 'builder-swatch-active' : ''}`}
+          className={`canvas-swatch ${value === color ? 'canvas-swatch-active' : ''}`}
           style={{ background: color }}
           title={color}
           onClick={() => onPick(color)}
         />
       ))}
-      <label className="builder-swatch builder-swatch-custom" title={t('builder.customColor')}>
+      <label className="canvas-swatch canvas-swatch-custom" title={t('canvas.customColor')}>
         <input type="color" value={value ?? '#ffffff'} onChange={(e) => onPick(e.target.value)} />
       </label>
     </div>
@@ -58,7 +58,7 @@ export function NumberField({ label, value, min, max, onChange, inline = false }
 }) {
   const input = (
     <input
-      className="editor-inline-input builder-size-input"
+      className="editor-inline-input canvas-size-input"
       type="number"
       min={min}
       max={max}
@@ -74,7 +74,7 @@ export function NumberField({ label, value, min, max, onChange, inline = false }
   );
   if (inline) return input;
   return (
-    <label className="builder-number-row">
+    <label className="canvas-number-row">
       <span>{label}</span>
       {input}
     </label>

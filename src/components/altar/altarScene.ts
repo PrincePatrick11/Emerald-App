@@ -1,9 +1,9 @@
-import type { BuilderElement, ImageProps, ShapeProps, TextProps } from '../editors/builder';
+import type { CanvasElement, ImageProps, ShapeProps, TextProps } from '../editors/canvas';
 import { BASE_RESOLUTION_WIDTH, isCandleEmoji } from '../../lib/altarConstants';
 import type { AltarPlacement } from '../../types';
 
 /**
- * The altar in the builder's terms and back. The builder works in pixels of
+ * The altar in the canvas editor's terms and back. The canvas editor works in pixels of
  * the altar's reference resolution (`resolveResolutionPixels`); a placement
  * stores its centre in percent of the altar and its size in units, where a
  * unit is 5 px at the reference width of 1920 (40 units, an item's default,
@@ -25,7 +25,7 @@ export function placementToElement(
   refW: number,
   refH: number,
   imageSrcFor: (imageData: string | undefined) => string | null,
-): BuilderElement {
+): CanvasElement {
   const unit = unitPx(refW);
   const k = pxScale(refW);
   const frame = {
@@ -63,11 +63,11 @@ export function placementToElement(
 const round = (n: number, digits = 3) => Math.round(n * 10 ** digits) / 10 ** digits;
 
 /**
- * A builder element as a placement. `previous` is the placement it was, for
- * what the builder does not carry (name, emoji, image of the item).
+ * A canvas element as a placement. `previous` is the placement it was, for
+ * what the canvas editor does not carry (name, emoji, image of the item).
  */
 export function elementToPlacement(
-  el: BuilderElement,
+  el: CanvasElement,
   refW: number,
   refH: number,
   previous: AltarPlacement | undefined,

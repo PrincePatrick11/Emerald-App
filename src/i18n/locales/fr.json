@@ -576,7 +576,7 @@
       "loadFailed": "Impossible de charger une image de ce dessin"
     }
   },
-  "builder": {
+  "canvas": {
     "newText": "Texte",
     "addShape": "Ajouter une forme",
     "addText": "Ajouter du texte",

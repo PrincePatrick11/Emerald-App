@@ -7,8 +7,8 @@ import {
 } from 'lucide-react';
 import { ToolbarBtn, ToolbarDivider, ToolbarGroup } from '../shared/toolbarParts';
 import PopoverButton from '../shared/PopoverButton';
-import type { BuilderController } from './BuilderEditor';
-import type { AlignEdge } from './builderActions';
+import type { CanvasController } from './CanvasEditor';
+import type { AlignEdge } from './canvasActions';
 
 const ALIGN_ICONS: Record<AlignEdge, ReactNode> = {
   left: <AlignHorizontalJustifyStart size={14} />,
@@ -20,14 +20,14 @@ const ALIGN_ICONS: Record<AlignEdge, ReactNode> = {
 };
 
 /**
- * The builder's bar. Like the text editor's, it shows what the builder can do:
+ * The canvas editor's bar. Like the text editor's, it shows what the canvas editor can do:
  * in the order of working, undo; what can be added (each registered type's
  * additions, several of one type behind one button); the controls of the
  * selected elements' types; where the selection sits (stacking, aligning),
  * duplicating and removing; and saving as an image at the far end. Zoom
- * sits on the stage itself (`BuilderZoom`), so the bar stays one row.
+ * sits on the stage itself (`CanvasZoom`), so the bar stays one row.
  */
-export default function BuilderToolbar({ controller: c, end }: { controller: BuilderController; end?: ReactNode }) {
+export default function CanvasToolbar({ controller: c, end }: { controller: CanvasController; end?: ReactNode }) {
   const { t } = useTranslation();
   const f = c.features;
   const editable = c.selected.filter((el) => !el.locked);
@@ -37,7 +37,7 @@ export default function BuilderToolbar({ controller: c, end }: { controller: Bui
   const selectedTypes = types.filter((type) => type.controls && editable.some((el) => el.type === type.type));
 
   return (
-    <div className="editor-toolbar builder-toolbar">
+    <div className="editor-toolbar canvas-toolbar">
       {f.history && (<>
         <ToolbarGroup>
           <ToolbarBtn onClick={c.undo} active={false} disabled={!c.canUndo} title={t('editor.toolbar.undo')}><Undo2 size={14} /></ToolbarBtn>
@@ -91,13 +91,13 @@ export default function BuilderToolbar({ controller: c, end }: { controller: Bui
       {hasSelection && (
         <ToolbarGroup>
           {f.arrange && (
-            <PopoverButton icon={<Layers2 size={14} />} title={t('builder.arrange')} active={false}>
+            <PopoverButton icon={<Layers2 size={14} />} title={t('canvas.arrange')} active={false}>
               {(close) => (
                 <ToolbarGroup>
-                  <ToolbarBtn onClick={() => { c.arrange('front'); close(); }} active={false} title={t('builder.toFront')}><BringToFront size={14} /></ToolbarBtn>
-                  <ToolbarBtn onClick={() => c.arrange('forward')} active={false} title={t('builder.forward')}><ArrowUp size={14} /></ToolbarBtn>
-                  <ToolbarBtn onClick={() => c.arrange('backward')} active={false} title={t('builder.backward')}><ArrowDown size={14} /></ToolbarBtn>
-                  <ToolbarBtn onClick={() => { c.arrange('back'); close(); }} active={false} title={t('builder.toBack')}><SendToBack size={14} /></ToolbarBtn>
+                  <ToolbarBtn onClick={() => { c.arrange('front'); close(); }} active={false} title={t('canvas.toFront')}><BringToFront size={14} /></ToolbarBtn>
+                  <ToolbarBtn onClick={() => c.arrange('forward')} active={false} title={t('canvas.forward')}><ArrowUp size={14} /></ToolbarBtn>
+                  <ToolbarBtn onClick={() => c.arrange('backward')} active={false} title={t('canvas.backward')}><ArrowDown size={14} /></ToolbarBtn>
+                  <ToolbarBtn onClick={() => { c.arrange('back'); close(); }} active={false} title={t('canvas.toBack')}><SendToBack size={14} /></ToolbarBtn>
                 </ToolbarGroup>
               )}
             </PopoverButton>
@@ -105,33 +105,33 @@ export default function BuilderToolbar({ controller: c, end }: { controller: Bui
           {f.align && (
             <PopoverButton
               icon={<AlignHorizontalJustifyCenter size={14} />}
-              title={editable.length > 1 ? t('builder.alignSelection') : t('builder.alignArtboard')}
+              title={editable.length > 1 ? t('canvas.alignSelection') : t('canvas.alignArtboard')}
               active={false}
             >
               {() => (
                 <ToolbarGroup>
                   {(Object.keys(ALIGN_ICONS) as AlignEdge[]).map((edge) => (
-                    <ToolbarBtn key={edge} onClick={() => c.align(edge)} active={false} title={t(`builder.align.${edge}`)}>
+                    <ToolbarBtn key={edge} onClick={() => c.align(edge)} active={false} title={t(`canvas.align.${edge}`)}>
                       {ALIGN_ICONS[edge]}
                     </ToolbarBtn>
                   ))}
                   {editable.length > 2 && (<>
                     <ToolbarDivider />
-                    <ToolbarBtn onClick={() => c.distribute('horizontal')} active={false} title={t('builder.distributeHorizontal')}><AlignHorizontalDistributeCenter size={14} /></ToolbarBtn>
-                    <ToolbarBtn onClick={() => c.distribute('vertical')} active={false} title={t('builder.distributeVertical')}><AlignVerticalDistributeCenter size={14} /></ToolbarBtn>
+                    <ToolbarBtn onClick={() => c.distribute('horizontal')} active={false} title={t('canvas.distributeHorizontal')}><AlignHorizontalDistributeCenter size={14} /></ToolbarBtn>
+                    <ToolbarBtn onClick={() => c.distribute('vertical')} active={false} title={t('canvas.distributeVertical')}><AlignVerticalDistributeCenter size={14} /></ToolbarBtn>
                   </>)}
                 </ToolbarGroup>
               )}
             </PopoverButton>
           )}
-          <ToolbarBtn onClick={c.duplicate} active={false} title={t('builder.duplicate')}><Copy size={14} /></ToolbarBtn>
-          <ToolbarBtn onClick={c.removeSelected} active={false} title={t('builder.remove')}><Trash2 size={14} /></ToolbarBtn>
+          <ToolbarBtn onClick={c.duplicate} active={false} title={t('canvas.duplicate')}><Copy size={14} /></ToolbarBtn>
+          <ToolbarBtn onClick={c.removeSelected} active={false} title={t('canvas.remove')}><Trash2 size={14} /></ToolbarBtn>
         </ToolbarGroup>
       )}
 
       <div className="editor-toolbar-end">
         {f.export && c.onExport && (
-          <ToolbarBtn onClick={c.onExport} active={false} title={t('builder.export')}><ImageDown size={14} /></ToolbarBtn>
+          <ToolbarBtn onClick={c.onExport} active={false} title={t('canvas.export')}><ImageDown size={14} /></ToolbarBtn>
         )}
         {end}
       </div>
@@ -140,15 +140,15 @@ export default function BuilderToolbar({ controller: c, end }: { controller: Bui
 }
 
 /** Zoom out, the level (a click fits the view), zoom in: a small bar in the stage's corner. */
-export function BuilderZoom({ controller: c }: { controller: BuilderController }) {
+export function CanvasZoom({ controller: c }: { controller: CanvasController }) {
   const { t } = useTranslation();
   return (
-    <div className="editor-toolbar builder-zoom">
-      <ToolbarBtn onClick={c.zoomOut} active={false} title={t('builder.zoomOut')}><ZoomOut size={14} /></ToolbarBtn>
-      <ToolbarBtn onClick={c.fit} active={false} title={t('builder.fit')}>
+    <div className="editor-toolbar canvas-zoom">
+      <ToolbarBtn onClick={c.zoomOut} active={false} title={t('canvas.zoomOut')}><ZoomOut size={14} /></ToolbarBtn>
+      <ToolbarBtn onClick={c.fit} active={false} title={t('canvas.fit')}>
         <span className="editor-toolbar-btn-label tabular-nums">{Math.round(c.zoom * 100)}%</span>
       </ToolbarBtn>
-      <ToolbarBtn onClick={c.zoomIn} active={false} title={t('builder.zoomIn')}><ZoomIn size={14} /></ToolbarBtn>
+      <ToolbarBtn onClick={c.zoomIn} active={false} title={t('canvas.zoomIn')}><ZoomIn size={14} /></ToolbarBtn>
     </div>
   );
 }

@@ -576,7 +576,7 @@
       "loadFailed": "Couldn't load an image of this drawing"
     }
   },
-  "builder": {
+  "canvas": {
     "newText": "Text",
     "addShape": "Add shape",
     "addText": "Add text",

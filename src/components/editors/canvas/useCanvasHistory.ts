@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { BuilderElement } from './types';
+import type { CanvasElement } from './types';
 
 const LIMIT = 100;
 /** Outside changes this close together are one step: a slider in a side panel. */
@@ -7,41 +7,41 @@ const MERGE_MS = 600;
 /** How long an undo waits for the place to hand back what it applied. */
 const SETTLE_MS = 400;
 
-function same(a: readonly BuilderElement[], b: readonly BuilderElement[]): boolean {
+function same(a: readonly CanvasElement[], b: readonly CanvasElement[]): boolean {
   if (a === b) return true;
   if (a.length !== b.length) return false;
-  const key = (list: readonly BuilderElement[]) => JSON.stringify([...list].sort((x, y) => x.id.localeCompare(y.id)));
+  const key = (list: readonly CanvasElement[]) => JSON.stringify([...list].sort((x, y) => x.id.localeCompare(y.id)));
   return key(a) === key(b);
 }
 
-export interface BuilderHistory {
+export interface CanvasHistory {
   undo: () => void;
   redo: () => void;
   canUndo: boolean;
   canRedo: boolean;
-  /** Call before the builder's own `onChange`: that change is one step of its own. */
+  /** Call before the canvas editor's own `onChange`: that change is one step of its own. */
   markLocal: () => void;
 }
 
 /**
- * Undo and redo for a builder whose elements live with the place that embeds
+ * Undo and redo for a canvas editor whose elements live with the place that embeds
  * it. The history follows the `elements` it is handed, whoever changed them:
- * the builder's own gestures are one step each, changes from outside (a side
+ * the canvas editor's own gestures are one step each, changes from outside (a side
  * panel) too, except that a burst of them counts once. Undo hands an earlier
  * list to `apply`; what comes back from the place replaces it, so clamping
  * there does not count as a new step.
  *
  * `resetKey`: when it changes, the history starts over at the current list.
  */
-export function useBuilderHistory(
-  elements: readonly BuilderElement[],
-  apply: (elements: BuilderElement[]) => void,
+export function useCanvasHistory(
+  elements: readonly CanvasElement[],
+  apply: (elements: CanvasElement[]) => void,
   resetKey: string,
-): BuilderHistory {
+): CanvasHistory {
   const state = useRef({
-    past: [] as BuilderElement[][],
-    present: elements as BuilderElement[],
-    future: [] as BuilderElement[][],
+    past: [] as CanvasElement[][],
+    present: elements as CanvasElement[],
+    future: [] as CanvasElement[][],
     local: false,
     applying: 0,
     lastOutside: 0,
@@ -65,7 +65,7 @@ export function useBuilderHistory(
     }
     const now = performance.now();
     if (s.applying && now - s.applying < SETTLE_MS) {
-      s.present = elements as BuilderElement[];
+      s.present = elements as CanvasElement[];
       s.applying = 0;
       return;
     }
@@ -78,7 +78,7 @@ export function useBuilderHistory(
       s.lastOutside = now;
     }
     if (s.past.length > LIMIT) s.past.shift();
-    s.present = elements as BuilderElement[];
+    s.present = elements as CanvasElement[];
     s.future = [];
     bump();
   }, [elements]);

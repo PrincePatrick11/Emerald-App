@@ -7,17 +7,17 @@ import Konva from 'konva';
 import { Group, Layer, Line, Rect, Shape, Stage, Transformer } from 'react-konva';
 import { DRAG_THRESHOLD_PX, trackPointerDrag } from '../../../lib/pointerDrag';
 import { drawElement, resourcesOf } from './draw';
-import { cachedBuilderImage, useBuilderResources } from './imageCache';
+import { cachedCanvasImage, useCanvasResources } from './imageCache';
 import { boxFromPoints, boxesIntersect, elementBounds, unionBounds, type Box } from './geometry';
 import { snapToGuides, snapToStep, type Guide } from './snapping';
-import { useBuilderHistory } from './useBuilderHistory';
-import { FULL_BUILDER_FEATURES, type BuilderFeatures } from './features';
-import { BUILTIN_BUILDER_TYPES } from './elements';
+import { useCanvasHistory } from './useCanvasHistory';
+import { FULL_CANVAS_FEATURES, type CanvasFeatures } from './features';
+import { BUILTIN_CANVAS_TYPES } from './elements';
 import {
   align, arrange, clamp, copiesOf, distribute, nudge, type AlignEdge, type ArrangeMove,
-} from './builderActions';
-import { byZ, type BuilderAddition, type BuilderElement, type BuilderGrid, type BuilderTypes } from './types';
-import BuilderToolbar, { BuilderZoom } from './BuilderToolbar';
+} from './canvasActions';
+import { byZ, type CanvasAddition, type CanvasElement, type CanvasGrid, type CanvasTypes } from './types';
+import CanvasToolbar, { CanvasZoom } from './CanvasToolbar';
 import TextEditOverlay from './TextEditOverlay';
 
 /** How close, on screen, an edge has to come to a guide to snap. */
@@ -28,32 +28,32 @@ const MAX_ZOOM = 8;
 const EDIT_PADDING = 32;
 const PASTE_OFFSET = 24;
 
-/** What the builder keeps between two pastes (one per window, shared by every builder). */
-let clipboard: BuilderElement[] = [];
+/** What the canvas editor keeps between two pastes (one per window, shared by every canvas editor). */
+let clipboard: CanvasElement[] = [];
 
-export interface BuilderEditorHandle {
+export interface CanvasEditorHandle {
   /** A point of the window in artboard pixels, or `null` when it is outside the stage. */
   clientToArtboard: (clientX: number, clientY: number) => { x: number; y: number } | null;
   /** The middle of what is visible of the artboard, for placing new elements. */
   visibleCentre: () => { x: number; y: number };
 }
 
-export interface BuilderEditorProps {
+export interface CanvasEditorProps {
   /** The artboard, in its own pixels. */
   width: number;
   height: number;
-  elements: BuilderElement[];
-  /** Every change made in the builder, as the whole new list. */
-  onChange: (elements: BuilderElement[]) => void;
+  elements: CanvasElement[];
+  /** Every change made in the canvas editor, as the whole new list. */
+  onChange: (elements: CanvasElement[]) => void;
   selectedIds: string[];
   onSelectionChange: (ids: string[]) => void;
   editable: boolean;
   /** The element types, by name; default the built-in image, shape and text. */
-  types?: BuilderTypes;
-  features?: BuilderFeatures;
+  types?: CanvasTypes;
+  features?: CanvasFeatures;
   /** Painted behind the artboard, filling it (DOM: an image, a gradient). */
   background?: ReactNode;
-  grid?: BuilderGrid | null;
+  grid?: CanvasGrid | null;
   /** Rotation snaps to multiples of this, in degrees; `null`: near the right angles, and 15° with Shift. */
   rotationSnap?: number | null;
   /** When it changes, undo starts over (another document). */
@@ -63,7 +63,7 @@ export interface BuilderEditorProps {
   /** New ids for added and copied elements. */
   createId?: () => string;
   /** Opening an element whose type has no typing in place (double-click or Enter), e.g. in an editor of its own. */
-  onEditElement?: (element: BuilderElement) => void;
+  onEditElement?: (element: CanvasElement) => void;
   /** Saving as an image, offered in the toolbar when given and `features.export` is on. */
   onExport?: () => void;
   /** Drawn over the viewport, e.g. a hint while something is dragged in. */
@@ -87,23 +87,23 @@ function readToken(el: HTMLElement | null, name: string, fallback: string): stri
  * Where a box's centre goes when its height changes from `before` to `after`,
  * keeping its top edge in place (along its own rotation).
  */
-function keepTop(el: Pick<BuilderElement, 'x' | 'y' | 'rotation'>, before: number, after: number): { x: number; y: number } {
+function keepTop(el: Pick<CanvasElement, 'x' | 'y' | 'rotation'>, before: number, after: number): { x: number; y: number } {
   const shift = (after - before) / 2;
   const rad = (el.rotation * Math.PI) / 180;
   return { x: el.x - Math.sin(rad) * shift, y: el.y + Math.cos(rad) * shift };
 }
 
 /**
- * The builder: elements on an artboard, selected with handles to move, scale
+ * The canvas editor: elements on an artboard, selected with handles to move, scale
  * and rotate them, several at once, with guides and a grid, zoom and pan,
  * undo, keys and a toolbar. What the elements are and how they draw comes
  * from the type registry (`types`); the elements belong to the embedding place
- * (`elements`/`onChange`). The builder keeps only the view and what a gesture
+ * (`elements`/`onChange`). The canvas editor keeps only the view and what a gesture
  * moves before it is committed. See Documentation/architecture/editors.md.
  */
-const BuilderEditor = forwardRef<BuilderEditorHandle, BuilderEditorProps>(function BuilderEditor({
+const CanvasEditor = forwardRef<CanvasEditorHandle, CanvasEditorProps>(function CanvasEditor({
   width, height, elements, onChange, selectedIds, onSelectionChange, editable,
-  types = BUILTIN_BUILDER_TYPES, features = FULL_BUILDER_FEATURES, background, grid = null, rotationSnap = null,
+  types = BUILTIN_CANVAS_TYPES, features = FULL_CANVAS_FEATURES, background, grid = null, rotationSnap = null,
   historyKey = '', readAlign = 'center', createId = () => crypto.randomUUID(), onEditElement, onExport, overlay, toolbarEnd,
 }, ref) {
   const { t } = useTranslation();
@@ -128,20 +128,20 @@ const BuilderEditor = forwardRef<BuilderEditorHandle, BuilderEditorProps>(functi
   const live = useRef({ elements, selectedIds, view, onChange, onSelectionChange, grid, types });
   live.current = { elements, selectedIds, view, onChange, onSelectionChange, grid, types };
 
-  const history = useBuilderHistory(elements, onChange, `${historyKey}:${editable}`);
-  const commit = useCallback((next: BuilderElement[]) => {
+  const history = useCanvasHistory(elements, onChange, `${historyKey}:${editable}`);
+  const commit = useCallback((next: CanvasElement[]) => {
     history.markLocal();
     live.current.onChange(next);
   }, [history]);
 
   const { sources, fonts } = useMemo(() => resourcesOf(elements, types), [elements, types]);
-  const resourceVersion = useBuilderResources(sources, fonts);
+  const resourceVersion = useCanvasResources(sources, fonts);
   const sorted = useMemo(() => byZ(elements), [elements]);
   const byId = useMemo(() => new Map(elements.map((el) => [el.id, el])), [elements]);
-  const selected = useMemo(() => selectedIds.map((id) => byId.get(id)).filter((el): el is BuilderElement => !!el), [selectedIds, byId]);
+  const selected = useMemo(() => selectedIds.map((id) => byId.get(id)).filter((el): el is CanvasElement => !!el), [selectedIds, byId]);
 
   /** The element with its height fitted to its type, the top edge kept. */
-  const fitted = useCallback((el: BuilderElement, heightBefore = el.height): BuilderElement => {
+  const fitted = useCallback((el: CanvasElement, heightBefore = el.height): CanvasElement => {
     const fit = live.current.types[el.type]?.fitHeight;
     if (!fit) return el;
     const h = fit(el);
@@ -277,20 +277,20 @@ const BuilderEditor = forwardRef<BuilderEditorHandle, BuilderEditorProps>(functi
   // ── Committing changes ────────────────────────────────────────────────
 
   /** The elements with the given ones replaced. */
-  const patched = useCallback((changes: Map<string, BuilderElement>) =>
+  const patched = useCallback((changes: Map<string, CanvasElement>) =>
     live.current.elements.map((el) => changes.get(el.id) ?? el), []);
 
   const commitTransform = useCallback(() => {
     const tr = transformerRef.current;
     const sides = (tr?.getActiveAnchor() ?? '').startsWith('middle');
-    const changes = new Map<string, BuilderElement>();
+    const changes = new Map<string, CanvasElement>();
     for (const el of live.current.elements) {
       const node = nodes.current.get(el.id);
       if (!node || !tr?.nodes().includes(node)) continue;
       const sx = Math.abs(node.scaleX());
       const sy = Math.abs(node.scaleY());
       const rotation = ((node.rotation() % 360) + 360) % 360;
-      let next: BuilderElement = {
+      let next: CanvasElement = {
         ...el, x: node.x(), y: node.y(), rotation: Math.round(rotation * 10) / 10,
         width: Math.max(1, node.width() * sx), height: Math.max(1, node.height() * sy),
       };
@@ -320,9 +320,9 @@ const BuilderEditor = forwardRef<BuilderEditorHandle, BuilderEditorProps>(functi
 
   // ── Pointer gestures ──────────────────────────────────────────────────
 
-  const elementAt = (target: Konva.Node): BuilderElement | null => {
+  const elementAt = (target: Konva.Node): CanvasElement | null => {
     let node: Konva.Node | null = target;
-    while (node && !node.hasName('builder-element')) node = node.getParent();
+    while (node && !node.hasName('canvas-element')) node = node.getParent();
     if (!node) return null;
     return live.current.elements.find((el) => el.id === node!.id()) ?? null;
   };
@@ -406,7 +406,7 @@ const BuilderEditor = forwardRef<BuilderEditorHandle, BuilderEditorProps>(functi
         setGesture(false);
         setGuides([]);
         if (!started) return;
-        const changes = new Map<string, BuilderElement>();
+        const changes = new Map<string, CanvasElement>();
         for (const el of moving) {
           const node = nodes.current.get(el.id);
           if (!node) continue;
@@ -475,7 +475,7 @@ const BuilderEditor = forwardRef<BuilderEditorHandle, BuilderEditorProps>(functi
     select([]);
   }, [commit, editableIds, select]);
 
-  const addCopies = useCallback((source: BuilderElement[], offset: number) => {
+  const addCopies = useCallback((source: CanvasElement[], offset: number) => {
     if (!source.length) return;
     const copies = copiesOf(source, live.current.elements, offset, createId);
     commit([...live.current.elements, ...copies]);
@@ -491,7 +491,7 @@ const BuilderEditor = forwardRef<BuilderEditorHandle, BuilderEditorProps>(functi
   }, []);
 
   const paste = useCallback(() => {
-    // Only what this builder can draw.
+    // Only what this canvas editor can draw.
     addCopies(clipboard.filter((el) => live.current.types[el.type]), PASTE_OFFSET);
     clipboard = clipboard.map((el) => ({ ...el, x: el.x + PASTE_OFFSET, y: el.y + PASTE_OFFSET }));
   }, [addCopies]);
@@ -508,9 +508,9 @@ const BuilderEditor = forwardRef<BuilderEditorHandle, BuilderEditorProps>(functi
     commit(distribute(live.current.elements, editableIds(), axis));
   }, [commit, editableIds]);
 
-  const updateSelected = useCallback((type: string, patch: (el: BuilderElement) => Partial<BuilderElement> | null) => {
+  const updateSelected = useCallback((type: string, patch: (el: CanvasElement) => Partial<CanvasElement> | null) => {
     const ids = editableIds();
-    const changes = new Map<string, BuilderElement>();
+    const changes = new Map<string, CanvasElement>();
     for (const el of live.current.elements) {
       if (!ids.includes(el.id) || el.type !== type) continue;
       const p = patch(el);
@@ -519,14 +519,14 @@ const BuilderEditor = forwardRef<BuilderEditorHandle, BuilderEditorProps>(functi
     if (changes.size) commit(patched(changes));
   }, [commit, editableIds, patched, fitted]);
 
-  const add = useCallback((type: string, addition: BuilderAddition) => {
+  const add = useCallback((type: string, addition: CanvasAddition) => {
     // Something already sits there: a step down and to the right, so the new one shows.
     let centre = visibleCentre();
     while (live.current.elements.some((e) => Math.abs(e.x - centre.x) < 1 && Math.abs(e.y - centre.y) < 1)) {
       centre = { x: centre.x + PASTE_OFFSET, y: centre.y + PASTE_OFFSET };
     }
     const made = addition.create(centre, { width, height }, t);
-    const el: BuilderElement = {
+    const el: CanvasElement = {
       id: createId(), type, x: centre.x, y: centre.y, rotation: 0, opacity: 1, locked: false, hidden: false,
       z: live.current.elements.reduce((max, e) => Math.max(max, e.z), -1) + 1,
       ...made,
@@ -536,7 +536,7 @@ const BuilderEditor = forwardRef<BuilderEditorHandle, BuilderEditorProps>(functi
     if (live.current.types[type]?.textEdit) setEditingTextId(el.id);
   }, [visibleCentre, width, height, t, createId, commit, select]);
 
-  const openElement = useCallback((el: BuilderElement) => {
+  const openElement = useCallback((el: CanvasElement) => {
     if (el.locked) return;
     if (live.current.types[el.type]?.textEdit) setEditingTextId(el.id);
     else onEditElement?.(el);
@@ -643,10 +643,10 @@ const BuilderEditor = forwardRef<BuilderEditorHandle, BuilderEditorProps>(functi
   const editingType = editingText ? types[editingText.type]?.textEdit : undefined;
   // Outlines: while reading the selection (there are no handles), while editing what the pointer is over.
   const outlined = editable
-    ? (hoveredId && !selectedIds.includes(hoveredId) && !gesture ? [byId.get(hoveredId)].filter((el): el is BuilderElement => !!el && !el.hidden) : [])
+    ? (hoveredId && !selectedIds.includes(hoveredId) && !gesture ? [byId.get(hoveredId)].filter((el): el is CanvasElement => !!el && !el.hidden) : [])
     : selected.filter((el) => !el.hidden);
 
-  const controller: BuilderController = {
+  const controller: CanvasController = {
     features, types, selected, canUndo: history.canUndo, canRedo: history.canRedo,
     undo: history.undo, redo: history.redo, add, removeSelected, duplicate,
     arrange: doArrange, align: doAlign, distribute: doDistribute, update: updateSelected,
@@ -657,32 +657,32 @@ const BuilderEditor = forwardRef<BuilderEditorHandle, BuilderEditorProps>(functi
   return (
     <div
       ref={rootRef}
-      className={`builder-editor ${editable ? 'builder-editor-editing' : ''}`}
+      className={`canvas-editor ${editable ? 'canvas-editor-editing' : ''}`}
       tabIndex={editable ? -1 : undefined}
       onKeyDown={onKeyDown}
     >
       {editable && (
-        <div className="builder-toolbar-strip">
-          <BuilderToolbar controller={controller} end={toolbarEnd} />
+        <div className="canvas-toolbar-strip">
+          <CanvasToolbar controller={controller} end={toolbarEnd} />
         </div>
       )}
       <div
         ref={viewportRef}
-        className="builder-viewport"
+        className="canvas-viewport"
         style={{ cursor: spaceDown ? 'grab' : undefined }}
         onContextMenu={(e) => { if (editable) e.preventDefault(); }}
       >
         <div
-          className="builder-artboard"
+          className="canvas-artboard"
           style={{ left: view.x, top: view.y, width: width * view.zoom, height: height * view.zoom }}
         >
-          <div className="builder-artboard-inner" style={{ width, height, transform: `scale(${view.zoom})` }}>
+          <div className="canvas-artboard-inner" style={{ width, height, transform: `scale(${view.zoom})` }}>
             {background}
           </div>
         </div>
         {size.width > 0 && size.height > 0 && (
           <Stage
-            className="builder-stage"
+            className="canvas-stage"
             width={size.width}
             height={size.height}
             onPointerDown={onStagePointerDown}
@@ -798,35 +798,35 @@ const BuilderEditor = forwardRef<BuilderEditorHandle, BuilderEditorProps>(functi
             onDone={(text) => finishTextEdit(editingText.id, text)}
           />
         )}
-        {editable && features.zoom && <BuilderZoom controller={controller} />}
+        {editable && features.zoom && <CanvasZoom controller={controller} />}
         {overlay}
       </div>
     </div>
   );
 });
 
-export default BuilderEditor;
+export default CanvasEditor;
 
 /** Guides in a colour of their own, apart from the selection. */
 const GUIDE_COLOR = '#e8559b';
 
 /** What the toolbar reads and calls. */
-export interface BuilderController {
-  features: BuilderFeatures;
-  types: BuilderTypes;
-  selected: BuilderElement[];
+export interface CanvasController {
+  features: CanvasFeatures;
+  types: CanvasTypes;
+  selected: CanvasElement[];
   canUndo: boolean;
   canRedo: boolean;
   undo: () => void;
   redo: () => void;
-  add: (type: string, addition: BuilderAddition) => void;
+  add: (type: string, addition: CanvasAddition) => void;
   removeSelected: () => void;
   duplicate: () => void;
   arrange: (move: ArrangeMove) => void;
   align: (edge: AlignEdge) => void;
   distribute: (axis: 'horizontal' | 'vertical') => void;
   /** Changes every selected, unlocked element of `type`; `null` from the callback leaves one alone. */
-  update: (type: string, patch: (el: BuilderElement) => Partial<BuilderElement> | null) => void;
+  update: (type: string, patch: (el: CanvasElement) => Partial<CanvasElement> | null) => void;
   zoom: number;
   zoomIn: () => void;
   zoomOut: () => void;
@@ -835,8 +835,8 @@ export interface BuilderController {
 }
 
 const ElementNode = memo(function ElementNode({ el, types, editable, editing, resourceVersion, register, onHover }: {
-  el: BuilderElement;
-  types: BuilderTypes;
+  el: CanvasElement;
+  types: CanvasTypes;
   editable: boolean;
   editing: boolean;
   /** Changes when a picture or font arrives: the node draws again. */
@@ -851,7 +851,7 @@ const ElementNode = memo(function ElementNode({ el, types, editable, editing, re
     <Shape
       ref={ref}
       id={el.id}
-      name="builder-element"
+      name="canvas-element"
       x={el.x}
       y={el.y}
       width={el.width}
@@ -871,7 +871,7 @@ const ElementNode = memo(function ElementNode({ el, types, editable, editing, re
         raw.globalAlpha = shape.getAbsoluteOpacity();
         // The node's size, not the element's: while a handle is dragged they differ.
         drawElement(raw, { ...el, width: shape.width(), height: shape.height() }, types, {
-          image: cachedBuilderImage,
+          image: cachedCanvasImage,
           time: animated ? performance.now() : null,
         });
       }}

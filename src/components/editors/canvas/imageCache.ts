@@ -1,13 +1,13 @@
 import { useEffect, useState } from 'react';
 
 /**
- * The pictures elements draw from, loaded once per source for every builder.
+ * The pictures elements draw from, loaded once per source for every canvas editor.
  * A source that fails stays `null`; the type draws its stand-in.
  */
 const cache = new Map<string, HTMLImageElement | null>();
 const pending = new Map<string, Promise<HTMLImageElement | null>>();
 
-function loadBuilderImage(src: string): Promise<HTMLImageElement | null> {
+function loadCanvasImage(src: string): Promise<HTMLImageElement | null> {
   if (cache.has(src)) return Promise.resolve(cache.get(src)!);
   let promise = pending.get(src);
   if (!promise) {
@@ -27,7 +27,7 @@ function loadBuilderImage(src: string): Promise<HTMLImageElement | null> {
   return promise;
 }
 
-export function cachedBuilderImage(src: string): HTMLImageElement | null {
+export function cachedCanvasImage(src: string): HTMLImageElement | null {
   return cache.get(src) ?? null;
 }
 
@@ -35,7 +35,7 @@ export function cachedBuilderImage(src: string): HTMLImageElement | null {
  * Loads the given sources and fonts and returns a number that changes
  * whenever one of them has arrived, for redrawing.
  */
-export function useBuilderResources(sources: readonly string[], fonts: readonly string[]): number {
+export function useCanvasResources(sources: readonly string[], fonts: readonly string[]): number {
   const [version, setVersion] = useState(0);
   const sourceKey = [...sources].sort().join('\n');
   const fontKey = [...fonts].sort().join('\n');
@@ -43,7 +43,7 @@ export function useBuilderResources(sources: readonly string[], fonts: readonly 
     let alive = true;
     const bump = () => { if (alive) setVersion((v) => v + 1); };
     for (const src of sourceKey ? sourceKey.split('\n') : []) {
-      if (!cache.has(src)) void loadBuilderImage(src).then(bump);
+      if (!cache.has(src)) void loadCanvasImage(src).then(bump);
     }
     if (fontKey && document.fonts) {
       void Promise.all(fontKey.split('\n').map((f) => document.fonts.load(f).catch(() => []))).then(bump);

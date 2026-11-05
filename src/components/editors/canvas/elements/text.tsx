@@ -2,30 +2,30 @@ import { useTranslation } from 'react-i18next';
 import { AlignCenter, AlignLeft, AlignRight, Bold, Italic, Type } from 'lucide-react';
 import PopoverButton from '../../shared/PopoverButton';
 import { ToolbarBtn, ToolbarGroup } from '../../shared/toolbarParts';
-import type { BuilderElement, BuilderElementType } from '../types';
+import type { CanvasElement, CanvasElementType } from '../types';
 import { ColorPanel, NumberField, common } from './controlParts';
 
-export const BUILDER_FONTS = ['serif', 'book', 'sans'] as const;
-export type BuilderFont = (typeof BUILDER_FONTS)[number];
-export type BuilderTextAlign = 'left' | 'center' | 'right';
+export const CANVAS_FONTS = ['serif', 'book', 'sans'] as const;
+export type CanvasFont = (typeof CANVAS_FONTS)[number];
+export type CanvasTextAlign = 'left' | 'center' | 'right';
 
 /** Text that wraps at the box's width; the height follows the lines. */
 export interface TextProps {
   text: string;
-  font: BuilderFont;
+  font: CanvasFont;
   fontSize: number;
   color: string;
-  align: BuilderTextAlign;
+  align: CanvasTextAlign;
   bold: boolean;
   italic: boolean;
 }
 
-export type TextElement = BuilderElement<TextProps>;
+export type TextElement = CanvasElement<TextProps>;
 
 export const DEFAULT_TEXT_COLOR = '#f4ecd8';
 
 /** The CSS families behind the fonts — all bundled with the app (`fonts.css`). */
-export const FONT_FAMILIES: Record<BuilderFont, string> = {
+export const FONT_FAMILIES: Record<CanvasFont, string> = {
   serif: '"Cormorant Garamond", Georgia, serif',
   book: 'Lora, Georgia, serif',
   sans: 'Inter, system-ui, sans-serif',
@@ -92,7 +92,7 @@ export function textHeight(p: TextProps, width: number): number {
   return Math.max(1, layoutText(p, width).length) * p.fontSize * TEXT_LINE_HEIGHT;
 }
 
-const ALIGN_TITLES: Record<BuilderTextAlign, string> = {
+const ALIGN_TITLES: Record<CanvasTextAlign, string> = {
   left: 'editor.toolbar.alignLeft',
   center: 'editor.toolbar.alignCenter',
   right: 'editor.toolbar.alignRight',
@@ -112,21 +112,21 @@ function TextControls({ elements, update }: {
   return (
     <ToolbarGroup>
       <PopoverButton
-        icon={<span className="editor-toolbar-btn-label">{font ? t(`builder.font.${font}`) : t('builder.fontMixed')}</span>}
-        title={t('builder.fontTitle')}
+        icon={<span className="editor-toolbar-btn-label">{font ? t(`canvas.font.${font}`) : t('canvas.fontMixed')}</span>}
+        title={t('canvas.fontTitle')}
         active={false}
       >
         {(close) => (
-          <div className="builder-panel">
-            {BUILDER_FONTS.map((key) => (
+          <div className="canvas-panel">
+            {CANVAS_FONTS.map((key) => (
               <button
                 key={key}
                 type="button"
-                className={`builder-font-option ${font === key ? 'builder-font-option-active' : ''}`}
+                className={`canvas-font-option ${font === key ? 'canvas-font-option-active' : ''}`}
                 style={{ fontFamily: FONT_FAMILIES[key] }}
                 onClick={() => { set(() => ({ font: key })); close(); }}
               >
-                {t(`builder.font.${key}`)}
+                {t(`canvas.font.${key}`)}
               </button>
             ))}
           </div>
@@ -134,7 +134,7 @@ function TextControls({ elements, update }: {
       </PopoverButton>
       <NumberField
         inline
-        label={t('builder.fontSize')}
+        label={t('canvas.fontSize')}
         value={common(elements, (el) => el.props.fontSize)}
         min={4}
         max={1000}
@@ -148,8 +148,8 @@ function TextControls({ elements, update }: {
         </ToolbarBtn>
       ))}
       <PopoverButton
-        icon={<span className="builder-color-dot" style={{ background: color ?? 'transparent' }} />}
-        title={t('builder.textColor')}
+        icon={<span className="canvas-color-dot" style={{ background: color ?? 'transparent' }} />}
+        title={t('canvas.textColor')}
         active={false}
       >
         {(close) => <ColorPanel value={color ?? null} onPick={(picked) => { if (picked) set(() => ({ color: picked })); close(); }} />}
@@ -158,7 +158,7 @@ function TextControls({ elements, update }: {
   );
 }
 
-export const textType: BuilderElementType<TextProps> = {
+export const textType: CanvasElementType<TextProps> = {
   type: 'text',
   keepRatio: true,
   handles: 'corners-and-sides',
@@ -192,10 +192,10 @@ export const textType: BuilderElementType<TextProps> = {
   additions: [{
     key: 'text',
     icon: <Type size={14} />,
-    label: (t) => t('builder.addText'),
+    label: (t) => t('canvas.addText'),
     create: (_centre, artboard, t) => {
       const props: TextProps = {
-        text: t('builder.newText'), font: 'serif', fontSize: Math.max(12, Math.round(artboard.height / 14)),
+        text: t('canvas.newText'), font: 'serif', fontSize: Math.max(12, Math.round(artboard.height / 14)),
         color: DEFAULT_TEXT_COLOR, align: 'center', bold: false, italic: false,
       };
       const width = Math.round(artboard.width * 0.4);

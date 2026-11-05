@@ -164,7 +164,7 @@ interface AltarState {
   selectPlacement: (id: string | null) => void;
   selectPlacements: (ids: string[]) => void;
   /**
-   * The open altar's placements as the builder hands them back: all at once,
+   * The open altar's placements as the canvas editor hands them back: all at once,
    * in the store right away, then written — rows for items, `altars.elements`
    * for shapes and text. New item placements need their `item_id`.
    */
@@ -716,7 +716,7 @@ export const useAltarStore = create<AltarState>((set, get) => ({
     const drawnBefore = altarElementsJson([...before.values()]);
     const drawnAfter = altarElementsJson(clamped);
     if (!statements.length && drawnBefore === drawnAfter) return Promise.resolve();
-    // In the store at once: the builder shows the new state in the same frame.
+    // In the store at once: the canvas editor shows the new state in the same frame.
     set((s) => ({
       placements: clamped,
       selectedPlacementIds: s.selectedPlacementIds.filter((id) => after.has(id)),

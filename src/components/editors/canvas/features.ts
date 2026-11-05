@@ -1,9 +1,9 @@
 /**
- * What a builder offers besides its element types (which come from the
- * registry, `BuilderElementType`). Each place picks its set; the toolbar and
+ * What a canvas editor offers besides its element types (which come from the
+ * registry, `CanvasElementType`). Each place picks its set; the toolbar and
  * the keys show only what is switched on.
  */
-export interface BuilderFeatures {
+export interface CanvasFeatures {
   /** Bring forward, send backward, to front, to back. */
   arrange: boolean;
   /** Aligning and distributing several elements. */
@@ -12,13 +12,13 @@ export interface BuilderFeatures {
   guides: boolean;
   /** Zooming and panning the view. */
   zoom: boolean;
-  /** Undo and redo inside the builder. */
+  /** Undo and redo inside the canvas editor. */
   history: boolean;
   /** Saving the artboard as an image (needs the place's `onExport`). */
   export: boolean;
 }
 
-export const FULL_BUILDER_FEATURES: BuilderFeatures = {
+export const FULL_CANVAS_FEATURES: CanvasFeatures = {
   arrange: true,
   align: true,
   guides: true,

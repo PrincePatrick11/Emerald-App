@@ -52,5 +52,5 @@ export const AltarPlacementVisual = memo(function AltarPlacementVisual({ placeme
 /** The name of what sits on an altar: the item's, a text's first line, or the kind of shape. */
 export function placementLabel(placement: AltarPlacement, t: TFunction): string {
   if (placement.kind === 'item') return placement.name;
-  return drawnLabel(placement, (type) => t(`builder.shape.${type}`));
+  return drawnLabel(placement, (type) => t(`canvas.shape.${type}`));
 }

@@ -1,14 +1,14 @@
 import { drawPlaced, resourcesOf } from './draw';
-import { BUILTIN_BUILDER_TYPES } from './elements';
-import { byZ, type BuilderElement, type BuilderTypes } from './types';
+import { BUILTIN_CANVAS_TYPES } from './elements';
+import { byZ, type CanvasElement, type CanvasTypes } from './types';
 
 export interface RenderOptions {
   /** The artboard in its own pixels. */
   width: number;
   height: number;
-  elements: readonly BuilderElement[];
+  elements: readonly CanvasElement[];
   /** The registry; default the built-in types. */
-  types?: BuilderTypes;
+  types?: CanvasTypes;
   /** Width of the picture; the height follows the artboard. Default: the artboard's. */
   outWidth?: number;
   /** Paints what lies behind the elements, in output pixels. */
@@ -35,8 +35,8 @@ function loadPlain(src: string): Promise<HTMLImageElement | null> {
  * as on the stage, with moving types standing still. For previews, thumbnails
  * and saving as a file.
  */
-export async function renderBuilderImage(options: RenderOptions): Promise<HTMLCanvasElement | null> {
-  const types = options.types ?? BUILTIN_BUILDER_TYPES;
+export async function renderCanvasImage(options: RenderOptions): Promise<HTMLCanvasElement | null> {
+  const types = options.types ?? BUILTIN_CANVAS_TYPES;
   const outW = Math.max(1, Math.round(options.outWidth ?? options.width));
   const scale = outW / options.width;
   const outH = Math.max(1, Math.round(options.height * scale));

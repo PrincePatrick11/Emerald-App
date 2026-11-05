@@ -9,7 +9,7 @@ import { generateId, isValidHexColor } from './helpers';
  * switches as an item's placement; `item_id` is empty.
  *
  * Positions and box sizes in the units of a placement (`x`/`y` in percent of
- * the altar, `width`/`height` as in `altarBuilder.ts`), font size, outline
+ * the altar, `width`/`height` as in `altarCanvas.ts`), font size, outline
  * width and corner radius in pixels at the reference width of 1920.
  */
 

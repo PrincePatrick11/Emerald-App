@@ -1,4 +1,4 @@
-import type { BuilderElement } from './types';
+import type { CanvasElement } from './types';
 
 export interface Box {
   x: number;
@@ -8,7 +8,7 @@ export interface Box {
 }
 
 /** The axis-aligned box around an element, rotation included. */
-export function elementBounds(el: Pick<BuilderElement, 'x' | 'y' | 'width' | 'height' | 'rotation'>): Box {
+export function elementBounds(el: Pick<CanvasElement, 'x' | 'y' | 'width' | 'height' | 'rotation'>): Box {
   const rad = (el.rotation * Math.PI) / 180;
   const cos = Math.abs(Math.cos(rad));
   const sin = Math.abs(Math.sin(rad));
