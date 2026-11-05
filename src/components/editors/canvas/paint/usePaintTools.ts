@@ -1,8 +1,8 @@
 import { useCallback, useMemo, useState } from 'react';
 import {
   canMergeDown, clamp, copyLayer, emptyLayer, emptyPaintDoc, IDENTITY, MAX_LAYERS, mergeDown, moveLayer as moveLayerIn,
-  moveLayerTo, PAINT_SIZE_MAX, PAINT_SIZE_MIN, paintId, transformStroke, translateLayer, updateLayer, withStroke,
-  type PaintDoc, type PaintStroke, type PaintTool, type PaintTransform,
+  MAX_SIDES, MIN_SIDES, moveLayerTo, PAINT_SIZE_MAX, PAINT_SIZE_MIN, paintId, symmetricCopies, transformStroke,
+  translateLayer, updateLayer, type PaintDoc, type PaintStroke, type PaintTool, type PaintTransform, type Symmetry,
 } from '../../../../lib/paint/document';
 
 /**
@@ -12,6 +12,8 @@ import {
  * colour from the drawing.
  */
 export type EditorTool = PaintTool | 'select' | 'lasso' | 'move' | 'picker';
+
+export type { Symmetry };
 
 export function isDrawTool(tool: EditorTool): tool is PaintTool {
   return tool !== 'select' && tool !== 'lasso' && tool !== 'move' && tool !== 'picker';
@@ -44,11 +46,20 @@ export interface PaintControls {
   size: number;
   /** Selected strokes of the active layer, by ID. */
   selection: string[];
+  /** New box shapes are filled instead of outlined. */
+  filled: boolean;
+  /** Corners of a new polygon, points of a new star. */
+  sides: number;
+  /** Every new stroke gets its symmetric copies. */
+  symmetry: Symmetry;
   canUndo: boolean;
   canRedo: boolean;
   setTool: (tool: EditorTool) => void;
   setColor: (color: string) => void;
   setSize: (size: number) => void;
+  setFilled: (filled: boolean) => void;
+  setSides: (sides: number) => void;
+  setSymmetry: (symmetry: Symmetry) => void;
   undo: () => void;
   redo: () => void;
   addStroke: (stroke: PaintStroke) => void;
@@ -82,13 +93,20 @@ export function usePaintBrush(startColor: string, startSize: number) {
   const [size, setSizeRaw] = useState(startSize);
   const [wantedLayer, setWantedLayer] = useState<string | null>(null);
   const [selection, setSelection] = useState<string[]>([]);
+  const [filled, setFilled] = useState(false);
+  const [sides, setSidesRaw] = useState(5);
+  const [symmetry, setSymmetry] = useState<Symmetry>({ kind: 'off' });
+  const setSides = useCallback((next: number) => setSidesRaw(Math.round(clamp(next, MIN_SIDES, MAX_SIDES))), []);
   const setSize = useCallback((next: number) => setSizeRaw(Math.round(clamp(next, PAINT_SIZE_MIN, PAINT_SIZE_MAX))), []);
   // A drawing tool lets the selection go; a selection tool keeps it.
   const setTool = useCallback((next: EditorTool) => {
     setToolRaw(next);
     if (!isSelectTool(next)) setSelection([]);
   }, []);
-  return { tool, setTool, color, setColor, size, setSize, wantedLayer, setWantedLayer, selection, setSelection };
+  return {
+    tool, setTool, color, setColor, size, setSize, wantedLayer, setWantedLayer, selection, setSelection,
+    filled, setFilled, sides, setSides, symmetry, setSymmetry,
+  };
 }
 
 /** The layer drawn on: the wanted one if the document has it, else the topmost. */
@@ -125,7 +143,11 @@ export function usePaintControls(
       setSelection(copies.map((s) => s.id));
     };
     return {
-      addStroke: (stroke: PaintStroke) => commit(withStroke(doc, active, stroke)),
+      // With its symmetric copies, in one step.
+      addStroke: (stroke: PaintStroke) => {
+        const copies = symmetricCopies(stroke, brush.symmetry).map((s) => ({ ...s, id: paintId() }));
+        onLayer((strokes) => [...strokes, stroke, ...copies]);
+      },
       select: (ids: string[]) => setSelection(ids),
       selectAll: () => setSelection(layer.strokes.filter((s) => s.tool !== 'eraser').map((s) => s.id)),
       transform: (t: PaintTransform, whole = false) => {
@@ -198,7 +220,7 @@ export function usePaintControls(
       },
       clear: () => commit(emptyPaintDoc()),
     };
-  }, [doc, active, layer, selection, commit, setWantedLayer, setSelection]);
+  }, [doc, active, layer, selection, commit, setWantedLayer, setSelection, brush.symmetry]);
 
   return {
     doc,
@@ -211,6 +233,12 @@ export function usePaintControls(
     setTool: brush.setTool,
     setColor: brush.setColor,
     setSize: brush.setSize,
+    filled: brush.filled,
+    sides: brush.sides,
+    symmetry: brush.symmetry,
+    setFilled: brush.setFilled,
+    setSides: brush.setSides,
+    setSymmetry: brush.setSymmetry,
     ...history,
     ...actions,
   };

@@ -1,9 +1,12 @@
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
-  Circle, Eraser, Lasso, Layers, Minus, Move, MousePointer2, PenTool, Pipette, Redo, Square, Trash2, Undo, type LucideIcon,
+  Circle, Eraser, FlipHorizontal2, Hexagon, Lasso, Layers, Minus, Move, MousePointer2, PaintBucket, PenTool, Pipette, Redo,
+  Square, SquareDashed, Star, Trash2, Undo, type LucideIcon,
 } from 'lucide-react';
-import { PAINT_SIZE_MAX, PAINT_SIZE_MIN } from '../../../../lib/paint/document';
+import {
+  isBoxShape, MAX_RAYS, MAX_SIDES, MIN_RAYS, MIN_SIDES, PAINT_SIZE_MAX, PAINT_SIZE_MIN, type Symmetry,
+} from '../../../../lib/paint/document';
 import PopoverButton from '../../shared/PopoverButton';
 import { ToolbarBtn, ToolbarDivider, ToolbarGroup } from '../../shared/toolbarParts';
 import LayerPanel from './LayerPanel';
@@ -29,6 +32,9 @@ export const DRAW_TOOL_DEFS: readonly ToolDef[] = [
   { tool: 'line', icon: Minus, key: 'l' },
   { tool: 'ellipse', icon: Circle, key: 'o' },
   { tool: 'rect', icon: Square, key: 'r' },
+  { tool: 'polygon', icon: Hexagon, key: 'g' },
+  { tool: 'star', icon: Star, key: 's' },
+  { tool: 'fill', icon: PaintBucket, key: 'b' },
   { tool: 'eraser', icon: Eraser, key: 'e' },
   { tool: 'picker', icon: Pipette, key: 'i' },
 ];
@@ -41,6 +47,7 @@ export function toolEnabled(tool: EditorTool, features: PaintFeatures): boolean 
     case 'pen': return true;
     case 'eraser': return features.eraser;
     case 'picker': return features.picker;
+    case 'fill': return features.fill;
     case 'select': case 'lasso': case 'move': return features.select;
     default: return features.shapes;
   }
@@ -103,6 +110,39 @@ export default function PaintToolbar({ api, features, palette, end }: {
           </ToolbarBtn>
         ))}
       </ToolbarGroup>
+
+      {((features.shapes && isBoxShape(api.tool)) || features.symmetry) && (<>
+        <ToolbarDivider />
+        <ToolbarGroup>
+          {features.shapes && isBoxShape(api.tool) && (
+            <ToolbarBtn
+              onClick={() => api.setFilled(!api.filled)}
+              active={api.filled}
+              title={t(api.filled ? 'editor.paint.filled' : 'editor.paint.outlined')}
+            >
+              {api.filled ? <Square size={14} fill="currentColor" /> : <SquareDashed size={14} />}
+            </ToolbarBtn>
+          )}
+          {features.shapes && (api.tool === 'polygon' || api.tool === 'star') && (
+            <Stepper
+              value={api.sides}
+              min={MIN_SIDES}
+              max={MAX_SIDES}
+              onChange={api.setSides}
+              label={t(api.tool === 'star' ? 'editor.paint.points' : 'editor.paint.corners')}
+            />
+          )}
+          {features.symmetry && (
+            <PopoverButton
+              icon={<FlipHorizontal2 size={14} />}
+              title={t('editor.paint.symmetry.title')}
+              active={api.symmetry.kind !== 'off'}
+            >
+              {(close) => <SymmetryPanel value={api.symmetry} onChange={api.setSymmetry} close={close} />}
+            </PopoverButton>
+          )}
+        </ToolbarGroup>
+      </>)}
 
       <ToolbarDivider />
       <ToolbarGroup>
@@ -175,6 +215,58 @@ export default function PaintToolbar({ api, features, palette, end }: {
         )}
         {end}
       </div>
+    </div>
+  );
+}
+
+/** A small number with a minus and a plus, for the corners of a polygon or the points of a star. */
+function Stepper({ value, min, max, onChange, label }: {
+  value: number;
+  min: number;
+  max: number;
+  onChange: (value: number) => void;
+  label: string;
+}) {
+  return (
+    <span className="paint-stepper" title={label}>
+      <button type="button" onClick={() => onChange(value - 1)} disabled={value <= min} aria-label={`${label} −`}>−</button>
+      <span className="paint-stepper-value" aria-label={label}>{value}</span>
+      <button type="button" onClick={() => onChange(value + 1)} disabled={value >= max} aria-label={`${label} +`}>+</button>
+    </span>
+  );
+}
+
+/** Off, mirrored, four quarters, or radial with its number of rays. */
+function SymmetryPanel({ value, onChange, close }: { value: Symmetry; onChange: (value: Symmetry) => void; close: () => void }) {
+  const { t } = useTranslation();
+  const rays = value.kind === 'radial' ? value.rays : 6;
+  const options: { kind: Symmetry['kind']; label: string }[] = [
+    { kind: 'off', label: t('editor.paint.symmetry.off') },
+    { kind: 'mirror', label: t('editor.paint.symmetry.mirror') },
+    { kind: 'quad', label: t('editor.paint.symmetry.quad') },
+    { kind: 'radial', label: t('editor.paint.symmetry.radial') },
+  ];
+  return (
+    <div className="paint-symmetry">
+      {options.map((o) => (
+        <button
+          key={o.kind}
+          type="button"
+          className={`paint-symmetry-option${value.kind === o.kind ? ' paint-symmetry-option--active' : ''}`}
+          onClick={() => {
+            onChange(o.kind === 'radial' ? { kind: 'radial', rays } : { kind: o.kind } as Symmetry);
+            if (o.kind !== 'radial') close();
+          }}
+        >
+          {o.label}
+        </button>
+      ))}
+      {value.kind === 'radial' && (
+        <div className="paint-symmetry-rays">
+          <span>{t('editor.paint.symmetry.rays')}</span>
+          <Stepper value={rays} min={MIN_RAYS} max={MAX_RAYS} onChange={(n) => onChange({ kind: 'radial', rays: n })} label={t('editor.paint.symmetry.rays')} />
+        </div>
+      )}
     </div>
   );
 }

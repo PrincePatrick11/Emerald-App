@@ -562,7 +562,10 @@
         "select": "Sélectionner",
         "lasso": "Lasso",
         "move": "Déplacer le calque",
-        "picker": "Prélever une couleur"
+        "picker": "Prélever une couleur",
+        "polygon": "Polygone",
+        "star": "Étoile",
+        "fill": "Pot de peinture"
       },
       "color": "Couleur",
       "customColor": "Toute couleur",
@@ -584,7 +587,19 @@
       "duplicateLayer": "Dupliquer le calque",
       "mergeDown": "Fusionner vers le bas",
       "mergeDownBlocked": "Fusion impossible : le calque contient une image ou des traits de gomme",
-      "dragLayer": "Glisser pour réordonner"
+      "dragLayer": "Glisser pour réordonner",
+      "filled": "Rempli (clic pour le contour)",
+      "outlined": "Contour (clic pour remplir)",
+      "corners": "Coins",
+      "points": "Branches",
+      "symmetry": {
+        "title": "Symétrie",
+        "off": "Désactivée",
+        "mirror": "Miroir",
+        "quad": "Quatre quarts",
+        "radial": "Radiale",
+        "rays": "Rayons"
+      }
     }
   },
   "canvas": {

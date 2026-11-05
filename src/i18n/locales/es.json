@@ -562,7 +562,10 @@
         "select": "Seleccionar",
         "lasso": "Lazo",
         "move": "Mover capa",
-        "picker": "Tomar color"
+        "picker": "Tomar color",
+        "polygon": "Polígono",
+        "star": "Estrella",
+        "fill": "Bote de pintura"
       },
       "color": "Color",
       "customColor": "Cualquier color",
@@ -584,7 +587,19 @@
       "duplicateLayer": "Duplicar capa",
       "mergeDown": "Combinar hacia abajo",
       "mergeDownBlocked": "No se puede combinar: la capa tiene una imagen o trazos de borrador",
-      "dragLayer": "Arrastrar para reordenar"
+      "dragLayer": "Arrastrar para reordenar",
+      "filled": "Relleno (clic para contorno)",
+      "outlined": "Contorno (clic para rellenar)",
+      "corners": "Esquinas",
+      "points": "Puntas",
+      "symmetry": {
+        "title": "Simetría",
+        "off": "Desactivada",
+        "mirror": "Espejo",
+        "quad": "Cuatro cuartos",
+        "radial": "Radial",
+        "rays": "Rayos"
+      }
     }
   },
   "canvas": {

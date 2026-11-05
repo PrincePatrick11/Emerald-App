@@ -562,7 +562,10 @@
         "select": "Select",
         "lasso": "Lasso",
         "move": "Move layer",
-        "picker": "Pick colour"
+        "picker": "Pick colour",
+        "polygon": "Polygon",
+        "star": "Star",
+        "fill": "Paint bucket"
       },
       "color": "Colour",
       "customColor": "Any colour",
@@ -584,7 +587,19 @@
       "duplicateLayer": "Duplicate layer",
       "mergeDown": "Merge down",
       "mergeDownBlocked": "Can't merge: this layer has an image or eraser strokes",
-      "dragLayer": "Drag to reorder"
+      "dragLayer": "Drag to reorder",
+      "filled": "Filled (click for outline)",
+      "outlined": "Outline (click to fill)",
+      "corners": "Corners",
+      "points": "Points",
+      "symmetry": {
+        "title": "Symmetry",
+        "off": "Off",
+        "mirror": "Mirror",
+        "quad": "Four quarters",
+        "radial": "Radial",
+        "rays": "Rays"
+      }
     }
   },
   "canvas": {

@@ -1,5 +1,5 @@
 import { getStroke } from 'perfect-freehand';
-import { isShapeTool, PAINT_HEIGHT, PAINT_WIDTH, type PaintDoc, type PaintLayer, type PaintStroke } from '../../../../lib/paint/document';
+import { isBoxShape, isShapeTool, PAINT_HEIGHT, PAINT_WIDTH, type PaintDoc, type PaintLayer, type PaintStroke } from '../../../../lib/paint/document';
 
 /**
  * Drawing a document onto a canvas. A pen or eraser stroke is a filled
@@ -51,11 +51,34 @@ function outlinePath(outline: number[][]): Path2D {
   return path;
 }
 
-/** The shape between two corners (or the two ends of a line), a rectangle or ellipse turned by `rotation` around its centre. */
-export function shapePath(tool: PaintStroke['tool'], points: readonly number[], rotation = 0): Path2D {
+/** The corners of a polygon (or the points and notches of a star) in the ellipse of its box, the first at the top. */
+function polygonPoints(tool: 'polygon' | 'star', sides: number, cx: number, cy: number, rx: number, ry: number): [number, number][] {
+  const count = tool === 'star' ? sides * 2 : sides;
+  const out: [number, number][] = [];
+  for (let i = 0; i < count; i++) {
+    const a = -Math.PI / 2 + (i / count) * Math.PI * 2;
+    // A star's notches lie at a little under half its radius.
+    const k = tool === 'star' && i % 2 ? 0.45 : 1;
+    out.push([cx + Math.cos(a) * rx * k, cy + Math.sin(a) * ry * k]);
+  }
+  return out;
+}
+
+/**
+ * The shape between two corners (or the two ends of a line), a box shape
+ * turned by `rotation` around its centre; a polygon or star has `sides`.
+ */
+export function shapePath(tool: PaintStroke['tool'], points: readonly number[], rotation = 0, sides = 5): Path2D {
   const path = new Path2D();
   const [x0, y0, , x1 = x0, y1 = y0] = points;
-  if (tool === 'line') {
+  if (tool === 'polygon' || tool === 'star') {
+    const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2, cos = Math.cos(rotation), sin = Math.sin(rotation);
+    const pts = polygonPoints(tool, sides, cx, cy, Math.abs(x1 - x0) / 2, Math.abs(y1 - y0) / 2)
+      .map(([x, y]) => [cx + (x - cx) * cos - (y - cy) * sin, cy + (x - cx) * sin + (y - cy) * cos]);
+    path.moveTo(pts[0][0], pts[0][1]);
+    for (const [x, y] of pts.slice(1)) path.lineTo(x, y);
+    path.closePath();
+  } else if (tool === 'line') {
     path.moveTo(x0, y0);
     path.lineTo(x1, y1);
   } else if (tool === 'rect') {
@@ -75,14 +98,52 @@ export function shapePath(tool: PaintStroke['tool'], points: readonly number[], 
   return path;
 }
 
+/** A corner sharper than this (the turn between its edges, in radians) stays a corner when a fill is smoothed. */
+const SHARP_TURN = 0.9;
+
+/**
+ * A fill's outlines as one path, smoothed by curves through the midpoints of
+ * their edges; a sharp corner (a square's, a star's tip) stays a corner.
+ */
+function ringsPath(rings: readonly number[][]): Path2D {
+  const path = new Path2D();
+  for (const ring of rings) {
+    const n = ring.length / 2;
+    if (n < 3) continue;
+    const pt = (i: number): [number, number] => [ring[((i + n) % n) * 2], ring[((i + n) % n) * 2 + 1]];
+    const mid = (i: number): [number, number] => {
+      const [ax, ay] = pt(i), [bx, by] = pt(i + 1);
+      return [(ax + bx) / 2, (ay + by) / 2];
+    };
+    const start = mid(n - 1);
+    path.moveTo(start[0], start[1]);
+    for (let i = 0; i < n; i++) {
+      const [px, py] = pt(i - 1), [x, y] = pt(i), [nx, ny] = pt(i + 1);
+      let turn = Math.abs(Math.atan2(ny - y, nx - x) - Math.atan2(y - py, x - px));
+      if (turn > Math.PI) turn = Math.PI * 2 - turn;
+      const [mx, my] = mid(i);
+      if (turn > SHARP_TURN) {
+        path.lineTo(x, y);
+        path.lineTo(mx, my);
+      } else {
+        path.quadraticCurveTo(x, y, mx, my);
+      }
+    }
+    path.closePath();
+  }
+  return path;
+}
+
 /** The path of a stroke; `live` while it is still being drawn (not cached, the end not yet final). */
 export function strokePath(stroke: PaintStroke, live = false): Path2D {
   if (!live) {
     const cached = paths.get(stroke);
     if (cached) return cached;
   }
-  const path = isShapeTool(stroke.tool)
-    ? shapePath(stroke.tool, stroke.points, stroke.rotation)
+  const path = stroke.tool === 'fill'
+    ? ringsPath(stroke.rings)
+    : isShapeTool(stroke.tool)
+    ? shapePath(stroke.tool, stroke.points, stroke.rotation, stroke.sides)
     : outlinePath(getStroke(triples(stroke.points), freehandOptions(stroke, !live)));
   if (!live) paths.set(stroke, path);
   return path;
@@ -91,7 +152,10 @@ export function strokePath(stroke: PaintStroke, live = false): Path2D {
 export function drawStroke(ctx: CanvasRenderingContext2D, stroke: PaintStroke, live = false): void {
   const path = strokePath(stroke, live);
   ctx.globalCompositeOperation = stroke.tool === 'eraser' ? 'destination-out' : 'source-over';
-  if (isShapeTool(stroke.tool)) {
+  if (stroke.tool === 'fill' || (isBoxShape(stroke.tool) && stroke.filled)) {
+    ctx.fillStyle = stroke.color;
+    ctx.fill(path, 'evenodd');
+  } else if (isShapeTool(stroke.tool)) {
     ctx.strokeStyle = stroke.color;
     ctx.lineWidth = stroke.size;
     ctx.lineCap = 'round';

@@ -15,13 +15,24 @@
 export const PAINT_WIDTH = 1200;
 export const PAINT_HEIGHT = 800;
 
-export const PAINT_TOOLS = ['pen', 'eraser', 'line', 'ellipse', 'rect'] as const;
+export const PAINT_TOOLS = ['pen', 'eraser', 'line', 'ellipse', 'rect', 'polygon', 'star', 'fill'] as const;
 export type PaintTool = (typeof PAINT_TOOLS)[number];
 
 /** Tools whose stroke is two points, the start and the end of a drag. */
 export function isShapeTool(tool: PaintTool): boolean {
-  return tool === 'line' || tool === 'ellipse' || tool === 'rect';
+  return tool === 'line' || isBoxShape(tool);
 }
+
+/**
+ * Shapes that fill the box between their two points: they can be turned
+ * (`rotation`) and filled (`filled`).
+ */
+export function isBoxShape(tool: string): boolean {
+  return tool === 'ellipse' || tool === 'rect' || tool === 'polygon' || tool === 'star';
+}
+
+export const MIN_SIDES = 3;
+export const MAX_SIDES = 12;
 
 export const PAINT_SIZE_MIN = 1;
 export const PAINT_SIZE_MAX = 120;
@@ -37,8 +48,17 @@ export interface PaintStroke {
   points: number[];
   /** Pressure came from a pen; otherwise the width follows the speed. */
   pressure: boolean;
-  /** Ellipse and rectangle only: turned by this many radians around their centre. */
+  /** Box shapes only: turned by this many radians around their centre. */
   rotation: number;
+  /** Box shapes only: filled with the colour instead of outlined. */
+  filled: boolean;
+  /** Polygon and star only: corners (a star: points), `MIN_SIDES`–`MAX_SIDES`. */
+  sides: number;
+  /**
+   * The fill tool only: the filled area as closed outlines (flat `x, y`),
+   * holes among them, filled even-odd. Its `points` hold the spot clicked.
+   */
+  rings: number[][];
 }
 
 /** Where a layer's image lies, in document units; by default the whole page. */
@@ -140,6 +160,9 @@ export function paintDocToJson(doc: PaintDoc): Record<string, unknown> {
         if (s.tool !== 'eraser') stroke.c = s.color;
         if (s.pressure) stroke.pr = true;
         if (s.rotation) stroke.r = Math.round(s.rotation * 10_000) / 10_000;
+        if (s.filled) stroke.f = true;
+        if (s.tool === 'polygon' || s.tool === 'star') stroke.n = s.sides;
+        if (s.tool === 'fill') stroke.g = s.rings.map((ring) => ring.map(round1));
         return stroke;
       });
       return out;
@@ -168,7 +191,7 @@ export function paintDocFromJson(value: unknown, images: ReadonlyMap<string, str
       if (!stroke) continue;
       strokes.push(stroke);
       strokesLeft -= 1;
-      pointsLeft -= stroke.points.length;
+      pointsLeft -= stroke.points.length + stroke.rings.reduce((n, ring) => n + ring.length, 0);
     }
     layers.push({
       id: raw.id,
@@ -191,7 +214,7 @@ function strokeFromJson(raw: unknown, pointsLeft: number): PaintStroke | null {
   const size = Number(raw.s);
   if (!Number.isFinite(size)) return null;
   const color = typeof raw.c === 'string' && COLOR_RE.test(raw.c) ? raw.c.toLowerCase() : '#000000';
-  const count = Math.min(raw.p.length - (raw.p.length % 3), pointsLeft - (pointsLeft % 3), isShapeTool(tool) ? 6 : Infinity);
+  const count = Math.min(raw.p.length - (raw.p.length % 3), pointsLeft - (pointsLeft % 3), isShapeTool(tool) ? 6 : tool === 'fill' ? 3 : Infinity);
   if (count < 3) return null;
   const points = new Array<number>(count);
   for (let i = 0; i < count; i += 3) {
@@ -209,8 +232,27 @@ function strokeFromJson(raw: unknown, pointsLeft: number): PaintStroke | null {
     size: clamp(size, PAINT_SIZE_MIN, PAINT_SIZE_MAX),
     points,
     pressure: raw.pr === true,
-    rotation: (tool === 'rect' || tool === 'ellipse') && Number.isFinite(raw.r) ? (raw.r as number) % (Math.PI * 2) : 0,
+    rotation: isBoxShape(tool) && Number.isFinite(raw.r) ? (raw.r as number) % (Math.PI * 2) : 0,
+    filled: isBoxShape(tool) && raw.f === true,
+    sides: Number.isFinite(raw.n) ? Math.round(clamp(raw.n as number, MIN_SIDES, MAX_SIDES)) : tool === 'star' ? 5 : 6,
+    rings: tool === 'fill' ? ringsFromJson(raw.g, pointsLeft - count) : [],
   };
+}
+
+function ringsFromJson(raw: unknown, numbersLeft: number): number[][] {
+  const rings: number[][] = [];
+  for (const r of Array.isArray(raw) ? raw : []) {
+    if (!Array.isArray(r) || r.length < 6 || r.length > numbersLeft) continue;
+    const ring = r.slice(0, r.length - (r.length % 2)).map(Number);
+    if (!ring.every(Number.isFinite)) continue;
+    for (let i = 0; i < ring.length; i += 2) {
+      ring[i] = clamp(ring[i], -PAINT_WIDTH * 4, PAINT_WIDTH * 4);
+      ring[i + 1] = clamp(ring[i + 1], -PAINT_HEIGHT * 4, PAINT_HEIGHT * 4);
+    }
+    rings.push(ring);
+    numbersLeft -= ring.length;
+  }
+  return rings;
 }
 
 function rectFromJson(raw: unknown): PaintRect {
@@ -297,7 +339,8 @@ export function applyTransform(t: PaintTransform, x: number, y: number): [number
  */
 export function transformStroke(stroke: PaintStroke, t: PaintTransform): PaintStroke {
   const size = clamp(stroke.size * t.scale, PAINT_SIZE_MIN, PAINT_SIZE_MAX);
-  if (stroke.tool === 'rect' || stroke.tool === 'ellipse') {
+  if (stroke.tool === 'fill') return mapStroke(stroke, (x, y) => applyTransform(t, x, y));
+  if (isBoxShape(stroke.tool)) {
     const [x0, y0, p0, x1, y1, p1] = stroke.points;
     const [cx, cy] = applyTransform(t, (x0 + x1) / 2, (y0 + y1) / 2);
     const hw = (Math.abs(x1 - x0) / 2) * t.scale, hh = (Math.abs(y1 - y0) / 2) * t.scale;
@@ -314,7 +357,12 @@ export function strokeBounds(stroke: PaintStroke): PaintRect {
   const add = (x: number, y: number) => {
     minX = Math.min(minX, x); minY = Math.min(minY, y); maxX = Math.max(maxX, x); maxY = Math.max(maxY, y);
   };
-  if ((stroke.tool === 'rect' || stroke.tool === 'ellipse') && stroke.rotation) {
+  if (stroke.tool === 'fill') {
+    for (const ring of stroke.rings) for (let i = 0; i + 1 < ring.length; i += 2) add(ring[i], ring[i + 1]);
+    if (minX === Infinity) add(stroke.points[0], stroke.points[1]);
+    return { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
+  }
+  if (isBoxShape(stroke.tool) && stroke.rotation) {
     for (const [x, y] of shapeCorners(stroke)) add(x, y);
   } else {
     for (let i = 0; i + 2 < stroke.points.length; i += 3) add(stroke.points[i], stroke.points[i + 1]);
@@ -358,7 +406,15 @@ export function translateLayer(layer: PaintLayer, dx: number, dy: number): Paint
 export function strokeSamples(stroke: PaintStroke): [number, number][] {
   const [x0, y0, , x1 = x0, y1 = y0] = stroke.points;
   if (stroke.tool === 'line') return [[x0, y0], [(x0 + x1) / 2, (y0 + y1) / 2], [x1, y1]];
-  if (stroke.tool === 'rect' || stroke.tool === 'ellipse') {
+  if (stroke.tool === 'fill') {
+    const out: [number, number][] = [];
+    for (const ring of stroke.rings) {
+      const step = Math.max(2, Math.floor(ring.length / 64) * 2);
+      for (let i = 0; i + 1 < ring.length; i += step) out.push([ring[i], ring[i + 1]]);
+    }
+    return out;
+  }
+  if (isBoxShape(stroke.tool)) {
     const t: PaintTransform = { ...IDENTITY, angle: stroke.rotation, cx: (x0 + x1) / 2, cy: (y0 + y1) / 2 };
     const rx = Math.abs(x1 - x0) / 2, ry = Math.abs(y1 - y0) / 2;
     const out: [number, number][] = [];
@@ -419,4 +475,56 @@ export function moveLayerTo(doc: PaintDoc, id: string, index: number): PaintDoc 
   const [layer] = layers.splice(from, 1);
   layers.splice(clamp(index, 0, layers.length), 0, layer);
   return { layers };
+}
+
+/** The stroke with every point (and a fill's outlines) moved by `map`; widths and turns unchanged. */
+function mapStroke(stroke: PaintStroke, map: (x: number, y: number) => [number, number]): PaintStroke {
+  const points = [...stroke.points];
+  for (let i = 0; i + 2 < points.length; i += 3) [points[i], points[i + 1]] = map(points[i], points[i + 1]);
+  const rings = stroke.rings.map((ring) => {
+    const out = [...ring];
+    for (let i = 0; i + 1 < out.length; i += 2) [out[i], out[i + 1]] = map(out[i], out[i + 1]);
+    return out;
+  });
+  return { ...stroke, points, rings };
+}
+
+/**
+ * The stroke mirrored at a vertical (`x`) or horizontal (`y`) line through
+ * `at`. A box shape keeps its box and mirrors its turn: a polygon or star
+ * points up unturned, so mirrored at a horizontal line it turns by half a
+ * circle.
+ */
+export function mirrorStroke(stroke: PaintStroke, axis: 'x' | 'y', at: number): PaintStroke {
+  const mirrored = mapStroke(stroke, (x, y) => (axis === 'x' ? [2 * at - x, y] : [x, 2 * at - y]));
+  if (!isBoxShape(stroke.tool) || stroke.tool === 'fill') return mirrored;
+  return { ...mirrored, rotation: axis === 'x' ? -stroke.rotation : Math.PI - stroke.rotation };
+}
+
+/** Drawing in symmetry: off, mirrored left to right, in four quarters, or turned around the middle `rays` times. */
+export type Symmetry = { kind: 'off' } | { kind: 'mirror' } | { kind: 'quad' } | { kind: 'radial'; rays: number };
+
+export const MIN_RAYS = 3;
+export const MAX_RAYS = 16;
+
+/** The copies a stroke gets in symmetry, around the middle of the page; the stroke itself not among them. */
+export function symmetricCopies(stroke: PaintStroke, symmetry: Symmetry): PaintStroke[] {
+  const cx = PAINT_WIDTH / 2, cy = PAINT_HEIGHT / 2;
+  switch (symmetry.kind) {
+    case 'mirror':
+      return [mirrorStroke(stroke, 'x', cx)];
+    case 'quad': {
+      const side = mirrorStroke(stroke, 'x', cx);
+      return [side, mirrorStroke(stroke, 'y', cy), mirrorStroke(side, 'y', cy)];
+    }
+    case 'radial': {
+      const out: PaintStroke[] = [];
+      for (let i = 1; i < symmetry.rays; i++) {
+        out.push(transformStroke(stroke, { ...IDENTITY, angle: (i / symmetry.rays) * Math.PI * 2, cx, cy }));
+      }
+      return out;
+    }
+    default:
+      return [];
+  }
 }

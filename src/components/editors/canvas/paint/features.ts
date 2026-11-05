@@ -5,8 +5,12 @@
  * switched off keeps its strokes and draws them.
  */
 export interface PaintFeatures {
-  /** Line, ellipse and rectangle. */
+  /** Line, ellipse, rectangle, polygon and star, outlined or filled. */
   shapes: boolean;
+  /** The paint bucket, filling an area as a vector. */
+  fill: boolean;
+  /** Drawing in mirror or radial symmetry. */
+  symmetry: boolean;
   eraser: boolean;
   /** Several layers: adding, hiding, reordering, renaming, removing. */
   layers: boolean;
@@ -23,6 +27,8 @@ export interface PaintFeatures {
 /** Everything. */
 export const FULL_PAINT_FEATURES: PaintFeatures = {
   shapes: true,
+  fill: true,
+  symmetry: true,
   eraser: true,
   layers: true,
   customColor: true,

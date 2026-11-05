@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import {
-  applyTransform, IDENTITY, inPolygon, isShapeTool, PAINT_HEIGHT, PAINT_WIDTH, paintId, strokeBounds, strokeSamples,
-  thinPoints, transformStroke, translateLayer, unionRects,
+  applyTransform, IDENTITY, inPolygon, isBoxShape, isShapeTool, PAINT_HEIGHT, PAINT_WIDTH, paintId, strokeBounds,
+  strokeSamples, symmetricCopies, thinPoints, transformStroke, translateLayer, unionRects,
   type PaintLayer, type PaintRect, type PaintStroke, type PaintTool, type PaintTransform,
 } from '../../../../lib/paint/document';
 import { drawLayer, drawStroke, strokePath, type LayerImages } from './render';
-import { isDrawTool, isSelectTool, type PaintControls } from './usePaintTools';
+import { fillArea } from './fillArea';
+import { isDrawTool, isSelectTool, type EditorTool, type PaintControls } from './usePaintTools';
 
 /**
  * The drawing surface of the paint mode, laid over the drawing element being
@@ -22,8 +23,11 @@ import { isDrawTool, isSelectTool, type PaintControls } from './usePaintTools';
  *
  * The tools besides drawing: selecting strokes of the layer drawn on with a
  * rectangle or a lasso (a stroke lying wholly inside), or by clicking one (Shift adds), with a frame whose
- * corners scale and whose knob turns; moving the whole layer; and taking a
- * colour from the drawing (the picker, or Alt with a drawing tool).
+ * corners scale and whose knob turns; moving the whole layer; taking a
+ * colour from the drawing (the picker, or Alt with the pen or the bucket);
+ * and the bucket, which fills the area around a spot as a vector
+ * (`fillArea`). In symmetry every stroke shows and gets its copies; the
+ * axes or rays show as guides while a drawing tool is picked.
  *
  * Input: pointer events with pen pressure where the device reports it, and
  * the coalesced events in between, so a fast stroke keeps its curve. Only
@@ -40,7 +44,7 @@ interface CachedLayer {
 }
 
 type Gesture =
-  | { kind: 'draw'; pointerId: number; layerId: string; stroke: PaintStroke }
+  | { kind: 'draw'; pointerId: number; layerId: string; stroke: PaintStroke; anchor: [number, number] }
   | { kind: 'transform'; pointerId: number; mode: 'move' | 'scale' | 'rotate' | 'layer'; layerId: string; start: [number, number]; pivot: [number, number]; corner: [number, number]; t: PaintTransform; moved: boolean }
   | { kind: 'pick'; pointerId: number; lasso: boolean; points: number[]; base: string[]; moved: boolean }
   | { kind: 'color'; pointerId: number };
@@ -174,6 +178,7 @@ export default function PaintSurface({ box, api, images, editable }: {
         sctx.drawImage(layerCanvas(layer), 0, 0);
         sctx.restore();
         drawStroke(sctx, g.stroke, true);
+        for (const copy of symmetricCopies(g.stroke, props.current.api.symmetry)) drawStroke(sctx, copy, true);
         ctx.drawImage(sctx.canvas, 0, 0);
       } else if (g?.kind === 'transform' && g.layerId === layer.id && g.moved) {
         const ids = new Set(selection);
@@ -269,8 +274,9 @@ export default function PaintSurface({ box, api, images, editable }: {
       const s = layer.strokes[i];
       if (s.tool === 'eraser') continue;
       const path = strokePath(s);
-      ctx.lineWidth = (isShapeTool(s.tool) ? s.size : 0) + tolerance * 2;
-      if ((!isShapeTool(s.tool) && ctx.isPointInPath(path, x, y)) || ctx.isPointInStroke(path, x, y)) return s;
+      const solid = !isShapeTool(s.tool) || s.filled;
+      ctx.lineWidth = (isShapeTool(s.tool) && !s.filled ? s.size : 0) + tolerance * 2;
+      if ((solid && ctx.isPointInPath(path, x, y, s.tool === 'fill' ? 'evenodd' : 'nonzero')) || ctx.isPointInStroke(path, x, y)) return s;
     }
     return null;
   };
@@ -311,16 +317,19 @@ export default function PaintSurface({ box, api, images, editable }: {
 
   // ── Pointer ────────────────────────────────────────────────────────────
 
+  /** Alt picks a colour with the pen or the bucket; with a shape it draws from the middle. */
+  const altPicks = (tool: EditorTool) => tool === 'pen' || tool === 'fill';
   const effectiveTool = (alt: boolean) => {
     const { tool } = props.current.api;
-    return alt && isDrawTool(tool) ? 'picker' : tool;
+    return alt && altPicks(tool) ? 'picker' : tool;
   };
 
   /** The brush's outline under the pointer, at the brush's size on screen. */
   const placeCursor = (e: React.PointerEvent, show: boolean) => {
     const cursor = cursorRef.current;
     if (!cursor) return;
-    if (!show || e.pointerType === 'touch' || !isDrawTool(effectiveTool(e.altKey))) {
+    const tool = effectiveTool(e.altKey);
+    if (!show || e.pointerType === 'touch' || !isDrawTool(tool) || tool === 'fill') {
       cursor.style.opacity = '0';
       return;
     }
@@ -404,20 +413,27 @@ export default function PaintSurface({ box, api, images, editable }: {
       return;
     }
     if (!isDrawTool(tool)) return;
+    const base = {
+      color: p.api.color, size: p.api.size, rotation: 0, filled: isBoxShape(tool) && p.api.filled, sides: p.api.sides, rings: [] as number[][],
+    };
+    if (tool === 'fill') {
+      const rings = fillArea(p.api.doc, p.images, x, y);
+      if (rings) p.api.addStroke({ ...base, id: paintId(), tool, points: [x, y, 1], pressure: false, rings });
+      return;
+    }
     const pen = e.pointerType === 'pen';
     const pressure = pen ? e.pressure || 0.5 : 0.5;
     gesture.current = {
       kind: 'draw',
       pointerId: e.pointerId,
       layerId: p.api.activeLayer,
+      anchor: [x, y],
       stroke: {
+        ...base,
         id: paintId(),
         tool,
-        color: p.api.color,
-        size: p.api.size,
         points: isShapeTool(tool) ? [x, y, pressure, x, y, pressure] : [x, y, pressure],
         pressure: pen,
-        rotation: 0,
       },
     };
     schedule();
@@ -467,7 +483,10 @@ export default function PaintSurface({ box, api, images, editable }: {
     const { stroke } = g;
     const pts = stroke.points;
     if (isShapeTool(stroke.tool)) {
-      if (e.shiftKey) [x, y] = constrain(stroke.tool, pts[0], pts[1], x, y);
+      const [ax, ay] = g.anchor;
+      if (e.shiftKey) [x, y] = constrain(stroke.tool, ax, ay, x, y);
+      // Alt: from the middle out, the start mirrored through it.
+      [pts[0], pts[1]] = e.altKey ? [2 * ax - x, 2 * ay - y] : [ax, ay];
       pts[3] = x;
       pts[4] = y;
     } else {
@@ -538,12 +557,28 @@ export default function PaintSurface({ box, api, images, editable }: {
     const [x0, y0, x1 = x0, y1 = y0] = pickPath.points;
     pickPoints.push([x0, y0], [x1, y0], [x1, y1], [x0, y1]);
   }
-  const tool = altDown && isDrawTool(api.tool) ? 'picker' : api.tool;
+  const tool = altDown && (api.tool === 'pen' || api.tool === 'fill') ? 'picker' : api.tool;
+  // The symmetry's axes or rays, from the middle of the page, while drawing.
+  const guides: [number, number][][] = [];
+  if (isDrawTool(api.tool) && api.symmetry.kind !== 'off') {
+    const cx = PAINT_WIDTH / 2, cy = PAINT_HEIGHT / 2;
+    if (api.symmetry.kind === 'radial') {
+      const reach = Math.hypot(cx, cy);
+      for (let i = 0; i < api.symmetry.rays; i++) {
+        const a = -Math.PI / 2 + (i / api.symmetry.rays) * Math.PI * 2;
+        guides.push([[cx, cy], [cx + Math.cos(a) * reach, cy + Math.sin(a) * reach]]);
+      }
+    } else {
+      guides.push([[cx, 0], [cx, PAINT_HEIGHT]]);
+      if (api.symmetry.kind === 'quad') guides.push([[0, cy], [PAINT_WIDTH, cy]]);
+    }
+  }
   const cursor = !editable ? undefined
     : tool === 'picker' ? 'crosshair'
       : api.layerLocked ? 'not-allowed'
         : tool === 'move' ? 'move'
           : isSelectTool(tool) ? 'default'
+            : tool === 'fill' ? 'cell'
             : undefined;
 
   return (
@@ -567,8 +602,9 @@ export default function PaintSurface({ box, api, images, editable }: {
         className={`paint-canvas${editable ? ' paint-canvas--editable' : ''}`}
         style={{ cursor }}
       />
-      {(selFrame || pickPath) && (
+      {(selFrame || pickPath || guides.length > 0) && (
         <svg className="paint-overlay" width={box.width} height={box.height} aria-hidden>
+          {guides.map((line, i) => <polyline key={i} className="paint-guide" points={pointsAttr(line)} />)}
           {selFrame && (<>
             <polygon className="paint-frame" points={pointsAttr(selFrame.corners)} />
             <polyline className="paint-frame" points={pointsAttr([selFrame.top, selFrame.knob])} />
