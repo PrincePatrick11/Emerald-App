@@ -12,7 +12,6 @@ import {
 } from '../../../lib/updates';
 import { settleBeforeExit } from '../../../lib/openEdits';
 import { takeStartFocus, useVaultPickerStore } from '../../../store/vaultPickerStore';
-import packageJson from '../../../../package.json';
 
 type Status = 'idle' | 'checking' | 'done' | 'failed' | 'installing';
 
@@ -38,8 +37,8 @@ const CALM_CODES = new Set(['unreachable', 'unsupported-target']);
 type SourceFeedback = { kind: 'saved' } | { kind: 'error'; code: string } | null;
 
 /**
- * The right half of the start page's foot: the version, a check, and
- * installing what it found. "Update server" opens a dialog with the source,
+ * The right half of the start page's foot: a check, and installing what it
+ * found (the version itself is under the brand). "Update server" opens a dialog with the source,
  * the check on start and the release notes. All of it belongs to the installation
  * (`{appDataDir}/update.json`, `updates.rs`). "Check for Updates…" and the
  * update dot open the page with a check already running (`focus`).
@@ -183,7 +182,6 @@ export default function StartUpdates() {
         <Server size={12} />
         {t('start.updateSettings')}
       </button>
-      <span className="shrink-0 tabular-nums text-muted">{t('start.version', { version: packageJson.version })}</span>
 
       {settingsOpen && (
         <Modal title={t('start.updateSettings')} onClose={closeSettings} bodyClassName="modal-body">

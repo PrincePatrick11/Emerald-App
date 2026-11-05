@@ -30,7 +30,7 @@ function BrandLink({ icon, label, url }: { icon: ReactNode; label: string; url: 
 }
 
 /** The start page's left column, on the frame: the mark, the name, the
- *  tagline, the links, and at the foot the author. */
+ *  tagline, the links, and at the foot the version and the author. */
 export default function StartBrand({ width }: { width: number }) {
   const { t, i18n } = useTranslation();
   const language = LANGUAGE_OPTIONS.some((o) => o.code === i18n.resolvedLanguage) ? i18n.resolvedLanguage : 'en';
@@ -50,7 +50,9 @@ export default function StartBrand({ width }: { width: number }) {
           <BrandLink icon={<DiscordMark size={14} />} label="Discord" url={DISCORD_URL} />
         </nav>
       </div>
-      <p className="mt-auto pt-8 text-xs text-subtle">{packageJson.author}</p>
+      <p className="mt-auto pt-8 text-xs text-subtle tabular-nums">
+        {t('start.version', { version: packageJson.version })} · {packageJson.author}
+      </p>
     </aside>
   );
 }
