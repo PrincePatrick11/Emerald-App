@@ -136,20 +136,44 @@ export function renderPaintPng(doc: PaintDoc, images: LayerImages): string {
 }
 
 /**
- * The document onto a canvas of any size, scaled to fit its width, hidden
- * layers left out — for a place that shows a drawing inside its own canvas
- * (another editor, a thumbnail) without the paint editor.
+ * The document drawn by a place that shows it without the paint editor,
+ * hidden layers left out. Without `box` it fills the target canvas's width.
+ * With `box` it is scaled into that box at the origin of the target's
+ * current transform (another editor's element, already moved, turned and
+ * scaled there); the target is neither cleared nor resized. The layers are
+ * stacked on a canvas of their own, at the pixels the box covers on the
+ * target, since an eraser stroke must cut only its own layer.
  */
-export function drawPaintDoc(target: CanvasRenderingContext2D, doc: PaintDoc, images: LayerImages): void {
-  const { width, height } = target.canvas;
-  const layer = canvasOf(width, height);
+export function drawPaintDoc(
+  target: CanvasRenderingContext2D,
+  doc: PaintDoc,
+  images: LayerImages,
+  box?: { width: number; height: number },
+): void {
+  const width = box?.width ?? target.canvas.width;
+  const height = box?.height ?? (target.canvas.width * PAINT_HEIGHT) / PAINT_WIDTH;
+  if (width <= 0 || height <= 0) return;
+  const m = target.getTransform();
+  const zoom = box ? Math.max(Math.hypot(m.a, m.b), Math.hypot(m.c, m.d)) : 1;
+  // Bounded: a huge zoom must not ask for a canvas the browser refuses.
+  const pxW = Math.max(1, Math.min(4096, Math.round(width * zoom)));
+  const pxH = Math.max(1, Math.min(4096, Math.round(height * zoom)));
+  const layer = canvasOf(pxW, pxH);
+  const stack = canvasOf(pxW, pxH);
   const lctx = layer.getContext('2d')!;
-  const scale = width / PAINT_WIDTH;
-  lctx.setTransform(scale, 0, 0, scale, 0, 0);
+  const sctx = stack.getContext('2d')!;
+  lctx.setTransform(pxW / PAINT_WIDTH, 0, 0, pxH / PAINT_HEIGHT, 0, 0);
   for (const l of doc.layers) {
     if (l.hidden) continue;
     drawLayer(lctx, l, images);
-    target.drawImage(layer, 0, 0);
+    sctx.drawImage(layer, 0, 0);
+  }
+  if (box) target.drawImage(stack, 0, 0, width, height);
+  else {
+    target.save();
+    target.setTransform(1, 0, 0, 1, 0, 0);
+    target.drawImage(stack, 0, 0);
+    target.restore();
   }
 }
 
