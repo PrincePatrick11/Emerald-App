@@ -1,12 +1,14 @@
 import type { Editor } from '@tiptap/react';
 import { useTranslation } from 'react-i18next';
 import {
-  CheckSquare, Globe, Heading1, Heading2, Heading3, ImagePlus, Link, List, ListOrdered, Minus, Quote, Redo,
+  CheckSquare, ChevronsDownUp, Globe, Heading1, Heading2, Heading3, ImagePlus, Link, List, ListOrdered, Minus, Quote, Redo,
   Search, Table, Undo, Unlink,
 } from 'lucide-react';
 import { editorHas } from './hostContext';
 import { ALIGN_ACTIONS, applyAlign, canAlign, isAlignActive, markActionsOf } from './formatActions';
-import { applyLinkHref, applyTextColor, currentTextColor, NEW_TABLE, pickImageFiles, removeLink } from './editorCommands';
+import {
+  applyLinkHref, applyTextColor, currentTextColor, NEW_TABLE, pickImageFiles, removeLink, toggleDetails,
+} from './editorCommands';
 import LinkHrefForm from './LinkHrefForm';
 import TextColorSwatches, { TextColorIcon } from './TextColorSwatches';
 import PopoverButton from '../shared/PopoverButton';
@@ -19,7 +21,7 @@ import { ToolbarBtn, ToolbarDivider, ToolbarGroup } from '../shared/toolbarParts
  *
  * In the order of writing: undo, what a line is (headings), how text looks
  * (marks and colour), how it sits (alignment), the block shapes (lists,
- * checklist, quote), what is put in (links, image, table, divider), and
+ * checklist, quote, collapsible section), what is put in (links, image, table, divider), and
  * finding at the far end.
  */
 export default function EditorToolbar({ editor, onOpenLinkPicker, findOpen, onToggleFind }: {
@@ -99,7 +101,7 @@ export default function EditorToolbar({ editor, onOpenLinkPicker, findOpen, onTo
         </ToolbarGroup>
       </>)}
 
-      {(has('bulletList') || has('taskList') || has('blockquote')) && (<>
+      {(has('bulletList') || has('taskList') || has('blockquote') || has('details')) && (<>
         <ToolbarDivider />
         <ToolbarGroup>
           {has('bulletList') && (<>
@@ -134,6 +136,15 @@ export default function EditorToolbar({ editor, onOpenLinkPicker, findOpen, onTo
               title={t('editor.toolbar.blockquote')}
             >
               <Quote size={14} />
+            </ToolbarBtn>
+          )}
+          {has('details') && (
+            <ToolbarBtn
+              onClick={() => toggleDetails(editor)}
+              active={editor.isActive('details')}
+              title={t('editor.details.insert')}
+            >
+              <ChevronsDownUp size={14} />
             </ToolbarBtn>
           )}
         </ToolbarGroup>
