@@ -25,11 +25,10 @@ import {
 
 /**
  * What the altar offers in the canvas editor: everything — library images,
- * shapes, text and drawings — but grouping, since placements do not store a
- * group. Drawings on an altar carry no layer images.
+ * shapes, text and drawings, groups among them. Drawings on an altar carry no
+ * layer images.
  */
-const FULL_PROFILE = fullProfile();
-const ALTAR_PROFILE = { ...FULL_PROFILE, features: { ...FULL_PROFILE.features, group: false } };
+const ALTAR_PROFILE = fullProfile();
 const ALTAR_PAINT: CanvasPaintOptions = {
   ...ALTAR_PROFILE.paint,
   palette: CANVAS_SWATCHES,

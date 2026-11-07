@@ -40,6 +40,7 @@ export function placementToElement(
     locked: p.locked,
     hidden: p.hidden,
     z: p.z_index,
+    ...(p.group ? { group: p.group } : {}),
   };
   if (p.kind === 'shape' && p.shape) {
     const props: ShapeProps = {
@@ -98,6 +99,7 @@ export function elementToPlacement(
     opacity: el.opacity,
     locked: el.locked,
     hidden: el.hidden,
+    ...(el.group ? { group: el.group } : {}),
   };
   if (el.type === 'shape') {
     const p = el.props as ShapeProps;

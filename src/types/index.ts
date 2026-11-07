@@ -164,6 +164,8 @@ export interface AltarPlacement {
   opacity: number;
   locked: boolean;
   hidden: boolean;
+  /** The group it is selected and moved with on the canvas; elements of one group share it. */
+  group?: string;
   image_data?: string;
   /** Only for `kind: 'drawing'`: the painted document (`lib/paint/document.ts`). */
   drawing?: PaintDoc;

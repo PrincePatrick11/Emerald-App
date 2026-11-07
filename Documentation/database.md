@@ -69,6 +69,7 @@ Per-migration detail lives in the code and in `CHANGELOG.md`. In short:
 | 54 | `drop_unused_descriptions` | Drops `tasks.description`/`due_date`, `block_definitions.description`, `templates.description` |
 | 55 | `entries_list_index` | `idx_entries_list` (the list columns) and the partial `idx_entries_decorated` replace `idx_entries_deleted` |
 | 56 | `altar_elements` | Additive: `altars.elements`, the drawn shapes and text as JSON ([altars](#altars)) |
+| 57 | `altar_placement_groups` | Additive: `altar_placements.group_id`, the group a placement belongs to ([altar_placements](#altar_placements)) |
 
 Column drops go through `dropColumnsIfPresent` (`dbRebuild.ts`), which skips columns already gone, so they are repeatable. Where a migration converts data, the same converter also runs on rows from an older `.emeralddb` file at import time — see [DB Backup / Restore](#db-backup--restore-emeralddb).
 
@@ -274,7 +275,7 @@ How words are matched when translating lives in `src/lib/lexicon.ts` — see [Le
 
 The display settings are one JSON column because they are only ever read and written together and no query filters by them; the image columns stay columns because the image cleanup looks for references in columns.
 
-`elements` holds what is made on an altar rather than taken from the library: shapes (`rect`, `ellipse`, `polygon`, `star`, and the `triangle` and `hexagon` of older altars, with fill, outline, outline width, corner radius and, for polygons and stars, `sides`, 3–12, missing for six corners or five points), text (content, font, size, colour, alignment, bold, italic) and drawings (the paint document's JSON, `paintDocToJson`, without layer images). They hang on no library item, so they cannot be rows of `altar_placements`, whose `item_id` is required. Each entry carries the same `id`, `x`/`y`, `z_index`, `width`/`height`, `rotation`, `opacity`, `locked` and `hidden` as a placement, plus `kind` (`shape`, `text` or `drawing`) and its `shape`, `text` or `drawing` object; sizes of fonts, outlines and corners are pixels at the reference width of 1920. `parseAltarElements` and `altarElementsJson` (`src/lib/altarElements.ts`) read and write it, validating like `parseAltarSettings`; the store holds the entries as placements with that `kind` and an empty `item_id`. A copied altar, a merged backup and an imported `.emerald` file give them new ids (`withNewElementIds`), since ids are unique across all altars in the store.
+`elements` holds what is made on an altar rather than taken from the library: shapes (`rect`, `ellipse`, `polygon`, `star`, and the `triangle` and `hexagon` of older altars, with fill, outline, outline width, corner radius and, for polygons and stars, `sides`, 3–12, missing for six corners or five points), text (content, font, size, colour, alignment, bold, italic) and drawings (the paint document's JSON, `paintDocToJson`, without layer images). They hang on no library item, so they cannot be rows of `altar_placements`, whose `item_id` is required. Each entry carries the same `id`, `x`/`y`, `z_index`, `width`/`height`, `rotation`, `opacity`, `locked`, `hidden` and, when grouped, `group` as a placement, plus `kind` (`shape`, `text` or `drawing`) and its `shape`, `text` or `drawing` object; sizes of fonts, outlines and corners are pixels at the reference width of 1920. `parseAltarElements` and `altarElementsJson` (`src/lib/altarElements.ts`) read and write it, validating like `parseAltarSettings`; the store holds the entries as placements with that `kind` and an empty `item_id`. A copied altar, a merged backup and an imported `.emerald` file give them new ids (`withNewElementIds`), since ids are unique across all altars in the store.
 
 `AltarRecord` stays flat: `fromRow.altar` unpacks `settings` through `parseAltarSettings`, and every write packs it through `altarSettingsJson` (`src/lib/altarSettings.ts`), which always normalizes — every key present, in a fixed order, a missing or invalid value replaced by its `DEFAULT_*` from `altarConstants.ts` (a non-hex grid colour, an unknown resolution, a non-finite number). `parseAltarSettings` also accepts a row with the individual columns (flags as 0/1), which is how v51 and pre-`"12"` backups are converted.
 
@@ -362,6 +363,7 @@ One placed object on one altar.
 | width / height | REAL | NOT NULL DEFAULT 8 |
 | rotation / opacity | REAL | degrees / 0–1 |
 | locked / hidden | INTEGER | boolean 0/1 |
+| group_id | TEXT | the group it is selected and moved with on the canvas, or NULL (since v57) |
 
 `AltarPlacement` in `src/types` also carries `name`, `emoji`, `category_id` and `image_data`. Those are **not** columns — they are joined in from `altar_items` when placements are loaded.
 
@@ -479,7 +481,7 @@ Full vault snapshots are exported and imported via Settings → Backup. The code
 
 | Version | Since | What changed | What import does with an older file |
 |---|---|---|---|
-| 13 | v56 | altars carry `elements` | Nothing; an older build would drop the drawn shapes and text, so it must refuse |
+| 13 | v56 | altars carry `elements`; placements may carry `group_id` (v57) | Nothing; an older build would drop the drawn shapes and text, so it must refuse |
 | 12 | v51–v53 | altar `settings` JSON; altar items with `updated_at`/`deleted_at`; tag ids | Packs altar columns into `settings` (`altarSettingsJson`); gives items `updated_at = created_at`; `tagNamesToIds` converts entries', templates' and old routines' tag names by the v53 rule ([tags](#tags)) and drops `affected_ids` |
 | 11 | v49 | one `data.entries` array with `type` | A `"11"`+ file is split back into journal/wiki/operation arrays (`splitEntries`; unknown `type` dropped), so the import paths work on three arrays; `entryRowsForInsert` projects them onto `entries`, de-duplicating ids (journal, wiki, operation wins) |
 | 10 | v46 | altars carry `deleted_at` | Nothing; an older build would revive trashed altars, so it must refuse |

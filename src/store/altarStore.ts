@@ -66,6 +66,7 @@ function mapPlacementRows(rows: DbRow[], items: AltarItem[]): AltarPlacement[] {
       opacity: Number(r.opacity),
       locked: bool(r.locked),
       hidden: bool(r.hidden),
+      ...(r.group_id ? { group: String(r.group_id) } : {}),
       image_data: item?.image_data,
     };
   });
@@ -99,12 +100,12 @@ async function writeAltarElements(altarId: string, placements: readonly AltarPla
 
 /** A placement's row values, in the column order of the INSERT statements below. */
 const placementValues = (p: AltarPlacement, altarId: string) => [
-  p.id, altarId, p.item_id, p.x, p.y, p.z_index, p.width, p.height, p.rotation, p.opacity, toInt(p.locked), toInt(p.hidden),
+  p.id, altarId, p.item_id, p.x, p.y, p.z_index, p.width, p.height, p.rotation, p.opacity, toInt(p.locked), toInt(p.hidden), p.group ?? null,
 ];
-const INSERT_PLACEMENT = 'INSERT INTO altar_placements (id, altar_id, item_id, x, y, z_index, width, height, rotation, opacity, locked, hidden) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)';
-const UPDATE_PLACEMENT = 'UPDATE altar_placements SET x=$1, y=$2, z_index=$3, width=$4, height=$5, rotation=$6, opacity=$7, locked=$8, hidden=$9 WHERE id=$10';
+const INSERT_PLACEMENT = 'INSERT INTO altar_placements (id, altar_id, item_id, x, y, z_index, width, height, rotation, opacity, locked, hidden, group_id) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)';
+const UPDATE_PLACEMENT = 'UPDATE altar_placements SET x=$1, y=$2, z_index=$3, width=$4, height=$5, rotation=$6, opacity=$7, locked=$8, hidden=$9, group_id=$10 WHERE id=$11';
 const placementUpdateValues = (p: AltarPlacement) => [
-  p.x, p.y, p.z_index, p.width, p.height, p.rotation, p.opacity, toInt(p.locked), toInt(p.hidden), p.id,
+  p.x, p.y, p.z_index, p.width, p.height, p.rotation, p.opacity, toInt(p.locked), toInt(p.hidden), p.group ?? null, p.id,
 ];
 
 
@@ -337,10 +338,11 @@ export const useAltarStore = create<AltarState>((set, get) => ({
       opacity: number | null;
       locked: number | null;
       hidden: number | null;
+      group_id: string | null;
     }[]>(
       // All of them, including those of items in the trash: if one comes back,
       // it sits on the copy just as on the original.
-      'SELECT item_id, x, y, z_index, width, height, rotation, opacity, locked, hidden FROM altar_placements WHERE altar_id=$1',
+      'SELECT item_id, x, y, z_index, width, height, rotation, opacity, locked, hidden, group_id FROM altar_placements WHERE altar_id=$1',
       [id],
     );
 
@@ -348,7 +350,7 @@ export const useAltarStore = create<AltarState>((set, get) => ({
     await db.execute('UPDATE altars SET elements=$1 WHERE id=$2', [withNewElementIds(sourceRow?.elements, copy.id), copy.id]);
 
     await db.batch(sourcePlacements.map((placement) => [
-      'INSERT INTO altar_placements (id, altar_id, item_id, x, y, z_index, width, height, rotation, opacity, locked, hidden) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)',
+      'INSERT INTO altar_placements (id, altar_id, item_id, x, y, z_index, width, height, rotation, opacity, locked, hidden, group_id) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)',
       [
         generateId(),
         copy.id,
@@ -362,6 +364,7 @@ export const useAltarStore = create<AltarState>((set, get) => ({
         placement.opacity ?? 1,
         placement.locked ?? 0,
         placement.hidden ?? 0,
+        placement.group_id,
       ],
     ] as const));
 
@@ -518,13 +521,13 @@ export const useAltarStore = create<AltarState>((set, get) => ({
     // order also keeps it repeatable — the altar is never left in between
     // without the placements it had.
     const upserts = restored.map((p) => [
-      `INSERT INTO altar_placements (id, altar_id, item_id, x, y, z_index, width, height, rotation, opacity, locked, hidden)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
+      `INSERT INTO altar_placements (id, altar_id, item_id, x, y, z_index, width, height, rotation, opacity, locked, hidden, group_id)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
        ON CONFLICT(id) DO UPDATE SET
          altar_id=excluded.altar_id, item_id=excluded.item_id, x=excluded.x, y=excluded.y, z_index=excluded.z_index,
          width=excluded.width, height=excluded.height, rotation=excluded.rotation, opacity=excluded.opacity,
-         locked=excluded.locked, hidden=excluded.hidden`,
-      [p.id, altar.id, p.item_id, p.x, p.y, p.z_index, p.width, p.height, p.rotation, p.opacity, toInt(p.locked), toInt(p.hidden)],
+         locked=excluded.locked, hidden=excluded.hidden, group_id=excluded.group_id`,
+      [p.id, altar.id, p.item_id, p.x, p.y, p.z_index, p.width, p.height, p.rotation, p.opacity, toInt(p.locked), toInt(p.hidden), p.group ?? null],
     ] as const);
     // The placements of items in the trash are not part of the remembered
     // snapshot, yet belong to the altar: they stay — including those of an
@@ -805,6 +808,8 @@ export const useAltarStore = create<AltarState>((set, get) => ({
       z_index: maxZ + 1,
       locked: false,
       hidden: false,
+      // A copy from the sidebar stands on its own.
+      group: undefined,
     };
     if (isDrawn(copy)) {
       await writeAltarElements(altarId, [...get().placements, copy]);

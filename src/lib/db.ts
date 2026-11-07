@@ -1436,6 +1436,17 @@ export const MIGRATIONS: Migration[] = [
       }
     },
   },
+  {
+    // Groups on an altar (the canvas editor's `group`): placements of library
+    // items keep theirs here, drawn elements in their JSON. Additive and repeatable.
+    version: 57,
+    name: 'altar_placement_groups',
+    up: async (db) => {
+      if (!(await columnNames(db, 'altar_placements')).has('group_id')) {
+        await db.execute('ALTER TABLE altar_placements ADD COLUMN group_id TEXT');
+      }
+    },
+  },
 ];
 
 async function altarSettingsToJson(db: Database): Promise<void> {
