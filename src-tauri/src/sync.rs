@@ -392,7 +392,8 @@ fn agree(health: &Value) -> Result<Handshake, String> {
 }
 
 /// Handshakes by server address, for as long as the app runs. A server updated
-/// meanwhile answers `protocol_unsupported`, which starts a new one.
+/// meanwhile answers `protocol_unsupported`, after which the next request
+/// starts a new one.
 fn handshakes() -> std::sync::MutexGuard<'static, HashMap<String, Handshake>> {
     static HANDSHAKES: OnceLock<Mutex<HashMap<String, Handshake>>> = OnceLock::new();
     HANDSHAKES.get_or_init(Default::default).lock().unwrap_or_else(std::sync::PoisonError::into_inner)
@@ -502,17 +503,14 @@ async fn send(builder: RequestBuilder) -> Result<Response, String> {
 /// The server's own word for why it refused, as `SYNC_` + what it said.
 async fn refused(response: Response) -> String {
     let status = response.status();
-    let url = response.url().as_str().split_once("/api/v1").map(|(base, _)| base.to_string());
     let code = response.json::<Value>().await.ok().and_then(|v| v["code"].as_str().map(str::to_owned));
     if status == StatusCode::UNAUTHORIZED {
         return NEEDS_LOGIN.to_string();
     }
-    // The server changed since the handshake: agree anew, and say why if that fails.
-    if let (Some(url), Some("protocol_unsupported")) = (url, code.as_deref()) {
-        handshakes().remove(&url);
-        if let Err(err) = Box::pin(handshake(&url)).await {
-            return err;
-        }
+    // The server changed since the handshake: the next request agrees anew. An
+    // installation has one server, so forgetting all of them costs nothing.
+    if code.as_deref() == Some("protocol_unsupported") {
+        handshakes().clear();
     }
     format!("SYNC_SERVER:{}", code.unwrap_or_else(|| status.as_u16().to_string()))
 }
@@ -837,8 +835,8 @@ pub async fn sync_delete_remote(app: tauri::AppHandle, remote_id: String) -> Res
 /// The vault was renamed here: the list on the server follows.
 #[tauri::command]
 pub async fn sync_rename(app: tauri::AppHandle, vault_id: String, name: String) -> Result<(), String> {
-    let server = connected(&app).await?;
     let target = remote(&app, &vault_id).await?;
+    let server = server(&app)?;
     let current = send(target.call(Method::GET, "", SHORT)?).await?;
     if !current.status().is_success() {
         return Err(refused(current).await);
