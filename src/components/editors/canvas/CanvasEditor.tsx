@@ -43,6 +43,10 @@ const EDIT_PADDING = 32;
 /** More on the left while editing, where the tool column lies. */
 const RAIL_PADDING = 48;
 const PASTE_OFFSET = 24;
+/** The id of the element shown while one is drawn, never committed. */
+const DRAFT_ID = '__draft';
+const ignoreNode = () => {};
+const ignoreHover = () => {};
 
 /** What the canvas editor keeps between two pastes (one per window, shared by every canvas editor). */
 let clipboard: CanvasElement[] = [];
@@ -176,6 +180,8 @@ const CanvasEditor = forwardRef<CanvasEditorHandle, CanvasEditorProps>(function 
   const fittedRef = useRef(true);
   const [guides, setGuides] = useState<Guide[]>([]);
   const [marquee, setMarquee] = useState<Box | null>(null);
+  /** The element being drawn with a tool of the column, shown as it will be while the pointer is down. */
+  const [draft, setDraft] = useState<CanvasElement | null>(null);
   /** The overview of the keys, open or not. */
   const [keysOpen, setKeysOpen] = useState(false);
   /** The right-click menu: where it opened, on screen and on the artboard, and a locked element it was opened on. */
@@ -619,10 +625,14 @@ const CanvasEditor = forwardRef<CanvasEditorHandle, CanvasEditorProps>(function 
     trackPointerDrag(start, {
       threshold: DRAG_THRESHOLD_PX,
       onStart: () => setGesture(true),
-      onMove: (e) => { last = e; setMarquee(boxTo(e)); },
+      onMove: (e) => {
+        last = e;
+        const box = boxTo(e);
+        setDraft({ ...made(tool.type, addition, { x: box.x + box.width / 2, y: box.y + box.height / 2 }, box), id: DRAFT_ID, locked: true });
+      },
       onEnd: ({ started, cancelled }) => {
         setGesture(false);
-        setMarquee(null);
+        setDraft(null);
         if (cancelled) return;
         setAddTool(null);
         const box = started && last ? boxTo(last) : null;
@@ -776,29 +786,34 @@ const CanvasEditor = forwardRef<CanvasEditorHandle, CanvasEditorProps>(function 
    * drawn (a type that keeps its proportions takes the box's width, text its
    * width and the height it needs), or at the addition's own size.
    */
-  const place = useCallback((type: string, addition: CanvasAddition, at: { x: number; y: number }, box: { width: number; height: number } | null) => {
+  const made = useCallback((type: string, addition: CanvasAddition, at: { x: number; y: number }, box: { width: number; height: number } | null) => {
     const kind = live.current.types[type];
-    const made = addition.create(at, { width, height }, t);
-    let size = { width: made.width, height: made.height };
+    const created = addition.create(at, { width, height }, t);
+    let size = { width: created.width, height: created.height };
     if (box) {
       const w = Math.max(8, box.width);
-      size = kind?.fitHeight ? { width: w, height: made.height }
-        : kind?.keepRatio ? { width: w, height: (w * made.height) / made.width }
+      size = kind?.fitHeight ? { width: w, height: created.height }
+        : kind?.keepRatio ? { width: w, height: (w * created.height) / created.width }
           : { width: w, height: Math.max(8, box.height) };
     }
     const centre = { x: clamp(at.x, 0, width), y: clamp(at.y, 0, height) };
-    const el = fitted({
+    return fitted({
       id: createId(), type, x: centre.x, y: centre.y, rotation: 0, opacity: 1, locked: false, hidden: false,
       z: live.current.elements.reduce((max, e) => Math.max(max, e.z), -1) + 1,
-      ...made, ...size,
+      ...created, ...size,
     });
+  }, [width, height, t, createId, fitted]);
+
+  const place = useCallback((type: string, addition: CanvasAddition, at: { x: number; y: number }, box: { width: number; height: number } | null) => {
+    const kind = live.current.types[type];
+    const el = made(type, addition, at, box);
     commit([...live.current.elements, el]);
     select([el.id]);
     rootRef.current?.focus({ preventScroll: true });
     // A new text is typed into at once, a new drawing painted in.
     if (kind?.textEdit) setEditingTextId(el.id);
     else if (kind?.paint) setPaintingId(el.id);
-  }, [width, height, t, createId, commit, select, fitted]);
+  }, [made, commit, select]);
 
   const openElement = useCallback((el: CanvasElement) => {
     if (el.locked) return;
@@ -1143,6 +1158,14 @@ const CanvasEditor = forwardRef<CanvasEditorHandle, CanvasEditorProps>(function 
                     onHover={setHoveredId}
                   />
                 ))}
+                {draft && (<>
+                  <ElementNode el={draft} types={types} editable={false} editing={false} resourceVersion={resourceVersion} register={ignoreNode} onHover={ignoreHover} />
+                  {/* Its frame too: a new drawing or text has little to show yet. */}
+                  <Rect
+                    x={draft.x} y={draft.y} width={draft.width} height={draft.height} offsetX={draft.width / 2} offsetY={draft.height / 2}
+                    stroke={accent} strokeWidth={1 / view.zoom} dash={[4 / view.zoom, 3 / view.zoom]} opacity={0.6} listening={false}
+                  />
+                </>)}
               </Group>
             </Layer>
             <Layer listening={false}>

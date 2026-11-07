@@ -323,12 +323,12 @@ export default function PaintSurface({ box, api, images, editable }: {
     return alt && altPicks(tool) ? 'picker' : tool;
   };
 
-  /** The brush's outline under the pointer, at the brush's size on screen. */
+  /** The brush's outline under the pointer, at the brush's size on screen; shapes and lines take a crosshair instead. */
   const placeCursor = (e: React.PointerEvent, show: boolean) => {
     const cursor = cursorRef.current;
     if (!cursor) return;
     const tool = effectiveTool(e.altKey);
-    if (!show || e.pointerType === 'touch' || !isDrawTool(tool) || tool === 'fill') {
+    if (!show || e.pointerType === 'touch' || !isDrawTool(tool) || tool === 'fill' || isShapeTool(tool)) {
       cursor.style.opacity = '0';
       return;
     }
@@ -591,6 +591,7 @@ export default function PaintSurface({ box, api, images, editable }: {
   const cursor = !editable ? undefined
     : tool === 'picker' ? 'crosshair'
       : api.layerLocked ? 'not-allowed'
+        : isDrawTool(tool) && isShapeTool(tool) ? 'crosshair'
         : tool === 'move' ? 'move'
           : isSelectTool(tool) ? 'default'
             : tool === 'fill' ? 'cell'
