@@ -4,16 +4,10 @@ import {
   Ruler, Scissors, SendToBack, Trash2, Ungroup,
 } from 'lucide-react';
 import type { ContextMenuAction } from '../../ui/ContextMenu';
-import { isMacOS } from '../../../lib/platform';
 import type { ArrangeMove } from './canvasActions';
 import type { CanvasFeatures } from './features';
 import type { CanvasElement } from './types';
-
-/** A key with the platform's modifiers, as the menu shows it: `⇧⌘G` on macOS, `Ctrl+Shift+G` elsewhere. */
-function keys(key: string, mod = true, shift = false): string {
-  if (isMacOS) return `${shift ? '⇧' : ''}${mod ? '⌘' : ''}${key}`;
-  return [mod && 'Ctrl', shift && 'Shift', key].filter(Boolean).join('+');
-}
+import { DELETE_KEY, keys } from './shortcuts';
 
 export interface CanvasMenuContext {
   t: TFunction;
@@ -94,7 +88,7 @@ export function canvasMenuActions(c: CanvasMenuContext): ContextMenuAction[] {
   actions.push(
     { label: t('canvas.layers.lock'), icon: <Lock size={12} />, onClick: () => c.patch(ids, { locked: true }), separator: true },
     { label: t(hidden ? 'canvas.layers.show' : 'canvas.layers.hide'), icon: hidden ? <Eye size={12} /> : <EyeOff size={12} />, onClick: () => c.patch(ids, { hidden: !hidden }) },
-    { label: t('canvas.remove'), icon: <Trash2 size={12} />, shortcut: isMacOS ? '⌫' : 'Del', onClick: c.remove, danger: true, separator: true, disabled: !editable.length },
+    { label: t('canvas.remove'), icon: <Trash2 size={12} />, shortcut: DELETE_KEY, onClick: c.remove, danger: true, separator: true, disabled: !editable.length },
   );
   return actions;
 }

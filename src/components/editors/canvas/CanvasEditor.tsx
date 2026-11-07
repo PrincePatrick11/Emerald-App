@@ -29,7 +29,8 @@ import { isSelectTool, usePaintBrush, usePaintControls } from './paint/usePaintT
 import { FULL_PAINT_FEATURES, type PaintFeatures } from './paint/features';
 import { emptyPaintDoc, type PaintDoc } from '../../../lib/paint/document';
 import { ToolbarBtn } from '../shared/toolbarParts';
-import { Check } from 'lucide-react';
+import { Check, Keyboard } from 'lucide-react';
+import ShortcutOverview from './ShortcutOverview';
 import ContextMenu from '../../ui/ContextMenu';
 import { canvasMenuActions } from './CanvasContextMenu';
 
@@ -175,6 +176,8 @@ const CanvasEditor = forwardRef<CanvasEditorHandle, CanvasEditorProps>(function 
   const fittedRef = useRef(true);
   const [guides, setGuides] = useState<Guide[]>([]);
   const [marquee, setMarquee] = useState<Box | null>(null);
+  /** The overview of the keys, open or not. */
+  const [keysOpen, setKeysOpen] = useState(false);
   /** The right-click menu: where it opened, on screen and on the artboard, and a locked element it was opened on. */
   const [menu, setMenu] = useState<{ x: number; y: number; at: { x: number; y: number }; locked: CanvasElement | null } | null>(null);
   const [editingTextId, setEditingTextId] = useState<string | null>(null);
@@ -871,12 +874,16 @@ const CanvasEditor = forwardRef<CanvasEditorHandle, CanvasEditorProps>(function 
   }, [editable]);
 
   const onKeyDown = (e: React.KeyboardEvent) => {
-    if (!editable || editingTextId) return;
+    // While the keys' overview is open the keys are its (Escape closes it), even with the focus still here.
+    if (!editable || editingTextId || keysOpen) return;
     const target = e.target as HTMLElement;
+    // Keys in the editor's menus and windows, which are portals, reach here through React too.
+    if (!rootRef.current?.contains(target)) return;
     if (target.closest('input, textarea, select, [contenteditable="true"]')) return;
     const mod = e.metaKey || e.ctrlKey;
     const key = e.key.toLowerCase();
     const handled = () => { e.preventDefault(); e.stopPropagation(); };
+    if (e.key === '?' && !mod) { handled(); setKeysOpen(true); return; }
     // The paint mode's keys: undo, the tools' letters, `[` and `]` for the size, Escape to leave.
     if (paintingId) {
       const pc = paintControls;
@@ -1020,6 +1027,10 @@ const CanvasEditor = forwardRef<CanvasEditorHandle, CanvasEditorProps>(function 
     ? (hoveredId && !selectedIds.includes(hoveredId) && !gesture ? [byId.get(hoveredId)].filter((el): el is CanvasElement => !!el && !el.hidden) : [])
     : selected.filter((el) => !el.hidden);
 
+  const keysButton = (
+    <ToolbarBtn onClick={() => setKeysOpen(true)} active={keysOpen} title={t('canvas.keys.open')}><Keyboard size={14} /></ToolbarBtn>
+  );
+
   const controller: CanvasController = {
     features, types, selected, canUndo: history.canUndo, canRedo: history.canRedo,
     undo: history.undo, redo: history.redo, tool: addTool, setTool: setAddTool, removeSelected, duplicate,
@@ -1046,15 +1057,18 @@ const CanvasEditor = forwardRef<CanvasEditorHandle, CanvasEditorProps>(function 
               palette={paint.palette}
               layersOpen={layersOpen}
               onToggleLayers={() => setLayersOpen((v) => !v)}
-              end={!paintElementId && (
-                <ToolbarBtn onClick={() => setPaintingId(null)} active={false} title={t('canvas.donePainting')}>
-                  <Check size={14} />
-                  <span className="editor-toolbar-btn-label">{t('canvas.donePainting')}</span>
-                </ToolbarBtn>
-              )}
+              end={(<>
+                {keysButton}
+                {!paintElementId && (
+                  <ToolbarBtn onClick={() => setPaintingId(null)} active={false} title={t('canvas.donePainting')}>
+                    <Check size={14} />
+                    <span className="editor-toolbar-btn-label">{t('canvas.donePainting')}</span>
+                  </ToolbarBtn>
+                )}
+              </>)}
             />
           ) : (
-            <CanvasToolbar controller={controller} end={toolbarEnd} />
+            <CanvasToolbar controller={controller} end={<>{keysButton}{toolbarEnd}</>} />
           )}
         </div>
       )}
@@ -1287,6 +1301,16 @@ const CanvasEditor = forwardRef<CanvasEditorHandle, CanvasEditorProps>(function 
         {editable && features.zoom && <CanvasZoom controller={controller} />}
         {overlay}
       </div>
+      {keysOpen && editable && (
+        <ShortcutOverview
+          painting={!!paintingId}
+          features={features}
+          paintFeatures={paintFeatures}
+          types={types}
+          canLeavePaint={!paintElementId}
+          onClose={() => { setKeysOpen(false); rootRef.current?.focus({ preventScroll: true }); }}
+        />
+      )}
       {menu && editable && (
         <ContextMenu
           x={menu.x}

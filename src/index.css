@@ -2689,6 +2689,52 @@ html[data-theme] .prop-segment--active {
   background: var(--well-solid);
   box-shadow: inset -1px -1px 0 var(--edge-strong);
 }
+/* The overview of the canvas editor's keys: sections in two columns, each row what it does and its keys. */
+.canvas-keys {
+  columns: 2 300px;
+  column-gap: 2rem;
+  padding: 0.75rem 1rem 1rem;
+}
+.canvas-keys-section {
+  break-inside: avoid;
+  margin-bottom: 1rem;
+}
+.canvas-keys-section h3 {
+  margin-bottom: 0.25rem;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-subtle);
+}
+.canvas-keys-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 3px 0;
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+}
+.canvas-keys-chips {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 4px;
+  flex-shrink: 0;
+  max-width: 55%;
+}
+.canvas-keys-chips kbd {
+  padding: 1px 6px;
+  border: 1px solid var(--edge-strong);
+  border-bottom-width: 2px;
+  border-radius: 4px;
+  background: var(--well-solid);
+  font-family: inherit;
+  font-size: 0.6875rem;
+  white-space: nowrap;
+  color: var(--text-primary);
+}
 /* A tool of the column picked: the stage draws a new element, over the others too. */
 .canvas-editor-adding .canvas-stage,
 .canvas-editor-adding .canvas-stage * { cursor: crosshair !important; }
