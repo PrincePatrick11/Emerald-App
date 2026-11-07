@@ -1,4 +1,4 @@
-import { elementBounds, unionBounds } from './geometry';
+import { elementBounds, unionBounds, type Box } from './geometry';
 import { byZ, type CanvasElement } from './types';
 
 /**
@@ -38,54 +38,69 @@ function withIndexZ(elements: readonly CanvasElement[], order: readonly CanvasEl
 
 export type AlignEdge = 'left' | 'hcenter' | 'right' | 'top' | 'vcenter' | 'bottom';
 
+/** The selected, unlocked elements in units that move as one: a group together, every other element alone. */
+function unitsOf(elements: readonly CanvasElement[], ids: readonly string[]): { members: CanvasElement[]; box: Box }[] {
+  const picked = elements.filter((el) => ids.includes(el.id) && !el.locked);
+  const units = new Map<string, CanvasElement[]>();
+  for (const el of picked) {
+    const key = el.group ? `group:${el.group}` : `element:${el.id}`;
+    units.set(key, [...(units.get(key) ?? []), el]);
+  }
+  return [...units.values()].map((members) => ({ members, box: unionBounds(members.map(elementBounds))! }));
+}
+
+/** The elements with every member of each unit shifted by that unit's (`dx`, `dy`). */
+function shiftUnits(elements: readonly CanvasElement[], shifts: { members: CanvasElement[]; dx: number; dy: number }[]): CanvasElement[] {
+  const moved = new Map<string, { dx: number; dy: number }>();
+  for (const { members, dx, dy } of shifts) for (const el of members) moved.set(el.id, { dx, dy });
+  return elements.map((el) => {
+    const d = moved.get(el.id);
+    return d && (d.dx || d.dy) ? { ...el, x: el.x + d.dx, y: el.y + d.dy } : el;
+  });
+}
+
 /**
  * Lines the selected elements up along an edge or centre: of their common box,
- * or of the artboard when only one is selected.
+ * or of the artboard when only one is selected. A group moves as one, keeping
+ * its members where they are to each other.
  */
 export function align(
   elements: readonly CanvasElement[], ids: readonly string[], edge: AlignEdge, artboard: { width: number; height: number },
 ): CanvasElement[] {
-  const picked = elements.filter((el) => ids.includes(el.id) && !el.locked);
-  const target = picked.length > 1
-    ? unionBounds(picked.map(elementBounds))!
+  const units = unitsOf(elements, ids);
+  if (!units.length) return [...elements];
+  const target = units.length > 1
+    ? unionBounds(units.map((u) => u.box))!
     : { x: 0, y: 0, width: artboard.width, height: artboard.height };
-  return elements.map((el) => {
-    if (!picked.includes(el)) return el;
-    const b = elementBounds(el);
+  return shiftUnits(elements, units.map(({ members, box: b }) => {
     switch (edge) {
-      case 'left': return { ...el, x: el.x + target.x - b.x };
-      case 'hcenter': return { ...el, x: target.x + target.width / 2 };
-      case 'right': return { ...el, x: el.x + target.x + target.width - (b.x + b.width) };
-      case 'top': return { ...el, y: el.y + target.y - b.y };
-      case 'vcenter': return { ...el, y: target.y + target.height / 2 };
-      case 'bottom': return { ...el, y: el.y + target.y + target.height - (b.y + b.height) };
+      case 'left': return { members, dx: target.x - b.x, dy: 0 };
+      case 'hcenter': return { members, dx: target.x + target.width / 2 - (b.x + b.width / 2), dy: 0 };
+      case 'right': return { members, dx: target.x + target.width - (b.x + b.width), dy: 0 };
+      case 'top': return { members, dx: 0, dy: target.y - b.y };
+      case 'vcenter': return { members, dx: 0, dy: target.y + target.height / 2 - (b.y + b.height / 2) };
+      case 'bottom': return { members, dx: 0, dy: target.y + target.height - (b.y + b.height) };
     }
-  });
+  }));
 }
 
-/** Equal gaps between three or more selected elements, across or down. */
+/** Equal gaps between three or more selected elements (a group counting as one), across or down. */
 export function distribute(elements: readonly CanvasElement[], ids: readonly string[], axis: 'horizontal' | 'vertical'): CanvasElement[] {
-  const picked = elements.filter((el) => ids.includes(el.id) && !el.locked);
-  if (picked.length < 3) return [...elements];
+  const units = unitsOf(elements, ids);
+  if (units.length < 3) return [...elements];
   const horizontal = axis === 'horizontal';
-  const sorted = [...picked].sort((a, b) => (horizontal ? a.x - b.x : a.y - b.y));
-  const boxes = sorted.map(elementBounds);
-  const size = (b: (typeof boxes)[number]) => (horizontal ? b.width : b.height);
-  const start = horizontal ? boxes[0].x : boxes[0].y;
-  const last = boxes[boxes.length - 1];
-  const end = horizontal ? last.x + last.width : last.y + last.height;
-  const gap = (end - start - boxes.reduce((sum, b) => sum + size(b), 0)) / (boxes.length - 1);
-  const moved = new Map<string, number>();
-  let cursor = start;
-  sorted.forEach((el, i) => {
-    moved.set(el.id, cursor + size(boxes[i]) / 2);
-    cursor += size(boxes[i]) + gap;
-  });
-  return elements.map((el) => {
-    const at = moved.get(el.id);
-    if (at === undefined) return el;
-    return horizontal ? { ...el, x: at } : { ...el, y: at };
-  });
+  const start = (b: Box) => (horizontal ? b.x : b.y);
+  const size = (b: Box) => (horizontal ? b.width : b.height);
+  const sorted = [...units].sort((a, b) => start(a.box) + size(a.box) / 2 - (start(b.box) + size(b.box) / 2));
+  const first = start(sorted[0].box);
+  const last = sorted[sorted.length - 1].box;
+  const gap = (start(last) + size(last) - first - sorted.reduce((sum, u) => sum + size(u.box), 0)) / (sorted.length - 1);
+  let cursor = first;
+  return shiftUnits(elements, sorted.map(({ members, box }) => {
+    const d = cursor - start(box);
+    cursor += size(box) + gap;
+    return horizontal ? { members, dx: d, dy: 0 } : { members, dx: 0, dy: d };
+  }));
 }
 
 /**

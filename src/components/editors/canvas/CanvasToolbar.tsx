@@ -38,6 +38,8 @@ export default function CanvasToolbar({ controller: c, end }: { controller: Canv
   const adders = types.filter((type) => type.additions?.length);
   const selectedTypes = types.filter((type) => type.controls && editable.some((el) => el.type === type.type));
   const grouped = c.selected.some((el) => el.group);
+  // What aligns as one: a group, or an element on its own.
+  const units = new Set(editable.map((el) => el.group ?? el.id)).size;
 
   return (
     <div className="editor-toolbar canvas-toolbar">
@@ -96,7 +98,7 @@ export default function CanvasToolbar({ controller: c, end }: { controller: Canv
           {f.align && (
             <PopoverButton
               icon={<AlignHorizontalJustifyCenter size={14} />}
-              title={editable.length > 1 ? t('canvas.alignSelection') : t('canvas.alignArtboard')}
+              title={units > 1 ? t('canvas.alignSelection') : t('canvas.alignArtboard')}
               active={false}
             >
               {() => (
@@ -106,7 +108,7 @@ export default function CanvasToolbar({ controller: c, end }: { controller: Canv
                       {ALIGN_ICONS[edge]}
                     </ToolbarBtn>
                   ))}
-                  {editable.length > 2 && (<>
+                  {units > 2 && (<>
                     <ToolbarDivider />
                     <ToolbarBtn onClick={() => c.distribute('horizontal')} active={false} title={t('canvas.distributeHorizontal')}><AlignHorizontalDistributeCenter size={14} /></ToolbarBtn>
                     <ToolbarBtn onClick={() => c.distribute('vertical')} active={false} title={t('canvas.distributeVertical')}><AlignVerticalDistributeCenter size={14} /></ToolbarBtn>
