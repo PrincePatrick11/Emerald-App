@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import {
   AlignHorizontalDistributeCenter, AlignHorizontalJustifyCenter, AlignHorizontalJustifyEnd,
   AlignHorizontalJustifyStart, AlignVerticalDistributeCenter, AlignVerticalJustifyCenter, AlignVerticalJustifyEnd,
-  AlignVerticalJustifyStart, ArrowDown, ArrowUp, BringToFront, Copy, Group, ImageDown, Layers, Layers2, Redo2, SendToBack, Trash2, Undo2,
+  AlignVerticalJustifyStart, ArrowDown, ArrowUp, BringToFront, Copy, Group, ImageDown, Layers, Layers2, MousePointer2, Redo2, SendToBack, Trash2, Undo2,
   Ungroup, ZoomIn, ZoomOut,
 } from 'lucide-react';
 import { ToolbarBtn, ToolbarDivider, ToolbarGroup } from '../shared/toolbarParts';
@@ -21,9 +21,8 @@ const ALIGN_ICONS: Record<AlignEdge, ReactNode> = {
 };
 
 /**
- * The canvas editor's bar. Like the text editor's, it shows what the canvas editor can do:
- * in the order of working, undo; what can be added (each registered type's
- * additions, several of one type behind one button); the controls of the
+ * The canvas editor's bar. Like the paint mode's, it keeps its place: undo
+ * first, then what the selection has — the controls of the
  * selected elements' types; aligning the selection, and — without the
  * element list, which has them — stacking, grouping, duplicating and
  * removing; at the far end the element list and saving as an image. Zoom
@@ -35,7 +34,6 @@ export default function CanvasToolbar({ controller: c, end }: { controller: Canv
   const editable = c.selected.filter((el) => !el.locked);
   const hasSelection = editable.length > 0;
   const types = Object.values(c.types);
-  const adders = types.filter((type) => type.additions?.length);
   const selectedTypes = types.filter((type) => type.controls && editable.some((el) => el.type === type.type));
   const grouped = c.selected.some((el) => el.group);
   // What aligns as one: a group, or an element on its own.
@@ -47,35 +45,6 @@ export default function CanvasToolbar({ controller: c, end }: { controller: Canv
         <ToolbarGroup>
           <ToolbarBtn onClick={c.undo} active={false} disabled={!c.canUndo} title={t('editor.toolbar.undo')}><Undo2 size={14} /></ToolbarBtn>
           <ToolbarBtn onClick={c.redo} active={false} disabled={!c.canRedo} title={t('editor.toolbar.redo')}><Redo2 size={14} /></ToolbarBtn>
-        </ToolbarGroup>
-        <ToolbarDivider />
-      </>)}
-
-      {adders.length > 0 && (<>
-        <ToolbarGroup>
-          {adders.map((type) => {
-            const additions = type.additions!;
-            if (additions.length === 1 || !type.additionsGroup) {
-              return additions.map((addition) => (
-                <ToolbarBtn key={`${type.type}:${addition.key}`} onClick={() => c.add(type.type, addition)} active={false} title={addition.label(t)}>
-                  {addition.icon}
-                </ToolbarBtn>
-              ));
-            }
-            return (
-              <PopoverButton key={type.type} icon={type.additionsGroup.icon} title={type.additionsGroup.label(t)} active={false}>
-                {(close) => (
-                  <ToolbarGroup>
-                    {additions.map((addition) => (
-                      <ToolbarBtn key={addition.key} onClick={() => { c.add(type.type, addition); close(); }} active={false} title={addition.label(t)}>
-                        {addition.icon}
-                      </ToolbarBtn>
-                    ))}
-                  </ToolbarGroup>
-                )}
-              </PopoverButton>
-            );
-          })}
         </ToolbarGroup>
         <ToolbarDivider />
       </>)}
@@ -152,6 +121,41 @@ export default function CanvasToolbar({ controller: c, end }: { controller: Canv
         )}
         {end}
       </div>
+    </div>
+  );
+}
+
+/**
+ * The tools in a column over the stage's left edge, like the paint mode's:
+ * selecting, then what each type can add (each type a group). A picked tool
+ * draws its element on the stage and hands back to selecting.
+ */
+export function CanvasToolRail({ controller: c }: { controller: CanvasController }) {
+  const { t } = useTranslation();
+  const groups = Object.values(c.types).filter((type) => type.additions?.length);
+  const label = (title: string, shortcut?: string) => (shortcut ? `${title} (${shortcut.toUpperCase()})` : title);
+  return (
+    <div className="editor-toolbar paint-rail" role="toolbar" aria-orientation="vertical" aria-label={t('canvas.tools')}>
+      <div className="paint-rail-group">
+        <ToolbarBtn onClick={() => c.setTool(null)} active={!c.tool} title={label(t('editor.paint.tools.select'), 'v')}>
+          <MousePointer2 size={15} />
+        </ToolbarBtn>
+      </div>
+      {groups.map((type) => (
+        <div key={type.type} className="paint-rail-group">
+          <div className="paint-rail-divider" />
+          {type.additions!.map((addition) => (
+            <ToolbarBtn
+              key={addition.key}
+              onClick={() => c.setTool({ type: type.type, key: addition.key })}
+              active={c.tool?.type === type.type && c.tool.key === addition.key}
+              title={label(addition.label(t), addition.shortcut)}
+            >
+              {addition.icon}
+            </ToolbarBtn>
+          ))}
+        </div>
+      ))}
     </div>
   );
 }

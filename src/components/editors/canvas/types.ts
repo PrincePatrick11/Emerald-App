@@ -65,10 +65,12 @@ export interface CanvasDrawEnv {
   time: number | null;
 }
 
-/** An entry of the toolbar's "add" group: what a type can put on the artboard. */
+/** A tool of the tool column: what a type can put on the artboard. */
 export interface CanvasAddition<P = unknown> {
   key: string;
   icon: ReactNode;
+  /** The letter that picks it in the tool column (the paint mode's letter for the same shape). */
+  shortcut?: string;
   label: (t: TFunction) => string;
   /** A new element's frame and props around `centre`, on an artboard of the given size. */
   create: (centre: { x: number; y: number }, artboard: { width: number; height: number }, t: TFunction) =>
@@ -127,10 +129,8 @@ export interface CanvasElementType<P = unknown> {
     /** A layer image's reference as a source the canvas can load. */
     resolveImage: (ref: string) => string;
   };
-  /** Entries for the toolbar's "add" group. */
+  /** Tools of the tool column: what the type can put on the artboard. */
   additions?: CanvasAddition<P>[];
-  /** Icon and label of the add group's panel when there is more than one addition. */
-  additionsGroup?: { icon: ReactNode; label: (t: TFunction) => string };
   /** Toolbar controls while elements of this type are selected. */
   controls?: CanvasTypeControls<P>;
 }

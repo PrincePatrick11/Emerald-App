@@ -602,12 +602,10 @@
     }
   },
   "canvas": {
+    "tools": "Werkzeuge",
     "drawing": "Zeichnung",
-    "addDrawing": "Zeichnung hinzufügen",
     "donePainting": "Fertig",
     "newText": "Text",
-    "addShape": "Form hinzufügen",
-    "addText": "Text hinzufügen",
     "shape": {
       "rect": "Rechteck",
       "ellipse": "Ellipse",

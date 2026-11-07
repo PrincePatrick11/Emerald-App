@@ -192,8 +192,9 @@ export const textType: CanvasElementType<TextProps> = {
   },
   additions: [{
     key: 'text',
+    shortcut: 't',
     icon: <Type size={14} />,
-    label: (t) => t('canvas.addText'),
+    label: (t) => t('canvas.newText'),
     create: (_centre, artboard, t) => {
       const props: TextProps = {
         text: t('canvas.newText'), font: 'serif', fontSize: Math.max(12, Math.round(artboard.height / 14)),

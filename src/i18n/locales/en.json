@@ -602,12 +602,10 @@
     }
   },
   "canvas": {
+    "tools": "Tools",
     "drawing": "Drawing",
-    "addDrawing": "Add drawing",
     "donePainting": "Done",
     "newText": "Text",
-    "addShape": "Add shape",
-    "addText": "Add text",
     "shape": {
       "rect": "Rectangle",
       "ellipse": "Ellipse",

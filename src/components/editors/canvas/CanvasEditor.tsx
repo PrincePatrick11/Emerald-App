@@ -18,7 +18,7 @@ import {
   type AlignEdge, type ArrangeMove,
 } from './canvasActions';
 import { byZ, type CanvasAddition, type CanvasElement, type CanvasGrid, type CanvasTypes } from './types';
-import CanvasToolbar, { CanvasZoom } from './CanvasToolbar';
+import CanvasToolbar, { CanvasToolRail, CanvasZoom } from './CanvasToolbar';
 import TextEditOverlay from './TextEditOverlay';
 import ElementList from './ElementList';
 import PaintSurface from './paint/PaintSurface';
@@ -36,6 +36,8 @@ const MIN_ZOOM = 0.05;
 const MAX_ZOOM = 8;
 /** Space around the artboard while editing. */
 const EDIT_PADDING = 32;
+/** More on the left while editing, where the tool column lies. */
+const RAIL_PADDING = 48;
 const PASTE_OFFSET = 24;
 
 /** What the canvas editor keeps between two pastes (one per window, shared by every canvas editor). */
@@ -165,6 +167,9 @@ const CanvasEditor = forwardRef<CanvasEditorHandle, CanvasEditorProps>(function 
   const [spaceDown, setSpaceDown] = useState(false);
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const [gesture, setGesture] = useState(false);
+  /** The tool picked in the tool column: an addition to draw on the stage, or `null` for selecting. */
+  const [addTool, setAddTool] = useState<{ type: string; key: string } | null>(null);
+  const hasRail = !paintElementId && Object.values(types).some((type) => type.additions?.length);
 
   // The latest props for the handlers below, which outlive a render.
   const live = useRef({ elements, selectedIds, view, onChange, onSelectionChange, grid, types });
@@ -195,11 +200,12 @@ const CanvasEditor = forwardRef<CanvasEditorHandle, CanvasEditorProps>(function 
 
   const fitView = useCallback((viewport: { width: number; height: number }, isEditing: boolean): View => {
     const pad = isEditing && !paintElementId ? EDIT_PADDING : 0;
-    const zoom = clamp(Math.min((viewport.width - 2 * pad) / width, (viewport.height - 2 * pad) / height), MIN_ZOOM, MAX_ZOOM);
-    const x = (viewport.width - width * zoom) / 2;
+    const rail = isEditing && hasRail ? RAIL_PADDING : 0;
+    const zoom = clamp(Math.min((viewport.width - 2 * pad - rail) / width, (viewport.height - 2 * pad) / height), MIN_ZOOM, MAX_ZOOM);
+    const x = rail + (viewport.width - rail - width * zoom) / 2;
     const y = !isEditing && readAlign === 'top' ? 0 : (viewport.height - height * zoom) / 2;
     return { zoom: zoom > 0 ? zoom : 1, x, y };
-  }, [width, height, readAlign, paintElementId]);
+  }, [width, height, readAlign, paintElementId, hasRail]);
 
   useLayoutEffect(() => {
     const el = viewportRef.current;
@@ -469,6 +475,42 @@ const CanvasEditor = forwardRef<CanvasEditorHandle, CanvasEditorProps>(function 
     });
   };
 
+  /**
+   * Drawing a new element with a tool of the column: dragging gives its box
+   * (Shift: a square), a click puts it there at its usual size. Then the
+   * column goes back to selecting.
+   */
+  const startCreate = (start: PointerEvent, tool: { type: string; key: string }) => {
+    const addition = live.current.types[tool.type]?.additions?.find((a) => a.key === tool.key);
+    if (!addition) { setAddTool(null); return; }
+    const from = toArtboard(start.clientX, start.clientY);
+    const boxTo = (e: PointerEvent) => {
+      const to = toArtboard(e.clientX, e.clientY);
+      let dx = to.x - from.x, dy = to.y - from.y;
+      if (e.shiftKey) {
+        const side = Math.max(Math.abs(dx), Math.abs(dy));
+        dx = Math.sign(dx || 1) * side;
+        dy = Math.sign(dy || 1) * side;
+      }
+      return boxFromPoints(from.x, from.y, from.x + dx, from.y + dy);
+    };
+    let last: PointerEvent | null = null;
+    trackPointerDrag(start, {
+      threshold: DRAG_THRESHOLD_PX,
+      onStart: () => setGesture(true),
+      onMove: (e) => { last = e; setMarquee(boxTo(e)); },
+      onEnd: ({ started, cancelled }) => {
+        setGesture(false);
+        setMarquee(null);
+        if (cancelled) return;
+        setAddTool(null);
+        const box = started && last ? boxTo(last) : null;
+        if (box && (box.width >= 4 || box.height >= 4)) place(tool.type, addition, { x: box.x + box.width / 2, y: box.y + box.height / 2 }, box);
+        else place(tool.type, addition, from, null);
+      },
+    });
+  };
+
   const onStagePointerDown = (e: Konva.KonvaEventObject<PointerEvent>) => {
     const evt = e.evt;
     // While reading, a click only selects (the place may show what is selected).
@@ -487,6 +529,11 @@ const CanvasEditor = forwardRef<CanvasEditorHandle, CanvasEditorProps>(function 
     if (evt.button !== 0) return;
     // The transformer's own handles.
     if (e.target.getParent() instanceof Konva.Transformer) return;
+    if (addTool) {
+      setEditingTextId(null);
+      startCreate(evt, addTool);
+      return;
+    }
     const additive = evt.shiftKey || evt.metaKey || evt.ctrlKey;
     const hit = elementAt(e.target);
     const current = live.current.selectedIds;
@@ -588,24 +635,34 @@ const CanvasEditor = forwardRef<CanvasEditorHandle, CanvasEditorProps>(function 
     if (changes.size) commit(patched(changes));
   }, [commit, editableIds, patched, fitted]);
 
-  const add = useCallback((type: string, addition: CanvasAddition) => {
-    // Something already sits there: a step down and to the right, so the new one shows.
-    let centre = visibleCentre();
-    while (live.current.elements.some((e) => Math.abs(e.x - centre.x) < 1 && Math.abs(e.y - centre.y) < 1)) {
-      centre = { x: centre.x + PASTE_OFFSET, y: centre.y + PASTE_OFFSET };
+  /**
+   * A new element of an addition with its centre at `at`: in the box that was
+   * drawn (a type that keeps its proportions takes the box's width, text its
+   * width and the height it needs), or at the addition's own size.
+   */
+  const place = useCallback((type: string, addition: CanvasAddition, at: { x: number; y: number }, box: { width: number; height: number } | null) => {
+    const kind = live.current.types[type];
+    const made = addition.create(at, { width, height }, t);
+    let size = { width: made.width, height: made.height };
+    if (box) {
+      const w = Math.max(8, box.width);
+      size = kind?.fitHeight ? { width: w, height: made.height }
+        : kind?.keepRatio ? { width: w, height: (w * made.height) / made.width }
+          : { width: w, height: Math.max(8, box.height) };
     }
-    const made = addition.create(centre, { width, height }, t);
-    const el: CanvasElement = {
+    const centre = { x: clamp(at.x, 0, width), y: clamp(at.y, 0, height) };
+    const el = fitted({
       id: createId(), type, x: centre.x, y: centre.y, rotation: 0, opacity: 1, locked: false, hidden: false,
       z: live.current.elements.reduce((max, e) => Math.max(max, e.z), -1) + 1,
-      ...made,
-    };
+      ...made, ...size,
+    });
     commit([...live.current.elements, el]);
     select([el.id]);
+    rootRef.current?.focus({ preventScroll: true });
     // A new text is typed into at once, a new drawing painted in.
-    if (live.current.types[type]?.textEdit) setEditingTextId(el.id);
-    else if (live.current.types[type]?.paint) setPaintingId(el.id);
-  }, [visibleCentre, width, height, t, createId, commit, select]);
+    if (kind?.textEdit) setEditingTextId(el.id);
+    else if (kind?.paint) setPaintingId(el.id);
+  }, [width, height, t, createId, commit, select, fitted]);
 
   const openElement = useCallback((el: CanvasElement) => {
     if (el.locked) return;
@@ -722,6 +779,15 @@ const CanvasEditor = forwardRef<CanvasEditorHandle, CanvasEditorProps>(function 
       return;
     }
     if (e.code === 'Space' && !mod) { setSpaceDown(true); handled(); return; }
+    // The tool column's letters: V selects, the others pick what to draw.
+    if (!mod && !e.altKey && hasRail) {
+      if (key === 'v') { handled(); setAddTool(null); return; }
+      for (const type of Object.values(live.current.types)) {
+        const addition = type.additions?.find((a) => a.shortcut === key);
+        if (addition) { handled(); setAddTool({ type: type.type, key: addition.key }); return; }
+      }
+    }
+    if (e.key === 'Escape' && addTool) { handled(); setAddTool(null); return; }
     if (mod && key === 'z' && features.history) { handled(); if (e.shiftKey) history.redo(); else history.undo(); return; }
     if (mod && key === 'y' && features.history) { handled(); history.redo(); return; }
     if (mod && key === 'a') { handled(); select(live.current.elements.filter((el) => !el.locked && !el.hidden).map((el) => el.id)); return; }
@@ -823,7 +889,7 @@ const CanvasEditor = forwardRef<CanvasEditorHandle, CanvasEditorProps>(function 
 
   const controller: CanvasController = {
     features, types, selected, canUndo: history.canUndo, canRedo: history.canRedo,
-    undo: history.undo, redo: history.redo, add, removeSelected, duplicate,
+    undo: history.undo, redo: history.redo, tool: addTool, setTool: setAddTool, removeSelected, duplicate,
     arrange: doArrange, align: doAlign, distribute: doDistribute, update: updateSelected,
     zoom: view.zoom, zoomIn: () => zoomTo(view.zoom * 1.25), zoomOut: () => zoomTo(view.zoom / 1.25), fit,
     onExport, group: doGroup, ungroup: doUngroup, listOpen, toggleList: () => setListOpen((v) => !v),
@@ -832,7 +898,7 @@ const CanvasEditor = forwardRef<CanvasEditorHandle, CanvasEditorProps>(function 
   return (
     <div
       ref={rootRef}
-      className={`canvas-editor canvas-editor-${layout} ${editable ? 'canvas-editor-editing' : ''} ${paintingId ? 'canvas-editor-painting' : ''}`}
+      className={`canvas-editor canvas-editor-${layout} ${editable ? 'canvas-editor-editing' : ''} ${paintingId ? 'canvas-editor-painting' : ''} ${addTool && !paintingId ? 'canvas-editor-adding' : ''}`}
       tabIndex={editable ? -1 : undefined}
       onKeyDown={onKeyDown}
     >
@@ -860,7 +926,7 @@ const CanvasEditor = forwardRef<CanvasEditorHandle, CanvasEditorProps>(function 
       <div
         ref={viewportRef}
         className="canvas-viewport"
-        style={{ cursor: spaceDown ? 'grab' : undefined, aspectRatio: layout === 'inline' ? `${width} / ${height}` : undefined }}
+        style={{ cursor: spaceDown ? 'grab' : addTool && !paintingId ? 'crosshair' : undefined, aspectRatio: layout === 'inline' ? `${width} / ${height}` : undefined }}
         onContextMenu={(e) => { if (editable) e.preventDefault(); }}
         onPointerDownCapture={(e) => {
           // The middle button or Space pans, over the elements and the paint surface alike.
@@ -1043,6 +1109,7 @@ const CanvasEditor = forwardRef<CanvasEditorHandle, CanvasEditorProps>(function 
             onClose={() => setListOpen(false)}
           />
         )}
+        {editable && hasRail && !paintingId && <CanvasToolRail controller={controller} />}
         {editable && features.zoom && <CanvasZoom controller={controller} />}
         {overlay}
       </div>
@@ -1064,7 +1131,9 @@ export interface CanvasController {
   canRedo: boolean;
   undo: () => void;
   redo: () => void;
-  add: (type: string, addition: CanvasAddition) => void;
+  /** The tool column's pick: an addition to draw, or `null` for selecting. */
+  tool: { type: string; key: string } | null;
+  setTool: (tool: { type: string; key: string } | null) => void;
   removeSelected: () => void;
   duplicate: () => void;
   arrange: (move: ArrangeMove) => void;

@@ -2671,6 +2671,9 @@ html[data-theme] .prop-segment--active {
   top: 0;
   transform-origin: 0 0;
 }
+/* A tool of the column picked: the stage draws a new element, over the others too. */
+.canvas-editor-adding .canvas-stage,
+.canvas-editor-adding .canvas-stage * { cursor: crosshair !important; }
 .canvas-stage {
   position: absolute;
   inset: 0;

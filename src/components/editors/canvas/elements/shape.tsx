@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next';
-import { Circle, Hexagon, PaintBucket, Shapes, Square, SquareDashed, Star } from 'lucide-react';
+import { Circle, Hexagon, PaintBucket, Square, SquareDashed, Star } from 'lucide-react';
 import PopoverButton from '../../shared/PopoverButton';
 import { ToolbarGroup, ToolbarStepper } from '../../shared/toolbarParts';
 import { MAX_SIDES, MIN_SIDES } from '../../../../lib/paint/document';
@@ -88,9 +88,12 @@ const SHAPE_ICONS: Record<(typeof CANVAS_SHAPES)[number], React.ReactNode> = {
   star: <Star size={14} />,
 };
 
+const SHAPE_KEYS: Record<(typeof CANVAS_SHAPES)[number], string> = { rect: 'r', ellipse: 'o', polygon: 'g', star: 's' };
+
 const additions: CanvasAddition<ShapeProps>[] = CANVAS_SHAPES.map((shape) => ({
   key: shape,
   icon: SHAPE_ICONS[shape],
+  shortcut: SHAPE_KEYS[shape],
   label: (t) => t(`canvas.shape.${shape}`),
   create: (_centre, artboard) => {
     const side = Math.round(Math.min(artboard.width, artboard.height) * 0.22);
@@ -180,6 +183,5 @@ export const shapeType: CanvasElementType<ShapeProps> = {
     props: { ...el.props, strokeWidth: el.props.strokeWidth * Math.sqrt(sx * sy), cornerRadius: el.props.cornerRadius * Math.min(sx, sy) },
   }),
   additions,
-  additionsGroup: { icon: <Shapes size={14} />, label: (t) => t('canvas.addShape') },
   controls: ShapeControls,
 };

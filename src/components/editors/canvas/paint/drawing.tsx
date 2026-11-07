@@ -75,8 +75,9 @@ export function createDrawingType({ resolveImage = (ref) => ref }: DrawingTypeOp
     },
     additions: [{
       key: 'drawing',
+      shortcut: 'p',
       icon: <PenTool size={14} />,
-      label: (t) => t('canvas.addDrawing'),
+      label: (t) => t('canvas.drawing'),
       create: (_centre, artboard) => {
         const width = Math.round(Math.min(artboard.width * 0.5, (artboard.height * 0.6 * PAINT_WIDTH) / PAINT_HEIGHT));
         return { width, height: Math.round((width * PAINT_HEIGHT) / PAINT_WIDTH), props: { doc: emptyPaintDoc() } };
