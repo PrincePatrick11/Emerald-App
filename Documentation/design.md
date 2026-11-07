@@ -158,7 +158,7 @@ Where the code contradicts the rules above today. No prioritisation — each poi
 
 ### Colour Values
 
-**Theme variables** (`src/themes/emerald-noctis.css`, `emerald-parchment.css`). Both files define the same 163 properties, including the edit sidebar's `--field-*`, `--primary-solid-*` and `--danger-soft-*` tokens `Button`'s `--tone-*` and the Settings' `--choice-*`. Core values:
+**Theme variables** (`src/themes/emerald-noctis.css`, `emerald-parchment.css`). Both files define the same 170 properties, including the edit sidebar's `--field-*`, `--primary-solid-*` and `--danger-soft-*` tokens `Button`'s `--tone-*` and the Settings' `--choice-*`. Core values:
 
 | Property | Emerald Noctis (dark) | Emerald Parchment (light) |
 | --- | --- | --- |
@@ -168,6 +168,7 @@ Where the code contradicts the rules above today. No prioritisation — each poi
 | `--accent` | `#00c47f` | `#008a57` |
 | `--accent-strong` | `#00a066` | `#006941` |
 | `--focus-ring` | `rgba(0, 196, 127, 0.42)` | `rgba(0, 138, 87, 0.34)` |
+| `--selection-bg` (marked text, also drawn by the editor over images) | `rgba(0, 230, 153, 0.25)` | `rgba(0, 138, 87, 0.22)` |
 | `--warning-text` | `#e2a854` | `#a75924` |
 | `--danger-text` | `#f87171` | `#b63f32` |
 | `--panel-bg` | `rgba(38, 32, 27, 0.78)` | `#f7eddb` |

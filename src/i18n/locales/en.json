@@ -496,10 +496,67 @@
       "alignCenter": "Align center",
       "alignRight": "Align right",
       "horizontalRule": "Horizontal rule",
-      "insertLink": "Insert link",
+      "insertLink": "Link entry",
+      "find": "Find and replace",
       "insertImage": "Insert image",
+      "insertTable": "Insert table",
       "undo": "Undo",
       "redo": "Redo"
+    },
+    "menu": {
+      "textColor": "Text colour",
+      "defaultColor": "Default colour",
+      "paragraph": "Text",
+      "webLink": "Link to a web address",
+      "width": "Width {{value}} %",
+      "removeImage": "Remove image"
+    },
+    "table": {
+      "addRowBefore": "Add row above",
+      "addRowAfter": "Add row below",
+      "addColumnBefore": "Add column left",
+      "addColumnAfter": "Add column right",
+      "deleteRow": "Delete row",
+      "deleteColumn": "Delete column",
+      "toggleHeaderRow": "Header row",
+      "deleteTable": "Delete table"
+    },
+    "colors": {
+      "red": "Red",
+      "orange": "Orange",
+      "yellow": "Yellow",
+      "green": "Green",
+      "blue": "Blue",
+      "purple": "Purple"
+    },
+    "find": {
+      "placeholder": "Find in entry",
+      "replacePlaceholder": "Replace with",
+      "count": "{{current}} of {{total}}",
+      "none": "No matches",
+      "previous": "Previous match",
+      "next": "Next match",
+      "toggleReplace": "Show replace",
+      "replace": "Replace this match",
+      "replaceShort": "Replace",
+      "replaceAll": "Replace all",
+      "close": "Close"
+    },
+    "count": {
+      "words_one": "{{count}} word",
+      "words_other": "{{count}} words",
+      "characters_one": "{{count}} character",
+      "characters_other": "{{count}} characters"
+    },
+    "details": {
+      "insert": "Collapsible section",
+      "summaryPlaceholder": "Heading of the section",
+      "expand": "Expand section",
+      "collapse": "Collapse section"
+    },
+    "fold": {
+      "expand": "Expand section",
+      "collapse": "Collapse section"
     },
     "unsaved": "Unsaved changes"
   },
@@ -830,6 +887,8 @@
     "sidebarLimitHint": "How many entries a list shows at first. The rest loads below via “Show more”.",
     "emojiDefaultsHint": "The emojis every emoji picker in this vault offers before you search. Click to remove, drag to reorder, search to add new ones.",
     "imagesHint": "Applies to newly inserted images. Larger ones are scaled down first and only rejected if they are still too large.",
+    "imageOptimizePhotos": "Optimise photos",
+    "imageOptimizePhotosHint": "A photo that arrives as PNG (pasted from the clipboard, for instance) is stored as JPEG at full size, about a fifth of the space and no visible difference. Screenshots, graphics and anything transparent stay PNG.",
     "imageMaxEdgeOption": "Larger images are scaled down to {{value}} px on their longest side",
     "imageMaxEdgeOriginalHint": "Images keep their original dimensions",
     "imageMaxSizeOption": "Images over {{max}} are rejected",

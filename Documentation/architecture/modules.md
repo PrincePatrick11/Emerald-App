@@ -17,7 +17,7 @@
 - `src/lib/entryTitle.ts`: new entries, tasks and altars are stored with an **empty** title, and `displayTitle(t, type, title)` shows the translated "Untitled …" wherever a title is displayed. `hasOwnTitle(title)` is the one test for "has a title of its own". `isLegacyUntitled` recognises the old English defaults, only where data comes in (migration v48, `.emeralddb`, `.emerald` and Markdown import); anything typed later is a title, whatever it says. Renaming starts from the *stored* title (`EntryListTab`'s `getEditTitle`), so Enter on an untitled row cannot save the placeholder.
 - `entryIcon(type, entry, category)` in `modules.ts` is the one icon rule for a wiki article or operation: its own icon (emoji or image), else its category's emoji, else the module's `DEFAULT_ENTRY_EMOJI`. A journal entry shows its moon phase instead.
 
-A second, smaller registry sits in `src/components/editor/SuggestionList.tsx` — `ENTRY_TYPE_ICONS` and `ENTRY_TYPE_LABEL_KEYS`, keyed by `ContentType` (what a link points *at*) rather than `ViewId`. It is deliberately not folded into `MODULES`, which has no field for that concern.
+A second, smaller registry sits in `src/components/editors/text/SuggestionList.tsx` — `ENTRY_TYPE_ICONS` and `ENTRY_TYPE_LABEL_KEYS`, keyed by `ContentType` (what a link points *at*) rather than `ViewId`. It is deliberately not folded into `MODULES`, which has no field for that concern.
 
 `modules.ts` imports only `lucide-react` and types (its edge to `types/index.ts` runs both ways, but only as `import type` — a runtime import either direction would be a real cycle). No stores, no React components. Two thinner layers build on top of it:
 

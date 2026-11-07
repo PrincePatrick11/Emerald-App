@@ -15,7 +15,7 @@ import {
   ENTRY_TYPE_ICONS,
   ENTRY_TYPE_LABEL_KEYS,
   type SuggestionItem,
-} from '../../editor/SuggestionList';
+} from '../../editors/text/SuggestionList';
 
 interface Props {
   /** The stored HTML content of the entry, the source of the list. */

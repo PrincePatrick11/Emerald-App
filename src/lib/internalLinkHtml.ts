@@ -213,7 +213,7 @@ export interface LinkBlockOptions {
 /**
  * An appended link block: separator line, category as heading,
  * then the chip. The one definition of this block — `appendEntryLink` in the
- * RichEditor, the migrations v36/v37 and the `.emerald` import all build
+ * text editor's commands, the migrations v36/v37 and the `.emerald` import all build
  * on it.
  */
 export function internalLinkBlockHtml(

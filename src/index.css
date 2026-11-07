@@ -11,6 +11,14 @@
     --editor-font-size: 17px;
   }
 
+  /* Marked text, in the theme's colour rather than the system's, so that it
+     matches what the editor draws itself (marked images). The token holds a
+     plain colour: WebKit resolves a `color-mix()` held in a custom property to
+     transparent here, and then shows the system colour after all. */
+  ::selection {
+    background-color: var(--selection-bg);
+  }
+
   * {
     border-color: var(--border-default);
   }
@@ -216,7 +224,8 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
     color: var(--text-secondary);
   }
 
-  .menu-item:hover:not(:disabled) {
+  .menu-item:hover:not(:disabled),
+  .menu-item--current {
     background: var(--menu-item-hover-bg);
     color: var(--menu-item-hover-text);
   }
@@ -1485,10 +1494,13 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
 }
 
 /* Relative to the editor text (em) instead of the root, so that they grow with its
-   setting: 1.5rem, 1.25rem and 1.125rem at the former 17px. */
-.tiptap h1 { @apply font-semibold mb-3 mt-6; font-size: 1.412em; line-height: 1.33; color: var(--text-primary); }
-.tiptap h2 { @apply font-semibold mb-2 mt-5; font-size: 1.176em; line-height: 1.4; color: var(--text-primary); }
-.tiptap h3 { @apply font-semibold mb-2 mt-4; font-size: 1.059em; line-height: 1.55; color: var(--text-secondary); }
+   setting. Three clear steps in size and space above, so the levels read as a
+   hierarchy; the space above is larger than below, binding a heading to its text.
+   At the top of the text a heading needs no space above. */
+.tiptap h1 { @apply font-semibold; font-size: 1.6em; line-height: 1.25; margin: 1.4em 0 0.5em; letter-spacing: -0.01em; color: var(--text-primary); }
+.tiptap h2 { @apply font-semibold; font-size: 1.3em; line-height: 1.3; margin: 1.3em 0 0.45em; color: var(--text-primary); }
+.tiptap h3 { @apply font-semibold; font-size: 1.1em; line-height: 1.4; margin: 1.2em 0 0.4em; color: var(--text-primary); }
+.tiptap > :first-child { margin-top: 0; }
 .entry-view-title {
   font-family: var(--font-editor);
 }
@@ -1497,35 +1509,155 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
   font-family: var(--font-editor);
 }
 
-.tiptap ul:not([data-type="taskList"]) { @apply list-disc pl-5 mb-3 space-y-1; }
-.tiptap ol { @apply list-decimal pl-5 mb-3 space-y-1; }
+/* Lists: the items close together (their paragraphs without the paragraph
+   gap), a nested list tight under its item, and the markers quieter than the
+   text, the numbers in even widths. Nested bullets change shape per level. */
+.tiptap ul:not([data-type="taskList"]) { @apply list-disc pl-6 mb-3; }
+.tiptap ol { @apply list-decimal pl-6 mb-3; }
+.tiptap ul:not([data-type="taskList"]) ul:not([data-type="taskList"]) { list-style-type: circle; }
+.tiptap ul:not([data-type="taskList"]) ul:not([data-type="taskList"]) ul:not([data-type="taskList"]) { list-style-type: square; }
+.tiptap li { padding-left: 0.15em; }
+.tiptap li + li { margin-top: 0.25em; }
+.tiptap li > p,
+.tiptap ul[data-type="taskList"] li > div > p { margin-bottom: 0; }
+.tiptap li > ul:not([data-type="taskList"]),
+.tiptap li > ol { margin-top: 0.25em; margin-bottom: 0; }
+.tiptap li::marker { color: var(--text-subtle); }
+.tiptap ol > li::marker { font-variant-numeric: tabular-nums; }
 
 /* Task List */
 .tiptap ul[data-type="taskList"] {
-  @apply list-none pl-0 mb-3 space-y-1;
+  @apply list-none pl-0 mb-3;
+}
+.tiptap ul[data-type="taskList"] ul[data-type="taskList"] {
+  margin: 0.25em 0 0;
 }
 
 .tiptap ul[data-type="taskList"] li {
-  @apply flex items-start gap-2;
+  @apply flex items-start;
+  gap: 0.55em;
+  padding-left: 0;
+}
+.tiptap ul[data-type="taskList"] li > div {
+  flex: 1;
+  min-width: 0;
 }
 
+/* The box sits on the middle of the item's first line, whatever the text size:
+   the label is one line tall and centres it (`em` first for WebViews without `lh`). */
 .tiptap ul[data-type="taskList"] li > label {
-  @apply flex-shrink-0 mt-0.5 cursor-pointer;
+  @apply flex flex-shrink-0 items-center cursor-pointer;
+  height: 1.625em;
+  height: 1lh;
 }
 
+/* The app's checkbox (`.block-checkbox`, below, shares its rules with this
+   one): TipTap renders the input itself, so only the size is set here, in
+   `em` to grow with the editor's text. While reading the box cannot be
+   changed, so it does not invite a click. */
 .tiptap ul[data-type="taskList"] li > label input[type="checkbox"] {
-  @apply w-4 h-4 rounded border border-edge-strong bg-well-active
-         cursor-pointer accent-accent;
+  width: 1em;
+  height: 1em;
+  margin: 0;
+  border-radius: 0.25em;
+}
+.tiptap ul[data-type="taskList"] li > label input[type="checkbox"]:checked::after {
+  width: 0.6em;
+  height: 0.6em;
+}
+.tiptap:not([contenteditable="true"]) ul[data-type="taskList"] li > label,
+.tiptap:not([contenteditable="true"]) ul[data-type="taskList"] li > label input[type="checkbox"] {
+  cursor: default;
+}
+.tiptap:not([contenteditable="true"]) ul[data-type="taskList"] li > label input[type="checkbox"]:not(:checked):hover {
+  border-color: var(--border-strong);
 }
 
-.tiptap ul[data-type="taskList"] li[data-checked="true"] > div {
-  @apply line-through text-subtle;
+/* Done: the item's own text struck through and quieter, not what is nested in it. */
+.tiptap ul[data-type="taskList"] li[data-checked="true"] > div > p {
+  @apply line-through;
+  color: var(--text-subtle);
+  text-decoration-color: color-mix(in srgb, var(--text-subtle) 70%, transparent);
 }
 
 .tiptap blockquote {
   @apply border-l-2 pl-4 italic my-4;
   border-color: color-mix(in srgb, var(--accent) 50%, transparent);
   color: var(--text-muted);
+}
+
+/* Tables, built like the app's other surfaces: a rounded frame with an edge
+   (design.md → Border Radius), quiet inner lines, the header row on the panel
+   colour. `separate` instead of `collapse`, or the outer corners would not round.
+   The wrapper scrolls a table wider than the text sideways; while editing,
+   prosemirror-tables marks selected cells and the column edge being dragged. */
+.tiptap .tableWrapper {
+  @apply my-4 overflow-x-auto;
+}
+.tiptap table {
+  border-collapse: separate;
+  border-spacing: 0;
+  table-layout: fixed;
+  width: 100%;
+  overflow: hidden;
+  border: 1px solid var(--border-soft);
+  border-radius: 0.75rem;
+}
+.tiptap th,
+.tiptap td {
+  @apply px-3 py-2 align-top;
+  position: relative;
+  min-width: 3em;
+  border-right: 1px solid var(--border-soft);
+  border-bottom: 1px solid var(--border-soft);
+}
+.tiptap tr > :last-child {
+  border-right: 0;
+}
+.tiptap tr:last-child > * {
+  border-bottom: 0;
+}
+.tiptap th {
+  @apply font-semibold text-left;
+  font-size: 0.94em;
+  color: var(--text-primary);
+  background-color: var(--panel-bg);
+}
+.tiptap td {
+  background-color: transparent;
+  transition: background-color 150ms;
+}
+.tiptap tr:hover > td {
+  background-color: var(--interactive-hover);
+}
+.tiptap th > p,
+.tiptap td > p {
+  @apply mb-0;
+}
+.tiptap th > p + p,
+.tiptap td > p + p {
+  @apply mt-1.5;
+}
+.tiptap .selectedCell::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-color: var(--accent-wash);
+  box-shadow: inset 0 0 0 1px var(--accent-edge);
+}
+.tiptap .column-resize-handle {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  right: -2px;
+  width: 3px;
+  border-radius: 2px;
+  pointer-events: none;
+  background-color: var(--accent);
+}
+.tiptap.resize-cursor {
+  cursor: col-resize;
 }
 
 /* The colour comes from the `hr` rule in the base layer — only the spacing here. */
@@ -1546,7 +1678,8 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
 }
 
 .tiptap pre {
-  @apply rounded-lg p-4 my-4 overflow-x-auto;
+  @apply rounded-lg px-4 py-3 my-4 overflow-x-auto;
+  line-height: 1.6;
   background-color: var(--code-bg);
   border: 1px solid var(--border-soft);
 }
@@ -1560,6 +1693,14 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
   background-color: var(--editor-mark-bg);
   color: var(--editor-mark-text);
 }
+
+/* Text colours: the mark stores the name, the theme the shade. */
+.tiptap span[data-color="red"] { color: var(--editor-color-red); }
+.tiptap span[data-color="orange"] { color: var(--editor-color-orange); }
+.tiptap span[data-color="yellow"] { color: var(--editor-color-yellow); }
+.tiptap span[data-color="green"] { color: var(--editor-color-green); }
+.tiptap span[data-color="blue"] { color: var(--editor-color-blue); }
+.tiptap span[data-color="purple"] { color: var(--editor-color-purple); }
 
 .tiptap a.external-link {
   @apply text-accent underline underline-offset-2 cursor-pointer hover:text-accent-raise;
@@ -1586,6 +1727,140 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
 
 .tiptap img {
   @apply max-w-full rounded-lg;
+}
+
+/* An image inside a text selection (imageSelection.ts): tinted like marked
+   text, since the page's own highlight does not reach into the picture. */
+.tiptap .editor-image--marked img {
+  box-shadow: 0 0 0 2px var(--accent-edge);
+  filter: brightness(0.8) saturate(0.85);
+}
+.tiptap.editor-marking-images::selection,
+.tiptap.editor-marking-images ::selection { background: transparent; }
+.tiptap .editor-text--marked { background-color: var(--selection-bg); }
+
+/* Folding by headings (HeadingFoldExtension): the chevron in the margin left of a
+   heading, shown on hover and while folded; what is folded away is not displayed.
+   While reading it has the page's margin; while editing only the frame's 12px
+   inner padding, so there it is narrower. The chevron has a fixed size: in `em`
+   it would grow with an H1 and run into the text. */
+.tiptap h1,
+.tiptap h2,
+.tiptap h3 {
+  position: relative;
+}
+.editor-fold-toggle {
+  position: absolute;
+  left: -24px;
+  top: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  border-radius: 0.375rem;
+  /* One line of the heading tall, so the chevron sits on its middle;
+     `em` first for WebViews without the `lh` unit. */
+  height: 1.3em;
+  height: 1lh;
+  padding: 0;
+  /* The heading's size and leading, which `lh` follows. */
+  font: inherit;
+  color: var(--text-subtle);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 150ms, color 150ms;
+}
+.tiptap h1:hover > .editor-fold-toggle,
+.tiptap h2:hover > .editor-fold-toggle,
+.tiptap h3:hover > .editor-fold-toggle,
+.editor-fold-toggle[aria-expanded="false"],
+.editor-fold-toggle:focus-visible {
+  opacity: 1;
+}
+.editor-fold-toggle:hover {
+  color: var(--text-primary);
+  background-color: var(--interactive-hover);
+}
+.block-frame--editing .editor-fold-toggle {
+  left: -12px;
+  width: 10px;
+}
+.block-frame--editing .editor-fold-toggle:hover {
+  background-color: transparent;
+}
+.tiptap .editor-folded {
+  display: none;
+}
+.tiptap .editor-heading--folded::after {
+  content: ' …';
+  font-weight: 400;
+  color: var(--text-subtle);
+}
+
+/* Collapsible sections: the toggle beside the heading line, the content under it. */
+.tiptap div[data-type="details"] {
+  @apply flex gap-1.5 my-3 rounded-lg px-2 py-1.5;
+  border: 1px solid var(--border-soft);
+}
+/* One line of the heading tall (the editor's leading-relaxed), so the
+   chevron sits on the middle of the heading's first line. */
+.tiptap div[data-type="details"] > button {
+  @apply flex-shrink-0 flex items-center justify-center rounded-md cursor-pointer;
+  width: 1.25em;
+  height: 1.625em;
+  color: var(--text-subtle);
+}
+.tiptap div[data-type="details"] > button::before,
+.editor-fold-toggle::before {
+  content: '';
+  flex-shrink: 0;
+  width: 0.36em;
+  height: 0.36em;
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  /* Pointing right; open points down. The shift keeps the rotated square centred. */
+  transform: translateX(-0.06em) rotate(-45deg);
+  transition: transform 150ms;
+}
+.editor-fold-toggle::before {
+  width: 6px;
+  height: 6px;
+  transform: translateX(-1px) rotate(-45deg);
+}
+.editor-fold-toggle[aria-expanded="true"]::before {
+  transform: translateY(-1.5px) rotate(45deg);
+}
+.tiptap div[data-type="details"].is-open > button::before,
+.editor-fold-toggle[aria-expanded="true"]::before {
+  transform: translateY(-0.08em) rotate(45deg);
+}
+.tiptap div[data-type="details"] > button:hover {
+  color: var(--text-primary);
+  background-color: var(--well-raise);
+}
+.tiptap div[data-type="details"] > div {
+  @apply flex-1 min-w-0;
+}
+.tiptap div[data-type="details"] summary {
+  @apply font-semibold list-none;
+  color: var(--text-primary);
+}
+.tiptap div[data-type="details"] summary::-webkit-details-marker {
+  display: none;
+}
+.tiptap div[data-type="detailsContent"] {
+  @apply mt-1.5;
+}
+.tiptap div[data-type="detailsContent"][hidden] {
+  display: none;
+}
+.tiptap div[data-type="detailsContent"] > :last-child {
+  @apply mb-0;
+}
+.tiptap summary.is-empty::before {
+  content: attr(data-placeholder);
+  @apply float-left h-0 pointer-events-none font-normal;
+  color: var(--text-subtle);
 }
 
 .tiptap p.is-editor-empty:first-child::before {
@@ -2129,6 +2404,7 @@ html[data-theme] .prop-segment--active {
    Read mode: no visible shell, the blocks flow like a document.
    Edit mode: subtle frame per block, handle + menu, insertion line. */
 .block-stack {
+  position: relative;
   display: flex;
   flex-direction: column;
 }
@@ -2139,12 +2415,206 @@ html[data-theme] .prop-segment--active {
   min-height: 2.5rem;
 }
 
-.block-stack--drop-target {
+/* Around the frames, which stand out of the stack by their overhang
+   (.block-frame--editing), not around the stack itself. */
+.block-stack--drop-target::after {
+  content: '';
+  position: absolute;
+  inset: 0 -0.75rem;
   border-radius: 0.75rem;
   box-shadow: inset 0 0 0 1px var(--focus-ring);
+  pointer-events: none;
 }
 
-/* The stack's one toolbar stays at the top while scrolling. */
+/* A suggestion popup at the caret (`[[` links, `/` commands); placed by the suggestion plugin. */
+.editor-suggestion-popup {
+  z-index: 60;
+}
+
+/* The small menu over a text editor's selection (SelectionMenus). */
+.editor-selection-menu {
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 3px;
+  border-radius: 8px;
+  border: 1px solid var(--edge-strong);
+  background: var(--well-solid);
+  box-shadow: var(--menu-shadow);
+}
+
+/* A colour in the selection menu's colour row; "none" is the default colour, struck through. */
+.editor-color-swatch {
+  width: 18px;
+  height: 18px;
+  border-radius: 9999px;
+  border: 1px solid var(--edge-strong);
+  cursor: pointer;
+}
+.editor-color-swatch--none {
+  background: linear-gradient(135deg, transparent 45%, var(--text-muted) 45%, var(--text-muted) 55%, transparent 55%);
+}
+.editor-color-swatch:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+.editor-color-swatch--active {
+  box-shadow: 0 0 0 2px var(--well-solid), 0 0 0 3px var(--accent);
+}
+
+/* The find bar above the toolbar (FindBar), the small inline field it shares with
+   the link form (LinkHrefForm), and the hits it marks. */
+.editor-find-bar {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-bottom: 4px;
+  padding: 3px;
+  border-radius: 0.5rem;
+  border: 1px solid var(--panel-border);
+  background: var(--panel-bg);
+}
+.editor-find-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px;
+}
+/* A field of the find bar, as tall as the bar's buttons, with its icon and the count inside. */
+.editor-find-field {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1 1 14rem;
+  max-width: 22rem;
+  height: 1.75rem;
+  margin-right: 2px;
+  padding: 0 8px;
+  border-radius: 0.375rem;
+  border: 1px solid var(--edge-strong);
+  background: var(--well-page);
+  cursor: text;
+  transition: border-color 150ms;
+}
+.editor-find-field:focus-within { border-color: var(--accent-edge); }
+.editor-find-field input {
+  flex: 1;
+  min-width: 0;
+  font-size: 12px;
+  color: var(--text-primary);
+  background: transparent;
+  outline: none;
+}
+.editor-find-field input::placeholder { color: var(--text-subtle); }
+.editor-find-count {
+  flex-shrink: 0;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-subtle);
+}
+.editor-find-count--none { color: var(--text-muted); }
+/* A button of the bar with a word instead of an icon. */
+.editor-toolbar-btn-label {
+  padding: 0 0.25rem;
+  font-size: 12px;
+}
+/* Finding sits at the bar's far end, apart from the formatting. */
+.editor-toolbar-end {
+  display: flex;
+  margin-left: auto;
+}
+/* A small panel hanging under a toolbar button (web link, text colour), in
+   place rather than in a portal: the bar is sticky at the top of the main
+   column, so there is always room below it. A button in the bar's right half
+   opens it towards the left (`--end`), so it stays on the sheet. */
+.editor-toolbar-popover {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+}
+.editor-toolbar-popover--end {
+  left: auto;
+  right: 0;
+}
+.editor-inline-input {
+  padding: 2px 8px;
+  font-size: 12px;
+  border-radius: 6px;
+  border: 1px solid var(--edge-strong);
+  background: var(--well-page);
+  color: var(--text-secondary);
+  outline: none;
+}
+.editor-inline-input:focus { border-color: var(--accent-edge); }
+.tiptap .editor-search-match {
+  border-radius: 2px;
+  background-color: var(--accent-wash);
+}
+.tiptap .editor-search-match--current {
+  background-color: var(--accent-wash-strong);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+
+/* Words and characters under the text while editing (WordCount). */
+.editor-word-count {
+  margin-top: 0.5rem;
+  text-align: right;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-subtle);
+}
+
+/* Where a drag into a text editor would land (DropIndicator). */
+.editor-drop-line,
+.editor-drop-caret {
+  position: fixed;
+  z-index: 60;
+  pointer-events: none;
+  border-radius: 1px;
+  background: var(--accent);
+}
+.editor-drop-line { height: 2px; }
+.editor-drop-caret { width: 2px; }
+
+/* An editor image's resize handles: a slim bar at the middle of the side that moves. */
+.editor-image-handle {
+  position: absolute;
+  top: 50%;
+  width: 6px;
+  height: 36px;
+  margin-top: -18px;
+  border-radius: 3px;
+  background: var(--accent);
+  box-shadow: 0 0 0 2px var(--well-page);
+  cursor: ew-resize;
+  touch-action: none;
+}
+.editor-image-handle--left { left: 6px; }
+.editor-image-handle--right { right: 6px; }
+
+/* The width while resizing, in the image's corner. */
+.editor-image-size {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 11px;
+  background: var(--well-solid);
+  color: var(--text-secondary);
+  pointer-events: none;
+}
+
+/* While an image is dragged, nothing gets selected along the way. */
+.editor-image-dragging,
+.editor-image-dragging * {
+  user-select: none !important;
+  cursor: grabbing !important;
+}
+
+/* The stack's one toolbar stays at the top while scrolling. The strip has the
+   sheet's colour, so text scrolling under it disappears instead of showing a band. */
 .block-stack-toolbar {
   position: sticky;
   top: 0;
@@ -2152,7 +2622,59 @@ html[data-theme] .prop-segment--active {
   /* The same overhang as .block-frame--editing, so that toolbar and frame
      below it sit on one edge. */
   margin: 0 -0.75rem 0.5rem;
-  background: var(--bg-app);
+  padding: 0.25rem 0 0.375rem;
+  background: var(--sheet-bg);
+}
+
+/* The formatting bar: a rounded surface of its own (design.md → Border Radius, Depth). */
+.editor-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px;
+  padding: 3px;
+  border-radius: 0.5rem;
+  border: 1px solid var(--panel-border);
+  background: var(--panel-bg);
+}
+
+/* A button of the bar and of the selection menus: neutral on hover, jade when active. */
+.editor-toolbar-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.75rem;
+  height: 1.75rem;
+  padding: 0 0.25rem;
+  border-radius: 0.375rem;
+  transition: color 150ms, background-color 150ms;
+}
+.editor-toolbar-btn-idle {
+  color: var(--text-subtle);
+}
+.editor-toolbar-btn-idle:hover {
+  color: var(--text-primary);
+  background-color: var(--interactive-hover);
+}
+.editor-toolbar-btn-active {
+  color: var(--editor-toolbar-active-text);
+  background-color: var(--editor-toolbar-active-bg);
+}
+.editor-toolbar-btn-disabled,
+.editor-toolbar-btn:disabled {
+  color: var(--text-subtle);
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.editor-toolbar-btn:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--focus-ring);
+}
+.editor-toolbar-divider {
+  width: 1px;
+  height: 1rem;
+  margin: 0 3px;
+  background: var(--border-soft);
 }
 
 /* The negative outer margin cancels the inner padding horizontally: the text
@@ -2643,8 +3165,9 @@ html[data-theme] .block-manager-row--idle,
   margin-top: 0;
 }
 
-/* "Jump to block" from the sidebar: flash briefly. */
-.block-stack-item--revealed {
+/* "Jump to block" from the sidebar: flash briefly. On the frame, which in
+   edit mode stands out of the list slot by its overhang. */
+.block-stack-item--revealed > .block-frame {
   border-radius: 0.75rem;
   animation: block-reveal 1.6s ease-out;
 }
@@ -2657,7 +3180,7 @@ html[data-theme] .block-manager-row--idle,
 /* Without motion, the ring stays for the duration instead of being missing entirely —
    as with the link chip. */
 @media (prefers-reduced-motion: reduce) {
-  .block-stack-item--revealed {
+  .block-stack-item--revealed > .block-frame {
     animation: none;
     box-shadow: 0 0 0 2px var(--focus-ring);
   }
@@ -2771,7 +3294,8 @@ html[data-theme] .block-manager-row--idle,
 .block-toggle:focus-visible,
 .block-check:focus-visible,
 .block-checklist-input:focus-visible,
-.block-checkbox:focus-visible {
+.block-checkbox:focus-visible,
+.tiptap ul[data-type="taskList"] li > label input[type="checkbox"]:focus-visible {
   outline: none;
   box-shadow: 0 0 0 2px var(--focus-ring);
 }
@@ -2780,8 +3304,9 @@ html[data-theme] .block-manager-row--idle,
    settings. Drawn by hand instead of native — a native checkbox brings
    its own colours and edges and looked out of place next to the fields and buttons.
    Everything comes from theme variables, so Parchment needs no
-   bridge of its own. */
-.block-checkbox {
+   bridge of its own. The editor's checklist uses it too, sized there. */
+.block-checkbox,
+.tiptap ul[data-type="taskList"] li > label input[type="checkbox"] {
   appearance: none;
   -webkit-appearance: none;
   width: 0.875rem;
@@ -2796,18 +3321,21 @@ html[data-theme] .block-manager-row--idle,
   transition: background-color 150ms, border-color 150ms;
 }
 
-.block-checkbox:hover {
+.block-checkbox:hover,
+.tiptap ul[data-type="taskList"] li > label input[type="checkbox"]:hover {
   border-color: var(--accent-text);
 }
 
-.block-checkbox:checked {
+.block-checkbox:checked,
+.tiptap ul[data-type="taskList"] li > label input[type="checkbox"]:checked {
   background-color: var(--accent-text);
   border-color: var(--accent-text);
 }
 
 /* The tick itself, cut out as a shape: in the app's surface colour,
    which provides the contrast to the accent in both themes. */
-.block-checkbox:checked::after {
+.block-checkbox:checked::after,
+.tiptap ul[data-type="taskList"] li > label input[type="checkbox"]:checked::after {
   content: '';
   width: 0.5rem;
   height: 0.5rem;
@@ -3633,12 +4161,9 @@ html[data-theme='emerald-parchment'] .tiptap {
 }
 
 html[data-theme='emerald-parchment'] .tiptap h1,
-html[data-theme='emerald-parchment'] .tiptap h2 {
-  color: #25180f;
-}
-
+html[data-theme='emerald-parchment'] .tiptap h2,
 html[data-theme='emerald-parchment'] .tiptap h3 {
-  color: #43301e;
+  color: #25180f;
 }
 
 html[data-theme='emerald-parchment'] .tiptap code {
@@ -3876,11 +4401,6 @@ html[data-theme='emerald-parchment'] .altar-category-chip.bg-well-active {
   border: 1px solid rgba(0, 138, 87, 0.32);
 }
 
-html[data-theme='emerald-parchment'] .editor-toolbar-btn-active {
-  background-color: var(--editor-toolbar-active-bg);
-  color: var(--editor-toolbar-active-text);
-}
-
 html[data-theme='emerald-parchment'] .editor-toolbar-btn-idle:hover {
   background-color: rgba(136, 97, 57, 0.14);
   color: #2f2114;
@@ -3891,6 +4411,12 @@ html[data-theme='emerald-parchment'] .tiptap :not(pre) > code {
   background-color: var(--editor-code-bg);
   color: var(--editor-code-text);
   border: 1px solid rgba(0, 122, 77, 0.2);
+}
+
+/* In a code block the block is the surface: no chip on every line. */
+html[data-theme='emerald-parchment'] .tiptap pre code {
+  background-color: transparent;
+  border: 0;
 }
 
 html[data-theme='emerald-parchment'] .altar-cat-scroll-fade {
@@ -3940,11 +4466,6 @@ html[data-theme='custom'] .sigil-tool-btn.bg-well-active {
 html[data-theme='custom'] .settings-nav-item-active,
 html[data-theme='custom'] .right-sidebar-tab-active {
   border: 1px solid var(--accent-edge);
-}
-
-html[data-theme='custom'] .editor-toolbar-btn-active {
-  background-color: var(--editor-toolbar-active-bg);
-  color: var(--editor-toolbar-active-text);
 }
 
 html[data-theme='custom'] .list-toolbar-option-active.text-danger {

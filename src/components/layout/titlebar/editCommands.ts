@@ -35,7 +35,7 @@ export async function pasteFromClipboard(): Promise<void> {
     const data = new DataTransfer();
     for (const item of items) {
       for (const type of item.types) {
-        // Images have to travel as files, not strings: RichEditor's
+        // Images have to travel as files, not strings: TextEditor's
         // handlePaste looks for an `image/*` entry in `clipboardData.items`
         // and calls `getAsFile()` on it. Without this branch, Paste from the
         // menu would silently drop images that Ctrl+V handles fine.

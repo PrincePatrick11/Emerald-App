@@ -4,7 +4,7 @@ import { ChevronLeft } from 'lucide-react';
 import { useUIStore } from '../../store/uiStore';
 import { MODULES, type EntryModuleId } from '../../lib/modules';
 import { displayTitle } from '../../lib/entryTitle';
-import TagInput from '../editor/TagInput';
+import TagInput from './TagInput';
 
 /** The page title as a heading: entries, altar and dashboards
  *  (`DashboardTitle`, Home) are deliberately the same size. One class chain. */

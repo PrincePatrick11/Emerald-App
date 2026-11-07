@@ -35,6 +35,13 @@ html[data-theme='emerald-parchment'] {
   --editor-toolbar-active-text: #0b5a3a;
   --editor-mark-bg: #d7ede0;
   --editor-mark-text: #0a5e3d;
+  /* Text colours in the editor (TextColor mark): dark enough on parchment. */
+  --editor-color-red: #b4372c;
+  --editor-color-orange: #a85a17;
+  --editor-color-yellow: #8a6d00;
+  --editor-color-green: #23794a;
+  --editor-color-blue: #2b5fa8;
+  --editor-color-purple: #6d47b0;
   --menu-bg: #f8efdf;
   --menu-border: rgba(146, 107, 68, 0.42);
   --menu-shadow: 0 18px 36px rgba(96, 63, 30, 0.2);
@@ -166,6 +173,7 @@ html[data-theme='emerald-parchment'] {
   --canvas: #ebdcc5;
   --accent-wash: rgba(0, 138, 87, 0.1);
   --accent-wash-strong: rgba(0, 138, 87, 0.25);
+  --selection-bg: rgba(0, 138, 87, 0.22);
   --accent-track: rgba(0, 138, 87, 0.6);
   --accent-fill: #159165;
   --accent-fill-strong: #159165;

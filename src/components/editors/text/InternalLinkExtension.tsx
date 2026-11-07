@@ -1,14 +1,10 @@
 import Mention from '@tiptap/extension-mention';
 import { mergeAttributes } from '@tiptap/core';
-import { ReactRenderer, ReactNodeViewRenderer, NodeViewWrapper } from '@tiptap/react';
+import { ReactNodeViewRenderer, NodeViewWrapper } from '@tiptap/react';
 import type { NodeViewRendererProps } from '@tiptap/react';
-import tippy, { type Instance } from 'tippy.js';
-import SuggestionList, {
-  DEFAULT_ENTRY_EMOJI,
-  type SuggestionItem,
-  type SuggestionListRef,
-} from './SuggestionList';
-import type { ContentType } from '../../types';
+import SuggestionList, { DEFAULT_ENTRY_EMOJI, type SuggestionItem } from './SuggestionList';
+import { suggestionPopup } from './suggestionPopup';
+import type { ContentType } from '../../../types';
 
 function getDefaultIcon(entryType: string): string {
   return DEFAULT_ENTRY_EMOJI[entryType as ContentType] ?? DEFAULT_ENTRY_EMOJI.operation;
@@ -167,52 +163,7 @@ export function createInternalLinkExtension(
           .run();
       },
 
-      render: () => {
-        let component: ReactRenderer<SuggestionListRef>;
-        let popup: Instance[];
-
-        return {
-          onStart: (props) => {
-            component = new ReactRenderer(SuggestionList, {
-              props,
-              editor: props.editor,
-            });
-
-            if (!props.clientRect) return;
-
-            popup = tippy('body', {
-              getReferenceClientRect: props.clientRect as () => DOMRect,
-              appendTo: () => document.body,
-              content: component.element,
-              showOnCreate: true,
-              interactive: true,
-              trigger: 'manual',
-              placement: 'bottom-start',
-            });
-          },
-
-          onUpdate: (props) => {
-            component.updateProps(props);
-            if (!props.clientRect) return;
-            popup[0]?.setProps({
-              getReferenceClientRect: props.clientRect as () => DOMRect,
-            });
-          },
-
-          onKeyDown: (props) => {
-            if (props.event.key === 'Escape') {
-              popup[0]?.hide();
-              return true;
-            }
-            return component.ref?.onKeyDown(props.event) ?? false;
-          },
-
-          onExit: () => {
-            popup[0]?.destroy();
-            component.destroy();
-          },
-        };
-      },
+      render: suggestionPopup<SuggestionItem>(SuggestionList as never),
     },
   });
 }

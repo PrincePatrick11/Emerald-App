@@ -38,7 +38,7 @@ A custom theme is a small JSON file. It sets colours and nothing else: spacing, 
 | `warning` | warnings and the edit action | no |
 | `success` | low task priority | no |
 
-Colours are `#rgb` or `#rrggbb`. Anything else makes the file invalid, as does an unknown version. Every other token is derived from these in [`src/themes/customTheme.ts`](../src/themes/customTheme.ts), and `npm run check:colors` fails if a token of the theme files is missing there.
+Colours are `#rgb` or `#rrggbb`. Anything else makes the file invalid, as does an unknown version. Every other token is derived from these in [`src/themes/customTheme.ts`](../src/themes/customTheme.ts), and `npm run check:colors` fails if a token of the theme files is missing there. The editor's six text colours (`--editor-color-*`) are not derived but taken from the built-in theme of the same base, so coloured text keeps its shade and stays readable.
 
 ## What the App Checks
 

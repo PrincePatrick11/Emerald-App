@@ -1,13 +1,13 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { LayoutList } from 'lucide-react';
-import { MODULE_LIST } from '../../lib/modules';
-import { useLinkItems } from '../../hooks/useLinkItems';
-import { isImageIcon } from '../../lib/helpers';
-import type { ContentType } from '../../types';
+import { MODULE_LIST } from '../../../lib/modules';
+import { useLinkItems } from '../../../hooks/useLinkItems';
+import { isImageIcon } from '../../../lib/helpers';
+import type { ContentType } from '../../../types';
 import { ENTRY_TYPE_ICONS, ENTRY_TYPE_LABEL_KEYS, type SuggestionItem } from './SuggestionList';
 import { useTranslation } from 'react-i18next';
-import Modal from '../ui/Modal';
-import SearchField from '../ui/SearchField';
+import Modal from '../../ui/Modal';
+import SearchField from '../../ui/SearchField';
 
 type Tab = 'all' | ContentType;
 

@@ -62,7 +62,7 @@ Known limit: under Wayland a minimised window cannot be brought forward (there i
 ### Known limitations
 
 - **Windows 11 Snap Layouts.** With `decorations: false` the hover flyout on the maximise button is missing; restoring it needs `WM_NCHITTEST` returning `HTMAXBUTTON` from Rust. `Win+Arrow` and drag-to-edge snapping work.
-- **Paste in the HTML Edit menu**: `document.execCommand('paste')` is blocked in WebView2 and WKWebView, so `editCommands.ts` replays `navigator.clipboard.read()` as a synthetic `ClipboardEvent`. A real event (not `insertText`) keeps ProseMirror's paste handling and `text/html`; images ride along as `File` entries for `RichEditor`'s `handlePaste`. `Ctrl+V` always works natively.
+- **Paste in the HTML Edit menu**: `document.execCommand('paste')` is blocked in WebView2 and WKWebView, so `editCommands.ts` replays `navigator.clipboard.read()` as a synthetic `ClipboardEvent`. A real event (not `insertText`) keeps ProseMirror's paste handling and `text/html`; images ride along as `File` entries for `TextEditor`'s `handlePaste`. `Ctrl+V` always works natively.
 
 ### Loading Screen and Boot Order
 

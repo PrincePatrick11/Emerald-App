@@ -496,10 +496,67 @@
       "alignCenter": "Centrar",
       "alignRight": "Alinear a la derecha",
       "horizontalRule": "Línea divisoria",
-      "insertLink": "Insertar enlace",
+      "insertLink": "Enlazar entrada",
+      "find": "Buscar y reemplazar",
       "insertImage": "Insertar imagen",
+      "insertTable": "Insertar tabla",
       "undo": "Deshacer",
       "redo": "Rehacer"
+    },
+    "menu": {
+      "textColor": "Color del texto",
+      "defaultColor": "Color predeterminado",
+      "paragraph": "Texto",
+      "webLink": "Enlazar a una dirección web",
+      "width": "Ancho {{value}} %",
+      "removeImage": "Quitar imagen"
+    },
+    "table": {
+      "addRowBefore": "Fila arriba",
+      "addRowAfter": "Fila abajo",
+      "addColumnBefore": "Columna a la izquierda",
+      "addColumnAfter": "Columna a la derecha",
+      "deleteRow": "Eliminar fila",
+      "deleteColumn": "Eliminar columna",
+      "toggleHeaderRow": "Fila de encabezado",
+      "deleteTable": "Eliminar tabla"
+    },
+    "colors": {
+      "red": "Rojo",
+      "orange": "Naranja",
+      "yellow": "Amarillo",
+      "green": "Verde",
+      "blue": "Azul",
+      "purple": "Morado"
+    },
+    "find": {
+      "placeholder": "Buscar en la entrada",
+      "replacePlaceholder": "Reemplazar por",
+      "count": "{{current}} de {{total}}",
+      "none": "Sin resultados",
+      "previous": "Resultado anterior",
+      "next": "Resultado siguiente",
+      "toggleReplace": "Mostrar reemplazo",
+      "replace": "Reemplazar este resultado",
+      "replaceShort": "Reemplazar",
+      "replaceAll": "Reemplazar todo",
+      "close": "Cerrar"
+    },
+    "count": {
+      "words_one": "{{count}} palabra",
+      "words_other": "{{count}} palabras",
+      "characters_one": "{{count}} carácter",
+      "characters_other": "{{count}} caracteres"
+    },
+    "details": {
+      "insert": "Sección plegable",
+      "summaryPlaceholder": "Título de la sección",
+      "expand": "Desplegar la sección",
+      "collapse": "Plegar la sección"
+    },
+    "fold": {
+      "expand": "Desplegar la sección",
+      "collapse": "Plegar la sección"
     },
     "unsaved": "Cambios sin guardar"
   },
@@ -838,6 +895,8 @@
     "sidebarLimitHint": "Cuántas entradas muestra una lista al principio. El resto se carga debajo con «Mostrar más».",
     "emojiDefaultsHint": "Los emojis que ofrece cada selector de este vault antes de buscar. Clic para quitar, arrastrar para ordenar, buscar para añadir nuevos.",
     "imagesHint": "Se aplica a las imágenes que se insertan. Las más grandes se reducen primero y solo se rechazan si siguen siendo demasiado grandes.",
+    "imageOptimizePhotos": "Optimizar fotos",
+    "imageOptimizePhotosHint": "Una foto que llega como PNG (pegada desde el portapapeles, por ejemplo) se guarda como JPEG a tamaño completo: alrededor de una quinta parte del espacio, sin diferencia visible. Las capturas de pantalla, los gráficos y todo lo transparente siguen siendo PNG.",
     "imageMaxEdgeOption": "Las imágenes más grandes se reducen a {{value}} px en su lado más largo",
     "imageMaxEdgeOriginalHint": "Las imágenes conservan su tamaño original",
     "imageMaxSizeOption": "Se rechazan las imágenes de más de {{max}}",

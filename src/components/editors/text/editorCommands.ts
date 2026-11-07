@@ -1,19 +1,21 @@
 import type { Editor } from '@tiptap/react';
 import type { Node as ProseMirrorNode } from '@tiptap/pm/model';
-import { saveImage } from '../../lib/images';
-import { prepareImageDataUrl } from '../../lib/imageLimits';
-import { reportImageError } from '../../store/imageNoticeStore';
-import { flashReveal, scrollIntoViewCentered } from '../../lib/reveal';
-import { internalLinkBlockHtml, toInternalLinkChip } from '../../lib/internalLinkHtml';
-import type { EntryLinkRequest } from '../../lib/links';
+import { saveImage } from '../../../lib/images';
+import { prepareImageDataUrl } from '../../../lib/imageLimits';
+import { reportImageError, useImageNoticeStore } from '../../../store/imageNoticeStore';
+import { ACCEPTED_IMAGE_MIME, isAcceptedImageFile, readFileAsDataUrl } from '../../../lib/helpers';
+import { flashReveal, scrollIntoViewCentered } from '../../../lib/reveal';
+import { internalLinkBlockHtml, toInternalLinkChip } from '../../../lib/internalLinkHtml';
+import type { EntryLinkRequest } from '../../../lib/links';
+import type { TextColor } from '../../../lib/textColors';
 import type { SuggestionItem } from './SuggestionList';
+import { revealFolded } from './HeadingFoldExtension';
 
 /**
  * Commands that write into an editor from outside: the sidebar's link
  * requests (append, remove, jump to), inserting an image, inserting a
- * link chip from the link picker. They used to be private
- * functions in the RichEditor. Since an entry can have several text blocks,
- * the `BlockStack` decides WHICH editor receives a request, and calls them
+ * link chip from the link picker. Since a document can have several
+ * editors, their host decides WHICH editor receives a request, and calls them
  * from there.
  */
 
@@ -154,6 +156,23 @@ const REVEAL_CLASS = 'is-revealed';
 const REVEAL_MS = 1600;
 
 /**
+ * Make `pos` visible: unfold the headings that hide it and open the closed
+ * collapsible sections around it. Their open state is not stored, so a
+ * section opens through its own toggle, which also moves the focus into the
+ * editor; a caller that keeps the focus elsewhere (the find bar) takes it back.
+ */
+export function revealPosition(editor: Editor, pos: number): void {
+  revealFolded(editor, pos);
+  const $pos = editor.state.doc.resolve(Math.min(pos, editor.state.doc.content.size));
+  for (let depth = 1; depth <= $pos.depth; depth++) {
+    if ($pos.node(depth).type.name !== 'details') continue;
+    const dom = editor.view.nodeDOM($pos.before(depth));
+    if (!(dom instanceof HTMLElement) || dom.classList.contains('is-open')) continue;
+    dom.querySelector<HTMLButtonElement>(':scope > button')?.click();
+  }
+}
+
+/**
  * Jumps to the link chip in the content and briefly highlights it. Returns `false`
  * if the entry does not contain it, in which case the caller can choose to
  * navigate to the target instead.
@@ -174,6 +193,7 @@ export function revealEntryLink(
 ): boolean {
   const pos = findEntryLinkPos(editor.state.doc, target);
   if (pos === null) return false;
+  revealPosition(editor, pos);
 
   // In edit mode also select for real so that the cursor is there;
   // in read mode ProseMirror shows no selection, and there the class does the job.
@@ -198,14 +218,132 @@ export function revealEntryLink(
   return true;
 }
 
-/** Image from the toolbar: first into the vault image folder, then as a node with the file name. */
-export async function insertImageFromDataUrl(editor: Editor, dataUrl: string): Promise<void> {
+/** What "Insert table" creates, from the toolbar and from the `/` menu. */
+export const NEW_TABLE = { rows: 3, cols: 3, withHeaderRow: true } as const;
+
+/**
+ * Images into the editor one after another, each behind the one before, from
+ * `at` on (`null`: the cursor). Storing a photo takes a moment and typing goes
+ * on meanwhile, so the spot follows every change of the document and moves
+ * past each image inserted there; inserting at the selection instead would
+ * replace the image just put in. At the cursor, the first image replaces what
+ * the user had selected, as typing would. One that fails does not stop the others.
+ */
+export async function insertImagesInOrder<T>(
+  editor: Editor,
+  at: number | null,
+  items: T[],
+  store: (item: T) => Promise<string>,
+  report: (e: unknown, item: T) => void,
+): Promise<void> {
+  const { selection } = editor.state;
+  let spot = at ?? selection.to;
+  // At the cursor, a selection of the user's (text, an image) is replaced by the first image.
+  let replace = at === null && !selection.empty ? { from: selection.from, to: selection.to } : null;
+  const follow = ({ transaction }: { transaction: { mapping: { map: (pos: number, assoc?: number) => number } } }) => {
+    spot = transaction.mapping.map(spot, 1);
+    if (replace) {
+      replace = { from: transaction.mapping.map(replace.from, 1), to: transaction.mapping.map(replace.to, -1) };
+      if (replace.from >= replace.to) replace = null;
+    }
+  };
+  editor.on('transaction', follow);
   try {
-    const src = await saveImage(await prepareImageDataUrl(dataUrl));
-    editor.chain().focus().insertContent({ type: 'image', attrs: { src } }).run();
-  } catch (e) {
-    reportImageError(e, 'toolbar');
+    for (const item of items) {
+      try {
+        const src = await store(item);
+        if (editor.isDestroyed) return;
+        const image = { type: 'image', attrs: { src } };
+        const target = replace ?? Math.min(spot, editor.state.doc.content.size);
+        replace = null;
+        editor.chain().focus().insertContentAt(target, image).run();
+      } catch (e) {
+        report(e, item);
+      }
+    }
+  } finally {
+    editor.off('transaction', follow);
   }
+}
+
+/**
+ * Chosen or pasted image files into the editor at the cursor, in their order:
+ * each prepared (limits, photo as JPEG) and stored first. Files of another
+ * format are left out with the notice saying so.
+ */
+export async function insertImageFiles(editor: Editor, files: File[]): Promise<void> {
+  const accepted = files.filter(isAcceptedImageFile);
+  if (accepted.length < files.length) useImageNoticeStore.getState().show({ kind: 'format' });
+  await insertImagesInOrder(
+    editor, null, accepted,
+    async (file) => saveImage(await prepareImageDataUrl(await readFileAsDataUrl(file))),
+    (e) => reportImageError(e, 'insert'),
+  );
+}
+
+/** The file picker for images (toolbar button, `/` menu), several at once. */
+export function pickImageFiles(editor: Editor): void {
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = ACCEPTED_IMAGE_MIME;
+  input.multiple = true;
+  input.onchange = () => { void insertImageFiles(editor, Array.from(input.files ?? [])); };
+  input.click();
+}
+
+/**
+ * Set the web address of the link at the selection, or take the link away
+ * when the address is empty — in the selection menu, the link popup and the
+ * toolbar alike. With nothing selected and no link at the cursor, the
+ * address itself goes in as the link's text.
+ */
+export function applyLinkHref(editor: Editor, href: string): void {
+  const value = href.trim();
+  const chain = editor.chain().focus().extendMarkRange('link');
+  if (!value) chain.unsetLink().run();
+  else if (editor.state.selection.empty && !editor.isActive('link')) {
+    // Then out of the link again: typing on is plain text, even where links are inclusive.
+    chain.insertContent({ type: 'text', text: value, marks: [{ type: 'link', attrs: { href: value } }] }).unsetMark('link').run();
+  } else chain.setLink({ href: value }).run();
+}
+
+/**
+ * The toolbar's collapsible section: wraps the selected blocks in one, or,
+ * inside one, unwraps it again. An empty summary would stay behind as an
+ * empty paragraph, which goes too.
+ */
+export function toggleDetails(editor: Editor): void {
+  if (!editor.isActive('details')) {
+    editor.chain().focus().setDetails().run();
+    return;
+  }
+  const { $from } = editor.state.selection;
+  let at = -1;
+  for (let depth = $from.depth; depth > 0; depth--) {
+    if ($from.node(depth).type.name !== 'details') continue;
+    at = $from.before(depth);
+    break;
+  }
+  editor.chain().focus().unsetDetails().command(({ tr }) => {
+    const left = at >= 0 ? tr.doc.nodeAt(at) : null;
+    if (left?.type.name === 'paragraph' && left.content.size === 0) tr.delete(at, at + left.nodeSize);
+    return true;
+  }).run();
+}
+
+/** Take the link at the selection away. */
+export function removeLink(editor: Editor): void {
+  editor.chain().focus().extendMarkRange('link').unsetLink().run();
+}
+
+/** The text colour at the cursor or the selection's start, `null` for the default. */
+export function currentTextColor(editor: Editor): TextColor | null {
+  return (editor.getAttributes('textColor').color as TextColor | undefined) ?? null;
+}
+
+/** Colour the selection, or what is typed next; `null` gives the default colour back. */
+export function applyTextColor(editor: Editor, color: TextColor | null): void {
+  editor.chain().focus().setTextColor(color).run();
 }
 
 /** Link chip from the link picker (toolbar button) at the cursor position. */

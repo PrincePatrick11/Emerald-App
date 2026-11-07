@@ -459,7 +459,7 @@ function useTasksConfig(): EntryListTabProps<Task> {
             // renderRow bypasses EntryListTabs' central drag wiring, hence
             // the same pointerdown handler here as there: it only sets the drag
             // channel, the click to open still fires normally. The channel
-            // is only cleared by the pointerup of a mounted RichEditor — after
+            // is only cleared by the pointerup of a mounted text editor host — after
             // a mere click the value stays around without consequence.
             onPointerDown={(e) => {
               if (e.button !== 0) return;

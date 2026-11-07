@@ -21,7 +21,7 @@ import { countBy, countByCategory, UNCATEGORIZED_KEY } from '../../lib/groupBy';
 import Dashboard from '../ui/Dashboard';
 import Dropdown from '../ui/Dropdown';
 import ContextMenu, { type ContextMenuAction } from '../ui/ContextMenu';
-import LinkPickerModal from '../editor/LinkPickerModal';
+import { LinkPickerModal } from '../editors/text';
 import CategorySelect from '../ui/CategorySelect';
 import CollapseChevron from '../ui/CollapseChevron';
 import CollapsibleGroupHeader from '../ui/CollapsibleGroupHeader';

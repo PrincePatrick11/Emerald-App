@@ -496,10 +496,67 @@
       "alignCenter": "Zentriert",
       "alignRight": "Rechtsbündig",
       "horizontalRule": "Trennlinie",
-      "insertLink": "Link einfügen",
+      "insertLink": "Eintrag verlinken",
+      "find": "Suchen und ersetzen",
       "insertImage": "Bild einfügen",
+      "insertTable": "Tabelle einfügen",
       "undo": "Rückgängig",
       "redo": "Wiederholen"
+    },
+    "menu": {
+      "textColor": "Textfarbe",
+      "defaultColor": "Standardfarbe",
+      "paragraph": "Text",
+      "webLink": "Mit Webadresse verlinken",
+      "width": "Breite {{value}} %",
+      "removeImage": "Bild entfernen"
+    },
+    "table": {
+      "addRowBefore": "Zeile darüber",
+      "addRowAfter": "Zeile darunter",
+      "addColumnBefore": "Spalte links",
+      "addColumnAfter": "Spalte rechts",
+      "deleteRow": "Zeile löschen",
+      "deleteColumn": "Spalte löschen",
+      "toggleHeaderRow": "Kopfzeile",
+      "deleteTable": "Tabelle löschen"
+    },
+    "colors": {
+      "red": "Rot",
+      "orange": "Orange",
+      "yellow": "Gelb",
+      "green": "Grün",
+      "blue": "Blau",
+      "purple": "Violett"
+    },
+    "find": {
+      "placeholder": "Im Eintrag suchen",
+      "replacePlaceholder": "Ersetzen durch",
+      "count": "{{current}} von {{total}}",
+      "none": "Keine Treffer",
+      "previous": "Vorheriger Treffer",
+      "next": "Nächster Treffer",
+      "toggleReplace": "Ersetzen einblenden",
+      "replace": "Diesen Treffer ersetzen",
+      "replaceShort": "Ersetzen",
+      "replaceAll": "Alle ersetzen",
+      "close": "Schließen"
+    },
+    "count": {
+      "words_one": "{{count}} Wort",
+      "words_other": "{{count}} Wörter",
+      "characters_one": "{{count}} Zeichen",
+      "characters_other": "{{count}} Zeichen"
+    },
+    "details": {
+      "insert": "Aufklappbarer Abschnitt",
+      "summaryPlaceholder": "Überschrift des Abschnitts",
+      "expand": "Abschnitt aufklappen",
+      "collapse": "Abschnitt zuklappen"
+    },
+    "fold": {
+      "expand": "Abschnitt aufklappen",
+      "collapse": "Abschnitt zuklappen"
     },
     "unsaved": "Ungespeicherte Änderungen"
   },
@@ -830,6 +887,8 @@
     "sidebarLimitHint": "Wie viele Einträge eine Liste zuerst zeigt. Der Rest lädt darunter über „Weitere anzeigen“ nach.",
     "emojiDefaultsHint": "Die Emojis, die jeder Emoji-Picker dieses Vaults vor der Suche anbietet. Klicken entfernt, Ziehen sortiert, über die Suche kommen neue dazu.",
     "imagesHint": "Gilt für neu eingefügte Bilder. Größere werden erst verkleinert und nur abgelehnt, wenn sie danach noch zu groß sind.",
+    "imageOptimizePhotos": "Fotos optimieren",
+    "imageOptimizePhotosHint": "Ein Foto, das als PNG ankommt (etwa aus der Zwischenablage), wird in voller Größe als JPEG gespeichert: etwa ein Fünftel des Platzes, ohne sichtbaren Unterschied. Screenshots, Grafiken und alles mit Transparenz bleiben PNG.",
     "imageMaxEdgeOption": "Größere Bilder werden an der längsten Seite auf {{value}} px verkleinert",
     "imageMaxEdgeOriginalHint": "Bilder behalten ihre Originalgröße",
     "imageMaxSizeOption": "Bilder über {{max}} werden abgelehnt",

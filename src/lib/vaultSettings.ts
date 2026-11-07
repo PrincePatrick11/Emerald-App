@@ -68,6 +68,8 @@ export type ImageMaxSizeMb = (typeof IMAGE_MAX_SIZE_MB_OPTIONS)[number];
 export interface ImageSettings {
   maxEdge: ImageMaxEdge;
   maxSizeMb: ImageMaxSizeMb;
+  /** A photo that arrives as PNG is stored as JPEG at full size (`lib/imageLimits.ts`). */
+  optimizePhotos: boolean;
 }
 
 export interface TagSettings {
@@ -167,6 +169,7 @@ export const DEFAULT_VAULT_SETTINGS: VaultSettings = {
   images: {
     maxEdge: null,
     maxSizeMb: null,
+    optimizePhotos: true,
   },
   tags: {
     createInline: true,
@@ -267,6 +270,7 @@ export function normalizeVaultSettings(raw: unknown): VaultSettings {
       ...images,
       maxEdge: oneOf(images.maxEdge, IMAGE_MAX_EDGE_OPTIONS, DEFAULT_VAULT_SETTINGS.images.maxEdge),
       maxSizeMb: oneOf(images.maxSizeMb, IMAGE_MAX_SIZE_MB_OPTIONS, DEFAULT_VAULT_SETTINGS.images.maxSizeMb),
+      optimizePhotos: flag(images.optimizePhotos, DEFAULT_VAULT_SETTINGS.images.optimizePhotos),
     },
     tags: {
       ...tags,
