@@ -602,6 +602,7 @@
     }
   },
   "canvas": {
+    "rulers": "Règles et repères",
     "tools": "Outils",
     "drawing": "Dessin",
     "donePainting": "Terminé",

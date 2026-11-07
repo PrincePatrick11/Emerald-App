@@ -21,6 +21,7 @@ import { byZ, type CanvasAddition, type CanvasElement, type CanvasGrid, type Can
 import CanvasToolbar, { CanvasToolRail, CanvasZoom } from './CanvasToolbar';
 import TextEditOverlay from './TextEditOverlay';
 import ElementList from './ElementList';
+import Rulers, { RULER_SIZE, type RulerGuide } from './Rulers';
 import PaintSurface from './paint/PaintSurface';
 import PaintToolbar, { PAINT_TOOL_DEFS, PaintToolRail, toolEnabled } from './paint/PaintToolbar';
 import LayerPanel from './paint/LayerPanel';
@@ -42,6 +43,10 @@ const PASTE_OFFSET = 24;
 
 /** What the canvas editor keeps between two pastes (one per window, shared by every canvas editor). */
 let clipboard: CanvasElement[] = [];
+/** The guides pulled out of the rulers, per document (`historyKey`), for as long as the window is open. */
+const guideMemory = new Map<string, RulerGuide[]>();
+/** Rulers shown or not, the same for every canvas editor in the window. */
+let rulersShown = false;
 
 export interface CanvasEditorHandle {
   /** A point of the window in artboard pixels, or `null` when it is outside the stage. */
@@ -170,10 +175,15 @@ const CanvasEditor = forwardRef<CanvasEditorHandle, CanvasEditorProps>(function 
   /** The tool picked in the tool column: an addition to draw on the stage, or `null` for selecting. */
   const [addTool, setAddTool] = useState<{ type: string; key: string } | null>(null);
   const hasRail = !paintElementId && Object.values(types).some((type) => type.additions?.length);
+  const [rulers, setRulers] = useState(rulersShown);
+  const [rulerGuides, setRulerGuides] = useState<RulerGuide[]>(() => guideMemory.get(historyKey) ?? []);
+  useEffect(() => { setRulerGuides(guideMemory.get(historyKey) ?? []); }, [historyKey]);
+  useEffect(() => { guideMemory.set(historyKey, rulerGuides); }, [historyKey, rulerGuides]);
+  const showRulers = rulers && editable && features.guides && !paintingId;
 
   // The latest props for the handlers below, which outlive a render.
-  const live = useRef({ elements, selectedIds, view, onChange, onSelectionChange, grid, types });
-  live.current = { elements, selectedIds, view, onChange, onSelectionChange, grid, types };
+  const live = useRef({ elements, selectedIds, view, onChange, onSelectionChange, grid, types, guides: [] as RulerGuide[] });
+  live.current = { elements, selectedIds, view, onChange, onSelectionChange, grid, types, guides: showRulers ? rulerGuides : [] };
 
   const history = useCanvasHistory(elements, onChange, `${historyKey}:${editable}`);
   const brush = usePaintBrush(paint.startColor, paint.startSize);
@@ -201,11 +211,12 @@ const CanvasEditor = forwardRef<CanvasEditorHandle, CanvasEditorProps>(function 
   const fitView = useCallback((viewport: { width: number; height: number }, isEditing: boolean): View => {
     const pad = isEditing && !paintElementId ? EDIT_PADDING : 0;
     const rail = isEditing && hasRail ? RAIL_PADDING : 0;
-    const zoom = clamp(Math.min((viewport.width - 2 * pad - rail) / width, (viewport.height - 2 * pad) / height), MIN_ZOOM, MAX_ZOOM);
-    const x = rail + (viewport.width - rail - width * zoom) / 2;
-    const y = !isEditing && readAlign === 'top' ? 0 : (viewport.height - height * zoom) / 2;
+    const ruler = isEditing && showRulers ? RULER_SIZE : 0;
+    const zoom = clamp(Math.min((viewport.width - 2 * pad - rail - ruler) / width, (viewport.height - 2 * pad - ruler) / height), MIN_ZOOM, MAX_ZOOM);
+    const x = rail + ruler + (viewport.width - rail - ruler - width * zoom) / 2;
+    const y = !isEditing && readAlign === 'top' ? 0 : ruler + (viewport.height - ruler - height * zoom) / 2;
     return { zoom: zoom > 0 ? zoom : 1, x, y };
-  }, [width, height, readAlign, paintElementId, hasRail]);
+  }, [width, height, readAlign, paintElementId, hasRail, showRulers]);
 
   useLayoutEffect(() => {
     const el = viewportRef.current;
@@ -426,7 +437,12 @@ const CanvasEditor = forwardRef<CanvasEditorHandle, CanvasEditorProps>(function 
     const moving = live.current.elements.filter((el) => ids.includes(el.id) && !el.locked && !el.hidden);
     if (!moving.length) return;
     const starts = new Map(moving.map((el) => [el.id, { x: el.x, y: el.y }]));
-    const others = live.current.elements.filter((el) => !ids.includes(el.id) && !el.hidden).map(elementBounds);
+    const others = [
+      ...live.current.elements.filter((el) => !ids.includes(el.id) && !el.hidden).map(elementBounds),
+      // The ruler guides, as boxes without width or height: their one line is every edge.
+      ...live.current.guides.map((g) => (g.orientation === 'vertical'
+        ? { x: g.at, y: 0, width: 0, height: 0 } : { x: 0, y: g.at, width: 0, height: 0 })),
+    ];
     const union = unionBounds(moving.map(elementBounds))!;
     trackPointerDrag(start, {
       threshold: DRAG_THRESHOLD_PX,
@@ -471,6 +487,37 @@ const CanvasEditor = forwardRef<CanvasEditorHandle, CanvasEditorProps>(function 
         }
         if (changes.size) commit(patched(changes));
         else elementsLayerRef.current?.batchDraw();
+      },
+    });
+  };
+
+  /**
+   * Moving a ruler guide, or pulling a new one out of a ruler (`id` null):
+   * it follows the pointer and stays where it is let go; let go over a
+   * ruler, it goes.
+   */
+  const startGuide = (start: PointerEvent, orientation: RulerGuide['orientation'], id: string | null) => {
+    const guideId = id ?? createId();
+    const at = (e: PointerEvent) => {
+      const p = toArtboard(e.clientX, e.clientY);
+      return Math.round(orientation === 'vertical' ? p.x : p.y);
+    };
+    const overRuler = (e: PointerEvent) => {
+      const rect = viewportRef.current?.getBoundingClientRect();
+      if (!rect) return true;
+      return orientation === 'vertical' ? e.clientX - rect.left < RULER_SIZE : e.clientY - rect.top < RULER_SIZE;
+    };
+    const put = (value: number) => setRulerGuides((list) => (list.some((g) => g.id === guideId)
+      ? list.map((g) => (g.id === guideId ? { ...g, at: value } : g))
+      : [...list, { id: guideId, orientation, at: value }]));
+    let last = start;
+    setGesture(true);
+    trackPointerDrag(start, {
+      onMove: (e) => { last = e; put(at(e)); },
+      onEnd: ({ cancelled }) => {
+        setGesture(false);
+        if (cancelled && id) return;
+        if (cancelled || overRuler(last)) setRulerGuides((list) => list.filter((g) => g.id !== guideId));
       },
     });
   };
@@ -529,6 +576,12 @@ const CanvasEditor = forwardRef<CanvasEditorHandle, CanvasEditorProps>(function 
     if (evt.button !== 0) return;
     // The transformer's own handles.
     if (e.target.getParent() instanceof Konva.Transformer) return;
+    // A ruler guide moves (its line takes the press).
+    if (e.target.hasName('canvas-ruler-guide')) {
+      const guide = rulerGuides.find((g) => g.id === e.target.id());
+      if (guide) startGuide(evt, guide.orientation, guide.id);
+      return;
+    }
     if (addTool) {
       setEditingTextId(null);
       startCreate(evt, addTool);
@@ -892,13 +945,14 @@ const CanvasEditor = forwardRef<CanvasEditorHandle, CanvasEditorProps>(function 
     undo: history.undo, redo: history.redo, tool: addTool, setTool: setAddTool, removeSelected, duplicate,
     arrange: doArrange, align: doAlign, distribute: doDistribute, update: updateSelected,
     zoom: view.zoom, zoomIn: () => zoomTo(view.zoom * 1.25), zoomOut: () => zoomTo(view.zoom / 1.25), fit,
-    onExport, group: doGroup, ungroup: doUngroup, listOpen, toggleList: () => setListOpen((v) => !v),
+    onExport, rulers: showRulers, canRulers: editable && features.guides && !paintingId,
+    toggleRulers: () => setRulers((v) => { rulersShown = !v; return !v; }), group: doGroup, ungroup: doUngroup, listOpen, toggleList: () => setListOpen((v) => !v),
   };
 
   return (
     <div
       ref={rootRef}
-      className={`canvas-editor canvas-editor-${layout} ${editable ? 'canvas-editor-editing' : ''} ${paintingId ? 'canvas-editor-painting' : ''} ${addTool && !paintingId ? 'canvas-editor-adding' : ''}`}
+      className={`canvas-editor canvas-editor-${layout} ${editable ? 'canvas-editor-editing' : ''} ${paintingId ? 'canvas-editor-painting' : ''} ${addTool && !paintingId ? 'canvas-editor-adding' : ''} ${showRulers ? 'canvas-editor-rulers' : ''}`}
       tabIndex={editable ? -1 : undefined}
       onKeyDown={onKeyDown}
     >
@@ -1015,6 +1069,23 @@ const CanvasEditor = forwardRef<CanvasEditorHandle, CanvasEditorProps>(function 
                     />
                   )}
                 </Group>
+                {showRulers && (
+                  <Group x={view.x} y={view.y} scaleX={view.zoom} scaleY={view.zoom}>
+                    {rulerGuides.map((g) => (
+                      <Line
+                        key={g.id}
+                        id={g.id}
+                        name="canvas-ruler-guide"
+                        points={g.orientation === 'vertical' ? [g.at, -1e5, g.at, 1e5] : [-1e5, g.at, 1e5, g.at]}
+                        stroke={RULER_GUIDE_COLOR}
+                        strokeWidth={1 / view.zoom}
+                        hitStrokeWidth={8 / view.zoom}
+                        onMouseEnter={(e) => { e.target.getStage()!.container().style.cursor = g.orientation === 'vertical' ? 'ew-resize' : 'ns-resize'; }}
+                        onMouseLeave={(e) => { e.target.getStage()!.container().style.cursor = ''; }}
+                      />
+                    ))}
+                  </Group>
+                )}
                 <Transformer
                   ref={transformerRef}
                   keepRatio={keepRatio}
@@ -1109,6 +1180,7 @@ const CanvasEditor = forwardRef<CanvasEditorHandle, CanvasEditorProps>(function 
             onClose={() => setListOpen(false)}
           />
         )}
+        {showRulers && <Rulers size={size} view={view} onPull={(orientation, e) => startGuide(e, orientation, null)} />}
         {editable && hasRail && !paintingId && <CanvasToolRail controller={controller} />}
         {editable && features.zoom && <CanvasZoom controller={controller} />}
         {overlay}
@@ -1121,6 +1193,8 @@ export default CanvasEditor;
 
 /** Guides in a colour of their own, apart from the selection. */
 const GUIDE_COLOR = '#e8559b';
+/** The guides pulled out of the rulers, apart from the snapping lines. */
+const RULER_GUIDE_COLOR = '#3fb8e8';
 
 /** What the toolbar reads and calls. */
 export interface CanvasController {
@@ -1146,6 +1220,10 @@ export interface CanvasController {
   zoomOut: () => void;
   fit: () => void;
   onExport?: () => void;
+  /** The rulers along the stage, with the guides pulled out of them. */
+  rulers: boolean;
+  canRulers: boolean;
+  toggleRulers: () => void;
   /** The selected elements as one group, and their groups dissolved. */
   group: () => void;
   ungroup: () => void;

@@ -602,6 +602,7 @@
     }
   },
   "canvas": {
+    "rulers": "Lineale und Hilfslinien",
     "tools": "Werkzeuge",
     "drawing": "Zeichnung",
     "donePainting": "Fertig",

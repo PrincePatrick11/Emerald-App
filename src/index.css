@@ -2671,6 +2671,28 @@ html[data-theme] .prop-segment--active {
   top: 0;
   transform-origin: 0 0;
 }
+/* The rulers along the stage's top and left edge; the floating parts move in beside them. */
+.canvas-ruler {
+  position: absolute;
+  z-index: 5;
+  background: var(--well-solid);
+  touch-action: none;
+}
+.canvas-ruler-horizontal { left: 18px; top: 0; border-bottom: 1px solid var(--edge); cursor: ns-resize; }
+.canvas-ruler-vertical { left: 0; top: 18px; border-right: 1px solid var(--edge); cursor: ew-resize; }
+.canvas-ruler-corner {
+  position: absolute;
+  left: 0;
+  top: 0;
+  z-index: 5;
+  width: 18px;
+  height: 18px;
+  background: var(--well-solid);
+  border-right: 1px solid var(--edge);
+  border-bottom: 1px solid var(--edge);
+}
+.canvas-editor-rulers .paint-rail { left: 30px; top: 30px; }
+.canvas-editor-rulers .paint-layers-dock { top: 30px; }
 /* A tool of the column picked: the stage draws a new element, over the others too. */
 .canvas-editor-adding .canvas-stage,
 .canvas-editor-adding .canvas-stage * { cursor: crosshair !important; }

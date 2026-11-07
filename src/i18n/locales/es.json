@@ -602,6 +602,7 @@
     }
   },
   "canvas": {
+    "rulers": "Reglas y guías",
     "tools": "Herramientas",
     "drawing": "Dibujo",
     "donePainting": "Listo",
