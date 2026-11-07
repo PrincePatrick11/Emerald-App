@@ -602,6 +602,10 @@
     }
   },
   "canvas": {
+    "menu": {
+      "group": "Gruppieren",
+      "ungroup": "Gruppe auflösen"
+    },
     "lockGuides": "Hilfslinien sperren",
     "unlockGuides": "Hilfslinien entsperren",
     "rulers": "Lineale und Hilfslinien",

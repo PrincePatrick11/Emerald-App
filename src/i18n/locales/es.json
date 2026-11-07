@@ -602,6 +602,10 @@
     }
   },
   "canvas": {
+    "menu": {
+      "group": "Agrupar",
+      "ungroup": "Desagrupar"
+    },
     "lockGuides": "Bloquear guías",
     "unlockGuides": "Desbloquear guías",
     "rulers": "Reglas y guías",

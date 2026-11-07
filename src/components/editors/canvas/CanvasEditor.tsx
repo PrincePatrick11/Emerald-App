@@ -30,6 +30,8 @@ import { FULL_PAINT_FEATURES, type PaintFeatures } from './paint/features';
 import { emptyPaintDoc, type PaintDoc } from '../../../lib/paint/document';
 import { ToolbarBtn } from '../shared/toolbarParts';
 import { Check } from 'lucide-react';
+import ContextMenu from '../../ui/ContextMenu';
+import { canvasMenuActions } from './CanvasContextMenu';
 
 /** How close, on screen, an edge has to come to a guide to snap. */
 const GUIDE_SNAP_PX = 6;
@@ -173,6 +175,8 @@ const CanvasEditor = forwardRef<CanvasEditorHandle, CanvasEditorProps>(function 
   const fittedRef = useRef(true);
   const [guides, setGuides] = useState<Guide[]>([]);
   const [marquee, setMarquee] = useState<Box | null>(null);
+  /** The right-click menu: where it opened, on screen and on the artboard, and a locked element it was opened on. */
+  const [menu, setMenu] = useState<{ x: number; y: number; at: { x: number; y: number }; locked: CanvasElement | null } | null>(null);
   const [editingTextId, setEditingTextId] = useState<string | null>(null);
   const [paintingIdState, setPaintingId] = useState<string | null>(null);
   /** The layer panel of the paint mode, open or not; it stays so between drawings. */
@@ -715,6 +719,15 @@ const CanvasEditor = forwardRef<CanvasEditorHandle, CanvasEditorProps>(function 
     clipboard = clipboard.map((el) => ({ ...el, x: el.x + PASTE_OFFSET, y: el.y + PASTE_OFFSET }));
   }, [addCopies]);
 
+  /** Pastes with the copies' middle at `at`, in artboard pixels. */
+  const pasteAt = useCallback((at: { x: number; y: number }) => {
+    const source = clipboard.filter((el) => live.current.types[el.type]);
+    const box = unionBounds(source.map(elementBounds));
+    if (!box) return;
+    const dx = at.x - (box.x + box.width / 2), dy = at.y - (box.y + box.height / 2);
+    addCopies(source.map((el) => ({ ...el, x: el.x + dx, y: el.y + dy })), 0);
+  }, [addCopies]);
+
   const doArrange = useCallback((move: ArrangeMove) => {
     commit(arrange(live.current.elements, editableIds(), move));
   }, [commit, editableIds]);
@@ -1073,6 +1086,25 @@ const CanvasEditor = forwardRef<CanvasEditorHandle, CanvasEditorProps>(function 
             width={size.width}
             height={size.height}
             onPointerDown={onStagePointerDown}
+            onContextMenu={(e) => {
+              // The paint mode keeps its own menu-less stage; a right click there does nothing.
+              if (!editable || paintingId) return;
+              e.evt.preventDefault();
+              setAddTool(null);
+              setEditingTextId(null);
+              const at = toArtboard(e.evt.clientX, e.evt.clientY);
+              const hit = elementAt(e.target);
+              // Locked elements take no presses; the topmost one whose box is under the pointer can be unlocked here.
+              const locked = hit ? null : byZ(live.current.elements).reverse().find((el) => {
+                if (!el.locked || el.hidden) return false;
+                const b = elementBounds(el);
+                return at.x >= b.x && at.x <= b.x + b.width && at.y >= b.y && at.y <= b.y + b.height;
+              }) ?? null;
+              if (hit && !live.current.selectedIds.includes(hit.id)) select(withGroups(live.current.elements, [hit.id]));
+              else if (!hit) select([]);
+              rootRef.current?.focus({ preventScroll: true });
+              setMenu({ x: e.evt.clientX, y: e.evt.clientY, at, locked });
+            }}
             onDblClick={(e) => {
               const hit = elementAt(e.target);
               if (!editable || !hit) return;
@@ -1255,6 +1287,21 @@ const CanvasEditor = forwardRef<CanvasEditorHandle, CanvasEditorProps>(function 
         {editable && features.zoom && <CanvasZoom controller={controller} />}
         {overlay}
       </div>
+      {menu && editable && (
+        <ContextMenu
+          x={menu.x}
+          y={menu.y}
+          onClose={() => setMenu(null)}
+          actions={canvasMenuActions({
+            t, features, selected, locked: menu.locked, canPaste: clipboard.some((el) => types[el.type]),
+            canRulers: controller.canRulers, rulers: showRulers,
+            cut: () => { copy(); removeSelected(); }, copy, pasteHere: () => pasteAt(menu.at), duplicate,
+            arrange: doArrange, group: doGroup, ungroup: doUngroup, patch: patchElements, remove: removeSelected,
+            selectAll: () => select(live.current.elements.filter((el) => !el.locked && !el.hidden).map((el) => el.id)),
+            fit, toggleRulers: controller.toggleRulers,
+          })}
+        />
+      )}
     </div>
   );
 });

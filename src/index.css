@@ -3827,6 +3827,19 @@ html[data-theme] .sidebar-search-inner:focus-within {
   color: var(--danger-text);
 }
 
+.context-menu-separator {
+  height: 1px;
+  margin: 4px 0;
+  background-color: var(--menu-border);
+}
+
+.context-menu-shortcut {
+  margin-left: auto;
+  padding-left: 1.5rem;
+  color: var(--text-subtle);
+  font-variant-numeric: tabular-nums;
+}
+
 /* The four links in the About section. Colour from --accent instead of a
    jade utility, so that Parchment need not carry another bridge for it; the
    hover mixes toward the text colour and thereby gets lighter in Noctis and

@@ -602,6 +602,10 @@
     }
   },
   "canvas": {
+    "menu": {
+      "group": "Grouper",
+      "ungroup": "Dégrouper"
+    },
     "lockGuides": "Verrouiller les repères",
     "unlockGuides": "Déverrouiller les repères",
     "rulers": "Règles et repères",
