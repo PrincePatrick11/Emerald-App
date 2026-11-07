@@ -14,11 +14,13 @@ import { useCanvasHistory } from './useCanvasHistory';
 import { FULL_CANVAS_FEATURES, type CanvasFeatures } from './features';
 import { BUILTIN_CANVAS_TYPES } from './elements';
 import {
-  align, arrange, clamp, copiesOf, distribute, nudge, type AlignEdge, type ArrangeMove,
+  align, arrange, clamp, copiesOf, distribute, group, moveInStack, nudge, ungroup, withGroups,
+  type AlignEdge, type ArrangeMove,
 } from './canvasActions';
 import { byZ, type CanvasAddition, type CanvasElement, type CanvasGrid, type CanvasTypes } from './types';
 import CanvasToolbar, { CanvasZoom } from './CanvasToolbar';
 import TextEditOverlay from './TextEditOverlay';
+import ElementList from './ElementList';
 import PaintSurface from './paint/PaintSurface';
 import PaintToolbar, { PAINT_TOOL_DEFS, PaintToolRail, toolEnabled } from './paint/PaintToolbar';
 import LayerPanel from './paint/LayerPanel';
@@ -78,6 +80,8 @@ export interface CanvasEditorProps {
   overlay?: ReactNode;
   /** Extra controls at the end of the toolbar. */
   toolbarEnd?: ReactNode;
+  /** The place's name for an element in the element list (an item's name); otherwise the type says. */
+  elementLabel?: (element: CanvasElement) => string | null | undefined;
   /** The paint tools of the paint mode: which there are, the palette, the brush to start with. */
   paint?: CanvasPaintOptions;
   /**
@@ -136,7 +140,7 @@ const CanvasEditor = forwardRef<CanvasEditorHandle, CanvasEditorProps>(function 
   width, height, elements, onChange, selectedIds, onSelectionChange, editable,
   types = BUILTIN_CANVAS_TYPES, features = FULL_CANVAS_FEATURES, background, grid = null, rotationSnap = null,
   historyKey = '', readAlign = 'center', createId = () => crypto.randomUUID(), onEditElement, onExport, overlay, toolbarEnd,
-  paint = DEFAULT_PAINT, paintElementId, layout = 'fill',
+  elementLabel, paint = DEFAULT_PAINT, paintElementId, layout = 'fill',
 }, ref) {
   const { t } = useTranslation();
   const rootRef = useRef<HTMLDivElement>(null);
@@ -155,6 +159,8 @@ const CanvasEditor = forwardRef<CanvasEditorHandle, CanvasEditorProps>(function 
   const [paintingIdState, setPaintingId] = useState<string | null>(null);
   /** The layer panel of the paint mode, open or not; it stays so between drawings. */
   const [layersOpen, setLayersOpen] = useState(false);
+  /** The element list beside the stage, open or not. */
+  const [listOpen, setListOpen] = useState(false);
   const paintingId = paintElementId ?? paintingIdState;
   const [spaceDown, setSpaceDown] = useState(false);
   const [hoveredId, setHoveredId] = useState<string | null>(null);
@@ -402,7 +408,10 @@ const CanvasEditor = forwardRef<CanvasEditorHandle, CanvasEditorProps>(function 
         const hits = live.current.elements
           .filter((el) => !el.locked && !el.hidden && boxesIntersect(elementBounds(el), area))
           .map((el) => el.id);
-        select([...new Set([...base, ...hits])]);
+        // Touching one member takes its whole group.
+        const all = withGroups(live.current.elements, hits)
+          .filter((id) => live.current.elements.some((el) => el.id === id && !el.locked && !el.hidden));
+        select([...new Set([...base, ...all])]);
       },
     });
   };
@@ -487,13 +496,15 @@ const CanvasEditor = forwardRef<CanvasEditorHandle, CanvasEditorProps>(function 
       return;
     }
     if (editingTextId && editingTextId !== hit.id) setEditingTextId(null);
+    // A click takes the whole group; the element list and a double click pick one member.
+    const picked = withGroups(live.current.elements, [hit.id]);
     let ids = current;
     if (additive) {
-      ids = current.includes(hit.id) ? current.filter((id) => id !== hit.id) : [...current, hit.id];
+      ids = current.includes(hit.id) ? current.filter((id) => !picked.includes(id)) : [...new Set([...current, ...picked])];
       select(ids);
       if (!ids.includes(hit.id)) return;
     } else if (!current.includes(hit.id)) {
-      ids = [hit.id];
+      ids = picked;
       select(ids);
     }
     startMove(evt, ids, hit.id);
@@ -548,6 +559,23 @@ const CanvasEditor = forwardRef<CanvasEditorHandle, CanvasEditorProps>(function 
   const doDistribute = useCallback((axis: 'horizontal' | 'vertical') => {
     commit(distribute(live.current.elements, editableIds(), axis));
   }, [commit, editableIds]);
+
+  const doGroup = useCallback(() => {
+    commit(group(live.current.elements, editableIds(), createId()));
+  }, [commit, editableIds, createId]);
+
+  const doUngroup = useCallback(() => {
+    commit(ungroup(live.current.elements, live.current.selectedIds));
+  }, [commit]);
+
+  /** Hiding or locking from the element list, in one step. */
+  const patchElements = useCallback((ids: string[], patch: Partial<Pick<CanvasElement, 'hidden' | 'locked'>>) => {
+    commit(live.current.elements.map((el) => (ids.includes(el.id) ? { ...el, ...patch } : el)));
+  }, [commit]);
+
+  const moveStack = useCallback((ids: string[], index: number) => {
+    commit(moveInStack(live.current.elements, ids, index));
+  }, [commit]);
 
   const updateSelected = useCallback((type: string, patch: (el: CanvasElement) => Partial<CanvasElement> | null) => {
     const ids = editableIds();
@@ -661,6 +689,7 @@ const CanvasEditor = forwardRef<CanvasEditorHandle, CanvasEditorProps>(function 
     if (mod && key === 'x') { handled(); copy(); removeSelected(); return; }
     if (mod && key === 'v') { handled(); paste(); return; }
     if (mod && key === '0' && features.zoom) { handled(); fit(); return; }
+    if (mod && key === 'g' && features.group) { handled(); if (e.shiftKey) doUngroup(); else doGroup(); return; }
     if (mod && (e.key === ']' || e.key === '[') && features.arrange) {
       handled();
       doArrange(e.key === ']' ? (e.shiftKey ? 'front' : 'forward') : (e.shiftKey ? 'back' : 'backward'));
@@ -756,7 +785,7 @@ const CanvasEditor = forwardRef<CanvasEditorHandle, CanvasEditorProps>(function 
     undo: history.undo, redo: history.redo, add, removeSelected, duplicate,
     arrange: doArrange, align: doAlign, distribute: doDistribute, update: updateSelected,
     zoom: view.zoom, zoomIn: () => zoomTo(view.zoom * 1.25), zoomOut: () => zoomTo(view.zoom / 1.25), fit,
-    onExport,
+    onExport, group: doGroup, ungroup: doUngroup, listOpen, toggleList: () => setListOpen((v) => !v),
   };
 
   return (
@@ -817,7 +846,11 @@ const CanvasEditor = forwardRef<CanvasEditorHandle, CanvasEditorProps>(function 
             onPointerDown={onStagePointerDown}
             onDblClick={(e) => {
               const hit = elementAt(e.target);
-              if (editable && hit) openElement(hit);
+              if (!editable || !hit) return;
+              // In a group, the first double click picks the member, the next opens it.
+              const current = live.current.selectedIds;
+              if (hit.group && !(current.length === 1 && current[0] === hit.id)) select([hit.id]);
+              else openElement(hit);
             }}
           >
             <Layer ref={elementsLayerRef}>
@@ -947,6 +980,22 @@ const CanvasEditor = forwardRef<CanvasEditorHandle, CanvasEditorProps>(function 
         {editable && painting && paintType && paintFeatures.layers && layersOpen && (
           <LayerPanel api={paintControls} images={layerImages} onClose={() => setLayersOpen(false)} />
         )}
+        {editable && !paintingId && features.layers && listOpen && (
+          <ElementList
+            elements={elements}
+            selectedIds={selectedIds}
+            types={types}
+            labelOf={elementLabel}
+            resourceVersion={resourceVersion}
+            canGroup={features.group}
+            onSelect={(ids) => { rootRef.current?.focus({ preventScroll: true }); select(ids); }}
+            onPatch={patchElements}
+            onMove={moveStack}
+            onGroup={doGroup}
+            onUngroup={doUngroup}
+            onClose={() => setListOpen(false)}
+          />
+        )}
         {editable && features.zoom && <CanvasZoom controller={controller} />}
         {overlay}
       </div>
@@ -981,6 +1030,12 @@ export interface CanvasController {
   zoomOut: () => void;
   fit: () => void;
   onExport?: () => void;
+  /** The selected elements as one group, and their groups dissolved. */
+  group: () => void;
+  ungroup: () => void;
+  /** The element list beside the stage. */
+  listOpen: boolean;
+  toggleList: () => void;
 }
 
 const ElementNode = memo(function ElementNode({ el, types, editable, editing, resourceVersion, register, onHover }: {

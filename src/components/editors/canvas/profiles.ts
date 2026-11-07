@@ -17,7 +17,7 @@ export interface CanvasProfile {
 }
 
 const NOTHING: CanvasFeatures = {
-  arrange: false, align: false, guides: false, zoom: false, history: true, export: false,
+  arrange: false, align: false, guides: false, zoom: false, history: true, export: false, layers: false, group: false,
 };
 
 /**

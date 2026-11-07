@@ -132,6 +132,7 @@ function ShapeControls({ elements, update }: {
 
 export const shapeType: CanvasElementType<ShapeProps> = {
   type: 'shape',
+  label: (el, t) => t(`canvas.shape.${el.props.shape}`),
   handles: 'all',
   draw: (ctx, el) => {
     const p = el.props;

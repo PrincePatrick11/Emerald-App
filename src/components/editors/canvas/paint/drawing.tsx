@@ -51,6 +51,7 @@ export function createDrawingType({ resolveImage = (ref) => ref }: DrawingTypeOp
   const sources = (el: DrawingElement) => layerImageRefs(el.props.doc).map(resolveImage);
   return {
     type: 'drawing',
+    label: (_el, t) => t('canvas.drawing'),
     keepRatio: true,
     handles: 'corners',
     sources,

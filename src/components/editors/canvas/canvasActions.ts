@@ -88,12 +88,66 @@ export function distribute(elements: readonly CanvasElement[], ids: readonly str
   });
 }
 
-/** Copies of `source`, shifted by `offset`, on top of everything, unlocked and visible. */
+/**
+ * Copies of `source`, shifted by `offset`, on top of everything, unlocked and
+ * visible. Copied groups become new groups of their own.
+ */
 export function copiesOf(
   source: readonly CanvasElement[], elements: readonly CanvasElement[], offset: number, createId: () => string,
 ): CanvasElement[] {
   let z = elements.reduce((max, el) => Math.max(max, el.z), -1);
-  return byZ(source).map((el) => ({ ...el, id: createId(), x: el.x + offset, y: el.y + offset, z: ++z, locked: false, hidden: false }));
+  const groups = new Map<string, string>();
+  const groupOf = (group: string | undefined) => {
+    if (!group) return undefined;
+    if (!groups.has(group)) groups.set(group, createId());
+    return groups.get(group);
+  };
+  return byZ(source).map((el) => ({
+    ...el, id: createId(), x: el.x + offset, y: el.y + offset, z: ++z, locked: false, hidden: false, group: groupOf(el.group),
+  }));
+}
+
+/** The ids with every other member of their groups added. */
+export function withGroups(elements: readonly CanvasElement[], ids: readonly string[]): string[] {
+  const groups = new Set(elements.filter((el) => el.group && ids.includes(el.id)).map((el) => el.group));
+  if (!groups.size) return [...ids];
+  const members = elements.filter((el) => el.group && groups.has(el.group) && !ids.includes(el.id)).map((el) => el.id);
+  return [...ids, ...members];
+}
+
+/**
+ * The selected elements as one group, stacked together where the topmost of
+ * them was. Groups among them are taken in; locked elements stay out.
+ */
+export function group(elements: readonly CanvasElement[], ids: readonly string[], groupId: string): CanvasElement[] {
+  const picked = new Set(withGroups(elements, ids).filter((id) => !elements.find((el) => el.id === id)?.locked));
+  if (picked.size < 2) return [...elements];
+  const order = byZ(elements);
+  const top = order.reduce((last, el, i) => (picked.has(el.id) ? i : last), -1);
+  const members = order.filter((el) => picked.has(el.id));
+  const rest = order.filter((el) => !picked.has(el.id));
+  const before = order.slice(0, top + 1).filter((el) => !picked.has(el.id)).length;
+  const stacked = [...rest.slice(0, before), ...members, ...rest.slice(before)];
+  return withIndexZ(elements, stacked).map((el) => (picked.has(el.id) ? { ...el, group: groupId } : el));
+}
+
+/** The groups of the selected elements dissolved. */
+export function ungroup(elements: readonly CanvasElement[], ids: readonly string[]): CanvasElement[] {
+  const groups = new Set(elements.filter((el) => el.group && ids.includes(el.id)).map((el) => el.group));
+  return elements.map((el) => (el.group && groups.has(el.group) ? { ...el, group: undefined } : el));
+}
+
+/**
+ * The given elements moved, together and in their order, so that the lowest
+ * of them lands at `index` of the stacking (0 the bottom) among the others.
+ */
+export function moveInStack(elements: readonly CanvasElement[], ids: readonly string[], index: number): CanvasElement[] {
+  const moving = new Set(ids);
+  const order = byZ(elements);
+  const picked = order.filter((el) => moving.has(el.id));
+  const rest = order.filter((el) => !moving.has(el.id));
+  const at = clamp(index, 0, rest.length);
+  return withIndexZ(elements, [...rest.slice(0, at), ...picked, ...rest.slice(at)]);
 }
 
 /** The same elements moved by (`dx`, `dy`), with their centres kept on the artboard. */

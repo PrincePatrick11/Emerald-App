@@ -25,9 +25,11 @@ import {
 
 /**
  * What the altar offers in the canvas editor: everything — library images,
- * shapes, text and drawings. Drawings on an altar carry no layer images.
+ * shapes, text and drawings — but grouping, since placements do not store a
+ * group. Drawings on an altar carry no layer images.
  */
-const ALTAR_PROFILE = fullProfile();
+const FULL_PROFILE = fullProfile();
+const ALTAR_PROFILE = { ...FULL_PROFILE, features: { ...FULL_PROFILE.features, group: false } };
 const ALTAR_PAINT: CanvasPaintOptions = {
   ...ALTAR_PROFILE.paint,
   palette: CANVAS_SWATCHES,
@@ -255,6 +257,11 @@ export function AltarCanvas({ altar, backgroundSrc, editable, readAlign, onExpor
     () => placements.map((p) => placementToElement(p, refW, refH, elementImageSrc)),
     [placements, refW, refH],
   );
+  /** Library items by their name in the element list. */
+  const elementLabel = useCallback(
+    (el: CanvasElement) => (el.type === 'image' ? placements.find((p) => p.id === el.id)?.name : null),
+    [placements],
+  );
 
   const handleChange = useCallback((next: CanvasElement[]) => {
     const previous = new Map(useAltarStore.getState().placements.map((p) => [p.id, p]));
@@ -314,6 +321,7 @@ export function AltarCanvas({ altar, backgroundSrc, editable, readAlign, onExpor
       readAlign={readAlign}
       createId={generateId}
       onExport={onExport}
+      elementLabel={elementLabel}
       background={<div className="h-full w-full" style={{ background: getAltarBackgroundStyle(altar, backgroundSrc) }} />}
       overlay={editable && dragItem ? (
         <>

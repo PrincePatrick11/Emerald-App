@@ -31,6 +31,7 @@ writeFileSync(
    export { withLegacyStatus, statusDefinition, hasLegacyStatus, convertLegacyStatusRows, STATUS_DEFINITION_ID } from '${root}/src/lib/blocks/legacyStatus';
    export { extractUniqueLetters, parseSigilCalc, serializeSigilCalc, createSigilCalcBlock, createSigilCanvasBlock, createSigilChargeBlock, parseSigilCharge, serializeSigilCharge, sigilState, withoutConcealed, withChargeUnloaded, sigilImage, withSigilImage, letterList, sigilUnits, sigilPartBlock, sigilPartId, withSigilPart, blockHoldsLocked, withRenamedPartTargets, parseSigilDrawing, withSigilDrawing } from '${root}/src/lib/blocks/sigil';
    export { paintDocFromJson, paintDocToJson, emptyPaintDoc, isPaintDocEmpty, thinPoints, transformStroke, mergeDown, canMergeDown, strokeSamples, inPolygon, symmetricCopies, mirrorStroke, splitStroke } from '${root}/src/lib/paint/document';
+   export { group, ungroup, withGroups, moveInStack, copiesOf } from '${root}/src/components/editors/canvas/canvasActions';
    export { renderBlocksForExport } from '${root}/src/lib/blocks/exportRender';
    export { parseAssignments, resolveDefaultTemplate, templatesFor, instantiateTemplateBlocks, isContentEmpty, templateOriginsOf, templateStart, mergeTemplateTags, mergeAssignmentChanges, withAssignmentState, assignmentStateAt, sameAssignments, defaultTemplateAt, contentForTemplate, areBlocksEmpty, fieldsWithTemplate, fieldsWithoutTemplate } from '${root}/src/lib/blocks/templates';
    export { internalLinkChipHtml } from '${root}/src/lib/internalLinkHtml';
@@ -64,6 +65,7 @@ const {
   createSigilChargeBlock, parseSigilCharge, serializeSigilCharge, sigilState, withoutConcealed, withChargeUnloaded,
   sigilImage, withSigilImage, letterList, renderBlocksForExport, parseSigilDrawing, withSigilDrawing,
   paintDocFromJson, paintDocToJson, emptyPaintDoc, isPaintDocEmpty, thinPoints, transformStroke, mergeDown, canMergeDown, strokeSamples, inPolygon, symmetricCopies, mirrorStroke, splitStroke,
+  group, ungroup, withGroups, moveInStack, copiesOf,
   sigilUnits, sigilPartBlock, sigilPartId, withSigilPart, blockHoldsLocked,
   remapDefinitionDefaults, definitionImageRefs, hasFrozenCopy, withRenamedPartTargets,
   parseAssignments, resolveDefaultTemplate, templatesFor, instantiateTemplateBlocks, isContentEmpty,
@@ -608,6 +610,25 @@ console.log('\n4f. Sigil blocks\n');
     check('drawing: a lasso takes a stroke with a point inside it',
       inPolygon(5, 5, [0, 0, 10, 0, 10, 10, 0, 10]) && !inPolygon(15, 5, [0, 0, 10, 0, 10, 10, 0, 10])
         && strokeSamples({ ...pen, tool: 'ellipse', points: [0, 0, 0.5, 20, 10, 0.5] }).length === 16);
+  }
+
+  {
+    const el = (id, z, extra = {}) => ({ id, type: 'shape', x: 0, y: 0, width: 10, height: 10, rotation: 0, opacity: 1, locked: false, hidden: false, z, props: {}, ...extra });
+    const scene = [el('a', 0), el('b', 1), el('c', 2), el('d', 3)];
+    const order = (els) => [...els].sort((p, q) => p.z - q.z).map((e) => e.id).join('');
+    const grouped = group(scene, ['a', 'c'], 'g');
+    check('canvas: a group is stacked together where its topmost member was',
+      order(grouped) === 'bacd' && grouped.filter((e) => e.group === 'g').length === 2, order(grouped));
+    check('canvas: one member pulls in its group, ungrouping dissolves it',
+      withGroups(grouped, ['a']).sort().join() === 'a,c' && ungroup(grouped, ['c']).every((e) => !e.group));
+    check('canvas: a locked element stays out of a group',
+      group([el('a', 0), el('b', 1, { locked: true })], ['a', 'b'], 'g').every((e) => !e.group));
+    check('canvas: moving in the stack keeps the moved ones together',
+      order(moveInStack(scene, ['a', 'b'], 2)) === 'cdab' && order(moveInStack(scene, ['d'], 0)) === 'dabc');
+    let n = 0;
+    const copies = copiesOf(grouped.filter((e) => e.group), grouped, 10, () => `n${n++}`);
+    check('canvas: copies of a group form a new group of their own',
+      copies.length === 2 && copies[0].group && copies[0].group !== 'g' && copies[0].group === copies[1].group, copies);
   }
 
   const odd = parseSigilCharge({ ...createSigilChargeBlock(), attrs: { 'data-block-data': JSON.stringify({ loaded: 'ja', revealDate: 'morgen', lock: 'alles' }) } });

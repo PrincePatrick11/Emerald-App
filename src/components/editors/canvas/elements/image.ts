@@ -25,6 +25,7 @@ function flicker(time: number): { sx: number; sy: number; alpha: number } {
 
 export const imageType: CanvasElementType<ImageProps> = {
   type: 'image',
+  label: (el, t) => (el.props.src || !el.props.emoji ? t('canvas.image') : el.props.emoji),
   keepRatio: true,
   handles: 'corners',
   sources: (el) => [el.props.src],

@@ -658,7 +658,23 @@
     "zoomIn": "Zoom avant",
     "zoomOut": "Zoom arrière",
     "fit": "Ajuster à la vue",
-    "export": "Enregistrer en PNG"
+    "export": "Enregistrer en PNG",
+    "image": "Image",
+    "element": "Élément",
+    "layers": {
+      "title": "Éléments",
+      "close": "Fermer la liste",
+      "empty": "Rien sur la toile pour l’instant.",
+      "hint": "Cliquer pour sélectionner (Maj ajoute), glisser pour réordonner",
+      "lock": "Verrouiller",
+      "unlock": "Déverrouiller",
+      "hide": "Masquer",
+      "show": "Afficher",
+      "group_one": "Groupe de {{count}}",
+      "group_other": "Groupe de {{count}}",
+      "groupAction": "Grouper (⌘G)",
+      "ungroup": "Dégrouper (⇧⌘G)"
+    }
   },
   "moonPhase": {
     "new": "Nouvelle lune",

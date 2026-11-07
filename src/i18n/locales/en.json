@@ -658,7 +658,23 @@
     "zoomIn": "Zoom in",
     "zoomOut": "Zoom out",
     "fit": "Fit to view",
-    "export": "Save as PNG"
+    "export": "Save as PNG",
+    "image": "Image",
+    "element": "Element",
+    "layers": {
+      "title": "Elements",
+      "close": "Close the list",
+      "empty": "Nothing on the canvas yet.",
+      "hint": "Click to select (Shift adds), drag to restack",
+      "lock": "Lock",
+      "unlock": "Unlock",
+      "hide": "Hide",
+      "show": "Show",
+      "group_one": "Group of {{count}}",
+      "group_other": "Group of {{count}}",
+      "groupAction": "Group (⌘G)",
+      "ungroup": "Ungroup (⇧⌘G)"
+    }
   },
   "moonPhase": {
     "new": "New Moon",

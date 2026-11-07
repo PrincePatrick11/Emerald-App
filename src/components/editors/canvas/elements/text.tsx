@@ -160,6 +160,7 @@ function TextControls({ elements, update }: {
 
 export const textType: CanvasElementType<TextProps> = {
   type: 'text',
+  label: (el, t) => el.props.text.split('\n')[0].trim() || t('canvas.newText'),
   keepRatio: true,
   handles: 'corners-and-sides',
   draw: (ctx, el) => {

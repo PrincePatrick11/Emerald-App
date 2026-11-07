@@ -658,7 +658,23 @@
     "zoomIn": "Vergrößern",
     "zoomOut": "Verkleinern",
     "fit": "Einpassen",
-    "export": "Als PNG speichern"
+    "export": "Als PNG speichern",
+    "image": "Bild",
+    "element": "Element",
+    "layers": {
+      "title": "Elemente",
+      "close": "Liste schließen",
+      "empty": "Noch nichts auf der Leinwand.",
+      "hint": "Klicken wählt aus (Shift ergänzt), Ziehen ändert die Reihenfolge",
+      "lock": "Sperren",
+      "unlock": "Entsperren",
+      "hide": "Ausblenden",
+      "show": "Einblenden",
+      "group_one": "Gruppe aus {{count}}",
+      "group_other": "Gruppe aus {{count}}",
+      "groupAction": "Gruppieren (⌘G)",
+      "ungroup": "Gruppe auflösen (⇧⌘G)"
+    }
   },
   "moonPhase": {
     "new": "Neumond",

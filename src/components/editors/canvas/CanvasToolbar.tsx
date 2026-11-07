@@ -3,7 +3,8 @@ import { useTranslation } from 'react-i18next';
 import {
   AlignHorizontalDistributeCenter, AlignHorizontalJustifyCenter, AlignHorizontalJustifyEnd,
   AlignHorizontalJustifyStart, AlignVerticalDistributeCenter, AlignVerticalJustifyCenter, AlignVerticalJustifyEnd,
-  AlignVerticalJustifyStart, ArrowDown, ArrowUp, BringToFront, Copy, ImageDown, Layers2, Redo2, SendToBack, Trash2, Undo2, ZoomIn, ZoomOut,
+  AlignVerticalJustifyStart, ArrowDown, ArrowUp, BringToFront, Copy, Group, ImageDown, Layers, Layers2, Redo2, SendToBack, Trash2, Undo2,
+  Ungroup, ZoomIn, ZoomOut,
 } from 'lucide-react';
 import { ToolbarBtn, ToolbarDivider, ToolbarGroup } from '../shared/toolbarParts';
 import PopoverButton from '../shared/PopoverButton';
@@ -24,7 +25,8 @@ const ALIGN_ICONS: Record<AlignEdge, ReactNode> = {
  * in the order of working, undo; what can be added (each registered type's
  * additions, several of one type behind one button); the controls of the
  * selected elements' types; where the selection sits (stacking, aligning),
- * duplicating and removing; and saving as an image at the far end. Zoom
+ * grouping, duplicating and removing; and at the far end the element list
+ * and saving as an image. Zoom
  * sits on the stage itself (`CanvasZoom`), so the bar stays one row.
  */
 export default function CanvasToolbar({ controller: c, end }: { controller: CanvasController; end?: ReactNode }) {
@@ -35,6 +37,7 @@ export default function CanvasToolbar({ controller: c, end }: { controller: Canv
   const types = Object.values(c.types);
   const adders = types.filter((type) => type.additions?.length);
   const selectedTypes = types.filter((type) => type.controls && editable.some((el) => el.type === type.type));
+  const grouped = c.selected.some((el) => el.group);
 
   return (
     <div className="editor-toolbar canvas-toolbar">
@@ -124,12 +127,21 @@ export default function CanvasToolbar({ controller: c, end }: { controller: Canv
               )}
             </PopoverButton>
           )}
+          {f.group && editable.length > 1 && (
+            <ToolbarBtn onClick={c.group} active={false} title={t('canvas.layers.groupAction')}><Group size={14} /></ToolbarBtn>
+          )}
+          {f.group && grouped && (
+            <ToolbarBtn onClick={c.ungroup} active={false} title={t('canvas.layers.ungroup')}><Ungroup size={14} /></ToolbarBtn>
+          )}
           <ToolbarBtn onClick={c.duplicate} active={false} title={t('canvas.duplicate')}><Copy size={14} /></ToolbarBtn>
           <ToolbarBtn onClick={c.removeSelected} active={false} title={t('canvas.remove')}><Trash2 size={14} /></ToolbarBtn>
         </ToolbarGroup>
       )}
 
       <div className="editor-toolbar-end">
+        {f.layers && (
+          <ToolbarBtn onClick={c.toggleList} active={c.listOpen} title={t('canvas.layers.title')}><Layers size={14} /></ToolbarBtn>
+        )}
         {f.export && c.onExport && (
           <ToolbarBtn onClick={c.onExport} active={false} title={t('canvas.export')}><ImageDown size={14} /></ToolbarBtn>
         )}

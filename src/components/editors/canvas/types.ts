@@ -34,6 +34,11 @@ export interface CanvasElement<P = unknown> {
    * look at (where it came from, say). Copies keep it.
    */
   ref?: string;
+  /**
+   * The group it belongs to: elements with the same group are selected,
+   * moved and stacked together. A place that does not store it has no groups.
+   */
+  group?: string;
   props: P;
 }
 
@@ -84,6 +89,8 @@ export type CanvasTypeControls<P = unknown> = ComponentType<{
  */
 export interface CanvasElementType<P = unknown> {
   type: string;
+  /** What the element is called in the element list (its text, its shape). */
+  label?: (el: CanvasElement<P>, t: TFunction) => string;
   /** Draws `el` with its box's top-left corner at the origin; frame, rotation and opacity are the canvas editor's. */
   draw: (ctx: CanvasRenderingContext2D, el: CanvasElement<P>, env: CanvasDrawEnv) => void;
   /** The picture sources it draws from; the canvas editor loads them and redraws when they arrive. */
