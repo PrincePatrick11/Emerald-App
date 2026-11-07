@@ -21,7 +21,7 @@ import { byZ, type CanvasAddition, type CanvasElement, type CanvasGrid, type Can
 import CanvasToolbar, { CanvasToolRail, CanvasZoom } from './CanvasToolbar';
 import TextEditOverlay from './TextEditOverlay';
 import ElementList from './ElementList';
-import Rulers, { RULER_SIZE, type RulerGuide } from './Rulers';
+import Rulers, { RULER_SIZE, rulerLayout, type RulerGuide } from './Rulers';
 import PaintSurface from './paint/PaintSurface';
 import PaintToolbar, { PAINT_TOOL_DEFS, PaintToolRail, toolEnabled } from './paint/PaintToolbar';
 import LayerPanel from './paint/LayerPanel';
@@ -232,12 +232,11 @@ const CanvasEditor = forwardRef<CanvasEditorHandle, CanvasEditorProps>(function 
   const fitView = useCallback((viewport: { width: number; height: number }, isEditing: boolean): View => {
     const pad = isEditing && !paintElementId ? EDIT_PADDING : 0;
     const rail = isEditing && hasRail ? RAIL_PADDING : 0;
-    const ruler = isEditing && showRulers ? RULER_SIZE : 0;
-    const zoom = clamp(Math.min((viewport.width - 2 * pad - rail - ruler) / width, (viewport.height - 2 * pad - ruler) / height), MIN_ZOOM, MAX_ZOOM);
-    const x = rail + ruler + (viewport.width - rail - ruler - width * zoom) / 2;
-    const y = !isEditing && readAlign === 'top' ? 0 : ruler + (viewport.height - ruler - height * zoom) / 2;
+    const zoom = clamp(Math.min((viewport.width - 2 * pad - rail) / width, (viewport.height - 2 * pad) / height), MIN_ZOOM, MAX_ZOOM);
+    const x = rail + (viewport.width - rail - width * zoom) / 2;
+    const y = !isEditing && readAlign === 'top' ? 0 : (viewport.height - height * zoom) / 2;
     return { zoom: zoom > 0 ? zoom : 1, x, y };
-  }, [width, height, readAlign, paintElementId, hasRail, showRulers]);
+  }, [width, height, readAlign, paintElementId, hasRail]);
 
   useLayoutEffect(() => {
     const el = viewportRef.current;
@@ -513,6 +512,45 @@ const CanvasEditor = forwardRef<CanvasEditorHandle, CanvasEditorProps>(function 
   };
 
   /**
+   * The box a scale handle drags, with its moving edges snapped to the ruler
+   * guides and the artboard's edges and middle (in stage pixels, unrotated).
+   * A box that keeps its proportions takes the edge that snapped and fits the
+   * other side to it.
+   */
+  const snapBoxEdges = (oldBox: Box & { rotation: number }, box: Box & { rotation: number }, anchor: string) => {
+    const v = live.current.view;
+    const stops = (orientation: 'vertical' | 'horizontal', size: number, offset: number) =>
+      [0, size / 2, size, ...live.current.guides.filter((g) => g.orientation === orientation).map((g) => g.at)].map((at) => offset + at * v.zoom);
+    const near = (value: number, list: number[]) => {
+      const best = list.reduce((b, s) => (Math.abs(s - value) < Math.abs(b - value) ? s : b), Infinity);
+      return Math.abs(best - value) <= GUIDE_SNAP_PX ? best - value : null;
+    };
+    const xs = stops('vertical', width, v.x), ys = stops('horizontal', height, v.y);
+    const left = anchor.includes('left'), right = anchor.includes('right');
+    const top = anchor.includes('top'), bottom = anchor.includes('bottom');
+    const dx = left ? near(box.x, xs) : right ? near(box.x + box.width, xs) : null;
+    const dy = top ? near(box.y, ys) : bottom ? near(box.y + box.height, ys) : null;
+    if (dx === null && dy === null) return box;
+    let w = box.width + (dx === null ? 0 : left ? -dx : dx);
+    let h = box.height + (dy === null ? 0 : top ? -dy : dy);
+    const keepsRatio = left !== right && top !== bottom && Math.abs(box.width / box.height - oldBox.width / oldBox.height) < 0.01;
+    if (keepsRatio) {
+      const ratio = oldBox.width / oldBox.height;
+      // The edge that snapped decides; the other follows the proportions.
+      if (dx !== null && (dy === null || Math.abs(dx) <= Math.abs(dy))) h = w / ratio;
+      else w = h * ratio;
+    }
+    if (w < 4 || h < 4) return box;
+    return {
+      ...box,
+      x: left ? box.x + box.width - w : box.x,
+      y: top ? box.y + box.height - h : box.y,
+      width: w,
+      height: h,
+    };
+  };
+
+  /**
    * Moving a ruler guide, or pulling a new one out of a ruler (`id` null):
    * it follows the pointer and stays where it is let go; let go over a
    * ruler, it goes.
@@ -523,10 +561,14 @@ const CanvasEditor = forwardRef<CanvasEditorHandle, CanvasEditorProps>(function 
       const p = toArtboard(e.clientX, e.clientY);
       return Math.round(orientation === 'vertical' ? p.x : p.y);
     };
+    // Back over its ruler, or out past the stage's edge on that side.
     const overRuler = (e: PointerEvent) => {
       const rect = viewportRef.current?.getBoundingClientRect();
       if (!rect) return true;
-      return orientation === 'vertical' ? e.clientX - rect.left < RULER_SIZE : e.clientY - rect.top < RULER_SIZE;
+      const layout = rulerLayout(size, live.current.view, { width, height });
+      return orientation === 'vertical'
+        ? e.clientX - rect.left < layout.vertical.left + RULER_SIZE
+        : e.clientY - rect.top < layout.horizontal.top + RULER_SIZE;
     };
     const put = (value: number) => setRulerGuides((list) => (list.some((g) => g.id === guideId)
       ? list.map((g) => (g.id === guideId ? { ...g, at: value } : g))
@@ -977,7 +1019,7 @@ const CanvasEditor = forwardRef<CanvasEditorHandle, CanvasEditorProps>(function 
   return (
     <div
       ref={rootRef}
-      className={`canvas-editor canvas-editor-${layout} ${editable ? 'canvas-editor-editing' : ''} ${paintingId ? 'canvas-editor-painting' : ''} ${addTool && !paintingId ? 'canvas-editor-adding' : ''} ${showRulers ? 'canvas-editor-rulers' : ''}`}
+      className={`canvas-editor canvas-editor-${layout} ${editable ? 'canvas-editor-editing' : ''} ${paintingId ? 'canvas-editor-painting' : ''} ${addTool && !paintingId ? 'canvas-editor-adding' : ''}`}
       tabIndex={editable ? -1 : undefined}
       onKeyDown={onKeyDown}
     >
@@ -1128,19 +1170,6 @@ const CanvasEditor = forwardRef<CanvasEditorHandle, CanvasEditorProps>(function 
                   anchorCornerRadius={2}
                   rotateAnchorOffset={22}
                   padding={1}
-                  anchorDragBoundFunc={(_old: Konva.Vector2d, pos: Konva.Vector2d, evt: MouseEvent | undefined) => {
-                    // A handle snaps to the ruler guides and the artboard's edges and middle (Alt: freely).
-                    if (!features.guides || evt?.altKey || transformerRef.current?.getActiveAnchor() === 'rotater') return pos;
-                    const v = live.current.view;
-                    const lines = (orientation: 'vertical' | 'horizontal', size: number) =>
-                      [0, size / 2, size, ...live.current.guides.filter((g) => g.orientation === orientation).map((g) => g.at)];
-                    const snap = (value: number, stops: number[], offset: number) => {
-                      const nearest = stops.map((stop) => offset + stop * v.zoom)
-                        .reduce((best, screen) => (Math.abs(screen - value) < Math.abs(best - value) ? screen : best), Infinity);
-                      return Math.abs(nearest - value) <= GUIDE_SNAP_PX ? nearest : value;
-                    };
-                    return { x: snap(pos.x, lines('vertical', width), v.x), y: snap(pos.y, lines('horizontal', height), v.y) };
-                  }}
                   onTransformStart={() => setGesture(true)}
                   onTransform={onTransform}
                   onTransformEnd={() => { setGesture(false); commitTransform(); }}
@@ -1149,7 +1178,8 @@ const CanvasEditor = forwardRef<CanvasEditorHandle, CanvasEditorProps>(function 
                     const g = live.current.grid;
                     const tr = transformerRef.current;
                     const anchor = tr?.getActiveAnchor() ?? '';
-                    if (!g?.snapSize || Math.abs(newBox.rotation) > 0.001 || !anchor || anchor === 'rotater') return newBox;
+                    if (Math.abs(newBox.rotation) > 0.001 || !anchor || anchor === 'rotater') return newBox;
+                    if (!g?.snapSize) return features.guides ? snapBoxEdges(oldBox, newBox, anchor) : newBox;
                     // Sizes on whole cells, the opposite edge staying where it is.
                     const zoom = live.current.view.zoom;
                     const cellW = (width / g.columns) * zoom;
@@ -1219,7 +1249,7 @@ const CanvasEditor = forwardRef<CanvasEditorHandle, CanvasEditorProps>(function 
             onClose={() => setListOpen(false)}
           />
         )}
-        {showRulers && <Rulers size={size} view={view} onPull={(orientation, e) => startGuide(e, orientation, null)} />}
+        {showRulers && <Rulers size={size} view={view} artboard={{ width, height }} onPull={(orientation, e) => startGuide(e, orientation, null)} />}
         {editable && hasRail && !paintingId && <CanvasToolRail controller={controller} />}
         {editable && features.zoom && <CanvasZoom controller={controller} />}
         {overlay}
