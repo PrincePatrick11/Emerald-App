@@ -10,6 +10,7 @@ export function syncErrorKey(code: string): string {
     case 'SYNC_PASSWORD_CHANGED': return 'sync.passwordChanged';
     case 'WRONG_PASSWORD': return 'vaultKey.wrongPassword';
     case 'SYNC_SERVER:client_outdated': return 'sync.errorOutdated';
+    case 'SYNC_SERVER_OUTDATED': return 'sync.errorServerOutdated';
     case 'SYNC_SNAPSHOT_OLDER': return 'sync.errorServerOlder';
     case 'SYNC_CANNOT_OPEN': return 'sync.errorCannotOpen';
     default: return 'sync.errorFailed';

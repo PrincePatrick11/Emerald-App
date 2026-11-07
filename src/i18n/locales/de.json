@@ -1187,6 +1187,7 @@
     "errorUnreachable": "Der Server antwortet nicht. Die Synchronisation geht weiter, sobald er wieder da ist.",
     "errorInsecure": "Diese Adresse ist nicht sicher. Nutze https, oder http nur auf diesem Computer, im privaten Netz oder im Tailnet.",
     "errorOutdated": "Der Vault auf dem Server stammt von einer neueren Emerald-Version. Aktualisiere diese App.",
+    "errorServerOutdated": "Dieser Server ist zu alt. Er muss auf Version 0.1.1 oder neuer aktualisiert werden.",
     "errorServerOlder": "Der Vault auf dem Server stammt aus einer älteren Version von Emerald. Aktualisiere zuerst das Gerät, das ihn dort abgelegt hat.",
     "errorCannotOpen": "Was der Server geschickt hat, lässt sich mit dem Schlüssel dieses Vaults nicht öffnen.",
     "errorFailed": "Die Synchronisation ist fehlgeschlagen.",

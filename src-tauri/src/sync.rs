@@ -44,6 +44,8 @@ const INSECURE: &str = "SYNC_INSECURE";
 const NOT_CONNECTED: &str = "SYNC_NOT_CONNECTED";
 const NEEDS_LOGIN: &str = "SYNC_NEEDS_LOGIN";
 const LOCKED: &str = "SYNC_VAULT_LOCKED";
+/// The server cannot take a proof in place of the key (before 0.1.1).
+const SERVER_OUTDATED: &str = "SYNC_SERVER_OUTDATED";
 
 /// The one server this installation talks to, as `sync.json` has it.
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -311,11 +313,33 @@ pub fn forget(app: &tauri::AppHandle, vault_id: &str) {
 }
 
 /// Case and whatever separates the groups do not matter, as on the server.
+fn clean_sync_key(sync_key: &str) -> Zeroizing<String> {
+    Zeroizing::new(sync_key.chars().filter(|c| c.is_alphanumeric()).flat_map(char::to_uppercase).collect())
+}
+
 fn names_key_from(sync_key: &str) -> String {
     use sha2::{Digest, Sha256};
-    let clean: String = sync_key.chars().filter(|c| c.is_alphanumeric()).flat_map(char::to_uppercase).collect();
-    let digest = Sha256::new().chain_update(b"emerald/sync-names\0").chain_update(clean.as_bytes()).finalize();
+    let digest = Sha256::new().chain_update(b"emerald/sync-names\0").chain_update(clean_sync_key(sync_key).as_bytes()).finalize();
     B64.encode(digest)
+}
+
+/// What pairing sends instead of the key, as `proof_of` on the server: derived
+/// apart from the names key, so the server can open neither from it.
+fn proof_from(sync_key: &str) -> String {
+    use sha2::{Digest, Sha256};
+    let digest = Sha256::new().chain_update(b"emerald/sync-auth\0").chain_update(clean_sync_key(sync_key).as_bytes()).finalize();
+    digest.iter().map(|b| format!("{b:02x}")).collect()
+}
+
+/// Whether `/health` names a version that takes a proof: 0.1.1 or later.
+/// 0.1.0, the only one before, names none.
+fn takes_proof(version: Option<&str>) -> bool {
+    let Some(version) = version else { return false };
+    let mut parts = version.split(['.', '-', '+']).map(|p| p.parse::<u64>().ok());
+    match (parts.next().flatten(), parts.next().flatten(), parts.next().flatten()) {
+        (Some(major), Some(minor), Some(patch)) => (major, minor, patch) >= (0, 1, 1),
+        _ => false,
+    }
 }
 
 fn names_key(server: &Server) -> Result<Key, String> {
@@ -534,13 +558,24 @@ pub async fn sync_server_status(app: tauri::AppHandle) -> Result<Value, String> 
     }))
 }
 
-/// Trades the sync key for a token of this device's own. The key is not kept.
+/// Trades a proof of the sync key for a token of this device's own. The key
+/// neither travels nor is kept. Never the key itself, not even after a refusal:
+/// a server that refuses the proof must not get the key that way. A server too
+/// old for the proof is told apart first.
 /// Another server than before means the old links lead nowhere.
 #[tauri::command]
 pub async fn sync_pair(app: tauri::AppHandle, url: String, key: Zeroizing<String>) -> Result<(), String> {
     let url = clean_url(&url)?;
+    let health = send(request(&url, Method::GET, "/health", SHORT)?).await?;
+    if !health.status().is_success() {
+        return Err(refused(health).await);
+    }
+    let health: Value = health.json().await.map_err(|_| UNREACHABLE.to_string())?;
+    if !takes_proof(health["version"].as_str()) {
+        return Err(SERVER_OUTDATED.to_string());
+    }
     let device = gethostname::gethostname().to_string_lossy().split('.').next().unwrap_or_default().to_string();
-    let body = json!({ "key": key.as_str(), "device": device });
+    let body = json!({ "proof": proof_from(&key), "device": device });
     let response = send(request(&url, Method::POST, "/pair", SHORT)?.json(&body)).await?;
     if !response.status().is_success() {
         return Err(match refused(response).await.as_str() {
@@ -1124,7 +1159,34 @@ pub async fn sync_unwatch(app: tauri::AppHandle) -> Result<(), String> {
 
 #[cfg(test)]
 mod tests {
-    use super::{clean_url, read_file_in, take_events, Credentials, SyncFile, BAD_FILE, SETTINGS_FILE};
+    use super::{
+        clean_url, names_key_from, proof_from, read_file_in, take_events, takes_proof, Credentials, SyncFile, BAD_FILE,
+        SETTINGS_FILE,
+    };
+
+    #[test]
+    fn the_proof_is_the_servers_and_not_the_names_key() {
+        // The value Emerald-Server's own test of `proof_of` expects.
+        assert_eq!(proof_from("abcd-efgh"), "35c556c1df68648bbdcc645ac38537f6f473b8839de5f941d108504a4f8bb7c1");
+        assert_eq!(proof_from(" ABCD efgh "), proof_from("abcd-efgh"));
+        use base64::Engine;
+        let names = base64::engine::general_purpose::STANDARD.decode(names_key_from("abcd-efgh")).unwrap();
+        let names_hex: String = names.iter().map(|b| format!("{b:02x}")).collect();
+        assert_ne!(names_hex, proof_from("abcd-efgh"));
+    }
+
+    #[test]
+    fn only_a_server_from_0_1_1_takes_a_proof() {
+        assert!(!takes_proof(None));
+        assert!(!takes_proof(Some("0.1.0")));
+        assert!(!takes_proof(Some("0.1")));
+        assert!(!takes_proof(Some("garbage")));
+        assert!(takes_proof(Some("0.1.1")));
+        assert!(takes_proof(Some("0.1.2-rc.1")));
+        assert!(takes_proof(Some("0.2.0")));
+        assert!(takes_proof(Some("0.10.0")));
+        assert!(takes_proof(Some("1.0.0")));
+    }
 
     #[test]
     fn credentials_in_the_file_are_not_in_plain_sight() {
