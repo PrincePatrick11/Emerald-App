@@ -602,6 +602,8 @@
     }
   },
   "canvas": {
+    "lockGuides": "Bloquear guías",
+    "unlockGuides": "Desbloquear guías",
     "rulers": "Reglas y guías",
     "tools": "Herramientas",
     "drawing": "Dibujo",

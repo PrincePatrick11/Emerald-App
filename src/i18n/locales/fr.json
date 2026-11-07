@@ -602,6 +602,8 @@
     }
   },
   "canvas": {
+    "lockGuides": "Verrouiller les repères",
+    "unlockGuides": "Déverrouiller les repères",
     "rulers": "Règles et repères",
     "tools": "Outils",
     "drawing": "Dessin",

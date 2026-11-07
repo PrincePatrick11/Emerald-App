@@ -139,6 +139,8 @@ interface AltarState {
   updateAltar: (id: string, patch: Partial<Pick<AltarRecord, 'title' | 'background_preset' | 'background_image_data' | 'background_overlay' | 'background_overlay_color' | 'thumbnail_data' | 'icon_data'>>, options?: WriteOptions) => Promise<void>;
   updateAltarGrid: (id: string, patch: Partial<Pick<AltarRecord, 'grid_enabled' | 'grid_size' | 'grid_opacity' | 'grid_color' | 'snap_to_grid' | 'rotation_snap_enabled' | 'rotation_snap_angle' | 'snap_scale_to_grid'>>) => Promise<void>;
   updateAltarResolution: (id: string, resolution: string) => Promise<void>;
+  /** The canvas editor's guides of an altar, and whether they are locked. */
+  updateAltarGuides: (id: string, patch: Partial<Pick<AltarRecord, 'guides' | 'guides_locked'>>) => Promise<void>;
   bumpAltarUpdatedAt: (id: string) => Promise<void>;
   /** Soft delete: into the trash. Placements and links to the altar stay, for the way back. */
   deleteAltar: (id: string) => Promise<void>;
@@ -423,6 +425,18 @@ export const useAltarStore = create<AltarState>((set, get) => ({
     set((s) => ({
       altars: s.altars.map((entry) => (entry.id === id ? next : entry)).sort((a, b) => b.updated_at.localeCompare(a.updated_at)),
     }));
+  }),
+
+  updateAltarGuides: (id, patch) => serialized(serialKey('altar', id), async () => {
+    const altar = get().altars.find((entry) => entry.id === id);
+    if (!altar) return;
+    const { guides, guides_locked } = parseAltarSettings({ ...altar, ...patch });
+    if (!needsWrite(altar, { guides, guides_locked })) return;
+    // Not a change of the altar's picture: the date stays.
+    const next: AltarRecord = { ...altar, guides, guides_locked };
+    const db = await getDb();
+    await db.execute('UPDATE altars SET settings=$1 WHERE id=$2', [altarSettingsJson(next), id]);
+    set((s) => ({ altars: s.altars.map((entry) => (entry.id === id ? next : entry)) }));
   }),
 
   updateAltarResolution: (id, resolution) => serialized(serialKey('altar', id), async () => {

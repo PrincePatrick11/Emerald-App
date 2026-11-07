@@ -602,6 +602,8 @@
     }
   },
   "canvas": {
+    "lockGuides": "Hilfslinien sperren",
+    "unlockGuides": "Hilfslinien entsperren",
     "rulers": "Lineale und Hilfslinien",
     "tools": "Werkzeuge",
     "drawing": "Zeichnung",

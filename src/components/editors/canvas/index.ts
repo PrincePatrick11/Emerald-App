@@ -8,6 +8,7 @@
 export { default as CanvasEditor } from './CanvasEditor';
 export type { CanvasEditorHandle, CanvasEditorProps, CanvasPaintOptions } from './CanvasEditor';
 export { FULL_CANVAS_FEATURES, type CanvasFeatures } from './features';
+export type { RulerGuide } from './Rulers';
 export {
   byZ,
   type CanvasAddition, type CanvasDrawEnv, type CanvasElement, type CanvasElementType, type CanvasGrid,

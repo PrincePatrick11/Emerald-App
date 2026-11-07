@@ -72,6 +72,12 @@ export type MoonPhase =
   | 'last_quarter'
   | 'waning_crescent';
 
+export interface AltarGuide {
+  id: string;
+  orientation: 'vertical' | 'horizontal';
+  at: number;
+}
+
 export interface AltarRecord {
   id: string;
   title: string;
@@ -90,6 +96,10 @@ export interface AltarRecord {
   rotation_snap_angle: number;
   snap_scale_to_grid: boolean;
   resolution: string;
+  /** Guide lines pulled out of the canvas editor's rulers; `at` in percent of the altar's width or height. */
+  guides: AltarGuide[];
+  /** The guides cannot be moved or removed. */
+  guides_locked: boolean;
   thumbnail_data?: string | null;
   icon_data?: string | null;
   /** In the trash since — the store only holds altars without it. */

@@ -1,4 +1,4 @@
-import type { AltarRecord } from '../types';
+import type { AltarGuide, AltarRecord } from '../types';
 import {
   DEFAULT_ALTAR_BACKGROUND, DEFAULT_ALTAR_RESOLUTION, DEFAULT_BACKGROUND_OVERLAY, DEFAULT_GRID_COLOR,
   DEFAULT_GRID_OPACITY, DEFAULT_GRID_SIZE, DEFAULT_OVERLAY_COLOR, isRatioFormat,
@@ -20,7 +20,26 @@ export const ALTAR_SETTING_KEYS = [
   'resolution',
 ] as const;
 
-export type AltarSettings = Pick<AltarRecord, (typeof ALTAR_SETTING_KEYS)[number]>;
+/** The settings that were never columns, only ever part of `settings`. */
+export type AltarSettings = Pick<AltarRecord, (typeof ALTAR_SETTING_KEYS)[number] | 'guides' | 'guides_locked'>;
+
+/** At most this many guides; more would be a foreign file. */
+const MAX_GUIDES = 200;
+
+function guideList(v: unknown): AltarGuide[] {
+  if (!Array.isArray(v)) return [];
+  const seen = new Set<string>();
+  const out: AltarGuide[] = [];
+  for (const g of v.slice(0, MAX_GUIDES)) {
+    if (!g || typeof g !== 'object') continue;
+    const e = g as Record<string, unknown>;
+    const at = finite(e.at, NaN);
+    if (typeof e.id !== 'string' || !e.id || seen.has(e.id) || (e.orientation !== 'vertical' && e.orientation !== 'horizontal') || !Number.isFinite(at)) continue;
+    seen.add(e.id);
+    out.push({ id: e.id, orientation: e.orientation, at: Math.max(0, Math.min(100, Math.round(at * 1000) / 1000)) });
+  }
+  return out;
+}
 
 const flag = (v: unknown): boolean => (typeof v === 'boolean' ? v : v != null && Number(v) !== 0);
 
@@ -66,6 +85,8 @@ export function parseAltarSettings(raw: unknown): AltarSettings {
     rotation_snap_angle: finite(s.rotation_snap_angle, 15),
     snap_scale_to_grid: flag(s.snap_scale_to_grid),
     resolution: isResolution(resolution) ? resolution : DEFAULT_ALTAR_RESOLUTION,
+    guides: guideList(s.guides),
+    guides_locked: flag(s.guides_locked),
   };
 }
 

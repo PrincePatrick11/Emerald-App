@@ -602,6 +602,8 @@
     }
   },
   "canvas": {
+    "lockGuides": "Lock guides",
+    "unlockGuides": "Unlock guides",
     "rulers": "Rulers and guides",
     "tools": "Tools",
     "drawing": "Drawing",

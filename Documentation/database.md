@@ -270,7 +270,7 @@ How words are matched when translating lives in `src/lib/lexicon.ts` — see [Le
 | thumbnail_data / icon_data | TEXT | data-URLs — see the Base64 note under [Key Conventions](#key-conventions) |
 | created_at / updated_at | TEXT | ISO 8601 |
 | deleted_at | TEXT | NULL = active. `altarStore` holds only altars without it; a trashed altar keeps its placements (`ON DELETE CASCADE` takes them once the row goes); purged after the retention period (`CLEANUP_TABLES`) |
-| settings | TEXT | NOT NULL DEFAULT `'{}'`; JSON with the twelve display keys (`ALTAR_SETTING_KEYS`): `background_preset`, `background_overlay`, `background_overlay_color`, `grid_enabled`, `grid_size`, `grid_opacity`, `grid_color`, `snap_to_grid`, `rotation_snap_enabled`, `rotation_snap_angle`, `snap_scale_to_grid`, `resolution` |
+| settings | TEXT | NOT NULL DEFAULT `'{}'`; JSON with the twelve display keys (`ALTAR_SETTING_KEYS`): `background_preset`, `background_overlay`, `background_overlay_color`, `grid_enabled`, `grid_size`, `grid_opacity`, `grid_color`, `snap_to_grid`, `rotation_snap_enabled`, `rotation_snap_angle`, `snap_scale_to_grid`, `resolution`; besides them, never columns, `guides` (the canvas editor's guide lines: `id`, `orientation` `vertical` or `horizontal`, `at` in percent of the altar's width or height; at most 200) and `guides_locked` |
 | elements | TEXT | NOT NULL DEFAULT `'[]'`; JSON list of the shapes, text and drawings made on the altar (since v56) |
 
 The display settings are one JSON column because they are only ever read and written together and no query filters by them; the image columns stay columns because the image cleanup looks for references in columns.

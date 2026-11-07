@@ -32,6 +32,7 @@ writeFileSync(
    export { extractUniqueLetters, parseSigilCalc, serializeSigilCalc, createSigilCalcBlock, createSigilCanvasBlock, createSigilChargeBlock, parseSigilCharge, serializeSigilCharge, sigilState, withoutConcealed, withChargeUnloaded, sigilImage, withSigilImage, letterList, sigilUnits, sigilPartBlock, sigilPartId, withSigilPart, blockHoldsLocked, withRenamedPartTargets, parseSigilDrawing, withSigilDrawing } from '${root}/src/lib/blocks/sigil';
    export { paintDocFromJson, paintDocToJson, emptyPaintDoc, isPaintDocEmpty, thinPoints, transformStroke, mergeDown, canMergeDown, strokeSamples, inPolygon, symmetricCopies, mirrorStroke, splitStroke } from '${root}/src/lib/paint/document';
    export { parseAltarElements, altarElementsJson } from '${root}/src/lib/altarElements';
+   export { parseAltarSettings } from '${root}/src/lib/altarSettings';
    export { group, ungroup, withGroups, moveInStack, copiesOf, align } from '${root}/src/components/editors/canvas/canvasActions';
    export { renderBlocksForExport } from '${root}/src/lib/blocks/exportRender';
    export { parseAssignments, resolveDefaultTemplate, templatesFor, instantiateTemplateBlocks, isContentEmpty, templateOriginsOf, templateStart, mergeTemplateTags, mergeAssignmentChanges, withAssignmentState, assignmentStateAt, sameAssignments, defaultTemplateAt, contentForTemplate, areBlocksEmpty, fieldsWithTemplate, fieldsWithoutTemplate } from '${root}/src/lib/blocks/templates';
@@ -66,7 +67,7 @@ const {
   createSigilChargeBlock, parseSigilCharge, serializeSigilCharge, sigilState, withoutConcealed, withChargeUnloaded,
   sigilImage, withSigilImage, letterList, renderBlocksForExport, parseSigilDrawing, withSigilDrawing,
   paintDocFromJson, paintDocToJson, emptyPaintDoc, isPaintDocEmpty, thinPoints, transformStroke, mergeDown, canMergeDown, strokeSamples, inPolygon, symmetricCopies, mirrorStroke, splitStroke,
-  group, ungroup, withGroups, moveInStack, copiesOf, align, parseAltarElements, altarElementsJson,
+  group, ungroup, withGroups, moveInStack, copiesOf, align, parseAltarElements, altarElementsJson, parseAltarSettings,
   sigilUnits, sigilPartBlock, sigilPartId, withSigilPart, blockHoldsLocked,
   remapDefinitionDefaults, definitionImageRefs, hasFrozenCopy, withRenamedPartTargets,
   parseAssignments, resolveDefaultTemplate, templatesFor, instantiateTemplateBlocks, isContentEmpty,
@@ -639,6 +640,13 @@ console.log('\n4f. Sigil blocks\n');
     const lined = align(pair, ['a', 'b', 'c'], 'left', { width: 1000, height: 600 });
     check('canvas: aligning moves a group as one, its members keeping their distance',
       lined[1].x - lined[0].x === 100 && lined[0].x === 100 && lined[2].x === 100, lined.map((e) => e.x));
+    const settings = parseAltarSettings(JSON.stringify({ guides_locked: true, guides: [
+      { id: 'a', orientation: 'vertical', at: 25 }, { id: 'a', orientation: 'vertical', at: 30 },
+      { id: 'b', orientation: 'diagonal', at: 10 }, { id: 'c', orientation: 'horizontal', at: 140 },
+    ] }));
+    check('altar: guides are read with their place in percent, doubles and nonsense left out',
+      settings.guides_locked && settings.guides.length === 2 && settings.guides[1].at === 100
+        && !parseAltarSettings('{}').guides_locked && parseAltarSettings('{}').guides.length === 0, settings.guides);
     check('canvas: copies of a group form a new group of their own',
       copies.length === 2 && copies[0].group && copies[0].group !== 'g' && copies[0].group === copies[1].group, copies);
   }

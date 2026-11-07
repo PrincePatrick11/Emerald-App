@@ -87,6 +87,17 @@ export interface CanvasEditorProps {
   overlay?: ReactNode;
   /** Extra controls at the end of the toolbar. */
   toolbarEnd?: ReactNode;
+  /**
+   * The guides pulled out of the rulers, in artboard pixels, when the place
+   * keeps them (with `onGuidesChange`); otherwise the editor keeps them while
+   * the window is open.
+   */
+  guides?: RulerGuide[];
+  /** Every finished change of the guides, as the whole new list. */
+  onGuidesChange?: (guides: RulerGuide[]) => void;
+  /** The guides cannot be moved or removed; with `onGuidesLockedChange` the bar can switch it. */
+  guidesLocked?: boolean;
+  onGuidesLockedChange?: (locked: boolean) => void;
   /** The place's name for an element in the element list (an item's name); otherwise the type says. */
   elementLabel?: (element: CanvasElement) => string | null | undefined;
   /** The paint tools of the paint mode: which there are, the palette, the brush to start with. */
@@ -147,7 +158,7 @@ const CanvasEditor = forwardRef<CanvasEditorHandle, CanvasEditorProps>(function 
   width, height, elements, onChange, selectedIds, onSelectionChange, editable,
   types = BUILTIN_CANVAS_TYPES, features = FULL_CANVAS_FEATURES, background, grid = null, rotationSnap = null,
   historyKey = '', readAlign = 'center', createId = () => crypto.randomUUID(), onEditElement, onExport, overlay, toolbarEnd,
-  elementLabel, paint = DEFAULT_PAINT, paintElementId, layout = 'fill',
+  elementLabel, guides: placeGuides, onGuidesChange, guidesLocked: placeLocked, onGuidesLockedChange, paint = DEFAULT_PAINT, paintElementId, layout = 'fill',
 }, ref) {
   const { t } = useTranslation();
   const rootRef = useRef<HTMLDivElement>(null);
@@ -176,9 +187,19 @@ const CanvasEditor = forwardRef<CanvasEditorHandle, CanvasEditorProps>(function 
   const [addTool, setAddTool] = useState<{ type: string; key: string } | null>(null);
   const hasRail = !paintElementId && Object.values(types).some((type) => type.additions?.length);
   const [rulers, setRulers] = useState(rulersShown);
-  const [rulerGuides, setRulerGuides] = useState<RulerGuide[]>(() => guideMemory.get(historyKey) ?? []);
-  useEffect(() => { setRulerGuides(guideMemory.get(historyKey) ?? []); }, [historyKey]);
-  useEffect(() => { guideMemory.set(historyKey, rulerGuides); }, [historyKey, rulerGuides]);
+  // The guides as shown; while one is dragged they run ahead of the place's, which hears of the result.
+  const [rulerGuides, setRulerGuides] = useState<RulerGuide[]>(() => placeGuides ?? guideMemory.get(historyKey) ?? []);
+  useEffect(() => { if (!onGuidesChange) setRulerGuides(guideMemory.get(historyKey) ?? []); }, [historyKey, onGuidesChange]);
+  useEffect(() => { if (onGuidesChange && placeGuides) setRulerGuides(placeGuides); }, [placeGuides, onGuidesChange]);
+  const finishGuides = useCallback((next: RulerGuide[]) => {
+    if (onGuidesChange) onGuidesChange(next);
+    else guideMemory.set(historyKey, next);
+  }, [onGuidesChange, historyKey]);
+  const guidesRef = useRef(rulerGuides);
+  guidesRef.current = rulerGuides;
+  const [localLocked, setLocalLocked] = useState(false);
+  const guidesLocked = onGuidesLockedChange ? !!placeLocked : localLocked;
+  const toggleGuidesLocked = () => (onGuidesLockedChange ? onGuidesLockedChange(!guidesLocked) : setLocalLocked((v) => !v));
   const showRulers = rulers && editable && features.guides && !paintingId;
 
   // The latest props for the handlers below, which outlive a render.
@@ -516,8 +537,11 @@ const CanvasEditor = forwardRef<CanvasEditorHandle, CanvasEditorProps>(function 
       onMove: (e) => { last = e; put(at(e)); },
       onEnd: ({ cancelled }) => {
         setGesture(false);
-        if (cancelled && id) return;
-        if (cancelled || overRuler(last)) setRulerGuides((list) => list.filter((g) => g.id !== guideId));
+        // The list as last drawn, with the dragged guide where it was let go.
+        const list = guidesRef.current;
+        const next = cancelled || overRuler(last) ? list.filter((g) => g.id !== guideId) : list;
+        setRulerGuides(next);
+        finishGuides(next);
       },
     });
   };
@@ -577,7 +601,7 @@ const CanvasEditor = forwardRef<CanvasEditorHandle, CanvasEditorProps>(function 
     // The transformer's own handles.
     if (e.target.getParent() instanceof Konva.Transformer) return;
     // A ruler guide moves (its line takes the press).
-    if (e.target.hasName('canvas-ruler-guide')) {
+    if (e.target.hasName('canvas-ruler-guide') && !guidesLocked) {
       const guide = rulerGuides.find((g) => g.id === e.target.id());
       if (guide) startGuide(evt, guide.orientation, guide.id);
       return;
@@ -946,7 +970,8 @@ const CanvasEditor = forwardRef<CanvasEditorHandle, CanvasEditorProps>(function 
     arrange: doArrange, align: doAlign, distribute: doDistribute, update: updateSelected,
     zoom: view.zoom, zoomIn: () => zoomTo(view.zoom * 1.25), zoomOut: () => zoomTo(view.zoom / 1.25), fit,
     onExport, rulers: showRulers, canRulers: editable && features.guides && !paintingId,
-    toggleRulers: () => setRulers((v) => { rulersShown = !v; return !v; }), group: doGroup, ungroup: doUngroup, listOpen, toggleList: () => setListOpen((v) => !v),
+    toggleRulers: () => setRulers((v) => { rulersShown = !v; return !v; }), guidesLocked, toggleGuidesLocked,
+    group: doGroup, ungroup: doUngroup, listOpen, toggleList: () => setListOpen((v) => !v),
   };
 
   return (
@@ -1080,6 +1105,7 @@ const CanvasEditor = forwardRef<CanvasEditorHandle, CanvasEditorProps>(function 
                         stroke={RULER_GUIDE_COLOR}
                         strokeWidth={1 / view.zoom}
                         hitStrokeWidth={8 / view.zoom}
+                        listening={!guidesLocked}
                         onMouseEnter={(e) => { e.target.getStage()!.container().style.cursor = g.orientation === 'vertical' ? 'ew-resize' : 'ns-resize'; }}
                         onMouseLeave={(e) => { e.target.getStage()!.container().style.cursor = ''; }}
                       />
@@ -1102,6 +1128,19 @@ const CanvasEditor = forwardRef<CanvasEditorHandle, CanvasEditorProps>(function 
                   anchorCornerRadius={2}
                   rotateAnchorOffset={22}
                   padding={1}
+                  anchorDragBoundFunc={(_old: Konva.Vector2d, pos: Konva.Vector2d, evt: MouseEvent | undefined) => {
+                    // A handle snaps to the ruler guides and the artboard's edges and middle (Alt: freely).
+                    if (!features.guides || evt?.altKey || transformerRef.current?.getActiveAnchor() === 'rotater') return pos;
+                    const v = live.current.view;
+                    const lines = (orientation: 'vertical' | 'horizontal', size: number) =>
+                      [0, size / 2, size, ...live.current.guides.filter((g) => g.orientation === orientation).map((g) => g.at)];
+                    const snap = (value: number, stops: number[], offset: number) => {
+                      const nearest = stops.map((stop) => offset + stop * v.zoom)
+                        .reduce((best, screen) => (Math.abs(screen - value) < Math.abs(best - value) ? screen : best), Infinity);
+                      return Math.abs(nearest - value) <= GUIDE_SNAP_PX ? nearest : value;
+                    };
+                    return { x: snap(pos.x, lines('vertical', width), v.x), y: snap(pos.y, lines('horizontal', height), v.y) };
+                  }}
                   onTransformStart={() => setGesture(true)}
                   onTransform={onTransform}
                   onTransformEnd={() => { setGesture(false); commitTransform(); }}
@@ -1224,6 +1263,8 @@ export interface CanvasController {
   rulers: boolean;
   canRulers: boolean;
   toggleRulers: () => void;
+  guidesLocked: boolean;
+  toggleGuidesLocked: () => void;
   /** The selected elements as one group, and their groups dissolved. */
   group: () => void;
   ungroup: () => void;

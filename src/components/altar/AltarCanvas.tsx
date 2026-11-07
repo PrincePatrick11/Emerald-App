@@ -20,7 +20,7 @@ import { canvasImageSrc, imageSrc } from '../../lib/images';
 import { THUMBNAIL_W, canvasToCappedThumbnail } from '../../lib/thumbnail';
 import {
   CANVAS_SWATCHES, CanvasEditor, canvasToDataUrl, fullProfile, renderCanvasImage, type CanvasEditorHandle,
-  type CanvasElement, type CanvasGrid, type CanvasPaintOptions,
+  type CanvasElement, type CanvasGrid, type CanvasPaintOptions, type RulerGuide,
 } from '../editors/canvas';
 
 /**
@@ -241,8 +241,10 @@ export function AltarCanvas({ altar, backgroundSrc, editable, readAlign, onExpor
 }) {
   const placements = useAltarStore((s) => s.placements);
   const selectedPlacementIds = useAltarStore((s) => s.selectedPlacementIds);
-  const { placeItem, applyPlacements, selectPlacements } = useAltarStore(
-    useShallow((s) => ({ placeItem: s.placeItem, applyPlacements: s.applyPlacements, selectPlacements: s.selectPlacements })),
+  const { placeItem, applyPlacements, selectPlacements, updateAltarGuides } = useAltarStore(
+    useShallow((s) => ({
+      placeItem: s.placeItem, applyPlacements: s.applyPlacements, selectPlacements: s.selectPlacements, updateAltarGuides: s.updateAltarGuides,
+    })),
   );
   const editorRef = useRef<CanvasEditorHandle>(null);
 
@@ -256,6 +258,19 @@ export function AltarCanvas({ altar, backgroundSrc, editable, readAlign, onExpor
     () => placements.map((p) => placementToElement(p, refW, refH, elementImageSrc)),
     [placements, refW, refH],
   );
+  // Guides are stored in percent of the altar, so they keep their place when the resolution changes.
+  const guides = useMemo(
+    () => altar.guides.map((g) => ({ ...g, at: (g.at / 100) * (g.orientation === 'vertical' ? refW : refH) })),
+    [altar.guides, refW, refH],
+  );
+  const onGuidesChange = useCallback((next: RulerGuide[]) => {
+    const stored = next.map((g) => ({ ...g, at: (g.at / (g.orientation === 'vertical' ? refW : refH)) * 100 }));
+    void updateAltarGuides(altar.id, { guides: stored }).catch(console.error);
+  }, [updateAltarGuides, altar.id, refW, refH]);
+  const onGuidesLockedChange = useCallback((locked: boolean) => {
+    void updateAltarGuides(altar.id, { guides_locked: locked }).catch(console.error);
+  }, [updateAltarGuides, altar.id]);
+
   /** Library items by their name in the element list. */
   const elementLabel = useCallback(
     (el: CanvasElement) => (el.type === 'image' ? placements.find((p) => p.id === el.id)?.name : null),
@@ -321,6 +336,10 @@ export function AltarCanvas({ altar, backgroundSrc, editable, readAlign, onExpor
       createId={generateId}
       onExport={onExport}
       elementLabel={elementLabel}
+      guides={guides}
+      onGuidesChange={onGuidesChange}
+      guidesLocked={altar.guides_locked}
+      onGuidesLockedChange={onGuidesLockedChange}
       background={<div className="h-full w-full" style={{ background: getAltarBackgroundStyle(altar, backgroundSrc) }} />}
       overlay={editable && dragItem ? (
         <>

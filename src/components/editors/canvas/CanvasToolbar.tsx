@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import {
   AlignHorizontalDistributeCenter, AlignHorizontalJustifyCenter, AlignHorizontalJustifyEnd,
   AlignHorizontalJustifyStart, AlignVerticalDistributeCenter, AlignVerticalJustifyCenter, AlignVerticalJustifyEnd,
-  AlignVerticalJustifyStart, ArrowDown, ArrowUp, BringToFront, Copy, Group, ImageDown, Layers, Layers2, MousePointer2, Redo2, Ruler, SendToBack, Trash2, Undo2,
+  AlignVerticalJustifyStart, ArrowDown, ArrowUp, BringToFront, Copy, Group, ImageDown, Layers, Layers2, Lock, LockOpen, MousePointer2, Redo2, Ruler, SendToBack, Trash2, Undo2,
   Ungroup, ZoomIn, ZoomOut,
 } from 'lucide-react';
 import { ToolbarBtn, ToolbarDivider, ToolbarGroup } from '../shared/toolbarParts';
@@ -115,6 +115,15 @@ export default function CanvasToolbar({ controller: c, end }: { controller: Canv
       <div className="editor-toolbar-end">
         {c.canRulers && (
           <ToolbarBtn onClick={c.toggleRulers} active={c.rulers} title={t('canvas.rulers')}><Ruler size={14} /></ToolbarBtn>
+        )}
+        {c.rulers && (
+          <ToolbarBtn
+            onClick={c.toggleGuidesLocked}
+            active={c.guidesLocked}
+            title={t(c.guidesLocked ? 'canvas.unlockGuides' : 'canvas.lockGuides')}
+          >
+            {c.guidesLocked ? <Lock size={14} /> : <LockOpen size={14} />}
+          </ToolbarBtn>
         )}
         {f.layers && (
           <ToolbarBtn onClick={c.toggleList} active={c.listOpen} title={t('canvas.layers.title')}><Layers size={14} /></ToolbarBtn>
