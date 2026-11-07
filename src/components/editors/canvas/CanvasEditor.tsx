@@ -31,6 +31,7 @@ import { emptyPaintDoc, type PaintDoc } from '../../../lib/paint/document';
 import { ToolbarBtn } from '../shared/toolbarParts';
 import { Check, Keyboard } from 'lucide-react';
 import ShortcutOverview from './ShortcutOverview';
+import ExportDialog, { type CanvasExportOptions } from './ExportDialog';
 import ContextMenu from '../../ui/ContextMenu';
 import { canvasMenuActions } from './CanvasContextMenu';
 
@@ -88,8 +89,12 @@ export interface CanvasEditorProps {
   createId?: () => string;
   /** Opening an element whose type has no typing in place (double-click or Enter), e.g. in an editor of its own. */
   onEditElement?: (element: CanvasElement) => void;
-  /** Saving as an image, offered in the toolbar when given and `features.export` is on. */
-  onExport?: () => void;
+  /**
+   * Saving as a picture, offered in the toolbar when given and
+   * `features.export` is on: the editor asks format, area, size and
+   * background (`ExportDialog`), the place renders and saves.
+   */
+  onExport?: (options: CanvasExportOptions) => void;
   /** Drawn over the viewport, e.g. a hint while something is dragged in. */
   overlay?: ReactNode;
   /** Extra controls at the end of the toolbar. */
@@ -184,6 +189,8 @@ const CanvasEditor = forwardRef<CanvasEditorHandle, CanvasEditorProps>(function 
   const [draft, setDraft] = useState<CanvasElement | null>(null);
   /** The overview of the keys, open or not. */
   const [keysOpen, setKeysOpen] = useState(false);
+  /** The export dialog, open or not. */
+  const [exportOpen, setExportOpen] = useState(false);
   /** The right-click menu: where it opened, on screen and on the artboard, and a locked element it was opened on. */
   const [menu, setMenu] = useState<{ x: number; y: number; at: { x: number; y: number }; locked: CanvasElement | null } | null>(null);
   const [editingTextId, setEditingTextId] = useState<string | null>(null);
@@ -890,7 +897,7 @@ const CanvasEditor = forwardRef<CanvasEditorHandle, CanvasEditorProps>(function 
 
   const onKeyDown = (e: React.KeyboardEvent) => {
     // While the keys' overview is open the keys are its (Escape closes it), even with the focus still here.
-    if (!editable || editingTextId || keysOpen) return;
+    if (!editable || editingTextId || keysOpen || exportOpen) return;
     const target = e.target as HTMLElement;
     // Keys in the editor's menus and windows, which are portals, reach here through React too.
     if (!rootRef.current?.contains(target)) return;
@@ -1051,7 +1058,7 @@ const CanvasEditor = forwardRef<CanvasEditorHandle, CanvasEditorProps>(function 
     undo: history.undo, redo: history.redo, tool: addTool, setTool: setAddTool, removeSelected, duplicate,
     arrange: doArrange, align: doAlign, distribute: doDistribute, update: updateSelected,
     zoom: view.zoom, zoomIn: () => zoomTo(view.zoom * 1.25), zoomOut: () => zoomTo(view.zoom / 1.25), fit,
-    onExport, rulers: showRulers, canRulers: editable && features.guides && !paintingId,
+    onExport: onExport ? () => setExportOpen(true) : undefined, rulers: showRulers, canRulers: editable && features.guides && !paintingId,
     toggleRulers: () => setRulers((v) => { rulersShown = !v; return !v; }), guidesLocked, toggleGuidesLocked,
     group: doGroup, ungroup: doUngroup, listOpen, toggleList: () => setListOpen((v) => !v),
   };
@@ -1332,6 +1339,15 @@ const CanvasEditor = forwardRef<CanvasEditorHandle, CanvasEditorProps>(function 
           types={types}
           canLeavePaint={!paintElementId}
           onClose={() => { setKeysOpen(false); rootRef.current?.focus({ preventScroll: true }); }}
+        />
+      )}
+      {exportOpen && onExport && (
+        <ExportDialog
+          artboard={{ width, height }}
+          selection={selectionBounds}
+          hasBackground={!!background}
+          onExport={onExport}
+          onClose={() => { setExportOpen(false); rootRef.current?.focus({ preventScroll: true }); }}
         />
       )}
       {menu && editable && (

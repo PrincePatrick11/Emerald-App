@@ -2689,6 +2689,43 @@ html[data-theme] .prop-segment--active {
   background: var(--well-solid);
   box-shadow: inset -1px -1px 0 var(--edge-strong);
 }
+/* The canvas editor's export dialog: a label, then its segments or fields. */
+.canvas-export-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+.canvas-export-label { flex-shrink: 0; }
+.canvas-export-segment {
+  width: auto;
+  min-width: 2.75rem;
+  padding: 0 0.6rem;
+  font-size: 12px;
+}
+.canvas-export-hint {
+  margin-top: -0.25rem;
+  font-size: 12px;
+  color: var(--text-subtle);
+}
+.canvas-export-size {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-muted);
+}
+.canvas-export-size input {
+  width: 5.5rem;
+  height: 28px;
+  padding: 0 8px;
+  border: 1px solid var(--field-border);
+  border-radius: 6px;
+  background: var(--field-inset-bg);
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+}
 /* The overview of the canvas editor's keys: sections in two columns, each row what it does and its keys. */
 .canvas-keys {
   columns: 2 300px;

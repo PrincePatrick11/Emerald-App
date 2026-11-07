@@ -34,7 +34,7 @@ import { AltarItemModal } from '../altar/AltarItemModal';
 import { AltarLibrarySection } from '../altar/AltarLibrarySection';
 import { AltarCard, AltarListRow, buildAltarContextMenuActions } from '../altar/AltarCard';
 import { imageSrc } from '../../lib/images';
-import { saveAltarImage } from '../../lib/altarExport';
+import { saveAltarPicture } from '../../lib/altarExport';
 import { useSessionState } from '../../store/sessionStore';
 import { createItem } from '../../lib/createItem';
 
@@ -490,7 +490,7 @@ export default function AltarView() {
           backgroundSrc={backgroundSrc || null}
           editable={isEditing}
           readAlign={altarWindowFullscreen ? 'center' : 'top'}
-          onExport={() => { void saveAltarImage('png').catch(console.error); }}
+          onExport={(options) => { void saveAltarPicture(options).catch(console.error); }}
         />
       </div>
 

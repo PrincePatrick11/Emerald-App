@@ -19,7 +19,8 @@ import { AltarItemVisual } from './AltarItemVisual';
 import { canvasImageSrc, imageSrc } from '../../lib/images';
 import { THUMBNAIL_W, canvasToCappedThumbnail } from '../../lib/thumbnail';
 import {
-  CANVAS_SWATCHES, CanvasEditor, canvasToDataUrl, fullProfile, renderCanvasImage, type CanvasEditorHandle,
+  CANVAS_SWATCHES, CanvasEditor, canvasToDataUrl, fullProfile, renderCanvasImage, renderCanvasSvg, type CanvasEditorHandle,
+  type CanvasExportOptions,
   type CanvasElement, type CanvasGrid, type CanvasPaintOptions, type RulerGuide,
 } from '../editors/canvas';
 
@@ -146,23 +147,37 @@ async function _drawBackground(ctx: CanvasRenderingContext2D, altar: AltarRecord
   }
 }
 
+/** What the altar renderers take: the elements with readable pictures, the background, the size. */
+async function _altarRenderOptions(
+  altar: AltarRecord,
+  backgroundSrc: string | null,
+  placements: AltarPlacement[],
+  outW: number,
+  options: Pick<CanvasExportOptions, 'region' | 'background'> = { region: null, background: true },
+) {
+  const { w: refW, h: refH } = resolveResolutionPixels(altar.resolution ?? DEFAULT_ALTAR_RESOLUTION);
+  // The items' pictures as data URLs, not the on-screen `emerald-img` ones, so `toBlob` can read the canvas.
+  const sources = new Map(await Promise.all(placements.map(async (p) => [p.id, (await canvasImageSrc(p.image_data)) || null] as const)));
+  return {
+    types: ALTAR_PROFILE.types,
+    width: refW,
+    height: refH,
+    elements: placements.map((p) => placementToElement(p, refW, refH, () => sources.get(p.id) ?? null)),
+    outWidth: outW,
+    region: options.region ?? undefined,
+    drawBackground: options.background
+      ? (ctx: CanvasRenderingContext2D, w: number, h: number) => _drawBackground(ctx, altar, backgroundSrc, w, h)
+      : undefined,
+  };
+}
+
 async function _renderAltar(
   altar: AltarRecord,
   backgroundSrc: string | null,
   placements: AltarPlacement[],
   outW: number,
 ): Promise<HTMLCanvasElement | null> {
-  const { w: refW, h: refH } = resolveResolutionPixels(altar.resolution ?? DEFAULT_ALTAR_RESOLUTION);
-  // The items' pictures as data URLs, not the on-screen `emerald-img` ones, so `toBlob` can read the canvas.
-  const sources = new Map(await Promise.all(placements.map(async (p) => [p.id, (await canvasImageSrc(p.image_data)) || null] as const)));
-  return renderCanvasImage({
-    types: ALTAR_PROFILE.types,
-    width: refW,
-    height: refH,
-    elements: placements.map((p) => placementToElement(p, refW, refH, () => sources.get(p.id) ?? null)),
-    outWidth: outW,
-    drawBackground: (ctx, w, h) => _drawBackground(ctx, altar, backgroundSrc, w, h),
-  });
+  return renderCanvasImage(await _altarRenderOptions(altar, backgroundSrc, placements, outW));
 }
 
 /** The active altar with its background as `canvasImageSrc` gives it. */
@@ -189,6 +204,40 @@ export async function exportCurrentAltarImage(format: 'jpeg' | 'png' | 'webp' = 
     console.error('[exportCurrentAltarImage]', err);
     return null;
   }
+}
+
+/** UTF-8 text as a base64 data URL of the given type. */
+function textDataUrl(text: string, mime: string): string {
+  const bytes = new TextEncoder().encode(text);
+  let binary = '';
+  for (let i = 0; i < bytes.length; i += 0x8000) binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  return `data:${mime};base64,${btoa(binary)}`;
+}
+
+/**
+ * The active altar as the canvas editor's export dialog asks for it: PNG,
+ * JPEG (on white where nothing is drawn) or SVG, all of it or a region, at a
+ * width, with its background or without. A data URL, or `null`.
+ */
+export async function exportAltarPicture(options: CanvasExportOptions): Promise<string | null> {
+  const active = await activeAltarForRender();
+  if (!active) return null;
+  const render = await _altarRenderOptions(active.altar, active.backgroundSrc, active.placements, options.width, options);
+  if (options.format === 'svg') return textDataUrl(await renderCanvasSvg(render), 'image/svg+xml');
+  const canvas = await renderCanvasImage(render);
+  if (!canvas) return null;
+  if (options.format === 'jpeg') {
+    const flat = document.createElement('canvas');
+    flat.width = canvas.width;
+    flat.height = canvas.height;
+    const ctx = flat.getContext('2d');
+    if (!ctx) return null;
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, flat.width, flat.height);
+    ctx.drawImage(canvas, 0, 0);
+    return canvasToDataUrl(flat, 'image/jpeg', 0.95);
+  }
+  return canvasToDataUrl(canvas, 'image/png');
 }
 
 /** Reads the active altar from the store and renders its thumbnail.
@@ -236,8 +285,8 @@ export function AltarCanvas({ altar, backgroundSrc, editable, readAlign, onExpor
   editable: boolean;
   /** Where the altar sits while reading: at the top of the view, or (fullscreen) in the middle. */
   readAlign: 'top' | 'center';
-  /** Saving the altar as an image, from the canvas editor's toolbar. */
-  onExport?: () => void;
+  /** Saving the altar as a picture, from the canvas editor's export dialog. */
+  onExport?: (options: CanvasExportOptions) => void;
 }) {
   const placements = useAltarStore((s) => s.placements);
   const selectedPlacementIds = useAltarStore((s) => s.selectedPlacementIds);

@@ -5,6 +5,7 @@ import { ToolbarGroup, ToolbarStepper } from '../../shared/toolbarParts';
 import { MAX_SIDES, MIN_SIDES } from '../../../../lib/paint/document';
 import { polygonPoints } from '../paint/render';
 import type { CanvasAddition, CanvasElement, CanvasElementType } from '../types';
+import { SvgPath, attrs, type PathSink } from '../svg';
 import { ColorPanel, NumberField, common } from './controlParts';
 
 /** The shapes that can be added, the same as the paint mode's. */
@@ -40,8 +41,14 @@ export function shapeSides(props: Pick<ShapeProps, 'shape' | 'sides'>): number |
   }
 }
 
+/** Where a shape's outline goes: a canvas context, or an `SvgPath`. */
+type ShapePathTarget = PathSink & {
+  beginPath(): void;
+  roundRect(x: number, y: number, w: number, h: number, r: number): void;
+};
+
 /** The outline of a shape in its box, as a path on `ctx`. */
-export function shapePath(ctx: CanvasRenderingContext2D, props: Pick<ShapeProps, 'shape' | 'cornerRadius' | 'sides'>, w: number, h: number): void {
+export function shapePath(ctx: ShapePathTarget, props: Pick<ShapeProps, 'shape' | 'cornerRadius' | 'sides'>, w: number, h: number): void {
   ctx.beginPath();
   switch (props.shape) {
     case 'rect': {
@@ -178,6 +185,16 @@ export const shapeType: CanvasElementType<ShapeProps> = {
       ctx.lineJoin = 'round';
       ctx.stroke();
     }
+  },
+  svg: (el) => {
+    const p = el.props;
+    const path = new SvgPath();
+    shapePath(path, p, el.width, el.height);
+    const outline = !!p.stroke && p.strokeWidth > 0;
+    return `<path${attrs({
+      d: path.d, fill: p.fill ?? 'none', stroke: outline ? p.stroke : null,
+      'stroke-width': outline ? p.strokeWidth : null, 'stroke-linejoin': outline ? 'round' : null,
+    })}/>`;
   },
   scaled: (el, sx, sy) => ({
     props: { ...el.props, strokeWidth: el.props.strokeWidth * Math.sqrt(sx * sy), cornerRadius: el.props.cornerRadius * Math.min(sx, sy) },

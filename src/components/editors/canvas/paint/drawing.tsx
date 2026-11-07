@@ -3,7 +3,8 @@ import {
   emptyPaintDoc, PAINT_HEIGHT, PAINT_WIDTH, type PaintDoc,
 } from '../../../../lib/paint/document';
 import type { CanvasElement, CanvasElementType } from '../types';
-import { drawPaintDoc, layerImageRefs } from './render';
+import { drawPaintDoc, layerImageRefs, paintDocSvg } from './render';
+import { attrs } from '../svg';
 
 /** A drawing: a paint document in the element's box. */
 export interface DrawingProps {
@@ -67,6 +68,13 @@ export function createDrawingType({ resolveImage = (ref) => ref }: DrawingTypeOp
       const pxW = Math.max(1, Math.min(4096, Math.round(el.width * zoom)));
       const pxH = Math.max(1, Math.min(4096, Math.round(el.height * zoom)));
       ctx.drawImage(picture(el.props.doc, images, pxW, pxH), 0, 0, el.width, el.height);
+    },
+    svg: (el, env) => {
+      const body = paintDocSvg(el.props.doc, (ref) => env.href(resolveImage(ref)), env.id, env.defs);
+      // The document's units scaled into the box; outside it nothing shows, as on the stage.
+      const clip = env.id();
+      env.defs.push(`<clipPath id="${clip}"><rect${attrs({ width: el.width, height: el.height })}/></clipPath>`);
+      return `<g clip-path="url(#${clip})"><g transform="scale(${el.width / PAINT_WIDTH} ${el.height / PAINT_HEIGHT})">${body}</g></g>`;
     },
     paint: {
       get: (el) => el.props.doc,

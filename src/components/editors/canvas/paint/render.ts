@@ -1,4 +1,5 @@
 import { getStroke } from 'perfect-freehand';
+import { SvgPath, attrs, esc, type PathSink } from '../svg';
 import { isBoxShape, isShapeTool, PAINT_HEIGHT, PAINT_WIDTH, type PaintDoc, type PaintLayer, type PaintStroke } from '../../../../lib/paint/document';
 
 /**
@@ -37,8 +38,7 @@ function triples(points: readonly number[]): number[][] {
 }
 
 /** The outline as a closed path of quadratic curves through the midpoints (perfect-freehand's README). */
-function outlinePath(outline: number[][]): Path2D {
-  const path = new Path2D();
+function outlinePath<T extends PathSink>(outline: number[][], path: T): T {
   if (outline.length < 2) return path;
   const [first, second] = outline;
   path.moveTo(first[0], first[1]);
@@ -68,8 +68,9 @@ export function polygonPoints(tool: 'polygon' | 'star', sides: number, cx: numbe
  * The shape between two corners (or the two ends of a line), a box shape
  * turned by `rotation` around its centre; a polygon or star has `sides`.
  */
-export function shapePath(tool: PaintStroke['tool'], points: readonly number[], rotation = 0, sides = 5): Path2D {
-  const path = new Path2D();
+export function shapePath<T extends PathSink = Path2D>(
+  tool: PaintStroke['tool'], points: readonly number[], rotation = 0, sides = 5, path: T = new Path2D() as unknown as T,
+): T {
   const [x0, y0, , x1 = x0, y1 = y0] = points;
   if (tool === 'polygon' || tool === 'star') {
     const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2, cos = Math.cos(rotation), sin = Math.sin(rotation);
@@ -105,8 +106,7 @@ const SHARP_TURN = 0.9;
  * A fill's outlines as one path, smoothed by curves through the midpoints of
  * their edges; a sharp corner (a square's, a star's tip) stays a corner.
  */
-function ringsPath(rings: readonly number[][]): Path2D {
-  const path = new Path2D();
+function ringsPath<T extends PathSink>(rings: readonly number[][], path: T): T {
   for (const ring of rings) {
     const n = ring.length / 2;
     if (n < 3) continue;
@@ -140,13 +140,56 @@ export function strokePath(stroke: PaintStroke, live = false): Path2D {
     const cached = paths.get(stroke);
     if (cached) return cached;
   }
-  const path = stroke.tool === 'fill'
-    ? ringsPath(stroke.rings)
-    : isShapeTool(stroke.tool)
-    ? shapePath(stroke.tool, stroke.points, stroke.rotation, stroke.sides)
-    : outlinePath(getStroke(triples(stroke.points), freehandOptions(stroke, !live)));
+  const path = buildStrokePath(stroke, new Path2D(), live);
   if (!live) paths.set(stroke, path);
   return path;
+}
+
+function buildStrokePath<T extends PathSink>(stroke: PaintStroke, path: T, live = false): T {
+  return stroke.tool === 'fill'
+    ? ringsPath(stroke.rings, path)
+    : isShapeTool(stroke.tool)
+    ? shapePath(stroke.tool, stroke.points, stroke.rotation, stroke.sides, path)
+    : outlinePath(getStroke(triples(stroke.points), freehandOptions(stroke, !live)), path);
+}
+
+/**
+ * The document as SVG content in its own units (`PAINT_WIDTH` × `PAINT_HEIGHT`),
+ * hidden layers left out: each layer a group with its opacity, its image and
+ * its strokes as paths. An eraser stroke masks what its layer has before it,
+ * so it cuts that layer only, as on the canvas. `href` gives a layer image's
+ * source to embed (`null` leaves it out); `id` makes ids unique in the file;
+ * masks go into `defs`.
+ */
+export function paintDocSvg(doc: PaintDoc, href: (ref: string) => string | null, id: () => string, defs: string[]): string {
+  const out: string[] = [];
+  for (const layer of doc.layers) {
+    if (layer.hidden) continue;
+    let body = '';
+    const image = layer.image ? href(layer.image) : null;
+    if (image) {
+      const r = layer.imageRect;
+      body += `<image${attrs({ href: image, x: r.x, y: r.y, width: r.width, height: r.height, preserveAspectRatio: 'none' })}/>`;
+    }
+    for (const stroke of layer.strokes) {
+      const d = buildStrokePath(stroke, new SvgPath()).d;
+      if (!d) continue;
+      if (stroke.tool === 'eraser') {
+        const mask = id();
+        defs.push(`<mask id="${mask}" maskUnits="userSpaceOnUse"${attrs({ x: 0, y: 0, width: PAINT_WIDTH, height: PAINT_HEIGHT })}>`
+          + `<rect${attrs({ width: PAINT_WIDTH, height: PAINT_HEIGHT, fill: '#fff' })}/><path d="${esc(d)}" fill="#000"/></mask>`);
+        body = `<g mask="url(#${mask})">${body}</g>`;
+      } else if (stroke.tool === 'fill' || (isBoxShape(stroke.tool) && stroke.filled)) {
+        body += `<path${attrs({ d, fill: stroke.color, 'fill-rule': 'evenodd' })}/>`;
+      } else if (isShapeTool(stroke.tool)) {
+        body += `<path${attrs({ d, fill: 'none', stroke: stroke.color, 'stroke-width': stroke.size, 'stroke-linecap': 'round', 'stroke-linejoin': 'round' })}/>`;
+      } else {
+        body += `<path${attrs({ d, fill: stroke.color })}/>`;
+      }
+    }
+    if (body) out.push(`<g${attrs({ opacity: layer.opacity < 1 ? layer.opacity : null })}>${body}</g>`);
+  }
+  return out.join('');
 }
 
 export function drawStroke(ctx: CanvasRenderingContext2D, stroke: PaintStroke, live = false): void {

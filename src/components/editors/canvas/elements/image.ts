@@ -1,4 +1,5 @@
 import type { CanvasElement, CanvasElementType } from '../types';
+import { attrs, esc } from '../svg';
 
 /** A picture, contained in its box; without a loaded source, the emoji. */
 export interface ImageProps {
@@ -30,6 +31,22 @@ export const imageType: CanvasElementType<ImageProps> = {
   handles: 'corners',
   sources: (el) => [el.props.src],
   animated: (el) => !!el.props.glow,
+  svg: (el, env) => {
+    const { width: w, height: h } = el;
+    let glow: string | null = null;
+    if (el.props.glow) {
+      glow = env.id();
+      // The canvas's shadowBlur is about twice the Gaussian's deviation.
+      env.defs.push(`<filter id="${glow}" x="-50%" y="-50%" width="200%" height="200%"><feDropShadow dx="0" dy="0"${attrs({ stdDeviation: Math.max(w, h) * 0.06 })} flood-color="#ff8c00"/></filter>`);
+    }
+    const filter = glow ? `url(#${glow})` : null;
+    const href = el.props.src ? env.href(el.props.src) : null;
+    if (href) return `<image${attrs({ href, width: w, height: h, preserveAspectRatio: 'xMidYMid meet', filter })}/>`;
+    return `<text${attrs({
+      x: w / 2, y: h / 2, 'font-size': Math.round(Math.max(w, h) * 0.8), 'font-family': 'serif',
+      'text-anchor': 'middle', 'dominant-baseline': 'central', filter,
+    })}>${esc(el.props.emoji)}</text>`;
+  },
   draw: (ctx, el, env) => {
     const { width: w, height: h } = el;
     if (el.props.glow) {

@@ -602,6 +602,22 @@
     }
   },
   "canvas": {
+    "exportDialog": {
+      "title": "Als Bild speichern",
+      "save": "Speichern …",
+      "format": "Format",
+      "svgHint": "Formen, Text und Zeichnungen bleiben Vektoren; Bilder und Hintergrund werden eingebettet.",
+      "area": "Bereich",
+      "all": "Ganze Leinwand",
+      "selection": "Auswahl",
+      "size": "Größe",
+      "pixels": "Pixel",
+      "displaySize": "Anzeigegröße",
+      "width": "Breite",
+      "height": "Höhe",
+      "background": "Hintergrund",
+      "jpegBackground": "Ein JPEG kennt keine Transparenz."
+    },
     "keys": {
       "open": "Tastenkürzel (?)",
       "title": "Tastenkürzel",
@@ -701,7 +717,7 @@
     "zoomIn": "Vergrößern",
     "zoomOut": "Verkleinern",
     "fit": "Einpassen",
-    "export": "Als PNG speichern",
+    "export": "Als Bild speichern …",
     "image": "Bild",
     "element": "Element",
     "layers": {

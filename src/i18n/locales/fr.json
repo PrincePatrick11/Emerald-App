@@ -602,6 +602,22 @@
     }
   },
   "canvas": {
+    "exportDialog": {
+      "title": "Enregistrer comme image",
+      "save": "Enregistrer…",
+      "format": "Format",
+      "svgHint": "Formes, texte et dessins restent vectoriels ; les images et le fond sont intégrés.",
+      "area": "Zone",
+      "all": "Tout le canevas",
+      "selection": "Sélection",
+      "size": "Taille",
+      "pixels": "Pixels",
+      "displaySize": "Taille d’affichage",
+      "width": "Largeur",
+      "height": "Hauteur",
+      "background": "Fond",
+      "jpegBackground": "Un JPEG ne connaît pas la transparence."
+    },
     "keys": {
       "open": "Raccourcis clavier (?)",
       "title": "Raccourcis clavier",
@@ -701,7 +717,7 @@
     "zoomIn": "Zoom avant",
     "zoomOut": "Zoom arrière",
     "fit": "Ajuster à la vue",
-    "export": "Enregistrer en PNG",
+    "export": "Enregistrer comme image…",
     "image": "Image",
     "element": "Élément",
     "layers": {

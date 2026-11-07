@@ -295,13 +295,13 @@ async fn write_file(app: tauri::AppHandle, path: String, content: String) -> Res
 }
 
 /// Exports a base64 data-URL image to a user-chosen path on disk.
-/// Only .png, .jpg, .jpeg, and .webp extensions are permitted.
+/// Only .png, .jpg, .jpeg, .webp and .svg extensions are permitted.
 /// Path must resolve to within the allowed user directories.
 #[tauri::command]
 async fn export_image(app: tauri::AppHandle, path: String, data_url: String) -> Result<(), String> {
     tauri::async_runtime::spawn_blocking(move || {
         let ext = ext_for_path(&path);
-        if !matches!(ext.as_str(), "png" | "jpg" | "jpeg" | "webp") {
+        if !matches!(ext.as_str(), "png" | "jpg" | "jpeg" | "webp" | "svg") {
             return Err("unsupported file type".to_string());
         }
 

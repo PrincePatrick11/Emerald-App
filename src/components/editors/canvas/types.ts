@@ -65,6 +65,16 @@ export interface CanvasDrawEnv {
   time: number | null;
 }
 
+/** What a type gets for writing itself as SVG, besides the element. */
+export interface CanvasSvgEnv {
+  /** One of the sources the type named (`sources`) as a reference to embed, a data URL; `null` if it did not load. */
+  href: (src: string) => string | null;
+  /** A fresh id, unique in the file, for a mask, filter or gradient. */
+  id: () => string;
+  /** Where masks, filters and gradients go. */
+  defs: string[];
+}
+
 /** A tool of the tool column: what a type can put on the artboard. */
 export interface CanvasAddition<P = unknown> {
   key: string;
@@ -95,6 +105,12 @@ export interface CanvasElementType<P = unknown> {
   label?: (el: CanvasElement<P>, t: TFunction) => string;
   /** Draws `el` with its box's top-left corner at the origin; frame, rotation and opacity are the canvas editor's. */
   draw: (ctx: CanvasRenderingContext2D, el: CanvasElement<P>, env: CanvasDrawEnv) => void;
+  /**
+   * The element as SVG content in its box (top-left corner at the origin;
+   * frame, rotation and opacity are the export's), for saving as SVG with
+   * vectors. Without it, or with `null`, the export embeds the drawn picture.
+   */
+  svg?: (el: CanvasElement<P>, env: CanvasSvgEnv) => string | null;
   /** The picture sources it draws from; the canvas editor loads them and redraws when they arrive. */
   sources?: (el: CanvasElement<P>) => (string | null)[];
   /** Fonts it draws with (CSS `font` strings); the canvas editor loads them before drawing. */

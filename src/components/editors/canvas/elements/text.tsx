@@ -3,6 +3,7 @@ import { AlignCenter, AlignLeft, AlignRight, Bold, Italic, Type } from 'lucide-r
 import PopoverButton from '../../shared/PopoverButton';
 import { ToolbarBtn, ToolbarGroup } from '../../shared/toolbarParts';
 import type { CanvasElement, CanvasElementType } from '../types';
+import { attrs, esc } from '../svg';
 import { ColorPanel, NumberField, common } from './controlParts';
 
 export const CANVAS_FONTS = ['serif', 'book', 'sans'] as const;
@@ -172,6 +173,18 @@ export const textType: CanvasElementType<TextProps> = {
     ctx.textAlign = p.align;
     const x = p.align === 'left' ? 0 : p.align === 'right' ? el.width : el.width / 2;
     layoutText(p, el.width).forEach((line, i) => ctx.fillText(line, x, i * lineHeight + lineHeight / 2));
+  },
+  svg: (el) => {
+    const p = el.props;
+    const lineHeight = p.fontSize * TEXT_LINE_HEIGHT;
+    const x = p.align === 'left' ? 0 : p.align === 'right' ? el.width : el.width / 2;
+    const lines = layoutText(p, el.width).map((line, i) =>
+      `<text${attrs({ x, y: i * lineHeight + lineHeight / 2 })}>${esc(line)}</text>`).join('');
+    return `<g${attrs({
+      'font-family': FONT_FAMILIES[p.font], 'font-size': p.fontSize, 'font-weight': p.bold ? 600 : 400,
+      'font-style': p.italic ? 'italic' : null, fill: p.color, 'dominant-baseline': 'central',
+      'text-anchor': p.align === 'left' ? 'start' : p.align === 'right' ? 'end' : 'middle', 'xml:space': 'preserve',
+    })}>${lines}</g>`;
   },
   fitHeight: (el) => textHeight(el.props, el.width),
   fonts: (el) => [fontString(el.props)],

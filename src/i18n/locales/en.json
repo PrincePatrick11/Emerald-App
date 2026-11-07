@@ -602,6 +602,22 @@
     }
   },
   "canvas": {
+    "exportDialog": {
+      "title": "Save as picture",
+      "save": "Save…",
+      "format": "Format",
+      "svgHint": "Shapes, text and drawings stay vectors; pictures and the background are embedded.",
+      "area": "Area",
+      "all": "Whole canvas",
+      "selection": "Selection",
+      "size": "Size",
+      "pixels": "Pixels",
+      "displaySize": "Display size",
+      "width": "Width",
+      "height": "Height",
+      "background": "Background",
+      "jpegBackground": "A JPEG has no transparency."
+    },
     "keys": {
       "open": "Keyboard shortcuts (?)",
       "title": "Keyboard shortcuts",
@@ -701,7 +717,7 @@
     "zoomIn": "Zoom in",
     "zoomOut": "Zoom out",
     "fit": "Fit to view",
-    "export": "Save as PNG",
+    "export": "Save as picture…",
     "image": "Image",
     "element": "Element",
     "layers": {

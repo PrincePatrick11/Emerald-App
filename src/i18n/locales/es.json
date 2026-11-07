@@ -602,6 +602,22 @@
     }
   },
   "canvas": {
+    "exportDialog": {
+      "title": "Guardar como imagen",
+      "save": "Guardar…",
+      "format": "Formato",
+      "svgHint": "Formas, texto y dibujos quedan como vectores; las imágenes y el fondo se incrustan.",
+      "area": "Área",
+      "all": "Todo el lienzo",
+      "selection": "Selección",
+      "size": "Tamaño",
+      "pixels": "Píxeles",
+      "displaySize": "Tamaño de visualización",
+      "width": "Ancho",
+      "height": "Alto",
+      "background": "Fondo",
+      "jpegBackground": "Un JPEG no admite transparencia."
+    },
     "keys": {
       "open": "Atajos de teclado (?)",
       "title": "Atajos de teclado",
@@ -701,7 +717,7 @@
     "zoomIn": "Acercar",
     "zoomOut": "Alejar",
     "fit": "Ajustar a la vista",
-    "export": "Guardar como PNG",
+    "export": "Guardar como imagen…",
     "image": "Imagen",
     "element": "Elemento",
     "layers": {
