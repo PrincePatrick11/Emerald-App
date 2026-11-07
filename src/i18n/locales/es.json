@@ -1247,6 +1247,7 @@
     "errorInsecure": "Esta dirección no es segura. Usa https, o http solo en este equipo, en una red privada o en una tailnet.",
     "errorOutdated": "El vault del servidor es de una versión más reciente de Emerald. Actualiza esta aplicación.",
     "errorServerOutdated": "Este servidor es demasiado antiguo. Hay que actualizarlo a la versión 0.1.1 o posterior.",
+    "errorAppOutdated": "Este servidor necesita una versión más reciente de Emerald. Actualiza esta aplicación.",
     "errorServerOlder": "El vault del servidor es de una versión anterior de Emerald. Actualiza primero el dispositivo que lo puso allí.",
     "errorCannotOpen": "Lo que envió el servidor no se puede abrir con la clave de este vault.",
     "errorFailed": "La sincronización ha fallado.",

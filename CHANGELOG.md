@@ -6,6 +6,7 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased] (targeting v0.2.0)
 
 ### Added
+- **Sync through Emerald Server.** A vault can be put on a self-hosted server that only sees ciphertext and syncs with the other devices from there: changes, images and settings, merged on the devices, with live updates and an automatic backup before a vault is replaced. App and server agree on a protocol when they connect, so either can be updated first; a server that is too old, or needs a newer app, says so.
 - **A start page.** The vault picker grew into the app's home screen: the vaults on the left, and on the right one section at a time — Server, Appearance (language and theme, custom themes included), Updates (check, install, update source) and About. Emerald → About Emerald App and the new Check for Updates… open it there, as does the update dot on the gear. Settings lost their Updates and About pages and the language and theme choices.
 - **Headings fold:** a chevron beside a heading hides everything under it up to the next heading of the same level, while reading and editing.
 - **Collapsible sections** from the `/` menu: a heading line that opens and closes the text under it, also while reading. The PDF export prints them open.

@@ -16,6 +16,7 @@
 //! it is the case.
 
 use std::collections::HashMap;
+use std::ops::RangeInclusive;
 use std::path::PathBuf;
 use std::sync::{Mutex, OnceLock};
 use std::time::Duration;
@@ -44,8 +45,18 @@ const INSECURE: &str = "SYNC_INSECURE";
 const NOT_CONNECTED: &str = "SYNC_NOT_CONNECTED";
 const NEEDS_LOGIN: &str = "SYNC_NEEDS_LOGIN";
 const LOCKED: &str = "SYNC_VAULT_LOCKED";
-/// The server cannot take a proof in place of the key (before 0.1.1).
+/// The server speaks no protocol this build does, or cannot take a proof in
+/// place of the key (before 0.1.1).
 const SERVER_OUTDATED: &str = "SYNC_SERVER_OUTDATED";
+/// The server speaks only protocols newer than this build's.
+const APP_OUTDATED: &str = "SYNC_APP_OUTDATED";
+
+/// The protocols this build speaks with a server, oldest first: Emerald-Server's
+/// `Documentation/api.md`, under Handshake. Only moves when a request or an
+/// answer changes in a way the other side would misread; what it can ignore
+/// does not need it.
+const PROTOCOLS: RangeInclusive<u32> = 1..=1;
+const PROTOCOL_HEADER: &str = "emerald-protocol";
 
 /// The one server this installation talks to, as `sync.json` has it.
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -342,6 +353,72 @@ fn takes_proof(version: Option<&str>) -> bool {
     }
 }
 
+/// What a server and this build agreed on.
+#[derive(Clone, Debug, PartialEq)]
+struct Handshake {
+    protocol: u32,
+    features: Vec<String>,
+}
+
+impl Handshake {
+    fn has(&self, feature: &str) -> bool {
+        self.features.iter().any(|f| f == feature)
+    }
+}
+
+/// Reads a server's `/health`: the highest protocol both sides speak and what
+/// the server offers beyond it. A server from before the handshake names no
+/// protocol and speaks the first; one from 0.1.1 takes a proof.
+fn agree(health: &Value) -> Result<Handshake, String> {
+    let (min, max, features) = match health.get("protocol") {
+        Some(range) => {
+            let bound = |name: &str| range[name].as_u64().and_then(|n| u32::try_from(n).ok());
+            let (Some(min), Some(max)) = (bound("min"), bound("max")) else { return Err(UNREACHABLE.to_string()) };
+            let features = health["features"].as_array().map(|list| list.iter().filter_map(|f| f.as_str().map(str::to_owned)).collect()).unwrap_or_default();
+            (min, max, features)
+        }
+        None => {
+            let features = if takes_proof(health["version"].as_str()) { vec!["proof".to_string()] } else { Vec::new() };
+            (1, 1, features)
+        }
+    };
+    if max < *PROTOCOLS.start() {
+        return Err(SERVER_OUTDATED.to_string());
+    }
+    if min > *PROTOCOLS.end() {
+        return Err(APP_OUTDATED.to_string());
+    }
+    Ok(Handshake { protocol: max.min(*PROTOCOLS.end()), features })
+}
+
+/// Handshakes by server address, for as long as the app runs. A server updated
+/// meanwhile answers `protocol_unsupported`, which starts a new one.
+fn handshakes() -> std::sync::MutexGuard<'static, HashMap<String, Handshake>> {
+    static HANDSHAKES: OnceLock<Mutex<HashMap<String, Handshake>>> = OnceLock::new();
+    HANDSHAKES.get_or_init(Default::default).lock().unwrap_or_else(std::sync::PoisonError::into_inner)
+}
+
+async fn handshake(url: &str) -> Result<Handshake, String> {
+    if let Some(known) = handshakes().get(url) {
+        return Ok(known.clone());
+    }
+    let response = send(request(url, Method::GET, "/health", SHORT)?).await?;
+    if !response.status().is_success() {
+        return Err(refused(response).await);
+    }
+    let health: Value = response.json().await.map_err(|_| UNREACHABLE.to_string())?;
+    let agreed = agree(&health)?;
+    handshakes().insert(url.to_string(), agreed.clone());
+    Ok(agreed)
+}
+
+/// The server with what opens it, once it is clear which protocol to speak.
+async fn connected(app: &tauri::AppHandle) -> Result<Server, String> {
+    let server = server(app)?;
+    handshake(&server.url).await?;
+    Ok(server)
+}
+
 fn names_key(server: &Server) -> Result<Key, String> {
     let bytes = B64.decode(&server.names_key).map_err(|_| NEEDS_LOGIN.to_string())?;
     let bytes: [u8; 32] = bytes.try_into().map_err(|_| NEEDS_LOGIN.to_string())?;
@@ -404,8 +481,11 @@ fn client() -> Result<&'static reqwest::Client, String> {
     Ok(CLIENT.get_or_init(|| built))
 }
 
+/// A request in the protocol agreed with that server; before any handshake,
+/// in the oldest this build speaks, which `/health` answers in any case.
 fn request(url: &str, method: Method, path: &str, timeout: Duration) -> Result<RequestBuilder, String> {
-    Ok(client()?.request(method, format!("{url}/api/v1{path}")).timeout(timeout))
+    let protocol = handshakes().get(url).map_or(*PROTOCOLS.start(), |h| h.protocol);
+    Ok(client()?.request(method, format!("{url}/api/v1{path}")).timeout(timeout).header(PROTOCOL_HEADER, protocol))
 }
 
 const SHORT: Duration = Duration::from_secs(60);
@@ -422,9 +502,17 @@ async fn send(builder: RequestBuilder) -> Result<Response, String> {
 /// The server's own word for why it refused, as `SYNC_` + what it said.
 async fn refused(response: Response) -> String {
     let status = response.status();
+    let url = response.url().as_str().split_once("/api/v1").map(|(base, _)| base.to_string());
     let code = response.json::<Value>().await.ok().and_then(|v| v["code"].as_str().map(str::to_owned));
     if status == StatusCode::UNAUTHORIZED {
         return NEEDS_LOGIN.to_string();
+    }
+    // The server changed since the handshake: agree anew, and say why if that fails.
+    if let (Some(url), Some("protocol_unsupported")) = (url, code.as_deref()) {
+        handshakes().remove(&url);
+        if let Err(err) = Box::pin(handshake(&url)).await {
+            return err;
+        }
     }
     format!("SYNC_SERVER:{}", code.unwrap_or_else(|| status.as_u16().to_string()))
 }
@@ -510,8 +598,8 @@ struct Remote {
     token: Zeroizing<String>,
 }
 
-fn remote(app: &tauri::AppHandle, vault_id: &str) -> Result<Remote, String> {
-    let server = server(app)?;
+async fn remote(app: &tauri::AppHandle, vault_id: &str) -> Result<Remote, String> {
+    let server = connected(app).await?;
     let file = read_file(app)?;
     let link = file.links.get(vault_id).ok_or_else(|| NOT_CONNECTED.to_string())?;
     Ok(Remote { url: server.url, remote: link.remote.clone(), token: Zeroizing::new(server.token) })
@@ -566,12 +654,9 @@ pub async fn sync_server_status(app: tauri::AppHandle) -> Result<Value, String> 
 #[tauri::command]
 pub async fn sync_pair(app: tauri::AppHandle, url: String, key: Zeroizing<String>) -> Result<(), String> {
     let url = clean_url(&url)?;
-    let health = send(request(&url, Method::GET, "/health", SHORT)?).await?;
-    if !health.status().is_success() {
-        return Err(refused(health).await);
-    }
-    let health: Value = health.json().await.map_err(|_| UNREACHABLE.to_string())?;
-    if !takes_proof(health["version"].as_str()) {
+    // A new start: the server behind the address may have changed.
+    handshakes().remove(&url);
+    if !handshake(&url).await?.has("proof") {
         return Err(SERVER_OUTDATED.to_string());
     }
     let device = gethostname::gethostname().to_string_lossy().split('.').next().unwrap_or_default().to_string();
@@ -628,13 +713,13 @@ async fn server_get(server: &Server, path: &str) -> Result<Value, String> {
 
 #[tauri::command]
 pub async fn sync_devices(app: tauri::AppHandle) -> Result<Value, String> {
-    server_get(&server(&app)?, "/devices").await
+    server_get(&connected(&app).await?, "/devices").await
 }
 
 /// Takes a device's token. Whoever still knows the sync key can connect again.
 #[tauri::command]
 pub async fn sync_remove_device(app: tauri::AppHandle, device_id: String) -> Result<(), String> {
-    let server = server(&app)?;
+    let server = connected(&app).await?;
     // An id from the server's own list, but it ends up in a path.
     if uuid::Uuid::parse_str(&device_id).is_err() {
         return Err("invalid device id".to_string());
@@ -650,7 +735,7 @@ pub async fn sync_remove_device(app: tauri::AppHandle, device_id: String) -> Res
 /// The vaults on the server, with the names this device can open.
 #[tauri::command]
 pub async fn sync_remote_vaults(app: tauri::AppHandle) -> Result<Value, String> {
-    let server = server(&app)?;
+    let server = connected(&app).await?;
     let key = names_key(&server)?;
     let vaults = server_get(&server, "/vaults").await?;
     let list = vaults.as_array().map_or(&[][..], Vec::as_slice).iter().map(|v| {
@@ -675,7 +760,7 @@ pub async fn sync_remote_vaults(app: tauri::AppHandle) -> Result<Value, String> 
 /// wrapped by the password, it is what lets another device unlock the vault.
 #[tauri::command]
 pub async fn sync_create_remote(app: tauri::AppHandle, vault_id: String, name: String) -> Result<(), String> {
-    let server = server(&app)?;
+    let server = connected(&app).await?;
     let dir = vault::vault_dir(&app, &vault_id)?;
     let key_file = keys::read_key_file(&dir)?.ok_or_else(|| LOCKED.to_string())?;
     let meta = seal(&names_key(&server)?, &json!({ "name": name }).to_string());
@@ -696,7 +781,7 @@ pub async fn sync_create_remote(app: tauri::AppHandle, vault_id: String, name: S
 /// `vault.key`, so that the usual question for the password can open it.
 #[tauri::command]
 pub async fn sync_adopt_remote(app: tauri::AppHandle, vault_id: String, remote_id: String, name: String) -> Result<(), String> {
-    let server = server(&app)?;
+    let server = connected(&app).await?;
     let dir = vault::vault_dir(&app, &vault_id)?;
     if keys::read_key_file(&dir)?.is_some() {
         return Err("SYNC_VAULT_NOT_EMPTY".to_string());
@@ -737,7 +822,7 @@ pub async fn sync_forget_link(app: tauri::AppHandle, vault_id: String) -> Result
 /// Removes a vault from the server. Copies on devices are not touched.
 #[tauri::command]
 pub async fn sync_delete_remote(app: tauri::AppHandle, remote_id: String) -> Result<(), String> {
-    let server = server(&app)?;
+    let server = connected(&app).await?;
     if uuid::Uuid::parse_str(&remote_id).is_err() {
         return Err("invalid vault id".to_string());
     }
@@ -752,8 +837,8 @@ pub async fn sync_delete_remote(app: tauri::AppHandle, remote_id: String) -> Res
 /// The vault was renamed here: the list on the server follows.
 #[tauri::command]
 pub async fn sync_rename(app: tauri::AppHandle, vault_id: String, name: String) -> Result<(), String> {
-    let server = server(&app)?;
-    let target = remote(&app, &vault_id)?;
+    let server = connected(&app).await?;
+    let target = remote(&app, &vault_id).await?;
     let current = send(target.call(Method::GET, "", SHORT)?).await?;
     if !current.status().is_success() {
         return Err(refused(current).await);
@@ -784,7 +869,7 @@ pub async fn sync_push(
     batch_id: String,
     changes: String,
 ) -> Result<Value, String> {
-    let target = remote(&app, &vault_id)?;
+    let target = remote(&app, &vault_id).await?;
     let key = files_key(&app, &vault_id)?;
     let payload = B64.encode(seal_packed(&key, &changes)?);
     let body = json!({ "base": base, "epoch": epoch, "schema": schema, "batch_id": batch_id, "payload": payload });
@@ -807,7 +892,7 @@ async fn protocol_answer(response: Response) -> Result<Value, String> {
 
 #[tauri::command]
 pub async fn sync_pull(app: tauri::AppHandle, vault_id: String, after: i64, epoch: i64, schema: i64) -> Result<Value, String> {
-    let target = remote(&app, &vault_id)?;
+    let target = remote(&app, &vault_id).await?;
     let path = format!("/changes?after={after}&epoch={epoch}&schema={schema}");
     let response = send(target.call(Method::GET, &path, LONG)?).await?;
     if !response.status().is_success() {
@@ -826,7 +911,7 @@ pub async fn sync_pull(app: tauri::AppHandle, vault_id: String, after: i64, epoc
 /// The server's position, which publishing a snapshot has to name.
 #[tauri::command]
 pub async fn sync_remote_state(app: tauri::AppHandle, vault_id: String) -> Result<Value, String> {
-    let target = remote(&app, &vault_id)?;
+    let target = remote(&app, &vault_id).await?;
     let response = send(target.call(Method::GET, "", SHORT)?).await?;
     if !response.status().is_success() {
         return Err(refused(response).await);
@@ -867,7 +952,7 @@ pub async fn sync_snapshot_put(
     epoch: i64,
     schema: i64,
 ) -> Result<Value, String> {
-    let target = remote(&app, &vault_id)?;
+    let target = remote(&app, &vault_id).await?;
     let rekeyed = read_file(&app)?.links.get(&vault_id).is_some_and(|l| l.rekeyed);
     // A device that missed a password change must not put the old key back.
     if !rekeyed && !same_key_as_server(&app, &vault_id, &target).await? {
@@ -899,7 +984,7 @@ pub async fn sync_snapshot_put(
 /// follow one by one through `sync_snapshot_frame`.
 #[tauri::command]
 pub async fn sync_snapshot_fetch(app: tauri::AppHandle, vault_id: String) -> Result<Value, String> {
-    let target = remote(&app, &vault_id)?;
+    let target = remote(&app, &vault_id).await?;
     let path = vault::vault_dir(&app, &vault_id)?.join(DOWNLOAD_FILE);
     let (seq, epoch, schema) = download_snapshot(&target, &path).await?;
     let offsets = frame_offsets(&path)?;
@@ -961,7 +1046,7 @@ async fn same_key_as_server(app: &tauri::AppHandle, vault_id: &str, target: &Rem
 /// a vault that asks again, never one whose key does not fit.
 #[tauri::command]
 pub async fn sync_adopt_new_password(app: tauri::AppHandle, vault_id: String, password: Zeroizing<String>) -> Result<(), String> {
-    let target = remote(&app, &vault_id)?;
+    let target = remote(&app, &vault_id).await?;
     let file = server_key_file(&target).await?;
     let key = {
         let file = file.clone();
@@ -991,7 +1076,7 @@ pub async fn sync_adopt_new_password(app: tauri::AppHandle, vault_id: String, pa
 /// anybody now; the server drops them after its grace period.
 #[tauri::command]
 pub async fn sync_rekey_done(app: tauri::AppHandle, vault_id: String) -> Result<(), String> {
-    let target = remote(&app, &vault_id)?;
+    let target = remote(&app, &vault_id).await?;
     let folder = vault::vault_dir(&app, &vault_id)?.join("images");
     let response = send(target.call(Method::GET, "/blobs", SHORT)?).await?;
     if response.status().is_success() {
@@ -1013,7 +1098,7 @@ pub async fn sync_rekey_done(app: tauri::AppHandle, vault_id: String) -> Result<
 /// are: what the server lacks goes up, what this device lacks comes down.
 #[tauri::command]
 pub async fn sync_images(app: tauri::AppHandle, vault_id: String) -> Result<Value, String> {
-    let target = remote(&app, &vault_id)?;
+    let target = remote(&app, &vault_id).await?;
     let folder = vault::vault_dir(&app, &vault_id)?.join("images");
     std::fs::create_dir_all(&folder).map_err(|e| e.to_string())?;
 
@@ -1070,7 +1155,7 @@ pub async fn sync_images(app: tauri::AppHandle, vault_id: String) -> Result<Valu
 /// and another device that still has one brings it back with its next sync.
 #[tauri::command]
 pub async fn sync_images_delete(app: tauri::AppHandle, vault_id: String, names: Vec<String>) -> Result<(), String> {
-    let target = remote(&app, &vault_id)?;
+    let target = remote(&app, &vault_id).await?;
     for name in names.iter().filter(|name| images::is_valid_image_name(name)) {
         let response = send(target.call(Method::DELETE, &format!("/blobs/{name}"), SHORT)?).await?;
         if !response.status().is_success() && response.status() != StatusCode::NOT_FOUND {
@@ -1105,7 +1190,7 @@ fn take_events(buffer: &mut String) -> Vec<String> {
 
 /// One connection to the server's event stream, until it breaks.
 async fn listen_once(app: &tauri::AppHandle, vault_id: &str) -> Result<(), String> {
-    let target = remote(app, vault_id)?;
+    let target = remote(app, vault_id).await?;
     let own = server(app)?.device;
     // Only an upper bound on one connection: its keep-alives pass the read timeout.
     let mut response = send(target.call(Method::GET, "/events", Duration::from_secs(86_400))?).await?;
@@ -1160,7 +1245,7 @@ pub async fn sync_unwatch(app: tauri::AppHandle) -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::{
-        clean_url, names_key_from, proof_from, read_file_in, take_events, takes_proof, Credentials, SyncFile, BAD_FILE,
+        agree, clean_url, names_key_from, proof_from, read_file_in, take_events, takes_proof, Credentials, SyncFile, BAD_FILE,
         SETTINGS_FILE,
     };
 
@@ -1173,6 +1258,21 @@ mod tests {
         let names = base64::engine::general_purpose::STANDARD.decode(names_key_from("abcd-efgh")).unwrap();
         let names_hex: String = names.iter().map(|b| format!("{b:02x}")).collect();
         assert_ne!(names_hex, proof_from("abcd-efgh"));
+    }
+
+    #[test]
+    fn the_handshake_picks_the_highest_protocol_both_speak() {
+        use super::{Handshake, APP_OUTDATED, SERVER_OUTDATED};
+        use serde_json::json;
+        let agreed = agree(&json!({ "version": "0.1.2", "protocol": { "min": 1, "max": 3 }, "features": ["proof", "later"] })).unwrap();
+        assert_eq!(agreed, Handshake { protocol: 1, features: vec!["proof".into(), "later".into()] });
+        assert!(agreed.has("proof") && !agreed.has("other"));
+        assert_eq!(agree(&json!({ "protocol": { "min": 2, "max": 3 } })), Err(APP_OUTDATED.to_string()));
+        assert_eq!(agree(&json!({ "protocol": { "min": 0, "max": 0 } })), Err(SERVER_OUTDATED.to_string()));
+        assert!(agree(&json!({ "protocol": { "min": "one" } })).is_err());
+        // Before the handshake: 0.1.1 takes a proof, 0.1.0 names no version.
+        assert_eq!(agree(&json!({ "status": "ok", "version": "0.1.1" })).unwrap(), Handshake { protocol: 1, features: vec!["proof".into()] });
+        assert_eq!(agree(&json!({ "status": "ok" })).unwrap(), Handshake { protocol: 1, features: vec![] });
     }
 
     #[test]
