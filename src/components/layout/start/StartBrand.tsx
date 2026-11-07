@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Globe } from 'lucide-react';
+import { Globe, ScrollText } from 'lucide-react';
 import { openUrl } from '@tauri-apps/plugin-opener';
 import EmeraldMark from '../../ui/EmeraldMark';
 import { LANGUAGE_OPTIONS } from '../../../i18n';
@@ -13,6 +13,8 @@ import { DiscordMark, GithubMark, PatreonMark } from '../settings/BrandIcons';
 const WEBSITE_BASE = 'https://the-emerald-app.de';
 const PATREON_URL = 'https://www.patreon.com/cw/PrincePatrick';
 const DISCORD_URL = 'https://discord.gg/3TpYUn2AkM';
+/** `main` carries the latest release, so this is the published changelog. */
+const CHANGELOG_URL = `${packageJson.homepage}/blob/main/CHANGELOG.md`;
 
 /** A link that leaves the app: `openUrl` instead of <a href>, so the WebView
  *  does not navigate there itself. */
@@ -52,6 +54,7 @@ export default function StartBrand({ width }: { width: number }) {
         <nav className="flex flex-col items-start gap-0.5 -ml-2.5" aria-label={t('start.links')}>
           <BrandLink icon={<Globe size={14} />} label={t('settings.website')} url={`${WEBSITE_BASE}/${language}/`} />
           <BrandLink icon={<GithubMark size={14} />} label="GitHub" url={packageJson.homepage} />
+          <BrandLink icon={<ScrollText size={14} />} label={t('start.changelog')} url={CHANGELOG_URL} />
           <BrandLink icon={<PatreonMark size={14} />} label="Patreon" url={PATREON_URL} />
           <BrandLink icon={<DiscordMark size={14} />} label="Discord" url={DISCORD_URL} />
         </nav>

@@ -1293,6 +1293,7 @@
     "server": "Serveur",
     "appearance": "Apparence",
     "links": "Liens",
+    "changelog": "Notes de version",
     "version": "Version {{version}}",
     "opened": "ouvert",
     "byAuthor": "par {{name}}",
