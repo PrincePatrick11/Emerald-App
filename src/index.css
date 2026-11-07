@@ -2687,6 +2687,7 @@ html[data-theme] .prop-segment--active {
   height: 18px;
   border-radius: 3px 0 0 0;
   background: var(--well-solid);
+  box-shadow: inset -1px -1px 0 var(--edge-strong);
 }
 /* A tool of the column picked: the stage draws a new element, over the others too. */
 .canvas-editor-adding .canvas-stage,

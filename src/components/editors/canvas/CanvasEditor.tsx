@@ -218,6 +218,7 @@ const CanvasEditor = forwardRef<CanvasEditorHandle, CanvasEditorProps>(function 
   const sorted = useMemo(() => byZ(elements), [elements]);
   const byId = useMemo(() => new Map(elements.map((el) => [el.id, el])), [elements]);
   const selected = useMemo(() => selectedIds.map((id) => byId.get(id)).filter((el): el is CanvasElement => !!el), [selectedIds, byId]);
+  const selectionBounds = useMemo(() => unionBounds(selected.map(elementBounds)), [selected]);
 
   /** The element with its height fitted to its type, the top edge kept. */
   const fitted = useCallback((el: CanvasElement, heightBefore = el.height): CanvasElement => {
@@ -1249,7 +1250,7 @@ const CanvasEditor = forwardRef<CanvasEditorHandle, CanvasEditorProps>(function 
             onClose={() => setListOpen(false)}
           />
         )}
-        {showRulers && <Rulers size={size} view={view} artboard={{ width, height }} onPull={(orientation, e) => startGuide(e, orientation, null)} />}
+        {showRulers && <Rulers size={size} view={view} artboard={{ width, height }} selection={selectionBounds} guides={rulerGuides} onPull={(orientation, e) => startGuide(e, orientation, null)} />}
         {editable && hasRail && !paintingId && <CanvasToolRail controller={controller} />}
         {editable && features.zoom && <CanvasZoom controller={controller} />}
         {overlay}
