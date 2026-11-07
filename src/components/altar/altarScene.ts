@@ -45,6 +45,7 @@ export function placementToElement(
     const props: ShapeProps = {
       shape: p.shape.type, fill: p.shape.fill, stroke: p.shape.stroke,
       strokeWidth: p.shape.stroke_width * k, cornerRadius: p.shape.corner_radius * k,
+      ...(p.shape.sides !== undefined ? { sides: p.shape.sides } : {}),
     };
     return { ...frame, type: 'shape', props };
   }
@@ -103,6 +104,7 @@ export function elementToPlacement(
     base.shape = {
       type: p.shape, fill: p.fill, stroke: p.stroke,
       stroke_width: round(p.strokeWidth / k, 2), corner_radius: round(p.cornerRadius / k, 2),
+      ...(p.sides !== undefined ? { sides: p.sides } : {}),
     };
   }
   if (el.type === 'drawing') base.drawing = (el.props as DrawingProps).doc;

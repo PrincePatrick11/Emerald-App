@@ -24,9 +24,9 @@ const ALIGN_ICONS: Record<AlignEdge, ReactNode> = {
  * The canvas editor's bar. Like the text editor's, it shows what the canvas editor can do:
  * in the order of working, undo; what can be added (each registered type's
  * additions, several of one type behind one button); the controls of the
- * selected elements' types; where the selection sits (stacking, aligning),
- * grouping, duplicating and removing; and at the far end the element list
- * and saving as an image. Zoom
+ * selected elements' types; aligning the selection, and — without the
+ * element list, which has them — stacking, grouping, duplicating and
+ * removing; at the far end the element list and saving as an image. Zoom
  * sits on the stage itself (`CanvasZoom`), so the bar stays one row.
  */
 export default function CanvasToolbar({ controller: c, end }: { controller: CanvasController; end?: ReactNode }) {
@@ -93,18 +93,6 @@ export default function CanvasToolbar({ controller: c, end }: { controller: Canv
 
       {hasSelection && (
         <ToolbarGroup>
-          {f.arrange && (
-            <PopoverButton icon={<Layers2 size={14} />} title={t('canvas.arrange')} active={false}>
-              {(close) => (
-                <ToolbarGroup>
-                  <ToolbarBtn onClick={() => { c.arrange('front'); close(); }} active={false} title={t('canvas.toFront')}><BringToFront size={14} /></ToolbarBtn>
-                  <ToolbarBtn onClick={() => c.arrange('forward')} active={false} title={t('canvas.forward')}><ArrowUp size={14} /></ToolbarBtn>
-                  <ToolbarBtn onClick={() => c.arrange('backward')} active={false} title={t('canvas.backward')}><ArrowDown size={14} /></ToolbarBtn>
-                  <ToolbarBtn onClick={() => { c.arrange('back'); close(); }} active={false} title={t('canvas.toBack')}><SendToBack size={14} /></ToolbarBtn>
-                </ToolbarGroup>
-              )}
-            </PopoverButton>
-          )}
           {f.align && (
             <PopoverButton
               icon={<AlignHorizontalJustifyCenter size={14} />}
@@ -127,14 +115,29 @@ export default function CanvasToolbar({ controller: c, end }: { controller: Canv
               )}
             </PopoverButton>
           )}
-          {f.group && editable.length > 1 && (
-            <ToolbarBtn onClick={c.group} active={false} title={t('canvas.layers.groupAction')}><Group size={14} /></ToolbarBtn>
-          )}
-          {f.group && grouped && (
-            <ToolbarBtn onClick={c.ungroup} active={false} title={t('canvas.layers.ungroup')}><Ungroup size={14} /></ToolbarBtn>
-          )}
-          <ToolbarBtn onClick={c.duplicate} active={false} title={t('canvas.duplicate')}><Copy size={14} /></ToolbarBtn>
-          <ToolbarBtn onClick={c.removeSelected} active={false} title={t('canvas.remove')}><Trash2 size={14} /></ToolbarBtn>
+          {/* With the element list, stacking, grouping, duplicating and removing live there, as the paint mode's layers do. */}
+          {!f.layers && (<>
+            {f.arrange && (
+              <PopoverButton icon={<Layers2 size={14} />} title={t('canvas.arrange')} active={false}>
+                {(close) => (
+                  <ToolbarGroup>
+                    <ToolbarBtn onClick={() => { c.arrange('front'); close(); }} active={false} title={t('canvas.toFront')}><BringToFront size={14} /></ToolbarBtn>
+                    <ToolbarBtn onClick={() => c.arrange('forward')} active={false} title={t('canvas.forward')}><ArrowUp size={14} /></ToolbarBtn>
+                    <ToolbarBtn onClick={() => c.arrange('backward')} active={false} title={t('canvas.backward')}><ArrowDown size={14} /></ToolbarBtn>
+                    <ToolbarBtn onClick={() => { c.arrange('back'); close(); }} active={false} title={t('canvas.toBack')}><SendToBack size={14} /></ToolbarBtn>
+                  </ToolbarGroup>
+                )}
+              </PopoverButton>
+            )}
+            {f.group && editable.length > 1 && (
+              <ToolbarBtn onClick={c.group} active={false} title={t('canvas.layers.groupAction')}><Group size={14} /></ToolbarBtn>
+            )}
+            {f.group && grouped && (
+              <ToolbarBtn onClick={c.ungroup} active={false} title={t('canvas.layers.ungroup')}><Ungroup size={14} /></ToolbarBtn>
+            )}
+            <ToolbarBtn onClick={c.duplicate} active={false} title={t('canvas.duplicate')}><Copy size={14} /></ToolbarBtn>
+            <ToolbarBtn onClick={c.removeSelected} active={false} title={t('canvas.remove')}><Trash2 size={14} /></ToolbarBtn>
+          </>)}
         </ToolbarGroup>
       )}
 

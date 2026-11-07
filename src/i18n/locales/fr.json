@@ -574,13 +574,8 @@
       "layerN": "Calque {{n}}",
       "addLayer": "Ajouter un calque",
       "removeLayer": "Retirer le calque",
-      "showLayer": "Afficher le calque",
-      "hideLayer": "Masquer le calque",
       "clear": "Vider le dessin",
       "loadFailed": "Impossible de charger une image de ce dessin",
-      "lockLayer": "Verrouiller le calque",
-      "unlockLayer": "Déverrouiller le calque",
-      "layerOpacity": "Opacité",
       "duplicateLayer": "Dupliquer le calque",
       "mergeDown": "Fusionner vers le bas",
       "mergeDownBlocked": "Fusion impossible : le calque contient une image ou des traits de gomme",
@@ -592,7 +587,6 @@
         "snap": "Aimanter à la grille",
         "cells": "Cases en largeur"
       },
-      "closeLayers": "Fermer les calques",
       "filled": "Rempli (clic pour le contour)",
       "outlined": "Contour (clic pour remplir)",
       "corners": "Coins",
@@ -617,6 +611,7 @@
     "shape": {
       "rect": "Rectangle",
       "ellipse": "Ellipse",
+      "polygon": "Polygone",
       "triangle": "Triangle",
       "star": "Étoile",
       "hexagon": "Hexagone"
@@ -663,7 +658,8 @@
     "element": "Élément",
     "layers": {
       "title": "Éléments",
-      "close": "Fermer la liste",
+      "close": "Fermer",
+      "opacity": "Opacité",
       "empty": "Rien sur la toile pour l’instant.",
       "hint": "Cliquer pour sélectionner (Maj ajoute), glisser pour réordonner",
       "lock": "Verrouiller",

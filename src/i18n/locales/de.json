@@ -574,13 +574,8 @@
       "layerN": "Ebene {{n}}",
       "addLayer": "Ebene hinzufügen",
       "removeLayer": "Ebene entfernen",
-      "showLayer": "Ebene einblenden",
-      "hideLayer": "Ebene ausblenden",
       "clear": "Zeichnung leeren",
       "loadFailed": "Ein Bild dieser Zeichnung ließ sich nicht laden",
-      "lockLayer": "Ebene sperren",
-      "unlockLayer": "Ebene entsperren",
-      "layerOpacity": "Deckkraft",
       "duplicateLayer": "Ebene duplizieren",
       "mergeDown": "Nach unten zusammenführen",
       "mergeDownBlocked": "Zusammenführen geht nicht: Die Ebene hat ein Bild oder Radierstriche",
@@ -592,7 +587,6 @@
         "snap": "Am Raster einrasten",
         "cells": "Felder quer"
       },
-      "closeLayers": "Ebenen schließen",
       "filled": "Gefüllt (Klick für Umriss)",
       "outlined": "Umriss (Klick zum Füllen)",
       "corners": "Ecken",
@@ -617,6 +611,7 @@
     "shape": {
       "rect": "Rechteck",
       "ellipse": "Ellipse",
+      "polygon": "Vieleck",
       "triangle": "Dreieck",
       "star": "Stern",
       "hexagon": "Sechseck"
@@ -663,7 +658,8 @@
     "element": "Element",
     "layers": {
       "title": "Elemente",
-      "close": "Liste schließen",
+      "close": "Schließen",
+      "opacity": "Deckkraft",
       "empty": "Noch nichts auf der Leinwand.",
       "hint": "Klicken wählt aus (Shift ergänzt), Ziehen ändert die Reihenfolge",
       "lock": "Sperren",

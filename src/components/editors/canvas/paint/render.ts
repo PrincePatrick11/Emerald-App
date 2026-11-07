@@ -52,7 +52,7 @@ function outlinePath(outline: number[][]): Path2D {
 }
 
 /** The corners of a polygon (or the points and notches of a star) in the ellipse of its box, the first at the top. */
-function polygonPoints(tool: 'polygon' | 'star', sides: number, cx: number, cy: number, rx: number, ry: number): [number, number][] {
+export function polygonPoints(tool: 'polygon' | 'star', sides: number, cx: number, cy: number, rx: number, ry: number): [number, number][] {
   const count = tool === 'star' ? sides * 2 : sides;
   const out: [number, number][] = [];
   for (let i = 0; i < count; i++) {

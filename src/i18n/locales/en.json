@@ -574,13 +574,8 @@
       "layerN": "Layer {{n}}",
       "addLayer": "Add layer",
       "removeLayer": "Remove layer",
-      "showLayer": "Show layer",
-      "hideLayer": "Hide layer",
       "clear": "Clear drawing",
       "loadFailed": "Couldn't load an image of this drawing",
-      "lockLayer": "Lock layer",
-      "unlockLayer": "Unlock layer",
-      "layerOpacity": "Opacity",
       "duplicateLayer": "Duplicate layer",
       "mergeDown": "Merge down",
       "mergeDownBlocked": "Can't merge: this layer has an image or eraser strokes",
@@ -592,7 +587,6 @@
         "snap": "Snap to grid",
         "cells": "Cells across"
       },
-      "closeLayers": "Close layers",
       "filled": "Filled (click for outline)",
       "outlined": "Outline (click to fill)",
       "corners": "Corners",
@@ -617,6 +611,7 @@
     "shape": {
       "rect": "Rectangle",
       "ellipse": "Ellipse",
+      "polygon": "Polygon",
       "triangle": "Triangle",
       "star": "Star",
       "hexagon": "Hexagon"
@@ -663,7 +658,8 @@
     "element": "Element",
     "layers": {
       "title": "Elements",
-      "close": "Close the list",
+      "close": "Close",
+      "opacity": "Opacity",
       "empty": "Nothing on the canvas yet.",
       "hint": "Click to select (Shift adds), drag to restack",
       "lock": "Lock",

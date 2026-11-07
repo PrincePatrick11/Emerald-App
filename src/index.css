@@ -2526,8 +2526,8 @@ html[data-theme] .prop-segment--active {
 /* The canvas editor's element list: the same dock, with group heads and their members indented under them. */
 .canvas-layer-group-icon {
   display: flex;
-  width: 28px;
-  height: 28px;
+  width: 48px;
+  height: 32px;
   flex-shrink: 0;
   align-items: center;
   justify-content: center;

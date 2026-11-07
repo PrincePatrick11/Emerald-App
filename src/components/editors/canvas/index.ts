@@ -17,6 +17,6 @@ export * from './elements';
 export { renderCanvasImage, canvasToDataUrl, type RenderOptions } from './exportImage';
 export { createDrawingType, type DrawingElement, type DrawingProps, type DrawingTypeOptions } from './paint/drawing';
 export { FULL_PAINT_FEATURES, type PaintFeatures } from './paint/features';
-export { drawPaintDoc, layerImageRefs, loadLayerImages, renderPaintPng, type ImageLoader, type LayerImages } from './paint/render';
+export { drawPaintDoc, layerImageRefs, loadLayerImages, polygonPoints, renderPaintPng, type ImageLoader, type LayerImages } from './paint/render';
 export { fullProfile, paintOnlyProfile, type CanvasProfile } from './profiles';
 export * from '../../../lib/paint/document';

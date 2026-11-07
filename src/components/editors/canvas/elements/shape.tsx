@@ -1,12 +1,16 @@
 import { useTranslation } from 'react-i18next';
-import { Circle, Hexagon, PaintBucket, Shapes, Square, SquareDashed, Star, Triangle } from 'lucide-react';
+import { Circle, Hexagon, PaintBucket, Shapes, Square, SquareDashed, Star } from 'lucide-react';
 import PopoverButton from '../../shared/PopoverButton';
-import { ToolbarGroup } from '../../shared/toolbarParts';
+import { ToolbarGroup, ToolbarStepper } from '../../shared/toolbarParts';
+import { MAX_SIDES, MIN_SIDES } from '../../../../lib/paint/document';
+import { polygonPoints } from '../paint/render';
 import type { CanvasAddition, CanvasElement, CanvasElementType } from '../types';
 import { ColorPanel, NumberField, common } from './controlParts';
 
-export const CANVAS_SHAPES = ['rect', 'ellipse', 'triangle', 'star', 'hexagon'] as const;
-export type CanvasShape = (typeof CANVAS_SHAPES)[number];
+/** The shapes that can be added, the same as the paint mode's. */
+export const CANVAS_SHAPES = ['rect', 'ellipse', 'polygon', 'star'] as const;
+/** Besides those, the triangle and hexagon of older altars: polygons of three and six corners. */
+export type CanvasShape = (typeof CANVAS_SHAPES)[number] | 'triangle' | 'hexagon';
 
 export interface ShapeProps {
   shape: CanvasShape;
@@ -17,14 +21,27 @@ export interface ShapeProps {
   strokeWidth: number;
   /** Rounded corners of a rectangle. */
   cornerRadius: number;
+  /** The corners of a polygon or the points of a star, `MIN_SIDES`–`MAX_SIDES`. */
+  sides?: number;
 }
 
 export type ShapeElement = CanvasElement<ShapeProps>;
 
 export const DEFAULT_FILL = '#d4af37';
 
+/** A polygon's corners or a star's points, with the defaults where none are stored. */
+export function shapeSides(props: Pick<ShapeProps, 'shape' | 'sides'>): number | null {
+  switch (props.shape) {
+    case 'polygon': return props.sides ?? 6;
+    case 'star': return props.sides ?? 5;
+    case 'triangle': return 3;
+    case 'hexagon': return 6;
+    default: return null;
+  }
+}
+
 /** The outline of a shape in its box, as a path on `ctx`. */
-export function shapePath(ctx: CanvasRenderingContext2D, props: Pick<ShapeProps, 'shape' | 'cornerRadius'>, w: number, h: number): void {
+export function shapePath(ctx: CanvasRenderingContext2D, props: Pick<ShapeProps, 'shape' | 'cornerRadius' | 'sides'>, w: number, h: number): void {
   ctx.beginPath();
   switch (props.shape) {
     case 'rect': {
@@ -42,19 +59,15 @@ export function shapePath(ctx: CanvasRenderingContext2D, props: Pick<ShapeProps,
       ctx.lineTo(0, h);
       ctx.closePath();
       break;
-    case 'star': {
-      const points = 5;
-      for (let i = 0; i < points * 2; i++) {
-        const radius = i % 2 === 0 ? 1 : 0.42;
-        const angle = -Math.PI / 2 + (i * Math.PI) / points;
-        const px = w / 2 + Math.cos(angle) * (w / 2) * radius;
-        const py = h / 2 + Math.sin(angle) * (h / 2) * radius * 1.05 + h * 0.03;
+    case 'polygon':
+    case 'star':
+      // The paint mode's polygons and stars, in the box.
+      polygonPoints(props.shape, shapeSides(props)!, w / 2, h / 2, w / 2, h / 2).forEach(([px, py], i) => {
         if (i === 0) ctx.moveTo(px, py);
         else ctx.lineTo(px, py);
-      }
+      });
       ctx.closePath();
       break;
-    }
     case 'hexagon':
       for (let i = 0; i < 6; i++) {
         const angle = (i * Math.PI) / 3;
@@ -68,12 +81,11 @@ export function shapePath(ctx: CanvasRenderingContext2D, props: Pick<ShapeProps,
   }
 }
 
-const SHAPE_ICONS: Record<CanvasShape, React.ReactNode> = {
+const SHAPE_ICONS: Record<(typeof CANVAS_SHAPES)[number], React.ReactNode> = {
   rect: <Square size={14} />,
   ellipse: <Circle size={14} />,
-  triangle: <Triangle size={14} />,
+  polygon: <Hexagon size={14} />,
   star: <Star size={14} />,
-  hexagon: <Hexagon size={14} />,
 };
 
 const additions: CanvasAddition<ShapeProps>[] = CANVAS_SHAPES.map((shape) => ({
@@ -85,7 +97,10 @@ const additions: CanvasAddition<ShapeProps>[] = CANVAS_SHAPES.map((shape) => ({
     return {
       width: shape === 'rect' ? Math.round(side * 1.4) : side,
       height: side,
-      props: { shape, fill: DEFAULT_FILL, stroke: null, strokeWidth: Math.max(2, Math.round(side / 40)), cornerRadius: 0 },
+      props: {
+        shape, fill: DEFAULT_FILL, stroke: null, strokeWidth: Math.max(2, Math.round(side / 40)), cornerRadius: 0,
+        ...(shape === 'polygon' || shape === 'star' ? { sides: shapeSides({ shape }) ?? undefined } : {}),
+      },
     };
   },
 }));
@@ -98,6 +113,10 @@ function ShapeControls({ elements, update }: {
   const set = (props: Partial<ShapeProps>) => update((el) => ({ props: { ...el.props, ...props } }));
   const fill = common(elements, (el) => el.props.fill);
   const stroke = common(elements, (el) => el.props.stroke);
+  // Corners for polygons (a triangle or hexagon becomes one), points for stars, when all selected are one of them.
+  const cornered = elements.every((el) => el.props.shape !== 'star' && shapeSides(el.props) !== null);
+  const starred = elements.every((el) => el.props.shape === 'star');
+  const sides = common(elements, (el) => shapeSides(el.props));
   return (
     <ToolbarGroup>
       <PopoverButton icon={<PaintBucket size={14} style={fill ? { color: fill } : undefined} />} title={t('canvas.fill')} active={false}>
@@ -126,6 +145,15 @@ function ShapeControls({ elements, update }: {
           </div>
         )}
       </PopoverButton>
+      {(cornered || starred) && (
+        <ToolbarStepper
+          value={sides ?? (starred ? 5 : 6)}
+          min={MIN_SIDES}
+          max={MAX_SIDES}
+          onChange={(n) => update((el) => ({ props: { ...el.props, shape: starred ? 'star' : 'polygon', sides: n } }))}
+          label={t(starred ? 'editor.paint.points' : 'editor.paint.corners')}
+        />
+      )}
     </ToolbarGroup>
   );
 }

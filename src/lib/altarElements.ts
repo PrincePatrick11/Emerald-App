@@ -1,6 +1,6 @@
 import type { AltarPlacement, AltarShapeStyle, AltarShapeType, AltarTextStyle } from '../types';
 import { generateId, isValidHexColor } from './helpers';
-import { emptyPaintDoc, paintDocFromJson, paintDocToJson } from './paint/document';
+import { MAX_SIDES, MIN_SIDES, emptyPaintDoc, paintDocFromJson, paintDocToJson } from './paint/document';
 
 /**
  * Shapes, text and drawings made on an altar. They hang on no library item,
@@ -15,7 +15,7 @@ import { emptyPaintDoc, paintDocFromJson, paintDocToJson } from './paint/documen
  * drawing is stored as the paint document's JSON (`paintDocToJson`).
  */
 
-const SHAPES: readonly AltarShapeType[] = ['rect', 'ellipse', 'triangle', 'star', 'hexagon'];
+const SHAPES: readonly AltarShapeType[] = ['rect', 'ellipse', 'polygon', 'triangle', 'star', 'hexagon'];
 const FONTS: readonly AltarTextStyle['font'][] = ['serif', 'book', 'sans'];
 const ALIGNS: readonly AltarTextStyle['align'][] = ['left', 'center', 'right'];
 
@@ -34,6 +34,7 @@ function shapeStyle(raw: unknown): AltarShapeStyle {
     stroke: color(s.stroke),
     stroke_width: num(s.stroke_width, 0, 0, 400),
     corner_radius: num(s.corner_radius, 0, 0, 4000),
+    ...(s.sides !== undefined ? { sides: Math.round(num(s.sides, 5, MIN_SIDES, MAX_SIDES)) } : {}),
   };
 }
 

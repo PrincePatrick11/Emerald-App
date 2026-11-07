@@ -639,6 +639,47 @@ const CanvasEditor = forwardRef<CanvasEditorHandle, CanvasEditorProps>(function 
     return () => { window.removeEventListener('keyup', up); window.removeEventListener('blur', blur); };
   }, []);
 
+  // Copy, cut and paste also come as the clipboard events of the app's Edit
+  // menu: on macOS its items take ⌘C, ⌘X and ⌘V before the page sees the key
+  // whenever there is text selected somewhere. `before…` enables the items.
+  const clipboardRef = useRef<(kind: 'copy' | 'cut' | 'paste') => boolean>(() => false);
+  clipboardRef.current = (kind) => {
+    if (!editable || editingTextId) return false;
+    const active = document.activeElement;
+    if (!active || !rootRef.current?.contains(active) || active.closest('input, textarea, select, [contenteditable="true"]')) return false;
+    if (paintingId) {
+      const pc = paintControls;
+      if (kind === 'paste') {
+        if (!paintFeatures.select) return false;
+        if (!isSelectTool(pc.tool)) pc.setTool('select');
+        pc.paste();
+        return true;
+      }
+      if (!pc.selection.length) return false;
+      pc.copySelection();
+      if (kind === 'cut') pc.removeSelection();
+      return true;
+    }
+    if (kind === 'paste') { paste(); return true; }
+    if (!live.current.selectedIds.length) return false;
+    copy();
+    if (kind === 'cut') removeSelected();
+    return true;
+  };
+  useEffect(() => {
+    const kinds = ['copy', 'cut', 'paste'] as const;
+    const handlers = kinds.flatMap((kind) => {
+      const before = (e: Event) => {
+        const active = document.activeElement;
+        if (editable && active && rootRef.current?.contains(active) && !active.closest('input, textarea, select, [contenteditable="true"]')) e.preventDefault();
+      };
+      const run = (e: Event) => { if (clipboardRef.current(kind)) e.preventDefault(); };
+      return [[`before${kind}`, before], [kind, run]] as const;
+    });
+    for (const [name, handler] of handlers) document.addEventListener(name, handler);
+    return () => { for (const [name, handler] of handlers) document.removeEventListener(name, handler); };
+  }, [editable]);
+
   const onKeyDown = (e: React.KeyboardEvent) => {
     if (!editable || editingTextId) return;
     const target = e.target as HTMLElement;
@@ -991,8 +1032,14 @@ const CanvasEditor = forwardRef<CanvasEditorHandle, CanvasEditorProps>(function 
             onSelect={(ids) => { rootRef.current?.focus({ preventScroll: true }); select(ids); }}
             onPatch={patchElements}
             onMove={moveStack}
+            onOpacity={(opacity) => {
+              const ids = editableIds();
+              commit(live.current.elements.map((el) => (ids.includes(el.id) ? { ...el, opacity } : el)));
+            }}
+            onDuplicate={duplicate}
             onGroup={doGroup}
             onUngroup={doUngroup}
+            onRemove={removeSelected}
             onClose={() => setListOpen(false)}
           />
         )}

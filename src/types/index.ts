@@ -118,7 +118,8 @@ export interface AltarItem {
  */
 export type AltarPlacementKind = 'item' | 'shape' | 'text' | 'drawing';
 
-export type AltarShapeType = 'rect' | 'ellipse' | 'triangle' | 'star' | 'hexagon';
+/** `triangle` and `hexagon` come from older altars; new shapes with corners are polygons. */
+export type AltarShapeType = 'rect' | 'ellipse' | 'polygon' | 'triangle' | 'star' | 'hexagon';
 
 /** A drawn shape. Sizes in pixels at the reference width of 1920. */
 export interface AltarShapeStyle {
@@ -127,6 +128,8 @@ export interface AltarShapeStyle {
   stroke: string | null;
   stroke_width: number;
   corner_radius: number;
+  /** A polygon's corners or a star's points; missing: six and five. */
+  sides?: number;
 }
 
 /** A drawn text. The size in pixels at the reference width of 1920. */

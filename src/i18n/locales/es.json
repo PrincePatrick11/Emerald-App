@@ -574,13 +574,8 @@
       "layerN": "Capa {{n}}",
       "addLayer": "Añadir capa",
       "removeLayer": "Quitar capa",
-      "showLayer": "Mostrar capa",
-      "hideLayer": "Ocultar capa",
       "clear": "Vaciar dibujo",
       "loadFailed": "No se pudo cargar una imagen de este dibujo",
-      "lockLayer": "Bloquear capa",
-      "unlockLayer": "Desbloquear capa",
-      "layerOpacity": "Opacidad",
       "duplicateLayer": "Duplicar capa",
       "mergeDown": "Combinar hacia abajo",
       "mergeDownBlocked": "No se puede combinar: la capa tiene una imagen o trazos de borrador",
@@ -592,7 +587,6 @@
         "snap": "Ajustar a la cuadrícula",
         "cells": "Celdas a lo ancho"
       },
-      "closeLayers": "Cerrar capas",
       "filled": "Relleno (clic para contorno)",
       "outlined": "Contorno (clic para rellenar)",
       "corners": "Esquinas",
@@ -617,6 +611,7 @@
     "shape": {
       "rect": "Rectángulo",
       "ellipse": "Elipse",
+      "polygon": "Polígono",
       "triangle": "Triángulo",
       "star": "Estrella",
       "hexagon": "Hexágono"
@@ -663,7 +658,8 @@
     "element": "Elemento",
     "layers": {
       "title": "Elementos",
-      "close": "Cerrar la lista",
+      "close": "Cerrar",
+      "opacity": "Opacidad",
       "empty": "Todavía no hay nada en el lienzo.",
       "hint": "Clic para seleccionar (Mayús añade), arrastrar para reordenar",
       "lock": "Bloquear",

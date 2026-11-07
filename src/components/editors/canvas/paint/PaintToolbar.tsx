@@ -8,7 +8,7 @@ import {
   isBoxShape, MAX_RAYS, MAX_SIDES, MIN_RAYS, MIN_SIDES, PAINT_SIZE_MAX, PAINT_SIZE_MIN, type Symmetry,
 } from '../../../../lib/paint/document';
 import PopoverButton from '../../shared/PopoverButton';
-import { ToolbarBtn, ToolbarDivider, ToolbarGroup } from '../../shared/toolbarParts';
+import { ToolbarBtn, ToolbarDivider, ToolbarGroup, ToolbarStepper } from '../../shared/toolbarParts';
 import type { PaintFeatures } from './features';
 import { MAX_GRID_CELLS, MIN_GRID_CELLS, type EditorTool, type PaintControls, type PaintGrid } from './usePaintTools';
 
@@ -194,7 +194,7 @@ export default function PaintToolbar({ api, features, palette, layersOpen, onTog
             {api.filled ? <Square size={14} fill="currentColor" /> : <SquareDashed size={14} />}
           </ToolbarBtn>
           {cornered && (
-            <Stepper
+            <ToolbarStepper
               value={api.sides}
               min={MIN_SIDES}
               max={MAX_SIDES}
@@ -214,23 +214,6 @@ export default function PaintToolbar({ api, features, palette, layersOpen, onTog
         {end}
       </div>
     </div>
-  );
-}
-
-/** A small number with a minus and a plus, for the corners of a polygon or the points of a star. */
-function Stepper({ value, min, max, onChange, label }: {
-  value: number;
-  min: number;
-  max: number;
-  onChange: (value: number) => void;
-  label: string;
-}) {
-  return (
-    <span className="paint-stepper" title={label}>
-      <button type="button" onClick={() => onChange(value - 1)} disabled={value <= min} aria-label={`${label} −`}>−</button>
-      <span className="paint-stepper-value" aria-label={label}>{value}</span>
-      <button type="button" onClick={() => onChange(value + 1)} disabled={value >= max} aria-label={`${label} +`}>+</button>
-    </span>
   );
 }
 
@@ -262,7 +245,7 @@ function SymmetryPanel({ value, onChange, close }: { value: Symmetry; onChange: 
       {value.kind === 'radial' && (
         <div className="paint-symmetry-rays">
           <span>{t('editor.paint.symmetry.rays')}</span>
-          <Stepper value={rays} min={MIN_RAYS} max={MAX_RAYS} onChange={(n) => onChange({ kind: 'radial', rays: n })} label={t('editor.paint.symmetry.rays')} />
+          <ToolbarStepper value={rays} min={MIN_RAYS} max={MAX_RAYS} onChange={(n) => onChange({ kind: 'radial', rays: n })} label={t('editor.paint.symmetry.rays')} />
         </div>
       )}
     </div>
@@ -284,7 +267,7 @@ function GridPanel({ value, onChange }: { value: PaintGrid; onChange: (value: Pa
       </label>
       <div className="paint-symmetry-rays">
         <span>{t('editor.paint.grid.cells')}</span>
-        <Stepper
+        <ToolbarStepper
           value={value.cells}
           min={MIN_GRID_CELLS}
           max={MAX_GRID_CELLS}
