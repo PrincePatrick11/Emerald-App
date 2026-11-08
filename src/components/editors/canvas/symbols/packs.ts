@@ -1,4 +1,4 @@
-import { circle, corners, join, line, poly, starPolygon } from './paths';
+import { circle, corners, join, lens, line, poly, polar, spiral, starPolygon } from './paths';
 
 /**
  * The symbols that come with the app, drawn for it as centre lines in a box
@@ -29,6 +29,37 @@ const venus = join(circle(50, 36, 22), line(50, 58, 50, 90), line(34, 75, 66, 75
 const mars = join(circle(42, 58, 24), line(59, 41, 84, 16), poly([[62, 16], [84, 16], [84, 38]]));
 const jupiter = join('M22 40C22 22 42 18 46 32C50 46 38 60 20 66L84 66', line(66, 18, 66, 90));
 const saturn = join(line(24, 22, 48, 22), line(36, 10, 36, 66), 'M36 44C44 30 66 32 66 48C66 62 50 70 54 82C56 88 64 90 70 84');
+
+/** Eight arrows out of a circle: the chaos star. */
+const chaosStar = join(circle(50, 50, 9), ...Array.from({ length: 8 }, (_, i) => {
+  const deg = i * 45;
+  const [x1, y1] = polar(50, 50, 9, deg);
+  const [x2, y2] = polar(50, 50, 44, deg);
+  return join(line(x1, y1, x2, y2), poly([polar(50, 50, 34, deg - 8), [x2, y2], polar(50, 50, 34, deg + 8)]));
+}));
+
+/** The helm of awe: eight arms out of a circle, each with a bar across and a fork at its end. */
+const helmOfAwe = join(circle(50, 50, 8), ...Array.from({ length: 8 }, (_, i) => {
+  const deg = i * 45;
+  const at = (r: number, side: number) => polar(50, 50, Math.hypot(r, side), deg + (Math.atan2(side, r) * 180) / Math.PI);
+  return join(
+    poly([polar(50, 50, 8, deg), polar(50, 50, 44, deg)]),
+    poly([at(24, -6), at(24, 6)]),
+    poly([at(44, -7), at(36, -7), at(36, 7), at(44, 7)]),
+  );
+}));
+
+/** Three triangles, each through the others, on a small circle. */
+const valknut = join(...[0, 120, 240].map((deg) => {
+  const [cx, cy] = polar(50, 56, 13, deg + 180);
+  return poly(corners(3, cx, cy, 32), true);
+}));
+
+/** The unicursal hexagram: one line through the six points, an X where the hexagram has its two bars. */
+const unicursal = (() => {
+  const [top, ur, lr, bottom, ll, ul] = corners(6, 50, 50, 42);
+  return poly([ul, bottom, ur, ll, top, lr, ul]);
+})();
 
 const pack = (id: string, entries: Record<string, string>): SymbolPack => ({
   id,
@@ -113,6 +144,22 @@ export const SYMBOL_PACKS: SymbolPack[] = [
     ingwaz: poly([[50, 22], [76, 50], [50, 78], [24, 50]], true),
     dagaz: poly([[22, 14], [22, 86], [78, 14], [78, 86]], true),
     othala: join(poly([[28, 86], [74, 38], [50, 12], [26, 38], [72, 86]])),
+  }),
+  pack('occult', {
+    chaosStar,
+    invertedPentagram: starPolygon(5, 2, 50, 46, 42, 180),
+    unicursalHexagram: unicursal,
+    septagram: starPolygon(7, 2, 50, 52, 42),
+    tripleMoon: join('M36 30A20 20 0 1 0 36 70A26 26 0 0 1 36 30Z', circle(50, 50, 10), 'M64 30A20 20 0 1 1 64 70A26 26 0 0 0 64 30Z'),
+    triquetra: join(...[0, 120, 240].map((deg) => lens(50, 56, ...polar(50, 56, 40, deg), 0.8))),
+    triquetraInCircle: join(circle(50, 56, 26), ...[0, 120, 240].map((deg) => lens(50, 56, ...polar(50, 56, 40, deg), 0.8))),
+    leviathanCross: join('M50 76C38 64 18 64 18 76C18 88 38 88 50 76C62 64 82 64 82 76C82 88 62 88 50 76', line(50, 76, 50, 8), line(34, 22, 66, 22), line(26, 42, 74, 42)),
+    lemniscate: 'M50 50C38 34 12 34 12 50C12 66 38 66 50 50C62 34 88 34 88 50C88 66 62 66 50 50',
+    eyeOfHorus: join('M12 42Q50 16 86 40', 'M12 42Q48 60 80 44', circle(48, 38, 9), 'M16 26Q50 6 88 22', line(40, 54, 34, 86), 'M60 54C62 72 76 80 84 70C90 62 82 54 74 62'),
+    valknut,
+    helmOfAwe,
+    mjolnir: join(circle(50, 10, 5), line(50, 15, 50, 44), poly([[18, 44], [82, 44], [82, 56], [60, 62], [55, 90], [45, 90], [40, 62], [18, 56]], true)),
+    spiral: spiral(50, 50, 42, 3),
   }),
   pack('geometry', {
     pentagram: starPolygon(5, 2, 50, 54, 42),

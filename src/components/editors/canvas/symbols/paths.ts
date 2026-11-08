@@ -29,9 +29,9 @@ export function corners(n: number, cx = 50, cy = 50, r = 40, start = 0): [number
   });
 }
 
-/** A star polygon {n/k}: every k-th corner joined, in as many closed runs as it takes. */
-export function starPolygon(n: number, k: number, cx = 50, cy = 50, r = 40): string {
-  const pts = corners(n, cx, cy, r);
+/** A star polygon {n/k}: every k-th corner joined, in as many closed runs as it takes; turned by `start` degrees. */
+export function starPolygon(n: number, k: number, cx = 50, cy = 50, r = 40, start = 0): string {
+  const pts = corners(n, cx, cy, r, start);
   const seen = new Set<number>();
   let d = '';
   for (let s = 0; s < n; s++) {
@@ -46,6 +46,24 @@ export function starPolygon(n: number, k: number, cx = 50, cy = 50, r = 40): str
     d += poly(run, true);
   }
   return d;
+}
+
+/** A point at `deg` degrees from the top, clockwise, `r` from the centre. */
+export function polar(cx: number, cy: number, r: number, deg: number): [number, number] {
+  const a = ((deg - 90) * Math.PI) / 180;
+  return [cx + Math.cos(a) * r, cy + Math.sin(a) * r];
+}
+
+/** An Archimedean spiral from the centre outward, `turns` times round, as a polyline. */
+export function spiral(cx: number, cy: number, r: number, turns: number): string {
+  const steps = Math.round(turns * 36);
+  return poly(Array.from({ length: steps + 1 }, (_, i) => polar(cx, cy, (r * i) / steps, (i / steps) * turns * 360)));
+}
+
+/** A lens between two points: two arcs of radius `bulge` × their distance. */
+export function lens(x1: number, y1: number, x2: number, y2: number, bulge = 0.62): string {
+  const r = Math.hypot(x2 - x1, y2 - y1) * bulge;
+  return `M${num(x1)} ${num(y1)}A${num(r)} ${num(r)} 0 0 1 ${num(x2)} ${num(y2)}A${num(r)} ${num(r)} 0 0 1 ${num(x1)} ${num(y1)}Z`;
 }
 
 /** Several paths as one. */

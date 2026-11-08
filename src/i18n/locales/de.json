@@ -575,6 +575,7 @@
       "zodiac": "Tierkreis",
       "alchemy": "Alchemie",
       "runes": "Runen",
+      "occult": "Okkult",
       "geometry": "Heilige Geometrie"
     },
     "planets": {
@@ -653,6 +654,22 @@
       "ingwaz": "Ingwaz",
       "dagaz": "Dagaz",
       "othala": "Othala"
+    },
+    "occult": {
+      "chaosStar": "Chaosstern",
+      "invertedPentagram": "Umgekehrtes Pentagramm",
+      "unicursalHexagram": "Unikursales Hexagramm",
+      "septagram": "Septagramm",
+      "tripleMoon": "Dreifacher Mond",
+      "triquetra": "Triquetra",
+      "triquetraInCircle": "Triquetra im Kreis",
+      "leviathanCross": "Leviathankreuz",
+      "lemniscate": "Lemniskate",
+      "eyeOfHorus": "Horusauge",
+      "valknut": "Valknut",
+      "helmOfAwe": "Ægishjálmur",
+      "mjolnir": "Mjölnir",
+      "spiral": "Spirale"
     },
     "geometry": {
       "pentagram": "Pentagramm",
