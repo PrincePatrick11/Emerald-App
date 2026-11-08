@@ -2,10 +2,10 @@ import { create } from 'zustand';
 import { getDb } from '../lib/db';
 import { fromRow, type DbRow } from '../lib/row';
 import { generateId, nowIso } from '../lib/helpers';
-import type { UndoAction } from './undoStore';
 import { deleteImageFiles, listImageFiles, type StoredImage } from '../lib/images';
 import { collectUsedImageFilenames, storedImageName } from '../lib/schema';
 import type Database from '../lib/sqlite';
+import { collectImageUses, type ImageUse } from '../lib/imageUsage';
 import { serialKey, serialized } from '../lib/serialize';
 import type { VaultImage } from '../types';
 
@@ -20,6 +20,9 @@ interface ImageState {
   images: VaultImage[];
   /** Every stored file of the vault, from the folder — also those without a row. */
   files: StoredImage[];
+  /** Where each picture is used (`collectImageUses`), refreshed when the view opens. */
+  uses: ReadonlyMap<string, ImageUse[]>;
+  refreshUses: () => Promise<void>;
   /** The files whose details are in the trash: hidden from the grid until restored. */
   trashedFiles: ReadonlySet<string>;
   loaded: boolean;
@@ -44,6 +47,7 @@ export const useImageStore = create<ImageState>((set, get) => ({
   images: [],
   files: [],
   trashedFiles: new Set(),
+  uses: new Map(),
   loaded: false,
 
   fetchImages: async () => {
@@ -53,6 +57,10 @@ export const useImageStore = create<ImageState>((set, get) => ({
     const trashedFiles = new Set(rows.filter((r) => r.deleted_at != null).map((r) => String(r.file)));
     set({ images: live, trashedFiles, loaded: true });
     await get().refreshFiles();
+  },
+
+  refreshUses: async () => {
+    set({ uses: await collectImageUses(await getDb()) });
   },
 
   refreshFiles: async () => {
@@ -144,13 +152,6 @@ export const useImageStore = create<ImageState>((set, get) => ({
     await get().refreshFiles();
   },
 }));
-
-/** Into the trash with an Undo, from the edit dialog and the right-click menu alike. */
-export async function deleteImageWithUndo(id: string, description: string, pushUndo: (action: UndoAction) => void): Promise<void> {
-  const store = useImageStore.getState();
-  await store.deleteImage(id);
-  pushUndo({ id: generateId(), description, undo: () => store.restoreImage(id) });
-}
 
 /**
  * After details went for good: their files too, where nothing else in the

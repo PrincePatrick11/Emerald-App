@@ -603,7 +603,13 @@
     "storing": "Enregistrement …",
     "dropHere": "Déposez des images ici ou cliquez pour choisir",
     "leaveOut": "Retirer",
-    "tagsForAll": "Étiquettes pour toutes"
+    "tagsForAll": "Étiquettes pour toutes",
+    "usedIn": "Utilisée dans",
+    "unused": "Utilisée nulle part",
+    "removeFromUses_one": "Affichée à {{count}} endroit – la retirer là aussi ?",
+    "removeFromUses_other": "Affichée à {{count}} endroits – la retirer là aussi ?",
+    "removeAndDelete": "Retirer et supprimer",
+    "roles": { "default": "Valeur par défaut du bloc", "drawing": "Dessin", "background": "Arrière-plan" }
   },
 
   "tags": {

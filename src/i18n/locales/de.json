@@ -603,7 +603,13 @@
     "storing": "Wird gespeichert …",
     "dropHere": "Bilder hierher ziehen oder klicken zum Auswählen",
     "leaveOut": "Weglassen",
-    "tagsForAll": "Tags für alle"
+    "tagsForAll": "Tags für alle",
+    "usedIn": "Verwendet in",
+    "unused": "Nirgends verwendet",
+    "removeFromUses_one": "An {{count}} Stelle eingebunden – dort auch entfernen?",
+    "removeFromUses_other": "An {{count}} Stellen eingebunden – dort auch entfernen?",
+    "removeAndDelete": "Entfernen und löschen",
+    "roles": { "default": "Block-Vorgabe", "drawing": "Zeichnung", "background": "Hintergrund" }
   },
 
   "tags": {

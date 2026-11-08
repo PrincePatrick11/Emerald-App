@@ -2,7 +2,9 @@ import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useShallow } from 'zustand/shallow';
 import { Pencil, Trash2 } from 'lucide-react';
-import { deleteImageWithUndo, useImageStore } from '../../store/imageStore';
+import { useImageStore } from '../../store/imageStore';
+import { deletePicture } from '../../store/imageActions';
+import { isOnlyDrawingOrBackground, isRemovableUse } from '../../lib/imageUsage';
 import { useUndoStore } from '../../store/undoStore';
 import { useTagStore } from '../../store/tagStore';
 import { useSessionState } from '../../store/sessionStore';
@@ -38,13 +40,13 @@ function byName(a: ImageItem, b: ImageItem): number {
  */
 export default function ImagesView() {
   const { t } = useTranslation();
-  const { images, files, trashedFiles, loaded } = useImageStore(useShallow((s) => ({
-    images: s.images, files: s.files, trashedFiles: s.trashedFiles, loaded: s.loaded,
+  const { images, files, trashedFiles, uses, loaded } = useImageStore(useShallow((s) => ({
+    images: s.images, files: s.files, trashedFiles: s.trashedFiles, uses: s.uses, loaded: s.loaded,
   })));
   const allTags = useTagStore((s) => s.tags);
   const [search, setSearch] = useSessionState('images.search', '');
   const [tagFilter, setTagFilter] = useSessionState<string[]>('images.tags', []);
-  const [editing, setEditing] = useState<ImageItem | null>(null);
+  const [editing, setEditing] = useState<(ImageItem & { confirmDelete?: boolean }) | null>(null);
   const [adding, setAdding] = useState(false);
   const [dropped, setDropped] = useState<string[]>([]);
   const [menu, setMenu] = useState<{ item: ImageItem; x: number; y: number } | null>(null);
@@ -65,7 +67,10 @@ export default function ImagesView() {
   });
 
   // The folder can have changed since the vault opened (texts, drawings).
-  useEffect(() => { void useImageStore.getState().refreshFiles(); }, []);
+  useEffect(() => {
+    void useImageStore.getState().refreshFiles();
+    void useImageStore.getState().refreshUses();
+  }, []);
 
   const all = useMemo<ImageItem[]>(() => {
     const byFile = new Map(images.map((image) => [image.file, image]));
@@ -75,12 +80,15 @@ export default function ImagesView() {
       listed.add(name);
       // In the trash: gone from here until it is restored.
       if (trashedFiles.has(name)) continue;
-      items.push({ file: name, image: byFile.get(name) ?? null });
+      const image = byFile.get(name) ?? null;
+      // A sigil drawing or an altar background is the thing itself, not a picture of its own.
+      if (!image && isOnlyDrawingOrBackground(uses.get(name))) continue;
+      items.push({ file: name, image });
     }
     // Details whose file the folder did not list (yet): still shown.
     for (const image of images) if (!listed.has(image.file)) items.push({ file: image.file, image });
     return items.sort(byName);
-  }, [images, files, trashedFiles]);
+  }, [images, files, trashedFiles, uses]);
 
   const query = search.trim().toLowerCase();
   const searched = all.filter((item) => !query
@@ -131,14 +139,16 @@ export default function ImagesView() {
             onClose={() => setMenu(null)}
             actions={[
               { label: t('images.edit'), icon: <Pencil size={12} />, onClick: () => setEditing(menu.item) },
-              // A picture without details has nothing in the trash to go to: its file may
-              // be in use in a text, and the image cleanup removes it once it is not.
+              // Still shown somewhere: the dialog asks before taking it out there.
               {
                 label: t('contextMenu.delete'),
                 icon: <Trash2 size={12} />,
                 danger: true,
-                disabled: !menu.item.image,
-                onClick: () => { if (menu.item.image) void deleteImageWithUndo(menu.item.image.id, t('undo.imageDeleted'), pushUndo); },
+                onClick: () => {
+                  const { item } = menu;
+                  if ((uses.get(item.file) ?? []).some(isRemovableUse)) setEditing({ ...item, confirmDelete: true });
+                  else void deletePicture(item.file, item.image, t('undo.imageDeleted'), pushUndo);
+                },
               },
             ]}
           />
@@ -155,7 +165,9 @@ export default function ImagesView() {
         grouping={{ mode: 'flat' }}
       />
       {adding && <AddImagesModal dropped={dropped} dragOver={dragOver} onClose={closeAdding} />}
-      {editing && <ImageEditModal file={editing.file} image={editing.image} onClose={() => setEditing(null)} />}
+      {editing && (
+        <ImageEditModal file={editing.file} image={editing.image} confirmDelete={editing.confirmDelete} onClose={() => setEditing(null)} />
+      )}
     </>
   );
 }

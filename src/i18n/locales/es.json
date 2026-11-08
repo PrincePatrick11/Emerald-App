@@ -603,7 +603,13 @@
     "storing": "Guardando …",
     "dropHere": "Suelta imágenes aquí o haz clic para elegir",
     "leaveOut": "Quitar",
-    "tagsForAll": "Etiquetas para todas"
+    "tagsForAll": "Etiquetas para todas",
+    "usedIn": "Usada en",
+    "unused": "No se usa en ningún sitio",
+    "removeFromUses_one": "Se muestra en {{count}} lugar – ¿quitarla también allí?",
+    "removeFromUses_other": "Se muestra en {{count}} lugares – ¿quitarla también allí?",
+    "removeAndDelete": "Quitar y eliminar",
+    "roles": { "default": "Valor por defecto del bloque", "drawing": "Dibujo", "background": "Fondo" }
   },
 
   "tags": {

@@ -603,7 +603,13 @@
     "storing": "Storing …",
     "dropHere": "Drop images here, or click to choose",
     "leaveOut": "Leave out",
-    "tagsForAll": "Tags for all"
+    "tagsForAll": "Tags for all",
+    "usedIn": "Used in",
+    "unused": "Not used anywhere",
+    "removeFromUses_one": "Shown in {{count}} place – take it out there too?",
+    "removeFromUses_other": "Shown in {{count}} places – take it out there too?",
+    "removeAndDelete": "Take out and delete",
+    "roles": { "default": "Block default", "drawing": "Drawing", "background": "Background" }
   },
 
   "tags": {

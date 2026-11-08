@@ -244,7 +244,7 @@ The Lexicon's languages, each with its alphabet here and its words in [`lexicon_
 
 ### images
 
-The details of pictures in "Images", the place of their own next to tags and categories. A row gives a stored file a name, tags and a note; every other file of the vault's `images/` folder is listed too, unnamed. A row keeps its file from the image cleanup (`collectUsedImageFilenames`), in the trash too, until it is deleted for good; every picture added through "Images" gets one.
+The details of pictures in "Images", the place of their own next to tags and categories. A row gives a stored file a name, tags and a note; every other file of the vault's `images/` folder is listed too, unnamed, except one used only as a sigil drawing or an altar background. Where a picture is used comes from `collectImageUses` (`src/lib/imageUsage.ts`), which reads the block stacks of entries and templates, the custom blocks' defaults and the altars' backgrounds; `withoutImage` takes a picture out of a block stack's texts and image fields, as deleting one asks for. A row keeps its file from the image cleanup (`collectUsedImageFilenames`), in the trash too, until it is deleted for good; every picture added through "Images" gets one.
 
 | Column | Type | Notes |
 |---|---|---|
