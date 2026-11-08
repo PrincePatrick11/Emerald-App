@@ -32,6 +32,8 @@ import { ToolbarBtn } from '../shared/toolbarParts';
 import { Check, Keyboard } from 'lucide-react';
 import ShortcutOverview from './ShortcutOverview';
 import ExportDialog, { type CanvasExportOptions } from './ExportDialog';
+import { backgroundCss, hasBackground, type CanvasBackground } from './background';
+import type { CanvasBackgroundImages } from './BackgroundPanel';
 import ContextMenu from '../../ui/ContextMenu';
 import { canvasMenuActions } from './CanvasContextMenu';
 
@@ -76,8 +78,17 @@ export interface CanvasEditorProps {
   /** The element types, by name; default the built-in image, shape and text. */
   types?: CanvasTypes;
   features?: CanvasFeatures;
-  /** Painted behind the artboard, filling it (DOM: an image, a gradient). */
+  /** Painted behind the artboard, filling it (DOM: an image, a gradient); `canvasBackground`, if set, takes its place. */
   background?: ReactNode;
+  /**
+   * The artboard's own background (fill, picture, tint), drawn behind the
+   * elements and saved with the exports. With `onCanvasBackgroundChange` the
+   * bar offers to change it.
+   */
+  canvasBackground?: CanvasBackground | null;
+  onCanvasBackgroundChange?: (background: CanvasBackground) => void;
+  /** The background picture's reference as a URL to show, and choosing a new one (its reference, or `null` if cancelled). */
+  backgroundImages?: CanvasBackgroundImages;
   grid?: CanvasGrid | null;
   /** Rotation snaps to multiples of this, in degrees; `null`: near the right angles, and 15° with Shift. */
   rotationSnap?: number | null;
@@ -168,7 +179,8 @@ function keepTop(el: Pick<CanvasElement, 'x' | 'y' | 'rotation'>, before: number
  */
 const CanvasEditor = forwardRef<CanvasEditorHandle, CanvasEditorProps>(function CanvasEditor({
   width, height, elements, onChange, selectedIds, onSelectionChange, editable,
-  types = BUILTIN_CANVAS_TYPES, features = FULL_CANVAS_FEATURES, background, grid = null, rotationSnap = null,
+  types = BUILTIN_CANVAS_TYPES, features = FULL_CANVAS_FEATURES, background, canvasBackground = null, onCanvasBackgroundChange,
+  backgroundImages, grid = null, rotationSnap = null,
   historyKey = '', readAlign = 'center', createId = () => crypto.randomUUID(), onEditElement, onExport, overlay, toolbarEnd,
   elementLabel, guides: placeGuides, onGuidesChange, guidesLocked: placeLocked, onGuidesLockedChange, paint = DEFAULT_PAINT, paintElementId, layout = 'fill',
 }, ref) {
@@ -1060,6 +1072,7 @@ const CanvasEditor = forwardRef<CanvasEditorHandle, CanvasEditorProps>(function 
     zoom: view.zoom, zoomIn: () => zoomTo(view.zoom * 1.25), zoomOut: () => zoomTo(view.zoom / 1.25), fit,
     onExport: onExport ? () => setExportOpen(true) : undefined, rulers: showRulers, canRulers: editable && features.guides && !paintingId,
     toggleRulers: () => setRulers((v) => { rulersShown = !v; return !v; }), guidesLocked, toggleGuidesLocked,
+    background: canvasBackground, setBackground: editable && !paintingId ? onCanvasBackgroundChange : undefined, backgroundImages,
     group: doGroup, ungroup: doUngroup, listOpen, toggleList: () => setListOpen((v) => !v),
   };
 
@@ -1113,7 +1126,9 @@ const CanvasEditor = forwardRef<CanvasEditorHandle, CanvasEditorProps>(function 
           style={{ left: view.x, top: view.y, width: width * view.zoom, height: height * view.zoom }}
         >
           <div className="canvas-artboard-inner" style={{ width, height, transform: `scale(${view.zoom})` }}>
-            {background}
+            {hasBackground(canvasBackground)
+              ? <div className="h-full w-full" style={{ background: backgroundCss(canvasBackground, backgroundImages?.resolve ?? ((src) => src)) }} />
+              : background}
           </div>
         </div>
         {size.width > 0 && size.height > 0 && (
@@ -1345,7 +1360,7 @@ const CanvasEditor = forwardRef<CanvasEditorHandle, CanvasEditorProps>(function 
         <ExportDialog
           artboard={{ width, height }}
           selection={selectionBounds}
-          hasBackground={!!background}
+          hasBackground={!!background || hasBackground(canvasBackground)}
           onExport={onExport}
           onClose={() => { setExportOpen(false); rootRef.current?.focus({ preventScroll: true }); }}
         />
@@ -1406,6 +1421,10 @@ export interface CanvasController {
   toggleRulers: () => void;
   guidesLocked: boolean;
   toggleGuidesLocked: () => void;
+  /** The artboard's background, and changing it where the place allows. */
+  background: CanvasBackground | null;
+  setBackground?: (background: CanvasBackground) => void;
+  backgroundImages?: CanvasBackgroundImages;
   /** The selected elements as one group, and their groups dissolved. */
   group: () => void;
   ungroup: () => void;

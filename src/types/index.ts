@@ -1,3 +1,4 @@
+import type { CanvasBackground } from '../components/editors/canvas/background';
 import type { PaintDoc } from '../lib/paint/document';
 import type { TrashKind, ViewId } from '../lib/modules';
 
@@ -100,6 +101,13 @@ export interface AltarRecord {
   guides: AltarGuide[];
   /** The guides cannot be moved or removed. */
   guides_locked: boolean;
+  /**
+   * The background as the canvas editor sets it; `null` until it is first
+   * changed there, and then the older `background_preset` and overlay are
+   * shown. Its picture is the `background_image_data` column's image or one
+   * of the app's own (`/backgrounds/…`).
+   */
+  canvas_background: CanvasBackground | null;
   thumbnail_data?: string | null;
   icon_data?: string | null;
   /** In the trash since — the store only holds altars without it. */

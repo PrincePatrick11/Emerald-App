@@ -136,7 +136,7 @@ interface AltarState {
   /** `createdAt` only for the import, which takes the date from the file; otherwise now. */
   createAltar: (opts?: { createdAt?: string }) => Promise<AltarRecord>;
   duplicateAltar: (id: string) => Promise<AltarRecord | null>;
-  updateAltar: (id: string, patch: Partial<Pick<AltarRecord, 'title' | 'background_preset' | 'background_image_data' | 'background_overlay' | 'background_overlay_color' | 'thumbnail_data' | 'icon_data'>>, options?: WriteOptions) => Promise<void>;
+  updateAltar: (id: string, patch: Partial<Pick<AltarRecord, 'title' | 'background_preset' | 'background_image_data' | 'background_overlay' | 'background_overlay_color' | 'canvas_background' | 'thumbnail_data' | 'icon_data'>>, options?: WriteOptions) => Promise<void>;
   updateAltarGrid: (id: string, patch: Partial<Pick<AltarRecord, 'grid_enabled' | 'grid_size' | 'grid_opacity' | 'grid_color' | 'snap_to_grid' | 'rotation_snap_enabled' | 'rotation_snap_angle' | 'snap_scale_to_grid'>>) => Promise<void>;
   updateAltarResolution: (id: string, resolution: string) => Promise<void>;
   /** The canvas editor's guides of an altar, and whether they are locked. */

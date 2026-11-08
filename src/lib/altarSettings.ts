@@ -4,6 +4,7 @@ import {
   DEFAULT_GRID_OPACITY, DEFAULT_GRID_SIZE, DEFAULT_OVERLAY_COLOR, isRatioFormat,
 } from './altarConstants';
 import { isValidHexColor } from './helpers';
+import { parseCanvasBackground } from '../components/editors/canvas/background';
 
 /**
  * How an altar looks — background, grid, snapping, resolution. Since v51
@@ -21,7 +22,7 @@ export const ALTAR_SETTING_KEYS = [
 ] as const;
 
 /** The settings that were never columns, only ever part of `settings`. */
-export type AltarSettings = Pick<AltarRecord, (typeof ALTAR_SETTING_KEYS)[number] | 'guides' | 'guides_locked'>;
+export type AltarSettings = Pick<AltarRecord, (typeof ALTAR_SETTING_KEYS)[number] | 'guides' | 'guides_locked' | 'canvas_background'>;
 
 /** At most this many guides; more would be a foreign file. */
 const MAX_GUIDES = 200;
@@ -87,6 +88,7 @@ export function parseAltarSettings(raw: unknown): AltarSettings {
     resolution: isResolution(resolution) ? resolution : DEFAULT_ALTAR_RESOLUTION,
     guides: guideList(s.guides),
     guides_locked: flag(s.guides_locked),
+    canvas_background: parseCanvasBackground(s.canvas_background),
   };
 }
 

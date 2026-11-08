@@ -1,5 +1,3 @@
-import type { AltarRecord } from '../types';
-
 export const DEFAULT_ALTAR_BACKGROUND = 'midnight' as const;
 
 /** Fixed cap for custom backgrounds, in addition to the vault's image limits — on upload as on import. */
@@ -75,10 +73,7 @@ export const DEFAULT_GRID_COLOR = '#dce8e2';
 
 export const ALTAR_BACKGROUND_PRESETS = ['midnight', 'ember', 'forest', 'moon'] as const;
 
-// Swatch colors for the gradient picker — muted dark ROYGBIV
-export const GRADIENT_PRESET_COLORS = ['#4a1a1a', '#4a2a10', '#3d3510', '#1a3d26', '#1a2a4a', '#1e1a4a', '#3d1a4a'] as const;
-
-// Maps legacy preset names to their representative hex color for the gradient picker
+// The older preset names by the colour their gradient started from (`altarCanvasBackground`)
 export const LEGACY_GRADIENT_COLORS: Record<(typeof ALTAR_BACKGROUND_PRESETS)[number], string> = {
   midnight: '#1e1e3c',
   ember: '#4a2917',
@@ -96,18 +91,6 @@ export function getGradientColor(preset: string): string | null {
   const color = preset.slice('gradient:'.length);
   return /^#[0-9a-fA-F]{6}$/.test(color) ? color : null;
 }
-
-/** Generates a radial-gradient CSS value from a hex color. */
-export function generateGradientStyle(hex: string): string {
-  const r = parseInt(hex.slice(1, 3), 16);
-  const g = parseInt(hex.slice(3, 5), 16);
-  const b = parseInt(hex.slice(5, 7), 16);
-  const r2 = Math.round(r * 0.5).toString(16).padStart(2, '0');
-  const g2 = Math.round(g * 0.5).toString(16).padStart(2, '0');
-  const b2 = Math.round(b * 0.5).toString(16).padStart(2, '0');
-  return `radial-gradient(circle at 50% 25%, ${hex} 0%, #${r2}${g2}${b2} 50%, #0a0a0f 100%)`;
-}
-
 
 export const ALTAR_IMAGE_PRESETS = [
   // Forest & nature
@@ -135,55 +118,7 @@ export const ALTAR_IMAGE_PRESETS = [
 
 export type AltarImagePresetName = (typeof ALTAR_IMAGE_PRESETS)[number];
 
-export const ALTAR_BACKGROUND_STYLES: Record<(typeof ALTAR_BACKGROUND_PRESETS)[number], string> = {
-  midnight: 'radial-gradient(ellipse at 50% 30%, #1a1a2e 0%, #0d0d15 60%, #0a0a0f 100%)',
-  ember: 'radial-gradient(circle at 50% 24%, #4a2917 0%, #25140f 42%, #120d10 100%)',
-  forest: 'radial-gradient(circle at 50% 22%, #183126 0%, #0d1a16 48%, #09110f 100%)',
-  moon: 'radial-gradient(circle at 50% 18%, #2b253d 0%, #171222 44%, #0b0a12 100%)',
-};
-
 export const DEFAULT_OVERLAY_COLOR = 'dark';
-
-function buildOverlayGradient(opacity: number, color: string = DEFAULT_OVERLAY_COLOR): string {
-  const top = Math.round(opacity * 60) / 100;
-  const bottom = opacity;
-  const rgb = color === 'light' ? '255,255,255' : '10,10,15';
-  return `linear-gradient(rgba(${rgb},${top}),rgba(${rgb},${bottom}))`;
-}
-
-/**
- * Returns a CSS `background` value for an altar canvas or card preview.
- * `backgroundSrc` must come from `imageSrc()`. That yields an empty string for
- * anything it does not recognise, and otherwise a stored image's
- * `emerald-img://` URL or an inline `data:` / `blob:` / `http` source passed
- * through unchanged — so only those four shapes reach the CSS `url()`.
- */
-export function getAltarBackgroundStyle(
-  altar: Pick<AltarRecord, 'background_preset' | 'background_overlay' | 'background_overlay_color'> | null,
-  backgroundSrc: string | null | undefined,
-): string {
-  if (!altar) return ALTAR_BACKGROUND_STYLES[DEFAULT_ALTAR_BACKGROUND];
-  const overlay = altar.background_overlay ?? DEFAULT_BACKGROUND_OVERLAY;
-  const overlayLayer = overlay > 0 ? `${buildOverlayGradient(overlay, altar.background_overlay_color)}, ` : '';
-  // A custom background resolves to an `emerald-img://` URL, a legacy one to a
-  // data-URL. Either way, having a source at all is what makes it custom.
-  if (backgroundSrc) {
-    return `${overlayLayer}url("${backgroundSrc}") center / cover no-repeat`;
-  }
-  if (ALTAR_IMAGE_PRESETS.includes(altar.background_preset as AltarImagePresetName)) {
-    return `${overlayLayer}url("/backgrounds/${altar.background_preset}.webp") center / cover no-repeat`;
-  }
-  if (isGradientPreset(altar.background_preset)) {
-    const hex = getGradientColor(altar.background_preset);
-    if (!hex) return ALTAR_BACKGROUND_STYLES[DEFAULT_ALTAR_BACKGROUND];
-    return `${overlayLayer}${generateGradientStyle(hex)}`;
-  }
-  // Legacy preset names — keep using the original hardcoded styles
-  const preset = ALTAR_BACKGROUND_PRESETS.includes(altar.background_preset as (typeof ALTAR_BACKGROUND_PRESETS)[number])
-    ? altar.background_preset as (typeof ALTAR_BACKGROUND_PRESETS)[number]
-    : DEFAULT_ALTAR_BACKGROUND;
-  return `${overlayLayer}${ALTAR_BACKGROUND_STYLES[preset]}`;
-}
 
 /**
  * Whether an item should flicker like a candle. Until v38 this hung on the

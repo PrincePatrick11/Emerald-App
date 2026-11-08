@@ -197,7 +197,7 @@ Adding, editing and deleting items happens in a modal. Deleting moves the item t
 
 Exporting the altar as an image or PDF is done from the application menu — see [Export and Import](#export-and-import).
 
-**Sidebar in edit mode.** The full editor — Favicon, Canvas Options, Background, Overlay Options, Grid Options and Placed Elements — shows only in edit mode. Each section collapses with a chevron; which ones are open is remembered per vault (the same for every altar) and defaults to open.
+**Sidebar in edit mode.** The full editor — Favicon, Canvas Options, Grid Options and Placed Elements — shows only in edit mode. Each section collapses with a chevron; which ones are open is remembered per vault (the same for every altar) and defaults to open.
 
 **Canvas resolution.** In edit mode, the "Canvas Options" section offers six aspect ratios (16:9, 4:3, 3:2, 1:1, 2:3, 9:16); the canvas then fills the available space at that proportion. An altar with a fixed pixel size (e.g. 1920 × 1080) renders at that size, scaled to fit. Dashboard cards reflect each altar's aspect ratio.
 
@@ -211,9 +211,7 @@ The grid also appears in thumbnails and exported images.
 
 **Multiple altars.** You can create several named altars, each with its own title, background and placements.
 
-**Backgrounds.** Choose a **gradient** — one of 7 preset colours or any colour from a colour wheel, in a small modal whose Save writes it to the altar — one of 16 photographic presets, or upload your own image (up to 5 MB). The photographic presets are grouped by theme (Forest & Nature, Mountains, Caves & Grottos, Magic & Portals, Temples & Halls) in a thumbnail grid; the full image loads only when the preset is in use. Each has a translated name. Removing a custom image or a gradient falls back to the first photographic preset. Altars from older versions keep their original colour background.
-
-**Overlay Options.** In edit mode, the "Overlay Options" section (between Background and Grid Options) has an opacity slider (0–100%, default 20%) and a Dark/Light toggle for the overlay's colour (dark by default). The overlay sits on top of every kind of background.
+**Backgrounds.** The background button at the end of the canvas bar sets the altar's background: no fill, a colour, or a linear or radial gradient of two or three colours (a linear one at any angle, a radial one from the top, middle or bottom), a picture of your own over it (up to 5 MB) that fills the canvas or fits into it, and a tint over both that darkens or lightens it by a chosen strength. Every change shows at once and is saved with the altar, in its exports and its card. An altar whose background was never changed there shows what it had before: its preset or picture with its overlay.
 
 **View mode and full-window mode.** Full-window mode is available only in view mode: entering edit mode, leaving the altar, or pressing **Escape** ends it — the dashboard never opens in it. The fullscreen toggle sits in the sidebar's action bar while the sidebar is open; otherwise it floats over the canvas. While full-window mode is on, its exit button is always visible.
 
@@ -249,7 +247,7 @@ If the entry was just created and never confirmed with Done, Cancel moves it to 
 
 The same applies to an altar and to the page of one of your own blocks or a template.
 
-An **altar** saves every canvas action the moment it happens, so its Cancel puts it back as it was when Edit was pressed — placements, background, overlay, grid, format, icon and title, along with its preview and its place in the list. A change to a library item is not taken back, since items belong to every altar.
+An **altar** saves every canvas action the moment it happens, so its Cancel puts it back as it was when Edit was pressed — placements, background, grid, format, icon and title, along with its preview and its place in the list. A change to a library item is not taken back, since items belong to every altar.
 
 **List header, split between the main area and the sidebar.** While a list view is showing — Home, Journal, Wiki, Operations, Tasks, the Altar dashboard, Trash, Categories, Tags, or the Blocks, Templates and Lexicon lists — its title and search sit above the list in the main area. Everything else lives in the right sidebar while it is open: the view's actions (a labelled "+ New …" button — on the Altar with an "add item" button beside it; Trash shows select-all and bulk delete instead), then view and sort as two rows of icon toggles, then the always-visible filter panel. Closing the sidebar hides those parts and gives the list the width back.
 
@@ -491,7 +489,7 @@ The Emerald format (`.emerald`) is a JSON file holding a full entry — or a ful
 
 **Templates** export from their page or the templates list's context menu as `"version": "3"`, `"type": "template"` — a combination used only for templates, so an older app rejects the file instead of mistaking it for an operation. It carries the template's blocks, images and Blocks-view blocks like an entry, plus its icon, the title new entries get, its tags and its assignments. A built-in category in an assignment travels by id (its name depends on the language); any other by name and emoji, created on import if nothing matches (at most 20 new categories per file, so a crafted file can't flood the list). Which template is a *default* never travels — importing never displaces a default the vault already has.
 
-**Altars.** The file carries background, overlay, grid and snapping settings, format, icon, thumbnail, the categories of the placed items (name and emoji), and every placed item with its name, emoji, category, note, image and placement (position, size, rotation, opacity, layer, locked/hidden). An imported background goes through the same 5 MB limit as an uploaded one. Import creates a new altar:
+**Altars.** The file carries the background (with its picture), grid and snapping settings, format, icon, thumbnail, the categories of the placed items (name and emoji), and every placed item with its name, emoji, category, note, image and placement (position, size, rotation, opacity, layer, locked/hidden). An imported background goes through the same 5 MB limit as an uploaded one. Import creates a new altar:
 
 - Categories not present locally (matched by name, ignoring case) are created first, so items land in the right category.
 - Items are matched against the library by name, category and image, reusing an existing item where possible — so re-importing a file, or importing into a vault that already has the same items, doesn't pile up duplicates, while items that only share a name but differ in artwork stay separate.

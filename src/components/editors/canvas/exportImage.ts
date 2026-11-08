@@ -2,6 +2,7 @@ import { drawElement, drawPlaced, resourcesOf } from './draw';
 import { BUILTIN_CANVAS_TYPES } from './elements';
 import type { Box } from './geometry';
 import { attrs, num } from './svg';
+import { backgroundSvg, drawCanvasBackground, hasBackground, type CanvasBackground } from './background';
 import { byZ, type CanvasElement, type CanvasTypes } from './types';
 
 export interface RenderOptions {
@@ -15,7 +16,9 @@ export interface RenderOptions {
   outWidth?: number;
   /** Only this part of the artboard, in artboard pixels; default the whole of it. */
   region?: Box;
-  /** Paints what lies behind the elements, in output pixels of the whole artboard. */
+  /** The artboard's background (its picture's `src` loaded with `loadImage`); without it, transparent. */
+  background?: CanvasBackground | null;
+  /** Paints what else lies behind the elements, over `background`, in output pixels of the whole artboard. */
   drawBackground?: (ctx: CanvasRenderingContext2D, outWidth: number, outHeight: number) => Promise<void> | void;
   /**
    * Loads a picture source the elements name. For a canvas that is read back
@@ -48,9 +51,14 @@ export async function renderCanvasImage(options: RenderOptions): Promise<HTMLCan
   const ctx = canvas.getContext('2d');
   if (!ctx) return null;
   ctx.translate(-frame.region.x * frame.scale, -frame.region.y * frame.scale);
-  await options.drawBackground?.(ctx, Math.round(options.width * frame.scale), Math.round(options.height * frame.scale));
-
   const { visible, images } = await loadScene(options, types);
+  const fullW = Math.round(options.width * frame.scale), fullH = Math.round(options.height * frame.scale);
+  if (hasBackground(options.background)) {
+    const src = options.background.image?.src;
+    drawCanvasBackground(ctx, options.background, fullW, fullH, src ? images.get(src) ?? null : null);
+  }
+  await options.drawBackground?.(ctx, fullW, fullH);
+
   ctx.scale(frame.scale, frame.scale);
   for (const el of visible) drawPlaced(ctx, el, types, { image: (src) => images.get(src) ?? null, time: null });
   return canvas;
@@ -68,6 +76,8 @@ function frameOf(options: RenderOptions): { region: Box; outW: number; outH: num
 async function loadScene(options: RenderOptions, types: CanvasTypes) {
   const visible = byZ(options.elements).filter((el) => !el.hidden);
   const { sources, fonts } = resourcesOf(visible, types);
+  const backgroundSrc = hasBackground(options.background) ? options.background.image?.src : undefined;
+  if (backgroundSrc && !sources.includes(backgroundSrc)) sources.push(backgroundSrc);
   // Text needs its font before measuring and drawing, or the fallback is drawn.
   await Promise.all(fonts.map((font) => document.fonts?.load(font).catch(() => [])));
   const load = options.loadImage ?? loadPlain;
@@ -118,6 +128,10 @@ export async function renderCanvasSvg(options: RenderOptions): Promise<string> {
   };
 
   const body: string[] = [];
+  if (hasBackground(options.background)) {
+    const src = options.background.image?.src;
+    body.push(backgroundSvg(options.background, options.width, options.height, src ? href(src) : null, id, defs));
+  }
   if (options.drawBackground) {
     const bg = document.createElement('canvas');
     // As many pixels as the picture has across the artboard, bounded.

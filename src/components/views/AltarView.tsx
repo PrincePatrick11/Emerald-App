@@ -33,7 +33,6 @@ import { AltarLibraryStrip } from '../altar/AltarLibraryStrip';
 import { AltarItemModal } from '../altar/AltarItemModal';
 import { AltarLibrarySection } from '../altar/AltarLibrarySection';
 import { AltarCard, AltarListRow, buildAltarContextMenuActions } from '../altar/AltarCard';
-import { imageSrc } from '../../lib/images';
 import { saveAltarPicture } from '../../lib/altarExport';
 import { useSessionState } from '../../store/sessionStore';
 import { createItem } from '../../lib/createItem';
@@ -270,8 +269,6 @@ export default function AltarView() {
     } : undefined,
   });
 
-  const backgroundSrc = imageSrc(activeAltar?.background_image_data);
-
   // An empty frame for the one loading step — short enough that nothing
   // visible is needed, but just not the dashboard.
   if (isAltarLoading) return <div className="h-full" />;
@@ -487,7 +484,6 @@ export default function AltarView() {
         <AltarCanvas
           key={activeAltar.id}
           altar={activeAltar}
-          backgroundSrc={backgroundSrc || null}
           editable={isEditing}
           readAlign={altarWindowFullscreen ? 'center' : 'top'}
           onExport={(options) => { void saveAltarPicture(options).catch(console.error); }}

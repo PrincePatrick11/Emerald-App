@@ -2689,6 +2689,57 @@ html[data-theme] .prop-segment--active {
   background: var(--well-solid);
   box-shadow: inset -1px -1px 0 var(--edge-strong);
 }
+/* The background panel of the canvas editor's bar. */
+.canvas-bg-panel {
+  width: 15.5rem;
+  gap: 6px;
+}
+.canvas-bg-preview {
+  height: 3.5rem;
+  border-radius: 6px;
+  border: 1px solid var(--edge-strong);
+  background-color: transparent;
+  background-image: conic-gradient(var(--well-raise) 25%, transparent 0 50%, var(--well-raise) 0 75%, transparent 0);
+  background-size: 12px 12px;
+}
+.canvas-bg-heading {
+  margin-top: 4px;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-subtle);
+}
+.canvas-bg-segments { align-self: flex-start; }
+.canvas-bg-stops, .canvas-bg-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.canvas-bg-icon, .canvas-bg-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 24px;
+  min-width: 24px;
+  padding: 0 6px;
+  border-radius: 5px;
+  border: 1px solid var(--field-border);
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+.canvas-bg-icon:hover:not(:disabled), .canvas-bg-button:hover:not(:disabled) { background: var(--interactive-hover); }
+.canvas-bg-icon:disabled, .canvas-bg-button:disabled { opacity: 0.45; }
+.canvas-bg-button { flex: 1; }
+.canvas-bg-slider {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+.canvas-bg-slider input { flex: 1; min-width: 0; }
 /* The canvas editor's export dialog: a label, then its segments or fields. */
 .canvas-export-row {
   display: flex;

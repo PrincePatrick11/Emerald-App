@@ -9,6 +9,8 @@ import {
 import { ToolbarBtn, ToolbarDivider, ToolbarGroup } from '../shared/toolbarParts';
 import PopoverButton from '../shared/PopoverButton';
 import type { CanvasController } from './CanvasEditor';
+import BackgroundPanel from './BackgroundPanel';
+import { EMPTY_BACKGROUND } from './background';
 import type { AlignEdge } from './canvasActions';
 
 const ALIGN_ICONS: Record<AlignEdge, ReactNode> = {
@@ -25,7 +27,8 @@ const ALIGN_ICONS: Record<AlignEdge, ReactNode> = {
  * first, then what the selection has — the controls of the
  * selected elements' types; aligning the selection, and — without the
  * element list, which has them — stacking, grouping, duplicating and
- * removing; at the far end the element list and saving as an image. Zoom
+ * removing; at the far end the background, the rulers, the element list and
+ * saving as a picture. Zoom
  * sits on the stage itself (`CanvasZoom`), so the bar stays one row.
  */
 export default function CanvasToolbar({ controller: c, end }: { controller: CanvasController; end?: ReactNode }) {
@@ -113,6 +116,7 @@ export default function CanvasToolbar({ controller: c, end }: { controller: Canv
       )}
 
       <div className="editor-toolbar-end">
+        {c.setBackground && <BackgroundPanel value={c.background ?? EMPTY_BACKGROUND} onChange={c.setBackground} images={c.backgroundImages} />}
         {c.canRulers && (
           <ToolbarBtn onClick={c.toggleRulers} active={c.rulers} title={t('canvas.rulers')}><Ruler size={14} /></ToolbarBtn>
         )}

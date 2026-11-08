@@ -51,6 +51,8 @@ import {
   DEFAULT_OVERLAY_COLOR, DEFAULT_GRID_COLOR, DEFAULT_GRID_OPACITY, DEFAULT_GRID_SIZE,
 } from './altarConstants';
 import { noAltarOpenMessage } from './altarExport';
+import { parseCanvasBackground, type CanvasBackground } from '../components/editors/canvas/background';
+import { isAppBackground } from './altarBackground';
 
 // ── Link chips across vault boundaries ───────────────────────────────────────
 
@@ -314,6 +316,8 @@ interface EmeraldMeta {
   altarBackgroundImagePath?: string;
   altarBackgroundOverlay?: number;
   altarBackgroundOverlayColor?: string;
+  /** The background as the canvas editor sets it; its picture, if of the vault, is `altarBackgroundImagePath`. */
+  altarCanvasBackground?: CanvasBackground;
   altarThumbnailData?: string;
   altarIconData?: string;
   altarGridEnabled?: boolean;
@@ -583,6 +587,7 @@ async function exportAltarAsEmerald(): Promise<void> {
     altarBackgroundImagePath: altar.background_image_data ?? undefined,
     altarBackgroundOverlay: altar.background_overlay,
     altarBackgroundOverlayColor: altar.background_overlay_color,
+    altarCanvasBackground: altar.canvas_background ?? undefined,
     altarThumbnailData: altar.thumbnail_data ?? undefined,
     altarIconData: altar.icon_data ?? undefined,
     altarGridEnabled: altar.grid_enabled,
@@ -1151,6 +1156,17 @@ async function remapAltarImagePath(path: string | undefined, images: Record<stri
   }
 }
 
+/**
+ * The canvas background of an imported altar: checked like a stored one, its
+ * picture of the vault pointing at the image as imported, or left out if
+ * that did not come along.
+ */
+function importedCanvasBackground(raw: unknown, imported: string | null | undefined): CanvasBackground | null {
+  const bg = parseCanvasBackground(raw);
+  if (!bg?.image || isAppBackground(bg.image.src)) return bg;
+  return { ...bg, image: imported ? { ...bg.image, src: imported } : null };
+}
+
 async function importAltarEntry(file: EmeraldFile): Promise<string> {
   const { createAltar, updateAltar, updateAltarGrid, updateAltarResolution, permanentlyDeleteAltar, permanentlyDeleteItem } = useAltarStore.getState();
   const altar = await createAltar({ createdAt: importedCreatedAt(file) });
@@ -1172,6 +1188,7 @@ async function importAltarEntry(file: EmeraldFile): Promise<string> {
       background_image_data: backgroundImageData,
       background_overlay: meta.altarBackgroundOverlay ?? DEFAULT_BACKGROUND_OVERLAY,
       background_overlay_color: meta.altarBackgroundOverlayColor ?? DEFAULT_OVERLAY_COLOR,
+      canvas_background: importedCanvasBackground(meta.altarCanvasBackground, backgroundImageData),
       thumbnail_data: meta.altarThumbnailData ?? null,
       icon_data: meta.altarIconData ?? null,
     });
