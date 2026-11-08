@@ -2689,6 +2689,84 @@ html[data-theme] .prop-segment--active {
   background: var(--well-solid);
   box-shadow: inset -1px -1px 0 var(--edge-strong);
 }
+/* A tool's choice beside the tool column, such as the symbol library. */
+.canvas-rail-picker {
+  position: absolute;
+  left: calc(100% + 8px);
+  top: 0;
+  z-index: 5;
+  padding: 6px;
+}
+/* The symbol library: search, the packs, a grid of symbols. */
+.canvas-symbols {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 17.5rem;
+}
+.canvas-symbols-search {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 8px;
+  border: 1px solid var(--field-border);
+  border-radius: 6px;
+  background: var(--field-inset-bg);
+  color: var(--text-subtle);
+}
+.canvas-symbols-search input {
+  flex: 1;
+  min-width: 0;
+  background: transparent;
+  color: var(--text-primary);
+  font-size: 12px;
+  outline: none;
+}
+.canvas-symbols-packs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.canvas-symbols-pack {
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--field-border);
+  font-size: 11px;
+  color: var(--text-muted);
+}
+.canvas-symbols-pack:hover { color: var(--text-secondary); background: var(--interactive-hover); }
+.canvas-symbols-pack--active,
+.canvas-symbols-pack--active:hover {
+  border-color: color-mix(in srgb, var(--accent) 44%, transparent);
+  background: var(--menu-item-active-bg);
+  color: var(--menu-item-active-text);
+}
+.canvas-symbols-grid {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 2px;
+  max-height: 15rem;
+  overflow-y: auto;
+}
+.canvas-symbols-item {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  aspect-ratio: 1;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  color: var(--text-secondary);
+}
+.canvas-symbols-item:hover { background: var(--interactive-hover); color: var(--text-primary); }
+.canvas-symbols-item--active { border-color: color-mix(in srgb, var(--accent) 44%, transparent); color: var(--accent); }
+.canvas-symbols-empty {
+  grid-column: 1 / -1;
+  padding: 1rem 0;
+  text-align: center;
+  font-size: 12px;
+  color: var(--text-subtle);
+}
 /* The background panel of the canvas editor's bar. */
 .canvas-bg-panel {
   width: 15.5rem;

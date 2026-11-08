@@ -1,4 +1,5 @@
-import { Fragment, type ReactNode } from 'react';
+import { Fragment, useRef, useState, type ReactNode } from 'react';
+import { useOutsideClick } from '../../../hooks/useOutsideClick';
 import { useTranslation } from 'react-i18next';
 import {
   AlignHorizontalDistributeCenter, AlignHorizontalJustifyCenter, AlignHorizontalJustifyEnd,
@@ -149,9 +150,15 @@ export default function CanvasToolbar({ controller: c, end }: { controller: Canv
 export function CanvasToolRail({ controller: c }: { controller: CanvasController }) {
   const { t } = useTranslation();
   const groups = Object.values(c.types).filter((type) => type.additions?.length);
+  /** The tool whose choice (`picker`) is open beside the column. */
+  const [picking, setPicking] = useState<{ type: string; key: string } | null>(null);
+  const railRef = useRef<HTMLDivElement>(null);
+  useOutsideClick(!!picking, () => setPicking(null), { refs: [railRef], escape: true });
+  const open = picking && groups.find((type) => type.type === picking.type)?.additions?.find((a) => a.key === picking.key);
+  const Picker = open ? open.picker : undefined;
   const label = (title: string, shortcut?: string) => (shortcut ? `${title} (${shortcut.toUpperCase()})` : title);
   return (
-    <div className="editor-toolbar paint-rail" role="toolbar" aria-orientation="vertical" aria-label={t('canvas.tools')}>
+    <div ref={railRef} className="editor-toolbar paint-rail" role="toolbar" aria-orientation="vertical" aria-label={t('canvas.tools')}>
       <div className="paint-rail-group">
         <ToolbarBtn onClick={() => c.setTool(null)} active={!c.tool} title={label(t('editor.paint.tools.select'), 'v')}>
           <MousePointer2 size={15} />
@@ -163,7 +170,10 @@ export function CanvasToolRail({ controller: c }: { controller: CanvasController
           {type.additions!.map((addition) => (
             <ToolbarBtn
               key={addition.key}
-              onClick={() => c.setTool({ type: type.type, key: addition.key })}
+              onClick={() => {
+                if (addition.picker) setPicking((p) => (p?.type === type.type && p.key === addition.key ? null : { type: type.type, key: addition.key }));
+                else c.setTool({ type: type.type, key: addition.key });
+              }}
               active={c.tool?.type === type.type && c.tool.key === addition.key}
               title={label(addition.label(t), addition.shortcut)}
             >
@@ -172,6 +182,11 @@ export function CanvasToolRail({ controller: c }: { controller: CanvasController
           ))}
         </div>
       ))}
+      {picking && Picker && (
+        <div className="editor-selection-menu canvas-rail-picker">
+          <Picker onPicked={() => { c.setTool(picking); setPicking(null); }} />
+        </div>
+      )}
     </div>
   );
 }

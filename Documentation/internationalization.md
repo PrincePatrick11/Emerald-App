@@ -87,6 +87,7 @@ Top-level keys of `en.json`, with the conventions worth knowing:
 | `creation` | The sigil creation tools (intention, letters, canvas, charge) |
 | `blocks` | Content-block UI and the Blocks view: `types.*` (block types), `kinds.*` (one per `ElementKind`, shared by the "Add block" menu and the builder's element picker), `fields.*` (field block), `sigil.*` (standalone sigil blocks and their in-block parts), `altar.*` (altar field kind), `library.*` (the Blocks builder and its update/remove-copies notices) |
 | `editor` | Shared editor buttons, link-popup actions, `lockedBySigil`, and `toolbar.*` (every formatting-toolbar tooltip) |
+| `symbols` | The canvas editor's symbol library: its own labels, `packs.*` the pack names, and `<pack>.<name>` every symbol's name, which the library's search looks in |
 | `moonPhase` | Display names of the eight moon phases |
 | `search` | Dashboard search placeholders (`placeholder`, `placeholderIn` with `{{title}}`) and the title bar's global search (`globalPlaceholder`, `hint`, `clear`, `showMore`). Result module labels reuse `nav.*`; only `altarElements`/`categories` have their own |
 | `templates` | Templates dashboard and page; `builtin.sigil` names the built-in `core-sigil` template the way `categories.builtin.*` names a category; `insert.*` is the editor's picker and apply flow |

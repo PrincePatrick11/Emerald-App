@@ -647,6 +647,14 @@ console.log('\n4f. Sigil blocks\n');
     check('altar: guides are read with their place in percent, doubles and nonsense left out',
       settings.guides_locked && settings.guides.length === 2 && settings.guides[1].at === 100
         && !parseAltarSettings('{}').guides_locked && parseAltarSettings('{}').guides.length === 0, settings.guides);
+    const symbols = parseAltarElements(JSON.stringify([
+      { id: 's', kind: 'symbol', symbol: { symbol: 'runes.fehu', d: 'M38 10L38 90', color: '#123456', weight: 99, fill: null } },
+      { id: 't', kind: 'symbol', symbol: { symbol: 'planets.sun', d: 'M0 0<script>' } },
+    ]), 'altar');
+    const symbolsAgain = parseAltarElements(altarElementsJson(symbols), 'altar');
+    check('altar: a symbol keeps its path and colour, its weight is clamped, a foreign path gives way to the library\'s',
+      symbolsAgain[0].symbol.d === 'M38 10L38 90' && symbolsAgain[0].symbol.color === '#123456' && symbolsAgain[0].symbol.weight === 16
+        && symbolsAgain[1].symbol.symbol === 'planets.sun' && !symbolsAgain[1].symbol.d.includes('<'), symbolsAgain);
     check('canvas: copies of a group form a new group of their own',
       copies.length === 2 && copies[0].group && copies[0].group !== 'g' && copies[0].group === copies[1].group, copies);
   }

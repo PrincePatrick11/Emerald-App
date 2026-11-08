@@ -1,12 +1,14 @@
-import type { AltarPlacement, AltarShapeStyle, AltarShapeType, AltarTextStyle } from '../types';
+import type { AltarPlacement, AltarShapeStyle, AltarShapeType, AltarSymbolStyle, AltarTextStyle } from '../types';
 import { generateId, isValidHexColor } from './helpers';
 import { MAX_SIDES, MIN_SIDES, emptyPaintDoc, paintDocFromJson, paintDocToJson } from './paint/document';
+import { DEFAULT_WEIGHT, MAX_WEIGHT, MIN_WEIGHT, isSymbolPath } from '../components/editors/canvas/symbols/limits';
+import { SYMBOLS_BY_ID } from '../components/editors/canvas/symbols/packs';
 
 /**
  * Shapes, text and drawings made on an altar. They hang on no library item,
  * so they are not rows of `altar_placements` (whose `item_id` is required) but
  * a JSON list in `altars.elements` (since v56). In the store they are
- * placements with `kind` 'shape', 'text' or 'drawing', with the same position,
+ * placements with `kind` 'shape', 'text', 'drawing' or 'symbol', with the same position,
  * size, stacking and switches as an item's placement; `item_id` is empty.
  *
  * Positions and box sizes in the units of a placement (`x`/`y` in percent of
@@ -51,6 +53,20 @@ function textStyle(raw: unknown): AltarTextStyle {
   };
 }
 
+/** A symbol's style; a path that is not plain path data falls back to the library's for its id, or the first symbol's. */
+function symbolStyle(raw: unknown): AltarSymbolStyle {
+  const s = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>;
+  const id = typeof s.symbol === 'string' ? s.symbol : '';
+  const known = SYMBOLS_BY_ID.get(id) ?? SYMBOLS_BY_ID.values().next().value!;
+  return {
+    symbol: isSymbolPath(s.d) || SYMBOLS_BY_ID.has(id) ? id : known.id,
+    d: isSymbolPath(s.d) ? s.d : known.d,
+    color: color(s.color) ?? '#d4af37',
+    weight: num(s.weight, DEFAULT_WEIGHT, MIN_WEIGHT, MAX_WEIGHT),
+    fill: color(s.fill),
+  };
+}
+
 /**
  * The drawn elements of an altar from the content of `altars.elements`.
  * Anything unusable is left out or falls back to a default — the text may come
@@ -71,11 +87,12 @@ export function parseAltarElements(raw: unknown, altarId: string): AltarPlacemen
   for (const entry of list) {
     if (!entry || typeof entry !== 'object') continue;
     const e = entry as Record<string, unknown>;
-    if (e.kind !== 'shape' && e.kind !== 'text' && e.kind !== 'drawing') continue;
+    if (e.kind !== 'shape' && e.kind !== 'text' && e.kind !== 'drawing' && e.kind !== 'symbol') continue;
     const id = typeof e.id === 'string' && e.id && !seen.has(e.id) ? e.id : generateId();
     seen.add(id);
     const shape = e.kind === 'shape' ? shapeStyle(e.shape) : undefined;
     const text = e.kind === 'text' ? textStyle(e.text) : undefined;
+    const symbol = e.kind === 'symbol' ? symbolStyle(e.symbol) : undefined;
     // A drawing without layer images: those come only from old sigil drawings.
     const drawing = e.kind === 'drawing' ? paintDocFromJson(e.drawing) ?? emptyPaintDoc() : undefined;
     result.push({
@@ -99,6 +116,7 @@ export function parseAltarElements(raw: unknown, altarId: string): AltarPlacemen
       ...(shape ? { shape } : {}),
       ...(text ? { text } : {}),
       ...(drawing ? { drawing } : {}),
+      ...(symbol ? { symbol } : {}),
     });
   }
   return result;
@@ -125,6 +143,7 @@ export function altarElementsJson(placements: readonly AltarPlacement[]): string
       ...(p.kind === 'shape' ? { shape: p.shape ?? shapeStyle({}) } : {}),
       ...(p.kind === 'text' ? { text: p.text ?? textStyle({}) } : {}),
       ...(p.kind === 'drawing' ? { drawing: paintDocToJson(p.drawing ?? emptyPaintDoc()) } : {}),
+      ...(p.kind === 'symbol' ? { symbol: p.symbol ?? symbolStyle({}) } : {}),
     })),
   );
 }
@@ -134,9 +153,15 @@ export function withNewElementIds(raw: unknown, altarId: string): string {
   return altarElementsJson(parseAltarElements(raw, altarId).map((p) => ({ ...p, id: generateId() })));
 }
 
-/** What the sidebar calls a drawn element: its text, the kind of shape, or `drawingName`. */
-export function drawnLabel(p: AltarPlacement, shapeName: (type: AltarShapeType) => string, drawingName = ''): string {
+/** What the sidebar calls a drawn element: its text, the kind of shape, `drawingName`, or the symbol's name. */
+export function drawnLabel(
+  p: AltarPlacement,
+  shapeName: (type: AltarShapeType) => string,
+  drawingName = '',
+  symbolName: (id: string) => string = (id) => id,
+): string {
   if (p.kind === 'drawing') return drawingName;
+  if (p.kind === 'symbol') return symbolName(p.symbol?.symbol ?? '');
   if (p.kind === 'text') return p.text?.content.split('\n')[0].trim() || '…';
   return shapeName(p.shape?.type ?? 'rect');
 }

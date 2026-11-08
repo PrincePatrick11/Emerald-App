@@ -1,0 +1,135 @@
+import { circle, corners, join, line, poly, starPolygon } from './paths';
+
+/**
+ * The symbols that come with the app, drawn for it as centre lines in a box
+ * of 100 × 100 (see `paths.ts`). A pack is a named list; a symbol's id is
+ * `pack.name`, its name the translation `symbols.<pack>.<name>`. Other packs
+ * can join the list in the same shape.
+ */
+export interface SymbolDef {
+  /** `pack.name`, unique. */
+  id: string;
+  /** Path data in the 100 × 100 box. */
+  d: string;
+}
+
+export interface SymbolPack {
+  id: string;
+  symbols: SymbolDef[];
+}
+
+/** A triangle pointing up or down, with a bar across for air and earth. */
+const triangleUp = poly([[50, 14], [88, 80], [12, 80]], true);
+const triangleDown = poly([[50, 86], [88, 20], [12, 20]], true);
+
+const sun = join(circle(50, 50, 34), circle(50, 50, 3));
+const moon = 'M62 12A40 40 0 1 0 62 88A44 44 0 0 1 62 12Z';
+const mercury = join(circle(50, 48, 16), 'M32 12C34 28 66 28 68 12', line(50, 64, 50, 92), line(38, 80, 62, 80));
+const venus = join(circle(50, 36, 22), line(50, 58, 50, 90), line(34, 75, 66, 75));
+const mars = join(circle(42, 58, 24), line(59, 41, 84, 16), poly([[62, 16], [84, 16], [84, 38]]));
+const jupiter = join('M22 40C22 22 42 18 46 32C50 46 38 60 20 66L84 66', line(66, 18, 66, 90));
+const saturn = join(line(24, 22, 48, 22), line(36, 10, 36, 66), 'M36 44C44 30 66 32 66 48C66 62 50 70 54 82C56 88 64 90 70 84');
+
+const pack = (id: string, entries: Record<string, string>): SymbolPack => ({
+  id,
+  symbols: Object.entries(entries).map(([name, d]) => ({ id: `${id}.${name}`, d })),
+});
+
+export const SYMBOL_PACKS: SymbolPack[] = [
+  pack('planets', {
+    sun,
+    moon,
+    mercury,
+    venus,
+    earth: join(circle(50, 50, 34), line(50, 16, 50, 84), line(16, 50, 84, 50)),
+    mars,
+    jupiter,
+    saturn,
+    uranus: join(line(24, 14, 24, 60), line(76, 14, 76, 60), line(24, 38, 76, 38), line(50, 14, 50, 66), circle(50, 78, 10)),
+    neptune: join('M22 20C22 56 78 56 78 20', line(50, 12, 50, 90), line(34, 74, 66, 74), poly([[14, 28], [22, 20], [30, 28]]), poly([[42, 20], [50, 12], [58, 20]]), poly([[70, 28], [78, 20], [86, 28]])),
+    pluto: join(circle(50, 28, 12), 'M24 20C24 56 76 56 76 20', line(50, 48, 50, 90), line(36, 74, 64, 74)),
+    northNode: join('M30 70C12 50 22 18 50 18C78 18 88 50 70 70', circle(26, 76, 7), circle(74, 76, 7)),
+    southNode: join('M30 30C12 50 22 82 50 82C78 82 88 50 70 30', circle(26, 24, 7), circle(74, 24, 7)),
+  }),
+  pack('zodiac', {
+    aries: 'M50 86L50 38C50 18 38 12 30 14C20 17 16 28 22 36M50 38C50 18 62 12 70 14C80 17 84 28 78 36',
+    taurus: join(circle(50, 64, 22), 'M16 18C24 38 38 42 50 42C62 42 76 38 84 18'),
+    gemini: join('M20 16Q50 30 80 16', 'M20 84Q50 70 80 84', line(38, 24, 38, 76), line(62, 24, 62, 76)),
+    cancer: join(circle(30, 38, 9), 'M30 29C50 22 72 22 88 32', circle(70, 62, 9), 'M70 71C50 78 28 78 12 68'),
+    leo: join(circle(32, 60, 13), 'M44 54C44 30 50 16 64 16C78 16 82 32 72 48C64 60 64 74 74 82C80 86 86 82 88 76'),
+    virgo: join(line(14, 26, 14, 80), 'M14 36C14 24 32 24 32 36L32 80', 'M32 36C32 24 50 24 50 36L50 80', 'M50 36C50 24 66 24 66 36L66 72C66 84 76 84 80 74C84 64 76 58 70 66C64 74 62 84 56 90'),
+    libra: join(line(14, 80, 86, 80), 'M14 62L36 62C26 50 32 30 50 30C68 30 74 50 64 62L86 62'),
+    scorpio: join(line(12, 26, 12, 72), 'M12 36C12 24 30 24 30 36L30 72', 'M30 36C30 24 48 24 48 36L48 70C48 82 58 84 70 76L84 66', poly([[72, 64], [84, 66], [82, 78]])),
+    sagittarius: join(line(18, 82, 82, 18), poly([[52, 18], [82, 18], [82, 48]]), line(30, 46, 54, 70)),
+    capricorn: 'M12 22C22 22 26 32 28 42L34 78L48 30C52 20 62 22 62 34L62 60C62 80 84 82 86 66C88 52 70 50 62 64C58 74 52 84 40 88',
+    aquarius: join(poly([[10, 42], [25, 30], [40, 42], [55, 30], [70, 42], [85, 30], [92, 36]]), poly([[10, 68], [25, 56], [40, 68], [55, 56], [70, 68], [85, 56], [92, 62]])),
+    pisces: join('M26 14C46 34 46 66 26 86', 'M74 14C54 34 54 66 74 86', line(22, 50, 78, 50)),
+    conjunction: join(circle(40, 60, 20), line(54, 46, 82, 18)),
+    opposition: join(circle(24, 76, 12), circle(76, 24, 12), line(32, 68, 68, 32)),
+    trine: triangleUp,
+    square: poly([[18, 18], [82, 18], [82, 82], [18, 82]], true),
+    sextile: join(line(50, 12, 50, 88), line(17, 31, 83, 69), line(17, 69, 83, 31)),
+  }),
+  pack('alchemy', {
+    fire: triangleUp,
+    water: triangleDown,
+    air: join(triangleUp, line(26, 56, 74, 56)),
+    earth: join(triangleDown, line(26, 44, 74, 44)),
+    salt: join(circle(50, 50, 34), line(16, 50, 84, 50)),
+    sulfur: join(poly([[50, 10], [78, 52], [22, 52]], true), line(50, 52, 50, 92), line(34, 72, 66, 72)),
+    mercury,
+    gold: sun,
+    silver: moon,
+    copper: venus,
+    iron: mars,
+    tin: jupiter,
+    lead: saturn,
+    antimony: join(circle(50, 62, 26), line(50, 36, 50, 8), line(38, 20, 62, 20)),
+    // The circle, the triangle in it, the square standing in the triangle, and the circle in the square.
+    philosophersStone: join(circle(50, 50, 44), poly(corners(3, 50, 50, 44), true), poly([[32.3, 36.6], [67.7, 36.6], [67.7, 72], [32.3, 72]], true), circle(50, 54.3, 17.7)),
+  }),
+  pack('runes', {
+    fehu: join(line(38, 10, 38, 90), line(38, 32, 66, 14), line(38, 52, 66, 34)),
+    uruz: poly([[32, 90], [32, 12], [66, 32], [66, 90]]),
+    thurisaz: join(line(36, 10, 36, 90), poly([[36, 30], [64, 50], [36, 70]])),
+    ansuz: join(line(38, 10, 38, 90), line(38, 12, 66, 30), line(38, 32, 66, 50)),
+    raidho: join(line(34, 10, 34, 90), poly([[34, 12], [64, 30], [34, 48], [66, 90]])),
+    kenaz: poly([[64, 18], [34, 50], [64, 82]]),
+    gebo: join(line(24, 14, 76, 86), line(76, 14, 24, 86)),
+    wunjo: join(line(36, 10, 36, 90), poly([[36, 12], [64, 32], [36, 52]])),
+    hagalaz: join(line(30, 10, 30, 90), line(70, 10, 70, 90), line(30, 38, 70, 62)),
+    naudiz: join(line(50, 10, 50, 90), line(34, 34, 66, 58)),
+    isa: line(50, 10, 50, 90),
+    jera: join(poly([[44, 18], [26, 36], [44, 54]]), poly([[56, 46], [74, 64], [56, 82]])),
+    eihwaz: join(line(50, 10, 50, 90), line(50, 11, 68, 29), line(50, 89, 32, 71)),
+    perthro: join(line(30, 10, 30, 90), poly([[30, 10], [58, 28], [70, 16]]), poly([[30, 90], [58, 72], [70, 84]])),
+    algiz: join(line(50, 10, 50, 90), line(50, 44, 26, 18), line(50, 44, 74, 18)),
+    sowilo: poly([[60, 10], [36, 40], [64, 60], [40, 90]]),
+    tiwaz: join(line(50, 10, 50, 90), poly([[26, 36], [50, 10], [74, 36]])),
+    berkano: join(line(34, 10, 34, 90), poly([[34, 10], [64, 30], [34, 50], [64, 70], [34, 90]])),
+    ehwaz: poly([[28, 90], [28, 10], [50, 32], [72, 10], [72, 90]]),
+    mannaz: join(poly([[28, 90], [28, 10], [72, 46]]), poly([[72, 90], [72, 10], [28, 46]])),
+    laguz: join(line(38, 10, 38, 90), line(38, 12, 64, 32)),
+    ingwaz: poly([[50, 22], [76, 50], [50, 78], [24, 50]], true),
+    dagaz: poly([[22, 14], [22, 86], [78, 14], [78, 86]], true),
+    othala: join(poly([[28, 86], [74, 38], [50, 12], [26, 38], [72, 86]])),
+  }),
+  pack('geometry', {
+    pentagram: starPolygon(5, 2, 50, 54, 42),
+    pentacle: join(circle(50, 50, 44), starPolygon(5, 2, 50, 50, 44)),
+    hexagram: starPolygon(6, 2, 50, 50, 42),
+    sealOfSolomon: join(circle(50, 50, 44), starPolygon(6, 2, 50, 50, 44)),
+    heptagram: starPolygon(7, 3, 50, 52, 42),
+    octagram: starPolygon(8, 3, 50, 50, 42),
+    triangleInCircle: join(circle(50, 50, 42), poly(corners(3, 50, 50, 42), true)),
+    vesicaPiscis: join(circle(38, 50, 26), circle(62, 50, 26)),
+    circumpunct: join(circle(50, 50, 36), circle(50, 50, 4)),
+    solarCross: join(circle(50, 50, 36), line(50, 14, 50, 86), line(14, 50, 86, 50)),
+    ankh: join('M50 44C34 44 32 10 50 10C68 10 66 44 50 44Z', line(50, 44, 50, 90), line(26, 52, 74, 52)),
+    monad: join('M32 10C36 24 64 24 68 10', circle(50, 36, 14), circle(50, 36, 2.5), line(50, 50, 50, 80), line(34, 64, 66, 64), 'M50 80C46 92 34 92 32 82', 'M50 80C54 92 66 92 68 82'),
+    eye: join(poly(corners(3, 50, 58, 42), true), 'M30 64Q50 48 70 64Q50 80 30 64Z', circle(50, 64, 5)),
+  }),
+];
+
+/** Every symbol by its id. */
+export const SYMBOLS_BY_ID: ReadonlyMap<string, SymbolDef> = new Map(SYMBOL_PACKS.flatMap((p) => p.symbols.map((s) => [s.id, s])));

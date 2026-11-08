@@ -82,6 +82,11 @@ export interface CanvasAddition<P = unknown> {
   /** The letter that picks it in the tool column (the paint mode's letter for the same shape). */
   shortcut?: string;
   label: (t: TFunction) => string;
+  /**
+   * A choice to make before drawing (a symbol from the library), shown beside
+   * the tool column when its button is pressed; `onPicked` then picks the tool.
+   */
+  picker?: ComponentType<{ onPicked: () => void }>;
   /** A new element's frame and props around `centre`, on an artboard of the given size. */
   create: (centre: { x: number; y: number }, artboard: { width: number; height: number }, t: TFunction) =>
     Pick<CanvasElement<P>, 'width' | 'height' | 'props'>;

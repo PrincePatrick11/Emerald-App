@@ -1,4 +1,4 @@
-import type { CanvasElement, DrawingProps, ImageProps, ShapeProps, TextProps } from '../editors/canvas';
+import type { CanvasElement, DrawingProps, ImageProps, ShapeProps, SymbolProps, TextProps } from '../editors/canvas';
 import { emptyPaintDoc } from '../../lib/paint/document';
 import { BASE_RESOLUTION_WIDTH, isCandleEmoji } from '../../lib/altarConstants';
 import type { AltarPlacement } from '../../types';
@@ -57,6 +57,10 @@ export function placementToElement(
     };
     return { ...frame, type: 'text', props };
   }
+  if (p.kind === 'symbol' && p.symbol) {
+    const props: SymbolProps = { symbol: p.symbol.symbol, d: p.symbol.d, color: p.symbol.color, weight: p.symbol.weight, fill: p.symbol.fill };
+    return { ...frame, type: 'symbol', props };
+  }
   if (p.kind === 'drawing') {
     const props: DrawingProps = { doc: p.drawing ?? emptyPaintDoc() };
     return { ...frame, type: 'drawing', props };
@@ -84,7 +88,7 @@ export function elementToPlacement(
   const base: AltarPlacement = {
     id: el.id,
     altar_id: previous?.altar_id,
-    kind: el.type === 'shape' || el.type === 'text' || el.type === 'drawing' ? el.type : 'item',
+    kind: el.type === 'shape' || el.type === 'text' || el.type === 'drawing' || el.type === 'symbol' ? el.type : 'item',
     item_id: el.type === 'image' ? el.ref ?? previous?.item_id ?? '' : '',
     name: previous?.name ?? '',
     emoji: previous?.emoji ?? (el.type === 'image' ? (el.props as ImageProps).emoji : ''),
@@ -110,6 +114,10 @@ export function elementToPlacement(
     };
   }
   if (el.type === 'drawing') base.drawing = (el.props as DrawingProps).doc;
+  if (el.type === 'symbol') {
+    const p = el.props as SymbolProps;
+    base.symbol = { symbol: p.symbol, d: p.d, color: p.color, weight: p.weight, fill: p.fill };
+  }
   if (el.type === 'text') {
     const p = el.props as TextProps;
     base.text = {

@@ -23,7 +23,7 @@ function shapeGlyph(shape: AltarShapeStyle | undefined): string {
   return `M${points.map(([x, y]) => `${x.toFixed(2)} ${y.toFixed(2)}`).join('L')}z`;
 }
 
-/** What sits on an altar, small: the item's picture or emoji, a drawn shape, or the letter of a text. */
+/** What sits on an altar, small: the item's picture or emoji, a drawn shape or symbol, or the letter of a text. */
 export const AltarPlacementVisual = memo(function AltarPlacementVisual({ placement, size, animate = true }: {
   placement: AltarPlacement;
   size: number;
@@ -45,6 +45,14 @@ export const AltarPlacementVisual = memo(function AltarPlacementVisual({ placeme
     );
   }
   if (placement.kind === 'drawing') return <PenTool size={size} className="flex-shrink-0 text-muted" aria-hidden />;
+  if (placement.kind === 'symbol') {
+    const symbol = placement.symbol;
+    return (
+      <svg width={size} height={size} viewBox="0 0 100 100" aria-hidden className="flex-shrink-0">
+        <path d={symbol?.d} fill={symbol?.fill ?? 'none'} stroke={symbol?.color ?? 'currentColor'} strokeWidth={8} strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    );
+  }
   if (placement.kind === 'text') {
     return (
       <span
@@ -62,5 +70,5 @@ export const AltarPlacementVisual = memo(function AltarPlacementVisual({ placeme
 /** The name of what sits on an altar: the item's, a text's first line, or the kind of shape. */
 export function placementLabel(placement: AltarPlacement, t: TFunction): string {
   if (placement.kind === 'item') return placement.name;
-  return drawnLabel(placement, (type) => t(`canvas.shape.${type}`), t('canvas.drawing'));
+  return drawnLabel(placement, (type) => t(`canvas.shape.${type}`), t('canvas.drawing'), (id) => t(`symbols.${id}`));
 }

@@ -134,7 +134,7 @@ export interface AltarItem {
  * `altars.elements`, see `lib/altarElements.ts`). The store holds both in one
  * list so stacking, the sidebar and the edit snapshot treat them alike.
  */
-export type AltarPlacementKind = 'item' | 'shape' | 'text' | 'drawing';
+export type AltarPlacementKind = 'item' | 'shape' | 'text' | 'drawing' | 'symbol';
 
 /** `triangle` and `hexagon` come from older altars; new shapes with corners are polygons. */
 export type AltarShapeType = 'rect' | 'ellipse' | 'polygon' | 'triangle' | 'star' | 'hexagon';
@@ -159,6 +159,15 @@ export interface AltarTextStyle {
   align: 'left' | 'center' | 'right';
   bold: boolean;
   italic: boolean;
+}
+
+/** A symbol of the canvas editor's library: its path in a box of 100 × 100, the line weight in those units. */
+export interface AltarSymbolStyle {
+  symbol: string;
+  d: string;
+  color: string;
+  weight: number;
+  fill: string | null;
 }
 
 export interface AltarPlacement {
@@ -191,6 +200,8 @@ export interface AltarPlacement {
   shape?: AltarShapeStyle;
   /** Only for `kind: 'text'`. */
   text?: AltarTextStyle;
+  /** Only for `kind: 'symbol'`. */
+  symbol?: AltarSymbolStyle;
 }
 
 export type TaskPriority = 'low' | 'medium' | 'high';
