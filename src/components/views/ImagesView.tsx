@@ -3,9 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { useShallow } from 'zustand/shallow';
 import { Pencil, Trash2 } from 'lucide-react';
 import { useImageStore } from '../../store/imageStore';
-import { deletePicture } from '../../store/imageActions';
-import { isOnlyDrawingOrBackground, isRemovableUse } from '../../lib/imageUsage';
-import { useUndoStore } from '../../store/undoStore';
+import { isOnlyDrawingOrBackground } from '../../lib/imageUsage';
 import { useTagStore } from '../../store/tagStore';
 import { useSessionState } from '../../store/sessionStore';
 import { useDeepLink } from '../../hooks/useDeepLink';
@@ -50,7 +48,6 @@ export default function ImagesView() {
   const [adding, setAdding] = useState(false);
   const [dropped, setDropped] = useState<string[]>([]);
   const [menu, setMenu] = useState<{ item: ImageItem; x: number; y: number } | null>(null);
-  const pushUndo = useUndoStore((s) => s.push);
 
   // Files dropped anywhere over the view go into the add dialog, opening it.
   const { dragOver } = useFileDrop(!editing, (paths) => {
@@ -139,16 +136,12 @@ export default function ImagesView() {
             onClose={() => setMenu(null)}
             actions={[
               { label: t('images.edit'), icon: <Pencil size={12} />, onClick: () => setEditing(menu.item) },
-              // Still shown somewhere: the dialog asks before taking it out there.
+              // The dialog asks first, naming where the picture is still shown.
               {
                 label: t('contextMenu.delete'),
                 icon: <Trash2 size={12} />,
                 danger: true,
-                onClick: () => {
-                  const { item } = menu;
-                  if ((uses.get(item.file) ?? []).some(isRemovableUse)) setEditing({ ...item, confirmDelete: true });
-                  else void deletePicture(item.file, item.image, t('undo.imageDeleted'), pushUndo);
-                },
+                onClick: () => setEditing({ ...menu.item, confirmDelete: true }),
               },
             ]}
           />

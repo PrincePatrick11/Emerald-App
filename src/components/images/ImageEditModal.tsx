@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Trash2 } from 'lucide-react';
 import { useImageStore } from '../../store/imageStore';
@@ -27,10 +27,10 @@ function viewOf(use: ImageUse): ActiveView {
 
 /**
  * Name, tags and note of a picture in "Images", and where it is used, each
- * place a click away. Deleting puts the picture in the trash with Undo; where
- * it is still shown in texts or image fields, the dialog asks first and takes
- * it out of them too (`deletePicture`). Opened with `confirmDelete`, it starts
- * at that question (the right-click menu).
+ * place a click away. Deleting always asks first — naming the places it is
+ * still shown in, which it is then taken out of too (`deletePicture`) — and
+ * puts the picture in the trash with Undo. Opened with `confirmDelete`, it
+ * starts at that question (the right-click menu).
  */
 export default function ImageEditModal({ file, image, confirmDelete = false, onClose }: {
   file: string;
@@ -46,7 +46,10 @@ export default function ImageEditModal({ file, image, confirmDelete = false, onC
   const [name, setName] = useState(image?.name ?? '');
   const [tags, setTags] = useState<string[]>(image?.tags ?? []);
   const [note, setNote] = useState(image?.note ?? '');
-  const [asking, setAsking] = useState(confirmDelete && removable.length > 0);
+  const [asking, setAsking] = useState(confirmDelete);
+
+  // Where it is used now, not as of the view's last scan.
+  useEffect(() => { void useImageStore.getState().refreshUses(); }, []);
 
   const save = async () => {
     await useImageStore.getState().saveDetails(file, { name: name.trim(), tags, note });
@@ -73,13 +76,15 @@ export default function ImageEditModal({ file, image, confirmDelete = false, onC
       bodyClassName="modal-body space-y-3"
       footer={asking ? (
         <>
-          <p className="mr-auto text-xs text-soft">{t('images.removeFromUses', { count: removable.length })}</p>
+          <p className="mr-auto text-xs text-soft">
+            {removable.length ? t('images.removeFromUses', { count: removable.length }) : t('images.confirmDelete')}
+          </p>
           <Button tone="neutral" onClick={() => setAsking(false)}>{t('common.cancel')}</Button>
-          <Button tone="danger" onClick={remove}>{t('images.removeAndDelete')}</Button>
+          <Button tone="danger" onClick={remove}>{removable.length ? t('images.removeAndDelete') : t('common.delete')}</Button>
         </>
       ) : (
         <>
-          <Button tone="danger" className="mr-auto" onClick={() => (removable.length ? setAsking(true) : void remove())}>
+          <Button tone="danger" className="mr-auto" onClick={() => setAsking(true)}>
             <Trash2 size={14} /> {t('common.delete')}
           </Button>
           <Button tone="neutral" onClick={onClose}>{t('common.cancel')}</Button>

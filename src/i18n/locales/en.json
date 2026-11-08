@@ -604,6 +604,7 @@
     "dropHere": "Drop images here, or click to choose",
     "leaveOut": "Leave out",
     "tagsForAll": "Tags for all",
+    "confirmDelete": "Delete this image?",
     "usedIn": "Used in",
     "unused": "Not used anywhere",
     "removeFromUses_one": "Shown in {{count}} place – take it out there too?",

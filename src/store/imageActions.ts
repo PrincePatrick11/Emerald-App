@@ -1,6 +1,6 @@
 import { getDb } from '../lib/db';
 import { generateId } from '../lib/helpers';
-import { isRemovableUse, withoutImage } from '../lib/imageUsage';
+import { collectImageUses, isRemovableUse, withoutImage } from '../lib/imageUsage';
 import type { VaultImage } from '../types';
 import { useImageStore } from './imageStore';
 import { useEntryStore } from './entryStore';
@@ -22,7 +22,8 @@ export async function deletePicture(
 ): Promise<void> {
   const store = useImageStore.getState();
   const db = await getDb();
-  const removable = (store.uses.get(file) ?? []).filter(isRemovableUse);
+  // Read again, not from the view's last scan: a text may have taken the picture in since.
+  const removable = ((await collectImageUses(db)).get(file) ?? []).filter(isRemovableUse);
   const before: { kind: 'entry' | 'template'; id: string; content: string }[] = [];
 
   for (const use of removable) {
