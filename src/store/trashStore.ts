@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { getDb, sweepDanglingTaskLinks } from '../lib/db';
+import { removeUnusedFiles, useImageStore } from './imageStore';
 import { purgeCategory } from '../lib/schema';
 import { trashWiring } from './moduleWiring';
 import { useTagStore } from './tagStore';
@@ -58,8 +59,8 @@ export const useTrashStore = create<TrashState>((set, get) => ({
       const altarItems = await db.select<{ id: string; name: string; emoji: string; deleted_at: string }[]>(
         `SELECT id, name, emoji, deleted_at FROM altar_items WHERE deleted_at IS NOT NULL`
       );
-      const images = await db.select<{ id: string; name: string; emoji: string; file: string; deleted_at: string }[]>(
-        `SELECT id, name, emoji, file, deleted_at FROM images WHERE deleted_at IS NOT NULL`
+      const images = await db.select<{ id: string; name: string; file: string; deleted_at: string }[]>(
+        `SELECT id, name, file, deleted_at FROM images WHERE deleted_at IS NOT NULL`
       );
       const items: TrashedItem[] = [
         // Without a title of its own, "Unnamed…", as everywhere (`displayTitle`).
@@ -100,7 +101,7 @@ export const useTrashStore = create<TrashState>((set, get) => ({
         })),
         ...images.map((r) => ({
           id: r.id,
-          title: iconTitle(r.emoji, r.name || r.file),
+          title: r.name || i18n.t('images.unnamed'),
           deleted_at: r.deleted_at,
           type: 'image' as const,
         })),
@@ -140,8 +141,11 @@ export const useTrashStore = create<TrashState>((set, get) => ({
     await db.execute(`DELETE FROM altars WHERE deleted_at IS NOT NULL`);
     // Likewise those of an item.
     await db.execute(`DELETE FROM altar_items WHERE deleted_at IS NOT NULL`);
-    // Only the rows: the files are left to the cleanup in Settings → Storage.
+    // The details, then their files where nothing else uses them.
+    const imageFiles = (await db.select<{ file: string }[]>(`SELECT file FROM images WHERE deleted_at IS NOT NULL`)).map((r) => r.file);
     await db.execute(`DELETE FROM images WHERE deleted_at IS NOT NULL`);
+    await removeUnusedFiles(db, imageFiles);
+    await useImageStore.getState().refreshFiles();
 
     // Categories last, and only after their remaining contents have been
     // reassigned. Previously the rows were simply deleted and everything that still

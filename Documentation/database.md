@@ -254,7 +254,7 @@ The details of pictures in "Images", the place of their own next to tags and cat
 | note | TEXT | NOT NULL DEFAULT `''` |
 | tags | TEXT | JSON array of tag ids, NOT NULL DEFAULT `'[]'`; in `TAG_REF_TABLES` (`src/lib/tagRefs.ts`), not in the frozen `TAGGED_TABLES` of v53 |
 | created_at / updated_at | TEXT | ISO 8601 |
-| deleted_at | TEXT | NULL = active; purged after the retention period (`CLEANUP_TABLES`), the file left to the cleanup |
+| deleted_at | TEXT | NULL = active; its file is hidden from "Images" meanwhile. Deleted for good from the Trash, the file goes too where nothing else uses it (`removeUnusedFiles` in `imageStore.ts`); purged after the retention period (`CLEANUP_TABLES`), the file is left to the cleanup |
 
 ### lexicon_entries
 

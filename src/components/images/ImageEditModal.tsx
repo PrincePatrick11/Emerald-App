@@ -1,9 +1,8 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Trash2 } from 'lucide-react';
-import { useImageStore } from '../../store/imageStore';
+import { deleteImageWithUndo, useImageStore } from '../../store/imageStore';
 import { useUndoStore } from '../../store/undoStore';
-import { generateId } from '../../lib/helpers';
 import { imageSrc } from '../../lib/images';
 import { OP_PROP_SELECT_CLASSES } from '../../lib/styleClasses';
 import type { VaultImage } from '../../types';
@@ -34,9 +33,7 @@ export default function ImageEditModal({ file, image, onClose }: {
 
   const remove = async () => {
     if (!image) return;
-    const store = useImageStore.getState();
-    await store.deleteImage(image.id);
-    pushUndo({ id: generateId(), description: t('undo.imageDeleted'), undo: () => store.restoreImage(image.id) });
+    await deleteImageWithUndo(image.id, t('undo.imageDeleted'), pushUndo);
     onClose();
   };
 

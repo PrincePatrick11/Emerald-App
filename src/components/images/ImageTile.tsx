@@ -12,13 +12,14 @@ interface Props {
   draggable?: boolean;
   /** Smaller, for a strip beside a canvas. */
   compact?: boolean;
+  onContextMenu?: (event: React.MouseEvent) => void;
 }
 
 /**
  * A picture of "Images": the image over its name — the picture is its own icon. One tile for the view
  * (click to edit) and for a canvas's strip (drag out).
  */
-export default function ImageTile({ file, image, onClick, draggable, compact }: Props) {
+export default function ImageTile({ file, image, onClick, draggable, compact, onContextMenu }: Props) {
   const { t } = useTranslation();
   const name = image?.name || '';
   return (
@@ -26,6 +27,7 @@ export default function ImageTile({ file, image, onClick, draggable, compact }: 
       role={onClick ? 'button' : undefined}
       tabIndex={onClick ? 0 : undefined}
       onClick={onClick}
+      onContextMenu={onContextMenu}
       onKeyDown={onClick ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick(); } } : undefined}
       onPointerDown={draggable ? (e) => { if (e.button === 0) { e.preventDefault(); setImageDragItem({ file, image }); } } : undefined}
       data-image-id={image?.id}

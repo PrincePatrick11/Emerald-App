@@ -2,8 +2,10 @@ import { create } from 'zustand';
 import { getDb } from '../lib/db';
 import { fromRow, type DbRow } from '../lib/row';
 import { generateId, nowIso } from '../lib/helpers';
-import { listImageFiles, type StoredImage } from '../lib/images';
-import { storedImageName } from '../lib/schema';
+import type { UndoAction } from './undoStore';
+import { deleteImageFiles, listImageFiles, type StoredImage } from '../lib/images';
+import { collectUsedImageFilenames, storedImageName } from '../lib/schema';
+import type Database from '../lib/sqlite';
 import { serialKey, serialized } from '../lib/serialize';
 import type { VaultImage } from '../types';
 
@@ -18,6 +20,8 @@ interface ImageState {
   images: VaultImage[];
   /** Every stored file of the vault, from the folder — also those without a row. */
   files: StoredImage[];
+  /** The files whose details are in the trash: hidden from the grid until restored. */
+  trashedFiles: ReadonlySet<string>;
   loaded: boolean;
   fetchImages: () => Promise<void>;
   /** The folder again, after something else stored or removed files. */
@@ -39,12 +43,15 @@ interface ImageState {
 export const useImageStore = create<ImageState>((set, get) => ({
   images: [],
   files: [],
+  trashedFiles: new Set(),
   loaded: false,
 
   fetchImages: async () => {
     const db = await getDb();
-    const rows = await db.select<DbRow[]>('SELECT * FROM images WHERE deleted_at IS NULL');
-    set({ images: rows.map(fromRow.image).sort(byName), loaded: true });
+    const rows = await db.select<DbRow[]>('SELECT * FROM images');
+    const live = rows.filter((r) => r.deleted_at == null).map(fromRow.image).sort(byName);
+    const trashedFiles = new Set(rows.filter((r) => r.deleted_at != null).map((r) => String(r.file)));
+    set({ images: live, trashedFiles, loaded: true });
     await get().refreshFiles();
   },
 
@@ -107,7 +114,11 @@ export const useImageStore = create<ImageState>((set, get) => ({
   deleteImage: async (id) => {
     const db = await getDb();
     await db.execute('UPDATE images SET deleted_at=$1 WHERE id=$2', [nowIso(), id]);
-    set((s) => ({ images: s.images.filter((i) => i.id !== id) }));
+    const file = get().images.find((i) => i.id === id)?.file;
+    set((s) => ({
+      images: s.images.filter((i) => i.id !== id),
+      trashedFiles: file ? new Set([...s.trashedFiles, file]) : s.trashedFiles,
+    }));
   },
 
   restoreImage: async (id) => {
@@ -118,12 +129,43 @@ export const useImageStore = create<ImageState>((set, get) => ({
     const [row] = await db.select<DbRow[]>('SELECT * FROM images WHERE id=$1', [id]);
     if (!row) return;
     const image = fromRow.image(row);
-    set((s) => ({ images: [...s.images.filter((i) => i.id !== id), image].sort(byName) }));
+    set((s) => ({
+      images: [...s.images.filter((i) => i.id !== id), image].sort(byName),
+      trashedFiles: new Set([...s.trashedFiles].filter((f) => f !== image.file)),
+    }));
   },
 
   permanentlyDeleteImage: async (id) => {
     const db = await getDb();
+    const [row] = await db.select<{ file: string }[]>('SELECT file FROM images WHERE id=$1', [id]);
     await db.execute('DELETE FROM images WHERE id=$1', [id]);
+    if (row) await removeUnusedFiles(db, [row.file]);
     set((s) => ({ images: s.images.filter((i) => i.id !== id) }));
+    await get().refreshFiles();
   },
 }));
+
+/** Into the trash with an Undo, from the edit dialog and the right-click menu alike. */
+export async function deleteImageWithUndo(id: string, description: string, pushUndo: (action: UndoAction) => void): Promise<void> {
+  const store = useImageStore.getState();
+  await store.deleteImage(id);
+  pushUndo({ id: generateId(), description, undo: () => store.restoreImage(id) });
+}
+
+/**
+ * After details went for good: their files too, where nothing else in the
+ * vault uses them — otherwise a picture deleted from "Images" would come back
+ * as an unnamed one. A file still in use (a text, a field) stays.
+ */
+export async function removeUnusedFiles(db: Database, files: string[]): Promise<void> {
+  if (!files.length) return;
+  const used = await collectUsedImageFilenames(db);
+  const unused = files.filter((file) => storedImageName(file) && !used.has(file));
+  if (!unused.length) return;
+  try {
+    await deleteImageFiles(unused);
+  } catch (e) {
+    console.error('[images] removing files failed:', e);
+  }
+  useImageStore.setState((s) => ({ trashedFiles: new Set([...s.trashedFiles].filter((f) => !unused.includes(f))) }));
+}

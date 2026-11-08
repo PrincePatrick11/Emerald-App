@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useShallow } from 'zustand/shallow';
-import { useImageStore } from '../../store/imageStore';
+import { Pencil, Trash2 } from 'lucide-react';
+import { deleteImageWithUndo, useImageStore } from '../../store/imageStore';
+import { useUndoStore } from '../../store/undoStore';
 import { useTagStore } from '../../store/tagStore';
 import { useSessionState } from '../../store/sessionStore';
 import { useDeepLink } from '../../hooks/useDeepLink';
@@ -9,6 +11,7 @@ import { useFileDrop } from '../../hooks/useFileDrop';
 import { AUX_VIEWS } from '../../lib/modules';
 import type { VaultImage } from '../../types';
 import Dashboard from '../ui/Dashboard';
+import ContextMenu from '../ui/ContextMenu';
 import ImageTile from '../images/ImageTile';
 import ImageEditModal from '../images/ImageEditModal';
 import AddImagesModal from '../images/AddImagesModal';
@@ -35,13 +38,17 @@ function byName(a: ImageItem, b: ImageItem): number {
  */
 export default function ImagesView() {
   const { t } = useTranslation();
-  const { images, files, loaded } = useImageStore(useShallow((s) => ({ images: s.images, files: s.files, loaded: s.loaded })));
+  const { images, files, trashedFiles, loaded } = useImageStore(useShallow((s) => ({
+    images: s.images, files: s.files, trashedFiles: s.trashedFiles, loaded: s.loaded,
+  })));
   const allTags = useTagStore((s) => s.tags);
   const [search, setSearch] = useSessionState('images.search', '');
   const [tagFilter, setTagFilter] = useSessionState<string[]>('images.tags', []);
   const [editing, setEditing] = useState<ImageItem | null>(null);
   const [adding, setAdding] = useState(false);
   const [dropped, setDropped] = useState<string[]>([]);
+  const [menu, setMenu] = useState<{ item: ImageItem; x: number; y: number } | null>(null);
+  const pushUndo = useUndoStore((s) => s.push);
 
   // Files dropped anywhere over the view go into the add dialog, opening it.
   const { dragOver } = useFileDrop(!editing, (paths) => {
@@ -66,12 +73,14 @@ export default function ImagesView() {
     const items: ImageItem[] = [];
     for (const { name } of files) {
       listed.add(name);
+      // In the trash: gone from here until it is restored.
+      if (trashedFiles.has(name)) continue;
       items.push({ file: name, image: byFile.get(name) ?? null });
     }
     // Details whose file the folder did not list (yet): still shown.
     for (const image of images) if (!listed.has(image.file)) items.push({ file: image.file, image });
     return items.sort(byName);
-  }, [images, files]);
+  }, [images, files, trashedFiles]);
 
   const query = search.trim().toLowerCase();
   const searched = all.filter((item) => !query
@@ -107,7 +116,33 @@ export default function ImagesView() {
         } : undefined}
         items={shown}
         itemKey={(item) => item.file}
-        renderItem={(item) => <ImageTile file={item.file} image={item.image} onClick={() => setEditing(item)} />}
+        renderItem={(item) => (
+          <ImageTile
+            file={item.file}
+            image={item.image}
+            onClick={() => setEditing(item)}
+            onContextMenu={(e) => { e.preventDefault(); setMenu({ item, x: e.clientX, y: e.clientY }); }}
+          />
+        )}
+        contextMenuSlot={menu && (
+          <ContextMenu
+            x={menu.x}
+            y={menu.y}
+            onClose={() => setMenu(null)}
+            actions={[
+              { label: t('images.edit'), icon: <Pencil size={12} />, onClick: () => setEditing(menu.item) },
+              // A picture without details has nothing in the trash to go to: its file may
+              // be in use in a text, and the image cleanup removes it once it is not.
+              {
+                label: t('contextMenu.delete'),
+                icon: <Trash2 size={12} />,
+                danger: true,
+                disabled: !menu.item.image,
+                onClick: () => { if (menu.item.image) void deleteImageWithUndo(menu.item.image.id, t('undo.imageDeleted'), pushUndo); },
+              },
+            ]}
+          />
+        )}
         isEmpty={loaded && all.length === 0}
         emptyState={{
           icon: AUX_VIEWS.images.icon,
