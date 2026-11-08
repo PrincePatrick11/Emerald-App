@@ -1,4 +1,5 @@
 import { circle, corners, join, lens, line, poly, polar, spiral, starPolygon } from './paths';
+import { num } from '../svg';
 
 /**
  * The symbols that come with the app, drawn for it as centre lines in a box
@@ -120,6 +121,52 @@ const metatron = (() => {
   return join(...pts.map(([x, y]) => circle(x, y, 9)), linked(pts, 0, pairs));
 })();
 
+/** The triskele: three spirals round arm centres on a small circle, each ending in the middle. */
+const triskele = join(...[0, 120, 240].map((deg) => {
+  const [cx, cy] = polar(50, 52, 24, deg);
+  const turns = 1.5;
+  // The spiral ends pointing at the middle, so the arms meet there.
+  const end = (Math.atan2(52 - cy, 50 - cx) * 180) / Math.PI + 90;
+  const steps = 48;
+  const pts = Array.from({ length: steps + 1 }, (_, i) => polar(cx, cy, (22 * i) / steps, end - (1 - i / steps) * turns * 360));
+  return poly([...pts, [50, 52]]);
+}));
+
+/** The ouroboros: a serpent round a circle, its head at the top biting its tail. */
+const ouroboros = {
+  d: join(
+    `M${polar(50, 52, 36, 18).join(' ')}A36 36 0 1 1 ${polar(50, 52, 36, 326).join(' ')}`,
+    `M${polar(50, 52, 28, 18).join(' ')}A28 28 0 1 1 ${polar(50, 52, 28, 330).join(' ')}`,
+    head(),
+  ),
+  solid: circle(...polar(50, 52, 34, 342), 2.5),
+};
+
+/** The ouroboros's head: an oval along the circle, just before the tail. */
+function head(): string {
+  const at = 339;
+  const [cx, cy] = polar(50, 52, 32, at);
+  // Along the circle there, the head's long axis.
+  const ux = Math.cos((at * Math.PI) / 180), uy = Math.sin((at * Math.PI) / 180);
+  const [x1, y1] = [cx - ux * 11, cy - uy * 11];
+  const [x2, y2] = [cx + ux * 11, cy + uy * 11];
+  return `M${num(x1)} ${num(y1)}A11 8 ${at} 0 1 ${num(x2)} ${num(y2)}A11 8 ${at} 0 1 ${num(x1)} ${num(y1)}Z`;
+}
+
+/** The caduceus: a winged staff with two serpents wound round it. */
+const caduceus = (() => {
+  const serpent = (phase: number) => poly(Array.from({ length: 41 }, (_, i) => {
+    const y = 34 + i * 1.3;
+    return [50 + Math.cos((i / 40) * Math.PI * 3 + phase) * 15 * (1 - i / 70), y] as [number, number];
+  }));
+  return join(
+    line(50, 10, 50, 94),
+    'M50 22C42 12 26 10 12 16C24 22 36 26 50 28', 'M50 22C58 12 74 10 88 16C76 22 64 26 50 28',
+    serpent(0), serpent(Math.PI),
+    circle(68, 31, 4), circle(32, 31, 4),
+  );
+})();
+
 const pack = (id: string, entries: Record<string, string | Omit<SymbolDef, 'id'>>): SymbolPack => ({
   id,
   symbols: Object.entries(entries).map(([name, s]) => ({ id: `${id}.${name}`, ...(typeof s === 'string' ? { d: s } : s) })),
@@ -219,37 +266,16 @@ export const SYMBOL_PACKS: SymbolPack[] = [
     helmOfAwe,
     mjolnir: join(circle(50, 10, 5), line(50, 15, 50, 44), poly([[18, 44], [82, 44], [82, 56], [60, 62], [55, 90], [45, 90], [40, 62], [18, 56]], true)),
     spiral: spiral(50, 50, 42, 3),
+    triskele,
+    ouroboros,
+    witchesKnot: join(circle(50, 50, 22), ...[45, 135, 225, 315].map((deg) => lens(50, 50, ...polar(50, 50, 46, deg), 0.75))),
+    caduceus,
   }),
   pack('ogham', {
     beith: ogham('right', 1), luis: ogham('right', 2), fearn: ogham('right', 3), sail: ogham('right', 4), nion: ogham('right', 5),
     uath: ogham('left', 1), dair: ogham('left', 2), tinne: ogham('left', 3), coll: ogham('left', 4), ceirt: ogham('left', 5),
     muin: ogham('slant', 1), gort: ogham('slant', 2), ngeadal: ogham('slant', 3), straif: ogham('slant', 4), ruis: ogham('slant', 5),
     ailm: ogham('notch', 1), onn: ogham('notch', 2), ur: ogham('notch', 3), eadhadh: ogham('notch', 4), iodhadh: ogham('notch', 5),
-  }),
-  // The Hebrew letters in their square script, as strokes.
-  pack('hebrew', {
-    aleph: 'M28 16L74 84M70 14C72 30 64 42 50 46M55 56C40 60 32 72 32 86',
-    bet: 'M24 22L68 22C74 22 76 26 76 32L76 80M18 80L86 80',
-    gimel: 'M40 20L58 20C62 20 62 24 62 30L62 82M62 62L40 84',
-    dalet: 'M18 22L84 22M70 22L70 84',
-    he: 'M20 22L80 22L80 84M30 44L30 84',
-    vav: 'M40 20L54 20L54 84',
-    zayin: 'M34 20L68 20M52 20L52 84',
-    chet: 'M24 84L24 22L76 22L76 84',
-    tet: 'M44 40C38 28 26 20 26 34L26 68C26 80 36 84 50 84C64 84 76 80 76 68L76 22',
-    yod: 'M42 22L58 22L58 46',
-    kaf: 'M22 22L64 22C74 22 78 30 78 52C78 74 74 82 64 82L22 82',
-    lamed: 'M30 6L30 34L70 34C74 34 76 38 74 42L54 84',
-    mem: 'M30 22L66 22C74 22 78 28 78 36L78 84L48 84M18 30L30 22L24 84',
-    nun: 'M38 22L56 22C60 22 62 26 62 30L62 84L34 84',
-    samekh: 'M20 22L66 22C78 22 82 32 82 50C82 72 70 84 50 84C30 84 20 70 20 50Z',
-    ayin: 'M24 20L50 72M76 20L62 72C58 84 44 86 26 86',
-    pe: 'M22 22L64 22C74 22 78 30 78 52C78 74 74 82 64 82L22 82M28 22L28 44L46 44',
-    tsadi: 'M24 18L58 58C64 66 70 78 78 84L18 84M74 18C76 38 70 50 58 58',
-    qof: 'M22 22L68 22C76 22 78 28 78 36L78 84M30 42L30 96',
-    resh: 'M22 22L64 22C74 22 76 28 76 36L76 84',
-    shin: 'M22 20L32 82L78 82L82 20M52 20L52 54L38 66',
-    tav: 'M20 22L70 22C76 22 80 26 80 34L80 84M34 22L34 76L22 84',
   }),
   pack('geometry', {
     pentagram: starPolygon(5, 2, 50, 54, 42),

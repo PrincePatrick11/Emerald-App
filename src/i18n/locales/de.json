@@ -577,7 +577,6 @@
       "runes": "Runen",
       "occult": "Okkult",
       "ogham": "Ogham",
-      "hebrew": "Hebräische Buchstaben",
       "geometry": "Heilige Geometrie"
     },
     "planets": {
@@ -671,7 +670,11 @@
       "valknut": "Valknut",
       "helmOfAwe": "Ægishjálmur",
       "mjolnir": "Mjölnir",
-      "spiral": "Spirale"
+      "spiral": "Spirale",
+      "triskele": "Triskele",
+      "ouroboros": "Ouroboros",
+      "witchesKnot": "Hexenknoten",
+      "caduceus": "Caduceus"
     },
     "ogham": {
       "beith": "Beith",
@@ -694,30 +697,6 @@
       "ur": "Ur",
       "eadhadh": "Éabhadh",
       "iodhadh": "Iodhadh"
-    },
-    "hebrew": {
-      "aleph": "Aleph",
-      "bet": "Beth",
-      "gimel": "Gimel",
-      "dalet": "Daleth",
-      "he": "He",
-      "vav": "Waw",
-      "zayin": "Sajin",
-      "chet": "Chet",
-      "tet": "Tet",
-      "yod": "Jod",
-      "kaf": "Kaph",
-      "lamed": "Lamed",
-      "mem": "Mem",
-      "nun": "Nun",
-      "samekh": "Samech",
-      "ayin": "Ajin",
-      "pe": "Pe",
-      "tsadi": "Zade",
-      "qof": "Koph",
-      "resh": "Resch",
-      "shin": "Schin",
-      "tav": "Taw"
     },
     "geometry": {
       "treeOfLife": "Lebensbaum",
