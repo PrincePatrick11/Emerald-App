@@ -883,7 +883,7 @@
   },
   "trash": {
     "title": "Trash",
-    "emptyTrash": "Empty Trash",
+    "emptyTrash": "Empty trash",
     "restore": "Restore",
     "restoreFailed": "Some items could not be restored and stay selected.",
     "restoreSelected": "Restore selected",
