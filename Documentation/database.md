@@ -70,6 +70,7 @@ Per-migration detail lives in the code and in `CHANGELOG.md`. In short:
 | 55 | `entries_list_index` | `idx_entries_list` (the list columns) and the partial `idx_entries_decorated` replace `idx_entries_deleted` |
 | 56 | `altar_elements` | Additive: `altars.elements`, the drawn shapes and text as JSON ([altars](#altars)) |
 | 57 | `altar_placement_groups` | Additive: `altar_placements.group_id`, the group a placement belongs to ([altar_placements](#altar_placements)) |
+| 58 | `symbols` | New table: the vault's own symbols for the canvas editor ([symbols](#symbols)) |
 
 Column drops go through `dropColumnsIfPresent` (`dbRebuild.ts`), which skips columns already gone, so they are repeatable. Where a migration converts data, the same converter also runs on rows from an older `.emeralddb` file at import time — see [DB Backup / Restore](#db-backup--restore-emeralddb).
 
@@ -259,6 +260,19 @@ The words of a language. `ON DELETE CASCADE` on `language_id` means permanently 
 | created_at / updated_at | TEXT | ISO 8601 |
 
 How words are matched when translating lives in `src/lib/lexicon.ts` — see [Lexicon](architecture/modules.md#lexicon).
+
+### symbols
+
+The vault's own symbols for the canvas editor's library, made from drawings (since v58). An element on a canvas keeps its own copy of the path data, so removing a symbol here changes nothing already placed. There is no `deleted_at`: removing one is immediate, with an undo toast that writes the same row back (`symbolStore`'s `removeSymbol`/`restoreSymbol`). Rows are read through `readUserSymbol` (`src/lib/userSymbols.ts`), which drops one without an id or usable path data.
+
+| Column | Type | Notes |
+|---|---|---|
+| id | TEXT PK | UUID; in the library `own.<id>` |
+| name | TEXT | NOT NULL DEFAULT `''`; at most 80 characters |
+| d | TEXT | NOT NULL DEFAULT `''`; the lines, path data in a box of 100 × 100 (commands and numbers only, `isSymbolPath`) |
+| solid | TEXT | NOT NULL DEFAULT `''`; the filled parts, in the same box |
+| weight | REAL | NOT NULL DEFAULT 5; the lines' width in that box, 1–16 |
+| created_at | TEXT | ISO 8601; the library lists the newest first |
 
 ### altars
 
@@ -504,6 +518,7 @@ Independently of the version, journal rows with the old fields go through `liftL
 
 - Entries, altars and tasks are date-filtered on `created_at`. Entries are one `SELECT` with a `type` filter for the ticked kinds.
 - The "library" tables travel complete, trashed rows included and without a date filter: `categories` (whenever any of Journal, Wiki, Operations, Tasks or Altars is ticked — trashed categories too, or their exported content could not be restored), `block_definitions` and `templates` (whenever Journal, Wiki or Operations is ticked, since a template's assignments can reference any of the three), `languages` and `lexicon_entries` (with `includeLexicon`; a word is nothing without its language).
+- `symbols` travels complete in every backup, whatever is ticked; the import adds the ones missing by id (`INSERT OR IGNORE`, on replace too), so none is ever removed by an import.
 - `includeDeleted` applies to entries, altars, tasks, `tags` and `altar_items` — a trashed tag travels with the Trash, since the trashed entries carrying its id come along too.
 - `task_links` is scoped to the exported task ids.
 - `altar_items` is exported in full whenever `includeAltars` is set, regardless of the altar date filter and even when no altar survives it: a library item can exist without ever touching a canvas. `altar_placements` is scoped to the exported altars and items, since a placement without either would fail the foreign key.

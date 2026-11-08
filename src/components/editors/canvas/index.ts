@@ -12,6 +12,7 @@ export { FULL_CANVAS_FEATURES, type CanvasFeatures } from './features';
 export type { RulerGuide } from './Rulers';
 export { EMPTY_BACKGROUND, backgroundCss, hasBackground, parseCanvasBackground, type CanvasBackground, type CanvasFill } from './background';
 export type { CanvasBackgroundImages } from './BackgroundPanel';
+export type { CanvasSymbolLibrary } from './symbols/library';
 export {
   byZ,
   type CanvasAddition, type CanvasDrawEnv, type CanvasElement, type CanvasElementType, type CanvasGrid,

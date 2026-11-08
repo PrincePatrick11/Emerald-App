@@ -8,7 +8,7 @@ export const MIN_WEIGHT = 1;
 export const MAX_WEIGHT = 16;
 export const DEFAULT_WEIGHT = 5;
 
-/** Path data as it may be stored: commands, numbers and separators only, and not endless. */
+/** Path data as it may be stored: commands, numbers and separators only, and not endless (a drawing made a symbol has long outlines). */
 export function isSymbolPath(d: unknown): d is string {
-  return typeof d === 'string' && d.length > 0 && d.length <= 20000 && /^[MLHVCSQTAZmlhvcsqtaz0-9 .,eE+-]+$/.test(d);
+  return typeof d === 'string' && d.length > 0 && d.length <= 400000 && /^[MLHVCSQTAZmlhvcsqtaz0-9 .,eE+-]+$/.test(d);
 }

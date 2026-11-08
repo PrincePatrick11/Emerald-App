@@ -1,14 +1,16 @@
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Search } from 'lucide-react';
+import { Trash2 } from 'lucide-react';
 import { SYMBOL_PACKS, type SymbolDef } from './packs';
+import { OWN_PACK, useSymbolLibrary } from './library';
 
 /** The pack shown last, for the next time the library opens. */
 let lastPack = SYMBOL_PACKS[0].id;
 
-/** A symbol's translated name, from its id `pack.name`. */
-export function symbolName(id: string, t: (key: string) => string): string {
-  return t(`symbols.${id}`);
+/** A symbol's name: its own, or the translation of its id `pack.name`. */
+export function symbolName(id: string, t: (key: string) => string, own?: string): string {
+  return own ?? t(`symbols.${id}`);
 }
 
 /** A symbol drawn small, in the current text colour. */
@@ -27,13 +29,18 @@ export function SymbolGlyph({ d, solid, weight = 5, size = 28 }: { d: string; so
  */
 export default function SymbolPicker({ onPick, current }: { onPick: (symbol: SymbolDef) => void; current?: string }) {
   const { t } = useTranslation();
-  const [pack, setPack] = useState(lastPack);
+  const library = useSymbolLibrary();
+  const packs = useMemo(
+    () => (library ? [{ id: OWN_PACK, symbols: library.own }, ...SYMBOL_PACKS] : SYMBOL_PACKS),
+    [library],
+  );
+  const [pack, setPack] = useState(() => (packs.some((p) => p.id === lastPack) ? lastPack : SYMBOL_PACKS[0].id));
   const [query, setQuery] = useState('');
   const shown = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return SYMBOL_PACKS.find((p) => p.id === pack)?.symbols ?? [];
-    return SYMBOL_PACKS.flatMap((p) => p.symbols).filter((s) => symbolName(s.id, t).toLowerCase().includes(q) || s.id.toLowerCase().includes(q));
-  }, [pack, query, t]);
+    if (!q) return packs.find((p) => p.id === pack)?.symbols ?? [];
+    return packs.flatMap((p) => p.symbols).filter((s) => symbolName(s.id, t, s.name).toLowerCase().includes(q) || s.id.toLowerCase().includes(q));
+  }, [packs, pack, query, t]);
 
   return (
     <div className="canvas-symbols">
@@ -51,7 +58,7 @@ export default function SymbolPicker({ onPick, current }: { onPick: (symbol: Sym
       </label>
       {!query.trim() && (
         <div className="canvas-symbols-packs" role="tablist">
-          {SYMBOL_PACKS.map((p) => (
+          {packs.map((p) => (
             <button
               key={p.id}
               type="button"
@@ -67,17 +74,30 @@ export default function SymbolPicker({ onPick, current }: { onPick: (symbol: Sym
       )}
       <div className="canvas-symbols-grid">
         {shown.map((s) => (
-          <button
-            key={s.id}
-            type="button"
-            className={`canvas-symbols-item${current === s.id ? ' canvas-symbols-item--active' : ''}`}
-            title={symbolName(s.id, t)}
-            onClick={() => onPick(s)}
-          >
-            <SymbolGlyph d={s.d} solid={s.solid} weight={s.weight} />
-          </button>
+          <div key={s.id} className="canvas-symbols-cell">
+            <button
+              type="button"
+              className={`canvas-symbols-item${current === s.id ? ' canvas-symbols-item--active' : ''}`}
+              title={symbolName(s.id, t, s.name)}
+              onClick={() => onPick(s)}
+            >
+              <SymbolGlyph d={s.d} solid={s.solid} weight={s.weight} />
+            </button>
+            {library && s.id.startsWith(`${OWN_PACK}.`) && (
+              <button
+                type="button"
+                className="canvas-symbols-remove"
+                title={t('symbols.remove')}
+                onClick={() => library.remove(s.id.slice(OWN_PACK.length + 1))}
+              >
+                <Trash2 size={10} />
+              </button>
+            )}
+          </div>
         ))}
-        {!shown.length && <p className="canvas-symbols-empty">{t('symbols.none')}</p>}
+        {!shown.length && (
+          <p className="canvas-symbols-empty">{t(!query.trim() && pack === OWN_PACK ? 'symbols.ownEmpty' : 'symbols.none')}</p>
+        )}
       </div>
     </div>
   );

@@ -2749,7 +2749,40 @@ html[data-theme] .prop-segment--active {
   max-height: 15rem;
   overflow-y: auto;
 }
+.canvas-symbols-cell { position: relative; }
+.canvas-symbols-remove {
+  position: absolute;
+  top: 1px;
+  right: 1px;
+  display: none;
+  padding: 2px;
+  border-radius: 4px;
+  background: var(--well-solid);
+  color: var(--text-muted);
+}
+.canvas-symbols-cell:hover .canvas-symbols-remove { display: flex; }
+.canvas-symbols-remove:hover { color: var(--danger-text); }
+/* Saving a drawing as a symbol: its preview, a name, the button. */
+.canvas-save-symbol { width: 13rem; }
+.canvas-save-symbol-preview {
+  display: flex;
+  justify-content: center;
+  padding: 6px;
+  border-radius: 6px;
+  background: var(--field-inset-bg);
+  color: var(--text-primary);
+}
+.canvas-save-symbol-name {
+  height: 28px;
+  padding: 0 8px;
+  border: 1px solid var(--field-border);
+  border-radius: 6px;
+  background: var(--field-inset-bg);
+  color: var(--text-primary);
+  font-size: 12px;
+}
 .canvas-symbols-item {
+  width: 100%;
   display: flex;
   align-items: center;
   justify-content: center;

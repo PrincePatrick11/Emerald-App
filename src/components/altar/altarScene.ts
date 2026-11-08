@@ -59,7 +59,7 @@ export function placementToElement(
   }
   if (p.kind === 'symbol' && p.symbol) {
     const props: SymbolProps = {
-      symbol: p.symbol.symbol, d: p.symbol.d, ...(p.symbol.solid ? { solid: p.symbol.solid } : {}),
+      symbol: p.symbol.symbol, d: p.symbol.d, ...(p.symbol.solid ? { solid: p.symbol.solid } : {}), ...(p.symbol.name ? { name: p.symbol.name } : {}),
       color: p.symbol.color, weight: p.symbol.weight, fill: p.symbol.fill,
     };
     return { ...frame, type: 'symbol', props };
@@ -119,7 +119,7 @@ export function elementToPlacement(
   if (el.type === 'drawing') base.drawing = (el.props as DrawingProps).doc;
   if (el.type === 'symbol') {
     const p = el.props as SymbolProps;
-    base.symbol = { symbol: p.symbol, d: p.d, ...(p.solid ? { solid: p.solid } : {}), color: p.color, weight: p.weight, fill: p.fill };
+    base.symbol = { symbol: p.symbol, d: p.d, ...(p.solid ? { solid: p.solid } : {}), ...(p.name ? { name: p.name } : {}), color: p.color, weight: p.weight, fill: p.fill };
   }
   if (el.type === 'text') {
     const p = el.props as TextProps;

@@ -1,7 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useShallow } from 'zustand/shallow';
+import { useTranslation } from 'react-i18next';
 import { useAltarStore } from '../../store/altarStore';
+import { useSymbolStore } from '../../store/symbolStore';
+import { useUndoStore } from '../../store/undoStore';
+import { userSymbolId } from '../../lib/userSymbols';
 import { getAltarDragItem, setAltarDragItem, subscribeAltarDrag } from '../../lib/altarDragState';
 import { ALTAR_BACKGROUND_MAX_BYTES, DEFAULT_ALTAR_RESOLUTION, resolveResolutionPixels } from '../../lib/altarConstants';
 import { altarBackgroundUrl, altarCanvasBackground, isAppBackground } from '../../lib/altarBackground';
@@ -13,7 +17,7 @@ import { canvasImageSrc, imageSrc, saveImage } from '../../lib/images';
 import { THUMBNAIL_W, canvasToCappedThumbnail } from '../../lib/thumbnail';
 import {
   CANVAS_SWATCHES, CanvasEditor, canvasToDataUrl, fullProfile, renderCanvasImage, renderCanvasSvg, type CanvasEditorHandle,
-  type CanvasBackground, type CanvasBackgroundImages, type CanvasExportOptions,
+  type CanvasBackground, type CanvasBackgroundImages, type CanvasExportOptions, type CanvasSymbolLibrary,
   type CanvasElement, type CanvasGrid, type CanvasPaintOptions, type RulerGuide,
 } from '../editors/canvas';
 
@@ -222,6 +226,22 @@ function pickBackgroundImage(): Promise<string | null> {
 
 const BACKGROUND_IMAGES: CanvasBackgroundImages = { resolve: altarBackgroundUrl, pick: pickBackgroundImage };
 
+/** The vault's own symbols as the canvas editor's library takes them; removing one offers undo. */
+function useOwnSymbols(): CanvasSymbolLibrary {
+  const { t } = useTranslation();
+  const symbols = useSymbolStore((s) => s.symbols);
+  const pushUndo = useUndoStore((s) => s.push);
+  return useMemo(() => ({
+    own: symbols.map((s) => ({ id: userSymbolId(s.id), name: s.name, d: s.d, ...(s.solid ? { solid: s.solid } : {}), weight: s.weight })),
+    save: async (symbol) => { await useSymbolStore.getState().addSymbol(symbol); },
+    remove: (id) => {
+      void useSymbolStore.getState().removeSymbol(id).then((removed) => {
+        if (removed) pushUndo({ id: generateId(), description: t('symbols.removed'), undo: () => useSymbolStore.getState().restoreSymbol(removed) });
+      }).catch(console.error);
+    },
+  }), [symbols, pushUndo, t]);
+}
+
 export function AltarCanvas({ altar, editable, readAlign, onExport }: {
   altar: AltarRecord;
   editable: boolean;
@@ -264,6 +284,7 @@ export function AltarCanvas({ altar, editable, readAlign, onExport }: {
   }, [updateAltarGuides, altar.id]);
 
   const canvasBackground = useMemo(() => altarCanvasBackground(altar), [altar]);
+  const symbolLibrary = useOwnSymbols();
   // The picture of the vault lives in the column the image cleanup looks at; one of the app's own needs none.
   const onCanvasBackgroundChange = useCallback((background: CanvasBackground) => {
     const src = background.image?.src;
@@ -345,6 +366,7 @@ export function AltarCanvas({ altar, editable, readAlign, onExport }: {
       canvasBackground={canvasBackground}
       onCanvasBackgroundChange={onCanvasBackgroundChange}
       backgroundImages={BACKGROUND_IMAGES}
+      symbolLibrary={symbolLibrary}
       overlay={editable && dragItem ? (
         <>
           <div className="canvas-drop-hint" />

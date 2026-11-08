@@ -564,6 +564,15 @@
     }
   },
   "symbols": {
+    "remove": "Retirer de mes symboles",
+    "removed": "Symbole retiré",
+    "ownEmpty": "Encore vide. Sélectionnez un dessin sur le canevas et enregistrez-le comme symbole depuis la barre.",
+    "saveAs": "Enregistrer comme symbole",
+    "namePlaceholder": "Nom",
+    "saveHint": "Une seule couleur ; les traits de gomme et les images sont omis.",
+    "save": "Enregistrer",
+    "emptyDrawing": "Le dessin est vide.",
+    "ownDefault": "Mon symbole",
     "title": "Symbole",
     "search": "Rechercher des symboles…",
     "none": "Aucun symbole trouvé.",
@@ -571,6 +580,7 @@
     "lineColor": "Couleur du trait",
     "weight": "Épaisseur du trait",
     "packs": {
+      "own": "Mes symboles",
       "planets": "Planètes",
       "zodiac": "Zodiaque",
       "alchemy": "Alchimie",

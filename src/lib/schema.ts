@@ -21,7 +21,7 @@ import type Database from './sqlite';
  * Must match the highest version in MIGRATIONS. `db.ts` checks this at
  * startup so that a new migration step cannot be forgotten.
  */
-export const BASELINE_VERSION = 57;
+export const BASELINE_VERSION = 58;
 
 /**
  * Tables in dependency order: parents before children.
@@ -48,6 +48,7 @@ export const TABLES = [
   'task_links',
   'languages',
   'lexicon_entries',
+  'symbols',
 ] as const;
 
 export type TableName = (typeof TABLES)[number];
@@ -272,6 +273,20 @@ export const TABLE_DDL: Record<TableName, string> = {
       sort_order INTEGER NOT NULL DEFAULT 0,
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL
+    )`,
+
+  // The vault's own symbols for the canvas editor's library (since v58), made
+  // from drawings: `d` the lines and `solid` the filled parts as path data in a
+  // box of 100 × 100, `weight` the lines' width there. No trash: a removed one
+  // is gone at once, with undo in memory, like a word of the lexicon.
+  symbols: `
+    CREATE TABLE symbols (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL DEFAULT '',
+      d TEXT NOT NULL DEFAULT '',
+      solid TEXT NOT NULL DEFAULT '',
+      weight REAL NOT NULL DEFAULT 5,
+      created_at TEXT NOT NULL
     )`,
 };
 

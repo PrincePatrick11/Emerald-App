@@ -564,6 +564,15 @@
     }
   },
   "symbols": {
+    "remove": "Remove from my symbols",
+    "removed": "Symbol removed",
+    "ownEmpty": "Nothing here yet. Select a drawing on the canvas and save it as a symbol from the bar.",
+    "saveAs": "Save as symbol",
+    "namePlaceholder": "Name",
+    "saveHint": "One colour; eraser strokes and pictures are left out.",
+    "save": "Save",
+    "emptyDrawing": "The drawing is empty.",
+    "ownDefault": "My symbol",
     "title": "Symbol",
     "search": "Search symbols…",
     "none": "No symbol found.",
@@ -571,6 +580,7 @@
     "lineColor": "Line colour",
     "weight": "Line weight",
     "packs": {
+      "own": "My symbols",
       "planets": "Planets",
       "zodiac": "Zodiac",
       "alchemy": "Alchemy",

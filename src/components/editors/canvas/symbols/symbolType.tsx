@@ -22,6 +22,8 @@ export interface SymbolProps {
   d: string;
   /** Parts filled in `color`, under the lines. */
   solid?: string;
+  /** The name of one of the place's own symbols, which has no translation. */
+  name?: string;
   color: string;
   weight: number;
   fill: string | null;
@@ -55,7 +57,7 @@ function SymbolControls({ elements, update }: {
   return (
     <ToolbarGroup>
       <PopoverButton icon={<SymbolGlyph d={elements[0].props.d} solid={elements[0].props.solid} size={15} />} title={t('symbols.swap')} active={false}>
-        {(close) => <SymbolPicker current={symbol} onPick={(s) => { set({ symbol: s.id, d: s.d, solid: s.solid }); close(); }} />}
+        {(close) => <SymbolPicker current={symbol} onPick={(s) => { set({ symbol: s.id, d: s.d, solid: s.solid, name: s.name }); close(); }} />}
       </PopoverButton>
       <PopoverButton icon={<PenLine size={14} style={color ? { color } : undefined} />} title={t('symbols.lineColor')} active={false}>
         {(close) => <ColorPanel value={color} onPick={(c) => { if (c) set({ color: c }); close(); }} />}
@@ -85,14 +87,14 @@ const addition: CanvasAddition<SymbolProps> = {
     return {
       width: side,
       height: side,
-      props: { symbol: chosen.id, d: chosen.d, ...(chosen.solid ? { solid: chosen.solid } : {}), color: DEFAULT_FILL, weight: chosen.weight ?? DEFAULT_WEIGHT, fill: null },
+      props: { symbol: chosen.id, d: chosen.d, ...(chosen.solid ? { solid: chosen.solid } : {}), ...(chosen.name ? { name: chosen.name } : {}), color: DEFAULT_FILL, weight: chosen.weight ?? DEFAULT_WEIGHT, fill: null },
     };
   },
 };
 
 export const symbolType: CanvasElementType<SymbolProps> = {
   type: 'symbol',
-  label: (el, t) => symbolName(el.props.symbol, t),
+  label: (el, t) => symbolName(el.props.symbol, t, el.props.name),
   keepRatio: true,
   handles: 'corners',
   draw: (ctx, el) => {
@@ -117,6 +119,7 @@ export const symbolType: CanvasElementType<SymbolProps> = {
     const p = el.props;
     const transform = `scale(${num(el.width / 100)} ${num(el.height / 100)})`;
     const solid = p.solid ? `<path${attrs({ d: p.solid, transform, fill: p.color })}/>` : '';
+    if (!p.d) return solid;
     return solid + `<path${attrs({
       d: p.d, transform,
       fill: p.fill ?? 'none', 'fill-rule': p.fill ? 'evenodd' : null,

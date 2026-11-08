@@ -33,6 +33,8 @@ writeFileSync(
    export { paintDocFromJson, paintDocToJson, emptyPaintDoc, isPaintDocEmpty, thinPoints, transformStroke, mergeDown, canMergeDown, strokeSamples, inPolygon, symmetricCopies, mirrorStroke, splitStroke } from '${root}/src/lib/paint/document';
    export { parseAltarElements, altarElementsJson } from '${root}/src/lib/altarElements';
    export { parseAltarSettings } from '${root}/src/lib/altarSettings';
+   export { symbolFromDrawing } from '${root}/src/components/editors/canvas/symbols/fromDrawing';
+   export { readUserSymbol } from '${root}/src/lib/userSymbols';
    export { group, ungroup, withGroups, moveInStack, copiesOf, align } from '${root}/src/components/editors/canvas/canvasActions';
    export { renderBlocksForExport } from '${root}/src/lib/blocks/exportRender';
    export { parseAssignments, resolveDefaultTemplate, templatesFor, instantiateTemplateBlocks, isContentEmpty, templateOriginsOf, templateStart, mergeTemplateTags, mergeAssignmentChanges, withAssignmentState, assignmentStateAt, sameAssignments, defaultTemplateAt, contentForTemplate, areBlocksEmpty, fieldsWithTemplate, fieldsWithoutTemplate } from '${root}/src/lib/blocks/templates';
@@ -68,6 +70,7 @@ const {
   sigilImage, withSigilImage, letterList, renderBlocksForExport, parseSigilDrawing, withSigilDrawing,
   paintDocFromJson, paintDocToJson, emptyPaintDoc, isPaintDocEmpty, thinPoints, transformStroke, mergeDown, canMergeDown, strokeSamples, inPolygon, symmetricCopies, mirrorStroke, splitStroke,
   group, ungroup, withGroups, moveInStack, copiesOf, align, parseAltarElements, altarElementsJson, parseAltarSettings,
+  symbolFromDrawing, readUserSymbol,
   sigilUnits, sigilPartBlock, sigilPartId, withSigilPart, blockHoldsLocked,
   remapDefinitionDefaults, definitionImageRefs, hasFrozenCopy, withRenamedPartTargets,
   parseAssignments, resolveDefaultTemplate, templatesFor, instantiateTemplateBlocks, isContentEmpty,
@@ -655,6 +658,20 @@ console.log('\n4f. Sigil blocks\n');
     check('altar: a symbol keeps its path and colour, its weight is clamped, a foreign path gives way to the library\'s',
       symbolsAgain[0].symbol.d === 'M38 10L38 90' && symbolsAgain[0].symbol.color === '#123456' && symbolsAgain[0].symbol.weight === 16
         && symbolsAgain[1].symbol.symbol === 'planets.sun' && !symbolsAgain[1].symbol.d.includes('<'), symbolsAgain);
+    const sketch = emptyPaintDoc();
+    sketch.layers[0].strokes = [
+      { id: 'p', tool: 'pen', color: '#ff0000', size: 20, points: [100, 100, 0.5, 300, 200, 0.5, 500, 100, 0.5], pressure: false, rotation: 0, filled: false, sides: 5, rings: [] },
+      { id: 'l', tool: 'line', color: '#00ff00', size: 10, points: [100, 400, 0.5, 500, 400, 0.5], pressure: false, rotation: 0, filled: false, sides: 5, rings: [] },
+      { id: 'e', tool: 'eraser', color: '#000000', size: 40, points: [2000, 2000, 0.5, 2100, 2100, 0.5], pressure: false, rotation: 0, filled: false, sides: 5, rings: [] },
+    ];
+    const made = symbolFromDrawing(sketch);
+    const coords = (d) => (d.match(/-?[0-9.]+/g) ?? []).map(Number);
+    check('symbols: a drawing becomes lines and filled parts inside the box, the eraser left out',
+      made && made.d.startsWith('M') && made.solid.length > 0 && coords(made.d + made.solid).every((n) => n >= -0.01 && n <= 100.01)
+        && Math.abs(made.weight - 10 * (88 / 420)) < 0.2 && symbolFromDrawing(emptyPaintDoc()) === null, made);
+    check('symbols: an own symbol from a file needs an id and plain path data',
+      readUserSymbol({ id: 'a', name: 'x', d: 'M0 0L10 10', solid: '', weight: 99 })?.weight === 16
+        && readUserSymbol({ id: 'b', d: '<svg/>' }) === null && readUserSymbol({ d: 'M0 0L1 1' }) === null);
     check('canvas: copies of a group form a new group of their own',
       copies.length === 2 && copies[0].group && copies[0].group !== 'g' && copies[0].group === copies[1].group, copies);
   }

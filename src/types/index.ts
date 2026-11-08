@@ -167,6 +167,8 @@ export interface AltarSymbolStyle {
   d: string;
   /** Parts filled in `color`. */
   solid?: string;
+  /** The name of one of the vault's own symbols. */
+  name?: string;
   color: string;
   weight: number;
   fill: string | null;

@@ -34,6 +34,7 @@ import ShortcutOverview from './ShortcutOverview';
 import ExportDialog, { type CanvasExportOptions } from './ExportDialog';
 import { backgroundCss, hasBackground, type CanvasBackground } from './background';
 import type { CanvasBackgroundImages } from './BackgroundPanel';
+import { SymbolLibraryContext, type CanvasSymbolLibrary } from './symbols/library';
 import ContextMenu from '../../ui/ContextMenu';
 import { canvasMenuActions } from './CanvasContextMenu';
 
@@ -89,6 +90,8 @@ export interface CanvasEditorProps {
   onCanvasBackgroundChange?: (background: CanvasBackground) => void;
   /** The background picture's reference as a URL to show, and choosing a new one (its reference, or `null` if cancelled). */
   backgroundImages?: CanvasBackgroundImages;
+  /** The place's own symbols: a pack of them in the library, and a drawing saved as one. */
+  symbolLibrary?: CanvasSymbolLibrary;
   grid?: CanvasGrid | null;
   /** Rotation snaps to multiples of this, in degrees; `null`: near the right angles, and 15° with Shift. */
   rotationSnap?: number | null;
@@ -180,7 +183,7 @@ function keepTop(el: Pick<CanvasElement, 'x' | 'y' | 'rotation'>, before: number
 const CanvasEditor = forwardRef<CanvasEditorHandle, CanvasEditorProps>(function CanvasEditor({
   width, height, elements, onChange, selectedIds, onSelectionChange, editable,
   types = BUILTIN_CANVAS_TYPES, features = FULL_CANVAS_FEATURES, background, canvasBackground = null, onCanvasBackgroundChange,
-  backgroundImages, grid = null, rotationSnap = null,
+  backgroundImages, symbolLibrary, grid = null, rotationSnap = null,
   historyKey = '', readAlign = 'center', createId = () => crypto.randomUUID(), onEditElement, onExport, overlay, toolbarEnd,
   elementLabel, guides: placeGuides, onGuidesChange, guidesLocked: placeLocked, onGuidesLockedChange, paint = DEFAULT_PAINT, paintElementId, layout = 'fill',
 }, ref) {
@@ -1077,310 +1080,312 @@ const CanvasEditor = forwardRef<CanvasEditorHandle, CanvasEditorProps>(function 
   };
 
   return (
-    <div
-      ref={rootRef}
-      className={`canvas-editor canvas-editor-${layout} ${editable ? 'canvas-editor-editing' : ''} ${paintingId ? 'canvas-editor-painting' : ''} ${addTool && !paintingId ? 'canvas-editor-adding' : ''}`}
-      tabIndex={editable ? -1 : undefined}
-      onKeyDown={onKeyDown}
-    >
-      {editable && (
-        <div className="canvas-toolbar-strip">
-          {painting && paintType ? (
-            <PaintToolbar
-              api={paintControls}
-              features={paintFeatures}
-              palette={paint.palette}
-              layersOpen={layersOpen}
-              onToggleLayers={() => setLayersOpen((v) => !v)}
-              end={(<>
-                {keysButton}
-                {!paintElementId && (
-                  <ToolbarBtn onClick={() => setPaintingId(null)} active={false} title={t('canvas.donePainting')}>
-                    <Check size={14} />
-                    <span className="editor-toolbar-btn-label">{t('canvas.donePainting')}</span>
-                  </ToolbarBtn>
-                )}
-              </>)}
-            />
-          ) : (
-            <CanvasToolbar controller={controller} end={<>{keysButton}{toolbarEnd}</>} />
-          )}
-        </div>
-      )}
+    <SymbolLibraryContext.Provider value={symbolLibrary ?? null}>
       <div
-        ref={viewportRef}
-        className="canvas-viewport"
-        style={{ cursor: spaceDown ? 'grab' : addTool && !paintingId ? 'crosshair' : undefined, aspectRatio: layout === 'inline' ? `${width} / ${height}` : undefined }}
-        onContextMenu={(e) => { if (editable) e.preventDefault(); }}
-        onPointerDownCapture={(e) => {
-          // The middle button or Space pans, over the elements and the paint surface alike.
-          if (!editable || !features.zoom || !(e.button === 1 || (e.button === 0 && spaceDown))) return;
-          e.preventDefault();
-          e.stopPropagation();
-          rootRef.current?.focus({ preventScroll: true });
-          startPan(e.nativeEvent);
-        }}
+        ref={rootRef}
+        className={`canvas-editor canvas-editor-${layout} ${editable ? 'canvas-editor-editing' : ''} ${paintingId ? 'canvas-editor-painting' : ''} ${addTool && !paintingId ? 'canvas-editor-adding' : ''}`}
+        tabIndex={editable ? -1 : undefined}
+        onKeyDown={onKeyDown}
       >
-        <div
-          className="canvas-artboard"
-          style={{ left: view.x, top: view.y, width: width * view.zoom, height: height * view.zoom }}
-        >
-          <div className="canvas-artboard-inner" style={{ width, height, transform: `scale(${view.zoom})` }}>
-            {hasBackground(canvasBackground)
-              ? <div className="h-full w-full" style={{ background: backgroundCss(canvasBackground, backgroundImages?.resolve ?? ((src) => src)) }} />
-              : background}
-          </div>
-        </div>
-        {size.width > 0 && size.height > 0 && (
-          <Stage
-            className="canvas-stage"
-            width={size.width}
-            height={size.height}
-            onPointerDown={onStagePointerDown}
-            onContextMenu={(e) => {
-              // The paint mode keeps its own menu-less stage; a right click there does nothing.
-              if (!editable || paintingId) return;
-              e.evt.preventDefault();
-              setAddTool(null);
-              setEditingTextId(null);
-              const at = toArtboard(e.evt.clientX, e.evt.clientY);
-              const hit = elementAt(e.target);
-              // Locked elements take no presses; the topmost one whose box is under the pointer can be unlocked here.
-              const locked = hit ? null : byZ(live.current.elements).reverse().find((el) => {
-                if (!el.locked || el.hidden) return false;
-                const b = elementBounds(el);
-                return at.x >= b.x && at.x <= b.x + b.width && at.y >= b.y && at.y <= b.y + b.height;
-              }) ?? null;
-              if (hit && !live.current.selectedIds.includes(hit.id)) select(withGroups(live.current.elements, [hit.id]));
-              else if (!hit) select([]);
-              rootRef.current?.focus({ preventScroll: true });
-              setMenu({ x: e.evt.clientX, y: e.evt.clientY, at, locked });
-            }}
-            onDblClick={(e) => {
-              const hit = elementAt(e.target);
-              if (!editable || !hit) return;
-              // In a group, the first double click picks the member, the next opens it.
-              const current = live.current.selectedIds;
-              if (hit.group && !(current.length === 1 && current[0] === hit.id)) select([hit.id]);
-              else openElement(hit);
-            }}
-          >
-            <Layer ref={elementsLayerRef}>
-              <Group x={view.x} y={view.y} scaleX={view.zoom} scaleY={view.zoom} clipX={0} clipY={0} clipWidth={width} clipHeight={height}>
-                {gridShape}
-                {sorted.map((el) => (
-                  <ElementNode
-                    key={el.id}
-                    el={el}
-                    types={types}
-                    editable={editable}
-                    editing={el.id === editingTextId || el.id === paintingId}
-                    resourceVersion={resourceVersion}
-                    register={register}
-                    onHover={setHoveredId}
-                  />
-                ))}
-                {draft && (<>
-                  <ElementNode el={draft} types={types} editable={false} editing={false} resourceVersion={resourceVersion} register={ignoreNode} onHover={ignoreHover} />
-                  {/* Its frame too: a new drawing or text has little to show yet. */}
-                  <Rect
-                    x={draft.x} y={draft.y} width={draft.width} height={draft.height} offsetX={draft.width / 2} offsetY={draft.height / 2}
-                    stroke={accent} strokeWidth={1 / view.zoom} dash={[4 / view.zoom, 3 / view.zoom]} opacity={0.6} listening={false}
-                  />
+        {editable && (
+          <div className="canvas-toolbar-strip">
+            {painting && paintType ? (
+              <PaintToolbar
+                api={paintControls}
+                features={paintFeatures}
+                palette={paint.palette}
+                layersOpen={layersOpen}
+                onToggleLayers={() => setLayersOpen((v) => !v)}
+                end={(<>
+                  {keysButton}
+                  {!paintElementId && (
+                    <ToolbarBtn onClick={() => setPaintingId(null)} active={false} title={t('canvas.donePainting')}>
+                      <Check size={14} />
+                      <span className="editor-toolbar-btn-label">{t('canvas.donePainting')}</span>
+                    </ToolbarBtn>
+                  )}
                 </>)}
-              </Group>
-            </Layer>
-            <Layer listening={false}>
-              <Group x={view.x} y={view.y} scaleX={view.zoom} scaleY={view.zoom}>
-                {outlined.map((el) => (
-                  <Rect
-                    key={el.id}
-                    x={el.x} y={el.y} width={el.width} height={el.height} offsetX={el.width / 2} offsetY={el.height / 2}
-                    rotation={el.rotation} stroke={accent} strokeWidth={1.5 / view.zoom} cornerRadius={4 / view.zoom}
-                    opacity={editable ? 0.6 : 0.9}
-                  />
-                ))}
-              </Group>
-            </Layer>
-            {editable && (
-              <Layer>
-                {/* Where a selection reaches past the artboard, a quiet outline shows its edge; fixed on one drawing, its frame is the edge. */}
-                {!paintElementId && (
-                  <Rect
-                    x={view.x} y={view.y} width={width * view.zoom} height={height * view.zoom}
-                    stroke={accent} strokeWidth={1} opacity={0.25} listening={false}
-                  />
-                )}
-                <Group x={view.x} y={view.y} scaleX={view.zoom} scaleY={view.zoom} listening={false}>
-                  {guides.map((g, i) => (
-                    <Line
-                      key={i}
-                      points={g.orientation === 'vertical' ? [g.at, -height, g.at, height * 2] : [-width, g.at, width * 2, g.at]}
-                      stroke={GUIDE_COLOR}
-                      strokeWidth={1 / view.zoom}
-                      dash={[4 / view.zoom, 4 / view.zoom]}
+              />
+            ) : (
+              <CanvasToolbar controller={controller} end={<>{keysButton}{toolbarEnd}</>} />
+            )}
+          </div>
+        )}
+        <div
+          ref={viewportRef}
+          className="canvas-viewport"
+          style={{ cursor: spaceDown ? 'grab' : addTool && !paintingId ? 'crosshair' : undefined, aspectRatio: layout === 'inline' ? `${width} / ${height}` : undefined }}
+          onContextMenu={(e) => { if (editable) e.preventDefault(); }}
+          onPointerDownCapture={(e) => {
+            // The middle button or Space pans, over the elements and the paint surface alike.
+            if (!editable || !features.zoom || !(e.button === 1 || (e.button === 0 && spaceDown))) return;
+            e.preventDefault();
+            e.stopPropagation();
+            rootRef.current?.focus({ preventScroll: true });
+            startPan(e.nativeEvent);
+          }}
+        >
+          <div
+            className="canvas-artboard"
+            style={{ left: view.x, top: view.y, width: width * view.zoom, height: height * view.zoom }}
+          >
+            <div className="canvas-artboard-inner" style={{ width, height, transform: `scale(${view.zoom})` }}>
+              {hasBackground(canvasBackground)
+                ? <div className="h-full w-full" style={{ background: backgroundCss(canvasBackground, backgroundImages?.resolve ?? ((src) => src)) }} />
+                : background}
+            </div>
+          </div>
+          {size.width > 0 && size.height > 0 && (
+            <Stage
+              className="canvas-stage"
+              width={size.width}
+              height={size.height}
+              onPointerDown={onStagePointerDown}
+              onContextMenu={(e) => {
+                // The paint mode keeps its own menu-less stage; a right click there does nothing.
+                if (!editable || paintingId) return;
+                e.evt.preventDefault();
+                setAddTool(null);
+                setEditingTextId(null);
+                const at = toArtboard(e.evt.clientX, e.evt.clientY);
+                const hit = elementAt(e.target);
+                // Locked elements take no presses; the topmost one whose box is under the pointer can be unlocked here.
+                const locked = hit ? null : byZ(live.current.elements).reverse().find((el) => {
+                  if (!el.locked || el.hidden) return false;
+                  const b = elementBounds(el);
+                  return at.x >= b.x && at.x <= b.x + b.width && at.y >= b.y && at.y <= b.y + b.height;
+                }) ?? null;
+                if (hit && !live.current.selectedIds.includes(hit.id)) select(withGroups(live.current.elements, [hit.id]));
+                else if (!hit) select([]);
+                rootRef.current?.focus({ preventScroll: true });
+                setMenu({ x: e.evt.clientX, y: e.evt.clientY, at, locked });
+              }}
+              onDblClick={(e) => {
+                const hit = elementAt(e.target);
+                if (!editable || !hit) return;
+                // In a group, the first double click picks the member, the next opens it.
+                const current = live.current.selectedIds;
+                if (hit.group && !(current.length === 1 && current[0] === hit.id)) select([hit.id]);
+                else openElement(hit);
+              }}
+            >
+              <Layer ref={elementsLayerRef}>
+                <Group x={view.x} y={view.y} scaleX={view.zoom} scaleY={view.zoom} clipX={0} clipY={0} clipWidth={width} clipHeight={height}>
+                  {gridShape}
+                  {sorted.map((el) => (
+                    <ElementNode
+                      key={el.id}
+                      el={el}
+                      types={types}
+                      editable={editable}
+                      editing={el.id === editingTextId || el.id === paintingId}
+                      resourceVersion={resourceVersion}
+                      register={register}
+                      onHover={setHoveredId}
                     />
                   ))}
-                  {marquee && (
+                  {draft && (<>
+                    <ElementNode el={draft} types={types} editable={false} editing={false} resourceVersion={resourceVersion} register={ignoreNode} onHover={ignoreHover} />
+                    {/* Its frame too: a new drawing or text has little to show yet. */}
                     <Rect
-                      x={marquee.x} y={marquee.y} width={marquee.width} height={marquee.height}
-                      fill={accent} opacity={0.12} stroke={accent} strokeWidth={1 / view.zoom}
+                      x={draft.x} y={draft.y} width={draft.width} height={draft.height} offsetX={draft.width / 2} offsetY={draft.height / 2}
+                      stroke={accent} strokeWidth={1 / view.zoom} dash={[4 / view.zoom, 3 / view.zoom]} opacity={0.6} listening={false}
+                    />
+                  </>)}
+                </Group>
+              </Layer>
+              <Layer listening={false}>
+                <Group x={view.x} y={view.y} scaleX={view.zoom} scaleY={view.zoom}>
+                  {outlined.map((el) => (
+                    <Rect
+                      key={el.id}
+                      x={el.x} y={el.y} width={el.width} height={el.height} offsetX={el.width / 2} offsetY={el.height / 2}
+                      rotation={el.rotation} stroke={accent} strokeWidth={1.5 / view.zoom} cornerRadius={4 / view.zoom}
+                      opacity={editable ? 0.6 : 0.9}
+                    />
+                  ))}
+                </Group>
+              </Layer>
+              {editable && (
+                <Layer>
+                  {/* Where a selection reaches past the artboard, a quiet outline shows its edge; fixed on one drawing, its frame is the edge. */}
+                  {!paintElementId && (
+                    <Rect
+                      x={view.x} y={view.y} width={width * view.zoom} height={height * view.zoom}
+                      stroke={accent} strokeWidth={1} opacity={0.25} listening={false}
                     />
                   )}
-                </Group>
-                {showRulers && (
-                  <Group x={view.x} y={view.y} scaleX={view.zoom} scaleY={view.zoom}>
-                    {rulerGuides.map((g) => (
+                  <Group x={view.x} y={view.y} scaleX={view.zoom} scaleY={view.zoom} listening={false}>
+                    {guides.map((g, i) => (
                       <Line
-                        key={g.id}
-                        id={g.id}
-                        name="canvas-ruler-guide"
-                        points={g.orientation === 'vertical' ? [g.at, -1e5, g.at, 1e5] : [-1e5, g.at, 1e5, g.at]}
-                        stroke={RULER_GUIDE_COLOR}
+                        key={i}
+                        points={g.orientation === 'vertical' ? [g.at, -height, g.at, height * 2] : [-width, g.at, width * 2, g.at]}
+                        stroke={GUIDE_COLOR}
                         strokeWidth={1 / view.zoom}
-                        hitStrokeWidth={8 / view.zoom}
-                        listening={!guidesLocked}
-                        onMouseEnter={(e) => { e.target.getStage()!.container().style.cursor = g.orientation === 'vertical' ? 'ew-resize' : 'ns-resize'; }}
-                        onMouseLeave={(e) => { e.target.getStage()!.container().style.cursor = ''; }}
+                        dash={[4 / view.zoom, 4 / view.zoom]}
                       />
                     ))}
+                    {marquee && (
+                      <Rect
+                        x={marquee.x} y={marquee.y} width={marquee.width} height={marquee.height}
+                        fill={accent} opacity={0.12} stroke={accent} strokeWidth={1 / view.zoom}
+                      />
+                    )}
                   </Group>
-                )}
-                <Transformer
-                  ref={transformerRef}
-                  keepRatio={keepRatio}
-                  enabledAnchors={anchors}
-                  rotationSnaps={rotationSnaps}
-                  rotationSnapTolerance={rotationSnap ? rotationSnap / 2 : 4}
-                  flipEnabled={false}
-                  ignoreStroke
-                  borderStroke={accent}
-                  borderStrokeWidth={1.5}
-                  anchorStroke={accent}
-                  anchorFill={handleFill}
-                  anchorSize={9}
-                  anchorCornerRadius={2}
-                  rotateAnchorOffset={22}
-                  padding={1}
-                  onTransformStart={() => setGesture(true)}
-                  onTransform={onTransform}
-                  onTransformEnd={() => { setGesture(false); commitTransform(); }}
-                  boundBoxFunc={(oldBox, newBox) => {
-                    if (newBox.width < 4 || newBox.height < 4) return oldBox;
-                    const g = live.current.grid;
-                    const tr = transformerRef.current;
-                    const anchor = tr?.getActiveAnchor() ?? '';
-                    if (Math.abs(newBox.rotation) > 0.001 || !anchor || anchor === 'rotater') return newBox;
-                    if (!g?.snapSize) return features.guides ? snapBoxEdges(oldBox, newBox, anchor) : newBox;
-                    // Sizes on whole cells, the opposite edge staying where it is.
-                    const zoom = live.current.view.zoom;
-                    const cellW = (width / g.columns) * zoom;
-                    const cellH = (height / g.rows) * zoom;
-                    const w = Math.max(cellW, snapToStep(newBox.width, cellW));
-                    const h = Math.max(cellH, snapToStep(newBox.height, cellH));
-                    return {
-                      ...newBox,
-                      x: anchor.includes('left') ? newBox.x + newBox.width - w : newBox.x,
-                      y: anchor.includes('top') ? newBox.y + newBox.height - h : newBox.y,
-                      width: w,
-                      height: h,
-                    };
-                  }}
-                />
-              </Layer>
-            )}
-          </Stage>
-        )}
-        {editingText && editingType && (
-          <TextEditOverlay
-            key={editingText.id}
-            element={editingText}
-            initial={editingType.get(editingText)}
-            style={editingType.style(editingText)}
-            view={view}
-            onDone={(text) => finishTextEdit(editingText.id, text)}
-          />
-        )}
-        {editable && painting && paintType && (
-          <PaintSurface
-            box={{
-              left: view.x + (painting.x - painting.width / 2) * view.zoom,
-              top: view.y + (painting.y - painting.height / 2) * view.zoom,
-              width: painting.width * view.zoom,
-              height: painting.height * view.zoom,
-              rotation: painting.rotation,
-            }}
-            api={paintControls}
-            images={layerImages}
-            editable={layerImages.size >= paintControls.doc.layers.filter((l) => l.image).length}
-          />
-        )}
-        {editable && painting && paintType && <PaintToolRail api={paintControls} features={paintFeatures} />}
-        {editable && painting && paintType && paintFeatures.layers && layersOpen && (
-          <LayerPanel api={paintControls} images={layerImages} onClose={() => setLayersOpen(false)} />
-        )}
-        {editable && !paintingId && features.layers && listOpen && (
-          <ElementList
-            elements={elements}
-            selectedIds={selectedIds}
+                  {showRulers && (
+                    <Group x={view.x} y={view.y} scaleX={view.zoom} scaleY={view.zoom}>
+                      {rulerGuides.map((g) => (
+                        <Line
+                          key={g.id}
+                          id={g.id}
+                          name="canvas-ruler-guide"
+                          points={g.orientation === 'vertical' ? [g.at, -1e5, g.at, 1e5] : [-1e5, g.at, 1e5, g.at]}
+                          stroke={RULER_GUIDE_COLOR}
+                          strokeWidth={1 / view.zoom}
+                          hitStrokeWidth={8 / view.zoom}
+                          listening={!guidesLocked}
+                          onMouseEnter={(e) => { e.target.getStage()!.container().style.cursor = g.orientation === 'vertical' ? 'ew-resize' : 'ns-resize'; }}
+                          onMouseLeave={(e) => { e.target.getStage()!.container().style.cursor = ''; }}
+                        />
+                      ))}
+                    </Group>
+                  )}
+                  <Transformer
+                    ref={transformerRef}
+                    keepRatio={keepRatio}
+                    enabledAnchors={anchors}
+                    rotationSnaps={rotationSnaps}
+                    rotationSnapTolerance={rotationSnap ? rotationSnap / 2 : 4}
+                    flipEnabled={false}
+                    ignoreStroke
+                    borderStroke={accent}
+                    borderStrokeWidth={1.5}
+                    anchorStroke={accent}
+                    anchorFill={handleFill}
+                    anchorSize={9}
+                    anchorCornerRadius={2}
+                    rotateAnchorOffset={22}
+                    padding={1}
+                    onTransformStart={() => setGesture(true)}
+                    onTransform={onTransform}
+                    onTransformEnd={() => { setGesture(false); commitTransform(); }}
+                    boundBoxFunc={(oldBox, newBox) => {
+                      if (newBox.width < 4 || newBox.height < 4) return oldBox;
+                      const g = live.current.grid;
+                      const tr = transformerRef.current;
+                      const anchor = tr?.getActiveAnchor() ?? '';
+                      if (Math.abs(newBox.rotation) > 0.001 || !anchor || anchor === 'rotater') return newBox;
+                      if (!g?.snapSize) return features.guides ? snapBoxEdges(oldBox, newBox, anchor) : newBox;
+                      // Sizes on whole cells, the opposite edge staying where it is.
+                      const zoom = live.current.view.zoom;
+                      const cellW = (width / g.columns) * zoom;
+                      const cellH = (height / g.rows) * zoom;
+                      const w = Math.max(cellW, snapToStep(newBox.width, cellW));
+                      const h = Math.max(cellH, snapToStep(newBox.height, cellH));
+                      return {
+                        ...newBox,
+                        x: anchor.includes('left') ? newBox.x + newBox.width - w : newBox.x,
+                        y: anchor.includes('top') ? newBox.y + newBox.height - h : newBox.y,
+                        width: w,
+                        height: h,
+                      };
+                    }}
+                  />
+                </Layer>
+              )}
+            </Stage>
+          )}
+          {editingText && editingType && (
+            <TextEditOverlay
+              key={editingText.id}
+              element={editingText}
+              initial={editingType.get(editingText)}
+              style={editingType.style(editingText)}
+              view={view}
+              onDone={(text) => finishTextEdit(editingText.id, text)}
+            />
+          )}
+          {editable && painting && paintType && (
+            <PaintSurface
+              box={{
+                left: view.x + (painting.x - painting.width / 2) * view.zoom,
+                top: view.y + (painting.y - painting.height / 2) * view.zoom,
+                width: painting.width * view.zoom,
+                height: painting.height * view.zoom,
+                rotation: painting.rotation,
+              }}
+              api={paintControls}
+              images={layerImages}
+              editable={layerImages.size >= paintControls.doc.layers.filter((l) => l.image).length}
+            />
+          )}
+          {editable && painting && paintType && <PaintToolRail api={paintControls} features={paintFeatures} />}
+          {editable && painting && paintType && paintFeatures.layers && layersOpen && (
+            <LayerPanel api={paintControls} images={layerImages} onClose={() => setLayersOpen(false)} />
+          )}
+          {editable && !paintingId && features.layers && listOpen && (
+            <ElementList
+              elements={elements}
+              selectedIds={selectedIds}
+              types={types}
+              labelOf={elementLabel}
+              resourceVersion={resourceVersion}
+              canGroup={features.group}
+              onSelect={(ids) => { rootRef.current?.focus({ preventScroll: true }); select(ids); }}
+              onPatch={patchElements}
+              onMove={moveStack}
+              onOpacity={(opacity) => {
+                const ids = editableIds();
+                commit(live.current.elements.map((el) => (ids.includes(el.id) ? { ...el, opacity } : el)));
+              }}
+              onDuplicate={duplicate}
+              onGroup={doGroup}
+              onUngroup={doUngroup}
+              onRemove={removeSelected}
+              onClose={() => setListOpen(false)}
+            />
+          )}
+          {showRulers && <Rulers size={size} view={view} artboard={{ width, height }} selection={selectionBounds} guides={rulerGuides} onPull={(orientation, e) => startGuide(e, orientation, null)} />}
+          {editable && hasRail && !paintingId && <CanvasToolRail controller={controller} />}
+          {editable && features.zoom && <CanvasZoom controller={controller} />}
+          {overlay}
+        </div>
+        {keysOpen && editable && (
+          <ShortcutOverview
+            painting={!!paintingId}
+            features={features}
+            paintFeatures={paintFeatures}
             types={types}
-            labelOf={elementLabel}
-            resourceVersion={resourceVersion}
-            canGroup={features.group}
-            onSelect={(ids) => { rootRef.current?.focus({ preventScroll: true }); select(ids); }}
-            onPatch={patchElements}
-            onMove={moveStack}
-            onOpacity={(opacity) => {
-              const ids = editableIds();
-              commit(live.current.elements.map((el) => (ids.includes(el.id) ? { ...el, opacity } : el)));
-            }}
-            onDuplicate={duplicate}
-            onGroup={doGroup}
-            onUngroup={doUngroup}
-            onRemove={removeSelected}
-            onClose={() => setListOpen(false)}
+            canLeavePaint={!paintElementId}
+            onClose={() => { setKeysOpen(false); rootRef.current?.focus({ preventScroll: true }); }}
           />
         )}
-        {showRulers && <Rulers size={size} view={view} artboard={{ width, height }} selection={selectionBounds} guides={rulerGuides} onPull={(orientation, e) => startGuide(e, orientation, null)} />}
-        {editable && hasRail && !paintingId && <CanvasToolRail controller={controller} />}
-        {editable && features.zoom && <CanvasZoom controller={controller} />}
-        {overlay}
+        {exportOpen && onExport && (
+          <ExportDialog
+            artboard={{ width, height }}
+            selection={selectionBounds}
+            hasBackground={!!background || hasBackground(canvasBackground)}
+            onExport={onExport}
+            onClose={() => { setExportOpen(false); rootRef.current?.focus({ preventScroll: true }); }}
+          />
+        )}
+        {menu && editable && (
+          <ContextMenu
+            x={menu.x}
+            y={menu.y}
+            onClose={() => setMenu(null)}
+            actions={canvasMenuActions({
+              t, features, selected, locked: menu.locked, canPaste: clipboard.some((el) => types[el.type]),
+              canRulers: controller.canRulers, rulers: showRulers,
+              cut: () => { copy(); removeSelected(); }, copy, pasteHere: () => pasteAt(menu.at), duplicate,
+              arrange: doArrange, group: doGroup, ungroup: doUngroup, patch: patchElements, remove: removeSelected,
+              selectAll: () => select(live.current.elements.filter((el) => !el.locked && !el.hidden).map((el) => el.id)),
+              fit, toggleRulers: controller.toggleRulers,
+            })}
+          />
+        )}
       </div>
-      {keysOpen && editable && (
-        <ShortcutOverview
-          painting={!!paintingId}
-          features={features}
-          paintFeatures={paintFeatures}
-          types={types}
-          canLeavePaint={!paintElementId}
-          onClose={() => { setKeysOpen(false); rootRef.current?.focus({ preventScroll: true }); }}
-        />
-      )}
-      {exportOpen && onExport && (
-        <ExportDialog
-          artboard={{ width, height }}
-          selection={selectionBounds}
-          hasBackground={!!background || hasBackground(canvasBackground)}
-          onExport={onExport}
-          onClose={() => { setExportOpen(false); rootRef.current?.focus({ preventScroll: true }); }}
-        />
-      )}
-      {menu && editable && (
-        <ContextMenu
-          x={menu.x}
-          y={menu.y}
-          onClose={() => setMenu(null)}
-          actions={canvasMenuActions({
-            t, features, selected, locked: menu.locked, canPaste: clipboard.some((el) => types[el.type]),
-            canRulers: controller.canRulers, rulers: showRulers,
-            cut: () => { copy(); removeSelected(); }, copy, pasteHere: () => pasteAt(menu.at), duplicate,
-            arrange: doArrange, group: doGroup, ungroup: doUngroup, patch: patchElements, remove: removeSelected,
-            selectAll: () => select(live.current.elements.filter((el) => !el.locked && !el.hidden).map((el) => el.id)),
-            fit, toggleRulers: controller.toggleRulers,
-          })}
-        />
-      )}
-    </div>
+    </SymbolLibraryContext.Provider>
   );
 });
 

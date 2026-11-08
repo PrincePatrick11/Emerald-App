@@ -1447,6 +1447,14 @@ export const MIGRATIONS: Migration[] = [
       }
     },
   },
+  {
+    // The vault's own symbols, made from drawings in the canvas editor.
+    version: 58,
+    name: 'symbols',
+    up: async (db) => {
+      await db.execute(ddlIfNotExists(TABLE_DDL.symbols));
+    },
+  },
 ];
 
 async function altarSettingsToJson(db: Database): Promise<void> {

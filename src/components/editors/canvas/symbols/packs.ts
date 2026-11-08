@@ -16,6 +16,8 @@ export interface SymbolDef {
   solid?: string;
   /** The line weight a new one starts with, for a dense symbol thinner than the usual. */
   weight?: number;
+  /** Its own name, for a symbol that is not translated (one of the place's own). */
+  name?: string;
 }
 
 export interface SymbolPack {

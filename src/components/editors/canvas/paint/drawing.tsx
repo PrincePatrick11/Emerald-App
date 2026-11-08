@@ -1,4 +1,5 @@
 import { PenTool } from 'lucide-react';
+import SaveAsSymbol from '../symbols/SaveAsSymbol';
 import {
   emptyPaintDoc, PAINT_HEIGHT, PAINT_WIDTH, type PaintDoc,
 } from '../../../../lib/paint/document';
@@ -76,6 +77,7 @@ export function createDrawingType({ resolveImage = (ref) => ref }: DrawingTypeOp
       env.defs.push(`<clipPath id="${clip}"><rect${attrs({ width: el.width, height: el.height })}/></clipPath>`);
       return `<g clip-path="url(#${clip})"><g transform="scale(${el.width / PAINT_WIDTH} ${el.height / PAINT_HEIGHT})">${body}</g></g>`;
     },
+    controls: SaveAsSymbol,
     paint: {
       get: (el) => el.props.doc,
       set: (el, doc) => ({ ...el.props, doc }),

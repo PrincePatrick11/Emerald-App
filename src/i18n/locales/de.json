@@ -564,6 +564,15 @@
     }
   },
   "symbols": {
+    "remove": "Aus meinen Symbolen entfernen",
+    "removed": "Symbol entfernt",
+    "ownEmpty": "Noch leer. Wähle eine Zeichnung auf der Leinwand aus und speichere sie in der Leiste als Symbol.",
+    "saveAs": "Als Symbol speichern",
+    "namePlaceholder": "Name",
+    "saveHint": "Eine Farbe; Radiererstriche und Bilder fallen weg.",
+    "save": "Speichern",
+    "emptyDrawing": "Die Zeichnung ist leer.",
+    "ownDefault": "Mein Symbol",
     "title": "Symbol",
     "search": "Symbole suchen …",
     "none": "Kein Symbol gefunden.",
@@ -571,6 +580,7 @@
     "lineColor": "Linienfarbe",
     "weight": "Strichstärke",
     "packs": {
+      "own": "Meine Symbole",
       "planets": "Planeten",
       "zodiac": "Tierkreis",
       "alchemy": "Alchemie",

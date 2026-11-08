@@ -34,6 +34,7 @@ import { definitionById, nextDefinitionSortOrder } from './blockDefinitionRows';
 import { nextTemplateSortOrder } from './templateRows';
 import { nextEntrySortOrder, nextLanguageSortOrder } from './lexiconRows';
 import { alphabetToJson, DEFAULT_LANGUAGE_ICON } from './lexicon';
+import { readUserSymbol, type UserSymbol } from './userSymbols';
 import type { EntryType, Language } from '../types';
 import {
   routineLinkResolver, routineToTemplate, vaultRoutineLinkSource, type RoutineCategoryRow, type RoutineTargetRow,
@@ -539,6 +540,11 @@ interface BackupFile {
     languages?: Row[];
     /** Their vocabulary (since '9') — worthless without its language, hence always together. */
     lexiconEntries?: Row[];
+    /**
+     * The vault's own symbols (table `symbols`). Needs no new version: an
+     * older build ignores the field and keeps the rest.
+     */
+    symbols?: Row[];
   };
   images: Record<string, string>;  // stored file name → data URL (in v1/v2: absolute path)
   /**
@@ -785,6 +791,10 @@ export async function buildBackup(options: BackupOptions): Promise<BackupFile> {
     data.languages = await db.select<Row[]>(`SELECT * FROM languages`);
     data.lexiconEntries = await db.select<Row[]>(`SELECT * FROM lexicon_entries`);
   }
+
+  // ── Own symbols ──────────────────────────────────────────────────────────
+  // Always and in full, like the lexicon: a short list, path data in the row.
+  data.symbols = await db.select<Row[]>('SELECT * FROM symbols');
 
   // ── Embed images ─────────────────────────────────────────────────────────
   const images: Record<string, string> = {};
@@ -1166,6 +1176,19 @@ async function insertLexicon(
 }
 
 /**
+ * The own symbols of a backup: by ID, `INSERT OR IGNORE` like the lexicon —
+ * one that exists here stays, none is deleted, not even on replace. The file
+ * is foreign: a row without an id or usable path data is dropped.
+ */
+async function insertSymbols(db: Awaited<ReturnType<typeof getDb>>, symbolRows: unknown): Promise<void> {
+  const symbols = (Array.isArray(symbolRows) ? symbolRows : [])
+    .filter((r): r is Row => typeof r === 'object' && r !== null)
+    .map(readUserSymbol)
+    .filter((s): s is UserSymbol => !!s);
+  await insertRows(db, 'symbols', symbols.map((s) => ({ ...s })), true);
+}
+
+/**
  * Journal (v36/v37): linked operations and articles, paradigm, banishing
  * and meditation of an older backup become link blocks in the content — before
  * inserting, because since v49 the old columns no longer exist (the
@@ -1520,6 +1543,7 @@ async function doReplace(db: Awaited<ReturnType<typeof getDb>>, backup: BackupFi
   await insertTemplates(db, d.templates, pathMap, catMap);
   // Like the custom blocks and the templates: never deleted, missing ones added.
   await insertLexicon(db, d.languages, d.lexiconEntries);
+  await insertSymbols(db, d.symbols);
 
   // Delete only the content types present in the backup (so a partial backup
   // replacing only Journal data won't wipe wiki/ops).
@@ -1737,6 +1761,8 @@ async function doMerge(db: Awaited<ReturnType<typeof getDb>>, backup: BackupFile
   // Without prefix like the two above: a language stands on its own, its ID
   // appears in no entry.
   await insertLexicon(db, d.languages, d.lexiconEntries);
+  // The same for own symbols: an element on an altar keeps its own copy of the path.
+  await insertSymbols(db, d.symbols);
 
   // Content: plain INSERT with prefixed IDs (no conflicts possible)
   await insertRows(db, 'entries', entryRowsForInsert(journalEntries, wikiArticles, operations));

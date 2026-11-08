@@ -145,7 +145,7 @@ export function strokePath(stroke: PaintStroke, live = false): Path2D {
   return path;
 }
 
-function buildStrokePath<T extends PathSink>(stroke: PaintStroke, path: T, live = false): T {
+export function buildStrokePath<T extends PathSink>(stroke: PaintStroke, path: T, live = false): T {
   return stroke.tool === 'fill'
     ? ringsPath(stroke.rings, path)
     : isShapeTool(stroke.tool)

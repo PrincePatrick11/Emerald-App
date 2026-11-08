@@ -564,6 +564,15 @@
     }
   },
   "symbols": {
+    "remove": "Quitar de mis símbolos",
+    "removed": "Símbolo eliminado",
+    "ownEmpty": "Aún vacío. Selecciona un dibujo en el lienzo y guárdalo como símbolo desde la barra.",
+    "saveAs": "Guardar como símbolo",
+    "namePlaceholder": "Nombre",
+    "saveHint": "Un solo color; los trazos de borrador y las imágenes se omiten.",
+    "save": "Guardar",
+    "emptyDrawing": "El dibujo está vacío.",
+    "ownDefault": "Mi símbolo",
     "title": "Símbolo",
     "search": "Buscar símbolos…",
     "none": "Ningún símbolo encontrado.",
@@ -571,6 +580,7 @@
     "lineColor": "Color de línea",
     "weight": "Grosor de línea",
     "packs": {
+      "own": "Mis símbolos",
       "planets": "Planetas",
       "zodiac": "Zodíaco",
       "alchemy": "Alquimia",
