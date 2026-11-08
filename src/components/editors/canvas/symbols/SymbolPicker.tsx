@@ -12,11 +12,11 @@ export function symbolName(id: string, t: (key: string) => string): string {
 }
 
 /** A symbol drawn small, in the current text colour. */
-export function SymbolGlyph({ d, solid, size = 28 }: { d: string; solid?: string; size?: number }) {
+export function SymbolGlyph({ d, solid, weight = 5, size = 28 }: { d: string; solid?: string; weight?: number; size?: number }) {
   return (
     <svg viewBox="0 0 100 100" width={size} height={size} aria-hidden>
       {solid && <path d={solid} fill="currentColor" />}
-      <path d={d} fill="none" stroke="currentColor" strokeWidth={6} strokeLinecap="round" strokeLinejoin="round" />
+      <path d={d} fill="none" stroke="currentColor" strokeWidth={Math.max(2.5, weight * 1.2)} strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );
 }
@@ -74,7 +74,7 @@ export default function SymbolPicker({ onPick, current }: { onPick: (symbol: Sym
             title={symbolName(s.id, t)}
             onClick={() => onPick(s)}
           >
-            <SymbolGlyph d={s.d} solid={s.solid} />
+            <SymbolGlyph d={s.d} solid={s.solid} weight={s.weight} />
           </button>
         ))}
         {!shown.length && <p className="canvas-symbols-empty">{t('symbols.none')}</p>}

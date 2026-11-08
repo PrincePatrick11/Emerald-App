@@ -720,6 +720,10 @@
       "tav": "Tav"
     },
     "geometry": {
+      "treeOfLife": "Tree of life",
+      "seedOfLife": "Seed of life",
+      "flowerOfLife": "Flower of life",
+      "metatronsCube": "Metatron's cube",
       "pentagram": "Pentagram",
       "pentacle": "Pentacle",
       "hexagram": "Hexagram",

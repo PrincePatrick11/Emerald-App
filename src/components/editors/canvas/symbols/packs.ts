@@ -13,6 +13,8 @@ export interface SymbolDef {
   d: string;
   /** Parts filled in the line colour (a dot, a disc), drawn under the lines. */
   solid?: string;
+  /** The line weight a new one starts with, for a dense symbol thinner than the usual. */
+  weight?: number;
 }
 
 export interface SymbolPack {
@@ -77,6 +79,46 @@ function ogham(kind: 'right' | 'left' | 'slant' | 'notch', count: number): strin
   });
   return join(line(50, 4, 50, 96), ...strokes);
 }
+
+/** Lines between circles, from edge to edge rather than centre to centre. */
+function linked(points: readonly (readonly [number, number])[], r: number, pairs: readonly (readonly [number, number])[]): string {
+  return join(...pairs.map(([a, b]) => {
+    const [x1, y1] = points[a], [x2, y2] = points[b];
+    const d = Math.hypot(x2 - x1, y2 - y1);
+    const ux = (x2 - x1) / d, uy = (y2 - y1) / d;
+    return line(x1 + ux * r, y1 + uy * r, x2 - ux * r, y2 - uy * r);
+  }));
+}
+
+/** The tree of life: the ten sephiroth and the 22 paths between them. */
+const SEPHIROTH: [number, number][] = [[50, 7], [76, 21], [24, 21], [76, 45], [24, 45], [50, 55], [76, 71], [24, 71], [50, 81], [50, 94]];
+const treeOfLife = join(
+  ...SEPHIROTH.map(([x, y]) => circle(x, y, 5)),
+  linked(SEPHIROTH, 5, [[0, 1], [0, 2], [0, 5], [1, 2], [1, 5], [1, 3], [2, 5], [2, 4], [3, 4], [3, 5], [3, 6], [4, 5], [4, 7], [5, 6], [5, 8], [5, 7], [6, 7], [6, 8], [6, 9], [7, 8], [7, 9], [8, 9]]),
+);
+
+/** Circles of radius `r` round the centre and on the corners of hexagons out to `rings` rings. */
+function lifeCircles(r: number, rings: number): string {
+  const centres: [number, number][] = [[50, 50]];
+  for (let ring = 1; ring <= rings; ring++) {
+    for (let side = 0; side < 6; side++) {
+      for (let step = 0; step < ring; step++) {
+        const [ax, ay] = polar(50, 50, r * ring, side * 60);
+        const [bx, by] = polar(50, 50, r * ring, (side + 1) * 60);
+        centres.push([ax + ((bx - ax) * step) / ring, ay + ((by - ay) * step) / ring]);
+      }
+    }
+  }
+  return join(...centres.map(([x, y]) => circle(x, y, r)));
+}
+
+/** Metatron's cube: thirteen circles and every line between their centres. */
+const metatron = (() => {
+  const pts: [number, number][] = [[50, 50], ...corners(6, 50, 50, 20, 0), ...corners(6, 50, 50, 40, 0)];
+  const pairs: [number, number][] = [];
+  for (let a = 0; a < pts.length; a++) for (let b = a + 1; b < pts.length; b++) pairs.push([a, b]);
+  return join(...pts.map(([x, y]) => circle(x, y, 9)), linked(pts, 0, pairs));
+})();
 
 const pack = (id: string, entries: Record<string, string | Omit<SymbolDef, 'id'>>): SymbolPack => ({
   id,
@@ -222,6 +264,10 @@ export const SYMBOL_PACKS: SymbolPack[] = [
     solarCross: join(circle(50, 50, 36), line(50, 14, 50, 86), line(14, 50, 86, 50)),
     ankh: join('M50 44C34 44 32 10 50 10C68 10 66 44 50 44Z', line(50, 44, 50, 90), line(26, 52, 74, 52)),
     monad: { d: join('M32 10C36 24 64 24 68 10', circle(50, 36, 14), line(50, 50, 50, 80), line(34, 64, 66, 64), 'M50 80C46 92 34 92 32 82', 'M50 80C54 92 66 92 68 82'), solid: circle(50, 36, 4) },
+    treeOfLife: { d: treeOfLife, weight: 3 },
+    seedOfLife: { d: join(circle(50, 50, 38), lifeCircles(19, 1)), weight: 3 },
+    flowerOfLife: { d: join(circle(50, 50, 44), lifeCircles(14.5, 2)), weight: 2 },
+    metatronsCube: { d: metatron, weight: 1 },
     eye: { d: join(poly(corners(3, 50, 58, 42), true), 'M30 64Q50 48 70 64Q50 80 30 64Z'), solid: circle(50, 64, 6) },
   }),
 ];

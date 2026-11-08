@@ -85,7 +85,7 @@ const addition: CanvasAddition<SymbolProps> = {
     return {
       width: side,
       height: side,
-      props: { symbol: chosen.id, d: chosen.d, ...(chosen.solid ? { solid: chosen.solid } : {}), color: DEFAULT_FILL, weight: DEFAULT_WEIGHT, fill: null },
+      props: { symbol: chosen.id, d: chosen.d, ...(chosen.solid ? { solid: chosen.solid } : {}), color: DEFAULT_FILL, weight: chosen.weight ?? DEFAULT_WEIGHT, fill: null },
     };
   },
 };
