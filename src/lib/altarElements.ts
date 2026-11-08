@@ -58,9 +58,12 @@ function symbolStyle(raw: unknown): AltarSymbolStyle {
   const s = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>;
   const id = typeof s.symbol === 'string' ? s.symbol : '';
   const known = SYMBOLS_BY_ID.get(id) ?? SYMBOLS_BY_ID.values().next().value!;
+  const own = isSymbolPath(s.d) ? s.d : null;
+  const solid = own ? (isSymbolPath(s.solid) ? s.solid : undefined) : known.solid;
   return {
-    symbol: isSymbolPath(s.d) || SYMBOLS_BY_ID.has(id) ? id : known.id,
-    d: isSymbolPath(s.d) ? s.d : known.d,
+    symbol: own || SYMBOLS_BY_ID.has(id) ? id : known.id,
+    d: own ?? known.d,
+    ...(solid ? { solid } : {}),
     color: color(s.color) ?? '#d4af37',
     weight: num(s.weight, DEFAULT_WEIGHT, MIN_WEIGHT, MAX_WEIGHT),
     fill: color(s.fill),

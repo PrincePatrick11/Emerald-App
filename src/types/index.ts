@@ -165,6 +165,8 @@ export interface AltarTextStyle {
 export interface AltarSymbolStyle {
   symbol: string;
   d: string;
+  /** Parts filled in `color`. */
+  solid?: string;
   color: string;
   weight: number;
   fill: string | null;

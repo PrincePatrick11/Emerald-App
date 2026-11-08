@@ -11,6 +11,8 @@ export interface SymbolDef {
   id: string;
   /** Path data in the 100 × 100 box. */
   d: string;
+  /** Parts filled in the line colour (a dot, a disc), drawn under the lines. */
+  solid?: string;
 }
 
 export interface SymbolPack {
@@ -22,7 +24,7 @@ export interface SymbolPack {
 const triangleUp = poly([[50, 14], [88, 80], [12, 80]], true);
 const triangleDown = poly([[50, 86], [88, 20], [12, 20]], true);
 
-const sun = join(circle(50, 50, 34), circle(50, 50, 3));
+const sun = { d: circle(50, 50, 34), solid: circle(50, 50, 6) };
 const moon = 'M62 12A40 40 0 1 0 62 88A44 44 0 0 1 62 12Z';
 const mercury = join(circle(50, 48, 16), 'M32 12C34 28 66 28 68 12', line(50, 64, 50, 92), line(38, 80, 62, 80));
 const venus = join(circle(50, 36, 22), line(50, 58, 50, 90), line(34, 75, 66, 75));
@@ -31,12 +33,12 @@ const jupiter = join('M22 40C22 22 42 18 46 32C50 46 38 60 20 66L84 66', line(66
 const saturn = join(line(24, 22, 48, 22), line(36, 10, 36, 66), 'M36 44C44 30 66 32 66 48C66 62 50 70 54 82C56 88 64 90 70 84');
 
 /** Eight arrows out of a circle: the chaos star. */
-const chaosStar = join(circle(50, 50, 9), ...Array.from({ length: 8 }, (_, i) => {
+const chaosStar = { solid: circle(50, 50, 10), d: join(...Array.from({ length: 8 }, (_, i) => {
   const deg = i * 45;
   const [x1, y1] = polar(50, 50, 9, deg);
   const [x2, y2] = polar(50, 50, 44, deg);
   return join(line(x1, y1, x2, y2), poly([polar(50, 50, 34, deg - 8), [x2, y2], polar(50, 50, 34, deg + 8)]));
-}));
+})) };
 
 /** The helm of awe: eight arms out of a circle, each with a bar across and a fork at its end. */
 const helmOfAwe = join(circle(50, 50, 8), ...Array.from({ length: 8 }, (_, i) => {
@@ -61,9 +63,24 @@ const unicursal = (() => {
   return poly([ul, bottom, ur, ll, top, lr, ul]);
 })();
 
-const pack = (id: string, entries: Record<string, string>): SymbolPack => ({
+/**
+ * An ogham letter on its stem: `count` strokes to the right, to the left,
+ * slanting across, or short notches across, as the four groups have them.
+ */
+function ogham(kind: 'right' | 'left' | 'slant' | 'notch', count: number): string {
+  const strokes = Array.from({ length: count }, (_, i) => {
+    const y = 50 + (i - (count - 1) / 2) * 13;
+    if (kind === 'right') return line(50, y, 76, y);
+    if (kind === 'left') return line(24, y, 50, y);
+    if (kind === 'slant') return line(32, y + 7, 68, y - 7);
+    return line(42, y, 58, y);
+  });
+  return join(line(50, 4, 50, 96), ...strokes);
+}
+
+const pack = (id: string, entries: Record<string, string | Omit<SymbolDef, 'id'>>): SymbolPack => ({
   id,
-  symbols: Object.entries(entries).map(([name, d]) => ({ id: `${id}.${name}`, d })),
+  symbols: Object.entries(entries).map(([name, s]) => ({ id: `${id}.${name}`, ...(typeof s === 'string' ? { d: s } : s) })),
 });
 
 export const SYMBOL_PACKS: SymbolPack[] = [
@@ -161,6 +178,37 @@ export const SYMBOL_PACKS: SymbolPack[] = [
     mjolnir: join(circle(50, 10, 5), line(50, 15, 50, 44), poly([[18, 44], [82, 44], [82, 56], [60, 62], [55, 90], [45, 90], [40, 62], [18, 56]], true)),
     spiral: spiral(50, 50, 42, 3),
   }),
+  pack('ogham', {
+    beith: ogham('right', 1), luis: ogham('right', 2), fearn: ogham('right', 3), sail: ogham('right', 4), nion: ogham('right', 5),
+    uath: ogham('left', 1), dair: ogham('left', 2), tinne: ogham('left', 3), coll: ogham('left', 4), ceirt: ogham('left', 5),
+    muin: ogham('slant', 1), gort: ogham('slant', 2), ngeadal: ogham('slant', 3), straif: ogham('slant', 4), ruis: ogham('slant', 5),
+    ailm: ogham('notch', 1), onn: ogham('notch', 2), ur: ogham('notch', 3), eadhadh: ogham('notch', 4), iodhadh: ogham('notch', 5),
+  }),
+  // The Hebrew letters in their square script, as strokes.
+  pack('hebrew', {
+    aleph: 'M28 16L74 84M70 14C72 30 64 42 50 46M55 56C40 60 32 72 32 86',
+    bet: 'M24 22L68 22C74 22 76 26 76 32L76 80M18 80L86 80',
+    gimel: 'M40 20L58 20C62 20 62 24 62 30L62 82M62 62L40 84',
+    dalet: 'M18 22L84 22M70 22L70 84',
+    he: 'M20 22L80 22L80 84M30 44L30 84',
+    vav: 'M40 20L54 20L54 84',
+    zayin: 'M34 20L68 20M52 20L52 84',
+    chet: 'M24 84L24 22L76 22L76 84',
+    tet: 'M44 40C38 28 26 20 26 34L26 68C26 80 36 84 50 84C64 84 76 80 76 68L76 22',
+    yod: 'M42 22L58 22L58 46',
+    kaf: 'M22 22L64 22C74 22 78 30 78 52C78 74 74 82 64 82L22 82',
+    lamed: 'M30 6L30 34L70 34C74 34 76 38 74 42L54 84',
+    mem: 'M30 22L66 22C74 22 78 28 78 36L78 84L48 84M18 30L30 22L24 84',
+    nun: 'M38 22L56 22C60 22 62 26 62 30L62 84L34 84',
+    samekh: 'M20 22L66 22C78 22 82 32 82 50C82 72 70 84 50 84C30 84 20 70 20 50Z',
+    ayin: 'M24 20L50 72M76 20L62 72C58 84 44 86 26 86',
+    pe: 'M22 22L64 22C74 22 78 30 78 52C78 74 74 82 64 82L22 82M28 22L28 44L46 44',
+    tsadi: 'M24 18L58 58C64 66 70 78 78 84L18 84M74 18C76 38 70 50 58 58',
+    qof: 'M22 22L68 22C76 22 78 28 78 36L78 84M30 42L30 96',
+    resh: 'M22 22L64 22C74 22 76 28 76 36L76 84',
+    shin: 'M22 20L32 82L78 82L82 20M52 20L52 54L38 66',
+    tav: 'M20 22L70 22C76 22 80 26 80 34L80 84M34 22L34 76L22 84',
+  }),
   pack('geometry', {
     pentagram: starPolygon(5, 2, 50, 54, 42),
     pentacle: join(circle(50, 50, 44), starPolygon(5, 2, 50, 50, 44)),
@@ -170,11 +218,11 @@ export const SYMBOL_PACKS: SymbolPack[] = [
     octagram: starPolygon(8, 3, 50, 50, 42),
     triangleInCircle: join(circle(50, 50, 42), poly(corners(3, 50, 50, 42), true)),
     vesicaPiscis: join(circle(38, 50, 26), circle(62, 50, 26)),
-    circumpunct: join(circle(50, 50, 36), circle(50, 50, 4)),
+    circumpunct: { d: circle(50, 50, 36), solid: circle(50, 50, 6) },
     solarCross: join(circle(50, 50, 36), line(50, 14, 50, 86), line(14, 50, 86, 50)),
     ankh: join('M50 44C34 44 32 10 50 10C68 10 66 44 50 44Z', line(50, 44, 50, 90), line(26, 52, 74, 52)),
-    monad: join('M32 10C36 24 64 24 68 10', circle(50, 36, 14), circle(50, 36, 2.5), line(50, 50, 50, 80), line(34, 64, 66, 64), 'M50 80C46 92 34 92 32 82', 'M50 80C54 92 66 92 68 82'),
-    eye: join(poly(corners(3, 50, 58, 42), true), 'M30 64Q50 48 70 64Q50 80 30 64Z', circle(50, 64, 5)),
+    monad: { d: join('M32 10C36 24 64 24 68 10', circle(50, 36, 14), line(50, 50, 50, 80), line(34, 64, 66, 64), 'M50 80C46 92 34 92 32 82', 'M50 80C54 92 66 92 68 82'), solid: circle(50, 36, 4) },
+    eye: { d: join(poly(corners(3, 50, 58, 42), true), 'M30 64Q50 48 70 64Q50 80 30 64Z'), solid: circle(50, 64, 6) },
   }),
 ];
 

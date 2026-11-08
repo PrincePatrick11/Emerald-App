@@ -49,6 +49,7 @@ export const AltarPlacementVisual = memo(function AltarPlacementVisual({ placeme
     const symbol = placement.symbol;
     return (
       <svg width={size} height={size} viewBox="0 0 100 100" aria-hidden className="flex-shrink-0">
+        {symbol?.solid && <path d={symbol.solid} fill={symbol.color} />}
         <path d={symbol?.d} fill={symbol?.fill ?? 'none'} stroke={symbol?.color ?? 'currentColor'} strokeWidth={8} strokeLinecap="round" strokeLinejoin="round" />
       </svg>
     );

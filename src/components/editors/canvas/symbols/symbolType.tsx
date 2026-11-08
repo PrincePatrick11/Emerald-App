@@ -20,6 +20,8 @@ export interface SymbolProps {
   /** `pack.name` in the library. */
   symbol: string;
   d: string;
+  /** Parts filled in `color`, under the lines. */
+  solid?: string;
   color: string;
   weight: number;
   fill: string | null;
@@ -52,8 +54,8 @@ function SymbolControls({ elements, update }: {
   const symbol = common(elements, (el) => el.props.symbol);
   return (
     <ToolbarGroup>
-      <PopoverButton icon={<SymbolGlyph d={elements[0].props.d} size={15} />} title={t('symbols.swap')} active={false}>
-        {(close) => <SymbolPicker current={symbol} onPick={(s) => { set({ symbol: s.id, d: s.d }); close(); }} />}
+      <PopoverButton icon={<SymbolGlyph d={elements[0].props.d} solid={elements[0].props.solid} size={15} />} title={t('symbols.swap')} active={false}>
+        {(close) => <SymbolPicker current={symbol} onPick={(s) => { set({ symbol: s.id, d: s.d, solid: s.solid }); close(); }} />}
       </PopoverButton>
       <PopoverButton icon={<PenLine size={14} style={color ? { color } : undefined} />} title={t('symbols.lineColor')} active={false}>
         {(close) => <ColorPanel value={color} onPick={(c) => { if (c) set({ color: c }); close(); }} />}
@@ -83,7 +85,7 @@ const addition: CanvasAddition<SymbolProps> = {
     return {
       width: side,
       height: side,
-      props: { symbol: chosen.id, d: chosen.d, color: DEFAULT_FILL, weight: DEFAULT_WEIGHT, fill: null },
+      props: { symbol: chosen.id, d: chosen.d, ...(chosen.solid ? { solid: chosen.solid } : {}), color: DEFAULT_FILL, weight: DEFAULT_WEIGHT, fill: null },
     };
   },
 };
@@ -101,6 +103,10 @@ export const symbolType: CanvasElementType<SymbolProps> = {
       ctx.fillStyle = p.fill;
       ctx.fill(path, 'evenodd');
     }
+    if (p.solid) {
+      ctx.fillStyle = p.color;
+      ctx.fill(pathOf(p.solid));
+    }
     ctx.strokeStyle = p.color;
     ctx.lineWidth = p.weight;
     ctx.lineCap = 'round';
@@ -109,8 +115,10 @@ export const symbolType: CanvasElementType<SymbolProps> = {
   },
   svg: (el) => {
     const p = el.props;
-    return `<path${attrs({
-      d: p.d, transform: `scale(${num(el.width / 100)} ${num(el.height / 100)})`,
+    const transform = `scale(${num(el.width / 100)} ${num(el.height / 100)})`;
+    const solid = p.solid ? `<path${attrs({ d: p.solid, transform, fill: p.color })}/>` : '';
+    return solid + `<path${attrs({
+      d: p.d, transform,
       fill: p.fill ?? 'none', 'fill-rule': p.fill ? 'evenodd' : null,
       stroke: p.color, 'stroke-width': p.weight, 'stroke-linecap': 'round', 'stroke-linejoin': 'round',
     })}/>`;
