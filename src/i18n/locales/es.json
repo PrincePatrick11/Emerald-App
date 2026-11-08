@@ -79,6 +79,7 @@
     "templateDeleted": "Plantilla eliminada",
     "languageDeleted": "Idioma eliminado",
     "altarItemDeleted": "Elemento eliminado",
+    "imageDeleted": "Imagen eliminada",
     "altarDeleted": "Altar eliminado",
     "wordDeleted": "Palabra eliminada",
     "placementRemoved": "Elemento retirado del altar"
@@ -94,6 +95,7 @@
     "altar": "Altar",
     "tags": "Etiquetas",
     "categories": "Categorías",
+    "images": "Imágenes",
     "trash": "Papelera",
     "blocks": "Bloques",
     "templates": "Plantillas",
@@ -589,6 +591,18 @@
     "categories": "Categoría",
     "showMore": "Mostrar {{count}} resultado más",
     "showMore_other": "Mostrar {{count}} resultados más"
+  },
+  "images": {
+    "add": "Añadir imágenes",
+    "edit": "Editar imagen",
+    "adopt": "Añadir a imágenes",
+    "unnamed": "Sin nombre",
+    "name": "Nombre",
+    "emoji": "Emoji",
+    "note": "Nota",
+    "noCategory": "Sin categoría",
+    "vaultOnly": "Solo en la bóveda",
+    "showVault": "También imágenes solo en la bóveda"
   },
   "tags": {
     "new": "Nueva etiqueta",
@@ -1197,6 +1211,7 @@
     "operations": { "title": "Aún no hay operaciones", "description": "Planifica rituales con ingredientes, desarrollo y resultado." },
     "altar": { "title": "Aún no hay altar", "description": "Diseña un altar con un fondo y elementos." },
     "altarLibrary": { "title": "Aún no hay elementos", "description": "Velas, cristales, símbolos: con elementos construyes tus altares." },
+    "images": { "title": "Aún no hay imágenes", "description": "Reúne aquí tus imágenes: ponles nombre, categoría y etiquetas, y arrástralas a un lienzo." },
     "lexicon": { "title": "Aún no hay idiomas", "description": "Crea un idioma y llénalo de palabras y caracteres." },
     "translate": { "title": "Aún no hay nada que traducir", "description": "Crea primero un idioma; luego este campo traduce con él." },
     "templates": { "title": "Aún no hay plantillas", "description": "Guarda procesos recurrentes como plantilla." },

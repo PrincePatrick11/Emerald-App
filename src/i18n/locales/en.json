@@ -79,6 +79,7 @@
     "templateDeleted": "Template deleted",
     "languageDeleted": "Language deleted",
     "altarItemDeleted": "Element deleted",
+    "imageDeleted": "Image deleted",
     "altarDeleted": "Altar deleted",
     "wordDeleted": "Word deleted",
     "placementRemoved": "Element removed from altar"
@@ -94,6 +95,7 @@
     "altar": "Altar",
     "tags": "Tags",
     "categories": "Categories",
+    "images": "Images",
     "trash": "Trash",
     "blocks": "Blocks",
     "templates": "Templates",
@@ -589,6 +591,18 @@
     "categories": "Category",
     "showMore": "Show {{count}} more result",
     "showMore_other": "Show {{count}} more results"
+  },
+  "images": {
+    "add": "Add images",
+    "edit": "Edit image",
+    "adopt": "Take into Images",
+    "unnamed": "Unnamed",
+    "name": "Name",
+    "emoji": "Emoji",
+    "note": "Note",
+    "noCategory": "No category",
+    "vaultOnly": "Only in the vault",
+    "showVault": "Also images only in the vault"
   },
   "tags": {
     "new": "New tag",
@@ -1197,6 +1211,7 @@
     "operations": { "title": "No operations yet", "description": "Plan rituals with ingredients, steps and outcome." },
     "altar": { "title": "No altar yet", "description": "Design an altar from a background and elements." },
     "altarLibrary": { "title": "No elements yet", "description": "Candles, crystals, symbols – elements are what you build your altars from." },
+    "images": { "title": "No images yet", "description": "Collect pictures here – name them, give them a category and tags, and drag them onto a canvas." },
     "lexicon": { "title": "No languages yet", "description": "Create a language and fill it with words and characters." },
     "translate": { "title": "Nothing to translate yet", "description": "Create a language first – then this field translates with it." },
     "templates": { "title": "No templates yet", "description": "Save recurring routines as a template." },

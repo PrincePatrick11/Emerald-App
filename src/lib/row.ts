@@ -26,6 +26,7 @@ import type {
   Tag,
   Task,
   TaskLink,
+  VaultImage,
 } from '../types';
 import {
   DEFAULT_DEFINITION_ICON, parseDefinitionDisplay, parseDefinitionElements, type BlockDefinition,
@@ -217,6 +218,20 @@ export const fromRow = {
       category_id: nullableStr(r.category_id),
       note: str(r.note),
       image_data: r.image_data == null ? undefined : String(r.image_data),
+      created_at: str(r.created_at),
+      updated_at: str(r.updated_at),
+    };
+  },
+
+  image(r: DbRow): VaultImage {
+    return {
+      id: str(r.id),
+      file: str(r.file),
+      name: str(r.name),
+      emoji: str(r.emoji),
+      category_id: nullableStr(r.category_id),
+      tags: jsonArray<unknown>(r.tags).filter((t): t is string => typeof t === 'string'),
+      note: str(r.note),
       created_at: str(r.created_at),
       updated_at: str(r.updated_at),
     };

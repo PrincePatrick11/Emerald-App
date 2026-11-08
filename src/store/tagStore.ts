@@ -8,6 +8,7 @@ import { fromRow, type DbRow } from '../lib/row';
 import { replaceTagId, stripTagIds, tagNameKey } from '../lib/tagRefs';
 import { useEntryStore, findEntry, mapEntries } from './entryStore';
 import { useTemplateStore } from './templateStore';
+import { useImageStore } from './imageStore';
 import { generateId, nowIso } from '../lib/helpers';
 import { serialKey, serialized } from '../lib/serialize';
 import type { EntryType, Tag } from '../types';
@@ -46,6 +47,9 @@ async function rewriteRefs(rewrite: (db: Database) => Promise<Map<string, string
   }));
   useTemplateStore.setState((s) => ({
     templates: s.templates.map((t) => (changed.has(t.id) ? { ...t, tags: changed.get(t.id)! } : t)),
+  }));
+  useImageStore.setState((s) => ({
+    images: s.images.map((i) => (changed.has(i.id) ? { ...i, tags: changed.get(i.id)! } : i)),
   }));
 }
 

@@ -15,6 +15,7 @@ const KIND_META: Record<SearchKind, { icon: LucideIcon; labelKey: string }> = {
   task: { icon: MODULES.tasks.icon, labelKey: MODULES.tasks.navLabelKey },
   altar: { icon: MODULES.altar.icon, labelKey: MODULES.altar.navLabelKey },
   altarItem: { icon: Sparkles, labelKey: 'search.altarElements' },
+  image: { icon: AUX_VIEWS.images.icon, labelKey: AUX_VIEWS.images.navLabelKey },
   tag: { icon: Tag, labelKey: 'nav.tags' },
   category: { icon: Folder, labelKey: 'search.categories' },
   language: { icon: AUX_VIEWS.lexicon.icon, labelKey: AUX_VIEWS.lexicon.navLabelKey },

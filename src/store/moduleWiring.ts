@@ -16,6 +16,7 @@ import { useCategoryStore } from './categoryStore';
 import { useBlockDefinitionStore } from './blockDefinitionStore';
 import { useTemplateStore } from './templateStore';
 import { useLexiconStore } from './lexiconStore';
+import { useImageStore } from './imageStore';
 import { ENTRY_MODULE_IDS, type EntryModuleId, type TrashKind } from '../lib/modules';
 
 /**
@@ -98,6 +99,10 @@ export const trashWiring: Record<TrashKind, {
     restore: (id) => useAltarStore.getState().restoreItem(id),
     permanentlyDelete: (id) => useAltarStore.getState().permanentlyDeleteItem(id),
   },
+  image: {
+    restore: (id) => useImageStore.getState().restoreImage(id),
+    permanentlyDelete: (id) => useImageStore.getState().permanentlyDeleteImage(id),
+  },
 };
 
 /**
@@ -118,6 +123,7 @@ export async function reloadAllStores(): Promise<void> {
     useBlockDefinitionStore.getState().fetchDefinitions(),
     useTemplateStore.getState().fetchTemplates(),
     useLexiconStore.getState().fetchLexicon(),
+    useImageStore.getState().fetchImages(),
   ]);
   await reloadEach(ENTRY_MODULE_IDS);
 }

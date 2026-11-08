@@ -23,6 +23,7 @@ import {
   Languages,
   LayoutList,
   Library,
+  Images,
   ListTodo,
   Sparkles,
   Tag,
@@ -73,7 +74,7 @@ export function entryIcon(
 export const ENTRY_MODULE_IDS = ['journal', 'tasks', 'operations', 'wiki', 'altar'] as const;
 export type EntryModuleId = (typeof ENTRY_MODULE_IDS)[number];
 
-export const AUX_VIEW_IDS = ['home', 'tags', 'categories', 'blocks', 'templates', 'lexicon', 'trash'] as const;
+export const AUX_VIEW_IDS = ['home', 'tags', 'categories', 'images', 'blocks', 'templates', 'lexicon', 'trash'] as const;
 export type AuxViewId = (typeof AUX_VIEW_IDS)[number];
 
 /**
@@ -153,6 +154,8 @@ export const AUX_VIEWS: Record<AuxViewId, { icon: LucideIcon; navLabelKey: strin
   // The same glyph as `TRASH_KIND_ICONS.category`: a deleted category
   // in the trash and its management should read as the same thing.
   categories: { icon: FolderOpen, navLabelKey: 'nav.categories' },
+  // The same glyph as `TRASH_KIND_ICONS.image`.
+  images: { icon: Images, navLabelKey: 'nav.images' },
   trash: { icon: Trash2, navLabelKey: 'nav.trash' },
   blocks: { icon: Box, navLabelKey: 'nav.blocks' },
   // The same glyph as `TRASH_KIND_ICONS.template`.
@@ -212,7 +215,7 @@ export function entryTypeForView(viewType: string): EntryType | undefined {
 /** All trash item types (`TrashedItem['type']`). */
 export const TRASH_KINDS = [
   'journal', 'wiki', 'tag', 'operation', 'task', 'category', 'blockDefinition', 'template', 'language', 'altar',
-  'altarItem',
+  'altarItem', 'image',
 ] as const;
 export type TrashKind = (typeof TRASH_KINDS)[number];
 
@@ -230,4 +233,5 @@ export const TRASH_KIND_ICONS: Record<TrashKind, LucideIcon> = {
   language: Languages,
   altar: AltarIcon,
   altarItem: Sparkles,
+  image: Images,
 };

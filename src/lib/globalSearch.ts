@@ -1,4 +1,4 @@
-import type { ActiveView, AltarItem, AltarRecord, Entry, Language, LexiconEntry, Tag, Task } from '../types';
+import type { ActiveView, AltarItem, AltarRecord, Entry, Language, LexiconEntry, Tag, Task, VaultImage } from '../types';
 import { foldTypography, plainTextFor } from './searchText';
 import { todayIso, withoutConcealed } from './blocks/sigil';
 import { viewTypeForEntryType } from './modules';
@@ -21,7 +21,7 @@ import type { CategoryModuleId } from './modules';
 
 export type SearchKind =
   | 'journal' | 'wiki' | 'operation' | 'task'
-  | 'altar' | 'altarItem' | 'tag' | 'category'
+  | 'altar' | 'altarItem' | 'image' | 'tag' | 'category'
   | 'language' | 'lexiconEntry';
 
 
@@ -71,6 +71,8 @@ export interface SearchCorpus {
   tasks: Task[];
   altars: AltarRecord[];
   altarItems: AltarItem[];
+  /** The pictures taken into "Images" — a hit opens the picture there. */
+  images: VaultImage[];
   tags: Tag[];
   categories: SearchCategory[];
   languages: Language[];
@@ -253,6 +255,12 @@ export function searchCorpus(corpus: SearchCorpus, rawQuery: string): SearchHit[
       { categoryId: item.category_id, updatedAt: item.updated_at || item.created_at });
   }
 
+  for (const image of corpus.images) {
+    push('image', image.id, image.name || image.file,
+      matchRecord(q, image.name, null, () => [image.note]),
+      { categoryId: image.category_id, updatedAt: image.updated_at });
+  }
+
   for (const tag of corpus.tags) {
     push('tag', tag.id, tag.name, matchRecord(q, tag.name, null, () => []));
   }
@@ -312,6 +320,9 @@ export function viewForSearchHit(hit: Pick<SearchHit, 'kind' | 'id' | 'module' |
       return { type: 'tasks', id: hit.id };
     case 'altarItem':
       return { type: 'altar' };
+    case 'image':
+      // With the id, `ImagesView` opens the picture.
+      return { type: 'images', id: hit.id };
     case 'tag':
       // With the id, `TagsView` selects the tag rather than merely opening.
       return { type: 'tags', id: hit.id };

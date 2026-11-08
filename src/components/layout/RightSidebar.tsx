@@ -33,7 +33,7 @@ const PROPERTIES_PANELS: Partial<Record<ViewId, ComponentType>> = {
  * 'templates', id }`) brings its own bar and portals it into
  * the same host as a dashboard.
  */
-const VIEWS_WITHOUT_ENTRIES: ReadonlySet<ViewId> = new Set<ViewId>(['home', 'tags', 'categories', ...LIBRARY_VIEW_IDS]);
+const VIEWS_WITHOUT_ENTRIES: ReadonlySet<ViewId> = new Set<ViewId>(['home', 'tags', 'categories', 'images', ...LIBRARY_VIEW_IDS]);
 
 
 function PropertiesContent({ activeView }: { activeView: ActiveView }) {

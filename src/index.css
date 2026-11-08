@@ -2093,6 +2093,71 @@ html[data-theme] .prop-segment--active {
   box-shadow: 0 0 0 2px var(--well-solid), 0 0 0 3px var(--accent);
 }
 
+/* "Images" (ImagesView, ImageTile): a grid of square pictures with their
+   name below; the compact tile is for a strip beside a canvas. */
+.images-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 0.75rem;
+}
+.image-tile {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 6px;
+  border-radius: 0.5rem;
+  border: 1px solid var(--edge);
+  background: var(--well);
+  transition: border-color 150ms, background-color 150ms;
+}
+.image-tile[role="button"]:hover {
+  border-color: var(--edge-strong);
+  background: var(--well-raise);
+}
+.image-tile:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--focus-ring);
+}
+.image-tile-picture {
+  aspect-ratio: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border-radius: 0.375rem;
+  background: var(--well-deep);
+}
+.image-tile-picture img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+.image-tile-label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  font-size: 12px;
+}
+.image-tile--compact {
+  width: 76px;
+  padding: 4px;
+  gap: 4px;
+}
+.image-tile--compact .image-tile-label { font-size: 11px; }
+.image-edit-preview {
+  display: flex;
+  justify-content: center;
+  max-height: 220px;
+  border-radius: 0.5rem;
+  background: var(--well-deep);
+  overflow: hidden;
+}
+.image-edit-preview img {
+  max-height: 220px;
+  object-fit: contain;
+}
+
 /* The find bar above the toolbar (FindBar), the small inline field it shares with
    the link form (LinkHrefForm), and the hits it marks. */
 .editor-find-bar {

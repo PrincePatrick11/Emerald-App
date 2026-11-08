@@ -68,6 +68,7 @@ Per-migration detail lives in the code and in `CHANGELOG.md`. In short:
 | 53 | `tags_by_id` | Tag lists hold ids instead of names; `tags.affected_ids` dropped ([tags](#tags)) |
 | 54 | `drop_unused_descriptions` | Drops `tasks.description`/`due_date`, `block_definitions.description`, `templates.description` |
 | 55 | `entries_list_index` | `idx_entries_list` (the list columns) and the partial `idx_entries_decorated` replace `idx_entries_deleted` |
+| 56 | `images` | Additive: the `images` table ([images](#images)) and its two indexes |
 
 Column drops go through `dropColumnsIfPresent` (`dbRebuild.ts`), which skips columns already gone, so they are repeatable. Where a migration converts data, the same converter also runs on rows from an older `.emeralddb` file at import time — see [DB Backup / Restore](#db-backup--restore-emeralddb).
 
@@ -240,6 +241,22 @@ The Lexicon's languages, each with its alphabet here and its words in [`lexicon_
 | sort_order | INTEGER | NOT NULL DEFAULT 0 |
 | created_at / updated_at | TEXT | ISO 8601 |
 | deleted_at | TEXT | NULL = active; purged after the retention period (`CLEANUP_TABLES`) |
+
+### images
+
+The pictures taken into "Images", the place of their own next to tags and categories. A row names a stored file and gives it a name, an emoji, a category and tags; files without a row (in texts, fields, drawings) are listed too, straight from the vault's `images/` folder. A row keeps its file from the image cleanup (`collectUsedImageFilenames`), in the trash too, until it is deleted for good.
+
+| Column | Type | Notes |
+|---|---|---|
+| id | TEXT PK | UUID |
+| file | TEXT | NOT NULL UNIQUE — the stored file name (`storedImageName`); one row per file |
+| name | TEXT | NOT NULL DEFAULT `''` — a new row from the disk takes the file's name without its extension |
+| emoji | TEXT | NOT NULL DEFAULT `'🖼️'` |
+| note | TEXT | NOT NULL DEFAULT `''` |
+| category_id | TEXT FK | → `categories(id)` ON DELETE RESTRICT, nullable; in `CATEGORIZED_TABLES` |
+| tags | TEXT | JSON array of tag ids, NOT NULL DEFAULT `'[]'`; in `TAG_REF_TABLES` (`src/lib/tagRefs.ts`), not in the frozen `TAGGED_TABLES` of v53 |
+| created_at / updated_at | TEXT | ISO 8601 |
+| deleted_at | TEXT | NULL = active; purged after the retention period (`CLEANUP_TABLES`), the file left to the cleanup |
 
 ### lexicon_entries
 
@@ -445,7 +462,7 @@ Full vault snapshots are exported and imported via Settings → Backup. The code
 
 ```json
 {
-  "version": "12",
+  "version": "13",
   "type": "backup",
   "exportedAt": "2026-04-18T...",
   "filters": { "includeJournal": true, "includeWiki": true, "..." : "..." },
@@ -469,12 +486,13 @@ Full vault snapshots are exported and imported via Settings → Backup. The code
 
 ### Backup versions
 
-`BACKUP_VERSION` is `"12"`. A build rejects any file newer than itself before touching anything (`migrateBackupPayload` compares numerically — a string compare would think `"10"` older than `"4"`). That is why the version is bumped whenever an older build would otherwise import a file *wrongly* rather than fail: `insertRows` filters every row against `PRAGMA table_info` (to guard against crafted files), so an older build would silently drop a column it doesn't know.
+`BACKUP_VERSION` is `"13"`. A build rejects any file newer than itself before touching anything (`migrateBackupPayload` compares numerically — a string compare would think `"10"` older than `"4"`). That is why the version is bumped whenever an older build would otherwise import a file *wrongly* rather than fail: `insertRows` filters every row against `PRAGMA table_info` (to guard against crafted files), so an older build would silently drop a column it doesn't know.
 
 `migrateBackupPayload` lifts an older file on load; some conversions run later, row by row, before insertion. Each step is an ordered `version < N` test, so a newer file never runs an older step twice.
 
 | Version | Since | What changed | What import does with an older file |
 |---|---|---|---|
+| 13 | v56 | `vaultImages`, the rows of [images](#images), their files in `images` | Nothing; an older build would restore the files without their names, categories and tags, so it must refuse. Import adds missing pictures by file in both modes (`insertVaultImages`), never deletes, follows the file names the images were stored under and the local categories |
 | 12 | v51–v53 | altar `settings` JSON; altar items with `updated_at`/`deleted_at`; tag ids | Packs altar columns into `settings` (`altarSettingsJson`); gives items `updated_at = created_at`; `tagNamesToIds` converts entries', templates' and old routines' tag names by the v53 rule ([tags](#tags)) and drops `affected_ids` |
 | 11 | v49 | one `data.entries` array with `type` | A `"11"`+ file is split back into journal/wiki/operation arrays (`splitEntries`; unknown `type` dropped), so the import paths work on three arrays; `entryRowsForInsert` projects them onto `entries`, de-duplicating ids (journal, wiki, operation wins) |
 | 10 | v46 | altars carry `deleted_at` | Nothing; an older build would revive trashed altars, so it must refuse |

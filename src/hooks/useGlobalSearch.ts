@@ -1,5 +1,6 @@
 import { useDeferredValue, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useImageStore } from '../store/imageStore';
 import { useAltarStore } from '../store/altarStore';
 import { useCategoryStore } from '../store/categoryStore';
 import { useEntryStore } from '../store/entryStore';
@@ -27,6 +28,7 @@ function useSearchCorpus(): SearchCorpus {
   const tasks = useTaskStore((s) => s.tasks);
   const altars = useAltarStore((s) => s.altars);
   const altarItems = useAltarStore((s) => s.items);
+  const images = useImageStore((s) => s.images);
   const allCategories = useCategoryStore((s) => s.categories);
   const tags = useTagStore((s) => s.tags);
   const languages = useLexiconStore((s) => s.languages);
@@ -45,8 +47,8 @@ function useSearchCorpus(): SearchCorpus {
   }, [allCategories, wiki, operations, tasks, altarItems, t]);
 
   return useMemo(
-    () => ({ journal, wiki, operations, tasks, altars, altarItems, tags, categories, languages, lexiconEntries }),
-    [journal, wiki, operations, tasks, altars, altarItems, tags, categories, languages, lexiconEntries],
+    () => ({ journal, wiki, operations, tasks, altars, altarItems, images, tags, categories, languages, lexiconEntries }),
+    [journal, wiki, operations, tasks, altars, altarItems, images, tags, categories, languages, lexiconEntries],
   );
 }
 

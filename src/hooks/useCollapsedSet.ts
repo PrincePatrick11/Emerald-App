@@ -1,7 +1,7 @@
 import { useCallback } from 'react';
 import { useUIStore } from '../store/uiStore';
 
-export type CollapseScope = 'journal' | 'wiki' | 'operations' | 'tasks' | 'altar-library' | 'tags';
+export type CollapseScope = 'journal' | 'wiki' | 'operations' | 'tasks' | 'altar-library' | 'tags' | 'images';
 
 const EMPTY: ReadonlySet<string> = new Set();
 

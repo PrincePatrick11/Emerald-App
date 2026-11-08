@@ -146,9 +146,10 @@ export default function LeftSidebarRail() {
       </div>
 
       {/* Bottom nav — always visible, read from the bottom: Settings, Vault,
-          Trash, Tags, Categories */}
+          Trash, Tags, Categories, Images */}
       <div className="sidebar-bottom-bar w-full flex-[1_0_auto] flex flex-col items-center justify-end gap-3 py-2">
         <div className={RAIL_GROUP}>
+          {viewButton('images', AUX_VIEWS.images)}
           {viewButton('categories', AUX_VIEWS.categories)}
           {viewButton('tags', AUX_VIEWS.tags)}
           {viewButton('trash', AUX_VIEWS.trash)}

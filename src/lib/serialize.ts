@@ -22,7 +22,7 @@ export function serialKey(
   domain:
     | 'entry' | 'task' | 'tag'
     | 'altar' | 'altarItem' | 'placement' | 'blockDefinition' | 'template'
-    | 'language',
+    | 'language' | 'image',
   id: string,
 ): string {
   return `${domain}:${id}`;

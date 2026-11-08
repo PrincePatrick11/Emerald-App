@@ -79,6 +79,7 @@
     "templateDeleted": "Modèle supprimé",
     "languageDeleted": "Langue supprimée",
     "altarItemDeleted": "Élément supprimé",
+    "imageDeleted": "Image supprimée",
     "altarDeleted": "Autel supprimé",
     "wordDeleted": "Mot supprimé",
     "placementRemoved": "Élément retiré de l'autel"
@@ -94,6 +95,7 @@
     "altar": "Autel",
     "tags": "Étiquettes",
     "categories": "Catégories",
+    "images": "Images",
     "trash": "Corbeille",
     "blocks": "Blocs",
     "templates": "Modèles",
@@ -589,6 +591,18 @@
     "categories": "Catégorie",
     "showMore": "Afficher {{count}} autre résultat",
     "showMore_other": "Afficher {{count}} autres résultats"
+  },
+  "images": {
+    "add": "Ajouter des images",
+    "edit": "Modifier l’image",
+    "adopt": "Ajouter aux images",
+    "unnamed": "Sans nom",
+    "name": "Nom",
+    "emoji": "Emoji",
+    "note": "Note",
+    "noCategory": "Sans catégorie",
+    "vaultOnly": "Seulement dans le coffre",
+    "showVault": "Aussi les images seulement dans le coffre"
   },
   "tags": {
     "new": "Nouvelle étiquette",
@@ -1197,6 +1211,7 @@
     "operations": { "title": "Aucune opération pour l'instant", "description": "Planifiez des rituels avec ingrédients, déroulement et résultat." },
     "altar": { "title": "Aucun autel pour l'instant", "description": "Composez un autel à partir d'un fond et d'éléments." },
     "altarLibrary": { "title": "Aucun élément pour l'instant", "description": "Bougies, cristaux, symboles : les éléments composent vos autels." },
+    "images": { "title": "Pas encore d’images", "description": "Rassemblez ici vos images – nommez-les, donnez-leur une catégorie et des étiquettes, et faites-les glisser sur un canevas." },
     "lexicon": { "title": "Aucune langue pour l'instant", "description": "Créez une langue et remplissez-la de mots et de caractères." },
     "translate": { "title": "Rien à traduire pour l'instant", "description": "Créez d'abord une langue, puis ce champ traduira avec elle." },
     "templates": { "title": "Aucun modèle pour l'instant", "description": "Enregistrez des déroulements récurrents comme modèle." },

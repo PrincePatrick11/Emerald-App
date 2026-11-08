@@ -79,6 +79,7 @@
     "templateDeleted": "Vorlage gelöscht",
     "languageDeleted": "Sprache gelöscht",
     "altarItemDeleted": "Element gelöscht",
+    "imageDeleted": "Bild gelöscht",
     "altarDeleted": "Altar gelöscht",
     "wordDeleted": "Vokabel gelöscht",
     "placementRemoved": "Element vom Altar genommen"
@@ -94,6 +95,7 @@
     "altar": "Altar",
     "tags": "Tags",
     "categories": "Kategorien",
+    "images": "Bilder",
     "trash": "Papierkorb",
     "blocks": "Blöcke",
     "templates": "Vorlagen",
@@ -589,6 +591,18 @@
     "categories": "Kategorie",
     "showMore": "{{count}} weiteres Ergebnis anzeigen",
     "showMore_other": "{{count}} weitere Ergebnisse anzeigen"
+  },
+  "images": {
+    "add": "Bilder hinzufügen",
+    "edit": "Bild bearbeiten",
+    "adopt": "In Bilder aufnehmen",
+    "unnamed": "Unbenannt",
+    "name": "Name",
+    "emoji": "Emoji",
+    "note": "Notiz",
+    "noCategory": "Ohne Kategorie",
+    "vaultOnly": "Nur im Tresor",
+    "showVault": "Auch Bilder, die nur im Tresor liegen"
   },
   "tags": {
     "new": "Neuer Tag",
@@ -1197,6 +1211,7 @@
     "operations": { "title": "Noch keine Operationen", "description": "Plane Rituale mit Zutaten, Ablauf und Ergebnis." },
     "altar": { "title": "Noch kein Altar", "description": "Gestalte einen Altar aus Hintergrund und Elementen." },
     "altarLibrary": { "title": "Noch keine Elemente", "description": "Kerzen, Kristalle, Symbole – aus Elementen baust du deine Altäre." },
+    "images": { "title": "Noch keine Bilder", "description": "Sammle hier Bilder – benenne sie, gib ihnen Kategorie und Tags und zieh sie auf eine Leinwand." },
     "lexicon": { "title": "Noch keine Sprachen", "description": "Leg eine Sprache an und füll sie mit Wörtern und Zeichen." },
     "translate": { "title": "Noch nichts zu übersetzen", "description": "Leg zuerst eine Sprache an – dann übersetzt dieses Feld damit." },
     "templates": { "title": "Noch keine Vorlagen", "description": "Speichere wiederkehrende Abläufe als Vorlage." },
