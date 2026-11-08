@@ -1,9 +1,8 @@
 import type { Editor } from '@tiptap/react';
 import type { Node as ProseMirrorNode } from '@tiptap/pm/model';
-import { saveImage } from '../../../lib/images';
-import { prepareImageDataUrl } from '../../../lib/imageLimits';
+import { storeImageFile } from '../../../lib/storeImage';
 import { reportImageError, useImageNoticeStore } from '../../../store/imageNoticeStore';
-import { ACCEPTED_IMAGE_MIME, isAcceptedImageFile, readFileAsDataUrl } from '../../../lib/helpers';
+import { ACCEPTED_IMAGE_MIME, isAcceptedImageFile } from '../../../lib/helpers';
 import { flashReveal, scrollIntoViewCentered } from '../../../lib/reveal';
 import { internalLinkBlockHtml, toInternalLinkChip } from '../../../lib/internalLinkHtml';
 import type { EntryLinkRequest } from '../../../lib/links';
@@ -276,7 +275,7 @@ export async function insertImageFiles(editor: Editor, files: File[]): Promise<v
   if (accepted.length < files.length) useImageNoticeStore.getState().show({ kind: 'format' });
   await insertImagesInOrder(
     editor, null, accepted,
-    async (file) => saveImage(await prepareImageDataUrl(await readFileAsDataUrl(file))),
+    storeImageFile,
     (e) => reportImageError(e, 'insert'),
   );
 }

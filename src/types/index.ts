@@ -96,18 +96,15 @@ export interface AltarRecord {
 }
 
 /**
- * An image taken into "Images" (`images`, since v56): a stored file of the
- * vault with a name, an emoji, a category and tags. Files without such a row
- * are listed too, as `StoredImage` from the folder.
+ * A picture of "Images" with details (`images`, since v56): a stored file of
+ * the vault with a name, tags and a note. Every other file of the vault is
+ * listed too, unnamed, as `StoredImage` from the folder.
  */
 export interface VaultImage {
   id: string;
   /** The stored file name (`storedImageName`). */
   file: string;
   name: string;
-  emoji: string;
-  /** `null` = no category. */
-  category_id: string | null;
   /** Tag IDs, as with entries. */
   tags: string[];
   note: string;

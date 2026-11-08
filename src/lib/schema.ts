@@ -272,18 +272,15 @@ export const TABLE_DDL: Record<TableName, string> = {
     )`,
 
   // The vault's images as a place of their own, like tags and categories
-  // (since v56): a row takes a stored file (`storedImageName`) into "Images",
-  // with a name, an emoji, a category, tags (IDs as JSON, `lib/tagRefs.ts`)
-  // and a note. Files without a row — in texts, fields, drawings — are listed
-  // too, from the folder; a row keeps its file from the cleanup.
+  // (since v56): a row gives a stored file (`storedImageName`) a name, tags
+  // (IDs as JSON, `lib/tagRefs.ts`) and a note. Every other file of the
+  // folder is listed too, unnamed; a row keeps its file from the cleanup.
   images: `
     CREATE TABLE images (
       id TEXT PRIMARY KEY,
       file TEXT NOT NULL UNIQUE,
       name TEXT NOT NULL DEFAULT '',
-      emoji TEXT NOT NULL DEFAULT '🖼️',
       note TEXT NOT NULL DEFAULT '',
-      category_id TEXT REFERENCES categories(id) ON DELETE RESTRICT,
       tags TEXT NOT NULL DEFAULT '[]',
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL,
@@ -381,10 +378,9 @@ export const ENTRIES_INDEX_DDL: readonly string[] = [
   'CREATE INDEX idx_entries_decorated ON entries(deleted_at) WHERE icon IS NOT NULL OR cover_image IS NOT NULL',
 ];
 
-/** The indexes of `images` (v56): its trash and its categories. */
+/** The index of `images` (v56): its trash. */
 export const IMAGES_INDEX_DDL: readonly string[] = [
   'CREATE INDEX idx_images_deleted ON images(deleted_at)',
-  'CREATE INDEX idx_images_category ON images(category_id)',
 ];
 
 /** All indexes of the current schema — what a fresh vault gets. */
@@ -437,7 +433,7 @@ export const STARTER_CATEGORIES: readonly [string, string][] = [
 ];
 
 /** The content tables with `category_id` (wiki and operations are in `entries`). A literal, because it is interpolated into SQL. */
-export const CATEGORIZED_TABLES = ['entries', 'tasks', 'altar_items', 'images'] as const;
+export const CATEGORIZED_TABLES = ['entries', 'tasks', 'altar_items'] as const;
 
 /**
  * The same DDL, but compatible with an already existing table.

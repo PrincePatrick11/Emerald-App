@@ -1708,20 +1708,12 @@ console.log('\n8i. Migration v43: templates and the sigil template\n');
     (await collectUsedImageFilenames(db)).has(`${'d'.repeat(64)}.png`)
   );
   await db.execute(
-    `INSERT INTO categories (id,name,emoji,sort_order,is_builtin) VALUES ('bildkat','Bilder','x',99,0)`
-  );
-  await db.execute(
-    `INSERT INTO images (id, file, category_id, created_at, updated_at) VALUES ('im1',$1,'bildkat',$2,$2)`,
+    `INSERT INTO images (id, file, created_at, updated_at) VALUES ('im1',$1,$2,$2)`,
     [`${'e'.repeat(64)}.webp`, new Date().toISOString()],
   );
   check(
-    'collectUsedImageFilenames keeps an image taken into "Images", used anywhere or not',
+    'collectUsedImageFilenames keeps a picture of "Images", used anywhere or not',
     (await collectUsedImageFilenames(db)).has(`${'e'.repeat(64)}.webp`)
-  );
-  await reassignCategoryContent(db, 'bildkat');
-  check(
-    'reassignCategoryContent uncategorizes an image too',
-    (await db.select("SELECT category_id FROM images WHERE id='im1'"))[0].category_id === null
   );
 
   // Merging: assignments move along, one star per type and category, active templates first.

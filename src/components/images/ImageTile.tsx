@@ -15,7 +15,7 @@ interface Props {
 }
 
 /**
- * A picture of "Images": the image over its name. One tile for the view
+ * A picture of "Images": the image over its name — the picture is its own icon. One tile for the view
  * (click to edit) and for a canvas's strip (drag out).
  */
 export default function ImageTile({ file, image, onClick, draggable, compact }: Props) {
@@ -36,7 +36,6 @@ export default function ImageTile({ file, image, onClick, draggable, compact }: 
         <img src={imageSrc(file)} alt="" loading="lazy" decoding="async" draggable={false} />
       </div>
       <div className="image-tile-label">
-        {image && <span className="flex-shrink-0">{image.emoji}</span>}
         <span className={`truncate ${name ? 'text-soft' : 'text-subtle italic'}`}>{name || t('images.unnamed')}</span>
       </div>
     </div>

@@ -595,15 +595,17 @@
   "images": {
     "add": "Añadir imágenes",
     "edit": "Editar imagen",
-    "adopt": "Añadir a imágenes",
     "unnamed": "Sin nombre",
     "name": "Nombre",
-    "emoji": "Emoji",
     "note": "Nota",
-    "noCategory": "Sin categoría",
-    "vaultOnly": "Solo en la bóveda",
-    "showVault": "También imágenes solo en la bóveda"
+    "addCount_one": "Añadir {{count}} imagen",
+    "addCount_other": "Añadir {{count}} imágenes",
+    "storing": "Guardando …",
+    "dropHere": "Suelta imágenes aquí o haz clic para elegir",
+    "leaveOut": "Quitar",
+    "tagsForAll": "Etiquetas para todas"
   },
+
   "tags": {
     "new": "Nueva etiqueta",
     "name": "Nombre de la etiqueta…",

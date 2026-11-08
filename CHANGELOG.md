@@ -6,7 +6,7 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased] (targeting v0.2.0)
 
 ### Added
-- **Images, a place of their own** in the rail next to Categories and Tags: add pictures from the disk, give them a name, emoji, category, tags and a note, find them by search, and drag them out. Every other picture the vault stores can be shown and taken in; a picture in Images is never removed by the image cleanup. Backups carry them along (backup version 13).
+- **Images, a place of their own** in the rail next to Categories and Tags: every picture of the vault in one grid. Add pictures by dropping them into a dialog, name them and give them tags and a note, find them by search, and drag them out. A picture added there is never removed by the image cleanup. Backups carry the details along (backup version 13).
 - **Headings fold:** a chevron beside a heading hides everything under it up to the next heading of the same level, while reading and editing.
 - **Collapsible sections** from the `/` menu: a heading line that opens and closes the text under it, also while reading. The PDF export prints them open.
 - **Word and character count** under the text while editing, across all text blocks.

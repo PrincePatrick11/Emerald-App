@@ -1,38 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
 import type { Editor } from '@tiptap/react';
 import { getCurrentWebview } from '@tauri-apps/api/webview';
-import { copyImageFile, readImageFile, saveImage } from '../../../lib/images';
-import { hasImageLimits, ImageTooLargeError, needsPreparing, prepareImageDataUrl } from '../../../lib/imageLimits';
+import { storeImageFromPath } from '../../../lib/storeImage';
 import { isWindows } from '../../../lib/platform';
 import { useSettingsStore } from '../../../store/settingsStore';
 import { reportImageError, useImageNoticeStore } from '../../../store/imageNoticeStore';
 import { editorAtPoint, lineSpot, type DropSpot } from './dropSpot';
 import { editorHas } from './hostContext';
 import { insertImagesInOrder } from './editorCommands';
-
-/** The read limit of the Rust command along with its number (see `images.rs`). */
-const TOO_LARGE_TO_READ = /image file too large: (\d+)/;
-
-/**
- * The stored name of a dropped file: read in and prepared (limits, photo as
- * JPEG) when that could change it, else copied as it is. A file too large to
- * read in is copied too as long as the vault sets no limits — only a photo
- * conversion was asked for then, and it would not be stored at all otherwise.
- * With limits, the read limit becomes the usual notice.
- */
-async function storeDroppedImage(path: string): Promise<string> {
-  if (!needsPreparing(path)) return copyImageFile(path);
-  let dataUrl: string;
-  try {
-    dataUrl = await readImageFile(path);
-  } catch (err) {
-    const limit = TOO_LARGE_TO_READ.exec(String(err));
-    if (!limit) throw err;
-    if (!hasImageLimits()) return copyImageFile(path);
-    throw new ImageTooLargeError(Number(limit[1]));
-  }
-  return saveImage(await prepareImageDataUrl(dataUrl));
-}
 
 /**
  * A position of Tauri's drag-drop event in the page's CSS pixels. The event
@@ -106,7 +81,7 @@ export function useEditorFileDrop({ enabled, getEditors, getContainer, getFallba
           const fallback = optionsRef.current.getFallback();
           const editor = spot?.editor ?? (fallback && editorHas(fallback, 'image') ? fallback : null);
           if (!editor) return;
-          await insertImagesInOrder(editor, spot ? spot.pos : null, imagePaths, storeDroppedImage,
+          await insertImagesInOrder(editor, spot ? spot.pos : null, imagePaths, storeImageFromPath,
             (e, path) => reportImageError(e, `drop ${path}`));
         }
       })

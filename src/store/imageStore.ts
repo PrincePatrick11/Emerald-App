@@ -1,20 +1,14 @@
 import { create } from 'zustand';
 import { getDb } from '../lib/db';
 import { fromRow, type DbRow } from '../lib/row';
-import { generateId, isAcceptedImageFile, nowIso, readFileAsDataUrl } from '../lib/helpers';
-import { listImageFiles, saveImage, type StoredImage } from '../lib/images';
-import { prepareImageDataUrl } from '../lib/imageLimits';
+import { generateId, nowIso } from '../lib/helpers';
+import { listImageFiles, type StoredImage } from '../lib/images';
 import { storedImageName } from '../lib/schema';
 import { serialKey, serialized } from '../lib/serialize';
 import type { VaultImage } from '../types';
 
 /** What a row lets one change; the file stays what it is. */
-export type ImagePatch = Partial<Pick<VaultImage, 'name' | 'emoji' | 'category_id' | 'tags' | 'note'>>;
-
-/** A new row takes the file's name without its extension, so a picture is never nameless. */
-function nameFromFile(fileName: string): string {
-  return fileName.replace(/\.[^.]+$/, '').trim();
-}
+export type ImagePatch = Partial<Pick<VaultImage, 'name' | 'tags' | 'note'>>;
 
 const byName = (a: VaultImage, b: VaultImage) =>
   (a.name || a.file).localeCompare(b.name || b.file) || a.created_at.localeCompare(b.created_at);
@@ -29,14 +23,11 @@ interface ImageState {
   /** The folder again, after something else stored or removed files. */
   refreshFiles: () => Promise<void>;
   /**
-   * Files from the disk into "Images", each prepared (limits, photo as JPEG)
-   * and stored first, in their order. A file of another format is skipped and
-   * reported in `skipped`; one that fails is reported in `failed` and does not
-   * stop the others.
+   * Details for a file the vault stores: a new row, the live one changed, or
+   * the one in the trash back and changed. A row also keeps the file from the
+   * cleanup, so every picture added through "Images" gets one, named or not.
    */
-  addFiles: (files: File[], patch?: ImagePatch) => Promise<{ added: VaultImage[]; skipped: number; failed: unknown[] }>;
-  /** A file the vault already stores, taken into "Images" (or back, from the trash). */
-  adoptFile: (file: string, patch?: ImagePatch) => Promise<VaultImage | null>;
+  saveDetails: (file: string, patch?: ImagePatch) => Promise<VaultImage | null>;
   updateImage: (id: string, patch: ImagePatch) => Promise<void>;
   /** Into the trash; the file stays until the cleanup finds it unused. */
   deleteImage: (id: string) => Promise<void>;
@@ -66,49 +57,35 @@ export const useImageStore = create<ImageState>((set, get) => ({
     }
   },
 
-  addFiles: async (files, patch = {}) => {
-    const added: VaultImage[] = [];
-    const failed: unknown[] = [];
-    const accepted = files.filter(isAcceptedImageFile);
-    for (const file of accepted) {
-      try {
-        const stored = await saveImage(await prepareImageDataUrl(await readFileAsDataUrl(file)));
-        const image = await get().adoptFile(stored, { name: nameFromFile(file.name), ...patch });
-        if (image) added.push(image);
-      } catch (e) {
-        failed.push(e);
-      }
-    }
-    if (added.length) await get().refreshFiles();
-    return { added, skipped: files.length - accepted.length, failed };
-  },
-
-  adoptFile: async (file, patch = {}) => {
+  saveDetails: async (file, patch = {}) => {
     if (!storedImageName(file)) return null;
-    const live = get().images.find((image) => image.file === file);
-    if (live) return live;
-    const db = await getDb();
-    const [row] = await db.select<DbRow[]>('SELECT * FROM images WHERE file=$1', [file]);
-    if (row) {
-      // In the trash: back, as it was.
-      await get().restoreImage(String(row.id));
-      return get().images.find((image) => image.file === file) ?? null;
+    const existing = async () => get().images.find((image) => image.file === file);
+    let live = await existing();
+    if (!live) {
+      const db = await getDb();
+      const [row] = await db.select<DbRow[]>('SELECT id FROM images WHERE file=$1', [file]);
+      // In the trash: back first, then changed like a live one.
+      if (row) await get().restoreImage(String(row.id));
+      live = await existing();
     }
+    if (live) {
+      if (Object.keys(patch).length) await get().updateImage(live.id, patch);
+      return get().images.find((image) => image.id === live!.id) ?? null;
+    }
+    const db = await getDb();
     const at = nowIso();
     const image: VaultImage = {
       id: generateId(),
       file,
       name: patch.name ?? '',
-      emoji: patch.emoji ?? '🖼️',
-      category_id: patch.category_id ?? null,
       tags: patch.tags ?? [],
       note: patch.note ?? '',
       created_at: at,
       updated_at: at,
     };
     await db.execute(
-      'INSERT INTO images (id, file, name, emoji, note, category_id, tags, created_at, updated_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)',
-      [image.id, image.file, image.name, image.emoji, image.note, image.category_id, JSON.stringify(image.tags), at, at],
+      'INSERT INTO images (id, file, name, note, tags, created_at, updated_at) VALUES ($1,$2,$3,$4,$5,$6,$7)',
+      [image.id, image.file, image.name, image.note, JSON.stringify(image.tags), at, at],
     );
     set((s) => ({ images: [...s.images, image].sort(byName) }));
     return image;
@@ -121,8 +98,8 @@ export const useImageStore = create<ImageState>((set, get) => ({
     const updated: VaultImage = { ...image, ...patch, updated_at: nowIso() };
     const db = await getDb();
     await db.execute(
-      'UPDATE images SET name=$1, emoji=$2, note=$3, category_id=$4, tags=$5, updated_at=$6 WHERE id=$7',
-      [updated.name, updated.emoji, updated.note, updated.category_id, JSON.stringify(updated.tags), updated.updated_at, id],
+      'UPDATE images SET name=$1, note=$2, tags=$3, updated_at=$4 WHERE id=$5',
+      [updated.name, updated.note, JSON.stringify(updated.tags), updated.updated_at, id],
     );
     set((s) => ({ images: s.images.map((i) => (i.id === id ? updated : i)).sort(byName) }));
   }),

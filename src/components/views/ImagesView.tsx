@@ -1,51 +1,53 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useShallow } from 'zustand/shallow';
 import { useImageStore } from '../../store/imageStore';
-import { useCategoryStore } from '../../store/categoryStore';
 import { useTagStore } from '../../store/tagStore';
-import { useImageNoticeStore } from '../../store/imageNoticeStore';
 import { useSessionState } from '../../store/sessionStore';
 import { useDeepLink } from '../../hooks/useDeepLink';
-import { useCollapsedSet } from '../../hooks/useCollapsedSet';
-import CollapsibleGroupHeader from '../ui/CollapsibleGroupHeader';
-import { categoryLabel } from '../../lib/categories';
-import { ACCEPTED_IMAGE_MIME } from '../../lib/helpers';
+import { useFileDrop } from '../../hooks/useFileDrop';
 import { AUX_VIEWS } from '../../lib/modules';
 import type { VaultImage } from '../../types';
-import Dashboard, { type DashboardGroup } from '../ui/Dashboard';
+import Dashboard from '../ui/Dashboard';
 import ImageTile from '../images/ImageTile';
 import ImageEditModal from '../images/ImageEditModal';
+import AddImagesModal from '../images/AddImagesModal';
 
-/** A picture of the view: a stored file, with its row in "Images" if it has one. */
+/** A picture of the view: a stored file, with its details if it has any. */
 interface ImageItem {
   file: string;
   image: VaultImage | null;
 }
 
-/** The filter value of "no category" and of the group of files without a row. */
-const NONE = '__none__';
-const VAULT_ONLY = '__vault__';
+/** Named pictures by name, then the unnamed ones, newest details first among equals. */
+function byName(a: ImageItem, b: ImageItem): number {
+  const an = a.image?.name ?? '';
+  const bn = b.image?.name ?? '';
+  if (!an !== !bn) return an ? -1 : 1;
+  return an.localeCompare(bn) || a.file.localeCompare(b.file);
+}
 
 /**
- * "Images", a place of their own like tags and categories: every picture
- * taken in, with name, emoji, category and tags, grouped by category; on
- * request also the files the vault stores without a row (in texts, fields,
- * drawings). "Add images" takes files from the disk; a click on a picture
- * edits it, or takes a vault file in.
+ * "Images", a place of their own like tags and categories: every picture the
+ * vault stores — added here or in texts, fields and drawings — with a name,
+ * tags and a note where it has them. A click edits a picture; "Add images",
+ * or files dropped onto the view, open the dialog that stores and names new ones.
  */
 export default function ImagesView() {
   const { t } = useTranslation();
   const { images, files, loaded } = useImageStore(useShallow((s) => ({ images: s.images, files: s.files, loaded: s.loaded })));
-  const categories = useCategoryStore((s) => s.categories);
-  const tagsById = useTagStore((s) => s.tags);
+  const allTags = useTagStore((s) => s.tags);
   const [search, setSearch] = useSessionState('images.search', '');
-  const [categoryFilter, setCategoryFilter] = useSessionState<string[]>('images.categories', []);
   const [tagFilter, setTagFilter] = useSessionState<string[]>('images.tags', []);
-  const [showVault, setShowVault] = useSessionState('images.vault', false);
   const [editing, setEditing] = useState<ImageItem | null>(null);
-  const { isCollapsed, toggle: toggleCollapsed } = useCollapsedSet('images');
-  const inputRef = useRef<HTMLInputElement>(null);
+  const [adding, setAdding] = useState(false);
+  const [dropped, setDropped] = useState<string[]>([]);
+
+  // Files dropped anywhere over the view go into the add dialog, opening it.
+  const { dragOver } = useFileDrop(!editing, (paths) => {
+    setDropped((list) => [...list, ...paths]);
+    setAdding(true);
+  });
 
   // A search hit opens its picture.
   useDeepLink({
@@ -59,89 +61,50 @@ export default function ImagesView() {
   useEffect(() => { void useImageStore.getState().refreshFiles(); }, []);
 
   const all = useMemo<ImageItem[]>(() => {
-    const taken = new Set(images.map((i) => i.file));
-    const rows = images.map((image) => ({ file: image.file, image }));
-    if (!showVault) return rows;
-    return [...rows, ...files.filter((f) => !taken.has(f.name)).map((f) => ({ file: f.name, image: null }))];
-  }, [images, files, showVault]);
+    const byFile = new Map(images.map((image) => [image.file, image]));
+    const listed = new Set<string>();
+    const items: ImageItem[] = [];
+    for (const { name } of files) {
+      listed.add(name);
+      items.push({ file: name, image: byFile.get(name) ?? null });
+    }
+    // Details whose file the folder did not list (yet): still shown.
+    for (const image of images) if (!listed.has(image.file)) items.push({ file: image.file, image });
+    return items.sort(byName);
+  }, [images, files]);
 
   const query = search.trim().toLowerCase();
-  const matchesSearch = (item: ImageItem) => !query
+  const searched = all.filter((item) => !query
     || (item.image?.name ?? '').toLowerCase().includes(query)
-    || (item.image?.note ?? '').toLowerCase().includes(query)
-    || item.file.toLowerCase().includes(query);
-  const searched = all.filter(matchesSearch);
-  const inCategory = (item: ImageItem) => !categoryFilter.length
-    || categoryFilter.includes(item.image ? item.image.category_id ?? NONE : VAULT_ONLY);
-  const withTags = (item: ImageItem) => !tagFilter.length || tagFilter.every((id) => item.image?.tags.includes(id));
-  const shown = searched.filter((item) => inCategory(item) && withTags(item));
+    || (item.image?.note ?? '').toLowerCase().includes(query));
+  const shown = searched.filter((item) => tagFilter.every((id) => item.image?.tags.includes(id)));
+  const usedTags = allTags.filter((tag) => searched.some((i) => i.image?.tags.includes(tag.id)));
 
-  const groups = useMemo<DashboardGroup<ImageItem>[]>(() => {
-    const byKey = new Map<string, ImageItem[]>();
-    for (const item of shown) {
-      const key = item.image ? item.image.category_id ?? NONE : VAULT_ONLY;
-      byKey.set(key, [...(byKey.get(key) ?? []), item]);
-    }
-    const ordered = [
-      ...categories.filter((c) => byKey.has(c.id)).map((c) => ({ key: c.id, label: categoryLabel(t, c) })),
-      ...(byKey.has(NONE) ? [{ key: NONE, label: t('images.noCategory') }] : []),
-      ...(byKey.has(VAULT_ONLY) ? [{ key: VAULT_ONLY, label: t('images.vaultOnly') }] : []),
-    ];
-    return ordered.map(({ key, label }) => ({ key, label, items: byKey.get(key)! }));
-  }, [shown, categories, t]);
-
-  const usedCategories = categories.filter((c) => searched.some((i) => i.image?.category_id === c.id));
-  const usedTags = tagsById.filter((tag) => searched.some((i) => i.image?.tags.includes(tag.id)));
-  const countWhere = (fn: (item: ImageItem) => boolean) => searched.filter(fn).length;
-
-  const addFiles = async (list: FileList | null) => {
-    if (!list?.length) return;
-    const { skipped, failed } = await useImageStore.getState().addFiles(Array.from(list));
-    if (skipped) useImageNoticeStore.getState().show({ kind: 'format' });
-    for (const e of failed) console.error('[images] adding failed:', e);
-  };
-
-  const groupEmoji = (key: string) =>
-    key === NONE ? '🖼️' : key === VAULT_ONLY ? '🗄️' : categories.find((c) => c.id === key)?.emoji ?? '📁';
-
-  const toggle = (list: string[], value: string) => (list.includes(value) ? list.filter((v) => v !== value) : [...list, value]);
+  const closeAdding = () => { setAdding(false); setDropped([]); };
 
   return (
     <>
       <Dashboard<ImageItem>
         title={t('nav.images')}
-        primaryAction={{ label: t('images.add'), onClick: () => inputRef.current?.click() }}
+        primaryAction={{ label: t('images.add'), onClick: () => setAdding(true) }}
         search={search}
         onSearch={setSearch}
         view="cards"
         cardsClassName="images-grid"
-        filters={{
-          activeFilterCount: categoryFilter.length + tagFilter.length,
-          onClearAll: () => { setCategoryFilter([]); setTagFilter([]); },
+        filters={usedTags.length ? {
+          activeFilterCount: tagFilter.length,
+          onClearAll: () => setTagFilter([]),
           panelProps: {
-            displayToggles: [{ label: t('images.showVault'), checked: showVault, onChange: setShowVault }],
-            chipLabel: t('properties.category'),
-            chips: [
-              ...usedCategories.map((c) => ({
-                value: c.id, label: categoryLabel(t, c), count: countWhere((i) => i.image?.category_id === c.id),
-              })),
-              { value: NONE, label: t('images.noCategory'), count: countWhere((i) => !!i.image && !i.image.category_id) },
-              ...(showVault ? [{ value: VAULT_ONLY, label: t('images.vaultOnly'), count: countWhere((i) => !i.image) }] : []),
-            ],
-            selectedChips: categoryFilter,
-            onChipToggle: (v) => setCategoryFilter((prev) => toggle(prev, v)),
-            onAllChips: () => setCategoryFilter([]),
-            allChipsCount: searched.length,
-            statusLabel: t('nav.tags'),
-            statusChips: usedTags.map((tag) => ({
-              value: tag.id, label: tag.name, count: countWhere((i) => !!i.image?.tags.includes(tag.id)),
+            chipLabel: t('nav.tags'),
+            chips: usedTags.map((tag) => ({
+              value: tag.id, label: tag.name, count: searched.filter((i) => i.image?.tags.includes(tag.id)).length,
             })),
-            selectedStatus: tagFilter,
-            onStatusToggle: (v) => setTagFilter((prev) => toggle(prev, v)),
-            onAllStatus: () => setTagFilter([]),
-            allStatusCount: searched.length,
+            selectedChips: tagFilter,
+            onChipToggle: (v) => setTagFilter((prev) => (prev.includes(v) ? prev.filter((x) => x !== v) : [...prev, v])),
+            onAllChips: () => setTagFilter([]),
+            allChipsCount: searched.length,
           },
-        }}
+        } : undefined}
         items={shown}
         itemKey={(item) => item.file}
         renderItem={(item) => <ImageTile file={item.file} image={item.image} onClick={() => setEditing(item)} />}
@@ -151,32 +114,12 @@ export default function ImagesView() {
           title: t('emptyState.images.title'),
           description: t('emptyState.images.description'),
           actionLabel: t('images.add'),
-          onAction: () => inputRef.current?.click(),
+          onAction: () => setAdding(true),
         }}
         hasNoResults={shown.length === 0}
-        grouping={{
-          mode: 'category',
-          groups,
-          isGroupCollapsed: (group) => isCollapsed(group.key!),
-          renderGroupHeader: (group) => (
-            <CollapsibleGroupHeader
-              emoji={groupEmoji(group.key!)}
-              label={group.label}
-              count={group.items.length}
-              collapsed={isCollapsed(group.key!)}
-              onToggleCollapse={() => toggleCollapsed(group.key!)}
-            />
-          ),
-        }}
+        grouping={{ mode: 'flat' }}
       />
-      <input
-        ref={inputRef}
-        type="file"
-        accept={ACCEPTED_IMAGE_MIME}
-        multiple
-        className="hidden"
-        onChange={(e) => { void addFiles(e.target.files); e.target.value = ''; }}
-      />
+      {adding && <AddImagesModal dropped={dropped} dragOver={dragOver} onClose={closeAdding} />}
       {editing && <ImageEditModal file={editing.file} image={editing.image} onClose={() => setEditing(null)} />}
     </>
   );

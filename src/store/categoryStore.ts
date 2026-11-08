@@ -18,7 +18,6 @@ import { fromRow, type DbRow } from '../lib/row';
 import type { Category } from '../types';
 import { useEntryStore } from './entryStore';
 import { reassignBaselineCategories } from './entryEdit';
-import { useImageStore } from './imageStore';
 import { useTaskStore } from './taskStore';
 import { useAltarStore } from './altarStore';
 import { dropCategoriesFromTemplatesInMemory, useTemplateStore } from './templateStore';
@@ -75,7 +74,6 @@ export function reassignCategoriesInMemory(ids: ReadonlySet<string>, to: string 
       Object.entries(s.previewPlacements).map(([k, list]) => [k, list.map(move)])
     ),
   }));
-  useImageStore.setState((s) => ({ images: s.images.map(move) }));
   // Also what a running edit would write back with Cancel.
   reassignBaselineCategories(ids, to);
   if (!to) dropCategoriesFromTemplatesInMemory(ids);

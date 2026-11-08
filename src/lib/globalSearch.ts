@@ -258,7 +258,7 @@ export function searchCorpus(corpus: SearchCorpus, rawQuery: string): SearchHit[
   for (const image of corpus.images) {
     push('image', image.id, image.name || image.file,
       matchRecord(q, image.name, null, () => [image.note]),
-      { categoryId: image.category_id, updatedAt: image.updated_at });
+      { updatedAt: image.updated_at });
   }
 
   for (const tag of corpus.tags) {

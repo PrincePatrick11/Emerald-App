@@ -1428,8 +1428,8 @@ export const MIGRATIONS: Migration[] = [
     },
   },
   {
-    // "Images" as a place of its own (`images`): a row takes a stored file in,
-    // with name, emoji, category and tags. Additive and repeatable.
+    // "Images" as a place of its own (`images`): a row gives a stored file a
+    // name, tags and a note. Additive and repeatable.
     version: 56,
     name: 'images',
     up: async (db) => {

@@ -2145,6 +2145,54 @@ html[data-theme] .prop-segment--active {
   gap: 4px;
 }
 .image-tile--compact .image-tile-label { font-size: 11px; }
+/* The add dialog (AddImagesModal): a zone to drop files on or click, then
+   one row per picture with its name. */
+.image-drop-zone {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 120px;
+  padding: 16px;
+  border-radius: 0.5rem;
+  border: 1.5px dashed var(--edge-strong);
+  background: var(--well-page);
+  color: var(--text-subtle);
+  font-size: 13px;
+  transition: border-color 150ms, background-color 150ms, color 150ms;
+}
+.image-drop-zone:hover,
+.image-drop-zone--over {
+  border-color: var(--accent-edge);
+  background: var(--accent-wash);
+  color: var(--accent-text);
+}
+.image-drop-zone:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--focus-ring);
+}
+.image-staged-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 280px;
+  overflow-y: auto;
+}
+.image-staged-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.image-staged-row img {
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+  object-fit: cover;
+  border-radius: 0.375rem;
+  background: var(--well-deep);
+}
 .image-edit-preview {
   display: flex;
   justify-content: center;

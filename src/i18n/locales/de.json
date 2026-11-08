@@ -595,15 +595,17 @@
   "images": {
     "add": "Bilder hinzufügen",
     "edit": "Bild bearbeiten",
-    "adopt": "In Bilder aufnehmen",
     "unnamed": "Unbenannt",
     "name": "Name",
-    "emoji": "Emoji",
     "note": "Notiz",
-    "noCategory": "Ohne Kategorie",
-    "vaultOnly": "Nur im Tresor",
-    "showVault": "Auch Bilder, die nur im Tresor liegen"
+    "addCount_one": "{{count}} Bild hinzufügen",
+    "addCount_other": "{{count}} Bilder hinzufügen",
+    "storing": "Wird gespeichert …",
+    "dropHere": "Bilder hierher ziehen oder klicken zum Auswählen",
+    "leaveOut": "Weglassen",
+    "tagsForAll": "Tags für alle"
   },
+
   "tags": {
     "new": "Neuer Tag",
     "name": "Tag-Name…",

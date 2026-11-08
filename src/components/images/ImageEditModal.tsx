@@ -2,23 +2,19 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Trash2 } from 'lucide-react';
 import { useImageStore } from '../../store/imageStore';
-import { useCategoryStore } from '../../store/categoryStore';
 import { useUndoStore } from '../../store/undoStore';
-import { categoryLabel } from '../../lib/categories';
 import { generateId } from '../../lib/helpers';
 import { imageSrc } from '../../lib/images';
 import { OP_PROP_SELECT_CLASSES } from '../../lib/styleClasses';
 import type { VaultImage } from '../../types';
 import Modal from '../ui/Modal';
 import Button from '../ui/Button';
-import EmojiPicker from '../ui/EmojiPicker';
-import CategorySelect from '../ui/CategorySelect';
 import TagInput from '../ui/TagInput';
 
 /**
- * Name, emoji, category, tags and note of a picture in "Images". A file that
- * is only in the vault so far is taken in on saving; deleting puts the row in
- * the trash, with Undo, and leaves the file to the cleanup.
+ * Name, tags and note of a picture in "Images". A file without details so far
+ * gets them on saving; deleting puts the row in the trash, with Undo, and
+ * leaves the file to the cleanup.
  */
 export default function ImageEditModal({ file, image, onClose }: {
   file: string;
@@ -26,19 +22,13 @@ export default function ImageEditModal({ file, image, onClose }: {
   onClose: () => void;
 }) {
   const { t } = useTranslation();
-  const categories = useCategoryStore((s) => s.categories);
   const pushUndo = useUndoStore((s) => s.push);
   const [name, setName] = useState(image?.name ?? '');
-  const [emoji, setEmoji] = useState(image?.emoji ?? '🖼️');
-  const [categoryId, setCategoryId] = useState<string | null>(image?.category_id ?? null);
   const [tags, setTags] = useState<string[]>(image?.tags ?? []);
   const [note, setNote] = useState(image?.note ?? '');
 
   const save = async () => {
-    const patch = { name: name.trim(), emoji, category_id: categoryId, tags, note };
-    const store = useImageStore.getState();
-    if (image) await store.updateImage(image.id, patch);
-    else await store.adoptFile(file, patch);
+    await useImageStore.getState().saveDetails(file, { name: name.trim(), tags, note });
     onClose();
   };
 
@@ -52,7 +42,7 @@ export default function ImageEditModal({ file, image, onClose }: {
 
   return (
     <Modal
-      title={image ? t('images.edit') : t('images.adopt')}
+      title={t('images.edit')}
       onClose={onClose}
       widthClassName="w-full max-w-md"
       bodyClassName="modal-body space-y-3"
@@ -71,39 +61,18 @@ export default function ImageEditModal({ file, image, onClose }: {
       <div className="image-edit-preview">
         <img src={imageSrc(file)} alt="" draggable={false} />
       </div>
-      <div className="flex items-center gap-2">
-        <EmojiPicker
-          value={emoji}
-          onChange={setEmoji}
-          size="lg"
-          trigger={({ toggle }) => (
-            <button onClick={toggle} className={`${OP_PROP_SELECT_CLASSES} w-11 justify-center text-xl`} title={t('images.emoji')}>
-              {emoji}
-            </button>
-          )}
-        />
-        <input
-          autoFocus
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); void save(); } }}
-          placeholder={t('images.name')}
-          className={`${OP_PROP_SELECT_CLASSES} selectable flex-1`}
-        />
-      </div>
-      <div>
-        <p className="label-xs mb-1">{t('properties.category')}</p>
-        <CategorySelect
-          categories={categories}
-          value={categoryId}
-          onChange={setCategoryId}
-          getLabel={(c) => categoryLabel(t, c)}
-          variant="field"
-        />
-      </div>
+      <p className="label-xs -mb-2">{t('images.name')}</p>
+      <input
+        autoFocus
+        value={name}
+        onChange={(e) => setName(e.target.value)}
+        onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); void save(); } }}
+        placeholder={t('images.name')}
+        className={`${OP_PROP_SELECT_CLASSES} selectable w-full`}
+      />
       <div>
         <p className="label-xs mb-1">{t('nav.tags')}</p>
-        <TagInput tags={tags} onChange={setTags} />
+        <TagInput tags={tags} onChange={setTags} flush />
       </div>
       <div>
         <p className="label-xs mb-1">{t('images.note')}</p>

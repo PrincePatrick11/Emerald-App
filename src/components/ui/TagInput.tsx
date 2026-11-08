@@ -15,9 +15,11 @@ interface TagInputProps {
   /** Reading only: `row` makes the chips 24px tall, for the sidebar,
    *  where they stand in line with the list rows above them. */
   chipSize?: 'default' | 'row';
+  /** Flush with the fields around it (a dialog), instead of indented like the sidebar's rows. */
+  flush?: boolean;
 }
 
-export default function TagInput({ tags, onChange, readOnly = false, chipSize = 'default' }: TagInputProps) {
+export default function TagInput({ tags, onChange, readOnly = false, chipSize = 'default', flush = false }: TagInputProps) {
   const { t } = useTranslation();
   const { tags: allTags, ensureTag, getByName } = useTagStore(
     useShallow((s) => ({ tags: s.tags, ensureTag: s.ensureTag, getByName: s.getByName }))
@@ -128,7 +130,7 @@ export default function TagInput({ tags, onChange, readOnly = false, chipSize = 
   return (
     <div ref={wrapperRef} className="relative flex flex-col gap-1">
       {shown.length > 0 && (
-        <div className="flex flex-wrap gap-1.5 pl-2.5 pr-3 pt-0.5 pb-1">
+        <div className={`flex flex-wrap gap-1.5 pt-0.5 pb-1 ${flush ? '' : 'pl-2.5 pr-3'}`}>
           {shown.map((tag) => (
             <span
               key={tag.id}
@@ -150,7 +152,7 @@ export default function TagInput({ tags, onChange, readOnly = false, chipSize = 
         </div>
       )}
       {/* Indented like the sidebar's rows, not like its headings. */}
-      <div className="sidebar-add-field ml-[9px] mr-3">
+      <div className={`sidebar-add-field ${flush ? '' : 'ml-[9px] mr-3'}`}>
         <Tag size={14} />
         <input
           ref={inputRef}

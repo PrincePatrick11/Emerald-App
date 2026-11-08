@@ -595,15 +595,17 @@
   "images": {
     "add": "Add images",
     "edit": "Edit image",
-    "adopt": "Take into Images",
     "unnamed": "Unnamed",
     "name": "Name",
-    "emoji": "Emoji",
     "note": "Note",
-    "noCategory": "No category",
-    "vaultOnly": "Only in the vault",
-    "showVault": "Also images only in the vault"
+    "addCount_one": "Add {{count}} image",
+    "addCount_other": "Add {{count}} images",
+    "storing": "Storing …",
+    "dropHere": "Drop images here, or click to choose",
+    "leaveOut": "Leave out",
+    "tagsForAll": "Tags for all"
   },
+
   "tags": {
     "new": "New tag",
     "name": "Tag name…",

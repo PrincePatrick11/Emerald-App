@@ -748,7 +748,6 @@ export async function buildBackup(options: BackupOptions): Promise<BackupFile> {
   // Also with journal alone: the templates then travel along, and their assignments need the categories.
   if (
     options.includeJournal || options.includeWiki || options.includeOperations || options.includeTasks || options.includeAltars
-    || data.vaultImages.some((row) => row.category_id != null)
   ) {
     data.categories = await db.select<Row[]>(`SELECT * FROM categories`);
     // The categories are read after their contents, and deleting or
@@ -760,7 +759,7 @@ export async function buildBackup(options: BackupOptions): Promise<BackupFile> {
     // backup loses the assignment to the target category for these rows — accepted,
     // the window is a few statements wide. The tables: `CATEGORIZED_TABLES`.
     const known = new Set(data.categories.map((c) => String(c.id)));
-    for (const rows of [data.entries, data.altarItems, data.tasks, data.vaultImages]) {
+    for (const rows of [data.entries, data.altarItems, data.tasks]) {
       for (const row of rows ?? []) {
         if (row.category_id != null && !known.has(String(row.category_id))) row.category_id = null;
       }
@@ -1059,21 +1058,18 @@ function templateCategoryIds(rows: Row[] | undefined): string[] {
 /**
  * The pictures of "Images" from a file: like the templates never deleted,
  * missing ones added — by file, since a file is one picture. The file name
- * follows the images stored here (`pathMap`), the category the local one;
- * one that is not here leaves the picture uncategorized. An ID already taken
- * by another picture gets a new one.
+ * follows the images stored here (`pathMap`). An ID already taken by another
+ * picture gets a new one.
  */
 async function insertVaultImages(
   db: Awaited<ReturnType<typeof getDb>>,
   rows: unknown,
   pathMap: Map<string, string>,
-  catMap: Map<string, string>,
 ): Promise<void> {
   if (!Array.isArray(rows)) return;
   const local = await db.select<{ id: string; file: string }[]>('SELECT id, file FROM images');
   const files = new Set(local.map((r) => r.file));
   const ids = new Set(local.map((r) => r.id));
-  const categories = new Set((await db.select<Row[]>('SELECT id FROM categories')).map((r) => String(r.id)));
   const fresh: Row[] = [];
   for (const raw of rows) {
     if (typeof raw !== 'object' || raw === null) continue;
@@ -1084,13 +1080,11 @@ async function insertVaultImages(
     files.add(file);
     const id = typeof row.id === 'string' && /^[\w-]{1,100}$/.test(row.id) && !ids.has(row.id) ? row.id : generateId();
     ids.add(id);
-    const category = row.category_id == null ? null : catMap.get(String(row.category_id)) ?? String(row.category_id);
     const at = typeof row.created_at === 'string' ? row.created_at : nowIso();
     fresh.push({
       ...row,
       id,
       file,
-      category_id: category && categories.has(category) ? category : null,
       created_at: at,
       updated_at: typeof row.updated_at === 'string' ? row.updated_at : at,
     });
@@ -1444,7 +1438,7 @@ async function resolveImportedCategories(
  */
 function usedCategoryRows(d: BackupFile['data']): Row[] {
   const used = new Set(
-    [...(d.wikiArticles ?? []), ...(d.operations ?? []), ...(d.tasks ?? []), ...(d.altarItems ?? []), ...(d.vaultImages ?? [])]
+    [...(d.wikiArticles ?? []), ...(d.operations ?? []), ...(d.tasks ?? []), ...(d.altarItems ?? [])]
       .filter((r) => r.category_id != null)
       .map((r) => String(r.category_id))
   );
@@ -1573,7 +1567,7 @@ async function doReplace(db: Awaited<ReturnType<typeof getDb>>, backup: BackupFi
   await insertTemplates(db, d.templates, pathMap, catMap);
   // Like the custom blocks and the templates: never deleted, missing ones added.
   await insertLexicon(db, d.languages, d.lexiconEntries);
-  await insertVaultImages(db, d.vaultImages, pathMap, catMap);
+  await insertVaultImages(db, d.vaultImages, pathMap);
 
   // Delete only the content types present in the backup (so a partial backup
   // replacing only Journal data won't wipe wiki/ops).
@@ -1790,7 +1784,7 @@ async function doMerge(db: Awaited<ReturnType<typeof getDb>>, backup: BackupFile
   // appears in no entry.
   await insertLexicon(db, d.languages, d.lexiconEntries);
   // By file, like the replace: a picture that is already here stays as it is.
-  await insertVaultImages(db, d.vaultImages, pathMap, catMap);
+  await insertVaultImages(db, d.vaultImages, pathMap);
 
   // Content: plain INSERT with prefixed IDs (no conflicts possible)
   await insertRows(db, 'entries', entryRowsForInsert(journalEntries, wikiArticles, operations));

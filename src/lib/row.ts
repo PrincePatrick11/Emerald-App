@@ -228,8 +228,6 @@ export const fromRow = {
       id: str(r.id),
       file: str(r.file),
       name: str(r.name),
-      emoji: str(r.emoji),
-      category_id: nullableStr(r.category_id),
       tags: jsonArray<unknown>(r.tags).filter((t): t is string => typeof t === 'string'),
       note: str(r.note),
       created_at: str(r.created_at),
