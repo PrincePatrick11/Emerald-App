@@ -275,6 +275,8 @@ export const TABLE_DDL: Record<TableName, string> = {
   // (since v56): a row gives a stored file (`storedImageName`) a name, tags
   // (IDs as JSON, `lib/tagRefs.ts`) and a note. Every other file of the
   // folder is listed too, unnamed; a row keeps its file from the cleanup.
+  // `detached` (JSON) holds, while the picture is in the trash, the texts it
+  // was taken out of, so that restoring it puts it back there.
   images: `
     CREATE TABLE images (
       id TEXT PRIMARY KEY,
@@ -282,6 +284,7 @@ export const TABLE_DDL: Record<TableName, string> = {
       name TEXT NOT NULL DEFAULT '',
       note TEXT NOT NULL DEFAULT '',
       tags TEXT NOT NULL DEFAULT '[]',
+      detached TEXT NOT NULL DEFAULT '[]',
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL,
       deleted_at TEXT

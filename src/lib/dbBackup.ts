@@ -1085,6 +1085,8 @@ async function insertVaultImages(
       ...row,
       id,
       file,
+      // The texts it was taken out of are this vault's, not the file's.
+      detached: '[]',
       created_at: at,
       updated_at: typeof row.updated_at === 'string' ? row.updated_at : at,
     });

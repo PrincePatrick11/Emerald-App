@@ -17,6 +17,7 @@ import { useBlockDefinitionStore } from './blockDefinitionStore';
 import { useTemplateStore } from './templateStore';
 import { useLexiconStore } from './lexiconStore';
 import { useImageStore } from './imageStore';
+import { restorePicture } from './imageActions';
 import { ENTRY_MODULE_IDS, type EntryModuleId, type TrashKind } from '../lib/modules';
 
 /**
@@ -100,7 +101,7 @@ export const trashWiring: Record<TrashKind, {
     permanentlyDelete: (id) => useAltarStore.getState().permanentlyDeleteItem(id),
   },
   image: {
-    restore: (id) => useImageStore.getState().restoreImage(id),
+    restore: async (id) => { await restorePicture(id); },
     permanentlyDelete: (id) => useImageStore.getState().permanentlyDeleteImage(id),
   },
 };

@@ -3,6 +3,8 @@ import { useTranslation } from 'react-i18next';
 import { useShallow } from 'zustand/shallow';
 import { Pencil, Trash2 } from 'lucide-react';
 import { useImageStore } from '../../store/imageStore';
+import { deletePicture, placesShowing } from '../../store/imageActions';
+import { useUndoStore } from '../../store/undoStore';
 import { isOnlyDrawingOrBackground } from '../../lib/imageUsage';
 import { useTagStore } from '../../store/tagStore';
 import { useSessionState } from '../../store/sessionStore';
@@ -48,6 +50,7 @@ export default function ImagesView() {
   const [adding, setAdding] = useState(false);
   const [dropped, setDropped] = useState<string[]>([]);
   const [menu, setMenu] = useState<{ item: ImageItem; x: number; y: number } | null>(null);
+  const pushUndo = useUndoStore((s) => s.push);
 
   // Files dropped anywhere over the view go into the add dialog, opening it.
   const { dragOver } = useFileDrop(!editing, (paths) => {
@@ -136,12 +139,18 @@ export default function ImagesView() {
             onClose={() => setMenu(null)}
             actions={[
               { label: t('images.edit'), icon: <Pencil size={12} />, onClick: () => setEditing(menu.item) },
-              // The dialog asks first, naming where the picture is still shown.
+              // Still shown in texts: the dialog asks first. Otherwise straight away, with Undo.
               {
                 label: t('contextMenu.delete'),
                 icon: <Trash2 size={12} />,
                 danger: true,
-                onClick: () => setEditing({ ...menu.item, confirmDelete: true }),
+                onClick: () => {
+                  const { item } = menu;
+                  void placesShowing(item.file).then((places) => {
+                    if (places.length) setEditing({ ...item, confirmDelete: true });
+                    else void deletePicture(item.file, item.image, t('undo.imageDeleted'), pushUndo);
+                  });
+                },
               },
             ]}
           />
