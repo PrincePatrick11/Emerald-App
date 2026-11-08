@@ -1707,6 +1707,22 @@ console.log('\n8i. Migration v43: templates and the sigil template\n');
     'collectUsedImageFilenames knows images in the block stack of a template',
     (await collectUsedImageFilenames(db)).has(`${'d'.repeat(64)}.png`)
   );
+  await db.execute(
+    `INSERT INTO categories (id,name,emoji,sort_order,is_builtin) VALUES ('bildkat','Bilder','x',99,0)`
+  );
+  await db.execute(
+    `INSERT INTO images (id, file, category_id, created_at, updated_at) VALUES ('im1',$1,'bildkat',$2,$2)`,
+    [`${'e'.repeat(64)}.webp`, new Date().toISOString()],
+  );
+  check(
+    'collectUsedImageFilenames keeps an image taken into "Images", used anywhere or not',
+    (await collectUsedImageFilenames(db)).has(`${'e'.repeat(64)}.webp`)
+  );
+  await reassignCategoryContent(db, 'bildkat');
+  check(
+    'reassignCategoryContent uncategorizes an image too',
+    (await db.select("SELECT category_id FROM images WHERE id='im1'"))[0].category_id === null
+  );
 
   // Merging: assignments move along, one star per type and category, active templates first.
   await db.execute(`INSERT INTO categories (id,name,emoji,sort_order,is_builtin) VALUES ('alt','Alt','x',100,0), ('neu','Neu','x',101,0)`);
@@ -2203,10 +2219,18 @@ console.log('\n8r. Migration v53: tags by ID\n');
   check('v53: checkIntegrity finds no tag orphans',
     !(await checkIntegrity(db)).some((o) => o.column === 'tags'), JSON.stringify(await checkIntegrity(db)));
 
+  // The tag lists of today include `images` (v56), which this vault gets first.
+  await MIGRATIONS.find((m) => m.version === 56).up(db);
+  await db.execute(
+    `INSERT INTO images (id, file, tags, created_at, updated_at) VALUES ('img1',$1,'["tGone","tLive"]',$2,$2)`,
+    [`${'c'.repeat(64)}.png`, at],
+  );
+
   // A tag goes for good: first out of every list.
   await stripTagIds(db, ['tGone']);
   check('stripTagIds removes the ID from every list, also in the trash',
     JSON.stringify(await tagsOf('entries', 'e2')) === JSON.stringify(['tLive']) && (await tagsOf('entries', 'e3')).length === 0);
+  check('stripTagIds removes it from an image too', JSON.stringify(await tagsOf('images', 'img1')) === JSON.stringify(['tLive']));
   await replaceTagId(db, 'tTwinLive', 'tLive');
   check('replaceTagId replaces without duplicates', JSON.stringify(await tagsOf('entries', 'e4')) === JSON.stringify(['tLive']));
   await db.execute(`UPDATE entries SET tags='["gibtsnicht"]' WHERE id='e5'`);

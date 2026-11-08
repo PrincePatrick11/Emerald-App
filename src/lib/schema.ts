@@ -21,7 +21,7 @@ import type Database from './sqlite';
  * Must match the highest version in MIGRATIONS. `db.ts` checks this at
  * startup so that a new migration step cannot be forgotten.
  */
-export const BASELINE_VERSION = 55;
+export const BASELINE_VERSION = 56;
 
 /**
  * Tables in dependency order: parents before children.
@@ -48,6 +48,7 @@ export const TABLES = [
   'task_links',
   'languages',
   'lexicon_entries',
+  'images',
 ] as const;
 
 export type TableName = (typeof TABLES)[number];
@@ -269,6 +270,25 @@ export const TABLE_DDL: Record<TableName, string> = {
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL
     )`,
+
+  // The vault's images as a place of their own, like tags and categories
+  // (since v56): a row takes a stored file (`storedImageName`) into "Images",
+  // with a name, an emoji, a category, tags (IDs as JSON, `lib/tagRefs.ts`)
+  // and a note. Files without a row — in texts, fields, drawings — are listed
+  // too, from the folder; a row keeps its file from the cleanup.
+  images: `
+    CREATE TABLE images (
+      id TEXT PRIMARY KEY,
+      file TEXT NOT NULL UNIQUE,
+      name TEXT NOT NULL DEFAULT '',
+      emoji TEXT NOT NULL DEFAULT '🖼️',
+      note TEXT NOT NULL DEFAULT '',
+      category_id TEXT REFERENCES categories(id) ON DELETE RESTRICT,
+      tags TEXT NOT NULL DEFAULT '[]',
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      deleted_at TEXT
+    )`,
 };
 
 
@@ -361,10 +381,16 @@ export const ENTRIES_INDEX_DDL: readonly string[] = [
   'CREATE INDEX idx_entries_decorated ON entries(deleted_at) WHERE icon IS NOT NULL OR cover_image IS NOT NULL',
 ];
 
+/** The indexes of `images` (v56): its trash and its categories. */
+export const IMAGES_INDEX_DDL: readonly string[] = [
+  'CREATE INDEX idx_images_deleted ON images(deleted_at)',
+  'CREATE INDEX idx_images_category ON images(category_id)',
+];
+
 /** All indexes of the current schema — what a fresh vault gets. */
 export const INDEX_DDL: readonly string[] = [
   ...KEPT_INDEX_DDL_V38, BLOCK_DEFINITIONS_INDEX_DDL, TEMPLATES_INDEX_DDL, ...LEXICON_INDEX_DDL, ALTARS_INDEX_DDL,
-  ...ENTRIES_INDEX_DDL, ALTAR_ITEMS_INDEX_DDL,
+  ...ENTRIES_INDEX_DDL, ALTAR_ITEMS_INDEX_DDL, ...IMAGES_INDEX_DDL,
 ];
 
 /**
@@ -411,7 +437,7 @@ export const STARTER_CATEGORIES: readonly [string, string][] = [
 ];
 
 /** The content tables with `category_id` (wiki and operations are in `entries`). A literal, because it is interpolated into SQL. */
-export const CATEGORIZED_TABLES = ['entries', 'tasks', 'altar_items'] as const;
+export const CATEGORIZED_TABLES = ['entries', 'tasks', 'altar_items', 'images'] as const;
 
 /**
  * The same DDL, but compatible with an already existing table.
@@ -793,6 +819,12 @@ export async function collectUsedImageFilenames(db: Database): Promise<Set<strin
   for (const { elements } of definitions) {
     for (const match of (elements ?? '').matchAll(IMAGE_NAME_RE)) used.add(match[0]);
   }
+
+  // Images taken into "Images" (v56) stay, used anywhere or not — not in
+  // IMAGE_FIELDS for the same reason. A row in the trash keeps its file until
+  // it is deleted for good.
+  const kept = await db.select<{ file: string }[]>('SELECT file FROM images');
+  for (const { file } of kept) if (storedImageName(file)) used.add(file);
 
   // Images in the templates' block stack (v43) — not in IMAGE_FIELDS for the same reason.
   const templates = await db.select<{ content: string | null }[]>('SELECT content FROM templates');

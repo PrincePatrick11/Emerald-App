@@ -2,7 +2,7 @@ import Database from './sqlite';
 import { invoke } from '@tauri-apps/api/core';
 import { getActiveVaultId } from './vaultManager';
 import {
-  ALTAR_ITEMS_INDEX_DDL, ALTARS_INDEX_DDL, BASELINE_VERSION, BLOCK_DEFINITIONS_INDEX_DDL, ENTRIES_INDEX_DDL, LEXICON_INDEX_DDL, TABLE_DDL,
+  ALTAR_ITEMS_INDEX_DDL, ALTARS_INDEX_DDL, BASELINE_VERSION, BLOCK_DEFINITIONS_INDEX_DDL, ENTRIES_INDEX_DDL, IMAGES_INDEX_DDL, LEXICON_INDEX_DDL, TABLE_DDL,
   TEMPLATES_INDEX_DDL, createSchema, ddlIfNotExists, purgeCategory, seedBuiltins, storedImageName,
 } from './schema';
 import { normalizeSchema } from './normalizeSchema';
@@ -283,6 +283,8 @@ const CLEANUP_TABLES = [
   'altars',
   // And those of an item.
   'altar_items',
+  // Its file stays until the cleanup in Settings → Storage finds it unused.
+  'images',
 ] as const;
 
 /**
@@ -1423,6 +1425,16 @@ export const MIGRATIONS: Migration[] = [
     up: async (db) => {
       await db.execute('DROP INDEX IF EXISTS idx_entries_deleted');
       await createIndexesIfMissing(db, ENTRIES_INDEX_DDL);
+    },
+  },
+  {
+    // "Images" as a place of its own (`images`): a row takes a stored file in,
+    // with name, emoji, category and tags. Additive and repeatable.
+    version: 56,
+    name: 'images',
+    up: async (db) => {
+      await db.execute(ddlIfNotExists(TABLE_DDL.images));
+      await createIndexesIfMissing(db, IMAGES_INDEX_DDL);
     },
   },
 ];

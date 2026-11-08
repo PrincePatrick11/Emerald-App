@@ -12,8 +12,14 @@ import { jsonArray } from './row';
  * DOM-free and without stores — it also runs in node (`scripts/schema-check.mjs`).
  */
 
-/** The tables whose rows carry tags — including those in the trash. */
+/**
+ * The tables whose rows carried tags when v53 turned names into IDs
+ * (`tagsById.ts`) — frozen, since that step runs before later tables exist.
+ */
 export const TAGGED_TABLES = ['entries', 'templates'] as const;
+
+/** The tables whose rows carry tags now — including those in the trash. */
+export const TAG_REF_TABLES = [...TAGGED_TABLES, 'images'] as const;
 
 /** A tag ID from a foreign source (backup): only harmless characters, like `isDefinitionId`. */
 export function isTagId(id: unknown): id is string {
@@ -26,14 +32,14 @@ export function tagIdList(raw: unknown): string[] {
 }
 
 /**
- * Rewrites the tag list of every row in `TAGGED_TABLES` whose list `fn`
+ * Rewrites the tag list of every row in `TAG_REF_TABLES` whose list `fn`
  * changes — trash included, without `updated_at`: a consequence, not a change to the
  * entry. Returns the new lists by row ID so that the stores can catch up
  * in memory.
  */
 export async function rewriteTagRefs(db: Database, fn: (ids: string[]) => string[]): Promise<Map<string, string[]>> {
   const changed = new Map<string, string[]>();
-  for (const table of TAGGED_TABLES) {
+  for (const table of TAG_REF_TABLES) {
     const rows = await db.select<{ id: string; tags: string }[]>(`SELECT id, tags FROM ${table} WHERE tags != '[]'`);
     const updates: [string, unknown[]][] = [];
     for (const row of rows) {
