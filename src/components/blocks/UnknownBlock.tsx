@@ -16,7 +16,7 @@ const FALLBACK_SANITIZE = {
   ALLOWED_TAGS: [
     'p', 'br', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'ul', 'ol', 'li', 'blockquote', 'pre', 'code',
     'strong', 'em', 's', 'u', 'mark', 'a', 'img', 'hr', 'span', 'div', 'dl', 'dt', 'dd',
-    'table', 'thead', 'tbody', 'tr', 'th', 'td',
+    'table', 'thead', 'tbody', 'tr', 'th', 'td', 'colgroup', 'col', 'details', 'summary',
   ],
   ALLOWED_ATTR: ['href', 'src', 'alt', 'title'],
   ALLOW_DATA_ATTR: false,

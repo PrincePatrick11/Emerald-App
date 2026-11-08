@@ -1,22 +1,14 @@
 import {
-  useCallback, useEffect, useMemo, useReducer, useRef, useState,
+  useCallback, useEffect, useMemo, useRef, useState,
   type MouseEvent, type MutableRefObject, type PointerEvent, type ReactNode,
 } from 'react';
 import { Reorder, useDragControls } from 'framer-motion';
-import type { Editor } from '@tiptap/react';
 import { useTranslation } from 'react-i18next';
 import { Eye, EyeOff, Plus, Puzzle } from 'lucide-react';
 import ContextMenu, { type ContextMenuAction } from '../ui/ContextMenu';
-import EditorToolbar from '../editor/EditorToolbar';
-import LinkPickerModal from '../editor/LinkPickerModal';
-import DragGhost from '../editor/DragGhost';
-import { useEditorFileDrop } from '../editor/useEditorFileDrop';
-import { useEditorPointerDrops } from '../editor/useEditorPointerDrops';
-import { useInternalLinkNavigation } from '../editor/useInternalLinkNavigation';
 import {
-  appendEntryLink, findEntryLinkPos, insertImageFromDataUrl, insertInternalLinkChip,
-  removeEntryLink, revealEntryLink,
-} from '../editor/editorCommands';
+  appendEntryLink, editorHas, findEntryLinkPos, removeEntryLink, revealEntryLink, TextEditorHostContext, useTextEditorHost,
+} from '../editors/text';
 import {
   APPEND_ENTRY_LINK_EVENT, REMOVE_ENTRY_LINK_EVENT, REVEAL_ENTRY_LINK_EVENT, subscribeEntryLinkRequest,
   type EntryLinkRequest,
@@ -24,7 +16,7 @@ import {
 import { extractInternalLinks, internalLinkBlockHtml, remapInternalLinks, toInternalLinkChip } from '../../lib/internalLinkHtml';
 import { generateId } from '../../lib/helpers';
 import { editorSavesSuspended } from '../../lib/editorLock';
-import { FIELDS_BLOCK_TYPE, linkFromSlot, parseFields, serializeFields } from '../../lib/blocks/fields';
+import { activeElements, FIELDS_BLOCK_TYPE, linkFromSlot, parseFields, serializeFields } from '../../lib/blocks/fields';
 import { useFieldFallbackText } from './useFieldFallbackText';
 import { REORDER_SPRING } from '../../lib/motion';
 import { flashReveal, scrollIntoViewCentered } from '../../lib/reveal';
@@ -47,7 +39,6 @@ import TemplateInsertion, { type TemplateTarget } from '../templates/TemplateIns
 import { BLOCK_VIEWS } from './blockViews';
 import { BlockStackContext, type BlockStackContextValue } from './blockStackContext';
 import { addBlockActions, commonBlockActions } from './blockActions';
-import { useTextEditorRegistry } from './useTextEditorRegistry';
 import BlockFrame from './BlockFrame';
 import UnknownBlock from './UnknownBlock';
 import BlockErrorBoundary from './BlockErrorBoundary';
@@ -56,7 +47,7 @@ interface BlockStackProps {
   /** The entry the stack belongs to; the sidebar only serves the matching session. */
   entryId: string;
   /**
-   * Only the INITIAL VALUE, as with RichEditor: the stack is uncontrolled
+   * Only the INITIAL VALUE, as with TextEditor: the stack is uncontrolled
    * afterwards. The views remount it via `key` when another
    * entry is loaded or Cancel is pressed.
    */
@@ -87,13 +78,10 @@ const REVEAL_MS = 1600;
 /**
  * The content of an entry as a stack of blocks, for reading and editing.
  *
- * It is also the one point of contact for everything that writes into the entry
- * from outside or listens document-wide: the sidebar's link requests, navigation
- * via chip click, drops (files, entries from the left list),
- * toolbar and link picker. That used to hang on the individual RichEditor; with
- * several text blocks every request would otherwise run in every block. Which
- * editor receives a request is decided by `useTextEditorRegistry`. The
- * sidebar's block management serves it via `blockSessionStore`.
+ * It is the text editors' host (`useTextEditorHost`: toolbar, link picker,
+ * chip navigation, drops) and the one point of contact for the sidebar's link
+ * requests, which also reach link and altar fields. The sidebar's block
+ * management serves it via `blockSessionStore`.
  *
  * Text input changes no React state: the new HTML lands in `blocksRef`
  * and goes serialised to `onChange`. It only becomes state on
@@ -150,18 +138,23 @@ export default function BlockStack({
 
   const definitions = useBlockDefinitionStore((s) => s.definitions);
 
-  const { registerTextEditor, orderedEditors, targetEditor, toolbarEditor, focusOnMount } =
-    useTextEditorRegistry(() => blocksRef.current);
+  const textHost = useTextEditorHost({
+    isEditing,
+    getOrder: () => textEditorKeys(blocksRef.current),
+    getContainer: () => stackRef.current,
+  });
+  const { orderedEditors, targetEditor, focusOnMount } = textHost;
 
   const context = useMemo<BlockStackContextValue>(() => ({
-    registerTextEditor,
     // Only the first text block carries the module's placeholder ("What happened
     // today?"); further text blocks get a neutral one.
     placeholderFor: (blockId) =>
       blocksRef.current.find((b) => b.type === TEXT_BLOCK_TYPE)?.id === blockId
         ? placeholder
         : t('blocks.types.text.placeholder'),
-  }), [registerTextEditor, placeholder, t]);
+  }), [placeholder, t]);
+
+  /* ---------------- Link requests from the sidebar ---------------- */
 
   /**
    * Append a link, unless it is already somewhere in the entry. The target is
@@ -171,7 +164,7 @@ export default function BlockStack({
   const appendLinkOnce = useCallback((item: EntryLinkRequest) => {
     if (orderedEditors().some((ed) => findEntryLinkPos(ed.state.doc, item) !== null)) return;
     const target = targetEditor();
-    if (target) {
+    if (target && editorHas(target, 'internalLink')) {
       appendEntryLink(target, item);
       return;
     }
@@ -179,16 +172,6 @@ export default function BlockStack({
       internalLinkBlockHtml(toInternalLinkChip(item), item.categoryLabel ?? '', { separator: false }),
     )]);
   }, [orderedEditors, targetEditor, commit]);
-
-  /* ---------------- Document-wide listeners, once per entry ---------------- */
-
-  useInternalLinkNavigation(!isEditing);
-  const fileDrop = useEditorFileDrop(isEditing, targetEditor);
-  const pointerDropActive = useEditorPointerDrops({
-    enabled: isEditing,
-    getEditors: orderedEditors,
-    getContainer: () => stackRef.current,
-  });
 
   /**
    * The field block whose link or altar field points to `target`,
@@ -264,7 +247,6 @@ export default function BlockStack({
   /* ---------------- Structural changes ---------------- */
 
   const [menu, setMenu] = useState<{ x: number; y: number; actions: ContextMenuAction[] } | null>(null);
-  const [linkPickerOpen, setLinkPickerOpen] = useState(false);
 
   const insertAt = (index: number, presetId: string) => {
     const block = createFromPreset(presetId, definitions, fieldTextRef.current);
@@ -497,14 +479,13 @@ export default function BlockStack({
   const stackClass = [
     'block-stack',
     blocks.length > 1 && 'block-stack--multi',
-    (fileDrop.fileDragOver || pointerDropActive) && 'block-stack--drop-target',
+    textHost.dropActive && 'block-stack--drop-target',
   ].filter(Boolean).join(' ');
 
   return (
     <BlockStackContext.Provider value={context}>
-      {isEditing && toolbarEditor && (
-        <StackToolbar editor={toolbarEditor} onOpenLinkPicker={() => setLinkPickerOpen(true)} />
-      )}
+    <TextEditorHostContext.Provider value={textHost.context}>
+      {textHost.toolbar}
 
       {isEditing && templateTarget && (
         <TemplateInsertion
@@ -554,15 +535,11 @@ export default function BlockStack({
         })}
       </Reorder.Group>
       {isEditing && blocks.length === 0 && <InsertLine always onAdd={(e) => openAddMenu(e, 0)} />}
+      {textHost.wordCount}
 
       {menu && <ContextMenu x={menu.x} y={menu.y} actions={menu.actions} onClose={() => setMenu(null)} />}
-      {isEditing && linkPickerOpen && toolbarEditor && (
-        <LinkPickerModal
-          onSelect={(item) => insertInternalLinkChip(toolbarEditor, item)}
-          onClose={() => setLinkPickerOpen(false)}
-        />
-      )}
-      <DragGhost />
+      {textHost.overlays}
+    </TextEditorHostContext.Provider>
     </BlockStackContext.Provider>
   );
 }
@@ -570,6 +547,20 @@ export default function BlockStack({
 /** Is the block a charge, or a custom block with a charge part? */
 function holdsCharge(block: BlockInstance): boolean {
   return block.type === SIGIL_CHARGE_TYPE || sigilUnits([block]).some((u) => u.block.type === SIGIL_CHARGE_TYPE);
+}
+
+/**
+ * The keys of the stack's text editors in block order: a text block under its
+ * ID, a custom block's text element under `<block ID>:<element ID>`, at the
+ * position of its block.
+ */
+function textEditorKeys(blocks: BlockInstance[]): string[] {
+  return blocks.flatMap((block) => [
+    block.id,
+    ...(block.type === FIELDS_BLOCK_TYPE
+      ? activeElements(parseFields(block)).filter((el) => el.kind === 'text').map((el) => `${block.id}:${el.id}`)
+      : []),
+  ]);
 }
 
 /** The blocks of a content; an empty entry gets an empty text block. */
@@ -632,27 +623,6 @@ function StackItem({ id, children }: { id: string; children: (startDrag: (e: Poi
     >
       {children((e) => controls.start(e))}
     </Reorder.Item>
-  );
-}
-
-/** The stack's one toolbar, bound to the focused text block. It
- *  sits outside the editor component and therefore does not re-render by itself
- *  with every transaction; the listener here makes up for that. */
-function StackToolbar({ editor, onOpenLinkPicker }: { editor: Editor; onOpenLinkPicker: () => void }) {
-  const [, rerender] = useReducer((n: number) => n + 1, 0);
-  useEffect(() => {
-    editor.on('transaction', rerender);
-    return () => { editor.off('transaction', rerender); };
-  }, [editor]);
-  if (editor.isDestroyed) return null;
-  return (
-    <div className="block-stack-toolbar">
-      <EditorToolbar
-        editor={editor}
-        onInsertImage={(dataUrl) => { void insertImageFromDataUrl(editor, dataUrl); }}
-        onOpenLinkPicker={onOpenLinkPicker}
-      />
-    </div>
   );
 }
 

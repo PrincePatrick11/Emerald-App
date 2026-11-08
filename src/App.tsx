@@ -6,7 +6,7 @@ export default function App() {
   // (`applyAppearance`); until then the boot mirror from `main.tsx` applies.
   //
   // Next to AppShell rather than inside it: AppShell returns early for the
-  // vault setup screen, and the edit menu belongs there too — in the name
+  // the vault picker screen, and the edit menu belongs there too — in the name
   // field of the new vault.
   return (
     <>

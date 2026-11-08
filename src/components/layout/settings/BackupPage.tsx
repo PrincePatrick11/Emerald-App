@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { VAULT_KEY_CANCELLED } from '../../../store/vaultKeyStore';
 import { keyErrorOf } from '../../../lib/vaultKeys';
 import { useTranslation } from 'react-i18next';
@@ -6,7 +6,7 @@ import { AlertTriangle, Download, FolderOpen, Upload } from 'lucide-react';
 import { open as openDialog } from '@tauri-apps/plugin-dialog';
 import Button from '../../ui/Button';
 import BlockCheckbox from '../../blocks/BlockCheckbox';
-import { VaultLocationRow } from '../VaultModal';
+import { VaultLocationRow } from '../VaultPicker';
 import {
   NEW_VAULT_TARGET_ERROR_KEY,
   newVaultBaseDir,
@@ -31,6 +31,8 @@ import { resolveOpenEdits } from '../../../lib/openEdits';
 import AutoBackupSection from './AutoBackupSection';
 import SettingsChoiceButton from './SettingsChoiceButton';
 import SettingsSection, { SettingsCheckboxGrid, SettingsStatus } from './SettingsSection';
+import { useVaultStore } from '../../../store/vaultStore';
+import { syncStatus } from '../../../lib/sync/engine';
 
 /** Everything as in the automatic backup — except the trash, which is added by hand. */
 const DEFAULT_EXPORT_OPTIONS: BackupOptions = { ...FULL_BACKUP_OPTIONS, includeDeleted: false };
@@ -57,6 +59,12 @@ const SETTINGS_GROUP_LABEL_KEYS: Record<SettingsGroup, string> = {
  */
 export default function BackupPage() {
   const { t } = useTranslation();
+  // Replacing a vault that syncs replaces it on the other devices too.
+  const [syncsToOthers, setSyncsToOthers] = useState(false);
+  const syncVaultId = useVaultStore((s) => s.activeVaultId);
+  useEffect(() => {
+    syncStatus(syncVaultId).then((status) => setSyncsToOthers(status.connected), () => setSyncsToOthers(false));
+  }, [syncVaultId]);
 
 
   // Export
@@ -76,7 +84,7 @@ export default function BackupPage() {
   // existing data.
   const [importMode, setImportMode] = useState<ImportMode>('add-vault');
   const [newVaultName, setNewVaultName] = useState('');
-  // Target folder of the new vault — the same mechanism as in the vault modal:
+  // Target folder of the new vault — the same mechanism as in the vault picker:
   // `{Documents}/Emerald Vaults` as the base, a folder chosen by hand
   // overrides it.
   const [vaultBaseDir, setVaultBaseDir] = useState<string | null>(null);
@@ -117,7 +125,7 @@ export default function BackupPage() {
       setImportedFile({ backup: result.backup, preview: result.preview });
       setNewVaultName(t('settings.importedVault'));
       setVaultCustomPath(null);
-      // Like `openCreateRow` in the vault modal: resolve once so the row shows
+      // Like `openCreateRow` in the vault picker: resolve once so the row shows
       // a real path from the start — and before the import becomes clickable,
       // otherwise a quick click runs into the fallback
       // `{appDataDir}/vaults/{id}`. If resolving fails, that fallback stays.
@@ -341,8 +349,8 @@ export default function BackupPage() {
                     className="block w-full text-left px-3 py-2"
                   >
                     {/* Active only through the colouring of the button itself
-                        (settings-choice-btn), as with the theme and language
-                        choice — no checkmark. */}
+                        (settings-choice-btn), as with the sizes on the
+                        General page — no checkmark. */}
                     <span className="block text-xs font-medium">{t(labelKey)}</span>
                     <span className="block text-xs mt-0.5 text-muted">{t(descKey)}</span>
                   </SettingsChoiceButton>
@@ -375,7 +383,7 @@ export default function BackupPage() {
                         const picked = await openDialog({ directory: true, multiple: false });
                         if (typeof picked !== 'string') return;
                         setVaultCustomPath(picked);
-                        // Like `pickFolder` in the vault modal: the correction
+                        // Like `pickFolder` in the vault picker: the correction
                         // takes the old error message away immediately.
                         setImportError('');
                       }}
@@ -414,6 +422,7 @@ export default function BackupPage() {
                     {t('settings.modeReplaceWarning')}
                     {/* Replace is the one mode in which language and appearance
                         switch without a choice of their own. */}
+                    {syncsToOthers && ` ${t('sync.replaceWarning')}`}
                     {importedFile.preview.hasSettings && ` ${t('settings.modeReplaceSettingsWarning')}`}
                   </span>
                 </div>

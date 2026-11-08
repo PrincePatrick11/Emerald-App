@@ -2,7 +2,7 @@
 
 ## Content Blocks
 
-Journal, Wiki and Operations entries render their body as a vertical stack of blocks — `BlockStack` (`src/components/blocks/BlockStack.tsx`) inside `EntryDetailFrame`'s `body="scroll"`. The types are text (`core.text`, one `RichEditor` per block), fields (`core.fields`, which also carries user-built blocks and an operation's Status) and the three sigil blocks (`core.sigil.calc`/`.canvas`/`.charge`).
+Journal, Wiki and Operations entries render their body as a vertical stack of blocks — `BlockStack` (`src/components/blocks/BlockStack.tsx`) inside `EntryDetailFrame`'s `body="scroll"`. The types are text (`core.text`, one `TextEditor` per block), fields (`core.fields`, which also carries user-built blocks and an operation's Status) and the three sigil blocks (`core.sigil.calc`/`.canvas`/`.charge`).
 
 ### Stored format
 
@@ -20,7 +20,7 @@ Two halves, mirroring `modules.ts`/`moduleViews.ts`: `src/lib/blocks/` is pure (
 
 ### The block stack
 
-**One owner for document-wide listeners.** With several text blocks, a `document`-level listener per editor would let every request hit every block, so `BlockStack` owns them once per entry: the three `lib/links.ts` link requests (append goes to the last-focused text block, else the last; reveal/remove try each block in order), chip-click navigation, OS file drops, pointer drops from the left list, `DragGhost`, the one sticky `EditorToolbar` bound to the focused editor, and `LinkPickerModal`. `RichEditor` is just a writing surface; link commands live in `components/editor/editorCommands.ts`.
+**One owner for document-wide listeners.** With several text blocks, a `document`-level listener per editor would let every request hit every block, so `BlockStack` is the host of the entry's text editors ([`editors.md`](editors.md#text-editor)): toolbar, link picker, chip-click navigation, OS file drops, pointer drops from the left list and `DragGhost` exist once per entry. The stack itself handles the three `lib/links.ts` link requests: append goes to the last-focused text block, else the last; reveal/remove try each block in order, then link and altar fields.
 
 **Keystrokes don't re-render the stack.** A text block's HTML goes into `blocksRef` and, serialised, to `useEntryEditor.handleContentChange`; React state only changes on structural edits (add, duplicate, remove, reorder). Read and edit mode share one tree — `Reorder.Group` stays mounted and inert in read mode — because remounting a text block on a mode switch would rebuild it from the last structural snapshot instead of the latest keystrokes. Only the grip starts a drag (`dragListener={false}`), so text selection still works.
 

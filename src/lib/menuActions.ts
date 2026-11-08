@@ -1,6 +1,7 @@
 import { emit } from '@tauri-apps/api/event';
 import { useUIStore } from '../store/uiStore';
 import { hasActiveVault, useVaultStore } from '../store/vaultStore';
+import { openVaultPicker, useVaultPickerStore } from '../store/vaultPickerStore';
 import { showSplash } from './splash';
 import type { ActiveView } from '../types';
 
@@ -20,6 +21,9 @@ export type MenuActionId =
   | 'toggle-right-sidebar'
   | 'toggle-view-lock'
   | 'show-splash'
+  | 'switch-vault'
+  | 'show-about'
+  | 'check-updates'
   | 'export-pdf'
   | 'export-markdown'
   | 'export-emerald'
@@ -56,6 +60,9 @@ const NATIVE_EVENTS: Record<Exclude<SelfContainedMenuActionId, TitleBarOnlyMenuA
   'toggle-right-sidebar': true,
   'toggle-view-lock': true,
   'show-splash': true,
+  'switch-vault': true,
+  'show-about': true,
+  'check-updates': true,
 };
 
 export const NATIVE_MENU_EVENTS = Object.keys(NATIVE_EVENTS) as (keyof typeof NATIVE_EVENTS)[];
@@ -83,20 +90,31 @@ export async function runMenuAction(id: SelfContainedMenuActionId): Promise<void
       return;
     // Shows the loading screen once more, until somewhere is clicked.
     // Sits up here with the toggles because, like them, it needs no
-    // vault — it should be viewable during vault setup too,
+    // vault — it should be viewable in the vault picker too,
     // which is the moment when one is most likely to look for it.
     case 'show-splash':
       showSplash();
       return;
+    // Emerald → "Switch vault…". With no vault open the picker is up already.
+    case 'switch-vault':
+      void openVaultPicker();
+      return;
+    // About and the updates are on the start page.
+    case 'show-about':
+      void openVaultPicker();
+      return;
+    case 'check-updates':
+      void openVaultPicker('updates');
+      return;
   }
 
-  // During vault setup there is no database, but the menu bar
-  // is there — it sits in the title bar, which stays visible so that
-  // the window can be operated. Without this guard, "Export" would run into a
-  // raw NO_ACTIVE_VAULT dialog, and "Import Markdown" would wait for a
-  // target modal that is not even mounted during setup: the promise would never
-  // resolve and would pop up as soon as the first vault was ready.
-  if (!hasActiveVault(useVaultStore.getState())) return;
+  // Export and Import live in the title bar, which leaves them out over the
+  // vault picker; this guard is the second line. Without a vault there is no
+  // database: "Export" would run into a raw NO_ACTIVE_VAULT dialog, and
+  // "Import Markdown" would wait for a target modal that is not mounted then,
+  // a promise that would only resolve once a vault was ready. Over an open
+  // vault the picker hides every view there would be to act on.
+  if (!hasActiveVault(useVaultStore.getState()) || useVaultPickerStore.getState().open) return;
 
   // The export/import modules (including turndown and marked) are only loaded on the
   // first menu call — otherwise they would hang on the startup path via AppShell.

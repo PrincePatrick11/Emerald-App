@@ -30,6 +30,7 @@ import Database from './sqlite';
 import { invoke } from '@tauri-apps/api/core';
 import { resetDbCache, markDbReplaced } from './db';
 import { TABLES } from './schema';
+import { isTracked, markSnapshotNeeded } from './sync/tracking';
 import { getActiveImportStagingFile, getActiveVaultId } from './vaultManager';
 
 /** Name under which the copy is attached during the swap. */
@@ -85,14 +86,19 @@ export async function importViaStaging(db: Database, fill: (staging: Database) =
   await db.execute(`VACUUM INTO ${sqlString(stagingFile)}`);
 
   try {
+    const tracked = await isTracked(db);
     const staging = await Database.load(vaultId, 'importStaging');
     try {
+      // `VACUUM INTO` copied the triggers along; this log is thrown away anyway.
+      if (tracked) await staging.execute('UPDATE _sync_ctx SET applying = 1');
       await fill(staging);
     } finally {
       // An error while closing should not mask the import's own error.
       await staging.close().catch((err: unknown) => console.warn('[backup] working copy not closed:', err));
     }
     await swapIn(db, stagingFile);
+    // Emptying and refilling every table is no change a log should carry.
+    if (tracked) await markSnapshotNeeded(db);
     // Anyone currently reading across several queries now has a mixed state (`dbEpoch`).
     markDbReplaced();
   } finally {

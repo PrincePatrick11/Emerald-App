@@ -167,13 +167,15 @@ Where the code contradicts the rules above today. No prioritisation — each poi
 
 **5. Contrast of `--accent` as a fill mark.** `--accent` itself stays `#008a57` in Parchment (3.99:1 against the sheet), which holds 3:1 for icons and marks. Text uses `--accent-text`. *Cost: none unless it gets used for text again.*
 
+**6. The start page's choices are hand-written.** The theme cards (`.start-theme`, a small picture of the theme and, for a custom theme, a remove button) and the vault tiles (`.picker-tile`) set their active state through a `className` ternary rather than `Button`'s `tone`: neither is a generic action button, and `SettingsChoiceButton`'s chips do not fit a card with a picture and a remove action. *Cost: a card variant of `SettingsChoiceButton`, then switch the theme cards over.*
+
 ---
 
 ## Appendix: Inventory and Traps
 
 ### Colour Values
 
-**Theme variables** (`src/themes/emerald-noctis.css`, `emerald-parchment.css`). Both files define the same 163 properties, including the edit sidebar's `--field-*`, `--primary-solid-*` and `--danger-soft-*` tokens `Button`'s `--tone-*` and the Settings' `--choice-*`. Core values:
+**Theme variables** (`src/themes/emerald-noctis.css`, `emerald-parchment.css`). Both files define the same 170 properties, including the edit sidebar's `--field-*`, `--primary-solid-*` and `--danger-soft-*` tokens `Button`'s `--tone-*` and the Settings' `--choice-*`. Core values:
 
 | Property | Emerald Noctis (dark) | Emerald Parchment (light) |
 | --- | --- | --- |
@@ -183,6 +185,7 @@ Where the code contradicts the rules above today. No prioritisation — each poi
 | `--accent` | `#00c47f` | `#008a57` |
 | `--accent-strong` | `#00a066` | `#006941` |
 | `--focus-ring` | `rgba(0, 196, 127, 0.42)` | `rgba(0, 138, 87, 0.34)` |
+| `--selection-bg` (marked text, also drawn by the editor over images) | `rgba(0, 230, 153, 0.25)` | `rgba(0, 138, 87, 0.22)` |
 | `--warning-text` | `#e2a854` | `#a75924` |
 | `--danger-text` | `#f87171` | `#b63f32` |
 | `--panel-bg` | `rgba(38, 32, 27, 0.78)` | `#f7eddb` |
@@ -199,22 +202,22 @@ Deliberately **not** tokenised: the Fluent red of the close button (`#c42b1c`, a
 
 Two traps of the theming system, both verified through computed styles in both themes. They hit **every** new state variant on an existing class, not just the places where they were discovered.
 
-**1. Theme overrides beat modifier classes.** `html[data-theme=…] .panel` has specificity 0-2-1. A single-class modifier rule such as `.panel.vault-card-active` (0-2-0) loses against it regardless of declaration order.
+**1. Theme overrides beat modifier classes.** `html[data-theme=…] .panel` has specificity 0-2-1. A single-class modifier rule such as `.panel.is-active` (0-2-0) loses against it regardless of declaration order.
 
 **2. Unlayered rules come later in the output.** Tailwind 3's `@layer` is not a native CSS cascade layer: it only moves its rules to where the matching `@tailwind` directive sits, at the top of `index.css`. Every rule written outside a `@layer` block — all the `html[data-theme=…]` overrides further down — therefore comes *after* `@layer components` and wins at equal specificity. Specificity itself still decides as usual: a layered rule with a higher specificity does win (measured with `getComputedStyle` in both themes). A review finding of the form "layered loses against unlayered" has to be measured before anything is moved.
 
-Consequence: a new "active" variant on a `.panel` card needs either a selector that outranks the theme override, a rule placed after it outside any `@layer` block, or must forgo `.panel` entirely. The vault picker shows two of these:
+Consequence: a new "active" variant on a `.panel` card needs either a selector that outranks the theme override, a rule placed after it outside any `@layer` block, or must forgo `.panel` entirely. Two examples:
 
-- `.vault-card*` forgoes `.panel` and rebuilds the look; the active card's accent border (`.vault-card.vault-card-active`) deliberately sits outside any `@layer` block, with a comment in place, rather than with the other `.vault-*` classes in `@layer components`.
+- The vault picker's `.picker-tile*` forgo `.panel-interactive` and are classes of their own on its tokens, so the open vault's tint applies in both themes.
 - `.row-target` marks the row a search hit points at, or a category being dragged, using `outline` rather than `background`/`border`/`box-shadow` — all three would be overridden by `html[data-theme=…] .panel-interactive`.
 
-`.search-match` and `.row-target` carry an `rgba()` fallback with their `color-mix()` behind `@supports`, for WebKitGTK before 2.40. The other `color-mix()` sites (vault cards, `.input-field`, …) have none yet.
+`.search-match` and `.row-target` carry an `rgba()` fallback with their `color-mix()` behind `@supports`, for WebKitGTK before 2.40. The other `color-mix()` sites (vault picker rows, `.input-field`, …) have none yet.
 
 ### Overlays and Portals
 
 **Everything floating that can sit inside a sidebar or scroller hangs off `document.body` via `createPortal`** and positions itself with `position: fixed` in viewport coordinates: `Modal` (global search's `SearchModal`/`SearchResultList` render inside its body rather than portalling separately), `ContextMenu`, `EmojiPicker`, and `AltarCanvas`'s floating controls. `Dropdown` does so only with its `portal` prop, and `UndoToast`, which is global, renders in place with `position: fixed`. `MenuDropdown` is the deliberate exception: it renders in place with `absolute` + `z-[9999]`, which works because the title bar sits above both stacking contexts described below.
 
-The reason is the same for all of them: `.app-sidebar` and `.app-main` carry `position: relative; z-index: 1` in both themes and are therefore **sibling stacking contexts**. An overlay rendered inline in the sidebar loses against the later-painted main area no matter how high its `z-index`. On top of that, the nearest ancestor with `overflow` clips the popover — in the vault modal, for instance, the scrolling modal body.
+The reason is the same for all of them: `.app-sidebar` and `.app-main` carry `position: relative; z-index: 1` in both themes and are therefore **sibling stacking contexts**. An overlay rendered inline in the sidebar loses against the later-painted main area no matter how high its `z-index`. On top of that, the nearest ancestor with `overflow` clips the popover — in the vault picker, for instance, its scrolling list.
 
 The overlay layer is uniformly `z-[9999]`, one step above modals (`z-50`).
 

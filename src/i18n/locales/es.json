@@ -102,7 +102,7 @@
     "operations": "Operaciones",
     "tasks": "Tareas",
     "settings": "Ajustes",
-    "vaults": "Vaults"
+    "startPage": "Página de inicio"
   },
   "sidebar": {
     "allEmpty": "Aún no hay entradas",
@@ -441,10 +441,67 @@
       "alignCenter": "Centrar",
       "alignRight": "Alinear a la derecha",
       "horizontalRule": "Línea divisoria",
-      "insertLink": "Insertar enlace",
+      "insertLink": "Enlazar entrada",
+      "find": "Buscar y reemplazar",
       "insertImage": "Insertar imagen",
+      "insertTable": "Insertar tabla",
       "undo": "Deshacer",
       "redo": "Rehacer"
+    },
+    "menu": {
+      "textColor": "Color del texto",
+      "defaultColor": "Color predeterminado",
+      "paragraph": "Texto",
+      "webLink": "Enlazar a una dirección web",
+      "width": "Ancho {{value}} %",
+      "removeImage": "Quitar imagen"
+    },
+    "table": {
+      "addRowBefore": "Fila arriba",
+      "addRowAfter": "Fila abajo",
+      "addColumnBefore": "Columna a la izquierda",
+      "addColumnAfter": "Columna a la derecha",
+      "deleteRow": "Eliminar fila",
+      "deleteColumn": "Eliminar columna",
+      "toggleHeaderRow": "Fila de encabezado",
+      "deleteTable": "Eliminar tabla"
+    },
+    "colors": {
+      "red": "Rojo",
+      "orange": "Naranja",
+      "yellow": "Amarillo",
+      "green": "Verde",
+      "blue": "Azul",
+      "purple": "Morado"
+    },
+    "find": {
+      "placeholder": "Buscar en la entrada",
+      "replacePlaceholder": "Reemplazar por",
+      "count": "{{current}} de {{total}}",
+      "none": "Sin resultados",
+      "previous": "Resultado anterior",
+      "next": "Resultado siguiente",
+      "toggleReplace": "Mostrar reemplazo",
+      "replace": "Reemplazar este resultado",
+      "replaceShort": "Reemplazar",
+      "replaceAll": "Reemplazar todo",
+      "close": "Cerrar"
+    },
+    "count": {
+      "words_one": "{{count}} palabra",
+      "words_other": "{{count}} palabras",
+      "characters_one": "{{count}} carácter",
+      "characters_other": "{{count}} caracteres"
+    },
+    "details": {
+      "insert": "Sección plegable",
+      "summaryPlaceholder": "Título de la sección",
+      "expand": "Desplegar la sección",
+      "collapse": "Plegar la sección"
+    },
+    "fold": {
+      "expand": "Desplegar la sección",
+      "collapse": "Plegar la sección"
     },
     "unsaved": "Cambios sin guardar"
   },
@@ -531,9 +588,6 @@
   },
   "vault": {
     "title": "Vaults",
-    "hint": "Un vault es una carpeta con su propia base de datos y sus propias imágenes.",
-    "switch": "Cambiar",
-    "switching": "Cambiando…",
     "edit": "Editar",
     "save": "Guardar",
     "icon": "Elegir icono",
@@ -543,9 +597,6 @@
     "add": "Nuevo vault",
     "create": "Crear",
     "cancel": "Cancelar",
-    "deleteHint": "El vault desaparece de la lista.",
-    "deleteActiveHint": "El siguiente vault pasa a ser el activo.",
-    "deleteLastHint": "Después vuelve a empezar la configuración de vaults.",
     "switchFailed": "No se pudo cambiar de vault.",
     "saveFailed": "No se pudo guardar el cambio.",
     "open": "Abrir vault",
@@ -559,10 +610,14 @@
     "folderHasVault": "Esta carpeta ya contiene un vault.",
     "folderHasNoVault": "Esta carpeta no contiene ningún vault.",
     "alreadyOpen": "Este vault ya está en la lista.",
-    "deleteFiles": "Eliminar también los archivos:",
+    "deleteFiles": "Eliminar también los archivos",
     "deleteFilesWarning": "La base de datos y sus imágenes se eliminarán permanentemente.",
     "folderNotEmpty": "La carpeta no está vacía. Un vault nuevo necesita una carpeta vacía.",
-    "deleteFilesLeftover": "La base de datos y las imágenes se eliminaron. La carpeta contenía otros archivos y se conservó."
+    "deleteFilesLeftover": "La base de datos y las imágenes se eliminaron. La carpeta contenía otros archivos y se conservó.",
+    "backTo": "Volver a {{name}}",
+    "openFailed": "No se pudo abrir el último vault. Elígelo de nuevo u otro.",
+    "removeConfirm": "¿Quitar de la lista?",
+    "deleteConfirmFiles": "¿Eliminar el vault y sus archivos?"
   },
   "vaultKey": {
     "unlockTitle": "Desbloquear «{{name}}»",
@@ -637,14 +692,11 @@
   },
   "settings": {
     "language": "Idioma",
-    "about": "Acerca de",
     "version": "Versión",
     "pageGeneral": "General",
     "tagline": "El espacio de trabajo para tu práctica mágica.",
-    "taglineDetail": "Diario, wiki, operaciones, plantillas, altares y tareas en un solo lugar: todo local en este equipo, sin nube y sin cuenta.",
     "author": "Autor",
     "license": "Licencia",
-    "links": "Enlaces",
     "website": "Sitio web",
     "backup": "Copia de seguridad",
     "exportDb": "Exportar base de datos",
@@ -712,7 +764,6 @@
     "importErrorInvalid": "El archivo no es una copia de seguridad válida de Emerald.",
     "importErrorOutside": "Emerald solo puede abrir copias de tus propias carpetas (carpeta personal, Documentos, Escritorio, Descargas). Copia primero el archivo allí.",
     "previewContains": "Contiene:",
-    "appearance": "Apariencia",
     "uiFont": "Fuente de la interfaz",
     "editorFont": "Fuente del cuerpo del editor",
     "cleanupImages": "Imágenes sin usar",
@@ -724,32 +775,27 @@
     "cleanupDelete": "Eliminar",
     "cleanupDone": "{{size}} liberados",
     "storage": "Almacenamiento",
-    "updates": "Actualizaciones",
     "updateCheck": "Buscar actualizaciones",
     "updateChecking": "Buscando…",
     "updateNone": "Emerald está actualizado.",
     "updateFound": "La versión {{version}} está disponible.",
-    "updateNotes": "Novedades",
     "updateInstall": "Descargar e instalar",
     "updateInstalling": "Instalando…",
-    "updateRestartHint": "Emerald se reinicia tras la instalación. Tus datos no se tocan.",
     "updateError": "La búsqueda ha fallado.",
     "updateUnsupported": "Esta instalación no puede actualizarse sola. Descarga la nueva versión desde la web e instálala así.",
     "updateSource": "Fuente de actualizaciones",
-    "updateSourceDesc": "La dirección a la que Emerald pregunta por versiones nuevas. Déjala vacía para usar las fuentes integradas. Cámbiala solo si esa dirección cambia alguna vez: la clave de firma permanece fija, así que otra fuente no puede instalar nada.",
     "updateSourcePlaceholder": "https://…/latest.json",
     "updateSourceReset": "Restablecer",
     "updateSourceInvalid": "Debe ser una dirección https completa.",
     "updateSourceSaved": "Guardado.",
     "updateAutoCheck": "Buscar actualizaciones al iniciar",
-    "updateAutoCheckDesc": "Pregunta a la fuente una vez por inicio. Si encuentra algo, aparece un punto en el engranaje: nunca se abre una ventana por su cuenta.",
     "updateErrorUnreachable": "No se ha podido contactar con la fuente de actualizaciones.",
     "updateErrorTarget": "No se ofrece ninguna actualización para esta plataforma.",
     "updateErrorStale": "La actualización encontrada ya no está disponible. Vuelve a buscar.",
     "updateErrorWrite": "No se ha podido guardar el ajuste.",
     "includeSettings": "Ajustes",
     "importSettings": "Aplicar ajustes de la copia",
-    "groupAppearance": "Idioma y apariencia",
+    "groupAppearance": "Fuentes y tamaños",
     "uiScale": "Tamaño de la interfaz",
     "editorFontSize": "Tamaño del texto del editor",
     "modeReplaceSettingsWarning": "Los ajustes de este vault también se sustituyen por los de la copia.",
@@ -789,6 +835,8 @@
     "sidebarLimitHint": "Cuántas entradas muestra una lista al principio. El resto se carga debajo con «Mostrar más».",
     "emojiDefaultsHint": "Los emojis que ofrece cada selector de este vault antes de buscar. Clic para quitar, arrastrar para ordenar, buscar para añadir nuevos.",
     "imagesHint": "Se aplica a las imágenes que se insertan. Las más grandes se reducen primero y solo se rechazan si siguen siendo demasiado grandes.",
+    "imageOptimizePhotos": "Optimizar fotos",
+    "imageOptimizePhotosHint": "Una foto que llega como PNG (pegada desde el portapapeles, por ejemplo) se guarda como JPEG a tamaño completo: alrededor de una quinta parte del espacio, sin diferencia visible. Las capturas de pantalla, los gráficos y todo lo transparente siguen siendo PNG.",
     "imageMaxEdgeOption": "Las imágenes más grandes se reducen a {{value}} px en su lado más largo",
     "imageMaxEdgeOriginalHint": "Las imágenes conservan su tamaño original",
     "imageMaxSizeOption": "Se rechazan las imágenes de más de {{max}}",
@@ -809,27 +857,23 @@
     "moonPhaseShow": "Mostrar en las entradas del diario",
     "moonPhaseShowHint": "Se aplica a todas las entradas, también a las antiguas. Desactivado: sin fase lunar como icono, en la barra lateral ni en la exportación, y sin filtrar ni agrupar por ella.",
     "trashRetentionHint": "Cuánto tiempo permanece lo eliminado en la papelera. Después se borra definitivamente al abrir el vault.",
-    "languageHint": "El idioma de la interfaz en este vault.",
-    "appearanceHint": "Esquema de colores, fuentes y tamaños de este vault.",
-    "themeDarkHint": "Esquema de colores oscuro",
-    "themeLightHint": "Esquema de colores claro",
-    "customThemesHint": "Importa un archivo de tema (.json). Solo define colores; los espacios y la estructura no cambian.",
-    "customThemeImport": "Importar tema …",
+    "customThemeImport": "Importar tema…",
     "customThemeRemove": "Quitar «{{name}}»",
     "customThemeInvalid": "Este no es un archivo de tema válido.",
     "customThemeUnreadable": "El texto de este tema sería ilegible: el color text tiene muy poco contraste con sheet o panel.",
-    "customThemeTooMany": "Un vault admite como máximo {{count}} temas.",
-    "customThemeImported": "«{{name}}» importado.",
+    "customThemeTooMany": "Este dispositivo admite como máximo {{count}} temas.",
     "customThemeContrast": "Importado, pero difícil de leer: {{pairs}}.",
     "uiFontHint": "Fuente de menús, listas y rótulos.",
     "editorFontHint": "Fuente de títulos y texto en las entradas.",
     "exportDbHint": "Guarda el vault como archivo .emeralddb, con las imágenes. Las opciones de abajo deciden qué se incluye.",
-    "includeSettingsHint": "Idioma, apariencia, barra lateral, papelera, emojis, imágenes, reglas de etiquetas y copia automática de este vault",
+    "includeSettingsHint": "Fuentes y tamaños, barra lateral, papelera, emojis, imágenes, reglas de etiquetas y copia automática de este vault",
     "importDbHint": "Recupera un archivo .emeralddb — como vault nuevo, junto a las entradas existentes o reemplazándolo todo. Las opciones aparecen al elegir un archivo.",
     "storageHint": "Imágenes de la carpeta del vault que ya no usa ninguna entrada. «Buscar» muestra cuánto ocupan, «Eliminar» las borra definitivamente.",
-    "updatesDesc": "Comprueba si existe una versión más reciente de Emerald y la instala.",
     "updateErrorInstall": "La instalación ha fallado.",
-    "pageSecurity": "Seguridad"
+    "pageSecurity": "Seguridad",
+    "pageSync": "Sincronización",
+    "theme": "Tema",
+    "text": "Texto"
   },
   "contextMenu": {
     "openInNewTab": "Abrir en nueva pestaña",
@@ -891,7 +935,10 @@
     "exportAltarWebp": "WebP…",
     "importMarkdown": "Desde Markdown…",
     "importEmerald": "Desde Emerald…",
-    "quit": "Salir de Emerald App"
+    "quit": "Salir de Emerald App",
+    "switchVault": "Cambiar de vault…",
+    "about": "Acerca de Emerald App",
+    "checkUpdates": "Buscar actualizaciones…"
   },
   "titlebar": {
     "minimize": "Minimizar",
@@ -1028,17 +1075,123 @@
     "unmappedCount_other": "{{count}} sin equivalencia"
   },
   "emptyState": {
-    "journal": { "title": "Aún no hay entradas", "description": "Registra lo que vives, sueñas y obras. Las entradas nuevas reciben la fase lunar del día.", "action": "Primera entrada" },
-    "wiki": { "title": "Aún no hay artículos", "description": "Reúne saber sobre hierbas, piedras y símbolos." },
-    "tasks": { "title": "Todo hecho", "description": "No hay tareas abiertas. Las nuevas aparecerán aquí." },
-    "operations": { "title": "Aún no hay operaciones", "description": "Planifica rituales con ingredientes, desarrollo y resultado." },
-    "altar": { "title": "Aún no hay altar", "description": "Diseña un altar con un fondo y elementos." },
-    "altarLibrary": { "title": "Aún no hay elementos", "description": "Velas, cristales, símbolos: con elementos construyes tus altares." },
-    "lexicon": { "title": "Aún no hay idiomas", "description": "Crea un idioma y llénalo de palabras y caracteres." },
-    "translate": { "title": "Aún no hay nada que traducir", "description": "Crea primero un idioma; luego este campo traduce con él." },
-    "templates": { "title": "Aún no hay plantillas", "description": "Guarda procesos recurrentes como plantilla." },
-    "blocks": { "title": "Aún no hay bloques", "description": "Piezas que reutilizas en tus entradas." },
-    "tags": { "title": "Aún no hay etiquetas", "description": "Asigna etiquetas al editar una entrada o crea una aquí." },
-    "trash": { "title": "La papelera está vacía" }
+    "journal": {
+      "title": "Aún no hay entradas",
+      "description": "Registra lo que vives, sueñas y obras. Las entradas nuevas reciben la fase lunar del día.",
+      "action": "Primera entrada"
+    },
+    "wiki": {
+      "title": "Aún no hay artículos",
+      "description": "Reúne saber sobre hierbas, piedras y símbolos."
+    },
+    "tasks": {
+      "title": "Todo hecho",
+      "description": "No hay tareas abiertas. Las nuevas aparecerán aquí."
+    },
+    "operations": {
+      "title": "Aún no hay operaciones",
+      "description": "Planifica rituales con ingredientes, desarrollo y resultado."
+    },
+    "altar": {
+      "title": "Aún no hay altar",
+      "description": "Diseña un altar con un fondo y elementos."
+    },
+    "altarLibrary": {
+      "title": "Aún no hay elementos",
+      "description": "Velas, cristales, símbolos: con elementos construyes tus altares."
+    },
+    "lexicon": {
+      "title": "Aún no hay idiomas",
+      "description": "Crea un idioma y llénalo de palabras y caracteres."
+    },
+    "translate": {
+      "title": "Aún no hay nada que traducir",
+      "description": "Crea primero un idioma; luego este campo traduce con él."
+    },
+    "templates": {
+      "title": "Aún no hay plantillas",
+      "description": "Guarda procesos recurrentes como plantilla."
+    },
+    "blocks": {
+      "title": "Aún no hay bloques",
+      "description": "Piezas que reutilizas en tus entradas."
+    },
+    "tags": {
+      "title": "Aún no hay etiquetas",
+      "description": "Asigna etiquetas al editar una entrada o crea una aquí."
+    },
+    "trash": {
+      "title": "La papelera está vacía"
+    }
+  },
+  "sync": {
+    "title": "Sincronización",
+    "url": "Dirección del servidor",
+    "connect": "Conectar",
+    "login": "Volver a conectar",
+    "connecting": "Conectando…",
+    "running": "Sincronizando…",
+    "last": "Última sincronización hace {{time}}",
+    "notYet": "Aún sin sincronizar en esta sesión",
+    "now": "Sincronizar ahora",
+    "needsLogin": "Este dispositivo ya no está conectado. Introduce de nuevo la clave de sincronización.",
+    "conflicts_one": "{{count}} entrada se cambió en dos dispositivos. Se conservan ambas versiones: busca «(conflicto)» en el título.",
+    "conflicts_other": "{{count}} entradas se cambiaron en dos dispositivos. Se conservan ambas versiones: busca «(conflicto)» en el título.",
+    "conflictTitle": "{{title}} (conflicto)",
+    "fetch": "Obtener",
+    "errorUnreachable": "El servidor no responde. La sincronización continuará cuando vuelva.",
+    "errorInsecure": "Esta dirección no es segura. Usa https, o http solo en este equipo, en una red privada o en una tailnet.",
+    "errorOutdated": "El vault del servidor es de una versión más reciente de Emerald. Actualiza esta aplicación.",
+    "errorServerOutdated": "Este servidor es demasiado antiguo para esta versión de Emerald. Actualiza el servidor.",
+    "errorAppOutdated": "Este servidor necesita una versión más reciente de Emerald. Actualiza esta aplicación.",
+    "errorServerOlder": "El vault del servidor es de una versión anterior de Emerald. Actualiza primero el dispositivo que lo puso allí.",
+    "errorCannotOpen": "Lo que envió el servidor no se puede abrir con la clave de este vault.",
+    "errorFailed": "La sincronización ha fallado.",
+    "passwordChanged": "La contraseña del vault se cambió en otro dispositivo. Introduce la nueva: esta copia se volverá a obtener con ella.",
+    "newVaultPassword": "Nueva contraseña del vault",
+    "adoptPassword": "Volver a obtener con esta contraseña",
+    "key": "Clave de sincronización",
+    "devices": "Dispositivos conectados",
+    "thisDevice": "este dispositivo",
+    "unnamedDevice": "Dispositivo sin nombre",
+    "removeDevice": "Quitar",
+    "errorWrongKey": "Esta no es la clave de este servidor.",
+    "disconnectServer": "Desconectar servidor",
+    "stateLocal": "solo aquí",
+    "statePaused": "desconectado",
+    "stateSynced": "sincronizando",
+    "upload": "Subir al servidor",
+    "pause": "Desconectar",
+    "resume": "Volver a conectar",
+    "deleteFromServer": "Borrar del servidor",
+    "reallyDelete": "Borrar de verdad",
+    "unnamedVault": "Vault {{number}}",
+    "goneFromServer": "Este vault se eliminó del servidor. Sigue aquí como vault local.",
+    "replaceWarning": "Este vault se sincroniza: la copia de seguridad también lo reemplaza en tus otros dispositivos, que antes guardan su propia copia de seguridad.",
+    "keychainWarning": "Emerald guarda la conexión en el llavero del sistema. Si rechazas el acceso, solo quedará ofuscada en un archivo de este dispositivo.",
+    "keychainShort": "La conexión se guarda en el llavero del sistema.",
+    "deleteFromServerConfirm": "¿Quitar del servidor?",
+    "noServer": "No hay ningún servidor conectado.",
+    "openPicker": "Servidor y vaults…",
+    "stateRemote": "solo en el servidor",
+    "notConnected": "Sin conectar",
+    "loggedOut": "Sesión cerrada",
+    "unreachable": "No disponible",
+    "reachable": "Disponible",
+    "statLastSync": "Última sincronización",
+    "statDevices": "Dispositivos",
+    "statSpace": "Espacio usado",
+    "unencryptedShort": "No está en el llavero del sistema: en este dispositivo solo está ofuscada.",
+    "removeDeviceConfirm": "¿Quitar?",
+    "disconnectServerConfirm": "¿Desconectar?"
+  },
+  "start": {
+    "server": "Servidor",
+    "appearance": "Apariencia",
+    "links": "Enlaces",
+    "version": "Versión {{version}}",
+    "opened": "abierto",
+    "byAuthor": "por {{name}}",
+    "updateServer": "Servidor de actualizaciones"
   }
 }

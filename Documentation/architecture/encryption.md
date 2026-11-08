@@ -23,7 +23,7 @@ The vault key is not used by any cipher directly. `crypto::subkey` derives one k
 
 A key held in memory belongs to the folder it was unlocked in: `register_vaults` forgets it when its id now points at another folder or is gone, so images and drafts are never sealed under a key the new folder's `vault.key` does not know.
 
-A remembered key is checked against `check` before it is used, and a keychain that does not answer is not an error: the password dialog follows. `vault_key_status` never touches the keychain; `vault_unlock_remembered` does, once, when it matters. The `rememberKey` argument of the unlock and create commands is tri-state — `undefined` leaves the keychain alone, so a keychain that failed to answer once cannot cost a valid entry. Every command that changes a key answers whether the key is remembered afterwards, so the dialog can say when the keychain refused. Deleting a vault's files forgets its key too.
+A remembered key is checked against `check` before it is used, and a keychain that does not answer is not an error: the password dialog follows. `vault_key_status` never touches the keychain; `vault_unlock_remembered` does, once, when it matters: the frontend shares a read in progress (`vaultKeyStore.ts`), because StrictMode runs the boot effect twice and concurrent reads would add prompts on macOS, where a build an entry does not trust yet may ask for a read ([security.md](../security.md)). One read can still show two prompts there. While it is pending the loading screen's fallback timer gets a 2 minute limit. The `rememberKey` argument of the unlock and create commands is tri-state — `undefined` leaves the keychain alone, so a keychain that failed to answer once cannot cost a valid entry. Every command that changes a key answers whether the key is remembered afterwards, so the dialog can say when the keychain refused. Deleting a vault's files forgets its key too.
 
 ## Sealed files
 
@@ -62,13 +62,13 @@ It asks `vault_key_status` (`hasDatabase`, `encrypted`, `unlocked`) and then:
 - **plain, with a database** — asks for a password and encrypts the vault (`encrypt`, mandatory: a plain vault is never opened);
 - **no database** — a new vault: asks for a password and creates the key (`create`).
 
-`VaultKeyDialog` renders the question and has a fourth form, `recover` ("forgot password": recovery key plus a new password, which re-encrypts like a password change and returns a new recovery key). It sits above everything, the vault modal included, and it calls `hideSplash` on mount so the loading screen's fallback timer does not cover it. Cancelling rejects with `VAULT_KEY_CANCELLED`; `switchVault` goes back to the previous vault, and when a vault's successor cannot be unlocked the app falls back to vault setup (`closeToSetup`). The question is a promise held in module state, so the boot effect that React StrictMode starts twice waits on one dialog instead of cancelling the first.
+`VaultKeyDialog` renders the question and has a fourth form, `recover` ("forgot password": recovery key plus a new password, which re-encrypts like a password change and returns a new recovery key). It sits above everything, the vault picker included, and it calls `hideSplash` on mount so the loading screen does not cover it. Once the question is answered the loading screen returns (`resumeSplash`) until the vault has loaded; after Cancel it does not. Cancelling rejects with `VAULT_KEY_CANCELLED`; `switchVault` goes back to the previous vault, and when a vault's successor cannot be unlocked the app falls back to the vault picker (`closeToSetup`). The question is a promise held in module state, so the boot effect that React StrictMode starts twice waits on one dialog instead of cancelling the first.
 
 Every question that creates a key ends on the new **recovery key** (`RecoveryKeyBox`, shown with Copy until the user confirms it is stored), and the recovery key comes back from a command exactly when it is created — after a commit it is always returned, even if reloading fails afterwards.
 
 Leaving a vault locks it (`vault_lock`): its key does not stay in memory while another is open. `vaultStore.locked` is true while a lock-and-ask is in progress; `AppShell` then renders only the frame, so no content stands behind the password question.
 
-`Modal` keeps a stack of open modals and gives Escape to the topmost only, since the unlock dialog opens over the vault modal and one key press must not close both; a non-dismissible modal on top swallows Escape for those below.
+`Modal` keeps a stack of open modals and gives Escape to the topmost only, since the unlock dialog can open over another dialog and one key press must not close both; a non-dismissible modal on top swallows Escape for those below.
 
 ## Re-encrypting a vault
 

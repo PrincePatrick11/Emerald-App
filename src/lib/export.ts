@@ -2,6 +2,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { imageRefsInHtml, readImageAsBase64, rewriteImageRefs } from './images';
 import { save, message } from '@tauri-apps/plugin-dialog';
 import TurndownService from 'turndown';
+import { TEXT_COLORS, TEXT_COLOR_SHADES } from './textColors';
 import { format } from 'date-fns';
 import DOMPurify from 'dompurify';
 import type { ExportData } from './exportData';
@@ -275,7 +276,14 @@ const PRINT_CSS = `
   .entry-content blockquote {
     border-left: 3px solid #bbb; padding-left: 1em; color: #555; margin: 0.8em 0;
   }
-  .entry-content table { border-collapse: collapse; width: 100%; margin: 0.8em 0; }
+  /* A table whose columns were resized carries a pixel width inline; on the
+     page it is the text column, or the right columns would be cut off. */
+  .entry-content table { border-collapse: collapse; width: 100% !important; max-width: 100%; table-layout: fixed; margin: 0.8em 0; }
+  .entry-content col { width: auto !important; }
+  .entry-content details { margin: 0.6em 0; padding: 0.3em 0.6em; border: 1px solid #ddd; border-radius: 4px; }
+  .entry-content summary { font-weight: 600; list-style: none; }
+  .entry-content summary::-webkit-details-marker { display: none; }
+  ${TEXT_COLORS.map((c) => `.entry-content span[data-color="${c}"] { color: ${TEXT_COLOR_SHADES.light[c]}; }`).join('\n  ')}
   .entry-content td, .entry-content th { border: 1px solid #ccc; padding: 0.4em 0.6em; }
   .entry-content ul, .entry-content ol { padding-left: 1.6em; margin-bottom: 0.8em; }
   .entry-content li { margin-bottom: 0.2em; }
@@ -321,7 +329,8 @@ export async function exportAsPDF(data: ExportData): Promise<void> {
   const embeddedContent  = await embedImages(resolvedContent);
   // Pre-render the internal-link chips here, so the export document stays
   // script-free (see `transformInternalLinks`).
-  const transformedContent = transformInternalLinks(embeddedContent);
+  // Collapsible sections print open, or their content would be missing on paper.
+  const transformedContent = transformInternalLinks(embeddedContent).replace(/<details(?![^>]*\sopen)/g, '<details open');
 
   const topBarHtml = buildTopBar(data);
   const metaHtml   = buildMetaHtml(data);
@@ -341,7 +350,7 @@ export async function exportAsPDF(data: ExportData): Promise<void> {
     <h1 class="entry-title">${escapedTitle}${numStr}</h1>
     ${metaHtml}
     <div class="entry-content">${DOMPurify.sanitize(transformedContent, {
-      ADD_ATTR: ['data-type', 'data-id', 'data-entry-type', 'data-label', 'data-icon', 'data-entry-number', 'data-href'],
+      ADD_ATTR: ['data-type', 'data-id', 'data-entry-type', 'data-label', 'data-icon', 'data-entry-number', 'data-href', 'colwidth', 'data-color'],
     })}</div>
   </div>
 </body>
@@ -372,9 +381,8 @@ function mdIcon(icon?: string | null, fallbackIcon?: string | null): string {
   return icon + ' ';
 }
 
-export async function exportAsMarkdown(data: ExportData): Promise<void> {
-  const stripped = stripImages(data.content);
-
+/** HTML of the content to Markdown, with the rules for what the app's content holds beyond plain HTML. */
+export function createMarkdownConverter(): TurndownService {
   const td = new TurndownService({ headingStyle: 'atx', codeBlockStyle: 'fenced' });
 
   td.addRule('internalLink', {
@@ -404,11 +412,37 @@ export async function exportAsMarkdown(data: ExportData): Promise<void> {
       return value.includes('\n') ? `\n\n${value}\n\n` : `${value}\n\n`;
     },
   });
+  // Tables as GFM pipe tables; the first row is the header, as GFM requires
+  // one. A cell's paragraphs are joined by `<br>`, pipes escaped.
+  td.addRule('table', {
+    filter: 'table',
+    replacement: (_content, node) => {
+      const rows = Array.from((node as HTMLTableElement).rows).map((row) =>
+        Array.from(row.cells).map((cell) =>
+          td.turndown(cell.innerHTML).trim().replace(/\n+/g, '<br>').replace(/\|/g, '\\|')));
+      if (rows.length === 0) return '';
+      const width = Math.max(...rows.map((r) => r.length));
+      const line = (cells: string[]) =>
+        `| ${Array.from({ length: width }, (_, i) => cells[i] ?? '').join(' | ')} |`;
+      return `\n\n${[line(rows[0]), line(Array(width).fill('---')), ...rows.slice(1).map(line)].join('\n')}\n\n`;
+    },
+  });
+  // A collapsible section's heading line in bold; its content follows as usual.
+  td.addRule('detailsSummary', {
+    filter: 'summary',
+    replacement: (content) => `\n\n**${content.trim()}**\n\n`,
+  });
   // Struck-through letters of the sigil calculator.
   td.addRule('strikethrough', {
     filter: ['s', 'del'],
     replacement: (content) => `~~${content}~~`,
   });
+  return td;
+}
+
+export async function exportAsMarkdown(data: ExportData): Promise<void> {
+  const stripped = stripImages(data.content);
+  const td = createMarkdownConverter();
 
   // Build frontmatter / header block
   const lines: string[] = [`# ${data.title}`, ''];

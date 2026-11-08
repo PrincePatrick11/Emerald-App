@@ -26,6 +26,7 @@ import { migrateRoutinesToTemplates } from './migrateRoutinesToTemplates';
 import i18n from '../i18n';
 import { LEGACY_UNTITLED_TITLES } from './entryTitle';
 import { useSettingsStore } from '../store/settingsStore';
+import { dropTriggers, installTriggers, isTracked, markMigrated } from './sync/tracking';
 
 // Per-vault DB cache: vault id → Database instance
 const _dbCache = new Map<string, Database>();
@@ -56,7 +57,7 @@ export function markDbReplaced(): void {
  * Dropping the JavaScript reference is not enough: the connection pool lives in
  * Rust (`db.rs`), and an open pool keeps the file locked. On Windows that
  * means the vault's folder cannot be moved, relocated, or deleted for the rest
- * of the session — which is exactly what the vault modal's "delete files"
+ * of the session — which is exactly what the vault picker's "delete files"
  * checkbox tries to do.
  */
 export async function resetDbCache(): Promise<void> {
@@ -243,6 +244,14 @@ export async function runMigrations(db: Database): Promise<void> {
   );
   const currentVersion = versionRows[0]?.version ?? 0;
 
+  // A migration changes rows on every device on its own, so sync starts over
+  // from a snapshot. Noted first: a crash in the chain must not lose that.
+  const tracked = await isTracked(db);
+  if (tracked && latest > currentVersion) {
+    await markMigrated(db);
+    await dropTriggers(db);
+  }
+
   for (const migration of MIGRATIONS) {
     if (migration.version <= currentVersion) continue;
     try {
@@ -258,6 +267,8 @@ export async function runMigrations(db: Database): Promise<void> {
       [migration.version, migration.name, new Date().toISOString()]
     );
   }
+
+  if (tracked) await installTriggers(db);
 }
 
 /**

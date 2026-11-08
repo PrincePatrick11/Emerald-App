@@ -26,6 +26,8 @@ import { captureLegacySettings } from '../lib/vaultSettings';
 import { resolveOpenEdits } from '../lib/openEdits';
 import { changeVaultPassword, keyErrorOf, lockVault, type CreatedKey } from '../lib/vaultKeys';
 import { ensureVaultReady, VAULT_KEY_CANCELLED } from './vaultKeyStore';
+import { backupBeforeReplacing, keepPendingForNewPassword, prepareOpenedVault, syncNow } from '../lib/sync/engine';
+import { hideSplash } from '../lib/splash';
 
 interface VaultStore {
   vaults: Vault[];
@@ -51,10 +53,20 @@ interface VaultStore {
    */
   locked: boolean;
   /**
+   * The active vault did not open: a successor after the open one was removed.
+   * It stays active, so the picker can relocate or retry it, but there is no
+   * way back to it until it opens (`retryOpen`).
+   */
+  openFailed: boolean;
+  /** Opens the active vault again, after `openFailed`. */
+  retryOpen: () => Promise<void>;
+  /**
    * New password, new vault key (`reencrypt.rs`). Afterwards everything is
    * reloaded — the images are named differently. `null` if a running
    * edit should continue.
    */
+  /** The password changed on another device: this copy starts over under it. */
+  adoptServerPassword: (password: string) => Promise<void>;
   changePassword: (currentPassword: string, newPassword: string) => Promise<(CreatedKey & { reopenFailed?: true }) | null>;
   /** Locks the open vault and asks for the password right away — even if it is remembered. */
   lockActive: () => Promise<void>;
@@ -65,7 +77,7 @@ interface VaultStore {
  *
  * Membership, not list length: `switchVault` rolls `activeVaultId` back to `''`
  * when a vault cannot be opened, and then the list is not empty but nothing is
- * active either. Both mean "no database" and both belong in vault setup.
+ * active either. Both mean "no database" and both belong in the vault picker.
  */
 export function hasActiveVault(state: Pick<VaultStore, 'vaults' | 'activeVaultId'>): boolean {
   return state.vaults.some((v) => v.id === state.activeVaultId);
@@ -92,6 +104,11 @@ async function openActiveVault({ askPassword = false }: { askPassword?: boolean 
   // cancels here ends up in the caller's error branch.
   const active = activeVault(useVaultStore.getState());
   if (active) await ensureVaultReady(active, { askPassword });
+  await loadActiveVault().finally(hideSplash);
+}
+
+/** What `openActiveVault` does past the password: the loading screen covers this part. */
+async function loadActiveVault(): Promise<void> {
   // Before getDb(): the migrations on opening already need the new vault's
   // language (see `loadForVault`). A missing vault folder already fails
   // here.
@@ -112,15 +129,16 @@ async function openActiveVault({ askPassword = false }: { askPassword?: boolean 
   // their text would be a leak that grows with every switch.
   clearSearchTextCache();
   clearEntrySummaryCache();
+  await prepareOpenedVault(useVaultStore.getState().activeVaultId);
   await reloadAllStores();
 }
 
 /**
- * No vault is open: the vault window takes over, settings and
+ * No vault is open: the vault picker takes over, settings and
  * lists revert to the defaults. `vaults.json` keeps the active vault —
  * the next start asks for it again.
  */
-async function closeToSetup(): Promise<void> {
+export async function closeToSetup(): Promise<void> {
   useVaultStore.setState({ activeVaultId: '' });
   await useSettingsStore.getState().clear();
   detachVaultPrefs();
@@ -134,6 +152,12 @@ export const useVaultStore = create<VaultStore>((set, get) => ({
   activeVaultId: '',
   loaded: false,
   locked: false,
+  openFailed: false,
+
+  retryOpen: async () => {
+    await openActiveVault();
+    set({ openFailed: false });
+  },
 
   loadVaults: async () => {
     const data = await loadVaultsFile();
@@ -180,6 +204,7 @@ export const useVaultStore = create<VaultStore>((set, get) => ({
       void lockVault(id).catch((e) => console.warn('[vault] lock failed', e));
       throw err;
     }
+    set({ openFailed: false });
     // The vault being left is locked: its key does not stay in
     // memory while another one is open.
     if (previous) void lockVault(previous).catch((e) => console.warn('[vault] lock failed', e));
@@ -251,7 +276,7 @@ export const useVaultStore = create<VaultStore>((set, get) => ({
     }
 
     // The neighbour moves up — the same expectation as when closing a
-    // tab. Without a neighbour the app falls into the vault setup.
+    // tab. Without a neighbour the app falls into the vault picker.
     const successor = remaining[Math.min(Math.max(index, 0), remaining.length - 1)];
     if (!successor) {
       set({ vaults: remaining, activeVaultId: '' });
@@ -266,7 +291,7 @@ export const useVaultStore = create<VaultStore>((set, get) => ({
     // including the modal in which the deletion is currently happening.
     set({ vaults: remaining, activeVaultId: successor.id });
     // If opening fails, the successor still remains the active one: it is in
-    // the list, the vault modal stays up and shows the error, and from
+    // the list, the vault picker stays up and shows the error, and from
     // there it can be relocated or another chosen. Falling back to ''
     // would mean throwing the user into the setup without a word.
     // Different if the user themself cancels unlocking the successor:
@@ -274,10 +299,30 @@ export const useVaultStore = create<VaultStore>((set, get) => ({
     try {
       await openActiveVault();
     } catch (err) {
-      if (keyErrorOf(err) !== VAULT_KEY_CANCELLED) throw err;
+      if (keyErrorOf(err) !== VAULT_KEY_CANCELLED) {
+        set({ openFailed: true });
+        throw err;
+      }
       await closeToSetup();
     }
     return dirRemoved;
+  },
+
+  adoptServerPassword: async (password) => {
+    const id = get().activeVaultId;
+    if (!(await resolveOpenEdits())) return;
+    await drainSerialized();
+    await keepPendingForNewPassword();
+    await backupBeforeReplacing(id);
+    await detachDrafts();
+    try {
+      await withDbClosed(() => invoke('sync_adopt_new_password', { vaultId: id, password }));
+    } catch (err) {
+      // A wrong password changed nothing: the vault opens with its old key.
+      await restoreDrafts(id);
+      throw err;
+    }
+    await openActiveVault();
   },
 
   changePassword: async (currentPassword, newPassword) => {
@@ -285,6 +330,9 @@ export const useVaultStore = create<VaultStore>((set, get) => ({
     // Like a switch: settle open edits, write drafts out —
     // the re-encryption rewrites them under the new key.
     if (!(await resolveOpenEdits())) return null;
+    // What other devices did since the last round would be lost in the snapshot
+    // that follows. Offline it stays a risk, not a reason to refuse.
+    await syncNow();
     await drainSerialized();
     await detachDrafts();
     let result: CreatedKey;
@@ -320,7 +368,7 @@ export const useVaultStore = create<VaultStore>((set, get) => ({
       await openActiveVault({ askPassword: true });
     } catch (err) {
       // Not unlocked — cancelled or failed: no vault is open,
-      // the vault window takes over. Never back to the old content without a database.
+      // the vault picker takes over. Never back to the old content without a database.
       if (keyErrorOf(err) !== VAULT_KEY_CANCELLED) console.error('[vault] lock failed', err);
       await closeToSetup();
     } finally {

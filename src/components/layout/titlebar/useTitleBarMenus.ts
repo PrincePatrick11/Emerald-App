@@ -78,8 +78,15 @@ export function useTitleBarMenus() {
     ],
   };
 
-  // Edit and View as submenus of the three-line button.
-  const appMenu: MenuNode[] = [edit, view].map((menu) => ({ kind: 'submenu', label: menu.label, children: menu.nodes }));
+  // The three-line button is the Emerald menu, as on macOS: Switch Vault…,
+  // Check for Updates…, About Emerald App, then Edit and View as submenus.
+  const appMenu: MenuNode[] = [
+    { kind: 'item', label: t('menu.switchVault'), onSelect: () => dispatchMenuAction('switch-vault') },
+    { kind: 'item', label: t('menu.checkUpdates'), onSelect: () => dispatchMenuAction('check-updates') },
+    { kind: 'item', label: t('menu.about'), onSelect: () => dispatchMenuAction('show-about') },
+    { kind: 'separator' },
+    ...[edit, view].map((menu): MenuNode => ({ kind: 'submenu', label: menu.label, children: menu.nodes })),
+  ];
 
   return { appMenu, exportMenu, importMenu };
 }

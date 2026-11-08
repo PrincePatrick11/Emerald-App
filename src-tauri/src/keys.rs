@@ -40,7 +40,7 @@ pub fn init_keychain(identifier: &str) {
     KEYRING_SERVICE.get_or_init(|| format!("Emerald ({identifier})"));
 }
 
-fn keyring_service() -> &'static str {
+pub(crate) fn keyring_service() -> &'static str {
     KEYRING_SERVICE.get().map(String::as_str).unwrap_or("Emerald")
 }
 
@@ -279,6 +279,11 @@ pub(crate) fn read_key_file_named(dir: &Path, name: &str) -> Result<Option<KeyFi
             KeyFile::from_json(&text).map(Some)
         }
     }
+}
+
+/// A `vault.key` fetched from a sync server, for a vault that has none yet.
+pub(crate) fn store_key_file(dir: &Path, file: &KeyFile) -> Result<(), String> {
+    write_key_file(dir, file)
 }
 
 fn write_key_file(dir: &Path, file: &KeyFile) -> Result<(), String> {

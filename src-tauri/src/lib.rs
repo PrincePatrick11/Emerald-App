@@ -39,6 +39,8 @@ mod backup;
 mod auto_backup;
 /// The in-app updater: variable source, check, installation.
 mod updates;
+/// The way to a sync server.
+mod sync;
 /// Lets the MCP server in `tools/mcp` drive the app where the webview has no
 /// debug port. Dev builds only, and only when asked for.
 #[cfg(feature = "devbridge")]
@@ -262,7 +264,26 @@ pub(crate) fn guarded_read_path(app: &tauri::AppHandle, path: &str) -> Result<Pa
     if !is_within_allowed_roots(&canonical, &allowed_roots) {
         return Err("access denied: path outside allowed directories".to_string());
     }
+    let app_data_dir = app.path().app_data_dir().ok().and_then(|dir| std::fs::canonicalize(dir).ok());
+    if app_data_dir.is_some_and(|dir| !app_data_read_allowed(&canonical, &dir)) {
+        return Err("access denied: this file is not for reading".to_string());
+    }
     Ok(canonical)
+}
+
+/// `sync.json` may hold the sync token, which the webview must never see — and
+/// so may its temp file and a copy set aside as unreadable. In any case: a file
+/// system that folds case would answer to another spelling.
+fn app_data_read_allowed(target: &Path, app_data_dir: &Path) -> bool {
+    target
+        .strip_prefix(app_data_dir)
+        .ok()
+        .and_then(|below| below.to_str())
+        .is_none_or(|below| {
+            ![sync::SETTINGS_FILE, sync::SETTINGS_TEMP_FILE, sync::BAD_FILE]
+                .iter()
+                .any(|name| below.eq_ignore_ascii_case(name))
+        })
 }
 
 // ── commands ──────────────────────────────────────────────────────────────────
@@ -378,11 +399,12 @@ async fn export_pdf(app: tauri::AppHandle, html: String, path: String, page_size
 /// Builds and installs the native application menu.
 ///
 /// macOS only: there the menu lives in the system menu bar at the top of the
-/// screen, where it belongs. On Windows and Linux `set_menu` would attach an
-/// in-window menu bar (HMENU / GTK menubar) that would collide with the
-/// app's own menu bar in `TitleBar` — those platforms render the same items
-/// in HTML instead (`src/components/layout/titlebar/useTitleBarMenus.ts`),
-/// running the same actions.
+/// screen, where it belongs — the app menu (About, Check for Updates, Switch
+/// Vault, Hide, Quit), Edit and View. On Windows and Linux `set_menu` would
+/// attach an in-window menu bar (HMENU / GTK menubar) that would collide with
+/// the title bar's own menu, which holds the same items in HTML
+/// (`src/components/layout/titlebar/useTitleBarMenus.ts`) and runs the same
+/// actions. Export and Import are title-bar buttons on every platform.
 ///
 /// `update_menu_labels` bails out on `app.menu()` returning `None`, so
 /// it becomes a no-op on the platforms that never get here.
@@ -393,7 +415,13 @@ fn install_native_menu(app: &tauri::App) -> tauri::Result<()> {
     // the suffix from `tauri.dev.conf.json`: in the dev build the app is called
     // "Emerald App Dev", but the menu here is still just "Emerald App".
     let app_submenu = Submenu::with_items(app, "Emerald App", true, &[
-        &PredefinedMenuItem::about(app, None, None)?,
+        // Not `PredefinedMenuItem::about`: About, like the updates, is a
+        // section of the start page (`openVaultPicker` in the frontend).
+        &MenuItem::with_id(app, "show-about", "About Emerald App", true, None::<&str>)?,
+        &MenuItem::with_id(app, "check-updates", "Check for Updates…", true, None::<&str>)?,
+        &PredefinedMenuItem::separator(app)?,
+        // Opens the start page in this same window (`openVaultPicker`).
+        &MenuItem::with_id(app, "switch-vault", "Switch Vault…", true, None::<&str>)?,
         &PredefinedMenuItem::separator(app)?,
         &PredefinedMenuItem::hide(app, None)?,
         &PredefinedMenuItem::hide_others(app, None)?,
@@ -488,6 +516,9 @@ fn install_native_menu(app: &tauri::App) -> tauri::Result<()> {
         match event.id().as_ref() {
             "reset-sidebar-widths" => { app.emit("reset-sidebar-widths", ()).ok(); }
             "show-splash"          => { app.emit("show-splash", ()).ok(); }
+            "switch-vault"         => { app.emit("switch-vault", ()).ok(); }
+            "show-about"           => { app.emit("show-about", ()).ok(); }
+            "check-updates"        => { app.emit("check-updates", ()).ok(); }
             "toggle-rail"          => { app.emit("toggle-rail", ()).ok(); }
             "toggle-left-list"     => { app.emit("toggle-left-list", ()).ok(); }
             "toggle-right-sidebar" => { app.emit("toggle-right-sidebar", ()).ok(); }
@@ -650,6 +681,9 @@ fn update_menu_labels(
     rail: String,
     entry_list: String,
     properties: String,
+    switch_vault: String,
+    about: String,
+    check_updates: String,
     quit: String,
 ) {
     use tauri::menu::MenuItemKind;
@@ -688,6 +722,9 @@ fn update_menu_labels(
                     let new_child_text = match child_id.as_str() {
                         "reset-sidebar-widths" => Some(reset_view.as_str()),
                         "show-splash"          => Some(show_splash.as_str()),
+                        "switch-vault"         => Some(switch_vault.as_str()),
+                        "show-about"           => Some(about.as_str()),
+                        "check-updates"        => Some(check_updates.as_str()),
                         "quit"                 => Some(quit.as_str()),
                         _ => None,
                     };
@@ -775,6 +812,7 @@ pub fn run() {
         .manage(db::Databases::default())
         .manage(keys::VaultKeys::default())
         .manage(updates::PendingUpdate::default())
+        .manage(sync::SyncState::default())
         .manage(CloseWatch::default())
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::CloseRequested { .. } = event {
@@ -824,6 +862,34 @@ pub fn run() {
             images::delete_image_files,
             vault::register_vaults,
             vault::ensure_vault_dirs,
+            sync::sync_status,
+            sync::sync_pair,
+            sync::sync_server_status,
+            sync::sync_unpair,
+            sync::sync_devices,
+            sync::sync_set_paused,
+            sync::sync_forget_link,
+            sync::sync_delete_remote,
+            sync::sync_rename,
+            sync::sync_remove_device,
+            sync::sync_remote_vaults,
+            sync::sync_create_remote,
+            sync::sync_adopt_remote,
+            sync::sync_push,
+            sync::sync_pull,
+            sync::sync_remote_state,
+            sync::sync_snapshot_begin,
+            sync::sync_snapshot_add,
+            sync::sync_snapshot_put,
+            sync::sync_snapshot_fetch,
+            sync::sync_snapshot_frame,
+            sync::sync_snapshot_done,
+            sync::sync_images,
+            sync::sync_images_delete,
+            sync::sync_adopt_new_password,
+            sync::sync_rekey_done,
+            sync::sync_watch,
+            sync::sync_unwatch,
             vault::create_vault_dirs,
             vault::default_vault_dir,
             vault::new_vault_base_dir,
@@ -836,6 +902,8 @@ pub fn run() {
             vault::prune_migration_backups,
             vault::read_vault_settings,
             vault::write_vault_settings,
+            vault::read_device_settings,
+            vault::write_device_settings,
             vault::read_vault_drafts,
             vault::write_vault_drafts,
             export_image,
@@ -883,6 +951,18 @@ pub fn run() {
 #[cfg(test)]
 mod app_data_write_tests {
     use super::*;
+
+    #[test]
+    fn the_sync_settings_cannot_be_read_by_path() {
+        let data = Path::new("/home/u/.local/share/emerald");
+        for refused in ["sync.json", "SYNC.JSON", "Sync.Json", "sync.json.bad", "sync.json.tmp"] {
+            assert!(!app_data_read_allowed(&data.join(refused), data), "{refused}");
+        }
+        for allowed in ["vaults.json", "vaults/sync.json"] {
+            assert!(app_data_read_allowed(&data.join(allowed), data), "{allowed}");
+        }
+        assert!(app_data_read_allowed(Path::new("/home/u/Documents/sync.json"), data));
+    }
 
     #[test]
     fn only_the_registry_and_the_vaults_folder_are_writable_in_the_app_data_dir() {

@@ -36,7 +36,7 @@ import {
 import {
   LEGACY_JOURNAL_FIELDS, type LegacyJournalField,
 } from './migrateJournalFieldsToContent';
-import type { SuggestionItem } from '../components/editor/SuggestionList';
+import type { SuggestionItem } from '../components/editors/text/SuggestionList';
 import type { Category } from '../types';
 import type { WriteOptions } from './stamp';
 import { displayTitle, hasOwnTitle, isLegacyUntitled } from './entryTitle';
@@ -748,13 +748,13 @@ async function importedContent(
 /**
  * The last step of every import that writes HTML into the database:
  * scripts and event handlers out; TipTap's own data attributes
- * (link chips, image alignment) and inline styles stay.
+ * (link chips, image alignment, table column widths, text colours) and inline styles stay.
  */
 function sanitizeImportedHtml(html: string): string {
   return DOMPurify.sanitize(html, {
     ADD_ATTR: [
       'data-type', 'data-id', 'data-entry-type', 'data-label', 'data-icon',
-      'data-entry-number', 'data-align',
+      'data-entry-number', 'data-align', 'colwidth', 'data-color',
     ],
   });
 }

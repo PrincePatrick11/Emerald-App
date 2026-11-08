@@ -79,7 +79,7 @@ export function requestEntryLinkRemove(
  * Returns the unsubscribe function.
  *
  * Together with the request functions, the whole protocol lives here —
- * before, the receiver side stood in the RichEditor three times, almost identical.
+ * before, the receiver side stood in the text editor three times, almost identical.
  */
 export function subscribeEntryLinkRequest(
   eventName: string,
