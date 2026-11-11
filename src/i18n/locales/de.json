@@ -219,12 +219,6 @@
         "description": "Zieldatum, Ladetechnik und das Laden der Sigille. Geladen verbirgt sie die gewählten Rechner und Zeichnungen und sperrt den Eintrag oder nur diese Blöcke."
       },
       "canvas": {
-    "keyNames": {
-      "shift": "Umschalt",
-      "ctrl": "Strg",
-      "alt": "Alt",
-      "delete": "Entf"
-    },
         "label": "Leinwand",
         "description": "Bilder aus „Bilder“, Formen, Text, Symbole und Zeichnungen, frei angeordnet."
       },
@@ -646,6 +640,12 @@
     }
   },
   "canvas": {
+    "keyNames": {
+      "shift": "Umschalt",
+      "ctrl": "Strg",
+      "alt": "Alt",
+      "delete": "Entf"
+    },
     "background": {
       "title": "Hintergrund",
       "fill": "Füllung",

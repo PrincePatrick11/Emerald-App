@@ -219,12 +219,6 @@
         "description": "Fecha objetivo, técnica de carga y la carga del sigilo. Cargado oculta las calculadoras y dibujos elegidos y bloquea la entrada o solo esos bloques."
       },
       "canvas": {
-    "keyNames": {
-      "shift": "Mayús",
-      "ctrl": "Ctrl",
-      "alt": "Alt",
-      "delete": "Supr"
-    },
         "label": "Lienzo",
         "description": "Imágenes de «Imágenes», formas, texto, símbolos y dibujos, colocados libremente."
       },
@@ -646,6 +640,12 @@
     }
   },
   "canvas": {
+    "keyNames": {
+      "shift": "Mayús",
+      "ctrl": "Ctrl",
+      "alt": "Alt",
+      "delete": "Supr"
+    },
     "background": {
       "title": "Fondo",
       "fill": "Relleno",

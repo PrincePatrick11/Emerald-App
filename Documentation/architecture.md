@@ -59,7 +59,8 @@ src/
 │   │   └── titlebar/                           custom title bar, menus, SearchModal
 │   ├── editors/
 │   │   └── text/     TextEditor, its host (toolbar, link picker, drops), TipTap extensions
-│   ├── blocks/       BlockStack, block views, fields/sigil blocks, block editor
+│   ├── blocks/       BlockStack, block views, fields/sigil/canvas/painting blocks, block editor
+│   ├── images/       picture tile, picker, add and edit dialogs, the strip below a canvas
 │   ├── views/        one view per module and aux view (Home … Trash)
 │   ├── sidebar/
 │   │   ├── panels/   Journal/Wiki/Operation properties panels
@@ -85,6 +86,8 @@ src/
 │   ├── vaultStore.ts, trashStore.ts, undoStore.ts, importStore.ts
 │   ├── vaultKeyStore.ts         the unlock gate (`ensureVaultReady`)
 │   ├── backupSecretStore.ts     asks for an encrypted backup's password
+│   ├── imageStore.ts            "Images": rows, files, places of use; `takeIn`, `discardRenders`
+│   ├── imagePickerStore.ts      `pickPictures`, the picture picker's open request
 │   ├── imageNoticeStore.ts      "image not inserted" notice
 │   └── moduleWiring.ts          per-module reload, trash wiring, startup reload
 ├── hooks/
@@ -96,6 +99,7 @@ src/
 │   ├── useMouseNavigation.ts    mouse back/forward buttons, browser keys
 │   ├── useCollapsedSet.ts, usePersistedFlag.ts, usePointerReorder.ts
 │   ├── useOpenInNewTabAction.tsx, useSaveAsTemplateAction.tsx
+│   ├── useVaultPictures.ts, useFileDrop.ts   the pictures of "Images"; files dropped from the disk
 │   └── useShrunkIcon.ts, useEmojiSearchData.ts
 ├── lib/
 │   ├── sqlite.ts                the SQL interface over the `db_*` commands
@@ -108,7 +112,7 @@ src/
 │   ├── unifyEntries.ts, tagsById.ts, nullableCategory.ts, mergeCategoryTables.ts,
 │   │   migrate*.ts               individual migrations, shared with importers
 │   ├── modules.ts               module registry
-│   ├── blocks/                  block format, types, fields, sigils, definitions, templates
+│   ├── blocks/                  block format, types, fields, sigils, canvas, painting, definitions, templates
 │   ├── entryTitle.ts, entryTypeChange.ts, moonPhase.ts
 │   ├── categories.ts, categoryMerge.ts
 │   ├── tagRefs.ts, templateTags.ts, templateRows.ts, blockDefinitionRows.ts
@@ -120,6 +124,9 @@ src/
 │   ├── globalSearch.ts, searchText.ts
 │   ├── dragChannel.ts, dragState.ts, imageDragState.ts
 │   ├── images.ts, imageLimits.ts, shrinkImage.ts
+│   ├── storeImage.ts            a file from the disk or a Blob into `images/`
+│   ├── imageUsage.ts            where each picture is used, and in which role
+│   ├── pictureExport.ts         a rendered picture saved where the user chooses
 │   ├── export.ts, exportData.ts, emeraldFormat.ts
 │   ├── dbBackup.ts, importStaging.ts   .emeralddb backup and restore
 │   ├── sync/                    sync with a server: `tracking.ts` (capture), `apply.ts` (merge), `engine.ts` (when)

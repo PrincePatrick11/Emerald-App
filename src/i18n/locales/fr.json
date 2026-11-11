@@ -219,12 +219,6 @@
         "description": "Date cible, technique de charge et chargement du sigil. Chargé, il masque les calculateurs et dessins choisis et verrouille l'entrée ou seulement ces blocs."
       },
       "canvas": {
-    "keyNames": {
-      "shift": "Maj",
-      "ctrl": "Ctrl",
-      "alt": "Alt",
-      "delete": "Suppr"
-    },
         "label": "Toile",
         "description": "Des images de « Images », des formes, du texte, des symboles et des dessins, disposés librement."
       },
@@ -646,6 +640,12 @@
     }
   },
   "canvas": {
+    "keyNames": {
+      "shift": "Maj",
+      "ctrl": "Ctrl",
+      "alt": "Alt",
+      "delete": "Suppr"
+    },
     "background": {
       "title": "Arrière-plan",
       "fill": "Remplissage",

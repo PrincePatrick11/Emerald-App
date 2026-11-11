@@ -116,7 +116,7 @@ The actions:
 
 - **`updateTag`** — a rename touches only the `tags` row. A name another live tag has throws `TAG_NAME_TAKEN`, checked before the `serialized` chain so the expected rejection isn't logged as an error.
 - **`deleteTag(id)`** (soft) only stamps `deleted_at`: every entry keeps the id, and the tag is invisible until **`restoreTag`** brings it back. If a live tag of the same name appeared meanwhile, `restoreTag` merges into it (`replaceTagId`, then the trashed row is dropped). **`permanentlyDeleteTag`** and **`purgeTrashedTags`** (used by `emptyTrash`) strip the ids from every list before deleting the rows; the retention purge in `runPeriodicCleanup` does the same.
-- **`createTag`** is `ensureTag` for the Tags view: it throws `TAG_NAME_TAKEN` instead of returning the existing tag. Both run through one `serialized` key, so a double-fired create of the same name finds the first one's tag instead of failing on `UNIQUE`.
+- **`createTag`** is `ensureTag` for the Tags view: it throws `TAG_NAME_TAKEN` instead of returning the existing tag. Both run through one `serialized` key, so a double-fired create of the same name finds the first one's tag instead of failing on `UNIQUE`. `ensureTag(name, id)` takes a fixed id for a tag that must be the same on every device ("Altar Library", `ALTAR_LIBRARY_TAG_ID`, which migration v62 gives the old library's pictures); it is used only for a new name and only while no row holds that id (renamed, or in the trash), else the tag gets a new id.
 
 Names are compared case-insensitively everywhere (`tagNameKey`, trim + lowercase); `TagInput` and the `.emerald`/Markdown import (`ensureTagIds`) store the id `ensureTag` returns. `tags.name` is `UNIQUE` across trashed rows as well, and **a name belongs to one tag**:
 
@@ -128,7 +128,7 @@ Names are compared case-insensitively everywhere (`tagNameKey`, trim + lowercase
 
 **`TagsView`** is a `Dashboard` in `category` mode with one group per tag. Its header (title, "New tag", search, sort A→Z/Z→A/most used, a module filter) portals into the right sidebar like every module's.
 
-- Groups start **collapsed**: the headers — colour dot, name, `ModuleCounts`, or "unused" ("only in templates") — are the overview. Expanding one lists its entries from Journal, Operations and Wiki (`TAG_MODULE_IDS`); templates are counted but not listed.
+- Groups start **collapsed**: the headers — colour dot, name, `ModuleCounts`, or "unused" ("only in templates", "only in Images" for a tag only pictures of "Images" carry) — are the overview. Expanding one lists its entries from Journal, Operations and Wiki (`TAG_MODULE_IDS`); templates are counted but not listed.
 - Tags are managed in their header, like categories in `CategoriesView`: the dot opens the palette; pencil/trash buttons and the context menu rename (inline `TagEditRow`, also used for creating) and delete (no question, then undo).
 - Unused tags stay visible via `keepEmptyGroups`, except while a search or module filter narrows the list. A search matching only entry titles shows the tag with just those entries and forces it open. Collapse keys are tag ids, so a renamed tag stays open.
 

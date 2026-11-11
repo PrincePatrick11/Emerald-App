@@ -84,14 +84,14 @@ Top-level keys of `en.json`, with the conventions worth knowing:
 | `sidebar` | Left sidebar strings (`allEmpty`) |
 | `journal`, `wiki`, `operations`, `tasks` | Module UI strings. Each module's `untitled` key is what `displayTitle` (`src/lib/entryTitle.ts`) shows for an empty title — display text only, never stored. `*.categories.*` is legacy-only (see above) |
 | `creation` | The sigil creation tools (intention, letters, canvas, charge) |
-| `blocks` | Content-block UI and the Blocks view: `types.*` (block types), `kinds.*` (one per `ElementKind`, shared by the "Add block" menu and the builder's element picker), `fields.*` (field block), `sigil.*` (standalone sigil blocks and their in-block parts), `canvas.*` (the Canvas and Altar blocks), `library.*` (the Blocks builder and its update/remove-copies notices) |
+| `blocks` | Content-block UI and the Blocks view: `types.*` (block types), `kinds.*` (one per `ElementKind`, shared by the "Add block" menu and the builder's element picker), `fields.*` (field block), `sigil.*` (standalone sigil blocks and their in-block parts), `canvas.*` (the Canvas and Altar blocks), `paint.*` (the Painting block), `library.*` (the Blocks builder and its update/remove-copies notices) |
 | `editor` | Shared editor buttons, link-popup actions, `lockedBySigil`, and `toolbar.*` (every formatting-toolbar tooltip) |
 | `symbols` | The canvas editor's symbol library: its own labels, `packs.*` the pack names, and `<pack>.<name>` every symbol's name, which the library's search looks in |
 | `moonPhase` | Display names of the eight moon phases |
 | `search` | Dashboard search placeholders (`placeholder`, `placeholderIn` with `{{title}}`) and the title bar's global search (`globalPlaceholder`, `hint`, `clear`, `showMore`). Result module labels reuse `nav.*`; only `categories` has its own |
 | `templates` | Templates dashboard and page; `builtin.sigil` and `builtin.altar` name the built-in `core-sigil` and `core-altar` templates the way `categories.builtin.*` names a category; `insert.*` is the editor's picker and apply flow |
 | `lexicon` | Lexicon dashboard, language page and translate field. `wordCount` counts vocabulary rows; the translated text's own count is `textWordCount` |
-| `tags` | Tags view (`new`, `name`, `nameTaken`, `color`, `unused`, `onlyInTemplates`) |
+| `tags` | Tags view (`new`, `name`, `nameTaken`, `color`, `unused`, `onlyInTemplates`, `onlyInImages`) |
 | `properties` | Right sidebar Properties panel |
 | `filters` | Filter panel; `all` is the "All" row every `FilterList` shows on top |
 | `vault` | `VaultPicker`: list/switch, edit, create, open/relocate, delete, the way back. Some keys (`chooseFolder`, `defaultFolder`, `alreadyOpen`, `accessDenied`, `folderHasVault`, `folderNotEmpty`) also serve the backup import's add-vault mode via `VaultLocationRow` and `NEW_VAULT_TARGET_ERROR_KEY` |
