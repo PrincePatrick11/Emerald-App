@@ -114,6 +114,23 @@ Size tokens in both theme files: `--tab-pill-h` (30px, `TabBar`) and `--control-
 - `Reorder.Item`'s layout animation is active only while a tab is being dragged (plus `REORDER_SETTLE_MS`) — otherwise every tab would spring whenever the strip itself shifts.
 - Focus rings sit *inset*, since the scrolling list clips anything beyond a pill.
 
+**Dashboards share one structure.** Whatever a dashboard lists, the same four rules apply:
+
+- **One row:** symbol and name on the left, metadata on the right, 44px tall (`h-11`, `DashboardItem`/`DashboardRow` with `RowContent`), 6px apart. A row's second line does not exist; what would go there is metadata.
+- **One group heading:** `CollapsibleGroupHeader`, 24px, for a category, a month and a whole section alike.
+- **Actions in the context menu:** rename, duplicate, delete. No row carries a permanently visible amber or red button. A permanent delete asks in the row (`InlineConfirm`).
+- **One sidebar order:** action, view, sort, grouping, filter. What a dashboard does not have falls away; preferences of the view (`displayToggles`) belong to the view section.
+
+The exceptions, each for a reason:
+
+- **Home** keeps view, sort and length in its section headings, because it has three lists and the sidebar has room for one; those headings are 30px tall for it. Its title is the date over the moon phase.
+- **Tasks** have no layout choice, since subtasks and inline editing have no card to live on; the view section holds only "Show completed". The checkbox and the subtask chevron come before the name. Add subtask, category, link and priority appear on hover, because a task is worked on from its row; rename and delete stay in the menu.
+- **Categories** have a drag handle, because their order is the hand-dragged one, and no view or sort for the same reason. **Tags** have a chevron and a colour dot, because a tag opens in place and its colour is its value.
+- **Trash** rows carry a checkbox and select on click, and a jade Restore button, since restoring is what the page is for. Deleting for good stays in the menu.
+- **Altar** rows show the preview (32px) as their symbol, wider than the column; it fits the row. The Altar's sidebar has a second sort and grouping for its library, after the altars' own.
+- **Built-in blocks** are rows without hover, since nothing opens from them.
+- The **"+"** in a group heading stays visible: it is jade, creates rather than alters, and belongs to the group.
+
 **Horizontal padding has exactly one source per column.** The column's outer container sets it; the panels inside add no `px-*` of their own. In the right sidebar that is `SidebarColumn`'s scrolling body (`p-3`, with a comment in place) — if a panel adds its own padding again, its rows end up visibly indented differently from the button in the action bar above them.
 
 **Spacing scale:** 2, 4, 6, 8, 10, 12, 16, 20, 24 and 32px (Tailwind `0.5`, `1`, `1.5`, `2`, `2.5`, `3`, `4`, `5`, `6`, `8`). `2.5` is for icon-to-label in menu and list rows. An arbitrary value needs a comment. Usual places: `px-8` for main-area content columns (`Dashboard`'s content, `EntryDetailFrame`), `px-3`/`p-3` in the sidebars, `px-5 py-2.5` in modal bars (`.modal-header`, `.modal-footer`), `.modal-body` (`px-3.5 py-4`) in modal bodies.
@@ -150,6 +167,8 @@ Where the code contradicts the rules above today. No prioritisation — each poi
 
 **5. Contrast of `--accent` as a fill mark.** `--accent` itself stays `#008a57` in Parchment (3.99:1 against the sheet), which holds 3:1 for icons and marks. Text uses `--accent-text`. *Cost: none unless it gets used for text again.*
 
+**6. The start page's choices are hand-written.** The theme cards (`.start-theme`, a small picture of the theme and, for a custom theme, a remove button) and the vault tiles (`.picker-tile`) set their active state through a `className` ternary rather than `Button`'s `tone`: neither is a generic action button, and `SettingsChoiceButton`'s chips do not fit a card with a picture and a remove action. *Cost: a card variant of `SettingsChoiceButton`, then switch the theme cards over.*
+
 ---
 
 ## Appendix: Inventory and Traps
@@ -183,22 +202,22 @@ Deliberately **not** tokenised: the Fluent red of the close button (`#c42b1c`, a
 
 Two traps of the theming system, both verified through computed styles in both themes. They hit **every** new state variant on an existing class, not just the places where they were discovered.
 
-**1. Theme overrides beat modifier classes.** `html[data-theme=…] .panel` has specificity 0-2-1. A single-class modifier rule such as `.panel.vault-card-active` (0-2-0) loses against it regardless of declaration order.
+**1. Theme overrides beat modifier classes.** `html[data-theme=…] .panel` has specificity 0-2-1. A single-class modifier rule such as `.panel.is-active` (0-2-0) loses against it regardless of declaration order.
 
 **2. Unlayered rules come later in the output.** Tailwind 3's `@layer` is not a native CSS cascade layer: it only moves its rules to where the matching `@tailwind` directive sits, at the top of `index.css`. Every rule written outside a `@layer` block — all the `html[data-theme=…]` overrides further down — therefore comes *after* `@layer components` and wins at equal specificity. Specificity itself still decides as usual: a layered rule with a higher specificity does win (measured with `getComputedStyle` in both themes). A review finding of the form "layered loses against unlayered" has to be measured before anything is moved.
 
-Consequence: a new "active" variant on a `.panel` card needs either a selector that outranks the theme override, a rule placed after it outside any `@layer` block, or must forgo `.panel` entirely. The vault picker shows two of these:
+Consequence: a new "active" variant on a `.panel` card needs either a selector that outranks the theme override, a rule placed after it outside any `@layer` block, or must forgo `.panel` entirely. Two examples:
 
-- `.vault-card*` forgoes `.panel` and rebuilds the look; the active card's accent border (`.vault-card.vault-card-active`) deliberately sits outside any `@layer` block, with a comment in place, rather than with the other `.vault-*` classes in `@layer components`.
-- `.task-row-target` marks the row a search hit points at using `outline` rather than `background`/`border`/`box-shadow` — all three would be overridden by `html[data-theme=…] .panel-interactive`.
+- The vault picker's `.picker-tile*` forgo `.panel-interactive` and are classes of their own on its tokens, so the open vault's tint applies in both themes.
+- `.row-target` marks the row a search hit points at, or a category being dragged, using `outline` rather than `background`/`border`/`box-shadow` — all three would be overridden by `html[data-theme=…] .panel-interactive`.
 
-`.search-match` and `.task-row-target` carry an `rgba()` fallback with their `color-mix()` behind `@supports`, for WebKitGTK before 2.40. The other `color-mix()` sites (vault cards, `.input-field`, …) have none yet.
+`.search-match` and `.row-target` carry an `rgba()` fallback with their `color-mix()` behind `@supports`, for WebKitGTK before 2.40. The other `color-mix()` sites (vault picker rows, `.input-field`, …) have none yet.
 
 ### Overlays and Portals
 
 **Everything floating that can sit inside a sidebar or scroller hangs off `document.body` via `createPortal`** and positions itself with `position: fixed` in viewport coordinates: `Modal` (global search's `SearchModal`/`SearchResultList` render inside its body rather than portalling separately), `ContextMenu`, `EmojiPicker`, and `AltarCanvas`'s floating controls. `Dropdown` does so only with its `portal` prop, and `UndoToast`, which is global, renders in place with `position: fixed`. `MenuDropdown` is the deliberate exception: it renders in place with `absolute` + `z-[9999]`, which works because the title bar sits above both stacking contexts described below.
 
-The reason is the same for all of them: `.app-sidebar` and `.app-main` carry `position: relative; z-index: 1` in both themes and are therefore **sibling stacking contexts**. An overlay rendered inline in the sidebar loses against the later-painted main area no matter how high its `z-index`. On top of that, the nearest ancestor with `overflow` clips the popover — in the vault modal, for instance, the scrolling modal body.
+The reason is the same for all of them: `.app-sidebar` and `.app-main` carry `position: relative; z-index: 1` in both themes and are therefore **sibling stacking contexts**. An overlay rendered inline in the sidebar loses against the later-painted main area no matter how high its `z-index`. On top of that, the nearest ancestor with `overflow` clips the popover — in the vault picker, for instance, its scrolling list.
 
 The overlay layer is uniformly `z-[9999]`, one step above modals (`z-50`).
 

@@ -2,13 +2,8 @@ import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Trash2 } from 'lucide-react';
 import { useBlockDefinitionStore } from '../../store/blockDefinitionStore';
-import { copyUsage, useBlockContentRows, type CopyUsage } from '../../store/blockCopies';
-import { useTemplateStore } from '../../store/templateStore';
-import { allEntries, useEntryStore, whenEntryContentLoaded } from '../../store/entryStore';
-import { useUIStore, type SortMode } from '../../store/uiStore';
+import { useUIStore } from '../../store/uiStore';
 import { useBlockDraftStore } from '../../store/draftStore';
-import { useUndoStore } from '../../store/undoStore';
-import { generateId } from '../../lib/helpers';
 import { AUX_VIEWS } from '../../lib/modules';
 import { definitionLabel } from '../../lib/blocks/blockAttrs';
 import type { BlockDefinition } from '../../lib/blocks/definitions';
@@ -17,38 +12,33 @@ import { sortItems } from '../../lib/sortItems';
 import { isCardView } from '../../lib/viewMode';
 import { groupByMonth } from '../../lib/groupBy';
 import { usePersistedFlag } from '../../hooks/usePersistedFlag';
-import Dashboard, { GroupDivider } from '../ui/Dashboard';
-import DashboardItem from '../ui/DashboardItem';
+import Dashboard from '../ui/Dashboard';
+import CollapsibleGroupHeader from '../ui/CollapsibleGroupHeader';
+import DashboardItem, { ROW_GEOMETRY_CLASS, RowContent, RowSymbol } from '../ui/DashboardItem';
 import ContextMenu from '../ui/ContextMenu';
 import { useOpenInNewTabAction } from '../../hooks/useOpenInNewTabAction';
 import BlockGlyph from '../blocks/BlockGlyph';
-import BlockDefinitionEditor, { DeleteDefinitionModal } from '../blocks/BlockDefinitionEditor';
+import BlockDefinitionEditor from '../blocks/BlockDefinitionEditor';
 import { useSessionState } from '../../store/sessionStore';
 import { createItem } from '../../lib/createItem';
+import { useLibraryItemRemove } from '../../hooks/useLibraryItemRemove';
+import DashboardSection from '../ui/DashboardSection';
 
 /**
  * The rail view "Blocks", built like the other dashboards: the list of
  * custom blocks, header (title, "New block", search, view and sorting —
  * both only for the custom ones) in the right sidebar. A click opens the block as a page of its own
- * (`{ type: 'blocks', id }`) — like an entry, with saving, display and
- * usage in the sidebar. Custom blocks are inserted in every
+ * (`{ type: 'blocks', id }`) — like an entry, with saving and display in
+ * the sidebar. Custom blocks are inserted in every
  * entry via "Add block".
  */
 export default function BlocksView() {
-  const { t } = useTranslation();
   const definitions = useBlockDefinitionStore((s) => s.definitions);
   const deleteDefinition = useBlockDefinitionStore((s) => s.deleteDefinition);
   const restoreDefinition = useBlockDefinitionStore((s) => s.restoreDefinition);
-  const pushUndo = useUndoStore((s) => s.push);
   const activeView = useUIStore((s) => s.activeView);
   const setActiveView = useUIStore((s) => s.setActiveView);
   const clearDraft = useBlockDraftStore((s) => s.clearDraft);
-  const rows = useBlockContentRows();
-  /** Snapshot instead of id: after deleting, the dialog still shows its message. */
-  const [deleting, setDeleting] = useState<BlockDefinition | null>(null);
-
-  const templates = useTemplateStore((s) => s.templates);
-  const usage = useMemo(() => copyUsage(rows, templates, definitions), [rows, templates, definitions]);
   // An id without a definition (deleted, another vault in the remembered tab) falls back to the list.
   const selected = activeView.id ? definitions.find((d) => d.id === activeView.id) ?? null : null;
 
@@ -56,70 +46,21 @@ export default function BlocksView() {
 
   const create = () => createItem('blocks');
 
-  /**
-   * To the trash without confirmation like everything else, with undo. Only
-   * where copies sit in entries or templates does the dialog ask whether they
-   * should be removed too.
-   */
-  const remove = async (def: BlockDefinition) => {
-    // While content is still loading (startup), `usage` counts too few copies —
-    // and without copies no confirmation would appear. So wait first and count afresh.
-    const fresh = useEntryStore.getState().pendingContent
-      ? (await whenEntryContentLoaded(), copyUsage(allEntries(useEntryStore.getState().entries), useTemplateStore.getState().templates, definitions))
-      : usage;
-    const used = fresh.get(def.id);
-    if ((used?.entries ?? 0) + (used?.templates ?? 0) > 0) {
-      setDeleting(def);
-      return;
-    }
-    try {
-      await deleteDefinition(def.id);
-    } catch (err) {
-      // Nothing lost: block and draft stay where they were.
-      console.error('[BlocksView] deleting the block failed:', err);
-      return;
-    }
-    clearDraft(def.id);
-    // The state after deleting — see TemplatesView.remove.
-    if (useUIStore.getState().activeView.id === def.id) backToList();
-    pushUndo({
-      id: generateId(),
-      description: t('undo.blockDefinitionDeleted'),
-      undo: () => restoreDefinition(def.id),
-    });
-  };
+  // Inserted copies stay.
+  const remove = useLibraryItemRemove({
+    viewType: 'blocks', remove: deleteDefinition, restore: restoreDefinition, clearDraft, undoKey: 'undo.blockDefinitionDeleted', logTag: 'BlocksView',
+  });
 
-  const deleteModal = deleting && (
-    <DeleteDefinitionModal
-      definition={deleting}
-      usage={usage.get(deleting.id)}
-      onClose={() => setDeleting(null)}
-      onDeleted={() => {
-        clearDraft(deleting.id);
-        setDeleting(null);
-        if (activeView.id === deleting.id) backToList();
-      }}
+  return selected ? (
+    <BlockDefinitionEditor
+      key={selected.id}
+      definition={selected}
+      onClose={backToList}
+      onDelete={() => void remove(selected.id)}
+      isNew={activeView.isNew}
     />
-  );
-
-  // One return path for page and list: the delete dialog has to survive the
-  // switch from the deleted page to the list with its state.
-  return (
-    <>
-      {selected ? (
-        <BlockDefinitionEditor
-          key={selected.id}
-          definition={selected}
-          usage={usage.get(selected.id)}
-          onClose={backToList}
-          onDelete={() => void remove(selected)}
-          isNew={activeView.isNew}
-        />
-      ) : (
-        <BlockList usage={usage} onCreate={() => void create()} onDelete={(def) => void remove(def)} />
-      )}
-      {deleteModal}
-    </>
+  ) : (
+    <BlockList onCreate={() => void create()} onDelete={(def) => void remove(def.id)} />
   );
 }
 
@@ -127,60 +68,47 @@ export default function BlocksView() {
  * The built-in blocks below the custom ones, built like the library below
  * the altars — the same list as "Add block" in the entry. For reference
  * only: nothing can be created or edited on them, hence
- * resting tiles (frame, three columns, no hover) instead of clickable
- * dashboard rows. The search filters them too.
+ * resting rows (no hover, no pointer) instead of clickable ones. The search filters them too.
  */
 function BuiltInBlocksSection({ query }: { query: string }) {
   const { t } = useTranslation();
-  const [collapsed, toggleCollapsed] = usePersistedFlag('blocks-builtin-collapsed');
   const presets = query
     ? BLOCK_PRESETS.filter((p) => t(p.labelKey).toLowerCase().includes(query))
     : BLOCK_PRESETS;
 
   return (
-    <div className="mt-8">
-      <GroupDivider
-        label={t('blocks.library.builtIn')}
-        collapsed={collapsed}
-        onToggleCollapse={toggleCollapsed}
-      />
-      {!collapsed && (
-        <>
+    <DashboardSection storageKey="blocks-builtin-collapsed" label={t('blocks.library.builtIn')}>
           {/* Deliberately the small line instead of `NoResults`: the list only
               becomes empty through the search, and the large "No results" is already above. */}
           {presets.length === 0
             ? <p className="text-xs text-subtle px-1 py-1">{t('search.noResults')}</p>
             : (
-              // Tiles with a frame, but without hover and pointer: nothing can
-              // be created or opened on them, they only show what exists.
-              <ul className="grid grid-cols-3 gap-2">
+              <ul className="space-y-1.5">
                 {presets.map((preset) => {
                   const Icon = preset.icon;
                   return (
                     <li
                       key={preset.id}
+                      // The description is cut off in the row; here it can be read in full.
                       title={preset.descriptionKey ? t(preset.descriptionKey) : undefined}
-                      className="panel flex min-w-0 items-center gap-3 rounded-lg px-3 py-2.5"
+                      className={`panel rounded-xl ${ROW_GEOMETRY_CLASS}`}
                     >
-                      <Icon size={16} className="flex-shrink-0 text-muted" />
-                      <span className="truncate text-sm text-secondary">{t(preset.labelKey)}</span>
+                      <RowContent
+                        icon={<Icon size={14} className="text-muted" />}
+                        title={t(preset.labelKey)}
+                        meta={preset.descriptionKey ? t(preset.descriptionKey) : undefined}
+                      />
                     </li>
                   );
                 })}
               </ul>
             )}
-        </>
-      )}
-    </div>
+    </DashboardSection>
   );
 }
 
-/** What the custom blocks can be sorted by: last modified, name, usage. */
-const BLOCK_SORTS: readonly SortMode[] = ['date_desc', 'date_asc', 'alpha_asc', 'alpha_desc', 'count_desc'];
-
 /** The list of custom blocks in the shared dashboard scaffold. */
-function BlockList({ usage, onCreate, onDelete }: {
-  usage: Map<string, CopyUsage>;
+function BlockList({ onCreate, onDelete }: {
   onCreate: () => void;
   onDelete: (def: BlockDefinition) => void;
 }) {
@@ -204,35 +132,19 @@ function BlockList({ usage, onCreate, onDelete }: {
     {
       date: (d) => d.updated_at,
       title: (d) => definitionLabel(t, d),
-      count: (d) => usage.get(d.id)?.entries ?? 0,
       tiebreak: (a, b) => definitionLabel(t, a).localeCompare(definitionLabel(t, b)),
     },
-  ), [definitions, query, sort, usage, t]);
+  ), [definitions, query, sort, t]);
   // Collapsed means an empty list instead of a special branch, as in the altar dashboard.
   const shown = customCollapsed ? [] : sorted;
 
   const renderRow = (def: BlockDefinition) => {
-    const u = usage.get(def.id);
-    const fieldCount = def.elements.filter((e) => !e.archived).length;
     const unsaved = def.id in drafts && (
       <span className="text-xs italic text-subtle flex-shrink-0">{t('editor.unsaved')}</span>
     );
-    const outdatedDot = !!(u?.outdated || u?.outdatedTemplates) && (
-      <span
-        className="block-library-outdated-dot"
-        title={[
-          u.outdated ? t('blocks.library.outdated', { count: u.outdated }) : '',
-          u.outdatedTemplates ? t('blocks.library.outdatedTemplates', { count: u.outdatedTemplates }) : '',
-        ].filter(Boolean).join(' · ')}
-      />
-    );
     const counts = (
       <span className="text-xs text-subtle tabular-nums flex-shrink-0">
-        {t('blocks.library.fieldCount', { count: fieldCount })}
-        {' · '}
-        <span title={u?.entries ? t('blocks.library.usedIn', { count: u.entries }) : t('blocks.library.unused')}>
-          {t('blocks.library.entryCount', { count: u?.entries ?? 0 })}
-        </span>
+        {t('blocks.library.fieldCount', { count: def.elements.length })}
       </span>
     );
     return (
@@ -250,17 +162,15 @@ function BlockList({ usage, onCreate, onDelete }: {
               <BlockGlyph icon={def.icon} size={16} />
               <span className="flex-1" />
               {unsaved}
-              {outdatedDot}
             </div>
             <div className="text-sm font-medium text-secondary truncate mb-1">{definitionLabel(t, def)}</div>
             {counts}
           </>
         ) : (
           <>
-            <BlockGlyph icon={def.icon} size={14} />
+            <RowSymbol><BlockGlyph icon={def.icon} size={14} /></RowSymbol>
             <span className="flex-1 min-w-0 text-sm text-soft truncate">{definitionLabel(t, def)}</span>
             {unsaved}
-            {outdatedDot}
             {counts}
           </>
         )}
@@ -280,7 +190,6 @@ function BlockList({ usage, onCreate, onDelete }: {
       sortDate="updated"
       onView={(next) => setPrefs({ view: next })}
       onSort={(next) => setPrefs({ sort: next })}
-      sortModes={BLOCK_SORTS}
       search={search}
       onSearch={setSearch}
       items={shown}
@@ -299,7 +208,7 @@ function BlockList({ usage, onCreate, onDelete }: {
       }}
       hasNoResults={!customCollapsed && sorted.length === 0}
       contentHeader={
-        <GroupDivider
+        <CollapsibleGroupHeader
           label={t('blocks.library.custom')}
           collapsed={customCollapsed}
           onToggleCollapse={toggleCustom}

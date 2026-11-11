@@ -39,6 +39,14 @@ const SETTINGS_TEMP_FILE: &str = "settings.json.tmp";
 /// Far above anything the settings page can produce — a guard against a
 /// runaway write, not a format limit.
 const SETTINGS_MAX_BYTES: u64 = 256 * 1024;
+/// The installation's own settings — language and theme, custom themes
+/// included — in the app data directory, beside [`VAULTS_FILE`]: there before
+/// any vault is unlocked, and no vault or backup brings it along. The frontend
+/// owns its shape (`deviceSettings.ts`).
+const DEVICE_FILE: &str = "device.json";
+const DEVICE_TEMP_FILE: &str = "device.json.tmp";
+/// Where an unreadable [`DEVICE_FILE`] is moved, instead of being overwritten.
+const DEVICE_BAD_FILE: &str = "device.json.bad";
 /// The unsaved drafts of the vault's block and template pages, written along
 /// while they are being edited so that a crash takes nothing that was typed.
 /// The frontend owns the shape; Rust only moves the text.
@@ -762,8 +770,28 @@ pub fn migrate_vault_layout(
     Ok(target_dir.to_string_lossy().into_owned())
 }
 
+/// Database, drafts and images go; the folder and its settings stay. For a vault
+/// that fetches itself anew from a sync server.
+pub(crate) fn remove_vault_content(dir: &Path) -> Result<(), String> {
+    let journal = format!("{DB_FILE}-journal");
+    for name in [DB_FILE, journal.as_str(), DRAFTS_FILE] {
+        let file = dir.join(name);
+        if file.is_file() {
+            std::fs::remove_file(&file).map_err(|e| format!("remove {}: {e}", file.display()))?;
+        }
+    }
+    if let Ok(entries) = std::fs::read_dir(dir.join(IMAGES_SUBDIR)) {
+        for entry in entries.flatten() {
+            if crate::images::is_valid_image_name(&entry.file_name().to_string_lossy()) {
+                std::fs::remove_file(entry.path()).ok();
+            }
+        }
+    }
+    Ok(())
+}
+
 /// Deletes a vault's files — the database, its journal, its images and its
-/// settings. Only ever reached through the vault modal's opt-in "delete files"
+/// settings. Only ever reached through the vault picker's opt-in "delete files"
 /// checkbox.
 ///
 /// Deliberately **not** `remove_dir_all`. A vault directory is one the user
@@ -789,6 +817,7 @@ pub fn delete_vault_files(app: tauri::AppHandle, vault_id: String) -> Result<boo
     if !dir.join(DB_FILE).is_file() {
         return Err("not a vault directory: no database found".to_string());
     }
+    crate::sync::forget(&app, &vault_id);
 
     // The database first: it is the only piece that can still be locked, and
     // a failure then at least leaves the images in place.
@@ -879,6 +908,42 @@ pub fn write_vault_settings(app: tauri::AppHandle, vault_id: String, contents: S
     let dir = vault_dir(&app, &vault_id)?;
     directory_state(&dir)?;
     write_settings_in(&dir, &contents)
+}
+
+/// `{appDataDir}/device.json` — same answers as [`read_vault_settings`].
+#[tauri::command(async)]
+pub fn read_device_settings(app: tauri::AppHandle) -> Result<VaultFileRead, String> {
+    let dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
+    Ok(read_device_in(&dir))
+}
+
+/// A file that is no JSON object, too large or no plain file is moved aside as
+/// `device.json.bad` — renamed, never removed — and answered as unreadable: the
+/// frontend then stays on its mirror and writes nothing until the user chooses.
+fn read_device_in(dir: &Path) -> VaultFileRead {
+    let read = read_json_in(dir, DEVICE_FILE, SETTINGS_MAX_BYTES);
+    let bad = match &read {
+        VaultFileRead::Found { contents } => {
+            !matches!(serde_json::from_str::<serde_json::Value>(contents), Ok(serde_json::Value::Object(_)))
+        }
+        VaultFileRead::Unreadable => true,
+        VaultFileRead::Missing => false,
+    };
+    if !bad {
+        return read;
+    }
+    if let Err(e) = std::fs::rename(dir.join(DEVICE_FILE), dir.join(DEVICE_BAD_FILE)) {
+        eprintln!("[device] could not set device.json aside: {e}");
+    }
+    VaultFileRead::Unreadable
+}
+
+/// Replaces `{appDataDir}/device.json`; a JSON object, like the vault's settings.
+#[tauri::command(async)]
+pub fn write_device_settings(app: tauri::AppHandle, contents: String) -> Result<(), String> {
+    let dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
+    std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    write_json_in(&dir, DEVICE_FILE, DEVICE_TEMP_FILE, SETTINGS_MAX_BYTES, &contents)
 }
 
 /// The vault's `drafts.json` — same answers as [`read_vault_settings`]. In an
@@ -1039,7 +1104,12 @@ fn write_json_in(dir: &Path, name: &str, temp_name: &str, max_bytes: u64, conten
 /// Writes `bytes` to `dir/name` through `dir/temp_name` and a rename, so a
 /// crash leaves either the old file or the new one, never half of either.
 pub(crate) fn write_atomic(dir: &Path, name: &str, temp_name: &str, bytes: &[u8]) -> Result<(), String> {
-    write_atomic_with(dir, name, temp_name, bytes, true)
+    write_atomic_with(dir, name, temp_name, bytes, true, false)
+}
+
+/// [`write_atomic`] for a file only this account may read, from its first byte on.
+pub(crate) fn write_atomic_private(dir: &Path, name: &str, temp_name: &str, bytes: &[u8]) -> Result<(), String> {
+    write_atomic_with(dir, name, temp_name, bytes, true, true)
 }
 
 /// [`write_atomic`] for a folder that is not the vault's: a volume that cannot
@@ -1047,7 +1117,7 @@ pub(crate) fn write_atomic(dir: &Path, name: &str, temp_name: &str, bytes: &[u8]
 /// backup that is the better answer; for `vault.key` it would not be. A flush
 /// that fails for any other reason still fails the write.
 pub(crate) fn write_atomic_anywhere(dir: &Path, name: &str, temp_name: &str, bytes: &[u8]) -> Result<(), String> {
-    write_atomic_with(dir, name, temp_name, bytes, false)
+    write_atomic_with(dir, name, temp_name, bytes, false, false)
 }
 
 /// Whether a failed flush only says "this volume cannot flush" — the one
@@ -1073,7 +1143,7 @@ fn sync_refusal_is_harmless(error: &std::io::Error) -> bool {
 }
 
 /// `must_sync`: whether a flush the volume refuses fails the write.
-fn write_atomic_with(dir: &Path, name: &str, temp_name: &str, bytes: &[u8], must_sync: bool) -> Result<(), String> {
+fn write_atomic_with(dir: &Path, name: &str, temp_name: &str, bytes: &[u8], must_sync: bool, private: bool) -> Result<(), String> {
     use std::io::Write;
 
     // Whatever lies under the temp name — a crash remnant or a planted
@@ -1082,9 +1152,16 @@ fn write_atomic_with(dir: &Path, name: &str, temp_name: &str, bytes: &[u8], must
     // link.
     let temp = dir.join(temp_name);
     std::fs::remove_file(&temp).ok();
-    let written = std::fs::OpenOptions::new()
-        .write(true)
-        .create_new(true)
+    let mut options = std::fs::OpenOptions::new();
+    options.write(true).create_new(true);
+    #[cfg(unix)]
+    if private {
+        use std::os::unix::fs::OpenOptionsExt;
+        options.mode(0o600);
+    }
+    #[cfg(not(unix))]
+    let _ = private;
+    let written = options
         .open(&temp)
         // First onto the disk, then rename: otherwise an empty file can sit under
         // the target name after a power failure — for `vault.key` that would mean the
@@ -1306,6 +1383,19 @@ mod tests {
         let big = scratch();
         write(&big.join(SETTINGS_FILE), &"a".repeat(SETTINGS_MAX_BYTES as usize + 1));
         assert_eq!(read_settings_in(&big), VaultFileRead::Unreadable);
+    }
+
+    #[test]
+    fn an_unreadable_device_file_is_set_aside_not_overwritten() {
+        let dir = scratch();
+        write(&dir.join(DEVICE_FILE), "[1, 2]");
+        assert_eq!(read_device_in(&dir), VaultFileRead::Unreadable);
+        assert!(!dir.join(DEVICE_FILE).exists());
+        assert_eq!(std::fs::read_to_string(dir.join(DEVICE_BAD_FILE)).unwrap(), "[1, 2]");
+        assert_eq!(read_device_in(&dir), VaultFileRead::Missing);
+
+        write(&dir.join(DEVICE_FILE), r#"{"theme":"emerald-parchment"}"#);
+        assert!(matches!(read_device_in(&dir), VaultFileRead::Found { .. }));
     }
 
     #[test]

@@ -436,6 +436,24 @@ async fn row_counts(conn: &mut SqliteConnection) -> Result<Vec<(String, i64)>, S
 
 /// Rewrites image names in every text value of every table, in one transaction.
 async fn rewrite_database(conn: &mut SqliteConnection, renamed: &HashMap<String, String>) -> Result<(), String> {
+    // A vault connected to a sync server took its triggers along into the copy.
+    // These renames are no change for the log, which would then fail the check
+    // that every table of the copy holds what the original does.
+    let tracked: Option<(String,)> = sqlx::query_as("SELECT name FROM sqlite_master WHERE type = 'table' AND name = '_sync_ctx'")
+        .fetch_optional(&mut *conn)
+        .await
+        .map_err(|e| e.to_string())?;
+    if tracked.is_some() {
+        sqlx::query("UPDATE _sync_ctx SET applying = 1").execute(&mut *conn).await.map_err(|e| e.to_string())?;
+    }
+    let result = rewrite_tables(conn, renamed).await;
+    if tracked.is_some() {
+        sqlx::query("UPDATE _sync_ctx SET applying = 0").execute(&mut *conn).await.map_err(|e| e.to_string())?;
+    }
+    result
+}
+
+async fn rewrite_tables(conn: &mut SqliteConnection, renamed: &HashMap<String, String>) -> Result<(), String> {
     if renamed.is_empty() {
         return Ok(());
     }
@@ -810,7 +828,9 @@ pub async fn vault_change_password(
     })
     .await
     .map_err(|e| e.to_string())??;
-    rekey_command(&app, &vault_id, old_key, &new_password, None).await
+    let created = rekey_command(&app, &vault_id, old_key, &new_password, None).await?;
+    crate::sync::note_rekeyed(&app, &vault_id)?;
+    Ok(created)
 }
 
 /// Dev builds only: the seed vault of an Emerald-Devtools MCP slot opens
@@ -869,7 +889,9 @@ pub async fn vault_recover(
     })
     .await
     .map_err(|e| e.to_string())??;
-    rekey_command(&app, &vault_id, old_key, &new_password, remember_key).await
+    let created = rekey_command(&app, &vault_id, old_key, &new_password, remember_key).await?;
+    crate::sync::note_rekeyed(&app, &vault_id)?;
+    Ok(created)
 }
 
 #[cfg(test)]

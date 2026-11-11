@@ -305,7 +305,7 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
   }
 
   /* The match in the title or in the text excerpt. The same accent mix
-     as `.vault-card-active .vault-badge` — the spot is tinted, not
+     as `.picker-row-active .picker-badge` — the spot is tinted, not
      outlined, so that a result list does not turn into a patchwork. */
   /* The `rgba()` is the fallback for an engine without `color-mix` (WebKitGTK
      before 2.40). It takes `@supports`: a declaration with `var()` always parses,
@@ -333,12 +333,12 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
      rule needs no theme twin and no specificity race.
      `outline-offset` pulls the ring inward so the row does not jump
      in the flow. */
-  .task-row-target {
+  .row-target {
     outline: 1px solid rgba(0, 176, 118, 0.55);
     outline-offset: -1px;
   }
   @supports (color: color-mix(in srgb, red 50%, blue)) {
-    .task-row-target {
+    .row-target {
       outline: 1px solid color-mix(in srgb, var(--accent) 55%, transparent);
     }
   }
@@ -712,62 +712,438 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
     border-color: var(--border-strong);
   }
 
-  /* Vault picker cards. Deliberately NOT built on .panel/.panel-interactive:
-     those carry per-theme overrides (html[data-theme=…] .panel, specificity
-     0-2-1) that outrank any single-class modifier layered on top, so the
-     accent tint below would never render. Same tokens, own selectors. */
-  .vault-card {
-    @apply flex items-center gap-3 rounded-xl border px-3 py-2.5 transition-all duration-150;
+  /* ── Start page (the vault picker) ─────────────────────────────────────
+     The whole window, as the shell is: the brand on the frame at the left,
+     one sheet beside it. On the sheet the vaults as tiles across the width,
+     server and appearance side by side below, each headed as Home heads its
+     sections, and at its foot language and updates. Tiles and panels take
+     the tokens of `.panel-interactive` rather than the class: it carries
+     per-theme overrides (html[data-theme=…] .panel-interactive, 0-2-1) that
+     outrank an active tint on top (design.md, Specificity Traps). */
+  .picker-frame {
+    padding: 0 var(--sheet-inset) var(--sheet-inset) 0;
+  }
+
+  .picker-sheet {
+    @apply flex-1 min-h-0;
+  }
+
+  /* Its width is the picker's (`VaultPicker`, dragged at the handle). */
+  /* Top and bottom line up with the sheet beside it: the mark starts where
+     the way back does (the sheet's 1px border, then `.start-back-row`), the
+     foot sits on the line of the sheet's foot (its border and 12px under a
+     28px row; the frame's inset is below both). */
+  .start-brand {
+    @apply flex flex-col shrink-0 overflow-y-auto;
+    padding: 24px 32px 13px 32px;
+  }
+
+  .start-brand-title {
+    @apply font-serif font-medium whitespace-nowrap;
+    font-size: 38px;
+    line-height: 1.02;
+    color: var(--text-primary);
+  }
+
+  .start-brand-tagline {
+    @apply font-serif;
+    font-size: 17px;
+    max-width: 17rem;
+    color: var(--text-muted);
+  }
+
+  .start-back-row {
+    @apply flex items-center shrink-0 px-10 pt-5;
+    min-height: 2.75rem;
+  }
+
+  /* Only this scrolls, the foot stays. The width is held so the tiles and the
+     two columns do not drift apart on a wide window. */
+  .start-content {
+    @apply flex flex-col flex-1 min-h-0 gap-10 overflow-y-auto px-10 pt-5 pb-8;
+  }
+
+  .start-content > * {
+    max-width: 1080px;
+  }
+
+  .start-columns {
+    @apply grid gap-10;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    align-items: start;
+  }
+
+  .start-section {
+    @apply min-w-0;
+  }
+
+  .start-section-head {
+    @apply flex items-center justify-between gap-3 mb-3.5 min-h-7;
+  }
+
+  .start-section-label {
+    @apply flex items-center gap-2 text-xs font-semibold uppercase tracking-wider outline-none;
+    color: var(--text-subtle);
+  }
+
+  /* A panel that is no choice: the server's state and its fields. */
+  .start-panel {
+    @apply rounded-xl border p-4;
     background-color: var(--bg-surface-1);
     border-color: var(--border-soft);
   }
 
-  .vault-card-idle {
-    @apply cursor-pointer;
+  .start-stats {
+    @apply grid grid-cols-3 gap-3;
   }
 
-  .vault-card-idle:hover {
+  /* Value first to the eye, its name under it, with the name still first in
+     the markup for screen readers. */
+  .start-stats > div {
+    @apply flex flex-col-reverse gap-0.5 min-w-0;
+  }
+
+  .start-stats dt {
+    @apply text-[11px] truncate;
+    color: var(--text-subtle);
+  }
+
+  .start-stats dd {
+    @apply text-base font-medium tabular-nums truncate;
+    color: var(--text-primary);
+  }
+
+  /* ── The vault tiles ── */
+  .start-tiles {
+    @apply grid gap-3;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  }
+
+  /* An editor or a confirmation takes the whole width. */
+  .start-tiles > li:has(.picker-row-open) {
+    grid-column: 1 / -1;
+  }
+
+  .picker-tile {
+    @apply relative rounded-xl border transition-colors duration-150;
+    background-color: var(--bg-surface-1);
+    border-color: var(--border-soft);
+  }
+
+  .picker-tile:hover,
+  .picker-tile:focus-within {
     background-color: var(--bg-surface-2);
     border-color: var(--border-strong);
   }
 
-  .vault-card-active {
+  .picker-tile-active,
+  .picker-tile-active:hover,
+  .picker-tile-active:focus-within {
     background-color: color-mix(in srgb, var(--accent) 12%, transparent);
-    border-color: color-mix(in srgb, var(--accent) 40%, transparent);
+    border-color: var(--choice-active-border);
   }
 
-  .vault-badge {
-    @apply flex items-center justify-center w-9 h-9 rounded-lg shrink-0;
-    background-color: var(--interactive-active);
-    color: var(--text-muted);
+  /* Name and icon edited in the tile itself. */
+  .picker-tile.picker-tile-editing {
+    @apply flex flex-col justify-between gap-2 h-28 px-4 py-3;
+    background-color: var(--bg-surface-2);
+    border-color: var(--border-strong);
   }
 
-  /* The badge was purely decorative as long as it sat inside the row button
-     and inherited its hover. As a trigger of its own for the emoji picker it stands
-     among nothing but .btn-ghost buttons and needs the same feedback. */
-  .vault-badge-interactive:hover {
-    background-color: var(--interactive-hover);
-    color: var(--text-primary);
+  /* Only on the server: a dashed edge, present but not yet here. */
+  .picker-tile.picker-tile-remote {
+    background-color: transparent;
+    border-style: dashed;
   }
 
-  .vault-card-active .vault-badge {
+  .picker-tile-main {
+    @apply flex flex-col justify-between gap-3 w-full h-28 px-4 py-3.5 text-left rounded-xl;
+  }
+
+  .picker-tile-main:focus-visible {
+    outline: 2px solid var(--focus-ring);
+    outline-offset: -2px;
+  }
+
+  .picker-tile-main .picker-badge {
+    @apply w-9 h-9;
+  }
+
+  .picker-tile-active .picker-badge {
     background-color: color-mix(in srgb, var(--accent) 22%, transparent);
     color: var(--accent-text);
   }
 
-  .vault-name {
-    @apply text-sm truncate;
-    color: var(--text-secondary);
+  .picker-tile-remote .picker-badge {
+    background-color: transparent;
+    border: 1px dashed var(--border-soft);
+    color: var(--text-subtle);
   }
 
-  .vault-card-active .vault-name,
-  .vault-card-idle:hover .vault-name {
+  .picker-tile .picker-row-name {
+    @apply font-medium;
     color: var(--text-primary);
   }
 
-  .vault-meta {
-    @apply text-xs;
+  .picker-tile-remote .picker-row-name {
+    color: var(--text-muted);
+  }
+
+  /* Top right: "open" on the open vault, edit and delete in its place on
+     hover or focus. */
+  .picker-tile-corner {
+    @apply absolute top-3 right-3 flex items-center;
+  }
+
+  .picker-tile-open {
+    @apply text-[11px] font-medium transition-opacity duration-150;
+    color: var(--accent-text);
+  }
+
+  .picker-tile-corner .picker-row-actions {
+    @apply absolute right-0;
+  }
+
+  .picker-tile:hover .picker-tile-open,
+  .picker-tile:focus-within .picker-tile-open {
+    opacity: 0;
+  }
+
+  .picker-tile:hover .picker-row-actions,
+  .picker-tile:focus-within .picker-row-actions {
+    opacity: 1;
+  }
+
+  .picker-tile-state {
+    @apply flex items-center gap-1.5 mt-0.5 text-xs min-w-0;
     color: var(--text-subtle);
+  }
+
+  .picker-tile-dot {
+    @apply w-1.5 h-1.5 rounded-full shrink-0;
+    background-color: currentColor;
+  }
+
+  .picker-tile-state.picker-tile-state-synced {
+    color: var(--accent-text);
+  }
+
+  .picker-tile-state.picker-tile-state-paused {
+    color: var(--warning-text);
+  }
+
+  .picker-tile-state-remote .picker-tile-dot {
+    background-color: transparent;
+    border: 1px solid currentColor;
+  }
+
+  .picker-tile-new,
+  .start-theme-new {
+    @apply flex flex-col items-center justify-center gap-2 w-full rounded-xl border border-dashed text-xs transition-colors duration-150;
+    border-color: var(--border-soft);
+    color: var(--text-muted);
+  }
+
+  .picker-tile-new {
+    @apply h-28 text-[13px];
+  }
+
+  .picker-tile-new:hover,
+  .start-theme-new:hover {
+    border-color: var(--border-strong);
+    color: var(--text-primary);
+  }
+
+  .picker-tile-new:focus-visible,
+  .start-theme-new:focus-visible,
+  .start-theme:focus-visible,
+  .start-theme-remove:focus-visible,
+  .picker-device-remove:focus-visible,
+  .picker-badge-interactive:focus-visible {
+    outline: 2px solid var(--focus-ring);
+    outline-offset: 1px;
+  }
+
+  /* ── The theme cards ── */
+  .start-themes {
+    @apply grid gap-3;
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  }
+
+  .start-theme {
+    @apply flex flex-col gap-2.5 w-full rounded-xl border p-2 pb-2.5 text-xs text-left transition-colors duration-150;
+    background-color: var(--bg-surface-1);
+    border-color: var(--border-soft);
+    color: var(--text-secondary);
+  }
+
+  .start-theme:hover {
+    background-color: var(--bg-surface-2);
+    border-color: var(--border-strong);
+    color: var(--text-primary);
+  }
+
+  .start-theme.start-theme-active {
+    background-color: color-mix(in srgb, var(--accent) 12%, transparent);
+    border-color: var(--choice-active-border);
+    color: var(--text-primary);
+  }
+
+  .start-theme-preview {
+    @apply flex h-16 rounded-lg p-1.5 pl-5;
+  }
+
+  .start-theme-sheet {
+    @apply flex flex-col gap-1 flex-1 rounded p-1.5;
+  }
+
+  .start-theme-sheet > span {
+    @apply block rounded-full;
+  }
+
+  .start-theme-new {
+    @apply h-full min-h-[104px];
+  }
+
+  .start-theme-remove {
+    @apply absolute top-3 right-3 flex items-center justify-center w-5 h-5 rounded-md opacity-0 transition-opacity duration-150;
+    background-color: var(--bg-surface-2);
+    color: var(--text-subtle);
+  }
+
+  .group:hover .start-theme-remove,
+  .start-theme-remove:focus-visible {
+    opacity: 1;
+  }
+
+  .start-theme-remove:hover {
+    color: var(--danger-text);
+  }
+
+  /* Language on the left, updates on the right. */
+  .start-foot {
+    @apply flex items-center justify-between gap-4 shrink-0 px-6 pb-3 pt-1 text-xs;
+    color: var(--text-subtle);
+  }
+
+  .start-foot-updates {
+    @apply flex items-center justify-end gap-2 min-w-0;
+  }
+
+  /* "Update server": opens upwards from the foot, at its right edge. */
+  .start-popover {
+    @apply absolute bottom-full right-0 mb-2 z-50 w-[360px] rounded-lg border p-3;
+    background-color: var(--menu-bg);
+    border-color: var(--menu-border);
+    box-shadow: var(--menu-shadow);
+  }
+
+  /* A quiet text button: the foot's, and the sections' own actions. */
+  .start-foot-action {
+    @apply inline-flex items-center gap-1.5 h-7 px-2 rounded-md shrink-0 text-xs transition-colors duration-150;
+    color: var(--text-muted);
+  }
+
+  .start-foot-action:hover,
+  .start-foot-action[aria-expanded="true"] {
+    color: var(--text-primary);
+    background-color: var(--interactive-hover);
+  }
+
+  .start-foot-action:disabled {
+    @apply opacity-50 cursor-not-allowed pointer-events-none;
+  }
+
+  .start-foot-action:focus-visible {
+    outline: 2px solid var(--focus-ring);
+    outline-offset: 1px;
+  }
+
+  .picker-label {
+    @apply block text-xs mb-1.5;
+    color: var(--text-muted);
+  }
+
+  /* The rows that open in a tile's place: edit, create, confirm. */
+  .picker-row {
+    @apply relative flex items-center gap-2 rounded-xl border px-3 py-2.5;
+  }
+
+  .picker-row-open {
+    background-color: var(--bg-surface-2);
+    border-color: var(--border-strong);
+  }
+
+  .picker-badge {
+    @apply flex items-center justify-center w-8 h-8 rounded-md shrink-0;
+    background-color: var(--interactive-active);
+    color: var(--text-muted);
+  }
+
+  .picker-badge-interactive:hover {
+    background-color: var(--interactive-hover);
+    color: var(--text-primary);
+  }
+
+  .picker-row-name {
+    @apply block text-sm truncate;
+    color: var(--text-secondary);
+  }
+
+  /* Edit and delete only where the pointer or the focus is. */
+  .picker-row-actions {
+    @apply flex items-center gap-1 shrink-0 opacity-0 transition-opacity duration-150;
+  }
+
+  .picker-dot {
+    @apply inline-block w-1.5 h-1.5 rounded-full shrink-0;
+    background-color: var(--text-subtle);
+  }
+
+  /* Compound: Tailwind emits a rule that uses @apply after plain ones, so a
+     single-class modifier would lose to `.picker-dot`. */
+  .picker-dot.picker-dot-up {
+    background-color: var(--accent);
+  }
+
+  .picker-dot.picker-dot-down {
+    background-color: var(--danger-text);
+  }
+
+  .picker-device {
+    @apply flex items-center justify-between gap-2 text-sm rounded-md px-2 py-1;
+  }
+
+  .picker-device:hover {
+    background-color: var(--interactive-hover);
+  }
+
+  .picker-device-remove {
+    @apply flex items-center justify-center w-5 h-5 rounded-md opacity-0 transition-opacity duration-150;
+    color: var(--text-subtle);
+  }
+
+  .picker-device:hover .picker-device-remove,
+  .picker-device-remove:focus-visible {
+    opacity: 1;
+  }
+
+  .picker-device-remove:hover {
+    color: var(--danger-text);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .picker-tile,
+    .picker-tile-open,
+    .picker-tile-new,
+    .picker-row-actions,
+    .picker-device-remove,
+    .start-foot-action,
+    .start-theme,
+    .start-theme-new,
+    .start-theme-remove {
+      transition: none;
+    }
   }
 
   /* Consistent small section label (JOURNAL, PROPERTIES, etc.) */
@@ -1028,17 +1404,6 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
     border-color: var(--border-soft);
   }
 
-  /* The dividers of the About page. */
-  .settings-divider-bottom {
-    @apply border-b;
-    border-color: var(--border-soft);
-  }
-
-  .settings-divider-top {
-    @apply border-t;
-    border-color: var(--border-soft);
-  }
-
   .input-field {
     background-color: color-mix(in srgb, var(--bg-surface-1) 80%, transparent);
     border: 1px solid var(--border-soft);
@@ -1102,26 +1467,6 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
     opacity: 0.25;
     cursor: not-allowed;
   }
-
-  .home-item-title {
-    color: var(--text-secondary);
-  }
-
-  .home-item-meta {
-    color: var(--text-muted);
-  }
-
-  .panel-interactive:hover .home-item-title {
-    color: var(--text-primary);
-  }
-}
-
-/* Outside @layer on purpose: Tailwind 3 hoists @layer components to the top of
-   the output, so the unlayered theme overrides further down would win over the
-   accent edge at equal specificity. Here it comes after them (design.md,
-   Specificity Traps). */
-.vault-card.vault-card-active {
-  border-color: color-mix(in srgb, var(--accent) 40%, transparent);
 }
 
 /* TipTap Editor Styles */
@@ -1692,7 +2037,8 @@ button.sidebar-section-title:focus-visible {
   object-fit: cover;
 }
 
-/* Type as segments: inset track, the active segment in jade. */
+/* Type as segments: inset track, the active segment in jade. Also the start
+   page's language choice, with words instead of icons (`--text`). */
 .prop-segments {
   display: flex;
   flex-shrink: 0;
@@ -1713,6 +2059,18 @@ button.sidebar-section-title:focus-visible {
   border: 1px solid transparent;
   color: var(--text-muted);
   transition: color 150ms, background-color 150ms;
+}
+
+.prop-segments--fill {
+  flex-shrink: 1;
+}
+
+.prop-segment--text {
+  flex: 1 1 0%;
+  width: auto;
+  height: 26px;
+  padding: 0 8px;
+  font-size: 12px;
 }
 
 .prop-segment:hover:not(:disabled) {
@@ -2487,6 +2845,785 @@ html[data-theme] .prop-segment--active {
   background: var(--border-soft);
 }
 
+/* The paint mode of the canvas editor (components/editors/canvas/paint). */
+.paint-custom-color {
+  position: relative;
+  width: 18px;
+  height: 18px;
+  overflow: hidden;
+  border-radius: 9999px;
+  border: 1px solid var(--edge-strong);
+  background: conic-gradient(#ef4444, #f59e0b, #00e699, #60a5fa, #a78bfa, #ef4444);
+  cursor: pointer;
+}
+.paint-custom-color input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+.paint-custom-color--active { box-shadow: 0 0 0 2px var(--well-solid), 0 0 0 3px var(--accent); }
+/* The brush's colours and size, right in the paint bar. */
+.paint-swatches {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 5px;
+  padding: 0 4px;
+}
+.paint-size-inline {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0 4px;
+}
+.paint-size-dot {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+}
+.paint-size-dot span {
+  border-radius: 9999px;
+  border: 1px solid var(--edge-strong);
+}
+.paint-size-slider { width: 6.5rem; }
+.paint-size-value {
+  width: 1.75rem;
+  text-align: right;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-subtle);
+}
+.paint-stepper {
+  display: inline-flex;
+  align-items: center;
+  height: 1.75rem;
+  border-radius: 0.375rem;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+.paint-stepper button {
+  width: 1.25rem;
+  height: 1.75rem;
+  border-radius: 0.375rem;
+  color: var(--text-subtle);
+}
+.paint-stepper button:enabled:hover { color: var(--text-primary); background: var(--interactive-hover); }
+.paint-stepper button:disabled { opacity: 0.4; }
+.paint-stepper-value {
+  min-width: 1.25rem;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+.paint-symmetry {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 11rem;
+}
+.paint-symmetry-option {
+  height: 1.75rem;
+  padding: 0 0.5rem;
+  border-radius: 0.375rem;
+  font-size: 12px;
+  text-align: left;
+  color: var(--text-secondary);
+}
+.paint-symmetry-option:hover { background: var(--interactive-hover); }
+.paint-symmetry-option--active { color: var(--editor-toolbar-active-text); background: var(--interactive-hover); }
+.paint-symmetry-rays {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.25rem 0.25rem 0 0.5rem;
+  border-top: 1px solid var(--border-soft);
+  font-size: 12px;
+  color: var(--text-subtle);
+}
+.paint-layers {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-height: 0;
+  overflow-y: auto;
+}
+/* The paint mode's tools in a column over the drawing's left edge; solid, like the menus, since the drawing runs under it. */
+.paint-rail {
+  position: absolute;
+  left: 12px;
+  top: 12px;
+  z-index: 4;
+  flex-direction: column;
+  flex-wrap: nowrap;
+  border-color: var(--edge-strong);
+  background: var(--well-solid);
+  box-shadow: var(--menu-shadow);
+}
+.paint-rail-group {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.paint-rail-divider {
+  height: 1px;
+  margin: 2px 4px;
+  background: var(--panel-border);
+}
+/* The layer panel over the drawing's right side, left open while painting. */
+.paint-layers-dock {
+  position: absolute;
+  right: 12px;
+  top: 12px;
+  z-index: 4;
+  display: flex;
+  flex-direction: column;
+  width: 15rem;
+  max-height: calc(100% - 72px);
+  padding: 4px;
+  border-radius: 0.5rem;
+  border: 1px solid var(--edge-strong);
+  background: var(--well-solid);
+  box-shadow: var(--menu-shadow);
+}
+.paint-layers-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 0 4px 6px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-subtle);
+}
+.paint-layer {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 2px 3px 4px;
+  border-radius: 0.375rem;
+  cursor: pointer;
+  user-select: none;
+  touch-action: none;
+}
+.paint-layer:hover { background: var(--interactive-hover); }
+.paint-layer--active,
+.paint-layer--active:hover { background: var(--interactive-active); box-shadow: inset 2px 0 0 var(--accent); }
+.paint-layer--hidden .paint-layer-thumb,
+.paint-layer--hidden .paint-layer-text { opacity: 0.45; }
+.paint-layer--dragged { opacity: 0.5; }
+.paint-layer--drop-above { box-shadow: inset 0 2px 0 var(--accent); }
+.paint-layer--drop-below { box-shadow: inset 0 -2px 0 var(--accent); }
+.paint-layer-thumb {
+  flex-shrink: 0;
+  border-radius: 3px;
+  border: 1px solid var(--edge);
+  background: var(--canvas);
+}
+.paint-layer-text {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  flex-direction: column;
+  font-size: 12px;
+  line-height: 1.25;
+  color: var(--text-secondary);
+}
+.paint-layer--active .paint-layer-text { color: var(--editor-toolbar-active-text); }
+.paint-layer-name {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 0.25rem;
+}
+.paint-layer-input { width: 100%; font-size: 12px; }
+.paint-layer-opacity {
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-subtle);
+}
+.paint-layer-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 4px;
+  padding: 6px 2px 0 6px;
+  border-top: 1px solid var(--border-soft);
+}
+.paint-layer-opacity-field {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  font-size: 12px;
+  color: var(--text-subtle);
+}
+.paint-layer-opacity-field input { flex: 1; min-width: 0; }
+.paint-layer-buttons { display: flex; justify-content: space-between; }
+/* The canvas editor's element list: the same dock, with group heads and their members indented under them. */
+.canvas-layer-group-icon {
+  display: flex;
+  width: 48px;
+  height: 32px;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-subtle);
+}
+.canvas-layer-group .paint-layer-text { font-weight: 600; }
+.canvas-layer-member { margin-left: 14px; box-shadow: inset 1px 0 0 var(--border-soft); }
+.canvas-layer-member.paint-layer--active { box-shadow: inset 2px 0 0 var(--accent); }
+.canvas-layer-member.paint-layer--drop-above { box-shadow: inset 0 2px 0 var(--accent); }
+.canvas-layers-empty { padding: 6px; font-size: 12px; color: var(--text-subtle); }
+.canvas-layers-drop-end { height: 2px; margin-top: 2px; background: var(--accent); }
+
+/* The drawing surface: the sheet's canvas colour, 3:2 like the document. */
+/* The drawing surface of the canvas editor's paint mode, laid over the
+   drawing element (PaintSurface places and turns it). */
+.paint-surface {
+  position: absolute;
+  z-index: 3;
+  transform-origin: 50% 50%;
+}
+/* On a scene of several elements the drawing's edge shows while it is painted;
+   fixed in the paint mode (a sigil) the drawing is the whole sheet. */
+.canvas-editor-painting:not(.canvas-editor-inline) .paint-surface {
+  outline: 1px dashed var(--accent);
+  outline-offset: 2px;
+}
+.paint-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  background: transparent;
+}
+.paint-canvas--editable {
+  touch-action: none;
+  cursor: none;
+}
+/* The brush's outline under the pointer (PaintSurface places it). */
+.paint-cursor {
+  position: absolute;
+  top: 0;
+  left: 0;
+  border-radius: 9999px;
+  border: 1px solid var(--text-primary);
+  box-shadow: 0 0 0 1px var(--well-solid);
+  opacity: 0;
+  pointer-events: none;
+}
+.paint-cursor--eraser { border-style: dashed; }
+/* The selected strokes' frame and the rectangle or lasso being drawn (PaintSurface). */
+.paint-overlay {
+  position: absolute;
+  inset: 0;
+  overflow: visible;
+  pointer-events: none;
+}
+.paint-frame {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 1.5;
+}
+.paint-handle {
+  fill: var(--panel-bg);
+  stroke: var(--accent);
+  stroke-width: 1.5;
+}
+.paint-guide {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 1;
+  stroke-dasharray: 6 4;
+  opacity: 0.6;
+}
+.paint-grid {
+  fill: none;
+  stroke: var(--text-subtle);
+  stroke-width: 1;
+  opacity: 0.25;
+}
+.paint-grid--middle { stroke: var(--accent); opacity: 0.55; }
+.paint-check {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  height: 1.75rem;
+  padding: 0 0.5rem;
+  border-radius: 0.375rem;
+  font-size: 12px;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+.paint-check:hover { background: var(--interactive-hover); }
+.paint-pick {
+  fill: color-mix(in srgb, var(--accent) 12%, transparent);
+  stroke: var(--accent);
+  stroke-width: 1;
+  stroke-dasharray: 4 3;
+}
+.paint-error {
+  font-size: 12px;
+  color: var(--danger-text);
+}
+
+/* ── Canvas editor (editors/canvas) ──────────────────────────────────────────────
+   The stage fills the place it is embedded in: the toolbar strip on top while
+   editing, below it the viewport with the artboard. The artboard's background
+   is DOM behind the canvas; the canvas draws the grid, the elements and the
+   handles. While editing, the area around the artboard is a quiet well. */
+.canvas-editor {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  outline: none;
+}
+.canvas-toolbar-strip {
+  flex-shrink: 0;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--edge);
+}
+.canvas-viewport {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  touch-action: none;
+}
+.canvas-editor-editing .canvas-viewport {
+  background: var(--well-sunk);
+}
+.canvas-artboard {
+  position: absolute;
+  overflow: hidden;
+  pointer-events: none;
+}
+.canvas-editor-editing .canvas-artboard {
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35);
+}
+.canvas-artboard-inner {
+  position: absolute;
+  left: 0;
+  top: 0;
+  transform-origin: 0 0;
+}
+/* The rulers right at the artboard's top and left edge, kept in view when it runs past the stage. */
+.canvas-ruler {
+  position: absolute;
+  z-index: 3;
+  background: var(--well-solid);
+  touch-action: none;
+}
+.canvas-ruler-horizontal { border-radius: 3px 3px 0 0; cursor: ns-resize; }
+.canvas-ruler-vertical { border-radius: 3px 0 0 3px; cursor: ew-resize; }
+.canvas-ruler-corner {
+  position: absolute;
+  z-index: 3;
+  width: 18px;
+  height: 18px;
+  border-radius: 3px 0 0 0;
+  background: var(--well-solid);
+  box-shadow: inset -1px -1px 0 var(--edge-strong);
+}
+/* A tool's choice beside the tool column, such as the symbol library. */
+.canvas-rail-picker {
+  position: absolute;
+  left: calc(100% + 8px);
+  top: 0;
+  z-index: 5;
+  padding: 6px;
+}
+/* The symbol library: search, the packs, a grid of symbols. */
+.canvas-symbols {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 17.5rem;
+}
+.canvas-symbols-search {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 8px;
+  border: 1px solid var(--field-border);
+  border-radius: 6px;
+  background: var(--field-inset-bg);
+  color: var(--text-subtle);
+}
+.canvas-symbols-search input {
+  flex: 1;
+  min-width: 0;
+  background: transparent;
+  color: var(--text-primary);
+  font-size: 12px;
+  outline: none;
+}
+.canvas-symbols-packs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.canvas-symbols-pack {
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--field-border);
+  font-size: 11px;
+  color: var(--text-muted);
+}
+.canvas-symbols-pack:hover { color: var(--text-secondary); background: var(--interactive-hover); }
+.canvas-symbols-pack--active,
+.canvas-symbols-pack--active:hover {
+  border-color: color-mix(in srgb, var(--accent) 44%, transparent);
+  background: var(--menu-item-active-bg);
+  color: var(--menu-item-active-text);
+}
+.canvas-symbols-grid {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 2px;
+  max-height: 15rem;
+  overflow-y: auto;
+}
+.canvas-symbols-cell { position: relative; }
+.canvas-symbols-remove {
+  position: absolute;
+  top: 1px;
+  right: 1px;
+  display: none;
+  padding: 2px;
+  border-radius: 4px;
+  background: var(--well-solid);
+  color: var(--text-muted);
+}
+.canvas-symbols-cell:hover .canvas-symbols-remove { display: flex; }
+.canvas-symbols-remove:hover { color: var(--danger-text); }
+/* Saving a drawing as a symbol: its preview, a name, the button. */
+.canvas-save-symbol { width: 13rem; }
+.canvas-save-symbol-preview {
+  display: flex;
+  justify-content: center;
+  padding: 6px;
+  border-radius: 6px;
+  background: var(--field-inset-bg);
+  color: var(--text-primary);
+}
+.canvas-save-symbol-name {
+  height: 28px;
+  padding: 0 8px;
+  border: 1px solid var(--field-border);
+  border-radius: 6px;
+  background: var(--field-inset-bg);
+  color: var(--text-primary);
+  font-size: 12px;
+}
+.canvas-symbols-item {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  aspect-ratio: 1;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  color: var(--text-secondary);
+}
+.canvas-symbols-item:hover { background: var(--interactive-hover); color: var(--text-primary); }
+.canvas-symbols-item--active { border-color: color-mix(in srgb, var(--accent) 44%, transparent); color: var(--accent); }
+.canvas-symbols-empty {
+  grid-column: 1 / -1;
+  padding: 1rem 0;
+  text-align: center;
+  font-size: 12px;
+  color: var(--text-subtle);
+}
+/* The background panel of the canvas editor's bar. */
+.canvas-bg-panel {
+  width: 15.5rem;
+  gap: 6px;
+}
+.canvas-bg-preview {
+  height: 3.5rem;
+  border-radius: 6px;
+  border: 1px solid var(--edge-strong);
+  background-color: transparent;
+  background-image: conic-gradient(var(--well-raise) 25%, transparent 0 50%, var(--well-raise) 0 75%, transparent 0);
+  background-size: 12px 12px;
+}
+.canvas-bg-heading {
+  margin-top: 4px;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-subtle);
+}
+.canvas-bg-segments { align-self: flex-start; }
+.canvas-bg-stops, .canvas-bg-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.canvas-bg-icon, .canvas-bg-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 24px;
+  min-width: 24px;
+  padding: 0 6px;
+  border-radius: 5px;
+  border: 1px solid var(--field-border);
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+.canvas-bg-icon:hover:not(:disabled), .canvas-bg-button:hover:not(:disabled) { background: var(--interactive-hover); }
+.canvas-bg-icon:disabled, .canvas-bg-button:disabled { opacity: 0.45; }
+.canvas-bg-button { flex: 1; }
+.canvas-bg-slider {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+.canvas-bg-slider input { flex: 1; min-width: 0; }
+/* The canvas editor's export dialog: a label, then its segments or fields. */
+.canvas-export-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+.canvas-export-label { flex-shrink: 0; }
+.canvas-export-segment {
+  width: auto;
+  min-width: 2.75rem;
+  padding: 0 0.6rem;
+  font-size: 12px;
+}
+.canvas-export-hint {
+  margin-top: -0.25rem;
+  font-size: 12px;
+  color: var(--text-subtle);
+}
+.canvas-export-size {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-muted);
+}
+.canvas-export-size input {
+  width: 5.5rem;
+  height: 28px;
+  padding: 0 8px;
+  border: 1px solid var(--field-border);
+  border-radius: 6px;
+  background: var(--field-inset-bg);
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+}
+/* The overview of the canvas editor's keys: sections in two columns, each row what it does and its keys. */
+.canvas-keys {
+  columns: 2 300px;
+  column-gap: 2rem;
+  padding: 0.75rem 1rem 1rem;
+}
+.canvas-keys-section {
+  break-inside: avoid;
+  margin-bottom: 1rem;
+}
+.canvas-keys-section h3 {
+  margin-bottom: 0.25rem;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-subtle);
+}
+.canvas-keys-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 3px 0;
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+}
+.canvas-keys-chips {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 4px;
+  flex-shrink: 0;
+  max-width: 55%;
+}
+.canvas-keys-chips kbd {
+  padding: 1px 6px;
+  border: 1px solid var(--edge-strong);
+  border-bottom-width: 2px;
+  border-radius: 4px;
+  background: var(--well-solid);
+  font-family: inherit;
+  font-size: 0.6875rem;
+  white-space: nowrap;
+  color: var(--text-primary);
+}
+/* A tool of the column picked: the stage draws a new element, over the others too. */
+.canvas-editor-adding .canvas-stage,
+.canvas-editor-adding .canvas-stage * { cursor: crosshair !important; }
+.canvas-stage {
+  position: absolute;
+  inset: 0;
+}
+/* In the flow (a sigil drawing in an entry): the bar, then the stage as a
+   rounded sheet in the artboard's shape. */
+.canvas-editor-inline {
+  position: relative;
+  inset: auto;
+  gap: 0.5rem;
+}
+.canvas-editor-inline .canvas-toolbar-strip {
+  padding: 0;
+  border-bottom: none;
+}
+.canvas-editor-inline .canvas-viewport {
+  flex: none;
+  width: 100%;
+  border-radius: 0.75rem;
+  border: 1px solid var(--edge);
+  background: transparent;
+}
+.canvas-editor-inline .canvas-artboard {
+  box-shadow: none;
+}
+/* The sheet a drawing lies on. */
+.canvas-paper {
+  background: var(--canvas);
+}
+/* Zoom in the stage's corner, a small bar of its own. */
+.canvas-zoom {
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+  z-index: 4;
+  flex-wrap: nowrap;
+  border-color: var(--edge-strong);
+  background: var(--well-solid);
+  box-shadow: var(--menu-shadow);
+}
+/* While something is dragged over the stage from outside. */
+.canvas-drop-hint {
+  position: absolute;
+  inset: 8px;
+  border: 1px dashed var(--edge-strong);
+  border-radius: 0.5rem;
+  pointer-events: none;
+}
+/* Typing into a text element: laid over it in its own font and colour. */
+.canvas-text-input {
+  position: absolute;
+  z-index: 5;
+  margin: 0;
+  padding: 0;
+  border: none;
+  outline: 1px dashed var(--accent);
+  outline-offset: 2px;
+  background: transparent;
+  resize: none;
+  overflow: hidden;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+}
+.canvas-panel {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+  padding: 4px;
+  min-width: 11rem;
+}
+.canvas-swatches {
+  display: grid;
+  grid-template-columns: repeat(7, 20px);
+  gap: 5px;
+  padding: 4px;
+}
+.canvas-swatch {
+  position: relative;
+  width: 20px;
+  height: 20px;
+  border-radius: 9999px;
+  border: 1px solid var(--edge-strong);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+}
+.canvas-swatch-active {
+  box-shadow: 0 0 0 2px var(--well-solid), 0 0 0 3px var(--accent);
+}
+/* The system's colour picker behind a rainbow swatch. */
+.canvas-swatch-custom {
+  background: conic-gradient(#e5484d, #f5d90a, #46a758, #0090ff, #8e4ec6, #e5484d);
+  overflow: hidden;
+}
+.canvas-swatch-custom input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+.canvas-number-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 0 4px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.canvas-size-input {
+  width: 3.5rem;
+  height: 1.75rem;
+  text-align: right;
+}
+.canvas-font-option {
+  padding: 4px 10px;
+  border-radius: 6px;
+  text-align: left;
+  font-size: 15px;
+  color: var(--text-secondary);
+}
+.canvas-font-option:hover {
+  background: var(--interactive-hover);
+}
+.canvas-font-option-active {
+  color: var(--editor-toolbar-active-text);
+  background: var(--editor-toolbar-active-bg);
+}
+.canvas-color-dot {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border-radius: 9999px;
+  border: 1px solid var(--edge-strong);
+}
+/* A drawn text in the altar's lists: a serif "T" in the text's colour. */
+.altar-text-glyph {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  font-family: "Cormorant Garamond", Georgia, serif;
+  font-weight: 600;
+  line-height: 1;
+}
+
 /* The negative outer margin cancels the inner padding horizontally: the text
    stays flush under the title in edit mode, exactly where it sits in
    read mode — the frame wraps around the outside, into the page's px-8. */
@@ -2755,42 +3892,7 @@ button.block-altar:hover .block-altar-title {
   line-height: 1;
 }
 
-/* "Newer version" in the frame of an outdated copy — a quiet hint
-   that opens the menu with "Update block". */
-.block-frame-outdated {
-  display: inline-flex;
-  flex-shrink: 0;
-  align-items: center;
-  gap: 0.25rem;
-  padding: 0 6px;
-  border-radius: 999px;
-  font-size: 10px;
-  color: var(--accent-text);
-  background: color-mix(in srgb, var(--accent) 12%, transparent);
-  transition: background-color 150ms;
-}
-
-.block-frame-outdated:hover {
-  background: color-mix(in srgb, var(--accent) 20%, transparent);
-}
-
-.block-frame-outdated:focus-visible {
-  outline: none;
-  box-shadow: 0 0 0 2px var(--focus-ring);
-}
-
-/* Blocks view: the "older versions in entries" dot and the field rows
-   of the block page. */
-.block-library-outdated-dot {
-  width: 6px;
-  height: 6px;
-  flex-shrink: 0;
-  border-radius: 999px;
-  background: var(--accent);
-}
-
-/* Templates in the entry: the "Template applied" notice above the stack and
-   the suggestions in the empty entry. */
+/* Templates in the entry: the "Template applied" notice above the stack. */
 .template-notice {
   display: flex;
   align-items: center;
@@ -2806,69 +3908,41 @@ button.block-altar:hover .block-altar-title {
   font-size: 0.75rem;
 }
 
-.template-suggestions {
+/* Assignment table: a cell as a quiet choice. */
+.template-assign-cell {
   display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-  margin-bottom: 0.75rem;
-}
-
-/* Templates: the "Default" star in the default templates overview and in the
-   sidebar of a template — in the accent like the dot above, in both themes. */
-.template-default-star {
-  display: flex;
-  flex-shrink: 0;
-  color: var(--accent-text);
-}
-
-/* Assignment table of a template (the dialog only, `AssignmentTable`):
-   label on the left; in the dialog fixed columns for wiki, operations and "both" —
-   fixed, so that the hint below a cell truncates instead of widening the
-   column. */
-.template-assign-row {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) repeat(3, 6.5rem);
-  column-gap: 0.75rem;
-  align-items: start;
-  padding: 0.25rem 0;
-}
-
-.template-assign-head {
-  align-items: end;
-  padding-bottom: 0.375rem;
-  border-bottom: 1px solid var(--border-soft);
-}
-
-/* The "available" tick before a template name — the default stands without a mark. */
-.template-overview-state {
-  display: flex;
-  flex-shrink: 0;
-  color: var(--text-subtle);
-}
-
-/* "Replaces X": the star takes something away from another template — in the accent. */
-.template-assign-replaces {
-  color: var(--accent-text);
-}
-
-/* Default templates overview in the dashboard: the name of a template as a link to its page. */
-.template-overview-link {
-  display: inline-flex;
-  max-width: 100%;
+  width: 100%;
+  min-width: 0;
   align-items: center;
   gap: 0.375rem;
+  padding: 0.25rem 0.5rem;
+  margin-left: -0.5rem;
   border-radius: 6px;
   color: var(--text-secondary);
-  transition: color 150ms;
+  transition: background-color 150ms, color 150ms;
 }
 
-.template-overview-link:hover {
+.template-assign-cell:hover {
+  background: var(--menu-item-hover-bg);
   color: var(--text-primary);
 }
 
-.template-overview-link:focus-visible {
+.template-assign-cell:focus-visible {
   outline: none;
   box-shadow: 0 0 0 2px var(--focus-ring);
+}
+
+.template-assign-chevron {
+  flex-shrink: 0;
+  margin-left: auto;
+  color: var(--text-subtle);
+  opacity: 0;
+  transition: opacity 150ms;
+}
+
+.template-assign-cell:hover .template-assign-chevron,
+.template-assign-cell:focus-visible .template-assign-chevron {
+  opacity: 1;
 }
 
 .block-def-element {
@@ -3381,15 +4455,6 @@ html[data-theme] .tasks-category-trigger:hover {
   border-color: var(--field-border-hover);
 }
 
-.sigil-tool-toggle {
-  background-color: var(--well-tint);
-  border-color: var(--edge);
-}
-
-.sigil-tool-btn:hover {
-  background-color: var(--interactive-active);
-}
-
 .sigil-brush-controls {
   background-color: var(--well-tint);
   border: 1px solid var(--edge);
@@ -3482,6 +4547,19 @@ html[data-theme] .sidebar-search-inner:focus-within {
   color: var(--danger-text);
 }
 
+.context-menu-separator {
+  height: 1px;
+  margin: 4px 0;
+  background-color: var(--menu-border);
+}
+
+.context-menu-shortcut {
+  margin-left: auto;
+  padding-left: 1.5rem;
+  color: var(--text-subtle);
+  font-variant-numeric: tabular-nums;
+}
+
 /* The four links in the About section. Colour from --accent instead of a
    jade utility, so that Parchment need not carry another bridge for it; the
    hover mixes toward the text colour and thereby gets lighter in Noctis and
@@ -3492,24 +4570,38 @@ html[data-theme] .settings-nav-item-idle {
   border-color: transparent;
 }
 
-/* The four icon links in the About section. Everything from theme tokens instead of
-   stone-/jade utilities, otherwise every colour here drags along another
-   Parchment bridge. The attribute selector in front for the same reason as a
-   rule further up: Parchment pre-colours every border, and at equal
-   specificity the later rule wins. The focus ring is mandatory — Noctis
-   has no generic button:focus-visible rule. */
-html[data-theme] .settings-about-link {
-  color: var(--accent-text);
+/* The four links under the start page's brand. Everything from theme tokens
+   instead of stone-/jade utilities, otherwise every colour here drags along
+   another Parchment bridge. The attribute selector in front for the same
+   reason as a rule further up: Parchment pre-colours every border, and at
+   equal specificity the later rule wins. The focus ring is mandatory —
+   Noctis has no generic button:focus-visible rule. */
+html[data-theme] .start-brand-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 30px;
+  padding: 0 10px;
+  border-radius: 8px;
+  font-size: 13px;
+  color: var(--text-muted);
+  transition: color 150ms, background-color 150ms;
 }
 
-html[data-theme] .settings-about-link:hover {
-  color: color-mix(in srgb, var(--accent) 78%, var(--text-primary));
+html[data-theme] .start-brand-link:hover {
+  color: var(--text-primary);
+  background-color: var(--interactive-hover);
 }
 
-html[data-theme] .settings-about-link:focus-visible {
+html[data-theme] .start-brand-link:focus-visible {
   outline: none;
-  border-radius: 4px;
   box-shadow: 0 0 0 2px var(--focus-ring);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html[data-theme] .start-brand-link {
+    transition: none;
+  }
 }
 
 .context-menu-item-default:hover {
@@ -3772,18 +4864,6 @@ html[data-theme] .link-picker-row:focus-visible .link-picker-label {
   color: var(--link-picker-row-hover-text);
 }
 
-html[data-theme='emerald-noctis'] .home-item-title {
-  color: #ded0c1;
-}
-
-html[data-theme='emerald-noctis'] .home-item-meta {
-  color: #9b8571;
-}
-
-html[data-theme='emerald-noctis'] .panel-interactive:hover .home-item-title {
-  color: #f4e8db;
-}
-
 /* The settings section navigation shares its values with the
    sidebar tabs, but gets a name of its own: a nav row in a
    dialog is something different from a tab icon in the sidebar, and the
@@ -3828,7 +4908,6 @@ html[data-theme='emerald-noctis'] .tasks-linked-entry:hover {
   background: rgba(0, 122, 77, 0.34);
 }
 
-html[data-theme='emerald-noctis'] .sigil-tool-toggle,
 html[data-theme='emerald-noctis'] .sigil-brush-controls,
 html[data-theme='emerald-noctis'] .altar-symbol-trigger,
 html[data-theme='emerald-noctis'] .altar-upload-item-btn,
@@ -3972,18 +5051,6 @@ html[data-theme='emerald-parchment'] .tiptap pre {
   border-color: rgba(150, 112, 73, 0.34);
 }
 
-html[data-theme='emerald-parchment'] .home-item-title {
-  color: #3b2a19;
-}
-
-html[data-theme='emerald-parchment'] .home-item-meta {
-  color: #9f7f5f;
-}
-
-html[data-theme='emerald-parchment'] .panel-interactive:hover .home-item-title {
-  color: #22160d;
-}
-
 html[data-theme='emerald-parchment'] .list-toolbar-chip,
 html[data-theme='emerald-parchment'] .list-toolbar-chip:hover {
   background: #faefdD;
@@ -4035,12 +5102,8 @@ html[data-theme='emerald-parchment'] .app-sidebar-left .bg-well-active.text-seco
   border: 1px solid rgba(0, 138, 87, 0.34);
 }
 
-html[data-theme='emerald-parchment'] .sigil-canvas-shell {
-  background: #ece2d1;
-  border-color: rgba(145, 108, 70, 0.34);
-}
-
-html[data-theme='emerald-parchment'] .sigil-canvas {
+html[data-theme='emerald-parchment'] .canvas-paper {
+  background-color: #ece2d1;
   background-image:
     linear-gradient(rgba(152, 117, 81, 0.18) 1px, transparent 1px),
     linear-gradient(90deg, rgba(152, 117, 81, 0.18) 1px, transparent 1px);
@@ -4095,21 +5158,6 @@ html[data-theme='emerald-parchment'] .tasks-linked-entry {
 html[data-theme='emerald-parchment'] .tasks-linked-entry:hover {
   color: #07593b;
   background: #c6e7d7;
-}
-
-html[data-theme='emerald-parchment'] .sigil-tool-toggle {
-  background: #eadcc6;
-  border-color: rgba(145, 108, 70, 0.36);
-}
-
-html[data-theme='emerald-parchment'] .sigil-tool-btn.bg-well-active {
-  background: #d6eee1;
-  color: #075e3d;
-}
-
-html[data-theme='emerald-parchment'] .sigil-tool-btn:hover {
-  background: #efdfc8;
-  color: #2f2114;
 }
 
 html[data-theme='emerald-parchment'] .sigil-brush-controls {
@@ -4252,8 +5300,7 @@ html[data-theme='custom'] .settings-nav-item-active,
 html[data-theme='custom'] .right-sidebar-tab-active,
 html[data-theme='custom'] .app-sidebar-right .bg-well-active.text-secondary,
 html[data-theme='custom'] .app-sidebar-left .bg-well-active.text-secondary,
-html[data-theme='custom'] .altar-category-chip.bg-well-active,
-html[data-theme='custom'] .sigil-tool-btn.bg-well-active {
+html[data-theme='custom'] .altar-category-chip.bg-well-active {
   background: var(--menu-item-active-bg);
   border-color: var(--accent-edge);
   color: var(--menu-item-active-text);
@@ -4288,3 +5335,36 @@ html[data-theme='custom'] .sidebar-search-input::placeholder {
   color: var(--text-subtle);
 }
 
+/* A selected dashboard row (trash). With a class more than the themes'
+   `.panel-interactive` rules, hover included, or they would win. */
+html[data-theme] .panel-interactive.row-selected,
+html[data-theme] .panel-interactive.row-selected:hover {
+  background: var(--accent-wash);
+  border-color: var(--accent);
+}
+
+/* A row's controls that show on hover. Takes no room at rest, so the row's
+   metadata keeps to the edge (-0.75rem undoes the row's gap), but stays in the
+   layout rather than `display: none`, or Tab could not reach it. */
+.row-hover-controls {
+  display: flex;
+  width: 0;
+  margin-left: -0.75rem;
+  overflow: hidden;
+  opacity: 0;
+}
+.group:hover > .row-hover-controls,
+.row-hover-controls:focus-within {
+  width: auto;
+  margin-left: 0;
+  overflow: visible;
+  opacity: 1;
+}
+/* Its own rule: an engine without :has() would drop a whole list. An open menu
+   lives inside the controls and must not vanish when the pointer leaves the row. */
+.row-hover-controls:has([aria-expanded='true']) {
+  width: auto;
+  margin-left: 0;
+  overflow: visible;
+  opacity: 1;
+}

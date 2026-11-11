@@ -21,7 +21,7 @@ import type Database from './sqlite';
  * Must match the highest version in MIGRATIONS. `db.ts` checks this at
  * startup so that a new migration step cannot be forgotten.
  */
-export const BASELINE_VERSION = 56;
+export const BASELINE_VERSION = 60;
 
 /**
  * Tables in dependency order: parents before children.
@@ -48,6 +48,7 @@ export const TABLES = [
   'task_links',
   'languages',
   'lexicon_entries',
+  'symbols',
   'images',
 ] as const;
 
@@ -90,11 +91,9 @@ export const TABLE_DDL: Record<TableName, string> = {
 
   // The custom blocks of the blocks view (since v40). A definition is the
   // template for copies: an inserted block carries elements and display rules
-  // itself in the `content` and remembers only origin and revision
-  // (`data-block-origin`/`-rev`). Hence no foreign key and no
-  // cleanup on deletion — the copies manage without their definition.
-  // `elements`/`display` are JSON (lib/blocks/definitions.ts); `revision`
-  // rises with every change that affects copies. The icon default is
+  // itself in the `content` and does not know where it came from. Hence no
+  // foreign key and no cleanup on deletion.
+  // `elements`/`display` are JSON (lib/blocks/definitions.ts). The icon default is
   // `DEFAULT_DEFINITION_ICON` — here as a literal so that the schema imports nothing from
   // the block logic.
   block_definitions: `
@@ -104,7 +103,6 @@ export const TABLE_DDL: Record<TableName, string> = {
       icon TEXT NOT NULL DEFAULT '🧩',
       elements TEXT NOT NULL DEFAULT '[]',
       display TEXT NOT NULL DEFAULT '{}',
-      revision INTEGER NOT NULL DEFAULT 1,
       sort_order INTEGER NOT NULL DEFAULT 0,
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL,
@@ -113,10 +111,9 @@ export const TABLE_DDL: Record<TableName, string> = {
 
   // The templates of the templates dashboard (since v43): title, block stack and
   // tags that an entry receives as a copy on creation or insertion. Like
-  // `block_definitions` without a foreign key — entries remember only the
-  // origin in the `content` (`data-template-origin`). `assignments` is JSON
-  // (lib/blocks/templates.ts): which entry kind × category the template
-  // offers and where it is the default; the category IDs in it are cleaned up by
+  // `block_definitions` without a foreign key — entries remember nothing of it.
+  // `assignments` is JSON (lib/blocks/templates.ts): which entry kind × category
+  // starts with the template; the category IDs in it are cleaned up by
   // `dropCategoryFromTemplates` when a category is permanently deleted.
   // The icon default is `DEFAULT_TEMPLATE_ICON`.
   templates: `
@@ -136,7 +133,9 @@ export const TABLE_DDL: Record<TableName, string> = {
 
   // `settings` (since v51) is JSON: background, grid, snapping and
   // resolution (`lib/altarSettings.ts`) — formerly twelve columns of their own. The
-  // image columns remain columns, the image cleanup looks there.
+  // image columns remain columns, the image cleanup looks there. `elements`
+  // (since v57) is JSON too: the shapes and text drawn on the altar
+  // (`lib/altarElements.ts`).
   altars: `
     CREATE TABLE altars (
       id TEXT PRIMARY KEY,
@@ -147,7 +146,8 @@ export const TABLE_DDL: Record<TableName, string> = {
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL,
       deleted_at TEXT,
-      settings TEXT NOT NULL DEFAULT '{}'
+      settings TEXT NOT NULL DEFAULT '{}',
+      elements TEXT NOT NULL DEFAULT '[]'
     )`,
 
   // Journal entries, wiki articles and operations in one table (since v49;
@@ -223,7 +223,8 @@ export const TABLE_DDL: Record<TableName, string> = {
       rotation REAL NOT NULL DEFAULT 0,
       opacity REAL NOT NULL DEFAULT 1,
       locked INTEGER NOT NULL DEFAULT 0,
-      hidden INTEGER NOT NULL DEFAULT 0
+      hidden INTEGER NOT NULL DEFAULT 0,
+      group_id TEXT
     )`,
 
   // target_id is polymorphic — no foreign key possible; checkIntegrity() checks the relationship.
@@ -271,8 +272,22 @@ export const TABLE_DDL: Record<TableName, string> = {
       updated_at TEXT NOT NULL
     )`,
 
+  // The vault's own symbols for the canvas editor's library (since v59), made
+  // from drawings: `d` the lines and `solid` the filled parts as path data in a
+  // box of 100 × 100, `weight` the lines' width there. No trash: a removed one
+  // is gone at once, with undo in memory, like a word of the lexicon.
+  symbols: `
+    CREATE TABLE symbols (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL DEFAULT '',
+      d TEXT NOT NULL DEFAULT '',
+      solid TEXT NOT NULL DEFAULT '',
+      weight REAL NOT NULL DEFAULT 5,
+      created_at TEXT NOT NULL
+    )`,
+
   // The vault's images as a place of their own, like tags and categories
-  // (since v56): a row gives a stored file (`storedImageName`) a name, tags
+  // (since v60): a row gives a stored file (`storedImageName`) a name, tags
   // (IDs as JSON, `lib/tagRefs.ts`) and a note. Every other file of the
   // folder is listed too, unnamed; a row keeps its file from the cleanup.
   // `detached` (JSON) holds, while the picture is in the trash, the texts it
@@ -381,7 +396,7 @@ export const ENTRIES_INDEX_DDL: readonly string[] = [
   'CREATE INDEX idx_entries_decorated ON entries(deleted_at) WHERE icon IS NOT NULL OR cover_image IS NOT NULL',
 ];
 
-/** The index of `images` (v56): its trash. */
+/** The index of `images` (v60): its trash. */
 export const IMAGES_INDEX_DDL: readonly string[] = [
   'CREATE INDEX idx_images_deleted ON images(deleted_at)',
 ];
@@ -652,8 +667,8 @@ function assignedCategory(a: unknown): string | null {
  * Removes a category from the assignments of all templates — including those in the
  * trash. `reassignCategoryContent` calls it on permanent deletion of a
  * category; do not call it in addition. Templates have no
- * foreign key that would enforce this, and an assignment pointing nowhere would offer
- * the template in a combination that no longer exists.
+ * foreign key that would enforce this, and an assignment pointing nowhere would apply
+ * the template to a combination that no longer exists.
  */
 export async function dropCategoryFromTemplates(db: Database, categoryId: string): Promise<void> {
   const rows = await db.select<{ id: string; assignments: string | null }[]>(
@@ -671,31 +686,23 @@ export async function dropCategoryFromTemplates(db: Database, categoryId: string
 
 /**
  * Re-attaches the assignments on `from` to `to` — when a category merges into
- * the one of the same name. If a template had both, one assignment remains. A
- * star only moves along if no active template carries one yet for this type
- * and `to`: there are not two defaults for the same combination. Stars
- * belong to active templates (as in `restoreTemplate`) — one in the trash
- * loses its star here.
+ * the one of the same name. A combination already held stays with its holder.
  */
 async function moveCategoryInTemplates(db: Database, from: string, to: string): Promise<void> {
-  const rows = await db.select<{ id: string; assignments: string | null; deleted_at: string | null }[]>(
-    'SELECT id, assignments, deleted_at FROM templates ORDER BY deleted_at IS NOT NULL'
-  );
-  const parsed = rows.map((row) => ({ id: row.id, active: !row.deleted_at, assignments: rawAssignments(row.assignments) }));
+  const rows = await db.select<{ id: string; assignments: string | null }[]>('SELECT id, assignments FROM templates');
+  const parsed = rows.map((row) => ({ id: row.id, assignments: rawAssignments(row.assignments) }));
   const entryTypeOf = (a: unknown) => String((a as { entryType?: unknown } | null)?.entryType);
-  const isDefault = (a: unknown) => (a as { isDefault?: unknown } | null)?.isDefault === true;
-  const starred = new Set(parsed.filter((row) => row.active).flatMap(({ assignments }) =>
-    (assignments ?? []).filter((a) => assignedCategory(a) === to && isDefault(a)).map(entryTypeOf)));
-  for (const { id, active, assignments } of parsed) {
+  const held = new Set(parsed.flatMap(({ assignments }) =>
+    (assignments ?? []).filter((a) => assignedCategory(a) === to).map(entryTypeOf)));
+  for (const { id, assignments } of parsed) {
     if (!assignments?.some((a) => assignedCategory(a) === from)) continue;
     const next: unknown[] = [];
     for (const a of assignments) {
       if (assignedCategory(a) !== from) { next.push(a); continue; }
       const entryType = entryTypeOf(a);
-      if (assignments.some((b) => assignedCategory(b) === to && entryTypeOf(b) === entryType)) continue;
-      const star = active && isDefault(a) && !starred.has(entryType);
-      if (star) starred.add(entryType);
-      next.push({ ...(a as object), category: to, isDefault: star });
+      if (held.has(entryType)) continue;
+      held.add(entryType);
+      next.push({ ...(a as object), category: to });
     }
     await db.execute('UPDATE templates SET assignments=$1 WHERE id=$2', [JSON.stringify(next), id]);
   }
@@ -819,7 +826,7 @@ export async function collectUsedImageFilenames(db: Database): Promise<Set<strin
     for (const match of (elements ?? '').matchAll(IMAGE_NAME_RE)) used.add(match[0]);
   }
 
-  // Images taken into "Images" (v56) stay, used anywhere or not — not in
+  // Images taken into "Images" (v60) stay, used anywhere or not — not in
   // IMAGE_FIELDS for the same reason. A row in the trash keeps its file until
   // it is deleted for good.
   const kept = await db.select<{ file: string }[]>('SELECT file FROM images');

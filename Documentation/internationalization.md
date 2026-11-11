@@ -2,15 +2,15 @@
 
 Emerald supports four languages: English (`en`), German (`de`), Spanish (`es`), and French (`fr`).
 
-The language is a **per-vault setting** (Settings → General → Language, part of `appearance` in the vault's `settings.json` — see [`database.md`](database.md#multi-vault-system) and [Vault Settings](architecture/storage.md#vault-settings)), applied through `settingsStore.loadForVault`/`update`.
+The language belongs to the **installation**, not to a vault: the menu at the start page's bottom left sets it, `store/deviceStore.ts` applies it and writes `{appDataDir}/device.json` (see [Device Settings](architecture/storage.md#device-settings)). It does not sync, and a vault's `settings.json` from before still holding it under `appearance` is no longer read.
 
-It is mirrored into `localStorage` (`app-language`) only as a boot-time starting point: `main.tsx` reads the mirror before any vault is open, so the app doesn't flash English while the vault's settings load. Once a vault has loaded, its `settings.json` is authoritative.
+It is mirrored into `localStorage` (`app-language`) as a boot-time starting point: `main.tsx` reads the mirror before the bundle can read `device.json`, so the app doesn't flash English. Once `device.json` is read, it is authoritative.
 
 ## Setup
 
 Translations are managed with `react-i18next`; the setup lives in `src/i18n/index.ts`. Only `en` — the startup and fallback language — is imported statically. `de`/`es`/`fr` load on demand as their own chunks, like the emoji search data (`src/lib/emojiSearch.ts`). `LANGUAGE_OPTIONS` in the same file is the one list of available languages.
 
-**Always switch languages through `changeAppLanguage(lang)`.** It loads the bundle (and the matching date-fns locale) before calling `i18n.changeLanguage`, then writes the `localStorage` mirror and `<html lang>`, and lets the last of two racing switches win. A direct `i18n.changeLanguage` would switch to a not-yet-registered locale and render the English fallback. The callers are `settingsStore`'s `applyAppearance` and the startup path in `main.tsx`.
+**Always switch languages through `changeAppLanguage(lang)`.** It loads the bundle (and the matching date-fns locale) before calling `i18n.changeLanguage`, then writes the `localStorage` mirror and `<html lang>`, and lets the last of two racing switches win. A direct `i18n.changeLanguage` would switch to a not-yet-registered locale and render the English fallback. The callers are `deviceStore`'s `apply` and the startup path in `main.tsx`.
 
 Weekday names (the automatic backup's weekday chips) come from `formatWeekday` and `weekdaysInLocaleOrder` in `lib/formatDate.ts`, i.e. from the date-fns locale, so they need no keys of their own.
 
@@ -83,10 +83,11 @@ Top-level keys of `en.json`, with the conventions worth knowing:
 | `nav` | Navigation labels, including `home`, `categories`, `all` and `vaults`. A rail entry needs its `nav.<id>` key in all four locales, since `ModuleMeta`/`AUX_VIEWS` resolve the label dynamically |
 | `sidebar` | Left sidebar strings (`allEmpty`) |
 | `journal`, `wiki`, `operations`, `tasks`, `altar` | Module UI strings. Each module's `untitled` key is what `displayTitle` (`src/lib/entryTitle.ts`) shows for an empty title — display text only, never stored. `*.categories.*` is legacy-only (see above) |
-| `altar` | Also: the "element" wording for library items (`addElement`, `elementName`, `noElements`, `placedElements`), background presets under `backgrounds.*`, overlay, grid and inspector labels (units are rendered in the UI, not in the values), the dashboard's `sectionTitle`/`libraryTitle` and their own sort labels `sortAltars`/`sortLibrary` |
+| `altar` | Also: the "element" wording for library items (`addElement`, `elementName`, `noElements`, `placedElements`), grid and inspector labels (units are rendered in the UI, not in the values), the dashboard's `sectionTitle`/`libraryTitle` and their own sort labels `sortAltars`/`sortLibrary` |
 | `creation` | The sigil creation tools (intention, letters, canvas, charge) |
 | `blocks` | Content-block UI and the Blocks view: `types.*` (block types), `kinds.*` (one per `ElementKind`, shared by the "Add block" menu and the builder's element picker), `fields.*` (field block), `sigil.*` (standalone sigil blocks and their in-block parts), `altar.*` (altar field kind), `library.*` (the Blocks builder and its update/remove-copies notices) |
 | `editor` | Shared editor buttons, link-popup actions, `lockedBySigil`, and `toolbar.*` (every formatting-toolbar tooltip) |
+| `symbols` | The canvas editor's symbol library: its own labels, `packs.*` the pack names, and `<pack>.<name>` every symbol's name, which the library's search looks in |
 | `moonPhase` | Display names of the eight moon phases |
 | `search` | Dashboard search placeholders (`placeholder`, `placeholderIn` with `{{title}}`) and the title bar's global search (`globalPlaceholder`, `hint`, `clear`, `showMore`). Result module labels reuse `nav.*`; only `altarElements`/`categories` have their own |
 | `templates` | Templates dashboard and page; `builtin.sigil` names the built-in `core-sigil` template the way `categories.builtin.*` names a category; `insert.*` is the editor's picker and apply flow |
@@ -94,8 +95,11 @@ Top-level keys of `en.json`, with the conventions worth knowing:
 | `tags` | Tags view (`new`, `name`, `nameTaken`, `color`, `unused`, `onlyInTemplates`) |
 | `properties` | Right sidebar Properties panel |
 | `filters` | Filter panel; `all` is the "All" row every `FilterList` shows on top |
-| `vault` | `VaultModal`: list/switch, edit, create, open/relocate, delete. Some keys (`chooseFolder`, `defaultFolder`, `alreadyOpen`, `accessDenied`, `folderHasVault`, `folderNotEmpty`) also serve the backup import's add-vault mode via `VaultLocationRow` and `NEW_VAULT_TARGET_ERROR_KEY` |
-| `settings` | Settings modal |
+| `vault` | `VaultPicker`: list/switch, edit, create, open/relocate, delete, the way back. Some keys (`chooseFolder`, `defaultFolder`, `alreadyOpen`, `accessDenied`, `folderHasVault`, `folderNotEmpty`) also serve the backup import's add-vault mode via `VaultLocationRow` and `NEW_VAULT_TARGET_ERROR_KEY` |
+| `settings` | Settings modal, and on the start page the keys its sections share with it (language, theme, custom themes, updates, tagline, website) |
+| `start` | The start page's own: section headings, links, version and author |
+| `createItem` | The rail's plus: `CreateItemModal` |
+| `sync` | The sync server: the start page's server section, Settings → Sync, the vault list's state marks, sync errors |
 | `vaultKey` | `VaultKeyDialog` and its shared parts: unlock, create, encrypt, recover, the recovery-key box, the "remember on this device" switch and the failure texts (`wrongPassword`, `tooShort` with `{{count}}`, …) |
 | `security` | Settings → Security: remember, lock, change password, each with a hint and a tooltip |
 | `backupKey` | `BackupUnlockDialog`: opening an encrypted backup |

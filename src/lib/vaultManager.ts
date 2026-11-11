@@ -232,7 +232,7 @@ async function readVaultsFile(): Promise<VaultsFile> {
   }
 
   // No `vaults.json` means one of two things: either this installation has never
-  // had a database — then the first start leads through the vault modal —,
+  // had a database — then the first start leads through the vault picker —,
   // or it dates from the time before multi-vault and its `emerald.db` has
   // long been there. The difference decides between onboarding and a
   // user sitting in front of their own, apparently empty journal.
@@ -365,7 +365,7 @@ export type NewVaultTargetProblem = 'alreadyOpen' | 'denied' | 'hasVault' | 'not
 
 /**
  * The message each problem gets. Lives beside {@link probeNewVaultTarget} so
- * the vault modal and the backup import cannot drift apart in what they tell
+ * the vault picker and the backup import cannot drift apart in what they tell
  * the user about the same folder.
  */
 export const NEW_VAULT_TARGET_ERROR_KEY: Record<NewVaultTargetProblem, string> = {
@@ -387,7 +387,7 @@ export const NEW_VAULT_TARGET_ERROR_KEY: Record<NewVaultTargetProblem, string> =
  *
  * `alreadyOpen` catches the case that the file probe does not see: the folder
  * is already *registered* as a vault but is currently not on the disk
- * (deleted, drive unplugged — "Folder not found" in the vault modal).
+ * (deleted, drive unplugged — "Folder not found" in the vault picker).
  * Without the check it would pass here as empty, `create_vault_dirs`
  * would create it anew, and two vault ids would share one folder — whereupon
  * "Delete files" on one would pull the rug out from under the other.
@@ -422,7 +422,7 @@ export function newVaultBaseDir(): Promise<string> {
  *
  * Without a `path` it falls back to `{appDataDir}/vaults/{id}` — the reserve
  * for the case that the documents folder cannot be resolved: an id-named
- * folder there can never collide. The vault modal and the backup import
+ * folder there can never collide. The vault picker and the backup import
  * normally pass a path, built from the documents folder and the vault's name
  * or picked by the user (see {@link newVaultTarget}).
  */
@@ -443,7 +443,7 @@ export async function newVaultRecord(
 }
 
 /**
- * The single funnel through which a vault enters the list — the vault modal,
+ * The single funnel through which a vault enters the list — the vault picker,
  * and the `add-vault` backup import. Creating the directory here means
  * `getDb()` never has to, which is what lets it treat a missing directory as
  * the error it is instead of silently starting an empty vault.

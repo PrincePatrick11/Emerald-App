@@ -21,17 +21,14 @@ import { categoryLabel } from './categories';
 import { useCategoryStore } from '../store/categoryStore';
 import { useBlockDefinitionStore } from '../store/blockDefinitionStore';
 import { useTemplateStore } from '../store/templateStore';
-import {
-  ALL_CATEGORIES, assignedCategoryId, MAX_ASSIGNMENTS, parseAssignments, type TemplateAssignment,
-} from './blocks/templates';
 import { fromRow, toInt } from './row';
-import { definitionImageRefs, isDefinitionId, remapDefinitionDefaults } from './blocks/definitions';
+import { isDefinitionId, remapDefinitionDefaults } from './blocks/definitions';
 import {
   hasLegacyStatus, legacyStatusOfRow, statusDefinition, STATUS_DEFINITION_ID, withLegacyStatus, type LegacyStatus,
 } from './blocks/legacyStatus';
 import { definitionById } from './blockDefinitionRows';
-import { entryBlockSummary } from './blocks/entrySummary';
 import { generateId, nowIso } from './helpers';
+import { altarElementsJson, isDrawn, withNewElementIds } from './altarElements';
 import i18n from '../i18n';
 import { buildLinkItems, linkItemKey, linkItemsByKey } from './linkItems';
 import {
@@ -50,6 +47,8 @@ import {
   DEFAULT_OVERLAY_COLOR, DEFAULT_GRID_COLOR, DEFAULT_GRID_OPACITY, DEFAULT_GRID_SIZE,
 } from './altarConstants';
 import { noAltarOpenMessage } from './altarExport';
+import { parseCanvasBackground, type CanvasBackground } from '../components/editors/canvas/background';
+import { isAppBackground } from './altarBackground';
 
 // ── Link chips across vault boundaries ───────────────────────────────────────
 
@@ -215,9 +214,8 @@ function legacyFieldTargets(fields: Array<{
 // ── File format ──────────────────────────────────────────────────────────────
 
 /**
- * '1' = up to v38; '2' = the file carries `meta.blockDefinitions`. Only then —
- * an entry without custom blocks (and every altar) stays '1', so that an
- * older app keeps accepting it. '3' = a template (`type: 'template'`,
+ * '1' = what entries and altars are written as; '2' = an older file that also
+ * carries `meta.blockDefinitions`, still read. '3' = a template (`type: 'template'`,
  * since v43): an older app does not know the type and would otherwise take the file
  * for an operation — with '3' it rejects it.
  */
@@ -284,27 +282,13 @@ interface EmeraldMeta {
    */
   contentLinks?: Array<{ id: string; entryType: string; title: string }>;
   /**
-   * The custom blocks the content carries copies of (since '2'). The
-   * copies work without them — rendering happens from the copy. With them,
-   * the target vault recognizes the origin and offers "Update".
-   * Created by ID on import if they do not exist there.
+   * Custom blocks an older file ('2') brought along. Nothing writes them
+   * any more; on import they are created by ID if they do not exist there,
+   * so that the blocks in such a file are not lost.
    */
   blockDefinitions?: Array<Record<string, unknown>>;
-  /**
-   * Templates only (the name is in `title`, icon and tags in `icon`/`tags`):
-   * the title of new entries and the assignments —
-   * categories as with an entry via name and emoji, built-in ones additionally
-   * via their ID (their name depends on the language); `all` for "all
-   * categories", with neither "no category". Stars do not travel along.
-   */
+  /** A template: the title new entries get. */
   newEntryTitle?: string;
-  templateAssignments?: Array<{
-    entryType: string;
-    all?: boolean;
-    categoryName?: string;
-    categoryEmoji?: string;
-    builtinCategoryId?: string;
-  }>;
   // altar — background_image_data is a stored image filename, so it's routed
   // through `images` like content images. icon_data, thumbnail_data, and item
   // images are already data: URLs (or a plain emoji, for icon) in the DB, so
@@ -313,6 +297,8 @@ interface EmeraldMeta {
   altarBackgroundImagePath?: string;
   altarBackgroundOverlay?: number;
   altarBackgroundOverlayColor?: string;
+  /** The background as the canvas editor sets it; its picture, if of the vault, is `altarBackgroundImagePath`. */
+  altarCanvasBackground?: CanvasBackground;
   altarThumbnailData?: string;
   altarIconData?: string;
   altarGridEnabled?: boolean;
@@ -354,6 +340,8 @@ interface EmeraldMeta {
     locked: boolean;
     hidden: boolean;
   }>;
+  /** The shapes and text drawn on the altar, as in `altars.elements` (`lib/altarElements.ts`). */
+  altarElements?: unknown[];
 }
 
 /** The file types that open a module — everything except the template. */
@@ -449,12 +437,10 @@ export async function exportAsEmerald(): Promise<void> {
   // Title for every link chip in the content — applies to all three types, since
   // journal, wiki and operations can link equally.
   meta.contentLinks = collectContentLinks(content);
-  const blockDefinitions = definitionsUsedIn(view.id, content);
-  if (blockDefinitions.length) meta.blockDefinitions = blockDefinitions;
 
-  const images = await embedImages(content, meta.blockDefinitions);
+  const images = await embedImages(content);
   await saveEmeraldFile({
-    version: meta.blockDefinitions ? '2' : '1', type, title, createdAt, content, images, meta,
+    version: '1', type, title, createdAt, content, images, meta,
   });
 }
 
@@ -468,16 +454,10 @@ async function saveEmeraldFile(file: EmeraldFile): Promise<void> {
   await invoke('write_file', { path: savePath, content: JSON.stringify(file, null, 2) });
 }
 
-/**
- * The local images of the content as Base64 — plus the image presets of the
- * custom blocks sent along, otherwise a new copy would show a dead image.
- * A missing image is dropped.
- */
-async function embedImages(content: string, blockDefinitions: EmeraldMeta['blockDefinitions']): Promise<Record<string, string>> {
+/** The local images of the content as Base64. A missing image is dropped. */
+async function embedImages(content: string): Promise<Record<string, string>> {
   const images: Record<string, string> = {};
-  const definitionImages = (blockDefinitions ?? []).flatMap((d) =>
-    definitionImageRefs(Array.isArray(d.elements) ? d.elements : []));
-  for (const ref of new Set([...imageRefsInHtml(content), ...definitionImages])) {
+  for (const ref of new Set(imageRefsInHtml(content))) {
     try {
       images[ref] = await readImageAsBase64(ref);
     } catch { /* skip missing files */ }
@@ -486,9 +466,8 @@ async function embedImages(content: string, blockDefinitions: EmeraldMeta['block
 }
 
 /**
- * A template as `.emerald` (version '3'): block stack, images, link titles
- * and custom blocks as with an entry, plus icon, description, title of new
- * entries, tags and assignments. The saved state is exported,
+ * A template as `.emerald` (version '3'): block stack, images and link titles
+ * as with an entry, plus icon, title of new entries and tags. The saved state is exported,
  * not an open draft.
  */
 export async function exportTemplateAsEmerald(templateId: string): Promise<void> {
@@ -510,41 +489,11 @@ export async function buildTemplateEmeraldFile(templateId: string): Promise<Emer
     icon: template.icon,
     tags: liveTagNames(template.tags),
     newEntryTitle: template.title,
-    templateAssignments: await exportedAssignments(template.assignments),
     contentLinks: collectContentLinks(content),
   };
-  const blockDefinitions = definitionsUsedIn(template.id, content);
-  if (blockDefinitions.length) meta.blockDefinitions = blockDefinitions;
   // An image icon is a data URL and is already in `meta.icon`.
-  const images = await embedImages(content, blockDefinitions);
+  const images = await embedImages(content);
   return { version: '3', type: 'template', title: template.name || 'Template', createdAt: template.created_at, content, images, meta };
-}
-
-/**
- * The assignments for the file format. Categories in the trash travel along too
- * (the import brings them back) — without them the template might end up in the target
- * without an assignment, i.e. in every entry. That is why the categories come from the
- * database, not from the store, which only knows the active ones.
- */
-async function exportedAssignments(assignments: readonly TemplateAssignment[]): Promise<NonNullable<EmeraldMeta['templateAssignments']>> {
-  if (!assignments.length) return [];
-  const rows = await (await getDb()).select<{ id: string; name: string; emoji: string | null; is_builtin: number }[]>(
-    'SELECT id, name, emoji, is_builtin FROM categories'
-  );
-  const byId = new Map(rows.map((r) => [r.id, r]));
-  return assignments.flatMap((a): NonNullable<EmeraldMeta['templateAssignments']> => {
-    const id = assignedCategoryId(a);
-    if (id === null) return [a.category === ALL_CATEGORIES ? { entryType: a.entryType, all: true } : { entryType: a.entryType }];
-    const cat = byId.get(id);
-    if (!cat) return [];
-    const isBuiltin = !!cat.is_builtin;
-    return [{
-      entryType: a.entryType,
-      categoryName: categoryLabel(i18n.t, { id: cat.id, name: cat.name, is_builtin: isBuiltin }),
-      categoryEmoji: cat.emoji ?? undefined,
-      ...(isBuiltin ? { builtinCategoryId: cat.id } : {}),
-    }];
-  });
 }
 
 async function exportAltarAsEmerald(): Promise<void> {
@@ -567,7 +516,7 @@ async function exportAltarAsEmerald(): Promise<void> {
     } catch { /* skip missing file */ }
   }
 
-  const placedItemIds = new Set(placements.map(p => p.item_id));
+  const placedItemIds = new Set(placements.filter(p => !isDrawn(p)).map(p => p.item_id));
   const altarItems = items.filter(i => placedItemIds.has(i.id));
   const usedCategoryIds = new Set(altarItems.map(i => i.category_id));
   const usedCategories = categories.filter(c => usedCategoryIds.has(c.id));
@@ -580,6 +529,7 @@ async function exportAltarAsEmerald(): Promise<void> {
     altarBackgroundImagePath: altar.background_image_data ?? undefined,
     altarBackgroundOverlay: altar.background_overlay,
     altarBackgroundOverlayColor: altar.background_overlay_color,
+    altarCanvasBackground: altar.canvas_background ?? undefined,
     altarThumbnailData: altar.thumbnail_data ?? undefined,
     altarIconData: altar.icon_data ?? undefined,
     altarGridEnabled: altar.grid_enabled,
@@ -601,7 +551,8 @@ async function exportAltarAsEmerald(): Promise<void> {
       imageData: i.image_data ?? undefined,
       createdAt: i.created_at,
     })),
-    altarPlacements: placements.map(p => ({
+    altarElements: JSON.parse(altarElementsJson(placements)) as unknown[],
+    altarPlacements: placements.filter(p => !isDrawn(p)).map(p => ({
       itemId: p.item_id, x: p.x, y: p.y, z_index: p.z_index, width: p.width, height: p.height,
       rotation: p.rotation, opacity: p.opacity, locked: p.locked, hidden: p.hidden,
     })),
@@ -618,17 +569,6 @@ async function exportAltarAsEmerald(): Promise<void> {
   };
 
   await saveEmeraldFile(file);
-}
-
-/** The active custom blocks the content carries copies of — for `meta.blockDefinitions`. */
-function definitionsUsedIn(entryId: string, content: string): NonNullable<EmeraldMeta['blockDefinitions']> {
-  const ids = new Set(entryBlockSummary(entryId, content).origins.map((o) => o.id));
-  if (!ids.size) return [];
-  return useBlockDefinitionStore.getState().definitions
-    .filter((d) => ids.has(d.id))
-    .map(({ id, name, icon, elements, display, revision }) => ({
-      id, name, icon, elements, display, revision,
-    }));
 }
 
 /**
@@ -849,57 +789,21 @@ export async function importTemplateFile(file: EmeraldFile): Promise<string> {
   return id;
 }
 
-/** This many distinct categories a template file may create or bring back — the rest of its assignments is dropped. */
-const MAX_IMPORTED_CATEGORIES = 20;
-
 /**
- * Creates the template from the file — always new, with a new ID, and without a star:
- * which template fills new entries is decided by this vault, not by a
- * foreign file. `parseAssignments` checks types, journal and duplicates.
+ * Creates the template from the file — always new, with a new ID, and without an
+ * assignment: which template fills new entries is decided by this vault, not by a
+ * foreign file.
  */
 async function createImportedTemplate(file: EmeraldFile, content: string, tagIds: string[]): Promise<string> {
   const { meta } = file;
-  const raw = Array.isArray(meta.templateAssignments) ? meta.templateAssignments.slice(0, MAX_ASSIGNMENTS) : [];
-  const resolvedByName = new Map<string, string | null>();
-  const assignments: unknown[] = [];
-  for (const a of raw) {
-    if (typeof a !== 'object' || a === null) continue;
-    const category = await importedAssignmentCategory(a, resolvedByName);
-    if (category !== undefined) assignments.push({ entryType: a.entryType, category, isDefault: false });
-  }
   const text = (v: unknown) => (typeof v === 'string' ? v : '');
   const created = await useTemplateStore.getState().createTemplate(text(file.title), {
     icon: text(meta.icon) || undefined,
     title: text(meta.newEntryTitle),
     content,
     tags: tagIds,
-    assignments: parseAssignments(assignments),
   });
   return created.id;
-}
-
-/**
- * The category of an imported assignment: `'*'`, `null` ("no
- * category"), an ID — or `undefined` if the assignment is dropped.
- * Built-in categories via their ID, otherwise via the name as with an entry
- * (missing ones are created, at most `MAX_IMPORTED_CATEGORIES`).
- */
-async function importedAssignmentCategory(
-  a: NonNullable<EmeraldMeta['templateAssignments']>[number],
-  resolvedByName: Map<string, string | null>,
-): Promise<string | null | undefined> {
-  if (a.entryType === 'journal' || a.all === true) return ALL_CATEGORIES;
-  const builtin = typeof a.builtinCategoryId === 'string'
-    ? useCategoryStore.getState().categories.find((c) => c.is_builtin && c.id === a.builtinCategoryId)
-    : undefined;
-  if (builtin) return builtin.id;
-  if (typeof a.categoryName !== 'string' || !a.categoryName.trim()) return null;
-  const key = categoryKey(a.categoryName);
-  if (!resolvedByName.has(key)) {
-    if (resolvedByName.size >= MAX_IMPORTED_CATEGORIES) return undefined;
-    resolvedByName.set(key, await ensureCategoryByName(a.categoryName, typeof a.categoryEmoji === 'string' ? a.categoryEmoji : undefined));
-  }
-  return resolvedByName.get(key) ?? undefined;
 }
 
 /**
@@ -1147,6 +1051,17 @@ async function remapAltarImagePath(path: string | undefined, images: Record<stri
   }
 }
 
+/**
+ * The canvas background of an imported altar: checked like a stored one, its
+ * picture of the vault pointing at the image as imported, or left out if
+ * that did not come along.
+ */
+function importedCanvasBackground(raw: unknown, imported: string | null | undefined): CanvasBackground | null {
+  const bg = parseCanvasBackground(raw);
+  if (!bg?.image || isAppBackground(bg.image.src)) return bg;
+  return { ...bg, image: imported ? { ...bg.image, src: imported } : null };
+}
+
 async function importAltarEntry(file: EmeraldFile): Promise<string> {
   const { createAltar, updateAltar, updateAltarGrid, updateAltarResolution, permanentlyDeleteAltar, permanentlyDeleteItem } = useAltarStore.getState();
   const altar = await createAltar({ createdAt: importedCreatedAt(file) });
@@ -1168,6 +1083,7 @@ async function importAltarEntry(file: EmeraldFile): Promise<string> {
       background_image_data: backgroundImageData,
       background_overlay: meta.altarBackgroundOverlay ?? DEFAULT_BACKGROUND_OVERLAY,
       background_overlay_color: meta.altarBackgroundOverlayColor ?? DEFAULT_OVERLAY_COLOR,
+      canvas_background: importedCanvasBackground(meta.altarCanvasBackground, backgroundImageData),
       thumbnail_data: meta.altarThumbnailData ?? null,
       icon_data: meta.altarIconData ?? null,
     });
@@ -1222,6 +1138,10 @@ async function importAltarEntry(file: EmeraldFile): Promise<string> {
           toInt(placementMeta.hidden),
         ],
       );
+    }
+
+    if (meta.altarElements?.length) {
+      await db.execute('UPDATE altars SET elements=$1 WHERE id=$2', [withNewElementIds(meta.altarElements, altar.id), altar.id]);
     }
 
     // Grid and format stamp "now" when writing — in the end, as with the

@@ -1,8 +1,9 @@
 import { memo } from 'react';
 import type { AltarPlacement, AltarRecord } from '../../types';
-import { getAltarBackgroundStyle, isCandleEmoji, resolveResolutionPixels } from '../../lib/altarConstants';
-import { AltarItemVisual } from './AltarItemVisual';
-import { imageSrc } from '../../lib/images';
+import { resolveResolutionPixels } from '../../lib/altarConstants';
+import { altarBackgroundUrl, altarCanvasBackground } from '../../lib/altarBackground';
+import { backgroundCss } from '../editors/canvas/background';
+import { AltarPlacementVisual } from './AltarPlacementVisual';
 
 export const AltarCardPreview = memo(function AltarCardPreview({
   altar,
@@ -13,8 +14,7 @@ export const AltarCardPreview = memo(function AltarCardPreview({
   previewItems: AltarPlacement[];
   compact?: boolean;
 }) {
-  const previewSrc = imageSrc(altar.background_image_data);
-  const background = getAltarBackgroundStyle(altar, previewSrc);
+  const background = backgroundCss(altarCanvasBackground(altar), altarBackgroundUrl);
   const { w, h } = resolveResolutionPixels(altar.resolution ?? '1920x1080');
 
   return (
@@ -40,7 +40,7 @@ export const AltarCardPreview = memo(function AltarCardPreview({
               height: size,
             }}
           >
-            <AltarItemVisual item={placement} size={size} candleAnimate={isCandleEmoji(placement.emoji)} />
+            <AltarPlacementVisual placement={placement} size={size} />
           </div>
         );
       })}

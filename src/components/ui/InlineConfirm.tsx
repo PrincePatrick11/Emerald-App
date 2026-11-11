@@ -16,7 +16,7 @@ interface InlineConfirmProps {
   /** `inline` sits in a row in place of its actions; `banner` is a
    *  strip of its own at full width, for dialogs. */
   variant?: 'inline' | 'banner';
-  /** The 24px buttons for dense rows (category and tag headers). */
+  /** The 24px buttons for dense rows. */
   small?: boolean;
   /** Question and buttons may wrap, for narrow header rows (the right
    *  sidebar is as narrow as 180px). It stays off in rows, where the

@@ -1,3 +1,5 @@
+import type { CanvasBackground } from '../components/editors/canvas/background';
+import type { PaintDoc } from '../lib/paint/document';
 import type { TrashKind, ViewId } from '../lib/modules';
 
 export type ContentType = 'journal' | 'wiki' | 'operation' | 'task' | 'altar';
@@ -71,6 +73,12 @@ export type MoonPhase =
   | 'last_quarter'
   | 'waning_crescent';
 
+export interface AltarGuide {
+  id: string;
+  orientation: 'vertical' | 'horizontal';
+  at: number;
+}
+
 export interface AltarRecord {
   id: string;
   title: string;
@@ -89,6 +97,17 @@ export interface AltarRecord {
   rotation_snap_angle: number;
   snap_scale_to_grid: boolean;
   resolution: string;
+  /** Guide lines pulled out of the canvas editor's rulers; `at` in percent of the altar's width or height. */
+  guides: AltarGuide[];
+  /** The guides cannot be moved or removed. */
+  guides_locked: boolean;
+  /**
+   * The background as the canvas editor sets it; `null` until it is first
+   * changed there, and then the older `background_preset` and overlay are
+   * shown. Its picture is the `background_image_data` column's image or one
+   * of the app's own (`/backgrounds/…`).
+   */
+  canvas_background: CanvasBackground | null;
   thumbnail_data?: string | null;
   icon_data?: string | null;
   /** In the trash since — the store only holds altars without it. */
@@ -126,9 +145,57 @@ export interface AltarItem {
   updated_at: string;
 }
 
+/**
+ * What sits on an altar: an item from the library (a row of
+ * `altar_placements`), or a shape or text drawn on the altar itself (kept in
+ * `altars.elements`, see `lib/altarElements.ts`). The store holds both in one
+ * list so stacking, the sidebar and the edit snapshot treat them alike.
+ */
+export type AltarPlacementKind = 'item' | 'shape' | 'text' | 'drawing' | 'symbol';
+
+/** `triangle` and `hexagon` come from older altars; new shapes with corners are polygons. */
+export type AltarShapeType = 'rect' | 'ellipse' | 'polygon' | 'triangle' | 'star' | 'hexagon';
+
+/** A drawn shape. Sizes in pixels at the reference width of 1920. */
+export interface AltarShapeStyle {
+  type: AltarShapeType;
+  fill: string | null;
+  stroke: string | null;
+  stroke_width: number;
+  corner_radius: number;
+  /** A polygon's corners or a star's points; missing: six and five. */
+  sides?: number;
+}
+
+/** A drawn text. The size in pixels at the reference width of 1920. */
+export interface AltarTextStyle {
+  content: string;
+  font: 'serif' | 'book' | 'sans';
+  size: number;
+  color: string;
+  align: 'left' | 'center' | 'right';
+  bold: boolean;
+  italic: boolean;
+}
+
+/** A symbol of the canvas editor's library: its path in a box of 100 × 100, the line weight in those units. */
+export interface AltarSymbolStyle {
+  symbol: string;
+  d: string;
+  /** Parts filled in `color`. */
+  solid?: string;
+  /** The name of one of the vault's own symbols. */
+  name?: string;
+  color: string;
+  weight: number;
+  fill: string | null;
+}
+
 export interface AltarPlacement {
   id: string;
   altar_id?: string;
+  kind: AltarPlacementKind;
+  /** The library item; empty for a shape or text. */
   item_id: string;
   // name, emoji, category_id and image_data come from altar_items and are
   // joined in on load — they are not columns of altar_placements.
@@ -145,7 +212,17 @@ export interface AltarPlacement {
   opacity: number;
   locked: boolean;
   hidden: boolean;
+  /** The group it is selected and moved with on the canvas; elements of one group share it. */
+  group?: string;
   image_data?: string;
+  /** Only for `kind: 'drawing'`: the painted document (`lib/paint/document.ts`). */
+  drawing?: PaintDoc;
+  /** Only for `kind: 'shape'`. */
+  shape?: AltarShapeStyle;
+  /** Only for `kind: 'text'`. */
+  text?: AltarTextStyle;
+  /** Only for `kind: 'symbol'`. */
+  symbol?: AltarSymbolStyle;
 }
 
 export type TaskPriority = 'low' | 'medium' | 'high';

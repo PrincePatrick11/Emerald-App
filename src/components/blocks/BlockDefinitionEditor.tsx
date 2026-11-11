@@ -1,13 +1,10 @@
 import { useState, type MouseEvent } from 'react';
 import { Reorder, useDragControls } from 'framer-motion';
 import { useTranslation } from 'react-i18next';
-import { ArchiveRestore, EyeOff, GripVertical, Heading, Lock, Plus, RefreshCw, Smile, Trash2 } from 'lucide-react';
+import { EyeOff, GripVertical, Heading, Lock, Plus, Smile, Trash2 } from 'lucide-react';
 import ContextMenu, { type ContextMenuAction } from '../ui/ContextMenu';
-import Button from '../ui/Button';
-import Modal from '../ui/Modal';
 import LibraryPageFrame from '../ui/LibraryPageFrame';
-import InlineConfirm from '../ui/InlineConfirm';
-import SidebarSection, { SidebarEmpty } from '../sidebar/fields/SidebarSection';
+import SidebarSection from '../sidebar/fields/SidebarSection';
 import { PropertiesSection } from '../sidebar/fields/EntryReadSections';
 import { EditSidebarBody, MediaPropertyRow } from '../sidebar/fields/EditProperties';
 import { SwitchRow } from '../ui/Switch';
@@ -15,19 +12,16 @@ import { useBlockDefinitionStore } from '../../store/blockDefinitionStore';
 import { useBlockDraftStore, type DefinitionDraft } from '../../store/draftStore';
 import { useDraftPage } from '../../hooks/useDraftPage';
 import { useShrunkIcon } from '../../hooks/useShrunkIcon';
-import { useUndoStore } from '../../store/undoStore';
-import { removeAllCopies, updateAllCopies, type CopyRunResult, type CopyUsage } from '../../store/blockCopies';
 import {
   canBeEmpty, defaultFromSlot, ELEMENT_KINDS, elementKindLabelKey, isSigilKind, isSlotKind, slotFromDefault,
   type ElementDef, type ElementKind, type FieldValue,
 } from '../../lib/blocks/fields';
 import { ELEMENT_KIND_ICONS } from '../../lib/blocks/presets';
-import { definitionLabel, elementLabel } from '../../lib/blocks/blockAttrs';
+import { definitionLabel } from '../../lib/blocks/blockAttrs';
 import { DEFAULT_DEFINITION_ICON, type BlockDefinition, type DefinitionDisplay } from '../../lib/blocks/definitions';
 import { generateId } from '../../lib/helpers';
 import { REORDER_SPRING } from '../../lib/motion';
 import { OP_PROP_SELECT_CLASSES } from '../../lib/styleClasses';
-import { useFieldFallbackText } from './useFieldFallbackText';
 import OptionsEditor from './OptionsEditor';
 import BlockCheckbox from './BlockCheckbox';
 import FieldValueEditor from './FieldValueEditor';
@@ -38,20 +32,11 @@ const draftOf = (d: DefinitionDraft): DefinitionDraft => ({
   name: d.name, icon: d.icon, elements: d.elements, display: d.display,
 });
 
-/** The visible elements first, the archived ones after them; the order that definition and copy keep. */
-const withArchivedLast = (elements: ElementDef[]): ElementDef[] => [
-  ...elements.filter((e) => !e.archived),
-  ...elements.filter((e) => e.archived),
-];
-
 interface Props {
   definition: BlockDefinition;
-  usage: CopyUsage | undefined;
   /** Back to the list. The back link above the title leaves the draft behind (the list
    *  shows it as unsaved); "Done" and "Cancel" settle it first. */
   onClose: () => void;
-  /** Deletes: immediately without copies, otherwise via the dialog the view holds,
-   *  so that its completion notice survives the page, which disappears with the definition. */
   onDelete: () => void;
   /** Just created with "New": "Cancel" moves it to the trash (`onDelete`). */
   isNew?: boolean;
@@ -60,19 +45,15 @@ interface Props {
 /**
  * A custom block's page (`LibraryPageFrame`): name as title,
  * below it the fields (add, name, sort,
- * remove); in the sidebar icon, display rules and usage.
+ * remove); in the sidebar icon and display rules.
  *
- * A draft is edited (`useDraftPage`); only "Done" writes it and
- * bumps the revision, otherwise every keystroke in the name would turn all copies into
- * "older versions". A saved field is archived on removal
- * instead of deleted: copies may have values for it, and it can be
- * restored.
+ * A draft is edited (`useDraftPage`); only "Done" writes it. Nothing here
+ * reaches an entry: what is already inserted is a copy of its own.
  */
-export default function BlockDefinitionEditor({ definition, usage, onClose, onDelete, isNew }: Props) {
+export default function BlockDefinitionEditor({ definition, onClose, onDelete, isNew }: Props) {
   const { t } = useTranslation();
-  const text = useFieldFallbackText();
   const updateDefinition = useBlockDefinitionStore((s) => s.updateDefinition);
-  const { draft, setDraft, patch, dirty, busy, setBusy, finish, cancel } = useDraftPage({
+  const { draft, setDraft, patch, dirty, busy, finish, cancel } = useDraftPage({
     store: useBlockDraftStore,
     viewType: 'blocks',
     id: definition.id,
@@ -84,16 +65,10 @@ export default function BlockDefinitionEditor({ definition, usage, onClose, onDe
     logTag: 'BlockDefinitionEditor',
   });
   const [menu, setMenu] = useState<{ x: number; y: number; actions: ContextMenuAction[] } | null>(null);
-  const [confirmUpdate, setConfirmUpdate] = useState(false);
-  const [notice, setNotice] = useState<string | null>(null);
-
-  const savedIds = new Set(definition.elements.map((e) => e.id));
-  const active = draft.elements.filter((e) => !e.archived);
-  const archived = draft.elements.filter((e) => e.archived);
 
   const patchDisplay = (p: Partial<DefinitionDisplay>) => setDraft((d) => ({ ...d, display: { ...d.display, ...p } }));
   const setElements = (fn: (elements: ElementDef[]) => ElementDef[]) =>
-    setDraft((d) => ({ ...d, elements: withArchivedLast(fn(d.elements)) }));
+    setDraft((d) => ({ ...d, elements: fn(d.elements) }));
   const patchElement = (id: string, p: Partial<ElementDef>) =>
     setElements((els) => els.map((e) => (e.id === id ? { ...e, ...p } : e)));
 
@@ -102,21 +77,10 @@ export default function BlockDefinitionEditor({ definition, usage, onClose, onDe
     if (kind === 'select') element.options = [];
     setElements((els) => [...els, element]);
   };
-  // Draft only: removed entirely. Saved: archived, since copies may have values for it.
-  const removeElement = (id: string) => setElements((els) => (savedIds.has(id)
-    ? els.map((e) => (e.id === id ? { ...e, archived: true } : e))
-    : els.filter((e) => e.id !== id)));
-  // To the end of the visible ones: where a new field would also land.
-  const restoreElement = (id: string) => setElements((els) => {
-    const element = els.find((e) => e.id === id);
-    if (!element) return els;
-    const { archived: _archived, ...restored } = element;
-    return [...els.filter((e) => e.id !== id && !e.archived), restored, ...els.filter((e) => e.id !== id && e.archived)];
-  });
-  const reorderActive = (ids: string[]) => setElements((els) => {
+  const removeElement = (id: string) => setElements((els) => els.filter((e) => e.id !== id));
+  const reorderElements = (ids: string[]) => setElements((els) => {
     const byId = new Map(els.map((e) => [e.id, e]));
-    if (ids.some((id) => !byId.has(id))) return els;
-    return [...ids.map((id) => byId.get(id)!), ...els.filter((e) => e.archived)];
+    return ids.some((id) => !byId.has(id)) ? els : ids.map((id) => byId.get(id)!);
   });
 
   const openAddMenu = (e: MouseEvent) => setMenu({
@@ -129,20 +93,6 @@ export default function BlockDefinitionEditor({ definition, usage, onClose, onDe
   });
 
   const setIcon = useShrunkIcon((icon) => patch({ icon }), 'BlockDefinitionEditor');
-
-  const runUpdateAll = async () => {
-    setConfirmUpdate(false);
-    setBusy(true);
-    try {
-      setNotice(resultNotice(t, 'updated', await updateAllCopies(definition, text)));
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const entries = usage?.entries ?? 0;
-  const templates = usage?.templates ?? 0;
-  const outdated = (usage?.outdated ?? 0) + (usage?.outdatedTemplates ?? 0);
 
   const sidebar = (
     <EditSidebarBody>
@@ -182,44 +132,6 @@ export default function BlockDefinitionEditor({ definition, usage, onClose, onDe
           onChange={(v) => patchDisplay({ readOnly: v })}
         />
       </SidebarSection>
-
-      <SidebarSection storageKey="block-usage-open" label={t('blocks.library.usage')} count={entries + templates}>
-        <SidebarEmpty>
-          {entries > 0 ? t('blocks.library.usedIn', { count: entries }) : t('blocks.library.unused')}
-          {templates > 0 && <> · {t('blocks.library.inTemplates', { count: templates })}</>}
-          {(usage?.outdated ?? 0) > 0 && <> · {t('blocks.library.outdated', { count: usage!.outdated })}</>}
-          {(usage?.outdatedTemplates ?? 0) > 0 && <> · {t('blocks.library.outdatedTemplates', { count: usage!.outdatedTemplates })}</>}
-        </SidebarEmpty>
-        {outdated > 0 && (
-          confirmUpdate ? (
-            <div className="pl-[9px] pr-3 py-1">
-              <InlineConfirm
-                tone="jade"
-                small
-                wrap
-                message={(usage?.outdatedTemplates ?? 0) > 0
-                  ? t('blocks.library.updateAllConfirmCopies', { count: outdated })
-                  : t('blocks.library.updateAllConfirm', { count: outdated })}
-                confirmLabel={t('blocks.library.updateAll')}
-                onConfirm={() => void runUpdateAll()}
-                onCancel={() => setConfirmUpdate(false)}
-              />
-            </div>
-          ) : (
-            <button
-              type="button"
-              className="sidebar-action-row"
-              disabled={dirty || busy}
-              title={dirty ? t('blocks.library.saveFirst') : undefined}
-              onClick={() => setConfirmUpdate(true)}
-            >
-              <RefreshCw size={14} className="flex-shrink-0" />
-              <span className="min-w-0 truncate">{t('blocks.library.updateAll')}</span>
-            </button>
-          )
-        )}
-        {notice && <SidebarEmpty>{notice}</SidebarEmpty>}
-      </SidebarSection>
     </EditSidebarBody>
   );
 
@@ -238,12 +150,12 @@ export default function BlockDefinitionEditor({ definition, usage, onClose, onDe
         {/* Fields */}
         <section className="space-y-2">
           <p className="label-xs">{t('blocks.library.fields')}</p>
-          <Reorder.Group as="div" axis="y" values={active.map((e) => e.id)} onReorder={reorderActive} className="space-y-2">
-            {active.map((element) => (
+          <Reorder.Group as="div" axis="y" values={draft.elements.map((e) => e.id)} onReorder={reorderElements} className="space-y-2">
+            {draft.elements.map((element) => (
               <ElementRow
                 key={element.id}
                 element={element}
-                siblings={active}
+                siblings={draft.elements}
                 blockHidesEmpty={draft.display.readHideEmpty}
                 onPatch={(p) => patchElement(element.id, p)}
                 onRemove={() => removeElement(element.id)}
@@ -254,31 +166,6 @@ export default function BlockDefinitionEditor({ definition, usage, onClose, onDe
             <Plus size={12} />
             <span>{t('blocks.library.addField')}</span>
           </button>
-
-          {archived.length > 0 && (
-            <div className="pt-2 space-y-1">
-              <p className="label-xs">{t('blocks.library.removedFields')}</p>
-              <p className="block-field-hint">{t('blocks.library.removedHint')}</p>
-              {archived.map((element) => {
-                const Icon = ELEMENT_KIND_ICONS[element.kind];
-                return (
-                  <div key={element.id} className="flex items-center gap-2 text-xs text-subtle">
-                    <Icon size={12} className="flex-shrink-0" />
-                    <span className="flex-1 truncate">{elementLabel(t, element)}</span>
-                    <button
-                      type="button"
-                      className="block-row-action"
-                      onClick={() => restoreElement(element.id)}
-                      title={t('blocks.library.restoreField')}
-                      aria-label={t('blocks.library.restoreField')}
-                    >
-                      <ArchiveRestore size={12} />
-                    </button>
-                  </div>
-                );
-              })}
-            </div>
-          )}
         </section>
       </div>
 
@@ -391,132 +278,5 @@ function PrefillEditor({ element, onPatch }: { element: ElementDef; onPatch: (p:
         />
       ))}
     </>
-  );
-}
-
-function resultNotice(t: ReturnType<typeof useTranslation>['t'], key: 'updated' | 'removed', result: CopyRunResult): string {
-  const entries = result.changed - result.changedTemplates;
-  return [
-    entries || !result.changedTemplates ? t(`blocks.library.${key}`, { count: entries }) : '',
-    result.changedTemplates ? t(`blocks.library.${key}Templates`, { count: result.changedTemplates }) : '',
-    result.skippedEditing ? t('blocks.library.skippedEditing', { count: result.skippedEditing }) : '',
-    result.skippedDrafts ? t('blocks.library.skippedDrafts', { count: result.skippedDrafts }) : '',
-    result.skippedLocked ? t('blocks.library.skippedLocked', { count: result.skippedLocked }) : '',
-    result.failed ? t('blocks.library.failed', { count: result.failed }) : '',
-  ].filter(Boolean).join(' ');
-}
-
-/**
- * Deleting, in two stages: by default all copies stay in the entries,
- * and the definition goes to the trash (undoable). Only
- * whoever ticks "also remove from entries" gets a second confirmation,
- * since that removal can only be recovered via a backup.
- */
-/** The texts of the delete dialog when templates also carry copies. */
-const WITH_TEMPLATES = {
-  deleteFromEntries: 'deleteFromCopies',
-  deleteFromEntriesWarning: 'deleteFromCopiesWarning',
-  removeAndDelete: 'removeAndDeleteCopies',
-} as const;
-
-export function DeleteDefinitionModal({ definition, usage, onClose, onDeleted }: {
-  definition: BlockDefinition;
-  usage: CopyUsage | undefined;
-  onClose: () => void;
-  onDeleted: () => void;
-}) {
-  const { t } = useTranslation();
-  const deleteDefinition = useBlockDefinitionStore((s) => s.deleteDefinition);
-  const restoreDefinition = useBlockDefinitionStore((s) => s.restoreDefinition);
-  const pushUndo = useUndoStore((s) => s.push);
-  const [alsoRemove, setAlsoRemove] = useState(false);
-  const [step, setStep] = useState<'choose' | 'confirm' | 'done'>('choose');
-  const [busy, setBusy] = useState(false);
-  const [notice, setNotice] = useState<string | null>(null);
-  const title = t('blocks.library.deleteTitle', { name: definitionLabel(t, definition) });
-  const entryCount = usage?.entries ?? 0;
-  const copyCount = entryCount + (usage?.templates ?? 0);
-  // If copies are also in templates, the texts say "entries and templates".
-  const copies = (key: keyof typeof WITH_TEMPLATES) => ((usage?.templates ?? 0) > 0
-    ? t(`blocks.library.${WITH_TEMPLATES[key]}`, { count: copyCount })
-    : t(`blocks.library.${key}`, { count: entryCount }));
-
-  const run = async () => {
-    if (alsoRemove && step === 'choose') {
-      setStep('confirm');
-      return;
-    }
-    setBusy(true);
-    try {
-      if (alsoRemove) {
-        const result = await removeAllCopies(definition.id);
-        await deleteDefinition(definition.id);
-        // Whoever is currently being edited keeps the block, and the user must be told.
-        if (result.skippedEditing || result.skippedDrafts || result.skippedLocked || result.failed) {
-          setNotice(resultNotice(t, 'removed', result));
-          setStep('done');
-          return;
-        }
-      } else {
-        await deleteDefinition(definition.id);
-        pushUndo({
-          id: generateId(),
-          description: t('undo.blockDefinitionDeleted'),
-          undo: () => restoreDefinition(definition.id),
-        });
-      }
-      onDeleted();
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  if (step === 'done') {
-    return (
-      <Modal
-        title={title}
-        onClose={onDeleted}
-        bodyClassName="modal-body"
-        footer={<Button tone="neutral" onClick={onDeleted}>{t('common.ok')}</Button>}
-      >
-        <p className="text-sm text-muted">{notice}</p>
-      </Modal>
-    );
-  }
-
-  return (
-    <Modal
-      title={title}
-      onClose={onClose}
-      dismissible={!busy}
-      bodyClassName="modal-body space-y-3"
-      footer={
-        <>
-          <Button tone="neutral" disabled={busy} onClick={onClose}>{t('common.cancel')}</Button>
-          <Button tone="danger" disabled={busy} onClick={() => void run()}>
-            {!alsoRemove
-              ? t('common.delete')
-              : step === 'choose'
-                ? t('blocks.library.continue')
-                : copies('removeAndDelete')}
-          </Button>
-        </>
-      }
-    >
-      {step === 'choose' ? (
-        <>
-          <p className="text-sm text-muted">{t('blocks.library.deleteKeeps')}</p>
-          {copyCount > 0 && (
-            <BlockCheckbox
-              checked={alsoRemove}
-              onChange={setAlsoRemove}
-              label={copies('deleteFromEntries')}
-            />
-          )}
-        </>
-      ) : (
-        <p className="text-sm text-danger">{copies('deleteFromEntriesWarning')}</p>
-      )}
-    </Modal>
   );
 }

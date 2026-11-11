@@ -7,9 +7,8 @@ import { templateLabel } from '../../lib/blocks/blockAttrs';
 import type { Template } from '../../lib/blocks/templates';
 
 /**
- * The choice of a template for an entry: search by name,
- * below it the templates in the order of `templatesFor` (assigned ones
- * first). A click selects.
+ * The choice of a template for an entry: search by name, below it all
+ * templates. A click selects.
  */
 export default function TemplatePickerModal({ templates, onSelect, onClose }: {
   templates: readonly Template[];

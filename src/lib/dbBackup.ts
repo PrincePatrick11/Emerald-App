@@ -34,12 +34,13 @@ import { definitionById, nextDefinitionSortOrder } from './blockDefinitionRows';
 import { nextTemplateSortOrder } from './templateRows';
 import { nextEntrySortOrder, nextLanguageSortOrder } from './lexiconRows';
 import { alphabetToJson, DEFAULT_LANGUAGE_ICON } from './lexicon';
+import { readUserSymbol, type UserSymbol } from './userSymbols';
 import type { EntryType, Language } from '../types';
 import {
   routineLinkResolver, routineToTemplate, vaultRoutineLinkSource, type RoutineCategoryRow, type RoutineTargetRow,
 } from './migrateRoutinesToTemplates';
 import {
-  assignedCategoryId, assignmentKey, defaultKeys, isTemplateId, parseAssignments, SIGIL_TEMPLATE_ID, templateToRow,
+  assignedCategoryId, assignmentKey, isTemplateId, parseAssignments, SIGIL_TEMPLATE_ID, templateToRow,
 } from './blocks/templates';
 import { fromRow } from './row';
 import { needsSigilConversion, sigilRowToContent, type LegacySigilRow } from './migrateLegacySigils';
@@ -47,6 +48,7 @@ import { linkedIdsToContent, rowsLinkSource } from './migrateLinkedIdsToContent'
 import { journalFieldsToContent } from './migrateJournalFieldsToContent';
 import { IMAGE_FIELDS, imageColumns, storedImageName } from './schema';
 import { ALTAR_SETTING_KEYS, altarSettingsJson } from './altarSettings';
+import { withNewElementIds } from './altarElements';
 import { isTagId, rewriteTagRefs, stripTagIds, tagIdList, tagNameKey, tagNameResolver, type LegacyTagRow } from './tagRefs';
 import { randomTagColor } from '../store/tagStore';
 import { categoryKey, mergeCategoryRows, type CategorySource } from './categoryMerge';
@@ -64,8 +66,9 @@ import { clearAltarEdits } from '../store/altarEdit';
 import { resumeEditorSaves, suspendEditorSaves } from './editorLock';
 import { drainSerialized } from './serialize';
 import { importViaStaging } from './importStaging';
-import { importableSettings, isPlainObject, withSettingsGroups, writeVaultSettings, type SettingsGroup } from './vaultSettings';
+import { importableSettings, isPlainObject, withSettingsGroups, withoutDeviceKeys, writeVaultSettings, type SettingsGroup } from './vaultSettings';
 import { useSettingsStore } from '../store/settingsStore';
+import { useDeviceStore } from '../store/deviceStore';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Public types
@@ -150,11 +153,16 @@ type Row = Record<string, any>;
  * array, each row with `type` and without the columns that no longer exist,
  * '12' = since v51 altars carry their appearance as a JSON column `settings`,
  * since v52 altar items `updated_at`/`deleted_at`, and since v53 entries and
- * templates tag IDs instead of tag names, '13' = since v56 the pictures taken
- * into "Images" travel along as `data.vaultImages`.
+ * templates tag IDs instead of tag names, '13' = since v56 `assignments` carry
+ * no `isDefault` and `block_definitions` no `revision`, since v57 altars
+ * carry the shapes and text drawn on them as a JSON column `elements`, and
+ * since v60 the pictures taken into "Images" travel along as `data.vaultImages`.
  *
- * The '13' keeps an older build from importing the file without them: it
- * would restore the files but not their names, categories and tags.
+ * The '13' is needed three times over: an older build would read every assignment
+ * as merely offered, it has no `elements` column, so `insertRows` would
+ * drop it and the drawn shapes and text would be gone without a word, and it
+ * would restore the pictures' files but not their names and tags. With
+ * the '13' it rejects the file.
  *
  * The '12' is needed because an older build looks for the twelve individual columns:
  * `insertRows` would drop `settings`, and every altar would arrive with the
@@ -538,6 +546,11 @@ interface BackupFile {
     languages?: Row[];
     /** Their vocabulary (since '9') — worthless without its language, hence always together. */
     lexiconEntries?: Row[];
+    /**
+     * The vault's own symbols (table `symbols`). Needs no new version: an
+     * older build ignores the field and keeps the rest.
+     */
+    symbols?: Row[];
     /** The pictures taken into "Images" (since '13'), with their files in `images`. */
     vaultImages?: Row[];
   };
@@ -767,8 +780,7 @@ export async function buildBackup(options: BackupOptions): Promise<BackupFile> {
   }
 
   // ── Custom blocks ────────────────────────────────────────────────────────
-  // The templates of the copies in the content. The copies manage without them, but
-  // without a definition there is no "Update" anymore. All of it, trash included —
+  // The vault's own blocks. All of it, trash included —
   // one list, no date question.
   if (options.includeJournal || options.includeWiki || options.includeOperations) {
     data.blockDefinitions = await db.select<Row[]>(`SELECT * FROM block_definitions`);
@@ -796,6 +808,10 @@ export async function buildBackup(options: BackupOptions): Promise<BackupFile> {
     data.lexiconEntries = await db.select<Row[]>(`SELECT * FROM lexicon_entries`);
   }
 
+  // ── Own symbols ──────────────────────────────────────────────────────────
+  // Always and in full, like the lexicon: a short list, path data in the row.
+  data.symbols = await db.select<Row[]>('SELECT * FROM symbols');
+
   // ── Embed images ─────────────────────────────────────────────────────────
   const images: Record<string, string> = {};
   for (const path of allImagePaths) {
@@ -813,7 +829,9 @@ export async function buildBackup(options: BackupOptions): Promise<BackupFile> {
     filters: options,
     data,
     images,
-    ...(options.includeSettings && { settings: useSettingsStore.getState().settings }),
+    // Without what a `settings.json` from before still carries of language and
+    // theme: those belong to the device, and a backup must not bring them back.
+    ...(options.includeSettings && { settings: withoutDeviceKeys(useSettingsStore.getState().settings) }),
   };
 }
 
@@ -1027,7 +1045,6 @@ async function insertBlockDefinitions(
       icon: text(r.icon, '') || DEFAULT_DEFINITION_ICON,
       elements: json(r.elements, '[]'),
       display: json(r.display, '{}'),
-      revision: Number.isInteger(r.revision) && (r.revision as number) > 0 ? r.revision : 1,
       sort_order: Number.isFinite(r.sort_order) ? r.sort_order : 0,
       created_at: text(r.created_at, now),
       updated_at: text(r.updated_at, now),
@@ -1051,9 +1068,8 @@ function templateCategoryIds(rows: Row[] | undefined): string[] {
  * The file is foreign: every row runs through `fromRow.template` as on
  * reading. `content` gets the images stored here (and, on merge, the
  * renamed link targets), the assignments the local category IDs — whatever
- * points to no category is dropped. A default that an active template here
- * already holds is lost by an active imported one; one from the
- * trash keeps it as in the store and settles that on restore.
+ * points to no category is dropped. A combination that an active template here
+ * already holds stays with it, and one from the trash brings no assignments.
  */
 /**
  * The pictures of "Images" from a file: like the templates never deleted,
@@ -1104,7 +1120,8 @@ async function insertTemplates(
   if (!Array.isArray(rows)) return;
   const local = (await db.select<Row[]>('SELECT * FROM templates')).map(fromRow.template);
   const known = new Set(local.map((t) => t.id));
-  const taken = new Set(local.filter((t) => t.deleted_at === null).flatMap((t) => [...defaultKeys(t.assignments)]));
+  const taken = new Set(local.filter((t) => t.deleted_at === null)
+    .flatMap((t) => t.assignments.map((a) => assignmentKey(a.entryType, a.category))));
   const categories = new Set((await db.select<Row[]>('SELECT id FROM categories')).map((r) => String(r.id)));
 
   const now = nowIso();
@@ -1123,12 +1140,11 @@ async function insertTemplates(
       const category = catMap.get(id) ?? id;
       return categories.has(category) ? [{ ...a, category }] : [];
     }));
-    const assignments = remapped.map((a) => {
+    const assignments = !active ? [] : remapped.filter((a) => {
       const key = assignmentKey(a.entryType, a.category);
-      if (!a.isDefault || !active) return a;
-      if (taken.has(key)) return { ...a, isDefault: false };
+      if (taken.has(key)) return false;
       taken.add(key);
-      return a;
+      return true;
     });
     return templateToRow({
       ...t,
@@ -1215,6 +1231,19 @@ async function insertLexicon(
 }
 
 /**
+ * The own symbols of a backup: by ID, `INSERT OR IGNORE` like the lexicon —
+ * one that exists here stays, none is deleted, not even on replace. The file
+ * is foreign: a row without an id or usable path data is dropped.
+ */
+async function insertSymbols(db: Awaited<ReturnType<typeof getDb>>, symbolRows: unknown): Promise<void> {
+  const symbols = (Array.isArray(symbolRows) ? symbolRows : [])
+    .filter((r): r is Row => typeof r === 'object' && r !== null)
+    .map(readUserSymbol)
+    .filter((s): s is UserSymbol => !!s);
+  await insertRows(db, 'symbols', symbols.map((s) => ({ ...s })), true);
+}
+
+/**
  * Journal (v36/v37): linked operations and articles, paradigm, banishing
  * and meditation of an older backup become link blocks in the content — before
  * inserting, because since v49 the old columns no longer exist (the
@@ -1292,7 +1321,7 @@ async function liftLegacySigilRows(operations: Row[], wikiArticles: Row[], backu
  * The "Status" definition by which old operation rows are rewritten:
  * the vault's (also in the trash), otherwise the file's — as in
  * migration v41. Otherwise the new copies would not match the "Status" that exists
- * in the vault afterwards, and would immediately show "Newer version".
+ * in the vault afterwards.
  */
 async function statusDefinitionForImport(
   db: Awaited<ReturnType<typeof getDb>>,
@@ -1570,6 +1599,7 @@ async function doReplace(db: Awaited<ReturnType<typeof getDb>>, backup: BackupFi
   // Like the custom blocks and the templates: never deleted, missing ones added.
   await insertLexicon(db, d.languages, d.lexiconEntries);
   await insertVaultImages(db, d.vaultImages, pathMap);
+  await insertSymbols(db, d.symbols);
 
   // Delete only the content types present in the backup (so a partial backup
   // replacing only Journal data won't wipe wiki/ops).
@@ -1745,13 +1775,15 @@ async function doMerge(db: Awaited<ReturnType<typeof getDb>>, backup: BackupFile
     withContentLinks(remapEntry(r, IMAGE_FIELDS_OP, ['charging_technique_wiki_id'], [], 'operation'))
   ), catMap), i18n.t, nowIso(), mergeStatus);
   const operations = await liftLegacySigilRows(mergeOps.rows, wikiArticles, backup);
-  const altars = (d.altars ?? []).map((r: Row) =>
+  const altars = (d.altars ?? []).map((r: Row) => {
     // The same three columns as in doReplace. As long as thumbnail_data and
     // icon_data hold data URLs, the difference is harmless — but the
     // export collects both as soon as they carry a file name, and then
     // merge would be the variant that does not carry it along.
-    remapEntry(r, ['background_image_data', 'thumbnail_data', 'icon_data'], [], [])
-  );
+    const row = remapEntry(r, ['background_image_data', 'thumbnail_data', 'icon_data'], [], []);
+    // Drawn shapes and text get new ids like the placements: ids are unique across all altars.
+    return r.elements === undefined ? row : { ...row, elements: withNewElementIds(r.elements, String(row.id)) };
+  });
   const altarItems = remapCategoryIds((d.altarItems ?? []).map((r: Row) =>
     remapEntry(r, ['image_data'], [], [])
   ), catMap);
@@ -1773,13 +1805,13 @@ async function doMerge(db: Awaited<ReturnType<typeof getDb>>, backup: BackupFile
 
   // Categories and tags are already resolved (resolveImportedCategories,
   // importTagsAndRemap above).
-  // Without prefix: the copies in the content name their definition by exactly this ID.
+  // Without prefix, so that a block arriving twice stays one.
   // Link defaults point to the renamed entries, like the chips in the content.
   await insertBlockDefinitions(db, await withStatusDefinition(
     db, remapDefinitionRows(d.blockDefinitions, pathMap, (t) => ({ id: String(remapId(t.id)), label: t.label })),
     mergeOps.definition, mergeStatus,
   ));
-  // Without prefix like the definitions: `data-template-origin` in the entries names exactly this ID.
+  // Without prefix, like the definitions.
   await insertTemplates(db, d.templates, pathMap, catMap,
     (content) => remapInternalLinks(content, (link) => ({ id: String(remapId(link.id)) })));
   // Without prefix like the two above: a language stands on its own, its ID
@@ -1787,6 +1819,8 @@ async function doMerge(db: Awaited<ReturnType<typeof getDb>>, backup: BackupFile
   await insertLexicon(db, d.languages, d.lexiconEntries);
   // By file, like the replace: a picture that is already here stays as it is.
   await insertVaultImages(db, d.vaultImages, pathMap);
+  // The same for own symbols: an element on an altar keeps its own copy of the path.
+  await insertSymbols(db, d.symbols);
 
   // Content: plain INSERT with prefixed IDs (no conflicts possible)
   await insertRows(db, 'entries', entryRowsForInsert(journalEntries, wikiArticles, operations));
@@ -1855,6 +1889,12 @@ export async function importDatabase(
 ): Promise<void> {
   // Unchecked from the file — from here on only in checked form.
   const backupSettings = importableSettings(backup.settings);
+  // A backup from before language and theme moved to the device may hold
+  // custom themes; they join this device's list (`adoptCustomThemes` checks
+  // them), while its language and selection do not apply here.
+  const backupThemes = isPlainObject(backup.settings) && isPlainObject(backup.settings.appearance)
+    ? backup.settings.appearance.customThemes
+    : undefined;
 
   // For the duration of the import the automatic editor saves are suspended,
   // in all three modes. replace keeps the original IDs and add-vault switches
@@ -1886,7 +1926,7 @@ export async function importDatabase(
     invalidateVaultCache();
 
     // Before switching into the folder: then the new vault opens right away with
-    // the backup's language and appearance, instead of the defaults first.
+    // the backup's fonts, instead of the defaults first.
     if (backupSettings) {
       // Just a nicety: if writing fails, the vault starts with the
       // defaults — the import itself should not get stuck on that.
@@ -1919,7 +1959,7 @@ export async function importDatabase(
     // the file carries its templates along (from '8' — routines of older files do not
     // count, they do not know the sigil template), its version applies — including that the
     // template was changed or deleted there. Otherwise the fresh
-    // row would displace the brought-along one, star and all.
+    // row would displace the brought-along one, assignments and all.
     const types = typeFilters ?? ALL_TYPES_INCLUDED;
     const bringsTemplates = (backup.sourceVersion ?? Number(BACKUP_VERSION)) >= 8 && Array.isArray(backup.data.templates);
     // Via the working copy as with replace: an abort leaves the new vault empty rather than half filled.
@@ -1929,6 +1969,8 @@ export async function importDatabase(
       }
       await doReplace(staging, filteredBackup);
     });
+    // Only once the import went through, as with replace and merge below.
+    if (backupThemes) useDeviceStore.getState().adoptCustomThemes(backupThemes);
   } else {
     // Never directly against the vault: `doReplace` deletes before it inserts, and
     // an aborted merge would leave half-imported data behind (see `importStaging.ts`).
@@ -1937,6 +1979,9 @@ export async function importDatabase(
 
     // Only after a successful swap: an aborted import leaves the
     // settings as they were, too.
+    if (backupThemes && (mode === 'replace' || settingsGroups.includes('appearance'))) {
+      useDeviceStore.getState().adoptCustomThemes(backupThemes);
+    }
     if (backupSettings) {
       const settingsStore = useSettingsStore.getState();
       if (mode === 'replace') {

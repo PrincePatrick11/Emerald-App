@@ -12,6 +12,10 @@ export interface ContextMenuAction {
    *  the situation changes its order on every call. Same
    *  meaning as disabled in MenuDropdown. */
   disabled?: boolean;
+  /** A line above this entry, starting a new section of the menu. */
+  separator?: boolean;
+  /** The key that does the same, shown at the entry's end, such as `⌘D`. */
+  shortcut?: string;
 }
 
 interface Props {
@@ -76,7 +80,8 @@ export default function ContextMenu({ x, y, actions, onClose, align = 'left', mi
       className="context-menu fixed z-[9999] w-max border rounded-lg shadow-menu py-1"
       style={{ left: pos.left, top: pos.top, minWidth }}
     >
-      {actions.map((action, i) => (
+      {actions.map((action, i) => [
+        action.separator && i > 0 && <div key={`separator-${i}`} className="context-menu-separator" role="separator" />,
         <button
           key={i}
           disabled={action.disabled}
@@ -95,8 +100,9 @@ export default function ContextMenu({ x, y, actions, onClose, align = 'left', mi
         >
           {action.icon}
           {action.label}
-        </button>
-      ))}
+          {action.shortcut && <span className="context-menu-shortcut">{action.shortcut}</span>}
+        </button>,
+      ])}
     </div>,
     document.body
   );

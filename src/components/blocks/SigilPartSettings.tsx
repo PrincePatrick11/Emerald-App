@@ -3,8 +3,7 @@ import Dropdown from '../ui/Dropdown';
 import { elementLabel } from '../../lib/blocks/blockAttrs';
 import { CALC_MODES, type CalcMode, type ChargeDefault, type ElementDef } from '../../lib/blocks/fields';
 import BlockCheckbox from './BlockCheckbox';
-import { DEFAULT_BRUSH_SIZE, SigilBrushSize, SigilColorSwatches } from './SigilBrushControls';
-import { SIGIL_COLORS } from './SigilDrawingCanvas';
+import { DEFAULT_BRUSH_SIZE, SIGIL_COLORS, SigilBrushSize, SigilColorSwatches } from './SigilBrushControls';
 
 type Patch = (p: Partial<ElementDef>) => void;
 

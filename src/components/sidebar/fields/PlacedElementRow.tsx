@@ -1,9 +1,8 @@
 import { memo, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Eye, EyeOff, Lock, Unlock, Trash2, Copy, GripVertical } from 'lucide-react';
-import { isCandleEmoji } from '../../../lib/altarConstants';
 import type { AltarPlacement } from '../../../types';
-import { AltarItemVisual } from '../../altar/AltarItemVisual';
+import { AltarPlacementVisual, placementLabel } from '../../altar/AltarPlacementVisual';
 import Button from '../../ui/Button';
 import ContextMenu from '../../ui/ContextMenu';
 import { sidebarRowStateClasses } from '../../../lib/styleClasses';
@@ -24,7 +23,8 @@ export const PlacedElementRow = memo(function PlacedElementRow({
   isEditing: boolean;
   isSelected: boolean;
   isDragging: boolean;
-  onSelect: () => void;
+  /** `additive`: Shift, ⌘ or Ctrl held — the row joins or leaves the selection. */
+  onSelect: (additive: boolean) => void;
   onToggleHidden: () => void;
   onToggleLocked: () => void;
   onDuplicate: () => void;
@@ -44,7 +44,7 @@ export const PlacedElementRow = memo(function PlacedElementRow({
   return (
     <>
       <div
-        onClick={onSelect}
+        onClick={(e) => onSelect(e.shiftKey || e.metaKey || e.ctrlKey)}
         onContextMenu={handleContextMenu}
         className={`w-full flex items-center gap-2 rounded-md border px-2 py-1.5 text-left transition-all cursor-pointer select-none ${
           sidebarRowStateClasses({ dragging: isDragging, selected: isSelected })
@@ -59,8 +59,8 @@ export const PlacedElementRow = memo(function PlacedElementRow({
             <GripVertical size={12} />
           </span>
         )}
-        <AltarItemVisual item={placement} size={16} candleAnimate={isCandleEmoji(placement.emoji)} />
-        <span className="flex-1 truncate text-[11px] font-medium">{placement.name}</span>
+        <AltarPlacementVisual placement={placement} size={16} />
+        <span className="flex-1 truncate text-[11px] font-medium">{placementLabel(placement, t)}</span>
         {isEditing && (
           <span className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
             <button
@@ -160,6 +160,12 @@ export const PlacedElementInspector = memo(function PlacedElementInspector({
     const percent = Number(value);
     if (Number.isNaN(percent)) return;
     const normalized = (Math.max(10, Math.min(1250, percent)) / 100) * 40;
+    // A drawn shape keeps its proportions; an item stays square, as it always was.
+    if (placement.kind === 'shape' || placement.kind === 'drawing') {
+      const factor = normalized / ((placement.width + placement.height) / 2);
+      onUpdate({ width: placement.width * factor, height: placement.height * factor });
+      return;
+    }
     onUpdate({ width: normalized, height: normalized });
   };
 
@@ -191,7 +197,10 @@ export const PlacedElementInspector = memo(function PlacedElementInspector({
           { field: 'x'            as const, label: t('altar.inspectorX'),        apply: () => applyNumber('x', draft.x),             unit: '%' },
           { field: 'y'            as const, label: t('altar.inspectorY'),        apply: () => applyNumber('y', draft.y),             unit: '%' },
           { field: 'rotation'     as const, label: t('altar.inspectorRotation'), apply: () => applyNumber('rotation', draft.rotation), unit: '°' },
-          { field: 'scalePercent' as const, label: t('altar.inspectorScale'),    apply: () => applyScalePercent(draft.scalePercent),  unit: '%' },
+          // Text is sized by its font, in the builder's bar.
+          ...(placement.kind === 'text' ? [] : [
+            { field: 'scalePercent' as const, label: t('altar.inspectorScale'), apply: () => applyScalePercent(draft.scalePercent), unit: '%' },
+          ]),
         ]).map(({ field, label, apply, unit }) => (
           <label key={field} className="space-y-0.5">
             <span className="text-[11px] uppercase tracking-wider text-subtle">{label}</span>

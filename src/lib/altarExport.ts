@@ -1,7 +1,8 @@
 import { invoke } from '@tauri-apps/api/core';
 import { save, message } from '@tauri-apps/plugin-dialog';
 import { useAltarStore } from '../store/altarStore';
-import { exportCurrentAltarImage } from '../components/altar/AltarCanvas';
+import { exportAltarPicture, exportCurrentAltarImage } from '../components/altar/AltarCanvas';
+import type { CanvasExportOptions } from '../components/editors/canvas';
 import { DEFAULT_ALTAR_RESOLUTION, resolveResolutionPixels } from './altarConstants';
 import { htmlEscape } from './export';
 import i18n from '../i18n';
@@ -49,6 +50,38 @@ export async function saveAltarImage(format: 'jpeg' | 'png' | 'webp'): Promise<v
   const filePath = await save({
     defaultPath: `${safeName}_${dateStr}.${ext}`,
     filters: [FILTER_MAP[format]],
+  });
+  if (!filePath) return;
+
+  await invoke('export_image', { path: filePath, dataUrl });
+  await message(`Image saved:\n${filePath}`, { title: 'Export', kind: 'info' });
+}
+
+const PICTURE_FILTERS: Record<CanvasExportOptions['format'], { name: string; extensions: string[] }> = {
+  png: FILTER_MAP.png,
+  jpeg: FILTER_MAP.jpeg,
+  svg: { name: 'SVG Image', extensions: ['svg'] },
+};
+
+/** The active altar saved as the canvas editor's export dialog asked: format, area, size, background. */
+export async function saveAltarPicture(options: CanvasExportOptions): Promise<void> {
+  const { altars, activeAltarId } = useAltarStore.getState();
+  const activeAltar = altars.find((a) => a.id === activeAltarId) ?? null;
+  if (!activeAltar) {
+    await noAltarOpenMessage();
+    return;
+  }
+
+  const dataUrl = await exportAltarPicture(options);
+  if (!dataUrl) throw new Error('capture failed');
+
+  const safeName = displayTitle(i18n.t, 'altar', activeAltar.title).replace(/[^\w\s\-äöüÄÖÜß]/g, '').trim().replace(/\s+/g, '_') || 'altar';
+  const dateStr = new Date().toISOString().slice(0, 10);
+  const filter = PICTURE_FILTERS[options.format];
+
+  const filePath = await save({
+    defaultPath: `${safeName}_${dateStr}.${filter.extensions[0]}`,
+    filters: [filter],
   });
   if (!filePath) return;
 

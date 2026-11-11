@@ -26,12 +26,18 @@ writeFileSync(
   `export { parseBlocks, serializeBlocks, createTextBlock, blockSectionHtml, neutralizeSectionTags } from '${root}/src/lib/blocks/blockHtml';
    export { TEXT_BLOCK_TYPE, BLOCK_ATTR } from '${root}/src/lib/blocks/types';
    export { parseFields, serializeFields, createFieldsBlock, isElementEmpty, isHiddenInRead, linkFromSlot, imageFromSlot } from '${root}/src/lib/blocks/fields';
-   export { instantiateDefinition, sameShape, updateInstanceToDefinition, isOutdatedCopy, blockOrigin, updateCopiesInContent, removeCopiesFromContent, parseDefinitionElements, parseDefinitionDisplay, remapDefinitionDefaults, definitionImageRefs, hasFrozenCopy } from '${root}/src/lib/blocks/definitions';
+   export { instantiateDefinition, parseDefinitionElements, parseDefinitionDisplay, remapDefinitionDefaults, definitionImageRefs } from '${root}/src/lib/blocks/definitions';
    export { entryBlockSummary } from '${root}/src/lib/blocks/entrySummary';
    export { withLegacyStatus, statusDefinition, hasLegacyStatus, convertLegacyStatusRows, STATUS_DEFINITION_ID } from '${root}/src/lib/blocks/legacyStatus';
-   export { extractUniqueLetters, parseSigilCalc, serializeSigilCalc, createSigilCalcBlock, createSigilCanvasBlock, createSigilChargeBlock, parseSigilCharge, serializeSigilCharge, sigilState, withoutConcealed, withChargeUnloaded, sigilImage, withSigilImage, letterList, sigilUnits, sigilPartBlock, sigilPartId, withSigilPart, blockHoldsLocked, withRenamedPartTargets } from '${root}/src/lib/blocks/sigil';
+   export { extractUniqueLetters, parseSigilCalc, serializeSigilCalc, createSigilCalcBlock, createSigilCanvasBlock, createSigilChargeBlock, parseSigilCharge, serializeSigilCharge, sigilState, withoutConcealed, sigilImage, withSigilImage, letterList, sigilUnits, sigilPartBlock, sigilPartId, withSigilPart, withChargesCoveringOnly, withRenamedPartTargets, parseSigilDrawing, withSigilDrawing } from '${root}/src/lib/blocks/sigil';
+   export { paintDocFromJson, paintDocToJson, emptyPaintDoc, isPaintDocEmpty, thinPoints, transformStroke, mergeDown, canMergeDown, strokeSamples, inPolygon, symmetricCopies, mirrorStroke, splitStroke } from '${root}/src/lib/paint/document';
+   export { parseAltarElements, altarElementsJson } from '${root}/src/lib/altarElements';
+   export { parseAltarSettings } from '${root}/src/lib/altarSettings';
+   export { symbolFromDrawing } from '${root}/src/components/editors/canvas/symbols/fromDrawing';
+   export { readUserSymbol } from '${root}/src/lib/userSymbols';
+   export { group, ungroup, withGroups, moveInStack, copiesOf, align } from '${root}/src/components/editors/canvas/canvasActions';
    export { renderBlocksForExport } from '${root}/src/lib/blocks/exportRender';
-   export { parseAssignments, resolveDefaultTemplate, templatesFor, instantiateTemplateBlocks, isContentEmpty, templateOriginsOf, templateStart, mergeTemplateTags, mergeAssignmentChanges, withAssignmentState, assignmentStateAt, sameAssignments, defaultTemplateAt, contentForTemplate, areBlocksEmpty, fieldsWithTemplate, fieldsWithoutTemplate } from '${root}/src/lib/blocks/templates';
+   export { parseAssignments, resolveAssignedTemplate, instantiateTemplateBlocks, isContentEmpty, templateStart, mergeTemplateTags, assignedTemplateAt, areBlocksEmpty, fieldsWithTemplate, fieldsWithoutTemplate } from '${root}/src/lib/blocks/templates';
    export { internalLinkChipHtml } from '${root}/src/lib/internalLinkHtml';
    export { extractInternalLinks } from '${root}/src/lib/internalLinkHtml';`
 );
@@ -56,17 +62,18 @@ const {
   parseBlocks, serializeBlocks, createTextBlock, neutralizeSectionTags, TEXT_BLOCK_TYPE, BLOCK_ATTR, extractInternalLinks,
   parseFields, serializeFields, createFieldsBlock, isElementEmpty, isHiddenInRead, linkFromSlot, imageFromSlot,
   internalLinkChipHtml,
-  instantiateDefinition, sameShape, updateInstanceToDefinition, isOutdatedCopy, blockOrigin, updateCopiesInContent,
-  removeCopiesFromContent, parseDefinitionElements, parseDefinitionDisplay, entryBlockSummary,
+  instantiateDefinition, parseDefinitionElements, parseDefinitionDisplay, entryBlockSummary,
   withLegacyStatus, statusDefinition, hasLegacyStatus, convertLegacyStatusRows, STATUS_DEFINITION_ID,
   extractUniqueLetters, parseSigilCalc, serializeSigilCalc, createSigilCalcBlock, createSigilCanvasBlock,
-  createSigilChargeBlock, parseSigilCharge, serializeSigilCharge, sigilState, withoutConcealed, withChargeUnloaded,
-  sigilImage, withSigilImage, letterList, renderBlocksForExport,
-  sigilUnits, sigilPartBlock, sigilPartId, withSigilPart, blockHoldsLocked,
-  remapDefinitionDefaults, definitionImageRefs, hasFrozenCopy, withRenamedPartTargets,
-  parseAssignments, resolveDefaultTemplate, templatesFor, instantiateTemplateBlocks, isContentEmpty,
-  templateOriginsOf, templateStart, mergeTemplateTags,
-  mergeAssignmentChanges, withAssignmentState, assignmentStateAt, sameAssignments, defaultTemplateAt, contentForTemplate, areBlocksEmpty,
+  createSigilChargeBlock, parseSigilCharge, serializeSigilCharge, sigilState, withoutConcealed,
+  sigilImage, withSigilImage, letterList, renderBlocksForExport, parseSigilDrawing, withSigilDrawing,
+  paintDocFromJson, paintDocToJson, emptyPaintDoc, isPaintDocEmpty, thinPoints, transformStroke, mergeDown, canMergeDown, strokeSamples, inPolygon, symmetricCopies, mirrorStroke, splitStroke,
+  group, ungroup, withGroups, moveInStack, copiesOf, align, parseAltarElements, altarElementsJson, parseAltarSettings,
+  symbolFromDrawing, readUserSymbol,
+  sigilUnits, sigilPartBlock, sigilPartId, withSigilPart, withChargesCoveringOnly,
+  remapDefinitionDefaults, definitionImageRefs, withRenamedPartTargets,
+  parseAssignments, resolveAssignedTemplate, instantiateTemplateBlocks, isContentEmpty,
+  templateStart, mergeTemplateTags, assignedTemplateAt, areBlocksEmpty,
   fieldsWithTemplate, fieldsWithoutTemplate,
 } = bundle;
 
@@ -333,11 +340,11 @@ console.log('\n4c. Field block\n');
     !isHiddenInRead(keepEmpty, { ...model, elements: [keepEmpty] }) && isHiddenInRead(el, model));
 }
 
-console.log('\n4d. Custom blocks: copies and updating\n');
+console.log('\n4d. Custom blocks: copies\n');
 {
   const text = { label: (el) => el.label || el.kind, yes: 'Ja', no: 'Nein', moonName: (p) => p };
   const def = {
-    id: 'def-1', name: 'Ritual', icon: '🕯️', revision: 1, sort_order: 0,
+    id: 'def-1', name: 'Ritual', icon: '🕯️', sort_order: 0,
     created_at: '', updated_at: '', deleted_at: null,
     display: { readHideEmpty: true, readOnly: false, showTitle: true },
     elements: [{ id: 'e-date', kind: 'date', label: 'Datum' }, { id: 'e-result', kind: 'shorttext', label: 'Ergebnis' }],
@@ -345,68 +352,20 @@ console.log('\n4d. Custom blocks: copies and updating\n');
 
   const copy = instantiateDefinition(def, text);
   const copyModel = parseFields(copy);
-  check('a copy carries origin, revision, name and the title rule',
-    blockOrigin(copy)?.id === 'def-1' && blockOrigin(copy)?.rev === 1 && copyModel.name === 'Ritual' &&
-      copy.attrs['data-block-show-title'] === '1', copy);
+  check('a copy carries name and title rule and no link to its definition',
+    copyModel.name === 'Ritual' && copy.attrs['data-block-show-title'] === '1'
+      && !copy.attrs['data-block-origin'] && !copy.attrs['data-block-rev'], copy);
   check('the element IDs of the copy are those of the definition',
     copyModel.elements.map((e) => e.id).join() === 'e-date,e-result');
 
   const filled = serializeFields(copy, { ...copyModel, values: { 'e-date': '2026-09-10', 'e-result': 'gut' } }, text);
-  check('a copy of the current revision is not outdated', !isOutdatedCopy(filled, def));
-
-  const def2 = {
-    ...def, revision: 2,
-    display: { readHideEmpty: false, readOnly: true, showTitle: false },
-    elements: [
-      { id: 'e-result', kind: 'shorttext', label: 'Resultat' },
-      { id: 'e-mood', kind: 'select', label: 'Stimmung', options: [{ id: 'o1', label: 'ruhig' }] },
-      { id: 'e-date', kind: 'date', label: 'Datum', archived: true },
-    ],
-  };
-  check('an older revision is outdated', isOutdatedCopy(filled, def2));
-
-  const titled = { ...filled, attrs: { ...filled.attrs, 'data-block-title': 'Mein Titel' } };
-  const updated = updateInstanceToDefinition(titled, def2, text);
-  const um = parseFields(updated);
-  check('values stay with their element ID', um.values['e-result'] === 'gut' && um.values['e-date'] === '2026-09-10', um.values);
-  check('the label comes from the definition', um.elements.find((e) => e.id === 'e-result')?.label === 'Resultat');
-  check('a new field is added empty, in the order of the definition',
-    um.elements.filter((e) => !e.archived).map((e) => e.id).join() === 'e-result,e-mood' && um.values['e-mood'] === undefined,
-    um.elements);
-  check('a removed field is archived, not deleted', um.elements.find((e) => e.id === 'e-date')?.archived === true);
-  check('an archived field is missing in the fallback and in read mode',
-    !updated.html.includes('2026-09-10') && isHiddenInRead(um.elements.find((e) => e.id === 'e-date'), um), updated.html);
-  check('the display rules come from the definition', um.display.readHideEmpty === false && um.display.readOnly === true);
-  check('the custom title stays, the revision is the new one',
-    updated.attrs['data-block-title'] === 'Mein Titel' && blockOrigin(updated)?.rev === 2 && !isOutdatedCopy(updated, def2));
-
-  const def3 = {
-    ...def2, revision: 3,
-    elements: [...def2.elements.filter((e) => e.id !== 'e-date'), { id: 'e-date', kind: 'date', label: 'Datum' }],
-  };
-  const back = parseFields(updateInstanceToDefinition(updated, def3, text));
-  check('a restored field brings its value back',
-    !back.elements.find((e) => e.id === 'e-date')?.archived && back.values['e-date'] === '2026-09-10');
-
-  const clash = { ...def2, revision: 4, elements: [{ id: 'e-result', kind: 'number', label: 'X' }] };
-  check('a different kind under the same ID does not discard the value',
-    parseFields(updateInstanceToDefinition(updated, clash, text)).values['e-result'] === 'gut');
-
   const content = serializeBlocks([createTextBlock('<p>a</p>'), filled, createFieldsBlock('number')]);
-  const updatedContent = updateCopiesInContent(content, def2, text);
-  const updatedBlocks = parseBlocks(updatedContent ?? '');
-  check('updateCopiesInContent updates only the copy',
-    updatedBlocks.length === 3 && blockOrigin(updatedBlocks[1])?.rev === 2 && updatedBlocks[0].html === '<p>a</p>', updatedBlocks);
-  check('without an outdated copy it returns null', updateCopiesInContent(updatedContent, def2, text) === null);
+  check('a field archived by an earlier version is gone from the definition',
+    parseDefinitionElements(JSON.stringify([{ id: 'a', kind: 'date', label: 'A', archived: true }, { id: 'b', kind: 'date', label: 'B' }])).map((e) => e.id).join() === 'b');
+  check('a copy from before keeps working with its old markers',
+    parseFields({ ...filled, attrs: { ...filled.attrs, 'data-block-origin': 'def-1', 'data-block-rev': '1' } }).values['e-result'] === 'gut');
 
-  const removed = removeCopiesFromContent(content, 'def-1');
-  check('removeCopiesFromContent removes only the copies of this definition',
-    parseBlocks(removed ?? '').length === 2 && removeCopiesFromContent(removed, 'def-1') === null);
-
-  const summary = entryBlockSummary('x', content);
-  check('entryBlockSummary returns origin and field values under definition:element',
-    summary.origins.length === 1 && summary.fieldValues['def-1:e-result'] === 'gut', summary);
-  check('content without custom blocks has no origin', entryBlockSummary('y', '<p>nur Text</p>').origins.length === 0); // lang-ok
+  check('a summary without sigil blocks is empty', entryBlockSummary('x', content).sigil === null);
 
   check('definition columns: broken JSON yields the defaults',
     parseDefinitionElements('{kaputt').length === 0 && parseDefinitionDisplay('nope').showTitle === true &&
@@ -421,7 +380,7 @@ console.log('\n4d. Custom blocks: copies and updating\n');
     defaultValue: [{ id: 'i1', text: 'Kerze', checked: false }, { id: 'i2', text: 'Räuchern', checked: true }, 'kaputt'], // lang-ok
   }]));
   const prefilledDef = {
-    ...def, revision: 5,
+    ...def,
     elements: [preset, { id: 'e-on', kind: 'toggle', label: 'An', defaultValue: true },
       { id: 'e-n', kind: 'number', label: 'N', defaultValue: 'drei' }, { id: 'e-pic', kind: 'image', label: 'Bild', defaultValue: 'x.png' }],
   };
@@ -439,19 +398,6 @@ console.log('\n4d. Custom blocks: copies and updating\n');
   check('the copy does not carry the default in its config, and items get their own IDs',
     !prefilled.attrs['data-block-config'].includes('defaultValue') && items.every((i) => i.id !== 'i1' && i.id !== 'i2'),
     prefilled.attrs['data-block-config']);
-  check('a different default does not raise the revision',
-    sameShape(pdef, { ...pdef, elements: pdef.elements.map((e) => (e.id === 'e-on' ? { ...e, defaultValue: false } : e)) })
-      && !sameShape(pdef, { ...pdef, elements: pdef.elements.map((e) => (e.id === 'e-on' ? { ...e, label: 'Aus' } : e)) }));
-  const grown = updateInstanceToDefinition(updated, {
-    ...def2, revision: 6,
-    elements: [
-      ...def2.elements.map((e) => (e.id === 'e-result' ? { ...e, defaultValue: 'überschreibt nicht' } : e)), // lang-ok
-      { id: 'e-new', kind: 'toggle', label: 'Neu', defaultValue: true },
-    ],
-  }, text);
-  const gm = parseFields(grown);
-  check('updating: a new field arrives with its default, existing values stay',
-    gm.values['e-new'] === true && gm.values['e-result'] === 'gut', gm.values);
 }
 
 console.log('\n4e. Legacy operation status becomes a block\n');
@@ -470,7 +416,7 @@ console.log('\n4e. Legacy operation status becomes a block\n');
   const [status, text] = parseBlocks(out);
   const model = parseFields(status);
   check('the status block comes before the content, the text stays',
-    status?.type === 'core.fields' && status.attrs['data-block-origin'] === STATUS_DEFINITION_ID && text?.html === '<p>Text</p>', out);
+    status?.type === 'core.fields' && model.name === 'Status' && text?.html === '<p>Text</p>', out);
   check('values: inactive, end date, version trimmed',
     model.values.active === false && model.values['end-date'] === '2026-03-01' && model.values.version === '1.2', model.values);
   check('the fallback names the values readably', status.html.includes('Nein') && status.html.includes('1.2'), status.html);
@@ -485,7 +431,7 @@ console.log('\n4e. Legacy operation status becomes a block\n');
   const converted = convertLegacyStatusRows(rows, t, 'now');
   check('convertLegacyStatusRows: only the row with a legacy status, columns cleared',
     converted.definition?.id === STATUS_DEFINITION_ID && converted.rows[1] === rows[1] &&
-      converted.rows[0].is_active === 1 && converted.rows[0].content.includes('data-block-origin'), converted.rows);
+      converted.rows[0].is_active === 1 && converted.rows[0].content.includes('core.fields'), converted.rows);
   check('without a legacy status no definition is needed', convertLegacyStatusRows([rows[1]], t, 'now').definition === null);
 
   // i18n not ready yet: `t` returns the key — never make it permanent as a label.
@@ -509,6 +455,163 @@ console.log('\n4f. Sigil blocks\n');
 
   const canvas = withSigilImage(createSigilCanvasBlock(), `${'ab'.repeat(32)}.png`);
   check('drawing: the file name is a src in the markup', sigilImage(canvas) === `${'ab'.repeat(32)}.png` && canvas.html.startsWith('<img src="'));
+
+  // The paint document: vector strokes as data JSON, the rendered image and layer images as src.
+  {
+    const old = `${'ab'.repeat(32)}.png`;
+    const render = `${'cd'.repeat(32)}.png`;
+    const legacy = parseSigilDrawing(canvas);
+    check('drawing: an old image becomes the only layer, nothing lost',
+      legacy.render === old && legacy.doc?.layers.length === 1 && legacy.doc.layers[0].image === old && legacy.doc.layers[0].strokes.length === 0, legacy);
+    check('drawing: an empty block has neither image nor document', parseSigilDrawing(createSigilCanvasBlock()).doc === null);
+
+    const stroke = { id: 's1', tool: 'pen', color: '#EF4444', size: 8, points: [1.234, 2.345, 0.5, 10, 20, 0.777], pressure: true };
+    const doc = { layers: [{ ...legacy.doc.layers[0], strokes: [stroke] }, { id: 'top', name: 'Oben', hidden: true, image: null, strokes: [] }] }; // lang-ok
+    const saved = withSigilDrawing(canvas, render, doc);
+    const back = parseSigilDrawing(parseBlocks(serializeBlocks([saved]))[0]);
+    check('drawing: the render comes first, the layer image after it, both as src',
+      sigilImage(saved) === render && saved.html.includes(`src="${old}"`) && saved.html.indexOf(render) < saved.html.indexOf(old), saved.html);
+    check('drawing: round trip keeps layers, strokes, the layer image; points rounded',
+      back.render === render && back.doc?.layers.length === 2 && back.doc.layers[0].image === old
+        && back.doc.layers[1].name === 'Oben' && back.doc.layers[1].hidden // lang-ok
+        && isDeepStrictEqual(back.doc.layers[0].strokes[0].points, [1.2, 2.3, 0.5, 10, 20, 0.78])
+        && back.doc.layers[0].strokes[0].color === '#ef4444' && back.doc.layers[0].strokes[0].pressure, back);
+    const text = {
+      title: (b) => b.type, date: (iso) => iso, number: (n) => `${n}`, targetDate: '', technique: '', loaded: '', notLoaded: '',
+      drawing: 'D', altar: () => null, fields: { label: (e) => e.label, yes: '', no: '', moonName: (p) => p },
+    };
+    const exported = renderBlocksForExport(serializeBlocks([saved]), text);
+    check('drawing: the export shows only the render', exported.includes(render) && !exported.includes(old), exported);
+
+    // Something that knows only the image (an older app) replaced it: the new image counts, as a layer.
+    const replaced = { ...saved, html: `<img src="${'ef'.repeat(32)}.png" alt="">` };
+    const stale = parseSigilDrawing(replaced);
+    check('drawing: an unmarked image wins over a stale document',
+      stale.doc?.layers.length === 1 && stale.doc.layers[0].image === `${'ef'.repeat(32)}.png`, stale);
+
+    const emptied = withSigilDrawing(saved, null, null);
+    check('drawing: emptied, the block holds nothing', emptied.html === '' && emptied.attrs['data-block-data'] === undefined, emptied);
+    check('drawing: an empty document is empty', isPaintDocEmpty(emptyPaintDoc()) && !isPaintDocEmpty(doc));
+
+    const junk = paintDocFromJson({ v: 1, layers: [
+      { id: 'a', strokes: [{ t: 'pen', s: 9999, c: 'red; x', p: [1, 2, 3, 'x'] }, { t: 'nope', s: 2, p: [1, 2, 3] }, { t: 'line', s: 2, p: [0, 0, 0.5, 5, 5, 0.5, 9, 9, 0.5] }] },
+      { id: 'a', strokes: [] }, { id: '<b>', strokes: [] },
+    ] });
+    check('drawing: doctored JSON is bounded and cleaned',
+      junk?.layers.length === 1 && junk.layers[0].strokes.length === 2 && junk.layers[0].strokes[0].size === 120
+        && junk.layers[0].strokes[0].color === '#000000' && junk.layers[0].strokes[0].points.length === 3
+        && junk.layers[0].strokes[0].points[2] === 1 && junk.layers[0].strokes[1].points.length === 6, junk);
+    check('drawing: not a document', paintDocFromJson({ v: 2, layers: [] }) === null && paintDocFromJson('x') === null);
+    const thin = thinPoints([0, 0, 0.5, 0.1, 0.1, 0.5, 0.2, 0.2, 0.5, 5, 5, 0.5, 5.1, 5.1, 0.5]);
+    check('drawing: thinning drops close points, keeps the ends', isDeepStrictEqual(thin, [0, 0, 0.5, 5, 5, 0.5, 5.1, 5.1, 0.5]), thin);
+
+    // Layer extras and turned shapes: stored only when they differ, older documents read with the defaults.
+    const extras = paintDocFromJson(paintDocToJson({ layers: [
+      { id: 'a', name: '', hidden: false, locked: true, opacity: 0.456, image: null, imageRect: { x: 0, y: 0, width: 1200, height: 800 },
+        strokes: [{ id: 'r', tool: 'rect', color: '#112233', size: 4, points: [10, 10, 0.5, 50, 30, 0.5], pressure: false, rotation: 0.5 }] },
+    ] }));
+    check('drawing: lock, opacity and a turned rectangle survive the round trip',
+      extras?.layers[0].locked && extras.layers[0].opacity === 0.46 && extras.layers[0].strokes[0].rotation === 0.5, extras);
+    const plain = paintDocFromJson({ v: 1, layers: [{ id: 'a', strokes: [{ t: 'pen', s: 2, p: [1, 2, 0.5] }] }] });
+    check('drawing: an older layer is unlocked, opaque, its image the whole page, its strokes unturned',
+      plain?.layers[0].locked === false && plain.layers[0].opacity === 1 && plain.layers[0].imageRect.width === 1200
+        && plain.layers[0].strokes[0].rotation === 0, plain);
+    const pen = { id: 'p', tool: 'pen', color: '#000000', size: 10, points: [0, 0, 0.5, 10, 0, 0.5], pressure: false, rotation: 0, filled: false, sides: 5, rings: [] };
+    const scaled = transformStroke(pen, { dx: 5, dy: 0, scale: 2, angle: 0, cx: 0, cy: 0 });
+    check('drawing: a transform moves and scales points and width', isDeepStrictEqual(scaled.points, [5, 0, 0.5, 25, 0, 0.5]) && scaled.size === 20, scaled);
+    const layerOf = (id, strokes, image = null) => ({ id, name: '', hidden: false, locked: false, opacity: 1, image, imageRect: { x: 0, y: 0, width: 1200, height: 800 }, strokes });
+    const two = { layers: [layerOf('low', [pen]), layerOf('up', [{ ...pen, id: 'q' }])] };
+    const merged = mergeDown(two, 'up');
+    check('drawing: merging down appends the strokes to the layer below',
+      merged.layers.length === 1 && merged.layers[0].strokes.map((x) => x.id).join() === 'p,q', merged);
+    check('drawing: a layer with eraser strokes or an image does not merge',
+      !canMergeDown({ layers: [layerOf('low', []), layerOf('up', [{ ...pen, tool: 'eraser' }])] }, 'up')
+        && !canMergeDown({ layers: [layerOf('low', []), layerOf('up', [], 'x.png')] }, 'up') && !canMergeDown(two, 'low'));
+    const shapes = paintDocFromJson(paintDocToJson({ layers: [layerOf('s', [
+      { ...pen, id: 'st', tool: 'star', sides: 7, filled: true, points: [0, 0, 0.5, 100, 100, 0.5], rings: [] },
+      { ...pen, id: 'fi', tool: 'fill', points: [5, 5, 1], rings: [[0, 0, 10, 0, 10, 10, 0, 10], [2, 2, 4, 2, 4, 4]] },
+    ])] }));
+    const [star, fill] = shapes?.layers[0].strokes ?? [];
+    check('drawing: a filled star keeps its points, a fill its outlines',
+      star?.sides === 7 && star.filled && fill?.tool === 'fill' && fill.rings.length === 2 && fill.rings[1].length === 6, shapes);
+    check('drawing: an older document gets outlined shapes and no fill outlines',
+      plain?.layers[0].strokes[0].filled === false && plain.layers[0].strokes[0].rings.length === 0, plain);
+    const left = { ...pen, points: [100, 100, 0.5, 200, 100, 0.5] };
+    check('drawing: mirror symmetry adds the copy across the middle',
+      isDeepStrictEqual(symmetricCopies(left, { kind: 'mirror' })[0].points, [1100, 100, 0.5, 1000, 100, 0.5])
+        && symmetricCopies(left, { kind: 'quad' }).length === 3 && symmetricCopies(left, { kind: 'radial', rays: 6 }).length === 5
+        && symmetricCopies(left, { kind: 'off' }).length === 0);
+    check('drawing: a mirrored polygon mirrors its turn',
+      mirrorStroke({ ...pen, tool: 'polygon', rotation: 0.3, points: [0, 0, 0.5, 10, 10, 0.5] }, 'x', 600).rotation === -0.3);
+    const long = { ...pen, points: [0, 0, 0.5, 10, 0, 0.5, 20, 0, 0.5, 30, 0, 0.5, 40, 0, 0.5, 50, 0, 0.5] };
+    const split = splitStroke(long, (x) => x >= 15 && x <= 35);
+    check('drawing: a freehand stroke is cut where it leaves the area, the pieces meeting',
+      split?.pieces.length === 3 && split.inside.length === 1
+        && isDeepStrictEqual(split.inside[0].points, [10, 0, 0.5, 20, 0, 0.5, 30, 0, 0.5, 40, 0, 0.5])
+        && split.pieces[0].points.length === 9 && splitStroke({ ...pen, tool: 'line', points: [0, 0, 0.5, 50, 0, 0.5] }, () => true) === null, split);
+    check('drawing: a lasso takes a stroke with a point inside it',
+      inPolygon(5, 5, [0, 0, 10, 0, 10, 10, 0, 10]) && !inPolygon(15, 5, [0, 0, 10, 0, 10, 10, 0, 10])
+        && strokeSamples({ ...pen, tool: 'ellipse', points: [0, 0, 0.5, 20, 10, 0.5] }).length === 16);
+  }
+
+  {
+    const el = (id, z, extra = {}) => ({ id, type: 'shape', x: 0, y: 0, width: 10, height: 10, rotation: 0, opacity: 1, locked: false, hidden: false, z, props: {}, ...extra });
+    const scene = [el('a', 0), el('b', 1), el('c', 2), el('d', 3)];
+    const order = (els) => [...els].sort((p, q) => p.z - q.z).map((e) => e.id).join('');
+    const grouped = group(scene, ['a', 'c'], 'g');
+    check('canvas: a group is stacked together where its topmost member was',
+      order(grouped) === 'bacd' && grouped.filter((e) => e.group === 'g').length === 2, order(grouped));
+    check('canvas: one member pulls in its group, ungrouping dissolves it',
+      withGroups(grouped, ['a']).sort().join() === 'a,c' && ungroup(grouped, ['c']).every((e) => !e.group));
+    check('canvas: a locked element stays out of a group',
+      group([el('a', 0), el('b', 1, { locked: true })], ['a', 'b'], 'g').every((e) => !e.group));
+    check('canvas: moving in the stack keeps the moved ones together',
+      order(moveInStack(scene, ['a', 'b'], 2)) === 'cdab' && order(moveInStack(scene, ['d'], 0)) === 'dabc');
+    let n = 0;
+    const copies = copiesOf(grouped.filter((e) => e.group), grouped, 10, () => `n${n++}`);
+    const drawn = parseAltarElements(JSON.stringify([
+      { id: 'p', kind: 'shape', group: 'g1', shape: { type: 'polygon', sides: 8 } },
+      { id: 'q', kind: 'shape', shape: { type: 'star', sides: 40 } },
+    ]), 'altar');
+    const again = parseAltarElements(altarElementsJson(drawn), 'altar');
+    check('altar: a drawn element keeps its group and corners, nonsense is clamped',
+      again[0].group === 'g1' && again[0].shape.sides === 8 && !again[1].group && again[1].shape.sides === 12, again);
+    const pair = [el('a', 0, { x: 100, y: 0, group: 'g' }), el('b', 1, { x: 200, y: 0, group: 'g' }), el('c', 2, { x: 500, y: 300 })];
+    const lined = align(pair, ['a', 'b', 'c'], 'left', { width: 1000, height: 600 });
+    check('canvas: aligning moves a group as one, its members keeping their distance',
+      lined[1].x - lined[0].x === 100 && lined[0].x === 100 && lined[2].x === 100, lined.map((e) => e.x));
+    const settings = parseAltarSettings(JSON.stringify({ guides_locked: true, guides: [
+      { id: 'a', orientation: 'vertical', at: 25 }, { id: 'a', orientation: 'vertical', at: 30 },
+      { id: 'b', orientation: 'diagonal', at: 10 }, { id: 'c', orientation: 'horizontal', at: 140 },
+    ] }));
+    check('altar: guides are read with their place in percent, doubles and nonsense left out',
+      settings.guides_locked && settings.guides.length === 2 && settings.guides[1].at === 100
+        && !parseAltarSettings('{}').guides_locked && parseAltarSettings('{}').guides.length === 0, settings.guides);
+    const symbols = parseAltarElements(JSON.stringify([
+      { id: 's', kind: 'symbol', symbol: { symbol: 'runes.fehu', d: 'M38 10L38 90', color: '#123456', weight: 99, fill: null } },
+      { id: 't', kind: 'symbol', symbol: { symbol: 'planets.sun', d: 'M0 0<script>' } },
+    ]), 'altar');
+    const symbolsAgain = parseAltarElements(altarElementsJson(symbols), 'altar');
+    check('altar: a symbol keeps its path and colour, its weight is clamped, a foreign path gives way to the library\'s',
+      symbolsAgain[0].symbol.d === 'M38 10L38 90' && symbolsAgain[0].symbol.color === '#123456' && symbolsAgain[0].symbol.weight === 16
+        && symbolsAgain[1].symbol.symbol === 'planets.sun' && !symbolsAgain[1].symbol.d.includes('<'), symbolsAgain);
+    const sketch = emptyPaintDoc();
+    sketch.layers[0].strokes = [
+      { id: 'p', tool: 'pen', color: '#ff0000', size: 20, points: [100, 100, 0.5, 300, 200, 0.5, 500, 100, 0.5], pressure: false, rotation: 0, filled: false, sides: 5, rings: [] },
+      { id: 'l', tool: 'line', color: '#00ff00', size: 10, points: [100, 400, 0.5, 500, 400, 0.5], pressure: false, rotation: 0, filled: false, sides: 5, rings: [] },
+      { id: 'e', tool: 'eraser', color: '#000000', size: 40, points: [2000, 2000, 0.5, 2100, 2100, 0.5], pressure: false, rotation: 0, filled: false, sides: 5, rings: [] },
+    ];
+    const made = symbolFromDrawing(sketch);
+    const coords = (d) => (d.match(/-?[0-9.]+/g) ?? []).map(Number);
+    check('symbols: a drawing becomes lines and filled parts inside the box, the eraser left out',
+      made && made.d.startsWith('M') && made.solid.length > 0 && coords(made.d + made.solid).every((n) => n >= -0.01 && n <= 100.01)
+        && Math.abs(made.weight - 10 * (88 / 420)) < 0.2 && symbolFromDrawing(emptyPaintDoc()) === null, made);
+    check('symbols: an own symbol from a file needs an id and plain path data',
+      readUserSymbol({ id: 'a', name: 'x', d: 'M0 0L10 10', solid: '', weight: 99 })?.weight === 16
+        && readUserSymbol({ id: 'b', d: '<svg/>' }) === null && readUserSymbol({ d: 'M0 0L1 1' }) === null);
+    check('canvas: copies of a group form a new group of their own',
+      copies.length === 2 && copies[0].group && copies[0].group !== 'g' && copies[0].group === copies[1].group, copies);
+  }
 
   const odd = parseSigilCharge({ ...createSigilChargeBlock(), attrs: { 'data-block-data': JSON.stringify({ loaded: 'ja', revealDate: 'morgen', lock: 'alles' }) } });
   check('charge: nonsense falls back to safe values', !odd.loaded && odd.revealDate === null && odd.lock === 'entry', odd);
@@ -550,9 +653,6 @@ console.log('\n4f. Sigil blocks\n');
   check('hidden: search and export do not see calculator and drawing',
     !hiddenContent.includes('core.sigil.calc') && !hiddenContent.includes('core.sigil.canvas') && hiddenContent.includes('Notiz'), hiddenContent);
   check('revealed: everything stays', withoutConcealed(content, '2030-02-01') === content);
-
-  const unloaded = withChargeUnloaded(content);
-  check('a copy is unloaded', sigilState(parseBlocks(unloaded), '2029-12-31').locked.size === 0 && withChargeUnloaded(unloaded) === unloaded);
 
   const secret = { ...createTextBlock('<p>geheim</p>'), attrs: { 'data-block-hidden': '1' } };
   const exportText = {
@@ -628,7 +728,7 @@ console.log('\n4g. Altar field and defaults with markup\n');
     byId.alt2.defaultValue === undefined && byId.lnk2.defaultValue === undefined && byId.pic2.defaultValue === undefined);
 
   const def = {
-    id: 'def-slots', name: 'Ritualplatz', icon: '🕯️', revision: 1, sort_order: 0,
+    id: 'def-slots', name: 'Ritualplatz', icon: '🕯️', sort_order: 0,
     created_at: '', updated_at: '', deleted_at: null,
     display: { readHideEmpty: true, readOnly: false, showTitle: true }, elements,
   };
@@ -660,7 +760,7 @@ console.log('\n4h. Sigils as parts of custom blocks\n');
 {
   const text = { label: (e) => e.label || e.kind, yes: 'Ja', no: 'Nein', moonName: (p) => p };
   const def = {
-    id: 'def-sigil', name: 'Sigillen-Ritual', icon: '🕯️', revision: 1, sort_order: 0,
+    id: 'def-sigil', name: 'Sigillen-Ritual', icon: '🕯️', sort_order: 0,
     created_at: '', updated_at: '', deleted_at: null,
     display: { readHideEmpty: true, readOnly: false, showTitle: true },
     elements: parseDefinitionElements(JSON.stringify([
@@ -697,7 +797,7 @@ console.log('\n4h. Sigils as parts of custom blocks\n');
   const before = sigilState(back, '2029-12-31');
   check('a loaded charge as a part hides and locks the parts, locks the entry',
     before.concealed.has(sigilPartId(block.id, 'calc')) && before.concealed.has(sigilPartId(block.id, 'draw'))
-      && before.lockEntry && blockHoldsLocked(before, block.id) && before.revealDate === '2030-01-01', before);
+      && before.lockEntry && before.revealDate === '2030-01-01', before);
   const content = serializeBlocks(back);
   const hidden = withoutConcealed(content, '2029-12-31');
   check('search and .emerald do not see hidden parts — the rest of the block stays',
@@ -716,10 +816,9 @@ console.log('\n4h. Sigils as parts of custom blocks\n');
   check('export after the date: calculator and drawing as parts',
     revealed.includes('Geheime Absicht') && revealed.includes('alt="Zeichnung"'), revealed);
 
-  const unloaded = withChargeUnloaded(content);
+  const unloaded = serializeBlocks([createTextBlock('<p>Notiz</p>'), setPart(block, 'charge', (p) => serializeSigilCharge(p, { ...parseSigilCharge(p), loaded: false }))]);
   const afterUnload = sigilState(parseBlocks(unloaded), '2029-12-31');
-  check('a copy of the entry also unloads the charge in the part',
-    afterUnload.concealed.size === 0 && !afterUnload.lockEntry && withChargeUnloaded(unloaded) === unloaded, afterUnload);
+  check('unloading the part conceals nothing any more', afterUnload.concealed.size === 0 && !afterUnload.lockEntry, afterUnload);
 
   const standaloneCharge = serializeSigilCharge(createSigilChargeBlock(), {
     loaded: true, revealDate: null, lock: 'sigil', technique: null, targets: [sigilPartId(block.id, 'draw')],
@@ -733,16 +832,6 @@ console.log('\n4h. Sigils as parts of custom blocks\n');
   check('the summary knows the sigil in the part (lock, no card image while hidden)',
     summary.sigil?.lockEntry === true && summary.sigil.image === null
       && entryBlockSummary('sigil-part-2', content, '2030-02-01').sigil?.image === `${'ab'.repeat(32)}.png`, summary.sigil);
-  check('sigil data does not end up in the field values for lists',
-    Object.keys(summary.fieldValues).every((k) => !k.endsWith(':calc') && !k.endsWith(':charge')), summary.fieldValues);
-
-  // A new revision without a charge: if it were dropped on update, the sigil would be unloaded.
-  const rev2 = { ...def, revision: 2, elements: def.elements.filter((e) => e.id !== 'charge') };
-  check('a copy with a loaded sigil is neither updated nor removed',
-    updateCopiesInContent(content, rev2, text) === null && removeCopiesFromContent(content, def.id) === null
-      && hasFrozenCopy(content, def.id) && !hasFrozenCopy(unloaded, def.id)
-      && updateCopiesInContent(unloaded, rev2, text) !== null);
-
   const dupId = 'dup-block';
   const targeted = setPart(parseBlocks(unloaded)[1], 'charge', (p) => serializeSigilCharge(p, {
     ...parseSigilCharge(p), targets: [sigilPartId(block.id, 'calc'), 'fremd-block'],
@@ -804,42 +893,40 @@ console.log('\n5. What is derived from the content sees through the blocks\n');
   check('extractInternalLinks finds chips in wrapped text blocks', links.length === 1 && links[0].entryType === 'wiki', links);
 }
 
-console.log('\n6. Templates: assignment, default, insertion\n');
+console.log('\n6. Templates: assignment, insertion\n');
 {
   const assignments = parseAssignments(JSON.stringify([
     { entryType: 'journal', category: 'ritual', isDefault: true },
-    { entryType: 'wiki', category: 'ritual', isDefault: false },
+    { entryType: 'wiki', category: 'ritual' },
     { entryType: 'wiki', category: 'ritual', isDefault: true },
+    { entryType: 'wiki', category: 'offered', isDefault: false },
     { entryType: 'wiki', category: null },
     { entryType: 'operation', category: '<x>' },
     { entryType: 'task', category: '*' },
     'kaputt',
   ]));
-  check('assignments: journal always "all", duplicates merge, foreign ones are dropped',
+  check('assignments: journal always "all", duplicates merge, foreign and merely offered ones are dropped',
     JSON.stringify(assignments) === JSON.stringify([
-      { entryType: 'journal', category: '*', isDefault: true },
-      { entryType: 'wiki', category: 'ritual', isDefault: true },
-      { entryType: 'wiki', category: null, isDefault: false },
+      { entryType: 'journal', category: '*' },
+      { entryType: 'wiki', category: 'ritual' },
+      { entryType: 'wiki', category: null },
     ]), assignments);
   check('assignments: unreadable JSON yields none', parseAssignments('{kaputt').length === 0);
 
   const tpl = (id, assignments, content = '') => ({ id, name: id, icon: '', title: '', content, tags: [], assignments, sort_order: 0, created_at: '', updated_at: '', deleted_at: null });
-  const exact = tpl('exact', [{ entryType: 'wiki', category: 'ritual', isDefault: true }]);
-  const fallback = tpl('fallback', [{ entryType: 'wiki', category: '*', isDefault: true }]);
-  const none = tpl('none', [{ entryType: 'wiki', category: null, isDefault: true }]);
+  const exact = tpl('exact', [{ entryType: 'wiki', category: 'ritual' }]);
+  const fallback = tpl('fallback', [{ entryType: 'wiki', category: '*' }]);
+  const none = tpl('none', [{ entryType: 'wiki', category: null }]);
   const free = tpl('free', []);
-  const other = tpl('other', [{ entryType: 'operation', category: '*', isDefault: false }]);
-  const all = [free, fallback, exact, none, other];
-  check('default: the exact combination before "all categories"', resolveDefaultTemplate(all, 'wiki', 'ritual')?.id === 'exact');
-  check('default: without its own default, the fallback', resolveDefaultTemplate(all, 'wiki', 'herbs')?.id === 'fallback');
-  check('default: "no category" is a combination of its own', resolveDefaultTemplate(all, 'wiki', null)?.id === 'none');
-  check('default: none for another entry type', resolveDefaultTemplate(all, 'journal', null) === null);
-  check('to choose from: assigned ones first, then unassigned, foreign combinations missing',
-    templatesFor(all, 'wiki', 'herbs').map((t) => t.id).join() === 'fallback,free', templatesFor(all, 'wiki', 'herbs').map((t) => t.id));
+  const all = [free, fallback, exact, none];
+  check('assigned: the exact combination before "all categories"', resolveAssignedTemplate(all, 'wiki', 'ritual')?.id === 'exact');
+  check('assigned: without one of its own, the fallback', resolveAssignedTemplate(all, 'wiki', 'herbs')?.id === 'fallback');
+  check('assigned: "no category" is a combination of its own', resolveAssignedTemplate(all, 'wiki', null)?.id === 'none');
+  check('assigned: none for another entry type', resolveAssignedTemplate(all, 'journal', null) === null);
 
-  // Insertion: new IDs, charge targets carried along, unloaded, origin on every block.
+  // Insertion: new IDs, charge targets carried along, everything else as it is.
   const calc = createSigilCalcBlock();
-  const canvas = createSigilCanvasBlock();
+  const canvas = withSigilImage(createSigilCanvasBlock(), `${'ef'.repeat(32)}.png`);
   const charge = serializeSigilCharge(createSigilChargeBlock(), {
     loaded: true, revealDate: null, lock: 'entry', technique: null, targets: [canvas.id],
   });
@@ -847,15 +934,23 @@ console.log('\n6. Templates: assignment, default, insertion\n');
   const first = instantiateTemplateBlocks(sigilTpl);
   const second = instantiateTemplateBlocks(sigilTpl);
   const firstCharge = parseSigilCharge(first[3]);
-  check('insertion: all blocks carry the origin', first.every((b) => b.attrs['data-template-origin'] === 'sigil-tpl'), first.map((b) => b.attrs));
+  check('insertion: no block remembers the template', first.every((b) => !b.attrs['data-template-origin']), first.map((b) => b.attrs));
   check('insertion: new block IDs, different ones the second time too',
     first.every((b, i) => b.id !== parseBlocks(sigilTpl.content)[i].id && b.id !== second[i].id));
-  check('insertion: the charge targets the new drawing and is unloaded',
-    !firstCharge.loaded && firstCharge.targets.join() === first[2].id, firstCharge);
+  check('insertion: the charge targets the new drawing and stays loaded, the drawing comes along',
+    firstCharge.loaded && firstCharge.targets.join() === first[2].id && sigilImage(first[2]) === `${'ef'.repeat(32)}.png`, firstCharge);
+  const allCharge = serializeSigilCharge(createSigilChargeBlock(), { loaded: true, revealDate: null, lock: 'entry', technique: null, targets: null });
+  const appended = withChargesCoveringOnly([calc, allCharge]);
+  const appendedCharge = parseSigilCharge(appended[1]);
+  check('appended: a charge for "all sigils" covers only the blocks that came with it',
+    appendedCharge.loaded && appendedCharge.targets.join() === calc.id, appendedCharge);
+  const existing = createSigilCanvasBlock();
+  check('appended: the entry\'s own drawing stays visible',
+    !sigilState([existing, ...appended], '2029-12-31').concealed.has(existing.id));
   // A charge as part of a custom block targets `<block ID>:<element ID>` — that is carried along too.
   const partText = { label: (el) => el.label || el.kind, yes: 'Ja', no: 'Nein', moonName: (ph) => ph };
   const partDef = {
-    id: 'part-def', name: 'Teile', icon: '', revision: 1, sort_order: 0,
+    id: 'part-def', name: 'Teile', icon: '', sort_order: 0,
     created_at: '', updated_at: '', deleted_at: null,
     display: { readHideEmpty: true, readOnly: false, showTitle: false },
     elements: parseDefinitionElements(JSON.stringify([
@@ -869,69 +964,37 @@ console.log('\n6. Templates: assignment, default, insertion\n');
   check('insertion: a charge as a part targets the part in the new block',
     partBlock.id !== partCopy.id && partCharge.targets.join() === sigilPartId(partBlock.id, 'draw'), partCharge);
 
-  check('read the origin from the blocks', templateOriginsOf([...first, createTextBlock('x')]).join() === 'sigil-tpl');
-
-  // Title and tags when detaching a template ("Other template").
-  const journalStd = { ...sigilTpl, id: 'journal-std', title: 'Tagebuch', tags: ['tag-j'], assignments: [{ entryType: 'journal', category: '*', isDefault: true }] };
+  // Title and tags when undoing a template.
+  const journalStd = { ...sigilTpl, id: 'journal-std', title: 'Tagebuch', tags: ['tag-j'], assignments: [{ entryType: 'journal', category: '*' }] };
 
   // Tags are IDs: the same ID is the same tag, there is no other spelling.
   const cleared = fieldsWithoutTemplate({ title: 'Tagebuch', tags: ['eigen', 'tag-j'] }, journalStd);
   check('fields without template: title empty again, its tags gone',
     cleared.title === '' && cleared.tags.join() === 'eigen', cleared);
-  const withNew = fieldsWithTemplate(cleared, { title: ' Artikel ', tags: ['eigen', 'neu'] }, { title: 'ifUntitled', tags: true });
+  const withNew = fieldsWithTemplate(cleared, { title: ' Artikel ', tags: ['eigen', 'neu'] });
   check('fields with template: title only without a custom one, tags without duplicates',
     withNew.title === 'Artikel' && withNew.tags.join() === 'eigen,neu', withNew);
   check('fields with template: a custom title stays',
-    fieldsWithTemplate({ title: 'Mein Titel', tags: [] }, { title: 'Artikel', tags: [] }, { title: 'ifUntitled', tags: false }).title === 'Mein Titel');
+    fieldsWithTemplate({ title: 'Mein Titel', tags: [] }, { title: 'Artikel', tags: [] }).title === 'Mein Titel');
   check('fields with template: without a custom title that of the template is used',
-    fieldsWithTemplate({ title: '  ', tags: [] }, { title: 'Artikel', tags: [] }, { title: 'ifUntitled', tags: false }).title === 'Artikel');
+    fieldsWithTemplate({ title: '  ', tags: [] }, { title: 'Artikel', tags: [] }).title === 'Artikel');
 
   check('empty: no content', isContentEmpty(''));
   check('empty: only empty paragraphs', isContentEmpty('<p></p><p style="text-align: center"><br></p>'));
   check('not empty: text', !isContentEmpty('<p>x</p>'));
   check('not empty: an image', !isContentEmpty(`<p><img src="${'a'.repeat(64)}.png"></p>`));
   check('not empty: a field block', !isContentEmpty(serializeBlocks([createFieldsBlock('shorttext')])));
-  check('not empty: an empty text block from a template',
-    !isContentEmpty(serializeBlocks([{ ...createTextBlock(''), attrs: { 'data-template-origin': 't' } }])));
 
   const start = templateStart({ ...sigilTpl, title: '  Ritual ', tags: ['a'] });
   check('start from template: title trimmed, tags copied, content inserted',
-    start.title === 'Ritual' && start.tags.join() === 'a' && start.content.includes('data-template-origin="sigil-tpl"'), start);
+    start.title === 'Ritual' && start.tags.join() === 'a' && parseBlocks(start.content).length === 4, start);
   check('start without template: empty, the title too',
     JSON.stringify(templateStart(null)) === JSON.stringify({ title: '', content: '', tags: [], templateId: null }));
   check('merge tags without duplicate IDs', mergeTemplateTags(['a', 'b'], ['a', 'c']).join() === 'a,b,c');
 
-  // Lay the assignments of an edit onto a state that has changed in the meantime.
-  const j = { entryType: 'journal', category: '*', isDefault: false };
-  const w = { entryType: 'wiki', category: 'ritual', isDefault: false };
-  const o = { entryType: 'operation', category: 'sigils', isDefault: true };
-  // This page: journal gets the star, wiki is added. Elsewhere: operation × sigils got the star.
-  const merged = mergeAssignmentChanges([j], [{ ...j, isDefault: true }, w], [j, o]);
-  check('edit and template saved elsewhere together: star from the page, new assignment, star from elsewhere stays',
-    JSON.stringify(merged) === JSON.stringify([{ ...j, isDefault: true }, o, w]), merged);
-  check('an assignment removed on the page is dropped, additions made elsewhere stay',
-    JSON.stringify(mergeAssignmentChanges([j, w], [j], [j, w, o])) === JSON.stringify([j, o]));
-  check('a star on an assignment already removed elsewhere does not bring it back',
-    mergeAssignmentChanges([w], [{ ...w, isDefault: true }], []).length === 0);
-  check('setting the default adds the missing assignment',
-    JSON.stringify(withAssignmentState([j], 'wiki', null, 'default')) === JSON.stringify([j, { entryType: 'wiki', category: null, isDefault: true }]));
-  check('to-choose-from only removes the star and keeps the position',
-    JSON.stringify(withAssignmentState([o, j], 'operation', 'sigils', 'assigned')) === JSON.stringify([{ ...o, isDefault: false }, j]));
-  check('off removes the assignment, "no category" is not "all"',
-    JSON.stringify(withAssignmentState([w, { ...w, category: null }], 'wiki', 'ritual', 'off')) === JSON.stringify([{ ...w, category: null }]));
-  check('back and forth: off and back to choose-from is the same assignment, just further back',
-    sameAssignments([w, j], withAssignmentState(withAssignmentState([w, j], 'wiki', 'ritual', 'off'), 'wiki', 'ritual', 'assigned')));
-  check('a different star is a change', !sameAssignments([j], [{ ...j, isDefault: true }]));
-  check('state of a combination',
-    assignmentStateAt([j, o], 'operation', 'sigils') === 'default' && assignmentStateAt([j, o], 'journal', '*') === 'assigned'
-      && assignmentStateAt([j, o], 'wiki', '*') === 'off');
-  const saved = contentForTemplate(serializeBlocks(first));
-  check('as a template: without origin, with unloaded charge',
-    !saved.includes('data-template-origin') && parseBlocks(saved).length === 4 && !parseSigilCharge(parseBlocks(saved)[3]).loaded, saved);
-  check('empty: a text block from a template does not count as empty',
-    !areBlocksEmpty([{ ...createTextBlock('<p></p>'), attrs: { 'data-template-origin': 'x' } }]) && areBlocksEmpty([createTextBlock('<p></p>')]));
-  check('default exactly here, without fallback',
-    defaultTemplateAt(all, 'wiki', 'herbs') === undefined && defaultTemplateAt(all, 'wiki', '*')?.id === 'fallback');
+  check('assigned exactly here, without fallback',
+    assignedTemplateAt(all, 'wiki', 'herbs') === undefined && assignedTemplateAt(all, 'wiki', '*')?.id === 'fallback');
+  check('empty blocks', areBlocksEmpty([createTextBlock('<p></p>')]) && !areBlocksEmpty([createTextBlock('<p>x</p>')]));
 }
 
 console.log('');

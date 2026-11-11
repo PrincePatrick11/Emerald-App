@@ -16,14 +16,14 @@ interface ModalProps {
   /** The action row, pinned below the body whatever its height. */
   footer?: React.ReactNode;
   /** `false` removes every way out — no X, no Escape, no backdrop click. For a
-   *  modal the app cannot continue past, such as first-run vault setup. */
+   *  modal the app cannot continue past, such as the vault picker without a vault. */
   dismissible?: boolean;
 }
 
 /**
  * The open modals, the most recently opened on top. Escape belongs only to the
  * topmost; otherwise one press over a second modal (the
- * unlock over the vault window) would close both. A topmost modal that cannot be closed
+ * unlock over the vault picker) would close both. A topmost modal that cannot be closed
  * swallows Escape: the one below must not go either.
  */
 const openModals: symbol[] = [];

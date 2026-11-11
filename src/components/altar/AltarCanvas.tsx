@@ -1,667 +1,387 @@
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { useTranslation } from 'react-i18next';
 import { useShallow } from 'zustand/shallow';
-import { MoveDiagonal2, RotateCw } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { useAltarStore } from '../../store/altarStore';
+import { useSymbolStore } from '../../store/symbolStore';
+import { useUndoStore } from '../../store/undoStore';
+import { userSymbolId } from '../../lib/userSymbols';
 import { getAltarDragItem, setAltarDragItem, subscribeAltarDrag } from '../../lib/altarDragState';
-import {
-  ALTAR_IMAGE_PRESETS,
-  BASE_RESOLUTION_WIDTH,
-  DEFAULT_ALTAR_RESOLUTION,
-  DEFAULT_BACKGROUND_OVERLAY,
-  DEFAULT_GRID_COLOR,
-  DEFAULT_GRID_OPACITY,
-  getGradientColor,
-  isGradientPreset,
-  resolveResolutionPixels,
-} from '../../lib/altarConstants';
-import type { AltarImagePresetName } from '../../lib/altarConstants';
-import { isCandleEmoji } from '../../lib/altarConstants';
-import { hexToRgb } from '../../lib/helpers';
+import { ALTAR_BACKGROUND_MAX_BYTES, DEFAULT_ALTAR_RESOLUTION, resolveResolutionPixels } from '../../lib/altarConstants';
+import { altarBackgroundUrl, altarCanvasBackground, isAppBackground } from '../../lib/altarBackground';
+import { ACCEPTED_IMAGE_MIME, generateId, hexToRgb, isAcceptedImageFile, readFileAsDataUrl } from '../../lib/helpers';
+import { prepareImageDataUrl } from '../../lib/imageLimits';
 import type { AltarItem, AltarPlacement, AltarRecord } from '../../types';
 import { AltarItemVisual } from './AltarItemVisual';
-import { canvasImageSrc } from '../../lib/images';
+import { canvasImageSrc, imageSrc, saveImage } from '../../lib/images';
 import { THUMBNAIL_W, canvasToCappedThumbnail } from '../../lib/thumbnail';
-import { isHistoryButton } from '../../lib/mouseButtons';
+import {
+  CANVAS_SWATCHES, CanvasEditor, canvasToDataUrl, fullProfile, renderCanvasImage, renderCanvasSvg, type CanvasEditorHandle,
+  type CanvasBackground, type CanvasBackgroundImages, type CanvasExportOptions, type CanvasSymbolLibrary,
+  type CanvasElement, type CanvasGrid, type CanvasPaintOptions, type RulerGuide,
+} from '../editors/canvas';
 
-const BASE_SIZE = 40;
-/** Past this much travel, a press on an element becomes a drag. */
-const DRAG_THRESHOLD_PX = 3;
-
-/** A screen point as a percentage of the area of `el`, unrounded. */
-function pointerPercent(el: HTMLElement, clientX: number, clientY: number): { x: number; y: number } {
-  const rect = el.getBoundingClientRect();
-  return { x: ((clientX - rect.left) / rect.width) * 100, y: ((clientY - rect.top) / rect.height) * 100 };
-}
-
-// ---------------------------------------------------------------------------
-// Altar thumbnail renderer — draws directly to a Canvas 2D context from
-// store data instead of relying on DOM capture (no external library needed).
-// ---------------------------------------------------------------------------
-
-const PRESET_GRAD: Record<string, { cx: number; cy: number; stops: [string, number][] }> = {
-  midnight: { cx: 0.5, cy: 0.30, stops: [['#1a1a2e', 0], ['#0d0d15', 0.6], ['#0a0a0f', 1]] },
-  ember:    { cx: 0.5, cy: 0.24, stops: [['#4a2917', 0], ['#25140f', 0.42], ['#120d10', 1]] },
-  forest:   { cx: 0.5, cy: 0.22, stops: [['#183126', 0], ['#0d1a16', 0.48], ['#09110f', 1]] },
-  moon:     { cx: 0.5, cy: 0.18, stops: [['#2b253d', 0], ['#171222', 0.44], ['#0b0a12', 1]] },
+/**
+ * What the altar offers in the canvas editor: everything — library images,
+ * shapes, text and drawings, groups among them. Drawings on an altar carry no
+ * layer images.
+ */
+const ALTAR_PROFILE = fullProfile();
+const ALTAR_PAINT: CanvasPaintOptions = {
+  ...ALTAR_PROFILE.paint,
+  palette: CANVAS_SWATCHES,
+  startColor: CANVAS_SWATCHES[0],
+  startSize: 8,
 };
+import { elementToPlacement, placementToElement } from './altarScene';
 
-function _radialGrad(
-  ctx: CanvasRenderingContext2D,
-  w: number, h: number,
-  cx: number, cy: number,
-  stops: [string, number][],
-) {
-  const r = Math.sqrt(w * w + h * h);
-  const g = ctx.createRadialGradient(cx * w, cy * h, 0, cx * w, cy * h, r);
-  for (const [color, pos] of stops) g.addColorStop(pos, color);
-  ctx.fillStyle = g;
-  ctx.fillRect(0, 0, w, h);
+// ---------------------------------------------------------------------------
+// Altar picture renderer — draws directly to a Canvas 2D context from store
+// data, for thumbnails and file export, with the canvas editor's own drawing for
+// the elements (`renderCanvasImage`), so the picture matches the stage.
+// ---------------------------------------------------------------------------
+
+/** The visible grid, in output pixels; the background and the elements come from the canvas editor's renderer. */
+function _drawGrid(ctx: CanvasRenderingContext2D, altar: AltarRecord, outW: number, outH: number) {
+  const grid = altarGrid(altar);
+  if (!grid?.visible) return;
+  const { r, g, b } = hexToRgb(grid.color);
+  ctx.save();
+  ctx.strokeStyle = `rgba(${r},${g},${b},${grid.opacity})`;
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  for (let i = 1; i < grid.columns; i++) { const x = (i / grid.columns) * outW; ctx.moveTo(x, 0); ctx.lineTo(x, outH); }
+  for (let i = 1; i < grid.rows; i++) { const y = (i / grid.rows) * outH; ctx.moveTo(0, y); ctx.lineTo(outW, y); }
+  ctx.stroke();
+  ctx.restore();
 }
 
 /**
- * Everything drawn here ends up in `exportCurrentAltarImage` and is read back
- * with `toBlob()`. That only works as long as no foreign source is on the
- * canvas, which is why the sources come from `canvasImageSrc()`, which returns
- * stored images as data URLs instead of via `emerald-img`.
- *
- * So no `crossOrigin`: there would be nothing left for it to apply to, and
- * same-origin only fetches the image a second time into the cache.
+ * Loads a picture for drawing onto a canvas that is read back with `toBlob()`.
+ * That only works as long as no foreign source is on it, which is why stored
+ * images are read as data URLs (`canvasImageSrc`) instead of via `emerald-img`.
  */
-function _loadImg(src: string): Promise<HTMLImageElement> {
-  return new Promise((resolve, reject) => {
-    const img = new Image();
-    img.onload = () => resolve(img);
-    img.onerror = reject;
-    img.src = src;
-  });
-}
-
-async function _drawCover(ctx: CanvasRenderingContext2D, src: string, w: number, h: number) {
-  const img = await _loadImg(src);
-  const ia = img.naturalWidth / img.naturalHeight;
-  const ca = w / h;
-  let sx, sy, sw, sh;
-  if (ia > ca) { sh = img.naturalHeight; sw = sh * ca; sx = (img.naturalWidth - sw) / 2; sy = 0; }
-  else          { sw = img.naturalWidth;  sh = sw / ca; sx = 0; sy = (img.naturalHeight - sh) / 2; }
-  ctx.drawImage(img, sx, sy, sw, sh, 0, 0, w, h);
-}
-
-async function _renderAltar(
-  altar: AltarRecord,
-  backgroundSrc: string | null,
-  placements: AltarPlacement[],
-  nativeW: number,
-  nativeH: number,
-  outW: number,
-): Promise<HTMLCanvasElement | null> {
-  const outH = Math.round(outW * nativeH / nativeW);
-  const canvas = document.createElement('canvas');
-  canvas.width = outW;
-  canvas.height = outH;
-  const ctx = canvas.getContext('2d');
-  if (!ctx) return null;
-
-  // 1. Background
-  const preset = altar.background_preset;
+async function _loadReadable(src: string): Promise<HTMLImageElement | null> {
+  const readable = await canvasImageSrc(src);
+  if (!readable) return null;
+  const img = new Image();
+  img.src = readable;
   try {
-    if (backgroundSrc) {
-      await _drawCover(ctx, backgroundSrc, outW, outH);
-    } else if (ALTAR_IMAGE_PRESETS.includes(preset as AltarImagePresetName)) {
-      await _drawCover(ctx, `/backgrounds/${preset}.webp`, outW, outH);
-    } else if (isGradientPreset(preset)) {
-      const hex = getGradientColor(preset);
-      if (!hex) throw new Error('invalid gradient color');
-      const { r, g, b } = hexToRgb(hex);
-      _radialGrad(ctx, outW, outH, 0.5, 0.25, [
-        [hex, 0],
-        [`rgb(${Math.round(r * 0.5)},${Math.round(g * 0.5)},${Math.round(b * 0.5)})`, 0.5],
-        ['#0a0a0f', 1],
-      ]);
-    } else {
-      const cfg = PRESET_GRAD[preset] ?? PRESET_GRAD.midnight;
-      _radialGrad(ctx, outW, outH, cfg.cx, cfg.cy, cfg.stops);
-    }
+    await img.decode();
+    return img;
   } catch {
-    const cfg = PRESET_GRAD.midnight;
-    _radialGrad(ctx, outW, outH, cfg.cx, cfg.cy, cfg.stops);
+    return null;
   }
-
-  // 2. Overlay
-  const overlay = altar.background_overlay ?? DEFAULT_BACKGROUND_OVERLAY;
-  if (overlay > 0) {
-    const topA = Math.round(overlay * 60) / 100;
-    const isLight = altar.background_overlay_color === 'light';
-    const rgb = isLight ? '255,255,255' : '10,10,15';
-    const og = ctx.createLinearGradient(0, 0, 0, outH);
-    og.addColorStop(0, `rgba(${rgb},${topA})`);
-    og.addColorStop(1, `rgba(${rgb},${overlay})`);
-    ctx.fillStyle = og;
-    ctx.fillRect(0, 0, outW, outH);
-  }
-
-  // 3. Grid
-  if (altar.grid_enabled && (altar.grid_size ?? 0) > 0) {
-    const gridSize = altar.grid_size!;
-    const { w: refW, h: refH } = resolveResolutionPixels(altar.resolution ?? DEFAULT_ALTAR_RESOLUTION);
-    const numCols = Math.max(1, Math.round(refW / gridSize));
-    const numRows = Math.max(1, Math.round(refH / gridSize));
-    const { r, g, b } = hexToRgb(altar.grid_color ?? DEFAULT_GRID_COLOR);
-    const opacity = altar.grid_opacity ?? DEFAULT_GRID_OPACITY;
-    ctx.save();
-    ctx.strokeStyle = `rgba(${r},${g},${b},${opacity})`;
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    for (let i = 1; i < numCols; i++) { const x = (i / numCols) * outW; ctx.moveTo(x, 0); ctx.lineTo(x, outH); }
-    for (let i = 1; i < numRows; i++) { const y = (i / numRows) * outH; ctx.moveTo(0, y); ctx.lineTo(outW, y); }
-    ctx.stroke();
-    ctx.restore();
-  }
-
-  // 4. Placements — same size formula as PlacedItem in AltarCanvas
-  const canvasScale = nativeW / BASE_RESOLUTION_WIDTH;
-  const scaledBase = BASE_SIZE * canvasScale;
-  const scaleX = outW / nativeW;
-  const scaleY = outH / nativeH;
-
-  for (const p of [...placements].sort((a, b) => a.z_index - b.z_index)) {
-    if (p.hidden) continue;
-    const drawW = Math.round(scaledBase * (p.width  / 8) * scaleX);
-    const drawH = Math.round(scaledBase * (p.height / 8) * scaleY);
-    const cx = (p.x / 100) * outW;
-    const cy = (p.y / 100) * outH;
-    const rot = ((p.rotation ?? 0) * Math.PI) / 180;
-
-    ctx.save();
-    ctx.translate(cx, cy);
-    if (rot !== 0) ctx.rotate(rot);
-    ctx.globalAlpha = p.opacity ?? 1;
-
-    const itemSrc = await canvasImageSrc(p.image_data);
-    if (itemSrc) {
-      try {
-        const img = await _loadImg(itemSrc);
-        const ia = img.naturalWidth / img.naturalHeight;
-        const da = drawW / drawH;
-        const [rw, rh] = ia > da ? [drawW, drawW / ia] : [drawH * ia, drawH];
-        ctx.drawImage(img, -rw / 2, -rh / 2, rw, rh);
-      } catch {
-        _drawEmoji(ctx, p.emoji, drawW);
-      }
-    } else {
-      _drawEmoji(ctx, p.emoji, drawW);
-    }
-
-    ctx.restore();
-  }
-
-  return canvas;
 }
 
-
-async function renderAltarThumbnail(
+/** What the altar renderers take: the elements with readable pictures, the background, the size. */
+async function _altarRenderOptions(
   altar: AltarRecord,
-  backgroundSrc: string | null,
   placements: AltarPlacement[],
-  nativeW: number,
-  nativeH: number,
-): Promise<string | null> {
-  const canvas = await _renderAltar(altar, backgroundSrc, placements, nativeW, nativeH, THUMBNAIL_W);
-  if (!canvas) return null;
-  // WebP ladder with JPEG fallback and 512 KB cap from lib/thumbnail.ts.
-  return canvasToCappedThumbnail(canvas, 'jpeg');
+  outW: number,
+  options: Pick<CanvasExportOptions, 'region' | 'background'> = { region: null, background: true },
+) {
+  const { w: refW, h: refH } = resolveResolutionPixels(altar.resolution ?? DEFAULT_ALTAR_RESOLUTION);
+  // The items' pictures as data URLs, not the on-screen `emerald-img` ones, so `toBlob` can read the canvas.
+  const sources = new Map(await Promise.all(placements.map(async (p) => [p.id, (await canvasImageSrc(p.image_data)) || null] as const)));
+  return {
+    types: ALTAR_PROFILE.types,
+    width: refW,
+    height: refH,
+    elements: placements.map((p) => placementToElement(p, refW, refH, () => sources.get(p.id) ?? null)),
+    outWidth: outW,
+    region: options.region ?? undefined,
+    background: options.background ? altarCanvasBackground(altar) : null,
+    loadImage: _loadReadable,
+    drawBackground: options.background
+      ? (ctx: CanvasRenderingContext2D, w: number, h: number) => _drawGrid(ctx, altar, w, h)
+      : undefined,
+  };
+}
+
+async function _renderAltar(altar: AltarRecord, placements: AltarPlacement[], outW: number): Promise<HTMLCanvasElement | null> {
+  return renderCanvasImage(await _altarRenderOptions(altar, placements, outW));
+}
+
+/** The active altar and its placements. */
+async function activeAltarForRender(): Promise<{ altar: AltarRecord; placements: AltarPlacement[] } | null> {
+  const { placements, activeAltarId, altars } = useAltarStore.getState();
+  const altar = altars.find((a) => a.id === activeAltarId) ?? null;
+  if (!altar) return null;
+  return { altar, placements };
 }
 
 /** Renders the active altar at full native resolution for file export. */
 export async function exportCurrentAltarImage(format: 'jpeg' | 'png' | 'webp' = 'jpeg'): Promise<string | null> {
   try {
-    const { placements, activeAltarId, altars } = useAltarStore.getState();
-    const altar = altars.find((a) => a.id === activeAltarId) ?? null;
-    if (!altar) return null;
-    const { w: nativeW, h: nativeH } = resolveResolutionPixels(altar.resolution ?? DEFAULT_ALTAR_RESOLUTION);
-    const backgroundSrc = (await canvasImageSrc(altar.background_image_data)) || null;
-    const canvas = await _renderAltar(altar, backgroundSrc, placements, nativeW, nativeH, nativeW);
+    const active = await activeAltarForRender();
+    if (!active) return null;
+    const { w: nativeW } = resolveResolutionPixels(active.altar.resolution ?? DEFAULT_ALTAR_RESOLUTION);
+    const canvas = await _renderAltar(active.altar, active.placements, nativeW);
     if (!canvas) return null;
     const mime = format === 'png' ? 'image/png' : format === 'webp' ? 'image/webp' : 'image/jpeg';
     const quality = format === 'png' ? undefined : format === 'webp' ? 0.92 : 0.97;
-    return new Promise((resolve) => {
-      canvas.toBlob((blob) => {
-        if (!blob) { resolve(null); return; }
-        const reader = new FileReader();
-        reader.onload = () => resolve(reader.result as string);
-        reader.readAsDataURL(blob);
-      }, mime, quality);
-    });
+    return canvasToDataUrl(canvas, mime, quality);
   } catch (err) {
     console.error('[exportCurrentAltarImage]', err);
     return null;
   }
 }
 
+/** UTF-8 text as a base64 data URL of the given type. */
+function textDataUrl(text: string, mime: string): string {
+  const bytes = new TextEncoder().encode(text);
+  let binary = '';
+  for (let i = 0; i < bytes.length; i += 0x8000) binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  return `data:${mime};base64,${btoa(binary)}`;
+}
+
+/**
+ * The active altar as the canvas editor's export dialog asks for it: PNG,
+ * JPEG (on white where nothing is drawn) or SVG, all of it or a region, at a
+ * width, with its background or without. A data URL, or `null`.
+ */
+export async function exportAltarPicture(options: CanvasExportOptions): Promise<string | null> {
+  const active = await activeAltarForRender();
+  if (!active) return null;
+  const render = await _altarRenderOptions(active.altar, active.placements, options.width, options);
+  if (options.format === 'svg') return textDataUrl(await renderCanvasSvg(render), 'image/svg+xml');
+  const canvas = await renderCanvasImage(render);
+  if (!canvas) return null;
+  if (options.format === 'jpeg') {
+    const flat = document.createElement('canvas');
+    flat.width = canvas.width;
+    flat.height = canvas.height;
+    const ctx = flat.getContext('2d');
+    if (!ctx) return null;
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, flat.width, flat.height);
+    ctx.drawImage(canvas, 0, 0);
+    return canvasToDataUrl(flat, 'image/jpeg', 0.95);
+  }
+  return canvasToDataUrl(canvas, 'image/png');
+}
+
 /** Reads the active altar from the store and renders its thumbnail.
  *  Safe to call from anywhere — uses an off-screen canvas independent of the DOM. */
 export async function captureCurrentAltar(): Promise<string | null> {
   try {
-    const { placements, activeAltarId, altars } = useAltarStore.getState();
-    const altar = altars.find((a) => a.id === activeAltarId) ?? null;
-    if (!altar) return null;
-    const { w: nativeW, h: nativeH } = resolveResolutionPixels(altar.resolution ?? DEFAULT_ALTAR_RESOLUTION);
-    const backgroundSrc = (await canvasImageSrc(altar.background_image_data)) || null;
-    return renderAltarThumbnail(altar, backgroundSrc, placements, nativeW, nativeH);
+    // Reads the store before its first await: the caller may switch to another altar right after.
+    const active = await activeAltarForRender();
+    if (!active) return null;
+    const canvas = await _renderAltar(active.altar, active.placements, THUMBNAIL_W);
+    if (!canvas) return null;
+    // WebP ladder with JPEG fallback and 512 KB cap from lib/thumbnail.ts.
+    return canvasToCappedThumbnail(canvas, 'jpeg');
   } catch (err) {
     console.error('[captureCurrentAltar]', err);
     return null;
   }
 }
 
-function _drawEmoji(ctx: CanvasRenderingContext2D, emoji: string, size: number) {
-  // fontSize matches AltarItemVisual: Math.round(size * 0.8)
-  ctx.font = `${Math.round(size * 0.8)}px serif`;
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillText(emoji, 0, 0);
+// ---------------------------------------------------------------------------
+// The altar on screen: the canvas editor (`editors/canvas`), fed from the store.
+// ---------------------------------------------------------------------------
+
+/** The altar's grid in the canvas editor's terms; `null` when nothing uses it. */
+function altarGrid(altar: AltarRecord): CanvasGrid | null {
+  const size = altar.grid_size ?? 0;
+  if (size <= 0 || !(altar.grid_enabled || altar.snap_to_grid || altar.snap_scale_to_grid)) return null;
+  const { w, h } = resolveResolutionPixels(altar.resolution ?? DEFAULT_ALTAR_RESOLUTION);
+  return {
+    columns: Math.max(1, Math.round(w / size)),
+    rows: Math.max(1, Math.round(h / size)),
+    visible: altar.grid_enabled,
+    color: altar.grid_color,
+    opacity: altar.grid_opacity,
+    snapPosition: altar.snap_to_grid,
+    snapSize: altar.snap_scale_to_grid,
+  };
 }
 
-export function AltarCanvas({
-  altar,
-  backgroundSrc,
-  editable,
-  showGrid,
-  gridSize,
-  gridOpacity,
-  gridColor,
-  snapToGrid,
-  rotationSnapEnabled,
-  rotationSnapAngle,
-  snapScaleToGrid,
-  resolution,
-  nativeW,
-  nativeH,
-  cssScale,
-  getBackgroundStyle,
-}: {
-  altar: AltarRecord | null;
-  backgroundSrc: string | null;
+const elementImageSrc = (imageData: string | undefined) => imageSrc(imageData) || null;
+
+/**
+ * Lets the user choose a background picture and stores it in the vault, as
+ * the sidebar's background upload did; its file name, or `null` if nothing
+ * was chosen or it could not be stored.
+ */
+function pickBackgroundImage(): Promise<string | null> {
+  return new Promise((resolve) => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = ACCEPTED_IMAGE_MIME;
+    input.addEventListener('cancel', () => resolve(null));
+    input.addEventListener('change', () => {
+      const file = input.files?.[0];
+      if (!file || !isAcceptedImageFile(file)) { resolve(null); return; }
+      readFileAsDataUrl(file)
+        .then((data) => prepareImageDataUrl(data, { capBytes: ALTAR_BACKGROUND_MAX_BYTES }))
+        .then((data) => saveImage(data))
+        .then(resolve, (error) => { console.error(error); resolve(null); });
+    });
+    input.click();
+  });
+}
+
+const BACKGROUND_IMAGES: CanvasBackgroundImages = { resolve: altarBackgroundUrl, pick: pickBackgroundImage };
+
+/** The vault's own symbols as the canvas editor's library takes them; removing one offers undo. */
+function useOwnSymbols(): CanvasSymbolLibrary {
+  const { t } = useTranslation();
+  const symbols = useSymbolStore((s) => s.symbols);
+  const pushUndo = useUndoStore((s) => s.push);
+  return useMemo(() => ({
+    own: symbols.map((s) => ({ id: userSymbolId(s.id), name: s.name, d: s.d, ...(s.solid ? { solid: s.solid } : {}), weight: s.weight })),
+    save: async (symbol) => { await useSymbolStore.getState().addSymbol(symbol); },
+    remove: (id) => {
+      void useSymbolStore.getState().removeSymbol(id).then((removed) => {
+        if (removed) pushUndo({ id: generateId(), description: t('symbols.removed'), undo: () => useSymbolStore.getState().restoreSymbol(removed) });
+      }).catch(console.error);
+    },
+  }), [symbols, pushUndo, t]);
+}
+
+export function AltarCanvas({ altar, editable, readAlign, onExport }: {
+  altar: AltarRecord;
   editable: boolean;
-  showGrid: boolean;
-  gridSize: number;
-  gridOpacity: number;
-  gridColor: string;
-  snapToGrid: boolean;
-  rotationSnapEnabled: boolean;
-  rotationSnapAngle: number;
-  snapScaleToGrid: boolean;
-  resolution: string;
-  nativeW: number;
-  nativeH: number;
-  cssScale: number;
-  getBackgroundStyle: (altar: AltarRecord | null, imageSrc: string | null | undefined) => string;
+  /** Where the altar sits while reading: at the top of the view, or (fullscreen) in the middle. */
+  readAlign: 'top' | 'center';
+  /** Saving the altar as a picture, from the canvas editor's export dialog. */
+  onExport?: (options: CanvasExportOptions) => void;
 }) {
   const placements = useAltarStore((s) => s.placements);
-  const selectedPlacementId = useAltarStore((s) => s.selectedPlacementId);
-  const { placeItem, movePlacement, savePlacementPosition, updatePlacement, selectPlacement } = useAltarStore(
+  const selectedPlacementIds = useAltarStore((s) => s.selectedPlacementIds);
+  const { placeItem, applyPlacements, selectPlacements, updateAltarGuides, updateAltar } = useAltarStore(
     useShallow((s) => ({
-      placeItem: s.placeItem,
-      movePlacement: s.movePlacement,
-      savePlacementPosition: s.savePlacementPosition,
-      updatePlacement: s.updatePlacement,
-      selectPlacement: s.selectPlacement,
+      updateAltar: s.updateAltar,
+      placeItem: s.placeItem, applyPlacements: s.applyPlacements, selectPlacements: s.selectPlacements, updateAltarGuides: s.updateAltarGuides,
     })),
   );
-  const gridRgb = hexToRgb(gridColor);
+  const editorRef = useRef<CanvasEditorHandle>(null);
 
-  // Reference resolution: stable across window resizes so grid/snap stay consistent.
   const { w: refW, h: refH } = useMemo(
-    () => resolveResolutionPixels(resolution ?? DEFAULT_ALTAR_RESOLUTION),
-    [resolution],
+    () => resolveResolutionPixels(altar.resolution ?? DEFAULT_ALTAR_RESOLUTION),
+    [altar.resolution],
   );
-  const gridNumCols  = Math.max(1, Math.round(refW / gridSize));
-  const gridNumRows  = Math.max(1, Math.round(refH / gridSize));
-  const gridCellW    = refW / gridNumCols;
-  const gridCellH    = refH / gridNumRows;
-  const gridScaledBase = BASE_SIZE * (refW / BASE_RESOLUTION_WIDTH);
+  const grid = useMemo(() => altarGrid(altar), [altar]);
 
-  const gridPath = useMemo(() => {
-    if (!showGrid || gridSize <= 0) return '';
-    const parts: string[] = [];
-    for (let i = 1; i < gridNumCols; i++) parts.push(`M${(i / gridNumCols) * nativeW},0V${nativeH}`);
-    for (let i = 1; i < gridNumRows; i++) parts.push(`M0,${(i / gridNumRows) * nativeH}H${nativeW}`);
-    return parts.join(' ');
-  }, [showGrid, gridNumCols, gridNumRows, nativeW, nativeH]);
+  const elements = useMemo(
+    () => placements.map((p) => placementToElement(p, refW, refH, elementImageSrc)),
+    [placements, refW, refH],
+  );
+  // Guides are stored in percent of the altar, so they keep their place when the resolution changes.
+  const guides = useMemo(
+    () => altar.guides.map((g) => ({ ...g, at: (g.at / 100) * (g.orientation === 'vertical' ? refW : refH) })),
+    [altar.guides, refW, refH],
+  );
+  const onGuidesChange = useCallback((next: RulerGuide[]) => {
+    const stored = next.map((g) => ({ ...g, at: (g.at / (g.orientation === 'vertical' ? refW : refH)) * 100 }));
+    void updateAltarGuides(altar.id, { guides: stored }).catch(console.error);
+  }, [updateAltarGuides, altar.id, refW, refH]);
+  const onGuidesLockedChange = useCallback((locked: boolean) => {
+    void updateAltarGuides(altar.id, { guides_locked: locked }).catch(console.error);
+  }, [updateAltarGuides, altar.id]);
 
-  const canvasScale = nativeW / BASE_RESOLUTION_WIDTH;
-  const canvasRef = useRef<HTMLDivElement>(null);
-  /**
-   * The dragged element: where it was grabbed (relative to its centre, in
-   * percent) and where the press began. Only after a few pixels of travel is it
-   * a drag; a click merely selects and moves nothing.
-   */
-  const draggingRef = useRef<{ id: string; grabX: number; grabY: number; startX: number; startY: number; moved: boolean } | null>(null);
-  // Snapping also applies to the hidden grid; the "Grid" toggle only shows it.
-  const snapPosition = snapToGrid;
-  const snapScale = snapScaleToGrid;
-  const [sidebarDragItem, setSidebarDragItem] = useState<AltarItem | null>(null);
-  const [ghostPos, setGhostPos] = useState<{ x: number; y: number } | null>(null);
-  const sortedPlacements = useMemo(
-    () => [...placements].sort((a, b) => a.z_index - b.z_index),
+  const canvasBackground = useMemo(() => altarCanvasBackground(altar), [altar]);
+  const symbolLibrary = useOwnSymbols();
+  // The picture of the vault lives in the column the image cleanup looks at; one of the app's own needs none.
+  const onCanvasBackgroundChange = useCallback((background: CanvasBackground) => {
+    const src = background.image?.src;
+    void updateAltar(altar.id, {
+      canvas_background: background,
+      background_image_data: src && !isAppBackground(src) ? src : null,
+    }).catch(console.error);
+  }, [updateAltar, altar.id]);
+
+  /** Library items by their name in the element list. */
+  const elementLabel = useCallback(
+    (el: CanvasElement) => (el.type === 'image' ? placements.find((p) => p.id === el.id)?.name : null),
     [placements],
   );
-  // Stable callbacks that accept `id` as a parameter so they can be passed
-  // down once to PlacedItem rather than recreated per-item inside the map.
-  // PlacedItem calls e.g. onStartDrag() — we give it the bound version below
-  // via useMemo so memo() can bail out when nothing changed.
-  const handleStartDragById = useCallback((id: string, clientX: number, clientY: number) => {
-    const placement = useAltarStore.getState().placements.find((p) => p.id === id);
-    if (!placement) return;
-    const { x, y } = pointerPercent(canvasRef.current!, clientX, clientY);
-    draggingRef.current = { id, grabX: x - placement.x, grabY: y - placement.y, startX: clientX, startY: clientY, moved: false };
-  }, []);
-  const handleSelectById = useCallback((id: string) => { selectPlacement(id); }, [selectPlacement]);
-  const handleResizeById = useCallback(
-    (id: string, width: number, height: number) => {
-      if (snapScale && gridSize > 0) {
-        // Determine N (cells to span) from width, apply same N to height → snaps as a box.
-        const displayW = gridScaledBase * (width / 8);
-        const N = Math.max(2, Math.round(displayW / gridCellW / 2) * 2);
-        const clampedW = Math.max(2, Math.min(500, Math.round((N * gridCellW / gridScaledBase) * 8 * 100) / 100));
-        const clampedH = Math.max(2, Math.min(500, Math.round((N * gridCellH / gridScaledBase) * 8 * 100) / 100));
-        updatePlacement(id, { width: clampedW, height: clampedH });
-      } else {
-        updatePlacement(id, { width, height });
-      }
-    },
-    [updatePlacement, snapScale, gridSize, gridCellW, gridCellH, gridScaledBase],
-  );
-  const handleRotateById = useCallback(
-    (id: string, rotation: number) => updatePlacement(id, { rotation }),
-    [updatePlacement],
-  );
 
-  /** A point as a percentage of the area, snapped and kept within the edge. */
-  const placeAt = useCallback((rawX: number, rawY: number) => {
-    if (snapPosition) {
-      const stepX = 100 / gridNumCols;
-      const stepY = 100 / gridNumRows;
-      const snappedX = stepX > 0 ? Math.round(rawX / stepX) * stepX : rawX;
-      const snappedY = stepY > 0 ? Math.round(rawY / stepY) * stepY : rawY;
-      return { x: Math.max(3, Math.min(97, snappedX)), y: Math.max(3, Math.min(97, snappedY)) };
-    }
-    return { x: Math.max(3, Math.min(97, rawX)), y: Math.max(3, Math.min(97, rawY)) };
-  }, [snapPosition, gridNumCols, gridNumRows]);
+  const handleChange = useCallback((next: CanvasElement[]) => {
+    const previous = new Map(useAltarStore.getState().placements.map((p) => [p.id, p]));
+    void applyPlacements(next.map((el) => elementToPlacement(el, refW, refH, previous.get(el.id)))).catch(console.error);
+  }, [applyPlacements, refW, refH]);
 
-  const coordsToPercent = useCallback((clientX: number, clientY: number) => {
-    const { x, y } = pointerPercent(canvasRef.current!, clientX, clientY);
-    return placeAt(x, y);
-  }, [placeAt]);
-
-  /** Where the dragged element belongs: the pointer, offset by the spot where it was grabbed. */
-  const dragTarget = useCallback((drag: { grabX: number; grabY: number }, clientX: number, clientY: number) => {
-    const { x, y } = pointerPercent(canvasRef.current!, clientX, clientY);
-    return placeAt(x - drag.grabX, y - drag.grabY);
-  }, [placeAt]);
-
-  useEffect(() => subscribeAltarDrag(setSidebarDragItem), []);
+  // Items dragged in from the library strip: a pointer drag on a channel,
+  // since the WebView has no HTML5 drag and drop.
+  const [dragItem, setDragItem] = useState<AltarItem | null>(null);
+  const [ghostPos, setGhostPos] = useState<{ x: number; y: number } | null>(null);
+  useEffect(() => subscribeAltarDrag(setDragItem), []);
 
   useEffect(() => {
-    if (!editable || !sidebarDragItem) {
+    if (!editable || !dragItem) {
       setGhostPos(null);
       return;
     }
-
-    const handlePointerMove = (e: PointerEvent) => {
-      setGhostPos({ x: e.clientX, y: e.clientY });
-    };
-
-    const handlePointerUp = (e: PointerEvent) => {
+    const onMove = (e: PointerEvent) => setGhostPos({ x: e.clientX, y: e.clientY });
+    const onUp = (e: PointerEvent) => {
       const item = getAltarDragItem();
       setAltarDragItem(null);
       if (!item) return;
-      const el = canvasRef.current;
-      if (!el) return;
-      const rect = el.getBoundingClientRect();
-      if (e.clientX >= rect.left && e.clientX <= rect.right && e.clientY >= rect.top && e.clientY <= rect.bottom) {
-        const { x, y } = coordsToPercent(e.clientX, e.clientY);
-        placeItem(item, x, y);
+      const point = editorRef.current?.clientToArtboard(e.clientX, e.clientY);
+      if (!point || point.x < 0 || point.y < 0 || point.x > refW || point.y > refH) return;
+      let x = (point.x / refW) * 100;
+      let y = (point.y / refH) * 100;
+      if (grid?.snapPosition) {
+        x = Math.round(x / (100 / grid.columns)) * (100 / grid.columns);
+        y = Math.round(y / (100 / grid.rows)) * (100 / grid.rows);
       }
+      void placeItem(item, Math.max(3, Math.min(97, x)), Math.max(3, Math.min(97, y))).catch(console.error);
     };
-
-    document.addEventListener('pointermove', handlePointerMove);
-    document.addEventListener('pointerup', handlePointerUp);
+    document.addEventListener('pointermove', onMove);
+    document.addEventListener('pointerup', onUp);
     return () => {
-      document.removeEventListener('pointermove', handlePointerMove);
-      document.removeEventListener('pointerup', handlePointerUp);
+      document.removeEventListener('pointermove', onMove);
+      document.removeEventListener('pointerup', onUp);
     };
-  }, [editable, sidebarDragItem, placeItem, coordsToPercent]);
-
-  const handleMouseMove = useCallback((e: React.MouseEvent) => {
-    const drag = draggingRef.current;
-    if (!editable || !drag) return;
-    if (!drag.moved && Math.hypot(e.clientX - drag.startX, e.clientY - drag.startY) < DRAG_THRESHOLD_PX) return;
-    drag.moved = true;
-    const { x, y } = dragTarget(drag, e.clientX, e.clientY);
-    movePlacement(drag.id, x, y);
-  }, [editable, dragTarget, movePlacement]);
-
-  const handleMouseUp = useCallback((e: React.MouseEvent) => {
-    const drag = draggingRef.current;
-    if (!editable || !drag) return;
-    draggingRef.current = null;
-    if (!drag.moved) return;
-    const { x, y } = dragTarget(drag, e.clientX, e.clientY);
-    savePlacementPosition(drag.id, x, y);
-  }, [editable, dragTarget, savePlacementPosition]);
+  }, [editable, dragItem, placeItem, refW, refH, grid]);
 
   return (
-    <div
-      ref={canvasRef}
-      className="w-full h-full relative overflow-hidden select-none"
-      style={{ background: getBackgroundStyle(altar, backgroundSrc) }}
-      onMouseDown={(e) => { if (!isHistoryButton(e)) selectPlacement(null); }}
-      onMouseMove={handleMouseMove}
-      onMouseUp={handleMouseUp}
-      onMouseLeave={handleMouseUp}
-    >
-      {showGrid && gridPath && (
-        <svg
-          className="absolute inset-0 w-full h-full pointer-events-none"
-          xmlns="http://www.w3.org/2000/svg"
-        >
-          <path
-            d={gridPath}
-            stroke={`rgba(${gridRgb.r},${gridRgb.g},${gridRgb.b},${gridOpacity})`}
-            strokeWidth="1"
-            fill="none"
-          />
-        </svg>
-      )}
-
-      {editable && sidebarDragItem && (
-        <div className="absolute inset-2 border border-dashed border-edge-strong rounded-lg pointer-events-none z-10" />
-      )}
-
-      {sortedPlacements.map((p) => (
-        <PlacedItem
-          key={p.id}
-          placement={p}
-          editable={editable}
-          selected={selectedPlacementId === p.id}
-          rotationSnapEnabled={rotationSnapEnabled}
-          rotationSnapAngle={rotationSnapAngle}
-          canvasScale={canvasScale}
-          cssScale={cssScale}
-          onStartDrag={handleStartDragById}
-          onSelect={handleSelectById}
-          onResize={handleResizeById}
-          onRotate={handleRotateById}
-        />
-      ))}
-
-      {editable && sidebarDragItem && ghostPos && createPortal(
-        <div
-          className="fixed pointer-events-none z-50 flex flex-col items-center gap-0.5 opacity-75"
-          style={{ left: ghostPos.x, top: ghostPos.y, transform: 'translate(-50%, -50%)' }}
-        >
-          <AltarItemVisual item={sidebarDragItem} size={32} />
-          <span className="text-xs text-muted whitespace-nowrap">{sidebarDragItem.name}</span>
-        </div>,
-        document.body,
-      )}
-    </div>
+    <CanvasEditor
+      ref={editorRef}
+      types={ALTAR_PROFILE.types}
+      features={ALTAR_PROFILE.features}
+      paint={ALTAR_PAINT}
+      width={refW}
+      height={refH}
+      elements={elements}
+      onChange={handleChange}
+      selectedIds={selectedPlacementIds}
+      onSelectionChange={selectPlacements}
+      editable={editable}
+      grid={grid}
+      rotationSnap={altar.rotation_snap_enabled ? altar.rotation_snap_angle : null}
+      historyKey={altar.id}
+      readAlign={readAlign}
+      createId={generateId}
+      onExport={onExport}
+      elementLabel={elementLabel}
+      guides={guides}
+      onGuidesChange={onGuidesChange}
+      guidesLocked={altar.guides_locked}
+      onGuidesLockedChange={onGuidesLockedChange}
+      canvasBackground={canvasBackground}
+      onCanvasBackgroundChange={onCanvasBackgroundChange}
+      backgroundImages={BACKGROUND_IMAGES}
+      symbolLibrary={symbolLibrary}
+      overlay={editable && dragItem ? (
+        <>
+          <div className="canvas-drop-hint" />
+          {ghostPos && createPortal(
+            <div
+              className="fixed pointer-events-none z-50 flex flex-col items-center gap-0.5 opacity-75"
+              style={{ left: ghostPos.x, top: ghostPos.y, transform: 'translate(-50%, -50%)' }}
+            >
+              <AltarItemVisual item={dragItem} size={32} />
+              <span className="text-xs text-muted whitespace-nowrap">{dragItem.name}</span>
+            </div>,
+            document.body,
+          )}
+        </>
+      ) : null}
+    />
   );
 }
-
-interface PlacedItemProps {
-  placement: AltarPlacement;
-  editable: boolean;
-  selected: boolean;
-  rotationSnapEnabled: boolean;
-  rotationSnapAngle: number;
-  canvasScale: number;
-  cssScale: number;
-  // Callbacks accept `id` so a single stable reference can be shared
-  // across all PlacedItem instances, letting React.memo bail out correctly.
-  onStartDrag: (id: string, clientX: number, clientY: number) => void;
-  onSelect: (id: string) => void;
-  onResize: (id: string, width: number, height: number) => void;
-  onRotate: (id: string, rotation: number) => void;
-}
-
-const PlacedItem = memo(function PlacedItem({ placement, editable, selected, rotationSnapEnabled, rotationSnapAngle, canvasScale, cssScale, onStartDrag, onSelect, onResize, onRotate }: PlacedItemProps) {
-  const { t } = useTranslation();
-  const [hovered, setHovered] = useState(false);
-  const [isRotating, setIsRotating] = useState(false);
-  const rootRef = useRef<HTMLDivElement>(null);
-  const width = placement.width ?? 8;
-  const height = placement.height ?? 8;
-  const scaledBase = BASE_SIZE * canvasScale;
-  const displayWidth = Math.round(scaledBase * (width / 8));
-  const displayHeight = Math.round(scaledBase * (height / 8));
-  // Buttons must be a fixed screen-pixel size regardless of canvas resolution.
-  // cssScale is the CSS transform factor applied to the canvas container, so
-  // dividing by it converts screen pixels → native canvas pixels.
-  const safeScale = cssScale > 0 ? cssScale : 1;
-  const btnSize = Math.round(26 / safeScale);
-  const iconSize = Math.round(14 / safeScale);
-  const rotateTopOffset = -Math.round(38 / safeScale);
-  const resizeEdgeOffset = -Math.round(10 / safeScale);
-  const tooltipTopOffset = -Math.round(75 / safeScale);
-
-  const startRotate = (event: React.MouseEvent) => {
-    if (!editable || placement.locked || isHistoryButton(event)) return;
-    event.preventDefault();
-    event.stopPropagation();
-    onSelect(placement.id);
-    const root = rootRef.current;
-    if (!root) return;
-    const rect = root.getBoundingClientRect();
-    const centerX = rect.left + rect.width / 2;
-    const centerY = rect.top + rect.height / 2;
-
-    const onMove = (moveEvent: MouseEvent) => {
-      const angle = (Math.atan2(moveEvent.clientY - centerY, moveEvent.clientX - centerX) * 180) / Math.PI + 90;
-      let normalized = Math.round((((angle % 360) + 360) % 360) * 10) / 10;
-      if (rotationSnapEnabled && rotationSnapAngle > 0) {
-        normalized = Math.round(normalized / rotationSnapAngle) * rotationSnapAngle;
-      } else if (moveEvent.shiftKey) {
-        normalized = Math.round(normalized / 15) * 15;
-      }
-      onRotate(placement.id, normalized);
-    };
-
-    const onUp = () => {
-      document.removeEventListener('mousemove', onMove);
-      document.removeEventListener('mouseup', onUp);
-      setIsRotating(false);
-    };
-
-    setIsRotating(true);
-    document.addEventListener('mousemove', onMove);
-    document.addEventListener('mouseup', onUp);
-  };
-
-  const startResize = (event: React.MouseEvent) => {
-    if (!editable || placement.locked || isHistoryButton(event)) return;
-    event.preventDefault();
-    event.stopPropagation();
-    onSelect(placement.id);
-    const startX = event.clientX;
-    const startY = event.clientY;
-    const startWidth = width;
-    const startHeight = height;
-    const startSize = (startWidth + startHeight) / 2;
-
-    const onMove = (moveEvent: MouseEvent) => {
-      const delta = (moveEvent.clientX - startX + (moveEvent.clientY - startY)) / 2;
-      const nextSize = Math.max(2, Math.min(500, startSize + (delta * 8) / scaledBase));
-      const normalized = Math.round(nextSize * 100) / 100;
-      onResize(placement.id, normalized, normalized);
-    };
-
-    const onUp = () => {
-      document.removeEventListener('mousemove', onMove);
-      document.removeEventListener('mouseup', onUp);
-    };
-
-    document.addEventListener('mousemove', onMove);
-    document.addEventListener('mouseup', onUp);
-  };
-
-  return (
-    <div
-      ref={rootRef}
-      className={`absolute flex items-center justify-center ${editable && !placement.locked ? 'cursor-grab active:cursor-grabbing' : 'cursor-default'}`}
-      style={{
-        left: `${placement.x}%`,
-        top: `${placement.y}%`,
-        transform: `translate(-50%, -50%) rotate(${placement.rotation ?? 0}deg)`,
-        width: displayWidth,
-        height: displayHeight,
-        zIndex: placement.z_index,
-        display: placement.hidden ? 'none' : undefined,
-        pointerEvents: placement.locked ? 'none' : undefined,
-      }}
-      onMouseDown={(e) => {
-        e.stopPropagation();
-        if (placement.locked || isHistoryButton(e)) return;
-        onSelect(placement.id);
-        if (!editable) return;
-        e.preventDefault();
-        onStartDrag(placement.id, e.clientX, e.clientY);
-      }}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-    >
-      <div style={{ opacity: placement.opacity ?? 1 }}>
-        <AltarItemVisual item={placement} size={Math.max(displayWidth, displayHeight)} candleAnimate={isCandleEmoji(placement.emoji)} />
-      </div>
-      {(selected || (editable && hovered)) && <span className="absolute inset-0 rounded-md border border-accent-edge pointer-events-none" />}
-      {editable && isRotating && (
-        <span style={{ top: tooltipTopOffset, fontSize: Math.round(14 / safeScale), padding: `${Math.round(4 / safeScale)}px ${Math.round(10 / safeScale)}px` }} className="absolute left-1/2 -translate-x-1/2 rounded-md bg-overlay border border-accent-edge font-semibold text-on-accent shadow-menu pointer-events-none whitespace-nowrap">
-          {Math.round((placement.rotation ?? 0) * 10) / 10}°
-        </span>
-      )}
-      {editable && selected && !placement.locked && (
-        <button
-          onMouseDown={startRotate}
-          style={{ width: btnSize, height: btnSize, top: rotateTopOffset, left: '50%', transform: 'translateX(-50%)' }}
-          className="absolute bg-well-solid border border-edge-strong rounded-full text-soft hover:text-accent-raise hover:border-accent-edge transition-colors z-10 flex items-center justify-center"
-          title={t('altar.rotate')}
-        >
-          <RotateCw size={iconSize} />
-        </button>
-      )}
-      {editable && selected && !placement.locked && (
-        <button
-          onMouseDown={startResize}
-          style={{ width: btnSize, height: btnSize, bottom: resizeEdgeOffset, right: resizeEdgeOffset }}
-          className="absolute bg-well-solid border border-edge-strong rounded-full text-soft hover:text-accent-raise hover:border-accent-edge transition-colors z-10 flex items-center justify-center"
-          title={t('altar.scale')}
-        >
-          <MoveDiagonal2 size={iconSize} />
-        </button>
-      )}
-    </div>
-  );
-});
-

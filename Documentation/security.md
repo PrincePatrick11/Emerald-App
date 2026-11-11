@@ -35,7 +35,7 @@ PDF export renders in a hidden window that the per-platform `export_pdf` command
 
 ## Command Surface
 
-`src-tauri/src/lib.rs` registers **58 commands**. The security-relevant ones are discussed in their own sections below; this inventory exists so a new command cannot hide among undocumented ones.
+`src-tauri/src/lib.rs` registers **88 commands**. The security-relevant ones are discussed in their own sections below; this inventory exists so a new command cannot hide among undocumented ones.
 
 | Command | Defined in | Notes |
 |---|---|---|
@@ -54,12 +54,14 @@ PDF export renders in a hidden window that the per-platform `export_pdf` command
 | `register_vaults`, `ensure_vault_dirs`, `create_vault_dirs`, `ensure_backup_dir`, `probe_vault_dir`, `delete_vault_files`, `discard_import_staging`, `prune_migration_backups` | `vault.rs` | see [Vault Directories as a Trust Boundary](#vault-directories-as-a-trust-boundary) |
 | `read_vault_drafts`, `write_vault_drafts` | `vault.rs` | the vault's `drafts.json`, see [Vault JSON files](#vault-json-files) |
 | `read_vault_settings`, `write_vault_settings` | `vault.rs` | the vault's `settings.json`, see [Vault JSON files](#vault-json-files) |
-| `default_vault_dir`, `new_vault_base_dir`, `legacy_default_db_exists` | `vault.rs` | path/existence oracles for the vault modal and the backup import's add-vault mode; take no path |
+| `read_device_settings`, `write_device_settings` | `vault.rs` | `{appDataDir}/device.json` (language, theme, custom themes); a JSON object of at most 256 KB, written atomically like the vault's settings; take no path |
+| `default_vault_dir`, `new_vault_base_dir`, `legacy_default_db_exists` | `vault.rs` | path/existence oracles for the vault picker and the backup import's add-vault mode; take no path |
 | `migrate_vault_layout` | `vault.rs` | moves a pre-0.2.1 flat `.db` into its own vault directory; the legacy name is validated with `is_valid_legacy_db_name` |
 | `close_request_seen` | `lib.rs` | no arguments: tells Rust the frontend is handling a close request (see [Closing the window](architecture/shell.md#closing-the-window)). All it can do is *prevent* the fallback that closes an unresponsive window |
 | `update_menu_labels`, `set_view_menu_checked` | `lib.rs` | native-menu state sync; no-ops on Windows/Linux, where no native menu is installed |
 | `set_dock_icon` | `lib.rs` | a custom theme's Dock icon as a size-limited image the frontend draws; no-op on Windows/Linux |
-| `update_settings`, `set_update_settings`, `check_for_update`, `install_update` | `updates.rs` | the only commands that reach the network — see [In-App Updates](#in-app-updates) |
+| `update_settings`, `set_update_settings`, `check_for_update`, `install_update` | `updates.rs` | reach the network for updates — see [In-App Updates](#in-app-updates) |
+| `sync_status`, `sync_server_status`, `sync_pair`, `sync_unpair`, `sync_devices`, `sync_remove_device`, `sync_set_paused`, `sync_forget_link`, `sync_delete_remote`, `sync_rename`, `sync_remote_vaults`, `sync_create_remote`, `sync_adopt_remote`, `sync_push`, `sync_pull`, `sync_remote_state`, `sync_snapshot_begin`, `sync_snapshot_add`, `sync_snapshot_put`, `sync_snapshot_fetch`, `sync_snapshot_frame`, `sync_snapshot_done`, `sync_images`, `sync_images_delete`, `sync_adopt_new_password`, `sync_rekey_done`, `sync_watch`, `sync_unwatch` | `sync.rs` | reach a sync server the user connected a vault to, and nothing else. Take a vault id; none returns the token or a key. See [Sync](architecture/sync.md) |
 
 ## The Dev Bridge
 
@@ -80,7 +82,7 @@ The read-mode click opens the link directly; the link popup that shows the URL a
 
 ## In-App Updates
 
-`src-tauri/src/updates.rs` is the only part of the app that talks to the network. The design rests on one split: **the update source is variable, the public key is not.**
+`src-tauri/src/updates.rs` talks to the network only for updates; the other part that does is [`sync.rs`](architecture/sync.md), for a connected vault. The design rests on one split: **the update source is variable, the public key is not.**
 
 The key lives in `plugins.updater.pubkey` in `tauri.conf.json` and is compiled into every build; its private half exists only as a GitHub secret (see [Signing](build.md#signing)). `tauri-plugin-updater` verifies every downloaded bundle against it before touching the installed app. If the key were editable alongside the URL, the variable source would become a way to install arbitrary code — which is why `update.json` has no field for it.
 
@@ -122,9 +124,11 @@ The mechanics are in [`architecture/encryption.md`](architecture/encryption.md);
 - **Plaintext that left the vault is not recalled.** Backups exported before encryption and kept outside the vault folder, exports (`.emerald`, Markdown, PDF), and earlier copies in cloud version history stay as they are. Deleted plain files may be recoverable from an SSD or a snapshot; only full-disk encryption (BitLocker, FileVault, LUKS) closes that gap.
 - **Legacy images keep their old names.** An image adopted from the pre-per-vault shared pool into an encrypted vault is sealed but keeps its SHA-256 name until the next password change.
 - **No cross-process lock.** Two Emerald processes on one vault — the release build and a dev build, say — are not coordinated; a password change in one while the other has the vault open is unsupported.
+- **The sync token** goes to the OS keychain. With no keychain, or one that refused, it and the key for vault names lie in `{appDataDir}/sync.json`, sealed under a key built into the app. That keeps them from being read at a glance or found by a tool that scans files for tokens, and is otherwise worth nothing, since the key is in the public source: the connect form warns of that and the start page's server section says so while it is the case. Whoever reads the file can use the server as this device, and can see vault names, but opens no vault without its password. `guarded_read_path` refuses the file, so the webview cannot read it, and on Unix it is for this account only.
+- **The sync key does not reach the server.** Pairing sends a proof derived from it, and the vault names are sealed under a key derived from it in another way, so the server cannot read them from what it holds or receives. Whoever saw the key when the server made it or set it can. The app never falls back to sending the key, and refuses a server that cannot check a proof, which would need it.
 - **macOS builds are unsigned.** After an update the keychain may ask whether the app may read its entry again; the choice is the user's. On a build the entry does not yet trust, macOS was measured asking twice for a single read. "Allow" holds for that read only; "Always Allow" in both prompts holds until the binary changes.
 - **Windows keychain entries are written with `CRED_PERSIST_ENTERPRISE`**, the `keyring` crate's setting, so on a domain profile with roaming enabled they may roam with the profile.
-- **`settings.json` is plain**, deliberately: it holds no entry content (appearance includes the names and colours of imported themes) and is read before any vault is unlocked.
+- **`settings.json` and `device.json` are plain**, deliberately: neither holds entry content. A vault's `settings.json` holds its fonts, sizes, limits and rules, and is read before the database opens; `{appDataDir}/device.json` holds the installation's language, theme and custom themes (their names and colours) and is read before any vault is unlocked. A `settings.json` written before still carries the language and theme it had, unread.
 
 ## Vault Directories as a Trust Boundary
 
@@ -168,11 +172,11 @@ The directories go last with plain `remove_dir`, which fails while anything else
 
 **`probe_vault_dir` is a deliberate exception:** it takes a raw path and is not confined to any root, because it answers "what is in the folder the user just picked?" before that folder is registered. It returns four booleans — exists, access denied, holds a database, is empty — and reads no content: an existence oracle for arbitrary paths and nothing more.
 
-**macOS: picking a file does not grant access to its folder.** "Open vault" and "Locate again" use a file dialog filtered to `.db` (a folder dialog lists no files, so nothing would show whether a folder holds a vault), and the vault directory is the file's parent. Under TCC, choosing a file inside `~/Documents`, `~/Desktop` or an iCloud-synced folder grants access to that file only, not to listing its parent. `probe_vault_dir` then reports `denied`, and the vault modal says "no access to the folder" rather than "no vault here"; `images_dir()` behaves the same afterwards. No Rust-side work gets around it — only the user can grant the permission.
+**macOS: picking a file does not grant access to its folder.** "Open vault" and "Locate again" use a file dialog filtered to `.db` (a folder dialog lists no files, so nothing would show whether a folder holds a vault), and the vault directory is the file's parent. Under TCC, choosing a file inside `~/Documents`, `~/Desktop` or an iCloud-synced folder grants access to that file only, not to listing its parent. `probe_vault_dir` then reports `denied`, and the vault picker says "no access to the folder" rather than "no vault here"; `images_dir()` behaves the same afterwards. No Rust-side work gets around it — only the user can grant the permission.
 
 ### Vault JSON files
 
-`settings.json` and `drafts.json` are read and written by vault id, through the same registry, never by path. `drafts.json` is sealed in an encrypted vault ([Vault Encryption](#vault-encryption)); `settings.json` is plain.
+`settings.json` and `drafts.json` are read and written by vault id, through the same registry, never by path; `device.json` by no argument at all, in the app data directory. An unreadable `device.json` (no JSON object, too large, no plain file) is renamed to `device.json.bad`, never removed, and so is a `sync.json` that does not parse (`sync.json.bad`, which `guarded_read_path` refuses like `sync.json`). `drafts.json` is sealed in an encrypted vault ([Vault Encryption](#vault-encryption)); `settings.json` is plain.
 
 - **Writes** accept only a JSON object, at most 256 KB for settings (`SETTINGS_MAX_BYTES`, far above what the settings page produces — a guard against a runaway write) and 4 MiB for drafts (`DRAFTS_MAX_BYTES`). They write a `.tmp` file, `fsync` it and `rename` it over the real one, so a crash mid-write leaves the previous file (`vault.key` is written the same way). A symlink is never followed under either name: the temp name is cleared and opened with `create_new`, and `rename` replaces a link at the target without following it. An empty drafts object removes `drafts.json` instead.
 - **Reads** use `symlink_metadata` (matching `guarded_read_path`) and return a tagged `Missing`/`Found`/`Unreadable` result. Only "the vault directory itself is gone" is an error: a file that exists but isn't a plain, readable, size-capped file must not block opening the vault, so the frontend falls back to defaults and leaves it alone.
@@ -219,7 +223,7 @@ On top of the guards, each command allowlists extensions and returns `"unsupport
 |---|---|---|
 | `write_file`, `read_file` | `.md`, `.emerald`, `.json`, `.txt` | keeps them from being a general filesystem read/write primitive. `.emeralddb` is not on the list: a backup is written only through `write_backup_file` and `write_auto_backup` and read only through `read_backup_file`, so none can be written in the clear by accident |
 | `write_backup_file`, `read_backup_file` | `.emeralddb` | the same path guards |
-| `export_image` | `.png`, `.jpg`, `.jpeg`, `.webp` | the base64 payload is decoded in Rust before writing, so no text encoding or newline handling can alter the bytes |
+| `export_image` | `.png`, `.jpg`, `.jpeg`, `.webp`, `.svg` | the base64 payload is decoded in Rust before writing, so no text encoding or newline handling can alter the bytes |
 | `copy_image_file`, `read_image_file` | `png`, `jpg`, `jpeg`, `gif`, `webp`, `svg` | shared helper `checked_image_source` |
 
 **`read_image_file`** never writes into a vault: it reads a validated external file and returns it as a base64 data-URL, for the frontend to scale and check against the vault's image limits (Settings → Entries, `src/lib/imageLimits.ts`), and to store a photo PNG as JPEG while "Optimise photos" is on, *before* handing it to `save_image`. A dropped file goes this way whenever one of these could change it (`needsPreparing`); otherwise `copy_image_file` copies it as it is. It adds a hard **64 MB cap** (`MAX_EXTERNAL_IMAGE_BYTES`) checked via `fs::metadata` before reading — the bytes cross IPC as base64 and are decoded onto a canvas, so an arbitrarily large file would stall the webview before any vault limit could reject it. The vault's own maximum (if smaller) is enforced afterwards in TypeScript, which is why the 64 MB number lives only in Rust.
@@ -231,7 +235,7 @@ For `copy_image_file` the *destination* is not a path at all — it is the vault
 Validation rules against malformed, oversized, or untrusted data, mostly in the altar canvas:
 
 - **Image sources.** Stored image references are turned into a `src` only through `imageSrc()` (`src/lib/images.ts`): a valid stored filename becomes an `emerald-img` URL for the active vault, `data:`, `blob:` and `http…` values pass through, and anything else yields an empty string, so the `<img>` is skipped and the emoji or live preview is shown instead. Altar item visuals, library tiles, dashboard thumbnails (`AltarCard`) and the altar field all go through it. Remote `http(s)` images are blocked by the CSP's `img-src` (see [Content Security Policy](#content-security-policy)).
-- **Background CSS interpolation.** All altar background CSS is built by `getAltarBackgroundStyle` in `altarConstants.ts`, whose source argument must come from `imageSrc()` — so only those shapes reach the CSS `url(…)`.
+- **Background CSS interpolation.** All altar background CSS is built by the canvas editor's `backgroundCss`, with the picture's URL from `altarBackgroundUrl`: one of the app's own `/backgrounds/{name}.webp` or whatever `imageSrc()` allows — so only those shapes reach the CSS `url(…)`, with any quote escaped.
 - **Gradient presets.** `getGradientColor` (`altarConstants.ts`) validates the extracted colour against `/^#[0-9a-fA-F]{6}$/` and returns `null` otherwise; callers fall back to the default background. Malformed `gradient:` presets never reach canvas colour parsing or CSS.
 - **Resolution strings.** `parseResolution` (`altarConstants.ts`) requires `/^\d+x\d+$/` and falls back to `1920x1080`; both dimensions are clamped to 7680 × 4320, preventing canvas sizes that could cause layout thrashing or memory pressure.
 - **`hexToRgb`** (`src/lib/helpers.ts`) calls `isValidHexColor` first and returns `{r:0, g:0, b:0}` for invalid input instead of `NaN` values that would propagate into `rgba(...)`.
@@ -289,7 +293,7 @@ The main window has an **explicit, hand-written CSP** in `tauri.conf.json` (`app
 - No `worker-src`: workers fall back to `script-src 'self'`. The one worker (`src/lib/photoWorker.ts`) is a file Vite emits next to the bundle, never a `blob:` or `data:` URL, and only decodes and encodes images.
 - `object-src 'none'`, `frame-src 'none'`, and `form-action 'none'`. The app has no HTML form that posts anywhere, and `default-src` does not cover form targets — without it, a form that slipped into rendered content could send what the user types to a remote server.
 
-The eight typefaces ship with the app (`@fontsource` woff2 files bundled by Vite, `src/fonts.css`), so nothing is fetched for typography and the app looks the same offline. The only network code is the updater in Rust (see [In-App Updates](#in-app-updates)), which the page's CSP does not govern.
+The eight typefaces ship with the app (`@fontsource` woff2 files bundled by Vite, `src/fonts.css`), so nothing is fetched for typography and the app looks the same offline. The only network code is in Rust, which the page's CSP does not govern: the updater (see [In-App Updates](#in-app-updates)) and the way to a sync server (see [Sync](architecture/sync.md)).
 
 **Inline scripts.** `script-src 'self'` does not block *every* inline script: Tauri hashes each inline `<script>` in the built HTML at compile time and appends its sha256 to `script-src` (`tauri-codegen`'s `inject_script_hashes`, consumed by `set_csp`). So a specific, unmodified inline script — like the boot script in `index.html`'s `<head>` that sets the theme and arms the loading screen's fallback timer, see [Loading Screen and Boot Order](architecture/shell.md#loading-screen-and-boot-order) — runs; any other or modified inline script is blocked.
 

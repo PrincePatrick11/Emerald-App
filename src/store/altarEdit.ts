@@ -115,12 +115,12 @@ function comparableAltar(altar: AltarRecord, title = altar.title): string {
   ]);
 }
 
-/** Only what the placement itself carries — name, emoji and image belong to the library item. */
+/** Only what the placement itself carries — name, emoji and image belong to the library item; a drawn one's look is its own. */
 function comparablePlacements(placements: readonly AltarPlacement[]): string {
   return JSON.stringify(
     placements
-      .map(({ id, item_id, x, y, z_index, width, height, rotation, opacity, locked, hidden }) =>
-        ({ id, item_id, x, y, z_index, width, height, rotation, opacity, locked, hidden }))
+      .map(({ id, item_id, x, y, z_index, width, height, rotation, opacity, locked, hidden, shape, text, drawing }) =>
+        ({ id, item_id, x, y, z_index, width, height, rotation, opacity, locked, hidden, shape, text, drawing }))
       .sort((a, b) => a.id.localeCompare(b.id)),
   );
 }

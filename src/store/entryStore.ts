@@ -27,8 +27,7 @@ interface EntryState {
    * Entries whose `content` is not loaded yet — `null` once all are
    * there. `fetchEntries` loads in two stages: first the metadata (the lists
    * appear immediately), the contents in the background. Until then the `content` of these
-   * entries is empty; whoever needs it waits with `ensureEntryContent` or
-   * `whenEntryContentLoaded`.
+   * entries is empty; whoever needs it waits with `ensureEntryContent`.
    */
   pendingContent: ReadonlySet<string> | null;
 
@@ -102,7 +101,6 @@ async function selectLiveEntries(): Promise<EntriesByType> {
 }
 
 /** The running second stage of `fetchEntries`; a new load makes an older one ineffective. */
-let contentLoad: Promise<void> = Promise.resolve();
 let loadGeneration = 0;
 /** Entries per query of the second stage. */
 const CONTENT_CHUNK = 1000;
@@ -160,22 +158,6 @@ async function loadAllContentWithRetry(generation: number): Promise<void> {
     console.warn('[entries] loading content failed, retrying', err);
     await new Promise((resolve) => setTimeout(resolve, 2000));
     await loadAllContent(generation);
-  }
-}
-
-/**
- * Resolves as soon as every entry has its content — for everything that spans
- * all contents. Throws if the reload fails.
- *
- * `contentLoad` is set as soon as `fetchEntries` begins: after waiting,
- * either everything is there, or a newer load has taken over — then wait
- * for that one. Without the comparison the loop would spin over an already fulfilled
- * promise in microtasks only, and the IPC response would never get its turn.
- */
-export async function whenEntryContentLoaded(): Promise<void> {
-  for (let load = contentLoad; useEntryStore.getState().pendingContent; load = contentLoad) {
-    await load;
-    if (load === contentLoad) return;
   }
 }
 
@@ -250,9 +232,7 @@ export const useEntryStore = create<EntryState>((set, get) => ({
         set({ loading: false });
       }
     })();
-    // Immediately, not only after the metadata — see `whenEntryContentLoaded`.
-    contentLoad = metadata.then(() => loadAllContentWithRetry(generation));
-    contentLoad.catch((err: unknown) => console.error('[entries] loading content failed', err));
+    metadata.then(() => loadAllContentWithRetry(generation)).catch((err: unknown) => console.error('[entries] loading content failed', err));
     return metadata;
   },
 
@@ -277,7 +257,7 @@ export const useEntryStore = create<EntryState>((set, get) => ({
     const now = nowIso();
     const category = type === 'journal' ? null : categoryId;
     // The "Sigils" category thus begins with calculator, drawing and charge
-    // (template `core-sigil`) — provided the vault applies defaults by itself.
+    // (template `core-sigil`), as long as it stays assigned there.
     const start = startOfNewEntry(type, category, blank);
     const entry: Entry = {
       id: generateId(),

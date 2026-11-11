@@ -1,4 +1,5 @@
 import i18n from '../i18n';
+import { entryBlockSummary } from './blocks/entrySummary';
 import { useAltarStore } from '../store/altarStore';
 import { useBlockDefinitionStore } from '../store/blockDefinitionStore';
 import { useEntryStore } from '../store/entryStore';
@@ -24,11 +25,21 @@ export function takeTaskToName(id: string): boolean {
   return true;
 }
 
+/**
+ * Where a new entry opens: for editing — unless its template brought a loaded
+ * sigil that locks the entry, which can only be read until it is unloaded.
+ */
+function newEntryView(type: 'journal' | 'operations' | 'wiki', entry: { id: string; content: string }): ActiveView {
+  return entryBlockSummary(entry.id, entry.content).sigil?.lockEntry
+    ? { type, id: entry.id, mode: 'view' }
+    : { type, id: entry.id, mode: 'edit', isNew: true };
+}
+
 /** Creates the item and returns where it opens. */
 const creators: Record<CreatableViewId, (categoryId?: string) => Promise<ActiveView>> = {
   journal: async () => {
     const entry = await useEntryStore.getState().createEntry('journal');
-    return { type: 'journal', id: entry.id, mode: 'edit', isNew: true };
+    return newEntryView('journal', entry);
   },
   tasks: async (categoryId) => {
     const task = await useTaskStore.getState().createTask(categoryId ?? null);
@@ -37,11 +48,11 @@ const creators: Record<CreatableViewId, (categoryId?: string) => Promise<ActiveV
   },
   operations: async (categoryId) => {
     const entry = await useEntryStore.getState().createEntry('operation', { categoryId });
-    return { type: 'operations', id: entry.id, mode: 'edit', isNew: true };
+    return newEntryView('operations', entry);
   },
   wiki: async (categoryId) => {
     const entry = await useEntryStore.getState().createEntry('wiki', { categoryId });
-    return { type: 'wiki', id: entry.id, mode: 'edit', isNew: true };
+    return newEntryView('wiki', entry);
   },
   altar: async () => {
     const altar = await useAltarStore.getState().createAltar();

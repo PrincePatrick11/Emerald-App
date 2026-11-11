@@ -48,7 +48,7 @@ fi
 
 # Give a brand-new instance a vault with test data in it. Skips an instance
 # that already has a vaults.json, so one you have been working in is never
-# touched. Failure is not fatal: the app then starts into its own vault setup.
+# touched. Failure is not fatal: the app then starts into its vault picker.
 if [[ -n "${EMERALD_MCP_APP_DATA:-}" ]]; then
     seed_args=()
     [[ "${EMERALD_MCP_SEED:-}" == "force" ]] && seed_args+=(--force)
@@ -57,7 +57,7 @@ if [[ -n "${EMERALD_MCP_APP_DATA:-}" ]]; then
         --checkout "$EMERALD_APP_DIR" \
         --app-data "$EMERALD_MCP_APP_DATA" \
         ${seed_args[@]+"${seed_args[@]}"} \
-      || echo "WARNING: seed provisioning failed - the app will start with its own vault setup"
+      || echo "WARNING: seed provisioning failed - the app will start with its vault picker"
     echo
 fi
 

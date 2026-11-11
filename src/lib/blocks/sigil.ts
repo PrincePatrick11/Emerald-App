@@ -6,13 +6,15 @@ import {
   type ElementDef, type FieldsModel, type SigilElementKind,
 } from './fields';
 import { BLOCK_ATTR, type BlockInstance, type BlockTypeId } from './types';
+import { paintDocFromImage, paintDocFromJson, paintDocToJson, type PaintDoc } from '../paint/document';
 
 /**
  * The three sigil blocks (since v42; previously a separate view with its own
  * columns on `operations`):
  * - Calculator (`core.sigil.calc`): intention, letter bank, implemented letters.
- * - Drawing (`core.sigil.canvas`): the drawing as a stored image —
- *   `<img src="{sha}.png">` in the inner HTML so that the image cleanup sees it.
+ * - Drawing (`core.sigil.canvas`): the canvas editor's paint document as data
+ *   JSON, its rendered image and layer images as `<img src="{sha}.png">` in the
+ *   inner HTML so that the image cleanup sees them (`parseSigilDrawing`).
  * - Charge (`core.sigil.charge`): loaded, target date, charging technique (as a
  *   link chip in the markup), what "loaded" locks and which calculators and
  *   drawings it conceals.
@@ -169,6 +171,64 @@ export function withSigilImage(block: BlockInstance, filename: string | null): B
   return { ...block, html: filename ? `<img src="${escapeHtml(filename)}" alt="">` : '' };
 }
 
+/** Marks the drawing's rendered image; a layer's image carries its layer ID instead. */
+const PAINT_RENDER = 'render';
+// Bounded like TECHNIQUE_RE below: it runs over foreign markup.
+const IMG_RE = /<img\b[^<>]{0,2048}>/gi;
+const PAINT_ATTR_RE = /\bdata-paint="([^"]*)"/i;
+
+export interface SigilDrawing {
+  /** The rendered image — what read mode, the card and the export show. */
+  render: string | null;
+  /** The vector document, with the old image as a layer where there was no document yet. */
+  doc: PaintDoc | null;
+}
+
+/**
+ * The drawing of a block. The vector document is its data JSON; the inner
+ * HTML holds the rendered image first (`data-paint="render"`), then the image
+ * of every layer that has one (`data-paint="<layer ID>"`), so that backups,
+ * exports and the image cleanup find them as they find every other image.
+ *
+ * A drawing without a document (from before the vector format), or one whose
+ * rendered image is no longer marked as such (something else replaced it),
+ * becomes a document with that image as its only layer: nothing it shows is lost.
+ */
+export function parseSigilDrawing(block: BlockInstance): SigilDrawing {
+  const images = new Map<string, string>();
+  let render: string | null = null;
+  let marked = false;
+  for (const [tag] of block.html.matchAll(IMG_RE)) {
+    const src = /\bsrc="([^"]*)"/i.exec(tag)?.[1];
+    if (!src) continue;
+    const role = PAINT_ATTR_RE.exec(tag)?.[1];
+    if (render === null) {
+      render = decodeHtmlAttr(src);
+      marked = role === PAINT_RENDER;
+    } else if (role && role !== PAINT_RENDER) {
+      images.set(decodeHtmlAttr(role), decodeHtmlAttr(src));
+    }
+  }
+  const { broken, data } = readData(block);
+  const doc = marked && !broken ? paintDocFromJson(data, images) : null;
+  if (doc) return { render, doc };
+  return { render, doc: render ? paintDocFromImage(render) : null };
+}
+
+/** The drawing with a new rendered image and document; `null` for both empties it. */
+export function withSigilDrawing(block: BlockInstance, render: string | null, doc: PaintDoc | null): BlockInstance {
+  if (!render || !doc) {
+    const attrs = { ...block.attrs };
+    delete attrs[BLOCK_ATTR.data];
+    return { ...block, html: '', attrs };
+  }
+  const layerImages = doc.layers
+    .filter((l) => l.image)
+    .map((l) => `<img src="${escapeHtml(l.image!)}" alt="" data-paint="${escapeHtml(l.id)}">`)
+    .join('');
+  return withData(block, paintDocToJson(doc), `<img src="${escapeHtml(render)}" alt="" data-paint="${PAINT_RENDER}">${layerImages}`);
+}
+
 /* ---------------- Charge ---------------- */
 
 /** What a loaded sigil locks: the whole entry (as before) or only the concealed calculators and drawings. */
@@ -269,7 +329,9 @@ export function withSigilPart(model: FieldsModel, element: ElementDef, part: Blo
   const values = { ...model.values };
   const slots = { ...model.slots };
   const raw = part.attrs[BLOCK_ATTR.data];
+  // Without data JSON the value goes too: an emptied drawing drops its document.
   if (raw !== undefined) values[element.id] = JSON.parse(raw) as Record<string, unknown>;
+  else delete values[element.id];
   if (part.html) slots[element.id] = part.html;
   else delete slots[element.id];
   return { ...model, values, slots };
@@ -322,26 +384,6 @@ export interface SigilState {
   locked: ReadonlySet<string>;
 }
 
-/** Does a loaded charge lock the block itself or one of its parts? */
-export function blockHoldsLocked(state: SigilState, blockId: string): boolean {
-  if (state.locked.has(blockId)) return true;
-  const prefix = `${blockId}:`;
-  for (const id of state.locked) if (id.startsWith(prefix)) return true;
-  return false;
-}
-
-/**
- * Must the block not be rebuilt — updated to a new revision,
- * removed from entries? As long as it carries a locked part or is itself
- * or contains a loaded charge: if the charge were lost in the rebuild (an
- * archived part does not count), the sigil would be unloaded without anyone
- * having pressed "Unload".
- */
-export function isSigilFrozen(block: BlockInstance, state: SigilState): boolean {
-  return blockHoldsLocked(state, block.id)
-    || sigilUnits([block]).some((u) => u.block.type === SIGIL_CHARGE_TYPE && parseSigilCharge(u.block).loaded);
-}
-
 /**
  * Rewrite the targets of every charge in the block — a charge block itself or
  * the charge parts of a field block. `map` receives each target (block ID or
@@ -349,22 +391,38 @@ export function isSigilFrozen(block: BlockInstance, state: SigilState): boolean 
  * changes, the charge is left untouched.
  */
 export function withMappedChargeTargets(block: BlockInstance, map: (target: string) => string | readonly string[]): BlockInstance {
-  const mapped = (charge: SigilCharge): string[] | null => {
-    if (charge.broken || !charge.targets) return null;
+  return withChargesRewritten(block, (charge) => {
+    if (!charge.targets) return null;
     const before = charge.targets;
     const targets = before.flatMap(map);
     return targets.length !== before.length || targets.some((id, i) => id !== before[i]) ? targets : null;
-  };
+  });
+}
+
+/**
+ * Blocks that join an entry which already has content (a template appended):
+ * a charge covering "every sigil in the entry" (`targets: null`) covers only
+ * the calculators and drawings among these blocks — it would otherwise
+ * conceal what the entry already held.
+ */
+export function withChargesCoveringOnly(blocks: readonly BlockInstance[]): BlockInstance[] {
+  const tools = sigilUnits(blocks).filter(({ block }) => isSigilToolType(block.type)).map(({ block }) => block.id);
+  return blocks.map((block) => withChargesRewritten(block, (charge) => (charge.targets ? null : tools)));
+}
+
+/** Every charge in the block — a charge block itself or the charge parts of a field block — with the targets `rewrite` returns; `null` leaves a charge as it is. */
+function withChargesRewritten(block: BlockInstance, rewrite: (charge: SigilCharge) => string[] | null): BlockInstance {
+  const targetsOf = (charge: SigilCharge) => (charge.broken ? null : rewrite(charge));
   if (block.type === SIGIL_CHARGE_TYPE) {
     const charge = parseSigilCharge(block);
-    const targets = mapped(charge);
+    const targets = targetsOf(charge);
     return targets ? serializeSigilCharge(block, { ...charge, targets }) : block;
   }
   let result = block;
   for (const unit of sigilUnits([block])) {
     if (!unit.part || unit.block.type !== SIGIL_CHARGE_TYPE) continue;
     const charge = parseSigilCharge(unit.block);
-    const targets = mapped(charge);
+    const targets = targetsOf(charge);
     if (!targets) continue;
     const next = serializeSigilCharge(unit.block, { ...charge, targets });
     result = withElementValue(result, unit.part.element.id, JSON.parse(next.attrs[BLOCK_ATTR.data]));
@@ -459,38 +517,6 @@ export function withoutConcealed(content: string, today: string): string {
   const { concealed } = sigilState(blocks, today);
   if (concealed.size === 0) return content;
   return serializeBlocks(blocks.filter((b) => !concealed.has(b.id)).map((b) => withoutConcealedParts(b, concealed)));
-}
-
-/**
- * The content with the sigil unloaded — for templates: a blueprint carries no
- * charge, and an entry made from it does not start concealed. A duplicated
- * entry, on the other hand, stays loaded.
- */
-export function withChargeUnloaded(content: string): string {
-  if (!mayHoldCharge(content)) return content;
-  let changed = false;
-  const unload = (block: BlockInstance): BlockInstance | null => {
-    const charge = parseSigilCharge(block);
-    return charge.broken || !charge.loaded ? null : serializeSigilCharge(block, { ...charge, loaded: false });
-  };
-  const blocks = parseBlocks(content).map((block) => {
-    if (block.type === SIGIL_CHARGE_TYPE) {
-      const next = unload(block);
-      if (next) changed = true;
-      return next ?? block;
-    }
-    let result = block;
-    for (const unit of sigilUnits([block])) {
-      if (!unit.part || unit.block.type !== SIGIL_CHARGE_TYPE) continue;
-      const next = unload(unit.block);
-      if (!next) continue;
-      changed = true;
-      // Only the data JSON: "loaded" is not in the slot's read version.
-      result = withElementValue(result, unit.part.element.id, JSON.parse(next.attrs[BLOCK_ATTR.data]));
-    }
-    return result;
-  });
-  return changed ? serializeBlocks(blocks) : content;
 }
 
 /* ---------------- New ---------------- */

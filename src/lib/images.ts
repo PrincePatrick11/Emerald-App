@@ -151,10 +151,11 @@ export async function listImageFiles(): Promise<StoredImage[]> {
 
 /** Deletes the named images from the active vault. Returns bytes freed. */
 export async function deleteImageFiles(filenames: string[]): Promise<number> {
-  return invoke<number>('delete_image_files', {
-    filenames,
-    vaultId: await getActiveVaultId(),
-  });
+  const vaultId = await getActiveVaultId();
+  const freed = await invoke<number>('delete_image_files', { filenames, vaultId });
+  // Unused here need not stop the server from keeping them for a while, so a failure is no reason to report one.
+  void invoke('sync_images_delete', { vaultId, names: filenames }).catch(() => {});
+  return freed;
 }
 
 /** Copies images out of the pre-0.2.1 shared pool into the active vault. */

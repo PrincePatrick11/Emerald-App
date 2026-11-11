@@ -80,6 +80,11 @@ export function formatTimeDistance(date: string | Date): string {
   return formatDistanceToNow(new Date(date), { locale: activeLocale });
 }
 
+/** The same with the language's own "ago": "5 minutes ago", "vor 5 Minuten". */
+export function formatTimeAgo(date: string | Date): string {
+  return formatDistanceToNow(new Date(date), { locale: activeLocale, addSuffix: true });
+}
+
 /**
  * An ISO date (`YYYY-MM-DD`) in the long form of the app language. Built as a local
  * date — the ISO string directly would mean UTC midnight and thus, west of

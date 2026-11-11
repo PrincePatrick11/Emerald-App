@@ -39,3 +39,20 @@ export function ToolbarBtn({
     </button>
   );
 }
+
+/** A small whole number with − and + beside it: the corners of a polygon, the rays of a symmetry. */
+export function ToolbarStepper({ value, min, max, onChange, label }: {
+  value: number;
+  min: number;
+  max: number;
+  onChange: (value: number) => void;
+  label: string;
+}) {
+  return (
+    <span className="paint-stepper" title={label}>
+      <button type="button" onClick={() => onChange(value - 1)} disabled={value <= min} aria-label={`${label} −`}>−</button>
+      <span className="paint-stepper-value" aria-label={label}>{value}</span>
+      <button type="button" onClick={() => onChange(value + 1)} disabled={value >= max} aria-label={`${label} +`}>+</button>
+    </span>
+  );
+}

@@ -69,6 +69,6 @@ export async function seedSigilTemplate(db: Database, t: TFunction): Promise<voi
   const [category] = await db.select<{ id: string }[]>('SELECT id FROM categories WHERE id=$1', [SIGIL_CATEGORY_ID]);
   await insertTemplateRow(db, {
     ...sigilTemplate(t, nowIso(), await nextTemplateSortOrder(db)),
-    assignments: category ? [{ entryType: 'operation', category: SIGIL_CATEGORY_ID, isDefault: true }] : [],
+    assignments: category ? [{ entryType: 'operation', category: SIGIL_CATEGORY_ID }] : [],
   });
 }

@@ -1,23 +1,24 @@
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { useShallow } from 'zustand/shallow';
 import { useTranslation } from 'react-i18next';
-import { BookOpen, Library, Wand2, Copy, Pencil, Trash2 } from 'lucide-react';
+import { Copy, Pencil, Trash2, type LucideIcon } from 'lucide-react';
 import { HOME_COUNTS, useUIStore } from '../../store/uiStore';
 import { useEntryStore } from '../../store/entryStore';
 import { useCategoryStore } from '../../store/categoryStore';
 import { useUndoStore } from '../../store/undoStore';
 import ContextMenu from '../ui/ContextMenu';
 import Dashboard from '../ui/Dashboard';
+import CollapsibleGroupHeader from '../ui/CollapsibleGroupHeader';
 import { ENTRY_TITLE_HEADING_CLASSES } from '../ui/EntryDetailFrame';
-import DashboardItem from '../ui/DashboardItem';
+import DashboardItem, { type DashboardItemLayout, CardContent, ItemGlyph, RENAME_INPUT_CLASS, RowContent } from '../ui/DashboardItem';
 import RenameField from '../ui/RenameField';
 import Dropdown from '../ui/Dropdown';
 import EmptyState from '../ui/EmptyState';
 import { useOpenInNewTabAction } from '../../hooks/useOpenInNewTabAction';
 import { useSaveAsTemplateAction } from '../../hooks/useSaveAsTemplateAction';
 import { getMoonPhase, journalIcon, MOON_PHASE_SYMBOLS } from '../../lib/moonPhase';
-import { generateId, isImageIcon } from '../../lib/helpers';
-import { entryIcon, MODULES, viewTypeForEntryType } from '../../lib/modules';
+import { generateId } from '../../lib/helpers';
+import { entryIcon, MODULES, viewTypeForEntryType, type ViewId } from '../../lib/modules';
 import { displayTitle, hasOwnTitle } from '../../lib/entryTitle';
 import { categoryLabel } from '../../lib/categories';
 import { formatDayHeading, formatEntryDate } from '../../lib/formatDate';
@@ -25,6 +26,7 @@ import { sortItems } from '../../lib/sortItems';
 import type { HomeSort, HomeView, HomeSectionPrefs } from '../../store/uiStore';
 import { useSettingsStore } from '../../store/settingsStore';
 import { createItem } from '../../lib/createItem';
+import type { Entry } from '../../types';
 
 type CtxTarget =
   | { kind: 'journal'; id: string }
@@ -68,10 +70,49 @@ function SectionToolbar({
   );
 }
 
-// ── Sort helpers ──────────────────────────────────────────────────────────────
-
 function applyCount<T>(items: T[], count: number): T[] {
   return count === 0 ? items : items.slice(0, count);
+}
+
+// ── Section ───────────────────────────────────────────────────────────────────
+
+/**
+ * One of Home's three lists. Each has its own view, sorting and length, which
+ * is why these controls sit in the heading here and not in the sidebar, whose
+ * column has room for one list's: the one exception to that rule.
+ */
+function HomeSection<T>({
+  icon: Icon, label, moduleView, prefs, setPrefs, items, empty, renderItem,
+}: {
+  icon: LucideIcon;
+  label: string;
+  moduleView: ViewId;
+  prefs: HomeSectionPrefs;
+  setPrefs: (p: Partial<HomeSectionPrefs>) => void;
+  items: T[];
+  /** Shown when the module has nothing at all, not when `count` cuts the list. */
+  empty: ReactNode;
+  renderItem: (item: T, layout: DashboardItemLayout) => ReactNode;
+}) {
+  const { t } = useTranslation();
+  const setActiveView = useUIStore((s) => s.setActiveView);
+  return (
+    <section>
+      <CollapsibleGroupHeader
+        leading={<Icon size={12} className="text-subtle" />}
+        label={label}
+        meta={(
+          <button onClick={() => setActiveView({ type: moduleView })} className="text-xs text-subtle hover:text-raise transition-colors flex-shrink-0">
+            {t('home.viewAll')}
+          </button>
+        )}
+        actions={<SectionToolbar prefs={prefs} setPrefs={setPrefs} />}
+      />
+      {empty || (prefs.view === 'list'
+        ? <div className="space-y-1.5">{items.map((item) => renderItem(item, 'row'))}</div>
+        : <div className="grid grid-cols-3 gap-3">{items.map((item) => renderItem(item, 'card'))}</div>)}
+    </section>
+  );
 }
 
 // ── Main component ────────────────────────────────────────────────────────────
@@ -135,8 +176,36 @@ export default function HomeView() {
   /** The title of a row or card — while renaming, the input field. */
   const itemTitle = (kind: CtxTarget['kind'], id: string, title: string) => (isRenaming(kind, id)
     ? <RenameField value={renameValue} onChange={setRenameValue} onCommit={commitRename} onCancel={() => setRenaming(null)}
-        className="home-item-title text-sm font-medium w-full bg-transparent outline-none selectable" />
-    : <div className="home-item-title text-sm font-medium truncate">{displayTitle(t, kind, title)}</div>);
+        className={RENAME_INPUT_CLASS} />
+    : displayTitle(t, kind, title));
+
+  /** One item of a section: the same for all three kinds, in either layout. */
+  const renderHomeItem = (
+    { kind, id, title, icon, meta }: { kind: CtxTarget['kind']; id: string; title: string; icon: string; meta: string },
+    layout: DashboardItemLayout,
+  ) => {
+    const Content = layout === 'row' ? RowContent : CardContent;
+    return (
+      <DashboardItem
+        key={id}
+        view={{ type: viewTypeForEntryType(kind), id, mode: 'view' }}
+        layout={layout}
+        editing={isRenaming(kind, id)}
+        onContextMenu={(e) => openCtx(e, { kind, id })}
+      >
+        <Content icon={<ItemGlyph icon={icon} large={layout === 'card'} />} title={itemTitle(kind, id, title)} meta={meta} />
+      </DashboardItem>
+    );
+  };
+
+  /** A wiki article's or operation's item: category and date as the metadata.
+   *  No fallback to the raw category_id, a deleted category's label is omitted. */
+  const renderCategorized = (kind: 'wiki' | 'operation') => (entry: Entry, layout: DashboardItemLayout) => {
+    const cat = categories.find((c) => c.id === entry.category_id);
+    const catLabel = categoryLabel(t, cat);
+    const meta = `${catLabel ? `${catLabel} · ` : ''}${formatEntryDate(entry.updated_at)}`;
+    return renderHomeItem({ kind, id: entry.id, title: entry.title, icon: entryIcon(kind, entry, cat), meta }, layout);
+  };
 
   const handleDelete = async (target: CtxTarget) => {
     await deleteEntry(target.id);
@@ -179,7 +248,6 @@ export default function HomeView() {
       primaryAction={{ label: t('journal.newEntry'), onClick: handleNewEntry }}
       items={[]}
       itemKey={() => ''}
-      contentClassName="flex-1 overflow-y-auto"
       contextMenuSlot={ctxMenu && (
         <ContextMenu
           x={ctxMenu.x}
@@ -189,23 +257,15 @@ export default function HomeView() {
         />
       )}
       grouping={{ mode: 'custom', render: () => (
-          <div className="max-w-3xl mx-auto px-8 py-10">
-
-            {/* ── Journal ── */}
-            <section className="mb-8">
-              <div className="flex items-center gap-2 mb-3">
-                <button onClick={() => setActiveView({ type: 'journal' })} className="flex items-center gap-2 group flex-shrink-0">
-                  <h2 className="text-xs font-semibold uppercase tracking-wider text-subtle group-hover:text-muted flex items-center gap-2 transition-colors">
-                    <BookOpen size={12} />
-                    {t('nav.journal')}
-                  </h2>
-                  <span className="text-xs text-subtle group-hover:text-muted transition-colors">{t('home.viewAll')}</span>
-                </button>
-                <div className="ml-auto flex-shrink-0">
-                  <SectionToolbar prefs={homeJournalPrefs} setPrefs={setHomeJournalPrefs} />
-                </div>
-              </div>
-              {entries.length === 0 ? (
+          <div className="space-y-8">
+            <HomeSection
+              icon={MODULES.journal.icon}
+              label={t('nav.journal')}
+              moduleView="journal"
+              prefs={homeJournalPrefs}
+              setPrefs={setHomeJournalPrefs}
+              items={journalItems}
+              empty={entries.length === 0 && (
                 <EmptyState
                   icon={MODULES.journal.icon}
                   title={t('emptyState.journal.title')}
@@ -213,193 +273,36 @@ export default function HomeView() {
                   actionLabel={t('emptyState.journal.action')}
                   onAction={handleNewEntry}
                 />
-              ) : homeJournalPrefs.view === 'list' ? (
-                <div className="space-y-2">
-                  {journalItems.map((entry) => (
-                    <DashboardItem
-                      key={entry.id}
-                      view={{ type: 'journal', id: entry.id, mode: 'view' }}
-                      layout="row"
-                      editing={isRenaming('journal', entry.id)}
-                      onContextMenu={(e) => openCtx(e, { kind: 'journal', id: entry.id })}
-                    >
-                      <span className="text-xl">{journalIcon(entry, showMoonPhase)}</span>
-                      <div className="flex-1 min-w-0">
-                        {itemTitle('journal', entry.id, entry.title)}
-                        <div className="home-item-meta text-xs mt-0.5">
-                          {formatEntryDate(entry.created_at)}
-                        </div>
-                      </div>
-                    </DashboardItem>
-                  ))}
-                </div>
-              ) : (
-                <div className="grid grid-cols-3 gap-2">
-                  {journalItems.map((entry) => (
-                    <DashboardItem
-                      key={entry.id}
-                      view={{ type: 'journal', id: entry.id, mode: 'view' }}
-                      layout="card"
-                      editing={isRenaming('journal', entry.id)}
-                      onContextMenu={(e) => openCtx(e, { kind: 'journal', id: entry.id })}
-                    >
-                      <div className="text-lg mb-1">{journalIcon(entry, showMoonPhase)}</div>
-                      {itemTitle('journal', entry.id, entry.title)}
-                      <div className="home-item-meta text-xs mt-0.5">
-                        {formatEntryDate(entry.created_at)}
-                      </div>
-                    </DashboardItem>
-                  ))}
-                </div>
               )}
-            </section>
-
-            {/* ── Operations ── */}
-            <section className="mb-8">
-              <div className="flex items-center gap-2 mb-3">
-                <button onClick={() => setActiveView({ type: 'operations' })} className="flex items-center gap-2 group flex-shrink-0">
-                  <h2 className="text-xs font-semibold uppercase tracking-wider text-subtle group-hover:text-muted flex items-center gap-2 transition-colors">
-                    <Wand2 size={12} />
-                    {t('nav.operations')}
-                  </h2>
-                  <span className="text-xs text-subtle group-hover:text-muted transition-colors">{t('home.viewAll')}</span>
-                </button>
-                <div className="ml-auto flex-shrink-0">
-                  <SectionToolbar prefs={homeOpsPrefs} setPrefs={setHomeOpsPrefs} />
-                </div>
-              </div>
-              {operations.length === 0 ? (
+              renderItem={(entry, layout) => renderHomeItem({
+                kind: 'journal', id: entry.id, title: entry.title,
+                icon: journalIcon(entry, showMoonPhase), meta: formatEntryDate(entry.created_at),
+              }, layout)}
+            />
+            <HomeSection
+              icon={MODULES.operations.icon}
+              label={t('nav.operations')}
+              moduleView="operations"
+              prefs={homeOpsPrefs}
+              setPrefs={setHomeOpsPrefs}
+              items={opsItems}
+              empty={operations.length === 0 && (
                 <EmptyState icon={MODULES.operations.icon} title={t('emptyState.operations.title')} description={t('emptyState.operations.description')} />
-              ) : homeOpsPrefs.view === 'list' ? (
-                <div className="space-y-2">
-                  {opsItems.map((op) => {
-                    const cat = categories.find((c) => c.id === op.category_id);
-                    const icon = entryIcon('operation', op, cat);
-                    return (
-                      <DashboardItem
-                        key={op.id}
-                        view={{ type: 'operations', id: op.id, mode: 'view' }}
-                        layout="row"
-                        editing={isRenaming('operation', op.id)}
-                        onContextMenu={(e) => openCtx(e, { kind: 'operation', id: op.id })}
-                      >
-                        {isImageIcon(icon)
-                          ? <img src={icon} alt="" className="w-6 h-6 object-cover rounded-md flex-shrink-0" />
-                          : <span className="text-xl">{icon}</span>
-                        }
-                        <div className="flex-1 min-w-0">
-                          {itemTitle('operation', op.id, op.title)}
-                          <div className="home-item-meta text-xs mt-0.5">
-                            {categoryLabel(t, cat)} · {formatEntryDate(op.updated_at)}
-                          </div>
-                        </div>
-                      </DashboardItem>
-                    );
-                  })}
-                </div>
-              ) : (
-                <div className="grid grid-cols-3 gap-2">
-                  {opsItems.map((op) => {
-                    const cat = categories.find((c) => c.id === op.category_id);
-                    const icon = entryIcon('operation', op, cat);
-                    return (
-                      <DashboardItem
-                        key={op.id}
-                        view={{ type: 'operations', id: op.id, mode: 'view' }}
-                        layout="card"
-                        editing={isRenaming('operation', op.id)}
-                        onContextMenu={(e) => openCtx(e, { kind: 'operation', id: op.id })}
-                      >
-                        {isImageIcon(icon)
-                          ? <img src={icon} alt="" className="w-6 h-6 object-cover rounded-md mb-1" />
-                          : <div className="text-lg mb-1">{icon}</div>
-                        }
-                        {itemTitle('operation', op.id, op.title)}
-                        <div className="home-item-meta text-xs mt-0.5">
-                          {categoryLabel(t, cat)} · {formatEntryDate(op.updated_at)}
-                        </div>
-                      </DashboardItem>
-                    );
-                  })}
-                </div>
               )}
-            </section>
-
-            {/* ── Wiki ── */}
-            <section>
-              <div className="flex items-center gap-2 mb-3">
-                <button onClick={() => setActiveView({ type: 'wiki' })} className="flex items-center gap-2 group flex-shrink-0">
-                  <h2 className="text-xs font-semibold uppercase tracking-wider text-subtle group-hover:text-muted flex items-center gap-2 transition-colors">
-                    <Library size={12} />
-                    {t('nav.wiki')}
-                  </h2>
-                  <span className="text-xs text-subtle group-hover:text-muted transition-colors">{t('home.viewAll')}</span>
-                </button>
-                <div className="ml-auto flex-shrink-0">
-                  <SectionToolbar prefs={homeWikiPrefs} setPrefs={setHomeWikiPrefs} />
-                </div>
-              </div>
-              {articles.length === 0 ? (
+              renderItem={renderCategorized('operation')}
+            />
+            <HomeSection
+              icon={MODULES.wiki.icon}
+              label={t('nav.wiki')}
+              moduleView="wiki"
+              prefs={homeWikiPrefs}
+              setPrefs={setHomeWikiPrefs}
+              items={wikiItems}
+              empty={articles.length === 0 && (
                 <EmptyState icon={MODULES.wiki.icon} title={t('emptyState.wiki.title')} description={t('emptyState.wiki.description')} />
-              ) : homeWikiPrefs.view === 'list' ? (
-                <div className="space-y-2">
-                  {wikiItems.map((article) => {
-                    const cat = categories.find((c) => c.id === article.category_id);
-                    const icon = entryIcon('wiki', article, cat);
-                    // No fallback to the raw category_id — for a deleted
-                    // category the label is omitted.
-                    const catLabel = categoryLabel(t, cat);
-                    return (
-                      <DashboardItem
-                        key={article.id}
-                        view={{ type: 'wiki', id: article.id, mode: 'view' }}
-                        layout="row"
-                        editing={isRenaming('wiki', article.id)}
-                        onContextMenu={(e) => openCtx(e, { kind: 'wiki', id: article.id })}
-                      >
-                        {isImageIcon(icon)
-                          ? <img src={icon} alt="" className="w-6 h-6 object-cover rounded-md flex-shrink-0" />
-                          : <span className="text-xl flex-shrink-0">{icon}</span>
-                        }
-                        <div className="flex-1 min-w-0">
-                          {itemTitle('wiki', article.id, article.title)}
-                          <div className="home-item-meta text-xs capitalize mt-0.5">
-                            {catLabel ? `${catLabel} · ` : ''}{formatEntryDate(article.updated_at)}
-                          </div>
-                        </div>
-                      </DashboardItem>
-                    );
-                  })}
-                </div>
-              ) : (
-                <div className="grid grid-cols-2 gap-2">
-                  {wikiItems.map((article) => {
-                    const cat = categories.find((c) => c.id === article.category_id);
-                    const icon = entryIcon('wiki', article, cat);
-                    const catLabel = categoryLabel(t, cat);
-                    return (
-                      <DashboardItem
-                        key={article.id}
-                        view={{ type: 'wiki', id: article.id, mode: 'view' }}
-                        layout="card"
-                        editing={isRenaming('wiki', article.id)}
-                        onContextMenu={(e) => openCtx(e, { kind: 'wiki', id: article.id })}
-                      >
-                        {isImageIcon(icon)
-                          ? <img src={icon} alt="" className="w-6 h-6 object-cover rounded-md mb-1" />
-                          : <div className="text-lg mb-1">{icon}</div>
-                        }
-                        {itemTitle('wiki', article.id, article.title)}
-                        <div className="home-item-meta text-xs capitalize mt-0.5">
-                          {catLabel ? `${catLabel} · ` : ''}{formatEntryDate(article.updated_at)}
-                        </div>
-                      </DashboardItem>
-                    );
-                  })}
-                </div>
               )}
-            </section>
-
+              renderItem={renderCategorized('wiki')}
+            />
           </div>
       )}}
     />

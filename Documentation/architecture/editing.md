@@ -45,7 +45,7 @@ What asks:
 
 - `uiStore.setActiveView`, `navigateBack`/`navigateForward` and `closeTab` run through `whenLeaveConfirmed`: immediately when nothing is dirty, otherwise after the answer. Back/Forward step from the history *as it was before the question* (`stepGuarded`), because Save and Discard navigate themselves and would otherwise shift the step by one.
 - Closing a background tab that holds changes goes through `uiStore.askInTab`: it switches to the tab, waits for its view to register its guard (`guardRegistered` — the view may have to load), asks, then closes the tab and returns to the one it was closed from.
-- `resolveOpenEdits()` (`lib/openEdits.ts`) asks for every open edit in turn — the open page, then each background tab via `askInTab`. A vault switch (`vaultStore.switchVault`) and a replace or add-vault import (`BackupPage`) call it first. `settleBeforeExit()` adds waiting for writes still under way (`drainSerialized`, `flushDrafts`) — for an update install (`UpdatesPage`) and closing the window (`AppShell`, Tauri's `onCloseRequested`), after which nothing gets another chance.
+- `resolveOpenEdits()` (`lib/openEdits.ts`) asks for every open edit in turn — the open page, then each background tab via `askInTab`. A vault switch (`vaultStore.switchVault`) and a replace or add-vault import (`BackupPage`) call it first. `settleBeforeExit()` adds waiting for writes still under way (`drainSerialized`, `flushDrafts`) — for an update install (`StartUpdates`) and closing the window (`AppShell`, Tauri's `onCloseRequested`), after which nothing gets another chance.
 
 What does not ask: switching to another tab (the edit continues there), and Done, Cancel and Delete themselves — `useEditActions` wraps them in `withoutLeaveGuard(key, …)`, which exempts that one page while its handler runs.
 
@@ -66,7 +66,7 @@ The entry keeps its id and its row in `entries`. `changeEntryType`:
 
 Since the row never leaves its table, the entry never exists twice or not at all. Wiki and Operation keep category, icon and cover image across the move; converting to Journal drops them, and `typeChangeDropsProperties` makes the field ask first via `InlineConfirm` when any is set.
 
-The content is left alone: a default template applies only when an entry is created (see [Defaulting on create](templates.md#defaulting-on-create)).
+The content is left alone: a default template applies only when an entry is created (see [Defaulting on create](templates.md#starting-an-entry)).
 
 ### Cancel after a type change
 
@@ -116,7 +116,7 @@ The props and sections are documented in [`components.md`](../components.md) (`D
 - Every dashboard's main action is `primaryAction`; `danger: true` renders the red `btn-primary-danger` (Trash). `extraActions` are compact icon buttons on the same row; `contentFooter` renders below the content in every state, for a module's second area (Altar library, Blocks' built-in blocks, Templates' defaults overview, Lexicon's translate panel).
 - `ListToolbar` and `FilterPanel` have only the sidebar-column presentation; `FilterPanel` is always visible. Search sits in the main area next to the title (`ListSearchField`).
 - **Timeline.** `sortBlockedInTimeline` disables every non-date sort, and the grouping switch, with an explanatory tooltip — the timeline orders and groups by month on its own. The stored sort is not overwritten: the select *shows* newest first, `groupByMonth` orders by date (ascending only if the list already is), and the stored sort applies again with another layout.
-- `FilterPanel`'s `displayToggles` (view preferences like Tasks' "Show completed") are not counted in the active-filter badge and untouched by a reset. Each `FilterList`'s "All" row clears it; "Reset filters" in the shared no-results state clears search and every filter at once.
+- `Dashboard`'s `displayToggles` (view preferences, in the sidebar's view section, like Tasks' "Show completed") are not counted in the active-filter badge and untouched by a reset. Each `FilterList`'s "All" row clears it; "Reset filters" in the shared no-results state clears search and every filter at once.
 
 ## Auto-Save (the `useEntryEditor` hook)
 

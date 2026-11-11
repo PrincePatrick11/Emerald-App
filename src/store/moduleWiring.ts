@@ -18,6 +18,7 @@ import { useTemplateStore } from './templateStore';
 import { useLexiconStore } from './lexiconStore';
 import { useImageStore } from './imageStore';
 import { restorePicture } from './imageActions';
+import { useSymbolStore } from './symbolStore';
 import { ENTRY_MODULE_IDS, type EntryModuleId, type TrashKind } from '../lib/modules';
 
 /**
@@ -125,6 +126,7 @@ export async function reloadAllStores(): Promise<void> {
     useTemplateStore.getState().fetchTemplates(),
     useLexiconStore.getState().fetchLexicon(),
     useImageStore.getState().fetchImages(),
+    useSymbolStore.getState().fetchSymbols(),
   ]);
   await reloadEach(ENTRY_MODULE_IDS);
 }
@@ -141,6 +143,7 @@ export async function reloadModules(ids: readonly EntryModuleId[]): Promise<void
     useBlockDefinitionStore.getState().fetchDefinitions(),
     useTemplateStore.getState().fetchTemplates(),
     useLexiconStore.getState().fetchLexicon(),
+    useSymbolStore.getState().fetchSymbols(),
   ]);
   // An import writes through the stores: whatever content is already loaded is correct.
   await reloadEach(ids, { keepLoaded: true });

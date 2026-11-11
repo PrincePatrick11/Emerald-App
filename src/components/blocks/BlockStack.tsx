@@ -4,7 +4,7 @@ import {
 } from 'react';
 import { Reorder, useDragControls } from 'framer-motion';
 import { useTranslation } from 'react-i18next';
-import { Eye, EyeOff, Plus, Puzzle, RefreshCw } from 'lucide-react';
+import { Eye, EyeOff, Plus, Puzzle } from 'lucide-react';
 import ContextMenu, { type ContextMenuAction } from '../ui/ContextMenu';
 import {
   appendEntryLink, editorHas, findEntryLinkPos, removeEntryLink, revealEntryLink, TextEditorHostContext, useTextEditorHost,
@@ -23,17 +23,17 @@ import { flashReveal, scrollIntoViewCentered } from '../../lib/reveal';
 import { createTextBlock, neutralizeSectionTags, parseBlocks, serializeBlocks } from '../../lib/blocks/blockHtml';
 import { resolveBlockType, type BlockTypeMeta } from '../../lib/blocks/blockTypes';
 import { blockIcon, createFromPreset } from '../../lib/blocks/presets';
-import { blockOrigin, isOutdatedCopy, updateInstanceToDefinition, type BlockDefinition } from '../../lib/blocks/definitions';
 import { useBlockDefinitionStore } from '../../store/blockDefinitionStore';
 import {
-  isSigilFrozen, SIGIL_CHARGE_TYPE, sigilState, sigilUnits, todayIso, withChargesCoveringCopy, withoutConcealedParts,
+  SIGIL_CHARGE_TYPE, withChargesCoveringOnly, sigilState, sigilUnits, todayIso, withChargesCoveringCopy, withoutConcealedParts,
   withRenamedPartTargets,
 } from '../../lib/blocks/sigil';
 import { blockLabel, hiddenAttrValue, isBlockHidden, showsTitleInRead, withBlockAttr } from '../../lib/blocks/blockAttrs';
 import { BLOCK_ATTR, TEXT_BLOCK_TYPE, type BlockAttrName, type BlockInstance } from '../../lib/blocks/types';
 import { useBlockSessionStore, type BlockStackApi } from '../../store/blockSessionStore';
 import { useTemplateNoticeStore } from '../../store/templateStore';
-import { applyTemplateFields, undoTemplateFields, type TemplateApplyOptions } from '../../store/templateApply';
+import { useUIStore } from '../../store/uiStore';
+import { applyTemplateFields, undoTemplateFields } from '../../store/templateApply';
 import { areBlocksEmpty, instantiateTemplateBlocks, isTextBlockEmpty, type Template } from '../../lib/blocks/templates';
 import TemplateInsertion, { type TemplateTarget } from '../templates/TemplateInsertion';
 import { BLOCK_VIEWS } from './blockViews';
@@ -100,14 +100,9 @@ export default function BlockStack({
   const onChangeRef = useRef(onChange);
   onChangeRef.current = onChange;
   const stackRef = useRef<HTMLDivElement>(null);
-  // Empty in the sense of templates: then the suggestions are shown. Only toggled
-  // when it changes; a keystroke does not otherwise re-render the stack.
-  const [empty, setEmpty] = useState(() => areBlocksEmpty(blocks));
-
   // Every change dismisses the "Template applied" notice; Undo would otherwise
-  // also empty whatever arose afterwards. Whoever inserts a template shows it again afterwards.
+  // also empty whatever arose afterwards.
   const emit = useCallback(() => {
-    setEmpty(areBlocksEmpty(blocksRef.current));
     useTemplateNoticeStore.getState().dismiss(entryId);
     onChangeRef.current(serializeBlocks(blocksRef.current));
   }, [entryId]);
@@ -134,7 +129,6 @@ export default function BlockStack({
   useEffect(() => {
     setBlocks(blocksRef.current);
     // In read mode the content may have changed from outside (useExternalContentReset).
-    setEmpty(areBlocksEmpty(blocksRef.current));
   }, [isEditing]);
 
   const resetEpoch = useExternalContentReset(initialContent, isEditing, blocksRef, setBlocks, onChangeRef);
@@ -143,13 +137,6 @@ export default function BlockStack({
   const sigil = useMemo(() => sigilState(blocks, todayIso()), [blocks]);
 
   const definitions = useBlockDefinitionStore((s) => s.definitions);
-  /** The definition, if the block is an outdated copy of it; then "Update block" is offered. */
-  const outdatedDefinitionOf = (block: BlockInstance): BlockDefinition | undefined => {
-    const origin = blockOrigin(block);
-    const def = origin ? definitions.find((d) => d.id === origin.id) : undefined;
-    // A copy holding a charged sigil is not rebuilt (isSigilFrozen).
-    return def && isOutdatedCopy(block, def) && !isSigilFrozen(block, sigil) ? def : undefined;
-  };
 
   const textHost = useTextEditorHost({
     isEditing,
@@ -342,26 +329,28 @@ export default function BlockStack({
   const [templatePickerOpen, setTemplatePickerOpen] = useState(false);
 
   /**
-   * Insert a template: append its blocks or replace the content (an
-   * empty stack is always replaced), like any block change through the
-   * editor. Title and tags go through the entry's store, as from the
-   * properties sidebar; Cancel rolls everything back.
+   * Insert a template: its blocks go below the content (an empty stack is
+   * replaced), like any block change through the editor. Title and tags go
+   * through the entry's store, as from the properties sidebar; Cancel rolls
+   * everything back.
    */
-  const applyTemplate = (template: Template, options: TemplateApplyOptions) => {
+  const applyTemplate = (template: Template) => {
     if (!templateTarget || !isEditing) return;
     const added = instantiateTemplateBlocks(template);
-    const next = options.mode === 'replace' || areBlocksEmpty(blocksRef.current)
-      ? added
-      : [...blocksRef.current, ...added];
+    // Appended, its sigil conceals only its own calculators and drawings.
+    const next = areBlocksEmpty(blocksRef.current) ? added : [...blocksRef.current, ...withChargesCoveringOnly(added)];
     commit(next.length > 0 ? next : [createTextBlock()]);
-    if (options.notice) useTemplateNoticeStore.getState().show({ entryId, templateId: template.id });
     const { entryType, flush } = templateTarget;
     // Save the deferred input first: title and tags are checked against the store.
-    void (async () => {
-      await flush();
-      if (options.replaces) await undoTemplateFields(entryType, entryId, options.replaces);
-      await applyTemplateFields(entryType, entryId, template, options);
-    })().catch((e: unknown) => console.error('[BlockStack] applying template fields failed:', e));
+    void flush()
+      .then(() => applyTemplateFields(entryType, entryId, template))
+      .then(() => {
+        // A loaded sigil that locks the entry ends the edit: the entry can only be read until it is unloaded.
+        if (!sigilState(blocksRef.current, todayIso()).lockEntry) return;
+        const { activeView, setActiveView } = useUIStore.getState();
+        if (activeView.id === entryId) setActiveView({ type: activeView.type, id: entryId, mode: 'view' });
+      })
+      .catch((e: unknown) => console.error('[BlockStack] applying template fields failed:', e));
   };
 
   /** Undo after the automatic insertion: empty stack, title and tags of the template reverted. */
@@ -438,19 +427,10 @@ export default function BlockStack({
 
   const openBlockMenu = (e: MouseEvent, block: BlockInstance, meta: BlockTypeMeta | undefined) => {
     const hidden = isBlockHidden(block);
-    const def = outdatedDefinitionOf(block);
     setMenu({
       x: e.clientX,
       y: e.clientY,
       actions: [
-        // Like any block change through the editor; Cancel rolls it back.
-        ...(def
-          ? [{
-              label: t('blocks.update'),
-              icon: <RefreshCw size={12} />,
-              onClick: () => updateBlock(block.id, updateInstanceToDefinition(block, def, fieldTextRef.current)),
-            }]
-          : []),
         {
           label: hidden ? t('blocks.show') : t('blocks.hide'),
           icon: hidden ? <Eye size={12} /> : <EyeOff size={12} />,
@@ -510,8 +490,6 @@ export default function BlockStack({
       {isEditing && templateTarget && (
         <TemplateInsertion
           entryId={entryId}
-          target={templateTarget}
-          empty={empty}
           pickerOpen={templatePickerOpen}
           onPickerOpenChange={setTemplatePickerOpen}
           apply={applyTemplate}
@@ -542,7 +520,6 @@ export default function BlockStack({
                     label={label}
                     hidden={isBlockHidden(block) || (!isEditing && isEmptyInRead(block.id))}
                     showReadTitle={showsTitleInRead(block, meta)}
-                    outdated={isEditing && !!outdatedDefinitionOf(block)}
                     onGripPointerDown={startDrag}
                     onOpenMenu={(e) => openBlockMenu(e, block, meta)}
                   >
