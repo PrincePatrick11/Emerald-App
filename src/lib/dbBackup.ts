@@ -24,7 +24,7 @@ import {
   joinPath,
   newVaultRecord,
 } from './vaultManager';
-import { imageRefsInHtml, isStoredImage, readImageAsBase64, saveImage } from './images';
+import { imageRefsInHtml, isStoredImage, listImageFiles, readImageAsBase64, saveImage } from './images';
 import { clearSearchTextCache } from './searchText';
 import { clearEntrySummaryCache } from './blocks/entrySummary';
 import {
@@ -909,9 +909,21 @@ export async function openBackupFile(): Promise<{ path: string; backup: BackupFi
 // Image restore helpers
 // ─────────────────────────────────────────────────────────────────────────────
 
+/**
+ * The file's pictures stored in this vault, by the name the file knew them by.
+ * A file already here under that very name stays as it is: a stored name is
+ * a hash of the content, and saving again could spell the type differently
+ * (a `.jpeg` taken from the disk comes back as `.jpg`), which would leave the
+ * picture in "Images" twice and the texts pointing at the second.
+ */
 async function restoreImages(backup: BackupFile): Promise<Map<string, string>> {
   const pathMap = new Map<string, string>();
+  const here = new Set(await listImageFiles().then((files) => files.map((f) => f.name), () => []));
   for (const [oldPath, dataUrl] of Object.entries(backup.images)) {
+    if (here.has(oldPath) && storedImageName(oldPath) === oldPath) {
+      pathMap.set(oldPath, oldPath);
+      continue;
+    }
     try {
       pathMap.set(oldPath, await saveImage(dataUrl));
     } catch {
