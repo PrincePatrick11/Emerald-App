@@ -20,7 +20,8 @@
  *                       [--locale en] [--verify] [--force]
  */
 import { DatabaseSync } from 'node:sqlite';
-import { mkdtempSync, mkdirSync, rmSync, existsSync, writeFileSync, readFileSync, renameSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, rmSync, existsSync, writeFileSync, readFileSync, readdirSync, renameSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { pathToFileURL, fileURLToPath } from 'node:url';
@@ -28,6 +29,22 @@ import { createRequire } from 'node:module';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 export const DEFAULT_FIXTURE = join(HERE, 'fixture.json');
+export const SEED_IMAGES = join(HERE, 'images');
+
+/**
+ * The pictures in seed/images, each with the name the vault stores it under:
+ * the SHA-256 of its content and its extension, as the app names a copied
+ * file in a vault without a key (`image_name` in images.rs). The fixture
+ * names them as @@file(<file in seed/images>)@@; provision.mjs copies them.
+ */
+export function seedImageFiles() {
+  if (!existsSync(SEED_IMAGES)) return [];
+  return readdirSync(SEED_IMAGES).filter((f) => /\.(png|jpe?g|gif|webp|svg)$/i.test(f)).map((f) => {
+    const source = join(SEED_IMAGES, f);
+    const ext = f.split('.').pop().toLowerCase();
+    return { key: f, source, name: `${createHash('sha256').update(readFileSync(source)).digest('hex')}.${ext}` };
+  });
+}
 
 /* -- args ------------------------------------------------------------- */
 
@@ -161,6 +178,19 @@ function starterNamer(checkout, locale) {
 }
 
 const CHIP_RE = /@@chip\(([^,]+),([^,]+),([^)]*)\)@@/g;
+const FILE_RE = /@@file\(([^)]+)\)@@/g;
+let fileNames = null;
+
+/** @@file(moon.png)@@ → the stored name of seed/images/moon.png. */
+function expandFiles(value) {
+  if (typeof value !== 'string' || !value.includes('@@file(')) return value;
+  fileNames ??= new Map(seedImageFiles().map((f) => [f.key, f.name]));
+  return value.replace(FILE_RE, (_, key) => {
+    const name = fileNames.get(key.trim());
+    if (!name) throw new Error(`fixture names a picture seed/images does not have: ${key}`);
+    return name;
+  });
+}
 
 function expandChips(value, chipHtml) {
   if (typeof value !== 'string' || !value.includes('@@chip(')) return value;
@@ -189,7 +219,7 @@ async function insertRows(db, table, rows, chipHtml, report) {
         continue;
       }
       cols.push(key);
-      values.push(expandChips(raw, chipHtml));
+      values.push(expandFiles(expandChips(raw, chipHtml)));
     }
     const placeholders = cols.map((_, i) => `$${i + 1}`).join(', ');
     await db.execute(

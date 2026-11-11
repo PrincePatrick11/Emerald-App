@@ -29,6 +29,7 @@
     { "id": "seed-tag-moon",     "name": "moon",     "color": "#8347ff" },
     { "id": "seed-tag-ritual",   "name": "ritual",   "color": "#3ba55d" },
     { "id": "seed-tag-research", "name": "research", "color": "#e0a30c" },
+    { "id": "altar-library",     "name": "Altar Library", "color": "#f59e0b" },
     { "id": "seed-tag-retired",  "name": "retired",  "color": "#8a8a8a",
       "deleted_at": "2026-09-06T09:05:00.000Z" }
   ],
@@ -61,6 +62,13 @@
       "content": "<p>Kept only so the wiki trash has something in it.</p>",
       "created_at": "2026-09-01T11:00:00.000Z", "updated_at": "2026-09-05T11:00:00.000Z",
       "deleted_at": "2026-09-06T11:00:00.000Z"
+    },
+    {
+      "id": "seed-wiki-sketch", "title": "Sketchbook", "slug": "sketchbook",
+      "category_id": "seed-cat-research", "entry_number": 5,
+      "content": "<section data-block=\"core.text\" data-block-id=\"seed-sketch-text\"><p>A canvas with pictures from Images, and a painting to try the brushes on.</p></section><section data-block=\"core.canvas\" data-block-id=\"seed-canvas-1\" data-block-data=\"{&quot;width&quot;:1600,&quot;height&quot;:1000,&quot;elements&quot;:[{&quot;id&quot;:&quot;seed-el-sun&quot;,&quot;x&quot;:500,&quot;y&quot;:450,&quot;width&quot;:320,&quot;height&quot;:320,&quot;z&quot;:1,&quot;type&quot;:&quot;image&quot;,&quot;rotation&quot;:0,&quot;opacity&quot;:1,&quot;locked&quot;:false,&quot;hidden&quot;:false,&quot;ref&quot;:&quot;@@file(sun.png)@@&quot;,&quot;props&quot;:{&quot;src&quot;:&quot;@@file(sun.png)@@&quot;,&quot;emoji&quot;:&quot;&quot;}},{&quot;id&quot;:&quot;seed-el-moon&quot;,&quot;x&quot;:1100,&quot;y&quot;:450,&quot;width&quot;:320,&quot;height&quot;:320,&quot;z&quot;:2,&quot;type&quot;:&quot;image&quot;,&quot;rotation&quot;:0,&quot;opacity&quot;:1,&quot;locked&quot;:false,&quot;hidden&quot;:false,&quot;ref&quot;:&quot;@@file(moon.png)@@&quot;,&quot;props&quot;:{&quot;src&quot;:&quot;@@file(moon.png)@@&quot;,&quot;emoji&quot;:&quot;&quot;}},{&quot;id&quot;:&quot;seed-el-text&quot;,&quot;type&quot;:&quot;text&quot;,&quot;x&quot;:800,&quot;y&quot;:150,&quot;width&quot;:700,&quot;height&quot;:90,&quot;rotation&quot;:0,&quot;opacity&quot;:1,&quot;locked&quot;:false,&quot;hidden&quot;:false,&quot;z&quot;:3,&quot;props&quot;:{&quot;text&quot;:&quot;As above, so below&quot;,&quot;font&quot;:&quot;serif&quot;,&quot;fontSize&quot;:64,&quot;color&quot;:&quot;#d4af37&quot;,&quot;align&quot;:&quot;center&quot;,&quot;bold&quot;:false,&quot;italic&quot;:false}}],&quot;background&quot;:null,&quot;guides&quot;:[],&quot;guidesLocked&quot;:false}\" data-block-config=\"{&quot;images&quot;:false,&quot;shapes&quot;:true,&quot;text&quot;:true,&quot;symbols&quot;:true,&quot;drawing&quot;:true}\"><img src=\"@@file(sun.png)@@\" alt=\"\" data-canvas=\"image\"><img src=\"@@file(moon.png)@@\" alt=\"\" data-canvas=\"image\"></section><section data-block=\"core.paint\" data-block-id=\"seed-paint-1\"></section>",
+      "tags": "[\"research\"]",
+      "created_at": "2026-09-04T10:00:00.000Z", "updated_at": "2026-09-04T10:00:00.000Z"
     }
   ],
 
@@ -172,6 +180,27 @@
   "task_links": [
     { "id": "seed-tasklink-1", "task_id": "seed-task-read",
       "target_id": "seed-wiki-moon", "target_type": "wiki" }
+  ],
+
+  "images": [
+    { "id": "seed-img-moon", "file": "@@file(moon.png)@@", "name": "Crescent Moon", "note": "For the moon workings.",
+      "tags": "[\"altar-library\",\"seed-tag-moon\"]",
+      "created_at": "2026-09-03T16:00:00.000Z", "updated_at": "2026-09-03T16:00:00.000Z" },
+    { "id": "seed-img-sun", "file": "@@file(sun.png)@@", "name": "Sun Disc",
+      "tags": "[\"altar-library\"]",
+      "created_at": "2026-09-03T16:01:00.000Z", "updated_at": "2026-09-03T16:01:00.000Z" },
+    { "id": "seed-img-candle", "file": "@@file(candle.png)@@", "name": "Candle Flame",
+      "tags": "[\"altar-library\",\"seed-tag-ritual\"]",
+      "created_at": "2026-09-03T16:02:00.000Z", "updated_at": "2026-09-03T16:02:00.000Z" },
+    { "id": "seed-img-star", "file": "@@file(star.png)@@", "name": "Old Star", "note": "Kept only so the Images trash has something in it.",
+      "created_at": "2026-09-03T16:03:00.000Z", "updated_at": "2026-09-05T16:03:00.000Z",
+      "deleted_at": "2026-09-06T16:03:00.000Z" }
+  ],
+
+  "symbols": [
+    { "id": "seed-symbol-spiral", "name": "Spiral", "weight": 5,
+      "d": "M50 50 C50 44 58 44 58 50 C58 60 42 60 42 50 C42 36 66 36 66 50 C66 68 34 68 34 50 C34 28 74 28 74 50",
+      "created_at": "2026-09-03T16:10:00.000Z" }
   ],
 
   "routines": [

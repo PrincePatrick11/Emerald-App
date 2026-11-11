@@ -17,9 +17,9 @@
  *   node provision.mjs --checkout <dir> --app-data <dir> [--vault-id seed]
  *                      [--name "MCP Test Vault"] [--locale en] [--force]
  */
-import { existsSync, mkdirSync, renameSync, rmSync, writeFileSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
-import { buildSeed, DEFAULT_FIXTURE } from './build_seed.mjs';
+import { buildSeed, DEFAULT_FIXTURE, seedImageFiles } from './build_seed.mjs';
 
 function parseArgs(argv) {
   const out = {
@@ -61,6 +61,8 @@ async function provision(opts) {
   const vaultId = opts['vault-id'];
   const vaultDir = join(appData, 'vaults', vaultId);
   mkdirSync(join(vaultDir, 'images'), { recursive: true });
+  // The fixture's pictures, under the names its rows give them.
+  for (const file of seedImageFiles()) copyFileSync(file.source, join(vaultDir, 'images', file.name));
 
   const seed = await buildSeed({
     checkout: opts.checkout,

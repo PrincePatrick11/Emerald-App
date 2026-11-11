@@ -53,6 +53,19 @@ const modules = unified
 
 check('the sigil category is there', one("SELECT COUNT(*) AS n FROM categories WHERE id = 'sigils'").n === 1);
 if (unified) check('an altar is there, an operation of the altars', one("SELECT COUNT(*) AS n FROM entries WHERE category_id = 'altars' AND content LIKE '%core.altar%'").n >= 1);
+if (tables.includes('images')) {
+  const pictures = one("SELECT COUNT(*) AS n FROM images WHERE deleted_at IS NULL").n;
+  check('Images has pictures', pictures >= 3, `${pictures}`);
+  check('Images has a trashed picture', one("SELECT COUNT(*) AS n FROM images WHERE deleted_at IS NOT NULL").n >= 1);
+  check('some pictures carry the tag Altar Library',
+    one("SELECT COUNT(*) AS n FROM images WHERE tags LIKE '%\"altar-library\"%'").n >= 2);
+  check('every picture names a stored file', q('SELECT file FROM images').every((r) => /^[0-9a-f]{64}\.(png|jpe?g|gif|webp|svg)$/.test(r.file)));
+}
+if (tables.includes('symbols')) check('an own symbol is there', one('SELECT COUNT(*) AS n FROM symbols').n >= 1);
+if (unified) {
+  check('a canvas block is there', one("SELECT COUNT(*) AS n FROM entries WHERE content LIKE '%core.canvas%'").n >= 1);
+  check('a painting block is there', one("SELECT COUNT(*) AS n FROM entries WHERE content LIKE '%core.paint%'").n >= 1);
+}
 
 // A vault with an empty module renders an empty screen, which is exactly what
 // the seed exists to avoid.

@@ -230,8 +230,8 @@ export const TABLE_DDL: Record<TableName, string> = {
 
   // The vault's images as a place of their own, like tags and categories
   // (since v60): a row gives a stored file (`storedImageName`) a name, tags
-  // (IDs as JSON, `lib/tagRefs.ts`) and a note. Every other file of the
-  // folder is listed too, unnamed; a row keeps its file from the cleanup.
+  // (IDs as JSON, `lib/tagRefs.ts`) and a note. A file without a row is
+  // listed too, unnamed, where something shows it; a row keeps its file from the cleanup.
   // `detached` (JSON) holds, while the picture is in the trash, the texts it
   // was taken out of, so that restoring it puts it back there.
   images: `
