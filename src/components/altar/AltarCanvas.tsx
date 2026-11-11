@@ -30,7 +30,7 @@ const ALTAR_PAINT: CanvasPaintOptions = {
   startColor: CANVAS_SWATCHES[0],
   startSize: 8,
 };
-import { elementToPlacement, placementToElement } from './altarScene';
+import { elementToPlacement, placementToElement } from '../../lib/altarScene';
 
 // ---------------------------------------------------------------------------
 // Altar picture renderer — draws directly to a Canvas 2D context from store

@@ -1,4 +1,5 @@
 import { invoke } from '@tauri-apps/api/core';
+import { convertAltarsInPlace } from './migrateAltars';
 import { todayIso, withoutConcealed } from './blocks/sigil';
 import { imageRefsInHtml, isStoredImage, readImageAsBase64, rewriteImageRefs, saveImage } from './images';
 import { open as openDialog, save, message } from '@tauri-apps/plugin-dialog';
@@ -688,12 +689,14 @@ export async function importFromEmerald(): Promise<void> {
     let newAltarId: string;
     try {
       newAltarId = await importAltarEntry(file);
+      // An altar is an operation of "Altars" now: it becomes one under its ID, as v62 did.
+      await convertAltarsInPlace(await getDb());
     } catch (e) {
       await message(`Import failed: ${e}`, { title: 'Import', kind: 'error' });
       return;
     }
-    await refreshAfterImport(file.type);
-    useUIStore.getState().setActiveView({ type: 'altar', id: newAltarId });
+    await refreshAfterImport('operations');
+    useUIStore.getState().setActiveView({ type: 'operations', id: newAltarId });
     await message('Altar imported successfully!', { title: 'Import', kind: 'info' });
     return;
   }

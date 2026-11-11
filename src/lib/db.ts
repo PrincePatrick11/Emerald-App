@@ -22,6 +22,7 @@ import { ALTAR_SETTING_KEYS, altarSettingsJson } from './altarSettings';
 import type { EntryType } from '../types';
 import { makeCategoryOptional } from './nullableCategory';
 import { seedAltarTemplate, seedSigilTemplate } from './templateRows';
+import { altarsToOperations } from './migrateAltars';
 import { migrateRoutinesToTemplates } from './migrateRoutinesToTemplates';
 import i18n from '../i18n';
 import { LEGACY_UNTITLED_TITLES } from './entryTitle';
@@ -1511,6 +1512,14 @@ export const MIGRATIONS: Migration[] = [
       }
       await seedAltarTemplate(db, i18n.t);
     },
+  },
+  {
+    // The altars become operations of the "Altars" category, their items
+    // pictures of "Images", every link to an altar one to its operation
+    // (`migrateAltars.ts`). The altar tables are emptied, not dropped.
+    version: 62,
+    name: 'altars_to_operations',
+    up: altarsToOperations,
   },
 ];
 

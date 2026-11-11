@@ -175,6 +175,12 @@ const {
   stripTagIds, replaceTagId, importTagsAndRemap, dropUnknownTagIds,
 } = await import(pathToFileURL(bundlePath).href);
 
+// v62 turns the altars into operations and empties their tables. The checks
+// of the older migrations look at the altar tables after the whole chain, so
+// the chain runs without it; its own section calls it (`altarsToOperations`).
+const altarsToOperations = MIGRATIONS.find((m) => m.version === 62).up;
+MIGRATIONS.find((m) => m.version === 62).up = async () => {};
+
 /* ------------------------------------------------------------------ *
  * Read out and compare the schema
  * ------------------------------------------------------------------ */
@@ -2009,6 +2015,77 @@ console.log('\n8n. Migration v49: three entry tables become entries\n');
     !!tpl && JSON.parse(tpl.assignments).some((a) => a.entryType === 'operation' && a.category === 'altars')
       && tpl.content.includes('data-block="core.altar"') && tpl.content.includes('data-block="core.text"'), tpl);
   check('v61: repeatable, schema identical to the baseline', JSON.stringify(await readSchema(db)) === JSON.stringify(schemaA));
+  db.close();
+}
+
+{
+  // v62: altars become operations of "Altars", items pictures of "Images", links follow.
+  const db = freshDb('v62.db');
+  await runMigrations(db);
+  const pic = `${'d'.repeat(64)}.png`;
+  const gone = `${'e'.repeat(64)}.webp`;
+  await db.execute(
+    `INSERT INTO altar_items (id,name,emoji,note,image_data,created_at,updated_at,deleted_at) VALUES
+       ('i1','Candle','🕯️','lit',$1,$4,$4,NULL),
+       ('i2','Star','⭐','',NULL,$4,$4,NULL),
+       ('i3','Old','✨','',$2,$4,$4,$4),
+       ('i4','Inline','✨','',$3,$4,$4,NULL)`,
+    [pic, gone, 'data:image/png;base64,AAAA', now],
+  );
+  const elements = JSON.stringify([{ id: 'sh1', kind: 'shape', x: 50, y: 50, width: 20, height: 20, shape: { type: 'rect', fill: '#ff0000' } }]);
+  const settings = JSON.stringify({ resolution: '1920x1080', guides: [{ id: 'g1', orientation: 'vertical', at: 50 }] });
+  await db.execute(
+    `INSERT INTO altars (id,title,settings,elements,background_image_data,icon_data,created_at,updated_at) VALUES ('a1','My altar',$1,$2,NULL,'🕯️',$3,$3)`,
+    [settings, elements, now],
+  );
+  await db.execute(`INSERT INTO altar_placements (id,altar_id,item_id,x,y,width,height) VALUES
+    ('p1','a1','i1',25,50,40,40), ('p2','a1','i2',75,50,40,40), ('p3','a1','i3',50,50,40,40), ('p4','a1','i4',50,25,40,40)`);
+  const chip = '<span data-type="internalLink" class="internal-link" data-id="a1" data-entry-type="altar" data-label="My altar">My altar</span>';
+  const config = JSON.stringify({ elements: [{ id: 'f1', kind: 'altar', label: 'Altar' }] }).replace(/"/g, '&quot;');
+  const content = `<section data-block="core.text" data-block-id="t1"><p>${chip}</p></section>`
+    + `<section data-block="core.fields" data-block-id="b1" data-block-config="${config}"><dl><dt>Altar</dt><dd data-block-slot="el:f1">${chip}</dd></dl></section>`;
+  await db.execute(`INSERT INTO entries (id,type,title,content,created_at,updated_at) VALUES ('e1','journal','Note',$1,$2,$2)`, [content, now]);
+  await db.execute(`INSERT INTO tasks (id,title,created_at,updated_at) VALUES ('tk1','Task',$1,$1)`, [now]);
+  await db.execute(`INSERT INTO task_links (id,task_id,target_id,target_type) VALUES ('l1','tk1','a1','altar')`);
+  await db.execute(
+    `INSERT INTO block_definitions (id,name,elements,created_at,updated_at) VALUES ('d1','Def',$1,$2,$2)`,
+    [JSON.stringify([{ id: 'x1', kind: 'altar', label: 'A', defaultValue: { id: 'a1', entryType: 'altar', label: 'My altar' } }]), now],
+  );
+
+  await altarsToOperations(db);
+  await altarsToOperations(db);
+
+  const [op] = await db.select("SELECT * FROM entries WHERE id='a1'");
+  check('v62: the altar is an operation of "Altars" under its own ID, with its title and icon',
+    op?.type === 'operation' && op.category_id === 'altars' && op.title === 'My altar' && op.icon === '🕯️' && op.entry_number >= 1, op);
+  const altarSection = /<section data-block="core\.altar"[^>]*data-block-data="([^"]*)"/.exec(op?.content ?? '');
+  const scene = altarSection ? JSON.parse(altarSection[1].replace(/&quot;/g, '"').replace(/&amp;/g, '&')) : null;
+  const byId = new Map((scene?.elements ?? []).map((e) => [e.id, e]));
+  check('v62: the scene holds the placements and the drawn shape, not the trashed item\'s',
+    scene && byId.size === 4 && byId.has('p1') && byId.has('p2') && byId.has('p4') && byId.has('sh1') && !byId.has('p3'), scene && [...byId.keys()]);
+  check('v62: a picture keeps its file, an emoji item its emoji, an inline picture became a file',
+    byId.get('p1')?.ref === pic && byId.get('p1')?.props.src === pic && byId.get('p2')?.props.emoji === '⭐' && !byId.get('p2')?.props.src
+      && byId.get('p4')?.props.src === `${'c'.repeat(64)}.png`, [byId.get('p1'), byId.get('p2'), byId.get('p4')]);
+  check('v62: at the altar\'s resolution, with its guide in pixels',
+    scene?.width === 1920 && scene?.height === 1080 && scene?.guides?.[0]?.at === 960, scene && [scene.width, scene.height, scene.guides]);
+  check('v62: a text for notes follows the altar', /data-block="core\.text"/.test(op?.content ?? ''));
+  const images = Object.fromEntries((await db.select('SELECT id, file, name, note, deleted_at FROM images')).map((r) => [r.id, r]));
+  check('v62: the items with pictures are pictures of "Images", the trashed one in the trash',
+    images.i1?.file === pic && images.i1.name === 'Candle' && images.i1.note === 'lit' && images.i1.deleted_at === null
+      && images.i3?.deleted_at === now && !images.i2 && !!images.i4, images);
+  const [e1] = await db.select("SELECT content FROM entries WHERE id='e1'");
+  check('v62: chips point at the operation, the altar field is a link field',
+    !e1.content.includes('data-entry-type="altar"') && e1.content.includes('data-entry-type="operation"')
+      && e1.content.includes('&quot;kind&quot;:&quot;link&quot;'), e1.content);
+  const [link] = await db.select("SELECT target_type, target_id FROM task_links WHERE id='l1'");
+  check('v62: the task link points at the operation', link?.target_type === 'operation' && link.target_id === 'a1', link);
+  const [def] = await db.select("SELECT elements FROM block_definitions WHERE id='d1'");
+  check('v62: a custom block\'s altar element is a link element with the operation as default',
+    JSON.parse(def.elements)[0].kind === 'link' && JSON.parse(def.elements)[0].defaultValue.entryType === 'operation', def.elements);
+  const left = await db.select('SELECT (SELECT COUNT(*) FROM altars) a, (SELECT COUNT(*) FROM altar_items) i, (SELECT COUNT(*) FROM altar_placements) p');
+  check('v62: the altar tables are empty', left[0].a === 0 && left[0].i === 0 && left[0].p === 0, left);
+  check('v62: repeatable, one operation', (await db.select("SELECT COUNT(*) n FROM entries WHERE id='a1'"))[0].n === 1);
+  check('v62: schema identical to the baseline', JSON.stringify(await readSchema(db)) === JSON.stringify(schemaA));
   db.close();
 }
 

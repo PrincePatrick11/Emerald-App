@@ -10,6 +10,7 @@
  *   add-vault — create a new vault from the backup and switch to it
  */
 
+import { convertAltarsInPlace } from './migrateAltars';
 import { invoke } from '@tauri-apps/api/core';
 import { save, open } from '@tauri-apps/plugin-dialog';
 import { clearLegacyUntitledTitles, getDb, sweepDanglingTaskLinks } from './db';
@@ -1972,6 +1973,8 @@ export async function importDatabase(
         }
       }
       await doReplace(staging, filteredBackup);
+      // Altars of an older file become operations, as v62 did with the vault's own.
+      await convertAltarsInPlace(staging);
     });
     // Only once the import went through, as with replace and merge below.
     if (backupThemes) useDeviceStore.getState().adoptCustomThemes(backupThemes);
@@ -1979,7 +1982,11 @@ export async function importDatabase(
     // Never directly against the vault: `doReplace` deletes before it inserts, and
     // an aborted merge would leave half-imported data behind (see `importStaging.ts`).
     const run = mode === 'replace' ? doReplace : doMerge;
-    await importViaStaging(await getDb(), (staging) => run(staging, filteredBackup));
+    await importViaStaging(await getDb(), async (staging) => {
+      await run(staging, filteredBackup);
+      // Altars of an older file become operations, as v62 did with the vault's own.
+      await convertAltarsInPlace(staging);
+    });
 
     // Only after a successful swap: an aborted import leaves the
     // settings as they were, too.

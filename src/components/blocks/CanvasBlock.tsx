@@ -10,6 +10,7 @@ import {
   canvasElementFile, parseCanvasBlock, withCanvasScene, type CanvasParts, type CanvasScene, type StoredCanvasElement,
 } from '../../lib/blocks/canvas';
 import { canvasImageSrc, imageSrc, saveImage } from '../../lib/images';
+import { emptyPaintDoc, paintDocFromJson, paintDocToJson, type PaintDoc } from '../../lib/paint/document';
 import { altarBackgroundUrl } from '../../lib/altarBackground';
 import { generateId } from '../../lib/helpers';
 import { storedImageName } from '../../lib/schema';
@@ -51,17 +52,24 @@ function profileFor(parts: CanvasParts) {
   return { ...profile, types };
 }
 
-/** A stored element as the canvas editor shows it: a picture's file as a URL. */
+/** A drawing's document from the stored JSON (`paintDocToJson`), checked like every foreign one. */
+function drawingDoc(raw: unknown): PaintDoc {
+  return paintDocFromJson(raw) ?? emptyPaintDoc();
+}
+
+/** A stored element as the canvas editor shows it: a picture's file as a URL, a drawing's document read. */
 function toElement(stored: StoredCanvasElement): CanvasElement {
+  if (stored.type === 'drawing') return { ...stored, props: { ...stored.props, doc: drawingDoc(stored.props.doc) } };
   if (stored.type !== 'image') return stored;
   const file = canvasElementFile(stored);
   return { ...stored, ...(file ? { ref: file } : {}), props: { emoji: '', ...stored.props, src: file ? imageSrc(file) : null } };
 }
 
-/** An element of the canvas editor as stored: a picture keeps its file, not the URL. */
+/** An element of the canvas editor as stored: a picture keeps its file, not the URL, a drawing its compact JSON. */
 function toStored(el: CanvasElement): StoredCanvasElement {
   const stored = { ...el, props: { ...(el.props as Record<string, unknown>) } } as StoredCanvasElement;
   if (el.type === 'image') stored.props.src = storedImageName(el.ref) ?? null;
+  if (el.type === 'drawing') stored.props.doc = paintDocToJson(stored.props.doc as PaintDoc);
   return stored;
 }
 
@@ -99,7 +107,9 @@ async function renderScene(scene: CanvasScene, types: CanvasTypes, background: C
     width: scene.width,
     height: scene.height,
     // Pictures by their file: `loadReadable` reads them as data URLs.
-    elements: scene.elements.map((el) => ({ ...el, props: { emoji: '', ...el.props } })),
+    elements: scene.elements.map((el) => (el.type === 'drawing'
+      ? { ...el, props: { ...el.props, doc: drawingDoc(el.props.doc) } }
+      : { ...el, props: { emoji: '', ...el.props } })),
     outWidth: RENDER_WIDTH,
     background,
     loadImage: loadReadable,

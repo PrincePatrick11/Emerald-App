@@ -21,7 +21,7 @@ import type Database from './sqlite';
  * Must match the highest version in MIGRATIONS. `db.ts` checks this at
  * startup so that a new migration step cannot be forgotten.
  */
-export const BASELINE_VERSION = 61;
+export const BASELINE_VERSION = 62;
 
 /**
  * Tables in dependency order: parents before children.

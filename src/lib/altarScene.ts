@@ -1,7 +1,7 @@
-import type { CanvasElement, DrawingProps, ImageProps, ShapeProps, SymbolProps, TextProps } from '../editors/canvas';
-import { emptyPaintDoc } from '../../lib/paint/document';
-import { BASE_RESOLUTION_WIDTH, isCandleEmoji } from '../../lib/altarConstants';
-import type { AltarPlacement } from '../../types';
+import type { CanvasElement, DrawingProps, ImageProps, ShapeProps, SymbolProps, TextProps } from '../components/editors/canvas';
+import { emptyPaintDoc } from './paint/document';
+import { BASE_RESOLUTION_WIDTH, isCandleEmoji } from './altarConstants';
+import type { AltarPlacement } from '../types';
 
 /**
  * The altar in the canvas editor's terms and back. The canvas editor works in pixels of

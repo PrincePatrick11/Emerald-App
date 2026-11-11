@@ -74,6 +74,7 @@ Per-migration detail lives in the code and in `CHANGELOG.md`. In short:
 | 59 | `symbols` | New table: the vault's own symbols for the canvas editor ([symbols](#symbols)) |
 | 60 | `images` | Additive: the `images` table ([images](#images)) and its `deleted_at` index |
 | 61 | `altar_category_and_template` | Additive: the built-in category `altars` (appended to the list) and the `core-altar` template ([templates](#templates)) |
+| 62 | `altars_to_operations` | Altars become operations of `altars` under their own IDs, items with a picture rows of [images](#images), chips, altar fields and task links point at the operations; the altar tables are emptied, not dropped (`migrateAltars.ts`, `altarConversion.ts`); a copy of the file first (`.pre-v62.bak`) |
 
 Column drops go through `dropColumnsIfPresent` (`dbRebuild.ts`), which skips columns already gone, so they are repeatable. Where a migration converts data, the same converter also runs on rows from an older `.emeralddb` file at import time — see [DB Backup / Restore](#db-backup--restore-emeralddb).
 

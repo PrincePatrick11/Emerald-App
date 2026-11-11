@@ -144,6 +144,7 @@ export async function reloadModules(ids: readonly EntryModuleId[]): Promise<void
     useTemplateStore.getState().fetchTemplates(),
     useLexiconStore.getState().fetchLexicon(),
     useSymbolStore.getState().fetchSymbols(),
+    useImageStore.getState().fetchImages(),
   ]);
   // An import writes through the stores: whatever content is already loaded is correct.
   await reloadEach(ids, { keepLoaded: true });

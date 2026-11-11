@@ -121,6 +121,8 @@ Servitors use the standard operations editor with no special fields. File them u
 
 ## Altar
 
+**Altars are operations now.** An altar is an operation of the built-in category Altars, built with the Altar block. Opening this version turns every altar into such an operation, under the same ID, so links, tasks and altar fields lead to it; the library's items with a picture go to [Images](#images) with their name and note, and an item without one stays on its altar as its emoji. Backups and `.emerald` files with altars are converted the same way on import. The Altar module below empties with that and goes in one of the next steps.
+
 The altar is a virtual arrangement of symbolic objects on a canvas.
 
 **Dashboard.** Opening the Altar section shows all your altars under a collapsible "Altars" heading, with search, sort and view mode (List / Cards / Cards in full width / Timeline). Click an altar to open it; the breadcrumb back button or the Altar entry in the left sidebar returns to the dashboard.
