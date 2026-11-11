@@ -133,7 +133,7 @@ Each element is one Konva `Shape` whose `sceneFunc` calls `drawElement` with the
 
 ### History
 
-`useCanvasHistory` keeps snapshots of the element list the canvas editor is handed, whoever changed it. The canvas editor's own gestures are one step each (`markLocal` before its `onChange`); changes from outside, such as the altar's sidebar, are steps too, except that a burst of them within 600 ms counts once (a slider). Undo hands the earlier list to `onChange`; what the place hands back within 400 ms replaces it, so clamping or rounding there is not a new step. ⌘/Ctrl+Z, ⇧⌘Z and ⌘/Ctrl+Y, or the toolbar's arrows. The history starts over with `historyKey` and when editing starts or ends.
+`useCanvasHistory` keeps snapshots of the scene the canvas editor is handed — the element list and the `canvasBackground` (`CanvasScene`) — whoever changed it. The canvas editor's own gestures are one step each (`markLocal` before its `onChange`); changes from outside, such as the altar's sidebar or the background panel, are steps too, except that a burst of them within 600 ms counts once (a slider). Undo hands the earlier elements to `onChange` and the earlier background to `onCanvasBackgroundChange`, each only if it differs; what the place hands back within 400 ms replaces it, so clamping or rounding there is not a new step. ⌘/Ctrl+Z, ⇧⌘Z and ⌘/Ctrl+Y, or the toolbar's arrows. The history starts over with `historyKey` and when editing starts or ends.
 
 ### Paint mode
 

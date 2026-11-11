@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import type { CanvasBackground } from './background';
 import type { CanvasElement } from './types';
 
 const LIMIT = 100;
@@ -7,11 +8,22 @@ const MERGE_MS = 600;
 /** How long an undo waits for the place to hand back what it applied. */
 const SETTLE_MS = 400;
 
-function same(a: readonly CanvasElement[], b: readonly CanvasElement[]): boolean {
+/** What a step of the history holds: the elements, and the artboard's background where the place has one. */
+export interface CanvasScene {
+  elements: readonly CanvasElement[];
+  background: CanvasBackground | null;
+}
+
+function sameElements(a: readonly CanvasElement[], b: readonly CanvasElement[]): boolean {
   if (a === b) return true;
   if (a.length !== b.length) return false;
   const key = (list: readonly CanvasElement[]) => JSON.stringify([...list].sort((x, y) => x.id.localeCompare(y.id)));
   return key(a) === key(b);
+}
+
+function same(a: CanvasScene, b: CanvasScene): boolean {
+  return sameElements(a.elements, b.elements)
+    && (a.background === b.background || JSON.stringify(a.background) === JSON.stringify(b.background));
 }
 
 export interface CanvasHistory {
@@ -24,24 +36,25 @@ export interface CanvasHistory {
 }
 
 /**
- * Undo and redo for a canvas editor whose elements live with the place that embeds
- * it. The history follows the `elements` it is handed, whoever changed them:
+ * Undo and redo for a canvas editor whose elements and background live with
+ * the place that embeds it. The history follows the scene it is handed, whoever changed it:
  * the canvas editor's own gestures are one step each, changes from outside (a side
- * panel) too, except that a burst of them counts once. Undo hands an earlier
- * list to `apply`; what comes back from the place replaces it, so clamping
- * there does not count as a new step.
+ * panel, the background panel) too, except that a burst of them counts once,
+ * so a slider dragged is one step. Undo hands an earlier scene to `apply`;
+ * what comes back from the place replaces it, so clamping there does not
+ * count as a new step.
  *
- * `resetKey`: when it changes, the history starts over at the current list.
+ * `resetKey`: when it changes, the history starts over at the current scene.
  */
 export function useCanvasHistory(
-  elements: readonly CanvasElement[],
-  apply: (elements: CanvasElement[]) => void,
+  scene: CanvasScene,
+  apply: (scene: CanvasScene) => void,
   resetKey: string,
 ): CanvasHistory {
   const state = useRef({
-    past: [] as CanvasElement[][],
-    present: elements as CanvasElement[],
-    future: [] as CanvasElement[][],
+    past: [] as CanvasScene[],
+    present: scene,
+    future: [] as CanvasScene[],
     local: false,
     applying: 0,
     lastOutside: 0,
@@ -54,18 +67,18 @@ export function useCanvasHistory(
   const keyRef = useRef(resetKey);
   if (keyRef.current !== resetKey) {
     keyRef.current = resetKey;
-    Object.assign(state.current, { past: [], future: [], present: elements, local: false, applying: 0, lastOutside: 0 });
+    Object.assign(state.current, { past: [], future: [], present: scene, local: false, applying: 0, lastOutside: 0 });
   }
 
   useEffect(() => {
     const s = state.current;
-    if (same(s.present, elements)) {
+    if (same(s.present, scene)) {
       s.local = false;
       return;
     }
     const now = performance.now();
     if (s.applying && now - s.applying < SETTLE_MS) {
-      s.present = elements as CanvasElement[];
+      s.present = scene;
       s.applying = 0;
       return;
     }
@@ -78,10 +91,10 @@ export function useCanvasHistory(
       s.lastOutside = now;
     }
     if (s.past.length > LIMIT) s.past.shift();
-    s.present = elements as CanvasElement[];
+    s.present = scene;
     s.future = [];
     bump();
-  }, [elements]);
+  }, [scene]);
 
   const undo = useCallback(() => {
     const s = state.current;

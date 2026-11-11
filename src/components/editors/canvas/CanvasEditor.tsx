@@ -10,7 +10,7 @@ import { drawElement, resourcesOf } from './draw';
 import { cachedCanvasImage, useCanvasResources } from './imageCache';
 import { boxFromPoints, boxesIntersect, elementBounds, unionBounds, type Box } from './geometry';
 import { snapToGuides, snapToStep, type Guide } from './snapping';
-import { useCanvasHistory } from './useCanvasHistory';
+import { useCanvasHistory, type CanvasScene } from './useCanvasHistory';
 import { FULL_CANVAS_FEATURES, type CanvasFeatures } from './features';
 import { BUILTIN_CANVAS_TYPES } from './elements';
 import {
@@ -32,7 +32,7 @@ import { ToolbarBtn } from '../shared/toolbarParts';
 import { Check, Keyboard } from 'lucide-react';
 import ShortcutOverview from './ShortcutOverview';
 import ExportDialog, { type CanvasExportOptions } from './ExportDialog';
-import { backgroundCss, hasBackground, type CanvasBackground } from './background';
+import { EMPTY_BACKGROUND, backgroundCss, hasBackground, type CanvasBackground } from './background';
 import type { CanvasBackgroundImages } from './BackgroundPanel';
 import { SymbolLibraryContext, type CanvasSymbolLibrary } from './symbols/library';
 import ContextMenu from '../../ui/ContextMenu';
@@ -238,10 +238,24 @@ const CanvasEditor = forwardRef<CanvasEditorHandle, CanvasEditorProps>(function 
   const showRulers = rulers && editable && features.guides && !paintingId;
 
   // The latest props for the handlers below, which outlive a render.
-  const live = useRef({ elements, selectedIds, view, onChange, onSelectionChange, grid, types, guides: [] as RulerGuide[] });
-  live.current = { elements, selectedIds, view, onChange, onSelectionChange, grid, types, guides: showRulers ? rulerGuides : [] };
+  const live = useRef({
+    elements, selectedIds, view, onChange, onSelectionChange, grid, types, guides: [] as RulerGuide[],
+    background: canvasBackground, onBackgroundChange: onCanvasBackgroundChange,
+  });
+  live.current = {
+    elements, selectedIds, view, onChange, onSelectionChange, grid, types, guides: showRulers ? rulerGuides : [],
+    background: canvasBackground, onBackgroundChange: onCanvasBackgroundChange,
+  };
 
-  const history = useCanvasHistory(elements, onChange, `${historyKey}:${editable}`);
+  const scene = useMemo(() => ({ elements, background: canvasBackground }), [elements, canvasBackground]);
+  // An undone step changes what differs: the elements, the background, or both.
+  const applyScene = useCallback((next: CanvasScene) => {
+    if (next.elements !== live.current.elements) live.current.onChange([...next.elements]);
+    if (JSON.stringify(next.background) !== JSON.stringify(live.current.background)) {
+      live.current.onBackgroundChange?.(next.background ?? EMPTY_BACKGROUND);
+    }
+  }, []);
+  const history = useCanvasHistory(scene, applyScene, `${historyKey}:${editable}`);
   const brush = usePaintBrush(paint.startColor, paint.startSize);
   const commit = useCallback((next: CanvasElement[]) => {
     history.markLocal();
