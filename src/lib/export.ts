@@ -146,7 +146,8 @@ function safeFilename(title: string): string {
   return title.replace(/[^\w\s\-äöüÄÖÜß]/g, '').trim().replace(/\s+/g, '_') || 'export';
 }
 
-function exportFilename(title: string, date: string, ext: string): string {
+/** `<title>_<yyyy-MM-dd>.<ext>`, the title reduced to what a file name takes — every export's default name. */
+export function exportFilename(title: string, date: string, ext: string): string {
   const base = safeFilename(title);
   const dateStr = format(new Date(date), 'yyyy-MM-dd');
   return `${base}_${dateStr}.${ext}`;

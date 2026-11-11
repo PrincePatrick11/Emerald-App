@@ -30,7 +30,7 @@ function byName(a: PictureItem, b: PictureItem): number {
  */
 export function useVaultPictures(): { pictures: PictureItem[]; loaded: boolean } {
   const { images, files, trashedFiles, uses, loaded } = useImageStore(useShallow((s) => ({
-    images: s.images, files: s.files, trashedFiles: s.trashedFiles, uses: s.uses, loaded: s.loaded,
+    images: s.images, files: s.files, trashedFiles: s.trashedFiles, uses: s.uses, loaded: s.loaded && s.usesLoaded,
   })));
 
   useEffect(() => {

@@ -103,7 +103,7 @@ function isOpaque(ctx: CanvasRenderingContext2D, width: number, height: number):
  * picture it shows. Opaque as a JPEG, with transparency as a PNG; `null` if
  * the canvas cannot be read back.
  */
-function pictureHref(image: CanvasImageSource, maxSide: number): string | null {
+function pictureHref(image: CanvasImageSource, maxSide = Infinity): string | null {
   const w = (image as HTMLImageElement).naturalWidth || (image as HTMLCanvasElement).width;
   const h = (image as HTMLImageElement).naturalHeight || (image as HTMLCanvasElement).height;
   if (!w || !h) return null;
@@ -146,7 +146,15 @@ export async function renderCanvasSvg(options: RenderOptions): Promise<string> {
     for (const src of types[el.type]?.sources?.(el) ?? []) if (src) note(src, Math.max(el.width, el.height) * frame.scale);
   }
   const backgroundSrc = hasBackground(options.background) ? options.background.image?.src : undefined;
-  if (backgroundSrc) note(backgroundSrc, Math.max(options.width, options.height) * frame.scale);
+  if (backgroundSrc) {
+    // Covering, the picture spreads past the artboard on its long side.
+    const image = images.get(backgroundSrc) as HTMLImageElement | undefined;
+    const iw = image?.naturalWidth ?? 0, ih = image?.naturalHeight ?? 0;
+    const cover = options.background?.image?.fit === 'cover' && iw && ih
+      ? Math.max(options.width / iw, options.height / ih) * Math.max(iw, ih)
+      : Math.max(options.width, options.height);
+    note(backgroundSrc, cover * frame.scale);
+  }
   const hrefs = new Map<string, string | null>();
   const href = (src: string) => {
     if (!hrefs.has(src)) {
@@ -170,7 +178,7 @@ export async function renderCanvasSvg(options: RenderOptions): Promise<string> {
     const ctx = bg.getContext('2d');
     if (ctx) {
       await options.drawBackground(ctx, bg.width, bg.height);
-      const data = pictureHref(bg, Infinity);
+      const data = pictureHref(bg);
       if (data) body.push(`<image${attrs({ href: data, width: options.width, height: options.height, preserveAspectRatio: 'none' })}/>`);
     }
   }
@@ -187,7 +195,7 @@ export async function renderCanvasSvg(options: RenderOptions): Promise<string> {
         ctx.scale(canvas.width / el.width, canvas.height / el.height);
         drawElement(ctx, el, types, { image: (src) => images.get(src) ?? null, time: null });
       }
-      const data = pictureHref(canvas, Infinity);
+      const data = pictureHref(canvas);
       content = data ? `<image${attrs({ href: data, width: el.width, height: el.height, preserveAspectRatio: 'none' })}/>` : '';
     }
     const transform = `translate(${num(el.x - el.width / 2)} ${num(el.y - el.height / 2)})`

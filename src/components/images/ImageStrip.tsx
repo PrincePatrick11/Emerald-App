@@ -22,7 +22,7 @@ export default function ImageStrip({ onPick, tag, onTagChange, onAdd }: {
   onAdd: () => void;
 }) {
   const { t } = useTranslation();
-  const { pictures } = useVaultPictures();
+  const { pictures, loaded } = useVaultPictures();
   const tags = useTagStore((s) => s.tags);
   const [search, setSearch] = useState('');
   const shown = searchPictures(pictures, search).filter((item) => !tag || item.image?.tags.includes(tag));
@@ -77,7 +77,7 @@ export default function ImageStrip({ onPick, tag, onTagChange, onAdd }: {
         </div>
       </div>
       {shown.length === 0 ? (
-        <p className="text-xs text-subtle py-6 text-center">{pictures.length ? t('images.noMatch') : t('images.stripEmpty')}</p>
+        <p className="text-xs text-subtle py-6 text-center">{!loaded ? null : pictures.length ? t('images.noMatch') : t('images.stripEmpty')}</p>
       ) : (
         <div ref={gridRef} className="image-strip-grid">
           {shown.map((item) => (

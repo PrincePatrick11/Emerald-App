@@ -92,7 +92,6 @@ async function loadReadable(src: string): Promise<HTMLImageElement | null> {
   }
 }
 
-/** The scene as a stored picture, for the export and the card; `null` if it is empty or could not be stored. */
 /** What drawing the scene off the editor takes: its elements with their pictures by file, read back as data URLs (`loadReadable`). */
 function sceneRenderOptions(scene: CanvasScene, types: CanvasTypes, background: CanvasBackground | null, outWidth: number): RenderOptions {
   return {
@@ -108,6 +107,7 @@ function sceneRenderOptions(scene: CanvasScene, types: CanvasTypes, background: 
   };
 }
 
+/** The scene as a stored picture, for the export and the card; `null` if it is empty or could not be stored. */
 async function renderScene(scene: CanvasScene, types: CanvasTypes, background: CanvasBackground | null): Promise<string | null> {
   if (!scene.elements.length && !background) return null;
   const canvas = await renderCanvasImage(sceneRenderOptions(scene, types, background, RENDER_WIDTH));
@@ -237,8 +237,29 @@ export default function CanvasBlock({ block, isEditing, onBlockChange, onPersist
     setSelectedIds([id]);
   }, [commit]);
 
-  // The tool column's button: pictures from "Images" or the disk (the picture
-  // picker), in the middle of what is visible, side by side.
+  // The strip's tag, saved with the block ('' for all; a tag gone since
+  // counts as none). Pictures added here carry it.
+  const { stripTag } = parsed;
+  const tagLive = useTagStore((s) => s.tags.some((x) => x.id === stripTag));
+  const activeTag = parts.images && tagLive ? stripTag : '';
+  const setStripTag = useCallback((tag: string) => {
+    const { block: current, onBlockChange: change } = latest.current;
+    const next = withCanvasStripTag(current, tag);
+    latest.current = { ...latest.current, block: next };
+    change(next);
+  }, []);
+  // The tag of pictures added here: the strip's. An altar's "Altar Library"
+  // that this vault does not have yet is made with the first of them.
+  const tagForNew = useCallback(async (): Promise<string> => {
+    if (activeTag) return activeTag;
+    if (!parts.images || stripTag !== ALTAR_LIBRARY_TAG_ID) return '';
+    const tag = await useTagStore.getState().ensureTag(ALTAR_LIBRARY_TAG_NAME, ALTAR_LIBRARY_TAG_ID);
+    setStripTag(tag.id);
+    return tag.id;
+  }, [activeTag, parts.images, stripTag, setStripTag]);
+  const [adding, setAdding] = useState<string[] | null>(null);
+  const [dropped, setDropped] = useState<string[]>([]);
+
   // The editor's export dialog: the scene as a file where the user chooses, named after the block's type.
   const exportPicture = useCallback((options: CanvasExportOptions) => {
     const { block: current } = latest.current;
@@ -250,8 +271,11 @@ export default function CanvasBlock({ block, isEditing, onBlockChange, onPersist
       .catch((e: unknown) => exportErrorMessage(e, 'Canvas picture'));
   }, [profile.types, t]);
 
+  // The tool column's button: pictures from "Images" or the disk (the picture
+  // picker, which gives the ones from the disk the strip's tag), in the
+  // middle of what is visible, side by side.
   const insertImages = useCallback(async () => {
-    const files = await pickPictures({ multiple: true });
+    const files = await pickPictures({ multiple: true, tags: activeTag ? [activeTag] : [] });
     const centre = editorRef.current?.visibleCentre();
     if (!files?.length || !centre) return;
     let offset = 0;
@@ -259,7 +283,7 @@ export default function CanvasBlock({ block, isEditing, onBlockChange, onPersist
       await place(file, { x: centre.x + offset, y: centre.y + offset });
       offset += 32;
     }
-  }, [place]);
+  }, [place, activeTag]);
 
   const pointOnArtboard = useCallback((clientX: number, clientY: number) => {
     const point = editorRef.current?.clientToArtboard(clientX, clientY);
@@ -294,29 +318,6 @@ export default function CanvasBlock({ block, isEditing, onBlockChange, onPersist
       document.removeEventListener('pointercancel', onCancel);
     };
   }, [editable, dragItem, pointOnArtboard, place]);
-
-  // The strip's tag, saved with the block ('' for all; a tag gone since
-  // counts as none). Pictures added here carry it.
-  const { stripTag } = parsed;
-  const tagLive = useTagStore((s) => s.tags.some((x) => x.id === stripTag));
-  const activeTag = parts.images && tagLive ? stripTag : '';
-  const setStripTag = useCallback((tag: string) => {
-    const { block: current, onBlockChange: change } = latest.current;
-    const next = withCanvasStripTag(current, tag);
-    latest.current = { ...latest.current, block: next };
-    change(next);
-  }, []);
-  // The tag of pictures added here: the strip's. An altar's "Altar Library"
-  // that this vault does not have yet is made with the first of them.
-  const tagForNew = useCallback(async (): Promise<string> => {
-    if (activeTag) return activeTag;
-    if (!parts.images || stripTag !== ALTAR_LIBRARY_TAG_ID) return '';
-    const tag = await useTagStore.getState().ensureTag(ALTAR_LIBRARY_TAG_NAME, ALTAR_LIBRARY_TAG_ID);
-    setStripTag(tag.id);
-    return tag.id;
-  }, [activeTag, parts.images, stripTag, setStripTag]);
-  const [adding, setAdding] = useState<string[] | null>(null);
-  const [dropped, setDropped] = useState<string[]>([]);
 
   // Files from the disk let go over the canvas: into "Images", under their
   // file name (with the strip's tag), and onto the canvas where they were

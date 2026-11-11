@@ -67,9 +67,9 @@ export async function convertAltarsInPlace(
   const tables = await db.select<{ name: string }[]>(
     "SELECT name FROM sqlite_master WHERE type='table' AND name IN ('altars', 'altar_items', 'altar_placements')",
   );
-  const held = tables.length === 3;
-  const altars = held ? await db.select<Row[]>('SELECT * FROM altars') : [];
-  const items = held ? await db.select<Row[]>('SELECT * FROM altar_items') : [];
+  const hasAltarTables = tables.length === 3;
+  const altars = hasAltarTables ? await db.select<Row[]>('SELECT * FROM altars') : [];
+  const items = hasAltarTables ? await db.select<Row[]>('SELECT * FROM altar_items') : [];
   if (!altars.length && !items.length) {
     const links = await altarLinkStatements(db);
     if (links.length) await db.batch(links);

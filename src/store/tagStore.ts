@@ -119,7 +119,7 @@ interface TagState {
 
 export const useTagStore = create<TagState>((set, get) => {
   /** Returns the existing tag of the same name or creates it. */
-  const ensure = (name: string, color?: string, fixedId?: string): Promise<Tag> => serialized(NEW_TAG_KEY, async () => {
+  const ensure = (name: string, { color, fixedId }: { color?: string; fixedId?: string } = {}): Promise<Tag> => serialized(NEW_TAG_KEY, async () => {
     const trimmed = name.trim();
     const existing = get().tags.find((t) => sameName(t.name, trimmed));
     if (existing) return existing;
@@ -158,14 +158,14 @@ export const useTagStore = create<TagState>((set, get) => {
       set({ tags: rows.map(fromRow.tag).sort(byName) });
     },
 
-    ensureTag: (name, id) => ensure(name, undefined, id),
+    ensureTag: (name, id) => ensure(name, { fixedId: id }),
 
     createTag: async (name, color) => {
       // The check before the chain, not inside it: there it would throw through
       // `serialized`, which logs every rejection as an error. A duplicate call
       // that still slips through here gets the fresh tag in `ensure`.
       if (nameTakenByOther(name.trim())) throw new Error(TAG_NAME_TAKEN);
-      return ensure(name, color);
+      return ensure(name, { color });
     },
 
     updateTag: async (id, patch) => {

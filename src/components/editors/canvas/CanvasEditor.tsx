@@ -997,7 +997,8 @@ const CanvasEditor = forwardRef<CanvasEditorHandle, CanvasEditorProps>(function 
     if (mod && key === 'v') { handled(); paste(); return; }
     if (mod && key === '0' && features.zoom) { handled(); fit(); return; }
     if (mod && key === 'g' && features.group) { handled(); if (e.shiftKey) doUngroup(); else doGroup(); return; }
-    if (mod && !e.altKey && (e.key === ']' || e.key === '[') && features.arrange) {
+    // With AltGr (Ctrl+Alt on Windows) too: on many layouts the brackets need it.
+    if (mod && (e.key === ']' || e.key === '[') && features.arrange) {
       handled();
       doArrange(e.key === ']' ? (e.shiftKey ? 'front' : 'forward') : (e.shiftKey ? 'back' : 'backward'));
       return;

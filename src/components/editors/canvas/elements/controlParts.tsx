@@ -65,7 +65,7 @@ export function RangeField({ label, value, min, max, onChange, format }: {
     <label className="canvas-range-field">
       <span>{label}</span>
       <input type="range" min={min} max={max} value={value ?? max} onChange={(e) => onChange(Number(e.target.value))} className="accent-accent" />
-      <span className="paint-size-value">{value === undefined ? '–' : format ? format(value) : value}</span>
+      <span className="canvas-range-value">{value === undefined ? '–' : format ? format(value) : value}</span>
     </label>
   );
 }

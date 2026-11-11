@@ -4,6 +4,8 @@ import { create } from 'zustand';
 export interface PickRequest {
   /** Several at once (a text) or exactly one (an image field). */
   multiple: boolean;
+  /** Tags a picture taken in from the disk gets (a canvas's strip tag). */
+  tags: string[];
   resolve: (files: string[] | null) => void;
 }
 
@@ -20,10 +22,10 @@ export const useImagePickerStore = create<ImagePickerState>(() => ({ request: nu
  * file names in their order, or `null` when cancelled. A second request
  * cancels the first.
  */
-export function pickPictures({ multiple }: { multiple: boolean }): Promise<string[] | null> {
+export function pickPictures({ multiple, tags = [] }: { multiple: boolean; tags?: string[] }): Promise<string[] | null> {
   return new Promise((resolve) => {
     useImagePickerStore.getState().request?.resolve(null);
-    useImagePickerStore.setState({ request: { multiple, resolve } });
+    useImagePickerStore.setState({ request: { multiple, tags, resolve } });
   });
 }
 

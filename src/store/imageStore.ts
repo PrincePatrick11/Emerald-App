@@ -22,6 +22,8 @@ interface ImageState {
   files: StoredImage[];
   /** Where each picture is used (`collectImageUses`), refreshed when the view opens. */
   uses: ReadonlyMap<string, ImageUse[]>;
+  /** `uses` has been read once: before, a file without a row cannot be told shown from left over. */
+  usesLoaded: boolean;
   refreshUses: () => Promise<void>;
   /** The files whose details are in the trash: hidden from the grid until restored. */
   trashedFiles: ReadonlySet<string>;
@@ -55,6 +57,7 @@ export const useImageStore = create<ImageState>((set, get) => ({
   files: [],
   trashedFiles: new Set(),
   uses: new Map(),
+  usesLoaded: false,
   loaded: false,
 
   fetchImages: async () => {
@@ -67,7 +70,7 @@ export const useImageStore = create<ImageState>((set, get) => ({
   },
 
   refreshUses: async () => {
-    set({ uses: await collectImageUses(await getDb()) });
+    set({ uses: await collectImageUses(await getDb()), usesLoaded: true });
   },
 
   refreshFiles: async () => {
@@ -86,8 +89,13 @@ export const useImageStore = create<ImageState>((set, get) => ({
     if (!live) {
       const db = await getDb();
       const [row] = await db.select<DbRow[]>('SELECT id FROM images WHERE file=$1', [file]);
-      // In the trash: back first, then changed like a live one.
-      if (row) await get().restoreImage(String(row.id));
+      // In the trash: back first, then changed like a live one. Taken in anew,
+      // not restored into its texts: the snapshots of the places it was
+      // taken out of (`detached`) go, or the cleanup would keep their files.
+      if (row) {
+        await db.execute("UPDATE images SET detached='[]' WHERE id=$1", [row.id]);
+        await get().restoreImage(String(row.id));
+      }
       live = await existing();
     }
     if (live) {

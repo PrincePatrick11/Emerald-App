@@ -20,9 +20,9 @@ import ImageTile from './ImageTile';
  * files from the disk too, by button or by dropping them on the window:
  * those are stored, taken into "Images" under their file name, and inserted.
  */
-export default function ImagePickerModal({ multiple }: { multiple: boolean }) {
+export default function ImagePickerModal({ multiple, tags }: { multiple: boolean; tags: string[] }) {
   const { t } = useTranslation();
-  const { pictures } = useVaultPictures();
+  const { pictures, loaded } = useVaultPictures();
   const [search, setSearch] = useState('');
   const [selected, setSelected] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
@@ -43,7 +43,7 @@ export default function ImagePickerModal({ multiple }: { multiple: boolean }) {
     for (const item of (multiple ? items : items.slice(0, 1))) {
       try {
         const file = await store(item);
-        await useImageStore.getState().takeIn(file, { name: name(item) });
+        await useImageStore.getState().takeIn(file, { name: name(item), tags });
         files.push(file);
       } catch (e) {
         reportImageError(e, `pick ${label(item)}`);
@@ -81,7 +81,7 @@ export default function ImagePickerModal({ multiple }: { multiple: boolean }) {
     >
       <SearchField value={search} onValueChange={setSearch} placeholder={t('images.searchPlaceholder')} />
       {shown.length === 0 ? (
-        <p className="text-xs text-subtle py-6 text-center">{pictures.length ? t('images.noMatch') : t('images.pickEmpty')}</p>
+        <p className="text-xs text-subtle py-6 text-center">{!loaded ? null : pictures.length ? t('images.noMatch') : t('images.pickEmpty')}</p>
       ) : (
         <div className="image-picker-grid">
           {shown.map((item) => (
@@ -113,5 +113,5 @@ export default function ImagePickerModal({ multiple }: { multiple: boolean }) {
 /** Shows the picker while a place has asked for pictures (`pickPictures`). Mounted once, in the shell. */
 export function ImagePickerHost() {
   const request = useImagePickerStore((s) => s.request);
-  return request ? <ImagePickerModal multiple={request.multiple} /> : null;
+  return request ? <ImagePickerModal multiple={request.multiple} tags={request.tags} /> : null;
 }

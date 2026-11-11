@@ -5,6 +5,7 @@ import { useImageStore } from '../../store/imageStore';
 import { reportImageError } from '../../store/imageNoticeStore';
 import { ACCEPTED_IMAGE_MIME } from '../../lib/helpers';
 import { imageSrc } from '../../lib/images';
+import { getDb } from '../../lib/db';
 import {
   acceptedImageFiles, acceptedImagePaths, fileBaseName as baseName, storeImageFile, storeImageFromPath,
 } from '../../lib/storeImage';
@@ -17,6 +18,8 @@ import TagInput from '../ui/TagInput';
 interface Staged {
   file: string;
   name: string;
+  /** The name it was staged with: only a name typed over it renames a picture already in "Images". */
+  staged: string;
 }
 
 /**
@@ -46,9 +49,10 @@ export default function AddImagesModal({ dropped, dragOver, initialTags, onClose
     for (const item of items) {
       try {
         const file = await store(item);
-        // A picture already in "Images" keeps its name (`takeIn`): shown as it is.
-        const known = useImageStore.getState().images.find((image) => image.file === file)?.name;
-        setStaged((list) => (list.some((s) => s.file === file) ? list : [...list, { file, name: known || name(item) }]));
+        // A picture already in "Images" (from the trash too) keeps its name (`takeIn`): shown as it is.
+        const [known] = await (await getDb()).select<{ name: string }[]>('SELECT name FROM images WHERE file=$1', [file]);
+        const shown = known?.name || name(item);
+        setStaged((list) => (list.some((s) => s.file === file) ? list : [...list, { file, name: shown, staged: shown }]));
       } catch (e) {
         reportImageError(e, `add ${label(item)}`);
       } finally {
@@ -73,9 +77,9 @@ export default function AddImagesModal({ dropped, dragOver, initialTags, onClose
     const store = useImageStore.getState();
     for (const item of staged) {
       const row = await store.takeIn(item.file, { name: item.name, tags });
-      // A name typed over the one it had.
+      // A name typed over the one it was staged with.
       const typed = item.name.trim();
-      if (row && typed && row.name !== typed) await store.updateImage(row.id, { name: typed });
+      if (row && typed && typed !== item.staged.trim() && row.name !== typed) await store.updateImage(row.id, { name: typed });
     }
     await store.refreshFiles();
     onClose();
