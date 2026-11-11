@@ -3,14 +3,13 @@
  * which module, and how trash entries are restored
  * or permanently deleted per type.
  *
- * Import rule of this file: content stores only (entry/task/altar/tag/category/
+ * Import rule of this file: content stores only (entry/task/tag/category/
  * blockDefinition/template/lexicon) — never uiStore, vaultStore or trashStore,
  * which in turn point here (they may). All access happens at runtime
  * via `getState()`, not at import time.
  */
 import { useEntryStore } from './entryStore';
 import { useTaskStore } from './taskStore';
-import { useAltarStore } from './altarStore';
 import { useTagStore, type TaggedType } from './tagStore';
 import { useCategoryStore } from './categoryStore';
 import { useBlockDefinitionStore } from './blockDefinitionStore';
@@ -36,7 +35,6 @@ export const moduleWiring: Record<EntryModuleId, { reload: (options?: ReloadOpti
   tasks: { reload: () => useTaskStore.getState().fetchAll() },
   operations: { reload: reloadEntries },
   wiki: { reload: reloadEntries },
-  altar: { reload: () => useAltarStore.getState().fetchAltars() },
 };
 
 /**
@@ -87,19 +85,6 @@ export const trashWiring: Record<TrashKind, {
   language: {
     restore: (id) => useLexiconStore.getState().restoreLanguage(id),
     permanentlyDelete: (id) => useLexiconStore.getState().permanentlyDeleteLanguage(id),
-  },
-  altar: {
-    restore: (id) => useAltarStore.getState().restoreAltar(id),
-    permanentlyDelete: async (id) => {
-      await useAltarStore.getState().permanentlyDeleteAltar(id);
-      // The `task_links` to the altar are gone from the database — handled here, so that
-      // `altarStore` need not import the task store.
-      useTaskStore.setState((s) => ({ links: s.links.filter((link) => link.target_id !== id) }));
-    },
-  },
-  altarItem: {
-    restore: (id) => useAltarStore.getState().restoreItem(id),
-    permanentlyDelete: (id) => useAltarStore.getState().permanentlyDeleteItem(id),
   },
   image: {
     restore: async (id) => { await restorePicture(id); },

@@ -13,9 +13,8 @@ interface SidebarSectionHeaderProps {
 /**
  * The header of a collapsible section in the right sidebar: chevron
  * plus a small uppercase label, optionally a counter. Controlled, because
- * the callers hold their state differently: the altar all sections per
- * altar in one localStorage object, the block management and `SidebarSection`
- * via `usePersistedFlag`.
+ * the callers may hold their state differently: the block management and
+ * `SidebarSection` via `usePersistedFlag`.
  */
 export default function SidebarSectionHeader({ label, open, onToggle, count, className = '' }: SidebarSectionHeaderProps) {
   return (

@@ -22,13 +22,11 @@ const LINK_RESULT_LIMIT = 50;
 
 /**
  * Editing: the chosen entry with "×", otherwise the search. `onChange(null)`
- * removes it. `entryType` restricts the search to one kind (the altar field).
+ * removes it.
  */
-export function LinkEditor({ slot, onChange, entryType, placeholder }: {
+export function LinkEditor({ slot, onChange }: {
   slot: string | undefined;
   onChange: (html: string | null) => void;
-  entryType?: ContentType;
-  placeholder?: string;
 }) {
   const { t } = useTranslation();
   const items = useLinkItems();
@@ -38,10 +36,10 @@ export function LinkEditor({ slot, onChange, entryType, placeholder }: {
   const results = useMemo(() => {
     const q = query.toLowerCase();
     return items
-      .filter((i) => (!entryType || i.entryType === entryType) && i.label.toLowerCase().includes(q))
+      .filter((i) => i.label.toLowerCase().includes(q))
       .sort((a, b) => (b.updatedAt ?? '').localeCompare(a.updatedAt ?? ''))
       .slice(0, LINK_RESULT_LIMIT);
-  }, [items, query, entryType]);
+  }, [items, query]);
 
   if (current) return <LinkTarget target={current} onRemove={() => onChange(null)} />;
   return (
@@ -51,7 +49,7 @@ export function LinkEditor({ slot, onChange, entryType, placeholder }: {
       onSelect={(item) => onChange(internalLinkChipHtml(toInternalLinkChip(item)))}
       query={query}
       onQueryChange={setQuery}
-      placeholder={placeholder ?? t('linkPicker.searchPlaceholder')}
+      placeholder={t('linkPicker.searchPlaceholder')}
       renderResult={(item) => (
         <>
           <LinkItemIcon item={item} />

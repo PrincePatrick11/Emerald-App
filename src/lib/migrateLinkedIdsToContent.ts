@@ -136,7 +136,7 @@ export function rowsLinkSource(
  * node attrs: `icon` lands in the stored HTML, and an uploaded
  * data URL thereby inflates every entry that links the target. The chip
  * fetches its image live anyway — only the emoji fallback is stored here. (The same
- * rule as the altar branch in useLinkItems.)
+ * rule as `splitIcon` in `linkItems.ts`.)
  */
 export function legacyChipIcon(type: LegacyLinkType, target: LegacyLinkTarget, categoryEmoji: string | null | undefined): string {
   if (target.icon && !isImageIcon(target.icon)) return target.icon;

@@ -35,7 +35,7 @@ export function isStoredImage(ref: string | null | undefined): boolean {
  * Windows serves custom schemes through `http://{scheme}.localhost`, the other
  * platforms through the scheme itself; the path is `/{vaultId}/{filename}`
  * either way. Inline sources (`data:`, `blob:`, remote URLs) pass through
- * untouched — altar item images and imported content still carry those.
+ * untouched — imported content may still carry those.
  */
 export function imageSrc(ref: string | null | undefined): string {
   if (!ref) return '';
@@ -117,7 +117,7 @@ export async function readImageAsBase64(ref: string): Promise<string> {
 /**
  * The same source, but for a canvas.
  *
- * The altar export paints its images onto a canvas and reads it back with
+ * The canvas and sigil blocks paint their images onto a canvas and read it back with
  * `toBlob()`. An image the browser considers foreign
  * taints the canvas and makes the read-back fail. Images served over
  * `emerald-img` *are* foreign — the handler does send a
@@ -127,7 +127,7 @@ export async function readImageAsBase64(ref: string): Promise<string> {
  *
  * That is why this one path does not go through the scheme but fetches the bytes
  * as a data URL. That always counts as a same-origin source, on every engine. The price
- * is one IPC round trip per image — only on export and for the thumbnail, never during
+ * is one IPC round trip per image — only when rendering a canvas, never during
  * normal display.
  */
 export async function canvasImageSrc(ref: string | null | undefined): Promise<string> {

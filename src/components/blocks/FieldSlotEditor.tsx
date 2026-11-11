@@ -4,11 +4,10 @@ import { imageFromSlot, imageSlotHtml, type ElementDef } from '../../lib/blocks/
 import { imageSrc } from '../../lib/images';
 import { pickPictures } from '../../store/imagePickerStore';
 import { LinkEditor } from './BlockLink';
-import { AltarFieldEditor } from './AltarField';
 
 /**
- * The inputs for the element kinds whose value sits in the markup: link,
- * image, altar. The value is the slot content (link chip or `<img>`);
+ * The inputs for the element kinds whose value sits in the markup: link
+ * and image. The value is the slot content (link chip or `<img>`);
  * `onChange(null)` clears it. Shared by the field block in edit mode and
  * by the defaults in the block builder of the blocks view; the counterpart to
  * `FieldValueEditor` for the values in the JSON.
@@ -21,8 +20,6 @@ export default function FieldSlotEditor({ element, slot, onChange }: {
   switch (element.kind) {
     case 'link':
       return <LinkEditor slot={slot} onChange={onChange} />;
-    case 'altar':
-      return <AltarFieldEditor slot={slot} onChange={onChange} />;
     case 'image':
       return <ImageEditor slot={slot} onChange={onChange} />;
     default:

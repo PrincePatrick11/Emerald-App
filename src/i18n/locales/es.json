@@ -80,11 +80,8 @@
     "blockDefinitionDeleted": "Bloque eliminado",
     "templateDeleted": "Plantilla eliminada",
     "languageDeleted": "Idioma eliminado",
-    "altarItemDeleted": "Elemento eliminado",
     "imageDeleted": "Imagen eliminada",
-    "altarDeleted": "Altar eliminado",
-    "wordDeleted": "Palabra eliminada",
-    "placementRemoved": "Elemento retirado del altar"
+    "wordDeleted": "Palabra eliminada"
   },
   "createItem": {
     "title": "Crear nuevo"
@@ -94,7 +91,6 @@
     "all": "Todo",
     "journal": "Diario",
     "wiki": "Wiki",
-    "altar": "Altar",
     "tags": "Etiquetas",
     "categories": "Categorías",
     "images": "Imágenes",
@@ -128,59 +124,6 @@
     }
   },
   "altar": {
-    "addElement": "Añadir elemento",
-    "element": "Elemento",
-    "newAltar": "Nuevo altar",
-    "libraryTitle": "Biblioteca del altar",
-    "sortAltars": "Orden · Altares",
-    "sortLibrary": "Orden · Biblioteca",
-    "sectionTitle": "Altares",
-    "elementName": "Nombre…",
-    "all": "Todos",
-    "noElements": "Aún no hay elementos.",
-    "untitled": "Altar sin título",
-    "uploadImage": "Subir imagen",
-    "favicon": "Icono",
-    "windowFullscreen": "Vista de enfoque",
-    "exitWindowFullscreen": "Salir de vista de enfoque",
-    "imageTooLarge": "Imagen demasiado grande (max. {{max}})",
-    "gridOverlay": "Superposición de cuadrícula",
-    "gridOptions": "Opciones de cuadrícula",
-    "gridSize": "Tamaño de cuadrícula",
-    "gridOpacity": "Opacidad de cuadrícula",
-    "gridColor": "Color de cuadrícula",
-    "snapToGrid": "Ajustar a la cuadrícula",
-    "rotationSnap": "Ajustar ángulo de rotación",
-    "rotationSnapAngle": "Paso de ángulo (°)",
-    "snapScaleToGrid": "Escalar a la cuadrícula",
-    "gridToggleGrid": "Cuadrícula",
-    "gridToggleSnap": "Ajustar",
-    "gridToggleRotate": "Rotar",
-    "gridToggleScale": "Escala",
-    "canvasOptions": "Opciones del lienzo",
-    "ratio": "Proporción",
-    "chooseEmoji": "Elegir emoji…",
-    "placedElements": "Elementos colocados",
-    "noElementsPlaced": "Aún no hay elementos colocados",
-    "summaryFormat": "Formato",
-    "summaryBackground": "Fondo",
-    "summaryGrid": "Cuadrícula",
-    "summaryGridOff": "Desactivada",
-    "summaryElements": "Elementos",
-    "inspectorX": "X",
-    "inspectorY": "Y",
-    "inspectorScale": "Escala",
-    "inspectorRotation": "Rotación",
-    "inspectorOpacity": "Opacidad",
-    "inspectorLocked": "Bloqueado: desbloquéalo para cambiarlo",
-    "show": "Mostrar",
-    "hide": "Ocultar",
-    "lock": "Bloquear",
-    "unlock": "Desbloquear",
-    "duplicateElement": "Duplicar elemento",
-    "removeElement": "Eliminar elemento",
-    "rotate": "Rotar",
-    "scale": "Escala",
     "categories": {
       "candle": "Vela",
       "crystal": "Cristal",
@@ -190,8 +133,7 @@
       "tool": "Herramienta",
       "table": "Mesa",
       "other": "Otro"
-    },
-    "showPreview": "Vista previa del altar"
+    }
   },
   "journal": {
     "title": "Diario",
@@ -296,7 +238,6 @@
       "link": "Enlace",
       "image": "Imagen",
       "moon": "Fase lunar",
-      "altar": "Altar",
       "sigilCalc": "Calculadora de sigilo",
       "sigilCanvas": "Dibujo del sigilo",
       "sigilCharge": "Carga"
@@ -372,11 +313,6 @@
       "locked": "Bloqueado mientras el sigilo está cargado",
       "saveFailed": "No se pudo guardar el dibujo",
       "loadFailed": "No se pudo cargar el dibujo — cierra y vuelve a abrir la entrada"
-    },
-    "altar": {
-      "search": "Buscar altar…",
-      "missing": "El altar «{{name}}» ya no existe",
-      "open": "Abrir altar"
     },
     "canvas": {
       "broken": "Este lienzo no se pudo leer. Se queda como está.",
@@ -880,7 +816,6 @@
     "globalPlaceholder": "Buscar en todo…",
     "hint": "Títulos, etiquetas y contenido de todos los módulos.",
     "clear": "Borrar búsqueda",
-    "altarElements": "Elemento de altar",
     "categories": "Categoría",
     "showMore": "Mostrar {{count}} resultado más",
     "showMore_other": "Mostrar {{count}} resultados más"
@@ -946,6 +881,7 @@
     "removeLink": "Quitar entrada enlazada",
     "icon": "Icono",
     "emoji": "Emoji",
+    "chooseEmoji": "Elegir emoji…",
     "coverImage": "Imagen de portada",
     "change": "Cambiar",
     "remove": "Eliminar",
@@ -1092,7 +1028,6 @@
     "includeJournal": "Diario",
     "includeWiki": "Wiki",
     "includeOperations": "Operaciones",
-    "includeAltars": "Altares",
     "includeTasks": "Tareas",
     "includeTags": "Etiquetas",
     "includeLexicon": "Léxico",
@@ -1284,7 +1219,6 @@
     "blockDefinitions": "Bloques",
     "templates": "Plantillas",
     "languages": "Idiomas",
-    "altarItems": "Elementos del altar",
     "deleteSelected": "Eliminar seleccionados ({{count}})",
     "confirmDeleteSelected": "Sí, eliminar {{count}}",
     "retentionNoteNever": "Los elementos se quedan hasta que los elimines definitivamente."
@@ -1313,10 +1247,6 @@
     "exportPdf": "Exportar como PDF…",
     "exportMarkdown": "Exportar como Markdown…",
     "exportEmerald": "Exportar como Emerald…",
-    "exportAltarImage": "Exportar como imagen",
-    "exportAltarJpeg": "JPEG…",
-    "exportAltarPng": "PNG…",
-    "exportAltarWebp": "WebP…",
     "importMarkdown": "Desde Markdown…",
     "importEmerald": "Desde Emerald…",
     "quit": "Salir de Emerald App",
@@ -1342,7 +1272,6 @@
     "tabWiki": "Wiki",
     "tabOperations": "Operaciones",
     "tabTasks": "Tareas",
-    "tabAltar": "Altar",
     "noResults": "No se encontraron entradas"
   },
   "importDestination": {
@@ -1476,14 +1405,6 @@
     "operations": {
       "title": "Aún no hay operaciones",
       "description": "Planifica rituales con ingredientes, desarrollo y resultado."
-    },
-    "altar": {
-      "title": "Aún no hay altar",
-      "description": "Diseña un altar con un fondo y elementos."
-    },
-    "altarLibrary": {
-      "title": "Aún no hay elementos",
-      "description": "Velas, cristales, símbolos: con elementos construyes tus altares."
     },
     "images": {
       "title": "Aún no hay imágenes",

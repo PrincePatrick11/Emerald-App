@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { ArrowLeft, ArrowRight, Download, Menu, Search, Upload } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { isAltarFullscreen, selectActiveHistory, useUIStore } from '../../../store/uiStore';
+import { selectActiveHistory, useUIStore } from '../../../store/uiStore';
 import { hasActiveVault, useVaultStore } from '../../../store/vaultStore';
 import { isMacOS, usesCustomWindowControls } from '../../../lib/platform';
 import EmeraldMark from '../../ui/EmeraldMark';
@@ -54,11 +54,6 @@ export default function TitleBar({ tabs = false, leadWidth = 0, animate = true, 
     return history.index < history.views.length - 1;
   });
 
-  // The altar's distraction-free mode hides the sidebars and the tab bar. The
-  // title bar stays — on Windows and Linux it holds the only way to close,
-  // minimise or move the window — but drops the navigation and the search.
-  const altarFullscreen = useUIStore(isAltarFullscreen);
-  const minimal = altarFullscreen || picker;
 
   // Without an open vault there is nothing to search — and more than that: the
   // stores keep their contents when the last vault is deleted
@@ -68,11 +63,11 @@ export default function TitleBar({ tabs = false, leadWidth = 0, animate = true, 
   // deleted — even after ticking "Delete files".
   const vaultOpen = useVaultStore(hasActiveVault);
   const [searchOpen, setSearchOpen] = useState(false);
-  // When the magnifier goes away — altar fullscreen, last vault closed — the
+  // When the magnifier goes away — the picker, last vault closed — the
   // search goes with it, instead of popping open again by itself on return.
-  if (searchOpen && (minimal || !vaultOpen)) setSearchOpen(false);
+  if (searchOpen && (picker || !vaultOpen)) setSearchOpen(false);
   const menus = useTitleBarMenus();
-  const showTabs = tabs && !minimal;
+  const showTabs = tabs && !picker;
 
   return (
     <header
@@ -127,7 +122,7 @@ export default function TitleBar({ tabs = false, leadWidth = 0, animate = true, 
           />
         )}
 
-        {!minimal && (
+        {!picker && (
           <div className="ml-1 flex items-center gap-0.5 flex-shrink-0">
             {vaultOpen && (
               <RailButton onClick={() => setSearchOpen(true)} title={t('titlebar.search')}>
@@ -147,10 +142,7 @@ export default function TitleBar({ tabs = false, leadWidth = 0, animate = true, 
           </div>
         )}
 
-        {/* Not gated on `minimal`: this is the only
-            route to the altar's image export, and distraction-free mode is
-            precisely where that export is wanted. Export carries Download,
-            Import Upload — as in Settings → Backup. */}
+        {/* Export carries Download, Import Upload — as in Settings → Backup. */}
         {!picker && (
           <div className="ml-1 flex items-center gap-0.5 flex-shrink-0">
             <TitleBarMenuButton label={menus.exportMenu.label} icon={<Download size={16} />} nodes={menus.exportMenu.nodes} />

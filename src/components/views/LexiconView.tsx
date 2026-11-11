@@ -24,8 +24,7 @@ import { useLibraryItemRemove } from '../../hooks/useLibraryItemRemove';
 /**
  * The rail view "Lexicon", built like "Templates": the languages in the
  * shared dashboard scaffold, a click opens one as a page of its own
- * (`{ type: 'lexicon', id }`). Below it, like the library under the
- * altars, the translate field — it works with all languages and therefore
+ * (`{ type: 'lexicon', id }`). Below it the translate field — it works with all languages and therefore
  * belongs next to the list, not on a single language page.
  *
  * Deleting moves a language to the trash (with undo); its vocabulary
@@ -133,7 +132,7 @@ function LanguageList({ onCreate, onDelete }: {
       onSort={(sort) => setPrefs({ sort })}
       search={search}
       onSearch={setSearch}
-      // Collapsed means an empty list instead of a special branch — like altar, blocks and templates.
+      // Collapsed means an empty list instead of a special branch — like blocks and templates.
       items={collapsed ? [] : sorted}
       itemKey={(l) => l.id}
       renderItem={renderItem}

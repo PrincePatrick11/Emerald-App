@@ -2,7 +2,7 @@ import type { CanvasBackground } from '../components/editors/canvas/background';
 import type { PaintDoc } from '../lib/paint/document';
 import type { TrashKind, ViewId } from '../lib/modules';
 
-export type ContentType = 'journal' | 'wiki' | 'operation' | 'task' | 'altar';
+export type ContentType = 'journal' | 'wiki' | 'operation' | 'task';
 
 /** The entry kinds of the `entries` table — the modules with a block stack. */
 export type EntryType = 'journal' | 'wiki' | 'operation';
@@ -37,7 +37,7 @@ export interface Entry {
 
 /**
  * A row of the global `categories` table — the same list for wiki,
- * operations, tasks and altar items. `is_builtin` applies only to `other`
+ * operations and tasks. `is_builtin` applies only to `other`
  * and `sigils`; the display name goes through `lib/categories.categoryLabel`.
  */
 export interface Category {
@@ -79,6 +79,11 @@ export interface AltarGuide {
   at: number;
 }
 
+/**
+ * A row of the old `altars` table, as the conversion of migration v62 and of
+ * older backups reads it (`lib/altarConversion.ts`). Altars are operations of
+ * the "Altars" category now, holding an Altar block.
+ */
 export interface AltarRecord {
   id: string;
   title: string;
@@ -110,7 +115,7 @@ export interface AltarRecord {
   canvas_background: CanvasBackground | null;
   thumbnail_data?: string | null;
   icon_data?: string | null;
-  /** In the trash since — the store only holds altars without it. */
+  /** In the trash since. */
   deleted_at?: string | null;
 }
 
@@ -131,6 +136,7 @@ export interface VaultImage {
   updated_at: string;
 }
 
+/** A row of the old `altar_items` table — its pictures went to "Images" with v62. */
 export interface AltarItem {
   id: string;
   name: string;
@@ -148,8 +154,8 @@ export interface AltarItem {
 /**
  * What sits on an altar: an item from the library (a row of
  * `altar_placements`), or a shape or text drawn on the altar itself (kept in
- * `altars.elements`, see `lib/altarElements.ts`). The store holds both in one
- * list so stacking, the sidebar and the edit snapshot treat them alike.
+ * `altars.elements`, see `lib/altarElements.ts`). Both in one list, as the
+ * conversion into an Altar block reads them (`lib/altarScene.ts`).
  */
 export type AltarPlacementKind = 'item' | 'shape' | 'text' | 'drawing' | 'symbol';
 

@@ -125,6 +125,12 @@
       "content": "<p>Kept only so the operations trash has something in it.</p>",
       "created_at": "2026-09-02T19:00:00.000Z", "updated_at": "2026-09-05T19:00:00.000Z",
       "deleted_at": "2026-09-06T13:00:00.000Z"
+    },
+    {
+      "id": "seed-altar-1", "title": "Working Altar", "entry_number": 4,
+      "category_id": "altars",
+      "content": "<section data-block=\"core.altar\" data-block-id=\"altar-seed-altar-1\" data-block-data=\"{&quot;width&quot;:1920,&quot;height&quot;:1080,&quot;elements&quot;:[{&quot;id&quot;:&quot;seed-place-1&quot;,&quot;x&quot;:614.4,&quot;y&quot;:496.8,&quot;width&quot;:50,&quot;height&quot;:50,&quot;rotation&quot;:0,&quot;opacity&quot;:1,&quot;locked&quot;:false,&quot;hidden&quot;:false,&quot;z&quot;:1,&quot;type&quot;:&quot;image&quot;,&quot;props&quot;:{&quot;src&quot;:null,&quot;emoji&quot;:&quot;🕯️&quot;,&quot;glow&quot;:true}},{&quot;id&quot;:&quot;seed-place-2&quot;,&quot;x&quot;:1228.8,&quot;y&quot;:496.8,&quot;width&quot;:40,&quot;height&quot;:40,&quot;rotation&quot;:15,&quot;opacity&quot;:1,&quot;locked&quot;:false,&quot;hidden&quot;:false,&quot;z&quot;:2,&quot;type&quot;:&quot;image&quot;,&quot;props&quot;:{&quot;src&quot;:null,&quot;emoji&quot;:&quot;🔮&quot;,&quot;glow&quot;:false}}],&quot;background&quot;:{&quot;fill&quot;:{&quot;kind&quot;:&quot;radial&quot;,&quot;colors&quot;:[&quot;#1e1e3c&quot;,&quot;#0f0f1e&quot;,&quot;#0a0a0f&quot;],&quot;cx&quot;:0.5,&quot;cy&quot;:0.25},&quot;image&quot;:null,&quot;tint&quot;:{&quot;color&quot;:&quot;#0a0a0f&quot;,&quot;opacity&quot;:0.16}},&quot;guides&quot;:[],&quot;guidesLocked&quot;:false}\" data-block-config=\"{&quot;images&quot;:true,&quot;shapes&quot;:true,&quot;text&quot;:true,&quot;symbols&quot;:true,&quot;drawing&quot;:true}\"></section><section data-block=\"core.text\" data-block-id=\"notes-seed-altar-1\"></section>",
+      "created_at": "2026-09-03T17:00:00.000Z", "updated_at": "2026-09-06T17:00:00.000Z"
     }
   ],
 
@@ -166,31 +172,6 @@
   "task_links": [
     { "id": "seed-tasklink-1", "task_id": "seed-task-read",
       "target_id": "seed-wiki-moon", "target_type": "wiki" }
-  ],
-
-  "altars": [
-    {
-      "id": "seed-altar-1", "title": "Working Altar",
-      "intention": "Steady work, clear head.",
-      "background_preset": "midnight", "grid_enabled": 1, "snap_to_grid": 1,
-      "created_at": "2026-09-03T17:00:00.000Z", "updated_at": "2026-09-06T17:00:00.000Z"
-    }
-  ],
-
-  "altar_items": [
-    { "id": "seed-item-candle", "name": "Black Candle", "emoji": "🕯️",
-      "category_id": "seed-cat-rituals", "note": "Used for banishing.",
-      "created_at": "2026-09-03T17:00:00.000Z" },
-    { "id": "seed-item-quartz", "name": "Clear Quartz", "emoji": "🔮",
-      "category_id": "seed-cat-rituals", "note": "Charged at the full moon.",
-      "created_at": "2026-09-03T17:05:00.000Z" }
-  ],
-
-  "altar_placements": [
-    { "id": "seed-place-1", "altar_id": "seed-altar-1", "item_id": "seed-item-candle",
-      "x": 32, "y": 46, "z_index": 1, "width": 10, "height": 10 },
-    { "id": "seed-place-2", "altar_id": "seed-altar-1", "item_id": "seed-item-quartz",
-      "x": 64, "y": 46, "z_index": 2, "width": 8, "height": 8, "rotation": 15 }
   ],
 
   "routines": [

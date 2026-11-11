@@ -8,8 +8,7 @@ import { BLOCK_ATTR, type BlockInstance, type BlockTypeId } from './types';
 
 /**
  * The field block (`core.fields`): a sequence of elements — text, short text, number,
- * date, select, yes/no, checklist, link, image, moon phase, altar
- * (a link to an altar, shown large with its image) and the
+ * date, select, yes/no, checklist, link, image, moon phase and the
  * three sigil parts calculator, drawing, charge (see `isSigilKind`). A
  * single field is a field block with one element; custom, composite
  * blocks (blocks view) are field blocks with several.
@@ -34,20 +33,14 @@ import { BLOCK_ATTR, type BlockInstance, type BlockTypeId } from './types';
 export const FIELDS_BLOCK_TYPE = 'core.fields' satisfies BlockTypeId;
 
 export const ELEMENT_KINDS = [
-  'text', 'shorttext', 'number', 'date', 'select', 'toggle', 'checklist', 'link', 'image', 'moon', 'altar',
+  'text', 'shorttext', 'number', 'date', 'select', 'toggle', 'checklist', 'link', 'image', 'moon',
   'sigilCalc', 'sigilCanvas', 'sigilCharge',
 ] as const;
 export type ElementKind = (typeof ELEMENT_KINDS)[number];
 
-/**
- * The kinds offered for new fields. `altar` is no longer: the altar is a
- * block of its own (`core.altar`); existing altar fields still read and edit.
- */
-export const OFFERED_ELEMENT_KINDS = ELEMENT_KINDS.filter((kind) => kind !== 'altar');
-
 const KIND_SET: ReadonlySet<string> = new Set(ELEMENT_KINDS);
 /** Element kinds whose value is in the markup instead of the JSON. */
-const SLOT_KINDS: ReadonlySet<ElementKind> = new Set<ElementKind>(['text', 'link', 'image', 'altar']);
+const SLOT_KINDS: ReadonlySet<ElementKind> = new Set<ElementKind>(['text', 'link', 'image']);
 
 export function isSlotKind(kind: ElementKind): boolean {
   return SLOT_KINDS.has(kind);
@@ -96,7 +89,7 @@ export interface ElementDef {
    * Only in a custom block definition: the value with which every new copy
    * prefills the element (checklist with items, yes/no set to "yes", a
    * linked entry …). The copy carries it as a value, not as a default.
-   * Link and altar give their target, image its file name — only the
+   * Link gives its target, image its file name — only the
    * copy writes a chip or `<img>` from it into its slot (`slotFromDefault`).
    * That way the definition contains no markup, and merge import and image cleanup
    * find target ID and file.
@@ -128,7 +121,7 @@ export interface ChargeDefault {
   targets: string[] | null;
 }
 
-/** The default of a link (or an altar): the target together with its name at the time of selection. */
+/** The default of a link: the target together with its name at the time of selection. */
 export interface LinkDefault {
   id: string;
   entryType: ContentType;
@@ -374,10 +367,8 @@ export function imageFromSlot(html: string | undefined): string | null {
  */
 function parseDefault(element: ElementDef, raw: unknown): ElementDefault | undefined {
   switch (element.kind) {
-    case 'link':
-    case 'altar': {
+    case 'link': {
       if (!isRecord(raw) || !isValidLinkTarget(raw)) return undefined;
-      if (element.kind === 'altar' && raw.entryType !== 'altar') return undefined;
       return {
         id: raw.id as string,
         // `isValidLinkTarget` has checked the kind against the list.
@@ -462,7 +453,6 @@ export function isElementEmpty(element: ElementDef, model: FieldsModel): boolean
       return isBlankContent(model.slots[element.id] ?? '');
     case 'link':
     case 'image':
-    case 'altar':
     case 'sigilCalc':
       return !model.slots[element.id];
     case 'sigilCanvas':

@@ -53,12 +53,6 @@ export const useTrashStore = create<TrashState>((set, get) => ({
       const languages = await db.select<{ id: string; name: string; icon: string; deleted_at: string }[]>(
         `SELECT id, name, icon, deleted_at FROM languages WHERE deleted_at IS NOT NULL`
       );
-      const altars = await db.select<{ id: string; title: string; deleted_at: string }[]>(
-        `SELECT id, title, deleted_at FROM altars WHERE deleted_at IS NOT NULL`
-      );
-      const altarItems = await db.select<{ id: string; name: string; emoji: string; deleted_at: string }[]>(
-        `SELECT id, name, emoji, deleted_at FROM altar_items WHERE deleted_at IS NOT NULL`
-      );
       const images = await db.select<{ id: string; name: string; file: string; deleted_at: string }[]>(
         `SELECT id, name, file, deleted_at FROM images WHERE deleted_at IS NOT NULL`
       );
@@ -91,13 +85,6 @@ export const useTrashStore = create<TrashState>((set, get) => ({
           title: iconTitle(r.icon, r.name),
           deleted_at: r.deleted_at,
           type: 'language' as const,
-        })),
-        ...altars.map((r) => ({ ...r, title: displayTitle(i18n.t, 'altar', r.title), type: 'altar' as const })),
-        ...altarItems.map((r) => ({
-          id: r.id,
-          title: iconTitle(r.emoji, r.name),
-          deleted_at: r.deleted_at,
-          type: 'altarItem' as const,
         })),
         ...images.map((r) => ({
           id: r.id,
@@ -137,10 +124,6 @@ export const useTrashStore = create<TrashState>((set, get) => ({
     await db.execute(`DELETE FROM templates WHERE deleted_at IS NOT NULL`);
     // ON DELETE CASCADE takes the vocabulary along — it has no `deleted_at` of its own.
     await db.execute(`DELETE FROM languages WHERE deleted_at IS NOT NULL`);
-    // The placements likewise; `sweepDanglingTaskLinks` below sweeps the links to the altar.
-    await db.execute(`DELETE FROM altars WHERE deleted_at IS NOT NULL`);
-    // Likewise those of an item.
-    await db.execute(`DELETE FROM altar_items WHERE deleted_at IS NOT NULL`);
     // The details, then their files where nothing else uses them.
     const imageFiles = (await db.select<{ file: string }[]>(`SELECT file FROM images WHERE deleted_at IS NOT NULL`)).map((r) => r.file);
     await db.execute(`DELETE FROM images WHERE deleted_at IS NOT NULL`);

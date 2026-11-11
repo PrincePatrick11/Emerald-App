@@ -1,7 +1,6 @@
 import { useDeferredValue, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useImageStore } from '../store/imageStore';
-import { useAltarStore } from '../store/altarStore';
 import { useCategoryStore } from '../store/categoryStore';
 import { useEntryStore } from '../store/entryStore';
 import { useTagStore } from '../store/tagStore';
@@ -26,8 +25,6 @@ function useSearchCorpus(): SearchCorpus {
   const wiki = useEntryStore((s) => s.entries.wiki);
   const operations = useEntryStore((s) => s.entries.operation);
   const tasks = useTaskStore((s) => s.tasks);
-  const altars = useAltarStore((s) => s.altars);
-  const altarItems = useAltarStore((s) => s.items);
   const images = useImageStore((s) => s.images);
   const allCategories = useCategoryStore((s) => s.categories);
   const tags = useTagStore((s) => s.tags);
@@ -38,17 +35,17 @@ function useSearchCorpus(): SearchCorpus {
   // module that uses the category most. The same count as the number columns
   // there — one helper for both.
   const categories = useMemo<SearchCategory[]>(() => {
-    const counts = categoryUsageCounts({ wiki, operations, tasks, altar: altarItems });
+    const counts = categoryUsageCounts({ wiki, operations, tasks });
     return allCategories.map((c) => ({
       id: c.id,
       name: categoryLabel(t, c),
       module: dominantCategoryModule(counts.get(c.id)),
     }));
-  }, [allCategories, wiki, operations, tasks, altarItems, t]);
+  }, [allCategories, wiki, operations, tasks, t]);
 
   return useMemo(
-    () => ({ journal, wiki, operations, tasks, altars, altarItems, images, tags, categories, languages, lexiconEntries }),
-    [journal, wiki, operations, tasks, altars, altarItems, images, tags, categories, languages, lexiconEntries],
+    () => ({ journal, wiki, operations, tasks, images, tags, categories, languages, lexiconEntries }),
+    [journal, wiki, operations, tasks, images, tags, categories, languages, lexiconEntries],
   );
 }
 

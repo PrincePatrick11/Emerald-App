@@ -22,7 +22,7 @@ import { ALTAR_SETTING_KEYS, altarSettingsJson } from './altarSettings';
 import type { EntryType } from '../types';
 import { makeCategoryOptional } from './nullableCategory';
 import { seedAltarTemplate, seedSigilTemplate } from './templateRows';
-import { altarsToOperations } from './migrateAltars';
+import { altarsToOperations, dropAltarTables } from './migrateAltars';
 import { migrateRoutinesToTemplates } from './migrateRoutinesToTemplates';
 import i18n from '../i18n';
 import { LEGACY_UNTITLED_TITLES } from './entryTitle';
@@ -293,10 +293,6 @@ const CLEANUP_TABLES = [
   'templates',
   // ON DELETE CASCADE takes their vocabulary along — it carries no `deleted_at` of its own.
   'languages',
-  // Likewise an altar's placements; what pointed to it is swept by `sweepDanglingTaskLinks`.
-  'altars',
-  // And those of an item.
-  'altar_items',
   // Its file stays until the cleanup in Settings → Storage finds it unused.
   'images',
 ] as const;
@@ -329,7 +325,6 @@ const LINK_TARGET_EXISTS = `(
   (target_type IN ('journal', 'wiki', 'operation')
     AND EXISTS (SELECT 1 FROM entries e WHERE e.id = task_links.target_id AND e.type = task_links.target_type))
   OR (target_type = 'task' AND EXISTS (SELECT 1 FROM tasks t WHERE t.id = task_links.target_id))
-  OR (target_type = 'altar' AND EXISTS (SELECT 1 FROM altars a WHERE a.id = task_links.target_id))
 )`;
 
 /**
@@ -1521,6 +1516,13 @@ export const MIGRATIONS: Migration[] = [
     name: 'altars_to_operations',
     up: altarsToOperations,
   },
+  {
+    // The altar module is gone, and its tables with it. What an older device
+    // synced into them since v62 is converted first, as v62 did.
+    version: 63,
+    name: 'drop_altar_tables',
+    up: dropAltarTables,
+  },
 ];
 
 async function altarSettingsToJson(db: Database): Promise<void> {
@@ -1538,7 +1540,7 @@ async function altarSettingsToJson(db: Database): Promise<void> {
 }
 
 /** The tables whose rows carry a title that may be empty. */
-const TITLED_TABLES = ['entries', 'tasks', 'altars'] as const;
+const TITLED_TABLES = ['entries', 'tasks'] as const;
 
 /**
  * Empties the English default titles of earlier versions (`LEGACY_UNTITLED_TITLES`).

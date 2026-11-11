@@ -25,7 +25,7 @@ interface Props {
 
 /**
  * The one heading above rows on a dashboard: a category, a moon phase, a
- * month, a type in the trash, and a whole section (the altars, the library,
+ * month, a type in the trash, and a whole section (custom blocks, templates,
  * the languages). Nothing is managed here; a category is managed in
  * `CategoriesView`, as a row.
  */

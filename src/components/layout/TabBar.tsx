@@ -1,5 +1,4 @@
 import { MoreHorizontal, Plus, X } from 'lucide-react';
-import { AltarIcon } from '../../lib/altarIcon';
 import { useShallow } from 'zustand/shallow';
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
@@ -8,7 +7,6 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { journalIcon } from '../../lib/moonPhase';
 import { hasOwnTitle } from '../../lib/entryTitle';
 import { REORDER_SPRING } from '../../lib/motion';
-import { useAltarStore } from '../../store/altarStore';
 import { findEntry, useEntryStore } from '../../store/entryStore';
 import { useTaskStore } from '../../store/taskStore';
 import { useUIStore } from '../../store/uiStore';
@@ -19,7 +17,6 @@ import { useTemplateStore } from '../../store/templateStore';
 import { useLexiconStore } from '../../store/lexiconStore';
 import { useSettingsStore } from '../../store/settingsStore';
 import { definitionLabel, templateLabel } from '../../lib/blocks/blockAttrs';
-import { imageSrc } from '../../lib/images';
 import { AUX_VIEWS, DEFAULT_ENTRY_EMOJI, entryIcon, entryTypeForView, moduleMeta, type AuxViewId } from '../../lib/modules';
 
 function getFallbackTitle(view: ActiveView, t: TFunction) {
@@ -37,14 +34,6 @@ function renderIconValue(icon: string | null | undefined, fallback: ReactNode) {
   return <span className="text-sm leading-none">{icon}</span>;
 }
 
-function AltarTabIcon({ iconData }: { iconData: string | null | undefined }) {
-  if (!iconData) return <AltarIcon size={14} />;
-  // `/` paths are presets from public/ and bypass imageSrc.
-  const src = iconData.startsWith('/') ? iconData : imageSrc(iconData);
-  if (src) return <img src={src} alt="" className="h-3.5 w-3.5 rounded-md object-cover" />;
-  return <span className="text-sm leading-none">{iconData}</span>;
-}
-
 /**
  * Title and icon of a tab. Each tab subscribes only to its own entry:
  * the selectors return the object itself, which only changes when exactly
@@ -58,7 +47,6 @@ function TabButton({ view, onSelect, onClose }: { view: ActiveView; onSelect: ()
   const entryType = entryTypeForView(type);
   const entry = useEntryStore((s) => (entryType && id ? findEntry(s.entries, id, entryType) : undefined));
   const task = useTaskStore((s) => (type === 'tasks' && id ? s.tasks.find((task) => task.id === id) : undefined));
-  const altar = useAltarStore((s) => (type === 'altar' && id ? s.altars.find((a) => a.id === id) : undefined));
   const definition = useBlockDefinitionStore((s) => (type === 'blocks' && id ? s.definitions.find((d) => d.id === id) : undefined));
   const template = useTemplateStore((s) => (type === 'templates' && id ? s.templates.find((tpl) => tpl.id === id) : undefined));
   const language = useLexiconStore((s) => (type === 'lexicon' && id ? s.languages.find((l) => l.id === id) : undefined));
@@ -69,7 +57,7 @@ function TabButton({ view, onSelect, onClose }: { view: ActiveView; onSelect: ()
   const fallback = getFallbackTitle(view, t);
   let title = fallback;
   if (id) {
-    const entityTitle = entry?.title ?? task?.title ?? altar?.title;
+    const entityTitle = entry?.title ?? task?.title;
     if (hasOwnTitle(entityTitle)) title = entityTitle;
     else if (definition) title = definitionLabel(t, definition);
     else if (template) title = templateLabel(t, template);
@@ -82,8 +70,6 @@ function TabButton({ view, onSelect, onClose }: { view: ActiveView; onSelect: ()
     icon = entryType === 'journal'
       ? <span className="text-sm leading-none">{entry ? journalIcon(entry, showMoonPhase) : DEFAULT_ENTRY_EMOJI.journal}</span>
       : renderIconValue(entryIcon(entryType, entry ?? {}, category), null);
-  } else if (type === 'altar' && id) {
-    icon = <AltarTabIcon iconData={altar?.icon_data} />;
   } else if (type === 'blocks' && id) {
     icon = renderIconValue(definition?.icon, <Icon size={14} />);
   } else if (type === 'templates' && id) {

@@ -5,7 +5,7 @@ import { nowIso } from './helpers';
  * changes on exactly this entry counts — what comes in as a consequence from
  * elsewhere leaves the stamp alone, and with it the order of the lists.
  *
- * Applies to the entries of the three modules, tasks, templates, altars, custom
+ * Applies to the entries of the three modules, tasks, templates, custom
  * blocks and the lexicon — every method that writes `updated_at` asks
  * `needsWrite` and stamps via `stampFor`.
  *

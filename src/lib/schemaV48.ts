@@ -131,9 +131,65 @@ export const V48_TABLE_DDL: Record<V48Table, string> = {
     )`,
 };
 
+/**
+ * The altar tables as they stood until v63 dropped them (the altars are
+ * operations since v62). v37's rebuild builds `altars` and
+ * `altar_placements` in this form (`altar_items` in the older one above,
+ * v52 adds its `updated_at` and `deleted_at`); the backup import builds all
+ * three in its staging copy to convert the altars of an older file
+ * (`dbBackup.ts`). Parents first.
+ */
+export const ALTAR_TABLE_DDL: Record<'altars' | 'altar_items' | 'altar_placements', string> = {
+  altars: `
+    CREATE TABLE altars (
+      id TEXT PRIMARY KEY,
+      title TEXT NOT NULL DEFAULT 'Untitled Altar',
+      background_image_data TEXT,
+      thumbnail_data TEXT,
+      icon_data TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      deleted_at TEXT,
+      settings TEXT NOT NULL DEFAULT '{}',
+      elements TEXT NOT NULL DEFAULT '[]'
+    )`,
+
+  altar_items: `
+    CREATE TABLE altar_items (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      emoji TEXT NOT NULL DEFAULT '✨',
+      category_id TEXT REFERENCES categories(id) ON DELETE RESTRICT,
+      note TEXT NOT NULL DEFAULT '',
+      image_data TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL DEFAULT '',
+      deleted_at TEXT
+    )`,
+
+  altar_placements: `
+    CREATE TABLE altar_placements (
+      id TEXT PRIMARY KEY,
+      altar_id TEXT NOT NULL REFERENCES altars(id) ON DELETE CASCADE,
+      item_id TEXT NOT NULL REFERENCES altar_items(id) ON DELETE CASCADE,
+      x REAL NOT NULL DEFAULT 50,
+      y REAL NOT NULL DEFAULT 50,
+      z_index INTEGER NOT NULL DEFAULT 0,
+      width REAL NOT NULL DEFAULT 8,
+      height REAL NOT NULL DEFAULT 8,
+      rotation REAL NOT NULL DEFAULT 0,
+      opacity REAL NOT NULL DEFAULT 1,
+      locked INTEGER NOT NULL DEFAULT 0,
+      hidden INTEGER NOT NULL DEFAULT 0,
+      group_id TEXT
+    )`,
+};
+
 /** The DDL that a migration up to v48 means for `table`: the frozen version, otherwise the live one. */
 export function ddlBeforeV49(table: string): string {
-  return (V48_TABLE_DDL as Record<string, string>)[table] ?? TABLE_DDL[table as TableName];
+  return (V48_TABLE_DDL as Record<string, string>)[table]
+    ?? (ALTAR_TABLE_DDL as Record<string, string>)[table]
+    ?? TABLE_DDL[table as TableName];
 }
 
 /** The image columns up to v48 — v35 runs over them (see `IMAGE_FIELDS` in `schema.ts`). */

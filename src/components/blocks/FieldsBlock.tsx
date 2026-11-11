@@ -11,7 +11,6 @@ import { formatIsoDateLong } from '../../lib/formatDate';
 import { TextEditor } from '../editors/text';
 import UnknownBlock from './UnknownBlock';
 import { LinkTarget } from './BlockLink';
-import { AltarFieldReader } from './AltarField';
 import FieldSlotEditor from './FieldSlotEditor';
 import { imageSrc } from '../../lib/images';
 import { MOON_PHASE_SYMBOLS } from '../../lib/moonPhase';
@@ -77,10 +76,10 @@ export default function FieldsBlock({ block, blocks, isEditing, onBlockChange, o
   return (
     <div className={isEditing ? 'block-fields block-fields--edit' : 'block-fields'}>
       {elements.map((element) => (
-        // Text, altar and sigil need the full width: label above instead of beside.
+        // Text and sigil need the full width: label above instead of beside.
         <div
           key={element.id}
-          className={element.kind === 'text' || element.kind === 'altar' || isSigilKind(element.kind)
+          className={element.kind === 'text' || isSigilKind(element.kind)
             ? 'block-field block-field--wide'
             : 'block-field'}
         >
@@ -211,8 +210,6 @@ function FieldReader({ element, model, set }: { element: ElementDef; model: Fiel
       const filename = imageFromSlot(model.slots[element.id]);
       return filename ? <img src={imageSrc(filename)} alt="" className="block-field-image" /> : null;
     }
-    case 'altar':
-      return <AltarFieldReader slot={model.slots[element.id]} />;
     case 'text': // FieldText
       return null;
   }

@@ -10,7 +10,8 @@
  *   add-vault — create a new vault from the backup and switch to it
  */
 
-import { convertAltarsInPlace } from './migrateAltars';
+import { convertAltarsInPlace, createAltarTables, removeAltarTables } from './migrateAltars';
+import { elementsWithAltarsAsOperations } from './altarConversion';
 import { invoke } from '@tauri-apps/api/core';
 import { save, open } from '@tauri-apps/plugin-dialog';
 import { clearLegacyUntitledTitles, getDb, sweepDanglingTaskLinks } from './db';
@@ -63,7 +64,6 @@ import { askBackupSecret, BACKUP_UNLOCK_CANCELLED, endBackupSecret, type BackupS
 import { reloadAllStores } from '../store/moduleWiring';
 import { useUIStore } from '../store/uiStore';
 import { clearAllDrafts, flushDrafts } from '../store/draftStore';
-import { clearAltarEdits } from '../store/altarEdit';
 import { resumeEditorSaves, suspendEditorSaves } from './editorLock';
 import { drainSerialized } from './serialize';
 import { importViaStaging } from './importStaging';
@@ -79,7 +79,6 @@ export interface BackupOptions {
   includeJournal: boolean;
   includeWiki: boolean;
   includeOperations: boolean;
-  includeAltars: boolean;
   includeTasks: boolean;
   includeTags: boolean;
   /** The lexicon's languages with their vocabulary — all of it, no date question. */
@@ -104,13 +103,10 @@ export interface BackupPreview {
   exportedAt: string;
   journalCount: number;
   wikiCount: number;
+  /** Operations, with the altars of an older file, which arrive as operations. */
   opsCount: number;
   /** Templates plus the routines of older files, which arrive as templates. */
   templatesCount: number;
-  altarsCount: number;
-  /** Separate counter: the library travels independently of the altars, a
-   *  file can carry zero altars and still carry items. */
-  altarItemsCount: number;
   taskCount: number;
   /** The lexicon's languages; their vocabulary travels with them. */
   languagesCount: number;
@@ -125,7 +121,6 @@ export interface ImportTypeFilters {
   includeJournal: boolean;
   includeWiki: boolean;
   includeOperations: boolean;
-  includeAltars: boolean;
   includeTasks: boolean;
   includeTags: boolean;
   includeLexicon: boolean;
@@ -662,7 +657,6 @@ export const FULL_BACKUP_OPTIONS: Required<BackupOptions> = {
   includeJournal: true,
   includeWiki: true,
   includeOperations: true,
-  includeAltars: true,
   includeTasks: true,
   includeTags: true,
   includeLexicon: true,
@@ -695,36 +689,6 @@ export async function buildBackup(options: BackupOptions): Promise<BackupFile> {
       dateParams,
     );
     collectImageRefs('entries', data.entries, allImagePaths);
-  }
-
-  // ── Altars ───────────────────────────────────────────────────────────────
-  if (options.includeAltars) {
-    data.altars = await db.select<Row[]>(
-      `SELECT * FROM altars WHERE 1=1 ${dateClause} ${deletedClause}`,
-      dateParams,
-    );
-    // The library is a collection of its own, not an appendage of the altars:
-    // an item is created, sorted and maintained in the dashboard without ever
-    // lying on a canvas. Formerly the export took along only the
-    // *placed* items of the filtered altars — the rest
-    // were missing from the backup, and since a replace restore empties `altar_items`
-    // completely beforehand, they were gone afterwards. Hence complete,
-    // independent of the altars' date filter and even when no
-    // altar is left at all.
-    // Items in the trash only if the trash comes along — like everything else.
-    data.altarItems = await db.select<Row[]>(`SELECT * FROM altar_items WHERE 1=1 ${deletedClause}`);
-    // Placements stay bound to their altars — no altar, no place —
-    // and to their item: without it the insert would fail on the foreign key.
-    const exportedItems = new Set(data.altarItems.map((r) => String(r.id)));
-    data.altarPlacements = data.altars.length
-      ? (await selectWhereIn(
-          db,
-          (ph) => `SELECT * FROM altar_placements WHERE altar_id IN (${ph})`,
-          data.altars,
-        )).filter((p) => exportedItems.has(String(p.item_id)))
-      : [];
-    collectImageRefs('altars', data.altars, allImagePaths);
-    collectImageRefs('altar_items', data.altarItems, allImagePaths);
   }
 
   // ── Tags ─────────────────────────────────────────────────────────────────
@@ -761,7 +725,7 @@ export async function buildBackup(options: BackupOptions): Promise<BackupFile> {
   // need their counterpart, otherwise the import fails on the foreign key.
   // Also with journal alone: the templates then travel along, and their assignments need the categories.
   if (
-    options.includeJournal || options.includeWiki || options.includeOperations || options.includeTasks || options.includeAltars
+    options.includeJournal || options.includeWiki || options.includeOperations || options.includeTasks
   ) {
     data.categories = await db.select<Row[]>(`SELECT * FROM categories`);
     // The categories are read after their contents, and deleting or
@@ -773,7 +737,7 @@ export async function buildBackup(options: BackupOptions): Promise<BackupFile> {
     // backup loses the assignment to the target category for these rows — accepted,
     // the window is a few statements wide. The tables: `CATEGORIZED_TABLES`.
     const known = new Set(data.categories.map((c) => String(c.id)));
-    for (const rows of [data.entries, data.altarItems, data.tasks]) {
+    for (const rows of [data.entries, data.tasks]) {
       for (const row of rows ?? []) {
         if (row.category_id != null && !known.has(String(row.category_id))) row.category_id = null;
       }
@@ -930,10 +894,8 @@ export async function openBackupFile(): Promise<{ path: string; backup: BackupFi
     exportedAt: backup.exportedAt,
     journalCount: backup.data.journalEntries?.length ?? 0,
     wikiCount: backup.data.wikiArticles?.length ?? 0,
-    opsCount: backup.data.operations?.length ?? 0,
+    opsCount: (backup.data.operations?.length ?? 0) + (backup.data.altars?.length ?? 0),
     templatesCount: (backup.data.templates?.length ?? 0) + (backup.data.routines?.length ?? 0),
-    altarsCount: backup.data.altars?.length ?? 0,
-    altarItemsCount: backup.data.altarItems?.length ?? 0,
     taskCount: backup.data.tasks?.length ?? 0,
     languagesCount: backup.data.languages?.length ?? 0,
     categories: (backup.data.categories ?? []).filter((c) => usedCatIds.has(c.id as string)) as BackupCategoryEntry[],
@@ -972,7 +934,8 @@ function remapPaths(value: unknown, pathMap: Map<string, string>): unknown {
 function remapDefinitionRows(rows: unknown, pathMap: Map<string, string>, link?: LinkDefaultResolver): unknown {
   if (!Array.isArray(rows)) return rows;
   return rows.map((r) => (typeof r === 'object' && r !== null
-    ? { ...r, elements: remapDefinitionDefaults((r as Row).elements, (name) => pathMap.get(name) ?? name, link) }
+    // An older file's altar elements are link elements first, or the check below drops them.
+    ? { ...r, elements: remapDefinitionDefaults(elementsWithAltarsAsOperations((r as Row).elements), (name) => pathMap.get(name) ?? name, link) }
     : r));
 }
 
@@ -1379,7 +1342,7 @@ async function insertTasks(
 // ─────────────────────────────────────────────────────────────────────────────
 
 function applyTypeFilters(d: BackupFile['data'], f: ImportTypeFilters): BackupFile['data'] {
-  const anyCategorized = f.includeWiki || f.includeOperations || f.includeTasks || f.includeAltars;
+  const anyCategorized = f.includeWiki || f.includeOperations || f.includeTasks;
   const anyBlocks = f.includeJournal || f.includeWiki || f.includeOperations;
   return {
     ...d,
@@ -1391,9 +1354,10 @@ function applyTypeFilters(d: BackupFile['data'], f: ImportTypeFilters): BackupFi
     operations:         f.includeOperations ? d.operations        : [],
     // Templates (with `anyBlocks`) need the categories of their assignments; `usedCategoryRows` narrows it down.
     categories:         anyCategorized || anyBlocks ? d.categories : [],
-    altars:             f.includeAltars     ? d.altars            : [],
-    altarItems:         f.includeAltars     ? d.altarItems        : [],
-    altarPlacements:    f.includeAltars     ? d.altarPlacements   : [],
+    // The altars of an older file arrive as operations.
+    altars:             f.includeOperations ? d.altars            : [],
+    altarItems:         f.includeOperations ? d.altarItems        : [],
+    altarPlacements:    f.includeOperations ? d.altarPlacements   : [],
     tasks:              f.includeTasks      ? d.tasks             : [],
     taskLinks:          f.includeTasks      ? d.taskLinks         : [],
     tags:               f.includeTags       ? d.tags              : [],
@@ -1560,6 +1524,30 @@ export async function withRoutinesAsTemplates(db: Awaited<ReturnType<typeof getD
   return { ...d, templates: [...(d.templates ?? []), ...converted], routines: [] };
 }
 
+/** The picture columns of the altar tables an older file brings (`IMAGE_FIELDS` no longer has them). */
+const ALTAR_IMAGE_COLUMNS = ['background_image_data', 'thumbnail_data', 'icon_data'];
+const ALTAR_ITEM_IMAGE_COLUMNS = ['image_data'];
+
+/**
+ * The altars of an older file (from before v62): written into altar tables
+ * the working copy builds for them, turned into operations as v62 did with
+ * the vault's own, and the tables dropped again (`migrateAltars.ts`). After
+ * the tasks and their links, which then follow the altars to their
+ * operations; before the sweep, which would take those links away.
+ * `replace`: the file's version of an operation wins over the vault's.
+ */
+async function importAltars(
+  db: Awaited<ReturnType<typeof getDb>>, altars: Row[], items: Row[], placements: Row[], replace: boolean,
+): Promise<void> {
+  if (!altars.length && !items.length) return;
+  await createAltarTables(db);
+  await insertRows(db, 'altars', altars);
+  await insertRows(db, 'altar_items', items, true);
+  await insertRows(db, 'altar_placements', placements);
+  await convertAltarsInPlace(db, undefined, { replace });
+  await removeAltarTables(db);
+}
+
 async function doReplace(db: Awaited<ReturnType<typeof getDb>>, backup: BackupFile): Promise<void> {
   const pathMap = await restoreImages(backup);
   // Tags are not replaced but merged: entries that this file does
@@ -1570,8 +1558,6 @@ async function doReplace(db: Awaited<ReturnType<typeof getDb>>, backup: BackupFi
 
   // Remap image paths — columns from `IMAGE_FIELDS`, not maintained by hand.
   const IMAGE_FIELDS_ENTRY = imageColumns('entries');
-  const IMAGE_FIELDS_ALTAR = imageColumns('altars');
-  const IMAGE_FIELDS_ITEM = imageColumns('altar_items');
 
   // Categories first: the contents get the local IDs before they are
   // inserted. Categories are never deleted (see there).
@@ -1586,8 +1572,8 @@ async function doReplace(db: Awaited<ReturnType<typeof getDb>>, backup: BackupFi
     i18n.t, nowIso(), replaceStatus,
   );
   const operations = await liftLegacySigilRows(replaceOps.rows, wikiArticles, backup);
-  const altars = (d.altars ?? []).map((r) => remapRow(r, IMAGE_FIELDS_ALTAR, pathMap));
-  const altarItems = remapCategoryIds((d.altarItems ?? []).map((r) => remapRow(r, IMAGE_FIELDS_ITEM, pathMap)), catMap);
+  const altars = (d.altars ?? []).map((r) => remapRow(r, ALTAR_IMAGE_COLUMNS, pathMap));
+  const altarItems = remapCategoryIds((d.altarItems ?? []).map((r) => remapRow(r, ALTAR_ITEM_IMAGE_COLUMNS, pathMap)), catMap);
   const tasks = remapCategoryIds(d.tasks ?? [], catMap);
 
   // Custom blocks like categories: never deleted, missing ones added by ID,
@@ -1605,20 +1591,8 @@ async function doReplace(db: Awaited<ReturnType<typeof getDb>>, backup: BackupFi
   // Delete only the content types present in the backup (so a partial backup
   // replacing only Journal data won't wipe wiki/ops).
   const entryTypes = presentEntryTypes(d);
-  const hasAltars = (d.altars?.length ?? 0) > 0;
   const hasTasks = (d.tasks?.length ?? 0) > 0;
 
-  // The library hangs on `hasAltars`, although the export now takes it along
-  // independently of the altars: `altar_placements.item_id` is
-  // ON DELETE CASCADE, so emptying `altar_items` would tear the placements away from the
-  // existing altars — precisely those this file does not
-  // replace at all. Without altars in the file, the library is therefore
-  // supplemented instead of replaced (see insertRows below).
-  if (hasAltars) {
-    await db.execute('DELETE FROM altar_placements');
-    await db.execute('DELETE FROM altar_items');
-    await db.execute('DELETE FROM altars');
-  }
   if (hasTasks) {
     await db.execute('DELETE FROM task_links');
     await db.execute('DELETE FROM tasks');
@@ -1634,18 +1608,10 @@ async function doReplace(db: Awaited<ReturnType<typeof getDb>>, backup: BackupFi
   }
   // Re-insert
   await insertRows(db, 'entries', entries);
-  await insertRows(db, 'altars', altars);
-  // OR IGNORE if nothing was emptied above: the file can carry a library
-  // without altars (date filter, or a vault that has only items),
-  // and a bare INSERT would then run into the primary key — and thereby
-  // make every such file fail the whole restore. The price:
-  // a version of an existing item changed in the file is left out
-  // in this one case.
-  const keepExistingLibrary = !hasAltars;
-  await insertRows(db, 'altar_items', altarItems, keepExistingLibrary);
-  if (d.altarPlacements) await insertRows(db, 'altar_placements', d.altarPlacements);
   await insertTasks(db, tasks);
   if (d.taskLinks) await insertRows(db, 'task_links', d.taskLinks);
+  // The file's version of an altar replaces its operation here.
+  await importAltars(db, altars, altarItems, d.altarPlacements ?? [], true);
 
   // A partial replace (e.g. only tasks) can orphan existing links that point to
   // just-replaced targets — and imported task_links
@@ -1825,11 +1791,9 @@ async function doMerge(db: Awaited<ReturnType<typeof getDb>>, backup: BackupFile
 
   // Content: plain INSERT with prefixed IDs (no conflicts possible)
   await insertRows(db, 'entries', entryRowsForInsert(journalEntries, wikiArticles, operations));
-  await insertRows(db, 'altars', altars);
-  await insertRows(db, 'altar_items', altarItems);
-  await insertRows(db, 'altar_placements', altarPlacements);
   await insertTasks(db, tasks);
   await insertRows(db, 'task_links', taskLinks, true);
+  await importAltars(db, altars, altarItems, altarPlacements, false);
 
   // Imported task_links can point to targets that the type filter
   // has just deselected — sweep them out as in doReplace.
@@ -1857,7 +1821,6 @@ const CONTENT_TYPE_LABELS: Record<keyof ImportTypeFilters, string> = {
   includeJournal: 'settings.includeJournal',
   includeWiki: 'settings.includeWiki',
   includeOperations: 'settings.includeOperations',
-  includeAltars: 'settings.includeAltars',
   includeTasks: 'settings.includeTasks',
   includeTags: 'settings.includeTags',
   includeLexicon: 'settings.includeLexicon',
@@ -1973,8 +1936,6 @@ export async function importDatabase(
         }
       }
       await doReplace(staging, filteredBackup);
-      // Altars of an older file become operations, as v62 did with the vault's own.
-      await convertAltarsInPlace(staging);
     });
     // Only once the import went through, as with replace and merge below.
     if (backupThemes) useDeviceStore.getState().adoptCustomThemes(backupThemes);
@@ -1984,8 +1945,6 @@ export async function importDatabase(
     const run = mode === 'replace' ? doReplace : doMerge;
     await importViaStaging(await getDb(), async (staging) => {
       await run(staging, filteredBackup);
-      // Altars of an older file become operations, as v62 did with the vault's own.
-      await convertAltarsInPlace(staging);
     });
 
     // Only after a successful swap: an aborted import leaves the
@@ -2011,7 +1970,6 @@ export async function importDatabase(
   // the tabs stay valid; add-vault goes through switchVault and cleans up there.
   if (mode === 'replace') {
     useUIStore.getState().closeAllTabs();
-    clearAltarEdits();
     clearAllDrafts();
     // Straight from the file, not only after the delay: an old draft
     // that survives a crash would overwrite the imported data at the next "Done".

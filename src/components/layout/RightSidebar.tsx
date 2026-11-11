@@ -1,7 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import { entryBlockSummary } from '../../lib/blocks/entrySummary';
 import type { ComponentType } from 'react';
-import { Pencil, Maximize2, Minimize2 } from 'lucide-react';
+import { Pencil } from 'lucide-react';
 import { useUIStore } from '../../store/uiStore';
 import { findEntry, useEntryStore } from '../../store/entryStore';
 import type { ActiveView } from '../../types';
@@ -10,7 +10,6 @@ import BlockSidebarArea, { BlockAddActions } from '../blocks/BlockSidebarArea';
 import JournalPropertiesPanel from '../sidebar/panels/JournalPropertiesPanel';
 import WikiPropertiesPanel from '../sidebar/panels/WikiPropertiesPanel';
 import OperationPropertiesPanel from '../sidebar/panels/OperationPropertiesPanel';
-import AltarSidebarPanel from '../sidebar/panels/AltarSidebarPanel';
 import Button from '../ui/Button';
 import SidebarColumn, { EditActionBar, SidebarActionBar } from '../ui/SidebarColumn';
 
@@ -21,7 +20,6 @@ const PROPERTIES_PANELS: Partial<Record<ViewId, ComponentType>> = {
   journal: JournalPropertiesPanel,
   wiki: WikiPropertiesPanel,
   operations: OperationPropertiesPanel,
-  altar: AltarSidebarPanel,
 };
 
 /**
@@ -49,8 +47,6 @@ function RightSidebarActionBar() {
   const setActiveView = useUIStore((s) => s.setActiveView);
   const editActions = useUIStore((s) => s.editActions);
   const editLocked = useUIStore((s) => s.editLocked);
-  const altarWindowFullscreen = useUIStore((s) => s.altarWindowFullscreen);
-  const setAltarWindowFullscreen = useUIStore((s) => s.setAltarWindowFullscreen);
   // The content of the open entry — for the lock of a loaded sigil.
   const entryType = entryTypeForView(activeView.type);
   const content = useEntryStore((s) => (entryType && activeView.id ? findEntry(s.entries, activeView.id, entryType)?.content : undefined));
@@ -79,7 +75,6 @@ function RightSidebarActionBar() {
   // charge block decides, in every entry type. The button stays
   // and says why it does nothing.
   const locked = content !== undefined && !!entryBlockSummary(activeView.id, content).sigil?.lockEntry;
-  const isAltar = activeView.type === 'altar';
 
   return (
     <SidebarActionBar>
@@ -98,18 +93,6 @@ function RightSidebarActionBar() {
           <span className="truncate">{t('editor.edit')}</span>
         </Button>
       </span>
-      {isAltar && (
-        <Button
-          tone="jade"
-          active={altarWindowFullscreen}
-          compact
-          title={altarWindowFullscreen ? t('altar.exitWindowFullscreen') : t('altar.windowFullscreen')}
-          aria-label={altarWindowFullscreen ? t('altar.exitWindowFullscreen') : t('altar.windowFullscreen')}
-          onClick={() => setAltarWindowFullscreen(!altarWindowFullscreen)}
-        >
-          {altarWindowFullscreen ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
-        </Button>
-      )}
     </SidebarActionBar>
   );
 }

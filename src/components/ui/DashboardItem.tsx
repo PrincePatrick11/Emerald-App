@@ -32,7 +32,7 @@ interface DashboardItemProps {
 /**
  * A clickable entry on a dashboard: `panel-interactive` frame,
  * click opens `view`, middle click opens it in a new tab. The content
- * is `RowContent` or `CardContent`; an altar card brings its own.
+ * is `RowContent` or `CardContent`.
  */
 export default function DashboardItem({ view, layout, onContextMenu, editing, children }: DashboardItemProps) {
   const setActiveView = useUIStore((s) => s.setActiveView);
@@ -78,7 +78,7 @@ export function ItemGlyph({ icon, large }: { icon: string; large?: boolean }) {
 }
 
 /** A row's symbol column, at least as wide as an emoji, so names line up across
- *  a list; an altar's preview is the one thing wider. */
+ *  a list. */
 export function RowSymbol({ children }: { children: ReactNode }) {
   return <span className="min-w-5 flex items-center justify-center flex-shrink-0 text-base">{children}</span>;
 }

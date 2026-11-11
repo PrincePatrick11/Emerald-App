@@ -4,7 +4,6 @@ import { renderBlocksForExport, type ExportText } from './blocks/exportRender';
 import { blockLabel, fieldFallbackText } from './blocks/blockAttrs';
 import { formatIsoDateLong } from './formatDate';
 import { useCategoryStore } from '../store/categoryStore';
-import { useAltarStore } from '../store/altarStore';
 import { useUIStore } from '../store/uiStore';
 import { entryMoonPhase, MOON_PHASE_SYMBOLS } from './moonPhase';
 import { useSettingsStore } from '../store/settingsStore';
@@ -32,10 +31,6 @@ function exportText(): ExportText {
     loaded: t('blocks.sigil.loaded'),
     notLoaded: t('blocks.sigil.notLoaded'),
     drawing: t('blocks.types.sigilCanvas.label'),
-    altar: (id) => {
-      const altar = useAltarStore.getState().altars.find((a) => a.id === id);
-      return altar ? { title: displayTitle(i18n.t, 'altar', altar.title), image: altar.thumbnail_data ?? null } : null;
-    },
   };
 }
 

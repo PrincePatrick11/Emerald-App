@@ -8,7 +8,6 @@ import DOMPurify from 'dompurify';
 import type { ExportData } from './exportData';
 import { useEntryStore } from '../store/entryStore';
 import { useTaskStore } from '../store/taskStore';
-import { useAltarStore } from '../store/altarStore';
 import { useCategoryStore } from '../store/categoryStore';
 import { DEFAULT_ENTRY_EMOJI, entryIcon } from './modules';
 import i18n from '../i18n';
@@ -74,7 +73,6 @@ function resolveInternalLinkIcons(html: string): string {
   const { wiki: articles, operation: operations } = useEntryStore.getState().entries;
   const { tasks } = useTaskStore.getState();
   const { categories } = useCategoryStore.getState();
-  const { altars } = useAltarStore.getState();
 
   for (const el of links) {
     // Only fill missing icons
@@ -95,11 +93,6 @@ function resolveInternalLinkIcons(html: string): string {
       // editor's live lookup: category emoji, otherwise the chip fallback.
       const task = tasks.find(t => t.id === id);
       if (task) icon = categories.find(c => c.id === task.category_id)?.emoji ?? DEFAULT_ENTRY_EMOJI.task;
-    } else if (entryType === 'altar') {
-      // Altar chips deliberately never store icon_data in the attrs (data URL);
-      // it is only resolved here, in the export.
-      const altar = altars.find(a => a.id === id);
-      if (altar) icon = altar.icon_data ?? DEFAULT_ENTRY_EMOJI.altar;
     }
     if (icon) el.setAttribute('data-icon', icon);
   }

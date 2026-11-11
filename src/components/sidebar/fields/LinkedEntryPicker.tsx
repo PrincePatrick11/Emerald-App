@@ -9,7 +9,7 @@ import { isImageIcon } from '../../../lib/helpers';
 import { DEFAULT_ENTRY_EMOJI } from '../../../lib/modules';
 import type { SuggestionItem } from '../../../lib/linkItems';
 
-/** The icon of a link target in chips and hit rows: image (altar), emoji, or the default of its kind. */
+/** The icon of a link target in chips and hit rows: image, emoji, or the default of its kind. */
 export function LinkItemIcon({ item }: { item: SuggestionItem }) {
   const icon = item.displayIcon || item.icon || DEFAULT_ENTRY_EMOJI[item.entryType];
   return isImageIcon(icon)

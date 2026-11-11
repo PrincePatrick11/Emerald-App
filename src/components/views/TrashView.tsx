@@ -279,8 +279,6 @@ export default function TrashView() {
     const blockDefs  = sorted.filter((i) => i.type === 'blockDefinition');
     const templates  = sorted.filter((i) => i.type === 'template');
     const languages  = sorted.filter((i) => i.type === 'language');
-    const altars     = sorted.filter((i) => i.type === 'altar');
-    const altarItems = sorted.filter((i) => i.type === 'altarItem');
     const images     = sorted.filter((i) => i.type === 'image');
 
     const renderItems = (subset: TrashedItem[]) =>
@@ -301,8 +299,6 @@ export default function TrashView() {
       { label: t('nav.wiki'), items: wiki, groups: wikiByCategory },
       { label: t('nav.operations'), items: operations, groups: opsByCategory },
       { label: t('nav.tasks'), items: tasks },
-      { label: t('nav.altar'), items: altars },
-      { label: t('trash.altarItems'), items: altarItems },
       { label: t('nav.images'), items: images },
       { label: t('nav.tags'), items: tags },
       { label: t('trash.categories'), items: cats },

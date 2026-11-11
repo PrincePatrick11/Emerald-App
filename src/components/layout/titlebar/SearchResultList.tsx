@@ -1,5 +1,5 @@
 import { useEffect, useRef, type ReactNode } from 'react';
-import { Folder, Sparkles, Tag, type LucideIcon } from 'lucide-react';
+import { Folder, Tag, type LucideIcon } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { comparable, type SearchHit, type SearchKind, type SearchResults } from '../../../lib/globalSearch';
 import { AUX_VIEWS, MODULES } from '../../../lib/modules';
@@ -13,8 +13,6 @@ const KIND_META: Record<SearchKind, { icon: LucideIcon; labelKey: string }> = {
   wiki: { icon: MODULES.wiki.icon, labelKey: MODULES.wiki.navLabelKey },
   operation: { icon: MODULES.operations.icon, labelKey: MODULES.operations.navLabelKey },
   task: { icon: MODULES.tasks.icon, labelKey: MODULES.tasks.navLabelKey },
-  altar: { icon: MODULES.altar.icon, labelKey: MODULES.altar.navLabelKey },
-  altarItem: { icon: Sparkles, labelKey: 'search.altarElements' },
   image: { icon: AUX_VIEWS.images.icon, labelKey: AUX_VIEWS.images.navLabelKey },
   tag: { icon: Tag, labelKey: 'nav.tags' },
   category: { icon: Folder, labelKey: 'search.categories' },

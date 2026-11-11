@@ -483,7 +483,7 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
   }
 
   /* Modal card — floating dialog surface, higher opacity than .panel to stay legible over the dimmed backdrop.
-     No overflow-hidden here: some modals (e.g. Altar's emoji picker) need a popover to escape the card bounds.
+     No overflow-hidden here: some modals (e.g. an emoji picker) need a popover to escape the card bounds.
      Pass "overflow-hidden" via Modal's className prop for modals that don't have such a popover. */
   .modal-card {
     @apply border rounded-xl shadow-2xl;
@@ -1328,8 +1328,7 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
 
   /* Visible in both themes via --accent. The filter rows, the
      switches, the tone buttons (sidebar-action-btn), the tab/segment toggles
-     (TabIconButton), the clickable library tiles (div[role=button]),
-     the link picker tabs and the settings navigation are focusable, but Noctis
+     (TabIconButton), the link picker tabs and the settings navigation are focusable, but Noctis
      has no generic button:focus-visible rule (design.md, Open
      Point 8) — without a ring of their own they would be keyboard-invisible there. */
   .filter-row:focus-visible,
@@ -1339,7 +1338,6 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
   .settings-nav-item-idle:focus-visible,
   .settings-nav-item-active:focus-visible,
   .sidebar-action-btn:focus-visible,
-  .altar-item-tile:focus-visible,
   .right-sidebar-tab-idle:focus-visible,
   .right-sidebar-tab-active:focus-visible,
   .link-picker-tab-idle:focus-visible,
@@ -3726,17 +3724,6 @@ html[data-theme] .prop-segment--active {
   border-radius: 9999px;
   border: 1px solid var(--edge-strong);
 }
-/* A drawn text in the altar's lists: a serif "T" in the text's colour. */
-.altar-text-glyph {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  font-family: "Cormorant Garamond", Georgia, serif;
-  font-weight: 600;
-  line-height: 1;
-}
-
 /* The negative outer margin cancels the inner padding horizontally: the text
    stays flush under the title in edit mode, exactly where it sits in
    read mode — the frame wraps around the outside, into the page's px-8. */
@@ -3772,8 +3759,7 @@ html[data-theme] .prop-segment--active {
   white-space: nowrap;
 }
 
-/* Handle and menu are deliberately not `Button`s: the handle is a drag surface (like the
-   handles in the altar), the menu a barely visible trigger that appears only when
+/* Handle and menu are deliberately not `Button`s: the handle is a drag surface, the menu a barely visible trigger that appears only when
    hovering over the block. */
 .block-frame-grip,
 .block-frame-menu {
@@ -3881,47 +3867,6 @@ html[data-theme] .prop-segment--active {
   object-fit: contain;
   border: 1px solid var(--border-soft);
   border-radius: 0.75rem;
-}
-
-/* The altar field: the altar's thumbnail at its own width (the
-   thumbnails are computed at 640px — wider would only make it blurry),
-   with the name below. In read mode the whole thing is a button that opens the altar. */
-.block-altar {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 0.375rem;
-  width: 100%;
-  max-width: 40rem;
-  text-align: left;
-}
-
-.block-altar-image {
-  display: block;
-  width: 100%;
-  height: auto;
-  border: 1px solid var(--border-soft);
-  border-radius: 0.75rem;
-  transition: border-color 150ms;
-}
-
-button.block-altar:hover .block-altar-image {
-  border-color: var(--border-strong);
-}
-
-.block-altar-title {
-  font-size: 0.875rem;
-  color: var(--text-secondary);
-}
-
-button.block-altar:hover .block-altar-title {
-  color: var(--text-primary);
-}
-
-.block-altar:focus-visible {
-  outline: none;
-  border-radius: 0.75rem;
-  box-shadow: 0 0 0 2px var(--focus-ring);
 }
 
 .block-sigil-intention {
@@ -4203,7 +4148,7 @@ html[data-theme] .block-manager-row--idle,
   align-items: center;
 }
 
-/* A field whose value needs the full width (the altar with its image):
+/* A field whose value needs the full width (text, the sigil parts):
    label above instead of beside it. */
 .block-field--wide,
 .block-fields--edit .block-field--wide {
@@ -4994,8 +4939,7 @@ html[data-theme='emerald-noctis'] .app-sidebar-left .bg-well-active.text-seconda
 
 html[data-theme='emerald-noctis'] .settings-nav-item-idle,
 html[data-theme='emerald-noctis'] .right-sidebar-tab-idle,
-html[data-theme='emerald-noctis'] .task-action-btn,
-html[data-theme='emerald-noctis'] .altar-category-chip {
+html[data-theme='emerald-noctis'] .task-action-btn {
   color: #b49d87;
 }
 
@@ -5004,7 +4948,6 @@ html[data-theme='emerald-noctis'] .right-sidebar-tab-idle:hover:not(:disabled),
 html[data-theme='emerald-noctis'] .app-sidebar-right .text-subtle.hover\:text-raise:hover,
 html[data-theme='emerald-noctis'] .app-sidebar-left .text-subtle.hover\:text-raise:hover,
 html[data-theme='emerald-noctis'] .task-action-btn:hover,
-html[data-theme='emerald-noctis'] .altar-category-chip:hover,
 html[data-theme='emerald-noctis'] .editor-toolbar-btn-idle:hover {
   color: #eadfce;
   background: rgba(104, 84, 68, 0.18);
@@ -5021,18 +4964,10 @@ html[data-theme='emerald-noctis'] .tasks-linked-entry:hover {
   background: rgba(0, 122, 77, 0.34);
 }
 
-html[data-theme='emerald-noctis'] .sigil-brush-controls,
-html[data-theme='emerald-noctis'] .altar-symbol-trigger,
-html[data-theme='emerald-noctis'] .altar-upload-item-btn,
-html[data-theme='emerald-noctis'] .altar-item-name-input {
+html[data-theme='emerald-noctis'] .sigil-brush-controls {
   background: rgba(45, 36, 31, 0.84);
   border-color: rgba(113, 94, 77, 0.48);
   color: #d8c8b8;
-}
-
-html[data-theme='emerald-noctis'] .altar-symbol-trigger:hover,
-html[data-theme='emerald-noctis'] .altar-upload-item-btn:hover {
-  border-color: rgba(142, 121, 101, 0.56);
 }
 
 /* Light mode redesign: stronger structure and readability */
@@ -5307,57 +5242,6 @@ html[data-theme='emerald-parchment'] .op-prop-select[type="date"]::-webkit-datet
   color: #3a2918;
 }
 
-html[data-theme='emerald-parchment'] .altar-bg-preset-label {
-  background: #5f574f;
-  border-color: rgba(222, 202, 173, 0.42);
-  color: #f3e4ca;
-}
-
-html[data-theme='emerald-parchment'] .altar-upload-bg-btn {
-  background: #7a7064;
-  border-color: rgba(120, 104, 87, 0.6);
-  color: #f5e8d2;
-}
-
-html[data-theme='emerald-parchment'] .altar-upload-bg-btn:hover {
-  background: #6f655a;
-  color: #fff4e1;
-}
-
-html[data-theme='emerald-parchment'] .altar-symbol-trigger,
-html[data-theme='emerald-parchment'] .altar-upload-item-btn,
-html[data-theme='emerald-parchment'] .altar-item-name-input {
-  background: #f3e6cf;
-  border: 1px solid rgba(145, 108, 70, 0.34);
-  color: #3a2918;
-}
-
-html[data-theme='emerald-parchment'] .altar-symbol-trigger:hover,
-html[data-theme='emerald-parchment'] .altar-upload-item-btn:hover {
-  background: #efdfc8;
-  border-color: rgba(131, 96, 62, 0.46);
-  color: #2f2114;
-}
-
-html[data-theme='emerald-parchment'] .altar-symbol-trigger-label {
-  color: #7f6448;
-}
-
-html[data-theme='emerald-parchment'] .altar-category-chip {
-  color: #6d553d;
-}
-
-html[data-theme='emerald-parchment'] .altar-category-chip:hover {
-  color: #2f2114;
-  background: #efdfc8;
-}
-
-html[data-theme='emerald-parchment'] .altar-category-chip.bg-well-active {
-  background: #d6eee1;
-  color: #0b5a3a;
-  border: 1px solid rgba(0, 138, 87, 0.32);
-}
-
 html[data-theme='emerald-parchment'] .editor-toolbar-btn-idle:hover {
   background-color: rgba(136, 97, 57, 0.14);
   color: #2f2114;
@@ -5374,10 +5258,6 @@ html[data-theme='emerald-parchment'] .tiptap :not(pre) > code {
 html[data-theme='emerald-parchment'] .tiptap pre code {
   background-color: transparent;
   border: 0;
-}
-
-html[data-theme='emerald-parchment'] .altar-cat-scroll-fade {
-  width: 3.5rem;
 }
 
 /* ── Emerald mark ─────────────────────────────────────────────────────────────
@@ -5412,8 +5292,7 @@ html[data-theme='custom'] .rail-button.active:hover,
 html[data-theme='custom'] .settings-nav-item-active,
 html[data-theme='custom'] .right-sidebar-tab-active,
 html[data-theme='custom'] .app-sidebar-right .bg-well-active.text-secondary,
-html[data-theme='custom'] .app-sidebar-left .bg-well-active.text-secondary,
-html[data-theme='custom'] .altar-category-chip.bg-well-active {
+html[data-theme='custom'] .app-sidebar-left .bg-well-active.text-secondary {
   background: var(--menu-item-active-bg);
   border-color: var(--accent-edge);
   color: var(--menu-item-active-text);

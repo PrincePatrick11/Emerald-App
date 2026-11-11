@@ -153,11 +153,11 @@ async function scaledAndConverted(dataUrl: string, maxEdge: number | null): Prom
 
 /**
  * The one step every image goes through before it is stored (editor, image
- * fields, covers and icons, the altar, `.emerald` imports): a photo PNG becomes
+ * fields, covers and icons, canvases, `.emerald` imports): a photo PNG becomes
  * a JPEG, then everything is brought within the vault's limits — downscaled to
  * the largest edge length, then the file size checked. Downscaling and the
  * change of format happen in one pass, so a photo is compressed only once.
- * `capBytes` is a fixed cap from the caller (altar images); the smaller limit
+ * `capBytes` is a fixed cap from the caller (old altar backgrounds on import); the smaller limit
  * applies. Backups and sigil drawings do not come through here.
  *
  * @throws ImageTooLargeError if it is still too large afterwards — with the limit that applied.
@@ -175,7 +175,7 @@ export async function prepareImageDataUrl(dataUrl: string, options: { capBytes?:
 }
 
 /**
- * A chosen file as an icon (entry, template, block, altar): only the
+ * A chosen file as an icon (entry, template, block): only the
  * accepted image formats and no SVG — icons sit inline in the row —,
  * downscaled like any image. `null` for a rejected file; the
  * error message is left to the caller.

@@ -480,7 +480,7 @@ console.log('\n4f. Sigil blocks\n');
         && back.doc.layers[0].strokes[0].color === '#ef4444' && back.doc.layers[0].strokes[0].pressure, back);
     const text = {
       title: (b) => b.type, date: (iso) => iso, number: (n) => `${n}`, targetDate: '', technique: '', loaded: '', notLoaded: '',
-      drawing: 'D', altar: () => null, fields: { label: (e) => e.label, yes: '', no: '', moonName: (p) => p },
+      drawing: 'D', fields: { label: (e) => e.label, yes: '', no: '', moonName: (p) => p },
     };
     const exported = renderBlocksForExport(serializeBlocks([saved]), text);
     check('drawing: the export shows only the render', exported.includes(render) && !exported.includes(old), exported);
@@ -659,7 +659,7 @@ console.log('\n4f. Sigil blocks\n');
   const secret = { ...createTextBlock('<p>geheim</p>'), attrs: { 'data-block-hidden': '1' } };
   const exportText = {
     title: (b) => `T:${b.type}`, date: (iso) => `D:${iso}`, number: (n) => `N:${n}`, targetDate: 'Ziel', technique: 'Technik',
-    loaded: 'Geladen', notLoaded: 'Offen', drawing: 'Zeichnung', altar: () => null,
+    loaded: 'Geladen', notLoaded: 'Offen', drawing: 'Zeichnung',
     fields: { label: (e) => e.label || e.kind, yes: 'Ja', no: 'Nein', moonName: (p) => p },
   };
   const exportedContent = serializeBlocks([createTextBlock('<p>sichtbar</p>'), secret, ...blocks]);
@@ -704,30 +704,28 @@ console.log('\n4f. Sigil blocks\n');
   check('charge technique regex stays fast on crafted markup', Date.now() - t0 < 500, `${Date.now() - t0} ms`);
 }
 
-console.log('\n4g. Altar field and defaults with markup\n');
+console.log('\n4g. Link and image defaults with markup\n');
 {
-  const altarId = 'a1111111-1111-1111-1111-111111111111';
   const wikiId = 'b1111111-1111-1111-1111-111111111111';
   const img = `${'cd'.repeat(32)}.png`;
   const text = {
     title: (b) => `T:${b.type}`, date: (iso) => iso, number: String, targetDate: '', technique: '', loaded: '', notLoaded: '',
     drawing: '', fields: { label: (e) => e.label, yes: 'Ja', no: 'Nein', moonName: (p) => p },
-    altar: (id) => (id === altarId ? { title: 'Hausaltar neu', image: 'data:image/png;base64,QUJD' } : null),
   };
 
   const elements = parseDefinitionElements(JSON.stringify([
-    { id: 'alt', kind: 'altar', label: 'Altar', defaultValue: { id: altarId, entryType: 'altar', label: 'Hausaltar' } },
     { id: 'lnk', kind: 'link', label: 'Quelle', defaultValue: { id: wikiId, entryType: 'wiki', label: 'Artikel' } },
     { id: 'pic', kind: 'image', label: 'Bild', defaultValue: `bilder/${img}` },
-    { id: 'alt2', kind: 'altar', label: 'Falsch', defaultValue: { id: wikiId, entryType: 'wiki', label: 'kein Altar' } }, // lang-ok
     { id: 'lnk2', kind: 'link', label: 'Kaputt', defaultValue: { id: 'nicht-uuid', entryType: 'wiki', label: 'x' } }, // lang-ok
     { id: 'pic2', kind: 'image', label: 'Fremd', defaultValue: 'javascript:alert(1)' },
+    // The altar field is gone (v62 made it a link field); one left over is dropped.
+    { id: 'alt', kind: 'altar', label: 'Altar' },
   ]));
   const byId = Object.fromEntries(elements.map((e) => [e.id, e]));
-  check('defaults: altar, link and image are read, image as a plain file name',
-    byId.alt.defaultValue?.id === altarId && byId.lnk.defaultValue?.entryType === 'wiki' && byId.pic.defaultValue === img, elements);
-  check('defaults: an altar field accepts only altars, links only valid targets, images only stored files',
-    byId.alt2.defaultValue === undefined && byId.lnk2.defaultValue === undefined && byId.pic2.defaultValue === undefined);
+  check('defaults: link and image are read, image as a plain file name',
+    byId.lnk.defaultValue?.entryType === 'wiki' && byId.pic.defaultValue === img, elements);
+  check('defaults: links only valid targets, images only stored files; an altar field is no element',
+    byId.lnk2.defaultValue === undefined && byId.pic2.defaultValue === undefined && !byId.alt);
 
   const def = {
     id: 'def-slots', name: 'Ritualplatz', icon: '🕯️', sort_order: 0,
@@ -737,24 +735,18 @@ console.log('\n4g. Altar field and defaults with markup\n');
   const copy = instantiateDefinition(def, text.fields);
   const cm = parseFields(copy);
   check('a new copy carries chip and image in its slots',
-    linkFromSlot(cm.slots.alt)?.id === altarId && linkFromSlot(cm.slots.lnk)?.id === wikiId && imageFromSlot(cm.slots.pic) === img
-      && !cm.slots.alt2 && !cm.slots.lnk2 && !cm.slots.pic2, cm.slots);
+    linkFromSlot(cm.slots.lnk)?.id === wikiId && imageFromSlot(cm.slots.pic) === img && !cm.slots.lnk2 && !cm.slots.pic2, cm.slots);
   check('the links of the copy are in the content (link table, backlinks)',
-    extractInternalLinks(serializeBlocks([copy])).length === 2);
-
-  const out = renderBlocksForExport(serializeBlocks([copy]), text);
-  check('export: the altar field with preview image under its current name and chip',
-    out.includes('<img src="data:image/png;base64,QUJD" alt="Hausaltar neu" data-export-placeholder="1">')
-      && out.includes('data-entry-type="altar"'), out);
+    extractInternalLinks(serializeBlocks([copy])).length === 1);
+  check('export: the link field shows its chip', renderBlocksForExport(serializeBlocks([copy]), text).includes('data-entry-type="wiki"'));
 
   const remapped = parseDefinitionElements(remapDefinitionDefaults(
     JSON.stringify(elements), (name) => (name === img ? `${'ef'.repeat(32)}.png` : name),
-    (t) => (t.entryType === 'wiki' ? null : { id: `abcd1234-${t.id}`, label: 'Neu' }),
+    (t) => ({ id: `abcd1234-${t.id}`, label: 'Neu' }),
   ));
   const rm = Object.fromEntries(remapped.map((e) => [e.id, e]));
-  check('import: image defaults follow the stored images, link defaults the new IDs — without a target they are dropped',
-    rm.pic.defaultValue === `${'ef'.repeat(32)}.png` && rm.alt.defaultValue?.id === `abcd1234-${altarId}`
-      && rm.alt.defaultValue?.label === 'Neu' && rm.lnk.defaultValue === undefined, remapped);
+  check('import: image defaults follow the stored images, link defaults the new IDs',
+    rm.pic.defaultValue === `${'ef'.repeat(32)}.png` && rm.lnk.defaultValue?.id === `abcd1234-${wikiId}` && rm.lnk.defaultValue?.label === 'Neu', remapped);
   check('the images of the defaults are known', definitionImageRefs(elements).join() === img);
 }
 
@@ -809,7 +801,7 @@ console.log('\n4h. Sigils as parts of custom blocks\n');
 
   const exportText = {
     title: (b) => `T:${b.type}`, date: (iso) => `D:${iso}`, number: String, targetDate: 'Ziel', technique: 'Technik',
-    loaded: 'Geladen', notLoaded: 'Offen', drawing: 'Zeichnung', altar: () => null, fields: text,
+    loaded: 'Geladen', notLoaded: 'Offen', drawing: 'Zeichnung', fields: text,
   };
   const out = renderBlocksForExport(content, exportText, '2029-12-31');
   check('export: hidden parts are missing, the charge is included as a part',

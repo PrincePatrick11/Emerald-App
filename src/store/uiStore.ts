@@ -23,15 +23,6 @@ export const GROUPING_MODES = ['grouped', 'flat'] as const;
 export type GroupingMode = (typeof GROUPING_MODES)[number];
 export interface ListPrefs { view: ViewMode; sort: SortMode; grouping: GroupingMode; }
 
-/** The controls of the altar library. A subset of SortMode — items
- *  have no "last edited", and the category there is the
- *  grouping, not a sorting. In the store, because the controls sit in the right
- *  sidebar (AltarView) and the section beneath reads them
- *  (AltarLibrarySection). */
-export type AltarLibrarySort = Extract<SortMode, 'alpha_asc' | 'alpha_desc' | 'date_desc'>;
-export interface AltarLibraryPrefs { sort: AltarLibrarySort; grouping: GroupingMode; }
-export const ALTAR_LIBRARY_SORTS: AltarLibrarySort[] = ['alpha_asc', 'alpha_desc', 'date_desc'];
-
 /** The sorting of the tags dashboard: tags have no date, but they have a
  *  frequency. */
 export type TagsSort = Extract<SortMode, 'alpha_asc' | 'alpha_desc' | 'count_desc'>;
@@ -98,7 +89,6 @@ interface UIState {
   wikiPrefs: ListPrefs;
   operationsPrefs: ListPrefs;
   tasksPrefs: ListPrefs;
-  altarPrefs: ListPrefs;
   trashPrefs: ListPrefs;
   templatesPrefs: ListPrefs;
   /** The custom blocks in the blocks view — the built-in ones beneath stay untouched. */
@@ -106,12 +96,6 @@ interface UIState {
   /** The language list of the lexicon — the translate field beneath stays untouched. */
   lexiconPrefs: ListPrefs;
   tagsSort: TagsSort;
-  altarWindowFullscreen: boolean;
-  /** Altar dashboard: preview of the canvas on the cards and in the list.
-   *  Off means a altar icon instead of a preview. */
-  altarShowPreview: boolean;
-  /** Sorting and grouping of the library. */
-  altarLibraryPrefs: AltarLibraryPrefs;
   homeJournalPrefs: HomeSectionPrefs;
   homeOpsPrefs: HomeSectionPrefs;
   homeWikiPrefs: HomeSectionPrefs;
@@ -163,15 +147,11 @@ interface UIState {
   setWikiPrefs: (p: Partial<ListPrefs>) => void;
   setOperationsPrefs: (p: Partial<ListPrefs>) => void;
   setTasksPrefs: (p: Partial<ListPrefs>) => void;
-  setAltarPrefs: (p: Partial<ListPrefs>) => void;
   setTrashPrefs: (p: Partial<ListPrefs>) => void;
   setTemplatesPrefs: (p: Partial<ListPrefs>) => void;
   setBlocksPrefs: (p: Partial<ListPrefs>) => void;
   setLexiconPrefs: (p: Partial<ListPrefs>) => void;
   setTagsSort: (sort: TagsSort) => void;
-  setAltarWindowFullscreen: (enabled: boolean) => void;
-  setAltarShowPreview: (enabled: boolean) => void;
-  setAltarLibraryPrefs: (p: Partial<AltarLibraryPrefs>) => void;
   setHomeJournalPrefs: (p: Partial<HomeSectionPrefs>) => void;
   setHomeOpsPrefs: (p: Partial<HomeSectionPrefs>) => void;
   setHomeWikiPrefs: (p: Partial<HomeSectionPrefs>) => void;
@@ -226,14 +206,6 @@ function saveTabs(tabs: OpenTab[], activeTabId: string | null) {
   localStorage.setItem('open-tabs', JSON.stringify(tabs));
   if (activeTabId) localStorage.setItem('active-tab-id', activeTabId);
   else localStorage.removeItem('active-tab-id');
-}
-
-/**
- * The Altar's distraction-free mode, which hides the sidebars and the tab bar.
- * Shared by `AppShell` and `TitleBar` so the two cannot drift apart.
- */
-export function isAltarFullscreen(s: Pick<UIState, 'activeView' | 'altarWindowFullscreen'>): boolean {
-  return s.activeView.type === 'altar' && s.activeView.mode !== 'edit' && s.altarWindowFullscreen;
 }
 
 /** Save/Cancel/Delete live only in the right sidebar, so edit mode must not start with it closed.
@@ -402,28 +374,19 @@ export const useUIStore = create<UIState>((set, get) => ({
   // group name, so it was equal for every visible row; the order
   // actually came from the store. The new sort value reproduces exactly that:
   // wiki loads `ORDER BY title` (alpha_asc), operations `updated_at DESC`
-  // and tasks `created_at DESC` (date_desc). Journal, altar and
+  // and tasks `created_at DESC` (date_desc). Journal and
   // trash were never grouped and stay 'flat'.
   journalPrefs: { view: 'list', sort: 'date_desc', grouping: 'flat' },
   wikiPrefs: { view: 'cards', sort: 'alpha_asc', grouping: 'grouped' },
   operationsPrefs: { view: 'list', sort: 'date_desc', grouping: 'grouped' },
   tasksPrefs: { view: 'list', sort: 'date_desc', grouping: 'grouped' },
-  // `grouping` stays unused for the altar: altars carry no categories,
-  // so the dashboard does not pass the axis on to the toolbar. The
-  // field is only there because all modules share the same ListPrefs.
-  altarPrefs: { view: 'cards', sort: 'date_desc', grouping: 'flat' },
   trashPrefs: { view: 'list', sort: 'date_desc', grouping: 'flat' },
-  // Templates have nothing to group — as with the altar, the field is only there for the shared ListPrefs.
+  // Templates have nothing to group — the field is only there for the shared ListPrefs.
   templatesPrefs: { view: 'list', sort: 'alpha_asc', grouping: 'flat' },
   blocksPrefs: { view: 'list', sort: 'alpha_asc', grouping: 'flat' },
-  // Languages carry no categories — `grouping` is here, as with the altar, only for the shared ListPrefs.
+  // Languages carry no categories — `grouping` is here, as with templates, only for the shared ListPrefs.
   lexiconPrefs: { view: 'list', sort: 'alpha_asc', grouping: 'flat' },
   tagsSort: 'alpha_asc',
-  altarWindowFullscreen: false,
-  // The preferences here are the defaults of a vault without its own —
-  // `vaultPrefs` loads a vault's saved ones over them when it is opened.
-  altarShowPreview: true,
-  altarLibraryPrefs: { sort: 'alpha_asc', grouping: 'grouped' },
   homeJournalPrefs: { sort: 'date_desc', view: 'list', count: 5 },
   homeOpsPrefs:     { sort: 'date_desc', view: 'list', count: 5 },
   homeWikiPrefs:    { sort: 'alpha_asc', view: 'cards', count: 5 },
@@ -621,15 +584,11 @@ export const useUIStore = create<UIState>((set, get) => ({
   setWikiPrefs: (p) => set((s) => ({ wikiPrefs: { ...s.wikiPrefs, ...p } })),
   setOperationsPrefs: (p) => set((s) => ({ operationsPrefs: { ...s.operationsPrefs, ...p } })),
   setTasksPrefs: (p) => set((s) => ({ tasksPrefs: { ...s.tasksPrefs, ...p } })),
-  setAltarPrefs: (p) => set((s) => ({ altarPrefs: { ...s.altarPrefs, ...p } })),
   setTrashPrefs: (p) => set((s) => ({ trashPrefs: { ...s.trashPrefs, ...p } })),
   setTemplatesPrefs: (p) => set((s) => ({ templatesPrefs: { ...s.templatesPrefs, ...p } })),
   setBlocksPrefs: (p) => set((s) => ({ blocksPrefs: { ...s.blocksPrefs, ...p } })),
   setLexiconPrefs: (p) => set((s) => ({ lexiconPrefs: { ...s.lexiconPrefs, ...p } })),
   setTagsSort: (sort) => set({ tagsSort: sort }),
-  setAltarWindowFullscreen: (enabled) => set({ altarWindowFullscreen: enabled }),
-  setAltarShowPreview: (enabled) => set({ altarShowPreview: enabled }),
-  setAltarLibraryPrefs: (p) => set((s) => ({ altarLibraryPrefs: { ...s.altarLibraryPrefs, ...p } })),
   setHomeJournalPrefs: (p) => set((s) => ({ homeJournalPrefs: { ...s.homeJournalPrefs, ...p } })),
   setHomeOpsPrefs:     (p) => set((s) => ({ homeOpsPrefs:     { ...s.homeOpsPrefs,     ...p } })),
   setHomeWikiPrefs:    (p) => set((s) => ({ homeWikiPrefs:    { ...s.homeWikiPrefs,    ...p } })),

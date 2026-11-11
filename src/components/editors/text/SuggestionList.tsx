@@ -1,7 +1,6 @@
 import { forwardRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { BookOpen, CheckSquare, Library, Wand2, type LucideIcon } from 'lucide-react';
-import { AltarIcon } from '../../../lib/altarIcon';
 import type { ContentType } from '../../../types';
 import type { SuggestionItem } from '../../../lib/linkItems';
 import { useListKeys, type SuggestionListHandle } from './suggestionPopup';
@@ -18,7 +17,6 @@ export const ENTRY_TYPE_ICONS: Record<ContentType, LucideIcon> = {
   wiki: Library,
   operation: Wand2,
   task: CheckSquare,
-  altar: AltarIcon,
 };
 
 /** Lives in `lib/modules.ts` so that `lib/` can reach it too; only
@@ -31,7 +29,6 @@ export const ENTRY_TYPE_LABEL_KEYS: Record<ContentType, string> = {
   wiki: 'linkPicker.tabWiki',
   operation: 'linkPicker.tabOperations',
   task: 'linkPicker.tabTasks',
-  altar: 'linkPicker.tabAltar',
 };
 
 interface Props {

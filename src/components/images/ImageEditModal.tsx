@@ -21,7 +21,6 @@ function viewOf(use: ImageUse): ActiveView {
     case 'entry': return { type: viewTypeForEntryType(use.entryType!), id: use.id, mode: 'view' };
     case 'template': return { type: 'templates', id: use.id };
     case 'blockDefinition': return { type: 'blocks', id: use.id };
-    case 'altar': return { type: 'altar', id: use.id, mode: 'view' };
   }
 }
 
@@ -73,8 +72,7 @@ export default function ImageEditModal({ file, image, confirmDelete = false, onC
   const useIcon = (use: ImageUse) => {
     if (use.kind === 'entry') return MODULES[viewTypeForEntryType(use.entryType!)].icon;
     if (use.kind === 'template') return AUX_VIEWS.templates.icon;
-    if (use.kind === 'blockDefinition') return AUX_VIEWS.blocks.icon;
-    return MODULES.altar.icon;
+    return AUX_VIEWS.blocks.icon;
   };
 
   return (

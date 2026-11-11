@@ -1,4 +1,4 @@
-import type { ActiveView, AltarItem, AltarRecord, Entry, Language, LexiconEntry, Tag, Task, VaultImage } from '../types';
+import type { ActiveView, Entry, Language, LexiconEntry, Tag, Task, VaultImage } from '../types';
 import { foldTypography, plainTextFor } from './searchText';
 import { todayIso, withoutConcealed } from './blocks/sigil';
 import { viewTypeForEntryType } from './modules';
@@ -21,7 +21,7 @@ import type { CategoryModuleId } from './modules';
 
 export type SearchKind =
   | 'journal' | 'wiki' | 'operation' | 'task'
-  | 'altar' | 'altarItem' | 'image' | 'tag' | 'category'
+  | 'image' | 'tag' | 'category'
   | 'language' | 'lexiconEntry';
 
 
@@ -69,8 +69,6 @@ export interface SearchCorpus {
   wiki: Entry[];
   operations: Entry[];
   tasks: Task[];
-  altars: AltarRecord[];
-  altarItems: AltarItem[];
   /** The pictures taken into "Images" — a hit opens the picture there. */
   images: VaultImage[];
   tags: Tag[];
@@ -243,18 +241,6 @@ export function searchCorpus(corpus: SearchCorpus, rawQuery: string): SearchHit[
       { updatedAt: task.updated_at, categoryId: task.category_id });
   }
 
-  for (const altar of corpus.altars) {
-    push('altar', altar.id, displayTitle(i18n.t, 'altar', altar.title),
-      matchRecord(q, displayTitle(i18n.t, 'altar', altar.title), null, () => []),
-      { updatedAt: altar.updated_at });
-  }
-
-  for (const item of corpus.altarItems) {
-    push('altarItem', item.id, item.name,
-      matchRecord(q, item.name, null, () => [item.note]),
-      { categoryId: item.category_id, updatedAt: item.updated_at || item.created_at });
-  }
-
   for (const image of corpus.images) {
     push('image', image.id, image.name || image.file,
       matchRecord(q, image.name, null, () => [image.note]),
@@ -302,9 +288,8 @@ export function searchCorpus(corpus: SearchCorpus, rawQuery: string): SearchHit[
 /**
  * Where a hit opens.
  *
- * Not every kind has a page of its own: an altar item lives inside the altar
- * module's library and lands on that module rather than on itself, and a
- * lexicon word opens the language it belongs to. A category does have one
+ * Not every kind has a page of its own: a lexicon word opens the language it
+ * belongs to. A category does have one
  * since `CategoriesView` — which is also why an *unused* category is
  * addressable at all, where it used to resolve to nothing.
  */
@@ -314,12 +299,8 @@ export function viewForSearchHit(hit: Pick<SearchHit, 'kind' | 'id' | 'module' |
     case 'wiki':
     case 'operation':
       return { type: viewTypeForEntryType(hit.kind), id: hit.id, mode: 'view' };
-    case 'altar':
-      return { type: 'altar', id: hit.id, mode: 'view' };
     case 'task':
       return { type: 'tasks', id: hit.id };
-    case 'altarItem':
-      return { type: 'altar' };
     case 'image':
       // With the id, `ImagesView` opens the picture.
       return { type: 'images', id: hit.id };

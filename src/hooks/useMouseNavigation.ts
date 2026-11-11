@@ -3,7 +3,7 @@ import { listen } from '@tauri-apps/api/event';
 import { isMacOS, isTauri } from '../lib/platform';
 import { HISTORY_BUTTON_STEPS, isHistoryButton } from '../lib/mouseButtons';
 import { hasOpenModal } from '../components/ui/Modal';
-import { isAltarFullscreen, useUIStore } from '../store/uiStore';
+import { useUIStore } from '../store/uiStore';
 
 /** Multimedia keyboards — and mouse drivers that send these keys instead of a click. */
 const KEY_STEPS: Partial<Record<string, -1 | 1>> = { BrowserBack: -1, BrowserForward: 1 };
@@ -13,8 +13,6 @@ function step(delta: -1 | 1): void {
   // Above a modal the page behind it is not visible: a step there
   // would only be noticed once it closes.
   if (hasOpenModal()) return;
-  // Like the title bar arrows, which do not exist in the altar's full window.
-  if (isAltarFullscreen(useUIStore.getState())) return;
   const { navigateBack, navigateForward } = useUIStore.getState();
   if (delta < 0) navigateBack();
   else navigateForward();
@@ -30,7 +28,7 @@ function step(delta: -1 | 1): void {
  * into swipe gestures there, which never arrive as a DOM event.
  *
  * Plus the keyboard's "Browser back/forward" keys, on every platform. No
- * path navigates above a modal or in the altar's full window.
+ * path navigates above a modal.
  */
 export function useMouseNavigation(): void {
   useEffect(() => {

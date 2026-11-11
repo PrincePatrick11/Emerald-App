@@ -1,6 +1,5 @@
 import i18n from '../i18n';
 import { entryBlockSummary } from './blocks/entrySummary';
-import { useAltarStore } from '../store/altarStore';
 import { useBlockDefinitionStore } from '../store/blockDefinitionStore';
 import { useEntryStore } from '../store/entryStore';
 import { confirmLeave } from '../store/leaveGuardStore';
@@ -53,10 +52,6 @@ const creators: Record<CreatableViewId, (categoryId?: string) => Promise<ActiveV
   wiki: async (categoryId) => {
     const entry = await useEntryStore.getState().createEntry('wiki', { categoryId });
     return newEntryView('wiki', entry);
-  },
-  altar: async () => {
-    const altar = await useAltarStore.getState().createAltar();
-    return { type: 'altar', id: altar.id, mode: 'edit', isNew: true };
   },
   lexicon: async () => {
     const language = await useLexiconStore.getState().createLanguage(i18n.t('lexicon.defaultName'));

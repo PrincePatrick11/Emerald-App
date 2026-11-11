@@ -6,27 +6,25 @@ import { MODULES, type EntryModuleId } from '../../lib/modules';
 import { displayTitle } from '../../lib/entryTitle';
 import TagInput from './TagInput';
 
-/** The page title as a heading: entries, altar and dashboards
+/** The page title as a heading: entries and dashboards
  *  (`Dashboard`, Home) are deliberately the same size. One class chain. */
 export const ENTRY_TITLE_HEADING_CLASSES = 'entry-view-title text-2xl font-semibold text-primary';
 
-/** The title line as an input: entries when editing, the altar and the libraries' pages (`LibraryPageFrame`). */
+/** The title line as an input: entries when editing and the libraries' pages (`LibraryPageFrame`). */
 export const ENTRY_TITLE_INPUT_CLASSES =
   `${ENTRY_TITLE_HEADING_CLASSES} w-full bg-transparent placeholder:text-subtle outline-none selectable`;
 
 /**
  * The narrow row above the title: on the left the way back to the overview
  * (chevron and module name), on the right the date, or when editing the
- * status (`EntryStatus`) instead. Shared by `EntryDetailFrame`, `LibraryPageFrame`
- * and `AltarView`; `inset` follows the indentation of the title below.
+ * status (`EntryStatus`) instead. Shared by `EntryDetailFrame` and `LibraryPageFrame`.
  */
-export function EntryHeaderRow({ back, meta, inset = 'px-8' }: {
+export function EntryHeaderRow({ back, meta }: {
   back: { label: string; onClick: () => void };
   meta?: ReactNode;
-  inset?: string;
 }) {
   return (
-    <div className={`${inset} pt-5 flex items-center gap-4 flex-shrink-0 min-w-0`}>
+    <div className={`px-8 pt-5 flex items-center gap-4 flex-shrink-0 min-w-0`}>
       <button type="button" onClick={back.onClick} className="entry-back-link">
         <ChevronLeft size={14} className="flex-shrink-0" />
         <span className="truncate">{back.label}</span>
@@ -77,9 +75,6 @@ interface EntryDetailFrameProps {
  * module's overview, on the right the date (`meta`) or, when editing, the
  * status. `useEntryEditor`, `setEditActions` and the
  * `editorEpoch` key stay in the views; the frame is purely presentational.
- *
- * AltarView is deliberately left out: own title block (px-6, fullscreen
- * behaviour); partial use would need more props than it saves lines.
  */
 export default function EntryDetailFrame({
   module, isEditing, meta,

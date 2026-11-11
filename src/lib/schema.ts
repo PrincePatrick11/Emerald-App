@@ -21,7 +21,7 @@ import type Database from './sqlite';
  * Must match the highest version in MIGRATIONS. `db.ts` checks this at
  * startup so that a new migration step cannot be forgotten.
  */
-export const BASELINE_VERSION = 62;
+export const BASELINE_VERSION = 63;
 
 /**
  * Tables in dependency order: parents before children.
@@ -40,11 +40,8 @@ export const TABLES = [
   'categories',
   'block_definitions',
   'templates',
-  'altars',
   'entries',
-  'altar_items',
   'tasks',
-  'altar_placements',
   'task_links',
   'languages',
   'lexicon_entries',
@@ -131,25 +128,6 @@ export const TABLE_DDL: Record<TableName, string> = {
       deleted_at TEXT
     )`,
 
-  // `settings` (since v51) is JSON: background, grid, snapping and
-  // resolution (`lib/altarSettings.ts`) — formerly twelve columns of their own. The
-  // image columns remain columns, the image cleanup looks there. `elements`
-  // (since v57) is JSON too: the shapes and text drawn on the altar
-  // (`lib/altarElements.ts`).
-  altars: `
-    CREATE TABLE altars (
-      id TEXT PRIMARY KEY,
-      title TEXT NOT NULL DEFAULT 'Untitled Altar',
-      background_image_data TEXT,
-      thumbnail_data TEXT,
-      icon_data TEXT,
-      created_at TEXT NOT NULL,
-      updated_at TEXT NOT NULL,
-      deleted_at TEXT,
-      settings TEXT NOT NULL DEFAULT '{}',
-      elements TEXT NOT NULL DEFAULT '[]'
-    )`,
-
   // Journal entries, wiki articles and operations in one table (since v49;
   // before, three, see `schemaV48.ts`). What distinguishes them is in the
   // content — blocks —, not in columns: `type` only says in which module the
@@ -176,25 +154,6 @@ export const TABLE_DDL: Record<TableName, string> = {
       deleted_at TEXT
     )`,
 
-  // category_id held the category *name* instead of the ID until v33 — the only
-  // name-based reference in the whole schema. That is why v23 had to cascade a rename
-  // across two tables.
-  // `updated_at`/`deleted_at` since v52: a deleted item lies in the
-  // trash, its placements stay and come back with it.
-  // When it is gone for good, ON DELETE CASCADE takes them along.
-  altar_items: `
-    CREATE TABLE altar_items (
-      id TEXT PRIMARY KEY,
-      name TEXT NOT NULL,
-      emoji TEXT NOT NULL DEFAULT '✨',
-      category_id TEXT REFERENCES categories(id) ON DELETE RESTRICT,
-      note TEXT NOT NULL DEFAULT '',
-      image_data TEXT,
-      created_at TEXT NOT NULL,
-      updated_at TEXT NOT NULL DEFAULT '',
-      deleted_at TEXT
-    )`,
-
   tasks: `
     CREATE TABLE tasks (
       id TEXT PRIMARY KEY,
@@ -208,23 +167,6 @@ export const TABLE_DDL: Record<TableName, string> = {
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL,
       deleted_at TEXT
-    )`,
-
-  altar_placements: `
-    CREATE TABLE altar_placements (
-      id TEXT PRIMARY KEY,
-      altar_id TEXT NOT NULL REFERENCES altars(id) ON DELETE CASCADE,
-      item_id TEXT NOT NULL REFERENCES altar_items(id) ON DELETE CASCADE,
-      x REAL NOT NULL DEFAULT 50,
-      y REAL NOT NULL DEFAULT 50,
-      z_index INTEGER NOT NULL DEFAULT 0,
-      width REAL NOT NULL DEFAULT 8,
-      height REAL NOT NULL DEFAULT 8,
-      rotation REAL NOT NULL DEFAULT 0,
-      opacity REAL NOT NULL DEFAULT 1,
-      locked INTEGER NOT NULL DEFAULT 0,
-      hidden INTEGER NOT NULL DEFAULT 0,
-      group_id TEXT
     )`,
 
   // target_id is polymorphic — no foreign key possible; checkIntegrity() checks the relationship.
@@ -323,14 +265,14 @@ const KEPT_INDEX_DDL_V38: readonly string[] = [
   'CREATE INDEX idx_task_links_target ON task_links(target_id)',
   'CREATE INDEX idx_tasks_category ON tasks(category_id)',
   'CREATE INDEX idx_tasks_parent ON tasks(parent_task_id)',
-  'CREATE INDEX idx_altar_items_category ON altar_items(category_id)',
-  'CREATE INDEX idx_altar_placements_altar ON altar_placements(altar_id)',
-  'CREATE INDEX idx_altar_placements_item ON altar_placements(item_id)',
   ...(['tags', 'categories', 'tasks'] as const).map((t) => `CREATE INDEX idx_${t}_deleted ON ${t}(deleted_at)`),
 ];
 
-/** Those from `INDEX_DDL_V38` whose tables v47 (`links`) and v49 (the three entry tables) drop. */
+/** Those from `INDEX_DDL_V38` whose tables v47 (`links`), v49 (the three entry tables) and v63 (the altar tables) drop. */
 const DROPPED_INDEX_DDL_V38: readonly string[] = [
+  'CREATE INDEX idx_altar_items_category ON altar_items(category_id)',
+  'CREATE INDEX idx_altar_placements_altar ON altar_placements(altar_id)',
+  'CREATE INDEX idx_altar_placements_item ON altar_placements(item_id)',
   'CREATE INDEX idx_links_source ON links(source_id)',
   'CREATE INDEX idx_links_target ON links(target_id)',
   'CREATE INDEX idx_wiki_articles_category ON wiki_articles(category_id)',
@@ -357,10 +299,10 @@ export const LEXICON_INDEX_DDL: readonly string[] = [
   'CREATE INDEX idx_lexicon_entries_language ON lexicon_entries(language_id)',
 ];
 
-/** The index of the altar trash (v46) — separate like those above. */
+/** The index of the altar trash (v46) — separate like those above; gone with its table since v63. */
 export const ALTARS_INDEX_DDL = 'CREATE INDEX idx_altars_deleted ON altars(deleted_at)';
 
-/** The index of the altar items' trash (v52). */
+/** The index of the altar items' trash (v52); gone with its table since v63. */
 export const ALTAR_ITEMS_INDEX_DDL = 'CREATE INDEX idx_altar_items_deleted ON altar_items(deleted_at)';
 
 /**
@@ -403,8 +345,8 @@ export const IMAGES_INDEX_DDL: readonly string[] = [
 
 /** All indexes of the current schema — what a fresh vault gets. */
 export const INDEX_DDL: readonly string[] = [
-  ...KEPT_INDEX_DDL_V38, BLOCK_DEFINITIONS_INDEX_DDL, TEMPLATES_INDEX_DDL, ...LEXICON_INDEX_DDL, ALTARS_INDEX_DDL,
-  ...ENTRIES_INDEX_DDL, ALTAR_ITEMS_INDEX_DDL, ...IMAGES_INDEX_DDL,
+  ...KEPT_INDEX_DDL_V38, BLOCK_DEFINITIONS_INDEX_DDL, TEMPLATES_INDEX_DDL, ...LEXICON_INDEX_DDL,
+  ...ENTRIES_INDEX_DDL, ...IMAGES_INDEX_DDL,
 ];
 
 /**
@@ -421,7 +363,7 @@ export const FALLBACK_CATEGORY_ID = 'other';
  * Since v39 the only built-in category. A new operation in it starts
  * with the sigil blocks — since v43 no longer hard-wired, but via
  * the built-in template `core-sigil`, which is the default there (and which the
- * user can change or delete). For articles, tasks and altar items
+ * user can change or delete). For articles and tasks
  * it is a category like any other.
  */
 export const SIGIL_CATEGORY_ID = 'sigils';
@@ -459,7 +401,7 @@ export const STARTER_CATEGORIES: readonly [string, string][] = [
 ];
 
 /** The content tables with `category_id` (wiki and operations are in `entries`). A literal, because it is interpolated into SQL. */
-export const CATEGORIZED_TABLES = ['entries', 'tasks', 'altar_items'] as const;
+export const CATEGORIZED_TABLES = ['entries', 'tasks'] as const;
 
 /**
  * The same DDL, but compatible with an already existing table.
@@ -594,7 +536,6 @@ export async function checkIntegrity(db: Database): Promise<Orphan[]> {
     wiki: "SELECT id FROM entries WHERE type = 'wiki'",
     operation: "SELECT id FROM entries WHERE type = 'operation'",
     task: 'SELECT id FROM tasks',
-    altar: 'SELECT id FROM altars',
   };
 
   for (const [type, target] of Object.entries(contentTargets)) {
@@ -741,9 +682,7 @@ async function moveCategoryInTemplates(db: Database, from: string, to: string): 
  * `MediaPropertyRow` (icons as in `Favicon` via `readIconFile`) as a data URL
  * through `FileReader`, and their renderers
  * check with `isImageIcon` for `data:` / `blob:` / `/`. A file name would
- * fall through there as text. The same applies to `altars.thumbnail_data` /
- * `icon_data` and `altar_items.image_data` (see the Base64 note in
- * `database.md`).
+ * fall through there as text (see the Base64 note in `database.md`).
  *
  * Migration v35 runs over the state of that time (`IMAGE_FIELDS_V48`), still with
  * the three entry tables.
@@ -755,8 +694,6 @@ export const IMAGE_FIELDS: {
   legacy: string[];
 }[] = [
   { table: 'entries', html: ['content'], plain: [], legacy: ['icon', 'cover_image'] },
-  { table: 'altars', html: [], plain: ['background_image_data'], legacy: ['thumbnail_data', 'icon_data'] },
-  { table: 'altar_items', html: [], plain: [], legacy: ['image_data'] },
 ];
 
 /**

@@ -1,6 +1,6 @@
 import {
-  ALTAR_LIBRARY_SORTS, GROUPING_MODES, HOME_COUNTS, HOME_VIEWS, SORT_MODES, TAGS_SORTS, VIEW_MODES, useUIStore,
-  type AltarLibraryPrefs, type HomeSectionPrefs, type ListPrefs,
+  GROUPING_MODES, HOME_COUNTS, HOME_VIEWS, SORT_MODES, TAGS_SORTS, VIEW_MODES, useUIStore,
+  type HomeSectionPrefs, type ListPrefs,
 } from './uiStore';
 
 /**
@@ -22,14 +22,14 @@ import {
  */
 /** The lists with view, sorting and grouping (`ListPrefs`). */
 const LIST_PREF_KEYS = [
-  'journalPrefs', 'wikiPrefs', 'operationsPrefs', 'tasksPrefs', 'altarPrefs', 'trashPrefs',
+  'journalPrefs', 'wikiPrefs', 'operationsPrefs', 'tasksPrefs', 'trashPrefs',
   'templatesPrefs', 'blocksPrefs', 'lexiconPrefs',
 ] as const;
 
 const PREF_KEYS = [
   ...LIST_PREF_KEYS,
   'homeJournalPrefs', 'homeOpsPrefs', 'homeWikiPrefs',
-  'tagsSort', 'altarShowPreview', 'altarLibraryPrefs',
+  'tagsSort',
   'collapsedGroups', 'flags',
 ] as const;
 
@@ -78,33 +78,6 @@ function homePrefs(saved: unknown, fallback: HomeSectionPrefs): HomeSectionPrefs
   };
 }
 
-function libraryPrefs(saved: unknown, fallback: AltarLibraryPrefs): AltarLibraryPrefs {
-  if (!isRecord(saved)) return fallback;
-  return {
-    sort: oneOf(saved.sort, ALTAR_LIBRARY_SORTS, fallback.sort),
-    grouping: oneOf(saved.grouping, GROUPING_MODES, fallback.grouping),
-  };
-}
-
-/**
- * The preferences that were app-wide before there were per-vault preferences. A vault without
- * its own starts with them, so that nothing jumps back after the update.
- */
-function legacyPrefs(): Partial<Prefs> {
-  try {
-    const preview = localStorage.getItem('altar-show-preview');
-    return {
-      ...(preview !== null ? { altarShowPreview: preview !== '0' } : {}),
-      altarLibraryPrefs: libraryPrefs({
-        sort: localStorage.getItem('altar-library-sort'),
-        grouping: localStorage.getItem('altar-library-grouping'),
-      }, DEFAULTS.altarLibraryPrefs),
-    };
-  } catch {
-    return {};
-  }
-}
-
 /**
  * The saved preferences, checked rather than trusted: only fields that exist
  * and are valid — a key survives versions in which there were other
@@ -138,8 +111,6 @@ function parse(raw: string | null): Prefs {
     homeOpsPrefs: homePrefs(saved.homeOpsPrefs, DEFAULTS.homeOpsPrefs),
     homeWikiPrefs: homePrefs(saved.homeWikiPrefs, DEFAULTS.homeWikiPrefs),
     tagsSort: oneOf(saved.tagsSort, TAGS_SORTS, DEFAULTS.tagsSort),
-    altarShowPreview: typeof saved.altarShowPreview === 'boolean' ? saved.altarShowPreview : DEFAULTS.altarShowPreview,
-    altarLibraryPrefs: libraryPrefs(saved.altarLibraryPrefs, DEFAULTS.altarLibraryPrefs),
     collapsedGroups,
     flags,
   };
@@ -162,7 +133,7 @@ export function loadVaultPrefs(vaultId: string): void {
   } catch {
     // Without storage the defaults apply.
   }
-  const prefs = raw === null ? { ...parse(null), ...legacyPrefs() } : parse(raw);
+  const prefs = parse(raw);
   hydrating = true;
   try {
     useUIStore.setState(prefs);

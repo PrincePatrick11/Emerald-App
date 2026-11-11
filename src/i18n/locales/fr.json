@@ -80,11 +80,8 @@
     "blockDefinitionDeleted": "Bloc supprimé",
     "templateDeleted": "Modèle supprimé",
     "languageDeleted": "Langue supprimée",
-    "altarItemDeleted": "Élément supprimé",
     "imageDeleted": "Image supprimée",
-    "altarDeleted": "Autel supprimé",
-    "wordDeleted": "Mot supprimé",
-    "placementRemoved": "Élément retiré de l'autel"
+    "wordDeleted": "Mot supprimé"
   },
   "createItem": {
     "title": "Créer"
@@ -94,7 +91,6 @@
     "all": "Tout",
     "journal": "Journal",
     "wiki": "Wiki",
-    "altar": "Autel",
     "tags": "Étiquettes",
     "categories": "Catégories",
     "images": "Images",
@@ -128,59 +124,6 @@
     }
   },
   "altar": {
-    "addElement": "Ajouter un élément",
-    "element": "Élément",
-    "newAltar": "Nouvel autel",
-    "libraryTitle": "Bibliothèque de l'autel",
-    "sortAltars": "Tri · Autels",
-    "sortLibrary": "Tri · Bibliothèque",
-    "sectionTitle": "Autels",
-    "elementName": "Nom…",
-    "all": "Tous",
-    "noElements": "Pas encore d'éléments.",
-    "untitled": "Autel sans titre",
-    "uploadImage": "Télécharger une image",
-    "favicon": "Icône",
-    "windowFullscreen": "Vue focus",
-    "exitWindowFullscreen": "Quitter la vue focus",
-    "imageTooLarge": "Image trop volumineuse (max {{max}})",
-    "gridOverlay": "Grille superposée",
-    "gridOptions": "Options de grille",
-    "gridSize": "Taille de grille",
-    "gridOpacity": "Opacité de grille",
-    "gridColor": "Couleur de grille",
-    "snapToGrid": "Aligner à la grille",
-    "rotationSnap": "Aligner l'angle de rotation",
-    "rotationSnapAngle": "Pas d'angle (°)",
-    "snapScaleToGrid": "Mettre à l'échelle de la grille",
-    "gridToggleGrid": "Grille",
-    "gridToggleSnap": "Aligner",
-    "gridToggleRotate": "Rotation",
-    "gridToggleScale": "Échelle",
-    "canvasOptions": "Options de la toile",
-    "ratio": "Format",
-    "chooseEmoji": "Choisir un emoji…",
-    "placedElements": "Éléments placés",
-    "noElementsPlaced": "Aucun élément placé pour l'instant",
-    "summaryFormat": "Format",
-    "summaryBackground": "Fond",
-    "summaryGrid": "Grille",
-    "summaryGridOff": "Désactivée",
-    "summaryElements": "Éléments",
-    "inspectorX": "X",
-    "inspectorY": "Y",
-    "inspectorScale": "Échelle",
-    "inspectorRotation": "Rotation",
-    "inspectorOpacity": "Opacité",
-    "inspectorLocked": "Verrouillé — déverrouillez-le pour le modifier",
-    "show": "Afficher",
-    "hide": "Masquer",
-    "lock": "Verrouiller",
-    "unlock": "Déverrouiller",
-    "duplicateElement": "Dupliquer l'élément",
-    "removeElement": "Supprimer l'élément",
-    "rotate": "Rotation",
-    "scale": "Échelle",
     "categories": {
       "candle": "Bougie",
       "crystal": "Cristal",
@@ -190,8 +133,7 @@
       "tool": "Outil",
       "table": "Table",
       "other": "Autre"
-    },
-    "showPreview": "Aperçu de l'autel"
+    }
   },
   "journal": {
     "title": "Journal",
@@ -296,7 +238,6 @@
       "link": "Lien",
       "image": "Image",
       "moon": "Phase lunaire",
-      "altar": "Autel",
       "sigilCalc": "Calculateur de sigil",
       "sigilCanvas": "Dessin du sigil",
       "sigilCharge": "Charge"
@@ -372,11 +313,6 @@
       "locked": "Verrouillé tant que le sigil est chargé",
       "saveFailed": "Le dessin n'a pas pu être enregistré",
       "loadFailed": "Le dessin n'a pas pu être chargé — fermez puis rouvrez l'entrée"
-    },
-    "altar": {
-      "search": "Rechercher un autel…",
-      "missing": "L'autel « {{name}} » n'existe plus",
-      "open": "Ouvrir l'autel"
     },
     "canvas": {
       "broken": "Cette toile n’a pas pu être lue. Elle reste telle quelle.",
@@ -880,7 +816,6 @@
     "globalPlaceholder": "Tout rechercher…",
     "hint": "Titres, étiquettes et contenus de tous les modules.",
     "clear": "Effacer la recherche",
-    "altarElements": "Élément d'autel",
     "categories": "Catégorie",
     "showMore": "Afficher {{count}} autre résultat",
     "showMore_other": "Afficher {{count}} autres résultats"
@@ -946,6 +881,7 @@
     "removeLink": "Retirer l'entrée liée",
     "icon": "Icône",
     "emoji": "Emoji",
+    "chooseEmoji": "Choisir un emoji…",
     "coverImage": "Image de couverture",
     "change": "Modifier",
     "remove": "Supprimer",
@@ -1092,7 +1028,6 @@
     "includeJournal": "Journal",
     "includeWiki": "Wiki",
     "includeOperations": "Opérations",
-    "includeAltars": "Autels",
     "includeTasks": "Tâches",
     "includeTags": "Tags",
     "includeLexicon": "Lexique",
@@ -1284,7 +1219,6 @@
     "blockDefinitions": "Blocs",
     "templates": "Modèles",
     "languages": "Langues",
-    "altarItems": "Éléments d'autel",
     "deleteSelected": "Supprimer la sélection ({{count}})",
     "confirmDeleteSelected": "Oui, supprimer {{count}}",
     "retentionNoteNever": "Les éléments restent jusqu'à ce que vous les supprimiez définitivement."
@@ -1313,10 +1247,6 @@
     "exportPdf": "Exporter en PDF…",
     "exportMarkdown": "Exporter en Markdown…",
     "exportEmerald": "Exporter en Emerald…",
-    "exportAltarImage": "Exporter en image",
-    "exportAltarJpeg": "JPEG…",
-    "exportAltarPng": "PNG…",
-    "exportAltarWebp": "WebP…",
     "importMarkdown": "Depuis Markdown…",
     "importEmerald": "Depuis Emerald…",
     "quit": "Quitter Emerald App",
@@ -1342,7 +1272,6 @@
     "tabWiki": "Wiki",
     "tabOperations": "Opérations",
     "tabTasks": "Tâches",
-    "tabAltar": "Autel",
     "noResults": "Aucune entrée trouvée"
   },
   "importDestination": {
@@ -1476,14 +1405,6 @@
     "operations": {
       "title": "Aucune opération pour l'instant",
       "description": "Planifiez des rituels avec ingrédients, déroulement et résultat."
-    },
-    "altar": {
-      "title": "Aucun autel pour l'instant",
-      "description": "Composez un autel à partir d'un fond et d'éléments."
-    },
-    "altarLibrary": {
-      "title": "Aucun élément pour l'instant",
-      "description": "Bougies, cristaux, symboles : les éléments composent vos autels."
     },
     "images": {
       "title": "Pas encore d’images",

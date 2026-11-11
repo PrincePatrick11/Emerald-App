@@ -147,7 +147,7 @@ function TemplateList({ onCreate, onDelete }: {
       onSort={(sort) => setPrefs({ sort })}
       search={search}
       onSearch={setSearch}
-      // Collapsed means an empty list instead of a special branch — like altar and blocks.
+      // Collapsed means an empty list instead of a special branch — like blocks and the lexicon.
       items={collapsed ? [] : sorted}
       itemKey={(tpl) => tpl.id}
       renderItem={renderItem}

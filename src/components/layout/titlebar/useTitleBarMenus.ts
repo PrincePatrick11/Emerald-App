@@ -57,17 +57,6 @@ export function useTitleBarMenus() {
       { kind: 'item', label: t('menu.exportPdf'), disabled: !enabled.pdfEnabled, onSelect: () => dispatchMenuAction('export-pdf') },
       { kind: 'item', label: t('menu.exportMarkdown'), disabled: !enabled.entryEnabled, onSelect: () => dispatchMenuAction('export-markdown') },
       { kind: 'item', label: t('menu.exportEmerald'), disabled: !enabled.emeraldEnabled, onSelect: () => dispatchMenuAction('export-emerald') },
-      { kind: 'separator' },
-      {
-        kind: 'submenu',
-        label: t('menu.exportAltarImage'),
-        disabled: !enabled.altarImageEnabled,
-        children: [
-          { kind: 'item', label: t('menu.exportAltarJpeg'), onSelect: () => dispatchMenuAction('export-altar-jpeg') },
-          { kind: 'item', label: t('menu.exportAltarPng'), onSelect: () => dispatchMenuAction('export-altar-png') },
-          { kind: 'item', label: t('menu.exportAltarWebp'), onSelect: () => dispatchMenuAction('export-altar-webp') },
-        ],
-      },
     ],
   };
   const importMenu: TitleBarMenu = {

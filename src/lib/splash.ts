@@ -175,7 +175,7 @@ export function showSplash(): void {
     document.removeEventListener('keydown', onKeyDown, true);
     fadeOutAndRemove(el);
   };
-  // Several layers share Escape — `Modal`, `AltarView` and
+  // Several layers share Escape — `Modal` and
   // `useOutsideClick`. Capture phase plus stopping propagation, so that
   // the preview gets it first and nothing underneath closes along with it.
   const onKeyDown = (e: KeyboardEvent) => {

@@ -10,7 +10,7 @@ import type { MoonPhase } from '../../types';
 
 /**
  * The inputs for the values of a field element that sit in the JSON: everything
- * except link, image and altar (which sit in the markup, see
+ * except link and image (which sit in the markup, see
  * `FieldSlotEditor`). Shared by the field block in edit mode and by the
  * defaults in the block builder of the blocks view. `onChange(undefined)` means "empty".
  */

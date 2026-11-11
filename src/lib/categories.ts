@@ -64,18 +64,18 @@ export function lookupCategory<C>(
 /** How often a category is used per module. */
 export type CategoryUsage = Record<CategoryModuleId, number>;
 
-/** The four entry lists from which a category's usage is derived. */
+/** The entry lists from which a category's usage is derived. */
 export type CategorySources = Record<CategoryModuleId, readonly { category_id: string | null }[]>;
 
-export const emptyCategoryUsage = (): CategoryUsage => ({ wiki: 0, operations: 0, tasks: 0, altar: 0 });
+export const emptyCategoryUsage = (): CategoryUsage => ({ wiki: 0, operations: 0, tasks: 0 });
 
 /**
  * How many entries per module point to each category — one pass per
  * list instead of one filter per category. Categories without a single
  * entry are missing from the map; `emptyCategoryUsage()` is their fallback value.
  *
- * One truth for the categories view (shows all four numbers) and the
- * global search (takes only the largest of them). Otherwise a fifth
+ * One truth for the categories view (shows all three numbers) and the
+ * global search (takes only the largest of them). Otherwise a fourth
  * categorized module would leave two places to maintain, and the two would contradict each other
  * about the same category.
  */

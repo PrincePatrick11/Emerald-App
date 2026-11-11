@@ -38,7 +38,7 @@ function BlockSettingsBox({ children, className = '' }: { children: ReactNode; c
  * an outline of the visible blocks (`BlockOutline`), whose rows jump to the
  * block, and only if there is more than one. If a
  * block type brings settings (`blockSidebarViews.ts`), a click on
- * its row expands them below it, like the altar's placed elements.
+ * its row expands them below it.
  *
  * Everything goes through the API that the `BlockStack` publishes in the
  * `blockSessionStore`; the sidebar never changes the entry itself.
@@ -138,7 +138,7 @@ function BlockManager({ session }: { session: BlockSession }) {
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const { api } = session;
-  // Without animation, like the altar's placed elements.
+  // Without animation.
   const { listRef, visualItems, draggingId, startDrag } = usePointerReorder(session.blocks, (ordered) => api.reorder(ordered.map((b) => b.id)));
 
   const openRowMenu = (e: MouseEvent, block: BlockInstance, meta: BlockTypeMeta | undefined) => {
@@ -225,8 +225,8 @@ interface ManagerRowProps {
 }
 
 /**
- * A row of the management list when editing; the same shape as the altar's placed
- * elements, with the same states (`sidebarRowStateClasses`).
+ * A row of the management list when editing, with the states of the
+ * sidebar's handle rows (`sidebarRowStateClasses`).
  */
 function ManagerRow({
   block, meta, label, typeLabel, renaming, onRenamed, selected, isDragging, onGripPointerDown, onActivate, onToggleHidden, onOpenMenu, settings,
@@ -242,8 +242,7 @@ function ManagerRow({
         onContextMenu={(e) => { e.preventDefault(); onOpenMenu(e); }}
         // 32px tall, 13px and 14px icons like the other rows of the sidebar.
         className={`w-full flex items-center gap-2 h-8 rounded-md border pl-1 pr-1 text-[13px] transition-all select-none ${
-          // Without a border as long as it is neither selected nor dragged; the
-          // states above it are shared with the altar's elements.
+          // Without a border as long as it is neither selected nor dragged.
           isDragging || selected ? sidebarRowStateClasses({ dragging: isDragging, selected }) : 'block-manager-row--idle'
         } ${hidden ? 'opacity-50' : ''}`}
       >

@@ -1,6 +1,6 @@
 /**
- * The one category list for wiki, operations, tasks and altar items
- * (table `categories`, since v38). Previously each of the four stores held its
+ * The one category list for wiki, operations and tasks
+ * (table `categories`, since v38). Previously each of the stores held its
  * own slice with the same five actions.
  *
  * Import rule: this store may import the content stores, the template store and
@@ -19,7 +19,6 @@ import type { Category } from '../types';
 import { useEntryStore } from './entryStore';
 import { reassignBaselineCategories } from './entryEdit';
 import { useTaskStore } from './taskStore';
-import { useAltarStore } from './altarStore';
 import { dropCategoriesFromTemplatesInMemory, useTemplateStore } from './templateStore';
 
 /** Error message from addCategory/updateCategory when the name is already taken. */
@@ -58,7 +57,7 @@ function nameTaken(categories: Category[], name: string, exceptId?: string): boo
  * Reassigns contents that point at one of the `ids` to `to` in the loaded
  * stores (`null` = no category) — the in-memory counterpart to
  * `reassignCategoryContent`. Also used when emptying the trash;
- * the four store shapes should live in one place only. Templates
+ * the store shapes should live in one place only. Templates
  * lose the assignment only without `to`; on merging,
  * `mergeCategory` reloads them.
  */
@@ -67,13 +66,6 @@ export function reassignCategoriesInMemory(ids: ReadonlySet<string>, to: string 
     x.category_id && ids.has(x.category_id) ? { ...x, category_id: to } : x;
   useEntryStore.setState((s) => ({ entries: { ...s.entries, wiki: s.entries.wiki.map(move), operation: s.entries.operation.map(move) } }));
   useTaskStore.setState((s) => ({ tasks: s.tasks.map(move) }));
-  useAltarStore.setState((s) => ({
-    items: s.items.map(move),
-    placements: s.placements.map(move),
-    previewPlacements: Object.fromEntries(
-      Object.entries(s.previewPlacements).map(([k, list]) => [k, list.map(move)])
-    ),
-  }));
   // Also what a running edit would write back with Cancel.
   reassignBaselineCategories(ids, to);
   if (!to) dropCategoriesFromTemplatesInMemory(ids);

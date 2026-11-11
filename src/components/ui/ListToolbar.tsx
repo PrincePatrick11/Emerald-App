@@ -62,9 +62,6 @@ interface Props {
   sortModes?: readonly SortMode[];
   /** Which date the date sort compares; default `created`. */
   sortDate?: SortDateField;
-  /** Heading of the sorting when the bar has more than one
-   *  (altar: "Sort · Altars" above "Sort · Library"). */
-  sortLabel?: string;
   /** Under the view's layout buttons, in the same section. */
   displayToggles?: DisplayToggle[];
   /** The grouping axis; if it is missing, its section is omitted. See DashboardGroupBy. */
@@ -109,10 +106,9 @@ const sortBlockedInTimeline = (v: SortMode) => v !== 'date_desc' && v !== 'date_
 /**
  * The sort select of the dashboard sidebar: full width, with icon
  * and label of the chosen mode in the trigger ("Created · newest"), a
- * `FieldDropdown` with `variant="sidebar"`. Exported for
- * the altar library, which provides its own sorting in the same header.
+ * `FieldDropdown` with `variant="sidebar"`.
  */
-export function SortSelect<S extends SortMode>({ label, value, modes, onChange, dateField = 'created', isDisabled, disabledHint }: {
+function SortSelect<S extends SortMode>({ label, value, modes, onChange, dateField = 'created', isDisabled, disabledHint }: {
   /** aria-label of the trigger, before the chosen mode. */
   label: string;
   value: S;
@@ -160,7 +156,7 @@ export function SortSelect<S extends SortMode>({ label, value, modes, onChange, 
  * have falls away. The search is in the main area (`ListSearchField`).
  */
 export default function ListToolbar({
-  view, sort, onView, onSort, viewOptions: viewOptionsProp, sortModes = DEFAULT_SORT_MODES, sortDate, sortLabel, displayToggles = [], groupBy,
+  view, sort, onView, onSort, viewOptions: viewOptionsProp, sortModes = DEFAULT_SORT_MODES, sortDate, displayToggles = [], groupBy,
 }: Props) {
   const { t } = useTranslation();
 
@@ -175,7 +171,7 @@ export default function ListToolbar({
   const showLayouts = view !== undefined && onView !== undefined && viewOptions.length > 1;
   const showSort = sort !== undefined && onSort !== undefined;
   const timelineHint = t('listView.notAvailableInTimeline');
-  const sortHeading = sortLabel ?? t('listView.sort');
+  const sortHeading = t('listView.sort');
 
   const showViewSection = showLayouts || displayToggles.length > 0;
 

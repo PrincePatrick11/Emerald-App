@@ -12,7 +12,7 @@ import SearchField from '../../ui/SearchField';
 type Tab = 'all' | ContentType;
 
 /** Tab order = rail order (registry), not the key order
- *  of some map: journal, task, operation, wiki, altar. */
+ *  of some map: journal, task, operation, wiki. */
 const LINK_TYPE_ORDER: ContentType[] = MODULE_LIST.map((mod) => mod.entryType);
 
 interface Props {
@@ -47,7 +47,7 @@ export default function LinkPickerModal({ onSelect, onClose }: Props) {
   const counts = useMemo(() => {
     const q = query.toLowerCase();
     const visible = q ? allItems.filter((i) => i.label.toLowerCase().includes(q)) : allItems;
-    const next: Record<Tab, number> = { all: visible.length, journal: 0, wiki: 0, operation: 0, task: 0, altar: 0 };
+    const next: Record<Tab, number> = { all: visible.length, journal: 0, wiki: 0, operation: 0, task: 0 };
     for (const item of visible) next[item.entryType]++;
     return next;
   }, [allItems, query]);
@@ -135,8 +135,8 @@ export default function LinkPickerModal({ onSelect, onClose }: Props) {
                     {/* Icon */}
                     <span className="text-base w-5 flex-shrink-0 flex items-center justify-center">
                       {(() => {
-                        // displayIcon first: altars carry their graphic only there
-                        // (see SuggestionItem), `icon` would stay empty.
+                        // displayIcon first: an image icon is carried only there
+                        // (see SuggestionItem), `icon` holds the emoji fallback.
                         const icon = item.displayIcon || item.icon;
                         return isImageIcon(icon)
                           ? <img src={icon} alt="" className="w-4 h-4 object-contain" />

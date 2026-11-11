@@ -13,8 +13,7 @@ export interface EditHandlers extends EditActions {
 
 /**
  * Registers Save/Cancel/Delete of the active view in the right sidebar,
- * as long as `active` is true — previously copied five times (journal/wiki/operations/
- * altar and the former sigil view).
+ * as long as `active` is true — once for every view that edits.
  *
  * The handlers run through a ref: the sidebar therefore never calls a
  * stale closure, and the effect does not have to re-register on every

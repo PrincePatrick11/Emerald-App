@@ -10,7 +10,7 @@ import Button from '../../ui/Button';
 /**
  * Just the glyph, without selection. Default 20px, the size of a
  * row meta entry; `className` replaces the size where the icon should be
- * large (the altar card, when it replaces the preview).
+ * larger.
  *
  * The one place that knows an icon is either an image or an emoji;
  * whoever decides that themselves forgets the emoji half.
@@ -38,8 +38,7 @@ interface FaviconProps {
  * remove) in one row.
  *
  * Returns only this row, without a label; the callers bring that
- * themselves: `IconField` (a language's page) its heading, the
- * altar its own collapsible header. The edit sidebar of
+ * themselves: `IconField` (a language's page) its heading. The edit sidebar of
  * entries and library pages uses `MediaPropertyRow` instead. For editing only; reading
  * goes through `FaviconGlyph`.
  *
@@ -82,7 +81,7 @@ export default function Favicon({ value, onChange, onRemove }: FaviconProps) {
             <Button tone="neutral" small title={value ? t('wiki.changeIcon') : t('wiki.addIcon')} onClick={pickFile}>
               <ImagePlus size={12} /> {value ? t('properties.change') : t('properties.icon')}
             </Button>
-            <Button tone="neutral" small title={t('altar.chooseEmoji')} onClick={toggle}>
+            <Button tone="neutral" small title={t('properties.chooseEmoji')} onClick={toggle}>
               <Smile size={12} /> {t('properties.emoji')}
             </Button>
             {/* Remove as an icon only: with a label the row would run out of the

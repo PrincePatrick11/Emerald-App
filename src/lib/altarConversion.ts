@@ -251,6 +251,16 @@ export function contentWithAltarsAsOperations(content: string): string {
   return changed ? serializeBlocks(next) : content;
 }
 
+/**
+ * The same for `elements` as an import reads them, a JSON string or already a
+ * list: before anything checks them, since an altar element or an altar
+ * default is no longer valid there.
+ */
+export function elementsWithAltarsAsOperations(elements: unknown): unknown {
+  if (typeof elements === 'string') return definitionElementsWithAltarsAsOperations(elements);
+  return linkElements(elements).elements;
+}
+
 /** The `elements` of a block definition with its altar elements as link elements; unchanged as it was. */
 export function definitionElementsWithAltarsAsOperations(raw: string): string {
   if (!raw.includes('altar')) return raw;

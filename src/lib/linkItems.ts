@@ -4,7 +4,7 @@ import { DEFAULT_ENTRY_EMOJI } from './modules';
 import { displayTitle } from './entryTitle';
 import { categoryLabel, lookupCategory } from './categories';
 import { isImageIcon } from './helpers';
-import type { AltarRecord, Category, ContentType, Entry, Task } from '../types';
+import type { Category, ContentType, Entry, Task } from '../types';
 
 /**
  * A linkable entry, as seen by the `[[` autocomplete, the
@@ -24,17 +24,16 @@ export interface SuggestionItem {
   /** Travels into the node attrs on insertion and thus into the stored HTML. */
   icon?: string;
   /**
-   * For display only, never for storing — for altars the data URL from
-   * `icon_data`, which has no business in the node attrs. Falls back to `icon`
-   * and from there to `DEFAULT_ENTRY_EMOJI`.
+   * For display only, never for storing — an uploaded icon image, which has
+   * no business in the node attrs (`splitIcon`). Falls back to `icon` and from
+   * there to `DEFAULT_ENTRY_EMOJI`.
    */
   displayIcon?: string;
   /**
    * Translated name of the category the entry is in within its module —
    * the heading under which an appended link lands in the entry. Journal
    * has no categories and uses the moon phase (that is what "category" is called there
-   * when sorting too) — or, if the vault does not show it, like altars
-   * the module name.
+   * when sorting too) — or, if the vault does not show it, the module name.
    */
   categoryLabel?: string;
   /**
@@ -57,7 +56,7 @@ export interface SuggestionItem {
  * import/export paths call it with `getState()` and `i18n.t` directly.
  *
  * Block order = rail order (registry): journal, task, operation,
- * wiki, altar — nothing enforces that, it is written here by hand.
+ * wiki — nothing enforces that, it is written here by hand.
  *
  * Deleted entries are already filtered out by the stores (`deleted_at IS NULL`
  * on load), so no second filter is needed here.
@@ -69,7 +68,6 @@ export interface LinkItemSources {
   articles: Entry[];
   /** The one global list — tasks, operations and articles all point into it. */
   categories: Category[];
-  altars: AltarRecord[];
   /** The vault setting `journal.moonPhase` — whether journal entries show their phase. */
   showMoonPhase: boolean;
 }
@@ -140,19 +138,6 @@ export function buildLinkItems(s: LinkItemSources, t: TFunction): SuggestionItem
         entry_number: a.entry_number,
       };
     }),
-    // No `icon`: it lands in the node attrs on insertion, and the only
-    // altar graphic (icon_data) is a data URL — only the
-    // emoji fallback is stored. For display it is carried by `displayIcon`.
-    ...s.altars.map((a) => ({
-      id: a.id,
-      entryType: 'altar' as const,
-      label: displayTitle(t, 'altar', a.title),
-      displayIcon: a.icon_data || DEFAULT_ENTRY_EMOJI.altar,
-      // Altars have no categories (the categories belong to the items
-      // on the altar, not to the altar itself) — the module name remains.
-      categoryLabel: t('nav.altar'),
-      updatedAt: a.updated_at,
-    })),
   ];
 }
 

@@ -65,8 +65,7 @@ export default function BlocksView() {
 }
 
 /**
- * The built-in blocks below the custom ones, built like the library below
- * the altars — the same list as "Add block" in the entry. For reference
+ * The built-in blocks below the custom ones — the same list as "Add block" in the entry. For reference
  * only: nothing can be created or edited on them, hence
  * resting rows (no hover, no pointer) instead of clickable ones. The search filters them too.
  */
@@ -135,7 +134,7 @@ function BlockList({ onCreate, onDelete }: {
       tiebreak: (a, b) => definitionLabel(t, a).localeCompare(definitionLabel(t, b)),
     },
   ), [definitions, query, sort, t]);
-  // Collapsed means an empty list instead of a special branch, as in the altar dashboard.
+  // Collapsed means an empty list instead of a special branch, as in templates and the lexicon.
   const shown = customCollapsed ? [] : sorted;
 
   const renderRow = (def: BlockDefinition) => {

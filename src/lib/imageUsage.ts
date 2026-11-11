@@ -10,7 +10,7 @@ import { storedImageName } from './schema';
 /**
  * Where the vault's pictures are used — for "Images": which entries show a
  * picture, and which pictures are not pictures of their own but the thing
- * itself (a sigil drawing, an altar background), kept out of the grid.
+ * itself (a sigil drawing, a canvas background), kept out of the grid.
  */
 
 /**
@@ -18,12 +18,12 @@ import { storedImageName } from './schema';
  * - `content`: shown in a text or an image field — it can be taken out there;
  * - `default`: the image default of a custom block — changed in the block;
  * - `drawing`: a sigil drawing, the drawing itself;
- * - `background`: an altar's background.
+ * - `background`: a canvas's background.
  */
 export type ImageUseRole = 'content' | 'default' | 'drawing' | 'background';
 
 export interface ImageUse {
-  kind: 'entry' | 'template' | 'blockDefinition' | 'altar';
+  kind: 'entry' | 'template' | 'blockDefinition';
   id: string;
   title: string;
   /** For an entry: its type, to open it. */
@@ -100,15 +100,6 @@ export async function collectImageUses(db: Database): Promise<Map<string, ImageU
   for (const definition of definitions) {
     for (const file of namesIn(definition.elements)) {
       add(file, { kind: 'blockDefinition', id: definition.id, title: definition.name, role: 'default' });
-    }
-  }
-
-  const altars = await db.select<{ id: string; title: string; background_image_data: string | null }[]>(
-    'SELECT id, title, background_image_data FROM altars WHERE deleted_at IS NULL'
-  );
-  for (const altar of altars) {
-    for (const file of namesIn(altar.background_image_data)) {
-      add(file, { kind: 'altar', id: altar.id, title: altar.title, role: 'background' });
     }
   }
   return uses;

@@ -27,7 +27,7 @@ export default function EntryReadSections({ properties, content, tags }: {
   );
 }
 
-/** The "Properties" section, also used by the altar, which otherwise has different sections. */
+/** The "Properties" section, also used by the block builder, which otherwise has different sections. */
 export function PropertiesSection({ children }: { children: ReactNode }) {
   const { t } = useTranslation();
   return <SidebarSection storageKey="entry-sidebar-properties-open" label={t('properties.title')}>{children}</SidebarSection>;

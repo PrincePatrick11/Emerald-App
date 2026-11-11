@@ -80,7 +80,7 @@ const REVEAL_MS = 1600;
  *
  * It is the text editors' host (`useTextEditorHost`: toolbar, link picker,
  * chip navigation, drops) and the one point of contact for the sidebar's link
- * requests, which also reach link and altar fields. The sidebar's block
+ * requests, which also reach link fields. The sidebar's block
  * management serves it via `blockSessionStore`.
  *
  * Text input changes no React state: the new HTML lands in `blocksRef`
@@ -174,7 +174,7 @@ export default function BlockStack({
   }, [orderedEditors, targetEditor, commit]);
 
   /**
-   * The field block whose link or altar field points to `target`,
+   * The field block whose link field points to `target`,
    * along with the block without that reference. The sidebar's links field
    * also lists these links (it reads the whole content), so
    * jumping to and removing must find them too.
@@ -189,9 +189,9 @@ export default function BlockStack({
       if (resolveBlockType(block)?.id !== FIELDS_BLOCK_TYPE) continue;
       const model = parseFields(block);
       if (model.broken) continue;
-      // The raw chip, in the altar field too: the sidebar lists every link in the content.
+      // The raw chip: the sidebar lists every link in the content.
       const element = model.elements.find((el) =>
-        (el.kind === 'link' || el.kind === 'altar') && matches(linkFromSlot(model.slots[el.id])));
+        el.kind === 'link' && matches(linkFromSlot(model.slots[el.id])));
       // A text element without a mounted editor (removed, but with content): there
       // only the chip goes away, not the whole text; its word stays.
       const text = element ? undefined : model.elements.find((el) =>
@@ -232,7 +232,7 @@ export default function BlockStack({
 
   // Click on a chip in the links field → jump to the spot. Also in
   // read mode, where it is the normal case. The first text block with the link
-  // wins; if it only appears in a link or altar field, it jumps there.
+  // wins; if it only appears in a link field, it jumps there.
   useEffect(() => subscribeEntryLinkRequest(
     REVEAL_ENTRY_LINK_EVENT,
     (target) => {

@@ -1,7 +1,7 @@
 /**
  * Changing an entry's type — journal, operation and wiki among each other,
- * the three modules with a block stack. Tasks and altars have a different
- * data model and stay what they are.
+ * the three modules with a block stack. Tasks have a different data model
+ * and stay what they are.
  *
  * The entry keeps its id: its row in `entries` gets the new type,
  * and everything that addresses it via `(id, type)` follows — link chips in

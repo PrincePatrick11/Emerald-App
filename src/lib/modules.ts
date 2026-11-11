@@ -25,13 +25,11 @@ import {
   Library,
   Images,
   ListTodo,
-  Sparkles,
   Tag,
   Trash2,
   Wand2,
   type LucideIcon,
 } from 'lucide-react';
-import { AltarIcon } from './altarIcon';
 import type { ContentType, EntryType } from '../types';
 
 /**
@@ -47,7 +45,6 @@ export const DEFAULT_ENTRY_EMOJI: Record<ContentType, string> = {
   wiki: '📚',
   operation: '⚡',
   task: '✅',
-  altar: '🔥',
 };
 
 /**
@@ -71,7 +68,7 @@ export function entryIcon(
  * `dominantCategoryModule` names as the hint on a search hit. A rearrangement
  * here therefore also renames search hits.
  */
-export const ENTRY_MODULE_IDS = ['journal', 'tasks', 'operations', 'wiki', 'altar'] as const;
+export const ENTRY_MODULE_IDS = ['journal', 'tasks', 'operations', 'wiki'] as const;
 export type EntryModuleId = (typeof ENTRY_MODULE_IDS)[number];
 
 export const AUX_VIEW_IDS = ['home', 'tags', 'categories', 'images', 'blocks', 'templates', 'lexicon', 'trash'] as const;
@@ -110,9 +107,9 @@ export const CATEGORY_MODULE_IDS: readonly Exclude<EntryModuleId, 'journal'>[] =
 );
 export type CategoryModuleId = (typeof CATEGORY_MODULE_IDS)[number];
 
-/** Modules whose entries carry tags — all except altar and tasks. */
-export const TAG_MODULE_IDS: readonly Exclude<EntryModuleId, 'altar' | 'tasks'>[] = ENTRY_MODULE_IDS.filter(
-  (id): id is Exclude<EntryModuleId, 'altar' | 'tasks'> => id !== 'altar' && id !== 'tasks',
+/** Modules whose entries carry tags — all except tasks. */
+export const TAG_MODULE_IDS: readonly Exclude<EntryModuleId, 'tasks'>[] = ENTRY_MODULE_IDS.filter(
+  (id): id is Exclude<EntryModuleId, 'tasks'> => id !== 'tasks',
 );
 export type TagModuleId = (typeof TAG_MODULE_IDS)[number];
 
@@ -123,7 +120,7 @@ export interface ModuleMeta {
   untitledKey: string;
   /**
    * The data-model counterpart in `task_links.target_type`/drag payloads —
-   * `'operation'` singular! tasks/altar are called `'task'`/`'altar'` there.
+   * `'operation'` singular! tasks are called `'task'` there.
    */
   entryType: ContentType;
   /** Save/Cancel/Delete live in the right sidebar. */
@@ -137,7 +134,6 @@ export const MODULES: Record<EntryModuleId, ModuleMeta> = {
   tasks: { id: 'tasks', icon: CheckSquare, navLabelKey: 'nav.tasks', untitledKey: 'tasks.untitled', entryType: 'task', usesEditorSidebar: false, usesBlocks: false },
   operations: { id: 'operations', icon: Wand2, navLabelKey: 'nav.operations', untitledKey: 'operations.untitled', entryType: 'operation', usesEditorSidebar: true, usesBlocks: true },
   wiki: { id: 'wiki', icon: Library, navLabelKey: 'nav.wiki', untitledKey: 'wiki.untitled', entryType: 'wiki', usesEditorSidebar: true, usesBlocks: true },
-  altar: { id: 'altar', icon: AltarIcon, navLabelKey: 'nav.altar', untitledKey: 'altar.untitled', entryType: 'altar', usesEditorSidebar: true, usesBlocks: false },
 };
 
 export const MODULE_LIST: readonly ModuleMeta[] = ENTRY_MODULE_IDS.map((id) => MODULES[id]);
@@ -214,8 +210,7 @@ export function entryTypeForView(viewType: string): EntryType | undefined {
 
 /** All trash item types (`TrashedItem['type']`). */
 export const TRASH_KINDS = [
-  'journal', 'wiki', 'tag', 'operation', 'task', 'category', 'blockDefinition', 'template', 'language', 'altar',
-  'altarItem', 'image',
+  'journal', 'wiki', 'tag', 'operation', 'task', 'category', 'blockDefinition', 'template', 'language', 'image',
 ] as const;
 export type TrashKind = (typeof TRASH_KINDS)[number];
 
@@ -231,7 +226,5 @@ export const TRASH_KIND_ICONS: Record<TrashKind, LucideIcon> = {
   blockDefinition: Box,
   template: CopyPlus,
   language: Languages,
-  altar: AltarIcon,
-  altarItem: Sparkles,
   image: Images,
 };

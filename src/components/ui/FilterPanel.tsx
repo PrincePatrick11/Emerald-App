@@ -1,7 +1,5 @@
-import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import FilterList, { type FilterChip } from './FilterList';
-import { SidebarGroup } from './SidebarColumn';
 
 export interface FilterPanelProps {
   chipLabel?: string;
@@ -22,12 +20,6 @@ export interface FilterPanelProps {
   allStatusCount?: number;
   /** Heading of the statusChips group; default t('filters.status'). */
   statusLabel?: string;
-
-  /** Further groups with their own heading, for controls that are not filters:
-   *  the altar hangs the sorting of its
-   *  library here so that it sits with the rest of the dashboard header instead of
-   *  in the content. They come first, directly below the sorting. */
-  extraGroups?: { label: string; content: ReactNode }[];
 }
 
 export default function FilterPanel({
@@ -43,7 +35,6 @@ export default function FilterPanel({
   onAllStatus,
   allStatusCount,
   statusLabel,
-  extraGroups,
 }: FilterPanelProps) {
   const { t } = useTranslation();
 
@@ -51,12 +42,6 @@ export default function FilterPanel({
     // Groups stacked, without their own px/bg: the right sidebar's
     // column (dashboard portal) provides the indentation.
     <div className="flex flex-col gap-4">
-      {extraGroups?.map((group) => (
-        <SidebarGroup key={group.label} label={group.label}>
-          {group.content}
-        </SidebarGroup>
-      ))}
-
       {/* Primary filters (category / moon phase / module) */}
       {chips && chips.length > 0 && onChipToggle && (
         <FilterList

@@ -7,7 +7,6 @@ import { categoryLabel, categoryUsageCounts, emptyCategoryUsage } from '../../li
 import { CATEGORY_NAME_TAKEN, useCategoryStore } from '../../store/categoryStore';
 import { useEntryStore } from '../../store/entryStore';
 import { useTaskStore } from '../../store/taskStore';
-import { useAltarStore } from '../../store/altarStore';
 import { useUndoStore } from '../../store/undoStore';
 import { useDeepLink } from '../../hooks/useDeepLink';
 import { generateId } from '../../lib/helpers';
@@ -104,12 +103,11 @@ export default function CategoriesView() {
     );
   const pushUndo = useUndoStore((s) => s.push);
 
-  // No fetch on mount: reloadAllStores() loads entries, tasks and altar
+  // No fetch on mount: reloadAllStores() loads entries and tasks
   // along with categories at startup and on vault switch.
   const articles = useEntryStore((s) => s.entries.wiki);
   const operations = useEntryStore((s) => s.entries.operation);
   const tasks = useTaskStore((s) => s.tasks);
-  const items = useAltarStore((s) => s.items);
 
   const [form, setForm] = useState<FormState | null>(null);
   const [name, setName] = useState('');
@@ -147,12 +145,12 @@ export default function CategoriesView() {
    * stores only hold live rows — what is in the trash does not count.
    */
   const countsById = useMemo(
-    () => categoryUsageCounts({ wiki: articles, operations, tasks, altar: items }),
-    [articles, operations, tasks, items],
+    () => categoryUsageCounts({ wiki: articles, operations, tasks }),
+    [articles, operations, tasks],
   );
 
   // ── Drag sorting ──────────────────────────────────────────────────────────
-  // The same pointer pattern as the layer list in the altar panel: no
+  // The same pointer pattern as the block list in the right sidebar: no
   // HTML5 drag, no package. `visualRef` holds the final order for the
   // pointerup closure, which would otherwise see the state from drag start.
   const [dragState, setDragState] = useState<{ fromId: string; overIndex: number } | null>(null);

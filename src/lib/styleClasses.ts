@@ -3,8 +3,8 @@ export const OP_PROP_SELECT_CLASSES =
   'border border-edge focus:border-edge-strong transition-colors placeholder:text-subtle';
 
 /**
- * The surface of a row in the sidebar lists with a handle — the altar's
- * placed elements, block management: dragged, selected or at rest. A
+ * The surface of a row in the sidebar lists with a handle — the block
+ * management: dragged, selected or at rest. A
  * Tailwind chain on the theme's colour utilities.
  */
 export function sidebarRowStateClasses({ dragging, selected }: { dragging: boolean; selected: boolean }): string {

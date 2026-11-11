@@ -6,18 +6,16 @@ import { categoryLabel, lookupCategory } from '../../lib/categories';
 import { entryIcon, type LeftListTabId } from '../../lib/modules';
 import { displayTitle } from '../../lib/entryTitle';
 import { CheckSquare, Square, Copy, Pencil, Trash2 } from 'lucide-react';
-import { AltarIcon } from '../../lib/altarIcon';
 import { useUIStore } from '../../store/uiStore';
 import { useSettingsStore } from '../../store/settingsStore';
 import { useEntryStore } from '../../store/entryStore';
 import { useTaskStore } from '../../store/taskStore';
-import { useAltarStore } from '../../store/altarStore';
 import { useCategoryStore } from '../../store/categoryStore';
 import { useUndoStore } from '../../store/undoStore';
 import { setDragItem } from '../../lib/dragState';
 import { generateId, isImageIcon } from '../../lib/helpers';
 import { journalIcon } from '../../lib/moonPhase';
-import type { AltarRecord, Entry, Task } from '../../types';
+import type { Entry, Task } from '../../types';
 import EntryListTab, { type EntryListTabProps } from '../ui/EntryListTab';
 import { useOpenInNewTabAction } from '../../hooks/useOpenInNewTabAction';
 import { useSaveAsTemplateAction } from '../../hooks/useSaveAsTemplateAction';
@@ -50,7 +48,6 @@ const TAB_LISTS: Record<LeftListTabId, ComponentType> = {
   tasks: TasksList,
   operations: OperationsList,
   wiki: WikiList,
-  altar: AltarList,
 };
 
 function ActiveList({ list }: { list: LeftListTabId }) {
@@ -67,7 +64,7 @@ function ActiveList({ list }: { list: LeftListTabId }) {
 // back to the plain icon/title layout), plus emptyMessage, which "All"
 // answers for itself.
 
-type EntryKind = 'journal' | 'task' | 'operation' | 'wiki' | 'altar';
+type EntryKind = 'journal' | 'task' | 'operation' | 'wiki';
 
 /** A list's config, type-erased: its functions only get items of
  *  the same config back (`AllRow.item`), so the cast in `toAllRows` is
@@ -103,14 +100,12 @@ function AllList() {
   const tasks = useTasksConfig();
   const operations = useOperationsConfig();
   const wiki = useWikiConfig();
-  const altar = useAltarConfig();
 
   const rows = [
     ...toAllRows('journal', t('nav.journal'), journal, (e) => e.updated_at),
     ...toAllRows('task', t('nav.tasks'), tasks, (task) => task.updated_at),
     ...toAllRows('operation', t('nav.operations'), operations, (op) => op.updated_at),
     ...toAllRows('wiki', t('nav.wiki'), wiki, (a) => a.updated_at),
-    ...toAllRows('altar', t('nav.altar'), altar, (a) => a.updated_at),
   ].sort((a, b) => b.sortDate.localeCompare(a.sortDate));
 
   return (
@@ -318,53 +313,6 @@ function useWikiConfig(): EntryListTabProps<Entry> {
 
 function WikiList() {
   return <EntryListTab {...useWikiConfig()} />;
-}
-
-// ── Altar ────────────────────────────────────────────────────────────────────
-function useAltarConfig(): EntryListTabProps<AltarRecord> {
-  const { t } = useTranslation();
-  const openInNewTabAction = useOpenInNewTabAction();
-  const { activeView, setActiveView, openViewInNewTab } = useUIStore(
-    useShallow((s) => ({ activeView: s.activeView, setActiveView: s.setActiveView, openViewInNewTab: s.openViewInNewTab }))
-  );
-  const { altars, updateAltar, deleteAltar, restoreAltar } = useAltarStore(
-    useShallow((s) => ({ altars: s.altars, updateAltar: s.updateAltar, deleteAltar: s.deleteAltar, restoreAltar: s.restoreAltar }))
-  );
-  const pushUndo = useUndoStore((s) => s.push);
-
-  const handleDelete = async (altar: AltarRecord) => {
-    await deleteAltar(altar.id);
-    pushUndo({ id: generateId(), description: t('undo.altarDeleted'), undo: () => restoreAltar(altar.id) });
-    if (activeView.id === altar.id) setActiveView({ type: 'altar' });
-  };
-
-  const sorted = altars.slice().sort((a, b) => b.updated_at.localeCompare(a.updated_at));
-
-  return {
-    items: sorted,
-    getId: (a) => a.id,
-    getTitle: (a) => displayTitle(t, 'altar', a.title),
-    getEditTitle: (a) => a.title,
-    getDateStr: (a) => formatEntryDate(a.updated_at),
-    getIcon: (a) => (isImageIcon(a.icon_data)
-      ? <img src={a.icon_data!} alt="" className="w-4 h-4 object-cover rounded-md flex-shrink-0" />
-      : <AltarIcon size={14} className="flex-shrink-0 text-subtle" />),
-    isActive: (a) => activeView.id === a.id,
-    onOpen: (a) => setActiveView({ type: 'altar', id: a.id, mode: 'view' }),
-    onOpenNewTab: (a) => openViewInNewTab({ type: 'altar', id: a.id, mode: 'view' }),
-    onDragStart: (a) => setDragItem({ id: a.id, entryType: 'altar', label: displayTitle(t, 'altar', a.title) }),
-    onRename: (a, title) => updateAltar(a.id, { title }),
-    contextMenuActions: (a, startRename) => [
-      openInNewTabAction({ type: 'altar', id: a.id, mode: 'view' }),
-      { label: t('contextMenu.rename'), icon: <Pencil size={12} />, onClick: startRename },
-      { label: t('contextMenu.delete'), icon: <Trash2 size={12} />, onClick: () => handleDelete(a), danger: true },
-    ],
-    emptyMessage: t('emptyState.altar.title'),
-  };
-}
-
-function AltarList() {
-  return <EntryListTab {...useAltarConfig()} />;
 }
 
 // ── Tasks ────────────────────────────────────────────────────────────────────

@@ -1,7 +1,7 @@
 import { memo, useEffect, useRef, useState } from 'react';
 import { listen } from '@tauri-apps/api/event';
 import { useTranslation } from 'react-i18next';
-import { isAltarFullscreen, useUIStore } from '../../store/uiStore';
+import { useUIStore } from '../../store/uiStore';
 import { reloadAllStores } from '../../store/moduleWiring';
 import { activeVault, closeToSetup, hasActiveVault, useVaultStore } from '../../store/vaultStore';
 import { useVaultPickerStore } from '../../store/vaultPickerStore';
@@ -66,9 +66,8 @@ const RIGHT_WIDTH_KEY = 'sidebar-right-width';
 /**
  * Keeps a sidebar's content mounted through the fade-out animation and only
  * unmounts it afterwards. Leaving it mounted permanently would be simpler but
- * costs: `AllList` calls all five config hooks of the modules,
- * `AltarSidebarPanel` brings its own effects and drag listeners — neither
- * should keep running while invisible. A timeout instead of `transitionend`, so
+ * costs: `AllList` calls all the config hooks of the modules, which
+ * should not keep running while invisible. A timeout instead of `transitionend`, so
  * it is also unmounted when the transition (reduced motion) never runs.
  */
 function useDeferredUnmount(open: boolean): boolean {
@@ -98,8 +97,6 @@ export default function AppShell() {
   const leftListOpen = useUIStore((s) => s.leftListOpen);
   const railOpen = useUIStore((s) => s.railOpen);
   const viewLocked = useUIStore((s) => s.viewLocked);
-  const setAltarWindowFullscreen = useUIStore((s) => s.setAltarWindowFullscreen);
-  const isAltarWindowFullscreen = useUIStore(isAltarFullscreen);
 
   const [entryListWidth, setEntryListWidth] = useState(() =>
     loadSavedWidth(ENTRY_LIST_WIDTH_KEY, ENTRY_LIST_MIN, ENTRY_LIST_DEFAULT)
@@ -252,13 +249,12 @@ export default function AppShell() {
       setRightWidth(RIGHT_DEFAULT);
       localStorage.removeItem(ENTRY_LIST_WIDTH_KEY);
       localStorage.removeItem(RIGHT_WIDTH_KEY);
-      setAltarWindowFullscreen(false);
       // Also the way back to hidden bars — with the rail gone, settings and
       // the vault button would otherwise stay away until the View menu is found.
       useUIStore.getState().showAllPanels();
     });
     return () => { unlisten.then(fn => fn()); };
-  }, [setAltarWindowFullscreen]);
+  }, []);
 
   // The native macOS menu emits these; the title bar's menus call
   // `runMenuAction` directly. Both go through the same implementation.
@@ -346,11 +342,11 @@ export default function AppShell() {
   // With nothing to its left, the sheet keeps its distance from the window
   // edge there too — it always floats, instead of sticking to the edge with a
   // rounded-md corner.
-  const leftFrameEmpty = isAltarWindowFullscreen || leftSidebarWidth === 0;
+  const leftFrameEmpty = leftSidebarWidth === 0;
   // Tied to the deferred unmount instead of `rightSidebarOpen`: when
   // collapsing, the main area only gets its right edge once the bar is gone,
   // instead of drawing a double line next to it.
-  const sheetJoined = rightSidebarMounted && !isAltarWindowFullscreen;
+  const sheetJoined = rightSidebarMounted;
 
   return (
     <div className="app-shell flex flex-col h-screen w-screen overflow-hidden relative">
@@ -374,35 +370,33 @@ export default function AppShell() {
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
       >
-        {!isAltarWindowFullscreen && (
-          <aside
-            // A frame, not a divider: rail and list merge seamlessly into the
-            // title bar, only the sheet next to them is set apart.
-            className={`app-sidebar app-sidebar-left flex-shrink-0 relative overflow-hidden${
-              railOpen ? ' app-sidebar-left-with-rail' : ''
-            }${resizing ? '' : ` ${SIDEBAR_ANIM_CLASS}`}`}
-            style={{ width: leftSidebarWidth }}
+        <aside
+          // A frame, not a divider: rail and list merge seamlessly into the
+          // title bar, only the sheet next to them is set apart.
+          className={`app-sidebar app-sidebar-left flex-shrink-0 relative overflow-hidden${
+            railOpen ? ' app-sidebar-left-with-rail' : ''
+          }${resizing ? '' : ` ${SIDEBAR_ANIM_CLASS}`}`}
+          style={{ width: leftSidebarWidth }}
+        >
+          {/* A hidden rail is pushed out of view to the left by the negative
+              margin, so the list moves into its place. */}
+          <div
+            className={`flex h-full${resizing ? '' : ` ${SIDEBAR_ANIM_CLASS}`}`}
+            style={{ width: RAIL_WIDTH + entryListWidth, marginLeft: railOpen ? 0 : -RAIL_WIDTH }}
           >
-            {/* A hidden rail is pushed out of view to the left by the negative
-                margin, so the list moves into its place. */}
-            <div
-              className={`flex h-full${resizing ? '' : ` ${SIDEBAR_ANIM_CLASS}`}`}
-              style={{ width: RAIL_WIDTH + entryListWidth, marginLeft: railOpen ? 0 : -RAIL_WIDTH }}
-            >
-              <div className="flex-shrink-0 h-full flex" inert={!railOpen} aria-hidden={!railOpen}>
-                <LeftSidebarRail />
-              </div>
-              <div
-                className="flex-shrink-0 h-full flex"
-                style={{ width: entryListWidth }}
-                inert={!leftListOpen}
-                aria-hidden={!leftListOpen}
-              >
-                {leftListMounted && <LeftSidebarEntryList />}
-              </div>
+            <div className="flex-shrink-0 h-full flex" inert={!railOpen} aria-hidden={!railOpen}>
+              <LeftSidebarRail />
             </div>
-          </aside>
-        )}
+            <div
+              className="flex-shrink-0 h-full flex"
+              style={{ width: entryListWidth }}
+              inert={!leftListOpen}
+              aria-hidden={!leftListOpen}
+            >
+              {leftListMounted && <LeftSidebarEntryList />}
+            </div>
+          </div>
+        </aside>
 
         {/* Main Content */}
         {/* The sheet, left half. With the right bar next to it, it is straight
@@ -421,14 +415,14 @@ export default function AppShell() {
             they reach over onto the sheet. A closed sidebar has none, or it would
             sit as a strip at the edge of the main area. With "Lock view" neither
             exists. */}
-        {leftListOpen && !isAltarWindowFullscreen && !viewLocked && (
+        {leftListOpen && !viewLocked && (
           <div
             onPointerDown={onLeftPointerDown}
             className="sidebar-resize-handle"
             style={{ left: leftSidebarWidth - 3 }}
           />
         )}
-        {rightSidebarOpen && !isAltarWindowFullscreen && !viewLocked && (
+        {rightSidebarOpen && !viewLocked && (
           <div
             onPointerDown={onRightPointerDown}
             className="sidebar-resize-handle sidebar-resize-handle--right"
@@ -438,27 +432,25 @@ export default function AppShell() {
 
         {/* Right Sidebar — content anchored to the right edge, so it slides in
             from there when opening instead of unfolding from the left. */}
-        {!isAltarWindowFullscreen && (
-          <aside
-            className={`app-sidebar app-sidebar-right flex-shrink-0 relative overflow-hidden${
-              resizing ? '' : ` ${SIDEBAR_ANIM_CLASS}`
-            }`}
-            style={{ width: rightSidebarOpen ? rightWidth : 0 }}
+        <aside
+          className={`app-sidebar app-sidebar-right flex-shrink-0 relative overflow-hidden${
+            resizing ? '' : ` ${SIDEBAR_ANIM_CLASS}`
+          }`}
+          style={{ width: rightSidebarOpen ? rightWidth : 0 }}
+        >
+          {/* The sheet, right half. Surface, border and radius sit on the
+              content, not on the <aside>: there the borders would remain as
+              a 2px line at width 0. This way they move out with the content
+              and are clipped along with it. */}
+          <div
+            className="app-sheet-side absolute top-0 right-0 h-full"
+            style={{ width: rightWidth }}
+            inert={!rightSidebarOpen}
+            aria-hidden={!rightSidebarOpen}
           >
-            {/* The sheet, right half. Surface, border and radius sit on the
-                content, not on the <aside>: there the borders would remain as
-                a 2px line at width 0. This way they move out with the content
-                and are clipped along with it. */}
-            <div
-              className="app-sheet-side absolute top-0 right-0 h-full"
-              style={{ width: rightWidth }}
-              inert={!rightSidebarOpen}
-              aria-hidden={!rightSidebarOpen}
-            >
-              {rightSidebarMounted && <RightSidebar />}
-            </div>
-          </aside>
-        )}
+            {rightSidebarMounted && <RightSidebar />}
+          </div>
+        </aside>
       </div>
 
       <UndoToast />

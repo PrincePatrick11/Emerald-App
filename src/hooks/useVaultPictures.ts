@@ -21,7 +21,7 @@ function byName(a: PictureItem, b: PictureItem): number {
 /**
  * Every picture of "Images", as the view and the picture picker show it: the
  * vault's stored files with their details, without those in the trash and
- * without sigil drawings and altar backgrounds (the thing itself, not a
+ * without sigil drawings and canvas backgrounds (the thing itself, not a
  * picture of its own). Reads the folder and the places of use again on mount.
  */
 export function useVaultPictures(): { pictures: PictureItem[]; loaded: boolean } {

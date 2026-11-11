@@ -129,7 +129,7 @@ export function remapInternalLinks(
   return doc.body.innerHTML;
 }
 
-const VALID_ENTRY_TYPES: readonly string[] = ['journal', 'wiki', 'operation', 'task', 'altar'];
+const VALID_ENTRY_TYPES: readonly string[] = ['journal', 'wiki', 'operation', 'task'];
 /** Standard UUIDs and the 8-character prefix put in front of them on merge import. */
 const LINK_ID_RE = /^([0-9a-z]{8}-)?[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 

@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
 
 /**
- * Reordering by handle, without animation — the altar's placed elements
- * and the sidebar's block management. While dragging, `visualItems` shows
+ * Reordering by handle, without animation — the sidebar's block
+ * management. While dragging, `visualItems` shows
  * the list with the row in its new place; on release, `onDrop` receives the
  * new order (only if it has changed).
  *

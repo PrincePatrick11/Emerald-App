@@ -9,6 +9,5 @@ import type { ViewMode } from '../store/uiStore';
  */
 export const isCardView = (view: ViewMode): boolean => view === 'cards' || view === 'cards_wide';
 
-/** The full width among the card views: one column instead of three, and in the
- *  altar additionally a taller preview. */
+/** The full width among the card views: one column instead of three. */
 export const isWideCardView = (view: ViewMode): boolean => view === 'cards_wide';

@@ -302,8 +302,6 @@ export default function BackupPage() {
                   importedFile.preview.wikiCount && `${importedFile.preview.wikiCount} W`,
                   importedFile.preview.opsCount && `${importedFile.preview.opsCount} O`,
                   importedFile.preview.templatesCount && `${importedFile.preview.templatesCount} V`,
-                  importedFile.preview.altarsCount && `${importedFile.preview.altarsCount} A`,
-                  importedFile.preview.altarItemsCount && `${importedFile.preview.altarItemsCount} E`,
                   importedFile.preview.taskCount && `${importedFile.preview.taskCount} T`,
                   importedFile.preview.languagesCount && `${importedFile.preview.languagesCount} L`,
                 ].filter(Boolean).join(', ')}

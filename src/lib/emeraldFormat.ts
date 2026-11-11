@@ -1,7 +1,8 @@
 import { invoke } from '@tauri-apps/api/core';
-import { convertAltarsInPlace } from './migrateAltars';
+import { altarInserts } from './migrateAltars';
+import { contentWithAltarsAsOperations, convertAltars, elementsWithAltarsAsOperations, type Row } from './altarConversion';
 import { todayIso, withoutConcealed } from './blocks/sigil';
-import { imageRefsInHtml, isStoredImage, readImageAsBase64, rewriteImageRefs, saveImage } from './images';
+import { imageRefsInHtml, readImageAsBase64, rewriteImageRefs, saveImage } from './images';
 import { open as openDialog, save, message } from '@tauri-apps/plugin-dialog';
 import { format } from 'date-fns';
 import { marked } from 'marked';
@@ -11,7 +12,6 @@ import { useEntryStore } from '../store/entryStore';
 import { liveTagNames, useTagStore } from '../store/tagStore';
 import { useSettingsStore } from '../store/settingsStore';
 import { entryMoonPhase } from './moonPhase';
-import { useAltarStore } from '../store/altarStore';
 import { reloadModules } from '../store/moduleWiring';
 import { useImportStore } from '../store/importStore';
 import { useTaskStore } from '../store/taskStore';
@@ -29,7 +29,7 @@ import {
 } from './blocks/legacyStatus';
 import { definitionById } from './blockDefinitionRows';
 import { generateId, nowIso } from './helpers';
-import { altarElementsJson, isDrawn, withNewElementIds } from './altarElements';
+import { withNewElementIds } from './altarElements';
 import i18n from '../i18n';
 import { buildLinkItems, linkItemKey, linkItemsByKey } from './linkItems';
 import {
@@ -43,11 +43,7 @@ import type { Category } from '../types';
 import type { WriteOptions } from './stamp';
 import { displayTitle, hasOwnTitle, isLegacyUntitled } from './entryTitle';
 import { prepareImageDataUrl } from './imageLimits';
-import {
-  ALTAR_BACKGROUND_MAX_BYTES, DEFAULT_ALTAR_BACKGROUND, DEFAULT_ALTAR_RESOLUTION, DEFAULT_BACKGROUND_OVERLAY,
-  DEFAULT_OVERLAY_COLOR, DEFAULT_GRID_COLOR, DEFAULT_GRID_OPACITY, DEFAULT_GRID_SIZE,
-} from './altarConstants';
-import { noAltarOpenMessage } from './altarExport';
+import { ALTAR_BACKGROUND_MAX_BYTES } from './altarConstants';
 import { parseCanvasBackground, type CanvasBackground } from '../components/editors/canvas/background';
 import { isAppBackground } from './altarBackground';
 
@@ -62,7 +58,6 @@ function linkItemsSnapshot(): SuggestionItem[] {
     operations: useEntryStore.getState().entries.operation,
     articles: useEntryStore.getState().entries.wiki,
     categories: useCategoryStore.getState().categories,
-    altars: useAltarStore.getState().altars,
     showMoonPhase: useSettingsStore.getState().settings.journal.moonPhase,
   }, i18n.t);
 }
@@ -100,7 +95,10 @@ function remapImportedLinks(
   items: SuggestionItem[],
 ): string {
   const byKey = linkItemsByKey(items);
-  const titleByKey = new Map((manifest ?? []).map((l) => [linkItemKey(l), l.title]));
+  // A chip to an altar points at its operation by now (`importedContent`).
+  const titleByKey = new Map((manifest ?? []).map((l) => [
+    linkItemKey(l.entryType === 'altar' ? { ...l, entryType: 'operation' } : l), l.title,
+  ]));
   return remapInternalLinks(content, (link) => resolveImportedTarget(link, titleByKey.get(linkItemKey(link)), items, byKey));
 }
 
@@ -346,7 +344,7 @@ interface EmeraldMeta {
 }
 
 /** The file types that open a module — everything except the template. */
-type EntryFileType = Exclude<EmeraldFile['type'], 'template'>;
+type EntryFileType = Exclude<EmeraldFile['type'], 'template' | 'altar'>;
 
 function safeFilename(title: string): string {
   return title.replace(/[^\w\s\-äöüÄÖÜß]/g, '').trim().replace(/\s+/g, '_') || 'export';
@@ -362,9 +360,6 @@ function exportFilename(title: string, date: string, ext: string): string {
 
 export async function exportAsEmerald(): Promise<void> {
   const view = useUIStore.getState().activeView;
-  if (view.type === 'altar') {
-    return exportAltarAsEmerald();
-  }
   if (view.type === 'templates' && view.id) {
     return exportTemplateAsEmerald(view.id);
   }
@@ -497,81 +492,6 @@ export async function buildTemplateEmeraldFile(templateId: string): Promise<Emer
   return { version: '3', type: 'template', title: template.name || 'Template', createdAt: template.created_at, content, images, meta };
 }
 
-async function exportAltarAsEmerald(): Promise<void> {
-  const { altars, activeAltarId, items, placements } = useAltarStore.getState();
-  const { categories } = useCategoryStore.getState();
-  const altar = altars.find(a => a.id === activeAltarId);
-  if (!altar) {
-    await noAltarOpenMessage();
-    return;
-  }
-
-  // Only background_image_data is a stored image filename — read it via Rust like
-  // content images. icon_data, thumbnail_data, and item images are already
-  // data: URLs (or a plain emoji for icon_data) straight from the DB.
-  const images: Record<string, string> = {};
-  const bgPath = altar.background_image_data;
-  if (isStoredImage(bgPath)) {
-    try {
-      images[bgPath!] = await readImageAsBase64(bgPath!);
-    } catch { /* skip missing file */ }
-  }
-
-  const placedItemIds = new Set(placements.filter(p => !isDrawn(p)).map(p => p.item_id));
-  const altarItems = items.filter(i => placedItemIds.has(i.id));
-  const usedCategoryIds = new Set(altarItems.map(i => i.category_id));
-  const usedCategories = categories.filter(c => usedCategoryIds.has(c.id));
-  // Translated names, so that a German "Sigillen" in the target vault hits the
-  // built-in category again instead of creating a second one.
-  const categoryNameById = new Map(categories.map(c => [c.id, categoryLabel(i18n.t, c)]));
-
-  const meta: EmeraldMeta = {
-    altarBackgroundPreset: altar.background_preset,
-    altarBackgroundImagePath: altar.background_image_data ?? undefined,
-    altarBackgroundOverlay: altar.background_overlay,
-    altarBackgroundOverlayColor: altar.background_overlay_color,
-    altarCanvasBackground: altar.canvas_background ?? undefined,
-    altarThumbnailData: altar.thumbnail_data ?? undefined,
-    altarIconData: altar.icon_data ?? undefined,
-    altarGridEnabled: altar.grid_enabled,
-    altarGridSize: altar.grid_size,
-    altarGridOpacity: altar.grid_opacity,
-    altarGridColor: altar.grid_color,
-    altarSnapToGrid: altar.snap_to_grid,
-    altarRotationSnapEnabled: altar.rotation_snap_enabled,
-    altarRotationSnapAngle: altar.rotation_snap_angle,
-    altarSnapScaleToGrid: altar.snap_scale_to_grid,
-    altarResolution: altar.resolution,
-    altarCategories: usedCategories.map(c => ({ name: categoryLabel(i18n.t, c), emoji: c.emoji })),
-    altarItems: altarItems.map(i => ({
-      id: i.id, name: i.name, emoji: i.emoji,
-      // Empty if the item has no category or its category is in the trash
-      // — the import then leaves it without one as well, instead of creating an English
-      // "Other" next to "Sonstiges".
-      category: (i.category_id && categoryNameById.get(i.category_id)) || '', note: i.note,
-      imageData: i.image_data ?? undefined,
-      createdAt: i.created_at,
-    })),
-    altarElements: JSON.parse(altarElementsJson(placements)) as unknown[],
-    altarPlacements: placements.filter(p => !isDrawn(p)).map(p => ({
-      itemId: p.item_id, x: p.x, y: p.y, z_index: p.z_index, width: p.width, height: p.height,
-      rotation: p.rotation, opacity: p.opacity, locked: p.locked, hidden: p.hidden,
-    })),
-  };
-
-  const file: EmeraldFile = {
-    version: '1',
-    type: 'altar',
-    title: altar.title,
-    createdAt: altar.created_at,
-    content: '',
-    images,
-    meta,
-  };
-
-  await saveEmeraldFile(file);
-}
-
 /**
  * Creates the imported custom blocks, as far as they do not exist here.
  * The file is foreign: every definition goes through the same check as a
@@ -584,7 +504,7 @@ async function importBlockDefinitions(raw: EmeraldMeta['blockDefinitions'], item
   const defs = raw
     .filter((r): r is Record<string, unknown> => typeof r === 'object' && r !== null && isDefinitionId(r.id))
     // Link presets remapped to this vault like the chips in the content; images are named after their content and stay.
-    .map((r) => ({ ...r, elements: remapDefinitionDefaults(r.elements, (name) => name, (t) => resolveImportedTarget(t, undefined, items, byKey)) }))
+    .map((r) => ({ ...r, elements: remapDefinitionDefaults(elementsWithAltarsAsOperations(r.elements), (name) => name, (t) => resolveImportedTarget(t, undefined, items, byKey)) }))
     .map((r) => fromRow.blockDefinition({ ...r, created_at: now, updated_at: now, deleted_at: null }));
   await useBlockDefinitionStore.getState().importDefinitions(defs);
 }
@@ -689,8 +609,6 @@ export async function importFromEmerald(): Promise<void> {
     let newAltarId: string;
     try {
       newAltarId = await importAltarEntry(file);
-      // An altar is an operation of "Altars" now: it becomes one under its ID, as v62 did.
-      await convertAltarsInPlace(await getDb());
     } catch (e) {
       await message(`Import failed: ${e}`, { title: 'Import', kind: 'error' });
       return;
@@ -752,7 +670,9 @@ async function importedContent(
   items: SuggestionItem[],
   beforeSanitize: (html: string) => string | Promise<string> = (html) => html,
 ): Promise<string> {
-  const remapped = await remapImages(typeof file.content === 'string' ? file.content : '', file.images ?? {});
+  // An older file's chips to altars and altar fields point at operations first, as v62 did.
+  const raw = typeof file.content === 'string' ? contentWithAltarsAsOperations(file.content) : '';
+  const remapped = await remapImages(raw, file.images ?? {});
   const relinked = remapImportedLinks(remapped, file.meta.contentLinks, items);
   return sanitizeImportedHtml(await beforeSanitize(relinked));
 }
@@ -827,7 +747,7 @@ function importedTitle(file: Pick<EmeraldFile, 'title'>): string {
   if (!hasOwnTitle(file.title) || isLegacyUntitled(file.title)) return '';
   // A Markdown or PDF export writes "Untitled…" for an empty title
   // in the app's language — that comes back empty on re-import.
-  const untitled = (['journal', 'wiki', 'operation', 'task', 'altar'] as const)
+  const untitled = (['journal', 'wiki', 'operation', 'task'] as const)
     .map((type) => displayTitle(i18n.t, type, ''));
   return untitled.includes(file.title.trim()) ? '' : file.title;
 }
@@ -1004,39 +924,6 @@ async function importOperationEntry(file: EmeraldFile, content: string, tagIds: 
 // ── Import altar from Emerald ────────────────────────────────────────────────
 
 /**
- * Reuses a matching existing altar item or creates a new one.
- * Matches by name + category + image, comparing the image by its actual
- * data: URL content (altar item images are stored inline, never as a local
- * file path — see the note on EmeraldMeta above). The item's id is
- * deliberately not treated as a match on its own — it only proves the two
- * items were assigned the same UUID, not that they're the same artwork, and a
- * file imported from an unrelated vault has no guarantee its ids mean
- * anything here.
- */
-async function resolveOrCreateItem(
-  itemMeta: NonNullable<EmeraldMeta['altarItems']>[number],
-): Promise<{ id: string; created: boolean }> {
-  const { items, addItem } = useAltarStore.getState();
-  // `importAltarEntry` has already created the file's categories; here the
-  // name only resolves.
-  const categoryId = await ensureCategoryByName(itemMeta.category);
-
-  const existingMatch = items.find(i =>
-    i.name === itemMeta.name &&
-    i.category_id === categoryId &&
-    (i.image_data ?? null) === (itemMeta.imageData ?? null),
-  );
-  if (existingMatch) return { id: existingMatch.id, created: false };
-
-  // createdAt comes from a foreign file and lands in a NOT NULL
-  // column: only a string is passed through, anything else falls back to now
-  // (as with files that do not know the field yet).
-  const createdAt = typeof itemMeta.createdAt === 'string' ? itemMeta.createdAt : undefined;
-  const created = await addItem(itemMeta.name, itemMeta.emoji, categoryId, itemMeta.note, itemMeta.imageData, createdAt);
-  return { id: created.id, created: true };
-}
-
-/**
  * The background of an imported altar: subject to the same limits as when
  * uploading in the sidebar (vault limits plus `ALTAR_BACKGROUND_MAX_BYTES`).
  * If it is still too large even downscaled, it is taken unchanged — like images in the content
@@ -1065,100 +952,61 @@ function importedCanvasBackground(raw: unknown, imported: string | null | undefi
   return { ...bg, image: imported ? { ...bg.image, src: imported } : null };
 }
 
+/**
+ * An altar's `.emerald` file (written before altars were operations): its
+ * altar, items and placements as the rows the altar tables held, turned into
+ * an operation of "Altars" and pictures of "Images" by the same conversion
+ * as v62 (`altarConversion.ts`). Under new IDs, since the file is foreign; an
+ * item's picture already in "Images" keeps its details there. The items'
+ * categories have no place in "Images" and are left out.
+ */
 async function importAltarEntry(file: EmeraldFile): Promise<string> {
-  const { createAltar, updateAltar, updateAltarGrid, updateAltarResolution, permanentlyDeleteAltar, permanentlyDeleteItem } = useAltarStore.getState();
-  const altar = await createAltar({ createdAt: importedCreatedAt(file) });
-  // Only items actually *created* (not reused) get rolled back on failure —
-  // altar_items is a shared library, so a partial import must not leave
-  // undetectable debris in it the way it briefly leaves the (fully deleted)
-  // altar behind. See the catch block below.
-  const createdItemIds: string[] = [];
+  const images = file.images ?? {};
+  const { meta } = file;
+  const id = generateId();
+  const at = importedCreatedAt(file) ?? nowIso();
+  const backgroundImageData = await remapAltarImagePath(meta.altarBackgroundImagePath, images);
+  // The settings as the column held them; `parseAltarSettings` fills in what the file lacks.
+  const settings = {
+    background_preset: meta.altarBackgroundPreset,
+    background_overlay: meta.altarBackgroundOverlay,
+    background_overlay_color: meta.altarBackgroundOverlayColor,
+    canvas_background: importedCanvasBackground(meta.altarCanvasBackground, backgroundImageData),
+    resolution: meta.altarResolution,
+  };
+  const altar: Row = {
+    id,
+    title: importedTitle(file),
+    settings: JSON.stringify(settings),
+    elements: withNewElementIds(meta.altarElements ?? [], id),
+    background_image_data: backgroundImageData,
+    icon_data: meta.altarIconData ?? null,
+    created_at: at,
+    updated_at: at,
+  };
+  const itemIds = new Map<string, string>();
+  const items: Row[] = (meta.altarItems ?? []).map((item) => {
+    const itemId = generateId();
+    itemIds.set(item.id, itemId);
+    // createdAt comes from a foreign file: only a string is passed through.
+    const created = typeof item.createdAt === 'string' ? item.createdAt : at;
+    return { id: itemId, name: item.name, emoji: item.emoji, note: item.note, image_data: item.imageData ?? null, created_at: created, updated_at: created };
+  });
+  const placements: Row[] = (meta.altarPlacements ?? []).flatMap((p) => {
+    const itemId = itemIds.get(p.itemId);
+    return itemId ? [{ ...p, id: generateId(), altar_id: id, item_id: itemId, locked: toInt(p.locked), hidden: toInt(p.hidden) }] : [];
+  });
 
-  try {
-    const images = file.images ?? {};
-    const meta = file.meta;
-
-    const backgroundImageData = await remapAltarImagePath(meta.altarBackgroundImagePath, images);
-
-    await updateAltar(altar.id, {
-      title: importedTitle(file),
-      background_preset: meta.altarBackgroundPreset || DEFAULT_ALTAR_BACKGROUND,
-      background_image_data: backgroundImageData,
-      background_overlay: meta.altarBackgroundOverlay ?? DEFAULT_BACKGROUND_OVERLAY,
-      background_overlay_color: meta.altarBackgroundOverlayColor ?? DEFAULT_OVERLAY_COLOR,
-      canvas_background: importedCanvasBackground(meta.altarCanvasBackground, backgroundImageData),
-      thumbnail_data: meta.altarThumbnailData ?? null,
-      icon_data: meta.altarIconData ?? null,
-    });
-
-    await updateAltarGrid(altar.id, {
-      grid_enabled: meta.altarGridEnabled ?? false,
-      grid_size: meta.altarGridSize ?? DEFAULT_GRID_SIZE,
-      grid_opacity: meta.altarGridOpacity ?? DEFAULT_GRID_OPACITY,
-      grid_color: meta.altarGridColor ?? DEFAULT_GRID_COLOR,
-      snap_to_grid: meta.altarSnapToGrid ?? false,
-      rotation_snap_enabled: meta.altarRotationSnapEnabled ?? false,
-      rotation_snap_angle: meta.altarRotationSnapAngle ?? 15,
-      snap_scale_to_grid: meta.altarSnapScaleToGrid ?? false,
-    });
-
-    await updateAltarResolution(altar.id, meta.altarResolution || DEFAULT_ALTAR_RESOLUTION);
-
-    for (const cat of meta.altarCategories ?? []) {
-      await ensureCategoryByName(cat.name, cat.emoji);
+  const converted = await convertAltars({ altars: [altar], items, placements }, async (dataUrl) => {
+    try {
+      return await saveImage(dataUrl);
+    } catch {
+      return null;
     }
-
-    const idMap = new Map<string, string>();
-    for (const itemMeta of meta.altarItems ?? []) {
-      const { id, created } = await resolveOrCreateItem(itemMeta);
-      idMap.set(itemMeta.id, id);
-      if (created) createdItemIds.push(id);
-    }
-
-    // Insert placements directly via SQL (like duplicateAltar does) rather than
-    // through placeItem()/updatePlacement() — those read the store's
-    // activeAltarId, which AltarView's view-sync effect can reassign out from
-    // under a bulk import as soon as createAltar() changes it, silently
-    // dropping every placement onto the wrong altar (or nowhere).
-    const db = await getDb();
-    for (const placementMeta of meta.altarPlacements ?? []) {
-      const realItemId = idMap.get(placementMeta.itemId);
-      if (!realItemId) continue;
-      await db.execute(
-        'INSERT INTO altar_placements (id, altar_id, item_id, x, y, z_index, width, height, rotation, opacity, locked, hidden) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)',
-        [
-          generateId(),
-          altar.id,
-          realItemId,
-          placementMeta.x,
-          placementMeta.y,
-          placementMeta.z_index,
-          placementMeta.width,
-          placementMeta.height,
-          placementMeta.rotation,
-          placementMeta.opacity,
-          toInt(placementMeta.locked),
-          toInt(placementMeta.hidden),
-        ],
-      );
-    }
-
-    if (meta.altarElements?.length) {
-      await db.execute('UPDATE altars SET elements=$1 WHERE id=$2', [withNewElementIds(meta.altarElements, altar.id), altar.id]);
-    }
-
-    // Grid and format stamp "now" when writing — in the end, as with the
-    // entries, the file's creation date applies.
-    await updateAltar(altar.id, {}, importedStamp(importedCreatedAt(file)));
-
-    return altar.id;
-  } catch (e) {
-    await permanentlyDeleteAltar(altar.id).catch(() => {});
-    for (const itemId of createdItemIds) {
-      await permanentlyDeleteItem(itemId).catch(() => {});
-    }
-    throw e;
-  }
+  });
+  const db = await getDb();
+  await db.batch(await altarInserts(db, converted));
+  return id;
 }
 
 // ── Import from Markdown ─────────────────────────────────────────────────────

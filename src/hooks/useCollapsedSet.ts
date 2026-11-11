@@ -1,13 +1,13 @@
 import { useCallback } from 'react';
 import { useUIStore } from '../store/uiStore';
 
-export type CollapseScope = 'journal' | 'wiki' | 'operations' | 'tasks' | 'altar-library' | 'tags';
+export type CollapseScope = 'journal' | 'wiki' | 'operations' | 'tasks' | 'tags';
 
 const EMPTY: ReadonlySet<string> = new Set();
 
 /**
  * Collapsed state of a module's category groups (tasks, wiki, operations,
- * the library in the altar dashboard, and tags).
+ * and tags).
  *
  * The state lives in the uiStore, not in the view: MainArea unmounts the views
  * on a module switch, so a useState would be empty again after every rail

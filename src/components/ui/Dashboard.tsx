@@ -83,8 +83,7 @@ interface DashboardBaseProps<T> {
   /** Labelled button that fills the bar at the top of the sidebar. */
   primaryAction?: DashboardPrimaryAction;
   /** Compact icon buttons to the right of the primary action, in the same row;
-   *  their label is only in the tooltip. For side areas of the module (altar:
-   *  the library below the altars) and for cancelling a confirmation
+   *  their label is only in the tooltip. For cancelling a confirmation
    *  that the primary action raises (trash). */
   extraActions?: { label: string; icon: ReactNode; onClick: () => void }[];
 
@@ -99,17 +98,14 @@ interface DashboardBaseProps<T> {
   sortModes?: readonly SortMode[];
   /** Which date the date sort compares (label "Created · newest"). */
   sortDate?: SortDateField;
-  /** Heading of the sort section instead of "Sort" (altar: "Sort · Altars"). */
-  sortLabel?: string;
   /** Preferences of the view, below its layout buttons: not filters, they do
-   *  not count as active ones and stay put on a reset (tasks: "Show completed",
-   *  altar: "Altar preview"). */
+   *  not count as active ones and stay put on a reset (tasks: "Show completed"). */
   displayToggles?: DisplayToggle[];
   /** The toolbar's grouping axis, as one object so that value and
    *  handler cannot go missing individually and the name is not confused with
    *  `grouping` below, which describes the structure of the content.
-   *  Without it the toolbar shows only view and sorting (altar: its
-   *  altars have nothing to group). */
+   *  Without it the toolbar shows only view and sorting (templates: they
+   *  have nothing to group). */
   groupBy?: DashboardGroupBy;
   search?: string;
   onSearch?: (v: string) => void;
@@ -122,17 +118,17 @@ interface DashboardBaseProps<T> {
   itemKey: (item: T) => string;
 
   /** Above the content, also in the empty and "No results" case: the
-   *  section heading of the main area (altar: "Altars" with a chevron,
-   *  matching that of the library below). */
+   *  section heading of the main area (blocks: the custom blocks with a
+   *  chevron, above the built-in ones). */
   contentHeader?: ReactNode;
   /** Below the content, also in the empty and "No results" case: a
-   *  second area of the same module (altar: the library). */
+   *  second area of the same module (blocks: the built-in ones). */
   contentFooter?: ReactNode;
 
   cardsClassName?: string;
   /** Grid of the "Full-width cards" view: one column instead of three.
    *  A separate prop instead of a variant of `cardsClassName`, because modules may
-   *  fill the wide card differently (altar: taller preview). */
+   *  fill the wide card differently. */
   wideCardsClassName?: string;
   listClassName?: string;
   /** Spacing between groups; rows that are themselves the groups sit closer (tags). */
@@ -184,7 +180,6 @@ export default function Dashboard<T>({
   viewOptions,
   sortModes,
   sortDate,
-  sortLabel,
   displayToggles,
   groupBy,
   search,
@@ -341,7 +336,6 @@ export default function Dashboard<T>({
         viewOptions={viewOptions}
         sortModes={sortModes}
         sortDate={sortDate}
-        sortLabel={sortLabel}
         displayToggles={displayToggles}
         groupBy={groupBy}
       />

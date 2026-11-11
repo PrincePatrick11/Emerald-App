@@ -18,7 +18,6 @@ import { drainSerialized } from '../lib/serialize';
 import { reloadAllStores } from './moduleWiring';
 import { useUIStore } from './uiStore';
 import { detachDrafts, restoreDrafts } from './draftStore';
-import { clearAltarEdits } from './altarEdit';
 import { detachVaultPrefs, forgetVaultPrefs, loadVaultPrefs } from './vaultPrefs';
 import { useUndoStore } from './undoStore';
 import { useSettingsStore } from './settingsStore';
@@ -118,7 +117,6 @@ async function loadActiveVault(): Promise<void> {
   // Tabs and history point into the old vault by entry ID — close everything,
   // not just the active tab to Home.
   useUIStore.getState().closeAllTabs();
-  clearAltarEdits();
   loadVaultPrefs(useVaultStore.getState().activeVaultId);
   // The drafts of the new vault; those of the old one only leave memory.
   await restoreDrafts(useVaultStore.getState().activeVaultId);

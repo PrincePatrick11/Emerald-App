@@ -239,15 +239,14 @@ await test('foreign key actions travel', async () => {
   a.run("INSERT INTO tasks (id, title, created_at, updated_at) VALUES ('p', 'P', ?, ?)", NOW, NOW);
   a.run("INSERT INTO tasks (id, title, parent_task_id, created_at, updated_at) VALUES ('k', 'K', 'p', ?, ?)", NOW, NOW);
   a.run("INSERT INTO task_links (id, task_id, target_id, target_type) VALUES ('l', 'p', 'x', 'journal')");
-  a.run("INSERT INTO altars (id, title, created_at, updated_at) VALUES ('a', 'A', ?, ?)", NOW, NOW);
-  a.run("INSERT INTO altar_items (id, name, created_at) VALUES ('i', 'I', ?)", NOW);
-  a.run("INSERT INTO altar_placements (id, altar_id, item_id) VALUES ('pl', 'a', 'i')");
+  a.run("INSERT INTO languages (id, name, created_at, updated_at) VALUES ('la', 'L', ?, ?)", NOW, NOW);
+  a.run("INSERT INTO lexicon_entries (id, language_id, created_at, updated_at) VALUES ('w', 'la', ?, ?)", NOW, NOW);
   await assertConverged(a, b);
   a.run("DELETE FROM tasks WHERE id = 'p'");
-  a.run("DELETE FROM altars WHERE id = 'a'");
+  a.run("DELETE FROM languages WHERE id = 'la'");
   await assertConverged(a, b);
   assert.equal(b.get("SELECT parent_task_id p FROM tasks WHERE id = 'k'").p, null);
-  assert.equal(b.get('SELECT count(*) c FROM altar_placements').c, 0);
+  assert.equal(b.get('SELECT count(*) c FROM lexicon_entries').c, 0);
 });
 
 console.log('Conflicts between two devices');
@@ -406,16 +405,15 @@ await test('moved into a category the other device deleted', async () => {
   assert.equal(b.get("SELECT category_id c FROM entries WHERE id = 'e'").c, null);
 });
 
-await test('a placement on an altar the other device deleted', async () => {
+await test('a word in a language the other device deleted', async () => {
   const [, a, b] = await pair();
-  a.run("INSERT INTO altars (id, title, created_at, updated_at) VALUES ('a', 'A', ?, ?)", NOW, NOW);
-  a.run("INSERT INTO altar_items (id, name, created_at) VALUES ('i', 'I', ?)", NOW);
+  a.run("INSERT INTO languages (id, name, created_at, updated_at) VALUES ('la', 'L', ?, ?)", NOW, NOW);
   await assertConverged(a, b);
-  a.run("DELETE FROM altars WHERE id = 'a'");
-  b.run("INSERT INTO altar_placements (id, altar_id, item_id) VALUES ('pl', 'a', 'i')");
+  a.run("DELETE FROM languages WHERE id = 'la'");
+  b.run("INSERT INTO lexicon_entries (id, language_id, created_at, updated_at) VALUES ('w', 'la', ?, ?)", NOW, NOW);
   await a.sync();
   await assertConverged(a, b);
-  assert.equal(a.get('SELECT count(*) c FROM altar_placements').c, 0);
+  assert.equal(a.get('SELECT count(*) c FROM lexicon_entries').c, 0);
 });
 
 await test('data from another version is refused before anything is written', async () => {
@@ -577,10 +575,9 @@ await test('many changes go out in parts, and references survive every part', as
   a.run("UPDATE categories SET name = 'Renamed' WHERE id = 'c'");
   a.run("INSERT INTO tasks (id, title, created_at, updated_at) VALUES ('z', 'P', ?, ?)", NOW, NOW);
   a.run("INSERT INTO tasks (id, title, parent_task_id, created_at, updated_at) VALUES ('k', 'K', 'z', ?, ?)", NOW, NOW);
-  a.run("INSERT INTO altars (id, title, created_at, updated_at) VALUES ('al', 'A', ?, ?)", NOW, NOW);
   // Large enough to end a part: a parent after it would come too late.
-  a.run("INSERT INTO altar_items (id, name, created_at) VALUES ('it', ?, ?)", 'y'.repeat(400), NOW);
-  a.run("INSERT INTO altar_placements (id, altar_id, item_id) VALUES ('pl', 'al', 'it')");
+  a.run("INSERT INTO languages (id, name, created_at, updated_at) VALUES ('la', ?, ?, ?)", 'y'.repeat(400), NOW, NOW);
+  a.run("INSERT INTO lexicon_entries (id, language_id, created_at, updated_at) VALUES ('w', 'la', ?, ?)", NOW, NOW);
   // Applied part by part, as the server would hand them out one push at a time.
   let parts = 0;
   for (;;) {
@@ -710,7 +707,7 @@ async function randomRun(seed) {
     (d) => {
       const c = r.pick(ids(d, 'categories'));
       if (!c) return;
-      for (const t of ['entries', 'tasks', 'altar_items']) d.run(`UPDATE ${t} SET category_id = NULL WHERE category_id = ?`, c);
+      for (const t of ['entries', 'tasks']) d.run(`UPDATE ${t} SET category_id = NULL WHERE category_id = ?`, c);
       d.run('DELETE FROM categories WHERE id = ?', c);
     },
     (d) => { const e = r.pick(ids(d, 'entries')); const c = r.pick(ids(d, 'categories')); if (e && c) d.run('UPDATE entries SET category_id = ? WHERE id = ?', c, e); },
@@ -721,10 +718,10 @@ async function randomRun(seed) {
     (d) => { const k = r.pick(ids(d, 'tasks')); const p = r.pick(ids(d, 'tasks')); if (k && p && k !== p) d.run('UPDATE tasks SET parent_task_id = ? WHERE id = ?', p, k); },
     (d) => { const k = r.pick(ids(d, 'tasks')); if (k) d.run('DELETE FROM tasks WHERE id = ?', k); },
     (d) => { const k = r.pick(ids(d, 'tasks')); if (k) d.run('INSERT OR IGNORE INTO task_links (id, task_id, target_id, target_type) VALUES (?, ?, ?, ?)', id('l'), k, `x${r.int(3)}`, 'journal'); },
-    (d) => { d.run('INSERT INTO altars (id, title, created_at, updated_at) VALUES (?, ?, ?, ?)', id('a'), 'a', NOW, NOW); d.run('INSERT INTO altar_items (id, name, created_at) VALUES (?, ?, ?)', id('i'), 'i', NOW); },
-    (d) => { const a = r.pick(ids(d, 'altars')); const i = r.pick(ids(d, 'altar_items')); if (a && i) d.run('INSERT INTO altar_placements (id, altar_id, item_id) VALUES (?, ?, ?)', id('p'), a, i); },
-    (d) => { const a = r.pick(ids(d, 'altars')); if (a) d.run('DELETE FROM altars WHERE id = ?', a); },
-    (d) => { const i = r.pick(ids(d, 'altar_items')); if (i) d.run('DELETE FROM altar_items WHERE id = ?', i); },
+    (d) => d.run('INSERT INTO languages (id, name, created_at, updated_at) VALUES (?, ?, ?, ?)', id('la'), 'l', NOW, NOW),
+    (d) => { const la = r.pick(ids(d, 'languages')); if (la) d.run('INSERT INTO lexicon_entries (id, language_id, created_at, updated_at) VALUES (?, ?, ?, ?)', id('w'), la, NOW, NOW); },
+    (d) => { const la = r.pick(ids(d, 'languages')); if (la) d.run('DELETE FROM languages WHERE id = ?', la); },
+    (d) => { const w = r.pick(ids(d, 'lexicon_entries')); if (w) d.run('DELETE FROM lexicon_entries WHERE id = ?', w); },
   ];
   for (let step = 0; step < 150; step++) {
     const device = r.pick(devices);

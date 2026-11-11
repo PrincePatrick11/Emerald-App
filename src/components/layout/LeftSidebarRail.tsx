@@ -31,8 +31,8 @@ export const RAIL_WIDTH = 44;
 const RAIL_GROUP = 'w-full flex flex-col items-center gap-1';
 
 /**
- * The check at startup, once per app start: the bar is re-mounted,
- * e.g. after the altar's fullscreen, and would otherwise check again every time.
+ * The check at startup, once per app start: the bar can be re-mounted
+ * and would otherwise check again every time.
  */
 let startupCheck: Promise<string | null> | undefined;
 /** The update dot has done its job — re-mounting does not show it again. */
@@ -136,11 +136,10 @@ export default function LeftSidebarRail() {
           {viewButton('tasks', MODULES.tasks)}
           {viewButton('operations', MODULES.operations)}
         </div>
-        {/* The lexicon is not an entry module, but belongs with wiki and altar. */}
+        {/* The lexicon is not an entry module, but belongs with the wiki. */}
         <div className={RAIL_GROUP}>
           {viewButton('wiki', MODULES.wiki)}
           {viewButton('lexicon', AUX_VIEWS.lexicon)}
-          {viewButton('altar', MODULES.altar)}
         </div>
         <div className={RAIL_GROUP}>
           {viewButton('templates', AUX_VIEWS.templates)}

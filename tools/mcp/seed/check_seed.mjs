@@ -52,6 +52,7 @@ const modules = unified
   : ['journal_entries', 'wiki_articles', 'operations'].map((table) => [table, table, 'WHERE']);
 
 check('the sigil category is there', one("SELECT COUNT(*) AS n FROM categories WHERE id = 'sigils'").n === 1);
+if (unified) check('an altar is there, an operation of the altars', one("SELECT COUNT(*) AS n FROM entries WHERE category_id = 'altars' AND content LIKE '%core.altar%'").n >= 1);
 
 // A vault with an empty module renders an empty screen, which is exactly what
 // the seed exists to avoid.
@@ -59,7 +60,7 @@ for (const [label, from] of modules) {
   const n = one(`SELECT COUNT(*) AS n FROM ${from}`).n;
   check(`${label} has content`, n > 0, `${n} rows`);
 }
-for (const table of ['tasks', 'altars', 'altar_items', 'altar_placements', 'tags', 'categories']) {
+for (const table of ['tasks', 'tags', 'categories']) {
   const n = one(`SELECT COUNT(*) AS n FROM ${table}`).n;
   check(`${table} has content`, n > 0, `${n} rows`);
 }

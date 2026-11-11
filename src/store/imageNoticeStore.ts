@@ -3,7 +3,7 @@ import { ImageTooLargeError } from '../lib/imageLimits';
 
 /** Why an image was not inserted — for the paths without their own message line:
  *  pasting from the clipboard, dropping from the file explorer, the toolbar
- *  and the image field. Whoever has a line (cover image, altar) reports there. */
+ *  and the image field. Whoever has a line (cover image) reports there. */
 export type ImageNotice = { kind: 'format' } | { kind: 'tooLarge'; maxBytes: number };
 
 interface ImageNoticeState {

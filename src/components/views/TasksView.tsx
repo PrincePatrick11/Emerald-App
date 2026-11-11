@@ -69,7 +69,7 @@ export default function TasksView() {
   const [searchQuery, setSearchQuery] = useSessionState('tasks.search', '');
   const [filterCategory, setFilterCategory] = useSessionState<Set<string>>('tasks.filterCategory', new Set());
   const [filterPriority, setFilterPriority] = useSessionState<Set<string>>('tasks.filterPriority', new Set());
-  // "Show completed" is a preference like the preview in the altar, not a
+  // "Show completed" is a preference like a dashboard's view, not a
   // filter: permanent per vault (`vaultPrefs`), a reset leaves it alone.
   const [showCompleted, , setShowCompleted] = usePersistedFlag(SHOW_COMPLETED_FLAG);
   const { isCollapsed: isCategoryCollapsed, toggle: toggleCategoryCollapse, expand: expandCategories } = useCollapsedSet('tasks');
@@ -619,7 +619,6 @@ const TaskRow = memo(function TaskRow({
             value={task.category_id}
             onChange={handleCategoryChange}
             getLabel={(c) => categoryLabel(t, c)}
-            variant="chip"
             align="right"
             title={t('filters.category')}
           />

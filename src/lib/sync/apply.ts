@@ -49,7 +49,6 @@ export const REFERENCE_REPAIRS: readonly Statement[] = [
   ['UPDATE tasks SET parent_task_id = NULL WHERE parent_task_id IS NOT NULL AND parent_task_id NOT IN (SELECT id FROM tasks)'],
   ['DELETE FROM task_links WHERE task_id NOT IN (SELECT id FROM tasks)'],
   ['DELETE FROM lexicon_entries WHERE language_id NOT IN (SELECT id FROM languages)'],
-  ['DELETE FROM altar_placements WHERE altar_id NOT IN (SELECT id FROM altars) OR item_id NOT IN (SELECT id FROM altar_items)'],
 ];
 
 function insertStatement(table: string, row: Row): Statement {
@@ -329,11 +328,9 @@ export async function beginRestore(db: Database, keep: readonly SyncChange[] = [
  */
 const FRAME_REPAIRS: Record<string, readonly Statement[]> = {
   entries: [REFERENCE_REPAIRS[0]],
-  tasks: [REFERENCE_REPAIRS[1], REFERENCE_REPAIRS[3]],
-  altar_items: [REFERENCE_REPAIRS[2]],
-  task_links: [REFERENCE_REPAIRS[4]],
-  lexicon_entries: [REFERENCE_REPAIRS[5]],
-  altar_placements: [REFERENCE_REPAIRS[6]],
+  tasks: [REFERENCE_REPAIRS[1], REFERENCE_REPAIRS[2]],
+  task_links: [REFERENCE_REPAIRS[3]],
+  lexicon_entries: [REFERENCE_REPAIRS[4]],
 };
 
 export async function restoreFrame(db: Database, frame: SnapshotFrame): Promise<void> {

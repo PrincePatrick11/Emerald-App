@@ -13,7 +13,7 @@ import { useBlockDraftStore, type DefinitionDraft } from '../../store/draftStore
 import { useDraftPage } from '../../hooks/useDraftPage';
 import { useShrunkIcon } from '../../hooks/useShrunkIcon';
 import {
-  canBeEmpty, defaultFromSlot, OFFERED_ELEMENT_KINDS, elementKindLabelKey, isSigilKind, isSlotKind, slotFromDefault,
+  canBeEmpty, defaultFromSlot, ELEMENT_KINDS, elementKindLabelKey, isSigilKind, isSlotKind, slotFromDefault,
   type ElementDef, type ElementKind, type FieldValue,
 } from '../../lib/blocks/fields';
 import { ELEMENT_KIND_ICONS } from '../../lib/blocks/presets';
@@ -86,7 +86,7 @@ export default function BlockDefinitionEditor({ definition, onClose, onDelete, i
   const openAddMenu = (e: MouseEvent) => setMenu({
     x: e.clientX,
     y: e.clientY,
-    actions: OFFERED_ELEMENT_KINDS.map((kind) => {
+    actions: ELEMENT_KINDS.map((kind) => {
       const Icon = ELEMENT_KIND_ICONS[kind];
       return { label: t(elementKindLabelKey(kind)), icon: <Icon size={12} />, onClick: () => addElement(kind) };
     }),

@@ -80,11 +80,8 @@
     "blockDefinitionDeleted": "Block deleted",
     "templateDeleted": "Template deleted",
     "languageDeleted": "Language deleted",
-    "altarItemDeleted": "Element deleted",
     "imageDeleted": "Image deleted",
-    "altarDeleted": "Altar deleted",
-    "wordDeleted": "Word deleted",
-    "placementRemoved": "Element removed from altar"
+    "wordDeleted": "Word deleted"
   },
   "createItem": {
     "title": "Create new"
@@ -94,7 +91,6 @@
     "all": "All",
     "journal": "Journal",
     "wiki": "Wiki",
-    "altar": "Altar",
     "tags": "Tags",
     "categories": "Categories",
     "images": "Images",
@@ -128,59 +124,6 @@
     }
   },
   "altar": {
-    "addElement": "Add element",
-    "element": "Element",
-    "newAltar": "New altar",
-    "libraryTitle": "Altar Library",
-    "sortAltars": "Sort · Altars",
-    "sortLibrary": "Sort · Library",
-    "sectionTitle": "Altars",
-    "elementName": "Name…",
-    "all": "All",
-    "noElements": "No elements yet.",
-    "untitled": "Untitled Altar",
-    "uploadImage": "Upload image",
-    "favicon": "Icon",
-    "windowFullscreen": "Focus view",
-    "exitWindowFullscreen": "Exit focus view",
-    "imageTooLarge": "Image too large (max {{max}})",
-    "gridOverlay": "Grid overlay",
-    "gridOptions": "Grid options",
-    "gridSize": "Grid size",
-    "gridOpacity": "Grid opacity",
-    "gridColor": "Grid color",
-    "snapToGrid": "Snap to grid",
-    "rotationSnap": "Snap rotation angle",
-    "rotationSnapAngle": "Angle step (°)",
-    "snapScaleToGrid": "Scale to grid",
-    "gridToggleGrid": "Grid",
-    "gridToggleSnap": "Snap",
-    "gridToggleRotate": "Rotate",
-    "gridToggleScale": "Scale",
-    "canvasOptions": "Canvas options",
-    "ratio": "Ratio",
-    "chooseEmoji": "Choose emoji…",
-    "placedElements": "Placed Elements",
-    "noElementsPlaced": "No elements placed yet",
-    "summaryFormat": "Format",
-    "summaryBackground": "Background",
-    "summaryGrid": "Grid",
-    "summaryGridOff": "Off",
-    "summaryElements": "Elements",
-    "inspectorX": "X",
-    "inspectorY": "Y",
-    "inspectorScale": "Scale",
-    "inspectorRotation": "Rot",
-    "inspectorOpacity": "Opacity",
-    "inspectorLocked": "Locked — unlock to change it",
-    "show": "Show",
-    "hide": "Hide",
-    "lock": "Lock",
-    "unlock": "Unlock",
-    "duplicateElement": "Duplicate element",
-    "removeElement": "Remove element",
-    "rotate": "Rotate",
-    "scale": "Scale",
     "categories": {
       "candle": "Candle",
       "crystal": "Crystal",
@@ -190,8 +133,7 @@
       "tool": "Tool",
       "table": "Table",
       "other": "Other"
-    },
-    "showPreview": "Altar preview"
+    }
   },
   "journal": {
     "title": "Journal",
@@ -296,7 +238,6 @@
       "link": "Link",
       "image": "Image",
       "moon": "Moon phase",
-      "altar": "Altar",
       "sigilCalc": "Sigil calculator",
       "sigilCanvas": "Sigil drawing",
       "sigilCharge": "Charge"
@@ -372,11 +313,6 @@
       "locked": "Locked while the sigil is loaded",
       "saveFailed": "Couldn't save the drawing",
       "loadFailed": "Couldn't load the drawing — close and reopen the entry to try again"
-    },
-    "altar": {
-      "search": "Search altars…",
-      "missing": "The altar “{{name}}” no longer exists",
-      "open": "Open altar"
     },
     "canvas": {
       "broken": "This canvas could not be read. It stays as it is.",
@@ -880,7 +816,6 @@
     "globalPlaceholder": "Search everything…",
     "hint": "Titles, tags and content across every module.",
     "clear": "Clear search",
-    "altarElements": "Altar element",
     "categories": "Category",
     "showMore": "Show {{count}} more result",
     "showMore_other": "Show {{count}} more results"
@@ -946,6 +881,7 @@
     "removeLink": "Remove linked entry",
     "icon": "Icon",
     "emoji": "Emoji",
+    "chooseEmoji": "Choose emoji…",
     "coverImage": "Cover Image",
     "change": "Change",
     "remove": "Remove",
@@ -1084,7 +1020,6 @@
     "includeJournal": "Journal",
     "includeWiki": "Wiki",
     "includeOperations": "Operations",
-    "includeAltars": "Altars",
     "includeTasks": "Tasks",
     "includeTags": "Tags",
     "includeLexicon": "Lexicon",
@@ -1284,7 +1219,6 @@
     "blockDefinitions": "Blocks",
     "templates": "Templates",
     "languages": "Languages",
-    "altarItems": "Altar elements",
     "deleteSelected": "Delete selected ({{count}})",
     "confirmDeleteSelected": "Yes, delete {{count}}",
     "retentionNoteNever": "Items stay until you delete them permanently."
@@ -1313,10 +1247,6 @@
     "exportPdf": "Export as PDF…",
     "exportMarkdown": "Export as Markdown…",
     "exportEmerald": "Export as Emerald…",
-    "exportAltarImage": "Export as Image",
-    "exportAltarJpeg": "JPEG…",
-    "exportAltarPng": "PNG…",
-    "exportAltarWebp": "WebP…",
     "importMarkdown": "From Markdown…",
     "importEmerald": "From Emerald…",
     "quit": "Quit Emerald App",
@@ -1342,7 +1272,6 @@
     "tabWiki": "Wiki",
     "tabOperations": "Operations",
     "tabTasks": "Tasks",
-    "tabAltar": "Altar",
     "noResults": "No entries found"
   },
   "importDestination": {
@@ -1476,14 +1405,6 @@
     "operations": {
       "title": "No operations yet",
       "description": "Plan rituals with ingredients, steps and outcome."
-    },
-    "altar": {
-      "title": "No altar yet",
-      "description": "Design an altar from a background and elements."
-    },
-    "altarLibrary": {
-      "title": "No elements yet",
-      "description": "Candles, crystals, symbols – elements are what you build your altars from."
     },
     "images": {
       "title": "No images yet",

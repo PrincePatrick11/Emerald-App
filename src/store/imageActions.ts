@@ -28,7 +28,7 @@ async function writeContent(kind: Detached['kind'], id: string, content: string)
 /**
  * A picture out of "Images" into the trash — and, where it is still shown in
  * texts or image fields of entries and templates, out of those too. Sigil
- * drawings, altar backgrounds and block defaults keep it. What it was taken
+ * drawings, canvas backgrounds and block defaults keep it. What it was taken
  * out of is kept with the picture, so that restoring it — by Undo or from
  * the trash — puts it back (`restorePicture`). A file without details gets
  * them first, so that the trash holds it like any other picture.

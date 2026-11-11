@@ -10,8 +10,8 @@ interface BaseSortOptions<T> {
 }
 
 /**
- * The title getter is mandatory as soon as the item has no `title` field — the
- * altar library sorts by `name`. Without this condition such a call would
+ * The title getter is mandatory as soon as the item has no `title` field —
+ * something sorted by `name`, say. Without this condition such a call would
  * silently fall back to empty titles, and the alpha modes would do nothing at all.
  */
 type TitleOption<T> = 'title' extends keyof T

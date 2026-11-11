@@ -5,7 +5,7 @@ import SidebarSectionHeader from './SidebarSectionHeader';
 
 /**
  * A collapsible section of the read view in the right sidebar:
- * properties, links, tags, blocks, and for the altar the elements. Header with
+ * properties, links, tags, blocks. Header with
  * chevron, label and an optional counter on the right; whether it is closed is remembered by
  * `storageKey` across all entries (a preference, not a working gesture).
  *
@@ -66,8 +66,7 @@ export function SidebarPropertyRow({ icon, label, value, muted = false }: {
 }
 
 /**
- * A clickable list row: a link, a block, an element of the
- * altar: icon, name, and on the right a quiet assignment (`meta`). Hover raises the
+ * A clickable list row: a link, a block: icon, name, and on the right a quiet assignment (`meta`). Hover raises the
  * row as a surface; `active` marks the selected one.
  *
  * When editing, `action` attaches a button behind the row (the links:

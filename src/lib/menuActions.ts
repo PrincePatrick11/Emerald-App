@@ -27,9 +27,6 @@ export type MenuActionId =
   | 'export-pdf'
   | 'export-markdown'
   | 'export-emerald'
-  | 'export-altar-jpeg'
-  | 'export-altar-png'
-  | 'export-altar-webp'
   | 'import-markdown'
   | 'import-emerald';
 
@@ -45,9 +42,6 @@ type TitleBarOnlyMenuActionId =
   | 'export-pdf'
   | 'export-markdown'
   | 'export-emerald'
-  | 'export-altar-jpeg'
-  | 'export-altar-png'
-  | 'export-altar-webp'
   | 'import-markdown'
   | 'import-emerald';
 
@@ -121,13 +115,6 @@ export async function runMenuAction(id: SelfContainedMenuActionId): Promise<void
   switch (id) {
     case 'export-pdf': {
       const { exportAsPDF, noEntryMessage, exportErrorMessage } = await import('./export');
-      const view = useUIStore.getState().activeView;
-      const isAltarReadingView = view.type === 'altar' && !!view.id && view.mode !== 'edit';
-      if (isAltarReadingView) {
-        const { saveAltarPDF } = await import('./altarExport');
-        saveAltarPDF().catch((err) => exportErrorMessage(err, 'PDF export'));
-        return;
-      }
       const { collectExportData } = await import('./exportData');
       const data = await collectExportData();
       if (!data) { noEntryMessage(); return; }
@@ -146,15 +133,6 @@ export async function runMenuAction(id: SelfContainedMenuActionId): Promise<void
       const { exportErrorMessage } = await import('./export');
       const { exportAsEmerald } = await import('./emeraldFormat');
       exportAsEmerald().catch((err) => exportErrorMessage(err, 'Emerald export'));
-      return;
-    }
-    case 'export-altar-jpeg':
-    case 'export-altar-png':
-    case 'export-altar-webp': {
-      const { exportErrorMessage } = await import('./export');
-      const { saveAltarImage } = await import('./altarExport');
-      const format = id.slice('export-altar-'.length) as 'jpeg' | 'png' | 'webp';
-      saveAltarImage(format).catch((err) => exportErrorMessage(err, 'Image export'));
       return;
     }
     case 'import-markdown': {
@@ -193,12 +171,10 @@ export function dispatchMenuAction(id: MenuActionId): void {
 export interface MenuEnabledState {
   /** Markdown export — journal / wiki / operation entries. */
   entryEnabled: boolean;
-  /** PDF export — entries, plus an Altar's reading view (exports the rendered altar). */
+  /** PDF export — journal / wiki / operation entries. */
   pdfEnabled: boolean;
   /** Emerald export — like PDF, plus an open template page. */
   emeraldEnabled: boolean;
-  /** "Export as Image" (JPEG/PNG/WebP) — Altar reading view only. */
-  altarImageEnabled: boolean;
 }
 
 /**
@@ -214,14 +190,11 @@ export function computeMenuEnabledState(activeView: ActiveView): MenuEnabledStat
      activeView.type === 'wiki' ||
      activeView.type === 'operations') &&
     !!activeView.id;
-  const isAltarReadingView =
-    activeView.type === 'altar' && !!activeView.id && activeView.mode !== 'edit';
   const isTemplatePage = activeView.type === 'templates' && !!activeView.id;
 
   return {
     entryEnabled: isEntryView,
-    pdfEnabled: isEntryView || isAltarReadingView,
-    emeraldEnabled: isEntryView || isAltarReadingView || isTemplatePage,
-    altarImageEnabled: isAltarReadingView,
+    pdfEnabled: isEntryView,
+    emeraldEnabled: isEntryView || isTemplatePage,
   };
 }

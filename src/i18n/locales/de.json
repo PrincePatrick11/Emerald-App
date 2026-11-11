@@ -80,11 +80,8 @@
     "blockDefinitionDeleted": "Block gelöscht",
     "templateDeleted": "Vorlage gelöscht",
     "languageDeleted": "Sprache gelöscht",
-    "altarItemDeleted": "Element gelöscht",
     "imageDeleted": "Bild gelöscht",
-    "altarDeleted": "Altar gelöscht",
-    "wordDeleted": "Vokabel gelöscht",
-    "placementRemoved": "Element vom Altar genommen"
+    "wordDeleted": "Vokabel gelöscht"
   },
   "createItem": {
     "title": "Neu anlegen"
@@ -94,7 +91,6 @@
     "all": "Alle",
     "journal": "Journal",
     "wiki": "Wiki",
-    "altar": "Altar",
     "tags": "Tags",
     "categories": "Kategorien",
     "images": "Bilder",
@@ -128,59 +124,6 @@
     }
   },
   "altar": {
-    "addElement": "Element hinzufügen",
-    "element": "Element",
-    "newAltar": "Neuer Altar",
-    "libraryTitle": "Altar-Bibliothek",
-    "sortAltars": "Sortierung · Altäre",
-    "sortLibrary": "Sortierung · Bibliothek",
-    "sectionTitle": "Altäre",
-    "elementName": "Name…",
-    "all": "Alle",
-    "noElements": "Noch keine Elemente.",
-    "untitled": "Unbenannter Altar",
-    "uploadImage": "Bild hochladen",
-    "favicon": "Icon",
-    "windowFullscreen": "Fokusansicht",
-    "exitWindowFullscreen": "Fokusansicht beenden",
-    "imageTooLarge": "Bild zu groß (max. {{max}})",
-    "gridOverlay": "Raster-Overlay",
-    "gridOptions": "Raster-Optionen",
-    "gridSize": "Rastergröße",
-    "gridOpacity": "Raster-Deckkraft",
-    "gridColor": "Rasterfarbe",
-    "snapToGrid": "Am Raster ausrichten",
-    "rotationSnap": "Rotationswinkel einrasten",
-    "rotationSnapAngle": "Winkelschritt (°)",
-    "snapScaleToGrid": "Skalierung am Raster einrasten",
-    "gridToggleGrid": "Raster",
-    "gridToggleSnap": "Einrasten",
-    "gridToggleRotate": "Drehen",
-    "gridToggleScale": "Skalieren",
-    "canvasOptions": "Leinwandoptionen",
-    "ratio": "Seitenverhältnis",
-    "chooseEmoji": "Emoji wählen…",
-    "placedElements": "Platzierte Elemente",
-    "noElementsPlaced": "Noch keine Elemente platziert",
-    "summaryFormat": "Format",
-    "summaryBackground": "Hintergrund",
-    "summaryGrid": "Raster",
-    "summaryGridOff": "Aus",
-    "summaryElements": "Elemente",
-    "inspectorX": "X",
-    "inspectorY": "Y",
-    "inspectorScale": "Skalierung",
-    "inspectorRotation": "Rotation",
-    "inspectorOpacity": "Deckkraft",
-    "inspectorLocked": "Gesperrt — zum Ändern entsperren",
-    "show": "Anzeigen",
-    "hide": "Ausblenden",
-    "lock": "Sperren",
-    "unlock": "Entsperren",
-    "duplicateElement": "Element duplizieren",
-    "removeElement": "Element entfernen",
-    "rotate": "Drehen",
-    "scale": "Skalieren",
     "categories": {
       "candle": "Kerze",
       "crystal": "Kristall",
@@ -190,8 +133,7 @@
       "tool": "Werkzeug",
       "table": "Tisch",
       "other": "Sonstiges"
-    },
-    "showPreview": "Altar-Vorschau"
+    }
   },
   "journal": {
     "title": "Journal",
@@ -296,7 +238,6 @@
       "link": "Verknüpfung",
       "image": "Bild",
       "moon": "Mondphase",
-      "altar": "Altar",
       "sigilCalc": "Sigillen-Rechner",
       "sigilCanvas": "Sigillen-Zeichnung",
       "sigilCharge": "Ladung"
@@ -372,11 +313,6 @@
       "locked": "Gesperrt, solange die Sigille geladen ist",
       "saveFailed": "Die Zeichnung ließ sich nicht speichern",
       "loadFailed": "Die Zeichnung ließ sich nicht laden — den Eintrag schließen und neu öffnen"
-    },
-    "altar": {
-      "search": "Altar suchen …",
-      "missing": "Der Altar „{{name}}“ ist nicht mehr da",
-      "open": "Altar öffnen"
     },
     "canvas": {
       "broken": "Diese Leinwand ließ sich nicht lesen. Sie bleibt, wie sie ist.",
@@ -880,7 +816,6 @@
     "globalPlaceholder": "Alles durchsuchen…",
     "hint": "Titel, Tags und Inhalte aller Module.",
     "clear": "Suche leeren",
-    "altarElements": "Altar-Element",
     "categories": "Kategorie",
     "showMore": "{{count}} weiteres Ergebnis anzeigen",
     "showMore_other": "{{count}} weitere Ergebnisse anzeigen"
@@ -946,6 +881,7 @@
     "removeLink": "Verlinkung entfernen",
     "icon": "Icon",
     "emoji": "Emoji",
+    "chooseEmoji": "Emoji wählen…",
     "coverImage": "Titelbild",
     "change": "Ändern",
     "remove": "Entfernen",
@@ -1084,7 +1020,6 @@
     "includeJournal": "Journal",
     "includeWiki": "Wiki",
     "includeOperations": "Operationen",
-    "includeAltars": "Altäre",
     "includeTasks": "Aufgaben",
     "includeTags": "Tags",
     "includeLexicon": "Lexikon",
@@ -1284,7 +1219,6 @@
     "blockDefinitions": "Blöcke",
     "templates": "Vorlagen",
     "languages": "Sprachen",
-    "altarItems": "Altar-Elemente",
     "deleteSelected": "Ausgewählte löschen ({{count}})",
     "confirmDeleteSelected": "Ja, {{count}} löschen",
     "retentionNoteNever": "Elemente bleiben, bis du sie endgültig löschst."
@@ -1313,10 +1247,6 @@
     "exportPdf": "Als PDF exportieren…",
     "exportMarkdown": "Als Markdown exportieren…",
     "exportEmerald": "Als Emerald exportieren…",
-    "exportAltarImage": "Als Bild exportieren",
-    "exportAltarJpeg": "JPEG…",
-    "exportAltarPng": "PNG…",
-    "exportAltarWebp": "WebP…",
     "importMarkdown": "Aus Markdown…",
     "importEmerald": "Aus Emerald…",
     "quit": "Emerald App beenden",
@@ -1342,7 +1272,6 @@
     "tabWiki": "Wiki",
     "tabOperations": "Operationen",
     "tabTasks": "Aufgaben",
-    "tabAltar": "Altar",
     "noResults": "Keine Einträge gefunden"
   },
   "importDestination": {
@@ -1476,14 +1405,6 @@
     "operations": {
       "title": "Noch keine Operationen",
       "description": "Plane Rituale mit Zutaten, Ablauf und Ergebnis."
-    },
-    "altar": {
-      "title": "Noch kein Altar",
-      "description": "Gestalte einen Altar aus Hintergrund und Elementen."
-    },
-    "altarLibrary": {
-      "title": "Noch keine Elemente",
-      "description": "Kerzen, Kristalle, Symbole – aus Elementen baust du deine Altäre."
     },
     "images": {
       "title": "Noch keine Bilder",

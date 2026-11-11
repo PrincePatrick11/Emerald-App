@@ -28,7 +28,6 @@ const UNTITLED_KEYS: Record<ContentType, string> = {
   wiki: 'wiki.untitled',
   operation: 'operations.untitled',
   task: 'tasks.untitled',
-  altar: 'altar.untitled',
 };
 
 /** The title as it is shown everywhere: its own, otherwise "Untitled …" in the app's language. */

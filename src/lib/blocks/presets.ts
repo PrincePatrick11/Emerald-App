@@ -7,7 +7,7 @@ import { createSigilCalcBlock, createSigilCanvasBlock, createSigilChargeBlock } 
 import { createTextBlock } from './blockHtml';
 import { ALTAR_BLOCK_TYPE, createCanvasBlock } from './canvas';
 import {
-  activeElements, createFieldsBlock, OFFERED_ELEMENT_KINDS, elementKindLabelKey, FIELDS_BLOCK_TYPE, isSigilKind, parseFields,
+  activeElements, createFieldsBlock, ELEMENT_KINDS, elementKindLabelKey, FIELDS_BLOCK_TYPE, isSigilKind, parseFields,
   type ElementKind, type FallbackText,
 } from './fields';
 import { instantiateDefinition, type BlockDefinition } from './definitions';
@@ -45,17 +45,16 @@ export const ELEMENT_KIND_ICONS: Record<ElementKind, LucideIcon> = {
   link: Link2,
   image: Image,
   moon: Moon,
-  altar: AltarIcon,
   sigilCalc: Sparkles,
   sigilCanvas: PenTool,
   sigilCharge: Zap,
 };
 
-const KIND_GROUPS: Partial<Record<ElementKind, BlockGroup>> = { link: 'reference', altar: 'reference', image: 'media', moon: 'moon' };
+const KIND_GROUPS: Partial<Record<ElementKind, BlockGroup>> = { link: 'reference', image: 'media', moon: 'moon' };
 
 // Text and the sigil parts exist only in custom blocks — on their own one
 // inserts the text block and the sigil blocks (above and below).
-const FIELD_PRESET_KINDS = OFFERED_ELEMENT_KINDS.filter((kind) => kind !== 'text' && !isSigilKind(kind));
+const FIELD_PRESET_KINDS = ELEMENT_KINDS.filter((kind) => kind !== 'text' && !isSigilKind(kind));
 
 export const BLOCK_PRESETS: readonly BlockPreset[] = [
   { id: 'text', labelKey: 'blocks.types.text.label', descriptionKey: 'blocks.types.text.description', icon: Type, group: 'text', create: () => createTextBlock() },

@@ -1,6 +1,6 @@
 /**
  * Module-wide channel for HTML5 drag payloads that do not fit through
- * dataTransfer (React objects). dragState/altarDragState are thin adapters
+ * dataTransfer (React objects). dragState/imageDragState are thin adapters
  * on top of it and keep their named exports.
  */
 export interface DragChannel<T> {

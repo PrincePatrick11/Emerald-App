@@ -3,7 +3,7 @@ import { isBlockHidden, showsTitleInRead } from './blockAttrs';
 import { parseBlocks } from './blockHtml';
 import { resolveBlockType, type BlockTypeMeta } from './blockTypes';
 import {
-  FIELDS_BLOCK_TYPE, fieldValueHtml, imageFromSlot, isElementEmpty, isHiddenInRead, isSigilKind, isSlotKind, linkFromSlot, parseFields,
+  FIELDS_BLOCK_TYPE, fieldValueHtml, imageFromSlot, isElementEmpty, isHiddenInRead, isSigilKind, isSlotKind, parseFields,
   type ElementDef, type FallbackText, type FieldsModel,
 } from './fields';
 import {
@@ -19,7 +19,6 @@ import { ALTAR_BLOCK_TYPE, CANVAS_BLOCK_TYPE, parseCanvasBlock } from './canvas'
  * type, following the same rules as read mode:
  * - hidden blocks (the eye) are missing,
  * - calculators and drawings that a loaded sigil still conceals are missing,
- * - an altar field shows the altar's preview image and its link chip,
  * - field blocks show only what read mode shows (archived and — per
  *   the display rule — empty fields do not appear), date and number formatted,
  * - the block title appears as a heading where read mode shows it,
@@ -46,8 +45,6 @@ export interface ExportText {
   notLoaded: string;
   /** Label of the drawing — in the Markdown the placeholder in its place. */
   drawing: string;
-  /** An altar with its stored preview image (file name or data URL) — `null` if it no longer exists. */
-  altar: (altarId: string) => { title: string; image: string | null } | null;
 }
 
 function row(label: string, valueHtml: string): string {
@@ -69,15 +66,6 @@ function fieldValue(element: ElementDef, model: FieldsModel, text: ExportText): 
       return model.slots[element.id] ?? null;
     case 'text':
       return isElementEmpty(element, model) ? null : model.slots[element.id]!;
-    case 'altar': {
-      const slot = model.slots[element.id];
-      if (!slot) return null;
-      // The image carries the current name, like read mode; a deleted altar stays with the chip.
-      const link = linkFromSlot(slot);
-      const altar = link?.entryType === 'altar' ? text.altar(link.id) : null;
-      const image = altar?.image ? imageHtml(altar.image, altar.title || link!.label) : '';
-      return `${image}${slot}`;
-    }
     case 'date':
       return typeof value === 'string' && value.trim() ? escapeHtml(text.date(value)) : null;
     case 'number':

@@ -3,7 +3,7 @@ import { useUIStore } from '../store/uiStore';
 
 /**
  * An on/off state that survives a restart — a preference like "which
- * section of the altar dashboard stays collapsed". Persistent and per vault,
+ * section of the templates list stays collapsed". Persistent and per vault,
  * along with the other preferences (`uiStore.flags`, `vaultPrefs`).
  *
  * If a vault has never set the key, what stood app-wide under the same key

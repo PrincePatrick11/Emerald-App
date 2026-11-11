@@ -144,7 +144,7 @@ function blockDisplay(display: DefinitionDisplay): DisplayRules {
 
 /**
  * The elements' defaults — what a new copy (or a new element in it)
- * receives: scalars as values, link, altar and image as a slot.
+ * receives: scalars as values, link and image as a slot.
  */
 function defaultsOf(elements: readonly ElementDef[], blockId: string): Pick<FieldsModel, 'values' | 'slots'> {
   const values: Record<string, FieldValue> = {};

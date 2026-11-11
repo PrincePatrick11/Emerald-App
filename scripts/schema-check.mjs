@@ -133,7 +133,8 @@ writeFileSync(
    export { convertLegacySigils, needsSigilConversion, sigilRowToContent } from '${process.cwd().replace(/\\/g, '/')}/src/lib/migrateLegacySigils';
    export { linkedIdsToContent, rowsLinkSource } from '${process.cwd().replace(/\\/g, '/')}/src/lib/migrateLinkedIdsToContent';
    export { journalFieldsToContent } from '${process.cwd().replace(/\\/g, '/')}/src/lib/migrateJournalFieldsToContent';
-   export { stripTagIds, replaceTagId } from '${process.cwd().replace(/\\/g, '/')}/src/lib/tagRefs';`
+   export { stripTagIds, replaceTagId } from '${process.cwd().replace(/\\/g, '/')}/src/lib/tagRefs';
+   export { createAltarTables } from '${process.cwd().replace(/\\/g, '/')}/src/lib/migrateAltars';`
 );
 
 const bundlePath = join(workDir, 'bundle.mjs');
@@ -172,14 +173,18 @@ const {
   collectUsedImageFilenames, invalidateVaultCache, copyTable, ddlBeforeV49,
   assertPayloadReferencesResolve, convertLegacySigils, migrateBackupPayload, withRoutinesAsTemplates,
   needsSigilConversion, sigilRowToContent, linkedIdsToContent, rowsLinkSource, journalFieldsToContent,
-  stripTagIds, replaceTagId, importTagsAndRemap, dropUnknownTagIds,
+  stripTagIds, replaceTagId, importTagsAndRemap, dropUnknownTagIds, createAltarTables,
 } = await import(pathToFileURL(bundlePath).href);
 
-// v62 turns the altars into operations and empties their tables. The checks
-// of the older migrations look at the altar tables after the whole chain, so
-// the chain runs without it; its own section calls it (`altarsToOperations`).
+// v62 turns the altars into operations and empties their tables, v63 drops
+// them. The checks of the older migrations look at the altar tables after
+// the whole chain, so the chain runs without both; section 1 drops the
+// tables before it compares, the v62 section calls both
+// (`altarsToOperations`, `dropAltarTables`).
 const altarsToOperations = MIGRATIONS.find((m) => m.version === 62).up;
 MIGRATIONS.find((m) => m.version === 62).up = async () => {};
+const dropAltarTables = MIGRATIONS.find((m) => m.version === 63).up;
+MIGRATIONS.find((m) => m.version === 63).up = async () => {};
 
 /* ------------------------------------------------------------------ *
  * Read out and compare the schema
@@ -223,11 +228,13 @@ async function readSchema(db) {
         .sort((a, b) => `${a.from}`.localeCompare(`${b.from}`)),
     };
   }
+  // Of the live tables: the chain keeps the altar tables for the older
+  // migrations' checks (v63 is left out, see above).
   out._indexes = (
     await db.select(
       "SELECT name, tbl_name, sql FROM sqlite_master WHERE type='index' ORDER BY name"
     )
-  ).map((i) => ({ name: i.name, table: i.tbl_name, sql: normalizeSql(i.sql) }));
+  ).filter((i) => TABLES.includes(i.tbl_name)).map((i) => ({ name: i.name, table: i.tbl_name, sql: normalizeSql(i.sql) }));
   return out;
 }
 
@@ -661,9 +668,13 @@ console.log('\n1. Baseline against migration chain\n');
 
 const baseline = await buildViaBaseline();
 const chain = await buildViaChain('chain.db');
+// The altar checks of sections 3 and 8d look at this chain; their tables
+// (v63) go in a copy of it.
+const chainNoAltars = await buildViaChain('chain-v63.db');
+await dropAltarTables(chainNoAltars);
 
 const schemaA = await readSchema(baseline);
-const schemaB = await readSchema(chain);
+const schemaB = await readSchema(chainNoAltars);
 
 for (const table of TABLES) {
   const a = schemaA[table];
@@ -691,6 +702,9 @@ const droppedCheck = await chain.select(
    ) OR name LIKE '%_old'`
 );
 check('legacy tables, old category and entry tables and _old tables removed', droppedCheck.length === 0, JSON.stringify(droppedCheck));
+const strayTables = (await chainNoAltars.select("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'"))
+  .filter((t) => !TABLES.includes(t.name));
+check('v63: after it, the chain holds the baseline\'s tables and no others', strayTables.length === 0, JSON.stringify(strayTables));
 
 console.log('\n2. Foreign keys\n');
 for (const [label, db] of [['baseline', baseline], ['chain', chain]]) {
@@ -1791,44 +1805,10 @@ console.log('\n8j. Migration v45: the lexicon\n');
 console.log('\n8k. Migration v46: altars get a trash\n');
 
 {
+  // The altar tables are gone since v63; v46 still runs over a vault from before.
   const db = freshDb('altar-trash.db');
   await runMigrations(db);
-  check(
-    'fresh schema: altars has deleted_at',
-    (await db.select('PRAGMA table_info(altars)')).some((c) => c.name === 'deleted_at')
-  );
-  check(
-    'fresh schema: the index on deleted_at is there',
-    (await db.select("SELECT name FROM sqlite_master WHERE type='index' AND name='idx_altars_deleted'")).length === 1
-  );
-
-  await db.execute(
-    `INSERT INTO altars (id,title,created_at,updated_at)
-     VALUES ('a1','Altar',?1,?1)`,
-    [now]
-  );
-  await db.execute(`INSERT INTO altar_items (id,name,emoji,note,created_at) VALUES ('i1','Kerze','x','',?1)`, [now]);
-  await db.execute(
-    `INSERT INTO altar_placements (id,altar_id,item_id,x,y) VALUES ('p1','a1','i1',50,50)`
-  );
-
-  // The trash puts the altar away, its placements stay for the way back.
-  await db.execute(`UPDATE altars SET deleted_at=?1 WHERE id='a1'`, [now]);
-  check(
-    'the placements survive the trash of their altar',
-    (await db.select('SELECT COUNT(*) AS n FROM altar_placements'))[0].n === 1
-  );
-
-  // Permanent deletion takes them along — CLEANUP_TABLES and emptyTrash rely on that.
-  await db.execute(`DELETE FROM altars WHERE deleted_at IS NOT NULL`);
-  check(
-    'ON DELETE CASCADE removes the placements along with the altar',
-    (await db.select('SELECT COUNT(*) AS n FROM altar_placements'))[0].n === 0
-  );
-  check(
-    'the library item stays',
-    (await db.select('SELECT COUNT(*) AS n FROM altar_items'))[0].n === 1
-  );
+  await createAltarTables(db);
 
   // A second run (created, but not stamped) does not abort.
   const v46 = MIGRATIONS.find((m) => m.version === 46);
@@ -2022,6 +2002,7 @@ console.log('\n8n. Migration v49: three entry tables become entries\n');
   // v62: altars become operations of "Altars", items pictures of "Images", links follow.
   const db = freshDb('v62.db');
   await runMigrations(db);
+  await createAltarTables(db);
   const pic = `${'d'.repeat(64)}.png`;
   const gone = `${'e'.repeat(64)}.webp`;
   await db.execute(
@@ -2085,7 +2066,15 @@ console.log('\n8n. Migration v49: three entry tables become entries\n');
   const left = await db.select('SELECT (SELECT COUNT(*) FROM altars) a, (SELECT COUNT(*) FROM altar_items) i, (SELECT COUNT(*) FROM altar_placements) p');
   check('v62: the altar tables are empty', left[0].a === 0 && left[0].i === 0 && left[0].p === 0, left);
   check('v62: repeatable, one operation', (await db.select("SELECT COUNT(*) n FROM entries WHERE id='a1'"))[0].n === 1);
-  check('v62: schema identical to the baseline', JSON.stringify(await readSchema(db)) === JSON.stringify(schemaA));
+
+  // v63: an altar an older device synced in since v62 is converted, then the tables go.
+  await db.execute(`INSERT INTO altars (id,title,created_at,updated_at) VALUES ('a2','Late',$1,$1)`, [now]);
+  await dropAltarTables(db);
+  const tables = await db.select("SELECT name FROM sqlite_master WHERE type='table' AND name LIKE 'altar%'");
+  check('v63: the altar tables are gone', tables.length === 0, tables);
+  check('v63: an altar synced in late is an operation', (await db.select("SELECT COUNT(*) n FROM entries WHERE id='a2' AND type='operation'"))[0].n === 1);
+  await dropAltarTables(db); // repeatable: without the tables there is nothing to do
+  check('v62/v63: schema identical to the baseline', JSON.stringify(await readSchema(db)) === JSON.stringify(schemaA));
   db.close();
 }
 
