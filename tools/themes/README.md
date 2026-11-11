@@ -13,4 +13,4 @@ Start the app through the MCP server, then activate the theme with `eval`:
 })()
 ```
 
-Evaluating `scan-bypass.js` returns the visible colours outside the theme's hues on the current page, grouped by class. Emoji, images and the altar canvas are skipped. The count covers one screen at a time, so it has to be run per view.
+Evaluating `scan-bypass.js` returns the visible colours outside the theme's hues on the current page, grouped by class. Emoji, images and canvases (the canvas editor, sigil drawings) are skipped. The count covers one screen at a time, so it has to be run per view.

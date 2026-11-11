@@ -9,10 +9,9 @@ This file is the overview: tech stack, module map, data flow and the IPC surface
 | [`architecture/modules.md`](architecture/modules.md) | Module registry, entry store, store selectors, categories, tags, moon phase, lexicon |
 | [`architecture/editing.md`](architecture/editing.md) | Edit mode, Cancel, leaving an edit, type change, auto-save, sidebar action bar, internal links |
 | [`architecture/blocks.md`](architecture/blocks.md) | Content blocks: stored format, fields, sigils, user-built blocks |
-| [`architecture/editors.md`](architecture/editors.md) | Editors shared across modules: the text editor, its host and features |
+| [`architecture/editors.md`](architecture/editors.md) | Editors shared across modules: the text editor, its host and features; the canvas editor, the Canvas and Altar blocks |
 | [`architecture/templates.md`](architecture/templates.md) | Templates: assignments, defaults, insertion |
 | [`architecture/navigation.md`](architecture/navigation.md) | Global search, drag and drop, tabs, navigation history, left sidebar |
-| [`architecture/altar.md`](architecture/altar.md) | Altar UI composition |
 | [`architecture/storage.md`](architecture/storage.md) | Image storage, vault layout, vault settings |
 | [`architecture/encryption.md`](architecture/encryption.md) | Vault keys, sealed files, the SQL layer, the unlock gate, re-encryption, encrypted backups |
 | [`architecture/sync.md`](architecture/sync.md) | Sync with a server: change capture, merge rules |
@@ -63,22 +62,20 @@ src/
 │   ├── blocks/       BlockStack, block views, fields/sigil blocks, block editor
 │   ├── views/        one view per module and aux view (Home … Trash)
 │   ├── sidebar/
-│   │   ├── panels/   Journal/Wiki/Operation properties panels, AltarSidebarPanel
+│   │   ├── panels/   Journal/Wiki/Operation properties panels
 │   │   └── fields/   sidebar sections, property rows, tags, links, type toggle
 │   ├── templates/    template page, assignments modal, insertion, pickers
 │   ├── lexicon/      LanguagePage, vocabulary/alphabet tables, TranslatePanel
-│   ├── altar/        canvas, cards, library strip/section, item modal
 │   └── ui/           shared component layer (see components.md)
 ├── store/
 │   ├── entryStore.ts            Journal, Wiki and Operations entries
-│   ├── taskStore.ts, altarStore.ts, tagStore.ts, categoryStore.ts
+│   ├── taskStore.ts, tagStore.ts, categoryStore.ts
 │   ├── blockDefinitionStore.ts  user-built blocks
 │   ├── blockSessionStore.ts     BlockStack ↔ sidebar block manager bridge
 │   ├── templateStore.ts, templateApply.ts   templates; applying one
 │   ├── lexiconStore.ts          languages and their words
 │   ├── draftStore.ts            unsaved block/template page drafts
 │   ├── autoBackupStore.ts       what the automatic backup did last
-│   ├── altarEdit.ts             altar snapshot for Cancel
 │   ├── entryEdit.ts             entry baselines for Cancel, carried across a type change
 │   ├── leaveGuardStore.ts       edit guards, "save / discard / keep editing"
 │   ├── uiStore.ts               tabs, active view, panels
@@ -99,7 +96,7 @@ src/
 │   ├── useMouseNavigation.ts    mouse back/forward buttons, browser keys
 │   ├── useCollapsedSet.ts, usePersistedFlag.ts, usePointerReorder.ts
 │   ├── useOpenInNewTabAction.tsx, useSaveAsTemplateAction.tsx
-│   └── useDisplayedAltar.ts, useShrunkIcon.ts, useEmojiSearchData.ts
+│   └── useShrunkIcon.ts, useEmojiSearchData.ts
 ├── lib/
 │   ├── sqlite.ts                the SQL interface over the `db_*` commands
 │   ├── db.ts                    connection and migration chain
@@ -121,15 +118,16 @@ src/
 │   ├── openEdits.ts             resolve open edits before closing everything
 │   ├── editorLock.ts            suspends editor saves during imports
 │   ├── globalSearch.ts, searchText.ts
-│   ├── dragChannel.ts, dragState.ts, altarDragState.ts
-│   ├── images.ts, imageLimits.ts, shrinkImage.ts, thumbnail.ts
-│   ├── export.ts, exportData.ts, emeraldFormat.ts, altarExport.ts
+│   ├── dragChannel.ts, dragState.ts, imageDragState.ts
+│   ├── images.ts, imageLimits.ts, shrinkImage.ts
+│   ├── export.ts, exportData.ts, emeraldFormat.ts
 │   ├── dbBackup.ts, importStaging.ts   .emeralddb backup and restore
 │   ├── sync/                    sync with a server: `tracking.ts` (capture), `apply.ts` (merge), `engine.ts` (when)
 │   ├── autoBackup.ts            automatic backup: when one is due, the run
 │   ├── vaultManager.ts, vaultSettings.ts
-│   ├── altarConstants.ts        altar sizes, backgrounds, candle check
-│   ├── altarSettings.ts         an altar's `settings` JSON
+│   ├── altarConversion.ts       older altars → operations (v62, v63, imports; `migrateAltars.ts` runs it)
+│   ├── altarScene.ts, altarElements.ts, altarSettings.ts, altarBackground.ts, altarConstants.ts
+│   │                            reading those altars; `altarIcon.ts` the Altar block's icon
 │   ├── menuActions.ts, platform.ts, updates.ts, splash.ts
 │   ├── formatDate.ts, sortItems.ts, groupBy.ts, viewMode.ts
 │   ├── helpers.ts, stamp.ts, reveal.ts, motion.ts, styleClasses.ts
@@ -190,24 +188,21 @@ The schema itself lives in `src/lib/schema.ts`, not in `db.ts`: fresh vaults exe
 
 `AppShell` calls `reloadAllStores()` (`src/store/moduleWiring.ts`) on mount and again on every vault switch — see [Module Registry](architecture/modules.md#module-registry) for the sequence. Views do **not** refetch on mount; a view that mounts before the startup fetch resolves renders its empty state until the store fills.
 
-Two details of what the stores load:
-
-- **Sigil drawings are files, not columns.** A drawing's rendered image is a file referenced from the canvas block's `<img src>`, next to its vector strokes as block data (see [Editors](architecture/editors.md#canvas-editor)), so the entry rows stay small. `entryBlockSummary(...).sigil` resolves the first visible, unconcealed drawing (`image`) and the target date; the Operations dashboard shows only the target date, in row and card alike.
-- **`altar_placements` load in one query.** `fetchAltars` selects the whole table once (`LIVE_PLACEMENTS`, joined to the live `altar_items` so placements of trashed elements stay hidden) and groups rows by `altar_id` in JS (`mapPlacementRows`). The drawn shapes and text come from the `elements` column of the altar rows already read (`parseAltarElements`).
+One detail of what the stores load: **sigil drawings are files, not columns.** A drawing's rendered image is a file referenced from the canvas block's `<img src>`, next to its vector strokes as block data (see [Editors](architecture/editors.md#canvas-editor)), so the entry rows stay small. `entryBlockSummary(...).sigil` resolves the first visible, unconcealed drawing (`image`) and the target date; the Operations dashboard shows only the target date, in row and card alike.
 
 ### Store write serialization
 
-Every content-store update method (`updateEntry`, `updateTask`/`toggleComplete`, `updateTag`, `updateTemplate`, `updateDefinition`, `updateAltar`/`updateAltarGrid`/`updateAltarResolution`, `updateItem`, `updatePlacement`, the lexicon's updates) reads a snapshot from the store, merges the patch into it, and writes the row back — the whole row, except that `updateEntry` writes `content` only when the patch carries it (it is by far the largest column). Two overlapping updates to the same entity — an autosave while the sidebar changes a property, an altar's thumbnail save overlapping a title save — would race, and the later one would overwrite the other's fields with a stale snapshot.
+Every content-store update method (`updateEntry`, `updateTask`/`toggleComplete`, `updateTag`, `updateTemplate`, `updateDefinition`, the lexicon's updates) reads a snapshot from the store, merges the patch into it, and writes the row back — the whole row, except that `updateEntry` writes `content` only when the patch carries it (it is by far the largest column). Two overlapping updates to the same entity — an autosave while the sidebar changes a property — would race, and the later one would overwrite the other's fields with a stale snapshot.
 
-`src/lib/serialize.ts` closes that race. `serialized(serialKey(domain, id), task)` chains same-key tasks strictly one after another, so a merge-and-write always runs against the previous one's result. The invariant: **any store method that writes back a whole row from a snapshot must run its write through `serialized()`, keyed per entity id.** `serialKey` types the domains (`entry`/`task`/`tag`/`altar`/`altarItem`/`placement`/`blockDefinition`/`template`/`language`); `templateStore` and `lexiconStore` use one store-wide key (`'*'`). `taskStore.toggleComplete` queues each affected descendant under its own `task:<id>` key, so a concurrent `updateTask` on a child can't have its `completed` columns rewound by the parent's cascade (or vice versa).
+`src/lib/serialize.ts` closes that race. `serialized(serialKey(domain, id), task)` chains same-key tasks strictly one after another, so a merge-and-write always runs against the previous one's result. The invariant: **any store method that writes back a whole row from a snapshot must run its write through `serialized()`, keyed per entity id.** `serialKey` types the domains (`entry`/`task`/`tag`/`blockDefinition`/`template`/`language`/`image`); `templateStore` and `lexiconStore` use one store-wide key (`'*'`). `taskStore.toggleComplete` queues each affected descendant under its own `task:<id>` key, so a concurrent `updateTask` on a child can't have its `completed` columns rewound by the parent's cascade (or vice versa).
 
-Deliberately not serialized, each with a comment at its definition: `bumpAltarUpdatedAt` (writes only `updated_at`) and `updateCategory` (writes only the columns passed in, no snapshot merge).
+Deliberately not serialized, with a comment at its definition: `updateCategory` (writes only the columns passed in, no snapshot merge).
 
 A serialized task must never await another task under its own key — it would wait on itself — and the chain carries no timeout, so a task that never settles occupies its key permanently. `drainSerialized()` resolves once every currently-queued chain has settled. `vaultStore.openActiveVault`, `dbBackup.importDatabase` (all modes) and `resolveOpenEdits` (`lib/openEdits.ts`) await it before swapping the database underneath the stores: the editor lock ([`editing.md`](architecture/editing.md#auto-save-the-useentryeditor-hook)) only stops *future* saves, so writes already in flight must finish first. `autoBackup.runAutoBackup` awaits it too, though it only reads: a write still queued would otherwise be missing from the payload.
 
 ### Code splitting
 
-`MainArea` loads every view with `React.lazy` via `VIEW_COMPONENTS` in `moduleViews.ts`, so TipTap (the largest chunk) only loads when an editor view first opens. `SettingsModal` is lazy for the same reason (it pulls in `dbBackup`). `menuActions.runMenuAction` imports the export/import modules (`export.ts`, `exportData.ts`, `emeraldFormat.ts`, `altarExport.ts` — and with them `turndown` and `marked`) with `await import()` per action, and `src/i18n/index.ts` ships only `en` eagerly. `vite.config.ts` deliberately has **no catch-all vendor chunk** — a blanket `return "vendor"` would pull the lazy libraries back into the eager bundle.
+`MainArea` loads every view with `React.lazy` via `VIEW_COMPONENTS` in `moduleViews.ts`, so TipTap (the largest chunk) only loads when an editor view first opens. `SettingsModal` is lazy for the same reason (it pulls in `dbBackup`). `menuActions.runMenuAction` imports the export/import modules (`export.ts`, `exportData.ts`, `emeraldFormat.ts` — and with them `turndown` and `marked`) with `await import()` per action, and `src/i18n/index.ts` ships only `en` eagerly. `vite.config.ts` deliberately has **no catch-all vendor chunk** — a blanket `return "vendor"` would pull the lazy libraries back into the eager bundle.
 
 ## IPC Command Surface
 
@@ -251,7 +246,7 @@ All Rust commands are *registered* in `src-tauri/src/lib.rs` and invoked from Ty
 | `write_file(path, content)` | Write UTF-8 text to a user-selected `.md`/`.emerald`/`.json`/`.txt` path. Rejects symlinks; the path must resolve within the allowed storage roots, and inside the app data directory only `vaults.json` and `vaults/` are writable (see [Path Confinement](security.md#path-confinement)). |
 | `read_file(path)` | Read a file as UTF-8. Same allowlist and confinement as `write_file`. |
 | `ensure_app_storage_dirs()` | Create the app data and config directories before vault metadata is written or SQLite opens. |
-| `export_pdf(html, path, page_size?)` | Render HTML to a PDF at a path the frontend obtained from the `dialog` plugin, by driving the app's own webview. `page_size` (inches) overrides the default Letter page — used by the Altar export only. See [PDF Export](architecture/shell.md#pdf-export). |
+| `export_pdf(html, path, page_size?)` | Render HTML to a PDF at a path the frontend obtained from the `dialog` plugin, by driving the app's own webview. `page_size` (inches) overrides the default Letter page; the frontend passes none at present. See [PDF Export](architecture/shell.md#pdf-export). |
 | `close_request_seen()` | The frontend's acknowledgement of a close request — see [Closing the window](architecture/shell.md#closing-the-window). |
 | `update_menu_labels(...)` | Translate the native menu's labels. macOS only in effect — see [Window Chrome](architecture/shell.md#window-chrome). |
 | `set_dock_icon(png?)` | Show a custom theme's Dock icon, or with none the one the app started with. Lasts while the app runs. macOS only in effect. |
@@ -267,7 +262,7 @@ Tauri menu events (not `invoke`) come from the native menu and are received in `
 | `toggle-rail` | View > Navigation Rail |
 | `toggle-left-list` | View > Entry List |
 | `toggle-right-sidebar` | View > Properties |
-| `reset-sidebar-widths` | View > Reset View — resets the entry-list and right-sidebar widths and the altar library height, leaves the altar's full-window mode, **and** brings back a hidden rail, entry list and right sidebar (`uiStore.showAllPanels`; with the rail hidden, Settings and the Vault button would otherwise be unreachable) |
+| `reset-sidebar-widths` | View > Reset View — resets the entry-list and right-sidebar widths **and** brings back a hidden rail, entry list and right sidebar (`uiStore.showAllPanels`; with the rail hidden, Settings and the Vault button would otherwise be unreachable) |
 | `toggle-view-lock` | View > Lock View — while on (`uiStore.viewLocked`, kept in localStorage), `AppShell` renders no resize handle on either sidebar; hiding and showing them and Reset View still work |
 | `show-splash` | View > Show Loading Screen |
 | `navigate-back` | Mouse back button (macOS NSEvent monitor; Windows and Linux read the button in the page — see [Navigation History](architecture/navigation.md#navigation-history)) |

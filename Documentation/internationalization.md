@@ -55,10 +55,10 @@ Skipping step 3 is the most common mistake: the fallback to English makes the om
 
 ## Built-in Category Names
 
-Wiki, Operations, Tasks, and Altar items share one `categories` table (see [`database.md`](database.md#categories)). Only one row is a true built-in (`is_builtin = 1`): `sigils` (a new operation in it starts with the sigil blocks). Its `name` column holds a fixed English seed value that must never be displayed directly — the display name always goes through the shared helper:
+Wiki, Operations and Tasks share one `categories` table (see [`database.md`](database.md#categories)). Two rows are true built-ins (`is_builtin = 1`): `sigils` and `altars` (a new operation in one starts with the sigil blocks, in the other with an altar). Their `name` column holds a fixed English seed value that must never be displayed directly — the display name always goes through the shared helper:
 
 ```tsx
-// correct — the one rule for all four modules
+// correct — the one rule for every module
 import { categoryLabel } from '../lib/categories';
 const label = categoryLabel(t, cat);
 
@@ -77,19 +77,18 @@ Top-level keys of `en.json`, with the conventions worth knowing:
 | Key | Contents |
 |---|---|
 | `common` | Shared labels: `save`/`cancel`/`delete`/`ok`, `loading`, the shared inline delete confirmation `confirmSure`/`confirmYes`/`confirmNo` ("Sure? Yes/No"), `copySuffix`, image-format and size messages, `searchEmoji`/`noEmojiResults` for the shared `EmojiPicker` |
-| `categories` | The one category block for all four modules: the Categories view (`add`, `name`, `nameTaken`, `dragHint`, `builtinHint`), `uncategorized`, `builtin.*` and `starter.*` (see [Built-in Category Names](#built-in-category-names)) |
+| `categories` | The one category block for every module: the Categories view (`add`, `name`, `nameTaken`, `dragHint`, `builtinHint`), `uncategorized`, `builtin.*` and `starter.*` (see [Built-in Category Names](#built-in-category-names)) |
 | `listView` | View/sort/grouping labels of the dashboard sidebar. The sort trigger combines a date field (`dateCreated`/`dateUpdated`/`dateDeleted`) with `sortNewest`/`sortOldest`, or uses `sortAlphaAsc`/`sortAlphaDesc`/`sortCountDesc`. `groupBy` (`"Group by {{label, lowercase}}"`) uses the `lowercase` formatter registered in `src/i18n/index.ts`; German capitalises the noun and skips the formatter |
 | `undo` | Undo toast messages |
 | `nav` | Navigation labels, including `home`, `categories`, `all` and `vaults`. A rail entry needs its `nav.<id>` key in all four locales, since `ModuleMeta`/`AUX_VIEWS` resolve the label dynamically |
 | `sidebar` | Left sidebar strings (`allEmpty`) |
-| `journal`, `wiki`, `operations`, `tasks`, `altar` | Module UI strings. Each module's `untitled` key is what `displayTitle` (`src/lib/entryTitle.ts`) shows for an empty title — display text only, never stored. `*.categories.*` is legacy-only (see above) |
-| `altar` | Also: the "element" wording for library items (`addElement`, `elementName`, `noElements`, `placedElements`), grid and inspector labels (units are rendered in the UI, not in the values), the dashboard's `sectionTitle`/`libraryTitle` and their own sort labels `sortAltars`/`sortLibrary` |
+| `journal`, `wiki`, `operations`, `tasks` | Module UI strings. Each module's `untitled` key is what `displayTitle` (`src/lib/entryTitle.ts`) shows for an empty title — display text only, never stored. `*.categories.*` is legacy-only (see above) |
 | `creation` | The sigil creation tools (intention, letters, canvas, charge) |
-| `blocks` | Content-block UI and the Blocks view: `types.*` (block types), `kinds.*` (one per `ElementKind`, shared by the "Add block" menu and the builder's element picker), `fields.*` (field block), `sigil.*` (standalone sigil blocks and their in-block parts), `altar.*` (altar field kind), `library.*` (the Blocks builder and its update/remove-copies notices) |
+| `blocks` | Content-block UI and the Blocks view: `types.*` (block types), `kinds.*` (one per `ElementKind`, shared by the "Add block" menu and the builder's element picker), `fields.*` (field block), `sigil.*` (standalone sigil blocks and their in-block parts), `canvas.*` (the Canvas and Altar blocks), `library.*` (the Blocks builder and its update/remove-copies notices) |
 | `editor` | Shared editor buttons, link-popup actions, `lockedBySigil`, and `toolbar.*` (every formatting-toolbar tooltip) |
 | `symbols` | The canvas editor's symbol library: its own labels, `packs.*` the pack names, and `<pack>.<name>` every symbol's name, which the library's search looks in |
 | `moonPhase` | Display names of the eight moon phases |
-| `search` | Dashboard search placeholders (`placeholder`, `placeholderIn` with `{{title}}`) and the title bar's global search (`globalPlaceholder`, `hint`, `clear`, `showMore`). Result module labels reuse `nav.*`; only `altarElements`/`categories` have their own |
+| `search` | Dashboard search placeholders (`placeholder`, `placeholderIn` with `{{title}}`) and the title bar's global search (`globalPlaceholder`, `hint`, `clear`, `showMore`). Result module labels reuse `nav.*`; only `categories` has its own |
 | `templates` | Templates dashboard and page; `builtin.sigil` and `builtin.altar` name the built-in `core-sigil` and `core-altar` templates the way `categories.builtin.*` names a category; `insert.*` is the editor's picker and apply flow |
 | `lexicon` | Lexicon dashboard, language page and translate field. `wordCount` counts vocabulary rows; the translated text's own count is `textWordCount` |
 | `tags` | Tags view (`new`, `name`, `nameTaken`, `color`, `unused`, `onlyInTemplates`) |

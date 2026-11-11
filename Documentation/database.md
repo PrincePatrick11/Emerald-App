@@ -15,11 +15,11 @@ Several consumers share those strings, and that sharing is the point of the file
 Older migrations must keep building the shape they were written for, not today's. Two files freeze that history:
 
 - `src/lib/schemaV37.ts` — the target shape of **v33** `normalize_schema` (`normalizeSchema.ts`): the tables that changed since v37 as their own DDL, everything else re-exported from `schema.ts`. It also holds the old built-in categories (`LEGACY_*_CATEGORIES`) that v36–v38 and old-file imports resolve against.
-- `src/lib/schemaV48.ts` — every table a later migration still reshaped, as it was before: `journal_entries`, `wiki_articles` and `operations` (before v49), `tasks`, `altar_items` and `tags` (before v50/v52/v53/v54). `ddlBeforeV49(table)` is what v33 (via `schemaV37`), v38 and v39 build from; `IMAGE_FIELDS_V48` is what v35 walks; `TITLED_TABLES_V48` is what v48 clears. **Nothing in it may change.**
+- `src/lib/schemaV48.ts` — every table a later migration still reshaped, as it was before: `journal_entries`, `wiki_articles` and `operations` (before v49), `tasks`, `altar_items` and `tags` (before v50/v52/v53/v54), and the three altar tables as they stood until v63 dropped them (`ALTAR_TABLE_DDL`; the backup import also builds them in its working copy to convert an older file's altars). `ddlBeforeV49(table)` is what v33 (via `schemaV37`), v38 and v39 build from, falling back to `ALTAR_TABLE_DDL` for the altar tables; `IMAGE_FIELDS_V48` is what v35 walks; `TITLED_TABLES_V48` is what v48 clears. **Nothing in it may change.**
 
 **Whoever changes a table in a later migration that v33, v38 or v39 also build must freeze its current DDL first** — otherwise those migrations silently start building the new shape on old vaults and then fail copying columns that no longer exist.
 
-Indexes follow the same rule. v38 and v39 create `INDEX_DDL_V38` (split into `DROPPED` and `KEPT` lists, since v47 and v49 drop some of those tables), not `INDEX_DDL`, because in the chain they run before later tables exist. A table added after them brings its own index constant (`BLOCK_DEFINITIONS_INDEX_DDL`, `TEMPLATES_INDEX_DDL`, `LEXICON_INDEX_DDL`, `ALTARS_INDEX_DDL`, `ENTRIES_INDEX_DDL`, `ALTAR_ITEMS_INDEX_DDL`), which its migration creates and `INDEX_DDL` appends for fresh vaults.
+Indexes follow the same rule. v38 and v39 create `INDEX_DDL_V38` (split into `DROPPED` and `KEPT` lists, since v47, v49 and v63 drop some of those tables), not `INDEX_DDL`, because in the chain they run before later tables exist. A table added after them brings its own index constant (`BLOCK_DEFINITIONS_INDEX_DDL`, `TEMPLATES_INDEX_DDL`, `LEXICON_INDEX_DDL`, `ALTARS_INDEX_DDL`, `ENTRIES_INDEX_DDL`, `ALTAR_ITEMS_INDEX_DDL`, `IMAGES_INDEX_DDL`), which its migration creates and `INDEX_DDL` appends for fresh vaults — except those of the altar tables, which went with them in v63.
 
 Because the baseline and the chain must produce the same schema, `npm run check:schema` (`scripts/schema-check.mjs`, needs `esbuild` from `devDependencies`) proves it: it builds a vault each way and compares `sqlite_master`, `PRAGMA table_info`, `PRAGMA foreign_key_list` and every index, table by table. It also covers the resume-after-crash paths of v33, v38 and v39, the seeded categories, the data migrations against seeded old rows, old-backup imports, and the constants mirrored across languages (see [Rules for Future Schema Changes](#rules-for-future-schema-changes)). Without that check, the two paths quietly diverge after a few releases and nobody notices until a user hits an error.
 
@@ -32,7 +32,7 @@ Because the baseline and the chain must produce the same schema, `npm run check:
 - **Fresh file** — no tables at all (checked in `sqlite_master`, not `schema_version`: a database old enough to predate the version table has tables but no version row and must run the chain). It runs the DDL from `schema.ts`, seeds the built-in categories, the starter categories and the `core-sigil` and `core-altar` templates — in the language active at first open, since `main.tsx` waits for the stored language before anything touches the database — and stamps one `baseline` row at `BASELINE_VERSION`.
 - **Existing file** — the ordered `MIGRATIONS` array runs from the highest applied version upward, each step stamping `schema_version` with version, name and ISO timestamp. Every vault reaches the same schema as a fresh one; there is no cut-off past which an old database stops being upgradable.
 
-`BASELINE_VERSION` in `schema.ts` must equal the last entry in `MIGRATIONS`; `runMigrations` throws at startup otherwise. The current version is **56**. **Version 24 does not exist** — the runner tolerates gaps and only requires each version to be above the last applied one. The three block migrations were first numbered v39–v41 on their development branch; `renumberBlockMigrations` restamps such a vault once by name and catches up on v39.
+`BASELINE_VERSION` in `schema.ts` must equal the last entry in `MIGRATIONS`; `runMigrations` throws at startup otherwise. The current version is **63**. **Version 24 does not exist** — the runner tolerates gaps and only requires each version to be above the last applied one. The three block migrations were first numbered v39–v41 on their development branch; `renumberBlockMigrations` restamps such a vault once by name and catches up on v39.
 
 After the migrations, every open runs:
 
@@ -63,18 +63,19 @@ Per-migration detail lives in the code and in `CHANGELOG.md`. In short:
 | 48 | `untitled_is_empty` | English default titles → empty (`clearLegacyUntitledTitles`) |
 | 49 | `unify_entries` | Journal, wiki and operations → one `entries` table ([entries](#entries)) |
 | 50 | `drop_dead_columns` | Drops `tasks.tags`, `altars.intention` |
-| 51 | `altar_settings` | Twelve altar display columns → JSON `settings` ([altars](#altars)) |
+| 51 | `altar_settings` | Twelve altar display columns → JSON `settings` |
 | 52 | `altar_items_soft_delete` | Additive: `altar_items.updated_at`/`deleted_at` |
 | 53 | `tags_by_id` | Tag lists hold ids instead of names; `tags.affected_ids` dropped ([tags](#tags)) |
 | 54 | `drop_unused_descriptions` | Drops `tasks.description`/`due_date`, `block_definitions.description`, `templates.description` |
 | 55 | `entries_list_index` | `idx_entries_list` (the list columns) and the partial `idx_entries_decorated` replace `idx_entries_deleted` |
 | 56 | `simple_copies_and_assignments` | Drops `block_definitions.revision`; `templates.assignments` keeps only what was a default, without the flag; trashed templates lose theirs |
-| 57 | `altar_elements` | Additive: `altars.elements`, the drawn shapes and text as JSON ([altars](#altars)) |
-| 58 | `altar_placement_groups` | Additive: `altar_placements.group_id`, the group a placement belongs to ([altar_placements](#altar_placements)) |
+| 57 | `altar_elements` | Additive: `altars.elements`, the drawn shapes and text as JSON |
+| 58 | `altar_placement_groups` | Additive: `altar_placements.group_id`, the group a placement belongs to |
 | 59 | `symbols` | New table: the vault's own symbols for the canvas editor ([symbols](#symbols)) |
 | 60 | `images` | Additive: the `images` table ([images](#images)) and its `deleted_at` index |
 | 61 | `altar_category_and_template` | Additive: the built-in category `altars` (appended to the list) and the `core-altar` template ([templates](#templates)) |
 | 62 | `altars_to_operations` | Altars become operations of `altars` under their own IDs, items with a picture rows of [images](#images), chips, altar fields and task links point at the operations; the altar tables are emptied, not dropped (`migrateAltars.ts`, `altarConversion.ts`); a copy of the file first (`.pre-v62.bak`) |
+| 63 | `drop_altar_tables` | Converts altar rows an older device synced in since v62 the same way, then drops `altars`, `altar_items` and `altar_placements` and deletes their rows from `_sync_log` (`dropAltarTables` in `migrateAltars.ts`); a copy of the file first (`.pre-v63.bak`) when there is something to convert |
 
 Column drops go through `dropColumnsIfPresent` (`dbRebuild.ts`), which skips columns already gone, so they are repeatable. Where a migration converts data, the same converter also runs on rows from an older `.emeralddb` file at import time — see [DB Backup / Restore](#db-backup--restore-emeralddb).
 
@@ -89,7 +90,7 @@ Two traps shape every rebuild after v33:
 
 v49 and v51 avoid the rename and need no marker: v49 copies per old table, skips ids already in `entries` and drops an old table only once every row is there; v51 adds `settings`, fills rows still at `'{}'`, then drops the old columns (a `DROP TABLE altars` would cascade into `altar_placements`).
 
-Before v33, v38, v39, v42, v44, v49, v51 and v53 rewrite anything (v42 and v44 only when there is something to convert), they write a full copy of the database via `VACUUM INTO` (`backupDatabaseFile` in `dbRebuild.ts`) to `{vaultDir}/emerald.db.pre-v33.bak`, `.pre-v38.bak` and so on — the escape hatch if a migration that rewrites every table goes wrong. On image-heavy vaults the file can be sizeable. `prune_migration_backups` keeps only the newest (what it may delete: [`security.md`](security.md#vault-directories-as-a-trust-boundary)).
+Before v33, v38, v39, v42, v44, v49, v51, v53, v62 and v63 rewrite anything (v42, v44, v62 and v63 only when there is something to convert), they write a full copy of the database via `VACUUM INTO` (`backupDatabaseFile` in `dbRebuild.ts`) to `{vaultDir}/emerald.db.pre-v33.bak`, `.pre-v38.bak` and so on — the escape hatch if a migration that rewrites every table goes wrong. On image-heavy vaults the file can be sizeable. `prune_migration_backups` keeps only the newest (what it may delete: [`security.md`](security.md#vault-directories-as-a-trust-boundary)).
 
 ### Frozen history, and why failures used to be swallowed
 
@@ -114,36 +115,33 @@ Two consequences shape how this schema is changed:
 - A constraint takes effect the moment it is declared. There is no grace period.
 - `PRAGMA foreign_keys = OFF` and `BEGIN` are **not usable across separate `execute()` calls** — each call reaches one pooled connection, and which one serves the next call is not controllable. That rules out the SQLite documentation's table-rebuild recipe (see [Rebuilding a table](#rebuilding-a-table)). A *single* call is different: sqlx runs the `;`-separated statements of one string in order on the one connection it picked, so one multi-statement `execute()` can hold a real `BEGIN … COMMIT`. `importStaging.ts`'s `swapIn` does this — see [DB Backup / Restore](#db-backup--restore-emeralddb). The other way is `Database.batch` (`db_batch` in `db.rs`): a list of statements with bound values, run as one transaction on one connection, all or none. Write loops use it; it cannot wrap a whole import, whose statements are built from reads in between.
 
-Eight relations are declared, each with a deliberately chosen delete behaviour:
+Five relations are declared, each with a deliberately chosen delete behaviour:
 
 | Relation | ON DELETE | Reason |
 |---|---|---|
-| `altar_placements.altar_id` → `altars.id` | CASCADE | a placement without its altar is meaningless |
-| `altar_placements.item_id` → `altar_items.id` | CASCADE | likewise |
-| `task_links.task_id` → `tasks.id` | CASCADE | likewise |
+| `task_links.task_id` → `tasks.id` | CASCADE | a link without its task is meaningless |
 | `lexicon_entries.language_id` → `languages.id` | CASCADE | a word without its language is nothing |
 | `tasks.parent_task_id` → `tasks.id` | SET NULL | the subtask survives as a standalone task |
 | `entries.category_id` → `categories.id` | RESTRICT | content must never vanish with its category (always `NULL` for a journal entry) |
 | `tasks.category_id` → `categories.id` | RESTRICT | likewise |
-| `altar_items.category_id` → `categories.id` | RESTRICT | likewise |
 
-All three `category_id` columns point at the one `categories` table and are nullable — `NULL` means no category, which is what a new entry starts with.
+Both `category_id` columns point at the one `categories` table and are nullable — `NULL` means no category, which is what a new entry starts with.
 
 ### What foreign keys cannot cover
 
-`task_links.target_id` is **polymorphic** — `target_type` (`'journal' | 'wiki' | 'operation' | 'task' | 'altar'`) decides what kind of row the target is, and SQL has no polymorphic foreign key. The same applies to the JSON-array references `templates.assignments` (category ids) and `entries.tags`/`templates.tags` (tag ids).
+`task_links.target_id` is **polymorphic** — `target_type` (`'journal' | 'wiki' | 'operation' | 'task'`) decides what kind of row the target is, and SQL has no polymorphic foreign key. The same applies to the JSON-array references `templates.assignments` (category ids) and `entries.tags`/`templates.tags` (tag ids).
 
 These are exactly the places where orphans accumulate. Three things stand in for the missing constraints:
 
 - **`checkIntegrity(db)`** in `schema.ts` reports `task_links` rows whose target is missing or exists with another `type` than `target_type`, unknown category ids in `templates.assignments` (parsed in JavaScript, since SQL cannot), and tag ids in `entries.tags`/`templates.tags` without a `tags` row (trashed tags count as existing). It scans whole tables and is a diagnostic only, not called on the production path.
-- **`sweepDanglingTaskLinks(db)`** in `db.ts` deletes `task_links` rows whose target does not exist **with the matching type** (`LINK_TARGET_EXISTS`: `entries` by `id` and `type`, plus `tasks` and `altars`). Its rule and `checkIntegrity`'s map of target types are kept in step by hand. Soft-deleted targets count as valid — trashed content isn't an orphan yet. It runs in the periodic cleanup, when the trash is emptied, and at the end of every backup import (a partial restore or an imported link row can point at something the import didn't bring).
-- **Permanent deletes clean up directly.** `altarStore.permanentlyDeleteAltar` deletes the rows pointing *at* the altar; `taskStore.permanentlyDeleteTask` (which takes every subtask in the Trash along) deletes both directions. A task's *soft* delete removes no `task_links` row — `taskStore` only loads the links of tasks outside the Trash, and restoring the task brings them back.
+- **`sweepDanglingTaskLinks(db)`** in `db.ts` deletes `task_links` rows whose target does not exist **with the matching type** (`LINK_TARGET_EXISTS`: `entries` by `id` and `type`, plus `tasks`). Its rule and `checkIntegrity`'s map of target types are kept in step by hand. Soft-deleted targets count as valid — trashed content isn't an orphan yet. It runs in the periodic cleanup, when the trash is emptied, and at the end of every backup import (a partial restore or an imported link row can point at something the import didn't bring).
+- **Permanent deletes clean up directly.** `taskStore.permanentlyDeleteTask` (which takes every subtask in the Trash along) deletes both directions. A task's *soft* delete removes no `task_links` row — `taskStore` only loads the links of tasks outside the Trash, and restoring the task brings them back.
 
 `lib/entryTypeChange.ts` (see [Changing an entry's type](architecture/editing.md#changing-an-entrys-type)) changes a Journal/Wiki/Operation entry's kind with one `UPDATE` of the same row (`retypeRow`). It is the one place allowed to rewrite `target_type` on existing `task_links` rows, and does so in the same step, so the sweep never has a reason to remove them.
 
 ### Deleting a category never deletes its content
 
-`RESTRICT` deletes nothing; it refuses a delete that would leave a dangling reference. `reassignCategoryContent(db, categoryId)` in `schema.ts` is the other half: it sets `category_id` to `NULL` across `CATEGORIZED_TABLES` (`entries`, `tasks`, `altar_items`) so the delete becomes permissible, and calls `dropCategoryFromTemplates`, which strips the category out of every template's `assignments` (trashed ones too). A template isn't content and doesn't become "Uncategorized" — it simply stops applying to a combination that no longer exists. `templateStore`'s `dropCategoriesFromTemplatesInMemory` mirrors that trim in the loaded store.
+`RESTRICT` deletes nothing; it refuses a delete that would leave a dangling reference. `reassignCategoryContent(db, categoryId)` in `schema.ts` is the other half: it sets `category_id` to `NULL` across `CATEGORIZED_TABLES` (`entries`, `tasks`) so the delete becomes permissible, and calls `dropCategoryFromTemplates`, which strips the category out of every template's `assignments` (trashed ones too). A template isn't content and doesn't become "Uncategorized" — it simply stops applying to a combination that no longer exists. `templateStore`'s `dropCategoriesFromTemplatesInMemory` mirrors that trim in the loaded store.
 
 When a category is merged into a namesake instead (`reassignCategoryContent(db, from, to)`, via `mergeCategory` from `categoryStore.restoreCategory` and `updateCategory`), content and assignments move to `to` (`moveCategoryInTemplates`): an assignment moves along only where no template already holds that entry type and `to`.
 
@@ -153,7 +151,7 @@ The built-ins, `sigils` and `altars` (since v61), cannot be deleted: an operatio
 
 ## Tables
 
-Thirteen tables. `TABLES` in `schema.ts` declares the dependency order, parents before children; the sections below group related tables. The order is not cosmetic: inserts are checked against foreign keys immediately, so it governs the rebuilds and the import swap.
+Twelve tables. `TABLES` in `schema.ts` declares the dependency order, parents before children; the sections below group related tables. The order is not cosmetic: inserts are checked against foreign keys immediately, so it governs the rebuilds and the import swap.
 
 ### schema_version
 
@@ -180,7 +178,7 @@ Migration bookkeeping. No rebuild touches it, since it records the very migratio
 
 ### categories
 
-One list shared by Wiki, Operations, Tasks and Altar items. Journal has no categories.
+One list shared by Wiki, Operations and Tasks. Journal has no categories.
 
 | Column | Type | Notes |
 |---|---|---|
@@ -212,7 +210,7 @@ The user-built blocks of the Blocks view. A row is only the template — an inse
 
 An element's kind never changes — the builder adds a new element instead.
 
-An element's `defaultValue` (the builder's "Prefill") is what a new copy starts with. A scalar (checklist, choice, …) is stored as the value itself; a `link` or `altar` element stores `{id, entryType, label}`; an `image` element stores the filename; a `sigilCharge` element stores `{lock, targets}`, with `targets` holding element ids (block-qualified only once a copy exists) or `null` for "all sigils in this block". Nothing here is markup — `instantiateDefinition` turns a default into a link chip or `<img>` only inside the copy it creates, so the definition row never needs the link or image machinery to understand it.
+An element's `defaultValue` (the builder's "Prefill") is what a new copy starts with. A scalar (checklist, choice, …) is stored as the value itself; a `link` element stores `{id, entryType, label}`; an `image` element stores the filename; a `sigilCharge` element stores `{lock, targets}`, with `targets` holding element ids (block-qualified only once a copy exists) or `null` for "all sigils in this block". Nothing here is markup — `instantiateDefinition` turns a default into a link chip or `<img>` only inside the copy it creates, so the definition row never needs the link or image machinery to understand it.
 
 ### templates
 
@@ -249,7 +247,7 @@ The Lexicon's languages, each with its alphabet here and its words in [`lexicon_
 
 ### images
 
-The details of pictures in "Images", the place of their own next to tags and categories. A row gives a stored file a name, tags and a note; every other file of the vault's `images/` folder is listed too, unnamed, except one used only as a sigil drawing or an altar background. Where a picture is used comes from `collectImageUses` (`src/lib/imageUsage.ts`), which reads the block stacks of entries and templates, the custom blocks' defaults and the altars' backgrounds; `withoutImage` takes a picture out of a block stack's texts and image fields, as deleting one asks for. A row keeps its file from the image cleanup (`collectUsedImageFilenames`), in the trash too, until it is deleted for good; every picture added through "Images" gets one.
+The details of pictures in "Images", the place of their own next to tags and categories. A row gives a stored file a name, tags and a note; every other file of the vault's `images/` folder is listed too, unnamed, except one used only as a sigil drawing or a canvas background. Where a picture is used comes from `collectImageUses` (`src/lib/imageUsage.ts`), which reads the block stacks of entries and templates, the custom blocks' defaults and the canvases' backgrounds; `withoutImage` takes a picture out of a block stack's texts and image fields, as deleting one asks for. A row keeps its file from the image cleanup (`collectUsedImageFilenames`), in the trash too, until it is deleted for good; every picture added through "Images" gets one.
 
 | Column | Type | Notes |
 |---|---|---|
@@ -292,25 +290,6 @@ The vault's own symbols for the canvas editor's library, made from drawings (sin
 | weight | REAL | NOT NULL DEFAULT 5; the lines' width in that box, 1–16 |
 | created_at | TEXT | ISO 8601; the library lists the newest first |
 
-### altars
-
-| Column | Type | Notes |
-|---|---|---|
-| id | TEXT PK | UUID |
-| title | TEXT | empty for a new altar (the DDL default `'Untitled Altar'` is never used — see "Titles" under [Key Conventions](#key-conventions)) |
-| background_image_data | TEXT | despite the name, the **bare filename** of a stored image, not base64 |
-| thumbnail_data / icon_data | TEXT | data-URLs — see the Base64 note under [Key Conventions](#key-conventions) |
-| created_at / updated_at | TEXT | ISO 8601 |
-| deleted_at | TEXT | NULL = active. `altarStore` holds only altars without it; a trashed altar keeps its placements (`ON DELETE CASCADE` takes them once the row goes); purged after the retention period (`CLEANUP_TABLES`) |
-| settings | TEXT | NOT NULL DEFAULT `'{}'`; JSON with the twelve display keys (`ALTAR_SETTING_KEYS`): `background_preset`, `background_overlay`, `background_overlay_color`, `grid_enabled`, `grid_size`, `grid_opacity`, `grid_color`, `snap_to_grid`, `rotation_snap_enabled`, `rotation_snap_angle`, `snap_scale_to_grid`, `resolution`; besides them, never columns, `guides` (the canvas editor's guide lines: `id`, `orientation` `vertical` or `horizontal`, `at` in percent of the altar's width or height; at most 200) and `guides_locked`, and `canvas_background` (the background as the canvas editor sets it: `fill` none, `color`, `linear` with two or three `colors` and an `angle`, or `radial` with `colors` and a centre `cx`/`cy`; `image` with `src` and `fit` `cover` or `contain`; `tint` with `color` and `opacity`; `null` until first set; its picture of the vault is also the `background_image_data` column, for the image cleanup) |
-| elements | TEXT | NOT NULL DEFAULT `'[]'`; JSON list of the shapes, text, drawings and symbols made on the altar (since v57) |
-
-The display settings are one JSON column because they are only ever read and written together and no query filters by them; the image columns stay columns because the image cleanup looks for references in columns.
-
-`elements` holds what is made on an altar rather than taken from the library: shapes (`rect`, `ellipse`, `polygon`, `star`, and the `triangle` and `hexagon` of older altars, with fill, outline, outline width, corner radius and, for polygons and stars, `sides`, 3–12, missing for six corners or five points), text (content, font, size, colour, alignment, bold, italic) drawings (the paint document's JSON, `paintDocToJson`, without layer images) and symbols of the canvas editor's library (`symbol` its id, `d` its path data in a box of 100 × 100 and `solid` the parts filled in its colour, kept so it draws without the library, checked to hold path commands only; `color`, `weight` 1–16 in those units, `fill` or `null`). They hang on no library item, so they cannot be rows of `altar_placements`, whose `item_id` is required. Each entry carries the same `id`, `x`/`y`, `z_index`, `width`/`height`, `rotation`, `opacity`, `locked`, `hidden` and, when grouped, `group` as a placement, plus `kind` (`shape`, `text`, `drawing` or `symbol`) and its `shape`, `text`, `drawing` or `symbol` object; sizes of fonts, outlines and corners are pixels at the reference width of 1920. `parseAltarElements` and `altarElementsJson` (`src/lib/altarElements.ts`) read and write it, validating like `parseAltarSettings`; the store holds the entries as placements with that `kind` and an empty `item_id`. A copied altar, a merged backup and an imported `.emerald` file give them new ids (`withNewElementIds`), since ids are unique across all altars in the store.
-
-`AltarRecord` stays flat: `fromRow.altar` unpacks `settings` through `parseAltarSettings`, and every write packs it through `altarSettingsJson` (`src/lib/altarSettings.ts`), which always normalizes — every key present, in a fixed order, a missing or invalid value replaced by its `DEFAULT_*` from `altarConstants.ts` (a non-hex grid colour, an unknown resolution, a non-finite number). `parseAltarSettings` also accepts a row with the individual columns (flags as 0/1), which is how v51 and pre-`"12"` backups are converted.
-
 ### entries
 
 Journal entries, wiki articles and operations in one table. What distinguishes them lives in `content` as blocks; `type` only says which module the entry belongs to, so a type change is an `UPDATE`.
@@ -336,30 +315,6 @@ Indexes: `idx_entries_type` on `(type, deleted_at)` (every module loads its live
 
 Not stored — derived from a journal entry's `created_at`; see [Moon Phase](architecture/modules.md#moon-phase).
 
-### altar_items
-
-The shared library of objects that can be placed on altars.
-
-| Column | Type | Notes |
-|---|---|---|
-| id | TEXT PK | UUID |
-| name | TEXT | NOT NULL |
-| emoji | TEXT | NOT NULL DEFAULT `'✨'` |
-| category_id | TEXT | nullable **FK → categories.id**, RESTRICT; `NULL` = no category (the default) |
-| note | TEXT | NOT NULL DEFAULT `''` |
-| image_data | TEXT | data-URL, not a path — see the Base64 note under [Key Conventions](#key-conventions) |
-| created_at | TEXT | ISO 8601 |
-| updated_at | TEXT | NOT NULL DEFAULT `''` (v52 filled it from `created_at`); stamped by `updateItem` |
-| deleted_at | TEXT | NULL = active; purged after the retention period (`CLEANUP_TABLES`) |
-
-Index: `idx_altar_items_deleted` (`ALTAR_ITEMS_INDEX_DDL`).
-
-Deleting a library element moves it to the Trash (`altarStore.deleteItem`, trash kind `altarItem`) with an Undo toast and no confirmation. Its placements stay in the database but out of sight: `altarStore` loads only items without `deleted_at` and only placements whose item is live (`LIVE_PLACEMENTS`, a join on `altar_items`), and `restoreItem` brings the element back to the same spots. Deleting it for good deletes the row, and `ON DELETE CASCADE` takes its placements along.
-
-How an altar edit's Cancel and `duplicateAltar` treat the placements of trashed elements: [The altar's snapshot](architecture/editing.md#the-altars-snapshot) and [Store](architecture/altar.md#store).
-
-`category_id` holds the id, so renaming a category touches nothing else. A `"1"` backup still carries the category *name* there, which import resolves to an id.
-
 ### tasks
 
 | Column | Type | Notes |
@@ -379,29 +334,11 @@ Tasks have no `entry_number` and no tags.
 
 The self-reference makes insert order matter: a child inserted before its parent violates the foreign key. `insertTasks` in `dbBackup.ts` inserts with `parent_task_id` NULL and fills it in afterwards.
 
-A creation call site that omits `category_id` leaves the row without a category — the state it is meant to start in, in all three categorized tables.
-
-### altar_placements
-
-One placed object on one altar.
-
-| Column | Type | Notes |
-|---|---|---|
-| id | TEXT PK | UUID |
-| altar_id | TEXT | **FK → altars.id**, CASCADE, NOT NULL |
-| item_id | TEXT | **FK → altar_items.id**, CASCADE, NOT NULL |
-| x / y | REAL | NOT NULL DEFAULT 50; percent of canvas, 0–100 |
-| z_index | INTEGER | stacking order |
-| width / height | REAL | NOT NULL DEFAULT 8 |
-| rotation / opacity | REAL | degrees / 0–1 |
-| locked / hidden | INTEGER | boolean 0/1 |
-| group_id | TEXT | the group it is selected and moved with on the canvas, or NULL (since v58) |
-
-`AltarPlacement` in `src/types` also carries `name`, `emoji`, `category_id` and `image_data`. Those are **not** columns — they are joined in from `altar_items` when placements are loaded.
+A creation call site that omits `category_id` leaves the row without a category — the state it is meant to start in, in both categorized tables.
 
 ### task_links
 
-Links a task to a journal entry, wiki article, operation, another task, or an altar. `target_id` is polymorphic — no foreign key possible (see [What foreign keys cannot cover](#what-foreign-keys-cannot-cover)).
+Links a task to a journal entry, wiki article, operation or another task. `target_id` is polymorphic — no foreign key possible (see [What foreign keys cannot cover](#what-foreign-keys-cannot-cover)).
 
 A task in the Trash keeps its rows, so restoring it brings its links back; `taskStore` loads only the links of tasks outside the Trash. They go when the task is deleted for good (`ON DELETE CASCADE`).
 
@@ -410,7 +347,7 @@ A task in the Trash keeps its rows, so restoring it brings its links back; `task
 | id | TEXT PK | UUID |
 | task_id | TEXT | NOT NULL, **FK → tasks.id**, CASCADE |
 | target_id | TEXT | NOT NULL; polymorphic |
-| target_type | TEXT | NOT NULL; `'journal'` \| `'wiki'` \| `'operation'` \| `'task'` \| `'altar'` |
+| target_type | TEXT | NOT NULL; `'journal'` \| `'wiki'` \| `'operation'` \| `'task'`; v62 turned `'altar'` links into `'operation'` ones |
 
 `UNIQUE (task_id, target_id, target_type)`.
 
@@ -428,21 +365,21 @@ The `deleted_at` indexes matter because `runPeriodicCleanup` runs a range scan a
 
 **entry_number.** A stable, compact, human-readable number, shown in the link picker as `#12`. `nextEntryNumber(db, type)` in `db.ts` assigns it at insert time, counting per `type` (journal #1 and wiki #1 can coexist) and including trashed rows, so a restored entry never duplicates a number. It is a stored value, never derived from `ROWID`, so a replace import cannot shift it. A type change gives the entry a fresh number in the target type — or its former one when it returns to the type it had when editing began (by Cancel, or by switching back by hand), unless another entry of that type has taken it meanwhile (see [Cancel after a type change](architecture/editing.md#cancel-after-a-type-change)).
 
-**Titles.** A new entry, task or altar is stored with an **empty** title. What the user sees is `displayTitle(t, type, title)` from `src/lib/entryTitle.ts`: the title if it has text, otherwise the translated "Untitled …" of that type — in lists, cards, tabs, search, the Trash, link chips and pickers, task links and exports. `hasOwnTitle(title)` is the one test for "has a title of its own"; nothing compares against a magic string.
+**Titles.** A new entry or task is stored with an **empty** title. What the user sees is `displayTitle(t, type, title)` from `src/lib/entryTitle.ts`: the title if it has text, otherwise the translated "Untitled …" of that type — in lists, cards, tabs, search, the Trash, link chips and pickers, task links and exports. `hasOwnTitle(title)` is the one test for "has a title of its own"; nothing compares against a magic string.
 
-The English defaults older versions stored (`LEGACY_UNTITLED_TITLES`) count as untitled only where data comes in: migration v48, a `.emeralddb` import (`clearLegacyUntitledTitles`), and a `.emerald` or Markdown import (`isLegacyUntitled`, plus the app-language "Untitled …" a Markdown/PDF export writes for an empty title). After that a title is whatever was typed. The DDL defaults of `tasks.title` and `altars.title` still say `'Untitled …'`, but no insert relies on them.
+The English defaults older versions stored (`LEGACY_UNTITLED_TITLES`) count as untitled only where data comes in: migration v48, a `.emeralddb` import (`clearLegacyUntitledTitles`), and a `.emerald` or Markdown import (`isLegacyUntitled`, plus the app-language "Untitled …" a Markdown/PDF export writes for an empty title). After that a title is whatever was typed. The DDL default of `tasks.title` still says `'Untitled …'`, but no insert relies on them.
 
 **Timestamps.** ISO 8601 text produced by `nowIso()`, sorted and compared lexicographically. No column holds a date-only value; dates inside blocks are `YYYY-MM-DD`.
 
-**`updated_at` means "last changed by you".** It moves only when someone changes that very row. The store update methods (`updateEntry`, `updateTask`, `updateTemplate`, `updateAltar`) take `{ touch }` from `src/lib/stamp.ts`:
+**`updated_at` means "last changed by you".** It moves only when someone changes that very row. The store update methods (`updateEntry`, `updateTask`, `updateTemplate`) take `{ touch }` from `src/lib/stamp.ts`:
 
 - `true` (the default) stamps now;
-- `false` keeps the stamp for writes that are a consequence of something elsewhere (a tag id stripped from or merged into a list, a new altar thumbnail);
+- `false` keeps the stamp for writes that are a consequence of something elsewhere (a tag id stripped from or merged into a list);
 - a timestamp sets exactly that one (Cancel puts back the stamp from before editing).
 
 A patch that changes nothing is not written at all (`needsWrite`). Checking a checklist item in read mode is a change and does stamp. Ticking a task stamps that task only; its subtasks change along without a new stamp, and ones already in that state are not written. An imported entry's `updated_at` is its creation date (the file knows no other), so an old operation does not jump to the top of a list sorted by last change.
 
-**Base64 in SQLite.** The rule is to keep image data in files (see [Rules for Future Schema Changes](#rules-for-future-schema-changes)). Five columns hold data-URLs instead — the `legacy` group of `IMAGE_FIELDS` in `schema.ts`: `entries.icon` / `cover_image`, `altars.thumbnail_data` / `icon_data`, and `altar_items.image_data`. `Favicon.tsx` (via `readIconFile` in `lib/imageLimits.ts`), `MediaPropertyRow` (`EditProperties.tsx`) and `AltarItemModal.tsx` read the uploaded file with the shared `readFileAsDataUrl` helper (`lib/helpers.ts`); none of them go through `save_image`. Consumers test the value with `isImageIcon` / `startsWith('data:image/')`. Do not add more.
+**Base64 in SQLite.** The rule is to keep image data in files (see [Rules for Future Schema Changes](#rules-for-future-schema-changes)). Two columns hold data-URLs instead — the `legacy` group of `IMAGE_FIELDS` in `schema.ts`: `entries.icon` / `cover_image`. `Favicon.tsx` (via `readIconFile` in `lib/imageLimits.ts`) and `MediaPropertyRow` (`EditProperties.tsx`) read the uploaded file with the shared `readFileAsDataUrl` helper (`lib/helpers.ts`); none of them go through `save_image`. Consumers test the value with `isImageIcon` / `startsWith('data:image/')`. Do not add more.
 
 ## Sigil Workflow
 
@@ -490,7 +427,6 @@ Full vault snapshots are exported and imported via Settings → Backup. The code
   "data": {
     "entries": [], "tags": [],
     "templates": [],
-    "altars": [], "altarItems": [], "altarPlacements": [],
     "tasks": [], "taskLinks": [],
     "categories": [],
     "blockDefinitions": [],
@@ -532,14 +468,13 @@ Independently of the version, journal rows with the old fields go through `liftL
 
 `buildBackup(options)` builds the payload; `exportDatabase()` wraps it for the manual export, and the automatic backup calls it with `FULL_BACKUP_OPTIONS` (every module, the Trash and settings, no date range) — see [Automatic Backup](architecture/storage.md#automatic-backup). A `category_id` whose category is missing from the categories list read in the same run is exported as `null`: deleting or merging a category runs over several statements, and a payload caught in between would be refused on import.
 
-**Export filters (`BackupOptions`):** `includeJournal / Wiki / Operations / Altars / Tasks / Tags / Lexicon`, `dateFrom`, `dateTo`, `includeDeleted`, `includeSettings`. There is no templates toggle. The seven content-type keys and their labels are `CONTENT_TYPES` in `dbBackup.ts`, shared by the export and the import page.
+**Export filters (`BackupOptions`):** `includeJournal / Wiki / Operations / Tasks / Tags / Lexicon`, `dateFrom`, `dateTo`, `includeDeleted`, `includeSettings`. There is no templates toggle, and no altars toggle: altars are operations. The six content-type keys and their labels are `CONTENT_TYPES` in `dbBackup.ts`, shared by the export and the import page.
 
-- Entries, altars and tasks are date-filtered on `created_at`. Entries are one `SELECT` with a `type` filter for the ticked kinds.
-- The "library" tables travel complete, trashed rows included and without a date filter: `categories` (whenever any of Journal, Wiki, Operations, Tasks or Altars is ticked — trashed categories too, or their exported content could not be restored), `block_definitions` and `templates` (whenever Journal, Wiki or Operations is ticked, since a template's assignments can reference any of the three), `languages` and `lexicon_entries` (with `includeLexicon`; a word is nothing without its language).
+- Entries and tasks are date-filtered on `created_at`. Entries are one `SELECT` with a `type` filter for the ticked kinds.
+- The "library" tables travel complete, trashed rows included and without a date filter: `categories` (whenever any of Journal, Wiki, Operations or Tasks is ticked — trashed categories too, or their exported content could not be restored), `block_definitions` and `templates` (whenever Journal, Wiki or Operations is ticked, since a template's assignments can reference any of the three), `languages` and `lexicon_entries` (with `includeLexicon`; a word is nothing without its language).
 - `symbols` travels complete in every backup, whatever is ticked; the import adds the ones missing by id (`INSERT OR IGNORE`, on replace too), so none is ever removed by an import.
-- `includeDeleted` applies to entries, altars, tasks, `tags` and `altar_items` — a trashed tag travels with the Trash, since the trashed entries carrying its id come along too.
+- `includeDeleted` applies to entries, tasks and `tags` — a trashed tag travels with the Trash, since the trashed entries carrying its id come along too.
 - `task_links` is scoped to the exported task ids.
-- `altar_items` is exported in full whenever `includeAltars` is set, regardless of the altar date filter and even when no altar survives it: a library item can exist without ever touching a canvas. `altar_placements` is scoped to the exported altars and items, since a placement without either would fail the foreign key.
 
 ID lists for `IN (...)` clauses are bound as parameters, never concatenated into the SQL string. The ids are not necessarily app-generated — an import takes them verbatim from the file — and sqlx splits a statement on `;`, so concatenating them would let a crafted backup run arbitrary SQL during a later export.
 
@@ -563,7 +498,7 @@ All three modes go through `importViaStaging`, and automatic editor saves are su
 
 | Mode | Behaviour |
 |---|---|
-| `replace` | Deletes only what the backup has data for (partial-backup-safe) — `entries` per present type plus every imported id (an id may sit under another type locally), altars/items/placements only if the file carries altars, tasks and links only if it carries tasks — then inserts. `tags`, `categories`, `block_definitions`, `templates` and the Lexicon are never wiped; they are resolved or *added to* (see below). |
+| `replace` | Deletes only what the backup has data for (partial-backup-safe) — `entries` per present type plus every imported id (an id may sit under another type locally), tasks and links only if it carries tasks — then inserts. `tags`, `categories`, `block_definitions`, `templates` and the Lexicon are never wiped; they are resolved or *added to* (see below). |
 | `merge` | Generates an 8-char base36 timestamp prefix. All entry ids are prefixed; cross-references are remapped. `entry_number` is offset past the highest existing one **per type**, since it is a stored value and would otherwise collide. `categories` and `tags` are resolved, not prefixed. |
 | `add-vault` | Creates a new vault → `switchVault()` → runs the replace logic against the empty vault. |
 
@@ -573,15 +508,15 @@ There is no category filter on import — the type ticks (`ImportTypeFilters`) a
 
 **Rows are inserted parents-first**; foreign keys are active during import. The order is hard-coded per import path (`doReplace` and `doMerge` each have their own) and does *not* follow `TABLES`.
 
-**Altar library.** `doReplace` deletes and re-inserts `altar_items`/`altar_placements` only when the file carries altars (`hasAltars`). Otherwise — a date-filtered or library-only export — the library is inserted with `INSERT OR IGNORE`, adding to the existing library: clearing `altar_items` would cascade into placements on altars the file never meant to touch. The cost: an item that already exists locally keeps its local version.
+**Altars of an older file.** A file from before v62 carries `altars`, `altarItems` and `altarPlacements`; the export no longer writes them. They are imported when Operations is ticked (`opsCount` in the preview counts them with the operations). `importAltars` builds the three tables in the working copy from `ALTAR_TABLE_DDL`, inserts the file's rows, converts them as v62 does (`convertAltarsInPlace`: operations of `altars`, pictures of "Images", chips, altar fields and task links pointing at the operations — see [Altars as operations](architecture/editors.md#altars-as-operations)) and drops the tables again. It runs after the tasks and their links, so they follow the altars, and before the dangling-link sweep. In `doReplace` the file's version of an operation wins (`replace`); in `doMerge` the altars, items and placements get the merge prefix like everything else, and an item's category is dropped with the table. Block definitions' altar elements and defaults are turned into link elements before they are validated (`elementsWithAltarsAsOperations`).
 
-**Categories are resolved, never deleted** — `resolveImportedCategories`. A category matches a local one by id (for the built-in) or by case-insensitive name (`categoryKey`); a match is revived from the trash if the local row is trashed and the imported one active. Anything left over is inserted, with a new id if the payload's id is taken. The content arrays are then remapped onto the local ids. A category is shared across modules, so a partial replace (Wiki only, say) must not delete categories out from under Tasks or Altar items.
+**Categories are resolved, never deleted** — `resolveImportedCategories`. A category matches a local one by id (for the built-in) or by case-insensitive name (`categoryKey`); a match is revived from the trash if the local row is trashed and the imported one active. Anything left over is inserted, with a new id if the payload's id is taken. The content arrays are then remapped onto the local ids. A category is shared across modules, so a partial replace (Wiki only, say) must not delete categories out from under Tasks.
 
 **Tags are resolved the same way, never deleted** — `importTagsAndRemap`, before anything else is written. A tag with a local tag's id is that tag; otherwise a case-insensitive name match (`tagNameKey`) maps it onto the local tag — a trashed local namesake is revived if the imported one is live, after its id is stripped from the rows still carrying it (the same rule as typing the name, see [Tags](architecture/modules.md#tags)). Anything left over is inserted with its own id, name trimmed to 100 characters and colour validated; rows without a valid id (`isTagId`) or name are skipped. In entry and template rows, an id the file has no tag row for (Tags unticked) survives only if that tag exists locally.
 
 **Block definitions are added, never replaced or deleted** — `insertBlockDefinitions`, `INSERT OR IGNORE` by id without the merge prefix, so a block arriving twice stays one. It runs before `doReplace`'s first `DELETE` and normalises every row to the full column set (ids must pass `isDefinitionId`), so a malformed array in a crafted file can neither abort a half-done replace nor slip a partial row past `insertRows`, which takes its column list from the first row. A definition that exists locally (even trashed) keeps its local version.
 
-A definition's prefills need their own remap, since nothing else touches `elements` JSON: `remapDefinitionRows`/`remapDefinitionDefaults` rewrite an image default onto the image's local filename and a link/altar default onto the imported entry — by the merge prefix's new id in `doMerge`, by id-or-title (`resolveImportedTarget`, shared with the `.emerald` chip resolver) in replace and add-vault. A link default that resolves to nothing is dropped, so a fresh copy never starts with a chip into the void.
+A definition's prefills need their own remap, since nothing else touches `elements` JSON: `remapDefinitionRows`/`remapDefinitionDefaults` rewrite an image default onto the image's local filename and a link default onto the imported entry — by the merge prefix's new id in `doMerge`, by id-or-title (`resolveImportedTarget`, shared with the `.emerald` chip resolver) in replace and add-vault. A link default that resolves to nothing is dropped, so a fresh copy never starts with a chip into the void.
 
 **Templates are added, never replaced or deleted** — `insertTemplates`, `INSERT OR IGNORE` by id, before the deletes in `doReplace` and after the merge prefix's remap in `doMerge`. A local template (including trashed) keeps its local version; new ones land at the end of the sort order. `content` gets the same image and (in merge) id remap as entries; `assignments`' category ids are remapped like content rows, and one that doesn't resolve is dropped. An assignment survives only if no local active template holds that combination; a template arriving via the trash has none, like `templateStore.restoreTemplate`.
 

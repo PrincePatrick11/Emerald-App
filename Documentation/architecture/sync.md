@@ -59,11 +59,11 @@ The server keeps the order and nothing else: it refuses a push from a device tha
 | Same file taken into "Images" | This device's row of `images` goes, the incoming one stays |
 | Same `entry_number` | This device's entry takes the next free number |
 | Same task link | This device's row goes |
-| A reference left dangling (moved into a deleted category, placed on a deleted altar) | An optional reference is cleared, a row needing its parent goes |
+| A reference left dangling (moved into a deleted category, a subtask or link of a deleted task) | An optional reference is cleared, a row needing its parent goes |
 
 Decisions of this device are written with the triggers on, so they reach the others. Everything runs in one `db.batch`, with `defer_foreign_keys`, so the order inside it does not matter and a failure changes nothing. The caller has to keep writers away between the reads and that batch, with the locks an import uses.
 
-Table and column names in a change come from decrypted data and end up in SQL: `applyRemoteChanges` refuses any it does not know (`SYNC_UNKNOWN_SHAPE`) before writing.
+Table and column names in a change come from decrypted data and end up in SQL: `applyRemoteChanges` refuses any it does not know (`SYNC_UNKNOWN_SHAPE`) before writing. That includes the altar tables v63 dropped: a device still on an older version that sends altar rows is refused until it is updated.
 
 ## Tests
 

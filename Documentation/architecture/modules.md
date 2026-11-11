@@ -4,17 +4,17 @@
 
 `src/lib/modules.ts` is the one source of truth for "which modules exist and what belongs to each": icon, nav-label key, untitled-placeholder key (for a tab and the title input — everywhere else `displayTitle` picks the text, see "Titles and icons" below), the module's `ContentType`, and the `usesEditorSidebar`/`usesBlocks` flags.
 
-- `ModuleMeta.entryType` is non-null for all five modules: Tasks and Altar are link *targets* (`'task'`/`'altar'`) even though, lacking an editor, they can never be a link's *source*.
-- `ENTRY_MODULE_IDS` (`journal`/`tasks`/`operations`/`wiki`/`altar`) is the canonical order. It drives the entry list's tab order and, through `CATEGORY_MODULE_IDS` (the same minus `journal`), the usage columns in `CategoriesView` and the module hint `dominantCategoryModule` gives a category search hit.
+- `ModuleMeta.entryType` is non-null for all four modules: Tasks are link *targets* (`'task'`) even though, lacking an editor, they can never be a link's *source*.
+- `ENTRY_MODULE_IDS` (`journal`/`tasks`/`operations`/`wiki`) is the canonical order. It drives the entry list's tab order and, through `CATEGORY_MODULE_IDS` (the same minus `journal`), the usage columns in `CategoriesView` and the module hint `dominantCategoryModule` gives a category search hit.
 - `MODULES` is the `Record<EntryModuleId, ModuleMeta>` everything reads; `MODULE_LIST` is its array form.
-- `ViewId` (`EntryModuleId | AuxViewId`, with `AuxViewId` = `home`/`tags`/`categories`/`blocks`/ `templates`/`lexicon`/`trash`) is what `ActiveView['type']` is. `isViewId()` guards persisted tabs at load time, so a stored tab of an unknown view type is dropped rather than crashing the router.
+- `ViewId` (`EntryModuleId | AuxViewId`, with `AuxViewId` = `home`/`tags`/`categories`/`images`/`blocks`/`templates`/`lexicon`/`trash`) is what `ActiveView['type']` is. `isViewId()` guards persisted tabs at load time, so a stored tab of an unknown view type is dropped rather than crashing the router.
 - `TRASH_KINDS`/`TRASH_KIND_ICONS` cover the larger set of trash-only kinds, including `category`, whose `FolderOpen` glyph `AUX_VIEWS.categories` reuses.
 
 `viewTypeForEntryType(entryType)` is the one place translating the data model's `operation` (singular — what `task_links.target_type`, drag payloads and the internal-link mark carry) into `ActiveView`'s `operations` (plural). It is a reverse lookup over `MODULES`, so `ModuleMeta.entryType` is the single source; `entryTypeForView` maps the other way.
 
 **Titles and icons.** Two small rules live beside the registry so that no list decides them for itself:
 
-- `src/lib/entryTitle.ts`: new entries, tasks and altars are stored with an **empty** title, and `displayTitle(t, type, title)` shows the translated "Untitled …" wherever a title is displayed. `hasOwnTitle(title)` is the one test for "has a title of its own". `isLegacyUntitled` recognises the old English defaults, only where data comes in (migration v48, `.emeralddb`, `.emerald` and Markdown import); anything typed later is a title, whatever it says. Renaming starts from the *stored* title (`EntryListTab`'s `getEditTitle`), so Enter on an untitled row cannot save the placeholder.
+- `src/lib/entryTitle.ts`: new entries and tasks are stored with an **empty** title, and `displayTitle(t, type, title)` shows the translated "Untitled …" wherever a title is displayed. `hasOwnTitle(title)` is the one test for "has a title of its own". `isLegacyUntitled` recognises the old English defaults, only where data comes in (migration v48, `.emeralddb`, `.emerald` and Markdown import); anything typed later is a title, whatever it says. Renaming starts from the *stored* title (`EntryListTab`'s `getEditTitle`), so Enter on an untitled row cannot save the placeholder.
 - `entryIcon(type, entry, category)` in `modules.ts` is the one icon rule for a wiki article or operation: its own icon (emoji or image), else its category's emoji, else the module's `DEFAULT_ENTRY_EMOJI`. A journal entry shows its moon phase instead.
 
 A second, smaller registry sits in `src/components/editors/text/SuggestionList.tsx` — `ENTRY_TYPE_ICONS` and `ENTRY_TYPE_LABEL_KEYS`, keyed by `ContentType` (what a link points *at*) rather than `ViewId`. It is deliberately not folded into `MODULES`, which has no field for that concern.
@@ -24,12 +24,12 @@ A second, smaller registry sits in `src/components/editors/text/SuggestionList.t
 - **`src/store/moduleWiring.ts`** — the store-layer half. `moduleWiring` maps each `EntryModuleId` to its store's reload function; `trashWiring` maps each `TrashKind` to its restore/permanently-delete pair.
   - `reloadAllStores()` is the startup/vault-switch reload: tags, categories, `block_definitions`, `templates` and the lexicon in parallel, then every module's content. No fetcher reads another store, but loading those first means a list never renders a frame with unresolved category or tag names, and a new entry never starts before its default template could be resolved.
   - `reloadModules(ids)` reloads a subset (the Emerald-format import) but always refetches the first group too, since an import can create new ones.
-  - Import rule: content stores only (`entry`/`task`/`altar`/`tag`/`category`/ `blockDefinition`/`template`/`lexicon`) — never `uiStore`, `vaultStore` or `trashStore`, which import this module instead.
+  - Import rule: content stores only (`entry`/`task`/`tag`/`category`/ `blockDefinition`/`template`/`lexicon`) — never `uiStore`, `vaultStore` or `trashStore`, which import this module instead.
 - **`src/components/layout/moduleViews.ts`** — the component-layer half. `VIEW_COMPONENTS` maps every `ViewId` to its `React.lazy` view. Import rule: **only `MainArea` may import this file** — any other importer risks pulling every view's lazy chunk (including TipTap) into its own bundle.
 
 ## Adding a Module or Table
 
-These places enumerate modules or tables and are easy to miss. Follow how the closest existing module does it: the Lexicon for a module with its own tables, Altar or Tasks for one with its own items. Leaving a place out can be right, as with the Lexicon and single-file export, but it should be a decision.
+These places enumerate modules or tables and are easy to miss. Follow how the closest existing module does it: the Lexicon for a module with its own tables, Tasks for one with its own items. Leaving a place out can be right, as with the Lexicon and single-file export, but it should be a decision.
 
 - **Schema:** `src/lib/schema.ts` (the table in `TABLES`, `BASELINE_VERSION`) and a migration in `src/lib/db.ts`, see [Rules for Future Schema Changes](../database.md#rules-for-future-schema-changes). Image columns go into `IMAGE_FIELDS`.
 - **Backup:** export, filter and insert in `src/lib/dbBackup.ts`, and `BACKUP_VERSION` with a step in `migrateBackupPayload` when the shape of the rows changes. A table missing here is lost on restore without an error.
@@ -82,7 +82,7 @@ All `useState`, `useEffect`, `useRef`, `useMemo`, and `useCallback` calls must a
 
 ## Categories
 
-Wiki, Operations, Tasks and Altar items share one category list — `useCategoryStore` (`src/store/categoryStore.ts`), backed by the single `categories` table (see [`database.md`](../database.md#categories)). Journal is not part of this; it groups by moon phase.
+Wiki, Operations and Tasks share one category list — `useCategoryStore` (`src/store/categoryStore.ts`), backed by the single `categories` table (see [`database.md`](../database.md#categories)). Journal is not part of this; it groups by moon phase.
 
 An entry's `category_id` may be `NULL`: no category is the state a new entry starts in. The "Uncategorized" bucket shows it, and also collects entries whose category is in the Trash — for the reader the two are the same thing. `lookupCategory(byId, id)` in `lib/categories.ts` resolves a possibly-null id; `categoryLabel` accepts `null`.
 
@@ -102,7 +102,6 @@ Import rule: `categoryStore` may import the content stores (it reassigns their i
   - `categoriesUsedBy(all, items)` returns the categories a view renders as chips/groups/tabs: those at least one item points at.
   - `categoryUsageCounts(sources)` and `dominantCategoryModule(usage)` are one truth for `CategoriesView`'s count columns and the search's module hint.
   - The `legacy*` helpers serve only migrations v36–v38 and imports of pre-v38 files.
-- **Altar:** `altarStore` reads `useCategoryStore` like every other module. Whether a placed item flickers like a candle depends on its own emoji (`isCandleEmoji` in `altarConstants.ts`, `🕯️` with or without the variation selector), not on a category. The Altar tab strip does not reorder categories: it shows only those holding an altar item, so a drag there would rearrange a subset of the app-wide order.
 
 ## Tags
 
@@ -144,7 +143,7 @@ Names are compared case-insensitively everywhere (`tagNameKey`, trim + lowercase
 
 ## Lexicon
 
-The Lexicon (rail, between Wiki and Altar) is a module without entries: it holds **languages** you keep yourself — Enochian, runes, one you made up — and translates a text with them. It reaches no network (see [`security.md`](../security.md#content-security-policy)). What a language does not know stays untranslated and is marked as such: a word list cannot guess, and pretending otherwise would be the worse answer.
+The Lexicon (rail, beside Wiki) is a module without entries: it holds **languages** you keep yourself — Enochian, runes, one you made up — and translates a text with them. It reaches no network (see [`security.md`](../security.md#content-security-policy)). What a language does not know stays untranslated and is marked as such: a word list cannot guess, and pretending otherwise would be the worse answer.
 
 **Two tables, one store.** `languages` and `lexicon_entries` (migration v45, see [`database.md`](../database.md#languages)) are both read by `lexiconStore`, since every view needs both at once — the dashboard counts the words, the language page lists them, the translate field reads them. `lexiconRows.ts` holds the raw row access the store and the backup import share, the same split as `blockDefinitionRows.ts`/`templateRows.ts`.
 
@@ -158,6 +157,6 @@ A language is **not** exportable as a single `.emerald` file the way a template 
 - **Characters.** `transliterate` rewrites character by character against the alphabet, longest run first — with `t` ahead of `th`, `th` would never be found. Anything not in the table stays as it is. Only a pair with both sides filled takes part (`isUsablePair`); a half-filled one is still *stored* (`isFilledPair`), so a side you mean to add later is not thrown away.
 - **Both** (the default) is words first, then the alphabet for whatever the word list did not know. A word that comes back unchanged from both is reported as unknown — shown dotted-underlined, and counted in the line below.
 
-**The translate field is not on a language's page** but under the language list (`Dashboard`'s `contentFooter`, like the Altar library under the altars): it picks its language itself and works with all of them, so it belongs beside the list.
+**The translate field is not on a language's page** but under the language list (`Dashboard`'s `contentFooter`, like Blocks' built-in blocks under the custom ones): it picks its language itself and works with all of them, so it belongs beside the list.
 
 **Search and trash.** A language and every single word are in the global search (`SearchKind` `language`/`lexiconEntry`); a word has no page of its own, so its hit opens the language holding it (`SearchHit.languageId`). Deleting a language is a soft delete with an undo toast — its words stay attached and come back with it; permanently deleting it takes them along through `ON DELETE CASCADE`.

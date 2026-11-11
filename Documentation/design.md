@@ -127,7 +127,6 @@ The exceptions, each for a reason:
 - **Tasks** have no layout choice, since subtasks and inline editing have no card to live on; the view section holds only "Show completed". The checkbox and the subtask chevron come before the name. Add subtask, category, link and priority appear on hover, because a task is worked on from its row; rename and delete stay in the menu.
 - **Categories** have a drag handle, because their order is the hand-dragged one, and no view or sort for the same reason. **Tags** have a chevron and a colour dot, because a tag opens in place and its colour is its value.
 - **Trash** rows carry a checkbox and select on click, and a jade Restore button, since restoring is what the page is for. Deleting for good stays in the menu.
-- **Altar** rows show the preview (32px) as their symbol, wider than the column; it fits the row. The Altar's sidebar has a second sort and grouping for its library, after the altars' own.
 - **Built-in blocks** are rows without hover, since nothing opens from them.
 - The **"+"** in a group heading stays visible: it is jade, creates rather than alters, and belongs to the group.
 
@@ -141,9 +140,9 @@ The exceptions, each for a reason:
 
 **Disabled runs through the shared `:disabled` rule** (`opacity-50 cursor-not-allowed pointer-events-none`), not through a colour of its own. A menu row is dimmed the same way, through `opacity`, rather than given a colour.
 
-**A tooltip for a disabled control sits on a wrapper.** A disabled `Button` carries `pointer-events-none`, so a `title` on the element itself never shows. When the reason is the point — the sigil-locked Edit button — the tooltip belongs on a wrapping `<span>`. (A hand-written button without that class, like the altar's snap buttons, can keep its own `title`.) A group of inputs locked as a whole (a locked placement's inspector, the read-only settings of a copy of one of your own blocks) is a disabled `<fieldset>` dimmed to `opacity-50` with its hint above or as its tooltip.
+**A tooltip for a disabled control sits on a wrapper.** A disabled `Button` carries `pointer-events-none`, so a `title` on the element itself never shows. When the reason is the point — the sigil-locked Edit button — the tooltip belongs on a wrapping `<span>`. (A hand-written button without that class can keep its own `title`.) A group of inputs locked as a whole (the read-only settings of a copy of one of your own blocks) is a disabled `<fieldset>` dimmed to `opacity-50` with its hint above or as its tooltip.
 
-**Active/inactive toggles use `Button`'s `tone` mode**, not a ternary in the `className` template. The base variants (`primary`/`secondary`/`ghost`/`danger`) have no active state; `tone` does. Documented exceptions: `EditorToolbar`'s `ToolbarBtn` and `AltarCanvas`'s drag handles — neither is a generic action button.
+**Active/inactive toggles use `Button`'s `tone` mode**, not a ternary in the `className` template. The base variants (`primary`/`secondary`/`ghost`/`danger`) have no active state; `tone` does. Documented exception: `EditorToolbar`'s `ToolbarBtn`, not a generic action button.
 
 **Hover changes the surface, active also changes the meaning.** Active shows jade; something merely hovered stays neutral (`--interactive-hover`). This holds for menu rows too: a hovered row is neutral (`--menu-item-hover-*`), the chosen one — the current emoji, the selected option — is jade (`--menu-item-active-*`).
 
@@ -215,7 +214,7 @@ Consequence: a new "active" variant on a `.panel` card needs either a selector t
 
 ### Overlays and Portals
 
-**Everything floating that can sit inside a sidebar or scroller hangs off `document.body` via `createPortal`** and positions itself with `position: fixed` in viewport coordinates: `Modal` (global search's `SearchModal`/`SearchResultList` render inside its body rather than portalling separately), `ContextMenu`, `EmojiPicker`, and `AltarCanvas`'s floating controls. `Dropdown` does so only with its `portal` prop, and `UndoToast`, which is global, renders in place with `position: fixed`. `MenuDropdown` is the deliberate exception: it renders in place with `absolute` + `z-[9999]`, which works because the title bar sits above both stacking contexts described below.
+**Everything floating that can sit inside a sidebar or scroller hangs off `document.body` via `createPortal`** and positions itself with `position: fixed` in viewport coordinates: `Modal` (global search's `SearchModal`/`SearchResultList` render inside its body rather than portalling separately), `ContextMenu`, and `EmojiPicker`. `Dropdown` does so only with its `portal` prop, and `UndoToast`, which is global, renders in place with `position: fixed`. `MenuDropdown` is the deliberate exception: it renders in place with `absolute` + `z-[9999]`, which works because the title bar sits above both stacking contexts described below.
 
 The reason is the same for all of them: `.app-sidebar` and `.app-main` carry `position: relative; z-index: 1` in both themes and are therefore **sibling stacking contexts**. An overlay rendered inline in the sidebar loses against the later-painted main area no matter how high its `z-index`. On top of that, the nearest ancestor with `overflow` clips the popover — in the vault picker, for instance, its scrolling list.
 
@@ -268,10 +267,10 @@ The measurements sit in unusual places, each for a concrete reason:
 
 - **Width on the grid, not the frame.** `width`/`minWidth`/`maxWidth` are computed on the grid in cell units (`cell * n + gap * (n-1)`), not on the padded border box — otherwise there is too little room for 5 columns. `repeat(COLUMNS, minmax(0, 1fr))` forces the column count instead of `auto-fill`; 5 columns, down to 3 on a narrow viewport.
 - **Scroll clipping on a wrapper of its own** (`max-h-56 overflow-y-auto overflow-x-hidden`), not on the grid: the global scrollbar rule produces a space-consuming bar on every platform, and an equally wide grid overflowed the wrapper on macOS. The grid is `SCROLLBAR_GUTTER` narrower than the wrapper, so the bar does not overlap the last column.
-- **The search field gets the same explicit width as the grid**, no `w-full`: the altar sidebar's favicon picker sits in a block `<div>` whose wrapper spans the parent, where a `w-full` search bar would inflate itself.
+- **The search field gets the same explicit width as the grid**, no `w-full`: an icon field's picker sits in a block `<div>` whose wrapper spans the parent, where a `w-full` search bar would inflate itself.
 - **The emoji search set loads lazily** (`src/lib/emojiSearchData/<lang>.json`, ~1900 entries each, dynamic `import()` on first open, module-level cache); matches are capped at 150.
 
 ### Platform Quirks
 
-- **`.modal-card` has no `overflow-hidden` in its base class**, because individual modals have popover content that must leave the card bounds (the altar category emoji picker, for one). It is opted into per modal via `className`.
+- **`.modal-card` has no `overflow-hidden` in its base class**, because individual modals have popover content that must leave the card bounds (an emoji picker, for one). It is opted into per modal via `className`.
 - **Platform-dependent looks branch in CSS through `html[data-platform]`**, never through a `navigator.userAgent` check in a component. `src/main.tsx` sets the attribute from `lib/platform.ts`'s `platformName`.

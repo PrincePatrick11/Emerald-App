@@ -1,6 +1,6 @@
 # Emerald
 
-Emerald is a private desktop workspace for magical practice: journal, wiki, operations with sigils, altar, tasks and a lexicon for your own languages, with templates and custom blocks, all in encrypted vaults. This repository is where it is developed; [`Documentation/features.md`](Documentation/features.md) describes what the app does.
+Emerald is a private desktop workspace for magical practice: journal, wiki, operations with sigils and altars, tasks and a lexicon for your own languages, with templates and custom blocks, all in encrypted vaults. This repository is where it is developed; [`Documentation/features.md`](Documentation/features.md) describes what the app does.
 
 Built with Tauri 2, React 19 and SQLCipher, for macOS, Windows and Linux. Emerald is in early development: expect breaking changes between versions and back up your data.
 
@@ -37,7 +37,7 @@ Work happens on the branch of the version in progress, `version/x.y.z`, not on `
 |---|---|
 | [Documentation/features.md](Documentation/features.md) | Full feature guide |
 | [Documentation/architecture.md](Documentation/architecture.md) | Architecture overview: module map, data flow, IPC |
-| [Documentation/architecture/](Documentation/architecture/) | Per-area patterns: modules, editing, blocks, templates, navigation, altar, storage, appearance, window shell |
+| [Documentation/architecture/](Documentation/architecture/) | Per-area patterns: modules, editing, blocks, editors, templates, navigation, storage, encryption, sync, appearance, window shell |
 | [Documentation/design.md](Documentation/design.md) | Design tokens, component patterns, and known inconsistencies |
 | [Documentation/components.md](Documentation/components.md) | Shared UI building blocks and when to use them |
 | [Documentation/themes.md](Documentation/themes.md) | Custom theme format |

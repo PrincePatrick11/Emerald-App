@@ -10,7 +10,7 @@ The Properties panel is gated by `activeView.mode === 'edit'`: while viewing, ea
 
 `ActiveView.isNew` marks an entry just created by a "New" action and not yet confirmed with Done. It is session-only: `stripSessionFlags` (`src/lib/tabs.ts`) drops it before a view enters any history — restored tabs (`normalizeSavedTab`) and a tab's back/forward history (`pushHistory`, `normalizeSavedHistory`, see [Navigation History](navigation.md#navigation-history)). Otherwise a restart or Back could make Cancel treat an entry that outlived its creation session as discardable.
 
-Cancel on a still-`isNew` entry runs the page's own Delete: the entry goes to the Trash with the usual undo toast, so nothing typed is lost outright. This holds for Journal, Wiki, Operations and the altar, and for templates and blocks: "New template" / "New block" open the page with `isNew`, `useDraftPage` gets `onCancelNew` (the page's delete), and Done keeps the page. Tasks have no Cancel: Escape on a task that was just created and never named (`freshTaskIds` in `TasksView`, session-only) puts it in the Trash with Undo.
+Cancel on a still-`isNew` entry runs the page's own Delete: the entry goes to the Trash with the usual undo toast, so nothing typed is lost outright. This holds for Journal, Wiki and Operations, and for templates and blocks: "New template" / "New block" open the page with `isNew`, `useDraftPage` gets `onCancelNew` (the page's delete), and Done keeps the page. Tasks have no Cancel: Escape on a task that was just created and never named (`freshTaskIds` in `TasksView`, session-only) puts it in the Trash with Undo.
 
 ### Reverting a confirmed entry
 
@@ -21,19 +21,6 @@ The baseline is wider than `buildPatch` on purpose: the Properties panel saves i
 A type change during the edit is part of it (see [Changing an entry's type](#changing-an-entrys-type)): the baseline moves along into the new module's view, and Cancel takes the entry back to the module it came from.
 
 The baseline outlives the view: it lives in a module-level map keyed by view type and entry id (`store/entryEdit.ts`), so looking into another tab mid-edit and coming back continues the same edit. A `uiStore` subscription drops it once no tab shows the entry in edit mode (Done, Cancel, Delete, closing the tab). It is memory only; after a restart a restored edit-mode tab starts a new baseline.
-
-### The altar's snapshot
-
-The altar writes every action through at once (placing, dragging, backgrounds, grid, format), so `store/altarEdit.ts` keeps a **snapshot** instead: the altar record and its placements as they were when edit mode was entered (`beginAltarEdit`, called by `AltarView`). Cancel writes it back through `altarStore.restoreAltarSnapshot`, including `updated_at` and the thumbnail, so the altar keeps its place in the lists.
-
-- **Repeatable write.** An upsert per placement, then a delete of what does not belong — there is no transaction, so if it fails the snapshot stays and the next Edit and Cancel finish it.
-- **Ordering.** Cancel switches to read mode first and restores behind it; `restoreAltarEdit` takes hold of the snapshot before its first `await`, since the view change would otherwise prune it. An Edit pressed right after Cancel waits for that write, so it starts from its own snapshot.
-- **Untracked writes.** Writes outside the serialized chains — Done's title and thumbnail, the thumbnail taken when the view is left — go through `trackAltarWrite`; a new snapshot and Cancel both wait for them.
-- **Vault switch / replace restore** drop every snapshot (`clearAltarEdits`), held ones included: the ids of a replaced vault come back, and Cancel would write the old altar over the restored one.
-- **Title.** The one field not written at once; leaving the view without Done saves it so the edit can continue in another tab, and Cancel takes it back with the rest.
-- **Library items** are not in the snapshot — they belong to every altar. The snapshot records which items were trashed when the edit began (`trashedItemIds`): their placements are in no snapshot (the store hides them), so Cancel's delete leaves them alone even if an item came back from the Trash during the edit.
-
-`altarEditDirty` answers both the altar's leave guard and the background-tab probe. The snapshot has the baseline's lifetime: kept across a tab switch, dropped once no tab shows the altar in edit mode.
 
 ## Leaving an edit
 
@@ -49,13 +36,13 @@ What asks:
 
 What does not ask: switching to another tab (the edit continues there), and Done, Cancel and Delete themselves — `useEditActions` wraps them in `withoutLeaveGuard(key, …)`, which exempts that one page while its handler runs.
 
-Whether a *background* tab holds changes is answered without mounting it: `holdsOpenEdit(view)` asks the **probes** registered by `draftStore` (a draft exists), `entryEdit` (stored state differs from the baseline, the entry changed type, or it is new) and `altarEdit` (`altarEditDirty`). Only such a tab is switched to; an unchanged edit-mode tab closes without a flicker.
+Whether a *background* tab holds changes is answered without mounting it: `holdsOpenEdit(view)` asks the **probes** registered by `draftStore` (a draft exists) and `entryEdit` (stored state differs from the baseline, the entry changed type, or it is new). Only such a tab is switched to; an unchanged edit-mode tab closes without a flicker.
 
 Whoever answers "keep editing" wants to be in the entry: the Settings and Vaults windows close on that answer (`useCloseOnKeepEditing`, fed by the `stays` counter in `leaveGuardStore`), whether they asked themselves or the window's close button did. `switchVault` resolves to `false` when the user keeps editing. The add-vault import asks *before* it starts and then passes `editsResolved`, so its own switch never asks again: a second "keep editing" would leave the old vault active, and the import would fill it instead of the new one.
 
 ## Changing an entry's type
 
-`EntryTypeField` — the first row of the Journal/Wiki/Operation edit-mode Properties section — renders the modules from `MODULE_LIST` filtered by `usesBlocks` as a segmented control; picking one calls `changeEntryType(id, from, to)` (`src/lib/entryTypeChange.ts`). Tasks and Altar have a different data model and aren't convertible.
+`EntryTypeField` — the first row of the Journal/Wiki/Operation edit-mode Properties section — renders the modules from `MODULE_LIST` filtered by `usesBlocks` as a segmented control; picking one calls `changeEntryType(id, from, to)` (`src/lib/entryTypeChange.ts`). Tasks have a different data model and aren't convertible.
 
 The entry keeps its id and its row in `entries`. `changeEntryType`:
 
@@ -86,7 +73,7 @@ The type field only exists in edit mode, so every type change happens inside an 
 
 ## Right Sidebar Action Bar
 
-`RightSidebar.tsx` renders a `RightSidebarActionBar` pinned above the scrollable Properties content. It reads `uiStore.editActions` (set via `setEditActions`): in edit mode it shows Done/Delete/Cancel, in view mode Edit (plus a Fullscreen toggle for the altar). An entry whose loaded sigil locks it keeps the Edit button in place, disabled, with a tooltip (`editor.lockedBySigil`) on a wrapper `<span>`, because a disabled tone `Button` takes no pointer events.
+`RightSidebar.tsx` renders a `RightSidebarActionBar` pinned above the scrollable Properties content. It reads `uiStore.editActions` (set via `setEditActions`): in edit mode it shows Done/Delete/Cancel, in view mode Edit. An entry whose loaded sigil locks it keeps the Edit button in place, disabled, with a tooltip (`editor.lockedBySigil`) on a wrapper `<span>`, because a disabled tone `Button` takes no pointer events.
 
 Each entry view registers its handlers through `useEditActions(active, handlers)` (`src/hooks/useEditActions.ts`):
 
@@ -113,7 +100,7 @@ Closing the right sidebar has nothing to fall back to: the header disappears wit
 The props and sections are documented in [`components.md`](../components.md) (`Dashboard`, `ListToolbar`, `FilterPanel`); the rules that matter here:
 
 - `groupBy` (`{ value, onChange, label? }`) is the grouping axis, independent of `sort` (`GroupingMode` vs. `SortMode`). A module with nothing to group omits it.
-- Every dashboard's main action is `primaryAction`; `danger: true` renders the red `btn-primary-danger` (Trash). `extraActions` are compact icon buttons on the same row; `contentFooter` renders below the content in every state, for a module's second area (Altar library, Blocks' built-in blocks, Templates' defaults overview, Lexicon's translate panel).
+- Every dashboard's main action is `primaryAction`; `danger: true` renders the red `btn-primary-danger` (Trash). `extraActions` are compact icon buttons on the same row; `contentFooter` renders below the content in every state, for a module's second area (Blocks' built-in blocks, Templates' defaults overview, Lexicon's translate panel).
 - `ListToolbar` and `FilterPanel` have only the sidebar-column presentation; `FilterPanel` is always visible. Search sits in the main area next to the title (`ListSearchField`).
 - **Timeline.** `sortBlockedInTimeline` disables every non-date sort, and the grouping switch, with an explanatory tooltip — the timeline orders and groups by month on its own. The stored sort is not overwritten: the select *shows* newest first, `groupByMonth` orders by date (ascending only if the list already is), and the stored sort applies again with another layout.
 - `Dashboard`'s `displayToggles` (view preferences, in the sidebar's view section, like Tasks' "Show completed") are not counted in the active-filter badge and untouched by a reset. Each `FilterList`'s "All" row clears it; "Reset filters" in the shared no-results state clears search and every filter at once.
@@ -147,7 +134,7 @@ Appending then jumps to and highlights the new block (`revealEntryLink` with `ca
 
 **Cross-vault import.** A chip's `data-id` is only meaningful in its own vault. `.emerald` export carries `meta.contentLinks` — id, entry type and title for every chip — so import can re-resolve each chip: by id first, then by the recorded title, then by the chip's own `data-label` for files without `contentLinks`. A chip that resolves to nothing becomes its display text (`remapInternalLinks`'s `null` case). The remap must run *before* DOMPurify: it parses and re-serialises the HTML, and that round-trip must not happen on content the sanitizer has already cleared. `sanitizeImportedHtml` is therefore the *last* step of every import that writes HTML — `.emerald` (after `beforeSanitize`, where legacy Journal links are appended as chips) and Markdown alike.
 
-The import also keeps the file's creation date: `importedCreatedAt(file)` passes it to `createEntry`/`createAltar` (`createdAt` option) so the entry sits at its place in the timeline. Only a parseable date with a four-digit year passes (dates sort as text, and `+010000-…` would sort before 2024); otherwise it falls back to now. `updated_at` is set to the same date (`importedStamp`), since an import is not an edit.
+The import also keeps the file's creation date: `importedCreatedAt(file)` passes it to `createEntry` (`createdAt` option) so the entry sits at its place in the timeline. Only a parseable date with a four-digit year passes (dates sort as text, and `+010000-…` would sort before 2024); otherwise it falls back to now. `updated_at` is set to the same date (`importedStamp`), since an import is not an edit.
 
 **A chip's own type, rewritten in place.** `retypeInternalLinks(html, id, entryType)` sets `data-entry-type` on every chip pointing at `id`, for an entry that changed type (see [Changing an entry's type](#changing-an-entrys-type)) — the id stays, so only that attribute changes. It is regex-based like `extractInternalLinks`: `entryTypeChange.ts` runs it over every matching row of `entries` and `templates`, and a full parse-and-reserialise would rewrite content nobody touched.
 

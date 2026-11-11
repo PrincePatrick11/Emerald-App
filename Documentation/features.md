@@ -20,7 +20,7 @@ The journal is the primary day-to-day writing space. Each entry has a title and 
 
 There is one formatting toolbar, pinned to the top while scrolling, acting on the text block you are typing in. A link added from "Linked entries" lands in the text block you last worked in; an image dropped from the file explorer or an entry dragged in from the left list lands where the pointer is, shown by a line or caret while dragging. Cancel reverts block changes along with the text. All of this applies to Wiki articles and Operations too, sigils included.
 
-**Field blocks.** "Add block" offers ten kinds of field besides text: short text, number, date, choice, yes/no, checklist, link (to any entry), image, moon phase, and altar — a link restricted to altars, shown full width with the altar's picture; clicking it opens the altar.
+**Field blocks.** "Add block" offers nine kinds of field besides text: short text, number, date, choice, yes/no, checklist, link (to any entry), image and moon phase. Altar fields from older versions became link fields to the altar's operation.
 
 - **Read mode** shows a field as a small label with its value, in the same typeface as the text around it; an empty field is left out.
 - **Editing**, each field has its own input — a date picker, a dropdown for a choice or a moon phase, a switch for yes/no, a list with "Add item" for a checklist, a search for a link, "Choose image" for an image.
@@ -28,7 +28,7 @@ There is one formatting toolbar, pinned to the top while scrolling, acting on th
 - Checklist items and yes/no switches can be toggled straight from read mode, unless the block is fully read-only.
 - A field's value is part of the entry: search finds it, links in a link field count as the entry's links (and show in "Linked entries"), and images in an image field are kept by the unused-image cleanup.
 
-**Managing blocks in the sidebar.** While editing, a collapsible "Blocks" section below the Properties panel lists the entry's blocks: drag a row by its grip to reorder (no animation — the row jumps into place), the eye hides a block, and the "…" menu renames, shows the title as a small read-mode heading, duplicates or removes it. "Add block" (and, where templates apply, "Insert template") sit at the top of the sidebar body in edit mode, "Insert template" first, in the template editor too; "Add block" appends one. Clicking a row selects the block and jumps to it; its own settings, if any, open in a box right under the row, like the Altar's placed elements.
+**Managing blocks in the sidebar.** While editing, a collapsible "Blocks" section below the Properties panel lists the entry's blocks: drag a row by its grip to reorder (no animation — the row jumps into place), the eye hides a block, and the "…" menu renames, shows the title as a small read-mode heading, duplicates or removes it. "Add block" (and, where templates apply, "Insert template") sit at the top of the sidebar body in edit mode, "Insert template" first, in the template editor too; "Add block" appends one. Clicking a row selects the block and jumps to it; its own settings, if any, open in a box right under the row.
 
 - A **hidden** block keeps everything in it — greyed out and marked while editing, absent in read mode.
 - A text block with no real content (only empty paragraphs or line breaks) is also absent from read mode, without being marked hidden; while editing it keeps its blank space so it can still be written into.
@@ -39,7 +39,7 @@ All of this is part of the entry's text, so Cancel reverts it too.
 
 **Your own blocks.** The **Blocks** view (rail, below Templates) lists the blocks you've built on the same dashboard every module uses — icon, name, field count, and "Unsaved" for a draft left open elsewhere. The right sidebar holds the header: title, count, "New block", search, view (list, cards, wide cards, or a timeline by month of last change) and sort (last changed, name).
 
-The list opens with a collapsible "Your blocks" section; below it, laid out like the Altar library, a collapsible "Built-in blocks" section lists what "Add block" offers out of the box — text, every field kind and the three sigil blocks — as a plain, non-clickable list (text and the sigil blocks have a description tooltip). Search filters both sections. With none of your own yet, a hint invites you to build the first; the built-in section stays regardless.
+The list opens with a collapsible "Your blocks" section; below it a collapsible "Built-in blocks" section lists what "Add block" offers out of the box — text, every field kind and the three sigil blocks — as a plain, non-clickable list (text and the sigil blocks have a description tooltip). Search filters both sections. With none of your own yet, a hint invites you to build the first; the built-in section stays regardless.
 
 *Building one.* Clicking a block opens its page: a breadcrumb back to the list, icon and name as the title, and its fields below — add by kind (including **Text**, the same rich text editor as the Text block), label, reorder by the grip, remove. No code is needed — a "Ritual log" with date, choice and checklist, for example. The right sidebar holds the icon (emoji or image), the display rules (hide empty fields in read mode, show the block's title, fully read-only) and Done/Delete/Cancel; with the sidebar closed, Done and Cancel sit in the page's own top bar.
 
@@ -49,13 +49,13 @@ The list opens with a collapsible "Your blocks" section; below it, laid out like
 
 *Deleting.* Deleting a block moves it to the Trash with an Undo toast and no question, leaving every copy untouched. Only when copies exist in entries or templates does a dialog offer to remove them as well: tick "Also remove it from N entries" and confirm a second time — that part can only be undone from a backup. "New block" followed by Cancel puts the new block in the Trash with Undo, like a new entry.
 
-**Prefill.** Every field kind can be prefilled: tick "Prefill" on a field in the builder and give it a starting value — a checklist with its points, yes/no set to "Yes", a link or altar pointing at a chosen entry, an image — and every new copy starts with it. Existing copies are unaffected, and a copy created before the prefill was added keeps its own value when the block updates.
+**Prefill.** Every field kind can be prefilled: tick "Prefill" on a field in the builder and give it a starting value — a checklist with its points, yes/no set to "Yes", a link pointing at a chosen entry, an image — and every new copy starts with it. Existing copies are unaffected, and a copy created before the prefill was added keeps its own value when the block updates.
 
 **Sigil parts.** A block can also hold the three sigil parts — calculator, drawing and charge — which work exactly like the standalone sigil blocks (see [Sigil Workflow](#sigil-workflow)). The builder lets a calculator choose how it reaches its letter bank (automatic, manual, or both — the default), a drawing preset its starting brush colour and size, and a charge preset its lock and which of the block's calculators and drawings it covers. A copy holding a loaded sigil, as a full block or as one of these parts, is never touched by "Update block" or "Update all" and never removed by "Also remove it from entries" — it is reported as skipped, so it keeps hiding what it charged. Duplicating a block that a charge hides or locks makes a copy that charge covers too, just as loaded.
 
 **Moon phase.** A journal entry's lunar phase is never stored — it is worked out from the entry's creation date whenever it is shown. Settings → Entries decides whether journal entries show it at all, for every entry, old ones included. On, it appears as the entry's icon, as a read-only row in the Properties sidebar and in exports, and the Journal list offers the phase filter and grouping; off, all of that is gone. It is not something you choose: a duplicate gets today's phase, an imported entry the phase of the file's date.
 
-**Linked entries.** The Properties sidebar's "Linked entries" field (above the tags) lists everything the entry links in its own text — journal entries, wiki articles, operations, tasks and altars — read directly from the content rather than kept as a separate list. The chips are grouped by category under small headings.
+**Linked entries.** The Properties sidebar's "Linked entries" field (above the tags) lists everything the entry links in its own text — journal entries, wiki articles, operations and tasks — read directly from the content rather than kept as a separate list. The chips are grouped by category under small headings.
 
 - In edit mode, searching (up to 50 matches, most recently updated first) and picking a result appends the link to the end of the entry as its own block — a divider, the linked item's category as a heading, then the chip; one block per link. The view jumps to it and briefly highlights it. An entry with no text yet gets its first link block without the divider.
 - Clicking a listed link does the same jump-and-highlight (or navigates to the target if the link somehow isn't in the text).
@@ -63,18 +63,18 @@ The list opens with a collapsible "Your blocks" section; below it, laid out like
 
 The same field is available on Wiki articles and Operations. Links are included in Markdown and Emerald exports. Older vaults and backups whose journal entries still had the fixed Paradigm, Banishing and Meditation properties have them converted into ordinary links on open or import.
 
-**Changing type.** In edit mode, a "Type" row at the top of the Properties panel shows Journal, Operations and Wiki as an icon toggle. Picking another turns the entry into that kind: it keeps its id, title, content, tags and creation date, and everything pointing at it follows — link chips elsewhere (including in templates and the Trash), its open tab and history, task links, and the prefilled link of any custom block. Wiki and Operation keep category, icon and cover image between each other; switching to Journal drops them, asking first if any are set. The content stays as it is — a default template applies only when an entry is created. Tasks and altars have a different data model and take no part in this.
+**Changing type.** In edit mode, a "Type" row at the top of the Properties panel shows Journal, Operations and Wiki as an icon toggle. Picking another turns the entry into that kind: it keeps its id, title, content, tags and creation date, and everything pointing at it follows — link chips elsewhere (including in templates and the Trash), its open tab and history, task links, and the prefilled link of any custom block. Wiki and Operation keep category, icon and cover image between each other; switching to Journal drops them, asking first if any are set. The content stays as it is — a default template applies only when an entry is created. Tasks have a different data model and take no part in this.
 
-**Tags.** Free-form labels shared across the app. Renaming a tag changes it on every entry at once. The Tags view lists the entries carrying a tag — journal entries, wiki articles and operations; tasks and altars carry no tags. A tag used only by templates reads "only in templates" instead of "unused". A tag in the Trash disappears from its entries until it is restored; deleting it for good removes it from them, including entries in the Trash.
+**Tags.** Free-form labels shared across the app. Renaming a tag changes it on every entry at once. The Tags view lists the entries carrying a tag — journal entries, wiki articles and operations; tasks carry no tags. A tag used only by templates reads "only in templates" instead of "unused". A tag in the Trash disappears from its entries until it is restored; deleting it for good removes it from them, including entries in the Trash.
 
-**Untitled.** A new journal entry, article, operation, task or altar has no title until you type one. Wherever a title is shown — lists, cards, tabs, search, the Trash, link chips and pickers, task links, exports — an empty one reads "Untitled Entry" (Article, Operation, Task, Altar) in the app's language; renaming starts from an empty field. A duplicate of an untitled entry is called "Untitled Entry (Copy)". Older vaults and imports have the old English default titles ("Untitled Entry", "New Task" …) emptied; a title you typed yourself is never touched.
+**Untitled.** A new journal entry, article, operation or task has no title until you type one. Wherever a title is shown — lists, cards, tabs, search, the Trash, link chips and pickers, task links, exports — an empty one reads "Untitled Entry" (Article, Operation, Task) in the app's language; renaming starts from an empty field. A duplicate of an untitled entry is called "Untitled Entry (Copy)". Older vaults and imports have the old English default titles ("Untitled Entry", "New Task" …) emptied; a title you typed yourself is never touched.
 
 **List views.** The journal list offers four layouts (List, Cards, Cards in full width, Timeline), four sort orders (newest first, oldest first, A→Z, Z→A), and a separate Grouping toggle, which for the journal groups by **moon phase** (with the moon phase setting off, the list is simply ungrouped and has no phase filter).
 
 - Grouped, each phase gets a collapsible group — chevron, moon emoji, name, count — in lunar-cycle order; an empty phase is left out.
 - The filter panel's phase list always shows all eight phases (icon, name, count of matching entries), since the cycle is fixed, plus an "All" row on top. Deselecting every phase hides all entries.
 - Search filters by title *or* tag name.
-- **Timeline locks out A→Z/Z→A and the Grouping toggle** — they're greyed out with a tooltip, since the timeline orders by date and groups by month on its own (ascending if the list was sorted oldest first, otherwise newest first). The chosen sort applies again once the timeline is left. The same holds wherever Timeline is offered (Wiki, Operations, the Altar dashboard).
+- **Timeline locks out A→Z/Z→A and the Grouping toggle** — they're greyed out with a tooltip, since the timeline orders by date and groups by month on its own (ascending if the list was sorted oldest first, otherwise newest first). The chosen sort applies again once the timeline is left. The same holds wherever Timeline is offered (Wiki, Operations).
 
 **Context menu.** Right-click any entry in the list or sidebar to Duplicate, Rename or Delete it — most menus also offer *Open in new tab* (the journal's own list view doesn't). The menu draws above everything and stays inside the window, flipping towards the cursor near an edge. See [Context Menus](#context-menus).
 
@@ -94,7 +94,7 @@ The wiki stores reference articles about anything relevant to your practice: rit
 
 Operations track magical workings: rituals in progress, ongoing practices, servitors, and sigils.
 
-**Categories.** The same shared list as Wiki, Tasks and Altar items — see [Categories](#categories). Its one built-in, **Sigils**, belongs here (see [Sigil Workflow](#sigil-workflow)).
+**Categories.** The same shared list as Wiki and Tasks — see [Categories](#categories). Its two built-ins belong here: **Sigils** (see [Sigil Workflow](#sigil-workflow)) and **Altars** (see [Altars](#altars)).
 
 **Status, end date and version are a block.** The block **Status** (Active — yes/no, End date, Version) is a user-built block like any other: add it to an operation via "Add block", toggle "Active" straight from read mode, and rename, extend or delete it in the Blocks view. Older vaults, backups, `.emerald` and Markdown files that carry these values as fixed fields get the block added to those operations on open or import. Filtering the list by block values is planned.
 
@@ -119,100 +119,41 @@ Sigils from older vaults are converted into these blocks on open (intention, let
 
 Servitors use the standard operations editor with no special fields. File them under whichever category fits — including one you name "Servitors" yourself.
 
-## Altar
+## Altars
 
-**Altars are operations now.** An altar is an operation of the built-in category Altars, built with the Altar block. Opening this version turns every altar into such an operation, under the same ID, so links, tasks and altar fields lead to it; the library's items with a picture go to [Images](#images) with their name and note, and an item without one stays on its altar as its emoji. Backups and `.emerald` files with altars are converted the same way on import. The Altar module below empties with that and goes in one of the next steps.
+An altar is an operation in the built-in category **Altars** (🪔), a virtual arrangement of pictures and symbols on a canvas. A new operation there starts, through the built-in template "Altar", with an **Altar block** on a night background and a text block for notes. Altars are listed, searched, tagged, linked from texts and tasks, exported and trashed like every other operation; there is no separate Altar section. Any other entry can hold an Altar or a Canvas block too ("Add block").
 
-The altar is a virtual arrangement of symbolic objects on a canvas.
+**The Altar block** is the Canvas block (see [Images](#images)) with "Images" below it while editing: two rows of pictures to scroll sideways, a search, and a tag filter.
 
-**Dashboard.** Opening the Altar section shows all your altars under a collapsible "Altars" heading, with search, sort and view mode (List / Cards / Cards in full width / Timeline). Click an altar to open it; the breadcrumb back button or the Altar entry in the left sidebar returns to the dashboard.
+- **Search and tag.** The search finds pictures by name. A tag chosen in the strip's head shows only the pictures carrying it; it holds for that block until the app is closed, and its × shows all again.
+- **Placing pictures.** Drag a picture onto the canvas, or click it to place it in the middle of what is visible; each comes in its own proportions at a third of the canvas's shorter side.
+- **Adding pictures.** The "+" opens the Add images dialog with the strip's tag set. Files dropped onto the canvas from the disk go into "Images" under their file name, with the strip's tag, and onto the canvas where they were let go.
+- A picture-less element with the 🕯️ emoji, as older altars have them, flickers like a candle.
 
-Cards and rows show a **thumbnail** of each altar, captured when you confirm an edit with Done — or leave a changed altar for another tab — and stored in the database. Cancel brings the previous thumbnail back with everything else. Without a stored thumbnail a live preview is drawn instead, leaving hidden elements out; changing a library element's picture or deleting it drops the thumbnails of the altars showing it until they are next confirmed with Done (their "last changed" date stays). Thumbnails keep the altar's proportions without cropping.
+**Editing the canvas.** In edit mode the canvas works like a design tool, laid out like painting a drawing: the tools in a column on the left, a bar above for undo and what the selection has, the element list on the right. A block's settings in the sidebar choose what it offers (shapes, text, symbols, drawing, and for the Altar block "Images" below); switched off, nothing new of that kind is added, and what is on the canvas stays.
 
-The preview can be turned off — a switch in the sidebar's "View" section — for a lighter list that shows each altar's own icon instead (or the altar icon, a candle on a table, for an altar with none).
-
-**Altar library.** You keep a personal library of items. Each item has a name, an emoji, a category, an optional note, and an optional uploaded image.
-
-**Item categories** come from the shared category list — see [Categories](#categories). In the altar editor, the library strip shows **All**, one tab per category that holds at least one item, and **Uncategorized** for items without one (a new item starts there, as do items whose category was deleted for good).
-
-- The tabs are not draggable: the strip shows only a subset of the categories, so a drag there would rearrange part of the app-wide order. Reorder in the Categories view.
-- With more categories than fit, the tab row scrolls horizontally; the scrollbar is hidden and fades at the edges show there is more.
-- An item with the 🕯️ emoji flickers like a candle, whatever its category.
-
-Adding, editing and deleting items happens in a modal. Deleting moves the item to the Trash without a question: it disappears from every altar, and Undo or restoring it from the Trash puts it back in the same places. In edit mode, the library strip is docked under the canvas and can be resized; its height is remembered. When uploading an image for a new item with an empty name, the filename (without extension) is filled in and selected. Library tiles have a compact fixed size so more items fit.
-
-**Library in the dashboard.** The Altar dashboard also shows the library below the altars, to browse and edit items without opening an altar.
-
-- An "Altar Library" divider with a chevron collapses the whole section; that state, like the category groups under it, is remembered per vault.
-- It has its own sort (A→Z, Z→A, newest first) and Grouping toggle, next to the altar list's controls in the dashboard header. Grouped, each category header shows a count and a "+" that opens the add-item dialog set to that category; only categories that hold an item are shown. Ungrouped, every matching item shows in one grid.
-- Clicking a tile opens the same edit modal as in the editor; a button next to "New altar" adds an item directly.
-- The dashboard's search matches item names too: if only items match, the altar list shows "No results" while the library shows its matches.
-- There is no drag-and-drop here — a category is changed in the edit modal, and items are dragged onto a canvas only in the editor's own strip.
-
-**Placing items.** In edit mode, drag items from the library onto the canvas. Placed items can be moved, scaled, rotated, layered, faded, hidden and locked. A click only selects: dragging starts after a few pixels of movement and the element keeps the spot where it was grabbed. A placement change that changes nothing is not written and does not re-date the altar. Locked elements are click-through, so clicks reach the items behind them.
-
-**Editing the canvas.** In edit mode the canvas works like a design tool, laid out like painting a drawing: the tools in a column on the left, a bar above for undo and what the selection has, the element list on the right.
-
-- **Tools.** Select (V), rectangle (R), ellipse (O), polygon (G), star (S), text (T) and drawing (P). Drag on the canvas to draw the element in that size (Shift: a square), or click to place it at its usual size; afterwards the column goes back to selecting. Escape drops a tool.
-
-- **Handles.** A selected element shows a frame with handles: the corners scale it (pictures and text keep their proportions, Shift frees them), the round handle above rotates it (snapping near the right angles, with Shift to 15°, or to the altar's rotation snap when it is on).
+- **Tools.** Select (V), rectangle (R), ellipse (O), polygon (G), star (S), text (T) and drawing (P), and the picture button, which opens the picture picker. Drag on the canvas to draw the element in that size (Shift: a square), or click to place it at its usual size; afterwards the column goes back to selecting. Escape drops a tool.
+- **Handles.** A selected element shows a frame with handles: the corners scale it (pictures and text keep their proportions, Shift frees them), the round handle above rotates it (snapping near the right angles, with Shift to 15°). A click only selects: dragging starts after a few pixels of movement and the element keeps the spot where it was grabbed. Locked elements are click-through.
 - **Several at once.** Shift-, ⌘- or Ctrl-click adds to the selection, a drag on an empty spot draws a frame around what to select, ⌘A selects everything. Moving, scaling, rotating and the toolbar then apply to all of them.
-- **Guides.** While moving, edges and centres snap to the canvas's edges and middle and to the other elements, and a pink line shows where; Alt moves freely. With "Snap" in the grid options the centre snaps to the grid instead, and with "Scale" sizes snap to whole cells.
-- **Shapes and text.** The tools add rectangles, ellipses, polygons and stars, and text boxes. A shape gets a fill and an outline from twelve colours or any other, a rectangle rounded corners, a polygon 3 to 12 corners and a star 3 to 12 points, like the shapes of the paint mode. Triangles and hexagons from before stay as they are until their corners are changed. Text is typed in place (double-click or Enter to change it), wraps at its box, and takes one of three fonts, a size, bold, italic, alignment and a colour; its side handles change the width, its corners the size. Shapes and text appear in the placed-elements list like items.
-- **Symbols.** The sparkle in the tool column opens a library of symbols drawn for Emerald, in seven packs: planets (with the lunar nodes), the zodiac with the aspects, alchemy (elements, salt, sulfur, mercury, the metals, antimony, the philosophers' stone), the 24 runes of the Elder Futhark, occult signs (chaos star, inverted pentagram, unicursal hexagram, septagram, triple moon, triquetra, Leviathan cross, lemniscate, Eye of Horus, valknut, helm of awe, Mjölnir, spiral, triskele, ouroboros, witch's knot, caduceus), the twenty letters of Ogham, and sacred geometry (tree of life, seed and flower of life, Metatron's cube, pentagram and pentacle, hexagram and seal of Solomon, heptagram, octagram, vesica piscis, ankh, Monas hieroglyphica, eye of providence and more). A search finds them by name across every pack. A picked symbol is drawn on the canvas like a shape (a click puts it there, a drag gives its size; Y draws the last one picked again). It is made of lines: the bar sets their colour and weight, a fill for its closed parts, and swaps it for another symbol. In an SVG export it stays a vector.
+- **Guides.** While moving, edges and centres snap to the canvas's edges and middle and to the other elements, and a pink line shows where; Alt moves freely.
+- **Shapes and text.** The tools add rectangles, ellipses, polygons and stars, and text boxes. A shape gets a fill and an outline from twelve colours or any other, a rectangle rounded corners, a polygon 3 to 12 corners and a star 3 to 12 points, like the shapes of the paint mode. Triangles and hexagons from older altars stay as they are until their corners are changed. Text is typed in place (double-click or Enter to change it), wraps at its box, and takes one of three fonts, a size, bold, italic, alignment and a colour; its side handles change the width, its corners the size.
+- **Symbols.** The sparkle in the tool column opens a library of symbols drawn for Emerald, in seven packs: planets (with the lunar nodes), the zodiac with the aspects, alchemy (elements, salt, sulfur, mercury, the metals, antimony, the philosophers' stone), the 24 runes of the Elder Futhark, occult signs (chaos star, inverted pentagram, unicursal hexagram, septagram, triple moon, triquetra, Leviathan cross, lemniscate, Eye of Horus, valknut, helm of awe, Mjölnir, spiral, triskele, ouroboros, witch's knot, caduceus), the twenty letters of Ogham, and sacred geometry (tree of life, seed and flower of life, Metatron's cube, pentagram and pentacle, hexagram and seal of Solomon, heptagram, octagram, vesica piscis, ankh, Monas hieroglyphica, eye of providence and more). A search finds them by name across every pack. A picked symbol is drawn on the canvas like a shape (a click puts it there, a drag gives its size; Y draws the last one picked again). It is made of lines: the bar sets their colour and weight, a fill for its closed parts, and swaps it for another symbol.
 - **Your own symbols.** Select a drawing on the canvas and choose "Save as symbol" in the bar: it shows the drawing as a symbol, takes a name, and puts it into "My symbols" in the library, where it is placed, coloured and scaled like the others. A symbol has one colour: pen strokes and fills become its filled parts, lines and outlined shapes its lines; eraser strokes and pictures are left out. A trash button on a symbol in "My symbols" removes it (with undo); what is already placed stays. Your symbols are kept in the vault and travel with every backup.
 - **Arrange and align.** Restack by dragging in the element list, or bring forward and send backward with ⌘] and ⌘[ (with Shift: to the front and back); the toolbar aligns edges or centres of the selection, or of one element on the canvas, and makes even gaps between three or more; a group counts as one element there.
-- **Rulers and guides.** The ruler button at the bar's end shows rulers right along the top and left edge of the canvas, in pixels of the altar; they tint where the selection lies and notch where each guide is. Drag from a ruler onto the canvas to pull out a guide line; elements snap to it while moving. Drag a guide to move it, back onto a ruler to remove it; the lock beside the ruler button fixes them. Handles snap to guides and to the canvas's edges and middle while scaling, pictures keeping their proportions. Guides and the lock are saved with the altar, in proportion to its size, so a new resolution keeps them in place.
+- **Rulers and guides.** The ruler button at the bar's end shows rulers right along the top and left edge of the canvas, in its pixels; they tint where the selection lies and notch where each guide is. Drag from a ruler onto the canvas to pull out a guide line; elements snap to it while moving. Drag a guide to move it, back onto a ruler to remove it; the lock beside the ruler button fixes them. Handles snap to guides and to the canvas's edges and middle while scaling, pictures keeping their proportions. Guides and the lock are saved with the block.
 - **Right-click menu.** A right click on an element offers cut, copy, paste, duplicate, bringing forward and sending back, grouping, locking, hiding and removing, with the keys for each. On the empty canvas it pastes right where you clicked, selects everything, fits the view or switches the rulers. A right click on a locked element unlocks it.
 - **Keyboard shortcuts.** Press ? or the keyboard button at the end of the bar to see every key and gesture of the canvas, or of the drawing while you paint.
 - **Element list.** The layer button at the bar's end opens a list of the elements over the canvas's right side, top first, each with a small picture and its name: click to select (Shift adds), drag a row to restack, the eye hides and the lock locks. Below the list sit the selection's opacity and buttons to duplicate and remove it; it looks and works like the layer panel of the paint mode.
-- **Groups.** ⌘G (or the group button under the element list) groups the selected elements, ⇧⌘G ungroups them. A click on the canvas then takes the whole group, which moves, scales and turns together; a double click picks one member, and in the list a group shows as a row with its members under it. Groups are saved with the altar.
-- **Undo** (⌘Z, ⇧⌘Z) covers everything done on the canvas and in the sidebar during the edit; Cancel still returns to the state before it.
+- **Groups.** ⌘G (or the group button under the element list) groups the selected elements, ⇧⌘G ungroups them. A click on the canvas then takes the whole group, which moves, scales and turns together; a double click picks one member, and in the list a group shows as a row with its members under it. Groups are saved with the block.
+- **Undo** (⌘Z, ⇧⌘Z) covers everything done on the canvas during the edit; the entry's Cancel returns to the state before it.
 - **Keys.** Arrows nudge (Shift: further), Delete removes, ⌘D duplicates, ⌘C/⌘X/⌘V copy, cut and paste, Escape clears the selection.
 - **Zoom.** Pinch or ⌘ with the wheel zooms at the pointer, the wheel pans, Space or the middle button with a drag pans too; the small bar in the canvas's corner zooms, and a click on its percentage fits the canvas again (⌘0).
 - **Drawings.** The pen in the tool column adds a drawing and starts painting in it at once: the paint tools of the sigil drawing (selecting and moving strokes, pen with pressure, line, ellipse, rectangle, eraser, picker, colours, size, layers) take the toolbar, and a dashed frame shows the drawing's edge. Double-click or Enter paints in a drawing again; Escape, Done or a click beside it ends painting. A drawing is moved, scaled and rotated like any element, and undo covers its strokes too.
-- **Save as a picture** from the toolbar: PNG, JPEG or SVG, the whole canvas or only the selection, at half, the same, twice or four times the altar's resolution or a size typed in, with the background or transparent. In an SVG, shapes, text and drawings stay vectors that other programs can edit; pictures and the background are embedded, and the fonts are named, not included.
+- **Backgrounds.** The background button at the end of the canvas bar sets the canvas's background: no fill, a colour, or a linear or radial gradient of two or three colours (a linear one at any angle, a radial one from the top, middle or bottom), a picture over it, chosen with the picture picker, that fills the canvas or fits into it, and a tint over both that darkens or lightens it by a chosen strength. ⌘Z takes it back like any other step, a dragged slider as one.
 
-**Inspector and placement controls.** The right sidebar has a placed-elements list with an inline inspector under the selected row: x and y (%), rotation (°), scale (%, not for text, which is sized by its font), and an opacity slider. It opens while exactly one element is selected; Shift-, ⌘- or Ctrl-click on rows selects several. The inspector of a locked element is locked too (dimmed, with a tooltip). The delete button sits in the row; it removes the element without a question, and the toast that follows puts it back.
+Read mode shows the canvas as it is; the entry's card and its exports show the picture made of it when editing ends.
 
-**Duplicate.** In edit mode, each placed-element row has a Duplicate button (also in its right-click menu). The copy has the same size, rotation and opacity, is offset by 2% in both axes, placed on top, unlocked, visible, and selected.
-
-**Row actions (edit mode).** Each row shows, left to right: a grip for reordering, the item's picture and name, then Duplicate, Lock/Unlock, Eye/Hide and Delete. Right-clicking a row opens the app's shared context menu with "Duplicate" and "Remove".
-
-**Drag-to-reorder Z-order.** In edit mode, dragging a row by its grip changes the layer order: the top of the list is the front-most element, and the canvas follows immediately.
-
-**Selecting elements.** Clicking a row highlights its element on the canvas with a jade border, in view and edit mode. Clicking the same row again, or an empty area of the canvas or sidebar, deselects (and closes the inspector).
-
-**Favicon.** Each altar can have its own icon, shown in its tab and as the first row of the view-mode summary. Set it in edit mode in the collapsible "Favicon" section at the top of the sidebar: pick an emoji from the shared emoji picker (the vault's default grid from Settings → Entries, searchable across the full emoji set) or upload an image. Without one, the tab shows the altar icon, a candle on a table.
-
-**Sidebar in view mode.** Outside edit mode, the action bar shows Edit and a Fullscreen toggle, and below it a compact **summary panel**:
-
-- **Icon** — the first row when a favicon is set.
-- **Format** — a ratio such as `16:9`, or a pixel size such as `1920 × 1080`.
-- **Background** — the background's name with a small swatch.
-- **Overlay** — opacity and colour (dark/light).
-- **Grid** — the grid size in pixels, or "Off".
-- **Elements** — a collapsible list of the visible elements, front-most first; clicking a row marks that element on the canvas, clicking again clears the mark.
-
-Exporting the altar as an image or PDF is done from the application menu — see [Export and Import](#export-and-import).
-
-**Sidebar in edit mode.** The full editor — Favicon, Canvas Options, Grid Options and Placed Elements — shows only in edit mode. Each section collapses with a chevron; which ones are open is remembered per vault (the same for every altar) and defaults to open.
-
-**Canvas resolution.** In edit mode, the "Canvas Options" section offers six aspect ratios (16:9, 4:3, 3:2, 1:1, 2:3, 9:16); the canvas then fills the available space at that proportion. An altar with a fixed pixel size (e.g. 1920 × 1080) renders at that size, scaled to fit. Dashboard cards reflect each altar's aspect ratio.
-
-**Grid and snapping.** Each altar keeps its own grid: overlay on/off, size (8–128 px), opacity (1–25%), colour, snap to grid, rotation snap, and scale to grid. Changes are saved immediately, and grid controls show only in edit mode. The grid stays crisp on high-density displays and keeps its cell count when the window is resized.
-
-- *Snap to grid* — snaps positions to the nearest grid intersection. It works with the grid hidden too; the size slider shows as soon as the grid or a snap option is on (opacity and colour only while the grid is shown).
-- *Snap rotation angle* — rotation snaps to a set step (1–180°, default 15°). Off, rotation is free; holding Shift still snaps to 15°.
-- *Scale to grid* — resizing snaps to an even number of grid cells (at least 2), the same on both axes.
-
-The grid also appears in thumbnails and exported images.
-
-**Multiple altars.** You can create several named altars, each with its own title, background and placements.
-
-**Backgrounds.** The background button at the end of the canvas bar sets the altar's background: no fill, a colour, or a linear or radial gradient of two or three colours (a linear one at any angle, a radial one from the top, middle or bottom), a picture of your own over it (up to 5 MB) that fills the canvas or fits into it, and a tint over both that darkens or lightens it by a chosen strength. Every change shows at once and is saved with the altar, in its exports and its card; ⌘Z takes it back like any other step, a dragged slider as one. An altar whose background was never changed there shows what it had before: its preset or picture with its overlay.
-
-**View mode and full-window mode.** Full-window mode is available only in view mode: entering edit mode, leaving the altar, or pressing **Escape** ends it — the dashboard never opens in it. The fullscreen toggle sits in the sidebar's action bar while the sidebar is open; otherwise it floats over the canvas. While full-window mode is on, its exit button is always visible.
+**Altars from older versions.** Opening this version turns every altar into an operation of Altars, under the same ID, so links, tasks and altar fields lead to it: its placements, drawn shapes, text, drawings, background and guides become its Altar block, at its old size; its grid settings are not kept. The library's items with a picture go to [Images](#images) with their name and note (in the Trash if the item was), and an item without one stays on its altar as its emoji. Backups and `.emerald` files with altars are converted the same way on import.
 
 ## Navigation
 
@@ -224,14 +165,14 @@ The title bar, the rail and the left entry list share one plain background with 
 
 **Left sidebar structure.** The left sidebar has two parts side by side:
 
-1. A narrow icon **rail**: a plus, then Home, then Journal, Tasks and Operations, then Wiki, Lexicon and Altar, then Templates and Blocks at the top, the groups set apart by space; at the bottom, Images, Categories, Tags and Trash, then Settings and the start page. The rail scrolls without a bar when the window is too low. Clicking a navigation icon switches the main view of the active tab — it never opens a new tab. The open view's icon is highlighted (also while an entry inside it is open). The start page button (a grid of four squares) opens the [start page](#vaults). The plus opens a small window with a tile each for Journal, Tasks, Operations, Wiki, Altar, Lexicon, Templates and Blocks; the choice is created and opened right away, a task as a new row ready to be named in the Tasks view. Arrow keys and Tab move between the tiles, the focused one shows a ring from the start, Enter picks it (Journal is preselected), and each tile's number key picks it directly, and Escape or a click beside the window closes it.
-2. A resizable, collapsible **entry list** showing either every module's items together (**All**, by last change) or one module's own — chosen in Settings → Sidebar. It has its own search, inline rename (from the context menu, starting from the stored title) and a context menu (Open in new tab/Duplicate/Rename/Delete where they apply — Altar offers Open in new tab, Rename and Delete, duplicating an altar lives in the dashboard's card menu; Tasks offers Rename/Delete). Task rows show a completion checkbox (in the All list a static checkbox icon). Every row can be dragged into an editor to insert an internal link — Tasks and Altars included. The list caps how many entries it shows (Settings → Sidebar: 10/25/50/100 or all); a "Show more" row reveals the next batch. With "all" it fills in as you scroll, so a vault with thousands of entries opens it at once. Creating items happens through the rail's plus and each module's own dashboard; the entry list has no "New" button.
+1. A narrow icon **rail**: a plus, then Home, then Journal, Tasks and Operations, then Wiki and Lexicon, then Templates and Blocks at the top, the groups set apart by space; at the bottom, Images, Categories, Tags and Trash, then Settings and the start page. The rail scrolls without a bar when the window is too low. Clicking a navigation icon switches the main view of the active tab — it never opens a new tab. The open view's icon is highlighted (also while an entry inside it is open). The start page button (a grid of four squares) opens the [start page](#vaults). The plus opens a small window with a tile each for Journal, Tasks, Operations, Wiki, Lexicon, Templates and Blocks; the choice is created and opened right away, a task as a new row ready to be named in the Tasks view. Arrow keys and Tab move between the tiles, the focused one shows a ring from the start, Enter picks it (Journal is preselected), and each tile's number key picks it directly, and Escape or a click beside the window closes it.
+2. A resizable, collapsible **entry list** showing either every module's items together (**All**, by last change) or one module's own — chosen in Settings → Sidebar. It has its own search, inline rename (from the context menu, starting from the stored title) and a context menu (Open in new tab/Duplicate/Rename/Delete where they apply — Tasks offers Rename/Delete). Task rows show a completion checkbox (in the All list a static checkbox icon). Every row can be dragged into an editor to insert an internal link — Tasks included. The list caps how many entries it shows (Settings → Sidebar: 10/25/50/100 or all); a "Show more" row reveals the next batch. With "all" it fills in as you scroll, so a vault with thousands of entries opens it at once. Creating items happens through the rail's plus and each module's own dashboard; the entry list has no "New" button.
 
-The rail has no toggle buttons: **View → Entry List** and **View → Properties** collapse and expand the two sidebars (with a checkmark for their state), animating their width. **View → Reset View** restores the sidebar widths and the altar library height, ends the altar's full-window mode, and brings back a hidden rail, entry list or right sidebar — without the rail, Settings and the Vault button would be out of reach. **View → Lock View** (with a checkmark while on) fixes the widths of the entry list and the right sidebar: their edges can no longer be dragged. Hiding and showing the sidebars and Reset View keep working, and the lock survives a restart.
+The rail has no toggle buttons: **View → Entry List** and **View → Properties** collapse and expand the two sidebars (with a checkmark for their state), animating their width. **View → Reset View** restores the sidebar widths and brings back a hidden rail, entry list or right sidebar — without the rail, Settings and the Vault button would be out of reach. **View → Lock View** (with a checkmark while on) fixes the widths of the entry list and the right sidebar: their edges can no longer be dragged. Hiding and showing the sidebars and Reset View keep working, and the lock survives a restart.
 
-**Back link above the title.** An open Journal entry, Wiki article or Operation shows a small row above the title: a chevron and the module's name, which goes back to its list without closing the tab, and on the right the entry's date — replaced by "Editing…" while you edit or have unsaved changes. The Altar and library pages (a block, a template, a language) show the same row.
+**Back link above the title.** An open Journal entry, Wiki article or Operation shows a small row above the title: a chevron and the module's name, which goes back to its list without closing the tab, and on the right the entry's date — replaced by "Editing…" while you edit or have unsaved changes. The library pages (a block, a template, a language) show the same row.
 
-**Right sidebar action bar.** Edit, Done, Delete and Cancel for an open Journal entry, Wiki article, Operation or Altar sit in one action bar pinned above the Properties panel — not in the entry's header, and not on double-click. In view mode it shows Edit; while editing, Done, Delete (where it applies) and Cancel. An entry whose loaded sigil locks the whole entry keeps Edit visible but disabled, with a tooltip saying the sigil has to be unloaded first.
+**Right sidebar action bar.** Edit, Done, Delete and Cancel for an open Journal entry, Wiki article or Operation sit in one action bar pinned above the Properties panel — not in the entry's header, and not on double-click. In view mode it shows Edit; while editing, Done, Delete (where it applies) and Cancel. An entry whose loaded sigil locks the whole entry keeps Edit visible but disabled, with a tooltip saying the sigil has to be unloaded first.
 
 **Cancel.** Cancel restores the entry as it was when editing began — title, body, tags, category, icon and cover image — even if autosave or the Properties panel already wrote in-between changes to disk. That includes a change of type made while editing: Cancel moves the entry back into the module it came from, with its old number (unless another entry has taken it since) and with the category, icon and cover image a move to the Journal had dropped. Looking into another tab meanwhile doesn't change that. Restarting the app keeps what you typed — and a changed type — and starts a new edit from there.
 
@@ -244,17 +185,15 @@ If the entry was just created and never confirmed with Done, Cancel moves it to 
 - Without changes, nothing asks.
 - If the question came from the Settings window or on the way to the start page (an import, an update, a vault switch), **Keep editing** closes the Settings window too and stays on the page.
 
-The same applies to an altar and to the page of one of your own blocks or a template.
+The same applies to the page of one of your own blocks or a template.
 
-An **altar** saves every canvas action the moment it happens, so its Cancel puts it back as it was when Edit was pressed — placements, background, grid, format, icon and title, along with its preview and its place in the list. A change to a library item is not taken back, since items belong to every altar.
+**List header, split between the main area and the sidebar.** While a list view is showing — Home, Journal, Wiki, Operations, Tasks, Trash, Categories, Tags, or the Blocks, Templates and Lexicon lists — its title and search sit above the list in the main area. Everything else lives in the right sidebar while it is open: the view's actions (a labelled "+ New …" button; Trash shows select-all and bulk delete instead), then view and sort as two rows of icon toggles, then the always-visible filter panel. Closing the sidebar hides those parts and gives the list the width back.
 
-**List header, split between the main area and the sidebar.** While a list view is showing — Home, Journal, Wiki, Operations, Tasks, the Altar dashboard, Trash, Categories, Tags, or the Blocks, Templates and Lexicon lists — its title and search sit above the list in the main area. Everything else lives in the right sidebar while it is open: the view's actions (a labelled "+ New …" button — on the Altar with an "add item" button beside it; Trash shows select-all and bulk delete instead), then view and sort as two rows of icon toggles, then the always-visible filter panel. Closing the sidebar hides those parts and gives the list the width back.
-
-**Internal link chips.** Links inserted with `[[` render as chips in both edit and view mode. A link can point at a Journal entry, Wiki article, Operation, Task or Altar — offered by the `[[` popup, the link picker (the toolbar's link button), and by dragging a row from the left entry list. Only Journal, Wiki and Operations can hold links; Tasks and Altars have no editor. Clicking a Task chip opens the Tasks view and highlights the task; clicking an Altar chip opens the altar. The link picker's tabs (All/Journal/Tasks/Operations/Wiki/Altar) are icons in the rail's order, each with its match count.
+**Internal link chips.** Links inserted with `[[` render as chips in both edit and view mode. A link can point at a Journal entry, Wiki article, Operation (an altar too) or Task — offered by the `[[` popup, the link picker (the toolbar's link button), and by dragging a row from the left entry list. Only Journal, Wiki and Operations can hold links; Tasks have no editor. Clicking a Task chip opens the Tasks view and highlights the task. The link picker's tabs (All/Journal/Tasks/Operations/Wiki) are icons in the rail's order, each with its match count.
 
 ## Search
 
-The magnifier in the title bar opens the search: one field, results beneath it, over everything in the current vault. Matches come from Journal, Wiki, Operations, Tasks, Altars, altar library items, tags, categories, and the Lexicon's languages and words. A title match ranks above a tag match, which ranks above a match in body text; ties go to whatever was updated more recently. Body-text matches start at two typed characters, so a single letter doesn't return most of the vault.
+The magnifier in the title bar opens the search: one field, results beneath it, over everything in the current vault. Matches come from Journal, Wiki, Operations (altars included), Tasks, pictures of "Images", tags, categories, and the Lexicon's languages and words. A title match ranks above a tag match, which ranks above a match in body text; ties go to whatever was updated more recently. Body-text matches start at two typed characters, so a single letter doesn't return most of the vault.
 
 Each result shows its module and, for Journal/Wiki/Operations, its entry number (e.g. `#12`). A body-text match shows a snippet with the word highlighted. A category result names the module that uses it most (e.g. "Category · Wiki") — a hint, not the destination: it opens the Categories view. A word shows as "term – translation" and opens its language. An untitled entry is found by its "Untitled …" name.
 
@@ -262,7 +201,7 @@ Each result shows its module and, for Journal/Wiki/Operations, its entry number 
 
 Keyboard: Up/Down moves the highlight without leaving the field, Enter opens, Ctrl/Cmd+Enter opens in a new tab, Escape closes (the × in the field clears just the text).
 
-Journal entries, Wiki articles, Operations and Altars open directly. Tasks and tags have no page of their own: opening one goes to the Tasks or Tags list, scrolls the row into view and marks it for as long as it is the row you navigated to. Opening a task also clears any search, filter or collapsed category that would hide it, and expands its parent tasks if it is a subtask. An altar library item opens the Altar dashboard.
+Journal entries, Wiki articles and Operations open directly. Tasks and tags have no page of their own: opening one goes to the Tasks or Tags list, scrolls the row into view and marks it for as long as it is the row you navigated to. Opening a task also clears any search, filter or collapsed category that would hide it, and expands its parent tasks if it is a subtask.
 
 There is no keyboard shortcut to open the search. Templates and your own blocks are not searched — they are libraries you insert from, not entries you open.
 
@@ -270,20 +209,20 @@ There is no keyboard shortcut to open the search. Templates and your own blocks 
 
 Emerald has browser-like tabs, so you can keep several things open at once — for example writing a journal entry while referencing a wiki article and an active operation. You can:
 
-- Open entries, altars and any other view in tabs, and switch between them.
+- Open entries and any other view in tabs, and switch between them.
 - Close tabs individually, or with a middle-click on the tab.
 - Drag tabs left/right to reorder them.
 - Scroll the mouse wheel over the tab bar once more tabs are open than fit.
 - Open an entry in a new tab with middle-click.
 - Create a new empty tab from the tab bar.
 - Reopen the app and continue with the same tabs in the same order.
-- Use Back/Forward per tab — every tab has its own history. The mouse's back and forward buttons (and a keyboard's browser back/forward keys) do the same as the two arrows in the title bar; while a dialog is open, or while an altar fills the whole window, they do nothing. Back or Forward at the end of the history does nothing, and does not ask about unsaved changes.
+- Use Back/Forward per tab — every tab has its own history. The mouse's back and forward buttons (and a keyboard's browser back/forward keys) do the same as the two arrows in the title bar; while a dialog is open, they do nothing. Back or Forward at the end of the history does nothing, and does not ask about unsaved changes.
 
 Opening an item in a new tab (middle-click, "Open in new tab", Ctrl/Cmd+Enter in the search) always makes a new tab, even if the item is open elsewhere.
 
 **What Emerald remembers.** Two kinds of things, with one rule each:
 
-- **Preferences stay, per vault** — how each list looks (view, sort, grouping), the Home sections, which groups and sections are collapsed, the Altar preview and library order, Tasks' "Show completed". A vault opened for the first time starts from the defaults.
+- **Preferences stay, per vault** — how each list looks (view, sort, grouping), the Home sections, which groups and sections are collapsed, Tasks' "Show completed". A vault opened for the first time starts from the defaults.
 - **Working state lasts for the session** — searches, filters and the Trash selection. Switching to another module and back finds them as you left them; a restart, a vault switch or restoring a backup starts clean.
 
 The window layout — open tabs, which sidebars are open, their widths — belongs to the app rather than to a vault; settings live in the vault (see [Settings](#settings)).
@@ -308,7 +247,7 @@ Routines from older vaults and `.emeralddb` backups are converted into templates
 
 ## Tasks
 
-The Tasks module is a hierarchical task manager with categories, priorities, and links to any entry, task or altar.
+The Tasks module is a hierarchical task manager with categories, priorities, and links to any entry or task.
 
 **Categories.** Tasks use the shared category list — see [Categories](#categories). None is built in on the Tasks side. Category headers show the emoji, name and a task count.
 
@@ -316,7 +255,7 @@ The Tasks module is a hierarchical task manager with categories, priorities, and
 
 **Priorities.** Low, Medium or High, shown as a coloured flag (green, yellow, red) and changed from a dropdown on each row.
 
-**Links.** A task can link to journal entries, wiki articles, operations, other tasks and altars — the same link picker the editor uses. Linked entries show as clickable chips on the row. A link whose target was deleted for good reads "Deleted".
+**Links.** A task can link to journal entries, wiki articles, operations (altars included) and other tasks — the same link picker the editor uses. Linked entries show as clickable chips on the row. A link whose target was deleted for good reads "Deleted".
 
 **Toolbar.** Search, a sort ("Created · newest/oldest", "Name · A → Z/Z → A") and a separate Grouping switch (by category, or ungrouped). Only the List view is available.
 
@@ -332,24 +271,24 @@ The Tasks module is a hierarchical task manager with categories, priorities, and
 
 ## Images
 
-"Images" in the left rail, next to Categories and Tags, is the vault's place for pictures: it shows every picture the vault stores, added here or in texts and fields — the picture is its own icon. Sigil drawings and altar backgrounds are not pictures of their own and stay out. **Add images** opens a dialog to drop files from the disk on (or click to choose them); each is prepared like any inserted image (limits, photo as JPEG) and named there, starting with the file's name, and tags can be given to all at once. Files dropped onto the view open the same dialog. A click on a picture edits its name, tags and note and lists where it is used — entries, templates, block defaults, each a click away. A right-click offers editing and deleting. The sidebar searches by name and note and filters by tag. Deleting moves a picture to the Trash, gone from the grid until it is restored. Where it is still shown in texts or image fields of entries and templates, it asks first — from the dialog and from the menu alike, looking at the places at that moment — and takes it out there too; restoring it, by Undo or from the Trash, puts it back into every text that has not changed since. A picture used nowhere is deleted without a question, with Undo. Deleting it in the Trash for good removes its file too, unless something still uses it. The global search finds pictures by name and note and opens them here. Pictures can be dragged out of a tile onto whatever takes them, such as a canvas.
+"Images" in the left rail, next to Categories and Tags, is the vault's place for pictures: it shows every picture the vault stores, added here or in texts and fields — the picture is its own icon. Sigil drawings and canvas backgrounds are not pictures of their own and stay out. **Add images** opens a dialog to drop files from the disk on (or click to choose them); each is prepared like any inserted image (limits, photo as JPEG) and named there, starting with the file's name, and tags can be given to all at once. Files dropped onto the view open the same dialog. A click on a picture edits its name, tags and note and lists where it is used — entries, templates, block defaults, each a click away. A right-click offers editing and deleting. The sidebar searches by name and note and filters by tag. Deleting moves a picture to the Trash, gone from the grid until it is restored. Where it is still shown in texts or image fields of entries and templates, it asks first — from the dialog and from the menu alike, looking at the places at that moment — and takes it out there too; restoring it, by Undo or from the Trash, puts it back into every text that has not changed since. A picture used nowhere is deleted without a question, with Undo. Deleting it in the Trash for good removes its file too, unless something still uses it. The global search finds pictures by name and note and opens them here. Pictures can be dragged out of a tile onto whatever takes them, such as a canvas.
 
-**Canvas and Altar.** The block **Canvas** ("Add block") arranges pictures, shapes, text, symbols and drawings freely on an artboard, with the canvas editor's tools: handles, guides, groups, the element list, a background and undo. The picture button in its tool column opens the picture picker: pictures from "Images" or from the disk land in the middle of the canvas. The block **Altar** is the same canvas with "Images" below it while editing, two rows to scroll sideways and search: drag a picture onto the canvas, or click it to place it in the middle. Files dropped on either from the disk go into "Images" under their file name and onto the canvas where they were let go. In the sidebar a block's settings choose what it offers ("Images" below, shapes, text, symbols, drawing); switched off, nothing new of that kind is added, and what is on the canvas stays. Read mode shows the canvas as it is, an export its picture, made when editing ends. Taking a picture out of "Images" takes it off every canvas too. The field kind Altar is no longer offered for new fields.
+**Canvas and Altar.** The block **Canvas** ("Add block") arranges pictures, shapes, text, symbols and drawings freely on an artboard, with the canvas editor's tools: handles, guides, groups, the element list, a background and undo. The picture button in its tool column opens the picture picker: pictures from "Images" or from the disk land in the middle of the canvas. The block **Altar** is the same canvas with "Images" below it while editing, to search, filter by a tag and drag from (see [Altars](#altars)). Files dropped on either from the disk go into "Images" under their file name and onto the canvas where they were let go. In the sidebar a block's settings choose what it offers ("Images" below, shapes, text, symbols, drawing); switched off, nothing new of that kind is added, and what is on the canvas stays. Read mode shows the canvas as it is, an export its picture, made when editing ends. Taking a picture out of "Images" takes it off every canvas too.
 
 ## Categories
 
-One list of categories serves Wiki, Operations, Tasks and Altar items, and the Categories view in the left rail — next to Tags — is the one place it is managed. The four modules only *assign* a category to an entry and group their lists by it; none of them can create, rename or delete one.
+One list of categories serves Wiki, Operations and Tasks, and the Categories view in the left rail — next to Tags — is the one place it is managed. The three modules only *assign* a category to an entry and group their lists by it; none of them can create, rename or delete one.
 
 A fresh vault starts with eight ordinary categories in the app's language (Paradigm, Ritual, Meditation, Herbs, Crystals, Candles, Deities, Tools) plus the built-in **Sigils** and **Altars**: a new operation in Altars starts with an altar and a text for notes.
 
-Each row shows the category's emoji, its name, and how many entries in each module use it (Tasks, Operations, Wiki, Altar — the rail's order, with the module's icon as the column header). Only live entries count, not the Trash.
+Each row shows the category's emoji, its name, and how many entries in each module use it (Tasks, Operations, Wiki — the rail's order, with the module's icon as the column header). Only live entries count, not the Trash.
 
 From here you can:
 
 - **Add** a category with the header button — pick an emoji, type a name, Enter saves. A name already in use is refused with a message under the field; the name of a category in the Trash brings that one back instead (with the emoji you picked), together with its entries.
 - **Rename and change the emoji** inline, through Edit in the row's right-click menu; Enter saves, Escape cancels. The change shows everywhere immediately. Renaming to the name of a category in the Trash merges that one in — its entries and template assignments come along.
 - **Delete** without a question, undoable from the toast. A deleted category goes to the Trash; its entries keep pointing at it and appear under "Uncategorized" until it is restored (bringing them back) or deleted for good (leaving them uncategorized). If another category took its name meanwhile, restoring merges the two into the one with the name (a template keeps a default star only where the combination has none yet).
-- **Reorder** by dragging a row by its grip. This order is used everywhere — group headers, filter rows, the Altar tab strip, the category picker — and is saved immediately.
+- **Reorder** by dragging a row by its grip. This order is used everywhere — group headers, filter rows, the category picker — and is saved immediately.
 
 **Sigils** is the one built-in: it can't be renamed or deleted, since its name comes from the app's translations, and an operation inside it opens the sigil editor. It can still be dragged. Everything else, including the **Other** that older vaults carry, is an ordinary category. New categories go to the end of the list.
 
@@ -387,9 +326,7 @@ Multi-word entries match as a phrase ("I am" → ZIRDO), capitalisation carries 
 
 ## Trash
 
-Deleting a journal entry, wiki article, operation, task, altar or altar library item moves it to the Trash rather than removing it. Trashed items are kept for a period set per vault (Settings → Storage — 7/14/30/60/90 days or never; 30 by default) and purged when the vault opens once that period has passed — categories too, whose entries are then left without one. The Trash's "time left" note names that period, or is left out when purging is off.
-
-**Altars go to the Trash like everything else** — from the action bar, the dashboard card's context menu or the left list, with the same undo toast. Its placements stay with it, and restoring brings the arrangement back, except elements whose library item was deleted for good meanwhile. Links pointing at the altar keep pointing at it while it is in the Trash and are removed only when it is deleted for good. A library item in the Trash disappears from every altar and comes back to the same places when restored.
+Deleting a journal entry, wiki article, operation (an altar too), task or picture moves it to the Trash rather than removing it. Trashed items are kept for a period set per vault (Settings → Storage — 7/14/30/60/90 days or never; 30 by default) and purged when the vault opens once that period has passed — categories too, whose entries are then left without one. The Trash's "time left" note names that period, or is left out when purging is off.
 
 From the Trash view you can:
 
@@ -461,7 +398,7 @@ Every vault is encrypted: entries, images, drafts and backups are unreadable wit
 
 ## Export and Import
 
-All export and import actions are in the application menu — on macOS the native menu bar, on Windows and Linux the app's own title bar, with the same items and rules. The menu stays available in the altar's full-window mode, where image export is most often wanted.
+All export and import actions are in the application menu — on macOS the native menu bar, on Windows and Linux the app's own title bar, with the same items and rules.
 
 > **Exports show an entry the way read mode does.** Markdown and PDF render each block on its own: hidden blocks are left out, field blocks list only the fields read mode shows (label and value), block titles appear as headings where read mode shows them, and a sigil exports its intention and letters, its drawing (in Markdown a placeholder) and its charge. While a sigil is charged and its reveal date not reached, calculator and drawing are left out of every export, `.emerald` included. Import is unaffected.
 
@@ -469,15 +406,7 @@ All export and import actions are in the application menu — on macOS the nativ
 
 A native save dialog asks for the destination and the PDF is written directly — no preview and no print dialog. It is rendered by the app's own webview, so emoji come out as proper colour glyphs. The suggested filename is `<Title>_YYYY-MM-DD.pdf`. Images are embedded; internal link chips appear as styled text.
 
-**Export → Export as PDF…** is available while a Journal / Wiki / Operations entry is open, or an Altar in **reading view** (not while editing it); it is disabled elsewhere (Home, Tags, Trash …). For an altar it exports the rendered altar instead (see below).
-
-### Altar PDF Export
-
-With an altar open in reading view, **Export → Export as PDF…** renders it like the image export (full native resolution) and places it on a single PDF page. The page follows the altar's proportions — long edge 11", so a portrait altar gives a portrait page and a landscape altar a landscape page. This custom page size works on Windows; on macOS and Linux the PDF uses the platform's default page size. A dialog shows the saved path afterwards.
-
-### Altar Image Export
-
-**Export → Export as Image → JPEG… / PNG… / WebP…** renders the open altar at full native resolution into a file chosen in a native save dialog (suggested name `AltarTitle_YYYY-MM-DD.<ext>`). JPEG and WebP use high quality settings, PNG is lossless. It is enabled only while an altar is open in **reading view**; a dialog shows the saved path afterwards.
+**Export → Export as PDF…** is available while a Journal / Wiki / Operations entry is open, an altar included; it is disabled elsewhere (Home, Tags, Trash …).
 
 ### Markdown Export
 
@@ -485,37 +414,33 @@ Saves a `.md` file: the `# Title`, a header with type, date, moon phase (when sh
 
 ### Emerald Format
 
-The Emerald format (`.emerald`) is a JSON file holding a full entry — or a full altar — with all metadata and embedded images, for lossless transfer between Emerald installations. **Export → Export as Emerald…** is enabled while a Journal / Wiki / Operations entry or a template's page is open, or an Altar in reading view, and exports whichever is active. **Import → From Emerald…** handles every type; the type is read from the file.
+The Emerald format (`.emerald`) is a JSON file holding a full entry with all metadata and embedded images, for lossless transfer between Emerald installations. **Export → Export as Emerald…** is enabled while a Journal / Wiki / Operations entry (an altar too) or a template's page is open, and exports whichever is active. **Import → From Emerald…** handles every type; the type is read from the file.
 
 ```json
 {
   "version": "1",
-  "type": "journal | wiki | operations | altar",
+  "type": "journal | wiki | operations",
   "title": "…",
   "createdAt": "ISO 8601",
-  "content": "HTML string (empty for altars)",
+  "content": "HTML string",
   "images": { "/absolute/path/to/image.png": "data:image/png;base64,…" },
   "meta": { … }
 }
 ```
 
-**Entries.** On import, images are saved into the vault's image folder (an identical image is stored once) and go through the vault's image limits like inserted ones (an image that stays too large, or can't be scaled, is kept as it is). The content is sanitised, links are resolved by id and then by title, and tags are added to the vault. An entry or altar keeps the file's `createdAt` as both creation and "last changed" date, so it lands at its place in the timeline — provided it is a readable date with a four-digit year; otherwise it is created now. Old English default titles import as empty, and fields this version doesn't use are ignored.
+**Entries.** On import, images are saved into the vault's image folder (an identical image is stored once) and go through the vault's image limits like inserted ones (an image that stays too large, or can't be scaled, is kept as it is). The content is sanitised, links are resolved by id and then by title, and tags are added to the vault. An entry keeps the file's `createdAt` as both creation and "last changed" date, so it lands at its place in the timeline — provided it is a readable date with a four-digit year; otherwise it is created now. Old English default titles import as empty, and fields this version doesn't use are ignored.
 
 **Your own blocks.** An entry carries its copies of Blocks-view blocks in its content; the blocks themselves do not travel. An older file (`"version": "2"`) may still carry them in `meta.blockDefinitions`: import creates any missing one under its original id, and leaves an existing one (even in the Trash) as it is.
 
 **Templates** export from their page or the templates list's context menu as `"version": "3"`, `"type": "template"` — a combination used only for templates, so an older app rejects the file instead of mistaking it for an operation. It carries the template's blocks, images and Blocks-view blocks like an entry, plus its icon, the title new entries get, its tags and its assignments. A built-in category in an assignment travels by id (its name depends on the language); any other by name and emoji, created on import if nothing matches (at most 20 new categories per file, so a crafted file can't flood the list). Which template is a *default* never travels — importing never displaces a default the vault already has.
 
-**Altars.** The file carries the background (with its picture), grid and snapping settings, format, icon, thumbnail, the categories of the placed items (name and emoji), and every placed item with its name, emoji, category, note, image and placement (position, size, rotation, opacity, layer, locked/hidden). An imported background goes through the same 5 MB limit as an uploaded one. Import creates a new altar:
-
-- Categories not present locally (matched by name, ignoring case) are created first, so items land in the right category.
-- Items are matched against the library by name, category and image, reusing an existing item where possible — so re-importing a file, or importing into a vault that already has the same items, doesn't pile up duplicates, while items that only share a name but differ in artwork stay separate.
-- If the import fails partway, the new altar and any newly created items are rolled back, leaving no orphans in the library.
+**Altars from older versions.** A file with `"type": "altar"`, written before altars were operations, still imports: it becomes a new operation in Altars with an Altar block, converted like the altars of an older vault (see [Altars](#altars)). Its items with a picture go to "Images" (a picture already there keeps its name and details), the background picture goes through the same 5 MB limit as before, and the items' categories are left out. Links in an older entry file that point at an altar point at its operation.
 
 ### Import from Markdown
 
 Reads a Markdown file exported by Emerald (or with the same structure). The `# Title` line becomes the title, key-value lines before `---` are metadata (unknown keys are ignored), and the body below is converted to rich text. A Markdown import has no creation date and is created now. Older files that carry an operation's status, end date and version, or a journal entry's paradigm/banishing/meditation and linked operations/articles, in the header have them turned into the matching block or link blocks.
 
-**Destination confirmation.** The header's `type` decides where the entry goes. If it is `journal`, `wiki` or `operations`, the import proceeds directly; otherwise (Altar is not a valid destination) a dialog shows the detected title and asks for Journal, Wiki or Operations — cancelling aborts the import. `.emerald` files always carry a type, so they never ask.
+**Destination confirmation.** The header's `type` decides where the entry goes. If it is `journal`, `wiki` or `operations`, the import proceeds directly; otherwise a dialog shows the detected title and asks for Journal, Wiki or Operations — cancelling aborts the import. `.emerald` files always carry a type, so they never ask.
 
 ### Vault Backup (`.emeralddb`)
 
@@ -523,7 +448,7 @@ The whole vault can be backed up and restored as one self-contained file (`.emer
 
 **Export.**
 
-- A "What to include" chip row picks the content: Journal, Wiki, Operations, Altars, Tasks, Tags, Lexicon and Settings. Templates and your own blocks travel whenever Journal, Wiki or Operations is included.
+- A "What to include" chip row picks the content: Journal, Wiki, Operations (altars included), Tasks, Tags, Lexicon and Settings. Templates and your own blocks travel whenever Journal, Wiki or Operations is included.
 - The Settings chip (on by default) exports the vault's settings — fonts, sizes, trash retention, sidebar, emoji defaults, image limits, tag rule, automatic backup — independently of the content chips. Language and theme belong to the installation and are not part of it; the custom themes an older backup still carries join this installation's list when it is imported.
 - Optional from/to dates restrict entries to those created in that window (tags, categories, blocks, templates, languages and settings are not date-filtered).
 - Trashed items are left out unless **Include deleted** is ticked — tags included, since trashed entries carry their ids.
@@ -556,7 +481,7 @@ For the file structure and per-mode semantics, see [DB Backup / Restore (`.emera
 
 Images are written into the vault's own `images/` folder, named after a hash of their content, so the same picture added twice is stored once. Entries refer to them by filename alone, which keeps a vault folder portable.
 
-Wherever an image is added — the text, an image field, covers and icons, the altar, an import — a photo that arrives as PNG (a photo pasted from the clipboard, for instance) is stored as JPEG at full size, with no visible difference and about a fifth of the space. Screenshots, graphics and anything with transparency stay PNG. Settings → Entries → Images can switch this off and set a largest edge length and file size for inserted images. Backups and sigil drawings are stored as they are.
+Wherever an image is added — the text, an image field, covers and icons, a canvas, an import — a photo that arrives as PNG (a photo pasted from the clipboard, for instance) is stored as JPEG at full size, with no visible difference and about a fifth of the space. Screenshots, graphics and anything with transparency stay PNG. Settings → Entries → Images can switch this off and set a largest edge length and file size for inserted images. Backups and sigil drawings are stored as they are.
 
 A picture taken into [Images](#images) is never unused, wherever it appears. Nothing deletes an image automatically. **Settings → Storage → Unused images** scans on demand: *Scan* reports how many images nothing points at and how much space they take, *Remove* deletes exactly those. It is manual on purpose — an image just inserted but not yet saved would otherwise look unused.
 
@@ -564,7 +489,7 @@ A vault from before per-vault image folders has its images copied into its own f
 
 ## Image Upload Validation
 
-Every image upload accepts only **PNG**, **JPEG**, **GIF**, **WebP** and **SVG**; anything else is rejected before processing. This covers altar backgrounds, icons and library item images; icons and cover images of articles and operations; template and block icons; and images inserted into the editor via the toolbar, paste, or drag-and-drop from the file manager. Icons (of entries, templates, blocks and altars) refuse SVG on top of that.
+Every image upload accepts only **PNG**, **JPEG**, **GIF**, **WebP** and **SVG**; anything else is rejected before processing. This covers icons and cover images of articles and operations; template and block icons; and images inserted into the editor via the toolbar, paste, or drag-and-drop from the file manager. Icons (of entries, templates and blocks) refuse SVG on top of that.
 
 A rejected file from a file picker shows an inline error near the control, cleared after 2.5 seconds. When every file dragged into the editor has an unsupported format, a dialog lists the allowed formats instead of silently ignoring the drop.
 
@@ -617,7 +542,7 @@ The menu at the bottom left of the start page, a flag beside each name, switches
 Settings → General has two independent font controls:
 
 - **UI font** — the typeface of the application shell, sidebars, settings, lists and all other non-editor UI. Default: **Inter**.
-- **Editor body font** — the typeface of the editor body, entry titles, and the read-mode body of journal entries, wiki articles, operations and the altar view. Default: **Lora**.
+- **Editor body font** — the typeface of the editor body, entry titles, and the read-mode body of journal entries, wiki articles and operations. Default: **Lora**.
 
 Both offer the same eight typefaces: Inter, Source Sans 3, Nunito, IBM Plex Sans, Alegreya, Cormorant Garamond, Lora and Merriweather. They ship with the app (Latin and Latin Extended), so they look the same offline and nothing is fetched from the network. Serif fonts fall back to Georgia, sans-serif ones to Segoe UI / system-ui.
 
@@ -638,4 +563,4 @@ Emerald ships with two themes, selectable on the start page's **Appearance**. Li
 
 **Custom themes:** **Import theme** on the same page adds a theme file to this installation and selects it; pointing at one offers to remove it. It sets colours only; see [Custom Themes](themes.md).
 
-The whole UI, the Altar included, follows the chosen theme. For how themes are built and how to add one, see [Architecture → Theming System](architecture/appearance.md#theming-system).
+The whole UI, the canvas included, follows the chosen theme. For how themes are built and how to add one, see [Architecture → Theming System](architecture/appearance.md#theming-system).

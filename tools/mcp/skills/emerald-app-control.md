@@ -1,6 +1,6 @@
 ---
 name: emerald-app-control
-description: Drives the Emerald Tauri/journal app through the emerald-devtools MCP server Covers Journal, Wiki, Operations, Altar, Tasks, Tags, Trash, Settings, export, theme and language switching.
+description: Drives the Emerald Tauri/journal app through the emerald-devtools MCP server Covers Journal, Wiki, Operations (altars included), Tasks, Tags, Trash, Settings, export, theme and language switching.
 version: 1.0.0
 platforms: [windows, macos, linux]
 metadata:
@@ -182,7 +182,6 @@ document.querySelector('.left-sidebar-rail button:has(.lucide-book-open)').click
 | Tasks | `lucide-square-check-big` | `.left-sidebar-rail button:has(.lucide-square-check-big)` |
 | Operations | `lucide-wand-sparkles` | `.left-sidebar-rail button:has(.lucide-wand-sparkles)` |
 | Wiki | `lucide-library` | `.left-sidebar-rail button:has(.lucide-library)` |
-| Altar | `lucide-altar` | `.left-sidebar-rail button:has(.lucide-altar)` |
 | Tags | `lucide-tag` | `.left-sidebar-rail button:has(.lucide-tag)` |
 | Trash | `lucide-trash2` | `.left-sidebar-rail button:has(.lucide-trash2)` |
 | Settings | `lucide-settings` | `.left-sidebar-rail button:has(.lucide-settings)` |
@@ -293,7 +292,7 @@ await mcp.call_tool("eval", { expression: "[...document.querySelectorAll('button
 // Trash auto-deletes after 30 days
 ```
 
-### Creating Wiki / Operations / Altar / Tasks entries
+### Creating Wiki / Operations / Tasks entries
 
 **These views open the editor inline**: clicking "New..." opens the editor immediately.
 
@@ -304,7 +303,6 @@ await mcp.call_tool("eval", { expression: "[...document.querySelectorAll('button
 | **Journal** | `input[placeholder="Untitled Entry" i]` | click the "Done" button | `.ProseMirror` |
 | **Wiki** | `input[placeholder="Untitled Article" i]` | `input.entry-view-title.blur()` | `.ProseMirror` |
 | **Operations** | `input[placeholder="Untitled Operation" i]` | **right-click → "Rename"** (NOT blur!) | `.ProseMirror` + 2 textareas |
-| **Altar** | not verified yet | presumably like Journal | not verified |
 | **Tasks** | `input.bg-stone-800[type="text"]` (NO placeholder) | Enter + blur | tasks have no body |
 
 **Category options per area:**
@@ -459,22 +457,22 @@ Then check the UI via `eval`:
 ```js
 (async () => {
   const icons = ['book-open','square-check-big','wand-sparkles','library',
-                 'altar','tag','trash2','settings'];
+                 'tag','trash2','settings'];
   const missing = icons.filter(i =>
     !document.querySelector(`.left-sidebar-rail button:has(.lucide-${i})`));
   const view = () => document.querySelector('.app-main')?.innerText.trim().split('\n')[1] || '';
-  document.querySelector('.left-sidebar-rail button:has(.lucide-altar)').click();
+  document.querySelector('.left-sidebar-rail button:has(.lucide-wand-sparkles)').click();
   await new Promise(s => setTimeout(s, 700));
-  const altar = view();
+  const operations = view();
   document.querySelector('.left-sidebar-rail button:has(.lucide-book-open)').click();
   await new Promise(s => setTimeout(s, 700));
-  return { railSelectorsMissing: missing, navigatedTo: altar, backTo: view(),
+  return { railSelectorsMissing: missing, navigatedTo: operations, backTo: view(),
            newEntryBtn: !!document.querySelector('button[title="New Entry"]'),
-           pass: missing.length === 0 && altar.length > 0 };
+           pass: missing.length === 0 && operations.length > 0 };
 })()
 ```
 
-Expected: `railSelectorsMissing: []`, `navigatedTo: "Altar"`, `pass: true`.
+Expected: `railSelectorsMissing: []`, `navigatedTo: "Operations"`, `pass: true`.
 If `railSelectorsMissing` is not empty, the rail has changed — update this skill
 before running tests.
 

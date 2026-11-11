@@ -60,7 +60,7 @@ Where things go:
 - `Documentation/architecture.md` → the overview: tech stack, module map (one line per file,
   no prose), data flow, IPC surface
 - `Documentation/architecture/*.md` → patterns and decisions per area (modules, editing,
-  blocks, templates, navigation, altar, storage, encryption, appearance, shell — see the table at the top
+  blocks, editors, templates, navigation, storage, encryption, sync, appearance, shell — see the table at the top
   of `architecture.md`). A new area that fits none gets its own file plus a row in that table
 - `Documentation/components.md` → the shared building blocks and the rules for using them: a new entry in the catalogue with its extension point, a changed contract, a resolved or newly recorded duplication
 - `Documentation/design.md` → colour, typography, radius, icon sizes, heights/spacing, states — plus the traps and values in the appendix

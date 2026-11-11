@@ -28,8 +28,6 @@ The logo (`EmeraldMark`, an inline SVG) is not a control. Its wrapper carries `d
 
 Per-platform window settings live in `src-tauri/tauri.{windows,linux,macos}.conf.json`, which Tauri merges over `tauri.conf.json` — each repeats the complete window object, and `tauri.dev.conf.json` must never gain an `app.windows` key (why: [Per-platform Tauri configs](../build.md#per-platform-tauri-configs)). All four files set `minWidth` 720 and `minHeight` 600.
 
-**Altar full-window mode.** The predicate is `isAltarFullscreen` in `uiStore`, shared by `AppShell` (hides the sidebars) and `TitleBar` (drops tabs, navigation and the magnifier), so the two cannot drift apart. The title bar itself stays: on Windows and Linux it holds the only way to close or move the window, *and* the only route to the altar's image export, which is usually why that mode was entered — so the menu button and Export/Import stay. `TitleBar` closes the search modal itself when the magnifier disappears (entering full-window mode, or the last vault closing), rather than leaving it open with nothing to reopen it.
-
 **Dragging** uses `data-tauri-drag-region`. Tauri reads it off the element directly under the cursor and does **not** walk up the tree, so every non-interactive wrapper in `TitleBar` carries the attribute and no interactive control does. Double-clicking a drag region maximises.
 
 **Permissions** (`src-tauri/capabilities/default.json`): the window controls add `allow-start-dragging`, `allow-minimize`, `allow-toggle-maximize` and `allow-close` to `core:default`; `core:webview:allow-set-webview-zoom` backs the interface-size setting. See [`security.md`](../security.md).
@@ -99,9 +97,9 @@ The vault picker is the app's start page. `VaultPicker` is a view in the main wi
 
 Emerald renders PDFs by driving its own embedded webview rather than bundling an HTML-to-PDF engine. There is one module per platform, selected at compile time by `#[cfg(target_os = "…")]` in `src-tauri/src/pdf_export/mod.rs`, so `lib.rs` just calls `pdf_export::export_pdf(&app, html, path, page_size).await`.
 
-The command backs two flows, chosen by what is open (see [Menu enablement gating](#menu-enablement-gating)): Journal/Wiki/Operations entries export their text at the default Letter/Portrait size; an open Altar in reading view exports its rendered image at a page size matching the altar's aspect ratio, via the optional `page_size`.
+The command backs one flow: Journal/Wiki/Operations entries (see [Menu enablement gating](#menu-enablement-gating)) export their text at the default Letter/Portrait size. The command also takes an optional `page_size` in inches, which the frontend does not pass at present.
 
-### Flow — Journal / Wiki / Operations (entry text)
+### Flow — entry text
 
 ```
 frontend export.ts:exportAsPDF
@@ -117,22 +115,6 @@ src-tauri/src/pdf_export/{windows,macos,linux}.rs
     ↓  with_webview(...) → call platform's native PDF API
     ↓  close the hidden window + remove the temp file
     ↓  return Result<(), String> → frontend toasts success/failure
-```
-
-### Flow — Altar (rendered image)
-
-```
-frontend altarExport.ts:saveAltarPDF
-    ↓  exportCurrentAltarImage('png')  // same capture path as "Export as Image"
-    ↓  pdfPageSizeForResolution(resolution) → [widthIn, heightIn]
-    ↓  build minimal HTML: single <img> filling the page (object-fit: cover, 2% overscan
-    ↓    to hide a rounding-induced hairline gap at some aspect ratios)
-frontend save() dialog → user picks destination path
-    ↓  invoke('export_pdf', { html, path, pageSize: [widthIn, heightIn] })
-src-tauri/src/lib.rs:export_pdf
-    ↓  pdf_export::export_pdf(&app, html, path, Some((widthIn, heightIn))).await
-    ↓  (same hidden-webview flow as above; Windows applies page_size as a
-    ↓   custom print media size, macOS/Linux currently ignore it — see below)
 ```
 
 All three platforms share that shape, with a 30 s page-load and a 120 s print timeout and cleanup in a guard. The temp file holds the entry in plain text outside the vault, so `TempHtml` owns it: readable by its user only on Unix, never logged by path, deleted when dropped however the export ends, and `sweep_leftovers` removes `emerald-export-*.html` older than an hour at startup (see [`encryption.md`](encryption.md#leftovers-outside-the-vault)). The platforms differ only in the native API and in whether `page_size` is honoured.
@@ -163,16 +145,13 @@ The three "Export as …" items (`export-pdf`, `export-markdown`, `export-emeral
 | Item | Enabled for |
 |---|---|
 | `export-markdown` | an open Journal/Wiki/Operations entry |
-| `export-pdf` | an entry, or an altar in reading view |
-| `export-emerald` | an entry, an altar in reading view, or an open template page |
-| `export-altar-image` submenu | an altar in reading view |
+| `export-pdf` | an open Journal/Wiki/Operations entry (an altar is an operation) |
+| `export-emerald` | an entry, or an open template page |
 
 
-There is one item per format, not one per content type: the handlers branch on what is open. `export-pdf` re-reads `useUIStore.getState().activeView` at click time and calls `saveAltarPDF()` (`src/lib/altarExport.ts`) for an altar in reading view, `exportAsPDF(data)` otherwise. `exportAsEmerald()` (`src/lib/emeraldFormat.ts`) branches the same way.
+There is one item per format, not one per content type: the handlers branch on what is open. `exportAsEmerald()` (`src/lib/emeraldFormat.ts`) re-reads `useUIStore.getState().activeView` at click time and writes an entry or a template.
 
 **Blocks export through their own serializers, so there is no concealed-sigil gate.** `collectExportData` runs `renderBlocksForExport` (`lib/blocks/exportRender.ts`, pure, texts passed in as `ExportText`): one serializer per block type, by the read-mode rules — hidden blocks and a concealed sigil's calculator and drawing are left out, field blocks list only what `isHiddenInRead` lets through, titles become `<h3>` where `showsTitleInRead` says so, unknown types go out as their stored inner HTML. The result is plain HTML without `<section>`, so DOMPurify, `embedImages`, the link-chip transform and Turndown work unchanged (Turndown has rules for `<dt>`/`<dd>`; `stripImages` keeps a block image's alt text as a placeholder). The `.emerald` export keeps blocks as stored, hidden ones flagged, but drops concealed ones via `withoutConcealed`.
-
-**Altar "Export as Image" submenu.** The title bar's Export menu holds `export-altar-jpeg`/`-png`/`-webp`; each reaches `runMenuAction`, which calls `saveAltarImage(format)` (`src/lib/altarExport.ts`).
 
 ### Bridging imperative menu-event code to a React modal
 

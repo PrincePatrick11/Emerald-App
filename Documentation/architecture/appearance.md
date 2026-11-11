@@ -81,7 +81,7 @@ async function applyAppearance(appearance: AppearanceSettings) {
 
 Many components use Tailwind utilities with hardcoded stone/jade colours, so `src/index.css` has a large bridge section that overrides those classes under each `html[data-theme='…']` selector (`.bg-stone-900`, `.text-stone-100`, `.border-stone-700`, …). Both themes need it — Noctis for jade accent adjustments and component refinements, Parchment for the full light-mode mapping.
 
-The Parchment bridge is organised into feature-scoped comment blocks at the end of `src/index.css`. The Altar block covers the sidebar control buttons, danger buttons (mapped to `--danger-*`), the jade CTA/fullscreen buttons, the slider track, the format-picker hover, the `AltarReadingSummary` preview background, the `from-stone-900` fade overlays, and `.altar-cat-scroll-fade` (wider, `3.5rem`, in Parchment). New Altar controls with hardcoded Tailwind classes add their overrides to that block rather than scattering them through the file.
+The Parchment bridge is organised into feature-scoped comment blocks at the end of `src/index.css`. New controls with hardcoded Tailwind classes add their overrides to the block of their feature rather than scattering them through the file.
 
 ### Adding a new theme
 
@@ -94,7 +94,7 @@ The Parchment bridge is organised into feature-scoped comment blocks at the end 
 
 ### Shared style constants
 
-Repeated Tailwind class chains go into **`src/lib/styleClasses.ts`** (currently `OP_PROP_SELECT_CLASSES`) — extend it rather than copying a chain again (see [`components.md`](../components.md)). The altar's background presets, defaults and resolution helpers live in **`src/lib/altarConstants.ts`**, described under [Altar constants](altar.md#altar-constants).
+Repeated Tailwind class chains go into **`src/lib/styleClasses.ts`** (currently `OP_PROP_SELECT_CLASSES`) — extend it rather than copying a chain again (see [`components.md`](../components.md)).
 
 ## Font System
 

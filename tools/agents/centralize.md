@@ -35,7 +35,7 @@ Where shared code lives in Emerald:
 
 - `src/components/sidebar/fields/` — shared property-panel building blocks reused across the per-module panels.
 
-- `src/lib/` — shared logic: `styleClasses.ts` (the established home for a repeated Tailwind chain — extend it rather than copying the chain again), `platform.ts` (the only permitted source of platform detection), `tabs.ts`, `helpers.ts`, `altarConstants.ts`.
+- `src/lib/` — shared logic: `styleClasses.ts` (the established home for a repeated Tailwind chain — extend it rather than copying the chain again), `platform.ts` (the only permitted source of platform detection), `tabs.ts`, `helpers.ts`.
 
 - `src/hooks/` — shared behaviour, for example `useDraftPage` and `useGlobalSearch`.
 
