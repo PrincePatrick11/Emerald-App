@@ -1,7 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Search } from 'lucide-react';
-import { Trash2 } from 'lucide-react';
+import { Search, Trash2 } from 'lucide-react';
 import { SYMBOL_PACKS, type SymbolDef } from './packs';
 import { OWN_PACK, useSymbolLibrary } from './library';
 
