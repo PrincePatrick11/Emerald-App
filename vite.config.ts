@@ -1,5 +1,7 @@
 import { defineConfig, type Plugin } from "vite";
 import react from "@vitejs/plugin-react";
+// @ts-expect-error node builtin; the project has no @types/node
+import { execFileSync } from "node:child_process";
 
 // @ts-expect-error process is a nodejs global
 const host = process.env.TAURI_DEV_HOST;
@@ -17,9 +19,32 @@ function stripCrossOrigin(): Plugin {
   };
 }
 
+// The branch an MCP test instance was started from, shown in its title bar so
+// a window can be told apart from the others. The MCP launcher
+// (tools/mcp/launcher.py) sets EMERALD_MCP_APP_DATA for every instance it
+// starts; any other dev run and every release build get an empty string.
+// @ts-expect-error process is a nodejs global
+const mcpInstance = Boolean(process.env.EMERALD_MCP_APP_DATA);
+
+function instanceBranch(): string {
+  if (!mcpInstance) return "";
+  // Vite runs in the checkout, so git answers for it.
+  const git = (...args: string[]): string =>
+    execFileSync("git", args, { encoding: "utf-8", stdio: ["ignore", "pipe", "ignore"] }).trim();
+  try {
+    const branch = git("rev-parse", "--abbrev-ref", "HEAD");
+    return branch === "HEAD" ? git("rev-parse", "--short", "HEAD") : branch;
+  } catch {
+    return "";
+  }
+}
+
 // https://vite.dev/config/
 export default defineConfig(async () => ({
   plugins: [react(), stripCrossOrigin()],
+  define: {
+    "import.meta.env.VITE_EMERALD_INSTANCE_BRANCH": JSON.stringify(instanceBranch()),
+  },
   build: {
     rollupOptions: {
       output: {
