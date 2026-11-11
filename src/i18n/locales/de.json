@@ -915,7 +915,9 @@
     "searchPlaceholder": "Bilder durchsuchen …",
     "noMatch": "Kein Bild passt.",
     "pickEmpty": "Noch keine Bilder – nimm welche von der Festplatte oder zieh sie hierher.",
-    "stripEmpty": "Noch keine Bilder – zieh Dateien auf die Leinwand, um welche hinzuzufügen."
+    "stripEmpty": "Noch keine Bilder – zieh Dateien auf die Leinwand, um welche hinzuzufügen.",
+    "allTags": "Alle Tags",
+    "clearTag": "Alle Tags zeigen"
   },
   "tags": {
     "new": "Neuer Tag",

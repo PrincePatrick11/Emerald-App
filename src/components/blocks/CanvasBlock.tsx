@@ -22,7 +22,10 @@ import { pickPictures, useImagePickerStore } from '../../store/imagePickerStore'
 import { removeUnusedFiles, useImageStore } from '../../store/imageStore';
 import { getDb } from '../../lib/db';
 import { reportImageError, useImageNoticeStore } from '../../store/imageNoticeStore';
+import { useSessionState } from '../../store/sessionStore';
+import { useTagStore } from '../../store/tagStore';
 import ImageStrip from '../images/ImageStrip';
+import AddImagesModal from '../images/AddImagesModal';
 import type { BlockViewProps } from './blockViews';
 
 // The replaced render is looked at once the entry has been saved.
@@ -269,11 +272,24 @@ export default function CanvasBlock({ block, isEditing, onBlockChange, onPersist
     };
   }, [editable, dragItem, pointOnArtboard, place]);
 
+  // The strip's tag, per block for the session ('' for all; a tag gone
+  // since counts as none). Pictures added here carry it.
+  const [stripTag, setStripTag] = useSessionState(`canvas.stripTag.${block.id}`, '');
+  const tagLive = useTagStore((s) => s.tags.some((x) => x.id === stripTag));
+  const activeTag = parts.images && tagLive ? stripTag : '';
+  const [adding, setAdding] = useState(false);
+  const [dropped, setDropped] = useState<string[]>([]);
+
   // Files from the disk let go over the canvas: into "Images", under their
-  // file name, and onto the canvas where they were let go, side by side.
-  // The text editors around leave them alone (`data-file-drop`).
+  // file name (with the strip's tag), and onto the canvas where they were
+  // let go, side by side. The text editors around leave them alone
+  // (`data-file-drop`). While the strip's add dialog is open, they go there.
   const pickerOpen = useImagePickerStore((s) => !!s.request);
-  useFileDrop(editable && !pickerOpen, (paths, point) => {
+  const { dragOver } = useFileDrop(editable && !pickerOpen, (paths, point) => {
+    if (adding) {
+      setDropped((list) => [...list, ...paths]);
+      return;
+    }
     const over = document.elementFromPoint(point.x, point.y);
     if (!over || !rootRef.current?.contains(over)) return;
     const at = pointOnArtboard(point.x, point.y) ?? editorRef.current?.visibleCentre();
@@ -285,7 +301,10 @@ export default function CanvasBlock({ block, isEditing, onBlockChange, onPersist
       for (const path of images) {
         try {
           const file = await storeImageFromPath(path);
-          await useImageStore.getState().saveDetails(file, { name: fileBaseName(path) });
+          const store = useImageStore.getState();
+          const had = store.images.find((image) => image.file === file)?.tags ?? [];
+          const tags = activeTag && !had.includes(activeTag) ? [...had, activeTag] : undefined;
+          await store.saveDetails(file, { name: fileBaseName(path), ...(tags ? { tags } : {}) });
           await place(file, { x: at.x + offset, y: at.y + offset });
           offset += 32;
         } catch (e) {
@@ -344,10 +363,23 @@ export default function CanvasBlock({ block, isEditing, onBlockChange, onPersist
         />
       </div>
       {editable && parts.images && (
-        <ImageStrip onPick={(item) => {
-          const centre = editorRef.current?.visibleCentre();
-          if (centre) void place(item.file, centre);
-        }} />
+        <ImageStrip
+          tag={activeTag}
+          onTagChange={setStripTag}
+          onAdd={() => setAdding(true)}
+          onPick={(item) => {
+            const centre = editorRef.current?.visibleCentre();
+            if (centre) void place(item.file, centre);
+          }}
+        />
+      )}
+      {adding && (
+        <AddImagesModal
+          dropped={dropped}
+          dragOver={dragOver}
+          initialTags={activeTag ? [activeTag] : []}
+          onClose={() => { setAdding(false); setDropped([]); }}
+        />
       )}
     </div>
   );

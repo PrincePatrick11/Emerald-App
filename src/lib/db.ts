@@ -1507,7 +1507,7 @@ export const MIGRATIONS: Migration[] = [
         const [last] = await db.select<{ n: number }[]>('SELECT COALESCE(MAX(sort_order), -1) + 1 AS n FROM categories');
         await db.execute(
           'INSERT INTO categories (id, name, emoji, sort_order, is_builtin) VALUES ($1,$2,$3,$4,1)',
-          [ALTAR_CATEGORY_ID, 'Altars', '🛐', last?.n ?? 0],
+          [ALTAR_CATEGORY_ID, 'Altars', '🪔', last?.n ?? 0],
         );
       }
       await seedAltarTemplate(db, i18n.t);

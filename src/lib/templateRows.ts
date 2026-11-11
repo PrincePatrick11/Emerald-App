@@ -86,7 +86,7 @@ export async function seedAltarTemplate(db: Database, t: TFunction): Promise<voi
   await insertTemplateRow(db, {
     id: ALTAR_TEMPLATE_ID,
     name: translatedOr(t, 'templates.builtin.altar', 'Altar'),
-    icon: '🛐',
+    icon: '🪔',
     title: '',
     content: serializeBlocks(altarBlockSet()),
     tags: [],

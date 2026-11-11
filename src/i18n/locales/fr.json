@@ -915,7 +915,9 @@
     "searchPlaceholder": "Rechercher des images …",
     "noMatch": "Aucune image ne correspond.",
     "pickEmpty": "Pas encore d’images – prenez-en sur le disque ou déposez-les ici.",
-    "stripEmpty": "Pas encore d’images – déposez des fichiers sur la toile pour en ajouter."
+    "stripEmpty": "Pas encore d’images – déposez des fichiers sur la toile pour en ajouter.",
+    "allTags": "Toutes les étiquettes",
+    "clearTag": "Afficher toutes les étiquettes"
   },
   "tags": {
     "new": "Nouvelle étiquette",

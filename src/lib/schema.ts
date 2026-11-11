@@ -439,7 +439,7 @@ export const ALTAR_CATEGORY_ID = 'altars';
  */
 export const BUILTIN_CATEGORIES: readonly [string, string, string][] = [
   [SIGIL_CATEGORY_ID, 'Sigils', '🔯'],
-  [ALTAR_CATEGORY_ID, 'Altars', '🛐'],
+  [ALTAR_CATEGORY_ID, 'Altars', '🪔'],
 ];
 
 /**

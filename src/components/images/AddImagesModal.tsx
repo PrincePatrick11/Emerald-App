@@ -25,15 +25,17 @@ interface Staged {
  * left out with Cancel stays unreferenced and goes with the next cleanup.
  * Files dropped onto the view open the dialog with them (`dropped`).
  */
-export default function AddImagesModal({ dropped, dragOver, onClose }: {
+export default function AddImagesModal({ dropped, dragOver, initialTags, onClose }: {
   /** Paths dropped from the disk, taken in as they arrive. */
   dropped: string[];
   dragOver: boolean;
+  /** Tags the new pictures start with (the tag a canvas' strip shows). */
+  initialTags?: string[];
   onClose: () => void;
 }) {
   const { t } = useTranslation();
   const [staged, setStaged] = useState<Staged[]>([]);
-  const [tags, setTags] = useState<string[]>([]);
+  const [tags, setTags] = useState<string[]>(() => initialTags ?? []);
   const [busy, setBusy] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -107,34 +109,34 @@ export default function AddImagesModal({ dropped, dragOver, onClose }: {
         onChange={(e) => { choose(e.target.files); e.target.value = ''; }}
       />
       {staged.length > 0 && (
-        <>
-          <ul className="image-staged-list">
-            {staged.map((item) => (
-              <li key={item.file} className="image-staged-row">
-                <img src={imageSrc(item.file)} alt="" draggable={false} />
-                <input
-                  value={item.name}
-                  onChange={(e) => setStaged((list) => list.map((s) => (s.file === item.file ? { ...s, name: e.target.value } : s)))}
-                  placeholder={t('images.name')}
-                  className={`${OP_PROP_SELECT_CLASSES} selectable flex-1`}
-                />
-                <Button
-                  tone="neutral"
-                  compact
-                  title={t('images.leaveOut')}
-                  aria-label={t('images.leaveOut')}
-                  onClick={() => setStaged((list) => list.filter((s) => s.file !== item.file))}
-                >
-                  <X size={14} />
-                </Button>
-              </li>
-            ))}
-          </ul>
-          <div>
-            <p className="label-xs mb-1">{t('images.tagsForAll')}</p>
-            <TagInput tags={tags} onChange={setTags} flush />
-          </div>
-        </>
+        <ul className="image-staged-list">
+          {staged.map((item) => (
+            <li key={item.file} className="image-staged-row">
+              <img src={imageSrc(item.file)} alt="" draggable={false} />
+              <input
+                value={item.name}
+                onChange={(e) => setStaged((list) => list.map((s) => (s.file === item.file ? { ...s, name: e.target.value } : s)))}
+                placeholder={t('images.name')}
+                className={`${OP_PROP_SELECT_CLASSES} selectable flex-1`}
+              />
+              <Button
+                tone="neutral"
+                compact
+                title={t('images.leaveOut')}
+                aria-label={t('images.leaveOut')}
+                onClick={() => setStaged((list) => list.filter((s) => s.file !== item.file))}
+              >
+                <X size={14} />
+              </Button>
+            </li>
+          ))}
+        </ul>
+      )}
+      {(staged.length > 0 || !!initialTags?.length) && (
+        <div>
+          <p className="label-xs mb-1">{t('images.tagsForAll')}</p>
+          <TagInput tags={tags} onChange={setTags} flush />
+        </div>
       )}
     </Modal>
   );

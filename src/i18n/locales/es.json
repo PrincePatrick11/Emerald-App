@@ -915,7 +915,9 @@
     "searchPlaceholder": "Buscar imágenes …",
     "noMatch": "Ninguna imagen coincide.",
     "pickEmpty": "Aún no hay imágenes: toma algunas del disco o suéltalas aquí.",
-    "stripEmpty": "Aún no hay imágenes: suelta archivos en el lienzo para añadirlas."
+    "stripEmpty": "Aún no hay imágenes: suelta archivos en el lienzo para añadirlas.",
+    "allTags": "Todas las etiquetas",
+    "clearTag": "Mostrar todas las etiquetas"
   },
   "tags": {
     "new": "Nueva etiqueta",

@@ -915,7 +915,9 @@
     "searchPlaceholder": "Search images …",
     "noMatch": "No image matches.",
     "pickEmpty": "No images yet – take some from the disk, or drop them here.",
-    "stripEmpty": "No images yet – drop files on the canvas to add some."
+    "stripEmpty": "No images yet – drop files on the canvas to add some.",
+    "allTags": "All tags",
+    "clearTag": "Show all tags"
   },
   "tags": {
     "new": "New tag",
