@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ArrowLeft, ArrowRight, Download, Menu, Search, Upload } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Download, GitBranch, Menu, Search, Upload } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { selectActiveHistory, useUIStore } from '../../../store/uiStore';
 import { hasActiveVault, useVaultStore } from '../../../store/vaultStore';
@@ -12,6 +12,8 @@ import TitleBarMenuButton from './TitleBarMenuButton';
 import { useTitleBarMenus } from './useTitleBarMenus';
 import SearchModal from './SearchModal';
 import WindowControls from './WindowControls';
+
+const INSTANCE_BRANCH = import.meta.env.VITE_EMERALD_INSTANCE_BRANCH;
 
 interface Props {
   tabs?: boolean;
@@ -161,6 +163,19 @@ export default function TitleBar({ tabs = false, leadWidth = 0, animate = true, 
       {/* `ml-auto` keeps the window controls at the right edge even when
           the tab bar renders nothing for lack of tabs. */}
       <div data-tauri-drag-region className="ml-auto flex items-center justify-end h-full flex-shrink-0">
+        {/* Only in an MCP test instance: which branch this window runs, so
+            several of them can be told apart. Part of the drag region;
+            `titlebar-branch` is the selector for repro steps. */}
+        {INSTANCE_BRANCH && (
+          <div
+            data-tauri-drag-region
+            title={INSTANCE_BRANCH}
+            className="titlebar-branch flex items-center gap-1 h-full px-2 text-xs text-subtle"
+          >
+            <GitBranch size={12} className="flex-shrink-0 pointer-events-none" />
+            <span className="truncate max-w-[12rem] pointer-events-none">{INSTANCE_BRANCH}</span>
+          </div>
+        )}
         {usesCustomWindowControls && <WindowControls />}
       </div>
 

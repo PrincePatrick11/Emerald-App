@@ -14,8 +14,13 @@
     "link chip via the app's own internalLinkChipHtml(), so the markup cannot",
     "drift from the editor extension.",
     "",
-    "Every soft-deletable table carries exactly one deleted row so the trash is",
-    "testable without having to delete something first."
+    "Ids are written readable (seed-wiki-sigil) and become stable UUIDs at build",
+    "time, everywhere they occur: the app only follows links to UUIDs. Write a",
+    "new row's id as seed-<something> and reference it by that name.",
+    "",
+    "Entries of every module, tags, categories and tasks carry one deleted row each so the trash is",
+    "testable without having to delete something first. Their deleted_at is moved",
+    "to about a day before the build, so the trash retention does not purge them."
   ],
 
   "categories": [

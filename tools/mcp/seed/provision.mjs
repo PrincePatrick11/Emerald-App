@@ -60,6 +60,11 @@ async function provision(opts) {
 
   const vaultId = opts['vault-id'];
   const vaultDir = join(appData, 'vaults', vaultId);
+  // A rebuild starts from an empty folder: the app has encrypted the old seed
+  // and left its vault.key and settings.json next to it, which would not fit
+  // the fresh plain database. Throws on purpose if it cannot: a half-cleared
+  // folder must not be seeded.
+  if (opts.force) rmSync(vaultDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
   mkdirSync(join(vaultDir, 'images'), { recursive: true });
   // The fixture's pictures, under the names its rows give them.
   for (const file of seedImageFiles()) copyFileSync(file.source, join(vaultDir, 'images', file.name));

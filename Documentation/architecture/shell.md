@@ -7,7 +7,7 @@ The title bar is drawn by the app, not the OS: a 40px bar (`h-10`) in `src/compo
 - **Leading group** (`flex-shrink-0`): the Emerald logo and the application menu button (neither on macOS, which has the traffic lights and its native menu), the global-search magnifier, back/forward, and the Export and Import buttons. With tabs shown it grows to the left sidebar's width, so the tabs start flush with the sheet below.
 - **Middle**: the tab strip (`TabBar`, see [Tabs and Workspace State](navigation.md#tabs-and-workspace-state)), or — without tabs (vault picker, boot still running) — an empty `flex-1` drag surface.
 
-- **Trailing group**: the window controls on Windows/Linux.
+- **Trailing group**: the window controls on Windows/Linux. In an [MCP test instance](../mcp.md#the-instance) they are preceded by the branch of its checkout (`titlebar-branch`); everywhere else that label is compiled out.
 
 Over the [vault picker](#vault-picker) (`TitleBar picker`) the bar keeps only the logo and the window controls (on macOS only the traffic lights), without Export, Import or the menu, and `WindowControls` drops maximise: the picker's window has one fixed size.
 

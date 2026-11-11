@@ -34,7 +34,7 @@ import { serialKey, serialized } from './serialize';
 import { viewTypeForEntryType } from './modules';
 import { parseDefinitionElements, remapDefinitionDefaults } from './blocks/definitions';
 import { hasOwnTitle } from './entryTitle';
-import { carryBaseline, originOfEdit, retypeBaselineLinks, type BaselineFields, type EditOrigin } from '../store/entryEdit';
+import { carryBaseline, originOfEdit, pendingEntryWrites, retypeBaselineLinks, type BaselineFields, type EditOrigin } from '../store/entryEdit';
 import { useBlockDraftStore, useTemplateDraftStore } from '../store/draftStore';
 import { mapEntries, useEntryStore, withAddedEntry, withSortedEntry, withoutIds } from '../store/entryStore';
 import { useTaskStore } from '../store/taskStore';
@@ -132,6 +132,9 @@ export async function changeEntryType(id: string, from: ConvertibleEntryType, to
   // that is about to be torn down, and after the change they would act on a pair of
   // type and id that no longer exists.
   await withEditLock(async () => {
+    // An icon still being shrunk belongs to the edit before the change: it
+    // lands first, and a change to the journal then drops it like any icon.
+    await pendingEntryWrites(id);
     // Before the chain below: the flush itself runs under the entry's key.
     await useUIStore.getState().editActions?.flush?.();
     // The content moves along — also for an entry that was never open since startup.

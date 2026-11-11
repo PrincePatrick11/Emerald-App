@@ -2,6 +2,8 @@ import { useTranslation } from 'react-i18next';
 import { Folder, Image, Smile } from 'lucide-react';
 import { useCategoryStore } from '../../../store/categoryStore';
 import { categoryLabel } from '../../../lib/categories';
+import { useShrunkIcon } from '../../../hooks/useShrunkIcon';
+import { isDiscarding, trackEntryWrite } from '../../../store/entryEdit';
 import { EditPropertyRow, MediaPropertyRow, PropertySelect } from './EditProperties';
 
 /** The "no category" entry of the menu; not a valid value of the column. */
@@ -24,6 +26,13 @@ export default function CategoryIconCoverRows({ entry, update }: {
 }) {
   const { t } = useTranslation();
   const categories = useCategoryStore((s) => s.categories);
+  // Shrinking takes a moment: Cancel waits for it (tracked), and the late
+  // icon drops itself instead of landing on the restored entry.
+  const shrinkIcon = useShrunkIcon(
+    (icon) => (isDiscarding(entry.id) ? undefined : update({ icon: icon || undefined })),
+    'CategoryIconCoverRows',
+  );
+  const setIcon = (icon: string) => trackEntryWrite(entry.id, shrinkIcon(icon));
   // A category in the trash no longer resolves and counts as "None".
   const category = categories.find((c) => c.id === entry.category_id);
 
@@ -53,8 +62,8 @@ export default function CategoryIconCoverRows({ entry, update }: {
         label={t('properties.icon')}
         kind="icon"
         value={entry.icon}
-        onChange={(icon) => void update({ icon })}
-        onRemove={() => void update({ icon: undefined })}
+        onChange={(icon) => void setIcon(icon)}
+        onRemove={() => void setIcon('')}
       />
       <MediaPropertyRow
         rowIcon={<Image size={14} />}

@@ -40,6 +40,8 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - **A plus in the rail creates anything.** It opens a small window with a tile for each type — Journal, Tasks, Operations, Wiki, Altar, Lexicon, Templates and Blocks — and opens what you pick, by click, by keyboard or by the tile's number key; the dashboards' own "New" buttons work the same way.
 - **Altars have their own icon,** a candle on a table, instead of a flame.
 - **A new paint editor for sigil drawings:** a pen that follows a stylus's pressure, line, ellipse and rectangle (Shift for straight angles, circles and squares), an eraser, any colour besides the seven, layers that can be added, hidden, reordered, renamed and removed, and keyboard shortcuts. Strokes are kept as lines, so they stay sharp at any size; drawings from before open with their picture as the first layer and lose nothing.
+- **Image icons of entries are shrunk to icon size.** A picture chosen as the icon of a Wiki article or an operation no longer keeps its full size (a 1.9 MB photo is now a few KB), like icons of templates, blocks and languages already did. Removing an icon or pressing Cancel right after picking one cannot be overtaken by the picture still being shrunk. Icons stored earlier stay as they are.
+- **An MCP test instance shows its branch in the title bar,** next to the window buttons, so the windows of several instances can be told apart.
 
 ### Changed
 - **Every dashboard's main button reads the same:** "New entry", "New altar", "New category" and so on.
@@ -128,6 +130,8 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - **Restoring a backup no longer stores pictures the vault already has a second time,** which showed a `.jpeg` picture twice in Images.
 - **Imports keep links to altars:** a backup restored without its operations still points altar chips, fields and task links at the altar's operation, and a Replace restore never overwrites an entry of another kind that happens to share an altar's ID. A canvas in an `.emerald` file keeps its pictures when they are stored here under another name.
 - **The canvas on Windows and Linux:** Ctrl with the mouse wheel zooms in even steps instead of jumping, `[` and `]` change the brush size with AltGr or ⌥ too, a touch drag out of Images that turns into a scroll ends cleanly, and emoji are drawn in colour.
+- **Links between the test entries of an MCP instance open.** The generated test data uses proper ids now, so the app's strict check on link targets accepts them; an older test vault needs `EMERALD_MCP_SEED=force`.
+- **An MCP instance's trash holds its test items again:** they are dated recently, so the trash retention no longer purges them on opening, and a forced rebuild of the test vault starts from an empty folder.
 - **"Show link" from the sidebar opens a folded heading or a closed section** around the link instead of scrolling to something hidden.
 - **The green ring around blocks sits on the block's frame again** — when jumping to a block from the sidebar and while something can be dropped into the text; it used to sit a little inside the frame.
 - **A dev build reads the remembered key once at start,** not twice at once, which doubled the keychain prompts on macOS.

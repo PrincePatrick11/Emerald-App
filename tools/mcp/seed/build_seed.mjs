@@ -243,6 +243,71 @@ async function insertTasks(db, tasks, chipHtml, report) {
   }
 }
 
+/* -- readable fixture ids → UUIDs ---------------------------------------- */
+
+const SEED_ID_RE = /seed-[a-z0-9]+(?:-[a-z0-9]+)*/g;
+
+/** A stable UUID for a readable fixture id: SHA-1 of the name, laid out as a
+ *  version 5 UUID. Stable, so a repro step that names an id stays valid
+ *  across rebuilds. */
+export function seedUuid(name) {
+  const hex = createHash('sha1').update('emerald-seed:' + name).digest('hex').slice(0, 32).split('');
+  hex[12] = '5';
+  hex[16] = ((parseInt(hex[16], 16) & 0x3) | 0x8).toString(16);
+  const h = hex.join('');
+  return `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20)}`;
+}
+
+/**
+ * The fixture names its rows `seed-wiki-sigil` and so on, which keeps it
+ * readable. The app only follows internal links to UUIDs
+ * (isValidLinkTarget in src/lib/internalLinkHtml.ts), so every id a fixture
+ * row declares is replaced by its UUID here - in its own row and wherever it
+ * is referenced: foreign keys, JSON id lists, @@chip() placeholders.
+ * `_`-prefixed keys are comments and stay as they are. The
+ * regex is greedy, so `seed-task-prep-candles` is never read as
+ * `seed-task-prep`; a seed-like token that no row declares is left alone.
+ */
+export function withUuids(fixture) {
+  const ids = new Map();
+  for (const [key, rows] of Object.entries(fixture)) {
+    if (key.startsWith('_') || !Array.isArray(rows)) continue;
+    for (const row of rows) {
+      if (typeof row?.id === 'string' && row.id.startsWith('seed-')) ids.set(row.id, seedUuid(row.id));
+    }
+  }
+  const swap = (value) => {
+    if (typeof value === 'string') return value.replace(SEED_ID_RE, (token) => ids.get(token) ?? token);
+    if (Array.isArray(value)) return value.map(swap);
+    if (value && typeof value === 'object') {
+      return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, k.startsWith('_') ? v : swap(v)]));
+    }
+    return value;
+  };
+  return swap(fixture);
+}
+
+/**
+ * Trashed rows are dated relative to the build, a day ago. A fixed date
+ * would age past the vault's trash retention (30 days by default), and the
+ * app purges such rows the moment it opens the vault - the trash would be
+ * empty again. Their order among themselves is kept.
+ */
+export function withFreshTrash(fixture, now = Date.now()) {
+  const dated = [];
+  for (const [key, rows] of Object.entries(fixture)) {
+    if (key.startsWith('_') || !Array.isArray(rows)) continue;
+    for (const row of rows) if (row?.deleted_at) dated.push(row);
+  }
+  if (!dated.length) return fixture;
+  const latest = Math.max(...dated.map((row) => Date.parse(row.deleted_at)));
+  const shift = now - 24 * 60 * 60 * 1000 - latest;
+  const fresh = (rows) => rows.map((row) =>
+    row?.deleted_at ? { ...row, deleted_at: new Date(Date.parse(row.deleted_at) + shift).toISOString() } : row);
+  return Object.fromEntries(Object.entries(fixture).map(([key, rows]) =>
+    [key, !key.startsWith('_') && Array.isArray(rows) ? fresh(rows) : rows]));
+}
+
 /* -- fitting the fixture to the checkout's schema ----------------------- */
 
 const ENTRY_SOURCES = [
@@ -299,7 +364,7 @@ export async function buildSeed(opts) {
   let db = null;
   try {
     const app = await loadAppModules(opts.checkout, workDir);
-    const fixture = fitFixture(JSON.parse(readFileSync(opts.fixture, 'utf-8')), app.TABLES);
+    const fixture = fitFixture(withFreshTrash(withUuids(JSON.parse(readFileSync(opts.fixture, 'utf-8')))), app.TABLES);
 
     db = new HarnessDb(stagingPath);
     // Match what the app opens with; a WAL sidecar would be left behind here.
