@@ -348,7 +348,6 @@
       "itemPlaceholder": "Nouvel élément",
       "removeItem": "Supprimer l'élément",
       "chooseImage": "Choisir une image",
-      "imageFailed": "Impossible d'enregistrer l'image",
       "label": "Libellé",
       "options": "Options",
       "addOption": "Ajouter une option",
@@ -609,7 +608,15 @@
     "removeFromUses_one": "Affichée à {{count}} endroit – la retirer là aussi ?",
     "removeFromUses_other": "Affichée à {{count}} endroits – la retirer là aussi ?",
     "removeAndDelete": "Retirer et supprimer",
-    "roles": { "default": "Valeur par défaut du bloc", "drawing": "Dessin", "background": "Arrière-plan" }
+    "roles": { "default": "Valeur par défaut du bloc", "drawing": "Dessin", "background": "Arrière-plan" },
+    "pickTitle": "Insérer des images",
+    "pickOneTitle": "Choisir une image",
+    "fromDisk": "Depuis le disque …",
+    "insertCount_one": "Insérer {{count}} image",
+    "insertCount_other": "Insérer {{count}} images",
+    "searchPlaceholder": "Rechercher des images …",
+    "noMatch": "Aucune image ne correspond.",
+    "pickEmpty": "Pas encore d’images – prenez-en sur le disque ou déposez-les ici."
   },
 
   "tags": {

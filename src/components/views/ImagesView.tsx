@@ -1,36 +1,22 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useShallow } from 'zustand/shallow';
 import { Pencil, Trash2 } from 'lucide-react';
 import { useImageStore } from '../../store/imageStore';
 import { deletePicture, placesShowing } from '../../store/imageActions';
 import { useUndoStore } from '../../store/undoStore';
-import { isOnlyDrawingOrBackground } from '../../lib/imageUsage';
 import { useTagStore } from '../../store/tagStore';
 import { useSessionState } from '../../store/sessionStore';
 import { useDeepLink } from '../../hooks/useDeepLink';
 import { useFileDrop } from '../../hooks/useFileDrop';
 import { AUX_VIEWS } from '../../lib/modules';
-import type { VaultImage } from '../../types';
+import { searchPictures, useVaultPictures, type PictureItem } from '../../hooks/useVaultPictures';
 import Dashboard from '../ui/Dashboard';
 import ContextMenu from '../ui/ContextMenu';
 import ImageTile from '../images/ImageTile';
 import ImageEditModal from '../images/ImageEditModal';
 import AddImagesModal from '../images/AddImagesModal';
 
-/** A picture of the view: a stored file, with its details if it has any. */
-interface ImageItem {
-  file: string;
-  image: VaultImage | null;
-}
-
-/** Named pictures by name, then the unnamed ones, newest details first among equals. */
-function byName(a: ImageItem, b: ImageItem): number {
-  const an = a.image?.name ?? '';
-  const bn = b.image?.name ?? '';
-  if (!an !== !bn) return an ? -1 : 1;
-  return an.localeCompare(bn) || a.file.localeCompare(b.file);
-}
+type ImageItem = PictureItem;
 
 /**
  * "Images", a place of their own like tags and categories: every picture the
@@ -40,9 +26,8 @@ function byName(a: ImageItem, b: ImageItem): number {
  */
 export default function ImagesView() {
   const { t } = useTranslation();
-  const { images, files, trashedFiles, uses, loaded } = useImageStore(useShallow((s) => ({
-    images: s.images, files: s.files, trashedFiles: s.trashedFiles, uses: s.uses, loaded: s.loaded,
-  })));
+  const images = useImageStore((s) => s.images);
+  const { pictures: all, loaded } = useVaultPictures();
   const allTags = useTagStore((s) => s.tags);
   const [search, setSearch] = useSessionState('images.search', '');
   const [tagFilter, setTagFilter] = useSessionState<string[]>('images.tags', []);
@@ -66,34 +51,7 @@ export default function ImagesView() {
     onOpen: (image) => setEditing({ file: image.file, image }),
   });
 
-  // The folder can have changed since the vault opened (texts, drawings).
-  useEffect(() => {
-    void useImageStore.getState().refreshFiles();
-    void useImageStore.getState().refreshUses();
-  }, []);
-
-  const all = useMemo<ImageItem[]>(() => {
-    const byFile = new Map(images.map((image) => [image.file, image]));
-    const listed = new Set<string>();
-    const items: ImageItem[] = [];
-    for (const { name } of files) {
-      listed.add(name);
-      // In the trash: gone from here until it is restored.
-      if (trashedFiles.has(name)) continue;
-      const image = byFile.get(name) ?? null;
-      // A sigil drawing or an altar background is the thing itself, not a picture of its own.
-      if (!image && isOnlyDrawingOrBackground(uses.get(name))) continue;
-      items.push({ file: name, image });
-    }
-    // Details whose file the folder did not list (yet): still shown.
-    for (const image of images) if (!listed.has(image.file)) items.push({ file: image.file, image });
-    return items.sort(byName);
-  }, [images, files, trashedFiles, uses]);
-
-  const query = search.trim().toLowerCase();
-  const searched = all.filter((item) => !query
-    || (item.image?.name ?? '').toLowerCase().includes(query)
-    || (item.image?.note ?? '').toLowerCase().includes(query));
+  const searched = searchPictures(all, search);
   const shown = searched.filter((item) => tagFilter.every((id) => item.image?.tags.includes(id)));
   const usedTags = allTags.filter((tag) => searched.some((i) => i.image?.tags.includes(tag.id)));
 

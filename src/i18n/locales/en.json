@@ -348,7 +348,6 @@
       "itemPlaceholder": "New item",
       "removeItem": "Remove item",
       "chooseImage": "Choose image",
-      "imageFailed": "Couldn't save the image",
       "label": "Label",
       "options": "Options",
       "addOption": "Add option",
@@ -609,7 +608,15 @@
     "removeFromUses_one": "Shown in {{count}} place – take it out there too?",
     "removeFromUses_other": "Shown in {{count}} places – take it out there too?",
     "removeAndDelete": "Take out and delete",
-    "roles": { "default": "Block default", "drawing": "Drawing", "background": "Background" }
+    "roles": { "default": "Block default", "drawing": "Drawing", "background": "Background" },
+    "pickTitle": "Insert images",
+    "pickOneTitle": "Choose an image",
+    "fromDisk": "From the disk …",
+    "insertCount_one": "Insert {{count}} image",
+    "insertCount_other": "Insert {{count}} images",
+    "searchPlaceholder": "Search images …",
+    "noMatch": "No image matches.",
+    "pickEmpty": "No images yet – take some from the disk, or drop them here."
   },
 
   "tags": {

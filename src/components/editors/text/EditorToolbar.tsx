@@ -160,7 +160,7 @@ export default function EditorToolbar({ editor, onOpenLinkPicker, findOpen, onTo
         )}
         {has('link') && <WebLinkButton editor={editor} />}
         {has('image') && (
-          <ToolbarBtn onClick={() => pickImageFiles(editor)} active={false} title={t('editor.toolbar.insertImage')}>
+          <ToolbarBtn onClick={() => void pickImageFiles(editor)} active={false} title={t('editor.toolbar.insertImage')}>
             <ImagePlus size={14} />
           </ToolbarBtn>
         )}

@@ -5,7 +5,7 @@ import { useImageStore } from '../../store/imageStore';
 import { reportImageError, useImageNoticeStore } from '../../store/imageNoticeStore';
 import { ACCEPTED_IMAGE_MIME, isAcceptedImageFile } from '../../lib/helpers';
 import { imageSrc } from '../../lib/images';
-import { storeImageFile, storeImageFromPath } from '../../lib/storeImage';
+import { fileBaseName as baseName, storeImageFile, storeImageFromPath } from '../../lib/storeImage';
 import { OP_PROP_SELECT_CLASSES } from '../../lib/styleClasses';
 import { DROPPED_IMAGE_RE } from '../../hooks/useFileDrop';
 import Modal from '../ui/Modal';
@@ -16,11 +16,6 @@ import TagInput from '../ui/TagInput';
 interface Staged {
   file: string;
   name: string;
-}
-
-/** A file's name without folder and extension — what a new picture is called first. */
-function baseName(name: string): string {
-  return name.split(/[\\/]/).pop()!.replace(/\.[^.]+$/, '').trim();
 }
 
 /**

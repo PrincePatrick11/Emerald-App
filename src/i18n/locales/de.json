@@ -348,7 +348,6 @@
       "itemPlaceholder": "Neuer Punkt",
       "removeItem": "Punkt entfernen",
       "chooseImage": "Bild wählen",
-      "imageFailed": "Bild konnte nicht gespeichert werden",
       "label": "Beschriftung",
       "options": "Optionen",
       "addOption": "Option hinzufügen",
@@ -609,7 +608,15 @@
     "removeFromUses_one": "An {{count}} Stelle eingebunden – dort auch entfernen?",
     "removeFromUses_other": "An {{count}} Stellen eingebunden – dort auch entfernen?",
     "removeAndDelete": "Entfernen und löschen",
-    "roles": { "default": "Block-Vorgabe", "drawing": "Zeichnung", "background": "Hintergrund" }
+    "roles": { "default": "Block-Vorgabe", "drawing": "Zeichnung", "background": "Hintergrund" },
+    "pickTitle": "Bilder einfügen",
+    "pickOneTitle": "Bild auswählen",
+    "fromDisk": "Von der Festplatte …",
+    "insertCount_one": "{{count}} Bild einfügen",
+    "insertCount_other": "{{count}} Bilder einfügen",
+    "searchPlaceholder": "Bilder durchsuchen …",
+    "noMatch": "Kein Bild passt.",
+    "pickEmpty": "Noch keine Bilder – nimm welche von der Festplatte oder zieh sie hierher."
   },
 
   "tags": {

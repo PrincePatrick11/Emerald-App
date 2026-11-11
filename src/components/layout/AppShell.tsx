@@ -20,6 +20,7 @@ import { ensureVaultReady, VAULT_KEY_CANCELLED } from '../../store/vaultKeyStore
 import { keyErrorOf } from '../../lib/vaultKeys';
 import UndoToast from '../ui/UndoToast';
 import ImageNoticeModal from '../ui/ImageNoticeModal';
+import { ImagePickerHost } from '../images/ImagePickerModal';
 import LeaveGuardModal from './LeaveGuardModal';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { isTauri } from '../../lib/platform';
@@ -450,6 +451,7 @@ export default function AppShell() {
 
       <UndoToast />
       <ImageNoticeModal />
+      <ImagePickerHost />
       <LeaveGuardModal />
       <ImportDestinationModal />
       <VaultKeyDialog />

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { Editor } from '@tiptap/react';
 import { getCurrentWebview } from '@tauri-apps/api/webview';
 import { storeImageFromPath } from '../../../lib/storeImage';
+import { useImagePickerStore } from '../../../store/imagePickerStore';
 import { isWindows } from '../../../lib/platform';
 import { useSettingsStore } from '../../../store/settingsStore';
 import { reportImageError, useImageNoticeStore } from '../../../store/imageNoticeStore';
@@ -63,6 +64,7 @@ export function useEditorFileDrop({ enabled, getEditors, getContainer, getFallba
       .onDragDropEvent(async (event) => {
         const { type } = event.payload;
 
+        if ((type === 'enter' || type === 'over') && useImagePickerStore.getState().request) return;
         if (type === 'enter' || type === 'over') {
           setFileDragOver(true);
           optionsRef.current.onSpot(spotAt(event.payload.position));
@@ -72,6 +74,8 @@ export function useEditorFileDrop({ enabled, getEditors, getContainer, getFallba
 
         if (type === 'drop') {
           setFileDragOver(false);
+          // The picture picker is open and takes the files itself.
+          if (useImagePickerStore.getState().request) { optionsRef.current.onSpot(null); return; }
           optionsRef.current.onSpot(null);
           const { paths, position } = event.payload;
           const imagePaths = paths.filter((p) => /\.(png|jpe?g|gif|webp|svg)$/i.test(p));

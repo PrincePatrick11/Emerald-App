@@ -2,7 +2,8 @@ import type { Editor } from '@tiptap/react';
 import type { Node as ProseMirrorNode } from '@tiptap/pm/model';
 import { storeImageFile } from '../../../lib/storeImage';
 import { reportImageError, useImageNoticeStore } from '../../../store/imageNoticeStore';
-import { ACCEPTED_IMAGE_MIME, isAcceptedImageFile } from '../../../lib/helpers';
+import { isAcceptedImageFile } from '../../../lib/helpers';
+import { pickPictures } from '../../../store/imagePickerStore';
 import { flashReveal, scrollIntoViewCentered } from '../../../lib/reveal';
 import { internalLinkBlockHtml, toInternalLinkChip } from '../../../lib/internalLinkHtml';
 import type { EntryLinkRequest } from '../../../lib/links';
@@ -280,14 +281,15 @@ export async function insertImageFiles(editor: Editor, files: File[]): Promise<v
   );
 }
 
-/** The file picker for images (toolbar button, `/` menu), several at once. */
-export function pickImageFiles(editor: Editor): void {
-  const input = document.createElement('input');
-  input.type = 'file';
-  input.accept = ACCEPTED_IMAGE_MIME;
-  input.multiple = true;
-  input.onchange = () => { void insertImageFiles(editor, Array.from(input.files ?? [])); };
-  input.click();
+/**
+ * Pictures for the text (toolbar button, `/` menu), several at once: from
+ * "Images" or from the disk, through the picture picker (`pickPictures`).
+ * They go in at the cursor, in the order chosen.
+ */
+export async function pickImageFiles(editor: Editor): Promise<void> {
+  const files = await pickPictures({ multiple: true });
+  if (!files?.length || editor.isDestroyed) return;
+  await insertImagesInOrder(editor, null, files, async (file) => file, (e) => reportImageError(e, 'insert'));
 }
 
 /**

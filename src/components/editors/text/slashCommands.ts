@@ -66,7 +66,7 @@ export const SLASH_COMMANDS: SlashCommand[] = [
     available: (ed) => editorHas(ed, 'image'),
     run: (ed, range) => {
       ed.chain().focus().deleteRange(range).run();
-      pickImageFiles(ed);
+      void pickImageFiles(ed);
     },
   },
   {

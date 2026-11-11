@@ -30,3 +30,8 @@ export async function storeImageFromPath(path: string): Promise<string> {
 export async function storeImageFile(file: Blob): Promise<string> {
   return saveImage(await prepareImageDataUrl(await readFileAsDataUrl(file)));
 }
+
+/** A file's name without folder and extension — what a new picture is called first. */
+export function fileBaseName(name: string): string {
+  return name.split(/[\\/]/).pop()!.replace(/\.[^.]+$/, '').trim();
+}
