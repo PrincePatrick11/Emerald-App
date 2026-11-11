@@ -2,12 +2,12 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import {
-  CANVAS_SWATCHES, CanvasEditor, canvasToDataUrl, fullProfile, parseCanvasBackground, renderCanvasImage,
-  type CanvasBackground, type CanvasBackgroundImages, type CanvasEditorHandle, type CanvasElement, type CanvasPaintOptions,
-  type CanvasTypes, type RulerGuide,
+  CANVAS_SWATCHES, CanvasEditor, canvasToDataUrl, fullProfile, parseCanvasBackground, renderCanvasImage, renderCanvasSvg,
+  type CanvasBackground, type CanvasBackgroundImages, type CanvasEditorHandle, type CanvasElement, type CanvasExportOptions,
+  type CanvasPaintOptions, type CanvasTypes, type RenderOptions, type RulerGuide,
 } from '../editors/canvas';
 import {
-  canvasElementFile, parseCanvasBlock, withCanvasScene, withCanvasStripTag, type CanvasParts, type CanvasScene, type StoredCanvasElement,
+  ALTAR_BLOCK_TYPE, canvasElementFile, parseCanvasBlock, withCanvasScene, withCanvasStripTag, type CanvasParts, type CanvasScene, type StoredCanvasElement,
 } from '../../lib/blocks/canvas';
 import { canvasImageSrc, imageSrc, saveImage } from '../../lib/images';
 import { emptyPaintDoc, paintDocFromJson, paintDocToJson, type PaintDoc } from '../../lib/paint/document';
@@ -19,16 +19,15 @@ import { getImageDragItem, setImageDragItem, subscribeImageDrag, type ImageDragI
 import { DROPPED_IMAGE_RE, useFileDrop } from '../../hooks/useFileDrop';
 import { useOwnSymbols } from '../../hooks/useOwnSymbols';
 import { pickPictures, useImagePickerStore } from '../../store/imagePickerStore';
-import { removeUnusedFiles, useImageStore } from '../../store/imageStore';
-import { getDb } from '../../lib/db';
+import { discardRenders, useImageStore } from '../../store/imageStore';
+import { savePictureAs, textDataUrl } from '../../lib/pictureExport';
+import { exportErrorMessage } from '../../lib/export';
 import { reportImageError, useImageNoticeStore } from '../../store/imageNoticeStore';
 import { useTagStore } from '../../store/tagStore';
 import ImageStrip from '../images/ImageStrip';
 import AddImagesModal from '../images/AddImagesModal';
 import type { BlockViewProps } from './blockViews';
 
-// The replaced render is looked at once the entry has been saved.
-const RENDER_CLEANUP_DELAY = 2000;
 /** The width of the rendered picture the export and the card show. */
 const RENDER_WIDTH = 1200;
 
@@ -102,22 +101,45 @@ async function loadReadable(src: string): Promise<HTMLImageElement | null> {
 }
 
 /** The scene as a stored picture, for the export and the card; `null` if it is empty or could not be stored. */
-async function renderScene(scene: CanvasScene, types: CanvasTypes, background: CanvasBackground | null): Promise<string | null> {
-  if (!scene.elements.length && !background) return null;
-  const canvas = await renderCanvasImage({
+/** What drawing the scene off the editor takes: its elements with their pictures by file, read back as data URLs (`loadReadable`). */
+function sceneRenderOptions(scene: CanvasScene, types: CanvasTypes, background: CanvasBackground | null, outWidth: number): RenderOptions {
+  return {
     types,
     width: scene.width,
     height: scene.height,
-    // Pictures by their file: `loadReadable` reads them as data URLs.
     elements: scene.elements.map((el) => (el.type === 'drawing'
       ? { ...el, props: { ...el.props, doc: drawingDoc(el.props.doc) } }
       : { ...el, props: { emoji: '', ...el.props } })),
-    outWidth: RENDER_WIDTH,
+    outWidth,
     background,
     loadImage: loadReadable,
-  });
+  };
+}
+
+async function renderScene(scene: CanvasScene, types: CanvasTypes, background: CanvasBackground | null): Promise<string | null> {
+  if (!scene.elements.length && !background) return null;
+  const canvas = await renderCanvasImage(sceneRenderOptions(scene, types, background, RENDER_WIDTH));
   const data = canvas ? await canvasToDataUrl(canvas, 'image/png') : null;
   return data ? saveImage(data) : null;
+}
+
+/** The scene as the export dialog asked: format, area, width, background; a JPEG on white. */
+async function exportedScene(scene: CanvasScene, types: CanvasTypes, options: CanvasExportOptions): Promise<string | null> {
+  const background = options.background ? parseCanvasBackground(scene.background) : null;
+  const render = { ...sceneRenderOptions(scene, types, background, options.width), region: options.region ?? undefined };
+  if (options.format === 'svg') return textDataUrl(await renderCanvasSvg(render), 'image/svg+xml');
+  const canvas = await renderCanvasImage(render);
+  if (!canvas) return null;
+  if (options.format === 'png') return canvasToDataUrl(canvas, 'image/png');
+  const flat = document.createElement('canvas');
+  flat.width = canvas.width;
+  flat.height = canvas.height;
+  const ctx = flat.getContext('2d');
+  if (!ctx) return null;
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, flat.width, flat.height);
+  ctx.drawImage(canvas, 0, 0);
+  return canvasToDataUrl(flat, 'image/jpeg', 0.95);
 }
 
 /**
@@ -175,20 +197,18 @@ export default function CanvasBlock({ block, isEditing, onBlockChange, onPersist
     if (from === null) return;
     const { block: current, onPersist: persist } = latest.current;
     const now = parseCanvasBlock(current);
-    if (now.broken || !persist || JSON.stringify(now.scene) === from) return;
+    // Unchanged needs no new picture — unless it has none yet (an altar converted from before).
+    if (now.broken || !persist || (JSON.stringify(now.scene) === from && now.render)) return;
     void renderScene(now.scene, profile.types, parseCanvasBackground(now.scene.background))
       .then(async (render) => {
         const { block: latestBlock, isEditing: editing, onPersist: save } = latest.current;
         // Editing again, or the scene changed meanwhile: that edit renders anew.
         if (!mounted.current || editing || !save) return;
         const { scene: shown, render: before } = parseCanvasBlock(latestBlock);
-        if (JSON.stringify(shown) !== JSON.stringify(now.scene)) return;
+        if (JSON.stringify(shown) !== JSON.stringify(now.scene) || render === before) return;
         save(withCanvasScene(latestBlock, shown, render));
         // The picture it replaces, once the entry is saved, unless something still shows it.
-        if (before && before !== render) {
-          await new Promise((resolve) => window.setTimeout(resolve, RENDER_CLEANUP_DELAY));
-          await removeUnusedFiles(await getDb(), [before]);
-        }
+        if (before) discardRenders([before], () => parseCanvasBlock(latest.current.block).render);
       })
       .catch((e: unknown) => console.error('[CanvasBlock] render failed:', e));
     // Only the switch between the modes.
@@ -230,6 +250,17 @@ export default function CanvasBlock({ block, isEditing, onBlockChange, onPersist
 
   // The tool column's button: pictures from "Images" or the disk (the picture
   // picker), in the middle of what is visible, side by side.
+  // The editor's export dialog: the scene as a file where the user chooses, named after the block's type.
+  const exportPicture = useCallback((options: CanvasExportOptions) => {
+    const { block: current } = latest.current;
+    void exportedScene(parseCanvasBlock(current).scene, profile.types, options)
+      .then((dataUrl) => {
+        if (!dataUrl) throw new Error('rendering the picture failed');
+        return savePictureAs(dataUrl, options.format, t(`blocks.types.${current.type === ALTAR_BLOCK_TYPE ? 'altar' : 'canvas'}.label`));
+      })
+      .catch((e: unknown) => exportErrorMessage(e, 'Canvas picture'));
+  }, [profile.types, t]);
+
   const insertImages = useCallback(async () => {
     const files = await pickPictures({ multiple: true });
     const centre = editorRef.current?.visibleCentre();
@@ -357,6 +388,7 @@ export default function CanvasBlock({ block, isEditing, onBlockChange, onPersist
           backgroundImages={BACKGROUND_IMAGES}
           symbolLibrary={symbolLibrary}
           onInsertImage={editable ? () => void insertImages() : undefined}
+          onExport={exportPicture}
           background={background ? undefined : <div className="h-full w-full canvas-paper" />}
           overlay={editable && dragItem ? (
             <>
