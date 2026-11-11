@@ -1,6 +1,6 @@
 import { generateId } from '../helpers';
 import { escapeHtml } from '../internalLinkHtml';
-import { storedImageName } from '../schema';
+import { ALTAR_LIBRARY_TAG_ID, storedImageName } from '../schema';
 import { createTextBlock, decodeHtmlAttr } from './blockHtml';
 import { BLOCK_ATTR, type BlockInstance, type BlockTypeId } from './types';
 
@@ -13,7 +13,8 @@ import { BLOCK_ATTR, type BlockInstance, type BlockTypeId } from './types';
  * their lock. A picture element keeps its stored file in `ref` and
  * `props.src` (the place turns it into a URL to show). What the block offers
  * — which parts — is its config JSON (`CanvasParts`), set in the block's
- * settings and in templates.
+ * settings and in templates; next to them `tag`, the tag "Images" below
+ * show ('' for all; an altar starts with "Altar Library").
  *
  * The inner HTML holds the rendered picture of the scene first
  * (`data-canvas="render"`, for the export and the card), then every stored
@@ -97,6 +98,8 @@ export interface CanvasBlock {
   broken: boolean;
   scene: CanvasScene;
   parts: CanvasParts;
+  /** The tag "Images" below show, '' for all. */
+  stripTag: string;
   /** The rendered picture, or `null`. */
   render: string | null;
 }
@@ -152,6 +155,12 @@ function readParts(value: Record<string, unknown>, type: string): CanvasParts {
   return parts;
 }
 
+/** The strip's tag: as stored, or what the type starts with. */
+function readStripTag(value: Record<string, unknown>, type: string): string {
+  if (typeof value.tag === 'string' && (value.tag === '' || ID_RE.test(value.tag))) return value.tag;
+  return type === ALTAR_BLOCK_TYPE ? ALTAR_LIBRARY_TAG_ID : '';
+}
+
 const RENDER = 'render';
 // Bounded: it runs over foreign markup.
 const IMG_RE = /<img\b[^<>]{0,2048}>/gi;
@@ -170,6 +179,7 @@ export function parseCanvasBlock(block: BlockInstance): CanvasBlock {
   return {
     broken: data.broken,
     parts: readParts(config.value, block.type),
+    stripTag: readStripTag(config.value, block.type),
     render,
     scene: {
       width: size(d.width, CANVAS_BLOCK_WIDTH),
@@ -206,7 +216,16 @@ export function withCanvasScene(block: BlockInstance, scene: CanvasScene, render
 }
 
 export function withCanvasParts(block: BlockInstance, parts: CanvasParts): BlockInstance {
-  return { ...block, attrs: { ...block.attrs, [BLOCK_ATTR.config]: JSON.stringify(parts) } };
+  const config = readJson(block.attrs[BLOCK_ATTR.config]).value;
+  const tag = typeof config.tag === 'string' ? { tag: config.tag } : {};
+  return { ...block, attrs: { ...block.attrs, [BLOCK_ATTR.config]: JSON.stringify({ ...parts, ...tag }) } };
+}
+
+/** The block with another tag for "Images" below ('' for all). */
+export function withCanvasStripTag(block: BlockInstance, tag: string): BlockInstance {
+  const config = readJson(block.attrs[BLOCK_ATTR.config]).value;
+  const parts = readParts(config, block.type);
+  return { ...block, attrs: { ...block.attrs, [BLOCK_ATTR.config]: JSON.stringify({ ...parts, tag }) } };
 }
 
 /**

@@ -376,6 +376,15 @@ export const SIGIL_CATEGORY_ID = 'sigils';
 export const ALTAR_CATEGORY_ID = 'altars';
 
 /**
+ * The tag "Altar Library": what an Altar block's "Images" show at first.
+ * v62 gives it to the pictures of the old altar library; a fixed ID, so that
+ * synced devices that convert their altars arrive at the same tag. An
+ * ordinary tag otherwise — renamable, deletable.
+ */
+export const ALTAR_LIBRARY_TAG_ID = 'altar-library';
+export const ALTAR_LIBRARY_TAG_NAME = 'Altar Library';
+
+/**
  * [id, name (database only — `categories.builtin.<id>` is displayed), emoji].
  * Since v39 `other` has lost its special status; since v61 the altars join the sigils.
  */

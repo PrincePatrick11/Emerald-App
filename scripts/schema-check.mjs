@@ -2050,10 +2050,13 @@ console.log('\n8n. Migration v49: three entry tables become entries\n');
   check('v62: at the altar\'s resolution, with its guide in pixels',
     scene?.width === 1920 && scene?.height === 1080 && scene?.guides?.[0]?.at === 960, scene && [scene.width, scene.height, scene.guides]);
   check('v62: a text for notes follows the altar', /data-block="core\.text"/.test(op?.content ?? ''));
-  const images = Object.fromEntries((await db.select('SELECT id, file, name, note, deleted_at FROM images')).map((r) => [r.id, r]));
+  const images = Object.fromEntries((await db.select('SELECT id, file, name, note, tags, deleted_at FROM images')).map((r) => [r.id, r]));
   check('v62: the items with pictures are pictures of "Images", the trashed one in the trash',
     images.i1?.file === pic && images.i1.name === 'Candle' && images.i1.note === 'lit' && images.i1.deleted_at === null
       && images.i3?.deleted_at === now && !images.i2 && !!images.i4, images);
+  const [library] = await db.select("SELECT name FROM tags WHERE id='altar-library'");
+  check('v62: the pictures carry the tag "Altar Library"',
+    library?.name === 'Altar Library' && images.i1.tags === '["altar-library"]' && images.i3.tags === '["altar-library"]', { library, images });
   const [e1] = await db.select("SELECT content FROM entries WHERE id='e1'");
   check('v62: chips point at the operation, the altar field is a link field',
     !e1.content.includes('data-entry-type="altar"') && e1.content.includes('data-entry-type="operation"')

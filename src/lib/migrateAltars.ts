@@ -2,7 +2,7 @@ import type Database from './sqlite';
 import type { Statement } from './sync/apply';
 import { saveImage } from './images';
 import { backupDatabaseFile } from './dbRebuild';
-import { ALTAR_CATEGORY_ID } from './schema';
+import { ALTAR_CATEGORY_ID, ALTAR_LIBRARY_TAG_ID, ALTAR_LIBRARY_TAG_NAME } from './schema';
 import { ALTAR_TABLE_DDL } from './schemaV48';
 import {
   contentWithAltarsAsOperations, convertAltars, definitionElementsWithAltarsAsOperations,
@@ -114,9 +114,27 @@ export async function altarStatements(db: Database, converted: ConvertedAltars, 
   return statements;
 }
 
-/** Only the converted rows: the operations, numbered on from the last, and the pictures. */
+/**
+ * Only the converted rows: the operations, numbered on from the last, and
+ * the pictures, tagged "Altar Library" (what an Altar block's "Images" show
+ * at first). A tag of that name already there is taken, from the trash too.
+ */
 export async function altarInserts(db: Database, converted: ConvertedAltars, replace = false): Promise<Statement[]> {
   const statements: Statement[] = [];
+  let libraryTag = ALTAR_LIBRARY_TAG_ID;
+  if (converted.images.length) {
+    const [held] = await db.select<{ id: string }[]>(
+      'SELECT id FROM tags WHERE id=$1 OR lower(name)=lower($2) ORDER BY id=$1 DESC LIMIT 1',
+      [ALTAR_LIBRARY_TAG_ID, ALTAR_LIBRARY_TAG_NAME],
+    );
+    if (held) {
+      libraryTag = held.id;
+      statements.push(['UPDATE tags SET deleted_at=NULL WHERE id=$1', [libraryTag]]);
+    } else {
+      statements.push(["INSERT INTO tags (id, name, color) VALUES ($1, $2, '#f59e0b')", [ALTAR_LIBRARY_TAG_ID, ALTAR_LIBRARY_TAG_NAME]]);
+    }
+  }
+  const libraryTags = JSON.stringify([libraryTag]);
   const [next] = await db.select<{ n: number }[]>(
     "SELECT COALESCE(MAX(entry_number), 0) + 1 AS n FROM entries WHERE type = 'operation'",
   );
@@ -132,8 +150,8 @@ export async function altarInserts(db: Database, converted: ConvertedAltars, rep
     // A file already in "Images" keeps its details.
     statements.push([
       `INSERT OR IGNORE INTO images (id, file, name, note, tags, detached, created_at, updated_at, deleted_at)
-       VALUES ($1, $2, $3, $4, '[]', '[]', $5, $6, $7)`,
-      [image.id, image.file, image.name, image.note, image.created_at, image.updated_at, image.deleted_at],
+       VALUES ($1, $2, $3, $4, $5, '[]', $6, $7, $8)`,
+      [image.id, image.file, image.name, image.note, libraryTags, image.created_at, image.updated_at, image.deleted_at],
     ]);
   }
   return statements;

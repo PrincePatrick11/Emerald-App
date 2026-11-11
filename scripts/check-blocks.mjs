@@ -37,7 +37,7 @@ writeFileSync(
    export { readUserSymbol } from '${root}/src/lib/userSymbols';
    export { group, ungroup, withGroups, moveInStack, copiesOf, align } from '${root}/src/components/editors/canvas/canvasActions';
    export { renderBlocksForExport } from '${root}/src/lib/blocks/exportRender';
-   export { createCanvasBlock, parseCanvasBlock, withCanvasScene, withCanvasParts, withoutCanvasFile, CANVAS_BLOCK_TYPE, ALTAR_BLOCK_TYPE } from '${root}/src/lib/blocks/canvas';
+   export { createCanvasBlock, parseCanvasBlock, withCanvasScene, withCanvasParts, withCanvasStripTag, withoutCanvasFile, CANVAS_BLOCK_TYPE, ALTAR_BLOCK_TYPE } from '${root}/src/lib/blocks/canvas';
    export { parseAssignments, resolveAssignedTemplate, instantiateTemplateBlocks, isContentEmpty, templateStart, mergeTemplateTags, assignedTemplateAt, areBlocksEmpty, fieldsWithTemplate, fieldsWithoutTemplate } from '${root}/src/lib/blocks/templates';
    export { internalLinkChipHtml } from '${root}/src/lib/internalLinkHtml';
    export { extractInternalLinks } from '${root}/src/lib/internalLinkHtml';`
@@ -76,7 +76,7 @@ const {
   parseAssignments, resolveAssignedTemplate, instantiateTemplateBlocks, isContentEmpty,
   templateStart, mergeTemplateTags, assignedTemplateAt, areBlocksEmpty,
   fieldsWithTemplate, fieldsWithoutTemplate,
-  createCanvasBlock, parseCanvasBlock, withCanvasScene, withCanvasParts, withoutCanvasFile, CANVAS_BLOCK_TYPE, ALTAR_BLOCK_TYPE,
+  createCanvasBlock, parseCanvasBlock, withCanvasScene, withCanvasParts, withCanvasStripTag, withoutCanvasFile, CANVAS_BLOCK_TYPE, ALTAR_BLOCK_TYPE,
 } = bundle;
 
 const failures = [];
@@ -1006,6 +1006,15 @@ console.log('\nCanvas block\n');
   check('a new altar: the same canvas, with "Images" below', altar.parts.images && altar.parts.shapes, altar.parts);
   check('an altar without config still has "Images" below',
     parseCanvasBlock({ id: 'a', type: ALTAR_BLOCK_TYPE, html: '', attrs: {} }).parts.images);
+  check('"Images" below an altar start with the tag "Altar Library", a canvas\'s with all',
+    altar.stripTag === 'altar-library' && parsed.stripTag === '', [altar.stripTag, parsed.stripTag]);
+  const allTags = withCanvasStripTag(createCanvasBlock(ALTAR_BLOCK_TYPE), '');
+  const otherTag = withCanvasParts(withCanvasStripTag(allTags, 'venus'), { ...altar.parts, shapes: false });
+  check('the strip\'s tag is kept: cleared stays cleared, another one survives a change of parts',
+    parseCanvasBlock(allTags).stripTag === '' && parseCanvasBlock(otherTag).stripTag === 'venus'
+      && !parseCanvasBlock(otherTag).parts.shapes, parseCanvasBlock(otherTag));
+  check('a foreign tag value counts as none set',
+    parseCanvasBlock({ ...allTags, attrs: { ...allTags.attrs, 'data-block-config': JSON.stringify({ tag: '<x>' }) } }).stripTag === 'altar-library');
 
   const scene = { ...parsed.scene, elements: [image('i1', pic), image('i2', pic)], background: { fill: { kind: 'none' }, image: { src: bg, fit: 'cover' }, tint: null } };
   const full = withCanvasScene(fresh, scene, render);

@@ -125,7 +125,7 @@ An altar is an operation in the built-in category **Altars** (🪔), a virtual a
 
 **The Altar block** is the Canvas block (see [Images](#images)) with "Images" below it while editing: two rows of pictures to scroll sideways, a search, and a tag filter.
 
-- **Search and tag.** The search finds pictures by name. A tag chosen in the strip's head shows only the pictures carrying it; it holds for that block until the app is closed, and its × shows all again.
+- **Search and tag.** The search finds pictures by name. A tag chosen in the strip's head shows only the pictures carrying it, and is saved with the altar, so each altar can keep its own selection; its × shows all again. A new altar starts with the tag "Altar Library", which the pictures of the old altar library carry; a vault without it gets it with the first picture added there.
 - **Placing pictures.** Drag a picture onto the canvas, or click it to place it in the middle of what is visible; each comes in its own proportions at a third of the canvas's shorter side.
 - **Adding pictures.** The "+" opens the Add images dialog with the strip's tag set. Files dropped onto the canvas from the disk go into "Images" under their file name, with the strip's tag, and onto the canvas where they were let go.
 - A picture-less element with the 🕯️ emoji, as older altars have them, flickers like a candle.

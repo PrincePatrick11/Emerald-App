@@ -7,13 +7,13 @@ import {
   type CanvasTypes, type RulerGuide,
 } from '../editors/canvas';
 import {
-  canvasElementFile, parseCanvasBlock, withCanvasScene, type CanvasParts, type CanvasScene, type StoredCanvasElement,
+  canvasElementFile, parseCanvasBlock, withCanvasScene, withCanvasStripTag, type CanvasParts, type CanvasScene, type StoredCanvasElement,
 } from '../../lib/blocks/canvas';
 import { canvasImageSrc, imageSrc, saveImage } from '../../lib/images';
 import { emptyPaintDoc, paintDocFromJson, paintDocToJson, type PaintDoc } from '../../lib/paint/document';
 import { altarBackgroundUrl } from '../../lib/altarBackground';
 import { generateId } from '../../lib/helpers';
-import { storedImageName } from '../../lib/schema';
+import { ALTAR_LIBRARY_TAG_ID, ALTAR_LIBRARY_TAG_NAME, storedImageName } from '../../lib/schema';
 import { fileBaseName, storeImageFromPath } from '../../lib/storeImage';
 import { getImageDragItem, setImageDragItem, subscribeImageDrag, type ImageDragItem } from '../../lib/imageDragState';
 import { DROPPED_IMAGE_RE, useFileDrop } from '../../hooks/useFileDrop';
@@ -22,7 +22,6 @@ import { pickPictures, useImagePickerStore } from '../../store/imagePickerStore'
 import { removeUnusedFiles, useImageStore } from '../../store/imageStore';
 import { getDb } from '../../lib/db';
 import { reportImageError, useImageNoticeStore } from '../../store/imageNoticeStore';
-import { useSessionState } from '../../store/sessionStore';
 import { useTagStore } from '../../store/tagStore';
 import ImageStrip from '../images/ImageStrip';
 import AddImagesModal from '../images/AddImagesModal';
@@ -272,12 +271,27 @@ export default function CanvasBlock({ block, isEditing, onBlockChange, onPersist
     };
   }, [editable, dragItem, pointOnArtboard, place]);
 
-  // The strip's tag, per block for the session ('' for all; a tag gone
-  // since counts as none). Pictures added here carry it.
-  const [stripTag, setStripTag] = useSessionState(`canvas.stripTag.${block.id}`, '');
+  // The strip's tag, saved with the block ('' for all; a tag gone since
+  // counts as none). Pictures added here carry it.
+  const { stripTag } = parsed;
   const tagLive = useTagStore((s) => s.tags.some((x) => x.id === stripTag));
   const activeTag = parts.images && tagLive ? stripTag : '';
-  const [adding, setAdding] = useState(false);
+  const setStripTag = useCallback((tag: string) => {
+    const { block: current, onBlockChange: change } = latest.current;
+    const next = withCanvasStripTag(current, tag);
+    latest.current = { ...latest.current, block: next };
+    change(next);
+  }, []);
+  // The tag of pictures added here: the strip's. An altar's "Altar Library"
+  // that this vault does not have yet is made with the first of them.
+  const tagForNew = useCallback(async (): Promise<string> => {
+    if (activeTag) return activeTag;
+    if (!parts.images || stripTag !== ALTAR_LIBRARY_TAG_ID) return '';
+    const tag = await useTagStore.getState().ensureTag(ALTAR_LIBRARY_TAG_NAME);
+    setStripTag(tag.id);
+    return tag.id;
+  }, [activeTag, parts.images, stripTag, setStripTag]);
+  const [adding, setAdding] = useState<string[] | null>(null);
   const [dropped, setDropped] = useState<string[]>([]);
 
   // Files from the disk let go over the canvas: into "Images", under their
@@ -297,13 +311,14 @@ export default function CanvasBlock({ block, isEditing, onBlockChange, onPersist
     const images = paths.filter((p) => DROPPED_IMAGE_RE.test(p));
     if (images.length < paths.length) useImageNoticeStore.getState().show({ kind: 'format' });
     void (async () => {
+      const tag = images.length ? await tagForNew() : '';
       let offset = 0;
       for (const path of images) {
         try {
           const file = await storeImageFromPath(path);
           const store = useImageStore.getState();
           const had = store.images.find((image) => image.file === file)?.tags ?? [];
-          const tags = activeTag && !had.includes(activeTag) ? [...had, activeTag] : undefined;
+          const tags = tag && !had.includes(tag) ? [...had, tag] : undefined;
           await store.saveDetails(file, { name: fileBaseName(path), ...(tags ? { tags } : {}) });
           await place(file, { x: at.x + offset, y: at.y + offset });
           offset += 32;
@@ -366,7 +381,7 @@ export default function CanvasBlock({ block, isEditing, onBlockChange, onPersist
         <ImageStrip
           tag={activeTag}
           onTagChange={setStripTag}
-          onAdd={() => setAdding(true)}
+          onAdd={() => void tagForNew().then((tag) => setAdding(tag ? [tag] : []))}
           onPick={(item) => {
             const centre = editorRef.current?.visibleCentre();
             if (centre) void place(item.file, centre);
@@ -377,8 +392,8 @@ export default function CanvasBlock({ block, isEditing, onBlockChange, onPersist
         <AddImagesModal
           dropped={dropped}
           dragOver={dragOver}
-          initialTags={activeTag ? [activeTag] : []}
-          onClose={() => { setAdding(false); setDropped([]); }}
+          initialTags={adding}
+          onClose={() => { setAdding(null); setDropped([]); }}
         />
       )}
     </div>
