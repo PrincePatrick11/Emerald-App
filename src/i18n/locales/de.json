@@ -222,6 +222,10 @@
         "label": "Leinwand",
         "description": "Bilder aus „Bilder“, Formen, Text, Symbole und Zeichnungen, frei angeordnet."
       },
+      "paint": {
+        "label": "Malen",
+        "description": "Frei malen mit Pinseln, Ebenen und Symmetrie – gespeichert als Bild."
+      },
       "altar": {
         "label": "Altar",
         "description": "Eine Leinwand mit „Bilder“ darunter, aus denen du Bilder ziehst."
@@ -313,6 +317,11 @@
       "locked": "Gesperrt, solange die Sigille geladen ist",
       "saveFailed": "Die Zeichnung ließ sich nicht speichern",
       "loadFailed": "Die Zeichnung ließ sich nicht laden — den Eintrag schließen und neu öffnen"
+    },
+    "paint": {
+      "empty": "Noch nichts gemalt",
+      "saveFailed": "Das Bild konnte nicht gespeichert werden",
+      "loadFailed": "Das Bild konnte nicht geladen werden – schließ den Eintrag und öffne ihn erneut"
     },
     "canvas": {
       "broken": "Diese Leinwand ließ sich nicht lesen. Sie bleibt, wie sie ist.",

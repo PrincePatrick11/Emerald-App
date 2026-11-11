@@ -222,6 +222,10 @@
         "label": "Lienzo",
         "description": "Imágenes de «Imágenes», formas, texto, símbolos y dibujos, colocados libremente."
       },
+      "paint": {
+        "label": "Pintura",
+        "description": "Pinta libremente con pinceles, capas y simetría: se guarda como imagen."
+      },
       "altar": {
         "label": "Altar",
         "description": "Un lienzo con «Imágenes» debajo para arrastrar imágenes."
@@ -313,6 +317,11 @@
       "locked": "Bloqueado mientras el sigilo está cargado",
       "saveFailed": "No se pudo guardar el dibujo",
       "loadFailed": "No se pudo cargar el dibujo — cierra y vuelve a abrir la entrada"
+    },
+    "paint": {
+      "empty": "Aún no hay nada pintado",
+      "saveFailed": "No se pudo guardar la pintura",
+      "loadFailed": "No se pudo cargar la pintura: cierra y vuelve a abrir la entrada"
     },
     "canvas": {
       "broken": "Este lienzo no se pudo leer. Se queda como está.",

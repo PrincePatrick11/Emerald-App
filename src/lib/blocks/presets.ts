@@ -1,11 +1,12 @@
 import {
-  Calendar, ChevronsUpDown, Frame, Hash, Image, Link2, ListChecks, Moon, PenTool, Sparkles, TextCursorInput, ToggleLeft, Type, Zap,
+  Brush, Calendar, ChevronsUpDown, Frame, Hash, Image, Link2, ListChecks, Moon, PenTool, Sparkles, TextCursorInput, ToggleLeft, Type, Zap,
   type LucideIcon,
 } from 'lucide-react';
 import { AltarIcon } from '../altarIcon';
 import { createSigilCalcBlock, createSigilCanvasBlock, createSigilChargeBlock } from './sigil';
 import { createTextBlock } from './blockHtml';
 import { ALTAR_BLOCK_TYPE, createCanvasBlock } from './canvas';
+import { createPaintBlock } from './paint';
 import {
   activeElements, createFieldsBlock, ELEMENT_KINDS, elementKindLabelKey, FIELDS_BLOCK_TYPE, isSigilKind, parseFields,
   type ElementKind, type FallbackText,
@@ -66,6 +67,7 @@ export const BLOCK_PRESETS: readonly BlockPreset[] = [
     create: () => createFieldsBlock(kind),
   })),
   { id: 'canvas', labelKey: 'blocks.types.canvas.label', descriptionKey: 'blocks.types.canvas.description', icon: Frame, group: 'media', create: () => createCanvasBlock() },
+  { id: 'paint', labelKey: 'blocks.types.paint.label', descriptionKey: 'blocks.types.paint.description', icon: Brush, group: 'media', create: createPaintBlock },
   { id: 'altar', labelKey: 'blocks.types.altar.label', descriptionKey: 'blocks.types.altar.description', icon: AltarIcon, group: 'media', create: () => createCanvasBlock(ALTAR_BLOCK_TYPE) },
   { id: 'sigil.calc', labelKey: 'blocks.types.sigilCalc.label', descriptionKey: 'blocks.types.sigilCalc.description', icon: Sparkles, group: 'sigil', create: createSigilCalcBlock },
   { id: 'sigil.canvas', labelKey: 'blocks.types.sigilCanvas.label', descriptionKey: 'blocks.types.sigilCanvas.description', icon: PenTool, group: 'sigil', create: createSigilCanvasBlock },

@@ -3,7 +3,7 @@ import type { EntryType } from '../types';
 import { parseBlocks, serializeBlocks } from './blocks/blockHtml';
 import { BLOCK_ATTR, type BlockInstance } from './blocks/types';
 import { FIELDS_BLOCK_TYPE, withoutElementContent } from './blocks/fields';
-import { SIGIL_CANVAS_TYPE } from './blocks/sigil';
+import { isDrawingBlockType } from './blocks/paint';
 import { isCanvasBlockType, canvasBackgroundFile, canvasElementFile, parseCanvasBlock, withoutCanvasFile } from './blocks/canvas';
 import { storedImageName } from './schema';
 
@@ -45,7 +45,7 @@ function usesInContent(content: string): Map<string, ImageUseRole> {
     if (roles.get(file) !== 'content') roles.set(file, role);
   };
   for (const block of parseBlocks(content)) {
-    if (block.type === SIGIL_CANVAS_TYPE) {
+    if (isDrawingBlockType(block.type)) {
       for (const file of namesIn(block.html)) note(file, 'drawing');
       continue;
     }
@@ -128,7 +128,7 @@ function withoutImageInHtml(html: string, file: string): string {
 
 /** The block without the picture where it is shown: an image field emptied, an image in a text gone. */
 function withoutImageInBlock(block: BlockInstance, file: string): BlockInstance {
-  if (block.type === SIGIL_CANVAS_TYPE || !block.html.includes(file)) return block;
+  if (isDrawingBlockType(block.type) || !block.html.includes(file)) return block;
   if (isCanvasBlockType(block.type)) return withoutCanvasFile(block, file);
   if (block.type === FIELDS_BLOCK_TYPE) {
     const slots = new Set<string>();

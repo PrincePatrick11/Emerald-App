@@ -37,6 +37,8 @@ writeFileSync(
    export { readUserSymbol } from '${root}/src/lib/userSymbols';
    export { group, ungroup, withGroups, moveInStack, copiesOf, align } from '${root}/src/components/editors/canvas/canvasActions';
    export { renderBlocksForExport } from '${root}/src/lib/blocks/exportRender';
+   export { createPaintBlock, isDrawingBlockType, PAINT_BLOCK_TYPE } from '${root}/src/lib/blocks/paint';
+   export { resolveBlockType } from '${root}/src/lib/blocks/blockTypes';
    export { createCanvasBlock, parseCanvasBlock, withCanvasScene, withCanvasParts, withCanvasStripTag, withoutCanvasFile, CANVAS_BLOCK_TYPE, ALTAR_BLOCK_TYPE } from '${root}/src/lib/blocks/canvas';
    export { parseAssignments, resolveAssignedTemplate, instantiateTemplateBlocks, isContentEmpty, templateStart, mergeTemplateTags, assignedTemplateAt, areBlocksEmpty, fieldsWithTemplate, fieldsWithoutTemplate } from '${root}/src/lib/blocks/templates';
    export { internalLinkChipHtml } from '${root}/src/lib/internalLinkHtml';
@@ -77,6 +79,7 @@ const {
   templateStart, mergeTemplateTags, assignedTemplateAt, areBlocksEmpty,
   fieldsWithTemplate, fieldsWithoutTemplate,
   createCanvasBlock, parseCanvasBlock, withCanvasScene, withCanvasParts, withCanvasStripTag, withoutCanvasFile, CANVAS_BLOCK_TYPE, ALTAR_BLOCK_TYPE,
+  createPaintBlock, isDrawingBlockType, PAINT_BLOCK_TYPE, resolveBlockType,
 } = bundle;
 
 const failures = [];
@@ -748,6 +751,23 @@ console.log('\n4g. Link and image defaults with markup\n');
   check('import: image defaults follow the stored images, link defaults the new IDs',
     rm.pic.defaultValue === `${'ef'.repeat(32)}.png` && rm.lnk.defaultValue?.id === `abcd1234-${wikiId}` && rm.lnk.defaultValue?.label === 'Neu', remapped);
   check('the images of the defaults are known', definitionImageRefs(elements).join() === img);
+}
+
+console.log('\n4g2. The paint block\n');
+{
+  const paint = createPaintBlock();
+  const render = `${'5a'.repeat(32)}.png`;
+  const saved = withSigilDrawing(paint, render, emptyPaintDoc());
+  const back = parseSigilDrawing(parseBlocks(serializeBlocks([saved]))[0]);
+  check('paint: a type of its own, known to the app, a drawing like the sigil\'s',
+    paint.type === PAINT_BLOCK_TYPE && !!resolveBlockType(paint) && isDrawingBlockType(paint.type) && !isDrawingBlockType('core.canvas'));
+  check('paint: picture and document survive the round trip', back.render === render && !!back.doc, back);
+  const text = {
+    title: () => 'Painting', date: (iso) => iso, number: String, targetDate: '', technique: '', loaded: '', notLoaded: '',
+    drawing: '', fields: { label: (e) => e.label, yes: '', no: '', moonName: (p) => p },
+  };
+  check('paint: the export shows the picture', renderBlocksForExport(serializeBlocks([saved]), text).includes(render));
+  check('paint: an empty one exports nothing of it', !renderBlocksForExport(serializeBlocks([paint]), text).includes('<img'));
 }
 
 console.log('\n4h. Sigils as parts of custom blocks\n');

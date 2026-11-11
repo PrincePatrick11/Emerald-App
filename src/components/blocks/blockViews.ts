@@ -3,8 +3,10 @@ import { TEXT_BLOCK_TYPE, type BlockInstance } from '../../lib/blocks/types';
 import { FIELDS_BLOCK_TYPE, type ElementDef } from '../../lib/blocks/fields';
 import { SIGIL_CALC_TYPE, SIGIL_CANVAS_TYPE, SIGIL_CHARGE_TYPE, type SigilState } from '../../lib/blocks/sigil';
 import { ALTAR_BLOCK_TYPE, CANVAS_BLOCK_TYPE } from '../../lib/blocks/canvas';
+import { PAINT_BLOCK_TYPE } from '../../lib/blocks/paint';
 import TextBlock from './TextBlock';
 import CanvasBlock from './CanvasBlock';
+import PaintBlock from './PaintBlock';
 import FieldsBlock from './FieldsBlock';
 import SigilCalcBlock from './SigilCalcBlock';
 import SigilCanvasBlock from './SigilCanvasBlock';
@@ -59,4 +61,5 @@ export const BLOCK_VIEWS: ReadonlyMap<string, ComponentType<BlockViewProps>> = n
   [SIGIL_CHARGE_TYPE, SigilChargeBlock],
   [CANVAS_BLOCK_TYPE, CanvasBlock],
   [ALTAR_BLOCK_TYPE, CanvasBlock],
+  [PAINT_BLOCK_TYPE, PaintBlock],
 ]);

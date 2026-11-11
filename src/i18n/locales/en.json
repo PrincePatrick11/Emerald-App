@@ -222,6 +222,10 @@
         "label": "Canvas",
         "description": "Pictures from \"Images\", shapes, text, symbols and drawings, arranged freely."
       },
+      "paint": {
+        "label": "Painting",
+        "description": "Paint freely with brushes, layers and symmetry — saved as a picture."
+      },
       "altar": {
         "label": "Altar",
         "description": "A canvas with \"Images\" below it to drag pictures from."
@@ -313,6 +317,11 @@
       "locked": "Locked while the sigil is loaded",
       "saveFailed": "Couldn't save the drawing",
       "loadFailed": "Couldn't load the drawing — close and reopen the entry to try again"
+    },
+    "paint": {
+      "empty": "Nothing painted yet",
+      "saveFailed": "Couldn't save the painting",
+      "loadFailed": "Couldn't load the painting — close and reopen the entry to try again"
     },
     "canvas": {
       "broken": "This canvas could not be read. It stays as it is.",

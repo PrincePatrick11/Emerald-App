@@ -275,6 +275,8 @@ The Tasks module is a hierarchical task manager with categories, priorities, and
 
 **Canvas and Altar.** The block **Canvas** ("Add block") arranges pictures, shapes, text, symbols and drawings freely on an artboard, with the canvas editor's tools: handles, guides, groups, the element list, a background and undo. The picture button in its tool column opens the picture picker: pictures from "Images" or from the disk land in the middle of the canvas. The block **Altar** is the same canvas with "Images" below it while editing, to search, filter by a tag and drag from (see [Altars](#altars)). Files dropped on either from the disk go into "Images" under their file name and onto the canvas where they were let go. In the sidebar a block's settings choose what it offers ("Images" below, shapes, text, symbols, drawing); switched off, nothing new of that kind is added, and what is on the canvas stays. Read mode shows the canvas as it is, an export its picture, made when editing ends. Taking a picture out of "Images" takes it off every canvas too.
 
+**Painting.** The block **Painting** ("Add block") is a drawing of its own, painted with the paint mode the sigil drawing has: brushes, shapes, fill, eraser, layers, symmetry and undo, in the canvas's colours. It is saved as it is painted; read mode, the card's export and a printout show the picture.
+
 ## Categories
 
 One list of categories serves Wiki, Operations and Tasks, and the Categories view in the left rail — next to Tags — is the one place it is managed. The three modules only *assign* a category to an entry and group their lists by it; none of them can create, rename or delete one.

@@ -222,6 +222,10 @@
         "label": "Toile",
         "description": "Des images de « Images », des formes, du texte, des symboles et des dessins, disposés librement."
       },
+      "paint": {
+        "label": "Peinture",
+        "description": "Peignez librement avec pinceaux, calques et symétrie – enregistré comme image."
+      },
       "altar": {
         "label": "Autel",
         "description": "Une toile avec « Images » en dessous, d’où glisser les images."
@@ -313,6 +317,11 @@
       "locked": "Verrouillé tant que le sigil est chargé",
       "saveFailed": "Le dessin n'a pas pu être enregistré",
       "loadFailed": "Le dessin n'a pas pu être chargé — fermez puis rouvrez l'entrée"
+    },
+    "paint": {
+      "empty": "Rien n’est encore peint",
+      "saveFailed": "Impossible d’enregistrer la peinture",
+      "loadFailed": "Impossible de charger la peinture – fermez puis rouvrez l’entrée"
     },
     "canvas": {
       "broken": "Cette toile n’a pas pu être lue. Elle reste telle quelle.",

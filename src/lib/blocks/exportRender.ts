@@ -13,6 +13,7 @@ import {
 } from './sigil';
 import { TEXT_BLOCK_TYPE, type BlockInstance } from './types';
 import { ALTAR_BLOCK_TYPE, CANVAS_BLOCK_TYPE, parseCanvasBlock } from './canvas';
+import { PAINT_BLOCK_TYPE } from './paint';
 
 /**
  * The blocks of an entry as HTML for PDF and Markdown — one serializer per
@@ -126,6 +127,10 @@ function bodyHtml(
     case SIGIL_CANVAS_TYPE:
     case SIGIL_CHARGE_TYPE:
       return sigilHtml(block, text);
+    case PAINT_BLOCK_TYPE: {
+      const image = sigilImage(block);
+      return image ? imageHtml(image, text.title(block, meta)) : '';
+    }
     case CANVAS_BLOCK_TYPE:
     case ALTAR_BLOCK_TYPE: {
       // The rendered picture; the pictures behind it are only references.
