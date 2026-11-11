@@ -15,6 +15,13 @@ import Modal from '../ui/Modal';
 import Button from '../ui/Button';
 import TagInput from '../ui/TagInput';
 
+/** The icon of a place of use: its module, the templates, the custom blocks. */
+function iconOf(use: ImageUse) {
+  if (use.kind === 'entry') return MODULES[viewTypeForEntryType(use.entryType!)].icon;
+  if (use.kind === 'template') return AUX_VIEWS.templates.icon;
+  return AUX_VIEWS.blocks.icon;
+}
+
 /** Where a place of use opens. */
 function viewOf(use: ImageUse): ActiveView {
   switch (use.kind) {
@@ -67,12 +74,6 @@ export default function ImageEditModal({ file, image, confirmDelete = false, onC
   const remove = async () => {
     await deletePicture(file, image, t('undo.imageDeleted'), pushUndo);
     onClose();
-  };
-
-  const useIcon = (use: ImageUse) => {
-    if (use.kind === 'entry') return MODULES[viewTypeForEntryType(use.entryType!)].icon;
-    if (use.kind === 'template') return AUX_VIEWS.templates.icon;
-    return AUX_VIEWS.blocks.icon;
   };
 
   return (
@@ -129,7 +130,7 @@ export default function ImageEditModal({ file, image, confirmDelete = false, onC
         ) : (
           <ul className="image-uses">
             {uses.map((use) => {
-              const Icon = useIcon(use);
+              const Icon = iconOf(use);
               const title = use.kind === 'entry' ? displayTitle(t, use.entryType!, use.title) : use.title;
               return (
                 <li key={`${use.kind}:${use.id}:${use.role}`}>

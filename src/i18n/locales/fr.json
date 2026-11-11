@@ -455,7 +455,6 @@
       "addLayer": "Ajouter un calque",
       "removeLayer": "Retirer le calque",
       "clear": "Vider le dessin",
-      "loadFailed": "Impossible de charger une image de ce dessin",
       "duplicateLayer": "Dupliquer le calque",
       "mergeDown": "Fusionner vers le bas",
       "mergeDownBlocked": "Fusion impossible : le calque contient une image ou des traits de gomme",
@@ -484,7 +483,7 @@
   "symbols": {
     "remove": "Retirer de mes symboles",
     "removed": "Symbole retiré",
-    "ownEmpty": "Encore vide. Sélectionnez un dessin sur le canevas et enregistrez-le comme symbole depuis la barre.",
+    "ownEmpty": "Encore vide. Sélectionnez un dessin sur la toile et enregistrez-le comme symbole depuis la barre.",
     "saveAs": "Enregistrer comme symbole",
     "namePlaceholder": "Nom",
     "saveHint": "Une seule couleur ; les traits de gomme et les images sont omis.",
@@ -677,7 +676,7 @@
       "format": "Format",
       "svgHint": "Formes, texte et dessins restent vectoriels ; les images et le fond sont intégrés.",
       "area": "Zone",
-      "all": "Tout le canevas",
+      "all": "Toute la toile",
       "selection": "Sélection",
       "size": "Taille",
       "pixels": "Pixels",
@@ -702,7 +701,7 @@
       "redo": "Rétablir",
       "drawing": "Dessin",
       "brushSize": "Pinceau plus petit, plus grand",
-      "pickWhileHeld": "Prélever une couleur tant que maintenu",
+      "pickWhileHeld": "Prélever une couleur tant que la touche est maintenue",
       "straight": "Lignes droites, formes régulières",
       "fromCentre": "Depuis le centre",
       "selection": "Sélection",
@@ -716,7 +715,7 @@
       "deselectOrLeave": "Ne rien sélectionner ; encore une fois pour terminer le dessin",
       "deselect": "Ne rien sélectionner",
       "dropTool": "Revenir à la sélection",
-      "dragEmpty": "Glisser sur le canevas vide",
+      "dragEmpty": "Glisser sur la toile vide",
       "frame": "Sélectionner avec un cadre",
       "doubleClick": "Double-clic",
       "member": "Choisir un élément d’un groupe ; encore une fois pour le modifier",
@@ -770,7 +769,7 @@
     "backward": "Reculer",
     "toBack": "Mettre à l’arrière-plan",
     "alignSelection": "Aligner la sélection",
-    "alignArtboard": "Aligner sur la surface",
+    "alignArtboard": "Aligner sur la toile",
     "align": {
       "left": "Bords gauches",
       "hcenter": "Centres à l’horizontale",
@@ -1424,7 +1423,7 @@
     },
     "images": {
       "title": "Pas encore d’images",
-      "description": "Rassemblez ici vos images – nommez-les, ajoutez des tags et une note, et retrouvez-les par la recherche."
+      "description": "Rassemblez ici vos images – nommez-les, ajoutez des étiquettes et une note, et retrouvez-les par la recherche."
     },
     "lexicon": {
       "title": "Aucune langue pour l'instant",

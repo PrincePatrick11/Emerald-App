@@ -326,13 +326,13 @@
     },
     "paint": {
       "empty": "Noch nichts gemalt",
-      "saveFailed": "Das Bild konnte nicht gespeichert werden",
-      "loadFailed": "Das Bild konnte nicht geladen werden – schließ den Eintrag und öffne ihn erneut"
+      "saveFailed": "Die Malerei konnte nicht gespeichert werden",
+      "loadFailed": "Die Malerei konnte nicht geladen werden – schließ den Eintrag und öffne ihn erneut"
     },
     "canvas": {
       "broken": "Diese Leinwand ließ sich nicht lesen. Sie bleibt, wie sie ist.",
       "empty": "Noch nichts auf der Leinwand.",
-      "parts": "Angeboten",
+      "parts": "Verfügbar",
       "part": {
         "images": "Bilder darunter",
         "shapes": "Formen",
@@ -455,7 +455,6 @@
       "addLayer": "Ebene hinzufügen",
       "removeLayer": "Ebene entfernen",
       "clear": "Zeichnung leeren",
-      "loadFailed": "Ein Bild dieser Zeichnung ließ sich nicht laden",
       "duplicateLayer": "Ebene duplizieren",
       "mergeDown": "Nach unten zusammenführen",
       "mergeDownBlocked": "Zusammenführen geht nicht: Die Ebene hat ein Bild oder Radierstriche",
@@ -476,7 +475,7 @@
         "off": "Aus",
         "mirror": "Spiegeln",
         "quad": "Vier Viertel",
-        "radial": "Strahlen",
+        "radial": "Strahlenförmig",
         "rays": "Strahlen"
       }
     }
@@ -487,7 +486,7 @@
     "ownEmpty": "Noch leer. Wähle eine Zeichnung auf der Leinwand aus und speichere sie in der Leiste als Symbol.",
     "saveAs": "Als Symbol speichern",
     "namePlaceholder": "Name",
-    "saveHint": "Eine Farbe; Radiererstriche und Bilder fallen weg.",
+    "saveHint": "Eine Farbe; Radierstriche und Bilder fallen weg.",
     "save": "Speichern",
     "emptyDrawing": "Die Zeichnung ist leer.",
     "ownDefault": "Mein Symbol",
@@ -695,7 +694,7 @@
       "drag": "Ziehen",
       "middleDrag": "Mit mittlerer Taste ziehen",
       "scroll": "Scrollen",
-      "pinch": "Zwei Finger zusammen",
+      "pinch": "Mit zwei Fingern zoomen",
       "pan": "Ansicht verschieben",
       "zoom": "Zoomen",
       "undo": "Rückgängig",
@@ -713,13 +712,13 @@
       "moveStraight": "Nur waagerecht oder senkrecht verschieben",
       "turn": "Drehen",
       "turnSteps": "In Schritten von 15° drehen",
-      "deselectOrLeave": "Nichts auswählen; nochmal, um das Zeichnen zu beenden",
+      "deselectOrLeave": "Nichts auswählen; noch einmal, um das Zeichnen zu beenden",
       "deselect": "Nichts auswählen",
       "dropTool": "Zurück zum Auswählen",
       "dragEmpty": "Auf der leeren Leinwand ziehen",
       "frame": "Mit einem Rahmen auswählen",
       "doubleClick": "Doppelklick",
-      "member": "Ein Element einer Gruppe wählen; nochmal, um es zu bearbeiten",
+      "member": "Ein Element einer Gruppe wählen; noch einmal, um es zu bearbeiten",
       "edit": "Das ausgewählte Element bearbeiten",
       "rightClick": "Rechtsklick",
       "menu": "Menü für das, was unter dem Zeiger liegt",
@@ -770,7 +769,7 @@
     "backward": "Eine Ebene nach hinten",
     "toBack": "Ganz nach hinten",
     "alignSelection": "Auswahl ausrichten",
-    "alignArtboard": "Auf der Fläche ausrichten",
+    "alignArtboard": "Auf der Leinwand ausrichten",
     "align": {
       "left": "Linke Kanten",
       "hcenter": "Mitten waagerecht",

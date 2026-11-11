@@ -14,7 +14,7 @@ import { paintDocFromImage, paintDocFromJson, paintDocToJson, type PaintDoc } fr
  * - Calculator (`core.sigil.calc`): intention, letter bank, implemented letters.
  * - Drawing (`core.sigil.canvas`): the canvas editor's paint document as data
  *   JSON, its rendered image and layer images as `<img src="{sha}.png">` in the
- *   inner HTML so that the image cleanup sees them (`parseSigilDrawing`).
+ *   inner HTML so that the image cleanup sees them (`parseDrawing`).
  * - Charge (`core.sigil.charge`): loaded, target date, charging technique (as a
  *   link chip in the markup), what "loaded" locks and which calculators and
  *   drawings it conceals.
@@ -177,7 +177,7 @@ const PAINT_RENDER = 'render';
 const IMG_RE = /<img\b[^<>]{0,2048}>/gi;
 const PAINT_ATTR_RE = /\bdata-paint="([^"]*)"/i;
 
-export interface SigilDrawing {
+export interface DrawingData {
   /** The rendered image — what read mode, the card and the export show. */
   render: string | null;
   /** The vector document, with the old image as a layer where there was no document yet. */
@@ -194,7 +194,7 @@ export interface SigilDrawing {
  * rendered image is no longer marked as such (something else replaced it),
  * becomes a document with that image as its only layer: nothing it shows is lost.
  */
-export function parseSigilDrawing(block: BlockInstance): SigilDrawing {
+export function parseDrawing(block: BlockInstance): DrawingData {
   const images = new Map<string, string>();
   let render: string | null = null;
   let marked = false;
@@ -216,7 +216,7 @@ export function parseSigilDrawing(block: BlockInstance): SigilDrawing {
 }
 
 /** The drawing with a new rendered image and document; `null` for both empties it. */
-export function withSigilDrawing(block: BlockInstance, render: string | null, doc: PaintDoc | null): BlockInstance {
+export function withDrawing(block: BlockInstance, render: string | null, doc: PaintDoc | null): BlockInstance {
   if (!render || !doc) {
     const attrs = { ...block.attrs };
     delete attrs[BLOCK_ATTR.data];

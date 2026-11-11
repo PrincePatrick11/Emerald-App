@@ -782,9 +782,13 @@ export async function collectUsedImageFilenames(db: Database): Promise<Set<strin
 
   // Images taken into "Images" (v60) stay, used anywhere or not — not in
   // IMAGE_FIELDS for the same reason. A row in the trash keeps its file until
-  // it is deleted for good.
-  const kept = await db.select<{ file: string }[]>('SELECT file FROM images');
-  for (const { file } of kept) if (storedImageName(file)) used.add(file);
+  // it is deleted for good. So do the places it was taken out of
+  // (`detached`): a canvas lost its render with it, and a restore writes them back.
+  const kept = await db.select<{ file: string; detached: string | null }[]>('SELECT file, detached FROM images');
+  for (const { file, detached } of kept) {
+    if (storedImageName(file)) used.add(file);
+    for (const match of (detached ?? '').matchAll(IMAGE_NAME_RE)) used.add(match[0]);
+  }
 
   // Images in the templates' block stack (v43) — not in IMAGE_FIELDS for the same reason.
   const templates = await db.select<{ content: string | null }[]>('SELECT content FROM templates');

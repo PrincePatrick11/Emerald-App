@@ -7,13 +7,13 @@ import {
   type CanvasPaintOptions, type CanvasTypes, type RenderOptions, type RulerGuide,
 } from '../editors/canvas';
 import {
-  ALTAR_BLOCK_TYPE, canvasElementFile, parseCanvasBlock, withCanvasScene, withCanvasStripTag, type CanvasParts, type CanvasScene, type StoredCanvasElement,
+  ALTAR_BLOCK_TYPE, canvasElementFile, parseCanvasBlock, storedCanvasElement, storedImageElement, withCanvasScene, withCanvasStripTag, type CanvasParts, type CanvasScene, type StoredCanvasElement,
 } from '../../lib/blocks/canvas';
 import { canvasImageSrc, imageSrc, saveImage } from '../../lib/images';
-import { emptyPaintDoc, paintDocFromJson, paintDocToJson, type PaintDoc } from '../../lib/paint/document';
+import { emptyPaintDoc, paintDocFromJson, type PaintDoc } from '../../lib/paint/document';
 import { altarBackgroundUrl } from '../../lib/altarBackground';
 import { generateId } from '../../lib/helpers';
-import { ALTAR_LIBRARY_TAG_ID, ALTAR_LIBRARY_TAG_NAME, storedImageName } from '../../lib/schema';
+import { ALTAR_LIBRARY_TAG_ID, ALTAR_LIBRARY_TAG_NAME } from '../../lib/schema';
 import { fileBaseName, storeImageFromPath } from '../../lib/storeImage';
 import { getImageDragItem, setImageDragItem, subscribeImageDrag, type ImageDragItem } from '../../lib/imageDragState';
 import { DROPPED_IMAGE_RE, useFileDrop } from '../../hooks/useFileDrop';
@@ -64,14 +64,6 @@ function toElement(stored: StoredCanvasElement): CanvasElement {
   if (stored.type !== 'image') return stored;
   const file = canvasElementFile(stored);
   return { ...stored, ...(file ? { ref: file } : {}), props: { emoji: '', ...stored.props, src: file ? imageSrc(file) : null } };
-}
-
-/** An element of the canvas editor as stored: a picture keeps its file, not the URL, a drawing its compact JSON. */
-function toStored(el: CanvasElement): StoredCanvasElement {
-  const stored = { ...el, props: { ...(el.props as Record<string, unknown>) } } as StoredCanvasElement;
-  if (el.type === 'image') stored.props.src = storedImageName(el.ref) ?? null;
-  if (el.type === 'drawing') stored.props.doc = paintDocToJson(stored.props.doc as PaintDoc);
-  return stored;
 }
 
 /** A picture's natural proportions, or a square if it does not load. */
@@ -226,7 +218,7 @@ export default function CanvasBlock({ block, isEditing, onBlockChange, onPersist
     change(next);
   }, []);
 
-  const handleChange = useCallback((next: CanvasElement[]) => commit({ elements: next.map(toStored) }), [commit]);
+  const handleChange = useCallback((next: CanvasElement[]) => commit({ elements: next.map(storedCanvasElement) }), [commit]);
   const onCanvasBackgroundChange = useCallback((next: CanvasBackground) => commit({ background: next }), [commit]);
   const onGuidesChange = useCallback((next: RulerGuide[]) => commit({ guides: next }), [commit]);
   const onGuidesLockedChange = useCallback((locked: boolean) => commit({ guidesLocked: locked }), [commit]);
@@ -240,10 +232,7 @@ export default function CanvasBlock({ block, isEditing, onBlockChange, onPersist
     const height = ratio >= 1 ? side / ratio : side;
     const id = generateId();
     const z = Math.max(0, ...now.scene.elements.map((el) => el.z + 1));
-    const element: StoredCanvasElement = {
-      id, type: 'image', x: at.x, y: at.y, width, height, rotation: 0, opacity: 1, locked: false, hidden: false, z,
-      ref: file, props: { src: file, emoji: '' },
-    };
+    const element = storedImageElement(file, { id, x: at.x, y: at.y, width, height, z });
     commit({ elements: [...now.scene.elements, element] });
     setSelectedIds([id]);
   }, [commit]);

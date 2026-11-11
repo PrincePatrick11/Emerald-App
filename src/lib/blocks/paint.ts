@@ -5,7 +5,7 @@ import type { BlockInstance, BlockTypeId } from './types';
 /**
  * The paint block: a drawing of its own, painted in the canvas editor's
  * paint mode with its layers, brushes and symmetry. It keeps the drawing as
- * the sigil drawing does (`parseSigilDrawing`, `withSigilDrawing` in
+ * the sigil drawing does (`parseDrawing`, `withDrawing` in
  * `sigil.ts`): the vector document as its data, the rendered picture and
  * every layer's picture as stored files in its inner HTML.
  */

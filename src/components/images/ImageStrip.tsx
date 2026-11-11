@@ -8,10 +8,11 @@ import Dropdown from '../ui/Dropdown';
 import ImageTile from './ImageTile';
 
 /**
- * "Images" below a canvas, two rows that scroll sideways under a head with the search: the pictures to search and drag out (the
- * `imageDragState` channel), or click to place one in the middle. A tag
- * narrows them down (`tag`, '' for all); "+" adds pictures, which then carry
- * that tag (the canvas owns the dialog, `onAdd`).
+ * "Images" below a canvas: a head with the tag filter, "+" and the search,
+ * over two rows of pictures that scroll sideways. A picture is dragged out
+ * (the `imageDragState` channel) or clicked to be placed in the middle. The
+ * tag narrows them down (`tag`, '' for all); pictures "+" adds carry it (the
+ * canvas owns the dialog, `onAdd`).
  */
 export default function ImageStrip({ onPick, tag, onTagChange, onAdd }: {
   onPick: (item: PictureItem) => void;

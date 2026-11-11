@@ -1,5 +1,5 @@
 import { createTextBlock, parseBlocks, serializeBlocks } from './blocks/blockHtml';
-import { ALTAR_BLOCK_TYPE, CANVAS_BLOCK_HEIGHT, CANVAS_BLOCK_WIDTH, createCanvasBlock, parseCanvasBlock, withCanvasScene, type StoredCanvasElement } from './blocks/canvas';
+import { ALTAR_BLOCK_TYPE, CANVAS_BLOCK_HEIGHT, CANVAS_BLOCK_WIDTH, createCanvasBlock, parseCanvasBlock, storedCanvasElement, withCanvasScene, type StoredCanvasElement } from './blocks/canvas';
 import { FIELDS_BLOCK_TYPE } from './blocks/fields';
 import { BLOCK_ATTR, type BlockInstance } from './blocks/types';
 import { placementToElement } from './altarScene';
@@ -7,7 +7,6 @@ import { parseAltarElements } from './altarElements';
 import { parseAltarSettings } from './altarSettings';
 import { altarCanvasBackground } from './altarBackground';
 import { DEFAULT_ALTAR_RESOLUTION, resolveResolutionPixels } from './altarConstants';
-import { paintDocToJson, type PaintDoc } from './paint/document';
 import { storedImageName } from './schema';
 import type { AltarPlacement } from '../types';
 
@@ -157,12 +156,8 @@ export async function convertAltars(
 
     const elements: StoredCanvasElement[] = placed.map((p) => {
       const file = p.kind === 'item' ? itemFile.get(p.item_id) ?? null : null;
-      const el = placementToElement(p, width, height, () => file);
-      const props = { ...(el.props as Record<string, unknown>) };
-      if (el.type === 'image') props.src = file;
-      if (el.type === 'drawing') props.doc = paintDocToJson(props.doc as PaintDoc);
-      const { ref: _ref, ...frame } = el;
-      return { ...frame, ...(file ? { ref: file } : {}), props } as StoredCanvasElement;
+      const { ref: _ref, ...el } = placementToElement(p, width, height, () => file);
+      return storedCanvasElement({ ...el, ...(file ? { ref: file } : {}) });
     });
 
     const background = altarCanvasBackground({

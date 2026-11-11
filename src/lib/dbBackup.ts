@@ -1036,18 +1036,6 @@ function templateCategoryIds(rows: Row[] | undefined): string[] {
 }
 
 /**
- * The templates of a backup: by ID, `INSERT OR IGNORE` like the custom
- * blocks — an existing template (also in the trash, also the built-in
- * sigil template) stays as it is, none is deleted. New ones go to the end
- * of the list in their order.
- *
- * The file is foreign: every row runs through `fromRow.template` as on
- * reading. `content` gets the images stored here (and, on merge, the
- * renamed link targets), the assignments the local category IDs — whatever
- * points to no category is dropped. A combination that an active template here
- * already holds stays with it, and one from the trash brings no assignments.
- */
-/**
  * The pictures of "Images" from a file: like the templates never deleted,
  * missing ones added — by file, since a file is one picture. The file name
  * follows the images stored here (`pathMap`). An ID already taken by another
@@ -1086,6 +1074,18 @@ async function insertVaultImages(
   await insertRows(db, 'images', fresh);
 }
 
+/**
+ * The templates of a backup: by ID, `INSERT OR IGNORE` like the custom
+ * blocks — an existing template (also in the trash, also the built-in
+ * sigil template) stays as it is, none is deleted. New ones go to the end
+ * of the list in their order.
+ *
+ * The file is foreign: every row runs through `fromRow.template` as on
+ * reading. `content` gets the images stored here (and, on merge, the
+ * renamed link targets), the assignments the local category IDs — whatever
+ * points to no category is dropped. A combination that an active template here
+ * already holds stays with it, and one from the trash brings no assignments.
+ */
 async function insertTemplates(
   db: Awaited<ReturnType<typeof getDb>>,
   rows: unknown,
@@ -1758,16 +1758,12 @@ async function doMerge(db: Awaited<ReturnType<typeof getDb>>, backup: BackupFile
   ), catMap), i18n.t, nowIso(), mergeStatus);
   const operations = await liftLegacySigilRows(mergeOps.rows, wikiArticles, backup);
   const altars = (d.altars ?? []).map((r: Row) => {
-    // The same three columns as in doReplace. As long as thumbnail_data and
-    // icon_data hold data URLs, the difference is harmless — but the
-    // export collects both as soon as they carry a file name, and then
-    // merge would be the variant that does not carry it along.
-    const row = remapEntry(r, ['background_image_data', 'thumbnail_data', 'icon_data'], [], []);
+    const row = remapEntry(r, ALTAR_IMAGE_COLUMNS, [], []);
     // Drawn shapes and text get new ids like the placements: ids are unique across all altars.
     return r.elements === undefined ? row : { ...row, elements: withNewElementIds(r.elements, String(row.id)) };
   });
   const altarItems = remapCategoryIds((d.altarItems ?? []).map((r: Row) =>
-    remapEntry(r, ['image_data'], [], [])
+    remapEntry(r, ALTAR_ITEM_IMAGE_COLUMNS, [], [])
   ), catMap);
   const altarPlacements = (d.altarPlacements ?? []).map((r: Row) => ({
     ...r,
@@ -1958,9 +1954,7 @@ export async function importDatabase(
     // Never directly against the vault: `doReplace` deletes before it inserts, and
     // an aborted merge would leave half-imported data behind (see `importStaging.ts`).
     const run = mode === 'replace' ? doReplace : doMerge;
-    await importViaStaging(await getDb(), async (staging) => {
-      await run(staging, filteredBackup);
-    });
+    await importViaStaging(await getDb(), (staging) => run(staging, filteredBackup));
 
     // Only after a successful swap: an aborted import leaves the
     // settings as they were, too.

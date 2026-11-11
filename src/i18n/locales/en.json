@@ -332,7 +332,7 @@
     "canvas": {
       "broken": "This canvas could not be read. It stays as it is.",
       "empty": "Nothing on the canvas yet.",
-      "parts": "On offer",
+      "parts": "Available",
       "part": {
         "images": "Images below",
         "shapes": "Shapes",
@@ -455,7 +455,6 @@
       "addLayer": "Add layer",
       "removeLayer": "Remove layer",
       "clear": "Clear drawing",
-      "loadFailed": "Couldn't load an image of this drawing",
       "duplicateLayer": "Duplicate layer",
       "mergeDown": "Merge down",
       "mergeDownBlocked": "Can't merge: this layer has an image or eraser strokes",

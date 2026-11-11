@@ -29,7 +29,7 @@ writeFileSync(
    export { instantiateDefinition, parseDefinitionElements, parseDefinitionDisplay, remapDefinitionDefaults, definitionImageRefs } from '${root}/src/lib/blocks/definitions';
    export { entryBlockSummary } from '${root}/src/lib/blocks/entrySummary';
    export { withLegacyStatus, statusDefinition, hasLegacyStatus, convertLegacyStatusRows, STATUS_DEFINITION_ID } from '${root}/src/lib/blocks/legacyStatus';
-   export { extractUniqueLetters, parseSigilCalc, serializeSigilCalc, createSigilCalcBlock, createSigilCanvasBlock, createSigilChargeBlock, parseSigilCharge, serializeSigilCharge, sigilState, withoutConcealed, sigilImage, withSigilImage, letterList, sigilUnits, sigilPartBlock, sigilPartId, withSigilPart, withChargesCoveringOnly, withRenamedPartTargets, parseSigilDrawing, withSigilDrawing } from '${root}/src/lib/blocks/sigil';
+   export { extractUniqueLetters, parseSigilCalc, serializeSigilCalc, createSigilCalcBlock, createSigilCanvasBlock, createSigilChargeBlock, parseSigilCharge, serializeSigilCharge, sigilState, withoutConcealed, sigilImage, withSigilImage, letterList, sigilUnits, sigilPartBlock, sigilPartId, withSigilPart, withChargesCoveringOnly, withRenamedPartTargets, parseDrawing, withDrawing } from '${root}/src/lib/blocks/sigil';
    export { paintDocFromJson, paintDocToJson, emptyPaintDoc, isPaintDocEmpty, thinPoints, transformStroke, mergeDown, canMergeDown, strokeSamples, inPolygon, symmetricCopies, mirrorStroke, splitStroke } from '${root}/src/lib/paint/document';
    export { parseAltarElements, altarElementsJson } from '${root}/src/lib/altarElements';
    export { parseAltarSettings } from '${root}/src/lib/altarSettings';
@@ -69,7 +69,7 @@ const {
   withLegacyStatus, statusDefinition, hasLegacyStatus, convertLegacyStatusRows, STATUS_DEFINITION_ID,
   extractUniqueLetters, parseSigilCalc, serializeSigilCalc, createSigilCalcBlock, createSigilCanvasBlock,
   createSigilChargeBlock, parseSigilCharge, serializeSigilCharge, sigilState, withoutConcealed,
-  sigilImage, withSigilImage, letterList, renderBlocksForExport, parseSigilDrawing, withSigilDrawing,
+  sigilImage, withSigilImage, letterList, renderBlocksForExport, parseDrawing, withDrawing,
   paintDocFromJson, paintDocToJson, emptyPaintDoc, isPaintDocEmpty, thinPoints, transformStroke, mergeDown, canMergeDown, strokeSamples, inPolygon, symmetricCopies, mirrorStroke, splitStroke,
   group, ungroup, withGroups, moveInStack, copiesOf, align, parseAltarElements, altarElementsJson, parseAltarSettings,
   symbolFromDrawing, readUserSymbol,
@@ -465,15 +465,15 @@ console.log('\n4f. Sigil blocks\n');
   {
     const old = `${'ab'.repeat(32)}.png`;
     const render = `${'cd'.repeat(32)}.png`;
-    const legacy = parseSigilDrawing(canvas);
+    const legacy = parseDrawing(canvas);
     check('drawing: an old image becomes the only layer, nothing lost',
       legacy.render === old && legacy.doc?.layers.length === 1 && legacy.doc.layers[0].image === old && legacy.doc.layers[0].strokes.length === 0, legacy);
-    check('drawing: an empty block has neither image nor document', parseSigilDrawing(createSigilCanvasBlock()).doc === null);
+    check('drawing: an empty block has neither image nor document', parseDrawing(createSigilCanvasBlock()).doc === null);
 
     const stroke = { id: 's1', tool: 'pen', color: '#EF4444', size: 8, points: [1.234, 2.345, 0.5, 10, 20, 0.777], pressure: true };
     const doc = { layers: [{ ...legacy.doc.layers[0], strokes: [stroke] }, { id: 'top', name: 'Oben', hidden: true, image: null, strokes: [] }] }; // lang-ok
-    const saved = withSigilDrawing(canvas, render, doc);
-    const back = parseSigilDrawing(parseBlocks(serializeBlocks([saved]))[0]);
+    const saved = withDrawing(canvas, render, doc);
+    const back = parseDrawing(parseBlocks(serializeBlocks([saved]))[0]);
     check('drawing: the render comes first, the layer image after it, both as src',
       sigilImage(saved) === render && saved.html.includes(`src="${old}"`) && saved.html.indexOf(render) < saved.html.indexOf(old), saved.html);
     check('drawing: round trip keeps layers, strokes, the layer image; points rounded',
@@ -490,11 +490,11 @@ console.log('\n4f. Sigil blocks\n');
 
     // Something that knows only the image (an older app) replaced it: the new image counts, as a layer.
     const replaced = { ...saved, html: `<img src="${'ef'.repeat(32)}.png" alt="">` };
-    const stale = parseSigilDrawing(replaced);
+    const stale = parseDrawing(replaced);
     check('drawing: an unmarked image wins over a stale document',
       stale.doc?.layers.length === 1 && stale.doc.layers[0].image === `${'ef'.repeat(32)}.png`, stale);
 
-    const emptied = withSigilDrawing(saved, null, null);
+    const emptied = withDrawing(saved, null, null);
     check('drawing: emptied, the block holds nothing', emptied.html === '' && emptied.attrs['data-block-data'] === undefined, emptied);
     check('drawing: an empty document is empty', isPaintDocEmpty(emptyPaintDoc()) && !isPaintDocEmpty(doc));
 
@@ -757,8 +757,8 @@ console.log('\n4g2. The paint block\n');
 {
   const paint = createPaintBlock();
   const render = `${'5a'.repeat(32)}.png`;
-  const saved = withSigilDrawing(paint, render, emptyPaintDoc());
-  const back = parseSigilDrawing(parseBlocks(serializeBlocks([saved]))[0]);
+  const saved = withDrawing(paint, render, emptyPaintDoc());
+  const back = parseDrawing(parseBlocks(serializeBlocks([saved]))[0]);
   check('paint: a type of its own, known to the app, a drawing like the sigil\'s',
     paint.type === PAINT_BLOCK_TYPE && !!resolveBlockType(paint) && isDrawingBlockType(paint.type) && !isDrawingBlockType('core.canvas'));
   check('paint: picture and document survive the round trip', back.render === render && !!back.doc, back);

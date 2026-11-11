@@ -1,6 +1,7 @@
 import { generateId } from '../helpers';
 import { escapeHtml } from '../internalLinkHtml';
 import { ALTAR_LIBRARY_TAG_ID, storedImageName } from '../schema';
+import { paintDocToJson, type PaintDoc } from '../paint/document';
 import { createTextBlock, decodeHtmlAttr } from './blockHtml';
 import { BLOCK_ATTR, type BlockInstance, type BlockTypeId } from './types';
 
@@ -190,6 +191,23 @@ export function parseCanvasBlock(block: BlockInstance): CanvasBlock {
       guidesLocked: d.guidesLocked === true,
     },
   };
+}
+
+/**
+ * An element of the canvas editor as stored: a picture keeps its file (its
+ * `ref`), not the URL it is shown by; a drawing its compact JSON. The one
+ * place for that form — the block writes it, and so do the conversions.
+ */
+export function storedCanvasElement(el: Omit<StoredCanvasElement, 'props'> & { props: unknown }): StoredCanvasElement {
+  const stored: StoredCanvasElement = { ...el, props: { ...(el.props as Record<string, unknown>) } };
+  if (el.type === 'image') stored.props.src = storedImageName(el.ref) ?? null;
+  if (el.type === 'drawing') stored.props.doc = paintDocToJson(stored.props.doc as PaintDoc);
+  return stored;
+}
+
+/** A picture placed new: its file, upright and opaque, at `frame`. */
+export function storedImageElement(file: string, frame: Pick<StoredCanvasElement, 'id' | 'x' | 'y' | 'width' | 'height' | 'z'>): StoredCanvasElement {
+  return { ...frame, type: 'image', rotation: 0, opacity: 1, locked: false, hidden: false, ref: file, props: { src: file, emoji: '' } };
 }
 
 /** The stored file a picture element shows, or `null`. */

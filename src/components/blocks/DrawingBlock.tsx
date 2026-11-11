@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  CanvasEditor as CanvasEditorView, layerImageRefs, loadLayerImages, paintOnlyProfile, renderPaintPng,
+  CanvasEditor, layerImageRefs, loadLayerImages, paintOnlyProfile, renderPaintPng,
   type CanvasElement, type DrawingProps, type LayerImages,
 } from '../editors/canvas';
 import { canvasImageSrc, imageSrc, saveImage } from '../../lib/images';
-import { parseSigilDrawing, withSigilDrawing } from '../../lib/blocks/sigil';
+import { parseDrawing, withDrawing } from '../../lib/blocks/sigil';
 import { discardRenders } from '../../store/imageStore';
 import { emptyPaintDoc, isPaintDocEmpty, PAINT_HEIGHT, PAINT_WIDTH, type PaintDoc } from '../../lib/paint/document';
 import type { BlockViewProps } from './blockViews';
@@ -25,7 +25,7 @@ export interface DrawingTexts {
  * A drawing, painted in the canvas editor: the paint block, and the sigil
  * drawing, which puts its concealment around it. The block keeps the
  * vector document as its data and the rendered image as a stored file
- * (`saveImage`, see `parseSigilDrawing`); base64 never enters the content.
+ * (`saveImage`, see `parseDrawing`); base64 never enters the content.
  * The undo list lives only in the editor while editing; rendered images
  * that were saved in between are cleaned up by "Delete unused images"
  * (Settings → Storage).
@@ -70,7 +70,7 @@ export default function DrawingBlock({ block, isEditing, onBlockChange, onPersis
       const files = new Set(made.current);
       made.current.clear();
       // A render still on its way after Done lands in the block within the delay.
-      discardRenders(files, () => parseSigilDrawing(latest.current.block).render);
+      discardRenders(files, () => parseDrawing(latest.current.block).render);
     }
     wasEditing.current = isEditing;
   }, [isEditing]);
@@ -92,7 +92,7 @@ export default function DrawingBlock({ block, isEditing, onBlockChange, onPersis
     if (!mounted.current || mine !== seq.current) return;
     setSaveFailed(false);
     const { block: current, isEditing: editing, onBlockChange: change, onPersist: persist } = latest.current;
-    const next = withSigilDrawing(current, name, empty ? null : doc);
+    const next = withDrawing(current, name, empty ? null : doc);
     if (editing) change(next);
     else persist?.(next);
   }, []);
@@ -113,7 +113,7 @@ export default function DrawingBlock({ block, isEditing, onBlockChange, onPersis
   }, [flush]);
 
   if (!isEditing || locked) {
-    const render = parseSigilDrawing(block).render;
+    const render = parseDrawing(block).render;
     return (
       <div className="space-y-2">
         {isEditing && <p className="block-field-hint">{texts.locked}</p>}
@@ -125,7 +125,7 @@ export default function DrawingBlock({ block, isEditing, onBlockChange, onPersis
   }
   return (
     <div className="space-y-2">
-      <CanvasEditor
+      <DrawingEditor
         block={block}
         palette={palette}
         startColor={startColor}
@@ -154,7 +154,7 @@ const DRAWING_ID = 'sigil-drawing';
  * source could not be read back. If one cannot be loaded the editor is not
  * shown, since its next save would lose that image.
  */
-function CanvasEditor({ block, palette, startColor, startSize, loadFailed, onChange, onClose }: {
+function DrawingEditor({ block, palette, startColor, startSize, loadFailed, onChange, onClose }: {
   block: BlockViewProps['block'];
   palette: readonly string[];
   startColor: string;
@@ -164,7 +164,7 @@ function CanvasEditor({ block, palette, startColor, startSize, loadFailed, onCha
   onClose: () => void;
 }) {
   // The drawing it was opened with; afterwards the editor itself is the truth.
-  const [doc, setDoc] = useState(() => parseSigilDrawing(block).doc ?? emptyPaintDoc());
+  const [doc, setDoc] = useState(() => parseDrawing(block).doc ?? emptyPaintDoc());
   const [images, setImages] = useState<{ urls: Map<string, string>; loaded: LayerImages } | null>(null);
   const [failed, setFailed] = useState(false);
   useEffect(() => onClose, [onClose]);
@@ -207,7 +207,7 @@ function CanvasEditor({ block, palette, startColor, startSize, loadFailed, onCha
   if (failed) return <p className="paint-error">{loadFailed}</p>;
   if (!images) return null;
   return (
-    <CanvasEditorView
+    <CanvasEditor
       {...profile}
       layout="inline"
       width={PAINT_WIDTH}
