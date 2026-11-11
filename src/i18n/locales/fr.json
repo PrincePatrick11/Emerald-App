@@ -870,6 +870,7 @@
     "color": "Changer la couleur",
     "unused": "inutilisée",
     "onlyInTemplates": "seulement dans des modèles",
+    "onlyInImages": "seulement dans Images",
     "unusedHint": "Aucune entrée ne porte encore cette étiquette.",
     "createNamed": "+ Créer « {{name}} »",
     "unknownOpenDashboard": "Aucune étiquette « {{name}} » — la créer dans Étiquettes"

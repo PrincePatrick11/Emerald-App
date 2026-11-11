@@ -870,6 +870,7 @@
     "color": "Farbe ändern",
     "unused": "nicht verwendet",
     "onlyInTemplates": "nur in Vorlagen",
+    "onlyInImages": "nur in Bildern",
     "unusedHint": "Noch kein Eintrag trägt diesen Tag.",
     "createNamed": "+ „{{name}}“ anlegen",
     "unknownOpenDashboard": "Kein Tag „{{name}}“ — unter Tags anlegen"

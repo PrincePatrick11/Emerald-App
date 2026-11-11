@@ -5,6 +5,7 @@ import { Pencil, Trash2 } from 'lucide-react';
 import { TAG_COLORS, TAG_NAME_TAKEN, randomTagColor, useTagStore } from '../../store/tagStore';
 import { useEntryStore } from '../../store/entryStore';
 import { useTemplateStore } from '../../store/templateStore';
+import { useImageStore } from '../../store/imageStore';
 import { useCategoryStore } from '../../store/categoryStore';
 import { TAGS_SORTS, isTagsSort, useUIStore } from '../../store/uiStore';
 import { useUndoStore } from '../../store/undoStore';
@@ -138,6 +139,7 @@ export default function TagsView() {
   const articles = useEntryStore((s) => s.entries.wiki);
   const operations = useEntryStore((s) => s.entries.operation);
   const templates = useTemplateStore((s) => s.templates);
+  const images = useImageStore((s) => s.images);
   const categories = useCategoryStore((s) => s.categories);
   const sort = useUIStore((s) => s.tagsSort);
   const setSort = useUIStore((s) => s.setTagsSort);
@@ -200,6 +202,9 @@ export default function TagsView() {
     for (const template of templates) for (const tagId of template.tags) map.set(tagId, (map.get(tagId) ?? 0) + 1);
     return map;
   }, [templates]);
+
+  /** Tag IDs some picture of "Images" carries: such a tag is not unused either. */
+  const imageTags = useMemo(() => new Set(images.flatMap((image) => image.tags)), [images]);
 
   const query = search.trim().toLowerCase();
   const filterActive = moduleFilter.length > 0;
@@ -348,7 +353,7 @@ export default function TagsView() {
         {usage
           ? <ModuleCounts modules={TAG_MODULE_IDS} counts={usage} />
           : <span className="text-xs text-muted flex-shrink-0">
-              {templateUsage.has(tag.id) ? t('tags.onlyInTemplates') : t('tags.unused')}
+              {templateUsage.has(tag.id) ? t('tags.onlyInTemplates') : imageTags.has(tag.id) ? t('tags.onlyInImages') : t('tags.unused')}
             </span>}
       </DashboardRow>
     );

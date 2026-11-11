@@ -870,6 +870,7 @@
     "color": "Cambiar color",
     "unused": "sin usar",
     "onlyInTemplates": "solo en plantillas",
+    "onlyInImages": "solo en Imágenes",
     "unusedHint": "Ninguna entrada lleva esta etiqueta todavía.",
     "createNamed": "+ Crear «{{name}}»",
     "unknownOpenDashboard": "No existe «{{name}}» — créala en Etiquetas"

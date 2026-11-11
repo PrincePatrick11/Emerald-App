@@ -43,7 +43,7 @@ export default function ImagePickerModal({ multiple }: { multiple: boolean }) {
     for (const item of (multiple ? items : items.slice(0, 1))) {
       try {
         const file = await store(item);
-        await useImageStore.getState().saveDetails(file, { name: name(item) });
+        await useImageStore.getState().takeIn(file, { name: name(item) });
         files.push(file);
       } catch (e) {
         reportImageError(e, `pick ${label(item)}`);

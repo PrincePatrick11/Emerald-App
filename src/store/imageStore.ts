@@ -35,6 +35,13 @@ interface ImageState {
    * cleanup, so every picture added through "Images" gets one, named or not.
    */
   saveDetails: (file: string, patch?: ImagePatch) => Promise<VaultImage | null>;
+  /**
+   * A file from the disk taken into "Images" (the add dialog, the picker, a
+   * drop on a canvas): a new picture under `name` with `tags`. One already
+   * there — the same content is the same file — keeps its name and gains the
+   * tags; from the trash it comes back.
+   */
+  takeIn: (file: string, details: { name: string; tags?: string[] }) => Promise<VaultImage | null>;
   updateImage: (id: string, patch: ImagePatch) => Promise<void>;
   /** Into the trash; the file stays until the cleanup finds it unused. */
   deleteImage: (id: string) => Promise<void>;
@@ -104,6 +111,17 @@ export const useImageStore = create<ImageState>((set, get) => ({
     );
     set((s) => ({ images: [...s.images, image].sort(byName) }));
     return image;
+  },
+
+  takeIn: async (file, { name, tags = [] }) => {
+    const row = await get().saveDetails(file);
+    if (!row) return null;
+    const patch: ImagePatch = {};
+    if (!row.name && name.trim()) patch.name = name.trim();
+    const merged = [...new Set([...row.tags, ...tags])];
+    if (merged.length !== row.tags.length) patch.tags = merged;
+    if (Object.keys(patch).length) await get().updateImage(row.id, patch);
+    return get().images.find((image) => image.id === row.id) ?? row;
   },
 
   // serialized: see lib/serialize.ts.

@@ -20,7 +20,8 @@ interface Staged {
 
 /**
  * Adding pictures to "Images": drop files from the disk onto the dialog (or
- * choose them), name each, give them all tags, then add. A file is stored as
+ * choose them), name each, give them all tags, then add. A picture already
+ * there keeps its name and gains the tags (`takeIn`). A file is stored as
  * it comes in, prepared like any inserted image (limits, photo as JPEG); one
  * left out with Cancel stays unreferenced and goes with the next cleanup.
  * Files dropped onto the view open the dialog with them (`dropped`).
@@ -44,7 +45,9 @@ export default function AddImagesModal({ dropped, dragOver, initialTags, onClose
     for (const item of items) {
       try {
         const file = await store(item);
-        setStaged((list) => (list.some((s) => s.file === file) ? list : [...list, { file, name: name(item) }]));
+        // A picture already in "Images" keeps its name (`takeIn`): shown as it is.
+        const known = useImageStore.getState().images.find((image) => image.file === file)?.name;
+        setStaged((list) => (list.some((s) => s.file === file) ? list : [...list, { file, name: known || name(item) }]));
       } catch (e) {
         reportImageError(e, `add ${label(item)}`);
       } finally {
@@ -72,7 +75,12 @@ export default function AddImagesModal({ dropped, dragOver, initialTags, onClose
 
   const add = async () => {
     const store = useImageStore.getState();
-    for (const item of staged) await store.saveDetails(item.file, { name: item.name.trim(), tags });
+    for (const item of staged) {
+      const row = await store.takeIn(item.file, { name: item.name, tags });
+      // A name typed over the one it had.
+      const typed = item.name.trim();
+      if (row && typed && row.name !== typed) await store.updateImage(row.id, { name: typed });
+    }
     await store.refreshFiles();
     onClose();
   };

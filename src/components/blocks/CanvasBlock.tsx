@@ -287,7 +287,7 @@ export default function CanvasBlock({ block, isEditing, onBlockChange, onPersist
   const tagForNew = useCallback(async (): Promise<string> => {
     if (activeTag) return activeTag;
     if (!parts.images || stripTag !== ALTAR_LIBRARY_TAG_ID) return '';
-    const tag = await useTagStore.getState().ensureTag(ALTAR_LIBRARY_TAG_NAME);
+    const tag = await useTagStore.getState().ensureTag(ALTAR_LIBRARY_TAG_NAME, ALTAR_LIBRARY_TAG_ID);
     setStripTag(tag.id);
     return tag.id;
   }, [activeTag, parts.images, stripTag, setStripTag]);
@@ -316,10 +316,7 @@ export default function CanvasBlock({ block, isEditing, onBlockChange, onPersist
       for (const path of images) {
         try {
           const file = await storeImageFromPath(path);
-          const store = useImageStore.getState();
-          const had = store.images.find((image) => image.file === file)?.tags ?? [];
-          const tags = tag && !had.includes(tag) ? [...had, tag] : undefined;
-          await store.saveDetails(file, { name: fileBaseName(path), ...(tags ? { tags } : {}) });
+          await useImageStore.getState().takeIn(file, { name: fileBaseName(path), tags: tag ? [tag] : [] });
           await place(file, { x: at.x + offset, y: at.y + offset });
           offset += 32;
         } catch (e) {

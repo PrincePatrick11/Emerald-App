@@ -95,7 +95,8 @@ interface TagState {
   tags: Tag[];
 
   fetchTags: () => Promise<void>;
-  ensureTag: (name: string) => Promise<Tag>;
+  /** `id` only for a tag with a fixed ID ("Altar Library"), used when the name is new. */
+  ensureTag: (name: string, id?: string) => Promise<Tag>;
   /** Like ensureTag, but throws TAG_NAME_TAKEN instead of returning the
    *  existing tag. Without `color` the tag gets a random one from TAG_COLORS. */
   createTag: (name: string, color?: string) => Promise<Tag>;
@@ -118,7 +119,7 @@ interface TagState {
 
 export const useTagStore = create<TagState>((set, get) => {
   /** Returns the existing tag of the same name or creates it. */
-  const ensure = (name: string, color?: string): Promise<Tag> => serialized(NEW_TAG_KEY, async () => {
+  const ensure = (name: string, color?: string, fixedId?: string): Promise<Tag> => serialized(NEW_TAG_KEY, async () => {
     const trimmed = name.trim();
     const existing = get().tags.find((t) => sameName(t.name, trimmed));
     if (existing) return existing;
@@ -130,7 +131,9 @@ export const useTagStore = create<TagState>((set, get) => {
       tag = color ? { ...revived, color } : revived;
       if (color) await db.execute('UPDATE tags SET color=$1 WHERE id=$2', [color, tag.id]);
     } else {
-      tag = { id: generateId(), name: trimmed, color: color ?? randomTagColor() };
+      // The fixed ID only while no row holds it (renamed, in the trash).
+      const taken = fixedId ? (await db.select<{ n: number }[]>('SELECT COUNT(*) AS n FROM tags WHERE id=$1', [fixedId]))[0]?.n : 0;
+      tag = { id: fixedId && !taken ? fixedId : generateId(), name: trimmed, color: color ?? randomTagColor() };
       await db.execute('INSERT INTO tags (id, name, color) VALUES ($1, $2, $3)', [tag.id, tag.name, tag.color]);
     }
     set((s) => ({
@@ -155,7 +158,7 @@ export const useTagStore = create<TagState>((set, get) => {
       set({ tags: rows.map(fromRow.tag).sort(byName) });
     },
 
-    ensureTag: (name) => ensure(name),
+    ensureTag: (name, id) => ensure(name, undefined, id),
 
     createTag: async (name, color) => {
       // The check before the chain, not inside it: there it would throw through

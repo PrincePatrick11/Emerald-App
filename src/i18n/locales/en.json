@@ -870,6 +870,7 @@
     "color": "Change color",
     "unused": "unused",
     "onlyInTemplates": "only in templates",
+    "onlyInImages": "only in Images",
     "unusedHint": "No entry carries this tag yet.",
     "createNamed": "+ Create “{{name}}”",
     "unknownOpenDashboard": "No tag “{{name}}” — create it in Tags"
