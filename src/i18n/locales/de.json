@@ -274,6 +274,10 @@
       "sigilCharge": {
         "label": "Ladung",
         "description": "Zieldatum, Ladetechnik und das Laden der Sigille. Geladen verbirgt sie die gewählten Rechner und Zeichnungen und sperrt den Eintrag oder nur diese Blöcke."
+      },
+      "canvas": {
+        "label": "Leinwand",
+        "description": "Bilder aus „Bilder“, Formen, Text, Symbole und Zeichnungen, frei angeordnet."
       }
     },
     "kinds": {
@@ -368,6 +372,18 @@
       "search": "Altar suchen …",
       "missing": "Der Altar „{{name}}“ ist nicht mehr da",
       "open": "Altar öffnen"
+    },
+    "canvas": {
+      "broken": "Diese Leinwand ließ sich nicht lesen. Sie bleibt, wie sie ist.",
+      "empty": "Noch nichts auf der Leinwand.",
+      "parts": "Angeboten",
+      "part": {
+        "images": "Bilder",
+        "shapes": "Formen",
+        "text": "Text",
+        "symbols": "Symbole",
+        "drawing": "Zeichnen"
+      }
     }
   },
   "editor": {
@@ -892,7 +908,8 @@
     "insertCount_other": "{{count}} Bilder einfügen",
     "searchPlaceholder": "Bilder durchsuchen …",
     "noMatch": "Kein Bild passt.",
-    "pickEmpty": "Noch keine Bilder – nimm welche von der Festplatte oder zieh sie hierher."
+    "pickEmpty": "Noch keine Bilder – nimm welche von der Festplatte oder zieh sie hierher.",
+    "stripEmpty": "Noch keine Bilder – zieh Dateien auf die Leinwand, um welche hinzuzufügen."
   },
   "tags": {
     "new": "Neuer Tag",

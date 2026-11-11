@@ -2552,6 +2552,34 @@ html[data-theme] .prop-segment--active {
   background: var(--well-deep);
 }
 /* The picture picker (ImagePickerModal): compact tiles, the chosen ones ringed. */
+/* The canvas block (CanvasBlock): the canvas, in edit mode with "Images"
+   beside it to drag from. */
+.canvas-block {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  min-width: 0;
+}
+.canvas-block-stage {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.image-strip {
+  flex: 0 0 172px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 560px;
+  min-height: 0;
+}
+.image-strip-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 76px);
+  gap: 6px;
+  overflow-y: auto;
+  min-height: 0;
+  padding: 2px;
+}
 .image-picker-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(88px, 1fr));

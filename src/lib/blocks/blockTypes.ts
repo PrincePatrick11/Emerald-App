@@ -1,7 +1,8 @@
-import { PenTool, SlidersHorizontal, Sparkles, Type, Zap, type LucideIcon } from 'lucide-react';
+import { Frame, PenTool, SlidersHorizontal, Sparkles, Type, Zap, type LucideIcon } from 'lucide-react';
 import { BLOCK_ATTR, TEXT_BLOCK_TYPE, type BlockInstance, type BlockTypeId } from './types';
 import { FIELDS_BLOCK_TYPE } from './fields';
 import { SIGIL_CALC_TYPE, SIGIL_CANVAS_TYPE, SIGIL_CHARGE_TYPE } from './sigil';
+import { CANVAS_BLOCK_TYPE } from './canvas';
 
 /**
  * The registry of block types — the pure part (metadata). Which component
@@ -55,6 +56,16 @@ const BLOCK_TYPES = new Map<string, BlockTypeMeta>([
     group: 'fields',
     dataVersion: 1,
     // A single field carries its label in the row anyway.
+    defaultShowTitle: false,
+  }],
+  [CANVAS_BLOCK_TYPE, {
+    id: CANVAS_BLOCK_TYPE,
+    origin: 'core',
+    icon: Frame,
+    labelKey: 'blocks.types.canvas.label',
+    descriptionKey: 'blocks.types.canvas.description',
+    group: 'media',
+    dataVersion: 1,
     defaultShowTitle: false,
   }],
   ...([

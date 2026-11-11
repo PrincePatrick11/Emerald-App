@@ -1,7 +1,9 @@
 import type { ComponentType } from 'react';
 import type { BlockAttrName, BlockInstance } from '../../lib/blocks/types';
 import { FIELDS_BLOCK_TYPE } from '../../lib/blocks/fields';
+import { CANVAS_BLOCK_TYPE } from '../../lib/blocks/canvas';
 import FieldsSidebarEdit from './FieldsSidebarEdit';
+import CanvasSidebarEdit from './CanvasSidebarEdit';
 
 /**
  * Settings that a block type brings into the right sidebar: one
@@ -13,7 +15,8 @@ import FieldsSidebarEdit from './FieldsSidebarEdit';
  *
  * The text block registers nothing: title and visibility apply to every
  * block and are in the management list. The field block brings its
- * settings along (labels, options, display rules).
+ * settings along (labels, options, display rules), the canvas block the
+ * parts it offers.
  *
  * Import rule: only `BlockSidebarArea` imports this file, and it must not
  * pull in anything that loads TipTap, since the sidebar is loaded eagerly.
@@ -41,4 +44,5 @@ export interface BlockSidebarViews {
 
 export const BLOCK_SIDEBAR_VIEWS: ReadonlyMap<string, BlockSidebarViews> = new Map<string, BlockSidebarViews>([
   [FIELDS_BLOCK_TYPE, { Edit: FieldsSidebarEdit }],
+  [CANVAS_BLOCK_TYPE, { Edit: CanvasSidebarEdit }],
 ]);

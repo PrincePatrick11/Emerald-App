@@ -274,6 +274,10 @@
       "sigilCharge": {
         "label": "Charge",
         "description": "Target date, charging technique and loading the sigil. Once loaded it hides the chosen calculators and drawings and locks the entry or only those blocks."
+      },
+      "canvas": {
+        "label": "Canvas",
+        "description": "Pictures from \"Images\", shapes, text, symbols and drawings, arranged freely."
       }
     },
     "kinds": {
@@ -368,6 +372,18 @@
       "search": "Search altars…",
       "missing": "The altar “{{name}}” no longer exists",
       "open": "Open altar"
+    },
+    "canvas": {
+      "broken": "This canvas could not be read. It stays as it is.",
+      "empty": "Nothing on the canvas yet.",
+      "parts": "On offer",
+      "part": {
+        "images": "Images",
+        "shapes": "Shapes",
+        "text": "Text",
+        "symbols": "Symbols",
+        "drawing": "Drawing"
+      }
     }
   },
   "editor": {
@@ -892,7 +908,8 @@
     "insertCount_other": "Insert {{count}} images",
     "searchPlaceholder": "Search images …",
     "noMatch": "No image matches.",
-    "pickEmpty": "No images yet – take some from the disk, or drop them here."
+    "pickEmpty": "No images yet – take some from the disk, or drop them here.",
+    "stripEmpty": "No images yet – drop files on the canvas to add some."
   },
   "tags": {
     "new": "New tag",

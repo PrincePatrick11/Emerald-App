@@ -37,6 +37,7 @@ writeFileSync(
    export { readUserSymbol } from '${root}/src/lib/userSymbols';
    export { group, ungroup, withGroups, moveInStack, copiesOf, align } from '${root}/src/components/editors/canvas/canvasActions';
    export { renderBlocksForExport } from '${root}/src/lib/blocks/exportRender';
+   export { createCanvasBlock, parseCanvasBlock, withCanvasScene, withCanvasParts, withoutCanvasFile, CANVAS_BLOCK_TYPE } from '${root}/src/lib/blocks/canvas';
    export { parseAssignments, resolveAssignedTemplate, instantiateTemplateBlocks, isContentEmpty, templateStart, mergeTemplateTags, assignedTemplateAt, areBlocksEmpty, fieldsWithTemplate, fieldsWithoutTemplate } from '${root}/src/lib/blocks/templates';
    export { internalLinkChipHtml } from '${root}/src/lib/internalLinkHtml';
    export { extractInternalLinks } from '${root}/src/lib/internalLinkHtml';`
@@ -75,6 +76,7 @@ const {
   parseAssignments, resolveAssignedTemplate, instantiateTemplateBlocks, isContentEmpty,
   templateStart, mergeTemplateTags, assignedTemplateAt, areBlocksEmpty,
   fieldsWithTemplate, fieldsWithoutTemplate,
+  createCanvasBlock, parseCanvasBlock, withCanvasScene, withCanvasParts, withoutCanvasFile, CANVAS_BLOCK_TYPE,
 } = bundle;
 
 const failures = [];
@@ -995,6 +997,43 @@ console.log('\n6. Templates: assignment, insertion\n');
   check('assigned exactly here, without fallback',
     assignedTemplateAt(all, 'wiki', 'herbs') === undefined && assignedTemplateAt(all, 'wiki', '*')?.id === 'fallback');
   check('empty blocks', areBlocksEmpty([createTextBlock('<p></p>')]) && !areBlocksEmpty([createTextBlock('<p>x</p>')]));
+}
+
+console.log('\nCanvas block\n');
+{
+  const pic = `${'a'.repeat(64)}.png`;
+  const bg = `${'b'.repeat(64)}.webp`;
+  const render = `${'c'.repeat(64)}.png`;
+  const image = (id, file) => ({ id, type: 'image', x: 10, y: 20, width: 100, height: 50, rotation: 0, opacity: 1, locked: false, hidden: false, z: 0, ref: file, props: { src: file, emoji: '' } });
+  const fresh = createCanvasBlock();
+  const parsed = parseCanvasBlock(fresh);
+  check('a new canvas: empty, all parts on, no render',
+    fresh.type === CANVAS_BLOCK_TYPE && parsed.scene.elements.length === 0 && Object.values(parsed.parts).every(Boolean) && parsed.render === null, parsed);
+
+  const scene = { ...parsed.scene, elements: [image('i1', pic), image('i2', pic)], background: { fill: { kind: 'none' }, image: { src: bg, fit: 'cover' }, tint: null } };
+  const full = withCanvasScene(fresh, scene, render);
+  check('the inner HTML: the render first, then each picture once, then the background',
+    full.html === `<img src="${render}" alt="" data-canvas="render"><img src="${pic}" alt="" data-canvas="image"><img src="${bg}" alt="" data-canvas="background">`, full.html);
+  const back = parseCanvasBlock(parseBlocks(serializeBlocks([full]))[0]);
+  check('scene and render survive the round trip', back.render === render && back.scene.elements.length === 2 && back.scene.elements[0].ref === pic, back);
+
+  const off = parseCanvasBlock(withCanvasParts(full, { ...parsed.parts, drawing: false })).parts;
+  check('parts are kept', off.drawing === false && off.images === true);
+
+  const without = parseCanvasBlock(withoutCanvasFile(full, pic));
+  check('a picture taken out: its elements go, the render with them', without.scene.elements.length === 0 && without.render === null, without);
+  const noBg = parseCanvasBlock(withoutCanvasFile(full, bg));
+  check('the background picture taken out: the elements stay', noBg.scene.elements.length === 2 && noBg.scene.background.image === null, noBg.scene);
+
+  const broken = { ...fresh, attrs: { ...fresh.attrs, [BLOCK_ATTR.data]: '{nope' } };
+  check('unreadable data is broken and never rewritten', parseCanvasBlock(broken).broken && withoutCanvasFile(broken, pic) === broken);
+  const foreign = { ...fresh, attrs: { ...fresh.attrs, [BLOCK_ATTR.data]: JSON.stringify({ width: 1e9, elements: [{ id: 'x y', type: 'image' }, { id: 'ok', type: 'shape', x: 'a' }] }) } };
+  const read = parseCanvasBlock(foreign).scene;
+  check('foreign data: sizes bounded, bad ids left out, numbers filled in',
+    read.width === 8192 && read.elements.length === 1 && read.elements[0].x === 0, read);
+
+  const exported = renderBlocksForExport(serializeBlocks([full]), { title: () => 'Canvas' });
+  check('the export shows the rendered picture', exported.includes(render) && !exported.includes(`src="${pic}"`), exported);
 }
 
 console.log('');

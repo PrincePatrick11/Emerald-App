@@ -274,6 +274,10 @@
       "sigilCharge": {
         "label": "Charge",
         "description": "Date cible, technique de charge et chargement du sigil. Chargé, il masque les calculateurs et dessins choisis et verrouille l'entrée ou seulement ces blocs."
+      },
+      "canvas": {
+        "label": "Toile",
+        "description": "Des images de « Images », des formes, du texte, des symboles et des dessins, disposés librement."
       }
     },
     "kinds": {
@@ -368,6 +372,18 @@
       "search": "Rechercher un autel…",
       "missing": "L'autel « {{name}} » n'existe plus",
       "open": "Ouvrir l'autel"
+    },
+    "canvas": {
+      "broken": "Cette toile n’a pas pu être lue. Elle reste telle quelle.",
+      "empty": "Rien sur la toile pour l’instant.",
+      "parts": "Proposé",
+      "part": {
+        "images": "Images",
+        "shapes": "Formes",
+        "text": "Texte",
+        "symbols": "Symboles",
+        "drawing": "Dessin"
+      }
     }
   },
   "editor": {
@@ -892,7 +908,8 @@
     "insertCount_other": "Insérer {{count}} images",
     "searchPlaceholder": "Rechercher des images …",
     "noMatch": "Aucune image ne correspond.",
-    "pickEmpty": "Pas encore d’images – prenez-en sur le disque ou déposez-les ici."
+    "pickEmpty": "Pas encore d’images – prenez-en sur le disque ou déposez-les ici.",
+    "stripEmpty": "Pas encore d’images – déposez des fichiers sur la toile pour en ajouter."
   },
   "tags": {
     "new": "Nouvelle étiquette",

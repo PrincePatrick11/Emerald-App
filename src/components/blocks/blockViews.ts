@@ -2,7 +2,9 @@ import type { ComponentType } from 'react';
 import { TEXT_BLOCK_TYPE, type BlockInstance } from '../../lib/blocks/types';
 import { FIELDS_BLOCK_TYPE, type ElementDef } from '../../lib/blocks/fields';
 import { SIGIL_CALC_TYPE, SIGIL_CANVAS_TYPE, SIGIL_CHARGE_TYPE, type SigilState } from '../../lib/blocks/sigil';
+import { CANVAS_BLOCK_TYPE } from '../../lib/blocks/canvas';
 import TextBlock from './TextBlock';
+import CanvasBlock from './CanvasBlock';
 import FieldsBlock from './FieldsBlock';
 import SigilCalcBlock from './SigilCalcBlock';
 import SigilCanvasBlock from './SigilCanvasBlock';
@@ -55,4 +57,5 @@ export const BLOCK_VIEWS: ReadonlyMap<string, ComponentType<BlockViewProps>> = n
   [SIGIL_CALC_TYPE, SigilCalcBlock],
   [SIGIL_CANVAS_TYPE, SigilCanvasBlock],
   [SIGIL_CHARGE_TYPE, SigilChargeBlock],
+  [CANVAS_BLOCK_TYPE, CanvasBlock],
 ]);

@@ -3,24 +3,11 @@ import type { Editor } from '@tiptap/react';
 import { getCurrentWebview } from '@tauri-apps/api/webview';
 import { storeImageFromPath } from '../../../lib/storeImage';
 import { useImagePickerStore } from '../../../store/imagePickerStore';
-import { isWindows } from '../../../lib/platform';
-import { useSettingsStore } from '../../../store/settingsStore';
+import { dropClaimedAt, dropPositionToCss } from '../../../hooks/useFileDrop';
 import { reportImageError, useImageNoticeStore } from '../../../store/imageNoticeStore';
 import { editorAtPoint, lineSpot, type DropSpot } from './dropSpot';
 import { editorHas } from './hostContext';
 import { insertImagesInOrder } from './editorCommands';
-
-/**
- * A position of Tauri's drag-drop event in the page's CSS pixels. The event
- * calls it physical, but only WebView2 delivers device pixels — and its
- * `devicePixelRatio` includes the page zoom. WKWebView and WebKitGTK deliver
- * the view's points, unzoomed, so there the UI scale (`setZoom`) divides
- * (wry: `wkwebview/drag_drop.rs`, `webkitgtk/drag_drop.rs`).
- */
-function dropPositionToCss(position: { x: number; y: number }): { x: number; y: number } {
-  const factor = isWindows ? window.devicePixelRatio : useSettingsStore.getState().settings.appearance.uiScale / 100;
-  return { x: position.x / factor, y: position.y / factor };
-}
 
 interface FileDropOptions {
   enabled: boolean;
@@ -49,6 +36,7 @@ export function useEditorFileDrop({ enabled, getEditors, getContainer, getFallba
   const spotAt = (position: { x: number; y: number }): DropSpot | null => {
     const { getEditors, getContainer } = optionsRef.current;
     const { x, y } = dropPositionToCss(position);
+    if (dropClaimedAt({ x, y })) return null;
     const target = editorAtPoint(getEditors().filter((ed) => editorHas(ed, 'image')), getContainer(), x, y);
     return target ? lineSpot(target.editor, target.y) : null;
   };
@@ -78,6 +66,8 @@ export function useEditorFileDrop({ enabled, getEditors, getContainer, getFallba
           if (useImagePickerStore.getState().request) { optionsRef.current.onSpot(null); return; }
           optionsRef.current.onSpot(null);
           const { paths, position } = event.payload;
+          // A place under the pointer takes the files itself.
+          if (dropClaimedAt(dropPositionToCss(position))) return;
           const imagePaths = paths.filter((p) => /\.(png|jpe?g|gif|webp|svg)$/i.test(p));
           if (!imagePaths.length) { useImageNoticeStore.getState().show({ kind: 'format' }); return; }
 

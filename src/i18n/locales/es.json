@@ -274,6 +274,10 @@
       "sigilCharge": {
         "label": "Carga",
         "description": "Fecha objetivo, técnica de carga y la carga del sigilo. Cargado oculta las calculadoras y dibujos elegidos y bloquea la entrada o solo esos bloques."
+      },
+      "canvas": {
+        "label": "Lienzo",
+        "description": "Imágenes de «Imágenes», formas, texto, símbolos y dibujos, colocados libremente."
       }
     },
     "kinds": {
@@ -368,6 +372,18 @@
       "search": "Buscar altar…",
       "missing": "El altar «{{name}}» ya no existe",
       "open": "Abrir altar"
+    },
+    "canvas": {
+      "broken": "Este lienzo no se pudo leer. Se queda como está.",
+      "empty": "Todavía no hay nada en el lienzo.",
+      "parts": "Disponible",
+      "part": {
+        "images": "Imágenes",
+        "shapes": "Formas",
+        "text": "Texto",
+        "symbols": "Símbolos",
+        "drawing": "Dibujo"
+      }
     }
   },
   "editor": {
@@ -892,7 +908,8 @@
     "insertCount_other": "Insertar {{count}} imágenes",
     "searchPlaceholder": "Buscar imágenes …",
     "noMatch": "Ninguna imagen coincide.",
-    "pickEmpty": "Aún no hay imágenes: toma algunas del disco o suéltalas aquí."
+    "pickEmpty": "Aún no hay imágenes: toma algunas del disco o suéltalas aquí.",
+    "stripEmpty": "Aún no hay imágenes: suelta archivos en el lienzo para añadirlas."
   },
   "tags": {
     "new": "Nueva etiqueta",

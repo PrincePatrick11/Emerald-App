@@ -12,6 +12,7 @@ import {
   todayIso,
 } from './sigil';
 import { TEXT_BLOCK_TYPE, type BlockInstance } from './types';
+import { CANVAS_BLOCK_TYPE, parseCanvasBlock } from './canvas';
 
 /**
  * The blocks of an entry as HTML for PDF and Markdown — one serializer per
@@ -137,6 +138,11 @@ function bodyHtml(
     case SIGIL_CANVAS_TYPE:
     case SIGIL_CHARGE_TYPE:
       return sigilHtml(block, text);
+    case CANVAS_BLOCK_TYPE: {
+      // The rendered picture; the pictures behind it are only references.
+      const { render } = parseCanvasBlock(block);
+      return render ? imageHtml(render, text.title(block, meta)) : '';
+    }
     case TEXT_BLOCK_TYPE:
     default: // Unknown type or format too new: the stored fallback.
       return block.html;
