@@ -95,7 +95,7 @@ src/
 │   ├── useEditActions.ts        registers Done/Cancel/Delete in the sidebar
 │   ├── useDraftPage.ts          draft lifecycle of block/template pages
 │   ├── useGlobalSearch.ts, useDeepLink.ts, useLinkItems.ts
-│   ├── useOutsideClick.ts, useCloseOnKeepEditing.ts
+│   ├── useOutsideClick.ts, useCloseOnKeepEditing.ts, useHorizontalWheel.ts
 │   ├── useMouseNavigation.ts    mouse back/forward buttons, browser keys
 │   ├── useCollapsedSet.ts, usePersistedFlag.ts, usePointerReorder.ts
 │   ├── useOpenInNewTabAction.tsx, useSaveAsTemplateAction.tsx
