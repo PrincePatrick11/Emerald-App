@@ -73,7 +73,8 @@ export const imageType: CanvasElementType<ImageProps> = {
     // Opaque: WebKit draws a colour emoji with the alpha of the current fill,
     // which may still be whatever the caller painted last (an overlay).
     ctx.fillStyle = '#000000';
-    ctx.font = `${Math.round(Math.max(w, h) * 0.8)}px serif`;
+    // The colour emoji fonts first: a serif without them draws a black glyph (Linux without Noto Color Emoji).
+    ctx.font = `${Math.round(Math.max(w, h) * 0.8)}px "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", serif`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText(el.props.emoji, w / 2, h / 2);

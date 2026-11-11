@@ -1,6 +1,7 @@
 import { Fragment, useRef, useState, type ReactNode } from 'react';
 import { useOutsideClick } from '../../../hooks/useOutsideClick';
 import { useTranslation } from 'react-i18next';
+import { keys } from './shortcuts';
 import {
   AlignHorizontalDistributeCenter, AlignHorizontalJustifyCenter, AlignHorizontalJustifyEnd,
   AlignHorizontalJustifyStart, AlignVerticalDistributeCenter, AlignVerticalJustifyCenter, AlignVerticalJustifyEnd,
@@ -105,10 +106,10 @@ export default function CanvasToolbar({ controller: c, end }: { controller: Canv
               </PopoverButton>
             )}
             {f.group && editable.length > 1 && (
-              <ToolbarBtn onClick={c.group} active={false} title={t('canvas.layers.groupAction')}><Group size={14} /></ToolbarBtn>
+              <ToolbarBtn onClick={c.group} active={false} title={t('canvas.layers.groupAction', { keys: keys('G') })}><Group size={14} /></ToolbarBtn>
             )}
             {f.group && grouped && (
-              <ToolbarBtn onClick={c.ungroup} active={false} title={t('canvas.layers.ungroup')}><Ungroup size={14} /></ToolbarBtn>
+              <ToolbarBtn onClick={c.ungroup} active={false} title={t('canvas.layers.ungroup', { keys: keys('G', true, true) })}><Ungroup size={14} /></ToolbarBtn>
             )}
             <ToolbarBtn onClick={c.duplicate} active={false} title={t('canvas.duplicate')}><Copy size={14} /></ToolbarBtn>
             <ToolbarBtn onClick={c.removeSelected} active={false} title={t('canvas.remove')}><Trash2 size={14} /></ToolbarBtn>

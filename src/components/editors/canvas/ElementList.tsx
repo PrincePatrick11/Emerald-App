@@ -1,5 +1,6 @@
 import { memo, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { keys } from './shortcuts';
 import { Copy, Group, Trash2, Ungroup } from 'lucide-react';
 import { DRAG_THRESHOLD_PX, trackPointerDrag } from '../../../lib/pointerDrag';
 import { ToolbarBtn } from '../shared/toolbarParts';
@@ -157,10 +158,10 @@ export default function ElementList({
             <Copy size={14} />
           </ToolbarBtn>
           {canGroup && (<>
-            <ToolbarBtn onClick={onGroup} active={false} disabled={editable.length < 2} title={t('canvas.layers.groupAction')}>
+            <ToolbarBtn onClick={onGroup} active={false} disabled={editable.length < 2} title={t('canvas.layers.groupAction', { keys: keys('G') })}>
               <Group size={14} />
             </ToolbarBtn>
-            <ToolbarBtn onClick={onUngroup} active={false} disabled={!selectedGroups.size} title={t('canvas.layers.ungroup')}>
+            <ToolbarBtn onClick={onUngroup} active={false} disabled={!selectedGroups.size} title={t('canvas.layers.ungroup', { keys: keys('G', true, true) })}>
               <Ungroup size={14} />
             </ToolbarBtn>
           </>)}

@@ -7,7 +7,7 @@ import type { ContextMenuAction } from '../../ui/ContextMenu';
 import type { ArrangeMove } from './canvasActions';
 import type { CanvasFeatures } from './features';
 import type { CanvasElement } from './types';
-import { DELETE_KEY, keys } from './shortcuts';
+import { deleteKey, keys } from './shortcuts';
 
 export interface CanvasMenuContext {
   t: TFunction;
@@ -88,7 +88,7 @@ export function canvasMenuActions(c: CanvasMenuContext): ContextMenuAction[] {
   actions.push(
     { label: t('canvas.layers.lock'), icon: <Lock size={12} />, onClick: () => c.patch(ids, { locked: true }), separator: true },
     { label: t(hidden ? 'canvas.layers.show' : 'canvas.layers.hide'), icon: hidden ? <Eye size={12} /> : <EyeOff size={12} />, onClick: () => c.patch(ids, { hidden: !hidden }) },
-    { label: t('canvas.remove'), icon: <Trash2 size={12} />, shortcut: DELETE_KEY, onClick: c.remove, danger: true, separator: true, disabled: !editable.length },
+    { label: t('canvas.remove'), icon: <Trash2 size={12} />, shortcut: deleteKey(), onClick: c.remove, danger: true, separator: true, disabled: !editable.length },
   );
   return actions;
 }

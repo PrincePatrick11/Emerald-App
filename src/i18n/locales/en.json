@@ -219,6 +219,12 @@
         "description": "Target date, charging technique and loading the sigil. Once loaded it hides the chosen calculators and drawings and locks the entry or only those blocks."
       },
       "canvas": {
+    "keyNames": {
+      "shift": "Shift",
+      "ctrl": "Ctrl",
+      "alt": "Alt",
+      "delete": "Del"
+    },
         "label": "Canvas",
         "description": "Pictures from \"Images\", shapes, text, symbols and drawings, arranged freely."
       },
@@ -795,8 +801,8 @@
       "show": "Show",
       "group_one": "Group of {{count}}",
       "group_other": "Group of {{count}}",
-      "groupAction": "Group (⌘G)",
-      "ungroup": "Ungroup (⇧⌘G)"
+      "groupAction": "Group ({{keys}})",
+      "ungroup": "Ungroup ({{keys}})"
     },
     "insertImage": "Insert image …"
   },

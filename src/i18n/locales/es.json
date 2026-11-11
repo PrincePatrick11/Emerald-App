@@ -219,6 +219,12 @@
         "description": "Fecha objetivo, técnica de carga y la carga del sigilo. Cargado oculta las calculadoras y dibujos elegidos y bloquea la entrada o solo esos bloques."
       },
       "canvas": {
+    "keyNames": {
+      "shift": "Mayús",
+      "ctrl": "Ctrl",
+      "alt": "Alt",
+      "delete": "Supr"
+    },
         "label": "Lienzo",
         "description": "Imágenes de «Imágenes», formas, texto, símbolos y dibujos, colocados libremente."
       },
@@ -795,8 +801,8 @@
       "show": "Mostrar",
       "group_one": "Grupo de {{count}}",
       "group_other": "Grupo de {{count}}",
-      "groupAction": "Agrupar (⌘G)",
-      "ungroup": "Desagrupar (⇧⌘G)"
+      "groupAction": "Agrupar ({{keys}})",
+      "ungroup": "Desagrupar ({{keys}})"
     },
     "insertImage": "Insertar imagen …"
   },

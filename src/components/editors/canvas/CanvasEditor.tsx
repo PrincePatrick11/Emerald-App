@@ -358,7 +358,9 @@ const CanvasEditor = forwardRef<CanvasEditorHandle, CanvasEditorProps>(function 
       const rect = el.getBoundingClientRect();
       if (e.ctrlKey || e.metaKey) {
         e.preventDefault();
-        const factor = Math.exp(-e.deltaY * (e.ctrlKey && !e.metaKey ? 0.01 : 0.002));
+        // Pinch arrives as Ctrl with small deltas; a mouse notch with Ctrl
+        // (Windows ≈ 100, WebKitGTK ≈ 40) would jump: one event zooms by at most a quarter.
+        const factor = Math.min(1.25, Math.max(0.8, Math.exp(-e.deltaY * (e.ctrlKey && !e.metaKey ? 0.01 : 0.002))));
         zoomTo(live.current.view.zoom * factor, { x: e.clientX - rect.left, y: e.clientY - rect.top });
       } else if (layout === 'inline' && fittedRef.current) {
         // In the flow of a page the wheel scrolls the page until the view is zoomed.
@@ -967,7 +969,9 @@ const CanvasEditor = forwardRef<CanvasEditorHandle, CanvasEditorProps>(function 
         pc.transform({ dx: arrow[0] * step, dy: arrow[1] * step, scale: 1, angle: 0, cx: 0, cy: 0 });
         return;
       }
-      if (mod || e.altKey) return;
+      // `[` and `]` come with AltGr (Ctrl+Alt) on many Windows layouts and with ⌥ on a German Mac.
+      const bracket = (key === '[' || key === ']') && !e.metaKey && (!mod || e.altKey);
+      if ((mod || e.altKey) && !bracket) return;
       if (key === '[') { handled(); brush.setSize(brush.size - (brush.size > 10 ? 2 : 1)); return; }
       if (key === ']') { handled(); brush.setSize(brush.size + (brush.size >= 10 ? 2 : 1)); return; }
       const def = PAINT_TOOL_DEFS.find((d) => d.key === key && toolEnabled(d.tool, paintFeatures));
@@ -993,7 +997,7 @@ const CanvasEditor = forwardRef<CanvasEditorHandle, CanvasEditorProps>(function 
     if (mod && key === 'v') { handled(); paste(); return; }
     if (mod && key === '0' && features.zoom) { handled(); fit(); return; }
     if (mod && key === 'g' && features.group) { handled(); if (e.shiftKey) doUngroup(); else doGroup(); return; }
-    if (mod && (e.key === ']' || e.key === '[') && features.arrange) {
+    if (mod && !e.altKey && (e.key === ']' || e.key === '[') && features.arrange) {
       handled();
       doArrange(e.key === ']' ? (e.shiftKey ? 'front' : 'forward') : (e.shiftKey ? 'back' : 'backward'));
       return;

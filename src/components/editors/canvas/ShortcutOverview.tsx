@@ -4,7 +4,7 @@ import { PAINT_TOOL_DEFS, toolEnabled } from './paint/PaintToolbar';
 import type { PaintFeatures } from './paint/features';
 import type { CanvasFeatures } from './features';
 import type { CanvasTypes } from './types';
-import { ALT_KEY, DELETE_KEY, MOD_KEY, SHIFT_KEY, keys } from './shortcuts';
+import { altKey, deleteKey, modKey, shiftKey, keys } from './shortcuts';
 
 /** A row: the keys or gestures (each one chip, alternatives side by side) and what they do. */
 interface Row { keys: string[]; label: string }
@@ -35,7 +35,7 @@ export default function ShortcutOverview({ painting, features, paintFeatures, ty
     title: k('view'),
     rows: [
       features.zoom && row([k('scroll'), with_(k('space'), 'drag'), k('middleDrag')], k('pan')),
-      features.zoom && row([with_(MOD_KEY, 'scroll'), k('pinch')], k('zoom')),
+      features.zoom && row([with_(modKey(), 'scroll'), k('pinch')], k('zoom')),
       features.zoom && row([keys('0')], t('canvas.fit')),
       row(['?'], k('title')),
     ].filter((r): r is Row => !!r),
@@ -57,26 +57,26 @@ export default function ShortcutOverview({ painting, features, paintFeatures, ty
         title: k('drawing'),
         rows: [
           row(['[', ']'], k('brushSize')),
-          paintFeatures.picker && row([ALT_KEY], k('pickWhileHeld')),
-          row([with_(SHIFT_KEY, 'drag')], k('straight')),
-          paintFeatures.shapes && row([with_(ALT_KEY, 'drag')], k('fromCentre')),
+          paintFeatures.picker && row([altKey()], k('pickWhileHeld')),
+          row([with_(shiftKey(), 'drag')], k('straight')),
+          paintFeatures.shapes && row([with_(altKey(), 'drag')], k('fromCentre')),
           ...history,
         ].filter((r): r is Row => !!r),
       },
       ...(select ? [{
         title: k('selection'),
         rows: [
-          row([with_(SHIFT_KEY, 'click')], k('addToSelection')),
+          row([with_(shiftKey(), 'click')], k('addToSelection')),
           row([keys('A')], t('menu.selectAll')),
           row([keys('C')], t('menu.copy')),
           row([keys('X')], t('menu.cut')),
           row([keys('V')], t('menu.paste')),
           row([keys('D')], t('canvas.duplicate')),
-          row([DELETE_KEY], t('canvas.remove')),
+          row([deleteKey()], t('canvas.remove')),
           row([ARROWS], k('nudge')),
-          row([`${SHIFT_KEY} ${ARROWS}`], k('nudgeMore')),
-          row([with_(SHIFT_KEY, 'drag')], k('moveStraight')),
-          row([with_(SHIFT_KEY, 'turn')], k('turnSteps')),
+          row([`${shiftKey()} ${ARROWS}`], k('nudgeMore')),
+          row([with_(shiftKey(), 'drag')], k('moveStraight')),
+          row([with_(shiftKey(), 'turn')], k('turnSteps')),
           row(['Esc'], canLeavePaint ? k('deselectOrLeave') : k('deselect')),
         ],
       }] : []),
@@ -96,7 +96,7 @@ export default function ShortcutOverview({ painting, features, paintFeatures, ty
       {
         title: k('selection'),
         rows: [
-          row([with_(SHIFT_KEY, 'click'), with_(MOD_KEY, 'click')], k('addToSelection')),
+          row([with_(shiftKey(), 'click'), with_(modKey(), 'click')], k('addToSelection')),
           row([k('dragEmpty')], k('frame')),
           row([k('doubleClick')], k('member')),
           row(['↵'], k('edit')),
@@ -112,9 +112,9 @@ export default function ShortcutOverview({ painting, features, paintFeatures, ty
           row([keys('X')], t('menu.cut')),
           row([keys('V')], t('menu.paste')),
           row([keys('D')], t('canvas.duplicate')),
-          row([DELETE_KEY], t('canvas.remove')),
+          row([deleteKey()], t('canvas.remove')),
           row([ARROWS], k('nudge')),
-          row([`${SHIFT_KEY} ${ARROWS}`], k('nudgeMore')),
+          row([`${shiftKey()} ${ARROWS}`], k('nudgeMore')),
           features.group && row([keys('G')], t('canvas.menu.group')),
           features.group && row([keys('G', true, true)], t('canvas.menu.ungroup')),
           features.arrange && row([keys(']')], t('canvas.forward')),
@@ -127,10 +127,10 @@ export default function ShortcutOverview({ painting, features, paintFeatures, ty
       {
         title: k('whileDragging'),
         rows: [
-          additions.length > 0 && row([with_(SHIFT_KEY, 'drag')], k('square')),
-          row([with_(SHIFT_KEY, 'scale')], k('keepProportions')),
-          row([with_(ALT_KEY, 'scale')], k('fromCentre')),
-          features.guides && row([with_(ALT_KEY, 'drag')], k('noSnap')),
+          additions.length > 0 && row([with_(shiftKey(), 'drag')], k('square')),
+          row([with_(shiftKey(), 'scale')], k('keepProportions')),
+          row([with_(altKey(), 'scale')], k('fromCentre')),
+          features.guides && row([with_(altKey(), 'drag')], k('noSnap')),
         ].filter((r): r is Row => !!r),
       },
       view,

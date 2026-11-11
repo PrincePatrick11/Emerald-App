@@ -294,11 +294,15 @@ export default function CanvasBlock({ block, isEditing, onBlockChange, onPersist
       const point = item ? pointOnArtboard(e.clientX, e.clientY) : null;
       if (item && point) void place(item.file, point);
     };
+    // A touch that turns into a scroll of the strip ends here: the drag is off.
+    const onCancel = () => window.setTimeout(() => setImageDragItem(null), 0);
     document.addEventListener('pointermove', onMove);
     document.addEventListener('pointerup', onUp);
+    document.addEventListener('pointercancel', onCancel);
     return () => {
       document.removeEventListener('pointermove', onMove);
       document.removeEventListener('pointerup', onUp);
+      document.removeEventListener('pointercancel', onCancel);
     };
   }, [editable, dragItem, pointOnArtboard, place]);
 
