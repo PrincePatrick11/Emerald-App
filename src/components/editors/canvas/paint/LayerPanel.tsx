@@ -86,21 +86,20 @@ export default function LayerPanel({ api, images, onClose }: { api: PaintControl
       footer={active && (<>
         <DockOpacity value={Math.round(active.opacity * 100)} onChange={(percent) => api.setOpacity(active.id, percent / 100)} />
         <DockButtons>
-          <ToolbarBtn onClick={api.addLayer} active={false} disabled={layers.length >= MAX_LAYERS} title={t('editor.paint.addLayer')}>
+          <ToolbarBtn onClick={api.addLayer} disabled={layers.length >= MAX_LAYERS} title={t('editor.paint.addLayer')}>
             <Plus size={14} />
           </ToolbarBtn>
-          <ToolbarBtn onClick={() => api.duplicateLayer(active.id)} active={false} disabled={layers.length >= MAX_LAYERS} title={t('editor.paint.duplicateLayer')}>
+          <ToolbarBtn onClick={() => api.duplicateLayer(active.id)} disabled={layers.length >= MAX_LAYERS} title={t('editor.paint.duplicateLayer')}>
             <Copy size={14} />
           </ToolbarBtn>
           <ToolbarBtn
             onClick={() => api.mergeDown(active.id)}
-            active={false}
             disabled={!api.canMergeDown(active.id)}
             title={activeIndex > 0 && !api.canMergeDown(active.id) ? t('editor.paint.mergeDownBlocked') : t('editor.paint.mergeDown')}
           >
             <ArrowDownToLine size={14} />
           </ToolbarBtn>
-          <ToolbarBtn onClick={() => api.removeLayer(active.id)} active={false} title={t('editor.paint.removeLayer')}>
+          <ToolbarBtn onClick={() => api.removeLayer(active.id)} title={t('editor.paint.removeLayer')}>
             <Trash2 size={14} />
           </ToolbarBtn>
         </DockButtons>

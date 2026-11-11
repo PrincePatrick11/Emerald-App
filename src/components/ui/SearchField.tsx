@@ -12,8 +12,9 @@ interface SearchFieldProps extends Omit<InputHTMLAttributes<HTMLInputElement>, '
 }
 
 /**
- * The outlined search field of the overlays: global search, link picker and
- * emoji picker. The entry list's borderless field on the frame is a different one.
+ * The outlined search field of the overlays: global search, link picker,
+ * emoji picker, picture picker, the canvas's symbol library. The entry list's
+ * borderless field on the frame and a dashboard's `ListSearchField` are different ones.
  * Remaining props go to the input, such as the global search's combobox ARIA.
  */
 export default function SearchField({ value, onValueChange, inputRef, className, style, ...inputProps }: SearchFieldProps) {

@@ -1,6 +1,27 @@
 import { copyImageFile, readImageFile, saveImage } from './images';
 import { hasImageLimits, ImageTooLargeError, needsPreparing, prepareImageDataUrl } from './imageLimits';
-import { readFileAsDataUrl } from './helpers';
+import { isAcceptedImageFile, readFileAsDataUrl } from './helpers';
+import { useImageNoticeStore } from '../store/imageNoticeStore';
+
+/** The image formats a file from the disk is taken in by its name; the same as `ACCEPTED_IMAGE_MIME`. */
+const ACCEPTED_IMAGE_PATH_RE = /\.(png|jpe?g|gif|webp|svg)$/i;
+
+/** The items in an accepted image format; the notice says so when others were left out. */
+function acceptedOnly<T>(items: T[], accepted: (item: T) => boolean): T[] {
+  const kept = items.filter(accepted);
+  if (kept.length < items.length) useImageNoticeStore.getState().show({ kind: 'format' });
+  return kept;
+}
+
+/** Paths dropped from the disk that are images (by their extension); the format notice for the rest. */
+export function acceptedImagePaths(paths: string[]): string[] {
+  return acceptedOnly(paths, (path) => ACCEPTED_IMAGE_PATH_RE.test(path));
+}
+
+/** Chosen or pasted files that are images (by their type); the format notice for the rest. */
+export function acceptedImageFiles(files: File[]): File[] {
+  return acceptedOnly(files, isAcceptedImageFile);
+}
 
 /** The read limit of the Rust command along with its number (see `images.rs`). */
 const TOO_LARGE_TO_READ = /image file too large: (\d+)/;

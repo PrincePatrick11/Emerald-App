@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Eye, EyeOff, Lock, LockOpen, X } from 'lucide-react';
 import { ToolbarBtn } from '../shared/toolbarParts';
+import { RangeField } from './elements/controlParts';
 
 /**
  * The frame both lists of the canvas editor share, the element list and the
@@ -25,7 +26,7 @@ export function LayerDock({ title, onClose, footer, children }: {
     <div className="paint-layers-dock" onPointerDown={(e) => e.stopPropagation()}>
       <div className="paint-layers-head">
         <span>{title}</span>
-        <ToolbarBtn onClick={onClose} active={false} title={t('canvas.layers.close')}>
+        <ToolbarBtn onClick={onClose} title={t('canvas.layers.close')}>
           <X size={13} />
         </ToolbarBtn>
       </div>
@@ -47,7 +48,7 @@ export function DockToggles({ locked, hidden, onLock, onHide }: {
     <ToolbarBtn onClick={onLock} active={locked} title={t(locked ? 'canvas.layers.unlock' : 'canvas.layers.lock')}>
       {locked ? <Lock size={13} /> : <LockOpen size={13} />}
     </ToolbarBtn>
-    <ToolbarBtn onClick={onHide} active={false} title={t(hidden ? 'canvas.layers.show' : 'canvas.layers.hide')}>
+    <ToolbarBtn onClick={onHide} title={t(hidden ? 'canvas.layers.show' : 'canvas.layers.hide')}>
       {hidden ? <EyeOff size={13} /> : <Eye size={13} />}
     </ToolbarBtn>
   </>);
@@ -56,13 +57,7 @@ export function DockToggles({ locked, hidden, onLock, onHide }: {
 /** The opacity of what is picked, 0–100; empty when the picked ones differ. */
 export function DockOpacity({ value, onChange }: { value: number | undefined; onChange: (percent: number) => void }) {
   const { t } = useTranslation();
-  return (
-    <label className="paint-layer-opacity-field">
-      <span>{t('canvas.layers.opacity')}</span>
-      <input type="range" min={0} max={100} value={value ?? 100} onChange={(e) => onChange(Number(e.target.value))} className="accent-accent" />
-      <span className="paint-size-value">{value ?? '–'}</span>
-    </label>
-  );
+  return <RangeField label={t('canvas.layers.opacity')} value={value} min={0} max={100} onChange={onChange} />;
 }
 
 export function DockButtons({ children }: { children: ReactNode }) {

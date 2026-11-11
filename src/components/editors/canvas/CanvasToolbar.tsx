@@ -5,10 +5,10 @@ import { keys } from './shortcuts';
 import {
   AlignHorizontalDistributeCenter, AlignHorizontalJustifyCenter, AlignHorizontalJustifyEnd,
   AlignHorizontalJustifyStart, AlignVerticalDistributeCenter, AlignVerticalJustifyCenter, AlignVerticalJustifyEnd,
-  AlignVerticalJustifyStart, ArrowDown, ArrowUp, BringToFront, Copy, Group, ImageDown, ImagePlus, Layers, Layers2, Lock, LockOpen, MousePointer2, Redo2, Ruler, SendToBack, Trash2, Undo2,
+  AlignVerticalJustifyStart, ArrowDown, ArrowUp, BringToFront, Copy, Group, ImageDown, ImagePlus, Layers, Layers2, Lock, LockOpen, MousePointer2, Ruler, SendToBack, Trash2,
   Ungroup, ZoomIn, ZoomOut,
 } from 'lucide-react';
-import { ToolbarBtn, ToolbarDivider, ToolbarGroup } from '../shared/toolbarParts';
+import { ToolbarBtn, ToolbarDivider, ToolbarGroup, ToolRail, ToolRailGroup, UndoRedoGroup } from '../shared/toolbarParts';
 import PopoverButton from '../shared/PopoverButton';
 import type { CanvasController } from './CanvasEditor';
 import BackgroundPanel from './BackgroundPanel';
@@ -47,10 +47,7 @@ export default function CanvasToolbar({ controller: c, end }: { controller: Canv
   return (
     <div className="editor-toolbar canvas-toolbar">
       {f.history && (<>
-        <ToolbarGroup>
-          <ToolbarBtn onClick={c.undo} active={false} disabled={!c.canUndo} title={t('editor.toolbar.undo')}><Undo2 size={14} /></ToolbarBtn>
-          <ToolbarBtn onClick={c.redo} active={false} disabled={!c.canRedo} title={t('editor.toolbar.redo')}><Redo2 size={14} /></ToolbarBtn>
-        </ToolbarGroup>
+        <UndoRedoGroup undo={c.undo} redo={c.redo} canUndo={c.canUndo} canRedo={c.canRedo} />
         <ToolbarDivider />
       </>)}
 
@@ -78,14 +75,14 @@ export default function CanvasToolbar({ controller: c, end }: { controller: Canv
               {() => (
                 <ToolbarGroup>
                   {(Object.keys(ALIGN_ICONS) as AlignEdge[]).map((edge) => (
-                    <ToolbarBtn key={edge} onClick={() => c.align(edge)} active={false} title={t(`canvas.align.${edge}`)}>
+                    <ToolbarBtn key={edge} onClick={() => c.align(edge)} title={t(`canvas.align.${edge}`)}>
                       {ALIGN_ICONS[edge]}
                     </ToolbarBtn>
                   ))}
                   {units > 2 && (<>
                     <ToolbarDivider />
-                    <ToolbarBtn onClick={() => c.distribute('horizontal')} active={false} title={t('canvas.distributeHorizontal')}><AlignHorizontalDistributeCenter size={14} /></ToolbarBtn>
-                    <ToolbarBtn onClick={() => c.distribute('vertical')} active={false} title={t('canvas.distributeVertical')}><AlignVerticalDistributeCenter size={14} /></ToolbarBtn>
+                    <ToolbarBtn onClick={() => c.distribute('horizontal')} title={t('canvas.distributeHorizontal')}><AlignHorizontalDistributeCenter size={14} /></ToolbarBtn>
+                    <ToolbarBtn onClick={() => c.distribute('vertical')} title={t('canvas.distributeVertical')}><AlignVerticalDistributeCenter size={14} /></ToolbarBtn>
                   </>)}
                 </ToolbarGroup>
               )}
@@ -97,22 +94,22 @@ export default function CanvasToolbar({ controller: c, end }: { controller: Canv
               <PopoverButton icon={<Layers2 size={14} />} title={t('canvas.arrange')} active={false}>
                 {(close) => (
                   <ToolbarGroup>
-                    <ToolbarBtn onClick={() => { c.arrange('front'); close(); }} active={false} title={t('canvas.toFront')}><BringToFront size={14} /></ToolbarBtn>
-                    <ToolbarBtn onClick={() => c.arrange('forward')} active={false} title={t('canvas.forward')}><ArrowUp size={14} /></ToolbarBtn>
-                    <ToolbarBtn onClick={() => c.arrange('backward')} active={false} title={t('canvas.backward')}><ArrowDown size={14} /></ToolbarBtn>
-                    <ToolbarBtn onClick={() => { c.arrange('back'); close(); }} active={false} title={t('canvas.toBack')}><SendToBack size={14} /></ToolbarBtn>
+                    <ToolbarBtn onClick={() => { c.arrange('front'); close(); }} title={t('canvas.toFront')}><BringToFront size={14} /></ToolbarBtn>
+                    <ToolbarBtn onClick={() => c.arrange('forward')} title={t('canvas.forward')}><ArrowUp size={14} /></ToolbarBtn>
+                    <ToolbarBtn onClick={() => c.arrange('backward')} title={t('canvas.backward')}><ArrowDown size={14} /></ToolbarBtn>
+                    <ToolbarBtn onClick={() => { c.arrange('back'); close(); }} title={t('canvas.toBack')}><SendToBack size={14} /></ToolbarBtn>
                   </ToolbarGroup>
                 )}
               </PopoverButton>
             )}
             {f.group && editable.length > 1 && (
-              <ToolbarBtn onClick={c.group} active={false} title={t('canvas.layers.groupAction', { keys: keys('G') })}><Group size={14} /></ToolbarBtn>
+              <ToolbarBtn onClick={c.group} title={t('canvas.layers.groupAction', { keys: keys('G') })}><Group size={14} /></ToolbarBtn>
             )}
             {f.group && grouped && (
-              <ToolbarBtn onClick={c.ungroup} active={false} title={t('canvas.layers.ungroup', { keys: keys('G', true, true) })}><Ungroup size={14} /></ToolbarBtn>
+              <ToolbarBtn onClick={c.ungroup} title={t('canvas.layers.ungroup', { keys: keys('G', true, true) })}><Ungroup size={14} /></ToolbarBtn>
             )}
-            <ToolbarBtn onClick={c.duplicate} active={false} title={t('canvas.duplicate')}><Copy size={14} /></ToolbarBtn>
-            <ToolbarBtn onClick={c.removeSelected} active={false} title={t('canvas.remove')}><Trash2 size={14} /></ToolbarBtn>
+            <ToolbarBtn onClick={c.duplicate} title={t('canvas.duplicate')}><Copy size={14} /></ToolbarBtn>
+            <ToolbarBtn onClick={c.removeSelected} title={t('canvas.remove')}><Trash2 size={14} /></ToolbarBtn>
           </>)}
         </ToolbarGroup>
       )}
@@ -135,7 +132,7 @@ export default function CanvasToolbar({ controller: c, end }: { controller: Canv
           <ToolbarBtn onClick={c.toggleList} active={c.listOpen} title={t('canvas.layers.title')}><Layers size={14} /></ToolbarBtn>
         )}
         {f.export && c.onExport && (
-          <ToolbarBtn onClick={c.onExport} active={false} title={t('canvas.export')}><ImageDown size={14} /></ToolbarBtn>
+          <ToolbarBtn onClick={c.onExport} title={t('canvas.export')}><ImageDown size={14} /></ToolbarBtn>
         )}
         {end}
       </div>
@@ -159,23 +156,21 @@ export function CanvasToolRail({ controller: c }: { controller: CanvasController
   const Picker = open ? open.picker : undefined;
   const label = (title: string, shortcut?: string) => (shortcut ? `${title} (${shortcut.toUpperCase()})` : title);
   return (
-    <div ref={railRef} className="editor-toolbar paint-rail" role="toolbar" aria-orientation="vertical" aria-label={t('canvas.tools')}>
-      <div className="paint-rail-group">
+    <ToolRail railRef={railRef} label={t('canvas.tools')}>
+      <ToolRailGroup>
         <ToolbarBtn onClick={() => c.setTool(null)} active={!c.tool} title={label(t('editor.paint.tools.select'), 'v')}>
           <MousePointer2 size={15} />
         </ToolbarBtn>
-      </div>
+      </ToolRailGroup>
       {c.insertImage && (
-        <div className="paint-rail-group">
-          <div className="paint-rail-divider" />
-          <ToolbarBtn onClick={() => { c.setTool(null); c.insertImage!(); }} active={false} title={t('canvas.insertImage')}>
+        <ToolRailGroup divider>
+          <ToolbarBtn onClick={() => { c.setTool(null); c.insertImage!(); }} title={t('canvas.insertImage')}>
             <ImagePlus size={15} />
           </ToolbarBtn>
-        </div>
+        </ToolRailGroup>
       )}
       {groups.map((type) => (
-        <div key={type.type} className="paint-rail-group">
-          <div className="paint-rail-divider" />
+        <ToolRailGroup key={type.type} divider>
           {type.additions!.map((addition) => (
             <ToolbarBtn
               key={addition.key}
@@ -189,14 +184,14 @@ export function CanvasToolRail({ controller: c }: { controller: CanvasController
               {addition.icon}
             </ToolbarBtn>
           ))}
-        </div>
+        </ToolRailGroup>
       ))}
       {picking && Picker && (
         <div className="editor-selection-menu canvas-rail-picker">
           <Picker onPicked={() => { c.setTool(picking); setPicking(null); }} />
         </div>
       )}
-    </div>
+    </ToolRail>
   );
 }
 
@@ -205,11 +200,11 @@ export function CanvasZoom({ controller: c }: { controller: CanvasController }) 
   const { t } = useTranslation();
   return (
     <div className="editor-toolbar canvas-zoom">
-      <ToolbarBtn onClick={c.zoomOut} active={false} title={t('canvas.zoomOut')}><ZoomOut size={14} /></ToolbarBtn>
-      <ToolbarBtn onClick={c.fit} active={false} title={t('canvas.fit')}>
+      <ToolbarBtn onClick={c.zoomOut} title={t('canvas.zoomOut')}><ZoomOut size={14} /></ToolbarBtn>
+      <ToolbarBtn onClick={c.fit} title={t('canvas.fit')}>
         <span className="editor-toolbar-btn-label tabular-nums">{Math.round(c.zoom * 100)}%</span>
       </ToolbarBtn>
-      <ToolbarBtn onClick={c.zoomIn} active={false} title={t('canvas.zoomIn')}><ZoomIn size={14} /></ToolbarBtn>
+      <ToolbarBtn onClick={c.zoomIn} title={t('canvas.zoomIn')}><ZoomIn size={14} /></ToolbarBtn>
     </div>
   );
 }

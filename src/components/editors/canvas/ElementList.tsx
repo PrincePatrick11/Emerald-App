@@ -154,18 +154,18 @@ export default function ElementList({
       footer={(<>
         <DockOpacity value={editable.length ? opacity : undefined} onChange={(percent) => onOpacity(percent / 100)} />
         <DockButtons>
-          <ToolbarBtn onClick={onDuplicate} active={false} disabled={!editable.length} title={t('canvas.duplicate')}>
+          <ToolbarBtn onClick={onDuplicate} disabled={!editable.length} title={t('canvas.duplicate')}>
             <Copy size={14} />
           </ToolbarBtn>
           {canGroup && (<>
-            <ToolbarBtn onClick={onGroup} active={false} disabled={editable.length < 2} title={t('canvas.layers.groupAction', { keys: keys('G') })}>
+            <ToolbarBtn onClick={onGroup} disabled={editable.length < 2} title={t('canvas.layers.groupAction', { keys: keys('G') })}>
               <Group size={14} />
             </ToolbarBtn>
-            <ToolbarBtn onClick={onUngroup} active={false} disabled={!selectedGroups.size} title={t('canvas.layers.ungroup', { keys: keys('G', true, true) })}>
+            <ToolbarBtn onClick={onUngroup} disabled={!selectedGroups.size} title={t('canvas.layers.ungroup', { keys: keys('G', true, true) })}>
               <Ungroup size={14} />
             </ToolbarBtn>
           </>)}
-          <ToolbarBtn onClick={onRemove} active={false} disabled={!editable.length} title={t('canvas.remove')}>
+          <ToolbarBtn onClick={onRemove} disabled={!editable.length} title={t('canvas.remove')}>
             <Trash2 size={14} />
           </ToolbarBtn>
         </DockButtons>

@@ -14,15 +14,15 @@ import { emptyPaintDoc, paintDocFromJson, type PaintDoc } from '../../lib/paint/
 import { altarBackgroundUrl } from '../../lib/altarBackground';
 import { generateId } from '../../lib/helpers';
 import { ALTAR_LIBRARY_TAG_ID, ALTAR_LIBRARY_TAG_NAME } from '../../lib/schema';
-import { fileBaseName, storeImageFromPath } from '../../lib/storeImage';
+import { acceptedImagePaths, fileBaseName, storeImageFromPath } from '../../lib/storeImage';
 import { getImageDragItem, setImageDragItem, subscribeImageDrag, type ImageDragItem } from '../../lib/imageDragState';
-import { DROPPED_IMAGE_RE, useFileDrop } from '../../hooks/useFileDrop';
+import { useFileDrop } from '../../hooks/useFileDrop';
 import { useOwnSymbols } from '../../hooks/useOwnSymbols';
 import { pickPictures, useImagePickerStore } from '../../store/imagePickerStore';
 import { discardRenders, useImageStore } from '../../store/imageStore';
 import { savePictureAs, textDataUrl } from '../../lib/pictureExport';
 import { exportErrorMessage } from '../../lib/export';
-import { reportImageError, useImageNoticeStore } from '../../store/imageNoticeStore';
+import { reportImageError } from '../../store/imageNoticeStore';
 import { useTagStore } from '../../store/tagStore';
 import ImageStrip from '../images/ImageStrip';
 import AddImagesModal from '../images/AddImagesModal';
@@ -332,8 +332,7 @@ export default function CanvasBlock({ block, isEditing, onBlockChange, onPersist
     if (!over || !rootRef.current?.contains(over)) return;
     const at = pointOnArtboard(point.x, point.y) ?? editorRef.current?.visibleCentre();
     if (!at) return;
-    const images = paths.filter((p) => DROPPED_IMAGE_RE.test(p));
-    if (images.length < paths.length) useImageNoticeStore.getState().show({ kind: 'format' });
+    const images = acceptedImagePaths(paths);
     void (async () => {
       const tag = images.length ? await tagForNew() : '';
       let offset = 0;

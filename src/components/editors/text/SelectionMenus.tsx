@@ -90,7 +90,7 @@ function TableMenu({ editor }: { editor: Editor }) {
     >
       {actions.map((action, i) => action
         ? (
-          <ToolbarBtn key={action.key} onClick={action.run} active={false} title={t(`editor.table.${action.key}`)}>
+          <ToolbarBtn key={action.key} onClick={action.run} title={t(`editor.table.${action.key}`)}>
             <action.icon size={14} />
           </ToolbarBtn>
         )
@@ -144,7 +144,7 @@ function TextMenu({ editor }: { editor: Editor }) {
       {choosingColor ? (
         <div className="flex items-center gap-1">
           <TextColorSwatches current={state?.color ?? null} onPick={pickColor} />
-          <ToolbarBtn onClick={() => setChoosingColor(false)} active={false} title={t('editor.cancel')}><X size={14} /></ToolbarBtn>
+          <ToolbarBtn onClick={() => setChoosingColor(false)} title={t('editor.cancel')}><X size={14} /></ToolbarBtn>
         </div>
       ) : typingLink ? (
         <LinkHrefForm
@@ -174,7 +174,7 @@ function TextMenu({ editor }: { editor: Editor }) {
                   <Unlink size={14} />
                 </ToolbarBtn>
               ) : (
-                <ToolbarBtn onClick={() => setTypingLink(true)} active={false} title={t('editor.menu.webLink')}>
+                <ToolbarBtn onClick={() => setTypingLink(true)} title={t('editor.menu.webLink')}>
                   <Globe size={14} />
                 </ToolbarBtn>
               )}
@@ -237,7 +237,7 @@ function ImageMenu({ editor }: { editor: Editor }) {
         ))}
       </ToolbarGroup>
       <ToolbarDivider />
-      <ToolbarBtn onClick={() => editor.chain().focus().deleteSelection().run()} active={false} title={t('editor.menu.removeImage')}>
+      <ToolbarBtn onClick={() => editor.chain().focus().deleteSelection().run()} title={t('editor.menu.removeImage')}>
         <Trash2 size={14} />
       </ToolbarBtn>
     </BubbleMenu>

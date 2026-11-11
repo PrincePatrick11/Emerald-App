@@ -1122,7 +1122,7 @@ const CanvasEditor = forwardRef<CanvasEditorHandle, CanvasEditorProps>(function 
                 end={(<>
                   {keysButton}
                   {!paintElementId && (
-                    <ToolbarBtn onClick={() => setPaintingId(null)} active={false} title={t('canvas.donePainting')}>
+                    <ToolbarBtn onClick={() => setPaintingId(null)} title={t('canvas.donePainting')}>
                       <Check size={14} />
                       <span className="editor-toolbar-btn-label">{t('canvas.donePainting')}</span>
                     </ToolbarBtn>

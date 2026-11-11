@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Search, Trash2 } from 'lucide-react';
+import { Trash2 } from 'lucide-react';
+import SearchField from '../../../ui/SearchField';
 import { SYMBOL_PACKS, type SymbolDef } from './packs';
 import { OWN_PACK, useSymbolLibrary } from './library';
 
@@ -43,18 +44,14 @@ export default function SymbolPicker({ onPick, current }: { onPick: (symbol: Sym
 
   return (
     <div className="canvas-symbols">
-      <label className="canvas-symbols-search">
-        <Search size={13} />
-        <input
-          type="search"
-          value={query}
-          placeholder={t('symbols.search')}
-          onChange={(e) => setQuery(e.target.value)}
-          // The canvas editor's letters pick tools; typing here must not.
-          onKeyDown={(e) => e.stopPropagation()}
-          autoFocus
-        />
-      </label>
+      <SearchField
+        value={query}
+        onValueChange={setQuery}
+        placeholder={t('symbols.search')}
+        // The canvas editor's letters pick tools; typing here must not.
+        onKeyDown={(e) => e.stopPropagation()}
+        autoFocus
+      />
       {!query.trim() && (
         <div className="canvas-symbols-packs" role="tablist">
           {packs.map((p) => (

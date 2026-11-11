@@ -2,12 +2,13 @@ import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ImagePlus, X } from 'lucide-react';
 import { useImageStore } from '../../store/imageStore';
-import { reportImageError, useImageNoticeStore } from '../../store/imageNoticeStore';
-import { ACCEPTED_IMAGE_MIME, isAcceptedImageFile } from '../../lib/helpers';
+import { reportImageError } from '../../store/imageNoticeStore';
+import { ACCEPTED_IMAGE_MIME } from '../../lib/helpers';
 import { imageSrc } from '../../lib/images';
-import { fileBaseName as baseName, storeImageFile, storeImageFromPath } from '../../lib/storeImage';
+import {
+  acceptedImageFiles, acceptedImagePaths, fileBaseName as baseName, storeImageFile, storeImageFromPath,
+} from '../../lib/storeImage';
 import { OP_PROP_SELECT_CLASSES } from '../../lib/styleClasses';
-import { DROPPED_IMAGE_RE } from '../../hooks/useFileDrop';
 import Modal from '../ui/Modal';
 import Button from '../ui/Button';
 import TagInput from '../ui/TagInput';
@@ -61,16 +62,11 @@ export default function AddImagesModal({ dropped, dragOver, initialTags, onClose
     const fresh = dropped.slice(handled.current);
     handled.current = dropped.length;
     if (!fresh.length) return;
-    const images = fresh.filter((p) => DROPPED_IMAGE_RE.test(p));
-    if (images.length < fresh.length) useImageNoticeStore.getState().show({ kind: 'format' });
-    void take(images, storeImageFromPath, baseName, (p) => p);
+    void take(acceptedImagePaths(fresh), storeImageFromPath, baseName, (p) => p);
   }, [dropped]);
 
   const choose = (list: FileList | null) => {
-    const files = Array.from(list ?? []);
-    const images = files.filter(isAcceptedImageFile);
-    if (images.length < files.length) useImageNoticeStore.getState().show({ kind: 'format' });
-    void take(images, storeImageFile, (f) => baseName(f.name), (f) => f.name);
+    void take(acceptedImageFiles(Array.from(list ?? [])), storeImageFile, (f) => baseName(f.name), (f) => f.name);
   };
 
   const add = async () => {

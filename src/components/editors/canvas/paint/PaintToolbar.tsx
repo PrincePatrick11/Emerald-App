@@ -1,14 +1,16 @@
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
-  Circle, Eraser, FlipHorizontal2, Grid3x3, Hexagon, Lasso, Layers, Minus, Move, MousePointer2, PaintBucket, PenTool, Pipette, Redo,
-  Square, SquareDashed, Star, Trash2, Undo, type LucideIcon,
+  Circle, Eraser, FlipHorizontal2, Grid3x3, Hexagon, Lasso, Layers, Minus, Move, MousePointer2, PaintBucket, PenTool, Pipette,
+  Square, SquareDashed, Star, Trash2, type LucideIcon,
 } from 'lucide-react';
 import {
   isBoxShape, MAX_RAYS, MAX_SIDES, MIN_RAYS, MIN_SIDES, PAINT_SIZE_MAX, PAINT_SIZE_MIN, type Symmetry,
 } from '../../../../lib/paint/document';
 import PopoverButton from '../../shared/PopoverButton';
-import { ToolbarBtn, ToolbarDivider, ToolbarGroup, ToolbarStepper } from '../../shared/toolbarParts';
+import {
+  ToolbarBtn, ToolbarDivider, ToolbarGroup, ToolbarStepper, ToolRail, ToolRailGroup, UndoRedoGroup,
+} from '../../shared/toolbarParts';
 import type { PaintFeatures } from './features';
 import { MAX_GRID_CELLS, MIN_GRID_CELLS, type EditorTool, type PaintControls, type PaintGrid } from './usePaintTools';
 
@@ -61,10 +63,9 @@ export function PaintToolRail({ api, features }: { api: PaintControls; features:
     DRAW_TOOL_DEFS.filter((d) => d.tool === 'fill' || d.tool === 'eraser' || d.tool === 'picker'),
   ].map((defs) => defs.filter((d) => toolEnabled(d.tool, features))).filter((defs) => defs.length);
   return (
-    <div className="editor-toolbar paint-rail" role="toolbar" aria-orientation="vertical" aria-label={t('editor.paint.toolsLabel')}>
+    <ToolRail label={t('editor.paint.toolsLabel')}>
       {groups.map((defs, i) => (
-        <div key={i} className="paint-rail-group">
-          {i > 0 && <div className="paint-rail-divider" />}
+        <ToolRailGroup key={i} divider={i > 0}>
           {defs.map(({ tool, icon: Icon, key }) => (
             <ToolbarBtn
               key={tool}
@@ -75,9 +76,9 @@ export function PaintToolRail({ api, features }: { api: PaintControls; features:
               <Icon size={15} />
             </ToolbarBtn>
           ))}
-        </div>
+        </ToolRailGroup>
       ))}
-    </div>
+    </ToolRail>
   );
 }
 
@@ -106,14 +107,7 @@ export default function PaintToolbar({ api, features, palette, layersOpen, onTog
 
   return (
     <div className="editor-toolbar paint-toolbar">
-      <ToolbarGroup>
-        <ToolbarBtn onClick={api.undo} active={false} disabled={!api.canUndo} title={t('editor.toolbar.undo')}>
-          <Undo size={14} />
-        </ToolbarBtn>
-        <ToolbarBtn onClick={api.redo} active={false} disabled={!api.canRedo} title={t('editor.toolbar.redo')}>
-          <Redo size={14} />
-        </ToolbarBtn>
-      </ToolbarGroup>
+      <UndoRedoGroup undo={api.undo} redo={api.redo} canUndo={api.canUndo} canRedo={api.canRedo} />
 
       <ToolbarDivider />
       <ToolbarGroup>
@@ -207,7 +201,7 @@ export default function PaintToolbar({ api, features, palette, layersOpen, onTog
 
       <div className="editor-toolbar-end">
         {features.clear && (
-          <ToolbarBtn onClick={api.clear} active={false} title={t('editor.paint.clear')}>
+          <ToolbarBtn onClick={api.clear} title={t('editor.paint.clear')}>
             <Trash2 size={14} />
           </ToolbarBtn>
         )}

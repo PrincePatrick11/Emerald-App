@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Shapes, type LucideIcon } from 'lucide-react';
 import InlineConfirm from '../../ui/InlineConfirm';
+import SegmentedControl from '../../ui/SegmentedControl';
 import { MODULE_LIST, viewTypeForEntryType } from '../../../lib/modules';
 import { changeEntryType, typeChangeDropsProperties, type ConvertibleEntryType } from '../../../lib/entryTypeChange';
 import { EditPropertyRow } from './EditProperties';
@@ -51,27 +52,16 @@ export default function EntryTypeField({ id, type, properties }: {
   return (
     <>
       <EditPropertyRow icon={<Shapes size={14} />} label={t('properties.type')}>
-        <div role="group" aria-label={t('properties.type')} className="prop-segments">
-          {TYPES.map((value) => {
+        <SegmentedControl
+          ariaLabel={t('properties.type')}
+          options={TYPES.map((value) => {
             const Icon = ICONS[value];
-            const label = t(LABEL_KEYS[value]);
-            const active = value === type;
-            return (
-              <button
-                key={value}
-                type="button"
-                aria-pressed={active}
-                aria-label={label}
-                title={label}
-                disabled={locked}
-                onClick={() => select(value)}
-                className={`prop-segment${active ? ' prop-segment--active' : ''}`}
-              >
-                <Icon size={14} />
-              </button>
-            );
+            return { value, label: t(LABEL_KEYS[value]), icon: <Icon size={14} /> };
           })}
-        </div>
+          value={type}
+          onChange={select}
+          disabled={locked}
+        />
       </EditPropertyRow>
       {pending && (
         <div className="pl-[9px] pr-3 pb-1">

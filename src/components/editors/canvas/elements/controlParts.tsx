@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Ban } from 'lucide-react';
 
@@ -43,6 +44,29 @@ export function ColorPanel({ value, allowNone = false, onPick }: {
         <input type="color" value={value ?? '#ffffff'} onChange={(e) => onPick(e.target.value)} />
       </label>
     </div>
+  );
+}
+
+/**
+ * A label, a slider and its value in a row, in the canvas editor's panels
+ * (an opacity, a gradient's angle). `undefined` shows "–" with the slider at
+ * `max`: the picked ones differ.
+ */
+export function RangeField({ label, value, min, max, onChange, format }: {
+  label: string;
+  value: number | undefined;
+  min: number;
+  max: number;
+  onChange: (value: number) => void;
+  /** The value as shown beside the slider; the number itself by default. */
+  format?: (value: number) => ReactNode;
+}) {
+  return (
+    <label className="canvas-range-field">
+      <span>{label}</span>
+      <input type="range" min={min} max={max} value={value ?? max} onChange={(e) => onChange(Number(e.target.value))} className="accent-accent" />
+      <span className="paint-size-value">{value === undefined ? '–' : format ? format(value) : value}</span>
+    </label>
   );
 }
 

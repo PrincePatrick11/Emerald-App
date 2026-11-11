@@ -29,8 +29,8 @@ export default function LinkHrefForm({ initial, onConfirm, onCancel }: {
         // A URL scheme, the same in every language.
         placeholder="https://"
       />
-      <ToolbarBtn onClick={() => onConfirm(href)} active={false} title={t('editor.confirm')}><Check size={14} /></ToolbarBtn>
-      <ToolbarBtn onClick={onCancel} active={false} title={t('editor.cancel')}><X size={14} /></ToolbarBtn>
+      <ToolbarBtn onClick={() => onConfirm(href)} title={t('editor.confirm')}><Check size={14} /></ToolbarBtn>
+      <ToolbarBtn onClick={onCancel} title={t('editor.cancel')}><X size={14} /></ToolbarBtn>
     </div>
   );
 }

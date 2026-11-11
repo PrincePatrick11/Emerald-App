@@ -1,8 +1,8 @@
 import type { Editor } from '@tiptap/react';
 import { useTranslation } from 'react-i18next';
 import {
-  CheckSquare, ChevronsDownUp, Globe, Heading1, Heading2, Heading3, ImagePlus, Link, List, ListOrdered, Minus, Quote, Redo,
-  Search, Table, Undo, Unlink,
+  CheckSquare, ChevronsDownUp, Globe, Heading1, Heading2, Heading3, ImagePlus, Link, List, ListOrdered, Minus, Quote,
+  Search, Table, Unlink,
 } from 'lucide-react';
 import { editorHas } from './hostContext';
 import { ALIGN_ACTIONS, applyAlign, canAlign, isAlignActive, markActionsOf } from './formatActions';
@@ -12,7 +12,7 @@ import {
 import LinkHrefForm from './LinkHrefForm';
 import TextColorSwatches, { TextColorIcon } from './TextColorSwatches';
 import PopoverButton from '../shared/PopoverButton';
-import { ToolbarBtn, ToolbarDivider, ToolbarGroup } from '../shared/toolbarParts';
+import { ToolbarBtn, ToolbarDivider, ToolbarGroup, UndoRedoGroup } from '../shared/toolbarParts';
 
 /**
  * The formatting bar of a text editor. It shows only what the editor's schema
@@ -36,24 +36,12 @@ export default function EditorToolbar({ editor, onOpenLinkPicker, findOpen, onTo
 
   return (
     <div className="editor-toolbar">
-      <ToolbarGroup>
-        <ToolbarBtn
-          onClick={() => editor.chain().focus().undo().run()}
-          active={false}
-          title={t('editor.toolbar.undo')}
-          disabled={!editor.can().undo()}
-        >
-          <Undo size={14} />
-        </ToolbarBtn>
-        <ToolbarBtn
-          onClick={() => editor.chain().focus().redo().run()}
-          active={false}
-          title={t('editor.toolbar.redo')}
-          disabled={!editor.can().redo()}
-        >
-          <Redo size={14} />
-        </ToolbarBtn>
-      </ToolbarGroup>
+      <UndoRedoGroup
+        undo={() => editor.chain().focus().undo().run()}
+        redo={() => editor.chain().focus().redo().run()}
+        canUndo={editor.can().undo()}
+        canRedo={editor.can().redo()}
+      />
 
       {has('heading') && (<>
         <ToolbarDivider />
@@ -154,13 +142,13 @@ export default function EditorToolbar({ editor, onOpenLinkPicker, findOpen, onTo
       <ToolbarDivider />
       <ToolbarGroup>
         {has('internalLink') && (
-          <ToolbarBtn onClick={onOpenLinkPicker} active={false} title={t('editor.toolbar.insertLink')}>
+          <ToolbarBtn onClick={onOpenLinkPicker} title={t('editor.toolbar.insertLink')}>
             <Link size={14} />
           </ToolbarBtn>
         )}
         {has('link') && <WebLinkButton editor={editor} />}
         {has('image') && (
-          <ToolbarBtn onClick={() => void pickImageFiles(editor)} active={false} title={t('editor.toolbar.insertImage')}>
+          <ToolbarBtn onClick={() => void pickImageFiles(editor)} title={t('editor.toolbar.insertImage')}>
             <ImagePlus size={14} />
           </ToolbarBtn>
         )}
@@ -177,7 +165,6 @@ export default function EditorToolbar({ editor, onOpenLinkPicker, findOpen, onTo
         {has('horizontalRule') && (
           <ToolbarBtn
             onClick={() => editor.chain().focus().setHorizontalRule().run()}
-            active={false}
             title={t('editor.toolbar.horizontalRule')}
           >
             <Minus size={14} />
@@ -221,7 +208,6 @@ function WebLinkButton({ editor }: { editor: Editor }) {
         {active && (
           <ToolbarBtn
             onClick={() => { removeLink(editor); close(); }}
-            active={false}
             title={t('editor.removeLink')}
           >
             <Unlink size={14} />

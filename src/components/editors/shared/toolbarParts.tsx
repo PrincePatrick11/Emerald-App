@@ -1,4 +1,6 @@
-import type { ReactNode } from 'react';
+import type { ReactNode, Ref } from 'react';
+import { useTranslation } from 'react-i18next';
+import { Redo, Undo } from 'lucide-react';
 
 /** The buttons of the toolbar, the selection menus and the find bar. */
 export function ToolbarGroup({ children }: { children: ReactNode }) {
@@ -14,13 +16,13 @@ export function ToolbarDivider() {
 export function ToolbarBtn({
   children,
   onClick,
-  active,
+  active = false,
   title,
   disabled = false,
 }: {
   children: ReactNode;
   onClick: () => void;
-  active: boolean;
+  active?: boolean;
   title: string;
   disabled?: boolean;
 }) {
@@ -37,6 +39,52 @@ export function ToolbarBtn({
     >
       {children}
     </button>
+  );
+}
+
+/** Undo and redo, first in every editor's bar. */
+export function UndoRedoGroup({ undo, redo, canUndo, canRedo }: {
+  undo: () => void;
+  redo: () => void;
+  canUndo: boolean;
+  canRedo: boolean;
+}) {
+  const { t } = useTranslation();
+  return (
+    <ToolbarGroup>
+      <ToolbarBtn onClick={undo} disabled={!canUndo} title={t('editor.toolbar.undo')}>
+        <Undo size={14} />
+      </ToolbarBtn>
+      <ToolbarBtn onClick={redo} disabled={!canRedo} title={t('editor.toolbar.redo')}>
+        <Redo size={14} />
+      </ToolbarBtn>
+    </ToolbarGroup>
+  );
+}
+
+/**
+ * A column of tools over the left edge of a drawing or a stage (the paint
+ * mode's and the canvas editor's), its tools in `ToolRailGroup`s; a group
+ * with `divider` starts under a line. `children` may add a panel beside it.
+ */
+export function ToolRail({ label, railRef, children }: {
+  label: string;
+  railRef?: Ref<HTMLDivElement>;
+  children: ReactNode;
+}) {
+  return (
+    <div ref={railRef} className="editor-toolbar paint-rail" role="toolbar" aria-orientation="vertical" aria-label={label}>
+      {children}
+    </div>
+  );
+}
+
+export function ToolRailGroup({ divider = false, children }: { divider?: boolean; children: ReactNode }) {
+  return (
+    <div className="paint-rail-group">
+      {divider && <div className="paint-rail-divider" />}
+      {children}
+    </div>
   );
 }
 

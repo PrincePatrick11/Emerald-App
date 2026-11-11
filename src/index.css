@@ -2071,6 +2071,14 @@ button.sidebar-section-title:focus-visible {
   font-size: 12px;
 }
 
+/* A segment with a word instead of an icon (`SegmentedControl`). */
+.prop-segment--label {
+  width: auto;
+  min-width: 2.75rem;
+  padding: 0 0.6rem;
+  font-size: 12px;
+}
+
 .prop-segment:hover:not(:disabled) {
   background-color: var(--interactive-hover);
   color: var(--text-secondary);
@@ -3163,14 +3171,15 @@ html[data-theme] .prop-segment--active {
   padding: 6px 2px 0 6px;
   border-top: 1px solid var(--border-soft);
 }
-.paint-layer-opacity-field {
+/* `RangeField`: a label, a slider and its value (the dock's opacity, the background panel). */
+.canvas-range-field {
   display: flex;
   align-items: center;
   gap: 0.375rem;
   font-size: 12px;
   color: var(--text-subtle);
 }
-.paint-layer-opacity-field input { flex: 1; min-width: 0; }
+.canvas-range-field input { flex: 1; min-width: 0; }
 .paint-layer-buttons { display: flex; justify-content: space-between; }
 /* The canvas editor's element list: the same dock, with group heads and their members indented under them. */
 .canvas-layer-group-icon {
@@ -3353,25 +3362,6 @@ html[data-theme] .prop-segment--active {
   gap: 6px;
   width: 17.5rem;
 }
-.canvas-symbols-search {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  height: 28px;
-  padding: 0 8px;
-  border: 1px solid var(--field-border);
-  border-radius: 6px;
-  background: var(--field-inset-bg);
-  color: var(--text-subtle);
-}
-.canvas-symbols-search input {
-  flex: 1;
-  min-width: 0;
-  background: transparent;
-  color: var(--text-primary);
-  font-size: 12px;
-  outline: none;
-}
 .canvas-symbols-packs {
   display: flex;
   flex-wrap: wrap;
@@ -3476,30 +3466,6 @@ html[data-theme] .prop-segment--active {
   align-items: center;
   gap: 4px;
 }
-.canvas-bg-icon, .canvas-bg-button {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  height: 24px;
-  min-width: 24px;
-  padding: 0 6px;
-  border-radius: 5px;
-  border: 1px solid var(--field-border);
-  color: var(--text-secondary);
-  font-size: 12px;
-}
-.canvas-bg-icon:hover:not(:disabled), .canvas-bg-button:hover:not(:disabled) { background: var(--interactive-hover); }
-.canvas-bg-icon:disabled, .canvas-bg-button:disabled { opacity: 0.45; }
-.canvas-bg-button { flex: 1; }
-.canvas-bg-slider {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 12px;
-  color: var(--text-secondary);
-}
-.canvas-bg-slider input { flex: 1; min-width: 0; }
 /* The canvas editor's export dialog: a label, then its segments or fields. */
 .canvas-export-row {
   display: flex;
@@ -3510,12 +3476,6 @@ html[data-theme] .prop-segment--active {
   color: var(--text-secondary);
 }
 .canvas-export-label { flex-shrink: 0; }
-.canvas-export-segment {
-  width: auto;
-  min-width: 2.75rem;
-  padding: 0 0.6rem;
-  font-size: 12px;
-}
 .canvas-export-hint {
   margin-top: -0.25rem;
   font-size: 12px;

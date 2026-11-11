@@ -7,6 +7,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { journalIcon } from '../../lib/moonPhase';
 import { hasOwnTitle } from '../../lib/entryTitle';
 import { REORDER_SPRING } from '../../lib/motion';
+import { useHorizontalWheel } from '../../hooks/useHorizontalWheel';
 import { findEntry, useEntryStore } from '../../store/entryStore';
 import { useTaskStore } from '../../store/taskStore';
 import { useUIStore } from '../../store/uiStore';
@@ -144,18 +145,7 @@ export default function TabBar() {
     list.scrollBy({ left: delta, behavior: smooth ? 'smooth' : 'auto' });
   }, [activeTabId, tabs.length]);
 
-  useEffect(() => {
-    const el = scrollRef.current;
-    if (!el) return;
-    const handleWheel = (event: WheelEvent) => {
-      if (el.scrollWidth <= el.clientWidth) return;
-      if (Math.abs(event.deltaY) <= Math.abs(event.deltaX)) return;
-      event.preventDefault();
-      el.scrollLeft += event.deltaY;
-    };
-    el.addEventListener('wheel', handleWheel, { passive: false });
-    return () => el.removeEventListener('wheel', handleWheel);
-  }, [tabs.length]);
+  useHorizontalWheel(scrollRef, [tabs.length]);
 
   if (tabs.length === 0) return null;
 

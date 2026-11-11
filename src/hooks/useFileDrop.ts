@@ -3,9 +3,6 @@ import { getCurrentWebview } from '@tauri-apps/api/webview';
 import { isWindows } from '../lib/platform';
 import { useSettingsStore } from '../store/settingsStore';
 
-/** The image formats a drop from the disk is taken for; anything else is left out. */
-export const DROPPED_IMAGE_RE = /\.(png|jpe?g|gif|webp|svg)$/i;
-
 /**
  * A position of Tauri's drag-drop event in the page's CSS pixels. The event
  * calls it physical, but only WebView2 delivers device pixels — and its

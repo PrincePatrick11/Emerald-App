@@ -2,7 +2,9 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ImagePlus, Minus, Plus, Trash2, Wallpaper } from 'lucide-react';
 import PopoverButton from '../shared/PopoverButton';
-import { ColorPanel } from './elements/controlParts';
+import Button from '../../ui/Button';
+import SegmentedControl, { type SegmentOption } from '../../ui/SegmentedControl';
+import { ColorPanel, RangeField } from './elements/controlParts';
 import { MAX_STOPS, MIN_STOPS, backgroundCss, type CanvasBackground, type CanvasFill } from './background';
 
 /** What the place offers for the background's picture. */
@@ -54,20 +56,8 @@ export default function BackgroundPanel({ value, onChange, images, onDismiss }: 
   const gradient = fill.kind === 'linear' || fill.kind === 'radial' ? fill : null;
   const current = Math.min(stop, (gradient?.colors.length ?? 1) - 1);
 
-  const segment = <T extends string>(options: { value: T; label: string }[], active: T | null, pick: (v: T) => void) => (
-    <div role="group" className="prop-segments canvas-bg-segments">
-      {options.map((o) => (
-        <button
-          key={o.value}
-          type="button"
-          aria-pressed={active === o.value}
-          className={`prop-segment canvas-export-segment${active === o.value ? ' prop-segment--active' : ''}`}
-          onClick={() => pick(o.value)}
-        >
-          {o.label}
-        </button>
-      ))}
-    </div>
+  const segment = <T extends string>(options: SegmentOption<T>[], active: T | null, pick: (v: T) => void) => (
+    <SegmentedControl options={options} value={active} onChange={pick} className="canvas-bg-segments" />
   );
 
   const choosePicture = async () => {
@@ -114,35 +104,40 @@ export default function BackgroundPanel({ value, onChange, images, onDismiss }: 
                   onClick={() => setStop(i)}
                 />
               ))}
-              <button
-                type="button"
-                className="canvas-bg-icon"
+              <Button
+                tone="neutral"
+                compact
+                small
                 disabled={gradient.colors.length >= MAX_STOPS}
                 title={t('canvas.background.addStop')}
                 onClick={() => { setFill({ ...gradient, colors: [...gradient.colors, gradient.colors[gradient.colors.length - 1]] }); setStop(gradient.colors.length); }}
               >
                 <Plus size={12} />
-              </button>
-              <button
-                type="button"
-                className="canvas-bg-icon"
+              </Button>
+              <Button
+                tone="neutral"
+                compact
+                small
                 disabled={gradient.colors.length <= MIN_STOPS}
                 title={t('canvas.background.removeStop')}
                 onClick={() => setFill({ ...gradient, colors: gradient.colors.filter((_, i) => i !== current) })}
               >
                 <Minus size={12} />
-              </button>
+              </Button>
             </div>
             <ColorPanel
               value={gradient.colors[current]}
               onPick={(color) => color && setFill({ ...gradient, colors: gradient.colors.map((c, i) => (i === current ? color : c)) })}
             />
             {gradient.kind === 'linear' && (
-              <label className="canvas-bg-slider">
-                <span>{t('canvas.background.angle')}</span>
-                <input type="range" min={0} max={359} value={gradient.angle} className="accent-accent" onChange={(e) => setFill({ ...gradient, angle: Number(e.target.value) })} />
-                <span className="paint-size-value">{Math.round(gradient.angle)}°</span>
-              </label>
+              <RangeField
+                label={t('canvas.background.angle')}
+                value={gradient.angle}
+                min={0}
+                max={359}
+                onChange={(angle) => setFill({ ...gradient, angle })}
+                format={(angle) => `${Math.round(angle)}°`}
+              />
             )}
             {gradient.kind === 'radial' && segment(
               RADIAL_CENTRES.map((c) => ({ value: c.key, label: t(`canvas.background.${c.key}`) })),
@@ -154,14 +149,20 @@ export default function BackgroundPanel({ value, onChange, images, onDismiss }: 
           {images && (<>
             <div className="canvas-bg-heading">{t('canvas.background.image')}</div>
             <div className="canvas-bg-row">
-              <button type="button" className="canvas-bg-button" disabled={picking} onClick={() => void choosePicture()}>
-                <ImagePlus size={13} />
+              <Button tone="neutral" small fill disabled={picking} onClick={() => void choosePicture()}>
+                <ImagePlus size={12} />
                 {t(image ? 'canvas.background.changeImage' : 'canvas.background.chooseImage')}
-              </button>
+              </Button>
               {image && (
-                <button type="button" className="canvas-bg-icon" title={t('canvas.background.removeImage')} onClick={() => set({ image: null })}>
+                <Button
+                  tone="neutral"
+                  compact
+                  small
+                  title={t('canvas.background.removeImage')}
+                  onClick={() => set({ image: null })}
+                >
                   <Trash2 size={12} />
-                </button>
+                </Button>
               )}
             </div>
             {image && segment(
@@ -182,11 +183,13 @@ export default function BackgroundPanel({ value, onChange, images, onDismiss }: 
             (v) => set({ tint: v === 'none' ? null : { color: v === 'light' ? '#ffffff' : '#0a0a0f', opacity: tint?.opacity ?? 0.3 } }),
           )}
           {tint && (
-            <label className="canvas-bg-slider">
-              <span>{t('canvas.layers.opacity')}</span>
-              <input type="range" min={5} max={95} value={Math.round(tint.opacity * 100)} className="accent-accent" onChange={(e) => set({ tint: { ...tint, opacity: Number(e.target.value) / 100 } })} />
-              <span className="paint-size-value">{Math.round(tint.opacity * 100)}</span>
-            </label>
+            <RangeField
+              label={t('canvas.layers.opacity')}
+              value={Math.round(tint.opacity * 100)}
+              min={5}
+              max={95}
+              onChange={(percent) => set({ tint: { ...tint, opacity: percent / 100 } })}
+            />
           )}
         </div>
       )}

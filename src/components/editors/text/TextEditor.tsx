@@ -363,12 +363,11 @@ export default function TextEditor({
             <>
               <ExternalLink size={12} className="text-subtle shrink-0 ml-1" />
               <span className="text-xs text-muted max-w-[220px] truncate">{linkPopup.href}</span>
-              <ToolbarBtn onClick={() => setEditingLink(true)} active={false} title={t('editor.editLink')}>
+              <ToolbarBtn onClick={() => setEditingLink(true)} title={t('editor.editLink')}>
                 <Pencil size={14} />
               </ToolbarBtn>
               <ToolbarBtn
                 onClick={() => { if (editor) applyLinkHref(editor, ''); closeLinkPopup(); }}
-                active={false}
                 title={t('editor.removeLink')}
               >
                 <Unlink size={14} />

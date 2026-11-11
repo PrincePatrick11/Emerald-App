@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import Modal from '../../ui/Modal';
 import Button from '../../ui/Button';
 import { SwitchRow } from '../../ui/Switch';
+import SegmentedControl, { type SegmentOption } from '../../ui/SegmentedControl';
 import type { Box } from './geometry';
 
 export type CanvasExportFormat = 'png' | 'jpeg' | 'svg';
@@ -66,22 +67,10 @@ export default function ExportDialog({ artboard, selection, hasBackground, onExp
     onClose();
   };
 
-  const segments = <T extends string | number>(label: string, options: { value: T; label: string }[], value: T | null, onChange: (v: T) => void) => (
+  const segments = <T extends string | number>(label: string, options: SegmentOption<T>[], value: T | null, onChange: (v: T) => void) => (
     <div className="canvas-export-row">
       <span className="canvas-export-label">{label}</span>
-      <div role="group" aria-label={label} className="prop-segments">
-        {options.map((o) => (
-          <button
-            key={String(o.value)}
-            type="button"
-            aria-pressed={value === o.value}
-            className={`prop-segment canvas-export-segment${value === o.value ? ' prop-segment--active' : ''}`}
-            onClick={() => onChange(o.value)}
-          >
-            {o.label}
-          </button>
-        ))}
-      </div>
+      <SegmentedControl ariaLabel={label} options={options} value={value} onChange={onChange} />
     </div>
   );
 

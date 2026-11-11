@@ -2,15 +2,15 @@ import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { HardDrive } from 'lucide-react';
 import { useImageStore } from '../../store/imageStore';
-import { reportImageError, useImageNoticeStore } from '../../store/imageNoticeStore';
+import { reportImageError } from '../../store/imageNoticeStore';
 import { settlePick, useImagePickerStore } from '../../store/imagePickerStore';
-import { ACCEPTED_IMAGE_MIME, isAcceptedImageFile } from '../../lib/helpers';
-import { fileBaseName, storeImageFile, storeImageFromPath } from '../../lib/storeImage';
-import { DROPPED_IMAGE_RE, useFileDrop } from '../../hooks/useFileDrop';
+import { ACCEPTED_IMAGE_MIME } from '../../lib/helpers';
+import { acceptedImageFiles, acceptedImagePaths, fileBaseName, storeImageFile, storeImageFromPath } from '../../lib/storeImage';
+import { useFileDrop } from '../../hooks/useFileDrop';
 import { searchPictures, useVaultPictures } from '../../hooks/useVaultPictures';
 import Modal from '../ui/Modal';
 import Button from '../ui/Button';
-import { ListSearchField } from '../ui/ListToolbar';
+import SearchField from '../ui/SearchField';
 import ImageTile from './ImageTile';
 
 /**
@@ -54,16 +54,11 @@ export default function ImagePickerModal({ multiple }: { multiple: boolean }) {
   };
 
   useFileDrop(true, (paths) => {
-    const images = paths.filter((p) => DROPPED_IMAGE_RE.test(p));
-    if (images.length < paths.length) useImageNoticeStore.getState().show({ kind: 'format' });
-    void takeFromDisk(images, storeImageFromPath, fileBaseName, (p) => p);
+    void takeFromDisk(acceptedImagePaths(paths), storeImageFromPath, fileBaseName, (p) => p);
   });
 
   const choose = (list: FileList | null) => {
-    const files = Array.from(list ?? []);
-    const images = files.filter(isAcceptedImageFile);
-    if (images.length < files.length) useImageNoticeStore.getState().show({ kind: 'format' });
-    void takeFromDisk(images, storeImageFile, (f) => fileBaseName(f.name), (f) => f.name);
+    void takeFromDisk(acceptedImageFiles(Array.from(list ?? [])), storeImageFile, (f) => fileBaseName(f.name), (f) => f.name);
   };
 
   return (
@@ -84,7 +79,7 @@ export default function ImagePickerModal({ multiple }: { multiple: boolean }) {
         </>
       }
     >
-      <ListSearchField value={search} onChange={setSearch} placeholder={t('images.searchPlaceholder')} />
+      <SearchField value={search} onValueChange={setSearch} placeholder={t('images.searchPlaceholder')} />
       {shown.length === 0 ? (
         <p className="text-xs text-subtle py-6 text-center">{pictures.length ? t('images.noMatch') : t('images.pickEmpty')}</p>
       ) : (

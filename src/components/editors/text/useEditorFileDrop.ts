@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
 import type { Editor } from '@tiptap/react';
 import { getCurrentWebview } from '@tauri-apps/api/webview';
-import { storeImageFromPath } from '../../../lib/storeImage';
+import { acceptedImagePaths, storeImageFromPath } from '../../../lib/storeImage';
 import { useImagePickerStore } from '../../../store/imagePickerStore';
 import { dropClaimedAt, dropPositionToCss } from '../../../hooks/useFileDrop';
-import { reportImageError, useImageNoticeStore } from '../../../store/imageNoticeStore';
+import { reportImageError } from '../../../store/imageNoticeStore';
 import { editorAtPoint, lineSpot, type DropSpot } from './dropSpot';
 import { editorHas } from './hostContext';
 import { insertImagesInOrder } from './editorCommands';
@@ -68,8 +68,8 @@ export function useEditorFileDrop({ enabled, getEditors, getContainer, getFallba
           const { paths, position } = event.payload;
           // A place under the pointer takes the files itself.
           if (dropClaimedAt(dropPositionToCss(position))) return;
-          const imagePaths = paths.filter((p) => /\.(png|jpe?g|gif|webp|svg)$/i.test(p));
-          if (!imagePaths.length) { useImageNoticeStore.getState().show({ kind: 'format' }); return; }
+          const imagePaths = acceptedImagePaths(paths);
+          if (!imagePaths.length) return;
 
           const spot = spotAt(position);
           const fallback = optionsRef.current.getFallback();

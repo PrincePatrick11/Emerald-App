@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { BookmarkPlus } from 'lucide-react';
 import PopoverButton from '../../shared/PopoverButton';
+import Button from '../../../ui/Button';
 import { ToolbarGroup } from '../../shared/toolbarParts';
 import type { CanvasElement } from '../types';
 import type { DrawingProps } from '../paint/drawing';
@@ -42,7 +43,7 @@ function SaveForm({ doc, library, close }: { doc: PaintDoc; library: CanvasSymbo
         autoFocus
       />
       <p className="canvas-export-hint">{t('symbols.saveHint')}</p>
-      <button type="submit" className="canvas-bg-button" disabled={busy}>{t('symbols.save')}</button>
+      <Button type="submit" tone="neutral" small disabled={busy}>{t('symbols.save')}</Button>
     </form>
   );
 }

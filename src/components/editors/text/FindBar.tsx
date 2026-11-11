@@ -134,10 +134,10 @@ export default function FindBar({ getEditors, isEditing, initialQuery, onClose }
           <span className={`editor-find-count${query && hits.length === 0 ? ' editor-find-count--none' : ''}`}>{countText}</span>
         </label>
         <ToolbarGroup>
-          <ToolbarBtn onClick={() => step(-1)} active={false} disabled={hits.length === 0} title={t('editor.find.previous')}>
+          <ToolbarBtn onClick={() => step(-1)} disabled={hits.length === 0} title={t('editor.find.previous')}>
             <ChevronUp size={14} />
           </ToolbarBtn>
-          <ToolbarBtn onClick={() => step(1)} active={false} disabled={hits.length === 0} title={t('editor.find.next')}>
+          <ToolbarBtn onClick={() => step(1)} disabled={hits.length === 0} title={t('editor.find.next')}>
             <ChevronDown size={14} />
           </ToolbarBtn>
         </ToolbarGroup>
@@ -148,7 +148,7 @@ export default function FindBar({ getEditors, isEditing, initialQuery, onClose }
               <Replace size={14} />
             </ToolbarBtn>
           )}
-          <ToolbarBtn onClick={onClose} active={false} title={t('editor.find.close')}>
+          <ToolbarBtn onClick={onClose} title={t('editor.find.close')}>
             <X size={14} />
           </ToolbarBtn>
         </ToolbarGroup>
@@ -168,10 +168,10 @@ export default function FindBar({ getEditors, isEditing, initialQuery, onClose }
             />
           </label>
           <ToolbarGroup>
-            <ToolbarBtn onClick={replaceCurrent} active={false} disabled={current === null} title={t('editor.find.replace')}>
+            <ToolbarBtn onClick={replaceCurrent} disabled={current === null} title={t('editor.find.replace')}>
               <span className="editor-toolbar-btn-label">{t('editor.find.replaceShort')}</span>
             </ToolbarBtn>
-            <ToolbarBtn onClick={replaceAll} active={false} disabled={hits.length === 0} title={t('editor.find.replaceAll')}>
+            <ToolbarBtn onClick={replaceAll} disabled={hits.length === 0} title={t('editor.find.replaceAll')}>
               <span className="editor-toolbar-btn-label">{t('editor.find.replaceAll')}</span>
             </ToolbarBtn>
           </ToolbarGroup>

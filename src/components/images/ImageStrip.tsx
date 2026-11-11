@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ChevronDown, Images, Plus, Tag as TagIcon, X } from 'lucide-react';
 import { searchPictures, useVaultPictures, type PictureItem } from '../../hooks/useVaultPictures';
 import { useTagStore } from '../../store/tagStore';
+import { useHorizontalWheel } from '../../hooks/useHorizontalWheel';
 import { ListSearchField } from '../ui/ListToolbar';
 import Dropdown from '../ui/Dropdown';
 import ImageTile from './ImageTile';
@@ -31,20 +32,8 @@ export default function ImageStrip({ onPick, tag, onTagChange, onAdd }: {
     ...[...tags].sort((a, b) => a.name.localeCompare(b.name)).map((x) => ({ value: x.id, label: x.name })),
   ], [tags, t]);
 
-  // A plain wheel scrolls the row sideways, not the page; a trackpad does so by itself.
-  // A listener of its own: React's wheel listener is passive and cannot stop the page.
-  const hasGrid = shown.length > 0;
-  useEffect(() => {
-    const grid = gridRef.current;
-    if (!grid) return;
-    const onWheel = (e: WheelEvent) => {
-      if (Math.abs(e.deltaY) <= Math.abs(e.deltaX) || grid.scrollWidth <= grid.clientWidth) return;
-      e.preventDefault();
-      grid.scrollLeft += e.deltaY;
-    };
-    grid.addEventListener('wheel', onWheel, { passive: false });
-    return () => grid.removeEventListener('wheel', onWheel);
-  }, [hasGrid]);
+  // The grid is only rendered while there are pictures.
+  useHorizontalWheel(gridRef, [shown.length > 0]);
   return (
     <div className="image-strip">
       <div className="image-strip-head">
