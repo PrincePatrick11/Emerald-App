@@ -1428,9 +1428,10 @@ console.log('\n8d. Migration v38: four category tables become one\n');
     (await one('SELECT COUNT(*) n FROM task_links')).n === 1
   );
   check(
-    // The order comes from v38; v39 does not re-sort.
-    'sigils first, other last',
-    cats[0].id === 'sigils' && cats[cats.length - 1].id === 'other'
+    // The order comes from v38; v39 does not re-sort. v61 appends the altars.
+    'sigils first, other last before the altars',
+    cats[0].id === 'sigils' && cats[cats.length - 2].id === 'other' && cats[cats.length - 1].id === 'altars',
+    JSON.stringify(cats.map((c) => c.id))
   );
   const v38Violations = await v38.select('PRAGMA foreign_key_check');
   check('v38: foreign_key_check empty', v38Violations.length === 0, JSON.stringify(v38Violations));
@@ -1457,10 +1458,10 @@ console.log('\n8e. Fresh vault: builtins and starter set\n');
 {
   const cats = await baseline.select('SELECT id, name, is_builtin, sort_order FROM categories ORDER BY sort_order');
   check(
-    // Since v39 only one. `other` is no longer created at all: it was
-    // the default for new entries, and they simply have none now.
-    'exactly one builtin, "sigils", and no "other"',
-    cats.filter((c) => c.is_builtin === 1).length === 1 &&
+    // Since v39 `other` is no longer created at all: it was the default for
+    // new entries, and they simply have none now. Since v61 the altars join the sigils.
+    'two builtins, "sigils" and "altars", and no "other"',
+    cats.filter((c) => c.is_builtin === 1).map((c) => c.id).join() === 'sigils,altars' &&
       cats[0].id === 'sigils' && !cats.some((c) => c.id === 'other'),
     JSON.stringify(cats)
   );
@@ -1989,6 +1990,25 @@ console.log('\n8n. Migration v49: three entry tables become entries\n');
     rows.live === JSON.stringify([{ entryType: 'wiki', category: '*' }]), rows.live);
   check('v56: a trashed template holds no assignments', rows.gone === '[]', rows.gone);
   check('v56: repeatable, schema identical to the baseline', JSON.stringify(await readSchema(db)) === JSON.stringify(schemaA));
+  db.close();
+}
+
+{
+  // v61: the built-in category "Altars" and the template "Altar", assigned to operation × altars.
+  const db = freshDb('v61.db');
+  await runMigrations(db);
+  await db.execute("DELETE FROM templates WHERE id='core-altar'");
+  await db.execute("DELETE FROM categories WHERE id='altars'");
+  const v61 = MIGRATIONS.find((m) => m.version === 61);
+  await v61.up(db);
+  await v61.up(db);
+  const cats = await db.select("SELECT id, is_builtin FROM categories WHERE id='altars'");
+  const [tpl] = await db.select("SELECT content, assignments FROM templates WHERE id='core-altar'");
+  check('v61: one built-in category "altars"', cats.length === 1 && cats[0].is_builtin === 1, cats);
+  check('v61: the altar template, default for operation × altars, with an altar and a text',
+    !!tpl && JSON.parse(tpl.assignments).some((a) => a.entryType === 'operation' && a.category === 'altars')
+      && tpl.content.includes('data-block="core.altar"') && tpl.content.includes('data-block="core.text"'), tpl);
+  check('v61: repeatable, schema identical to the baseline', JSON.stringify(await readSchema(db)) === JSON.stringify(schemaA));
   db.close();
 }
 

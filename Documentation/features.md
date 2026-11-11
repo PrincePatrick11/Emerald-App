@@ -294,7 +294,7 @@ Clicking one opens its page — name as the title, the title new entries get, an
 
 **A template is copied, and that is all.** Whatever it puts into an entry stays there unchanged; changing or deleting the template later changes no entry, nothing asks about updates, and nothing counts where a template was used.
 
-**Assignments** are set in the collapsible "Assignments" table below the template list, or in the same table from the "Assignments" property on a template's page, where a click puts that template into a cell or takes it out. Journal has one row, Wiki and Operations are columns against "All categories", "Uncategorized" and every category. Each cell picks the template new entries of that combination start with and applies at once; a template already holding the cell loses it. A cell without a template of its own names the "All categories" template that applies instead. The built-in template `core-sigil` (calculator, drawing, charge) starts assigned to Operations × Sigils; it can be edited, reassigned or deleted like any other.
+**Assignments** are set in the collapsible "Assignments" table below the template list, or in the same table from the "Assignments" property on a template's page, where a click puts that template into a cell or takes it out. Journal has one row, Wiki and Operations are columns against "All categories", "Uncategorized" and every category. Each cell picks the template new entries of that combination start with and applies at once; a template already holding the cell loses it. A cell without a template of its own names the "All categories" template that applies instead. The built-in templates start assigned too: `core-sigil` (calculator, drawing, charge) to Operations × Sigils, `core-altar` (an altar on a dark night, and a text for notes) to Operations × Altars; they can be edited, reassigned or deleted like any other.
 
 **When an entry is created,** its combination's template is copied in: the exact category's first, then "All categories" for that type, or nothing. A notice above the block stack offers Undo. Changing an entry's category or type later never touches its content.
 
@@ -338,7 +338,7 @@ The Tasks module is a hierarchical task manager with categories, priorities, and
 
 One list of categories serves Wiki, Operations, Tasks and Altar items, and the Categories view in the left rail — next to Tags — is the one place it is managed. The four modules only *assign* a category to an entry and group their lists by it; none of them can create, rename or delete one.
 
-A fresh vault starts with eight ordinary categories in the app's language (Paradigm, Ritual, Meditation, Herbs, Crystals, Candles, Deities, Tools) plus the built-in **Sigils**.
+A fresh vault starts with eight ordinary categories in the app's language (Paradigm, Ritual, Meditation, Herbs, Crystals, Candles, Deities, Tools) plus the built-in **Sigils** and **Altars**: a new operation in Altars starts with an altar and a text for notes.
 
 Each row shows the category's emoji, its name, and how many entries in each module use it (Tasks, Operations, Wiki, Altar — the rail's order, with the module's icon as the column header). Only live entries count, not the Trash.
 

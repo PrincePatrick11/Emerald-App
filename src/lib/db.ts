@@ -3,7 +3,7 @@ import Database from './sqlite';
 import { invoke } from '@tauri-apps/api/core';
 import { getActiveVaultId } from './vaultManager';
 import {
-  ALTAR_ITEMS_INDEX_DDL, ALTARS_INDEX_DDL, BASELINE_VERSION, BLOCK_DEFINITIONS_INDEX_DDL, ENTRIES_INDEX_DDL, IMAGES_INDEX_DDL, LEXICON_INDEX_DDL, TABLE_DDL,
+  ALTAR_CATEGORY_ID, ALTAR_ITEMS_INDEX_DDL, ALTARS_INDEX_DDL, BASELINE_VERSION, BLOCK_DEFINITIONS_INDEX_DDL, ENTRIES_INDEX_DDL, IMAGES_INDEX_DDL, LEXICON_INDEX_DDL, TABLE_DDL,
   TEMPLATES_INDEX_DDL, createSchema, ddlIfNotExists, purgeCategory, seedBuiltins, storedImageName,
 } from './schema';
 import { normalizeSchema } from './normalizeSchema';
@@ -21,7 +21,7 @@ import { rewriteTagRefs, stripTagIds } from './tagRefs';
 import { ALTAR_SETTING_KEYS, altarSettingsJson } from './altarSettings';
 import type { EntryType } from '../types';
 import { makeCategoryOptional } from './nullableCategory';
-import { seedSigilTemplate } from './templateRows';
+import { seedAltarTemplate, seedSigilTemplate } from './templateRows';
 import { migrateRoutinesToTemplates } from './migrateRoutinesToTemplates';
 import i18n from '../i18n';
 import { LEGACY_UNTITLED_TITLES } from './entryTitle';
@@ -228,6 +228,7 @@ export async function runMigrations(db: Database): Promise<void> {
     await seedBuiltins(db, (key) => i18n.t(`categories.starter.${key}`));
     // Not in seedBuiltins: schema.ts imports no block logic.
     await seedSigilTemplate(db, i18n.t);
+    await seedAltarTemplate(db, i18n.t);
     const now = new Date().toISOString();
     await db.execute(
       'INSERT INTO schema_version (version, name, applied_at) VALUES ($1, $2, $3)',
@@ -1491,6 +1492,24 @@ export const MIGRATIONS: Migration[] = [
     up: async (db) => {
       await db.execute(ddlIfNotExists(TABLE_DDL.images));
       await createIndexesIfMissing(db, IMAGES_INDEX_DDL);
+    },
+  },
+  {
+    // Altars become operations: the built-in category "Altars" and the
+    // template "Altar" (an altar block and a text for notes), its default.
+    // Additive and repeatable.
+    version: 61,
+    name: 'altar_category_and_template',
+    up: async (db) => {
+      const [held] = await db.select<{ n: number }[]>('SELECT COUNT(*) AS n FROM categories WHERE id=$1', [ALTAR_CATEGORY_ID]);
+      if (!held?.n) {
+        const [last] = await db.select<{ n: number }[]>('SELECT COALESCE(MAX(sort_order), -1) + 1 AS n FROM categories');
+        await db.execute(
+          'INSERT INTO categories (id, name, emoji, sort_order, is_builtin) VALUES ($1,$2,$3,$4,1)',
+          [ALTAR_CATEGORY_ID, 'Altars', '🛐', last?.n ?? 0],
+        );
+      }
+      await seedAltarTemplate(db, i18n.t);
     },
   },
 ];

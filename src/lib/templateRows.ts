@@ -2,11 +2,12 @@ import type Database from './sqlite';
 import type { TFunction } from 'i18next';
 import { nowIso } from './helpers';
 import { fromRow, type DbRow } from './row';
-import { SIGIL_CATEGORY_ID } from './schema';
+import { ALTAR_CATEGORY_ID, SIGIL_CATEGORY_ID } from './schema';
 import { serializeBlocks } from './blocks/blockHtml';
 import { translatedOr } from './blocks/blockAttrs';
 import { sigilBlockSet } from './blocks/sigil';
-import { SIGIL_TEMPLATE_ID, templateToRow, type Template } from './blocks/templates';
+import { altarBlockSet } from './blocks/canvas';
+import { ALTAR_TEMPLATE_ID, SIGIL_TEMPLATE_ID, templateToRow, type Template } from './blocks/templates';
 
 /**
  * The accesses to `templates` that store, migration, fresh vaults and
@@ -70,5 +71,29 @@ export async function seedSigilTemplate(db: Database, t: TFunction): Promise<voi
   await insertTemplateRow(db, {
     ...sigilTemplate(t, nowIso(), await nextTemplateSortOrder(db)),
     assignments: category ? [{ entryType: 'operation', category: SIGIL_CATEGORY_ID }] : [],
+  });
+}
+
+/**
+ * Creates the built-in "Altar" template if it does not yet exist (including
+ * in the trash) — for fresh vaults and migration v61: an altar and a text for
+ * notes, default for operations of the "Altars" category.
+ */
+export async function seedAltarTemplate(db: Database, t: TFunction): Promise<void> {
+  if (await templateById(db, ALTAR_TEMPLATE_ID)) return;
+  const [category] = await db.select<{ id: string }[]>('SELECT id FROM categories WHERE id=$1', [ALTAR_CATEGORY_ID]);
+  const now = nowIso();
+  await insertTemplateRow(db, {
+    id: ALTAR_TEMPLATE_ID,
+    name: translatedOr(t, 'templates.builtin.altar', 'Altar'),
+    icon: '🛐',
+    title: '',
+    content: serializeBlocks(altarBlockSet()),
+    tags: [],
+    sort_order: await nextTemplateSortOrder(db),
+    created_at: now,
+    updated_at: now,
+    deleted_at: null,
+    assignments: category ? [{ entryType: 'operation', category: ALTAR_CATEGORY_ID }] : [],
   });
 }

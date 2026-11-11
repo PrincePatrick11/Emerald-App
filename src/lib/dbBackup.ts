@@ -40,7 +40,7 @@ import {
   routineLinkResolver, routineToTemplate, vaultRoutineLinkSource, type RoutineCategoryRow, type RoutineTargetRow,
 } from './migrateRoutinesToTemplates';
 import {
-  assignedCategoryId, assignmentKey, isTemplateId, parseAssignments, SIGIL_TEMPLATE_ID, templateToRow,
+  ALTAR_TEMPLATE_ID, assignedCategoryId, assignmentKey, isTemplateId, parseAssignments, SIGIL_TEMPLATE_ID, templateToRow,
 } from './blocks/templates';
 import { fromRow } from './row';
 import { needsSigilConversion, sigilRowToContent, type LegacySigilRow } from './migrateLegacySigils';
@@ -1966,6 +1966,10 @@ export async function importDatabase(
     await importViaStaging(db, async (staging) => {
       if (bringsTemplates && (types.includeJournal || types.includeWiki || types.includeOperations)) {
         await staging.execute('DELETE FROM templates WHERE id=$1', [SIGIL_TEMPLATE_ID]);
+        // The altar template is known from '13' on; an older file keeps the fresh one.
+        if ((backup.sourceVersion ?? Number(BACKUP_VERSION)) >= 13) {
+          await staging.execute('DELETE FROM templates WHERE id=$1', [ALTAR_TEMPLATE_ID]);
+        }
       }
       await doReplace(staging, filteredBackup);
     });

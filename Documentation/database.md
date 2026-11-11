@@ -29,7 +29,7 @@ Because the baseline and the chain must produce the same schema, `npm run check:
 
 `runMigrations` takes one of two routes:
 
-- **Fresh file** — no tables at all (checked in `sqlite_master`, not `schema_version`: a database old enough to predate the version table has tables but no version row and must run the chain). It runs the DDL from `schema.ts`, seeds the built-in category, the starter categories and the `core-sigil` template — in the language active at first open, since `main.tsx` waits for the stored language before anything touches the database — and stamps one `baseline` row at `BASELINE_VERSION`.
+- **Fresh file** — no tables at all (checked in `sqlite_master`, not `schema_version`: a database old enough to predate the version table has tables but no version row and must run the chain). It runs the DDL from `schema.ts`, seeds the built-in categories, the starter categories and the `core-sigil` and `core-altar` templates — in the language active at first open, since `main.tsx` waits for the stored language before anything touches the database — and stamps one `baseline` row at `BASELINE_VERSION`.
 - **Existing file** — the ordered `MIGRATIONS` array runs from the highest applied version upward, each step stamping `schema_version` with version, name and ISO timestamp. Every vault reaches the same schema as a fresh one; there is no cut-off past which an old database stops being upgradable.
 
 `BASELINE_VERSION` in `schema.ts` must equal the last entry in `MIGRATIONS`; `runMigrations` throws at startup otherwise. The current version is **56**. **Version 24 does not exist** — the runner tolerates gaps and only requires each version to be above the last applied one. The three block migrations were first numbered v39–v41 on their development branch; `renumberBlockMigrations` restamps such a vault once by name and catches up on v39.
@@ -73,6 +73,7 @@ Per-migration detail lives in the code and in `CHANGELOG.md`. In short:
 | 58 | `altar_placement_groups` | Additive: `altar_placements.group_id`, the group a placement belongs to ([altar_placements](#altar_placements)) |
 | 59 | `symbols` | New table: the vault's own symbols for the canvas editor ([symbols](#symbols)) |
 | 60 | `images` | Additive: the `images` table ([images](#images)) and its `deleted_at` index |
+| 61 | `altar_category_and_template` | Additive: the built-in category `altars` (appended to the list) and the `core-altar` template ([templates](#templates)) |
 
 Column drops go through `dropColumnsIfPresent` (`dbRebuild.ts`), which skips columns already gone, so they are repeatable. Where a migration converts data, the same converter also runs on rows from an older `.emeralddb` file at import time — see [DB Backup / Restore](#db-backup--restore-emeralddb).
 
@@ -147,7 +148,7 @@ When a category is merged into a namesake instead (`reassignCategoryContent(db, 
 
 Only a **permanent** deletion reassigns: `categoryStore.permanentlyDeleteCategory`, `trashStore.emptyTrash`, and the periodic cleanup for an expired category (`purgeCategory`). That is why `categories` is **not in `CLEANUP_TABLES`** — it is purged separately, after its content is released. A *soft* delete never reassigns: content keeps pointing at the trashed category, the UI groups it under "Uncategorized", and restoring the category brings everything back. `reassignCategoriesInMemory` in `categoryStore.ts` applies the same move to the loaded content stores, so an in-memory row doesn't write back a `category_id` the foreign key would reject.
 
-The one built-in, `sigils`, cannot be deleted: an operation in it is a sigil, and a new one starts with the sigil blocks through the built-in `core-sigil` template, assigned to Operations × Sigils.
+The built-ins, `sigils` and `altars` (since v61), cannot be deleted: an operation in `sigils` is a sigil, and a new one starts with the sigil blocks through the built-in `core-sigil` template, assigned to Operations × Sigils; an operation in `altars` is an altar and starts with an altar block and a text for notes through `core-altar`.
 
 ## Tables
 
@@ -218,7 +219,7 @@ The templates dashboard's rows, behind Journal/Wiki/Operations' "insert a templa
 
 | Column | Type | Notes |
 |---|---|---|
-| id | TEXT PK | UUID (or `'core-sigil'` for the built-in) |
+| id | TEXT PK | UUID (or `'core-sigil'`, `'core-altar'` for the built-ins) |
 | name | TEXT | NOT NULL |
 | icon | TEXT | emoji or image, NOT NULL DEFAULT `'📄'` |
 | title | TEXT | NOT NULL DEFAULT `''`; the title a new entry gets — empty means the entry starts untitled |
@@ -229,7 +230,7 @@ The templates dashboard's rows, behind Journal/Wiki/Operations' "insert a templa
 | created_at / updated_at | TEXT | ISO 8601 |
 | deleted_at | TEXT | NULL = active; purged after the retention period (`CLEANUP_TABLES`) |
 
-`core-sigil` is seeded with the three sigil blocks (`sigilBlockSet()` in `lib/blocks/sigil.ts`), assigned to Operations × Sigils; otherwise it is an ordinary row — editable, deletable, reassignable. `templateStore`, not the database, enforces "at most one template per combination" among *active* templates (`assignTemplate`); deleting a template clears its assignments, so it comes back without them. Older blocks in `content` may still carry `data-block-origin`, `data-block-rev` and `data-template-origin`, which nothing reads. An `isDefault: false` in older data only offered a template for selection and is dropped by `parseAssignments`. A dangling category id in `assignments` has no foreign key to stop it (see [What foreign keys cannot cover](#what-foreign-keys-cannot-cover)) — `checkIntegrity` reports it.
+`core-sigil` is seeded with the three sigil blocks (`sigilBlockSet()` in `lib/blocks/sigil.ts`), assigned to Operations × Sigils, and `core-altar` with an altar block on a dark night and a text block (`altarBlockSet()` in `lib/blocks/canvas.ts`), assigned to Operations × Altars; otherwise each is an ordinary row — editable, deletable, reassignable. `templateStore`, not the database, enforces "at most one template per combination" among *active* templates (`assignTemplate`); deleting a template clears its assignments, so it comes back without them. Older blocks in `content` may still carry `data-block-origin`, `data-block-rev` and `data-template-origin`, which nothing reads. An `isDefault: false` in older data only offered a template for selection and is dropped by `parseAssignments`. A dangling category id in `assignments` has no foreign key to stop it (see [What foreign keys cannot cover](#what-foreign-keys-cannot-cover)) — `checkIntegrity` reports it.
 
 ### languages
 
@@ -583,7 +584,7 @@ A definition's prefills need their own remap, since nothing else touches `elemen
 
 **Templates are added, never replaced or deleted** — `insertTemplates`, `INSERT OR IGNORE` by id, before the deletes in `doReplace` and after the merge prefix's remap in `doMerge`. A local template (including trashed) keeps its local version; new ones land at the end of the sort order. `content` gets the same image and (in merge) id remap as entries; `assignments`' category ids are remapped like content rows, and one that doesn't resolve is dropped. An assignment survives only if no local active template holds that combination; a template arriving via the trash has none, like `templateStore.restoreTemplate`.
 
-A fresh vault (add-vault) seeds its own `core-sigil` before the import runs. If the file carries its own `templates` (`"8"`+; converted routines don't count) and the import includes Journal, Wiki or Operations, that seeded row is deleted first, so the file's version of `core-sigil` — edited, deleted or otherwise — wins.
+A fresh vault (add-vault) seeds its own `core-sigil` before the import runs. If the file carries its own `templates` (`"8"`+; converted routines don't count) and the import includes Journal, Wiki or Operations, that seeded row is deleted first, so the file's version of `core-sigil` — edited, deleted or otherwise — wins; `core-altar` likewise for a file from `"13"` on, which knows it.
 
 **The Lexicon is added, never replaced or deleted** — `insertLexicon`, `INSERT OR IGNORE` by id; a word is inserted only when its language exists in the target vault, since `lexicon_entries.language_id` is a real foreign key.
 

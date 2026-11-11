@@ -90,7 +90,7 @@ Top-level keys of `en.json`, with the conventions worth knowing:
 | `symbols` | The canvas editor's symbol library: its own labels, `packs.*` the pack names, and `<pack>.<name>` every symbol's name, which the library's search looks in |
 | `moonPhase` | Display names of the eight moon phases |
 | `search` | Dashboard search placeholders (`placeholder`, `placeholderIn` with `{{title}}`) and the title bar's global search (`globalPlaceholder`, `hint`, `clear`, `showMore`). Result module labels reuse `nav.*`; only `altarElements`/`categories` have their own |
-| `templates` | Templates dashboard and page; `builtin.sigil` names the built-in `core-sigil` template the way `categories.builtin.*` names a category; `insert.*` is the editor's picker and apply flow |
+| `templates` | Templates dashboard and page; `builtin.sigil` and `builtin.altar` name the built-in `core-sigil` and `core-altar` templates the way `categories.builtin.*` names a category; `insert.*` is the editor's picker and apply flow |
 | `lexicon` | Lexicon dashboard, language page and translate field. `wordCount` counts vocabulary rows; the translated text's own count is `textWordCount` |
 | `tags` | Tags view (`new`, `name`, `nameTaken`, `color`, `unused`, `onlyInTemplates`) |
 | `properties` | Right sidebar Properties panel |

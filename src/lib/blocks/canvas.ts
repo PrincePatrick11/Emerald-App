@@ -1,7 +1,7 @@
 import { generateId } from '../helpers';
 import { escapeHtml } from '../internalLinkHtml';
 import { storedImageName } from '../schema';
-import { decodeHtmlAttr } from './blockHtml';
+import { createTextBlock, decodeHtmlAttr } from './blockHtml';
 import { BLOCK_ATTR, type BlockInstance, type BlockTypeId } from './types';
 
 /**
@@ -230,4 +230,14 @@ export function createCanvasBlock(type: typeof CANVAS_BLOCK_TYPE | typeof ALTAR_
   return withCanvasParts(withCanvasScene(block, {
     width: CANVAS_BLOCK_WIDTH, height: CANVAS_BLOCK_HEIGHT, elements: [], background: null, guides: [], guidesLocked: false,
   }, null), defaultCanvasParts(type));
+}
+
+/** The night an altar starts on: a radial gradient from a dark blue, as the altars of old had. */
+const ALTAR_NIGHT = { fill: { kind: 'radial', colors: ['#1e1e3c', '#0f0f1e', '#0a0a0f'], cx: 0.5, cy: 0.25 }, image: null, tint: null };
+
+/** What an operation of the "Altars" category starts with (the template `core-altar`): an altar on its night, and a text for notes. */
+export function altarBlockSet(): BlockInstance[] {
+  const altar = createCanvasBlock(ALTAR_BLOCK_TYPE);
+  const { scene, render } = parseCanvasBlock(altar);
+  return [withCanvasScene(altar, { ...scene, background: ALTAR_NIGHT }, render), createTextBlock()];
 }

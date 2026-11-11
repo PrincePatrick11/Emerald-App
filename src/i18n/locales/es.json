@@ -32,7 +32,8 @@
     "builtinHint": "Integrada — no se puede renombrar ni eliminar.",
     "builtin": {
       "other": "Otro",
-      "sigils": "Sigilos"
+      "sigils": "Sigilos",
+      "altars": "Altares"
     },
     "starter": {
       "paradigm": "Paradigma",
@@ -1373,7 +1374,8 @@
   "templates": {
     "untitled": "Plantilla sin título",
     "builtin": {
-      "sigil": "Sigilo"
+      "sigil": "Sigilo",
+      "altar": "Altar"
     },
     "newTemplate": "Nueva plantilla",
     "defaultName": "Nueva plantilla",

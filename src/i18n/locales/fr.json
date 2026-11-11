@@ -32,7 +32,8 @@
     "builtinHint": "Intégrée — ne peut être ni renommée ni supprimée.",
     "builtin": {
       "other": "Autre",
-      "sigils": "Sigils"
+      "sigils": "Sigils",
+      "altars": "Autels"
     },
     "starter": {
       "paradigm": "Paradigme",
@@ -1373,7 +1374,8 @@
   "templates": {
     "untitled": "Modèle sans titre",
     "builtin": {
-      "sigil": "Sigil"
+      "sigil": "Sigil",
+      "altar": "Autel"
     },
     "newTemplate": "Nouveau modèle",
     "defaultName": "Nouveau modèle",

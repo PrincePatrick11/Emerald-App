@@ -32,7 +32,8 @@
     "builtinHint": "Eingebaut — nicht umbenenn- oder löschbar.",
     "builtin": {
       "other": "Sonstiges",
-      "sigils": "Sigillen"
+      "sigils": "Sigillen",
+      "altars": "Altäre"
     },
     "starter": {
       "paradigm": "Paradigma",
@@ -1373,7 +1374,8 @@
   "templates": {
     "untitled": "Unbenannte Vorlage",
     "builtin": {
-      "sigil": "Sigille"
+      "sigil": "Sigille",
+      "altar": "Altar"
     },
     "newTemplate": "Neue Vorlage",
     "defaultName": "Neue Vorlage",

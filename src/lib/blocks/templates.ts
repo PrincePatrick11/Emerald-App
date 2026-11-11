@@ -59,6 +59,9 @@ export const DEFAULT_TEMPLATE_ICON = '📄';
 /** The built-in sigil template: assigned to operation × sigils. Editable and deletable; the fixed ID lets migration and import recognise it. */
 export const SIGIL_TEMPLATE_ID = 'core-sigil';
 
+/** The built-in altar template (since v61): assigned to operation × altars, editable and deletable like the sigil's. */
+export const ALTAR_TEMPLATE_ID = 'core-altar';
+
 /** A template ID from a foreign source. The same rule as for definitions. */
 export function isTemplateId(id: unknown): id is string {
   return isDefinitionId(id);

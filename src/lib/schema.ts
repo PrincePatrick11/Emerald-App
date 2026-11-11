@@ -21,7 +21,7 @@ import type Database from './sqlite';
  * Must match the highest version in MIGRATIONS. `db.ts` checks this at
  * startup so that a new migration step cannot be forgotten.
  */
-export const BASELINE_VERSION = 60;
+export const BASELINE_VERSION = 61;
 
 /**
  * Tables in dependency order: parents before children.
@@ -427,11 +427,19 @@ export const FALLBACK_CATEGORY_ID = 'other';
 export const SIGIL_CATEGORY_ID = 'sigils';
 
 /**
+ * Built in since v61: a new operation in it starts with an altar and a text
+ * for notes, via the built-in template `core-altar`. An altar is an
+ * operation of this category, not a module of its own.
+ */
+export const ALTAR_CATEGORY_ID = 'altars';
+
+/**
  * [id, name (database only — `categories.builtin.<id>` is displayed), emoji].
- * Since v39 only one: `other` has lost its special status.
+ * Since v39 `other` has lost its special status; since v61 the altars join the sigils.
  */
 export const BUILTIN_CATEGORIES: readonly [string, string, string][] = [
   [SIGIL_CATEGORY_ID, 'Sigils', '🔯'],
+  [ALTAR_CATEGORY_ID, 'Altars', '🛐'],
 ];
 
 /**

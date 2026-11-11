@@ -32,7 +32,8 @@
     "builtinHint": "Built-in — cannot be renamed or deleted.",
     "builtin": {
       "other": "Other",
-      "sigils": "Sigils"
+      "sigils": "Sigils",
+      "altars": "Altars"
     },
     "starter": {
       "paradigm": "Paradigm",
@@ -1373,7 +1374,8 @@
   "templates": {
     "untitled": "Untitled template",
     "builtin": {
-      "sigil": "Sigil"
+      "sigil": "Sigil",
+      "altar": "Altar"
     },
     "newTemplate": "New template",
     "defaultName": "New template",
