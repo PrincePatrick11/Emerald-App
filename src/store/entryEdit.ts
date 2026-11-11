@@ -155,6 +155,25 @@ export function endDiscard(id: string): void {
   discarding.delete(id);
 }
 
+/**
+ * A change that only writes after some work of its own — an image icon is
+ * shrunk first. Cancel waits for it after `beginDiscard`, and a type change
+ * before it starts. Dropping a late write is the caller's job: its write
+ * checks `isDiscarding` first, or it would land after Cancel's restore.
+ */
+const pending = new Map<string, Promise<unknown>>();
+
+export function trackEntryWrite(id: string, write: Promise<unknown>): void {
+  const tracked = Promise.allSettled([pending.get(id), write]).finally(() => {
+    if (pending.get(id) === tracked) pending.delete(id);
+  });
+  pending.set(id, tracked);
+}
+
+export async function pendingEntryWrites(id: string): Promise<void> {
+  await pending.get(id);
+}
+
 useUIStore.subscribe((s) => {
   for (const [key, { scope, id }] of baselines) {
     if (!isInEdit(s, scope, id)) baselines.delete(key);

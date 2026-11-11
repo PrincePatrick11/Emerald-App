@@ -528,7 +528,7 @@ For the file structure and per-mode semantics, see [DB Backup / Restore (`.emera
 
 Images are written into the vault's own `images/` folder, named after a hash of their content, so the same picture added twice is stored once. Entries refer to them by filename alone, which keeps a vault folder portable.
 
-Wherever an image is added — the text, an image field, covers and icons, the altar, an import — a photo that arrives as PNG (a photo pasted from the clipboard, for instance) is stored as JPEG at full size, with no visible difference and about a fifth of the space. Screenshots, graphics and anything with transparency stay PNG. Settings → Entries → Images can switch this off and set a largest edge length and file size for inserted images. Backups and sigil drawings are stored as they are.
+Wherever an image is added — the text, an image field, covers and icons, the altar, an import — a photo that arrives as PNG (a photo pasted from the clipboard, for instance) is stored as JPEG at full size, with no visible difference and about a fifth of the space. Screenshots, graphics and anything with transparency stay PNG. Settings → Entries → Images can switch this off and set a largest edge length and file size for inserted images. Backups and sigil drawings are stored as they are. An image chosen as an icon — of an entry, an altar, a template, a block or a language — is in addition shrunk to icon size (64px, 128px for an altar).
 
 Nothing deletes an image automatically. **Settings → Storage → Unused images** scans on demand: *Scan* reports how many images nothing points at and how much space they take, *Remove* deletes exactly those. It is manual on purpose — an image just inserted but not yet saved would otherwise look unused.
 

@@ -22,6 +22,7 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - **Several images at once** through paste or the image button.
 - **A plus in the rail creates anything.** It opens a small window with a tile for each type — Journal, Tasks, Operations, Wiki, Altar, Lexicon, Templates and Blocks — and opens what you pick, by click, by keyboard or by the tile's number key; the dashboards' own "New" buttons work the same way.
 - **Altars have their own icon,** a candle on a table, instead of a flame.
+- **Image icons of entries and altars are shrunk to icon size.** A picture chosen as the icon of a Wiki article, an operation or an altar no longer keeps its full size (a 1.9 MB photo is now a few KB), like icons of templates, blocks and languages already did. Removing an icon or pressing Cancel right after picking one cannot be overtaken by the picture still being shrunk. Icons stored earlier stay as they are.
 
 ### Changed
 - **Every dashboard's main button reads the same:** "New entry", "New altar", "New category" and so on.

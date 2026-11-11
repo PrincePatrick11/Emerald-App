@@ -35,7 +35,7 @@ Creation is the only moment an assignment applies by itself. Changing an entry's
 - The draft lives in a `DraftStore<T>` (`createDraftStore<T>()` in `store/draftStore.ts`, behind `useBlockDraftStore` and `useTemplateDraftStore`), so edits survive `MainArea` unmounting the view on a module switch.
 - "Done" writes only the fields that changed since the page opened (names compared trimmed), so a tag renamed meanwhile isn't overwritten.
 
-Templates have no description; the picker matches the name only. `useShrunkIcon` (shrink an image icon to 64px, last write wins) and `TagsField` (the edit-mode "Tags" section) are shared with the other pages.
+Templates have no description; the picker matches the name only. `useShrunkIcon` (shrink an image icon to icon size, last write wins) and `TagsField` (the edit-mode "Tags" section) are shared with the other pages.
 
 ### The assignment table
 

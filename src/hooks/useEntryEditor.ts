@@ -4,7 +4,7 @@ import { entryTypeForView, type ViewId } from '../lib/modules';
 import { revertEntryType } from '../lib/entryTypeChange';
 import { serialKey, settled } from '../lib/serialize';
 import {
-  baselineKey, baselineOf, baselines, beginDiscard, editIsDirty, endDiscard, isDiscarding, type BaselineFields,
+  baselineKey, baselineOf, baselines, beginDiscard, editIsDirty, endDiscard, isDiscarding, pendingEntryWrites, type BaselineFields,
 } from '../store/entryEdit';
 import { useUIStore, withEditLock } from '../store/uiStore';
 import type { WriteOptions } from '../lib/stamp';
@@ -194,6 +194,9 @@ export function useEntryEditor<TPatch extends BaselineFields, TRestore extends B
     beginDiscard(id);
     type Outcome = { restored: TRestore | null; reverted: boolean };
     const { restored, reverted } = await withEditLock(async (): Promise<Outcome> => {
+      // An icon still being shrunk drops itself now that discarding has begun;
+      // inside the lock, so the page stays locked from the click on.
+      await pendingEntryWrites(id);
       // A type change that is still writing already belongs to the editing
       // session: only after it is it clear under which view its baseline lies.
       await settled(serialKey('entry', id));

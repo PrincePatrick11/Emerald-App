@@ -29,6 +29,8 @@ import { useUndoStore } from '../../../store/undoStore';
 import { useDisplayedAltar } from '../../../hooks/useDisplayedAltar';
 import { usePointerReorder } from '../../../hooks/usePointerReorder';
 import { usePersistedFlag } from '../../../hooks/usePersistedFlag';
+import { useShrunkIcon } from '../../../hooks/useShrunkIcon';
+import { trackAltarWrite } from '../../../store/altarEdit';
 import { imageSrc, saveImage } from '../../../lib/images';
 import { PlacedElementRow, PlacedElementInspector } from '../fields/PlacedElementRow';
 import AltarReadingSummary from '../fields/AltarReadingSummary';
@@ -41,6 +43,9 @@ import Modal from '../../ui/Modal';
  * would look, after removal, as if one were active again.
  */
 const BACKGROUND_AFTER_REMOVE = ALTAR_IMAGE_PRESETS[0];
+
+/** The altar card shows its icon up to 64px wide; twice that stays sharp on high-resolution screens. */
+const ALTAR_ICON_MAX_EDGE = 128;
 
 
 // The collapse states used to live per altar in localStorage; whatever is left of them goes.
@@ -85,6 +90,15 @@ export default function AltarSidebarPanel() {
   const activeView = useUIStore((s) => s.activeView);
   const isEditing = activeView.type === 'altar' && activeView.mode === 'edit';
   const activeAltar = useDisplayedAltar();
+  const shrinkIcon = useShrunkIcon(
+    (icon) => (activeAltar ? updateAltar(activeAltar.id, { icon_data: icon || null }) : undefined),
+    'AltarSidebarPanel',
+    ALTAR_ICON_MAX_EDGE,
+  );
+  /** Tracked, so a Cancel pressed while the image is still being shrunk waits for it and then restores. */
+  const setIcon = (icon: string) => {
+    if (activeAltar) trackAltarWrite(activeAltar.id, shrinkIcon(icon));
+  };
   const gridOpacityPercent = Math.round((activeAltar?.grid_opacity ?? 0) * 100);
   const backgroundInputRef = useRef<HTMLInputElement>(null);
 const noticeTimerRef = useRef<number | null>(null);
@@ -210,8 +224,8 @@ const noticeTimerRef = useRef<number | null>(null);
                 <div className="mt-2 mb-4">
                   <Favicon
                     value={activeAltar.icon_data}
-                    onChange={(icon_data) => updateAltar(activeAltar.id, { icon_data })}
-                    onRemove={() => updateAltar(activeAltar.id, { icon_data: null })}
+                    onChange={setIcon}
+                    onRemove={() => setIcon('')}
                   />
                 </div>
               )}
