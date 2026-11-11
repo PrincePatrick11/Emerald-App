@@ -30,8 +30,7 @@ interface Props<T extends string> {
  * A select menu in the look of the property fields: full width, field border,
  * chevron. The menu is portalled: the sidebars scroll, and an absolutely
  * positioned menu would be clipped there. Users: `CategorySelect`
- * (`variant="field"`), a template's assignments, the overview of the
- * default templates and the sorting of the dashboard sidebar
+ * (`variant="field"`) and the sorting of the dashboard sidebar
  * (`SortSelect`, `variant="sidebar"`).
  */
 export default function FieldDropdown<T extends string>({ value, options, onChange, triggerText, align, variant = 'field', ariaLabel }: Props<T>) {

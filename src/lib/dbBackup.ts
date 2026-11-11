@@ -40,7 +40,7 @@ import {
   routineLinkResolver, routineToTemplate, vaultRoutineLinkSource, type RoutineCategoryRow, type RoutineTargetRow,
 } from './migrateRoutinesToTemplates';
 import {
-  assignedCategoryId, assignmentKey, defaultKeys, isTemplateId, parseAssignments, SIGIL_TEMPLATE_ID, templateToRow,
+  assignedCategoryId, assignmentKey, isTemplateId, parseAssignments, SIGIL_TEMPLATE_ID, templateToRow,
 } from './blocks/templates';
 import { fromRow } from './row';
 import { needsSigilConversion, sigilRowToContent, type LegacySigilRow } from './migrateLegacySigils';
@@ -66,8 +66,9 @@ import { clearAltarEdits } from '../store/altarEdit';
 import { resumeEditorSaves, suspendEditorSaves } from './editorLock';
 import { drainSerialized } from './serialize';
 import { importViaStaging } from './importStaging';
-import { importableSettings, isPlainObject, withSettingsGroups, writeVaultSettings, type SettingsGroup } from './vaultSettings';
+import { importableSettings, isPlainObject, withSettingsGroups, withoutDeviceKeys, writeVaultSettings, type SettingsGroup } from './vaultSettings';
 import { useSettingsStore } from '../store/settingsStore';
+import { useDeviceStore } from '../store/deviceStore';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Public types
@@ -152,12 +153,14 @@ type Row = Record<string, any>;
  * array, each row with `type` and without the columns that no longer exist,
  * '12' = since v51 altars carry their appearance as a JSON column `settings`,
  * since v52 altar items `updated_at`/`deleted_at`, and since v53 entries and
- * templates tag IDs instead of tag names, '13' = since v56 altars carry the
- * shapes and text drawn on them as a JSON column `elements`.
+ * templates tag IDs instead of tag names, '13' = since v56 `assignments` carry
+ * no `isDefault` and `block_definitions` no `revision`, and since v57 altars
+ * carry the shapes and text drawn on them as a JSON column `elements`.
  *
- * The '13' is needed because an older build has no `elements` column:
- * `insertRows` would drop it, and the drawn shapes and text would be gone
- * without a word. With the '13' it rejects the file.
+ * The '13' is needed twice over: an older build would read every assignment
+ * as merely offered, and it has no `elements` column, so `insertRows` would
+ * drop it and the drawn shapes and text would be gone without a word. With
+ * the '13' it rejects the file.
  *
  * The '12' is needed because an older build looks for the twelve individual columns:
  * `insertRows` would drop `settings`, and every altar would arrive with the
@@ -763,8 +766,7 @@ export async function buildBackup(options: BackupOptions): Promise<BackupFile> {
   }
 
   // ── Custom blocks ────────────────────────────────────────────────────────
-  // The templates of the copies in the content. The copies manage without them, but
-  // without a definition there is no "Update" anymore. All of it, trash included —
+  // The vault's own blocks. All of it, trash included —
   // one list, no date question.
   if (options.includeJournal || options.includeWiki || options.includeOperations) {
     data.blockDefinitions = await db.select<Row[]>(`SELECT * FROM block_definitions`);
@@ -813,7 +815,9 @@ export async function buildBackup(options: BackupOptions): Promise<BackupFile> {
     filters: options,
     data,
     images,
-    ...(options.includeSettings && { settings: useSettingsStore.getState().settings }),
+    // Without what a `settings.json` from before still carries of language and
+    // theme: those belong to the device, and a backup must not bring them back.
+    ...(options.includeSettings && { settings: withoutDeviceKeys(useSettingsStore.getState().settings) }),
   };
 }
 
@@ -1027,7 +1031,6 @@ async function insertBlockDefinitions(
       icon: text(r.icon, '') || DEFAULT_DEFINITION_ICON,
       elements: json(r.elements, '[]'),
       display: json(r.display, '{}'),
-      revision: Number.isInteger(r.revision) && (r.revision as number) > 0 ? r.revision : 1,
       sort_order: Number.isFinite(r.sort_order) ? r.sort_order : 0,
       created_at: text(r.created_at, now),
       updated_at: text(r.updated_at, now),
@@ -1051,9 +1054,8 @@ function templateCategoryIds(rows: Row[] | undefined): string[] {
  * The file is foreign: every row runs through `fromRow.template` as on
  * reading. `content` gets the images stored here (and, on merge, the
  * renamed link targets), the assignments the local category IDs — whatever
- * points to no category is dropped. A default that an active template here
- * already holds is lost by an active imported one; one from the
- * trash keeps it as in the store and settles that on restore.
+ * points to no category is dropped. A combination that an active template here
+ * already holds stays with it, and one from the trash brings no assignments.
  */
 async function insertTemplates(
   db: Awaited<ReturnType<typeof getDb>>,
@@ -1065,7 +1067,8 @@ async function insertTemplates(
   if (!Array.isArray(rows)) return;
   const local = (await db.select<Row[]>('SELECT * FROM templates')).map(fromRow.template);
   const known = new Set(local.map((t) => t.id));
-  const taken = new Set(local.filter((t) => t.deleted_at === null).flatMap((t) => [...defaultKeys(t.assignments)]));
+  const taken = new Set(local.filter((t) => t.deleted_at === null)
+    .flatMap((t) => t.assignments.map((a) => assignmentKey(a.entryType, a.category))));
   const categories = new Set((await db.select<Row[]>('SELECT id FROM categories')).map((r) => String(r.id)));
 
   const now = nowIso();
@@ -1084,12 +1087,11 @@ async function insertTemplates(
       const category = catMap.get(id) ?? id;
       return categories.has(category) ? [{ ...a, category }] : [];
     }));
-    const assignments = remapped.map((a) => {
+    const assignments = !active ? [] : remapped.filter((a) => {
       const key = assignmentKey(a.entryType, a.category);
-      if (!a.isDefault || !active) return a;
-      if (taken.has(key)) return { ...a, isDefault: false };
+      if (taken.has(key)) return false;
       taken.add(key);
-      return a;
+      return true;
     });
     return templateToRow({
       ...t,
@@ -1266,7 +1268,7 @@ async function liftLegacySigilRows(operations: Row[], wikiArticles: Row[], backu
  * The "Status" definition by which old operation rows are rewritten:
  * the vault's (also in the trash), otherwise the file's — as in
  * migration v41. Otherwise the new copies would not match the "Status" that exists
- * in the vault afterwards, and would immediately show "Newer version".
+ * in the vault afterwards.
  */
 async function statusDefinitionForImport(
   db: Awaited<ReturnType<typeof getDb>>,
@@ -1749,13 +1751,13 @@ async function doMerge(db: Awaited<ReturnType<typeof getDb>>, backup: BackupFile
 
   // Categories and tags are already resolved (resolveImportedCategories,
   // importTagsAndRemap above).
-  // Without prefix: the copies in the content name their definition by exactly this ID.
+  // Without prefix, so that a block arriving twice stays one.
   // Link defaults point to the renamed entries, like the chips in the content.
   await insertBlockDefinitions(db, await withStatusDefinition(
     db, remapDefinitionRows(d.blockDefinitions, pathMap, (t) => ({ id: String(remapId(t.id)), label: t.label })),
     mergeOps.definition, mergeStatus,
   ));
-  // Without prefix like the definitions: `data-template-origin` in the entries names exactly this ID.
+  // Without prefix, like the definitions.
   await insertTemplates(db, d.templates, pathMap, catMap,
     (content) => remapInternalLinks(content, (link) => ({ id: String(remapId(link.id)) })));
   // Without prefix like the two above: a language stands on its own, its ID
@@ -1831,6 +1833,12 @@ export async function importDatabase(
 ): Promise<void> {
   // Unchecked from the file — from here on only in checked form.
   const backupSettings = importableSettings(backup.settings);
+  // A backup from before language and theme moved to the device may hold
+  // custom themes; they join this device's list (`adoptCustomThemes` checks
+  // them), while its language and selection do not apply here.
+  const backupThemes = isPlainObject(backup.settings) && isPlainObject(backup.settings.appearance)
+    ? backup.settings.appearance.customThemes
+    : undefined;
 
   // For the duration of the import the automatic editor saves are suspended,
   // in all three modes. replace keeps the original IDs and add-vault switches
@@ -1862,7 +1870,7 @@ export async function importDatabase(
     invalidateVaultCache();
 
     // Before switching into the folder: then the new vault opens right away with
-    // the backup's language and appearance, instead of the defaults first.
+    // the backup's fonts, instead of the defaults first.
     if (backupSettings) {
       // Just a nicety: if writing fails, the vault starts with the
       // defaults — the import itself should not get stuck on that.
@@ -1895,7 +1903,7 @@ export async function importDatabase(
     // the file carries its templates along (from '8' — routines of older files do not
     // count, they do not know the sigil template), its version applies — including that the
     // template was changed or deleted there. Otherwise the fresh
-    // row would displace the brought-along one, star and all.
+    // row would displace the brought-along one, assignments and all.
     const types = typeFilters ?? ALL_TYPES_INCLUDED;
     const bringsTemplates = (backup.sourceVersion ?? Number(BACKUP_VERSION)) >= 8 && Array.isArray(backup.data.templates);
     // Via the working copy as with replace: an abort leaves the new vault empty rather than half filled.
@@ -1905,6 +1913,8 @@ export async function importDatabase(
       }
       await doReplace(staging, filteredBackup);
     });
+    // Only once the import went through, as with replace and merge below.
+    if (backupThemes) useDeviceStore.getState().adoptCustomThemes(backupThemes);
   } else {
     // Never directly against the vault: `doReplace` deletes before it inserts, and
     // an aborted merge would leave half-imported data behind (see `importStaging.ts`).
@@ -1913,6 +1923,9 @@ export async function importDatabase(
 
     // Only after a successful swap: an aborted import leaves the
     // settings as they were, too.
+    if (backupThemes && (mode === 'replace' || settingsGroups.includes('appearance'))) {
+      useDeviceStore.getState().adoptCustomThemes(backupThemes);
+    }
     if (backupSettings) {
       const settingsStore = useSettingsStore.getState();
       if (mode === 'replace') {

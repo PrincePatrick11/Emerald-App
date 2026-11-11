@@ -12,7 +12,6 @@ import { useCollapsedSet } from '../../hooks/useCollapsedSet';
 import { usePersistedFlag } from '../../hooks/usePersistedFlag';
 import type { AltarItem } from '../../types';
 import CollapsibleGroupHeader from '../ui/CollapsibleGroupHeader';
-import { GroupDivider } from '../ui/Dashboard';
 import EmptyState from '../ui/EmptyState';
 import { AltarItemTile } from './AltarItemTile';
 
@@ -131,9 +130,7 @@ export function AltarLibrarySection({ search, onNewElement, onEditElement }: Pro
 
   return (
     <div className="mt-8">
-      {/* The same divider heading as the timeline groups of the
-          dashboard, here with a chevron. */}
-      <GroupDivider
+      <CollapsibleGroupHeader
         label={t('altar.libraryTitle')}
         collapsed={sectionCollapsed}
         onToggleCollapse={toggleSection}

@@ -26,10 +26,10 @@ writeFileSync(
   `export { parseBlocks, serializeBlocks, createTextBlock, blockSectionHtml, neutralizeSectionTags } from '${root}/src/lib/blocks/blockHtml';
    export { TEXT_BLOCK_TYPE, BLOCK_ATTR } from '${root}/src/lib/blocks/types';
    export { parseFields, serializeFields, createFieldsBlock, isElementEmpty, isHiddenInRead, linkFromSlot, imageFromSlot } from '${root}/src/lib/blocks/fields';
-   export { instantiateDefinition, sameShape, updateInstanceToDefinition, isOutdatedCopy, blockOrigin, updateCopiesInContent, removeCopiesFromContent, parseDefinitionElements, parseDefinitionDisplay, remapDefinitionDefaults, definitionImageRefs, hasFrozenCopy } from '${root}/src/lib/blocks/definitions';
+   export { instantiateDefinition, parseDefinitionElements, parseDefinitionDisplay, remapDefinitionDefaults, definitionImageRefs } from '${root}/src/lib/blocks/definitions';
    export { entryBlockSummary } from '${root}/src/lib/blocks/entrySummary';
    export { withLegacyStatus, statusDefinition, hasLegacyStatus, convertLegacyStatusRows, STATUS_DEFINITION_ID } from '${root}/src/lib/blocks/legacyStatus';
-   export { extractUniqueLetters, parseSigilCalc, serializeSigilCalc, createSigilCalcBlock, createSigilCanvasBlock, createSigilChargeBlock, parseSigilCharge, serializeSigilCharge, sigilState, withoutConcealed, withChargeUnloaded, sigilImage, withSigilImage, letterList, sigilUnits, sigilPartBlock, sigilPartId, withSigilPart, blockHoldsLocked, withRenamedPartTargets, parseSigilDrawing, withSigilDrawing } from '${root}/src/lib/blocks/sigil';
+   export { extractUniqueLetters, parseSigilCalc, serializeSigilCalc, createSigilCalcBlock, createSigilCanvasBlock, createSigilChargeBlock, parseSigilCharge, serializeSigilCharge, sigilState, withoutConcealed, sigilImage, withSigilImage, letterList, sigilUnits, sigilPartBlock, sigilPartId, withSigilPart, withChargesCoveringOnly, withRenamedPartTargets, parseSigilDrawing, withSigilDrawing } from '${root}/src/lib/blocks/sigil';
    export { paintDocFromJson, paintDocToJson, emptyPaintDoc, isPaintDocEmpty, thinPoints, transformStroke, mergeDown, canMergeDown, strokeSamples, inPolygon, symmetricCopies, mirrorStroke, splitStroke } from '${root}/src/lib/paint/document';
    export { parseAltarElements, altarElementsJson } from '${root}/src/lib/altarElements';
    export { parseAltarSettings } from '${root}/src/lib/altarSettings';
@@ -37,7 +37,7 @@ writeFileSync(
    export { readUserSymbol } from '${root}/src/lib/userSymbols';
    export { group, ungroup, withGroups, moveInStack, copiesOf, align } from '${root}/src/components/editors/canvas/canvasActions';
    export { renderBlocksForExport } from '${root}/src/lib/blocks/exportRender';
-   export { parseAssignments, resolveDefaultTemplate, templatesFor, instantiateTemplateBlocks, isContentEmpty, templateOriginsOf, templateStart, mergeTemplateTags, mergeAssignmentChanges, withAssignmentState, assignmentStateAt, sameAssignments, defaultTemplateAt, contentForTemplate, areBlocksEmpty, fieldsWithTemplate, fieldsWithoutTemplate } from '${root}/src/lib/blocks/templates';
+   export { parseAssignments, resolveAssignedTemplate, instantiateTemplateBlocks, isContentEmpty, templateStart, mergeTemplateTags, assignedTemplateAt, areBlocksEmpty, fieldsWithTemplate, fieldsWithoutTemplate } from '${root}/src/lib/blocks/templates';
    export { internalLinkChipHtml } from '${root}/src/lib/internalLinkHtml';
    export { extractInternalLinks } from '${root}/src/lib/internalLinkHtml';`
 );
@@ -62,20 +62,18 @@ const {
   parseBlocks, serializeBlocks, createTextBlock, neutralizeSectionTags, TEXT_BLOCK_TYPE, BLOCK_ATTR, extractInternalLinks,
   parseFields, serializeFields, createFieldsBlock, isElementEmpty, isHiddenInRead, linkFromSlot, imageFromSlot,
   internalLinkChipHtml,
-  instantiateDefinition, sameShape, updateInstanceToDefinition, isOutdatedCopy, blockOrigin, updateCopiesInContent,
-  removeCopiesFromContent, parseDefinitionElements, parseDefinitionDisplay, entryBlockSummary,
+  instantiateDefinition, parseDefinitionElements, parseDefinitionDisplay, entryBlockSummary,
   withLegacyStatus, statusDefinition, hasLegacyStatus, convertLegacyStatusRows, STATUS_DEFINITION_ID,
   extractUniqueLetters, parseSigilCalc, serializeSigilCalc, createSigilCalcBlock, createSigilCanvasBlock,
-  createSigilChargeBlock, parseSigilCharge, serializeSigilCharge, sigilState, withoutConcealed, withChargeUnloaded,
+  createSigilChargeBlock, parseSigilCharge, serializeSigilCharge, sigilState, withoutConcealed,
   sigilImage, withSigilImage, letterList, renderBlocksForExport, parseSigilDrawing, withSigilDrawing,
   paintDocFromJson, paintDocToJson, emptyPaintDoc, isPaintDocEmpty, thinPoints, transformStroke, mergeDown, canMergeDown, strokeSamples, inPolygon, symmetricCopies, mirrorStroke, splitStroke,
   group, ungroup, withGroups, moveInStack, copiesOf, align, parseAltarElements, altarElementsJson, parseAltarSettings,
   symbolFromDrawing, readUserSymbol,
-  sigilUnits, sigilPartBlock, sigilPartId, withSigilPart, blockHoldsLocked,
-  remapDefinitionDefaults, definitionImageRefs, hasFrozenCopy, withRenamedPartTargets,
-  parseAssignments, resolveDefaultTemplate, templatesFor, instantiateTemplateBlocks, isContentEmpty,
-  templateOriginsOf, templateStart, mergeTemplateTags,
-  mergeAssignmentChanges, withAssignmentState, assignmentStateAt, sameAssignments, defaultTemplateAt, contentForTemplate, areBlocksEmpty,
+  sigilUnits, sigilPartBlock, sigilPartId, withSigilPart, withChargesCoveringOnly,
+  remapDefinitionDefaults, definitionImageRefs, withRenamedPartTargets,
+  parseAssignments, resolveAssignedTemplate, instantiateTemplateBlocks, isContentEmpty,
+  templateStart, mergeTemplateTags, assignedTemplateAt, areBlocksEmpty,
   fieldsWithTemplate, fieldsWithoutTemplate,
 } = bundle;
 
@@ -342,11 +340,11 @@ console.log('\n4c. Field block\n');
     !isHiddenInRead(keepEmpty, { ...model, elements: [keepEmpty] }) && isHiddenInRead(el, model));
 }
 
-console.log('\n4d. Custom blocks: copies and updating\n');
+console.log('\n4d. Custom blocks: copies\n');
 {
   const text = { label: (el) => el.label || el.kind, yes: 'Ja', no: 'Nein', moonName: (p) => p };
   const def = {
-    id: 'def-1', name: 'Ritual', icon: '🕯️', revision: 1, sort_order: 0,
+    id: 'def-1', name: 'Ritual', icon: '🕯️', sort_order: 0,
     created_at: '', updated_at: '', deleted_at: null,
     display: { readHideEmpty: true, readOnly: false, showTitle: true },
     elements: [{ id: 'e-date', kind: 'date', label: 'Datum' }, { id: 'e-result', kind: 'shorttext', label: 'Ergebnis' }],
@@ -354,68 +352,20 @@ console.log('\n4d. Custom blocks: copies and updating\n');
 
   const copy = instantiateDefinition(def, text);
   const copyModel = parseFields(copy);
-  check('a copy carries origin, revision, name and the title rule',
-    blockOrigin(copy)?.id === 'def-1' && blockOrigin(copy)?.rev === 1 && copyModel.name === 'Ritual' &&
-      copy.attrs['data-block-show-title'] === '1', copy);
+  check('a copy carries name and title rule and no link to its definition',
+    copyModel.name === 'Ritual' && copy.attrs['data-block-show-title'] === '1'
+      && !copy.attrs['data-block-origin'] && !copy.attrs['data-block-rev'], copy);
   check('the element IDs of the copy are those of the definition',
     copyModel.elements.map((e) => e.id).join() === 'e-date,e-result');
 
   const filled = serializeFields(copy, { ...copyModel, values: { 'e-date': '2026-09-10', 'e-result': 'gut' } }, text);
-  check('a copy of the current revision is not outdated', !isOutdatedCopy(filled, def));
-
-  const def2 = {
-    ...def, revision: 2,
-    display: { readHideEmpty: false, readOnly: true, showTitle: false },
-    elements: [
-      { id: 'e-result', kind: 'shorttext', label: 'Resultat' },
-      { id: 'e-mood', kind: 'select', label: 'Stimmung', options: [{ id: 'o1', label: 'ruhig' }] },
-      { id: 'e-date', kind: 'date', label: 'Datum', archived: true },
-    ],
-  };
-  check('an older revision is outdated', isOutdatedCopy(filled, def2));
-
-  const titled = { ...filled, attrs: { ...filled.attrs, 'data-block-title': 'Mein Titel' } };
-  const updated = updateInstanceToDefinition(titled, def2, text);
-  const um = parseFields(updated);
-  check('values stay with their element ID', um.values['e-result'] === 'gut' && um.values['e-date'] === '2026-09-10', um.values);
-  check('the label comes from the definition', um.elements.find((e) => e.id === 'e-result')?.label === 'Resultat');
-  check('a new field is added empty, in the order of the definition',
-    um.elements.filter((e) => !e.archived).map((e) => e.id).join() === 'e-result,e-mood' && um.values['e-mood'] === undefined,
-    um.elements);
-  check('a removed field is archived, not deleted', um.elements.find((e) => e.id === 'e-date')?.archived === true);
-  check('an archived field is missing in the fallback and in read mode',
-    !updated.html.includes('2026-09-10') && isHiddenInRead(um.elements.find((e) => e.id === 'e-date'), um), updated.html);
-  check('the display rules come from the definition', um.display.readHideEmpty === false && um.display.readOnly === true);
-  check('the custom title stays, the revision is the new one',
-    updated.attrs['data-block-title'] === 'Mein Titel' && blockOrigin(updated)?.rev === 2 && !isOutdatedCopy(updated, def2));
-
-  const def3 = {
-    ...def2, revision: 3,
-    elements: [...def2.elements.filter((e) => e.id !== 'e-date'), { id: 'e-date', kind: 'date', label: 'Datum' }],
-  };
-  const back = parseFields(updateInstanceToDefinition(updated, def3, text));
-  check('a restored field brings its value back',
-    !back.elements.find((e) => e.id === 'e-date')?.archived && back.values['e-date'] === '2026-09-10');
-
-  const clash = { ...def2, revision: 4, elements: [{ id: 'e-result', kind: 'number', label: 'X' }] };
-  check('a different kind under the same ID does not discard the value',
-    parseFields(updateInstanceToDefinition(updated, clash, text)).values['e-result'] === 'gut');
-
   const content = serializeBlocks([createTextBlock('<p>a</p>'), filled, createFieldsBlock('number')]);
-  const updatedContent = updateCopiesInContent(content, def2, text);
-  const updatedBlocks = parseBlocks(updatedContent ?? '');
-  check('updateCopiesInContent updates only the copy',
-    updatedBlocks.length === 3 && blockOrigin(updatedBlocks[1])?.rev === 2 && updatedBlocks[0].html === '<p>a</p>', updatedBlocks);
-  check('without an outdated copy it returns null', updateCopiesInContent(updatedContent, def2, text) === null);
+  check('a field archived by an earlier version is gone from the definition',
+    parseDefinitionElements(JSON.stringify([{ id: 'a', kind: 'date', label: 'A', archived: true }, { id: 'b', kind: 'date', label: 'B' }])).map((e) => e.id).join() === 'b');
+  check('a copy from before keeps working with its old markers',
+    parseFields({ ...filled, attrs: { ...filled.attrs, 'data-block-origin': 'def-1', 'data-block-rev': '1' } }).values['e-result'] === 'gut');
 
-  const removed = removeCopiesFromContent(content, 'def-1');
-  check('removeCopiesFromContent removes only the copies of this definition',
-    parseBlocks(removed ?? '').length === 2 && removeCopiesFromContent(removed, 'def-1') === null);
-
-  const summary = entryBlockSummary('x', content);
-  check('entryBlockSummary returns origin and field values under definition:element',
-    summary.origins.length === 1 && summary.fieldValues['def-1:e-result'] === 'gut', summary);
-  check('content without custom blocks has no origin', entryBlockSummary('y', '<p>nur Text</p>').origins.length === 0); // lang-ok
+  check('a summary without sigil blocks is empty', entryBlockSummary('x', content).sigil === null);
 
   check('definition columns: broken JSON yields the defaults',
     parseDefinitionElements('{kaputt').length === 0 && parseDefinitionDisplay('nope').showTitle === true &&
@@ -430,7 +380,7 @@ console.log('\n4d. Custom blocks: copies and updating\n');
     defaultValue: [{ id: 'i1', text: 'Kerze', checked: false }, { id: 'i2', text: 'Räuchern', checked: true }, 'kaputt'], // lang-ok
   }]));
   const prefilledDef = {
-    ...def, revision: 5,
+    ...def,
     elements: [preset, { id: 'e-on', kind: 'toggle', label: 'An', defaultValue: true },
       { id: 'e-n', kind: 'number', label: 'N', defaultValue: 'drei' }, { id: 'e-pic', kind: 'image', label: 'Bild', defaultValue: 'x.png' }],
   };
@@ -448,19 +398,6 @@ console.log('\n4d. Custom blocks: copies and updating\n');
   check('the copy does not carry the default in its config, and items get their own IDs',
     !prefilled.attrs['data-block-config'].includes('defaultValue') && items.every((i) => i.id !== 'i1' && i.id !== 'i2'),
     prefilled.attrs['data-block-config']);
-  check('a different default does not raise the revision',
-    sameShape(pdef, { ...pdef, elements: pdef.elements.map((e) => (e.id === 'e-on' ? { ...e, defaultValue: false } : e)) })
-      && !sameShape(pdef, { ...pdef, elements: pdef.elements.map((e) => (e.id === 'e-on' ? { ...e, label: 'Aus' } : e)) }));
-  const grown = updateInstanceToDefinition(updated, {
-    ...def2, revision: 6,
-    elements: [
-      ...def2.elements.map((e) => (e.id === 'e-result' ? { ...e, defaultValue: 'überschreibt nicht' } : e)), // lang-ok
-      { id: 'e-new', kind: 'toggle', label: 'Neu', defaultValue: true },
-    ],
-  }, text);
-  const gm = parseFields(grown);
-  check('updating: a new field arrives with its default, existing values stay',
-    gm.values['e-new'] === true && gm.values['e-result'] === 'gut', gm.values);
 }
 
 console.log('\n4e. Legacy operation status becomes a block\n');
@@ -479,7 +416,7 @@ console.log('\n4e. Legacy operation status becomes a block\n');
   const [status, text] = parseBlocks(out);
   const model = parseFields(status);
   check('the status block comes before the content, the text stays',
-    status?.type === 'core.fields' && status.attrs['data-block-origin'] === STATUS_DEFINITION_ID && text?.html === '<p>Text</p>', out);
+    status?.type === 'core.fields' && model.name === 'Status' && text?.html === '<p>Text</p>', out);
   check('values: inactive, end date, version trimmed',
     model.values.active === false && model.values['end-date'] === '2026-03-01' && model.values.version === '1.2', model.values);
   check('the fallback names the values readably', status.html.includes('Nein') && status.html.includes('1.2'), status.html);
@@ -494,7 +431,7 @@ console.log('\n4e. Legacy operation status becomes a block\n');
   const converted = convertLegacyStatusRows(rows, t, 'now');
   check('convertLegacyStatusRows: only the row with a legacy status, columns cleared',
     converted.definition?.id === STATUS_DEFINITION_ID && converted.rows[1] === rows[1] &&
-      converted.rows[0].is_active === 1 && converted.rows[0].content.includes('data-block-origin'), converted.rows);
+      converted.rows[0].is_active === 1 && converted.rows[0].content.includes('core.fields'), converted.rows);
   check('without a legacy status no definition is needed', convertLegacyStatusRows([rows[1]], t, 'now').definition === null);
 
   // i18n not ready yet: `t` returns the key — never make it permanent as a label.
@@ -717,9 +654,6 @@ console.log('\n4f. Sigil blocks\n');
     !hiddenContent.includes('core.sigil.calc') && !hiddenContent.includes('core.sigil.canvas') && hiddenContent.includes('Notiz'), hiddenContent);
   check('revealed: everything stays', withoutConcealed(content, '2030-02-01') === content);
 
-  const unloaded = withChargeUnloaded(content);
-  check('a copy is unloaded', sigilState(parseBlocks(unloaded), '2029-12-31').locked.size === 0 && withChargeUnloaded(unloaded) === unloaded);
-
   const secret = { ...createTextBlock('<p>geheim</p>'), attrs: { 'data-block-hidden': '1' } };
   const exportText = {
     title: (b) => `T:${b.type}`, date: (iso) => `D:${iso}`, number: (n) => `N:${n}`, targetDate: 'Ziel', technique: 'Technik',
@@ -794,7 +728,7 @@ console.log('\n4g. Altar field and defaults with markup\n');
     byId.alt2.defaultValue === undefined && byId.lnk2.defaultValue === undefined && byId.pic2.defaultValue === undefined);
 
   const def = {
-    id: 'def-slots', name: 'Ritualplatz', icon: '🕯️', revision: 1, sort_order: 0,
+    id: 'def-slots', name: 'Ritualplatz', icon: '🕯️', sort_order: 0,
     created_at: '', updated_at: '', deleted_at: null,
     display: { readHideEmpty: true, readOnly: false, showTitle: true }, elements,
   };
@@ -826,7 +760,7 @@ console.log('\n4h. Sigils as parts of custom blocks\n');
 {
   const text = { label: (e) => e.label || e.kind, yes: 'Ja', no: 'Nein', moonName: (p) => p };
   const def = {
-    id: 'def-sigil', name: 'Sigillen-Ritual', icon: '🕯️', revision: 1, sort_order: 0,
+    id: 'def-sigil', name: 'Sigillen-Ritual', icon: '🕯️', sort_order: 0,
     created_at: '', updated_at: '', deleted_at: null,
     display: { readHideEmpty: true, readOnly: false, showTitle: true },
     elements: parseDefinitionElements(JSON.stringify([
@@ -863,7 +797,7 @@ console.log('\n4h. Sigils as parts of custom blocks\n');
   const before = sigilState(back, '2029-12-31');
   check('a loaded charge as a part hides and locks the parts, locks the entry',
     before.concealed.has(sigilPartId(block.id, 'calc')) && before.concealed.has(sigilPartId(block.id, 'draw'))
-      && before.lockEntry && blockHoldsLocked(before, block.id) && before.revealDate === '2030-01-01', before);
+      && before.lockEntry && before.revealDate === '2030-01-01', before);
   const content = serializeBlocks(back);
   const hidden = withoutConcealed(content, '2029-12-31');
   check('search and .emerald do not see hidden parts — the rest of the block stays',
@@ -882,10 +816,9 @@ console.log('\n4h. Sigils as parts of custom blocks\n');
   check('export after the date: calculator and drawing as parts',
     revealed.includes('Geheime Absicht') && revealed.includes('alt="Zeichnung"'), revealed);
 
-  const unloaded = withChargeUnloaded(content);
+  const unloaded = serializeBlocks([createTextBlock('<p>Notiz</p>'), setPart(block, 'charge', (p) => serializeSigilCharge(p, { ...parseSigilCharge(p), loaded: false }))]);
   const afterUnload = sigilState(parseBlocks(unloaded), '2029-12-31');
-  check('a copy of the entry also unloads the charge in the part',
-    afterUnload.concealed.size === 0 && !afterUnload.lockEntry && withChargeUnloaded(unloaded) === unloaded, afterUnload);
+  check('unloading the part conceals nothing any more', afterUnload.concealed.size === 0 && !afterUnload.lockEntry, afterUnload);
 
   const standaloneCharge = serializeSigilCharge(createSigilChargeBlock(), {
     loaded: true, revealDate: null, lock: 'sigil', technique: null, targets: [sigilPartId(block.id, 'draw')],
@@ -899,16 +832,6 @@ console.log('\n4h. Sigils as parts of custom blocks\n');
   check('the summary knows the sigil in the part (lock, no card image while hidden)',
     summary.sigil?.lockEntry === true && summary.sigil.image === null
       && entryBlockSummary('sigil-part-2', content, '2030-02-01').sigil?.image === `${'ab'.repeat(32)}.png`, summary.sigil);
-  check('sigil data does not end up in the field values for lists',
-    Object.keys(summary.fieldValues).every((k) => !k.endsWith(':calc') && !k.endsWith(':charge')), summary.fieldValues);
-
-  // A new revision without a charge: if it were dropped on update, the sigil would be unloaded.
-  const rev2 = { ...def, revision: 2, elements: def.elements.filter((e) => e.id !== 'charge') };
-  check('a copy with a loaded sigil is neither updated nor removed',
-    updateCopiesInContent(content, rev2, text) === null && removeCopiesFromContent(content, def.id) === null
-      && hasFrozenCopy(content, def.id) && !hasFrozenCopy(unloaded, def.id)
-      && updateCopiesInContent(unloaded, rev2, text) !== null);
-
   const dupId = 'dup-block';
   const targeted = setPart(parseBlocks(unloaded)[1], 'charge', (p) => serializeSigilCharge(p, {
     ...parseSigilCharge(p), targets: [sigilPartId(block.id, 'calc'), 'fremd-block'],
@@ -970,42 +893,40 @@ console.log('\n5. What is derived from the content sees through the blocks\n');
   check('extractInternalLinks finds chips in wrapped text blocks', links.length === 1 && links[0].entryType === 'wiki', links);
 }
 
-console.log('\n6. Templates: assignment, default, insertion\n');
+console.log('\n6. Templates: assignment, insertion\n');
 {
   const assignments = parseAssignments(JSON.stringify([
     { entryType: 'journal', category: 'ritual', isDefault: true },
-    { entryType: 'wiki', category: 'ritual', isDefault: false },
+    { entryType: 'wiki', category: 'ritual' },
     { entryType: 'wiki', category: 'ritual', isDefault: true },
+    { entryType: 'wiki', category: 'offered', isDefault: false },
     { entryType: 'wiki', category: null },
     { entryType: 'operation', category: '<x>' },
     { entryType: 'task', category: '*' },
     'kaputt',
   ]));
-  check('assignments: journal always "all", duplicates merge, foreign ones are dropped',
+  check('assignments: journal always "all", duplicates merge, foreign and merely offered ones are dropped',
     JSON.stringify(assignments) === JSON.stringify([
-      { entryType: 'journal', category: '*', isDefault: true },
-      { entryType: 'wiki', category: 'ritual', isDefault: true },
-      { entryType: 'wiki', category: null, isDefault: false },
+      { entryType: 'journal', category: '*' },
+      { entryType: 'wiki', category: 'ritual' },
+      { entryType: 'wiki', category: null },
     ]), assignments);
   check('assignments: unreadable JSON yields none', parseAssignments('{kaputt').length === 0);
 
   const tpl = (id, assignments, content = '') => ({ id, name: id, icon: '', title: '', content, tags: [], assignments, sort_order: 0, created_at: '', updated_at: '', deleted_at: null });
-  const exact = tpl('exact', [{ entryType: 'wiki', category: 'ritual', isDefault: true }]);
-  const fallback = tpl('fallback', [{ entryType: 'wiki', category: '*', isDefault: true }]);
-  const none = tpl('none', [{ entryType: 'wiki', category: null, isDefault: true }]);
+  const exact = tpl('exact', [{ entryType: 'wiki', category: 'ritual' }]);
+  const fallback = tpl('fallback', [{ entryType: 'wiki', category: '*' }]);
+  const none = tpl('none', [{ entryType: 'wiki', category: null }]);
   const free = tpl('free', []);
-  const other = tpl('other', [{ entryType: 'operation', category: '*', isDefault: false }]);
-  const all = [free, fallback, exact, none, other];
-  check('default: the exact combination before "all categories"', resolveDefaultTemplate(all, 'wiki', 'ritual')?.id === 'exact');
-  check('default: without its own default, the fallback', resolveDefaultTemplate(all, 'wiki', 'herbs')?.id === 'fallback');
-  check('default: "no category" is a combination of its own', resolveDefaultTemplate(all, 'wiki', null)?.id === 'none');
-  check('default: none for another entry type', resolveDefaultTemplate(all, 'journal', null) === null);
-  check('to choose from: assigned ones first, then unassigned, foreign combinations missing',
-    templatesFor(all, 'wiki', 'herbs').map((t) => t.id).join() === 'fallback,free', templatesFor(all, 'wiki', 'herbs').map((t) => t.id));
+  const all = [free, fallback, exact, none];
+  check('assigned: the exact combination before "all categories"', resolveAssignedTemplate(all, 'wiki', 'ritual')?.id === 'exact');
+  check('assigned: without one of its own, the fallback', resolveAssignedTemplate(all, 'wiki', 'herbs')?.id === 'fallback');
+  check('assigned: "no category" is a combination of its own', resolveAssignedTemplate(all, 'wiki', null)?.id === 'none');
+  check('assigned: none for another entry type', resolveAssignedTemplate(all, 'journal', null) === null);
 
-  // Insertion: new IDs, charge targets carried along, unloaded, origin on every block.
+  // Insertion: new IDs, charge targets carried along, everything else as it is.
   const calc = createSigilCalcBlock();
-  const canvas = createSigilCanvasBlock();
+  const canvas = withSigilImage(createSigilCanvasBlock(), `${'ef'.repeat(32)}.png`);
   const charge = serializeSigilCharge(createSigilChargeBlock(), {
     loaded: true, revealDate: null, lock: 'entry', technique: null, targets: [canvas.id],
   });
@@ -1013,15 +934,23 @@ console.log('\n6. Templates: assignment, default, insertion\n');
   const first = instantiateTemplateBlocks(sigilTpl);
   const second = instantiateTemplateBlocks(sigilTpl);
   const firstCharge = parseSigilCharge(first[3]);
-  check('insertion: all blocks carry the origin', first.every((b) => b.attrs['data-template-origin'] === 'sigil-tpl'), first.map((b) => b.attrs));
+  check('insertion: no block remembers the template', first.every((b) => !b.attrs['data-template-origin']), first.map((b) => b.attrs));
   check('insertion: new block IDs, different ones the second time too',
     first.every((b, i) => b.id !== parseBlocks(sigilTpl.content)[i].id && b.id !== second[i].id));
-  check('insertion: the charge targets the new drawing and is unloaded',
-    !firstCharge.loaded && firstCharge.targets.join() === first[2].id, firstCharge);
+  check('insertion: the charge targets the new drawing and stays loaded, the drawing comes along',
+    firstCharge.loaded && firstCharge.targets.join() === first[2].id && sigilImage(first[2]) === `${'ef'.repeat(32)}.png`, firstCharge);
+  const allCharge = serializeSigilCharge(createSigilChargeBlock(), { loaded: true, revealDate: null, lock: 'entry', technique: null, targets: null });
+  const appended = withChargesCoveringOnly([calc, allCharge]);
+  const appendedCharge = parseSigilCharge(appended[1]);
+  check('appended: a charge for "all sigils" covers only the blocks that came with it',
+    appendedCharge.loaded && appendedCharge.targets.join() === calc.id, appendedCharge);
+  const existing = createSigilCanvasBlock();
+  check('appended: the entry\'s own drawing stays visible',
+    !sigilState([existing, ...appended], '2029-12-31').concealed.has(existing.id));
   // A charge as part of a custom block targets `<block ID>:<element ID>` — that is carried along too.
   const partText = { label: (el) => el.label || el.kind, yes: 'Ja', no: 'Nein', moonName: (ph) => ph };
   const partDef = {
-    id: 'part-def', name: 'Teile', icon: '', revision: 1, sort_order: 0,
+    id: 'part-def', name: 'Teile', icon: '', sort_order: 0,
     created_at: '', updated_at: '', deleted_at: null,
     display: { readHideEmpty: true, readOnly: false, showTitle: false },
     elements: parseDefinitionElements(JSON.stringify([
@@ -1035,69 +964,37 @@ console.log('\n6. Templates: assignment, default, insertion\n');
   check('insertion: a charge as a part targets the part in the new block',
     partBlock.id !== partCopy.id && partCharge.targets.join() === sigilPartId(partBlock.id, 'draw'), partCharge);
 
-  check('read the origin from the blocks', templateOriginsOf([...first, createTextBlock('x')]).join() === 'sigil-tpl');
-
-  // Title and tags when detaching a template ("Other template").
-  const journalStd = { ...sigilTpl, id: 'journal-std', title: 'Tagebuch', tags: ['tag-j'], assignments: [{ entryType: 'journal', category: '*', isDefault: true }] };
+  // Title and tags when undoing a template.
+  const journalStd = { ...sigilTpl, id: 'journal-std', title: 'Tagebuch', tags: ['tag-j'], assignments: [{ entryType: 'journal', category: '*' }] };
 
   // Tags are IDs: the same ID is the same tag, there is no other spelling.
   const cleared = fieldsWithoutTemplate({ title: 'Tagebuch', tags: ['eigen', 'tag-j'] }, journalStd);
   check('fields without template: title empty again, its tags gone',
     cleared.title === '' && cleared.tags.join() === 'eigen', cleared);
-  const withNew = fieldsWithTemplate(cleared, { title: ' Artikel ', tags: ['eigen', 'neu'] }, { title: 'ifUntitled', tags: true });
+  const withNew = fieldsWithTemplate(cleared, { title: ' Artikel ', tags: ['eigen', 'neu'] });
   check('fields with template: title only without a custom one, tags without duplicates',
     withNew.title === 'Artikel' && withNew.tags.join() === 'eigen,neu', withNew);
   check('fields with template: a custom title stays',
-    fieldsWithTemplate({ title: 'Mein Titel', tags: [] }, { title: 'Artikel', tags: [] }, { title: 'ifUntitled', tags: false }).title === 'Mein Titel');
+    fieldsWithTemplate({ title: 'Mein Titel', tags: [] }, { title: 'Artikel', tags: [] }).title === 'Mein Titel');
   check('fields with template: without a custom title that of the template is used',
-    fieldsWithTemplate({ title: '  ', tags: [] }, { title: 'Artikel', tags: [] }, { title: 'ifUntitled', tags: false }).title === 'Artikel');
+    fieldsWithTemplate({ title: '  ', tags: [] }, { title: 'Artikel', tags: [] }).title === 'Artikel');
 
   check('empty: no content', isContentEmpty(''));
   check('empty: only empty paragraphs', isContentEmpty('<p></p><p style="text-align: center"><br></p>'));
   check('not empty: text', !isContentEmpty('<p>x</p>'));
   check('not empty: an image', !isContentEmpty(`<p><img src="${'a'.repeat(64)}.png"></p>`));
   check('not empty: a field block', !isContentEmpty(serializeBlocks([createFieldsBlock('shorttext')])));
-  check('not empty: an empty text block from a template',
-    !isContentEmpty(serializeBlocks([{ ...createTextBlock(''), attrs: { 'data-template-origin': 't' } }])));
 
   const start = templateStart({ ...sigilTpl, title: '  Ritual ', tags: ['a'] });
   check('start from template: title trimmed, tags copied, content inserted',
-    start.title === 'Ritual' && start.tags.join() === 'a' && start.content.includes('data-template-origin="sigil-tpl"'), start);
+    start.title === 'Ritual' && start.tags.join() === 'a' && parseBlocks(start.content).length === 4, start);
   check('start without template: empty, the title too',
     JSON.stringify(templateStart(null)) === JSON.stringify({ title: '', content: '', tags: [], templateId: null }));
   check('merge tags without duplicate IDs', mergeTemplateTags(['a', 'b'], ['a', 'c']).join() === 'a,b,c');
 
-  // Lay the assignments of an edit onto a state that has changed in the meantime.
-  const j = { entryType: 'journal', category: '*', isDefault: false };
-  const w = { entryType: 'wiki', category: 'ritual', isDefault: false };
-  const o = { entryType: 'operation', category: 'sigils', isDefault: true };
-  // This page: journal gets the star, wiki is added. Elsewhere: operation × sigils got the star.
-  const merged = mergeAssignmentChanges([j], [{ ...j, isDefault: true }, w], [j, o]);
-  check('edit and template saved elsewhere together: star from the page, new assignment, star from elsewhere stays',
-    JSON.stringify(merged) === JSON.stringify([{ ...j, isDefault: true }, o, w]), merged);
-  check('an assignment removed on the page is dropped, additions made elsewhere stay',
-    JSON.stringify(mergeAssignmentChanges([j, w], [j], [j, w, o])) === JSON.stringify([j, o]));
-  check('a star on an assignment already removed elsewhere does not bring it back',
-    mergeAssignmentChanges([w], [{ ...w, isDefault: true }], []).length === 0);
-  check('setting the default adds the missing assignment',
-    JSON.stringify(withAssignmentState([j], 'wiki', null, 'default')) === JSON.stringify([j, { entryType: 'wiki', category: null, isDefault: true }]));
-  check('to-choose-from only removes the star and keeps the position',
-    JSON.stringify(withAssignmentState([o, j], 'operation', 'sigils', 'assigned')) === JSON.stringify([{ ...o, isDefault: false }, j]));
-  check('off removes the assignment, "no category" is not "all"',
-    JSON.stringify(withAssignmentState([w, { ...w, category: null }], 'wiki', 'ritual', 'off')) === JSON.stringify([{ ...w, category: null }]));
-  check('back and forth: off and back to choose-from is the same assignment, just further back',
-    sameAssignments([w, j], withAssignmentState(withAssignmentState([w, j], 'wiki', 'ritual', 'off'), 'wiki', 'ritual', 'assigned')));
-  check('a different star is a change', !sameAssignments([j], [{ ...j, isDefault: true }]));
-  check('state of a combination',
-    assignmentStateAt([j, o], 'operation', 'sigils') === 'default' && assignmentStateAt([j, o], 'journal', '*') === 'assigned'
-      && assignmentStateAt([j, o], 'wiki', '*') === 'off');
-  const saved = contentForTemplate(serializeBlocks(first));
-  check('as a template: without origin, with unloaded charge',
-    !saved.includes('data-template-origin') && parseBlocks(saved).length === 4 && !parseSigilCharge(parseBlocks(saved)[3]).loaded, saved);
-  check('empty: a text block from a template does not count as empty',
-    !areBlocksEmpty([{ ...createTextBlock('<p></p>'), attrs: { 'data-template-origin': 'x' } }]) && areBlocksEmpty([createTextBlock('<p></p>')]));
-  check('default exactly here, without fallback',
-    defaultTemplateAt(all, 'wiki', 'herbs') === undefined && defaultTemplateAt(all, 'wiki', '*')?.id === 'fallback');
+  check('assigned exactly here, without fallback',
+    assignedTemplateAt(all, 'wiki', 'herbs') === undefined && assignedTemplateAt(all, 'wiki', '*')?.id === 'fallback');
+  check('empty blocks', areBlocksEmpty([createTextBlock('<p></p>')]) && !areBlocksEmpty([createTextBlock('<p>x</p>')]));
 }
 
 console.log('');

@@ -19,6 +19,8 @@ interface Props {
   leadWidth?: number;
   /** Off while a sidebar is being dragged to a new width. */
   animate?: boolean;
+  /** Over the vault picker: only the logo and the window buttons. */
+  picker?: boolean;
 }
 
 /**
@@ -41,7 +43,7 @@ interface Props {
  * Without `tabs` (no vault yet, boot still running) the shell content is
  * unmounted and there are no tabs to show.
  */
-export default function TitleBar({ tabs = false, leadWidth = 0, animate = true }: Props) {
+export default function TitleBar({ tabs = false, leadWidth = 0, animate = true, picker = false }: Props) {
   const { t } = useTranslation();
   const navigateBack = useUIStore((s) => s.navigateBack);
   const navigateForward = useUIStore((s) => s.navigateForward);
@@ -55,7 +57,8 @@ export default function TitleBar({ tabs = false, leadWidth = 0, animate = true }
   // The altar's distraction-free mode hides the sidebars and the tab bar. The
   // title bar stays — on Windows and Linux it holds the only way to close,
   // minimise or move the window — but drops the navigation and the search.
-  const minimal = useUIStore(isAltarFullscreen);
+  const altarFullscreen = useUIStore(isAltarFullscreen);
+  const minimal = altarFullscreen || picker;
 
   // Without an open vault there is nothing to search — and more than that: the
   // stores keep their contents when the last vault is deleted
@@ -116,7 +119,7 @@ export default function TitleBar({ tabs = false, leadWidth = 0, animate = true }
           </div>
         )}
 
-        {!isMacOS && (
+        {!isMacOS && !picker && (
           <TitleBarMenuButton
             label={t('titlebar.menu')}
             icon={<Menu size={16} />}
@@ -148,10 +151,12 @@ export default function TitleBar({ tabs = false, leadWidth = 0, animate = true }
             route to the altar's image export, and distraction-free mode is
             precisely where that export is wanted. Export carries Download,
             Import Upload — as in Settings → Backup. */}
-        <div className="ml-1 flex items-center gap-0.5 flex-shrink-0">
-          <TitleBarMenuButton label={menus.exportMenu.label} icon={<Download size={16} />} nodes={menus.exportMenu.nodes} />
-          <TitleBarMenuButton label={menus.importMenu.label} icon={<Upload size={16} />} nodes={menus.importMenu.nodes} />
-        </div>
+        {!picker && (
+          <div className="ml-1 flex items-center gap-0.5 flex-shrink-0">
+            <TitleBarMenuButton label={menus.exportMenu.label} icon={<Download size={16} />} nodes={menus.exportMenu.nodes} />
+            <TitleBarMenuButton label={menus.importMenu.label} icon={<Upload size={16} />} nodes={menus.importMenu.nodes} />
+          </div>
+        )}
       </div>
 
       {/* Without tabs: empty space that stays free as a drag area. */}

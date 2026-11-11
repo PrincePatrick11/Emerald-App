@@ -7,7 +7,7 @@ import { SYMBOLS_BY_ID } from '../components/editors/canvas/symbols/packs';
 /**
  * Shapes, text and drawings made on an altar. They hang on no library item,
  * so they are not rows of `altar_placements` (whose `item_id` is required) but
- * a JSON list in `altars.elements` (since v56). In the store they are
+ * a JSON list in `altars.elements` (since v57). In the store they are
  * placements with `kind` 'shape', 'text', 'drawing' or 'symbol', with the same position,
  * size, stacking and switches as an item's placement; `item_id` is empty.
  *

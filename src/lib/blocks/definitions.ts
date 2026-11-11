@@ -1,28 +1,19 @@
 import { generateId } from '../helpers';
-import { parseBlocks, serializeBlocks } from './blockHtml';
 import {
   DEFAULT_DISPLAY, FIELDS_BLOCK_TYPE, isSlotKind, parseDisplay, parseElements, parseFields, serializeFields, slotFromDefault,
   type ChargeDefault, type DisplayRules, type ElementDef, type FallbackText, type FieldsModel, type FieldValue,
 } from './fields';
-import { isSigilFrozen, mayHoldSigil, sigilPartId, sigilState, todayIso } from './sigil';
+import { sigilPartId } from './sigil';
 import { BLOCK_ATTR, type BlockInstance } from './types';
 
 /**
  * Custom blocks (blocks view, table `block_definitions`): a definition
  * is the template from which a field block with several elements is copied.
  *
- * The model is **copies, not live references** (the user's decision):
- * an inserted block carries elements, display rules, name and icon itself —
- * rendering always comes from the copy. A change to the definition therefore
- * changes no existing entry; if the definition is missing (trash, import
- * from another vault), the copy works anyway. The copy only remembers
- * where it came from (`data-block-origin`) and in which revision
- * (`data-block-rev`) — that is how the app recognises an "older version" and
- * offers to update it, individually in the entry or collectively in the blocks view.
- *
- * Element IDs are the same in the definition and all copies. Values thus
- * stay with their element across renaming and updating, and a later
- * list filter finds them in every copy, whatever its version.
+ * The model is **copies, without any link**: an inserted block carries
+ * elements, display rules, name and icon itself and does not know where it
+ * came from. A change to the definition therefore changes no existing entry,
+ * and nothing in an entry or template ever changes because of a definition.
  */
 
 /** The display rules of a definition: those of the field block plus the title in read mode. */
@@ -37,9 +28,8 @@ export const DEFAULT_DEFINITION_DISPLAY: DefinitionDisplay = { ...DEFAULT_DISPLA
 export const DEFAULT_DEFINITION_ICON = '🧩';
 
 /**
- * A definition ID from a foreign source (backup, `.emerald`): it ends up in
- * the `data-block-origin` of every copy, so only harmless characters. One
- * shared rule for both import paths.
+ * A definition ID from a foreign source (backup, `.emerald`): only harmless
+ * characters. One shared rule for both import paths.
  */
 export function isDefinitionId(id: unknown): id is string {
   return typeof id === 'string' && /^[\w-]{1,100}$/.test(id);
@@ -50,11 +40,8 @@ export interface BlockDefinition {
   name: string;
   /** Emoji. */
   icon: string;
-  /** Including archived elements: they remain restorable. */
   elements: ElementDef[];
   display: DefinitionDisplay;
-  /** Increases with every change that affects copies (name, icon, elements, display). */
-  revision: number;
   sort_order: number;
   created_at: string;
   updated_at: string;
@@ -66,23 +53,10 @@ export function definitionToRow(def: BlockDefinition) {
   return { ...def, elements: JSON.stringify(def.elements), display: JSON.stringify(def.display) };
 }
 
-/** What a definition passes on to its copies; `sameShape` decides which of it raises the revision. */
-export type DefinitionShape = Pick<BlockDefinition, 'name' | 'icon' | 'elements' | 'display'>;
-
 /** The element as a copy carries it: without a default — that has already become a value there. */
 function elementForCopy(element: ElementDef): ElementDef {
   const { defaultValue: _defaultValue, ...rest } = element;
   return rest;
-}
-
-// Comparison via JSON: depends on key order. Elements are therefore always
-// created through `parseElement` or as a copy from there — an object sorted
-// differently would yield a revision without a real change. Defaults and
-// "show title" do not count: they only affect new copies, an existing one
-// would have nothing to update (`updateInstanceToDefinition`).
-export function sameShape(a: DefinitionShape, b: DefinitionShape): boolean {
-  const shape = (d: DefinitionShape) => JSON.stringify([d.name, d.icon, d.elements.map(elementForCopy), blockDisplay(d.display)]);
-  return shape(a) === shape(b);
 }
 
 function parseJsonText(raw: unknown): unknown {
@@ -94,9 +68,13 @@ function parseJsonText(raw: unknown): unknown {
   }
 }
 
-/** The elements of a definition from its JSON column — validated like the copy in the content. */
+/**
+ * The elements of a definition from its JSON column — validated like the copy
+ * in the content. A field archived by an earlier version stays out: a removed
+ * field is simply gone from the definition.
+ */
 export function parseDefinitionElements(raw: unknown): ElementDef[] {
-  return parseElements(parseJsonText(raw));
+  return parseElements(parseJsonText(raw)).filter((element) => !element.archived);
 }
 
 export function parseDefinitionDisplay(raw: unknown): DefinitionDisplay {
@@ -160,21 +138,6 @@ export function remapDefinitionDefaults(
   return typeof rawElements === 'string' ? JSON.stringify(remapped) : remapped;
 }
 
-/** Origin of a copy, or `null` for any other block. */
-export function blockOrigin(block: BlockInstance): { id: string; rev: number } | null {
-  if (block.type !== FIELDS_BLOCK_TYPE) return null;
-  const id = block.attrs[BLOCK_ATTR.origin];
-  if (!id) return null;
-  const rev = Number(block.attrs[BLOCK_ATTR.rev]);
-  return { id, rev: Number.isInteger(rev) && rev > 0 ? rev : 0 };
-}
-
-/** Is the block a copy of this definition in an older revision — and readable enough to update it? */
-export function isOutdatedCopy(block: BlockInstance, def: BlockDefinition): boolean {
-  const origin = blockOrigin(block);
-  return !!origin && origin.id === def.id && origin.rev < def.revision && !parseFields(block).broken;
-}
-
 function blockDisplay(display: DefinitionDisplay): DisplayRules {
   return { readHideEmpty: display.readHideEmpty, readOnly: display.readOnly };
 }
@@ -210,12 +173,11 @@ function defaultsOf(elements: readonly ElementDef[], blockId: string): Pick<Fiel
 }
 
 /**
- * A new block as a copy of the definition — without the archived elements,
- * prefilled with the defaults. `text` writes the readable fallback of these
+ * A new block as a copy of the definition, prefilled with the defaults. `text` writes the readable fallback of these
  * values so that search and export find them right away.
  */
 export function instantiateDefinition(def: BlockDefinition, text: FallbackText): BlockInstance {
-  const elements = def.elements.filter((e) => !e.archived);
+  const { elements } = def;
   const attrs: Record<string, string> = {
     [BLOCK_ATTR.config]: JSON.stringify({
       elements: elements.map(elementForCopy),
@@ -223,8 +185,6 @@ export function instantiateDefinition(def: BlockDefinition, text: FallbackText):
       name: def.name,
       icon: def.icon,
     }),
-    [BLOCK_ATTR.origin]: def.id,
-    [BLOCK_ATTR.rev]: String(def.revision),
   };
   // The field block's default is "without title"; only the deviation becomes an attribute.
   if (def.display.showTitle) attrs[BLOCK_ATTR.showTitle] = '1';
@@ -237,85 +197,4 @@ export function instantiateDefinition(def: BlockDefinition, text: FallbackText):
     values: { ...model.values, ...defaults.values },
     slots: { ...model.slots, ...defaults.slots },
   }, text);
-}
-
-/**
- * Bring the copy up to the definition's state:
- * - Values stay where they are — at their element ID.
- * - New elements are added, in the definition's order — with their
- *   default, otherwise empty.
- * - Elements that the definition no longer shows are archived:
- *   invisible, with their data.
- * - Labels, options, display rules, name and icon come from the
- *   definition. What belongs to the instance itself — own title, eye, title
- *   in read mode — stays.
- *
- * An unreadable block comes back unchanged. An element whose kind in the copy
- * differs from the one in the definition (the blocks view does not allow
- * that; only a doctored file could) keeps its own version — the
- * definition's would discard its value.
- */
-export function updateInstanceToDefinition(block: BlockInstance, def: BlockDefinition, text: FallbackText): BlockInstance {
-  const model = parseFields(block);
-  if (model.broken) return block;
-  const own = new Map(model.elements.map((e) => [e.id, e]));
-  const fromDef = def.elements
-    .filter((e) => !e.archived)
-    .map((e) => {
-      const mine = own.get(e.id);
-      return mine && mine.kind !== e.kind ? mine : elementForCopy(e);
-    });
-  // Only elements the copy never knew — neither as an (even archived) element nor as an orphaned value or slot.
-  const added = def.elements.filter((e) =>
-    !e.archived && !own.has(e.id) && !(e.id in model.orphans) && !(e.id in model.slots));
-  const defaults = defaultsOf(added, block.id);
-  const shown = new Set(fromDef.map((e) => e.id));
-  const archived = model.elements
-    .filter((e) => !shown.has(e.id))
-    .map((e) => ({ ...e, archived: true }));
-
-  const next: FieldsModel = {
-    ...model,
-    values: { ...defaults.values, ...model.values },
-    slots: { ...defaults.slots, ...model.slots },
-    elements: [...fromDef, ...archived],
-    display: blockDisplay(def.display),
-    name: def.name,
-    icon: def.icon,
-  };
-  const withRev = { ...block, attrs: { ...block.attrs, [BLOCK_ATTR.rev]: String(def.revision) } };
-  return serializeFields(withRev, next, text);
-}
-
-/**
- * Does the content carry a copy of the definition that a loaded sigil
- * holds fixed (`isSigilFrozen`)? It stays in place on updating and removing
- * — the caller reports it as skipped.
- */
-export function hasFrozenCopy(content: string, defId: string, today = todayIso()): boolean {
-  if (!mayHoldSigil(content)) return false;
-  const blocks = parseBlocks(content);
-  const state = sigilState(blocks, today);
-  return blocks.some((block) => blockOrigin(block)?.id === defId && isSigilFrozen(block, state));
-}
-
-/** Update all outdated copies of the definition in a content — `null` if there were none. */
-export function updateCopiesInContent(content: string, def: BlockDefinition, text: FallbackText): string | null {
-  let changed = false;
-  const blocks = parseBlocks(content);
-  const state = sigilState(blocks, todayIso());
-  const next = blocks.map((block) => {
-    if (!isOutdatedCopy(block, def) || isSigilFrozen(block, state)) return block;
-    changed = true;
-    return updateInstanceToDefinition(block, def, text);
-  });
-  return changed ? serializeBlocks(next) : null;
-}
-
-/** Remove all copies of the definition from a content — `null` if there were none. Locked ones stay (see `hasFrozenCopy`). */
-export function removeCopiesFromContent(content: string, defId: string): string | null {
-  const blocks = parseBlocks(content);
-  const state = sigilState(blocks, todayIso());
-  const next = blocks.filter((block) => blockOrigin(block)?.id !== defId || isSigilFrozen(block, state));
-  return next.length === blocks.length ? null : serializeBlocks(next);
 }

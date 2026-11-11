@@ -4,9 +4,9 @@ import { Plus } from 'lucide-react';
 import Button from './Button';
 import SidebarPortal from './SidebarPortal';
 import SidebarColumn, { SidebarActionBar } from './SidebarColumn';
-import CollapseChevron from './CollapseChevron';
+import CollapsibleGroupHeader from './CollapsibleGroupHeader';
 import EmptyState, { NoResults, type EmptyStateProps } from './EmptyState';
-import ListToolbar, { ListSearchField, type SortDateField } from './ListToolbar';
+import ListToolbar, { ListSearchField, type DisplayToggle, type SortDateField } from './ListToolbar';
 import { ENTRY_TITLE_HEADING_CLASSES } from './EntryDetailFrame';
 import FilterPanel, { type FilterPanelProps } from './FilterPanel';
 import { useUIStore, type ViewMode, type SortMode, type GroupingMode } from '../../store/uiStore';
@@ -77,8 +77,8 @@ interface DashboardBaseProps<T> {
   /** Only the title: no icon, no number. The icon is already in the rail,
    *  and counting is not done in the sections below (equally plain everywhere). */
   title?: string;
-  /** Replaces the whole title line, for headers with more than the title
-   *  (Home: two lines; trash: `DashboardTitle` plus "Select all"). */
+  /** Replaces the whole title line, for a header with more than the title
+   *  (Home: the date over the moon phase). */
   headerLeft?: ReactNode;
   /** Labelled button that fills the bar at the top of the sidebar. */
   primaryAction?: DashboardPrimaryAction;
@@ -101,6 +101,10 @@ interface DashboardBaseProps<T> {
   sortDate?: SortDateField;
   /** Heading of the sort section instead of "Sort" (altar: "Sort · Altars"). */
   sortLabel?: string;
+  /** Preferences of the view, below its layout buttons: not filters, they do
+   *  not count as active ones and stay put on a reset (tasks: "Show completed",
+   *  altar: "Altar preview"). */
+  displayToggles?: DisplayToggle[];
   /** The toolbar's grouping axis, as one object so that value and
    *  handler cannot go missing individually and the name is not confused with
    *  `grouping` below, which describes the structure of the content.
@@ -131,7 +135,8 @@ interface DashboardBaseProps<T> {
    *  fill the wide card differently (altar: taller preview). */
   wideCardsClassName?: string;
   listClassName?: string;
-  contentClassName?: string;
+  /** Spacing between groups; rows that are themselves the groups sit closer (tags). */
+  groupsClassName?: string;
   /** <ContextMenu> stays caller-owned since its trigger is wired inside renderItem. */
   contextMenuSlot?: ReactNode;
 }
@@ -162,55 +167,10 @@ type DashboardContentProps<T> =
 
 export type DashboardProps<T> = DashboardBaseProps<T> & DashboardContentProps<T>;
 
-const DEFAULT_CONTENT_CLASSNAME = 'flex-1 overflow-y-auto px-8 py-6';
 const DEFAULT_CARDS_CLASSNAME = 'grid grid-cols-3 gap-3';
 const DEFAULT_WIDE_CARDS_CLASSNAME = 'grid grid-cols-1 gap-3';
 const DEFAULT_LIST_CLASSNAME = 'space-y-1.5';
-
-/**
- * The title of a dashboard in the main area: just the title. Dashboard renders
- * it itself from `title`; exported for headers that need something after it
- * (`children`, the trash its "Select all") and therefore build it as
- * `headerLeft`.
- */
-export function DashboardTitle({ title, children }: {
-  title: string;
-  children?: ReactNode;
-}) {
-  return (
-    <div className="flex items-center gap-3 min-w-0">
-      <h1 className={`${ENTRY_TITLE_HEADING_CLASSES} truncate`}>{title}</h1>
-      {children}
-    </div>
-  );
-}
-
-/**
- * The divider heading of the timeline groups: a label, then a line
- * to the edge. Exported because a whole section is also headed this way
- * (the library in the altar dashboard); there with a chevron. Deliberately without
- * a counter: a section is only named, nothing is counted in the header.
- * Not CollapsibleGroupHeader: that one has no line and carries category rows,
- * not sections.
- */
-export function GroupDivider({
-  label, collapsed, onToggleCollapse,
-}: {
-  label: string;
-  collapsed?: boolean;
-  onToggleCollapse?: () => void;
-}) {
-  const labelClass = 'text-xs font-semibold text-subtle uppercase tracking-wider whitespace-nowrap';
-  return (
-    <div className="flex items-center gap-3 mb-3">
-      {onToggleCollapse && <CollapseChevron collapsed={!!collapsed} onToggle={onToggleCollapse} />}
-      {onToggleCollapse
-        ? <button onClick={onToggleCollapse} className={`${labelClass} transition-colors hover:text-raise`}>{label}</button>
-        : <span className={labelClass}>{label}</span>}
-      <div className="flex-1 h-px bg-well-raise" />
-    </div>
-  );
-}
+const DEFAULT_GROUPS_CLASSNAME = 'space-y-6';
 
 export default function Dashboard<T>({
   title,
@@ -225,6 +185,7 @@ export default function Dashboard<T>({
   sortModes,
   sortDate,
   sortLabel,
+  displayToggles,
   groupBy,
   search,
   onSearch,
@@ -241,7 +202,7 @@ export default function Dashboard<T>({
   cardsClassName = DEFAULT_CARDS_CLASSNAME,
   wideCardsClassName = DEFAULT_WIDE_CARDS_CLASSNAME,
   listClassName = DEFAULT_LIST_CLASSNAME,
-  contentClassName = DEFAULT_CONTENT_CLASSNAME,
+  groupsClassName = DEFAULT_GROUPS_CLASSNAME,
   contextMenuSlot,
 }: DashboardProps<T>) {
   const { t } = useTranslation();
@@ -288,7 +249,7 @@ export default function Dashboard<T>({
         <div className="space-y-6">
           {grouping.groups.map((group) => (
             <div key={group.key ?? group.label}>
-              {group.label && <GroupDivider label={group.label} />}
+              {group.label && <CollapsibleGroupHeader label={group.label} />}
               {renderItems(group.items)}
             </div>
           ))}
@@ -309,7 +270,7 @@ export default function Dashboard<T>({
       : grouping.groups.filter((group) => group.items.length > 0);
     if (groups.length === 0) return noResults;
     return (
-      <div className="space-y-6">
+      <div className={groupsClassName}>
         {groups.map((group) => (
           <div key={group.key ?? group.label}>
             {grouping.renderGroupHeader?.(group)}
@@ -381,6 +342,7 @@ export default function Dashboard<T>({
         sortModes={sortModes}
         sortDate={sortDate}
         sortLabel={sortLabel}
+        displayToggles={displayToggles}
         groupBy={groupBy}
       />
 
@@ -407,7 +369,7 @@ export default function Dashboard<T>({
           independently of the indentation a view sets for its content. */}
       <div className="px-8 pt-6 flex items-center gap-4 flex-shrink-0">
         <div className="flex-1 min-w-0">
-          {headerLeft ?? (title && <DashboardTitle title={title} />)}
+          {headerLeft ?? (title && <h1 className={`${ENTRY_TITLE_HEADING_CLASSES} truncate`}>{title}</h1>)}
         </div>
         {onSearch && (
           <ListSearchField
@@ -419,7 +381,7 @@ export default function Dashboard<T>({
         )}
       </div>
 
-      <div className={contentClassName}>
+      <div className="flex-1 overflow-y-auto px-8 py-6">
         {contentHeader}
         {renderContent()}
         {contentFooter}

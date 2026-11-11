@@ -1,3 +1,4 @@
+import { parseAssignments } from './blocks/templates';
 import Database from './sqlite';
 import { invoke } from '@tauri-apps/api/core';
 import { getActiveVaultId } from './vaultManager';
@@ -25,6 +26,7 @@ import { migrateRoutinesToTemplates } from './migrateRoutinesToTemplates';
 import i18n from '../i18n';
 import { LEGACY_UNTITLED_TITLES } from './entryTitle';
 import { useSettingsStore } from '../store/settingsStore';
+import { dropTriggers, installTriggers, isTracked, markMigrated } from './sync/tracking';
 
 // Per-vault DB cache: vault id → Database instance
 const _dbCache = new Map<string, Database>();
@@ -55,7 +57,7 @@ export function markDbReplaced(): void {
  * Dropping the JavaScript reference is not enough: the connection pool lives in
  * Rust (`db.rs`), and an open pool keeps the file locked. On Windows that
  * means the vault's folder cannot be moved, relocated, or deleted for the rest
- * of the session — which is exactly what the vault modal's "delete files"
+ * of the session — which is exactly what the vault picker's "delete files"
  * checkbox tries to do.
  */
 export async function resetDbCache(): Promise<void> {
@@ -242,6 +244,14 @@ export async function runMigrations(db: Database): Promise<void> {
   );
   const currentVersion = versionRows[0]?.version ?? 0;
 
+  // A migration changes rows on every device on its own, so sync starts over
+  // from a snapshot. Noted first: a crash in the chain must not lose that.
+  const tracked = await isTracked(db);
+  if (tracked && latest > currentVersion) {
+    await markMigrated(db);
+    await dropTriggers(db);
+  }
+
   for (const migration of MIGRATIONS) {
     if (migration.version <= currentVersion) continue;
     try {
@@ -257,6 +267,8 @@ export async function runMigrations(db: Database): Promise<void> {
       [migration.version, migration.name, new Date().toISOString()]
     );
   }
+
+  if (tracked) await installTriggers(db);
 }
 
 /**
@@ -1426,9 +1438,23 @@ export const MIGRATIONS: Migration[] = [
     },
   },
   {
+    // A block in an entry no longer knows its definition, so the definition
+    // needs no revision. An assignment now always means "new entries start with
+    // it": what was only offered for selection goes (`parseAssignments`). Repeatable.
+    version: 56,
+    name: 'simple_copies_and_assignments',
+    up: async (db) => {
+      await dropColumnsIfPresent(db, 'block_definitions', ['revision']);
+      const rows = await db.select<{ id: string; assignments: string }[]>('SELECT id, assignments FROM templates');
+      await db.batch(rows.map((row) => ['UPDATE templates SET assignments=$1 WHERE id=$2', [JSON.stringify(parseAssignments(row.assignments)), row.id]] as const));
+      // A trashed template holds no assignments any more.
+      await db.execute("UPDATE templates SET assignments='[]' WHERE deleted_at IS NOT NULL");
+    },
+  },
+  {
     // Shapes and text drawn on an altar (`lib/altarElements.ts`): a JSON list,
     // since they hang on no library item. Additive and repeatable.
-    version: 56,
+    version: 57,
     name: 'altar_elements',
     up: async (db) => {
       if (!(await columnNames(db, 'altars')).has('elements')) {
@@ -1439,7 +1465,7 @@ export const MIGRATIONS: Migration[] = [
   {
     // Groups on an altar (the canvas editor's `group`): placements of library
     // items keep theirs here, drawn elements in their JSON. Additive and repeatable.
-    version: 57,
+    version: 58,
     name: 'altar_placement_groups',
     up: async (db) => {
       if (!(await columnNames(db, 'altar_placements')).has('group_id')) {
@@ -1449,7 +1475,7 @@ export const MIGRATIONS: Migration[] = [
   },
   {
     // The vault's own symbols, made from drawings in the canvas editor.
-    version: 58,
+    version: 59,
     name: 'symbols',
     up: async (db) => {
       await db.execute(ddlIfNotExists(TABLE_DDL.symbols));

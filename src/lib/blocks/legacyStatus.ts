@@ -50,7 +50,6 @@ export function statusDefinition(t: TFunction, now: string): BlockDefinition {
       { id: 'version', kind: 'shorttext', label: label('blocks.status.version', 'Version') },
     ],
     display: { readHideEmpty: true, readOnly: false, showTitle: true },
-    revision: 1,
     sort_order: 0,
     created_at: now,
     updated_at: now,

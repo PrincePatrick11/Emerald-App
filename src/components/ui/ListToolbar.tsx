@@ -40,6 +40,15 @@ const SORT_DATE_KEYS: Record<SortDateField, string> = {
   deleted: 'listView.dateDeleted',
 };
 
+/** A display toggle: a preference of the view, not a filter; it does not count
+ *  towards `activeFilterCount` and stays put on reset. */
+export interface DisplayToggle {
+  label: string;
+  icon?: LucideIcon;
+  checked: boolean;
+  onChange: (next: boolean) => void;
+}
+
 interface Props {
   /** View and sorting are axes like `groupBy`: if the handler is missing,
    *  the section is omitted. The categories view has neither the one nor
@@ -56,8 +65,9 @@ interface Props {
   /** Heading of the sorting when the bar has more than one
    *  (altar: "Sort · Altars" above "Sort · Library"). */
   sortLabel?: string;
-  /** The grouping axis; if it is missing, the toggle below the
-   *  sorting is omitted. See DashboardGroupBy. */
+  /** Under the view's layout buttons, in the same section. */
+  displayToggles?: DisplayToggle[];
+  /** The grouping axis; if it is missing, its section is omitted. See DashboardGroupBy. */
   groupBy?: DashboardGroupBy;
 }
 
@@ -145,12 +155,12 @@ export function SortSelect<S extends SortMode>({ label, value, modes, onChange, 
 }
 
 /**
- * View, sorting and grouping as labelled sections, for the
- * header in the right sidebar (dashboard portal). The search is in the
- * main area (`ListSearchField`).
+ * View, sorting and grouping as labelled sections, always in this order, for
+ * the header in the right sidebar (dashboard portal). What a dashboard does not
+ * have falls away. The search is in the main area (`ListSearchField`).
  */
 export default function ListToolbar({
-  view, sort, onView, onSort, viewOptions: viewOptionsProp, sortModes = DEFAULT_SORT_MODES, sortDate, sortLabel, groupBy,
+  view, sort, onView, onSort, viewOptions: viewOptionsProp, sortModes = DEFAULT_SORT_MODES, sortDate, sortLabel, displayToggles = [], groupBy,
 }: Props) {
   const { t } = useTranslation();
 
@@ -162,57 +172,61 @@ export default function ListToolbar({
   ];
 
   const inTimeline = view === 'timeline';
-  const showView = view !== undefined && onView !== undefined && viewOptions.length > 1;
+  const showLayouts = view !== undefined && onView !== undefined && viewOptions.length > 1;
   const showSort = sort !== undefined && onSort !== undefined;
   const timelineHint = t('listView.notAvailableInTimeline');
-  // Without sorting, the grouping toggle would stand alone under "Sort".
-  const sortHeading = showSort ? (sortLabel ?? t('listView.sort')) : undefined;
+  const sortHeading = sortLabel ?? t('listView.sort');
 
-  if (!showView && !showSort && !groupBy) return null;
+  const showViewSection = showLayouts || displayToggles.length > 0;
+
+  if (!showViewSection && !showSort && !groupBy) return null;
 
   return (
     // Without strip chrome of its own: the sidebar's p-3 column provides
     // the indentation (one indentation source per column, design.md).
     <div className="flex flex-col gap-4">
-      {showView && (
+      {showViewSection && (
         <SidebarGroup label={t('listView.view')}>
-          <IconToggleGroup
-            fill
-            label={t('listView.view')}
-            options={viewOptions}
-            icons={VIEW_ICONS}
-            value={view!}
-            onChange={onView!}
+          {showLayouts && (
+            <IconToggleGroup
+              fill
+              label={t('listView.view')}
+              options={viewOptions}
+              icons={VIEW_ICONS}
+              value={view!}
+              onChange={onView!}
+            />
+          )}
+          {displayToggles.map((toggle) => <SwitchRow key={toggle.label} {...toggle} />)}
+        </SidebarGroup>
+      )}
+      {showSort && (
+        <SidebarGroup label={sortHeading}>
+          <SortSelect
+            label={sortHeading}
+            // In the timeline a date applies (`groupByMonth`); the saved
+            // sorting stays and applies again as soon as it is left.
+            value={inTimeline && sortBlockedInTimeline(sort!) ? 'date_desc' : sort!}
+            modes={sortModes}
+            onChange={onSort!}
+            dateField={sortDate}
+            isDisabled={inTimeline ? sortBlockedInTimeline : undefined}
+            disabledHint={timelineHint}
           />
         </SidebarGroup>
       )}
-      {(showSort || groupBy) && (
-        <SidebarGroup label={sortHeading}>
-          {showSort && (
-            <SortSelect
-              label={sortHeading!}
-              // In the timeline a date applies (`groupByMonth`); the saved
-              // sorting stays and applies again as soon as it is left.
-              value={inTimeline && sortBlockedInTimeline(sort!) ? 'date_desc' : sort!}
-              modes={sortModes}
-              onChange={onSort!}
-              dateField={sortDate}
-              isDisabled={inTimeline ? sortBlockedInTimeline : undefined}
-              disabledHint={timelineHint}
-            />
-          )}
-          {/* In the timeline the months group; the toggle has no effect there
-              and stays disabled instead of disappearing. */}
-          {groupBy && (
-            <SwitchRow
-              icon={Layers}
-              label={t('listView.groupBy', { label: groupBy.label ?? t('listView.category') })}
-              checked={groupBy.value === 'grouped'}
-              onChange={(on) => groupBy.onChange(on ? 'grouped' : 'flat')}
-              disabled={inTimeline}
-              title={inTimeline ? timelineHint : undefined}
-            />
-          )}
+      {/* In the timeline the months group; the toggle has no effect there
+          and stays disabled instead of disappearing. */}
+      {groupBy && (
+        <SidebarGroup label={t('listView.grouping')}>
+          <SwitchRow
+            icon={Layers}
+            label={t('listView.groupBy', { label: groupBy.label ?? t('listView.category') })}
+            checked={groupBy.value === 'grouped'}
+            onChange={(on) => groupBy.onChange(on ? 'grouped' : 'flat')}
+            disabled={inTimeline}
+            title={inTimeline ? timelineHint : undefined}
+          />
         </SidebarGroup>
       )}
     </div>

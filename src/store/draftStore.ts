@@ -2,7 +2,6 @@ import { create, type StoreApi, type UseBoundStore } from 'zustand';
 import { invoke } from '@tauri-apps/api/core';
 import { registerEditProbe } from './leaveGuardStore';
 import { isDefinitionId, parseDefinitionDisplay, parseDefinitionElements } from '../lib/blocks/definitions';
-import { parseAssignments } from '../lib/blocks/templates';
 import type { BlockDefinitionPatch } from './blockDefinitionStore';
 import type { TemplatePatch } from './templateStore';
 import type { VaultFileRead } from '../lib/vaultSettings';
@@ -17,8 +16,7 @@ export type TemplateDraft = Required<TemplatePatch>;
 /**
  * An open draft: the state on opening (`base`) and the edit
  * (`draft`). "Done" saves only what has changed relative to `base` —
- * whatever other places have written in the meantime (a renamed tag, a
- * star that another template took over) stays in place.
+ * whatever other places have written in the meantime (a renamed tag) stays in place.
  */
 export interface DraftEntry<T> {
   base: T;
@@ -263,7 +261,6 @@ export const useTemplateDraftStore = createDraftStore<TemplateDraft>('templates'
   title: text(raw.title),
   content: text(raw.content),
   tags: Array.isArray(raw.tags) ? raw.tags.filter((tag): tag is string => typeof tag === 'string') : [],
-  assignments: parseAssignments(raw.assignments),
 }));
 
 /** Empty all draft lists, including the persisted ones — see `clearAll`. */

@@ -37,20 +37,15 @@ There is one formatting toolbar, pinned to the top while scrolling, acting on th
 
 All of this is part of the entry's text, so Cancel reverts it too.
 
-**Your own blocks.** The **Blocks** view (rail, below Templates) lists the blocks you've built on the same dashboard every module uses — icon, name, field and entry count, an "outdated" dot, and "Unsaved" for a draft left open elsewhere. The right sidebar holds the header: title, count, "New block", search, view (list, cards, wide cards, or a timeline by month of last change) and sort (last changed, name, most used).
+**Your own blocks.** The **Blocks** view (rail, below Templates) lists the blocks you've built on the same dashboard every module uses — icon, name, field count, and "Unsaved" for a draft left open elsewhere. The right sidebar holds the header: title, count, "New block", search, view (list, cards, wide cards, or a timeline by month of last change) and sort (last changed, name).
 
 The list opens with a collapsible "Your blocks" section; below it, laid out like the Altar library, a collapsible "Built-in blocks" section lists what "Add block" offers out of the box — text, every field kind and the three sigil blocks — as a plain, non-clickable list (text and the sigil blocks have a description tooltip). Search filters both sections. With none of your own yet, a hint invites you to build the first; the built-in section stays regardless.
 
-*Building one.* Clicking a block opens its page: a breadcrumb back to the list, icon and name as the title, and its fields below — add by kind (including **Text**, the same rich text editor as the Text block), label, reorder by the grip, remove. No code is needed — a "Ritual log" with date, choice and checklist, for example. The right sidebar holds the icon (emoji or image), the display rules (hide empty fields in read mode, show the block's title, fully read-only), its usage, and Done/Delete/Cancel; with the sidebar closed, Done and Cancel sit in the page's own top bar.
+*Building one.* Clicking a block opens its page: a breadcrumb back to the list, icon and name as the title, and its fields below — add by kind (including **Text**, the same rich text editor as the Text block), label, reorder by the grip, remove. No code is needed — a "Ritual log" with date, choice and checklist, for example. The right sidebar holds the icon (emoji or image), the display rules (hide empty fields in read mode, show the block's title, fully read-only) and Done/Delete/Cancel; with the sidebar closed, Done and Cancel sit in the page's own top bar.
 
 *Drafts.* Edits are a draft until Done; leaving the page with changes asks whether to save or discard (see "Leaving an edit" under [Navigation](#navigation)). A block left unfinished in another tab shows "Unsaved" in the list until you return. Drafts are written into the vault folder (`drafts.json`), so they survive a crash or restart. In a vault inside a sync service that file is re-uploaded after every pause in typing, and two devices editing the same vault can leave conflict copies of it, which Emerald ignores.
 
-*Copies and updates.* After Done the block appears under "Add block" in every entry, after the built-in ones. What lands in an entry is a **copy**: changing the block later leaves existing entries as they are.
-
-- The copy's labels, options and display rules are read-only in the entry — the sidebar shows them dimmed with a note to change them in the block itself, since "Update block" would overwrite a local edit without a word. Once the block itself is gone, the copy's settings become editable.
-- When the block has changed, the copy's frame shows "Newer version" while editing, and its "…" menu offers "Update block" (Cancel reverts it like any other change).
-- The block's page shows how many entries use it and how many carry an older version; "Update all" brings them up to date at once — except an entry open for editing right then, or one where a loaded sigil holds the copy (see below), which are reported and left alone.
-- Updating keeps every value; new fields arrive empty (or with their prefill). A field you removed keeps its data in the entries but stays hidden — the page lists removed fields and can bring them back.
+*Copies.* After Done the block appears under "Add block" in every entry, after the built-in ones. What lands in an entry is a **copy** with no link back: changing or deleting the block later changes nothing in existing entries or templates, and a copy's own labels, options and display rules can be edited in the entry.
 
 *Deleting.* Deleting a block moves it to the Trash with an Undo toast and no question, leaving every copy untouched. Only when copies exist in entries or templates does a dialog offer to remove them as well: tick "Also remove it from N entries" and confirm a second time — that part can only be undone from a backup. "New block" followed by Cancel puts the new block in the Trash with Undo, like a new entry.
 
@@ -107,7 +102,7 @@ Operations track magical workings: rituals in progress, ongoing practices, servi
 
 ### Sigil Workflow
 
-A sigil is an operation with three blocks — **Sigil calculator**, **Sigil drawing** and **Charge** — alongside text and any other block. A new operation in the **Sigils** category starts with all three (through the built-in default template, see [Templates](#templates)); any other operation can add them via "Add block".
+A sigil is an operation with three blocks — **Sigil calculator**, **Sigil drawing** and **Charge** — alongside text and any other block. A new operation in the **Sigils** category starts with all three (through the built-in template assigned there, see [Templates](#templates)); any other operation can add them via "Add block".
 
 1. In the calculator, write the intention and use "Reduce automatically" (or "Reduce manually") to get the letter bank — each letter once. Tick letters off as you work them into the drawing.
 2. Draw the sigil in the drawing block, a paint editor (the canvas editor fixed on one drawing): a pen that follows the pressure of a stylus (with a mouse or finger the speed shapes the line), line, ellipse and rectangle (Shift for 15° steps, circles and squares), an eraser, seven colours or any other and the brush size right in the bar, polygons and stars with 3–12 corners or points, shapes outlined or filled (Alt draws a shape from its middle), a paint bucket whose fill becomes a smooth vector area with its holes, a grid with the page's middle lines that shapes, lines and moves can snap to, drawing in symmetry (mirrored, four quarters, or radial with 3–16 rays, with the axes shown), a picker that takes a colour from the drawing (or Alt with the pen or the bucket), brush size, layers in a panel beside the drawing that can stay open, each with a picture of what it holds, that can be added, hidden, locked, dragged into another order, renamed, copied, merged down, given an opacity and removed, undo/redo and clear. Strokes can be selected with a rectangle or a lasso (a freehand stroke reaching out of it is cut at its edge, so only the part inside is taken; lines, shapes and fills count when they lie wholly inside) or a click and then moved, scaled, turned, copied, pasted, duplicated or deleted; the move tool shifts a whole layer. Pinch or ⌘ with the wheel zooms into the drawing, Space or the middle button pans, ⌘0 shows it whole again. Keys while drawing: ⌘Z/Ctrl+Z, with Shift to redo, V, Q, M, P, L, O, R, G, S, B, E and I for the tools, `[` and `]` for the size, ⌘A, ⌘C, ⌘X, ⌘V, ⌘D, Delete and the arrows for the selected strokes. The strokes are kept as lines, not pixels, and an image of the drawing is saved for reading, cards and exports. A drawing from before keeps its picture as the first layer, so drawing on it and erasing from it work as before.
@@ -116,7 +111,7 @@ A sigil is an operation with three blocks — **Sigil calculator**, **Sigil draw
 
 While charged, the calculators and drawings it covers are hidden (also in search) and left out of exports until the reveal date; a charge without a reveal date hides them until you unload it. From the reveal date on they show again, still locked. "Unload sigil" (with confirmation) lifts the lock. A charge that locks the whole entry disables Edit, with a tooltip saying why.
 
-Duplicating keeps the charge: a duplicated entry, or a duplicated block the charge hides or locks, comes out just as loaded, hidden until the same date. Saving an entry as a template, or inserting a template, brings the sigil unloaded — a template is a blueprint.
+Duplicating keeps the charge: a duplicated entry, or a duplicated block the charge hides or locks, comes out just as loaded, hidden until the same date. Saving an entry as a template, and inserting a template, work the same way: a drawn or loaded sigil comes along as it is. A new entry from a template whose loaded sigil locks the whole entry opens for reading until the sigil is unloaded. Inserted into an entry that already has content, a template's charge covers only the calculators and drawings the template brought.
 
 Sigils from older vaults are converted into these blocks on open (intention, letters, drawing, charge state, reveal date, technique, and notes as a text block), with a backup written next to the database first.
 
@@ -132,7 +127,7 @@ The altar is a virtual arrangement of symbolic objects on a canvas.
 
 Cards and rows show a **thumbnail** of each altar, captured when you confirm an edit with Done — or leave a changed altar for another tab — and stored in the database. Cancel brings the previous thumbnail back with everything else. Without a stored thumbnail a live preview is drawn instead, leaving hidden elements out; changing a library element's picture or deleting it drops the thumbnails of the altars showing it until they are next confirmed with Done (their "last changed" date stays). Thumbnails keep the altar's proportions without cropping.
 
-The preview can be turned off — a switch in the filter panel's "Display" group — for a lighter list that shows each altar's own icon instead (or the altar icon, a candle on a table, for an altar with none).
+The preview can be turned off — a switch in the sidebar's "View" section — for a lighter list that shows each altar's own icon instead (or the altar icon, a candle on a table, for an altar with none).
 
 **Altar library.** You keep a personal library of items. Each item has a name, an emoji, a category, an optional note, and an optional uploaded image.
 
@@ -219,15 +214,15 @@ The grid also appears in thumbnails and exported images.
 
 ## Navigation
 
-**Loading screen.** On startup, before the app is ready, a loading screen covers the window: a breathing emerald gem with twinkling facets, the wordmark and a progress rail, on the app's own dark background. It fades as soon as your vault's data (or, on a new install, vault setup) is ready, however fast that is. If a password question comes first, the loading screen returns after you answer it and stays until the vault has loaded; a keychain prompt does not count against its time limit. **View → Show Loading Screen** replays it; a click or Escape closes it.
+**Loading screen.** On startup, before the app is ready, a loading screen covers the window: a breathing emerald gem with twinkling facets, the wordmark and a progress rail, on the app's own dark background. It fades as soon as your vault's data (or, without one, the [vault picker](#vaults)) is ready, however fast that is, and comes back while a vault chosen in the picker opens. If a password question comes first, the loading screen returns after you answer it and stays until the vault has loaded; a keychain prompt does not count against its time limit. **View → Show Loading Screen** replays it; a click or Escape closes it.
 
-**Window title bar and frame.** The app draws its own title bar: the Emerald logo (decoration, centred above the rail), on Windows and Linux one menu button holding the Edit and View menus, a magnifier for [Search](#search) (hidden while no vault is open), back/forward through the view history, on Windows and Linux an Export and an Import menu button, the open tabs, and — on Windows and Linux — the minimise / maximise / close buttons. macOS keeps its native window buttons and menu bar, so its title bar shows only the logo, search and navigation. The minimum window width is 720px.
+**Window title bar and frame.** The app draws its own title bar: the Emerald logo (decoration, centred above the rail), on Windows and Linux one menu button holding Switch Vault…, Check for Updates…, About Emerald App and the Edit and View menus, a magnifier for [Search](#search) (hidden while no vault is open), back/forward through the view history, on Windows and Linux an Export and an Import menu button, the open tabs, and — on Windows and Linux — the minimise / maximise / close buttons. macOS keeps its native window buttons and menu bar, so its title bar shows only the logo, search and navigation. The minimum window width is 720px. Over the [vault picker](#vaults) the title bar holds only the logo and, on Windows and Linux, minimise and close.
 
 The title bar, the rail and the left entry list share one plain background with no dividers, framing the window; the main content and the right sidebar form a rounded surface on top of it, so an entry's content and its properties read as one while the navigation stays in the background.
 
 **Left sidebar structure.** The left sidebar has two parts side by side:
 
-1. A narrow icon **rail**: a plus, then Home, then Journal, Tasks and Operations, then Wiki, Lexicon and Altar, then Templates and Blocks at the top, the groups set apart by space; at the bottom, Categories, Tags and Trash, then Vault and Settings. The rail scrolls without a bar when the window is too low. Clicking a navigation icon switches the main view of the active tab — it never opens a new tab. The open view's icon is highlighted (also while an entry inside it is open). The Vault button opens [vault management](#vaults). The plus opens a small window with a tile each for Journal, Tasks, Operations, Wiki, Altar, Lexicon, Templates and Blocks; the choice is created and opened right away, a task as a new row ready to be named in the Tasks view. Arrow keys and Tab move between the tiles, the focused one shows a ring from the start, Enter picks it (Journal is preselected), and each tile's number key picks it directly, and Escape or a click beside the window closes it.
+1. A narrow icon **rail**: a plus, then Home, then Journal, Tasks and Operations, then Wiki, Lexicon and Altar, then Templates and Blocks at the top, the groups set apart by space; at the bottom, Categories, Tags and Trash, then Settings and the start page. The rail scrolls without a bar when the window is too low. Clicking a navigation icon switches the main view of the active tab — it never opens a new tab. The open view's icon is highlighted (also while an entry inside it is open). The start page button (a grid of four squares) opens the [start page](#vaults). The plus opens a small window with a tile each for Journal, Tasks, Operations, Wiki, Altar, Lexicon, Templates and Blocks; the choice is created and opened right away, a task as a new row ready to be named in the Tasks view. Arrow keys and Tab move between the tiles, the focused one shows a ring from the start, Enter picks it (Journal is preselected), and each tile's number key picks it directly, and Escape or a click beside the window closes it.
 2. A resizable, collapsible **entry list** showing either every module's items together (**All**, by last change) or one module's own — chosen in Settings → Sidebar. It has its own search, inline rename (from the context menu, starting from the stored title) and a context menu (Open in new tab/Duplicate/Rename/Delete where they apply — Altar offers Open in new tab, Rename and Delete, duplicating an altar lives in the dashboard's card menu; Tasks offers Rename/Delete). Task rows show a completion checkbox (in the All list a static checkbox icon). Every row can be dragged into an editor to insert an internal link — Tasks and Altars included. The list caps how many entries it shows (Settings → Sidebar: 10/25/50/100 or all); a "Show more" row reveals the next batch. With "all" it fills in as you scroll, so a vault with thousands of entries opens it at once. Creating items happens through the rail's plus and each module's own dashboard; the entry list has no "New" button.
 
 The rail has no toggle buttons: **View → Entry List** and **View → Properties** collapse and expand the two sidebars (with a checkmark for their state), animating their width. **View → Reset View** restores the sidebar widths and the altar library height, ends the altar's full-window mode, and brings back a hidden rail, entry list or right sidebar — without the rail, Settings and the Vault button would be out of reach. **View → Lock View** (with a checkmark while on) fixes the widths of the entry list and the right sidebar: their edges can no longer be dragged. Hiding and showing the sidebars and Reset View keep working, and the lock survives a restart.
@@ -245,7 +240,7 @@ If the entry was just created and never confirmed with Done, Cancel moves it to 
 - **Save** (like Done), **Discard** (like Cancel — a brand-new entry goes to the Trash), or **Keep editing**. Escape, the X and a click beside the dialog mean Keep editing.
 - Switching to another tab does not ask — the edit simply continues there. Closing a background tab with changes brings it to the front first, so you see what the question is about.
 - Without changes, nothing asks.
-- If the question came from the Settings or Vaults window (an import, an update, a vault switch), **Keep editing** closes that window too.
+- If the question came from the Settings window or on the way to the start page (an import, an update, a vault switch), **Keep editing** closes the Settings window too and stays on the page.
 
 The same applies to an altar and to the page of one of your own blocks or a template.
 
@@ -293,27 +288,21 @@ The window layout — open tabs, which sidebars are open, their widths — belon
 
 ## Templates
 
-A template is a pre-filled starting point for a Journal entry, Wiki article or Operation: an optional title, a block stack — the same content an entry has — and tags. The **Templates** button sits in the left rail next to Blocks. The dashboard lists templates under a collapsible "Templates" heading with its own view (List, Cards, Cards (full width), or Timeline by month) and sort (date or A–Z); each row or card shows the icon, name, "Unsaved" while a draft is open, and the entry count.
+A template is a pre-filled starting point for a Journal entry, Wiki article or Operation: an optional title, a block stack — the same content an entry has — and tags. The **Templates** button sits in the left rail next to Blocks. The dashboard lists templates under a collapsible "Templates" heading with its own view (List, Cards, Cards (full width), or Timeline by month) and sort (date or A–Z); each row or card shows the icon, the name, and "Unsaved" while a draft is open.
 
 Clicking one opens its page — name as the title, the title new entries get, and the block stack — which works like a block's own page (see "Your own blocks" under [Journal](#journal)): edits are a draft until Done, leaving with changes asks first, and an unfinished page in another tab shows "Unsaved" in the list.
 
-**Assignment and default** decide where a template shows up and which one a new entry starts with.
+**A template is copied, and that is all.** Whatever it puts into an entry stays there unchanged; changing or deleting the template later changes no entry, nothing asks about updates, and nothing counts where a template was used.
 
-- The template's sidebar has an "Assignment" property. Its value button reads "Everywhere" (nothing assigned — offered everywhere), the one combination it holds (a type — Journal, Wiki or Operations — and for Wiki/Operations a category or "All categories", with a star if it is the default), or the number of assignments, listed in its tooltip.
-- With nothing assigned the button opens the dialog straight away; otherwise a small menu offers **Assign** and **Clear**.
-- The dialog is one table: Journal as its own row, then Wiki and Operations as columns against "All categories", "Uncategorized" and every category. Each cell cycles **not assigned**, **offered** (available when inserting), and **default** (what a matching new entry starts with); a "Both" column sets a category for Wiki and Operations at once.
-- A cell about to become the default says "Replaces “…”", naming the current holder ("Default: …" on the others); the star changes hands only with **Apply**. Apply changes the page's draft only if something changed; the page still saves with Done.
-- A collapsible, read-only "Defaults" section under the template list mirrors the table: each cell names its default (star) and what else is offered (check), links to the template, and shows the fallback where a category has no default of its own, or "—".
+**Assignments** are set in the collapsible "Assignments" table below the template list, or in the same table from the "Assignments" property on a template's page, where a click puts that template into a cell or takes it out. Journal has one row, Wiki and Operations are columns against "All categories", "Uncategorized" and every category. Each cell picks the template new entries of that combination start with and applies at once; a template already holding the cell loses it. A cell without a template of its own names the "All categories" template that applies instead. The built-in template `core-sigil` (calculator, drawing, charge) starts assigned to Operations × Sigils; it can be edited, reassigned or deleted like any other.
 
-**Defaults apply when an entry is created.** A new entry starts with its combination's default: the exact category's first, then "All categories" for that type, or nothing. A notice above the block stack — Undo, or "Other template" — appears whenever a default just filled a new entry. The built-in template `core-sigil` (calculator, drawing, charge) is the default for Operations × Sigils; it can be edited, reassigned or deleted like any other. Changing an entry's category or type later never touches its content. Settings → Entries → **Default template** turns the automatic part off: new entries then start empty and offer the matching templates as buttons.
+**When an entry is created,** its combination's template is copied in: the exact category's first, then "All categories" for that type, or nothing. A notice above the block stack offers Undo. Changing an entry's category or type later never touches its content.
 
-**Inserting one by hand.** "Insert template" in the blocks sidebar opens a searchable list. Picking one into an entry with content asks whether to append its blocks or replace everything, and whether to bring its title and tags along; an empty entry lists matching templates as buttons instead. Every entry's context menu offers **"Save as template"**, which creates one from the entry's current content (unsaved edits included) and opens it. A block a template inserts remembers where it came from, which is how the dashboard counts a template's entries.
+**Inserting one by hand.** "Insert template" in the blocks sidebar opens a searchable list of all templates. The blocks go below the content (into an empty entry they replace the empty text); an entry without a title takes the template's title, and the template's tags are added. Every entry's context menu offers **"Save as template"**, which creates one from the entry's current content (unsaved edits included) and opens it.
 
-**Duplicate** on a template makes an independent copy without the original's stars, so it doesn't compete with itself for a default.
+**Duplicate** on a template makes an independent copy without assignments. Deleting a template moves it to the Trash with an Undo toast and clears its assignments; it comes back without them. "New template" followed by Cancel puts it in the Trash with Undo; after Done it stays. Exporting a template as `.emerald` carries no assignments: which template fills new entries is this vault's decision.
 
-Deleting a template moves it to the Trash with an Undo toast; nothing it already inserted is affected, since insertion always makes a copy. "New template" followed by Cancel puts it in the Trash with Undo; after Done it stays.
-
-Routines from older vaults and `.emeralddb` backups are converted into templates on open or import (same content and tags, linked entries as link blocks, offered everywhere).
+Routines from older vaults and `.emeralddb` backups are converted into templates on open or import (same content and tags, linked entries as link blocks, without assignments).
 
 ## Tasks
 
@@ -329,13 +318,13 @@ The Tasks module is a hierarchical task manager with categories, priorities, and
 
 **Toolbar.** Search, a sort ("Created · newest/oldest", "Name · A → Z/Z → A") and a separate Grouping switch (by category, or ungrouped). Only the List view is available.
 
-**Filter panel.** A "Display" group holds "Show completed" — a display preference, not a filter: off, it hides completed tasks and subtasks, it doesn't count toward the active-filter badge, and resetting filters leaves it alone. Below it come the category filter (see [Categories](#categories); for tasks the "Uncategorized" row looks at top-level tasks only, since that group lists only those) and a priority filter ("All" plus High/Medium/Low with a count each). Both are multi-select; "All" clears a list, and a "Reset filters" button appears once search and filters leave nothing to show.
+**Sidebar.** The "View" section holds "Show completed" — a display preference, not a filter: off, it hides completed tasks and subtasks, it doesn't count toward the active-filter badge, and resetting filters leaves it alone. The filters are the category filter (see [Categories](#categories); for tasks the "Uncategorized" row looks at top-level tasks only, since that group lists only those) and a priority filter ("All" plus High/Medium/Low with a count each). Both are multi-select; "All" clears a list, and a "Reset filters" button appears once search and filters leave nothing to show.
 
 **Grouped view.** Tasks sit under collapsible category headers; an "Uncategorized" section collects tasks without a category (including those whose category is in the Trash). It is not a category and can't be deleted. Empty groups are left out.
 
 **Inline editing.** Double-click a title to rename it, starting from the stored title. Enter saves, Escape cancels — on a task just created and never named, Escape puts it in the Trash with Undo.
 
-**Context menu.** Right-click a task to Mark as Completed/Active, Add Subtask, Link Entry, or Delete.
+**Context menu.** Right-click a task to Mark as Completed/Active, Add Subtask, Link Entry, Rename or Delete.
 
 **Trash integration.** Deleted tasks go to the Trash, where they can be restored or removed for good. A task deleted with its subtasks is one item there, its entry links staying with it. A subtask deleted on its own earlier is a separate item, and deleting its parent for good takes it along.
 
@@ -350,7 +339,7 @@ Each row shows the category's emoji, its name, and how many entries in each modu
 From here you can:
 
 - **Add** a category with the header button — pick an emoji, type a name, Enter saves. A name already in use is refused with a message under the field; the name of a category in the Trash brings that one back instead (with the emoji you picked), together with its entries.
-- **Rename and change the emoji** inline with the pencil; Enter saves, Escape cancels. The change shows everywhere immediately. Renaming to the name of a category in the Trash merges that one in — its entries and template assignments come along.
+- **Rename and change the emoji** inline, through Edit in the row's right-click menu; Enter saves, Escape cancels. The change shows everywhere immediately. Renaming to the name of a category in the Trash merges that one in — its entries and template assignments come along.
 - **Delete** without a question, undoable from the toast. A deleted category goes to the Trash; its entries keep pointing at it and appear under "Uncategorized" until it is restored (bringing them back) or deleted for good (leaving them uncategorized). If another category took its name meanwhile, restoring merges the two into the one with the name (a template keeps a default star only where the combination has none yet).
 - **Reorder** by dragging a row by its grip. This order is used everywhere — group headers, filter rows, the Altar tab strip, the category picker — and is saved immediately.
 
@@ -396,34 +385,51 @@ Deleting a journal entry, wiki article, operation, task, altar or altar library 
 
 From the Trash view you can:
 
-- **Restore** an item to its original section.
-- **Delete permanently** to remove it immediately.
-- Select several items and delete the selection.
+- **Restore** an item to its original section, with the button on its row or from its right-click menu.
+- **Delete permanently** from the right-click menu, after a confirmation in the row.
+- Select several items by clicking them, then restore or delete the selection from the sidebar's action bar, where "Select all" sits too.
 - Empty the entire Trash at once (with confirmation).
 
 Tags, categories, your own blocks, templates and the Lexicon's languages also go to the Trash and can be restored; a language brings its words back with it, and deleted for good takes them along. Trashed wiki articles and operations without a category are grouped under "Uncategorized". Only the latest deletion can be undone from the toast — a new one replaces the previous Undo; older items are restored from the Trash.
 
 ## Vaults
 
-A vault is a **folder** you choose, holding its own encrypted database and its own images — see [Vault Layout](architecture/storage.md#vault-layout) for the on-disk layout and [Vault Encryption](#vault-encryption) for the password. Because nothing inside it refers to a location, a vault folder can be copied to another machine and opened there. A vault can carry its own icon — any emoji, shown on its card and on the Vault rail button while it is active; without one, both show the plain vault glyph.
+A vault is a **folder** you choose, holding its own encrypted database and its own images — see [Vault Layout](architecture/storage.md#vault-layout) for the on-disk layout and [Vault Encryption](#vault-encryption) for the password. Because nothing inside it refers to a location, a vault folder can be copied to another machine and opened there. A vault can carry its own icon — any emoji, shown on its tile on the start page; without one, the tile shows the plain vault glyph.
 
-**First start.** A new installation has no vault. Emerald opens straight into the vault modal below — with no way to close it — until you create or open one. An installation from before multi-vault support has its existing database adopted as a vault named "Emerald".
+**The start page.** Emerald normally opens the vault that was open last, straight away; with a single vault you never see a choice. The start page (the vault picker) is a view of its own in the same window, at the window's own size: it shows only the start page — the open vault's pages stay out of sight while you choose — and once you choose a vault the loading screen covers the switch.
 
-Vault management lives in its own modal, opened from the Vault icon in the left rail (above Settings):
+- It comes up by itself when there is no vault (a new installation, or after the last one was removed), when the last vault cannot be opened — it then says so above the list — and when you cancel the password question on start.
+- By hand it opens from the menu: **Emerald → Switch Vault…**, in the macOS menu bar or behind the three-line button in the title bar on Windows and Linux, or from the start page button at the very bottom of the left rail (below Settings). Open edits are settled first, as for any switch: save, discard or keep editing.
+- The open vault's name with a chevron at the top left of the page, as in an open entry, Escape, or clicking the open vault's row returns to it without switching. With no vault open there is no way back, only a choice.
 
-- Each vault is a card with its name and folder. Clicking a card switches to that vault; the active vault's card is disabled and highlighted.
-- **New Vault** creates an empty one. Give it a name and optionally an icon; the row shows live where it will land — by default `Documents/Emerald Vaults/{name}`, with a folder picker to choose elsewhere and a reset button. The target folder has to be empty: sharing it with unrelated files would make deleting them ambiguous later. Opening the new vault asks for its password.
-- **Open vault** adds a vault that already exists on disk: pick its `emerald.db` file (not the folder — a folder dialog can't show whether one is there), and it joins the list under its folder's name. This is how you take over a vault from another machine or re-add one you removed.
-- **Edit** and **Delete** are inline states on the card. Edit changes name and icon together. Delete asks for confirmation and offers **"Delete the files as well"** (off by default, showing the folder). It removes the vault's own files — database, its journal, images, the key file, and an empty `backup/` — but leaves anything else (an exported backup, a stray system file) and with it the folder; the modal then says so, making clear the database is gone either way. A folder that stayed can't host a *new* vault until it is emptied. Any vault can be deleted, including the active one (Emerald switches to another) and the last one (back to vault setup).
+An installation from before multi-vault support has its existing database adopted as a vault named "Emerald".
+
+The start page is one page without tabs. On the left the name, the tagline, links to the website, GitHub, Patreon and Discord, and at the bottom the version and the author; its edge to the page can be dragged, as the entry list's can. Beside it, headed as Home's sections are: **Vaults**, a tile for every vault, and below it side by side **Server** (the [sync server](#sync-server)) and **Appearance** (the [theme](#theming) as small pictures, custom themes included). At the bottom of the page the [language](#language) on the left, the [updates](#updates) on the right. **Emerald → About Emerald App** opens it.
+
+- Each tile is a vault, with where it lives in words under its name: only here, synced (in the accent colour), disconnected, or only on the server (with a dashed edge and its size). Clicking a tile opens that vault; the open vault's tile is tinted and marked open. A vault only on the server is fetched: a local copy is made, its password asked for, and the first sync fills it. Opening a locked vault asks for its password first, in the picker; cancelling leaves you there. The folder shows when you point at a row.
+- **New Vault** (the last tile) creates an empty one. Give it a name and optionally an icon; the row that opens shows live where it will land — by default `Documents/Emerald Vaults/{name}`, with a folder picker to choose elsewhere and a reset button. The target folder has to be empty: sharing it with unrelated files would make deleting them ambiguous later. Opening the new vault asks for its password.
+- **Open vault** (at the top right of the section) adds a vault that already exists on disk: pick its `emerald.db` file (not the folder — a folder dialog can't show whether one is there), and it joins the list under its folder's name. This is how you take over a vault from another machine or re-add one you removed.
+- **Edit** and **Delete** appear in a tile's corner when you point at it. Edit works in the tile itself; Delete opens as a row in its place. Edit changes name and icon together. Delete asks for confirmation and offers **"Delete the files as well"** (off by default). A vault only on the server can be deleted there the same way, which leaves every device's copy as a local vault. It removes the vault's own files — database, its journal, images, the key file, and an empty `backup/` — but leaves anything else (an exported backup, a stray system file) and with it the folder; the picker then says so, making clear the database is gone either way. A folder that stayed can't host a *new* vault until it is emptied. Any vault can be deleted, including the active one (Emerald switches to another) and the last one (the picker then has nothing to go back to).
 - A vault whose folder moved or is on a disconnected drive is marked **Folder not found** and can't be switched to; a folder button lets you point it at the new location (again via its `emerald.db`). Emerald deliberately doesn't recreate a missing folder — SQLite would put a fresh, empty database in it, and the vault would come back looking empty instead of telling you something is wrong.
 - A vault Emerald is not *allowed* to read is marked **No access** and gets no relocate button — the folder is where you left it. On macOS this is what `~/Documents`, `~/Desktop` and iCloud folders look like until you grant access in System Settings › Privacy & Security; picking the `.db` file in the open dialog does not grant it.
 - A vault in iCloud Drive, Dropbox or OneDrive works, but SQLite in a synchronised folder can be damaged if the sync client touches the file mid-write.
 
-New vaults are not switched to automatically — except during first-start setup, where the first one becomes active. Importing a `.emeralddb` backup in Add Vault mode also creates a vault, filled from the backup — see [Vault Backup](#vault-backup-emeralddb).
+New vaults are not switched to automatically — except while no vault is open, where the new one is opened right away. Importing a `.emeralddb` backup in Add Vault mode also creates a vault, filled from the backup — see [Vault Backup](#vault-backup-emeralddb).
+
+### Sync Server
+
+A vault can sync with your other devices through a server of your own, which only ever stores it encrypted; how that works is in [Sync](architecture/sync.md). Everything about the server is in the vault picker, so it works with no vault open — on a new device that is how the first vault arrives:
+
+- **Connect** with the server's address and its sync key. The key is asked for once and not kept; the connection goes to the system keychain, and one line warns that refusing the keychain leaves it in a file on this device, only obscured, not securely encrypted. The panel says so while that is the case.
+- Connected, the panel shows the address, whether the server answers (a dot beside the status line), the last sync of this session, how many devices are connected and the space the server holds. The vaults on it are in the list on the left.
+- **Devices**, each with when it was last seen; pointing at one offers to remove it. Whoever still knows the key can connect again.
+- **Disconnect server** (after a confirmation) stops syncing on this device; vaults stay here and on the server, and connecting the same server again resumes them.
+
+Settings → Sync covers only the open vault: **Put on server** (it has to be open for that), **Disconnect** and **Connect again** for that vault, **Delete from server**, its state, when it last synced, **Sync now**, and fetching it anew when its password was changed on another device. A button there opens the picker for the rest.
 
 ## Vault Encryption
 
-Every vault is encrypted: entries, images, drafts and backups are unreadable without the vault's password. Someone who gets hold of the vault folder — a lost laptop, a cloud folder, a copied backup drive — sees nothing of your practice. Settings (theme, fonts, limits) are the one thing left readable; they hold no content.
+Every vault is encrypted: entries, images, drafts and backups are unreadable without the vault's password. Someone who gets hold of the vault folder — a lost laptop, a cloud folder, a copied backup drive — sees nothing of your practice. Settings are the one thing left readable — the vault's `settings.json` (fonts, limits, rules) and the installation's `device.json` (language, theme, custom themes); they hold no content.
 
 **A new vault** asks for a password (at least eight characters, entered twice) before it opens, and then shows its **recovery key**. The recovery key is the only way back in if the password is forgotten. It is shown once; write it down or keep it in a password manager — not inside the vault itself — and tick the box that says it is stored before continuing.
 
@@ -487,7 +493,7 @@ The Emerald format (`.emerald`) is a JSON file holding a full entry — or a ful
 
 **Entries.** On import, images are saved into the vault's image folder (an identical image is stored once) and go through the vault's image limits like inserted ones (an image that stays too large, or can't be scaled, is kept as it is). The content is sanitised, links are resolved by id and then by title, and tags are added to the vault. An entry or altar keeps the file's `createdAt` as both creation and "last changed" date, so it lands at its place in the timeline — provided it is a readable date with a four-digit year; otherwise it is created now. Old English default titles import as empty, and fields this version doesn't use are ignored.
 
-**Your own blocks.** An entry holding copies of Blocks-view blocks is written as `"version": "2"`, carrying those blocks in `meta.blockDefinitions`; everything else stays `"1"`, so older app versions keep accepting it. Import creates any missing block under its original id, so the copies are recognised and can be updated; an existing one (even in the Trash) is left as it is.
+**Your own blocks.** An entry carries its copies of Blocks-view blocks in its content; the blocks themselves do not travel. An older file (`"version": "2"`) may still carry them in `meta.blockDefinitions`: import creates any missing one under its original id, and leaves an existing one (even in the Trash) as it is.
 
 **Templates** export from their page or the templates list's context menu as `"version": "3"`, `"type": "template"` — a combination used only for templates, so an older app rejects the file instead of mistaking it for an operation. It carries the template's blocks, images and Blocks-view blocks like an entry, plus its icon, the title new entries get, its tags and its assignments. A built-in category in an assignment travels by id (its name depends on the language); any other by name and emoji, created on import if nothing matches (at most 20 new categories per file, so a crafted file can't flood the list). Which template is a *default* never travels — importing never displaces a default the vault already has.
 
@@ -510,7 +516,7 @@ The whole vault can be backed up and restored as one self-contained file (`.emer
 **Export.**
 
 - A "What to include" chip row picks the content: Journal, Wiki, Operations, Altars, Tasks, Tags, Lexicon and Settings. Templates and your own blocks travel whenever Journal, Wiki or Operations is included.
-- The Settings chip (on by default) exports the vault's settings — language, theme, fonts, sizes, trash retention, sidebar, emoji defaults, image limits, tag rule, template rule, automatic backup — independently of the content chips.
+- The Settings chip (on by default) exports the vault's settings — fonts, sizes, trash retention, sidebar, emoji defaults, image limits, tag rule, automatic backup — independently of the content chips. Language and theme belong to the installation and are not part of it; the custom themes an older backup still carries join this installation's list when it is imported.
 - Optional from/to dates restrict entries to those created in that window (tags, categories, blocks, templates, languages and settings are not date-filtered).
 - Trashed items are left out unless **Include deleted** is ticked — tags included, since trashed entries carry their ids.
 - Images referenced by exported entries are embedded.
@@ -524,7 +530,7 @@ The whole vault can be backed up and restored as one self-contained file (`.emer
 - Three modes, from least to most invasive: **Add Vault** (into a new vault, then switch to it — the default, since it can't touch existing data), **Merge** (imported items get new ids, so nothing existing is overwritten), and **Replace** (overwrite the selected content in the current vault, with a warning).
 - Add Vault asks for the new vault's name **and folder**, with the same folder row as creating a vault (default `Documents/Emerald Vaults/{name}`). The folder is checked before anything is touched: it must be empty or not exist yet, must not hold a vault, and must be readable. The new vault then asks for its own password; cancelling that cancels the import and removes the empty vault.
 - A failed import — a corrupt file, a crash partway — leaves the vault exactly as it was: every mode fills a hidden copy of the database and swaps it in only once the import succeeded.
-- If the file carries settings, Add Vault and Replace apply them; Merge lists them as checkboxes (appearance, trash, sidebar, emoji, images, tag rule, templates, automatic formatting, journal, automatic backup) so only the ticked groups come in.
+- If the file carries settings, Add Vault and Replace apply them; Merge lists them as checkboxes (appearance, trash, sidebar, emoji, images, tag rule, automatic formatting, journal, automatic backup) so only the ticked groups come in.
 
 **Automatic backup.**
 
@@ -570,34 +576,33 @@ Right-click any entry in the left sidebar or in any list view (List, Cards, Card
 
 ## Settings
 
-Settings are **per vault** — stored in the vault's own `settings.json`. Switching vaults switches the whole configuration, and a vault folder copied to another machine keeps its settings; a new vault starts with the defaults. The window has eight pages:
+Settings are **per vault** — stored in the vault's own `settings.json`. Switching vaults switches the whole configuration, and a vault folder copied to another machine keeps its settings; a new vault starts with the defaults. Language, theme, updates and About belong to the installation and live on the [start page](#vaults). The window has seven pages:
 
-- **General** — language, theme, the two fonts, interface size and editor text size (see [Language](#language), [Typography](#typography), [Sizing](#sizing), [Theming](#theming)).
+- **General** — the two fonts, interface size and editor text size (see [Typography](#typography), [Sizing](#sizing)).
 - **Sidebar** — which list the left entry list shows (all items together, or one module's own), and how many entries it lists before "Show more".
-- **Entries** — the emoji picker's default set, how inserted images are stored (photos as JPEG, size limits), whether new tags may appear on the spot (typed, from a template, from an import), whether a new entry starts with its default template, **Automatic formatting** (Markdown shortcuts such as `# ` or `**bold**`; typography such as curly quotes, dashes, arrows and fractions; auto-links for typed or pasted addresses — each its own switch, applying to editors opened afterwards), and whether journal entries show their **moon phase** (see [Journal](#journal)).
+- **Entries** — the emoji picker's default set, how inserted images are stored (photos as JPEG, size limits), whether new tags may appear on the spot (typed, from a template, from an import), **Automatic formatting** (Markdown shortcuts such as `# ` or `**bold**`; typography such as curly quotes, dashes, arrows and fractions; auto-links for typed or pasted addresses — each its own switch, applying to editors opened afterwards), and whether journal entries show their **moon phase** (see [Journal](#journal)).
 - **Security** — remember on this device, lock now, change password (see [Vault Encryption](#vault-encryption)).
+- **Sync** — the open vault on the server: put it there, disconnect or connect it again, delete it there, its state and last sync, Sync now; the server itself is on the start page (see [Sync Server](#sync-server)).
 - **Backup** — see [Vault Backup](#vault-backup-emeralddb).
 - **Storage** — how long the Trash keeps deleted items, and the unused-images cleanup (see [Image Storage and Cleanup](#image-storage-and-cleanup)).
-- **Updates** — see [Updates](#updates). The one page that is *not* per vault: the update source and the check on start belong to the installation (see [In-App Updates](security.md#in-app-updates)).
-- **About** — version, author, license and links.
 
 Each section has a short description under its heading, and a tooltip where useful.
 
 ## Updates
 
-**Settings → Updates** shows the installed version, checks for a new one, and installs it. A check ends in one of three states: a newer version is offered, Emerald is up to date, or the source could not be reached. A source that *answers* without offering anything — including a 404, which every source returns until a release carries a manifest — counts as up to date; only a request that doesn't get through reports as unreachable. Technical error text goes to the console, not the window.
+The start page shows the installed version at the bottom of its left column; the right of its foot checks for a new one and installs it; **Emerald → Check for Updates…** opens the start page and checks. A check ends in one of three states: a newer version is offered, Emerald is up to date, or the source could not be reached. A source that *answers* without offering anything — including a 404, which every source returns until a release carries a manifest — counts as up to date; only a request that doesn't get through reports as unreachable. Technical error text goes to the console, not the window.
 
-Finding an update downloads nothing by itself: the version, its changelog section and a **Download and install** button appear, with a progress bar during the download, and the app restarts into the new version. Vault data is untouched — an update replaces the application, not its content.
+Finding an update downloads nothing by itself: the version and a **Download and install** button appear, with a progress bar during the download, and the app restarts into the new version. Its changelog section shows on pointing at the find. Vault data is untouched — an update replaces the application, not its content.
 
-With **Check for updates on start** on (the default), the app checks once per launch. A find only shows a small dot on the gear in the left rail; clicking it opens Settings on the Updates page. Nothing opens or installs on its own.
+With **Check for updates on start** on (the default), the app checks once per launch. A find only shows a small dot on the start page button in the left rail; clicking it opens the start page and checks again. Nothing opens or installs on its own.
 
-**Update source** is a free-text address field. Empty — the normal state — uses the built-in addresses: `the-emerald-app.de` first, the GitHub release manifest as a fallback. It exists so a moved address can be fixed without a new build; the signing key is *not* editable, so a wrong address can only fail to deliver, never deliver something else (see [In-App Updates](security.md#in-app-updates)). Only complete `https` addresses are accepted, and changing the source clears the last result. Ticking **Check for updates on start** saves just that checkbox, leaving an unsaved address in the field as it is; the field's Reset clears it.
+**Update server**, at the bottom right of the start page, opens a small panel with the source and the check on start. The source is a free-text address field. Empty — the normal state — uses the built-in addresses: `the-emerald-app.de` first, the GitHub release manifest as a fallback. It exists so a moved address can be fixed without a new build; the signing key is *not* editable, so a wrong address can only fail to deliver, never deliver something else (see [In-App Updates](security.md#in-app-updates)). Only complete `https` addresses are accepted, and changing the source clears the last result. Ticking **Check for updates on start** saves just that checkbox, leaving an unsaved address in the field as it is; the Reset beside the field clears it.
 
 A `.deb` install is not offered updates and says so — the new version comes from the website. AppImage, the Windows installer and macOS update in place.
 
 ## Language
 
-Settings → General → Language switches the vault's language between English, German, Spanish and French. English is the default and fallback; the other languages load the first time they are selected.
+The menu at the bottom left of the start page, a flag beside each name, switches the language between English, German, Spanish and French. It belongs to the installation, not to a vault: every vault opens in it, and it does not sync. English is the default and fallback; the other languages load the first time they are selected.
 
 ## Typography
 
@@ -618,11 +623,11 @@ There is no separate heading font: headings in the editor and entry titles use t
 
 ## Theming
 
-Emerald ships with two themes, selectable in Settings → General:
+Emerald ships with two themes, selectable on the start page's **Appearance**. Like the language, the theme belongs to the installation and does not sync:
 
 - **Emerald Noctis** — dark, with warm stone tones and jade green accents. The default.
 - **Emerald Parchment** — light, with warm parchment backgrounds, flat bordered panels and adapted accents.
 
-**Custom themes:** import a theme file under Settings → General. It sets colours only; see [Custom Themes](themes.md).
+**Custom themes:** **Import theme** on the same page adds a theme file to this installation and selects it; pointing at one offers to remove it. It sets colours only; see [Custom Themes](themes.md).
 
 The whole UI, the Altar included, follows the chosen theme. For how themes are built and how to add one, see [Architecture → Theming System](architecture/appearance.md#theming-system).

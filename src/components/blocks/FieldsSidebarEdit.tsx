@@ -1,7 +1,5 @@
 import { useTranslation } from 'react-i18next';
-import { definitionLabel, elementLabel } from '../../lib/blocks/blockAttrs';
-import { BLOCK_ATTR } from '../../lib/blocks/types';
-import { useBlockDefinitionStore } from '../../store/blockDefinitionStore';
+import { elementLabel } from '../../lib/blocks/blockAttrs';
 import {
   activeElements, canBeEmpty, elementKindLabelKey, parseFields, serializeFields, type ElementDef, type FieldsModel,
 } from '../../lib/blocks/fields';
@@ -21,11 +19,6 @@ import type { BlockSidebarEditProps } from './blockSidebarViews';
 export default function FieldsSidebarEdit({ block, update }: BlockSidebarEditProps) {
   const { t } = useTranslation();
   const text = useFieldFallbackText();
-  // A copy of a custom block carries its settings: "Update
-  // block" would silently write changes made here back. So changes are made
-  // only in the definition, as long as it exists.
-  const originId = block.attrs[BLOCK_ATTR.origin];
-  const origin = useBlockDefinitionStore((s) => (originId ? s.definitions.find((d) => d.id === originId) : undefined));
   const model = parseFields(block);
   // Unreadable data: no settings; any would overwrite it with "empty".
   if (model.broken) return null;
@@ -36,9 +29,7 @@ export default function FieldsSidebarEdit({ block, update }: BlockSidebarEditPro
   const elements = activeElements(model);
 
   return (
-    <div className="space-y-3">
-      {origin && <p className="block-field-hint">{t('blocks.fields.fromDefinition', { name: definitionLabel(t, origin) })}</p>}
-    <fieldset disabled={!!origin} className={`min-w-0 space-y-3${origin ? ' opacity-50' : ''}`}>
+    <div className="min-w-0 space-y-3">
       {elements.map((element, index) => {
         const hides = element.hideWhenEmpty ?? model.display.readHideEmpty;
         return (
@@ -83,7 +74,6 @@ export default function FieldsSidebarEdit({ block, update }: BlockSidebarEditPro
         hint={t('blocks.fields.readOnlyHint')}
         onChange={(readOnly) => write({ ...model, display: { ...model.display, readOnly } })}
       />
-    </fieldset>
     </div>
   );
 }

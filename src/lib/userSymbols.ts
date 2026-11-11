@@ -1,6 +1,6 @@
 import { isSymbolPath, MAX_WEIGHT, MIN_WEIGHT } from '../components/editors/canvas/symbols/limits';
 
-/** A symbol of the vault's own, as the table `symbols` holds it (since v58). */
+/** A symbol of the vault's own, as the table `symbols` holds it (since v59). */
 export interface UserSymbol {
   id: string;
   name: string;

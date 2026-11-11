@@ -1,47 +1,42 @@
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Copy, FileDown, Trash2 } from 'lucide-react';
 import { useTemplateStore } from '../../store/templateStore';
 import { useTemplateDraftStore } from '../../store/draftStore';
-import { templateEntries, useBlockContentRows, type EntryContentRow } from '../../store/blockCopies';
 import { useUIStore } from '../../store/uiStore';
-import { useUndoStore } from '../../store/undoStore';
 import { AUX_VIEWS } from '../../lib/modules';
-import { generateId } from '../../lib/helpers';
 import { sortItems } from '../../lib/sortItems';
 import { isCardView } from '../../lib/viewMode';
 import { groupByMonth } from '../../lib/groupBy';
 import { usePersistedFlag } from '../../hooks/usePersistedFlag';
 import { templateLabel } from '../../lib/blocks/blockAttrs';
 import type { Template } from '../../lib/blocks/templates';
-import Dashboard, { GroupDivider } from '../ui/Dashboard';
-import DashboardItem from '../ui/DashboardItem';
+import Dashboard from '../ui/Dashboard';
+import CollapsibleGroupHeader from '../ui/CollapsibleGroupHeader';
+import DashboardItem, { RowSymbol } from '../ui/DashboardItem';
 import ContextMenu from '../ui/ContextMenu';
 import { useOpenInNewTabAction } from '../../hooks/useOpenInNewTabAction';
 import BlockGlyph from '../blocks/BlockGlyph';
 import TemplateEditor from '../templates/TemplateEditor';
-import TemplateDefaultsOverview from '../templates/TemplateDefaultsOverview';
+import TemplateAssignmentTable from '../templates/TemplateAssignmentTable';
 import { useSessionState } from '../../store/sessionStore';
 import { createItem } from '../../lib/createItem';
+import { useLibraryItemRemove } from '../../hooks/useLibraryItemRemove';
 
 /**
  * The rail view "Templates", built like "Blocks": the list of templates in the
  * shared dashboard scaffold, a click opens the template as a page of its own
- * (`{ type: 'templates', id }`). Below it the overall overview of the defaults
- * per combination. Deleting moves a template to the trash (with
+ * (`{ type: 'templates', id }`). Below it the table of assignments per
+ * combination. Deleting moves a template to the trash (with
  * undo) — entries created from it stay as they are.
  */
 export default function TemplatesView() {
-  const { t } = useTranslation();
   const templates = useTemplateStore((s) => s.templates);
   const deleteTemplate = useTemplateStore((s) => s.deleteTemplate);
   const restoreTemplate = useTemplateStore((s) => s.restoreTemplate);
   const activeView = useUIStore((s) => s.activeView);
   const setActiveView = useUIStore((s) => s.setActiveView);
   const clearDraft = useTemplateDraftStore((s) => s.clearDraft);
-  const pushUndo = useUndoStore((s) => s.push);
-  const rows = useBlockContentRows();
-  const entries = useMemo(() => templateEntries(rows), [rows]);
 
   // An id without a template (deleted, another vault in the remembered tab) falls back to the list.
   const selected = activeView.id ? templates.find((tpl) => tpl.id === activeView.id) ?? null : null;
@@ -50,36 +45,20 @@ export default function TemplatesView() {
 
   const create = () => createItem('templates');
 
-  const remove = async (template: Template) => {
-    try {
-      await deleteTemplate(template.id);
-    } catch (err) {
-      // Nothing lost: template and draft stay where they were.
-      console.error('[TemplatesView] deleting the template failed:', err);
-      return;
-    }
-    clearDraft(template.id);
-    // The state after deleting, not the one at render time: whoever discarded
-    // via the question on leaving has meanwhile gone elsewhere and stays there.
-    if (useUIStore.getState().activeView.id === template.id) backToList();
-    pushUndo({
-      id: generateId(),
-      description: t('undo.templateDeleted'),
-      undo: () => restoreTemplate(template.id),
-    });
-  };
+  const remove = useLibraryItemRemove({
+    viewType: 'templates', remove: deleteTemplate, restore: restoreTemplate, clearDraft, undoKey: 'undo.templateDeleted', logTag: 'TemplatesView',
+  });
 
   return selected ? (
     <TemplateEditor
       key={selected.id}
       template={selected}
-      entries={entries.get(selected.id) ?? []}
       onClose={backToList}
-      onDelete={() => void remove(selected)}
+      onDelete={() => void remove(selected.id)}
       isNew={activeView.isNew}
     />
   ) : (
-    <TemplateList entries={entries} onCreate={() => void create()} onDelete={(tpl) => void remove(tpl)} />
+    <TemplateList onCreate={() => void create()} onDelete={(tpl) => void remove(tpl.id)} />
   );
 }
 
@@ -97,10 +76,9 @@ async function exportTemplate(id: string): Promise<void> {
 /**
  * The list of templates in the shared dashboard scaffold — with view and
  * sorting like the other dashboards, under a collapsible
- * heading like the default templates below.
+ * heading like the assignments below.
  */
-function TemplateList({ entries, onCreate, onDelete }: {
-  entries: Map<string, EntryContentRow[]>;
+function TemplateList({ onCreate, onDelete }: {
   onCreate: () => void;
   onDelete: (template: Template) => void;
 }) {
@@ -124,12 +102,8 @@ function TemplateList({ entries, onCreate, onDelete }: {
 
   const cards = isCardView(prefs.view);
   const renderItem = (template: Template) => {
-    const count = entries.get(template.id)?.length ?? 0;
     const unsaved = template.id in drafts && (
       <span className="text-xs italic text-subtle flex-shrink-0">{t('editor.unsaved')}</span>
-    );
-    const countLabel = (
-      <span className="text-xs text-subtle tabular-nums flex-shrink-0">{t('templates.entryCount', { count })}</span>
     );
     return (
       <DashboardItem
@@ -147,15 +121,13 @@ function TemplateList({ entries, onCreate, onDelete }: {
               <span className="flex-1" />
               {unsaved}
             </div>
-            <div className="text-sm font-medium text-secondary truncate mb-1">{templateLabel(t, template)}</div>
-            {countLabel}
+            <div className="text-sm font-medium text-secondary truncate">{templateLabel(t, template)}</div>
           </>
         ) : (
           <>
-            <BlockGlyph icon={template.icon} size={14} />
+            <RowSymbol><BlockGlyph icon={template.icon} size={14} /></RowSymbol>
             <span className="flex-1 min-w-0 text-sm text-soft truncate">{templateLabel(t, template)}</span>
             {unsaved}
-            {countLabel}
           </>
         )}
       </DashboardItem>
@@ -194,13 +166,13 @@ function TemplateList({ entries, onCreate, onDelete }: {
       }}
       hasNoResults={!collapsed && filtered.length === 0}
       contentHeader={
-        <GroupDivider
+        <CollapsibleGroupHeader
           label={t('nav.templates')}
           collapsed={collapsed}
           onToggleCollapse={toggleCollapsed}
         />
       }
-      contentFooter={<TemplateDefaultsOverview />}
+      contentFooter={<TemplateAssignmentTable />}
       contextMenuSlot={ctxMenu && menuTemplate && (
         <ContextMenu
           x={ctxMenu.x}

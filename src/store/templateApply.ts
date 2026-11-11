@@ -5,7 +5,7 @@
  * through their sync effects) and "Save as template". The blocks are set by the stack itself
  * (`applyTemplate` in `BlockStack`) — it holds the live content.
  *
- * Import rule as in `blockCopies`: this store reads the content stores and
+ * Import rule: this store reads the content stores and
  * the template store, none of them imports back.
  */
 import { useEntryStore } from './entryStore';
@@ -14,31 +14,9 @@ import { useBlockSessionStore } from './blockSessionStore';
 import { withUsableTags } from '../lib/templateTags';
 import { serializeBlocks } from '../lib/blocks/blockHtml';
 import {
-  contentForTemplate, fieldsWithoutTemplate, fieldsWithTemplate,
+  fieldsWithoutTemplate, fieldsWithTemplate,
   type Template, type TemplateEntryType, type TemplateFields,
 } from '../lib/blocks/templates';
-
-/** What is adopted besides the blocks. */
-export interface TemplateFieldOptions {
-  /**
-   * Set the template's title (only if it has one). `'ifUntitled'`:
-   * only as long as the entry carries none of its own (`mayTakeTemplateTitle`) —
-   * decided only after saving the current input.
-   */
-  title: boolean | 'ifUntitled';
-  /** Add the template's tags. */
-  tags: boolean;
-}
-
-/** How a template gets into the stack. */
-export interface TemplateApplyOptions extends TemplateFieldOptions {
-  /** Append at the end or replace the entire content. An empty stack is always replaced. */
-  mode: 'append' | 'replace';
-  /** The template it replaces ("Other template") — its tags are dropped beforehand. */
-  replaces?: Template;
-  /** Afterwards show the "Template applied" notice. */
-  notice?: boolean;
-}
 
 function entryFields(entryType: TemplateEntryType, id: string): (TemplateFields & { content: string }) | undefined {
   return useEntryStore.getState().getEntry(id, entryType);
@@ -63,11 +41,10 @@ export async function applyTemplateFields(
   entryType: TemplateEntryType,
   id: string,
   template: Pick<Template, 'title' | 'tags'>,
-  options: TemplateFieldOptions & { replaces?: Pick<Template, 'title'> },
 ): Promise<void> {
   const fields = entryFields(entryType, id);
   if (!fields) return;
-  await writeChangedFields(id, fields, fieldsWithTemplate(fields, withUsableTags(template), options));
+  await writeChangedFields(id, fields, fieldsWithTemplate(fields, withUsableTags(template)));
 }
 
 /**
@@ -98,7 +75,7 @@ export async function saveEntryAsTemplate(entryType: TemplateEntryType, id: stri
   const session = useBlockSessionStore.getState().session;
   const content = session?.entryId === id && session.isEditing ? serializeBlocks(session.api.liveBlocks()) : entry.content;
   return useTemplateStore.getState().createTemplate(entry.title, {
-    content: contentForTemplate(content),
+    content,
     tags: entry.tags,
   });
 }

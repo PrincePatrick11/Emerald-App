@@ -123,7 +123,7 @@ export const useTrashStore = create<TrashState>((set, get) => ({
     await db.execute(`DELETE FROM tasks WHERE deleted_at IS NOT NULL`);
     // Copies in entries manage without their definition — nothing to follow up.
     await db.execute(`DELETE FROM block_definitions WHERE deleted_at IS NOT NULL`);
-    // Likewise templates: entries carry only their origin.
+    // Likewise templates.
     await db.execute(`DELETE FROM templates WHERE deleted_at IS NOT NULL`);
     // ON DELETE CASCADE takes the vocabulary along — it has no `deleted_at` of its own.
     await db.execute(`DELETE FROM languages WHERE deleted_at IS NOT NULL`);

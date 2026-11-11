@@ -114,7 +114,7 @@ guessing at all. A failed tool call is returned with `isError` set.
 
 ## Test data
 
-A new instance would open on the vault setup, with nothing to test a view against. The launcher therefore gives it a vault of test data first, in `%APPDATA%\<identifier>\vaults\seed`, and registers it as the active vault.
+A new instance would open on the vault picker, with nothing to test a view against. The launcher therefore gives it a vault of test data first, in `%APPDATA%\<identifier>\vaults\seed`, and registers it as the active vault.
 
 `seed/build_seed.mjs` builds the database by bundling the checkout's own `src/lib/schema.ts` and calling the real `createSchema` and `seedBuiltins`, the way `scripts/schema-check.mjs` does. A checkout whose branch changed the schema gets a vault for its schema, which a database file committed here could not offer. `seed/fixture.json` holds the data: entries across every module, categories, tags, internal links, a subtask, an altar with placements, and one trashed row per module.
 

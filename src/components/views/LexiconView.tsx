@@ -3,16 +3,15 @@ import { useTranslation } from 'react-i18next';
 import { Copy, Trash2 } from 'lucide-react';
 import { useLexiconStore } from '../../store/lexiconStore';
 import { useUIStore } from '../../store/uiStore';
-import { useUndoStore } from '../../store/undoStore';
 import { AUX_VIEWS } from '../../lib/modules';
-import { generateId } from '../../lib/helpers';
 import { sortItems } from '../../lib/sortItems';
 import { isCardView } from '../../lib/viewMode';
 import { groupByMonth } from '../../lib/groupBy';
 import { usePersistedFlag } from '../../hooks/usePersistedFlag';
 import { useOpenInNewTabAction } from '../../hooks/useOpenInNewTabAction';
-import Dashboard, { GroupDivider } from '../ui/Dashboard';
-import DashboardItem from '../ui/DashboardItem';
+import Dashboard from '../ui/Dashboard';
+import CollapsibleGroupHeader from '../ui/CollapsibleGroupHeader';
+import DashboardItem, { CardContent, RowContent } from '../ui/DashboardItem';
 import ContextMenu from '../ui/ContextMenu';
 import BlockGlyph from '../blocks/BlockGlyph';
 import LanguagePage from '../lexicon/LanguagePage';
@@ -20,6 +19,7 @@ import TranslatePanel from '../lexicon/TranslatePanel';
 import type { Language } from '../../types';
 import { useSessionState } from '../../store/sessionStore';
 import { createItem } from '../../lib/createItem';
+import { useLibraryItemRemove } from '../../hooks/useLibraryItemRemove';
 
 /**
  * The rail view "Lexicon", built like "Templates": the languages in the
@@ -32,13 +32,11 @@ import { createItem } from '../../lib/createItem';
  * stays attached to it and comes back with it.
  */
 export default function LexiconView() {
-  const { t } = useTranslation();
   const languages = useLexiconStore((s) => s.languages);
   const deleteLanguage = useLexiconStore((s) => s.deleteLanguage);
   const restoreLanguage = useLexiconStore((s) => s.restoreLanguage);
   const activeView = useUIStore((s) => s.activeView);
   const setActiveView = useUIStore((s) => s.setActiveView);
-  const pushUndo = useUndoStore((s) => s.push);
 
   // An id without a language (deleted, another vault in the remembered tab) falls back to the list.
   const selected = activeView.id ? languages.find((l) => l.id === activeView.id) ?? null : null;
@@ -47,31 +45,19 @@ export default function LexiconView() {
 
   const create = () => createItem('lexicon');
 
-  const remove = async (language: Language) => {
-    try {
-      await deleteLanguage(language.id);
-    } catch (err) {
-      // Nothing lost: the language stays where it was.
-      console.error('[LexiconView] deleting the language failed:', err);
-      return;
-    }
-    if (activeView.id === language.id) backToList();
-    pushUndo({
-      id: generateId(),
-      description: t('undo.languageDeleted'),
-      undo: () => restoreLanguage(language.id),
-    });
-  };
+  const remove = useLibraryItemRemove({
+    viewType: 'lexicon', remove: deleteLanguage, restore: restoreLanguage, undoKey: 'undo.languageDeleted', logTag: 'LexiconView',
+  });
 
   return selected ? (
     <LanguagePage
       key={selected.id}
       language={selected}
       onClose={backToList}
-      onDelete={() => void remove(selected)}
+      onDelete={() => void remove(selected.id)}
     />
   ) : (
-    <LanguageList onCreate={() => void create()} onDelete={(language) => void remove(language)} />
+    <LanguageList onCreate={() => void create()} onDelete={(language) => void remove(language.id)} />
   );
 }
 
@@ -111,7 +97,7 @@ function LanguageList({ onCreate, onDelete }: {
   const cards = isCardView(prefs.view);
   const renderItem = (language: Language) => {
     const meta = (
-      <span className="text-xs text-subtle tabular-nums flex-shrink-0">
+      <span className="tabular-nums">
         {t('lexicon.wordCount', { count: wordCounts.get(language.id) ?? 0 })}
         {language.alphabet.length > 0 && (
           <> · {t('lexicon.letterCount', { count: language.alphabet.length })}</>
@@ -127,21 +113,9 @@ function LanguageList({ onCreate, onDelete }: {
           setCtxMenu({ id: language.id, x: e.clientX, y: e.clientY });
         }}
       >
-        {cards ? (
-          <>
-            <div className="flex items-center gap-2 mb-2">
-              <BlockGlyph icon={language.icon} size={16} />
-            </div>
-            <div className="text-sm font-medium text-secondary truncate mb-1">{language.name}</div>
-            {meta}
-          </>
-        ) : (
-          <>
-            <BlockGlyph icon={language.icon} size={14} />
-            <span className="flex-1 min-w-0 text-sm text-soft truncate">{language.name}</span>
-            {meta}
-          </>
-        )}
+        {cards
+          ? <CardContent icon={<BlockGlyph icon={language.icon} size={16} />} title={language.name} meta={meta} />
+          : <RowContent icon={<BlockGlyph icon={language.icon} size={14} />} title={language.name} meta={meta} />}
       </DashboardItem>
     );
   };
@@ -178,7 +152,7 @@ function LanguageList({ onCreate, onDelete }: {
       }}
       hasNoResults={!collapsed && filtered.length === 0}
       contentHeader={
-        <GroupDivider
+        <CollapsibleGroupHeader
           label={t('lexicon.languages')}
           collapsed={collapsed}
           onToggleCollapse={toggleCollapsed}

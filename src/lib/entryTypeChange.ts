@@ -239,7 +239,6 @@ function retypeEntry(id: string, from: ConvertibleEntryType, to: ConvertibleEntr
     );
     let definitionsChanged = false;
     for (const row of definitionRows) {
-      // Without a revision jump: `retypeContentColumn` has already rewritten the copies in the entries.
       const { next, hit } = retypeDefinitionTargets(row.elements, id, to);
       if (!hit) continue;
       await db.execute('UPDATE block_definitions SET elements=$1 WHERE id=$2', [next, row.id]);

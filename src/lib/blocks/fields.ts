@@ -82,9 +82,8 @@ export interface ElementDef {
   /** Overrides `display.readHideEmpty` for this element. */
   hideWhenEmpty?: boolean;
   /**
-   * Removed, but not forgotten: deleted in the definition or dropped during an
-   * update. Invisible in reading, editing and fallback —
-   * the value stays and comes back if the element does.
+   * Only in copies from earlier versions, which archived a field on update.
+   * Invisible in reading, editing and fallback; the value stays.
    */
   archived?: boolean;
   /**

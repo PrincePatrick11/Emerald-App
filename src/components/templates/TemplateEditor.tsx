@@ -8,25 +8,22 @@ import { PropertiesSection } from '../sidebar/fields/EntryReadSections';
 import { EditSidebarBody, MediaPropertyRow } from '../sidebar/fields/EditProperties';
 import BlockStack from '../blocks/BlockStack';
 import BlockSidebarArea, { BlockAddActions } from '../blocks/BlockSidebarArea';
-import TemplateAssignments from './TemplateAssignments';
-import TemplateUsage from './TemplateUsage';
+import { TemplateAssignmentProperty } from './TemplateAssignmentTable';
 import { useTemplateStore } from '../../store/templateStore';
 import { useTemplateDraftStore, type TemplateDraft } from '../../store/draftStore';
-import type { EntryContentRow } from '../../store/blockCopies';
 import { templateLabel } from '../../lib/blocks/blockAttrs';
 import { useDraftPage } from '../../hooks/useDraftPage';
 import { useShrunkIcon } from '../../hooks/useShrunkIcon';
 import { OP_PROP_SELECT_CLASSES } from '../../lib/styleClasses';
-import { DEFAULT_TEMPLATE_ICON, mergeAssignmentChanges, type Template } from '../../lib/blocks/templates';
+import { DEFAULT_TEMPLATE_ICON, type Template } from '../../lib/blocks/templates';
 
 const draftOf = (d: TemplateDraft): TemplateDraft => ({
   name: d.name, icon: d.icon, title: d.title,
-  content: d.content, tags: d.tags, assignments: d.assignments,
+  content: d.content, tags: d.tags,
 });
 
 interface Props {
   template: Template;
-  entries: readonly EntryContentRow[];
   /** Back to the list. The back link above the title leaves the draft behind; "Done" and "Cancel" settle it first. */
   onClose: () => void;
   onDelete: () => void;
@@ -38,15 +35,13 @@ interface Props {
  * A template's page (`LibraryPageFrame`, like a custom block): name
  * as title, the title of new entries and the block stack,
  * the same editor as in an entry, always in edit mode. In the sidebar:
- * icon, linked entries, tags, assignment and default (set in the
- * dialog), the block management and the entries that arose from the
- * template.
+ * icon, assignments (applied at once), linked entries, tags and the block
+ * management.
  *
  * A draft is edited (`useDraftPage`); only "Done" saves the
- * changed fields, and in doing so applies chosen stars, which the other templates
- * then lack. Entries never change: they carry copies.
+ * changed fields. Entries never change: they carry copies.
  */
-export default function TemplateEditor({ template, entries, onClose, onDelete, isNew }: Props) {
+export default function TemplateEditor({ template, onClose, onDelete, isNew }: Props) {
   const { t } = useTranslation();
   const updateTemplate = useTemplateStore((s) => s.updateTemplate);
   const { draft, patch, dirty, busy, finish, cancel } = useDraftPage({
@@ -55,10 +50,7 @@ export default function TemplateEditor({ template, entries, onClose, onDelete, i
     id: template.id,
     label: (current) => templateLabel(t, current),
     saved: draftOf(template),
-    // Assignments as a change on top of the current state; another template may have taken stars in the meantime.
-    save: (id, patch, base) => updateTemplate(id, patch.assignments
-      ? { ...patch, assignments: mergeAssignmentChanges(base.assignments, patch.assignments, useTemplateStore.getState().templates.find((t) => t.id === id)?.assignments ?? []) }
-      : patch),
+    save: updateTemplate,
     onClose,
     onCancelNew: isNew ? onDelete : undefined,
     logTag: 'TemplateEditor',
@@ -80,12 +72,7 @@ export default function TemplateEditor({ template, entries, onClose, onDelete, i
           onChange={(icon) => void setIcon(icon)}
           fallback={DEFAULT_TEMPLATE_ICON}
         />
-        <TemplateAssignments
-          templateId={template.id}
-          name={templateLabel(t, draft)}
-          assignments={draft.assignments}
-          onChange={(assignments) => patch({ assignments })}
-        />
+        <TemplateAssignmentProperty templateId={template.id} name={templateLabel(t, draft)} />
       </PropertiesSection>
 
       <LinkedEntriesField content={draft.content} />
@@ -93,8 +80,6 @@ export default function TemplateEditor({ template, entries, onClose, onDelete, i
       <TagsField tags={draft.tags} onChange={(tags) => patch({ tags })} />
 
       <BlockSidebarArea />
-
-      <TemplateUsage entries={entries} />
     </EditSidebarBody>
   );
 

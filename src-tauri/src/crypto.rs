@@ -39,6 +39,10 @@ pub enum Context<'a> {
     Image(&'a str),
     Drafts,
     Backup,
+    /// What travels to a sync server: changes, snapshots, vault names.
+    Sync,
+    /// The sync token where the keychain would not take it.
+    SyncCredentials,
 }
 
 impl Context<'_> {
@@ -49,6 +53,8 @@ impl Context<'_> {
             Context::Image(name) => (b"emerald/image", name.as_bytes()),
             Context::Drafts => (b"emerald/drafts", b""),
             Context::Backup => (b"emerald/backup", b""),
+            Context::Sync => (b"emerald/sync", b""),
+            Context::SyncCredentials => (b"emerald/sync-credentials", b""),
         };
         [MAGIC.as_slice(), &[VERSION], label, &[0], id].concat()
     }

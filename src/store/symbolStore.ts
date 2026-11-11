@@ -6,7 +6,7 @@ import { readUserSymbol, type UserSymbol } from '../lib/userSymbols';
 
 /**
  * The vault's own symbols for the canvas editor's library (table `symbols`,
- * since v58), newest first. Made from drawings; removing one takes it out at
+ * since v59), newest first. Made from drawings; removing one takes it out at
  * once, and `restoreSymbol` puts it back for undo.
  */
 interface SymbolState {
