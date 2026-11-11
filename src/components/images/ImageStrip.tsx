@@ -5,7 +5,7 @@ import { ListSearchField } from '../ui/ListToolbar';
 import ImageTile from './ImageTile';
 
 /**
- * "Images" beside a canvas: the pictures to search and drag out (the
+ * "Images" below a canvas, in one row: the pictures to search and drag out (the
  * `imageDragState` channel), or click to place one in the middle.
  */
 export default function ImageStrip({ onPick }: { onPick: (item: PictureItem) => void }) {

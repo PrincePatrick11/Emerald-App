@@ -110,7 +110,7 @@ async function renderScene(scene: CanvasScene, types: CanvasTypes, background: C
 /**
  * The canvas block (`core.canvas`): pictures from "Images", shapes, text,
  * symbols and drawings on an artboard, in the canvas editor. In edit mode
- * "Images" stands beside it to drag from (or click, for the middle), and
+ * "Images" stands below it to drag from (or click, for the middle), and
  * files from the disk dropped on it go into "Images" and onto the canvas.
  * Read mode shows the scene itself, not the rendered picture.
  *
@@ -217,7 +217,9 @@ export default function CanvasBlock({ block, isEditing, onBlockChange, onPersist
     const onMove = (e: PointerEvent) => setGhost({ x: e.clientX, y: e.clientY });
     const onUp = (e: PointerEvent) => {
       const item = getImageDragItem();
-      setImageDragItem(null);
+      // Every canvas of the page listens: the channel empties only once all
+      // of them have looked, so the one under the pointer still gets the picture.
+      window.setTimeout(() => setImageDragItem(null), 0);
       const point = item ? pointOnArtboard(e.clientX, e.clientY) : null;
       if (item && point) void place(item.file, point);
     };
@@ -259,7 +261,7 @@ export default function CanvasBlock({ block, isEditing, onBlockChange, onPersist
   if (!isEditing && !elements.length && !background) return <p className="block-field-hint">{t('blocks.canvas.empty')}</p>;
 
   return (
-    <div ref={rootRef} className={editable && parts.images ? 'canvas-block canvas-block--strip' : 'canvas-block'} data-file-drop={editable ? '' : undefined}>
+    <div ref={rootRef} className="canvas-block" data-file-drop={editable ? '' : undefined}>
       <div className="canvas-block-stage">
         <CanvasEditor
           ref={editorRef}
@@ -303,12 +305,10 @@ export default function CanvasBlock({ block, isEditing, onBlockChange, onPersist
         />
       </div>
       {editable && parts.images && (
-        <div className="canvas-block-side">
-          <ImageStrip onPick={(item) => {
-            const centre = editorRef.current?.visibleCentre();
-            if (centre) void place(item.file, centre);
-          }} />
-        </div>
+        <ImageStrip onPick={(item) => {
+          const centre = editorRef.current?.visibleCentre();
+          if (centre) void place(item.file, centre);
+        }} />
       )}
     </div>
   );
