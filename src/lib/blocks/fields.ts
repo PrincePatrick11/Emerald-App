@@ -39,6 +39,12 @@ export const ELEMENT_KINDS = [
 ] as const;
 export type ElementKind = (typeof ELEMENT_KINDS)[number];
 
+/**
+ * The kinds offered for new fields. `altar` is no longer: the altar is a
+ * block of its own (`core.altar`); existing altar fields still read and edit.
+ */
+export const OFFERED_ELEMENT_KINDS = ELEMENT_KINDS.filter((kind) => kind !== 'altar');
+
 const KIND_SET: ReadonlySet<string> = new Set(ELEMENT_KINDS);
 /** Element kinds whose value is in the markup instead of the JSON. */
 const SLOT_KINDS: ReadonlySet<ElementKind> = new Set<ElementKind>(['text', 'link', 'image', 'altar']);

@@ -2604,12 +2604,8 @@ html[data-theme] .prop-segment--active {
   overflow-x: auto;
   overflow-y: hidden;
   min-width: 0;
-  padding: 2px;
-  /* No bar: the wheel and the trackpad scroll it sideways (ImageStrip). */
-  scrollbar-width: none;
-}
-.image-strip-grid::-webkit-scrollbar {
-  display: none;
+  /* Room for the app's slim bar; the wheel scrolls sideways too (ImageStrip). */
+  padding: 2px 2px 8px;
 }
 .image-picker-grid {
   display: grid;

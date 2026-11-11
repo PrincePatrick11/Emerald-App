@@ -278,6 +278,10 @@
       "canvas": {
         "label": "Canvas",
         "description": "Pictures from \"Images\", shapes, text, symbols and drawings, arranged freely."
+      },
+      "altar": {
+        "label": "Altar",
+        "description": "A canvas with \"Images\" below it to drag pictures from."
       }
     },
     "kinds": {
@@ -378,7 +382,7 @@
       "empty": "Nothing on the canvas yet.",
       "parts": "On offer",
       "part": {
-        "images": "Images",
+        "images": "Images below",
         "shapes": "Shapes",
         "text": "Text",
         "symbols": "Symbols",
@@ -847,7 +851,8 @@
       "group_other": "Group of {{count}}",
       "groupAction": "Group (⌘G)",
       "ungroup": "Ungroup (⇧⌘G)"
-    }
+    },
+    "insertImage": "Insert image …"
   },
   "moonPhase": {
     "new": "New Moon",

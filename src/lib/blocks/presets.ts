@@ -5,9 +5,9 @@ import {
 import { AltarIcon } from '../altarIcon';
 import { createSigilCalcBlock, createSigilCanvasBlock, createSigilChargeBlock } from './sigil';
 import { createTextBlock } from './blockHtml';
-import { createCanvasBlock } from './canvas';
+import { ALTAR_BLOCK_TYPE, createCanvasBlock } from './canvas';
 import {
-  activeElements, createFieldsBlock, ELEMENT_KINDS, elementKindLabelKey, FIELDS_BLOCK_TYPE, isSigilKind, parseFields,
+  activeElements, createFieldsBlock, OFFERED_ELEMENT_KINDS, elementKindLabelKey, FIELDS_BLOCK_TYPE, isSigilKind, parseFields,
   type ElementKind, type FallbackText,
 } from './fields';
 import { instantiateDefinition, type BlockDefinition } from './definitions';
@@ -55,7 +55,7 @@ const KIND_GROUPS: Partial<Record<ElementKind, BlockGroup>> = { link: 'reference
 
 // Text and the sigil parts exist only in custom blocks — on their own one
 // inserts the text block and the sigil blocks (above and below).
-const FIELD_PRESET_KINDS = ELEMENT_KINDS.filter((kind) => kind !== 'text' && !isSigilKind(kind));
+const FIELD_PRESET_KINDS = OFFERED_ELEMENT_KINDS.filter((kind) => kind !== 'text' && !isSigilKind(kind));
 
 export const BLOCK_PRESETS: readonly BlockPreset[] = [
   { id: 'text', labelKey: 'blocks.types.text.label', descriptionKey: 'blocks.types.text.description', icon: Type, group: 'text', create: () => createTextBlock() },
@@ -67,6 +67,7 @@ export const BLOCK_PRESETS: readonly BlockPreset[] = [
     create: () => createFieldsBlock(kind),
   })),
   { id: 'canvas', labelKey: 'blocks.types.canvas.label', descriptionKey: 'blocks.types.canvas.description', icon: Frame, group: 'media', create: () => createCanvasBlock() },
+  { id: 'altar', labelKey: 'blocks.types.altar.label', descriptionKey: 'blocks.types.altar.description', icon: AltarIcon, group: 'media', create: () => createCanvasBlock(ALTAR_BLOCK_TYPE) },
   { id: 'sigil.calc', labelKey: 'blocks.types.sigilCalc.label', descriptionKey: 'blocks.types.sigilCalc.description', icon: Sparkles, group: 'sigil', create: createSigilCalcBlock },
   { id: 'sigil.canvas', labelKey: 'blocks.types.sigilCanvas.label', descriptionKey: 'blocks.types.sigilCanvas.description', icon: PenTool, group: 'sigil', create: createSigilCanvasBlock },
   { id: 'sigil.charge', labelKey: 'blocks.types.sigilCharge.label', descriptionKey: 'blocks.types.sigilCharge.description', icon: Zap, group: 'sigil', create: createSigilChargeBlock },

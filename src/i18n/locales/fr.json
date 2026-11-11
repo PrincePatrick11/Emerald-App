@@ -278,6 +278,10 @@
       "canvas": {
         "label": "Toile",
         "description": "Des images de « Images », des formes, du texte, des symboles et des dessins, disposés librement."
+      },
+      "altar": {
+        "label": "Autel",
+        "description": "Une toile avec « Images » en dessous, d’où glisser les images."
       }
     },
     "kinds": {
@@ -378,7 +382,7 @@
       "empty": "Rien sur la toile pour l’instant.",
       "parts": "Proposé",
       "part": {
-        "images": "Images",
+        "images": "Images en dessous",
         "shapes": "Formes",
         "text": "Texte",
         "symbols": "Symboles",
@@ -847,7 +851,8 @@
       "group_other": "Groupe de {{count}}",
       "groupAction": "Grouper (⌘G)",
       "ungroup": "Dégrouper (⇧⌘G)"
-    }
+    },
+    "insertImage": "Insérer une image …"
   },
   "moonPhase": {
     "new": "Nouvelle lune",

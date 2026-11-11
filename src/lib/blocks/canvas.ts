@@ -22,12 +22,26 @@ import { BLOCK_ATTR, type BlockInstance, type BlockTypeId } from './types';
  * image.
  */
 export const CANVAS_BLOCK_TYPE = 'core.canvas' satisfies BlockTypeId;
+/**
+ * The altar: the same canvas with "Images" below it to drag from, a type of
+ * its own so that it is offered, named and iconed as one. Same data.
+ */
+export const ALTAR_BLOCK_TYPE = 'core.altar' satisfies BlockTypeId;
+
+/** A canvas or an altar: both are scenes of the canvas editor. */
+export function isCanvasBlockType(type: string): boolean {
+  return type === CANVAS_BLOCK_TYPE || type === ALTAR_BLOCK_TYPE;
+}
 
 /** The artboard of a new canvas, in its own pixels. */
 export const CANVAS_BLOCK_WIDTH = 1600;
 export const CANVAS_BLOCK_HEIGHT = 1000;
 
-/** The parts a canvas block offers; painting covers the drawing element and its tools. */
+/**
+ * The parts a canvas block offers; painting covers the drawing element and
+ * its tools. `images` is "Images" below the canvas; a picture can always be
+ * inserted from the tool column.
+ */
 export interface CanvasParts {
   images: boolean;
   shapes: boolean;
@@ -37,6 +51,11 @@ export interface CanvasParts {
 }
 
 export const ALL_CANVAS_PARTS: CanvasParts = { images: true, shapes: true, text: true, symbols: true, drawing: true };
+
+/** What a block of the type offers until its settings say otherwise: a plain canvas without "Images" below. */
+export function defaultCanvasParts(type: string): CanvasParts {
+  return type === ALTAR_BLOCK_TYPE ? ALL_CANVAS_PARTS : { ...ALL_CANVAS_PARTS, images: false };
+}
 export const CANVAS_PART_KEYS = Object.keys(ALL_CANVAS_PARTS) as (keyof CanvasParts)[];
 
 /** One element as stored: the canvas editor's element, with what its type keeps in `props`. */
@@ -127,8 +146,8 @@ function readGuide(v: unknown): StoredGuide | null {
   return { id: v.id, orientation: v.orientation, at: finite(v.at, 0) };
 }
 
-function readParts(value: Record<string, unknown>): CanvasParts {
-  const parts = { ...ALL_CANVAS_PARTS };
+function readParts(value: Record<string, unknown>, type: string): CanvasParts {
+  const parts = { ...defaultCanvasParts(type) };
   for (const key of CANVAS_PART_KEYS) if (typeof value[key] === 'boolean') parts[key] = value[key] as boolean;
   return parts;
 }
@@ -150,7 +169,7 @@ export function parseCanvasBlock(block: BlockInstance): CanvasBlock {
   }
   return {
     broken: data.broken,
-    parts: readParts(config.value),
+    parts: readParts(config.value, block.type),
     render,
     scene: {
       width: size(d.width, CANVAS_BLOCK_WIDTH),
@@ -206,9 +225,9 @@ export function withoutCanvasFile(block: BlockInstance, file: string): BlockInst
   return withCanvasScene(block, { ...parsed.scene, elements, background }, null);
 }
 
-export function createCanvasBlock(parts: CanvasParts = ALL_CANVAS_PARTS): BlockInstance {
-  const block: BlockInstance = { id: generateId(), type: CANVAS_BLOCK_TYPE, html: '', attrs: {} };
+export function createCanvasBlock(type: typeof CANVAS_BLOCK_TYPE | typeof ALTAR_BLOCK_TYPE = CANVAS_BLOCK_TYPE): BlockInstance {
+  const block: BlockInstance = { id: generateId(), type, html: '', attrs: {} };
   return withCanvasParts(withCanvasScene(block, {
     width: CANVAS_BLOCK_WIDTH, height: CANVAS_BLOCK_HEIGHT, elements: [], background: null, guides: [], guidesLocked: false,
-  }, null), parts);
+  }, null), defaultCanvasParts(type));
 }

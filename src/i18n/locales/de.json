@@ -278,6 +278,10 @@
       "canvas": {
         "label": "Leinwand",
         "description": "Bilder aus „Bilder“, Formen, Text, Symbole und Zeichnungen, frei angeordnet."
+      },
+      "altar": {
+        "label": "Altar",
+        "description": "Eine Leinwand mit „Bilder“ darunter, aus denen du Bilder ziehst."
       }
     },
     "kinds": {
@@ -378,7 +382,7 @@
       "empty": "Noch nichts auf der Leinwand.",
       "parts": "Angeboten",
       "part": {
-        "images": "Bilder",
+        "images": "Bilder darunter",
         "shapes": "Formen",
         "text": "Text",
         "symbols": "Symbole",
@@ -847,7 +851,8 @@
       "group_other": "Gruppe aus {{count}}",
       "groupAction": "Gruppieren (⌘G)",
       "ungroup": "Gruppe auflösen (⇧⌘G)"
-    }
+    },
+    "insertImage": "Bild einfügen …"
   },
   "moonPhase": {
     "new": "Neumond",

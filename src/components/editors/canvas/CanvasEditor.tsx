@@ -109,6 +109,11 @@ export interface CanvasEditorProps {
    * background (`ExportDialog`), the place renders and saves.
    */
   onExport?: (options: CanvasExportOptions) => void;
+  /**
+   * Inserting a picture, offered in the tool column when given: the place
+   * lets the user choose one and adds it (in the middle, `visibleCentre`).
+   */
+  onInsertImage?: () => void;
   /** Drawn over the viewport, e.g. a hint while something is dragged in. */
   overlay?: ReactNode;
   /** Extra controls at the end of the toolbar. */
@@ -184,7 +189,7 @@ const CanvasEditor = forwardRef<CanvasEditorHandle, CanvasEditorProps>(function 
   width, height, elements, onChange, selectedIds, onSelectionChange, editable,
   types = BUILTIN_CANVAS_TYPES, features = FULL_CANVAS_FEATURES, background, canvasBackground = null, onCanvasBackgroundChange,
   backgroundImages, symbolLibrary, grid = null, rotationSnap = null,
-  historyKey = '', readAlign = 'center', createId = () => crypto.randomUUID(), onEditElement, onExport, overlay, toolbarEnd,
+  historyKey = '', readAlign = 'center', createId = () => crypto.randomUUID(), onEditElement, onExport, onInsertImage, overlay, toolbarEnd,
   elementLabel, guides: placeGuides, onGuidesChange, guidesLocked: placeLocked, onGuidesLockedChange, paint = DEFAULT_PAINT, paintElementId, layout = 'fill',
 }, ref) {
   const { t } = useTranslation();
@@ -220,7 +225,7 @@ const CanvasEditor = forwardRef<CanvasEditorHandle, CanvasEditorProps>(function 
   const [gesture, setGesture] = useState(false);
   /** The tool picked in the tool column: an addition to draw on the stage, or `null` for selecting. */
   const [addTool, setAddTool] = useState<{ type: string; key: string } | null>(null);
-  const hasRail = !paintElementId && Object.values(types).some((type) => type.additions?.length);
+  const hasRail = !paintElementId && (!!onInsertImage || Object.values(types).some((type) => type.additions?.length));
   const [rulers, setRulers] = useState(rulersShown);
   // The guides as shown; while one is dragged they run ahead of the place's, which hears of the result.
   const [rulerGuides, setRulerGuides] = useState<RulerGuide[]>(() => placeGuides ?? guideMemory.get(historyKey) ?? []);
@@ -1087,7 +1092,7 @@ const CanvasEditor = forwardRef<CanvasEditorHandle, CanvasEditorProps>(function 
     undo: history.undo, redo: history.redo, tool: addTool, setTool: setAddTool, removeSelected, duplicate,
     arrange: doArrange, align: doAlign, distribute: doDistribute, update: updateSelected,
     zoom: view.zoom, zoomIn: () => zoomTo(view.zoom * 1.25), zoomOut: () => zoomTo(view.zoom / 1.25), fit,
-    onExport: onExport ? () => setExportOpen(true) : undefined, rulers: showRulers, canRulers: editable && features.guides && !paintingId,
+    onExport: onExport ? () => setExportOpen(true) : undefined, insertImage: onInsertImage, rulers: showRulers, canRulers: editable && features.guides && !paintingId,
     toggleRulers: () => setRulers((v) => { rulersShown = !v; return !v; }), guidesLocked, toggleGuidesLocked,
     background: canvasBackground, setBackground: editable && !paintingId ? onCanvasBackgroundChange : undefined, backgroundImages,
     group: doGroup, ungroup: doUngroup, listOpen, toggleList: () => setListOpen((v) => !v),
@@ -1419,6 +1424,8 @@ export interface CanvasController {
   canRedo: boolean;
   undo: () => void;
   redo: () => void;
+  /** The place's picture insertion (`onInsertImage`), a button in the tool column. */
+  insertImage?: () => void;
   /** The tool column's pick: an addition to draw, or `null` for selecting. */
   tool: { type: string; key: string } | null;
   setTool: (tool: { type: string; key: string } | null) => void;

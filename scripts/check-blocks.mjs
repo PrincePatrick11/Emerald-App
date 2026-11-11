@@ -37,7 +37,7 @@ writeFileSync(
    export { readUserSymbol } from '${root}/src/lib/userSymbols';
    export { group, ungroup, withGroups, moveInStack, copiesOf, align } from '${root}/src/components/editors/canvas/canvasActions';
    export { renderBlocksForExport } from '${root}/src/lib/blocks/exportRender';
-   export { createCanvasBlock, parseCanvasBlock, withCanvasScene, withCanvasParts, withoutCanvasFile, CANVAS_BLOCK_TYPE } from '${root}/src/lib/blocks/canvas';
+   export { createCanvasBlock, parseCanvasBlock, withCanvasScene, withCanvasParts, withoutCanvasFile, CANVAS_BLOCK_TYPE, ALTAR_BLOCK_TYPE } from '${root}/src/lib/blocks/canvas';
    export { parseAssignments, resolveAssignedTemplate, instantiateTemplateBlocks, isContentEmpty, templateStart, mergeTemplateTags, assignedTemplateAt, areBlocksEmpty, fieldsWithTemplate, fieldsWithoutTemplate } from '${root}/src/lib/blocks/templates';
    export { internalLinkChipHtml } from '${root}/src/lib/internalLinkHtml';
    export { extractInternalLinks } from '${root}/src/lib/internalLinkHtml';`
@@ -76,7 +76,7 @@ const {
   parseAssignments, resolveAssignedTemplate, instantiateTemplateBlocks, isContentEmpty,
   templateStart, mergeTemplateTags, assignedTemplateAt, areBlocksEmpty,
   fieldsWithTemplate, fieldsWithoutTemplate,
-  createCanvasBlock, parseCanvasBlock, withCanvasScene, withCanvasParts, withoutCanvasFile, CANVAS_BLOCK_TYPE,
+  createCanvasBlock, parseCanvasBlock, withCanvasScene, withCanvasParts, withoutCanvasFile, CANVAS_BLOCK_TYPE, ALTAR_BLOCK_TYPE,
 } = bundle;
 
 const failures = [];
@@ -1007,8 +1007,13 @@ console.log('\nCanvas block\n');
   const image = (id, file) => ({ id, type: 'image', x: 10, y: 20, width: 100, height: 50, rotation: 0, opacity: 1, locked: false, hidden: false, z: 0, ref: file, props: { src: file, emoji: '' } });
   const fresh = createCanvasBlock();
   const parsed = parseCanvasBlock(fresh);
-  check('a new canvas: empty, all parts on, no render',
-    fresh.type === CANVAS_BLOCK_TYPE && parsed.scene.elements.length === 0 && Object.values(parsed.parts).every(Boolean) && parsed.render === null, parsed);
+  check('a new canvas: empty, every part but "Images" below on, no render',
+    fresh.type === CANVAS_BLOCK_TYPE && parsed.scene.elements.length === 0 && !parsed.parts.images
+      && parsed.parts.shapes && parsed.parts.drawing && parsed.render === null, parsed);
+  const altar = parseCanvasBlock(createCanvasBlock(ALTAR_BLOCK_TYPE));
+  check('a new altar: the same canvas, with "Images" below', altar.parts.images && altar.parts.shapes, altar.parts);
+  check('an altar without config still has "Images" below',
+    parseCanvasBlock({ id: 'a', type: ALTAR_BLOCK_TYPE, html: '', attrs: {} }).parts.images);
 
   const scene = { ...parsed.scene, elements: [image('i1', pic), image('i2', pic)], background: { fill: { kind: 'none' }, image: { src: bg, fit: 'cover' }, tint: null } };
   const full = withCanvasScene(fresh, scene, render);
@@ -1017,7 +1022,7 @@ console.log('\nCanvas block\n');
   const back = parseCanvasBlock(parseBlocks(serializeBlocks([full]))[0]);
   check('scene and render survive the round trip', back.render === render && back.scene.elements.length === 2 && back.scene.elements[0].ref === pic, back);
 
-  const off = parseCanvasBlock(withCanvasParts(full, { ...parsed.parts, drawing: false })).parts;
+  const off = parseCanvasBlock(withCanvasParts(full, { ...parsed.parts, drawing: false, images: true })).parts;
   check('parts are kept', off.drawing === false && off.images === true);
 
   const without = parseCanvasBlock(withoutCanvasFile(full, pic));

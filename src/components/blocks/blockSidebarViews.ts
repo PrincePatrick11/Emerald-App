@@ -1,7 +1,7 @@
 import type { ComponentType } from 'react';
 import type { BlockAttrName, BlockInstance } from '../../lib/blocks/types';
 import { FIELDS_BLOCK_TYPE } from '../../lib/blocks/fields';
-import { CANVAS_BLOCK_TYPE } from '../../lib/blocks/canvas';
+import { ALTAR_BLOCK_TYPE, CANVAS_BLOCK_TYPE } from '../../lib/blocks/canvas';
 import FieldsSidebarEdit from './FieldsSidebarEdit';
 import CanvasSidebarEdit from './CanvasSidebarEdit';
 
@@ -45,4 +45,5 @@ export interface BlockSidebarViews {
 export const BLOCK_SIDEBAR_VIEWS: ReadonlyMap<string, BlockSidebarViews> = new Map<string, BlockSidebarViews>([
   [FIELDS_BLOCK_TYPE, { Edit: FieldsSidebarEdit }],
   [CANVAS_BLOCK_TYPE, { Edit: CanvasSidebarEdit }],
+  [ALTAR_BLOCK_TYPE, { Edit: CanvasSidebarEdit }],
 ]);

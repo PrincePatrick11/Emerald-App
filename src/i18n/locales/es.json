@@ -278,6 +278,10 @@
       "canvas": {
         "label": "Lienzo",
         "description": "Imágenes de «Imágenes», formas, texto, símbolos y dibujos, colocados libremente."
+      },
+      "altar": {
+        "label": "Altar",
+        "description": "Un lienzo con «Imágenes» debajo para arrastrar imágenes."
       }
     },
     "kinds": {
@@ -378,7 +382,7 @@
       "empty": "Todavía no hay nada en el lienzo.",
       "parts": "Disponible",
       "part": {
-        "images": "Imágenes",
+        "images": "Imágenes debajo",
         "shapes": "Formas",
         "text": "Texto",
         "symbols": "Símbolos",
@@ -847,7 +851,8 @@
       "group_other": "Grupo de {{count}}",
       "groupAction": "Agrupar (⌘G)",
       "ungroup": "Desagrupar (⇧⌘G)"
-    }
+    },
+    "insertImage": "Insertar imagen …"
   },
   "moonPhase": {
     "new": "Luna nueva",

@@ -6,6 +6,7 @@ import {
 } from '../editors/canvas';
 import { canvasImageSrc, imageSrc, saveImage } from '../../lib/images';
 import { parseSigilDrawing, withSigilDrawing } from '../../lib/blocks/sigil';
+import { discardRenders } from '../../store/imageStore';
 import { emptyPaintDoc, isPaintDocEmpty, PAINT_HEIGHT, PAINT_WIDTH, type PaintDoc } from '../../lib/paint/document';
 import SigilConcealed from './SigilConcealed';
 import { DEFAULT_BRUSH_SIZE, SIGIL_COLORS } from './SigilBrushControls';
@@ -46,6 +47,21 @@ export default function SigilCanvasBlock({ block, isEditing, onBlockChange, onPe
   }, []);
   const seq = useRef(0);
 
+  // Every picture rendered while editing goes when editing ends, the one the
+  // block shows then and the one the entry was saved with excepted
+  // (`discardRenders`): a stroke at a time would leave a file behind each.
+  const made = useRef(new Set<string>());
+  const wasEditing = useRef(isEditing);
+  useEffect(() => {
+    if (wasEditing.current && !isEditing) {
+      const files = new Set(made.current);
+      made.current.clear();
+      // A render still on its way after Done lands in the block within the delay.
+      discardRenders(files, () => parseSigilDrawing(latest.current.block).render);
+    }
+    wasEditing.current = isEditing;
+  }, [isEditing]);
+
   const store = useCallback(async (doc: PaintDoc, toPng: () => string) => {
     const mine = ++seq.current;
     const empty = isPaintDocEmpty(doc);
@@ -53,6 +69,7 @@ export default function SigilCanvasBlock({ block, isEditing, onBlockChange, onPe
     if (!empty) {
       try {
         name = await saveImage(toPng());
+        made.current.add(name);
       } catch (e) {
         console.error('[SigilCanvasBlock] save failed:', e);
         if (mounted.current && mine === seq.current) setSaveFailed(true);

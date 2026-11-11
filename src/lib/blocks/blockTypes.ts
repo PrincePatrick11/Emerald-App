@@ -2,7 +2,8 @@ import { Frame, PenTool, SlidersHorizontal, Sparkles, Type, Zap, type LucideIcon
 import { BLOCK_ATTR, TEXT_BLOCK_TYPE, type BlockInstance, type BlockTypeId } from './types';
 import { FIELDS_BLOCK_TYPE } from './fields';
 import { SIGIL_CALC_TYPE, SIGIL_CANVAS_TYPE, SIGIL_CHARGE_TYPE } from './sigil';
-import { CANVAS_BLOCK_TYPE } from './canvas';
+import { ALTAR_BLOCK_TYPE, CANVAS_BLOCK_TYPE } from './canvas';
+import { AltarIcon } from '../altarIcon';
 
 /**
  * The registry of block types — the pure part (metadata). Which component
@@ -64,6 +65,16 @@ const BLOCK_TYPES = new Map<string, BlockTypeMeta>([
     icon: Frame,
     labelKey: 'blocks.types.canvas.label',
     descriptionKey: 'blocks.types.canvas.description',
+    group: 'media',
+    dataVersion: 1,
+    defaultShowTitle: false,
+  }],
+  [ALTAR_BLOCK_TYPE, {
+    id: ALTAR_BLOCK_TYPE,
+    origin: 'core',
+    icon: AltarIcon,
+    labelKey: 'blocks.types.altar.label',
+    descriptionKey: 'blocks.types.altar.description',
     group: 'media',
     dataVersion: 1,
     defaultShowTitle: false,

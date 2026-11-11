@@ -109,9 +109,11 @@ async function renderScene(scene: CanvasScene, types: CanvasTypes, background: C
 }
 
 /**
- * The canvas block (`core.canvas`): pictures from "Images", shapes, text,
- * symbols and drawings on an artboard, in the canvas editor. In edit mode
- * "Images" stands below it to drag from (or click, for the middle), and
+ * The canvas block (`core.canvas`) and the altar (`core.altar`): pictures
+ * from "Images", shapes, text, symbols and drawings on an artboard, in the
+ * canvas editor. Pictures come in by the tool column's button (the picture
+ * picker); with the part `images` on — an altar's default — "Images" stands
+ * below in edit mode to drag from (or click, for the middle), and
  * files from the disk dropped on it go into "Images" and onto the canvas.
  * Read mode shows the scene itself, not the rendered picture.
  *
@@ -186,7 +188,10 @@ export default function CanvasBlock({ block, isEditing, onBlockChange, onPersist
     const { block: current, onBlockChange: change } = latest.current;
     const now = parseCanvasBlock(current);
     if (now.broken) return;
-    change(withCanvasScene(current, { ...now.scene, ...patch }, now.render));
+    const next = withCanvasScene(current, { ...now.scene, ...patch }, now.render);
+    // Seen at once by the next change, before the stack has rendered it (several pictures in a row).
+    latest.current = { ...latest.current, block: next };
+    change(next);
   }, []);
 
   const handleChange = useCallback((next: CanvasElement[]) => commit({ elements: next.map(toStored) }), [commit]);
@@ -210,6 +215,19 @@ export default function CanvasBlock({ block, isEditing, onBlockChange, onPersist
     commit({ elements: [...now.scene.elements, element] });
     setSelectedIds([id]);
   }, [commit]);
+
+  // The tool column's button: pictures from "Images" or the disk (the picture
+  // picker), in the middle of what is visible, side by side.
+  const insertImages = useCallback(async () => {
+    const files = await pickPictures({ multiple: true });
+    const centre = editorRef.current?.visibleCentre();
+    if (!files?.length || !centre) return;
+    let offset = 0;
+    for (const file of files) {
+      await place(file, { x: centre.x + offset, y: centre.y + offset });
+      offset += 32;
+    }
+  }, [place]);
 
   const pointOnArtboard = useCallback((clientX: number, clientY: number) => {
     const point = editorRef.current?.clientToArtboard(clientX, clientY);
@@ -297,6 +315,7 @@ export default function CanvasBlock({ block, isEditing, onBlockChange, onPersist
           onCanvasBackgroundChange={onCanvasBackgroundChange}
           backgroundImages={BACKGROUND_IMAGES}
           symbolLibrary={symbolLibrary}
+          onInsertImage={editable ? () => void insertImages() : undefined}
           background={background ? undefined : <div className="h-full w-full canvas-paper" />}
           overlay={editable && dragItem ? (
             <>

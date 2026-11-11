@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import {
   AlignHorizontalDistributeCenter, AlignHorizontalJustifyCenter, AlignHorizontalJustifyEnd,
   AlignHorizontalJustifyStart, AlignVerticalDistributeCenter, AlignVerticalJustifyCenter, AlignVerticalJustifyEnd,
-  AlignVerticalJustifyStart, ArrowDown, ArrowUp, BringToFront, Copy, Group, ImageDown, Layers, Layers2, Lock, LockOpen, MousePointer2, Redo2, Ruler, SendToBack, Trash2, Undo2,
+  AlignVerticalJustifyStart, ArrowDown, ArrowUp, BringToFront, Copy, Group, ImageDown, ImagePlus, Layers, Layers2, Lock, LockOpen, MousePointer2, Redo2, Ruler, SendToBack, Trash2, Undo2,
   Ungroup, ZoomIn, ZoomOut,
 } from 'lucide-react';
 import { ToolbarBtn, ToolbarDivider, ToolbarGroup } from '../shared/toolbarParts';
@@ -164,6 +164,14 @@ export function CanvasToolRail({ controller: c }: { controller: CanvasController
           <MousePointer2 size={15} />
         </ToolbarBtn>
       </div>
+      {c.insertImage && (
+        <div className="paint-rail-group">
+          <div className="paint-rail-divider" />
+          <ToolbarBtn onClick={() => { c.setTool(null); c.insertImage!(); }} active={false} title={t('canvas.insertImage')}>
+            <ImagePlus size={15} />
+          </ToolbarBtn>
+        </div>
+      )}
       {groups.map((type) => (
         <div key={type.type} className="paint-rail-group">
           <div className="paint-rail-divider" />

@@ -170,3 +170,21 @@ export async function removeUnusedFiles(db: Database, files: string[]): Promise<
   }
   useImageStore.setState((s) => ({ trashedFiles: new Set([...s.trashedFiles].filter((f) => !unused.includes(f))) }));
 }
+
+/**
+ * The pictures a place made for itself while editing (the rendered picture
+ * of a drawing or a canvas) and no longer shows: gone a moment after editing
+ * ended, once the entry is saved, unless something still shows them. What
+ * the database names — the state Cancel goes back to — stays; so does
+ * `keep()`, read then: the picture the place shows now.
+ */
+export function discardRenders(files: Iterable<string>, keep: () => string | null, delay = 2000): void {
+  const list = [...files].filter((f) => storedImageName(f));
+  if (!list.length) return;
+  window.setTimeout(() => {
+    const shown = keep();
+    void getDb()
+      .then((db) => removeUnusedFiles(db, list.filter((f) => f !== shown)))
+      .catch((e) => console.error('[images] discarding renders failed:', e));
+  }, delay);
+}
