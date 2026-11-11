@@ -110,9 +110,9 @@ export function isRemovableUse(use: ImageUse): boolean {
   return use.role === 'content' && (use.kind === 'entry' || use.kind === 'template');
 }
 
-/** A picture used only as the thing itself (a drawing, a background) — not one for "Images". */
-export function isOnlyDrawingOrBackground(uses: readonly ImageUse[] | undefined): boolean {
-  return !!uses?.length && uses.every((use) => use.role === 'drawing' || use.role === 'background');
+/** A place that shows the picture as a picture of its own (a text, a field, a canvas, a block default) — not as a drawing or a background. */
+export function isShownUse(use: ImageUse): boolean {
+  return use.role === 'content' || use.role === 'default';
 }
 
 function withoutImageInHtml(html: string, file: string): string {

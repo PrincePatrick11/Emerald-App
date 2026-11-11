@@ -1,7 +1,7 @@
 import { useEffect, useMemo } from 'react';
 import { useShallow } from 'zustand/shallow';
 import { useImageStore } from '../store/imageStore';
-import { isOnlyDrawingOrBackground } from '../lib/imageUsage';
+import { isShownUse } from '../lib/imageUsage';
 import type { VaultImage } from '../types';
 
 /** A picture of "Images": a stored file, with its details if it has any. */
@@ -19,10 +19,14 @@ function byName(a: PictureItem, b: PictureItem): number {
 }
 
 /**
- * Every picture of "Images", as the view and the picture picker show it: the
- * vault's stored files with their details, without those in the trash and
- * without sigil drawings and canvas backgrounds (the thing itself, not a
- * picture of its own). Reads the folder and the places of use again on mount.
+ * Every picture of "Images", as the view, the strip and the picture picker
+ * show it: what was taken into "Images" (a row with details), and every
+ * other stored file a text, a field, a canvas or a block default shows. Not
+ * in the trash, and not a file nothing shows: the rendered pictures a
+ * drawing or a canvas leaves behind while it is edited, a picture taken out
+ * of its text — those go with the cleanup. Nor a drawing or a background
+ * (the thing itself, not a picture of its own). Reads the folder and the
+ * places of use again on mount.
  */
 export function useVaultPictures(): { pictures: PictureItem[]; loaded: boolean } {
   const { images, files, trashedFiles, uses, loaded } = useImageStore(useShallow((s) => ({
@@ -42,7 +46,7 @@ export function useVaultPictures(): { pictures: PictureItem[]; loaded: boolean }
       listed.add(name);
       if (trashedFiles.has(name)) continue;
       const image = byFile.get(name) ?? null;
-      if (!image && isOnlyDrawingOrBackground(uses.get(name))) continue;
+      if (!image && !uses.get(name)?.some(isShownUse)) continue;
       items.push({ file: name, image });
     }
     // Details whose file the folder did not list (yet): still shown.
