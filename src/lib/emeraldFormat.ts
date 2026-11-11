@@ -2,7 +2,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { altarInserts } from './migrateAltars';
 import { contentWithAltarsAsOperations, convertAltars, elementsWithAltarsAsOperations, type Row } from './altarConversion';
 import { todayIso, withoutConcealed } from './blocks/sigil';
-import { imageRefsInHtml, readImageAsBase64, rewriteImageRefs, saveImage } from './images';
+import { imageRefsInHtml, readImageAsBase64, rewriteImageRefs, saveImage, storedImageName } from './images';
 import { open as openDialog, save, message } from '@tauri-apps/plugin-dialog';
 import { format } from 'date-fns';
 import { marked } from 'marked';
@@ -555,7 +555,13 @@ async function remapImages(content: string, images: Record<string, string>): Pro
       map.set(oldRef, await saveImage(prepared));
     } catch { /* skip */ }
   }
-  return rewriteImageRefs(content, (ref) => map.get(ref) ?? null);
+  let rewritten = rewriteImageRefs(content, (ref) => map.get(ref) ?? null);
+  // A canvas names its pictures in its scene JSON too (`ref`, `props.src`,
+  // the background): a stored name is a hash, so it is replaced wherever it stands.
+  for (const [oldRef, file] of map) {
+    if (oldRef !== file && storedImageName(oldRef) === oldRef) rewritten = rewritten.split(oldRef).join(file);
+  }
+  return rewritten;
 }
 
 /** Re-reads the relevant store from DB so the UI reflects the imported data. */

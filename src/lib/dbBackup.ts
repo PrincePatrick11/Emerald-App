@@ -1551,11 +1551,14 @@ const ALTAR_ITEM_IMAGE_COLUMNS = ['image_data'];
 async function importAltars(
   db: Awaited<ReturnType<typeof getDb>>, altars: Row[], items: Row[], placements: Row[], replace: boolean,
 ): Promise<void> {
-  if (!altars.length && !items.length) return;
-  await createAltarTables(db);
-  await insertRows(db, 'altars', altars);
-  await insertRows(db, 'altar_items', items, true);
-  await insertRows(db, 'altar_placements', placements);
+  if (altars.length || items.length) {
+    await createAltarTables(db);
+    await insertRows(db, 'altars', altars);
+    await insertRows(db, 'altar_items', items, true);
+    await insertRows(db, 'altar_placements', placements);
+  }
+  // Also without its altars (Operations not ticked): the file's chips, altar
+  // fields and task links point at operations, or they would be dropped.
   await convertAltarsInPlace(db, undefined, { replace });
   await removeAltarTables(db);
 }
@@ -1942,8 +1945,8 @@ export async function importDatabase(
     await importViaStaging(db, async (staging) => {
       if (bringsTemplates && (types.includeJournal || types.includeWiki || types.includeOperations)) {
         await staging.execute('DELETE FROM templates WHERE id=$1', [SIGIL_TEMPLATE_ID]);
-        // The altar template is known from '13' on; an older file keeps the fresh one.
-        if ((backup.sourceVersion ?? Number(BACKUP_VERSION)) >= 13) {
+        // Only a file that knows the altar template brings its version (or its deletion is not known).
+        if (backup.data.templates?.some((t) => t.id === ALTAR_TEMPLATE_ID)) {
           await staging.execute('DELETE FROM templates WHERE id=$1', [ALTAR_TEMPLATE_ID]);
         }
       }

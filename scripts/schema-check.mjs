@@ -134,7 +134,7 @@ writeFileSync(
    export { linkedIdsToContent, rowsLinkSource } from '${process.cwd().replace(/\\/g, '/')}/src/lib/migrateLinkedIdsToContent';
    export { journalFieldsToContent } from '${process.cwd().replace(/\\/g, '/')}/src/lib/migrateJournalFieldsToContent';
    export { stripTagIds, replaceTagId } from '${process.cwd().replace(/\\/g, '/')}/src/lib/tagRefs';
-   export { createAltarTables } from '${process.cwd().replace(/\\/g, '/')}/src/lib/migrateAltars';`
+   export { createAltarTables, convertAltarsInPlace } from '${process.cwd().replace(/\\/g, '/')}/src/lib/migrateAltars';`
 );
 
 const bundlePath = join(workDir, 'bundle.mjs');
@@ -173,7 +173,7 @@ const {
   collectUsedImageFilenames, invalidateVaultCache, copyTable, ddlBeforeV49,
   assertPayloadReferencesResolve, convertLegacySigils, migrateBackupPayload, withRoutinesAsTemplates,
   needsSigilConversion, sigilRowToContent, linkedIdsToContent, rowsLinkSource, journalFieldsToContent,
-  stripTagIds, replaceTagId, importTagsAndRemap, dropUnknownTagIds, createAltarTables,
+  stripTagIds, replaceTagId, importTagsAndRemap, dropUnknownTagIds, createAltarTables, convertAltarsInPlace,
 } = await import(pathToFileURL(bundlePath).href);
 
 // v62 turns the altars into operations and empties their tables, v63 drops
@@ -2077,6 +2077,30 @@ console.log('\n8n. Migration v49: three entry tables become entries\n');
   check('v63: the altar tables are gone', tables.length === 0, tables);
   check('v63: an altar synced in late is an operation', (await db.select("SELECT COUNT(*) n FROM entries WHERE id='a2' AND type='operation'"))[0].n === 1);
   await dropAltarTables(db); // repeatable: without the tables there is nothing to do
+
+  // A file that brings altar fields and chips but not its altars (Operations
+  // not ticked), into a vault without the altar tables: they still point at operations.
+  const lateConfig = JSON.stringify({ elements: [{ id: 'f9', kind: 'altar', label: 'Altar' }] }).replace(/"/g, '&quot;');
+  const lateChip = '<span data-type="internalLink" class="internal-link" data-id="a1" data-entry-type="altar" data-label="x">x</span>';
+  await db.execute(`INSERT INTO entries (id,type,title,content,created_at,updated_at) VALUES ('e9','journal','Late',$1,$2,$2)`,
+    [`<section data-block="core.fields" data-block-id="b9" data-block-config="${lateConfig}"><dl><dd data-block-slot="el:f9">${lateChip}</dd></dl></section>`, now]);
+  await db.execute(`INSERT INTO task_links (id,task_id,target_id,target_type) VALUES ('l9','tk1','a2','altar')`);
+  await convertAltarsInPlace(db);
+  const [late] = await db.select("SELECT content FROM entries WHERE id='e9'");
+  const [lateLink] = await db.select("SELECT target_type FROM task_links WHERE id='l9'");
+  check('without altars: chips, altar fields and task links still point at operations',
+    !late.content.includes('altar') && late.content.includes('&quot;kind&quot;:&quot;link&quot;') && lateLink?.target_type === 'operation', late.content);
+
+  // A replace import whose altar carries the ID of a journal entry: the journal entry stays.
+  await createAltarTables(db);
+  await db.execute(`INSERT INTO altars (id,title,created_at,updated_at) VALUES ('e9','Intruder',$1,$1)`, [now]);
+  await db.execute(`INSERT INTO altars (id,title,created_at,updated_at) VALUES ('a2','Late, newer',$1,$1)`, [now]);
+  await convertAltarsInPlace(db, undefined, { replace: true });
+  const [kept] = await db.select("SELECT type, title FROM entries WHERE id='e9'");
+  const [replaced] = await db.select("SELECT title FROM entries WHERE id='a2'");
+  check('replace: an altar never overwrites an entry of another type, but does its own operation',
+    kept?.type === 'journal' && kept.title === 'Late' && replaced?.title === 'Late, newer', { kept, replaced });
+  await dropAltarTables(db);
   check('v62/v63: schema identical to the baseline', JSON.stringify(await readSchema(db)) === JSON.stringify(schemaA));
   db.close();
 }

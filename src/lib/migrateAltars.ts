@@ -52,8 +52,12 @@ export async function createAltarTables(db: Database): Promise<void> {
 }
 
 /**
- * The same for altars an import has just written into its working copy (a
- * backup from before, `dbBackup.ts`): converted where they landed, before anything sees them.
+ * Converts whatever the altar tables hold, in place: the core of v62 and
+ * v63, and of importing an older backup into its working copy
+ * (`dbBackup.ts`). Without altars (or without the tables), links to altars
+ * are still pointed at their operations: chips, altar fields and task links
+ * of a file that did not bring its altars along, or of a vault whose
+ * altars went before.
  */
 export async function convertAltarsInPlace(
   db: Database,
@@ -63,10 +67,14 @@ export async function convertAltarsInPlace(
   const tables = await db.select<{ name: string }[]>(
     "SELECT name FROM sqlite_master WHERE type='table' AND name IN ('altars', 'altar_items', 'altar_placements')",
   );
-  if (tables.length < 3) return;
-  const altars = await db.select<Row[]>('SELECT * FROM altars');
-  const items = await db.select<Row[]>('SELECT * FROM altar_items');
-  if (!altars.length && !items.length) return;
+  const held = tables.length === 3;
+  const altars = held ? await db.select<Row[]>('SELECT * FROM altars') : [];
+  const items = held ? await db.select<Row[]>('SELECT * FROM altar_items') : [];
+  if (!altars.length && !items.length) {
+    const links = await altarLinkStatements(db);
+    if (links.length) await db.batch(links);
+    return;
+  }
   const placements = await db.select<Row[]>('SELECT * FROM altar_placements');
 
   await before?.();
@@ -82,12 +90,19 @@ export async function convertAltarsInPlace(
 }
 
 /**
- * The writes that put converted altars into the vault and point every link
- * at them. An operation already there stays, unless `replace` (a replace
- * import, whose file's version wins).
+ * The writes that put converted altars into the vault, point every link at
+ * them and empty the altar tables. An operation already there stays, unless
+ * `replace` (a replace import, whose file's version wins).
  */
 export async function altarStatements(db: Database, converted: ConvertedAltars, replace = false): Promise<Statement[]> {
-  const statements = await altarInserts(db, converted, replace);
+  const statements = [...await altarInserts(db, converted, replace), ...await altarLinkStatements(db)];
+  statements.push(['DELETE FROM altar_placements'], ['DELETE FROM altar_items'], ['DELETE FROM altars']);
+  return statements;
+}
+
+/** Every link to an altar pointed at its operation (the same ID): chips and altar fields in contents and custom blocks, task links. */
+async function altarLinkStatements(db: Database): Promise<Statement[]> {
+  const statements: Statement[] = [];
   for (const table of ['entries', 'templates'] as const) {
     const rows = await db.select<{ id: string; content: string }[]>(
       `SELECT id, content FROM ${table} WHERE content LIKE '%altar%'`,
@@ -104,13 +119,14 @@ export async function altarStatements(db: Database, converted: ConvertedAltars, 
     const elements = definitionElementsWithAltarsAsOperations(row.elements);
     if (elements !== row.elements) statements.push(['UPDATE block_definitions SET elements=$1 WHERE id=$2', [elements, row.id]]);
   }
-  // Same ID, other type; a link the task already has to the operation stays alone.
-  statements.push([
-    `UPDATE OR IGNORE task_links SET target_type='operation' WHERE target_type='altar'`,
-  ]);
-  statements.push(["DELETE FROM task_links WHERE target_type='altar'"]);
-
-  statements.push(['DELETE FROM altar_placements'], ['DELETE FROM altar_items'], ['DELETE FROM altars']);
+  const [links] = await db.select<{ n: number }[]>("SELECT COUNT(*) AS n FROM task_links WHERE target_type='altar'");
+  if (links?.n) {
+    // Same ID, other type; a link the task already has to the operation stays alone.
+    statements.push(
+      [`UPDATE OR IGNORE task_links SET target_type='operation' WHERE target_type='altar'`],
+      ["DELETE FROM task_links WHERE target_type='altar'"],
+    );
+  }
   return statements;
 }
 
@@ -140,8 +156,10 @@ export async function altarInserts(db: Database, converted: ConvertedAltars, rep
   );
   let number = next?.n ?? 1;
   for (const op of converted.operations) {
+    // A replace import's version wins over the operation, never over an entry of another type with that ID.
+    if (replace) statements.push(["DELETE FROM entries WHERE id=$1 AND type='operation'", [op.id]]);
     statements.push([
-      `INSERT OR ${replace ? 'REPLACE' : 'IGNORE'} INTO entries (id, type, title, content, category_id, entry_number, icon, cover_image, tags, created_at, updated_at, deleted_at)
+      `INSERT OR IGNORE INTO entries (id, type, title, content, category_id, entry_number, icon, cover_image, tags, created_at, updated_at, deleted_at)
        VALUES ($1, 'operation', $2, $3, $4, $5, $6, NULL, '[]', $7, $8, $9)`,
       [op.id, op.title, op.content, ALTAR_CATEGORY_ID, number++, op.icon, op.created_at, op.updated_at, op.deleted_at],
     ]);
