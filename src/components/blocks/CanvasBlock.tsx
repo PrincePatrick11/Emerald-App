@@ -18,13 +18,14 @@ import { getImageDragItem, setImageDragItem, subscribeImageDrag, type ImageDragI
 import { DROPPED_IMAGE_RE, useFileDrop } from '../../hooks/useFileDrop';
 import { useOwnSymbols } from '../../hooks/useOwnSymbols';
 import { pickPictures, useImagePickerStore } from '../../store/imagePickerStore';
-import { useImageStore } from '../../store/imageStore';
+import { removeUnusedFiles, useImageStore } from '../../store/imageStore';
+import { getDb } from '../../lib/db';
 import { reportImageError, useImageNoticeStore } from '../../store/imageNoticeStore';
 import ImageStrip from '../images/ImageStrip';
 import type { BlockViewProps } from './blockViews';
 
-// Changes in quick succession are saved together, once the hand rests.
-const SAVE_DELAY = 400;
+// The replaced render is looked at once the entry has been saved.
+const RENDER_CLEANUP_DELAY = 2000;
 /** The width of the rendered picture the export and the card show. */
 const RENDER_WIDTH = 1200;
 
@@ -115,9 +116,9 @@ async function renderScene(scene: CanvasScene, types: CanvasTypes, background: C
  * Read mode shows the scene itself, not the rendered picture.
  *
  * Saving: every change goes into the block at once; the rendered picture
- * follows once the hand rests, and only the latest render counts (`seq`).
- * The block stays mounted across both modes (the stack keeps its tree), so
- * a render that finishes after "Done" goes into the entry by `onPersist`.
+ * for the export is made on "Done" if the scene changed, and goes into the
+ * entry by `onPersist` (the block stays mounted across both modes); the
+ * picture it replaces is removed unless something else still shows it.
  */
 export default function CanvasBlock({ block, isEditing, onBlockChange, onPersist }: BlockViewProps) {
   const { t } = useTranslation();
@@ -146,38 +147,47 @@ export default function CanvasBlock({ block, isEditing, onBlockChange, onPersist
     return () => { mounted.current = false; };
   }, []);
 
-  // The rendered picture, once the hand rests; a later change makes an earlier render moot.
-  const seq = useRef(0);
-  const timer = useRef(0);
-  const scheduleRender = useCallback(() => {
-    window.clearTimeout(timer.current);
-    const mine = ++seq.current;
-    timer.current = window.setTimeout(() => {
-      const { scene: rendered } = parseCanvasBlock(latest.current.block);
-      void renderScene(rendered, profile.types, parseCanvasBackground(rendered.background))
-        .then((render) => {
-          if (!mounted.current || mine !== seq.current) return;
-          const { block: current, isEditing: editing, onBlockChange: change, onPersist: persist } = latest.current;
-          // Only for the scene it shows: after Cancel the block holds another.
-          const { scene } = parseCanvasBlock(current);
-          if (JSON.stringify(scene) !== JSON.stringify(rendered)) return;
-          // Done before the render was there: it goes straight into the entry.
-          const next = withCanvasScene(current, scene, render);
-          if (editing) change(next);
-          else persist?.(next);
-        })
-        .catch((e: unknown) => console.error('[CanvasBlock] render failed:', e));
-    }, SAVE_DELAY);
-  }, [profile.types]);
+  // The rendered picture, made once editing ends with "Done": a render per
+  // change would leave a file behind each time. The scene editing started
+  // from tells Done (changed) from Cancel (back as it was, or remounted).
+  const startScene = useRef<string | null>(null);
+  useEffect(() => {
+    if (isEditing) {
+      startScene.current = JSON.stringify(parseCanvasBlock(latest.current.block).scene);
+      return;
+    }
+    const from = startScene.current;
+    startScene.current = null;
+    if (from === null) return;
+    const { block: current, onPersist: persist } = latest.current;
+    const now = parseCanvasBlock(current);
+    if (now.broken || !persist || JSON.stringify(now.scene) === from) return;
+    void renderScene(now.scene, profile.types, parseCanvasBackground(now.scene.background))
+      .then(async (render) => {
+        const { block: latestBlock, isEditing: editing, onPersist: save } = latest.current;
+        // Editing again, or the scene changed meanwhile: that edit renders anew.
+        if (!mounted.current || editing || !save) return;
+        const { scene: shown, render: before } = parseCanvasBlock(latestBlock);
+        if (JSON.stringify(shown) !== JSON.stringify(now.scene)) return;
+        save(withCanvasScene(latestBlock, shown, render));
+        // The picture it replaces, once the entry is saved, unless something still shows it.
+        if (before && before !== render) {
+          await new Promise((resolve) => window.setTimeout(resolve, RENDER_CLEANUP_DELAY));
+          await removeUnusedFiles(await getDb(), [before]);
+        }
+      })
+      .catch((e: unknown) => console.error('[CanvasBlock] render failed:', e));
+    // Only the switch between the modes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isEditing]);
 
-  /** A new scene into the block now; the old render stays until the new one is there. */
+  /** A new scene into the block now; the render follows on Done. */
   const commit = useCallback((patch: Partial<CanvasScene>) => {
     const { block: current, onBlockChange: change } = latest.current;
     const now = parseCanvasBlock(current);
     if (now.broken) return;
     change(withCanvasScene(current, { ...now.scene, ...patch }, now.render));
-    scheduleRender();
-  }, [scheduleRender]);
+  }, []);
 
   const handleChange = useCallback((next: CanvasElement[]) => commit({ elements: next.map(toStored) }), [commit]);
   const onCanvasBackgroundChange = useCallback((next: CanvasBackground) => commit({ background: next }), [commit]);
