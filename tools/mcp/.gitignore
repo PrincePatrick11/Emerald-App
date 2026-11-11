@@ -90,3 +90,6 @@ htmlcov/
 # Cargo build artifacts (in case CARGO_TARGET_DIR is ever set to a relative path)
 target*/
 *.bak
+
+# The seed vault's pictures (seed/images) are fixtures, not screenshots.
+!seed/images/*.png

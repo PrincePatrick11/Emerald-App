@@ -103,6 +103,8 @@ check('internal link chips rendered',
   contents.some((c) => c.includes('data-type="internalLink"')));
 check('no unexpanded @@chip() placeholders',
   !contents.some((c) => c.includes('@@chip(')));
+check('no unexpanded @@file() placeholders',
+  !contents.some((c) => c.includes('@@file(')) && !(tables.includes('images') && q('SELECT file FROM images').some((r) => r.file.includes('@@file('))));
 
 check('a subtask points at its parent',
   one('SELECT COUNT(*) AS n FROM tasks WHERE parent_task_id IS NOT NULL').n >= 1);
