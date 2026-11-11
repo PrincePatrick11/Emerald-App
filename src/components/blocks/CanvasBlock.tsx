@@ -303,10 +303,12 @@ export default function CanvasBlock({ block, isEditing, onBlockChange, onPersist
         />
       </div>
       {editable && parts.images && (
-        <ImageStrip onPick={(item) => {
-          const centre = editorRef.current?.visibleCentre();
-          if (centre) void place(item.file, centre);
-        }} />
+        <div className="canvas-block-side">
+          <ImageStrip onPick={(item) => {
+            const centre = editorRef.current?.visibleCentre();
+            if (centre) void place(item.file, centre);
+          }} />
+        </div>
       )}
     </div>
   );

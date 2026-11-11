@@ -2557,20 +2557,25 @@ html[data-theme] .prop-segment--active {
 .canvas-block {
   display: flex;
   gap: 12px;
-  align-items: flex-start;
+  align-items: stretch;
   min-width: 0;
 }
 .canvas-block-stage {
   flex: 1 1 auto;
   min-width: 0;
 }
-.image-strip {
+/* As high as the canvas beside it, at least a few rows: it scrolls inside. */
+.canvas-block-side {
+  position: relative;
   flex: 0 0 172px;
+  min-height: 320px;
+}
+.image-strip {
+  position: absolute;
+  inset: 0;
   display: flex;
   flex-direction: column;
   gap: 8px;
-  max-height: 560px;
-  min-height: 0;
 }
 .image-strip-grid {
   display: grid;
