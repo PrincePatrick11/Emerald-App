@@ -118,7 +118,7 @@ function AssignmentGrid({ templateId }: { templateId?: string }) {
   // out with a bold name, and only that; a shaded row was too loud. The fixed
   // emoji column keeps the names aligned.
   const row = (types: readonly TemplateEntryType[], category: string | null, name: string, glyph: ReactNode, bold = false) => (
-    <div key={category ?? ''} className={`${GRID} border-t border-[var(--border-soft)] py-1.5`}>
+    <div key={`${types.join(',')}:${category ?? ''}`} className={`${GRID} border-t border-[var(--border-soft)] py-1.5`}>
       <div className={`flex min-w-0 items-center gap-2 text-sm text-primary${bold ? ' font-semibold' : ''}`}>
         <span className="flex w-5 flex-shrink-0 justify-center text-muted">{glyph}</span>
         <span className="truncate">{name}</span>
