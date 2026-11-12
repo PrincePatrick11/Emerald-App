@@ -1,5 +1,5 @@
 import type { ComponentType } from 'react';
-import type { ElementDef, FieldsModel, SigilElementKind } from '../../lib/blocks/fields';
+import type { FieldsModel, SigilElement, SigilElementKind } from '../../lib/blocks/fields';
 import { sigilPartBlock, withSigilPart } from '../../lib/blocks/sigil';
 import type { BlockInstance } from '../../lib/blocks/types';
 import SigilCalcBlock from './SigilCalcBlock';
@@ -16,14 +16,14 @@ const PART_VIEWS: Record<SigilElementKind, ComponentType<BlockViewProps>> = {
 const noHtml = () => {};
 
 /**
- * A sigil part of a custom block: the same component as the block
- * of the same kind, just on the virtual block (`sigilPartBlock`). What it
+ * A sigil part of a fields block — one of a custom block's, or a calculator
+ * or charge on its own: its component on the virtual block (`sigilPartBlock`). What it
  * writes goes back into the field block's model and from there as a whole
  * block into the entry: when editing via `onBlockChange`, in read mode
  * (charging, discharging, a drawing saved late) via `onPersist`.
  */
 export default function SigilPart({ element, block, model, write, persist, ...rest }: {
-  element: ElementDef & { kind: SigilElementKind };
+  element: SigilElement;
   block: BlockInstance;
   model: FieldsModel;
   /** Adopt the changed model when editing. */

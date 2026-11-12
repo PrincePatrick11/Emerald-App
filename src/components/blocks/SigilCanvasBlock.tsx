@@ -5,7 +5,8 @@ import { DEFAULT_BRUSH_SIZE, SIGIL_COLORS } from './SigilBrushControls';
 import type { BlockViewProps } from './blockViews';
 
 /**
- * The sigil drawing: a drawing (`DrawingBlock`) in the sigil's colours,
+ * The sigil drawing — a paint block marked as one, or a custom block's
+ * drawing part: a drawing (`DrawingBlock`) in the sigil's colours,
  * hidden while a charge conceals it (when editing too) and shown without
  * its editor while the lock "sigil only" holds it.
  */

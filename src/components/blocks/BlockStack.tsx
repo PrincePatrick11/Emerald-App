@@ -25,7 +25,7 @@ import { resolveBlockType, type BlockTypeMeta } from '../../lib/blocks/blockType
 import { blockIcon, createFromPreset } from '../../lib/blocks/presets';
 import { useBlockDefinitionStore } from '../../store/blockDefinitionStore';
 import {
-  SIGIL_CHARGE_TYPE, withChargesCoveringOnly, sigilState, sigilUnits, todayIso, withChargesCoveringCopy, withoutConcealedParts,
+  SIGIL_CHARGE_KIND, withChargesCoveringOnly, sigilState, sigilUnits, todayIso, withChargesCoveringCopy, withoutConcealedParts,
   withRenamedPartTargets,
 } from '../../lib/blocks/sigil';
 import { blockLabel, hiddenAttrValue, isBlockHidden, showsTitleInRead, withBlockAttr } from '../../lib/blocks/blockAttrs';
@@ -133,7 +133,7 @@ export default function BlockStack({
 
   const resetEpoch = useExternalContentReset(initialContent, isEditing, blocksRef, setBlocks, onChangeRef);
 
-  // Locked and concealed come from the sigil's charge block; all blocks see the same state.
+  // Locked and concealed come from the sigil's charges; all blocks see the same state.
   const sigil = useMemo(() => sigilState(blocks, todayIso()), [blocks]);
 
   const definitions = useBlockDefinitionStore((s) => s.definitions);
@@ -544,9 +544,9 @@ export default function BlockStack({
   );
 }
 
-/** Is the block a charge, or a custom block with a charge part? */
+/** Does the block hold a charge (a charge on its own or the part of a custom block)? */
 function holdsCharge(block: BlockInstance): boolean {
-  return block.type === SIGIL_CHARGE_TYPE || sigilUnits([block]).some((u) => u.block.type === SIGIL_CHARGE_TYPE);
+  return sigilUnits([block]).some((u) => u.block.type === SIGIL_CHARGE_KIND);
 }
 
 /**

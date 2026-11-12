@@ -13,7 +13,7 @@ import { migrateJournalFieldsToContent } from './migrateJournalFieldsToContent';
 import { mergeCategoryTables } from './mergeCategoryTables';
 import { backupDatabaseFile, columnNames, createIndexesIfMissing, dropColumnsIfPresent } from './dbRebuild';
 import { migrateOperationStatusToBlocks } from './migrateOperationStatusToBlocks';
-import { convertLegacySigils, hasLegacySigilRows } from './migrateLegacySigils';
+import { convertLegacySigils, hasLegacySigilRows, convertLegacySigilsInPlace } from './migrateLegacySigils';
 import { IMAGE_FIELDS_V48, TITLED_TABLES_V48 } from './schemaV48';
 import { unifyEntries } from './unifyEntries';
 import { tagsById } from './tagsById';
@@ -23,6 +23,7 @@ import type { EntryType } from '../types';
 import { makeCategoryOptional } from './nullableCategory';
 import { seedAltarTemplate, seedSigilTemplate } from './templateRows';
 import { altarsToOperations, dropAltarTables } from './migrateAltars';
+import { legacySigilLabels } from './blocks/legacySigilBlocks';
 import { migrateRoutinesToTemplates } from './migrateRoutinesToTemplates';
 import i18n from '../i18n';
 import { LEGACY_UNTITLED_TITLES } from './entryTitle';
@@ -1522,6 +1523,15 @@ export const MIGRATIONS: Migration[] = [
     version: 63,
     name: 'drop_altar_tables',
     up: dropAltarTables,
+  },
+  {
+    // The sigil blocks of v42 become what a custom block's sigil parts are:
+    // calculator and charge fields blocks with one element, the drawing a
+    // paint block marked as a sigil drawing; charge targets follow
+    // (`legacySigilBlocks.ts`). A copy first, only if there is something to convert.
+    version: 64,
+    name: 'sigil_blocks_to_fields_and_paint',
+    up: (db) => convertLegacySigilsInPlace(db, legacySigilLabels(i18n.t), () => backupDatabaseFile(db, 'v64')),
   },
 ];
 

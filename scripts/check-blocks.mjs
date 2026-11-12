@@ -29,7 +29,8 @@ writeFileSync(
    export { instantiateDefinition, parseDefinitionElements, parseDefinitionDisplay, remapDefinitionDefaults, definitionImageRefs } from '${root}/src/lib/blocks/definitions';
    export { entryBlockSummary } from '${root}/src/lib/blocks/entrySummary';
    export { withLegacyStatus, statusDefinition, hasLegacyStatus, convertLegacyStatusRows, STATUS_DEFINITION_ID } from '${root}/src/lib/blocks/legacyStatus';
-   export { extractUniqueLetters, parseSigilCalc, serializeSigilCalc, createSigilCalcBlock, createSigilCanvasBlock, createSigilChargeBlock, parseSigilCharge, serializeSigilCharge, sigilState, withoutConcealed, sigilImage, withSigilImage, letterList, sigilUnits, sigilPartBlock, sigilPartId, withSigilPart, withChargesCoveringOnly, withRenamedPartTargets, parseDrawing, withDrawing } from '${root}/src/lib/blocks/sigil';
+   export { extractUniqueLetters, parseSigilCalc, serializeSigilCalc, createSigilCalcBlock, createSigilCanvasBlock, createSigilChargeBlock, parseSigilCharge, serializeSigilCharge, sigilState, withoutConcealed, letterList, sigilUnits, sigilPartBlock, sigilPartId, withSigilPart, withChargesCoveringOnly, withRenamedPartTargets } from '${root}/src/lib/blocks/sigil';
+   export { convertLegacySigilBlocks, contentWithoutLegacySigils, legacySigilBlock, LEGACY_SIGIL_CALC_TYPE, LEGACY_SIGIL_CANVAS_TYPE, LEGACY_SIGIL_CHARGE_TYPE } from '${root}/src/lib/blocks/legacySigilBlocks';
    export { paintDocFromJson, paintDocToJson, emptyPaintDoc, isPaintDocEmpty, thinPoints, transformStroke, mergeDown, canMergeDown, strokeSamples, inPolygon, symmetricCopies, mirrorStroke, splitStroke } from '${root}/src/lib/paint/document';
    export { parseAltarElements, altarElementsJson } from '${root}/src/lib/altarElements';
    export { parseAltarSettings } from '${root}/src/lib/altarSettings';
@@ -37,7 +38,7 @@ writeFileSync(
    export { readUserSymbol } from '${root}/src/lib/userSymbols';
    export { group, ungroup, withGroups, moveInStack, copiesOf, align } from '${root}/src/components/editors/canvas/canvasActions';
    export { renderBlocksForExport } from '${root}/src/lib/blocks/exportRender';
-   export { createPaintBlock, isDrawingBlockType, PAINT_BLOCK_TYPE } from '${root}/src/lib/blocks/paint';
+   export { createPaintBlock, isDrawingBlockType, PAINT_BLOCK_TYPE, parseDrawing, withDrawing, withDrawingImage, isSigilDrawing, drawingImage } from '${root}/src/lib/blocks/paint';
    export { resolveBlockType } from '${root}/src/lib/blocks/blockTypes';
    export { createCanvasBlock, parseCanvasBlock, withCanvasScene, withCanvasParts, withCanvasStripTag, withoutCanvasFile, CANVAS_BLOCK_TYPE, ALTAR_BLOCK_TYPE } from '${root}/src/lib/blocks/canvas';
    export { parseAssignments, resolveAssignedTemplate, instantiateTemplateBlocks, isContentEmpty, templateStart, mergeTemplateTags, assignedTemplateAt, areBlocksEmpty, fieldsWithTemplate, fieldsWithoutTemplate } from '${root}/src/lib/blocks/templates';
@@ -69,7 +70,8 @@ const {
   withLegacyStatus, statusDefinition, hasLegacyStatus, convertLegacyStatusRows, STATUS_DEFINITION_ID,
   extractUniqueLetters, parseSigilCalc, serializeSigilCalc, createSigilCalcBlock, createSigilCanvasBlock,
   createSigilChargeBlock, parseSigilCharge, serializeSigilCharge, sigilState, withoutConcealed,
-  sigilImage, withSigilImage, letterList, renderBlocksForExport, parseDrawing, withDrawing,
+  drawingImage, withDrawingImage, isSigilDrawing, letterList, renderBlocksForExport, parseDrawing, withDrawing,
+  convertLegacySigilBlocks, contentWithoutLegacySigils, legacySigilBlock, LEGACY_SIGIL_CALC_TYPE, LEGACY_SIGIL_CANVAS_TYPE, LEGACY_SIGIL_CHARGE_TYPE,
   paintDocFromJson, paintDocToJson, emptyPaintDoc, isPaintDocEmpty, thinPoints, transformStroke, mergeDown, canMergeDown, strokeSamples, inPolygon, symmetricCopies, mirrorStroke, splitStroke,
   group, ungroup, withGroups, moveInStack, copiesOf, align, parseAltarElements, altarElementsJson, parseAltarSettings,
   symbolFromDrawing, readUserSymbol,
@@ -447,19 +449,39 @@ console.log('\n4e. Legacy operation status becomes a block\n');
   check('without translation: the fallback text has no keys either', rawHtml.includes('No') && !rawHtml.includes('blocks.'), rawHtml);
 }
 
-console.log('\n4f. Sigil blocks\n');
+// A sigil is written as the UI writes it: the part as a virtual block, then back into the fields block.
+const sigilFieldText = { label: (e) => e.label || e.kind, yes: 'Ja', no: 'Nein', moonName: (p) => p };
+function setSigilPart(block, elementId, change) {
+  const model = parseFields(block);
+  const element = model.elements.find((e) => e.id === elementId);
+  return serializeFields(block, withSigilPart(model, element, change(sigilPartBlock(block, element, model))), sigilFieldText);
+}
+const calcOf = (data) => setSigilPart(createSigilCalcBlock(), 'calc', (p) => serializeSigilCalc(p, data));
+const chargeOf = (data) => setSigilPart(createSigilChargeBlock(), 'charge', (p) => serializeSigilCharge(p, data));
+/** The unit ID of a calculator on its own. */
+const calcPart = (block) => sigilPartId(block.id, 'calc');
+/** The (first) charge of a block, as its virtual block. */
+const chargeUnit = (block) => sigilUnits([block]).find((u) => u.block.type === 'sigilCharge').block;
+const virtualCharge = (attrs, html = '') => ({ id: 'v', type: 'sigilCharge', html, attrs });
+
+console.log('\n4f. Sigils\n');
 {
   check('letter bank: each letter once, uppercase, without accents',
     extractUniqueLetters('Äpfel äpfel!').join('') === 'APFEL', extractUniqueLetters('Äpfel äpfel!')); // lang-ok
 
-  const calc = serializeSigilCalc(createSigilCalcBlock(), { intention: 'Ich <b>bin</b>', letters: ['I', 'C'], implemented: ['I', 'X'] });
-  const calcBack = parseSigilCalc(parseBlocks(serializeBlocks([calc, createTextBlock('<p>x</p>')]))[0]);
+  const calc = calcOf({ intention: 'Ich <b>bin</b>', letters: ['I', 'C'], implemented: ['I', 'X'] });
+  check('calculator on its own: a fields block with one calculator, shown even when empty',
+    calc.type === 'core.fields' && parseFields(calc).elements.map((e) => `${e.id}:${e.kind}`).join() === 'calc:sigilCalc'
+      && !parseFields(createSigilCalcBlock()).display.readHideEmpty && calc.attrs['data-block-show-title'] === '1', calc);
+  const calcBack = parseSigilCalc(sigilUnits(parseBlocks(serializeBlocks([calc, createTextBlock('<p>x</p>')])))[0].block);
   check('calculator: round trip, implemented letters only from the bank',
     calcBack.intention === 'Ich <b>bin</b>' && calcBack.letters.join() === 'I,C' && calcBack.implemented.join() === 'I', calcBack);
   check('calculator: the fallback is escaped', calc.html.includes('&lt;b&gt;') && !calc.html.includes('<b>'), calc.html);
 
-  const canvas = withSigilImage(createSigilCanvasBlock(), `${'ab'.repeat(32)}.png`);
-  check('drawing: the file name is a src in the markup', sigilImage(canvas) === `${'ab'.repeat(32)}.png` && canvas.html.startsWith('<img src="'));
+  const canvas = withDrawingImage(createSigilCanvasBlock(), `${'ab'.repeat(32)}.png`);
+  check('drawing: a paint block marked as a sigil drawing, its title shown',
+    canvas.type === PAINT_BLOCK_TYPE && isSigilDrawing(canvas) && !isSigilDrawing(createPaintBlock()) && canvas.attrs['data-block-show-title'] === '1', canvas);
+  check('drawing: the file name is a src in the markup', drawingImage(canvas) === `${'ab'.repeat(32)}.png` && canvas.html.startsWith('<img src="'));
 
   // The paint document: vector strokes as data JSON, the rendered image and layer images as src.
   {
@@ -475,7 +497,7 @@ console.log('\n4f. Sigil blocks\n');
     const saved = withDrawing(canvas, render, doc);
     const back = parseDrawing(parseBlocks(serializeBlocks([saved]))[0]);
     check('drawing: the render comes first, the layer image after it, both as src',
-      sigilImage(saved) === render && saved.html.includes(`src="${old}"`) && saved.html.indexOf(render) < saved.html.indexOf(old), saved.html);
+      drawingImage(saved) === render && saved.html.includes(`src="${old}"`) && saved.html.indexOf(render) < saved.html.indexOf(old), saved.html);
     check('drawing: round trip keeps layers, strokes, the layer image; points rounded',
       back.render === render && back.doc?.layers.length === 2 && back.doc.layers[0].image === old
         && back.doc.layers[1].name === 'Oben' && back.doc.layers[1].hidden // lang-ok
@@ -618,45 +640,50 @@ console.log('\n4f. Sigil blocks\n');
       copies.length === 2 && copies[0].group && copies[0].group !== 'g' && copies[0].group === copies[1].group, copies);
   }
 
-  const odd = parseSigilCharge({ ...createSigilChargeBlock(), attrs: { 'data-block-data': JSON.stringify({ loaded: 'ja', revealDate: 'morgen', lock: 'alles' }) } });
+  const odd = parseSigilCharge(virtualCharge({ 'data-block-data': JSON.stringify({ loaded: 'ja', revealDate: 'morgen', lock: 'alles' }) }));
   check('charge: nonsense falls back to safe values', !odd.loaded && odd.revealDate === null && odd.lock === 'entry', odd);
 
   const chargeData = { loaded: true, revealDate: '2030-01-01', lock: 'entry', technique: null, targets: null };
-  const charged = serializeSigilCharge(createSigilChargeBlock(), chargeData);
+  const charged = chargeOf(chargeData);
   const blocks = [calc, canvas, charged];
   const before = sigilState(blocks, '2029-12-31');
   const after = sigilState(blocks, '2030-01-01');
   check('loaded before the date: hidden and fully locked',
-    before.concealed.get(calc.id) === '2030-01-01' && before.concealed.has(canvas.id) && before.lockEntry
-      && before.locked.has(calc.id) && before.locked.has(canvas.id), before);
-  check('on the reveal day: visible, but still locked', after.concealed.size === 0 && after.lockEntry && after.locked.has(calc.id), after);
-  const sigilOnly = sigilState([calc, serializeSigilCharge(createSigilChargeBlock(), { ...chargeData, lock: 'sigil' })], '2029-01-01');
-  check('lock "sigils only": entry editable, sigil blocks not', !sigilOnly.lockEntry && sigilOnly.locked.has(calc.id));
+    before.concealed.get(calcPart(calc)) === '2030-01-01' && before.concealed.has(canvas.id) && before.lockEntry
+      && before.locked.has(calcPart(calc)) && before.locked.has(canvas.id), before);
+  check('on the reveal day: visible, but still locked', after.concealed.size === 0 && after.lockEntry && after.locked.has(calcPart(calc)), after);
+  const sigilOnly = sigilState([calc, chargeOf({ ...chargeData, lock: 'sigil' })], '2029-01-01');
+  check('lock "sigils only": entry editable, sigil blocks not', !sigilOnly.lockEntry && sigilOnly.locked.has(calcPart(calc)));
 
-  const noDate = sigilState([calc, serializeSigilCharge(createSigilChargeBlock(), { ...chargeData, revealDate: null })], '2099-01-01');
-  check('loaded without a target date: hidden until unloaded', noDate.concealed.has(calc.id) && noDate.concealed.get(calc.id) === null, noDate);
+  const noDate = sigilState([calc, chargeOf({ ...chargeData, revealDate: null })], '2099-01-01');
+  check('loaded without a target date: hidden until unloaded', noDate.concealed.has(calcPart(calc)) && noDate.concealed.get(calcPart(calc)) === null, noDate);
 
-  const onlyCanvas = serializeSigilCharge(createSigilChargeBlock(), { ...chargeData, lock: 'sigil', targets: [canvas.id] });
+  const painting = withDrawingImage(createPaintBlock(), `${'99'.repeat(32)}.png`);
+  const withPainting = sigilState([calc, canvas, painting, charged], '2029-12-31');
+  check('a charge for "all" leaves an unmarked paint block alone',
+    withPainting.concealed.has(canvas.id) && !withPainting.concealed.has(painting.id) && !withPainting.locked.has(painting.id), withPainting);
+
+  const onlyCanvas = chargeOf({ ...chargeData, lock: 'sigil', targets: [canvas.id] });
   const picked = sigilState([calc, canvas, onlyCanvas], '2029-12-31');
   check('charge with selection: conceals and locks only the chosen drawing',
-    picked.concealed.has(canvas.id) && !picked.concealed.has(calc.id) && !picked.locked.has(calc.id) && !picked.lockEntry, picked);
-  const pickedBack = parseSigilCharge(parseBlocks(serializeBlocks([onlyCanvas]))[0]);
+    picked.concealed.has(canvas.id) && !picked.concealed.has(calcPart(calc)) && !picked.locked.has(calcPart(calc)) && !picked.lockEntry, picked);
+  const pickedBack = parseSigilCharge(chargeUnit(parseBlocks(serializeBlocks([onlyCanvas]))[0]));
   check('charge: the selection survives the round trip, without a selection it is missing in the JSON',
-    pickedBack.targets?.join() === canvas.id && parseSigilCharge(charged).targets === null
+    pickedBack.targets?.join() === canvas.id && parseSigilCharge(chargeUnit(charged)).targets === null
       && !charged.attrs['data-block-data'].includes('targets'), pickedBack);
-  const oddTargets = parseSigilCharge({ ...createSigilChargeBlock(), attrs: { 'data-block-data': JSON.stringify({ targets: ['ok-1', 'ok-1', '<x>', 3, 'y'.repeat(65)] }) } });
+  const oddTargets = parseSigilCharge(virtualCharge({ 'data-block-data': JSON.stringify({ targets: ['ok-1', 'ok-1', '<x>', 3, 'y'.repeat(65)] }) }));
   check('charge: foreign selection — only harmless, unique IDs', oddTargets.targets?.join() === 'ok-1', oddTargets);
-  const later = sigilState([calc, serializeSigilCharge(createSigilChargeBlock(), { ...chargeData, targets: [calc.id] }),
-    serializeSigilCharge(createSigilChargeBlock(), { ...chargeData, revealDate: '2031-06-01', targets: [calc.id] })], '2029-12-31');
-  check('two charges on the same block: the longer one applies', later.concealed.get(calc.id) === '2031-06-01', later);
+  const later = sigilState([calc, chargeOf({ ...chargeData, targets: [calcPart(calc)] }),
+    chargeOf({ ...chargeData, revealDate: '2031-06-01', targets: [calcPart(calc)] })], '2029-12-31');
+  check('two charges on the same block: the longer one applies', later.concealed.get(calcPart(calc)) === '2031-06-01', later);
   const partial = withoutConcealed(serializeBlocks([calc, canvas, onlyCanvas]), '2029-12-31');
   check('search without the concealed drawing, with the free calculator',
-    partial.includes('core.sigil.calc') && !partial.includes('core.sigil.canvas'), partial);
+    partial.includes('Ich &lt;b&gt;bin') && !partial.includes('core.paint') && !partial.includes('abab'), partial);
 
   const content = serializeBlocks([createTextBlock('<p>Notiz</p>'), ...blocks]);
   const hiddenContent = withoutConcealed(content, '2029-12-31');
   check('hidden: search and export do not see calculator and drawing',
-    !hiddenContent.includes('core.sigil.calc') && !hiddenContent.includes('core.sigil.canvas') && hiddenContent.includes('Notiz'), hiddenContent);
+    !hiddenContent.includes('Ich &lt;b') && !hiddenContent.includes('core.paint') && hiddenContent.includes('Notiz'), hiddenContent);
   check('revealed: everything stays', withoutConcealed(content, '2030-02-01') === content);
 
   const secret = { ...createTextBlock('<p>geheim</p>'), attrs: { 'data-block-hidden': '1' } };
@@ -671,10 +698,12 @@ console.log('\n4f. Sigil blocks\n');
     exported.includes('sichtbar') && !exported.includes('geheim') && !exported.includes('Ich') && !exported.includes('<img')
       && exported.includes('<dt>Ziel</dt><dd>D:2030-01-01</dd>') && exported.includes('Geladen'), exported);
   check('export: no sections, title as heading, text without title',
-    !exported.includes('<section') && exported.includes('<h3>T:core.sigil.charge</h3>') && !exported.includes('T:core.text'), exported);
+    !exported.includes('<section') && exported.includes('<h3>T:core.fields</h3><dl><dt>Ziel</dt>') && !exported.includes('<dt>sigilCharge</dt>')
+      && !exported.includes('T:core.text'), exported);
   const revealed = renderBlocksForExport(exportedContent, exportText, '2030-02-01');
   check('export after the target date: calculator and drawing (with alt text) are included',
-    revealed.includes('Ich &lt;b&gt;bin') && revealed.includes(`<img src="${'ab'.repeat(32)}.png" alt="Zeichnung" data-export-placeholder="1">`), revealed);
+    revealed.includes('Ich &lt;b&gt;bin') && revealed.includes('<h3>T:core.paint</h3>')
+      && revealed.includes(`<img src="${'ab'.repeat(32)}.png" alt="T:core.paint" data-export-placeholder="1">`), revealed);
 
   const fieldsBlock = {
     id: 'fx', type: 'core.fields', html: '',
@@ -699,11 +728,11 @@ console.log('\n4f. Sigil blocks\n');
   check('export: a text block with the title switched on carries it', fieldsOut.includes('<h3>T:core.text</h3><p>mit Titel</p>'), fieldsOut);
 
   const journalSigil = serializeBlocks([createTextBlock('<p>Tagebuch</p>'), ...blocks]);
-  check('a sigil in the journal hides itself the same way', !withoutConcealed(journalSigil, '2029-12-31').includes('core.sigil.calc'));
+  check('a sigil in the journal hides itself the same way', !withoutConcealed(journalSigil, '2029-12-31').includes('Ich &lt;b'));
   check('letter list: at most 500, only short strings',
     letterList([...Array(2000).fill('A'), 'x'.repeat(9), 3]).length === 500 && letterList(['AB', 'x'.repeat(9), 3]).join() === 'AB');
   const t0 = Date.now();
-  parseSigilCharge({ ...createSigilChargeBlock(), html: '<p '.repeat(50000) });
+  parseSigilCharge(virtualCharge({}, '<p '.repeat(50000)));
   check('charge technique regex stays fast on crafted markup', Date.now() - t0 < 500, `${Date.now() - t0} ms`);
 }
 
@@ -797,7 +826,7 @@ console.log('\n4h. Sigils as parts of custom blocks\n');
   };
   let block = instantiateDefinition(def, text);
   block = setPart(block, 'calc', (p) => serializeSigilCalc(p, { intention: 'Geheime Absicht', letters: ['G', 'H'], implemented: [] }));
-  block = setPart(block, 'draw', (p) => withSigilImage(p, `${'ab'.repeat(32)}.png`));
+  block = setPart(block, 'draw', (p) => withDrawingImage(p, `${'ab'.repeat(32)}.png`));
   block = setPart(block, 'charge', (p) => serializeSigilCharge(p, {
     loaded: true, revealDate: '2030-01-01', lock: 'entry', technique: null, targets: null,
   }));
@@ -805,7 +834,7 @@ console.log('\n4h. Sigils as parts of custom blocks\n');
   const units = sigilUnits(back);
   check('the parts survive the round trip and are named <block>:<element>',
     units.map((u) => u.block.id).join() === ['calc', 'draw', 'charge'].map((e) => sigilPartId(block.id, e)).join()
-      && parseSigilCalc(units[0].block).intention === 'Geheime Absicht' && sigilImage(units[1].block) === `${'ab'.repeat(32)}.png`,
+      && parseSigilCalc(units[0].block).intention === 'Geheime Absicht' && drawingImage(units[1].block) === `${'ab'.repeat(32)}.png`,
     units.map((u) => u.block));
 
   const before = sigilState(back, '2029-12-31');
@@ -834,13 +863,13 @@ console.log('\n4h. Sigils as parts of custom blocks\n');
   const afterUnload = sigilState(parseBlocks(unloaded), '2029-12-31');
   check('unloading the part conceals nothing any more', afterUnload.concealed.size === 0 && !afterUnload.lockEntry, afterUnload);
 
-  const standaloneCharge = serializeSigilCharge(createSigilChargeBlock(), {
+  const standaloneCharge = chargeOf({
     loaded: true, revealDate: null, lock: 'sigil', technique: null, targets: [sigilPartId(block.id, 'draw')],
   });
   const mixed = sigilState([...parseBlocks(unloaded), standaloneCharge], '2029-12-31');
-  check('a charge block can conceal a part specifically (target <block>:<element>)',
+  check('a charge on its own can conceal a part specifically (target <block>:<element>)',
     mixed.concealed.has(sigilPartId(block.id, 'draw')) && !mixed.concealed.has(sigilPartId(block.id, 'calc'))
-      && parseSigilCharge(parseBlocks(serializeBlocks([standaloneCharge]))[0]).targets?.[0] === sigilPartId(block.id, 'draw'), mixed);
+      && parseSigilCharge(chargeUnit(parseBlocks(serializeBlocks([standaloneCharge]))[0])).targets?.[0] === sigilPartId(block.id, 'draw'), mixed);
 
   const summary = entryBlockSummary('sigil-part', content, '2029-12-31');
   check('the summary knows the sigil in the part (lock, no card image while hidden)',
@@ -851,7 +880,7 @@ console.log('\n4h. Sigils as parts of custom blocks\n');
     ...parseSigilCharge(p), targets: [sigilPartId(block.id, 'calc'), 'fremd-block'],
   }));
   const dup = withRenamedPartTargets({ ...targeted, id: dupId }, block.id, dupId);
-  const dupCharge = sigilUnits([dup]).find((u) => u.block.type === 'core.sigil.charge');
+  const dupCharge = sigilUnits([dup]).find((u) => u.block.type === 'sigilCharge');
   check('a duplicated block targets its own parts with its charge',
     parseSigilCharge(dupCharge.block).targets.join() === `${dupId}:calc,fremd-block`, parseSigilCharge(dupCharge.block));
 
@@ -882,7 +911,7 @@ console.log('\n4h. Sigils as parts of custom blocks\n');
 
   const presetDef = { ...def, id: 'def-preset', elements: configured.filter((e) => ['c', 'd', 'l'].includes(e.id)) };
   const presetCopy = instantiateDefinition(presetDef, text);
-  const presetCharge = sigilUnits([presetCopy]).find((u) => u.block.type === 'core.sigil.charge');
+  const presetCharge = sigilUnits([presetCopy]).find((u) => u.block.type === 'sigilCharge');
   const pc = parseSigilCharge(presetCharge.block);
   check('a new copy carries the charge unloaded, with lock and targets on its own parts',
     !pc.loaded && pc.lock === 'sigil' && pc.targets.join() === sigilPartId(presetCopy.id, 'd'), pc);
@@ -895,6 +924,120 @@ console.log('\n4h. Sigils as parts of custom blocks\n');
     parseFields(presetCopy).elements.find((e) => e.id === 'c').calcMode === 'auto'
       && parseFields(presetCopy).elements.find((e) => e.id === 'd').brushSize === 20
       && !presetCopy.attrs['data-block-config'].includes('defaultValue'));
+}
+
+console.log('\n4h1. A sigil part on its own shows without a label row — a custom block with one part does not\n');
+{
+  const exportText = {
+    title: (b) => `T:${b.type}`, date: (iso) => `D:${iso}`, number: String, targetDate: 'Ziel', technique: 'Technik',
+    loaded: 'Geladen', notLoaded: 'Offen', drawing: 'Zeichnung', fields: sigilFieldText,
+  };
+  const own = chargeOf({ loaded: false, revealDate: '2030-01-01', lock: 'entry', technique: null, targets: null });
+  const def = {
+    id: 'def-one', name: 'Monatsladung', icon: '', sort_order: 0, created_at: '', updated_at: '', deleted_at: null,
+    display: { readHideEmpty: true, readOnly: false, showTitle: false },
+    elements: parseDefinitionElements(JSON.stringify([{ id: 'charge', kind: 'sigilCharge', label: 'Monatsladung' }])),
+  };
+  const copy = instantiateDefinition(def, sigilFieldText);
+  const ownOut = renderBlocksForExport(serializeBlocks([own]), exportText);
+  const copyOut = renderBlocksForExport(serializeBlocks([copy]), exportText);
+  check('export: a charge on its own is the charge under its title, no label row',
+    ownOut.startsWith('<h3>T:core.fields</h3><dl><dt>Ziel</dt>') && !ownOut.includes('<dt>sigilCharge</dt>'), ownOut);
+  check('export: a custom block with one charge keeps its label row',
+    copyOut.includes('<dt>Monatsladung</dt>'), copyOut);
+}
+
+console.log('\n4h2. The sigil blocks of v42 to v63 become fields and paint blocks (v64)\n');
+{
+  const legacy = (type, data, html = '', attrs = {}) => ({
+    ...legacySigilBlock(type), html, attrs: { ...attrs, ...(data ? { 'data-block-data': JSON.stringify(data) } : {}) },
+  });
+  const img = `${'7c'.repeat(32)}.png`;
+  const chip = internalLinkChipHtml({ id: 'b2222222-2222-2222-2222-222222222222', entryType: 'wiki', label: 'Technik' });
+  const oldCalc = legacy(LEGACY_SIGIL_CALC_TYPE, { intention: 'Alte Absicht', letters: ['A', 'L'], implemented: ['A'] },
+    '<p>Alte Absicht</p><p><s>A</s> L</p>', { 'data-block-title': 'Mein Rechner' });
+  const oldCanvas = legacy(LEGACY_SIGIL_CANVAS_TYPE, null, `<img src="${img}" alt="">`, { 'data-block-hidden': '1' });
+  const oldCalc2 = legacy(LEGACY_SIGIL_CALC_TYPE, { intention: 'Zweite', letters: ['Z'], implemented: [] }, '<p>Zweite</p>');
+  const oldCharge = legacy(LEGACY_SIGIL_CHARGE_TYPE,
+    { loaded: true, revealDate: '2030-01-01', lock: 'sigil', targets: [oldCalc.id, oldCanvas.id, 'fremd-block', 'feld:draw'] },
+    `<p>2030-01-01</p><p data-block-slot="technique">${chip}</p>`);
+  const unreadable = { ...legacySigilBlock(LEGACY_SIGIL_CALC_TYPE), attrs: { 'data-block-data': '{kaputt' } };
+  const newer = legacy(LEGACY_SIGIL_CANVAS_TYPE, null, '', { 'data-block-v': '2' });
+  const partCharge = {
+    id: 'feld', type: 'core.fields', html: '',
+    attrs: {
+      'data-block-config': JSON.stringify({ elements: [{ id: 'l', kind: 'sigilCharge', label: '' }], display: { readHideEmpty: true, readOnly: false } }),
+      'data-block-data': JSON.stringify({ values: { l: { loaded: false, revealDate: null, lock: 'entry', targets: [oldCalc2.id] } } }),
+    },
+  };
+  const source = [createTextBlock('<p>Notiz</p>'), oldCalc, oldCanvas, oldCalc2, oldCharge, partCharge, unreadable, newer];
+  const content = serializeBlocks(source);
+  const out = contentWithoutLegacySigils(content, { calc: 'Rechner', charge: 'Ladung' });
+  const blocks = parseBlocks(out);
+  check('v64: every block keeps its ID and place',
+    blocks.map((b) => b.id).join() === source.map((b) => b.id).join(), blocks.map((b) => b.id));
+  check('v64: calculator and charge become fields blocks, the drawing a paint block; unreadable and newer ones stay',
+    blocks.map((b) => b.type).join() === 'core.text,core.fields,core.paint,core.fields,core.fields,core.fields,core.sigil.calc,core.sigil.canvas',
+    blocks.map((b) => b.type));
+
+  const calcModel = parseFields(blocks[1]);
+  const calcUnit = sigilUnits([blocks[1]])[0].block;
+  const calc = parseSigilCalc(calcUnit);
+  check('v64: the calculator keeps intention, letters, title; label and slot in the fallback',
+    calcModel.elements.map((e) => `${e.id}:${e.kind}`).join() === 'calc:sigilCalc' && !calcModel.display.readHideEmpty
+      && calc.intention === 'Alte Absicht' && calc.letters.join() === 'A,L' && calc.implemented.join() === 'A'
+      && blocks[1].attrs['data-block-title'] === 'Mein Rechner' && blocks[1].attrs['data-block-show-title'] === '1'
+      && blocks[1].html.startsWith('<dl><dt>Rechner</dt>')
+      && calcUnit.html === oldCalc.html && calcUnit.id === `${oldCalc.id}:calc`, [calcModel, blocks[1]]);
+
+  const drawing = blocks[2];
+  check('v64: the drawing is a marked paint block, hidden as before, with its picture as the only layer',
+    isSigilDrawing(drawing) && drawing.attrs['data-block-hidden'] === '1' && drawing.attrs['data-block-show-title'] === '1'
+      && drawingImage(drawing) === img && parseDrawing(drawing).doc?.layers[0].image === img, drawing);
+
+  const charge = parseSigilCharge(chargeUnit(blocks[4]));
+  check('v64: the charge keeps its state and technique; a calculator target becomes its part, the others stay',
+    charge.loaded && charge.revealDate === '2030-01-01' && charge.lock === 'sigil' && charge.technique === chip
+      && charge.targets.join() === [`${oldCalc.id}:calc`, oldCanvas.id, 'fremd-block', 'feld:draw'].join()
+      && blocks[4].html.includes('<dt>Ladung</dt>'), charge);
+  check('v64: a charge part of a custom block follows the calculator too',
+    parseSigilCharge(chargeUnit(blocks[5])).targets.join() === `${oldCalc2.id}:calc`, parseSigilCharge(chargeUnit(blocks[5])));
+  check('v64: unreadable and newer blocks are left byte for byte',
+    isDeepStrictEqual(blocks[6], parseBlocks(serializeBlocks([unreadable]))[0]) && isDeepStrictEqual(blocks[7], parseBlocks(serializeBlocks([newer]))[0]));
+
+  check('v64: a second run changes nothing', contentWithoutLegacySigils(out) === out);
+
+  const brokenDrawing = { ...legacySigilBlock(LEGACY_SIGIL_CANVAS_TYPE), html: `<img src="${img}" alt="">`, attrs: { 'data-block-data': '{kaputt' } };
+  const [rescued] = parseBlocks(contentWithoutLegacySigils(serializeBlocks([brokenDrawing])));
+  check('v64: a drawing with unreadable data still becomes a sigil drawing, showing its picture',
+    isSigilDrawing(rescued) && parseDrawing(rescued).render === img, rescued);
+  const prototypeNames = serializeBlocks([oldCalc, ...['constructor', '__proto__', 'toString'].map((type) => ({ id: `p-${type.replace(/_/g, '')}`, type, html: '<p>a</p>', attrs: {} }))]);
+  let protoOut = null;
+  try { protoOut = parseBlocks(contentWithoutLegacySigils(prototypeNames)); } catch { protoOut = null; }
+  check('v64: a block named like an object property is left alone, nothing throws',
+    protoOut !== null && protoOut.slice(1).map((b) => b.type).join() === 'constructor,__proto__,toString', protoOut);
+  const plain = serializeBlocks([createTextBlock('<p>core.paint, sigil</p>'), createFieldsBlock('date')]);
+  check('v64: content without the old blocks comes back as the same string', contentWithoutLegacySigils(plain) === plain);
+
+  const state = sigilState(blocks, '2029-12-31');
+  check('v64: the charge conceals what it concealed — the calculator part and the drawing, not the second calculator',
+    state.concealed.get(`${oldCalc.id}:calc`) === '2030-01-01' && state.concealed.has(oldCanvas.id)
+      && !state.concealed.has(`${oldCalc2.id}:calc`) && !state.lockEntry, state);
+  const hidden = withoutConcealed(out, '2029-12-31');
+  check('v64: search does not see what stays concealed', !hidden.includes('Alte Absicht') && !hidden.includes(img) && hidden.includes('Zweite'), hidden);
+
+  // `targets: null` — every calculator and drawing of the entry, before and after; a painting of its own is none of them.
+  const oldAll = legacy(LEGACY_SIGIL_CHARGE_TYPE, { loaded: true, revealDate: null, lock: 'entry' });
+  const painting = withDrawingImage(createPaintBlock(), `${'8d'.repeat(32)}.png`);
+  const all = parseBlocks(contentWithoutLegacySigils(serializeBlocks([oldCalc, oldCanvas, painting, oldAll])));
+  const allState = sigilState(all, '2099-01-01');
+  check('v64: a charge for "all" stays one, conceals calculator and drawing until unloaded, locks the entry',
+    parseSigilCharge(chargeUnit(all[3])).targets === null && allState.lockEntry
+      && allState.concealed.get(`${oldCalc.id}:calc`) === null && allState.concealed.get(oldCanvas.id) === null
+      && !allState.concealed.has(painting.id), allState);
+  const summary = entryBlockSummary('v64-all', serializeBlocks(all), '2099-01-01');
+  check('v64: the card still knows the sigil (lock, no image while concealed)',
+    summary.sigil?.lockEntry === true && summary.sigil.image === null, summary.sigil);
 }
 
 console.log('\n5. What is derived from the content sees through the blocks\n');
@@ -940,24 +1083,22 @@ console.log('\n6. Templates: assignment, insertion\n');
 
   // Insertion: new IDs, charge targets carried along, everything else as it is.
   const calc = createSigilCalcBlock();
-  const canvas = withSigilImage(createSigilCanvasBlock(), `${'ef'.repeat(32)}.png`);
-  const charge = serializeSigilCharge(createSigilChargeBlock(), {
-    loaded: true, revealDate: null, lock: 'entry', technique: null, targets: [canvas.id],
-  });
+  const canvas = withDrawingImage(createSigilCanvasBlock(), `${'ef'.repeat(32)}.png`);
+  const charge = chargeOf({ loaded: true, revealDate: null, lock: 'entry', technique: null, targets: [canvas.id] });
   const sigilTpl = tpl('sigil-tpl', [], serializeBlocks([createTextBlock('<p>Absicht</p>'), calc, canvas, charge]));
   const first = instantiateTemplateBlocks(sigilTpl);
   const second = instantiateTemplateBlocks(sigilTpl);
-  const firstCharge = parseSigilCharge(first[3]);
+  const firstCharge = parseSigilCharge(chargeUnit(first[3]));
   check('insertion: no block remembers the template', first.every((b) => !b.attrs['data-template-origin']), first.map((b) => b.attrs));
   check('insertion: new block IDs, different ones the second time too',
     first.every((b, i) => b.id !== parseBlocks(sigilTpl.content)[i].id && b.id !== second[i].id));
   check('insertion: the charge targets the new drawing and stays loaded, the drawing comes along',
-    firstCharge.loaded && firstCharge.targets.join() === first[2].id && sigilImage(first[2]) === `${'ef'.repeat(32)}.png`, firstCharge);
-  const allCharge = serializeSigilCharge(createSigilChargeBlock(), { loaded: true, revealDate: null, lock: 'entry', technique: null, targets: null });
+    firstCharge.loaded && firstCharge.targets.join() === first[2].id && drawingImage(first[2]) === `${'ef'.repeat(32)}.png`, firstCharge);
+  const allCharge = chargeOf({ loaded: true, revealDate: null, lock: 'entry', technique: null, targets: null });
   const appended = withChargesCoveringOnly([calc, allCharge]);
-  const appendedCharge = parseSigilCharge(appended[1]);
+  const appendedCharge = parseSigilCharge(chargeUnit(appended[1]));
   check('appended: a charge for "all sigils" covers only the blocks that came with it',
-    appendedCharge.loaded && appendedCharge.targets.join() === calc.id, appendedCharge);
+    appendedCharge.loaded && appendedCharge.targets.join() === calcPart(calc), appendedCharge);
   const existing = createSigilCanvasBlock();
   check('appended: the entry\'s own drawing stays visible',
     !sigilState([existing, ...appended], '2029-12-31').concealed.has(existing.id));
@@ -974,7 +1115,7 @@ console.log('\n6. Templates: assignment, insertion\n');
   };
   const partCopy = instantiateDefinition(partDef, partText);
   const [partBlock] = instantiateTemplateBlocks(tpl('part-tpl', [], serializeBlocks([partCopy])));
-  const partCharge = parseSigilCharge(sigilUnits([partBlock]).find((u) => u.block.type === 'core.sigil.charge').block);
+  const partCharge = parseSigilCharge(sigilUnits([partBlock]).find((u) => u.block.type === 'sigilCharge').block);
   check('insertion: a charge as a part targets the part in the new block',
     partBlock.id !== partCopy.id && partCharge.targets.join() === sigilPartId(partBlock.id, 'draw'), partCharge);
 

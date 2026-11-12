@@ -1,13 +1,22 @@
 import { useTranslation } from 'react-i18next';
 import { CANVAS_SWATCHES } from '../editors/canvas';
+import { isSigilDrawing } from '../../lib/blocks/paint';
 import DrawingBlock from './DrawingBlock';
+import SigilCanvasBlock from './SigilCanvasBlock';
 import type { BlockViewProps } from './blockViews';
 
 /** Where the brush starts: a middle size of the paint mode's range. */
 const START_SIZE = 8;
 
-/** The paint block (`core.paint`): a drawing of its own, in the canvas swatches. */
-export default function PaintBlock({ block, isEditing, onBlockChange, onPersist }: BlockViewProps) {
+/**
+ * The paint block (`core.paint`): a drawing of its own, in the canvas swatches.
+ * Marked as a sigil drawing, it is the sigil's drawing (`SigilCanvasBlock`).
+ */
+export default function PaintBlock(props: BlockViewProps) {
+  return isSigilDrawing(props.block) ? <SigilCanvasBlock {...props} /> : <Painting {...props} />;
+}
+
+function Painting({ block, isEditing, onBlockChange, onPersist }: BlockViewProps) {
   const { t } = useTranslation();
   return (
     <DrawingBlock

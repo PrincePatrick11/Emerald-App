@@ -1,5 +1,6 @@
 import { invoke } from '@tauri-apps/api/core';
 import { altarInserts } from './migrateAltars';
+import { contentWithoutLegacySigils, legacySigilLabels } from './blocks/legacySigilBlocks';
 import { contentWithAltarsAsOperations, convertAltars, elementsWithAltarsAsOperations, type Row } from './altarConversion';
 import { todayIso, withoutConcealed } from './blocks/sigil';
 import { imageRefsInHtml, readImageAsBase64, rewriteImageRefs, saveImage, storedImageName } from './images';
@@ -676,8 +677,11 @@ async function importedContent(
   items: SuggestionItem[],
   beforeSanitize: (html: string) => string | Promise<string> = (html) => html,
 ): Promise<string> {
-  // An older file's chips to altars and altar fields point at operations first, as v62 did.
-  const raw = typeof file.content === 'string' ? contentWithAltarsAsOperations(file.content) : '';
+  // An older file's chips to altars and altar fields point at operations first, as v62 did,
+  // and its sigil blocks become fields and paint blocks, as v64 did.
+  const raw = typeof file.content === 'string'
+    ? contentWithoutLegacySigils(contentWithAltarsAsOperations(file.content), legacySigilLabels(i18n.t))
+    : '';
   const remapped = await remapImages(raw, file.images ?? {});
   const relinked = remapImportedLinks(remapped, file.meta.contentLinks, items);
   return sanitizeImportedHtml(await beforeSanitize(relinked));

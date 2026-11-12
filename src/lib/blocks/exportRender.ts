@@ -3,17 +3,17 @@ import { isBlockHidden, showsTitleInRead } from './blockAttrs';
 import { parseBlocks } from './blockHtml';
 import { resolveBlockType, type BlockTypeMeta } from './blockTypes';
 import {
-  FIELDS_BLOCK_TYPE, fieldValueHtml, imageFromSlot, isElementEmpty, isHiddenInRead, isSigilKind, isSlotKind, parseFields,
+  FIELDS_BLOCK_TYPE, fieldValueHtml, imageFromSlot, isElementEmpty, isHiddenInRead, isSigilElement, isSlotKind, parseFields, soleSigilElement,
   type ElementDef, type FallbackText, type FieldsModel,
 } from './fields';
 import {
-  parseSigilCharge, sigilImage, sigilPartBlock, sigilState, SIGIL_CALC_TYPE, SIGIL_CANVAS_TYPE, SIGIL_CHARGE_TYPE,
+  parseSigilCharge, sigilPartBlock, sigilState, SIGIL_CANVAS_KIND, SIGIL_CHARGE_KIND,
   withoutConcealedParts,
   todayIso,
 } from './sigil';
 import { TEXT_BLOCK_TYPE, type BlockInstance } from './types';
 import { ALTAR_BLOCK_TYPE, CANVAS_BLOCK_TYPE, parseCanvasBlock } from './canvas';
-import { PAINT_BLOCK_TYPE } from './paint';
+import { drawingImage, PAINT_BLOCK_TYPE } from './paint';
 
 /**
  * The blocks of an entry as HTML for PDF and Markdown — one serializer per
@@ -79,12 +79,18 @@ function fieldValue(element: ElementDef, model: FieldsModel, text: ExportText): 
 function fieldsHtml(block: BlockInstance, text: ExportText, concealed: ReadonlyMap<string, string | null>): string {
   const model = parseFields(block);
   if (model.broken) return block.html;
+  // A sigil part on its own is shown as read mode shows it: the part, under the block's title.
+  const sole = soleSigilElement(model);
+  if (sole) {
+    const part = sigilPartBlock(block, sole, model);
+    return isHiddenInRead(sole, model) || concealed.has(part.id) ? '' : sigilHtml(part, text);
+  }
   const rows = model.elements
     .filter((element) => !isHiddenInRead(element, model))
     .flatMap((element) => {
-      if (!isSigilKind(element.kind)) return [row(text.fields.label(element), fieldValue(element, model, text) ?? '—')];
-      // A sigil part like a block of the same kind — if concealed it is missing entirely.
-      const part = sigilPartBlock(block, { ...element, kind: element.kind }, model);
+      if (!isSigilElement(element)) return [row(text.fields.label(element), fieldValue(element, model, text) ?? '—')];
+      // A sigil part as read mode shows it — if concealed it is missing entirely.
+      const part = sigilPartBlock(block, element, model);
       if (concealed.has(part.id)) return [];
       const body = sigilHtml(part, text);
       return body.trim() ? [row(text.fields.label(element), body)] : [];
@@ -92,14 +98,14 @@ function fieldsHtml(block: BlockInstance, text: ExportText, concealed: ReadonlyM
   return rows.length ? `<dl>${rows.join('')}</dl>` : '';
 }
 
-/** Calculator, drawing or charge — as a block as well as a part of a custom block. */
+/** Calculator, drawing or charge — a part of a fields block, as its virtual block. */
 function sigilHtml(block: BlockInstance, text: ExportText): string {
   switch (block.type) {
-    case SIGIL_CANVAS_TYPE: {
-      const image = sigilImage(block);
+    case SIGIL_CANVAS_KIND: {
+      const image = drawingImage(block);
       return image ? imageHtml(image, text.drawing) : '';
     }
-    case SIGIL_CHARGE_TYPE:
+    case SIGIL_CHARGE_KIND:
       return chargeHtml(block, text);
     default: // Calculator: its stored fallback is already the read version (intention, letters).
       return block.html;
@@ -123,12 +129,8 @@ function bodyHtml(
   switch (meta?.id) {
     case FIELDS_BLOCK_TYPE:
       return fieldsHtml(block, text, concealed);
-    case SIGIL_CALC_TYPE:
-    case SIGIL_CANVAS_TYPE:
-    case SIGIL_CHARGE_TYPE:
-      return sigilHtml(block, text);
     case PAINT_BLOCK_TYPE: {
-      const image = sigilImage(block);
+      const image = drawingImage(block);
       return image ? imageHtml(image, text.title(block, meta)) : '';
     }
     case CANVAS_BLOCK_TYPE:

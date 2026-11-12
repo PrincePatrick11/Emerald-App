@@ -6,6 +6,8 @@ import type { BlockDefinitionPatch } from './blockDefinitionStore';
 import type { TemplatePatch } from './templateStore';
 import type { VaultFileRead } from '../lib/vaultSettings';
 import { tagNameKey } from '../lib/tagRefs';
+import { contentWithoutLegacySigils, legacySigilLabels } from '../lib/blocks/legacySigilBlocks';
+import i18n from '../i18n';
 
 /** What the page of a custom block edits — exactly what `updateDefinition` accepts. */
 export type DefinitionDraft = Required<BlockDefinitionPatch>;
@@ -259,7 +261,8 @@ export const useTemplateDraftStore = createDraftStore<TemplateDraft>('templates'
   name: text(raw.name),
   icon: text(raw.icon),
   title: text(raw.title),
-  content: text(raw.content),
+  // A draft from before v64 with the old sigil blocks, as the migration converted its template.
+  content: contentWithoutLegacySigils(text(raw.content), legacySigilLabels(i18n.t)),
   tags: Array.isArray(raw.tags) ? raw.tags.filter((tag): tag is string => typeof tag === 'string') : [],
 }));
 

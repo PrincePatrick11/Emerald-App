@@ -4,6 +4,7 @@ import type { BlockTypeMeta } from './blockTypes';
 import {
   activeElements, elementKindLabelKey, FIELDS_BLOCK_TYPE, parseFields, type ElementDef, type FallbackText,
 } from './fields';
+import { isSigilDrawing } from './paint';
 
 /**
  * Reading and setting the instance attributes from `BLOCK_ATTR` — the same
@@ -43,6 +44,7 @@ export function blockTypeLabel(t: TFunction, block: BlockInstance, meta: BlockTy
     const elements = activeElements(model);
     if (elements.length === 1) return elementLabel(t, elements[0]);
   }
+  if (isSigilDrawing(block)) return t(elementKindLabelKey('sigilCanvas'));
   return t(meta.labelKey);
 }
 

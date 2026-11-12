@@ -130,11 +130,12 @@ writeFileSync(
    export { ddlBeforeV49 } from '${process.cwd().replace(/\\/g, '/')}/src/lib/schemaV48';
    export { assertPayloadReferencesResolve, dropUnknownTagIds, entryRowsForInsert, importTagsAndRemap, migrateBackupPayload, withRoutinesAsTemplates } from '${process.cwd().replace(/\\/g, '/')}/src/lib/dbBackup';
    export { invalidateVaultCache } from '${process.cwd().replace(/\\/g, '/')}/src/lib/vaultManager';
-   export { convertLegacySigils, needsSigilConversion, sigilRowToContent } from '${process.cwd().replace(/\\/g, '/')}/src/lib/migrateLegacySigils';
+   export { convertLegacySigils, convertLegacySigilsInPlace, needsSigilConversion, sigilRowToContent } from '${process.cwd().replace(/\\/g, '/')}/src/lib/migrateLegacySigils';
    export { linkedIdsToContent, rowsLinkSource } from '${process.cwd().replace(/\\/g, '/')}/src/lib/migrateLinkedIdsToContent';
    export { journalFieldsToContent } from '${process.cwd().replace(/\\/g, '/')}/src/lib/migrateJournalFieldsToContent';
    export { stripTagIds, replaceTagId } from '${process.cwd().replace(/\\/g, '/')}/src/lib/tagRefs';
-   export { createAltarTables, convertAltarsInPlace } from '${process.cwd().replace(/\\/g, '/')}/src/lib/migrateAltars';`
+   export { createAltarTables, convertAltarsInPlace } from '${process.cwd().replace(/\\/g, '/')}/src/lib/migrateAltars';
+   export { contentWithoutLegacySigils } from '${process.cwd().replace(/\\/g, '/')}/src/lib/blocks/legacySigilBlocks';`
 );
 
 const bundlePath = join(workDir, 'bundle.mjs');
@@ -174,6 +175,7 @@ const {
   assertPayloadReferencesResolve, convertLegacySigils, migrateBackupPayload, withRoutinesAsTemplates,
   needsSigilConversion, sigilRowToContent, linkedIdsToContent, rowsLinkSource, journalFieldsToContent,
   stripTagIds, replaceTagId, importTagsAndRemap, dropUnknownTagIds, createAltarTables, convertAltarsInPlace,
+  contentWithoutLegacySigils, convertLegacySigilsInPlace,
 } = await import(pathToFileURL(bundlePath).href);
 
 // v62 turns the altars into operations and empties their tables, v63 drops
@@ -1637,7 +1639,8 @@ console.log('\n8g. Migration v42: sigils become blocks\n');
 
   await runMigrations(v42);
   const [carried] = await v42.select("SELECT content FROM entries WHERE id='g1' AND type='operation'");
-  check('v49 carries over the sigil blocks unchanged', carried?.content === g1.content, carried?.content);
+  check('v49 carries over the sigil blocks, v64 converts them',
+    carried?.content === contentWithoutLegacySigils(g1.content) && !carried.content.includes('core.sigil.'), carried?.content);
   check('v42: schema identical to the baseline', JSON.stringify(await readSchema(v42)) === JSON.stringify(schemaA));
   v42.close();
 }
@@ -1684,9 +1687,9 @@ console.log('\n8i. Migration v43: templates and the sigil template\n');
       JSON.stringify(rows)
     );
     check(
-      `${label}: with calculator, drawing and charge (harness: English name)`,
-      t && t.name === 'Sigil' &&
-        ['core.sigil.calc', 'core.sigil.canvas', 'core.sigil.charge'].every((type) => t.content.includes(`data-block="${type}"`)),
+      `${label}: with calculator, drawing and charge as fields and paint blocks (harness: English name)`,
+      t && t.name === 'Sigil' && !t.content.includes('core.sigil.') && t.content.includes('data-block="core.paint"')
+        && ['sigilCalc', 'sigilCharge'].every((kind) => t.content.includes(kind)),
       t?.content
     );
   }
@@ -2105,6 +2108,63 @@ console.log('\n8n. Migration v49: three entry tables become entries\n');
   db.close();
 }
 
+console.log('\n8v. Migration v64: the sigil blocks become fields and paint blocks\n');
+
+{
+  const db = freshDb('v64.db');
+  await runMigrations(db);
+  const up64 = MIGRATIONS.find((m) => m.version === 64).up;
+  const enc = (value) => JSON.stringify(value).replace(/"/g, '&quot;');
+  const img = `${'b'.repeat(64)}.png`;
+  // Loaded with a date, only the calculator and drawing named; a second calculator stays free.
+  const loaded = `<section data-block="core.sigil.calc" data-block-id="c1" data-block-data="${enc({ intention: 'Geheim', letters: ['G'], implemented: [] })}"><p>Geheim</p><p>G</p></section>`
+    + `<section data-block="core.sigil.canvas" data-block-id="d1"><img src="${img}" alt=""></section>`
+    + `<section data-block="core.sigil.calc" data-block-id="c2" data-block-data="${enc({ intention: 'Offen', letters: ['O'], implemented: [] })}"><p>Offen</p></section>`
+    + `<section data-block="core.sigil.charge" data-block-id="l1" data-block-data="${enc({ loaded: true, revealDate: '2099-01-01', lock: 'sigil', targets: ['c1', 'd1'] })}"><p>2099-01-01</p></section>`;
+  // Loaded without a date for "all", locking the entry; in the trash.
+  const all = `<section data-block="core.sigil.calc" data-block-id="c3" data-block-data="${enc({ intention: 'Alles', letters: ['A'], implemented: [] })}"><p>Alles</p></section>`
+    + `<section data-block="core.sigil.charge" data-block-id="l3" data-block-data="${enc({ loaded: true, revealDate: null, lock: 'entry' })}"></section>`;
+  const untouched = '<p>Kein Siegel</p>';
+  await db.execute(`INSERT INTO entries (id,type,title,content,created_at,updated_at,deleted_at) VALUES
+    ('s1','operation','Loaded',$1,$4,$4,NULL), ('s2','journal','All',$2,$4,$4,$4), ('s3','wiki','None',$3,$4,$4,NULL)`,
+  [loaded, all, untouched, now]);
+  await db.execute(`INSERT INTO templates (id,name,content,created_at,updated_at) VALUES ('t64','Old sigil',$1,$2,$2)`, [loaded, now]);
+
+  await up64(db);
+  await up64(db);
+
+  const row = async (table, id) => (await db.select(`SELECT content, updated_at FROM ${table} WHERE id=$1`, [id]))[0];
+  const [s1, s2, s3, t64] = [await row('entries', 's1'), await row('entries', 's2'), await row('entries', 's3'), await row('templates', 't64')];
+  check('v64: no old sigil block is left, in entries, the trash and templates',
+    [s1, s2, t64].every((r) => !r.content.includes('core.sigil.')), [s1.content, s2.content, t64.content]);
+  check('v64: entries and templates are converted alike, by the shared converter',
+    s1.content === contentWithoutLegacySigils(loaded) && t64.content === s1.content && s2.content === contentWithoutLegacySigils(all));
+  check('v64: the calculators are fields blocks under their IDs, the drawing a sigil paint block with its picture',
+    s1.content.includes('data-block="core.fields" data-block-id="c1"') && s1.content.includes('data-block="core.paint" data-block-id="d1"')
+      && s1.content.includes(`src="${img}"`) && s1.content.includes('&quot;sigil&quot;:true'), s1.content);
+  check('v64: the charge targets the calculator part and the drawing, the second calculator stays free',
+    s1.content.includes(enc(['c1:calc', 'd1'])) && !s1.content.includes('c2:calc'), s1.content);
+  check('v64: a charge for "all" stays one (no targets written)', !s2.content.includes('targets'), s2.content);
+  check('v64: an entry without sigil blocks is not touched', s3.content === untouched && s3.updated_at === now);
+  check('v64: updated_at stays as it was', s1.updated_at === now && s2.updated_at === now);
+  check('v64: a backup beforehand', readdirSync(join(workDir, 'v64')).some((f) => f.includes('.pre-v64')));
+  check('v64: schema identical to the baseline', JSON.stringify(await readSchema(db)) === JSON.stringify(schemaA));
+  db.close();
+
+  // Nothing to convert: no backup. And the import path (no backup callback) converts the same.
+  const quiet = freshDb('v64-quiet.db');
+  await runMigrations(quiet);
+  await MIGRATIONS.find((m) => m.version === 64).up(quiet);
+  check('v64: without sigil blocks no backup is made', !readdirSync(join(workDir, 'v64-quiet')).some((f) => f.includes('.pre-v64')));
+  await quiet.execute(`INSERT INTO entries (id,type,title,content,created_at,updated_at) VALUES ('i1','operation','Imported',$1,$2,$2)`, [loaded, now]);
+  await convertLegacySigilsInPlace(quiet);
+  const [imported] = await quiet.select("SELECT content FROM entries WHERE id='i1'");
+  check('import: the working copy converts an imported sigil like v64, without a backup',
+    imported?.content === contentWithoutLegacySigils(loaded)
+      && !readdirSync(join(workDir, 'v64-quiet')).some((f) => f.includes('.pre-v64')), imported?.content);
+  quiet.close();
+}
+
 {
   // An '11' file carries `entries`; the import splits it by type again.
   const backup = {
@@ -2173,7 +2233,7 @@ console.log('\n8n. Migration v49: three entry tables become entries\n');
   await db.execute("UPDATE operations SET drawing_data='data:image/png;base64,CCCC' WHERE id='s1'");
   await runMigrations(db);
   const [s1] = await db.select("SELECT content FROM entries WHERE id='s1'");
-  check('on the next attempt it becomes a block and v49 runs through', s1?.content.includes('core.sigil.canvas'), s1?.content);
+  check('on the next attempt it becomes a block and v49 runs through', s1?.content.includes('data-block="core.paint"'), s1?.content);
   db.close();
 }
 
@@ -2521,6 +2581,7 @@ console.log('\n9. Mirrored constants\n');
 
 baseline.close();
 chain.close();
+chainNoAltars.close();
 seeded.close();
 
 console.log('');

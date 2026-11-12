@@ -61,6 +61,13 @@ export function isSigilKind(kind: ElementKind): kind is SigilElementKind {
   return kind === 'sigilCalc' || kind === 'sigilCanvas' || kind === 'sigilCharge';
 }
 
+/** An element that is a sigil part. */
+export type SigilElement = ElementDef & { kind: SigilElementKind };
+
+export function isSigilElement(element: ElementDef): element is SigilElement {
+  return isSigilKind(element.kind);
+}
+
 /** The i18n key for the name of an element kind — picker, label, placeholder. */
 export function elementKindLabelKey(kind: ElementKind): string {
   return `blocks.kinds.${kind}`;
@@ -260,6 +267,24 @@ export function parseDisplay(raw: unknown): DisplayRules {
 /** The elements the block shows — without the archived ones. */
 export function activeElements(model: FieldsModel): ElementDef[] {
   return model.elements.filter((e) => !e.archived);
+}
+
+/** The element IDs of a calculator and a charge standing on their own (`sigil.ts`). */
+export const SIGIL_CALC_ELEMENT_ID = 'calc';
+export const SIGIL_CHARGE_ELEMENT_ID = 'charge';
+
+/**
+ * The sigil part the block is — a calculator or a charge on its own, not a
+ * copy of a custom block (which carries its name) — or `null`. Such a block
+ * shows the part itself, under the block's title, without a label row or
+ * settings: in read and edit mode, in the sidebar, in the export, in a
+ * charge's list of what it covers.
+ */
+export function soleSigilElement(model: FieldsModel): SigilElement | null {
+  if (model.name.trim()) return null;
+  const [only, ...more] = activeElements(model);
+  return only && more.length === 0 && isSigilElement(only)
+    && (only.id === SIGIL_CALC_ELEMENT_ID || only.id === SIGIL_CHARGE_ELEMENT_ID) ? only : null;
 }
 
 function parseValue(kind: ElementKind, raw: unknown): FieldValue | undefined {

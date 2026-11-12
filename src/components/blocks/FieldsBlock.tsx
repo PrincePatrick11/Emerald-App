@@ -2,9 +2,9 @@ import { useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { elementLabel } from '../../lib/blocks/blockAttrs';
 import {
-  activeElements, imageFromSlot, isElementEmpty, isHiddenInRead, isSigilKind, isSlotKind, linkFromSlot, parseFields,
-  serializeFields,
-  type ElementDef, type FieldValue, type FieldsModel,
+  activeElements, imageFromSlot, isElementEmpty, isHiddenInRead, isSigilElement, isSigilKind, isSlotKind, linkFromSlot, parseFields,
+  serializeFields, soleSigilElement,
+  type ElementDef, type SigilElement, type FieldValue, type FieldsModel,
 } from '../../lib/blocks/fields';
 import { isBlankContent } from '../../lib/internalLinkHtml';
 import { formatIsoDateLong } from '../../lib/formatDate';
@@ -36,8 +36,8 @@ type Setter = (value: FieldValue | undefined) => void;
  * A text element is the same editor as the text block (`FieldText`); its
  * HTML sits in the slot and is only written in edit mode.
  *
- * Sigil parts (calculator, drawing, charge) are rendered by `SigilPart` with the
- * components of the blocks of the same name. Charging and discharging always work in
+ * Sigil parts (calculator, drawing, charge) are rendered by `SigilPart`; a
+ * part on its own is shown without a label row, under the block's title. Charging and discharging always work in
  * read mode, even with "completely read-only" or a locked
  * entry, otherwise a sigil could never be discharged again.
  */
@@ -73,6 +73,26 @@ export default function FieldsBlock({ block, blocks, isEditing, onBlockChange, o
   const elements = isEditing ? activeElements(model) : model.elements.filter((el) => !isHiddenInRead(el, model));
   if (elements.length === 0) return null;
 
+  const sigilPart = (element: SigilElement) => (
+    <SigilPart
+      element={element}
+      block={block}
+      blocks={blocks}
+      model={model}
+      isEditing={isEditing}
+      sigil={sigil}
+      write={write}
+      // Only the charge may act despite the lock and "read-only", and
+      // the drawing, whose saving has outlasted "Done".
+      persist={element.kind === 'sigilCharge' || element.kind === 'sigilCanvas' ? persist : undefined}
+    />
+  );
+
+  // A sigil part on its own (a calculator, a charge) is the part itself, without
+  // a label row: the block's title names it, as it always did.
+  const sole = soleSigilElement(model);
+  if (sole) return sigilPart(sole);
+
   return (
     <div className={isEditing ? 'block-fields block-fields--edit' : 'block-fields'}>
       {elements.map((element) => (
@@ -98,19 +118,8 @@ export default function FieldsBlock({ block, blocks, isEditing, onBlockChange, o
                   if (isEditing) setSlot(element)(isBlankContent(html) ? null : html);
                 }}
               />
-            ) : isSigilKind(element.kind) ? (
-              <SigilPart
-                element={{ ...element, kind: element.kind }}
-                block={block}
-                blocks={blocks}
-                model={model}
-                isEditing={isEditing}
-                sigil={sigil}
-                write={write}
-                // Only the charge may act despite the lock and "read-only", and
-                // the drawing, whose saving has outlasted "Done".
-                persist={element.kind === 'sigilCharge' || element.kind === 'sigilCanvas' ? persist : undefined}
-              />
+            ) : isSigilElement(element) ? (
+              sigilPart(element)
             ) : isEditing ? (
               <FieldEditor element={element} model={model} set={setValue(element)} setSlot={setSlot(element)} />
             ) : (

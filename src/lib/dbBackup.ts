@@ -11,6 +11,7 @@
  */
 
 import { convertAltarsInPlace, createAltarTables, removeAltarTables } from './migrateAltars';
+import { legacySigilLabels } from './blocks/legacySigilBlocks';
 import { elementsWithAltarsAsOperations } from './altarConversion';
 import { invoke } from '@tauri-apps/api/core';
 import { save, open } from '@tauri-apps/plugin-dialog';
@@ -45,7 +46,7 @@ import {
   ALTAR_TEMPLATE_ID, assignedCategoryId, assignmentKey, isTemplateId, parseAssignments, SIGIL_TEMPLATE_ID, templateToRow,
 } from './blocks/templates';
 import { fromRow } from './row';
-import { needsSigilConversion, sigilRowToContent, type LegacySigilRow } from './migrateLegacySigils';
+import { convertLegacySigilsInPlace, needsSigilConversion, sigilRowToContent, type LegacySigilRow } from './migrateLegacySigils';
 import { linkedIdsToContent, rowsLinkSource } from './migrateLinkedIdsToContent';
 import { journalFieldsToContent } from './migrateJournalFieldsToContent';
 import { IMAGE_FIELDS, imageColumns, storedImageName } from './schema';
@@ -1627,6 +1628,8 @@ async function doReplace(db: Awaited<ReturnType<typeof getDb>>, backup: BackupFi
   if (d.taskLinks) await insertRows(db, 'task_links', d.taskLinks);
   // The file's version of an altar replaces its operation here.
   await importAltars(db, altars, altarItems, d.altarPlacements ?? [], true);
+  // The sigil blocks of an older file (or made from its sigil rows) as v64 converts them.
+  await convertLegacySigilsInPlace(db, legacySigilLabels(i18n.t));
 
   // A partial replace (e.g. only tasks) can orphan existing links that point to
   // just-replaced targets — and imported task_links
@@ -1805,6 +1808,7 @@ async function doMerge(db: Awaited<ReturnType<typeof getDb>>, backup: BackupFile
   await insertTasks(db, tasks);
   await insertRows(db, 'task_links', taskLinks, true);
   await importAltars(db, altars, altarItems, altarPlacements, false);
+  await convertLegacySigilsInPlace(db, legacySigilLabels(i18n.t));
 
   // Imported task_links can point to targets that the type filter
   // has just deselected — sweep them out as in doReplace.

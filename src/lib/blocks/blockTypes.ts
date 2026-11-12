@@ -1,7 +1,6 @@
-import { Brush, Frame, PenTool, SlidersHorizontal, Sparkles, Type, Zap, type LucideIcon } from 'lucide-react';
+import { Brush, Frame, SlidersHorizontal, Type, type LucideIcon } from 'lucide-react';
 import { BLOCK_ATTR, TEXT_BLOCK_TYPE, type BlockInstance, type BlockTypeId } from './types';
 import { FIELDS_BLOCK_TYPE } from './fields';
-import { SIGIL_CALC_TYPE, SIGIL_CANVAS_TYPE, SIGIL_CHARGE_TYPE } from './sigil';
 import { ALTAR_BLOCK_TYPE, CANVAS_BLOCK_TYPE } from './canvas';
 import { PAINT_BLOCK_TYPE } from './paint';
 import { AltarIcon } from '../altarIcon';
@@ -90,20 +89,6 @@ const BLOCK_TYPES = new Map<string, BlockTypeMeta>([
     dataVersion: 1,
     defaultShowTitle: false,
   }],
-  ...([
-    [SIGIL_CALC_TYPE, Sparkles, 'sigilCalc'],
-    [SIGIL_CANVAS_TYPE, PenTool, 'sigilCanvas'],
-    [SIGIL_CHARGE_TYPE, Zap, 'sigilCharge'],
-  ] as const).map(([id, icon, key]): [string, BlockTypeMeta] => [id, {
-    id,
-    origin: 'core',
-    icon,
-    labelKey: `blocks.types.${key}.label`,
-    descriptionKey: `blocks.types.${key}.description`,
-    group: 'sigil',
-    dataVersion: 1,
-    defaultShowTitle: true,
-  }]),
 ]);
 
 /**

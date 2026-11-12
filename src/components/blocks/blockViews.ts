@@ -1,16 +1,13 @@
 import type { ComponentType } from 'react';
 import { TEXT_BLOCK_TYPE, type BlockInstance } from '../../lib/blocks/types';
 import { FIELDS_BLOCK_TYPE, type ElementDef } from '../../lib/blocks/fields';
-import { SIGIL_CALC_TYPE, SIGIL_CANVAS_TYPE, SIGIL_CHARGE_TYPE, type SigilState } from '../../lib/blocks/sigil';
+import type { SigilState } from '../../lib/blocks/sigil';
 import { ALTAR_BLOCK_TYPE, CANVAS_BLOCK_TYPE } from '../../lib/blocks/canvas';
 import { PAINT_BLOCK_TYPE } from '../../lib/blocks/paint';
 import TextBlock from './TextBlock';
 import CanvasBlock from './CanvasBlock';
 import PaintBlock from './PaintBlock';
 import FieldsBlock from './FieldsBlock';
-import SigilCalcBlock from './SigilCalcBlock';
-import SigilCanvasBlock from './SigilCanvasBlock';
-import SigilChargeBlock from './SigilChargeBlock';
 
 /**
  * Which component renders a block type: the component part of the
@@ -44,7 +41,7 @@ export interface BlockViewProps {
    * sigil) into the entry immediately. Absent if the entry does not allow it.
    */
   onPersist?: (next: BlockInstance) => void;
-  /** What the charge block gives the entry: locked, concealed (see `sigilState`). */
+  /** What the charges give the entry: locked, concealed (see `sigilState`). */
   sigil: SigilState;
   /**
    * Only for a sigil part of a custom block (`SigilPart`): its
@@ -56,9 +53,6 @@ export interface BlockViewProps {
 export const BLOCK_VIEWS: ReadonlyMap<string, ComponentType<BlockViewProps>> = new Map<string, ComponentType<BlockViewProps>>([
   [TEXT_BLOCK_TYPE, TextBlock],
   [FIELDS_BLOCK_TYPE, FieldsBlock],
-  [SIGIL_CALC_TYPE, SigilCalcBlock],
-  [SIGIL_CANVAS_TYPE, SigilCanvasBlock],
-  [SIGIL_CHARGE_TYPE, SigilChargeBlock],
   [CANVAS_BLOCK_TYPE, CanvasBlock],
   [ALTAR_BLOCK_TYPE, CanvasBlock],
   [PAINT_BLOCK_TYPE, PaintBlock],

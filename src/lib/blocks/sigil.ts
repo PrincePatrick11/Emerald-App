@@ -1,82 +1,71 @@
 import { escapeHtml } from '../internalLinkHtml';
 import { generateId } from '../helpers';
-import { decodeHtmlAttr, neutralizeSectionTags, parseBlocks, serializeBlocks } from './blockHtml';
+import { neutralizeSectionTags, parseBlocks, serializeBlocks } from './blockHtml';
 import {
-  FIELDS_BLOCK_TYPE, isSigilKind, parseFields, withElementValue, withoutElementContent,
-  type ElementDef, type FieldsModel, type SigilElementKind,
+  DEFAULT_DISPLAY, FIELDS_BLOCK_TYPE, isSigilElement, SIGIL_CALC_ELEMENT_ID, SIGIL_CHARGE_ELEMENT_ID, parseFields, withElementValue, withoutElementContent,
+  type ElementDef, type FieldsModel, type SigilElement, type SigilElementKind,
 } from './fields';
-import { BLOCK_ATTR, type BlockInstance, type BlockTypeId } from './types';
-import { paintDocFromImage, paintDocFromJson, paintDocToJson, type PaintDoc } from '../paint/document';
+import { createSigilDrawingBlock, isSigilDrawing, PAINT_BLOCK_TYPE } from './paint';
+import { readBlockData, withBlockData } from './blockJson';
+import { BLOCK_ATTR, type BlockInstance } from './types';
 
 /**
- * The three sigil blocks (since v42; previously a separate view with its own
- * columns on `operations`):
- * - Calculator (`core.sigil.calc`): intention, letter bank, implemented letters.
- * - Drawing (`core.sigil.canvas`): the canvas editor's paint document as data
- *   JSON, its rendered image and layer images as `<img src="{sha}.png">` in the
- *   inner HTML so that the image cleanup sees them (`parseDrawing`).
- * - Charge (`core.sigil.charge`): loaded, target date, charging technique (as a
- *   link chip in the markup), what "loaded" locks and which calculators and
- *   drawings it conceals.
+ * A sigil: calculator, drawing, charge (since v42; previously a separate view
+ * with its own columns on `operations`; v42–v63 three block types of their
+ * own, see `legacySigilBlocks.ts`).
+ * - Calculator (field kind `sigilCalc`): intention, letter bank, implemented letters.
+ * - Drawing: a paint block marked as a sigil drawing (`isSigilDrawing`), or
+ *   the drawing part of a custom block (field kind `sigilCanvas`) — the
+ *   paint document of `lib/blocks/paint.ts` either way.
+ * - Charge (field kind `sigilCharge`): loaded, target date, charging technique
+ *   (as a link chip in the markup), what "loaded" locks and which calculators
+ *   and drawings it conceals.
+ *
+ * Calculator and charge are always elements of a fields block — on their own a
+ * fields block with that one element, as every single field is. A part is
+ * read as a virtual block with the ID `<block ID>:<element ID>` and the field
+ * kind as its type (`sigilUnits`); a sigil drawing block is a unit of its own.
+ * Loading, concealing and locking do not distinguish where a unit sits.
  *
  * The state of the entry — locked, which blocks are concealed — results
- * from the charges (`sigilState`), no longer from the "Sigils"
- * category.
- *
- * The same three exist as parts of a custom block (field kinds
- * `sigilCalc`/`sigilCanvas`/`sigilCharge`). A part here is a virtual
- * block with the ID `<block ID>:<element ID>` (`sigilUnits`) — loading, concealing
- * and locking do not distinguish whether a sigil is a block or a part.
+ * from the charges (`sigilState`), not from the "Sigils" category.
  *
  * Pure and DOM-free like the rest of `lib/blocks`: the migration uses it.
  */
 
-export const SIGIL_CALC_TYPE = 'core.sigil.calc' satisfies BlockTypeId;
-export const SIGIL_CANVAS_TYPE = 'core.sigil.canvas' satisfies BlockTypeId;
-export const SIGIL_CHARGE_TYPE = 'core.sigil.charge' satisfies BlockTypeId;
-
-/** Appears in the content as soon as it carries a sigil block — the cheap pre-filter before parsing. */
-export const SIGIL_BLOCK_MARKER = 'data-block="core.sigil.';
+/** The virtual block types of the parts: the field kinds themselves. */
+export const SIGIL_CALC_KIND = 'sigilCalc' satisfies SigilElementKind;
+export const SIGIL_CANVAS_KIND = 'sigilCanvas' satisfies SigilElementKind;
+export const SIGIL_CHARGE_KIND = 'sigilCharge' satisfies SigilElementKind;
 
 // A sigil part appears in the config JSON of a field block. Deliberately only
 // the kind name, without quotes: those are entity-encoded in the attribute, and
 // imported content may encode them differently (`&#34;`, single
 // quotes) — a pre-filter that is too narrow would let concealed parts through.
-const SIGIL_ELEMENT_MARKERS = ['sigilCalc', 'sigilCanvas', 'sigilCharge'];
+const SIGIL_ELEMENT_MARKERS = [SIGIL_CALC_KIND, SIGIL_CANVAS_KIND, SIGIL_CHARGE_KIND];
 
-/** Can the content carry a sigil (block or part)? The pre-filter before parsing. */
+/** Can the content carry a sigil (part or sigil drawing)? The pre-filter before parsing. */
 export function mayHoldSigil(content: string): boolean {
-  return content.includes('core.sigil.') || SIGIL_ELEMENT_MARKERS.some((m) => content.includes(m));
+  return SIGIL_ELEMENT_MARKERS.some((m) => content.includes(m))
+    || (content.includes(PAINT_BLOCK_TYPE) && content.includes('sigil'));
 }
 
 /** Can the content carry a charge? Without a charge nothing is concealed or locked. */
 function mayHoldCharge(content: string): boolean {
-  return content.includes(SIGIL_CHARGE_TYPE) || content.includes('sigilCharge');
+  return content.includes(SIGIL_CHARGE_KIND);
 }
 
-/** Calculator and drawing — what a loaded sigil conceals and locks. */
+/**
+ * Is a unit of `sigilUnits` a drawing (a sigil drawing block or a drawing part)?
+ * Only for the type of a unit: a plain paint block is never one, `sigilUnits` leaves it out.
+ */
+export function isDrawingUnitType(type: string): boolean {
+  return type === SIGIL_CANVAS_KIND || type === PAINT_BLOCK_TYPE;
+}
+
+/** Calculator and drawing — what a loaded sigil conceals and locks. For the type of a unit (`sigilUnits`). */
 export function isSigilToolType(type: string): boolean {
-  return type === SIGIL_CALC_TYPE || type === SIGIL_CANVAS_TYPE;
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
-/** The JSON data of a block. Unreadable input sets `broken` — such a block is never overwritten. */
-function readData(block: BlockInstance): { broken: boolean; data: Record<string, unknown> } {
-  const raw = block.attrs[BLOCK_ATTR.data];
-  if (raw === undefined) return { broken: false, data: {} };
-  try {
-    const value: unknown = JSON.parse(raw);
-    return isRecord(value) ? { broken: false, data: value } : { broken: true, data: {} };
-  } catch {
-    return { broken: true, data: {} };
-  }
-}
-
-function withData(block: BlockInstance, data: Record<string, unknown>, html: string): BlockInstance {
-  return { ...block, html, attrs: { ...block.attrs, [BLOCK_ATTR.data]: JSON.stringify(data) } };
+  return type === SIGIL_CALC_KIND || isDrawingUnitType(type);
 }
 
 /* ---------------- Date and text ---------------- */
@@ -139,7 +128,7 @@ export function implementedIn(letters: readonly string[], implemented: readonly 
 }
 
 export function parseSigilCalc(block: BlockInstance): SigilCalc {
-  const { broken, data } = readData(block);
+  const { broken, data } = readBlockData(block);
   const letters = letterList(data.letters);
   return {
     broken,
@@ -156,77 +145,7 @@ export function serializeSigilCalc(block: BlockInstance, calc: Omit<SigilCalc, '
   const letters = calc.letters.length
     ? `<p>${calc.letters.map((l) => (done.has(l) ? `<s>${escapeHtml(l)}</s>` : escapeHtml(l))).join(' ')}</p>`
     : '';
-  return withData(block, { intention: calc.intention, letters: calc.letters, implemented: calc.implemented }, intention + letters);
-}
-
-/* ---------------- Drawing ---------------- */
-
-/** The file name of the drawing — or `null`. */
-export function sigilImage(block: BlockInstance): string | null {
-  const src = /\bsrc="([^"]*)"/i.exec(block.html)?.[1];
-  return src ? decodeHtmlAttr(src) : null;
-}
-
-export function withSigilImage(block: BlockInstance, filename: string | null): BlockInstance {
-  return { ...block, html: filename ? `<img src="${escapeHtml(filename)}" alt="">` : '' };
-}
-
-/** Marks the drawing's rendered image; a layer's image carries its layer ID instead. */
-const PAINT_RENDER = 'render';
-// Bounded like TECHNIQUE_RE below: it runs over foreign markup.
-const IMG_RE = /<img\b[^<>]{0,2048}>/gi;
-const PAINT_ATTR_RE = /\bdata-paint="([^"]*)"/i;
-
-export interface DrawingData {
-  /** The rendered image — what read mode, the card and the export show. */
-  render: string | null;
-  /** The vector document, with the old image as a layer where there was no document yet. */
-  doc: PaintDoc | null;
-}
-
-/**
- * The drawing of a block. The vector document is its data JSON; the inner
- * HTML holds the rendered image first (`data-paint="render"`), then the image
- * of every layer that has one (`data-paint="<layer ID>"`), so that backups,
- * exports and the image cleanup find them as they find every other image.
- *
- * A drawing without a document (from before the vector format), or one whose
- * rendered image is no longer marked as such (something else replaced it),
- * becomes a document with that image as its only layer: nothing it shows is lost.
- */
-export function parseDrawing(block: BlockInstance): DrawingData {
-  const images = new Map<string, string>();
-  let render: string | null = null;
-  let marked = false;
-  for (const [tag] of block.html.matchAll(IMG_RE)) {
-    const src = /\bsrc="([^"]*)"/i.exec(tag)?.[1];
-    if (!src) continue;
-    const role = PAINT_ATTR_RE.exec(tag)?.[1];
-    if (render === null) {
-      render = decodeHtmlAttr(src);
-      marked = role === PAINT_RENDER;
-    } else if (role && role !== PAINT_RENDER) {
-      images.set(decodeHtmlAttr(role), decodeHtmlAttr(src));
-    }
-  }
-  const { broken, data } = readData(block);
-  const doc = marked && !broken ? paintDocFromJson(data, images) : null;
-  if (doc) return { render, doc };
-  return { render, doc: render ? paintDocFromImage(render) : null };
-}
-
-/** The drawing with a new rendered image and document; `null` for both empties it. */
-export function withDrawing(block: BlockInstance, render: string | null, doc: PaintDoc | null): BlockInstance {
-  if (!render || !doc) {
-    const attrs = { ...block.attrs };
-    delete attrs[BLOCK_ATTR.data];
-    return { ...block, html: '', attrs };
-  }
-  const layerImages = doc.layers
-    .filter((l) => l.image)
-    .map((l) => `<img src="${escapeHtml(l.image!)}" alt="" data-paint="${escapeHtml(l.id)}">`)
-    .join('');
-  return withData(block, paintDocToJson(doc), `<img src="${escapeHtml(render)}" alt="" data-paint="${PAINT_RENDER}">${layerImages}`);
+  return withBlockData(block, { intention: calc.intention, letters: calc.letters, implemented: calc.implemented }, intention + letters);
 }
 
 /* ---------------- Charge ---------------- */
@@ -265,7 +184,7 @@ function targetList(value: unknown): string[] | null {
 const TECHNIQUE_RE = /<p\b[^<>]{0,256}?\bdata-block-slot="technique"[^<>]{0,256}>([\s\S]*?)<\/p>/i;
 
 export function parseSigilCharge(block: BlockInstance): SigilCharge {
-  const { broken, data } = readData(block);
+  const { broken, data } = readBlockData(block);
   const technique = TECHNIQUE_RE.exec(block.html)?.[1];
   return {
     broken,
@@ -283,7 +202,7 @@ export function serializeSigilCharge(block: BlockInstance, charge: Omit<SigilCha
   const technique = charge.technique ? `<p data-block-slot="technique">${neutralizeSectionTags(charge.technique)}</p>` : '';
   const data: Record<string, unknown> = { loaded: charge.loaded, revealDate: charge.revealDate, lock: charge.lock };
   if (charge.targets) data.targets = charge.targets;
-  return withData(block, data, date + technique);
+  return withBlockData(block, data, date + technique);
 }
 
 /** Does the charge currently conceal: loaded, and the target date has not been reached (or there is none). */
@@ -296,29 +215,23 @@ export function chargeCovers(charge: Pick<SigilCharge, 'targets'>, blockId: stri
   return charge.targets === null || charge.targets.includes(blockId);
 }
 
-/* ---------------- Parts of custom blocks ---------------- */
-
-const KIND_TYPES: Record<SigilElementKind, string> = {
-  sigilCalc: SIGIL_CALC_TYPE,
-  sigilCanvas: SIGIL_CANVAS_TYPE,
-  sigilCharge: SIGIL_CHARGE_TYPE,
-};
+/* ---------------- Parts ---------------- */
 
 /** The ID under which a part is tracked as a sigil — also the target that a charge stores. */
 export function sigilPartId(blockId: string, elementId: string): string {
   return `${blockId}:${elementId}`;
 }
 
-/** The part as a virtual block: its value as data JSON, its slot as inner HTML. */
+/** The part as a virtual block: the field kind as its type, its value as data JSON, its slot as inner HTML. */
 export function sigilPartBlock(
   block: BlockInstance,
-  element: ElementDef & { kind: SigilElementKind },
+  element: SigilElement,
   model: FieldsModel,
 ): BlockInstance {
   const value = model.values[element.id];
   return {
     id: sigilPartId(block.id, element.id),
-    type: KIND_TYPES[element.kind],
+    type: element.kind,
     html: model.slots[element.id] ?? '',
     attrs: value !== undefined ? { [BLOCK_ATTR.data]: JSON.stringify(value) } : {},
   };
@@ -337,14 +250,14 @@ export function withSigilPart(model: FieldsModel, element: ElementDef, part: Blo
   return { ...model, values, slots };
 }
 
-/** A sigil of the entry: a block, or the part of a custom block (then with element and field block). */
+/** A sigil of the entry: a sigil drawing block, or the part of a fields block (then with element and field block). */
 export interface SigilUnit {
   block: BlockInstance;
   part?: { parent: BlockInstance; element: ElementDef };
 }
 
 /**
- * All sigils of the entry in stack order, parts as virtual blocks.
+ * All sigils of the entry in stack order: sigil drawing blocks, and parts as virtual blocks.
  * Archived calculators and drawings count — their content is still in the
  * block and must stay concealed; an archived charge does not, it could
  * no longer be unloaded anywhere.
@@ -352,7 +265,7 @@ export interface SigilUnit {
 export function sigilUnits(blocks: readonly BlockInstance[]): SigilUnit[] {
   const units: SigilUnit[] = [];
   for (const block of blocks) {
-    if (block.type.startsWith('core.sigil.')) {
+    if (isSigilDrawing(block)) {
       units.push({ block });
       continue;
     }
@@ -360,8 +273,8 @@ export function sigilUnits(blocks: readonly BlockInstance[]): SigilUnit[] {
     const model = parseFields(block);
     if (model.broken) continue;
     for (const element of model.elements) {
-      if (!isSigilKind(element.kind) || (element.archived && element.kind === 'sigilCharge')) continue;
-      units.push({ block: sigilPartBlock(block, { ...element, kind: element.kind }, model), part: { parent: block, element } });
+      if (!isSigilElement(element) || (element.archived && element.kind === 'sigilCharge')) continue;
+      units.push({ block: sigilPartBlock(block, element, model), part: { parent: block, element } });
     }
   }
   return units;
@@ -385,8 +298,8 @@ export interface SigilState {
 }
 
 /**
- * Rewrite the targets of every charge in the block — a charge block itself or
- * the charge parts of a field block. `map` receives each target (block ID or
+ * Rewrite the targets of every charge in the block (the charge parts of a
+ * fields block). `map` receives each target (block ID or
  * `<block ID>:<element ID>`) and returns the new one, or several; if none
  * changes, the charge is left untouched.
  */
@@ -410,19 +323,14 @@ export function withChargesCoveringOnly(blocks: readonly BlockInstance[]): Block
   return blocks.map((block) => withChargesRewritten(block, (charge) => (charge.targets ? null : tools)));
 }
 
-/** Every charge in the block — a charge block itself or the charge parts of a field block — with the targets `rewrite` returns; `null` leaves a charge as it is. */
+/** Every charge part of the block with the targets `rewrite` returns; `null` leaves a charge as it is. */
 function withChargesRewritten(block: BlockInstance, rewrite: (charge: SigilCharge) => string[] | null): BlockInstance {
-  const targetsOf = (charge: SigilCharge) => (charge.broken ? null : rewrite(charge));
-  if (block.type === SIGIL_CHARGE_TYPE) {
-    const charge = parseSigilCharge(block);
-    const targets = targetsOf(charge);
-    return targets ? serializeSigilCharge(block, { ...charge, targets }) : block;
-  }
   let result = block;
   for (const unit of sigilUnits([block])) {
-    if (!unit.part || unit.block.type !== SIGIL_CHARGE_TYPE) continue;
+    if (!unit.part || unit.block.type !== SIGIL_CHARGE_KIND) continue;
     const charge = parseSigilCharge(unit.block);
-    const targets = targetsOf(charge);
+    if (charge.broken) continue;
+    const targets = rewrite(charge);
     if (!targets) continue;
     const next = serializeSigilCharge(unit.block, { ...charge, targets });
     result = withElementValue(result, unit.part.element.id, JSON.parse(next.attrs[BLOCK_ATTR.data]));
@@ -468,7 +376,7 @@ function laterReveal(a: string | null, b: string | null): string | null {
 export function sigilState(blocks: readonly BlockInstance[], today: string): SigilState {
   const units = sigilUnits(blocks).map((u) => u.block);
   const charges = units
-    .filter((b) => b.type === SIGIL_CHARGE_TYPE)
+    .filter((b) => b.type === SIGIL_CHARGE_KIND)
     .map(parseSigilCharge)
     .filter((c) => !c.broken);
   if (charges.length === 0) return NO_SIGIL;
@@ -521,22 +429,35 @@ export function withoutConcealed(content: string, today: string): string {
 
 /* ---------------- New ---------------- */
 
-function emptyBlock(type: string): BlockInstance {
-  return { id: generateId(), type, html: '', attrs: {} };
+/**
+ * The attributes of a fields block holding this one sigil part, as every
+ * single field is. As the sigil always did, read mode shows it even empty and
+ * under its title (`FieldsBlock` then shows the part without a label row).
+ * The converter of the old sigil blocks writes the same.
+ */
+export function sigilFieldAttrs(kind: SigilElementKind, elementId: string): Record<string, string> {
+  const element: ElementDef = { id: elementId, kind, label: '' };
+  return {
+    [BLOCK_ATTR.config]: JSON.stringify({ elements: [element], display: { ...DEFAULT_DISPLAY, readHideEmpty: false } }),
+    [BLOCK_ATTR.showTitle]: '1',
+  };
+}
+
+function sigilFieldBlock(kind: SigilElementKind, elementId: string): BlockInstance {
+  return { id: generateId(), type: FIELDS_BLOCK_TYPE, html: '', attrs: sigilFieldAttrs(kind, elementId) };
 }
 
 export function createSigilCalcBlock(): BlockInstance {
-  return serializeSigilCalc(emptyBlock(SIGIL_CALC_TYPE), { intention: '', letters: [], implemented: [] });
+  return sigilFieldBlock(SIGIL_CALC_KIND, SIGIL_CALC_ELEMENT_ID);
 }
 
+/** The drawing of a sigil set — a sigil drawing block; named alongside the calculator and the charge. */
 export function createSigilCanvasBlock(): BlockInstance {
-  return emptyBlock(SIGIL_CANVAS_TYPE);
+  return createSigilDrawingBlock();
 }
 
 export function createSigilChargeBlock(): BlockInstance {
-  return serializeSigilCharge(emptyBlock(SIGIL_CHARGE_TYPE), {
-    loaded: false, revealDate: null, lock: 'entry', technique: null, targets: null,
-  });
+  return sigilFieldBlock(SIGIL_CHARGE_KIND, SIGIL_CHARGE_ELEMENT_ID);
 }
 
 /** The sigil set: calculator, drawing, charge — the default layout of the "Sigils" category. */

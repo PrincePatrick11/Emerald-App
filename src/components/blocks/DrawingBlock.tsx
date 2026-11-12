@@ -4,7 +4,7 @@ import {
   type CanvasElement, type DrawingProps, type LayerImages,
 } from '../editors/canvas';
 import { canvasImageSrc, imageSrc, saveImage } from '../../lib/images';
-import { parseDrawing, withDrawing } from '../../lib/blocks/sigil';
+import { parseDrawing, withDrawing } from '../../lib/blocks/paint';
 import { discardRenders } from '../../store/imageStore';
 import { emptyPaintDoc, isPaintDocEmpty, PAINT_HEIGHT, PAINT_WIDTH, type PaintDoc } from '../../lib/paint/document';
 import type { BlockViewProps } from './blockViews';

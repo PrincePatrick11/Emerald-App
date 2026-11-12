@@ -1,13 +1,17 @@
 import type Database from './sqlite';
+import type { Statement } from './sync/apply';
 import { isStoredImage, saveImage } from './images';
 import { internalLinkChipHtml } from './internalLinkHtml';
 import { isImageIcon } from './helpers';
 import { createTextBlock, parseBlocks, serializeBlocks } from './blocks/blockHtml';
 import { hiddenAttrValue } from './blocks/blockAttrs';
 import {
-  createSigilCalcBlock, createSigilCanvasBlock, createSigilChargeBlock, implementedIn, isIsoDate, letterList,
-  serializeSigilCalc, serializeSigilCharge, SIGIL_BLOCK_MARKER, textParagraphs, withSigilImage,
+  implementedIn, isIsoDate, letterList, mayHoldSigil, serializeSigilCalc, serializeSigilCharge, textParagraphs,
 } from './blocks/sigil';
+import { withDrawingImage } from './blocks/paint';
+import {
+  contentWithoutLegacySigils, hasLegacySigilBlocks, LEGACY_SIGIL_CALC_TYPE, LEGACY_SIGIL_MARKER, type LegacySigilLabels, LEGACY_SIGIL_CANVAS_TYPE, LEGACY_SIGIL_CHARGE_TYPE, legacySigilBlock,
+} from './blocks/legacySigilBlocks';
 import { BLOCK_ATTR, type BlockInstance } from './blocks/types';
 import { SIGIL_CATEGORY_ID } from './schema';
 
@@ -36,6 +40,9 @@ import { SIGIL_CATEGORY_ID } from './schema';
  * sigil blocks: an aborted and restarted v42 run
  * does not put a second set in front, and catching up does not add the blocks
  * again to an entry from which the user deliberately removed them.
+ *
+ * The blocks are written in the form of v42 to v63 (`legacySigilBlocks.ts`);
+ * v64, and the backup import after it, convert them like every other.
  *
  * The columns are set to their base values, `updated_at` stays. The
  * conversion of a row (`sigilRowToContent`) is also used by the import of old
@@ -88,7 +95,7 @@ function hasSigilValues(row: LegacySigilRow): boolean {
 
 /** Does the row get calculator, drawing and charging? */
 function hasSigilData(row: LegacySigilRow): boolean {
-  const inSigilCategory = row.category_id === SIGIL_CATEGORY_ID && !(row.content ?? '').includes(SIGIL_BLOCK_MARKER);
+  const inSigilCategory = row.category_id === SIGIL_CATEGORY_ID && !carriesSigil(row.content ?? '');
   return inSigilCategory || hasSigilValues(row);
 }
 
@@ -139,12 +146,12 @@ export async function sigilRowToContent(
     const drawing = await drawingFile(row.drawing_data);
     if (drawing === undefined) return undefined;
     const letters = jsonLetters(row.letter_bank);
-    blocks.push(serializeSigilCalc(createSigilCalcBlock(), {
+    blocks.push(serializeSigilCalc(legacySigilBlock(LEGACY_SIGIL_CALC_TYPE), {
       intention: row.intention_text ?? '',
       letters,
       implemented: implementedIn(letters, jsonLetters(row.implemented_letters)),
     }));
-    const canvas = withSigilImage(createSigilCanvasBlock(), drawing);
+    const canvas = withDrawingImage(legacySigilBlock(LEGACY_SIGIL_CANVAS_TYPE), drawing);
     const loaded = Number(row.is_loaded) === 1;
     const hidden = Number(row.show_sigil) === 0 && !loaded;
     blocks.push(hidden ? { ...canvas, attrs: { ...canvas.attrs, [BLOCK_ATTR.hidden]: hiddenAttrValue(true)! } } : canvas);
@@ -163,7 +170,7 @@ export async function sigilRowToContent(
         })
       : null;
     const date = row.target_reveal_date?.slice(0, 10);
-    blocks.push(serializeSigilCharge(createSigilChargeBlock(), {
+    blocks.push(serializeSigilCharge(legacySigilBlock(LEGACY_SIGIL_CHARGE_TYPE), {
       loaded,
       revealDate: isIsoDate(date) ? date : null,
       lock: 'entry',
@@ -173,6 +180,11 @@ export async function sigilRowToContent(
   }
   if (row.description?.trim()) blocks.push(createTextBlock(textParagraphs(row.description)));
   return serializeBlocks([...blocks, ...parseBlocks(row.content ?? '')]);
+}
+
+/** Does the content already carry a sigil — the blocks of v42 to v63, or what v64 made of them? */
+function carriesSigil(content: string): boolean {
+  return hasLegacySigilBlocks(content) || mayHoldSigil(content);
 }
 
 /** Are there rows the conversion would touch? For the backup before v42. */
@@ -227,4 +239,31 @@ export async function convertLegacySigils(
     converted += 1;
   }
   return { converted, failed };
+}
+
+/**
+ * Converts the old sigil blocks (v42 to v63, `legacySigilBlocks.ts`) of every
+ * entry and template, trash included, in one transaction: the core of v64 and
+ * of importing an older backup into its working copy (`dbBackup.ts`).
+ * `before` (the backup of the database) runs only if there is something to
+ * convert. Repeatable.
+ */
+export async function convertLegacySigilsInPlace(
+  db: Database,
+  labels?: LegacySigilLabels,
+  before?: () => Promise<unknown>,
+): Promise<void> {
+  const statements: Statement[] = [];
+  for (const table of ['entries', 'templates'] as const) {
+    const rows = await db.select<{ id: string; content: string | null }[]>(
+      `SELECT id, content FROM ${table} WHERE content LIKE '%${LEGACY_SIGIL_MARKER}%'`,
+    );
+    for (const row of rows) {
+      const content = contentWithoutLegacySigils(row.content ?? '', labels);
+      if (content !== row.content) statements.push([`UPDATE ${table} SET content=$1 WHERE id=$2`, [content, row.id]]);
+    }
+  }
+  if (statements.length === 0) return;
+  await before?.();
+  await db.batch(statements);
 }
