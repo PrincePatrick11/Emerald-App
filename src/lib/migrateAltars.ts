@@ -1,4 +1,6 @@
 import type Database from './sqlite';
+import { replaceOwnerBlocks } from './blockStore';
+import { hasContentColumn } from './contentColumn';
 import type { Statement } from './sync/apply';
 import { saveImage } from './images';
 import { backupDatabaseFile } from './dbRebuild';
@@ -155,14 +157,28 @@ export async function altarInserts(db: Database, converted: ConvertedAltars, rep
     "SELECT COALESCE(MAX(entry_number), 0) + 1 AS n FROM entries WHERE type = 'operation'",
   );
   let number = next?.n ?? 1;
+  // Before v66 (the migrations v62/v63, a backup import's working copy) the
+  // block stack goes into `content`; after it (a `.emerald` altar, always
+  // under a new ID) into rows of `blocks`.
+  const withContent = await hasContentColumn(db, 'entry');
+  const now = new Date().toISOString();
   for (const op of converted.operations) {
     // A replace import's version wins over the operation, never over an entry of another type with that ID.
     if (replace) statements.push(["DELETE FROM entries WHERE id=$1 AND type='operation'", [op.id]]);
+    if (withContent) {
+      statements.push([
+        `INSERT OR IGNORE INTO entries (id, type, title, content, category_id, entry_number, icon, cover_image, tags, created_at, updated_at, deleted_at)
+         VALUES ($1, 'operation', $2, $3, $4, $5, $6, NULL, '[]', $7, $8, $9)`,
+        [op.id, op.title, op.content, ALTAR_CATEGORY_ID, number++, op.icon, op.created_at, op.updated_at, op.deleted_at],
+      ]);
+      continue;
+    }
     statements.push([
-      `INSERT OR IGNORE INTO entries (id, type, title, content, category_id, entry_number, icon, cover_image, tags, created_at, updated_at, deleted_at)
-       VALUES ($1, 'operation', $2, $3, $4, $5, $6, NULL, '[]', $7, $8, $9)`,
-      [op.id, op.title, op.content, ALTAR_CATEGORY_ID, number++, op.icon, op.created_at, op.updated_at, op.deleted_at],
+      `INSERT INTO entries (id, type, title, category_id, entry_number, icon, cover_image, tags, created_at, updated_at, deleted_at)
+       VALUES ($1, 'operation', $2, $3, $4, $5, NULL, '[]', $6, $7, $8)`,
+      [op.id, op.title, ALTAR_CATEGORY_ID, number++, op.icon, op.created_at, op.updated_at, op.deleted_at],
     ]);
+    statements.push(...replaceOwnerBlocks({ kind: 'entry', id: op.id }, op.content, now, { hasRows: false }).statements);
   }
   for (const image of converted.images) {
     // A file already in "Images" keeps its details.

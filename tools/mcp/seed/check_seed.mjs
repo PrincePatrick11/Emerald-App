@@ -51,8 +51,15 @@ const modules = unified
   ? ['journal', 'wiki', 'operation'].map((type) => [type, `entries WHERE type = '${type}'`, 'AND'])
   : ['journal_entries', 'wiki_articles', 'operations'].map((table) => [table, table, 'WHERE']);
 
+// Since v66 the blocks are rows of `blocks` only; before, the block stack was `content`.
+const blockRows = unified && tables.includes('blocks') && !q('PRAGMA table_info(entries)').some((c) => c.name === 'content');
+/** Entries with a block of this type. */
+const withBlock = (type, where = '1') => blockRows
+  ? one(`SELECT COUNT(DISTINCT e.id) AS n FROM entries e JOIN blocks b ON b.entry_id = e.id WHERE b.type = '${type}' AND ${where}`).n
+  : one(`SELECT COUNT(*) AS n FROM entries e WHERE content LIKE '%${type}%' AND ${where}`).n;
+
 check('the sigil category is there', one("SELECT COUNT(*) AS n FROM categories WHERE id = 'sigils'").n === 1);
-if (unified) check('an altar is there, an operation of the altars', one("SELECT COUNT(*) AS n FROM entries WHERE category_id = 'altars' AND content LIKE '%core.altar%'").n >= 1);
+if (unified) check('an altar is there, an operation of the altars', withBlock('core.altar', "e.category_id = 'altars'") >= 1);
 if (tables.includes('images')) {
   const pictures = one("SELECT COUNT(*) AS n FROM images WHERE deleted_at IS NULL").n;
   check('Images has pictures', pictures >= 3, `${pictures}`);
@@ -63,8 +70,8 @@ if (tables.includes('images')) {
 }
 if (tables.includes('symbols')) check('an own symbol is there', one('SELECT COUNT(*) AS n FROM symbols').n >= 1);
 if (unified) {
-  check('a canvas block is there', one("SELECT COUNT(*) AS n FROM entries WHERE content LIKE '%core.canvas%'").n >= 1);
-  check('a painting block is there', one("SELECT COUNT(*) AS n FROM entries WHERE content LIKE '%core.paint%'").n >= 1);
+  check('a canvas block is there', withBlock('core.canvas') >= 1);
+  check('a painting block is there', withBlock('core.paint') >= 1);
 }
 
 // A vault with an empty module renders an empty screen, which is exactly what
@@ -98,8 +105,15 @@ const oldest = trashDates.length ? Math.min(...trashDates) : NaN;
 check('trashed rows are recent enough to survive the purge',
   Date.now() - oldest < 7 * 24 * 60 * 60 * 1000, Number.isNaN(oldest) ? 'none' : new Date(oldest).toISOString());
 
-const contents = q(modules.map(([, from]) => `SELECT content FROM ${from}`).join(' UNION ALL '))
-  .map((r) => String(r.content ?? ''));
+const contents = blockRows
+  ? q("SELECT html || ' ' || COALESCE(config, '') || ' ' || COALESCE(data, '') || ' ' || attrs AS content FROM blocks WHERE entry_id IS NOT NULL")
+    .map((r) => String(r.content ?? ''))
+  : q(modules.map(([, from]) => `SELECT content FROM ${from}`).join(' UNION ALL '))
+    .map((r) => String(r.content ?? ''));
+if (blockRows) {
+  const empty = one('SELECT COUNT(*) AS n FROM entries e WHERE NOT EXISTS (SELECT 1 FROM blocks b WHERE b.entry_id = e.id)').n;
+  check('every entry has its block rows', one('SELECT COUNT(*) AS n FROM blocks').n > 0 && empty === 0, `${empty} without`);
+}
 
 if (unified) {
   // Tags are referenced by id there; a name left in the list matches nothing.

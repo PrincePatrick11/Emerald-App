@@ -2,7 +2,7 @@
 
 ## Templates
 
-A **template** (`templates` table, v43, `store/templateStore.ts`) is a pre-filled entry: an optional title, a block stack in the entry `content` format, tags, and **assignments** — JSON `TemplateAssignment[]` (`lib/blocks/templates.ts`) of `{ entryType, category }`. `category` is a category id, `null` for "no category", or `'*'` for "all categories" (Journal, which has no categories, only uses `'*'`).
+A **template** (`templates` table, v43, `store/templateStore.ts`) is a pre-filled entry: an optional title, a block stack (rows of `blocks` with `template_id` set, like an entry's), tags, and **assignments** — JSON `TemplateAssignment[]` (`lib/blocks/templates.ts`) of `{ entryType, category }`. `category` is a category id, `null` for "no category", or `'*'` for "all categories" (Journal, which has no categories, only uses `'*'`).
 
 An assignment means one thing: new entries of this combination start with a copy of the template. At most one active template holds a combination. `assignTemplate` in `templateStore` enforces that itself (not the database, as with `block_definitions`): it takes the combination from its holder under one write key (`serialKey('template', '*')`), so a change touching two rows can't interleave with another write. `resolveAssignedTemplate` falls back from the exact category to `'*'` — one level for Journal, two for Wiki/Operations.
 

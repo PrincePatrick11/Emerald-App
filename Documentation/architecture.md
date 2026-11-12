@@ -108,13 +108,14 @@ src/
 │   ├── schema.ts                live DDL, builtin/starter seed
 │   ├── row.ts                   SQLite row ↔ TypeScript type conversion
 │   ├── serialize.ts             per-entity write serialization
-│   ├── normalizeSchema.ts, dbRebuild.ts, schemaV37.ts, schemaV48.ts   table rebuilds
+│   ├── normalizeSchema.ts, dbRebuild.ts, schemaV37.ts, schemaV48.ts, schemaV65.ts   table rebuilds, frozen shapes
 │   ├── unifyEntries.ts, tagsById.ts, nullableCategory.ts, mergeCategoryTables.ts,
 │   │   migrate*.ts               individual migrations, shared with importers
 │   ├── modules.ts               module registry
 │   ├── blocks/                  block format, types, fields, sigils, canvas, painting, definitions, templates;
-│   │                            a block as a row (`blockRows.ts`), its references (`blockRefs.ts`), positions (`position.ts`)
-│   ├── blockStore.ts            blocks as rows: loading, writing only what changed, rebuilding from `content`
+│   │                            a block as a row (`blockRows.ts`), its references (`blockRefs.ts`), positions (`position.ts`), field values by SQL (`blockQuery.ts`)
+│   ├── blockStore.ts            blocks as rows: loading, writing only what changed, replacing a whole stack
+│   ├── contentColumn.ts         the old `content` column: migrations v65/v66, a backup import's working copy
 │   ├── entryTitle.ts, entryTypeChange.ts, moonPhase.ts
 │   ├── categories.ts, categoryMerge.ts
 │   ├── tagRefs.ts, templateTags.ts, templateRows.ts, blockDefinitionRows.ts
@@ -127,11 +128,11 @@ src/
 │   ├── dragChannel.ts, dragState.ts, imageDragState.ts
 │   ├── images.ts, imageLimits.ts, shrinkImage.ts
 │   ├── storeImage.ts            a file from the disk or a Blob into `images/`
-│   ├── imageUsage.ts            where each picture is used, and in which role
+│   ├── imageUsage.ts            where each picture is used, and in which role (`block_refs`)
 │   ├── pictureExport.ts         a rendered picture saved where the user chooses
 │   ├── export.ts, exportData.ts, emeraldFormat.ts
 │   ├── dbBackup.ts, importStaging.ts   .emeralddb backup and restore
-│   ├── sync/                    sync with a server: `tracking.ts` (capture), `apply.ts` (merge), `engine.ts` (when)
+│   ├── sync/                    sync with a server: `tracking.ts` (capture), `apply.ts` (merge), `blockStack.ts` (blocks on the wire), `engine.ts` (when)
 │   ├── autoBackup.ts            automatic backup: when one is due, the run
 │   ├── vaultManager.ts, vaultSettings.ts
 │   ├── altarConversion.ts       older altars → operations (v62, v63, imports; `migrateAltars.ts` runs it)

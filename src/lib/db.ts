@@ -29,7 +29,9 @@ import i18n from '../i18n';
 import { LEGACY_UNTITLED_TITLES } from './entryTitle';
 import { useSettingsStore } from '../store/settingsStore';
 import { dropTriggers, installTriggers, isTracked, markMigrated } from './sync/tracking';
-import { clearSavedBlocks, fillMissingBlockRows } from './blockStore';
+import { clearSavedBlocks } from './blockStore';
+import { fillMissingBlockRows, hasContentColumn, reconcileBlockRows } from './contentColumn';
+import { TEMPLATES_DDL_V65 } from './schemaV65';
 
 // Per-vault DB cache: vault id → Database instance
 const _dbCache = new Map<string, Database>();
@@ -126,10 +128,6 @@ export async function getDb(): Promise<Database> {
     await invoke('prune_migration_backups', { vaultId })
       .catch((e: unknown) => console.warn('[db] migration backups:', e));
     await runPeriodicCleanup(db, trashRetentionFor(vaultId));
-    // Entries and templates that came in by plain SQL (an import's working
-    // copy, a seeded vault) get their block rows. Owners with rows cost an
-    // index lookup; only the others' content is read.
-    await fillMissingBlockRows(db);
     _dbCache.set(vaultId, db);
     _initPromises.delete(vaultId);
     return db;
@@ -238,8 +236,6 @@ export async function runMigrations(db: Database): Promise<void> {
     // Not in seedBuiltins: schema.ts imports no block logic.
     await seedSigilTemplate(db, i18n.t);
     await seedAltarTemplate(db, i18n.t);
-    // The seeds write `content`; their blocks come from it, as in v65.
-    await fillMissingBlockRows(db);
     const now = new Date().toISOString();
     await db.execute(
       'INSERT INTO schema_version (version, name, applied_at) VALUES ($1, $2, $3)',
@@ -1317,7 +1313,8 @@ export const MIGRATIONS: Migration[] = [
     version: 43,
     name: 'templates',
     up: async (db) => {
-      await db.execute(ddlIfNotExists(TABLE_DDL.templates));
+      // The shape before v66, which drops `content` (`schemaV65.ts`).
+      await db.execute(ddlIfNotExists(TEMPLATES_DDL_V65));
       await createIndexesIfMissing(db, [TEMPLATES_INDEX_DDL]);
       await seedSigilTemplate(db, i18n.t);
     },
@@ -1545,14 +1542,36 @@ export const MIGRATIONS: Migration[] = [
   {
     // The blocks become rows of their own (`blocks`), with what they point at
     // (`block_refs`), built from `content` by the block parser
-    // (`blockStore.ts`). `content` stays until step 3 of the block rebuild and
-    // is normalised to what the rows give. A copy first; repeatable, since an
-    // owner is done the moment its batch is.
+    // (`contentColumn.ts`), and `content` is normalised to what the rows give.
+    // A copy first; repeatable, since an owner is done the moment its batch is.
     version: 65,
     name: 'blocks_table',
     up: blocksTable,
   },
+  {
+    // The rows are the only record of the blocks: `entries.content` and
+    // `templates.content` go. Every owner whose rows do not give its `content`
+    // (written by an older version, by sync) is rebuilt from it first, so
+    // nothing is lost. A copy first; repeatable, the drop skips what is gone.
+    version: 66,
+    name: 'drop_content_columns',
+    up: dropContentColumnsMigration,
+  },
 ];
+
+async function dropContentColumnsMigration(db: Database): Promise<void> {
+  const entries = await hasContentColumn(db, 'entry');
+  const templates = await hasContentColumn(db, 'template');
+  if (!entries && !templates) return;
+  // Reconciling reads `content` of both tables, so it runs while both are there; a
+  // resumed run whose first try dropped one had reconciled and made its copy before.
+  if (entries && templates) {
+    await backupDatabaseFile(db, 'v66');
+    await reconcileBlockRows(db);
+  }
+  await dropColumnsIfPresent(db, 'entries', ['content']);
+  await dropColumnsIfPresent(db, 'templates', ['content']);
+}
 
 async function blocksTable(db: Database): Promise<void> {
   const tables = await db.select<{ name: string }[]>("SELECT name FROM sqlite_master WHERE type='table' AND name='blocks'");

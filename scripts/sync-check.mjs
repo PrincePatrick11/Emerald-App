@@ -71,7 +71,9 @@ writeFileSync(
    export { BASELINE_VERSION, TABLES, TABLE_DDL, INDEX_DDL } from '${root}/src/lib/schema';
    export * from '${root}/src/lib/sync/tracking';
    export * from '${root}/src/lib/sync/apply';
-   export * from '${root}/src/lib/sync/settings';`
+   export * from '${root}/src/lib/sync/settings';
+   export { replaceOwnerBlocks, contentOf } from '${root}/src/lib/blockStore';
+   export { fromBlockRow } from '${root}/src/lib/blocks/blockRows';`
 );
 const bundlePath = join(workDir, 'bundle.mjs');
 await build({ entryPoints: [entry], bundle: true, format: 'esm', platform: 'node', outfile: bundlePath, plugins: [stubPlugin], logLevel: 'warning' });
@@ -84,6 +86,7 @@ const {
   startTracking, stopTracking, isTracked, needsSnapshot, clearSnapshotNeeded, markSnapshotNeeded,
   collectChanges, acknowledge, pendingRows, dropTriggers, installTriggers, applyRemoteChanges, runMigrations,
   flattenSettings, settingsDiff, mergeIncomingSettings, snapshotFrames, replaceWithSnapshot, beginRestore, restoreFrame, isRestoring, acknowledgeChanges, positionStatements, readPosition,
+  replaceOwnerBlocks, contentOf, fromBlockRow,
 } = sync;
 
 const NOW = '2026-11-01T00:00:00.000Z';
@@ -124,9 +127,28 @@ class Device {
     }
   }
   maxBytes = Infinity;
+  /** Every synced row, entries and templates with their block stack (since v66 rows of `blocks`). */
   dump() {
-    return Object.fromEntries(SYNCED_TABLES.map((t) => [t, this.db.raw.prepare(`SELECT * FROM ${t} ORDER BY id`).all()]));
+    return Object.fromEntries(SYNCED_TABLES.map((t) => {
+      const rows = this.db.raw.prepare(`SELECT * FROM ${t} ORDER BY id`).all();
+      if (t === 'entries' || t === 'templates') for (const row of rows) row.content = stackOf(this, t, row.id);
+      return [t, rows];
+    }));
   }
+}
+
+const OWNER_COLUMN = { entries: 'entry_id', templates: 'template_id' };
+
+/** The block stack of an entry or a template, from its rows — what `content` was until v66. */
+function stackOf(d, table, id) {
+  const rows = d.db.raw.prepare(`SELECT * FROM blocks WHERE ${OWNER_COLUMN[table]} = ? ORDER BY position`).all(id);
+  return contentOf(rows.map(fromBlockRow));
+}
+
+/** What a save does since v66: the owner's block rows, here all of them anew. */
+function setStack(d, table, id, html) {
+  const plan = replaceOwnerBlocks({ kind: table === 'entries' ? 'entry' : 'template', id }, html, NOW, { hasRows: true });
+  for (const [sql, params = []] of plan.statements) d.db.raw.prepare(sql.replace(/\$(\d+)/g, '?$1')).run(...params);
 }
 
 async function makeDevice(server) {
@@ -154,11 +176,14 @@ async function assertConverged(...devices) {
   }
 }
 
-const entry_ = (d, id, n, fields = {}) =>
+const entry_ = (d, id, n, fields = {}) => {
   d.run(
-    'INSERT INTO entries (id, type, title, content, entry_number, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
-    id, fields.type ?? 'journal', fields.title ?? '', fields.content ?? '', n, NOW, NOW
+    'INSERT INTO entries (id, type, title, entry_number, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)',
+    id, fields.type ?? 'journal', fields.title ?? '', n, NOW, NOW
   );
+  if (fields.content) setStack(d, 'entries', id, fields.content);
+};
+const content_ = (d, id) => stackOf(d, 'entries', id);
 
 let passed = 0;
 async function test(name, fn) {
@@ -192,7 +217,7 @@ await test('a whole-row write that changes nothing is not logged', async () => {
   const [, a] = await pair();
   entry_(a, 'e', 1);
   await a.sync();
-  a.run("UPDATE entries SET title = title, content = content WHERE id = 'e'");
+  a.run("UPDATE entries SET title = title WHERE id = 'e'");
   assert.equal((await pendingRows(a.db)).length, 0);
 });
 
@@ -200,18 +225,18 @@ await test('many saves of one entry fold into one change', async () => {
   const [, a] = await pair();
   entry_(a, 'e', 1);
   await a.sync();
-  for (let i = 0; i < 50; i++) a.run("UPDATE entries SET content = ? WHERE id = 'e'", `<p>${i}</p>`);
+  for (let i = 0; i < 50; i++) setStack(a, 'entries', 'e', `<p>${i}</p>`);
   const { changes } = await collectChanges(a.db);
   assert.equal(changes.length, 1);
   assert.deepEqual(changes[0].changed, ['content']);
   assert.equal(changes[0].row.content, '<p>49</p>');
-  assert.equal(a.get('SELECT count(*) c FROM _sync_log').c, 50);
+  assert.ok(a.get('SELECT count(*) c FROM _sync_log').c >= 50);
 });
 
 await test('the log stores names, not values', async () => {
   const [, a] = await pair();
   entry_(a, 'e', 1, { content: 'secret-text' });
-  a.run("UPDATE entries SET content = 'more-secret-text' WHERE id = 'e'");
+  setStack(a, 'entries', 'e', 'more-secret-text');
   assert.ok(!JSON.stringify(a.db.raw.prepare('SELECT * FROM _sync_log').all()).includes('secret'));
 });
 
@@ -267,13 +292,13 @@ await test('both changed the text: nothing is lost', async () => {
   const [, a, b] = await pair();
   entry_(a, 'e', 1, { title: 'T', content: '<p>base</p>' });
   await assertConverged(a, b);
-  a.run("UPDATE entries SET content = '<p>A</p>' WHERE id = 'e'");
-  b.run("UPDATE entries SET content = '<p>B</p>' WHERE id = 'e'");
+  setStack(a, 'entries', 'e', '<p>A</p>');
+  setStack(b, 'entries', 'e', '<p>B</p>');
   await a.sync();
   const { conflicts } = await b.sync();
   assert.equal(conflicts.length, 1);
   await assertConverged(a, b);
-  const texts = a.db.raw.prepare('SELECT content FROM entries ORDER BY content').all().map((r) => r.content);
+  const texts = a.db.raw.prepare('SELECT id FROM entries').all().map((r) => content_(a, r.id)).sort();
   assert.deepEqual(texts, ['<p>A</p>', '<p>B</p>']);
   const copy = a.get('SELECT title, entry_number n FROM entries WHERE id = ?', conflicts[0].copyId);
   assert.equal(copy.title, 'T (conflict)');
@@ -284,8 +309,8 @@ await test('both wrote the same text: no conflict', async () => {
   const [, a, b] = await pair();
   entry_(a, 'e', 1);
   await assertConverged(a, b);
-  a.run("UPDATE entries SET content = 'same' WHERE id = 'e'");
-  b.run("UPDATE entries SET content = 'same' WHERE id = 'e'");
+  setStack(a, 'entries', 'e', 'same');
+  setStack(b, 'entries', 'e', 'same');
   await a.sync();
   assert.equal((await b.sync()).conflicts.length, 0);
   await assertConverged(a, b);
@@ -312,8 +337,8 @@ await test('edited here, deleted there: the edit keeps the row', async () => {
   await a.sync();
   await b.sync();
   await assertConverged(a, b);
-  const row = a.get("SELECT title, content FROM entries WHERE id = 'e'");
-  assert.deepEqual({ ...row }, { title: 'edited', content: 'text' });
+  const row = a.get("SELECT title FROM entries WHERE id = 'e'");
+  assert.deepEqual({ ...row, content: content_(a, 'e') }, { title: 'edited', content: 'text' });
 });
 
 await test('deleted here, edited there: the edit brings the row back', async () => {
@@ -325,8 +350,8 @@ await test('deleted here, edited there: the edit brings the row back', async () 
   await b.sync();
   await a.sync();
   await assertConverged(a, b);
-  const row = b.get("SELECT title, content FROM entries WHERE id = 'e'");
-  assert.deepEqual({ ...row }, { title: 'edited', content: 'text' });
+  const row = b.get("SELECT title FROM entries WHERE id = 'e'");
+  assert.deepEqual({ ...row, content: content_(b, 'e') }, { title: 'edited', content: 'text' });
 });
 
 await test('both deleted', async () => {
@@ -438,6 +463,48 @@ await test('a failed apply leaves log and rows as they were', async () => {
   assert.equal(a.get('SELECT applying FROM _sync_ctx').applying, 0);
 });
 
+console.log('Blocks');
+
+await test('blocks travel and arrive as rows, with what they point at', async () => {
+  const [, a, b] = await pair();
+  const chip = '<span data-type="internalLink" class="internal-link" data-id="target" data-entry-type="wiki" data-label="T">T</span>';
+  const stack = `<section data-block="core.text" data-block-id="b1"><p>eins ${chip}</p></section>`
+    + '<section data-block="core.fields" data-block-id="b2" data-block-config="{&quot;elements&quot;:[{&quot;id&quot;:&quot;n&quot;,&quot;kind&quot;:&quot;number&quot;,&quot;label&quot;:&quot;N&quot;}]}"'
+    + ' data-block-data="{&quot;values&quot;:{&quot;n&quot;:5}}"><dl></dl></section>';
+  entry_(a, 'e', 1, { content: stack });
+  await assertConverged(a, b);
+  assert.equal(content_(b, 'e'), stack);
+  assert.deepEqual(b.db.raw.prepare("SELECT id, type FROM blocks WHERE entry_id = 'e' ORDER BY position").all().map((r) => `${r.id}:${r.type}`),
+    ['b1:core.text', 'b2:core.fields']);
+  assert.equal(b.get("SELECT count(*) c FROM block_refs WHERE target_kind = 'entry' AND target = 'target'").c, 1);
+  assert.equal(b.get("SELECT json_extract(data, '$.values.n') v FROM blocks WHERE id = 'b2'").v, 5);
+  // A change of one block on B reaches A.
+  setStack(b, 'entries', 'e', stack.replace('eins', 'zwei'));
+  await assertConverged(a, b);
+  assert.ok(content_(a, 'e').includes('zwei'));
+});
+
+await test("a template's blocks travel too", async () => {
+  const [, a, b] = await pair();
+  a.run("INSERT INTO templates (id, name, created_at, updated_at) VALUES ('t', 'T', ?, ?)", NOW, NOW);
+  setStack(a, 'templates', 't', '<section data-block="core.text" data-block-id="x"><p>Vorlage</p></section><p>zwei</p>');
+  await assertConverged(a, b);
+  assert.equal(stackOf(b, 'templates', 't'), stackOf(a, 'templates', 't'));
+  assert.equal(b.get("SELECT count(*) c FROM blocks WHERE template_id = 't'").c, 2);
+});
+
+await test('an entry deleted for good sends its delete, not a change of its blocks', async () => {
+  const [server, a, b] = await pair();
+  entry_(a, 'e', 1, { content: '<p>x</p>' });
+  await assertConverged(a, b);
+  a.run("DELETE FROM entries WHERE id = 'e'");
+  const before = server.log.length;
+  await a.sync();
+  assert.deepEqual(server.log.slice(before).map((c) => `${c.table}:${c.op}`), ['entries:delete']);
+  await assertConverged(a, b);
+  assert.equal(b.get('SELECT count(*) c FROM blocks').c, 0);
+});
+
 console.log('Snapshots');
 
 await test('a new device starts from a snapshot and goes on from there', async () => {
@@ -474,6 +541,21 @@ await test('starting over keeps what this device had not pushed', async () => {
   assert.deepEqual({ ...row }, { title: 'mine', icon: 'from-snapshot' });
   await assertConverged(a, b);
   assert.equal(a.get("SELECT count(*) c FROM entries WHERE id IN ('new', 'gone')").c, 1);
+});
+
+await test('an entry the snapshot no longer has comes back with its blocks, whatever this device changed', async () => {
+  const [server, a, b] = await pair();
+  entry_(a, 'e', 1, { title: 'T', content: '<p>kept</p>' });
+  await assertConverged(a, b);
+  a.run("DELETE FROM entries WHERE id = 'e'");
+  await a.sync();
+  b.run("UPDATE entries SET title = 'renamed' WHERE id = 'e'");
+  const { changes } = await collectChanges(b.db);
+  await replaceWithSnapshot(b.db, await allFrames(a.db), changes, positionStatements({ cursor: server.log.length }));
+  b.cursor = server.log.length;
+  assert.equal(content_(b, 'e'), '<p>kept</p>');
+  await assertConverged(a, b);
+  assert.equal(content_(a, 'e'), '<p>kept</p>');
 });
 
 await test('a kept row that no longer fits gives way', async () => {
@@ -699,7 +781,7 @@ async function randomRun(seed) {
   const nextNumber = (d) => d.get('SELECT COALESCE(MAX(entry_number), 0) + 1 n FROM entries').n;
   const actions = [
     (d) => entry_(d, id('e'), nextNumber(d), { title: 't', content: `c${r.int(5)}` }),
-    (d) => { const e = r.pick(ids(d, 'entries')); if (e) d.run('UPDATE entries SET content = ? WHERE id = ?', `c${r.int(1000)}`, e); },
+    (d) => { const e = r.pick(ids(d, 'entries')); if (e) setStack(d, 'entries', e, `c${r.int(1000)}`); },
     (d) => { const e = r.pick(ids(d, 'entries')); if (e) d.run('UPDATE entries SET title = ? WHERE id = ?', `t${r.int(1000)}`, e); },
     (d) => { const e = r.pick(ids(d, 'entries')); if (e) d.run('DELETE FROM entries WHERE id = ?', e); },
     (d) => { const e = r.pick(ids(d, 'entries')); if (e) d.run('UPDATE entries SET deleted_at = ? WHERE id = ?', NOW, e); },

@@ -31,6 +31,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { resetDbCache, markDbReplaced } from './db';
 import { TABLES } from './schema';
 import { clearSavedBlocks } from './blockStore';
+import { addContentColumns, dropContentColumns } from './contentColumn';
 import { isTracked, markSnapshotNeeded } from './sync/tracking';
 import { getActiveImportStagingFile, getActiveVaultId } from './vaultManager';
 
@@ -92,7 +93,12 @@ export async function importViaStaging(db: Database, fill: (staging: Database) =
     try {
       // `VACUUM INTO` copied the triggers along; this log is thrown away anyway.
       if (tracked) await staging.execute('UPDATE _sync_ctx SET applying = 1');
+      // The import's converters for older files read and write the block stack
+      // as `content` with plain SQL: the copy has the column for as long as
+      // they run, and the rows are built from it at the end (`contentColumn.ts`).
+      await addContentColumns(staging);
       await fill(staging);
+      await dropContentColumns(staging);
     } finally {
       // Rebuilding the working copy's block rows remembered them as the vault's saved
       // blocks (`blockStore.ts`); whether or not the import goes through, that no longer holds.

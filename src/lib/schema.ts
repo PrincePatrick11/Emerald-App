@@ -21,7 +21,7 @@ import type Database from './sqlite';
  * Must match the highest version in MIGRATIONS. `db.ts` checks this at
  * startup so that a new migration step cannot be forgotten.
  */
-export const BASELINE_VERSION = 65;
+export const BASELINE_VERSION = 66;
 
 /**
  * Tables in dependency order: parents before children.
@@ -109,7 +109,8 @@ export const TABLE_DDL: Record<TableName, string> = {
     )`,
 
   // The templates of the templates dashboard (since v43): title, block stack and
-  // tags that an entry receives as a copy on creation or insertion. Like
+  // tags that an entry receives as a copy on creation or insertion. The block
+  // stack is in `blocks` (since v66; before, `content`, see `schemaV65.ts`). Like
   // `block_definitions` without a foreign key — entries remember nothing of it.
   // `assignments` is JSON (lib/blocks/templates.ts): which entry kind × category
   // starts with the template; the category IDs in it are cleaned up by
@@ -121,7 +122,6 @@ export const TABLE_DDL: Record<TableName, string> = {
       name TEXT NOT NULL,
       icon TEXT NOT NULL DEFAULT '📄',
       title TEXT NOT NULL DEFAULT '',
-      content TEXT NOT NULL DEFAULT '',
       tags TEXT NOT NULL DEFAULT '[]',
       assignments TEXT NOT NULL DEFAULT '[]',
       sort_order INTEGER NOT NULL DEFAULT 0,
@@ -131,8 +131,8 @@ export const TABLE_DDL: Record<TableName, string> = {
     )`,
 
   // Journal entries, wiki articles and operations in one table (since v49;
-  // before, three, see `schemaV48.ts`). What distinguishes them is in the
-  // content — blocks —, not in columns: `type` only says in which module the
+  // before, three, see `schemaV48.ts`). What distinguishes them is in their
+  // blocks (rows of `blocks`; until v66 `content`, see `schemaV65.ts`), not in columns: `type` only says in which module the
   // entry lives. A type change is therefore an UPDATE (`entryTypeChange`).
   // - `category_id`: the journal has no categories; store and type change
   //   keep it NULL there.
@@ -145,7 +145,6 @@ export const TABLE_DDL: Record<TableName, string> = {
       id TEXT PRIMARY KEY,
       type TEXT NOT NULL CHECK (type IN ('journal', 'wiki', 'operation')),
       title TEXT NOT NULL DEFAULT '',
-      content TEXT NOT NULL DEFAULT '',
       category_id TEXT REFERENCES categories(id) ON DELETE RESTRICT,
       entry_number INTEGER,
       icon TEXT,
@@ -164,8 +163,8 @@ export const TABLE_DDL: Record<TableName, string> = {
   // writes its row alone. The instance attributes have columns of their own;
   // `config`/`data` are the block's JSON as written, `attrs` (JSON) what else
   // it carries, `html` its inner markup, `text` its plain text for the search
-  // (`lib/blocks/blockRows.ts`). Until step 3 of the block rebuild `content`
-  // stays, written along in the same transaction (`lib/blockStore.ts`).
+  // (`lib/blocks/blockRows.ts`). Since v66 the only record of the blocks
+  // (`lib/blockStore.ts`).
   blocks: `
     CREATE TABLE blocks (
       row_id INTEGER PRIMARY KEY,
@@ -371,9 +370,10 @@ export const ENTRIES_INDEX_DDL_V49: readonly string[] = [
  *
  * `idx_entries_list` (v55) carries every column that the lists read at startup
  * (`fetchEntries`, first stage), and the tags (`rewriteTagRefs` on open).
- * In the row, `tags`, `created_at` … lie behind `content`: without the index
- * SQLite read the overflow pages of every entry for that — and SQLCipher
- * decrypted almost the whole file for it. With it, the index alone is enough.
+ * Until v66 `tags`, `created_at` … lay behind `content` in the row: without the
+ * index SQLite read the overflow pages of every entry for that — and SQLCipher
+ * decrypted almost the whole file for it. With it, the index alone is enough
+ * (and icons and covers as data URLs still make rows long).
  * `deleted_at` leads, so it also serves the range scan of
  * `runPeriodicCleanup`. Icon and cover image are deliberately missing: they can be
  * data URLs. The few entries that carry one are found by the partial index
@@ -730,7 +730,16 @@ async function moveCategoryInTemplates(db: Database, from: string, to: string): 
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
- * The complete inventory of the columns in which an image can be referenced.
+ * The block stack of an entry as a row of a backup file carries it (`content`).
+ * Since v66 the vault has no such column: its blocks are rows of `blocks`, and
+ * what they name is in `block_refs`.
+ */
+export const BLOCK_STACK_COLUMN = 'content';
+
+/**
+ * The complete inventory of the columns in which an image can be referenced —
+ * as rows of a backup file have them: `entries.content` is the block stack
+ * (`BLOCK_STACK_COLUMN`), which the vault keeps in `blocks` since v66.
  * Three kinds, because they have to be treated differently:
  *
  * - `html` — the reference sits in a `src` attribute. Is rewritten.
@@ -814,8 +823,24 @@ export function imageColumns(table: string): string[] {
 export async function collectUsedImageFilenames(db: Database): Promise<Set<string>> {
   const used = new Set<string>();
 
+  // Every picture a block names, with whatever role (`block_refs`, rewritten
+  // with each save of the block) — of entries and templates, the trash included.
+  const refs = await db.select<{ target: string }[]>("SELECT DISTINCT target FROM block_refs WHERE target_kind = 'image'");
+  for (const { target } of refs) used.add(target);
+  // And every name anywhere in a block's row: what decides about deleting a file
+  // for good must not depend on `blockRefs` reading the block — broken JSON, a
+  // type from a newer version, a drawing it reads only in part.
+  const blockRows = await db.select<Record<string, string | null>[]>('SELECT title, config, data, attrs, html FROM blocks');
+  for (const row of blockRows) {
+    for (const value of Object.values(row)) {
+      for (const match of (value ?? '').matchAll(IMAGE_NAME_RE)) used.add(match[0]);
+    }
+  }
+
   for (const { table, html, plain, legacy } of IMAGE_FIELDS) {
-    const columns = [...html, ...plain, ...legacy];
+    // The block stack (`content` of a file's row) is in `blocks` since v66 — read above through `block_refs`.
+    const columns = [...html, ...plain, ...legacy].filter((column) => column !== BLOCK_STACK_COLUMN);
+    if (!columns.length) continue;
     const rows = await db.select<Record<string, string | null>[]>(
       `SELECT ${columns.join(', ')} FROM ${table}`
     );
@@ -847,12 +872,6 @@ export async function collectUsedImageFilenames(db: Database): Promise<Set<strin
   for (const { file, detached } of kept) {
     if (storedImageName(file)) used.add(file);
     for (const match of (detached ?? '').matchAll(IMAGE_NAME_RE)) used.add(match[0]);
-  }
-
-  // Images in the templates' block stack (v43) — not in IMAGE_FIELDS for the same reason.
-  const templates = await db.select<{ content: string | null }[]>('SELECT content FROM templates');
-  for (const { content } of templates) {
-    for (const match of (content ?? '').matchAll(IMAGE_NAME_RE)) used.add(match[0]);
   }
 
   return used;

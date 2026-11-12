@@ -10,7 +10,7 @@
  *   add-vault — create a new vault from the backup and switch to it
  */
 
-import { reconcileBlockRows } from './blockStore';
+import { withContents } from './blockStore';
 import { convertAltarsInPlace, createAltarTables, removeAltarTables } from './migrateAltars';
 import { legacySigilLabels } from './blocks/legacySigilBlocks';
 import { elementsWithAltarsAsOperations } from './altarConversion';
@@ -690,6 +690,8 @@ export async function buildBackup(options: BackupOptions): Promise<BackupFile> {
       `SELECT * FROM entries WHERE type IN (${entryTypes.join(', ')}) ${dateClause} ${deletedClause}`,
       dateParams,
     );
+    // The block stack as `content`, the form a backup file has carried since its first version.
+    await withContents(db, 'entry', data.entries);
     collectImageRefs('entries', data.entries, allImagePaths);
   }
 
@@ -761,6 +763,7 @@ export async function buildBackup(options: BackupOptions): Promise<BackupFile> {
   // Like the custom blocks: all of it, trash included, with the images in the block stack.
   if (options.includeJournal || options.includeWiki || options.includeOperations) {
     data.templates = await db.select<Row[]>(`SELECT * FROM templates`);
+    await withContents(db, 'template', data.templates);
     for (const row of data.templates) {
       if (typeof row.content === 'string') imageRefsInHtml(row.content).forEach((ref) => allImagePaths.add(ref));
     }
@@ -1639,8 +1642,6 @@ async function doReplace(db: Awaited<ReturnType<typeof getDb>>, backup: BackupFi
   await dropUnknownTagIds(db);
   // A backup from before v48 brings the English default titles along.
   await clearLegacyUntitledTitles(db);
-  // The rows of `blocks` from `content`, for every entry and template the steps above wrote.
-  await reconcileBlockRows(db);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1818,7 +1819,6 @@ async function doMerge(db: Awaited<ReturnType<typeof getDb>>, backup: BackupFile
   await sweepDanglingTaskLinks(db);
   await dropUnknownTagIds(db);
   await clearLegacyUntitledTitles(db);
-  await reconcileBlockRows(db);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

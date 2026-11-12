@@ -7,14 +7,15 @@ import { TEXT_BLOCK_TYPE, type BlockInstance } from './blocks/types';
 
 /**
  * The blocks of entries and templates as rows (`blocks`, `block_refs`, since
- * v65) — reading, writing only what changed, and rebuilding from `content`.
+ * v65) — reading, and writing only what changed. Since v66 the rows are the
+ * only record: there is no `content` column any more. In memory the stores
+ * still carry an owner's blocks as one string (`contentOf`, the block HTML of
+ * `serializeBlocks`), the form `.emerald`, export and backup files hold too.
  *
- * Until `content` goes (step 3 of the block rebuild), every write keeps the
- * two in step: the rows, their references and `content` = `serializeBlocks`
- * of the rows go into one `Database.batch`. The stores write through
- * `planBlockWrite`; a path that writes `content` with plain SQL rebuilds the
- * rows of what it touched (`rebuildOwnerStatements`), and every open fills in
- * owners without rows (`fillMissingBlockRows`).
+ * A write that has a whole block stack as a string and no saved state to
+ * compare with (sync, a seed, an import) replaces the owner's rows
+ * (`replaceOwnerBlocks`). Tools for the old `content` column — migrations
+ * and an import's working copy — are in `contentColumn.ts`.
  *
  * Free of `db.ts` (which imports this file for the migration) and of the DOM
  * (the schema harness runs it under Node).
@@ -29,7 +30,8 @@ export interface BlockOwner {
 
 export type Statement = readonly [query: string, values: readonly unknown[]];
 
-const OWNER: Record<BlockOwnerKind, { column: 'entry_id' | 'template_id'; table: 'entries' | 'templates' }> = {
+/** Table and owner column per owner kind. */
+export const OWNER: Record<BlockOwnerKind, { column: 'entry_id' | 'template_id'; table: 'entries' | 'templates' }> = {
   entry: { column: 'entry_id', table: 'entries' },
   template: { column: 'template_id', table: 'templates' },
 };
@@ -101,9 +103,34 @@ export async function loadBlocks(db: Database, kind: BlockOwnerKind, ids: readon
   return blocks;
 }
 
-/** The content of an owner's blocks — what `content` holds until it goes. */
+/** An owner's blocks as one string — the block HTML the stores and the files carry. */
 export function contentOf(blocks: readonly BlockInstance[]): string {
   return serializeBlocks([...blocks]);
+}
+
+/** The block HTML of one owner from its rows, or `null` if the owner is gone. Remembers its blocks as saved, like `loadBlocks`. */
+export async function readContent(db: Database, owner: BlockOwner): Promise<string | null> {
+  const { table } = OWNER[owner.kind];
+  const [row] = await db.select<{ id: string }[]>(`SELECT id FROM ${table} WHERE id = $1`, [owner.id]);
+  if (!row) return null;
+  return contentOf((await loadBlocks(db, owner.kind, [owner.id])).get(owner.id) ?? []);
+}
+
+/** The block HTML of many owners from their rows, by ID — every ID in the result, one without rows with `''`. Does not remember. */
+export async function readContents(db: Database, kind: BlockOwnerKind, ids: readonly string[]): Promise<Map<string, string>> {
+  const { blocks } = await readBlocks(db, kind, ids);
+  return new Map([...blocks].map(([id, list]) => [id, contentOf(list)]));
+}
+
+/**
+ * Rows of entries or templates with their block HTML as `content` — the form
+ * backup files and sync carry (as the column did until v66). In place.
+ */
+export async function withContents<T extends Record<string, unknown>>(db: Database, kind: BlockOwnerKind, rows: T[]): Promise<T[]> {
+  if (!rows.length) return rows;
+  const contents = await readContents(db, kind, rows.map((row) => String(row.id)));
+  for (const row of rows) (row as Record<string, unknown>).content = contents.get(String(row.id)) ?? '';
+  return rows;
 }
 
 /* ---------------- From content to blocks ---------------- */
@@ -196,7 +223,7 @@ function deleteStatements(owner: BlockOwner, ids: readonly string[]): Statement[
 export interface BlockWrite {
   /** The statements for the rows; the caller adds its own row's and runs them in one batch. */
   statements: Statement[];
-  /** `content` as it follows from the blocks. */
+  /** The block HTML as it follows from the blocks — what the store keeps in memory. */
   content: string;
   /** How many blocks are written (inserted, changed or moved) or removed. */
   changed: number;
@@ -241,100 +268,19 @@ export async function planBlockWrite(
 }
 
 /**
- * Every row of the owner anew from `content`, which is normalised to what the
- * rows give (without touching `updated_at`) — for paths that wrote `content`
- * with plain SQL, the migration and imports, and for sync in the batch that writes `content`. The owner row must exist.
+ * Every row of the owner anew from a block stack given as one string — for
+ * sync, seeds and imports, which have no saved state to compare with. The
+ * owner row must exist (or be inserted before in the same batch). `hasRows:
+ * false` leaves out the delete, for an owner that is new. `content` is the
+ * string as the rows give it back.
  */
-export function rebuildOwnerStatements(
-  owner: BlockOwner, content: string, now: string, { hasRows }: { hasRows: boolean },
-): { statements: Statement[]; commit: () => void } {
-  const { column, table } = OWNER[owner.kind];
-  const blocks = blocksOfContent(content, idsOf(savedByOwner.get(ownerKey(owner))));
+export function replaceOwnerBlocks(
+  owner: BlockOwner, html: string, now: string, { hasRows }: { hasRows: boolean },
+): { statements: Statement[]; content: string; commit: () => void } {
+  const { column } = OWNER[owner.kind];
+  const blocks = blocksOfContent(html, idsOf(savedByOwner.get(ownerKey(owner))));
   const positions = positionsFor(new Map(), blocks.map((b) => b.id));
   const statements: Statement[] = hasRows ? [[`DELETE FROM blocks WHERE ${column} = $1`, [owner.id]]] : [];
   blocks.forEach((block, i) => statements.push(...blockStatements(owner, block, positions[i], now)));
-  const normalized = contentOf(blocks);
-  if (normalized !== content) statements.push([`UPDATE ${table} SET content = $1 WHERE id = $2`, [normalized, owner.id]]);
-  return { statements, commit: () => remember(owner, blocks, positions) };
-}
-
-/** Owners per batch when rebuilding: one batch stays small, a crash loses at most this many. */
-const OWNER_CHUNK = 50;
-
-/**
- * Rebuilds the rows of these owners from their stored `content`, one batch per
- * chunk of owners. `hasRows: false` (the owners have none yet) leaves out the
- * delete. Every owner read is remembered as saved, an empty one too.
- */
-async function rebuildChunked(db: Database, kind: BlockOwnerKind, ids: readonly string[], hasRows: boolean): Promise<void> {
-  const { table } = OWNER[kind];
-  const now = new Date().toISOString();
-  for (let i = 0; i < ids.length; i += OWNER_CHUNK) {
-    const chunk = ids.slice(i, i + OWNER_CHUNK);
-    const rows = await db.select<{ id: string; content: string | null }[]>(
-      `SELECT id, content FROM ${table} WHERE id IN (${placeholders(chunk.length)})`, [...chunk],
-    );
-    const plans = rows.map((r) => rebuildOwnerStatements({ kind, id: r.id }, r.content ?? '', now, { hasRows }));
-    const statements = plans.flatMap((p) => p.statements);
-    if (statements.length) await db.batch(statements);
-    plans.forEach((p) => p.commit());
-  }
-}
-
-/** Rebuilds the rows of these owners from their stored `content` — after a write with plain SQL. */
-export async function rebuildOwners(db: Database, kind: BlockOwnerKind, ids: readonly string[]): Promise<void> {
-  await rebuildChunked(db, kind, ids, true);
-}
-
-/**
- * Builds the rows of every entry and template that has none yet — the
- * migration v65, a fresh vault's seeds, and on every open whatever came in by
- * plain SQL (an import's working copy, the MCP seed). Owners with rows are
- * found through the index without reading their content; the rest is read in
- * chunks. Repeatable: an owner is done the moment its batch is.
- */
-export async function fillMissingBlockRows(db: Database): Promise<void> {
-  for (const kind of ['template', 'entry'] as const) {
-    const { column, table } = OWNER[kind];
-    const missing = await db.select<{ id: string }[]>(
-      `SELECT id FROM ${table} t WHERE NOT EXISTS (SELECT 1 FROM blocks b WHERE b.${column} = t.id)`,
-    );
-    // An owner without content stays without rows; reading it is cheap, and it is remembered as empty.
-    await rebuildChunked(db, kind, missing.map((r) => r.id), false);
-  }
-}
-
-/** The owners whose rows do not give their `content` — `checkBlockRows` reports them, `reconcileBlockRows` rebuilds them. */
-async function mismatchedOwners(db: Database, kind: BlockOwnerKind): Promise<string[]> {
-  const { table } = OWNER[kind];
-  const ids = (await db.select<{ id: string }[]>(`SELECT id FROM ${table}`)).map((r) => r.id);
-  const out: string[] = [];
-  for (let i = 0; i < ids.length; i += ID_CHUNK) {
-    const chunk = ids.slice(i, i + ID_CHUNK);
-    const contents = await db.select<{ id: string; content: string | null }[]>(
-      `SELECT id, content FROM ${table} WHERE id IN (${placeholders(chunk.length)})`, chunk,
-    );
-    const { blocks } = await readBlocks(db, kind, chunk);
-    for (const { id, content } of contents) {
-      if (contentOf(blocks.get(id) ?? []) !== (content ?? '')) out.push(id);
-    }
-  }
-  return out;
-}
-
-/** Diagnostic: entries and templates whose rows and `content` disagree. Writes nothing. */
-export async function checkBlockRows(db: Database): Promise<{ entries: string[]; templates: string[] }> {
-  return { entries: await mismatchedOwners(db, 'entry'), templates: await mismatchedOwners(db, 'template') };
-}
-
-/**
- * Rebuilds every owner whose rows and `content` disagree — at the end of an
- * import, in its working copy, where many paths have written `content` with
- * plain SQL. Reads the whole vault; not for the everyday path.
- */
-export async function reconcileBlockRows(db: Database): Promise<void> {
-  for (const kind of ['template', 'entry'] as const) {
-    const ids = await mismatchedOwners(db, kind);
-    if (ids.length) await rebuildOwners(db, kind, ids);
-  }
+  return { statements, content: contentOf(blocks), commit: () => remember(owner, blocks, positions) };
 }

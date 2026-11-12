@@ -1,5 +1,6 @@
 import { TABLES } from '../schema';
 import type Database from '../sqlite';
+import { STACK_COLUMN, stackOwnerKind, withStacks } from './blockStack';
 
 /**
  * Change capture for a vault connected to a sync server: triggers note which
@@ -14,10 +15,9 @@ import type Database from '../sqlite';
  */
 
 /**
- * Not synced: `schema_version`, and the block rows (`blocks`, `block_refs`),
- * which each device derives from `content` until step 3 of the block rebuild —
- * their `row_id` means nothing on another device. `sync/apply.ts` rebuilds
- * them for whatever it wrote.
+ * Not synced as tables: `schema_version`, and the block rows (`blocks`,
+ * `block_refs`), whose `row_id` means nothing on another device. They travel
+ * as their owner's `content` instead (`blockStack.ts`).
  */
 export const LOCAL_TABLES: readonly string[] = ['schema_version', 'blocks', 'block_refs'];
 
@@ -60,9 +60,16 @@ export function rowKey(table: string, id: string): string {
   return `${table}\u0000${id}`;
 }
 
+/** The columns of the table itself. */
 export async function columnsOf(db: Database, table: string): Promise<string[]> {
   const rows = await db.select<{ name: string }[]>(`PRAGMA table_info(${table})`);
   return rows.map((r) => r.name);
+}
+
+/** The columns a change of `table` may carry: its own, and `content` for the block stack (`blockStack.ts`). */
+export async function syncedColumnsOf(db: Database, table: string): Promise<string[]> {
+  const columns = await columnsOf(db, table);
+  return stackOwnerKind(table) && !columns.includes(STACK_COLUMN) ? [...columns, STACK_COLUMN] : columns;
 }
 
 export async function isTracked(db: Database): Promise<boolean> {
@@ -96,11 +103,32 @@ function triggerDdl(table: string, columns: readonly string[]): string[] {
 }
 
 /**
+ * A block row written or removed is a change of its owner's `content`. Not
+ * when the owner itself went: its delete is logged, and the cascade that took
+ * its blocks along is no change of a row that still exists.
+ */
+function blockTriggerDdl(): string[] {
+  const [insert, update, remove] = triggerNames('blocks');
+  const guard = '(SELECT applying FROM _sync_ctx) = 0';
+  const log = (row: 'NEW' | 'OLD') => `
+    INSERT INTO _sync_log (tbl, pk, op, cols)
+    SELECT 'entries', ${row}.entry_id, 'U', '["${STACK_COLUMN}"]' WHERE EXISTS (SELECT 1 FROM entries WHERE id = ${row}.entry_id)
+    UNION ALL
+    SELECT 'templates', ${row}.template_id, 'U', '["${STACK_COLUMN}"]' WHERE EXISTS (SELECT 1 FROM templates WHERE id = ${row}.template_id);`;
+  return [
+    `CREATE TRIGGER ${insert} AFTER INSERT ON blocks WHEN ${guard} BEGIN ${log('NEW')} END`,
+    `CREATE TRIGGER ${update} AFTER UPDATE ON blocks WHEN ${guard} BEGIN ${log('NEW')} END`,
+    `CREATE TRIGGER ${remove} AFTER DELETE ON blocks WHEN ${guard} BEGIN ${log('OLD')} END`,
+  ];
+}
+
+/**
  * Drops the triggers. A migration needs that: `DROP COLUMN` fails while a
  * trigger names the column, and a table rebuild would drag them along.
  */
 export async function dropTriggers(db: Database): Promise<void> {
-  await db.batch(SYNCED_TABLES.flatMap(triggerNames).map((name) => [`DROP TRIGGER IF EXISTS ${name}`] as const));
+  const names = [...SYNCED_TABLES, 'blocks'].flatMap(triggerNames);
+  await db.batch(names.map((name) => [`DROP TRIGGER IF EXISTS ${name}`] as const));
 }
 
 /** Builds the triggers from the columns the tables have now. */
@@ -108,6 +136,8 @@ export async function installTriggers(db: Database): Promise<void> {
   await dropTriggers(db);
   const ddl: string[] = [];
   for (const table of SYNCED_TABLES) ddl.push(...triggerDdl(table, await columnsOf(db, table)));
+  const blocks = await db.select<{ name: string }[]>("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'blocks'");
+  if (blocks.length) ddl.push(...blockTriggerDdl());
   await db.batch(ddl.map((statement) => [statement] as const));
 }
 
@@ -263,7 +293,7 @@ export async function collectChanges(
       changes.push({ table: row.table, id: row.id, op: 'delete' });
       continue;
     }
-    const found = await db.select<Record<string, unknown>[]>(`SELECT * FROM ${row.table} WHERE id = $1`, [row.id]);
+    const found = await withStacks(db, row.table, await db.select<Record<string, unknown>[]>(`SELECT * FROM ${row.table} WHERE id = $1`, [row.id]));
     if (found.length) {
       if (maxBytes !== Infinity) bytes += JSON.stringify(found[0]).length;
       changes.push({

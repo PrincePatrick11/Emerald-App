@@ -119,7 +119,7 @@ export function withoutIds(pending: ReadonlySet<string>, ids: Iterable<string>):
  * since would otherwise be left with the older state from this query.
  *
  * The content comes from the block rows (`blocks`), entry by entry in
- * order; `content` is what they give, the form `entries.content` holds too.
+ * order; `content` is what they give (`contentOf`).
  */
 async function loadAllContent(generation: number): Promise<void> {
   if (generation !== loadGeneration || !useEntryStore.getState().pendingContent) return;
@@ -286,9 +286,9 @@ export const useEntryStore = create<EntryState>((set, get) => ({
     // The row first: its blocks point at it.
     await db.batch([
       [
-        `INSERT INTO entries (id, type, title, content, category_id, created_at, updated_at, tags, entry_number)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
-        [entry.id, type, entry.title, entry.content, category, entry.created_at, entry.updated_at,
+        `INSERT INTO entries (id, type, title, category_id, created_at, updated_at, tags, entry_number)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+        [entry.id, type, entry.title, category, entry.created_at, entry.updated_at,
           JSON.stringify(entry.tags), entry.entry_number],
       ],
       ...blocks.statements,
@@ -341,10 +341,9 @@ export const useEntryStore = create<EntryState>((set, get) => ({
     // Only `entryTypeChange` changes the type.
     const merged: Entry = { ...entry, ...patch, type: entry.type, updated_at: stampFor(entry.updated_at, touch) };
 
-    // `content` only if it is meant to change: it is by far the largest
-    // field, and a title or tag change need not re-encrypt it. Its blocks
-    // are written as rows, only those that changed (`planBlockWrite`), and
-    // `content` becomes what they give — in the same transaction.
+    // The blocks only if they are meant to change: as rows, only those that
+    // changed (`planBlockWrite`), in the same transaction as the entry's row;
+    // `content` in memory becomes what they give.
     const owner: BlockOwner = { kind: 'entry', id };
     const blocks = patch.content !== undefined
       ? await planContentWrite(db, owner, patch.content, merged.updated_at)
@@ -353,7 +352,7 @@ export const useEntryStore = create<EntryState>((set, get) => ({
     await db.batch([
       [
         `UPDATE entries
-            SET title=$1, category_id=$2, updated_at=$3, tags=$4, cover_image=$5, icon=$6${blocks ? ', content=$8' : ''}
+            SET title=$1, category_id=$2, updated_at=$3, tags=$4, cover_image=$5, icon=$6
           WHERE id=$7`,
         [
           merged.title,
@@ -363,7 +362,6 @@ export const useEntryStore = create<EntryState>((set, get) => ({
           merged.cover_image ?? null,
           merged.icon ?? null,
           id,
-          ...(blocks ? [merged.content] : []),
         ],
       ],
       ...(blocks?.statements ?? []),

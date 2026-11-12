@@ -122,9 +122,9 @@ export const useTemplateStore = create<TemplateState>((set, get) => ({
     await db.batch([
       [
         `UPDATE templates
-            SET name=$1, icon=$2, title=$3, tags=$4, updated_at=$5${blocks ? ', content=$7' : ''}
+            SET name=$1, icon=$2, title=$3, tags=$4, updated_at=$5
           WHERE id=$6`,
-        [row.name, row.icon, row.title, row.tags, row.updated_at, id, ...(blocks ? [row.content] : [])],
+        [row.name, row.icon, row.title, row.tags, row.updated_at, id],
       ],
       ...(blocks?.statements ?? []),
     ]);

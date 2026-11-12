@@ -26,7 +26,7 @@
  * Import rule like `dbBackup`: reads and writes the stores from the outside; none
  * of them imports back.
  */
-import { planContentWrite } from './blockStore';
+import { OWNER, planContentWrite, readContent, type BlockOwnerKind } from './blockStore';
 import type Database from './sqlite';
 import { getDb, nextEntryNumber } from './db';
 import { nowIso } from './helpers';
@@ -87,16 +87,16 @@ async function retypeRow(
   db: Database, to: ConvertibleEntryType, core: EntryCore, entryNumber: number, updatedAt: string,
 ): Promise<Entry> {
   const entry: Entry = { ...core, type: to, entry_number: entryNumber, updated_at: updatedAt, deleted_at: null };
-  // The blocks as rows, only those that changed, `content` as what they give (`blockStore.ts`).
+  // The blocks as rows, only those that changed; `content` in memory as what they give (`blockStore.ts`).
   const owner = { kind: 'entry', id: entry.id } as const;
   const blocks = await planContentWrite(db, owner, entry.content, updatedAt);
   entry.content = blocks.content;
   await db.batch([
     [
       `UPDATE entries
-          SET type=$1, entry_number=$2, title=$3, content=$4, category_id=$5, icon=$6, cover_image=$7, updated_at=$8, tags=$9
-        WHERE id=$10`,
-      [to, entry.entry_number, entry.title, entry.content, entry.category_id, entry.icon ?? null, entry.cover_image ?? null,
+          SET type=$1, entry_number=$2, title=$3, category_id=$4, icon=$5, cover_image=$6, updated_at=$7, tags=$8
+        WHERE id=$9`,
+      [to, entry.entry_number, entry.title, entry.category_id, entry.icon ?? null, entry.cover_image ?? null,
         entry.updated_at, JSON.stringify(entry.tags), entry.id],
     ],
     ...blocks.statements,
@@ -106,38 +106,43 @@ async function retypeRow(
 }
 
 /**
- * Rewrites `content` of every row that carries a chip pointing at `id` — also in the
- * trash, otherwise a restored entry would come back with a dead link.
- * Without `updated_at`: nobody changed anything about the content of these entries.
- * Returns the new contents per id, for the stores.
+ * Rewrites the blocks of every entry or template that carries a chip pointing
+ * at `id` — also in the trash, otherwise a restored entry would come back with
+ * a dead link. Who points at it is in `block_refs`. Without `updated_at`:
+ * nobody changed anything about the content of these entries. Returns the new
+ * contents per id, for the stores.
  */
-async function retypeContentColumn(
-  db: Database, table: 'entries' | 'templates', id: string, to: ConvertibleEntryType,
+async function retypeLinkingOwners(
+  db: Database, kind: BlockOwnerKind, id: string, to: ConvertibleEntryType,
 ): Promise<Map<string, string>> {
-  const rows = await db.select<{ id: string; content: string }[]>(
-    `SELECT id, content FROM ${table} WHERE content LIKE $1`, [`%${id}%`]
+  const { column } = OWNER[kind];
+  const rows = await db.select<{ owner: string }[]>(
+    `SELECT DISTINCT b.${column} AS owner
+       FROM block_refs r JOIN blocks b ON b.row_id = r.block_row
+      WHERE r.target_kind = 'entry' AND r.target = $1 AND b.${column} IS NOT NULL`,
+    [id],
   );
   const changed = new Map<string, string>();
   const now = nowIso();
-  for (const row of rows) {
+  for (const { owner: ownerId } of rows) {
     // The entry itself was written by `retypeRow`, under its own key.
-    if (table === 'entries' && row.id === id) continue;
-    if (retypeInternalLinks(row.content, id, to) === row.content) continue;
+    if (kind === 'entry' && ownerId === id) continue;
     // The block holding the chip is rewritten along, with its references —
     // under the key its own saves run under (an entry's, the template store's
     // one), so that they and this write of its blocks cannot interleave.
-    const owner = { kind: table === 'entries' ? 'entry' : 'template', id: row.id } as const;
+    const owner = { kind, id: ownerId } as const;
     const write = async () => {
-      // Read again under the key: an autosave may have written meanwhile.
-      const [current] = await db.select<{ content: string }[]>(`SELECT content FROM ${table} WHERE id=$1`, [row.id]);
-      const next = retypeInternalLinks(current?.content ?? '', id, to);
-      if (!current || next === current.content) return;
+      // Read under the key: an autosave may have written meanwhile.
+      const current = await readContent(db, owner);
+      if (current === null) return;
+      const next = retypeInternalLinks(current, id, to);
+      if (next === current) return;
       const blocks = await planContentWrite(db, owner, next, now);
-      await db.batch([[`UPDATE ${table} SET content=$1 WHERE id=$2`, [blocks.content, row.id]], ...blocks.statements]);
+      await db.batch(blocks.statements);
       blocks.commit();
-      changed.set(row.id, blocks.content);
+      changed.set(ownerId, blocks.content);
     };
-    await serialized(table === 'entries' ? serialKey('entry', row.id) : serialKey('template', '*'), write);
+    await serialized(kind === 'entry' ? serialKey('entry', ownerId) : serialKey('template', '*'), write);
   }
   return changed;
 }
@@ -260,8 +265,8 @@ function retypeEntry(id: string, from: ConvertibleEntryType, to: ConvertibleEntr
       : await nextEntryNumber(db, to);
     const converted = await retypeRow(db, to, core, entryNumber, revert?.stamp ?? nowIso());
 
-    const entryContent = await retypeContentColumn(db, 'entries', id, to);
-    const templateContent = await retypeContentColumn(db, 'templates', id, to);
+    const entryContent = await retypeLinkingOwners(db, 'entry', id, to);
+    const templateContent = await retypeLinkingOwners(db, 'template', id, to);
 
     const definitionRows = await db.select<{ id: string; elements: string }[]>(
       'SELECT id, elements FROM block_definitions WHERE elements LIKE $1', [`%${id}%`]

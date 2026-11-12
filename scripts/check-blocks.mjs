@@ -46,6 +46,7 @@ writeFileSync(
    export { extractInternalLinks } from '${root}/src/lib/internalLinkHtml';
    export { toBlockRow, fromBlockRow, blockPlainText, htmlPlainText } from '${root}/src/lib/blocks/blockRows';
    export { blockRefs } from '${root}/src/lib/blocks/blockRefs';
+   export { withoutImage } from '${root}/src/lib/imageUsage';
    export { keyBetween, evenKeys, positionsFor, isPositionKey } from '${root}/src/lib/blocks/position';
    export { blocksOfContent, planBlockWrite, clearSavedBlocks, contentOf } from '${root}/src/lib/blockStore';`
 );
@@ -86,7 +87,7 @@ const {
   fieldsWithTemplate, fieldsWithoutTemplate,
   createCanvasBlock, parseCanvasBlock, withCanvasScene, withCanvasParts, withCanvasStripTag, withoutCanvasFile, CANVAS_BLOCK_TYPE, ALTAR_BLOCK_TYPE,
   createPaintBlock, isDrawingBlockType, PAINT_BLOCK_TYPE, resolveBlockType,
-  toBlockRow, fromBlockRow, blockPlainText, htmlPlainText, blockRefs, keyBetween, evenKeys, positionsFor, isPositionKey,
+  toBlockRow, fromBlockRow, blockPlainText, htmlPlainText, blockRefs, withoutImage, keyBetween, evenKeys, positionsFor, isPositionKey,
   blocksOfContent, planBlockWrite, clearSavedBlocks, contentOf,
 } = bundle;
 
@@ -1293,6 +1294,14 @@ console.log('\n7. Blocks as rows (blocks, block_refs, v65)\n');
   check('refs: a custom block\'s drawing part is a drawing', refs(sigilPart) === 'image:2:layer image:3:render', refs(sigilPart));
   check('refs: an unknown type shows what its markup shows', refs(oddAttrs) === 'entry:L:content', refs(oddAttrs));
   check('refs: no duplicates', blockRefs({ ...titled, html: titled.html + titled.html }).length === 2);
+
+  // #107: the pictures of a custom block's drawing part are the drawing — "Images" cannot take them out.
+  const partStack = serializeBlocks([sigilPart, createTextBlock('<p>x</p>')]);
+  check('#107: taking the render or a layer out of "Images" leaves a drawing part whole',
+    withoutImage(partStack, render) === partStack && withoutImage(partStack, layerPic) === partStack);
+  const imageStack = serializeBlocks([withImage, createTextBlock('<p>x</p>')]);
+  check('taking a picture out of "Images" still empties an image field',
+    withoutImage(imageStack, pic) !== imageStack && !withoutImage(imageStack, pic).includes(pic));
 
   const even = evenKeys(5);
   check('positions: evenly spread keys ascend and are valid', even.every((k, i) => isPositionKey(k) && (i === 0 || even[i - 1] < k)), even);
