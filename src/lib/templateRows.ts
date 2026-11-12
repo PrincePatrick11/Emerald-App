@@ -21,17 +21,27 @@ export async function nextTemplateSortOrder(db: Database): Promise<number> {
   return rows[0]?.n ?? 0;
 }
 
-export async function insertTemplateRow(db: Database, template: Template): Promise<void> {
+/** The INSERT of a template row — for a batch that writes its blocks along (`templateStore`). */
+export function insertTemplateStatement(template: Template): readonly [string, unknown[]] {
   const row = templateToRow(template);
-  await db.execute(
+  return [
     `INSERT INTO templates
        (id, name, icon, title, content, tags, assignments, sort_order, created_at, updated_at, deleted_at)
      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
     [
       row.id, row.name, row.icon, row.title, row.content, row.tags, row.assignments,
       row.sort_order, row.created_at, row.updated_at, row.deleted_at,
-    ]
-  );
+    ],
+  ];
+}
+
+/**
+ * The row alone, without block rows — for migrations from before v65 (v43, v44,
+ * v61) and the seeds of a fresh vault, whose blocks `fillMissingBlockRows` builds.
+ */
+export async function insertTemplateRow(db: Database, template: Template): Promise<void> {
+  const [query, values] = insertTemplateStatement(template);
+  await db.execute(query, values);
 }
 
 /** A template by ID — also from the trash, unlike the store, which holds only the active ones. */

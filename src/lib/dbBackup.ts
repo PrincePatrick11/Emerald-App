@@ -10,6 +10,7 @@
  *   add-vault — create a new vault from the backup and switch to it
  */
 
+import { reconcileBlockRows } from './blockStore';
 import { convertAltarsInPlace, createAltarTables, removeAltarTables } from './migrateAltars';
 import { legacySigilLabels } from './blocks/legacySigilBlocks';
 import { elementsWithAltarsAsOperations } from './altarConversion';
@@ -1638,6 +1639,8 @@ async function doReplace(db: Awaited<ReturnType<typeof getDb>>, backup: BackupFi
   await dropUnknownTagIds(db);
   // A backup from before v48 brings the English default titles along.
   await clearLegacyUntitledTitles(db);
+  // The rows of `blocks` from `content`, for every entry and template the steps above wrote.
+  await reconcileBlockRows(db);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1815,6 +1818,7 @@ async function doMerge(db: Awaited<ReturnType<typeof getDb>>, backup: BackupFile
   await sweepDanglingTaskLinks(db);
   await dropUnknownTagIds(db);
   await clearLegacyUntitledTitles(db);
+  await reconcileBlockRows(db);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

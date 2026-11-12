@@ -30,6 +30,7 @@ import Database from './sqlite';
 import { invoke } from '@tauri-apps/api/core';
 import { resetDbCache, markDbReplaced } from './db';
 import { TABLES } from './schema';
+import { clearSavedBlocks } from './blockStore';
 import { isTracked, markSnapshotNeeded } from './sync/tracking';
 import { getActiveImportStagingFile, getActiveVaultId } from './vaultManager';
 
@@ -93,6 +94,9 @@ export async function importViaStaging(db: Database, fill: (staging: Database) =
       if (tracked) await staging.execute('UPDATE _sync_ctx SET applying = 1');
       await fill(staging);
     } finally {
+      // Rebuilding the working copy's block rows remembered them as the vault's saved
+      // blocks (`blockStore.ts`); whether or not the import goes through, that no longer holds.
+      clearSavedBlocks();
       // An error while closing should not mask the import's own error.
       await staging.close().catch((err: unknown) => console.warn('[backup] working copy not closed:', err));
     }

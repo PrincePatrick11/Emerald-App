@@ -21,7 +21,7 @@ import type Database from './sqlite';
  * Must match the highest version in MIGRATIONS. `db.ts` checks this at
  * startup so that a new migration step cannot be forgotten.
  */
-export const BASELINE_VERSION = 64;
+export const BASELINE_VERSION = 65;
 
 /**
  * Tables in dependency order: parents before children.
@@ -41,6 +41,8 @@ export const TABLES = [
   'block_definitions',
   'templates',
   'entries',
+  'blocks',
+  'block_refs',
   'tasks',
   'task_links',
   'languages',
@@ -152,6 +154,53 @@ export const TABLE_DDL: Record<TableName, string> = {
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL,
       deleted_at TEXT
+    )`,
+
+  // The blocks of entries and templates, one row each (since v65; before, only
+  // sections in `content`). Exactly one owner: an entry or a template, both
+  // CASCADE — a block is nothing without its owner. Block IDs are unique per
+  // owner only (a duplicated entry keeps them), hence `row_id` as the key.
+  // `position` sorts as a string (`lib/blocks/position.ts`): moving a block
+  // writes its row alone. The instance attributes have columns of their own;
+  // `config`/`data` are the block's JSON as written, `attrs` (JSON) what else
+  // it carries, `html` its inner markup, `text` its plain text for the search
+  // (`lib/blocks/blockRows.ts`). Until step 3 of the block rebuild `content`
+  // stays, written along in the same transaction (`lib/blockStore.ts`).
+  blocks: `
+    CREATE TABLE blocks (
+      row_id INTEGER PRIMARY KEY,
+      id TEXT NOT NULL,
+      entry_id TEXT REFERENCES entries(id) ON DELETE CASCADE,
+      template_id TEXT REFERENCES templates(id) ON DELETE CASCADE,
+      position TEXT NOT NULL,
+      type TEXT NOT NULL,
+      version INTEGER,
+      hidden INTEGER NOT NULL DEFAULT 0,
+      title TEXT,
+      show_title INTEGER,
+      config TEXT,
+      data TEXT,
+      attrs TEXT NOT NULL DEFAULT '{}',
+      html TEXT NOT NULL DEFAULT '',
+      text TEXT NOT NULL DEFAULT '',
+      updated_at TEXT NOT NULL,
+      CHECK ((entry_id IS NULL) <> (template_id IS NULL)),
+      UNIQUE (entry_id, id),
+      UNIQUE (template_id, id)
+    )`,
+
+  // What a block points at (since v65): an entry by ID or a picture by its
+  // stored file name, with the role it plays there (`lib/blocks/blockRefs.ts`).
+  // Rewritten whenever its block is written; gone with it. Not `WITHOUT ROWID`:
+  // re-encrypting a vault renames pictures in every table by `rowid`
+  // (`rewrite_tables` in `reencrypt.rs`).
+  block_refs: `
+    CREATE TABLE block_refs (
+      block_row INTEGER NOT NULL REFERENCES blocks(row_id) ON DELETE CASCADE,
+      target_kind TEXT NOT NULL CHECK (target_kind IN ('entry', 'image')),
+      target TEXT NOT NULL,
+      role TEXT NOT NULL CHECK (role IN ('content', 'render', 'layer', 'background', 'default')),
+      PRIMARY KEY (block_row, target_kind, target, role)
     )`,
 
   tasks: `
@@ -343,10 +392,20 @@ export const IMAGES_INDEX_DDL: readonly string[] = [
   'CREATE INDEX idx_images_deleted ON images(deleted_at)',
 ];
 
+/**
+ * The indexes of `blocks` and `block_refs` (v65): an owner's blocks in order,
+ * and every block pointing at an entry or a picture.
+ */
+export const BLOCKS_INDEX_DDL: readonly string[] = [
+  'CREATE INDEX idx_blocks_entry ON blocks(entry_id, position)',
+  'CREATE INDEX idx_blocks_template ON blocks(template_id, position)',
+  'CREATE INDEX idx_block_refs_target ON block_refs(target_kind, target)',
+];
+
 /** All indexes of the current schema — what a fresh vault gets. */
 export const INDEX_DDL: readonly string[] = [
   ...KEPT_INDEX_DDL_V38, BLOCK_DEFINITIONS_INDEX_DDL, TEMPLATES_INDEX_DDL, ...LEXICON_INDEX_DDL,
-  ...ENTRIES_INDEX_DDL, ...IMAGES_INDEX_DDL,
+  ...ENTRIES_INDEX_DDL, ...IMAGES_INDEX_DDL, ...BLOCKS_INDEX_DDL,
 ];
 
 /**

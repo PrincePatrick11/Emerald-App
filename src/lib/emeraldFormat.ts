@@ -1,5 +1,6 @@
 import { invoke } from '@tauri-apps/api/core';
 import { altarInserts } from './migrateAltars';
+import { rebuildOwners } from './blockStore';
 import { contentWithoutLegacySigils, legacySigilLabels } from './blocks/legacySigilBlocks';
 import { contentWithAltarsAsOperations, convertAltars, elementsWithAltarsAsOperations, type Row } from './altarConversion';
 import { todayIso, withoutConcealed } from './blocks/sigil';
@@ -1016,6 +1017,8 @@ async function importAltarEntry(file: EmeraldFile): Promise<string> {
   });
   const db = await getDb();
   await db.batch(await altarInserts(db, converted));
+  // Written with plain SQL: the operation's blocks come from its content.
+  await rebuildOwners(db, 'entry', [id]);
   return id;
 }
 

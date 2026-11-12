@@ -3,7 +3,7 @@ import Database from './sqlite';
 import { invoke } from '@tauri-apps/api/core';
 import { getActiveVaultId } from './vaultManager';
 import {
-  ALTAR_CATEGORY_ID, ALTAR_ITEMS_INDEX_DDL, ALTARS_INDEX_DDL, BASELINE_VERSION, BLOCK_DEFINITIONS_INDEX_DDL, ENTRIES_INDEX_DDL, IMAGES_INDEX_DDL, LEXICON_INDEX_DDL, TABLE_DDL,
+  ALTAR_CATEGORY_ID, ALTAR_ITEMS_INDEX_DDL, ALTARS_INDEX_DDL, BASELINE_VERSION, BLOCK_DEFINITIONS_INDEX_DDL, BLOCKS_INDEX_DDL, ENTRIES_INDEX_DDL, IMAGES_INDEX_DDL, LEXICON_INDEX_DDL, TABLE_DDL,
   TEMPLATES_INDEX_DDL, createSchema, ddlIfNotExists, purgeCategory, seedBuiltins, storedImageName,
 } from './schema';
 import { normalizeSchema } from './normalizeSchema';
@@ -29,6 +29,7 @@ import i18n from '../i18n';
 import { LEGACY_UNTITLED_TITLES } from './entryTitle';
 import { useSettingsStore } from '../store/settingsStore';
 import { dropTriggers, installTriggers, isTracked, markMigrated } from './sync/tracking';
+import { clearSavedBlocks, fillMissingBlockRows } from './blockStore';
 
 // Per-vault DB cache: vault id → Database instance
 const _dbCache = new Map<string, Database>();
@@ -51,6 +52,7 @@ export function dbEpoch(): number {
 /** The content was replaced, the connection stayed — after swapping in an import. */
 export function markDbReplaced(): void {
   _epoch++;
+  clearSavedBlocks();
 }
 
 /**
@@ -64,6 +66,7 @@ export function markDbReplaced(): void {
  */
 export async function resetDbCache(): Promise<void> {
   _epoch++;
+  clearSavedBlocks();
   // First wait for the running loads, then clear. A `getDb()`
   // enters its connection into the cache only *after* `Database.load` — anyone who
   // just clears misses exactly those: they land in the freshly cleared
@@ -123,6 +126,10 @@ export async function getDb(): Promise<Database> {
     await invoke('prune_migration_backups', { vaultId })
       .catch((e: unknown) => console.warn('[db] migration backups:', e));
     await runPeriodicCleanup(db, trashRetentionFor(vaultId));
+    // Entries and templates that came in by plain SQL (an import's working
+    // copy, a seeded vault) get their block rows. Owners with rows cost an
+    // index lookup; only the others' content is read.
+    await fillMissingBlockRows(db);
     _dbCache.set(vaultId, db);
     _initPromises.delete(vaultId);
     return db;
@@ -231,6 +238,8 @@ export async function runMigrations(db: Database): Promise<void> {
     // Not in seedBuiltins: schema.ts imports no block logic.
     await seedSigilTemplate(db, i18n.t);
     await seedAltarTemplate(db, i18n.t);
+    // The seeds write `content`; their blocks come from it, as in v65.
+    await fillMissingBlockRows(db);
     const now = new Date().toISOString();
     await db.execute(
       'INSERT INTO schema_version (version, name, applied_at) VALUES ($1, $2, $3)',
@@ -1533,7 +1542,30 @@ export const MIGRATIONS: Migration[] = [
     name: 'sigil_blocks_to_fields_and_paint',
     up: (db) => convertLegacySigilsInPlace(db, legacySigilLabels(i18n.t), () => backupDatabaseFile(db, 'v64')),
   },
+  {
+    // The blocks become rows of their own (`blocks`), with what they point at
+    // (`block_refs`), built from `content` by the block parser
+    // (`blockStore.ts`). `content` stays until step 3 of the block rebuild and
+    // is normalised to what the rows give. A copy first; repeatable, since an
+    // owner is done the moment its batch is.
+    version: 65,
+    name: 'blocks_table',
+    up: blocksTable,
+  },
 ];
+
+async function blocksTable(db: Database): Promise<void> {
+  const tables = await db.select<{ name: string }[]>("SELECT name FROM sqlite_master WHERE type='table' AND name='blocks'");
+  const [content] = await db.select<{ n: number }[]>(
+    "SELECT (SELECT COUNT(*) FROM entries WHERE content <> '') + (SELECT COUNT(*) FROM templates WHERE content <> '') AS n"
+  );
+  // A resumed run already has the copy from before its first try.
+  if (tables.length === 0 && (content?.n ?? 0) > 0) await backupDatabaseFile(db, 'v65');
+  await db.execute(ddlIfNotExists(TABLE_DDL.blocks));
+  await db.execute(ddlIfNotExists(TABLE_DDL.block_refs));
+  await createIndexesIfMissing(db, BLOCKS_INDEX_DDL);
+  await fillMissingBlockRows(db);
+}
 
 async function altarSettingsToJson(db: Database): Promise<void> {
   const columns = await columnNames(db, 'altars');

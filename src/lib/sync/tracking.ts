@@ -13,7 +13,15 @@ import type Database from '../sqlite';
  * DOM-free and without stores: it also runs in node (`scripts/sync-check.mjs`).
  */
 
-export const SYNCED_TABLES: readonly string[] = TABLES.filter((t) => t !== 'schema_version');
+/**
+ * Not synced: `schema_version`, and the block rows (`blocks`, `block_refs`),
+ * which each device derives from `content` until step 3 of the block rebuild —
+ * their `row_id` means nothing on another device. `sync/apply.ts` rebuilds
+ * them for whatever it wrote.
+ */
+export const LOCAL_TABLES: readonly string[] = ['schema_version', 'blocks', 'block_refs'];
+
+export const SYNCED_TABLES: readonly string[] = TABLES.filter((t) => !LOCAL_TABLES.includes(t));
 
 /** One row's change as it travels to the other devices. */
 export type SyncChange =

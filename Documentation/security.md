@@ -282,6 +282,8 @@ All HTML that enters the app from outside is sanitised with DOMPurify before bei
 
 The title bar's global search needs plain text from stored entry HTML — content that can arrive through an import. `htmlToText()` (`src/lib/searchText.ts`) parses it with `DOMParser` rather than assigning it to `innerHTML` on a detached `<div>`: a `DOMParser` document is inert, so an `<img onerror>` payload in stored content never executes when search re-parses it. `script`, `style` and `noscript` elements are stripped before `textContent` is read — TipTap never emits them, but imported content can.
 
+**Block rows.** Content that arrives through an import or from another device is also split into [block rows](database.md#blocks) without a DOM. `htmlTags` (`src/lib/blocks/blockHtml.ts`) scans the markup linearly instead of with a backtracking regular expression, so crafted markup (thousands of `<a` without a `>`) cannot stall the open, an import or a sync. `htmlPlainText` (behind `blockPlainText`) strips tags the same way and never executes anything. Older regular expressions elsewhere (`extractInternalLinks`) can still be slow on such markup.
+
 ## Content Security Policy
 
 The main window has an **explicit, hand-written CSP** in `tauri.conf.json` (`app.security.csp`), not Tauri's default. It allows **no remote origin at all**:

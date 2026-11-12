@@ -8,6 +8,7 @@ import type { Entry, EntryType } from '../types';
 import i18n from '../i18n';
 import { displayTitle } from '../lib/entryTitle';
 import { startOfNewEntry, useTemplateNoticeStore } from './templateStore';
+import { contentOf, loadBlocks, planContentWrite, type BlockOwner } from '../lib/blockStore';
 
 /**
  * The entries of journal, wiki and operations — one store over the single
@@ -116,6 +117,9 @@ export function withoutIds(pending: ReadonlySet<string>, ids: Iterable<string>):
  * Fills in the contents afterwards — only for entries that are still pending. An entry
  * that `ensureEntryContent` has already fetched and the autosave has written to
  * since would otherwise be left with the older state from this query.
+ *
+ * The content comes from the block rows (`blocks`), entry by entry in
+ * order; `content` is what they give, the form `entries.content` holds too.
  */
 async function loadAllContent(generation: number): Promise<void> {
   if (generation !== loadGeneration || !useEntryStore.getState().pendingContent) return;
@@ -126,14 +130,16 @@ async function loadAllContent(generation: number): Promise<void> {
   const contentById = new Map<string, string>();
   for (let after = -1; ;) {
     // `+deleted_at`: no index for this term. Otherwise SQLite would take
-    // `idx_entries_list` and sort the content of all remaining rows
-    // by rowid for every chunk — this way it walks along the rowid.
-    const rows = await db.select<{ rid: number; id: string; content: string | null }[]>(
-      'SELECT rowid AS rid, id, content FROM entries WHERE +deleted_at IS NULL AND rowid > $1 ORDER BY rowid LIMIT $2',
+    // `idx_entries_list` and sort all remaining rows by rowid for every
+    // chunk — this way it walks along the rowid.
+    const rows = await db.select<{ rid: number; id: string }[]>(
+      'SELECT rowid AS rid, id FROM entries WHERE +deleted_at IS NULL AND rowid > $1 ORDER BY rowid LIMIT $2',
       [after, CONTENT_CHUNK],
     );
     if (generation !== loadGeneration) return;
-    for (const r of rows) contentById.set(r.id, r.content ?? '');
+    const blocks = await loadBlocks(db, 'entry', rows.map((r) => r.id));
+    if (generation !== loadGeneration) return;
+    for (const [id, list] of blocks) contentById.set(id, contentOf(list));
     if (rows.length < CONTENT_CHUNK) break;
     after = rows[rows.length - 1].rid;
   }
@@ -148,6 +154,12 @@ async function loadAllContent(generation: number): Promise<void> {
       pendingContent: null,
     };
   });
+}
+
+/** The content of one entry, from its block rows. */
+async function selectContent(id: string): Promise<string> {
+  const db = await getDb();
+  return contentOf((await loadBlocks(db, 'entry', [id])).get(id) ?? []);
 }
 
 /** Retried once: a single error should not leave empty contents for the whole session. */
@@ -238,13 +250,11 @@ export const useEntryStore = create<EntryState>((set, get) => ({
 
   ensureEntryContent: async (id) => {
     if (!get().pendingContent?.has(id)) return;
-    const db = await getDb();
-    const rows = await db.select<{ content: string | null }[]>('SELECT content FROM entries WHERE id = $1', [id]);
+    const content = await selectContent(id);
     set((s) => {
       // In the meantime the second stage — or another call — got there first.
       if (!s.pendingContent?.has(id)) return {};
       const entry = findEntry(s.entries, id);
-      const content = rows[0]?.content ?? '';
       return {
         pendingContent: withoutIds(s.pendingContent, [id]),
         ...(entry && { entries: withEntry(s.entries, entry.type, (list) => list.map((e) => (e.id === id ? { ...e, content } : e))) }),
@@ -259,24 +269,31 @@ export const useEntryStore = create<EntryState>((set, get) => ({
     // The "Sigils" category thus begins with calculator, drawing and charge
     // (template `core-sigil`), as long as it stays assigned there.
     const start = startOfNewEntry(type, category, blank);
+    const id = generateId();
+    const blocks = await planContentWrite(db, { kind: 'entry', id }, start.content, now);
     const entry: Entry = {
-      id: generateId(),
+      id,
       type,
       entry_number: await nextEntryNumber(db, type),
       title: start.title,
-      content: start.content,
+      content: blocks.content,
       category_id: category,
       created_at: createdAt ?? now,
       updated_at: now,
       tags: start.tags,
       deleted_at: null,
     };
-    await db.execute(
-      `INSERT INTO entries (id, type, title, content, category_id, created_at, updated_at, tags, entry_number)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
-      [entry.id, type, entry.title, entry.content, category, entry.created_at, entry.updated_at,
-        JSON.stringify(entry.tags), entry.entry_number]
-    );
+    // The row first: its blocks point at it.
+    await db.batch([
+      [
+        `INSERT INTO entries (id, type, title, content, category_id, created_at, updated_at, tags, entry_number)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+        [entry.id, type, entry.title, entry.content, category, entry.created_at, entry.updated_at,
+          JSON.stringify(entry.tags), entry.entry_number],
+      ],
+      ...blocks.statements,
+    ]);
+    blocks.commit();
     set((s) => ({ entries: withAddedEntry(s.entries, entry) }));
     if (start.templateId) useTemplateNoticeStore.getState().show({ entryId: entry.id, templateId: start.templateId });
     return entry;
@@ -325,23 +342,33 @@ export const useEntryStore = create<EntryState>((set, get) => ({
     const merged: Entry = { ...entry, ...patch, type: entry.type, updated_at: stampFor(entry.updated_at, touch) };
 
     // `content` only if it is meant to change: it is by far the largest
-    // field, and a title or tag change need not re-encrypt it.
-    const writesContent = patch.content !== undefined;
-    await db.execute(
-      `UPDATE entries
-          SET title=$1, category_id=$2, updated_at=$3, tags=$4, cover_image=$5, icon=$6${writesContent ? ', content=$8' : ''}
-        WHERE id=$7`,
+    // field, and a title or tag change need not re-encrypt it. Its blocks
+    // are written as rows, only those that changed (`planBlockWrite`), and
+    // `content` becomes what they give — in the same transaction.
+    const owner: BlockOwner = { kind: 'entry', id };
+    const blocks = patch.content !== undefined
+      ? await planContentWrite(db, owner, patch.content, merged.updated_at)
+      : null;
+    if (blocks) merged.content = blocks.content;
+    await db.batch([
       [
-        merged.title,
-        merged.category_id,
-        merged.updated_at,
-        JSON.stringify(merged.tags),
-        merged.cover_image ?? null,
-        merged.icon ?? null,
-        id,
-        ...(writesContent ? [merged.content] : []),
-      ]
-    );
+        `UPDATE entries
+            SET title=$1, category_id=$2, updated_at=$3, tags=$4, cover_image=$5, icon=$6${blocks ? ', content=$8' : ''}
+          WHERE id=$7`,
+        [
+          merged.title,
+          merged.category_id,
+          merged.updated_at,
+          JSON.stringify(merged.tags),
+          merged.cover_image ?? null,
+          merged.icon ?? null,
+          id,
+          ...(blocks ? [merged.content] : []),
+        ],
+      ],
+      ...(blocks?.statements ?? []),
+    ]);
+    blocks?.commit();
     set((s) => ({
       entries: withEntry(s.entries, entry.type, (list) => list.map((e) => (e.id === id ? merged : e))),
     }));
@@ -358,9 +385,9 @@ export const useEntryStore = create<EntryState>((set, get) => ({
     const db = await getDb();
     await db.execute('UPDATE entries SET deleted_at=NULL WHERE id=$1', [id]);
     // Only this row, sorted in as on load.
-    const rows = await db.select<DbRow[]>('SELECT * FROM entries WHERE id = $1', [id]);
+    const rows = await db.select<DbRow[]>(`SELECT ${LIST_COLUMNS}, icon, cover_image FROM entries WHERE id = $1`, [id]);
     if (!rows[0]) return;
-    const entry = fromRow.entry(rows[0]);
+    const entry = { ...fromRow.entry(rows[0]), content: await selectContent(id) };
     set((s) => ({
       entries: withEntry(s.entries, entry.type, (list) => [...list.filter((e) => e.id !== id), entry].sort(ORDER[entry.type].sort)),
       // The full row is here — even if the second stage is still running.

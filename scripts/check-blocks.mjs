@@ -43,7 +43,11 @@ writeFileSync(
    export { createCanvasBlock, parseCanvasBlock, withCanvasScene, withCanvasParts, withCanvasStripTag, withoutCanvasFile, CANVAS_BLOCK_TYPE, ALTAR_BLOCK_TYPE } from '${root}/src/lib/blocks/canvas';
    export { parseAssignments, resolveAssignedTemplate, instantiateTemplateBlocks, isContentEmpty, templateStart, mergeTemplateTags, assignedTemplateAt, areBlocksEmpty, fieldsWithTemplate, fieldsWithoutTemplate } from '${root}/src/lib/blocks/templates';
    export { internalLinkChipHtml } from '${root}/src/lib/internalLinkHtml';
-   export { extractInternalLinks } from '${root}/src/lib/internalLinkHtml';`
+   export { extractInternalLinks } from '${root}/src/lib/internalLinkHtml';
+   export { toBlockRow, fromBlockRow, blockPlainText, htmlPlainText } from '${root}/src/lib/blocks/blockRows';
+   export { blockRefs } from '${root}/src/lib/blocks/blockRefs';
+   export { keyBetween, evenKeys, positionsFor, isPositionKey } from '${root}/src/lib/blocks/position';
+   export { blocksOfContent, planBlockWrite, clearSavedBlocks, contentOf } from '${root}/src/lib/blockStore';`
 );
 
 const bundlePath = join(workDir, 'bundle.mjs');
@@ -82,6 +86,8 @@ const {
   fieldsWithTemplate, fieldsWithoutTemplate,
   createCanvasBlock, parseCanvasBlock, withCanvasScene, withCanvasParts, withCanvasStripTag, withoutCanvasFile, CANVAS_BLOCK_TYPE, ALTAR_BLOCK_TYPE,
   createPaintBlock, isDrawingBlockType, PAINT_BLOCK_TYPE, resolveBlockType,
+  toBlockRow, fromBlockRow, blockPlainText, htmlPlainText, blockRefs, keyBetween, evenKeys, positionsFor, isPositionKey,
+  blocksOfContent, planBlockWrite, clearSavedBlocks, contentOf,
 } = bundle;
 
 const failures = [];
@@ -1201,6 +1207,169 @@ console.log('\nCanvas block\n');
 
   const exported = renderBlocksForExport(serializeBlocks([full]), { title: () => 'Canvas' });
   check('the export shows the rendered picture', exported.includes(render) && !exported.includes(`src="${pic}"`), exported);
+}
+
+console.log('\n7. Blocks as rows (blocks, block_refs, v65)\n');
+{
+  const pic = `${'1'.repeat(64)}.png`;
+  const layerPic = `${'2'.repeat(64)}.png`;
+  const render = `${'3'.repeat(64)}.png`;
+  const bg = `${'4'.repeat(64)}.jpg`;
+  const def = `${'5'.repeat(64)}.webp`;
+  const linked = '33333333-3333-3333-3333-333333333333';
+  const chip = internalLinkChipHtml({ id: linked, entryType: 'wiki', label: 'Ziel' }); // lang-ok
+  const fallback = { label: (e) => e.label, yes: 'Yes', no: 'No', moonName: (p) => p };
+
+  const linkBlock = createFieldsBlock('link');
+  const linkModel = parseFields(linkBlock);
+  const withLink = serializeFields(linkBlock, { ...linkModel, slots: { [linkModel.elements[0].id]: chip } }, fallback);
+  const imageBlock = createFieldsBlock('image');
+  const imageModel = parseFields(imageBlock);
+  const withImage = serializeFields(imageBlock, { ...imageModel, slots: { [imageModel.elements[0].id]: `<img src="${pic}">` } }, fallback);
+  const paint = withDrawing(createPaintBlock(), render, { layers: [{ ...emptyPaintDoc().layers[0], image: layerPic }] });
+  const canvasBase = createCanvasBlock();
+  const canvas = withCanvasScene(canvasBase, {
+    ...parseCanvasBlock(canvasBase).scene,
+    elements: [{ id: 'i1', type: 'image', x: 0, y: 0, width: 10, height: 10, rotation: 0, opacity: 1, locked: false, hidden: false, z: 0, ref: pic, props: { src: pic, emoji: '' } }],
+    background: { fill: { kind: 'none' }, image: { src: bg, fit: 'cover' }, tint: null },
+  }, render);
+  const withDefault = {
+    ...createFieldsBlock('image'),
+    attrs: { [BLOCK_ATTR.config]: JSON.stringify({ elements: [{ id: 'img', kind: 'image', label: 'Bild', defaultValue: def }] }) }, // lang-ok
+  };
+  const sigilPart = {
+    id: 'sp', type: 'core.fields',
+    html: `<dl><dt>Zeichnung</dt><dd data-block-slot="el:d"><img src="${render}" alt="" data-paint="render"><img src="${layerPic}" alt="" data-paint="L1"></dd></dl>`, // lang-ok
+    attrs: {
+      [BLOCK_ATTR.config]: JSON.stringify({ elements: [{ id: 'd', kind: 'sigilCanvas', label: '' }] }),
+      [BLOCK_ATTR.data]: JSON.stringify({ values: { d: paintDocToJson({ layers: [{ ...emptyPaintDoc().layers[0], id: 'L1', image: layerPic }] }) } }),
+    },
+  };
+  const oddAttrs = {
+    id: 'odd', type: 'x.future',
+    html: `<p>Neu ${chip}</p>`, // lang-ok
+    attrs: { 'data-block-origin': 'abc', [BLOCK_ATTR.hidden]: '0', [BLOCK_ATTR.version]: 'v2', 'data-zz': 'ä"<', [BLOCK_ATTR.title]: '' }, // lang-ok
+  };
+  const titled = {
+    ...createTextBlock(`<h2>Kopf</h2><p>eins<strong>zwei</strong> &amp; ${chip}</p><img src="${pic}">`), // lang-ok
+    attrs: { [BLOCK_ATTR.showTitle]: '0', [BLOCK_ATTR.title]: 'Mein Text', [BLOCK_ATTR.hidden]: '1', [BLOCK_ATTR.version]: '3' }, // lang-ok
+  };
+  const samples = [titled, withLink, withImage, paint, canvas, withDefault, sigilPart, oddAttrs, createTextBlock('<p>x</p>'),
+    createSigilCalcBlock(), createSigilChargeBlock()];
+
+  const roundTripsAsRow = (b) => {
+    const back = fromBlockRow({ ...toBlockRow(b) });
+    // Next to a second block, so that a plain text block is written with its section too.
+    const other = { id: 'other', type: 'core.text', html: '', attrs: {} };
+    return serializeBlocks([back, other]) === serializeBlocks([b, other]) && back.id === b.id && back.type === b.type;
+  };
+  check('every kind of block comes back from its row as the same string', samples.every(roundTripsAsRow),
+    samples.filter((b) => !roundTripsAsRow(b)).map((b) => b.type));
+  const oddRow = toBlockRow(oddAttrs);
+  check('values the app does not write that way stay in attrs, the known ones get columns',
+    oddRow.hidden === 0 && oddRow.version === null && oddRow.title === '' && JSON.parse(oddRow.attrs)['data-block-hidden'] === '0'
+      && JSON.parse(oddRow.attrs)['data-block-v'] === 'v2' && JSON.parse(oddRow.attrs)['data-block-origin'] === 'abc', oddRow);
+  const titledRow = toBlockRow(titled);
+  check('hidden, title, show title and version have columns of their own',
+    titledRow.hidden === 1 && titledRow.title === 'Mein Text' && titledRow.show_title === 0 && titledRow.version === 3 && titledRow.attrs === '{}', titledRow); // lang-ok
+  const reordered = { ...titled, attrs: Object.fromEntries(Object.entries(titled.attrs).reverse()) };
+  check('the instance attributes are written in one order, however the block holds them',
+    serializeBlocks([reordered, oddAttrs]) === serializeBlocks([titled, oddAttrs]));
+  const foreignRow = fromBlockRow({ id: 'f', type: 'core.text', html: '', attrs: '{"onclick":"x","data-ok":"1","data-block":"y","data-n":5}' });
+  check('a row\'s attrs keep only data-* strings, never the type or the ID', JSON.stringify(foreignRow.attrs) === '{"data-ok":"1"}', foreignRow.attrs);
+  check('unreadable attrs JSON loses only itself', Object.keys(fromBlockRow({ id: 'f', type: 'core.text', html: '', attrs: '{nope' }).attrs).length === 0);
+
+  check('plain text: tags gone, words kept apart by block elements, chips their own word, entities decoded',
+    blockPlainText(titled) === 'Kopf einszwei & Ziel', blockPlainText(titled)); // lang-ok
+  check('plain text: a fields block reads as its fallback', blockPlainText(withLink).includes('Ziel'), blockPlainText(withLink)); // lang-ok
+  check('plain text: a canvas and a drawing have none', blockPlainText(canvas) === '' && blockPlainText(paint) === '');
+
+  const refs = (b) => blockRefs(b).map((r) => `${r.kind}:${r.target === linked ? 'L' : r.target.slice(0, 1)}:${r.role}`).sort().join(' ');
+  check('refs: a text block points at its chip and its picture', refs(titled) === 'entry:L:content image:1:content', refs(titled));
+  check('refs: link and image fields', refs(withLink) === 'entry:L:content' && refs(withImage) === 'image:1:content', [refs(withLink), refs(withImage)]);
+  check('refs: a drawing has its render and its layers', refs(paint) === 'image:2:layer image:3:render', refs(paint));
+  check('refs: a canvas has its pictures, its background and its render', refs(canvas) === 'image:1:content image:3:render image:4:background', refs(canvas));
+  check('refs: a prefill is a default', refs(withDefault) === 'image:5:default', refs(withDefault));
+  check('refs: a custom block\'s drawing part is a drawing', refs(sigilPart) === 'image:2:layer image:3:render', refs(sigilPart));
+  check('refs: an unknown type shows what its markup shows', refs(oddAttrs) === 'entry:L:content', refs(oddAttrs));
+  check('refs: no duplicates', blockRefs({ ...titled, html: titled.html + titled.html }).length === 2);
+
+  const even = evenKeys(5);
+  check('positions: evenly spread keys ascend and are valid', even.every((k, i) => isPositionKey(k) && (i === 0 || even[i - 1] < k)), even);
+  const many = evenKeys(5000);
+  check('positions: thousands still ascend and stay short', many.every((k, i) => i === 0 || many[i - 1] < k) && many.every((k) => k.length <= 3));
+  let lo = null;
+  let hi = null;
+  let ok = true;
+  for (let i = 0; i < 200; i++) {
+    const k = keyBetween(lo, hi);
+    if ((lo !== null && !(lo < k)) || (hi !== null && !(k < hi)) || !isPositionKey(k)) ok = false;
+    if (i % 2) lo = k; else hi = k;
+  }
+  check('positions: there is always a key in between', ok);
+  const prev = new Map([['a', 'A'], ['b', 'M'], ['c', 'Z'], ['d', 'k']]);
+  const moved = positionsFor(prev, ['a', 'c', 'b', 'd']);
+  check('positions: moving one block changes one key', moved.filter((k, i) => k !== prev.get(['a', 'c', 'b', 'd'][i])).length === 1
+    && moved.every((k, i) => i === 0 || moved[i - 1] < k), moved);
+  const inserted = positionsFor(prev, ['a', 'n', 'b', 'c', 'd']);
+  check('positions: inserting one keeps every other key', inserted.filter((k, i) => k !== prev.get(['a', 'n', 'b', 'c', 'd'][i])).length === 1
+    && inserted.every((k, i) => i === 0 || inserted[i - 1] < k), inserted);
+  const appended = positionsFor(prev, ['a', 'b', 'c', 'd', ...Array.from({ length: 1000 }, (_, i) => `n${i}`)]);
+  check('positions: a thousand appended stay short and ascend', appended.every((k, i) => (i === 0 || appended[i - 1] < k) && k.length < 20));
+
+  // The write plan against a database that has nothing saved yet.
+  const db = { select: async () => [] };
+  const owner = { kind: 'entry', id: 'e1' };
+  clearSavedBlocks();
+  const stack = [titled, withLink, paint];
+  const first = await planBlockWrite(db, owner, stack, 'T1');
+  first.commit();
+  const upserts = (plan) => plan.statements.filter(([q]) => q.includes('INSERT INTO blocks')).length;
+  check('write: a new stack writes every block, with its references',
+    upserts(first) === 3 && first.statements.some(([q]) => q.includes('INSERT OR IGNORE INTO block_refs')) && first.content === serializeBlocks(stack));
+  const typed = [{ ...titled, html: titled.html + '<p>mehr</p>' }, withLink, paint]; // lang-ok
+  const second = await planBlockWrite(db, owner, typed, 'T2');
+  check('write: a keystroke writes only its block', upserts(second) === 1 && second.changed === 1
+    && second.statements.every(([, v]) => !v.includes(withLink.id) && !v.includes(paint.id)), second.statements.map(([q]) => q.slice(0, 40)));
+  second.commit();
+  const noop = await planBlockWrite(db, owner, typed, 'T3');
+  check('write: nothing changed, nothing written', noop.statements.length === 0 && noop.changed === 0);
+  const swapped = await planBlockWrite(db, owner, [typed[0], typed[2], typed[1]], 'T4');
+  check('write: a move writes one position', swapped.statements.length === 1 && swapped.statements[0][0].startsWith('UPDATE blocks SET position'), swapped.statements);
+  swapped.commit();
+  const removed = await planBlockWrite(db, owner, [typed[0], typed[2]], 'T5');
+  check('write: a removed block is deleted', removed.statements.length === 1 && removed.statements[0][0].startsWith('DELETE FROM blocks'), removed.statements);
+  const ascending = [...first.statements, ...second.statements, ...swapped.statements].every(([q]) => {
+    const n = [...q.matchAll(/\$(\d+)/g)].map((m) => Number(m[1]));
+    return n.every((v, i) => i === 0 || v >= n[i - 1] || n.slice(0, i).includes(v));
+  });
+  check('write: placeholders ascend in every statement', ascending);
+
+  const one = createTextBlock('<p>nur Text</p>'); // lang-ok
+  check('a single plain text block keeps the ID it was saved under, though its content carries none',
+    blocksOfContent(serializeBlocks([one]), [one.id])[0].id === one.id && blocksOfContent(serializeBlocks([one]), null)[0].id !== one.id);
+  check('content of no blocks is empty', contentOf([]) === '');
+
+  // Markup from imports and other devices: crafted tags without a `>`, quotes that never close,
+  // a script without its end. Reading them must stay fast — this runs when a vault opens.
+  const crafted = ['<script', '<a ', '<a "', '<section data-block="x" a="', '<!--', '<!-- a', "<p a='", '<style>'];
+  let slowest = 0;
+  for (const piece of crafted) {
+    const input = piece.repeat(Math.ceil(400_000 / piece.length)) + '>';
+    const started = performance.now();
+    parseBlocks(input);
+    htmlPlainText(input);
+    slowest = Math.max(slowest, performance.now() - started);
+  }
+  check('crafted markup of 400 KB is read in well under a second', slowest < 1000, `${Math.round(slowest)} ms`);
+  const afterUnclosed = parseBlocks('<p title="x <section data-block="core.text" data-block-id="q1">body</section>');
+  check('a quote left open before a block does not hide the section of that block', afterUnclosed.some((blk) => blk.id === 'q1'),
+    afterUnclosed.map((blk) => blk.id));
+  check('plain text: script and style content is dropped, an unclosed script is not',
+    htmlPlainText('<p>a</p><script>x()</script><style>p{}</style><p>b</p>') === 'a b'
+      && htmlPlainText('<p>a</p><script>x').includes('x'), htmlPlainText('<p>a</p><script>x()</script><style>p{}</style><p>b</p>'));
+  check('plain text: a chip inside a word still stands apart, formatting does not',
+    htmlPlainText(`ab${chip}cd <b>fe</b>tt`) === 'ab Ziel cd fett', htmlPlainText(`ab${chip}cd <b>fe</b>tt`)); // lang-ok
 }
 
 console.log('');

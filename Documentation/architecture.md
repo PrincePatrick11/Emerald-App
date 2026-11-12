@@ -112,7 +112,9 @@ src/
 │   ├── unifyEntries.ts, tagsById.ts, nullableCategory.ts, mergeCategoryTables.ts,
 │   │   migrate*.ts               individual migrations, shared with importers
 │   ├── modules.ts               module registry
-│   ├── blocks/                  block format, types, fields, sigils, canvas, painting, definitions, templates
+│   ├── blocks/                  block format, types, fields, sigils, canvas, painting, definitions, templates;
+│   │                            a block as a row (`blockRows.ts`), its references (`blockRefs.ts`), positions (`position.ts`)
+│   ├── blockStore.ts            blocks as rows: loading, writing only what changed, rebuilding from `content`
 │   ├── entryTitle.ts, entryTypeChange.ts, moonPhase.ts
 │   ├── categories.ts, categoryMerge.ts
 │   ├── tagRefs.ts, templateTags.ts, templateRows.ts, blockDefinitionRows.ts

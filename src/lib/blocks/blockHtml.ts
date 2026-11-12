@@ -1,6 +1,6 @@
 import { escapeHtml } from '../internalLinkHtml';
 import { generateId } from '../helpers';
-import { TEXT_BLOCK_TYPE, type BlockInstance } from './types';
+import { BLOCK_ATTR, TEXT_BLOCK_TYPE, type BlockInstance } from './types';
 
 /**
  * The block format in the stored `content` — reading and writing.
@@ -34,7 +34,89 @@ import { TEXT_BLOCK_TYPE, type BlockInstance } from './types';
  * when written back — the value itself does not change in the process.
  */
 
-const TAG_RE = /<!--[\s\S]*?-->|<(\/?)([a-z][^\s/>]*)((?:[^>"']|"[^"]*"|'[^']*')*)>/gi;
+/** A tag or comment in markup, as `htmlTags` finds it. */
+export interface HtmlTag {
+  /** Where it starts, and how long it is (`<` to `>` inclusive). */
+  index: number;
+  length: number;
+  /** An end tag (`</p>`). */
+  close: boolean;
+  /** The tag name as written; `''` for a comment. */
+  name: string;
+  /** Everything between the name and `>`. */
+  attrs: string;
+}
+
+const NAME_START_RE = /[a-z]/i;
+const NAME_END_RE = /[\s/>]/;
+const UNKNOWN = -2;
+const FAILS = -1;
+
+/**
+ * The tags and comments of markup, in order — quote-aware: a `>` in a quoted
+ * attribute value does not end a tag. A `<` that does not start one is text.
+ *
+ * A scan rather than a regular expression: markup comes from imports and
+ * other devices, and a backtracking pattern over a few kilobytes of `<a` without
+ * a `>` takes minutes. Every character is looked at a bounded number of times:
+ * a tag that is found is skipped as a whole, a comment without an end is
+ * remembered as such, and where an attribute scan ends (at a `>`, or failing
+ * at a quote that never closes) is remembered for every position it passed,
+ * so a later scan that reaches one of them takes the answer from there.
+ */
+export function* htmlTags(html: string): Generator<HtmlTag> {
+  const lastGt = html.lastIndexOf('>');
+  const lastQuote = { '"': html.lastIndexOf('"'), "'": html.lastIndexOf("'") };
+  /** Per position outside quotes: where the tag's `>` is (≥ 0), `FAILS`, or `UNKNOWN`. */
+  let ends: Int32Array | null = null;
+  let commentsEnd = true;
+  for (let i = html.indexOf('<'); i !== -1 && i < lastGt; ) {
+    if (commentsEnd && html.startsWith('<!--', i)) {
+      const end = html.indexOf('-->', i + 4);
+      if (end !== -1) {
+        yield { index: i, length: end + 3 - i, close: false, name: '', attrs: '' };
+        i = html.indexOf('<', end + 3);
+        continue;
+      }
+      // No `-->` after this one, so none after any later `<!--` either.
+      commentsEnd = false;
+    }
+    let j = i + 1;
+    const close = html[j] === '/';
+    if (close) j++;
+    if (!NAME_START_RE.test(html[j] ?? '')) {
+      i = html.indexOf('<', i + 1);
+      continue;
+    }
+    const nameStart = j;
+    while (j < html.length && !NAME_END_RE.test(html[j])) j++;
+    const nameEnd = j;
+    ends ??= new Int32Array(html.length + 1).fill(UNKNOWN);
+    const passed: number[] = [];
+    let end: number = FAILS;
+    while (j <= lastGt) {
+      if (ends[j] !== UNKNOWN) { end = ends[j]; break; }
+      passed.push(j);
+      const c = html[j];
+      if (c === '>') { end = j; break; }
+      if (c === '"' || c === "'") {
+        // A quote closes if another of its kind follows.
+        if (j >= lastQuote[c]) break;
+        j = html.indexOf(c, j + 1) + 1;
+        continue;
+      }
+      j++;
+    }
+    for (const p of passed) ends[p] = end;
+    if (end === FAILS) {
+      i = html.indexOf('<', i + 1);
+      continue;
+    }
+    yield { index: i, length: end + 1 - i, close, name: html.slice(nameStart, nameEnd), attrs: html.slice(nameEnd, end) };
+    i = html.indexOf('<', end + 1);
+  }
+}
+
 const ATTR_RE = /([^\s"'<>/=]+)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'=<>`]+)))?/g;
 /** Only `data-*` is passed through. Everything else on a section has no
  *  meaning for the format and should not get one either (`onclick` …). */
@@ -108,33 +190,32 @@ export function parseBlocks(html: string): BlockInstance[] {
     if (loose.trim()) blocks.push(createTextBlock(loose));
   };
 
-  for (const m of html.matchAll(TAG_RE)) {
+  for (const t of htmlTags(html)) {
     // Skip comments (no tag name) and everything except <section>.
-    if (m[2]?.toLowerCase() !== 'section') continue;
-    const tag = m[0];
-    const at = m.index!;
-    if (m[1] === '/') {
+    if (t.name.toLowerCase() !== 'section') continue;
+    const at = t.index;
+    if (t.close) {
       if (depth === 0) continue; // stray end tag — belongs to the loose text
       depth--;
       if (depth === 0 && open) {
         blocks.push(toBlock(open.attrs, html.slice(open.contentFrom, at)));
-        looseFrom = at + tag.length;
+        looseFrom = at + t.length;
         open = null;
       }
       continue;
     }
 
-    const selfClosing = /\/\s*$/.test(m[3]);
+    const selfClosing = /\/\s*$/.test(t.attrs);
     if (depth === 0) {
-      const attrs = parseSectionAttrs(m[3]);
+      const attrs = parseSectionAttrs(t.attrs);
       if (attrs['data-block']) {
         pushLoose(at);
         if (selfClosing) {
           blocks.push(toBlock(attrs, ''));
-          looseFrom = at + tag.length;
+          looseFrom = at + t.length;
           continue;
         }
-        open = { attrs, contentFrom: at + tag.length };
+        open = { attrs, contentFrom: at + t.length };
       }
     }
     if (!selfClosing) depth++;
@@ -156,13 +237,29 @@ export function parseBlocks(html: string): BlockInstance[] {
   return blocks;
 }
 
+/**
+ * The order the instance attributes are written in; whatever else a block
+ * carries follows in its own order. Fixed, because a block row
+ * (`blockRows.ts`) keeps these attributes in columns of their own: written
+ * from a row or from the stack, a block comes out as the same string.
+ */
+const ATTR_ORDER: readonly string[] = [
+  BLOCK_ATTR.version, BLOCK_ATTR.hidden, BLOCK_ATTR.title, BLOCK_ATTR.showTitle, BLOCK_ATTR.config, BLOCK_ATTR.data,
+];
+
+/** The attributes of a block in the order they are written (`ATTR_ORDER`, then the rest). */
+export function orderedBlockAttrs(attrs: Record<string, string>): Array<[string, string]> {
+  const known = ATTR_ORDER.filter((name) => name in attrs).map((name): [string, string] => [name, attrs[name]]);
+  return [...known, ...Object.entries(attrs).filter(([name]) => !ATTR_ORDER.includes(name))];
+}
+
 /** A section, attributes double-quoted and escaped — the same form that
  *  `DOMParser` + `innerHTML` output again on merge import. */
 export function blockSectionHtml(block: BlockInstance): string {
   const attrs: Array<[string, string]> = [
     ['data-block', block.type],
     ['data-block-id', block.id],
-    ...Object.entries(block.attrs),
+    ...orderedBlockAttrs(block.attrs),
   ];
   return `<section ${attrs.map(([k, v]) => `${k}="${escapeHtml(v)}"`).join(' ')}>${block.html}</section>`;
 }

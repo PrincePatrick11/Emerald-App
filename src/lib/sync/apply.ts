@@ -2,6 +2,7 @@ import { CATEGORIZED_TABLES } from '../schema';
 import type Database from '../sqlite';
 import { jsonArray } from '../row';
 import { TAG_REF_TABLES } from '../tagRefs';
+import { clearSavedBlocks, fillMissingBlockRows, rebuildOwnerStatements, type BlockOwner } from '../blockStore';
 import { columnsOf, pendingRows, rowKey, SYNCED_TABLES, type PendingRow, type SyncChange } from './tracking';
 
 /**
@@ -117,6 +118,12 @@ export async function applyRemoteChanges(
   }
 
   const conflicts: ApplyResult['conflicts'] = [];
+  /** Entries and templates whose `content` this writes, with that content: their block rows are rebuilt in the same batch. */
+  const rewritten = new Map<string, { owner: BlockOwner; key: string; content: string }>();
+  const noteContent = (table: string, id: string, content: unknown) => {
+    const kind = table === 'entries' ? 'entry' : table === 'templates' ? 'template' : null;
+    if (kind) rewritten.set(rowKey(table, id), { owner: { kind, id }, key: rowKey(table, id), content: typeof content === 'string' ? content : '' });
+  };
   const statements: Statement[] = [['PRAGMA defer_foreign_keys = ON'], APPLYING];
   /** Statements that are this device's own decisions, so they go out as changes. */
   const logged = (...own: Statement[]) => statements.push(LOGGING, ...own, APPLYING);
@@ -224,6 +231,7 @@ export async function applyRemoteChanges(
         ]);
       }
       statements.push(insertStatement(change.table, change.row));
+      noteContent(change.table, change.id, change.row.content);
       rows.set(key, { ...change.row });
       if (change.table === 'tags') tagIdByName.set(String(change.row.name), change.id);
       if (change.table === 'entries') renumberOthers(change.id, change.row);
@@ -253,6 +261,9 @@ export async function applyRemoteChanges(
           entry_number: number,
         }));
         conflicts.push({ entryId: change.id, copyId });
+        noteContent('entries', copyId, row.content);
+        // Keeps the copy in the block-row rebuild below, which takes only owners still in `rows`.
+        rows.set(rowKey('entries', copyId), { ...row, id: copyId });
         take.push(column);
       }
     }
@@ -263,14 +274,24 @@ export async function applyRemoteChanges(
       [...take.map((column) => change.row[column]), change.id],
     ]);
     for (const column of take) row[column] = change.row[column];
+    if (take.includes('content')) noteContent(change.table, change.id, row.content);
     if (change.table === 'tags' && take.includes('name')) tagIdByName.set(String(change.row.name), change.id);
     if (change.table === 'entries' && (take.includes('entry_number') || take.includes('type'))) {
       renumberOthers(change.id, row);
     }
   }
 
+  // The block rows are this device's own, derived from `content` (not synced), and go
+  // into the same transaction: a crash after it must not leave rows the content has moved past.
+  // Only for owners still there (a later change in this batch may have deleted one).
+  const now = new Date().toISOString();
+  const rebuilt = [...rewritten.values()]
+    .filter(({ key }) => rows.has(key))
+    .map(({ owner, content }) => rebuildOwnerStatements(owner, content, now, { hasRows: true }));
+  statements.push(...rebuilt.flatMap((r) => r.statements));
   statements.push(LOGGING, ...REFERENCE_REPAIRS, ...(options.finally ?? []));
   await db.batch(statements);
+  rebuilt.forEach((r) => r.commit());
   return { conflicts };
 }
 
@@ -319,6 +340,8 @@ export async function beginRestore(db: Database, keep: readonly SyncChange[] = [
     ["INSERT OR REPLACE INTO _sync_meta (key, value) VALUES ('kept', $1)", [JSON.stringify(keep)]],
   );
   await db.batch(statements);
+  // The block rows went with their owners; what was remembered as saved no longer holds.
+  clearSavedBlocks();
 }
 
 /**
@@ -378,6 +401,9 @@ export async function finishRestore(
   }
   statements.push(...REFERENCE_REPAIRS, ["DELETE FROM _sync_meta WHERE key IN ('restoring', 'kept')"], ...finalStatements);
   await db.batch(statements);
+  // Emptying the vault took the block rows along (CASCADE): every entry and template of the
+  // snapshot, and what was kept on top, gets its rows anew from its content.
+  await fillMissingBlockRows(db);
 }
 
 /** A snapshot all at once: for tests, and a vault small enough not to matter. */

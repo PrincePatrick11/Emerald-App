@@ -55,7 +55,11 @@ interface BlockStackProps {
   isEditing: boolean;
   /** Placeholder of the first text block: the module-specific text. */
   placeholder: string;
-  /** The complete serialised content after every change (→ `useEntryEditor.handleContentChange`). */
+  /**
+   * The complete serialised content after every change (→ `useEntryEditor.handleContentChange`).
+   * Saving writes only the blocks that changed as rows (`planBlockWrite` in
+   * `lib/blockStore.ts`); every section carries its block ID, so the store can tell.
+   */
   onChange: (content: string) => void;
   /**
    * Read mode: save a permitted change (tick a checklist, yes/no) immediately;

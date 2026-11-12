@@ -19,7 +19,7 @@ Older migrations must keep building the shape they were written for, not today's
 
 **Whoever changes a table in a later migration that v33, v38 or v39 also build must freeze its current DDL first** — otherwise those migrations silently start building the new shape on old vaults and then fail copying columns that no longer exist.
 
-Indexes follow the same rule. v38 and v39 create `INDEX_DDL_V38` (split into `DROPPED` and `KEPT` lists, since v47, v49 and v63 drop some of those tables), not `INDEX_DDL`, because in the chain they run before later tables exist. A table added after them brings its own index constant (`BLOCK_DEFINITIONS_INDEX_DDL`, `TEMPLATES_INDEX_DDL`, `LEXICON_INDEX_DDL`, `ALTARS_INDEX_DDL`, `ENTRIES_INDEX_DDL`, `ALTAR_ITEMS_INDEX_DDL`, `IMAGES_INDEX_DDL`), which its migration creates and `INDEX_DDL` appends for fresh vaults — except those of the altar tables, which went with them in v63.
+Indexes follow the same rule. v38 and v39 create `INDEX_DDL_V38` (split into `DROPPED` and `KEPT` lists, since v47, v49 and v63 drop some of those tables), not `INDEX_DDL`, because in the chain they run before later tables exist. A table added after them brings its own index constant (`BLOCK_DEFINITIONS_INDEX_DDL`, `TEMPLATES_INDEX_DDL`, `LEXICON_INDEX_DDL`, `ALTARS_INDEX_DDL`, `ENTRIES_INDEX_DDL`, `ALTAR_ITEMS_INDEX_DDL`, `IMAGES_INDEX_DDL`, `BLOCKS_INDEX_DDL`), which its migration creates and `INDEX_DDL` appends for fresh vaults — except those of the altar tables, which went with them in v63.
 
 Because the baseline and the chain must produce the same schema, `npm run check:schema` (`scripts/schema-check.mjs`, needs `esbuild` from `devDependencies`) proves it: it builds a vault each way and compares `sqlite_master`, `PRAGMA table_info`, `PRAGMA foreign_key_list` and every index, table by table. It also covers the resume-after-crash paths of v33, v38 and v39, the seeded categories, the data migrations against seeded old rows, old-backup imports, and the constants mirrored across languages (see [Rules for Future Schema Changes](#rules-for-future-schema-changes)). Without that check, the two paths quietly diverge after a few releases and nobody notices until a user hits an error.
 
@@ -32,7 +32,7 @@ Because the baseline and the chain must produce the same schema, `npm run check:
 - **Fresh file** — no tables at all (checked in `sqlite_master`, not `schema_version`: a database old enough to predate the version table has tables but no version row and must run the chain). It runs the DDL from `schema.ts`, seeds the built-in categories, the starter categories and the `core-sigil` and `core-altar` templates — in the language active at first open, since `main.tsx` waits for the stored language before anything touches the database — and stamps one `baseline` row at `BASELINE_VERSION`.
 - **Existing file** — the ordered `MIGRATIONS` array runs from the highest applied version upward, each step stamping `schema_version` with version, name and ISO timestamp. Every vault reaches the same schema as a fresh one; there is no cut-off past which an old database stops being upgradable.
 
-`BASELINE_VERSION` in `schema.ts` must equal the last entry in `MIGRATIONS`; `runMigrations` throws at startup otherwise. The current version is **64**. **Version 24 does not exist** — the runner tolerates gaps and only requires each version to be above the last applied one. The three block migrations were first numbered v39–v41 on their development branch; `renumberBlockMigrations` restamps such a vault once by name and catches up on v39.
+`BASELINE_VERSION` in `schema.ts` must equal the last entry in `MIGRATIONS`; `runMigrations` throws at startup otherwise. The current version is **65**. **Version 24 does not exist** — the runner tolerates gaps and only requires each version to be above the last applied one. The three block migrations were first numbered v39–v41 on their development branch; `renumberBlockMigrations` restamps such a vault once by name and catches up on v39.
 
 After the migrations, every open runs:
 
@@ -77,6 +77,7 @@ Per-migration detail lives in the code and in `CHANGELOG.md`. In short:
 | 62 | `altars_to_operations` | Altars become operations of `altars` under their own IDs, items with a picture rows of [images](#images) tagged "Altar Library" (`altar-library`, or a tag of that name already there), chips, altar fields and task links point at the operations; the altar tables are emptied, not dropped (`migrateAltars.ts`, `altarConversion.ts`); a copy of the file first (`.pre-v62.bak`) |
 | 63 | `drop_altar_tables` | Converts altar rows an older device synced in since v62 the same way, then drops `altars`, `altar_items` and `altar_placements` and deletes their rows from `_sync_log` (`dropAltarTables` in `migrateAltars.ts`); a copy of the file first (`.pre-v63.bak`) when there is something to convert |
 | 64 | `sigil_blocks_to_fields_and_paint` | The sigil blocks `core.sigil.calc`/`.charge` become fields blocks with that one element, `core.sigil.canvas` a paint block marked as a sigil drawing, in entries and templates (trash included); charge targets follow (`convertLegacySigilsInPlace` in `migrateLegacySigils.ts`, converter in `lib/blocks/legacySigilBlocks.ts`, see [Sigil Workflow](#sigil-workflow)); a copy of the file first (`.pre-v64.bak`) when there is something to convert |
+| 65 | `blocks_table` | New tables [blocks](#blocks) and [block_refs](#block_refs): every block of every entry and template (trash included) becomes a row, built from `content` by the block parser, with what it points at; `content` is normalised to what the rows give, `updated_at` untouched (`fillMissingBlockRows` in `blockStore.ts`); a copy of the file first (`.pre-v65.bak`) when there is content. Repeatable: an owner is done the moment its batch is |
 
 Column drops go through `dropColumnsIfPresent` (`dbRebuild.ts`), which skips columns already gone, so they are repeatable. Where a migration converts data, the same converter also runs on rows from an older `.emeralddb` file at import time — see [DB Backup / Restore](#db-backup--restore-emeralddb).
 
@@ -91,7 +92,7 @@ Two traps shape every rebuild after v33:
 
 v49 and v51 avoid the rename and need no marker: v49 copies per old table, skips ids already in `entries` and drops an old table only once every row is there; v51 adds `settings`, fills rows still at `'{}'`, then drops the old columns (a `DROP TABLE altars` would cascade into `altar_placements`).
 
-Before v33, v38, v39, v42, v44, v49, v51, v53, v62, v63 and v64 rewrite anything (v42, v44, v62, v63 and v64 only when there is something to convert), they write a full copy of the database via `VACUUM INTO` (`backupDatabaseFile` in `dbRebuild.ts`) to `{vaultDir}/emerald.db.pre-v33.bak`, `.pre-v38.bak` and so on — the escape hatch if a migration that rewrites every table goes wrong. On image-heavy vaults the file can be sizeable. `prune_migration_backups` keeps only the newest (what it may delete: [`security.md`](security.md#vault-directories-as-a-trust-boundary)).
+Before v33, v38, v39, v42, v44, v49, v51, v53, v62, v63, v64 and v65 rewrite anything (v42, v44, v62, v63, v64 and v65 only when there is something to convert), they write a full copy of the database via `VACUUM INTO` (`backupDatabaseFile` in `dbRebuild.ts`) to `{vaultDir}/emerald.db.pre-v33.bak`, `.pre-v38.bak` and so on — the escape hatch if a migration that rewrites every table goes wrong. On image-heavy vaults the file can be sizeable. `prune_migration_backups` keeps only the newest (what it may delete: [`security.md`](security.md#vault-directories-as-a-trust-boundary)).
 
 ### Frozen history, and why failures used to be swallowed
 
@@ -116,11 +117,14 @@ Two consequences shape how this schema is changed:
 - A constraint takes effect the moment it is declared. There is no grace period.
 - `PRAGMA foreign_keys = OFF` and `BEGIN` are **not usable across separate `execute()` calls** — each call reaches one pooled connection, and which one serves the next call is not controllable. That rules out the SQLite documentation's table-rebuild recipe (see [Rebuilding a table](#rebuilding-a-table)). A *single* call is different: sqlx runs the `;`-separated statements of one string in order on the one connection it picked, so one multi-statement `execute()` can hold a real `BEGIN … COMMIT`. `importStaging.ts`'s `swapIn` does this — see [DB Backup / Restore](#db-backup--restore-emeralddb). The other way is `Database.batch` (`db_batch` in `db.rs`): a list of statements with bound values, run as one transaction on one connection, all or none. Write loops use it; it cannot wrap a whole import, whose statements are built from reads in between.
 
-Five relations are declared, each with a deliberately chosen delete behaviour:
+Eight relations are declared, each with a deliberately chosen delete behaviour:
 
 | Relation | ON DELETE | Reason |
 |---|---|---|
 | `task_links.task_id` → `tasks.id` | CASCADE | a link without its task is meaningless |
+| `blocks.entry_id` → `entries.id` | CASCADE | a block is part of its entry |
+| `blocks.template_id` → `templates.id` | CASCADE | likewise for a template |
+| `block_refs.block_row` → `blocks.row_id` | CASCADE | a reference is part of its block |
 | `lexicon_entries.language_id` → `languages.id` | CASCADE | a word without its language is nothing |
 | `tasks.parent_task_id` → `tasks.id` | SET NULL | the subtask survives as a standalone task |
 | `entries.category_id` → `categories.id` | RESTRICT | content must never vanish with its category (always `NULL` for a journal entry) |
@@ -152,7 +156,7 @@ The built-ins, `sigils` and `altars` (since v61), cannot be deleted: an operatio
 
 ## Tables
 
-Twelve tables. `TABLES` in `schema.ts` declares the dependency order, parents before children; the sections below group related tables. The order is not cosmetic: inserts are checked against foreign keys immediately, so it governs the rebuilds and the import swap.
+Fourteen tables. `TABLES` in `schema.ts` declares the dependency order, parents before children; the sections below group related tables. The order is not cosmetic: inserts are checked against foreign keys immediately, so it governs the rebuilds and the import swap.
 
 ### schema_version
 
@@ -223,7 +227,7 @@ The templates dashboard's rows, behind Journal/Wiki/Operations' "insert a templa
 | name | TEXT | NOT NULL |
 | icon | TEXT | emoji or image, NOT NULL DEFAULT `'📄'` |
 | title | TEXT | NOT NULL DEFAULT `''`; the title a new entry gets — empty means the entry starts untitled |
-| content | TEXT | NOT NULL DEFAULT `''`; a block stack, same format as an entry's `content` |
+| content | TEXT | NOT NULL DEFAULT `''`; a block stack, same format as an entry's `content`; since v65 a copy of the template's [blocks](#blocks) rows, as for entries |
 | tags | TEXT | JSON array of tag ids, NOT NULL DEFAULT `'[]'` |
 | assignments | TEXT | JSON array of `{entryType, category}`, NOT NULL DEFAULT `'[]'`; `category` is a category id, `null` (no category) or `'*'` (all categories). No assignments = no entry starts with it, it can still be inserted by hand; a template in the Trash has none |
 | sort_order | INTEGER | NOT NULL DEFAULT 0 |
@@ -300,7 +304,7 @@ Journal entries, wiki articles and operations in one table. What distinguishes t
 | id | TEXT PK | UUID |
 | type | TEXT | NOT NULL, `CHECK (type IN ('journal','wiki','operation'))` |
 | title | TEXT | NOT NULL DEFAULT `''`; empty for a new entry — see "Titles" under [Key Conventions](#key-conventions) |
-| content | TEXT | NOT NULL DEFAULT `''`; HTML produced by TipTap |
+| content | TEXT | NOT NULL DEFAULT `''`; the block stack as HTML (`serializeBlocks`) — since v65 a copy of what the entry's [blocks](#blocks) rows give, written along with them, for the readers that still use it (see [blocks](#blocks)) |
 | category_id | TEXT | nullable **FK → categories.id**, RESTRICT; `NULL` = no category (the default). A journal entry is **always** `NULL` |
 | entry_number | INTEGER | stable per row, counted **per type** — see [Key Conventions](#key-conventions) |
 | icon / cover_image | TEXT | data-URL, or emoji for icon — see the Base64 note under [Key Conventions](#key-conventions) |
@@ -311,6 +315,47 @@ Journal entries, wiki articles and operations in one table. What distinguishes t
 Indexes: `idx_entries_type` on `(type, deleted_at)` (every module loads its live entries that way), `idx_entries_category`, `idx_entries_list` on `(deleted_at, type, title, category_id, entry_number, tags, created_at, updated_at, id)` and the partial `idx_entries_decorated` on `deleted_at` `WHERE icon IS NOT NULL OR cover_image IS NOT NULL`. In the row, `tags`, `created_at` and the rest come after `content`, so reading them walked every entry's overflow pages — under SQLCipher that decrypted nearly the whole file. `idx_entries_list` answers the start-up list query (`fetchEntries`, first stage) and the tag sweep on open from the index alone; icon and cover can be data URLs and stay out of it, the few entries carrying one are found through `idx_entries_decorated`, which a query only uses with that exact condition in its WHERE.
 
 **Old rows (v49 and pre-`"11"` backups).** The three old tables carried columns the app no longer reads — `slug`, `moon_phase`, journal `mood`/`paradigm_id`/banishing/meditation/`linked_*_ids` fields, operation status, sigil and `description` columns. Their content was converted into blocks and link chips by v36, v37, v41 and v42; v49 then copies only the shared columns. An id that sat in two old tables (a type change interrupted in an earlier version) keeps the first one (journal, wiki, operation) and the others are logged; they remain in `.pre-v49.bak`. Before copying, v49 retries the sigil drawings v42 could not save, and aborts until that succeeds — the column they wait in is about to go. Older backups go through the same converters on import, row by row (see [DB Backup / Restore](#db-backup--restore-emeralddb)).
+
+### blocks
+
+The blocks of entries and templates, one row each (since v65). An entry or a template is the owner; the row is its block as `BlockInstance` holds it, without the section around it (`toBlockRow`/`fromBlockRow` in `src/lib/blocks/blockRows.ts`).
+
+| Column | Type | Notes |
+|---|---|---|
+| row_id | INTEGER PK | the row's key; block IDs are unique per owner only (a duplicated entry, a template saved from an entry and a merge import keep them) |
+| id | TEXT | NOT NULL; the block's ID (`data-block-id`) |
+| entry_id | TEXT | **FK → entries.id**, CASCADE |
+| template_id | TEXT | **FK → templates.id**, CASCADE; exactly one of the two is set (`CHECK`) |
+| position | TEXT | NOT NULL; sorts as a string (`lib/blocks/position.ts`): base-62 fraction digits, so a key fits between any two and moving or inserting a block writes that one row |
+| type | TEXT | NOT NULL; `core.text`, `core.fields`, … or a type this version does not know |
+| version | INTEGER | `data-block-v`; NULL = absent (version 1) |
+| hidden | INTEGER | NOT NULL DEFAULT 0; `data-block-hidden="1"` |
+| title | TEXT | `data-block-title`; NULL = absent |
+| show_title | INTEGER | `data-block-show-title` (`1`/`0`); NULL = the type's default |
+| config / data | TEXT | the block's JSON as written (`data-block-config`/`-data`), NULL when absent; field values sit in `data` by element ID, for filters through SQLite's JSON functions |
+| attrs | TEXT | NOT NULL DEFAULT `'{}'`; JSON object of every other `data-*` attribute, in order — older copies' `data-block-origin`, a newer type's own, and an instance attribute whose value the app does not write that way (`hidden="0"`) |
+| html | TEXT | NOT NULL DEFAULT `''`; the inner HTML. For now every type keeps it, the pictures a canvas or drawing lists included, so `content` can be written from the rows |
+| text | TEXT | NOT NULL DEFAULT `''`; plain text for the search, without a DOM (`blockPlainText`): tags gone, block elements and chips as word boundaries; empty for a canvas and a drawing. A concealed sigil's text is in it — concealing depends on the date |
+| updated_at | TEXT | NOT NULL; ISO 8601, when the block was last written by a save that changed it (a move does not count). A rebuild from `content` (v65, sync, an import, the fill on open) writes all of its owner's blocks anew, with new positions and this stamp |
+
+`UNIQUE (entry_id, id)` and `UNIQUE (template_id, id)` (NULL is distinct, so each covers only its owner kind); indexes `idx_blocks_entry` and `idx_blocks_template` on `(owner, position)`.
+
+**Writing (`src/lib/blockStore.ts`).** The stores (`createEntry`, `updateEntry`, `createTemplate`, `updateTemplate`) and `entryTypeChange` write through `planContentWrite` (their `content` string → blocks → `planBlockWrite`), which compares the blocks to what was last saved (kept per owner in memory, read from the rows when missing, forgotten with `resetDbCache`/`markDbReplaced`) and write only blocks that are new, changed or moved (a move writes `position` alone), delete removed ones, and rewrite each written block's [block_refs](#block_refs) (`planBlockWrite`). A keystroke thus writes its own block. A single plain text block carries no ID in `content` (`serializeBlocks`, rule 2); it keeps the ID it was saved under (`blocksOfContent`).
+
+**`content` until step 3 of the block rebuild.** `entries.content` and `templates.content` stay as a copy for the readers that still use them (search, "Linked entries", the image cleanup and "Images", export, `.emerald`, backup, sync). Every write puts the rows, their references and `content` = `serializeBlocks` of the rows into **one** `Database.batch`, so the two never disagree; the stores load from the rows. `serializeBlocks` writes the instance attributes in a fixed order (`orderedBlockAttrs`), so the same block written from its row or from the stack is the same string. Paths that write `content` with plain SQL rebuild the rows of what they touched. Sync apply does so in the same batch as the `content` it applies (`rebuildOwnerStatements`; the block rows are local, see [Sync](architecture/sync.md#capture)). The `.emerald` altar import calls `rebuildOwners` after its insert, in a second transaction. A backup import runs `reconcileBlockRows` at the end, in its working copy; it compares every owner's rows with its `content`. `fillMissingBlockRows` fills owners without rows on every open (a seeded vault, raw inserts) — found through the index, only their `content` is read — and after a sync restore (`finishRestore`). A backup import and a sync restore (`beginRestore`) also forget what was saved (`clearSavedBlocks`). `checkBlockRows` reports owners whose rows and `content` disagree; it is a diagnostic for the checks.
+
+### block_refs
+
+What a block points at (since v65), rewritten whenever its block is written (`blockRefs` in `src/lib/blocks/blockRefs.ts`).
+
+| Column | Type | Notes |
+|---|---|---|
+| block_row | INTEGER | NOT NULL, **FK → blocks.row_id**, CASCADE |
+| target_kind | TEXT | NOT NULL, `'entry'` or `'image'` |
+| target | TEXT | NOT NULL; the entry's ID, or the picture's stored file name |
+| role | TEXT | NOT NULL; `content` (a chip, a picture in a text, an image field, a picture on a canvas), `render` (a canvas's or drawing's rendered picture), `layer` (a drawing layer's picture), `background` (a canvas's background), `default` (a custom block's prefill) |
+
+`PRIMARY KEY (block_row, target_kind, target, role)` — with a `rowid`, since re-encrypting a vault renames pictures in every table by it (`reencrypt.rs`); `idx_block_refs_target` on `(target_kind, target)` answers "who points at this". A drawing without a vector document has its render as its only layer, as `parseDrawing` reads it. Nothing reads the table yet — "Linked entries", the image cleanup, "Images" and rewriting links move onto it in step 3.
 
 ### Moon phase
 
@@ -354,7 +399,7 @@ A task in the Trash keeps its rows, so restoring it brings its links back; `task
 
 ## Indexes
 
-Declared in `INDEX_DDL` in `schema.ts`: one on every foreign-key column, one on each side of `task_links`, one on every `deleted_at` column (for `entries` the leading column of `idx_entries_list`), `idx_entries_type` on `entries(type, deleted_at)`, and the list indexes `idx_entries_list` and `idx_entries_decorated` — see [entries](#entries).
+Declared in `INDEX_DDL` in `schema.ts`: one on every foreign-key column, one on each side of `task_links`, one on every `deleted_at` column (for `entries` the leading column of `idx_entries_list`), `idx_entries_type` on `entries(type, deleted_at)`, the list indexes `idx_entries_list` and `idx_entries_decorated` — see [entries](#entries) — and `BLOCKS_INDEX_DDL` (an owner's blocks in order, references by target) — see [blocks](#blocks).
 
 The `deleted_at` indexes matter because `runPeriodicCleanup` runs a range scan across every soft-delete table each time a vault is opened.
 

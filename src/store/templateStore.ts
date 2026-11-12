@@ -21,7 +21,8 @@ import { generateId, nowIso } from '../lib/helpers';
 import { needsWrite, stampFor, type WriteOptions } from '../lib/stamp';
 import { fromRow, type DbRow } from '../lib/row';
 import { serialized, serialKey } from '../lib/serialize';
-import { insertTemplateRow, nextTemplateSortOrder } from '../lib/templateRows';
+import { insertTemplateStatement, nextTemplateSortOrder } from '../lib/templateRows';
+import { contentOf, loadBlocks, planContentWrite, type BlockOwner } from '../lib/blockStore';
 import {
   DEFAULT_TEMPLATE_ICON, matches, resolveAssignedTemplate, templateStart, templateToRow, assignedCategoryId,
   type EntryStart, type Template, type TemplateAssignment, type TemplateEntryType,
@@ -59,7 +60,12 @@ async function selectActive(db: Database): Promise<Template[]> {
   const rows = await db.select<DbRow[]>(
     'SELECT * FROM templates WHERE deleted_at IS NULL ORDER BY sort_order ASC, name ASC'
   );
-  return rows.map(fromRow.template);
+  // The block stack comes from the block rows (`blocks`).
+  const blocks = await loadBlocks(db, 'template', rows.map((r) => String(r.id)));
+  return rows.map((r) => {
+    const template = fromRow.template(r);
+    return { ...template, content: contentOf(blocks.get(template.id) ?? []) };
+  });
 }
 
 export const useTemplateStore = create<TemplateState>((set, get) => ({
@@ -73,12 +79,14 @@ export const useTemplateStore = create<TemplateState>((set, get) => ({
   createTemplate: (name, init = {}) => serialized(WRITE_KEY, async () => {
     const db = await getDb();
     const now = nowIso();
+    const id = generateId();
+    const blocks = await planContentWrite(db, { kind: 'template', id }, init.content ?? '', now);
     const template: Template = {
-      id: generateId(),
+      id,
       name: name.trim(),
       icon: init.icon ?? DEFAULT_TEMPLATE_ICON,
       title: init.title ?? '',
-      content: init.content ?? '',
+      content: blocks.content,
       tags: init.tags ?? [],
       assignments: [],
       sort_order: await nextTemplateSortOrder(db),
@@ -86,7 +94,9 @@ export const useTemplateStore = create<TemplateState>((set, get) => ({
       updated_at: now,
       deleted_at: null,
     };
-    await insertTemplateRow(db, template);
+    // The row first: its blocks point at it.
+    await db.batch([insertTemplateStatement(template), ...blocks.statements]);
+    blocks.commit();
     set((s) => ({ templates: [...s.templates, template] }));
     return template;
   }),
@@ -101,13 +111,24 @@ export const useTemplateStore = create<TemplateState>((set, get) => ({
       updated_at: stampFor(current.updated_at, touch),
     };
     const db = await getDb();
+    // The block stack only if it is meant to change: as rows, only the blocks
+    // that changed, and `content` as what they give — in one transaction.
+    const owner: BlockOwner = { kind: 'template', id };
+    const blocks = patch.content !== undefined
+      ? await planContentWrite(db, owner, patch.content, updated.updated_at)
+      : null;
+    if (blocks) updated.content = blocks.content;
     const row = templateToRow(updated);
-    await db.execute(
-      `UPDATE templates
-          SET name=$1, icon=$2, title=$3, content=$4, tags=$5, updated_at=$6
-        WHERE id=$7`,
-      [row.name, row.icon, row.title, row.content, row.tags, row.updated_at, id]
-    );
+    await db.batch([
+      [
+        `UPDATE templates
+            SET name=$1, icon=$2, title=$3, tags=$4, updated_at=$5${blocks ? ', content=$7' : ''}
+          WHERE id=$6`,
+        [row.name, row.icon, row.title, row.tags, row.updated_at, id, ...(blocks ? [row.content] : [])],
+      ],
+      ...(blocks?.statements ?? []),
+    ]);
+    blocks?.commit();
     set((s) => ({ templates: s.templates.map((t) => (t.id === id ? updated : t)) }));
   }),
 

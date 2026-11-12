@@ -6,13 +6,15 @@ Journal, Wiki and Operations entries render their body as a vertical stack of bl
 
 ### Stored format
 
-Blocks live in the `content` column, not a side table, so every pipeline that reads `content` (search, "Linked entries", image cleanup, merge-import link remapping, `.emerald`, backup, export) works without a special case. Each block is a top-level `<section data-block="<type>" data-block-id="<id>" …>inner HTML</section>` (`src/lib/blocks/blockHtml.ts`). Three rules carry the format:
+Since v65 every block of an entry or a template is a row of its own in [`blocks`](../database.md#blocks), with what it points at in [`block_refs`](../database.md#block_refs). The stores load a stack from the rows in `position` order and save only the blocks that changed (`planBlockWrite` in `src/lib/blockStore.ts`): a keystroke writes its own block, a move writes one position (`lib/blocks/position.ts`), and each written block's references are rewritten (`lib/blocks/blockRefs.ts`). A row holds the block losslessly (`lib/blocks/blockRows.ts`): the instance attributes in columns of their own, every other attribute in `attrs`, the inner HTML in `html`, plain text for the search in `text`.
+
+Until step 3 of the block rebuild, `content` stays as a copy the rows give, written in the same transaction, for the pipelines that still read it (search, "Linked entries", image cleanup, merge-import link remapping, `.emerald`, backup, export) — how the two stay in step is in [`database.md`](../database.md#blocks). The format below is that copy's, the one `BlockStack` hands to `useEntryEditor`, and the one older files are read in. Each block is a top-level `<section data-block="<type>" data-block-id="<id>" …>inner HTML</section>` (`src/lib/blocks/blockHtml.ts`); the instance attributes are written in a fixed order (`orderedBlockAttrs`), then any others in theirs. Three rules carry the format:
 
 1. Content *outside* a section is text: content with no wrapper is one text block, and raw HTML an import or migration appends becomes another.
-2. A single text block with no further attributes is written **without** a wrapper.
+2. A single text block with no further attributes is written **without** a wrapper. Its ID is not in `content` then; its row keeps the one it was saved under (`blocksOfContent`).
 3. Sections only appear at the top level; TipTap has no section node, so none can end up inside a text block.
 
-`parseBlocks`/`serializeBlocks` are deliberately `DOMParser`-free, so migrations and `scripts/check-blocks.mjs` (`npm run check:blocks`, in CI) can run them under Node. Only `data-*` attributes are carried through. A block of an unknown type, or with a `data-block-v` newer than its registry entry, renders its inner HTML through DOMPurify (`UnknownBlock`), can only be moved or removed, and is written back untouched.
+`parseBlocks`/`serializeBlocks` are deliberately `DOMParser`-free, so migrations and `scripts/check-blocks.mjs` (`npm run check:blocks`, in CI) can run them under Node. `parseBlocks` finds tags with a linear scanner (`htmlTags`), not a regular expression: markup arrives from imports and other devices, and a backtracking pattern over crafted markup (thousands of `<a` without a `>`) takes minutes. Only `data-*` attributes are carried through. A block of an unknown type, or with a `data-block-v` newer than its registry entry, renders its inner HTML through DOMPurify (`UnknownBlock`), can only be moved or removed, and is written back untouched.
 
 ### Registry
 
