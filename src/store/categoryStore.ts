@@ -12,7 +12,7 @@
 import { create } from 'zustand';
 import { getDb } from '../lib/db';
 import { purgeCategory, reassignCategoryContent } from '../lib/schema';
-import { categoryKey } from '../lib/categoryMerge';
+import { categoryKey } from '../lib/categories';
 import { generateId, nowIso } from '../lib/helpers';
 import { fromRow, type DbRow } from '../lib/row';
 import type { Category } from '../types';

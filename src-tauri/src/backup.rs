@@ -13,7 +13,8 @@
 //! machine. A backup of a vault that is unlocked right now opens without
 //! asking: its key is tried first.
 //!
-//! Backups from before encryption are plain JSON and are still read.
+//! Backups from before encryption are plain JSON: they are opened, and the
+//! import then refuses them by their version.
 
 use zeroize::Zeroizing;
 

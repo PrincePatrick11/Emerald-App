@@ -3,7 +3,6 @@ import type { TFunction } from 'i18next';
 import { nowIso } from './helpers';
 import { fromRow, type DbRow } from './row';
 import { readContents, replaceOwnerBlocks } from './blockStore';
-import { hasContentColumn } from './contentColumn';
 import { ALTAR_CATEGORY_ID, SIGIL_CATEGORY_ID } from './schema';
 import { serializeBlocks } from './blocks/blockHtml';
 import { translatedOr } from './blocks/blockAttrs';
@@ -12,9 +11,8 @@ import { altarBlockSet } from './blocks/canvas';
 import { ALTAR_TEMPLATE_ID, SIGIL_TEMPLATE_ID, templateToRow, type Template } from './blocks/templates';
 
 /**
- * The accesses to `templates` that store, migration, fresh vaults and
- * imports share. Here instead of in the store, because migrations and `lib/` modules
- * may not import a store — the same pattern as `blockDefinitionRows`.
+ * The accesses to `templates` that store, fresh vaults and imports share.
+ * Here instead of in the store, because `lib/` modules may not import a store — the same pattern as `blockDefinitionRows`.
  */
 
 /** The next free position at the end of the list — also behind templates in the trash. */
@@ -37,43 +35,24 @@ export function insertTemplateStatement(template: Template): readonly [string, u
   ];
 }
 
-/**
- * A template with its block stack — for the seeds of a fresh vault and the
- * migrations that create templates (v43, v44, v61). Those run on vaults from
- * before v65, which keep the block stack in `content` (v65 builds the rows from
- * it, v66 drops the column); a fresh vault gets the rows straight away.
- */
+/** A template with its block stack — for the seeds of a fresh vault. */
 export async function insertTemplateRow(db: Database, template: Template): Promise<void> {
-  if (await hasContentColumn(db, 'template')) {
-    const row = templateToRow(template);
-    await db.execute(
-      `INSERT INTO templates
-         (id, name, icon, title, content, tags, assignments, sort_order, created_at, updated_at, deleted_at)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
-      [
-        row.id, row.name, row.icon, row.title, row.content, row.tags, row.assignments,
-        row.sort_order, row.created_at, row.updated_at, row.deleted_at,
-      ],
-    );
-    return;
-  }
   const blocks = replaceOwnerBlocks({ kind: 'template', id: template.id }, template.content, template.updated_at, { hasRows: false });
   await db.batch([insertTemplateStatement(template), ...blocks.statements]);
   blocks.commit();
 }
 
-/** A template by ID — also from the trash, unlike the store, which holds only the active ones; its blocks from their rows since v66. */
+/** A template by ID — also from the trash, unlike the store, which holds only the active ones; its blocks from their rows. */
 export async function templateById(db: Database, id: string): Promise<Template | undefined> {
   const [row] = await db.select<DbRow[]>('SELECT * FROM templates WHERE id=$1', [id]);
   if (!row) return undefined;
   const template = fromRow.template(row);
-  if (await hasContentColumn(db, 'template')) return template;
   return { ...template, content: (await readContents(db, 'template', [id])).get(id) ?? '' };
 }
 
 /**
  * The built-in "Sigil" template: calculator, drawing and charge, default
- * for operations of the "Sigils" category — what was hard-wired up to v42.
+ * for operations of the "Sigils" category.
  * The name ends up permanently in the row; if i18n is not ready yet, English.
  */
 function sigilTemplate(t: TFunction, now: string, sortOrder: number): Omit<Template, 'assignments'> {
@@ -93,8 +72,8 @@ function sigilTemplate(t: TFunction, now: string, sortOrder: number): Omit<Templ
 
 /**
  * Creates the sigil template if it does not yet exist (including in the trash)
- * — for fresh vaults and migration v43. Without the "Sigils" category
- * (only a doctored database) it stays without an assignment.
+ * — for fresh vaults. Without the "Sigils" category (only a doctored
+ * database) it stays without an assignment.
  */
 export async function seedSigilTemplate(db: Database, t: TFunction): Promise<void> {
   if (await templateById(db, SIGIL_TEMPLATE_ID)) return;
@@ -107,7 +86,7 @@ export async function seedSigilTemplate(db: Database, t: TFunction): Promise<voi
 
 /**
  * Creates the built-in "Altar" template if it does not yet exist (including
- * in the trash) — for fresh vaults and migration v61: an altar and a text for
+ * in the trash) — for fresh vaults: an altar and a text for
  * notes, default for operations of the "Altars" category.
  */
 export async function seedAltarTemplate(db: Database, t: TFunction): Promise<void> {

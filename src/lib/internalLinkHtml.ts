@@ -279,12 +279,3 @@ export function internalLinkBlockHtml(
   const tail = suffix ? ` ${escapeHtml(suffix)}` : '';
   return `${rule}${heading}<p>${internalLinkChipHtml(chip)}${tail} </p>`;
 }
-
-/**
- * The same block without a chip — for a replaced value whose target does not
- * (or no longer) exist: a set `is_bannung` without an article, say. Without this, migration
- * v37 would lose the information without replacement.
- */
-export function plainBlockHtml(text: string, { separator = true }: LinkBlockOptions = {}): string {
-  return `${separator ? '<hr>' : ''}<p>${escapeHtml(text)}</p>`;
-}

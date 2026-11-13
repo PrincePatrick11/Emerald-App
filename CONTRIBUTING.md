@@ -53,7 +53,7 @@ Every push to `main` or a version branch and every pull request runs `ci.yml`: a
 
 - **The current state only.** No "used to", "formerly", "no longer", "now also", "replaces the old …", "since vNN". A migration or importer that converts old data is current behaviour — describe what it converts, not the old feature.
 - **Keep the why, drop the when.** A reason that still explains today's design stays; a reason that only explains how the code got here goes.
-- **Name symbols, not line numbers.** Write `normalizeSchema.ts` or `.vault-card`, never `index.css:1426`.
+- **Name symbols, not line numbers.** Write `dbBackup.ts` or `.vault-card`, never `index.css:1426`.
 - **One paragraph per line.** No hard wrapping, so a diff shows the paragraph that changed. Split anything long into several paragraphs or a list.
 - **Say it once.** Each topic has one home; other files link to it.
 - **Rewrite, don't append.** When behaviour changes, rewrite the section so it reads as one description, instead of adding a sentence that amends the previous ones.

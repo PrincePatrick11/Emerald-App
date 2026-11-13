@@ -20,8 +20,7 @@ The journal is the primary day-to-day writing space. Each entry has a title and 
 
 There is one formatting toolbar, pinned to the top while scrolling, acting on the text block you are typing in. A link added from "Linked entries" lands in the text block you last worked in; an image dropped from the file explorer or an entry dragged in from the left list lands where the pointer is, shown by a line or caret while dragging. Cancel reverts block changes along with the text. All of this applies to Wiki articles and Operations too, sigils included.
 
-**Field blocks.** "Add block" offers nine kinds of field besides text: short text, number, date, choice, yes/no, checklist, link (to any entry), image and moon phase. Altar fields from older versions became link fields to the altar's operation.
-
+**Field blocks.** "Add block" offers nine kinds of field besides text: short text, number, date, choice, yes/no, checklist, link (to any entry), image and moon phase.
 - **Read mode** shows a field as a small label with its value, in the same typeface as the text around it; an empty field is left out.
 - **Editing**, each field has its own input — a date picker, a dropdown for a choice or a moon phase, a switch for yes/no, a list with "Add item" for a checklist, a search for a link, "Choose image" for an image.
 - **Settings** sit in the block's section in the sidebar: the label, a choice's options (added, renamed, removed there), whether the field is hidden in read mode while empty, and "Fully read-only".
@@ -61,13 +60,13 @@ The list opens with a collapsible "Your blocks" section; below it a collapsible 
 - Clicking a listed link does the same jump-and-highlight (or navigates to the target if the link somehow isn't in the text).
 - The "×" removes it — the whole block if it is one of these appended blocks, just the chip if it sits inline in running text.
 
-The same field is available on Wiki articles and Operations. Links are included in Markdown and Emerald exports. Older vaults and backups whose journal entries still had the fixed Paradigm, Banishing and Meditation properties have them converted into ordinary links on open or import.
+The same field is available on Wiki articles and Operations. Links are included in Markdown and Emerald exports.
 
 **Changing type.** In edit mode, a "Type" row at the top of the Properties panel shows Journal, Operations and Wiki as an icon toggle. Picking another turns the entry into that kind: it keeps its id, title, content, tags and creation date, and everything pointing at it follows — link chips elsewhere (including in templates and the Trash), its open tab and history, task links, and the prefilled link of any custom block. Wiki and Operation keep category, icon and cover image between each other; switching to Journal drops them, asking first if any are set. The content stays as it is — a default template applies only when an entry is created. Tasks have a different data model and take no part in this.
 
 **Tags.** Free-form labels shared across the app. Renaming a tag changes it on every entry at once. The Tags view lists the entries carrying a tag — journal entries, wiki articles and operations; tasks carry no tags. A tag used only by templates reads "only in templates", one only pictures in [Images](#images) carry "only in Images", instead of "unused". A tag in the Trash disappears from its entries until it is restored; deleting it for good removes it from them, including entries in the Trash.
 
-**Untitled.** A new journal entry, article, operation or task has no title until you type one. Wherever a title is shown — lists, cards, tabs, search, the Trash, link chips and pickers, task links, exports — an empty one reads "Untitled Entry" (Article, Operation, Task) in the app's language; renaming starts from an empty field. A duplicate of an untitled entry is called "Untitled Entry (Copy)". Older vaults and imports have the old English default titles ("Untitled Entry", "New Task" …) emptied; a title you typed yourself is never touched.
+**Untitled.** A new journal entry, article, operation or task has no title until you type one. Wherever a title is shown — lists, cards, tabs, search, the Trash, link chips and pickers, task links, exports — an empty one reads "Untitled Entry" (Article, Operation, Task) in the app's language; renaming starts from an empty field. A duplicate of an untitled entry is called "Untitled Entry (Copy)". An imported `.emerald` or Markdown file whose title is the "Untitled …" an export wrote for an empty one comes in untitled.
 
 **List views.** The journal list offers four layouts (List, Cards, Cards in full width, Timeline), four sort orders (newest first, oldest first, A→Z, Z→A), and a separate Grouping toggle, which for the journal groups by **moon phase** (with the moon phase setting off, the list is simply ungrouped and has no phase filter).
 
@@ -96,7 +95,7 @@ Operations track magical workings: rituals in progress, ongoing practices, servi
 
 **Categories.** The same shared list as Wiki and Tasks — see [Categories](#categories). Its two built-ins belong here: **Sigils** (see [Sigil Workflow](#sigil-workflow)) and **Altars** (see [Altars](#altars)).
 
-**Status, end date and version are a block.** The block **Status** (Active — yes/no, End date, Version) is a user-built block like any other: add it to an operation via "Add block", toggle "Active" straight from read mode, and rename, extend or delete it in the Blocks view. Older vaults, backups, `.emerald` and Markdown files that carry these values as fixed fields get the block added to those operations on open or import. Filtering the list by block values is planned.
+**Status, end date and version are yours to build.** Operations have no fixed status fields: a block of your own in the Blocks view (say, Active — yes/no, End date, Version) is added via "Add block", and a yes/no field can be toggled straight from read mode. Filtering the list by block values is planned.
 
 **Icon and Cover Image.** Operations use the same icon rule and cover image as wiki articles (see [Wiki](#wiki)). A row shows "category · last changed"; a sigil with a target date appends "Target date: …", in rows and cards alike.
 
@@ -113,8 +112,6 @@ While charged, the calculators and drawings it covers are hidden (also in search
 
 Duplicating keeps the charge: a duplicated entry, or a duplicated block the charge hides or locks, comes out just as loaded, hidden until the same date. Saving an entry as a template, and inserting a template, work the same way: a drawn or loaded sigil comes along as it is. A new entry from a template whose loaded sigil locks the whole entry opens for reading until the sigil is unloaded. Inserted into an entry that already has content, a template's charge covers only the calculators and drawings the template brought.
 
-Sigils from older vaults are converted into these blocks on open (intention, letters, drawing, charge state, reveal date, technique, and notes as a text block), with a backup written next to the database first.
-
 ### Servitors
 
 Servitors use the standard operations editor with no special fields. File them under whichever category fits — including one you name "Servitors" yourself.
@@ -125,18 +122,16 @@ An altar is an operation in the built-in category **Altars** (🪔), a virtual a
 
 **The Altar block** is the Canvas block (see [Images](#images)) with "Images" below it while editing: two rows of pictures to scroll sideways, a search, and a tag filter.
 
-- **Search and tag.** The search finds pictures by name. A tag chosen in the strip's head shows only the pictures carrying it, and is saved with the altar, so each altar can keep its own selection; its × shows all again. A new altar starts with the tag "Altar Library", which the pictures of the old altar library carry; a vault without it gets it with the first picture added there.
+- **Search and tag.** The search finds pictures by name. A tag chosen in the strip's head shows only the pictures carrying it, and is saved with the altar, so each altar can keep its own selection; its × shows all again. A new altar starts with the tag "Altar Library"; a vault without it gets it with the first picture added there.
 - **Placing pictures.** Drag a picture onto the canvas, or click it to place it in the middle of what is visible; each comes in its own proportions at a third of the canvas's shorter side.
 - **Adding pictures.** The "+" opens the Add images dialog with the strip's tag set. Files dropped onto the canvas from the disk go into "Images" under their file name, with the strip's tag, and onto the canvas where they were let go; pictures taken from the disk through the picture button in the tool column carry that tag too.
-- A picture-less element with the 🕯️ emoji, as older altars have them, flickers like a candle.
-
 **Editing the canvas.** In edit mode the canvas works like a design tool, laid out like painting a drawing: the tools in a column on the left, a bar above for undo and what the selection has, the element list on the right. A block's settings in the sidebar choose what it offers (shapes, text, symbols, drawing, and for the Altar block "Images" below); switched off, nothing new of that kind is added, and what is on the canvas stays.
 
 - **Tools.** Select (V), rectangle (R), ellipse (O), polygon (G), star (S), text (T) and drawing (P), and the picture button, which opens the picture picker. Drag on the canvas to draw the element in that size (Shift: a square), or click to place it at its usual size; afterwards the column goes back to selecting. Escape drops a tool.
 - **Handles.** A selected element shows a frame with handles: the corners scale it (pictures and text keep their proportions, Shift frees them), the round handle above rotates it (snapping near the right angles, with Shift to 15°). A click only selects: dragging starts after a few pixels of movement and the element keeps the spot where it was grabbed. Locked elements are click-through.
 - **Several at once.** Shift-, ⌘- or Ctrl-click adds to the selection, a drag on an empty spot draws a frame around what to select, ⌘A selects everything. Moving, scaling, rotating and the toolbar then apply to all of them.
 - **Guides.** While moving, edges and centres snap to the canvas's edges and middle and to the other elements, and a pink line shows where; Alt moves freely.
-- **Shapes and text.** The tools add rectangles, ellipses, polygons and stars, and text boxes. A shape gets a fill and an outline from twelve colours or any other, a rectangle rounded corners, a polygon 3 to 12 corners and a star 3 to 12 points, like the shapes of the paint mode. Triangles and hexagons from older altars stay as they are until their corners are changed. Text is typed in place (double-click or Enter to change it), wraps at its box, and takes one of three fonts, a size, bold, italic, alignment and a colour; its side handles change the width, its corners the size.
+- **Shapes and text.** The tools add rectangles, ellipses, polygons and stars, and text boxes. A shape gets a fill and an outline from twelve colours or any other, a rectangle rounded corners, a polygon 3 to 12 corners and a star 3 to 12 points, like the shapes of the paint mode. Text is typed in place (double-click or Enter to change it), wraps at its box, and takes one of three fonts, a size, bold, italic, alignment and a colour; its side handles change the width, its corners the size.
 - **Symbols.** The sparkle in the tool column opens a library of symbols drawn for Emerald, in seven packs: planets (with the lunar nodes), the zodiac with the aspects, alchemy (elements, salt, sulfur, mercury, the metals, antimony, the philosophers' stone), the 24 runes of the Elder Futhark, occult signs (chaos star, inverted pentagram, unicursal hexagram, septagram, triple moon, triquetra, Leviathan cross, lemniscate, Eye of Horus, valknut, helm of awe, Mjölnir, spiral, triskele, ouroboros, witch's knot, caduceus), the twenty letters of Ogham, and sacred geometry (tree of life, seed and flower of life, Metatron's cube, pentagram and pentacle, hexagram and seal of Solomon, heptagram, octagram, vesica piscis, ankh, Monas hieroglyphica, eye of providence and more). A search finds them by name across every pack. A picked symbol is drawn on the canvas like a shape (a click puts it there, a drag gives its size; Y draws the last one picked again). It is made of lines: the bar sets their colour and weight, a fill for its closed parts, and swaps it for another symbol.
 - **Your own symbols.** Select a drawing on the canvas and choose "Save as symbol" in the bar: it shows the drawing as a symbol, takes a name, and puts it into "My symbols" in the library, where it is placed, coloured and scaled like the others. A symbol has one colour: pen strokes and fills become its filled parts, lines and outlined shapes its lines; eraser strokes and pictures are left out. A trash button on a symbol in "My symbols" removes it (with undo); what is already placed stays. Your symbols are kept in the vault and travel with every backup.
 - **Arrange and align.** Restack by dragging in the element list, or bring forward and send backward with ⌘] and ⌘[ (with Shift: to the front and back); the toolbar aligns edges or centres of the selection, or of one element on the canvas, and makes even gaps between three or more; a group counts as one element there.
@@ -153,9 +148,6 @@ An altar is an operation in the built-in category **Altars** (🪔), a virtual a
 - **Backgrounds.** The background button at the end of the canvas bar sets the canvas's background: no fill, a colour, or a linear or radial gradient of two or three colours (a linear one at any angle, a radial one from the top, middle or bottom), a picture over it, chosen with the picture picker, that fills the canvas or fits into it, and a tint over both that darkens or lightens it by a chosen strength. ⌘Z takes it back like any other step, a dragged slider as one.
 
 Read mode shows the canvas as it is; the entry's card and its exports show the picture made of it when editing ends with Done.
-
-**Altars from older versions.** Opening this version turns every altar into an operation of Altars, under the same ID, so links, tasks and altar fields lead to it: its placements, drawn shapes, text, drawings, background and guides become its Altar block, at its old size; its grid settings are not kept. The library's items with a picture go to [Images](#images) with their name and note (in the Trash if the item was), and an item without one stays on its altar as its emoji. Backups and `.emerald` files with altars are converted the same way on import. A converted altar has no picture of its canvas yet: its PDF and Markdown exports leave the canvas out until the altar has been edited once and closed with Done, which makes the picture.
-
 ## Navigation
 
 **Loading screen.** On startup, before the app is ready, a loading screen covers the window: a breathing emerald gem with twinkling facets, the wordmark and a progress rail, on the app's own dark background. It fades as soon as your vault's data (or, without one, the [vault picker](#vaults)) is ready, however fast that is, and comes back while a vault chosen in the picker opens. If a password question comes first, the loading screen returns after you answer it and stays until the vault has loaded; a keychain prompt does not count against its time limit. **View → Show Loading Screen** replays it; a click or Escape closes it.
@@ -244,8 +236,6 @@ Clicking one opens its page — name as the title, the title new entries get, an
 
 **Duplicate** on a template makes an independent copy without assignments. Deleting a template moves it to the Trash with an Undo toast and clears its assignments; it comes back without them. "New template" followed by Cancel puts it in the Trash with Undo; after Done it stays. Exporting a template as `.emerald` carries no assignments: which template fills new entries is this vault's decision.
 
-Routines from older vaults and `.emeralddb` backups are converted into templates on open or import (same content and tags, linked entries as link blocks, without assignments).
-
 ## Tasks
 
 The Tasks module is a hierarchical task manager with categories, priorities, and links to any entry or task.
@@ -293,7 +283,7 @@ From here you can:
 - **Delete** without a question, undoable from the toast. A deleted category goes to the Trash; its entries keep pointing at it and appear under "Uncategorized" until it is restored (bringing them back) or deleted for good (leaving them uncategorized). If another category took its name meanwhile, restoring merges the two into the one with the name (a template keeps a default star only where the combination has none yet).
 - **Reorder** by dragging a row by its grip. This order is used everywhere — group headers, filter rows, the category picker — and is saved immediately.
 
-**Sigils** is the one built-in: it can't be renamed or deleted, since its name comes from the app's translations, and an operation inside it opens the sigil editor. It can still be dragged. Everything else, including the **Other** that older vaults carry, is an ordinary category. New categories go to the end of the list.
+**Sigils** and **Altars** are the built-ins: they can't be renamed or deleted, since their names come from the app's translations; a new operation inside one starts with the sigil blocks or an altar. They can still be dragged. Everything else is an ordinary category. New categories go to the end of the list.
 
 **In the modules.** Entries start with **no category** and stay under "Uncategorized" until you pick one in the properties panel (or the task row); "Uncategorized" is the first entry of every category picker, and choosing it removes an assignment. A category that nothing in a module uses doesn't appear there.
 
@@ -350,7 +340,7 @@ A vault is a **folder** you choose, holding its own encrypted database and its o
 - By hand it opens from the menu: **Emerald → Switch Vault…**, in the macOS menu bar or behind the three-line button in the title bar on Windows and Linux, or from the start page button at the very bottom of the left rail (below Settings). Open edits are settled first, as for any switch: save, discard or keep editing.
 - The open vault's name with a chevron at the top left of the page, as in an open entry, Escape, or clicking the open vault's row returns to it without switching. With no vault open there is no way back, only a choice.
 
-An installation from before multi-vault support has its existing database adopted as a vault named "Emerald".
+**Vaults of other versions.** A vault made by an earlier version of Emerald — one from before the fresh start of the database in this version, an unencrypted one included — is not opened: the start page says it comes from an older version and that a converter will follow, and the vault stays exactly as it was. A vault made by a newer version is refused the same way, with a hint to update. Vault records of an installation from before per-vault folders are not listed.
 
 The start page is one page without tabs. On the left the name, the tagline, links to the website, GitHub, Patreon and Discord, and at the bottom the version and the author; its edge to the page can be dragged, as the entry list's can. Beside it, headed as Home's sections are: **Vaults**, a tile for every vault, and below it side by side **Server** (the [sync server](#sync-server)) and **Appearance** (the [theme](#theming) as small pictures, custom themes included). At the bottom of the page the [language](#language) on the left, the [updates](#updates) on the right. **Emerald → About Emerald App** opens it.
 
@@ -381,7 +371,7 @@ Every vault is encrypted: entries, images, drafts and backups are unreadable wit
 
 **A new vault** asks for a password (at least eight characters, entered twice) before it opens, and then shows its **recovery key**. The recovery key is the only way back in if the password is forgotten. It is shown once; write it down or keep it in a password manager — not inside the vault itself — and tick the box that says it is stored before continuing.
 
-**An existing vault from before encryption** is encrypted the first time it opens: Emerald asks for a password, builds an encrypted copy, checks it, and only then replaces the original. A vault is never opened unencrypted. Depending on its size this takes a moment; a progress bar in the dialog shows how far it is, and if the volume does not have enough free space for the copy, Emerald says how much is needed and how much is free before it writes anything. An interruption — a crash, a power cut — leaves the vault usable and finishes or discards the work on the next start. Old plain backups inside the vault's `backup/` folder are encrypted along with it; the original files are deleted.
+**A vault from before encryption** is not opened and not encrypted: like every vault of an earlier version it is refused and left unchanged (see [Vaults](#vaults)). A vault is never opened unencrypted.
 
 **Unlocking.** Opening or switching to a vault asks for its password. Leaving a vault locks it. If you forgot the password, **Forgot your password?** takes the recovery key and a new password, and gives you a new recovery key; the old one stops working.
 
@@ -391,7 +381,7 @@ Every vault is encrypted: entries, images, drafts and backups are unreadable wit
 
 - **Remember on this device** — on or off.
 - **Lock now** — closes the vault and asks for the password again, even if it is remembered. While the password is asked, no content stays on screen.
-- **Change password** — enter the current password and a new one. The vault is re-encrypted under a new key (with a progress bar and the same free-space check as the first encryption) and you get a new recovery key. Open tabs close, and the window stays open until the new recovery key is confirmed. Backups made earlier still open with the password they were made with.
+- **Change password** — enter the current password and a new one. The vault is re-encrypted under a new key and you get a new recovery key. Depending on its size this takes a moment; a progress bar shows how far it is, and if the volume does not have enough free space for the copy, Emerald says how much is needed and how much is free before it writes anything. An interruption — a crash, a power cut — leaves the vault usable and finishes or discards the work on the next start. Open tabs close, and the window stays open until the new recovery key is confirmed. Backups made earlier still open with the password they were made with.
 
 **What encryption does not do.**
 
@@ -421,8 +411,8 @@ The Emerald format (`.emerald`) is a JSON file holding a full entry with all met
 
 ```json
 {
-  "version": "1",
-  "type": "journal | wiki | operations",
+  "version": "4",
+  "type": "journal | wiki | operations | template",
   "title": "…",
   "createdAt": "ISO 8601",
   "content": "HTML string",
@@ -431,17 +421,16 @@ The Emerald format (`.emerald`) is a JSON file holding a full entry with all met
 }
 ```
 
-**Entries.** On import, images are saved into the vault's image folder (an identical image is stored once) and go through the vault's image limits like inserted ones (an image that stays too large, or can't be scaled, is kept as it is). The content is sanitised, links are resolved by id and then by title, and tags are added to the vault. An entry keeps the file's `createdAt` as both creation and "last changed" date, so it lands at its place in the timeline — provided it is a readable date with a four-digit year; otherwise it is created now. Old English default titles import as empty, and fields this version doesn't use are ignored.
+**Entries.** On import, images are saved into the vault's image folder (an identical image is stored once) and go through the vault's image limits like inserted ones (an image that stays too large, or can't be scaled, is kept as it is). The content is sanitised, links are resolved by id and then by title, and tags are added to the vault. An entry keeps the file's `createdAt` as both creation and "last changed" date, so it lands at its place in the timeline — provided it is a readable date with a four-digit year; otherwise it is created now. Fields this version doesn't use are ignored.
 
-**Your own blocks.** An entry carries its copies of Blocks-view blocks in its content; the blocks themselves do not travel. An older file (`"version": "2"`) may still carry them in `meta.blockDefinitions`: import creates any missing one under its original id, and leaves an existing one (even in the Trash) as it is.
+**Versions.** Entries and templates are written as `"version": "4"`, and only that version is read. A file of an earlier version is not imported — a notice says it comes from an older version and that a converter will follow — and one of a newer version asks for an update; nothing is changed either way. Earlier versions of Emerald refuse a version-4 file in turn.
 
-**Templates** export from their page or the templates list's context menu as `"version": "3"`, `"type": "template"` — a combination used only for templates, so an older app rejects the file instead of mistaking it for an operation. It carries the template's blocks, images and Blocks-view blocks like an entry, plus its icon, the title new entries get, its tags and its assignments. A built-in category in an assignment travels by id (its name depends on the language); any other by name and emoji, created on import if nothing matches (at most 20 new categories per file, so a crafted file can't flood the list). Which template is a *default* never travels — importing never displaces a default the vault already has.
+**Your own blocks.** An entry carries its copies of Blocks-view blocks in its content; the blocks themselves do not travel.
 
-**Altars from older versions.** A file with `"type": "altar"`, written before altars were operations, still imports: it becomes a new operation in Altars with an Altar block, converted like the altars of an older vault (see [Altars](#altars)). Its items with a picture go to "Images" (a picture already there keeps its name and details), the background picture goes through the same 5 MB limit as before, and the items' categories are left out. Links in an older entry file that point at an altar point at its operation.
-
+**Templates** export from their page or the templates list's context menu as `"type": "template"` — a type used only for templates, so an app that does not know it rejects the file instead of mistaking it for an operation. It carries the template's blocks, images and Blocks-view blocks like an entry, plus its icon, the title new entries get, its tags and its assignments. A built-in category in an assignment travels by id (its name depends on the language); any other by name and emoji, created on import if nothing matches (at most 20 new categories per file, so a crafted file can't flood the list). Which template is a *default* never travels — importing never displaces a default the vault already has.
 ### Import from Markdown
 
-Reads a Markdown file exported by Emerald (or with the same structure). The `# Title` line becomes the title, key-value lines before `---` are metadata (unknown keys are ignored), and the body below is converted to rich text. A Markdown import has no creation date and is created now. Older files that carry an operation's status, end date and version, or a journal entry's paradigm/banishing/meditation and linked operations/articles, in the header have them turned into the matching block or link blocks.
+Reads a Markdown file exported by Emerald (or with the same structure). The `# Title` line becomes the title, key-value lines before `---` are metadata (unknown keys are ignored), and the body below is converted to rich text. A Markdown import has no creation date and is created now. Header fields of earlier versions (an operation's status, end date and version, a journal entry's paradigm, banishing, meditation and linked operations or articles) count as unknown keys.
 
 **Destination confirmation.** The header's `type` decides where the entry goes. If it is `journal`, `wiki` or `operations`, the import proceeds directly; otherwise a dialog shows the detected title and asks for Journal, Wiki or Operations — cancelling aborts the import. `.emerald` files always carry a type, so they never ask.
 
@@ -452,7 +441,7 @@ The whole vault can be backed up and restored as one self-contained file (`.emer
 **Export.**
 
 - A "What to include" chip row picks the content: Journal, Wiki, Operations (altars included), Tasks, Tags, Lexicon and Settings. Templates and your own blocks travel whenever Journal, Wiki or Operations is included.
-- The Settings chip (on by default) exports the vault's settings — fonts, sizes, trash retention, sidebar, emoji defaults, image limits, tag rule, automatic backup — independently of the content chips. Language and theme belong to the installation and are not part of it; the custom themes an older backup still carries join this installation's list when it is imported.
+- The Settings chip (on by default) exports the vault's settings — fonts, sizes, trash retention, sidebar, emoji defaults, image limits, tag rule, automatic backup — independently of the content chips. Language and theme belong to the installation and are not part of it; custom themes a backup still carries join this installation's list when it is imported.
 - Optional from/to dates restrict entries to those created in that window (tags, categories, blocks, templates, languages and settings are not date-filtered).
 - Trashed items are left out unless **Include deleted** is ticked — tags included, since trashed entries carry their ids.
 - Images referenced by exported entries are embedded.
@@ -461,8 +450,9 @@ The whole vault can be backed up and restored as one self-contained file (`.emer
 
 **Import.**
 
-- Choosing a backup first opens it. If it belongs to a vault that is unlocked right now, that is automatic. Otherwise Emerald asks for the password the backup was made with, or its recovery key from that time, and asks again after a wrong answer. Backups from before encryption are plain files and open without a question.
-- A preview line counts the file's contents per type (templates include an older file's routines, which convert into templates). The same chip row picks what to apply.
+- Choosing a backup first opens it. If it belongs to a vault that is unlocked right now, that is automatic. Otherwise Emerald asks for the password the backup was made with, or its recovery key from that time, and asks again after a wrong answer.
+- **Only backups of this version are restored** (format 15). A backup of an earlier version — one from before encryption included — is refused with a notice that a converter will follow; one of a newer version asks for an update. Nothing is changed either way. Earlier versions of Emerald refuse a format-15 backup in turn.
+- A preview line counts the file's contents per type. The same chip row picks what to apply.
 - Three modes, from least to most invasive: **Add Vault** (into a new vault, then switch to it — the default, since it can't touch existing data), **Merge** (imported items get new ids, so nothing existing is overwritten), and **Replace** (overwrite the selected content in the current vault, with a warning).
 - Add Vault asks for the new vault's name **and folder**, with the same folder row as creating a vault (default `Documents/Emerald Vaults/{name}`). The folder is checked before anything is touched: it must be empty or not exist yet, must not hold a vault, and must be readable. The new vault then asks for its own password; cancelling that cancels the import and removes the empty vault.
 - A failed import — a corrupt file, a crash partway — leaves the vault exactly as it was: every mode fills a hidden copy of the database and swaps it in only once the import succeeded.
@@ -487,8 +477,6 @@ Images are written into the vault's own `images/` folder, named after a hash of 
 Wherever an image is added — the text, an image field, covers and icons, a canvas, an import — a photo that arrives as PNG (a photo pasted from the clipboard, for instance) is stored as JPEG at full size, with no visible difference and about a fifth of the space. Screenshots, graphics and anything with transparency stay PNG. Settings → Entries → Images can switch this off and set a largest edge length and file size for inserted images. Backups and sigil drawings are stored as they are. An image chosen as an icon — of an entry, a template, a block or a language — is in addition shrunk to icon size (64px, 128px for an altar).
 
 A picture taken into [Images](#images) is never unused, wherever it appears. Nothing deletes an image automatically. **Settings → Storage → Unused images** scans on demand: *Scan* reports how many images nothing points at and how much space they take, *Remove* deletes exactly those. It is manual on purpose — an image just inserted but not yet saved would otherwise look unused.
-
-A vault from before per-vault image folders has its images copied into its own folder the first time it is opened. The cleanup never deletes from the old shared pool, since a vault not yet opened may still read from it.
 
 ## Image Upload Validation
 

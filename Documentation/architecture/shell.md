@@ -75,7 +75,7 @@ The loading screen's markup (`#splash` in `index.html`) and styles (`public/spla
 - **`showSplash()`** shows a fresh clone as a preview, dismissed by click or Escape — the View menu's **Show Loading Screen** (`show-splash`).
 - **`showLoadingScreen()` / `hideLoadingScreen()`** put up a fresh clone without the click to dismiss while a vault chosen in the vault picker opens, and take it down once the window is back at its size.
 
-The initial-load effect loads the active vault's settings (`loadForVault`) *before* `reloadAllStores()` — the trash purge needs the retention setting and migration v39 the language — and `AppShell` renders its content only after that (`bootSettled`), so nothing calls `getDb()` on a vault whose settings haven't loaded (a restored tab pointing straight at Trash, for one).
+The initial-load effect loads the active vault's settings (`loadForVault`) *before* `reloadAllStores()` — the trash purge on the first `getDb()` needs the retention setting — and `AppShell` renders its content only after that (`bootSettled`), so nothing calls `getDb()` on a vault whose settings haven't loaded (a restored tab pointing straight at Trash, for one).
 
 **Dragging the loading screen.** The root carries `data-tauri-drag-region`, and a `.splash-drag` strip across the top (2.5rem, the title bar's height) repeats it, because the root's attribute is lost wherever a child takes the click: `showSplash()` removes it from the preview's root so a click can dismiss it, and `.splash-gem` (animated via `transform`, its 512px box reaching into the strip at minimum height) needs `pointer-events: none` to stay out of the strip's way.
 

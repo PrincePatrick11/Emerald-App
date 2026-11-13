@@ -31,13 +31,12 @@ Scope focus for Emerald:
 
 - `Documentation/database.md` holds the rules this review enforces: `Where the schema lives`, `Rules for Future Schema Changes` and `Backup versions`. Read them when the change touches a table, a migration or the backup format.
 
-- DB schema and shared tables, including foreign keys and referential integrity between module tables. A schema change is `src/lib/schema.ts` plus a migration plus `BASELINE_VERSION`; one without the others is a `Must fix`.
+- DB schema and shared tables, including foreign keys and referential integrity between module tables. A schema change is `src/lib/schema.ts` plus a step in `MIGRATIONS` (`src/lib/db.ts`) above the current baseline plus `BASELINE_VERSION`; one without the others is a `Must fix`. Vaults from before the fresh start (`FRESH_START_VERSION`) are refused, not migrated — code that reads or converts their data is a finding.
 
-- Frozen history: a migration that reshapes a table which older migrations also build must freeze that table's previous DDL first (`schemaV37.ts`, `schemaV48.ts`). Editing a frozen file or an old migration is a `Must fix`.
 
-- Backup format: a change to the shape of exported rows needs a `BACKUP_VERSION` bump in `dbBackup.ts` and a step in `migrateBackupPayload`, or an older build imports the file wrongly instead of refusing it.
+- Backup format: a change to the shape of exported rows needs a `BACKUP_VERSION` bump in `dbBackup.ts`, or an older build imports the file wrongly instead of refusing it; files of any other version are refused (`readBackupPayload`), not lifted.
 
-- Image-backed columns must be listed in `IMAGE_FIELDS`, or migration and cleanup do not see them.
+- Image-backed columns must be listed in `IMAGE_FIELDS`, or the backup and the image cleanup do not see them.
 
 - Encryption: anything new that a vault keeps on disk must be sealed, and re-encryption (`reencrypt.rs`) and encrypted backups must carry it along.
 

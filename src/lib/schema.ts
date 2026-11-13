@@ -1,27 +1,26 @@
 /**
- * Emerald's schema in one place.
+ * Emerald's schema in one place — the only record of what a vault looks like.
  *
- * The baseline path in `db.ts` executes it directly for fresh vaults; the
- * rebuild migrations v33 (`normalizeSchema.ts`, against the frozen copy
- * in `schemaV37.ts`), v38/v39 (`mergeCategoryTables.ts`/`nullableCategory.ts`,
- * against this DDL and `schemaV48.ts`) and v49 (`unifyEntries.ts`) bring
- * existing vaults to the same state. `scripts/schema-check.mjs`
- * proves that both paths end up at the identical schema — without this check
- * a baseline squash, experience shows, produces two different schemas
- * after a few releases, and nobody notices.
- *
- * Whoever wants to change a column changes it here — and additionally writes a
- * new migration that does the same for existing databases. If the
- * migration rebuilds a table that v33, v38 or v39 also touch, those
- * get their old state frozen (see `schemaV37.ts` and `schemaV48.ts`).
+ * `db.ts` creates fresh vaults straight from it. Whoever changes a column
+ * changes it here, appends a step to `MIGRATIONS` in `db.ts` that does the same
+ * for vaults created before, and raises `BASELINE_VERSION`
+ * (`scripts/schema-check.mjs` checks the fresh vault against these strings).
  */
 import type Database from './sqlite';
 
 /**
- * Must match the highest version in MIGRATIONS. `db.ts` checks this at
- * startup so that a new migration step cannot be forgotten.
+ * The oldest schema this version opens. Everything below came out of the old
+ * migration chain (v1–v66), which is gone: such a vault is recognised and
+ * refused, not changed (`VAULT_OUTDATED` in `db.ts`).
  */
-export const BASELINE_VERSION = 66;
+export const FRESH_START_VERSION = 100;
+
+/**
+ * What a fresh vault is stamped with. Equals the last step in `MIGRATIONS`
+ * (`FRESH_START_VERSION` while there is none); `db.ts` checks this at startup
+ * so that a new migration step cannot be forgotten.
+ */
+export const BASELINE_VERSION = 100;
 
 /**
  * Tables in dependency order: parents before children.
@@ -29,10 +28,7 @@ export const BASELINE_VERSION = 66;
  * This order is not cosmetic. Foreign keys are permanently on in this app
  * — sqlx sets `foreign_keys = ON` as a default pragma on every
  * pool connection — and an INSERT immediately checks whether the parent row exists.
- * Whoever reorders here breaks the rebuild migrations and the backup import.
- *
- * `schema_version` is deliberately first and is rebuilt by no rebuild:
- * it holds the migration state that the rebuild is currently working through.
+ * Whoever reorders here breaks the backup import.
  */
 export const TABLES = [
   'schema_version',
@@ -61,8 +57,8 @@ export const TABLE_DDL: Record<TableName, string> = {
       applied_at TEXT NOT NULL
     )`,
 
-  // Entries and templates carry tag IDs as JSON (since v53, names before;
-  // `lib/tagRefs.ts`). A tag in the trash stays in their lists.
+  // Entries and templates carry tag IDs as JSON (`lib/tagRefs.ts`). A tag in
+  // the trash stays in their lists.
   tags: `
     CREATE TABLE tags (
       id TEXT PRIMARY KEY,
@@ -71,10 +67,9 @@ export const TABLE_DDL: Record<TableName, string> = {
       deleted_at TEXT
     )`,
 
-  // One list for wiki, operations, tasks and altar items (since v38;
-  // before, four identically built tables, one per module). Since v39 the only
-  // built-in one is `sigils`, whose new operations start with the sigil blocks.
-  // Everything else is created by the user; uniqueness of names is checked by the store
+  // One list for wiki, operations and tasks. Built in are `sigils` and
+  // `altars` (`BUILTIN_CATEGORIES`), whose new operations start with their
+  // templates. Everything else is created by the user; uniqueness of names is checked by the store
   // (categoryKey), not the database — a UNIQUE index would block
   // restoring from the trash as soon as an active category
   // of the same name exists.
@@ -88,9 +83,9 @@ export const TABLE_DDL: Record<TableName, string> = {
       deleted_at TEXT
     )`,
 
-  // The custom blocks of the blocks view (since v40). A definition is the
+  // The custom blocks of the blocks view. A definition is the
   // template for copies: an inserted block carries elements and display rules
-  // itself in the `content` and does not know where it came from. Hence no
+  // itself in its row of `blocks` and does not know where it came from. Hence no
   // foreign key and no cleanup on deletion.
   // `elements`/`display` are JSON (lib/blocks/definitions.ts). The icon default is
   // `DEFAULT_DEFINITION_ICON` — here as a literal so that the schema imports nothing from
@@ -108,9 +103,9 @@ export const TABLE_DDL: Record<TableName, string> = {
       deleted_at TEXT
     )`,
 
-  // The templates of the templates dashboard (since v43): title, block stack and
+  // The templates of the templates dashboard: title, block stack and
   // tags that an entry receives as a copy on creation or insertion. The block
-  // stack is in `blocks` (since v66; before, `content`, see `schemaV65.ts`). Like
+  // stack is in `blocks`. Like
   // `block_definitions` without a foreign key — entries remember nothing of it.
   // `assignments` is JSON (lib/blocks/templates.ts): which entry kind × category
   // starts with the template; the category IDs in it are cleaned up by
@@ -130,14 +125,13 @@ export const TABLE_DDL: Record<TableName, string> = {
       deleted_at TEXT
     )`,
 
-  // Journal entries, wiki articles and operations in one table (since v49;
-  // before, three, see `schemaV48.ts`). What distinguishes them is in their
-  // blocks (rows of `blocks`; until v66 `content`, see `schemaV65.ts`), not in columns: `type` only says in which module the
-  // entry lives. A type change is therefore an UPDATE (`entryTypeChange`).
+  // Journal entries, wiki articles and operations in one table. What
+  // distinguishes them is in their blocks (rows of `blocks`), not in columns:
+  // `type` only says in which module the entry lives. A type change is
+  // therefore an UPDATE (`entryTypeChange`).
   // - `category_id`: the journal has no categories; store and type change
   //   keep it NULL there.
-  // - `entry_number` counts per type (`nextEntryNumber`) — the same numbers
-  //   as in the days of the three tables.
+  // - `entry_number` counts per type (`nextEntryNumber`).
   // - The moon phase of a journal entry follows from `created_at`
   //   (`entryMoonPhase`), it is not a column.
   entries: `
@@ -155,15 +149,14 @@ export const TABLE_DDL: Record<TableName, string> = {
       deleted_at TEXT
     )`,
 
-  // The blocks of entries and templates, one row each (since v65; before, only
-  // sections in `content`). Exactly one owner: an entry or a template, both
+  // The blocks of entries and templates, one row each. Exactly one owner: an entry or a template, both
   // CASCADE — a block is nothing without its owner. Block IDs are unique per
   // owner only (a duplicated entry keeps them), hence `row_id` as the key.
   // `position` sorts as a string (`lib/blocks/position.ts`): moving a block
   // writes its row alone. The instance attributes have columns of their own;
   // `config`/`data` are the block's JSON as written, `attrs` (JSON) what else
   // it carries, `html` its inner markup, `text` its plain text for the search
-  // (`lib/blocks/blockRows.ts`). Since v66 the only record of the blocks
+  // (`lib/blocks/blockRows.ts`). The only record of the blocks
   // (`lib/blockStore.ts`).
   blocks: `
     CREATE TABLE blocks (
@@ -188,7 +181,7 @@ export const TABLE_DDL: Record<TableName, string> = {
       UNIQUE (template_id, id)
     )`,
 
-  // What a block points at (since v65): an entry by ID or a picture by its
+  // What a block points at: an entry by ID or a picture by its
   // stored file name, with the role it plays there (`lib/blocks/blockRefs.ts`).
   // Rewritten whenever its block is written; gone with it. Not `WITHOUT ROWID`:
   // re-encrypting a vault renames pictures in every table by `rowid`
@@ -227,7 +220,7 @@ export const TABLE_DDL: Record<TableName, string> = {
       UNIQUE (task_id, target_id, target_type)
     )`,
 
-  // The languages of the lexicon (since v45): one language each with its alphabet,
+  // The languages of the lexicon: one language each with its alphabet,
   // the vocabulary is in `lexicon_entries`. `alphabet` is JSON
   // (lib/lexicon.ts): pairs `{ from, to }` with which the translate field
   // rewrites character by character. No foreign key to the outside — a
@@ -245,7 +238,7 @@ export const TABLE_DDL: Record<TableName, string> = {
       deleted_at TEXT
     )`,
 
-  // The vocabulary of a language (since v45). No `deleted_at` of its own: a
+  // The vocabulary of a language. No `deleted_at` of its own: a
   // deleted word is gone immediately (with undo in memory), only the
   // language as a whole goes to the trash. ON DELETE CASCADE therefore
   // cleans up too when the language is permanently deleted.
@@ -262,7 +255,7 @@ export const TABLE_DDL: Record<TableName, string> = {
       updated_at TEXT NOT NULL
     )`,
 
-  // The vault's own symbols for the canvas editor's library (since v59), made
+  // The vault's own symbols for the canvas editor's library, made
   // from drawings: `d` the lines and `solid` the filled parts as path data in a
   // box of 100 × 100, `weight` the lines' width there. No trash: a removed one
   // is gone at once, with undo in memory, like a word of the lexicon.
@@ -276,8 +269,8 @@ export const TABLE_DDL: Record<TableName, string> = {
       created_at TEXT NOT NULL
     )`,
 
-  // The vault's images as a place of their own, like tags and categories
-  // (since v60): a row gives a stored file (`storedImageName`) a name, tags
+  // The vault's images as a place of their own, like tags and categories:
+  // a row gives a stored file (`storedImageName`) a name, tags
   // (IDs as JSON, `lib/tagRefs.ts`) and a note. A file without a row is
   // listed too, unnamed, where something shows it; a row keeps its file from the cleanup.
   // `detached` (JSON) holds, while the picture is in the trash, the texts it
@@ -296,157 +289,72 @@ export const TABLE_DDL: Record<TableName, string> = {
     )`,
 };
 
-
-/**
- * What v38 (`mergeCategoryTables`) and v39 (`nullableCategory`) create in the
- * middle of the chain — on every foreign key column, on both sides of
- * `task_links` and on every `deleted_at` column. There `links` and the
- * three entry tables still exist; v47 drops `links`, v49 the three.
- */
-/**
- * The indexes from `INDEX_DDL_V38` that still exist. The `deleted_at` indexes,
- * because `runPeriodicCleanup` runs a range scan over all soft-delete tables
- * every time a vault is opened.
- */
-const KEPT_INDEX_DDL_V38: readonly string[] = [
-  'CREATE INDEX idx_task_links_task ON task_links(task_id)',
-  'CREATE INDEX idx_task_links_target ON task_links(target_id)',
-  'CREATE INDEX idx_tasks_category ON tasks(category_id)',
-  'CREATE INDEX idx_tasks_parent ON tasks(parent_task_id)',
-  ...(['tags', 'categories', 'tasks'] as const).map((t) => `CREATE INDEX idx_${t}_deleted ON ${t}(deleted_at)`),
-];
-
-/** Those from `INDEX_DDL_V38` whose tables v47 (`links`), v49 (the three entry tables) and v63 (the altar tables) drop. */
-const DROPPED_INDEX_DDL_V38: readonly string[] = [
-  'CREATE INDEX idx_altar_items_category ON altar_items(category_id)',
-  'CREATE INDEX idx_altar_placements_altar ON altar_placements(altar_id)',
-  'CREATE INDEX idx_altar_placements_item ON altar_placements(item_id)',
-  'CREATE INDEX idx_links_source ON links(source_id)',
-  'CREATE INDEX idx_links_target ON links(target_id)',
-  'CREATE INDEX idx_wiki_articles_category ON wiki_articles(category_id)',
-  'CREATE INDEX idx_operations_category ON operations(category_id)',
-  ...(['journal_entries', 'wiki_articles', 'operations'] as const).map((t) => `CREATE INDEX idx_${t}_deleted ON ${t}(deleted_at)`),
-];
-
-export const INDEX_DDL_V38: readonly string[] = [...DROPPED_INDEX_DDL_V38, ...KEPT_INDEX_DDL_V38];
-
-/**
- * The index of `block_definitions` (v40), separate from `INDEX_DDL_V38`: v38
- * (`mergeCategoryTables`) and v39 (`nullableCategory`) create their list in the middle
- * of the chain, where the table does not yet exist. v40 creates it, fresh
- * vaults via `INDEX_DDL`.
- */
-export const BLOCK_DEFINITIONS_INDEX_DDL = 'CREATE INDEX idx_block_definitions_deleted ON block_definitions(deleted_at)';
-
-/** The index of `templates` (v43) — separate for the same reason as that of `block_definitions`. */
-export const TEMPLATES_INDEX_DDL = 'CREATE INDEX idx_templates_deleted ON templates(deleted_at)';
-
-/** The lexicon's indexes (v45) — separate like the two above. */
-export const LEXICON_INDEX_DDL: readonly string[] = [
-  'CREATE INDEX idx_languages_deleted ON languages(deleted_at)',
-  'CREATE INDEX idx_lexicon_entries_language ON lexicon_entries(language_id)',
-];
-
-/** The index of the altar trash (v46) — separate like those above; gone with its table since v63. */
-export const ALTARS_INDEX_DDL = 'CREATE INDEX idx_altars_deleted ON altars(deleted_at)';
-
-/** The index of the altar items' trash (v52); gone with its table since v63. */
-export const ALTAR_ITEMS_INDEX_DDL = 'CREATE INDEX idx_altar_items_deleted ON altar_items(deleted_at)';
-
-/**
- * The indexes of `entries` as v49 created them — frozen for
- * `unifyEntries`, so that the chain at v55 sees the same rebuild as a real
- * v54 vault. v55 replaces `idx_entries_deleted` (`ENTRIES_INDEX_DDL`).
- */
-export const ENTRIES_INDEX_DDL_V49: readonly string[] = [
-  'CREATE INDEX idx_entries_type ON entries(type, deleted_at)',
-  'CREATE INDEX idx_entries_category ON entries(category_id)',
-  'CREATE INDEX idx_entries_deleted ON entries(deleted_at)',
-];
-
 /**
  * The indexes of `entries`. `type` together with `deleted_at`, because every module
  * loads its live entries that way.
  *
- * `idx_entries_list` (v55) carries every column that the lists read at startup
- * (`fetchEntries`, first stage), and the tags (`rewriteTagRefs` on open).
- * Until v66 `tags`, `created_at` … lay behind `content` in the row: without the
- * index SQLite read the overflow pages of every entry for that — and SQLCipher
- * decrypted almost the whole file for it. With it, the index alone is enough
- * (and icons and covers as data URLs still make rows long).
- * `deleted_at` leads, so it also serves the range scan of
+ * `idx_entries_list` carries every column that the lists read at startup
+ * (`fetchEntries`, first stage), and the tags (`rewriteTagRefs` on open):
+ * without it SQLite would read the overflow pages of rows made long by icons
+ * and covers as data URLs — and SQLCipher decrypt almost the whole file for
+ * it. `deleted_at` leads, so it also serves the range scan of
  * `runPeriodicCleanup`. Icon and cover image are deliberately missing: they can be
  * data URLs. The few entries that carry one are found by the partial index
  * `idx_entries_decorated` — a query uses it only with exactly this
  * condition in its WHERE.
  */
-export const ENTRIES_INDEX_DDL: readonly string[] = [
+const ENTRIES_INDEX_DDL: readonly string[] = [
   'CREATE INDEX idx_entries_type ON entries(type, deleted_at)',
   'CREATE INDEX idx_entries_category ON entries(category_id)',
   'CREATE INDEX idx_entries_list ON entries(deleted_at, type, title, category_id, entry_number, tags, created_at, updated_at, id)',
   'CREATE INDEX idx_entries_decorated ON entries(deleted_at) WHERE icon IS NOT NULL OR cover_image IS NOT NULL',
 ];
 
-/** The index of `images` (v60): its trash. */
-export const IMAGES_INDEX_DDL: readonly string[] = [
-  'CREATE INDEX idx_images_deleted ON images(deleted_at)',
-];
-
 /**
- * The indexes of `blocks` and `block_refs` (v65): an owner's blocks in order,
- * and every block pointing at an entry or a picture.
+ * All indexes of the schema — what a fresh vault gets: on the foreign key
+ * columns, on both sides of `task_links`, an owner's blocks in order, every
+ * block pointing at an entry or a picture, and every `deleted_at` column,
+ * because `runPeriodicCleanup` runs a range scan over all soft-delete tables
+ * every time a vault is opened.
  */
-export const BLOCKS_INDEX_DDL: readonly string[] = [
+export const INDEX_DDL: readonly string[] = [
+  'CREATE INDEX idx_task_links_task ON task_links(task_id)',
+  'CREATE INDEX idx_task_links_target ON task_links(target_id)',
+  'CREATE INDEX idx_tasks_category ON tasks(category_id)',
+  'CREATE INDEX idx_tasks_parent ON tasks(parent_task_id)',
+  ...(['tags', 'categories', 'tasks', 'block_definitions', 'templates', 'languages', 'images'] as const)
+    .map((t) => `CREATE INDEX idx_${t}_deleted ON ${t}(deleted_at)`),
+  'CREATE INDEX idx_lexicon_entries_language ON lexicon_entries(language_id)',
+  ...ENTRIES_INDEX_DDL,
   'CREATE INDEX idx_blocks_entry ON blocks(entry_id, position)',
   'CREATE INDEX idx_blocks_template ON blocks(template_id, position)',
   'CREATE INDEX idx_block_refs_target ON block_refs(target_kind, target)',
 ];
 
-/** All indexes of the current schema — what a fresh vault gets. */
-export const INDEX_DDL: readonly string[] = [
-  ...KEPT_INDEX_DDL_V38, BLOCK_DEFINITIONS_INDEX_DDL, TEMPLATES_INDEX_DDL, ...LEXICON_INDEX_DDL,
-  ...ENTRIES_INDEX_DDL, ...IMAGES_INDEX_DDL, ...BLOCKS_INDEX_DDL,
-];
-
 /**
- * The former catch-all. Since v39 it is none any more: `category_id` may be
- * NULL, an entry without a category is the normal case, and `other` is
- * an ordinary category like any other — renamable and deletable, not even
- * created in fresh vaults. The constant remains for the
- * migrations v36–v39 and for lifting old backups that still know the old
- * special status.
- */
-export const FALLBACK_CATEGORY_ID = 'other';
-
-/**
- * Since v39 the only built-in category. A new operation in it starts
- * with the sigil blocks — since v43 no longer hard-wired, but via
- * the built-in template `core-sigil`, which is the default there (and which the
- * user can change or delete). For articles and tasks
- * it is a category like any other.
+ * Built in. A new operation in it starts with the sigil blocks, via the
+ * built-in template `core-sigil`, which is the default there (and which the
+ * user can change or delete). For articles and tasks it is a category like
+ * any other.
  */
 export const SIGIL_CATEGORY_ID = 'sigils';
 
 /**
- * Built in since v61: a new operation in it starts with an altar and a text
+ * Built in: a new operation in it starts with an altar and a text
  * for notes, via the built-in template `core-altar`. An altar is an
  * operation of this category, not a module of its own.
  */
 export const ALTAR_CATEGORY_ID = 'altars';
 
 /**
- * The tag "Altar Library": what an Altar block's "Images" show at first.
- * v62 gives it to the pictures of the old altar library; a fixed ID, so that
- * synced devices that convert their altars arrive at the same tag. An
- * ordinary tag otherwise — renamable, deletable.
+ * The tag "Altar Library": what an Altar block's "Images" show at first,
+ * created by the block when it needs it. A fixed ID, so that synced devices
+ * arrive at the same tag. An ordinary tag otherwise — renamable, deletable.
  */
 export const ALTAR_LIBRARY_TAG_ID = 'altar-library';
 export const ALTAR_LIBRARY_TAG_NAME = 'Altar Library';
 
-/**
- * [id, name (database only — `categories.builtin.<id>` is displayed), emoji].
- * Since v39 `other` has lost its special status; since v61 the altars join the sigils.
- */
+/** [id, name (database only — `categories.builtin.<id>` is displayed), emoji]. */
 export const BUILTIN_CATEGORIES: readonly [string, string, string][] = [
   [SIGIL_CATEGORY_ID, 'Sigils', '🔯'],
   [ALTAR_CATEGORY_ID, 'Altars', '🪔'],
@@ -471,16 +379,6 @@ export const STARTER_CATEGORIES: readonly [string, string][] = [
 /** The content tables with `category_id` (wiki and operations are in `entries`). A literal, because it is interpolated into SQL. */
 export const CATEGORIZED_TABLES = ['entries', 'tasks'] as const;
 
-/**
- * The same DDL, but compatible with an already existing table.
- * The chain path needs this for `schema_version`, which may already exist
- * there — without this detour the CREATE would stand in the code a second time, and that is
- * exactly what the separation of baseline and chain would otherwise have failed on.
- */
-export function ddlIfNotExists(ddl: string): string {
-  return ddl.replace('CREATE TABLE ', 'CREATE TABLE IF NOT EXISTS ');
-}
-
 /** Creates tables and indexes. The order follows TABLES. */
 export async function createSchema(db: Database): Promise<void> {
   for (const table of TABLES) {
@@ -491,8 +389,8 @@ export async function createSchema(db: Database): Promise<void> {
   }
 }
 
-/** A category row as `seedBuiltins` and migration v38 write it. */
-export interface CategorySeedRow {
+/** A category row as `seedBuiltins` writes it. */
+interface CategorySeedRow {
   id: string;
   name: string;
   emoji: string;
@@ -501,7 +399,7 @@ export interface CategorySeedRow {
   deleted_at: string | null;
 }
 
-export async function insertCategoryRows(db: Database, rows: readonly CategorySeedRow[]): Promise<void> {
+async function insertCategoryRows(db: Database, rows: readonly CategorySeedRow[]): Promise<void> {
   for (const row of rows) {
     await db.execute(
       'INSERT INTO categories (id, name, emoji, sort_order, is_builtin, deleted_at) VALUES ($1,$2,$3,$4,$5,$6)',
@@ -531,36 +429,24 @@ export async function seedBuiltins(
   await insertCategoryRows(db, rows);
 }
 
-/**
- * Detaches the category from all its contents — in all four modules — and
- * reports how many there were. To be called **before** every permanent deletion of a
- * category.
- *
- * Nobody used to do that: `runPeriodicCleanup` and `emptyTrash` hard-deleted
- * category rows and left the contents untouched, which
- * thereby pointed to a `category_id` for which no row existed any more. Since
- * v33 ON DELETE RESTRICT prevents that — the delete attempt fails
- * instead of silently leaving garbage behind. This helper is the other side of it:
- * it ensures that deleting is allowed without any content
- * disappearing.
- *
- * Until v38 the contents landed in the catch-all `other`. Since `category_id`
- * may be NULL, they simply become categoryless — the same as a new
- * entry is anyway.
- *
- * Since v43 it also removes the category from the templates' assignments
- * (`dropCategoryFromTemplates`) — both cleanup jobs belong to the same
- * permanent deletion.
- *
- * With `to` the contents move into that category instead — when a
- * restored one merges into the one of the same name (`categoryStore.restoreCategory`).
- */
 /** Delete permanently: first detach the contents (ON DELETE RESTRICT), then the row. */
 export async function purgeCategory(db: Database, categoryId: string): Promise<void> {
   await reassignCategoryContent(db, categoryId);
   await db.execute('DELETE FROM categories WHERE id=$1', [categoryId]);
 }
 
+/**
+ * Detaches the category from all its contents and reports how many there
+ * were. To be called **before** every permanent deletion of a category: ON
+ * DELETE RESTRICT makes the delete fail otherwise, and this ensures that
+ * deleting is allowed without any content disappearing — the contents simply
+ * become categoryless, the same as a new entry is anyway. It also removes the
+ * category from the templates' assignments (`dropCategoryFromTemplates`) —
+ * both cleanup jobs belong to the same permanent deletion.
+ *
+ * With `to` the contents move into that category instead — when a
+ * restored one merges into the one of the same name (`categoryStore.restoreCategory`).
+ */
 export async function reassignCategoryContent(db: Database, categoryId: string, to: string | null = null): Promise<number> {
   let moved = 0;
   for (const table of CATEGORIZED_TABLES) {
@@ -730,22 +616,24 @@ async function moveCategoryInTemplates(db: Database, from: string, to: string): 
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
- * The block stack of an entry as a row of a backup file carries it (`content`).
- * Since v66 the vault has no such column: its blocks are rows of `blocks`, and
- * what they name is in `block_refs`.
+ * The block stack of an entry or template as sync carries it (`content`,
+ * `lib/sync/blockStack.ts`). The vault has no such column: its blocks are rows
+ * of `blocks`, and what they name is in `block_refs`.
  */
 export const BLOCK_STACK_COLUMN = 'content';
 
 /**
- * The complete inventory of the columns in which an image can be referenced —
- * as rows of a backup file have them: `entries.content` is the block stack
- * (`BLOCK_STACK_COLUMN`), which the vault keeps in `blocks` since v66.
- * Three kinds, because they have to be treated differently:
+ * The columns of a row in which an image can be referenced, besides the
+ * blocks (read through `block_refs` and the rows of `blocks`). Three kinds,
+ * because they have to be treated differently:
  *
  * - `html` — the reference sits in a `src` attribute. Is rewritten.
  * - `plain` — the column *is* the reference. Is rewritten.
  * - `legacy` — the column today holds a data URL. Is **read**, but never
  *   rewritten.
+ *
+ * Today only `legacy` holds columns; `html` and `plain` stay for an image
+ * column of the future (see "Rules for Future Schema Changes" in `database.md`).
  *
  * The `legacy` group is the reason why this list has to be complete
  * and not name only the rewritable columns. `collectUsedImageFilenames`
@@ -760,9 +648,6 @@ export const BLOCK_STACK_COLUMN = 'content';
  * through `FileReader`, and their renderers
  * check with `isImageIcon` for `data:` / `blob:` / `/`. A file name would
  * fall through there as text (see the Base64 note in `database.md`).
- *
- * Migration v35 runs over the state of that time (`IMAGE_FIELDS_V48`), still with
- * the three entry tables.
  */
 export const IMAGE_FIELDS: {
   table: string;
@@ -770,7 +655,7 @@ export const IMAGE_FIELDS: {
   plain: string[];
   legacy: string[];
 }[] = [
-  { table: 'entries', html: ['content'], plain: [], legacy: ['icon', 'cover_image'] },
+  { table: 'entries', html: [], plain: [], legacy: ['icon', 'cover_image'] },
 ];
 
 /**
@@ -779,9 +664,8 @@ export const IMAGE_FIELDS: {
  * encrypted vault one formed with the vault key.
  *
  * The format is a property of the columns, not of the UI — which is why
- * it lives here and not in `images.ts`, which only re-exports it. `db.ts`
- * can thus use it in migration v35 without pulling in the Tauri modules that
- * `scripts/schema-check.mjs` does not have at all.
+ * it lives here and not in `images.ts`, which only re-exports it, so that
+ * `scripts/schema-check.mjs` can use it without the Tauri modules.
  */
 const STORED_IMAGE_RE = /^[0-9a-f]{64}\.(?:png|jpe?g|gif|webp|svg)$/;
 
@@ -794,11 +678,8 @@ export function storedImageNamesIn(text: string): string[] {
 }
 
 /**
- * The stored file name of a reference, or null.
- *
- * Also accepts a full path: v35 rewrites every absolute path it
- * finds, but a `.emerald` file from an older version still carries
- * some.
+ * The stored file name of a reference, or null. Also accepts a path: the
+ * name is its last part.
  */
 export function storedImageName(ref: string | null | undefined): string | null {
   if (!ref) return null;
@@ -843,8 +724,7 @@ export async function collectUsedImageFilenames(db: Database): Promise<Set<strin
   }
 
   for (const { table, html, plain, legacy } of IMAGE_FIELDS) {
-    // The block stack (`content` of a file's row) is in `blocks` since v66 — read above through `block_refs`.
-    const columns = [...html, ...plain, ...legacy].filter((column) => column !== BLOCK_STACK_COLUMN);
+    const columns = [...html, ...plain, ...legacy];
     if (!columns.length) continue;
     const rows = await db.select<Record<string, string | null>[]>(
       `SELECT ${columns.join(', ')} FROM ${table}`
@@ -862,17 +742,16 @@ export async function collectUsedImageFilenames(db: Database): Promise<Set<strin
   }
 
   // Image defaults of custom blocks: the `elements` JSON names the file before
-  // a copy writes it into a content. Not in IMAGE_FIELDS — migration
-  // v35 runs over that list, and the table only comes into being with v40.
+  // a copy writes it into a block.
   const definitions = await db.select<{ elements: string | null }[]>('SELECT elements FROM block_definitions');
   for (const { elements } of definitions) {
     for (const match of (elements ?? '').matchAll(IMAGE_NAME_RE)) used.add(match[0]);
   }
 
-  // Images taken into "Images" (v60) stay, used anywhere or not — not in
-  // IMAGE_FIELDS for the same reason. A row in the trash keeps its file until
-  // it is deleted for good. So do the places it was taken out of
-  // (`detached`): a canvas lost its render with it, and a restore writes them back.
+  // Images taken into "Images" stay, used anywhere or not. A row in the trash
+  // keeps its file until it is deleted for good. So do the places it was taken
+  // out of (`detached`): a canvas lost its render with it, and a restore writes
+  // them back.
   const kept = await db.select<{ file: string; detached: string | null }[]>('SELECT file, detached FROM images');
   for (const { file, detached } of kept) {
     if (storedImageName(file)) used.add(file);

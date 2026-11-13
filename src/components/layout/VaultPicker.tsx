@@ -11,6 +11,7 @@ import StartAppearance from './start/StartAppearance';
 import StartUpdates from './start/StartUpdates';
 import StartLanguage from './start/StartLanguage';
 import { keyErrorOf } from '../../lib/vaultKeys';
+import { vaultOpenErrorKey } from '../../lib/db';
 import { hideLoadingScreen, hideSplash, showLoadingScreen } from '../../lib/splash';
 import { adoptRemoteVault, deleteRemoteVault, syncErrorCode, type RemoteVault } from '../../lib/sync/engine';
 import { syncErrorKey } from '../../lib/sync/errors';
@@ -219,7 +220,7 @@ export default function VaultPicker() {
       // Cancelling is not an error: the user did not want to enter the password.
       if (keyErrorOf(e) === VAULT_KEY_CANCELLED) return;
       console.error('[vault] switch failed', e);
-      setError(t('vault.switchFailed'));
+      setError(t(vaultOpenErrorKey(e, 'vault.switchFailed')));
       return;
     }
     closeVaultPicker();
@@ -380,7 +381,8 @@ export default function VaultPicker() {
       if (deleteFiles && !dirRemoved) setError(t('vault.deleteFilesLeftover'));
     } catch (e) {
       console.error('[vault] remove failed', e);
-      setError(t('vault.saveFailed'));
+      // The vault that moves up may be one this version refuses: say so.
+      setError(t(vaultOpenErrorKey(e, 'vault.saveFailed')));
       closeEditor();
     } finally {
       setRemovingId(null);

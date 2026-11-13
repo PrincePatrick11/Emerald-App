@@ -16,8 +16,6 @@
  * Use `fromRow.*` when reading, `toInt` and `toJson` when writing.
  */
 import type {
-  AltarItem,
-  AltarRecord,
   Category,
   Entry,
   EntryType,
@@ -33,7 +31,6 @@ import {
 } from './blocks/definitions';
 import { DEFAULT_TEMPLATE_ICON, parseAssignments, type Template } from './blocks/templates';
 import { DEFAULT_LANGUAGE_ICON, parseAlphabet } from './lexicon';
-import { parseAltarSettings } from './altarSettings';
 
 /** A raw row as it comes from `db.select`. */
 export type DbRow = Record<string, unknown>;
@@ -190,33 +187,6 @@ export const fromRow = {
       pronunciation: str(r.pronunciation),
       note: str(r.note),
       sort_order: num(r.sort_order, 0),
-      created_at: str(r.created_at),
-      updated_at: str(r.updated_at),
-    };
-  },
-
-  altar(r: DbRow): AltarRecord {
-    return {
-      id: str(r.id),
-      title: str(r.title),
-      ...parseAltarSettings(r.settings),
-      background_image_data: nullableStr(r.background_image_data),
-      created_at: str(r.created_at),
-      updated_at: str(r.updated_at),
-      thumbnail_data: nullableStr(r.thumbnail_data),
-      icon_data: nullableStr(r.icon_data),
-      deleted_at: nullableStr(r.deleted_at),
-    };
-  },
-
-  altarItem(r: DbRow): AltarItem {
-    return {
-      id: str(r.id),
-      name: str(r.name),
-      emoji: str(r.emoji),
-      category_id: nullableStr(r.category_id),
-      note: str(r.note),
-      image_data: r.image_data == null ? undefined : String(r.image_data),
       created_at: str(r.created_at),
       updated_at: str(r.updated_at),
     };

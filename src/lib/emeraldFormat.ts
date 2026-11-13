@@ -1,7 +1,4 @@
 import { invoke } from '@tauri-apps/api/core';
-import { altarInserts } from './migrateAltars';
-import { contentWithoutLegacySigils, legacySigilLabels } from './blocks/legacySigilBlocks';
-import { contentWithAltarsAsOperations, convertAltars, elementsWithAltarsAsOperations, type Row } from './altarConversion';
 import { todayIso, withoutConcealed } from './blocks/sigil';
 import { readImageAsBase64, rewriteImageRefs, saveImage, storedImageName } from './images';
 import { storedImageNamesIn } from './schema';
@@ -20,36 +17,17 @@ import { reloadModules } from '../store/moduleWiring';
 import { useImportStore } from '../store/importStore';
 import { useTaskStore } from '../store/taskStore';
 import { getDb } from './db';
-import { LEGACY_WIKI_CATEGORIES } from './schemaV37';
-import { categoryKey } from './categoryMerge';
-import { categoryLabel } from './categories';
+import { categoryKey, categoryLabel } from './categories';
 import { useCategoryStore } from '../store/categoryStore';
-import { useBlockDefinitionStore } from '../store/blockDefinitionStore';
 import { useTemplateStore } from '../store/templateStore';
-import { fromRow, toInt } from './row';
-import { isDefinitionId, remapDefinitionDefaults } from './blocks/definitions';
-import {
-  hasLegacyStatus, legacyStatusOfRow, statusDefinition, STATUS_DEFINITION_ID, withLegacyStatus, type LegacyStatus,
-} from './blocks/legacyStatus';
-import { definitionById } from './blockDefinitionRows';
-import { generateId, nowIso } from './helpers';
-import { withNewElementIds } from './altarElements';
 import i18n from '../i18n';
 import { buildLinkItems, linkItemKey, linkItemsByKey } from './linkItems';
-import {
-  extractInternalLinks, internalLinkBlockHtml, isBlankContent, plainBlockHtml, remapInternalLinks,
-} from './internalLinkHtml';
-import {
-  LEGACY_JOURNAL_FIELDS, type LegacyJournalField,
-} from './migrateJournalFieldsToContent';
+import { extractInternalLinks, remapInternalLinks } from './internalLinkHtml';
 import type { SuggestionItem } from '../components/editors/text/SuggestionList';
 import type { Category } from '../types';
 import type { WriteOptions } from './stamp';
-import { displayTitle, hasOwnTitle, isLegacyUntitled } from './entryTitle';
+import { displayTitle, hasOwnTitle } from './entryTitle';
 import { prepareImageDataUrl } from './imageLimits';
-import { ALTAR_BACKGROUND_MAX_BYTES } from './altarConstants';
-import { parseCanvasBackground, type CanvasBackground } from '../components/editors/canvas/background';
-import { isAppBackground } from './altarBackground';
 
 // ── Link chips across vault boundaries ───────────────────────────────────────
 
@@ -83,8 +61,8 @@ function collectContentLinks(content: string): EmeraldMeta['contentLinks'] {
 /**
  * Points every link chip of the imported content at the target IN THIS vault:
  * first via the ID (the same vault or an already matching entry),
- * then via the title from `meta.contentLinks` — and for old files without that
- * meta via the `data-label` that sits in the chip itself. If nothing is found,
+ * then via the title from `meta.contentLinks`, otherwise via the
+ * `data-label` that sits in the chip itself. If nothing is found,
  * the chip becomes its text (see `remapInternalLinks`).
  *
  * In every hit the label is also set to the title of the local target.
@@ -99,17 +77,13 @@ function remapImportedLinks(
   items: SuggestionItem[],
 ): string {
   const byKey = linkItemsByKey(items);
-  // A chip to an altar points at its operation by now (`importedContent`).
-  const titleByKey = new Map((manifest ?? []).map((l) => [
-    linkItemKey(l.entryType === 'altar' ? { ...l, entryType: 'operation' } : l), l.title,
-  ]));
+  const titleByKey = new Map((manifest ?? []).map((l) => [linkItemKey(l), l.title]));
   return remapInternalLinks(content, (link) => resolveImportedTarget(link, titleByKey.get(linkItemKey(link)), items, byKey));
 }
 
 /**
  * A link target from a foreign file in this vault: the same ID, otherwise
- * the same title under the same kind — or `null`. For chips in the content and
- * for the link presets of imported custom blocks.
+ * the same title under the same kind — or `null`.
  */
 function resolveImportedTarget(
   link: { id: string; entryType: string; label: string },
@@ -125,133 +99,31 @@ function resolveImportedTarget(
   return match ? { id: match.id, label: match.label } : null;
 }
 
-/** A resolved target from the replaced columns, plus optional text
- *  after it (the meditation duration, which has no target of its own). */
-interface LegacyLinkTarget {
-  id: string | null;
-  entryType: 'operation' | 'wiki';
-  suffix?: string;
-  /**
-   * What appears as a plain text paragraph when no target can be resolved.
-   * Without it, a value would be lost that has no counterpart in this vault
-   * — exactly the case that migration v37 catches with `plainBlockHtml`.
-   */
-  fallbackText?: string;
-}
-
-/**
- * Appends the links from the replaced journal columns as blocks to the
- * content — so that a `.emerald` or Markdown file from before the migrations
- * v36/v37 ends up where links live today, instead of in columns with no
- * display. That concerns `linked_operation_ids`/`linked_wiki_ids` as well as
- * Paradigm, Banishing and Meditation.
- *
- * The IDs must already be resolved to THIS vault; the resolving itself
- * differs per file format and is left to the caller.
- */
-function appendLegacyLinks(
-  content: string,
-  items: SuggestionItem[],
-  targets: LegacyLinkTarget[],
-): string {
-  // What the content already links is not appended again — across all
-  // sources, hence one shared set.
-  const already = new Set(extractInternalLinks(content).map(linkItemKey));
-  let separator = !isBlankContent(content);
-  let out = content;
-
-  for (const { id, entryType, suffix, fallbackText } of targets) {
-    const key = id ? linkItemKey({ id, entryType }) : null;
-    const item = key && !already.has(key) ? items.find((i) => linkItemKey(i) === key) : undefined;
-    if (!item) {
-      // No target in this vault — the words at least stay as text,
-      // provided the caller supplied some.
-      if (!fallbackText || (key && already.has(key))) continue;
-      out += plainBlockHtml(suffix ? `${fallbackText} ${suffix}` : fallbackText, { separator });
-      separator = true;
-      continue;
-    }
-    already.add(key!);
-    out += internalLinkBlockHtml(
-      {
-        id: item.id,
-        entryType,
-        label: item.label,
-        icon: item.icon ?? null,
-        entry_number: item.entry_number ?? null,
-      },
-      item.categoryLabel ?? '',
-      { separator, suffix },
-    );
-    separator = true;
-  }
-  return out;
-}
-
-/**
- * The three replaced journal fields as blocks. `active` is the old checkbox
- * from `is_bannung`/`is_meditation`: if it was set without an article being
- * found for it in THIS vault, at least a text paragraph remains — as in
- * migration v37 — instead of nothing at all.
- */
-function legacyFieldTargets(fields: Array<{
-  key: LegacyJournalField;
-  id: string | null;
-  /** The title from the file; still stays there even if it matches nothing here. */
-  title?: string | null;
-  active?: boolean;
-  suffix?: string;
-}>): LegacyLinkTarget[] {
-  return fields
-    .filter((f) => f.id || f.title || f.active)
-    .map((f) => ({
-      id: f.id,
-      entryType: 'wiki' as const,
-      suffix: f.suffix,
-      fallbackText: `${LEGACY_JOURNAL_FIELDS[f.key].emoji} ${
-        f.title || i18n.t(`wiki.categories.${f.key}`) || LEGACY_JOURNAL_FIELDS[f.key].fallbackName
-      }`,
-    }));
-}
-
 // ── File format ──────────────────────────────────────────────────────────────
 
 /**
- * '1' = what entries and altars are written as; '2' = an older file that also
- * carries `meta.blockDefinitions`, still read. '3' = a template (`type: 'template'`,
- * since v43): an older app does not know the type and would otherwise take the file
- * for an operation — with '3' it rejects it.
+ * The format of a `.emerald` file. '4' is the first since the fresh start of
+ * the schema (`FRESH_START_VERSION` in `schema.ts`), for entries and templates
+ * alike (`type` tells them apart). Only this version is read: an older file
+ * ('1' to '3') comes from before the fresh start and is refused with a notice —
+ * its converters are gone with the old migration chain; a newer one is
+ * refused too, since this build cannot know what it carries.
  */
-type EmeraldVersion = '1' | '2' | '3';
+const EMERALD_VERSION = '4';
 
 interface EmeraldFile {
-  version: EmeraldVersion;
-  type: 'journal' | 'wiki' | 'operations' | 'altar' | 'template';
+  version: typeof EMERALD_VERSION;
+  type: 'journal' | 'wiki' | 'operations' | 'template';
   title: string;
   createdAt: string;
   content: string;
-  images: Record<string, string>;  // original absolute path → data-URL
+  images: Record<string, string>;  // stored file name → data-URL
   meta: EmeraldMeta;
 }
 
 interface EmeraldMeta {
-  // journal
+  /** journal: for information only — the import recalculates the phase from `createdAt`. */
   moonPhase?: string;
-  paradigmaTitle?: string;
-  isBannung?: boolean;
-  bannungTitle?: string;
-  isMeditation?: boolean;
-  meditationTitle?: string;
-  meditationDuration?: number;
-  // Legacy: the two replaced journal columns. Since migration v36
-  // journal links live in `content` and travel via `contentLinks`;
-  // these fields are only still filled for entries whose columns a backup
-  // from before v36 restored.
-  linkedOps?: Array<{ id: string; title: string }>;
-  linkedWiki?: Array<{ id: string; title: string }>;
-  // legacy (v1 files written before ID was stored)
-  linkedOpsTitles?: string[];
-  linkedWikiTitles?: string[];
   /**
    * wiki + operations: the category via its display name (and its emoji,
    * in case it has to be created in the target vault first). The name, not the
@@ -260,95 +132,36 @@ interface EmeraldMeta {
    */
   categoryName?: string;
   categoryEmoji?: string;
-  // Legacy from before v38: wiki named the category via ID (builtins) or
-  // name, operations only via name. Still read and, for older
-  // app versions, still written.
-  wikiCategoryId?: string;
-  wikiCategoryName?: string;
-  opCategoryName?: string;
-  // Legacy up to v40 (operations): becomes the status block on import
-  // (lib/blocks/legacyStatus.ts), it is no longer written.
-  isActive?: boolean;
-  endDate?: string | null;
-  version?: string | null;
-  // wiki / operations entry icon (emoji or data-URL)
+  /** wiki / operations entry icon, a template's icon (emoji or data-URL) */
   icon?: string;
-  // common
   tags?: string[];
   /**
    * Title for every link chip in `content` — the repair aid for import
    * into a FOREIGN vault, where the same note has a different ID. Without it
    * the chips point at IDs after import that do not exist there.
-   *
-   * Replaces `linkedOps`/`linkedWiki` in this role and covers all five
-   * module types, not only operations and wiki articles.
    */
   contentLinks?: Array<{ id: string; entryType: string; title: string }>;
-  /**
-   * Custom blocks an older file ('2') brought along. Nothing writes them
-   * any more; on import they are created by ID if they do not exist there,
-   * so that the blocks in such a file are not lost.
-   */
-  blockDefinitions?: Array<Record<string, unknown>>;
   /** A template: the title new entries get. */
   newEntryTitle?: string;
-  // altar — background_image_data is a stored image filename, so it's routed
-  // through `images` like content images. icon_data, thumbnail_data, and item
-  // images are already data: URLs (or a plain emoji, for icon) in the DB, so
-  // they're embedded directly rather than treated as paths.
-  altarBackgroundPreset?: string;
-  altarBackgroundImagePath?: string;
-  altarBackgroundOverlay?: number;
-  altarBackgroundOverlayColor?: string;
-  /** The background as the canvas editor sets it; its picture, if of the vault, is `altarBackgroundImagePath`. */
-  altarCanvasBackground?: CanvasBackground;
-  altarThumbnailData?: string;
-  altarIconData?: string;
-  altarGridEnabled?: boolean;
-  altarGridSize?: number;
-  altarGridOpacity?: number;
-  altarGridColor?: string;
-  altarSnapToGrid?: boolean;
-  altarRotationSnapEnabled?: boolean;
-  altarRotationSnapAngle?: number;
-  altarSnapScaleToGrid?: boolean;
-  altarResolution?: string;
-  altarCategories?: Array<{ name: string; emoji: string }>;
-  altarItems?: Array<{
-    id: string;
-    name: string;
-    emoji: string;
-    /**
-     * Category *name*, not the ID. A `.emerald` file travels between
-     * vaults, and the same self-created category has different
-     * IDs there. The import therefore matches by name and resolves it
-     * locally. The database holds the ID since v33.
-     */
-    category: string;
-    note: string;
-    imageData?: string;
-    /** Missing in files from before the library sorting — the import then stamps
-     *  the import time, as it always did before. */
-    createdAt?: string;
-  }>;
-  altarPlacements?: Array<{
-    itemId: string;
-    x: number;
-    y: number;
-    z_index: number;
-    width: number;
-    height: number;
-    rotation: number;
-    opacity: number;
-    locked: boolean;
-    hidden: boolean;
-  }>;
-  /** The shapes and text drawn on the altar, as in `altars.elements` (`lib/altarElements.ts`). */
-  altarElements?: unknown[];
 }
 
+/**
+ * The notice for a file this version does not read — `null` when it does.
+ * A version from before '4' is from an older app, a higher one from a newer.
+ */
+function unreadableVersionNotice(version: unknown): string | null {
+  if (version === EMERALD_VERSION) return null;
+  const number = Number(version);
+  if (Number.isInteger(number) && number >= 1) {
+    return i18n.t(number < Number(EMERALD_VERSION) ? 'emeraldImport.oldVersion' : 'emeraldImport.newVersion');
+  }
+  return i18n.t('emeraldImport.unsupported');
+}
+
+const FILE_TYPES: readonly unknown[] = ['journal', 'wiki', 'operations', 'template'] satisfies EmeraldFile['type'][];
+
 /** The file types that open a module — everything except the template. */
-type EntryFileType = Exclude<EmeraldFile['type'], 'template' | 'altar'>;
+type EntryFileType = Exclude<EmeraldFile['type'], 'template'>;
 
 function safeFilename(title: string): string {
   return title.replace(/[^\w\s\-äöüÄÖÜß]/g, '').trim().replace(/\s+/g, '_') || 'export';
@@ -406,10 +219,6 @@ export async function exportAsEmerald(): Promise<void> {
     const cat = categories.find(c => c.id === article.category_id);
     meta.categoryName     = categoryLabel(i18n.t, cat) || undefined;
     meta.categoryEmoji    = cat?.emoji;
-    meta.wikiCategoryId   = article.category_id ?? undefined;
-    // No fallback to the raw ID: a category in the trash is not loaded
-    // here, and the import would turn the UUID into a name.
-    meta.wikiCategoryName = cat?.name;
     meta.icon             = article.icon ?? undefined;
     meta.tags             = liveTagNames(article.tags);
 
@@ -424,7 +233,6 @@ export async function exportAsEmerald(): Promise<void> {
     const cat = categories.find(c => c.id === op.category_id);
     meta.categoryName   = categoryLabel(i18n.t, cat) || undefined;
     meta.categoryEmoji  = cat?.emoji;
-    meta.opCategoryName = cat?.name;
     meta.icon      = op.icon ?? undefined;
     meta.tags      = liveTagNames(op.tags);
   }
@@ -440,7 +248,7 @@ export async function exportAsEmerald(): Promise<void> {
 
   const images = await embedImages(content);
   await saveEmeraldFile({
-    version: '1', type, title, createdAt, content, images, meta,
+    version: EMERALD_VERSION, type, title, createdAt, content, images, meta,
   });
 }
 
@@ -474,7 +282,7 @@ async function embedImages(content: string): Promise<Record<string, string>> {
 }
 
 /**
- * A template as `.emerald` (version '3'): block stack, images and link titles
+ * A template as `.emerald`: block stack, images and link titles
  * as with an entry, plus icon, title of new entries and tags. The saved state is exported,
  * not an open draft.
  */
@@ -501,37 +309,7 @@ export async function buildTemplateEmeraldFile(templateId: string): Promise<Emer
   };
   // An image icon is a data URL and is already in `meta.icon`.
   const images = await embedImages(content);
-  return { version: '3', type: 'template', title: template.name || 'Template', createdAt: template.created_at, content, images, meta };
-}
-
-/**
- * Creates the imported custom blocks, as far as they do not exist here.
- * The file is foreign: every definition goes through the same check as a
- * database row, one without a usable ID is dropped.
- */
-async function importBlockDefinitions(raw: EmeraldMeta['blockDefinitions'], items: SuggestionItem[]): Promise<void> {
-  if (!Array.isArray(raw) || !raw.length) return;
-  const now = nowIso();
-  const byKey = linkItemsByKey(items);
-  const defs = raw
-    .filter((r): r is Record<string, unknown> => typeof r === 'object' && r !== null && isDefinitionId(r.id))
-    // Link presets remapped to this vault like the chips in the content; images are named after their content and stay.
-    .map((r) => ({ ...r, elements: remapDefinitionDefaults(elementsWithAltarsAsOperations(r.elements), (name) => name, (t) => resolveImportedTarget(t, undefined, items, byKey)) }))
-    .map((r) => fromRow.blockDefinition({ ...r, created_at: now, updated_at: now, deleted_at: null }));
-  await useBlockDefinitionStore.getState().importDefinitions(defs);
-}
-
-/**
- * Status/end date/version from a file from before v41 as a status block in front of the
- * content — like migration v41, using the same definition: the existing one
- * (also from the trash), otherwise a new one.
- */
-async function withImportedStatus(content: string, status: LegacyStatus): Promise<string> {
-  if (!hasLegacyStatus(status)) return content;
-  const existing = await definitionById(await getDb(), STATUS_DEFINITION_ID);
-  const def = existing ?? statusDefinition(i18n.t, nowIso());
-  if (!existing) await useBlockDefinitionStore.getState().importDefinitions([def]);
-  return withLegacyStatus(content, status, def, i18n.t);
+  return { version: EMERALD_VERSION, type: 'template', title: template.name || 'Template', createdAt: template.created_at, content, images, meta };
 }
 
 // ── Import helpers ───────────────────────────────────────────────────────────
@@ -600,10 +378,12 @@ export async function importFromEmerald(): Promise<void> {
     return;
   }
 
-  // A template only comes as '3', and '3' is only a template.
-  const knownVersion = file.version === '1' || file.version === '2' || file.version === '3';
-  if (!knownVersion || (file.version === '3') !== (file.type === 'template')) {
-    await message('Unsupported Emerald file version.', { title: 'Import', kind: 'error' });
+  // Checked before anything is created: a refused file leaves the vault as it is.
+  // A type this version does not know is no file it can read either.
+  const notice = unreadableVersionNotice(file?.version)
+    ?? (FILE_TYPES.includes(file.type) ? null : i18n.t('emeraldImport.unsupported'));
+  if (notice) {
+    await message(notice, { title: 'Import', kind: 'error' });
     return;
   }
   if (typeof file.meta !== 'object' || file.meta === null) file.meta = {};
@@ -616,39 +396,15 @@ export async function importFromEmerald(): Promise<void> {
       await message(`Import failed: ${e}`, { title: 'Import', kind: 'error' });
       return;
     }
-    // No entry module affected — only tags, categories, custom blocks and templates.
+    // No entry module affected — only tags and templates.
     await reloadModules([]);
     useUIStore.getState().setActiveView({ type: 'templates', id: templateId });
     await message('Template imported successfully!', { title: 'Import', kind: 'info' });
     return;
   }
 
-  if (file.type === 'altar') {
-    let newAltarId: string;
-    try {
-      newAltarId = await importAltarEntry(file);
-    } catch (e) {
-      await message(`Import failed: ${e}`, { title: 'Import', kind: 'error' });
-      return;
-    }
-    await refreshAfterImport('operations');
-    useUIStore.getState().setActiveView({ type: 'operations', id: newAltarId });
-    await message('Altar imported successfully!', { title: 'Import', kind: 'info' });
-    return;
-  }
-
-  // One snapshot for the whole import: the remap and, for the journal, the
-  // legacy links need the same list, and nothing changes in the stock
-  // between the two.
   const items = linkItemsSnapshot();
-  // Status/end date/version of an operation from before v41 as a block (the values
-  // come from the file and are checked like a backup row), the
-  // legacy links of a journal entry as chips — both before the filter.
-  const content = await importedContent(file, items, (html) => file.type === 'operations'
-    ? withImportedStatus(html, legacyStatusOfRow({
-        is_active: file.meta.isActive, end_date: file.meta.endDate, version: file.meta.version,
-      }))
-    : file.type === 'journal' ? appendLegacyLinks(html, items, legacyJournalTargets(file)) : html);
+  const content = await importedContent(file, items);
   const tagIds = await importedTags(file.meta);
 
   let newId: string;
@@ -660,9 +416,6 @@ export async function importFromEmerald(): Promise<void> {
     } else {
       newId = await importOperationEntry(file, content, tagIds);
     }
-    // After the entry: if that fails, no definition is left orphaned
-    // behind. The copies in the content do not need them to work.
-    await importBlockDefinitions(file.meta.blockDefinitions, items);
   } catch (e) {
     await message(`Import failed: ${e}`, { title: 'Import', kind: 'error' });
     return;
@@ -675,10 +428,9 @@ export async function importFromEmerald(): Promise<void> {
 
 /**
  * The content of an imported file, ready to be saved: images into this
- * vault, link targets onto this vault, `beforeSanitize`, DOMPurify last.
+ * vault, link targets onto this vault, DOMPurify last.
  *
- * The order is deliberate: the remap (and a `beforeSanitize` that inserts
- * blocks) parses the HTML and serializes it again, and such a round trip
+ * The order is deliberate: the remap parses the HTML and serializes it again, and such a round trip
  * must never come AFTER the sanitizer — otherwise what goes into the database
  * is no longer what it checked. The remap itself only reads
  * data attributes and replaces nodes, so it needs no clean input.
@@ -686,16 +438,11 @@ export async function importFromEmerald(): Promise<void> {
 async function importedContent(
   file: EmeraldFile,
   items: SuggestionItem[],
-  beforeSanitize: (html: string) => string | Promise<string> = (html) => html,
 ): Promise<string> {
-  // An older file's chips to altars and altar fields point at operations first, as v62 did,
-  // and its sigil blocks become fields and paint blocks, as v64 did.
-  const raw = typeof file.content === 'string'
-    ? contentWithoutLegacySigils(contentWithAltarsAsOperations(file.content), legacySigilLabels(i18n.t))
-    : '';
+  const raw = typeof file.content === 'string' ? file.content : '';
   const remapped = await remapImages(raw, file.images ?? {});
   const relinked = remapImportedLinks(remapped, file.meta.contentLinks, items);
-  return sanitizeImportedHtml(await beforeSanitize(relinked));
+  return sanitizeImportedHtml(relinked);
 }
 
 /**
@@ -718,19 +465,17 @@ async function importedTags(meta: EmeraldMeta): Promise<string[]> {
 }
 
 /**
- * Reads in a `.emerald` template — like an entry: content and tags, then
- * the custom blocks. Without a dialog, so that it can be checked without a file picker;
- * the check of type and version is therefore here too.
+ * Reads in a `.emerald` template — like an entry: content and tags. Without
+ * a dialog, so that it can be checked without a file picker; the check of
+ * type and version is therefore here too.
  */
 export async function importTemplateFile(file: EmeraldFile): Promise<string> {
-  if (file.type !== 'template' || file.version !== '3') throw new Error('Not a template file.');
+  const notice = unreadableVersionNotice(file.version);
+  if (notice) throw new Error(notice);
+  if (file.type !== 'template') throw new Error('Not a template file.');
   if (typeof file.meta !== 'object' || file.meta === null) file.meta = {};
-  const items = linkItemsSnapshot();
-  const content = await importedContent(file, items);
-  const id = await createImportedTemplate(file, content, await importedTags(file.meta));
-  // After the template: if that fails, no definition is left orphaned behind.
-  await importBlockDefinitions(file.meta.blockDefinitions, items);
-  return id;
+  const content = await importedContent(file, linkItemsSnapshot());
+  return createImportedTemplate(file, content, await importedTags(file.meta));
 }
 
 /**
@@ -763,9 +508,9 @@ function importedCreatedAt(file: EmeraldFile): string | undefined {
   return /^\d{4}-/.test(iso) ? iso : undefined;
 }
 
-/** The title from the file — an old English default title becomes empty, as in the database (v48). */
+/** The title from the file. */
 function importedTitle(file: Pick<EmeraldFile, 'title'>): string {
-  if (!hasOwnTitle(file.title) || isLegacyUntitled(file.title)) return '';
+  if (!hasOwnTitle(file.title)) return '';
   // A Markdown or PDF export writes "Untitled…" for an empty title
   // in the app's language — that comes back empty on re-import.
   const untitled = (['journal', 'wiki', 'operation', 'task'] as const)
@@ -782,56 +527,6 @@ function importedStamp(createdAt: string | undefined): WriteOptions {
   return { touch: createdAt ?? true };
 }
 
-/**
- * Files from before the migrations v36/v37 carry their links and the
- * three fields Paradigm/Banishing/Meditation in the meta instead of in the content. On
- * import they become blocks in the text (`appendLegacyLinks`, before the filter)
- * — written to the columns they would no longer be displayed: no chip, no
- * backlink, no search hit.
- */
-function legacyJournalTargets(file: EmeraldFile): Parameters<typeof appendLegacyLinks>[2] {
-  const { wiki: articles, operation: operations } = useEntryStore.getState().entries;
-
-  const paradigmId = file.meta.paradigmaTitle
-    ? (articles.find(a => a.title === file.meta.paradigmaTitle)?.id ?? null)
-    : null;
-  const bannungId = file.meta.bannungTitle
-    ? (articles.find(a => a.title === file.meta.bannungTitle)?.id ?? null)
-    : null;
-  const meditationId = file.meta.meditationTitle
-    ? (articles.find(a => a.title === file.meta.meditationTitle)?.id ?? null)
-    : null;
-  const resolveOpId = (id: string, title: string) =>
-    operations.find(o => o.id === id)?.id ?? operations.find(o => o.title === title)?.id;
-  const resolveWikiId = (id: string, title: string) =>
-    articles.find(a => a.id === id)?.id ?? articles.find(a => a.title === title)?.id;
-
-  const linkedOpIds = (
-    file.meta.linkedOps
-      ? file.meta.linkedOps.map(({ id, title }) => resolveOpId(id, title))
-      : (file.meta.linkedOpsTitles ?? []).map(t => operations.find(o => o.title === t)?.id)
-  ).filter(Boolean) as string[];
-  const linkedWikiIds = (
-    file.meta.linkedWiki
-      ? file.meta.linkedWiki.map(({ id, title }) => resolveWikiId(id, title))
-      : (file.meta.linkedWikiTitles ?? []).map(t => articles.find(a => a.title === t)?.id)
-  ).filter(Boolean) as string[];
-
-  return [
-    ...linkedOpIds.map((id) => ({ id, entryType: 'operation' as const })),
-    ...linkedWikiIds.map((id) => ({ id, entryType: 'wiki' as const })),
-    ...legacyFieldTargets([
-      { key: 'paradigm', id: paradigmId, title: file.meta.paradigmaTitle },
-      { key: 'bannung', id: bannungId, title: file.meta.bannungTitle, active: file.meta.isBannung },
-      {
-        key: 'meditation', id: meditationId, title: file.meta.meditationTitle,
-        active: file.meta.isMeditation,
-        suffix: file.meta.meditationDuration ? `(${file.meta.meditationDuration} min)` : undefined,
-      },
-    ]),
-  ];
-}
-
 async function importJournalEntry(file: EmeraldFile, content: string, tagIds: string[]): Promise<string> {
   const { createEntry, updateEntry } = useEntryStore.getState();
   // The moon phase follows from the file's creation date (`entryMoonPhase`).
@@ -846,12 +541,9 @@ async function importJournalEntry(file: EmeraldFile, content: string, tagIds: st
  * category with this name (case-insensitive, builtins also via their
  * translated name), otherwise newly created; without a name the entry stays
  * uncategorized.
- * Before, wiki, operations and altar each had a strategy of their own.
  */
 async function ensureCategoryByName(name: string | null | undefined, emoji = '📁'): Promise<string | null> {
   const trimmed = name?.trim();
-  // Without a name the entry stays uncategorized — until v38 it fell into the
-  // catch-all, which no longer exists as a special case.
   if (!trimmed) return null;
   const key = categoryKey(trimmed);
   const matches = (c: Category) =>
@@ -882,33 +574,10 @@ async function ensureCategoryByName(name: string | null | undefined, emoji = '�
   }
 }
 
-const LEGACY_WIKI_BY_ID = new Map(LEGACY_WIKI_CATEGORIES.map(([id, , emoji]) => [id, emoji]));
-
-/**
- * Name and emoji of the wiki category from the file. Files from before v38 name
- * builtins only via their ID — which is translated via the old locale key into the name
- * that the same category carries in this vault after the migration.
- */
-function legacyWikiCategory(meta: EmeraldMeta): { name: string | undefined; emoji: string | undefined } {
-  const id = meta.wikiCategoryId;
-  if (id && LEGACY_WIKI_BY_ID.has(id)) {
-    const key = `wiki.categories.${id}`;
-    return {
-      name: i18n.exists(key) ? i18n.t(key) : meta.wikiCategoryName,
-      emoji: LEGACY_WIKI_BY_ID.get(id),
-    };
-  }
-  return { name: meta.wikiCategoryName, emoji: undefined };
-}
-
 async function importWikiArticle(file: EmeraldFile, content: string, tagIds: string[]): Promise<string> {
   const { createEntry, updateEntry } = useEntryStore.getState();
 
-  const legacy = legacyWikiCategory(file.meta);
-  const categoryId = await ensureCategoryByName(
-    file.meta.categoryName ?? legacy.name,
-    file.meta.categoryEmoji ?? legacy.emoji ?? '📄',
-  );
+  const categoryId = await ensureCategoryByName(file.meta.categoryName, file.meta.categoryEmoji ?? '📄');
 
   const createdAt = importedCreatedAt(file);
   const article = await createEntry('wiki', { categoryId, blank: true, createdAt });
@@ -925,10 +594,7 @@ async function importWikiArticle(file: EmeraldFile, content: string, tagIds: str
 async function importOperationEntry(file: EmeraldFile, content: string, tagIds: string[]): Promise<string> {
   const { createEntry, updateEntry } = useEntryStore.getState();
 
-  const categoryId = await ensureCategoryByName(
-    file.meta.categoryName ?? file.meta.opCategoryName,
-    file.meta.categoryEmoji ?? '⚡',
-  );
+  const categoryId = await ensureCategoryByName(file.meta.categoryName, file.meta.categoryEmoji ?? '⚡');
 
   const createdAt = importedCreatedAt(file);
   const op = await createEntry('operation', { categoryId, blank: true, createdAt });
@@ -942,95 +608,6 @@ async function importOperationEntry(file: EmeraldFile, content: string, tagIds: 
   return op.id;
 }
 
-// ── Import altar from Emerald ────────────────────────────────────────────────
-
-/**
- * The background of an imported altar: subject to the same limits as when
- * uploading in the sidebar (vault limits plus `ALTAR_BACKGROUND_MAX_BYTES`).
- * If it is still too large even downscaled, it is taken unchanged — like images in the content
- * (`remapImages`).
- */
-async function remapAltarImagePath(path: string | undefined, images: Record<string, string>): Promise<string | null> {
-  if (!path) return null;
-  const dataUrl = images[path];
-  if (!dataUrl) return path;
-  try {
-    const prepared = await prepareImageDataUrl(dataUrl, { capBytes: ALTAR_BACKGROUND_MAX_BYTES }).catch(() => dataUrl);
-    return await saveImage(prepared);
-  } catch {
-    return null;
-  }
-}
-
-/**
- * The canvas background of an imported altar: checked like a stored one, its
- * picture of the vault pointing at the image as imported, or left out if
- * that did not come along.
- */
-function importedCanvasBackground(raw: unknown, imported: string | null | undefined): CanvasBackground | null {
-  const bg = parseCanvasBackground(raw);
-  if (!bg?.image || isAppBackground(bg.image.src)) return bg;
-  return { ...bg, image: imported ? { ...bg.image, src: imported } : null };
-}
-
-/**
- * An altar's `.emerald` file (written before altars were operations): its
- * altar, items and placements as the rows the altar tables held, turned into
- * an operation of "Altars" and pictures of "Images" by the same conversion
- * as v62 (`altarConversion.ts`). Under new IDs, since the file is foreign; an
- * item's picture already in "Images" keeps its details there. The items'
- * categories have no place in "Images" and are left out.
- */
-async function importAltarEntry(file: EmeraldFile): Promise<string> {
-  const images = file.images ?? {};
-  const { meta } = file;
-  const id = generateId();
-  const at = importedCreatedAt(file) ?? nowIso();
-  const backgroundImageData = await remapAltarImagePath(meta.altarBackgroundImagePath, images);
-  // The settings as the column held them; `parseAltarSettings` fills in what the file lacks.
-  const settings = {
-    background_preset: meta.altarBackgroundPreset,
-    background_overlay: meta.altarBackgroundOverlay,
-    background_overlay_color: meta.altarBackgroundOverlayColor,
-    canvas_background: importedCanvasBackground(meta.altarCanvasBackground, backgroundImageData),
-    resolution: meta.altarResolution,
-  };
-  const altar: Row = {
-    id,
-    title: importedTitle(file),
-    settings: JSON.stringify(settings),
-    elements: withNewElementIds(meta.altarElements ?? [], id),
-    background_image_data: backgroundImageData,
-    icon_data: meta.altarIconData ?? null,
-    created_at: at,
-    updated_at: at,
-  };
-  const itemIds = new Map<string, string>();
-  const items: Row[] = (meta.altarItems ?? []).map((item) => {
-    const itemId = generateId();
-    itemIds.set(item.id, itemId);
-    // createdAt comes from a foreign file: only a string is passed through.
-    const created = typeof item.createdAt === 'string' ? item.createdAt : at;
-    return { id: itemId, name: item.name, emoji: item.emoji, note: item.note, image_data: item.imageData ?? null, created_at: created, updated_at: created };
-  });
-  const placements: Row[] = (meta.altarPlacements ?? []).flatMap((p) => {
-    const itemId = itemIds.get(p.itemId);
-    return itemId ? [{ ...p, id: generateId(), altar_id: id, item_id: itemId, locked: toInt(p.locked), hidden: toInt(p.hidden) }] : [];
-  });
-
-  const converted = await convertAltars({ altars: [altar], items, placements }, async (dataUrl) => {
-    try {
-      return await saveImage(dataUrl);
-    } catch {
-      return null;
-    }
-  });
-  const db = await getDb();
-  // The operation and its block rows in one batch (`altarInserts`).
-  await db.batch(await altarInserts(db, converted));
-  return id;
-}
-
 // ── Import from Markdown ─────────────────────────────────────────────────────
 
 /** Strips a leading emoji + whitespace from a metadata value like "🌀 Paradigm Name". */
@@ -1041,18 +618,6 @@ function stripIconPrefix(val: string): string {
     return spaceIdx >= 0 ? trimmed.slice(spaceIdx + 1).trim() : '';
   }
   return trimmed;
-}
-
-/** Parses a comma-separated linked-items string. Each item may be "Icon Title [id]" or just "Icon Title". */
-function parseLinkedItems(raw: string): Array<{ id: string | null; title: string }> {
-  return raw.split(',').map(s => {
-    const stripped = stripIconPrefix(s.trim());
-    const idMatch = /\[([^\]]+)\]$/.exec(stripped);
-    if (idMatch) {
-      return { id: idMatch[1], title: stripped.slice(0, idMatch.index).trim() };
-    }
-    return { id: null, title: stripped };
-  }).filter(item => item.title);
 }
 
 export async function importFromMarkdown(): Promise<void> {
@@ -1096,7 +661,7 @@ export async function importFromMarkdown(): Promise<void> {
   const html   = await marked.parse(bodyMd) as string;
 
   // Markdown import only supports journal/wiki/operations as a destination
-  // (unlike .emerald files, which also carry 'altar'). A missing or
+  // (unlike .emerald files, which also carry templates). A missing or
   // unrecognised `type` frontmatter key is ambiguous, so ask the user
   // instead of silently defaulting to journal.
   const rawType = frontMeta['type'];
@@ -1117,7 +682,7 @@ export async function importFromMarkdown(): Promise<void> {
   let newId: string;
   try {
     if (type === 'journal') {
-      newId = await importJournalFromMarkdown(title, html, tagIds, frontMeta);
+      newId = await importJournalFromMarkdown(title, html, tagIds);
     } else if (type === 'wiki') {
       newId = await importWikiFromMarkdown(title, html, tagIds, frontMeta);
     } else {
@@ -1133,68 +698,13 @@ export async function importFromMarkdown(): Promise<void> {
   await message('Entry imported successfully!', { title: 'Import', kind: 'info' });
 }
 
-async function importJournalFromMarkdown(
-  title: string, html: string, tagIds: string[],
-  meta: Record<string, string>,
-): Promise<string> {
+async function importJournalFromMarkdown(title: string, html: string, tagIds: string[]): Promise<string> {
   const { createEntry, updateEntry } = useEntryStore.getState();
-  const { wiki: articles, operation: operations } = useEntryStore.getState().entries;
-
-  const paradigmaName = meta['paradigma'] ? stripIconPrefix(meta['paradigma']) : null;
-  const paradigmId = paradigmaName
-    ? (articles.find(a => a.title === paradigmaName)?.id ?? null)
-    : null;
-
-  const bannungName = meta['bannung'] ? stripIconPrefix(meta['bannung']) : null;
-  const bannungId = bannungName
-    ? (articles.find(a => a.title === bannungName)?.id ?? null)
-    : null;
-
-  let meditationName: string | null = null;
-  let meditationDuration: number | null = null;
-  if (meta['meditation']) {
-    const raw = stripIconPrefix(meta['meditation']);
-    const durMatch = /\((\d+)\s*min\)$/.exec(raw);
-    meditationDuration = durMatch ? parseInt(durMatch[1], 10) : null;
-    meditationName     = durMatch ? raw.slice(0, durMatch.index).trim() : raw;
-  }
-  const meditationId = meditationName
-    ? (articles.find(a => a.title === meditationName)?.id ?? null)
-    : null;
-
-  const linkedOpIds = parseLinkedItems(meta['operations'] ?? '')
-    .map(({ id, title }) => id
-      ? (operations.find(o => o.id === id)?.id ?? operations.find(o => o.title === title)?.id)
-      : operations.find(o => o.title === title)?.id
-    ).filter(Boolean) as string[];
-
-  const linkedWikiIds = parseLinkedItems(meta['wiki'] ?? '')
-    .map(({ id, title }) => id
-      ? (articles.find(a => a.id === id)?.id ?? articles.find(a => a.title === title)?.id)
-      : articles.find(a => a.title === title)?.id
-    ).filter(Boolean) as string[];
-
-  // As with the `.emerald` import: everything from the Markdown header lands as a
-  // block in the text, not in the replaced columns.
-  const content = sanitizeImportedHtml(appendLegacyLinks(html, linkItemsSnapshot(), [
-    ...linkedOpIds.map((id) => ({ id, entryType: 'operation' as const })),
-    ...linkedWikiIds.map((id) => ({ id, entryType: 'wiki' as const })),
-    ...legacyFieldTargets([
-      { key: 'paradigm', id: paradigmId, title: paradigmaName },
-      { key: 'bannung', id: bannungId, title: bannungName },
-      {
-        key: 'meditation', id: meditationId, title: meditationName,
-        suffix: meditationDuration ? `(${meditationDuration} min)` : undefined,
-      },
-    ]),
-  ]));
-
   // Without a date in the file the entry is created today — with today's moon phase.
   const entry = await createEntry('journal', { blank: true });
-  await updateEntry(entry.id, { title, content, tags: tagIds });
+  await updateEntry(entry.id, { title, content: sanitizeImportedHtml(html), tags: tagIds });
   return entry.id;
 }
-
 async function importWikiFromMarkdown(
   title: string, html: string, tagIds: string[],
   meta: Record<string, string>,
@@ -1218,14 +728,7 @@ async function importOperationFromMarkdown(
   const categoryName = meta['category'] ? stripIconPrefix(meta['category']) : null;
   const categoryId = await ensureCategoryByName(categoryName, '⚡');
 
-  // "Status"/"End Date"/"Version" in the header come from exports up to v40. Before
-  // creating: if the conversion fails, no empty operation is left behind.
-  const content = sanitizeImportedHtml(await withImportedStatus(html, {
-    isActive: meta['status'] ? meta['status'].toLowerCase() === 'active' : true,
-    endDate: meta['end date'] ?? null,
-    version: meta['version'] ?? null,
-  }));
   const op = await createEntry('operation', { categoryId, blank: true });
-  await updateEntry(op.id, { title, content, category_id: categoryId, tags: tagIds });
+  await updateEntry(op.id, { title, content: sanitizeImportedHtml(html), category_id: categoryId, tags: tagIds });
   return op.id;
 }

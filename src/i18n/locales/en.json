@@ -31,7 +31,6 @@
     "dragHint": "Drag to reorder.",
     "builtinHint": "Built-in — cannot be renamed or deleted.",
     "builtin": {
-      "other": "Other",
       "sigils": "Sigils",
       "altars": "Altars"
     },
@@ -116,24 +115,7 @@
     "new": "New operation",
     "untitled": "Untitled Operation",
     "placeholder": "Document your operation...",
-    "all": "All",
-    "categories": {
-      "sigils": "Sigils",
-      "servitors": "Servitors",
-      "other": "Other"
-    }
-  },
-  "altar": {
-    "categories": {
-      "candle": "Candle",
-      "crystal": "Crystal",
-      "herb": "Herb",
-      "deity": "Deity",
-      "symbol": "Symbol",
-      "tool": "Tool",
-      "table": "Table",
-      "other": "Other"
-    }
+    "all": "All"
   },
   "journal": {
     "title": "Journal",
@@ -165,20 +147,6 @@
     "newArticle": "New article",
     "untitled": "Untitled Article",
     "placeholder": "Document your knowledge...",
-    "categories": {
-      "ritual": "Ritual",
-      "deity": "Deity",
-      "herb": "Herb",
-      "symbol": "Symbol",
-      "tool": "Tool",
-      "concept": "Concept",
-      "spell": "Spell",
-      "paradigm": "Paradigm",
-      "bannung": "Banishing",
-      "meditation": "Meditation",
-      "sigil_charging": "Sigil Charging",
-      "other": "Other"
-    },
     "addIcon": "Add icon",
     "changeIcon": "Change icon",
     "removeIcon": "Remove icon"
@@ -291,12 +259,6 @@
       "display": "Display",
       "fieldCount": "{{count}} field",
       "fieldCount_other": "{{count}} fields"
-    },
-    "status": {
-      "name": "Status",
-      "active": "Active",
-      "endDate": "End date",
-      "version": "Version"
     },
     "sigil": {
       "hidden": "Hidden while the sigil is loaded",
@@ -944,7 +906,9 @@
     "backTo": "Back to {{name}}",
     "openFailed": "The last vault could not be opened. Choose it again or another one.",
     "removeConfirm": "Remove from the list?",
-    "deleteConfirmFiles": "Delete the vault and its files?"
+    "deleteConfirmFiles": "Delete the vault and its files?",
+    "outdated": "This vault comes from an older version of Emerald and cannot be opened in this one. It stays as it is; a converter will follow.",
+    "tooNew": "This vault comes from a newer version of Emerald. Update this app to open it. It stays as it is."
   },
   "vaultKey": {
     "unlockTitle": "Unlock “{{name}}”",
@@ -981,10 +945,6 @@
     "rememberUnavailable": "This system has no keychain to remember the key in.",
     "rememberFailed": "The operating system's keychain refused to remember the key. The vault is open, but Emerald will ask for the password again next time.",
     "continue": "Continue",
-    "encryptTitle": "Encrypt “{{name}}”",
-    "encryptHint": "This vault dates from before encryption. From now on every vault is encrypted: choose a password and Emerald encrypts entries, images and drafts. Depending on the size this takes a moment, and the original stays untouched until everything has been checked.",
-    "encryptNote": "Backups you exported earlier (.emeralddb) stay unencrypted until you delete them. On SSDs, deleted files can sometimes be recovered for a while — only an encrypted disk (BitLocker, FileVault) closes that gap.",
-    "encryptFailed": "Could not encrypt the vault. It is unchanged — please try again.",
     "progressDatabase": "Encrypting the database …",
     "progressImages": "Images: {{done}} of {{total}}",
     "progressImagesPhase": "Encrypting the images …",
@@ -1199,7 +1159,9 @@
     "pageSecurity": "Security",
     "pageSync": "Sync",
     "theme": "Theme",
-    "text": "Text"
+    "text": "Text",
+    "importErrorOldVersion": "This backup comes from an older version of Emerald and cannot be restored in this one. Nothing was changed; a converter will follow.",
+    "importErrorNewVersion": "This backup comes from a newer version of Emerald. Update this app to restore it. Nothing was changed."
   },
   "home": {
     "viewAll": "View all",
@@ -1470,6 +1432,7 @@
     "errorServerOutdated": "This server is too old for this version of Emerald. Update the server.",
     "errorAppOutdated": "This server needs a newer version of Emerald. Update this app.",
     "errorServerOlder": "The vault on the server is from an older version of Emerald. Update the device that put it there first.",
+    "errorServerVaultOutdated": "The vault on the server comes from an older version of Emerald and cannot be taken over by this one. It stays as it is on the server; a converter will follow.",
     "errorCannotOpen": "What the server sent cannot be opened with this vault's key.",
     "errorFailed": "Syncing failed.",
     "passwordChanged": "The vault password was changed on another device. Enter the new one: this copy is fetched again under it.",
@@ -1518,5 +1481,10 @@
     "opened": "open",
     "byAuthor": "by {{name}}",
     "updateServer": "Update server"
+  },
+  "emeraldImport": {
+    "oldVersion": "This file comes from an older version of Emerald and cannot be imported in this one. Nothing was changed; a converter will follow.",
+    "newVersion": "This file comes from a newer version of Emerald. Update this app to import it. Nothing was changed.",
+    "unsupported": "This file is not an Emerald file this version can read. Nothing was changed."
   }
 }

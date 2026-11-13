@@ -50,8 +50,7 @@ class HarnessDb {
 
 const STUBS = {
   '@tauri-apps/api/core': `export async function invoke(cmd) {
-    if (cmd === 'legacy_default_db_exists') return true;
-    if (cmd === 'migrate_vault_layout' || cmd === 'default_vault_dir' || cmd === 'new_vault_base_dir') return process.env.EMERALD_HARNESS_DIR;
+    if (cmd === 'default_vault_dir' || cmd === 'new_vault_base_dir') return process.env.EMERALD_HARNESS_DIR;
     return undefined;
   }`,
   '@tauri-apps/api/path': 'export async function appDataDir() { return process.env.EMERALD_HARNESS_DIR; }',
@@ -691,14 +690,14 @@ await test('a pending migration runs under tracking and asks for a snapshot', as
   await runMigrations(db);
   await startTracking(db);
   await clearSnapshotNeeded(db);
-  // One step behind: the last migration runs again.
-  db.raw.prepare('UPDATE schema_version SET version = ?').run(BASELINE_VERSION - 1);
   db.raw.exec("INSERT INTO tags (id, name) VALUES ('t', 'before')");
-  await runMigrations(db);
+  // A step of the harness above the baseline, as a later schema change would add one.
+  const step = { version: BASELINE_VERSION + 1, name: 'harness_step', up: async () => {} };
+  await runMigrations(db, [step], step.version);
   assert.equal(await needsSnapshot(db), true);
   assert.equal((await pendingRows(db)).length, 1, 'what waited to go out stays until it is known who goes first');
   db.raw.exec("INSERT INTO tags (id, name) VALUES ('u', 'after')");
-  assert.equal((await pendingRows(db)).length, 2, 'triggers are back after the chain');
+  assert.equal((await pendingRows(db)).length, 2, 'triggers are back after the step');
 });
 
 await test('a kept rename onto a name the snapshot has gives way, and the rest of what was kept stays', async () => {

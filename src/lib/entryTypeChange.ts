@@ -18,10 +18,10 @@
  * moves along (`store/entryEdit.ts`), and Cancel brings the entry back the same
  * way (`revertEntryType`) — into its module, with its old number.
  *
- * Without a transaction (see `normalizeSchema.ts`): first the row, then the
- * references. If it aborts in between, at worst individual chips still
- * show the old type — the entry itself is never duplicated and never gone (until v48
- * the row moved between three tables).
+ * Without a transaction (the SQL layer hands each statement to any connection
+ * of its pool): first the row, then the references. If it aborts in between,
+ * at worst individual chips still show the old type — the entry itself is
+ * never duplicated and never gone.
  *
  * Import rule like `dbBackup`: reads and writes the stores from the outside; none
  * of them imports back.

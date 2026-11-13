@@ -158,13 +158,6 @@ export async function deleteImageFiles(filenames: string[]): Promise<number> {
   return freed;
 }
 
-/** Copies images out of the pre-0.2.1 shared pool into the active vault. */
-export async function adoptLegacyImages(filenames: string[]): Promise<number> {
-  return invoke<number>('adopt_legacy_images', {
-    filenames,
-    vaultId: await getActiveVaultId(),
-  });
-}
 
 export interface UnusedImages {
   names: string[];
@@ -179,13 +172,8 @@ export interface UnusedImages {
  * that only exists in an editor buffer nobody has saved yet would count as
  * unused, and deleting it would be a surprise.
  *
- * The pre-per-vault shared pool is not considered. `list_image_files` only
- * reports the vault's own folder, and vaults that have not been opened since
- * the migration still read from that pool.
- *
- * Takes the database rather than calling `getDb()` so this module does not
- * depend on `db.ts` — `db.ts` needs `adoptLegacyImages` from here for migration
- * v35, and a cycle between the two would be the fragile way to get it.
+ * Takes the database rather than calling `getDb()`, so this module does not
+ * depend on `db.ts`.
  */
 export async function findUnusedImages(db: Database): Promise<UnusedImages> {
   const [files, used] = await Promise.all([listImageFiles(), collectUsedImageFilenames(db)]);

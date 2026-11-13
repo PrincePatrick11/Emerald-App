@@ -8,9 +8,9 @@
  * .db committed to this repo could never do.
  *
  * The finished file is stamped at BASELINE_VERSION, so the app treats it as
- * current and the migration chain never runs against it. That matters: only
- * migrations up to v32 tolerate pre-existing schema, v33+ fail loudly, so an
- * almost-right database would hard-fail rather than repair itself.
+ * current: no migration runs against it, and a checkout since the fresh start
+ * of the schema refuses a vault stamped any lower as one of an older version.
+
  *
  * The bundling technique (esbuild + Tauri stubs + a node:sqlite adapter behind
  * the tauri-plugin-sql interface) is lifted from the app's own

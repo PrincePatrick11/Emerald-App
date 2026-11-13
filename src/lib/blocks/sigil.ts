@@ -10,9 +10,7 @@ import { readBlockData, withBlockData } from './blockJson';
 import { BLOCK_ATTR, type BlockInstance } from './types';
 
 /**
- * A sigil: calculator, drawing, charge (since v42; previously a separate view
- * with its own columns on `operations`; v42–v63 three block types of their
- * own, see `legacySigilBlocks.ts`).
+ * A sigil: calculator, drawing, charge.
  * - Calculator (field kind `sigilCalc`): intention, letter bank, implemented letters.
  * - Drawing: a paint block marked as a sigil drawing (`isSigilDrawing`), or
  *   the drawing part of a custom block (field kind `sigilCanvas`) — the

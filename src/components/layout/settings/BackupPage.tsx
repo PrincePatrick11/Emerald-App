@@ -19,6 +19,8 @@ import {
   type ImportTypeFilters,
   CONTENT_TYPES,
   allTypesIncluded,
+  BACKUP_OUTDATED,
+  BACKUP_TOO_NEW,
   type BackupFile,
   type BackupPreview,
   exportDatabase,
@@ -135,8 +137,15 @@ export default function BackupPage() {
     } catch (err) {
       // Emerald reads nothing outside its own folders (`guarded_read_path`) —
       // so an automatic backup on another drive is not a broken one, and the
-      // message says what to do.
-      setImportError(t(keyErrorOf(err).includes('access denied') ? 'settings.importErrorOutside' : 'settings.importErrorInvalid'));
+      // message says what to do. A file from another version is not broken
+      // either: it says which.
+      const code = keyErrorOf(err);
+      setImportError(t(
+        code.includes('access denied') ? 'settings.importErrorOutside'
+          : code.includes(BACKUP_OUTDATED) ? 'settings.importErrorOldVersion'
+            : code.includes(BACKUP_TOO_NEW) ? 'settings.importErrorNewVersion'
+              : 'settings.importErrorInvalid',
+      ));
     }
   }
 

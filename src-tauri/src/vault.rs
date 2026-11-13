@@ -105,19 +105,6 @@ pub(crate) fn is_valid_vault_id(id: &str) -> bool {
         && id.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'-')
 }
 
-/// Legacy database filenames are `emerald.db` and `emerald-{uuid}.db`. The
-/// check exists so the name can never carry a separator into a join.
-fn is_valid_legacy_db_name(name: &str) -> bool {
-    match name.strip_suffix(".db") {
-        Some(stem) => {
-            !stem.is_empty()
-                && stem.len() <= 64
-                && stem.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'-')
-        }
-        None => false,
-    }
-}
-
 /// Resolves a vault id against the registered list. The only way to obtain a
 /// vault directory.
 pub fn vault_dir(app: &tauri::AppHandle, vault_id: &str) -> Result<PathBuf, String> {
@@ -150,16 +137,6 @@ pub fn images_dir(app: &tauri::AppHandle, vault_id: &str) -> Result<PathBuf, Str
     Ok(dir)
 }
 
-/// The shared image pool every vault wrote into before the per-vault layout.
-/// Read-only from here on: migration v35 copies out of it, nothing copies in.
-pub fn legacy_images_dir(app: &tauri::AppHandle) -> Result<PathBuf, String> {
-    Ok(app
-        .path()
-        .app_data_dir()
-        .map_err(|e| e.to_string())?
-        .join(IMAGES_SUBDIR))
-}
-
 /// Where a vault lives when the user did not choose a location.
 fn default_dir_for(app: &tauri::AppHandle, vault_id: &str) -> Result<PathBuf, String> {
     if !is_valid_vault_id(vault_id) {
@@ -173,15 +150,6 @@ fn default_dir_for(app: &tauri::AppHandle, vault_id: &str) -> Result<PathBuf, St
         .join(vault_id))
 }
 
-/// Moves a file, falling back to copy+delete when `rename` cannot cross a
-/// filesystem boundary.
-fn move_file(from: &Path, to: &Path) -> Result<(), String> {
-    if std::fs::rename(from, to).is_ok() {
-        return Ok(());
-    }
-    std::fs::copy(from, to).map_err(|e| format!("copy {}: {e}", from.display()))?;
-    std::fs::remove_file(from).map_err(|e| format!("remove {}: {e}", from.display()))
-}
 
 // ── Taking over data from the previous identifier's directory ────────────────
 
@@ -374,9 +342,9 @@ fn retarget_registry(file: &Path, old_root: &Path, new_root: &Path) -> Result<()
 
     // Nothing rewritten means: do not touch the file. Otherwise this function
     // would rewrite it just for the formatting — and the oldest version of the
-    // registry that still exists does not know `path` at all, but `dbName` (see
-    // `migrate_vault_layout`). It falls through here, and it should travel on
-    // unchanged.
+    // registry that still exists does not know `path` at all, but `dbName` (a
+    // flat database file of an installation before 0.2.1). It falls through
+    // here, and it should travel on unchanged.
     if !moved_any {
         return Ok(());
     }
@@ -505,8 +473,8 @@ fn adopt_into(current: &Path) -> Result<(), String> {
 /// `lib.rs`. Copying thus blocks no window thread and nobody can look at a
 /// frozen UI.
 pub fn adopt_previous_identifier_dirs(app: &tauri::AppHandle) {
-    // On Windows and macOS both are the same directory, on Linux not — see
-    // `migrate_vault_layout`. Running twice would be harmless (the second pass
+    // On Windows and macOS both are the same directory; on Linux `app_config_dir`
+    // and `app_data_dir` differ. Running twice would be harmless (the second pass
     // would no longer find the target free), but the error message would be one
     // too many. Deliberately `contains` and not `dedup`: that only removes
     // adjacent equals and would silently miss with a third entry.
@@ -637,9 +605,9 @@ pub fn ensure_backup_dir(app: tauri::AppHandle, vault_id: String) -> Result<Stri
 
 /// The folder new vaults are offered in: `{documentDir}/Emerald Vaults`.
 ///
-/// Deliberately not [`default_dir_for`]. That one is the *migration* target and
-/// has to keep pointing at `{appDataDir}/vaults/{id}` for every installation
-/// with the move still ahead of it — moving it would strand their database.
+/// Deliberately not [`default_dir_for`]: that one is an id-named folder under
+/// `{appDataDir}/vaults/` that can never collide, the fallback when nothing
+/// else is chosen.
 ///
 /// Falls back to that same app directory where the platform exposes no
 /// documents folder, so there is always somewhere to offer.
@@ -654,36 +622,6 @@ pub fn new_vault_base_dir(app: tauri::AppHandle) -> Result<String, String> {
             .join(VAULTS_SUBDIR),
     };
     Ok(base.to_string_lossy().into_owned())
-}
-
-/// Whether this installation already holds a database from before `vaults.json`
-/// existed, or from a first run that was cut short after the layout migration.
-///
-/// Answers one question for the frontend: is a missing `vaults.json` a genuine
-/// first start, or an installation whose journal is sitting right there? Getting
-/// that wrong the wrong way puts a user with data on disk through onboarding.
-///
-/// Deliberately `is_file()` and not [`probe_vault_dir`]: that one lists the
-/// directory, and a refused listing reports `has_db: false` — indistinguishable
-/// from "there is nothing here". Statting a single file needs no listing.
-///
-/// The two legacy locations are not the same directory on every platform — see
-/// [`migrate_vault_layout`] — so both are searched. Only `emerald.db` matters:
-/// the flat `emerald-{uuid}.db` files of other legacy vaults were only ever
-/// addressable through `vaults.json`, so without it they are unreachable anyway.
-#[tauri::command]
-pub fn legacy_default_db_exists(app: tauri::AppHandle) -> Result<bool, String> {
-    let legacy = [
-        app.path().app_config_dir().ok(),
-        app.path().app_data_dir().ok(),
-    ]
-    .into_iter()
-    .flatten()
-    .map(|dir| dir.join(DB_FILE));
-
-    let adopted = default_dir_for(&app, "default")?.join(DB_FILE);
-
-    Ok(legacy.chain(std::iter::once(adopted)).any(|db| db.is_file()))
 }
 
 /// Reports what a directory chosen in the folder dialog contains, so the UI
@@ -714,60 +652,6 @@ pub fn probe_vault_dir(path: String) -> Result<VaultProbe, String> {
         has_db: dir.join(DB_FILE).is_file(),
         is_empty: entries.next().is_none(),
     })
-}
-
-/// Moves a pre-0.2.1 vault into its own directory and returns that directory.
-///
-/// This cannot be a SQL migration — the database file itself is what moves, and
-/// it moves before anything opens it. Idempotent: a vault whose target already
-/// holds an `emerald.db` is left alone.
-///
-/// The two legacy locations are **not** the same directory on every platform.
-/// `tauri-plugin-sql` joins its connection string onto `app_config_dir`, while
-/// the shared image pool was written to `app_data_dir`. Windows and macOS
-/// resolve both to one folder; on Linux they are `~/.config/…` and
-/// `~/.local/share/…`, and looking in only one of them finds nothing.
-#[tauri::command]
-pub fn migrate_vault_layout(
-    app: tauri::AppHandle,
-    vault_id: String,
-    legacy_db_name: String,
-) -> Result<String, String> {
-    if !is_valid_legacy_db_name(&legacy_db_name) {
-        return Err("invalid database filename".to_string());
-    }
-
-    let target_dir = default_dir_for(&app, &vault_id)?;
-    std::fs::create_dir_all(target_dir.join(IMAGES_SUBDIR)).map_err(|e| e.to_string())?;
-
-    let target_db = target_dir.join(DB_FILE);
-    if target_db.exists() {
-        return Ok(target_dir.to_string_lossy().into_owned());
-    }
-
-    let legacy_db = [
-        app.path().app_config_dir().ok(),
-        app.path().app_data_dir().ok(),
-    ]
-    .into_iter()
-    .flatten()
-    .map(|dir| dir.join(&legacy_db_name))
-    .find(|candidate| candidate.is_file());
-
-    // No legacy file means a vault that was registered but never opened. An
-    // empty directory is the correct outcome; the first getDb() fills it.
-    if let Some(source) = legacy_db {
-        move_file(&source, &target_db)?;
-        // journal_mode = DELETE leaves no sidecar behind on a clean close, but
-        // an unclean shutdown does. Leaving it next to a moved database would
-        // strand a rollback the database can no longer find.
-        let journal = source.with_file_name(format!("{legacy_db_name}-journal"));
-        if journal.is_file() {
-            move_file(&journal, &target_dir.join(format!("{DB_FILE}-journal")))?;
-        }
-    }
-
-    Ok(target_dir.to_string_lossy().into_owned())
 }
 
 /// Database, drafts and images go; the folder and its settings stay. For a vault
@@ -1216,50 +1100,15 @@ pub fn discard_import_staging(app: tauri::AppHandle, vault_id: String) -> Result
     Ok(())
 }
 
-/// The version number of a migration backup (`emerald.db.pre-v42.bak`,
-/// created by `backupDatabaseFile` in `dbRebuild.ts`) — `None` for every other
-/// name.
+/// The version number of a migration backup (`emerald.db.pre-v42.bak`) — `None`
+/// for every other name. Only vaults from before the fresh start of the schema
+/// hold such copies; deleting such a vault's files takes them along.
 pub(crate) fn migration_backup_version(name: &str) -> Option<u32> {
     name.strip_prefix(DB_FILE)?
         .strip_prefix(".pre-v")?
         .strip_suffix(".bak")?
         .parse()
         .ok()
-}
-
-/// Deletes in `dir` all migration backups except the newest and returns
-/// how many there were. Only ordinary files of exactly this name — a symlink
-/// or folder of the same name stays.
-fn prune_migration_backups_in(dir: &Path) -> Result<u32, String> {
-    let entries = match std::fs::read_dir(dir) {
-        Ok(entries) => entries,
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(0),
-        Err(e) => return Err(format!("read {}: {e}", dir.display())),
-    };
-    let mut found: Vec<(u32, PathBuf)> = entries
-        .filter_map(Result::ok)
-        .filter(|entry| entry.file_type().map(|t| t.is_file()).unwrap_or(false))
-        .filter_map(|entry| {
-            let version = migration_backup_version(entry.file_name().to_str()?)?;
-            Some((version, entry.path()))
-        })
-        .collect();
-    found.sort_by_key(|(version, _)| *version);
-    found.pop();
-    for (_, path) in &found {
-        std::fs::remove_file(path).map_err(|e| format!("remove {}: {e}", path.display()))?;
-    }
-    Ok(found.len() as u32)
-}
-
-/// Every migration that rebuilds creates a full copy of the database
-/// beforehand (embedded images included). Once the vault is open afterwards,
-/// only the newest is needed — the older ones used to lie in the vault folder
-/// forever. Deletes nothing outside the registered vault folder and nothing
-/// that is not named exactly `emerald.db.pre-vNN.bak`.
-#[tauri::command]
-pub fn prune_migration_backups(app: tauri::AppHandle, vault_id: String) -> Result<u32, String> {
-    prune_migration_backups_in(&vault_dir(&app, &vault_id)?)
 }
 
 #[cfg(test)]
@@ -1622,26 +1471,10 @@ mod tests {
     }
 
     #[test]
-    fn prune_keeps_only_the_newest_migration_backup() {
-        let dir = scratch();
-        for name in ["emerald.db.pre-v33.bak", "emerald.db.pre-v9.bak", "emerald.db.pre-v42.bak"] {
-            write(&dir.join(name), "db");
-        }
-        // Not this pattern, or no file name in order: stays.
+    fn migration_backup_names_are_recognised() {
+        assert_eq!(migration_backup_version("emerald.db.pre-v42.bak"), Some(42));
         for name in ["emerald.db", "emerald.db.pre-vx.bak", "other.db.pre-v50.bak", "emerald.db.pre-v50.bak.old"] {
-            write(&dir.join(name), "keep");
+            assert_eq!(migration_backup_version(name), None, "{name}");
         }
-        std::fs::create_dir_all(dir.join("emerald.db.pre-v60.bak")).unwrap();
-
-        assert_eq!(prune_migration_backups_in(&dir).unwrap(), 2);
-        assert!(dir.join("emerald.db.pre-v42.bak").is_file());
-        assert!(!dir.join("emerald.db.pre-v33.bak").exists());
-        assert!(!dir.join("emerald.db.pre-v9.bak").exists());
-        for name in ["emerald.db", "emerald.db.pre-vx.bak", "other.db.pre-v50.bak", "emerald.db.pre-v50.bak.old"] {
-            assert!(dir.join(name).is_file(), "{name}");
-        }
-        assert!(dir.join("emerald.db.pre-v60.bak").is_dir());
-        assert_eq!(prune_migration_backups_in(&dir.join("missing")).unwrap(), 0);
-        let _ = std::fs::remove_dir_all(&dir);
     }
 }

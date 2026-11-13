@@ -4,7 +4,7 @@ import i18n from '../../i18n';
 import { dbEpoch, getDb } from '../db';
 import { editorSavesSuspended } from '../editorLock';
 import { hasOpenEdits } from '../openEdits';
-import { BASELINE_VERSION } from '../schema';
+import { BASELINE_VERSION, FRESH_START_VERSION } from '../schema';
 import { drainSerialized } from '../serialize';
 import type Database from '../sqlite';
 import { useLeaveGuardStore } from '../../store/leaveGuardStore';
@@ -74,6 +74,8 @@ export interface RemoteVault {
 
 const OUTDATED = 'SYNC_SERVER:client_outdated';
 const SERVER_OLDER = 'SYNC_SNAPSHOT_OLDER';
+/** A snapshot from before the fresh start of the schema: no update of the device that made it helps. */
+const SERVER_OUTDATED_VAULT = 'SYNC_SNAPSHOT_OUTDATED';
 const CANNOT_OPEN = 'SYNC_CANNOT_OPEN';
 const TICK_MS = 2_000;
 /** The server says when something is new. This is for when that line is down. */
@@ -246,6 +248,7 @@ async function restoreFromSnapshot(db: Database, vaultId: string, keepPending: b
   try {
     if (snapshot.schema > BASELINE_VERSION) throw OUTDATED;
     // Older rows would need the migrations in between: the device that made it updates first.
+    if (snapshot.schema < FRESH_START_VERSION) throw SERVER_OUTDATED_VAULT;
     if (snapshot.schema < BASELINE_VERSION) throw SERVER_OLDER;
     // Every vault has rows. Nothing here must not empty this one.
     if (snapshot.frames === 0) throw CANNOT_OPEN;

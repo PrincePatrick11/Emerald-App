@@ -51,6 +51,8 @@ const DB_SIDE_FILES: [&str; 3] = ["-journal", "-wal", "-shm"];
 
 /// What the vault is under now.
 #[derive(Clone, Copy)]
+// `Plain` is built only by the dev seed and the tests (`encrypt_dir`).
+#[cfg_attr(not(any(debug_assertions, test)), allow(dead_code))]
 enum Source<'a> {
     Plain,
     Key(&'a Key),
@@ -82,7 +84,8 @@ enum Phase {
 
 type OnProgress<'a> = &'a (dyn Fn(Progress) + Send + Sync);
 
-/// For runs no one watches.
+/// For runs no one watches: the dev seed and the tests.
+#[cfg(any(debug_assertions, test))]
 fn quiet(_: Progress) {}
 
 /// The event the frontend listens to (`onReencryptProgress` in
@@ -349,6 +352,9 @@ fn finish_commit(dir: &Path) -> Result<bool, String> {
             remove_checked(&dir.join(format!("{base}{suffix}")), &mut failed);
         }
     }
+    // A vault from before the fresh start of the schema can still be
+    // recovered ("Forgot password") before it is refused; the database copies
+    // its old migrations left lie under the old key and must not outlive it.
     if let Ok(entries) = std::fs::read_dir(dir) {
         for entry in entries.flatten() {
             if entry.file_name().to_str().and_then(vault::migration_backup_version).is_some() {
@@ -356,6 +362,7 @@ fn finish_commit(dir: &Path) -> Result<bool, String> {
             }
         }
     }
+
     if !failed.is_empty() {
         eprintln!("[reencrypt] cleanup continues on the next open: {failed:?}");
         return Ok(false);
@@ -639,37 +646,11 @@ async fn prepare(dir: &Path, source: Source<'_>, new_key: &Key, progress: OnProg
     Ok(keep)
 }
 
-/// Seals the plain `.emeralddb` backups from before encryption that lie in
-/// the vault's own `backup/` folder — the folder the export offers. Others,
-/// wherever the user put them, are theirs; the encrypt dialog says so.
-fn seal_plain_backups(dir: &Path, key_file: &KeyFile, vault_key: &Key) {
-    let folder = dir.join(vault::BACKUP_SUBDIR);
-    if !is_real_dir(&folder) {
-        return;
-    }
-    let Ok(entries) = std::fs::read_dir(&folder) else { return };
-    for entry in entries.flatten() {
-        let name = entry.file_name().to_string_lossy().into_owned();
-        if !name.ends_with(".emeralddb") || !is_regular_file(&entry.path()) {
-            continue;
-        }
-        let Ok(bytes) = std::fs::read(entry.path()) else { continue };
-        if bytes.starts_with(crate::backup::MAGIC) {
-            continue;
-        }
-        let Ok(json) = String::from_utf8(bytes) else { continue };
-        let sealed = crate::backup::seal(key_file, vault_key, &json);
-        if let Err(e) = vault::write_atomic(&folder, &name, &format!("{name}.tmp"), &sealed) {
-            eprintln!("[reencrypt] backup {name} stays plain: {e}");
-        }
-    }
-}
 
 /// What a finished run hands back.
 struct Reencrypted {
     vault_key: Key,
     recovery_key: zeroize::Zeroizing<String>,
-    key_file: KeyFile,
 }
 
 /// The whole run under a fresh vault key.
@@ -703,18 +684,19 @@ async fn reencrypt(dir: &Path, source: Source<'_>, password: &str, kdf: KdfParam
     if let Err(e) = finish_commit(dir) {
         eprintln!("[reencrypt] committed; the swap finishes on the next open: {e}");
     }
-    Ok(Reencrypted { vault_key, recovery_key, key_file })
+    Ok(Reencrypted { vault_key, recovery_key })
 }
 
-/// Encrypts an existing plain vault in `dir`.
+/// Encrypts a plain vault in `dir` — only the seed vault of a dev build
+/// (`dev_seed`) and the tests: a plain vault of a user predates encryption,
+/// and with it the fresh start of the schema, so the app refuses it instead.
+#[cfg(any(debug_assertions, test))]
 async fn encrypt_dir(dir: &Path, password: &str, kdf: KdfParams, progress: OnProgress<'_>) -> Result<Reencrypted, String> {
     recover_interrupted(dir)?;
     if keys::is_encrypted_dir(dir) {
         return Err(keys::VAULT_ALREADY_ENCRYPTED.into());
     }
-    let done = reencrypt(dir, Source::Plain, password, kdf, progress).await?;
-    seal_plain_backups(dir, &done.key_file, &done.vault_key);
-    Ok(done)
+    reencrypt(dir, Source::Plain, password, kdf, progress).await
 }
 
 /// Moves an encrypted vault in `dir` from `old_key` to a new vault key under
@@ -761,32 +743,6 @@ fn vault_dir_checked(app: &tauri::AppHandle, vault_id: &str) -> Result<std::path
     let dir = vault::vault_dir(app, vault_id)?;
     vault::directory_state(&dir)?;
     Ok(dir)
-}
-
-/// Encrypts an existing plain vault and unlocks it. Closes the vault's pools
-/// first: the export reads the database file itself.
-#[tauri::command]
-pub async fn vault_encrypt_existing(
-    app: tauri::AppHandle,
-    vault_id: String,
-    password: zeroize::Zeroizing<String>,
-    remember_key: Option<bool>,
-) -> Result<keys::CreatedKey, String> {
-    let _guard = RUNNING.lock().await;
-    let dir = vault_dir_checked(&app, &vault_id)?;
-    crate::db::close_vault(&app, &vault_id).await;
-    let done = encrypt_dir(&dir, &password, keys::DEFAULT_KDF, &progress_events(&app, &vault_id)).await?;
-    // Images that were shown earlier sit in plain text in the WebView's
-    // disk cache — back then still served with `immutable`. Get rid of
-    // them; the price is the remaining browser data (column widths, open
-    // tabs).
-    {
-        use tauri::Manager;
-        if let Some(window) = app.get_webview_window("main") {
-            window.clear_all_browsing_data().unwrap_or_else(|e| eprintln!("[reencrypt] webview cache: {e}"));
-        }
-    }
-    Ok(adopt(&app, &vault_id, done, remember_key).await)
 }
 
 /// Moves an unlocked or unlockable vault to a new key under `new_password`.
@@ -929,7 +885,6 @@ mod tests {
         conn.close().await.unwrap();
 
         std::fs::write(dir.join(vault::DRAFTS_FILE), format!("{{\"img\":\"{image}\",\"text\":\"GEHEIM-ENTWURF\"}}")).unwrap();
-        std::fs::copy(dir.join(vault::DB_FILE), dir.join("emerald.db.pre-v50.bak")).unwrap();
         (dir, image)
     }
 
@@ -956,7 +911,7 @@ mod tests {
 
     fn assert_no_leftovers(dir: &Path) {
         let names: Vec<String> = std::fs::read_dir(dir).unwrap().flatten().map(|e| e.file_name().to_string_lossy().into_owned()).collect();
-        for leftover in [MARKER, PENDING_KEY, DB_NEW, DB_OLD, DRAFTS_NEW, IMAGES_NEW, "emerald.db.pre-v50.bak"] {
+        for leftover in [MARKER, PENDING_KEY, DB_NEW, DB_OLD, DRAFTS_NEW, IMAGES_NEW] {
             assert!(!names.iter().any(|n| n == leftover), "{leftover} left behind: {names:?}");
         }
     }
@@ -1130,21 +1085,6 @@ mod tests {
         rekey_dir(&dir, &done.vault_key, "battery staple", TEST_KDF, &quiet).await.unwrap();
         assert!(stored_images(&dir).contains(&foreign));
         assert_eq!(stored_images(&dir).len(), 2);
-        std::fs::remove_dir_all(&dir).ok();
-    }
-
-    #[tokio::test]
-    async fn plain_backups_in_the_vault_are_sealed_too() {
-        let (dir, _) = plain_vault().await;
-        let backups = dir.join(vault::BACKUP_SUBDIR);
-        std::fs::create_dir_all(&backups).unwrap();
-        std::fs::write(backups.join("old.emeralddb"), r#"{"type":"backup","secret":"GEHEIM-ALTBACKUP"}"#).unwrap();
-        std::fs::write(backups.join("notes.txt"), "left alone").unwrap();
-        encrypt_dir(&dir, "correct horse", TEST_KDF, &quiet).await.unwrap();
-        let sealed = std::fs::read(backups.join("old.emeralddb")).unwrap();
-        assert!(sealed.starts_with(crate::backup::MAGIC));
-        assert!(!contains(&backups.join("old.emeralddb"), "GEHEIM-ALTBACKUP"));
-        assert_eq!(std::fs::read_to_string(backups.join("notes.txt")).unwrap(), "left alone");
         std::fs::remove_dir_all(&dir).ok();
     }
 

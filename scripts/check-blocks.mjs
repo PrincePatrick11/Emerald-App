@@ -28,12 +28,8 @@ writeFileSync(
    export { parseFields, serializeFields, createFieldsBlock, isElementEmpty, isHiddenInRead, linkFromSlot, imageFromSlot } from '${root}/src/lib/blocks/fields';
    export { instantiateDefinition, parseDefinitionElements, parseDefinitionDisplay, remapDefinitionDefaults, definitionImageRefs } from '${root}/src/lib/blocks/definitions';
    export { entryBlockSummary } from '${root}/src/lib/blocks/entrySummary';
-   export { withLegacyStatus, statusDefinition, hasLegacyStatus, convertLegacyStatusRows, STATUS_DEFINITION_ID } from '${root}/src/lib/blocks/legacyStatus';
    export { extractUniqueLetters, parseSigilCalc, serializeSigilCalc, createSigilCalcBlock, createSigilCanvasBlock, createSigilChargeBlock, parseSigilCharge, serializeSigilCharge, sigilState, withoutConcealed, letterList, sigilUnits, sigilPartBlock, sigilPartId, withSigilPart, withChargesCoveringOnly, withRenamedPartTargets } from '${root}/src/lib/blocks/sigil';
-   export { convertLegacySigilBlocks, contentWithoutLegacySigils, legacySigilBlock, LEGACY_SIGIL_CALC_TYPE, LEGACY_SIGIL_CANVAS_TYPE, LEGACY_SIGIL_CHARGE_TYPE } from '${root}/src/lib/blocks/legacySigilBlocks';
    export { paintDocFromJson, paintDocToJson, emptyPaintDoc, isPaintDocEmpty, thinPoints, transformStroke, mergeDown, canMergeDown, strokeSamples, inPolygon, symmetricCopies, mirrorStroke, splitStroke } from '${root}/src/lib/paint/document';
-   export { parseAltarElements, altarElementsJson } from '${root}/src/lib/altarElements';
-   export { parseAltarSettings } from '${root}/src/lib/altarSettings';
    export { symbolFromDrawing } from '${root}/src/components/editors/canvas/symbols/fromDrawing';
    export { readUserSymbol } from '${root}/src/lib/userSymbols';
    export { group, ungroup, withGroups, moveInStack, copiesOf, align } from '${root}/src/components/editors/canvas/canvasActions';
@@ -72,13 +68,11 @@ const {
   parseFields, serializeFields, createFieldsBlock, isElementEmpty, isHiddenInRead, linkFromSlot, imageFromSlot,
   internalLinkChipHtml,
   instantiateDefinition, parseDefinitionElements, parseDefinitionDisplay, entryBlockSummary,
-  withLegacyStatus, statusDefinition, hasLegacyStatus, convertLegacyStatusRows, STATUS_DEFINITION_ID,
   extractUniqueLetters, parseSigilCalc, serializeSigilCalc, createSigilCalcBlock, createSigilCanvasBlock,
   createSigilChargeBlock, parseSigilCharge, serializeSigilCharge, sigilState, withoutConcealed,
   drawingImage, withDrawingImage, isSigilDrawing, letterList, renderBlocksForExport, parseDrawing, withDrawing,
-  convertLegacySigilBlocks, contentWithoutLegacySigils, legacySigilBlock, LEGACY_SIGIL_CALC_TYPE, LEGACY_SIGIL_CANVAS_TYPE, LEGACY_SIGIL_CHARGE_TYPE,
   paintDocFromJson, paintDocToJson, emptyPaintDoc, isPaintDocEmpty, thinPoints, transformStroke, mergeDown, canMergeDown, strokeSamples, inPolygon, symmetricCopies, mirrorStroke, splitStroke,
-  group, ungroup, withGroups, moveInStack, copiesOf, align, parseAltarElements, altarElementsJson, parseAltarSettings,
+  group, ungroup, withGroups, moveInStack, copiesOf, align,
   symbolFromDrawing, readUserSymbol,
   sigilUnits, sigilPartBlock, sigilPartId, withSigilPart, withChargesCoveringOnly,
   remapDefinitionDefaults, definitionImageRefs, withRenamedPartTargets,
@@ -414,48 +408,6 @@ console.log('\n4d. Custom blocks: copies\n');
     prefilled.attrs['data-block-config']);
 }
 
-console.log('\n4e. Legacy operation status becomes a block\n');
-{
-  const labels = {
-    'blocks.status.name': 'Status', 'blocks.status.active': 'Aktiv', 'blocks.status.endDate': 'Enddatum',
-    'blocks.status.version': 'Version', 'blocks.fields.yes': 'Ja', 'blocks.fields.no': 'Nein',
-  };
-  const t = (key) => labels[key] ?? key;
-  const def = statusDefinition(t, '2026-01-01T00:00:00.000Z');
-
-  check('active without end date and version is not a legacy status',
-    !hasLegacyStatus({ isActive: true, endDate: null, version: ' ' }) && hasLegacyStatus({ isActive: false, endDate: null, version: null }));
-
-  const out = withLegacyStatus('<p>Text</p>', { isActive: false, endDate: '2026-03-01', version: ' 1.2 ' }, def, t);
-  const [status, text] = parseBlocks(out);
-  const model = parseFields(status);
-  check('the status block comes before the content, the text stays',
-    status?.type === 'core.fields' && model.name === 'Status' && text?.html === '<p>Text</p>', out);
-  check('values: inactive, end date, version trimmed',
-    model.values.active === false && model.values['end-date'] === '2026-03-01' && model.values.version === '1.2', model.values);
-  check('the fallback names the values readably', status.html.includes('Nein') && status.html.includes('1.2'), status.html);
-
-  const md = parseFields(parseBlocks(withLegacyStatus('', { isActive: true, endDate: 'Sep 10, 2026', version: null }, def, t))[0]);
-  check('a date from a Markdown export becomes ISO', md.values['end-date'] === '2026-09-10', md.values);
-
-  const rows = [
-    { id: 'a', content: '<p>x</p>', is_active: 0, end_date: null, version: null },
-    { id: 'b', content: '<p>y</p>', is_active: 1, end_date: null, version: '' },
-  ];
-  const converted = convertLegacyStatusRows(rows, t, 'now');
-  check('convertLegacyStatusRows: only the row with a legacy status, columns cleared',
-    converted.definition?.id === STATUS_DEFINITION_ID && converted.rows[1] === rows[1] &&
-      converted.rows[0].is_active === 1 && converted.rows[0].content.includes('core.fields'), converted.rows);
-  check('without a legacy status no definition is needed', convertLegacyStatusRows([rows[1]], t, 'now').definition === null);
-
-  // i18n not ready yet: `t` returns the key — never make it permanent as a label.
-  const raw = statusDefinition((key) => key, 'now');
-  check('without translation: English labels instead of keys',
-    raw.name === 'Status' && raw.elements.map((e) => e.label).join() === 'Active,End date,Version', raw);
-  const rawHtml = parseBlocks(withLegacyStatus('', { isActive: false, endDate: null, version: null }, raw, (key) => key))[0].html;
-  check('without translation: the fallback text has no keys either', rawHtml.includes('No') && !rawHtml.includes('blocks.'), rawHtml);
-}
-
 // A sigil is written as the UI writes it: the part as a virtual block, then back into the fields block.
 const sigilFieldText = { label: (e) => e.label || e.kind, yes: 'Ja', no: 'Nein', moonName: (p) => p };
 function setSigilPart(block, elementId, change) {
@@ -603,32 +555,10 @@ console.log('\n4f. Sigils\n');
       order(moveInStack(scene, ['a', 'b'], 2)) === 'cdab' && order(moveInStack(scene, ['d'], 0)) === 'dabc');
     let n = 0;
     const copies = copiesOf(grouped.filter((e) => e.group), grouped, 10, () => `n${n++}`);
-    const drawn = parseAltarElements(JSON.stringify([
-      { id: 'p', kind: 'shape', group: 'g1', shape: { type: 'polygon', sides: 8 } },
-      { id: 'q', kind: 'shape', shape: { type: 'star', sides: 40 } },
-    ]), 'altar');
-    const again = parseAltarElements(altarElementsJson(drawn), 'altar');
-    check('altar: a drawn element keeps its group and corners, nonsense is clamped',
-      again[0].group === 'g1' && again[0].shape.sides === 8 && !again[1].group && again[1].shape.sides === 12, again);
     const pair = [el('a', 0, { x: 100, y: 0, group: 'g' }), el('b', 1, { x: 200, y: 0, group: 'g' }), el('c', 2, { x: 500, y: 300 })];
     const lined = align(pair, ['a', 'b', 'c'], 'left', { width: 1000, height: 600 });
     check('canvas: aligning moves a group as one, its members keeping their distance',
       lined[1].x - lined[0].x === 100 && lined[0].x === 100 && lined[2].x === 100, lined.map((e) => e.x));
-    const settings = parseAltarSettings(JSON.stringify({ guides_locked: true, guides: [
-      { id: 'a', orientation: 'vertical', at: 25 }, { id: 'a', orientation: 'vertical', at: 30 },
-      { id: 'b', orientation: 'diagonal', at: 10 }, { id: 'c', orientation: 'horizontal', at: 140 },
-    ] }));
-    check('altar: guides are read with their place in percent, doubles and nonsense left out',
-      settings.guides_locked && settings.guides.length === 2 && settings.guides[1].at === 100
-        && !parseAltarSettings('{}').guides_locked && parseAltarSettings('{}').guides.length === 0, settings.guides);
-    const symbols = parseAltarElements(JSON.stringify([
-      { id: 's', kind: 'symbol', symbol: { symbol: 'runes.fehu', d: 'M38 10L38 90', color: '#123456', weight: 99, fill: null } },
-      { id: 't', kind: 'symbol', symbol: { symbol: 'planets.sun', d: 'M0 0<script>' } },
-    ]), 'altar');
-    const symbolsAgain = parseAltarElements(altarElementsJson(symbols), 'altar');
-    check('altar: a symbol keeps its path and colour, its weight is clamped, a foreign path gives way to the library\'s',
-      symbolsAgain[0].symbol.d === 'M38 10L38 90' && symbolsAgain[0].symbol.color === '#123456' && symbolsAgain[0].symbol.weight === 16
-        && symbolsAgain[1].symbol.symbol === 'planets.sun' && !symbolsAgain[1].symbol.d.includes('<'), symbolsAgain);
     const sketch = emptyPaintDoc();
     sketch.layers[0].strokes = [
       { id: 'p', tool: 'pen', color: '#ff0000', size: 20, points: [100, 100, 0.5, 300, 200, 0.5, 500, 100, 0.5], pressure: false, rotation: 0, filled: false, sides: 5, rings: [] },
@@ -954,99 +884,6 @@ console.log('\n4h1. A sigil part on its own shows without a label row — a cust
     copyOut.includes('<dt>Monatsladung</dt>'), copyOut);
 }
 
-console.log('\n4h2. The sigil blocks of v42 to v63 become fields and paint blocks (v64)\n');
-{
-  const legacy = (type, data, html = '', attrs = {}) => ({
-    ...legacySigilBlock(type), html, attrs: { ...attrs, ...(data ? { 'data-block-data': JSON.stringify(data) } : {}) },
-  });
-  const img = `${'7c'.repeat(32)}.png`;
-  const chip = internalLinkChipHtml({ id: 'b2222222-2222-2222-2222-222222222222', entryType: 'wiki', label: 'Technik' });
-  const oldCalc = legacy(LEGACY_SIGIL_CALC_TYPE, { intention: 'Alte Absicht', letters: ['A', 'L'], implemented: ['A'] },
-    '<p>Alte Absicht</p><p><s>A</s> L</p>', { 'data-block-title': 'Mein Rechner' });
-  const oldCanvas = legacy(LEGACY_SIGIL_CANVAS_TYPE, null, `<img src="${img}" alt="">`, { 'data-block-hidden': '1' });
-  const oldCalc2 = legacy(LEGACY_SIGIL_CALC_TYPE, { intention: 'Zweite', letters: ['Z'], implemented: [] }, '<p>Zweite</p>');
-  const oldCharge = legacy(LEGACY_SIGIL_CHARGE_TYPE,
-    { loaded: true, revealDate: '2030-01-01', lock: 'sigil', targets: [oldCalc.id, oldCanvas.id, 'fremd-block', 'feld:draw'] },
-    `<p>2030-01-01</p><p data-block-slot="technique">${chip}</p>`);
-  const unreadable = { ...legacySigilBlock(LEGACY_SIGIL_CALC_TYPE), attrs: { 'data-block-data': '{kaputt' } };
-  const newer = legacy(LEGACY_SIGIL_CANVAS_TYPE, null, '', { 'data-block-v': '2' });
-  const partCharge = {
-    id: 'feld', type: 'core.fields', html: '',
-    attrs: {
-      'data-block-config': JSON.stringify({ elements: [{ id: 'l', kind: 'sigilCharge', label: '' }], display: { readHideEmpty: true, readOnly: false } }),
-      'data-block-data': JSON.stringify({ values: { l: { loaded: false, revealDate: null, lock: 'entry', targets: [oldCalc2.id] } } }),
-    },
-  };
-  const source = [createTextBlock('<p>Notiz</p>'), oldCalc, oldCanvas, oldCalc2, oldCharge, partCharge, unreadable, newer];
-  const content = serializeBlocks(source);
-  const out = contentWithoutLegacySigils(content, { calc: 'Rechner', charge: 'Ladung' });
-  const blocks = parseBlocks(out);
-  check('v64: every block keeps its ID and place',
-    blocks.map((b) => b.id).join() === source.map((b) => b.id).join(), blocks.map((b) => b.id));
-  check('v64: calculator and charge become fields blocks, the drawing a paint block; unreadable and newer ones stay',
-    blocks.map((b) => b.type).join() === 'core.text,core.fields,core.paint,core.fields,core.fields,core.fields,core.sigil.calc,core.sigil.canvas',
-    blocks.map((b) => b.type));
-
-  const calcModel = parseFields(blocks[1]);
-  const calcUnit = sigilUnits([blocks[1]])[0].block;
-  const calc = parseSigilCalc(calcUnit);
-  check('v64: the calculator keeps intention, letters, title; label and slot in the fallback',
-    calcModel.elements.map((e) => `${e.id}:${e.kind}`).join() === 'calc:sigilCalc' && !calcModel.display.readHideEmpty
-      && calc.intention === 'Alte Absicht' && calc.letters.join() === 'A,L' && calc.implemented.join() === 'A'
-      && blocks[1].attrs['data-block-title'] === 'Mein Rechner' && blocks[1].attrs['data-block-show-title'] === '1'
-      && blocks[1].html.startsWith('<dl><dt>Rechner</dt>')
-      && calcUnit.html === oldCalc.html && calcUnit.id === `${oldCalc.id}:calc`, [calcModel, blocks[1]]);
-
-  const drawing = blocks[2];
-  check('v64: the drawing is a marked paint block, hidden as before, with its picture as the only layer',
-    isSigilDrawing(drawing) && drawing.attrs['data-block-hidden'] === '1' && drawing.attrs['data-block-show-title'] === '1'
-      && drawingImage(drawing) === img && parseDrawing(drawing).doc?.layers[0].image === img, drawing);
-
-  const charge = parseSigilCharge(chargeUnit(blocks[4]));
-  check('v64: the charge keeps its state and technique; a calculator target becomes its part, the others stay',
-    charge.loaded && charge.revealDate === '2030-01-01' && charge.lock === 'sigil' && charge.technique === chip
-      && charge.targets.join() === [`${oldCalc.id}:calc`, oldCanvas.id, 'fremd-block', 'feld:draw'].join()
-      && blocks[4].html.includes('<dt>Ladung</dt>'), charge);
-  check('v64: a charge part of a custom block follows the calculator too',
-    parseSigilCharge(chargeUnit(blocks[5])).targets.join() === `${oldCalc2.id}:calc`, parseSigilCharge(chargeUnit(blocks[5])));
-  check('v64: unreadable and newer blocks are left byte for byte',
-    isDeepStrictEqual(blocks[6], parseBlocks(serializeBlocks([unreadable]))[0]) && isDeepStrictEqual(blocks[7], parseBlocks(serializeBlocks([newer]))[0]));
-
-  check('v64: a second run changes nothing', contentWithoutLegacySigils(out) === out);
-
-  const brokenDrawing = { ...legacySigilBlock(LEGACY_SIGIL_CANVAS_TYPE), html: `<img src="${img}" alt="">`, attrs: { 'data-block-data': '{kaputt' } };
-  const [rescued] = parseBlocks(contentWithoutLegacySigils(serializeBlocks([brokenDrawing])));
-  check('v64: a drawing with unreadable data still becomes a sigil drawing, showing its picture',
-    isSigilDrawing(rescued) && parseDrawing(rescued).render === img, rescued);
-  const prototypeNames = serializeBlocks([oldCalc, ...['constructor', '__proto__', 'toString'].map((type) => ({ id: `p-${type.replace(/_/g, '')}`, type, html: '<p>a</p>', attrs: {} }))]);
-  let protoOut = null;
-  try { protoOut = parseBlocks(contentWithoutLegacySigils(prototypeNames)); } catch { protoOut = null; }
-  check('v64: a block named like an object property is left alone, nothing throws',
-    protoOut !== null && protoOut.slice(1).map((b) => b.type).join() === 'constructor,__proto__,toString', protoOut);
-  const plain = serializeBlocks([createTextBlock('<p>core.paint, sigil</p>'), createFieldsBlock('date')]);
-  check('v64: content without the old blocks comes back as the same string', contentWithoutLegacySigils(plain) === plain);
-
-  const state = sigilState(blocks, '2029-12-31');
-  check('v64: the charge conceals what it concealed — the calculator part and the drawing, not the second calculator',
-    state.concealed.get(`${oldCalc.id}:calc`) === '2030-01-01' && state.concealed.has(oldCanvas.id)
-      && !state.concealed.has(`${oldCalc2.id}:calc`) && !state.lockEntry, state);
-  const hidden = withoutConcealed(out, '2029-12-31');
-  check('v64: search does not see what stays concealed', !hidden.includes('Alte Absicht') && !hidden.includes(img) && hidden.includes('Zweite'), hidden);
-
-  // `targets: null` — every calculator and drawing of the entry, before and after; a painting of its own is none of them.
-  const oldAll = legacy(LEGACY_SIGIL_CHARGE_TYPE, { loaded: true, revealDate: null, lock: 'entry' });
-  const painting = withDrawingImage(createPaintBlock(), `${'8d'.repeat(32)}.png`);
-  const all = parseBlocks(contentWithoutLegacySigils(serializeBlocks([oldCalc, oldCanvas, painting, oldAll])));
-  const allState = sigilState(all, '2099-01-01');
-  check('v64: a charge for "all" stays one, conceals calculator and drawing until unloaded, locks the entry',
-    parseSigilCharge(chargeUnit(all[3])).targets === null && allState.lockEntry
-      && allState.concealed.get(`${oldCalc.id}:calc`) === null && allState.concealed.get(oldCanvas.id) === null
-      && !allState.concealed.has(painting.id), allState);
-  const summary = entryBlockSummary('v64-all', serializeBlocks(all), '2099-01-01');
-  check('v64: the card still knows the sigil (lock, no image while concealed)',
-    summary.sigil?.lockEntry === true && summary.sigil.image === null, summary.sigil);
-}
-
 console.log('\n5. What is derived from the content sees through the blocks\n');
 {
   const chip =
@@ -1210,7 +1047,7 @@ console.log('\nCanvas block\n');
   check('the export shows the rendered picture', exported.includes(render) && !exported.includes(`src="${pic}"`), exported);
 }
 
-console.log('\n7. Blocks as rows (blocks, block_refs, v65)\n');
+console.log('\n7. Blocks as rows (blocks, block_refs)\n');
 {
   const pic = `${'1'.repeat(64)}.png`;
   const layerPic = `${'2'.repeat(64)}.png`;

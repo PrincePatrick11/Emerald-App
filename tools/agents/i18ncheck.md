@@ -33,7 +33,7 @@ What to check:
 
 - Keys present in one locale and missing in others, reported per locale.
 
-- Keys that no component references any more. `wiki.categories.*`, `operations.categories.*` and `altar.categories.*` are legacy-only and never orphans, see `Documentation/internationalization.md`.
+- Keys that no component references any more. Mind dynamic keys (`categories.builtin.${id}`, `categories.starter.${key}`, `blocks.types.${type}…`) before calling one an orphan.
 
 - User-facing strings hardcoded in components instead of resolved through the translation function — button labels, placeholders, tooltips, aria-labels, toasts, and error messages.
 

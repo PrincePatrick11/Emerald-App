@@ -5,7 +5,7 @@
  * vault is unlocked, and everything that needs it names only the vault ID.
  * Only the password and the recovery key come in here. A
  * recovery key comes out exactly once — when it is created:
- * on creating, encrypting, changing the password and after "Forgot password".
+ * on creating, changing the password and after "Forgot password".
  *
  * `rememberKey`: whether the key should be stored in the operating system's
  * keychain. `undefined` means "not touched" — then the keychain stays
@@ -40,7 +40,7 @@ export interface ReencryptProgress {
   total: number;
 }
 
-/** Progress of the re-encryption of `vaultId`: encrypting, password change, "Forgot password". */
+/** Progress of the re-encryption of `vaultId`: password change, "Forgot password". */
 export function onReencryptProgress(vaultId: string, handler: (p: ReencryptProgress) => void): Promise<UnlistenFn> {
   // The same name as `PROGRESS_EVENT` in `reencrypt.rs`.
   return listen<ReencryptProgress>('vault-reencrypt-progress', (e) => {
@@ -87,17 +87,6 @@ export function createVaultKey(
   return invoke('vault_create_key', { vaultId, password, rememberKey });
 }
 
-/**
- * Encrypts an existing plaintext vault (`reencrypt.rs`) and
- * unlocks it. The connections to it must be closed.
- */
-export function encryptExistingVault(
-  vaultId: string,
-  password: string,
-  rememberKey: boolean | undefined,
-): Promise<CreatedKey> {
-  return invoke('vault_encrypt_existing', { vaultId, password, rememberKey });
-}
 
 export function unlockVault(vaultId: string, password: string, rememberKey: boolean | undefined): Promise<boolean> {
   return invoke('vault_unlock', { vaultId, password, rememberKey });

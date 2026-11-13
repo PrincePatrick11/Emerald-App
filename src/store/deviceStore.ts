@@ -37,7 +37,7 @@ interface DeviceStore {
    * What a vault's `settings.json` still holds from when language and theme
    * were vault settings: its custom themes join the list once per vault, and on
    * the first start without a mirror its language and theme apply as well.
-   * Resolves once they are applied: migration v39 needs the language.
+   * Resolves once they are applied.
    */
   adoptFromVault: (vaultId: string, appearance: unknown) => Promise<void>;
 }

@@ -28,7 +28,7 @@ Disconnecting a vault keeps its place on the server and goes on noting changes, 
 
 `lib/sync/tracking.ts`. Triggers on every table but `LOCAL_TABLES` (`schema_version`, `blocks`, `block_refs`) write to `_sync_log`: table, row id, `I`/`U`/`D`, and for an update the names of the columns that really changed. So none of the SQL in the stores has to know, a whole-row write that changes nothing leaves no trace, and foreign key actions are captured like any other write.
 
-**Blocks travel as `content`.** Since v66 an entry's or a template's blocks are rows of `blocks`, whose `row_id` means nothing on another device. On the wire they stay what they were before: a column `content` of the owner's row, the block HTML its rows give (`lib/sync/blockStack.ts`). A trigger on `blocks` logs any written or removed block as a change of its owner's `content` (not when the owner itself went: its delete is the change); pushing and snapshots add `content` from the rows; applying writes the incoming `content` as the owner's block rows, in the same batch, silently. So the format, the conflict rules below and devices of an older version stay as they were — a change of one block still sends the whole stack, as before. Blocks as rows of their own on the wire would need keys that hold across devices, rules per block and a new protocol; that is a step of its own.
+**Blocks travel as `content`.** An entry's or a template's blocks are rows of `blocks`, whose `row_id` means nothing on another device. On the wire they are a column `content` of the owner's row, the block HTML its rows give (`lib/sync/blockStack.ts`). A trigger on `blocks` logs any written or removed block as a change of its owner's `content` (not when the owner itself went: its delete is the change); pushing and snapshots add `content` from the rows; applying writes the incoming `content` as the owner's block rows, in the same batch, silently. So a change of one block sends the whole stack, and the conflict rules below work on stacks. Blocks as rows of their own on the wire would need keys that hold across devices, rules per block and a new protocol; that is a step of its own.
 
 - **Names, not values.** The values are read when pushing. An entry saved a hundred times between two pushes is one change, and the log stays small and holds no content.
 - **Only connected vaults carry anything.** `startTracking` creates `_sync_log`, `_sync_ctx`, `_sync_meta` and the triggers; `stopTracking` removes them, apart from SQLite's own `sqlite_sequence`.
@@ -40,11 +40,11 @@ Disconnecting a vault keeps its place on the server and goes on noting changes, 
 
 Some changes are not for a log, and `markSnapshotNeeded` empties the log and asks for a snapshot instead:
 
-- **A migration** changes rows on every device on its own. `runMigrations` notes the snapshot before the chain and drops the triggers for it, since `DROP COLUMN` fails while a trigger names the column and a rebuild would drag them along. Every open of a tracked vault rebuilds the triggers from the current columns.
+- **A migration** changes rows on every device on its own. Before it runs a step of `MIGRATIONS` (there is none yet — see [Opening a Vault](../database.md#opening-a-vault)), `runMigrations` notes the snapshot (`markMigrated`) and drops the triggers, since `DROP COLUMN` fails while a trigger names the column and a rebuild would drag them along; afterwards it installs them again. Every open of a tracked vault rebuilds the triggers from the current columns.
 - **A backup import** empties and refills every table (`importViaStaging`).
 - **Starting to track.** What the vault already holds is in no log.
 
-A new device always starts from a snapshot, since a fresh vault seeds categories under new ids.
+A new device always starts from a snapshot, since a fresh vault seeds categories under new ids. A snapshot below `FRESH_START_VERSION` comes from a device of a version before the fresh start of the schema: it is refused (`SYNC_SNAPSHOT_OUTDATED`, `sync.errorServerVaultOutdated`) — no update of that device helps, its own vault is refused too. A snapshot above it but below `BASELINE_VERSION` needs the device that made it to update first (`SYNC_SNAPSHOT_OLDER`).
 
 ## Merging
 
@@ -65,10 +65,10 @@ The server keeps the order and nothing else: it refuses a push from a device tha
 
 Decisions of this device are written with the triggers on, so they reach the others. Everything runs in one `db.batch`, with `defer_foreign_keys`, so the order inside it does not matter and a failure changes nothing. The caller has to keep writers away between the reads and that batch, with the locks an import uses.
 
-Table and column names in a change come from decrypted data and end up in SQL: `applyRemoteChanges` refuses any it does not know (`SYNC_UNKNOWN_SHAPE`) before writing. That includes the altar tables v63 dropped: a device still on an older version that sends altar rows is refused until it is updated.
+Table and column names in a change come from decrypted data and end up in SQL: `applyRemoteChanges` refuses any it does not know (`SYNC_UNKNOWN_SHAPE`) before writing — the altar tables of earlier versions among them.
 
 ## Tests
 
-`scripts/sync-check.mjs` runs devices against an ordered list standing in for the server, on the real schema and migration runner: one test per rule above, and 300 seeded runs of random work on three devices that must converge with no dangling reference and no duplicate entry number.
+`scripts/sync-check.mjs` runs devices against an ordered list standing in for the server, on the real schema and migration runner (with an injected step for a pending migration): one test per rule above, and 300 seeded runs of random work on three devices that must converge with no dangling reference and no duplicate entry number.
 
 It runs on `node:sqlite`, without SQLCipher and without the stores. Two running instances against a real server were driven by hand through the dev bridge, on macOS only: connecting, fetching, images, a conflict, editing while changes arrive, the server going away. That script is not in this repository.

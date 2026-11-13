@@ -31,7 +31,6 @@
     "dragHint": "Arrastra para reordenar.",
     "builtinHint": "Integrada — no se puede renombrar ni eliminar.",
     "builtin": {
-      "other": "Otro",
       "sigils": "Sigilos",
       "altars": "Altares"
     },
@@ -116,24 +115,7 @@
     "new": "Nueva operación",
     "untitled": "Operación sin título",
     "placeholder": "Documenta tu operación...",
-    "all": "Todas",
-    "categories": {
-      "sigils": "Sigilos",
-      "servitors": "Servidores",
-      "other": "Otro"
-    }
-  },
-  "altar": {
-    "categories": {
-      "candle": "Vela",
-      "crystal": "Cristal",
-      "herb": "Hierba",
-      "deity": "Deidad",
-      "symbol": "Símbolo",
-      "tool": "Herramienta",
-      "table": "Mesa",
-      "other": "Otro"
-    }
+    "all": "Todas"
   },
   "journal": {
     "title": "Diario",
@@ -165,20 +147,6 @@
     "newArticle": "Nuevo artículo",
     "untitled": "Artículo sin título",
     "placeholder": "Documenta tu conocimiento...",
-    "categories": {
-      "ritual": "Ritual",
-      "deity": "Deidad",
-      "herb": "Hierba",
-      "symbol": "Símbolo",
-      "tool": "Herramienta",
-      "concept": "Concepto",
-      "spell": "Hechizo",
-      "paradigm": "Paradigma",
-      "bannung": "Destierro",
-      "meditation": "Meditación",
-      "sigil_charging": "Carga de sigilos",
-      "other": "Otro"
-    },
     "addIcon": "Añadir icono",
     "changeIcon": "Cambiar icono",
     "removeIcon": "Eliminar icono"
@@ -291,12 +259,6 @@
       "display": "Visualización",
       "fieldCount": "{{count}} campo",
       "fieldCount_other": "{{count}} campos"
-    },
-    "status": {
-      "name": "Estado",
-      "active": "Activa",
-      "endDate": "Fecha de fin",
-      "version": "Versión"
     },
     "sigil": {
       "hidden": "Oculto mientras el sigilo está cargado",
@@ -952,7 +914,9 @@
     "backTo": "Volver a {{name}}",
     "openFailed": "No se pudo abrir el último vault. Elígelo de nuevo u otro.",
     "removeConfirm": "¿Quitar de la lista?",
-    "deleteConfirmFiles": "¿Eliminar el vault y sus archivos?"
+    "deleteConfirmFiles": "¿Eliminar el vault y sus archivos?",
+    "outdated": "Este vault procede de una versión anterior de Emerald y no se puede abrir en esta. Se queda como está; llegará un conversor.",
+    "tooNew": "Este vault procede de una versión más reciente de Emerald. Actualiza esta aplicación para abrirlo. Se queda como está."
   },
   "vaultKey": {
     "unlockTitle": "Desbloquear «{{name}}»",
@@ -989,10 +953,6 @@
     "rememberUnavailable": "Este sistema no tiene un llavero en el que recordar la clave.",
     "rememberFailed": "El llavero del sistema operativo no ha aceptado recordar la clave. El vault está abierto, pero Emerald volverá a pedir la contraseña la próxima vez.",
     "continue": "Continuar",
-    "encryptTitle": "Cifrar «{{name}}»",
-    "encryptHint": "Este vault es de antes del cifrado. A partir de ahora todos los vaults están cifrados: elige una contraseña y Emerald cifrará las entradas, las imágenes y los borradores. Según el tamaño tarda un momento, y el original no se toca hasta que todo esté comprobado.",
-    "encryptNote": "Las copias de seguridad que exportaste antes (.emeralddb) siguen sin cifrar hasta que las borres. En los SSD, los archivos borrados a veces se pueden recuperar durante un tiempo; solo un disco cifrado (BitLocker, FileVault) cierra ese hueco.",
-    "encryptFailed": "No se pudo cifrar el vault. No ha cambiado; inténtalo de nuevo.",
     "progressDatabase": "Cifrando la base de datos…",
     "progressImages": "Imágenes: {{done}} de {{total}}",
     "progressImagesPhase": "Cifrando las imágenes…",
@@ -1207,7 +1167,9 @@
     "pageSecurity": "Seguridad",
     "pageSync": "Sincronización",
     "theme": "Tema",
-    "text": "Texto"
+    "text": "Texto",
+    "importErrorOldVersion": "Esta copia de seguridad procede de una versión anterior de Emerald y no se puede restaurar en esta. No se ha cambiado nada; llegará un conversor.",
+    "importErrorNewVersion": "Esta copia de seguridad procede de una versión más reciente de Emerald. Actualiza esta aplicación para restaurarla. No se ha cambiado nada."
   },
   "contextMenu": {
     "openInNewTab": "Abrir en nueva pestaña",
@@ -1470,6 +1432,7 @@
     "errorServerOutdated": "Este servidor es demasiado antiguo para esta versión de Emerald. Actualiza el servidor.",
     "errorAppOutdated": "Este servidor necesita una versión más reciente de Emerald. Actualiza esta aplicación.",
     "errorServerOlder": "El vault del servidor es de una versión anterior de Emerald. Actualiza primero el dispositivo que lo puso allí.",
+    "errorServerVaultOutdated": "El vault del servidor procede de una versión anterior de Emerald y no se puede adoptar en esta. Se queda como está en el servidor; llegará un conversor.",
     "errorCannotOpen": "Lo que envió el servidor no se puede abrir con la clave de este vault.",
     "errorFailed": "La sincronización ha fallado.",
     "passwordChanged": "La contraseña del vault se cambió en otro dispositivo. Introduce la nueva: esta copia se volverá a obtener con ella.",
@@ -1518,5 +1481,10 @@
     "opened": "abierto",
     "byAuthor": "por {{name}}",
     "updateServer": "Servidor de actualizaciones"
+  },
+  "emeraldImport": {
+    "oldVersion": "Este archivo procede de una versión anterior de Emerald y no se puede importar en esta. No se ha cambiado nada; llegará un conversor.",
+    "newVersion": "Este archivo procede de una versión más reciente de Emerald. Actualiza esta aplicación para importarlo. No se ha cambiado nada.",
+    "unsupported": "Este archivo no es un archivo de Emerald que esta versión pueda leer. No se ha cambiado nada."
   }
 }

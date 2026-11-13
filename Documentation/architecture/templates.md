@@ -2,7 +2,7 @@
 
 ## Templates
 
-A **template** (`templates` table, v43, `store/templateStore.ts`) is a pre-filled entry: an optional title, a block stack (rows of `blocks` with `template_id` set, like an entry's), tags, and **assignments** — JSON `TemplateAssignment[]` (`lib/blocks/templates.ts`) of `{ entryType, category }`. `category` is a category id, `null` for "no category", or `'*'` for "all categories" (Journal, which has no categories, only uses `'*'`).
+A **template** (`templates` table, `store/templateStore.ts`) is a pre-filled entry: an optional title, a block stack (rows of `blocks` with `template_id` set, like an entry's), tags, and **assignments** — JSON `TemplateAssignment[]` (`lib/blocks/templates.ts`) of `{ entryType, category }`. `category` is a category id, `null` for "no category", or `'*'` for "all categories" (Journal, which has no categories, only uses `'*'`).
 
 An assignment means one thing: new entries of this combination start with a copy of the template. At most one active template holds a combination. `assignTemplate` in `templateStore` enforces that itself (not the database, as with `block_definitions`): it takes the combination from its holder under one write key (`serialKey('template', '*')`), so a change touching two rows can't interleave with another write. `resolveAssignedTemplate` falls back from the exact category to `'*'` — one level for Journal, two for Wiki/Operations.
 
@@ -44,9 +44,3 @@ Templates have no description; the picker matches the name only. `useShrunkIcon`
 - Journal first on its own, as one "Every new entry" row — as a table column it would stand almost empty.
 - Then a table with Wiki/Operations as columns and one row per "All categories"/ "Uncategorized"/category. "All categories", every row's fallback, is set off by a bold name only (a tinted band was too loud).
 - On the dashboard a cell is a `Dropdown` of all templates and "No template"; a choice calls `assignTemplate` and is saved at once. Without a template of its own the cell shows the fallback ("↳ name"), or "—".
-
-### Routines converted to templates
-
-Migration v44 (`migrateRoutinesToTemplates`) turns every row of the old `routines` table into an unassigned template with the same id, then drops the table (backing up the database first if there was anything to convert). Markdown is parsed by a dedicated `Marked` renderer with raw HTML escaped and only `http(s)`/`mailto` links kept; `operation_ids`/`wiki_ids` become link-chip blocks (`internalLinkBlockHtml`); tags carry over.
-
-A `.emeralddb` below backup version `'8'` with `routines` is converted the same way at import (`withRoutinesAsTemplates`, `dbBackup.ts`), but only *after* the type and category filters, since a link target must be in the file or already in the vault to survive. An add-vault import of such a file keeps the fresh vault's `core-sigil`; a file from `'8'` on that brings templates replaces it with its own version (or its absence).

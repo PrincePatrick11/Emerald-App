@@ -15,7 +15,7 @@ import { categoryLabel, categoryUsageCounts, dominantCategoryModule } from '../l
  * came from.
  *
  * Category names are resolved here rather than there because built-in ones are
- * named by a locale key — searching `categories.builtin.other`'s raw `name`
+ * named by a locale key — searching `categories.builtin.sigils`' raw `name`
  * would hunt for the English word in a German vault.
  */
 function useSearchCorpus(): SearchCorpus {

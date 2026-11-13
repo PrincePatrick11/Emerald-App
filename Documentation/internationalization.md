@@ -14,7 +14,7 @@ Translations are managed with `react-i18next`; the setup lives in `src/i18n/inde
 
 Weekday names (the automatic backup's weekday chips) come from `formatWeekday` and `weekdaysInLocaleOrder` in `lib/formatDate.ts`, i.e. from the date-fns locale, so they need no keys of their own.
 
-Code without hook access (stores, migrations, importers — e.g. the duplicate actions' `common.copySuffix`) reads translations through the default `i18n` export.
+Code without hook access (stores, the schema seed in `db.ts`, importers — e.g. the duplicate actions' `common.copySuffix`) reads translations through the default `i18n` export.
 
 Translation files:
 
@@ -27,7 +27,7 @@ src/i18n/locales/fr.json
 
 All four files must have the same key structure. A key missing from a non-English locale silently falls back to English, which is easy to miss — always add every key to all four files.
 
-`npm run check:i18n` (`scripts/i18n-check.mjs`, run in CI) verifies this: it flattens all four files to `a.b.c` paths and fails if a language lacks a key English has, has a key English doesn't, or a value's `{{placeholder}}`s differ from English's. It deliberately does not detect dead keys — dynamic lookups like `t(`${module}.categories.${id}`)` would make a static search too noisy to trust.
+`npm run check:i18n` (`scripts/i18n-check.mjs`, run in CI) verifies this: it flattens all four files to `a.b.c` paths and fails if a language lacks a key English has, has a key English doesn't, or a value's `{{placeholder}}`s differ from English's. It deliberately does not detect dead keys — dynamic lookups like `t(`categories.builtin.${id}`)` would make a static search too noisy to trust.
 
 ## Using Translations
 
@@ -66,9 +66,7 @@ const label = categoryLabel(t, cat);
 const label = cat.name;
 ```
 
-`categoryLabel` resolves a builtin via `categories.builtin.<id>` and returns `cat.name` unchanged for everything else. That includes a fresh vault's eight starter categories: `categories.starter.<key>` is used only once, to *name* them at creation; from then on they are ordinary rows the user can rename or delete.
-
-The module-scoped keys `wiki.categories.*`, `operations.categories.*` and `altar.categories.*` are **legacy-only and must stay in all four locale files**: migrations v36–v38 and the importer for `.emerald`/backup files written before v38 resolve an old builtin id or name through them. Nothing in the live UI reads them; do not remove them, and do not add new keys there.
+`categoryLabel` resolves a builtin via `categories.builtin.<id>` and returns `cat.name` unchanged for everything else. That includes a fresh vault's eight starter categories: `categories.starter.<key>` is used only once, to *name* them at creation; from then on they are ordinary rows the user can rename or delete. There are no module-scoped category keys: every category name goes through `categories.*`.
 
 ## Key Structure
 
@@ -82,7 +80,7 @@ Top-level keys of `en.json`, with the conventions worth knowing:
 | `undo` | Undo toast messages |
 | `nav` | Navigation labels, including `home`, `categories`, `all` and `vaults`. A rail entry needs its `nav.<id>` key in all four locales, since `ModuleMeta`/`AUX_VIEWS` resolve the label dynamically |
 | `sidebar` | Left sidebar strings (`allEmpty`) |
-| `journal`, `wiki`, `operations`, `tasks` | Module UI strings. Each module's `untitled` key is what `displayTitle` (`src/lib/entryTitle.ts`) shows for an empty title — display text only, never stored. `*.categories.*` is legacy-only (see above) |
+| `journal`, `wiki`, `operations`, `tasks` | Module UI strings. Each module's `untitled` key is what `displayTitle` (`src/lib/entryTitle.ts`) shows for an empty title — display text only, never stored |
 | `creation` | The sigil creation tools (intention, letters, canvas, charge) |
 | `blocks` | Content-block UI and the Blocks view: `types.*` (block types), `kinds.*` (one per `ElementKind`, shared by the "Add block" menu and the builder's element picker), `fields.*` (field block), `sigil.*` (calculator, drawing and charge, on their own or as parts of a block), `canvas.*` (the Canvas and Altar blocks), `paint.*` (the Painting block), `library.*` (the Blocks builder and its update/remove-copies notices) |
 | `editor` | Shared editor buttons, link-popup actions, `lockedBySigil`, and `toolbar.*` (every formatting-toolbar tooltip) |
@@ -94,12 +92,12 @@ Top-level keys of `en.json`, with the conventions worth knowing:
 | `tags` | Tags view (`new`, `name`, `nameTaken`, `color`, `unused`, `onlyInTemplates`, `onlyInImages`) |
 | `properties` | Right sidebar Properties panel |
 | `filters` | Filter panel; `all` is the "All" row every `FilterList` shows on top |
-| `vault` | `VaultPicker`: list/switch, edit, create, open/relocate, delete, the way back. Some keys (`chooseFolder`, `defaultFolder`, `alreadyOpen`, `accessDenied`, `folderHasVault`, `folderNotEmpty`) also serve the backup import's add-vault mode via `VaultLocationRow` and `NEW_VAULT_TARGET_ERROR_KEY` |
+| `vault` | `VaultPicker`: list/switch, edit, create, open/relocate, delete, the way back. Some keys (`chooseFolder`, `defaultFolder`, `alreadyOpen`, `accessDenied`, `folderHasVault`, `folderNotEmpty`) also serve the backup import's add-vault mode via `VaultLocationRow` and `NEW_VAULT_TARGET_ERROR_KEY`. `outdated` and `tooNew` are what a vault of an earlier or a newer version is refused with (`vaultOpenErrorKey`) |
 | `settings` | Settings modal, and on the start page the keys its sections share with it (language, theme, custom themes, updates, tagline, website) |
 | `start` | The start page's own: section headings, links, version and author |
 | `createItem` | The rail's plus: `CreateItemModal` |
 | `sync` | The sync server: the start page's server section, Settings → Sync, the vault list's state marks, sync errors |
-| `vaultKey` | `VaultKeyDialog` and its shared parts: unlock, create, encrypt, recover, the recovery-key box, the "remember on this device" switch and the failure texts (`wrongPassword`, `tooShort` with `{{count}}`, …) |
+| `vaultKey` | `VaultKeyDialog` and its shared parts: unlock, create, recover, the recovery-key box, the "remember on this device" switch and the failure texts (`wrongPassword`, `tooShort` with `{{count}}`, …) |
 | `security` | Settings → Security: remember, lock, change password, each with a hint and a tooltip |
 | `backupKey` | `BackupUnlockDialog`: opening an encrypted backup |
 | `home` | Home view |

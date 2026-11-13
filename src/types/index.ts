@@ -1,5 +1,3 @@
-import type { CanvasBackground } from '../components/editors/canvas/background';
-import type { PaintDoc } from '../lib/paint/document';
 import type { TrashKind, ViewId } from '../lib/modules';
 
 export type ContentType = 'journal' | 'wiki' | 'operation' | 'task';
@@ -73,52 +71,6 @@ export type MoonPhase =
   | 'last_quarter'
   | 'waning_crescent';
 
-export interface AltarGuide {
-  id: string;
-  orientation: 'vertical' | 'horizontal';
-  at: number;
-}
-
-/**
- * A row of the old `altars` table, as the conversion of migration v62 and of
- * older backups reads it (`lib/altarConversion.ts`). Altars are operations of
- * the "Altars" category now, holding an Altar block.
- */
-export interface AltarRecord {
-  id: string;
-  title: string;
-  background_preset: string;
-  background_image_data: string | null;
-  background_overlay: number;
-  background_overlay_color: string;
-  created_at: string;
-  updated_at: string;
-  grid_enabled: boolean;
-  grid_size: number;
-  grid_opacity: number;
-  grid_color: string;
-  snap_to_grid: boolean;
-  rotation_snap_enabled: boolean;
-  rotation_snap_angle: number;
-  snap_scale_to_grid: boolean;
-  resolution: string;
-  /** Guide lines pulled out of the canvas editor's rulers; `at` in percent of the altar's width or height. */
-  guides: AltarGuide[];
-  /** The guides cannot be moved or removed. */
-  guides_locked: boolean;
-  /**
-   * The background as the canvas editor sets it; `null` until it is first
-   * changed there, and then the older `background_preset` and overlay are
-   * shown. Its picture is the `background_image_data` column's image or one
-   * of the app's own (`/backgrounds/…`).
-   */
-  canvas_background: CanvasBackground | null;
-  thumbnail_data?: string | null;
-  icon_data?: string | null;
-  /** In the trash since. */
-  deleted_at?: string | null;
-}
-
 /**
  * A picture of "Images" with details (`images`, since v56): a stored file of
  * the vault with a name, tags and a note. Every other file of the vault is
@@ -134,101 +86,6 @@ export interface VaultImage {
   note: string;
   created_at: string;
   updated_at: string;
-}
-
-/** A row of the old `altar_items` table — its pictures went to "Images" with v62. */
-export interface AltarItem {
-  id: string;
-  name: string;
-  emoji: string;
-  /** `null` = no category, the normal case for a new entry since v39. */
-  category_id: string | null;
-  note: string;
-  image_data?: string;
-  /** Only for sorting the library — the column already existed in
-   *  `altar_items`, it just never made it into the type. */
-  created_at: string;
-  updated_at: string;
-}
-
-/**
- * What sits on an altar: an item from the library (a row of
- * `altar_placements`), or a shape or text drawn on the altar itself (kept in
- * `altars.elements`, see `lib/altarElements.ts`). Both in one list, as the
- * conversion into an Altar block reads them (`lib/altarScene.ts`).
- */
-export type AltarPlacementKind = 'item' | 'shape' | 'text' | 'drawing' | 'symbol';
-
-/** `triangle` and `hexagon` come from older altars; new shapes with corners are polygons. */
-export type AltarShapeType = 'rect' | 'ellipse' | 'polygon' | 'triangle' | 'star' | 'hexagon';
-
-/** A drawn shape. Sizes in pixels at the reference width of 1920. */
-export interface AltarShapeStyle {
-  type: AltarShapeType;
-  fill: string | null;
-  stroke: string | null;
-  stroke_width: number;
-  corner_radius: number;
-  /** A polygon's corners or a star's points; missing: six and five. */
-  sides?: number;
-}
-
-/** A drawn text. The size in pixels at the reference width of 1920. */
-export interface AltarTextStyle {
-  content: string;
-  font: 'serif' | 'book' | 'sans';
-  size: number;
-  color: string;
-  align: 'left' | 'center' | 'right';
-  bold: boolean;
-  italic: boolean;
-}
-
-/** A symbol of the canvas editor's library: its path in a box of 100 × 100, the line weight in those units. */
-export interface AltarSymbolStyle {
-  symbol: string;
-  d: string;
-  /** Parts filled in `color`. */
-  solid?: string;
-  /** The name of one of the vault's own symbols. */
-  name?: string;
-  color: string;
-  weight: number;
-  fill: string | null;
-}
-
-export interface AltarPlacement {
-  id: string;
-  altar_id?: string;
-  kind: AltarPlacementKind;
-  /** The library item; empty for a shape or text. */
-  item_id: string;
-  // name, emoji, category_id and image_data come from altar_items and are
-  // joined in on load — they are not columns of altar_placements.
-  name: string;
-  emoji: string;
-  /** `null` = no category, the normal case for a new entry since v39. */
-  category_id: string | null;
-  x: number;
-  y: number;
-  z_index: number;
-  width: number;
-  height: number;
-  rotation: number;
-  opacity: number;
-  locked: boolean;
-  hidden: boolean;
-  /** The group it is selected and moved with on the canvas; elements of one group share it. */
-  group?: string;
-  image_data?: string;
-  /** Only for `kind: 'drawing'`: the painted document (`lib/paint/document.ts`). */
-  drawing?: PaintDoc;
-  /** Only for `kind: 'shape'`. */
-  shape?: AltarShapeStyle;
-  /** Only for `kind: 'text'`. */
-  text?: AltarTextStyle;
-  /** Only for `kind: 'symbol'`. */
-  symbol?: AltarSymbolStyle;
 }
 
 export type TaskPriority = 'low' | 'medium' | 'high';

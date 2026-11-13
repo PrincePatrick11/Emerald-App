@@ -108,11 +108,10 @@ async function openActiveVault({ askPassword = false }: { askPassword?: boolean 
 
 /** What `openActiveVault` does past the password: the loading screen covers this part. */
 async function loadActiveVault(): Promise<void> {
-  // Before getDb(): the migrations on opening already need the new vault's
-  // language (see `loadForVault`). A missing vault folder already fails
-  // here.
+  // Before getDb(): its purge of the trash needs the vault's retention period
+  // (see `loadForVault`). The gate (`ensureVaultReady`) has opened the
+  // database and checked its schema already.
   await useSettingsStore.getState().loadForVault(useVaultStore.getState().activeVaultId);
-  // runMigrations is idempotent, so this is also what initialises a fresh vault.
   await getDb();
   // Tabs and history point into the old vault by entry ID — close everything,
   // not just the active tab to Home.
@@ -197,8 +196,8 @@ export const useVaultStore = create<VaultStore>((set, get) => ({
       } else {
         detachVaultPrefs();
       }
-      // Unlocked and then not opened after all (e.g. a failing
-      // migration): the key does not stay in memory.
+      // Unlocked and then not opened after all (e.g. a vault from another
+      // version): the key does not stay in memory.
       void lockVault(id).catch((e) => console.warn('[vault] lock failed', e));
       throw err;
     }

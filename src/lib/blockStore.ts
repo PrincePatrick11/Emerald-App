@@ -14,11 +14,10 @@ import { TEXT_BLOCK_TYPE, type BlockInstance } from './blocks/types';
  *
  * A write that has a whole block stack as a string and no saved state to
  * compare with (sync, a seed, an import) replaces the owner's rows
- * (`replaceOwnerBlocks`). Tools for the old `content` column — migrations
- * and an import's working copy — are in `contentColumn.ts`.
+ * (`replaceOwnerBlocks`).
  *
- * Free of `db.ts` (which imports this file for the migration) and of the DOM
- * (the schema harness runs it under Node).
+ * Free of `db.ts` (which imports this file) and of the DOM (the schema
+ * harness runs it under Node).
  */
 
 export type BlockOwnerKind = 'entry' | 'template';

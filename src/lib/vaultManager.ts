@@ -23,13 +23,6 @@ interface VaultsFile {
   activeVaultId: string;
 }
 
-/** Pre-0.2.1 shape: every database sat flat in the app directory. */
-interface LegacyVault {
-  id: string;
-  name: string;
-  dbName: string;
-  createdAt: string;
-}
 
 /** Mirrors `DB_FILE` in `src-tauri/src/vault.rs`. */
 export const DB_FILE = 'emerald.db';
@@ -47,13 +40,11 @@ export interface VaultProbe {
 }
 
 let _cached: VaultsFile | null = null;
+/** Records of `vaults.json` this version does not list (see `readVaultsFile`), kept as they were. */
+let _unreadRecords: unknown[] = [];
 /**
- * The first call runs, the others wait for it.
- *
- * `loadVaultsFile` now triggers `migrate_vault_layout` and writes
- * `vaults.json`. Without this serialization two simultaneous first
- * callers would do both twice — `db.ts` solves the same problem with
- * `_initPromises`.
+ * The first call runs, the others wait for it: `loadVaultsFile` may write
+ * `vaults.json`, and two simultaneous first callers would do it twice.
  */
 let _loading: Promise<VaultsFile> | null = null;
 let _vaultsPath: string | null = null;
@@ -199,20 +190,6 @@ async function syncRegistry(data: VaultsFile): Promise<void> {
   });
 }
 
-/**
- * Moves a vault into its own directory and returns the record in the new shape.
- *
- * This is not a database migration — the `.db` file itself moves, before
- * anything opens it. See `migrate_vault_layout` in `src-tauri/src/vault.rs`.
- */
-async function adoptLayout(vault: LegacyVault): Promise<Vault> {
-  const path = await invoke<string>('migrate_vault_layout', {
-    vaultId: vault.id,
-    legacyDbName: vault.dbName,
-  });
-  return { id: vault.id, name: vault.name, path, createdAt: vault.createdAt };
-}
-
 export async function loadVaultsFile(): Promise<VaultsFile> {
   if (_cached) return _cached;
   if (_loading) return _loading;
@@ -224,19 +201,16 @@ async function readVaultsFile(): Promise<VaultsFile> {
   await invoke('ensure_app_storage_dirs');
   const path = await getVaultsPath();
 
-  let parsed: { vaults?: (Vault | LegacyVault)[]; activeVaultId?: string } | null = null;
+  let parsed: { vaults?: unknown[]; activeVaultId?: string } | null = null;
   try {
     parsed = JSON.parse(await invoke<string>('read_file', { path }));
   } catch {
-    // No file yet — first run, or an installation that predates multi-vault.
+    // No file yet — first run.
   }
 
-  // No `vaults.json` means one of two things: either this installation has never
-  // had a database — then the first start leads through the vault picker —,
-  // or it dates from the time before multi-vault and its `emerald.db` has
-  // long been there. The difference decides between onboarding and a
-  // user sitting in front of their own, apparently empty journal.
-  if (parsed === null && !(await invoke<boolean>('legacy_default_db_exists'))) {
+  // No `vaults.json`: this installation has never had a vault, and the first
+  // start leads through the vault picker.
+  if (parsed === null) {
     const data: VaultsFile = { version: 2, vaults: [], activeVaultId: '' };
     _cached = data;
     _activeVaultIdSync = '';
@@ -245,43 +219,31 @@ async function readVaultsFile(): Promise<VaultsFile> {
     return data;
   }
 
-  const legacy = parsed?.vaults ?? [];
-  // Only for the legacy installation from above. An existing file with an empty
-  // list is someone who removed their vaults — slipping a `default` in
-  // would mean resurrecting it along with an empty folder.
-  if (parsed === null && !legacy.some((v) => v.id === 'default')) {
-    legacy.unshift({ id: 'default', name: 'Emerald', dbName: 'emerald.db', createdAt: new Date(0).toISOString() });
-  }
+  // Only records with a folder. One that still names a flat database file
+  // (`dbName`, before 0.2.1) belongs to an installation from before the fresh
+  // start of the schema: it is left out of the list, its file is not touched,
+  // and the record itself is written back unchanged with every save
+  // (`_unreadRecords`), so that a converter can still find it.
+  const records = Array.isArray(parsed.vaults) ? parsed.vaults : [];
+  const isVault = (entry: unknown): entry is Vault => typeof entry === 'object' && entry !== null
+    && typeof (entry as Vault).path === 'string' && !!(entry as Vault).path;
+  const vaults = records.filter(isVault);
+  _unreadRecords = records.filter((entry) => !isVault(entry));
 
-  // A record already carrying `path` has been through this; one still carrying
-  // `dbName` has not. Both shapes can coexist if a previous run was cut short.
-  const vaults: Vault[] = [];
-  let migrated = false;
-  for (const entry of legacy) {
-    if ('path' in entry && entry.path) {
-      vaults.push(entry);
-      continue;
-    }
-    vaults.push(await adoptLayout(entry as LegacyVault));
-    migrated = true;
-  }
-
-  // The fallback goes to the first existing vault, not to `default`:
-  // since the first start leaves the list empty, a `default` entry is no
-  // longer guaranteed. Returning an id the registry does not know
-  // would make `getDb()` fail at `ensure_vault_dirs`, while
-  // `getActiveVaultPath()` cheerfully delivers the first vault's path.
+  // The fallback goes to the first existing vault: returning an id the
+  // registry does not know would make `getDb()` fail at `ensure_vault_dirs`,
+  // while `getActiveVaultPath()` cheerfully delivers the first vault's path.
   const activeVaultId = vaults.some((v) => v.id === parsed?.activeVaultId)
-    ? parsed!.activeVaultId!
+    ? parsed.activeVaultId!
     : (vaults[0]?.id ?? '');
 
   const data: VaultsFile = { version: 2, vaults, activeVaultId };
   _cached = data;
   _activeVaultIdSync = activeVaultId;
 
-  // Only write if something has really changed — a start on an
-  // already migrated installation then does not touch the file at all.
-  if (migrated || parsed === null || parsed.activeVaultId !== activeVaultId) {
+  // Only write if something has really changed — a normal start does not
+  // touch the file at all.
+  if (parsed.activeVaultId !== activeVaultId) {
     await saveVaultsFile(data);
   } else {
     await syncRegistry(data);
@@ -292,7 +254,8 @@ async function readVaultsFile(): Promise<VaultsFile> {
 
 export async function saveVaultsFile(data: VaultsFile): Promise<void> {
   const path = await getVaultsPath();
-  await invoke('write_file', { path, content: JSON.stringify(data, null, 2) });
+  const content = { ...data, vaults: [...data.vaults, ..._unreadRecords] };
+  await invoke('write_file', { path, content: JSON.stringify(content, null, 2) });
   _cached = data;
   _activeVaultIdSync = data.activeVaultId;
   await syncRegistry(data);

@@ -85,7 +85,8 @@ fn store(app: &tauri::AppHandle, vault_id: &str, bytes: &[u8], ext: &str) -> Res
 }
 
 /// Reads a stored image's bytes, opening it in an encrypted vault. A file that
-/// is not sealed is returned as it is: the shared pre-0.2.1 pool is plain.
+/// is not sealed is returned as it is: the dev seed's and the tests' vaults
+/// start out plain.
 fn load(app: &tauri::AppHandle, vault_id: &str, filename: &str) -> Result<Vec<u8>, String> {
     let path = locate(app, vault_id, filename)?;
     let bytes = std::fs::read(&path).map_err(|e| format!("read: {e}"))?;
@@ -140,10 +141,7 @@ pub(crate) fn is_valid_image_name(name: &str) -> bool {
         && IMAGE_EXTS.contains(&ext)
 }
 
-/// Resolves a stored filename to a file on disk: the vault's own folder first,
-/// then the shared pool every vault used before the per-vault layout. The
-/// fallback is what keeps images rendering when migration v35 could not copy
-/// one over.
+/// Resolves a stored filename to the file in the vault's own folder.
 fn locate(app: &tauri::AppHandle, vault_id: &str, filename: &str) -> Result<PathBuf, String> {
     if !is_valid_image_name(filename) {
         return Err("invalid image name".to_string());
@@ -153,10 +151,6 @@ fn locate(app: &tauri::AppHandle, vault_id: &str, filename: &str) -> Result<Path
         .join(filename);
     if own.is_file() {
         return Ok(own);
-    }
-    let legacy = vault::legacy_images_dir(app)?.join(filename);
-    if legacy.is_file() {
-        return Ok(legacy);
     }
     Err("file not found".to_string())
 }
@@ -283,61 +277,13 @@ pub async fn read_image_as_base64(
     .map_err(|e| e.to_string())?
 }
 
-/// Copies images out of the pre-per-vault shared pool into a vault's own folder.
-/// Migration v35 calls this with the names it found in that vault's content.
-/// Returns how many files were copied. An encrypted vault gets them sealed,
-/// under their old names — the content refers to those.
-#[tauri::command]
-pub async fn adopt_legacy_images(
-    app: tauri::AppHandle,
-    vault_id: String,
-    filenames: Vec<String>,
-) -> Result<u32, String> {
-    tauri::async_runtime::spawn_blocking(move || {
-        let target_dir = vault::images_dir(&app, &vault_id)?;
-        let legacy_dir = vault::legacy_images_dir(&app)?;
-        let keys = image_keys(&app, &vault_id)?;
-        let _guard = image_write_guard();
-        let mut copied = 0;
-
-        for name in filenames {
-            if !is_valid_image_name(&name) {
-                continue;
-            }
-            let target = target_dir.join(&name);
-            if target.exists() {
-                continue;
-            }
-            let source = legacy_dir.join(&name);
-            if !source.is_file() {
-                continue;
-            }
-            let done = match &keys {
-                Some(keys) => std::fs::read(&source)
-                    .and_then(|bytes| std::fs::write(&target, crypto::seal(&keys.files, Context::Image(&name), &bytes)))
-                    .is_ok(),
-                None => std::fs::copy(&source, &target).is_ok(),
-            };
-            if done {
-                copied += 1;
-            }
-        }
-
-        Ok(copied)
-    })
-    .await
-    .map_err(|e| e.to_string())?
-}
-
 #[derive(serde::Serialize)]
 pub struct StoredImage {
     pub name: String,
     pub bytes: u64,
 }
 
-/// Every image file in a vault's own folder. The shared legacy pool is
-/// deliberately not listed: it is still readable by vaults that have not been
-/// opened since the migration, so nothing here may propose deleting from it.
+/// Every image file in a vault's own folder.
 #[tauri::command]
 pub async fn list_image_files(
     app: tauri::AppHandle,

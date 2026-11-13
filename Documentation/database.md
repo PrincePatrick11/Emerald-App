@@ -4,111 +4,24 @@ Emerald uses one SQLite file per vault, always named `emerald.db`, inside the va
 
 ## Where the schema lives
 
-`src/lib/schema.ts` holds the complete, current schema as `CREATE TABLE` and `CREATE INDEX` strings (`TABLE_DDL`, `INDEX_DDL`). It is the reference: reading it tells you what the database looks like today, without replaying any history.
+`src/lib/schema.ts` holds the complete, current schema as `CREATE TABLE` and `CREATE INDEX` strings (`TABLE_DDL`, `INDEX_DDL`). It is the only record of the schema: a fresh vault is created straight from it, and reading it tells you what every vault this version opens looks like.
 
-Several consumers share those strings, and that sharing is the point of the file:
+`npm run check:schema` (`scripts/schema-check.mjs`, needs `esbuild` from `devDependencies`) builds a fresh vault under `node:sqlite` and checks what the app and its import rely on: exactly the tables of `schema.ts`, the foreign keys, `checkIntegrity` and the sweep, deleting a category, the seeds, the block rows and their readers, the indexes the lists use, a backup's round trip in every mode — and that a vault or a backup from an older version is refused without being changed. It also compares constants mirrored across languages (see [Rules for Future Schema Changes](#rules-for-future-schema-changes)).
 
-- the **baseline path** in `runMigrations`, which fresh vaults take;
-- the rebuild migrations **v38** `merge_category_tables` (`mergeCategoryTables.ts`) and **v39** `category_optional` (`nullableCategory.ts`), which rebuild existing vaults' tables against this DDL;
-- the additive migrations, which create their table or index from the same constant.
+## Opening a Vault
 
-Older migrations must keep building the shape they were written for, not today's. Two files freeze that history:
+`src/lib/db.ts` exports `openVaultDb(vaultId)` and `getDb()`. `openVaultDb` loads the database and runs `runMigrations(db)`; the unlock gate (`ensureVaultReady`, see [encryption](architecture/encryption.md#the-unlock-gate)) calls it right after unlocking, before the vault's settings or drafts are read or written. `getDb()` returns the active vault's connection and runs the periodic cleanup once per session (it needs the vault's trash retention, which is loaded after the gate). The database uses `PRAGMA journal_mode = DELETE` (not WAL) for robustness across unclean shutdowns.
 
-- `src/lib/schemaV37.ts` — the target shape of **v33** `normalize_schema` (`normalizeSchema.ts`): the tables that changed since v37 as their own DDL, everything else re-exported from `schema.ts`. It also holds the old built-in categories (`LEGACY_*_CATEGORIES`) that v36–v38 and old-file imports resolve against.
-- `src/lib/schemaV65.ts` — `entries` and `templates` with their `content` column, as v43 and v49 create them; v66 drops the column.
-- `src/lib/schemaV48.ts` — every table a later migration still reshaped, as it was before: `journal_entries`, `wiki_articles` and `operations` (before v49), `tasks`, `altar_items` and `tags` (before v50/v52/v53/v54), and the three altar tables as they stood until v63 dropped them (`ALTAR_TABLE_DDL`; the backup import also builds them in its working copy to convert an older file's altars). `ddlBeforeV49(table)` is what v33 (via `schemaV37`), v38 and v39 build from, falling back to `ALTAR_TABLE_DDL` for the altar tables; `IMAGE_FIELDS_V48` is what v35 walks; `TITLED_TABLES_V48` is what v48 clears. **Nothing in it may change.**
+`runMigrations` first reads the highest version in `schema_version` — before it writes anything — and then takes one of these routes:
 
-**Whoever changes a table in a later migration that v33, v38 or v39 also build must freeze its current DDL first** — otherwise those migrations silently start building the new shape on old vaults and then fail copying columns that no longer exist.
+- **Empty file** — a new vault. It runs the DDL from `schema.ts`, seeds the built-in categories, the starter categories and the `core-sigil` and `core-altar` templates — in the language active at first open, since `main.tsx` waits for the stored language before anything touches the database — and stamps one `baseline` row at `BASELINE_VERSION`, last. A new vault whose creation was cut short before the stamp — tables of `schema.ts` only, no entries or tasks — is dropped and created again on the next open.
+- **Below `FRESH_START_VERSION`** (100), or tables without a version that are not such an unfinished new vault — a vault from before the fresh start of the schema, built by the old migration chain v1–v66 that this version no longer has. It is refused with `VAULT_OUTDATED` and left exactly as it was; the vault picker says so (`vault.outdated`). A converter for such vaults is a task of its own.
+- **Above `BASELINE_VERSION`** — a vault of a newer app: refused with `VAULT_TOO_NEW` (`vault.tooNew`), unchanged too.
+- **Between the two** — the steps of `MIGRATIONS` above the stored version run in order, each stamping `schema_version` with version, name and ISO timestamp. The list is empty today: `BASELINE_VERSION` equals `FRESH_START_VERSION`, and `runMigrations` throws at startup if the last step and `BASELINE_VERSION` disagree. A vault connected to a sync server has its triggers dropped for the run and is marked for a snapshot first (`markMigrated`), since a migration changes rows on every device on its own.
 
-Indexes follow the same rule. v38 and v39 create `INDEX_DDL_V38` (split into `DROPPED` and `KEPT` lists, since v47, v49 and v63 drop some of those tables), not `INDEX_DDL`, because in the chain they run before later tables exist. A table added after them brings its own index constant (`BLOCK_DEFINITIONS_INDEX_DDL`, `TEMPLATES_INDEX_DDL`, `LEXICON_INDEX_DDL`, `ALTARS_INDEX_DDL`, `ENTRIES_INDEX_DDL`, `ALTAR_ITEMS_INDEX_DDL`, `IMAGES_INDEX_DDL`, `BLOCKS_INDEX_DDL`), which its migration creates and `INDEX_DDL` appends for fresh vaults — except those of the altar tables, which went with them in v63.
+An unencrypted vault with a database is refused the same way by the gate, before any password question: every such vault predates encryption, and with it the fresh start.
 
-Because the baseline and the chain must produce the same schema, `npm run check:schema` (`scripts/schema-check.mjs`, needs `esbuild` from `devDependencies`) proves it: it builds a vault each way and compares `sqlite_master`, `PRAGMA table_info`, `PRAGMA foreign_key_list` and every index, table by table. It also covers the resume-after-crash paths of v33, v38 and v39, the seeded categories, the data migrations against seeded old rows, old-backup imports, and the constants mirrored across languages (see [Rules for Future Schema Changes](#rules-for-future-schema-changes)). Without that check, the two paths quietly diverge after a few releases and nobody notices until a user hits an error.
-
-## Migration Model
-
-`src/lib/db.ts` exports `getDb()`. The first caller loads the active vault's database and runs `runMigrations(db)`; later callers get the cached instance. The database uses `PRAGMA journal_mode = DELETE` (not WAL) for robustness across unclean shutdowns.
-
-`runMigrations` takes one of two routes:
-
-- **Fresh file** — no tables at all (checked in `sqlite_master`, not `schema_version`: a database old enough to predate the version table has tables but no version row and must run the chain). It runs the DDL from `schema.ts`, seeds the built-in categories, the starter categories and the `core-sigil` and `core-altar` templates — in the language active at first open, since `main.tsx` waits for the stored language before anything touches the database — and stamps one `baseline` row at `BASELINE_VERSION`.
-- **Existing file** — the ordered `MIGRATIONS` array runs from the highest applied version upward, each step stamping `schema_version` with version, name and ISO timestamp. Every vault reaches the same schema as a fresh one; there is no cut-off past which an old database stops being upgradable.
-
-`BASELINE_VERSION` in `schema.ts` must equal the last entry in `MIGRATIONS`; `runMigrations` throws at startup otherwise. The current version is **66**. **Version 24 does not exist** — the runner tolerates gaps and only requires each version to be above the last applied one. The three block migrations were first numbered v39–v41 on their development branch; `renumberBlockMigrations` restamps such a vault once by name and catches up on v39.
-
-After the migrations, every open runs:
-
-- `prune_migration_backups` (Rust), which keeps only the newest migration backup — see [Rebuilding a table](#rebuilding-a-table). A failure is logged, never a reason not to open the vault.
-- `runPeriodicCleanup(db)`, which is **not** a migration — idempotent, time-dependent, and run on every open. It purges trashed rows older than the vault's trash retention (`trash.retentionDays` in `vaultSettings.ts`, default 30 days, or never). If the loaded settings belong to another vault it purges nothing (`null` = never), so one vault's retention can never empty another's trash. Expired tags are first stripped from every tag list (`stripTagIds`). Afterwards it sweeps dangling `task_links` and tag ids without a `tags` row (`sweepDanglingTagIds` — such an id can appear when a tag goes for good while a draft or an open entry still holds the old list and saves it later).
-
-### Migrations since v33
-
-Per-migration detail lives in the code and in `CHANGELOG.md`. In short:
-
-| Version | Name | What it does |
-|---|---|---|
-| 33 | `normalize_schema` | Full rebuild onto the v37 shape; foreign keys, indexes, `entry_number` backfill, repairs v4's damage (below) |
-| 34 | `operation_other_category` | Seeds a built-in `other` operation category |
-| 35 | `vault_scoped_images` | Copies images into the vault's `images/` and reduces paths to filenames ([details](architecture/storage.md#migrating-an-older-installation)) |
-| 36 | `journal_linked_ids_to_content` | Journal link columns → link chips in `content` |
-| 37 | `journal_paradigm_bannung_meditation_to_content` | Journal paradigm/banishing/meditation fields → blocks |
-| 38 | `merge_category_tables` | Four category tables → one `categories` |
-| 39 | `category_optional` | `category_id` nullable; `other` becomes an ordinary category |
-| 40 | `block_definitions` | Additive: user-built blocks |
-| 41 | `operation_status_to_blocks` | Operation status/end date/version → a copy of the "Status" block |
-| 42 | `sigils_to_blocks` | Sigil columns → sigil blocks ([Sigil Workflow](#sigil-workflow)) |
-| 43 | `templates` | Additive: templates, seeds `core-sigil` |
-| 44 | `routines_to_templates` | Every routine → an unassigned template with the same id; `routines` dropped |
-| 45 | `lexicon` | Additive: `languages`, `lexicon_entries` |
-| 46 | `altars_soft_delete` | Additive: `altars.deleted_at` |
-| 47 | `drop_links` | Drops `links`; link chips in `content` are the only record |
-| 48 | `untitled_is_empty` | English default titles → empty (`clearLegacyUntitledTitles`) |
-| 49 | `unify_entries` | Journal, wiki and operations → one `entries` table ([entries](#entries)) |
-| 50 | `drop_dead_columns` | Drops `tasks.tags`, `altars.intention` |
-| 51 | `altar_settings` | Twelve altar display columns → JSON `settings` |
-| 52 | `altar_items_soft_delete` | Additive: `altar_items.updated_at`/`deleted_at` |
-| 53 | `tags_by_id` | Tag lists hold ids instead of names; `tags.affected_ids` dropped ([tags](#tags)) |
-| 54 | `drop_unused_descriptions` | Drops `tasks.description`/`due_date`, `block_definitions.description`, `templates.description` |
-| 55 | `entries_list_index` | `idx_entries_list` (the list columns) and the partial `idx_entries_decorated` replace `idx_entries_deleted` |
-| 56 | `simple_copies_and_assignments` | Drops `block_definitions.revision`; `templates.assignments` keeps only what was a default, without the flag; trashed templates lose theirs |
-| 57 | `altar_elements` | Additive: `altars.elements`, the drawn shapes and text as JSON |
-| 58 | `altar_placement_groups` | Additive: `altar_placements.group_id`, the group a placement belongs to |
-| 59 | `symbols` | New table: the vault's own symbols for the canvas editor ([symbols](#symbols)) |
-| 60 | `images` | Additive: the `images` table ([images](#images)) and its `deleted_at` index |
-| 61 | `altar_category_and_template` | Additive: the built-in category `altars` (appended to the list) and the `core-altar` template ([templates](#templates)) |
-| 62 | `altars_to_operations` | Altars become operations of `altars` under their own IDs, items with a picture rows of [images](#images) tagged "Altar Library" (`altar-library`, or a tag of that name already there), chips, altar fields and task links point at the operations; the altar tables are emptied, not dropped (`migrateAltars.ts`, `altarConversion.ts`); a copy of the file first (`.pre-v62.bak`) |
-| 63 | `drop_altar_tables` | Converts altar rows an older device synced in since v62 the same way, then drops `altars`, `altar_items` and `altar_placements` and deletes their rows from `_sync_log` (`dropAltarTables` in `migrateAltars.ts`); a copy of the file first (`.pre-v63.bak`) when there is something to convert |
-| 64 | `sigil_blocks_to_fields_and_paint` | The sigil blocks `core.sigil.calc`/`.charge` become fields blocks with that one element, `core.sigil.canvas` a paint block marked as a sigil drawing, in entries and templates (trash included); charge targets follow (`convertLegacySigilsInPlace` in `migrateLegacySigils.ts`, converter in `lib/blocks/legacySigilBlocks.ts`, see [Sigil Workflow](#sigil-workflow)); a copy of the file first (`.pre-v64.bak`) when there is something to convert |
-| 65 | `blocks_table` | New tables [blocks](#blocks) and [block_refs](#block_refs): every block of every entry and template (trash included) becomes a row, built from `content` by the block parser, with what it points at; `content` is normalised to what the rows give, `updated_at` untouched (`fillMissingBlockRows`, today in `contentColumn.ts`); a copy of the file first (`.pre-v65.bak`) when there is content. Repeatable: an owner is done the moment its batch is |
-| 66 | `drop_content_columns` | `entries.content` and `templates.content` go: the [blocks](#blocks) rows are the only record. Every owner whose rows do not give its `content` (written by an older version or by sync since v65) is rebuilt from it first (`reconcileBlockRows` in `contentColumn.ts`); a copy of the file first (`.pre-v66.bak`). Repeatable |
-
-Column drops go through `dropColumnsIfPresent` (`dbRebuild.ts`), which skips columns already gone, so they are repeatable. Where a migration converts data, the same converter also runs on rows from an older `.emeralddb` file at import time — see [DB Backup / Restore](#db-backup--restore-emeralddb).
-
-### Rebuilding a table
-
-SQLite can only change a column's type or constraints by rebuilding the table, and the usual twelve-step recipe is unavailable here (see [Foreign Keys](#foreign-keys)). v33, v38 and v39 therefore follow the ordering in `normalizeSchema.ts`'s header: undo a crashed run, snapshot, rename to `*_old`, create, copy parents before children, drop `*_old`, create indexes, `PRAGMA foreign_key_check`.
-
-Two traps shape every rebuild after v33:
-
-- **Renames repoint foreign keys.** `ALTER TABLE altar_items RENAME TO altar_items_old` repoints `altar_placements`' foreign key at `altar_items_old`, so dropping `altar_items_old` would cascade-delete every placement — the same for `tasks` ← `task_links`. v38 and v39 rebuild such parent/child pairs together: children renamed first (so both halves point at each other and vanish together), parents copied first, children dropped first.
-- **Past a certain point, resuming must never roll back.** Once the new tables are filled, rolling back would `DROP TABLE tasks` on the finished table and cascade into the finished `task_links`. A marker in a real table (not `TEMP TABLE`, which is scoped to one pooled connection) records that point: `_category_id_map` with `src='_state', old_id='content_rebuilt'` for v38 (which also holds the old → new category id map), `_v39_content_rebuilt` for v39. Before the marker a resumed run starts over; after it, it only redoes cleanup, index creation and the foreign-key check.
-
-v49 and v51 avoid the rename and need no marker: v49 copies per old table, skips ids already in `entries` and drops an old table only once every row is there; v51 adds `settings`, fills rows still at `'{}'`, then drops the old columns (a `DROP TABLE altars` would cascade into `altar_placements`).
-
-Before v33, v38, v39, v42, v44, v49, v51, v53, v62, v63, v64, v65 and v66 rewrite anything (v42, v44, v62, v63, v64 and v65 only when there is something to convert), they write a full copy of the database via `VACUUM INTO` (`backupDatabaseFile` in `dbRebuild.ts`) to `{vaultDir}/emerald.db.pre-v33.bak`, `.pre-v38.bak` and so on — the escape hatch if a migration that rewrites every table goes wrong. On image-heavy vaults the file can be sizeable. `prune_migration_backups` keeps only the newest (what it may delete: [`security.md`](security.md#vault-directories-as-a-trust-boundary)).
-
-### Frozen history, and why failures used to be swallowed
-
-Migrations v1–v32 carry `legacy: true`. Only for those does the runner swallow "duplicate column name" / "already exists" errors and mark the step applied anyway (`isAlreadyAppliedError`).
-
-That leniency is harmful: it aborts the **entire remaining body** of a migration and still records it as done. Migration v4 is the case in point — v1 already creates `altars` with `background_preset`, v4 opens with an `ALTER TABLE` for the same column, and everything after it (`altar_placements.altar_id`, the default-altar seeding) never runs. The emergency migrations v30 and v31 add the missing placement columns back; v33 repairs the rest, giving placements without a valid altar one and creating the default altar if the vault has none.
-
-The historical migrations themselves stay untouched. Rewriting history is riskier than repairing its outcome, and existing vaults have already run them exactly as written.
-
-**Migrations from v33 onward do not carry the flag and fail loudly.**
-
-### Removing a feature does not mean editing its old migrations
-
-Migration 1 still creates `custom_properties` and migration 11 still alters it — both untouched, because existing vaults applied them. The removal is a *new* migration, v32, which drops the table. v33 does the same for `creations` and `altar_intentions` (carrying `creations` rows over into operations first), v47 for `links`.
+`runPeriodicCleanup(db)` is **not** a migration — idempotent, time-dependent, and run on the first `getDb()` of a session. It purges trashed rows older than the vault's trash retention (`trash.retentionDays` in `vaultSettings.ts`, default 30 days, or never). If the loaded settings belong to another vault it purges nothing (`null` = never), so one vault's retention can never empty another's trash. Expired tags are first stripped from every tag list (`stripTagIds`). Afterwards it sweeps dangling `task_links` and tag ids without a `tags` row (`sweepDanglingTagIds` — such an id can appear when a tag goes for good while a draft or an open entry still holds the old list and saves it later).
 
 ## Foreign Keys
 
@@ -117,7 +30,7 @@ Foreign keys are **enforced on every connection**: the SQL layer (`db.rs`) runs 
 Two consequences shape how this schema is changed:
 
 - A constraint takes effect the moment it is declared. There is no grace period.
-- `PRAGMA foreign_keys = OFF` and `BEGIN` are **not usable across separate `execute()` calls** — each call reaches one pooled connection, and which one serves the next call is not controllable. That rules out the SQLite documentation's table-rebuild recipe (see [Rebuilding a table](#rebuilding-a-table)). A *single* call is different: sqlx runs the `;`-separated statements of one string in order on the one connection it picked, so one multi-statement `execute()` can hold a real `BEGIN … COMMIT`. `importStaging.ts`'s `swapIn` does this — see [DB Backup / Restore](#db-backup--restore-emeralddb). The other way is `Database.batch` (`db_batch` in `db.rs`): a list of statements with bound values, run as one transaction on one connection, all or none. Write loops use it; it cannot wrap a whole import, whose statements are built from reads in between.
+- `PRAGMA foreign_keys = OFF` and `BEGIN` are **not usable across separate `execute()` calls** — each call reaches one pooled connection, and which one serves the next call is not controllable. That rules out the SQLite documentation's table-rebuild recipe spread over several calls. A *single* call is different: sqlx runs the `;`-separated statements of one string in order on the one connection it picked, so one multi-statement `execute()` can hold a real `BEGIN … COMMIT`. `importStaging.ts`'s `swapIn` does this — see [DB Backup / Restore](#db-backup--restore-emeralddb). The other way is `Database.batch` (`db_batch` in `db.rs`): a list of statements with bound values, run as one transaction on one connection, all or none. Write loops use it; it cannot wrap a whole import, whose statements are built from reads in between.
 
 Eight relations are declared, each with a deliberately chosen delete behaviour:
 
@@ -154,20 +67,20 @@ When a category is merged into a namesake instead (`reassignCategoryContent(db, 
 
 Only a **permanent** deletion reassigns: `categoryStore.permanentlyDeleteCategory`, `trashStore.emptyTrash`, and the periodic cleanup for an expired category (`purgeCategory`). That is why `categories` is **not in `CLEANUP_TABLES`** — it is purged separately, after its content is released. A *soft* delete never reassigns: content keeps pointing at the trashed category, the UI groups it under "Uncategorized", and restoring the category brings everything back. `reassignCategoriesInMemory` in `categoryStore.ts` applies the same move to the loaded content stores, so an in-memory row doesn't write back a `category_id` the foreign key would reject.
 
-The built-ins, `sigils` and `altars` (since v61), cannot be deleted: an operation in `sigils` is a sigil, and a new one starts with the sigil blocks through the built-in `core-sigil` template, assigned to Operations × Sigils; an operation in `altars` is an altar and starts with an altar block and a text for notes through `core-altar`.
+The built-ins, `sigils` and `altars`, cannot be deleted: an operation in `sigils` is a sigil, and a new one starts with the sigil blocks through the built-in `core-sigil` template, assigned to Operations × Sigils; an operation in `altars` is an altar and starts with an altar block and a text for notes through `core-altar`.
 
 ## Tables
 
-Fourteen tables. `TABLES` in `schema.ts` declares the dependency order, parents before children; the sections below group related tables. The order is not cosmetic: inserts are checked against foreign keys immediately, so it governs the rebuilds and the import swap.
+Fourteen tables. `TABLES` in `schema.ts` declares the dependency order, parents before children; the sections below group related tables. The order is not cosmetic: inserts are checked against foreign keys immediately, so it governs the creation of the schema and the import swap.
 
 ### schema_version
 
-Migration bookkeeping. No rebuild touches it, since it records the very migration being run.
+Which state of the schema the vault is at — what `runMigrations` reads first (see [Opening a Vault](#opening-a-vault)). A fresh vault has one `baseline` row; each later migration step adds its own. The import swap leaves it alone.
 
 | Column | Type | Notes |
 |---|---|---|
-| version | INTEGER PK | migration version, or `BASELINE_VERSION` for a fresh vault |
-| name | TEXT | migration name, or `'baseline'` |
+| version | INTEGER PK | `BASELINE_VERSION` for a fresh vault, or the version of a migration step |
+| name | TEXT | `'baseline'`, or the migration step's name |
 | applied_at | TEXT | ISO 8601 |
 
 ### tags
@@ -179,9 +92,7 @@ Migration bookkeeping. No rebuild touches it, since it records the very migratio
 | color | TEXT | hex, default `'#8347ff'` |
 | deleted_at | TEXT | NULL = active |
 
-`entries.tags` and `templates.tags` are JSON arrays of `tags.id` (`src/lib/tagRefs.ts`). A trashed tag stays in its rows, merely hidden, and comes back with its restore. Lists are rewritten only when a tag disappears for good (permanent delete, empty trash, retention purge — `stripTagIds`) or merges into a live namesake on restore (`replaceTagId`). Both go through `rewriteTagRefs`, which walks `TAGGED_TABLES` including the Trash and leaves `updated_at` alone. Tasks carry no tags.
-
-**Converting names (v53 and pre-`"12"` backups).** `tagNameResolver` maps names to ids case-insensitively, a live tag winning over a trashed namesake; a name without a tag row gets a new tag rather than being lost; a value that already is a known id stays. A trashed tag is written back into every row its old `affected_ids` listed, unless the row meanwhile carries a namesake. v53 computes all new lists first, then inserts the missing tags, then writes the rows and drops `affected_ids` last, so it is repeatable without a transaction.
+`entries.tags` and `templates.tags` are JSON arrays of `tags.id` (`src/lib/tagRefs.ts`). A trashed tag stays in its rows, merely hidden, and comes back with its restore. Lists are rewritten only when a tag disappears for good (permanent delete, empty trash, retention purge — `stripTagIds`) or merges into a live namesake on restore (`replaceTagId`). Both go through `rewriteTagRefs`, which walks `TAG_REF_TABLES` (`entries`, `templates`, `images`) including the Trash and leaves `updated_at` alone. Tasks carry no tags.
 
 ### categories
 
@@ -189,20 +100,18 @@ One list shared by Wiki, Operations and Tasks. Journal has no categories.
 
 | Column | Type | Notes |
 |---|---|---|
-| id | TEXT PK | `'sigils'` for the built-in; on upgraded vaults the ids of former built-ins such as `'other'`; UUID otherwise |
-| name | TEXT | NOT NULL; ignored for the built-in — its display name comes from `categories.builtin.<id>` in the active locale |
+| id | TEXT PK | `'sigils'` and `'altars'` for the built-ins; the key for a starter category (`'ritual'`, …); UUID otherwise |
+| name | TEXT | NOT NULL; ignored for the built-ins — their display name comes from `categories.builtin.<id>` in the active locale |
 | emoji | TEXT | NOT NULL DEFAULT `'📁'` |
 | sort_order | INTEGER | NOT NULL DEFAULT 0 |
-| is_builtin | INTEGER | boolean 0/1; true only for `sigils` |
+| is_builtin | INTEGER | boolean 0/1; true only for `sigils` and `altars` |
 | deleted_at | TEXT | NULL = active |
 
-There is no `UNIQUE` on `name`: uniqueness is enforced by the store (`categoryKey`: trimmed, case-insensitive), because a `UNIQUE` index would block restoring a trashed category whenever an active one shares its name. `SIGIL_CATEGORY_ID` (`'sigils'`) is the one category with behaviour. `FALLBACK_CATEGORY_ID` (`'other'`) is used only by migrations v36–v39 and for lifting pre-`"4"` backups; nothing in the live app treats that row specially. A fresh vault also seeds eight ordinary starter categories (`STARTER_CATEGORIES`, named in the app's language at creation), freely renamable and deletable.
-
-**Merging (v38 and pre-`"4"` backups).** `mergeCategoryRows` in `src/lib/categoryMerge.ts` merges by case-insensitive display name: same-named categories from different modules become one row, ids are kept where possible, `general` and every module's `other` collapse into one `other`, and an active/trashed pair comes out active. v39 then demotes `other` to an ordinary category, writing its translated name into the row (or keeping the old one if another category already claims that name).
+There is no `UNIQUE` on `name`: uniqueness is enforced by the store (`categoryKey`: trimmed, case-insensitive), because a `UNIQUE` index would block restoring a trashed category whenever an active one shares its name. `SIGIL_CATEGORY_ID` (`'sigils'`) and `ALTAR_CATEGORY_ID` (`'altars'`) are the categories with behaviour (see above). A fresh vault also seeds eight ordinary starter categories (`STARTER_CATEGORIES`, named in the app's language at creation), freely renamable and deletable.
 
 ### block_definitions
 
-The user-built blocks of the Blocks view. A row is only the template — an inserted block is a **copy** inside the entry's `content` (a `core.fields` section carrying its own elements, display rules, name and icon, with no link back). Nothing references this table by foreign key, and deleting a row touches no entry.
+The user-built blocks of the Blocks view. A row is only the template — an inserted block is a **copy** among the entry's blocks (a `core.fields` section carrying its own elements, display rules, name and icon, with no link back). Nothing references this table by foreign key, and deleting a row touches no entry.
 
 | Column | Type | Notes |
 |---|---|---|
@@ -221,7 +130,7 @@ An element's `defaultValue` (the builder's "Prefill") is what a new copy starts 
 
 ### templates
 
-The templates dashboard's rows, behind Journal/Wiki/Operations' "insert a template" flow — see [Templates](architecture/templates.md#templates) for assignments and the routine conversion. Like `block_definitions`, a row is only ever copied into an entry's blocks with no link back, so deleting a row touches no entry. Its own block stack is rows of [blocks](#blocks) with `template_id` set (since v66 only there; before, `content`).
+The templates dashboard's rows, behind Journal/Wiki/Operations' "insert a template" flow — see [Templates](architecture/templates.md#templates) for assignments. Like `block_definitions`, a row is only ever copied into an entry's blocks with no link back, so deleting a row touches no entry. Its own block stack is rows of [blocks](#blocks) with `template_id` set.
 
 | Column | Type | Notes |
 |---|---|---|
@@ -261,7 +170,7 @@ The details of pictures in "Images", the place of their own next to tags and cat
 | file | TEXT | NOT NULL UNIQUE — the stored file name (`storedImageName`); one row per file |
 | name | TEXT | NOT NULL DEFAULT `''` — a picture added from the disk starts with the file's name without its extension |
 | note | TEXT | NOT NULL DEFAULT `''` |
-| tags | TEXT | JSON array of tag ids, NOT NULL DEFAULT `'[]'`; in `TAG_REF_TABLES` (`src/lib/tagRefs.ts`), not in the frozen `TAGGED_TABLES` of v53 |
+| tags | TEXT | JSON array of tag ids, NOT NULL DEFAULT `'[]'`; in `TAG_REF_TABLES` (`src/lib/tagRefs.ts`) |
 | detached | TEXT | JSON array, NOT NULL DEFAULT `'[]'` — while the picture is in the trash, the entries and templates it was taken out of, each with its content before and after; restoring it writes `before` back where the content is still `after` (`restorePicture` in `src/store/imageActions.ts`), so the image cleanup keeps every file named in it. Not carried into another vault by a backup |
 | created_at / updated_at | TEXT | ISO 8601 |
 | deleted_at | TEXT | NULL = active; its file is hidden from "Images" meanwhile. Deleted for good from the Trash, the file goes too where nothing else uses it (`removeUnusedFiles` in `imageStore.ts`); purged after the retention period (`CLEANUP_TABLES`), the file is left to the cleanup |
@@ -285,7 +194,7 @@ How words are matched when translating lives in `src/lib/lexicon.ts` — see [Le
 
 ### symbols
 
-The vault's own symbols for the canvas editor's library, made from drawings (since v59). An element on a canvas keeps its own copy of the path data, so removing a symbol here changes nothing already placed. There is no `deleted_at`: removing one is immediate, with an undo toast that writes the same row back (`symbolStore`'s `removeSymbol`/`restoreSymbol`). Rows are read through `readUserSymbol` (`src/lib/userSymbols.ts`), which drops one without an id or usable path data.
+The vault's own symbols for the canvas editor's library, made from drawings. An element on a canvas keeps its own copy of the path data, so removing a symbol here changes nothing already placed. There is no `deleted_at`: removing one is immediate, with an undo toast that writes the same row back (`symbolStore`'s `removeSymbol`/`restoreSymbol`). Rows are read through `readUserSymbol` (`src/lib/userSymbols.ts`), which drops one without an id or usable path data.
 
 | Column | Type | Notes |
 |---|---|---|
@@ -312,13 +221,11 @@ Journal entries, wiki articles and operations in one table. What distinguishes t
 | created_at / updated_at | TEXT | ISO 8601 |
 | deleted_at | TEXT | NULL = active |
 
-Indexes: `idx_entries_type` on `(type, deleted_at)` (every module loads its live entries that way), `idx_entries_category`, `idx_entries_list` on `(deleted_at, type, title, category_id, entry_number, tags, created_at, updated_at, id)` and the partial `idx_entries_decorated` on `deleted_at` `WHERE icon IS NOT NULL OR cover_image IS NOT NULL`. Until v66 `tags`, `created_at` and the rest came after `content` in the row, so reading them walked every entry's overflow pages — under SQLCipher that decrypted nearly the whole file. `idx_entries_list` answers the start-up list query (`fetchEntries`, first stage) and the tag sweep on open from the index alone; icon and cover can be data URLs and stay out of it, the few entries carrying one are found through `idx_entries_decorated`, which a query only uses with that exact condition in its WHERE.
-
-**Old rows (v49 and pre-`"11"` backups).** The three old tables carried columns the app no longer reads — `slug`, `moon_phase`, journal `mood`/`paradigm_id`/banishing/meditation/`linked_*_ids` fields, operation status, sigil and `description` columns. Their content was converted into blocks and link chips by v36, v37, v41 and v42; v49 then copies only the shared columns. An id that sat in two old tables (a type change interrupted in an earlier version) keeps the first one (journal, wiki, operation) and the others are logged; they remain in `.pre-v49.bak`. Before copying, v49 retries the sigil drawings v42 could not save, and aborts until that succeeds — the column they wait in is about to go. Older backups go through the same converters on import, row by row (see [DB Backup / Restore](#db-backup--restore-emeralddb)).
+Indexes: `idx_entries_type` on `(type, deleted_at)` (every module loads its live entries that way), `idx_entries_category`, `idx_entries_list` on `(deleted_at, type, title, category_id, entry_number, tags, created_at, updated_at, id)` and the partial `idx_entries_decorated` on `deleted_at` `WHERE icon IS NOT NULL OR cover_image IS NOT NULL`. `idx_entries_list` answers the start-up list query (`fetchEntries`, first stage) and the tag sweep on open from the index alone; icon and cover can be data URLs and stay out of it, the few entries carrying one are found through `idx_entries_decorated`, which a query only uses with that exact condition in its WHERE.
 
 ### blocks
 
-The blocks of entries and templates, one row each (since v65). An entry or a template is the owner; the row is its block as `BlockInstance` holds it, without the section around it (`toBlockRow`/`fromBlockRow` in `src/lib/blocks/blockRows.ts`).
+The blocks of entries and templates, one row each. An entry or a template is the owner; the row is its block as `BlockInstance` holds it, without the section around it (`toBlockRow`/`fromBlockRow` in `src/lib/blocks/blockRows.ts`).
 
 | Column | Type | Notes |
 |---|---|---|
@@ -334,21 +241,21 @@ The blocks of entries and templates, one row each (since v65). An entry or a tem
 | show_title | INTEGER | `data-block-show-title` (`1`/`0`); NULL = the type's default |
 | config / data | TEXT | the block's JSON as written (`data-block-config`/`-data`), NULL when absent; field values sit in `data` by element ID, for filters through SQLite's JSON functions |
 | attrs | TEXT | NOT NULL DEFAULT `'{}'`; JSON object of every other `data-*` attribute, in order — older copies' `data-block-origin`, a newer type's own, and an instance attribute whose value the app does not write that way (`hidden="0"`) |
-| html | TEXT | NOT NULL DEFAULT `''`; the inner HTML. For now every type keeps it, the pictures a canvas or drawing lists included, so the block HTML of `.emerald` files and sync can be written from the rows; a `"14"` backup carries it as it is |
+| html | TEXT | NOT NULL DEFAULT `''`; the inner HTML. For now every type keeps it, the pictures a canvas or drawing lists included, so the block HTML of `.emerald` files and sync can be written from the rows; a backup carries it as it is |
 | text | TEXT | NOT NULL DEFAULT `''`; plain text, written for a later search over the rows — the search reads the stores' in-memory content today (see below) — without a DOM (`blockPlainText`): tags gone, block elements and chips as word boundaries; empty for a canvas and a drawing. A concealed sigil's text is in it — concealing depends on the date |
-| updated_at | TEXT | NOT NULL; ISO 8601, when the block was last written by a save that changed it (a move does not count). A rebuild from a whole block stack (v65, v66, sync, an import of an older file, a seed) writes all of its owner's blocks anew, with new positions and this stamp; a backup from `"14"` on restores each block with its own position and stamp |
+| updated_at | TEXT | NOT NULL; ISO 8601, when the block was last written by a save that changed it (a move does not count). A rebuild from a whole block stack (sync, a seed) writes all of its owner's blocks anew, with new positions and this stamp; a backup restores each block with its own position and stamp |
 
 `UNIQUE (entry_id, id)` and `UNIQUE (template_id, id)` (NULL is distinct, so each covers only its owner kind); indexes `idx_blocks_entry` and `idx_blocks_template` on `(owner, position)`.
 
 **Writing (`src/lib/blockStore.ts`).** The stores keep an owner's blocks in memory as one string, `content` (`contentOf`: the block HTML of `serializeBlocks`, loaded from the rows). The stores (`createEntry`, `updateEntry`, `createTemplate`, `updateTemplate`), `entryTypeChange` and "Images" write through `planContentWrite` (that string → blocks → `planBlockWrite`), which compares the blocks to what was last saved (kept per owner in memory, read from the rows when missing, forgotten with `resetDbCache`/`markDbReplaced`) and write only blocks that are new, changed or moved (a move writes `position` alone), delete removed ones, and rewrite each written block's [block_refs](#block_refs) (`planBlockWrite`). A keystroke thus writes its own block. A single plain text block carries no ID in `content` (`serializeBlocks`, rule 2); it keeps the ID it was saved under (`blocksOfContent`).
 
-**Whole stacks, and the old column.** A path that has a whole block stack and nothing saved to compare with — sync, the seeded templates of a fresh vault, the `.emerald` altar import, the MCP seed — replaces the owner's rows in its own batch (`replaceOwnerBlocks`). `serializeBlocks` writes the instance attributes in a fixed order (`orderedBlockAttrs`), so the same block written from its row or from the stack is the same string. The `content` column itself is gone since v66; `src/lib/contentColumn.ts` holds what still meets it: the migrations v65/v66, the two writers that run before and after v66 and ask `hasContentColumn` which form to write (`insertTemplateRow`, `altarInserts`), and the working copy of a backup import from a file older than `"14"`, which gets the column back, filled from the rows, for as long as the import's converters for older files run, and builds the rows from it at the end (`addContentColumns`/`dropContentColumns` in `importStaging.ts`; see [Import](#import)). A `"14"` file brings the rows themselves (`copyBlockStatements`: each block with its position and `updated_at`, its references written from it). A backup import and a sync restore (`beginRestore`) forget what was saved (`clearSavedBlocks`).
+**Whole stacks.** A path that has a whole block stack and nothing saved to compare with — sync, the seeded templates of a fresh vault (`insertTemplateRow` in `templateRows.ts`), the MCP seed — replaces the owner's rows in its own batch (`replaceOwnerBlocks`). `serializeBlocks` writes the instance attributes in a fixed order (`orderedBlockAttrs`), so the same block written from its row or from the stack is the same string. The `entries` and `templates` tables have no `content` column; a backup brings the rows themselves (`copyBlockStatements`: each block with its position and `updated_at`, its references written from it; see [Import](#import)). A backup import and a sync restore (`beginRestore`) forget what was saved (`clearSavedBlocks`).
 
 **Asking for field values.** `lib/blocks/blockQuery.ts` (`entriesWithFieldValue`, `fieldValueSql`) finds the entries whose fields block holds a value — equals, contains, empty, not empty — through `json_extract` on `blocks.data` (`$.values."<element id>"`), the first piece of filtering by block values. Element IDs are checked, never quoted into the path as given. Text, link and image elements keep their values as markup in the slots and are not reached that way.
 
 ### block_refs
 
-What a block points at (since v65), rewritten whenever its block is written (`blockRefs` in `src/lib/blocks/blockRefs.ts`).
+What a block points at, rewritten whenever its block is written (`blockRefs` in `src/lib/blocks/blockRefs.ts`).
 
 | Column | Type | Notes |
 |---|---|---|
@@ -373,8 +280,8 @@ Not stored — derived from a journal entry's `created_at`; see [Moon Phase](arc
 | parent_task_id | TEXT | **FK → tasks.id**, SET NULL |
 | priority | TEXT | `'low'` \| `'medium'` \| `'high'`, default `'medium'` |
 | completed | INTEGER | boolean 0/1 |
-| completed_at | TEXT | unused — the code neither writes nor reads it; kept for older backups |
-| sort_order | INTEGER | NOT NULL DEFAULT 0; unused — tasks sort by `created_at`; kept for older backups |
+| completed_at | TEXT | unused — the code neither writes nor reads it |
+| sort_order | INTEGER | NOT NULL DEFAULT 0; unused — tasks sort by `created_at` |
 | created_at / updated_at | TEXT | ISO 8601 |
 | deleted_at | TEXT | NULL = active |
 
@@ -395,13 +302,13 @@ A task in the Trash keeps its rows, so restoring it brings its links back; `task
 | id | TEXT PK | UUID |
 | task_id | TEXT | NOT NULL, **FK → tasks.id**, CASCADE |
 | target_id | TEXT | NOT NULL; polymorphic |
-| target_type | TEXT | NOT NULL; `'journal'` \| `'wiki'` \| `'operation'` \| `'task'`; v62 turned `'altar'` links into `'operation'` ones |
+| target_type | TEXT | NOT NULL; `'journal'` \| `'wiki'` \| `'operation'` \| `'task'` |
 
 `UNIQUE (task_id, target_id, target_type)`.
 
 ## Indexes
 
-Declared in `INDEX_DDL` in `schema.ts`: one on every foreign-key column, one on each side of `task_links`, one on every `deleted_at` column (for `entries` the leading column of `idx_entries_list`), `idx_entries_type` on `entries(type, deleted_at)`, the list indexes `idx_entries_list` and `idx_entries_decorated` — see [entries](#entries) — and `BLOCKS_INDEX_DDL` (an owner's blocks in order, references by target) — see [blocks](#blocks).
+Declared in `INDEX_DDL` in `schema.ts`: one on every foreign-key column, one on each side of `task_links`, one on every `deleted_at` column (for `entries` the leading column of `idx_entries_list`), `idx_entries_type` on `entries(type, deleted_at)`, the list indexes `idx_entries_list` and `idx_entries_decorated` — see [entries](#entries) — and the block indexes (an owner's blocks in order, references by target) — see [blocks](#blocks).
 
 The `deleted_at` indexes matter because `runPeriodicCleanup` runs a range scan across every soft-delete table each time a vault is opened.
 
@@ -413,9 +320,7 @@ The `deleted_at` indexes matter because `runPeriodicCleanup` runs a range scan a
 
 **entry_number.** A stable, compact, human-readable number, shown in the link picker as `#12`. `nextEntryNumber(db, type)` in `db.ts` assigns it at insert time, counting per `type` (journal #1 and wiki #1 can coexist) and including trashed rows, so a restored entry never duplicates a number. It is a stored value, never derived from `ROWID`, so a replace import cannot shift it. A type change gives the entry a fresh number in the target type — or its former one when it returns to the type it had when editing began (by Cancel, or by switching back by hand), unless another entry of that type has taken it meanwhile (see [Cancel after a type change](architecture/editing.md#cancel-after-a-type-change)).
 
-**Titles.** A new entry or task is stored with an **empty** title. What the user sees is `displayTitle(t, type, title)` from `src/lib/entryTitle.ts`: the title if it has text, otherwise the translated "Untitled …" of that type — in lists, cards, tabs, search, the Trash, link chips and pickers, task links and exports. `hasOwnTitle(title)` is the one test for "has a title of its own"; nothing compares against a magic string.
-
-The English defaults older versions stored (`LEGACY_UNTITLED_TITLES`) count as untitled only where data comes in: migration v48, a `.emeralddb` import (`clearLegacyUntitledTitles`), and a `.emerald` or Markdown import (`isLegacyUntitled`, plus the app-language "Untitled …" a Markdown/PDF export writes for an empty title). After that a title is whatever was typed. The DDL default of `tasks.title` still says `'Untitled …'`, but no insert relies on them.
+**Titles.** A new entry or task is stored with an **empty** title. What the user sees is `displayTitle(t, type, title)` from `src/lib/entryTitle.ts`: the title if it has text, otherwise the translated "Untitled …" of that type — in lists, cards, tabs, search, the Trash, link chips and pickers, task links and exports. `hasOwnTitle(title)` is the one test for "has a title of its own"; nothing compares against a magic string. The one exception is where data comes in: a `.emerald` or Markdown import reads the app-language "Untitled …" a Markdown/PDF export writes for an empty title as no title. The DDL default of `tasks.title` still says `'Untitled Task'`, but no insert relies on it.
 
 **Timestamps.** ISO 8601 text produced by `nowIso()`, sorted and compared lexicographically. No column holds a date-only value; dates inside blocks are `YYYY-MM-DD`.
 
@@ -431,7 +336,7 @@ A patch that changes nothing is not written at all (`needsWrite`). Checking a ch
 
 ## Sigil Workflow
 
-A sigil is not a kind of row but three blocks in an entry's `content` (`src/lib/blocks/sigil.ts`), in any category; a new operation in `sigils` starts with them via the built-in `core-sigil` template (see [templates](#templates)). Calculator and charge are fields blocks with that one element (element IDs `calc` and `charge`), the drawing a paint block marked as a sigil drawing — the same three exist as parts of a user-built block:
+A sigil is not a kind of row but three blocks of an entry (`src/lib/blocks/sigil.ts`), in any category; a new operation in `sigils` starts with them via the built-in `core-sigil` template (see [templates](#templates)). Calculator and charge are fields blocks with that one element (element IDs `calc` and `charge`), the drawing a paint block marked as a sigil drawing — the same three exist as parts of a user-built block:
 
 1. **Calculator** (element kind `sigilCalc`) — the intention, the letter bank (each letter once) and the letters already implemented, as the element's value in `data-block-data`, the readable version in its slot.
 2. **Drawing** (`core.paint` with `data-block-config='{"sigil":true}'`, or element kind `sigilCanvas`) — the vector strokes as data JSON (`data-block-data`, layers of strokes, see [Editors](architecture/editors.md#canvas-editor)), and as inner HTML the rendered image first (`<img src="{sha}.png" data-paint="render">`), then the image of every layer that has one (`data-paint="<layer ID>"`), so backups, exports and the image cleanup see them. A block whose first image is not marked as the render (one from before the vector format) opens with that image as its only layer. No base64 in content; rendered images saved while drawing become unused files that "Delete unused images" removes.
@@ -439,27 +344,23 @@ A sigil is not a kind of row but three blocks in an entry's `content` (`src/lib/
 
 The entry's state comes from the charges (`sigilState`). A charge's `targets` are unit IDs — `<block ID>:<element ID>` for a calculator or drawing part, the block ID for a sigil drawing — or absent for every calculator and drawing of the entry. An unmarked paint block is never a target. Charged and before the reveal date, the sigil is *concealed*: calculator and drawing hidden in both modes, left out of search and every export. Charged, it is *locked* in any entry type: `lock: 'entry'` hides Edit and blocks read-mode writes except unloading, `'sigil'` makes the two blocks read-only; date and lock scope are fixed while charged.
 
-**Converting sigil columns (v42 and pre-`"7"` backups).** `migrateLegacySigils.ts` turns every row with sigil data — and, in v42 and files below `"7"`, every operation in `sigils` — into these blocks, with the old notes (`description`) as a text block after them. A drawing is written through `save_image` (only PNG/JPEG/GIF/WebP data URLs up to ~25 MB — anything else is dropped rather than retried forever; letter banks are capped at 500 entries). A hidden drawing (`show_sigil = 0`, not charged) becomes a hidden drawing block; an operation whose content already carries sigil blocks gets no second set. If saving fails the row stays untouched, and v49 retries it before copying (see [entries](#entries)). The backup import converts rows before inserting them (`liftLegacySigilRows`) and throws if a drawing cannot be saved, rather than importing a sigil without it. These conversions still write the sigil blocks of v42 to v63; v64 converts them like any other.
-
-**The sigil blocks of v42 to v63 (v64, backups, `.emerald`, drafts).** Up to v63 the three were block types of their own: `core.sigil.calc`, `core.sigil.canvas`, `core.sigil.charge`. `lib/blocks/legacySigilBlocks.ts` is the one place that still knows them. Each keeps its block ID and instance attributes; calculator and charge become a fields block with one element (old data JSON as the value, old inner HTML as the slot, `readHideEmpty: false`, title shown), the drawing a sigil paint block with the same data and HTML. A charge target naming a converted calculator becomes `<ID>:calc`; a drawing's ID, part targets, foreign IDs and "all" stay. A calculator or charge with unreadable data JSON, or any block with a newer `data-block-v`, is left as it is; a drawing with unreadable data is converted anyway and shows its picture. The same converter runs in v64, in the backup import's working copy after the altars (`convertLegacySigilsInPlace` in `migrateLegacySigils.ts`, every mode), on a `.emerald` file's content (`importedContent`) and on template drafts read from `drafts.json`. Block definitions need none: they never held sigil blocks, only elements. Sync is not covered: a device still on v63 can bring old sigil blocks into a converted vault, as v62 altars can. A `"14"` backup needs none: it was written by a converted vault.
-
 ## Image Storage
 
 Handled natively in `src-tauri/src/images.rs`. Images live in `{vaultDir}/images/`, sealed, and are named after a keyed hash of their own bytes (HMAC under a key derived from the vault key), so the same image is stored once per vault however many entries reference it. The plain SHA-256 would let anyone holding a known picture confirm it is in the vault.
 
 **The database stores the bare filename** — `{hash}.{ext}` (64 hex digits), no directory and no drive letter. Rendering goes through the `emerald-img` URI scheme rather than IPC; the details are in [Image Storage System](architecture/storage.md#image-storage-system).
 
-The image commands (`save_image`, `copy_image_file`, `read_image_as_base64`, `adopt_legacy_images`, `list_image_files`, `delete_image_files`) are listed in [IPC Command Surface](architecture.md#ipc-command-surface).
+The image commands (`save_image`, `copy_image_file`, `read_image_as_base64`, `list_image_files`, `delete_image_files`) are listed in [IPC Command Surface](architecture.md#ipc-command-surface).
 
 ## Multi-Vault System
 
-A vault is a **directory** holding `emerald.db` (SQLCipher), `vault.key`, `images/`, `backup/`, `settings.json` (the vault's own settings, read and written by `read_vault_settings`/`write_vault_settings`) and, while a block or template page holds unsaved edits, `drafts.json`. Vault metadata lives outside SQLite in `{appDataDir}/vaults.json`. The directory layout, `vaults.json`'s shape, first-launch behaviour, the default location for new vaults and the migrations of older installations are described in [Vault Layout](architecture/storage.md#vault-layout); what matters for the database:
+A vault is a **directory** holding `emerald.db` (SQLCipher), `vault.key`, `images/`, `backup/`, `settings.json` (the vault's own settings, read and written by `read_vault_settings`/`write_vault_settings`) and, while a block or template page holds unsaved edits, `drafts.json`. Vault metadata lives outside SQLite in `{appDataDir}/vaults.json`. The directory layout, `vaults.json`'s shape, first-launch behaviour and the default location for new vaults are described in [Vault Layout](architecture/storage.md#vault-layout); what matters for the database:
 
 - `getDb()` opens the database by vault id (`Database.load(vaultId)` in `src/lib/sqlite.ts`); Rust resolves the path, so folder names with `?`, `#` or `%` need no encoding. It throws `NO_ACTIVE_VAULT` rather than fall back to another vault, and Rust refuses to open a vault whose key is not unlocked — the gate in front of `getDb()` is described in [`architecture/encryption.md`](architecture/encryption.md#the-unlock-gate). All data is encrypted at rest; there is no unencrypted database.
 - Every write to `vaults.json` calls `register_vaults`, mirroring `id → path` into Rust. Storage commands resolve a vault *id* against that registry and never accept a path — see [`security.md`](security.md).
 - `resetDbCache()` in `db.ts` must be called before switching vaults; it clears the per-vault `Map<vaultId, Database>` cache and advances `dbEpoch()`, by which a reader spanning several awaits (the automatic backup) notices that the database was closed or — `markDbReplaced()` after an import — replaced under it. It first awaits any load still in flight: `getDb()` only caches a connection once `Database.load` resolves, so a reset racing a load could otherwise leak that connection unclosed, keeping the file locked on Windows.
 - `withDbClosed(fn)` runs `fn` with every connection closed and blocks `getDb()` for its duration (throwing `DB_CLOSED`); vault deletion uses it so a debounced autosave can't reopen the very file being removed.
-- `runMigrations()` runs on every `getDb()` cache miss and is safe on existing and empty files. A new vault's `.db` file is only written the first time the app switches to it, which is why `newVaultRecord(name)` does not create it up front. All vaults share the same schema.
+- `runMigrations()` runs whenever `openVaultDb` loads a vault that is not cached yet, and is safe on existing and empty files (see [Opening a Vault](#opening-a-vault)). A new vault's `.db` file is only written the first time the app switches to it, which is why `newVaultRecord(name)` does not create it up front. All vaults share the same schema.
 - `newVaultRecord(name, opts?)` in `vaultManager.ts` is the single place that builds a new vault's record; the vault picker (see [Vaults](features.md#vaults)) and the add-vault import both use it. `addVault`/`updateVault`/`removeVault`/`setActiveVaultId`/`relocateVault` read-modify-write `vaults.json` by copying, never mutating the cached object before the write lands. `removeVault` hands off the active role in the same write that removes the record, so `vaults.json` never names an active vault missing from its own list.
 
 ## DB Backup / Restore (`.emeralddb`)
@@ -470,7 +371,7 @@ Full vault snapshots are exported and imported via Settings → Backup. The code
 
 ```json
 {
-  "version": "14",
+  "version": "15",
   "type": "backup",
   "exportedAt": "2026-04-18T...",
   "filters": { "includeJournal": true, "includeWiki": true, "..." : "..." },
@@ -493,27 +394,11 @@ Full vault snapshots are exported and imported via Settings → Backup. The code
 
 ### Backup versions
 
-`BACKUP_VERSION` is `"14"`. A build rejects any file newer than itself before touching anything (`migrateBackupPayload` compares numerically — a string compare would think `"10"` older than `"4"`). That is why the version is bumped whenever an older build would otherwise import a file *wrongly* rather than fail: `insertRows` filters every row against `PRAGMA table_info` (to guard against crafted files), so an older build would silently drop a column it doesn't know.
+`BACKUP_VERSION` is `"15"`: journal entries, wiki articles and operations in one `data.entries` array, each row with `type`; the blocks of the exported entries and of the templates as the rows of [blocks](#blocks) in `data.blocks` (without `row_id` and `text`; entries and templates carry no `content`); the rows of [images](#images) in `data.vaultImages`, their files in `images`.
 
-`migrateBackupPayload` lifts an older file on load; some conversions run later, row by row, before insertion. Each step is an ordered `version < N` test, so a newer file never runs an older step twice.
+Only this version is read. `readBackupPayload` compares numerically (a string compare would think `"10"` older than `"4"`) before anything is touched: a file below `"15"` comes from before the fresh start and is refused with `BACKUP_OUTDATED` (`settings.importErrorOldVersion`), a newer one with `BACKUP_TOO_NEW` (`settings.importErrorNewVersion`). Nothing is converted, and the vault stays as it was. A current file is then split into journal, wiki and operation arrays (`splitEntries`; unknown `type` dropped), so the import paths work on three arrays; `entryRowsForInsert` projects them back onto `entries`, de-duplicating ids (journal, wiki, operation wins).
 
-| Version | Since | What changed | What import does with an older file |
-|---|---|---|---|
-| 14 | v66 | `data.blocks`: the rows of [blocks](#blocks) of the exported entries and of the templates, without `row_id` and `text`; entries and templates carry no `content` | A file below `"14"` keeps its blocks in `content`: the working copy gets the column back for the import, every converter of older data runs on it, and the rows are built from it at the end (see [Import](#import)). An older build would find no `content` and restore every entry empty, so it must refuse |
-| 13 | v56–v60 | `assignments` without `isDefault`, `block_definitions` without `revision` (v56); altars carry `elements` (v57); placements may carry `group_id` (v58); `vaultImages`, the rows of [images](#images), their files in `images` (v60) | Nothing to lift: `parseAssignments` drops what was only offered, and `revision` is not read. An older build would read every assignment as merely offered, drop the drawn shapes and text, and restore the pictures' files without their names, tags and notes, so it must refuse. Import adds missing pictures by file in both modes (`insertVaultImages`), never deletes, and follows the file names the images were stored under |
-| 12 | v51–v53 | altar `settings` JSON; altar items with `updated_at`/`deleted_at`; tag ids | Packs altar columns into `settings` (`altarSettingsJson`); gives items `updated_at = created_at`; `tagNamesToIds` converts entries', templates' and old routines' tag names by the v53 rule ([tags](#tags)) and drops `affected_ids` |
-| 11 | v49 | one `data.entries` array with `type` | A `"11"`+ file is split back into journal/wiki/operation arrays (`splitEntries`; unknown `type` dropped), so the import paths work on three arrays; `entryRowsForInsert` projects them onto `entries`, de-duplicating ids (journal, wiki, operation wins) |
-| 10 | v46 | altars carry `deleted_at` | Nothing; an older build would revive trashed altars, so it must refuse |
-| 9 | v45 | `languages`, `lexiconEntries` | Nothing |
-| 8 | v43 | `templates` | A file's `routines` stays standing and becomes templates at import time, after the type filters (`withRoutinesAsTemplates`, see [Routines converted to templates](architecture/templates.md#routines-converted-to-templates)) |
-| 7 | v42 | sigils as blocks | Sigil columns are converted before insertion (`liftLegacySigilRows`); empty `sigils` operations get the sigil blocks only from files below `"7"` |
-| 6 | v40 | `blockDefinitions` | Nothing |
-| 5 | v39 | `category_id` may be `null` | Nothing; an older build has a `NOT NULL` column and must refuse |
-| 4 | v38 | one `categories` array | `mergeLegacyCategoryArrays` merges the four per-module arrays by the v38 rule ([categories](#categories)), translating built-in names via `legacyDisplayName`, and remaps every row's `category_id` |
-| 3 | v35 | images referenced by filename | Nothing: `restoreImages` maps whatever keys the file carries (absolute paths in v1/v2) onto the filenames it wrote, and `remapPaths` substitutes them |
-| 2 | v33 | category references by id | A `"1"` file's `wiki_articles.category` becomes `category_id`, `altar_items.category` is resolved from name to id against the file's own categories, and null `linked_*_ids` become `'[]'` |
-
-Independently of the version, journal rows with the old fields go through `liftLegacyJournalRows` (link ids and paradigm/banishing/meditation fields → blocks, looking up link targets in the file and falling back to the vault), and operations with `is_active = 0`, an `end_date` or a `version` through `convertLegacyStatusRows` (the v41 converter: the Status block is prepended to `content`; the copies follow the vault's own "Status" definition if there is one, even in the trash, else the file's, else a new one at the end of the list). `vaultRoutineLinkSource` (resolving old routines' link targets) reads `entries`. A file from before v47 may carry a `links` array; import ignores it. A pre-v54 file's `description` values are dropped by `insertRows`' column filter.
+The version is bumped whenever an older build would otherwise import a file *wrongly* rather than fail: `insertRows` filters every row against `PRAGMA table_info` (to guard against crafted files), so an older build would silently drop a column it doesn't know.
 
 ### Export
 
@@ -538,7 +423,7 @@ ID lists for `IN (...)` clauses are bound as parameters, never concatenated into
 
 1. Discard any copy a crashed import left behind — `discard_import_staging(vaultId)` in `vault.rs`, scoped to that vault's directory and the fixed filename `emerald.db.import` (`IMPORT_STAGING_FILE`, mirrored in `vaultManager.ts`).
 2. `VACUUM INTO` that filename, next to `emerald.db`.
-3. Open the copy as its own connection (`Database.load(vaultId, 'importStaging')`, keyed like the vault) and run `doReplace`/`doMerge` against it. The live vault is untouched, however far the import gets. A `"14"` file brings its blocks as rows: after their owners, `insertImportedBlocks` writes the blocks of every owner the import actually inserted (an entry the type filter left out, or a template that already existed here, gets none), each through `remapBlock` (`lib/blocks/blockRemap.ts`: the pictures under the names they were stored under here, and on a merge every chip's `data-id` and every ID in the config and data JSON — a link prefill, an altar's links — onto the prefixed entry) and `copyBlockStatements` (its position and `updated_at` kept, its [block_refs](#block_refs) written from it; positions that are not valid keys in ascending order are replaced by fresh ones in the file's order). A file below `"14"` carries its blocks as each owner's `content`: for the import's duration the copy's `entries` and `templates` have a `content` column again, filled with every owner's block stack from its rows (`addContentColumns` in `contentColumn.ts`), and the converters for older files (altars, sigil blocks, old journal fields, status) read and write it with plain SQL — the same converters as the migrations. At the end every owner whose rows do not give its `content` gets its rows from it, and the column goes (`dropContentColumns`). On a merge the link IDs in such a file's blocks follow the prefix through the same `remapBlock`, on the parsed stack.
+3. Open the copy as its own connection (`Database.load(vaultId, 'importStaging')`, keyed like the vault) and run `doReplace`/`doMerge` against it. The live vault is untouched, however far the import gets. The file brings its blocks as rows: after their owners, `insertImportedBlocks` writes the blocks of every owner the import actually inserted (an entry the type filter left out, or a template that already existed here, gets none), each through `remapBlock` (`lib/blocks/blockRemap.ts`: the pictures under the names they were stored under here, and on a merge every chip's `data-id` and every ID in the config and data JSON — a link prefill, an altar's links — onto the prefixed entry) and `copyBlockStatements` (its position and `updated_at` kept, its [block_refs](#block_refs) written from it; positions that are not valid keys in ascending order are replaced by fresh ones in the file's order).
 4. Swap the copy in with one multi-statement `execute()` on the vault's connection: `ATTACH DATABASE`, `BEGIN IMMEDIATE`, `PRAGMA defer_foreign_keys = ON` (the vault is briefly empty mid-swap), `DELETE FROM` every table in `TABLES` except `schema_version` (children first), `INSERT INTO … SELECT` with explicit columns (parents first), `COMMIT`, `DETACH DATABASE`. One `execute()` stays on one pooled connection, so this is a real transaction that survives a crash. If the string aborts after `BEGIN`, `resetDbCache()` closes the whole pool, which makes SQLite roll back and detach — the connection would otherwise sit in the pool with an open transaction and lock every later write.
 5. Delete the staging copy, on success and on failure.
 
@@ -554,13 +439,11 @@ All three modes go through `importViaStaging`, and automatic editor saves are su
 | `merge` | Generates an 8-char base36 timestamp prefix. All entry ids are prefixed; cross-references are remapped. `entry_number` is offset past the highest existing one **per type**, since it is a stored value and would otherwise collide. `categories` and `tags` are resolved, not prefixed. |
 | `add-vault` | Creates a new vault → `switchVault()` → runs the replace logic against the empty vault. |
 
-There is no category filter on import — the type ticks (`ImportTypeFilters`) are the only selection, plus the settings groups for Merge. Both `doReplace` and `doMerge` finish with `sweepDanglingTaskLinks`, `dropUnknownTagIds` and `clearLegacyUntitledTitles` (pre-v48 files carry the English "Untitled …" defaults).
+There is no category filter on import — the type ticks (`ImportTypeFilters`) are the only selection, plus the settings groups for Merge. Both `doReplace` and `doMerge` finish with `sweepDanglingTaskLinks` and `dropUnknownTagIds`.
 
 **Before anything is written**, `assertPayloadReferencesResolve` checks that every category a payload references exists — in the file, or among the target vault's own categories (an import never deletes those). It rejects an unresolvable payload with a message that names the category; the staging copy is what protects the vault.
 
 **Rows are inserted parents-first**; foreign keys are active during import. The order is hard-coded per import path (`doReplace` and `doMerge` each have their own) and does *not* follow `TABLES`.
-
-**Altars of an older file.** A file from before v62 carries `altars`, `altarItems` and `altarPlacements`; the export no longer writes them. They are imported when Operations is ticked (`opsCount` in the preview counts them with the operations); the links to altars are converted either way. `importAltars` builds the three tables in the working copy from `ALTAR_TABLE_DDL`, inserts the file's rows, converts them as v62 does (`convertAltarsInPlace`: operations of `altars`, pictures of "Images", chips, altar fields and task links pointing at the operations — see [Altars as operations](architecture/editors.md#altars-as-operations)) and drops the tables again. Without altars to import it still points the file's chips, altar fields and task links at their operations (`convertAltarsInPlace` with no altar rows), or they would be dropped. It runs after the tasks and their links, so they follow the altars, and before the dangling-link sweep. In `doReplace` the file's version of an operation wins (`replace`), over an operation of that ID only, never over an entry of another type; in `doMerge` the altars, items and placements get the merge prefix like everything else, and an item's category is dropped with the table. Block definitions' altar elements and defaults are turned into link elements before they are validated (`elementsWithAltarsAsOperations`).
 
 **Categories are resolved, never deleted** — `resolveImportedCategories`. A category matches a local one by id (for the built-in) or by case-insensitive name (`categoryKey`); a match is revived from the trash if the local row is trashed and the imported one active. Anything left over is inserted, with a new id if the payload's id is taken. The content arrays are then remapped onto the local ids. A category is shared across modules, so a partial replace (Wiki only, say) must not delete categories out from under Tasks.
 
@@ -570,17 +453,17 @@ There is no category filter on import — the type ticks (`ImportTypeFilters`) a
 
 A definition's prefills need their own remap, since nothing else touches `elements` JSON: `remapDefinitionRows`/`remapDefinitionDefaults` rewrite an image default onto the image's local filename and a link default onto the imported entry — by the merge prefix's new id in `doMerge`, by id-or-title (`resolveImportedTarget`, shared with the `.emerald` chip resolver) in replace and add-vault. A link default that resolves to nothing is dropped, so a fresh copy never starts with a chip into the void.
 
-**Templates are added, never replaced or deleted** — `insertTemplates`, `INSERT OR IGNORE` by id, before the deletes in `doReplace` and after the merge prefix's remap in `doMerge`. A local template (including trashed) keeps its local version; new ones land at the end of the sort order. `content` (a file below `"14"`) gets the same image and (in merge) id remap as entries; a `"14"` file's template blocks go through `insertImportedBlocks`/`remapBlock` like an entry's, and only for templates that were actually inserted; `assignments`' category ids are remapped like content rows, and one that doesn't resolve is dropped. An assignment survives only if no local active template holds that combination; a template arriving via the trash has none, like `templateStore.restoreTemplate`.
+**Templates are added, never replaced or deleted** — `insertTemplates`, `INSERT OR IGNORE` by id, before the deletes in `doReplace` and after the merge prefix's remap in `doMerge`. A local template (including trashed) keeps its local version; new ones land at the end of the sort order. Their blocks go through `insertImportedBlocks`/`remapBlock` like an entry's, and only for templates that were actually inserted; `assignments`' category ids are remapped like content rows, and one that doesn't resolve is dropped. An assignment survives only if no local active template holds that combination; a template arriving via the trash has none, like `templateStore.restoreTemplate`.
 
-A fresh vault (add-vault) seeds its own `core-sigil` before the import runs. If the file carries its own `templates` (`"8"`+; converted routines don't count) and the import includes Journal, Wiki or Operations, that seeded row is deleted first, so the file's version of `core-sigil` — edited, deleted or otherwise — wins; `core-altar` likewise, but only when the file carries a `core-altar` row; from a file without one the fresh vault keeps its own.
+A fresh vault (add-vault) seeds its own `core-sigil` and `core-altar` before the import runs. If the file carries its own `templates` and the import includes Journal, Wiki or Operations, those seeded rows are deleted first, so the file's version of them — edited, deleted or otherwise — wins.
 
 **The Lexicon is added, never replaced or deleted** — `insertLexicon`, `INSERT OR IGNORE` by id; a word is inserted only when its language exists in the target vault, since `lexicon_entries.language_id` is a real foreign key.
 
 ### Image references
 
-Images are restored via `save_image`, which returns the filename in the importing vault. A picture the vault already holds under the very name the file knew it by keeps that name (`restoreImages`): the name is a hash of the content, and saving again could spell the type differently (a `.jpeg` taken from the disk comes back as `.jpg`), which would leave it in "Images" twice. The remap covers the columns of `IMAGE_FIELDS` in `schema.ts` (via `imageColumns(table)`), the inventory shared by the importer, migration v35 (in its frozen form, `IMAGE_FIELDS_V48`) and `collectUsedImageFilenames`. It groups the columns by how they must be treated:
+Images are restored via `save_image`, which returns the filename in the importing vault. A picture the vault already holds under the very name the file knew it by keeps that name (`restoreImages`): the name is a hash of the content, and saving again could spell the type differently (a `.jpeg` taken from the disk comes back as `.jpg`), which would leave it in "Images" twice. The remap covers the columns of `IMAGE_FIELDS` in `schema.ts` (via `imageColumns(table)`), the inventory shared by the importer and `collectUsedImageFilenames`. It groups the columns by how they must be treated:
 
-| Group | Meaning | v35 rewrites | Cleanup scans |
+| Group | Meaning | Rewritten on import | Cleanup scans |
 |---|---|---|---|
 | `html` | the reference sits in a `src` attribute | yes | yes |
 | `plain` | the column *is* the reference | yes | yes |
@@ -588,17 +471,17 @@ Images are restored via `save_image`, which returns the filename in the importin
 
 The `legacy` group is why the list has to be complete: `collectUsedImageFilenames` decides which file the cleanup may delete, so a missing column would be a reference nobody sees. Rewriting those columns would break their renderers, which test them with `isImageIcon` (only `data:` / `blob:` / `/`).
 
-`entries.content` in `IMAGE_FIELDS` is the block stack as the row of a backup file older than `"14"` carries it (`BLOCK_STACK_COLUMN`): the importer remaps the pictures in it; a `"14"` file's blocks are remapped by `remapBlock`; in the vault, `collectUsedImageFilenames` reads the pictures of every block, of entries and templates, from [block_refs](#block_refs) instead, and every image name in the rows of `blocks` as well. `block_definitions.elements` is scanned directly instead of through `IMAGE_FIELDS`: the table is younger than v35, which walks that list. All of their images travel with a `.emeralddb` export.
+`IMAGE_FIELDS` lists `entries.icon` and `cover_image` (group `legacy`); the `html` and `plain` groups are empty and are where a new image column goes. The blocks are not in it: on import they are remapped by `remapBlock`, and in the vault `collectUsedImageFilenames` reads the pictures of every block, of entries and templates, from [block_refs](#block_refs), and every image name in the rows of `blocks` as well. `block_definitions.elements` is scanned directly too. All of their images travel with a `.emeralddb` export.
 
 ## Rules for Future Schema Changes
 
-- **Change `schema.ts` and add a migration.** Both, always. The DDL there is what fresh vaults get; the migration is what existing vaults get. Bump `BASELINE_VERSION` to match — `runMigrations` refuses to start otherwise.
-- **Run `npm run check:schema`.** It builds a vault each way and compares them column by column (including foreign keys and indexes), then exercises the migrations against seeded legacy data. It is the only thing standing between a schema edit and two silently divergent databases.
+- **Change `schema.ts`, append a step to `MIGRATIONS` and raise `BASELINE_VERSION`.** All three, always. The DDL in `schema.ts` is what fresh vaults get; the step — a `version` above the current baseline, a `name` and an `up(db)` — is what vaults created before get. `BASELINE_VERSION` must equal the last step's version — `runMigrations` refuses to start otherwise. Steps are never removed or rewritten once released; a vault below `FRESH_START_VERSION` stays refused.
+- **Run `npm run check:schema`.** It checks the fresh vault against `schema.ts` (tables, stamp, foreign keys, indexes), that old and newer vaults are refused unchanged, and that the migration mechanism runs an injected step; extend it with a vault at the previous baseline brought up by the new step and compared with a fresh one.
 - **Constants mirrored across languages must change together.** The check compares the image-extension list, vault file names and the `emerald-img` scheme name across `images.rs`, `schema.ts`, `vault.rs`, `vaultManager.ts` and `tauri.conf.json`. Changing one side alone fails `check:schema`, not the compiler.
-- Prefer additive changes. A rename or a type change means another full rebuild in the style of `normalizeSchema.ts`; dropping a column can use `dropColumnsIfPresent`.
+- Prefer additive changes. A rename or a type change means rebuilding the table inside one multi-statement `execute()` or `batch` (see [Foreign Keys](#foreign-keys)).
 - New boolean fields: `INTEGER NOT NULL DEFAULT 0` (or `1` where the safe default is true). New array fields: `TEXT NOT NULL DEFAULT '[]'`.
 - New references: name them `<thing>_id`, store the id and never the name, declare the foreign key, and index the column.
-- New image-backed fields: reuse the file pipeline through `src/lib/images.ts` (`saveImage` / `copyImageFile`), store the returned **filename**, and add the column to the `plain` (or `html`) group of `IMAGE_FIELDS` in `schema.ts` so migration and cleanup both see it. Do not store base64 in SQLite, and do not store a path.
-- Never use the retired `try { ALTER TABLE … ADD COLUMN … } catch {}` pattern, and never rely on the `legacy` error-swallowing — new migrations must fail loudly.
+- New image-backed fields: reuse the file pipeline through `src/lib/images.ts` (`saveImage` / `copyImageFile`), store the returned **filename**, and add the column to the `plain` (or `html`) group of `IMAGE_FIELDS` in `schema.ts` so import and cleanup both see it. Do not store base64 in SQLite, and do not store a path.
+- Never swallow errors in a migration step (`try { ALTER TABLE … } catch {}`) — steps must fail loudly.
 - **`$N` placeholders must appear in ascending order in the SQL text.** SQLite treats `$N` as a *named* parameter and assigns bind indexes by order of first appearance, not by the digit — `SELECT $21, $23, $22` binds them as 1, 2, 3 (verified against the SQLite C API). `db.rs` binds the values array purely positionally, so a `$23` written before a `$22` silently swaps two values. Every query in this codebase works only because its placeholders ascend; reusing a placeholder (`WHERE id IN ($1, $3)`) is fine, skipping ahead is not.
-- If a change alters the shape of exported rows, bump `BACKUP_VERSION` in `dbBackup.ts` and handle older files — in `migrateBackupPayload`, or gated on the file's `sourceVersion` in the import, as version 14 does (`carriesBlockRows` in `dbBackup.ts`; the working copy in `importStaging.ts`) — so they still import.
+- If a change alters the shape of exported rows so that an older build would import a file wrongly, bump `BACKUP_VERSION` in `dbBackup.ts` (see [Backup versions](#backup-versions)). `readBackupPayload` reads only the current version: older files are refused, not lifted, unless a converter for them is added deliberately.
