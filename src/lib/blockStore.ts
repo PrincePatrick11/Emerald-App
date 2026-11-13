@@ -2,7 +2,7 @@ import type Database from './sqlite';
 import { blockSectionHtml, parseBlocks, serializeBlocks } from './blocks/blockHtml';
 import { blockRefs } from './blocks/blockRefs';
 import { fromBlockRow, toBlockRow, type StoredBlockRow } from './blocks/blockRows';
-import { positionsFor } from './blocks/position';
+import { isPositionKey, positionsFor } from './blocks/position';
 import { TEXT_BLOCK_TYPE, type BlockInstance } from './blocks/types';
 
 /**
@@ -178,7 +178,7 @@ export async function planContentWrite(db: Database, owner: BlockOwner, content:
 /** References per INSERT: three bound values each, far below SQLite's limit. */
 const REF_CHUNK = 100;
 
-/** Insert or update one block, then rewrite its references. */
+/** Insert or update one block, then rewrite its references. `now` becomes its `updated_at`. */
 function blockStatements(owner: BlockOwner, block: BlockInstance, position: string, now: string): Statement[] {
   const { column } = OWNER[owner.kind];
   const row = toBlockRow(block);
@@ -283,4 +283,31 @@ export function replaceOwnerBlocks(
   const statements: Statement[] = hasRows ? [[`DELETE FROM blocks WHERE ${column} = $1`, [owner.id]]] : [];
   blocks.forEach((block, i) => statements.push(...blockStatements(owner, block, positions[i], now)));
   return { statements, content: contentOf(blocks), commit: () => remember(owner, blocks, positions) };
+}
+
+/** A block as a file brings it along: with the position and the time it was written. */
+export interface CopiedBlock {
+  block: BlockInstance;
+  /** As the file gives it; `null` when it is no string. */
+  position: string | null;
+  updatedAt: string | null;
+}
+
+/**
+ * The rows of a new owner as copies of the given blocks — a backup import,
+ * which carries the rows of `blocks` themselves. Each block keeps its
+ * `updated_at` (else `now`) and, when every position is a valid key and no two
+ * are equal, its position, in position order; otherwise the blocks keep the
+ * given order under fresh, evenly spread keys. Its references are written anew
+ * from the block (`block_refs` does not travel). The first block of an ID
+ * wins. The owner row must exist; it has no rows yet.
+ */
+export function copyBlockStatements(owner: BlockOwner, copies: readonly CopiedBlock[], now: string): Statement[] {
+  const byId = new Map<string, CopiedBlock>();
+  for (const copy of copies) if (!byId.has(copy.block.id)) byId.set(copy.block.id, copy);
+  let ordered = [...byId.values()];
+  const keyed = ordered.every((c) => isPositionKey(c.position)) && new Set(ordered.map((c) => c.position)).size === ordered.length;
+  if (keyed) ordered = ordered.sort((a, b) => (a.position! < b.position! ? -1 : 1));
+  const positions = keyed ? ordered.map((c) => c.position!) : positionsFor(new Map(), ordered.map((c) => c.block.id));
+  return ordered.flatMap((c, i) => blockStatements(owner, c.block, positions[i], c.updatedAt ?? now));
 }

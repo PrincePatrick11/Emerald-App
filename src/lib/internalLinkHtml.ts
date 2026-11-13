@@ -64,6 +64,29 @@ export function retypeInternalLinks(html: string, id: string, entryType: string)
   });
 }
 
+const DATA_ID_ATTR_RE = /\bdata-id=("[^"]*"|'[^']*')/i;
+
+/**
+ * Points every chip whose target `next` knows at the new ID — the merge
+ * import, where the same entries arrive under prefixed IDs. A chip `next`
+ * returns `undefined` for stays as it is.
+ *
+ * Via the start tag like `retypeInternalLinks`: no DOM (the schema harness
+ * runs the import under Node), and everything but the one attribute stays
+ * byte for byte. Only the label is untouched: the target's title does not change.
+ */
+export function rewriteInternalLinkIds(html: string, next: (id: string) => string | undefined): string {
+  if (!html || !html.includes('internalLink')) return html;
+  return html.replace(SPAN_TAG_RE, (tag) => {
+    if (tagAttr(tag, 'data-type') !== 'internalLink') return tag;
+    const id = tagAttr(tag, 'data-id');
+    const to = id ? next(id) : undefined;
+    if (to === undefined || to === id) return tag;
+    // The ID comes from a file: never let it close the attribute.
+    return tag.replace(DATA_ID_ATTR_RE, () => `data-id="${to.replace(/"/g, '&quot;')}"`);
+  });
+}
+
 /**
  * Does the stored HTML carry visible content? A fresh entry is
  * `<p></p>` — in front of the first link block there belongs no separator line,

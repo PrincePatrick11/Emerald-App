@@ -89,6 +89,8 @@ const STUBS = {
       // name, and a forced failure if the data URL carries "FAIL".
       if (cmd === 'save_image') {
         if (String(args?.dataUrl ?? '').includes('FAIL')) throw new Error('save_image failed (Harness)');
+        // The backup checks give every picture a name of its own (section 8z).
+        if (globalThis.harnessSaveImage) return globalThis.harnessSaveImage(String(args?.dataUrl ?? ''));
         return '${'c'.repeat(64)}.png';
       }
       // Without vaults.json this command decides whether it is a first start
@@ -96,6 +98,10 @@ const STUBS = {
       // harness needs the second case: an empty list would mean no active
       // vault, and v33 backs up the database file via getActiveDbFile().
       if (cmd === 'legacy_default_db_exists') return true;
+      // The backup import asks which pictures the vault has: none here.
+      if (cmd === 'list_image_files') return [];
+      // A backup embeds its pictures; the harness has no files, so the name stands in for the bytes.
+      if (cmd === 'read_image_as_base64') return 'data:image/png;base64,' + Buffer.from(String(args?.filename ?? '')).toString('base64');
       // A vault is a directory; in the harness that is simply the
       // working directory, so that the backup from v33 lands there.
       if (cmd === 'migrate_vault_layout' || cmd === 'default_vault_dir' || cmd === 'new_vault_base_dir') {
@@ -128,7 +134,7 @@ writeFileSync(
    export { TABLES, TABLE_DDL, ddlIfNotExists, checkIntegrity, reassignCategoryContent, collectUsedImageFilenames } from '${process.cwd().replace(/\\/g, '/')}/src/lib/schema';
    export { copyTable } from '${process.cwd().replace(/\\/g, '/')}/src/lib/dbRebuild';
    export { ddlBeforeV49 } from '${process.cwd().replace(/\\/g, '/')}/src/lib/schemaV48';
-   export { assertPayloadReferencesResolve, dropUnknownTagIds, entryRowsForInsert, importTagsAndRemap, migrateBackupPayload, withRoutinesAsTemplates } from '${process.cwd().replace(/\\/g, '/')}/src/lib/dbBackup';
+   export { assertPayloadReferencesResolve, buildBackupFrom, doMerge, doReplace, dropUnknownTagIds, entryRowsForInsert, importTagsAndRemap, migrateBackupPayload, withRoutinesAsTemplates } from '${process.cwd().replace(/\\/g, '/')}/src/lib/dbBackup';
    export { invalidateVaultCache } from '${process.cwd().replace(/\\/g, '/')}/src/lib/vaultManager';
    export { convertLegacySigils, convertLegacySigilsInPlace, needsSigilConversion, sigilRowToContent } from '${process.cwd().replace(/\\/g, '/')}/src/lib/migrateLegacySigils';
    export { linkedIdsToContent, rowsLinkSource } from '${process.cwd().replace(/\\/g, '/')}/src/lib/migrateLinkedIdsToContent';
@@ -178,7 +184,7 @@ const {
   runMigrations, MIGRATIONS, clearLegacyUntitledTitles, sweepDanglingTaskLinks, entryRowsForInsert, TABLES, TABLE_DDL,
   ddlIfNotExists, checkIntegrity, reassignCategoryContent,
   collectUsedImageFilenames, invalidateVaultCache, copyTable, ddlBeforeV49,
-  assertPayloadReferencesResolve, convertLegacySigils, migrateBackupPayload, withRoutinesAsTemplates,
+  assertPayloadReferencesResolve, convertLegacySigils, migrateBackupPayload, withRoutinesAsTemplates, buildBackupFrom, doMerge, doReplace,
   needsSigilConversion, sigilRowToContent, linkedIdsToContent, rowsLinkSource, journalFieldsToContent,
   stripTagIds, replaceTagId, importTagsAndRemap, dropUnknownTagIds, createAltarTables, convertAltarsInPlace,
   contentWithoutLegacySigils, convertLegacySigilsInPlace,
@@ -2763,6 +2769,216 @@ console.log('\n8y. Readers of the block rows: "Images", image cleanup, field val
   check('import working copy: an owner it did not touch keeps its rows as they were', (await rowIds()) === before);
   check('readers: schema identical to the baseline', JSON.stringify(await readSchema(db)) === JSON.stringify(schemaA));
   db.close();
+}
+
+console.log("\n8z. Backups: block rows since '14', older files through the converter\n");
+
+{
+  const { createHash } = await import('node:crypto');
+  // Every picture the import saves gets a name of its own, the hash of what it was given.
+  const savedName = (dataUrl) => `${createHash('sha256').update(dataUrl).digest('hex')}.png`;
+  globalThis.harnessSaveImage = savedName;
+  const FULL = {
+    includeJournal: true, includeWiki: true, includeOperations: true, includeTasks: true, includeTags: true,
+    includeLexicon: true, dateFrom: '', dateTo: '', includeDeleted: true,
+  };
+  const ownColumn = { entry: 'entry_id', template: 'template_id' };
+  const blockRows = async (db, kind, id) => (await db.select(
+    `SELECT id, position, type, version, hidden, title, show_title, config, data, attrs, html, updated_at FROM blocks WHERE ${ownColumn[kind]} = $1 ORDER BY position`, [id],
+  )).map((r) => ({ ...r }));
+  const refRows = async (db, kind, id) => (await db.select(
+    `SELECT b.id AS block, r.target_kind, r.target, r.role FROM block_refs r JOIN blocks b ON b.row_id = r.block_row
+      WHERE b.${ownColumn[kind]} = $1 ORDER BY b.id, r.target_kind, r.target, r.role`, [id],
+  )).map((r) => ({ ...r }));
+  /** The file through JSON, as it is written and read, and lifted like on opening it. */
+  const reread = (file) => {
+    const copy = JSON.parse(JSON.stringify(file));
+    migrateBackupPayload(copy);
+    return copy;
+  };
+  /** A stored name in the file → the name the import saved it under. */
+  const namesAfterImport = (file) => new Map(Object.entries(file.images).map(([name, url]) => [name, savedName(url)]));
+  const renamed = (value, names) => {
+    let out = JSON.stringify(value);
+    for (const [from, to] of names) out = out.split(from).join(to);
+    return JSON.parse(out);
+  };
+
+  const W = '7b000000-0000-4000-8000-000000000001';
+  const J = '7b000000-0000-4000-8000-000000000002';
+  const TPL = '7b000000-0000-4000-8000-000000000003';
+  const TASK = '7b000000-0000-4000-8000-000000000004';
+  const pic = (c) => `${c.repeat(64)}.png`;
+  const attr = (value) => JSON.stringify(value).replace(/&/g, '&amp;').replace(/"/g, '&quot;');
+  const chipTo = (id) => `<span data-type="internalLink" class="internal-link" data-id="${id}" data-entry-type="wiki" data-label="Ziel">Ziel</span>`; // lang-ok
+  const scene = {
+    width: 1600, height: 1000, elements: [], guides: [], guidesLocked: false,
+    background: { fill: null, image: { src: pic('4') }, tint: null },
+  };
+  const fieldsConfig = {
+    elements: [
+      { id: 'ln', kind: 'link', label: 'L', defaultValue: { id: W, entryType: 'wiki', label: 'Ziel' } }, // lang-ok
+      { id: 'im', kind: 'image', label: 'I', defaultValue: pic('5') },
+    ],
+  };
+  const journalStack =
+    `<section data-block="core.text" data-block-id="t1"><p>Link ${chipTo(W)}</p><img src="${pic('1')}"></section>`
+    + `<section data-block="core.paint" data-block-id="p1" data-block-config="${attr({ sigil: true })}" data-block-data="${attr({ v: 1, layers: [{ id: 'L1', image: true, strokes: [] }] })}">`
+    + `<img src="${pic('2')}" alt="" data-paint="render"><img src="${pic('3')}" alt="" data-paint="L1"></section>`
+    + `<section data-block="core.canvas" data-block-id="c1" data-block-data="${attr(scene)}"><img src="${pic('4')}" alt="" data-canvas="background"></section>`
+    + `<section data-block="core.fields" data-block-id="f1" data-block-config="${attr(fieldsConfig)}"></section>`;
+
+  const src = freshDb('backup-src.db');
+  await runMigrations(src);
+  await insertWithStack(src, 'entries', { id: W, type: 'wiki', title: 'Ziel', created_at: now, updated_at: now }, '<p>Ziel</p>'); // lang-ok
+  await insertWithStack(src, 'entries', { id: J, type: 'journal', title: 'Quelle', created_at: now, updated_at: now }, journalStack); // lang-ok
+  await insertWithStack(src, 'templates', { id: TPL, name: 'Vorlage', created_at: now, updated_at: now }, `<p>Bild</p><img src="${pic('6')}">`); // lang-ok
+  await src.execute(`INSERT INTO tasks (id,title,created_at,updated_at) VALUES ($1,'Aufgabe',$2,$2)`, [TASK, now]); // lang-ok
+  await src.execute(`INSERT INTO task_links (id,task_id,target_id,target_type) VALUES ('tl1',$1,$2,'wiki')`, [TASK, W]);
+  // A block written at another time than the others keeps that time.
+  await src.execute("UPDATE blocks SET updated_at = '2025-05-05T05:05:05.000Z' WHERE entry_id = $1 AND id = 'p1'", [J]);
+  const journalBefore = await blockRows(src, 'entry', J);
+  const sigilBefore = await blockRows(src, 'template', 'core-sigil');
+
+  const backup = await buildBackupFrom(src, FULL);
+  check("export: version '14', the blocks as rows, no content on their owners",
+    backup.version === '14' && Array.isArray(backup.data.blocks) && backup.data.blocks.length > 0
+      && backup.data.entries.every((r) => !('content' in r)) && backup.data.templates.every((r) => !('content' in r))
+      && backup.data.blocks.every((r) => !('row_id' in r) && !('text' in r)), backup.data.blocks?.[0]);
+  check("export: every picture of the blocks travels, the one only in a prefill's JSON too",
+    ['1', '2', '3', '4', '5', '6'].every((c) => pic(c) in backup.images), Object.keys(backup.images));
+
+  // (a) Replace into an empty vault: the same rows, pictures renamed, references rebuilt.
+  const restored = reread(backup);
+  const dst = freshDb('backup-dst.db');
+  await runMigrations(dst);
+  clearSavedBlocks();
+  await doReplace(dst, restored);
+  const names = namesAfterImport(restored);
+  for (const [kind, id, label] of [['entry', J, 'journal entry'], ['entry', W, 'wiki article'], ['template', TPL, 'template']]) {
+    const expected = renamed(await blockRows(src, kind, id), names);
+    const got = await blockRows(dst, kind, id);
+    check(`restore '14': the ${label} has its blocks unchanged, position and time included`,
+      got.length > 0 && JSON.stringify(got) === JSON.stringify(expected), { got, expected });
+    // Sorted after renaming: the new names sort differently.
+    const sorted = (refs) => refs.map((r) => JSON.stringify(r)).sort().join('\n');
+    const refs = await refRows(dst, kind, id);
+    check(`restore '14': the references of the ${label} are rebuilt`,
+      sorted(refs) === sorted(renamed(await refRows(src, kind, id), names)), { refs, src: renamed(await refRows(src, kind, id), names) });
+  }
+  check("restore '14': the prefill's picture is referenced as a default",
+    (await refRows(dst, 'entry', J)).some((r) => r.role === 'default' && r.target === names.get(pic('5'))));
+  check("restore '14': the vault's own templates keep their blocks",
+    (await dst.select("SELECT COUNT(*) AS n FROM blocks WHERE template_id = 'core-sigil'"))[0].n > 0);
+  check("restore '14': no content column was left behind", !(await hasContentColumn(dst, 'entry')));
+  check("restore '14': schema identical to the baseline", JSON.stringify(await readSchema(dst)) === JSON.stringify(schemaA));
+  dst.close();
+
+  // (b) Merge into the vault it came from: copies under prefixed IDs, links pointing at the copies.
+  clearSavedBlocks();
+  await doMerge(src, reread(backup));
+  const [copy] = await src.select('SELECT id FROM entries WHERE id LIKE $1', [`%-${J}`]);
+  const prefixed = copy ? copy.id.slice(0, copy.id.length - J.length) + W : null;
+  const copyStack = copy ? await stackOf(src, 'entry', copy.id) : '';
+  check("merge '14': the copy's chip and link prefill point at the copied target",
+    !!copy && copyStack.includes(`data-id="${prefixed}"`) && !copyStack.includes(`data-id="${W}"`)
+      && copyStack.includes(`&quot;id&quot;:&quot;${prefixed}&quot;`), copyStack);
+  check("merge '14': the copy's references to entries point at the copied target",
+    !!copy && (await refRows(src, 'entry', copy.id)).filter((r) => r.target_kind === 'entry').every((r) => r.target === prefixed));
+  check("merge '14': the original keeps its blocks", JSON.stringify(await blockRows(src, 'entry', J)) === JSON.stringify(journalBefore));
+  check("merge '14': a template that is already there gets no second set of blocks", (await blockRows(src, 'template', TPL)).length === 1);
+  src.close();
+
+  // (c) A partial replace — journal and tasks only: no other owner gets blocks, a link to the missing article goes.
+  const partial = reread(backup);
+  partial.data.wikiArticles = [];
+  partial.data.operations = [];
+  const dst2 = freshDb('backup-partial.db');
+  await runMigrations(dst2);
+  clearSavedBlocks();
+  await doReplace(dst2, partial);
+  check('partial restore: the journal entry has its blocks, the wiki article neither row nor blocks',
+    (await blockRows(dst2, 'entry', J)).length === 4 && (await blockRows(dst2, 'entry', W)).length === 0
+      && (await dst2.select('SELECT COUNT(*) AS n FROM entries WHERE id = $1', [W]))[0].n === 0);
+  check('partial restore: the task link to the article left out is swept',
+    (await dst2.select('SELECT COUNT(*) AS n FROM task_links'))[0].n === 0);
+  dst2.close();
+
+  // As a new vault (add-vault): the seeded sigil template goes first, the file's arrives with its own blocks.
+  const fresh = freshDb('backup-add-vault.db');
+  await runMigrations(fresh);
+  clearSavedBlocks();
+  await fresh.execute("DELETE FROM templates WHERE id = 'core-sigil'");
+  const asNew = reread(backup);
+  await doReplace(fresh, asNew);
+  check('new vault: the sigil template has exactly the blocks of the file',
+    JSON.stringify(await blockRows(fresh, 'template', 'core-sigil')) === JSON.stringify(renamed(sigilBefore, namesAfterImport(asNew))));
+  fresh.close();
+
+  // A crafted file with short picture keys: every name is renamed once, nothing grows key by key.
+  const crafted = reread(backup);
+  crafted.images = { ...crafted.images, '': 'data:image/png;base64,AA', 0: 'data:image/png;base64,AB', a: 'data:image/png;base64,AC' };
+  const dst3 = freshDb('backup-crafted.db');
+  await runMigrations(dst3);
+  clearSavedBlocks();
+  await doReplace(dst3, crafted);
+  const longest = (await dst3.select('SELECT MAX(LENGTH(html) + LENGTH(COALESCE(data, \'\'))) AS n FROM blocks'))[0].n;
+  check('crafted picture keys: the import finishes and the blocks keep their size', longest < 5000, longest);
+  dst3.close();
+
+  // (d) Files from before the rebuild (tools/mcp/seed/imports, written by build_import_fixtures.mjs).
+  const fixture = (name) => JSON.parse(readFileSync(join(process.cwd(), 'tools/mcp/seed/imports', name), 'utf8'));
+  const FX = {
+    wiki: '0f1e2d3c-0000-4000-8000-000000000001', journal: '0f1e2d3c-0000-4000-8000-000000000002',
+    sigilOp: '0f1e2d3c-0000-4000-8000-000000000003', altarOp: '0f1e2d3c-0000-4000-8000-000000000004',
+    template: '0f1e2d3c-0000-4000-8000-000000000005', altar: '0f1e2d3c-0000-4000-8000-000000000010',
+    journal12: '0f1e2d3c-0000-4000-8000-000000000013',
+  };
+  const old = freshDb('backup-old.db');
+  await runMigrations(old);
+  clearSavedBlocks();
+  const lifted13 = reread(fixture('backup-v13-pre-rebuild.emeralddb'));
+  await withContentColumns(old, () => doReplace(old, lifted13));
+  const names13 = namesAfterImport(lifted13);
+  const types = async (kind, id) => (await blockRows(old, kind, id)).map((r) => r.type);
+  check("old '13': no sigil block of v42–v63 is left",
+    (await old.select("SELECT COUNT(*) AS n FROM blocks WHERE type LIKE 'core.sigil.%'"))[0].n === 0);
+  const sigilRows = await blockRows(old, 'entry', FX.sigilOp);
+  check("old '13': the sigils are a calculator, a sigil drawing and a charge, then the notes",
+    JSON.stringify(sigilRows.map((r) => r.type)) === JSON.stringify(['core.fields', 'core.paint', 'core.fields', 'core.text'])
+      && JSON.parse(sigilRows[1]?.config ?? '{}').sigil === true, sigilRows.map((r) => [r.type, r.config]));
+  check("old '13': the drawing's picture is referenced under the name it was saved under",
+    (await refRows(old, 'entry', FX.sigilOp)).some((r) => r.target === names13.get(`${'2b'.repeat(32)}.png`)));
+  check("old '13': the altar is an operation of \"Altars\" with its altar and its picture",
+    JSON.stringify(await types('entry', FX.altarOp)) === JSON.stringify(['core.altar', 'core.text'])
+      && (await old.select('SELECT category_id FROM entries WHERE id = $1', [FX.altarOp]))[0]?.category_id === 'altars'
+      && (await refRows(old, 'entry', FX.altarOp)).some((r) => r.target === names13.get(`${'3c'.repeat(32)}.png`)),
+    await refRows(old, 'entry', FX.altarOp));
+  const journalRefs = await refRows(old, 'entry', FX.journal);
+  check("old '13': the journal's links and picture are references",
+    journalRefs.some((r) => r.target_kind === 'entry' && r.target === FX.wiki) && journalRefs.some((r) => r.target_kind === 'entry' && r.target === FX.altarOp)
+      && journalRefs.some((r) => r.target === names13.get(`${'1a'.repeat(32)}.png`)), journalRefs);
+  check("old '13': the template's sigils are converted too",
+    JSON.stringify(await types('template', FX.template)) === JSON.stringify(['core.fields', 'core.paint', 'core.fields']),
+    await types('template', FX.template));
+  check("old '13': the task link to the altar stays", (await old.select('SELECT COUNT(*) AS n FROM task_links'))[0].n === 1);
+  check("old '13': no content column was left behind", !(await hasContentColumn(old, 'entry')) && !(await hasContentColumn(old, 'template')));
+
+  const lifted12 = reread(fixture('backup-v12-altars.emeralddb'));
+  await withContentColumns(old, () => doMerge(old, lifted12));
+  const [altarCopy] = await old.select('SELECT id, type, category_id FROM entries WHERE id LIKE $1', [`%-${FX.altar}`]);
+  const [journalCopy] = await old.select('SELECT id FROM entries WHERE id LIKE $1', [`%-${FX.journal12}`]);
+  check("old '12' merged: the altar is an operation of \"Altars\" under the prefixed ID, with an altar block",
+    altarCopy?.type === 'operation' && altarCopy.category_id === 'altars'
+      && (await blockRows(old, 'entry', altarCopy.id))[0]?.type === 'core.altar', altarCopy);
+  const journal12Stack = journalCopy ? await stackOf(old, 'entry', journalCopy.id) : '';
+  check("old '12' merged: the chip to the altar points at the prefixed operation",
+    !!altarCopy && journal12Stack.includes(`data-id="${altarCopy.id}"`) && journal12Stack.includes('data-entry-type="operation"'), journal12Stack);
+  check("old '12' merged: the item's picture is in \"Images\"",
+    (await old.select('SELECT COUNT(*) AS n FROM images WHERE file = $1', [namesAfterImport(lifted12).get(`${'5e'.repeat(32)}.png`)]))[0].n === 1);
+  check('old files: schema identical to the baseline', JSON.stringify(await readSchema(old)) === JSON.stringify(schemaA));
+  old.close();
+  delete globalThis.harnessSaveImage;
 }
 
 console.log('\n9. Mirrored constants\n');

@@ -1,0 +1,38 @@
+{
+  "version": "1",
+  "type": "altar",
+  "title": "Fixture: Altar aus .emerald",
+  "createdAt": "2026-10-20T10:00:00.000Z",
+  "content": "",
+  "images": {},
+  "meta": {
+    "altarBackgroundPreset": "night",
+    "altarResolution": "1920x1080",
+    "altarIconData": "🕯️",
+    "altarItems": [
+      {
+        "id": "item-1",
+        "name": "Fixture: Schale",
+        "emoji": "🥣",
+        "category": "",
+        "note": "",
+        "imageData": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADAAAAAwCAIAAADYYG7QAAAAQUlEQVR4nO3OQQ0AIAwAsQmb/yALFxyPJhXQObtfmXwgJCQkVA+EhISE6oGQkJBQPRASEhKqB0JCQkL1QEhI6LEL/eVApkKKBrIAAAAASUVORK5CYII=",
+        "createdAt": "2026-10-20T10:00:00.000Z"
+      }
+    ],
+    "altarPlacements": [
+      {
+        "itemId": "item-1",
+        "x": 40,
+        "y": 40,
+        "z_index": 1,
+        "width": 25,
+        "height": 25,
+        "rotation": 0,
+        "opacity": 1,
+        "locked": false,
+        "hidden": false
+      }
+    ]
+  }
+}

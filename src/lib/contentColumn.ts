@@ -9,7 +9,7 @@ import { OWNER, readContents, replaceOwnerBlocks, type BlockOwner, type BlockOwn
  * Only these places still meet it:
  * - the migrations v65 (`fillMissingBlockRows`) and v66 (`reconcileBlockRows`,
  *   then the drop), on vaults that still have it;
- * - a backup import's working copy, which gets the column back for as long as
+ * - the working copy of an import of a backup older than '14', which gets the column back for as long as
  *   the import runs (`addContentColumns`/`dropContentColumns`, see
  *   `importStaging.ts`): its converters for older files read and write
  *   `content` with plain SQL, and the rows are built from it at the end;

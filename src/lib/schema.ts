@@ -788,6 +788,11 @@ const STORED_IMAGE_RE = /^[0-9a-f]{64}\.(?:png|jpe?g|gif|webp|svg)$/;
 /** The same form, unanchored — for collecting from HTML. */
 const IMAGE_NAME_RE = /[0-9a-f]{64}\.(?:png|jpe?g|gif|webp|svg)/g;
 
+/** Every stored image name anywhere in a text — markup, JSON, whatever holds it. */
+export function storedImageNamesIn(text: string): string[] {
+  return text.match(IMAGE_NAME_RE) ?? [];
+}
+
 /**
  * The stored file name of a reference, or null.
  *
