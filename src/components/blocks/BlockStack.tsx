@@ -614,6 +614,11 @@ function useExternalContentReset(
  *  could be selected in the text block any more. */
 function StackItem({ id, children }: { id: string; children: (startDrag: (e: PointerEvent) => void) => ReactNode }) {
   const controls = useDragControls();
+  // Only for the look: a dragged block gets an opaque surface (index.css),
+  // until it has sprung back into its slot after release. The ref keeps the
+  // end of an earlier snap-back from clearing a drag that started again.
+  const [dragging, setDragging] = useState(false);
+  const draggingRef = useRef(false);
   return (
     <Reorder.Item
       as="div"
@@ -621,8 +626,11 @@ function StackItem({ id, children }: { id: string; children: (startDrag: (e: Poi
       dragListener={false}
       dragControls={controls}
       transition={REORDER_SPRING}
+      onDragStart={() => { draggingRef.current = true; setDragging(true); }}
+      onDragEnd={() => { draggingRef.current = false; }}
+      onDragTransitionEnd={() => { if (!draggingRef.current) setDragging(false); }}
       style={{ position: 'relative' }}
-      className="block-stack-item"
+      className={dragging ? 'block-stack-item block-stack-item--dragging' : 'block-stack-item'}
       data-block-item={id}
     >
       {children((e) => controls.start(e))}
