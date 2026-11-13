@@ -3,7 +3,7 @@ import Database from './sqlite';
 import { invoke } from '@tauri-apps/api/core';
 import { getActiveVaultId } from './vaultManager';
 import {
-  ALTAR_CATEGORY_ID, ALTAR_ITEMS_INDEX_DDL, ALTARS_INDEX_DDL, BASELINE_VERSION, BLOCK_DEFINITIONS_INDEX_DDL, ENTRIES_INDEX_DDL, IMAGES_INDEX_DDL, LEXICON_INDEX_DDL, TABLE_DDL,
+  ALTAR_CATEGORY_ID, ALTAR_ITEMS_INDEX_DDL, ALTARS_INDEX_DDL, BASELINE_VERSION, BLOCK_DEFINITIONS_INDEX_DDL, BLOCKS_INDEX_DDL, ENTRIES_INDEX_DDL, IMAGES_INDEX_DDL, LEXICON_INDEX_DDL, TABLE_DDL,
   TEMPLATES_INDEX_DDL, createSchema, ddlIfNotExists, purgeCategory, seedBuiltins, storedImageName,
 } from './schema';
 import { normalizeSchema } from './normalizeSchema';
@@ -13,7 +13,7 @@ import { migrateJournalFieldsToContent } from './migrateJournalFieldsToContent';
 import { mergeCategoryTables } from './mergeCategoryTables';
 import { backupDatabaseFile, columnNames, createIndexesIfMissing, dropColumnsIfPresent } from './dbRebuild';
 import { migrateOperationStatusToBlocks } from './migrateOperationStatusToBlocks';
-import { convertLegacySigils, hasLegacySigilRows } from './migrateLegacySigils';
+import { convertLegacySigils, hasLegacySigilRows, convertLegacySigilsInPlace } from './migrateLegacySigils';
 import { IMAGE_FIELDS_V48, TITLED_TABLES_V48 } from './schemaV48';
 import { unifyEntries } from './unifyEntries';
 import { tagsById } from './tagsById';
@@ -23,11 +23,15 @@ import type { EntryType } from '../types';
 import { makeCategoryOptional } from './nullableCategory';
 import { seedAltarTemplate, seedSigilTemplate } from './templateRows';
 import { altarsToOperations, dropAltarTables } from './migrateAltars';
+import { legacySigilLabels } from './blocks/legacySigilBlocks';
 import { migrateRoutinesToTemplates } from './migrateRoutinesToTemplates';
 import i18n from '../i18n';
 import { LEGACY_UNTITLED_TITLES } from './entryTitle';
 import { useSettingsStore } from '../store/settingsStore';
 import { dropTriggers, installTriggers, isTracked, markMigrated } from './sync/tracking';
+import { clearSavedBlocks } from './blockStore';
+import { fillMissingBlockRows, hasContentColumn, reconcileBlockRows } from './contentColumn';
+import { TEMPLATES_DDL_V65 } from './schemaV65';
 
 // Per-vault DB cache: vault id → Database instance
 const _dbCache = new Map<string, Database>();
@@ -50,6 +54,7 @@ export function dbEpoch(): number {
 /** The content was replaced, the connection stayed — after swapping in an import. */
 export function markDbReplaced(): void {
   _epoch++;
+  clearSavedBlocks();
 }
 
 /**
@@ -63,6 +68,7 @@ export function markDbReplaced(): void {
  */
 export async function resetDbCache(): Promise<void> {
   _epoch++;
+  clearSavedBlocks();
   // First wait for the running loads, then clear. A `getDb()`
   // enters its connection into the cache only *after* `Database.load` — anyone who
   // just clears misses exactly those: they land in the freshly cleared
@@ -1307,7 +1313,8 @@ export const MIGRATIONS: Migration[] = [
     version: 43,
     name: 'templates',
     up: async (db) => {
-      await db.execute(ddlIfNotExists(TABLE_DDL.templates));
+      // The shape before v66, which drops `content` (`schemaV65.ts`).
+      await db.execute(ddlIfNotExists(TEMPLATES_DDL_V65));
       await createIndexesIfMissing(db, [TEMPLATES_INDEX_DDL]);
       await seedSigilTemplate(db, i18n.t);
     },
@@ -1523,7 +1530,61 @@ export const MIGRATIONS: Migration[] = [
     name: 'drop_altar_tables',
     up: dropAltarTables,
   },
+  {
+    // The sigil blocks of v42 become what a custom block's sigil parts are:
+    // calculator and charge fields blocks with one element, the drawing a
+    // paint block marked as a sigil drawing; charge targets follow
+    // (`legacySigilBlocks.ts`). A copy first, only if there is something to convert.
+    version: 64,
+    name: 'sigil_blocks_to_fields_and_paint',
+    up: (db) => convertLegacySigilsInPlace(db, legacySigilLabels(i18n.t), () => backupDatabaseFile(db, 'v64')),
+  },
+  {
+    // The blocks become rows of their own (`blocks`), with what they point at
+    // (`block_refs`), built from `content` by the block parser
+    // (`contentColumn.ts`), and `content` is normalised to what the rows give.
+    // A copy first; repeatable, since an owner is done the moment its batch is.
+    version: 65,
+    name: 'blocks_table',
+    up: blocksTable,
+  },
+  {
+    // The rows are the only record of the blocks: `entries.content` and
+    // `templates.content` go. Every owner whose rows do not give its `content`
+    // (written by an older version, by sync) is rebuilt from it first, so
+    // nothing is lost. A copy first; repeatable, the drop skips what is gone.
+    version: 66,
+    name: 'drop_content_columns',
+    up: dropContentColumnsMigration,
+  },
 ];
+
+async function dropContentColumnsMigration(db: Database): Promise<void> {
+  const entries = await hasContentColumn(db, 'entry');
+  const templates = await hasContentColumn(db, 'template');
+  if (!entries && !templates) return;
+  // Reconciling reads `content` of both tables, so it runs while both are there; a
+  // resumed run whose first try dropped one had reconciled and made its copy before.
+  if (entries && templates) {
+    await backupDatabaseFile(db, 'v66');
+    await reconcileBlockRows(db);
+  }
+  await dropColumnsIfPresent(db, 'entries', ['content']);
+  await dropColumnsIfPresent(db, 'templates', ['content']);
+}
+
+async function blocksTable(db: Database): Promise<void> {
+  const tables = await db.select<{ name: string }[]>("SELECT name FROM sqlite_master WHERE type='table' AND name='blocks'");
+  const [content] = await db.select<{ n: number }[]>(
+    "SELECT (SELECT COUNT(*) FROM entries WHERE content <> '') + (SELECT COUNT(*) FROM templates WHERE content <> '') AS n"
+  );
+  // A resumed run already has the copy from before its first try.
+  if (tables.length === 0 && (content?.n ?? 0) > 0) await backupDatabaseFile(db, 'v65');
+  await db.execute(ddlIfNotExists(TABLE_DDL.blocks));
+  await db.execute(ddlIfNotExists(TABLE_DDL.block_refs));
+  await createIndexesIfMissing(db, BLOCKS_INDEX_DDL);
+  await fillMissingBlockRows(db);
+}
 
 async function altarSettingsToJson(db: Database): Promise<void> {
   const columns = await columnNames(db, 'altars');

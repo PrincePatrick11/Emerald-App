@@ -68,3 +68,6 @@ CLAUDE.md.backup
 # Emerald export/backup files (user data)
 *.emerald
 *.emeralddb
+# ...except the files of older versions the import tests read (tools/mcp/README.md)
+!tools/mcp/seed/imports/*.emerald
+!tools/mcp/seed/imports/*.emeralddb

@@ -6,7 +6,7 @@ import { AltarIcon } from '../altarIcon';
 import { createSigilCalcBlock, createSigilCanvasBlock, createSigilChargeBlock } from './sigil';
 import { createTextBlock } from './blockHtml';
 import { ALTAR_BLOCK_TYPE, createCanvasBlock } from './canvas';
-import { createPaintBlock } from './paint';
+import { createPaintBlock, isSigilDrawing } from './paint';
 import {
   activeElements, createFieldsBlock, ELEMENT_KINDS, elementKindLabelKey, FIELDS_BLOCK_TYPE, isSigilKind, parseFields,
   type ElementKind, type FallbackText,
@@ -53,8 +53,9 @@ export const ELEMENT_KIND_ICONS: Record<ElementKind, LucideIcon> = {
 
 const KIND_GROUPS: Partial<Record<ElementKind, BlockGroup>> = { link: 'reference', image: 'media', moon: 'moon' };
 
-// Text and the sigil parts exist only in custom blocks — on their own one
-// inserts the text block and the sigil blocks (above and below).
+// Text and the sigil parts are not offered as fields of their own: one inserts
+// the text block, and the three sigil presets below (calculator and charge as
+// a fields block with that one part, the drawing as a sigil paint block).
 const FIELD_PRESET_KINDS = ELEMENT_KINDS.filter((kind) => kind !== 'text' && !isSigilKind(kind));
 
 export const BLOCK_PRESETS: readonly BlockPreset[] = [
@@ -108,5 +109,6 @@ export function blockIcon(block: BlockInstance, meta: BlockTypeMeta | undefined)
     const elements = activeElements(model);
     if (elements.length === 1) return ELEMENT_KIND_ICONS[elements[0].kind];
   }
+  if (meta && isSigilDrawing(block)) return ELEMENT_KIND_ICONS.sigilCanvas;
   return meta?.icon;
 }

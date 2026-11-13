@@ -133,12 +133,17 @@ async function loadAppModules(checkout, workDir) {
   const { build } = await import(pathToFileURL(require_.resolve('esbuild')).href);
 
   const src = checkout.replace(/\\/g, '/') + '/src/lib';
+  // Since v66 the blocks of entries and templates are rows of `blocks` only;
+  // a checkout that far writes them through its own block store.
+  const blockStore = join(checkout, 'src', 'lib', 'blockStore.ts');
+  const hasBlockRows = existsSync(blockStore) && readFileSync(blockStore, 'utf-8').includes('export function replaceOwnerBlocks');
   const entry = join(workDir, 'entry.ts');
   writeFileSync(
     entry,
     `export { BASELINE_VERSION, TABLES, createSchema, seedBuiltins, checkIntegrity } from '${src}/schema';
      export { internalLinkChipHtml } from '${src}/internalLinkHtml';
-     export { runMigrations, MIGRATIONS } from '${src}/db';`
+     export { runMigrations, MIGRATIONS } from '${src}/db';
+     ${hasBlockRows ? `export { replaceOwnerBlocks } from '${src}/blockStore';` : ''}`
   );
 
   const bundlePath = join(workDir, 'bundle.mjs');
@@ -205,10 +210,17 @@ function columnsOf(db, table) {
   return new Set(db.raw.prepare(`PRAGMA table_info(${table})`).all().map((r) => r.name));
 }
 
-async function insertRows(db, table, rows, chipHtml, report) {
+/** Which owner kind a table's rows are, for their block rows. */
+const BLOCK_OWNERS = { entries: 'entry', templates: 'template' };
+
+async function insertRows(db, table, rows, chipHtml, report, app = {}) {
   if (!rows?.length) return;
   const known = columnsOf(db, table);
   const dropped = new Set();
+  // Since v66 a block stack is no column but rows of `blocks`.
+  const owner = BLOCK_OWNERS[table];
+  const asBlockRows = owner && !known.has('content') && typeof app.replaceOwnerBlocks === 'function';
+  const now = new Date().toISOString();
   for (const row of rows) {
     const cols = [];
     const values = [];
@@ -226,7 +238,13 @@ async function insertRows(db, table, rows, chipHtml, report) {
       `INSERT INTO ${table} (${cols.join(', ')}) VALUES (${placeholders})`,
       values
     );
+    if (asBlockRows && typeof row.content === 'string') {
+      const content = expandFiles(expandChips(row.content, chipHtml));
+      const plan = app.replaceOwnerBlocks({ kind: owner, id: row.id }, content, row.updated_at ?? now, { hasRows: false });
+      for (const [query, params] of plan.statements) await db.execute(query, params ?? []);
+    }
   }
+  if (asBlockRows) dropped.delete('content');
   report.counts[table] = (report.counts[table] ?? 0) + rows.length;
   if (dropped.size) report.dropped[table] = [...dropped];
 }
@@ -386,7 +404,7 @@ export async function buildSeed(opts) {
         await insertTasks(db, fixture.tasks ?? [], chipHtml, report);
         continue;
       }
-      await insertRows(db, table, fixture[table], chipHtml, report);
+      await insertRows(db, table, fixture[table], chipHtml, report, app);
     }
 
     await db.execute(

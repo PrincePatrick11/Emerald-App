@@ -1,0 +1,84 @@
+{
+  "version": "12",
+  "type": "backup",
+  "exportedAt": "2026-10-20T10:00:00.000Z",
+  "filters": {
+    "includeJournal": true,
+    "includeWiki": true,
+    "includeOperations": true,
+    "includeTasks": true,
+    "includeTags": true,
+    "includeLexicon": false,
+    "dateFrom": "",
+    "dateTo": "",
+    "includeDeleted": true
+  },
+  "data": {
+    "entries": [
+      {
+        "category_id": null,
+        "entry_number": 1,
+        "icon": null,
+        "cover_image": null,
+        "tags": "[]",
+        "created_at": "2026-10-20T10:00:00.000Z",
+        "updated_at": "2026-10-20T10:00:00.000Z",
+        "deleted_at": null,
+        "id": "0f1e2d3c-0000-4000-8000-000000000013",
+        "type": "journal",
+        "title": "Fixture: Tagebuch zum alten Altar",
+        "content": "<section data-block=\"core.text\" data-block-id=\"fx-j12\"><p>Am <span data-type=\"internalLink\" class=\"internal-link\" data-id=\"0f1e2d3c-0000-4000-8000-000000000010\" data-entry-type=\"altar\" data-label=\"Fixture: Alter Altar\">Fixture: Alter Altar</span></p></section>"
+      }
+    ],
+    "tags": [],
+    "tasks": [],
+    "taskLinks": [],
+    "categories": [],
+    "blockDefinitions": [],
+    "templates": [],
+    "altars": [
+      {
+        "id": "0f1e2d3c-0000-4000-8000-000000000010",
+        "title": "Fixture: Alter Altar",
+        "settings": "{\"background_preset\":\"night\",\"resolution\":\"1920x1080\"}",
+        "background_image_data": null,
+        "icon_data": "🕯️",
+        "created_at": "2026-10-20T10:00:00.000Z",
+        "updated_at": "2026-10-20T10:00:00.000Z",
+        "deleted_at": null
+      }
+    ],
+    "altarItems": [
+      {
+        "id": "0f1e2d3c-0000-4000-8000-000000000011",
+        "name": "Fixture: Kerze",
+        "emoji": "🕯️",
+        "category_id": null,
+        "note": "aus dem alten Altar",
+        "image_data": "5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e.png",
+        "created_at": "2026-10-20T10:00:00.000Z",
+        "updated_at": "2026-10-20T10:00:00.000Z",
+        "deleted_at": null
+      }
+    ],
+    "altarPlacements": [
+      {
+        "id": "0f1e2d3c-0000-4000-8000-000000000012",
+        "altar_id": "0f1e2d3c-0000-4000-8000-000000000010",
+        "item_id": "0f1e2d3c-0000-4000-8000-000000000011",
+        "x": 50,
+        "y": 50,
+        "width": 30,
+        "height": 30,
+        "z_index": 1,
+        "rotation": 0,
+        "opacity": 1,
+        "locked": 0,
+        "hidden": 0
+      }
+    ]
+  },
+  "images": {
+    "5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e.png": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADAAAAAwCAIAAADYYG7QAAAAQUlEQVR4nO3OQQ0AIAwAsQmb/yALFxyPJhXQObtfmXwgJCQkVA+EhISE6oGQkJBQPRASEhKqB0JCQkL1QEhI6LEL/eVApkKKBrIAAAAASUVORK5CYII="
+  }
+}

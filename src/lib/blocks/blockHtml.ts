@@ -1,6 +1,7 @@
 import { escapeHtml } from '../internalLinkHtml';
 import { generateId } from '../helpers';
-import { TEXT_BLOCK_TYPE, type BlockInstance } from './types';
+import { htmlTags } from '../htmlTags';
+import { BLOCK_ATTR, TEXT_BLOCK_TYPE, type BlockInstance } from './types';
 
 /**
  * The block format in the stored `content` — reading and writing.
@@ -34,7 +35,6 @@ import { TEXT_BLOCK_TYPE, type BlockInstance } from './types';
  * when written back — the value itself does not change in the process.
  */
 
-const TAG_RE = /<!--[\s\S]*?-->|<(\/?)([a-z][^\s/>]*)((?:[^>"']|"[^"]*"|'[^']*')*)>/gi;
 const ATTR_RE = /([^\s"'<>/=]+)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'=<>`]+)))?/g;
 /** Only `data-*` is passed through. Everything else on a section has no
  *  meaning for the format and should not get one either (`onclick` …). */
@@ -108,33 +108,32 @@ export function parseBlocks(html: string): BlockInstance[] {
     if (loose.trim()) blocks.push(createTextBlock(loose));
   };
 
-  for (const m of html.matchAll(TAG_RE)) {
+  for (const t of htmlTags(html)) {
     // Skip comments (no tag name) and everything except <section>.
-    if (m[2]?.toLowerCase() !== 'section') continue;
-    const tag = m[0];
-    const at = m.index!;
-    if (m[1] === '/') {
+    if (t.name.toLowerCase() !== 'section') continue;
+    const at = t.index;
+    if (t.close) {
       if (depth === 0) continue; // stray end tag — belongs to the loose text
       depth--;
       if (depth === 0 && open) {
         blocks.push(toBlock(open.attrs, html.slice(open.contentFrom, at)));
-        looseFrom = at + tag.length;
+        looseFrom = at + t.length;
         open = null;
       }
       continue;
     }
 
-    const selfClosing = /\/\s*$/.test(m[3]);
+    const selfClosing = /\/\s*$/.test(t.attrs);
     if (depth === 0) {
-      const attrs = parseSectionAttrs(m[3]);
+      const attrs = parseSectionAttrs(t.attrs);
       if (attrs['data-block']) {
         pushLoose(at);
         if (selfClosing) {
           blocks.push(toBlock(attrs, ''));
-          looseFrom = at + tag.length;
+          looseFrom = at + t.length;
           continue;
         }
-        open = { attrs, contentFrom: at + tag.length };
+        open = { attrs, contentFrom: at + t.length };
       }
     }
     if (!selfClosing) depth++;
@@ -156,13 +155,29 @@ export function parseBlocks(html: string): BlockInstance[] {
   return blocks;
 }
 
+/**
+ * The order the instance attributes are written in; whatever else a block
+ * carries follows in its own order. Fixed, because a block row
+ * (`blockRows.ts`) keeps these attributes in columns of their own: written
+ * from a row or from the stack, a block comes out as the same string.
+ */
+const ATTR_ORDER: readonly string[] = [
+  BLOCK_ATTR.version, BLOCK_ATTR.hidden, BLOCK_ATTR.title, BLOCK_ATTR.showTitle, BLOCK_ATTR.config, BLOCK_ATTR.data,
+];
+
+/** The attributes of a block in the order they are written (`ATTR_ORDER`, then the rest). */
+export function orderedBlockAttrs(attrs: Record<string, string>): Array<[string, string]> {
+  const known = ATTR_ORDER.filter((name) => name in attrs).map((name): [string, string] => [name, attrs[name]]);
+  return [...known, ...Object.entries(attrs).filter(([name]) => !ATTR_ORDER.includes(name))];
+}
+
 /** A section, attributes double-quoted and escaped — the same form that
  *  `DOMParser` + `innerHTML` output again on merge import. */
 export function blockSectionHtml(block: BlockInstance): string {
   const attrs: Array<[string, string]> = [
     ['data-block', block.type],
     ['data-block-id', block.id],
-    ...Object.entries(block.attrs),
+    ...orderedBlockAttrs(block.attrs),
   ];
   return `<section ${attrs.map(([k, v]) => `${k}="${escapeHtml(v)}"`).join(' ')}>${block.html}</section>`;
 }

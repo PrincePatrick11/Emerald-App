@@ -1,4 +1,5 @@
 import type { ContentType } from '../types';
+import { htmlTags } from './htmlTags';
 
 /**
  * Reading and writing the stored HTML of an internal link chip —
@@ -10,7 +11,28 @@ import type { ContentType } from '../types';
  * `data-*` names. If this deviates, TipTap reads the chip in as text.
  */
 
-const SPAN_TAG_RE = /<span\b[^>]*>/gi;
+/**
+ * The start tags of `<span>`s, as written (`<` to `>`) — through the linear,
+ * quote-aware `htmlTags` rather than a regular expression: this runs over
+ * every imported, saved and backed-up block (`blockRefs`), and a pattern
+ * like `<span[^>]*>` over a long run of `<span` without a `>` takes minutes.
+ */
+function* spanStartTags(html: string): Generator<{ index: number; tag: string }> {
+  for (const t of htmlTags(html)) {
+    if (!t.close && t.name.toLowerCase() === 'span') yield { index: t.index, tag: html.slice(t.index, t.index + t.length) };
+  }
+}
+
+/** `html` with every `<span>` start tag replaced by what `replace` makes of it. */
+function replaceSpanStartTags(html: string, replace: (tag: string) => string): string {
+  let out = '';
+  let from = 0;
+  for (const { index, tag } of spanStartTags(html)) {
+    out += html.slice(from, index) + replace(tag);
+    from = index + tag.length;
+  }
+  return out + html.slice(from);
+}
 
 function tagAttr(tag: string, name: string): string | null {
   const match = new RegExp(`\\b${name}=("([^"]*)"|'([^']*)')`, 'i').exec(tag);
@@ -33,8 +55,7 @@ export function extractInternalLinks(
 ): Array<{ id: string; entryType: string }> {
   if (!html) return [];
   const out: Array<{ id: string; entryType: string }> = [];
-  for (const match of html.matchAll(SPAN_TAG_RE)) {
-    const tag = match[0];
+  for (const { tag } of spanStartTags(html)) {
     if (tagAttr(tag, 'data-type') !== 'internalLink') continue;
     const id = tagAttr(tag, 'data-id');
     if (!id) continue;
@@ -57,10 +78,33 @@ const ENTRY_TYPE_ATTR_RE = /\bdata-entry-type=("[^"]*"|'[^']*')/i;
  */
 export function retypeInternalLinks(html: string, id: string, entryType: string): string {
   if (!html || !html.includes(id)) return html;
-  return html.replace(SPAN_TAG_RE, (tag) => {
+  return replaceSpanStartTags(html, (tag) => {
     if (tagAttr(tag, 'data-type') !== 'internalLink' || tagAttr(tag, 'data-id') !== id) return tag;
     const attr = `data-entry-type="${entryType}"`;
     return ENTRY_TYPE_ATTR_RE.test(tag) ? tag.replace(ENTRY_TYPE_ATTR_RE, attr) : tag.replace(/^<span\b/i, `<span ${attr}`);
+  });
+}
+
+const DATA_ID_ATTR_RE = /\bdata-id=("[^"]*"|'[^']*')/i;
+
+/**
+ * Points every chip whose target `next` knows at the new ID — the merge
+ * import, where the same entries arrive under prefixed IDs. A chip `next`
+ * returns `undefined` for stays as it is.
+ *
+ * Via the start tag like `retypeInternalLinks`: no DOM (the schema harness
+ * runs the import under Node), and everything but the one attribute stays
+ * byte for byte. Only the label is untouched: the target's title does not change.
+ */
+export function rewriteInternalLinkIds(html: string, next: (id: string) => string | undefined): string {
+  if (!html || !html.includes('internalLink')) return html;
+  return replaceSpanStartTags(html, (tag) => {
+    if (tagAttr(tag, 'data-type') !== 'internalLink') return tag;
+    const id = tagAttr(tag, 'data-id');
+    const to = id ? next(id) : undefined;
+    if (to === undefined || to === id) return tag;
+    // The ID comes from a file: never let it close the attribute.
+    return tag.replace(DATA_ID_ATTR_RE, () => `data-id="${to.replace(/"/g, '&quot;')}"`);
   });
 }
 
@@ -76,7 +120,16 @@ export function isBlankContent(html: string): boolean {
   if (!html) return true;
   // Elements that stand on their own — an image without a word next to it is content.
   if (/<(img|hr|br|iframe|table|svg|video|audio|span)\b/i.test(html)) return false;
-  return !html.replace(/<[^>]*>/g, '').replace(/&nbsp;/gi, ' ').trim();
+  // The text between the tags, through the linear `htmlTags` — a regular
+  // expression over a long run of `<` without a `>` would take minutes.
+  let text = '';
+  let from = 0;
+  for (const tag of htmlTags(html)) {
+    text += html.slice(from, tag.index);
+    from = tag.index + tag.length;
+  }
+  text += html.slice(from);
+  return !text.replace(/&nbsp;/gi, ' ').trim();
 }
 
 export interface ParsedInternalLink {

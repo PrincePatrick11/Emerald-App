@@ -1,4 +1,5 @@
 import { getDb } from '../lib/db';
+import { readContent } from '../lib/blockStore';
 import { generateId } from '../lib/helpers';
 import { collectImageUses, isRemovableUse, withoutImage, type ImageUse } from '../lib/imageUsage';
 import type { VaultImage } from '../types';
@@ -15,7 +16,7 @@ interface Detached {
   after: string;
 }
 
-/** The places a picture is shown in now, read from the database — entries and templates whose texts or image fields hold it. */
+/** The places a picture is shown in now, read from the database (`block_refs`) — entries and templates whose texts or image fields hold it. */
 export async function placesShowing(file: string): Promise<ImageUse[]> {
   return ((await collectImageUses(await getDb())).get(file) ?? []).filter(isRemovableUse);
 }
@@ -44,10 +45,7 @@ export async function deletePicture(
   const detached: Detached[] = [];
   for (const use of await placesShowing(file)) {
     const kind = use.kind as Detached['kind'];
-    const [row] = await db.select<{ content: string | null }[]>(
-      `SELECT content FROM ${kind === 'entry' ? 'entries' : 'templates'} WHERE id=$1`, [use.id],
-    );
-    const before = row?.content ?? '';
+    const before = await readContent(db, { kind, id: use.id }) ?? '';
     const after = withoutImage(before, file);
     if (after === before) continue;
     await writeContent(kind, use.id, after);
@@ -80,10 +78,8 @@ export async function restorePicture(id: string): Promise<number> {
   }
   for (const place of Array.isArray(detached) ? detached : []) {
     if ((place.kind !== 'entry' && place.kind !== 'template') || typeof place.id !== 'string') continue;
-    const [current] = await db.select<{ content: string | null }[]>(
-      `SELECT content FROM ${place.kind === 'entry' ? 'entries' : 'templates'} WHERE id=$1`, [place.id],
-    );
-    if (!current || current.content !== place.after) { missed++; continue; }
+    const current = await readContent(db, { kind: place.kind, id: place.id });
+    if (current !== place.after) { missed++; continue; }
     await writeContent(place.kind, place.id, place.before);
   }
   await db.execute("UPDATE images SET detached='[]' WHERE id=$1", [id]);

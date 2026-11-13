@@ -2,6 +2,8 @@ import type Database from './sqlite';
 import type { TFunction } from 'i18next';
 import { nowIso } from './helpers';
 import { fromRow, type DbRow } from './row';
+import { readContents, replaceOwnerBlocks } from './blockStore';
+import { hasContentColumn } from './contentColumn';
 import { ALTAR_CATEGORY_ID, SIGIL_CATEGORY_ID } from './schema';
 import { serializeBlocks } from './blocks/blockHtml';
 import { translatedOr } from './blocks/blockAttrs';
@@ -21,23 +23,52 @@ export async function nextTemplateSortOrder(db: Database): Promise<number> {
   return rows[0]?.n ?? 0;
 }
 
-export async function insertTemplateRow(db: Database, template: Template): Promise<void> {
+/** The INSERT of a template row, without its blocks — for a batch that writes them along (`templateStore`). */
+export function insertTemplateStatement(template: Template): readonly [string, unknown[]] {
   const row = templateToRow(template);
-  await db.execute(
+  return [
     `INSERT INTO templates
-       (id, name, icon, title, content, tags, assignments, sort_order, created_at, updated_at, deleted_at)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
+       (id, name, icon, title, tags, assignments, sort_order, created_at, updated_at, deleted_at)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
     [
-      row.id, row.name, row.icon, row.title, row.content, row.tags, row.assignments,
+      row.id, row.name, row.icon, row.title, row.tags, row.assignments,
       row.sort_order, row.created_at, row.updated_at, row.deleted_at,
-    ]
-  );
+    ],
+  ];
 }
 
-/** A template by ID — also from the trash, unlike the store, which holds only the active ones. */
+/**
+ * A template with its block stack — for the seeds of a fresh vault and the
+ * migrations that create templates (v43, v44, v61). Those run on vaults from
+ * before v65, which keep the block stack in `content` (v65 builds the rows from
+ * it, v66 drops the column); a fresh vault gets the rows straight away.
+ */
+export async function insertTemplateRow(db: Database, template: Template): Promise<void> {
+  if (await hasContentColumn(db, 'template')) {
+    const row = templateToRow(template);
+    await db.execute(
+      `INSERT INTO templates
+         (id, name, icon, title, content, tags, assignments, sort_order, created_at, updated_at, deleted_at)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
+      [
+        row.id, row.name, row.icon, row.title, row.content, row.tags, row.assignments,
+        row.sort_order, row.created_at, row.updated_at, row.deleted_at,
+      ],
+    );
+    return;
+  }
+  const blocks = replaceOwnerBlocks({ kind: 'template', id: template.id }, template.content, template.updated_at, { hasRows: false });
+  await db.batch([insertTemplateStatement(template), ...blocks.statements]);
+  blocks.commit();
+}
+
+/** A template by ID — also from the trash, unlike the store, which holds only the active ones; its blocks from their rows since v66. */
 export async function templateById(db: Database, id: string): Promise<Template | undefined> {
   const [row] = await db.select<DbRow[]>('SELECT * FROM templates WHERE id=$1', [id]);
-  return row ? fromRow.template(row) : undefined;
+  if (!row) return undefined;
+  const template = fromRow.template(row);
+  if (await hasContentColumn(db, 'template')) return template;
+  return { ...template, content: (await readContents(db, 'template', [id])).get(id) ?? '' };
 }
 
 /**

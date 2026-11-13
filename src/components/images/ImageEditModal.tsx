@@ -6,7 +6,7 @@ import { deletePicture, placesShowing } from '../../store/imageActions';
 import { useUndoStore } from '../../store/undoStore';
 import { useUIStore } from '../../store/uiStore';
 import { imageSrc } from '../../lib/images';
-import { isRemovableUse, type ImageUse } from '../../lib/imageUsage';
+import { imageRoleLabelKey, isRemovableUse, type ImageUse } from '../../lib/imageUsage';
 import { displayTitle } from '../../lib/entryTitle';
 import { MODULES, AUX_VIEWS, viewTypeForEntryType } from '../../lib/modules';
 import { OP_PROP_SELECT_CLASSES } from '../../lib/styleClasses';
@@ -137,7 +137,7 @@ export default function ImageEditModal({ file, image, confirmDelete = false, onC
                   <button type="button" className="image-use-row" onClick={() => { setActiveView(viewOf(use)); onClose(); }}>
                     <Icon size={14} className="text-subtle flex-shrink-0" />
                     <span className="flex-1 truncate">{title}</span>
-                    {use.role !== 'content' && <span className="text-[11px] text-subtle">{t(`images.roles.${use.role}`)}</span>}
+                    {use.role !== 'content' && <span className="text-[11px] text-subtle">{t(imageRoleLabelKey(use.role))}</span>}
                   </button>
                 </li>
               );

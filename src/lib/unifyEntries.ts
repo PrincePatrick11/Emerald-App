@@ -28,7 +28,8 @@
  * `.pre-v49.bak` and is named in the log.
  */
 import type Database from './sqlite';
-import { ENTRIES_INDEX_DDL_V49, TABLE_DDL, ddlIfNotExists } from './schema';
+import { ENTRIES_INDEX_DDL_V49, ddlIfNotExists } from './schema';
+import { ENTRIES_DDL_V65 } from './schemaV65';
 import { assertForeignKeysIntact, backupDatabaseFile, createIndexesIfMissing, tableExists } from './dbRebuild';
 import { convertLegacySigils } from './migrateLegacySigils';
 import type { EntryType } from '../types';
@@ -81,7 +82,8 @@ export async function unifyEntries(db: Database): Promise<void> {
       }
     }
     await backupDatabaseFile(db, 'v49');
-    await db.execute(ddlIfNotExists(TABLE_DDL.entries));
+    // The shape before v66, which drops `content` (`schemaV65.ts`).
+    await db.execute(ddlIfNotExists(ENTRIES_DDL_V65));
     for (const source of remaining) {
       await copyInto(db, source);
       // The old table's indexes go with it.

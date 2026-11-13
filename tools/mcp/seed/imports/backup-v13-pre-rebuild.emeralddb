@@ -1,0 +1,154 @@
+{
+  "version": "13",
+  "type": "backup",
+  "exportedAt": "2026-10-20T10:00:00.000Z",
+  "filters": {
+    "includeJournal": true,
+    "includeWiki": true,
+    "includeOperations": true,
+    "includeTasks": true,
+    "includeTags": true,
+    "includeLexicon": false,
+    "dateFrom": "",
+    "dateTo": "",
+    "includeDeleted": true
+  },
+  "data": {
+    "entries": [
+      {
+        "category_id": "0f1e2d3c-0000-4000-8000-000000000009",
+        "entry_number": 1,
+        "icon": null,
+        "cover_image": null,
+        "tags": "[]",
+        "created_at": "2026-10-20T10:00:00.000Z",
+        "updated_at": "2026-10-20T10:00:00.000Z",
+        "deleted_at": null,
+        "id": "0f1e2d3c-0000-4000-8000-000000000001",
+        "type": "wiki",
+        "title": "Fixture: Zielartikel",
+        "content": "<section data-block=\"core.text\" data-block-id=\"fx-w1\"><p>Ziel der Links</p></section>"
+      },
+      {
+        "category_id": null,
+        "entry_number": 1,
+        "icon": null,
+        "cover_image": null,
+        "tags": "[\"0f1e2d3c-0000-4000-8000-000000000008\"]",
+        "created_at": "2026-10-20T10:00:00.000Z",
+        "updated_at": "2026-10-20T10:00:00.000Z",
+        "deleted_at": null,
+        "id": "0f1e2d3c-0000-4000-8000-000000000002",
+        "type": "journal",
+        "title": "Fixture: Tagebuch mit Link und Bild",
+        "content": "<section data-block=\"core.text\" data-block-id=\"fx-j1\"><p>Siehe <span data-type=\"internalLink\" class=\"internal-link\" data-id=\"0f1e2d3c-0000-4000-8000-000000000001\" data-entry-type=\"wiki\" data-label=\"Fixture: Zielartikel\">Fixture: Zielartikel</span> und <span data-type=\"internalLink\" class=\"internal-link\" data-id=\"0f1e2d3c-0000-4000-8000-000000000004\" data-entry-type=\"operation\" data-label=\"Fixture: Altar\">Fixture: Altar</span></p><img src=\"1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a.png\"></section>"
+      },
+      {
+        "category_id": "sigils",
+        "entry_number": 1,
+        "icon": null,
+        "cover_image": null,
+        "tags": "[]",
+        "created_at": "2026-10-20T10:00:00.000Z",
+        "updated_at": "2026-10-20T10:00:00.000Z",
+        "deleted_at": null,
+        "id": "0f1e2d3c-0000-4000-8000-000000000003",
+        "type": "operation",
+        "title": "Fixture: Siegel",
+        "content": "<section data-block=\"core.sigil.calc\" data-block-id=\"fx-s-calc\" data-block-data=\"{&quot;intention&quot;:&quot;Klarheit&quot;,&quot;letters&quot;:[&quot;K&quot;,&quot;L&quot;,&quot;A&quot;,&quot;R&quot;,&quot;H&quot;,&quot;E&quot;,&quot;I&quot;,&quot;T&quot;],&quot;implemented&quot;:[]}\"><p>Klarheit</p><p>KLARHEIT</p></section><section data-block=\"core.sigil.canvas\" data-block-id=\"fx-s-draw\"><img src=\"2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b.png\" alt=\"\"></section><section data-block=\"core.sigil.charge\" data-block-id=\"fx-s-charge\" data-block-data=\"{&quot;loaded&quot;:true,&quot;revealDate&quot;:&quot;2099-01-01&quot;,&quot;lock&quot;:&quot;sigil&quot;,&quot;targets&quot;:[&quot;fx-s-calc&quot;,&quot;fx-s-draw&quot;]}\"><p>2099-01-01</p></section><section data-block=\"core.text\" data-block-id=\"fx-s-notes\"><p>Technik: <span data-type=\"internalLink\" class=\"internal-link\" data-id=\"0f1e2d3c-0000-4000-8000-000000000001\" data-entry-type=\"wiki\" data-label=\"Fixture: Zielartikel\">Fixture: Zielartikel</span></p></section>"
+      },
+      {
+        "category_id": "altars",
+        "entry_number": 2,
+        "icon": "🕯️",
+        "cover_image": null,
+        "tags": "[]",
+        "created_at": "2026-10-20T10:00:00.000Z",
+        "updated_at": "2026-10-20T10:00:00.000Z",
+        "deleted_at": null,
+        "id": "0f1e2d3c-0000-4000-8000-000000000004",
+        "type": "operation",
+        "title": "Fixture: Altar",
+        "content": "<section data-block=\"core.altar\" data-block-id=\"fx-a-altar\" data-block-data=\"{&quot;width&quot;:1600,&quot;height&quot;:1000,&quot;elements&quot;:[{&quot;id&quot;:&quot;fx-a-p1&quot;,&quot;type&quot;:&quot;image&quot;,&quot;x&quot;:600,&quot;y&quot;:300,&quot;width&quot;:400,&quot;height&quot;:400,&quot;rotation&quot;:0,&quot;opacity&quot;:1,&quot;locked&quot;:false,&quot;hidden&quot;:false,&quot;z&quot;:1,&quot;ref&quot;:&quot;3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c.png&quot;,&quot;props&quot;:{&quot;src&quot;:&quot;3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c.png&quot;,&quot;emoji&quot;:&quot;&quot;}}],&quot;background&quot;:{&quot;fill&quot;:{&quot;kind&quot;:&quot;radial&quot;,&quot;colors&quot;:[&quot;#1e1e3c&quot;,&quot;#0f0f1e&quot;,&quot;#0a0a0f&quot;],&quot;cx&quot;:0.5,&quot;cy&quot;:0.25},&quot;image&quot;:null,&quot;tint&quot;:null},&quot;guides&quot;:[],&quot;guidesLocked&quot;:false}\"><img src=\"3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c.png\" alt=\"\" data-canvas=\"image\"></section><section data-block=\"core.text\" data-block-id=\"fx-a-notes\"><p>Notizen zum Altar</p></section>"
+      }
+    ],
+    "tags": [
+      {
+        "id": "0f1e2d3c-0000-4000-8000-000000000008",
+        "name": "Fixture",
+        "color": "#2ea05a",
+        "deleted_at": null
+      }
+    ],
+    "tasks": [
+      {
+        "id": "0f1e2d3c-0000-4000-8000-000000000006",
+        "title": "Fixture: Aufgabe",
+        "category_id": null,
+        "parent_task_id": null,
+        "priority": "medium",
+        "completed": 0,
+        "sort_order": 0,
+        "created_at": "2026-10-20T10:00:00.000Z",
+        "updated_at": "2026-10-20T10:00:00.000Z",
+        "deleted_at": null
+      }
+    ],
+    "taskLinks": [
+      {
+        "id": "0f1e2d3c-0000-4000-8000-000000000007",
+        "task_id": "0f1e2d3c-0000-4000-8000-000000000006",
+        "target_id": "0f1e2d3c-0000-4000-8000-000000000004",
+        "target_type": "operation"
+      }
+    ],
+    "categories": [
+      {
+        "id": "sigils",
+        "name": "Sigils",
+        "emoji": "🔮",
+        "sort_order": 0,
+        "is_builtin": 1,
+        "deleted_at": null
+      },
+      {
+        "id": "altars",
+        "name": "Altars",
+        "emoji": "🕯️",
+        "sort_order": 1,
+        "is_builtin": 1,
+        "deleted_at": null
+      },
+      {
+        "id": "0f1e2d3c-0000-4000-8000-000000000009",
+        "name": "Fixture",
+        "emoji": "🧪",
+        "sort_order": 2,
+        "is_builtin": 0,
+        "deleted_at": null
+      }
+    ],
+    "blockDefinitions": [],
+    "templates": [
+      {
+        "id": "0f1e2d3c-0000-4000-8000-000000000005",
+        "name": "Fixture: Vorlage mit Siegel",
+        "icon": "📄",
+        "title": "",
+        "tags": "[]",
+        "assignments": "[]",
+        "sort_order": 9,
+        "content": "<section data-block=\"core.sigil.calc\" data-block-id=\"fx-t-calc\" data-block-data=\"{&quot;intention&quot;:&quot;Vorlage&quot;,&quot;letters&quot;:[&quot;V&quot;,&quot;O&quot;,&quot;R&quot;,&quot;L&quot;,&quot;A&quot;,&quot;G&quot;,&quot;E&quot;],&quot;implemented&quot;:[]}\"><p>Vorlage</p><p>VORLAGE</p></section><section data-block=\"core.sigil.canvas\" data-block-id=\"fx-t-draw\"><img src=\"4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d.png\" alt=\"\"></section><section data-block=\"core.sigil.charge\" data-block-id=\"fx-t-charge\" data-block-data=\"{&quot;loaded&quot;:true,&quot;revealDate&quot;:&quot;2099-01-01&quot;,&quot;lock&quot;:&quot;sigil&quot;,&quot;targets&quot;:[&quot;fx-t-calc&quot;,&quot;fx-t-draw&quot;]}\"><p>2099-01-01</p></section>",
+        "created_at": "2026-10-20T10:00:00.000Z",
+        "updated_at": "2026-10-20T10:00:00.000Z",
+        "deleted_at": null
+      }
+    ]
+  },
+  "images": {
+    "1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a.png": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADAAAAAwCAIAAADYYG7QAAAAQklEQVR4nO3OQQ0AIAwAsSlCEOqQiguOR5MK6KyzvzL5QEhISKgeCAkJCdUDISEhoXogJCQkVA+EhISE6oGQkNBjF5l0aJeGMHh9AAAAAElFTkSuQmCC",
+    "2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b.png": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADAAAAAwCAIAAADYYG7QAAAAQUlEQVR4nO3OQQ0AIAwAsblDGMLBBcejSQV09jpfmXwgJCQkVA+EhISE6oGQkJBQPRASEhKqB0JCQkL1QEhI6LELo7ER8Sx69XgAAAAASUVORK5CYII=",
+    "3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c.png": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADAAAAAwCAIAAADYYG7QAAAAQklEQVR4nO3OQQ0AIAwAsclBMeoQgwuOR5MK6Jy9vjL5QEhISKgeCAkJCdUDISEhoXogJCQkVA+EhISE6oGQkNBjF9tOatNpQqWoAAAAAElFTkSuQmCC",
+    "4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d.png": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADAAAAAwCAIAAADYYG7QAAAAQklEQVR4nO3OQQ0AIAwAsclBImIRgwuOR5MK6Kx9vjL5QEhISKgeCAkJCdUDISEhoXogJCQkVA+EhISE6oGQkNBjFwuBXMSWIJdqAAAAAElFTkSuQmCC"
+  }
+}

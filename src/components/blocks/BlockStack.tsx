@@ -25,7 +25,7 @@ import { resolveBlockType, type BlockTypeMeta } from '../../lib/blocks/blockType
 import { blockIcon, createFromPreset } from '../../lib/blocks/presets';
 import { useBlockDefinitionStore } from '../../store/blockDefinitionStore';
 import {
-  SIGIL_CHARGE_TYPE, withChargesCoveringOnly, sigilState, sigilUnits, todayIso, withChargesCoveringCopy, withoutConcealedParts,
+  SIGIL_CHARGE_KIND, withChargesCoveringOnly, sigilState, sigilUnits, todayIso, withChargesCoveringCopy, withoutConcealedParts,
   withRenamedPartTargets,
 } from '../../lib/blocks/sigil';
 import { blockLabel, hiddenAttrValue, isBlockHidden, showsTitleInRead, withBlockAttr } from '../../lib/blocks/blockAttrs';
@@ -55,7 +55,11 @@ interface BlockStackProps {
   isEditing: boolean;
   /** Placeholder of the first text block: the module-specific text. */
   placeholder: string;
-  /** The complete serialised content after every change (→ `useEntryEditor.handleContentChange`). */
+  /**
+   * The complete serialised content after every change (→ `useEntryEditor.handleContentChange`).
+   * Saving writes only the blocks that changed as rows (`planBlockWrite` in
+   * `lib/blockStore.ts`); every section carries its block ID, so the store can tell.
+   */
   onChange: (content: string) => void;
   /**
    * Read mode: save a permitted change (tick a checklist, yes/no) immediately;
@@ -133,7 +137,7 @@ export default function BlockStack({
 
   const resetEpoch = useExternalContentReset(initialContent, isEditing, blocksRef, setBlocks, onChangeRef);
 
-  // Locked and concealed come from the sigil's charge block; all blocks see the same state.
+  // Locked and concealed come from the sigil's charges; all blocks see the same state.
   const sigil = useMemo(() => sigilState(blocks, todayIso()), [blocks]);
 
   const definitions = useBlockDefinitionStore((s) => s.definitions);
@@ -544,9 +548,9 @@ export default function BlockStack({
   );
 }
 
-/** Is the block a charge, or a custom block with a charge part? */
+/** Does the block hold a charge (a charge on its own or the part of a custom block)? */
 function holdsCharge(block: BlockInstance): boolean {
-  return block.type === SIGIL_CHARGE_TYPE || sigilUnits([block]).some((u) => u.block.type === SIGIL_CHARGE_TYPE);
+  return sigilUnits([block]).some((u) => u.block.type === SIGIL_CHARGE_KIND);
 }
 
 /**
@@ -610,6 +614,11 @@ function useExternalContentReset(
  *  could be selected in the text block any more. */
 function StackItem({ id, children }: { id: string; children: (startDrag: (e: PointerEvent) => void) => ReactNode }) {
   const controls = useDragControls();
+  // Only for the look: a dragged block gets an opaque surface (index.css),
+  // until it has sprung back into its slot after release. The ref keeps the
+  // end of an earlier snap-back from clearing a drag that started again.
+  const [dragging, setDragging] = useState(false);
+  const draggingRef = useRef(false);
   return (
     <Reorder.Item
       as="div"
@@ -617,8 +626,11 @@ function StackItem({ id, children }: { id: string; children: (startDrag: (e: Poi
       dragListener={false}
       dragControls={controls}
       transition={REORDER_SPRING}
+      onDragStart={() => { draggingRef.current = true; setDragging(true); }}
+      onDragEnd={() => { draggingRef.current = false; }}
+      onDragTransitionEnd={() => { if (!draggingRef.current) setDragging(false); }}
       style={{ position: 'relative' }}
-      className="block-stack-item"
+      className={dragging ? 'block-stack-item block-stack-item--dragging' : 'block-stack-item'}
       data-block-item={id}
     >
       {children((e) => controls.start(e))}

@@ -4,7 +4,7 @@ import type { TFunction } from 'i18next';
 import { Zap } from 'lucide-react';
 import Button from '../ui/Button';
 import Dropdown from '../ui/Dropdown';
-import { linkFromSlot } from '../../lib/blocks/fields';
+import { linkFromSlot, parseFields, soleSigilElement, type ElementDef } from '../../lib/blocks/fields';
 import {
   chargeConceals, chargeCovers, isSigilToolType, parseSigilCharge, serializeSigilCharge, sigilUnits, todayIso,
   type SigilCharge, type SigilLockScope,
@@ -27,18 +27,22 @@ interface ToolBlock {
   label: string;
 }
 
+/** "Block · Part" — or only the block's name where the block is the part (a calculator on its own). */
+function partLabel(t: TFunction, parent: BlockInstance, element: ElementDef): string {
+  const block = blockLabel(t, parent, resolveBlockType(parent));
+  return soleSigilElement(parseFields(parent)) ? block : `${block} · ${elementLabel(t, element)}`;
+}
+
 /**
- * The calculators and drawings of the entry: blocks and parts of custom blocks
- * (then "Block · Part"); those with identical names get their number added.
+ * The calculators and drawings of the entry: sigil drawings and parts of
+ * fields blocks; those with identical names get their number added.
  */
 function toolBlocks(t: TFunction, blocks: readonly BlockInstance[]): ToolBlock[] {
   const tools = sigilUnits(blocks)
     .filter(({ block, part }) => isSigilToolType(block.type) && !part?.element.archived)
     .map(({ block, part }) => ({
       id: block.id,
-      label: part
-        ? `${blockLabel(t, part.parent, resolveBlockType(part.parent))} · ${elementLabel(t, part.element)}`
-        : blockLabel(t, block, resolveBlockType(block)),
+      label: part ? partLabel(t, part.parent, part.element) : blockLabel(t, block, resolveBlockType(block)),
     }));
   const total = new Map<string, number>();
   for (const tool of tools) total.set(tool.label, (total.get(tool.label) ?? 0) + 1);

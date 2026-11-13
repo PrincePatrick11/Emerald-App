@@ -1,7 +1,8 @@
 /**
  * Plain text out of the editor's HTML, for the global search.
  *
- * `entries.content` holds what TipTap's `getHTML()` emitted — markup, not text. Searching the raw
+ * An entry's content, as `loadAllContent` assembles it from the block rows, is
+ * markup, not text. Searching the raw
  * string would match tag names, `data-id` attributes of internal links and the
  * hashed filenames behind `<img src>`, so every one of them is reduced to its
  * text first.

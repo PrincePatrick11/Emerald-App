@@ -2,7 +2,9 @@ import { CATEGORIZED_TABLES } from '../schema';
 import type Database from '../sqlite';
 import { jsonArray } from '../row';
 import { TAG_REF_TABLES } from '../tagRefs';
-import { columnsOf, pendingRows, rowKey, SYNCED_TABLES, type PendingRow, type SyncChange } from './tracking';
+import { clearSavedBlocks } from '../blockStore';
+import { STACK_COLUMN, stackOwnerKind, stackStatements, withStacks, withoutStack } from './blockStack';
+import { pendingRows, rowKey, syncedColumnsOf, SYNCED_TABLES, type PendingRow, type SyncChange } from './tracking';
 
 /**
  * Applies changes from the server on top of what this device has not pushed
@@ -51,7 +53,9 @@ export const REFERENCE_REPAIRS: readonly Statement[] = [
   ['DELETE FROM lexicon_entries WHERE language_id NOT IN (SELECT id FROM languages)'],
 ];
 
-function insertStatement(table: string, row: Row): Statement {
+/** The INSERT of a row, without its block stack (`content`, written as block rows by `stackStatements`). */
+function insertStatement(table: string, full: Row): Statement {
+  const row = withoutStack(table, full);
   const columns = Object.keys(row);
   const places = columns.map((_, i) => `$${i + 1}`).join(', ');
   return [`INSERT INTO ${table} (${columns.join(', ')}) VALUES (${places})`, columns.map((c) => row[c])];
@@ -60,7 +64,7 @@ function insertStatement(table: string, row: Row): Statement {
 /** Table and column names come from decrypted data and end up in SQL. */
 async function assertKnownShape(db: Database, changes: readonly SyncChange[]): Promise<void> {
   const known = new Map<string, Set<string>>();
-  for (const table of SYNCED_TABLES) known.set(table, new Set(await columnsOf(db, table)));
+  for (const table of SYNCED_TABLES) known.set(table, new Set(await syncedColumnsOf(db, table)));
   for (const change of changes) {
     const columns = known.get(change.table);
     if (!columns) throw new Error(`SYNC_UNKNOWN_SHAPE: table ${change.table}`);
@@ -86,7 +90,7 @@ async function loadRows(db: Database, changes: readonly SyncChange[]): Promise<M
         `SELECT * FROM ${table} WHERE id IN (${chunk.map((_, n) => `$${n + 1}`).join(', ')})`,
         chunk
       );
-      for (const row of found) rows.set(rowKey(table, String(row.id)), row);
+      for (const row of await withStacks(db, table, found)) rows.set(rowKey(table, String(row.id)), row);
     }
   }
   return rows;
@@ -117,6 +121,11 @@ export async function applyRemoteChanges(
   }
 
   const conflicts: ApplyResult['conflicts'] = [];
+  /** Entries and templates whose block stack this writes, with that stack: their block rows are replaced in the same batch. */
+  const rewritten = new Map<string, { table: string; id: string; key: string; content: unknown }>();
+  const noteContent = (table: string, id: string, content: unknown) => {
+    if (stackOwnerKind(table)) rewritten.set(rowKey(table, id), { table, id, key: rowKey(table, id), content });
+  };
   const statements: Statement[] = [['PRAGMA defer_foreign_keys = ON'], APPLYING];
   /** Statements that are this device's own decisions, so they go out as changes. */
   const logged = (...own: Statement[]) => statements.push(LOGGING, ...own, APPLYING);
@@ -224,6 +233,7 @@ export async function applyRemoteChanges(
         ]);
       }
       statements.push(insertStatement(change.table, change.row));
+      noteContent(change.table, change.id, change.row.content);
       rows.set(key, { ...change.row });
       if (change.table === 'tags') tagIdByName.set(String(change.row.name), change.id);
       if (change.table === 'entries') renumberOthers(change.id, change.row);
@@ -253,24 +263,42 @@ export async function applyRemoteChanges(
           entry_number: number,
         }));
         conflicts.push({ entryId: change.id, copyId });
+        noteContent('entries', copyId, row.content);
+        // Keeps the copy in the block-row rebuild below, which takes only owners still in `rows`.
+        rows.set(rowKey('entries', copyId), { ...row, id: copyId });
         take.push(column);
       }
     }
     if (!take.length) continue;
-    const sets = take.map((column, i) => `${column} = $${i + 1}`).join(', ');
-    statements.push([
-      `UPDATE ${change.table} SET ${sets} WHERE id = $${take.length + 1}`,
-      [...take.map((column) => change.row[column]), change.id],
-    ]);
+    // The block stack is no column of the table: it becomes block rows below.
+    const columns = stackOwnerKind(change.table) ? take.filter((column) => column !== STACK_COLUMN) : take;
+    if (columns.length) {
+      const sets = columns.map((column, i) => `${column} = $${i + 1}`).join(', ');
+      statements.push([
+        `UPDATE ${change.table} SET ${sets} WHERE id = $${columns.length + 1}`,
+        [...columns.map((column) => change.row[column]), change.id],
+      ]);
+    }
     for (const column of take) row[column] = change.row[column];
+    if (columns.length < take.length) noteContent(change.table, change.id, row[STACK_COLUMN]);
     if (change.table === 'tags' && take.includes('name')) tagIdByName.set(String(change.row.name), change.id);
     if (change.table === 'entries' && (take.includes('entry_number') || take.includes('type'))) {
       renumberOthers(change.id, row);
     }
   }
 
+  // The block rows of what arrived as `content`, in the same transaction, written
+  // silently: they are the incoming change itself. A conflict copy goes out with
+  // its own logged insert, which reads its rows when pushed.
+  // Only for owners still there (a later change in this batch may have deleted one).
+  const now = new Date().toISOString();
+  const rebuilt = [...rewritten.values()]
+    .filter(({ key }) => rows.has(key))
+    .map(({ table, id, content }) => stackStatements(table, id, content, now));
+  statements.push(...rebuilt.flatMap((r) => r.statements));
   statements.push(LOGGING, ...REFERENCE_REPAIRS, ...(options.finally ?? []));
   await db.batch(statements);
+  rebuilt.forEach((r) => r.commit());
   return { conflicts };
 }
 
@@ -291,7 +319,7 @@ export async function* snapshotFrames(db: Database, maxBytes: number): AsyncGene
     let bytes = 0;
     let after = '';
     for (;;) {
-      const page = await db.select<Row[]>(`SELECT * FROM ${table} WHERE id > $1 ORDER BY id LIMIT 200`, [after]);
+      const page = await withStacks(db, table, await db.select<Row[]>(`SELECT * FROM ${table} WHERE id > $1 ORDER BY id LIMIT 200`, [after]));
       if (!page.length) break;
       after = String(page[page.length - 1].id);
       for (const row of page) {
@@ -319,6 +347,8 @@ export async function beginRestore(db: Database, keep: readonly SyncChange[] = [
     ["INSERT OR REPLACE INTO _sync_meta (key, value) VALUES ('kept', $1)", [JSON.stringify(keep)]],
   );
   await db.batch(statements);
+  // The block rows went with their owners; what was remembered as saved no longer holds.
+  clearSavedBlocks();
 }
 
 /**
@@ -338,13 +368,19 @@ export async function restoreFrame(db: Database, frame: SnapshotFrame): Promise<
     (row): SyncChange => ({ table: frame.table, id: String(row.id), op: 'upsert', changed: Object.keys(row), row })
   );
   await assertKnownShape(db, changes);
+  const now = new Date().toISOString();
+  const stacks = stackOwnerKind(frame.table)
+    ? frame.rows.map((row) => stackStatements(frame.table, String(row.id), row[STACK_COLUMN], now))
+    : [];
   await db.batch([
     ['PRAGMA defer_foreign_keys = ON'],
     APPLYING,
     ...frame.rows.map((row) => insertStatement(frame.table, row)),
+    ...stacks.flatMap((stack) => stack.statements),
     ...(FRAME_REPAIRS[frame.table] ?? []),
     LOGGING,
   ]);
+  stacks.forEach((stack) => stack.commit());
 }
 
 /**
@@ -359,6 +395,20 @@ export async function finishRestore(
 ): Promise<void> {
   await assertKnownShape(db, keep);
   const statements: Statement[] = [['PRAGMA defer_foreign_keys = ON']];
+  const now = new Date().toISOString();
+  const stacks: ReturnType<typeof stackStatements>[] = [];
+  // Kept owners the snapshot brought: the others come back by their insert, with their whole stack.
+  const inSnapshot = new Set<string>();
+  for (const table of ['entries', 'templates']) {
+    const ids = keep.filter((change) => change.table === table && change.op === 'upsert').map((change) => change.id);
+    for (let i = 0; i < ids.length; i += 200) {
+      const chunk = ids.slice(i, i + 200);
+      const found = await db.select<{ id: string }[]>(
+        `SELECT id FROM ${table} WHERE id IN (${chunk.map((_, n) => `$${n + 1}`).join(', ')})`, chunk,
+      );
+      for (const row of found) inSnapshot.add(rowKey(table, row.id));
+    }
+  }
   for (const change of keep) {
     if (change.op === 'delete') {
       statements.push([`DELETE FROM ${change.table} WHERE id = $1`, [change.id]]);
@@ -368,16 +418,28 @@ export async function finishRestore(
     statements.push([query.replace('INSERT INTO', 'INSERT OR IGNORE INTO'), values]);
     // A statement of its own: `OR IGNORE` on an insert does not cover its `DO UPDATE`,
     // and a name taken in the snapshot must not throw everything else away.
-    if (change.changed.length) {
-      const sets = change.changed.map((column, index) => `${column} = $${index + 2}`).join(', ');
+    const hasStack = stackOwnerKind(change.table) !== null;
+    const columns = hasStack ? change.changed.filter((column) => column !== STACK_COLUMN) : change.changed;
+    if (columns.length) {
+      const sets = columns.map((column, index) => `${column} = $${index + 2}`).join(', ');
       statements.push([
         `UPDATE OR IGNORE ${change.table} SET ${sets} WHERE id = $1`,
-        [change.id, ...change.changed.map((column) => change.row[column])],
+        [change.id, ...columns.map((column) => change.row[column])],
       ]);
+    }
+    // The block stack this device had not pushed goes back on top, as its block rows —
+    // and all of it for an owner the snapshot no longer has, whatever changed.
+    const stackChanged = columns.length < change.changed.length;
+    const reinserted = !inSnapshot.has(rowKey(change.table, change.id)) && STACK_COLUMN in change.row;
+    if (hasStack && (stackChanged || reinserted)) {
+      const plan = stackStatements(change.table, change.id, change.row[STACK_COLUMN], now);
+      statements.push(...plan.statements);
+      stacks.push(plan);
     }
   }
   statements.push(...REFERENCE_REPAIRS, ["DELETE FROM _sync_meta WHERE key IN ('restoring', 'kept')"], ...finalStatements);
   await db.batch(statements);
+  stacks.forEach((plan) => plan.commit());
 }
 
 /** A snapshot all at once: for tests, and a vault small enough not to matter. */

@@ -89,6 +89,8 @@ const STUBS = {
       // name, and a forced failure if the data URL carries "FAIL".
       if (cmd === 'save_image') {
         if (String(args?.dataUrl ?? '').includes('FAIL')) throw new Error('save_image failed (Harness)');
+        // The backup checks give every picture a name of its own (section 8z).
+        if (globalThis.harnessSaveImage) return globalThis.harnessSaveImage(String(args?.dataUrl ?? ''));
         return '${'c'.repeat(64)}.png';
       }
       // Without vaults.json this command decides whether it is a first start
@@ -96,6 +98,10 @@ const STUBS = {
       // harness needs the second case: an empty list would mean no active
       // vault, and v33 backs up the database file via getActiveDbFile().
       if (cmd === 'legacy_default_db_exists') return true;
+      // The backup import asks which pictures the vault has: none here.
+      if (cmd === 'list_image_files') return [];
+      // A backup embeds its pictures; the harness has no files, so the name stands in for the bytes.
+      if (cmd === 'read_image_as_base64') return 'data:image/png;base64,' + Buffer.from(String(args?.filename ?? '')).toString('base64');
       // A vault is a directory; in the harness that is simply the
       // working directory, so that the backup from v33 lands there.
       if (cmd === 'migrate_vault_layout' || cmd === 'default_vault_dir' || cmd === 'new_vault_base_dir') {
@@ -128,13 +134,20 @@ writeFileSync(
    export { TABLES, TABLE_DDL, ddlIfNotExists, checkIntegrity, reassignCategoryContent, collectUsedImageFilenames } from '${process.cwd().replace(/\\/g, '/')}/src/lib/schema';
    export { copyTable } from '${process.cwd().replace(/\\/g, '/')}/src/lib/dbRebuild';
    export { ddlBeforeV49 } from '${process.cwd().replace(/\\/g, '/')}/src/lib/schemaV48';
-   export { assertPayloadReferencesResolve, dropUnknownTagIds, entryRowsForInsert, importTagsAndRemap, migrateBackupPayload, withRoutinesAsTemplates } from '${process.cwd().replace(/\\/g, '/')}/src/lib/dbBackup';
+   export { assertPayloadReferencesResolve, buildBackupFrom, doMerge, doReplace, dropUnknownTagIds, entryRowsForInsert, importTagsAndRemap, migrateBackupPayload, withRoutinesAsTemplates } from '${process.cwd().replace(/\\/g, '/')}/src/lib/dbBackup';
    export { invalidateVaultCache } from '${process.cwd().replace(/\\/g, '/')}/src/lib/vaultManager';
-   export { convertLegacySigils, needsSigilConversion, sigilRowToContent } from '${process.cwd().replace(/\\/g, '/')}/src/lib/migrateLegacySigils';
+   export { convertLegacySigils, convertLegacySigilsInPlace, needsSigilConversion, sigilRowToContent } from '${process.cwd().replace(/\\/g, '/')}/src/lib/migrateLegacySigils';
    export { linkedIdsToContent, rowsLinkSource } from '${process.cwd().replace(/\\/g, '/')}/src/lib/migrateLinkedIdsToContent';
    export { journalFieldsToContent } from '${process.cwd().replace(/\\/g, '/')}/src/lib/migrateJournalFieldsToContent';
    export { stripTagIds, replaceTagId } from '${process.cwd().replace(/\\/g, '/')}/src/lib/tagRefs';
-   export { createAltarTables, convertAltarsInPlace } from '${process.cwd().replace(/\\/g, '/')}/src/lib/migrateAltars';`
+   export { createAltarTables, convertAltarsInPlace } from '${process.cwd().replace(/\\/g, '/')}/src/lib/migrateAltars';
+   export { contentWithoutLegacySigils } from '${process.cwd().replace(/\\/g, '/')}/src/lib/blocks/legacySigilBlocks';
+   export { clearSavedBlocks, readContents, replaceOwnerBlocks } from '${process.cwd().replace(/\\/g, '/')}/src/lib/blockStore';
+   export { ENTRIES_DDL_V65 } from '${process.cwd().replace(/\\/g, '/')}/src/lib/schemaV65';
+   export { addContentColumns, dropContentColumns, checkBlockRows, reconcileBlockRows, hasContentColumn } from '${process.cwd().replace(/\\/g, '/')}/src/lib/contentColumn';
+   export { entriesWithFieldValue } from '${process.cwd().replace(/\\/g, '/')}/src/lib/blocks/blockQuery';
+   export { collectImageUses } from '${process.cwd().replace(/\\/g, '/')}/src/lib/imageUsage';
+   export { parseBlocks } from '${process.cwd().replace(/\\/g, '/')}/src/lib/blocks/blockHtml';`
 );
 
 const bundlePath = join(workDir, 'bundle.mjs');
@@ -171,10 +184,47 @@ const {
   runMigrations, MIGRATIONS, clearLegacyUntitledTitles, sweepDanglingTaskLinks, entryRowsForInsert, TABLES, TABLE_DDL,
   ddlIfNotExists, checkIntegrity, reassignCategoryContent,
   collectUsedImageFilenames, invalidateVaultCache, copyTable, ddlBeforeV49,
-  assertPayloadReferencesResolve, convertLegacySigils, migrateBackupPayload, withRoutinesAsTemplates,
+  assertPayloadReferencesResolve, convertLegacySigils, migrateBackupPayload, withRoutinesAsTemplates, buildBackupFrom, doMerge, doReplace,
   needsSigilConversion, sigilRowToContent, linkedIdsToContent, rowsLinkSource, journalFieldsToContent,
   stripTagIds, replaceTagId, importTagsAndRemap, dropUnknownTagIds, createAltarTables, convertAltarsInPlace,
+  contentWithoutLegacySigils, convertLegacySigilsInPlace,
+  checkBlockRows, reconcileBlockRows, clearSavedBlocks, parseBlocks,
+  readContents, replaceOwnerBlocks, addContentColumns, dropContentColumns, hasContentColumn, entriesWithFieldValue, collectImageUses,
+  ENTRIES_DDL_V65,
 } = await import(pathToFileURL(bundlePath).href);
+
+/**
+ * Since v66 a vault keeps its blocks as rows only. The converters of older
+ * data (v62/v63, which this harness runs after the chain, and the backup
+ * import) work on `content`: like the import's working copy
+ * (`importStaging.ts`), the vault gets the column back for as long as they
+ * run, and the rows are built from it at the end.
+ */
+async function withContentColumns(db, fn) {
+  await addContentColumns(db);
+  try {
+    return await fn();
+  } finally {
+    await dropContentColumns(db);
+  }
+}
+
+/** A row of entries or templates, with its block stack as block rows — what the stores write since v66. */
+async function insertWithStack(db, table, row, content) {
+  const columns = Object.keys(row);
+  await db.execute(
+    `INSERT INTO ${table} (${columns.join(', ')}) VALUES (${columns.map((_, i) => `$${i + 1}`).join(', ')})`,
+    columns.map((c) => row[c]),
+  );
+  const plan = replaceOwnerBlocks({ kind: table === 'entries' ? 'entry' : 'template', id: row.id }, content, row.updated_at ?? now, { hasRows: false });
+  for (const [query, values] of plan.statements) await db.execute(query, values ?? []);
+  plan.commit();
+}
+
+/** An owner's block stack as the rows give it (what `content` held until v66). */
+async function stackOf(db, kind, id) {
+  return (await readContents(db, kind, [id])).get(id) ?? '';
+}
 
 // v62 turns the altars into operations and empties their tables, v63 drops
 // them. The checks of the older migrations look at the altar tables after
@@ -671,7 +721,7 @@ const chain = await buildViaChain('chain.db');
 // The altar checks of sections 3 and 8d look at this chain; their tables
 // (v63) go in a copy of it.
 const chainNoAltars = await buildViaChain('chain-v63.db');
-await dropAltarTables(chainNoAltars);
+await withContentColumns(chainNoAltars, () => dropAltarTables(chainNoAltars));
 
 const schemaA = await readSchema(baseline);
 const schemaB = await readSchema(chainNoAltars);
@@ -778,7 +828,8 @@ console.log('\n3b. Migration v44: routines become templates\n');
 
 {
   const [routineTable] = await seeded.select("SELECT COUNT(*) AS n FROM sqlite_master WHERE type='table' AND name='routines'");
-  const [tpl] = await seeded.select("SELECT * FROM templates WHERE id='r1-routine'");
+  const [tplRow] = await seeded.select("SELECT * FROM templates WHERE id='r1-routine'");
+  const tpl = tplRow && { ...tplRow, content: await stackOf(seeded, 'template', 'r1-routine') };
   check('the routines table is gone', routineTable.n === 0);
   // Since v53 the template carries the ID of the tag "ritual" — v53 created it.
   const tagNamesOf = async (db, json) => {
@@ -838,8 +889,8 @@ console.log('\n4. checkIntegrity finds what foreign keys do not cover\n');
   const db = freshDb('integrity.db');
   await runMigrations(db);
   await db.execute(
-    `INSERT INTO entries (id,type,title,content,created_at,updated_at,tags)
-     VALUES ('e1','wiki','Artikel','',$1,$1,'[]')`,
+    `INSERT INTO entries (id,type,title,created_at,updated_at,tags)
+     VALUES ('e1','wiki','Artikel',$1,$1,'[]')`,
     [now]
   );
   await db.execute(`INSERT INTO tasks (id,title,created_at,updated_at) VALUES ('t1','Aufgabe',$1,$1)`, [now]);
@@ -873,8 +924,8 @@ console.log('\n5. Deleting a category loses no entries\n');
      VALUES ('temporaer','Temporär','🧪',99,0)` // lang-ok
   );
   await db.execute(
-    `INSERT INTO entries (id,type,title,content,category_id,created_at,updated_at,tags)
-     VALUES ('a1','wiki','Wichtiger Artikel','Inhalt','temporaer',$1,$1,'[]')`,
+    `INSERT INTO entries (id,type,title,category_id,created_at,updated_at,tags)
+     VALUES ('a1','wiki','Wichtiger Artikel','temporaer',$1,$1,'[]')`,
     [now]
   );
   // Since v38 the same category also holds content of the other modules.
@@ -1149,7 +1200,7 @@ console.log('\n8. Migration v35: image references\n');
 
 {
   const v35 = await buildViaChain('v35.db', seedImageRefs);
-  const [entry] = await v35.select("SELECT content FROM entries WHERE id='j1' AND type='journal'");
+  const entry = { content: await stackOf(v35, 'entry', 'j1') };
   const [altar] = await v35.select("SELECT background_image_data, icon_data FROM altars WHERE id='a1'");
 
   check(
@@ -1252,7 +1303,7 @@ console.log('\n8b. Migration v36: journal links into the content\n');
   );
 
   await runMigrations(v36);
-  const [carried] = await v36.select("SELECT content FROM entries WHERE id='j1' AND type='journal'");
+  const carried = { content: await stackOf(v36, 'entry', 'j1') };
   check('v49 carries over the converted content unchanged', carried?.content === entry.content, carried?.content);
 
   v36.close();
@@ -1314,7 +1365,7 @@ console.log('\n8c. Migration v37: paradigm/banishing/meditation into the content
   );
 
   await runMigrations(v37);
-  const [carried] = await v37.select("SELECT content FROM entries WHERE id='j1' AND type='journal'");
+  const carried = { content: await stackOf(v37, 'entry', 'j1') };
   check('v49 carries over the converted content unchanged', carried?.content === entry.content, carried?.content);
 
   v37.close();
@@ -1534,7 +1585,7 @@ console.log('\n8f. Migration v41: status, end date and version become a block\n'
   );
   plain.close();
   await runMigrations(v41);
-  const [carried] = await v41.select("SELECT content FROM entries WHERE id='s1' AND type='operation'");
+  const carried = { content: await stackOf(v41, 'entry', 's1') };
   check('v49 carries over the status block unchanged', carried?.content === s1.content, carried?.content);
   check('v41: schema identical to the baseline', JSON.stringify(await readSchema(v41)) === JSON.stringify(schemaA));
   v41.close();
@@ -1636,8 +1687,9 @@ console.log('\n8g. Migration v42: sigils become blocks\n');
   );
 
   await runMigrations(v42);
-  const [carried] = await v42.select("SELECT content FROM entries WHERE id='g1' AND type='operation'");
-  check('v49 carries over the sigil blocks unchanged', carried?.content === g1.content, carried?.content);
+  const carried = { content: await stackOf(v42, 'entry', 'g1') };
+  check('v49 carries over the sigil blocks, v64 converts them',
+    carried?.content === contentWithoutLegacySigils(g1.content) && !carried.content.includes('core.sigil.'), carried?.content);
   check('v42: schema identical to the baseline', JSON.stringify(await readSchema(v42)) === JSON.stringify(schemaA));
   v42.close();
 }
@@ -1676,7 +1728,7 @@ console.log('\n8i. Migration v43: templates and the sigil template\n');
   const sigilTemplate = async (db) => (await db.select("SELECT * FROM templates WHERE id='core-sigil'"));
   for (const [label, db] of [['fresh vault', baseline], ['chain', chain]]) {
     const rows = await sigilTemplate(db);
-    const t = rows[0];
+    const t = rows[0] && { ...rows[0], content: await stackOf(db, 'template', 'core-sigil') };
     check(
       `${label}: exactly one sigil template, assigned to operation × sigils`,
       rows.length === 1 &&
@@ -1684,9 +1736,9 @@ console.log('\n8i. Migration v43: templates and the sigil template\n');
       JSON.stringify(rows)
     );
     check(
-      `${label}: with calculator, drawing and charge (harness: English name)`,
-      t && t.name === 'Sigil' &&
-        ['core.sigil.calc', 'core.sigil.canvas', 'core.sigil.charge'].every((type) => t.content.includes(`data-block="${type}"`)),
+      `${label}: with calculator, drawing and charge as fields and paint blocks (harness: English name)`,
+      t && t.name === 'Sigil' && !t.content.includes('core.sigil.') && t.content.includes('data-block="core.paint"')
+        && ['sigilCalc', 'sigilCharge'].every((kind) => t.content.includes(kind)),
       t?.content
     );
   }
@@ -1702,15 +1754,14 @@ console.log('\n8i. Migration v43: templates and the sigil template\n');
   await db.execute(
     `INSERT INTO categories (id,name,emoji,sort_order,is_builtin) VALUES ('weg','Weg','x',99,0)`
   );
-  await db.execute(
-    `INSERT INTO templates (id,name,content,assignments,created_at,updated_at)
-     VALUES ('t1','Vorlage','<p><img src="${'d'.repeat(64)}.png"></p>',?1,?2,?2)`,
-    [JSON.stringify([
+  await insertWithStack(db, 'templates', {
+    id: 't1', name: 'Vorlage', created_at: now, updated_at: now,
+    assignments: JSON.stringify([
       { entryType: 'wiki', category: 'weg' },
       { entryType: 'wiki', category: '*' },
       { entryType: 'operation', category: 'fehlt' },
-    ]), now]
-  );
+    ]),
+  }, `<p><img src="${'d'.repeat(64)}.png"></p>`);
   const orphans = await checkIntegrity(db);
   check(
     'checkIntegrity reports the assignment to a missing category, not "*"',
@@ -1740,7 +1791,7 @@ console.log('\n8i. Migration v43: templates and the sigil template\n');
   // Merging: assignments move along, one template per type and category, the one holding it wins.
   await db.execute(`INSERT INTO categories (id,name,emoji,sort_order,is_builtin) VALUES ('alt','Alt','x',100,0), ('neu','Neu','x',101,0)`);
   const insertTpl = (id, assignments, deletedAt = null) => db.execute(
-    `INSERT INTO templates (id,name,content,assignments,created_at,updated_at,deleted_at) VALUES (?1,?1,'',?2,?3,?3,?4)`,
+    `INSERT INTO templates (id,name,assignments,created_at,updated_at,deleted_at) VALUES (?1,?1,?2,?3,?3,?4)`,
     [id, JSON.stringify(assignments), now, deletedAt]
   );
   await insertTpl('m1', [{ entryType: 'wiki', category: 'alt' }, { entryType: 'operation', category: 'alt' }]);
@@ -1877,7 +1928,7 @@ console.log('\n8m. Migration v48: old English default titles become empty\n');
 
   // The import of old backups calls the same against `entries`.
   await runMigrations(db);
-  await db.execute(`INSERT INTO entries (id, type, title, content, created_at, updated_at) VALUES ('e9','wiki','Untitled Article','',$1,$1)`, [at]);
+  await db.execute(`INSERT INTO entries (id, type, title, created_at, updated_at) VALUES ('e9','wiki','Untitled Article',$1,$1)`, [at]);
   await clearLegacyUntitledTitles(db);
   check('after v49 it clears the default titles in entries',
     (await db.select("SELECT title FROM entries WHERE id='e9'"))[0]?.title === '');
@@ -1909,7 +1960,7 @@ console.log('\n8n. Migration v49: three entry tables become entries\n');
 
   // Reproduce the abort: the journal has already been moved over and its table is gone,
   // wiki and operations are still there.
-  await db.execute(TABLE_DDL.entries);
+  await db.execute(ENTRIES_DDL_V65);
   await db.execute(
     `INSERT INTO entries (id, type, title, content, entry_number, tags, created_at, updated_at)
      SELECT id, 'journal', title, content, entry_number, tags, created_at, updated_at FROM journal_entries`
@@ -1927,6 +1978,8 @@ console.log('\n8n. Migration v49: three entry tables become entries\n');
   check('aborted v49 resumes on the next start', resumed, message);
 
   const rows = Object.fromEntries((await db.select('SELECT * FROM entries')).map((r) => [r.id, r]));
+  // The block stack is in the rows since v66.
+  for (const row of Object.values(rows)) row.content = await stackOf(db, 'entry', row.id);
   check('every row is in entries exactly once', Object.keys(rows).length === 5, JSON.stringify(Object.keys(rows)));
   check(
     'type, number, category, icon, cover image and tags stay',
@@ -1967,7 +2020,7 @@ console.log('\n8n. Migration v49: three entry tables become entries\n');
   await runMigrations(db);
   await db.execute('ALTER TABLE block_definitions ADD COLUMN revision INTEGER NOT NULL DEFAULT 1');
   const old = JSON.stringify([{ entryType: 'wiki', category: '*', isDefault: true }, { entryType: 'operation', category: '*', isDefault: false }]);
-  await db.execute(`INSERT INTO templates (id,name,content,assignments,created_at,updated_at,deleted_at) VALUES ('live','L','',?1,?2,?2,NULL), ('gone','G','',?1,?2,?2,?2)`, [old, now]);
+  await db.execute(`INSERT INTO templates (id,name,assignments,created_at,updated_at,deleted_at) VALUES ('live','L',?1,?2,?2,NULL), ('gone','G',?1,?2,?2,?2)`, [old, now]);
   const v56 = MIGRATIONS.find((m) => m.version === 56);
   await v56.up(db);
   await v56.up(db);
@@ -1989,7 +2042,8 @@ console.log('\n8n. Migration v49: three entry tables become entries\n');
   await v61.up(db);
   await v61.up(db);
   const cats = await db.select("SELECT id, is_builtin FROM categories WHERE id='altars'");
-  const [tpl] = await db.select("SELECT content, assignments FROM templates WHERE id='core-altar'");
+  const [tplRow] = await db.select("SELECT assignments FROM templates WHERE id='core-altar'");
+  const tpl = tplRow && { ...tplRow, content: await stackOf(db, 'template', 'core-altar') };
   check('v61: one built-in category "altars"', cats.length === 1 && cats[0].is_builtin === 1, cats);
   check('v61: the altar template, default for operation × altars, with an altar and a text',
     !!tpl && JSON.parse(tpl.assignments).some((a) => a.entryType === 'operation' && a.category === 'altars')
@@ -2002,6 +2056,8 @@ console.log('\n8n. Migration v49: three entry tables become entries\n');
   // v62: altars become operations of "Altars", items pictures of "Images", links follow.
   const db = freshDb('v62.db');
   await runMigrations(db);
+  // As v62/v63 meet a vault: with `content` (v66 drops it, below).
+  await addContentColumns(db);
   await createAltarTables(db);
   const pic = `${'d'.repeat(64)}.png`;
   const gone = `${'e'.repeat(64)}.webp`;
@@ -2101,7 +2157,203 @@ console.log('\n8n. Migration v49: three entry tables become entries\n');
   check('replace: an altar never overwrites an entry of another type, but does its own operation',
     kept?.type === 'journal' && kept.title === 'Late' && replaced?.title === 'Late, newer', { kept, replaced });
   await dropAltarTables(db);
+  await dropContentColumns(db);
   check('v62/v63: schema identical to the baseline', JSON.stringify(await readSchema(db)) === JSON.stringify(schemaA));
+  check('v62/v63 then v66: the converted chips are in the block rows',
+    (await stackOf(db, 'entry', 'e1')).includes('data-entry-type="operation"')
+      && (await db.select("SELECT COUNT(*) AS n FROM block_refs WHERE target_kind = 'entry' AND target = 'a1'"))[0].n >= 1);
+  db.close();
+}
+
+console.log('\n8v. Migration v64: the sigil blocks become fields and paint blocks\n');
+
+{
+  const db = freshDb('v64.db');
+  await runMigrations(db);
+  // As v64 meets a vault: with `content` (v66 drops it, below).
+  await addContentColumns(db);
+  const up64 = MIGRATIONS.find((m) => m.version === 64).up;
+  const enc = (value) => JSON.stringify(value).replace(/"/g, '&quot;');
+  const img = `${'b'.repeat(64)}.png`;
+  // Loaded with a date, only the calculator and drawing named; a second calculator stays free.
+  const loaded = `<section data-block="core.sigil.calc" data-block-id="c1" data-block-data="${enc({ intention: 'Geheim', letters: ['G'], implemented: [] })}"><p>Geheim</p><p>G</p></section>`
+    + `<section data-block="core.sigil.canvas" data-block-id="d1"><img src="${img}" alt=""></section>`
+    + `<section data-block="core.sigil.calc" data-block-id="c2" data-block-data="${enc({ intention: 'Offen', letters: ['O'], implemented: [] })}"><p>Offen</p></section>`
+    + `<section data-block="core.sigil.charge" data-block-id="l1" data-block-data="${enc({ loaded: true, revealDate: '2099-01-01', lock: 'sigil', targets: ['c1', 'd1'] })}"><p>2099-01-01</p></section>`;
+  // Loaded without a date for "all", locking the entry; in the trash.
+  const all = `<section data-block="core.sigil.calc" data-block-id="c3" data-block-data="${enc({ intention: 'Alles', letters: ['A'], implemented: [] })}"><p>Alles</p></section>`
+    + `<section data-block="core.sigil.charge" data-block-id="l3" data-block-data="${enc({ loaded: true, revealDate: null, lock: 'entry' })}"></section>`;
+  const untouched = '<p>Kein Siegel</p>'; // lang-ok
+  await db.execute(`INSERT INTO entries (id,type,title,content,created_at,updated_at,deleted_at) VALUES
+    ('s1','operation','Loaded',$1,$4,$4,NULL), ('s2','journal','All',$2,$4,$4,$4), ('s3','wiki','None',$3,$4,$4,NULL)`,
+  [loaded, all, untouched, now]);
+  await db.execute(`INSERT INTO templates (id,name,content,created_at,updated_at) VALUES ('t64','Old sigil',$1,$2,$2)`, [loaded, now]);
+
+  await up64(db);
+  await up64(db);
+
+  const row = async (table, id) => (await db.select(`SELECT content, updated_at FROM ${table} WHERE id=$1`, [id]))[0];
+  const [s1, s2, s3, t64] = [await row('entries', 's1'), await row('entries', 's2'), await row('entries', 's3'), await row('templates', 't64')];
+  check('v64: no old sigil block is left, in entries, the trash and templates',
+    [s1, s2, t64].every((r) => !r.content.includes('core.sigil.')), [s1.content, s2.content, t64.content]);
+  check('v64: entries and templates are converted alike, by the shared converter',
+    s1.content === contentWithoutLegacySigils(loaded) && t64.content === s1.content && s2.content === contentWithoutLegacySigils(all));
+  check('v64: the calculators are fields blocks under their IDs, the drawing a sigil paint block with its picture',
+    s1.content.includes('data-block="core.fields" data-block-id="c1"') && s1.content.includes('data-block="core.paint" data-block-id="d1"')
+      && s1.content.includes(`src="${img}"`) && s1.content.includes('&quot;sigil&quot;:true'), s1.content);
+  check('v64: the charge targets the calculator part and the drawing, the second calculator stays free',
+    s1.content.includes(enc(['c1:calc', 'd1'])) && !s1.content.includes('c2:calc'), s1.content);
+  check('v64: a charge for "all" stays one (no targets written)', !s2.content.includes('targets'), s2.content);
+  check('v64: an entry without sigil blocks is not touched', s3.content === untouched && s3.updated_at === now);
+  check('v64: updated_at stays as it was', s1.updated_at === now && s2.updated_at === now);
+  check('v64: a backup beforehand', readdirSync(join(workDir, 'v64')).some((f) => f.includes('.pre-v64')));
+  await dropContentColumns(db);
+  check('v64, then v66: schema identical to the baseline', JSON.stringify(await readSchema(db)) === JSON.stringify(schemaA));
+  check('v64, then v66: the converted blocks are the rows', (await stackOf(db, 'entry', 's1')) === contentWithoutLegacySigils(loaded));
+  db.close();
+
+  // Nothing to convert: no backup. And the import path (no backup callback) converts the same.
+  const quiet = freshDb('v64-quiet.db');
+  await runMigrations(quiet);
+  await addContentColumns(quiet);
+  await MIGRATIONS.find((m) => m.version === 64).up(quiet);
+  check('v64: without sigil blocks no backup is made', !readdirSync(join(workDir, 'v64-quiet')).some((f) => f.includes('.pre-v64')));
+  await quiet.execute(`INSERT INTO entries (id,type,title,content,created_at,updated_at) VALUES ('i1','operation','Imported',$1,$2,$2)`, [loaded, now]);
+  await convertLegacySigilsInPlace(quiet);
+  const [imported] = await quiet.select("SELECT content FROM entries WHERE id='i1'");
+  check('import: the working copy converts an imported sigil like v64, without a backup',
+    imported?.content === contentWithoutLegacySigils(loaded)
+      && !readdirSync(join(workDir, 'v64-quiet')).some((f) => f.includes('.pre-v64')), imported?.content);
+  quiet.close();
+}
+
+console.log('\n8w. Migration v65: the blocks become rows of their own\n');
+
+{
+  const db = freshDb('v65.db');
+  await runMigrations(db);
+  // As v65 met a vault: with `content`, which v66 drops (below).
+  await addContentColumns(db);
+  const [fresh] = await db.select("SELECT COUNT(*) AS n FROM blocks WHERE template_id IN ('core-sigil', 'core-altar')");
+  check('fresh vault: the seeded templates have their block rows', fresh.n >= 4, fresh);
+  const freshCheck = await checkBlockRows(db);
+  check('fresh vault: rows and content agree', !freshCheck.entries.length && !freshCheck.templates.length, freshCheck);
+
+  // Back to before v65: no tables, no stamp.
+  await db.execute('DROP TABLE block_refs');
+  await db.execute('DROP TABLE blocks');
+  await db.execute('DELETE FROM schema_version WHERE version = 65');
+  clearSavedBlocks();
+  const up65 = MIGRATIONS.find((m) => m.version === 65).up;
+  const linked = '44444444-4444-4444-4444-444444444444';
+  const img = `${'c'.repeat(64)}.png`;
+  const chip = `<span data-type="internalLink" class="internal-link" data-id="${linked}" data-entry-type="wiki" data-label="Ziel">Ziel</span>`;
+  const plain = `<p>Nur Text mit ${chip}</p>`; // lang-ok
+  // Attributes in another order than the app writes them, loose text between two sections, an old origin attribute.
+  const mixed = '<section data-block="core.text" data-block-id="b1" data-block-origin="x" data-block-title="Kopf" data-block-hidden="1"><p>eins</p></section>' // lang-ok
+    + '<p>lose</p>' // lang-ok
+    + `<section data-block="core.paint" data-block-id="b2" data-block-data="{&quot;v&quot;:1,&quot;layers&quot;:[]}"><img src="${img}" alt="" data-paint="render"></section>`;
+  await db.execute(`INSERT INTO entries (id,type,title,content,created_at,updated_at,deleted_at) VALUES
+    ('p1','journal','Plain',$1,$4,$4,NULL), ('m1','wiki','Mixed',$2,$4,$4,$4), ('e1','operation','Empty',$3,$4,$4,NULL)`,
+  [plain, mixed, '', now]);
+  await db.execute(`INSERT INTO templates (id,name,content,created_at,updated_at) VALUES ('t65','T',$1,$2,$2)`, [mixed, now]);
+
+  await up65(db);
+  await db.execute("INSERT INTO schema_version (version, name, applied_at) VALUES (65, 'blocks_table', $1)", [now]);
+  check('v65: a backup beforehand', readdirSync(join(workDir, 'v65')).some((f) => f.includes('.pre-v65')));
+
+  const rowsOf = (column, id) => db.select(`SELECT * FROM blocks WHERE ${column} = $1 ORDER BY position`, [id]);
+  const [p1] = await rowsOf('entry_id', 'p1');
+  check('v65: a plain text entry is one text row with its text', p1?.type === 'core.text' && p1.html === plain && p1.text === 'Nur Text mit Ziel', p1); // lang-ok
+  const m1 = await rowsOf('entry_id', 'm1');
+  check('v65: the trash is converted too; loose text becomes a block of its own between the two',
+    m1.map((r) => r.type).join() === 'core.text,core.text,core.paint' && m1[0].id === 'b1' && m1[2].id === 'b2', m1.map((r) => [r.id, r.type]));
+  check('v65: instance attributes in columns, the old one kept in attrs',
+    m1[0].hidden === 1 && m1[0].title === "Kopf" && JSON.parse(m1[0].attrs)["data-block-origin"] === "x", JSON.stringify(m1[0]));
+  check('v65: an empty entry has no rows', (await rowsOf('entry_id', 'e1')).length === 0);
+  check('v65: templates get rows in the same table', (await rowsOf('template_id', 't65')).length === 3);
+
+  const refs = await db.select(`SELECT b.entry_id AS owner, r.target_kind AS kind, r.target, r.role FROM block_refs r JOIN blocks b ON b.row_id = r.block_row
+    WHERE b.entry_id IS NOT NULL ORDER BY owner`);
+  // A drawing without a usable document has its render as its only layer, as `parseDrawing` reads it.
+  check("v65: block_refs holds the chip and the drawing's render and layer",
+    JSON.stringify(refs.map((r) => [r.owner, r.kind, r.target === linked ? 'L' : r.target === img ? 'I' : r.target, r.role]))
+      === JSON.stringify([["m1", "image", "I", "layer"], ["m1", "image", "I", "render"], ["p1", "entry", "L", "content"]]), JSON.stringify(refs));
+
+  const [m1Row] = await db.select("SELECT content, updated_at FROM entries WHERE id='m1'");
+  check('v65: content is normalised to what the rows give, updated_at untouched',
+    parseBlocks(m1Row.content).map((b) => b.id).join() === m1.map((r) => r.id).join() && m1Row.updated_at === now
+      && m1Row.content.indexOf('data-block-hidden') < m1Row.content.indexOf('data-block-title'), m1Row.content);
+  const [plainRow] = await db.select("SELECT content FROM entries WHERE id='p1'");
+  check('v65: a plain text entry keeps its content byte for byte', plainRow.content === plain);
+  const agree = await checkBlockRows(db);
+  check('v65: rows and content agree everywhere', !agree.entries.length && !agree.templates.length, agree);
+
+  // Resumed after a crash: an owner without rows is filled, the others stay.
+  const before = await db.select('SELECT row_id, entry_id, template_id, id FROM blocks ORDER BY row_id');
+  await db.execute("DELETE FROM blocks WHERE entry_id = 'm1'");
+  await up65(db);
+  const after = await db.select('SELECT row_id, entry_id, template_id, id FROM blocks ORDER BY row_id');
+  check('v65: resuming fills what is missing and leaves the rest',
+    after.length === before.length && before.filter((r) => r.entry_id !== 'm1').every((r) => after.some((a) => a.row_id === r.row_id)), after);
+  check('v65: block_refs go with their block', (await db.select(
+    'SELECT COUNT(*) AS n FROM block_refs WHERE block_row NOT IN (SELECT row_id FROM blocks)'))[0].n === 0);
+
+  // An entry deleted for good takes its blocks along (CASCADE), and their references.
+  await db.execute("DELETE FROM entries WHERE id = 'p1'");
+  check('v65: deleting an entry deletes its blocks and refs',
+    (await rowsOf('entry_id', 'p1')).length === 0
+      && (await db.select('SELECT COUNT(*) AS n FROM block_refs WHERE target = $1', [linked]))[0].n === 0);
+
+  // Content written with plain SQL (an import's working copy): reconciling rebuilds those owners.
+  await db.execute("UPDATE templates SET content = '<p>neu</p>' WHERE id = 't65'"); // lang-ok
+  const stale = await checkBlockRows(db);
+  check('checkBlockRows finds content the rows do not give', stale.templates.includes('t65'), stale);
+  await reconcileBlockRows(db);
+  const [t65] = await rowsOf('template_id', 't65');
+  check('reconcileBlockRows rebuilds it', t65?.html === '<p>neu</p>' && !(await checkBlockRows(db)).templates.length, t65); // lang-ok
+
+  // A row with both owners or none is refused.
+  let refused = 0;
+  for (const sql of [
+    "INSERT INTO blocks (id, entry_id, template_id, position, type, updated_at) VALUES ('x', 'm1', 't65', 'V', 'core.text', 'now')",
+    "INSERT INTO blocks (id, position, type, updated_at) VALUES ('x', 'V', 'core.text', 'now')",
+  ]) {
+    try { await db.execute(sql); } catch { refused++; }
+  }
+  check('blocks: exactly one owner (CHECK)', refused === 2);
+
+  // Re-encrypting a vault renames pictures in every table by `rowid` (`rewrite_tables` in `reencrypt.rs`).
+  const withoutRowid = [];
+  for (const table of TABLES) {
+    try { await db.select(`SELECT rowid FROM ${table} LIMIT 0`); } catch { withoutRowid.push(table); }
+  }
+  check('every table has a rowid, which re-encrypting needs', withoutRowid.length === 0, withoutRowid.join(', '));
+  db.close();
+}
+
+console.log('\n8x. Migration v66: content goes, the rows stay\n');
+
+{
+  const db = freshDb('v66.db');
+  await runMigrations(db);
+  // Back to v65: `content` as the rows give it, and one owner whose `content` an older version changed since.
+  await addContentColumns(db);
+  await db.execute("DELETE FROM schema_version WHERE version = 66");
+  const chip = '<span data-type="internalLink" class="internal-link" data-id="55555555-5555-5555-5555-555555555555" data-entry-type="wiki" data-label="Z">Z</span>';
+  await insertWithStack(db, 'entries', { id: 'k1', type: 'journal', title: 'Kept', created_at: now, updated_at: now }, '<p>alt</p>'); // lang-ok
+  await db.execute(`UPDATE entries SET content = $1 WHERE id = 'k1'`, [`<p>neu ${chip}</p>`]); // lang-ok
+  clearSavedBlocks();
+  const up66 = MIGRATIONS.find((m) => m.version === 66).up;
+  await up66(db);
+  await up66(db);
+  check('v66: schema identical to the baseline, also on the second run', JSON.stringify(await readSchema(db)) === JSON.stringify(schemaA));
+  check('v66: a backup beforehand', readdirSync(join(workDir, 'v66')).some((f) => f.includes('.pre-v66')));
+  check('v66: what only content held is in the rows before it goes',
+    (await stackOf(db, 'entry', 'k1')) === `<p>neu ${chip}</p>`, await stackOf(db, 'entry', 'k1')); // lang-ok
+  check('v66: with its references',
+    (await db.select("SELECT COUNT(*) AS n FROM block_refs WHERE target = '55555555-5555-5555-5555-555555555555'"))[0].n === 1);
+  check('v66: the seeded templates keep their blocks', (await stackOf(db, 'template', 'core-sigil')).includes('core.paint'));
   db.close();
 }
 
@@ -2172,8 +2424,8 @@ console.log('\n8n. Migration v49: three entry tables become entries\n');
   );
   await db.execute("UPDATE operations SET drawing_data='data:image/png;base64,CCCC' WHERE id='s1'");
   await runMigrations(db);
-  const [s1] = await db.select("SELECT content FROM entries WHERE id='s1'");
-  check('on the next attempt it becomes a block and v49 runs through', s1?.content.includes('core.sigil.canvas'), s1?.content);
+  const s1 = { content: await stackOf(db, 'entry', 's1') };
+  check('on the next attempt it becomes a block and v49 runs through', s1.content.includes('data-block="core.paint"'), s1.content);
   db.close();
 }
 
@@ -2394,7 +2646,7 @@ console.log('\n8r. Migration v53: tags by ID\n');
        ('trashed','Mond','#333333',$1)`,
     [at]
   );
-  await vault.execute(`INSERT INTO entries (id, type, title, content, tags, created_at, updated_at) VALUES ('alt','journal','','','["same","weg"]',$1,$1)`, [at]);
+  await vault.execute(`INSERT INTO entries (id, type, title, tags, created_at, updated_at) VALUES ('alt','journal','','["same","weg"]',$1,$1)`, [at]);
   const remapped = await importTagsAndRemap(vault, {
     tags: [
       { id: 'same', name: 'Anders benannt', color: '#000000' },   // same ID → same tag // lang-ok
@@ -2446,10 +2698,287 @@ console.log('\n8s. Migration v55: list index instead of idx_entries_deleted\n');
   check('the list query reads only the index', list.includes('COVERING INDEX idx_entries_list'), list);
   const decorated = await plan('SELECT id, icon, cover_image FROM entries WHERE deleted_at IS NULL AND (icon IS NOT NULL OR cover_image IS NOT NULL)');
   check('icon and cover image come via the partial index', decorated.includes('idx_entries_decorated'), decorated);
-  const chunk = await plan('SELECT rowid AS rid, id, content FROM entries WHERE +deleted_at IS NULL AND rowid > 1 ORDER BY rowid LIMIT 1000');
+  const chunk = await plan('SELECT rowid AS rid, id FROM entries WHERE +deleted_at IS NULL AND rowid > 1 ORDER BY rowid LIMIT 1000');
   check('the content chunks run along the rowid, without sorting', !chunk.includes('TEMP B-TREE'), chunk);
   check('v55: schema identical to the baseline', JSON.stringify(await readSchema(db)) === JSON.stringify(schemaA));
   db.close();
+}
+
+console.log('\n8y. Readers of the block rows: "Images", image cleanup, field values, import working copy\n');
+
+{
+  const db = freshDb('readers.db');
+  await runMigrations(db);
+  clearSavedBlocks();
+  const name = (c) => `${c.repeat(64)}.png`;
+  const [shown, render, layer, tplPic, trashed] = ['1', '2', '3', '4', '5'].map(name);
+  const enc = (value) => JSON.stringify(value).replace(/&/g, '&amp;').replace(/"/g, '&quot;');
+  // A custom block with a drawing part (#107): its render and layer are the drawing.
+  const part = `<section data-block="core.fields" data-block-id="sp" data-block-config="${enc({ elements: [{ id: 'd', kind: 'sigilCanvas', label: '' }] })}"`
+    + ` data-block-data="${enc({ values: { d: { v: 1, layers: [{ id: 'L1', image: true }] } } })}">`
+    + `<dl><dt>Zeichnung</dt><dd data-block-slot="el:d"><img src="${render}" alt="" data-paint="render"><img src="${layer}" alt="" data-paint="L1"></dd></dl></section>`; // lang-ok
+  const text = `<section data-block="core.text" data-block-id="tx"><p><img src="${shown}"></p></section>`;
+  await insertWithStack(db, 'entries', { id: 'u1', type: 'journal', title: 'Uses', created_at: now, updated_at: now }, part + text);
+  await insertWithStack(db, 'entries', { id: 'u2', type: 'wiki', title: 'Gone', created_at: now, updated_at: now, deleted_at: now }, `<p><img src="${trashed}"></p>`);
+  await insertWithStack(db, 'templates', { id: 'ut', name: 'Tpl', created_at: now, updated_at: now }, `<p><img src="${tplPic}"></p>`);
+
+  const uses = await collectImageUses(db);
+  const roles = (file) => (uses.get(file) ?? []).map((u) => `${u.kind}:${u.id}:${u.role}`).join(' ');
+  check('Images: a picture in a text is shown by its entry', roles(shown) === 'entry:u1:content', roles(shown));
+  check('Images (#107): a drawing part\'s render and layer are the drawing, not pictures of their own',
+    roles(render) === 'entry:u1:render' && roles(layer) === 'entry:u1:layer', [roles(render), roles(layer)]);
+  check('Images: a template shows its picture; the trash shows nothing', roles(tplPic) === 'template:ut:content' && !uses.has(trashed),
+    [roles(tplPic), roles(trashed)]);
+  const used = await collectUsedImageFilenames(db);
+  check('image cleanup: every picture a block names is in use, the trash included',
+    [shown, render, layer, tplPic, trashed].every((f) => used.has(f)), [...used]);
+  check('image cleanup: a picture nobody names is not', !used.has(name('6')));
+  // A canvas whose JSON cannot be read still names its pictures in its markup: the cleanup keeps them.
+  await insertWithStack(db, 'entries', { id: 'u3', type: 'journal', title: 'Broken', created_at: now, updated_at: now },
+    `<section data-block="core.canvas" data-block-id="cv" data-block-data="{nope"><img src="${name('7')}" data-canvas="image"></section>`);
+  check('image cleanup: a block it cannot read keeps the pictures its row names', (await collectUsedImageFilenames(db)).has(name('7')));
+
+  // Field values through SQLite's JSON functions (#37).
+  const fields = (id, values) => `<section data-block="core.fields" data-block-id="${id}"`
+    + ` data-block-config="${enc({ elements: [{ id: 'n1', kind: 'number', label: 'N' }, { id: 's1', kind: 'shorttext', label: 'S' }, { id: 'b1', kind: 'toggle', label: 'B' }] })}"`
+    + ` data-block-data="${enc({ values })}"><dl></dl></section>`;
+  await insertWithStack(db, 'entries', { id: 'f1', type: 'operation', title: 'F1', created_at: now, updated_at: now }, fields('fa', { n1: 5, s1: 'Hallo Welt', b1: true })); // lang-ok
+  await insertWithStack(db, 'entries', { id: 'f2', type: 'operation', title: 'F2', created_at: now, updated_at: now }, fields('fb', { n1: 7, s1: '', b1: false }));
+  await insertWithStack(db, 'entries', { id: 'f3', type: 'operation', title: 'F3', created_at: now, updated_at: now, deleted_at: now }, fields('fc', { n1: 5 }));
+  const ids = async (elementId, condition, extra = {}) => (await entriesWithFieldValue(db, { elementId, condition, ...extra })).sort().join();
+  check('field values: equals a number, the trash left out', (await ids('n1', { op: 'equals', value: 5 })) === 'f1');
+  check('field values: the trash on request', (await ids('n1', { op: 'equals', value: 5 }, { includeDeleted: true })) === 'f1,f3');
+  check('field values: contains, regardless of case', (await ids('s1', { op: 'contains', value: 'WELT' })) === 'f1');
+  check('field values: a toggle', (await ids('b1', { op: 'equals', value: false })) === 'f2');
+  check('field values: empty, only in blocks that have the element', (await ids('s1', { op: 'empty' })) === 'f2', await ids('s1', { op: 'empty' }));
+  check('field values: not empty', (await ids('s1', { op: 'notEmpty' })) === 'f1');
+  let refusedId = false;
+  try { await entriesWithFieldValue(db, { elementId: 'x".evil', condition: { op: 'empty' } }); } catch { refusedId = true; }
+  check('field values: an element ID that is no ID is refused', refusedId);
+
+  // An import's working copy gets `content` back, filled from the rows, and gives it up again.
+  const rowIds = async () => (await db.select("SELECT row_id FROM blocks WHERE entry_id = 'u1' ORDER BY row_id")).map((r) => r.row_id).join();
+  const before = await rowIds();
+  await addContentColumns(db);
+  const [filled] = await db.select("SELECT content FROM entries WHERE id = 'u1'");
+  check('import working copy: content is filled from the rows', filled?.content === part + text, filled?.content);
+  await db.execute("UPDATE entries SET content = '<p>importiert</p>' WHERE id = 'f2'"); // lang-ok
+  await dropContentColumns(db);
+  check('import working copy: what the import wrote becomes rows, the column goes',
+    (await stackOf(db, 'entry', 'f2')) === '<p>importiert</p>' && !(await hasContentColumn(db, 'entry')) && !(await hasContentColumn(db, 'template'))); // lang-ok
+  check('import working copy: an owner it did not touch keeps its rows as they were', (await rowIds()) === before);
+  check('readers: schema identical to the baseline', JSON.stringify(await readSchema(db)) === JSON.stringify(schemaA));
+  db.close();
+}
+
+console.log("\n8z. Backups: block rows since '14', older files through the converter\n");
+
+{
+  const { createHash } = await import('node:crypto');
+  // Every picture the import saves gets a name of its own, the hash of what it was given.
+  const savedName = (dataUrl) => `${createHash('sha256').update(dataUrl).digest('hex')}.png`;
+  globalThis.harnessSaveImage = savedName;
+  const FULL = {
+    includeJournal: true, includeWiki: true, includeOperations: true, includeTasks: true, includeTags: true,
+    includeLexicon: true, dateFrom: '', dateTo: '', includeDeleted: true,
+  };
+  const ownColumn = { entry: 'entry_id', template: 'template_id' };
+  const blockRows = async (db, kind, id) => (await db.select(
+    `SELECT id, position, type, version, hidden, title, show_title, config, data, attrs, html, updated_at FROM blocks WHERE ${ownColumn[kind]} = $1 ORDER BY position`, [id],
+  )).map((r) => ({ ...r }));
+  const refRows = async (db, kind, id) => (await db.select(
+    `SELECT b.id AS block, r.target_kind, r.target, r.role FROM block_refs r JOIN blocks b ON b.row_id = r.block_row
+      WHERE b.${ownColumn[kind]} = $1 ORDER BY b.id, r.target_kind, r.target, r.role`, [id],
+  )).map((r) => ({ ...r }));
+  /** The file through JSON, as it is written and read, and lifted like on opening it. */
+  const reread = (file) => {
+    const copy = JSON.parse(JSON.stringify(file));
+    migrateBackupPayload(copy);
+    return copy;
+  };
+  /** A stored name in the file → the name the import saved it under. */
+  const namesAfterImport = (file) => new Map(Object.entries(file.images).map(([name, url]) => [name, savedName(url)]));
+  const renamed = (value, names) => {
+    let out = JSON.stringify(value);
+    for (const [from, to] of names) out = out.split(from).join(to);
+    return JSON.parse(out);
+  };
+
+  const W = '7b000000-0000-4000-8000-000000000001';
+  const J = '7b000000-0000-4000-8000-000000000002';
+  const TPL = '7b000000-0000-4000-8000-000000000003';
+  const TASK = '7b000000-0000-4000-8000-000000000004';
+  const pic = (c) => `${c.repeat(64)}.png`;
+  const attr = (value) => JSON.stringify(value).replace(/&/g, '&amp;').replace(/"/g, '&quot;');
+  const chipTo = (id) => `<span data-type="internalLink" class="internal-link" data-id="${id}" data-entry-type="wiki" data-label="Ziel">Ziel</span>`; // lang-ok
+  const scene = {
+    width: 1600, height: 1000, elements: [], guides: [], guidesLocked: false,
+    background: { fill: null, image: { src: pic('4') }, tint: null },
+  };
+  const fieldsConfig = {
+    elements: [
+      { id: 'ln', kind: 'link', label: 'L', defaultValue: { id: W, entryType: 'wiki', label: 'Ziel' } }, // lang-ok
+      { id: 'im', kind: 'image', label: 'I', defaultValue: pic('5') },
+    ],
+  };
+  const journalStack =
+    `<section data-block="core.text" data-block-id="t1"><p>Link ${chipTo(W)}</p><img src="${pic('1')}"></section>`
+    + `<section data-block="core.paint" data-block-id="p1" data-block-config="${attr({ sigil: true })}" data-block-data="${attr({ v: 1, layers: [{ id: 'L1', image: true, strokes: [] }] })}">`
+    + `<img src="${pic('2')}" alt="" data-paint="render"><img src="${pic('3')}" alt="" data-paint="L1"></section>`
+    + `<section data-block="core.canvas" data-block-id="c1" data-block-data="${attr(scene)}"><img src="${pic('4')}" alt="" data-canvas="background"></section>`
+    + `<section data-block="core.fields" data-block-id="f1" data-block-config="${attr(fieldsConfig)}"></section>`;
+
+  const src = freshDb('backup-src.db');
+  await runMigrations(src);
+  await insertWithStack(src, 'entries', { id: W, type: 'wiki', title: 'Ziel', created_at: now, updated_at: now }, '<p>Ziel</p>'); // lang-ok
+  await insertWithStack(src, 'entries', { id: J, type: 'journal', title: 'Quelle', created_at: now, updated_at: now }, journalStack); // lang-ok
+  await insertWithStack(src, 'templates', { id: TPL, name: 'Vorlage', created_at: now, updated_at: now }, `<p>Bild</p><img src="${pic('6')}">`); // lang-ok
+  await src.execute(`INSERT INTO tasks (id,title,created_at,updated_at) VALUES ($1,'Aufgabe',$2,$2)`, [TASK, now]); // lang-ok
+  await src.execute(`INSERT INTO task_links (id,task_id,target_id,target_type) VALUES ('tl1',$1,$2,'wiki')`, [TASK, W]);
+  // A block written at another time than the others keeps that time.
+  await src.execute("UPDATE blocks SET updated_at = '2025-05-05T05:05:05.000Z' WHERE entry_id = $1 AND id = 'p1'", [J]);
+  const journalBefore = await blockRows(src, 'entry', J);
+  const sigilBefore = await blockRows(src, 'template', 'core-sigil');
+
+  const backup = await buildBackupFrom(src, FULL);
+  check("export: version '14', the blocks as rows, no content on their owners",
+    backup.version === '14' && Array.isArray(backup.data.blocks) && backup.data.blocks.length > 0
+      && backup.data.entries.every((r) => !('content' in r)) && backup.data.templates.every((r) => !('content' in r))
+      && backup.data.blocks.every((r) => !('row_id' in r) && !('text' in r)), backup.data.blocks?.[0]);
+  check("export: every picture of the blocks travels, the one only in a prefill's JSON too",
+    ['1', '2', '3', '4', '5', '6'].every((c) => pic(c) in backup.images), Object.keys(backup.images));
+
+  // (a) Replace into an empty vault: the same rows, pictures renamed, references rebuilt.
+  const restored = reread(backup);
+  const dst = freshDb('backup-dst.db');
+  await runMigrations(dst);
+  clearSavedBlocks();
+  await doReplace(dst, restored);
+  const names = namesAfterImport(restored);
+  for (const [kind, id, label] of [['entry', J, 'journal entry'], ['entry', W, 'wiki article'], ['template', TPL, 'template']]) {
+    const expected = renamed(await blockRows(src, kind, id), names);
+    const got = await blockRows(dst, kind, id);
+    check(`restore '14': the ${label} has its blocks unchanged, position and time included`,
+      got.length > 0 && JSON.stringify(got) === JSON.stringify(expected), { got, expected });
+    // Sorted after renaming: the new names sort differently.
+    const sorted = (refs) => refs.map((r) => JSON.stringify(r)).sort().join('\n');
+    const refs = await refRows(dst, kind, id);
+    check(`restore '14': the references of the ${label} are rebuilt`,
+      sorted(refs) === sorted(renamed(await refRows(src, kind, id), names)), { refs, src: renamed(await refRows(src, kind, id), names) });
+  }
+  check("restore '14': the prefill's picture is referenced as a default",
+    (await refRows(dst, 'entry', J)).some((r) => r.role === 'default' && r.target === names.get(pic('5'))));
+  check("restore '14': the vault's own templates keep their blocks",
+    (await dst.select("SELECT COUNT(*) AS n FROM blocks WHERE template_id = 'core-sigil'"))[0].n > 0);
+  check("restore '14': no content column was left behind", !(await hasContentColumn(dst, 'entry')));
+  check("restore '14': schema identical to the baseline", JSON.stringify(await readSchema(dst)) === JSON.stringify(schemaA));
+  dst.close();
+
+  // (b) Merge into the vault it came from: copies under prefixed IDs, links pointing at the copies.
+  clearSavedBlocks();
+  await doMerge(src, reread(backup));
+  const [copy] = await src.select('SELECT id FROM entries WHERE id LIKE $1', [`%-${J}`]);
+  const prefixed = copy ? copy.id.slice(0, copy.id.length - J.length) + W : null;
+  const copyStack = copy ? await stackOf(src, 'entry', copy.id) : '';
+  check("merge '14': the copy's chip and link prefill point at the copied target",
+    !!copy && copyStack.includes(`data-id="${prefixed}"`) && !copyStack.includes(`data-id="${W}"`)
+      && copyStack.includes(`&quot;id&quot;:&quot;${prefixed}&quot;`), copyStack);
+  check("merge '14': the copy's references to entries point at the copied target",
+    !!copy && (await refRows(src, 'entry', copy.id)).filter((r) => r.target_kind === 'entry').every((r) => r.target === prefixed));
+  check("merge '14': the original keeps its blocks", JSON.stringify(await blockRows(src, 'entry', J)) === JSON.stringify(journalBefore));
+  check("merge '14': a template that is already there gets no second set of blocks", (await blockRows(src, 'template', TPL)).length === 1);
+  src.close();
+
+  // (c) A partial replace — journal and tasks only: no other owner gets blocks, a link to the missing article goes.
+  const partial = reread(backup);
+  partial.data.wikiArticles = [];
+  partial.data.operations = [];
+  const dst2 = freshDb('backup-partial.db');
+  await runMigrations(dst2);
+  clearSavedBlocks();
+  await doReplace(dst2, partial);
+  check('partial restore: the journal entry has its blocks, the wiki article neither row nor blocks',
+    (await blockRows(dst2, 'entry', J)).length === 4 && (await blockRows(dst2, 'entry', W)).length === 0
+      && (await dst2.select('SELECT COUNT(*) AS n FROM entries WHERE id = $1', [W]))[0].n === 0);
+  check('partial restore: the task link to the article left out is swept',
+    (await dst2.select('SELECT COUNT(*) AS n FROM task_links'))[0].n === 0);
+  dst2.close();
+
+  // As a new vault (add-vault): the seeded sigil template goes first, the file's arrives with its own blocks.
+  const fresh = freshDb('backup-add-vault.db');
+  await runMigrations(fresh);
+  clearSavedBlocks();
+  await fresh.execute("DELETE FROM templates WHERE id = 'core-sigil'");
+  const asNew = reread(backup);
+  await doReplace(fresh, asNew);
+  check('new vault: the sigil template has exactly the blocks of the file',
+    JSON.stringify(await blockRows(fresh, 'template', 'core-sigil')) === JSON.stringify(renamed(sigilBefore, namesAfterImport(asNew))));
+  fresh.close();
+
+  // A crafted file with short picture keys: every name is renamed once, nothing grows key by key.
+  const crafted = reread(backup);
+  crafted.images = { ...crafted.images, '': 'data:image/png;base64,AA', 0: 'data:image/png;base64,AB', a: 'data:image/png;base64,AC' };
+  const dst3 = freshDb('backup-crafted.db');
+  await runMigrations(dst3);
+  clearSavedBlocks();
+  await doReplace(dst3, crafted);
+  const longest = (await dst3.select('SELECT MAX(LENGTH(html) + LENGTH(COALESCE(data, \'\'))) AS n FROM blocks'))[0].n;
+  check('crafted picture keys: the import finishes and the blocks keep their size', longest < 5000, longest);
+  dst3.close();
+
+  // (d) Files from before the rebuild (tools/mcp/seed/imports, written by build_import_fixtures.mjs).
+  const fixture = (name) => JSON.parse(readFileSync(join(process.cwd(), 'tools/mcp/seed/imports', name), 'utf8'));
+  const FX = {
+    wiki: '0f1e2d3c-0000-4000-8000-000000000001', journal: '0f1e2d3c-0000-4000-8000-000000000002',
+    sigilOp: '0f1e2d3c-0000-4000-8000-000000000003', altarOp: '0f1e2d3c-0000-4000-8000-000000000004',
+    template: '0f1e2d3c-0000-4000-8000-000000000005', altar: '0f1e2d3c-0000-4000-8000-000000000010',
+    journal12: '0f1e2d3c-0000-4000-8000-000000000013',
+  };
+  const old = freshDb('backup-old.db');
+  await runMigrations(old);
+  clearSavedBlocks();
+  const lifted13 = reread(fixture('backup-v13-pre-rebuild.emeralddb'));
+  await withContentColumns(old, () => doReplace(old, lifted13));
+  const names13 = namesAfterImport(lifted13);
+  const types = async (kind, id) => (await blockRows(old, kind, id)).map((r) => r.type);
+  check("old '13': no sigil block of v42–v63 is left",
+    (await old.select("SELECT COUNT(*) AS n FROM blocks WHERE type LIKE 'core.sigil.%'"))[0].n === 0);
+  const sigilRows = await blockRows(old, 'entry', FX.sigilOp);
+  check("old '13': the sigils are a calculator, a sigil drawing and a charge, then the notes",
+    JSON.stringify(sigilRows.map((r) => r.type)) === JSON.stringify(['core.fields', 'core.paint', 'core.fields', 'core.text'])
+      && JSON.parse(sigilRows[1]?.config ?? '{}').sigil === true, sigilRows.map((r) => [r.type, r.config]));
+  check("old '13': the drawing's picture is referenced under the name it was saved under",
+    (await refRows(old, 'entry', FX.sigilOp)).some((r) => r.target === names13.get(`${'2b'.repeat(32)}.png`)));
+  check("old '13': the altar is an operation of \"Altars\" with its altar and its picture",
+    JSON.stringify(await types('entry', FX.altarOp)) === JSON.stringify(['core.altar', 'core.text'])
+      && (await old.select('SELECT category_id FROM entries WHERE id = $1', [FX.altarOp]))[0]?.category_id === 'altars'
+      && (await refRows(old, 'entry', FX.altarOp)).some((r) => r.target === names13.get(`${'3c'.repeat(32)}.png`)),
+    await refRows(old, 'entry', FX.altarOp));
+  const journalRefs = await refRows(old, 'entry', FX.journal);
+  check("old '13': the journal's links and picture are references",
+    journalRefs.some((r) => r.target_kind === 'entry' && r.target === FX.wiki) && journalRefs.some((r) => r.target_kind === 'entry' && r.target === FX.altarOp)
+      && journalRefs.some((r) => r.target === names13.get(`${'1a'.repeat(32)}.png`)), journalRefs);
+  check("old '13': the template's sigils are converted too",
+    JSON.stringify(await types('template', FX.template)) === JSON.stringify(['core.fields', 'core.paint', 'core.fields']),
+    await types('template', FX.template));
+  check("old '13': the task link to the altar stays", (await old.select('SELECT COUNT(*) AS n FROM task_links'))[0].n === 1);
+  check("old '13': no content column was left behind", !(await hasContentColumn(old, 'entry')) && !(await hasContentColumn(old, 'template')));
+
+  const lifted12 = reread(fixture('backup-v12-altars.emeralddb'));
+  await withContentColumns(old, () => doMerge(old, lifted12));
+  const [altarCopy] = await old.select('SELECT id, type, category_id FROM entries WHERE id LIKE $1', [`%-${FX.altar}`]);
+  const [journalCopy] = await old.select('SELECT id FROM entries WHERE id LIKE $1', [`%-${FX.journal12}`]);
+  check("old '12' merged: the altar is an operation of \"Altars\" under the prefixed ID, with an altar block",
+    altarCopy?.type === 'operation' && altarCopy.category_id === 'altars'
+      && (await blockRows(old, 'entry', altarCopy.id))[0]?.type === 'core.altar', altarCopy);
+  const journal12Stack = journalCopy ? await stackOf(old, 'entry', journalCopy.id) : '';
+  check("old '12' merged: the chip to the altar points at the prefixed operation",
+    !!altarCopy && journal12Stack.includes(`data-id="${altarCopy.id}"`) && journal12Stack.includes('data-entry-type="operation"'), journal12Stack);
+  check("old '12' merged: the item's picture is in \"Images\"",
+    (await old.select('SELECT COUNT(*) AS n FROM images WHERE file = $1', [namesAfterImport(lifted12).get(`${'5e'.repeat(32)}.png`)]))[0].n === 1);
+  check('old files: schema identical to the baseline', JSON.stringify(await readSchema(old)) === JSON.stringify(schemaA));
+  old.close();
+  delete globalThis.harnessSaveImage;
 }
 
 console.log('\n9. Mirrored constants\n');
@@ -2521,6 +3050,7 @@ console.log('\n9. Mirrored constants\n');
 
 baseline.close();
 chain.close();
+chainNoAltars.close();
 seeded.close();
 
 console.log('');

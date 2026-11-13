@@ -108,11 +108,14 @@ src/
 │   ├── schema.ts                live DDL, builtin/starter seed
 │   ├── row.ts                   SQLite row ↔ TypeScript type conversion
 │   ├── serialize.ts             per-entity write serialization
-│   ├── normalizeSchema.ts, dbRebuild.ts, schemaV37.ts, schemaV48.ts   table rebuilds
+│   ├── normalizeSchema.ts, dbRebuild.ts, schemaV37.ts, schemaV48.ts, schemaV65.ts   table rebuilds, frozen shapes
 │   ├── unifyEntries.ts, tagsById.ts, nullableCategory.ts, mergeCategoryTables.ts,
 │   │   migrate*.ts               individual migrations, shared with importers
 │   ├── modules.ts               module registry
-│   ├── blocks/                  block format, types, fields, sigils, canvas, painting, definitions, templates
+│   ├── blocks/                  block format, types, fields, sigils, canvas, painting, definitions, templates;
+│   │                            a block as a row (`blockRows.ts`), its references (`blockRefs.ts`), positions (`position.ts`), field values by SQL (`blockQuery.ts`), an imported block pointed at this vault (`blockRemap.ts`)
+│   ├── blockStore.ts            blocks as rows: loading, writing only what changed, replacing a whole stack
+│   ├── contentColumn.ts         the old `content` column: migrations v65/v66, the working copy of an import of an older backup
 │   ├── entryTitle.ts, entryTypeChange.ts, moonPhase.ts
 │   ├── categories.ts, categoryMerge.ts
 │   ├── tagRefs.ts, templateTags.ts, templateRows.ts, blockDefinitionRows.ts
@@ -125,14 +128,15 @@ src/
 │   ├── dragChannel.ts, dragState.ts, imageDragState.ts
 │   ├── images.ts, imageLimits.ts, shrinkImage.ts
 │   ├── storeImage.ts            a file from the disk or a Blob into `images/`
-│   ├── imageUsage.ts            where each picture is used, and in which role
+│   ├── imageUsage.ts            where each picture is used, and in which role (`block_refs`)
 │   ├── pictureExport.ts         a rendered picture saved where the user chooses
 │   ├── export.ts, exportData.ts, emeraldFormat.ts
 │   ├── dbBackup.ts, importStaging.ts   .emeralddb backup and restore
-│   ├── sync/                    sync with a server: `tracking.ts` (capture), `apply.ts` (merge), `engine.ts` (when)
+│   ├── sync/                    sync with a server: `tracking.ts` (capture), `apply.ts` (merge), `blockStack.ts` (blocks on the wire), `engine.ts` (when)
 │   ├── autoBackup.ts            automatic backup: when one is due, the run
 │   ├── vaultManager.ts, vaultSettings.ts
 │   ├── altarConversion.ts       older altars → operations (v62, v63, imports; `migrateAltars.ts` runs it)
+│   ├── migrateLegacySigils.ts   sigil columns and v42–v63 sigil blocks → current form (v42, v64, imports; converter in `blocks/legacySigilBlocks.ts`)
 │   ├── altarScene.ts, altarElements.ts, altarSettings.ts, altarBackground.ts, altarConstants.ts
 │   │                            reading those altars; `altarIcon.ts` the Altar block's icon
 │   ├── menuActions.ts, platform.ts, updates.ts, splash.ts
@@ -195,7 +199,7 @@ The schema itself lives in `src/lib/schema.ts`, not in `db.ts`: fresh vaults exe
 
 `AppShell` calls `reloadAllStores()` (`src/store/moduleWiring.ts`) on mount and again on every vault switch — see [Module Registry](architecture/modules.md#module-registry) for the sequence. Views do **not** refetch on mount; a view that mounts before the startup fetch resolves renders its empty state until the store fills.
 
-One detail of what the stores load: **sigil drawings are files, not columns.** A drawing's rendered image is a file referenced from the canvas block's `<img src>`, next to its vector strokes as block data (see [Editors](architecture/editors.md#canvas-editor)), so the entry rows stay small. `entryBlockSummary(...).sigil` resolves the first visible, unconcealed drawing (`image`) and the target date; the Operations dashboard shows only the target date, in row and card alike.
+One detail of what the stores load: **sigil drawings are files, not columns.** A drawing's rendered image is a file referenced from the sigil drawing's (a paint block's) or drawing part's `<img src>`, next to its vector strokes as block data (see [Editors](architecture/editors.md#canvas-editor)), so the entry rows stay small. `entryBlockSummary(...).sigil` resolves the first visible, unconcealed drawing (`image`) and the target date; the Operations dashboard shows only the target date, in row and card alike.
 
 ### Store write serialization
 

@@ -10,12 +10,17 @@
  *   add-vault — create a new vault from the backup and switch to it
  */
 
+import { copyBlockStatements, OWNER, type BlockOwnerKind, type CopiedBlock, type Statement } from './blockStore';
+import { blockRefs } from './blocks/blockRefs';
+import { fromBlockRow, type StoredBlockRow } from './blocks/blockRows';
+import { remapBlock, renameAll, type BlockRemap } from './blocks/blockRemap';
+import { parseBlocks, serializeBlocks } from './blocks/blockHtml';
 import { convertAltarsInPlace, createAltarTables, removeAltarTables } from './migrateAltars';
+import { legacySigilLabels } from './blocks/legacySigilBlocks';
 import { elementsWithAltarsAsOperations } from './altarConversion';
 import { invoke } from '@tauri-apps/api/core';
 import { save, open } from '@tauri-apps/plugin-dialog';
 import { clearLegacyUntitledTitles, getDb, sweepDanglingTaskLinks } from './db';
-import { remapInternalLinks } from './internalLinkHtml';
 import {
   addVault,
   getActiveDbFile,
@@ -45,10 +50,10 @@ import {
   ALTAR_TEMPLATE_ID, assignedCategoryId, assignmentKey, isTemplateId, parseAssignments, SIGIL_TEMPLATE_ID, templateToRow,
 } from './blocks/templates';
 import { fromRow } from './row';
-import { needsSigilConversion, sigilRowToContent, type LegacySigilRow } from './migrateLegacySigils';
+import { convertLegacySigilsInPlace, needsSigilConversion, sigilRowToContent, type LegacySigilRow } from './migrateLegacySigils';
 import { linkedIdsToContent, rowsLinkSource } from './migrateLinkedIdsToContent';
 import { journalFieldsToContent } from './migrateJournalFieldsToContent';
-import { IMAGE_FIELDS, imageColumns, storedImageName } from './schema';
+import { IMAGE_FIELDS, imageColumns, storedImageName, storedImageNamesIn } from './schema';
 import { ALTAR_SETTING_KEYS, altarSettingsJson } from './altarSettings';
 import { withNewElementIds } from './altarElements';
 import { isTagId, rewriteTagRefs, stripTagIds, tagIdList, tagNameKey, tagNameResolver, type LegacyTagRow } from './tagRefs';
@@ -152,7 +157,12 @@ type Row = Record<string, any>;
  * templates tag IDs instead of tag names, '13' = since v56 `assignments` carry
  * no `isDefault` and `block_definitions` no `revision`, since v57 altars
  * carry the shapes and text drawn on them as a JSON column `elements`, and
- * since v60 the pictures taken into "Images" travel along as `data.vaultImages`.
+ * since v60 the pictures taken into "Images" travel along as `data.vaultImages`,
+ * '14' = since v66 the blocks of entries and templates travel as the rows of
+ * `blocks` (`data.blocks`) instead of as a `content` column of their owners.
+ *
+ * The '14' is needed because an older build looks for `content`: it would
+ * find none and restore every entry empty.
  *
  * The '13' is needed three times over: an older build would read every assignment
  * as merely offered, it has no `elements` column, so `insertRows` would
@@ -180,7 +190,7 @@ type Row = Record<string, any>;
  * "newer than me" check (`backup.version > BACKUP_VERSION`) honestly rejects the file
  * before anything happens.
  */
-const BACKUP_VERSION = '13' as const;
+const BACKUP_VERSION = '14' as const;
 
 /** The four category arrays of backups up to version 3. */
 interface LegacyCategoryArrays {
@@ -504,7 +514,7 @@ function presentEntryTypes(d: BackupFile['data']): EntryType[] {
 }
 
 interface BackupFile {
-  version: '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9' | '10' | '11' | '12' | '13';
+  version: '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9' | '10' | '11' | '12' | '13' | '14';
   /** The version the file was written with — `migrateBackupPayload` sets `version` to the current one. */
   sourceVersion?: number;
   type: 'backup';
@@ -549,6 +559,13 @@ interface BackupFile {
     symbols?: Row[];
     /** The pictures taken into "Images" (since '13'), with their files in `images`. */
     vaultImages?: Row[];
+    /**
+     * The blocks of the entries and templates in the file (since '14'): the
+     * rows of `blocks` without `row_id` and `text`, the owner in `entry_id` or
+     * `template_id`. Before '14' an owner carried them as `content`.
+     * `block_refs` does not travel: the import writes it from the blocks.
+     */
+    blocks?: Row[];
   };
   images: Record<string, string>;  // stored file name → data URL (in v1/v2: absolute path)
   /**
@@ -666,9 +683,43 @@ export const FULL_BACKUP_OPTIONS: Required<BackupOptions> = {
   includeSettings: true,
 };
 
+/**
+ * The rows of `blocks` of these owners, as the file carries them (without
+ * `row_id`, which is the vault's own, and `text`, which follows from the
+ * block), in owner and position order. Their pictures go into `into`, from
+ * the blocks themselves (`blockRefs`): a picture that only stands in a
+ * block's JSON — a canvas background, a copy's image prefill — comes along too.
+ */
+async function exportBlockRows(
+  db: Awaited<ReturnType<typeof getDb>>, kind: BlockOwnerKind, owners: Row[], into: Set<string>,
+): Promise<Row[]> {
+  const { column } = OWNER[kind];
+  const rows = await selectWhereIn(
+    db, (ph) => `SELECT * FROM blocks WHERE ${column} IN (${ph}) ORDER BY ${column}, position`, owners,
+  );
+  for (const row of rows) {
+    delete row.row_id;
+    delete row.text;
+    for (const ref of blockRefs(fromBlockRow(row as StoredBlockRow))) {
+      if (ref.kind === 'image') into.add(ref.target);
+    }
+    // And every stored name anywhere in the row, as the image cleanup keeps them
+    // (`collectUsedImageFilenames`): a block `blockRefs` cannot fully read
+    // (broken JSON, a newer type) still takes its pictures along.
+    for (const key of ['title', 'config', 'data', 'attrs', 'html']) {
+      if (typeof row[key] === 'string') storedImageNamesIn(row[key]).forEach((name) => into.add(name));
+    }
+  }
+  return rows;
+}
+
 /** The content of a backup according to `options`, images embedded. Writes nothing. */
 export async function buildBackup(options: BackupOptions): Promise<BackupFile> {
-  const db = await getDb();
+  return buildBackupFrom(await getDb(), options);
+}
+
+/** `buildBackup` against a given database — the schema harness calls it directly. */
+export async function buildBackupFrom(db: Awaited<ReturnType<typeof getDb>>, options: BackupOptions): Promise<BackupFile> {
   const data: BackupFile['data'] = {};
   const allImagePaths = new Set<string>();
 
@@ -689,6 +740,7 @@ export async function buildBackup(options: BackupOptions): Promise<BackupFile> {
       dateParams,
     );
     collectImageRefs('entries', data.entries, allImagePaths);
+    data.blocks = await exportBlockRows(db, 'entry', data.entries, allImagePaths);
   }
 
   // ── Tags ─────────────────────────────────────────────────────────────────
@@ -759,9 +811,7 @@ export async function buildBackup(options: BackupOptions): Promise<BackupFile> {
   // Like the custom blocks: all of it, trash included, with the images in the block stack.
   if (options.includeJournal || options.includeWiki || options.includeOperations) {
     data.templates = await db.select<Row[]>(`SELECT * FROM templates`);
-    for (const row of data.templates) {
-      if (typeof row.content === 'string') imageRefsInHtml(row.content).forEach((ref) => allImagePaths.add(ref));
-    }
+    data.blocks = [...(data.blocks ?? []), ...await exportBlockRows(db, 'template', data.templates, allImagePaths)];
   }
 
   // ── Lexicon ──────────────────────────────────────────────────────────────
@@ -934,12 +984,7 @@ async function restoreImages(backup: BackupFile): Promise<Map<string, string>> {
 }
 
 function remapPaths(value: unknown, pathMap: Map<string, string>): unknown {
-  if (typeof value !== 'string') return value;
-  let result = value;
-  for (const [oldPath, newPath] of pathMap) {
-    result = result.split(oldPath).join(newPath);
-  }
-  return result;
+  return typeof value === 'string' ? renameAll(value, pathMap) : value;
 }
 
 /** Rewrite the defaults of brought-along definitions to the images stored here (and, on merge, to the new IDs). */
@@ -1092,8 +1137,8 @@ async function insertTemplates(
   pathMap: Map<string, string>,
   catMap: Map<string, string>,
   remapContent: (content: string) => string = (content) => content,
-): Promise<void> {
-  if (!Array.isArray(rows)) return;
+): Promise<string[]> {
+  if (!Array.isArray(rows)) return [];
   const local = (await db.select<Row[]>('SELECT * FROM templates')).map(fromRow.template);
   const known = new Set(local.map((t) => t.id));
   const taken = new Set(local.filter((t) => t.deleted_at === null)
@@ -1124,7 +1169,8 @@ async function insertTemplates(
     });
     return templateToRow({
       ...t,
-      content: remapContent(String(remapPaths(t.content, pathMap))),
+      // A '14' file's templates have no `content`: their blocks come as rows (`insertImportedBlocks`).
+      content: t.content ? remapContent(String(remapPaths(t.content, pathMap))) : '',
       assignments,
       sort_order: sortOrder++,
       created_at: t.created_at || now,
@@ -1132,6 +1178,86 @@ async function insertTemplates(
     });
   });
   await insertRows(db, 'templates', normalized, true);
+  return normalized.map((t) => t.id);
+}
+
+/** Statements per `batch` when inserting block rows — a block is a few of them. */
+const BLOCK_BATCH = 500;
+
+/** A row of `data.blocks` in the shape `fromBlockRow` reads — the file is foreign, so every value is checked. */
+function fileBlockRow(row: Row): StoredBlockRow | null {
+  if (typeof row.id !== 'string' || !row.id || typeof row.type !== 'string' || !row.type) return null;
+  const text = (v: unknown) => (typeof v === 'string' ? v : null);
+  return {
+    id: row.id,
+    type: row.type,
+    version: Number.isInteger(row.version) && row.version > 0 ? row.version : null,
+    hidden: row.hidden === 1 ? 1 : 0,
+    title: text(row.title),
+    show_title: row.show_title === 0 || row.show_title === 1 ? row.show_title : null,
+    config: text(row.config),
+    data: text(row.data),
+    attrs: text(row.attrs),
+    html: text(row.html) ?? '',
+  };
+}
+
+/**
+ * The blocks of a '14' file, for the owners the import has just inserted:
+ * `owners` maps an owner's ID in the file to its ID here (the merge prefix), and
+ * an owner not in it — filtered out, or a template that already existed here —
+ * gets none. Each block goes through `remapBlock` (pictures, and on a merge the
+ * IDs) and keeps its position and time (`copyBlockStatements`); `block_refs`
+ * is written from it.
+ */
+async function insertImportedBlocks(
+  db: Awaited<ReturnType<typeof getDb>>,
+  rows: Row[] | undefined,
+  kind: BlockOwnerKind,
+  owners: ReadonlyMap<string, string>,
+  remap: BlockRemap,
+): Promise<void> {
+  if (!Array.isArray(rows) || !rows.length || !owners.size) return;
+  const { column } = OWNER[kind];
+  const byOwner = new Map<string, CopiedBlock[]>();
+  for (const row of rows) {
+    if (typeof row !== 'object' || row === null) continue;
+    const owner = typeof row[column] === 'string' ? owners.get(row[column]) : undefined;
+    if (owner === undefined) continue;
+    const stored = fileBlockRow(row);
+    if (!stored) continue;
+    const list = byOwner.get(owner) ?? [];
+    list.push({
+      block: remapBlock(fromBlockRow(stored), remap),
+      position: typeof row.position === 'string' ? row.position : null,
+      updatedAt: typeof row.updated_at === 'string' && row.updated_at ? row.updated_at : null,
+    });
+    byOwner.set(owner, list);
+  }
+  const now = nowIso();
+  let batch: Statement[] = [];
+  for (const [id, copies] of byOwner) {
+    batch.push(...copyBlockStatements({ kind, id }, copies, now));
+    if (batch.length >= BLOCK_BATCH) {
+      await db.batch(batch);
+      batch = [];
+    }
+  }
+  if (batch.length) await db.batch(batch);
+}
+
+/**
+ * Whether a file carries its blocks as rows (`data.blocks`, since '14') rather
+ * than as `content`. `doReplace`/`doMerge` expect the working copy to have the
+ * `content` columns exactly when it does not (`importViaStaging`).
+ */
+function carriesBlockRows(backup: Pick<BackupFile, 'sourceVersion'>): boolean {
+  return (backup.sourceVersion ?? Number(BACKUP_VERSION)) >= 14;
+}
+
+/** The link IDs in an older file's block stack, on a merge — the same rewrite as for the rows of a '14' file. */
+function remapContentIds(content: string, id: (id: string) => string | undefined): string {
+  return serializeBlocks(parseBlocks(content).map((block) => remapBlock(block, { id })));
 }
 
 /**
@@ -1563,7 +1689,7 @@ async function importAltars(
   await removeAltarTables(db);
 }
 
-async function doReplace(db: Awaited<ReturnType<typeof getDb>>, backup: BackupFile): Promise<void> {
+export async function doReplace(db: Awaited<ReturnType<typeof getDb>>, backup: BackupFile): Promise<void> {
   const pathMap = await restoreImages(backup);
   // Tags are not replaced but merged: entries that this file does
   // not replace carry the IDs of the existing ones.
@@ -1597,7 +1723,7 @@ async function doReplace(db: Awaited<ReturnType<typeof getDb>>, backup: BackupFi
   await insertBlockDefinitions(db, await withStatusDefinition(
     db, remapDefinitionRows(d.blockDefinitions, pathMap), replaceOps.definition, replaceStatus,
   ));
-  await insertTemplates(db, d.templates, pathMap, catMap);
+  const templateIds = await insertTemplates(db, d.templates, pathMap, catMap);
   // Like the custom blocks and the templates: never deleted, missing ones added.
   await insertLexicon(db, d.languages, d.lexiconEntries);
   await insertVaultImages(db, d.vaultImages, pathMap);
@@ -1623,10 +1749,19 @@ async function doReplace(db: Awaited<ReturnType<typeof getDb>>, backup: BackupFi
   }
   // Re-insert
   await insertRows(db, 'entries', entries);
+  if (carriesBlockRows(backup)) {
+    const same = (ids: string[]) => new Map(ids.map((id) => [id, id]));
+    await insertImportedBlocks(db, d.blocks, 'entry', same(entries.map((r) => String(r.id))), { images: pathMap });
+    await insertImportedBlocks(db, d.blocks, 'template', same(templateIds), { images: pathMap });
+  }
   await insertTasks(db, tasks);
   if (d.taskLinks) await insertRows(db, 'task_links', d.taskLinks);
-  // The file's version of an altar replaces its operation here.
-  await importAltars(db, altars, altarItems, d.altarPlacements ?? [], true);
+  if (!carriesBlockRows(backup)) {
+    // The file's version of an altar replaces its operation here.
+    await importAltars(db, altars, altarItems, d.altarPlacements ?? [], true);
+    // The sigil blocks of an older file (or made from its sigil rows) as v64 converts them.
+    await convertLegacySigilsInPlace(db, legacySigilLabels(i18n.t));
+  }
 
   // A partial replace (e.g. only tasks) can orphan existing links that point to
   // just-replaced targets — and imported task_links
@@ -1641,7 +1776,7 @@ async function doReplace(db: Awaited<ReturnType<typeof getDb>>, backup: BackupFi
 // Merge import (ID-prefix strategy)
 // ─────────────────────────────────────────────────────────────────────────────
 
-async function doMerge(db: Awaited<ReturnType<typeof getDb>>, backup: BackupFile): Promise<void> {
+export async function doMerge(db: Awaited<ReturnType<typeof getDb>>, backup: BackupFile): Promise<void> {
   const pathMap = await restoreImages(backup);
   const d = await importTagsAndRemap(db, await liftLegacyJournalRows(db, await withRoutinesAsTemplates(db, backup.data)));
 
@@ -1664,9 +1799,10 @@ async function doMerge(db: Awaited<ReturnType<typeof getDb>>, backup: BackupFile
     ...(d.tasks ?? []).map((r: Row) => r.id as string),
   ]);
 
+  /** The ID here of an entry, task or altar of the file; `undefined` for any other ID. */
+  const nextId = (id: string): string | undefined => (allOldIds.has(id) ? pid(id) : undefined);
   function remapId(id: unknown): unknown {
-    if (typeof id === 'string' && allOldIds.has(id)) return pid(id);
-    return id;
+    return typeof id === 'string' ? nextId(id) ?? id : id;
   }
 
   function remapJsonIds(jsonStr: unknown): unknown {
@@ -1722,28 +1858,15 @@ async function doMerge(db: Awaited<ReturnType<typeof getDb>>, backup: BackupFile
   }
 
   /**
-   * Carry along the target IDs of the internal link chips IN `content`. `remapEntry`
-   * treats `content` only as an image-path field; the `data-id` attributes in it
-   * would otherwise keep the old IDs, renamed here, and every
-   * link chip would point nowhere.
-   *
-   * Deliberately always return an ID: `null` would replace the chip with its text,
-   * and on merge the target does exist. `remapId` leaves unknown
-   * IDs unchanged — the same convention as `remapJsonIds`. No `label`:
-   * the target's title does not change on merge.
-   *
-   * A content WITH chips runs once through parsing and serialising and
-   * may afterwards be formatted slightly differently (quotes, empty
-   * elements); one without stays byte for byte the same. Accepted
-   * deliberately: the markup comes from TipTap, which rewrites it on every save
-   * anyway.
+   * The link IDs in an older file's `content` (a '14' file's rows get the same
+   * in `insertImportedBlocks`): every block goes through `remapBlock` with
+   * `nextId` — chips and the IDs in its JSON (a link prefill, an altar's
+   * links). IDs that are not the file's stay. The stack is parsed and written
+   * again; its rows are rebuilt from it at the end of the import anyway.
    */
   const withContentLinks = (row: Row): Row => {
     if (typeof row.content !== 'string') return row;
-    return {
-      ...row,
-      content: remapInternalLinks(row.content, (link) => ({ id: String(remapId(link.id)) })),
-    };
+    return { ...row, content: remapContentIds(row.content, nextId) };
   };
 
   const journalEntries = (d.journalEntries ?? []).map((r: Row) =>
@@ -1790,8 +1913,7 @@ async function doMerge(db: Awaited<ReturnType<typeof getDb>>, backup: BackupFile
     mergeOps.definition, mergeStatus,
   ));
   // Without prefix, like the definitions.
-  await insertTemplates(db, d.templates, pathMap, catMap,
-    (content) => remapInternalLinks(content, (link) => ({ id: String(remapId(link.id)) })));
+  const templateIds = await insertTemplates(db, d.templates, pathMap, catMap, (content) => remapContentIds(content, nextId));
   // Without prefix like the two above: a language stands on its own, its ID
   // appears in no entry.
   await insertLexicon(db, d.languages, d.lexiconEntries);
@@ -1801,10 +1923,21 @@ async function doMerge(db: Awaited<ReturnType<typeof getDb>>, backup: BackupFile
   await insertSymbols(db, d.symbols);
 
   // Content: plain INSERT with prefixed IDs (no conflicts possible)
-  await insertRows(db, 'entries', entryRowsForInsert(journalEntries, wikiArticles, operations));
+  const entries = entryRowsForInsert(journalEntries, wikiArticles, operations);
+  await insertRows(db, 'entries', entries);
+  if (carriesBlockRows(backup)) {
+    // The blocks under the prefixed owners, their pictures and links pointed here like the rows'.
+    const inserted = new Set(entries.map((r) => String(r.id)));
+    const owners = new Map([...allOldIds].filter((id) => inserted.has(pid(id))).map((id) => [id, pid(id)]));
+    await insertImportedBlocks(db, d.blocks, 'entry', owners, { images: pathMap, id: nextId });
+    await insertImportedBlocks(db, d.blocks, 'template', new Map(templateIds.map((id) => [id, id])), { images: pathMap, id: nextId });
+  }
   await insertTasks(db, tasks);
   await insertRows(db, 'task_links', taskLinks, true);
-  await importAltars(db, altars, altarItems, altarPlacements, false);
+  if (!carriesBlockRows(backup)) {
+    await importAltars(db, altars, altarItems, altarPlacements, false);
+    await convertLegacySigilsInPlace(db, legacySigilLabels(i18n.t));
+  }
 
   // Imported task_links can point to targets that the type filter
   // has just deselected — sweep them out as in doReplace.
@@ -1947,14 +2080,14 @@ export async function importDatabase(
         }
       }
       await doReplace(staging, filteredBackup);
-    });
+    }, { withContentColumn: !carriesBlockRows(backup) });
     // Only once the import went through, as with replace and merge below.
     if (backupThemes) useDeviceStore.getState().adoptCustomThemes(backupThemes);
   } else {
     // Never directly against the vault: `doReplace` deletes before it inserts, and
     // an aborted merge would leave half-imported data behind (see `importStaging.ts`).
     const run = mode === 'replace' ? doReplace : doMerge;
-    await importViaStaging(await getDb(), (staging) => run(staging, filteredBackup));
+    await importViaStaging(await getDb(), (staging) => run(staging, filteredBackup), { withContentColumn: !carriesBlockRows(backup) });
 
     // Only after a successful swap: an aborted import leaves the
     // settings as they were, too.

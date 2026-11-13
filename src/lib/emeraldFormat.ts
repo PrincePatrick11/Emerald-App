@@ -1,8 +1,12 @@
 import { invoke } from '@tauri-apps/api/core';
 import { altarInserts } from './migrateAltars';
+import { contentWithoutLegacySigils, legacySigilLabels } from './blocks/legacySigilBlocks';
 import { contentWithAltarsAsOperations, convertAltars, elementsWithAltarsAsOperations, type Row } from './altarConversion';
 import { todayIso, withoutConcealed } from './blocks/sigil';
-import { imageRefsInHtml, readImageAsBase64, rewriteImageRefs, saveImage, storedImageName } from './images';
+import { readImageAsBase64, rewriteImageRefs, saveImage, storedImageName } from './images';
+import { storedImageNamesIn } from './schema';
+import { parseBlocks } from './blocks/blockHtml';
+import { blockRefs } from './blocks/blockRefs';
 import { open as openDialog, save, message } from '@tauri-apps/plugin-dialog';
 import { format } from 'date-fns';
 import { marked } from 'marked';
@@ -450,10 +454,18 @@ async function saveEmeraldFile(file: EmeraldFile): Promise<void> {
   await invoke('write_file', { path: savePath, content: JSON.stringify(file, null, 2) });
 }
 
-/** The local images of the content as Base64. A missing image is dropped. */
+/**
+ * The local images of the content as Base64. A missing image is dropped.
+ * Taken from the blocks (`blockRefs`), like `block_refs` in the vault: a
+ * picture that only stands in a block's JSON — a canvas background, a
+ * copy's image prefill — travels along too.
+ */
 async function embedImages(content: string): Promise<Record<string, string>> {
   const images: Record<string, string> = {};
-  for (const ref of new Set(imageRefsInHtml(content))) {
+  const refs = parseBlocks(content).flatMap(blockRefs).filter((ref) => ref.kind === 'image').map((ref) => ref.target);
+  // And every stored name anywhere in it, as the backup does: a block `blockRefs` cannot fully read keeps its pictures.
+  refs.push(...storedImageNamesIn(content));
+  for (const ref of new Set(refs)) {
     try {
       images[ref] = await readImageAsBase64(ref);
     } catch { /* skip missing files */ }
@@ -676,8 +688,11 @@ async function importedContent(
   items: SuggestionItem[],
   beforeSanitize: (html: string) => string | Promise<string> = (html) => html,
 ): Promise<string> {
-  // An older file's chips to altars and altar fields point at operations first, as v62 did.
-  const raw = typeof file.content === 'string' ? contentWithAltarsAsOperations(file.content) : '';
+  // An older file's chips to altars and altar fields point at operations first, as v62 did,
+  // and its sigil blocks become fields and paint blocks, as v64 did.
+  const raw = typeof file.content === 'string'
+    ? contentWithoutLegacySigils(contentWithAltarsAsOperations(file.content), legacySigilLabels(i18n.t))
+    : '';
   const remapped = await remapImages(raw, file.images ?? {});
   const relinked = remapImportedLinks(remapped, file.meta.contentLinks, items);
   return sanitizeImportedHtml(await beforeSanitize(relinked));
@@ -1011,6 +1026,7 @@ async function importAltarEntry(file: EmeraldFile): Promise<string> {
     }
   });
   const db = await getDb();
+  // The operation and its block rows in one batch (`altarInserts`).
   await db.batch(await altarInserts(db, converted));
   return id;
 }

@@ -1,0 +1,18 @@
+{
+  "version": "2",
+  "type": "operations",
+  "title": "Fixture: Siegel aus .emerald",
+  "createdAt": "2026-10-20T10:00:00.000Z",
+  "content": "<section data-block=\"core.sigil.calc\" data-block-id=\"fx-e-calc\" data-block-data=\"{&quot;intention&quot;:&quot;Mut&quot;,&quot;letters&quot;:[&quot;M&quot;,&quot;U&quot;,&quot;T&quot;],&quot;implemented&quot;:[]}\"><p>Mut</p><p>MUT</p></section><section data-block=\"core.sigil.canvas\" data-block-id=\"fx-e-draw\"><img src=\"2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b.png\" alt=\"\"></section><section data-block=\"core.sigil.charge\" data-block-id=\"fx-e-charge\" data-block-data=\"{&quot;loaded&quot;:true,&quot;revealDate&quot;:&quot;2099-01-01&quot;,&quot;lock&quot;:&quot;sigil&quot;,&quot;targets&quot;:[&quot;fx-e-calc&quot;,&quot;fx-e-draw&quot;]}\"><p>2099-01-01</p></section><section data-block=\"core.text\" data-block-id=\"fx-e-notes\"><p>Bild:</p><img src=\"1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a.png\"></section>",
+  "images": {
+    "2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b.png": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADAAAAAwCAIAAADYYG7QAAAAQUlEQVR4nO3OQQ0AIAwAsblDGMLBBcejSQV09jpfmXwgJCQkVA+EhISE6oGQkJBQPRASEhKqB0JCQkL1QEhI6LELo7ER8Sx69XgAAAAASUVORK5CYII=",
+    "1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a.png": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADAAAAAwCAIAAADYYG7QAAAAQklEQVR4nO3OQQ0AIAwAsSlCEOqQiguOR5MK6KyzvzL5QEhISKgeCAkJCdUDISEhoXogJCQkVA+EhISE6oGQkNBjF5l0aJeGMHh9AAAAAElFTkSuQmCC"
+  },
+  "meta": {
+    "categoryName": "Sigils",
+    "categoryEmoji": "🔮",
+    "tags": [
+      "Fixture"
+    ]
+  }
+}

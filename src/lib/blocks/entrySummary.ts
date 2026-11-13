@@ -1,6 +1,7 @@
 import { parseBlocks } from './blockHtml';
 import { isBlockHidden } from './blockAttrs';
-import { mayHoldSigil, SIGIL_CANVAS_TYPE, sigilImage, sigilState, sigilUnits, todayIso, type SigilState } from './sigil';
+import { isDrawingUnitType, mayHoldSigil, sigilState, sigilUnits, todayIso, type SigilState } from './sigil';
+import { drawingImage } from './paint';
 
 /**
  * What lists, sidebar and menu want to know about the blocks
@@ -26,9 +27,9 @@ function summarize(content: string, today: string): EntryBlockSummary {
   const state = sigilState(blocks, today);
   // The first visible drawing, block or part — a part counts as visible if its block is.
   const canvas = units.find(({ block, part }) =>
-    block.type === SIGIL_CANVAS_TYPE && !isBlockHidden(part?.parent ?? block) && !part?.element.archived
-      && !state.concealed.has(block.id) && sigilImage(block));
-  return { sigil: { ...state, image: canvas ? sigilImage(canvas.block) : null } };
+    isDrawingUnitType(block.type) && !isBlockHidden(part?.parent ?? block) && !part?.element.archived
+      && !state.concealed.has(block.id) && drawingImage(block));
+  return { sigil: { ...state, image: canvas ? drawingImage(canvas.block) : null } };
 }
 
 /** The summary of an entry; the same content is not parsed twice on the same day. */

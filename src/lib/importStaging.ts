@@ -30,6 +30,8 @@ import Database from './sqlite';
 import { invoke } from '@tauri-apps/api/core';
 import { resetDbCache, markDbReplaced } from './db';
 import { TABLES } from './schema';
+import { clearSavedBlocks } from './blockStore';
+import { addContentColumns, dropContentColumns } from './contentColumn';
 import { isTracked, markSnapshotNeeded } from './sync/tracking';
 import { getActiveImportStagingFile, getActiveVaultId } from './vaultManager';
 
@@ -76,9 +78,13 @@ async function swapIn(db: Database, stagingFile: string): Promise<void> {
 
 /**
  * Runs `fill` against a copy of the active vault and then swaps it in
- * atomically. `db` is the connection of the active vault.
+ * atomically. `db` is the connection of the active vault. `withContentColumn`:
+ * the file carries its blocks as `content` (a backup from before '14'), so
+ * the copy gets the old column for as long as `fill` runs.
  */
-export async function importViaStaging(db: Database, fill: (staging: Database) => Promise<void>): Promise<void> {
+export async function importViaStaging(
+  db: Database, fill: (staging: Database) => Promise<void>, { withContentColumn }: { withContentColumn: boolean },
+): Promise<void> {
   const vaultId = await getActiveVaultId();
   const stagingFile = await getActiveImportStagingFile();
 
@@ -91,8 +97,17 @@ export async function importViaStaging(db: Database, fill: (staging: Database) =
     try {
       // `VACUUM INTO` copied the triggers along; this log is thrown away anyway.
       if (tracked) await staging.execute('UPDATE _sync_ctx SET applying = 1');
+      // The import's converters for older files read and write the block stack
+      // as `content` with plain SQL: the copy has the column for as long as
+      // they run, and the rows are built from it at the end (`contentColumn.ts`).
+      // A '14' file brings the rows themselves.
+      if (withContentColumn) await addContentColumns(staging);
       await fill(staging);
+      if (withContentColumn) await dropContentColumns(staging);
     } finally {
+      // Rebuilding the working copy's block rows remembered them as the vault's saved
+      // blocks (`blockStore.ts`); whether or not the import goes through, that no longer holds.
+      clearSavedBlocks();
       // An error while closing should not mask the import's own error.
       await staging.close().catch((err: unknown) => console.warn('[backup] working copy not closed:', err));
     }

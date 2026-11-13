@@ -72,7 +72,7 @@ function RightSidebarActionBar() {
   }
 
   // A loaded sigil with the "whole entry" lock cannot be edited — the
-  // charge block decides, in every entry type. The button stays
+  // charge decides, in every entry type. The button stays
   // and says why it does nothing.
   const locked = content !== undefined && !!entryBlockSummary(activeView.id, content).sigil?.lockEntry;
 
