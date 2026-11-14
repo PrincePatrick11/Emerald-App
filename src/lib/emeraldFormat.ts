@@ -1,8 +1,7 @@
 import { invoke } from '@tauri-apps/api/core';
-import { todayIso, withoutConcealed } from './blocks/sigil';
-import { readImageAsBase64, rewriteImageRefs, saveImage, storedImageName } from './images';
-import { importedIcon, isImageDataUrl, portableIcon, readIconAsBase64, storeIconDataUrl } from './icons';
-import { storedImageNamesIn } from './schema';
+import { readImageAsBase64, saveImage } from './images';
+import { isIconFile, plausibleEmoji } from './icons';
+import { storedImageName, storedImageNamesIn } from './schema';
 import { parseBlocks } from './blocks/blockHtml';
 import { blockRefs } from './blocks/blockRefs';
 import { open as openDialog, save, message } from '@tauri-apps/plugin-dialog';
@@ -13,7 +12,6 @@ import { useUIStore } from '../store/uiStore';
 import { useEntryStore } from '../store/entryStore';
 import { liveTagNames, useTagStore } from '../store/tagStore';
 import { useSettingsStore } from '../store/settingsStore';
-import { entryMoonPhase } from './moonPhase';
 import { reloadModules } from '../store/moduleWiring';
 import { useImportStore } from '../store/importStore';
 import { useTaskStore } from '../store/taskStore';
@@ -24,13 +22,24 @@ import { useTemplateStore } from '../store/templateStore';
 import i18n from '../i18n';
 import { buildLinkItems, linkItemKey, linkItemsByKey } from './linkItems';
 import { extractInternalLinks, linkTargetKindOf, remapInternalLinks } from './internalLinkHtml';
-import { entriesByKindNow } from '../store/entryViews';
+import { entriesByKindNow, viewOfEntryId } from '../store/entryViews';
 import { startCategoryOf } from './createItem';
+import { isEntryView } from './modules';
 import type { SuggestionItem } from '../components/editors/text/SuggestionList';
 import type { Category } from '../types';
 import type { WriteOptions } from './stamp';
 import { displayTitle, hasOwnTitle } from './entryTitle';
-import { prepareImageDataUrl } from './imageLimits';
+import { getActiveVaultId } from './vaultManager';
+import { compressDataUrl } from './imageCompression';
+import { keyErrorOf, KEY_ERRORS } from './vaultKeys';
+import { askBackupSecret, BACKUP_UNLOCK_CANCELLED, endBackupSecret } from '../store/backupSecretStore';
+import {
+  blocksToContent, contentToBlocks, EMERALD_FORMAT_VERSION, gentlestImageMode, parseManifest, relinkWithinFile,
+  renameStoredFiles, storedNameStem,
+  type EmeraldManifest, type ImageMode, type ManifestEntry, type ManifestItem, type ManifestLink, type ManifestTemplate,
+} from './emerald/manifest';
+
+export type { ImageMode } from './emerald/manifest';
 
 // ── Link chips across vault boundaries ───────────────────────────────────────
 
@@ -48,24 +57,26 @@ function linkItemsSnapshot(): SuggestionItem[] {
   }, i18n.t);
 }
 
-/** The title of every link chip in the content — travels along as `meta.contentLinks`. */
-function collectContentLinks(content: string): EmeraldMeta['contentLinks'] {
+/** The title of every link chip in the contents — travels along as the manifest's `links`. */
+function collectContentLinks(contents: readonly string[]): ManifestLink[] {
   const byKey = linkItemsByKey(linkItemsSnapshot());
   const seen = new Set<string>();
-  const out: NonNullable<EmeraldMeta['contentLinks']> = [];
-  for (const link of extractInternalLinks(content)) {
-    const key = linkItemKey(link);
-    if (seen.has(key)) continue;
-    seen.add(key);
-    out.push({ id: link.id, entryType: link.entryType, title: byKey.get(key)?.label ?? '' });
+  const out: ManifestLink[] = [];
+  for (const content of contents) {
+    for (const link of extractInternalLinks(content)) {
+      const key = linkItemKey(link);
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push({ id: link.id, kind: link.entryType === 'task' ? 'task' : 'entry', title: byKey.get(key)?.label ?? '' });
+    }
   }
-  return out.length ? out : undefined;
+  return out;
 }
 
 /**
  * Points every link chip of the imported content at the target IN THIS vault:
  * first via the ID (the same vault or an already matching entry),
- * then via the title from `meta.contentLinks`, otherwise via the
+ * then via the title from the manifest's `links`, otherwise via the
  * `data-label` that sits in the chip itself. If nothing is found,
  * the chip becomes its text (see `remapInternalLinks`).
  *
@@ -77,12 +88,18 @@ function collectContentLinks(content: string): EmeraldMeta['contentLinks'] {
  */
 function remapImportedLinks(
   content: string,
-  manifest: EmeraldMeta['contentLinks'],
+  links: readonly ManifestLink[],
   items: SuggestionItem[],
+  ownIds: ReadonlySet<string> = new Set(),
 ): string {
   const byKey = linkItemsByKey(items);
-  const titleByKey = new Map((manifest ?? []).map((l) => [linkItemKey(l), l.title]));
-  return remapInternalLinks(content, (link) => resolveImportedTarget(link, titleByKey.get(linkItemKey(link)), items, byKey));
+  const titleByKey = new Map(links.map((l) => [linkItemKey({ id: l.id, entryType: l.kind }), l.title]));
+  return remapInternalLinks(content, (link) => (
+    // An entry of the same file, created by this import: its title is not written yet, the chip's own label stays.
+    link.entryType !== 'task' && ownIds.has(link.id)
+      ? { id: link.id }
+      : resolveImportedTarget(link, titleByKey.get(linkItemKey(link)), items, byKey)
+  ));
 }
 
 /**
@@ -97,82 +114,15 @@ function resolveImportedTarget(
 ): { id: string; label: string } | null {
   const local = byKey.get(linkItemKey({ id: link.id, entryType: link.entryType as SuggestionItem['entryType'] }));
   if (local) return { id: local.id, label: local.label };
-  const title = manifestTitle || link.label;
+  // No title, or only the "Untitled …" every untitled entry shows: nothing to find it by.
+  const title = importedTitle({ title: manifestTitle || link.label });
   if (!title) return null;
   const kind = linkTargetKindOf(link.entryType);
   const match = items.find((i) => linkTargetKindOf(i.entryType) === kind && i.label === title);
   return match ? { id: match.id, label: match.label } : null;
 }
 
-// ── File format ──────────────────────────────────────────────────────────────
-
-/**
- * The format of a `.emerald` file, for entries and templates alike (`type`
- * tells them apart). '5' names icons by file: `meta.icon` carries an uploaded
- * icon as a data URL, and the icons of block copies travel in `icons`. Only
- * this version is read: an older file ('1' to '3' from before the fresh start
- * of the schema, '4' with icons as data URLs inside the blocks) is refused
- * with a notice; a newer one is refused too, since this build cannot know
- * what it carries.
- */
-const EMERALD_VERSION = '5';
-
-interface EmeraldFile {
-  version: typeof EMERALD_VERSION;
-  type: 'journal' | 'wiki' | 'operations' | 'template';
-  title: string;
-  createdAt: string;
-  content: string;
-  images: Record<string, string>;  // stored file name → data-URL
-  /**
-   * The icon files the content's block copies name (a custom block's icon),
-   * stored name → data-URL. Optional: a file without it simply has none.
-   */
-  icons?: Record<string, string>;
-  meta: EmeraldMeta;
-}
-
-interface EmeraldMeta {
-  /** journal: for information only — the import recalculates the phase from `createdAt`. */
-  moonPhase?: string;
-  /**
-   * wiki + operations: the category via its display name (and its emoji,
-   * in case it has to be created in the target vault first). The name, not the
-   * ID — a `.emerald` file travels between vaults, and the same self-created
-   * category has a different ID there.
-   */
-  categoryName?: string;
-  categoryEmoji?: string;
-  /** The entry's or template's icon: an emoji, or an uploaded icon as a data-URL (the vault keeps it as a file in `icons/`). */
-  icon?: string;
-  tags?: string[];
-  /**
-   * Title for every link chip in `content` — the repair aid for import
-   * into a FOREIGN vault, where the same note has a different ID. Without it
-   * the chips point at IDs after import that do not exist there.
-   */
-  contentLinks?: Array<{ id: string; entryType: string; title: string }>;
-  /** A template: the title new entries get. */
-  newEntryTitle?: string;
-}
-
-/**
- * The notice for a file this version does not read — `null` when it does.
- * A version from before '4' is from an older app, a higher one from a newer.
- */
-function unreadableVersionNotice(version: unknown): string | null {
-  if (version === EMERALD_VERSION) return null;
-  const number = Number(version);
-  if (Number.isInteger(number) && number >= 1) {
-    return i18n.t(number < Number(EMERALD_VERSION) ? 'emeraldImport.oldVersion' : 'emeraldImport.newVersion');
-  }
-  return i18n.t('emeraldImport.unsupported');
-}
-
-const FILE_TYPES: readonly unknown[] = ['journal', 'wiki', 'operations', 'template'] satisfies EmeraldFile['type'][];
-
-/** The file types that open a module — everything except the template. */
-type EntryFileType = Exclude<EmeraldFile['type'], 'template'>;
+// ── File names ───────────────────────────────────────────────────────────────
 
 function safeFilename(title: string): string {
   return title.replace(/[^\w\s\-äöüÄÖÜß]/g, '').trim().replace(/\s+/g, '_') || 'export';
@@ -186,125 +136,207 @@ function exportFilename(title: string, date: string, ext: string): string {
 
 // ── Export ───────────────────────────────────────────────────────────────────
 
+/** One item of an export: an entry or a template, with its own picture handling if it differs from the export's. */
+export interface EmeraldExportItem {
+  kind: 'entry' | 'template';
+  id: string;
+  images?: ImageMode;
+}
+
+/**
+ * What an export writes — the settings the export menu (#98) offers:
+ *
+ * - `items`: the entries and templates, chosen by the caller (linked entries
+ *   included or not; `linkedEntriesOf` finds them).
+ * - `images`: what happens to the pictures (`ImageMode`); each item can
+ *   override it, so linked entries can have a setting of their own. A picture
+ *   two items share gets the gentlest setting either asks for.
+ * - `password`: seals the whole file; at least 8 characters.
+ *
+ * Always along, without a setting: category and tags by name, icons, cover,
+ * the copies of custom blocks in the content and concealed sigils (concealed).
+ */
+export interface EmeraldExportOptions {
+  items: readonly EmeraldExportItem[];
+  images?: ImageMode;
+  password?: string;
+}
+
+/** The pictures and icons a block stack names — from the blocks (`blockRefs`), and every stored name in it, as the backup does. */
+function storedFilesOf(content: string): { images: string[]; icons: string[] } {
+  const refs = parseBlocks(content).flatMap(blockRefs);
+  const images = refs.filter((r) => r.kind === 'image').map((r) => r.target);
+  const icons = refs.filter((r) => r.kind === 'icon').map((r) => r.target);
+  const iconSet = new Set(icons);
+  // A stored name `blockRefs` cannot place is a picture — unless it is a known icon.
+  images.push(...storedImageNamesIn(content).filter((name) => !iconSet.has(name)));
+  const valid = (names: string[]) => [...new Set(names.map((n) => storedImageName(n)).filter((n): n is string => !!n))];
+  return { images: valid(images), icons: valid(icons) };
+}
+
+async function manifestItemOf(item: EmeraldExportItem): Promise<{ manifest: ManifestItem; content: string } | null> {
+  if (item.kind === 'template') {
+    const template = useTemplateStore.getState().templates.find((tpl) => tpl.id === item.id);
+    if (!template) return null;
+    const manifest: ManifestTemplate = {
+      kind: 'template',
+      id: template.id,
+      name: template.name,
+      title: template.title,
+      createdAt: template.created_at,
+      updatedAt: template.updated_at,
+      icon: template.icon ?? '',
+      tags: liveTagNames(template.tags),
+      blocks: contentToBlocks(template.content),
+    };
+    return { manifest, content: template.content };
+  }
+  // Right after startup the content may still be pending.
+  await useEntryStore.getState().ensureEntryContent(item.id);
+  const entry = useEntryStore.getState().getEntry(item.id);
+  if (!entry) return null;
+  const cat = useCategoryStore.getState().categories.find((c) => c.id === entry.category_id);
+  const content = entry.content || '';
+  const manifest: ManifestEntry = {
+    kind: 'entry',
+    id: entry.id,
+    title: entry.title,
+    number: entry.entry_number ?? null,
+    createdAt: entry.created_at,
+    updatedAt: entry.updated_at,
+    icon: entry.icon ?? '',
+    cover: storedImageName(entry.cover_image) ?? null,
+    // A built-in by its stored name, the same in every vault — its label
+    // depends on the language and would create a new category elsewhere.
+    category: cat ? { name: cat.is_builtin ? cat.name : categoryLabel(i18n.t, cat), icon: cat.emoji, builtin: Boolean(cat.is_builtin) } : null,
+    tags: liveTagNames(entry.tags),
+    // Concealed sigils go along as they are: they arrive concealed.
+    blocks: contentToBlocks(content),
+  };
+  return { manifest, content };
+}
+
+/**
+ * Writes the items as a `.emerald` file at `path` — without a dialog, so the
+ * export menu and a check can call it alike.
+ */
+export async function writeEmeraldFile(path: string, options: EmeraldExportOptions): Promise<void> {
+  const fallback = options.images ?? 'none';
+  const items: ManifestItem[] = [];
+  const contents: string[] = [];
+  const imageModes = new Map<string, ImageMode>();
+  const icons = new Set<string>();
+  for (const item of options.items) {
+    const built = await manifestItemOf(item);
+    if (!built) continue;
+    items.push(built.manifest);
+    contents.push(built.content);
+    const files = storedFilesOf(built.content);
+    const mode = item.images ?? fallback;
+    const cover = built.manifest.kind === 'entry' ? built.manifest.cover : null;
+    for (const name of cover ? [...files.images, cover] : files.images) {
+      const known = imageModes.get(name);
+      imageModes.set(name, known ? gentlestImageMode(known, mode) : mode);
+    }
+    files.icons.forEach((name) => icons.add(name));
+    if (isIconFile(built.manifest.icon)) icons.add(built.manifest.icon);
+  }
+  if (items.length === 0) throw new Error('Nothing to export.');
+
+  const images: Array<{ name: string; dataUrl?: string }> = [];
+  const omittedImages: string[] = [];
+  for (const [name, mode] of imageModes) {
+    if (mode === 'placeholder') {
+      omittedImages.push(name);
+    } else if (mode === 'none') {
+      images.push({ name });
+    } else {
+      try {
+        const original = await readImageAsBase64(name);
+        const compressed = await compressDataUrl(original, mode);
+        images.push(compressed === original ? { name } : { name, dataUrl: compressed });
+      } catch { /* a missing picture is left out, as Rust does */ }
+    }
+  }
+
+  const manifest: EmeraldManifest = {
+    format: 'emerald',
+    version: EMERALD_FORMAT_VERSION,
+    exportedAt: new Date().toISOString(),
+    items,
+    links: collectContentLinks(contents),
+    omittedImages,
+  };
+  await invoke('write_emerald_file', {
+    vaultId: await getActiveVaultId(),
+    path,
+    manifest: JSON.stringify(manifest),
+    images,
+    icons: [...icons],
+    password: options.password || null,
+  });
+}
+
+/**
+ * For the export menu (#98), which does not exist yet: the entries the given ones link to (`block_refs`, kind `entry`), without
+ * the given ones and without entries in the trash — with `recursive`, also
+ * those the linked ones link to, and so on. For the export menu's
+ * "include linked entries".
+ */
+export async function linkedEntriesOf(ids: readonly string[], { recursive = false } = {}): Promise<string[]> {
+  const db = await getDb();
+  const seen = new Set(ids);
+  const found: string[] = [];
+  let frontier = [...ids];
+  while (frontier.length > 0) {
+    const rows = await db.select<{ target: string }[]>(
+      `SELECT DISTINCT r.target AS target
+         FROM block_refs r
+         JOIN blocks b ON b.row_id = r.block_row
+         JOIN entries e ON e.id = r.target AND e.deleted_at IS NULL
+        WHERE r.target_kind = 'entry' AND b.entry_id IN (SELECT value FROM json_each($1))`,
+      [JSON.stringify(frontier)],
+    );
+    frontier = rows.map((r) => r.target).filter((id) => !seen.has(id));
+    frontier.forEach((id) => { seen.add(id); found.push(id); });
+    if (!recursive) break;
+  }
+  return found;
+}
+
+/** The menu's export: the open entry or template, as it is, without a password. */
 export async function exportAsEmerald(): Promise<void> {
   const view = useUIStore.getState().activeView;
   if (view.type === 'templates' && view.id) {
     return exportTemplateAsEmerald(view.id);
   }
-  if (!view.id) {
-    await message('Please open a journal entry, wiki article, or operation first.', { title: 'Export', kind: 'info' });
+  if (!view.id || !isEntryView(view.type)) {
+    await message(i18n.t('emeraldExport.openEntryFirst'), { title: i18n.t('emeraldExport.title'), kind: 'info' });
     return;
   }
-  // Right after startup the content of the open entry may still be pending.
   await useEntryStore.getState().ensureEntryContent(view.id);
-
-  if (view.type !== 'journal' && view.type !== 'wiki' && view.type !== 'operations') return;
   const entry = useEntryStore.getState().getEntry(view.id);
   if (!entry) return;
-  // The file's type is the module it was exported from — on import it picks
-  // the category a file without one lands in.
-  const type: EmeraldFile['type'] = view.type;
-  const title = entry.title;
-  let content = entry.content || '';
-  const createdAt = entry.created_at;
-  const cat = useCategoryStore.getState().categories.find((c) => c.id === entry.category_id);
-  const meta: EmeraldMeta = {
-    // For information only: the import recalculates the phase from `createdAt`.
-    moonPhase: entryMoonPhase(entry, useSettingsStore.getState().settings.journal.moonPhase) ?? undefined,
-    // A built-in by its stored name, the same in every vault — its label
-    // depends on the language and would create a new category elsewhere.
-    categoryName: (cat?.is_builtin ? cat.name : categoryLabel(i18n.t, cat)) || undefined,
-    categoryEmoji: cat?.emoji,
-    icon: (await portableIcon(entry.icon)) || undefined,
-    tags: liveTagNames(entry.tags),
-  };
-
-  // A loaded, still concealed sigil does not leave — sigil blocks
-  // can stand in every entry. Before links, definitions and images, so that
-  // the embedded drawing is missing too.
-  content = withoutConcealed(content, todayIso());
-
-  // Title for every link chip in the content — applies to all three types, since
-  // journal, wiki and operations can link equally.
-  meta.contentLinks = collectContentLinks(content);
-
-  const images = await embedImages(content);
-  const icons = await embedIcons(content);
-  await saveEmeraldFile({
-    version: EMERALD_VERSION, type, title, createdAt, content, images, icons, meta,
-  });
+  await saveWithDialog(entry.title, entry.created_at, { kind: 'entry', id: entry.id });
 }
 
-/** Save dialog and writing — the common ending of every `.emerald` export. */
-async function saveEmeraldFile(file: EmeraldFile): Promise<void> {
-  const savePath = await save({
-    defaultPath: exportFilename(file.title, file.createdAt, 'emerald'),
-    filters: [{ name: 'Emerald', extensions: ['emerald'] }],
-  });
-  if (!savePath) return;
-  await invoke('write_file', { path: savePath, content: JSON.stringify(file, null, 2) });
-}
-
-/**
- * The local images of the content as Base64. A missing image is dropped.
- * Taken from the blocks (`blockRefs`), like `block_refs` in the vault: a
- * picture that only stands in a block's JSON — a canvas background, a
- * copy's image prefill — travels along too.
- */
-async function embedImages(content: string): Promise<Record<string, string>> {
-  const images: Record<string, string> = {};
-  const refs = parseBlocks(content).flatMap(blockRefs).filter((ref) => ref.kind === 'image').map((ref) => ref.target);
-  // And every stored name anywhere in it, as the backup does: a block `blockRefs` cannot fully read keeps its pictures.
-  refs.push(...storedImageNamesIn(content));
-  for (const ref of new Set(refs)) {
-    try {
-      images[ref] = await readImageAsBase64(ref);
-    } catch { /* skip missing files */ }
-  }
-  return images;
-}
-
-/** The icon files the block copies of the content name (`blockRefs`, kind `icon`), as Base64. */
-async function embedIcons(content: string): Promise<Record<string, string>> {
-  const icons: Record<string, string> = {};
-  const names = parseBlocks(content).flatMap(blockRefs).filter((ref) => ref.kind === 'icon').map((ref) => ref.target);
-  for (const name of new Set(names)) {
-    try {
-      icons[name] = await readIconAsBase64(name);
-    } catch { /* skip missing files */ }
-  }
-  return icons;
-}
-
-/**
- * A template as `.emerald`: block stack, images and link titles
- * as with an entry, plus icon, title of new entries and tags. The saved state is exported,
- * not an open draft.
- */
+/** A template as `.emerald` — the saved state, not an open draft. */
 export async function exportTemplateAsEmerald(templateId: string): Promise<void> {
-  const file = await buildTemplateEmeraldFile(templateId);
-  if (!file) {
-    await message('Please open a template first.', { title: 'Export', kind: 'info' });
+  const template = useTemplateStore.getState().templates.find((tpl) => tpl.id === templateId);
+  if (!template) {
+    await message(i18n.t('emeraldExport.openTemplateFirst'), { title: i18n.t('emeraldExport.title'), kind: 'info' });
     return;
   }
-  await saveEmeraldFile(file);
+  await saveWithDialog(template.name || 'Template', template.created_at, { kind: 'template', id: template.id });
 }
 
-/** The `.emerald` file of a template — without a dialog, so that it can be checked without a file picker too. */
-export async function buildTemplateEmeraldFile(templateId: string): Promise<EmeraldFile | null> {
-  const template = useTemplateStore.getState().templates.find((tpl) => tpl.id === templateId);
-  if (!template) return null;
-  // As with the entry: a loaded, concealed sigil does not leave.
-  const content = withoutConcealed(template.content, todayIso());
-  const meta: EmeraldMeta = {
-    icon: (await portableIcon(template.icon)) || undefined,
-    tags: liveTagNames(template.tags),
-    newEntryTitle: template.title,
-    contentLinks: collectContentLinks(content),
-  };
-  const images = await embedImages(content);
-  const icons = await embedIcons(content);
-  return { version: EMERALD_VERSION, type: 'template', title: template.name || 'Template', createdAt: template.created_at, content, images, icons, meta };
+async function saveWithDialog(title: string, date: string, item: EmeraldExportItem): Promise<void> {
+  const path = await save({
+    defaultPath: exportFilename(title, date, 'emerald'),
+    filters: [{ name: 'Emerald', extensions: ['emerald'] }],
+  });
+  if (!path) return;
+  await writeEmeraldFile(path, { items: [item] });
 }
 
 // ── Import helpers ───────────────────────────────────────────────────────────
@@ -325,131 +357,249 @@ async function ensureTagIds(names: string[]): Promise<string[]> {
   return result;
 }
 
-/**
- * Saves the images of the file into the image folder and rewrites their references.
- * The vault's image limits apply as on insertion; if an image
- * is still too large even downscaled or cannot be downscaled, it is taken
- * unchanged — an import should not lose anything the file brings along.
- */
-async function remapImages(content: string, images: Record<string, string>): Promise<string> {
-  const map = new Map<string, string>();
-  for (const [oldRef, dataUrl] of Object.entries(images)) {
-    if (!dataUrl) continue;
-    try {
-      const prepared = await prepareImageDataUrl(dataUrl).catch(() => dataUrl);
-      map.set(oldRef, await saveImage(prepared));
-    } catch { /* skip */ }
-  }
-  let rewritten = rewriteImageRefs(content, (ref) => map.get(ref) ?? null);
-  // A canvas names its pictures in its scene JSON too (`ref`, `props.src`,
-  // the background): a stored name is a hash, so it is replaced wherever it stands.
-  for (const [oldRef, file] of map) {
-    if (oldRef !== file && storedImageName(oldRef) === oldRef) rewritten = rewritten.split(oldRef).join(file);
-  }
-  return rewritten;
-}
-
-/**
- * Saves the icons of the file into this vault's `icons/` and renames them in
- * the content (a block copy names its icon in its config JSON). A name is a
- * hash, so it is replaced wherever it stands.
- */
-async function remapIcons(content: string, icons: unknown): Promise<string> {
-  if (!icons || typeof icons !== 'object') return content;
-  let rewritten = content;
-  for (const [oldName, dataUrl] of Object.entries(icons as Record<string, unknown>)) {
-    if (storedImageName(oldName) !== oldName || !isImageDataUrl(dataUrl)) continue;
-    try {
-      const name = await storeIconDataUrl(dataUrl);
-      if (name !== oldName) rewritten = rewritten.split(oldName).join(name);
-    } catch { /* skip */ }
-  }
-  return rewritten;
-}
-
-/** Re-reads the relevant store from DB so the UI reflects the imported data. */
-async function refreshAfterImport(type: EntryFileType): Promise<void> {
-  await reloadModules([type]);
-}
+/** The modules an imported entry can land in (the Markdown import asks for one). */
+type EntryFileType = 'journal' | 'wiki' | 'operations';
 
 // ── Import from Emerald ──────────────────────────────────────────────────────
 
-export async function importFromEmerald(): Promise<void> {
-  const result = await openDialog({
-    filters: [{ name: 'Emerald', extensions: ['emerald'] }],
-    multiple: false,
-  });
-  const filePath = Array.isArray(result) ? result[0] : result;
-  if (!filePath) return;
+/** What `read_emerald_file` returns: the manifest, and the pictures stored in this vault by the hash part of their name in the file. */
+interface ReadArchive {
+  manifest: string;
+  images: Record<string, string>;
+  icons: Record<string, string>;
+}
 
-  let file: EmeraldFile;
-  try {
-    const json = await invoke<string>('read_file', { path: filePath });
-    file = JSON.parse(json);
-  } catch (e) {
-    await message(`Failed to read file: ${e}`, { title: 'Import', kind: 'error' });
-    return;
+/** Error codes of `emerald_file.rs`. */
+const EMERALD_ERRORS = {
+  locked: 'EMERALD_LOCKED',
+  oldFormat: 'EMERALD_OLD_FORMAT',
+  tooLarge: 'EMERALD_TOO_LARGE',
+  unreadable: 'EMERALD_UNREADABLE',
+  newer: 'EMERALD_NEWER',
+} as const;
+
+/** Thrown with a text for the person importing — nothing was changed. */
+class EmeraldImportNotice extends Error {}
+
+function noticeFor(err: unknown): string | null {
+  switch (keyErrorOf(err)) {
+    case EMERALD_ERRORS.oldFormat: return i18n.t('emeraldImport.oldVersion');
+    case EMERALD_ERRORS.tooLarge: return i18n.t('emeraldImport.tooLarge');
+    case EMERALD_ERRORS.unreadable: return i18n.t('emeraldImport.unsupported');
+    case EMERALD_ERRORS.newer: return i18n.t('emeraldImport.newVersion');
+    default: return null;
   }
-
-  // Checked before anything is created: a refused file leaves the vault as it is.
-  // A type this version does not know is no file it can read either.
-  const notice = unreadableVersionNotice(file?.version)
-    ?? (FILE_TYPES.includes(file.type) ? null : i18n.t('emeraldImport.unsupported'));
-  if (notice) {
-    await message(notice, { title: 'Import', kind: 'error' });
-    return;
-  }
-  if (typeof file.meta !== 'object' || file.meta === null) file.meta = {};
-
-  if (file.type === 'template') {
-    let templateId: string;
-    try {
-      templateId = await importTemplateFile(file);
-    } catch (e) {
-      await message(`Import failed: ${e}`, { title: 'Import', kind: 'error' });
-      return;
-    }
-    // No entry module affected — only tags and templates.
-    await reloadModules([]);
-    useUIStore.getState().setActiveView({ type: 'templates', id: templateId });
-    await message('Template imported successfully!', { title: 'Import', kind: 'info' });
-    return;
-  }
-
-  const items = linkItemsSnapshot();
-  const content = await importedContent(file, items);
-  const tagIds = await importedTags(file.meta);
-
-  let newId: string;
-  try {
-    newId = await importEntryFile({ ...file, type: file.type }, content, tagIds);
-  } catch (e) {
-    await message(`Import failed: ${e}`, { title: 'Import', kind: 'error' });
-    return;
-  }
-
-  await refreshAfterImport(file.type);
-  useUIStore.getState().setActiveView({ type: file.type, id: newId });
-  await message('Entry imported successfully!', { title: 'Import', kind: 'info' });
 }
 
 /**
- * The content of an imported file, ready to be saved: images into this
- * vault, link targets onto this vault, DOMPurify last.
- *
- * The order is deliberate: the remap parses the HTML and serializes it again, and such a round trip
- * must never come AFTER the sanitizer — otherwise what goes into the database
- * is no longer what it checked. The remap itself only reads
- * data attributes and replaces nodes, so it needs no clean input.
+ * Reads the file, asking for its password while one is needed and the last
+ * one did not fit. `null`: the question was cancelled.
  */
-async function importedContent(
-  file: EmeraldFile,
-  items: SuggestionItem[],
-): Promise<string> {
-  const raw = typeof file.content === 'string' ? file.content : '';
-  const remapped = await remapImages(await remapIcons(raw, file.icons), file.images ?? {});
-  const relinked = remapImportedLinks(remapped, file.meta.contentLinks, items);
-  return sanitizeImportedHtml(relinked);
+async function readArchiveAsking(path: string): Promise<ReadArchive | null> {
+  const vaultId = await getActiveVaultId();
+  let password: string | null = null;
+  try {
+    for (;;) {
+      let error: string | null;
+      try {
+        return await invoke<ReadArchive>('read_emerald_file', { vaultId, path, password });
+      } catch (err) {
+        const code = keyErrorOf(err);
+        if (code === EMERALD_ERRORS.locked) error = null;
+        else if (code === KEY_ERRORS.wrongPassword) error = i18n.t('emeraldKey.wrongPassword');
+        else throw err;
+      }
+      try {
+        // A `.emerald` file has no recovery key: the answer is always a password.
+        const secret = await askBackupSecret(error, 'emerald');
+        password = 'password' in secret ? secret.password : null;
+      } catch (cancelled) {
+        if (keyErrorOf(cancelled) === BACKUP_UNLOCK_CANCELLED) return null;
+        throw cancelled;
+      }
+    }
+  } finally {
+    endBackupSecret();
+  }
+}
+
+/** The picture a left-out one becomes: grey, with a crossed-out picture, without words — stored once per import. */
+async function placeholderImage(): Promise<string> {
+  const canvas = document.createElement('canvas');
+  canvas.width = 480;
+  canvas.height = 320;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) throw new Error('No 2D canvas context');
+  ctx.fillStyle = '#d6d3d1';
+  ctx.fillRect(0, 0, 480, 320);
+  ctx.strokeStyle = '#78716c';
+  ctx.lineWidth = 8;
+  ctx.lineJoin = 'round';
+  ctx.lineCap = 'round';
+  // A frame with a mountain and a sun, crossed out.
+  ctx.strokeRect(170, 110, 140, 100);
+  ctx.beginPath();
+  ctx.moveTo(178, 200);
+  ctx.lineTo(225, 155);
+  ctx.lineTo(255, 182);
+  ctx.lineTo(272, 168);
+  ctx.lineTo(302, 200);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.arc(278, 138, 10, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(150, 90);
+  ctx.lineTo(330, 230);
+  ctx.stroke();
+  return saveImage(canvas.toDataURL('image/png'));
+}
+
+/** What an import created, in the order of the file. */
+export interface EmeraldImportResult {
+  entries: string[];
+  templates: string[];
+}
+
+/**
+ * Reads a `.emerald` file at `path` into the active vault — without the open
+ * dialog, so a check can call it; it still asks for a password when the file
+ * needs one. `null`: cancelled at the password.
+ */
+export async function importEmeraldFile(path: string): Promise<EmeraldImportResult | null> {
+  let archive: ReadArchive | null;
+  try {
+    archive = await readArchiveAsking(path);
+  } catch (err) {
+    const notice = noticeFor(err);
+    throw notice ? new EmeraldImportNotice(notice) : err;
+  }
+  if (!archive) return null;
+  const manifest = parseManifest(archive.manifest);
+  // Checked before anything is created (format, version and item count already
+  // by Rust, before it stored the pictures): a refused file leaves the vault as it is.
+  if (typeof manifest === 'string') throw new EmeraldImportNotice(i18n.t(`emeraldImport.${manifest}`));
+  return importManifest(manifest, archive);
+}
+
+/**
+ * Creates the items of a manifest. Entries are created first, all of them, so
+ * that links between items of the same file can point at the new ones; then
+ * each gets its content, category, tags, icon and cover. If a step fails, what
+ * was created is removed again.
+ */
+async function importManifest(manifest: EmeraldManifest, archive: ReadArchive): Promise<EmeraldImportResult> {
+  const result: EmeraldImportResult = { entries: [], templates: [] };
+  const entryStore = useEntryStore.getState();
+  try {
+    const imageNames = new Map(Object.entries(archive.images));
+    if (manifest.omittedImages.length > 0) {
+      const placeholder = await placeholderImage();
+      for (const name of manifest.omittedImages) {
+        const stem = storedNameStem(name);
+        if (!imageNames.has(stem)) imageNames.set(stem, placeholder);
+      }
+    }
+    const iconNames = new Map(Object.entries(archive.icons));
+    // Created blank, so that the IDs are there before any content refers to them.
+    // The link targets of this vault as they were before the import: a blank
+    // entry it creates must not be found by title ("Untitled …") for a link
+    // that pointed elsewhere.
+    const linkItems = linkItemsSnapshot();
+    const idMap = new Map<string, string>();
+    const createdAt = new Map<string, string | undefined>();
+    for (const item of manifest.items) {
+      if (item.kind !== 'entry') continue;
+      const categoryId = item.category ? await ensureCategoryByName(item.category.name, item.category.icon) : null;
+      const at = importedCreatedAt(item.createdAt);
+      const entry = await entryStore.createEntry({ categoryId, blank: true, createdAt: at });
+      idMap.set(item.id, entry.id);
+      createdAt.set(entry.id, at);
+      result.entries.push(entry.id);
+    }
+
+    const ownIds = new Set(idMap.values());
+    const contentOf = (item: ManifestItem): string => {
+      const raw = blocksToContent(item.blocks);
+      const renamed = renameStoredFiles(renameStoredFiles(raw, iconNames), imageNames);
+      const relinked = remapImportedLinks(relinkWithinFile(renamed, idMap), manifest.links, linkItems, ownIds);
+      return sanitizeImportedHtml(relinked);
+    };
+    const iconOf = (icon: string): string | undefined => {
+      if (!icon) return undefined;
+      if (isIconFile(icon)) return iconNames.get(storedNameStem(icon));
+      return plausibleEmoji(icon) || undefined;
+    };
+
+    for (const item of manifest.items) {
+      const content = contentOf(item);
+      const tags = await ensureTagIds(item.tags);
+      if (item.kind === 'template') {
+        const created = await useTemplateStore.getState().createTemplate(item.name, {
+          icon: iconOf(item.icon), title: item.title, content, tags,
+        });
+        result.templates.push(created.id);
+        continue;
+      }
+      const id = idMap.get(item.id)!;
+      const cover = item.cover ? imageNames.get(storedNameStem(item.cover)) : undefined;
+      await entryStore.updateEntry(id, {
+        title: importedTitle(item),
+        content,
+        tags,
+        icon: iconOf(item.icon),
+        ...(cover ? { cover_image: cover } : {}),
+      }, importedStamp(createdAt.get(id)));
+    }
+    return result;
+  } catch (err) {
+    await Promise.allSettled([
+      ...result.entries.map((id) => discardEntry(id)),
+      ...result.templates.map((id) => discardTemplate(id)),
+    ]);
+    throw err;
+  }
+}
+
+/** Removes a template an import created, from the database and the list. */
+async function discardTemplate(id: string): Promise<void> {
+  await useTemplateStore.getState().permanentlyDeleteTemplate(id);
+  useTemplateStore.setState((s) => ({ templates: s.templates.filter((t) => t.id !== id) }));
+}
+
+/** Removes an entry an import created, from the database and the list. */
+async function discardEntry(id: string): Promise<void> {
+  await useEntryStore.getState().permanentlyDeleteEntry(id);
+  useEntryStore.setState((s) => ({ entries: s.entries.filter((e) => e.id !== id) }));
+}
+
+/** The menu's import: the open dialog, the import, then the first imported item opened. */
+export async function importFromEmerald(): Promise<void> {
+  const picked = await openDialog({
+    filters: [{ name: 'Emerald', extensions: ['emerald'] }],
+    multiple: false,
+  });
+  const filePath = Array.isArray(picked) ? picked[0] : picked;
+  if (!filePath) return;
+
+  let result: EmeraldImportResult | null;
+  try {
+    result = await importEmeraldFile(filePath);
+  } catch (e) {
+    const text = e instanceof EmeraldImportNotice ? e.message : `${i18n.t('emeraldImport.failed')}\n${e}`;
+    await message(text, { title: i18n.t('emeraldImport.title'), kind: 'error' });
+    return;
+  }
+  if (!result) return;
+
+  await reloadModules(['journal', 'wiki', 'operations']);
+  const [firstEntry] = result.entries;
+  if (firstEntry) useUIStore.getState().setActiveView({ type: viewOfEntryId(firstEntry), id: firstEntry });
+  else if (result.templates[0]) useUIStore.getState().setActiveView({ type: 'templates', id: result.templates[0] });
+  await message(
+    i18n.t('emeraldImport.done', { entries: result.entries.length, templates: result.templates.length }),
+    { title: i18n.t('emeraldImport.title'), kind: 'info' },
+  );
 }
 
 /**
@@ -466,57 +616,21 @@ function sanitizeImportedHtml(html: string): string {
   });
 }
 
-/** The tags of the file as IDs of this vault — strings only, the file is foreign. */
-async function importedTags(meta: EmeraldMeta): Promise<string[]> {
-  return ensureTagIds(Array.isArray(meta.tags) ? meta.tags.filter((t): t is string => typeof t === 'string') : []);
-}
-
-/**
- * Reads in a `.emerald` template — like an entry: content and tags. Without
- * a dialog, so that it can be checked without a file picker; the check of
- * type and version is therefore here too.
- */
-export async function importTemplateFile(file: EmeraldFile): Promise<string> {
-  const notice = unreadableVersionNotice(file.version);
-  if (notice) throw new Error(notice);
-  if (file.type !== 'template') throw new Error('Not a template file.');
-  if (typeof file.meta !== 'object' || file.meta === null) file.meta = {};
-  const content = await importedContent(file, linkItemsSnapshot());
-  return createImportedTemplate(file, content, await importedTags(file.meta));
-}
-
-/**
- * Creates the template from the file — always new, with a new ID, and without an
- * assignment: which template fills new entries is decided by this vault, not by a
- * foreign file.
- */
-async function createImportedTemplate(file: EmeraldFile, content: string, tagIds: string[]): Promise<string> {
-  const { meta } = file;
-  const text = (v: unknown) => (typeof v === 'string' ? v : '');
-  const created = await useTemplateStore.getState().createTemplate(text(file.title), {
-    icon: await importedIcon(meta.icon),
-    title: text(meta.newEntryTitle),
-    content,
-    tags: tagIds,
-  });
-  return created.id;
-}
-
 /**
  * The creation date from the file, so that an entry lands at its place in the
  * timeline instead of as the newest. The file is foreign: only a readable
  * date with a four-digit year, as ISO like any other — dates are sorted as
  * text, and `+010000-…` would sort before 2024. Otherwise now.
  */
-function importedCreatedAt(file: EmeraldFile): string | undefined {
-  const time = typeof file.createdAt === 'string' ? Date.parse(file.createdAt) : NaN;
+function importedCreatedAt(value: string): string | undefined {
+  const time = value ? Date.parse(value) : NaN;
   if (Number.isNaN(time)) return undefined;
   const iso = new Date(time).toISOString();
   return /^\d{4}-/.test(iso) ? iso : undefined;
 }
 
 /** The title from the file. */
-function importedTitle(file: Pick<EmeraldFile, 'title'>): string {
+function importedTitle(file: { title: string }): string {
   if (!hasOwnTitle(file.title)) return '';
   // A Markdown or PDF export writes "Untitled…" for an empty title
   // in the app's language — that comes back empty on re-import.
@@ -526,40 +640,18 @@ function importedTitle(file: Pick<EmeraldFile, 'title'>): string {
 }
 
 /**
- * "Last modified" of an imported entry: its creation date. The file
- * has no modification date, and an import is not an edit — otherwise
- * it would still be at the very top of lists that sort by it (operations).
+ * "Last modified" of an imported entry: its creation date. An import is not
+ * an edit — otherwise it would still be at the very top of lists that sort
+ * by it.
  */
 function importedStamp(createdAt: string | undefined): WriteOptions {
   return { touch: createdAt ?? true };
 }
 
 /**
- * An entry from a file: in the category the file names — found or created by
- * name — else in the first category of the module it came from (the journal's
- * for a journal file). The moon phase follows from the file's creation date
- * (`entryMoonPhase`).
- */
-async function importEntryFile(file: EmeraldFile & { type: EntryFileType }, content: string, tagIds: string[]): Promise<string> {
-  const { createEntry, updateEntry } = useEntryStore.getState();
-  const categoryId = await ensureCategoryByName(file.meta.categoryName, file.meta.categoryEmoji)
-    ?? startCategoryOf(file.type);
-  const createdAt = importedCreatedAt(file);
-  const entry = await createEntry({ categoryId, blank: true, createdAt });
-  await updateEntry(entry.id, {
-    title: importedTitle(file),
-    content,
-    tags: tagIds,
-    icon: await importedIcon(file.meta.icon),
-  }, importedStamp(createdAt));
-  return entry.id;
-}
-
-/**
- * The one category resolution of the import, for all four modules: the local
- * category with this name (case-insensitive, builtins also via their
- * translated name), otherwise newly created; without a name the entry stays
- * uncategorized.
+ * The one category resolution of the import: the local category with this
+ * name (case-insensitive, builtins also via their translated name), otherwise
+ * newly created; without a name the entry stays uncategorized.
  */
 async function ensureCategoryByName(name: string | null | undefined, emoji = '📁'): Promise<string | null> {
   const trimmed = name?.trim();
@@ -586,13 +678,12 @@ async function ensureCategoryByName(name: string | null | undefined, emoji = '�
   }
 
   try {
-    return (await store.addCategory(trimmed, emoji || '📁')).id;
+    return (await store.addCategory(trimmed, plausibleEmoji(emoji) || '📁')).id;
   } catch {
     // Name conflict from a parallel creation — then it exists now.
     return useCategoryStore.getState().categories.find(matches)?.id ?? null;
   }
 }
-
 
 // ── Import from Markdown ─────────────────────────────────────────────────────
 
@@ -673,7 +764,7 @@ export async function importFromMarkdown(): Promise<void> {
     return;
   }
 
-  await refreshAfterImport(type);
+  await reloadModules([type]);
   useUIStore.getState().setActiveView({ type, id: newId });
   await message('Entry imported successfully!', { title: 'Import', kind: 'info' });
 }

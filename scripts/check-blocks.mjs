@@ -44,7 +44,8 @@ writeFileSync(
    export { blockRefs } from '${root}/src/lib/blocks/blockRefs';
    export { withoutImage } from '${root}/src/lib/imageUsage';
    export { keyBetween, evenKeys, positionsFor, isPositionKey } from '${root}/src/lib/blocks/position';
-   export { blocksOfContent, planBlockWrite, clearSavedBlocks, contentOf } from '${root}/src/lib/blockStore';`
+   export { blocksOfContent, planBlockWrite, clearSavedBlocks, contentOf } from '${root}/src/lib/blockStore';
+   export { contentToBlocks, blocksToContent, parseManifest, renameStoredFiles, relinkWithinFile, gentlestImageMode, storedNameStem, EMERALD_FORMAT_VERSION } from '${root}/src/lib/emerald/manifest';`
 );
 
 const bundlePath = join(workDir, 'bundle.mjs');
@@ -83,6 +84,8 @@ const {
   createPaintBlock, isDrawingBlockType, PAINT_BLOCK_TYPE, resolveBlockType,
   toBlockRow, fromBlockRow, blockPlainText, htmlPlainText, blockRefs, withoutImage, keyBetween, evenKeys, positionsFor, isPositionKey,
   blocksOfContent, planBlockWrite, clearSavedBlocks, contentOf,
+  contentToBlocks, blocksToContent, parseManifest, renameStoredFiles, relinkWithinFile, gentlestImageMode, storedNameStem,
+  EMERALD_FORMAT_VERSION,
 } = bundle;
 
 const failures = [];
@@ -1206,6 +1209,92 @@ console.log('\n7. Blocks as rows (blocks, block_refs)\n');
       && htmlPlainText('<p>a</p><script>x').includes('x'), htmlPlainText('<p>a</p><script>x()</script><style>p{}</style><p>b</p>'));
   check('plain text: a chip inside a word still stands apart, formatting does not',
     htmlPlainText(`ab${chip}cd <b>fe</b>tt`) === 'ab Ziel cd fett', htmlPlainText(`ab${chip}cd <b>fe</b>tt`)); // lang-ok
+}
+
+console.log('\n8. .emerald manifest (lib/emerald/manifest.ts)\n');
+{
+  const idA = '11111111-1111-4111-8111-111111111111';
+  const idB = '22222222-2222-4222-8222-222222222222';
+  const newA = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+  const newB = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+  const outside = '33333333-3333-4333-8333-333333333333';
+  const pic = `${'ab'.repeat(32)}.png`;
+  const kept = `${'cd'.repeat(32)}.jpg`;
+  const chipTo = (id, label) => internalLinkChipHtml({ id, entryType: 'entry', label });
+
+  // Two entries of one file that link to each other, plus a link outside and pictures.
+  const contentA = serializeBlocks([
+    { ...createTextBlock(`<p>see ${chipTo(idB, 'B')} and ${chipTo(outside, 'Elsewhere')}</p><img src="${pic}">`), id: 'blk-a' },
+  ]);
+  const fields = createFieldsBlock();
+  const contentB = serializeBlocks([
+    { ...createTextBlock(`<p>back to ${chipTo(idA, 'A')}</p><img src="${kept}">`), id: 'blk-b' },
+    { ...fields, attrs: { ...fields.attrs, [BLOCK_ATTR.data]: JSON.stringify({ slots: { l: `link:${idA}` } }) } },
+  ]);
+  const manifest = {
+    format: 'emerald', version: EMERALD_FORMAT_VERSION, exportedAt: '2026-11-14T00:00:00.000Z',
+    items: [
+      { kind: 'entry', id: idA, title: 'A', number: 1, createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '', icon: '🌙', cover: null,
+        category: { name: 'Ritual', icon: '🕯️', builtin: false }, tags: ['x'], blocks: contentToBlocks(contentA) },
+      { kind: 'entry', id: idB, title: 'B', number: 2, createdAt: '', updatedAt: '', icon: '', cover: null, category: null, tags: [],
+        blocks: contentToBlocks(contentB) },
+      { kind: 'template', id: 'tpl', name: 'T', title: 'New', createdAt: '', updatedAt: '', icon: '📄', tags: [], blocks: [] },
+    ],
+    links: [{ id: outside, kind: 'entry', title: 'Elsewhere' }],
+    omittedImages: [pic],
+  };
+  const parsed = parseManifest(JSON.stringify(manifest));
+  check('a manifest round-trips through JSON', typeof parsed === 'object' && parsed.items.length === 3 && parsed.links.length === 1, parsed);
+  check('block rows give back the content byte for byte',
+    blocksToContent(parsed.items[0].blocks) === contentA && blocksToContent(parsed.items[1].blocks) === contentB,
+    blocksToContent(parsed.items[1].blocks));
+
+  const idMap = new Map([[idA, newA], [idB, newB]]);
+  const importedA = relinkWithinFile(blocksToContent(parsed.items[0].blocks), idMap);
+  const importedB = relinkWithinFile(blocksToContent(parsed.items[1].blocks), idMap);
+  const targets = (html) => extractInternalLinks(html).map((l) => l.id);
+  check('two entries of one file stay linked to each other (chips)',
+    targets(importedA).includes(newB) && targets(importedB).includes(newA) && !importedA.includes(idB) && !importedB.includes(idA),
+    { a: targets(importedA), b: targets(importedB) });
+  check('a field block’s link slot follows too', importedB.includes(`link:${newA}`), importedB);
+  check('a link outside the file is left for the title lookup', targets(importedA).includes(outside));
+
+  const placeholder = `${'ef'.repeat(32)}.png`;
+  const stored = `${'01'.repeat(32)}.jpg`;
+  const byStem = new Map([[storedNameStem(pic), placeholder], [storedNameStem(kept), stored]]);
+  const renamedA = renameStoredFiles(importedA, byStem);
+  const renamedB = renameStoredFiles(importedB, byStem);
+  check('a left-out picture becomes the placeholder', renamedA.includes(placeholder) && !renamedA.includes(pic), renamedA);
+  check('a picture of the file gets its new name', renamedB.includes(stored) && !renamedB.includes(kept), renamedB);
+  check('a picture compressed to another type is found by its hash',
+    renameStoredFiles(`<img src="${'ab'.repeat(32)}.webp">`, byStem).includes(placeholder));
+
+  check('the gentlest picture setting wins', gentlestImageMode('placeholder', 'none') === 'none'
+    && gentlestImageMode('strong', 'balanced') === 'balanced');
+
+  check('an older manifest is named as such', parseManifest(JSON.stringify({ ...manifest, version: 5 })) === 'oldVersion');
+  check('a newer manifest is named as such', parseManifest(JSON.stringify({ ...manifest, version: 7 })) === 'newVersion');
+  check('no JSON, another format or no item is refused',
+    parseManifest('nope') === 'unsupported' && parseManifest('{"format":"x","version":6}') === 'unsupported'
+      && parseManifest(JSON.stringify({ ...manifest, items: [] })) === 'unsupported');
+  const hostile = parseManifest(JSON.stringify({ ...manifest, items: [
+    { kind: 'entry', id: idA, title: 7, tags: ['ok', 3, null], category: { name: 5 }, blocks: [{ id: 'b', type: 'core.text', html: '<p>x</p>', hidden: 'yes', version: -1 }, { type: 'core.text' }, 'x'] },
+    { kind: 'script', id: 'x' },
+    null,
+  ] }));
+  check('more items than the limit are refused as too large',
+    parseManifest(JSON.stringify({ ...manifest, items: Array.from({ length: 1001 }, () => manifest.items[2]) })) === 'tooLarge');
+  const shortId = parseManifest(JSON.stringify({ ...manifest, items: [{ ...manifest.items[0], id: 'e' }, manifest.items[2]] }));
+  const twice = parseManifest(JSON.stringify({ ...manifest, items: [manifest.items[0], { ...manifest.items[1], id: idA }] }));
+  check('an item ID that appears twice is taken once', typeof twice === 'object' && twice.items.length === 1, twice);
+  check('an entry whose ID is no UUID is dropped', typeof shortId === 'object' && shortId.items.length === 1 && shortId.items[0].kind === 'template', shortId);
+  check('re-linking replaces whole IDs only, in one pass',
+    relinkWithinFile(`x${idA}y ${idA.slice(0, 8)}`, idMap) === `x${newA}y ${idA.slice(0, 8)}`);
+  check('foreign values of the wrong type are dropped, not trusted',
+    typeof hostile === 'object' && hostile.items.length === 1 && hostile.items[0].title === ''
+      && hostile.items[0].tags.join() === 'ok' && hostile.items[0].category === null
+      && hostile.items[0].blocks.length === 1 && hostile.items[0].blocks[0].hidden === 0 && hostile.items[0].blocks[0].version === null,
+    hostile);
 }
 
 console.log('');

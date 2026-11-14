@@ -391,7 +391,7 @@ Every vault is encrypted: entries, images, drafts and backups are unreadable wit
 
 All export and import actions are in the application menu — on macOS the native menu bar, on Windows and Linux the app's own title bar, with the same items and rules.
 
-> **Exports show an entry the way read mode does.** Markdown and PDF render each block on its own: hidden blocks are left out, field blocks list only the fields read mode shows (label and value), block titles appear as headings where read mode shows them, and a sigil exports its intention and letters, its drawing (in Markdown a placeholder) and its charge. While a sigil is charged and its reveal date not reached, calculator and drawing are left out of every export, `.emerald` included. Import is unaffected.
+> **Exports show an entry the way read mode does.** Markdown and PDF render each block on its own: hidden blocks are left out, field blocks list only the fields read mode shows (label and value), block titles appear as headings where read mode shows them, and a sigil exports its intention and letters, its drawing (in Markdown a placeholder) and its charge. While a sigil is charged and its reveal date not reached, calculator and drawing are left out of these exports. A `.emerald` file carries the sigil as it is, still concealed. Import is unaffected.
 
 ### PDF Export
 
@@ -405,35 +405,27 @@ Saves a `.md` file: the `# Title`, a header with type, date, moon phase (when sh
 
 ### Emerald Format
 
-The Emerald format (`.emerald`) is a JSON file holding a full entry with all metadata and embedded images, for lossless transfer between Emerald installations. **Export → Export as Emerald…** is enabled while a Journal / Wiki / Operations entry (an altar too) or a template's page is open, and exports whichever is active. **Import → From Emerald…** handles every type; the type is read from the file.
+The Emerald format (`.emerald`) carries entries and templates from one vault to another, without loss. A file is a ZIP archive with a `manifest.json` and the pictures and icons as files of their own; it can hold one or several entries and templates, and it can be sealed with a password. **Export → Export as Emerald…** is enabled while an entry (an altar too) or a template's page is open, and writes whichever is active, without a password. **Import → From Emerald…** reads any of them; for a sealed file it asks for the password first, and a wrong one says so.
 
-```json
-{
-  "version": "5",
-  "type": "journal | wiki | operations | template",
-  "title": "…",
-  "createdAt": "ISO 8601",
-  "content": "HTML string",
-  "images": { "<stored name>.png": "data:image/png;base64,…" },
-  "icons": { "<stored name>.png": "data:image/png;base64,…" },
-  "meta": { … }
-}
-```
+**What travels.** Per entry: title, creation date, its blocks as stored (hidden blocks flagged, concealed sigils concealed — they can be revealed over there as usual), category by name and emoji, tags by name, icon and cover. Per template: name, the title new entries get, icon, tags and blocks. Every picture and icon these use travels along as a file. Links name their target's title too, so the import can find it in the other vault. Not carried yet: a picture's name, note and tags, and tag colours.
 
-**Entries.** On import, images are saved into the vault's image folder (an identical image is stored once) and go through the vault's image limits like inserted ones (an image that stays too large, or can't be scaled, is kept as it is). The content is sanitised, links are resolved by id and then by title, and tags are added to the vault. An entry keeps the file's `createdAt` as both creation and "last changed" date, so it lands at its place in the timeline — provided it is a readable date with a four-digit year; otherwise it is created now. Fields this version doesn't use are ignored.
+**Entries.** On import, the category of the same name is used — a built-in one by its stored name — or created; tags are found by name or added; if the vault doesn't create tags inline, a tag it doesn't have is left off. Pictures and icons are stored in the vault's folders as they are, without the vault's image limits. Links between entries of the same file point at the new entries; a link to an entry outside the file is found by its id, then by its title, and otherwise becomes plain text. An entry keeps the file's creation date as both creation and "last changed" date, so it lands at its place in the timeline — provided it is a readable date with a four-digit year; otherwise it is created now. A picture left out on export (see below) shows as a grey placeholder picture. The first imported entry opens in Journal, Wiki or Operations, depending on its category; a category the import created is in no dashboard's filter yet, so its entries show in All entries until a dashboard ticks it (see [All Entries and Dashboards](#all-entries-and-dashboards)). Importing the same file twice gives two copies. If a step fails, the entries and templates created so far are removed again; a category or tag it added stays.
 
-**Icons.** An uploaded icon of the entry or template travels in `meta.icon` as a picture, the icons of its custom blocks in `icons`; on import they are stored as icon files of the vault. An emoji stays an emoji.
+**Your own blocks.** An entry carries its copies of Blocks-view blocks in its content, complete and usable; the blocks of the Blocks view themselves do not travel.
 
-**Versions.** Entries and templates are written as `"version": "5"`, and only that version is read. A file of an earlier version is not imported — a notice says it comes from an older version and that a converter will follow — and one of a newer version asks for an update; nothing is changed either way. Earlier versions of Emerald refuse a version-5 file in turn.
+**Templates** export from their page or the templates list's context menu. Which category starts with a template, and whether it is the default template, never travels: that is this vault's decision.
 
-**Your own blocks.** An entry carries its copies of Blocks-view blocks in its content; the blocks themselves do not travel.
+**Versions.** The archive is version 6 of the format. A `.emerald` file of an earlier version (a single JSON file) is not imported — a notice says it comes from an older version and that a converter will follow — and one of a newer version asks for an update; nothing is changed either way.
 
-**Templates** export from their page or the templates list's context menu as `"type": "template"` — a type used only for templates, so an app that does not know it rejects the file instead of mistaking it for an operation. It carries the template's blocks, images and Blocks-view blocks like an entry, plus its icon, the title new entries get and its tags. Which category starts with it, and whether it is the default template, never travels: that is this vault's decision.
+**Limits.** A file is refused, with nothing changed, if it is larger than 512 MB, has more than 5,000 parts or more than 1,000 entries and templates, a single picture above 64 MB, or anything inside that is not the manifest, a picture or an icon.
+
+A menu to export several entries at once, with a password and compressed or left-out pictures, will follow; the format already carries all of it (see [`architecture/editing.md`](architecture/editing.md#the-emerald-file)).
+
 ### Import from Markdown
 
 Reads a Markdown file exported by Emerald (or with the same structure). The `# Title` line becomes the title, key-value lines before `---` are metadata (unknown keys are ignored), and the body below is converted to rich text. A Markdown import has no creation date and is created now. Header fields of earlier versions (an operation's status, end date and version, a journal entry's paradigm, banishing, meditation and linked operations or articles) count as unknown keys.
 
-**Destination confirmation.** The header's `type` decides where the entry goes. If it is `journal`, `wiki` or `operations`, the import proceeds directly; otherwise a dialog shows the detected title and asks for Journal, Wiki or Operations — cancelling aborts the import. `.emerald` files always carry a type, so they never ask.
+**Destination confirmation.** The header's `type` decides where the entry goes. If it is `journal`, `wiki` or `operations`, the import proceeds directly; otherwise a dialog shows the detected title and asks for Journal, Wiki or Operations — cancelling aborts the import. `.emerald` entries keep their category by name and never ask.
 
 ### Vault Backup (`.emeralddb`)
 

@@ -107,7 +107,7 @@ pub(crate) fn seal_for_vault(vault_key: &Key, kind: Store, bytes: &[u8], ext: &s
 
 /// Writes an image into the vault — sealed in an encrypted one — unless a file
 /// of that name is there already. Returns the name.
-fn store(app: &tauri::AppHandle, vault_id: &str, kind: Store, bytes: &[u8], ext: &str) -> Result<String, String> {
+pub(crate) fn store(app: &tauri::AppHandle, vault_id: &str, kind: Store, bytes: &[u8], ext: &str) -> Result<String, String> {
     let keys = image_keys(app, vault_id)?;
     let filename = image_name(keys.as_ref(), bytes, ext);
     let path = kind.dir(app, vault_id)?.join(&filename);
@@ -125,7 +125,7 @@ fn store(app: &tauri::AppHandle, vault_id: &str, kind: Store, bytes: &[u8], ext:
 /// Reads a stored image's bytes, opening it in an encrypted vault. A file that
 /// is not sealed is returned as it is: the dev seed's and the tests' vaults
 /// start out plain.
-fn load(app: &tauri::AppHandle, vault_id: &str, kind: Store, filename: &str) -> Result<Vec<u8>, String> {
+pub(crate) fn load(app: &tauri::AppHandle, vault_id: &str, kind: Store, filename: &str) -> Result<Vec<u8>, String> {
     let path = locate(app, vault_id, kind, filename)?;
     let bytes = std::fs::read(&path).map_err(|e| format!("read: {e}"))?;
     if !crypto::is_sealed(&bytes) {
@@ -209,8 +209,8 @@ fn image_write_guard() -> std::sync::MutexGuard<'static, ()> {
 }
 
 
-/// Stores a base64 data-URL in one of the folders and returns the filename.
-fn store_data_url(app: &tauri::AppHandle, vault_id: &str, kind: Store, data_url: &str) -> Result<String, String> {
+/// A base64 data-URL's bytes and the extension its MIME type maps to.
+pub(crate) fn decode_data_url(data_url: &str) -> Result<(&'static str, Vec<u8>), String> {
     let (mime_part, b64) = data_url
         .strip_prefix("data:")
         .and_then(|s| s.split_once(','))
@@ -220,6 +220,12 @@ fn store_data_url(app: &tauri::AppHandle, vault_id: &str, kind: Store, data_url:
     let bytes = general_purpose::STANDARD
         .decode(b64)
         .map_err(|e| e.to_string())?;
+    Ok((ext, bytes))
+}
+
+/// Stores a base64 data-URL in one of the folders and returns the filename.
+fn store_data_url(app: &tauri::AppHandle, vault_id: &str, kind: Store, data_url: &str) -> Result<String, String> {
+    let (ext, bytes) = decode_data_url(data_url)?;
     store(app, vault_id, kind, &bytes, ext)
 }
 
@@ -239,6 +245,8 @@ pub async fn save_image(
 /// Largest icon a data URL may carry. An icon is brought down to 128px before
 /// it gets here (`lib/icons.ts`); anything far beyond that is not an icon.
 const MAX_ICON_DATA_URL: usize = 2 * 1024 * 1024;
+/// The same bound for an icon's raw bytes (an `.emerald` import): base64 is 4/3 of them.
+pub(crate) const MAX_ICON_BYTES: usize = MAX_ICON_DATA_URL / 4 * 3;
 
 /// Whether a data URL carries an SVG, by the extension its MIME type maps to.
 fn is_svg_data_url(data_url: &str) -> bool {
@@ -357,8 +365,7 @@ pub async fn read_image_as_base64(
         .map_err(|e| e.to_string())?
 }
 
-/// A stored icon as a base64 data-URL — for the backup, the `.emerald` export
-/// and the PDF, like [`read_image_as_base64`].
+/// A stored icon as a base64 data-URL — for the backup and the PDF, like [`read_image_as_base64`].
 #[tauri::command]
 pub async fn read_icon_as_base64(
     app: tauri::AppHandle,

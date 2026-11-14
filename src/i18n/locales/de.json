@@ -1430,9 +1430,25 @@
     "updateServer": "Update-Server"
   },
   "emeraldImport": {
+    "title": "Import",
     "oldVersion": "Diese Datei stammt aus einer älteren Emerald-Version und lässt sich in dieser nicht importieren. Es wurde nichts verändert; ein Konverter folgt.",
     "newVersion": "Diese Datei stammt aus einer neueren Emerald-Version. Aktualisiere diese App, um sie zu importieren. Es wurde nichts verändert.",
-    "unsupported": "Diese Datei ist keine Emerald-Datei, die diese Version lesen kann. Es wurde nichts verändert."
+    "unsupported": "Diese Datei ist keine Emerald-Datei, die diese Version lesen kann. Es wurde nichts verändert.",
+    "tooLarge": "Diese Datei ist zu groß oder besteht aus zu vielen Teilen, um sie zu importieren. Es wurde nichts verändert.",
+    "failed": "Der Import ist fehlgeschlagen. Die schon angelegten Einträge und Vorlagen wurden wieder entfernt.",
+    "done": "Import abgeschlossen – Einträge: {{entries}}, Vorlagen: {{templates}}."
+  },
+  "emeraldExport": {
+    "title": "Export",
+    "openEntryFirst": "Öffne zuerst einen Eintrag.",
+    "openTemplateFirst": "Öffne zuerst eine Vorlage."
+  },
+  "emeraldKey": {
+    "title": "Emerald-Datei öffnen",
+    "hint": "Diese Datei ist mit einem Passwort verschlüsselt. Gib das Passwort ein, das beim Export vergeben wurde.",
+    "password": "Passwort der Datei",
+    "open": "Öffnen",
+    "wrongPassword": "Das Passwort passt nicht zu dieser Datei."
   },
   "dashboards": {
     "unnamed": "Unbenanntes Dashboard",

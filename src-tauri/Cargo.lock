@@ -1081,6 +1081,7 @@ dependencies = [
  "webview2-com",
  "windows",
  "zeroize",
+ "zip",
 ]
 
 [[package]]

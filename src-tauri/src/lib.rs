@@ -35,6 +35,8 @@ mod keys;
 mod reencrypt;
 /// Encrypted `.emeralddb` backups.
 mod backup;
+/// `.emerald` files: entries and templates as a ZIP archive, optionally sealed with a password.
+mod emerald_file;
 /// Automatic backups: the target folder, the file name, what gets pruned.
 mod auto_backup;
 /// The in-app updater: variable source, check, installation.
@@ -276,14 +278,15 @@ pub(crate) fn guarded_read_path(app: &tauri::AppHandle, path: &str) -> Result<Pa
 // synchronous on purpose: they mutate NSMenu, and that is main-thread-only on macOS.
 
 /// Writes text content to a user-selected file path.
-/// Only .md, .emerald, .json, and .txt extensions are permitted. Backups
-/// (.emeralddb) go through `backup::write_backup_file`, which encrypts them —
-/// none may be written in the clear by accident.
+/// Only .md, .json, and .txt extensions are permitted. Backups (.emeralddb)
+/// go through `backup::write_backup_file`, which encrypts them — none may be
+/// written in the clear by accident — and `.emerald` archives through
+/// `emerald_file::write_emerald_file`.
 #[tauri::command]
 async fn write_file(app: tauri::AppHandle, path: String, content: String) -> Result<(), String> {
     tauri::async_runtime::spawn_blocking(move || {
         let ext = ext_for_path(&path);
-        if !matches!(ext.as_str(), "md" | "emerald" | "json" | "txt") {
+        if !matches!(ext.as_str(), "md" | "json" | "txt") {
             return Err("unsupported file type".to_string());
         }
 
@@ -321,13 +324,14 @@ async fn export_image(app: tauri::AppHandle, path: String, data_url: String) -> 
 }
 
 /// Reads a text file and returns its contents as a UTF-8 string.
-/// Only .md, .emerald, .json, and .txt extensions are permitted; backups are
-/// read through `backup::read_backup_file`.
+/// Only .md, .json, and .txt extensions are permitted; backups are read
+/// through `backup::read_backup_file`, `.emerald` archives through
+/// `emerald_file::read_emerald_file`.
 #[tauri::command]
 async fn read_file(app: tauri::AppHandle, path: String) -> Result<String, String> {
     tauri::async_runtime::spawn_blocking(move || {
         let ext = ext_for_path(&path);
-        if !matches!(ext.as_str(), "md" | "emerald" | "json" | "txt") {
+        if !matches!(ext.as_str(), "md" | "json" | "txt") {
             return Err("unsupported file type".to_string());
         }
 
@@ -820,6 +824,8 @@ pub fn run() {
             reencrypt::vault_recover,
             backup::write_backup_file,
             backup::read_backup_file,
+            emerald_file::write_emerald_file,
+            emerald_file::read_emerald_file,
             auto_backup::auto_backup_status,
             auto_backup::pick_auto_backup_dir,
             auto_backup::reset_auto_backup_dir,

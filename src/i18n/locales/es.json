@@ -1430,9 +1430,25 @@
     "updateServer": "Servidor de actualizaciones"
   },
   "emeraldImport": {
+    "title": "Importar",
     "oldVersion": "Este archivo procede de una versión anterior de Emerald y no se puede importar en esta. No se ha cambiado nada; llegará un conversor.",
     "newVersion": "Este archivo procede de una versión más reciente de Emerald. Actualiza esta aplicación para importarlo. No se ha cambiado nada.",
-    "unsupported": "Este archivo no es un archivo de Emerald que esta versión pueda leer. No se ha cambiado nada."
+    "unsupported": "Este archivo no es un archivo de Emerald que esta versión pueda leer. No se ha cambiado nada.",
+    "tooLarge": "Este archivo es demasiado grande o tiene demasiadas partes para importarlo. No se ha cambiado nada.",
+    "failed": "La importación ha fallado. Las entradas y plantillas ya creadas se han vuelto a eliminar.",
+    "done": "Importación completada – entradas: {{entries}}, plantillas: {{templates}}."
+  },
+  "emeraldExport": {
+    "title": "Exportar",
+    "openEntryFirst": "Abre primero una entrada.",
+    "openTemplateFirst": "Abre primero una plantilla."
+  },
+  "emeraldKey": {
+    "title": "Abrir archivo de Emerald",
+    "hint": "Este archivo está cifrado con una contraseña. Introduce la contraseña que se le dio al exportarlo.",
+    "password": "Contraseña del archivo",
+    "open": "Abrir",
+    "wrongPassword": "La contraseña no corresponde a este archivo."
   },
   "dashboards": {
     "unnamed": "Panel sin nombre",

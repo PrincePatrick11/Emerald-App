@@ -44,6 +44,7 @@ PDF export renders in a hidden window that the per-platform `export_pdf` command
 | `vault_change_password`, `vault_recover` | `reencrypt.rs` | put a vault under a new key; each returns the new recovery key. They need the current password or recovery key — an unlocked session alone is not enough to change the password |
 | `auto_backup_status`, `pick_auto_backup_dir`, `reset_auto_backup_dir`, `write_auto_backup` | `auto_backup.rs` | take a vault id and never a path; see [Automatic Backups](#automatic-backups) |
 | `write_backup_file`, `read_backup_file` | `backup.rs` | the only way to write a `.emeralddb` to a chosen path, or to read one (`write_auto_backup` is the second writer, sealing through the same `seal_for_vault`); take an extension check and the same path guards as `write_file`/`read_file` |
+| `write_emerald_file`, `read_emerald_file` | `emerald_file.rs` | the only way to write or read a `.emerald` file; extension check and the same path guards as `write_file`/`read_file`. Reading is bounded — see [Emerald Import Limits](#emerald-import-limits) |
 | `write_file`, `read_file`, `export_image` | `lib.rs` | path-taking; confined by `guarded_write_target` / `guarded_read_path` (see [Path Confinement](#path-confinement)) |
 | `export_pdf` | `lib.rs` → `pdf_export/` | hidden-window PDF render, per-platform |
 | `ensure_app_storage_dirs` | `lib.rs` | creates the app's own data and config dirs; takes no path |
@@ -215,7 +216,7 @@ On top of the guards, each command allowlists extensions and returns `"unsupport
 
 | Command | Extensions | Notes |
 |---|---|---|
-| `write_file`, `read_file` | `.md`, `.emerald`, `.json`, `.txt` | keeps them from being a general filesystem read/write primitive. `.emeralddb` is not on the list: a backup is written only through `write_backup_file` and `write_auto_backup` and read only through `read_backup_file`, so none can be written in the clear by accident |
+| `write_file`, `read_file` | `.md`, `.json`, `.txt` | keeps them from being a general filesystem read/write primitive. `.emeralddb` is not on the list: a backup is written only through `write_backup_file` and `write_auto_backup` and read only through `read_backup_file`, so none can be written in the clear by accident |
 | `write_backup_file`, `read_backup_file` | `.emeralddb` | the same path guards |
 | `export_image` | `.png`, `.jpg`, `.jpeg`, `.webp`, `.svg` | the base64 payload is decoded in Rust before writing, so no text encoding or newline handling can alter the bytes |
 | `copy_image_file`, `read_image_file` | `png`, `jpg`, `jpeg`, `gif`, `webp`, `svg` | shared helper `checked_image_source` |
@@ -240,6 +241,12 @@ The block rows of a backup (`data.blocks`) do not go through `insertRows`: `file
 
 An imported row's *id* is a value too, and stays untrusted after the import — it can resurface in an unrelated later export. `buildBackup()` (behind `exportDatabase()` and the automatic backup) scopes related tables with `IN (...)` clauses (e.g. `task_links` to the exported tasks). sqlx splits a statement on `;` and executes each part, so an id like `'; DROP TABLE …; --` concatenated into the SQL would run as a second statement during a harmless-looking export. `selectWhereIn()` therefore binds every id as a parameter, chunked at 400 per query (`IN_CHUNK`) so the statement stays independent of vault size.
 
+## Emerald Import Limits
+
+A `.emerald` file comes from anywhere. `read_emerald_file` (`src-tauri/src/emerald_file.rs`) therefore bounds what it can make the app do before anything reaches the vault: the file at most 512 MB, at most 5,000 members (read from the end record, before the ZIP reader allocates one record per member; a file with a ZIP64 locator is refused, since the reader would take its count instead), the manifest at most 32 MB, each picture at most 64 MB and all members together at most 512 MB — each read through `take(limit + 1)`, so a member whose header understates its size, or members that overlap, are caught by what was really read. Members are stored, never decompressed: the reader is built without a decompressor, so a compressed member is refused rather than inflated. Only `manifest.json`, `images/{name}` and `icons/{name}` with a name `is_valid_image_name` accepts are taken; any other member — a directory, `..`, an absolute or backslash path — refuses the whole file. Nothing is written by member name: pictures go through `images::store`, which names them by the keyed hash of their bytes. Icons follow `save_icon`'s rules (no SVG, at most 1.5 MB). A sealed file's Argon2id parameters are bounded like `vault.key`'s, so a crafted header cannot make the key derivation take minutes or gigabytes. Before a single picture is stored, the manifest's format, version and item count (at most 1,000) are checked in Rust (`check_manifest`), so a refused file leaves the vault as it was. The manifest is then checked field by field in the frontend (`parseManifest`: entry ids must be UUIDs, since re-linking replaces them in the content; at most 50,000 blocks and links), and the content goes through `sanitizeImportedHtml` like every import.
+
+A password-sealed `.emerald` file (XChaCha20-Poly1305 under an Argon2id key, header as associated data) protects the file in transit only; once imported, its content lives under the vault's own key like everything else.
+
 ## HTML Escaping in Exports
 
 User-provided text interpolated into the PDF export HTML goes through `htmlEscape()` (exported from `src/lib/export.ts`), which replaces `&`, `<`, `>`, `"` and `'` with HTML entities. It is applied to:
@@ -256,7 +263,7 @@ All HTML that enters the app from outside is sanitised with DOMPurify before bei
 
 **PDF export (`src/lib/export.ts`).** Before the content HTML is handed to `export_pdf`, it passes through `DOMPurify.sanitize` with an allowlist for the internal-link attributes — `data-type`, `data-id`, `data-entry-type`, `data-label`, `data-icon`, `data-entry-number`, `data-href` — so internal-link chips survive, plus `colwidth` (table column widths) and `data-color` (one of six colour names; the print CSS matches only those). This closes an injection path if an editor extension or import produces unexpected HTML.
 
-**Emerald import (`src/lib/emeraldFormat.ts`).** After image paths are remapped, content passes through `sanitizeImportedHtml` — the last step of every import that writes HTML to the database. It keeps TipTap's own attributes (`data-type`, `data-id`, `data-entry-type`, `data-label`, `data-icon`, `data-entry-number`, `data-align`, `colwidth`, `data-color`) and strips everything DOMPurify removes by default (script tags, event handlers, …). `data-align` is intentionally not in the PDF allowlist: that path never reads it, and alignment survives through the image's inline margins.
+**Emerald import (`src/lib/emeraldFormat.ts`).** After picture names and links are remapped, content passes through `sanitizeImportedHtml` — the last step of every import that writes HTML to the database. It keeps TipTap's own attributes (`data-type`, `data-id`, `data-entry-type`, `data-label`, `data-icon`, `data-entry-number`, `data-align`, `colwidth`, `data-color`) and strips everything DOMPurify removes by default (script tags, event handlers, …). `data-align` is intentionally not in the PDF allowlist: that path never reads it, and alignment survives through the image's inline margins.
 
 **Markdown import.** `marked` converts the body to HTML in `emeraldFormat.ts`, and `sanitizeImportedHtml` runs as the very last step, so nothing added along the way skips the filter.
 

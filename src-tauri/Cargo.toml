@@ -53,6 +53,10 @@ chacha20poly1305 = "0.10"
 argon2 = "0.5"
 hmac = "0.12"
 zeroize = { version = "1", features = ["serde"] }
+# `.emerald` archives (`emerald_file.rs`). Stored members only: the images in
+# them are compressed already, and without a decompressor no member can unpack
+# to more than it occupies.
+zip = { version = "4", default-features = false }
 # Free space before a re-encryption writes its copy (`reencrypt.rs`).
 fs4 = { version = "0.13", features = ["sync"] }
 # The WebSocket the dev bridge serves; only with the `devbridge` feature.

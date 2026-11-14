@@ -38,7 +38,7 @@ export function iconSrc(icon: string | null | undefined): string {
   return schemeUrl(`${getActiveVaultIdSync()}/icons/${icon}`);
 }
 
-/** Whether a value from a file is a picture as a data URL, which an import stores as an icon file. */
+/** Whether a value from a file is a picture as a data URL, which a backup import stores as an icon file. */
 export function isImageDataUrl(value: unknown): value is string {
   return typeof value === 'string' && value.startsWith('data:image/');
 }
@@ -63,8 +63,8 @@ export async function storeIconDataUrl(dataUrl: string): Promise<string> {
 }
 
 /**
- * Reads a stored icon back as a data URL — for the backup, the `.emerald`
- * export and the PDF, which the scheme does not reach.
+ * Reads a stored icon back as a data URL — for the backup and the PDF,
+ * which the scheme does not reach.
  */
 export async function readIconAsBase64(icon: string): Promise<string> {
   const filename = storedImageName(icon);
@@ -81,23 +81,6 @@ export async function portableIcon(icon: string | null | undefined): Promise<str
   } catch {
     return '';
   }
-}
-
-/**
- * An icon from a foreign file (`.emerald`): a data URL becomes a stored icon,
- * an emoji stays; a stored name the file cannot vouch for is dropped.
- */
-export async function importedIcon(icon: unknown): Promise<string | undefined> {
-  if (typeof icon !== 'string' || !icon) return undefined;
-  if (isImageDataUrl(icon)) {
-    try {
-      return await saveIcon(icon);
-    } catch {
-      return undefined;
-    }
-  }
-  if (isIconFile(icon)) return undefined;
-  return plausibleEmoji(icon) || undefined;
 }
 
 /** Every icon file in the active vault's `icons/`. */
