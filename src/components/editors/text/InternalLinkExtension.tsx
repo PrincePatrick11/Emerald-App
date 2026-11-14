@@ -5,6 +5,8 @@ import type { NodeViewRendererProps } from '@tiptap/react';
 import SuggestionList, { DEFAULT_ENTRY_EMOJI, type SuggestionItem } from './SuggestionList';
 import { suggestionPopup } from './suggestionPopup';
 import { linkTargetKindOf } from '../../../lib/internalLinkHtml';
+import { isImageIcon } from '../../../lib/helpers';
+import { iconSrc } from '../../../lib/icons';
 
 function getDefaultIcon(entryType: string): string {
   return entryType === 'task' ? DEFAULT_ENTRY_EMOJI.task : DEFAULT_ENTRY_EMOJI.wiki;
@@ -40,7 +42,7 @@ function InternalLinkNodeView({ node, editor, extension }: NodeViewRendererProps
   return (
     <NodeViewWrapper as="span" className="internal-link-chip" onClick={handleClick} data-drag-handle>
       <span className="internal-link-icon">
-        {icon?.startsWith('data:') ? <img src={icon} alt="" /> : icon}
+        {isImageIcon(icon) ? <img src={iconSrc(icon)} alt="" /> : icon}
       </span>
       <span className="internal-link-label">{displayLabel}</span>
     </NodeViewWrapper>

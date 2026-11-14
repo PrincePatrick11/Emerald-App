@@ -1,11 +1,17 @@
+import { storedImageName } from './schema';
+
+/**
+ * Whether an icon is an uploaded picture — the stored name of a file in the
+ * vault's `icons/` (`lib/icons.ts`) — rather than an emoji. Shown through
+ * `iconSrc`.
+ */
 export function isImageIcon(icon: string | null | undefined): boolean {
-  if (!icon) return false;
-  return icon.startsWith('data:image/') || icon.startsWith('blob:') || icon.startsWith('/');
+  return !!icon && storedImageName(icon) === icon;
 }
 
 /**
  * Icon and name as one line — for lists that show both side by side
- * (trash). An image icon is a data URL and would appear as Base64 in front of the
+ * (trash). An image icon is a file name and would appear as text in front of the
  * name; in that case the row already carries its symbol in its own column.
  */
 export function iconTitle(icon: string, name: string): string {

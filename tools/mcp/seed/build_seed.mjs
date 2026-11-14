@@ -213,6 +213,13 @@ function columnsOf(db, table) {
 /** Which owner kind a table's rows are, for their block rows. */
 const BLOCK_OWNERS = { entries: 'entry', templates: 'template' };
 
+/** Since v102 tags are link rows: the table and owner column for a row's `tags` list. */
+const TAG_LINKS = {
+  entries: ['entry_tags', 'entry_id'],
+  templates: ['template_tags', 'template_id'],
+  images: ['image_tags', 'image_id'],
+};
+
 async function insertRows(db, table, rows, chipHtml, report, app = {}) {
   if (!rows?.length) return;
   const known = columnsOf(db, table);
@@ -220,6 +227,8 @@ async function insertRows(db, table, rows, chipHtml, report, app = {}) {
   // Since v66 a block stack is no column but rows of `blocks`.
   const owner = BLOCK_OWNERS[table];
   const asBlockRows = owner && !known.has('content') && typeof app.replaceOwnerBlocks === 'function';
+  const [linkTable, linkOwner] = TAG_LINKS[table] ?? [];
+  const asTagLinks = !!linkTable && !known.has('tags') && columnsOf(db, linkTable).size > 0;
   const now = new Date().toISOString();
   for (const row of rows) {
     const cols = [];
@@ -243,8 +252,15 @@ async function insertRows(db, table, rows, chipHtml, report, app = {}) {
       const plan = app.replaceOwnerBlocks({ kind: owner, id: row.id }, content, row.updated_at ?? now, { hasRows: false });
       for (const [query, params] of plan.statements) await db.execute(query, params ?? []);
     }
+    if (asTagLinks && row.tags) {
+      const tags = typeof row.tags === 'string' ? JSON.parse(row.tags) : row.tags;
+      for (const tag of new Set(tags)) {
+        await db.execute(`INSERT OR IGNORE INTO ${linkTable} (${linkOwner}, tag_id) SELECT $1, id FROM tags WHERE id = $2`, [row.id, tag]);
+      }
+    }
   }
   if (asBlockRows) dropped.delete('content');
+  if (asTagLinks) dropped.delete('tags');
   report.counts[table] = (report.counts[table] ?? 0) + rows.length;
   if (dropped.size) report.dropped[table] = [...dropped];
 }

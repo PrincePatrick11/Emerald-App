@@ -818,6 +818,7 @@
     "removeFromUses_other": "Affichée à {{count}} endroits – la retirer là aussi ?",
     "removeAndDelete": "Retirer et supprimer",
     "roles": {
+      "cover": "Image de couverture",
       "default": "Valeur par défaut du bloc",
       "drawing": "Dessin",
       "background": "Arrière-plan"

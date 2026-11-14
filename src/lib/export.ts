@@ -11,6 +11,7 @@ import { useTaskStore } from '../store/taskStore';
 import { useCategoryStore } from '../store/categoryStore';
 import { kindOfEntry } from '../store/dashboardStore';
 import { DEFAULT_ENTRY_EMOJI, entryIcon } from './modules';
+import { portableIcon } from './icons';
 import i18n from '../i18n';
 
 // ── helpers ────────────────────────────────────────────────────────────────
@@ -65,8 +66,10 @@ function stripImages(html: string): string {
 /**
  * Pre-resolve missing data-icon attributes on internal link spans.
  * TipTap only stores the icon at save-time; if it was null then, we fill it now.
+ * An uploaded icon is a file the export document cannot reach: it goes in as
+ * a data URL (`portableIcon`).
  */
-function resolveInternalLinkIcons(html: string): string {
+async function resolveInternalLinkIcons(html: string): Promise<string> {
   const doc = new DOMParser().parseFromString(html, 'text/html');
   const links = doc.querySelectorAll<HTMLElement>('span[data-type="internalLink"]');
   if (!links.length) return html;
@@ -94,6 +97,7 @@ function resolveInternalLinkIcons(html: string): string {
       const task = tasks.find(t => t.id === id);
       if (task) icon = categories.find(c => c.id === task.category_id)?.emoji ?? DEFAULT_ENTRY_EMOJI.task;
     }
+    icon = await portableIcon(icon);
     if (icon) el.setAttribute('data-icon', icon);
   }
 
@@ -319,7 +323,7 @@ const PRINT_CSS = `
 // shape as the Markdown / Emerald exports.
 
 export async function exportAsPDF(data: ExportData): Promise<void> {
-  const resolvedContent  = resolveInternalLinkIcons(data.content);
+  const resolvedContent  = await resolveInternalLinkIcons(data.content);
   const embeddedContent  = await embedImages(resolvedContent);
   // Pre-render the internal-link chips here, so the export document stays
   // script-free (see `transformInternalLinks`).

@@ -10,6 +10,7 @@ import DashboardItem, { CardContent, ItemGlyph, RENAME_INPUT_CLASS, RowContent }
 import RenameField from '../ui/RenameField';
 import CollapsibleGroupHeader from '../ui/CollapsibleGroupHeader';
 import { generateId } from '../../lib/helpers';
+import { imageSrc } from '../../lib/images';
 import { entryIcon, MODULES } from '../../lib/modules';
 import { displayTitle } from '../../lib/entryTitle';
 import { categoriesUsedBy, categoryLabel, hasUncategorized, lookupCategory } from '../../lib/categories';
@@ -398,7 +399,7 @@ export default function OperationsView() {
       // Cover image — read mode hero (deliberately after the title, unlike in the wiki)
       belowTitle={!isEditing && operation.cover_image && (
         <div className="flex-shrink-0 px-8 pt-5">
-          <img src={operation.cover_image} alt="" className="w-full max-h-48 object-cover rounded-lg border border-edge" />
+          <img src={imageSrc(operation.cover_image)} alt="" className="w-full max-h-48 object-cover rounded-lg border border-edge" />
         </div>
       )}
       tags={{ value: tags, onChange: (newTags) => { setTags(newTags); triggerAutoSave(); } }}

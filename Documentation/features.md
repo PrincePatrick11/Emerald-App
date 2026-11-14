@@ -83,7 +83,7 @@ The wiki stores reference articles about anything relevant to your practice: rit
 
 **Categories.** An article can belong to one category from the shared list — see [Categories](#categories) for how it works, including grouping and the category filter.
 
-**Icons.** A wiki article or operation takes its icon by one rule everywhere — Home, lists, the left list, link chips, exports: its own icon (an emoji or an image), else its category's emoji, else the module's default. Image icons from remote `http(s)` addresses are not rendered; only local images and embedded image data are.
+**Icons.** A wiki article or operation takes its icon by one rule everywhere — Home, lists, the left list, link chips, exports: its own icon (an emoji or an image), else its category's emoji, else the module's default. Image icons from remote `http(s)` addresses are not rendered; only uploaded icon files of the vault are.
 
 **Sort and date.** The wiki list sorts, and its timeline groups, by "last changed" — the date its rows show, as on Home and in the left list.
 
@@ -404,19 +404,22 @@ The Emerald format (`.emerald`) is a JSON file holding a full entry with all met
 
 ```json
 {
-  "version": "4",
+  "version": "5",
   "type": "journal | wiki | operations | template",
   "title": "…",
   "createdAt": "ISO 8601",
   "content": "HTML string",
-  "images": { "/absolute/path/to/image.png": "data:image/png;base64,…" },
+  "images": { "<stored name>.png": "data:image/png;base64,…" },
+  "icons": { "<stored name>.png": "data:image/png;base64,…" },
   "meta": { … }
 }
 ```
 
 **Entries.** On import, images are saved into the vault's image folder (an identical image is stored once) and go through the vault's image limits like inserted ones (an image that stays too large, or can't be scaled, is kept as it is). The content is sanitised, links are resolved by id and then by title, and tags are added to the vault. An entry keeps the file's `createdAt` as both creation and "last changed" date, so it lands at its place in the timeline — provided it is a readable date with a four-digit year; otherwise it is created now. Fields this version doesn't use are ignored.
 
-**Versions.** Entries and templates are written as `"version": "4"`, and only that version is read. A file of an earlier version is not imported — a notice says it comes from an older version and that a converter will follow — and one of a newer version asks for an update; nothing is changed either way. Earlier versions of Emerald refuse a version-4 file in turn.
+**Icons.** An uploaded icon of the entry or template travels in `meta.icon` as a picture, the icons of its custom blocks in `icons`; on import they are stored as icon files of the vault. An emoji stays an emoji.
+
+**Versions.** Entries and templates are written as `"version": "5"`, and only that version is read. A file of an earlier version is not imported — a notice says it comes from an older version and that a converter will follow — and one of a newer version asks for an update; nothing is changed either way. Earlier versions of Emerald refuse a version-5 file in turn.
 
 **Your own blocks.** An entry carries its copies of Blocks-view blocks in its content; the blocks themselves do not travel.
 
@@ -467,13 +470,13 @@ For the file structure and per-mode semantics, see [DB Backup / Restore (`.emera
 
 Images are written into the vault's own `images/` folder, named after a hash of their content, so the same picture added twice is stored once. Entries refer to them by filename alone, which keeps a vault folder portable.
 
-Wherever an image is added — the text, an image field, covers and icons, a canvas, an import — a photo that arrives as PNG (a photo pasted from the clipboard, for instance) is stored as JPEG at full size, with no visible difference and about a fifth of the space. Screenshots, graphics and anything with transparency stay PNG. Settings → Entries → Images can switch this off and set a largest edge length and file size for inserted images. Backups and sigil drawings are stored as they are. An image chosen as an icon — of an entry, a template, a block or a language — is in addition shrunk to icon size (64px, 128px for an altar).
+Wherever an image is added — the text, an image field, covers, a canvas, an import — a photo that arrives as PNG (a photo pasted from the clipboard, for instance) is stored as JPEG at full size, with no visible difference and about a fifth of the space. Screenshots, graphics and anything with transparency stay PNG. Settings → Entries → Images can switch this off and set a largest edge length and file size for inserted images. Backups and sigil drawings are stored as they are. An image chosen as an icon — of an entry, a template, a block or a language — is shrunk to 128px instead, sharp on high-resolution screens, and kept apart from the pictures: it does not appear in "Images". A cover image is a picture like any other and appears there, with its entry as the place that uses it.
 
 A picture taken into [Images](#images) is never unused, wherever it appears. Nothing deletes an image automatically. **Settings → Storage → Unused images** scans on demand: *Scan* reports how many images nothing points at and how much space they take, *Remove* deletes exactly those. It is manual on purpose — an image just inserted but not yet saved would otherwise look unused.
 
 ## Image Upload Validation
 
-Every image upload accepts only **PNG**, **JPEG**, **GIF**, **WebP** and **SVG**; anything else is rejected before processing. This covers icons and cover images of articles and operations; template and block icons; and images inserted into the editor via the toolbar, paste, or drag-and-drop from the file manager. Icons (of entries, templates and blocks) refuse SVG on top of that.
+Every image upload accepts only **PNG**, **JPEG**, **GIF**, **WebP** and **SVG**; anything else is rejected before processing. This covers icons and cover images of articles and operations; template and block icons; and images inserted into the editor via the toolbar, paste, or drag-and-drop from the file manager. Icons (of entries, templates, blocks and languages) refuse SVG on top of that, also when they arrive in a backup or an `.emerald` file.
 
 A rejected file from a file picker shows an inline error near the control, cleared after 2.5 seconds. When every file dragged into the editor has an unsupported format, a dialog lists the allowed formats instead of silently ignoring the drop.
 

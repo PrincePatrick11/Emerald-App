@@ -7,6 +7,7 @@ import { collectUsedImageFilenames, storedImageName } from '../lib/schema';
 import type Database from '../lib/sqlite';
 import { collectImageUses, type ImageUse } from '../lib/imageUsage';
 import { serialKey, serialized } from '../lib/serialize';
+import { readTagLinks, readTags, tagStatements } from '../lib/tagRefs';
 import type { VaultImage } from '../types';
 
 /** What a row lets one change; the file stays what it is. */
@@ -62,8 +63,9 @@ export const useImageStore = create<ImageState>((set, get) => ({
 
   fetchImages: async () => {
     const db = await getDb();
-    const rows = await db.select<DbRow[]>('SELECT * FROM images');
-    const live = rows.filter((r) => r.deleted_at == null).map(fromRow.image).sort(byName);
+    const [rows, tags] = await Promise.all([db.select<DbRow[]>('SELECT * FROM images'), readTagLinks(db, 'image')]);
+    const live = rows.filter((r) => r.deleted_at == null)
+      .map((r) => fromRow.image({ ...r, tags: tags.get(String(r.id)) ?? [] })).sort(byName);
     const trashedFiles = new Set(rows.filter((r) => r.deleted_at != null).map((r) => String(r.file)));
     set({ images: live, trashedFiles, loaded: true });
     await get().refreshFiles();
@@ -113,10 +115,13 @@ export const useImageStore = create<ImageState>((set, get) => ({
       created_at: at,
       updated_at: at,
     };
-    await db.execute(
-      'INSERT INTO images (id, file, name, note, tags, created_at, updated_at) VALUES ($1,$2,$3,$4,$5,$6,$7)',
-      [image.id, image.file, image.name, image.note, JSON.stringify(image.tags), at, at],
-    );
+    await db.batch([
+      [
+        'INSERT INTO images (id, file, name, note, created_at, updated_at) VALUES ($1,$2,$3,$4,$5,$6)',
+        [image.id, image.file, image.name, image.note, at, at],
+      ],
+      ...tagStatements('image', image.id, image.tags),
+    ]);
     set((s) => ({ images: [...s.images, image].sort(byName) }));
     return image;
   },
@@ -138,10 +143,13 @@ export const useImageStore = create<ImageState>((set, get) => ({
     if (!image) return;
     const updated: VaultImage = { ...image, ...patch, updated_at: nowIso() };
     const db = await getDb();
-    await db.execute(
-      'UPDATE images SET name=$1, note=$2, tags=$3, updated_at=$4 WHERE id=$5',
-      [updated.name, updated.note, JSON.stringify(updated.tags), updated.updated_at, id],
-    );
+    await db.batch([
+      [
+        'UPDATE images SET name=$1, note=$2, updated_at=$3 WHERE id=$4',
+        [updated.name, updated.note, updated.updated_at, id],
+      ],
+      ...(patch.tags !== undefined ? tagStatements('image', id, updated.tags) : []),
+    ]);
     set((s) => ({ images: s.images.map((i) => (i.id === id ? updated : i)).sort(byName) }));
   }),
 
@@ -162,7 +170,7 @@ export const useImageStore = create<ImageState>((set, get) => ({
     await db.execute('UPDATE images SET deleted_at=NULL WHERE id=$1', [id]);
     const [row] = await db.select<DbRow[]>('SELECT * FROM images WHERE id=$1', [id]);
     if (!row) return;
-    const image = fromRow.image(row);
+    const image = fromRow.image({ ...row, tags: await readTags(db, 'image', id) });
     set((s) => ({
       images: [...s.images.filter((i) => i.id !== id), image].sort(byName),
       trashedFiles: new Set([...s.trashedFiles].filter((f) => f !== image.file)),

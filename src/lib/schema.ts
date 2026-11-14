@@ -11,17 +11,18 @@ import type Database from './sqlite';
 /**
  * The oldest schema this version opens. Everything below came out of the old
  * migration chain (v1–v66), which is gone: such a vault is recognised and
- * refused, not changed (`VAULT_OUTDATED` in `db.ts`). So is v100, the first
- * fresh schema, which still told entries apart by a type: it was never released.
+ * refused, not changed (`VAULT_OUTDATED` in `db.ts`). So are v100, the first
+ * fresh schema, which still told entries apart by a type, and v101, which kept
+ * tags as JSON and icons as data URLs in the rows: neither was released.
  */
-export const FRESH_START_VERSION = 101;
+export const FRESH_START_VERSION = 102;
 
 /**
  * What a fresh vault is stamped with. Equals the last step in `MIGRATIONS`
  * (`FRESH_START_VERSION` while there is none); `db.ts` checks this at startup
  * so that a new migration step cannot be forgotten.
  */
-export const BASELINE_VERSION = 101;
+export const BASELINE_VERSION = 102;
 
 /**
  * Tables in dependency order: parents before children.
@@ -42,12 +43,15 @@ export const TABLES = [
   'entries',
   'blocks',
   'block_refs',
+  'entry_tags',
+  'template_tags',
   'tasks',
   'task_links',
   'languages',
   'lexicon_entries',
   'symbols',
   'images',
+  'image_tags',
 ] as const;
 
 export type TableName = (typeof TABLES)[number];
@@ -60,8 +64,9 @@ export const TABLE_DDL: Record<TableName, string> = {
       applied_at TEXT NOT NULL
     )`,
 
-  // Entries and templates carry tag IDs as JSON (`lib/tagRefs.ts`). A tag in
-  // the trash stays in their lists.
+  // Entries, templates and pictures carry tags through `entry_tags`,
+  // `template_tags` and `image_tags` (`lib/tagRefs.ts`). A tag in the trash
+  // stays linked; deleted for good, its links go with it (CASCADE).
   tags: `
     CREATE TABLE tags (
       id TEXT PRIMARY KEY,
@@ -142,7 +147,6 @@ export const TABLE_DDL: Record<TableName, string> = {
       name TEXT NOT NULL,
       icon TEXT NOT NULL DEFAULT '📄',
       title TEXT NOT NULL DEFAULT '',
-      tags TEXT NOT NULL DEFAULT '[]',
       sort_order INTEGER NOT NULL DEFAULT 0,
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL,
@@ -157,6 +161,9 @@ export const TABLE_DDL: Record<TableName, string> = {
   //   (`idx_entries_number`).
   // - The moon phase of an entry of the category Journal follows from
   //   `created_at` (`entryMoonPhase`), it is not a column.
+  // - `icon`: an emoji, or the stored name of a file in `icons/` (`ICON_FIELDS`).
+  // - `cover_image`: the stored name of a picture in `images/` (`IMAGE_FIELDS`).
+  // - Tags in `entry_tags`.
   entries: `
     CREATE TABLE entries (
       id TEXT PRIMARY KEY,
@@ -165,7 +172,6 @@ export const TABLE_DDL: Record<TableName, string> = {
       entry_number INTEGER,
       icon TEXT,
       cover_image TEXT,
-      tags TEXT NOT NULL DEFAULT '[]',
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL,
       deleted_at TEXT
@@ -203,18 +209,35 @@ export const TABLE_DDL: Record<TableName, string> = {
       UNIQUE (template_id, id)
     )`,
 
-  // What a block points at: an entry by ID or a picture by its
+  // What a block points at: an entry by ID, a picture or an icon by its
   // stored file name, with the role it plays there (`lib/blocks/blockRefs.ts`).
   // Rewritten whenever its block is written; gone with it. Not `WITHOUT ROWID`:
   // re-encrypting a vault renames pictures in every table by `rowid`
-  // (`rewrite_tables` in `reencrypt.rs`).
+  // (`rewrite_database` in `reencrypt.rs`).
   block_refs: `
     CREATE TABLE block_refs (
       block_row INTEGER NOT NULL REFERENCES blocks(row_id) ON DELETE CASCADE,
-      target_kind TEXT NOT NULL CHECK (target_kind IN ('entry', 'image')),
+      target_kind TEXT NOT NULL CHECK (target_kind IN ('entry', 'image', 'icon')),
       target TEXT NOT NULL,
-      role TEXT NOT NULL CHECK (role IN ('content', 'render', 'layer', 'background', 'default')),
+      role TEXT NOT NULL CHECK (role IN ('content', 'render', 'layer', 'background', 'default', 'icon')),
       PRIMARY KEY (block_row, target_kind, target, role)
+    )`,
+
+  // The tags of an entry, a template and a picture: one row per tag, in the
+  // order they were given (`rowid`, `lib/tagRefs.ts`). Gone with their owner
+  // and with the tag (CASCADE). Not `WITHOUT ROWID`, like `block_refs`.
+  entry_tags: `
+    CREATE TABLE entry_tags (
+      entry_id TEXT NOT NULL REFERENCES entries(id) ON DELETE CASCADE,
+      tag_id TEXT NOT NULL REFERENCES tags(id) ON DELETE CASCADE,
+      PRIMARY KEY (entry_id, tag_id)
+    )`,
+
+  template_tags: `
+    CREATE TABLE template_tags (
+      template_id TEXT NOT NULL REFERENCES templates(id) ON DELETE CASCADE,
+      tag_id TEXT NOT NULL REFERENCES tags(id) ON DELETE CASCADE,
+      PRIMARY KEY (template_id, tag_id)
     )`,
 
   tasks: `
@@ -294,7 +317,7 @@ export const TABLE_DDL: Record<TableName, string> = {
 
   // The vault's images as a place of their own, like tags and categories:
   // a row gives a stored file (`storedImageName`) a name, tags
-  // (IDs as JSON, `lib/tagRefs.ts`) and a note. A file without a row is
+  // (`image_tags`) and a note. A file without a row is
   // listed too, unnamed, where something shows it; a row keeps its file from the cleanup.
   // `detached` (JSON) holds, while the picture is in the trash, the texts it
   // was taken out of, so that restoring it puts it back there.
@@ -304,11 +327,17 @@ export const TABLE_DDL: Record<TableName, string> = {
       file TEXT NOT NULL UNIQUE,
       name TEXT NOT NULL DEFAULT '',
       note TEXT NOT NULL DEFAULT '',
-      tags TEXT NOT NULL DEFAULT '[]',
       detached TEXT NOT NULL DEFAULT '[]',
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL,
       deleted_at TEXT
+    )`,
+
+  image_tags: `
+    CREATE TABLE image_tags (
+      image_id TEXT NOT NULL REFERENCES images(id) ON DELETE CASCADE,
+      tag_id TEXT NOT NULL REFERENCES tags(id) ON DELETE CASCADE,
+      PRIMARY KEY (image_id, tag_id)
     )`,
 };
 
@@ -317,20 +346,15 @@ export const TABLE_DDL: Record<TableName, string> = {
  * unique (it allows any number of NULLs).
  *
  * `idx_entries_list` carries every column that the lists read at startup
- * (`fetchEntries`, first stage), and the tags (`rewriteTagRefs` on open):
- * without it SQLite would read the overflow pages of rows made long by icons
- * and covers as data URLs — and SQLCipher decrypt almost the whole file for
- * it. `deleted_at` leads, so it also serves the range scan of
- * `runPeriodicCleanup`. Icon and cover image are deliberately missing: they can be
- * data URLs. The few entries that carry one are found by the partial index
- * `idx_entries_decorated` — a query uses it only with exactly this
- * condition in its WHERE.
+ * (`fetchEntries`, first stage): without it SQLite would read the table, and
+ * SQLCipher decrypt every page of it. `deleted_at` leads, so it also serves
+ * the range scan of `runPeriodicCleanup`. Icon and cover image are in it: both
+ * hold a short stored file name, never a data URL.
  */
 const ENTRIES_INDEX_DDL: readonly string[] = [
   'CREATE INDEX idx_entries_category ON entries(category_id)',
   'CREATE UNIQUE INDEX idx_entries_number ON entries(entry_number)',
-  'CREATE INDEX idx_entries_list ON entries(deleted_at, title, category_id, entry_number, tags, created_at, updated_at, id)',
-  'CREATE INDEX idx_entries_decorated ON entries(deleted_at) WHERE icon IS NOT NULL OR cover_image IS NOT NULL',
+  'CREATE INDEX idx_entries_list ON entries(deleted_at, title, category_id, entry_number, icon, cover_image, created_at, updated_at, id)',
 ];
 
 /**
@@ -353,6 +377,11 @@ export const INDEX_DDL: readonly string[] = [
   'CREATE INDEX idx_blocks_entry ON blocks(entry_id, position)',
   'CREATE INDEX idx_blocks_template ON blocks(template_id, position)',
   'CREATE INDEX idx_block_refs_target ON block_refs(target_kind, target)',
+  // The other side of the tag links: what carries a tag (`TagsView`, a
+  // dashboard filter by tag, merging tags).
+  'CREATE INDEX idx_entry_tags_tag ON entry_tags(tag_id)',
+  'CREATE INDEX idx_template_tags_tag ON template_tags(tag_id)',
+  'CREATE INDEX idx_image_tags_tag ON image_tags(tag_id)',
 ];
 
 
@@ -511,8 +540,8 @@ export interface Orphan {
 
 /**
  * Checks the relationships for which no foreign key can be declared: the
- * polymorphic `task_links`, the category IDs in the dashboards' filters and
- * the tag IDs in entries and templates. Foreign keys cover the rest, which
+ * polymorphic `task_links` and the category and tag IDs in the dashboards'
+ * filters. Foreign keys cover the rest — the tag links too —, which
  * `PRAGMA foreign_key_check` checks.
  *
  * Intended only for verification and diagnosis, not for the production path —
@@ -544,8 +573,10 @@ export async function checkIntegrity(db: Database): Promise<Orphan[]> {
     return new Set(rows.map((r) => r.id));
   };
 
-  // Category IDs in the dashboards' filters.
+  // Category and tag IDs in the dashboards' filters, the trash included: an
+  // ID without a row points nowhere.
   const categoryIds = await idsOf('categories');
+  const tagIds = await idsOf('tags');
   const dashboards = await db.select<{ id: string; filter: string | null }[]>('SELECT id, filter FROM dashboards');
   for (const r of dashboards) {
     const filter = rawFilter(r.filter);
@@ -558,32 +589,14 @@ export async function checkIntegrity(db: Database): Promise<Orphan[]> {
         orphans.push({ table: 'dashboards', column: 'filter', id: r.id, missingTarget: `categories.${category}` });
       }
     }
-  }
-
-  // Tag IDs, including those in the trash: an ID without a row in `tags` points nowhere.
-  const tagIds = await idsOf('tags');
-  for (const table of ['entries', 'templates'] as const) {
-    const rows = await db.select<{ id: string; tags: string }[]>(`SELECT id, tags FROM ${table} WHERE tags != '[]'`);
-    for (const r of rows) {
-      for (const tag of rawJsonList(r.tags) ?? []) {
-        if (typeof tag !== 'string' || !tagIds.has(tag)) {
-          orphans.push({ table, column: 'tags', id: r.id, missingTarget: `tags.${String(tag)}` });
-        }
+    for (const tag of filterIds(filter, 'tags')) {
+      if (!tagIds.has(tag)) {
+        orphans.push({ table: 'dashboards', column: 'filter', id: r.id, missingTarget: `tags.${tag}` });
       }
     }
   }
 
   return orphans;
-}
-
-/** A JSON array from a column — `null` if it is not one. */
-function rawJsonList(json: string | null): unknown[] | null {
-  try {
-    const parsed: unknown = JSON.parse(json ?? '[]');
-    return Array.isArray(parsed) ? parsed : null;
-  } catch {
-    return null;
-  }
 }
 
 /** The raw `filter` JSON of a dashboard row as an object — `null` if it is not one. */
@@ -601,8 +614,32 @@ function rawFilter(json: string | null): Record<string, unknown> | null {
  * in `lib/dashboards.ts`, which this file does not import.
  */
 function filterCategories(filter: Record<string, unknown>): string[] {
-  const categories = filter.categories;
-  return Array.isArray(categories) ? categories.filter((c): c is string => typeof c === 'string') : [];
+  return filterIds(filter, 'categories');
+}
+
+/** The IDs of one list of a raw filter (`categories`, `tags`). */
+function filterIds(filter: Record<string, unknown>, key: 'categories' | 'tags'): string[] {
+  const ids = filter[key];
+  return Array.isArray(ids) ? ids.filter((c): c is string => typeof c === 'string') : [];
+}
+
+/**
+ * Drops tags that are gone for good from every dashboard's filter, the trash
+ * included — the counterpart of `replaceCategoryInDashboards` for tags. A
+ * merged tag is replaced by the one it merged into (`to`).
+ */
+export async function replaceTagsInDashboards(db: Database, from: Iterable<string>, to: string | null = null): Promise<void> {
+  const gone = new Set(from);
+  if (!gone.size) return;
+  const rows = await db.select<{ id: string; filter: string | null }[]>('SELECT id, filter FROM dashboards');
+  for (const row of rows) {
+    const filter = rawFilter(row.filter);
+    if (!filter || !Array.isArray(filter.tags)) continue;
+    const tags = filterIds(filter, 'tags');
+    if (!tags.some((t) => gone.has(t))) continue;
+    const next = [...new Set(tags.map((t) => (gone.has(t) ? to : t)).filter((t): t is string => t !== null))];
+    await db.execute('UPDATE dashboards SET filter=$1 WHERE id=$2', [JSON.stringify({ ...filter, tags: next }), row.id]);
+  }
 }
 
 /**
@@ -631,40 +668,67 @@ async function replaceCategoryInDashboards(db: Database, from: string, to: strin
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
- * The columns of a row in which an image can be referenced, besides the
- * blocks (read through `block_refs` and the rows of `blocks`). Three kinds,
- * because they have to be treated differently:
+ * The columns of a row in which a picture of `images/` can be referenced,
+ * besides the blocks (read through `block_refs` and the rows of `blocks`). Two
+ * kinds, because they are rewritten differently on import:
  *
- * - `html` — the reference sits in a `src` attribute. Is rewritten.
- * - `plain` — the column *is* the reference. Is rewritten.
- * - `legacy` — the column today holds a data URL. Is **read**, but never
- *   rewritten.
+ * - `html` — the reference sits in a `src` attribute.
+ * - `plain` — the column *is* the reference.
  *
- * Today only `legacy` holds columns; `html` and `plain` stay for an image
- * column of the future (see "Rules for Future Schema Changes" in `database.md`).
- *
- * The `legacy` group is the reason why this list has to be complete
- * and not name only the rewritable columns. `collectUsedImageFilenames`
- * decides which file the cleanup action may delete; a column that is
- * missing here would be a reference nobody sees. Data URLs do not
- * interfere — they contain no 64 hex characters with an image extension and fall
- * through by themselves.
- *
- * They are still not rewritten, and that is intentional:
- * `entries.icon` and `cover_image` are written by
- * `MediaPropertyRow` (icons as in `Favicon` via `readIconFile`) as a data URL
- * through `FileReader`, and their renderers
- * check with `isImageIcon` for `data:` / `blob:` / `/`. A file name would
- * fall through there as text (see the Base64 note in `database.md`).
+ * The list has to be complete: `collectUsedImageFilenames` decides which file
+ * the cleanup action may delete, and a column missing here would be a
+ * reference nobody sees. Icons are not pictures of `images/`: their columns
+ * are in `ICON_FIELDS`.
  */
 export const IMAGE_FIELDS: {
   table: string;
   html: string[];
   plain: string[];
-  legacy: string[];
 }[] = [
-  { table: 'entries', html: [], plain: [], legacy: ['icon', 'cover_image'] },
+  { table: 'entries', html: [], plain: ['cover_image'] },
 ];
+
+/**
+ * The columns that hold an icon: an emoji, or the stored name of a file in the
+ * vault's `icons/` folder (`lib/icons.ts`) — never a data URL. A custom
+ * block's copies carry its icon in `blocks.config` and name it in
+ * `block_refs` (`target_kind` 'icon'). `collectUsedIconFilenames` and the
+ * backup read exactly these.
+ */
+export const ICON_FIELDS: readonly { table: string; column: string }[] = [
+  { table: 'entries', column: 'icon' },
+  { table: 'templates', column: 'icon' },
+  { table: 'block_definitions', column: 'icon' },
+  { table: 'languages', column: 'icon' },
+  { table: 'dashboards', column: 'icon' },
+];
+
+/**
+ * All icon file names this vault references — the trash included, like
+ * `collectUsedImageFilenames`: the icon columns, every icon a block names
+ * (`block_refs`), and every stored name anywhere in a block's row or a
+ * template draft's copy, so that a block `blockRefs` cannot read keeps its
+ * icon. Pictures of `images/` that match by chance only make the set larger.
+ */
+export async function collectUsedIconFilenames(db: Database): Promise<Set<string>> {
+  const used = new Set<string>();
+  for (const { table, column } of ICON_FIELDS) {
+    const rows = await db.select<{ icon: string | null }[]>(`SELECT ${column} AS icon FROM ${table}`);
+    for (const { icon } of rows) {
+      const name = storedImageName(icon);
+      if (name) used.add(name);
+    }
+  }
+  const refs = await db.select<{ target: string }[]>("SELECT DISTINCT target FROM block_refs WHERE target_kind = 'icon'");
+  for (const { target } of refs) used.add(target);
+  const blockRows = await db.select<{ config: string | null; attrs: string | null }[]>('SELECT config, attrs FROM blocks');
+  for (const row of blockRows) {
+    for (const value of Object.values(row)) {
+      for (const match of (value ?? '').matchAll(IMAGE_NAME_RE)) used.add(match[0]);
+    }
+  }
+  return used;
+}
 
 /**
  * Mirrors `is_valid_image_name` in `src-tauri/src/images.rs`: a stored
@@ -698,13 +762,13 @@ export function storedImageName(ref: string | null | undefined): string | null {
 /**
  * All columns of a table that can hold an image reference.
  *
- * For everything that does not need to distinguish between the three groups — the
+ * For everything that does not need to distinguish between the two groups — the
  * backup export and both import modes simply want "every column in which an
  * image can be".
  */
 export function imageColumns(table: string): string[] {
   const entry = IMAGE_FIELDS.find((f) => f.table === table);
-  return entry ? [...entry.html, ...entry.plain, ...entry.legacy] : [];
+  return entry ? [...entry.html, ...entry.plain] : [];
 }
 
 /**
@@ -731,8 +795,8 @@ export async function collectUsedImageFilenames(db: Database): Promise<Set<strin
     }
   }
 
-  for (const { table, html, plain, legacy } of IMAGE_FIELDS) {
-    const columns = [...html, ...plain, ...legacy];
+  for (const { table, html, plain } of IMAGE_FIELDS) {
+    const columns = [...html, ...plain];
     if (!columns.length) continue;
     const rows = await db.select<Record<string, string | null>[]>(
       `SELECT ${columns.join(', ')} FROM ${table}`
@@ -741,9 +805,6 @@ export async function collectUsedImageFilenames(db: Database): Promise<Set<strin
       for (const column of columns) {
         const value = row[column];
         if (!value) continue;
-        // A data URL contains no 64 hex characters with an image extension and
-        // falls through by itself — which is why the `legacy` columns may run
-        // along here without special handling.
         for (const match of value.matchAll(IMAGE_NAME_RE)) used.add(match[0]);
       }
     }

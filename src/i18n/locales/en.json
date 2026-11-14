@@ -818,6 +818,7 @@
     "removeFromUses_other": "Shown in {{count}} places – take it out there too?",
     "removeAndDelete": "Take out and delete",
     "roles": {
+      "cover": "Cover image",
       "default": "Block default",
       "drawing": "Drawing",
       "background": "Background"

@@ -1,6 +1,7 @@
 import { invoke } from '@tauri-apps/api/core';
 import { todayIso, withoutConcealed } from './blocks/sigil';
 import { readImageAsBase64, rewriteImageRefs, saveImage, storedImageName } from './images';
+import { importedIcon, isImageDataUrl, portableIcon, readIconAsBase64, storeIconDataUrl } from './icons';
 import { storedImageNamesIn } from './schema';
 import { parseBlocks } from './blocks/blockHtml';
 import { blockRefs } from './blocks/blockRefs';
@@ -106,14 +107,15 @@ function resolveImportedTarget(
 // ── File format ──────────────────────────────────────────────────────────────
 
 /**
- * The format of a `.emerald` file. '4' is the first since the fresh start of
- * the schema (`FRESH_START_VERSION` in `schema.ts`), for entries and templates
- * alike (`type` tells them apart). Only this version is read: an older file
- * ('1' to '3') comes from before the fresh start and is refused with a notice —
- * its converters are gone with the old migration chain; a newer one is
- * refused too, since this build cannot know what it carries.
+ * The format of a `.emerald` file, for entries and templates alike (`type`
+ * tells them apart). '5' names icons by file: `meta.icon` carries an uploaded
+ * icon as a data URL, and the icons of block copies travel in `icons`. Only
+ * this version is read: an older file ('1' to '3' from before the fresh start
+ * of the schema, '4' with icons as data URLs inside the blocks) is refused
+ * with a notice; a newer one is refused too, since this build cannot know
+ * what it carries.
  */
-const EMERALD_VERSION = '4';
+const EMERALD_VERSION = '5';
 
 interface EmeraldFile {
   version: typeof EMERALD_VERSION;
@@ -122,6 +124,11 @@ interface EmeraldFile {
   createdAt: string;
   content: string;
   images: Record<string, string>;  // stored file name → data-URL
+  /**
+   * The icon files the content's block copies name (a custom block's icon),
+   * stored name → data-URL. Optional: a file without it simply has none.
+   */
+  icons?: Record<string, string>;
   meta: EmeraldMeta;
 }
 
@@ -136,7 +143,7 @@ interface EmeraldMeta {
    */
   categoryName?: string;
   categoryEmoji?: string;
-  /** wiki / operations entry icon, a template's icon (emoji or data-URL) */
+  /** The entry's or template's icon: an emoji, or an uploaded icon as a data-URL (the vault keeps it as a file in `icons/`). */
   icon?: string;
   tags?: string[];
   /**
@@ -208,7 +215,7 @@ export async function exportAsEmerald(): Promise<void> {
     // depends on the language and would create a new category elsewhere.
     categoryName: (cat?.is_builtin ? cat.name : categoryLabel(i18n.t, cat)) || undefined,
     categoryEmoji: cat?.emoji,
-    icon: entry.icon ?? undefined,
+    icon: (await portableIcon(entry.icon)) || undefined,
     tags: liveTagNames(entry.tags),
   };
 
@@ -222,8 +229,9 @@ export async function exportAsEmerald(): Promise<void> {
   meta.contentLinks = collectContentLinks(content);
 
   const images = await embedImages(content);
+  const icons = await embedIcons(content);
   await saveEmeraldFile({
-    version: EMERALD_VERSION, type, title, createdAt, content, images, meta,
+    version: EMERALD_VERSION, type, title, createdAt, content, images, icons, meta,
   });
 }
 
@@ -256,6 +264,18 @@ async function embedImages(content: string): Promise<Record<string, string>> {
   return images;
 }
 
+/** The icon files the block copies of the content name (`blockRefs`, kind `icon`), as Base64. */
+async function embedIcons(content: string): Promise<Record<string, string>> {
+  const icons: Record<string, string> = {};
+  const names = parseBlocks(content).flatMap(blockRefs).filter((ref) => ref.kind === 'icon').map((ref) => ref.target);
+  for (const name of new Set(names)) {
+    try {
+      icons[name] = await readIconAsBase64(name);
+    } catch { /* skip missing files */ }
+  }
+  return icons;
+}
+
 /**
  * A template as `.emerald`: block stack, images and link titles
  * as with an entry, plus icon, title of new entries and tags. The saved state is exported,
@@ -277,14 +297,14 @@ export async function buildTemplateEmeraldFile(templateId: string): Promise<Emer
   // As with the entry: a loaded, concealed sigil does not leave.
   const content = withoutConcealed(template.content, todayIso());
   const meta: EmeraldMeta = {
-    icon: template.icon,
+    icon: (await portableIcon(template.icon)) || undefined,
     tags: liveTagNames(template.tags),
     newEntryTitle: template.title,
     contentLinks: collectContentLinks(content),
   };
-  // An image icon is a data URL and is already in `meta.icon`.
   const images = await embedImages(content);
-  return { version: EMERALD_VERSION, type: 'template', title: template.name || 'Template', createdAt: template.created_at, content, images, meta };
+  const icons = await embedIcons(content);
+  return { version: EMERALD_VERSION, type: 'template', title: template.name || 'Template', createdAt: template.created_at, content, images, icons, meta };
 }
 
 // ── Import helpers ───────────────────────────────────────────────────────────
@@ -325,6 +345,24 @@ async function remapImages(content: string, images: Record<string, string>): Pro
   // the background): a stored name is a hash, so it is replaced wherever it stands.
   for (const [oldRef, file] of map) {
     if (oldRef !== file && storedImageName(oldRef) === oldRef) rewritten = rewritten.split(oldRef).join(file);
+  }
+  return rewritten;
+}
+
+/**
+ * Saves the icons of the file into this vault's `icons/` and renames them in
+ * the content (a block copy names its icon in its config JSON). A name is a
+ * hash, so it is replaced wherever it stands.
+ */
+async function remapIcons(content: string, icons: unknown): Promise<string> {
+  if (!icons || typeof icons !== 'object') return content;
+  let rewritten = content;
+  for (const [oldName, dataUrl] of Object.entries(icons as Record<string, unknown>)) {
+    if (storedImageName(oldName) !== oldName || !isImageDataUrl(dataUrl)) continue;
+    try {
+      const name = await storeIconDataUrl(dataUrl);
+      if (name !== oldName) rewritten = rewritten.split(oldName).join(name);
+    } catch { /* skip */ }
   }
   return rewritten;
 }
@@ -409,7 +447,7 @@ async function importedContent(
   items: SuggestionItem[],
 ): Promise<string> {
   const raw = typeof file.content === 'string' ? file.content : '';
-  const remapped = await remapImages(raw, file.images ?? {});
+  const remapped = await remapImages(await remapIcons(raw, file.icons), file.images ?? {});
   const relinked = remapImportedLinks(remapped, file.meta.contentLinks, items);
   return sanitizeImportedHtml(relinked);
 }
@@ -456,7 +494,7 @@ async function createImportedTemplate(file: EmeraldFile, content: string, tagIds
   const { meta } = file;
   const text = (v: unknown) => (typeof v === 'string' ? v : '');
   const created = await useTemplateStore.getState().createTemplate(text(file.title), {
-    icon: text(meta.icon) || undefined,
+    icon: await importedIcon(meta.icon),
     title: text(meta.newEntryTitle),
     content,
     tags: tagIds,
@@ -512,7 +550,7 @@ async function importEntryFile(file: EmeraldFile & { type: EntryFileType }, cont
     title: importedTitle(file),
     content,
     tags: tagIds,
-    icon: file.meta.icon ?? undefined,
+    icon: await importedIcon(file.meta.icon),
   }, importedStamp(createdAt));
   return entry.id;
 }

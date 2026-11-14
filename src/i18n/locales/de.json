@@ -818,6 +818,7 @@
     "removeFromUses_other": "An {{count}} Stellen eingebunden – dort auch entfernen?",
     "removeAndDelete": "Entfernen und löschen",
     "roles": {
+      "cover": "Titelbild",
       "default": "Block-Vorgabe",
       "drawing": "Zeichnung",
       "background": "Hintergrund"

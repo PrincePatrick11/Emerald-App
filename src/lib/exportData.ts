@@ -11,6 +11,7 @@ import { useSettingsStore } from '../store/settingsStore';
 import { displayTitle } from './entryTitle';
 import { categoryLabel } from './categories';
 import i18n from '../i18n';
+import { portableIcon } from './icons';
 
 export interface ChipData {
   id?: string;            // entry ID (for import resolution)
@@ -75,7 +76,8 @@ export async function collectExportData(): Promise<ExportData | null> {
     createdAt: entry.created_at,
     moonPhase: phase ? `${MOON_PHASE_SYMBOLS[phase]} ${moonLabel(phase)}` : undefined,
     category: cat && !phase ? { label: categoryLabel(i18n.t, cat), icon: cat.emoji } : undefined,
-    entryIcon: entry.icon || undefined,
+    // An uploaded icon as a data URL: the export document cannot reach the vault's files.
+    entryIcon: (await portableIcon(entry.icon)) || undefined,
     tagNames: liveTagNames(entry.tags),
   };
 }

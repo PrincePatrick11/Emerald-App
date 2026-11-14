@@ -37,6 +37,8 @@ pub enum Context<'a> {
     VaultKey,
     /// A stored image, by its filename.
     Image(&'a str),
+    /// A stored icon (`icons/`), by its filename.
+    Icon(&'a str),
     Drafts,
     Backup,
 }
@@ -47,6 +49,7 @@ impl Context<'_> {
         let (label, id): (&[u8], &[u8]) = match self {
             Context::VaultKey => (b"emerald/vault-key", b""),
             Context::Image(name) => (b"emerald/image", name.as_bytes()),
+            Context::Icon(name) => (b"emerald/icon", name.as_bytes()),
             Context::Drafts => (b"emerald/drafts", b""),
             Context::Backup => (b"emerald/backup", b""),
         };
@@ -171,6 +174,8 @@ mod tests {
         assert_eq!(open(&key, Context::Image("a.png"), &sealed).unwrap().as_slice(), b"pixels");
         // Swapped in under another name: does not open.
         assert_eq!(open(&key, Context::Image("b.png"), &sealed), Err(OpenError::Corrupt));
+        // An image does not open as an icon of the same name, nor the other way round.
+        assert_eq!(open(&key, Context::Icon("a.png"), &sealed), Err(OpenError::Corrupt));
     }
 
     #[test]

@@ -33,9 +33,10 @@ One format seals everything outside the database: images, `drafts.json`, backups
 "EMRC" | version (1 byte) | nonce (24 bytes) | XChaCha20-Poly1305 ciphertext + tag
 ```
 
-The nonce is random per seal. The header, a **context** (vault key, image, drafts, backup) and — for an image — its file name are bound as associated data. A blob sealed as one thing cannot be passed off as another, and an image cannot be swapped in under a different name: it fails to open. `crypto::is_sealed` tells a sealed file from a plain one by its magic bytes.
+The nonce is random per seal. The header, a **context** (vault key, image, icon, drafts, backup) and — for an image or an icon — its file name are bound as associated data. A blob sealed as one thing cannot be passed off as another, and an image cannot be swapped in under a different name: it fails to open. `crypto::is_sealed` tells a sealed file from a plain one by its magic bytes.
 
 - **Images** are sealed and named by a keyed hash (HMAC under the `ImageNames` subkey) instead of the SHA-256 of their bytes: the plain hash would let anyone holding a copy of a known picture confirm it is in the vault. The name stays 64 hex digits plus the extension, so nothing that reads names changes, and identical images still share one file. `images.rs` has two functions that touch image bytes, `store` and `load`. `load` returns an unsealed file as it is, and opens a sealed one only with the vault's key.
+- **Icons** (`icons/`) are sealed and named the same way, under the context `Icon`: an icon does not open as an image, nor an image as an icon, so a file moved between the two folders fails to open.
 - **`drafts.json`** is sealed under the `Files` subkey; a plain one written before the vault was encrypted is still read.
 - **`settings.json` stays plaintext.** It holds appearance (with the names and colours of imported themes) and limits, no entry content, and the boot path reads it before any vault is unlocked.
 
@@ -78,9 +79,9 @@ Leaving a vault locks it (`vault_lock`): its key does not stay in memory while a
 
 Nothing in the vault is touched until a complete, checked copy under the new key sits next to it:
 
-1. **Prepare.** `vault.key.pending`; the database exported into `emerald.db.reencrypting` with `sqlcipher_export`; every image sealed under its new keyed name into `images.reencrypting/`; every image name inside the copy rewritten; `drafts.json.reencrypting`. Image names are rewritten in every text column of every table — a name is 64 hex digits plus an image extension, unique enough that no schema knowledge is needed. The copy is then verified: `integrity_check` and the same row count in every table as the original.
-2. **Commit.** The marker `vault.reencrypting` is written, naming the new key by its `check` value and the images to keep. Then database, `vault.key`, drafts and images are swapped in.
-3. **Clean up.** The old database, the import staging copy, any `emerald.db.pre-vNN.bak` an earlier version's migrations left (a vault from before the fresh start can still be recovered before it is refused) and every image not named in the marker are deleted, then the marker.
+1. **Prepare.** `vault.key.pending`; the database exported into `emerald.db.reencrypting` with `sqlcipher_export`; every image sealed under its new keyed name into `images.reencrypting/`, every icon likewise into `icons.reencrypting/` (under the icons' own sealing context); every image and icon name inside the copy rewritten; `drafts.json.reencrypting`. Image names are rewritten in every text column of every table — a name is 64 hex digits plus an image extension, unique enough that no schema knowledge is needed. The copy is then verified: `integrity_check` and the same row count in every table as the original.
+2. **Commit.** The marker `vault.reencrypting` is written, naming the new key by its `check` value and the images and icons to keep (`keep`, `keep_icons`; a marker without `keep_icons` leaves `icons/` alone). Then database, `vault.key`, drafts, images and icons are swapped in.
+3. **Clean up.** The old database, the import staging copy, any `emerald.db.pre-vNN.bak` an earlier version's migrations left (a vault from before the fresh start can still be recovered before it is refused) and every image or icon not named in the marker are deleted, then the marker.
 
 The same run from a plain folder (`encrypt_dir`) exists only for debug builds' `dev_seed` and the tests; the app has no command that encrypts a user's plain vault.
 

@@ -10,7 +10,7 @@
  */
 import { useEntryStore } from './entryStore';
 import { useTaskStore } from './taskStore';
-import { useTagStore, type TaggedType } from './tagStore';
+import { useTagStore } from './tagStore';
 import { useCategoryStore } from './categoryStore';
 import { useDashboardStore } from './dashboardStore';
 import { useBlockDefinitionStore } from './blockDefinitionStore';
@@ -38,29 +38,20 @@ export const moduleWiring: Record<EntryModuleId, { reload: (options?: ReloadOpti
   wiki: { reload: reloadEntries },
 };
 
-/**
- * After restoring: IDs of tags that no longer exist are dropped
- * (`dropUnknownTagIds`) — for everything that carries tags.
- */
-async function withLiveTags(type: TaggedType, id: string, restored: Promise<void>): Promise<void> {
-  await restored;
-  await useTagStore.getState().dropUnknownTagIds(type, id);
-}
-
 export const trashWiring: Record<TrashKind, {
   restore: (id: string) => Promise<void>;
   permanentlyDelete: (id: string) => Promise<void>;
 }> = {
   journal: {
-    restore: (id) => withLiveTags('entry', id, useEntryStore.getState().restoreEntry(id)),
+    restore: (id) => useEntryStore.getState().restoreEntry(id),
     permanentlyDelete: (id) => useEntryStore.getState().permanentlyDeleteEntry(id),
   },
   wiki: {
-    restore: (id) => withLiveTags('entry', id, useEntryStore.getState().restoreEntry(id)),
+    restore: (id) => useEntryStore.getState().restoreEntry(id),
     permanentlyDelete: (id) => useEntryStore.getState().permanentlyDeleteEntry(id),
   },
   operation: {
-    restore: (id) => withLiveTags('entry', id, useEntryStore.getState().restoreEntry(id)),
+    restore: (id) => useEntryStore.getState().restoreEntry(id),
     permanentlyDelete: (id) => useEntryStore.getState().permanentlyDeleteEntry(id),
   },
   category: {
@@ -80,7 +71,7 @@ export const trashWiring: Record<TrashKind, {
     permanentlyDelete: (id) => useBlockDefinitionStore.getState().permanentlyDeleteDefinition(id),
   },
   template: {
-    restore: (id) => withLiveTags('template', id, useTemplateStore.getState().restoreTemplate(id)),
+    restore: (id) => useTemplateStore.getState().restoreTemplate(id),
     permanentlyDelete: (id) => useTemplateStore.getState().permanentlyDeleteTemplate(id),
   },
   language: {

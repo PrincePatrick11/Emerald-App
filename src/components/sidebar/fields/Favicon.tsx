@@ -2,6 +2,7 @@ import { useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ImagePlus, Smile, X } from 'lucide-react';
 import { ACCEPTED_IMAGE_MIME, isImageIcon } from '../../../lib/helpers';
+import { iconSrc } from '../../../lib/icons';
 import EmojiPicker from '../../ui/EmojiPicker';
 import { readIconFile } from '../../../lib/imageLimits';
 import { reportImageError } from '../../../store/imageNoticeStore';
@@ -21,7 +22,7 @@ export function FaviconGlyph({ value, className = 'w-5 h-5 text-base' }: {
 }) {
   if (!value) return null;
   return isImageIcon(value) ? (
-    <img src={value} alt="" className={`${className} object-contain rounded-md border border-edge flex-shrink-0`} />
+    <img src={iconSrc(value)} alt="" className={`${className} object-contain rounded-md border border-edge flex-shrink-0`} />
   ) : (
     <span className={`${className} leading-none flex items-center justify-center flex-shrink-0`}>{value}</span>
   );

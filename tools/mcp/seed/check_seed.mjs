@@ -70,8 +70,11 @@ if (tables.includes('images')) {
   const pictures = one("SELECT COUNT(*) AS n FROM images WHERE deleted_at IS NULL").n;
   check('Images has pictures', pictures >= 3, `${pictures}`);
   check('Images has a trashed picture', one("SELECT COUNT(*) AS n FROM images WHERE deleted_at IS NOT NULL").n >= 1);
-  check('some pictures carry the tag Altar Library',
-    one("SELECT COUNT(*) AS n FROM images WHERE tags LIKE '%\"altar-library\"%'").n >= 2);
+  // Since v102 a picture's tags are rows of `image_tags`.
+  const linked = tables.includes('image_tags');
+  check('some pictures carry the tag Altar Library', linked
+    ? one("SELECT COUNT(*) AS n FROM image_tags WHERE tag_id = 'altar-library'").n >= 2
+    : one("SELECT COUNT(*) AS n FROM images WHERE tags LIKE '%\"altar-library\"%'").n >= 2);
   check('every picture names a stored file', q('SELECT file FROM images').every((r) => /^[0-9a-f]{64}\.(png|jpe?g|gif|webp|svg)$/.test(r.file)));
 }
 if (tables.includes('symbols')) check('an own symbol is there', one('SELECT COUNT(*) AS n FROM symbols').n >= 1);
@@ -124,7 +127,9 @@ if (blockRows) {
 if (unified) {
   // Tags are referenced by id there; a name left in the list matches nothing.
   const tagIds = new Set(q('SELECT id FROM tags').map((r) => r.id));
-  const used = q("SELECT tags FROM entries WHERE tags != '[]'").flatMap((r) => JSON.parse(r.tags));
+  const used = tables.includes('entry_tags')
+    ? q('SELECT tag_id FROM entry_tags').map((r) => r.tag_id)
+    : q("SELECT tags FROM entries WHERE tags != '[]'").flatMap((r) => JSON.parse(r.tags));
   check('entries carry tags', used.length > 0, `${used.length}`);
   check('every entry tag is a tag id', used.every((id) => tagIds.has(id)));
 }

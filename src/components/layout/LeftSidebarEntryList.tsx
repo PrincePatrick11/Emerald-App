@@ -15,6 +15,7 @@ import { useCategoryStore } from '../../store/categoryStore';
 import { useUndoStore } from '../../store/undoStore';
 import { setDragItem } from '../../lib/dragState';
 import { generateId, isImageIcon } from '../../lib/helpers';
+import { iconSrc } from '../../lib/icons';
 import { journalIcon } from '../../lib/moonPhase';
 import type { Entry, Task } from '../../types';
 import EntryListTab, { type EntryListTabProps } from '../ui/EntryListTab';
@@ -228,7 +229,7 @@ function useOperationsConfig(operations: Entry[]): EntryListTabProps<Entry> {
       const cat = lookupCategory(catById, op.category_id);
       const iconValue = entryIcon('operation', op, cat);
       return isImageIcon(iconValue)
-        ? <img src={iconValue} alt="" className="w-4 h-4 object-cover rounded-md flex-shrink-0" />
+        ? <img src={iconSrc(iconValue)} alt="" className="w-4 h-4 object-cover rounded-md flex-shrink-0" />
         : <span className="text-base leading-none flex-shrink-0">{iconValue}</span>;
     },
     isActive: (op) => activeView.id === op.id,
@@ -295,7 +296,7 @@ function useWikiConfig(articles: Entry[]): EntryListTabProps<Entry> {
     getIcon: (a) => {
       const icon = entryIcon('wiki', a, lookupCategory(catById, a.category_id));
       return isImageIcon(icon)
-        ? <img src={icon} alt="" className="w-4 h-4 object-cover rounded-md flex-shrink-0" />
+        ? <img src={iconSrc(icon)} alt="" className="w-4 h-4 object-cover rounded-md flex-shrink-0" />
         : <span className="text-base leading-none flex-shrink-0">{icon}</span>;
     },
     isActive: (a) => activeView.id === a.id,

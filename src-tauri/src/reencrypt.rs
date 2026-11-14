@@ -8,24 +8,26 @@
 //!
 //! 1. **Prepare** — `vault.key.pending`; the database exported into
 //!    `emerald.db.reencrypting` (`sqlcipher_export`); every image sealed under
-//!    its new keyed name into `images.reencrypting/`; every image name inside
-//!    the copy rewritten; `drafts.json.reencrypting`. Then the copy is
+//!    its new keyed name into `images.reencrypting/`, every icon likewise into
+//!    `icons.reencrypting/`; every image and icon name inside the copy
+//!    rewritten; `drafts.json.reencrypting`. Then the copy is
 //!    checked: `integrity_check`, and the same row count in every table as
 //!    the original.
 //! 2. **Commit** — the marker `vault.reencrypting` is written, naming the
-//!    images to keep. Then database, `vault.key`, drafts and images are
-//!    swapped in.
+//!    images and icons to keep. Then database, `vault.key`, drafts, images and
+//!    icons are swapped in.
 //! 3. **Clean up** — the old database, its migration backups, the import
-//!    staging copy and every image not named in the marker are deleted, then
+//!    staging copy and every image or icon not named in the marker are deleted, then
 //!    the marker.
 //!
 //! [`recover_interrupted`] makes a crash anywhere safe. Without the marker
 //! the original is untouched: the half-made copy is thrown away. With it, the
 //! swap is finished — every step of it can run again.
 //!
-//! Image names are rewritten wherever they occur, in every text column of
-//! every table: a name is 64 hex digits and an image extension, unique enough
-//! that no schema knowledge is needed.
+//! Image and icon names are rewritten wherever they occur, in every text
+//! column of every table: a name is 64 hex digits and an image extension,
+//! unique enough that no schema knowledge is needed. The same bytes get the
+//! same new name in either folder, so one map serves both.
 
 use sqlx::sqlite::{SqliteConnectOptions, SqliteConnection};
 use sqlx::{ConnectOptions, Connection, Executor, Row};
@@ -45,6 +47,10 @@ const DB_OLD: &str = "emerald.db.old";
 const DRAFTS_NEW: &str = "drafts.json.reencrypting";
 const DRAFTS_NEW_TEMP: &str = "drafts.json.reencrypting.tmp";
 const IMAGES_NEW: &str = "images.reencrypting";
+const ICONS_NEW: &str = "icons.reencrypting";
+
+/// The vault's two picture folders, each with its staging folder.
+const FOLDERS: [(images::Store, &str); 2] = [(images::Store::Images, IMAGES_NEW), (images::Store::Icons, ICONS_NEW)];
 
 /// SQLite's companions of a database file.
 const DB_SIDE_FILES: [&str; 3] = ["-journal", "-wal", "-shm"];
@@ -128,10 +134,14 @@ pub const NOT_ENOUGH_SPACE: &str = "NOT_ENOUGH_SPACE";
 /// goes ahead and a full disk fails it as any write error would.
 fn check_space(dir: &Path) -> Result<(), String> {
     let size = |path: &Path| std::fs::symlink_metadata(path).map_or(0, |m| if m.is_file() { local_need(&m) } else { 0 });
-    let images = dir.join(vault::IMAGES_SUBDIR);
-    let copy = size(&dir.join(vault::DB_FILE))
-        + size(&dir.join(vault::DRAFTS_FILE))
-        + image_names(&images).iter().map(|name| size(&images.join(name))).sum::<u64>();
+    let pictures: u64 = FOLDERS
+        .iter()
+        .map(|(kind, _)| {
+            let folder = dir.join(kind.subdir());
+            image_names(&folder).iter().map(|name| size(&folder.join(name))).sum::<u64>()
+        })
+        .sum();
+    let copy = size(&dir.join(vault::DB_FILE)) + size(&dir.join(vault::DRAFTS_FILE)) + pictures;
     // Some headroom: the header of every sealed file, the page structure of
     // the new database, the journal while the image names are rewritten.
     let needed = copy + copy / 20 + 64 * 1024 * 1024;
@@ -201,13 +211,23 @@ fn image_names(dir: &Path) -> Vec<String> {
 }
 
 /// What the marker records: which key the run committed to, and which
-/// images the vault keeps.
+/// images and icons the vault keeps.
 #[derive(serde::Serialize, serde::Deserialize)]
 struct Marker {
     /// `check` of the new key file. A marker whose key is neither pending nor
     /// in place does not belong here — nothing is touched for it.
     check: String,
     keep: Vec<String>,
+    /// The icons to keep. Missing in a marker of a build without `icons/`:
+    /// then the folder is left as it is.
+    #[serde(default)]
+    keep_icons: Option<Vec<String>>,
+}
+
+/// What a run keeps of either folder.
+struct Kept {
+    images: Vec<String>,
+    icons: Vec<String>,
 }
 
 /// A regular file, not a link or a folder under that name.
@@ -253,8 +273,10 @@ pub fn remove_leftovers(dir: &Path) {
     for name in [MARKER, MARKER_TEMP, PENDING_KEY, PENDING_KEY_TEMP, DRAFTS_NEW, DRAFTS_NEW_TEMP] {
         std::fs::remove_file(dir.join(name)).ok();
     }
-    if is_real_dir(&dir.join(IMAGES_NEW)) {
-        std::fs::remove_dir_all(dir.join(IMAGES_NEW)).ok();
+    for (_, staged) in FOLDERS {
+        if is_real_dir(&dir.join(staged)) {
+            std::fs::remove_dir_all(dir.join(staged)).ok();
+        }
     }
 }
 
@@ -281,9 +303,11 @@ fn recover_interrupted(dir: &Path) -> Result<(), String> {
     for name in [PENDING_KEY, PENDING_KEY_TEMP, DRAFTS_NEW, DRAFTS_NEW_TEMP, MARKER_TEMP] {
         std::fs::remove_file(dir.join(name)).ok();
     }
-    match vault::patiently(|| std::fs::remove_dir_all(dir.join(IMAGES_NEW))) {
-        Err(e) if e.kind() != std::io::ErrorKind::NotFound => eprintln!("[reencrypt] {IMAGES_NEW} stays for now: {e}"),
-        _ => {}
+    for (_, staged) in FOLDERS {
+        match vault::patiently(|| std::fs::remove_dir_all(dir.join(staged))) {
+            Err(e) if e.kind() != std::io::ErrorKind::NotFound => eprintln!("[reencrypt] {staged} stays for now: {e}"),
+            _ => {}
+        }
     }
     Ok(())
 }
@@ -304,11 +328,11 @@ fn finish_commit(dir: &Path) -> Result<bool, String> {
     if !pending && !in_place {
         return Err(format!("{MARKER} does not belong to this vault's key, nothing was changed"));
     }
-    let images = dir.join(vault::IMAGES_SUBDIR);
-    let staged = dir.join(IMAGES_NEW);
-    for folder in [&images, &staged] {
-        if folder.exists() && !is_real_dir(folder) {
-            return Err(format!("{} is not a folder, nothing was changed", folder.display()));
+    for (kind, staged) in FOLDERS {
+        for folder in [dir.join(kind.subdir()), dir.join(staged)] {
+            if folder.exists() && !is_real_dir(&folder) {
+                return Err(format!("{} is not a folder, nothing was changed", folder.display()));
+            }
         }
     }
 
@@ -323,28 +347,39 @@ fn finish_commit(dir: &Path) -> Result<bool, String> {
         rename_patiently(dir, PENDING_KEY, keys::KEY_FILE)?;
     }
     rename_patiently(dir, DRAFTS_NEW, vault::DRAFTS_FILE)?;
-    if staged.exists() {
-        std::fs::create_dir_all(&images).map_err(|e| format!("create {}: {e}", images.display()))?;
-        for name in image_names(&staged) {
-            let target = images.join(&name);
-            if target.exists() {
-                std::fs::remove_file(staged.join(&name)).ok();
-            } else {
-                vault::patiently(|| std::fs::rename(staged.join(&name), &target)).map_err(|e| format!("move {name}: {e}"))?;
+    for (kind, staged) in FOLDERS {
+        let (folder, staged) = (dir.join(kind.subdir()), dir.join(staged));
+        if staged.exists() {
+            std::fs::create_dir_all(&folder).map_err(|e| format!("create {}: {e}", folder.display()))?;
+            for name in image_names(&staged) {
+                let target = folder.join(&name);
+                if target.exists() {
+                    std::fs::remove_file(staged.join(&name)).ok();
+                } else {
+                    vault::patiently(|| std::fs::rename(staged.join(&name), &target)).map_err(|e| format!("move {name}: {e}"))?;
+                }
             }
+            vault::patiently(|| std::fs::remove_dir_all(&staged)).ok();
         }
-        vault::patiently(|| std::fs::remove_dir_all(&staged)).ok();
+        sync_dir(&folder);
     }
-    sync_dir(&images);
     sync_dir(dir);
 
     // From here on the vault is under the new key; what follows is the old
     // state — plain text, or under a key that no longer exists.
-    let keep: HashSet<&str> = marker.keep.iter().map(String::as_str).filter(|n| images::is_valid_image_name(n)).collect();
     let mut failed = Vec::new();
-    for name in image_names(&images) {
-        if !keep.contains(name.as_str()) {
-            remove_checked(&images.join(name), &mut failed);
+    for (kind, _) in FOLDERS {
+        let keep = match kind {
+            images::Store::Images => Some(&marker.keep),
+            images::Store::Icons => marker.keep_icons.as_ref(),
+        };
+        let Some(keep) = keep else { continue };
+        let keep: HashSet<&str> = keep.iter().map(String::as_str).filter(|n| images::is_valid_image_name(n)).collect();
+        let folder = dir.join(kind.subdir());
+        for name in image_names(&folder) {
+            if !keep.contains(name.as_str()) {
+                remove_checked(&folder.join(name), &mut failed);
+            }
         }
     }
     for base in [DB_OLD, vault::IMPORT_STAGING_FILE] {
@@ -367,7 +402,9 @@ fn finish_commit(dir: &Path) -> Result<bool, String> {
         eprintln!("[reencrypt] cleanup continues on the next open: {failed:?}");
         return Ok(false);
     }
-    sync_dir(&images);
+    for (kind, _) in FOLDERS {
+        sync_dir(&dir.join(kind.subdir()));
+    }
     sync_dir(dir);
     std::fs::remove_file(dir.join(MARKER)).map_err(|e| format!("remove {MARKER}: {e}"))?;
     Ok(true)
@@ -531,8 +568,8 @@ fn write_synced(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
 }
 
 /// Step 1: everything next to the vault, nothing in it. Returns the names of
-/// the images the vault keeps.
-async fn prepare(dir: &Path, source: Source<'_>, new_key: &Key, progress: OnProgress<'_>) -> Result<Vec<String>, String> {
+/// the images and the icons the vault keeps.
+async fn prepare(dir: &Path, source: Source<'_>, new_key: &Key, progress: OnProgress<'_>) -> Result<Kept, String> {
     let db_key = crypto::subkey(new_key, Purpose::Database);
 
     progress(Progress { phase: Phase::Database, done: 0, total: 1 });
@@ -557,33 +594,46 @@ async fn prepare(dir: &Path, source: Source<'_>, new_key: &Key, progress: OnProg
     old.close().await.ok();
     let expected = exported?;
 
-    // The images: under a new name into the vault's own folder.
-    let images = dir.join(vault::IMAGES_SUBDIR);
-    let staged = dir.join(IMAGES_NEW);
-    std::fs::create_dir_all(&staged).map_err(|e| format!("create {IMAGES_NEW}: {e}"))?;
+    // The images and the icons: under a new name into the vault's own
+    // folders. The progress counts both as one run.
     let mut renamed = HashMap::new();
-    let mut keep = Vec::new();
-    let names = image_names(&images);
-    let total = names.len();
-    for (index, name) in names.into_iter().enumerate() {
-        progress(Progress { phase: Phase::Images, done: index, total });
-        let bytes = std::fs::read(images.join(&name)).map_err(|e| format!("read {name}: {e}"))?;
-        let Some(bytes) = plaintext(bytes, source, Context::Image(&name)) else {
-            // Stays as it is — it cannot be opened any more than before.
-            eprintln!("[reencrypt] {name} does not open under this vault's key, kept as it is");
-            keep.push(name);
-            continue;
+    let mut kept = Kept { images: Vec::new(), icons: Vec::new() };
+    let lists: Vec<(images::Store, &str, Vec<String>)> = FOLDERS
+        .iter()
+        .map(|&(kind, staged)| (kind, staged, image_names(&dir.join(kind.subdir()))))
+        .collect();
+    let total: usize = lists.iter().map(|(_, _, names)| names.len()).sum();
+    let mut index = 0;
+    for (kind, staged_name, names) in lists {
+        let folder = dir.join(kind.subdir());
+        let staged = dir.join(staged_name);
+        std::fs::create_dir_all(&staged).map_err(|e| format!("create {staged_name}: {e}"))?;
+        let keep = match kind {
+            images::Store::Images => &mut kept.images,
+            images::Store::Icons => &mut kept.icons,
         };
-        let ext = name.rsplit_once('.').map(|(_, ext)| ext).expect("validated image name");
-        let (new_name, contents) = images::seal_for_vault(new_key, &bytes, ext);
-        let target = staged.join(&new_name);
-        if !target.exists() {
-            write_synced(&target, &contents).map_err(|e| format!("write {new_name}: {e}"))?;
+        for name in names {
+            progress(Progress { phase: Phase::Images, done: index, total });
+            index += 1;
+            let bytes = std::fs::read(folder.join(&name)).map_err(|e| format!("read {name}: {e}"))?;
+            let Some(bytes) = plaintext(bytes, source, kind.context(&name)) else {
+                // Stays as it is — it cannot be opened any more than before.
+                eprintln!("[reencrypt] {name} does not open under this vault's key, kept as it is");
+                keep.push(name);
+                continue;
+            };
+            let ext = name.rsplit_once('.').map(|(_, ext)| ext).expect("validated image name");
+            let (new_name, contents) = images::seal_for_vault(new_key, kind, &bytes, ext);
+            let target = staged.join(&new_name);
+            if !target.exists() {
+                write_synced(&target, &contents).map_err(|e| format!("write {new_name}: {e}"))?;
+            }
+            keep.push(new_name.clone());
+            renamed.insert(name, new_name);
         }
-        renamed.insert(name, new_name);
+        sync_dir(&staged);
     }
     progress(Progress { phase: Phase::Images, done: total, total });
-    sync_dir(&staged);
 
     // The references in the copy, then the check.
     progress(Progress { phase: Phase::Checking, done: 0, total: 1 });
@@ -622,10 +672,11 @@ async fn prepare(dir: &Path, source: Source<'_>, new_key: &Key, progress: OnProg
         }
     }
 
-    keep.extend(renamed.into_values());
-    keep.sort();
-    keep.dedup();
-    Ok(keep)
+    for keep in [&mut kept.images, &mut kept.icons] {
+        keep.sort();
+        keep.dedup();
+    }
+    Ok(kept)
 }
 
 
@@ -657,7 +708,7 @@ async fn reencrypt(dir: &Path, source: Source<'_>, password: &str, kdf: KdfParam
         }
     };
 
-    let marker = Marker { check: key_file.check().to_string(), keep };
+    let marker = Marker { check: key_file.check().to_string(), keep: keep.images, keep_icons: Some(keep.icons) };
     let marker = serde_json::to_string(&marker).map_err(|e| e.to_string())?;
     if let Err(e) = vault::write_atomic(dir, MARKER, MARKER_TEMP, marker.as_bytes()) {
         recover_interrupted(dir).ok();
@@ -889,7 +940,7 @@ mod tests {
 
     fn assert_no_leftovers(dir: &Path) {
         let names: Vec<String> = std::fs::read_dir(dir).unwrap().flatten().map(|e| e.file_name().to_string_lossy().into_owned()).collect();
-        for leftover in [MARKER, PENDING_KEY, DB_NEW, DB_OLD, DRAFTS_NEW, IMAGES_NEW] {
+        for leftover in [MARKER, PENDING_KEY, DB_NEW, DB_OLD, DRAFTS_NEW, IMAGES_NEW, ICONS_NEW] {
             assert!(!names.iter().any(|n| n == leftover), "{leftover} left behind: {names:?}");
         }
     }
@@ -984,7 +1035,7 @@ mod tests {
     }
 
     fn assert_no_leftovers_except_backup(dir: &Path) {
-        for leftover in [MARKER, PENDING_KEY, DB_NEW, DRAFTS_NEW, IMAGES_NEW] {
+        for leftover in [MARKER, PENDING_KEY, DB_NEW, DRAFTS_NEW, IMAGES_NEW, ICONS_NEW] {
             assert!(!dir.join(leftover).exists(), "{leftover} left behind");
         }
     }
@@ -994,7 +1045,7 @@ mod tests {
         let (dir, _) = plain_vault().await;
         let (file, new_key, _) = KeyFile::create("correct horse", TEST_KDF).unwrap();
         vault::write_atomic(&dir, PENDING_KEY, PENDING_KEY_TEMP, file.to_json().as_bytes()).unwrap();
-        let keep = prepare(&dir, Source::Plain, &new_key, &quiet).await.unwrap();
+        let keep = prepare(&dir, Source::Plain, &new_key, &quiet).await.unwrap().images;
         write_marker(&dir, &file, &keep);
         // Crash in the middle of the swap: the database is already set aside.
         std::fs::rename(dir.join(vault::DB_FILE), dir.join(DB_OLD)).unwrap();
@@ -1007,7 +1058,7 @@ mod tests {
     }
 
     fn write_marker(dir: &Path, file: &KeyFile, keep: &[String]) {
-        let marker = Marker { check: file.check().to_string(), keep: keep.to_vec() };
+        let marker = Marker { check: file.check().to_string(), keep: keep.to_vec(), keep_icons: None };
         vault::write_atomic(dir, MARKER, MARKER_TEMP, serde_json::to_string(&marker).unwrap().as_bytes()).unwrap();
     }
 
@@ -1018,7 +1069,7 @@ mod tests {
         let (dir, image) = plain_vault().await;
         let (file, new_key, _) = KeyFile::create("correct horse", TEST_KDF).unwrap();
         vault::write_atomic(&dir, PENDING_KEY, PENDING_KEY_TEMP, file.to_json().as_bytes()).unwrap();
-        let keep = prepare(&dir, Source::Plain, &new_key, &quiet).await.unwrap();
+        let keep = prepare(&dir, Source::Plain, &new_key, &quiet).await.unwrap().images;
         std::fs::remove_file(dir.join(PENDING_KEY)).unwrap();
         write_marker(&dir, &file, &keep);
         assert!(recover_interrupted(&dir).is_err());
@@ -1063,6 +1114,50 @@ mod tests {
         rekey_dir(&dir, &done.vault_key, "battery staple", TEST_KDF, &quiet).await.unwrap();
         assert!(stored_images(&dir).contains(&foreign));
         assert_eq!(stored_images(&dir).len(), 2);
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    #[tokio::test]
+    async fn icons_are_sealed_in_their_own_folder_and_renamed_in_the_rows() {
+        let (dir, _) = plain_vault().await;
+        const ICON: &[u8] = b"\x89PNG\r\n\x1a\na small icon";
+        let icon = plain_name(ICON, "png");
+        std::fs::create_dir_all(dir.join(vault::ICONS_SUBDIR)).unwrap();
+        std::fs::write(dir.join(vault::ICONS_SUBDIR).join(&icon), ICON).unwrap();
+        // A template naming it, so the rename has a row to reach.
+        let options = SqliteConnectOptions::new().filename(dir.join(vault::DB_FILE));
+        let mut conn = SqliteConnection::connect_with(&options).await.unwrap();
+        conn.execute("CREATE TABLE templates (id TEXT PRIMARY KEY, icon TEXT)").await.unwrap();
+        sqlx::query("INSERT INTO templates VALUES ('t1', ?)").bind(icon.clone()).execute(&mut conn).await.unwrap();
+        conn.close().await.unwrap();
+
+        let done = encrypt_dir(&dir, "correct horse", TEST_KDF, &quiet).await.unwrap();
+        assert_no_leftovers(&dir);
+        let icons = image_names(&dir.join(vault::ICONS_SUBDIR));
+        assert_eq!(icons.len(), 1);
+        let new_icon = &icons[0];
+        assert_ne!(new_icon, &icon, "icon kept its plain hash name");
+        // Sealed as an icon, not as an image: the pictures' context does not open it.
+        let files_key = crypto::subkey(&done.vault_key, Purpose::Files);
+        let sealed = std::fs::read(dir.join(vault::ICONS_SUBDIR).join(new_icon)).unwrap();
+        assert_eq!(crypto::open(&files_key, Context::Icon(new_icon), &sealed).unwrap().as_slice(), ICON);
+        assert!(crypto::open(&files_key, Context::Image(new_icon), &sealed).is_err());
+        assert_eq!(stored_images(&dir).len(), 1, "the icon landed among the pictures");
+
+        let db_key = crypto::subkey(&done.vault_key, Purpose::Database);
+        let mut conn = open_keyed(&dir.join(vault::DB_FILE), &db_key).await.unwrap();
+        let stored: String = conn.fetch_one("SELECT icon FROM templates WHERE id = 't1'").await.unwrap().get(0);
+        assert_eq!(&stored, new_icon);
+        conn.close().await.unwrap();
+
+        // A second key renames it again, the old file goes.
+        let again = rekey_dir(&dir, &done.vault_key, "battery staple", TEST_KDF, &quiet).await.unwrap();
+        let icons = image_names(&dir.join(vault::ICONS_SUBDIR));
+        assert_eq!(icons.len(), 1);
+        assert_ne!(&icons[0], new_icon);
+        let files_key = crypto::subkey(&again.vault_key, Purpose::Files);
+        let sealed = std::fs::read(dir.join(vault::ICONS_SUBDIR).join(&icons[0])).unwrap();
+        assert!(crypto::open(&files_key, Context::Icon(&icons[0]), &sealed).is_ok());
         std::fs::remove_dir_all(&dir).ok();
     }
 

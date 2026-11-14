@@ -6,6 +6,7 @@ import type { BlockDefinitionPatch } from './blockDefinitionStore';
 import type { TemplatePatch } from './templateStore';
 import type { VaultFileRead } from '../lib/vaultSettings';
 import { tagNameKey } from '../lib/tagRefs';
+import { storedImageNamesIn } from '../lib/schema';
 
 /** What the page of a custom block edits — exactly what `updateDefinition` accepts. */
 export type DefinitionDraft = Required<BlockDefinitionPatch>;
@@ -262,6 +263,22 @@ export const useTemplateDraftStore = createDraftStore<TemplateDraft>('templates'
   content: text(raw.content),
   tags: Array.isArray(raw.tags) ? raw.tags.filter((tag): tag is string => typeof tag === 'string') : [],
 }));
+
+/**
+ * Every stored file name an open draft holds — an icon chosen there, a picture
+ * in a template draft's blocks. Such a file exists before any row names it,
+ * so the storage cleanup has to count it as used, or "Done" would save a
+ * draft pointing at a file that is gone.
+ */
+export function fileNamesHeldByDrafts(): Set<string> {
+  const names = new Set<string>();
+  for (const { store } of stores) {
+    for (const entry of Object.values(store.getState().drafts)) {
+      for (const name of storedImageNamesIn(JSON.stringify([entry.base, entry.draft]))) names.add(name);
+    }
+  }
+  return names;
+}
 
 /** Empty all draft lists, including the persisted ones — see `clearAll`. */
 export function clearAllDrafts(): void {

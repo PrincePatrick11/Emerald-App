@@ -176,7 +176,7 @@ export interface FieldsModel {
   orphans: Record<string, unknown>;
   /** Element ID → inner HTML of its slot (link chip or `<img>`), also without a known element. */
   slots: Record<string, string>;
-  /** Name and icon (emoji) of the custom block definition the block was copied from — empty for single fields. */
+  /** Name and icon (an emoji or an icon file, `blockRefs` names it) of the custom block definition the block was copied from — empty for single fields. */
   name: string;
   icon: string;
 }

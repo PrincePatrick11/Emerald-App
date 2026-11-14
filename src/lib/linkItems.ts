@@ -73,12 +73,12 @@ export interface LinkItemSources {
 }
 
 /**
- * Separates the display icon from the stored icon. An uploaded image (data URL, blob,
- * vault filename) must NOT end up in `icon`: that travels on insertion into
+ * Separates the display icon from the stored icon. An uploaded icon (a file
+ * name in `icons/`) must NOT end up in `icon`: that travels on insertion into
  * the node attrs and thus into the stored content of every entry that links
- * the target — a data URL inflates it there by its full size without ever being
- * read (the chip resolves its icon live). The emoji fallback is stored,
- * the image is displayed.
+ * the target, where a name of a file that may be gone is worth nothing (the
+ * chip resolves its icon live). The emoji fallback is stored, the image is
+ * displayed (`iconSrc`).
  */
 function splitIcon(icon: string | null | undefined, emojiFallback: string) {
   if (icon && isImageIcon(icon)) return { icon: emojiFallback, displayIcon: icon };

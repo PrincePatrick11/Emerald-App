@@ -21,7 +21,7 @@ import { TEXT_BLOCK_TYPE, type BlockInstance } from './types';
 export interface Template {
   id: string;
   name: string;
-  /** Emoji or image (data URL), as with custom blocks. */
+  /** Emoji or an icon file in `icons/` (`lib/icons.ts`), as with custom blocks. */
   icon: string;
   /** The title a new entry gets — empty = the type's default title. */
   title: string;
@@ -48,9 +48,10 @@ export function isTemplateId(id: unknown): id is string {
   return isDefinitionId(id);
 }
 
-/** The template as a database row — `tags` as JSON text. */
+/** The template as a database row — without `tags` and `content`, which have tables of their own (`template_tags`, `blocks`). */
 export function templateToRow(template: Template) {
-  return { ...template, tags: JSON.stringify(template.tags) };
+  const { tags: _tags, content: _content, ...row } = template;
+  return row;
 }
 
 /**

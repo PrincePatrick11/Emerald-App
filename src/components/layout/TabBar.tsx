@@ -5,6 +5,8 @@ import type { TFunction } from 'i18next';
 import { LazyMotion, Reorder, domAnimation } from 'framer-motion';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { journalIcon } from '../../lib/moonPhase';
+import { isImageIcon } from '../../lib/helpers';
+import { iconSrc } from '../../lib/icons';
 import { hasOwnTitle } from '../../lib/entryTitle';
 import { REORDER_SPRING } from '../../lib/motion';
 import { useHorizontalWheel } from '../../hooks/useHorizontalWheel';
@@ -29,8 +31,8 @@ function getFallbackTitle(view: ActiveView, t: TFunction) {
 
 function renderIconValue(icon: string | null | undefined, fallback: ReactNode) {
   if (!icon) return fallback;
-  if (icon.startsWith('data:') || icon.startsWith('blob:') || icon.startsWith('http') || icon.startsWith('/')) {
-    return <img src={icon} alt="" className="h-3.5 w-3.5 rounded-md object-cover" />;
+  if (isImageIcon(icon)) {
+    return <img src={iconSrc(icon)} alt="" className="h-3.5 w-3.5 rounded-md object-cover" />;
   }
   return <span className="text-sm leading-none">{icon}</span>;
 }

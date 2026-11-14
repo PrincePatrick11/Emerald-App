@@ -43,8 +43,16 @@ export function imageSrc(ref: string | null | undefined): string {
 
   const name = storedImageName(ref);
   if (!name) return '';
+  return schemeUrl(`${getActiveVaultIdSync()}/${name}`);
+}
 
-  const path = `${getActiveVaultIdSync()}/${name}`;
+/**
+ * The `emerald-img` URL of a path under the scheme — `{vaultId}/{name}` for a
+ * picture, `{vaultId}/icons/{name}` for an icon (`iconSrc`). Windows serves
+ * custom schemes through `http://{scheme}.localhost`, the other platforms
+ * through the scheme itself.
+ */
+export function schemeUrl(path: string): string {
   return isWindows
     ? `http://emerald-img.localhost/${path}`
     : `emerald-img://localhost/${path}`;
@@ -158,6 +166,8 @@ export async function deleteImageFiles(filenames: string[]): Promise<number> {
 export interface UnusedImages {
   names: string[];
   bytes: number;
+  /** The size of each unused file, by name. */
+  sizes: Map<string, number>;
 }
 
 /**
@@ -177,5 +187,6 @@ export async function findUnusedImages(db: Database): Promise<UnusedImages> {
   return {
     names: unused.map((file) => file.name),
     bytes: unused.reduce((total, file) => total + file.bytes, 0),
+    sizes: new Map(unused.map((file) => [file.name, file.bytes])),
   };
 }

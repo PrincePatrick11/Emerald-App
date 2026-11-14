@@ -42,8 +42,9 @@ import {
 } from './blocks/templates';
 import { isBuiltinDashboard, parseDashboardFilter } from './dashboards';
 import { fromRow } from './row';
-import { IMAGE_FIELDS, imageColumns, storedImageName, storedImageNamesIn } from './schema';
-import { isTagId, rewriteTagRefs, stripTagIds, tagIdList, tagNameKey } from './tagRefs';
+import { ICON_FIELDS, IMAGE_FIELDS, imageColumns, storedImageName, storedImageNamesIn } from './schema';
+import { iconFileNames, isImageDataUrl, plausibleEmoji, readIconAsBase64, storeIconDataUrl } from './icons';
+import { isTagId, readTagLinks, tagIdList, tagInsertStatements, tagNameKey, unlinkTags, type TagOwner } from './tagRefs';
 import { randomTagColor } from '../store/tagStore';
 import { categoryKey } from './categories';
 import i18n from '../i18n';
@@ -130,12 +131,14 @@ export interface ImportTypeFilters extends EntrySelection {
 type Row = Record<string, any>;
 
 /**
- * The format of a backup. '16' is the first since entries have no type
+ * The format of a backup. '17' is the one of the current schema
  * (`FRESH_START_VERSION` in `schema.ts`): all entries in one `data.entries`
  * array; categories with their start template (`template_id`); the
  * dashboards as `data.dashboards`; the blocks of entries and templates as the
  * rows of `blocks` (`data.blocks`); the pictures taken into "Images" as
- * `data.vaultImages`.
+ * `data.vaultImages`. The rows of entries, templates and pictures carry their
+ * tags as an array of IDs in `tags` (the vault keeps them in link tables);
+ * icons are stored names, their files in `icons` beside `images`.
  *
  * Only this version is read. An older file comes from before the fresh start
  * and is refused with {@link BACKUP_OUTDATED} before anything happens — its
@@ -145,7 +148,7 @@ type Row = Record<string, any>;
  * be imported *wrongly* rather than fail. Raise the version whenever an older
  * build would otherwise import a file wrongly.
  */
-const BACKUP_VERSION = '16' as const;
+const BACKUP_VERSION = '17' as const;
 
 /** A backup from before the fresh start of the schema: refused, not converted. */
 export const BACKUP_OUTDATED = 'BACKUP_OUTDATED';
@@ -201,7 +204,7 @@ export async function importTagsAndRemap(db: Awaited<ReturnType<typeof getDb>>, 
     const hit = byId.get(id) ?? byName.get(tagNameKey(name));
     if (hit) {
       if (hit.deleted_at && !row.deleted_at) {
-        await stripTagIds(db, [hit.id]);
+        await unlinkTags(db, [hit.id]);
         await db.execute('UPDATE tags SET deleted_at=NULL WHERE id=$1', [hit.id]);
         hit.deleted_at = null;
       }
@@ -217,23 +220,55 @@ export async function importTagsAndRemap(db: Awaited<ReturnType<typeof getDb>>, 
     byName.set(tagNameKey(name), tag);
     idMap.set(id, id);
   }
-  const remap = (rows: Row[] | undefined) => rows?.map((row) => ({
-    ...row,
-    tags: JSON.stringify(tagIdList(row.tags).flatMap((id) => idMap.get(id) ?? (byId.has(id) ? [id] : []))),
-  }));
+  const localIds = (ids: string[]) => [...new Set(ids.flatMap((id) => idMap.get(id) ?? (byId.has(id) ? [id] : [])))];
+  const remap = (rows: Row[] | undefined) => rows?.map((row) => ({ ...row, tags: localIds(tagIdList(row.tags)) }));
+  // The dashboards' tag filters name the same tags.
+  const dashboards = d.dashboards?.map((row) => {
+    if (typeof row !== 'object' || row === null) return row;
+    const filter = parseDashboardFilter(row.filter);
+    return filter.tags ? { ...row, filter: { ...filter, tags: localIds(filter.tags) } } : row;
+  });
   return {
     ...d,
     tags: [],
     entries: remap(d.entries),
     templates: remap(d.templates),
     vaultImages: remap(d.vaultImages),
+    dashboards,
   };
 }
 
-/** After the import: tag IDs without a tag row drop out of every list. */
-export async function dropUnknownTagIds(db: Awaited<ReturnType<typeof getDb>>): Promise<void> {
-  const known = new Set((await db.select<{ id: string }[]>('SELECT id FROM tags')).map((r) => r.id));
-  await rewriteTagRefs(db, (ids) => ids.filter((id) => known.has(id)));
+/**
+ * Writes the tag links of imported rows — `tags` as `importTagsAndRemap` left
+ * it, under the owner's ID in this vault (`idOf`). Only for owners the import
+ * actually inserted: an existing one keeps its own tags.
+ */
+async function insertTagLinks(
+  db: Awaited<ReturnType<typeof getDb>>,
+  owner: TagOwner,
+  rows: readonly Row[] | undefined,
+  idOf: (id: string) => string | undefined,
+): Promise<void> {
+  let batch: [string, unknown[]][] = [];
+  for (const row of rows ?? []) {
+    if (typeof row !== 'object' || row === null || typeof row.id !== 'string') continue;
+    const id = idOf(row.id);
+    const tags = tagIdList(row.tags);
+    if (!id || !tags.length) continue;
+    batch.push(...tagInsertStatements(owner, id, tags));
+    if (batch.length >= INSERT_CHUNK) {
+      await db.batch(batch);
+      batch = [];
+    }
+  }
+  if (batch.length) await db.batch(batch);
+}
+
+/** Puts the tags of the owners into their rows, as an array of IDs — what the file carries. */
+async function withTagLists(db: Awaited<ReturnType<typeof getDb>>, owner: TagOwner, rows: Row[]): Promise<Row[]> {
+  const tags = await readTagLinks(db, owner, rows.map((r) => String(r.id)));
+  for (const row of rows) row.tags = tags.get(String(row.id)) ?? [];
+  return rows;
 }
 
 /**
@@ -243,7 +278,7 @@ export async function dropUnknownTagIds(db: Awaited<ReturnType<typeof getDb>>): 
  */
 const ENTRY_COLUMNS = [
   'id', 'title', 'category_id', 'entry_number', 'icon', 'cover_image',
-  'tags', 'created_at', 'updated_at', 'deleted_at',
+  'created_at', 'updated_at', 'deleted_at',
 ] as const;
 
 /** The image columns of an entry row at import. */
@@ -253,7 +288,6 @@ function asEntryRow(row: Row): Row {
   const out: Row = {};
   for (const column of ENTRY_COLUMNS) out[column] = row[column] ?? null;
   out.title ??= '';
-  out.tags ??= '[]';
   return out;
 }
 
@@ -346,6 +380,8 @@ interface BackupFile {
     blocks?: Row[];
   };
   images: Record<string, string>;  // stored file name → data URL
+  /** The icon files: stored name → data URL (`ICON_FIELDS`, the icons of block copies). */
+  icons?: Record<string, string>;
   /**
    * The vault's settings (`settings.json`), unchecked like everything from
    * the file — normalised only at import. An older build simply ignores the
@@ -370,7 +406,7 @@ function collectImageRefs(table: string, rows: Row[] | undefined, into: Set<stri
       const value = row[column];
       if (typeof value === 'string') imageRefsInHtml(value).forEach((ref) => into.add(ref));
     }
-    for (const column of [...fields.plain, ...fields.legacy]) {
+    for (const column of fields.plain) {
       const value = row[column];
       if (isStoredImage(value as string)) into.add(value as string);
     }
@@ -485,6 +521,88 @@ async function exportBlockRows(
   return rows;
 }
 
+/**
+ * Where the icon columns of `ICON_FIELDS` travel in a backup's `data`. A
+ * table missing here would lose its icons on the way.
+ */
+const ICON_DATA_KEYS: Record<string, keyof BackupFile['data']> = {
+  entries: 'entries',
+  templates: 'templates',
+  block_definitions: 'blockDefinitions',
+  languages: 'languages',
+  dashboards: 'dashboards',
+};
+
+/**
+ * The icon files the rows of a backup name, embedded as data URLs: the icon
+ * columns (`ICON_FIELDS`) and every stored name in the block rows' `config`
+ * (a custom block's copy carries its icon there). A name that is no file in
+ * `icons/` — a picture of a block — is skipped.
+ */
+async function embedIcons(data: BackupFile['data']): Promise<Record<string, string>> {
+  const names = new Set<string>();
+  for (const { table, column } of ICON_FIELDS) {
+    const rows = data[ICON_DATA_KEYS[table]] as Row[] | undefined;
+    for (const row of rows ?? []) {
+      const name = storedImageName(typeof row[column] === 'string' ? row[column] : null);
+      if (name) names.add(name);
+    }
+  }
+  for (const row of data.blocks ?? []) {
+    if (typeof row.config === 'string') storedImageNamesIn(row.config).forEach((name) => names.add(name));
+  }
+  const stored = await iconFileNames();
+  const icons: Record<string, string> = {};
+  for (const name of names) {
+    if (!stored.has(name)) continue;
+    try {
+      icons[name] = await readIconAsBase64(name);
+    } catch {
+      // Icon file unreadable — the row falls back to its default
+    }
+  }
+  return icons;
+}
+
+/**
+ * The file's icons stored in this vault's `icons/`, by the name the file knew
+ * them by — the counterpart of `restoreImages`. Then every icon column of the
+ * file's rows points at the name here; a value that is neither an emoji nor
+ * an icon the file brings (a data URL, a name without its file) is dropped,
+ * so that the row falls back to its default icon.
+ */
+async function restoreIcons(backup: BackupFile): Promise<Map<string, string>> {
+  const iconMap = new Map<string, string>();
+  const here = await iconFileNames();
+  const icons = backup.icons && typeof backup.icons === 'object' ? backup.icons : {};
+  for (const [oldName, dataUrl] of Object.entries(icons)) {
+    if (!storedImageName(oldName) || !isImageDataUrl(dataUrl)) continue;
+    if (here.has(oldName)) {
+      iconMap.set(oldName, oldName);
+      continue;
+    }
+    try {
+      iconMap.set(oldName, await storeIconDataUrl(dataUrl));
+    } catch {
+      // skip
+    }
+  }
+  for (const { table, column } of ICON_FIELDS) {
+    const key = ICON_DATA_KEYS[table];
+    const rows = backup.data[key] as unknown;
+    if (!Array.isArray(rows)) continue;
+    (backup.data as Record<string, unknown>)[key] = rows.map((row: unknown) => {
+      if (typeof row !== 'object' || row === null) return row;
+      const value = (row as Row)[column];
+      if (typeof value !== 'string' || !value) return row;
+      const name = storedImageName(value);
+      const next = name ? iconMap.get(name) ?? '' : plausibleEmoji(value);
+      return next === value ? row : { ...row, [column]: next || null };
+    });
+  }
+  return iconMap;
+}
+
 /** The content of a backup according to `options`, images embedded. Writes nothing. */
 export async function buildBackup(options: BackupOptions): Promise<BackupFile> {
   return buildBackupFrom(await getDb(), options);
@@ -506,7 +624,7 @@ export async function buildBackupFrom(db: Awaited<ReturnType<typeof getDb>>, opt
   if (withEntries) {
     const live = new Set((await db.select<{ id: string }[]>('SELECT id FROM categories WHERE deleted_at IS NULL')).map((r) => r.id));
     const rows = await db.select<Row[]>(`SELECT * FROM entries WHERE 1=1 ${dateClause} ${deletedClause}`, dateParams);
-    data.entries = rows.filter((row) => entrySelected(row, options, live));
+    data.entries = await withTagLists(db, 'entry', rows.filter((row) => entrySelected(row, options, live)));
     collectImageRefs('entries', data.entries, allImagePaths);
     data.blocks = await exportBlockRows(db, 'entry', data.entries, allImagePaths);
     data.dashboards = await db.select<Row[]>('SELECT * FROM dashboards');
@@ -534,7 +652,7 @@ export async function buildBackupFrom(db: Awaited<ReturnType<typeof getDb>>, opt
   // ── Images ───────────────────────────────────────────────────────────────
   // The pictures taken into "Images" belong to no module: all of them, trash
   // included, with their files — like the templates, one list, no date question.
-  data.vaultImages = await db.select<Row[]>(`SELECT * FROM images`);
+  data.vaultImages = await withTagLists(db, 'image', await db.select<Row[]>(`SELECT * FROM images`));
   for (const row of data.vaultImages) {
     const file = storedImageName(typeof row.file === 'string' ? row.file : null);
     if (file) allImagePaths.add(file);
@@ -576,14 +694,13 @@ export async function buildBackupFrom(db: Awaited<ReturnType<typeof getDb>>, opt
   // ── Templates ────────────────────────────────────────────────────────────
   // Like the custom blocks: all of it, trash included, with the images in the block stack.
   if (withEntries) {
-    data.templates = await db.select<Row[]>(`SELECT * FROM templates`);
+    data.templates = await withTagLists(db, 'template', await db.select<Row[]>(`SELECT * FROM templates`));
     data.blocks = [...(data.blocks ?? []), ...await exportBlockRows(db, 'template', data.templates, allImagePaths)];
   }
 
   // ── Lexicon ──────────────────────────────────────────────────────────────
   // Languages and vocabulary travel together and in full, trash included: it is
   // one list, no date question — like the custom blocks and the templates.
-  // Icons are a data URL in the row, so no image file hangs off them.
   if (options.includeLexicon) {
     data.languages = await db.select<Row[]>(`SELECT * FROM languages`);
     data.lexiconEntries = await db.select<Row[]>(`SELECT * FROM lexicon_entries`);
@@ -603,6 +720,9 @@ export async function buildBackupFrom(db: Awaited<ReturnType<typeof getDb>>, opt
     }
   }
 
+  // ── Embed icons ──────────────────────────────────────────────────────────
+  const icons = await embedIcons(data);
+
   return {
     version: BACKUP_VERSION,
     type: 'backup',
@@ -610,6 +730,7 @@ export async function buildBackupFrom(db: Awaited<ReturnType<typeof getDb>>, opt
     filters: options,
     data,
     images,
+    icons,
     // Without what a `settings.json` from before still carries of language and
     // theme: those belong to the device, and a backup must not bring them back.
     ...(options.includeSettings && { settings: withoutDeviceKeys(useSettingsStore.getState().settings) }),
@@ -880,6 +1001,7 @@ async function insertVaultImages(
     });
   }
   await insertRows(db, 'images', fresh);
+  await insertTagLinks(db, 'image', fresh, (id) => id);
 }
 
 /**
@@ -918,6 +1040,8 @@ async function insertTemplates(
     });
   });
   await insertRows(db, 'templates', normalized, true);
+  const inserted = new Set(normalized.map((t) => t.id));
+  await insertTagLinks(db, 'template', fresh.map((t) => ({ id: t.id, tags: t.tags })), (id) => (inserted.has(id) ? id : undefined));
   return normalized.map((t) => t.id);
 }
 
@@ -1318,6 +1442,9 @@ export async function assertPayloadReferencesResolve(
 
 export async function doReplace(db: Awaited<ReturnType<typeof getDb>>, backup: BackupFile): Promise<void> {
   const pathMap = await restoreImages(backup);
+  // The block copies name their icons in `config`, beside their pictures: one
+  // rename for both (the same bytes have the same name in either folder).
+  const fileMap = new Map([...pathMap, ...await restoreIcons(backup)]);
   // Tags are not replaced but merged: entries that this file does
   // not replace carry the IDs of the existing ones.
   const d = await importTagsAndRemap(db, backup.data);
@@ -1371,8 +1498,10 @@ export async function doReplace(db: Awaited<ReturnType<typeof getDb>>, backup: B
   await insertRows(db, 'entries', entries);
   await numberUnnumbered(db);
   const same = (ids: string[]) => new Map(ids.map((id) => [id, id]));
-  await insertImportedBlocks(db, d.blocks, 'entry', same(entries.map((r) => String(r.id))), { images: pathMap });
-  await insertImportedBlocks(db, d.blocks, 'template', same(templateIds), { images: pathMap });
+  const insertedEntries = new Set(entries.map((r) => String(r.id)));
+  await insertTagLinks(db, 'entry', d.entries, (id) => (insertedEntries.has(id) ? id : undefined));
+  await insertImportedBlocks(db, d.blocks, 'entry', same(entries.map((r) => String(r.id))), { images: fileMap });
+  await insertImportedBlocks(db, d.blocks, 'template', same(templateIds), { images: fileMap });
   await insertTasks(db, tasks);
   if (d.taskLinks) await insertRows(db, 'task_links', d.taskLinks);
 
@@ -1380,7 +1509,6 @@ export async function doReplace(db: Awaited<ReturnType<typeof getDb>>, backup: B
   // just-replaced targets — and imported task_links
   // can point to deselected types. Same sweep as for the trash.
   await sweepDanglingTaskLinks(db);
-  await dropUnknownTagIds(db);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1389,6 +1517,7 @@ export async function doReplace(db: Awaited<ReturnType<typeof getDb>>, backup: B
 
 export async function doMerge(db: Awaited<ReturnType<typeof getDb>>, backup: BackupFile): Promise<void> {
   const pathMap = await restoreImages(backup);
+  const fileMap = new Map([...pathMap, ...await restoreIcons(backup)]);
   const d = await importTagsAndRemap(db, backup.data);
 
   // Merge deletes nothing, but aborts midway through inserting if a
@@ -1469,15 +1598,15 @@ export async function doMerge(db: Awaited<ReturnType<typeof getDb>>, backup: Bac
   // The blocks under the prefixed owners, their pictures and links pointed here like the rows'.
   const inserted = new Set(entries.map((r) => String(r.id)));
   const owners = new Map([...allOldIds].filter((id) => inserted.has(pid(id))).map((id) => [id, pid(id)]));
-  await insertImportedBlocks(db, d.blocks, 'entry', owners, { images: pathMap, id: nextId });
-  await insertImportedBlocks(db, d.blocks, 'template', new Map(templateIds.map((id) => [id, id])), { images: pathMap, id: nextId });
+  await insertTagLinks(db, 'entry', d.entries, (id) => (inserted.has(pid(id)) ? pid(id) : undefined));
+  await insertImportedBlocks(db, d.blocks, 'entry', owners, { images: fileMap, id: nextId });
+  await insertImportedBlocks(db, d.blocks, 'template', new Map(templateIds.map((id) => [id, id])), { images: fileMap, id: nextId });
   await insertTasks(db, tasks);
   await insertRows(db, 'task_links', taskLinks, true);
 
   // Imported task_links can point to targets that the type filter
   // has just deselected — sweep them out as in doReplace.
   await sweepDanglingTaskLinks(db);
-  await dropUnknownTagIds(db);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

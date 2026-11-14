@@ -1,11 +1,10 @@
 import Database from './sqlite';
 import { invoke } from '@tauri-apps/api/core';
 import { getActiveVaultId } from './vaultManager';
-import { BASELINE_VERSION, FRESH_START_VERSION, TABLES, createSchema, purgeCategory, seedBuiltins } from './schema';
+import { BASELINE_VERSION, FRESH_START_VERSION, TABLES, createSchema, purgeCategory, replaceTagsInDashboards, seedBuiltins } from './schema';
 import { seedAltarTemplate, seedSigilTemplate } from './templateRows';
 import i18n from '../i18n';
 import { useSettingsStore } from '../store/settingsStore';
-import { rewriteTagRefs, stripTagIds } from './tagRefs';
 import { clearSavedBlocks } from './blockStore';
 
 /**
@@ -335,12 +334,13 @@ async function runPeriodicCleanup(db: Database, retentionDays: number | null): P
   // Permanently delete trash contents older than the configured period — "never" skips this.
   if (retentionDays !== null) {
     const cutoff = new Date(Date.now() - retentionDays * 24 * 60 * 60 * 1000).toISOString();
-    // Tags are attached to entries by ID: whoever goes is removed from every list first.
+    // A tag takes its links with it (CASCADE); the dashboards' filters
+    // name it without a foreign key.
     const expiredTags = await db.select<{ id: string }[]>(
       'SELECT id FROM tags WHERE deleted_at IS NOT NULL AND deleted_at < $1',
       [cutoff]
     );
-    await stripTagIds(db, expiredTags.map((t) => t.id));
+    await replaceTagsInDashboards(db, expiredTags.map((t) => t.id));
     // One transaction instead of one commit per table — this runs on every open.
     await db.batch(CLEANUP_TABLES.map((table) => [
       `DELETE FROM ${table} WHERE deleted_at IS NOT NULL AND deleted_at < $1`,
@@ -356,17 +356,6 @@ async function runPeriodicCleanup(db: Database, retentionDays: number | null): P
   }
 
   await sweepDanglingTaskLinks(db);
-  await sweepDanglingTagIds(db);
-}
-
-/**
- * Removes tag IDs without a tag row from every list. One can arise when
- * a tag is permanently deleted while a draft or an open entry still holds the
- * old list and saves afterwards.
- */
-async function sweepDanglingTagIds(db: Database): Promise<void> {
-  const known = new Set((await db.select<{ id: string }[]>('SELECT id FROM tags')).map((r) => r.id));
-  await rewriteTagRefs(db, (ids) => ids.filter((id) => known.has(id)));
 }
 
 /**

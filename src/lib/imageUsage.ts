@@ -7,6 +7,7 @@ import { FIELDS_BLOCK_TYPE, isSigilElement, parseFields, withoutElementContent }
 import { isDrawingBlockType } from './blocks/paint';
 import { isCanvasBlockType, withoutCanvasFile } from './blocks/canvas';
 import { storedImageName } from './schema';
+import { entryTagsSql } from './tagRefs';
 
 /**
  * Where the vault's pictures are used — for "Images": which entries show a
@@ -16,8 +17,11 @@ import { storedImageName } from './schema';
  * (`lib/blocks/blockRefs.ts`), so the roles are the ones it gives.
  */
 
-/** How a place uses a picture — the roles of `block_refs` (`BlockRefRole`). */
-export type ImageUseRole = BlockRefRole;
+/**
+ * How a place uses a picture — the roles of `block_refs` (`BlockRefRole`) a
+ * picture can have, and `cover`: an entry's cover image (`entries.cover_image`).
+ */
+export type ImageUseRole = Exclude<BlockRefRole, 'icon'> | 'cover';
 
 export interface ImageUse {
   kind: 'entry' | 'template' | 'blockDefinition';
@@ -35,11 +39,11 @@ function namesIn(text: string | null | undefined): string[] {
 }
 
 /** Which role a place is listed under when it uses a picture in several ways: the one most like a picture of its own. */
-const ROLE_RANK: Record<ImageUseRole, number> = { content: 0, default: 1, background: 2, render: 3, layer: 4 };
+const ROLE_RANK: Record<ImageUseRole, number> = { content: 0, cover: 1, default: 2, background: 3, render: 4, layer: 5 };
 
 interface RefRow {
   file: string;
-  role: ImageUseRole;
+  role: Exclude<ImageUseRole, 'cover'>;
   entry_id: string | null;
   entry_category: string | null;
   entry_tags: string | null;
@@ -62,7 +66,8 @@ export async function collectImageUses(db: Database): Promise<Map<string, ImageU
 
   const refs = await db.select<RefRow[]>(
     `SELECT r.target AS file, r.role,
-            e.id AS entry_id, e.category_id AS entry_category, e.tags AS entry_tags, e.title AS entry_title,
+            e.id AS entry_id, e.category_id AS entry_category, e.title AS entry_title,
+            ${entryTagsSql('e.id')} AS entry_tags,
             t.id AS template_id, t.name AS template_name
        FROM block_refs r
        JOIN blocks b ON b.row_id = r.block_row
@@ -76,6 +81,16 @@ export async function collectImageUses(db: Database): Promise<Map<string, ImageU
     } else if (ref.template_id) {
       add(ref.file, { kind: 'template', id: ref.template_id, title: ref.template_name ?? '', role: ref.role });
     }
+  }
+
+  // Covers: the column names the picture.
+  const covers = await db.select<{ id: string; title: string; category_id: string | null; cover_image: string; tags: string }[]>(
+    `SELECT e.id, e.title, e.category_id, e.cover_image,
+            ${entryTagsSql('e.id')} AS tags
+       FROM entries e WHERE e.deleted_at IS NULL AND e.cover_image IS NOT NULL`
+  );
+  for (const cover of covers) {
+    add(cover.cover_image, { kind: 'entry', id: cover.id, title: cover.title, entry: { category_id: cover.category_id, tags: jsonArray(cover.tags) }, role: 'cover' });
   }
 
   const definitions = await db.select<{ id: string; name: string; elements: string | null }[]>(
@@ -94,14 +109,15 @@ export function imageRoleLabelKey(role: ImageUseRole): string {
   return `images.roles.${role === 'render' || role === 'layer' ? 'drawing' : role}`;
 }
 
-/** Whether a place can take the picture out itself: shown in a text or an image field of an entry or a template. */
+/** Whether a place can take the picture out itself: shown in a text or an image field of an entry or a template, or an entry's cover. */
 export function isRemovableUse(use: ImageUse): boolean {
+  if (use.role === 'cover') return true;
   return use.role === 'content' && (use.kind === 'entry' || use.kind === 'template');
 }
 
-/** A place that shows the picture as a picture of its own (a text, a field, a canvas, a block default) — not as a drawing's render or layer, nor as a background. */
+/** A place that shows the picture as a picture of its own (a text, a field, a canvas, a block default, a cover) — not as a drawing's render or layer, nor as a background. */
 export function isShownUse(use: ImageUse): boolean {
-  return use.role === 'content' || use.role === 'default';
+  return use.role === 'content' || use.role === 'default' || use.role === 'cover';
 }
 
 function withoutImageInHtml(html: string, file: string): string {

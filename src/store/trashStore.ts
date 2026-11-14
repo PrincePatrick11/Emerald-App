@@ -14,6 +14,7 @@ import { displayTitle } from '../lib/entryTitle';
 import type { TrashedItem } from '../types';
 import { kindOfEntry } from './dashboardStore';
 import { jsonArray } from '../lib/row';
+import { entryTagsSql } from '../lib/tagRefs';
 
 interface TrashState {
   items: TrashedItem[];
@@ -35,7 +36,8 @@ export const useTrashStore = create<TrashState>((set, get) => ({
       const db = await getDb();
       // All entries in one query; the group they show under follows from their category (`kindOfEntry`).
       const entries = await db.select<{ id: string; category_id: string | null; tags: string; title: string; deleted_at: string; category: string | null }[]>(
-        `SELECT e.id, e.category_id, e.tags, e.title, e.deleted_at, c.name as category
+        `SELECT e.id, e.category_id, e.title, e.deleted_at, c.name as category,
+                ${entryTagsSql('e.id')} AS tags
            FROM entries e LEFT JOIN categories c ON e.category_id = c.id
           WHERE e.deleted_at IS NOT NULL`
       );

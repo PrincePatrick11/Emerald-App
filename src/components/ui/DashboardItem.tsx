@@ -1,6 +1,7 @@
 import type { HTMLAttributes, MouseEvent, ReactNode } from 'react';
 import { useUIStore } from '../../store/uiStore';
 import { isImageIcon } from '../../lib/helpers';
+import { iconSrc } from '../../lib/icons';
 import type { ActiveView } from '../../types';
 
 /** The one row of every dashboard: 44px, whatever it holds. */
@@ -72,7 +73,7 @@ export function DashboardRow({ className = '', onClick, children, ...rest }: HTM
 /** An entry's icon, an emoji or an image, at row or card size. */
 export function ItemGlyph({ icon, large }: { icon: string; large?: boolean }) {
   if (isImageIcon(icon)) {
-    return <img src={icon} alt="" className={`${large ? 'w-6 h-6' : 'w-5 h-5'} object-cover rounded-md`} />;
+    return <img src={iconSrc(icon)} alt="" className={`${large ? 'w-6 h-6' : 'w-5 h-5'} object-cover rounded-md`} />;
   }
   return <>{icon}</>;
 }

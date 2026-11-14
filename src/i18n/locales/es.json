@@ -818,6 +818,7 @@
     "removeFromUses_other": "Se muestra en {{count}} lugares – ¿quitarla también allí?",
     "removeAndDelete": "Quitar y eliminar",
     "roles": {
+      "cover": "Imagen de portada",
       "default": "Valor por defecto del bloque",
       "drawing": "Dibujo",
       "background": "Fondo"

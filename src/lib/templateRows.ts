@@ -9,6 +9,7 @@ import { translatedOr } from './blocks/blockAttrs';
 import { sigilBlockSet } from './blocks/sigil';
 import { altarBlockSet } from './blocks/canvas';
 import { ALTAR_TEMPLATE_ID, SIGIL_TEMPLATE_ID, templateToRow, type Template } from './blocks/templates';
+import { readTags, tagStatements } from './tagRefs';
 
 /**
  * The accesses to `templates` that store, fresh vaults and imports share.
@@ -21,24 +22,30 @@ export async function nextTemplateSortOrder(db: Database): Promise<number> {
   return rows[0]?.n ?? 0;
 }
 
-/** The INSERT of a template row, without its blocks — for a batch that writes them along (`templateStore`). */
-export function insertTemplateStatement(template: Template): readonly [string, unknown[]] {
+/**
+ * The INSERT of a template row and its tag links, without its blocks — for a
+ * batch that writes them along (`templateStore`).
+ */
+export function insertTemplateStatements(template: Template): [string, unknown[]][] {
   const row = templateToRow(template);
   return [
-    `INSERT INTO templates
-       (id, name, icon, title, tags, sort_order, created_at, updated_at, deleted_at)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
     [
-      row.id, row.name, row.icon, row.title, row.tags,
-      row.sort_order, row.created_at, row.updated_at, row.deleted_at,
+      `INSERT INTO templates
+         (id, name, icon, title, sort_order, created_at, updated_at, deleted_at)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
+      [
+        row.id, row.name, row.icon, row.title,
+        row.sort_order, row.created_at, row.updated_at, row.deleted_at,
+      ],
     ],
+    ...tagStatements('template', template.id, template.tags),
   ];
 }
 
 /** A template with its block stack — for the seeds of a fresh vault. */
 export async function insertTemplateRow(db: Database, template: Template): Promise<void> {
   const blocks = replaceOwnerBlocks({ kind: 'template', id: template.id }, template.content, template.updated_at, { hasRows: false });
-  await db.batch([insertTemplateStatement(template), ...blocks.statements]);
+  await db.batch([...insertTemplateStatements(template), ...blocks.statements]);
   blocks.commit();
 }
 
@@ -46,7 +53,7 @@ export async function insertTemplateRow(db: Database, template: Template): Promi
 export async function templateById(db: Database, id: string): Promise<Template | undefined> {
   const [row] = await db.select<DbRow[]>('SELECT * FROM templates WHERE id=$1', [id]);
   if (!row) return undefined;
-  const template = fromRow.template(row);
+  const template = fromRow.template({ ...row, tags: await readTags(db, 'template', id) });
   return { ...template, content: (await readContents(db, 'template', [id])).get(id) ?? '' };
 }
 

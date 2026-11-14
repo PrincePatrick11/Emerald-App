@@ -94,10 +94,19 @@ const STUBS = {
         if (globalThis.harnessSaveImage) return globalThis.harnessSaveImage(String(args?.dataUrl ?? ''));
         return '${'c'.repeat(64)}.png';
       }
+      // Icons the same way, in a folder of their own (section 11 lists them).
+      if (cmd === 'save_icon') {
+        if (globalThis.harnessSaveImage) return globalThis.harnessSaveImage(String(args?.dataUrl ?? ''));
+        return '${'f'.repeat(64)}.png';
+      }
       // The backup import asks which pictures the vault has: none here.
       if (cmd === 'list_image_files') return [];
+      // The icons the backup export may embed: those a check puts here.
+      if (cmd === 'list_icon_files') return (globalThis.harnessIconFiles ?? []).map((name) => ({ name, bytes: 1 }));
       // A backup embeds its pictures; the harness has no files, so the name stands in for the bytes.
-      if (cmd === 'read_image_as_base64') return 'data:image/png;base64,' + Buffer.from(String(args?.filename ?? '')).toString('base64');
+      // An icon is no file of images/, as in the vault.
+      if (cmd === 'read_image_as_base64' && (globalThis.harnessIconFiles ?? []).includes(args?.filename)) throw new Error('file not found');
+      if (cmd === 'read_image_as_base64' || cmd === 'read_icon_as_base64') return 'data:image/png;base64,' + Buffer.from(String(args?.filename ?? '')).toString('base64');
       return undefined;
     }`,
   '@tauri-apps/api/path': `
@@ -123,7 +132,8 @@ const entry = join(workDir, 'entry.ts');
 writeFileSync(
   entry,
   `export { runMigrations, VAULT_OUTDATED, VAULT_TOO_NEW, sweepDanglingTaskLinks } from '${root}/src/lib/db';
-   export { TABLES, TABLE_DDL, BASELINE_VERSION, FRESH_START_VERSION, checkIntegrity, reassignCategoryContent, collectUsedImageFilenames } from '${root}/src/lib/schema';
+   export { TABLES, TABLE_DDL, BASELINE_VERSION, FRESH_START_VERSION, checkIntegrity, reassignCategoryContent, collectUsedImageFilenames, collectUsedIconFilenames, replaceTagsInDashboards } from '${root}/src/lib/schema';
+   export { readTagLinks, replaceTagId, tagStatements } from '${root}/src/lib/tagRefs';
    export { assertPayloadReferencesResolve, buildBackupFrom, doMerge, doReplace, readBackupPayload, BACKUP_OUTDATED, BACKUP_TOO_NEW } from '${root}/src/lib/dbBackup';
    export { invalidateVaultCache } from '${root}/src/lib/vaultManager';
    export { clearSavedBlocks, readContents, replaceOwnerBlocks } from '${root}/src/lib/blockStore';
@@ -164,6 +174,7 @@ globalThis.localStorage ??= {
 const {
   runMigrations, VAULT_OUTDATED, VAULT_TOO_NEW, sweepDanglingTaskLinks,
   TABLES, BASELINE_VERSION, FRESH_START_VERSION, checkIntegrity, reassignCategoryContent, collectUsedImageFilenames,
+  collectUsedIconFilenames, replaceTagsInDashboards, readTagLinks, replaceTagId, tagStatements,
   assertPayloadReferencesResolve, buildBackupFrom, doMerge, doReplace, readBackupPayload, BACKUP_OUTDATED, BACKUP_TOO_NEW,
   invalidateVaultCache, clearSavedBlocks, readContents, replaceOwnerBlocks, entriesWithFieldValue, collectImageUses,
 } = await import(pathToFileURL(bundlePath).href);
@@ -346,6 +357,12 @@ console.log('\n2. Vaults from another version are refused and stay as they were\
     INSERT INTO schema_version VALUES (100, 'baseline', '2026-11-01');
     CREATE TABLE entries (id TEXT PRIMARY KEY, type TEXT NOT NULL);`);
   check('a vault of the first fresh schema (v100, entries with a type) is refused as outdated, unchanged', await refuses(firstFresh, VAULT_OUTDATED));
+  // v101 kept tags as JSON and icons as data URLs in the rows; it was never released either.
+  const jsonTags = await prepare('json-tags.db', `
+    CREATE TABLE schema_version (version INTEGER PRIMARY KEY, name TEXT NOT NULL, applied_at TEXT NOT NULL);
+    INSERT INTO schema_version VALUES (101, 'baseline', '2026-11-14');
+    CREATE TABLE entries (id TEXT PRIMARY KEY, tags TEXT NOT NULL DEFAULT '[]');`);
+  check('a vault of v101 (tags as JSON) is refused as outdated, unchanged', await refuses(jsonTags, VAULT_OUTDATED));
 
   // The mechanism for the steps to come: a vault at the fresh start runs a
   // step above it once, stamps it, and keeps the schema otherwise.
@@ -371,8 +388,8 @@ console.log('\n3. checkIntegrity finds what foreign keys do not cover\n');
   const db = freshDb('integrity.db');
   await runMigrations(db);
   await db.execute(
-    `INSERT INTO entries (id,title,created_at,updated_at,tags)
-     VALUES ('e1','Artikel',$1,$1,'[]')`,
+    `INSERT INTO entries (id,title,created_at,updated_at)
+     VALUES ('e1','Artikel',$1,$1)`,
     [now]
   );
   await db.execute(`INSERT INTO tasks (id,title,created_at,updated_at) VALUES ('t1','Aufgabe',$1,$1)`, [now]);
@@ -401,6 +418,49 @@ console.log('\n3. checkIntegrity finds what foreign keys do not cover\n');
     'PRAGMA foreign_key_check sees none of this',
     (await db.select('PRAGMA foreign_key_check')).length === 0
   );
+  // A dashboard filtering by a tag that is gone points nowhere.
+  await db.execute("INSERT INTO tags (id,name) VALUES ('tg1','Da')");
+  await db.execute(
+    `INSERT INTO dashboards (id,name,filter,created_at,updated_at) VALUES ('dt','T',$1,$2,$2)`,
+    [JSON.stringify({ tags: ['tg1', 'weg'] }), now],
+  );
+  check('checkIntegrity reports a dashboard filtering by a missing tag',
+    (await checkIntegrity(db)).some((o) => o.table === 'dashboards' && o.missingTarget === 'tags.weg'));
+  await replaceTagsInDashboards(db, ['weg']);
+  check('replaceTagsInDashboards drops a tag that is gone from the filters',
+    JSON.parse((await db.select("SELECT filter FROM dashboards WHERE id='dt'"))[0].filter).tags.join() === 'tg1');
+  db.close();
+}
+
+console.log('\n3b. Tags are links with foreign keys\n');
+
+{
+  const db = await freshVault('tag-links.db');
+  await db.execute("INSERT INTO tags (id,name) VALUES ('ta','A'), ('tb','B'), ('tc','C')");
+  await db.execute("INSERT INTO entries (id,title,created_at,updated_at) VALUES ('e1','Eins',$1,$1), ('e2','Zwei',$1,$1)", [now]); // lang-ok
+  await db.execute("INSERT INTO images (id,file,created_at,updated_at) VALUES ('im','" + 'a'.repeat(64) + ".png',$1,$1)", [now]);
+  await db.batch([
+    ...tagStatements('entry', 'e1', ['tc', 'ta', 'missing']),
+    ...tagStatements('entry', 'e2', ['ta', 'tb']),
+    ...tagStatements('image', 'im', ['tb']),
+    ...tagStatements('template', 'core-sigil', ['ta']),
+  ]);
+  const tags = async (owner, id) => ((await readTagLinks(db, owner, [id])).get(id) ?? []).join();
+  check('the tags keep the order they were given in; an unknown ID is skipped', (await tags('entry', 'e1')) === 'tc,ta', await tags('entry', 'e1'));
+  let refusedLink = false;
+  try { await db.execute("INSERT INTO entry_tags (entry_id, tag_id) VALUES ('e1','nope')"); } catch { refusedLink = true; }
+  check('a link to a tag that does not exist is refused (foreign key)', refusedLink);
+  await replaceTagId(db, 'ta', 'tb');
+  check('merging tags: the links move over, an owner carrying both keeps one',
+    (await tags('entry', 'e1')) === 'tc,tb' && (await tags('entry', 'e2')) === 'tb' && (await tags('template', 'core-sigil')) === 'tb',
+    [await tags('entry', 'e1'), await tags('entry', 'e2')]);
+  await db.execute("DELETE FROM tags WHERE id='tb'");
+  check('deleting a tag for good takes its links with it (CASCADE)',
+    (await tags('entry', 'e1')) === 'tc' && (await tags('entry', 'e2')) === '' && (await tags('image', 'im')) === '');
+  await db.execute("DELETE FROM entries WHERE id='e1'");
+  check('deleting an entry for good takes its links with it (CASCADE)',
+    (await db.select("SELECT COUNT(*) AS n FROM entry_tags WHERE entry_id='e1'"))[0].n === 0);
+  check('tag links: no orphans, foreign keys hold', (await checkIntegrity(db)).length === 0 && (await db.select('PRAGMA foreign_key_check')).length === 0);
   db.close();
 }
 
@@ -413,8 +473,8 @@ console.log('\n4. Deleting a category loses no entries\n');
      VALUES ('temporaer','Temporär','🧪',99,0)` // lang-ok
   );
   await db.execute(
-    `INSERT INTO entries (id,title,category_id,created_at,updated_at,tags)
-     VALUES ('a1','Wichtiger Artikel','temporaer',$1,$1,'[]')`,
+    `INSERT INTO entries (id,title,category_id,created_at,updated_at)
+     VALUES ('a1','Wichtiger Artikel','temporaer',$1,$1)`,
     [now]
   );
   // The same category also holds content of the other modules.
@@ -711,7 +771,7 @@ console.log('\n9. Block rows\n');
   }
   check('blocks: exactly one owner (CHECK)', refused === 2);
 
-  // Re-encrypting a vault renames pictures in every table by `rowid` (`rewrite_tables` in `reencrypt.rs`).
+  // Re-encrypting a vault renames pictures in every table by `rowid` (`rewrite_database` in `reencrypt.rs`).
   const withoutRowid = [];
   for (const table of TABLES) {
     try { await db.select(`SELECT rowid FROM ${table} LIMIT 0`); } catch { withoutRowid.push(table); }
@@ -720,10 +780,10 @@ console.log('\n9. Block rows\n');
 
   // The lists read only the index at startup (`fetchEntries`).
   const plan = async (sql) => (await db.select(`EXPLAIN QUERY PLAN ${sql}`)).map((r) => r.detail).join(' | ');
-  const list = await plan('SELECT id, title, category_id, entry_number, tags, created_at, updated_at, deleted_at FROM entries WHERE deleted_at IS NULL');
-  check('the list query reads only the index', list.includes('COVERING INDEX idx_entries_list'), list);
-  const decorated = await plan('SELECT id, icon, cover_image FROM entries WHERE deleted_at IS NULL AND (icon IS NOT NULL OR cover_image IS NOT NULL)');
-  check('icon and cover image come via the partial index', decorated.includes('idx_entries_decorated'), decorated);
+  const list = await plan('SELECT id, title, category_id, entry_number, icon, cover_image, created_at, updated_at, deleted_at FROM entries WHERE deleted_at IS NULL');
+  check('the list query reads only the index, icon and cover included', list.includes('COVERING INDEX idx_entries_list'), list);
+  const links = await plan('SELECT entry_id AS owner, tag_id AS tag FROM entry_tags ORDER BY rowid');
+  check('the tags of the lists come in one scan of entry_tags', links.includes('entry_tags') && !links.includes('TEMP B-TREE'), links);
   const chunk = await plan('SELECT rowid AS rid, id FROM entries WHERE +deleted_at IS NULL AND rowid > 1 ORDER BY rowid LIMIT 1000');
   check('the content chunks run along the rowid, without sorting', !chunk.includes('TEMP B-TREE'), chunk);
   db.close();
@@ -762,6 +822,28 @@ console.log('\n10. Readers of the block rows: "Images", image cleanup, field val
     `<section data-block="core.canvas" data-block-id="cv" data-block-data="{nope"><img src="${name('7')}" data-canvas="image"></section>`);
   check('image cleanup: a block it cannot read keeps the pictures its row names', (await collectUsedImageFilenames(db)).has(name('7')));
 
+  // Icons: the columns, and the copies of a custom block, which all name the same file.
+  const icon = (c) => `${c.repeat(64)}.png`;
+  await db.execute("UPDATE entries SET icon=$1 WHERE id='u1'", [icon('a')]);
+  await db.execute("UPDATE templates SET icon=$1 WHERE id='ut'", [icon('b')]);
+  await db.execute(`INSERT INTO languages (id,name,icon,created_at,updated_at) VALUES ('lg','L',$1,$2,$3)`, [icon('c'), now, now]);
+  const copy = (id) => `<section data-block="core.fields" data-block-id="${id}" data-block-config="${enc({ elements: [{ id: 'n', kind: 'number', label: 'N' }], name: 'Block', icon: icon('d') })}"><dl></dl></section>`;
+  await insertWithStack(db, 'entries', { id: 'u4', title: 'Copy 1', created_at: now, updated_at: now }, copy('k1'));
+  await insertWithStack(db, 'entries', { id: 'u5', title: 'Copy 2', created_at: now, updated_at: now, deleted_at: now }, copy('k2'));
+  const iconRefs = await db.select("SELECT DISTINCT target FROM block_refs WHERE target_kind='icon' AND role='icon'");
+  check('a block copy names its icon in block_refs, both copies the same file',
+    iconRefs.length === 1 && iconRefs[0].target === icon('d'), iconRefs);
+  const usedIcons = await collectUsedIconFilenames(db);
+  check('icon cleanup: the icons of entries, templates, languages and block copies are in use, the trash included',
+    ['a', 'b', 'c', 'd'].every((c) => usedIcons.has(icon(c))), [...usedIcons]);
+  check('icon cleanup: an icon nobody names is not', !usedIcons.has(icon('e')));
+  check('Images: an icon is no use of a picture', ![...uses.keys()].includes(icon('a')) && !(await collectImageUses(db)).has(icon('d')));
+  // A cover is a picture of "Images", used by its entry.
+  await db.execute("UPDATE entries SET cover_image=$1 WHERE id='u1'", [name('8')]);
+  check('Images: a cover is a use of its entry, with the role cover',
+    ((await collectImageUses(db)).get(name('8')) ?? []).map((u) => `${u.kind}:${u.id}:${u.role}`).join() === 'entry:u1:cover');
+  check('image cleanup: a cover is in use', (await collectUsedImageFilenames(db)).has(name('8')));
+
   // Field values through SQLite's JSON functions (#37).
   const fields = (id, values) => `<section data-block="core.fields" data-block-id="${id}"`
     + ` data-block-config="${enc({ elements: [{ id: 'n1', kind: 'number', label: 'N' }, { id: 's1', kind: 'shorttext', label: 'S' }, { id: 'b1', kind: 'toggle', label: 'B' }] })}"`
@@ -784,7 +866,7 @@ console.log('\n10. Readers of the block rows: "Images", image cleanup, field val
   db.close();
 }
 
-console.log("\n11. Backups: the round trip of '16', older and newer files refused\n");
+console.log("\n11. Backups: the round trip of '17', older and newer files refused\n");
 
 {
   const { createHash } = await import('node:crypto');
@@ -842,9 +924,19 @@ console.log("\n11. Backups: the round trip of '16', older and newer files refuse
     + `<section data-block="core.fields" data-block-id="f1" data-block-config="${attr(fieldsConfig)}"></section>`;
 
   const src = await freshVault('backup-src.db');
-  await insertWithStack(src, 'entries', { id: W, title: 'Ziel', created_at: now, updated_at: now }, '<p>Ziel</p>'); // lang-ok
+  const ico = (c) => `${c.repeat(64)}.webp`;
+  const iconCopy = `<section data-block="core.fields" data-block-id="ic" data-block-config="${attr({ elements: [{ id: 'n', kind: 'number', label: 'N' }], name: 'B', icon: ico('a') })}"><dl></dl></section>`;
+  await insertWithStack(src, 'entries', { id: W, title: 'Ziel', icon: ico('b'), cover_image: pic('7'), created_at: now, updated_at: now }, '<p>Ziel</p>' + iconCopy); // lang-ok
   await insertWithStack(src, 'entries', { id: J, title: 'Quelle', created_at: now, updated_at: now }, journalStack); // lang-ok
-  await insertWithStack(src, 'templates', { id: TPL, name: 'Vorlage', created_at: now, updated_at: now }, `<p>Bild</p><img src="${pic('6')}">`); // lang-ok
+  await insertWithStack(src, 'templates', { id: TPL, name: 'Vorlage', icon: ico('c'), created_at: now, updated_at: now }, `<p>Bild</p><img src="${pic('6')}">`); // lang-ok
+  await src.execute("INSERT INTO tags (id,name) VALUES ('t-a','Alpha'), ('t-b','Beta')");
+  await src.execute(`INSERT INTO images (id,file,created_at,updated_at) VALUES ('img1',$1,$2,$2)`, [pic('8'), now]);
+  await src.batch([
+    ...tagStatements('entry', W, ['t-b', 't-a']),
+    ...tagStatements('template', TPL, ['t-a']),
+    ...tagStatements('image', 'img1', ['t-b']),
+  ]);
+  globalThis.harnessIconFiles = [ico('a'), ico('b'), ico('c')];
   await src.execute(`INSERT INTO tasks (id,title,created_at,updated_at) VALUES ($1,'Aufgabe',$2,$2)`, [TASK, now]); // lang-ok
   await src.execute(`INSERT INTO task_links (id,task_id,target_id,target_type) VALUES ('tl1',$1,$2,'entry')`, [TASK, W]);
   // A block written at another time than the others keeps that time.
@@ -853,19 +945,29 @@ console.log("\n11. Backups: the round trip of '16', older and newer files refuse
   const sigilBefore = await blockRows(src, 'template', 'core-sigil');
 
   const backup = await buildBackupFrom(src, FULL);
-  check("export: version '16', the blocks as rows, no content on their owners",
-    backup.version === '16' && Array.isArray(backup.data.blocks) && backup.data.blocks.length > 0
+  check("export: version '17', the blocks as rows, no content on their owners",
+    backup.version === '17' && Array.isArray(backup.data.blocks) && backup.data.blocks.length > 0
       && backup.data.entries.every((r) => !('content' in r)) && backup.data.templates.every((r) => !('content' in r))
       && backup.data.blocks.every((r) => !('row_id' in r) && !('text' in r)), backup.data.blocks?.[0]);
   check("export: every picture of the blocks travels, the one only in a prefill's JSON too",
     ['1', '2', '3', '4', '5', '6'].every((c) => pic(c) in backup.images), Object.keys(backup.images));
+  check('export: the cover travels as a picture', pic('7') in backup.images);
+  check("export: the icons travel as files of their own — the entry's, the template's and a block copy's — none among the pictures",
+    ['a', 'b', 'c'].every((c) => ico(c) in (backup.icons ?? {})) && !Object.keys(backup.images).some((n) => n.endsWith('.webp')), Object.keys(backup.icons ?? {}));
+  check('export: rows carry their tags as arrays of IDs, in their order',
+    backup.data.entries.find((r) => r.id === W)?.tags.join() === 't-b,t-a'
+      && backup.data.templates.find((r) => r.id === TPL)?.tags.join() === 't-a'
+      && backup.data.vaultImages.find((r) => r.id === 'img1')?.tags.join() === 't-b');
 
   // (a) Replace into an empty vault: the same rows, pictures renamed, references rebuilt.
+  // The target vault has none of the source's icon files.
+  globalThis.harnessIconFiles = [];
   const restored = reread(backup);
   const dst = await freshVault('backup-dst.db');
   clearSavedBlocks();
   await doReplace(dst, restored);
-  const names = namesAfterImport(restored);
+  const iconNames = new Map(Object.entries(restored.icons).map(([n, url]) => [n, savedName(url)]));
+  const names = new Map([...namesAfterImport(restored), ...iconNames]);
   for (const [kind, id, label] of [['entry', J, 'journal entry'], ['entry', W, 'wiki article'], ['template', TPL, 'template']]) {
     const expected = renamed(await blockRows(src, kind, id), names);
     const got = await blockRows(dst, kind, id);
@@ -881,6 +983,16 @@ console.log("\n11. Backups: the round trip of '16', older and newer files refuse
     (await refRows(dst, 'entry', J)).some((r) => r.role === 'default' && r.target === names.get(pic('5'))));
   check("restore: the vault's own templates keep their blocks",
     (await dst.select("SELECT COUNT(*) AS n FROM blocks WHERE template_id = 'core-sigil'"))[0].n > 0);
+  const [wRow] = await dst.select('SELECT icon, cover_image FROM entries WHERE id = $1', [W]);
+  const [tRow] = await dst.select('SELECT icon FROM templates WHERE id = $1', [TPL]);
+  check('restore: icons are stored anew and the rows name them', wRow.icon === iconNames.get(ico('b')) && tRow.icon === iconNames.get(ico('c')), { wRow, tRow });
+  check('restore: the cover names the picture stored here', wRow.cover_image === names.get(pic('7')), wRow);
+  check("restore: the block copy's icon is renamed and referenced as an icon",
+    (await refRows(dst, 'entry', W)).some((r) => r.target_kind === 'icon' && r.target === iconNames.get(ico('a'))));
+  const tagsOf = async (db, owner, id) => ((await readTagLinks(db, owner, [id])).get(id) ?? []).join();
+  check('restore: entries, templates and pictures get their tags back, in their order',
+    (await tagsOf(dst, 'entry', W)) === 't-b,t-a' && (await tagsOf(dst, 'template', TPL)) === 't-a' && (await tagsOf(dst, 'image', 'img1')) === 't-b',
+    [await tagsOf(dst, 'entry', W), await tagsOf(dst, 'template', TPL), await tagsOf(dst, 'image', 'img1')]);
   check("restore: schema identical to the fresh vault", JSON.stringify(await readSchema(dst)) === JSON.stringify(schemaA));
   dst.close();
 
@@ -897,6 +1009,9 @@ console.log("\n11. Backups: the round trip of '16', older and newer files refuse
     !!copy && (await refRows(src, 'entry', copy.id)).filter((r) => r.target_kind === 'entry').every((r) => r.target === prefixed));
   check("merge: the original keeps its blocks", JSON.stringify(await blockRows(src, 'entry', J)) === JSON.stringify(journalBefore));
   check("merge: a template that is already there gets no second set of blocks", (await blockRows(src, 'template', TPL)).length === 1);
+  const copyW = copy ? copy.id.slice(0, copy.id.length - J.length) + W : null;
+  check('merge: the copy carries the tags of its original, the template keeps its own',
+    !!copyW && (await readTagLinks(src, 'entry', [copyW])).get(copyW)?.join() === 't-b,t-a' && (await readTagLinks(src, 'template', [TPL])).get(TPL)?.join() === 't-a');
   src.close();
 
   // (c) A partial replace — journal and tasks only: no other owner gets blocks, a link to the missing article goes.
@@ -935,16 +1050,18 @@ console.log("\n11. Backups: the round trip of '16', older and newer files refuse
 
   // Files of other versions: refused when they are read, before anything happens.
   const refused = (version, code) => throwsCode(() => readBackupPayload({ ...JSON.parse(JSON.stringify(backup)), version }), code);
+  check("a backup of '16' (tags as JSON, icons as data URLs) is refused as outdated", await refused('16', BACKUP_OUTDATED));
   check("a backup of '15' (entries with a type) is refused as outdated", await refused('15', BACKUP_OUTDATED));
   check("a backup of '14' (the last version before the fresh start) is refused as outdated", await refused('14', BACKUP_OUTDATED));
   check("a backup of '1' is refused as outdated", await refused('1', BACKUP_OUTDATED));
-  check("a backup of '17' is refused as too new", await refused('17', BACKUP_TOO_NEW));
+  check("a backup of '18' is refused as too new", await refused('18', BACKUP_TOO_NEW));
   check('a backup without a usable version is refused', await throwsCode(() => readBackupPayload({ ...backup, version: 'x' }), 'Unsupported backup version'));
   const fixture = (name) => JSON.parse(readFileSync(join(process.cwd(), 'tools/mcp/seed/imports', name), 'utf8'));
   for (const name of ['backup-v12-altars.emeralddb', 'backup-v13-pre-rebuild.emeralddb']) {
     check(`the old fixture ${name} is refused as outdated`, await throwsCode(() => readBackupPayload(fixture(name)), BACKUP_OUTDATED));
   }
   delete globalThis.harnessSaveImage;
+  delete globalThis.harnessIconFiles;
 }
 
 console.log('\n12. Mirrored constants\n');
@@ -985,6 +1102,17 @@ console.log('\n12. Mirrored constants\n');
   check(
     'the image folder is called images (Rust is the only source)',
     vaultRs.includes('pub const IMAGES_SUBDIR: &str = "images"')
+  );
+  // The icon folder appears as a folder in Rust and as the path under the scheme on both sides.
+  const iconsTs = read('src/lib/icons.ts');
+  check(
+    'the icon folder is called icons, and the scheme serves it under /icons/ on both sides',
+    vaultRs.includes('pub const ICONS_SUBDIR: &str = "icons"') && imagesRs.includes('strip_prefix("icons/")')
+      && iconsTs.includes('/icons/${icon}')
+  );
+  check(
+    'emerald-img: icons build their URL with the builder of the pictures (schemeUrl)',
+    iconsTs.includes('schemeUrl(') && imagesTs.includes('export function schemeUrl')
   );
 
   // The scheme appears in three places: handler, URL construction and CSP. If one of the

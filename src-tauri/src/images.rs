@@ -18,6 +18,13 @@
 //! stay 64 hex digits either way, so nothing that reads them changes, and
 //! identical images still share one file. [`store`] and [`load`] are the only
 //! places that touch image bytes on disk.
+//!
+//! Icons (of entries, templates, custom blocks, languages) are stored the same
+//! way in a folder of their own, `{vaultDir}/icons/` ([`Store::Icons`]): same
+//! names, same sealing — under a context of their own, so a file of one folder
+//! does not open as one of the other — and served by the same scheme under
+//! `/{vaultId}/icons/{filename}`. They are kept apart from the pictures so
+//! that "Images" never lists them.
 
 use base64::{engine::general_purpose, Engine as _};
 use sha2::{Digest, Sha256};
@@ -46,6 +53,37 @@ fn image_keys(app: &tauri::AppHandle, vault_id: &str) -> Result<Option<ImageKeys
     }))
 }
 
+/// Which of a vault's two picture folders.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub(crate) enum Store {
+    Images,
+    Icons,
+}
+
+impl Store {
+    pub(crate) fn subdir(self) -> &'static str {
+        match self {
+            Store::Images => vault::IMAGES_SUBDIR,
+            Store::Icons => vault::ICONS_SUBDIR,
+        }
+    }
+
+    /// What a file of this folder is sealed as.
+    pub(crate) fn context(self, name: &str) -> Context<'_> {
+        match self {
+            Store::Images => Context::Image(name),
+            Store::Icons => Context::Icon(name),
+        }
+    }
+
+    fn dir(self, app: &tauri::AppHandle, vault_id: &str) -> Result<PathBuf, String> {
+        match self {
+            Store::Images => vault::images_dir(app, vault_id),
+            Store::Icons => vault::icons_dir(app, vault_id),
+        }
+    }
+}
+
 /// The name an image's bytes are stored under.
 fn image_name(keys: Option<&ImageKeys>, bytes: &[u8], ext: &str) -> String {
     let digest = match keys {
@@ -56,27 +94,27 @@ fn image_name(keys: Option<&ImageKeys>, bytes: &[u8], ext: &str) -> String {
 }
 
 /// An image as an encrypted vault stores it: its name and the sealed bytes.
-/// For putting a vault's images under a new key (`reencrypt.rs`).
-pub(crate) fn seal_for_vault(vault_key: &Key, bytes: &[u8], ext: &str) -> (String, Vec<u8>) {
+/// For putting a vault's images and icons under a new key (`reencrypt.rs`).
+pub(crate) fn seal_for_vault(vault_key: &Key, kind: Store, bytes: &[u8], ext: &str) -> (String, Vec<u8>) {
     let keys = ImageKeys {
         files: crypto::subkey(vault_key, Purpose::Files),
         names: crypto::subkey(vault_key, Purpose::ImageNames),
     };
     let name = image_name(Some(&keys), bytes, ext);
-    let sealed = crypto::seal(&keys.files, Context::Image(&name), bytes);
+    let sealed = crypto::seal(&keys.files, kind.context(&name), bytes);
     (name, sealed)
 }
 
 /// Writes an image into the vault — sealed in an encrypted one — unless a file
 /// of that name is there already. Returns the name.
-fn store(app: &tauri::AppHandle, vault_id: &str, bytes: &[u8], ext: &str) -> Result<String, String> {
+fn store(app: &tauri::AppHandle, vault_id: &str, kind: Store, bytes: &[u8], ext: &str) -> Result<String, String> {
     let keys = image_keys(app, vault_id)?;
     let filename = image_name(keys.as_ref(), bytes, ext);
-    let path = vault::images_dir(app, vault_id)?.join(&filename);
+    let path = kind.dir(app, vault_id)?.join(&filename);
     let _guard = image_write_guard();
     if !path.exists() {
         let contents = match &keys {
-            Some(keys) => crypto::seal(&keys.files, Context::Image(&filename), bytes),
+            Some(keys) => crypto::seal(&keys.files, kind.context(&filename), bytes),
             None => bytes.to_vec(),
         };
         std::fs::write(&path, contents).map_err(|e| e.to_string())?;
@@ -87,14 +125,14 @@ fn store(app: &tauri::AppHandle, vault_id: &str, bytes: &[u8], ext: &str) -> Res
 /// Reads a stored image's bytes, opening it in an encrypted vault. A file that
 /// is not sealed is returned as it is: the dev seed's and the tests' vaults
 /// start out plain.
-fn load(app: &tauri::AppHandle, vault_id: &str, filename: &str) -> Result<Vec<u8>, String> {
-    let path = locate(app, vault_id, filename)?;
+fn load(app: &tauri::AppHandle, vault_id: &str, kind: Store, filename: &str) -> Result<Vec<u8>, String> {
+    let path = locate(app, vault_id, kind, filename)?;
     let bytes = std::fs::read(&path).map_err(|e| format!("read: {e}"))?;
     if !crypto::is_sealed(&bytes) {
         return Ok(bytes);
     }
     let keys = image_keys(app, vault_id)?.ok_or("sealed image in an unencrypted vault")?;
-    crypto::open(&keys.files, Context::Image(filename), &bytes)
+    crypto::open(&keys.files, kind.context(filename), &bytes)
         .map(|plain| plain.to_vec())
         .map_err(|e| e.to_string())
 }
@@ -142,12 +180,12 @@ pub(crate) fn is_valid_image_name(name: &str) -> bool {
 }
 
 /// Resolves a stored filename to the file in the vault's own folder.
-fn locate(app: &tauri::AppHandle, vault_id: &str, filename: &str) -> Result<PathBuf, String> {
+fn locate(app: &tauri::AppHandle, vault_id: &str, kind: Store, filename: &str) -> Result<PathBuf, String> {
     if !is_valid_image_name(filename) {
         return Err("invalid image name".to_string());
     }
     let own = vault::vault_dir(app, vault_id)?
-        .join(vault::IMAGES_SUBDIR)
+        .join(kind.subdir())
         .join(filename);
     if own.is_file() {
         return Ok(own);
@@ -170,6 +208,21 @@ fn image_write_guard() -> std::sync::MutexGuard<'static, ()> {
         .unwrap_or_else(|poisoned| poisoned.into_inner())
 }
 
+
+/// Stores a base64 data-URL in one of the folders and returns the filename.
+fn store_data_url(app: &tauri::AppHandle, vault_id: &str, kind: Store, data_url: &str) -> Result<String, String> {
+    let (mime_part, b64) = data_url
+        .strip_prefix("data:")
+        .and_then(|s| s.split_once(','))
+        .ok_or("Invalid data URL")?;
+
+    let ext = ext_for_mime(mime_part.split(';').next().unwrap_or(""));
+    let bytes = general_purpose::STANDARD
+        .decode(b64)
+        .map_err(|e| e.to_string())?;
+    store(app, vault_id, kind, &bytes, ext)
+}
+
 /// Stores a base64 data-URL and returns the filename it was given.
 /// A hash of the raw bytes is the name, so identical images share one file.
 #[tauri::command]
@@ -178,20 +231,44 @@ pub async fn save_image(
     data_url: String,
     vault_id: String,
 ) -> Result<String, String> {
-    tauri::async_runtime::spawn_blocking(move || {
-        let (mime_part, b64) = data_url
-            .strip_prefix("data:")
-            .and_then(|s| s.split_once(','))
-            .ok_or("Invalid data URL")?;
+    tauri::async_runtime::spawn_blocking(move || store_data_url(&app, &vault_id, Store::Images, &data_url))
+        .await
+        .map_err(|e| e.to_string())?
+}
 
-        let ext = ext_for_mime(mime_part.split(';').next().unwrap_or(""));
-        let bytes = general_purpose::STANDARD
-            .decode(b64)
-            .map_err(|e| e.to_string())?;
-        store(&app, &vault_id, &bytes, ext)
-    })
-    .await
-    .map_err(|e| e.to_string())?
+/// Largest icon a data URL may carry. An icon is brought down to 128px before
+/// it gets here (`lib/icons.ts`); anything far beyond that is not an icon.
+const MAX_ICON_DATA_URL: usize = 2 * 1024 * 1024;
+
+/// Whether a data URL carries an SVG, by the extension its MIME type maps to.
+fn is_svg_data_url(data_url: &str) -> bool {
+    let mime = data_url
+        .strip_prefix("data:")
+        .and_then(|s| s.split([';', ',']).next())
+        .unwrap_or("");
+    ext_for_mime(&mime.to_ascii_lowercase()) == "svg"
+}
+
+/// Stores an icon (a base64 data-URL, already small) in the vault's `icons/`
+/// and returns the filename — like [`save_image`], in the other folder.
+#[tauri::command]
+pub async fn save_icon(
+    app: tauri::AppHandle,
+    data_url: String,
+    vault_id: String,
+) -> Result<String, String> {
+    if data_url.len() > MAX_ICON_DATA_URL {
+        return Err("icon too large".to_string());
+    }
+    // No SVG: the picker refuses it (`readIconFile`), and a backup or an
+    // `.emerald` file must not bring one in either — an icon is served from
+    // the app's own image origin.
+    if is_svg_data_url(&data_url) {
+        return Err("svg icons are not accepted".to_string());
+    }
+    tauri::async_runtime::spawn_blocking(move || store_data_url(&app, &vault_id, Store::Icons, &data_url))
+        .await
+        .map_err(|e| e.to_string())?
 }
 
 /// The checks every command that reads an image from an arbitrary location
@@ -216,7 +293,7 @@ pub async fn copy_image_file(
     tauri::async_runtime::spawn_blocking(move || {
         let (ext, canonical_source) = checked_image_source(&app, &source)?;
         let bytes = std::fs::read(&canonical_source).map_err(|e| format!("read {source}: {e}"))?;
-        store(&app, &vault_id, &bytes, &ext)
+        store(&app, &vault_id, Store::Images, &bytes, &ext)
     })
     .await
     .map_err(|e| e.to_string())?
@@ -253,28 +330,44 @@ pub async fn read_image_file(app: tauri::AppHandle, source: String) -> Result<St
     .map_err(|e| e.to_string())?
 }
 
+/// A stored file of one folder as a base64 data-URL.
+fn as_data_url(app: &tauri::AppHandle, vault_id: &str, kind: Store, filename: &str) -> Result<String, String> {
+    let bytes = load(app, vault_id, kind, filename)?;
+    let ext = crate::ext_for_path(filename);
+    Ok(format!(
+        "data:{};base64,{}",
+        mime_for_ext(&ext),
+        general_purpose::STANDARD.encode(&bytes)
+    ))
+}
+
 /// Reads a stored image and returns it as a base64 data-URL.
 ///
 /// Only for the callers that cannot use the `emerald-img` scheme: the PDF
-/// export renders in a `file://` webview, and the backup writer has to embed
-/// the bytes in JSON.
+/// export renders in a `file://` webview the scheme cannot reach, and the
+/// backup writer has to embed the bytes in JSON.
 #[tauri::command]
 pub async fn read_image_as_base64(
     app: tauri::AppHandle,
     filename: String,
     vault_id: String,
 ) -> Result<String, String> {
-    tauri::async_runtime::spawn_blocking(move || {
-        let bytes = load(&app, &vault_id, &filename)?;
-        let ext = crate::ext_for_path(&filename);
-        Ok(format!(
-            "data:{};base64,{}",
-            mime_for_ext(&ext),
-            general_purpose::STANDARD.encode(&bytes)
-        ))
-    })
-    .await
-    .map_err(|e| e.to_string())?
+    tauri::async_runtime::spawn_blocking(move || as_data_url(&app, &vault_id, Store::Images, &filename))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+/// A stored icon as a base64 data-URL — for the backup, the `.emerald` export
+/// and the PDF, like [`read_image_as_base64`].
+#[tauri::command]
+pub async fn read_icon_as_base64(
+    app: tauri::AppHandle,
+    filename: String,
+    vault_id: String,
+) -> Result<String, String> {
+    tauri::async_runtime::spawn_blocking(move || as_data_url(&app, &vault_id, Store::Icons, &filename))
+        .await
+        .map_err(|e| e.to_string())?
 }
 
 #[derive(serde::Serialize)]
@@ -283,29 +376,52 @@ pub struct StoredImage {
     pub bytes: u64,
 }
 
+/// Every file with a stored name in one of the vault's folders.
+fn list_files(app: &tauri::AppHandle, vault_id: &str, kind: Store) -> Result<Vec<StoredImage>, String> {
+    let dir = kind.dir(app, vault_id)?;
+    let mut out = Vec::new();
+
+    for entry in std::fs::read_dir(&dir).map_err(|e| e.to_string())?.flatten() {
+        let name = entry.file_name().to_string_lossy().into_owned();
+        if !is_valid_image_name(&name) {
+            continue;
+        }
+        let bytes = entry.metadata().map(|m| m.len()).unwrap_or(0);
+        out.push(StoredImage { name, bytes });
+    }
+
+    Ok(out)
+}
+
+/// Deletes the named files from one of the vault's folders. Returns bytes freed.
+fn delete_files(app: &tauri::AppHandle, vault_id: &str, kind: Store, filenames: Vec<String>) -> Result<u64, String> {
+    let dir = kind.dir(app, vault_id)?;
+    let _guard = image_write_guard();
+    let mut freed = 0u64;
+
+    for name in filenames {
+        if !is_valid_image_name(&name) {
+            continue;
+        }
+        let path = dir.join(&name);
+        let size = std::fs::metadata(&path).map(|m| m.len()).unwrap_or(0);
+        if std::fs::remove_file(&path).is_ok() {
+            freed += size;
+        }
+    }
+
+    Ok(freed)
+}
+
 /// Every image file in a vault's own folder.
 #[tauri::command]
 pub async fn list_image_files(
     app: tauri::AppHandle,
     vault_id: String,
 ) -> Result<Vec<StoredImage>, String> {
-    tauri::async_runtime::spawn_blocking(move || {
-        let dir = vault::images_dir(&app, &vault_id)?;
-        let mut out = Vec::new();
-
-        for entry in std::fs::read_dir(&dir).map_err(|e| e.to_string())?.flatten() {
-            let name = entry.file_name().to_string_lossy().into_owned();
-            if !is_valid_image_name(&name) {
-                continue;
-            }
-            let bytes = entry.metadata().map(|m| m.len()).unwrap_or(0);
-            out.push(StoredImage { name, bytes });
-        }
-
-        Ok(out)
-    })
-    .await
-    .map_err(|e| e.to_string())?
+    tauri::async_runtime::spawn_blocking(move || list_files(&app, &vault_id, Store::Images))
+        .await
+        .map_err(|e| e.to_string())?
 }
 
 /// Deletes the named images from a vault's own folder. Returns bytes freed.
@@ -315,26 +431,32 @@ pub async fn delete_image_files(
     vault_id: String,
     filenames: Vec<String>,
 ) -> Result<u64, String> {
-    tauri::async_runtime::spawn_blocking(move || {
-        let dir = vault::images_dir(&app, &vault_id)?;
-        let _guard = image_write_guard();
-        let mut freed = 0u64;
+    tauri::async_runtime::spawn_blocking(move || delete_files(&app, &vault_id, Store::Images, filenames))
+        .await
+        .map_err(|e| e.to_string())?
+}
 
-        for name in filenames {
-            if !is_valid_image_name(&name) {
-                continue;
-            }
-            let path = dir.join(&name);
-            let size = std::fs::metadata(&path).map(|m| m.len()).unwrap_or(0);
-            if std::fs::remove_file(&path).is_ok() {
-                freed += size;
-            }
-        }
+/// Every icon file in a vault's `icons/`.
+#[tauri::command]
+pub async fn list_icon_files(
+    app: tauri::AppHandle,
+    vault_id: String,
+) -> Result<Vec<StoredImage>, String> {
+    tauri::async_runtime::spawn_blocking(move || list_files(&app, &vault_id, Store::Icons))
+        .await
+        .map_err(|e| e.to_string())?
+}
 
-        Ok(freed)
-    })
-    .await
-    .map_err(|e| e.to_string())?
+/// Deletes the named icons from a vault's `icons/`. Returns bytes freed.
+#[tauri::command]
+pub async fn delete_icon_files(
+    app: tauri::AppHandle,
+    vault_id: String,
+    filenames: Vec<String>,
+) -> Result<u64, String> {
+    tauri::async_runtime::spawn_blocking(move || delete_files(&app, &vault_id, Store::Icons, filenames))
+        .await
+        .map_err(|e| e.to_string())?
 }
 
 // ── emerald-img:// ───────────────────────────────────────────────────────────
@@ -348,17 +470,22 @@ fn not_found() -> Response<Vec<u8>> {
 }
 
 fn serve(app: &tauri::AppHandle, request: &Request<Vec<u8>>) -> Response<Vec<u8>> {
-    // `/{vaultId}/{filename}` on every platform. Windows serves custom schemes
-    // as `http://emerald-img.localhost/…` and the others as
+    // `/{vaultId}/{filename}` for a picture, `/{vaultId}/icons/{filename}` for
+    // an icon, on every platform. Windows serves custom schemes as
+    // `http://emerald-img.localhost/…` and the others as
     // `emerald-img://localhost/…`, but the host carries no meaning either way,
     // so the path is identical.
     let path = request.uri().path();
     let mut segments = path.trim_start_matches('/').splitn(2, '/');
-    let (Some(vault_id), Some(filename)) = (segments.next(), segments.next()) else {
+    let (Some(vault_id), Some(rest)) = (segments.next(), segments.next()) else {
         return not_found();
     };
+    let (kind, filename) = match rest.strip_prefix("icons/") {
+        Some(name) => (Store::Icons, name),
+        None => (Store::Images, rest),
+    };
 
-    let Ok(bytes) = load(app, vault_id, filename) else {
+    let Ok(bytes) = load(app, vault_id, kind, filename) else {
         return not_found();
     };
     // Decrypted images do not belong in the WebView's disk cache — there
@@ -403,4 +530,17 @@ pub fn register(builder: tauri::Builder<tauri::Wry>) -> tauri::Builder<tauri::Wr
             });
         },
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn svg_icons_are_recognised_whatever_the_spelling() {
+        assert!(is_svg_data_url("data:image/svg+xml;base64,PHN2Zz4="));
+        assert!(is_svg_data_url("data:IMAGE/SVG+XML,<svg/>"));
+        assert!(!is_svg_data_url("data:image/png;base64,AAAA"));
+        assert!(!is_svg_data_url("not a data url"));
+    }
 }

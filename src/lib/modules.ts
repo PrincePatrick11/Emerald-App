@@ -50,7 +50,7 @@ export const DEFAULT_ENTRY_EMOJI: Record<ContentType, string> = {
 /**
  * The icon of an entry in lists, on Home, in the left list and in the
  * export: its own (emoji or image), otherwise the category's emoji, otherwise
- * that of its kind. Either an emoji or an image address — `isImageIcon` tells
+ * that of its kind. Either an emoji or an icon file (`iconSrc`) — `isImageIcon` tells
  * them apart. Entries of the category Journal show their moon phase instead
  * (`journalIcon`), where the moon phase is shown.
  */

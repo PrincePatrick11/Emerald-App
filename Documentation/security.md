@@ -51,6 +51,7 @@ PDF export renders in a hidden window that the per-platform `export_pdf` command
 | `copy_image_file`, `read_image_as_base64`, `read_image_file` | `images.rs` | see [Path Confinement](#path-confinement) |
 | `list_image_files` | `images.rs` | enumerates the vault's `images/` |
 | `delete_image_files` | `images.rs` | **a delete primitive** — takes filenames, skips any that fail `is_valid_image_name`, resolves them only against the vault's `images/`. Used by Settings → Storage cleanup |
+| `save_icon`, `read_icon_as_base64`, `list_icon_files`, `delete_icon_files` | `images.rs` | the same as their image counterparts, confined to the vault's `icons/` (`Store::Icons`); `save_icon` refuses a data URL above 2 MB (`MAX_ICON_DATA_URL`). An icon is sealed under `Context::Icon(name)`, so a file moved between `icons/` and `images/` does not open; the `emerald-img` handler serves `/{vaultId}/icons/{name}` from `icons/` with the same name check |
 | `register_vaults`, `ensure_vault_dirs`, `create_vault_dirs`, `ensure_backup_dir`, `probe_vault_dir`, `delete_vault_files`, `discard_import_staging` | `vault.rs` | see [Vault Directories as a Trust Boundary](#vault-directories-as-a-trust-boundary) |
 | `read_vault_drafts`, `write_vault_drafts` | `vault.rs` | the vault's `drafts.json`, see [Vault JSON files](#vault-json-files) |
 | `read_vault_settings`, `write_vault_settings` | `vault.rs` | the vault's `settings.json`, see [Vault JSON files](#vault-json-files) |
@@ -102,7 +103,7 @@ It also refuses on an install method that cannot be replaced, and on Linux that 
 
 The mechanics are in [`architecture/encryption.md`](architecture/encryption.md); this section is what they are for and where they stop.
 
-**What is protected.** Everything a vault keeps on disk except `settings.json`: the database (SQLCipher, AES-256), images and drafts (XChaCha20-Poly1305), and `.emeralddb` backups. Someone who gets the vault folder — a stolen laptop, a synced cloud folder, a backup drive, a copy shared by mistake — reads nothing without the password or the recovery key. Image names are keyed hashes, so even the presence of a known picture cannot be confirmed.
+**What is protected.** Everything a vault keeps on disk except `settings.json`: the database (SQLCipher, AES-256), images, icons and drafts (XChaCha20-Poly1305), and `.emeralddb` backups. Someone who gets the vault folder — a stolen laptop, a synced cloud folder, a backup drive, a copy shared by mistake — reads nothing without the password or the recovery key. Image names are keyed hashes, so even the presence of a known picture cannot be confirmed.
 
 **Passwords and keys.**
 
@@ -151,7 +152,7 @@ The automatic backup is the one place where a backup is written outside the fixe
 **`delete_vault_files`** removes only the vault's own artefacts **by name**, never with `remove_dir_all`: the app puts its database into whatever folder the user chose, so a vault created straight in Documents would otherwise take Documents with it. It refuses unless the folder contains an `emerald.db` (`not a vault directory: no database found`), then deletes:
 
 1. `emerald.db` and its journal,
-2. files in `images/` whose names pass `is_valid_image_name`,
+2. files in `images/` and `icons/` whose names pass `is_valid_image_name`,
 3. `settings.json`, `drafts.json`, `vault.key` and their `.tmp` write-companions,
 4. what is useless without the key: the import staging copy, every `emerald.db.pre-vNN.bak` an earlier version's migrations left (by whole name, `migration_backup_version`), and the leftovers of an interrupted re-encryption.
 
@@ -161,7 +162,7 @@ The directories go last with plain `remove_dir`, which fails while anything else
 
 **`discard_import_staging`** is the narrowest by-name delete, for one fixed target: `emerald.db.import` (plus `-journal`/`-wal`/`-shm`), the working copy a backup import fills and swaps in (see [DB Backup / Restore](database.md#db-backup--restore-emeralddb)). It can delete nothing else, and a missing file is not an error. It runs before every import, to clear what a crashed one left, and after every import, successful or not.
 
-**`ensure_vault_dirs` does not create the vault directory.** The rule lives in `images_dir()`, so it holds for every command that touches vault storage: SQLite would put a fresh, empty database into a recreated folder, so a vault on an unplugged drive would silently come back empty. Creating is `create_vault_dirs`, called once when a vault enters the list.
+**`ensure_vault_dirs` does not create the vault directory.** The rule lives in `images_dir()` and `icons_dir()` (`vault_subdir`), so it holds for every command that touches vault storage: SQLite would put a fresh, empty database into a recreated folder, so a vault on an unplugged drive would silently come back empty. Creating is `create_vault_dirs`, called once when a vault enters the list.
 
 **`probe_vault_dir` is a deliberate exception:** it takes a raw path and is not confined to any root, because it answers "what is in the folder the user just picked?" before that folder is registered. It returns four booleans — exists, access denied, holds a database, is empty — and reads no content: an existence oracle for arbitrary paths and nothing more.
 
@@ -185,11 +186,11 @@ That does not widen what a vault path can be: `vaults.json` always holds arbitra
 
 ## The `emerald-img` URI Scheme
 
-Images are served to the webview over a custom scheme instead of through IPC. The request path is `/{vaultId}/{filename}`, and both segments are attacker-reachable in principle: the filename comes from stored HTML content, which may have arrived in an imported backup.
+Images are served to the webview over a custom scheme instead of through IPC. The request path is `/{vaultId}/{filename}` for a picture and `/{vaultId}/icons/{filename}` for an icon, and both segments are attacker-reachable in principle: the filename comes from stored HTML content, which may have arrived in an imported backup.
 
 - **The handler decrypts**, in Rust, with the key of the vault named in the URL; a locked vault, a wrong key or a damaged file is a 404. The response carries `Cache-Control: no-store` so the WebView does not keep decrypted images on disk.
 - **The filename is validated before any path is built** (`is_valid_image_name`): exactly 64 lowercase hex digits, a dot, and one of `png` / `jpg` / `jpeg` / `gif` / `webp` / `svg`. Rejecting everything outside that alphabet means percent-encoded traversal never has to be decoded — it simply fails the check.
-- **The vault id is resolved through the registry**, so the directory is one the user authorised; an unknown id yields 404. The file is looked up in that vault's `images/` and nowhere else.
+- **The vault id is resolved through the registry**, so the directory is one the user authorised; an unknown id yields 404. The file is looked up in that vault's `images/` (or `icons/` for the `icons/` path) and nowhere else.
 - **Reads happen off the main thread** (`register_asynchronous_uri_scheme_protocol`), so a large file cannot stall the UI.
 - **`Access-Control-Allow-Origin: *`** is belt and braces, not load-bearing: the canvas blocks load their images as data-URLs when they render a picture (`canvasImageSrc()`), so they do not depend on the scheme being CORS-enabled (wry does not register it as such on every platform). The header stays because the images come from the app's own storage, so allowing the read grants the page nothing it could not already request.
 
@@ -230,7 +231,7 @@ Validation rules against malformed, oversized, or untrusted data, much of it in 
 - **Image sources.** Stored image references are turned into a `src` only through `imageSrc()` (`src/lib/images.ts`): a valid stored filename becomes an `emerald-img` URL for the active vault, `data:`, `blob:` and `http…` values pass through, and anything else yields an empty string, so the `<img>` is skipped and the emoji or live preview is shown instead. Pictures on a canvas, the tiles of "Images" and image fields all go through it. Remote `http(s)` images are blocked by the CSP's `img-src` (see [Content Security Policy](#content-security-policy)).
 - **Background CSS interpolation.** All canvas background CSS is built by the canvas editor's `backgroundCss`, with the picture's URL from `altarBackgroundUrl` (`src/lib/altarBackground.ts`, used by `CanvasBlock`): one of the app's own `/backgrounds/{name}.webp` or whatever `imageSrc()` allows — so only those shapes reach the CSS `url(…)`, with any quote escaped.
 - **`hexToRgb`** (`src/lib/helpers.ts`) calls `isValidHexColor` first and returns `{r:0, g:0, b:0}` for invalid input instead of `NaN` values that would propagate into `rgba(...)`.
-- **No SVG icons.** Every icon upload (entry, template, block) goes through `readIconFile` (`src/lib/imageLimits.ts`), which refuses `image/svg+xml` on top of the general MIME allowlist (`isAcceptedImageFile`). Other upload paths accept SVG.
+- **No SVG icons.** Every icon upload (entry, template, block, language) goes through `readIconFile` (`src/lib/imageLimits.ts`), which refuses `image/svg+xml` on top of the general MIME allowlist (`isAcceptedImageFile`); `save_icon` refuses an SVG data URL as well, so a backup or an `.emerald` file cannot bring one into `icons/` either (the row falls back to its default icon). Other upload paths accept SVG.
 ## Backup Import Column Validation
 
 `.emeralddb` backup files are untrusted input — they can be hand-edited or come from another machine. `insertRows()` in `src/lib/dbBackup.ts` (used by every import mode) builds each `INSERT`'s column list by intersecting the row's keys with `PRAGMA table_info(<table>)` of the real, hardcoded target table. A crafted backup can at worst contribute an extra key that is silently dropped (or, if no valid column remains, cause the row to be skipped) — it can never inject SQL through the column list. Row *values* go through parameterised placeholders (`$1, $2, …`).

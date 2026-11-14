@@ -20,7 +20,8 @@ import { generateId, nowIso } from '../lib/helpers';
 import { needsWrite, stampFor, type WriteOptions } from '../lib/stamp';
 import { fromRow, type DbRow } from '../lib/row';
 import { serialized, serialKey } from '../lib/serialize';
-import { insertTemplateStatement, nextTemplateSortOrder } from '../lib/templateRows';
+import { insertTemplateStatements, nextTemplateSortOrder } from '../lib/templateRows';
+import { readTagLinks, tagStatements } from '../lib/tagRefs';
 import { contentOf, loadBlocks, planContentWrite, type BlockOwner } from '../lib/blockStore';
 import {
   DEFAULT_TEMPLATE_ICON, resolveStartTemplate, templateStart, templateToRow,
@@ -56,9 +57,10 @@ async function selectActive(db: Database): Promise<Template[]> {
     'SELECT * FROM templates WHERE deleted_at IS NULL ORDER BY sort_order ASC, name ASC'
   );
   // The block stack comes from the block rows (`blocks`).
-  const blocks = await loadBlocks(db, 'template', rows.map((r) => String(r.id)));
+  const ids = rows.map((r) => String(r.id));
+  const [blocks, tags] = await Promise.all([loadBlocks(db, 'template', ids), readTagLinks(db, 'template', ids)]);
   return rows.map((r) => {
-    const template = fromRow.template(r);
+    const template = fromRow.template({ ...r, tags: tags.get(String(r.id)) ?? [] });
     return { ...template, content: contentOf(blocks.get(template.id) ?? []) };
   });
 }
@@ -89,7 +91,7 @@ export const useTemplateStore = create<TemplateState>((set, get) => ({
       deleted_at: null,
     };
     // The row first: its blocks point at it.
-    await db.batch([insertTemplateStatement(template), ...blocks.statements]);
+    await db.batch([...insertTemplateStatements(template), ...blocks.statements]);
     blocks.commit();
     set((s) => ({ templates: [...s.templates, template] }));
     return template;
@@ -116,10 +118,11 @@ export const useTemplateStore = create<TemplateState>((set, get) => ({
     await db.batch([
       [
         `UPDATE templates
-            SET name=$1, icon=$2, title=$3, tags=$4, updated_at=$5
-          WHERE id=$6`,
-        [row.name, row.icon, row.title, row.tags, row.updated_at, id],
+            SET name=$1, icon=$2, title=$3, updated_at=$4
+          WHERE id=$5`,
+        [row.name, row.icon, row.title, row.updated_at, id],
       ],
+      ...(patch.tags !== undefined ? tagStatements('template', id, updated.tags) : []),
       ...(blocks?.statements ?? []),
     ]);
     blocks?.commit();

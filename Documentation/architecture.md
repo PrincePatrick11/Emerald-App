@@ -114,7 +114,7 @@ src/
 │   ├── blockStore.ts            blocks as rows: loading, writing only what changed, replacing a whole stack
 │   ├── entryTitle.ts, dashboards.ts, moonPhase.ts
 │   ├── categories.ts
-│   ├── tagRefs.ts, templateTags.ts, templateRows.ts, blockDefinitionRows.ts
+│   ├── tagRefs.ts, templateTags.ts, templateRows.ts, blockDefinitionRows.ts, icons.ts
 │   ├── lexicon.ts, lexiconRows.ts
 │   ├── links.ts, linkItems.ts, internalLinkHtml.ts
 │   ├── tabs.ts                  tab ids, navigation history helpers
@@ -233,6 +233,7 @@ All Rust commands are *registered* in `src-tauri/src/lib.rs` and invoked from Ty
 | `read_vault_drafts(vault_id)` / `write_vault_drafts(vault_id, contents)` | The vault's `drafts.json` — unsaved drafts of block and template pages (`store/draftStore.ts`), sealed in an encrypted vault. An empty object removes the file. `async`, since it is written after every pause in typing; a rename or remove that fails is retried briefly, since on Windows a scanner or sync client may hold the file. |
 | `read_vault_settings(vault_id)` / `write_vault_settings(vault_id, contents)` | The vault's `settings.json` — see [Vault Settings](architecture/storage.md#vault-settings) and [`security.md`](security.md#vault-json-files) for atomicity and symlink handling. |
 | `list_image_files(vault_id)` / `delete_image_files(vault_id, filenames)` | Back the *Unused images* cleanup. Confined to the vault's folder; reject any name that is not 64 hex digits plus a known extension. |
+| `save_icon(data_url, vault_id)` / `read_icon_as_base64(filename, vault_id)` / `list_icon_files(vault_id)` / `delete_icon_files(vault_id, filenames)` | The same four for the vault's `icons/` (uploaded icons, already 128px; `save_icon` refuses a data URL above 2 MB). Sealed under the icons' own context; shown through `emerald-img` under `/{vaultId}/icons/{name}`. See [Icons](database.md#icons). |
 | `register_vaults(vaults)` | Mirror `vaults.json` into the `id → path` registry every storage command resolves against. |
 | `create_vault_dirs(vault_id)` / `ensure_vault_dirs(vault_id)` | Build a new vault's tree / verify an existing one before its database opens. `ensure_vault_dirs` does not create the vault directory — see [Vault Layout](architecture/storage.md#vault-layout). |
 | `default_vault_dir(vault_id)` / `probe_vault_dir(path)` | The location a vault gets when the user picks none / what a chosen folder already contains. |

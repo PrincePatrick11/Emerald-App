@@ -38,14 +38,14 @@ These places enumerate modules or tables and are easy to miss. Follow how the cl
 - **Search:** `SearchKind` and the query in `src/lib/globalSearch.ts`, the display in `src/components/layout/titlebar/SearchResultList.tsx`.
 - **Links:** a link target goes through `src/lib/linkItems.ts` and `viewOfLinkTarget`.
 - **Files:** `src/lib/export.ts`, `src/lib/exportData.ts` and `src/lib/emeraldFormat.ts`, when the content can be exported or imported.
-- **Categories and tags:** `src/lib/categories.ts` and the reassignment in `src/store/categoryStore.ts`, `src/lib/tagRefs.ts`.
+- **Categories and tags:** `src/lib/categories.ts` and the reassignment in `src/store/categoryStore.ts`, `src/lib/tagRefs.ts` (a new tagged thing needs a link table and an entry in `TAG_LINKS`).
 - **Text and docs:** all four locale files, `Documentation/features.md`, `Documentation/database.md`, this file.
 
 Then run the `crosscheck` agent, see [`agents.md`](../agents.md). `npm run check:schema` compares shapes only: it does not notice that search or the Trash lack the new data.
 
 ## Entry Store
 
-All entries live in one Zustand store, `useEntryStore` (`src/store/entryStore.ts`), over the one `entries` table (see [`database.md`](../database.md#entries)). `Entry` (`types/index.ts`) has no type; `TaggedType` (`tagStore.ts`) is `'entry' | 'template'`.
+All entries live in one Zustand store, `useEntryStore` (`src/store/entryStore.ts`), over the one `entries` table (see [`database.md`](../database.md#entries)). `Entry` (`types/index.ts`) has no type; what carries tags is `TagOwner` (`tagRefs.ts`: `'entry' | 'template' | 'image'`).
 
 - **State:** `entries: Entry[]` — one list, newest first. A change replaces only that entry's object, so a selector over one entry (`findEntry(s.entries, id)`) re-renders only for it. Every view sorts for itself.
 - **Reading by module:** `useDashboardEntries(key)` (`hooks/useDashboardEntries.ts`) gives the entries a built-in dashboard shows, filtered and sorted once per change and cached by the identity of the list and the dashboard (`entriesOfDashboard`/`entriesByKind` in `store/entryViews.ts`), so a list re-renders only when its own result changes. `useEntriesByKind()` puts every entry under exactly one kind (`partitionByKind`) — for what lists all entries labelled by module: search, link items, the left list's "All", Tags and the category counts.
@@ -116,24 +116,24 @@ Import rule: `categoryStore` may import the content stores and the dashboard sto
 
 ## Tags
 
-Entries and templates store tag **ids** (`tags: string[]`); the `tags` table (`useTagStore`, `src/store/tagStore.ts`) holds name and colour. Lists that carry ids: entries and templates (and pictures of "Images") (a template has no place in `TagsView` but passes its tags on to the entry it fills in). Tasks carry none.
+Entries, templates and pictures of "Images" link their tags (`entry_tags`, `template_tags`, `image_tags`), held in memory as tag **ids** (`tags: string[]`); the `tags` table (`useTagStore`, `src/store/tagStore.ts`) holds name and colour. A template has no place in `TagsView` but passes its tags on to the entry it fills in. Tasks carry none.
 
 The store holds only live tags, and an id that is not among them is shown nowhere:
 
 - **Read side:** `useTagMap()` (live tags by id), `visibleTags(ids, byId)` (what `TagInput`, the template dialog and the lists render) and `liveTagNames(ids)` (what the `.emerald`, Markdown and HTML exports write — files carry names).
-- **Write side:** `lib/tagRefs.ts` (DOM- and store-free, so `scripts/schema-check.mjs` can run it). `rewriteTagRefs` walks `entries`, `templates` and `images` (`TAG_REF_TABLES`) including the Trash without stamping `updated_at`; `stripTagIds`/`replaceTagId` are its two uses, and `tagStore`'s `rewriteRefs` applies the result to the entry and template stores in memory.
+- **Write side:** `lib/tagRefs.ts` (DOM- and store-free, so `scripts/schema-check.mjs` can run it). Tags are rows of `entry_tags`, `template_tags` and `image_tags` (`TAG_LINKS`); the stores write an owner's tags with its row (`tagStatements`) and read them all at once (`readTagLinks`). A tag deleted for good takes its links with it (CASCADE); merging hands them over (`replaceTagId`), reviving a trashed namesake drops them (`unlinkTags`). `tagStore`'s `dropFromStores` applies the same to the entry, template and image stores in memory, and `replaceTagsInDashboards` (`schema.ts`) to the dashboards' filters.
 
 The actions:
 
 - **`updateTag`** — a rename touches only the `tags` row. A name another live tag has throws `TAG_NAME_TAKEN`, checked before the `serialized` chain so the expected rejection isn't logged as an error.
-- **`deleteTag(id)`** (soft) only stamps `deleted_at`: every entry keeps the id, and the tag is invisible until **`restoreTag`** brings it back. If a live tag of the same name appeared meanwhile, `restoreTag` merges into it (`replaceTagId`, then the trashed row is dropped). **`permanentlyDeleteTag`** and **`purgeTrashedTags`** (used by `emptyTrash`) strip the ids from every list before deleting the rows; the retention purge in `runPeriodicCleanup` does the same.
+- **`deleteTag(id)`** (soft) only stamps `deleted_at`: every link stays, and the tag is invisible until **`restoreTag`** brings it back. If a live tag of the same name appeared meanwhile, `restoreTag` merges into it (`replaceTagId`, then the trashed row is dropped). **`permanentlyDeleteTag`** and **`purgeTrashedTags`** (used by `emptyTrash`) delete the rows, and their links go with them (CASCADE); the dashboards' filters drop them (`replaceTagsInDashboards`) and the dashboard store reloads. The retention purge in `runPeriodicCleanup` does the same in the database.
 - **`createTag`** is `ensureTag` for the Tags view: it throws `TAG_NAME_TAKEN` instead of returning the existing tag. Both run through one `serialized` key, so a double-fired create of the same name finds the first one's tag instead of failing on `UNIQUE`. `ensureTag(name, id)` takes a fixed id for a tag that must be the same on every device ("Altar Library", `ALTAR_LIBRARY_TAG_ID`, which an Altar block's strip starts with); it is used only for a new name and only while no row holds that id (renamed, or in the trash), else the tag gets a new id.
 
 Names are compared case-insensitively everywhere (`tagNameKey`, trim + lowercase); `TagInput` and the `.emerald`/Markdown import (`ensureTagIds`) store the id `ensureTag` returns. `tags.name` is `UNIQUE` across trashed rows as well, and **a name belongs to one tag**:
 
-- Creating a name a trashed tag carries — typed or imported — brings that tag back with its colour and spelling (`reviveTrashedNamesake`), but first strips its id from the entries that still carried it: whoever gives the name now means this one entry. `createTag` with an explicit colour applies it.
-- Renaming onto a trashed tag's name deletes the trashed namesake for good (ids stripped first) — its entries do not get the name back. Categories differ here: their trashed namesake is merged in, entries included (see [Categories](#categories)).
-- An entry or template **restored from the Trash** drops the ids of tags that no longer exist at all (`dropUnknownTagIds`, via `withLiveTags` in `trashWiring`); ids of trashed tags stay, since they can come back. `runPeriodicCleanup` sweeps dangling ids on every vault open as a backstop (see [`database.md`](../database.md#opening-a-vault)).
+- Creating a name a trashed tag carries — typed or imported — brings that tag back with its colour and spelling (`reviveTrashedNamesake`), but first removes its links (`unlinkTags`): whoever gives the name now means this one entry. `createTag` with an explicit colour applies it.
+- Renaming onto a trashed tag's name deletes the trashed namesake for good (its links go with it) — its entries do not get the name back. Categories differ here: their trashed namesake is merged in, entries included (see [Categories](#categories)).
+- An entry or template **restored from the Trash** reads its tags from the links; a tag gone for good took its links along, a trashed one stays linked, since it can come back.
 
 **`tags.createInline` governs every way a new tag can appear.** Off, the tag field accepts only existing tags and a `.emerald` import keeps only names that already are tags (`ensureTagIds`); on, both create what's missing. A template carries ids, so it never creates a tag: `usableTemplateTags(ids)` (`lib/templateTags.ts`, fed by `tagStore` via `registerTagLookup` to avoid an import cycle) hands over only its live tags. A `.emeralddb` backup is a restore, not a content import, and always brings its tags (resolved by id, then name — see [`database.md`](../database.md#db-backup--restore-emeralddb)). `drafts.json` is version 2: a version-1 file's template drafts carry tag names, which `draftStore` maps onto this vault's tag ids when reading (a name without a tag drops out).
 

@@ -174,7 +174,7 @@ export interface AlphabetPair {
 export interface Language {
   id: string;
   name: string;
-  /** Emoji or image data URL, as with custom blocks and templates. */
+  /** Emoji or an icon file in `icons/` (`lib/icons.ts`), as with custom blocks and templates. */
   icon: string;
   alphabet: AlphabetPair[];
   sort_order: number;

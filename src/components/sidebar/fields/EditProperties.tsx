@@ -5,6 +5,8 @@ import Dropdown, { type DropdownOption } from '../../ui/Dropdown';
 import ContextMenu, { type ContextMenuAction } from '../../ui/ContextMenu';
 import EmojiPicker from '../../ui/EmojiPicker';
 import { ACCEPTED_IMAGE_MIME, isAcceptedImageFile, isImageIcon, readFileAsDataUrl } from '../../../lib/helpers';
+import { iconSrc } from '../../../lib/icons';
+import { imageSrc, saveImage } from '../../../lib/images';
 import { ImageTooLargeError, imageSizeLabel, prepareImageDataUrl, readIconFile } from '../../../lib/imageLimits';
 import { reportImageError } from '../../../store/imageNoticeStore';
 import { RowIcon } from './SidebarSection';
@@ -82,9 +84,9 @@ export function PropertySelect<T extends string>({ value, options, onChange, tex
 
 /** The preview in the media button: image as thumbnail (icon 20×18, cover image 44×18) or the emoji. */
 function MediaPreview({ kind, value }: { kind: 'icon' | 'cover'; value: string }) {
-  if (kind === 'cover') return <img src={value} alt="" className="prop-value-thumb w-11" />;
+  if (kind === 'cover') return <img src={imageSrc(value)} alt="" className="prop-value-thumb w-11" />;
   return isImageIcon(value)
-    ? <img src={value} alt="" className="prop-value-thumb w-5" />
+    ? <img src={iconSrc(value)} alt="" className="prop-value-thumb w-5" />
     : <span className="text-sm leading-none px-0.5">{value}</span>;
 }
 
@@ -127,7 +129,8 @@ export function MediaPropertyRow({ rowIcon, label, kind, value, onChange, onRemo
       return;
     }
     try {
-      const next = kind === 'icon' ? await readIconFile(file) : await prepareImageDataUrl(await readFileAsDataUrl(file));
+      // A cover is a picture of the vault (`images/`, "Images"): stored here, its name goes into the row.
+      const next = kind === 'icon' ? await readIconFile(file) : await saveImage(await prepareImageDataUrl(await readFileAsDataUrl(file)));
       // `null`: an icon in a rejected format (SVG too); say so, as with the cover image.
       if (next) onChange(next);
       else showNotice(t('common.unsupportedImageFormat'));

@@ -15,13 +15,13 @@ Emerald uses one SQLite file per vault, always named `emerald.db`, inside the va
 `runMigrations` first reads the highest version in `schema_version` — before it writes anything — and then takes one of these routes:
 
 - **Empty file** — a new vault. It runs the DDL from `schema.ts`, seeds the built-in categories, the starter categories, the built-in dashboards and the `core-sigil` and `core-altar` templates (as the start templates of `sigils` and `altars`) — in the language active at first open, since `main.tsx` waits for the stored language before anything touches the database — and stamps one `baseline` row at `BASELINE_VERSION`, last. A new vault whose creation was cut short before the stamp — tables of `schema.ts` only, no entries or tasks — is dropped and created again on the next open.
-- **Below `FRESH_START_VERSION`** (101), or tables without a version that are not such an unfinished new vault — a vault from before the fresh start of the schema, built by the old migration chain v1–v66 that this version no longer has, or by the first fresh schema (v100, entries with a type; never released). It is refused with `VAULT_OUTDATED` and left exactly as it was; the vault picker says so (`vault.outdated`). A converter for such vaults is a task of its own.
+- **Below `FRESH_START_VERSION`** (102), or tables without a version that are not such an unfinished new vault — a vault from before the fresh start of the schema, built by the old migration chain v1–v66 that this version no longer has, or by one of the fresh schemas before (v100, entries with a type; v101, tags as JSON and icons as data URLs in the rows; neither released). It is refused with `VAULT_OUTDATED` and left exactly as it was; the vault picker says so (`vault.outdated`). A converter for such vaults is a task of its own.
 - **Above `BASELINE_VERSION`** — a vault of a newer app: refused with `VAULT_TOO_NEW` (`vault.tooNew`), unchanged too.
 - **Between the two** — the steps of `MIGRATIONS` above the stored version run in order, each stamping `schema_version` with version, name and ISO timestamp. The list is empty today: `BASELINE_VERSION` equals `FRESH_START_VERSION`, and `runMigrations` throws at startup if the last step and `BASELINE_VERSION` disagree.
 
 An unencrypted vault with a database is refused the same way by the gate, before any password question: every such vault predates encryption, and with it the fresh start.
 
-`runPeriodicCleanup(db)` is **not** a migration — idempotent, time-dependent, and run on the first `getDb()` of a session. It purges trashed rows older than the vault's trash retention (`trash.retentionDays` in `vaultSettings.ts`, default 30 days, or never). If the loaded settings belong to another vault it purges nothing (`null` = never), so one vault's retention can never empty another's trash. Expired tags are first stripped from every tag list (`stripTagIds`). Afterwards it sweeps dangling `task_links` and tag ids without a `tags` row (`sweepDanglingTagIds` — such an id can appear when a tag goes for good while a draft or an open entry still holds the old list and saves it later).
+`runPeriodicCleanup(db)` is **not** a migration — idempotent, time-dependent, and run on the first `getDb()` of a session. It purges trashed rows older than the vault's trash retention (`trash.retentionDays` in `vaultSettings.ts`, default 30 days, or never). If the loaded settings belong to another vault it purges nothing (`null` = never), so one vault's retention can never empty another's trash. An expired tag takes its links with it (`ON DELETE CASCADE`) and is first dropped from the dashboards' filters (`replaceTagsInDashboards`). Afterwards it sweeps dangling `task_links`.
 
 ## Foreign Keys
 
@@ -32,7 +32,7 @@ Two consequences shape how this schema is changed:
 - A constraint takes effect the moment it is declared. There is no grace period.
 - `PRAGMA foreign_keys = OFF` and `BEGIN` are **not usable across separate `execute()` calls** — each call reaches one pooled connection, and which one serves the next call is not controllable. That rules out the SQLite documentation's table-rebuild recipe spread over several calls. A *single* call is different: sqlx runs the `;`-separated statements of one string in order on the one connection it picked, so one multi-statement `execute()` can hold a real `BEGIN … COMMIT`. `importStaging.ts`'s `swapIn` does this — see [DB Backup / Restore](#db-backup--restore-emeralddb). The other way is `Database.batch` (`db_batch` in `db.rs`): a list of statements with bound values, run as one transaction on one connection, all or none. Write loops use it; it cannot wrap a whole import, whose statements are built from reads in between.
 
-Eight relations are declared, each with a deliberately chosen delete behaviour:
+Fifteen relations are declared, each with a deliberately chosen delete behaviour:
 
 | Relation | ON DELETE | Reason |
 |---|---|---|
@@ -41,6 +41,9 @@ Eight relations are declared, each with a deliberately chosen delete behaviour:
 | `blocks.template_id` → `templates.id` | CASCADE | likewise for a template |
 | `block_refs.block_row` → `blocks.row_id` | CASCADE | a reference is part of its block |
 | `lexicon_entries.language_id` → `languages.id` | CASCADE | a word without its language is nothing |
+| `entry_tags.entry_id` → `entries.id`, `template_tags.template_id` → `templates.id`, `image_tags.image_id` → `images.id` | CASCADE | a tag link is part of its owner |
+| `entry_tags.tag_id`, `template_tags.tag_id`, `image_tags.tag_id` → `tags.id` | CASCADE | a tag deleted for good leaves every owner |
+| `categories.template_id` → `templates.id` | SET NULL | a category whose start template goes falls back to the default |
 | `tasks.parent_task_id` → `tasks.id` | SET NULL | the subtask survives as a standalone task |
 | `entries.category_id` → `categories.id` | RESTRICT | content must never vanish with its category (always `NULL` for a journal entry) |
 | `tasks.category_id` → `categories.id` | RESTRICT | likewise |
@@ -49,11 +52,11 @@ Both `category_id` columns point at the one `categories` table and are nullable 
 
 ### What foreign keys cannot cover
 
-`task_links.target_id` is **polymorphic** — `target_type` (`'entry' | 'task'`) decides what kind of row the target is, and SQL has no polymorphic foreign key. The same applies to the JSON references `dashboards.filter` (category ids) and `entries.tags`/`templates.tags` (tag ids).
+`task_links.target_id` is **polymorphic** — `target_type` (`'entry' | 'task'`) decides what kind of row the target is, and SQL has no polymorphic foreign key. The same applies to the JSON references in `dashboards.filter` (category and tag ids). Tags themselves are links with foreign keys ([entry_tags, template_tags, image_tags](#entry_tags-template_tags-image_tags)).
 
 These are exactly the places where orphans accumulate. Three things stand in for the missing constraints:
 
-- **`checkIntegrity(db)`** in `schema.ts` reports `task_links` rows whose target is missing from the table `target_type` names, unknown category ids in `dashboards.filter` (parsed in JavaScript, since SQL cannot), and tag ids in `entries.tags`/`templates.tags` without a `tags` row (trashed tags count as existing). It scans whole tables and is a diagnostic only, not called on the production path.
+- **`checkIntegrity(db)`** in `schema.ts` reports `task_links` rows whose target is missing from the table `target_type` names, and category and tag ids in `dashboards.filter` without a row (parsed in JavaScript, since SQL cannot; trashed rows count as existing). It scans whole tables and is a diagnostic only, not called on the production path.
 - **`sweepDanglingTaskLinks(db)`** in `db.ts` deletes `task_links` rows whose target does not exist in the table its `target_type` names (`LINK_TARGET_EXISTS`: `entries` or `tasks`, by `id`). Its rule and `checkIntegrity`'s map of target kinds are kept in step by hand. Soft-deleted targets count as valid — trashed content isn't an orphan yet. It runs in the periodic cleanup, when the trash is emptied, and at the end of every backup import (a partial restore or an imported link row can point at something the import didn't bring).
 - **Permanent deletes clean up directly.** `taskStore.permanentlyDeleteTask` (which takes every subtask in the Trash along) deletes both directions. A task's *soft* delete removes no `task_links` row — `taskStore` only loads the links of tasks outside the Trash, and restoring the task brings them back.
 
@@ -71,7 +74,7 @@ The built-ins, `journal`, `sigils` and `altars`, cannot be deleted: the journal'
 
 ## Tables
 
-Fourteen tables. `TABLES` in `schema.ts` declares the dependency order, parents before children; the sections below group related tables. The order is not cosmetic: inserts are checked against foreign keys immediately, so it governs the creation of the schema and the import swap.
+Eighteen tables. `TABLES` in `schema.ts` declares the dependency order, parents before children; the sections below group related tables. The order is not cosmetic: inserts are checked against foreign keys immediately, so it governs the creation of the schema and the import swap.
 
 ### schema_version
 
@@ -92,7 +95,18 @@ Which state of the schema the vault is at — what `runMigrations` reads first (
 | color | TEXT | hex, default `'#8347ff'` |
 | deleted_at | TEXT | NULL = active |
 
-`entries.tags` and `templates.tags` are JSON arrays of `tags.id` (`src/lib/tagRefs.ts`). A trashed tag stays in its rows, merely hidden, and comes back with its restore. Lists are rewritten only when a tag disappears for good (permanent delete, empty trash, retention purge — `stripTagIds`) or merges into a live namesake on restore (`replaceTagId`). Both go through `rewriteTagRefs`, which walks `TAG_REF_TABLES` (`entries`, `templates`, `images`) including the Trash and leaves `updated_at` alone. Tasks carry no tags.
+Entries, templates and pictures carry tags through the link tables [entry_tags, template_tags, image_tags](#entry_tags-template_tags-image_tags) (`src/lib/tagRefs.ts`). A trashed tag stays linked, merely hidden, and comes back with its restore. A tag that disappears for good (permanent delete, empty trash, retention purge) takes its links with it (`ON DELETE CASCADE`) and leaves the dashboards' filters (`replaceTagsInDashboards`); one that merges into a live namesake on restore hands its links over (`replaceTagId`). Neither touches `updated_at`. Tasks carry no tags.
+
+### entry_tags, template_tags, image_tags
+
+The tags of an entry, a template and a picture of "Images", one row per tag.
+
+| Column | Type | Notes |
+|---|---|---|
+| entry_id / template_id / image_id | TEXT | NOT NULL, **FK → entries.id / templates.id / images.id**, CASCADE |
+| tag_id | TEXT | NOT NULL, **FK → tags.id**, CASCADE |
+
+`PRIMARY KEY (owner, tag_id)`, with a `rowid`: the tags of an owner are in the order they were given, which is the `rowid` order — writing an owner's tags deletes its rows and inserts them anew (`tagStatements`, in the same batch as the owner's row; an id without a `tags` row is skipped, `INSERT … SELECT`). `idx_entry_tags_tag`, `idx_template_tags_tag` and `idx_image_tags_tag` on `tag_id` answer "what carries this tag". The stores read every owner's tags in one query (`readTagLinks`) and keep them in memory as `tags: string[]`; the dashboards' filters are still evaluated there (`matchesFilter` in `lib/dashboards.ts`).
 
 ### categories
 
@@ -119,7 +133,7 @@ Views over entries by filter rules (`lib/dashboards.ts`, `store/dashboardStore.t
 | id | TEXT PK | the key for a built-in (`'all'`, `'journal'`, `'wiki'`, `'operations'`) — the same on every device, so two fresh vaults mean the same rows; UUID otherwise |
 | builtin | TEXT | the built-in's key, `NULL` for one built by hand |
 | name | TEXT | NOT NULL DEFAULT `''`; empty shows the translated name of the built-in |
-| icon | TEXT | NOT NULL DEFAULT `''`; empty shows the module's |
+| icon | TEXT | emoji or an icon file (see [Icons](#icons)), NOT NULL DEFAULT `''`; empty shows the module's |
 | position | INTEGER | order in the rail |
 | filter | TEXT | JSON `{ categories?: string[], tags?: string[] }`; a missing key does not narrow, so `{}` shows every entry |
 | sort | TEXT | JSON `{ by: 'created' \| 'title' \| 'updated', dir }` |
@@ -137,7 +151,7 @@ The user-built blocks of the Blocks view. A row is only the template — an inse
 |---|---|---|
 | id | TEXT PK | UUID |
 | name | TEXT | NOT NULL |
-| icon | TEXT | emoji, NOT NULL DEFAULT `'🧩'` |
+| icon | TEXT | emoji or an icon file (see [Icons](#icons)), NOT NULL DEFAULT `'🧩'`; a copy carries it in its config |
 | elements | TEXT | JSON array of `ElementDef` (`id`, `kind`, `label`, `options`, `hideWhenEmpty`, `defaultValue`, plus `calcMode` for a `sigilCalc` element and `brushColor`/`brushSize` for a `sigilCanvas` one), NOT NULL DEFAULT `'[]'`; read through the same validation as a copy in content |
 | display | TEXT | JSON `{ readHideEmpty, readOnly, showTitle }`, NOT NULL DEFAULT `'{}'` (missing keys fall back to their defaults) |
 | sort_order | INTEGER | NOT NULL DEFAULT 0 |
@@ -156,9 +170,8 @@ The templates dashboard's rows, behind Journal/Wiki/Operations' "insert a templa
 |---|---|---|
 | id | TEXT PK | UUID (or `'core-sigil'`, `'core-altar'` for the built-ins) |
 | name | TEXT | NOT NULL |
-| icon | TEXT | emoji or image, NOT NULL DEFAULT `'📄'` |
+| icon | TEXT | emoji or an icon file (see [Icons](#icons)), NOT NULL DEFAULT `'📄'` |
 | title | TEXT | NOT NULL DEFAULT `''`; the title a new entry gets — empty means the entry starts untitled |
-| tags | TEXT | JSON array of tag ids, NOT NULL DEFAULT `'[]'` |
 | sort_order | INTEGER | NOT NULL DEFAULT 0 |
 | created_at / updated_at | TEXT | ISO 8601 |
 | deleted_at | TEXT | NULL = active; purged after the retention period (`CLEANUP_TABLES`) |
@@ -173,7 +186,7 @@ The Lexicon's languages, each with its alphabet here and its words in [`lexicon_
 |---|---|---|
 | id | TEXT PK | UUID |
 | name | TEXT | NOT NULL |
-| icon | TEXT | emoji or image, NOT NULL DEFAULT `'🗣️'` (`DEFAULT_LANGUAGE_ICON`) |
+| icon | TEXT | emoji or an icon file (see [Icons](#icons)), NOT NULL DEFAULT `'🗣️'` (`DEFAULT_LANGUAGE_ICON`) |
 | alphabet | TEXT | JSON array of `{from, to}`, NOT NULL DEFAULT `'[]'` — the transliteration table, read by `parseAlphabet` in `src/lib/lexicon.ts`. `from` may be several characters (`th` → `ᚦ`); the longest match wins |
 | sort_order | INTEGER | NOT NULL DEFAULT 0 |
 | created_at / updated_at | TEXT | ISO 8601 |
@@ -181,7 +194,7 @@ The Lexicon's languages, each with its alphabet here and its words in [`lexicon_
 
 ### images
 
-The details of pictures in "Images", the place of their own next to tags and categories. A row gives a stored file a name, tags and a note; every other file of the vault's `images/` folder is listed too, unnamed, when a text, a field, a canvas or a block default shows it (`isShownUse`). A file used only as a drawing, a canvas's render or a background is not, nor one nothing shows (such as a render left behind while painting): the image cleanup takes those. Where a picture is used comes from `collectImageUses` (`src/lib/imageUsage.ts`), which reads the block stacks of entries and templates, the custom blocks' defaults and the canvases' backgrounds; `withoutImage` takes a picture out of a block stack's texts and image fields, as deleting one asks for. A row keeps its file from the image cleanup (`collectUsedImageFilenames`), in the trash too, until it is deleted for good; every picture taken in from the disk (the add dialog, the picture picker, a drop on a canvas) gets one through `takeIn` in `imageStore.ts`, which keeps the name of a row already there for that file and adds the tags; a row in the trash comes back with `detached` emptied, since the picture is taken in anew rather than restored into its texts.
+The details of pictures in "Images", the place of their own next to tags and categories. A row gives a stored file a name, tags and a note; every other file of the vault's `images/` folder is listed too, unnamed, when a text, a field, a canvas, a block default or a cover shows it (`isShownUse`). Icons live in `icons/` and are never listed. A file used only as a drawing, a canvas's render or a background is not, nor one nothing shows (such as a render left behind while painting): the image cleanup takes those. Where a picture is used comes from `collectImageUses` (`src/lib/imageUsage.ts`), which reads the block stacks of entries and templates, the custom blocks' defaults and the canvases' backgrounds; `withoutImage` takes a picture out of a block stack's texts and image fields, as deleting one asks for. A row keeps its file from the image cleanup (`collectUsedImageFilenames`), in the trash too, until it is deleted for good; every picture taken in from the disk (the add dialog, the picture picker, a drop on a canvas) gets one through `takeIn` in `imageStore.ts`, which keeps the name of a row already there for that file and adds the tags; a row in the trash comes back with `detached` emptied, since the picture is taken in anew rather than restored into its texts.
 
 | Column | Type | Notes |
 |---|---|---|
@@ -189,8 +202,7 @@ The details of pictures in "Images", the place of their own next to tags and cat
 | file | TEXT | NOT NULL UNIQUE — the stored file name (`storedImageName`); one row per file |
 | name | TEXT | NOT NULL DEFAULT `''` — a picture added from the disk starts with the file's name without its extension |
 | note | TEXT | NOT NULL DEFAULT `''` |
-| tags | TEXT | JSON array of tag ids, NOT NULL DEFAULT `'[]'`; in `TAG_REF_TABLES` (`src/lib/tagRefs.ts`) |
-| detached | TEXT | JSON array, NOT NULL DEFAULT `'[]'` — while the picture is in the trash, the entries and templates it was taken out of, each with its content before and after; restoring it writes `before` back where the content is still `after` (`restorePicture` in `src/store/imageActions.ts`), so the image cleanup keeps every file named in it. Not carried into another vault by a backup |
+| detached | TEXT | JSON array, NOT NULL DEFAULT `'[]'` — while the picture is in the trash, the entries and templates it was taken out of, each with its content before and after, and the entries it was the cover of (`kind` `cover`); restoring it writes `before` back where the content is still `after`, and a cover where the entry has none by then (`restorePicture` in `src/store/imageActions.ts`), so the image cleanup keeps every file named in it. Not carried into another vault by a backup |
 | created_at / updated_at | TEXT | ISO 8601 |
 | deleted_at | TEXT | NULL = active; its file is hidden from "Images" meanwhile. Deleted for good from the Trash, the file goes too where nothing else uses it (`removeUnusedFiles` in `imageStore.ts`); purged after the retention period (`CLEANUP_TABLES`), the file is left to the cleanup |
 
@@ -234,12 +246,12 @@ All entries in one table, without a type. What an entry is follows from its cate
 | title | TEXT | NOT NULL DEFAULT `''`; empty for a new entry — see "Titles" under [Key Conventions](#key-conventions) |
 | category_id | TEXT | nullable **FK → categories.id**, RESTRICT; at most one category, `NULL` = none. A new entry from a module starts in the first category of its dashboard |
 | entry_number | INTEGER | stable per row, **one count over all entries**, unique — see [Key Conventions](#key-conventions) |
-| icon / cover_image | TEXT | data-URL, or emoji for icon — see the Base64 note under [Key Conventions](#key-conventions) |
-| tags | TEXT | NOT NULL DEFAULT `'[]'`; JSON array of tag **ids** — see [tags](#tags) |
+| icon | TEXT | an emoji or an icon file, NULL = the category's — see [Icons](#icons) |
+| cover_image | TEXT | the stored name of a picture in `images/` (`plain` in `IMAGE_FIELDS`), NULL = none; a use of the picture with the role `cover` in "Images" |
 | created_at / updated_at | TEXT | ISO 8601 |
 | deleted_at | TEXT | NULL = active |
 
-Indexes: `idx_entries_category`, the unique `idx_entries_number` (any number of `NULL`s), `idx_entries_list` on `(deleted_at, title, category_id, entry_number, tags, created_at, updated_at, id)` and the partial `idx_entries_decorated` on `deleted_at` `WHERE icon IS NOT NULL OR cover_image IS NOT NULL`. `idx_entries_list` answers the start-up list query (`fetchEntries`, first stage) and the tag sweep on open from the index alone; icon and cover can be data URLs and stay out of it, the few entries carrying one are found through `idx_entries_decorated`, which a query only uses with that exact condition in its WHERE.
+Tags in [entry_tags](#entry_tags-template_tags-image_tags). Indexes: `idx_entries_category`, the unique `idx_entries_number` (any number of `NULL`s) and `idx_entries_list` on `(deleted_at, title, category_id, entry_number, icon, cover_image, created_at, updated_at, id)`, which answers the start-up list query (`fetchEntries`, first stage) from the index alone; icon and cover are short file names, never data URLs.
 
 ### blocks
 
@@ -278,9 +290,9 @@ What a block points at, rewritten whenever its block is written (`blockRefs` in 
 | Column | Type | Notes |
 |---|---|---|
 | block_row | INTEGER | NOT NULL, **FK → blocks.row_id**, CASCADE |
-| target_kind | TEXT | NOT NULL, `'entry'` or `'image'` |
-| target | TEXT | NOT NULL; the entry's ID, or the picture's stored file name |
-| role | TEXT | NOT NULL; `content` (a chip, a picture in a text, an image field, a picture on a canvas), `render` (a canvas's or drawing's rendered picture), `layer` (a drawing layer's picture), `background` (a canvas's background), `default` (a custom block's prefill) |
+| target_kind | TEXT | NOT NULL, `'entry'`, `'image'` or `'icon'` |
+| target | TEXT | NOT NULL; the entry's ID, or the stored file name of the picture or the icon |
+| role | TEXT | NOT NULL; `content` (a chip, a picture in a text, an image field, a picture on a canvas), `render` (a canvas's or drawing's rendered picture), `layer` (a drawing layer's picture), `background` (a canvas's background), `default` (a custom block's prefill), `icon` (a custom block copy's icon, kind `icon` — every copy names the same file) |
 
 `PRIMARY KEY (block_row, target_kind, target, role)` — with a `rowid`, since re-encrypting a vault renames pictures in every table by it (`reencrypt.rs`); `idx_block_refs_target` on `(target_kind, target)` answers "who points at this". A drawing without a vector document has its render as its only layer, as `parseDrawing` reads it. Who reads it: "Images" (`collectImageUses` in `imageUsage.ts`, whose roles are these — `render` and `layer` are the drawing itself, not pictures of their own, so "Images" neither lists nor removes them), the image cleanup (`collectUsedImageFilenames`, every role, the trash included — and, since deleting a file is for good, every image name in the rows of `blocks` as well, so a block `blockRefs` cannot fully read keeps its pictures), and the backup. "Linked entries" and the search read the open stores instead: they must see what is being typed.
 
@@ -326,7 +338,7 @@ A task in the Trash keeps its rows, so restoring it brings its links back; `task
 
 ## Indexes
 
-Declared in `INDEX_DDL` in `schema.ts`: one on every foreign-key column, one on each side of `task_links`, one on every `deleted_at` column (for `entries` the leading column of `idx_entries_list`), `idx_categories_template`, the unique `idx_entries_number`, the list indexes `idx_entries_list` and `idx_entries_decorated` — see [entries](#entries) — and the block indexes (an owner's blocks in order, references by target) — see [blocks](#blocks).
+Declared in `INDEX_DDL` in `schema.ts`: one on every foreign-key column, one on each side of `task_links`, one on every `deleted_at` column (for `entries` the leading column of `idx_entries_list`), `idx_categories_template`, the unique `idx_entries_number`, the list index `idx_entries_list` — see [entries](#entries) —, the tag links' `tag_id` and the block indexes (an owner's blocks in order, references by target) — see [blocks](#blocks).
 
 The `deleted_at` indexes matter because `runPeriodicCleanup` runs a range scan across every soft-delete table each time a vault is opened.
 
@@ -334,7 +346,7 @@ The `deleted_at` indexes matter because `runPeriodicCleanup` runs a range scan a
 
 **Reading and writing rows.** `src/lib/row.ts` is the only place that converts between SQLite rows and the types in `src/types`. Read with `fromRow.*`, write with `toInt` and `toJson`. SQLite has neither booleans nor arrays: booleans come back as `0`/`1`, arrays as JSON text.
 
-**tags field.** `tags` on entries and templates is a JSON array of tag **ids**. The ids of trashed tags stay in the list and are simply not shown (`visibleTags`); exports (`.emerald`, Markdown, HTML) write names (`liveTagNames`), and imports map names back to ids. Tasks carry no tags.
+**Tags.** Entries, templates and pictures carry tag **ids** through the link tables, in memory as `tags: string[]`. The ids of trashed tags stay linked and are simply not shown (`visibleTags`); exports (`.emerald`, Markdown, HTML) write names (`liveTagNames`), and imports map names back to ids. Tasks carry no tags.
 
 **entry_number.** A stable, compact, human-readable number, shown in the search and the link picker as `#12`. `nextEntryNumber(db)` in `db.ts` assigns it at insert time — one count over all entries, trashed rows included, so a restored entry never duplicates a number; `idx_entries_number` makes it unique. It is a stored value, never derived from `ROWID`, so a replace import cannot shift it, and a change of category keeps it. An import numbers what it brings behind the vault's (see [Import](#import)).
 
@@ -350,7 +362,11 @@ The `deleted_at` indexes matter because `runPeriodicCleanup` runs a range scan a
 
 A patch that changes nothing is not written at all (`needsWrite`). Checking a checklist item in read mode is a change and does stamp. Ticking a task stamps that task only; its subtasks change along without a new stamp, and ones already in that state are not written. An imported entry's `updated_at` is its creation date (the file knows no other), so an old operation does not jump to the top of a list sorted by last change.
 
-**Base64 in SQLite.** The rule is to keep image data in files (see [Rules for Future Schema Changes](#rules-for-future-schema-changes)). Two columns hold data-URLs instead — the `legacy` group of `IMAGE_FIELDS` in `schema.ts`: `entries.icon` / `cover_image`. `Favicon.tsx` (via `readIconFile` in `lib/imageLimits.ts`) and `MediaPropertyRow` (`EditProperties.tsx`) read the uploaded file with the shared `readFileAsDataUrl` helper (`lib/helpers.ts`); none of them go through `save_image`. Consumers test the value with `isImageIcon` / `startsWith('data:image/')`. Do not add more.
+**No Base64 in SQLite.** Image data lives in files (see [Rules for Future Schema Changes](#rules-for-future-schema-changes)); no column holds a data URL. A cover is a picture of `images/`, an uploaded icon a file of `icons/`.
+
+### Icons
+
+The `icon` columns of `ICON_FIELDS` in `schema.ts` — `entries`, `templates`, `block_definitions`, `languages`, `dashboards` — hold an emoji or the stored name of a file in the vault's `icons/` folder. An uploaded icon is brought down to 128px (`saveIcon` in `src/lib/icons.ts`, through `useShrunkIcon`) and stored by `save_icon` like a picture by `save_image`: named after a hash of its bytes, sealed in an encrypted vault — under a context of its own, so a file of one folder does not open as one of the other. `isImageIcon` (`lib/helpers.ts`) tells a file name from an emoji, `iconSrc` builds its URL (`emerald-img` under `/{vaultId}/icons/{name}`). A custom block's copies carry the definition's icon in their config JSON and name it in [block_refs](#block_refs) (`target_kind` `icon`), so every copy points at the same file. Categories, tags and vaults know only emoji; no view writes `dashboards.icon` yet. Icons are not pictures of "Images": `collectImageUses` never sees them, and their own cleanup is `collectUsedIconFilenames` (the icon columns, the icon references and every stored name in the block rows' `config`/`attrs`, the trash included) behind the same action in Settings → Storage.
 
 ## Sigil Workflow
 
@@ -364,11 +380,11 @@ The entry's state comes from the charges (`sigilState`). A charge's `targets` ar
 
 ## Image Storage
 
-Handled natively in `src-tauri/src/images.rs`. Images live in `{vaultDir}/images/`, sealed, and are named after a keyed hash of their own bytes (HMAC under a key derived from the vault key), so the same image is stored once per vault however many entries reference it. The plain SHA-256 would let anyone holding a known picture confirm it is in the vault.
+Handled natively in `src-tauri/src/images.rs`. Images live in `{vaultDir}/images/`, uploaded icons beside them in `{vaultDir}/icons/` (see [Icons](#icons)), sealed, and are named after a keyed hash of their own bytes (HMAC under a key derived from the vault key), so the same image is stored once per vault however many entries reference it. The plain SHA-256 would let anyone holding a known picture confirm it is in the vault.
 
 **The database stores the bare filename** — `{hash}.{ext}` (64 hex digits), no directory and no drive letter. Rendering goes through the `emerald-img` URI scheme rather than IPC; the details are in [Image Storage System](architecture/storage.md#image-storage-system).
 
-The image commands (`save_image`, `copy_image_file`, `read_image_as_base64`, `list_image_files`, `delete_image_files`) are listed in [IPC Command Surface](architecture.md#ipc-command-surface).
+The image commands (`save_image`, `copy_image_file`, `read_image_as_base64`, `list_image_files`, `delete_image_files`) and their icon counterparts (`save_icon`, `read_icon_as_base64`, `list_icon_files`, `delete_icon_files`) are listed in [IPC Command Surface](architecture.md#ipc-command-surface).
 
 ## Multi-Vault System
 
@@ -389,7 +405,7 @@ Full vault snapshots are exported and imported via Settings → Backup. The code
 
 ```json
 {
-  "version": "16",
+  "version": "17",
   "type": "backup",
   "exportedAt": "2026-04-18T...",
   "filters": { "categoryIds": null, "includeUncategorized": true, "includeTasks": true, "..." : "..." },
@@ -402,6 +418,7 @@ Full vault snapshots are exported and imported via Settings → Backup. The code
     "languages": [], "lexiconEntries": []
   },
   "images": { "3f2a….png": "data:image/png;base64,..." },
+  "icons": { "9c1d….png": "data:image/png;base64,..." },
   "settings": { "version": 1, "appearance": { "…": "…" }, "trash": { "…": "…" }, "…": "…" }
 }
 ```
@@ -412,9 +429,9 @@ Full vault snapshots are exported and imported via Settings → Backup. The code
 
 ### Backup versions
 
-`BACKUP_VERSION` is `"16"`: all entries in one `data.entries` array, without a type; categories with their start template (`template_id`); the [dashboards](#dashboards) in `data.dashboards`; the blocks of the exported entries and of the templates as the rows of [blocks](#blocks) in `data.blocks` (without `row_id` and `text`; entries and templates carry no `content`); the rows of [images](#images) in `data.vaultImages`, their files in `images`.
+`BACKUP_VERSION` is `"17"`: all entries in one `data.entries` array, without a type; categories with their start template (`template_id`); the [dashboards](#dashboards) in `data.dashboards`; the blocks of the exported entries and of the templates as the rows of [blocks](#blocks) in `data.blocks` (without `row_id` and `text`; entries and templates carry no `content`); the rows of [images](#images) in `data.vaultImages`, their files in `images`. The rows of entries, templates and pictures carry their tags as an array of ids in `tags`, in their order (the link tables do not travel as tables); the [icon](#icons) files the rows and the block copies name travel in `icons` (stored name → data URL) beside `images`.
 
-Only this version is read. `readBackupPayload` compares numerically (a string compare would think `"10"` older than `"4"`) before anything is touched: a file below `"16"` comes from before entries lost their type (`"15"`) or before the fresh start and is refused with `BACKUP_OUTDATED` (`settings.importErrorOldVersion`), a newer one with `BACKUP_TOO_NEW` (`settings.importErrorNewVersion`). Nothing is converted, and the vault stays as it was. `entryRowsForInsert` projects the file's rows onto the columns of `entries`, de-duplicating ids and numbers (a second holder of a number gets none and is numbered after the import, `numberUnnumbered`).
+Only this version is read. `readBackupPayload` compares numerically (a string compare would think `"10"` older than `"4"`) before anything is touched: a file below `"17"` comes from before tags became links and icons files (`"16"`), before entries lost their type (`"15"`) or before the fresh start and is refused with `BACKUP_OUTDATED` (`settings.importErrorOldVersion`), a newer one with `BACKUP_TOO_NEW` (`settings.importErrorNewVersion`). Nothing is converted, and the vault stays as it was. `entryRowsForInsert` projects the file's rows onto the columns of `entries`, de-duplicating ids and numbers (a second holder of a number gets none and is numbered after the import, `numberUnnumbered`).
 
 The version is bumped whenever an older build would otherwise import a file *wrongly* rather than fail: `insertRows` filters every row against `PRAGMA table_info` (to guard against crafted files), so an older build would silently drop a column it doesn't know.
 
@@ -457,7 +474,7 @@ All three modes go through `importViaStaging`, and automatic editor saves are su
 | `merge` | Generates an 8-char base36 timestamp prefix. All entry ids are prefixed; cross-references are remapped. `entry_number` is offset past the highest existing one, since it is a stored, unique value and would otherwise collide. The vault's dashboards keep their state and take on the file's categories besides. `categories` and `tags` are resolved, not prefixed. |
 | `add-vault` | Creates a new vault → `switchVault()` → runs the replace logic against the empty vault. |
 
-The selection (`ImportTypeFilters`) is the same as the export's: one box per category the file holds entries of, with their count (`previewOf`), "Uncategorized", then Tasks, Tags and the Lexicon, plus the settings groups for Merge. Both `doReplace` and `doMerge` finish with `sweepDanglingTaskLinks` and `dropUnknownTagIds`.
+The selection (`ImportTypeFilters`) is the same as the export's: one box per category the file holds entries of, with their count (`previewOf`), "Uncategorized", then Tasks, Tags and the Lexicon, plus the settings groups for Merge. Both `doReplace` and `doMerge` finish with `sweepDanglingTaskLinks`.
 
 **Reading the file** (`readBackupPayload`) clears the `category_id` of an entry whose category the file does not carry: the selection by category, the preview counts and the deletion of a replace then all agree, and no file can reach a category of this vault it does not name. An entry number outside 1 to 10⁹ is given afresh (`entryRowsForInsert`); a dashboard row whose id is a built-in key it does not carry as `builtin` is left out, and "All entries" is imported without a filter.
 
@@ -467,7 +484,7 @@ The selection (`ImportTypeFilters`) is the same as the export's: one box per cat
 
 **Categories are resolved, never deleted** — `resolveImportedCategories`. A category matches a local one by id (for the built-in) or by case-insensitive name (`categoryKey`); a match is revived from the trash if the local row is trashed and the imported one active. Anything left over is inserted, with a new id if the payload's id is taken. The content arrays are then remapped onto the local ids. A category is shared by entries and tasks, so a partial replace must not delete categories out from under the rest. A category the file brings its start template for gets it once the templates are in (`applyStartTemplates`), unless it already has one; the dashboards' category ids are remapped the same way (`importDashboards`), and one that points nowhere here drops out.
 
-**Tags are resolved the same way, never deleted** — `importTagsAndRemap`, before anything else is written. A tag with a local tag's id is that tag; otherwise a case-insensitive name match (`tagNameKey`) maps it onto the local tag — a trashed local namesake is revived if the imported one is live, after its id is stripped from the rows still carrying it (the same rule as typing the name, see [Tags](architecture/modules.md#tags)). Anything left over is inserted with its own id, name trimmed to 100 characters and colour validated; rows without a valid id (`isTagId`) or name are skipped. In entry and template rows, an id the file has no tag row for (Tags unticked) survives only if that tag exists locally.
+**Tags are resolved the same way, never deleted** — `importTagsAndRemap`, before anything else is written. A tag with a local tag's id is that tag; otherwise a case-insensitive name match (`tagNameKey`) maps it onto the local tag — a trashed local namesake is revived if the imported one is live, after its links are removed (`unlinkTags`; the same rule as typing the name, see [Tags](architecture/modules.md#tags)). Anything left over is inserted with its own id, name trimmed to 100 characters and colour validated; rows without a valid id (`isTagId`) or name are skipped. In entry, template and picture rows and in the dashboards' tag filters, an id the file has no tag row for (Tags unticked) survives only if that tag exists locally. The links are written for the owners the import actually inserted (`insertTagLinks`): an entry, template or picture that already exists keeps its own tags.
 
 **Block definitions are added, never replaced or deleted** — `insertBlockDefinitions`, `INSERT OR IGNORE` by id without the merge prefix, so a block arriving twice stays one. It runs before `doReplace`'s first `DELETE` and normalises every row to the full column set (ids must pass `isDefinitionId`), so a malformed array in a crafted file can neither abort a half-done replace nor slip a partial row past `insertRows`, which takes its column list from the first row. A definition that exists locally (even trashed) keeps its local version.
 
@@ -481,17 +498,16 @@ A fresh vault (add-vault) seeds its own `core-sigil` and `core-altar` before the
 
 ### Image references
 
-Images are restored via `save_image`, which returns the filename in the importing vault. A picture the vault already holds under the very name the file knew it by keeps that name (`restoreImages`): the name is a hash of the content, and saving again could spell the type differently (a `.jpeg` taken from the disk comes back as `.jpg`), which would leave it in "Images" twice. The remap covers the columns of `IMAGE_FIELDS` in `schema.ts` (via `imageColumns(table)`), the inventory shared by the importer and `collectUsedImageFilenames`. It groups the columns by how they must be treated:
+Images are restored via `save_image`, which returns the filename in the importing vault. A picture the vault already holds under the very name the file knew it by keeps that name (`restoreImages`): the name is a hash of the content, and saving again could spell the type differently (a `.jpeg` taken from the disk comes back as `.jpg`), which would leave it in "Images" twice. The remap covers the columns of `IMAGE_FIELDS` in `schema.ts` (via `imageColumns(table)`), the inventory shared by the importer and `collectUsedImageFilenames`. It groups the columns by how they are rewritten:
 
-| Group | Meaning | Rewritten on import | Cleanup scans |
-|---|---|---|---|
-| `html` | the reference sits in a `src` attribute | yes | yes |
-| `plain` | the column *is* the reference | yes | yes |
-| `legacy` | the column holds a data-URL | no | yes |
+| Group | Meaning |
+|---|---|
+| `html` | the reference sits in a `src` attribute |
+| `plain` | the column *is* the reference |
 
-The `legacy` group is why the list has to be complete: `collectUsedImageFilenames` decides which file the cleanup may delete, so a missing column would be a reference nobody sees. Rewriting those columns would break their renderers, which test them with `isImageIcon` (only `data:` / `blob:` / `/`).
+The list has to be complete: `collectUsedImageFilenames` decides which file the cleanup may delete, so a missing column would be a reference nobody sees.
 
-`IMAGE_FIELDS` lists `entries.icon` and `cover_image` (group `legacy`); the `html` and `plain` groups are empty and are where a new image column goes. The blocks are not in it: on import they are remapped by `remapBlock`, and in the vault `collectUsedImageFilenames` reads the pictures of every block, of entries and templates, from [block_refs](#block_refs), and every image name in the rows of `blocks` as well. `block_definitions.elements` is scanned directly too. All of their images travel with a `.emeralddb` export.
+`IMAGE_FIELDS` lists `entries.cover_image` (group `plain`). Icons are restored the same way into `icons/` (`restoreIcons`, `save_icon`): the icon columns of the file's rows are pointed at the names here, and a value that is neither an emoji nor an icon the file brings is dropped, so the row falls back to its default. A block copy names its icon in its config beside its pictures; the blocks are remapped with one map for both (the same bytes have the same name in either folder). The blocks are not in `IMAGE_FIELDS`: on import they are remapped by `remapBlock`, and in the vault `collectUsedImageFilenames` reads the pictures of every block, of entries and templates, from [block_refs](#block_refs), and every image name in the rows of `blocks` as well. `block_definitions.elements` is scanned directly too. All of their images travel with a `.emeralddb` export.
 
 ## Rules for Future Schema Changes
 
@@ -501,7 +517,8 @@ The `legacy` group is why the list has to be complete: `collectUsedImageFilename
 - Prefer additive changes. A rename or a type change means rebuilding the table inside one multi-statement `execute()` or `batch` (see [Foreign Keys](#foreign-keys)).
 - New boolean fields: `INTEGER NOT NULL DEFAULT 0` (or `1` where the safe default is true). New array fields: `TEXT NOT NULL DEFAULT '[]'`.
 - New references: name them `<thing>_id`, store the id and never the name, declare the foreign key, and index the column.
-- New image-backed fields: reuse the file pipeline through `src/lib/images.ts` (`saveImage` / `copyImageFile`), store the returned **filename**, and add the column to the `plain` (or `html`) group of `IMAGE_FIELDS` in `schema.ts` so import and cleanup both see it. Do not store base64 in SQLite, and do not store a path.
+- New image-backed fields: reuse the file pipeline through `src/lib/images.ts` (`saveImage` / `copyImageFile`), store the returned **filename**, and add the column to the `plain` (or `html`) group of `IMAGE_FIELDS` in `schema.ts` so import and cleanup both see it. A new icon column goes through `saveIcon` (`src/lib/icons.ts`) and into `ICON_FIELDS` (and `ICON_DATA_KEYS` in `dbBackup.ts`). Do not store base64 in SQLite, and do not store a path.
+- New tagged things get a link table like `entry_tags` (owner and `tag_id`, both CASCADE, with a `rowid`) and an entry in `TAG_LINKS` (`tagRefs.ts`), never a JSON list of ids.
 - Never swallow errors in a migration step (`try { ALTER TABLE … } catch {}`) — steps must fail loudly.
 - **`$N` placeholders must appear in ascending order in the SQL text.** SQLite treats `$N` as a *named* parameter and assigns bind indexes by order of first appearance, not by the digit — `SELECT $21, $23, $22` binds them as 1, 2, 3 (verified against the SQLite C API). `db.rs` binds the values array purely positionally, so a `$23` written before a `$22` silently swaps two values. Every query in this codebase works only because its placeholders ascend; reusing a placeholder (`WHERE id IN ($1, $3)`) is fine, skipping ahead is not.
 - If a change alters the shape of exported rows so that an older build would import a file wrongly, bump `BACKUP_VERSION` in `dbBackup.ts` (see [Backup versions](#backup-versions)). `readBackupPayload` reads only the current version: older files are refused, not lifted, unless a converter for them is added deliberately.

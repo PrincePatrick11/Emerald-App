@@ -25,6 +25,8 @@ pub const DB_FILE: &str = "emerald.db";
 /// The copy a backup import fills before it swaps it in, next to [`DB_FILE`].
 pub const IMPORT_STAGING_FILE: &str = "emerald.db.import";
 pub const IMAGES_SUBDIR: &str = "images";
+/// The vault's uploaded icons (`images.rs`, `Store::Icons`), apart from the pictures.
+pub const ICONS_SUBDIR: &str = "icons";
 /// Where a vault migrated from the pre-0.2.1 layout lives: `{appDataDir}/vaults/`.
 pub const VAULTS_SUBDIR: &str = "vaults";
 /// The folder new vaults are offered in, inside the user's documents directory.
@@ -130,9 +132,19 @@ pub fn vault_dir(app: &tauri::AppHandle, vault_id: &str) -> Result<PathBuf, Stri
 /// [`create_vault_dirs`] builds a vault directory, and only when that is the
 /// point.
 pub fn images_dir(app: &tauri::AppHandle, vault_id: &str) -> Result<PathBuf, String> {
+    vault_subdir(app, vault_id, IMAGES_SUBDIR)
+}
+
+/// The vault's icon folder — created on demand under the same rule as
+/// [`images_dir`].
+pub fn icons_dir(app: &tauri::AppHandle, vault_id: &str) -> Result<PathBuf, String> {
+    vault_subdir(app, vault_id, ICONS_SUBDIR)
+}
+
+fn vault_subdir(app: &tauri::AppHandle, vault_id: &str, name: &str) -> Result<PathBuf, String> {
     let vault = vault_dir(app, vault_id)?;
     directory_state(&vault)?;
-    let dir = vault.join(IMAGES_SUBDIR);
+    let dir = vault.join(name);
     std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
     Ok(dir)
 }
@@ -540,6 +552,7 @@ pub fn register_vaults(app: tauri::AppHandle, vaults: Vec<VaultEntry>) -> Result
 pub fn create_vault_dirs(app: tauri::AppHandle, vault_id: String) -> Result<(), String> {
     let dir = vault_dir(&app, &vault_id)?;
     std::fs::create_dir_all(dir.join(IMAGES_SUBDIR)).map_err(|e| e.to_string())?;
+    std::fs::create_dir_all(dir.join(ICONS_SUBDIR)).map_err(|e| e.to_string())?;
     // `backup/` belongs from the start, not only from the first export — that
     // way the structure of a vault folder is always the same. For vaults outside
     // the allowed roots it stays empty without consequence (the export does not
@@ -558,7 +571,8 @@ pub fn create_vault_dirs(app: tauri::AppHandle, vault_id: String) -> Result<(), 
 /// touches vault storage and not just for this one.
 #[tauri::command]
 pub fn ensure_vault_dirs(app: tauri::AppHandle, vault_id: String) -> Result<(), String> {
-    images_dir(&app, &vault_id).map(|_| ())
+    images_dir(&app, &vault_id)?;
+    icons_dir(&app, &vault_id).map(|_| ())
 }
 
 /// The default location for a vault the user did not place themselves.
@@ -696,15 +710,17 @@ pub fn delete_vault_files(app: tauri::AppHandle, vault_id: String) -> Result<boo
     // point on would leave the entry in place, and the next `getDb()` would put
     // a fresh, empty database into the folder — the state that the invariant
     // above rules out. What cannot be deleted simply stays, folder included.
-    let images = dir.join(IMAGES_SUBDIR);
-    if let Ok(entries) = std::fs::read_dir(&images) {
-        for entry in entries.flatten() {
-            let name = entry.file_name().to_string_lossy().into_owned();
-            if crate::images::is_valid_image_name(&name) {
-                std::fs::remove_file(entry.path()).ok();
+    for sub in [IMAGES_SUBDIR, ICONS_SUBDIR] {
+        let folder = dir.join(sub);
+        if let Ok(entries) = std::fs::read_dir(&folder) {
+            for entry in entries.flatten() {
+                let name = entry.file_name().to_string_lossy().into_owned();
+                if crate::images::is_valid_image_name(&name) {
+                    std::fs::remove_file(entry.path()).ok();
+                }
             }
+            std::fs::remove_dir(&folder).ok();
         }
-        std::fs::remove_dir(&images).ok();
     }
 
     for name in [SETTINGS_FILE, SETTINGS_TEMP_FILE, DRAFTS_FILE, DRAFTS_TEMP_FILE, crate::keys::KEY_FILE, crate::keys::KEY_TEMP_FILE] {

@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useMemo } from 'react';
 import { LayoutList } from 'lucide-react';
 import { MODULE_LIST } from '../../../lib/modules';
 import { useLinkItems } from '../../../hooks/useLinkItems';
-import { isImageIcon } from '../../../lib/helpers';
+import { LinkItemIcon } from '../../sidebar/fields/LinkedEntryPicker';
 import type { ContentType } from '../../../types';
 import { ENTRY_TYPE_ICONS, ENTRY_TYPE_LABEL_KEYS, type SuggestionItem } from './SuggestionList';
 import { useTranslation } from 'react-i18next';
@@ -134,14 +134,7 @@ export default function LinkPickerModal({ onSelect, onClose }: Props) {
                   >
                     {/* Icon */}
                     <span className="text-base w-5 flex-shrink-0 flex items-center justify-center">
-                      {(() => {
-                        // displayIcon first: an image icon is carried only there
-                        // (see SuggestionItem), `icon` holds the emoji fallback.
-                        const icon = item.displayIcon || item.icon;
-                        return isImageIcon(icon)
-                          ? <img src={icon} alt="" className="w-4 h-4 object-contain" />
-                          : icon;
-                      })()}
+                      <LinkItemIcon item={item} />
                     </span>
 
                     {/* Title */}

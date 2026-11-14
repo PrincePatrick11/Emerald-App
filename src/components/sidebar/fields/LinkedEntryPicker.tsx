@@ -6,6 +6,7 @@ import { X } from 'lucide-react';
 import { useOutsideClick } from '../../../hooks/useOutsideClick';
 import { OP_PROP_SELECT_CLASSES } from '../../../lib/styleClasses';
 import { isImageIcon } from '../../../lib/helpers';
+import { iconSrc } from '../../../lib/icons';
 import { DEFAULT_ENTRY_EMOJI } from '../../../lib/modules';
 import type { SuggestionItem } from '../../../lib/linkItems';
 
@@ -13,7 +14,7 @@ import type { SuggestionItem } from '../../../lib/linkItems';
 export function LinkItemIcon({ item }: { item: SuggestionItem }) {
   const icon = item.displayIcon || item.icon || DEFAULT_ENTRY_EMOJI[item.entryType];
   return isImageIcon(icon)
-    ? <img src={icon} alt="" className="w-4 h-4 object-cover rounded-md flex-shrink-0" />
+    ? <img src={iconSrc(icon)} alt="" className="w-4 h-4 object-cover rounded-md flex-shrink-0" />
     : <span className="flex-shrink-0">{icon}</span>;
 }
 

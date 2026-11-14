@@ -10,6 +10,7 @@ import { displayTitle } from '../lib/entryTitle';
 import { startOfNewEntry, useTemplateNoticeStore } from './templateStore';
 import { kindOfEntry } from './dashboardStore';
 import { contentOf, loadBlocks, planContentWrite, type BlockOwner } from '../lib/blockStore';
+import { readTagLinks, readTags, tagStatements } from '../lib/tagRefs';
 
 /**
  * All entries — one store over the single table `entries`, in one list.
@@ -55,31 +56,23 @@ interface EntryState {
 const byCreatedDesc = (a: Entry, b: Entry) => b.created_at.localeCompare(a.created_at);
 
 /** The columns of `idx_entries_list` — the query reads only the index (`ENTRIES_INDEX_DDL`). */
-const LIST_COLUMNS = 'id, title, category_id, entry_number, tags, created_at, updated_at, deleted_at';
+const LIST_COLUMNS = 'id, title, category_id, entry_number, icon, cover_image, created_at, updated_at, deleted_at';
 
 /**
  * The live entries from the database — without content, the first stage of
- * `fetchEntries`. Icon and cover image are not in the index (data URLs): for
- * the few entries that carry one, they come via `idx_entries_decorated` —
- * which is why its condition appears verbatim in the WHERE.
+ * `fetchEntries` — with their tags from `entry_tags`. The trashed entries'
+ * links come along too: reading them costs less than filtering them out.
  */
 async function selectLiveEntries(): Promise<Entry[]> {
   const db = await getDb();
-  // Two connections, so not the same state: a write exactly in
-  // between can attach an older icon to newer list columns — display
-  // only, and the next load fixes it.
-  const [rows, decorated] = await Promise.all([
+  // Two connections, so not the same state: a write exactly in between can
+  // attach older tags to newer list columns — display only, and the next
+  // load fixes it.
+  const [rows, tags] = await Promise.all([
     db.select<DbRow[]>(`SELECT ${LIST_COLUMNS} FROM entries WHERE deleted_at IS NULL`),
-    db.select<DbRow[]>(
-      'SELECT id, icon, cover_image FROM entries WHERE deleted_at IS NULL AND (icon IS NOT NULL OR cover_image IS NOT NULL)',
-    ),
+    readTagLinks(db, 'entry'),
   ]);
-  const decorationById = new Map(decorated.map((d) => [d.id, d]));
-  for (const row of rows) {
-    const d = decorationById.get(row.id);
-    if (d) Object.assign(row, { icon: d.icon, cover_image: d.cover_image });
-  }
-  return rows.map((row) => fromRow.entry(row)).sort(byCreatedDesc);
+  return rows.map((row) => fromRow.entry({ ...row, tags: tags.get(String(row.id)) ?? [] })).sort(byCreatedDesc);
 }
 
 /** The running second stage of `fetchEntries`; a new load makes an older one ineffective. */
@@ -239,11 +232,11 @@ export const useEntryStore = create<EntryState>((set, get) => ({
     // The row first: its blocks point at it.
     await db.batch([
       [
-        `INSERT INTO entries (id, title, category_id, created_at, updated_at, tags, entry_number)
-         VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-        [entry.id, entry.title, categoryId, entry.created_at, entry.updated_at,
-          JSON.stringify(entry.tags), entry.entry_number],
+        `INSERT INTO entries (id, title, category_id, created_at, updated_at, entry_number)
+         VALUES ($1, $2, $3, $4, $5, $6)`,
+        [entry.id, entry.title, categoryId, entry.created_at, entry.updated_at, entry.entry_number],
       ],
+      ...tagStatements('entry', entry.id, entry.tags),
       ...blocks.statements,
     ]);
     blocks.commit();
@@ -302,18 +295,19 @@ export const useEntryStore = create<EntryState>((set, get) => ({
     await db.batch([
       [
         `UPDATE entries
-            SET title=$1, category_id=$2, updated_at=$3, tags=$4, cover_image=$5, icon=$6
-          WHERE id=$7`,
+            SET title=$1, category_id=$2, updated_at=$3, cover_image=$4, icon=$5
+          WHERE id=$6`,
         [
           merged.title,
           merged.category_id,
           merged.updated_at,
-          JSON.stringify(merged.tags),
           merged.cover_image ?? null,
           merged.icon ?? null,
           id,
         ],
       ],
+      // The links only when the tags are meant to change.
+      ...(patch.tags !== undefined ? tagStatements('entry', id, merged.tags) : []),
       ...(blocks?.statements ?? []),
     ]);
     blocks?.commit();
@@ -330,9 +324,9 @@ export const useEntryStore = create<EntryState>((set, get) => ({
     const db = await getDb();
     await db.execute('UPDATE entries SET deleted_at=NULL WHERE id=$1', [id]);
     // Only this row, sorted in as on load.
-    const rows = await db.select<DbRow[]>(`SELECT ${LIST_COLUMNS}, icon, cover_image FROM entries WHERE id = $1`, [id]);
+    const rows = await db.select<DbRow[]>(`SELECT ${LIST_COLUMNS} FROM entries WHERE id = $1`, [id]);
     if (!rows[0]) return;
-    const entry = { ...fromRow.entry(rows[0]), content: await selectContent(id) };
+    const entry = { ...fromRow.entry({ ...rows[0], tags: await readTags(db, 'entry', id) }), content: await selectContent(id) };
     set((s) => ({
       entries: [...s.entries.filter((e) => e.id !== id), entry].sort(byCreatedDesc),
       // The full row is here — even if the second stage is still running.
