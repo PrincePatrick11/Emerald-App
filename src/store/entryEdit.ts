@@ -1,9 +1,8 @@
-import { viewTypeForEntryType, type ViewId } from '../lib/modules';
+import type { ViewId } from '../lib/modules';
 import { isInEdit, useUIStore } from './uiStore';
 import { guardKey, registerEditProbe } from './leaveGuardStore';
 import { useEntryStore } from './entryStore';
-import { retypeInternalLinks } from '../lib/internalLinkHtml';
-import type { Entry, EntryType } from '../types';
+import type { Entry } from '../types';
 
 /**
  * The baselines of the running edits, per view and entry — how
@@ -18,9 +17,10 @@ import type { Entry, EntryType } from '../types';
  * `uiStore`, no view has to report it. In memory only: a restart
  * begins with what is saved.
  *
- * A type change does not end the edit: the baseline moves along into the
- * new view (`carryBaseline`) and remembers where the entry came from — Cancel
- * brings it back there (`revertEntryType`).
+ * Moving the entry to another module (`EntryAreaField`) does not end the
+ * edit: the baseline moves along into the new view (`carryBaseline`) and
+ * remembers the view the edit began in — Cancel restores the category and
+ * brings the tab back there.
  */
 export interface EditBaseline {
   scope: ViewId;
@@ -30,18 +30,12 @@ export interface EditBaseline {
   stamp: string | undefined;
   /** The saved state, in the shape of `patch` — `null` if the entry no longer exists. */
   stored: () => unknown;
-  /** Only after a type change: what the entry was on entering. `patch` then has the shape of that view. */
-  origin?: EditOrigin;
+  /** Only after a move to another module: the view the edit began in. */
+  origin?: ViewId;
 }
 
-/** What a baseline holds: an excerpt of the entry — for the journal only the first three fields. */
+/** What a baseline holds: an excerpt of the entry. */
 export type BaselineFields = Partial<Pick<Entry, 'title' | 'content' | 'tags' | 'category_id' | 'icon' | 'cover_image'>>;
-
-/** Type and number of an entry before it changed type during the edit. */
-export interface EditOrigin {
-  type: EntryType;
-  entry_number: number | undefined;
-}
 
 export const baselines = new Map<string, EditBaseline>();
 
@@ -51,7 +45,7 @@ export const baselineKey = guardKey;
  * Does an edit carry changes? The one rule for the guard of the
  * open page and the probe in the background: a deleted entry
  * (`stored === null`) has nothing left to preserve; a new, never confirmed one,
- * one with a pending autosave or with a changed type always does; otherwise
+ * one with a pending autosave or moved to another module always does; otherwise
  * what counts is whether the saved state differs from the baseline.
  */
 export function editIsDirty(stored: unknown, baseline: EditBaseline | undefined, isNew: boolean, pending = false): boolean {
@@ -62,7 +56,7 @@ export function editIsDirty(stored: unknown, baseline: EditBaseline | undefined,
 
 /**
  * The baseline of the edit of `id` — under whichever view it currently
- * sits: after a type change that is no longer the one in which
+ * sits: after a move to another module that is no longer the one in which
  * "Edit" was pressed.
  */
 export function baselineOf(id: string): EditBaseline | undefined {
@@ -72,52 +66,30 @@ export function baselineOf(id: string): EditBaseline | undefined {
   return undefined;
 }
 
-/** Where the entry came from, if it has already changed type in this edit. */
-export function originOfEdit(id: string, type: EntryType): EditOrigin | undefined {
-  return baselines.get(baselineKey(viewTypeForEntryType(type), id))?.origin;
-}
-
 /**
- * Carries the baseline along into the view of the new type on a type change.
- * On the first change it remembers `source` as the origin; if the change leads
- * back there, it is an ordinary edit again. Must run
- * before the tabs move (`retypeEntryViews`) — the reconciliation below would
- * otherwise clear the baseline.
+ * Carries the baseline along into the view `to` when the entry moves to
+ * another module during the edit. It remembers the view the edit began in;
+ * a move back there makes it an ordinary edit again. Must run before the
+ * tabs move (`moveEntryViews`) — the reconciliation below would otherwise
+ * clear the baseline.
  *
- * `stored` used to read through the old view and would no longer find the entry
- * there ("deleted"). Until the new view is mounted and installs its reader
- * (`useEntryEditor`), it only says whether the entry exists — in a tab that
- * went to the background beforehand, it stays that way.
+ * Until the new view is mounted and installs its reader (`useEntryEditor`),
+ * `stored` only says whether the entry exists — in a tab that went to the
+ * background beforehand, it stays that way.
  */
-export function carryBaseline(id: string, from: EntryType, to: EntryType, source: EditOrigin): void {
-  const fromKey = baselineKey(viewTypeForEntryType(from), id);
+export function carryBaseline(id: string, from: ViewId, to: ViewId): void {
+  const fromKey = baselineKey(from, id);
   const baseline = baselines.get(fromKey);
-  if (!baseline) return;
-  const origin = baseline.origin ?? source;
-  const scope = viewTypeForEntryType(to);
+  if (!baseline || from === to) return;
+  const origin = baseline.origin ?? from;
   baselines.delete(fromKey);
-  baselines.set(baselineKey(scope, id), {
+  baselines.set(baselineKey(to, id), {
     ...baseline,
-    scope,
-    origin: origin.type === to ? undefined : origin,
+    scope: to,
+    origin: origin === to ? undefined : origin,
     // `{}` matches no baseline — with `origin` the edit counts as changed anyway.
-    stored: () => (useEntryStore.getState().getEntry(id, to) ? {} : null),
+    stored: () => (useEntryStore.getState().getEntry(id) ? {} : null),
   });
-}
-
-/**
- * An entry has changed type: the chips pointing at it in the baselines of
- * OTHER running edits move along. `entryTypeChange` rewrites the saved
- * contents; a Cancel there would otherwise write the chip with the old type
- * back — and that leads nowhere any more.
- */
-export function retypeBaselineLinks(id: string, to: EntryType): void {
-  for (const baseline of baselines.values()) {
-    const content = baseline.patch.content;
-    if (baseline.id === id || !content) continue;
-    const next = retypeInternalLinks(content, id, to);
-    if (next !== content) baseline.patch = { ...baseline.patch, content: next };
-  }
 }
 
 /**
@@ -135,11 +107,11 @@ export function reassignBaselineCategories(ids: ReadonlySet<string>, to: string 
 
 /**
  * The entries whose edit Cancel is discarding right now — after a
- * type revert also beyond that, until their next edit
+ * move back also beyond that, until their next edit
  * begins: the views are only being torn down then. Whatever a view would
  * still save now — the debounce, the save on navigating away or on
  * teardown — would write the discarded input over the restored
- * entry. Per entry and not per view: when Cancel reverts a type change,
+ * entry. Per entry and not per view: when Cancel moves an entry back,
  * not only the view in which it was pressed is torn down.
  */
 const discarding = new Set<string>();
@@ -157,8 +129,8 @@ export function endDiscard(id: string): void {
 
 /**
  * A change that only writes after some work of its own — an image icon is
- * shrunk first. Cancel waits for it after `beginDiscard`, and a type change
- * before it starts. Dropping a late write is the caller's job: its write
+ * shrunk first. Cancel waits for it after `beginDiscard`, and a move to
+ * another module before it starts. Dropping a late write is the caller's job: its write
  * checks `isDiscarding` first, or it would land after Cancel's restore.
  */
 const pending = new Map<string, Promise<unknown>>();

@@ -36,10 +36,11 @@ import { nextTemplateSortOrder } from './templateRows';
 import { nextEntrySortOrder, nextLanguageSortOrder } from './lexiconRows';
 import { alphabetToJson, DEFAULT_LANGUAGE_ICON } from './lexicon';
 import { readUserSymbol, type UserSymbol } from './userSymbols';
-import type { EntryType, Language } from '../types';
+import type { Language } from '../types';
 import {
-  ALTAR_TEMPLATE_ID, assignedCategoryId, assignmentKey, isTemplateId, parseAssignments, SIGIL_TEMPLATE_ID, templateToRow,
+  ALTAR_TEMPLATE_ID, isTemplateId, SIGIL_TEMPLATE_ID, templateToRow,
 } from './blocks/templates';
+import { isBuiltinDashboard, parseDashboardFilter } from './dashboards';
 import { fromRow } from './row';
 import { IMAGE_FIELDS, imageColumns, storedImageName, storedImageNamesIn } from './schema';
 import { isTagId, rewriteTagRefs, stripTagIds, tagIdList, tagNameKey } from './tagRefs';
@@ -65,10 +66,18 @@ import { useDeviceStore } from '../store/deviceStore';
 // Public types
 // ─────────────────────────────────────────────────────────────────────────────
 
-export interface BackupOptions {
-  includeJournal: boolean;
-  includeWiki: boolean;
-  includeOperations: boolean;
+/**
+ * Which entries come along, by category — the packing list instead of the
+ * former entry types. `categoryIds` null: every category; otherwise only
+ * these. `includeUncategorized`: entries without a category, and those whose
+ * category is not among the categories at hand (in the trash, or not in the file).
+ */
+export interface EntrySelection {
+  categoryIds: string[] | null;
+  includeUncategorized: boolean;
+}
+
+export interface BackupOptions extends EntrySelection {
   includeTasks: boolean;
   includeTags: boolean;
   /** The lexicon's languages with their vocabulary — all of it, no date question. */
@@ -91,9 +100,11 @@ export interface BackupCategoryEntry {
 
 export interface BackupPreview {
   exportedAt: string;
-  journalCount: number;
-  wikiCount: number;
-  opsCount: number;
+  entriesCount: number;
+  /** How many entries of the file have no category it carries — the "Uncategorized" choice. */
+  uncategorizedCount: number;
+  /** Entries per category ID of the file. */
+  entryCounts: Record<string, number>;
   templatesCount: number;
   taskCount: number;
   /** The lexicon's languages; their vocabulary travels with them. */
@@ -104,11 +115,8 @@ export interface BackupPreview {
   hasSettings: boolean;
 }
 
-/** Which top-level content types to import. */
-export interface ImportTypeFilters {
-  includeJournal: boolean;
-  includeWiki: boolean;
-  includeOperations: boolean;
+/** Which content to import — the entries by category, the rest by kind. */
+export interface ImportTypeFilters extends EntrySelection {
   includeTasks: boolean;
   includeTags: boolean;
   includeLexicon: boolean;
@@ -122,11 +130,12 @@ export interface ImportTypeFilters {
 type Row = Record<string, any>;
 
 /**
- * The format of a backup. '15' is the first since the fresh start of the
- * schema (`FRESH_START_VERSION` in `schema.ts`): journal, wiki and operations
- * in one `data.entries` array, each row with `type`; the blocks of entries and
- * templates as the rows of `blocks` (`data.blocks`); the pictures taken into
- * "Images" as `data.vaultImages`.
+ * The format of a backup. '16' is the first since entries have no type
+ * (`FRESH_START_VERSION` in `schema.ts`): all entries in one `data.entries`
+ * array; categories with their start template (`template_id`); the
+ * dashboards as `data.dashboards`; the blocks of entries and templates as the
+ * rows of `blocks` (`data.blocks`); the pictures taken into "Images" as
+ * `data.vaultImages`.
  *
  * Only this version is read. An older file comes from before the fresh start
  * and is refused with {@link BACKUP_OUTDATED} before anything happens — its
@@ -136,7 +145,7 @@ type Row = Record<string, any>;
  * be imported *wrongly* rather than fail. Raise the version whenever an older
  * build would otherwise import a file wrongly.
  */
-const BACKUP_VERSION = '15' as const;
+const BACKUP_VERSION = '16' as const;
 
 /** A backup from before the fresh start of the schema: refused, not converted. */
 export const BACKUP_OUTDATED = 'BACKUP_OUTDATED';
@@ -144,16 +153,25 @@ export const BACKUP_OUTDATED = 'BACKUP_OUTDATED';
 export const BACKUP_TOO_NEW = 'BACKUP_TOO_NEW';
 
 /**
- * Checks a parsed file's version and splits its entries into the lists the
- * import works with. Throws {@link BACKUP_OUTDATED} / {@link BACKUP_TOO_NEW}
- * (numerically: a string comparison would consider '10' older than '4').
+ * Checks a parsed file's version, and clears the `category_id` of an entry
+ * whose category the file does not carry. Throws {@link BACKUP_OUTDATED} /
+ * {@link BACKUP_TOO_NEW} (numerically: a string comparison would consider
+ * '10' older than '4').
  */
 export function readBackupPayload(backup: BackupFile): void {
   const version = Number(backup.version);
   if (!Number.isInteger(version) || version < 1) throw new Error(`Unsupported backup version: ${backup.version}`);
   if (version < Number(BACKUP_VERSION)) throw new Error(BACKUP_OUTDATED);
   if (version > Number(BACKUP_VERSION)) throw new Error(BACKUP_TOO_NEW);
-  splitEntries(backup.data);
+  if (!Array.isArray(backup.data.entries)) backup.data.entries = [];
+  // An entry is in a category only if the file carries that category. Without
+  // this, a crafted file could count an entry as "uncategorized" in the
+  // dialog and still name a category of this vault — whose entries a replace
+  // would then delete without being asked.
+  const known = new Set((Array.isArray(backup.data.categories) ? backup.data.categories : []).map((c) => String(c?.id)));
+  backup.data.entries = backup.data.entries.map((row) => (
+    row?.category_id != null && !known.has(String(row.category_id)) ? { ...row, category_id: null } : row
+  ));
 }
 
 /** Maximum length of a tag name from a foreign source. */
@@ -206,9 +224,7 @@ export async function importTagsAndRemap(db: Awaited<ReturnType<typeof getDb>>, 
   return {
     ...d,
     tags: [],
-    journalEntries: remap(d.journalEntries),
-    wikiArticles: remap(d.wikiArticles),
-    operations: remap(d.operations),
+    entries: remap(d.entries),
     templates: remap(d.templates),
     vaultImages: remap(d.vaultImages),
   };
@@ -220,20 +236,10 @@ export async function dropUnknownTagIds(db: Awaited<ReturnType<typeof getDb>>): 
   await rewriteTagRefs(db, (ids) => ids.filter((id) => known.has(id)));
 }
 
-/** Splits `data.entries` into the lists the import works with. */
-function splitEntries(data: BackupFile['data']): void {
-  const rows = Array.isArray(data.entries) ? data.entries : [];
-  const ofType = (type: EntryType) => rows.filter((r) => r?.type === type);
-  data.journalEntries = ofType('journal');
-  data.wikiArticles = ofType('wiki');
-  data.operations = ofType('operation');
-  delete data.entries;
-}
-
 /**
- * The columns of `entries` except `type`. Every row gets all of them: `insertRows`
- * takes the column list from the first row, and a journal entry at the front
- * would otherwise strip category, icon and cover image from the wiki articles behind it.
+ * The columns of `entries`. Every row gets all of them: `insertRows` takes
+ * the column list from the first row, and a row without an icon at the front
+ * would otherwise strip the icons from the rows behind it.
  */
 const ENTRY_COLUMNS = [
   'id', 'title', 'category_id', 'entry_number', 'icon', 'cover_image',
@@ -243,45 +249,65 @@ const ENTRY_COLUMNS = [
 /** The image columns of an entry row at import. */
 const IMAGE_FIELDS_ENTRY = imageColumns('entries');
 
-function asEntryRow(type: EntryType, row: Row): Row {
-  const out: Row = { type };
+function asEntryRow(row: Row): Row {
+  const out: Row = {};
   for (const column of ENTRY_COLUMNS) out[column] = row[column] ?? null;
   out.title ??= '';
   out.tags ??= '[]';
-  // The journal has no category, no icon and no cover image.
-  if (type === 'journal') out.category_id = out.icon = out.cover_image = null;
   return out;
 }
 
+/** The highest number an imported entry may keep — far above any real vault. */
+const MAX_ENTRY_NUMBER = 1_000_000_000;
+
 /**
- * The import's entry rows for `entries`. An ID arrives only once: a crafted
- * file could carry the same entry under two types — the first wins, in the
- * order journal, wiki, operations.
+ * The import's entry rows for `entries`. An ID arrives only once (a crafted
+ * file could carry it twice — the first wins), and so does a number: the
+ * second holder of a number (`idx_entries_number` is unique), or one out of
+ * range, gets none and is numbered afterwards (`numberUnnumbered`).
  */
-export function entryRowsForInsert(journal: Row[], wiki: Row[], operations: Row[]): Row[] {
+export function entryRowsForInsert(rows: Row[]): Row[] {
   const seen = new Set<string>();
+  const numbers = new Set<number>();
   const out: Row[] = [];
-  for (const [type, rows] of [['journal', journal], ['wiki', wiki], ['operation', operations]] as const) {
-    for (const row of rows) {
-      const id = String(row.id);
-      if (seen.has(id)) {
-        console.warn(`[backup] ${type}.${id} is already in the file under another type — skipped`);
-        continue;
-      }
-      seen.add(id);
-      out.push(asEntryRow(type, row));
+  for (const row of rows) {
+    const id = String(row.id);
+    if (seen.has(id)) {
+      console.warn(`[backup] entry ${id} is in the file twice — skipped`);
+      continue;
     }
+    seen.add(id);
+    const entry = asEntryRow(row);
+    const number = Number(entry.entry_number);
+    // A number out of range (a crafted 1e20 would make every next number collide) is given afresh.
+    if (entry.entry_number != null && (!Number.isSafeInteger(number) || number < 1 || number > MAX_ENTRY_NUMBER || numbers.has(number))) entry.entry_number = null;
+    else if (entry.entry_number != null) numbers.add(number);
+    out.push(entry);
   }
   return out;
 }
 
-/** The entry types a backup brings along — `doReplace` replaces only their entries. */
-function presentEntryTypes(d: BackupFile['data']): EntryType[] {
-  return ([
-    ['journal', d.journalEntries],
-    ['wiki', d.wikiArticles],
-    ['operation', d.operations],
-  ] as const).filter(([, rows]) => (rows?.length ?? 0) > 0).map(([type]) => type);
+/** Gives every entry without a number the next free one, in creation order. */
+async function numberUnnumbered(db: Awaited<ReturnType<typeof getDb>>): Promise<void> {
+  const rows = await db.select<{ id: string }[]>('SELECT id FROM entries WHERE entry_number IS NULL ORDER BY created_at, id');
+  if (!rows.length) return;
+  const [{ n }] = await db.select<{ n: number }[]>('SELECT COALESCE(MAX(entry_number), 0) AS n FROM entries');
+  await db.batch(rows.map((r, i) => ['UPDATE entries SET entry_number=$1 WHERE id=$2', [n + i + 1, r.id]] as const));
+}
+
+/** Does an entry row pass the selection by category? `known`: the category IDs at hand. */
+export function entrySelected(row: Row, selection: EntrySelection, known: ReadonlySet<string>): boolean {
+  const category = row.category_id == null ? null : String(row.category_id);
+  if (category === null || !known.has(category)) return selection.includeUncategorized;
+  return selection.categoryIds === null || selection.categoryIds.includes(category);
+}
+
+/** Selects every category, with the uncategorized entries. */
+export const ALL_ENTRIES: EntrySelection = { categoryIds: null, includeUncategorized: true };
+
+/** Does the selection take any entry at all? */
+function selectsEntries(selection: EntrySelection): boolean {
+  return selection.includeUncategorized || selection.categoryIds === null || selection.categoryIds.length > 0;
 }
 
 interface BackupFile {
@@ -290,21 +316,15 @@ interface BackupFile {
   exportedAt: string;
   filters: BackupOptions;
   data: {
-    /**
-     * In the file: journal, wiki and operations as in the `entries` table.
-     * `readBackupPayload` splits them into the three lists below — the import
-     * treats each type differently (categories, icons).
-     */
+    /** The entries, as in the `entries` table. */
     entries?: Row[];
-    /** In the import: the entries per type. */
-    journalEntries?: Row[];
-    wikiArticles?: Row[];
-    operations?: Row[];
-    /** The global list; included as soon as one of the categorized modules is included. */
+    /** The global list; included as soon as entries or tasks are included. */
     categories?: Row[];
-    /** The custom blocks; included as soon as journal, wiki or operations are included. */
+    /** The dashboards; included with the entries. */
+    dashboards?: Row[];
+    /** The custom blocks; included as soon as entries are included. */
     blockDefinitions?: Row[];
-    /** The templates; included as soon as journal, wiki or operations are included. */
+    /** The templates; included as soon as entries are included. */
     templates?: Row[];
     tags?: Row[];
     tasks?: Row[];
@@ -425,9 +445,7 @@ async function selectWhereIn(
 /** Everything in the vault — trash and settings included. The selection
  *  of the automatic backup: one with gaps would be a trap. */
 export const FULL_BACKUP_OPTIONS: Required<BackupOptions> = {
-  includeJournal: true,
-  includeWiki: true,
-  includeOperations: true,
+  ...ALL_ENTRIES,
   includeTasks: true,
   includeTags: true,
   includeLexicon: true,
@@ -480,21 +498,18 @@ export async function buildBackupFrom(db: Awaited<ReturnType<typeof getDb>>, opt
   const { clause: dateClause, params: dateParams } = buildDateFilter(options.dateFrom, options.dateTo);
   const deletedClause = deletedFilter(options.includeDeleted);
 
-  // ── Journal, Wiki, Operationen ───────────────────────────────────────────
-  // One table, one array — the selection decides which types come along.
-  // The types are literal in the SQL (no user input).
-  const entryTypes = [
-    options.includeJournal && "'journal'",
-    options.includeWiki && "'wiki'",
-    options.includeOperations && "'operation'",
-  ].filter(Boolean);
-  if (entryTypes.length) {
-    data.entries = await db.select<Row[]>(
-      `SELECT * FROM entries WHERE type IN (${entryTypes.join(', ')}) ${dateClause} ${deletedClause}`,
-      dateParams,
-    );
+  // ── Entries ──────────────────────────────────────────────────────────────
+  // One table, one array — the selection by category decides which come
+  // along. An entry whose category is in the trash counts as uncategorized,
+  // as everywhere it is shown.
+  const withEntries = selectsEntries(options);
+  if (withEntries) {
+    const live = new Set((await db.select<{ id: string }[]>('SELECT id FROM categories WHERE deleted_at IS NULL')).map((r) => r.id));
+    const rows = await db.select<Row[]>(`SELECT * FROM entries WHERE 1=1 ${dateClause} ${deletedClause}`, dateParams);
+    data.entries = rows.filter((row) => entrySelected(row, options, live));
     collectImageRefs('entries', data.entries, allImagePaths);
     data.blocks = await exportBlockRows(db, 'entry', data.entries, allImagePaths);
+    data.dashboards = await db.select<Row[]>('SELECT * FROM dashboards');
   }
 
   // ── Tags ─────────────────────────────────────────────────────────────────
@@ -526,13 +541,10 @@ export async function buildBackupFrom(db: Awaited<ReturnType<typeof getDb>>, opt
   }
 
   // ── Categories ───────────────────────────────────────────────────────────
-  // The one list, as soon as a categorized module is included. Soft-deleted
+  // The one list, as soon as entries or tasks are included. Soft-deleted
   // categories too: their contents are exported along and
   // need their counterpart, otherwise the import fails on the foreign key.
-  // Also with journal alone: the templates then travel along, and their assignments need the categories.
-  if (
-    options.includeJournal || options.includeWiki || options.includeOperations || options.includeTasks
-  ) {
+  if (withEntries || options.includeTasks) {
     data.categories = await db.select<Row[]>(`SELECT * FROM categories`);
     // The categories are read after their contents, and deleting or
     // merging a category runs over several statements without a
@@ -553,7 +565,7 @@ export async function buildBackupFrom(db: Awaited<ReturnType<typeof getDb>>, opt
   // ── Custom blocks ────────────────────────────────────────────────────────
   // The vault's own blocks. All of it, trash included —
   // one list, no date question.
-  if (options.includeJournal || options.includeWiki || options.includeOperations) {
+  if (withEntries) {
     data.blockDefinitions = await db.select<Row[]>(`SELECT * FROM block_definitions`);
     // The image defaults travel along, even if no copy uses them yet.
     for (const row of data.blockDefinitions) {
@@ -563,7 +575,7 @@ export async function buildBackupFrom(db: Awaited<ReturnType<typeof getDb>>, opt
 
   // ── Templates ────────────────────────────────────────────────────────────
   // Like the custom blocks: all of it, trash included, with the images in the block stack.
-  if (options.includeJournal || options.includeWiki || options.includeOperations) {
+  if (withEntries) {
     data.templates = await db.select<Row[]>(`SELECT * FROM templates`);
     data.blocks = [...(data.blocks ?? []), ...await exportBlockRows(db, 'template', data.templates, allImagePaths)];
   }
@@ -683,29 +695,34 @@ export async function openBackupFile(): Promise<{ path: string; backup: BackupFi
   if (backup.type !== 'backup') throw new Error('Not an Emerald backup file');
   readBackupPayload(backup);
 
-  // Only show categories that are actually used by entries in this backup
-  const usedCatIds = new Set([
-    ...[
-      ...(backup.data.wikiArticles ?? []),
-      ...(backup.data.operations ?? []),
-      ...(backup.data.tasks ?? []),
-    ].map((r) => r.category_id as string),
-    ...templateCategoryIds(backup.data.templates),
-  ]);
+  const preview = previewOf(backup);
+  return { path: filePath, backup, preview };
+}
 
-  const preview: BackupPreview = {
+/** What the import offers to choose from: the categories in use and how many entries each holds. */
+export function previewOf(backup: BackupFile): BackupPreview {
+  const entries = backup.data.entries ?? [];
+  const known = new Set((backup.data.categories ?? []).map((c) => String(c.id)));
+  const entryCounts: Record<string, number> = {};
+  let uncategorizedCount = 0;
+  for (const row of entries) {
+    const category = row.category_id == null ? null : String(row.category_id);
+    if (category === null || !known.has(category)) uncategorizedCount += 1;
+    else entryCounts[category] = (entryCounts[category] ?? 0) + 1;
+  }
+  // Only show categories that are actually used by entries or tasks in this backup.
+  const usedCatIds = new Set([...entries, ...(backup.data.tasks ?? [])].map((r) => String(r.category_id)));
+  return {
     exportedAt: backup.exportedAt,
-    journalCount: backup.data.journalEntries?.length ?? 0,
-    wikiCount: backup.data.wikiArticles?.length ?? 0,
-    opsCount: backup.data.operations?.length ?? 0,
+    entriesCount: entries.length,
+    uncategorizedCount,
+    entryCounts,
     templatesCount: backup.data.templates?.length ?? 0,
     taskCount: backup.data.tasks?.length ?? 0,
     languagesCount: backup.data.languages?.length ?? 0,
-    categories: (backup.data.categories ?? []).filter((c) => usedCatIds.has(c.id as string)) as BackupCategoryEntry[],
+    categories: (backup.data.categories ?? []).filter((c) => usedCatIds.has(String(c.id))) as BackupCategoryEntry[],
     hasSettings: isPlainObject(backup.settings),
   };
-
-  return { path: filePath, backup, preview };
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -826,12 +843,6 @@ async function insertBlockDefinitions(
   await insertRows(db, 'block_definitions', normalized, true);
 }
 
-/** The category IDs that a backup's templates are assigned to. */
-function templateCategoryIds(rows: Row[] | undefined): string[] {
-  return (rows ?? []).flatMap((r) => parseAssignments(r.assignments).map(assignedCategoryId))
-    .filter((id): id is string => id !== null);
-}
-
 /**
  * The pictures of "Images" from a file: like the templates never deleted,
  * missing ones added — by file, since a file is one picture. The file name
@@ -878,21 +889,16 @@ async function insertVaultImages(
  * of the list in their order.
  *
  * The file is foreign: every row runs through `fromRow.template` as on
- * reading; its blocks come as rows (`insertImportedBlocks`). The assignments
- * get the local category IDs — whatever points to no category is dropped. A combination that an active template here
- * already holds stays with it, and one from the trash brings no assignments.
+ * reading; its blocks come as rows (`insertImportedBlocks`). Which category
+ * starts with it is the category's business (`applyStartTemplates`).
  */
 async function insertTemplates(
   db: Awaited<ReturnType<typeof getDb>>,
   rows: unknown,
-  catMap: Map<string, string>,
 ): Promise<string[]> {
   if (!Array.isArray(rows)) return [];
   const local = (await db.select<Row[]>('SELECT * FROM templates')).map(fromRow.template);
   const known = new Set(local.map((t) => t.id));
-  const taken = new Set(local.filter((t) => t.deleted_at === null)
-    .flatMap((t) => t.assignments.map((a) => assignmentKey(a.entryType, a.category))));
-  const categories = new Set((await db.select<Row[]>('SELECT id FROM categories')).map((r) => String(r.id)));
 
   const now = nowIso();
   const fresh = rows
@@ -903,23 +909,9 @@ async function insertTemplates(
     .filter((t) => !known.has(t.id) && !!known.add(t.id));
   let sortOrder = await nextTemplateSortOrder(db);
   const normalized = fresh.map((t) => {
-    const active = t.deleted_at === null;
-    const remapped = parseAssignments(t.assignments.flatMap((a) => {
-      const id = assignedCategoryId(a);
-      if (id === null) return [a];
-      const category = catMap.get(id) ?? id;
-      return categories.has(category) ? [{ ...a, category }] : [];
-    }));
-    const assignments = !active ? [] : remapped.filter((a) => {
-      const key = assignmentKey(a.entryType, a.category);
-      if (taken.has(key)) return false;
-      taken.add(key);
-      return true;
-    });
     return templateToRow({
       ...t,
       content: '',
-      assignments,
       sort_order: sortOrder++,
       created_at: t.created_at || now,
       updated_at: t.updated_at || now,
@@ -1107,17 +1099,16 @@ async function insertTasks(
 // ─────────────────────────────────────────────────────────────────────────────
 
 function applyTypeFilters(d: BackupFile['data'], f: ImportTypeFilters): BackupFile['data'] {
-  const anyCategorized = f.includeWiki || f.includeOperations || f.includeTasks;
-  const anyBlocks = f.includeJournal || f.includeWiki || f.includeOperations;
+  const anyEntries = selectsEntries(f);
+  const known = new Set((d.categories ?? []).map((c) => String(c.id)));
   return {
     ...d,
-    blockDefinitions:   anyBlocks           ? d.blockDefinitions  : [],
-    templates:          anyBlocks           ? d.templates         : [],
-    journalEntries:     f.includeJournal    ? d.journalEntries    : [],
-    wikiArticles:       f.includeWiki       ? d.wikiArticles      : [],
-    operations:         f.includeOperations ? d.operations        : [],
-    // Templates (with `anyBlocks`) need the categories of their assignments; `usedCategoryRows` narrows it down.
-    categories:         anyCategorized || anyBlocks ? d.categories : [],
+    blockDefinitions:   anyEntries          ? d.blockDefinitions  : [],
+    templates:          anyEntries          ? d.templates         : [],
+    entries:            anyEntries          ? (d.entries ?? []).filter((row) => entrySelected(row, f, known)) : [],
+    dashboards:         anyEntries          ? d.dashboards        : [],
+    // `usedCategoryRows` narrows them down to what the rest needs.
+    categories:         anyEntries || f.includeTasks ? d.categories : [],
     tasks:              f.includeTasks      ? d.tasks             : [],
     taskLinks:          f.includeTasks      ? d.taskLinks         : [],
     tags:               f.includeTags       ? d.tags              : [],
@@ -1128,18 +1119,20 @@ function applyTypeFilters(d: BackupFile['data'], f: ImportTypeFilters): BackupFi
 
 /**
  * Translates a backup's categories into this vault's: same ID
- * (the two builtins) or same name (case-insensitive) → local row,
+ * (the builtins) or same name (case-insensitive) → local row,
  * otherwise newly created. Returns the mapping backup ID → local ID, with
- * which the four content arrays are re-pointed (`remapCategoryIds`).
+ * which the content arrays are re-pointed (`remapCategoryIds`), and the
+ * start templates the newly created ones bring (`applyStartTemplates`,
+ * once the templates are in).
  *
  * Categories are never deleted, not even on replace: a category
- * spans modules, and a partial replace (wiki only) must not pull the
- * categories out from under the tasks.
+ * spans entries and tasks, and a partial replace must not pull the
+ * categories out from under the rest.
  */
 async function resolveImportedCategories(
   db: Awaited<ReturnType<typeof getDb>>,
   rows: Row[],
-): Promise<Map<string, string>> {
+): Promise<CategoryResolution> {
   const local = await db.select<Row[]>('SELECT id, name, deleted_at, sort_order FROM categories');
   const localById = new Map(local.map((r) => [String(r.id), r]));
   // If the same name exists both active and in the trash (a vault from before the
@@ -1149,8 +1142,10 @@ async function resolveImportedCategories(
   let nextSort = local.reduce((m, r) => Math.max(m, Number(r.sort_order ?? 0)), -1) + 1;
 
   const map = new Map<string, string>();
+  const startTemplates = new Map<string, string>();
   for (const row of rows) {
     const id = String(row.id);
+    const template = typeof row.template_id === 'string' && isTemplateId(row.template_id) ? row.template_id : null;
     // A built-in category carries only its English seed in the column
     // ("Sigils"); it is displayed via its locale key. Matched by ID first,
     // otherwise by its name in the app language.
@@ -1161,6 +1156,8 @@ async function resolveImportedCategories(
     const match = (row.is_builtin ? localById.get(id) : undefined) ?? localByKey.get(key);
     if (match) {
       map.set(id, String(match.id));
+      // A local category keeps its own start template; one without gets the file's.
+      if (template) startTemplates.set(String(match.id), template);
       // An imported active category brings its local counterpart back from the trash.
       if (match.deleted_at != null && row.deleted_at == null) {
         await db.execute('UPDATE categories SET deleted_at=NULL WHERE id=$1', [match.id]);
@@ -1180,25 +1177,92 @@ async function resolveImportedCategories(
     localById.set(newId, inserted);
     localByKey.set(key, inserted);
     map.set(id, newId);
+    if (template) startTemplates.set(newId, template);
   }
-  return map;
+  return { map, startTemplates };
+}
+
+interface CategoryResolution {
+  /** Backup ID → local ID. */
+  map: Map<string, string>;
+  /** Local category ID → the start template the file gives it. */
+  startTemplates: Map<string, string>;
+}
+
+/**
+ * The start templates of the file, once its templates are in: a category
+ * that has none yet gets the file's — if that template is here. A category
+ * with a start template of its own keeps it.
+ */
+async function applyStartTemplates(db: Awaited<ReturnType<typeof getDb>>, startTemplates: Map<string, string>): Promise<void> {
+  for (const [category, template] of startTemplates) {
+    await db.execute(
+      'UPDATE categories SET template_id=$1 WHERE id=$2 AND template_id IS NULL AND EXISTS (SELECT 1 FROM templates WHERE id=$1)',
+      [template, category],
+    );
+  }
 }
 
 /**
  * Only the categories that some content of the (already filtered) payload
- * points to. The export sends the whole table along; what nobody needs here —
- * deselected types, excluded categories, unused ones — should not become
- * a row in the vault.
+ * points to — entries, tasks, the dashboards' filters — and the ones whose
+ * start template the file brings. The export sends
+ * the whole table along; what nobody needs here — excluded categories,
+ * unused ones — should not become a row in the vault.
  */
 function usedCategoryRows(d: BackupFile['data']): Row[] {
   const used = new Set(
-    [...(d.wikiArticles ?? []), ...(d.operations ?? []), ...(d.tasks ?? [])]
+    [...(d.entries ?? []), ...(d.tasks ?? [])]
       .filter((r) => r.category_id != null)
       .map((r) => String(r.category_id))
   );
-  // Also the categories a template is assigned to — otherwise it would lose the assignment.
-  templateCategoryIds(d.templates).forEach((id) => used.add(id));
+  for (const row of d.dashboards ?? []) parseDashboardFilter(row?.filter).categories?.forEach((id) => used.add(id));
+  // And a category whose start template comes along — otherwise a fresh vault would lose it.
+  const templates = new Set((d.templates ?? []).map((t) => String(t?.id)));
+  for (const c of d.categories ?? []) if (c?.template_id != null && templates.has(String(c.template_id))) used.add(String(c.id));
   return (d.categories ?? []).filter((c) => used.has(String(c.id)));
+}
+
+/**
+ * The file's dashboards, their category IDs translated to this vault's (an
+ * ID that points nowhere here drops out). `replace`: a dashboard the vault
+ * has (the built-ins, by ID) takes the file's state, one it lacks is added.
+ * `merge`: a dashboard the vault has keeps its state and takes on the file's
+ * categories besides; one it lacks is added.
+ */
+async function importDashboards(
+  db: Awaited<ReturnType<typeof getDb>>,
+  rows: Row[] | undefined,
+  catMap: Map<string, string>,
+  mode: 'replace' | 'merge',
+): Promise<void> {
+  if (!rows?.length) return;
+  const categories = new Set((await db.select<{ id: string }[]>('SELECT id FROM categories')).map((r) => r.id));
+  const local = new Map((await db.select<Row[]>('SELECT * FROM dashboards')).map((r) => [String(r.id), fromRow.dashboard(r)]));
+  const now = nowIso();
+  for (const raw of rows) {
+    if (typeof raw !== 'object' || raw === null || typeof raw.id !== 'string' || !/^[\w-]{1,100}$/.test(raw.id)) continue;
+    // A built-in's id belongs to that built-in: a row that takes it without being it is left out.
+    if (isBuiltinDashboard(raw.id) && raw.builtin !== raw.id) continue;
+    const row = fromRow.dashboard(raw);
+    const mapped = row.filter.categories?.map((id) => catMap.get(id) ?? id).filter((id) => categories.has(id));
+    // "All entries" has no filter, so that no entry can become unfindable.
+    const filter = row.builtin === 'all' ? {} : { ...row.filter, ...(mapped && { categories: [...new Set(mapped)] }) };
+    const mine = local.get(row.id);
+    if (mine && mode === 'merge') {
+      if (!mine.filter.categories || !filter.categories) continue;
+      const merged = [...new Set([...mine.filter.categories, ...filter.categories])];
+      if (merged.length === mine.filter.categories.length) continue;
+      await db.execute('UPDATE dashboards SET filter=$1, updated_at=$2 WHERE id=$3', [JSON.stringify({ ...mine.filter, categories: merged }), now, row.id]);
+      continue;
+    }
+    await db.execute(
+      `INSERT OR REPLACE INTO dashboards (id, builtin, name, icon, position, filter, sort, display, created_at, updated_at, deleted_at)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
+      [row.id, row.builtin, row.name, row.icon, row.position, JSON.stringify(filter), JSON.stringify(row.sort),
+        JSON.stringify(row.display), row.created_at || now, row.updated_at || now, row.deleted_at],
+    );
+  }
 }
 
 function remapCategoryIds(rows: Row[], map: Map<string, string>): Row[] {
@@ -1229,8 +1293,7 @@ export async function assertPayloadReferencesResolve(
   }
 
   const checks = [
-    ['wikiArticles', 'wiki articles'],
-    ['operations', 'operations'],
+    ['entries', 'entries'],
     ['tasks', 'tasks'],
   ] as const;
 
@@ -1263,43 +1326,50 @@ export async function doReplace(db: Awaited<ReturnType<typeof getDb>>, backup: B
 
   // Categories first: the contents get the local IDs before they are
   // inserted. Categories are never deleted (see there).
-  const catMap = await resolveImportedCategories(db, usedCategoryRows(d));
+  const { map: catMap, startTemplates } = await resolveImportedCategories(db, usedCategoryRows(d));
 
-  const journalEntries = (d.journalEntries ?? []).map((r) => remapRow(r, IMAGE_FIELDS_ENTRY, pathMap));
-  const wikiArticles = remapCategoryIds((d.wikiArticles ?? []).map((r) => remapRow(r, IMAGE_FIELDS_ENTRY, pathMap)), catMap);
-  const operations = remapCategoryIds((d.operations ?? []).map((r) => remapRow(r, IMAGE_FIELDS_ENTRY, pathMap)), catMap);
+  const entries = entryRowsForInsert(remapCategoryIds((d.entries ?? []).map((r) => remapRow(r, IMAGE_FIELDS_ENTRY, pathMap)), catMap));
   const tasks = remapCategoryIds(d.tasks ?? [], catMap);
 
   // Custom blocks like categories: never deleted, missing ones added by ID,
   // existing ones stay. `db` here is the working copy (`importViaStaging`):
   // if anything fails before the end, the vault stays as it was.
   await insertBlockDefinitions(db, remapDefinitionRows(d.blockDefinitions, pathMap));
-  const templateIds = await insertTemplates(db, d.templates, catMap);
+  const templateIds = await insertTemplates(db, d.templates);
+  await applyStartTemplates(db, startTemplates);
+  await importDashboards(db, d.dashboards, catMap, 'replace');
   // Like the custom blocks and the templates: never deleted, missing ones added.
   await insertLexicon(db, d.languages, d.lexiconEntries);
   await insertVaultImages(db, d.vaultImages, pathMap);
   await insertSymbols(db, d.symbols);
 
-  // Delete only the content types present in the backup (so a partial backup
-  // replacing only Journal data won't wipe wiki/ops).
-  const entryTypes = presentEntryTypes(d);
   const hasTasks = (d.tasks?.length ?? 0) > 0;
-
   if (hasTasks) {
     await db.execute('DELETE FROM task_links');
     await db.execute('DELETE FROM tasks');
   }
-  for (const type of entryTypes) await db.execute('DELETE FROM entries WHERE type=$1', [type]);
-  // Plus every imported ID, whatever type it has in the vault by now: an
-  // entry that has changed its module since the backup would otherwise appear
-  // twice — and `entries.id` is unique across all types.
-  const entries = entryRowsForInsert(journalEntries, wikiArticles, operations);
+  // Replace only the categories the backup brings entries of (so a partial
+  // backup holding only the journal does not wipe the rest) — and the
+  // uncategorized entries only if it brings some of those.
+  const presentCategories = [...new Set(entries.filter((r) => r.category_id != null).map((r) => String(r.category_id)))];
+  for (let i = 0; i < presentCategories.length; i += IN_CHUNK) {
+    const chunk = presentCategories.slice(i, i + IN_CHUNK);
+    await db.execute(`DELETE FROM entries WHERE category_id IN (${chunk.map((_, n) => `$${n + 1}`).join(',')})`, chunk);
+  }
+  if (entries.some((r) => r.category_id == null)) await db.execute('DELETE FROM entries WHERE category_id IS NULL');
+  // Plus every imported ID, whatever category it has in the vault by now: an
+  // entry that has changed its category since the backup would otherwise
+  // appear twice — and `entries.id` is unique.
   for (let i = 0; i < entries.length; i += IN_CHUNK) {
     const chunk = entries.slice(i, i + IN_CHUNK).map((r) => String(r.id));
     await db.execute(`DELETE FROM entries WHERE id IN (${chunk.map((_, n) => `$${n + 1}`).join(',')})`, chunk);
   }
+  // A number an entry that stays still holds goes to the file's entry afresh (`numberUnnumbered`).
+  const heldNumbers = new Set((await db.select<{ n: number }[]>('SELECT entry_number AS n FROM entries WHERE entry_number IS NOT NULL')).map((r) => r.n));
+  for (const row of entries) if (row.entry_number != null && heldNumbers.has(Number(row.entry_number))) row.entry_number = null;
   // Re-insert
   await insertRows(db, 'entries', entries);
+  await numberUnnumbered(db);
   const same = (ids: string[]) => new Map(ids.map((id) => [id, id]));
   await insertImportedBlocks(db, d.blocks, 'entry', same(entries.map((r) => String(r.id))), { images: pathMap });
   await insertImportedBlocks(db, d.blocks, 'template', same(templateIds), { images: pathMap });
@@ -1324,7 +1394,7 @@ export async function doMerge(db: Awaited<ReturnType<typeof getDb>>, backup: Bac
   // Merge deletes nothing, but aborts midway through inserting if a
   // category is missing — check beforehand so the message says which.
   await assertPayloadReferencesResolve(db, d);
-  const catMap = await resolveImportedCategories(db, usedCategoryRows(d));
+  const { map: catMap, startTemplates } = await resolveImportedCategories(db, usedCategoryRows(d));
 
   // Prefix = base36 encoding of current timestamp (8 chars, unique per merge)
   const prefix = Date.now().toString(36).slice(-8);
@@ -1332,9 +1402,7 @@ export async function doMerge(db: Awaited<ReturnType<typeof getDb>>, backup: Bac
 
   // Build id maps for every entity type
   const allOldIds = new Set<string>([
-    ...(d.journalEntries ?? []).map((r: Row) => r.id as string),
-    ...(d.wikiArticles ?? []).map((r: Row) => r.id as string),
-    ...(d.operations ?? []).map((r: Row) => r.id as string),
+    ...(d.entries ?? []).map((r: Row) => r.id as string),
     ...(d.tasks ?? []).map((r: Row) => r.id as string),
   ]);
 
@@ -1345,28 +1413,17 @@ export async function doMerge(db: Awaited<ReturnType<typeof getDb>>, backup: Bac
   }
 
   /**
-   * `entry_number` is stored with the entry. On merge the numbers must
-   * therefore be shifted behind the existing ones — otherwise two entries
-   * show the same `#n`.
+   * `entry_number` is stored with the entry and unique over all of them. On
+   * merge the numbers are therefore shifted behind the existing ones —
+   * otherwise two entries would show the same `#n`.
    */
-  async function entryNumberOffset(type: EntryType): Promise<number> {
-    const rows = await db.select<{ n: number }[]>(
-      'SELECT COALESCE(MAX(entry_number), 0) AS n FROM entries WHERE type = $1',
-      [type]
-    );
-    return rows[0]?.n ?? 0;
-  }
-  const offsets: Record<EntryType, number> = {
-    journal: await entryNumberOffset('journal'),
-    wiki: await entryNumberOffset('wiki'),
-    operation: await entryNumberOffset('operation'),
-  };
+  const [{ n: offset }] = await db.select<{ n: number }[]>('SELECT COALESCE(MAX(entry_number), 0) AS n FROM entries');
 
-  function remapEntry(row: Row, imagePaths: string[], idFields: string[], entryType?: EntryType): Row {
+  function remapEntry(row: Row, imagePaths: string[], idFields: string[], numbered = false): Row {
     const out = remapRow(row, imagePaths, pathMap);
     out.id = pid(out.id as string);
-    if (entryType && out.entry_number != null) {
-      out.entry_number = Number(out.entry_number) + offsets[entryType];
+    if (numbered && out.entry_number != null) {
+      out.entry_number = Number(out.entry_number) + offset;
     }
     for (const f of idFields) {
       if (out[f] != null) out[f] = remapId(out[f]);
@@ -1374,13 +1431,9 @@ export async function doMerge(db: Awaited<ReturnType<typeof getDb>>, backup: Bac
     return out;
   }
 
-  const journalEntries = (d.journalEntries ?? []).map((r: Row) => remapEntry(r, [], [], 'journal'));
-  const wikiArticles = remapCategoryIds((d.wikiArticles ?? []).map((r: Row) =>
-    remapEntry(r, IMAGE_FIELDS_ENTRY, [], 'wiki')
-  ), catMap);
-  const operations = remapCategoryIds((d.operations ?? []).map((r: Row) =>
-    remapEntry(r, IMAGE_FIELDS_ENTRY, [], 'operation')
-  ), catMap);
+  const entries = entryRowsForInsert(remapCategoryIds((d.entries ?? []).map((r: Row) =>
+    remapEntry(r, IMAGE_FIELDS_ENTRY, [], true)
+  ), catMap));
   const tasks = remapCategoryIds((d.tasks ?? []).map((r: Row) =>
     remapEntry(r, [], ['parent_task_id'])
   ), catMap);
@@ -1399,7 +1452,9 @@ export async function doMerge(db: Awaited<ReturnType<typeof getDb>>, backup: Bac
     db, remapDefinitionRows(d.blockDefinitions, pathMap, (t) => ({ id: String(remapId(t.id)), label: t.label })),
   );
   // Without prefix, like the definitions.
-  const templateIds = await insertTemplates(db, d.templates, catMap);
+  const templateIds = await insertTemplates(db, d.templates);
+  await applyStartTemplates(db, startTemplates);
+  await importDashboards(db, d.dashboards, catMap, 'merge');
   // Without prefix like the two above: a language stands on its own, its ID
   // appears in no entry.
   await insertLexicon(db, d.languages, d.lexiconEntries);
@@ -1409,8 +1464,8 @@ export async function doMerge(db: Awaited<ReturnType<typeof getDb>>, backup: Bac
   await insertSymbols(db, d.symbols);
 
   // Content: plain INSERT with prefixed IDs (no conflicts possible)
-  const entries = entryRowsForInsert(journalEntries, wikiArticles, operations);
   await insertRows(db, 'entries', entries);
+  await numberUnnumbered(db);
   // The blocks under the prefixed owners, their pictures and links pointed here like the rows'.
   const inserted = new Set(entries.map((r) => String(r.id)));
   const owners = new Map([...allOldIds].filter((id) => inserted.has(pid(id))).map((id) => [id, pid(id)]));
@@ -1440,22 +1495,22 @@ export async function doMerge(db: Awaited<ReturnType<typeof getDb>>, backup: Bac
  * below. A kind that was forgotten there was silently excluded from every
  * "import everything".
  */
-const CONTENT_TYPE_LABELS: Record<keyof ImportTypeFilters, string> = {
-  includeJournal: 'settings.includeJournal',
-  includeWiki: 'settings.includeWiki',
-  includeOperations: 'settings.includeOperations',
+const CONTENT_TYPE_LABELS: Record<ContentToggle, string> = {
   includeTasks: 'settings.includeTasks',
   includeTags: 'settings.includeTags',
   includeLexicon: 'settings.includeLexicon',
 };
 
+/** The content kinds besides the entries, which are chosen by category (`EntrySelection`). */
+export type ContentToggle = Exclude<keyof ImportTypeFilters, keyof EntrySelection>;
+
 /** The same kinds as a list — the order of the packing lists. */
-export const CONTENT_TYPES: readonly [keyof ImportTypeFilters, string][] =
-  (Object.keys(CONTENT_TYPE_LABELS) as (keyof ImportTypeFilters)[]).map((key) => [key, CONTENT_TYPE_LABELS[key]]);
+export const CONTENT_TYPES: readonly [ContentToggle, string][] =
+  (Object.keys(CONTENT_TYPE_LABELS) as ContentToggle[]).map((key) => [key, CONTENT_TYPE_LABELS[key]]);
 
 /** Everything included — the default of the import filter and its reset value. */
 export function allTypesIncluded(): ImportTypeFilters {
-  const filters = {} as ImportTypeFilters;
+  const filters = { ...ALL_ENTRIES } as ImportTypeFilters;
   for (const [key] of CONTENT_TYPES) filters[key] = true;
   return filters;
 }
@@ -1545,12 +1600,12 @@ export async function importDatabase(
     // The fresh vault has just created the built-in templates itself. If
     // the file carries its templates along, its version applies — including
     // that a template was changed or deleted there. Otherwise the fresh
-    // row would displace the brought-along one, assignments and all.
+    // row would displace the brought-along one, and the categories would keep starting with it.
     const types = typeFilters ?? ALL_TYPES_INCLUDED;
     const bringsTemplates = Array.isArray(backup.data.templates);
     // Via the working copy as with replace: an abort leaves the new vault empty rather than half filled.
     await importViaStaging(db, async (staging) => {
-      if (bringsTemplates && (types.includeJournal || types.includeWiki || types.includeOperations)) {
+      if (bringsTemplates && selectsEntries(types)) {
         await staging.execute('DELETE FROM templates WHERE id IN ($1, $2)', [SIGIL_TEMPLATE_ID, ALTAR_TEMPLATE_ID]);
       }
       await doReplace(staging, filteredBackup);

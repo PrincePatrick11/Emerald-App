@@ -2,27 +2,26 @@ import { create } from 'zustand';
 import { getDb, nextEntryNumber } from '../lib/db';
 import { generateId, nowIso } from '../lib/helpers';
 import { needsWrite, stampFor, type WriteOptions } from '../lib/stamp';
-import { serialKey, serialized } from '../lib/serialize';
+import { ENTRY_NUMBER_KEY, serialKey, serialized } from '../lib/serialize';
 import { fromRow, type DbRow } from '../lib/row';
-import type { Entry, EntryType } from '../types';
+import type { Entry } from '../types';
 import i18n from '../i18n';
 import { displayTitle } from '../lib/entryTitle';
 import { startOfNewEntry, useTemplateNoticeStore } from './templateStore';
+import { kindOfEntry } from './dashboardStore';
 import { contentOf, loadBlocks, planContentWrite, type BlockOwner } from '../lib/blockStore';
 
 /**
- * The entries of journal, wiki and operations — one store over the single
- * table `entries` (since v49; previously three nearly identical stores).
+ * All entries — one store over the single table `entries`, in one list.
+ * An entry has no type: which module shows it follows from the dashboards'
+ * filters (`useDashboardEntries`, `lib/dashboards.ts`).
  *
- * The entries sit in a separate array per type: a module subscribes to
- * `s.entries.wiki` and does not re-render when a journal entry
- * changes — and a selector always returns the same array as long as nothing
- * changes for its type (zustand 5 requires stable snapshots).
+ * The list is in creation order, newest first; every view sorts for itself.
+ * An entry changed in place keeps its slot, so a selector over one entry
+ * (`getEntry`) re-renders only when exactly that entry changes.
  */
-export type EntriesByType = Record<EntryType, Entry[]>;
-
 interface EntryState {
-  entries: EntriesByType;
+  entries: Entry[];
   loading: boolean;
   /**
    * Entries whose `content` is not loaded yet — `null` once all are
@@ -40,43 +39,31 @@ interface EntryState {
   fetchEntries: (options?: { keepLoaded?: boolean }) => Promise<void>;
   /** Loads an entry's content immediately, if it is still pending. */
   ensureEntryContent: (id: string) => Promise<void>;
-  /** With the default of the combination (templates) — unless `blank`. The journal has no category. */
-  createEntry: (type: EntryType, opts?: { categoryId?: string | null; blank?: boolean; createdAt?: string }) => Promise<Entry>;
+  /**
+   * A new entry in `categoryId`, starting with that category's start template
+   * or the vault's default (`resolveStartTemplate`) — unless `blank`.
+   */
+  createEntry: (opts?: { categoryId?: string | null; blank?: boolean; createdAt?: string }) => Promise<Entry>;
   duplicateEntry: (id: string) => Promise<Entry | undefined>;
   updateEntry: (id: string, patch: Partial<Entry>, options?: WriteOptions) => Promise<void>;
   deleteEntry: (id: string) => Promise<void>;
   restoreEntry: (id: string) => Promise<void>;
   permanentlyDeleteEntry: (id: string) => Promise<void>;
-  /** With `type`, only an entry of that type (`findEntry`). */
-  getEntry: (id: string, type?: EntryType) => Entry | undefined;
+  getEntry: (id: string) => Entry | undefined;
 }
 
-export const ENTRY_TYPES: readonly EntryType[] = ['journal', 'wiki', 'operation'];
-
-/**
- * The order of the lists, as the three stores had it: the journal
- * by creation, the wiki by title, operations by last change. New
- * entries go to the front in the journal and operations, to the end in the
- * wiki — until the next load, as before.
- */
-const ORDER: Record<EntryType, { sort: (a: Entry, b: Entry) => number; newAtEnd: boolean }> = {
-  journal: { sort: (a, b) => b.created_at.localeCompare(a.created_at), newAtEnd: false },
-  wiki: { sort: (a, b) => a.title.localeCompare(b.title), newAtEnd: true },
-  operation: { sort: (a, b) => b.updated_at.localeCompare(a.updated_at), newAtEnd: false },
-};
-
-const emptyEntries = (): EntriesByType => ({ journal: [], wiki: [], operation: [] });
+const byCreatedDesc = (a: Entry, b: Entry) => b.created_at.localeCompare(a.created_at);
 
 /** The columns of `idx_entries_list` — the query reads only the index (`ENTRIES_INDEX_DDL`). */
-const LIST_COLUMNS = 'id, type, title, category_id, entry_number, tags, created_at, updated_at, deleted_at';
+const LIST_COLUMNS = 'id, title, category_id, entry_number, tags, created_at, updated_at, deleted_at';
 
 /**
- * The live entries from the database, sorted per type — without content, the
- * first stage of `fetchEntries`. Icon and cover image are not in the index
- * (data URLs): for the few entries that carry one, they come via
- * `idx_entries_decorated` — which is why its condition appears verbatim in the WHERE.
+ * The live entries from the database — without content, the first stage of
+ * `fetchEntries`. Icon and cover image are not in the index (data URLs): for
+ * the few entries that carry one, they come via `idx_entries_decorated` —
+ * which is why its condition appears verbatim in the WHERE.
  */
-async function selectLiveEntries(): Promise<EntriesByType> {
+async function selectLiveEntries(): Promise<Entry[]> {
   const db = await getDb();
   // Two connections, so not the same state: a write exactly in
   // between can attach an older icon to newer list columns — display
@@ -92,13 +79,7 @@ async function selectLiveEntries(): Promise<EntriesByType> {
     const d = decorationById.get(row.id);
     if (d) Object.assign(row, { icon: d.icon, cover_image: d.cover_image });
   }
-  const byType = emptyEntries();
-  for (const row of rows) {
-    const entry = fromRow.entry(row);
-    byType[entry.type].push(entry);
-  }
-  for (const type of ENTRY_TYPES) byType[type].sort(ORDER[type].sort);
-  return byType;
+  return rows.map((row) => fromRow.entry(row)).sort(byCreatedDesc);
 }
 
 /** The running second stage of `fetchEntries`; a new load makes an older one ineffective. */
@@ -107,7 +88,7 @@ let loadGeneration = 0;
 const CONTENT_CHUNK = 1000;
 
 /** `pending` without the `ids` — `null` if none is left pending afterwards. */
-export function withoutIds(pending: ReadonlySet<string>, ids: Iterable<string>): ReadonlySet<string> | null {
+function withoutIds(pending: ReadonlySet<string>, ids: Iterable<string>): ReadonlySet<string> | null {
   const next = new Set(pending);
   for (const id of ids) next.delete(id);
   return next.size ? next : null;
@@ -147,10 +128,10 @@ async function loadAllContent(generation: number): Promise<void> {
     const pending = s.pendingContent;
     if (!pending) return {};
     return {
-      entries: mapEntries(s.entries, (list) => list.map((e) => {
+      entries: s.entries.map((e) => {
         const content = pending.has(e.id) ? contentById.get(e.id) : undefined;
         return content === undefined ? e : { ...e, content };
-      })),
+      }),
       pendingContent: null,
     };
   });
@@ -173,52 +154,21 @@ async function loadAllContentWithRetry(generation: number): Promise<void> {
   }
 }
 
-/** All entries in one list — journal, wiki, operations. */
-export function allEntries(entries: EntriesByType): Entry[] {
-  return [...entries.journal, ...entries.wiki, ...entries.operation];
-}
-
 /**
- * The entry `id` — with `type` only if it has that type. Returns the
- * object from the store itself: a selector over it re-renders only when
- * exactly this entry changes.
+ * The entry `id`. Returns the object from the store itself: a selector over
+ * it re-renders only when exactly this entry changes.
  */
-export function findEntry(entries: EntriesByType, id: string, type?: EntryType): Entry | undefined {
-  for (const t of type ? [type] : ENTRY_TYPES) {
-    const entry = entries[t].find((e) => e.id === id);
-    if (entry) return entry;
-  }
-  return undefined;
+export function findEntry(entries: readonly Entry[], id: string): Entry | undefined {
+  return entries.find((e) => e.id === id);
 }
 
-/** Applies `map` to the list of each type. */
-export function mapEntries(entries: EntriesByType, map: (list: Entry[], type: EntryType) => Entry[]): EntriesByType {
-  return { journal: map(entries.journal, 'journal'), wiki: map(entries.wiki, 'wiki'), operation: map(entries.operation, 'operation') };
-}
-
-/**
- * Inserts an entry into the list of its type — at the front or back as when
- * creating. For `entryTypeChange`, which moves an entry into another module.
- */
-export function withAddedEntry(entries: EntriesByType, entry: Entry): EntriesByType {
-  return withEntry(entries, entry.type, (list) => (ORDER[entry.type].newAtEnd ? [...list, entry] : [entry, ...list]));
-}
-
-/**
- * Inserts an entry into the list of its type, sorted in as on load —
- * for one that returns to its old place (`revertEntryType`).
- */
-export function withSortedEntry(entries: EntriesByType, entry: Entry): EntriesByType {
-  return withEntry(entries, entry.type, (list) => [...list.filter((e) => e.id !== entry.id), entry].sort(ORDER[entry.type].sort));
-}
-
-/** Replaces or removes an entry in its type — the other arrays stay the same. */
-function withEntry(entries: EntriesByType, type: EntryType, map: (list: Entry[]) => Entry[]): EntriesByType {
-  return { ...entries, [type]: map(entries[type]) };
+/** Replaces the entry `id` in place — the others keep their objects. */
+function withEntry(entries: Entry[], id: string, map: (entry: Entry) => Entry): Entry[] {
+  return entries.map((e) => (e.id === id ? map(e) : e));
 }
 
 export const useEntryStore = create<EntryState>((set, get) => ({
-  entries: emptyEntries(),
+  entries: [],
   loading: false,
   pendingContent: null,
 
@@ -232,13 +182,13 @@ export const useEntryStore = create<EntryState>((set, get) => ({
         const s = get();
         const loaded = new Map<string, string>();
         if (keepLoaded) {
-          for (const e of allEntries(s.entries)) if (!s.pendingContent?.has(e.id)) loaded.set(e.id, e.content);
+          for (const e of s.entries) if (!s.pendingContent?.has(e.id)) loaded.set(e.id, e.content);
         }
-        const entries = mapEntries(fresh, (list) => list.map((e) => {
+        const entries = fresh.map((e) => {
           const content = loaded.get(e.id);
           return content === undefined ? e : { ...e, content };
-        }));
-        const pending = allEntries(entries).filter((e) => !loaded.has(e.id)).map((e) => e.id);
+        });
+        const pending = entries.filter((e) => !loaded.has(e.id)).map((e) => e.id);
         set({ entries, pendingContent: pending.length ? new Set(pending) : null });
       } finally {
         set({ loading: false });
@@ -254,30 +204,33 @@ export const useEntryStore = create<EntryState>((set, get) => ({
     set((s) => {
       // In the meantime the second stage — or another call — got there first.
       if (!s.pendingContent?.has(id)) return {};
-      const entry = findEntry(s.entries, id);
       return {
         pendingContent: withoutIds(s.pendingContent, [id]),
-        ...(entry && { entries: withEntry(s.entries, entry.type, (list) => list.map((e) => (e.id === id ? { ...e, content } : e))) }),
+        entries: withEntry(s.entries, id, (e) => ({ ...e, content })),
       };
     });
   },
 
-  createEntry: async (type, { categoryId = null, blank = false, createdAt } = {}) => {
+  // Serialized: the number is read and then written, and two quick creations
+  // must not both take the same one (`idx_entries_number` is unique).
+  createEntry: ({ categoryId = null, blank = false, createdAt } = {}) => serialized(ENTRY_NUMBER_KEY, async () => {
     const db = await getDb();
     const now = nowIso();
-    const category = type === 'journal' ? null : categoryId;
     // The "Sigils" category thus begins with calculator, drawing and charge
-    // (template `core-sigil`), as long as it stays assigned there.
-    const start = startOfNewEntry(type, category, blank);
+    // (template `core-sigil`), as long as it stays its start template. Read
+    // from the row: this store does not import the category store.
+    const [category] = categoryId && !blank
+      ? await db.select<{ template_id: string | null }[]>('SELECT template_id FROM categories WHERE id=$1', [categoryId])
+      : [];
+    const start = startOfNewEntry(category?.template_id ?? null, blank);
     const id = generateId();
     const blocks = await planContentWrite(db, { kind: 'entry', id }, start.content, now);
     const entry: Entry = {
       id,
-      type,
-      entry_number: await nextEntryNumber(db, type),
+      entry_number: await nextEntryNumber(db),
       title: start.title,
       content: blocks.content,
-      category_id: category,
+      category_id: categoryId,
       created_at: createdAt ?? now,
       updated_at: now,
       tags: start.tags,
@@ -286,18 +239,18 @@ export const useEntryStore = create<EntryState>((set, get) => ({
     // The row first: its blocks point at it.
     await db.batch([
       [
-        `INSERT INTO entries (id, type, title, category_id, created_at, updated_at, tags, entry_number)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-        [entry.id, type, entry.title, category, entry.created_at, entry.updated_at,
+        `INSERT INTO entries (id, title, category_id, created_at, updated_at, tags, entry_number)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+        [entry.id, entry.title, categoryId, entry.created_at, entry.updated_at,
           JSON.stringify(entry.tags), entry.entry_number],
       ],
       ...blocks.statements,
     ]);
     blocks.commit();
-    set((s) => ({ entries: withAddedEntry(s.entries, entry) }));
+    set((s) => ({ entries: [entry, ...s.entries] }));
     if (start.templateId) useTemplateNoticeStore.getState().show({ entryId: entry.id, templateId: start.templateId });
     return entry;
-  },
+  }),
 
   /**
    * Copies all content fields of the source entry; identity, number and
@@ -309,22 +262,20 @@ export const useEntryStore = create<EntryState>((set, get) => ({
     await get().ensureEntryContent(id);
     const src = get().getEntry(id);
     if (!src) return undefined;
-    const copy = await get().createEntry(src.type, { categoryId: src.category_id, blank: true });
+    const copy = await get().createEntry({ categoryId: src.category_id, blank: true });
     const {
       id: _id,
-      type: _type,
       created_at: _created,
       updated_at: _updated,
       deleted_at: _deleted,
       entry_number: _number,
       ...fields
     } = src;
-    await get().updateEntry(copy.id, { ...fields, title: displayTitle(i18n.t, src.type, src.title) + i18n.t('common.copySuffix') });
+    await get().updateEntry(copy.id, { ...fields, title: displayTitle(i18n.t, kindOfEntry(src), src.title) + i18n.t('common.copySuffix') });
     return get().getEntry(copy.id) ?? copy;
   },
 
-  // serialized: see lib/serialize.ts. One key per entry, not per
-  // type — a type change runs under the same one (`entryTypeChange`).
+  // serialized: see lib/serialize.ts. One key per entry.
   updateEntry: (id, patch, { touch } = {}) => serialized(serialKey('entry', id), async () => {
     const entry = get().getEntry(id);
     if (!entry) return;
@@ -338,8 +289,7 @@ export const useEntryStore = create<EntryState>((set, get) => ({
     }
     if (!needsWrite(entry, patch, touch)) return;
     const db = await getDb();
-    // Only `entryTypeChange` changes the type.
-    const merged: Entry = { ...entry, ...patch, type: entry.type, updated_at: stampFor(entry.updated_at, touch) };
+    const merged: Entry = { ...entry, ...patch, updated_at: stampFor(entry.updated_at, touch) };
 
     // The blocks only if they are meant to change: as rows, only those that
     // changed (`planBlockWrite`), in the same transaction as the entry's row;
@@ -367,16 +317,13 @@ export const useEntryStore = create<EntryState>((set, get) => ({
       ...(blocks?.statements ?? []),
     ]);
     blocks?.commit();
-    set((s) => ({
-      entries: withEntry(s.entries, entry.type, (list) => list.map((e) => (e.id === id ? merged : e))),
-    }));
+    set((s) => ({ entries: withEntry(s.entries, id, () => merged) }));
   }),
 
   deleteEntry: async (id) => {
-    const entry = get().getEntry(id);
     const db = await getDb();
     await db.execute('UPDATE entries SET deleted_at=$1 WHERE id=$2', [nowIso(), id]);
-    if (entry) set((s) => ({ entries: withEntry(s.entries, entry.type, (list) => list.filter((e) => e.id !== id)) }));
+    set((s) => ({ entries: s.entries.filter((e) => e.id !== id) }));
   },
 
   restoreEntry: async (id) => {
@@ -387,7 +334,7 @@ export const useEntryStore = create<EntryState>((set, get) => ({
     if (!rows[0]) return;
     const entry = { ...fromRow.entry(rows[0]), content: await selectContent(id) };
     set((s) => ({
-      entries: withEntry(s.entries, entry.type, (list) => [...list.filter((e) => e.id !== id), entry].sort(ORDER[entry.type].sort)),
+      entries: [...s.entries.filter((e) => e.id !== id), entry].sort(byCreatedDesc),
       // The full row is here — even if the second stage is still running.
       pendingContent: s.pendingContent && withoutIds(s.pendingContent, [id]),
     }));
@@ -398,5 +345,5 @@ export const useEntryStore = create<EntryState>((set, get) => ({
     await db.execute('DELETE FROM entries WHERE id=$1', [id]);
   },
 
-  getEntry: (id, type) => findEntry(get().entries, id, type),
+  getEntry: (id) => findEntry(get().entries, id),
 }));

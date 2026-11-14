@@ -12,6 +12,7 @@ import { useEntryStore } from './entryStore';
 import { useTaskStore } from './taskStore';
 import { useTagStore, type TaggedType } from './tagStore';
 import { useCategoryStore } from './categoryStore';
+import { useDashboardStore } from './dashboardStore';
 import { useBlockDefinitionStore } from './blockDefinitionStore';
 import { useTemplateStore } from './templateStore';
 import { useLexiconStore } from './lexiconStore';
@@ -51,15 +52,15 @@ export const trashWiring: Record<TrashKind, {
   permanentlyDelete: (id: string) => Promise<void>;
 }> = {
   journal: {
-    restore: (id) => withLiveTags('journal', id, useEntryStore.getState().restoreEntry(id)),
+    restore: (id) => withLiveTags('entry', id, useEntryStore.getState().restoreEntry(id)),
     permanentlyDelete: (id) => useEntryStore.getState().permanentlyDeleteEntry(id),
   },
   wiki: {
-    restore: (id) => withLiveTags('wiki', id, useEntryStore.getState().restoreEntry(id)),
+    restore: (id) => withLiveTags('entry', id, useEntryStore.getState().restoreEntry(id)),
     permanentlyDelete: (id) => useEntryStore.getState().permanentlyDeleteEntry(id),
   },
   operation: {
-    restore: (id) => withLiveTags('operation', id, useEntryStore.getState().restoreEntry(id)),
+    restore: (id) => withLiveTags('entry', id, useEntryStore.getState().restoreEntry(id)),
     permanentlyDelete: (id) => useEntryStore.getState().permanentlyDeleteEntry(id),
   },
   category: {
@@ -107,6 +108,7 @@ export async function reloadAllStores(): Promise<void> {
   await Promise.all([
     useTagStore.getState().fetchTags(),
     useCategoryStore.getState().fetchCategories(),
+    useDashboardStore.getState().fetchDashboards(),
     useBlockDefinitionStore.getState().fetchDefinitions(),
     useTemplateStore.getState().fetchTemplates(),
     useLexiconStore.getState().fetchLexicon(),
@@ -125,6 +127,7 @@ export async function reloadModules(ids: readonly EntryModuleId[]): Promise<void
   await Promise.all([
     useTagStore.getState().fetchTags(),
     useCategoryStore.getState().fetchCategories(),
+    useDashboardStore.getState().fetchDashboards(),
     useBlockDefinitionStore.getState().fetchDefinitions(),
     useTemplateStore.getState().fetchTemplates(),
     useLexiconStore.getState().fetchLexicon(),

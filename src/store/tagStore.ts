@@ -6,12 +6,12 @@ import { AS_A_CONSEQUENCE } from '../lib/stamp';
 import { getDb } from '../lib/db';
 import { fromRow, type DbRow } from '../lib/row';
 import { replaceTagId, stripTagIds, tagNameKey } from '../lib/tagRefs';
-import { useEntryStore, findEntry, mapEntries } from './entryStore';
+import { useEntryStore, findEntry } from './entryStore';
 import { useTemplateStore } from './templateStore';
 import { useImageStore } from './imageStore';
 import { generateId, nowIso } from '../lib/helpers';
 import { serialKey, serialized } from '../lib/serialize';
-import type { EntryType, Tag } from '../types';
+import type { Tag } from '../types';
 
 /** The palette of tag colours — colour choice in TagsView and random colour of new tags. */
 export const TAG_COLORS = [
@@ -30,7 +30,7 @@ export function randomTagColor() {
 
 const byName = (a: Tag, b: Tag) => a.name.localeCompare(b.name);
 
-export type TaggedType = EntryType | 'template';
+export type TaggedType = 'entry' | 'template';
 
 const sameName = (a: string, b: string) => tagNameKey(a) === tagNameKey(b);
 
@@ -43,7 +43,7 @@ async function rewriteRefs(rewrite: (db: Database) => Promise<Map<string, string
   const changed = await rewrite(await getDb());
   if (!changed.size) return;
   useEntryStore.setState((s) => ({
-    entries: mapEntries(s.entries, (list) => list.map((e) => (changed.has(e.id) ? { ...e, tags: changed.get(e.id)! } : e))),
+    entries: s.entries.map((e) => (changed.has(e.id) ? { ...e, tags: changed.get(e.id)! } : e)),
   }));
   useTemplateStore.setState((s) => ({
     templates: s.templates.map((t) => (changed.has(t.id) ? { ...t, tags: changed.get(t.id)! } : t)),
@@ -233,7 +233,7 @@ export const useTagStore = create<TagState>((set, get) => {
     dropUnknownTagIds: async (type, id) => {
       const item = type === 'template'
         ? useTemplateStore.getState().templates.find((t) => t.id === id)
-        : findEntry(useEntryStore.getState().entries, id, type);
+        : findEntry(useEntryStore.getState().entries, id);
       if (!item?.tags.length) return;
       const db = await getDb();
       const known = new Set((await db.select<{ id: string }[]>('SELECT id FROM tags')).map((r) => r.id));

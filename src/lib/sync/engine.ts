@@ -5,7 +5,7 @@ import { dbEpoch, getDb } from '../db';
 import { editorSavesSuspended } from '../editorLock';
 import { hasOpenEdits } from '../openEdits';
 import { BASELINE_VERSION, FRESH_START_VERSION } from '../schema';
-import { drainSerialized } from '../serialize';
+import { drainSerialized, ENTRY_NUMBER_KEY, serialized } from '../serialize';
 import type Database from '../sqlite';
 import { useLeaveGuardStore } from '../../store/leaveGuardStore';
 import { useSettingsStore } from '../../store/settingsStore';
@@ -254,14 +254,18 @@ async function restoreFromSnapshot(db: Database, vaultId: string, keepPending: b
     if (snapshot.frames === 0) throw CANNOT_OPEN;
     await drainSerialized();
     if (replacing) await backupBeforeReplacing(vaultId);
-    await beginRestore(db, keep);
-    for (let index = 0; index < snapshot.frames; index++) {
-      const text = await invoke<string>('sync_snapshot_frame', { vaultId, index });
-      const frame = JSON.parse(text) as SnapshotFrame;
-      if (frame.table === SETTINGS_TABLE) await takeIncomingSettings(db, vaultId, frame.rows[0] as FlatSettings);
-      else await restoreFrame(db, frame);
-    }
-    await finishRestore(db, keep, positionStatements({ cursor: snapshot.seq, epoch: snapshot.epoch }));
+    // Under the number key: a new entry created while the frames arrive would
+    // read the highest number of a half-filled vault.
+    await serialized(ENTRY_NUMBER_KEY, async () => {
+      await beginRestore(db, keep);
+      for (let index = 0; index < snapshot.frames; index++) {
+        const text = await invoke<string>('sync_snapshot_frame', { vaultId, index });
+        const frame = JSON.parse(text) as SnapshotFrame;
+        if (frame.table === SETTINGS_TABLE) await takeIncomingSettings(db, vaultId, frame.rows[0] as FlatSettings);
+        else await restoreFrame(db, frame);
+      }
+      await finishRestore(db, keep, positionStatements({ cursor: snapshot.seq, epoch: snapshot.epoch }));
+    });
     keptOverNewPassword.length = 0;
   } finally {
     await invoke('sync_snapshot_done', { vaultId });
@@ -332,11 +336,13 @@ async function pull(db: Database, vaultId: string, epochAtStart: number): Promis
       for (const change of incoming) {
         if (change.table === SETTINGS_TABLE && change.op === 'upsert') await takeIncomingSettings(db, vaultId, change.row);
       }
-      const { conflicts } = await applyRemoteChanges(db, incoming.filter((change) => change.table !== SETTINGS_TABLE), {
+      // Under the key of creating entries: it reads the highest number and
+      // writes later, and so does this page — the number is unique.
+      const { conflicts } = await serialized(ENTRY_NUMBER_KEY, () => applyRemoteChanges(db, incoming.filter((change) => change.table !== SETTINGS_TABLE), {
         newId: () => crypto.randomUUID(),
         conflictTitle: (title) => i18n.t('sync.conflictTitle', { title }),
         finally: positionStatements({ cursor: page.seq }),
-      });
+      }));
       if (conflicts.length) useSyncStore.setState((s) => ({ conflicts: s.conflicts + conflicts.length }));
       changed = true;
     }

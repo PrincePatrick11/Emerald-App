@@ -8,7 +8,9 @@ import { useUndoStore } from '../../store/undoStore';
 import { takeTaskToName } from '../../lib/createItem';
 import { generateId } from '../../lib/helpers';
 import { displayTitle, hasOwnTitle } from '../../lib/entryTitle';
-import { MODULES, viewTypeForEntryType } from '../../lib/modules';
+import { MODULES } from '../../lib/modules';
+import { linkTargetKindOf } from '../../lib/internalLinkHtml';
+import { viewOfLinkTarget } from '../../store/entryViews';
 import EmptyState, { NoResults } from '../ui/EmptyState';
 import { useCollapsedSet } from '../../hooks/useCollapsedSet';
 import { usePersistedFlag } from '../../hooks/usePersistedFlag';
@@ -408,7 +410,7 @@ export default function TasksView() {
 
       {linkModal && (
         <LinkPickerModal
-          onSelect={(item) => { addLink(linkModal.taskId, item.id, item.entryType); }}
+          onSelect={(item) => { addLink(linkModal.taskId, item.id, linkTargetKindOf(item.entryType)); }}
           onClose={() => setLinkModal(null)}
         />
       )}
@@ -591,9 +593,9 @@ const TaskRow = memo(function TaskRow({
               <span
                 key={link.id}
                 className="tasks-linked-entry text-xs cursor-pointer px-1.5 py-0.5 rounded-md transition-colors"
-                title={`${link.target_type}: ${link.title}`}
+                title={link.title}
                 onClick={() => {
-                  useUIStore.getState().setActiveView({ type: viewTypeForEntryType(link.target_type), id: link.target_id, mode: 'view' });
+                  useUIStore.getState().setActiveView({ type: viewOfLinkTarget(link.target_type, link.target_id), id: link.target_id, mode: 'view' });
                 }}
               >
                 {link.title}

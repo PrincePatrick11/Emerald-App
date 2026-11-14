@@ -1,7 +1,7 @@
 import type { ActiveView, Entry, Language, LexiconEntry, Tag, Task, VaultImage } from '../types';
 import { foldTypography, plainTextFor } from './searchText';
 import { todayIso, withoutConcealed } from './blocks/sigil';
-import { viewTypeForEntryType } from './modules';
+import { viewTypeForKind } from './modules';
 import { displayTitle } from './entryTitle';
 import i18n from '../i18n';
 import type { CategoryModuleId } from './modules';
@@ -205,7 +205,7 @@ export function searchCorpus(corpus: SearchCorpus, rawQuery: string): SearchHit[
   };
 
   // A loaded sigil that is still concealed is concealed from the search too —
-  // in every entry type. The state lives in the cache stamp: the length of the
+  // in every entry. The state lives in the cache stamp: the length of the
   // visible content changes as soon as one of several chargings reaches its
   // target date — then it is re-read. Likewise when the content was only
   // loaded after startup (`pendingContent`): before that it is empty.
@@ -298,7 +298,7 @@ export function viewForSearchHit(hit: Pick<SearchHit, 'kind' | 'id' | 'module' |
     case 'journal':
     case 'wiki':
     case 'operation':
-      return { type: viewTypeForEntryType(hit.kind), id: hit.id, mode: 'view' };
+      return { type: viewTypeForKind(hit.kind), id: hit.id, mode: 'view' };
     case 'task':
       return { type: 'tasks', id: hit.id };
     case 'image':

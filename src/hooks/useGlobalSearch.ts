@@ -2,7 +2,7 @@ import { useDeferredValue, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useImageStore } from '../store/imageStore';
 import { useCategoryStore } from '../store/categoryStore';
-import { useEntryStore } from '../store/entryStore';
+import { useEntriesByKind } from './useDashboardEntries';
 import { useTagStore } from '../store/tagStore';
 import { useTaskStore } from '../store/taskStore';
 import { useLexiconStore } from '../store/lexiconStore';
@@ -21,9 +21,7 @@ import { categoryLabel, categoryUsageCounts, dominantCategoryModule } from '../l
 function useSearchCorpus(): SearchCorpus {
   const { t } = useTranslation();
 
-  const journal = useEntryStore((s) => s.entries.journal);
-  const wiki = useEntryStore((s) => s.entries.wiki);
-  const operations = useEntryStore((s) => s.entries.operation);
+  const { journal, wiki, operation: operations } = useEntriesByKind();
   const tasks = useTaskStore((s) => s.tasks);
   const images = useImageStore((s) => s.images);
   const allCategories = useCategoryStore((s) => s.categories);
@@ -35,13 +33,13 @@ function useSearchCorpus(): SearchCorpus {
   // module that uses the category most. The same count as the number columns
   // there — one helper for both.
   const categories = useMemo<SearchCategory[]>(() => {
-    const counts = categoryUsageCounts({ wiki, operations, tasks });
+    const counts = categoryUsageCounts({ journal, wiki, operations, tasks });
     return allCategories.map((c) => ({
       id: c.id,
       name: categoryLabel(t, c),
       module: dominantCategoryModule(counts.get(c.id)),
     }));
-  }, [allCategories, wiki, operations, tasks, t]);
+  }, [allCategories, journal, wiki, operations, tasks, t]);
 
   return useMemo(
     () => ({ journal, wiki, operations, tasks, images, tags, categories, languages, lexiconEntries }),

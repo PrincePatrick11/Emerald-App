@@ -345,9 +345,17 @@ const ENTRY_SOURCES = [
  * the old tables (slug, mood, ingredients, ...) are dropped by insertRows like
  * any other column the schema no longer has; plain HTML is still valid
  * content, the app reads it as a single text block.
+ *
+ * Checkouts with a `dashboards` table have no entry types at all: what an
+ * entry is follows from its category. There a journal entry goes into the
+ * category Journal, numbers run over all entries, link targets are `entry`
+ * or `task`, and every category of the fixture joins the dashboard of the
+ * module most of its entries came from (`_dashboardCategories`, applied by
+ * `fitDashboards` once the rows are in).
  */
 function fitFixture(fixture, tables) {
   if (!tables.includes('entries') || fixture.entries) return fixture;
+  const typeless = tables.includes('dashboards');
 
   const tagIds = new Map((fixture.tags ?? []).map((tag) => [tag.name, tag.id]));
   const tagsById = (json) => JSON.stringify(JSON.parse(json).map((name) => tagIds.get(name) ?? name));
@@ -355,14 +363,52 @@ function fitFixture(fixture, tables) {
   const entries = [];
   for (const [source, type] of ENTRY_SOURCES) {
     for (const row of fixture[source] ?? []) {
-      const entry = { ...row, type };
+      const entry = typeless ? { ...row } : { ...row, type };
       if (row.tags) entry.tags = tagsById(row.tags);
+      if (typeless && type === 'journal') entry.category_id = 'journal';
       // The journal has no categories; the app keeps the column NULL there.
-      if (type === 'journal') delete entry.category_id;
-      entries.push(entry);
+      else if (type === 'journal') delete entry.category_id;
+      entries.push(Object.assign(entry, { _type: type }));
     }
   }
-  return { ...fixture, entries };
+  if (!typeless) return { ...fixture, entries: entries.map(({ _type, ...entry }) => entry) };
+
+  // One count over all entries, in creation order.
+  [...entries].sort((a, b) => String(a.created_at).localeCompare(String(b.created_at)))
+    .forEach((entry, i) => { entry.entry_number = i + 1; });
+  const uses = new Map();
+  for (const entry of entries) {
+    if (!entry.category_id || entry.category_id === 'journal') continue;
+    const counts = uses.get(entry.category_id) ?? { wiki: 0, operation: 0 };
+    counts[entry._type] += 1;
+    uses.set(entry.category_id, counts);
+  }
+  const fixtureCategories = new Set((fixture.categories ?? []).map((c) => c.id));
+  const dashboardCategories = { wiki: [], operations: [] };
+  for (const [category, counts] of uses) {
+    if (!fixtureCategories.has(category)) continue;
+    dashboardCategories[counts.operation > counts.wiki ? 'operations' : 'wiki'].push(category);
+  }
+  const target = (type) => (type === 'task' ? 'task' : 'entry');
+  return {
+    ...fixture,
+    entries: entries.map(({ _type, ...entry }) => entry),
+    task_links: (fixture.task_links ?? []).map((link) => ({ ...link, target_type: target(link.target_type) })),
+    _typelessChips: true,
+    _dashboardCategories: dashboardCategories,
+  };
+}
+
+/** Adds the fixture's own categories to the built-in dashboards `fitFixture` chose for them. */
+async function fitDashboards(db, fixture) {
+  for (const [dashboard, categories] of Object.entries(fixture._dashboardCategories ?? {})) {
+    if (!categories.length) continue;
+    const rows = await db.select('SELECT filter FROM dashboards WHERE id = $1', [dashboard]);
+    if (!rows.length) continue;
+    const filter = JSON.parse(rows[0].filter || '{}');
+    filter.categories = [...new Set([...(filter.categories ?? []), ...categories])];
+    await db.execute('UPDATE dashboards SET filter = $1 WHERE id = $2', [JSON.stringify(filter), dashboard]);
+  }
 }
 
 /* -- build ------------------------------------------------------------- */
@@ -393,7 +439,10 @@ export async function buildSeed(opts) {
     await app.seedBuiltins(db, starterNamer(opts.checkout, opts.locale));
 
     const report = { counts: {}, dropped: {} };
-    const chipHtml = app.internalLinkChipHtml;
+    // Without entry types a chip names its target kind: an entry, or a task.
+    const chipHtml = fixture._typelessChips
+      ? (chip) => app.internalLinkChipHtml({ ...chip, entryType: chip.entryType === 'task' ? 'task' : 'entry' })
+      : app.internalLinkChipHtml;
 
     // TABLES order is dependency order: parents before children, and it has to
     // be followed exactly - task_links comes after tasks for a reason.
@@ -406,6 +455,8 @@ export async function buildSeed(opts) {
       }
       await insertRows(db, table, fixture[table], chipHtml, report, app);
     }
+
+    await fitDashboards(db, fixture);
 
     await db.execute(
       'INSERT INTO schema_version (version, name, applied_at) VALUES ($1, $2, $3)',

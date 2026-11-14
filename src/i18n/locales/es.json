@@ -29,10 +29,11 @@
     "uncategorized": "Sin categoría",
     "nameTaken": "Esta categoría ya existe",
     "dragHint": "Arrastra para reordenar.",
-    "builtinHint": "Integrada — no se puede renombrar ni eliminar.",
+    "builtinHint": "Integrada — no se puede renombrar ni eliminar. Su plantilla inicial sí se puede cambiar.",
     "builtin": {
       "sigils": "Sigilos",
-      "altars": "Altares"
+      "altars": "Altares",
+      "journal": "Diario"
     },
     "starter": {
       "paradigm": "Paradigma",
@@ -43,7 +44,10 @@
       "candles": "Velas",
       "deities": "Deidades",
       "tools": "Herramientas"
-    }
+    },
+    "startTemplate": "Plantilla inicial",
+    "startTemplateDefault": "Plantilla predeterminada",
+    "startTemplateHint": "Con qué empieza una entrada nueva de esta categoría. «Plantilla predeterminada» es la que se elige en Plantillas."
   },
   "listView": {
     "view": "Vista",
@@ -846,8 +850,6 @@
     "noEntry": "Abre una entrada para ver sus propiedades.",
     "title": "Propiedades",
     "type": "Tipo",
-    "typeDropsProperties": "Las entradas del diario no tienen categoría, icono ni imagen de portada; se eliminarán.",
-    "changeType": "Convertir",
     "category": "Categoría",
     "noCategory": "Ninguna",
     "moonPhase": "Fase lunar",
@@ -866,7 +868,8 @@
     "chooseImage": "Elegir imagen",
     "linkEntry": "Vincular entrada …",
     "addTag": "Añadir etiqueta …",
-    "removeTag": "Quitar etiqueta"
+    "removeTag": "Quitar etiqueta",
+    "area": "Módulo"
   },
   "filters": {
     "all": "Todas",
@@ -1000,9 +1003,6 @@
     "importDb": "Importar base de datos",
     "importBrowse": "Seleccionar archivo…",
     "importedVault": "Vault importado",
-    "includeJournal": "Diario",
-    "includeWiki": "Wiki",
-    "includeOperations": "Operaciones",
     "includeTasks": "Tareas",
     "includeTags": "Etiquetas",
     "includeLexicon": "Léxico",
@@ -1169,7 +1169,14 @@
     "theme": "Tema",
     "text": "Texto",
     "importErrorOldVersion": "Esta copia de seguridad procede de una versión anterior de Emerald y no se puede restaurar en esta. No se ha cambiado nada; llegará un conversor.",
-    "importErrorNewVersion": "Esta copia de seguridad procede de una versión más reciente de Emerald. Actualiza esta aplicación para restaurarla. No se ha cambiado nada."
+    "importErrorNewVersion": "Esta copia de seguridad procede de una versión más reciente de Emerald. Actualiza esta aplicación para restaurarla. No se ha cambiado nada.",
+    "entriesByCategory": "Entradas por categoría",
+    "includeUncategorizedHint": "Entradas sin categoría y aquellas cuya categoría está en la papelera.",
+    "groupTemplates": "Plantillas",
+    "previewEntries": "Entradas",
+    "previewTemplates": "Plantillas",
+    "previewTasks": "Tareas",
+    "previewLanguages": "Idiomas"
   },
   "contextMenu": {
     "openInNewTab": "Abrir en nueva pestaña",
@@ -1293,15 +1300,6 @@
     "entryTitlePlaceholder": "Déjalo vacío para el título habitual",
     "content": "Contenido",
     "contentPlaceholder": "Lo que trae cada entrada creada con esta plantilla …",
-    "allCategories": "Todas las categorías",
-    "overview": {
-      "title": "Asignaciones",
-      "hint": "Las entradas nuevas empiezan con una copia de la plantilla asignada. «Todas las categorías» se aplica donde una categoría no tiene una propia.",
-      "category": "Categoría",
-      "none": "Sin plantilla",
-      "fallback": "Si no: {{name}} (todas las categorías)",
-      "everyEntry": "Cada entrada nueva"
-    },
     "saveAsTemplate": "Guardar como plantilla",
     "insert": {
       "button": "Insertar plantilla",
@@ -1311,8 +1309,9 @@
       "noticeApplied": "Plantilla «{{name}}» aplicada",
       "dismiss": "Cerrar aviso"
     },
-    "assignTitle": "Asignaciones – {{name}}",
-    "assignHint": "Haz clic en una celda para que las entradas nuevas empiecen con esta plantilla; otro clic lo deshace. Se aplica al instante."
+    "defaultTemplate": "Plantilla predeterminada",
+    "defaultTemplateHint": "Con qué empieza una entrada nueva cuando su categoría no tiene plantilla inicial propia. Las plantillas iniciales se eligen en la categoría, en Categorías.",
+    "defaultNone": "Ninguna: empezar vacía"
   },
   "lexicon": {
     "languages": "Idiomas",

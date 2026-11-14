@@ -35,6 +35,9 @@ import SettingsChoiceButton from './SettingsChoiceButton';
 import SettingsSection, { SettingsCheckboxGrid, SettingsStatus } from './SettingsSection';
 import { useVaultStore } from '../../../store/vaultStore';
 import { syncStatus } from '../../../lib/sync/engine';
+import { useCategoryStore } from '../../../store/categoryStore';
+import { categoryLabel } from '../../../lib/categories';
+import EntryCategoryChecks, { type CategoryChoice } from './EntryCategoryChecks';
 
 /** Everything as in the automatic backup — except the trash, which is added by hand. */
 const DEFAULT_EXPORT_OPTIONS: BackupOptions = { ...FULL_BACKUP_OPTIONS, includeDeleted: false };
@@ -49,6 +52,7 @@ const SETTINGS_GROUP_LABEL_KEYS: Record<SettingsGroup, string> = {
   tags: 'settings.groupTags',
   editor: 'settings.groupEditor',
   journal: 'settings.groupJournal',
+  templates: 'settings.groupTemplates',
   backup: 'settings.groupBackup',
 };
 
@@ -61,6 +65,8 @@ const SETTINGS_GROUP_LABEL_KEYS: Record<SettingsGroup, string> = {
  */
 export default function BackupPage() {
   const { t } = useTranslation();
+  const vaultCategories = useCategoryStore((s) => s.categories);
+  const exportCategories: CategoryChoice[] = vaultCategories.map((c) => ({ id: c.id, label: categoryLabel(t, c), emoji: c.emoji }));
   // Replacing a vault that syncs replaces it on the other devices too.
   const [syncsToOthers, setSyncsToOthers] = useState(false);
   const syncVaultId = useVaultStore((s) => s.activeVaultId);
@@ -203,6 +209,12 @@ export default function BackupPage() {
           {/* Packing list = checkbox, single choice = choice button (below, the
               three import modes). The same form for both would read like a
               setting from the other pages. */}
+          <EntryCategoryChecks
+            categories={exportCategories}
+            selection={exportOpts}
+            onChange={(selection) => setExportOpts((o) => ({ ...o, ...selection }))}
+          />
+
           <SettingsCheckboxGrid label={t('settings.exportInclude')}>
             {(
               // The settings appear only here, not for the import: there they
@@ -307,18 +319,32 @@ export default function BackupPage() {
             {importedFile && (
               <p className="text-xs text-secondary">
                 {t('settings.previewContains')} {[
-                  importedFile.preview.journalCount && `${importedFile.preview.journalCount} J`,
-                  importedFile.preview.wikiCount && `${importedFile.preview.wikiCount} W`,
-                  importedFile.preview.opsCount && `${importedFile.preview.opsCount} O`,
-                  importedFile.preview.templatesCount && `${importedFile.preview.templatesCount} V`,
-                  importedFile.preview.taskCount && `${importedFile.preview.taskCount} T`,
-                  importedFile.preview.languagesCount && `${importedFile.preview.languagesCount} L`,
+                  importedFile.preview.entriesCount && `${importedFile.preview.entriesCount} ${t('settings.previewEntries')}`,
+                  importedFile.preview.templatesCount && `${importedFile.preview.templatesCount} ${t('settings.previewTemplates')}`,
+                  importedFile.preview.taskCount && `${importedFile.preview.taskCount} ${t('settings.previewTasks')}`,
+                  importedFile.preview.languagesCount && `${importedFile.preview.languagesCount} ${t('settings.previewLanguages')}`,
                 ].filter(Boolean).join(', ')}
               </p>
             )}
           </div>
 
-          {/* Type filters — the same packing list as for the export. */}
+          {/* Type filters — the same packing list as for the export: the
+              entries by the categories the file holds entries of. */}
+          {importedFile && importedFile.preview.entriesCount > 0 && (
+            <EntryCategoryChecks
+              categories={importedFile.preview.categories
+                .filter((c) => importedFile.preview.entryCounts[c.id])
+                .map((c) => ({
+                  id: c.id,
+                  label: categoryLabel(t, c),
+                  emoji: c.emoji,
+                  count: importedFile.preview.entryCounts[c.id],
+                }))}
+              selection={importTypeFilters}
+              onChange={(selection) => setImportTypeFilters((f) => ({ ...f, ...selection }))}
+              uncategorizedCount={importedFile.preview.uncategorizedCount}
+            />
+          )}
           {importedFile && (
             <SettingsCheckboxGrid label={t('settings.importInclude')}>
               {CONTENT_TYPES.map(([key, labelKey]) => (

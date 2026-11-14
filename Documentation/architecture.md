@@ -7,10 +7,10 @@ This file is the overview: tech stack, module map, data flow and the IPC surface
 | File | Covers |
 |---|---|
 | [`architecture/modules.md`](architecture/modules.md) | Module registry, entry store, store selectors, categories, tags, moon phase, lexicon |
-| [`architecture/editing.md`](architecture/editing.md) | Edit mode, Cancel, leaving an edit, type change, auto-save, sidebar action bar, internal links |
+| [`architecture/editing.md`](architecture/editing.md) | Edit mode, Cancel, leaving an edit, moving to another module, auto-save, sidebar action bar, internal links |
 | [`architecture/blocks.md`](architecture/blocks.md) | Content blocks: stored format, fields, sigils, user-built blocks |
 | [`architecture/editors.md`](architecture/editors.md) | Editors shared across modules: the text editor, its host and features; the canvas editor, the Canvas and Altar blocks |
-| [`architecture/templates.md`](architecture/templates.md) | Templates: assignments, defaults, insertion |
+| [`architecture/templates.md`](architecture/templates.md) | Templates: start and default templates, insertion |
 | [`architecture/navigation.md`](architecture/navigation.md) | Global search, drag and drop, tabs, navigation history, left sidebar |
 | [`architecture/storage.md`](architecture/storage.md) | Image storage, vault layout, vault settings |
 | [`architecture/encryption.md`](architecture/encryption.md) | Vault keys, sealed files, the SQL layer, the unlock gate, re-encryption, encrypted backups |
@@ -65,19 +65,20 @@ src/
 │   ├── sidebar/
 │   │   ├── panels/   Journal/Wiki/Operation properties panels
 │   │   └── fields/   sidebar sections, property rows, tags, links, type toggle
-│   ├── templates/    template page, assignments modal, insertion, pickers
+│   ├── templates/    template page, default template, insertion, pickers
 │   ├── lexicon/      LanguagePage, vocabulary/alphabet tables, TranslatePanel
 │   └── ui/           shared component layer (see components.md)
 ├── store/
-│   ├── entryStore.ts            Journal, Wiki and Operations entries
+│   ├── entryStore.ts            all entries, one list
 │   ├── taskStore.ts, tagStore.ts, categoryStore.ts
+│   ├── dashboardStore.ts, entryViews.ts   dashboards; where an entry opens
 │   ├── blockDefinitionStore.ts  user-built blocks
 │   ├── blockSessionStore.ts     BlockStack ↔ sidebar block manager bridge
 │   ├── templateStore.ts, templateApply.ts   templates; applying one
 │   ├── lexiconStore.ts          languages and their words
 │   ├── draftStore.ts            unsaved block/template page drafts
 │   ├── autoBackupStore.ts       what the automatic backup did last
-│   ├── entryEdit.ts             entry baselines for Cancel, carried across a type change
+│   ├── entryEdit.ts             entry baselines for Cancel, carried across a move to another module
 │   ├── leaveGuardStore.ts       edit guards, "save / discard / keep editing"
 │   ├── uiStore.ts               tabs, active view, panels
 │   ├── sessionStore.ts          per-view search/filter state (session only)
@@ -112,7 +113,7 @@ src/
 │   ├── blocks/                  block format, types, fields, sigils, canvas, painting, definitions, templates;
 │   │                            a block as a row (`blockRows.ts`), its references (`blockRefs.ts`), positions (`position.ts`), field values by SQL (`blockQuery.ts`), an imported block pointed at this vault (`blockRemap.ts`)
 │   ├── blockStore.ts            blocks as rows: loading, writing only what changed, replacing a whole stack
-│   ├── entryTitle.ts, entryTypeChange.ts, moonPhase.ts
+│   ├── entryTitle.ts, dashboards.ts, moonPhase.ts
 │   ├── categories.ts
 │   ├── tagRefs.ts, templateTags.ts, templateRows.ts, blockDefinitionRows.ts
 │   ├── lexicon.ts, lexiconRows.ts
@@ -198,7 +199,7 @@ One detail of what the stores load: **sigil drawings are files, not columns.** A
 
 Every content-store update method (`updateEntry`, `updateTask`/`toggleComplete`, `updateTag`, `updateTemplate`, `updateDefinition`, the lexicon's updates) reads a snapshot from the store, merges the patch into it, and writes the row back — the whole row, except that `updateEntry` writes `content` only when the patch carries it (it is by far the largest column). Two overlapping updates to the same entity — an autosave while the sidebar changes a property — would race, and the later one would overwrite the other's fields with a stale snapshot.
 
-`src/lib/serialize.ts` closes that race. `serialized(serialKey(domain, id), task)` chains same-key tasks strictly one after another, so a merge-and-write always runs against the previous one's result. The invariant: **any store method that writes back a whole row from a snapshot must run its write through `serialized()`, keyed per entity id.** `serialKey` types the domains (`entry`/`task`/`tag`/`blockDefinition`/`template`/`language`/`image`); `templateStore` and `lexiconStore` use one store-wide key (`'*'`). `taskStore.toggleComplete` queues each affected descendant under its own `task:<id>` key, so a concurrent `updateTask` on a child can't have its `completed` columns rewound by the parent's cascade (or vice versa).
+`src/lib/serialize.ts` closes that race. `serialized(serialKey(domain, id), task)` chains same-key tasks strictly one after another, so a merge-and-write always runs against the previous one's result. The invariant: **any store method that writes back a whole row from a snapshot must run its write through `serialized()`, keyed per entity id.** `serialKey` types the domains (`entry`/`task`/`tag`/`blockDefinition`/`template`/`language`/`image`); `templateStore` and `lexiconStore` use one store-wide key (`'*'`); creating an entry and the sync's writes of incoming entries share `ENTRY_NUMBER_KEY`, since both hand out numbers. `taskStore.toggleComplete` queues each affected descendant under its own `task:<id>` key, so a concurrent `updateTask` on a child can't have its `completed` columns rewound by the parent's cascade (or vice versa).
 
 Deliberately not serialized, with a comment at its definition: `updateCategory` (writes only the columns passed in, no snapshot merge).
 

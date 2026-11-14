@@ -8,16 +8,22 @@ import { useUIStore } from '../../store/uiStore';
 import { imageSrc } from '../../lib/images';
 import { imageRoleLabelKey, isRemovableUse, type ImageUse } from '../../lib/imageUsage';
 import { displayTitle } from '../../lib/entryTitle';
-import { MODULES, AUX_VIEWS, viewTypeForEntryType } from '../../lib/modules';
+import { MODULES, AUX_VIEWS, viewTypeForKind } from '../../lib/modules';
+import { kindOfEntry } from '../../store/dashboardStore';
 import { OP_PROP_SELECT_CLASSES } from '../../lib/styleClasses';
 import type { ActiveView, VaultImage } from '../../types';
 import Modal from '../ui/Modal';
 import Button from '../ui/Button';
 import TagInput from '../ui/TagInput';
 
+/** The kind of an entry using the picture — under the dashboards loaded now. */
+function kindOfUse(use: ImageUse) {
+  return kindOfEntry(use.entry ?? { category_id: null, tags: [] });
+}
+
 /** The icon of a place of use: its module, the templates, the custom blocks. */
 function iconOf(use: ImageUse) {
-  if (use.kind === 'entry') return MODULES[viewTypeForEntryType(use.entryType!)].icon;
+  if (use.kind === 'entry') return MODULES[viewTypeForKind(kindOfUse(use))].icon;
   if (use.kind === 'template') return AUX_VIEWS.templates.icon;
   return AUX_VIEWS.blocks.icon;
 }
@@ -25,7 +31,7 @@ function iconOf(use: ImageUse) {
 /** Where a place of use opens. */
 function viewOf(use: ImageUse): ActiveView {
   switch (use.kind) {
-    case 'entry': return { type: viewTypeForEntryType(use.entryType!), id: use.id, mode: 'view' };
+    case 'entry': return { type: viewTypeForKind(kindOfUse(use)), id: use.id, mode: 'view' };
     case 'template': return { type: 'templates', id: use.id };
     case 'blockDefinition': return { type: 'blocks', id: use.id };
   }
@@ -131,7 +137,7 @@ export default function ImageEditModal({ file, image, confirmDelete = false, onC
           <ul className="image-uses">
             {uses.map((use) => {
               const Icon = iconOf(use);
-              const title = use.kind === 'entry' ? displayTitle(t, use.entryType!, use.title) : use.title;
+              const title = use.kind === 'entry' ? displayTitle(t, kindOfUse(use), use.title) : use.title;
               return (
                 <li key={`${use.kind}:${use.id}:${use.role}`}>
                   <button type="button" className="image-use-row" onClick={() => { setActiveView(viewOf(use)); onClose(); }}>

@@ -47,9 +47,15 @@ const tables = q("SELECT name FROM sqlite_master WHERE type='table' AND name NOT
 // table; before that each had its own. Both are a valid seed, for the
 // checkout it was built from.
 const unified = tables.includes('entries');
-const modules = unified
-  ? ['journal', 'wiki', 'operation'].map((type) => [type, `entries WHERE type = '${type}'`, 'AND'])
-  : ['journal_entries', 'wiki_articles', 'operations'].map((table) => [table, table, 'WHERE']);
+// Checkouts with dashboards have no entry types: a module shows the categories of its dashboard's filter.
+const typeless = tables.includes('dashboards');
+const inDashboard = (id) =>
+  `entries WHERE category_id IN (SELECT j.value FROM dashboards d, json_each(d.filter, '$.categories') j WHERE d.id = '${id}')`;
+const modules = typeless
+  ? ['journal', 'wiki', 'operations'].map((id) => [id, inDashboard(id), 'AND'])
+  : unified
+    ? ['journal', 'wiki', 'operation'].map((type) => [type, `entries WHERE type = '${type}'`, 'AND'])
+    : ['journal_entries', 'wiki_articles', 'operations'].map((table) => [table, table, 'WHERE']);
 
 // Since v66 the blocks are rows of `blocks` only; before, the block stack was `content`.
 const blockRows = unified && tables.includes('blocks') && !q('PRAGMA table_info(entries)').some((c) => c.name === 'content');

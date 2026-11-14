@@ -37,7 +37,7 @@ writeFileSync(
    export { createPaintBlock, isDrawingBlockType, PAINT_BLOCK_TYPE, parseDrawing, withDrawing, withDrawingImage, isSigilDrawing, drawingImage } from '${root}/src/lib/blocks/paint';
    export { resolveBlockType } from '${root}/src/lib/blocks/blockTypes';
    export { createCanvasBlock, parseCanvasBlock, withCanvasScene, withCanvasParts, withCanvasStripTag, withoutCanvasFile, CANVAS_BLOCK_TYPE, ALTAR_BLOCK_TYPE } from '${root}/src/lib/blocks/canvas';
-   export { parseAssignments, resolveAssignedTemplate, instantiateTemplateBlocks, isContentEmpty, templateStart, mergeTemplateTags, assignedTemplateAt, areBlocksEmpty, fieldsWithTemplate, fieldsWithoutTemplate } from '${root}/src/lib/blocks/templates';
+   export { resolveStartTemplate, instantiateTemplateBlocks, isContentEmpty, templateStart, mergeTemplateTags, areBlocksEmpty, fieldsWithTemplate, fieldsWithoutTemplate } from '${root}/src/lib/blocks/templates';
    export { internalLinkChipHtml } from '${root}/src/lib/internalLinkHtml';
    export { extractInternalLinks } from '${root}/src/lib/internalLinkHtml';
    export { toBlockRow, fromBlockRow, blockPlainText, htmlPlainText } from '${root}/src/lib/blocks/blockRows';
@@ -76,8 +76,8 @@ const {
   symbolFromDrawing, readUserSymbol,
   sigilUnits, sigilPartBlock, sigilPartId, withSigilPart, withChargesCoveringOnly,
   remapDefinitionDefaults, definitionImageRefs, withRenamedPartTargets,
-  parseAssignments, resolveAssignedTemplate, instantiateTemplateBlocks, isContentEmpty,
-  templateStart, mergeTemplateTags, assignedTemplateAt, areBlocksEmpty,
+  resolveStartTemplate, instantiateTemplateBlocks, isContentEmpty,
+  templateStart, mergeTemplateTags, areBlocksEmpty,
   fieldsWithTemplate, fieldsWithoutTemplate,
   createCanvasBlock, parseCanvasBlock, withCanvasScene, withCanvasParts, withCanvasStripTag, withoutCanvasFile, CANVAS_BLOCK_TYPE, ALTAR_BLOCK_TYPE,
   createPaintBlock, isDrawingBlockType, PAINT_BLOCK_TYPE, resolveBlockType,
@@ -683,16 +683,16 @@ console.log('\n4g. Link and image defaults with markup\n');
   };
 
   const elements = parseDefinitionElements(JSON.stringify([
-    { id: 'lnk', kind: 'link', label: 'Quelle', defaultValue: { id: wikiId, entryType: 'wiki', label: 'Artikel' } },
+    { id: 'lnk', kind: 'link', label: 'Quelle', defaultValue: { id: wikiId, entryType: 'entry', label: 'Artikel' } },
     { id: 'pic', kind: 'image', label: 'Bild', defaultValue: `bilder/${img}` },
-    { id: 'lnk2', kind: 'link', label: 'Kaputt', defaultValue: { id: 'nicht-uuid', entryType: 'wiki', label: 'x' } }, // lang-ok
+    { id: 'lnk2', kind: 'link', label: 'Kaputt', defaultValue: { id: 'nicht-uuid', entryType: 'entry', label: 'x' } }, // lang-ok
     { id: 'pic2', kind: 'image', label: 'Fremd', defaultValue: 'javascript:alert(1)' },
     // The altar field is gone (v62 made it a link field); one left over is dropped.
     { id: 'alt', kind: 'altar', label: 'Altar' },
   ]));
   const byId = Object.fromEntries(elements.map((e) => [e.id, e]));
   check('defaults: link and image are read, image as a plain file name',
-    byId.lnk.defaultValue?.entryType === 'wiki' && byId.pic.defaultValue === img, elements);
+    byId.lnk.defaultValue?.entryType === 'entry' && byId.pic.defaultValue === img, elements);
   check('defaults: links only valid targets, images only stored files; an altar field is no element',
     byId.lnk2.defaultValue === undefined && byId.pic2.defaultValue === undefined && !byId.alt);
 
@@ -707,7 +707,7 @@ console.log('\n4g. Link and image defaults with markup\n');
     linkFromSlot(cm.slots.lnk)?.id === wikiId && imageFromSlot(cm.slots.pic) === img && !cm.slots.lnk2 && !cm.slots.pic2, cm.slots);
   check('the links of the copy are in the content (link table, backlinks)',
     extractInternalLinks(serializeBlocks([copy])).length === 1);
-  check('export: the link field shows its chip', renderBlocksForExport(serializeBlocks([copy]), text).includes('data-entry-type="wiki"'));
+  check('export: the link field shows its chip', renderBlocksForExport(serializeBlocks([copy]), text).includes('data-entry-type="entry"'));
 
   const remapped = parseDefinitionElements(remapDefinitionDefaults(
     JSON.stringify(elements), (name) => (name === img ? `${'ef'.repeat(32)}.png` : name),
@@ -888,48 +888,34 @@ console.log('\n5. What is derived from the content sees through the blocks\n');
 {
   const chip =
     '<span data-type="internalLink" class="internal-link" data-id="11111111-1111-1111-1111-111111111111" ' +
-    'data-entry-type="wiki" data-label="A">A</span>';
+    'data-entry-type="entry" data-label="A">A</span>';
   const html = serializeBlocks([createTextBlock('<p>ohne</p>'), createTextBlock(`<p>${chip}</p>`)]); // lang-ok
   const links = extractInternalLinks(html);
-  check('extractInternalLinks finds chips in wrapped text blocks', links.length === 1 && links[0].entryType === 'wiki', links);
+  check('extractInternalLinks finds chips in wrapped text blocks', links.length === 1 && links[0].entryType === 'entry', links);
 }
 
-console.log('\n6. Templates: assignment, insertion\n');
+console.log('\n6. Templates: start template, insertion\n');
 {
-  const assignments = parseAssignments(JSON.stringify([
-    { entryType: 'journal', category: 'ritual', isDefault: true },
-    { entryType: 'wiki', category: 'ritual' },
-    { entryType: 'wiki', category: 'ritual', isDefault: true },
-    { entryType: 'wiki', category: 'offered', isDefault: false },
-    { entryType: 'wiki', category: null },
-    { entryType: 'operation', category: '<x>' },
-    { entryType: 'task', category: '*' },
-    'kaputt',
-  ]));
-  check('assignments: journal always "all", duplicates merge, foreign and merely offered ones are dropped',
-    JSON.stringify(assignments) === JSON.stringify([
-      { entryType: 'journal', category: '*' },
-      { entryType: 'wiki', category: 'ritual' },
-      { entryType: 'wiki', category: null },
-    ]), assignments);
-  check('assignments: unreadable JSON yields none', parseAssignments('{kaputt').length === 0);
-
-  const tpl = (id, assignments, content = '') => ({ id, name: id, icon: '', title: '', content, tags: [], assignments, sort_order: 0, created_at: '', updated_at: '', deleted_at: null });
-  const exact = tpl('exact', [{ entryType: 'wiki', category: 'ritual' }]);
-  const fallback = tpl('fallback', [{ entryType: 'wiki', category: '*' }]);
-  const none = tpl('none', [{ entryType: 'wiki', category: null }]);
-  const free = tpl('free', []);
-  const all = [free, fallback, exact, none];
-  check('assigned: the exact combination before "all categories"', resolveAssignedTemplate(all, 'wiki', 'ritual')?.id === 'exact');
-  check('assigned: without one of its own, the fallback', resolveAssignedTemplate(all, 'wiki', 'herbs')?.id === 'fallback');
-  check('assigned: "no category" is a combination of its own', resolveAssignedTemplate(all, 'wiki', null)?.id === 'none');
-  check('assigned: none for another entry type', resolveAssignedTemplate(all, 'journal', null) === null);
+  const tpl = (id, content = '') => ({ id, name: id, icon: '', title: '', content, tags: [], sort_order: 0, created_at: '', updated_at: '', deleted_at: null });
+  const own = tpl('own');
+  const standard = tpl('standard');
+  const all = [standard, own];
+  check('start: the category\'s own start template before the default',
+    resolveStartTemplate(all, { template_id: 'own' }, 'standard')?.id === 'own');
+  check('start: a category without one gets the default',
+    resolveStartTemplate(all, { template_id: null }, 'standard')?.id === 'standard');
+  check('start: no category gets the default',
+    resolveStartTemplate(all, null, 'standard')?.id === 'standard');
+  check('start: a start template in the trash (not among the active) falls back to the default',
+    resolveStartTemplate(all, { template_id: 'trashed' }, 'standard')?.id === 'standard');
+  check('start: neither — none',
+    resolveStartTemplate(all, { template_id: null }, null) === null && resolveStartTemplate(all, null, 'gone') === null);
 
   // Insertion: new IDs, charge targets carried along, everything else as it is.
   const calc = createSigilCalcBlock();
   const canvas = withDrawingImage(createSigilCanvasBlock(), `${'ef'.repeat(32)}.png`);
   const charge = chargeOf({ loaded: true, revealDate: null, lock: 'entry', technique: null, targets: [canvas.id] });
-  const sigilTpl = tpl('sigil-tpl', [], serializeBlocks([createTextBlock('<p>Absicht</p>'), calc, canvas, charge]));
+  const sigilTpl = tpl('sigil-tpl', serializeBlocks([createTextBlock('<p>Absicht</p>'), calc, canvas, charge]));
   const first = instantiateTemplateBlocks(sigilTpl);
   const second = instantiateTemplateBlocks(sigilTpl);
   const firstCharge = parseSigilCharge(chargeUnit(first[3]));
@@ -958,13 +944,13 @@ console.log('\n6. Templates: assignment, insertion\n');
     ])),
   };
   const partCopy = instantiateDefinition(partDef, partText);
-  const [partBlock] = instantiateTemplateBlocks(tpl('part-tpl', [], serializeBlocks([partCopy])));
+  const [partBlock] = instantiateTemplateBlocks(tpl('part-tpl', serializeBlocks([partCopy])));
   const partCharge = parseSigilCharge(sigilUnits([partBlock]).find((u) => u.block.type === 'sigilCharge').block);
   check('insertion: a charge as a part targets the part in the new block',
     partBlock.id !== partCopy.id && partCharge.targets.join() === sigilPartId(partBlock.id, 'draw'), partCharge);
 
   // Title and tags when undoing a template.
-  const journalStd = { ...sigilTpl, id: 'journal-std', title: 'Tagebuch', tags: ['tag-j'], assignments: [{ entryType: 'journal', category: '*' }] };
+  const journalStd = { ...sigilTpl, id: 'journal-std', title: 'Tagebuch', tags: ['tag-j'] };
 
   // Tags are IDs: the same ID is the same tag, there is no other spelling.
   const cleared = fieldsWithoutTemplate({ title: 'Tagebuch', tags: ['eigen', 'tag-j'] }, journalStd);
@@ -991,8 +977,6 @@ console.log('\n6. Templates: assignment, insertion\n');
     JSON.stringify(templateStart(null)) === JSON.stringify({ title: '', content: '', tags: [], templateId: null }));
   check('merge tags without duplicate IDs', mergeTemplateTags(['a', 'b'], ['a', 'c']).join() === 'a,b,c');
 
-  check('assigned exactly here, without fallback',
-    assignedTemplateAt(all, 'wiki', 'herbs') === undefined && assignedTemplateAt(all, 'wiki', '*')?.id === 'fallback');
   check('empty blocks', areBlocksEmpty([createTextBlock('<p></p>')]) && !areBlocksEmpty([createTextBlock('<p>x</p>')]));
 }
 

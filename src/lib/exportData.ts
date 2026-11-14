@@ -5,6 +5,7 @@ import { blockLabel, fieldFallbackText } from './blocks/blockAttrs';
 import { formatIsoDateLong } from './formatDate';
 import { useCategoryStore } from '../store/categoryStore';
 import { useUIStore } from '../store/uiStore';
+import { kindOfEntry } from '../store/dashboardStore';
 import { entryMoonPhase, MOON_PHASE_SYMBOLS } from './moonPhase';
 import { useSettingsStore } from '../store/settingsStore';
 import { displayTitle } from './entryTitle';
@@ -56,69 +57,25 @@ function moonLabel(phase: string): string {
 
 export async function collectExportData(): Promise<ExportData | null> {
   const view = useUIStore.getState().activeView;
-  if (!view.id) return null;
+  if (!view.id || (view.type !== 'journal' && view.type !== 'wiki' && view.type !== 'operations')) return null;
   // Right after startup the content of the open entry may still be pending.
   await useEntryStore.getState().ensureEntryContent(view.id);
+  const entry = useEntryStore.getState().getEntry(view.id);
+  if (!entry) return null;
 
-  const { journal: entries, wiki: articles, operation: operations } = useEntryStore.getState().entries;
-  const { categories } = useCategoryStore.getState();
+  const cat = useCategoryStore.getState().categories.find((c) => c.id === entry.category_id);
+  const phase = entryMoonPhase(entry, useSettingsStore.getState().settings.journal.moonPhase);
 
-  // ── Journal ──────────────────────────────────────────────────────────────
-  if (view.type === 'journal') {
-    const entry = entries.find(e => e.id === view.id);
-    if (!entry) return null;
-
-    const phase = entryMoonPhase(entry, useSettingsStore.getState().settings.journal.moonPhase);
-    const moonPhase = phase ? `${MOON_PHASE_SYMBOLS[phase]} ${moonLabel(phase)}` : undefined;
-
-    return {
-      type: 'journal',
-      title: displayTitle(i18n.t, 'journal', entry.title),
-      entryNumber: entry.entry_number,
-      content: renderBlocksForExport(entry.content, exportText()),
-      createdAt: entry.created_at,
-      moonPhase,
-      tagNames: liveTagNames(entry.tags),
-    };
-  }
-
-  // ── Wiki ─────────────────────────────────────────────────────────────────
-  if (view.type === 'wiki') {
-    const article = articles.find(a => a.id === view.id);
-    if (!article) return null;
-
-    const cat = categories.find(c => c.id === article.category_id);
-
-    return {
-      type: 'wiki',
-      title: displayTitle(i18n.t, 'wiki', article.title),
-      entryNumber: article.entry_number,
-      content: renderBlocksForExport(article.content, exportText()),
-      createdAt: article.created_at,
-      category: cat ? { label: categoryLabel(i18n.t, cat), icon: cat.emoji } : undefined,
-      entryIcon: article.icon || undefined,
-      tagNames: liveTagNames(article.tags),
-    };
-  }
-
-  // ── Operations ───────────────────────────────────────────────────────────
-  if (view.type === 'operations') {
-    const op = operations.find(o => o.id === view.id);
-    if (!op) return null;
-
-    const cat = categories.find(c => c.id === op.category_id);
-
-    return {
-      type: 'operations',
-      title: displayTitle(i18n.t, 'operation', op.title),
-      entryNumber: op.entry_number,
-      content: renderBlocksForExport(op.content, exportText()),
-      createdAt: op.created_at,
-      category: cat ? { label: categoryLabel(i18n.t, cat), icon: cat.emoji } : undefined,
-      entryIcon: op.icon || undefined,
-      tagNames: liveTagNames(op.tags),
-    };
-  }
-
-  return null;
+  return {
+    // The view it is open in — the export's layout follows the module.
+    type: view.type,
+    title: displayTitle(i18n.t, kindOfEntry(entry), entry.title),
+    entryNumber: entry.entry_number,
+    content: renderBlocksForExport(entry.content, exportText()),
+    createdAt: entry.created_at,
+    moonPhase: phase ? `${MOON_PHASE_SYMBOLS[phase]} ${moonLabel(phase)}` : undefined,
+    category: cat && !phase ? { label: categoryLabel(i18n.t, cat), icon: cat.emoji } : undefined,
+    entryIcon: entry.icon || undefined,
+    tagNames: liveTagNames(entry.tags),
+  };
 }

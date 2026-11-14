@@ -141,9 +141,13 @@ export function buildLinkItems(s: LinkItemSources, t: TFunction): SuggestionItem
   ];
 }
 
-/** `entryType:id` → item. The key under which link chips are looked up. */
+/**
+ * `entry:id` or `task:id` → item. The key under which link chips are looked
+ * up. A chip carries the target kind (`entry`/`task`), an item its display
+ * kind (journal, wiki, …) — both map onto the same key.
+ */
 export function linkItemKey(target: { id: string; entryType: string }): string {
-  return `${target.entryType}:${target.id}`;
+  return `${target.entryType === 'task' ? 'task' : 'entry'}:${target.id}`;
 }
 
 export function linkItemsByKey(items: SuggestionItem[]): Map<string, SuggestionItem> {

@@ -30,12 +30,12 @@ import {
   Wand2,
   type LucideIcon,
 } from 'lucide-react';
-import type { ContentType, EntryType } from '../types';
+import type { ContentType, EntryKind } from '../types';
 
 /**
- * Emoji fallback per link type, when neither a custom icon nor a
+ * Emoji fallback per kind, when neither a custom icon nor a
  * category emoji applies — one source of truth for the chip NodeView, editor lookups,
- * picker, export and migration v36. It lives here instead of in `SuggestionList`
+ * picker and export. It lives here instead of in `SuggestionList`
  * because `lib/` modules (down to `db.ts`) need it too and no component
  * may be imported there; `SuggestionList` re-exports it
  * for the components that already get it from there.
@@ -48,18 +48,20 @@ export const DEFAULT_ENTRY_EMOJI: Record<ContentType, string> = {
 };
 
 /**
- * The icon of a wiki article or an operation in lists, on Home, in
- * the left list and in the export: its own (emoji or image), otherwise the
- * category's emoji, otherwise the module's. Either an emoji or an image address
- * — `isImageIcon` tells them apart. Journal entries show their moon phase.
+ * The icon of an entry in lists, on Home, in the left list and in the
+ * export: its own (emoji or image), otherwise the category's emoji, otherwise
+ * that of its kind. Either an emoji or an image address — `isImageIcon` tells
+ * them apart. Entries of the category Journal show their moon phase instead
+ * (`journalIcon`), where the moon phase is shown.
  */
 export function entryIcon(
-  type: 'wiki' | 'operation',
+  kind: EntryKind,
   entry: { icon?: string | null },
   category: { emoji: string } | null | undefined,
 ): string {
-  return entry.icon || category?.emoji || DEFAULT_ENTRY_EMOJI[type];
+  return entry.icon || category?.emoji || DEFAULT_ENTRY_EMOJI[kind];
 }
+
 
 /**
  * Order = rail and entry-list tab order. Via
@@ -101,11 +103,9 @@ export type LeftListTabId = 'all' | EntryModuleId;
 /** The tabs of the entry list in their order — "All" first. */
 export const LEFT_LIST_TAB_IDS: readonly LeftListTabId[] = ['all', ...ENTRY_MODULE_IDS];
 
-/** Modules whose entries carry a category — all except journal. */
-export const CATEGORY_MODULE_IDS: readonly Exclude<EntryModuleId, 'journal'>[] = ENTRY_MODULE_IDS.filter(
-  (id): id is Exclude<EntryModuleId, 'journal'> => id !== 'journal',
-);
-export type CategoryModuleId = (typeof CATEGORY_MODULE_IDS)[number];
+/** Modules whose items carry a category — all of them; the journal's is the category Journal. */
+export const CATEGORY_MODULE_IDS: readonly EntryModuleId[] = ENTRY_MODULE_IDS;
+export type CategoryModuleId = EntryModuleId;
 
 /** Modules whose entries carry tags — all except tasks. */
 export const TAG_MODULE_IDS: readonly Exclude<EntryModuleId, 'tasks'>[] = ENTRY_MODULE_IDS.filter(
@@ -119,10 +119,11 @@ export interface ModuleMeta {
   navLabelKey: string;
   untitledKey: string;
   /**
-   * The data-model counterpart in `task_links.target_type`/drag payloads —
-   * `'operation'` singular! tasks are called `'task'` there.
+   * The kind of what the module shows — `'operation'` singular! Keys the
+   * per-kind texts and icons; an entry's kind follows from its category
+   * (`entryKindOf`).
    */
-  entryType: ContentType;
+  kind: ContentType;
   /** Save/Cancel/Delete live in the right sidebar. */
   usesEditorSidebar: boolean;
   /** The content is a block stack — the sidebar shows the block management. */
@@ -130,10 +131,10 @@ export interface ModuleMeta {
 }
 
 export const MODULES: Record<EntryModuleId, ModuleMeta> = {
-  journal: { id: 'journal', icon: BookOpen, navLabelKey: 'nav.journal', untitledKey: 'journal.untitled', entryType: 'journal', usesEditorSidebar: true, usesBlocks: true },
-  tasks: { id: 'tasks', icon: CheckSquare, navLabelKey: 'nav.tasks', untitledKey: 'tasks.untitled', entryType: 'task', usesEditorSidebar: false, usesBlocks: false },
-  operations: { id: 'operations', icon: Wand2, navLabelKey: 'nav.operations', untitledKey: 'operations.untitled', entryType: 'operation', usesEditorSidebar: true, usesBlocks: true },
-  wiki: { id: 'wiki', icon: Library, navLabelKey: 'nav.wiki', untitledKey: 'wiki.untitled', entryType: 'wiki', usesEditorSidebar: true, usesBlocks: true },
+  journal: { id: 'journal', icon: BookOpen, navLabelKey: 'nav.journal', untitledKey: 'journal.untitled', kind: 'journal', usesEditorSidebar: true, usesBlocks: true },
+  tasks: { id: 'tasks', icon: CheckSquare, navLabelKey: 'nav.tasks', untitledKey: 'tasks.untitled', kind: 'task', usesEditorSidebar: false, usesBlocks: false },
+  operations: { id: 'operations', icon: Wand2, navLabelKey: 'nav.operations', untitledKey: 'operations.untitled', kind: 'operation', usesEditorSidebar: true, usesBlocks: true },
+  wiki: { id: 'wiki', icon: Library, navLabelKey: 'nav.wiki', untitledKey: 'wiki.untitled', kind: 'wiki', usesEditorSidebar: true, usesBlocks: true },
 };
 
 export const MODULE_LIST: readonly ModuleMeta[] = ENTRY_MODULE_IDS.map((id) => MODULES[id]);
@@ -181,31 +182,34 @@ export function moduleMeta(viewType: string): ModuleMeta | null {
 }
 
 /**
- * The view type an entry of `entryType` opens in.
+ * The view type something of `kind` opens in.
  *
- * The one rename in the app: the data model says `operation`, singular — it is
- * what `task_links.target_type`, the drag payload and the internal-link mark all
- * carry — while `ActiveView` says `operations`, plural, after the module rather
- * than the record. Journal and wiki spell both the same, which is why the
- * mismatch is easy to forget at exactly the fourth call site.
+ * The one rename in the app: the kind says `operation`, singular, while
+ * `ActiveView` says `operations`, plural, after the module rather than the
+ * record. Journal and wiki spell both the same, which is why the mismatch is
+ * easy to forget.
  *
  * A reverse lookup via the registry instead of a mapping of its own — which makes
- * `ModuleMeta.entryType` the single source of truth for this assignment.
+ * `ModuleMeta.kind` the single source of truth for this assignment.
  */
-export function viewTypeForEntryType(entryType: ContentType): EntryModuleId {
-  const mod = MODULE_LIST.find((meta) => meta.entryType === entryType);
-  if (!mod) throw new Error(`No module for entry type "${entryType}"`);
+export function viewTypeForKind(kind: ContentType): EntryModuleId {
+  const mod = MODULE_LIST.find((meta) => meta.kind === kind);
+  if (!mod) throw new Error(`No module for kind "${kind}"`);
   return mod.id;
 }
 
 /**
- * The entry type (`entries.type`) of a view — `undefined` for everything that is
- * not a journal, wiki or operations entry. Like `viewTypeForEntryType`
- * via `ModuleMeta.entryType`, only in the other direction.
+ * The entry kind of a view — `undefined` for everything that is not the
+ * journal, wiki or operations view. Like `viewTypeForKind`, the other way.
  */
-export function entryTypeForView(viewType: string): EntryType | undefined {
-  const entryType = (MODULES as Partial<Record<string, ModuleMeta>>)[viewType]?.entryType;
-  return entryType === 'journal' || entryType === 'wiki' || entryType === 'operation' ? entryType : undefined;
+export function kindForView(viewType: string): EntryKind | undefined {
+  const kind = (MODULES as Partial<Record<string, ModuleMeta>>)[viewType]?.kind;
+  return kind === 'journal' || kind === 'wiki' || kind === 'operation' ? kind : undefined;
+}
+
+/** Is the view one of the entry modules — journal, wiki or operations? */
+export function isEntryView(viewType: string): viewType is 'journal' | 'wiki' | 'operations' {
+  return kindForView(viewType) !== undefined;
 }
 
 /** All trash item types (`TrashedItem['type']`). */

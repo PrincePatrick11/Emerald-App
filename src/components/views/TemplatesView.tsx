@@ -18,7 +18,7 @@ import ContextMenu from '../ui/ContextMenu';
 import { useOpenInNewTabAction } from '../../hooks/useOpenInNewTabAction';
 import BlockGlyph from '../blocks/BlockGlyph';
 import TemplateEditor from '../templates/TemplateEditor';
-import TemplateAssignmentTable from '../templates/TemplateAssignmentTable';
+import DefaultTemplateSection from '../templates/DefaultTemplateSection';
 import { useSessionState } from '../../store/sessionStore';
 import { createItem } from '../../lib/createItem';
 import { useLibraryItemRemove } from '../../hooks/useLibraryItemRemove';
@@ -26,8 +26,8 @@ import { useLibraryItemRemove } from '../../hooks/useLibraryItemRemove';
 /**
  * The rail view "Templates", built like "Blocks": the list of templates in the
  * shared dashboard scaffold, a click opens the template as a page of its own
- * (`{ type: 'templates', id }`). Below it the table of assignments per
- * combination. Deleting moves a template to the trash (with
+ * (`{ type: 'templates', id }`). Below it the vault's default template
+ * (`DefaultTemplateSection`). Deleting moves a template to the trash (with
  * undo) — entries created from it stay as they are.
  */
 export default function TemplatesView() {
@@ -76,7 +76,7 @@ async function exportTemplate(id: string): Promise<void> {
 /**
  * The list of templates in the shared dashboard scaffold — with view and
  * sorting like the other dashboards, under a collapsible
- * heading like the assignments below.
+ * heading like the default template below.
  */
 function TemplateList({ onCreate, onDelete }: {
   onCreate: () => void;
@@ -172,7 +172,7 @@ function TemplateList({ onCreate, onDelete }: {
           onToggleCollapse={toggleCollapsed}
         />
       }
-      contentFooter={<TemplateAssignmentTable />}
+      contentFooter={<DefaultTemplateSection />}
       contextMenuSlot={ctxMenu && menuTemplate && (
         <ContextMenu
           x={ctxMenu.x}

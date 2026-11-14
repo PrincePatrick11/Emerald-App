@@ -1,9 +1,9 @@
 import { useTranslation } from 'react-i18next';
 import { useUIStore } from '../../../store/uiStore';
-import { useEntryStore } from '../../../store/entryStore';
+import { findEntry, useEntryStore } from '../../../store/entryStore';
 import TagsField from '../fields/TagsField';
 import LinkedEntriesField from '../fields/LinkedEntriesField';
-import EntryTypeField from '../fields/EntryTypeField';
+import EntryAreaField from '../fields/EntryAreaField';
 import EntryReadSections, { CategoryPropertyRow, PropertiesSection } from '../fields/EntryReadSections';
 import CategoryIconCoverRows from '../fields/CategoryIconCoverRows';
 
@@ -16,10 +16,9 @@ export default function OperationPropertiesPanel() {
   const { t } = useTranslation();
   const activeView = useUIStore((s) => s.activeView);
   const isEditing = activeView.mode === 'edit';
-  const operations = useEntryStore((s) => s.entries.operation);
+  const op = useEntryStore((s) => (activeView.id ? findEntry(s.entries, activeView.id) : undefined));
   const updateEntry = useEntryStore((s) => s.updateEntry);
 
-  const op = activeView.id ? operations.find((o) => o.id === activeView.id) : null;
   if (!op) {
     return <p className="text-xs text-subtle px-2 py-3">{t('properties.noEntry')}</p>;
   }
@@ -37,7 +36,7 @@ export default function OperationPropertiesPanel() {
   return (
     <>
       <PropertiesSection>
-        <EntryTypeField id={op.id} type="operation" properties={op} />
+        <EntryAreaField entry={op} />
         <CategoryIconCoverRows entry={op} update={(patch) => updateEntry(op.id, patch)} />
       </PropertiesSection>
       <LinkedEntriesField content={op.content} />

@@ -18,7 +18,7 @@ import { useTemplateStore } from '../../store/templateStore';
 import { useLexiconStore } from '../../store/lexiconStore';
 import { useSettingsStore } from '../../store/settingsStore';
 import { definitionLabel, templateLabel } from '../../lib/blocks/blockAttrs';
-import { AUX_VIEWS, DEFAULT_ENTRY_EMOJI, entryIcon, entryTypeForView, moduleMeta, type AuxViewId } from '../../lib/modules';
+import { AUX_VIEWS, DEFAULT_ENTRY_EMOJI, entryIcon, kindForView, moduleMeta, type AuxViewId } from '../../lib/modules';
 
 function getFallbackTitle(view: ActiveView, t: TFunction) {
   const meta = moduleMeta(view.type);
@@ -45,8 +45,8 @@ function renderIconValue(icon: string | null | undefined, fallback: ReactNode) {
 function TabButton({ view, onSelect, onClose }: { view: ActiveView; onSelect: () => void; onClose: () => void }) {
   const { t } = useTranslation();
   const { type, id } = view;
-  const entryType = entryTypeForView(type);
-  const entry = useEntryStore((s) => (entryType && id ? findEntry(s.entries, id, entryType) : undefined));
+  const kind = kindForView(type);
+  const entry = useEntryStore((s) => (kind && id ? findEntry(s.entries, id) : undefined));
   const task = useTaskStore((s) => (type === 'tasks' && id ? s.tasks.find((task) => task.id === id) : undefined));
   const definition = useBlockDefinitionStore((s) => (type === 'blocks' && id ? s.definitions.find((d) => d.id === id) : undefined));
   const template = useTemplateStore((s) => (type === 'templates' && id ? s.templates.find((tpl) => tpl.id === id) : undefined));
@@ -67,10 +67,10 @@ function TabButton({ view, onSelect, onClose }: { view: ActiveView; onSelect: ()
 
   let icon: ReactNode;
   const Icon = moduleMeta(type)?.icon ?? AUX_VIEWS[type as AuxViewId]?.icon ?? MoreHorizontal;
-  if (entryType && id) {
-    icon = entryType === 'journal'
+  if (kind && id) {
+    icon = kind === 'journal'
       ? <span className="text-sm leading-none">{entry ? journalIcon(entry, showMoonPhase) : DEFAULT_ENTRY_EMOJI.journal}</span>
-      : renderIconValue(entryIcon(entryType, entry ?? {}, category), null);
+      : renderIconValue(entryIcon(kind, entry ?? {}, category), null);
   } else if (type === 'blocks' && id) {
     icon = renderIconValue(definition?.icon, <Icon size={14} />);
   } else if (type === 'templates' && id) {

@@ -1,11 +1,9 @@
 /**
- * The one category list for wiki, operations and tasks
- * (table `categories`, since v38). Previously each of the stores held its
- * own slice with the same five actions.
+ * The one category list for entries and tasks (table `categories`).
  *
- * Import rule: this store may import the content stores, the template store and
- * `entryEdit` — after permanently deleting a category it also reassigns
- * its contents, template assignments and the baselines of running edits in
+ * Import rule: this store may import the content stores, the dashboard store
+ * and `entryEdit` — after permanently deleting a category it also reassigns
+ * its contents, the dashboards' filters and the baselines of running edits in
  * memory; none of them imports back. All access goes
  * through `getState()` at runtime.
  */
@@ -19,7 +17,7 @@ import type { Category } from '../types';
 import { useEntryStore } from './entryStore';
 import { reassignBaselineCategories } from './entryEdit';
 import { useTaskStore } from './taskStore';
-import { dropCategoriesFromTemplatesInMemory, useTemplateStore } from './templateStore';
+import { reassignDashboardCategoriesInMemory } from './dashboardStore';
 
 /** Error message from addCategory/updateCategory when the name is already taken. */
 export const CATEGORY_NAME_TAKEN = 'CATEGORY_NAME_TAKEN';
@@ -31,6 +29,8 @@ export interface CategoryState {
   fetchCategories: () => Promise<void>;
   addCategory: (name: string, emoji: string) => Promise<Category>;
   updateCategory: (id: string, name: string, emoji: string) => Promise<void>;
+  /** The template new entries of the category start with — `null`: the vault's default. Built-ins too. */
+  setStartTemplate: (id: string, templateId: string | null) => Promise<void>;
   /** Soft delete. `false` if the category is built in. */
   deleteCategory: (id: string) => Promise<boolean>;
   /** The id of the category the content now sits in — its own, or the same-named one it merged into. */
@@ -57,29 +57,28 @@ function nameTaken(categories: Category[], name: string, exceptId?: string): boo
  * Reassigns contents that point at one of the `ids` to `to` in the loaded
  * stores (`null` = no category) — the in-memory counterpart to
  * `reassignCategoryContent`. Also used when emptying the trash;
- * the store shapes should live in one place only. Templates
- * lose the assignment only without `to`; on merging,
- * `mergeCategory` reloads them.
+ * the store shapes should live in one place only. The dashboards' filters
+ * follow the same way.
  */
 export function reassignCategoriesInMemory(ids: ReadonlySet<string>, to: string | null = null): void {
   const move = <T extends { category_id: string | null }>(x: T): T =>
     x.category_id && ids.has(x.category_id) ? { ...x, category_id: to } : x;
-  useEntryStore.setState((s) => ({ entries: { ...s.entries, wiki: s.entries.wiki.map(move), operation: s.entries.operation.map(move) } }));
+  useEntryStore.setState((s) => ({ entries: s.entries.map(move) }));
   useTaskStore.setState((s) => ({ tasks: s.tasks.map(move) }));
   // Also what a running edit would write back with Cancel.
   reassignBaselineCategories(ids, to);
-  if (!to) dropCategoriesFromTemplatesInMemory(ids);
+  reassignDashboardCategoriesInMemory(ids, to);
 }
 
 /**
  * A name belongs to one category: `from` merges into `to` — its content and
- * its template assignments move over, the row disappears.
+ * its place in the dashboards' filters move over, the row disappears. `to`
+ * keeps its own start template.
  */
 async function mergeCategory(db: Awaited<ReturnType<typeof getDb>>, from: string, to: string): Promise<void> {
   await reassignCategoryContent(db, from, to);
   await db.execute('DELETE FROM categories WHERE id=$1', [from]);
   reassignCategoriesInMemory(new Set([from]), to);
-  await useTemplateStore.getState().fetchTemplates();
 }
 
 export const useCategoryStore = create<CategoryState>((set, get) => ({
@@ -116,7 +115,7 @@ export const useCategoryStore = create<CategoryState>((set, get) => ({
     const sortOrder = (last?.sort_order ?? -1) + 1;
 
     const cat: Category = {
-      id: generateId(), name: trimmed, emoji, sort_order: sortOrder, is_builtin: false, deleted_at: null,
+      id: generateId(), name: trimmed, emoji, sort_order: sortOrder, is_builtin: false, template_id: null, deleted_at: null,
     };
     await db.execute(
       'INSERT INTO categories (id, name, emoji, sort_order, is_builtin) VALUES ($1,$2,$3,$4,0)',
@@ -140,6 +139,12 @@ export const useCategoryStore = create<CategoryState>((set, get) => ({
     }
     await db.execute('UPDATE categories SET name=$1, emoji=$2 WHERE id=$3', [trimmed, emoji, id]);
     set((s) => ({ categories: s.categories.map((c) => (c.id === id ? { ...c, name: trimmed, emoji } : c)) }));
+  },
+
+  setStartTemplate: async (id, templateId) => {
+    const db = await getDb();
+    await db.execute('UPDATE categories SET template_id=$1 WHERE id=$2', [templateId, id]);
+    set((s) => ({ categories: s.categories.map((c) => (c.id === id ? { ...c, template_id: templateId } : c)) }));
   },
 
   deleteCategory: async (id) => {

@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useRef } from 'react';
 import { editorSavesSuspended } from '../lib/editorLock';
-import { entryTypeForView, type ViewId } from '../lib/modules';
-import { revertEntryType } from '../lib/entryTypeChange';
+import type { ViewId } from '../lib/modules';
 import { serialKey, settled } from '../lib/serialize';
 import {
   baselineKey, baselineOf, baselines, beginDiscard, editIsDirty, endDiscard, isDiscarding, pendingEntryWrites, type BaselineFields,
@@ -151,14 +150,14 @@ export function useEntryEditor<TPatch extends BaselineFields, TRestore extends B
     const running = baselines.get(key);
     if (running) {
       // Editing is already running. From now on this view reads the saved
-      // state: after a type change the state came along from another view,
-      // and that view's reader would no longer find the entry.
+      // state: after a move to another module the edit came along from
+      // another view, and that view may no longer be mounted.
       running.stored = () => readStoredRef.current(entityId);
       return;
     }
     // A new editing session: an earlier Cancel is over, including one that
-    // reverted the type. Not further up — the view that mounts between a type
-    // change and its reversal finds a state and must not save anything.
+    // moved the entry back. Not further up — the view that mounts between a
+    // move and its reversal finds a state and must not save anything.
     endDiscard(entityId);
     const patch = restoreFields(contentRef.current);
     baselines.set(key, {
@@ -178,8 +177,8 @@ export function useEntryEditor<TPatch extends BaselineFields, TRestore extends B
    * is nothing to return (no entry open, the write or the reversal failed) —
    * the view then falls back to the store state and leaves edit mode anyway.
    *
-   * If the entry changed type during this editing session, it goes back to
-   * its module with the entry-time state (`revertEntryType`). If the open
+   * If the entry moved to another module during this editing session, it
+   * goes back to its view with the entry-time state. If the open
    * page at the end no longer shows this entry in this view, the result is
    * `EDIT_ENDED` (see there).
    *
@@ -197,14 +196,16 @@ export function useEntryEditor<TPatch extends BaselineFields, TRestore extends B
       // An icon still being shrunk drops itself now that discarding has begun;
       // inside the lock, so the page stays locked from the click on.
       await pendingEntryWrites(id);
-      // A type change that is still writing already belongs to the editing
+      // A move to another module that is still writing already belongs to the editing
       // session: only after it is it clear under which view its baseline lies.
       await settled(serialKey('entry', id));
       const baseline = baselineOf(id);
-      // Only journal, wiki and operations change type — `type` then always exists.
-      const type = baseline && entryTypeForView(baseline.scope);
-      if (baseline?.origin && type) {
-        return { restored: null, reverted: await revertEntryType(id, type, baseline.origin, baseline.patch, baseline.stamp) };
+      // Moved to another module in this edit: the category comes back with
+      // the rest, and the tabs go back to the view the edit began in.
+      if (baseline?.origin) {
+        await updateRef.current(id, baseline.patch as TRestore, { touch: baseline.stamp ?? true });
+        useUIStore.getState().moveEntryViews(id, baseline.scope, baseline.origin, { endEdit: true });
+        return { restored: null, reverted: true };
       }
       if (baseline) {
         await updateRef.current(id, baseline.patch as TRestore, { touch: baseline.stamp ?? true });
@@ -251,9 +252,7 @@ export function useEntryEditor<TPatch extends BaselineFields, TRestore extends B
       // If Cancel is discarding the entry right now, only the write is
       // skipped: timer and `prevRef` are cleared anyway — otherwise a later
       // run would write the state of the NEXT entry under the old id.
-      // The same if the entry no longer belongs to this view: after a type
-      // change `changeEntryType` has saved beforehand, and the state here
-      // still carries the chips with the old type.
+      // The same if the entry is gone (deleted meanwhile): there is nothing left to save into.
       const discarded = isDiscarding(prev.id) || readStoredRef.current(prev.id) === null;
       if (prev.id !== entityId) {
         // Navigated away while editing: the id has already changed in this

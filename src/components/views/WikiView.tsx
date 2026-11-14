@@ -24,7 +24,8 @@ import { EDIT_ENDED, useEntryEditor } from '../../hooks/useEntryEditor';
 import { useEntryContentReady } from '../../hooks/useEntryContentReady';
 import { useEditActions } from '../../hooks/useEditActions';
 import { guardKey } from '../../store/leaveGuardStore';
-import { useEntryStore } from '../../store/entryStore';
+import { findEntry, useEntryStore } from '../../store/entryStore';
+import { useDashboardEntries } from '../../hooks/useDashboardEntries';
 import { useTagMap, visibleTags } from '../../store/tagStore';
 import { useCategoryStore } from '../../store/categoryStore';
 import { useUndoStore } from '../../store/undoStore';
@@ -42,13 +43,15 @@ export default function WikiView() {
   );
   const openInNewTabAction = useOpenInNewTabAction();
   const saveAsTemplateAction = useSaveAsTemplateAction();
-  const { articles, duplicateEntry, updateEntry, deleteEntry, restoreEntry, getEntry } = useEntryStore(
-    useShallow((s) => ({ articles: s.entries.wiki, duplicateEntry: s.duplicateEntry, updateEntry: s.updateEntry, deleteEntry: s.deleteEntry, restoreEntry: s.restoreEntry, getEntry: s.getEntry }))
+  const articles = useDashboardEntries('wiki');
+  const { duplicateEntry, updateEntry, deleteEntry, restoreEntry, getEntry } = useEntryStore(
+    useShallow((s) => ({ duplicateEntry: s.duplicateEntry, updateEntry: s.updateEntry, deleteEntry: s.deleteEntry, restoreEntry: s.restoreEntry, getEntry: s.getEntry }))
   );
   const categories = useCategoryStore((s) => s.categories);
   const pushUndo = useUndoStore((s) => s.push);
 
-  const article = activeView.id ? getEntry(activeView.id, 'wiki') : null;
+  // Any entry opens here, whichever dashboards show it: the page follows its object in the store.
+  const article = useEntryStore((s) => (activeView.id ? findEntry(s.entries, activeView.id) : undefined)) ?? null;
   // Startup loads content after the lists: until it arrives, the frame with
   // the title is shown, and the block stack only mounts with the real content.
   const contentReady = useEntryContentReady(article?.id);
@@ -91,10 +94,10 @@ export default function WikiView() {
       category_id: article?.category_id ?? null, icon: article?.icon, cover_image: article?.cover_image,
     }),
     readStored: (id) => {
-      const stored = getEntry(id, 'wiki');
+      const stored = getEntry(id);
       return stored ? fieldsOf(stored) : null;
     },
-    readStamp: (id) => getEntry(id, 'wiki')?.updated_at,
+    readStamp: (id) => getEntry(id)?.updated_at,
     update: updateEntry,
   });
 
@@ -168,7 +171,7 @@ export default function WikiView() {
     onSave: handleDone, onCancel: handleCancel, onDelete: handleDelete, flush: flushAutoSave,
     guard: article ? {
       key: guardKey('wiki', article.id),
-      title: () => title.trim() || getEntry(article.id, 'wiki')?.title.trim() || t('wiki.untitled'),
+      title: () => title.trim() || getEntry(article.id)?.title.trim() || t('wiki.untitled'),
       isDirty: () => isDirty(!!activeView.isNew),
     } : undefined,
   });
@@ -373,7 +376,7 @@ export default function WikiView() {
             actions={[
               openInNewTabAction({ type: 'wiki', id: ctxMenu.id, mode: 'view' }),
               { label: t('contextMenu.duplicate'), icon: <Copy size={12} />, onClick: () => handleDuplicate(ctxMenu.id) },
-              saveAsTemplateAction('wiki', ctxMenu.id),
+              saveAsTemplateAction(ctxMenu.id),
               { label: t('contextMenu.rename'),    icon: <Pencil size={12} />, onClick: () => startRename(ctxMenu.id) },
               { label: t('contextMenu.delete'),    icon: <Trash2 size={12} />, onClick: () => handleCtxDelete(ctxMenu.id), danger: true },
             ]}
@@ -410,7 +413,7 @@ export default function WikiView() {
           onChange={handleContentChange}
           onReadModeChange={(content) => updateEntry(article.id, { content })}
           isEditing={isEditing}
-          templateTarget={{ entryType: 'wiki', flush: flushAutoSave }}
+          templateTarget={{ flush: flushAutoSave }}
         />
       )}
     </EntryDetailFrame>

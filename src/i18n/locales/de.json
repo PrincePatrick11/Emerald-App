@@ -29,10 +29,11 @@
     "uncategorized": "Ohne Kategorie",
     "nameTaken": "Diese Kategorie gibt es schon",
     "dragHint": "Zum Sortieren ziehen.",
-    "builtinHint": "Eingebaut — nicht umbenenn- oder löschbar.",
+    "builtinHint": "Eingebaut — nicht umbenennbar oder löschbar. Die Startvorlage lässt sich ändern.",
     "builtin": {
       "sigils": "Sigillen",
-      "altars": "Altäre"
+      "altars": "Altäre",
+      "journal": "Journal"
     },
     "starter": {
       "paradigm": "Paradigma",
@@ -43,7 +44,10 @@
       "candles": "Kerzen",
       "deities": "Gottheiten",
       "tools": "Werkzeuge"
-    }
+    },
+    "startTemplate": "Startvorlage",
+    "startTemplateDefault": "Standardvorlage",
+    "startTemplateHint": "Womit ein neuer Eintrag in dieser Kategorie beginnt. „Standardvorlage“ ist die unter Vorlagen eingestellte."
   },
   "listView": {
     "view": "Ansicht",
@@ -846,8 +850,6 @@
     "noEntry": "Öffne einen Eintrag, um seine Eigenschaften zu sehen.",
     "title": "Eigenschaften",
     "type": "Typ",
-    "typeDropsProperties": "Im Journal fallen Kategorie, Icon und Titelbild weg.",
-    "changeType": "Umwandeln",
     "category": "Kategorie",
     "noCategory": "Keine",
     "moonPhase": "Mondphase",
@@ -866,7 +868,8 @@
     "chooseImage": "Bild wählen",
     "linkEntry": "Eintrag verknüpfen …",
     "addTag": "Tag hinzufügen …",
-    "removeTag": "Tag entfernen"
+    "removeTag": "Tag entfernen",
+    "area": "Bereich"
   },
   "filters": {
     "all": "Alle",
@@ -992,9 +995,6 @@
     "importDb": "Datenbank importieren",
     "importBrowse": "Datei auswählen…",
     "importedVault": "Importierter Vault",
-    "includeJournal": "Journal",
-    "includeWiki": "Wiki",
-    "includeOperations": "Operationen",
     "includeTasks": "Aufgaben",
     "includeTags": "Tags",
     "includeLexicon": "Lexikon",
@@ -1161,7 +1161,14 @@
     "theme": "Theme",
     "text": "Text",
     "importErrorOldVersion": "Dieses Backup stammt aus einer älteren Emerald-Version und lässt sich in dieser nicht wiederherstellen. Es wurde nichts verändert; ein Konverter folgt.",
-    "importErrorNewVersion": "Dieses Backup stammt aus einer neueren Emerald-Version. Aktualisiere diese App, um es wiederherzustellen. Es wurde nichts verändert."
+    "importErrorNewVersion": "Dieses Backup stammt aus einer neueren Emerald-Version. Aktualisiere diese App, um es wiederherzustellen. Es wurde nichts verändert.",
+    "entriesByCategory": "Einträge nach Kategorie",
+    "includeUncategorizedHint": "Einträge ohne Kategorie und solche, deren Kategorie im Papierkorb liegt.",
+    "groupTemplates": "Vorlagen",
+    "previewEntries": "Einträge",
+    "previewTemplates": "Vorlagen",
+    "previewTasks": "Aufgaben",
+    "previewLanguages": "Sprachen"
   },
   "home": {
     "viewAll": "Alle anzeigen",
@@ -1293,15 +1300,6 @@
     "entryTitlePlaceholder": "Leer lassen für den üblichen Titel",
     "content": "Inhalt",
     "contentPlaceholder": "Was jeder Eintrag aus dieser Vorlage mitbringt …",
-    "allCategories": "Alle Kategorien",
-    "overview": {
-      "title": "Zuweisungen",
-      "hint": "Neue Einträge starten mit einer Kopie der zugewiesenen Vorlage. „Alle Kategorien“ gilt, wo eine Kategorie keine eigene hat.",
-      "category": "Kategorie",
-      "none": "Keine Vorlage",
-      "fallback": "Sonst: {{name}} (alle Kategorien)",
-      "everyEntry": "Jeder neue Eintrag"
-    },
     "saveAsTemplate": "Als Vorlage speichern",
     "insert": {
       "button": "Vorlage einfügen",
@@ -1311,8 +1309,9 @@
       "noticeApplied": "Vorlage „{{name}}“ angewendet",
       "dismiss": "Hinweis schließen"
     },
-    "assignTitle": "Zuweisungen – {{name}}",
-    "assignHint": "Klicke eine Zelle an, damit neue Einträge mit dieser Vorlage starten, ein zweiter Klick nimmt es zurück. Gilt sofort."
+    "defaultTemplate": "Standardvorlage",
+    "defaultTemplateHint": "Womit ein neuer Eintrag beginnt, wenn seine Kategorie keine eigene Startvorlage hat. Startvorlagen stellst du an der Kategorie ein, unter Kategorien.",
+    "defaultNone": "Keine — leer beginnen"
   },
   "lexicon": {
     "languages": "Sprachen",

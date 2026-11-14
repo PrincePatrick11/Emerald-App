@@ -35,22 +35,29 @@ export interface ApplyResult {
 const APPLYING: Statement = ['UPDATE _sync_ctx SET applying = 1'];
 const LOGGING: Statement = ['UPDATE _sync_ctx SET applying = 0'];
 
+/** The repairs per table — what a snapshot frame of that table runs too (`FRAME_REPAIRS`). */
+const REPAIRS_BY_TABLE: Readonly<Record<string, readonly Statement[]>> = {
+  ...Object.fromEntries(CATEGORIZED_TABLES.map((table) => [table, [[
+    `UPDATE ${table} SET category_id = NULL
+       WHERE category_id IS NOT NULL AND category_id NOT IN (SELECT id FROM categories)`,
+  ] as Statement]])),
+  categories: [['UPDATE categories SET template_id = NULL WHERE template_id IS NOT NULL AND template_id NOT IN (SELECT id FROM templates)']],
+};
+const TASK_PARENT_REPAIR: Statement = ['UPDATE tasks SET parent_task_id = NULL WHERE parent_task_id IS NOT NULL AND parent_task_id NOT IN (SELECT id FROM tasks)'];
+const TASK_LINK_REPAIR: Statement = ['DELETE FROM task_links WHERE task_id NOT IN (SELECT id FROM tasks)'];
+const LEXICON_REPAIR: Statement = ['DELETE FROM lexicon_entries WHERE language_id NOT IN (SELECT id FROM languages)'];
+
 /**
  * Run last, and logged: a reference a merge left dangling (a task moved into
- * a category another device deleted) would otherwise fail the commit, and every
- * retry with it. An optional reference is cleared, a row that cannot exist
- * without its parent goes.
+ * a category another device deleted, a start template deleted elsewhere) would
+ * otherwise fail the commit, and every retry with it. An optional reference is
+ * cleared, a row that cannot exist without its parent goes.
  */
 export const REFERENCE_REPAIRS: readonly Statement[] = [
-  ...CATEGORIZED_TABLES.map(
-    (table): Statement => [
-      `UPDATE ${table} SET category_id = NULL
-       WHERE category_id IS NOT NULL AND category_id NOT IN (SELECT id FROM categories)`,
-    ]
-  ),
-  ['UPDATE tasks SET parent_task_id = NULL WHERE parent_task_id IS NOT NULL AND parent_task_id NOT IN (SELECT id FROM tasks)'],
-  ['DELETE FROM task_links WHERE task_id NOT IN (SELECT id FROM tasks)'],
-  ['DELETE FROM lexicon_entries WHERE language_id NOT IN (SELECT id FROM languages)'],
+  ...Object.values(REPAIRS_BY_TABLE).flat(),
+  TASK_PARENT_REPAIR,
+  TASK_LINK_REPAIR,
+  LEXICON_REPAIR,
 ];
 
 /** The INSERT of a row, without its block stack (`content`, written as block rows by `stackStatements`). */
@@ -164,35 +171,45 @@ export async function applyRemoteChanges(
     rows.delete(rowKey('images', other));
   };
 
-  // Who holds which number. Asking the database per row would scan the table per
-  // row: `entry_number` has no index, and a long time offline is thousands of rows.
-  const numberOwner = new Map<string, string>();
-  const highest = new Map<string, number>();
-  const noteNumber = (type: unknown, number: unknown, id: string) => {
+  // Who holds which number — one count over all entries, unique
+  // (`idx_entries_number`). Read once: a long time offline is thousands of rows.
+  const numberOwner = new Map<number, string>();
+  const ownNumber = new Map<string, number>();
+  let highest = 0;
+  const noteNumber = (number: unknown, id: string) => {
     if (number === null || number === undefined) return;
-    numberOwner.set(`${type}:${number}`, id);
-    highest.set(String(type), Math.max(highest.get(String(type)) ?? 0, Number(number)));
+    const n = Number(number);
+    const before = ownNumber.get(id);
+    if (before !== undefined && numberOwner.get(before) === id) numberOwner.delete(before);
+    numberOwner.set(n, id);
+    ownNumber.set(id, n);
+    highest = Math.max(highest, n);
   };
-  const nextNumber = (type: unknown) => {
-    const next = (highest.get(String(type)) ?? 0) + 1;
-    highest.set(String(type), next);
-    return next;
+  const forgetNumber = (id: string) => {
+    const n = ownNumber.get(id);
+    if (n !== undefined && numberOwner.get(n) === id) numberOwner.delete(n);
+    ownNumber.delete(id);
   };
+  const nextNumber = () => ++highest;
   if (remote.some((change) => change.table === 'entries')) {
-    const held = await db.select<{ id: string; type: string; entry_number: number | null }[]>('SELECT id, type, entry_number FROM entries');
-    for (const row of held) noteNumber(row.type, row.entry_number, row.id);
+    const held = await db.select<{ id: string; entry_number: number | null }[]>('SELECT id, entry_number FROM entries');
+    for (const row of held) noteNumber(row.entry_number, row.id);
   }
 
-  /** Two devices gave out the same number: this device's entry takes the next free one. */
-  const renumberOthers = (id: string, row: Row) => {
-    if (row.entry_number === null || row.entry_number === undefined) return;
-    const other = numberOwner.get(`${row.type}:${row.entry_number}`);
+  /**
+   * Two devices gave out the same number: this device's entry takes the next
+   * free one. Must run before the incoming row is written — the number is
+   * unique, and a unique index is checked per statement.
+   */
+  const renumberOthers = (id: string, number: unknown) => {
+    if (number === null || number === undefined) return;
+    const other = numberOwner.get(Number(number));
     if (other && other !== id) {
-      const next = nextNumber(row.type);
-      numberOwner.set(`${row.type}:${next}`, other);
+      const next = nextNumber();
+      noteNumber(next, other);
       logged(['UPDATE entries SET entry_number = $1 WHERE id = $2', [next, other]]);
     }
-    noteNumber(row.type, row.entry_number, id);
+    noteNumber(number, id);
   };
 
   for (const change of remote) {
@@ -214,7 +231,7 @@ export async function applyRemoteChanges(
       rows.delete(key);
       if (change.table === 'tags') tagIdByName.delete(String(row.name));
       if (change.table === 'images') imageIdByFile.delete(String(row.file));
-      if (change.table === 'entries') numberOwner.delete(`${row.type}:${row.entry_number}`);
+      if (change.table === 'entries') forgetNumber(change.id);
       continue;
     }
 
@@ -232,11 +249,11 @@ export async function applyRemoteChanges(
           [task_id, target_id, target_type, change.id],
         ]);
       }
+      if (change.table === 'entries') renumberOthers(change.id, change.row.entry_number);
       statements.push(insertStatement(change.table, change.row));
       noteContent(change.table, change.id, change.row.content);
       rows.set(key, { ...change.row });
       if (change.table === 'tags') tagIdByName.set(String(change.row.name), change.id);
-      if (change.table === 'entries') renumberOthers(change.id, change.row);
       continue;
     }
 
@@ -254,8 +271,8 @@ export async function applyRemoteChanges(
       // this device's value stands and goes out with its next push.
       if (change.table === 'entries' && column === 'content') {
         const copyId = options.newId();
-        const number = nextNumber(row.type);
-        numberOwner.set(`${row.type}:${number}`, copyId);
+        const number = nextNumber();
+        noteNumber(number, copyId);
         logged(insertStatement('entries', {
           ...row,
           id: copyId,
@@ -270,6 +287,8 @@ export async function applyRemoteChanges(
       }
     }
     if (!take.length) continue;
+    // A changed number first frees its place (see `renumberOthers`).
+    if (change.table === 'entries' && take.includes('entry_number')) renumberOthers(change.id, change.row.entry_number);
     // The block stack is no column of the table: it becomes block rows below.
     const columns = stackOwnerKind(change.table) ? take.filter((column) => column !== STACK_COLUMN) : take;
     if (columns.length) {
@@ -282,9 +301,6 @@ export async function applyRemoteChanges(
     for (const column of take) row[column] = change.row[column];
     if (columns.length < take.length) noteContent(change.table, change.id, row[STACK_COLUMN]);
     if (change.table === 'tags' && take.includes('name')) tagIdByName.set(String(change.row.name), change.id);
-    if (change.table === 'entries' && (take.includes('entry_number') || take.includes('type'))) {
-      renumberOthers(change.id, row);
-    }
   }
 
   // The block rows of what arrived as `content`, in the same transaction, written
@@ -357,10 +373,11 @@ export async function beginRestore(db: Database, keep: readonly SyncChange[] = [
  * that points at it arrived is the one case that leaves a reference open here.
  */
 const FRAME_REPAIRS: Record<string, readonly Statement[]> = {
-  entries: [REFERENCE_REPAIRS[0]],
-  tasks: [REFERENCE_REPAIRS[1], REFERENCE_REPAIRS[2]],
-  task_links: [REFERENCE_REPAIRS[3]],
-  lexicon_entries: [REFERENCE_REPAIRS[4]],
+  entries: REPAIRS_BY_TABLE.entries,
+  categories: REPAIRS_BY_TABLE.categories,
+  tasks: [...REPAIRS_BY_TABLE.tasks, TASK_PARENT_REPAIR],
+  task_links: [TASK_LINK_REPAIR],
+  lexicon_entries: [LEXICON_REPAIR],
 };
 
 export async function restoreFrame(db: Database, frame: SnapshotFrame): Promise<void> {
@@ -409,11 +426,40 @@ export async function finishRestore(
       for (const row of found) inSnapshot.add(rowKey(table, row.id));
     }
   }
-  for (const change of keep) {
-    if (change.op === 'delete') {
-      statements.push([`DELETE FROM ${change.table} WHERE id = $1`, [change.id]]);
+  // A kept entry whose number the snapshot gave to another entry takes the next
+  // free one — the number is unique, and `OR IGNORE` would otherwise drop the entry.
+  const numberHolder = new Map<number, string>();
+  let highest = 0;
+  if (keep.some((change) => change.table === 'entries' && change.op === 'upsert')) {
+    for (const row of await db.select<{ id: string; entry_number: number | null }[]>('SELECT id, entry_number FROM entries WHERE entry_number IS NOT NULL')) {
+      numberHolder.set(Number(row.entry_number), row.id);
+      highest = Math.max(highest, Number(row.entry_number));
+    }
+  }
+  type Upsert = Extract<SyncChange, { op: 'upsert' }>;
+  const withFreeNumber = (change: Upsert): Upsert => {
+    const number = change.row.entry_number;
+    if (change.table !== 'entries' || number === null || number === undefined) return change;
+    const holder = numberHolder.get(Number(number));
+    if (holder === undefined || holder === change.id) {
+      numberHolder.set(Number(number), change.id);
+      highest = Math.max(highest, Number(number));
+      return change;
+    }
+    const next = ++highest;
+    numberHolder.set(next, change.id);
+    return {
+      ...change,
+      row: { ...change.row, entry_number: next },
+      changed: change.changed.includes('entry_number') ? change.changed : [...change.changed, 'entry_number'],
+    };
+  };
+  for (const kept of keep) {
+    if (kept.op === 'delete') {
+      statements.push([`DELETE FROM ${kept.table} WHERE id = $1`, [kept.id]]);
       continue;
     }
+    const change = withFreeNumber(kept);
     const [query, values] = insertStatement(change.table, change.row);
     statements.push([query.replace('INSERT INTO', 'INSERT OR IGNORE INTO'), values]);
     // A statement of its own: `OR IGNORE` on an insert does not cover its `DO UPDATE`,

@@ -9,6 +9,7 @@ import type { ExportData } from './exportData';
 import { useEntryStore } from '../store/entryStore';
 import { useTaskStore } from '../store/taskStore';
 import { useCategoryStore } from '../store/categoryStore';
+import { kindOfEntry } from '../store/dashboardStore';
 import { DEFAULT_ENTRY_EMOJI, entryIcon } from './modules';
 import i18n from '../i18n';
 
@@ -70,7 +71,7 @@ function resolveInternalLinkIcons(html: string): string {
   const links = doc.querySelectorAll<HTMLElement>('span[data-type="internalLink"]');
   if (!links.length) return html;
 
-  const { wiki: articles, operation: operations } = useEntryStore.getState().entries;
+  const { entries } = useEntryStore.getState();
   const { tasks } = useTaskStore.getState();
   const { categories } = useCategoryStore.getState();
 
@@ -78,17 +79,16 @@ function resolveInternalLinkIcons(html: string): string {
     // Only fill missing icons
     if (el.getAttribute('data-icon')) continue;
     const id        = el.getAttribute('data-id');
-    const entryType = el.getAttribute('data-entry-type');
+    const targetKind = el.getAttribute('data-entry-type');
     if (!id) continue;
 
     let icon = '';
-    if (entryType === 'wiki') {
-      const article = articles.find(a => a.id === id);
-      if (article) icon = entryIcon('wiki', article, categories.find(c => c.id === article.category_id));
-    } else if (entryType === 'operation') {
-      const op = operations.find(o => o.id === id);
-      if (op) icon = entryIcon('operation', op, categories.find(c => c.id === op.category_id));
-    } else if (entryType === 'task') {
+    if (targetKind === 'entry') {
+      // The journal's chips show the moon phase, which the export does not resolve.
+      const entry = entries.find(e => e.id === id);
+      const kind = entry && kindOfEntry(entry);
+      if (entry && kind && kind !== 'journal') icon = entryIcon(kind, entry, categories.find(c => c.id === entry.category_id));
+    } else if (targetKind === 'task') {
       // Task chips from sidebar drags carry no data-icon — as in the
       // editor's live lookup: category emoji, otherwise the chip fallback.
       const task = tasks.find(t => t.id === id);

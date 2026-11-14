@@ -1,5 +1,6 @@
 import type { MoonPhase } from '../types';
 import { DEFAULT_ENTRY_EMOJI } from './modules';
+import { JOURNAL_CATEGORY_ID } from './schema';
 
 /**
  * Calculates the approximate moon phase for a given date.
@@ -42,20 +43,21 @@ export const MOON_PHASE_SYMBOLS: Record<MoonPhase, string> = {
 };
 
 /**
- * The moon phase of a journal entry: that of the day it was created.
+ * The moon phase of an entry of the category Journal: that of the day it was
+ * created. Entries of any other category have none.
  * No column — a stored value was only a copy of it, which had to be reset on
- * import, type change and duplication.
+ * import, category change and duplication.
  * `shown` is the vault setting `journal.moonPhase`: off means no
  * entry shows a phase, not even an old one.
  */
-export function entryMoonPhase(entry: { created_at: string }, shown: boolean): MoonPhase | null {
-  if (!shown) return null;
+export function entryMoonPhase(entry: { created_at: string; category_id: string | null }, shown: boolean): MoonPhase | null {
+  if (!shown || entry.category_id !== JOURNAL_CATEGORY_ID) return null;
   const created = new Date(entry.created_at);
   return Number.isNaN(created.getTime()) ? null : getMoonPhase(created);
 }
 
-/** The icon of a journal entry: its moon phase, otherwise the journal emoji. */
-export function journalIcon(entry: { created_at: string }, shown: boolean): string {
+/** The icon of an entry in the journal: its moon phase, otherwise the journal emoji. */
+export function journalIcon(entry: { created_at: string; category_id: string | null }, shown: boolean): string {
   const phase = entryMoonPhase(entry, shown);
   return phase ? MOON_PHASE_SYMBOLS[phase] : DEFAULT_ENTRY_EMOJI.journal;
 }

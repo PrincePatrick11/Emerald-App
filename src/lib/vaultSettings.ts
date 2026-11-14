@@ -94,6 +94,15 @@ export interface JournalSettings {
   moonPhase: boolean;
 }
 
+export interface TemplateSettings {
+  /**
+   * The vault's default template: what a new entry starts with when its
+   * category has no start template of its own, or it has none
+   * (`resolveStartTemplate`). `null`: such entries start empty.
+   */
+  defaultTemplateId: string | null;
+}
+
 /** How often the automatic backup runs — whole days only, the file name carries the date. */
 export const BACKUP_INTERVAL_OPTIONS = ['daily', 'weekly', 'monthly'] as const;
 export type BackupInterval = (typeof BACKUP_INTERVAL_OPTIONS)[number];
@@ -128,6 +137,7 @@ export interface VaultSettings {
   tags: TagSettings;
   editor: EditorSettings;
   journal: JournalSettings;
+  templates: TemplateSettings;
   backup: BackupSettings;
 }
 
@@ -136,7 +146,7 @@ export type SettingsGroup = Exclude<keyof VaultSettings, 'version'>;
 /** Each group exactly once — the record forces a new one not to be missing. */
 const GROUP_SET: Record<SettingsGroup, true> = {
   appearance: true, trash: true, leftList: true, emojis: true, images: true, tags: true,
-  editor: true, journal: true, backup: true,
+  editor: true, journal: true, templates: true, backup: true,
 };
 export const SETTINGS_GROUPS = Object.keys(GROUP_SET) as SettingsGroup[];
 
@@ -173,6 +183,9 @@ export const DEFAULT_VAULT_SETTINGS: VaultSettings = {
   },
   journal: {
     moonPhase: true,
+  },
+  templates: {
+    defaultTemplateId: null,
   },
   backup: {
     auto: false,
@@ -226,6 +239,7 @@ export function normalizeVaultSettings(raw: unknown): VaultSettings {
   const tags = asRecord(root.tags);
   const editor = asRecord(root.editor);
   const journal = asRecord(root.journal);
+  const templates = asRecord(root.templates);
   const backup = asRecord(root.backup);
   const flag = (value: unknown, fallback: boolean) => (typeof value === 'boolean' ? value : fallback);
   const version = typeof root.version === 'number' && Number.isInteger(root.version) && root.version > 1
@@ -273,6 +287,13 @@ export function normalizeVaultSettings(raw: unknown): VaultSettings {
     journal: {
       ...journal,
       moonPhase: flag(journal.moonPhase, DEFAULT_VAULT_SETTINGS.journal.moonPhase),
+    },
+    templates: {
+      ...templates,
+      // Only an ID of the harmless form; a template it names that is gone resolves to none.
+      defaultTemplateId: typeof templates.defaultTemplateId === 'string' && /^[\w-]{1,100}$/.test(templates.defaultTemplateId)
+        ? templates.defaultTemplateId
+        : null,
     },
     backup: {
       ...backup,

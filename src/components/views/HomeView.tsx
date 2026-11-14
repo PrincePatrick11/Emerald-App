@@ -18,7 +18,9 @@ import { useOpenInNewTabAction } from '../../hooks/useOpenInNewTabAction';
 import { useSaveAsTemplateAction } from '../../hooks/useSaveAsTemplateAction';
 import { getMoonPhase, journalIcon, MOON_PHASE_SYMBOLS } from '../../lib/moonPhase';
 import { generateId } from '../../lib/helpers';
-import { entryIcon, MODULES, viewTypeForEntryType, type ViewId } from '../../lib/modules';
+import { entryIcon, MODULES, viewTypeForKind, type ViewId } from '../../lib/modules';
+import { useDashboardEntries } from '../../hooks/useDashboardEntries';
+import { viewOfEntry } from '../../store/entryViews';
 import { displayTitle, hasOwnTitle } from '../../lib/entryTitle';
 import { categoryLabel } from '../../lib/categories';
 import { formatDayHeading, formatEntryDate } from '../../lib/formatDate';
@@ -33,7 +35,7 @@ type CtxTarget =
   | { kind: 'wiki'; id: string }
   | { kind: 'operation'; id: string };
 
-/** The undo notice after deleting, per entry type. */
+/** The undo notice after deleting, per section's kind. */
 const UNDO_DELETED = {
   journal: 'undo.entryDeleted',
   wiki: 'undo.articleDeleted',
@@ -124,11 +126,14 @@ export default function HomeView() {
   );
   const openInNewTabAction = useOpenInNewTabAction();
   const saveAsTemplateAction = useSaveAsTemplateAction();
-  const { entries, articles, operations, duplicateEntry, updateEntry, deleteEntry, restoreEntry } = useEntryStore(
+  // Each section shows its dashboard — the same entries as the module it leads to.
+  const entries = useDashboardEntries('journal');
+  const articles = useDashboardEntries('wiki');
+  const operations = useDashboardEntries('operations');
+  const { duplicateEntry, updateEntry, deleteEntry, restoreEntry, getEntry } = useEntryStore(
     useShallow((s) => ({
-      entries: s.entries.journal, articles: s.entries.wiki, operations: s.entries.operation,
       duplicateEntry: s.duplicateEntry, updateEntry: s.updateEntry,
-      deleteEntry: s.deleteEntry, restoreEntry: s.restoreEntry,
+      deleteEntry: s.deleteEntry, restoreEntry: s.restoreEntry, getEntry: s.getEntry,
     }))
   );
   const categories = useCategoryStore((s) => s.categories);
@@ -149,7 +154,7 @@ export default function HomeView() {
 
   const handleDuplicate = async (target: CtxTarget) => {
     const copy = await duplicateEntry(target.id);
-    if (copy) setActiveView({ type: viewTypeForEntryType(copy.type), id: copy.id, mode: 'view' });
+    if (copy) setActiveView({ type: viewOfEntry(copy), id: copy.id, mode: 'view' });
   };
 
   // Renaming in place, as in the modules' lists.
@@ -158,8 +163,7 @@ export default function HomeView() {
   const isRenaming = (kind: CtxTarget['kind'], id: string) => renaming?.kind === kind && renaming.id === id;
 
   const handleRename = (target: CtxTarget) => {
-    const pool = target.kind === 'journal' ? entries : target.kind === 'wiki' ? articles : operations;
-    const title = pool.find((item) => item.id === target.id)?.title;
+    const title = getEntry(target.id)?.title;
     setRenameValue(hasOwnTitle(title) ? title : '');
     setRenaming(target);
   };
@@ -188,7 +192,7 @@ export default function HomeView() {
     return (
       <DashboardItem
         key={id}
-        view={{ type: viewTypeForEntryType(kind), id, mode: 'view' }}
+        view={{ type: viewTypeForKind(kind), id, mode: 'view' }}
         layout={layout}
         editing={isRenaming(kind, id)}
         onContextMenu={(e) => openCtx(e, { kind, id })}
@@ -214,9 +218,9 @@ export default function HomeView() {
 
   const ctxActions = ctxMenu
     ? [
-        openInNewTabAction({ type: viewTypeForEntryType(ctxMenu.target.kind), id: ctxMenu.target.id, mode: 'view' }),
+        openInNewTabAction({ type: viewTypeForKind(ctxMenu.target.kind), id: ctxMenu.target.id, mode: 'view' }),
         { label: t('contextMenu.duplicate'), icon: <Copy size={12} />,   onClick: () => handleDuplicate(ctxMenu.target) },
-        saveAsTemplateAction(ctxMenu.target.kind, ctxMenu.target.id),
+        saveAsTemplateAction(ctxMenu.target.id),
         { label: t('contextMenu.rename'),    icon: <Pencil size={12} />, onClick: () => handleRename(ctxMenu.target) },
         { label: t('contextMenu.delete'),    icon: <Trash2 size={12} />, onClick: () => handleDelete(ctxMenu.target), danger: true },
       ]

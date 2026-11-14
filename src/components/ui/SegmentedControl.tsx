@@ -9,7 +9,7 @@ export interface SegmentOption<T extends string | number> {
 
 /**
  * A choice of a few options as segments on an inset track, the active one in
- * jade (`.prop-segments`): the entry type, the canvas editor's export dialog
+ * jade (`.prop-segments`): the module of an entry, the canvas editor's export dialog
  * and background panel. An option with an icon shows only the icon; one
  * without shows its label and takes the width it needs (`--label`).
  */

@@ -1,5 +1,5 @@
 import type Database from './sqlite';
-import type { EntryType } from '../types';
+import { jsonArray } from './row';
 import { decodeHtmlAttr, parseBlocks, serializeBlocks } from './blocks/blockHtml';
 import type { BlockRefRole } from './blocks/blockRefs';
 import type { BlockInstance } from './blocks/types';
@@ -23,8 +23,8 @@ export interface ImageUse {
   kind: 'entry' | 'template' | 'blockDefinition';
   id: string;
   title: string;
-  /** For an entry: its type, to open it. */
-  entryType?: EntryType;
+  /** For an entry: what its kind follows from (`entryKindOf`), to open it. */
+  entry?: { category_id: string | null; tags: string[] };
   role: ImageUseRole;
 }
 
@@ -41,7 +41,8 @@ interface RefRow {
   file: string;
   role: ImageUseRole;
   entry_id: string | null;
-  entry_type: EntryType | null;
+  entry_category: string | null;
+  entry_tags: string | null;
   entry_title: string | null;
   template_id: string | null;
   template_name: string | null;
@@ -61,7 +62,7 @@ export async function collectImageUses(db: Database): Promise<Map<string, ImageU
 
   const refs = await db.select<RefRow[]>(
     `SELECT r.target AS file, r.role,
-            e.id AS entry_id, e.type AS entry_type, e.title AS entry_title,
+            e.id AS entry_id, e.category_id AS entry_category, e.tags AS entry_tags, e.title AS entry_title,
             t.id AS template_id, t.name AS template_name
        FROM block_refs r
        JOIN blocks b ON b.row_id = r.block_row
@@ -71,7 +72,7 @@ export async function collectImageUses(db: Database): Promise<Map<string, ImageU
   );
   for (const ref of refs) {
     if (ref.entry_id) {
-      add(ref.file, { kind: 'entry', id: ref.entry_id, title: ref.entry_title ?? '', entryType: ref.entry_type ?? undefined, role: ref.role });
+      add(ref.file, { kind: 'entry', id: ref.entry_id, title: ref.entry_title ?? '', entry: { category_id: ref.entry_category, tags: jsonArray(ref.entry_tags) }, role: ref.role });
     } else if (ref.template_id) {
       add(ref.file, { kind: 'template', id: ref.template_id, title: ref.template_name ?? '', role: ref.role });
     }

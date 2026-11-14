@@ -177,8 +177,8 @@ async function assertConverged(...devices) {
 
 const entry_ = (d, id, n, fields = {}) => {
   d.run(
-    'INSERT INTO entries (id, type, title, entry_number, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)',
-    id, fields.type ?? 'journal', fields.title ?? '', n, NOW, NOW
+    'INSERT INTO entries (id, title, category_id, entry_number, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)',
+    id, fields.title ?? '', fields.category ?? null, n, NOW, NOW
   );
   if (fields.content) setStack(d, 'entries', id, fields.content);
 };
@@ -262,7 +262,7 @@ await test('foreign key actions travel', async () => {
   const [, a, b] = await pair();
   a.run("INSERT INTO tasks (id, title, created_at, updated_at) VALUES ('p', 'P', ?, ?)", NOW, NOW);
   a.run("INSERT INTO tasks (id, title, parent_task_id, created_at, updated_at) VALUES ('k', 'K', 'p', ?, ?)", NOW, NOW);
-  a.run("INSERT INTO task_links (id, task_id, target_id, target_type) VALUES ('l', 'p', 'x', 'journal')");
+  a.run("INSERT INTO task_links (id, task_id, target_id, target_type) VALUES ('l', 'p', 'x', 'entry')");
   a.run("INSERT INTO languages (id, name, created_at, updated_at) VALUES ('la', 'L', ?, ?)", NOW, NOW);
   a.run("INSERT INTO lexicon_entries (id, language_id, created_at, updated_at) VALUES ('w', 'la', ?, ?)", NOW, NOW);
   await assertConverged(a, b);
@@ -405,12 +405,45 @@ await test('same entry number: one moves on', async () => {
   assert.equal(new Set(numbers).size, 2);
 });
 
+await test('same entry number in a renumbering chain: every number stays unique', async () => {
+  const [, a, b] = await pair();
+  entry_(a, 'x5', 5);
+  entry_(b, 'y5', 5);
+  entry_(b, 'y6', 6);
+  await b.sync();
+  await a.sync();
+  await assertConverged(a, b);
+  const numbers = a.db.raw.prepare('SELECT entry_number n FROM entries ORDER BY n').all().map((r) => r.n);
+  assert.equal(new Set(numbers).size, 3);
+});
+
+await test('a start template deleted on one device, chosen on the other', async () => {
+  const [, a, b] = await pair();
+  a.run("INSERT INTO categories (id, name) VALUES ('c', 'Cat')");
+  a.run("INSERT INTO templates (id, name, created_at, updated_at) VALUES ('p', 'Tpl', ?, ?)", NOW, NOW);
+  await assertConverged(a, b);
+  a.run("DELETE FROM templates WHERE id = 'p'");
+  b.run("UPDATE categories SET template_id = 'p' WHERE id = 'c'");
+  await a.sync();
+  await assertConverged(a, b);
+  assert.equal(a.get("SELECT template_id FROM categories WHERE id = 'c'").template_id, null);
+});
+
+await test('a dashboard filter changed on one device reaches the other', async () => {
+  const [, a, b] = await pair();
+  a.run("INSERT INTO dashboards (id, builtin, filter, created_at, updated_at) VALUES ('wiki', 'wiki', '{}', ?, ?)", NOW, NOW);
+  await assertConverged(a, b);
+  b.run("UPDATE dashboards SET filter = ? WHERE id = 'wiki'", JSON.stringify({ categories: ['herbs'] }));
+  await assertConverged(a, b);
+  assert.equal(a.get("SELECT filter FROM dashboards WHERE id = 'wiki'").filter, JSON.stringify({ categories: ['herbs'] }));
+});
+
 await test('same task link: one survives', async () => {
   const [, a, b] = await pair();
   a.run("INSERT INTO tasks (id, title, created_at, updated_at) VALUES ('t', 'T', ?, ?)", NOW, NOW);
   await assertConverged(a, b);
-  a.run("INSERT INTO task_links (id, task_id, target_id, target_type) VALUES ('la', 't', 'x', 'journal')");
-  b.run("INSERT INTO task_links (id, task_id, target_id, target_type) VALUES ('lb', 't', 'x', 'journal')");
+  a.run("INSERT INTO task_links (id, task_id, target_id, target_type) VALUES ('la', 't', 'x', 'entry')");
+  b.run("INSERT INTO task_links (id, task_id, target_id, target_type) VALUES ('lb', 't', 'x', 'entry')");
   await a.sync();
   await assertConverged(a, b);
   assert.equal(a.get('SELECT count(*) c FROM task_links').c, 1);
@@ -419,7 +452,7 @@ await test('same task link: one survives', async () => {
 await test('moved into a category the other device deleted', async () => {
   const [, a, b] = await pair();
   a.run("INSERT INTO categories (id, name) VALUES ('c', 'Cat')");
-  entry_(a, 'e', 1, { type: 'wiki' });
+  entry_(a, 'e', 1);
   await assertConverged(a, b);
   a.run("DELETE FROM categories WHERE id = 'c'");
   b.run("UPDATE entries SET category_id = 'c' WHERE id = 'e'");
@@ -454,7 +487,7 @@ await test('a failed apply leaves log and rows as they were', async () => {
   const before = a.db.raw.prepare('SELECT * FROM _sync_log').all();
   const bad = [
     { table: 'tags', id: 't', op: 'upsert', changed: ['id', 'name'], row: { id: 't', name: 'n' } },
-    { table: 'entries', id: 'z', op: 'upsert', changed: ['id'], row: { id: 'z', type: 'not-a-type' } },
+    { table: 'entries', id: 'z', op: 'upsert', changed: ['id'], row: { id: 'z', created_at: null, updated_at: null } },
   ];
   await assert.rejects(applyRemoteChanges(a.db, bad, OPTIONS));
   assert.deepEqual(a.db.raw.prepare('SELECT * FROM _sync_log').all(), before);
@@ -466,7 +499,7 @@ console.log('Blocks');
 
 await test('blocks travel and arrive as rows, with what they point at', async () => {
   const [, a, b] = await pair();
-  const chip = '<span data-type="internalLink" class="internal-link" data-id="target" data-entry-type="wiki" data-label="T">T</span>';
+  const chip = '<span data-type="internalLink" class="internal-link" data-id="target" data-entry-type="entry" data-label="T">T</span>';
   const stack = `<section data-block="core.text" data-block-id="b1"><p>eins ${chip}</p></section>`
     + '<section data-block="core.fields" data-block-id="b2" data-block-config="{&quot;elements&quot;:[{&quot;id&quot;:&quot;n&quot;,&quot;kind&quot;:&quot;number&quot;,&quot;label&quot;:&quot;N&quot;}]}"'
     + ' data-block-data="{&quot;values&quot;:{&quot;n&quot;:5}}"><dl></dl></section>';
@@ -542,6 +575,21 @@ await test('starting over keeps what this device had not pushed', async () => {
   assert.equal(a.get("SELECT count(*) c FROM entries WHERE id IN ('new', 'gone')").c, 1);
 });
 
+await test('starting over keeps a new entry whose number the snapshot gave away', async () => {
+  const [server, a, b] = await pair();
+  await assertConverged(a, b);
+  entry_(a, 'theirs', 4, { content: '<p>a</p>' });
+  await a.sync();
+  entry_(b, 'mine', 4, { content: '<p>b</p>' });
+  const { changes } = await collectChanges(b.db);
+  await replaceWithSnapshot(b.db, await allFrames(a.db), changes, positionStatements({ cursor: server.log.length }));
+  b.cursor = server.log.length;
+  const numbers = b.db.raw.prepare('SELECT id, entry_number n FROM entries ORDER BY n').all().map((r) => `${r.id}:${r.n}`);
+  assert.deepEqual(numbers, ['theirs:4', 'mine:5']);
+  assert.equal(content_(b, 'mine'), '<p>b</p>');
+  await assertConverged(a, b);
+});
+
 await test('an entry the snapshot no longer has comes back with its blocks, whatever this device changed', async () => {
   const [server, a, b] = await pair();
   entry_(a, 'e', 1, { title: 'T', content: '<p>kept</p>' });
@@ -598,7 +646,7 @@ await test('a restore that stops halfway says so', async () => {
 await test('a child read after its parent frame loses nothing once the log arrives', async () => {
   const [server, a] = await pair();
   a.run("INSERT INTO categories (id, name) VALUES ('old', 'Old')");
-  entry_(a, 'e', 1, { type: 'wiki' });
+  entry_(a, 'e', 1);
   await a.sync();
   const frames = await allFrames(a.db);
   // Written while the snapshot was being read: the entry frame knows a category the categories frame does not.
@@ -795,10 +843,14 @@ async function randomRun(seed) {
     (d) => d.run('INSERT OR IGNORE INTO tags (id, name) VALUES (?, ?)', id('t'), `tag${r.int(4)}`),
     (d) => { const e = r.pick(ids(d, 'entries')); const t = r.pick(ids(d, 'tags')); if (e && t) d.run('UPDATE entries SET tags = ? WHERE id = ?', JSON.stringify([t]), e); },
     (d) => { const t = r.pick(ids(d, 'tags')); if (t) d.run('DELETE FROM tags WHERE id = ?', t); },
+    (d) => d.run('INSERT INTO templates (id, name, created_at, updated_at) VALUES (?, ?, ?, ?)', id('p'), 'tpl', NOW, NOW),
+    (d) => { const c = r.pick(ids(d, 'categories')); const p = r.pick(ids(d, 'templates')); if (c && p) d.run('UPDATE categories SET template_id = ? WHERE id = ?', p, c); },
+    (d) => { const p = r.pick(ids(d, 'templates')); if (p) d.run('DELETE FROM templates WHERE id = ?', p); },
+    (d) => { const c = r.pick(ids(d, 'categories')); const b = r.pick(ids(d, 'dashboards')); if (c && b) d.run('UPDATE dashboards SET filter = ? WHERE id = ?', JSON.stringify({ categories: [c] }), b); },
     (d) => d.run('INSERT INTO tasks (id, title, created_at, updated_at) VALUES (?, ?, ?, ?)', id('k'), 'task', NOW, NOW),
     (d) => { const k = r.pick(ids(d, 'tasks')); const p = r.pick(ids(d, 'tasks')); if (k && p && k !== p) d.run('UPDATE tasks SET parent_task_id = ? WHERE id = ?', p, k); },
     (d) => { const k = r.pick(ids(d, 'tasks')); if (k) d.run('DELETE FROM tasks WHERE id = ?', k); },
-    (d) => { const k = r.pick(ids(d, 'tasks')); if (k) d.run('INSERT OR IGNORE INTO task_links (id, task_id, target_id, target_type) VALUES (?, ?, ?, ?)', id('l'), k, `x${r.int(3)}`, 'journal'); },
+    (d) => { const k = r.pick(ids(d, 'tasks')); if (k) d.run('INSERT OR IGNORE INTO task_links (id, task_id, target_id, target_type) VALUES (?, ?, ?, ?)', id('l'), k, `x${r.int(3)}`, 'entry'); },
     (d) => d.run('INSERT INTO languages (id, name, created_at, updated_at) VALUES (?, ?, ?, ?)', id('la'), 'l', NOW, NOW),
     (d) => { const la = r.pick(ids(d, 'languages')); if (la) d.run('INSERT INTO lexicon_entries (id, language_id, created_at, updated_at) VALUES (?, ?, ?, ?)', id('w'), la, NOW, NOW); },
     (d) => { const la = r.pick(ids(d, 'languages')); if (la) d.run('DELETE FROM languages WHERE id = ?', la); },
@@ -810,7 +862,7 @@ async function randomRun(seed) {
     else r.pick(actions)(device);
   }
   await assertConverged(...devices);
-  const numbers = devices[0].db.raw.prepare('SELECT type, entry_number n, count(*) c FROM entries GROUP BY type, n HAVING c > 1').all();
+  const numbers = devices[0].db.raw.prepare('SELECT entry_number n, count(*) c FROM entries WHERE entry_number IS NOT NULL GROUP BY n HAVING c > 1').all();
   assert.deepEqual(numbers, [], `seed ${seed}: duplicate entry numbers`);
 }
 

@@ -9,6 +9,7 @@ import { CheckSquare, Square, Copy, Pencil, Trash2 } from 'lucide-react';
 import { useUIStore } from '../../store/uiStore';
 import { useSettingsStore } from '../../store/settingsStore';
 import { useEntryStore } from '../../store/entryStore';
+import { useDashboardEntries, useEntriesByKind } from '../../hooks/useDashboardEntries';
 import { useTaskStore } from '../../store/taskStore';
 import { useCategoryStore } from '../../store/categoryStore';
 import { useUndoStore } from '../../store/undoStore';
@@ -96,10 +97,12 @@ function toAllRows<T>(
 
 function AllList() {
   const { t } = useTranslation();
-  const journal = useJournalConfig();
+  // Every entry once, under the module it opens in — also one no dashboard shows.
+  const byKind = useEntriesByKind();
+  const journal = useJournalConfig(byKind.journal);
   const tasks = useTasksConfig();
-  const operations = useOperationsConfig();
-  const wiki = useWikiConfig();
+  const operations = useOperationsConfig(byKind.operation);
+  const wiki = useWikiConfig(byKind.wiki);
 
   const rows = [
     ...toAllRows('journal', t('nav.journal'), journal, (e) => e.updated_at),
@@ -130,15 +133,15 @@ function AllList() {
 }
 
 // ── Journal ──────────────────────────────────────────────────────────────────
-function useJournalConfig(): EntryListTabProps<Entry> {
+function useJournalConfig(entries: Entry[]): EntryListTabProps<Entry> {
   const { t } = useTranslation();
   const openInNewTabAction = useOpenInNewTabAction();
   const saveAsTemplateAction = useSaveAsTemplateAction();
   const { activeView, setActiveView, openViewInNewTab } = useUIStore(
     useShallow((s) => ({ activeView: s.activeView, setActiveView: s.setActiveView, openViewInNewTab: s.openViewInNewTab }))
   );
-  const { entries, duplicateEntry, updateEntry, deleteEntry, restoreEntry } = useEntryStore(
-    useShallow((s) => ({ entries: s.entries.journal, duplicateEntry: s.duplicateEntry, updateEntry: s.updateEntry, deleteEntry: s.deleteEntry, restoreEntry: s.restoreEntry }))
+  const { duplicateEntry, updateEntry, deleteEntry, restoreEntry } = useEntryStore(
+    useShallow((s) => ({ duplicateEntry: s.duplicateEntry, updateEntry: s.updateEntry, deleteEntry: s.deleteEntry, restoreEntry: s.restoreEntry }))
   );
   const pushUndo = useUndoStore((s) => s.push);
   const showMoonPhase = useSettingsStore((s) => s.settings.journal.moonPhase);
@@ -169,7 +172,7 @@ function useJournalConfig(): EntryListTabProps<Entry> {
     contextMenuActions: (e, startRename) => [
       openInNewTabAction({ type: 'journal', id: e.id, mode: 'view' }),
       { label: t('contextMenu.duplicate'), icon: <Copy size={12} />, onClick: () => handleDuplicate(e) },
-      saveAsTemplateAction('journal', e.id),
+      saveAsTemplateAction(e.id),
       { label: t('contextMenu.rename'), icon: <Pencil size={12} />, onClick: startRename },
       { label: t('contextMenu.delete'), icon: <Trash2 size={12} />, onClick: () => handleDelete(e), danger: true },
     ],
@@ -178,19 +181,19 @@ function useJournalConfig(): EntryListTabProps<Entry> {
 }
 
 function JournalList() {
-  return <EntryListTab {...useJournalConfig()} />;
+  return <EntryListTab {...useJournalConfig(useDashboardEntries('journal'))} />;
 }
 
 // ── Operations ───────────────────────────────────────────────────────────────
-function useOperationsConfig(): EntryListTabProps<Entry> {
+function useOperationsConfig(operations: Entry[]): EntryListTabProps<Entry> {
   const { t } = useTranslation();
   const openInNewTabAction = useOpenInNewTabAction();
   const saveAsTemplateAction = useSaveAsTemplateAction();
   const { activeView, setActiveView, openViewInNewTab } = useUIStore(
     useShallow((s) => ({ activeView: s.activeView, setActiveView: s.setActiveView, openViewInNewTab: s.openViewInNewTab }))
   );
-  const { operations, duplicateEntry, updateEntry, deleteEntry, restoreEntry } = useEntryStore(
-    useShallow((s) => ({ operations: s.entries.operation, duplicateEntry: s.duplicateEntry, updateEntry: s.updateEntry, deleteEntry: s.deleteEntry, restoreEntry: s.restoreEntry }))
+  const { duplicateEntry, updateEntry, deleteEntry, restoreEntry } = useEntryStore(
+    useShallow((s) => ({ duplicateEntry: s.duplicateEntry, updateEntry: s.updateEntry, deleteEntry: s.deleteEntry, restoreEntry: s.restoreEntry }))
   );
   const categories = useCategoryStore((s) => s.categories);
   const pushUndo = useUndoStore((s) => s.push);
@@ -236,7 +239,7 @@ function useOperationsConfig(): EntryListTabProps<Entry> {
     contextMenuActions: (op, startRename) => [
       openInNewTabAction({ type: 'operations', id: op.id, mode: 'view' }),
       { label: t('contextMenu.duplicate'), icon: <Copy size={12} />, onClick: () => handleDuplicate(op) },
-      saveAsTemplateAction('operation', op.id),
+      saveAsTemplateAction(op.id),
       { label: t('contextMenu.rename'), icon: <Pencil size={12} />, onClick: startRename },
       { label: t('contextMenu.delete'), icon: <Trash2 size={12} />, onClick: () => handleDelete(op), danger: true },
     ],
@@ -245,19 +248,19 @@ function useOperationsConfig(): EntryListTabProps<Entry> {
 }
 
 function OperationsList() {
-  return <EntryListTab {...useOperationsConfig()} />;
+  return <EntryListTab {...useOperationsConfig(useDashboardEntries('operations'))} />;
 }
 
 // ── Wiki ─────────────────────────────────────────────────────────────────────
-function useWikiConfig(): EntryListTabProps<Entry> {
+function useWikiConfig(articles: Entry[]): EntryListTabProps<Entry> {
   const { t } = useTranslation();
   const openInNewTabAction = useOpenInNewTabAction();
   const saveAsTemplateAction = useSaveAsTemplateAction();
   const { activeView, setActiveView, openViewInNewTab } = useUIStore(
     useShallow((s) => ({ activeView: s.activeView, setActiveView: s.setActiveView, openViewInNewTab: s.openViewInNewTab }))
   );
-  const { articles, duplicateEntry, updateEntry, deleteEntry, restoreEntry } = useEntryStore(
-    useShallow((s) => ({ articles: s.entries.wiki, duplicateEntry: s.duplicateEntry, updateEntry: s.updateEntry, deleteEntry: s.deleteEntry, restoreEntry: s.restoreEntry }))
+  const { duplicateEntry, updateEntry, deleteEntry, restoreEntry } = useEntryStore(
+    useShallow((s) => ({ duplicateEntry: s.duplicateEntry, updateEntry: s.updateEntry, deleteEntry: s.deleteEntry, restoreEntry: s.restoreEntry }))
   );
   const categories = useCategoryStore((s) => s.categories);
   const pushUndo = useUndoStore((s) => s.push);
@@ -303,7 +306,7 @@ function useWikiConfig(): EntryListTabProps<Entry> {
     contextMenuActions: (a, startRename) => [
       openInNewTabAction({ type: 'wiki', id: a.id, mode: 'view' }),
       { label: t('contextMenu.duplicate'), icon: <Copy size={12} />, onClick: () => handleDuplicate(a) },
-      saveAsTemplateAction('wiki', a.id),
+      saveAsTemplateAction(a.id),
       { label: t('contextMenu.rename'), icon: <Pencil size={12} />, onClick: startRename },
       { label: t('contextMenu.delete'), icon: <Trash2 size={12} />, onClick: () => handleDelete(a), danger: true },
     ],
@@ -312,7 +315,7 @@ function useWikiConfig(): EntryListTabProps<Entry> {
 }
 
 function WikiList() {
-  return <EntryListTab {...useWikiConfig()} />;
+  return <EntryListTab {...useWikiConfig(useDashboardEntries('wiki'))} />;
 }
 
 // ── Tasks ────────────────────────────────────────────────────────────────────

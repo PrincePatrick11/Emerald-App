@@ -22,7 +22,9 @@ import { useCategoryStore } from '../store/categoryStore';
 import { useTemplateStore } from '../store/templateStore';
 import i18n from '../i18n';
 import { buildLinkItems, linkItemKey, linkItemsByKey } from './linkItems';
-import { extractInternalLinks, remapInternalLinks } from './internalLinkHtml';
+import { extractInternalLinks, linkTargetKindOf, remapInternalLinks } from './internalLinkHtml';
+import { entriesByKindNow } from '../store/entryViews';
+import { startCategoryOf } from './createItem';
 import type { SuggestionItem } from '../components/editors/text/SuggestionList';
 import type { Category } from '../types';
 import type { WriteOptions } from './stamp';
@@ -34,11 +36,12 @@ import { prepareImageDataUrl } from './imageLimits';
 /** `buildLinkItems` over the current stores — the React-free variant of
  *  `useLinkItems`, for the import/export paths. */
 function linkItemsSnapshot(): SuggestionItem[] {
+  const byKind = entriesByKindNow();
   return buildLinkItems({
-    entries: useEntryStore.getState().entries.journal,
+    entries: byKind.journal,
     tasks: useTaskStore.getState().tasks,
-    operations: useEntryStore.getState().entries.operation,
-    articles: useEntryStore.getState().entries.wiki,
+    operations: byKind.operation,
+    articles: byKind.wiki,
     categories: useCategoryStore.getState().categories,
     showMoonPhase: useSettingsStore.getState().settings.journal.moonPhase,
   }, i18n.t);
@@ -95,7 +98,8 @@ function resolveImportedTarget(
   if (local) return { id: local.id, label: local.label };
   const title = manifestTitle || link.label;
   if (!title) return null;
-  const match = items.find((i) => i.entryType === link.entryType && i.label === title);
+  const kind = linkTargetKindOf(link.entryType);
+  const match = items.find((i) => linkTargetKindOf(i.entryType) === kind && i.label === title);
   return match ? { id: match.id, label: match.label } : null;
 }
 
@@ -187,58 +191,29 @@ export async function exportAsEmerald(): Promise<void> {
   // Right after startup the content of the open entry may still be pending.
   await useEntryStore.getState().ensureEntryContent(view.id);
 
-  const { journal: entries, wiki: articles, operation: operations } = useEntryStore.getState().entries;
-  const { categories }  = useCategoryStore.getState();
-  let content = '';
-  let title = '';
-  let createdAt = '';
-  let type: EmeraldFile['type'] = 'journal';
-  const meta: EmeraldMeta = {};
-
-  if (view.type === 'journal') {
-    const entry = entries.find(e => e.id === view.id);
-    if (!entry) return;
-    type      = 'journal';
-    title     = entry.title;
-    content   = entry.content || '';
-    createdAt = entry.created_at;
-
+  if (view.type !== 'journal' && view.type !== 'wiki' && view.type !== 'operations') return;
+  const entry = useEntryStore.getState().getEntry(view.id);
+  if (!entry) return;
+  // The file's type is the module it was exported from — on import it picks
+  // the category a file without one lands in.
+  const type: EmeraldFile['type'] = view.type;
+  const title = entry.title;
+  let content = entry.content || '';
+  const createdAt = entry.created_at;
+  const cat = useCategoryStore.getState().categories.find((c) => c.id === entry.category_id);
+  const meta: EmeraldMeta = {
     // For information only: the import recalculates the phase from `createdAt`.
-    meta.moonPhase = entryMoonPhase(entry, useSettingsStore.getState().settings.journal.moonPhase) ?? undefined;
-
-    meta.tags = liveTagNames(entry.tags);
-
-  } else if (view.type === 'wiki') {
-    const article = articles.find(a => a.id === view.id);
-    if (!article) return;
-    type      = 'wiki';
-    title     = article.title;
-    content   = article.content || '';
-    createdAt = article.created_at;
-
-    const cat = categories.find(c => c.id === article.category_id);
-    meta.categoryName     = categoryLabel(i18n.t, cat) || undefined;
-    meta.categoryEmoji    = cat?.emoji;
-    meta.icon             = article.icon ?? undefined;
-    meta.tags             = liveTagNames(article.tags);
-
-  } else if (view.type === 'operations') {
-    const op = operations.find(o => o.id === view.id);
-    if (!op) return;
-    type      = 'operations';
-    title     = op.title;
-    content   = op.content || '';
-    createdAt = op.created_at;
-
-    const cat = categories.find(c => c.id === op.category_id);
-    meta.categoryName   = categoryLabel(i18n.t, cat) || undefined;
-    meta.categoryEmoji  = cat?.emoji;
-    meta.icon      = op.icon ?? undefined;
-    meta.tags      = liveTagNames(op.tags);
-  }
+    moonPhase: entryMoonPhase(entry, useSettingsStore.getState().settings.journal.moonPhase) ?? undefined,
+    // A built-in by its stored name, the same in every vault — its label
+    // depends on the language and would create a new category elsewhere.
+    categoryName: (cat?.is_builtin ? cat.name : categoryLabel(i18n.t, cat)) || undefined,
+    categoryEmoji: cat?.emoji,
+    icon: entry.icon ?? undefined,
+    tags: liveTagNames(entry.tags),
+  };
 
   // A loaded, still concealed sigil does not leave — sigil blocks
-  // exist in every entry type. Before links, definitions and images, so that
+  // can stand in every entry. Before links, definitions and images, so that
   // the embedded drawing is missing too.
   content = withoutConcealed(content, todayIso());
 
@@ -409,13 +384,7 @@ export async function importFromEmerald(): Promise<void> {
 
   let newId: string;
   try {
-    if (file.type === 'journal') {
-      newId = await importJournalEntry(file, content, tagIds);
-    } else if (file.type === 'wiki') {
-      newId = await importWikiArticle(file, content, tagIds);
-    } else {
-      newId = await importOperationEntry(file, content, tagIds);
-    }
+    newId = await importEntryFile({ ...file, type: file.type }, content, tagIds);
   } catch (e) {
     await message(`Import failed: ${e}`, { title: 'Import', kind: 'error' });
     return;
@@ -527,12 +496,24 @@ function importedStamp(createdAt: string | undefined): WriteOptions {
   return { touch: createdAt ?? true };
 }
 
-async function importJournalEntry(file: EmeraldFile, content: string, tagIds: string[]): Promise<string> {
+/**
+ * An entry from a file: in the category the file names — found or created by
+ * name — else in the first category of the module it came from (the journal's
+ * for a journal file). The moon phase follows from the file's creation date
+ * (`entryMoonPhase`).
+ */
+async function importEntryFile(file: EmeraldFile & { type: EntryFileType }, content: string, tagIds: string[]): Promise<string> {
   const { createEntry, updateEntry } = useEntryStore.getState();
-  // The moon phase follows from the file's creation date (`entryMoonPhase`).
+  const categoryId = await ensureCategoryByName(file.meta.categoryName, file.meta.categoryEmoji)
+    ?? startCategoryOf(file.type);
   const createdAt = importedCreatedAt(file);
-  const entry = await createEntry('journal', { blank: true, createdAt });
-  await updateEntry(entry.id, { title: importedTitle(file), content, tags: tagIds }, importedStamp(createdAt));
+  const entry = await createEntry({ categoryId, blank: true, createdAt });
+  await updateEntry(entry.id, {
+    title: importedTitle(file),
+    content,
+    tags: tagIds,
+    icon: file.meta.icon ?? undefined,
+  }, importedStamp(createdAt));
   return entry.id;
 }
 
@@ -574,39 +555,6 @@ async function ensureCategoryByName(name: string | null | undefined, emoji = '�
   }
 }
 
-async function importWikiArticle(file: EmeraldFile, content: string, tagIds: string[]): Promise<string> {
-  const { createEntry, updateEntry } = useEntryStore.getState();
-
-  const categoryId = await ensureCategoryByName(file.meta.categoryName, file.meta.categoryEmoji ?? '📄');
-
-  const createdAt = importedCreatedAt(file);
-  const article = await createEntry('wiki', { categoryId, blank: true, createdAt });
-  await updateEntry(article.id, {
-    title: importedTitle(file),
-    content,
-    category_id: categoryId,
-    tags: tagIds,
-    icon: file.meta.icon ?? undefined,
-  }, importedStamp(createdAt));
-  return article.id;
-}
-
-async function importOperationEntry(file: EmeraldFile, content: string, tagIds: string[]): Promise<string> {
-  const { createEntry, updateEntry } = useEntryStore.getState();
-
-  const categoryId = await ensureCategoryByName(file.meta.categoryName, file.meta.categoryEmoji ?? '⚡');
-
-  const createdAt = importedCreatedAt(file);
-  const op = await createEntry('operation', { categoryId, blank: true, createdAt });
-  await updateEntry(op.id, {
-    title: importedTitle(file),
-    content,
-    category_id: categoryId,
-    tags: tagIds,
-    icon: file.meta.icon ?? undefined,
-  }, importedStamp(createdAt));
-  return op.id;
-}
 
 // ── Import from Markdown ─────────────────────────────────────────────────────
 
@@ -681,13 +629,7 @@ export async function importFromMarkdown(): Promise<void> {
 
   let newId: string;
   try {
-    if (type === 'journal') {
-      newId = await importJournalFromMarkdown(title, html, tagIds);
-    } else if (type === 'wiki') {
-      newId = await importWikiFromMarkdown(title, html, tagIds, frontMeta);
-    } else {
-      newId = await importOperationFromMarkdown(title, html, tagIds, frontMeta);
-    }
+    newId = await importMarkdownEntry(type, title, html, tagIds, frontMeta);
   } catch (e) {
     await message(`Import failed: ${e}`, { title: 'Import', kind: 'error' });
     return;
@@ -698,37 +640,19 @@ export async function importFromMarkdown(): Promise<void> {
   await message('Entry imported successfully!', { title: 'Import', kind: 'info' });
 }
 
-async function importJournalFromMarkdown(title: string, html: string, tagIds: string[]): Promise<string> {
+/**
+ * An entry from Markdown: in the category its front matter names, else in
+ * the first category of the chosen module. Without a date in the file it is
+ * created today — with today's moon phase if it lands in the journal.
+ */
+async function importMarkdownEntry(
+  type: EntryFileType, title: string, html: string, tagIds: string[],
+  meta: Record<string, string>,
+): Promise<string> {
   const { createEntry, updateEntry } = useEntryStore.getState();
-  // Without a date in the file the entry is created today — with today's moon phase.
-  const entry = await createEntry('journal', { blank: true });
+  const categoryName = meta['category'] ? stripIconPrefix(meta['category']) : null;
+  const categoryId = await ensureCategoryByName(categoryName) ?? startCategoryOf(type);
+  const entry = await createEntry({ categoryId, blank: true });
   await updateEntry(entry.id, { title, content: sanitizeImportedHtml(html), tags: tagIds });
   return entry.id;
-}
-async function importWikiFromMarkdown(
-  title: string, html: string, tagIds: string[],
-  meta: Record<string, string>,
-): Promise<string> {
-  const { createEntry, updateEntry } = useEntryStore.getState();
-
-  const categoryName = meta['category'] ? stripIconPrefix(meta['category']) : null;
-  const categoryId = await ensureCategoryByName(categoryName, '📄');
-
-  const article = await createEntry('wiki', { categoryId, blank: true });
-  await updateEntry(article.id, { title, content: sanitizeImportedHtml(html), category_id: categoryId, tags: tagIds });
-  return article.id;
-}
-
-async function importOperationFromMarkdown(
-  title: string, html: string, tagIds: string[],
-  meta: Record<string, string>,
-): Promise<string> {
-  const { createEntry, updateEntry } = useEntryStore.getState();
-
-  const categoryName = meta['category'] ? stripIconPrefix(meta['category']) : null;
-  const categoryId = await ensureCategoryByName(categoryName, '⚡');
-
-  const op = await createEntry('operation', { categoryId, blank: true });
-  await updateEntry(op.id, { title, content: sanitizeImportedHtml(html), category_id: categoryId, tags: tagIds });
-  return op.id;
 }

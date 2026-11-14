@@ -17,8 +17,8 @@
  */
 import type {
   Category,
+  Dashboard,
   Entry,
-  EntryType,
   Language,
   LexiconEntry,
   Tag,
@@ -29,8 +29,9 @@ import type {
 import {
   DEFAULT_DEFINITION_ICON, parseDefinitionDisplay, parseDefinitionElements, type BlockDefinition,
 } from './blocks/definitions';
-import { DEFAULT_TEMPLATE_ICON, parseAssignments, type Template } from './blocks/templates';
+import { DEFAULT_TEMPLATE_ICON, type Template } from './blocks/templates';
 import { DEFAULT_LANGUAGE_ICON, parseAlphabet } from './lexicon';
+import { isBuiltinDashboard, parseDashboardDisplay, parseDashboardFilter, parseDashboardSort } from './dashboards';
 
 /** A raw row as it comes from `db.select`. */
 export type DbRow = Record<string, unknown>;
@@ -81,9 +82,6 @@ const num = (v: unknown, fallback: number): number =>
 const nullableNum = (v: unknown): number | null =>
   v == null || Number.isNaN(Number(v)) ? null : Number(v);
 
-/** The column has a CHECK — anything else ends up in the journal instead of blowing up the list. */
-const entryType = (v: unknown): EntryType => (v === 'wiki' || v === 'operation' ? v : 'journal');
-
 /**
  * Callable as `rows.map(fromRow.entry)` — the mappers ignore the
  * extra arguments that `Array.map` passes.
@@ -92,7 +90,6 @@ export const fromRow = {
   entry(r: DbRow): Entry {
     return {
       id: str(r.id),
-      type: entryType(r.type),
       title: str(r.title),
       content: str(r.content),
       category_id: nullableStr(r.category_id),
@@ -129,6 +126,25 @@ export const fromRow = {
       emoji: str(r.emoji),
       sort_order: num(r.sort_order, 0),
       is_builtin: bool(r.is_builtin),
+      template_id: nullableStr(r.template_id),
+      deleted_at: nullableStr(r.deleted_at),
+    };
+  },
+
+  /** `filter`/`sort`/`display` are validated — the row can come from an import or another device. */
+  dashboard(r: DbRow): Dashboard {
+    return {
+      id: str(r.id),
+      // A built-in key counts only on its own row: another row naming it would take the module over.
+      builtin: isBuiltinDashboard(r.builtin) && r.id === r.builtin ? r.builtin : null,
+      name: str(r.name),
+      icon: str(r.icon),
+      position: num(r.position, 0),
+      filter: parseDashboardFilter(r.filter),
+      sort: parseDashboardSort(r.sort),
+      display: parseDashboardDisplay(r.display),
+      created_at: str(r.created_at),
+      updated_at: str(r.updated_at),
       deleted_at: nullableStr(r.deleted_at),
     };
   },
@@ -148,7 +164,6 @@ export const fromRow = {
     };
   },
 
-  /** `assignments` goes through `parseAssignments` — the row can come from an import. */
   template(r: DbRow): Template {
     return {
       id: str(r.id),
@@ -157,7 +172,6 @@ export const fromRow = {
       title: str(r.title),
       content: str(r.content),
       tags: jsonArray<unknown>(r.tags).filter((t): t is string => typeof t === 'string'),
-      assignments: parseAssignments(r.assignments),
       sort_order: num(r.sort_order, 0),
       created_at: str(r.created_at),
       updated_at: str(r.updated_at),
@@ -213,7 +227,7 @@ export const fromRow = {
       id: str(r.id),
       task_id: str(r.task_id),
       target_id: str(r.target_id),
-      target_type: r.target_type as TaskLink['target_type'],
+      target_type: r.target_type === 'task' ? 'task' : 'entry',
     };
   },
 };

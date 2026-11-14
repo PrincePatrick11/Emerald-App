@@ -9,7 +9,7 @@ import {
   requestEntryLinkAppend, requestEntryLinkRemove, requestEntryLinkReveal,
 } from '../../../lib/links';
 import { extractInternalLinks } from '../../../lib/internalLinkHtml';
-import { viewTypeForEntryType } from '../../../lib/modules';
+import { viewTypeForKind } from '../../../lib/modules';
 import { linkItemKey as itemKey, linkItemsByKey } from '../../../lib/linkItems';
 import {
   ENTRY_TYPE_ICONS,
@@ -91,13 +91,13 @@ function useRevealLink() {
   const setActiveView = useUIStore((s) => s.setActiveView);
   return (item: SuggestionItem) => {
     if (requestEntryLinkReveal(item)) return;
-    setActiveView({ type: viewTypeForEntryType(item.entryType), id: item.id, mode: 'view' });
+    setActiveView({ type: viewTypeForKind(item.entryType), id: item.id, mode: 'view' });
   };
 }
 
 /**
  * The links in the read view: a section with a counter, one row per link:
- * icon, title, and on the right the category (the entry type if there is no category).
+ * icon, title, and on the right the category (the module if there is no category).
  */
 export function LinkedEntriesSection({ content }: Props) {
   const { t } = useTranslation();

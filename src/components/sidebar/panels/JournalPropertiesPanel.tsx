@@ -1,9 +1,9 @@
 import { useTranslation } from 'react-i18next';
 import { useUIStore } from '../../../store/uiStore';
-import { useEntryStore } from '../../../store/entryStore';
+import { findEntry, useEntryStore } from '../../../store/entryStore';
 import TagsField from '../fields/TagsField';
 import LinkedEntriesField from '../fields/LinkedEntriesField';
-import EntryTypeField from '../fields/EntryTypeField';
+import EntryAreaField from '../fields/EntryAreaField';
 import EntryReadSections, { PropertiesSection } from '../fields/EntryReadSections';
 import { SidebarPropertyRow } from '../fields/SidebarSection';
 import { useSettingsStore } from '../../../store/settingsStore';
@@ -35,12 +35,11 @@ export default function JournalPropertiesPanel() {
   const { t } = useTranslation();
   const activeView = useUIStore((s) => s.activeView);
   const isEditing = activeView.mode === 'edit';
-  const entries = useEntryStore((s) => s.entries.journal);
+  const entry = useEntryStore((s) => (activeView.id ? findEntry(s.entries, activeView.id) : undefined));
   const updateEntry = useEntryStore((s) => s.updateEntry);
 
   const showMoonPhase = useSettingsStore((s) => s.settings.journal.moonPhase);
 
-  const entry = activeView.id ? entries.find((e) => e.id === activeView.id) : null;
 
   if (!entry) {
     return <p className="text-xs text-subtle px-2 py-3">{t('properties.noEntry')}</p>;
@@ -61,7 +60,7 @@ export default function JournalPropertiesPanel() {
   return (
     <>
       <PropertiesSection>
-        <EntryTypeField id={entry.id} type="journal" />
+        <EntryAreaField entry={entry} />
         {phase && <MoonPhaseRow phase={phase} />}
       </PropertiesSection>
       <LinkedEntriesField content={entry.content} />

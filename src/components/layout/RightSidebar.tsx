@@ -5,7 +5,7 @@ import { Pencil } from 'lucide-react';
 import { useUIStore } from '../../store/uiStore';
 import { findEntry, useEntryStore } from '../../store/entryStore';
 import type { ActiveView } from '../../types';
-import { entryTypeForView, LIBRARY_VIEW_IDS, moduleMeta, type ViewId } from '../../lib/modules';
+import { isEntryView, LIBRARY_VIEW_IDS, moduleMeta, type ViewId } from '../../lib/modules';
 import BlockSidebarArea, { BlockAddActions } from '../blocks/BlockSidebarArea';
 import JournalPropertiesPanel from '../sidebar/panels/JournalPropertiesPanel';
 import WikiPropertiesPanel from '../sidebar/panels/WikiPropertiesPanel';
@@ -48,8 +48,8 @@ function RightSidebarActionBar() {
   const editActions = useUIStore((s) => s.editActions);
   const editLocked = useUIStore((s) => s.editLocked);
   // The content of the open entry — for the lock of a loaded sigil.
-  const entryType = entryTypeForView(activeView.type);
-  const content = useEntryStore((s) => (entryType && activeView.id ? findEntry(s.entries, activeView.id, entryType)?.content : undefined));
+  const entryView = isEntryView(activeView.type);
+  const content = useEntryStore((s) => (entryView && activeView.id ? findEntry(s.entries, activeView.id)?.content : undefined));
 
   if (!activeView.id) return null;
   const isEditing = activeView.mode === 'edit';
@@ -72,7 +72,7 @@ function RightSidebarActionBar() {
   }
 
   // A loaded sigil with the "whole entry" lock cannot be edited — the
-  // charge decides, in every entry type. The button stays
+  // charge decides, in every entry. The button stays
   // and says why it does nothing.
   const locked = content !== undefined && !!entryBlockSummary(activeView.id, content).sigil?.lockEntry;
 

@@ -11,16 +11,17 @@ import type Database from './sqlite';
 /**
  * The oldest schema this version opens. Everything below came out of the old
  * migration chain (v1–v66), which is gone: such a vault is recognised and
- * refused, not changed (`VAULT_OUTDATED` in `db.ts`).
+ * refused, not changed (`VAULT_OUTDATED` in `db.ts`). So is v100, the first
+ * fresh schema, which still told entries apart by a type: it was never released.
  */
-export const FRESH_START_VERSION = 100;
+export const FRESH_START_VERSION = 101;
 
 /**
  * What a fresh vault is stamped with. Equals the last step in `MIGRATIONS`
  * (`FRESH_START_VERSION` while there is none); `db.ts` checks this at startup
  * so that a new migration step cannot be forgotten.
  */
-export const BASELINE_VERSION = 100;
+export const BASELINE_VERSION = 101;
 
 /**
  * Tables in dependency order: parents before children.
@@ -33,9 +34,11 @@ export const BASELINE_VERSION = 100;
 export const TABLES = [
   'schema_version',
   'tags',
-  'categories',
-  'block_definitions',
+  // Before `categories`: a category names its start template.
   'templates',
+  'categories',
+  'dashboards',
+  'block_definitions',
   'entries',
   'blocks',
   'block_refs',
@@ -67,12 +70,15 @@ export const TABLE_DDL: Record<TableName, string> = {
       deleted_at TEXT
     )`,
 
-  // One list for wiki, operations and tasks. Built in are `sigils` and
-  // `altars` (`BUILTIN_CATEGORIES`), whose new operations start with their
-  // templates. Everything else is created by the user; uniqueness of names is checked by the store
+  // One list for entries and tasks; an entry has at most one. Built in are
+  // `journal`, `sigils` and `altars` (`BUILTIN_CATEGORIES`). Everything else is
+  // created by the user; uniqueness of names is checked by the store
   // (categoryKey), not the database — a UNIQUE index would block
   // restoring from the trash as soon as an active category
   // of the same name exists.
+  // `template_id`: the template a new entry of the category starts with
+  // (`resolveStartTemplate`); without one — or with one in the trash — the
+  // vault's default template applies (setting `templates.defaultTemplateId`).
   categories: `
     CREATE TABLE categories (
       id TEXT PRIMARY KEY,
@@ -80,6 +86,27 @@ export const TABLE_DDL: Record<TableName, string> = {
       emoji TEXT NOT NULL DEFAULT '📁',
       sort_order INTEGER NOT NULL DEFAULT 0,
       is_builtin INTEGER NOT NULL DEFAULT 0,
+      template_id TEXT REFERENCES templates(id) ON DELETE SET NULL,
+      deleted_at TEXT
+    )`,
+
+  // Views over entries by filter rules (`lib/dashboards.ts`). The built-in
+  // ones carry their key in `builtin` and as ID (`BUILTIN_DASHBOARDS`), so
+  // that devices seeded apart mean the same rows. `filter`, `sort` and
+  // `display` are JSON. The category IDs in `filter` have no foreign key:
+  // `reassignCategoryContent` drops or moves them with the category.
+  dashboards: `
+    CREATE TABLE dashboards (
+      id TEXT PRIMARY KEY,
+      builtin TEXT,
+      name TEXT NOT NULL DEFAULT '',
+      icon TEXT NOT NULL DEFAULT '',
+      position INTEGER NOT NULL DEFAULT 0,
+      filter TEXT NOT NULL DEFAULT '{}',
+      sort TEXT NOT NULL DEFAULT '{}',
+      display TEXT NOT NULL DEFAULT '{}',
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
       deleted_at TEXT
     )`,
 
@@ -107,9 +134,7 @@ export const TABLE_DDL: Record<TableName, string> = {
   // tags that an entry receives as a copy on creation or insertion. The block
   // stack is in `blocks`. Like
   // `block_definitions` without a foreign key — entries remember nothing of it.
-  // `assignments` is JSON (lib/blocks/templates.ts): which entry kind × category
-  // starts with the template; the category IDs in it are cleaned up by
-  // `dropCategoryFromTemplates` when a category is permanently deleted.
+  // Which categories start with it is said by the category (`template_id`).
   // The icon default is `DEFAULT_TEMPLATE_ICON`.
   templates: `
     CREATE TABLE templates (
@@ -118,26 +143,23 @@ export const TABLE_DDL: Record<TableName, string> = {
       icon TEXT NOT NULL DEFAULT '📄',
       title TEXT NOT NULL DEFAULT '',
       tags TEXT NOT NULL DEFAULT '[]',
-      assignments TEXT NOT NULL DEFAULT '[]',
       sort_order INTEGER NOT NULL DEFAULT 0,
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL,
       deleted_at TEXT
     )`,
 
-  // Journal entries, wiki articles and operations in one table. What
-  // distinguishes them is in their blocks (rows of `blocks`), not in columns:
-  // `type` only says in which module the entry lives. A type change is
-  // therefore an UPDATE (`entryTypeChange`).
-  // - `category_id`: the journal has no categories; store and type change
-  //   keep it NULL there.
-  // - `entry_number` counts per type (`nextEntryNumber`).
-  // - The moon phase of a journal entry follows from `created_at`
-  //   (`entryMoonPhase`), it is not a column.
+  // All entries in one table, without a type: what an entry is follows from
+  // its category, which dashboards show it (`lib/dashboards.ts`) and its
+  // blocks (rows of `blocks`).
+  // - `category_id`: at most one category, NULL for none.
+  // - `entry_number` runs over all entries (`nextEntryNumber`), unique
+  //   (`idx_entries_number`).
+  // - The moon phase of an entry of the category Journal follows from
+  //   `created_at` (`entryMoonPhase`), it is not a column.
   entries: `
     CREATE TABLE entries (
       id TEXT PRIMARY KEY,
-      type TEXT NOT NULL CHECK (type IN ('journal', 'wiki', 'operation')),
       title TEXT NOT NULL DEFAULT '',
       category_id TEXT REFERENCES categories(id) ON DELETE RESTRICT,
       entry_number INTEGER,
@@ -210,13 +232,14 @@ export const TABLE_DDL: Record<TableName, string> = {
       deleted_at TEXT
     )`,
 
-  // target_id is polymorphic — no foreign key possible; checkIntegrity() checks the relationship.
+  // target_id is polymorphic — an entry or a task, `target_type` says which;
+  // no foreign key possible; checkIntegrity() checks the relationship.
   task_links: `
     CREATE TABLE task_links (
       id TEXT PRIMARY KEY,
       task_id TEXT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
       target_id TEXT NOT NULL,
-      target_type TEXT NOT NULL,
+      target_type TEXT NOT NULL CHECK (target_type IN ('entry', 'task')),
       UNIQUE (task_id, target_id, target_type)
     )`,
 
@@ -290,8 +313,8 @@ export const TABLE_DDL: Record<TableName, string> = {
 };
 
 /**
- * The indexes of `entries`. `type` together with `deleted_at`, because every module
- * loads its live entries that way.
+ * The indexes of `entries`. `idx_entries_number` keeps the running number
+ * unique (it allows any number of NULLs).
  *
  * `idx_entries_list` carries every column that the lists read at startup
  * (`fetchEntries`, first stage), and the tags (`rewriteTagRefs` on open):
@@ -304,9 +327,9 @@ export const TABLE_DDL: Record<TableName, string> = {
  * condition in its WHERE.
  */
 const ENTRIES_INDEX_DDL: readonly string[] = [
-  'CREATE INDEX idx_entries_type ON entries(type, deleted_at)',
   'CREATE INDEX idx_entries_category ON entries(category_id)',
-  'CREATE INDEX idx_entries_list ON entries(deleted_at, type, title, category_id, entry_number, tags, created_at, updated_at, id)',
+  'CREATE UNIQUE INDEX idx_entries_number ON entries(entry_number)',
+  'CREATE INDEX idx_entries_list ON entries(deleted_at, title, category_id, entry_number, tags, created_at, updated_at, id)',
   'CREATE INDEX idx_entries_decorated ON entries(deleted_at) WHERE icon IS NOT NULL OR cover_image IS NOT NULL',
 ];
 
@@ -322,7 +345,8 @@ export const INDEX_DDL: readonly string[] = [
   'CREATE INDEX idx_task_links_target ON task_links(target_id)',
   'CREATE INDEX idx_tasks_category ON tasks(category_id)',
   'CREATE INDEX idx_tasks_parent ON tasks(parent_task_id)',
-  ...(['tags', 'categories', 'tasks', 'block_definitions', 'templates', 'languages', 'images'] as const)
+  'CREATE INDEX idx_categories_template ON categories(template_id)',
+  ...(['tags', 'categories', 'dashboards', 'tasks', 'block_definitions', 'templates', 'languages', 'images'] as const)
     .map((t) => `CREATE INDEX idx_${t}_deleted ON ${t}(deleted_at)`),
   'CREATE INDEX idx_lexicon_entries_language ON lexicon_entries(language_id)',
   ...ENTRIES_INDEX_DDL,
@@ -331,18 +355,24 @@ export const INDEX_DDL: readonly string[] = [
   'CREATE INDEX idx_block_refs_target ON block_refs(target_kind, target)',
 ];
 
+
 /**
- * Built in. A new operation in it starts with the sigil blocks, via the
- * built-in template `core-sigil`, which is the default there (and which the
- * user can change or delete). For articles and tasks it is a category like
- * any other.
+ * Built in: the journal. A dashboard of the same name shows it, and the moon
+ * phase belongs to its entries (`entryMoonPhase`).
+ */
+export const JOURNAL_CATEGORY_ID = 'journal';
+
+/**
+ * Built in. A new entry in it starts with the sigil blocks, via the
+ * built-in template `core-sigil` as its start template (which the user can
+ * change or delete).
  */
 export const SIGIL_CATEGORY_ID = 'sigils';
 
 /**
- * Built in: a new operation in it starts with an altar and a text
+ * Built in: a new entry in it starts with an altar and a text
  * for notes, via the built-in template `core-altar`. An altar is an
- * operation of this category, not a module of its own.
+ * entry of this category, not a module of its own.
  */
 export const ALTAR_CATEGORY_ID = 'altars';
 
@@ -356,6 +386,7 @@ export const ALTAR_LIBRARY_TAG_NAME = 'Altar Library';
 
 /** [id, name (database only — `categories.builtin.<id>` is displayed), emoji]. */
 export const BUILTIN_CATEGORIES: readonly [string, string, string][] = [
+  [JOURNAL_CATEGORY_ID, 'Journal', '📓'],
   [SIGIL_CATEGORY_ID, 'Sigils', '🔯'],
   [ALTAR_CATEGORY_ID, 'Altars', '🪔'],
 ];
@@ -376,7 +407,24 @@ export const STARTER_CATEGORIES: readonly [string, string][] = [
   ['tools', '⚗️'],
 ];
 
-/** The content tables with `category_id` (wiki and operations are in `entries`). A literal, because it is interpolated into SQL. */
+/**
+ * The built-in dashboards of a fresh vault, in the order of the rail: key
+ * (= ID), the categories their filter starts with, and their order. "All
+ * entries" has no filter, so that no entry can become unfindable. Renaming
+ * and changing the filters is the user's business afterwards.
+ */
+export const BUILTIN_DASHBOARDS: readonly {
+  key: 'all' | 'journal' | 'operations' | 'wiki';
+  categories: readonly string[] | null;
+  sort: { by: 'created' | 'title' | 'updated'; dir: 'asc' | 'desc' };
+}[] = [
+  { key: 'all', categories: null, sort: { by: 'updated', dir: 'desc' } },
+  { key: 'journal', categories: [JOURNAL_CATEGORY_ID], sort: { by: 'created', dir: 'desc' } },
+  { key: 'operations', categories: [SIGIL_CATEGORY_ID, ALTAR_CATEGORY_ID, 'ritual', 'meditation'], sort: { by: 'updated', dir: 'desc' } },
+  { key: 'wiki', categories: ['paradigm', 'herbs', 'crystals', 'candles', 'deities', 'tools'], sort: { by: 'title', dir: 'asc' } },
+];
+
+/** The content tables with `category_id`. A literal, because it is interpolated into SQL. */
 export const CATEGORIZED_TABLES = ['entries', 'tasks'] as const;
 
 /** Creates tables and indexes. The order follows TABLES. */
@@ -389,44 +437,36 @@ export async function createSchema(db: Database): Promise<void> {
   }
 }
 
-/** A category row as `seedBuiltins` writes it. */
-interface CategorySeedRow {
-  id: string;
-  name: string;
-  emoji: string;
-  sort_order: number;
-  is_builtin: boolean;
-  deleted_at: string | null;
-}
-
-async function insertCategoryRows(db: Database, rows: readonly CategorySeedRow[]): Promise<void> {
-  for (const row of rows) {
-    await db.execute(
-      'INSERT INTO categories (id, name, emoji, sort_order, is_builtin, deleted_at) VALUES ($1,$2,$3,$4,$5,$6)',
-      [row.id, row.name, row.emoji, row.sort_order, row.is_builtin ? 1 : 0, row.deleted_at]
-    );
-  }
-}
-
 /**
- * Creates the built-in categories and the starter set. Only for fresh
- * vaults. `starterName` translates a STARTER_CATEGORIES key into the
- * app language — the caller passes `i18n.t` through so that this file stays free of
- * i18n.
+ * Creates the built-in categories, the starter set and the built-in
+ * dashboards. Only for fresh vaults. `starterName` translates a
+ * STARTER_CATEGORIES key into the app language — the caller passes `i18n.t`
+ * through so that this file stays free of i18n. The start templates of
+ * `sigils` and `altars` are set by their seeds (`lib/templateRows.ts`).
  */
 export async function seedBuiltins(
   db: Database,
   starterName: (key: string) => string
 ): Promise<void> {
-  const rows: CategorySeedRow[] = [
-    ...BUILTIN_CATEGORIES.map(([id, name, emoji]) => ({
-      id, name, emoji, is_builtin: true,
-    })),
-    ...STARTER_CATEGORIES.map(([key, emoji]) => ({
-      id: key, name: starterName(key), emoji, is_builtin: false,
-    })),
-  ].map((row, i) => ({ ...row, sort_order: i, deleted_at: null }));
-  await insertCategoryRows(db, rows);
+  const rows = [
+    ...BUILTIN_CATEGORIES.map(([id, name, emoji]) => ({ id, name, emoji, is_builtin: 1 })),
+    ...STARTER_CATEGORIES.map(([key, emoji]) => ({ id: key, name: starterName(key), emoji, is_builtin: 0 })),
+  ];
+  for (const [i, row] of rows.entries()) {
+    await db.execute(
+      'INSERT INTO categories (id, name, emoji, sort_order, is_builtin) VALUES ($1,$2,$3,$4,$5)',
+      [row.id, row.name, row.emoji, i, row.is_builtin]
+    );
+  }
+  const now = new Date().toISOString();
+  for (const [i, dashboard] of BUILTIN_DASHBOARDS.entries()) {
+    const filter = dashboard.categories ? { categories: [...dashboard.categories] } : {};
+    await db.execute(
+      `INSERT INTO dashboards (id, builtin, position, filter, sort, created_at, updated_at)
+       VALUES ($1,$2,$3,$4,$5,$6,$6)`,
+      [dashboard.key, dashboard.key, i, JSON.stringify(filter), JSON.stringify(dashboard.sort), now]
+    );
+  }
 }
 
 /** Delete permanently: first detach the contents (ON DELETE RESTRICT), then the row. */
@@ -440,12 +480,13 @@ export async function purgeCategory(db: Database, categoryId: string): Promise<v
  * were. To be called **before** every permanent deletion of a category: ON
  * DELETE RESTRICT makes the delete fail otherwise, and this ensures that
  * deleting is allowed without any content disappearing — the contents simply
- * become categoryless, the same as a new entry is anyway. It also removes the
- * category from the templates' assignments (`dropCategoryFromTemplates`) —
- * both cleanup jobs belong to the same permanent deletion.
+ * become categoryless. It also takes the category out of every dashboard's
+ * filter (`dropCategoryFromDashboards`) — both cleanup jobs belong to the
+ * same permanent deletion.
  *
  * With `to` the contents move into that category instead — when a
- * restored one merges into the one of the same name (`categoryStore.restoreCategory`).
+ * restored one merges into the one of the same name (`categoryStore.restoreCategory`)
+ * — and the dashboards name `to` where they named it.
  */
 export async function reassignCategoryContent(db: Database, categoryId: string, to: string | null = null): Promise<number> {
   let moved = 0;
@@ -456,10 +497,7 @@ export async function reassignCategoryContent(db: Database, categoryId: string, 
     );
     moved += result.rowsAffected ?? 0;
   }
-  // Templates do not count — they are not contents. On merging
-  // their assignments move along, otherwise they are removed.
-  if (to) await moveCategoryInTemplates(db, categoryId, to);
-  else await dropCategoryFromTemplates(db, categoryId);
+  await replaceCategoryInDashboards(db, categoryId, to);
   return moved;
 }
 
@@ -473,8 +511,8 @@ export interface Orphan {
 
 /**
  * Checks the relationships for which no foreign key can be declared: the
- * polymorphic `task_links`, the category IDs in the templates' JSON and the
- * tag IDs in entries and templates. Foreign keys cover the rest, which
+ * polymorphic `task_links`, the category IDs in the dashboards' filters and
+ * the tag IDs in entries and templates. Foreign keys cover the rest, which
  * `PRAGMA foreign_key_check` checks.
  *
  * Intended only for verification and diagnosis, not for the production path —
@@ -483,12 +521,9 @@ export interface Orphan {
 export async function checkIntegrity(db: Database): Promise<Orphan[]> {
   const orphans: Orphan[] = [];
 
-  // Polymorphic targets: the *_type field decides where the target is. The three
-  // entry kinds are in `entries` and must carry the type there too.
+  // Polymorphic targets: the *_type field decides where the target is.
   const contentTargets: Record<string, string> = {
-    journal: "SELECT id FROM entries WHERE type = 'journal'",
-    wiki: "SELECT id FROM entries WHERE type = 'wiki'",
-    operation: "SELECT id FROM entries WHERE type = 'operation'",
+    entry: 'SELECT id FROM entries',
     task: 'SELECT id FROM tasks',
   };
 
@@ -509,18 +544,18 @@ export async function checkIntegrity(db: Database): Promise<Orphan[]> {
     return new Set(rows.map((r) => r.id));
   };
 
-  // Category IDs in the templates' assignments.
+  // Category IDs in the dashboards' filters.
   const categoryIds = await idsOf('categories');
-  const templates = await db.select<{ id: string; assignments: string | null }[]>('SELECT id, assignments FROM templates');
-  for (const r of templates) {
-    const assignments = rawAssignments(r.assignments);
-    if (!assignments) {
-      orphans.push({ table: 'templates', column: 'assignments', id: r.id, missingTarget: '(invalid JSON)' });
+  const dashboards = await db.select<{ id: string; filter: string | null }[]>('SELECT id, filter FROM dashboards');
+  for (const r of dashboards) {
+    const filter = rawFilter(r.filter);
+    if (!filter) {
+      orphans.push({ table: 'dashboards', column: 'filter', id: r.id, missingTarget: '(invalid JSON)' });
       continue;
     }
-    for (const category of assignments.map(assignedCategory)) {
-      if (category !== null && !categoryIds.has(category)) {
-        orphans.push({ table: 'templates', column: 'assignments', id: r.id, missingTarget: `categories.${category}` });
+    for (const category of filterCategories(filter)) {
+      if (!categoryIds.has(category)) {
+        orphans.push({ table: 'dashboards', column: 'filter', id: r.id, missingTarget: `categories.${category}` });
       }
     }
   }
@@ -541,11 +576,6 @@ export async function checkIntegrity(db: Database): Promise<Orphan[]> {
   return orphans;
 }
 
-/** The raw `assignments` JSON of a template row as a list — `null` if it is not one. */
-function rawAssignments(json: string | null): unknown[] | null {
-  return rawJsonList(json);
-}
-
 /** A JSON array from a column — `null` if it is not one. */
 function rawJsonList(json: string | null): unknown[] | null {
   try {
@@ -556,58 +586,43 @@ function rawJsonList(json: string | null): unknown[] | null {
   }
 }
 
-/**
- * The category ID of a raw assignment — `null` for "all" (`'*'`) and "no
- * category". The same rule as `assignedCategoryId` in
- * `lib/blocks/templates.ts`, which this file does not import.
- */
-function assignedCategory(a: unknown): string | null {
-  const category = (a as { category?: unknown } | null)?.category;
-  return typeof category === 'string' && category !== '*' ? category : null;
-}
-
-/**
- * Removes a category from the assignments of all templates — including those in the
- * trash. `reassignCategoryContent` calls it on permanent deletion of a
- * category; do not call it in addition. Templates have no
- * foreign key that would enforce this, and an assignment pointing nowhere would apply
- * the template to a combination that no longer exists.
- */
-export async function dropCategoryFromTemplates(db: Database, categoryId: string): Promise<void> {
-  const rows = await db.select<{ id: string; assignments: string | null }[]>(
-    'SELECT id, assignments FROM templates WHERE instr(assignments, $1) > 0',
-    [categoryId]
-  );
-  for (const row of rows) {
-    const assignments = rawAssignments(row.assignments);
-    if (!assignments) continue;
-    const kept = assignments.filter((a) => assignedCategory(a) !== categoryId);
-    if (kept.length === assignments.length) continue;
-    await db.execute('UPDATE templates SET assignments=$1 WHERE id=$2', [JSON.stringify(kept), row.id]);
+/** The raw `filter` JSON of a dashboard row as an object — `null` if it is not one. */
+function rawFilter(json: string | null): Record<string, unknown> | null {
+  try {
+    const parsed: unknown = JSON.parse(json ?? '{}');
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed as Record<string, unknown> : null;
+  } catch {
+    return null;
   }
 }
 
 /**
- * Re-attaches the assignments on `from` to `to` — when a category merges into
- * the one of the same name. A combination already held stays with its holder.
+ * The category IDs of a raw filter. The same reading as `parseDashboardFilter`
+ * in `lib/dashboards.ts`, which this file does not import.
  */
-async function moveCategoryInTemplates(db: Database, from: string, to: string): Promise<void> {
-  const rows = await db.select<{ id: string; assignments: string | null }[]>('SELECT id, assignments FROM templates');
-  const parsed = rows.map((row) => ({ id: row.id, assignments: rawAssignments(row.assignments) }));
-  const entryTypeOf = (a: unknown) => String((a as { entryType?: unknown } | null)?.entryType);
-  const held = new Set(parsed.flatMap(({ assignments }) =>
-    (assignments ?? []).filter((a) => assignedCategory(a) === to).map(entryTypeOf)));
-  for (const { id, assignments } of parsed) {
-    if (!assignments?.some((a) => assignedCategory(a) === from)) continue;
-    const next: unknown[] = [];
-    for (const a of assignments) {
-      if (assignedCategory(a) !== from) { next.push(a); continue; }
-      const entryType = entryTypeOf(a);
-      if (held.has(entryType)) continue;
-      held.add(entryType);
-      next.push({ ...(a as object), category: to });
-    }
-    await db.execute('UPDATE templates SET assignments=$1 WHERE id=$2', [JSON.stringify(next), id]);
+function filterCategories(filter: Record<string, unknown>): string[] {
+  const categories = filter.categories;
+  return Array.isArray(categories) ? categories.filter((c): c is string => typeof c === 'string') : [];
+}
+
+/**
+ * Replaces category `from` in every dashboard's filter by `to`, or drops it
+ * (`to` null) — the trash included. `reassignCategoryContent` calls it; do
+ * not call it in addition. A filter naming a category that no longer exists
+ * would match nothing, and one naming it twice after a merge would be noise.
+ */
+async function replaceCategoryInDashboards(db: Database, from: string, to: string | null): Promise<void> {
+  const rows = await db.select<{ id: string; filter: string | null }[]>(
+    'SELECT id, filter FROM dashboards WHERE instr(filter, $1) > 0',
+    [from]
+  );
+  for (const row of rows) {
+    const filter = rawFilter(row.filter);
+    if (!filter || !Array.isArray(filter.categories)) continue;
+    const categories = filterCategories(filter);
+    if (!categories.includes(from)) continue;
+    const next = [...new Set(categories.map((c) => (c === from ? to : c)).filter((c): c is string => c !== null))];
+    await db.execute('UPDATE dashboards SET filter=$1 WHERE id=$2', [JSON.stringify({ ...filter, categories: next }), row.id]);
   }
 }
 

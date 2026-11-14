@@ -1,42 +1,53 @@
 import type { TrashKind, ViewId } from '../lib/modules';
 
-export type ContentType = 'journal' | 'wiki' | 'operation' | 'task';
+/**
+ * The kind of an entry as the modules show it — journal, wiki or operation.
+ * Not stored: an entry has no kind of its own, it follows from which
+ * built-in dashboard's filter its category falls into (`entryKindOf`,
+ * `lib/dashboards.ts`). Keys the per-kind texts and icons (untitled title,
+ * fallback emoji, trash groups, search hits).
+ */
+export type EntryKind = 'journal' | 'wiki' | 'operation';
 
-/** The entry kinds of the `entries` table — the modules with a block stack. */
-export type EntryType = 'journal' | 'wiki' | 'operation';
+/** An entry kind or a task — what lists, search hits and link chips show. */
+export type ContentType = EntryKind | 'task';
 
 /**
- * An entry from `entries` — journal, wiki or operation. What sets the three
- * apart lives in the content (blocks); `type` only says which module it
- * belongs to, and a type change changes exactly that (`entryTypeChange`).
+ * What a link points at (`task_links.target_type`, the chip's
+ * `data-entry-type`, drag payloads): an entry — of whatever kind — or a task.
+ */
+export type LinkTargetKind = 'entry' | 'task';
+
+/**
+ * An entry from `entries`. It has no type: what it is follows from its
+ * category, which dashboards show it and with which template it started.
  *
- * The moon phase of a journal entry follows from `created_at`
- * (`entryMoonPhase`); status, sigils, paradigm, banishing, meditation and the
- * linked entries have been blocks or link chips in the content since v36–v42.
+ * The moon phase of an entry of the category Journal follows from
+ * `created_at` (`entryMoonPhase`).
  */
 export interface Entry {
   id: string;
-  type: EntryType;
   title: string;
   content: string; // HTML, as TipTap's getHTML() returns it
-  /** `null` = no category, the normal case for a new entry since v39 — always in the journal. */
+  /** At most one category; `null` = none. */
   category_id: string | null;
   created_at: string;
   updated_at: string;
   /** Tag IDs (`lib/tagRefs.ts`) — those of tags in the trash stay in place, invisible. */
   tags: string[];
   deleted_at: string | null;
+  /** Running number over all entries, unique. */
   entry_number?: number;
-  /** Custom icon (emoji or image) — wiki and operations only. */
+  /** Custom icon (emoji or image). */
   icon?: string;
-  /** Cover image — wiki and operations only. */
+  /** Cover image. */
   cover_image?: string;
 }
 
 /**
- * A row of the global `categories` table — the same list for wiki,
- * operations and tasks. `is_builtin` applies only to `other`
- * and `sigils`; the display name goes through `lib/categories.categoryLabel`.
+ * A row of the global `categories` table — one list for entries and tasks.
+ * `is_builtin` holds for `journal`, `sigils` and `altars`; the display name
+ * goes through `lib/categories.categoryLabel`.
  */
 export interface Category {
   id: string;
@@ -44,6 +55,44 @@ export interface Category {
   emoji: string;
   sort_order: number;
   is_builtin: boolean;
+  /** The template a new entry of this category starts with — `null`: the vault's default. */
+  template_id: string | null;
+  deleted_at: string | null;
+}
+
+/** Which entries a dashboard shows. A missing key does not narrow. */
+export interface DashboardFilter {
+  /** The entry's category is one of these. */
+  categories?: string[];
+  /** The entry carries at least one of these tags. */
+  tags?: string[];
+}
+
+export interface DashboardSort {
+  by: 'created' | 'title' | 'updated';
+  dir: 'asc' | 'desc';
+}
+
+/** The key of a built-in dashboard — at the same time its fixed ID. */
+export type BuiltinDashboard = 'all' | 'journal' | 'wiki' | 'operations';
+
+/**
+ * A row of `dashboards`: a view over entries by filter rules. The built-in
+ * ones carry their key in `builtin` and as ID; an empty `name` shows the
+ * translated name of the built-in.
+ */
+export interface Dashboard {
+  id: string;
+  builtin: BuiltinDashboard | null;
+  name: string;
+  icon: string;
+  position: number;
+  filter: DashboardFilter;
+  sort: DashboardSort;
+  /** How the dashboard draws its entries — empty until dashboards can be built. */
+  display: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
   deleted_at: string | null;
 }
 
@@ -94,7 +143,7 @@ export interface TaskLink {
   id: string;
   task_id: string;
   target_id: string;
-  target_type: ContentType;
+  target_type: LinkTargetKind;
 }
 
 export interface Task {

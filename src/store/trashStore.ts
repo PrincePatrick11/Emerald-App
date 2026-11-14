@@ -4,13 +4,16 @@ import { removeUnusedFiles, useImageStore } from './imageStore';
 import { purgeCategory } from '../lib/schema';
 import { trashWiring } from './moduleWiring';
 import { useTagStore } from './tagStore';
+import { useSettingsStore } from './settingsStore';
 import { selectTrashedTaskRoots } from './taskStore';
 import { reassignCategoriesInMemory } from './categoryStore';
 import { definitionLabel, templateLabel } from '../lib/blocks/blockAttrs';
 import { iconTitle } from '../lib/helpers';
 import i18n from '../i18n';
 import { displayTitle } from '../lib/entryTitle';
-import type { EntryType, TrashedItem } from '../types';
+import type { TrashedItem } from '../types';
+import { kindOfEntry } from './dashboardStore';
+import { jsonArray } from '../lib/row';
 
 interface TrashState {
   items: TrashedItem[];
@@ -30,9 +33,9 @@ export const useTrashStore = create<TrashState>((set, get) => ({
     set({ loading: true });
     try {
       const db = await getDb();
-      // Journal, wiki and operations in one query — only the last two have a category.
-      const entries = await db.select<{ id: string; type: EntryType; title: string; deleted_at: string; category: string | null }[]>(
-        `SELECT e.id, e.type, e.title, e.deleted_at, c.name as category
+      // All entries in one query; the group they show under follows from their category (`kindOfEntry`).
+      const entries = await db.select<{ id: string; category_id: string | null; tags: string; title: string; deleted_at: string; category: string | null }[]>(
+        `SELECT e.id, e.category_id, e.tags, e.title, e.deleted_at, c.name as category
            FROM entries e LEFT JOIN categories c ON e.category_id = c.id
           WHERE e.deleted_at IS NOT NULL`
       );
@@ -58,13 +61,16 @@ export const useTrashStore = create<TrashState>((set, get) => ({
       );
       const items: TrashedItem[] = [
         // Without a title of its own, "Unnamed…", as everywhere (`displayTitle`).
-        ...entries.map((r) => ({
-          id: r.id,
-          title: displayTitle(i18n.t, r.type, r.title),
-          deleted_at: r.deleted_at,
-          type: r.type,
-          category: r.category ?? undefined,
-        })),
+        ...entries.map((r) => {
+          const kind = kindOfEntry({ category_id: r.category_id, tags: jsonArray(r.tags) });
+          return {
+            id: r.id,
+            title: displayTitle(i18n.t, kind, r.title),
+            deleted_at: r.deleted_at,
+            type: kind,
+            category: r.category ?? undefined,
+          };
+        }),
         ...tags.map((r) => ({ id: r.id, title: r.name, deleted_at: r.deleted_at, type: 'tag' as const })),
         ...categories.map((r) => ({ id: r.id, title: `${r.emoji} ${r.name}`, deleted_at: r.deleted_at, type: 'category' as const })),
         ...tasks.map((r) => ({ ...r, title: displayTitle(i18n.t, 'task', r.title), type: 'task' as const })),
@@ -122,6 +128,12 @@ export const useTrashStore = create<TrashState>((set, get) => ({
     await db.execute(`DELETE FROM block_definitions WHERE deleted_at IS NOT NULL`);
     // Likewise templates.
     await db.execute(`DELETE FROM templates WHERE deleted_at IS NOT NULL`);
+    // A default template that went with them points nowhere — the setting follows, as on a single deletion.
+    const settings = useSettingsStore.getState();
+    const defaultId = settings.settings.templates.defaultTemplateId;
+    if (defaultId && !(await db.select<{ id: string }[]>('SELECT id FROM templates WHERE id=$1', [defaultId])).length) {
+      settings.update('templates', { defaultTemplateId: null });
+    }
     // ON DELETE CASCADE takes the vocabulary along — it has no `deleted_at` of its own.
     await db.execute(`DELETE FROM languages WHERE deleted_at IS NOT NULL`);
     // The details, then their files where nothing else uses them.

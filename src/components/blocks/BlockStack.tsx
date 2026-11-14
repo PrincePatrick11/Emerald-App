@@ -13,7 +13,7 @@ import {
   APPEND_ENTRY_LINK_EVENT, REMOVE_ENTRY_LINK_EVENT, REVEAL_ENTRY_LINK_EVENT, subscribeEntryLinkRequest,
   type EntryLinkRequest,
 } from '../../lib/links';
-import { extractInternalLinks, internalLinkBlockHtml, remapInternalLinks, toInternalLinkChip } from '../../lib/internalLinkHtml';
+import { extractInternalLinks, internalLinkBlockHtml, linkTargetKindOf, remapInternalLinks, toInternalLinkChip } from '../../lib/internalLinkHtml';
 import { generateId } from '../../lib/helpers';
 import { editorSavesSuspended } from '../../lib/editorLock';
 import { activeElements, FIELDS_BLOCK_TYPE, linkFromSlot, parseFields, serializeFields } from '../../lib/blocks/fields';
@@ -188,7 +188,7 @@ export default function BlockStack({
   fieldTextRef.current = fieldText;
   const findBlockLink = useCallback((target: { id: string; entryType: string }) => {
     const matches = (link: { id: string; entryType: string } | null) =>
-      link?.id === target.id && link.entryType === target.entryType;
+      link?.id === target.id && linkTargetKindOf(link.entryType) === linkTargetKindOf(target.entryType);
     for (const block of blocksRef.current) {
       if (resolveBlockType(block)?.id !== FIELDS_BLOCK_TYPE) continue;
       const model = parseFields(block);
@@ -344,10 +344,10 @@ export default function BlockStack({
     // Appended, its sigil conceals only its own calculators and drawings.
     const next = areBlocksEmpty(blocksRef.current) ? added : [...blocksRef.current, ...withChargesCoveringOnly(added)];
     commit(next.length > 0 ? next : [createTextBlock()]);
-    const { entryType, flush } = templateTarget;
+    const { flush } = templateTarget;
     // Save the deferred input first: title and tags are checked against the store.
     void flush()
-      .then(() => applyTemplateFields(entryType, entryId, template))
+      .then(() => applyTemplateFields(entryId, template))
       .then(() => {
         // A loaded sigil that locks the entry ends the edit: the entry can only be read until it is unloaded.
         if (!sigilState(blocksRef.current, todayIso()).lockEntry) return;
@@ -361,9 +361,9 @@ export default function BlockStack({
   const undoTemplate = (template: Template) => {
     if (!templateTarget) return;
     commit([createTextBlock()]);
-    const { entryType, flush } = templateTarget;
+    const { flush } = templateTarget;
     void flush()
-      .then(() => undoTemplateFields(entryType, entryId, template))
+      .then(() => undoTemplateFields(entryId, template))
       .catch((e: unknown) => console.error('[BlockStack] undoing template fields failed:', e));
   };
 

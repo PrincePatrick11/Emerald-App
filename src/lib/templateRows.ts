@@ -26,10 +26,10 @@ export function insertTemplateStatement(template: Template): readonly [string, u
   const row = templateToRow(template);
   return [
     `INSERT INTO templates
-       (id, name, icon, title, tags, assignments, sort_order, created_at, updated_at, deleted_at)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
+       (id, name, icon, title, tags, sort_order, created_at, updated_at, deleted_at)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
     [
-      row.id, row.name, row.icon, row.title, row.tags, row.assignments,
+      row.id, row.name, row.icon, row.title, row.tags,
       row.sort_order, row.created_at, row.updated_at, row.deleted_at,
     ],
   ];
@@ -51,11 +51,11 @@ export async function templateById(db: Database, id: string): Promise<Template |
 }
 
 /**
- * The built-in "Sigil" template: calculator, drawing and charge, default
- * for operations of the "Sigils" category.
+ * The built-in "Sigil" template: calculator, drawing and charge, the start
+ * template of the "Sigils" category.
  * The name ends up permanently in the row; if i18n is not ready yet, English.
  */
-function sigilTemplate(t: TFunction, now: string, sortOrder: number): Omit<Template, 'assignments'> {
+function sigilTemplate(t: TFunction, now: string, sortOrder: number): Template {
   return {
     id: SIGIL_TEMPLATE_ID,
     name: translatedOr(t, 'templates.builtin.sigil', 'Sigil'),
@@ -70,28 +70,28 @@ function sigilTemplate(t: TFunction, now: string, sortOrder: number): Omit<Templ
   };
 }
 
+/** Makes the template the start template of the category — if the category exists and has none yet. */
+async function startCategoryWith(db: Database, categoryId: string, templateId: string): Promise<void> {
+  await db.execute('UPDATE categories SET template_id=$1 WHERE id=$2 AND template_id IS NULL', [templateId, categoryId]);
+}
+
 /**
  * Creates the sigil template if it does not yet exist (including in the trash)
- * — for fresh vaults. Without the "Sigils" category (only a doctored
- * database) it stays without an assignment.
+ * — for fresh vaults — and makes it the start template of "Sigils".
  */
 export async function seedSigilTemplate(db: Database, t: TFunction): Promise<void> {
   if (await templateById(db, SIGIL_TEMPLATE_ID)) return;
-  const [category] = await db.select<{ id: string }[]>('SELECT id FROM categories WHERE id=$1', [SIGIL_CATEGORY_ID]);
-  await insertTemplateRow(db, {
-    ...sigilTemplate(t, nowIso(), await nextTemplateSortOrder(db)),
-    assignments: category ? [{ entryType: 'operation', category: SIGIL_CATEGORY_ID }] : [],
-  });
+  await insertTemplateRow(db, sigilTemplate(t, nowIso(), await nextTemplateSortOrder(db)));
+  await startCategoryWith(db, SIGIL_CATEGORY_ID, SIGIL_TEMPLATE_ID);
 }
 
 /**
  * Creates the built-in "Altar" template if it does not yet exist (including
  * in the trash) — for fresh vaults: an altar and a text for
- * notes, default for operations of the "Altars" category.
+ * notes, the start template of the "Altars" category.
  */
 export async function seedAltarTemplate(db: Database, t: TFunction): Promise<void> {
   if (await templateById(db, ALTAR_TEMPLATE_ID)) return;
-  const [category] = await db.select<{ id: string }[]>('SELECT id FROM categories WHERE id=$1', [ALTAR_CATEGORY_ID]);
   const now = nowIso();
   await insertTemplateRow(db, {
     id: ALTAR_TEMPLATE_ID,
@@ -104,6 +104,6 @@ export async function seedAltarTemplate(db: Database, t: TFunction): Promise<voi
     created_at: now,
     updated_at: now,
     deleted_at: null,
-    assignments: category ? [{ entryType: 'operation', category: ALTAR_CATEGORY_ID }] : [],
   });
+  await startCategoryWith(db, ALTAR_CATEGORY_ID, ALTAR_TEMPLATE_ID);
 }

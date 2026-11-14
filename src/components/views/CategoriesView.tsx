@@ -1,12 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useShallow } from 'zustand/shallow';
 import { useTranslation } from 'react-i18next';
-import { GripVertical, Pencil, Trash2 } from 'lucide-react';
+import { Check, GripVertical, Pencil, Trash2, X } from 'lucide-react';
 import { CATEGORY_MODULE_IDS } from '../../lib/modules';
 import { categoryLabel, categoryUsageCounts, emptyCategoryUsage } from '../../lib/categories';
 import { CATEGORY_NAME_TAKEN, useCategoryStore } from '../../store/categoryStore';
-import { useEntryStore } from '../../store/entryStore';
+import { useEntriesByKind } from '../../hooks/useDashboardEntries';
 import { useTaskStore } from '../../store/taskStore';
+import Button from '../ui/Button';
+import TemplateSelect from '../ui/TemplateSelect';
 import { useUndoStore } from '../../store/undoStore';
 import { useDeepLink } from '../../hooks/useDeepLink';
 import { generateId } from '../../lib/helpers';
@@ -41,7 +43,7 @@ type FormState =
  * save and cancel (both `() => void`) could be swapped silently.
  */
 function CategoryEditRow({
-  emoji, onEmoji, name, onName, error, onSave, onCancel,
+  emoji, onEmoji, name, onName, error, onSave, onCancel, template, onTemplate, builtin,
 }: {
   emoji: string;
   onEmoji: (value: string) => void;
@@ -50,6 +52,11 @@ function CategoryEditRow({
   error: string | null;
   onSave: () => void;
   onCancel: () => void;
+  /** The start template's ID, `''` for the vault's default. */
+  template: string;
+  onTemplate: (value: string) => void;
+  /** A built-in category: name and emoji stay, only the start template changes. */
+  builtin?: { label: string };
 }) {
   const { t } = useTranslation();
   return (
@@ -57,21 +64,58 @@ function CategoryEditRow({
       {/* Placeholder for the read row's drag handle — without it emoji
           and name would jump to the left when switching to edit mode. */}
       <span className="w-3 flex-shrink-0" />
-      <EmojiPicker
-        value={emoji}
-        onChange={onEmoji}
-        trigger={({ toggle }) => (
-          <button
-            onClick={toggle}
-            className="w-5 text-center flex-shrink-0 text-base hover:opacity-70 transition-opacity"
-          >
-            {emoji}
-          </button>
-        )}
-      />
-      <InlineNameEditor value={name} onChange={onName} error={error} onSave={onSave} onCancel={onCancel}
-        placeholder={t('categories.name')} />
+      {builtin ? (
+        <>
+          <span className="w-5 text-center flex-shrink-0 text-base">{emoji}</span>
+          <span className="flex-1 min-w-0 truncate text-sm">{builtin.label}</span>
+          <StartTemplateSelect value={template} onChange={onTemplate} />
+          <Button tone="jade" compact small title={t('common.save')} aria-label={t('common.save')} onClick={onSave}>
+            <Check size={12} />
+          </Button>
+          <Button tone="neutral" compact small title={t('common.cancel')} aria-label={t('common.cancel')} onClick={onCancel}>
+            <X size={12} />
+          </Button>
+        </>
+      ) : (
+        <>
+          <EmojiPicker
+            value={emoji}
+            onChange={onEmoji}
+            trigger={({ toggle }) => (
+              <button
+                onClick={toggle}
+                className="w-5 text-center flex-shrink-0 text-base hover:opacity-70 transition-opacity"
+              >
+                {emoji}
+              </button>
+            )}
+          />
+          <InlineNameEditor value={name} onChange={onName} error={error} onSave={onSave} onCancel={onCancel}
+            placeholder={t('categories.name')}
+            beforeActions={<StartTemplateSelect value={template} onChange={onTemplate} />} />
+        </>
+      )}
     </DashboardRow>
+  );
+}
+
+/**
+ * The start template of a category: what a new entry in it starts with.
+ * `''` is "Default template" — the vault's, set under Templates. A plain
+ * dropdown for now; the category page of the collections brings the real one.
+ */
+function StartTemplateSelect({ value, onChange }: { value: string; onChange: (value: string) => void }) {
+  const { t } = useTranslation();
+  return (
+    <span className="flex-shrink-0" title={t('categories.startTemplateHint')}>
+      <TemplateSelect
+        label={`${t('categories.startTemplate')}: `}
+        noneLabel={t('categories.startTemplateDefault')}
+        value={value || null}
+        onChange={(id) => onChange(id ?? '')}
+        portal
+      />
+    </span>
   );
 }
 
@@ -105,13 +149,14 @@ export default function CategoriesView() {
 
   // No fetch on mount: reloadAllStores() loads entries and tasks
   // along with categories at startup and on vault switch.
-  const articles = useEntryStore((s) => s.entries.wiki);
-  const operations = useEntryStore((s) => s.entries.operation);
+  const { journal, wiki: articles, operation: operations } = useEntriesByKind();
   const tasks = useTaskStore((s) => s.tasks);
+  const setStartTemplate = useCategoryStore((s) => s.setStartTemplate);
 
   const [form, setForm] = useState<FormState | null>(null);
   const [name, setName] = useState('');
   const [emoji, setEmoji] = useState(DEFAULT_EMOJI);
+  const [template, setTemplate] = useState('');
   const [search, setSearch] = useSessionState('categories.search', '');
   /** Error message next to the name field — today only "Name already taken". */
   const [nameError, setNameError] = useState<string | null>(null);
@@ -145,8 +190,8 @@ export default function CategoriesView() {
    * stores only hold live rows — what is in the trash does not count.
    */
   const countsById = useMemo(
-    () => categoryUsageCounts({ wiki: articles, operations, tasks }),
-    [articles, operations, tasks],
+    () => categoryUsageCounts({ journal, wiki: articles, operations, tasks }),
+    [journal, articles, operations, tasks],
   );
 
   // ── Drag sorting ──────────────────────────────────────────────────────────
@@ -212,10 +257,11 @@ export default function CategoriesView() {
   }, [categories, reorderCategories]);
 
   // ── Create / edit / delete ────────────────────────────────────────────────
-  const openForm = (next: FormState, withName: string, withEmoji: string) => {
+  const openForm = (next: FormState, withName: string, withEmoji: string, withTemplate: string | null = null) => {
     setNameError(null);
     setName(withName);
     setEmoji(withEmoji);
+    setTemplate(withTemplate ?? '');
     setForm(next);
   };
 
@@ -227,10 +273,21 @@ export default function CategoriesView() {
   /** Creates or saves the change — depending on which form is open. */
   const submitForm = async () => {
     const trimmed = name.trim();
-    if (!form || !trimmed) return;
+    if (!form) return;
+    const editing = form.mode === 'edit' ? categories.find((c) => c.id === form.id) : undefined;
+    // A built-in keeps its name; only its start template is edited.
+    if (!trimmed && !editing?.is_builtin) return;
     try {
-      if (form.mode === 'add') await addCategory(trimmed, emoji);
-      else await updateCategory(form.id, trimmed, emoji);
+      // The category as it stands now — an add may have brought one back from
+      // the trash, with the start template it had there.
+      let saved: { id: string; template_id: string | null } | undefined;
+      if (form.mode === 'add') saved = await addCategory(trimmed, emoji);
+      else {
+        if (!editing?.is_builtin) await updateCategory(form.id, trimmed, emoji);
+        saved = editing;
+      }
+      const startTemplate = template || null;
+      if (saved && (saved.template_id ?? null) !== startTemplate) await setStartTemplate(saved.id, startTemplate);
     } catch (err) {
       // The store throws on a taken name instead of returning an error value.
       if (err instanceof Error && err.message === CATEGORY_NAME_TAKEN) setNameError(t('categories.nameTaken'));
@@ -261,12 +318,14 @@ export default function CategoriesView() {
     error: nameError,
     onSave: submitForm,
     onCancel: closeForm,
+    template,
+    onTemplate: setTemplate,
   };
 
   // ── Rows ──────────────────────────────────────────────────────────────────
   const renderRow = (cat: Category) => {
     if (form?.mode === 'edit' && form.id === cat.id) {
-      return <CategoryEditRow key={cat.id} {...formProps} />;
+      return <CategoryEditRow key={cat.id} {...formProps} builtin={cat.is_builtin ? { label: categoryLabel(t, cat) } : undefined} />;
     }
 
     const counts = countsById.get(cat.id) ?? emptyCategoryUsage();
@@ -278,9 +337,9 @@ export default function CategoriesView() {
         data-category-id={cat.id}
         title={cat.is_builtin ? t('categories.builtinHint') : undefined}
         className={`${isDragging || highlightId === cat.id ? 'row-target' : ''} ${isDragging ? 'opacity-50' : ''}`}
-        // Sigils: not deletable, and a rename would lead nowhere — the name
-        // comes from the locale, not from the row. So no menu for them.
-        onContextMenu={cat.is_builtin ? undefined : (e) => {
+        // Built-ins: not deletable, and a rename would lead nowhere — the name
+        // comes from the locale, not from the row. Their menu only edits the start template.
+        onContextMenu={(e) => {
           e.preventDefault();
           setCtxMenu({ id: cat.id, x: e.clientX, y: e.clientY });
         }}
@@ -339,8 +398,10 @@ export default function CategoriesView() {
           y={ctxMenu.y}
           onClose={() => setCtxMenu(null)}
           actions={[
-            { label: t('editor.edit'), icon: <Pencil size={12} />, onClick: () => openForm({ mode: 'edit', id: menuCategory.id }, menuCategory.name, menuCategory.emoji) },
-            { label: t('common.delete'), icon: <Trash2 size={12} />, danger: true, onClick: () => void handleDelete(menuCategory.id) },
+            { label: t('editor.edit'), icon: <Pencil size={12} />, onClick: () => openForm({ mode: 'edit', id: menuCategory.id }, menuCategory.name, menuCategory.emoji, menuCategory.template_id) },
+            ...(menuCategory.is_builtin ? [] : [
+              { label: t('common.delete'), icon: <Trash2 size={12} />, danger: true, onClick: () => void handleDelete(menuCategory.id) },
+            ]),
           ]}
         />
       )}

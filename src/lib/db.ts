@@ -3,7 +3,6 @@ import { invoke } from '@tauri-apps/api/core';
 import { getActiveVaultId } from './vaultManager';
 import { BASELINE_VERSION, FRESH_START_VERSION, TABLES, createSchema, purgeCategory, seedBuiltins } from './schema';
 import { seedAltarTemplate, seedSigilTemplate } from './templateRows';
-import type { EntryType } from '../types';
 import i18n from '../i18n';
 import { useSettingsStore } from '../store/settingsStore';
 import { rewriteTagRefs, stripTagIds } from './tagRefs';
@@ -310,27 +309,22 @@ const CLEANUP_TABLES = [
 ] as const;
 
 /**
- * The next running number of an entry type — each type counts on its own.
- * Entries in the trash count too, so that a number does not occur twice after
- * a restore. The number is assigned on creation and stays: a replace import
- * reassigns ROWIDs, so the ROWID cannot stand in for it.
+ * The next running number — one count over all entries, unique
+ * (`idx_entries_number`). Entries in the trash count too, so that a number
+ * does not occur twice after a restore. The number is assigned on creation and
+ * stays: a replace import reassigns ROWIDs, so the ROWID cannot stand in for it.
  */
-export async function nextEntryNumber(db: Database, type: EntryType): Promise<number> {
-  const rows = await db.select<{ n: number }[]>(
-    'SELECT COALESCE(MAX(entry_number), 0) + 1 AS n FROM entries WHERE type = $1',
-    [type]
-  );
+export async function nextEntryNumber(db: Database): Promise<number> {
+  const rows = await db.select<{ n: number }[]>('SELECT COALESCE(MAX(entry_number), 0) + 1 AS n FROM entries');
   return rows[0]?.n ?? 1;
 }
 
-/** When the target of a link exists — the same types and the same
- *  rule as `checkIntegrity` (schema.ts), otherwise the sweep deletes exactly the
- *  rows the diagnosis considers valid: an entry counts only under
- *  its own type. Soft-deleted rows deliberately count:
- *  trash contents are not orphans yet. */
+/** When the target of a link exists — the same rule as `checkIntegrity`
+ *  (schema.ts), otherwise the sweep deletes exactly the rows the diagnosis
+ *  considers valid. Soft-deleted rows deliberately count: trash contents are
+ *  not orphans yet. */
 const LINK_TARGET_EXISTS = `(
-  (target_type IN ('journal', 'wiki', 'operation')
-    AND EXISTS (SELECT 1 FROM entries e WHERE e.id = task_links.target_id AND e.type = task_links.target_type))
+  (target_type = 'entry' AND EXISTS (SELECT 1 FROM entries e WHERE e.id = task_links.target_id))
   OR (target_type = 'task' AND EXISTS (SELECT 1 FROM tasks t WHERE t.id = task_links.target_id))
 )`;
 

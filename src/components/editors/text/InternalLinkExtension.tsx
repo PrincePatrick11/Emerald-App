@@ -4,10 +4,10 @@ import { ReactNodeViewRenderer, NodeViewWrapper } from '@tiptap/react';
 import type { NodeViewRendererProps } from '@tiptap/react';
 import SuggestionList, { DEFAULT_ENTRY_EMOJI, type SuggestionItem } from './SuggestionList';
 import { suggestionPopup } from './suggestionPopup';
-import type { ContentType } from '../../../types';
+import { linkTargetKindOf } from '../../../lib/internalLinkHtml';
 
 function getDefaultIcon(entryType: string): string {
-  return DEFAULT_ENTRY_EMOJI[entryType as ContentType] ?? DEFAULT_ENTRY_EMOJI.operation;
+  return entryType === 'task' ? DEFAULT_ENTRY_EMOJI.task : DEFAULT_ENTRY_EMOJI.wiki;
 }
 
 interface InternalLinkOptions {
@@ -63,8 +63,8 @@ export function createInternalLinkExtension(
           renderHTML: (attrs) => ({ 'data-id': attrs.id }),
         },
         entryType: {
-          default: 'wiki',
-          parseHTML: (el) => el.getAttribute('data-entry-type'),
+          default: 'entry',
+          parseHTML: (el) => linkTargetKindOf(el.getAttribute('data-entry-type')),
           renderHTML: (attrs) => ({ 'data-entry-type': attrs.entryType }),
         },
         label: {

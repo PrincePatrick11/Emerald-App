@@ -52,7 +52,7 @@ export default function AutoBackupSection() {
   const running = useAutoBackupStore((s) => s.running);
   // Only for the folder dialog: what the run itself reports is in the store.
   const [folderFailed, setFolderFailed] = useState(false);
-  // "Back up now" waits if an import or type change is currently writing —
+  // "Back up now" waits if an import or a move to another module is currently writing —
   // until then the button shows that the click has arrived.
   const requested = useAutoBackupStore((s) => s.requested);
   const pending = running || requested;

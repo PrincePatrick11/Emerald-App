@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Check, X } from 'lucide-react';
 import Button from './Button';
@@ -10,6 +11,8 @@ interface InlineNameEditorProps {
   onSave: () => void;
   onCancel: () => void;
   placeholder?: string;
+  /** Between the field and its buttons — a further choice of the same row (a category's start template). */
+  beforeActions?: ReactNode;
 }
 
 /**
@@ -19,7 +22,7 @@ interface InlineNameEditorProps {
  * placeholder for handle or chevron) are brought by the caller.
  */
 export default function InlineNameEditor({
-  value, onChange, error, onSave, onCancel, placeholder,
+  value, onChange, error, onSave, onCancel, placeholder, beforeActions,
 }: InlineNameEditorProps) {
   const { t } = useTranslation();
   return (
@@ -36,6 +39,7 @@ export default function InlineNameEditor({
         className="input-field flex-1 min-w-0 rounded-md px-2 py-0.5 text-sm outline-none selectable"
       />
       {error && <span className="text-xs text-danger shrink-0">{error}</span>}
+      {beforeActions}
       <Button tone="jade" compact small title={t('common.save')} aria-label={t('common.save')} onClick={onSave}>
         <Check size={12} />
       </Button>

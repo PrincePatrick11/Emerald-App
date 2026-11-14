@@ -7,8 +7,7 @@ import { linkFromSlot } from '../../lib/blocks/fields';
 import { internalLinkChipHtml, toInternalLinkChip } from '../../lib/internalLinkHtml';
 import { isValidLinkTarget } from '../../lib/links';
 import { linkItemKey, linkItemsByKey, type SuggestionItem } from '../../lib/linkItems';
-import { viewTypeForEntryType } from '../../lib/modules';
-import type { ContentType } from '../../types';
+import { viewOfLinkTarget } from '../../store/entryViews';
 
 /**
  * A reference to an entry inside a block, stored as
@@ -67,12 +66,12 @@ export function LinkTarget({ target, onRemove }: { target: { id: string; entryTy
   const setActiveView = useUIStore((s) => s.setActiveView);
   const { id, entryType } = target;
   const live = useMemo(
-    () => linkItemsByKey(items).get(linkItemKey({ id, entryType: entryType as ContentType })),
+    () => linkItemsByKey(items).get(linkItemKey({ id, entryType })),
     [items, id, entryType],
   );
   const open = () => {
     if (!isValidLinkTarget(target)) return;
-    setActiveView({ type: viewTypeForEntryType(target.entryType as ContentType), id: target.id, mode: 'view' });
+    setActiveView({ type: viewOfLinkTarget(target.entryType, target.id), id: target.id, mode: 'view' });
   };
   return (
     <span className="inline-flex">

@@ -1,8 +1,8 @@
-import { escapeHtml, extractInternalLinks, internalLinkChipHtml, isBlankContent, isValidLinkTarget } from '../internalLinkHtml';
+import { escapeHtml, extractInternalLinks, internalLinkChipHtml, isBlankContent, isValidLinkTarget, linkTargetKindOf } from '../internalLinkHtml';
 import { generateId } from '../helpers';
 import { storedImageName } from '../schema';
 import { MOON_PHASE_ORDER, MOON_PHASE_SYMBOLS } from '../moonPhase';
-import type { ContentType, MoonPhase } from '../../types';
+import type { LinkTargetKind, MoonPhase } from '../../types';
 import { decodeHtmlAttr, neutralizeSectionTags } from './blockHtml';
 import { BLOCK_ATTR, type BlockInstance, type BlockTypeId } from './types';
 
@@ -131,7 +131,7 @@ export interface ChargeDefault {
 /** The default of a link: the target together with its name at the time of selection. */
 export interface LinkDefault {
   id: string;
-  entryType: ContentType;
+  entryType: LinkTargetKind;
   label: string;
 }
 
@@ -397,7 +397,7 @@ function parseDefault(element: ElementDef, raw: unknown): ElementDefault | undef
       return {
         id: raw.id as string,
         // `isValidLinkTarget` has checked the kind against the list.
-        entryType: String(raw.entryType).trim() as ContentType,
+        entryType: linkTargetKindOf(String(raw.entryType)),
         label: typeof raw.label === 'string' ? raw.label : '',
       };
     }

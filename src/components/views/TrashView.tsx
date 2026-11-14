@@ -431,7 +431,7 @@ export default function TrashView() {
       sortDate="deleted"
       onView={(v) => setTrashPrefs({ view: v })}
       onSort={(s) => setTrashPrefs({ sort: s })}
-      // The trash groups by entry type, not by category.
+      // The trash groups by the module an entry counts as, not by category.
       groupBy={{ value: trashPrefs.grouping, onChange: (g) => setTrashPrefs({ grouping: g }), label: t('listView.type') }}
       items={items}
       itemKey={(item) => item.id}

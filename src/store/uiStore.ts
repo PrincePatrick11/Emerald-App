@@ -6,7 +6,7 @@ import {
 import {
   confirmLeave, guardKey, guardRegistered, holdsOpenEdit, leaveNeedsConfirm, useLeaveGuardStore,
 } from './leaveGuardStore';
-import { isLibraryView, isViewId, moduleMeta, type EntryModuleId } from '../lib/modules';
+import { isLibraryView, isViewId, moduleMeta, type ViewId } from '../lib/modules';
 import type { ActiveView } from '../types';
 import { clearSessionState } from './sessionStore';
 
@@ -42,7 +42,7 @@ export interface EditActions {
   onCancel: () => void | Promise<void>;
   onDelete?: () => void | Promise<void>;
   /** Write the deferred autosave immediately — for sidebar actions
-   *  that afterwards read the entry's store state (type change). */
+   *  that afterwards read the entry's store state (a move to another module). */
   flush?: () => Promise<void>;
 }
 
@@ -73,8 +73,8 @@ interface UIState {
    *  wiki and operations fall back to their dashboard. */
   dashboardMounted: boolean;
   editActions: EditActions | null;
-  /** A type change or a cancel is writing right now (`withEditLock`): Done,
-   *  Delete, Cancel and the type switch of the open entry are locked,
+  /** A move to another module or a cancel is writing right now (`withEditLock`): Done,
+   *  Delete, Cancel and the module switch of the open entry are locked,
    *  and the page cannot be left — a click in between would hit the
    *  view that is being torn down, and the confirmation would apply to it. */
   editLocked: boolean;
@@ -115,12 +115,12 @@ interface UIState {
   addCollapsedGroups: (scope: string, ids: string[]) => void;
   setFlag: (key: string, value: boolean) => void;
   closeAllTabs: () => void;
-  /** An entry has changed type: every tab and every history that opens it
-   *  under `from` now opens it under `to` — same id. With
-   *  `endEdit` the open page is then in read mode: Cancel reverts a
-   *  type change, and the view of the old type should not even appear in
-   *  edit mode. Other tabs keep their mode. */
-  retypeEntryViews: (id: string, from: EntryModuleId, to: EntryModuleId, options?: { endEdit?: boolean }) => void;
+  /** An entry has moved to another module: every tab and every history that
+   *  opens it under `from` now opens it under `to` — same id. With
+   *  `endEdit` the open page is then in read mode: Cancel moves an entry
+   *  back, and the view it had moved to should not even appear in edit
+   *  mode. Other tabs keep their mode. */
+  moveEntryViews: (id: string, from: ViewId, to: ViewId, options?: { endEdit?: boolean }) => void;
   openViewInNewTab: (view: ActiveView) => void;
   addTab: (view?: ActiveView) => void;
   selectTab: (id: string) => void;
@@ -308,8 +308,8 @@ let heldHistory: NavHistory | null = null;
  * on the page one wanted to leave.
  *
  * It lives in `heldHistory`, not in the closure: if "Discard" reverts a
- * type change, `retypeEntryViews` rewrites it too — otherwise it would
- * keep leading to the entry under the discarded type.
+ * move to another module, `moveEntryViews` rewrites it too — otherwise it would
+ * keep leading to the entry under the discarded view.
  */
 function stepGuarded(delta: -1 | 1): void {
   // A step into the void does not ask about unsaved changes: the
@@ -458,23 +458,23 @@ export const useUIStore = create<UIState>((set, get) => ({
     });
   },
 
-  retypeEntryViews: (id, from, to, { endEdit = false } = {}) => {
+  moveEntryViews: (id, from, to, { endEdit = false } = {}) => {
     const isEntry = (view: ActiveView) => view.type === from && view.id === id;
-    const retype = (view: ActiveView): ActiveView => (isEntry(view) ? { ...view, type: to } : view);
-    const retypeHistory = (history: NavHistory): NavHistory => ({ ...history, views: history.views.map(retype) });
+    const move = (view: ActiveView): ActiveView => (isEntry(view) ? { ...view, type: to } : view);
+    const moveHistory = (history: NavHistory): NavHistory => ({ ...history, views: history.views.map(move) });
     // The open page: with `endEdit` straight into read mode if it is this entry.
-    const retypeOpenPage = (view: ActiveView): ActiveView => (
-      endEdit && isEntry(view) ? { type: to, id, mode: 'view' } : retype(view)
+    const moveOpenPage = (view: ActiveView): ActiveView => (
+      endEdit && isEntry(view) ? { type: to, id, mode: 'view' } : move(view)
     );
-    if (heldHistory) heldHistory = retypeHistory(heldHistory);
+    if (heldHistory) heldHistory = moveHistory(heldHistory);
     set((s) => {
       const tabs = s.tabs.map((tab) => ({
         ...tab,
-        view: tab.id === s.activeTabId ? retypeOpenPage(tab.view) : retype(tab.view),
-        history: retypeHistory(tab.history),
+        view: tab.id === s.activeTabId ? moveOpenPage(tab.view) : move(tab.view),
+        history: moveHistory(tab.history),
       }));
       saveTabs(tabs, s.activeTabId);
-      return { tabs, activeView: retypeOpenPage(s.activeView), tablessHistory: retypeHistory(s.tablessHistory) };
+      return { tabs, activeView: moveOpenPage(s.activeView), tablessHistory: moveHistory(s.tablessHistory) };
     });
   },
 
@@ -601,7 +601,7 @@ let editLocksStarted = 0;
 
 /**
  * Counts every lock that has begun. Anyone reading across several awaits (the
- * automatic backup) can tell from it that a type change or a
+ * automatic backup) can tell from it that a move to another module or a
  * cancel has written in between — even if `editLocked` is off again at the end.
  */
 export function editLockEpoch(): number {
@@ -610,8 +610,8 @@ export function editLockEpoch(): number {
 
 /**
  * Locks editing while `run` writes (`editLocked`): the sidebar,
- * the type switch and leaving the page. Counted, not toggled: a
- * cancel can wait for a type change that is still running — whichever finishes
+ * the module switch and leaving the page. Counted, not toggled: a
+ * cancel can wait for a move that is still running — whichever finishes
  * first does not release the other's lock.
  */
 export async function withEditLock<T>(run: () => Promise<T>): Promise<T> {

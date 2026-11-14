@@ -4,7 +4,7 @@ import { acceptedImageFiles, storeImageFile } from '../../../lib/storeImage';
 import { reportImageError } from '../../../store/imageNoticeStore';
 import { pickPictures } from '../../../store/imagePickerStore';
 import { flashReveal, scrollIntoViewCentered } from '../../../lib/reveal';
-import { internalLinkBlockHtml, toInternalLinkChip } from '../../../lib/internalLinkHtml';
+import { internalLinkBlockHtml, linkTargetKindOf, toInternalLinkChip } from '../../../lib/internalLinkHtml';
 import type { EntryLinkRequest } from '../../../lib/links';
 import type { TextColor } from '../../../lib/textColors';
 import type { SuggestionItem } from './SuggestionList';
@@ -26,7 +26,7 @@ export function findEntryLinkPos(doc: ProseMirrorNode, target: { id: string; ent
   let found: number | null = null;
   doc.descendants((node, pos) => {
     if (found !== null) return false;
-    if (node.type.name === 'internalLink' && node.attrs.id === target.id && node.attrs.entryType === target.entryType) {
+    if (node.type.name === 'internalLink' && node.attrs.id === target.id && linkTargetKindOf(node.attrs.entryType) === linkTargetKindOf(target.entryType)) {
       found = pos;
       return false;
     }
@@ -84,7 +84,7 @@ function holdsOnlyLink(paragraph: ProseMirrorNode, target: { id: string; entryTy
   let only = true;
   paragraph.forEach((child) => {
     if (child.type.name === 'internalLink') {
-      if (child.attrs.id !== target.id || child.attrs.entryType !== target.entryType) only = false;
+      if (child.attrs.id !== target.id || linkTargetKindOf(child.attrs.entryType) !== linkTargetKindOf(target.entryType)) only = false;
       return;
     }
     if (child.isText && !(child.text ?? '').trim()) return;

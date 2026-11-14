@@ -1,4 +1,3 @@
-import type { EntryType } from '../../types';
 import { generateId } from '../helpers';
 import { hasOwnTitle } from '../entryTitle';
 import { parseBlocks, serializeBlocks } from './blockHtml';
@@ -19,23 +18,6 @@ import { TEXT_BLOCK_TYPE, type BlockInstance } from './types';
  * `scripts/check-blocks.mjs` use it.
  */
 
-/** The entry types a template fits — the modules with a block stack, i.e. those of `entries`. */
-export const TEMPLATE_ENTRY_TYPES = ['journal', 'wiki', 'operation'] as const satisfies readonly EntryType[];
-export type TemplateEntryType = EntryType;
-
-/** The category level "all categories" — the fallback when the exact combination has no template. */
-export const ALL_CATEGORIES = '*';
-
-/**
- * An assignment: new entries of this combination start with a copy of the
- * template. `category`: `'*'` = all categories, `null` = no category, otherwise a
- * category ID. Journal knows no categories and always has `'*'`.
- */
-export interface TemplateAssignment {
-  entryType: TemplateEntryType;
-  category: string | null;
-}
-
 export interface Template {
   id: string;
   name: string;
@@ -47,7 +29,6 @@ export interface Template {
   content: string;
   /** Tag IDs, as with entries. */
   tags: string[];
-  assignments: TemplateAssignment[];
   sort_order: number;
   created_at: string;
   updated_at: string;
@@ -56,10 +37,10 @@ export interface Template {
 
 export const DEFAULT_TEMPLATE_ICON = '📄';
 
-/** The built-in sigil template: assigned to operation × sigils. Editable and deletable; the fixed ID lets migration and import recognise it. */
+/** The built-in sigil template: the start template of the category Sigils. Editable and deletable; the fixed ID lets seed and import recognise it. */
 export const SIGIL_TEMPLATE_ID = 'core-sigil';
 
-/** The built-in altar template (since v61): assigned to operation × altars, editable and deletable like the sigil's. */
+/** The built-in altar template: the start template of the category Altars, editable and deletable like the sigil's. */
 export const ALTAR_TEMPLATE_ID = 'core-altar';
 
 /** A template ID from a foreign source. The same rule as for definitions. */
@@ -67,87 +48,24 @@ export function isTemplateId(id: unknown): id is string {
   return isDefinitionId(id);
 }
 
-function isEntryType(value: unknown): value is TemplateEntryType {
-  return (TEMPLATE_ENTRY_TYPES as readonly unknown[]).includes(value);
-}
-
-/** Key of a combination — at most one template per key. */
-export function assignmentKey(entryType: TemplateEntryType, category: string | null): string {
-  return `${entryType}|${category === null ? '' : category}`;
-}
-
-/** There are no more combinations than entry types × categories; anything above comes from a doctored file. */
-const MAX_ASSIGNMENTS = 500;
-
-/**
- * Assignments from JSON (row, backup, draft): unreadable entries are dropped,
- * journal always gets `'*'`, duplicate combinations merge into one. An entry with
- * `isDefault: false` comes from older data, where it only offered the template
- * for selection — today that is not an assignment.
- * A category ID follows the same rule for harmless IDs as definitions.
- */
-export function parseAssignments(raw: unknown): TemplateAssignment[] {
-  let value = raw;
-  if (typeof raw === 'string') {
-    try {
-      value = JSON.parse(raw);
-    } catch {
-      return [];
-    }
-  }
-  if (!Array.isArray(value)) return [];
-  const byKey = new Map<string, TemplateAssignment>();
-  for (const item of value.slice(0, MAX_ASSIGNMENTS)) {
-    if (typeof item !== 'object' || item === null) continue;
-    const { entryType, category, isDefault } = item as Record<string, unknown>;
-    if (!isEntryType(entryType) || isDefault === false) continue;
-    let cat: string | null;
-    if (entryType === 'journal' || category === ALL_CATEGORIES) cat = ALL_CATEGORIES;
-    else if (category === null) cat = null;
-    else if (isDefinitionId(category)) cat = category;
-    else continue;
-    byKey.set(assignmentKey(entryType, cat), { entryType, category: cat });
-  }
-  return [...byKey.values()];
-}
-
-/** The template as a database row — `tags`/`assignments` as JSON text. */
+/** The template as a database row — `tags` as JSON text. */
 export function templateToRow(template: Template) {
-  return { ...template, tags: JSON.stringify(template.tags), assignments: JSON.stringify(template.assignments) };
-}
-
-/** The category ID of an assignment — `null` for "all" and "no category", which point to no row. */
-export function assignedCategoryId(a: Pick<TemplateAssignment, 'category'>): string | null {
-  return a.category === null || a.category === ALL_CATEGORIES ? null : a.category;
-}
-
-/** The template assigned exactly to this combination — without fallback. */
-export function assignedTemplateAt(
-  templates: readonly Template[],
-  entryType: TemplateEntryType,
-  category: string | null,
-): Template | undefined {
-  return templates.find((t) => t.assignments.some((a) => matches(a, entryType, category)));
-}
-
-export function matches(a: TemplateAssignment, entryType: TemplateEntryType, category: string | null): boolean {
-  return a.entryType === entryType && a.category === category;
+  return { ...template, tags: JSON.stringify(template.tags) };
 }
 
 /**
- * The template for a new entry: first the exact combination (for
- * journal there is only "all"), then "all categories" — otherwise none.
- * `templates` are the active ones in display order; if two held the same
- * combination (only via a doctored file), the first wins.
+ * The template a new entry starts with: its category's start template, else
+ * the vault's default template — each only while it is active (in
+ * `templates`, the active ones) — else none. A category whose template went
+ * to the trash thus falls back to the default.
  */
-export function resolveAssignedTemplate(
+export function resolveStartTemplate(
   templates: readonly Template[],
-  entryType: TemplateEntryType,
-  categoryId: string | null,
+  category: { template_id: string | null } | null | undefined,
+  defaultTemplateId: string | null,
 ): Template | null {
-  const levels = entryType === 'journal' ? [ALL_CATEGORIES] : [categoryId, ALL_CATEGORIES];
-  for (const category of levels) {
-    const hit = assignedTemplateAt(templates, entryType, category);
+  for (const id of [category?.template_id ?? null, defaultTemplateId]) {
+    const hit = id ? templates.find((t) => t.id === id) : undefined;
     if (hit) return hit;
   }
   return null;

@@ -327,7 +327,7 @@ console.log('\n2. Vaults from another version are refused and stay as they were\
   // A new vault whose creation was cut short before the stamp: created again on the next open.
   {
     const db = freshDb('unfinished.db');
-    for (const table of ['schema_version', 'tags', 'categories']) db.raw.exec(schemaA[table].sql.replace(/^CREATE TABLE (\w+)\(/, 'CREATE TABLE $1 ('));
+    for (const table of ['schema_version', 'tags', 'templates', 'categories']) db.raw.exec(schemaA[table].sql.replace(/^CREATE TABLE (\w+)\(/, 'CREATE TABLE $1 ('));
     db.raw.exec("INSERT INTO categories (id, name) VALUES ('half', 'Half')");
     await runMigrations(db);
     check('a new vault cut short before its stamp is created again, complete',
@@ -340,6 +340,12 @@ console.log('\n2. Vaults from another version are refused and stay as they were\
     CREATE TABLE schema_version (version INTEGER PRIMARY KEY, name TEXT NOT NULL, applied_at TEXT NOT NULL);
     INSERT INTO schema_version VALUES (${BASELINE_VERSION + 1}, 'future', '2030-01-01');`);
   check('a vault of a newer version is refused as too new, unchanged', await refuses(newer, VAULT_TOO_NEW));
+  // The first fresh schema still told entries apart by a type; it was never released.
+  const firstFresh = await prepare('first-fresh.db', `
+    CREATE TABLE schema_version (version INTEGER PRIMARY KEY, name TEXT NOT NULL, applied_at TEXT NOT NULL);
+    INSERT INTO schema_version VALUES (100, 'baseline', '2026-11-01');
+    CREATE TABLE entries (id TEXT PRIMARY KEY, type TEXT NOT NULL);`);
+  check('a vault of the first fresh schema (v100, entries with a type) is refused as outdated, unchanged', await refuses(firstFresh, VAULT_OUTDATED));
 
   // The mechanism for the steps to come: a vault at the fresh start runs a
   // step above it once, stamps it, and keeps the schema otherwise.
@@ -365,22 +371,29 @@ console.log('\n3. checkIntegrity finds what foreign keys do not cover\n');
   const db = freshDb('integrity.db');
   await runMigrations(db);
   await db.execute(
-    `INSERT INTO entries (id,type,title,created_at,updated_at,tags)
-     VALUES ('e1','wiki','Artikel',$1,$1,'[]')`,
+    `INSERT INTO entries (id,title,created_at,updated_at,tags)
+     VALUES ('e1','Artikel',$1,$1,'[]')`,
     [now]
   );
   await db.execute(`INSERT INTO tasks (id,title,created_at,updated_at) VALUES ('t1','Aufgabe',$1,$1)`, [now]);
   await db.execute(
     `INSERT INTO task_links (id,task_id,target_id,target_type)
-     VALUES ('tl1','t1','fehlt','wiki'), ('tl2','t1','e1','journal'), ('tl3','t1','e1','wiki')`
+     VALUES ('tl1','t1','fehlt','entry'), ('tl2','t1','e1','task'), ('tl3','t1','e1','entry')`
   );
 
   const found = await checkIntegrity(db);
   const hit = (id, type) => found.some((o) => o.table === 'task_links' && o.id === id && o.missingTarget === type);
 
-  check('orphan in task_links detected', hit('fehlt', 'wiki'));
-  check('a link with the wrong type counts as an orphan', hit('e1', 'journal'));
-  check('the correct link to the same entry does not', !hit('e1', 'wiki'), JSON.stringify(found));
+  check('orphan in task_links detected', hit('fehlt', 'entry'));
+  check('a link with the wrong kind counts as an orphan', hit('e1', 'task'));
+  check('the correct link to the same entry does not', !hit('e1', 'entry'), JSON.stringify(found));
+  let badKind = false;
+  try {
+    await db.execute("INSERT INTO task_links (id,task_id,target_id,target_type) VALUES ('tl4','t1','e1','wiki')");
+  } catch {
+    badKind = true;
+  }
+  check('a link target kind other than entry/task is refused by the CHECK', badKind);
   await sweepDanglingTaskLinks(db);
   const kept = (await db.select('SELECT id FROM task_links ORDER BY id')).map((r) => r.id);
   check('the sweep removes the same links that checkIntegrity reports', JSON.stringify(kept) === '["tl3"]', JSON.stringify(kept));
@@ -400,8 +413,8 @@ console.log('\n4. Deleting a category loses no entries\n');
      VALUES ('temporaer','Temporär','🧪',99,0)` // lang-ok
   );
   await db.execute(
-    `INSERT INTO entries (id,type,title,category_id,created_at,updated_at,tags)
-     VALUES ('a1','wiki','Wichtiger Artikel','temporaer',$1,$1,'[]')`,
+    `INSERT INTO entries (id,title,category_id,created_at,updated_at,tags)
+     VALUES ('a1','Wichtiger Artikel','temporaer',$1,$1,'[]')`,
     [now]
   );
   // The same category also holds content of the other modules.
@@ -443,8 +456,7 @@ console.log('\n5. Backup with entries without a category\n');
 
   const payload = {
     categories: [{ id: 'sigils', name: 'Sigils' }],
-    wikiArticles: [{ id: 'a', title: 'Ohne', category_id: null }], // lang-ok
-    operations: [{ id: 'o', title: 'Ohne', category_id: null }], // lang-ok
+    entries: [{ id: 'a', title: 'Ohne', category_id: null }, { id: 'o', title: 'Ohne', category_id: null }], // lang-ok
     tasks: [{ id: 't', title: 'Ohne', category_id: null }], // lang-ok
   };
 
@@ -461,7 +473,7 @@ console.log('\n5. Backup with entries without a category\n');
   // An empty *string* remains a hit into nothing and must keep being noticed.
   let rejected = false;
   try {
-    await assertPayloadReferencesResolve(db, { wikiArticles: [{ id: 'b', category_id: '' }] });
+    await assertPayloadReferencesResolve(db, { entries: [{ id: 'b', category_id: '' }] });
   } catch {
     rejected = true;
   }
@@ -531,14 +543,14 @@ console.log('\n6. Insertion order during import\n');
   db.close();
 }
 
-console.log('\n7. Seeds: built-in categories, starter set, built-in templates\n');
+console.log('\n7. Seeds: built-in categories, starter set, built-in templates and dashboards\n');
 
 {
   const cats = await baseline.select('SELECT id, name, is_builtin, sort_order FROM categories ORDER BY sort_order');
   check(
-    'two builtins, "sigils" and "altars", and no "other"',
-    cats.filter((c) => c.is_builtin === 1).map((c) => c.id).join() === 'sigils,altars' &&
-      cats[0].id === 'sigils' && !cats.some((c) => c.id === 'other'),
+    'three builtins, "journal", "sigils" and "altars", and no "other"',
+    cats.filter((c) => c.is_builtin === 1).map((c) => c.id).join() === 'journal,sigils,altars' &&
+      cats[0].id === 'journal' && !cats.some((c) => c.id === 'other'),
     JSON.stringify(cats)
   );
   check(
@@ -548,10 +560,11 @@ console.log('\n7. Seeds: built-in categories, starter set, built-in templates\n'
   );
   const [t] = await baseline.select("SELECT * FROM templates WHERE id='core-sigil'");
   const content = await stackOf(baseline, 'template', 'core-sigil');
+  const starts = Object.fromEntries((await baseline.select('SELECT id, template_id FROM categories')).map((c) => [c.id, c.template_id]));
   check(
-    'exactly one sigil template, assigned to operation × sigils',
-    !!t && JSON.stringify(JSON.parse(t.assignments)) === JSON.stringify([{ entryType: 'operation', category: 'sigils' }]),
-    JSON.stringify(t)
+    'exactly one sigil template, the start template of "sigils"',
+    !!t && starts.sigils === 'core-sigil',
+    JSON.stringify(starts)
   );
   check(
     'with calculator, drawing and charge as fields and paint blocks (harness: English name)',
@@ -559,40 +572,53 @@ console.log('\n7. Seeds: built-in categories, starter set, built-in templates\n'
       && ['sigilCalc', 'sigilCharge'].every((kind) => content.includes(kind)),
     content
   );
-  const [altar] = await baseline.select("SELECT assignments FROM templates WHERE id='core-altar'");
-  check('the altar template, assigned to operation × altars',
-    JSON.stringify(JSON.parse(altar?.assignments ?? '[]')) === JSON.stringify([{ entryType: 'operation', category: 'altars' }]), JSON.stringify(altar));
+  check('the altar template, the start template of "altars"; no other category has one',
+    starts.altars === 'core-altar' && Object.entries(starts).every(([id, tpl]) => ['sigils', 'altars'].includes(id) || tpl === null), JSON.stringify(starts));
+  const dashboards = await baseline.select('SELECT id, builtin, position, filter, sort FROM dashboards ORDER BY position');
+  const filterOf = (id) => JSON.parse(dashboards.find((d) => d.id === id)?.filter ?? 'null');
+  check('four built-in dashboards, "all" first, each with its key as ID',
+    dashboards.map((d) => d.id).join() === 'all,journal,operations,wiki' && dashboards.every((d) => d.builtin === d.id), JSON.stringify(dashboards));
+  check('"all" has no filter; journal, operations and wiki filter by their starter categories',
+    JSON.stringify(filterOf('all')) === '{}'
+      && JSON.stringify(filterOf('journal')) === JSON.stringify({ categories: ['journal'] })
+      && JSON.stringify(filterOf('operations')) === JSON.stringify({ categories: ['sigils', 'altars', 'ritual', 'meditation'] })
+      && JSON.stringify(filterOf('wiki')) === JSON.stringify({ categories: ['paradigm', 'herbs', 'crystals', 'candles', 'deities', 'tools'] }),
+    JSON.stringify(dashboards));
+  check('every category of a dashboard exists', (await checkIntegrity(baseline)).filter((o) => o.table === 'dashboards').length === 0);
 }
 
 console.log('\n8. Templates and the lexicon\n');
 
 {
-  // Assignments: detect orphans, clean them up when a category is permanently deleted.
+  // Dashboard filters: detect orphans, clean them up when a category is permanently deleted.
   const db = await freshVault('templates.db');
   await db.execute(
     `INSERT INTO categories (id,name,emoji,sort_order,is_builtin) VALUES ('weg','Weg','x',99,0)`
   );
-  await insertWithStack(db, 'templates', {
-    id: 't1', name: 'Vorlage', created_at: now, updated_at: now,
-    assignments: JSON.stringify([
-      { entryType: 'wiki', category: 'weg' },
-      { entryType: 'wiki', category: '*' },
-      { entryType: 'operation', category: 'fehlt' },
-    ]),
-  }, `<p><img src="${'d'.repeat(64)}.png"></p>`);
+  await db.execute(
+    `INSERT INTO dashboards (id,name,filter,created_at,updated_at) VALUES ('d1','Eigen',$1,$2,$2)`, // lang-ok
+    [JSON.stringify({ categories: ['weg', 'herbs', 'fehlt'] }), now],
+  );
+  await insertWithStack(db, 'templates', { id: 't1', name: 'Vorlage', created_at: now, updated_at: now }, `<p><img src="${'d'.repeat(64)}.png"></p>`);
   const orphans = await checkIntegrity(db);
   check(
-    'checkIntegrity reports the assignment to a missing category, not "*"',
-    orphans.length === 1 && orphans[0].table === 'templates' && orphans[0].missingTarget === 'categories.fehlt',
+    'checkIntegrity reports a dashboard filtering by a missing category',
+    orphans.length === 1 && orphans[0].table === 'dashboards' && orphans[0].missingTarget === 'categories.fehlt',
     JSON.stringify(orphans)
   );
   await reassignCategoryContent(db, 'weg');
-  const [t1] = await db.select("SELECT assignments FROM templates WHERE id='t1'");
+  const [d1] = await db.select("SELECT filter FROM dashboards WHERE id='d1'");
   check(
-    'reassignCategoryContent removes the category from the assignments',
-    !t1.assignments.includes('"weg"') && t1.assignments.includes('"*"'),
-    t1.assignments
+    'reassignCategoryContent removes the category from the dashboards\' filters',
+    !d1.filter.includes('"weg"') && d1.filter.includes('"herbs"'),
+    d1.filter
   );
+  // A category's start template: deleting the template for good leaves the category without one.
+  await db.execute("UPDATE categories SET template_id='t1' WHERE id='herbs'");
+  await db.execute("DELETE FROM templates WHERE id='t1'");
+  check('deleting a start template for good clears it on its category (ON DELETE SET NULL)',
+    (await db.select("SELECT template_id FROM categories WHERE id='herbs'"))[0].template_id === null);
+  await insertWithStack(db, 'templates', { id: 't1', name: 'Vorlage', created_at: now, updated_at: now }, `<p><img src="${'d'.repeat(64)}.png"></p>`);
   check(
     'collectUsedImageFilenames knows images in the block stack of a template',
     (await collectUsedImageFilenames(db)).has(`${'d'.repeat(64)}.png`)
@@ -606,28 +632,20 @@ console.log('\n8. Templates and the lexicon\n');
     (await collectUsedImageFilenames(db)).has(`${'e'.repeat(64)}.webp`)
   );
 
-  // Merging: assignments move along, one template per type and category, the one holding it wins.
+  // Merging: the dashboards name the surviving category, once.
   await db.execute(`INSERT INTO categories (id,name,emoji,sort_order,is_builtin) VALUES ('alt','Alt','x',100,0), ('neu','Neu','x',101,0)`);
-  const insertTpl = (id, assignments, deletedAt = null) => db.execute(
-    `INSERT INTO templates (id,name,assignments,created_at,updated_at,deleted_at) VALUES (?1,?1,?2,?3,?3,?4)`,
-    [id, JSON.stringify(assignments), now, deletedAt]
+  await db.execute(
+    `INSERT INTO dashboards (id,name,filter,created_at,updated_at) VALUES ('d2','A',$1,$3,$3), ('d3','B',$2,$3,$3)`,
+    [JSON.stringify({ categories: ['alt'] }), JSON.stringify({ categories: ['alt', 'neu'] }), now],
   );
-  await insertTpl('m1', [{ entryType: 'wiki', category: 'alt' }, { entryType: 'operation', category: 'alt' }]);
-  await insertTpl('m2', [{ entryType: 'wiki', category: 'neu' }]);
   await reassignCategoryContent(db, 'alt', 'neu');
-  const merged = Object.fromEntries((await db.select("SELECT id, assignments FROM templates WHERE id IN ('m1','m2')"))
-    .map((r) => [r.id, JSON.parse(r.assignments)]));
-  check('merging: no assignment stays on the old category',
-    !JSON.stringify(merged).includes('"alt"'), JSON.stringify(merged));
-  check('merging: the combination already held stays, the free one moves',
-    merged.m2.length === 1 && merged.m1.length === 1 && merged.m1[0].entryType === 'operation' && merged.m1[0].category === 'neu', JSON.stringify(merged));
-  await db.execute(`INSERT INTO categories (id,name,emoji,sort_order,is_builtin) VALUES ('alt2','Alt2','x',102,0), ('neu2','Neu2','x',103,0)`);
-  await insertTpl('m3', [{ entryType: 'wiki', category: 'alt2' }, { entryType: 'wiki', category: 'neu2' }]);
-  await reassignCategoryContent(db, 'alt2', 'neu2');
-  const [m3] = await db.select("SELECT assignments FROM templates WHERE id='m3'");
-  check('merging: a template with both categories keeps one assignment',
-    JSON.stringify(JSON.parse(m3.assignments)) === JSON.stringify([{ entryType: 'wiki', category: 'neu2' }]), m3.assignments);
-  check('merging: no orphans', (await checkIntegrity(db)).filter((o) => o.table === 'templates' && o.missingTarget !== 'categories.fehlt').length === 0);
+  const merged = Object.fromEntries((await db.select("SELECT id, filter FROM dashboards WHERE id IN ('d2','d3')"))
+    .map((r) => [r.id, JSON.parse(r.filter).categories]));
+  check('merging: a dashboard of the old category shows the surviving one',
+    JSON.stringify(merged.d2) === '["neu"]', JSON.stringify(merged));
+  check('merging: a dashboard with both categories names the survivor once',
+    JSON.stringify(merged.d3) === '["neu"]', JSON.stringify(merged));
+  check('merging: no orphans', (await checkIntegrity(db)).filter((o) => o.missingTarget !== 'categories.fehlt').length === 0);
   db.close();
 }
 {
@@ -672,7 +690,7 @@ console.log('\n9. Block rows\n');
 
   const linked = '44444444-4444-4444-4444-444444444444';
   const chip = `<span data-type="internalLink" class="internal-link" data-id="${linked}" data-entry-type="wiki" data-label="Ziel">Ziel</span>`;
-  await insertWithStack(db, 'entries', { id: 'p1', type: 'journal', title: 'Plain', created_at: now, updated_at: now }, `<p>Text ${chip}</p>`);
+  await insertWithStack(db, 'entries', { id: 'p1', title: 'Plain', created_at: now, updated_at: now }, `<p>Text ${chip}</p>`);
   const [p1] = await db.select("SELECT type, text FROM blocks WHERE entry_id = 'p1'");
   check('a text entry is one text row with its plain text', p1?.type === 'core.text' && p1.text === 'Text Ziel', p1); // lang-ok
   check('its chip is a reference', (await db.select('SELECT COUNT(*) AS n FROM block_refs WHERE target = $1', [linked]))[0].n === 1);
@@ -702,7 +720,7 @@ console.log('\n9. Block rows\n');
 
   // The lists read only the index at startup (`fetchEntries`).
   const plan = async (sql) => (await db.select(`EXPLAIN QUERY PLAN ${sql}`)).map((r) => r.detail).join(' | ');
-  const list = await plan('SELECT id, type, title, category_id, entry_number, tags, created_at, updated_at, deleted_at FROM entries WHERE deleted_at IS NULL');
+  const list = await plan('SELECT id, title, category_id, entry_number, tags, created_at, updated_at, deleted_at FROM entries WHERE deleted_at IS NULL');
   check('the list query reads only the index', list.includes('COVERING INDEX idx_entries_list'), list);
   const decorated = await plan('SELECT id, icon, cover_image FROM entries WHERE deleted_at IS NULL AND (icon IS NOT NULL OR cover_image IS NOT NULL)');
   check('icon and cover image come via the partial index', decorated.includes('idx_entries_decorated'), decorated);
@@ -724,8 +742,8 @@ console.log('\n10. Readers of the block rows: "Images", image cleanup, field val
     + ` data-block-data="${enc({ values: { d: { v: 1, layers: [{ id: 'L1', image: true }] } } })}">`
     + `<dl><dt>Zeichnung</dt><dd data-block-slot="el:d"><img src="${render}" alt="" data-paint="render"><img src="${layer}" alt="" data-paint="L1"></dd></dl></section>`; // lang-ok
   const text = `<section data-block="core.text" data-block-id="tx"><p><img src="${shown}"></p></section>`;
-  await insertWithStack(db, 'entries', { id: 'u1', type: 'journal', title: 'Uses', created_at: now, updated_at: now }, part + text);
-  await insertWithStack(db, 'entries', { id: 'u2', type: 'wiki', title: 'Gone', created_at: now, updated_at: now, deleted_at: now }, `<p><img src="${trashed}"></p>`);
+  await insertWithStack(db, 'entries', { id: 'u1', title: 'Uses', created_at: now, updated_at: now }, part + text);
+  await insertWithStack(db, 'entries', { id: 'u2', title: 'Gone', created_at: now, updated_at: now, deleted_at: now }, `<p><img src="${trashed}"></p>`);
   await insertWithStack(db, 'templates', { id: 'ut', name: 'Tpl', created_at: now, updated_at: now }, `<p><img src="${tplPic}"></p>`);
 
   const uses = await collectImageUses(db);
@@ -740,7 +758,7 @@ console.log('\n10. Readers of the block rows: "Images", image cleanup, field val
     [shown, render, layer, tplPic, trashed].every((f) => used.has(f)), [...used]);
   check('image cleanup: a picture nobody names is not', !used.has(name('6')));
   // A canvas whose JSON cannot be read still names its pictures in its markup: the cleanup keeps them.
-  await insertWithStack(db, 'entries', { id: 'u3', type: 'journal', title: 'Broken', created_at: now, updated_at: now },
+  await insertWithStack(db, 'entries', { id: 'u3', title: 'Broken', created_at: now, updated_at: now },
     `<section data-block="core.canvas" data-block-id="cv" data-block-data="{nope"><img src="${name('7')}" data-canvas="image"></section>`);
   check('image cleanup: a block it cannot read keeps the pictures its row names', (await collectUsedImageFilenames(db)).has(name('7')));
 
@@ -748,9 +766,9 @@ console.log('\n10. Readers of the block rows: "Images", image cleanup, field val
   const fields = (id, values) => `<section data-block="core.fields" data-block-id="${id}"`
     + ` data-block-config="${enc({ elements: [{ id: 'n1', kind: 'number', label: 'N' }, { id: 's1', kind: 'shorttext', label: 'S' }, { id: 'b1', kind: 'toggle', label: 'B' }] })}"`
     + ` data-block-data="${enc({ values })}"><dl></dl></section>`;
-  await insertWithStack(db, 'entries', { id: 'f1', type: 'operation', title: 'F1', created_at: now, updated_at: now }, fields('fa', { n1: 5, s1: 'Hallo Welt', b1: true })); // lang-ok
-  await insertWithStack(db, 'entries', { id: 'f2', type: 'operation', title: 'F2', created_at: now, updated_at: now }, fields('fb', { n1: 7, s1: '', b1: false }));
-  await insertWithStack(db, 'entries', { id: 'f3', type: 'operation', title: 'F3', created_at: now, updated_at: now, deleted_at: now }, fields('fc', { n1: 5 }));
+  await insertWithStack(db, 'entries', { id: 'f1', title: 'F1', created_at: now, updated_at: now }, fields('fa', { n1: 5, s1: 'Hallo Welt', b1: true })); // lang-ok
+  await insertWithStack(db, 'entries', { id: 'f2', title: 'F2', created_at: now, updated_at: now }, fields('fb', { n1: 7, s1: '', b1: false }));
+  await insertWithStack(db, 'entries', { id: 'f3', title: 'F3', created_at: now, updated_at: now, deleted_at: now }, fields('fc', { n1: 5 }));
   const ids = async (elementId, condition, extra = {}) => (await entriesWithFieldValue(db, { elementId, condition, ...extra })).sort().join();
   check('field values: equals a number, the trash left out', (await ids('n1', { op: 'equals', value: 5 })) === 'f1');
   check('field values: the trash on request', (await ids('n1', { op: 'equals', value: 5 }, { includeDeleted: true })) === 'f1,f3');
@@ -766,7 +784,7 @@ console.log('\n10. Readers of the block rows: "Images", image cleanup, field val
   db.close();
 }
 
-console.log("\n11. Backups: the round trip of '15', older and newer files refused\n");
+console.log("\n11. Backups: the round trip of '16', older and newer files refused\n");
 
 {
   const { createHash } = await import('node:crypto');
@@ -774,7 +792,7 @@ console.log("\n11. Backups: the round trip of '15', older and newer files refuse
   const savedName = (dataUrl) => `${createHash('sha256').update(dataUrl).digest('hex')}.png`;
   globalThis.harnessSaveImage = savedName;
   const FULL = {
-    includeJournal: true, includeWiki: true, includeOperations: true, includeTasks: true, includeTags: true,
+    categoryIds: null, includeUncategorized: true, includeTasks: true, includeTags: true,
     includeLexicon: true, dateFrom: '', dateTo: '', includeDeleted: true,
   };
   const ownColumn = { entry: 'entry_id', template: 'template_id' };
@@ -805,14 +823,14 @@ console.log("\n11. Backups: the round trip of '15', older and newer files refuse
   const TASK = '7b000000-0000-4000-8000-000000000004';
   const pic = (c) => `${c.repeat(64)}.png`;
   const attr = (value) => JSON.stringify(value).replace(/&/g, '&amp;').replace(/"/g, '&quot;');
-  const chipTo = (id) => `<span data-type="internalLink" class="internal-link" data-id="${id}" data-entry-type="wiki" data-label="Ziel">Ziel</span>`; // lang-ok
+  const chipTo = (id) => `<span data-type="internalLink" class="internal-link" data-id="${id}" data-entry-type="entry" data-label="Ziel">Ziel</span>`; // lang-ok
   const scene = {
     width: 1600, height: 1000, elements: [], guides: [], guidesLocked: false,
     background: { fill: null, image: { src: pic('4') }, tint: null },
   };
   const fieldsConfig = {
     elements: [
-      { id: 'ln', kind: 'link', label: 'L', defaultValue: { id: W, entryType: 'wiki', label: 'Ziel' } }, // lang-ok
+      { id: 'ln', kind: 'link', label: 'L', defaultValue: { id: W, entryType: 'entry', label: 'Ziel' } }, // lang-ok
       { id: 'im', kind: 'image', label: 'I', defaultValue: pic('5') },
     ],
   };
@@ -824,19 +842,19 @@ console.log("\n11. Backups: the round trip of '15', older and newer files refuse
     + `<section data-block="core.fields" data-block-id="f1" data-block-config="${attr(fieldsConfig)}"></section>`;
 
   const src = await freshVault('backup-src.db');
-  await insertWithStack(src, 'entries', { id: W, type: 'wiki', title: 'Ziel', created_at: now, updated_at: now }, '<p>Ziel</p>'); // lang-ok
-  await insertWithStack(src, 'entries', { id: J, type: 'journal', title: 'Quelle', created_at: now, updated_at: now }, journalStack); // lang-ok
+  await insertWithStack(src, 'entries', { id: W, title: 'Ziel', created_at: now, updated_at: now }, '<p>Ziel</p>'); // lang-ok
+  await insertWithStack(src, 'entries', { id: J, title: 'Quelle', created_at: now, updated_at: now }, journalStack); // lang-ok
   await insertWithStack(src, 'templates', { id: TPL, name: 'Vorlage', created_at: now, updated_at: now }, `<p>Bild</p><img src="${pic('6')}">`); // lang-ok
   await src.execute(`INSERT INTO tasks (id,title,created_at,updated_at) VALUES ($1,'Aufgabe',$2,$2)`, [TASK, now]); // lang-ok
-  await src.execute(`INSERT INTO task_links (id,task_id,target_id,target_type) VALUES ('tl1',$1,$2,'wiki')`, [TASK, W]);
+  await src.execute(`INSERT INTO task_links (id,task_id,target_id,target_type) VALUES ('tl1',$1,$2,'entry')`, [TASK, W]);
   // A block written at another time than the others keeps that time.
   await src.execute("UPDATE blocks SET updated_at = '2025-05-05T05:05:05.000Z' WHERE entry_id = $1 AND id = 'p1'", [J]);
   const journalBefore = await blockRows(src, 'entry', J);
   const sigilBefore = await blockRows(src, 'template', 'core-sigil');
 
   const backup = await buildBackupFrom(src, FULL);
-  check("export: version '15', the blocks as rows, no content on their owners",
-    backup.version === '15' && Array.isArray(backup.data.blocks) && backup.data.blocks.length > 0
+  check("export: version '16', the blocks as rows, no content on their owners",
+    backup.version === '16' && Array.isArray(backup.data.blocks) && backup.data.blocks.length > 0
       && backup.data.entries.every((r) => !('content' in r)) && backup.data.templates.every((r) => !('content' in r))
       && backup.data.blocks.every((r) => !('row_id' in r) && !('text' in r)), backup.data.blocks?.[0]);
   check("export: every picture of the blocks travels, the one only in a prefill's JSON too",
@@ -883,8 +901,7 @@ console.log("\n11. Backups: the round trip of '15', older and newer files refuse
 
   // (c) A partial replace — journal and tasks only: no other owner gets blocks, a link to the missing article goes.
   const partial = reread(backup);
-  partial.data.wikiArticles = [];
-  partial.data.operations = [];
+  partial.data.entries = partial.data.entries.filter((r) => r.id !== W);
   const dst2 = await freshVault('backup-partial.db');
   clearSavedBlocks();
   await doReplace(dst2, partial);
@@ -918,9 +935,10 @@ console.log("\n11. Backups: the round trip of '15', older and newer files refuse
 
   // Files of other versions: refused when they are read, before anything happens.
   const refused = (version, code) => throwsCode(() => readBackupPayload({ ...JSON.parse(JSON.stringify(backup)), version }), code);
+  check("a backup of '15' (entries with a type) is refused as outdated", await refused('15', BACKUP_OUTDATED));
   check("a backup of '14' (the last version before the fresh start) is refused as outdated", await refused('14', BACKUP_OUTDATED));
   check("a backup of '1' is refused as outdated", await refused('1', BACKUP_OUTDATED));
-  check("a backup of '16' is refused as too new", await refused('16', BACKUP_TOO_NEW));
+  check("a backup of '17' is refused as too new", await refused('17', BACKUP_TOO_NEW));
   check('a backup without a usable version is refused', await throwsCode(() => readBackupPayload({ ...backup, version: 'x' }), 'Unsupported backup version'));
   const fixture = (name) => JSON.parse(readFileSync(join(process.cwd(), 'tools/mcp/seed/imports', name), 'utf8'));
   for (const name of ['backup-v12-altars.emeralddb', 'backup-v13-pre-rebuild.emeralddb']) {

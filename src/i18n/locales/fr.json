@@ -29,10 +29,11 @@
     "uncategorized": "Sans catégorie",
     "nameTaken": "Cette catégorie existe déjà",
     "dragHint": "Glissez pour réordonner.",
-    "builtinHint": "Intégrée — ne peut être ni renommée ni supprimée.",
+    "builtinHint": "Intégrée — ne peut être ni renommée ni supprimée. Son modèle de départ peut être changé.",
     "builtin": {
       "sigils": "Sigils",
-      "altars": "Autels"
+      "altars": "Autels",
+      "journal": "Journal"
     },
     "starter": {
       "paradigm": "Paradigme",
@@ -43,7 +44,10 @@
       "candles": "Bougies",
       "deities": "Divinités",
       "tools": "Outils"
-    }
+    },
+    "startTemplate": "Modèle de départ",
+    "startTemplateDefault": "Modèle par défaut",
+    "startTemplateHint": "Ce par quoi commence une nouvelle entrée de cette catégorie. « Modèle par défaut » est celui choisi sous Modèles."
   },
   "listView": {
     "view": "Vue",
@@ -846,8 +850,6 @@
     "noEntry": "Ouvrez une entrée pour voir ses propriétés.",
     "title": "Propriétés",
     "type": "Type",
-    "typeDropsProperties": "Les entrées du journal n’ont ni catégorie, ni icône, ni image de couverture ; elles seront supprimées.",
-    "changeType": "Convertir",
     "category": "Catégorie",
     "noCategory": "Aucune",
     "moonPhase": "Phase lunaire",
@@ -866,7 +868,8 @@
     "chooseImage": "Choisir une image",
     "linkEntry": "Lier une entrée …",
     "addTag": "Ajouter un tag …",
-    "removeTag": "Retirer le tag"
+    "removeTag": "Retirer le tag",
+    "area": "Module"
   },
   "filters": {
     "all": "Toutes",
@@ -1000,9 +1003,6 @@
     "importDb": "Importer la base de données",
     "importBrowse": "Sélectionner un fichier…",
     "importedVault": "Vault importé",
-    "includeJournal": "Journal",
-    "includeWiki": "Wiki",
-    "includeOperations": "Opérations",
     "includeTasks": "Tâches",
     "includeTags": "Tags",
     "includeLexicon": "Lexique",
@@ -1169,7 +1169,14 @@
     "theme": "Thème",
     "text": "Texte",
     "importErrorOldVersion": "Cette sauvegarde provient d'une version antérieure d'Emerald et ne peut pas être restaurée dans celle-ci. Rien n'a été modifié ; un convertisseur suivra.",
-    "importErrorNewVersion": "Cette sauvegarde provient d'une version plus récente d'Emerald. Mettez à jour cette application pour la restaurer. Rien n'a été modifié."
+    "importErrorNewVersion": "Cette sauvegarde provient d'une version plus récente d'Emerald. Mettez à jour cette application pour la restaurer. Rien n'a été modifié.",
+    "entriesByCategory": "Entrées par catégorie",
+    "includeUncategorizedHint": "Les entrées sans catégorie et celles dont la catégorie est dans la corbeille.",
+    "groupTemplates": "Modèles",
+    "previewEntries": "Entrées",
+    "previewTemplates": "Modèles",
+    "previewTasks": "Tâches",
+    "previewLanguages": "Langues"
   },
   "contextMenu": {
     "openInNewTab": "Ouvrir dans un nouvel onglet",
@@ -1293,15 +1300,6 @@
     "entryTitlePlaceholder": "Laisser vide pour le titre habituel",
     "content": "Contenu",
     "contentPlaceholder": "Ce que chaque entrée issue de ce modèle contient au départ …",
-    "allCategories": "Toutes les catégories",
-    "overview": {
-      "title": "Attributions",
-      "hint": "Les nouvelles entrées commencent par une copie du modèle attribué. « Toutes les catégories » s’applique lorsqu’une catégorie n’en a pas.",
-      "category": "Catégorie",
-      "none": "Aucun modèle",
-      "fallback": "Sinon : {{name}} (toutes les catégories)",
-      "everyEntry": "Chaque nouvelle entrée"
-    },
     "saveAsTemplate": "Enregistrer comme modèle",
     "insert": {
       "button": "Insérer un modèle",
@@ -1311,8 +1309,9 @@
       "noticeApplied": "Modèle « {{name}} » appliqué",
       "dismiss": "Fermer"
     },
-    "assignTitle": "Attributions – {{name}}",
-    "assignHint": "Cliquez sur une cellule pour que les nouvelles entrées commencent par ce modèle ; un second clic l’annule. S’applique aussitôt."
+    "defaultTemplate": "Modèle par défaut",
+    "defaultTemplateHint": "Ce par quoi commence une nouvelle entrée quand sa catégorie n’a pas de modèle de départ propre. Les modèles de départ se choisissent sur la catégorie, sous Catégories.",
+    "defaultNone": "Aucun — commencer vide"
   },
   "lexicon": {
     "languages": "Langues",

@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useEntryStore } from '../store/entryStore';
+import { useEntriesByKind } from './useDashboardEntries';
 import { useTaskStore } from '../store/taskStore';
 import { useCategoryStore } from '../store/categoryStore';
 import { useSettingsStore } from '../store/settingsStore';
@@ -28,9 +28,7 @@ function sharedLinkItems(deps: readonly unknown[], build: () => SuggestionItem[]
  */
 export function useLinkItems(): SuggestionItem[] {
   const { t } = useTranslation();
-  const entries = useEntryStore((s) => s.entries.journal);
-  const articles = useEntryStore((s) => s.entries.wiki);
-  const operations = useEntryStore((s) => s.entries.operation);
+  const { journal: entries, wiki: articles, operation: operations } = useEntriesByKind();
   const categories = useCategoryStore((s) => s.categories);
   const tasks = useTaskStore((s) => s.tasks);
   const showMoonPhase = useSettingsStore((s) => s.settings.journal.moonPhase);

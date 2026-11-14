@@ -106,7 +106,7 @@ export default function EntryDetailFrame({
           />
         ) : (
           <h1 className={ENTRY_TITLE_HEADING_CLASSES}>
-            {displayTitle(t, moduleInfo.entryType, title)}
+            {displayTitle(t, moduleInfo.kind, title)}
           </h1>
         )}
       </div>

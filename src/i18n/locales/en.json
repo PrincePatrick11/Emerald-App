@@ -29,10 +29,11 @@
     "uncategorized": "Uncategorized",
     "nameTaken": "This category already exists",
     "dragHint": "Drag to reorder.",
-    "builtinHint": "Built-in — cannot be renamed or deleted.",
+    "builtinHint": "Built-in — cannot be renamed or deleted. Its start template can be changed.",
     "builtin": {
       "sigils": "Sigils",
-      "altars": "Altars"
+      "altars": "Altars",
+      "journal": "Journal"
     },
     "starter": {
       "paradigm": "Paradigm",
@@ -43,7 +44,10 @@
       "candles": "Candles",
       "deities": "Deities",
       "tools": "Tools"
-    }
+    },
+    "startTemplate": "Start template",
+    "startTemplateDefault": "Default template",
+    "startTemplateHint": "What a new entry in this category starts with. \"Default template\" is the one set under Templates."
   },
   "listView": {
     "view": "View",
@@ -846,8 +850,6 @@
     "noEntry": "Open an entry to see its properties.",
     "title": "Properties",
     "type": "Type",
-    "typeDropsProperties": "Journal entries have no category, icon or cover image — they will be removed.",
-    "changeType": "Convert",
     "category": "Category",
     "noCategory": "None",
     "moonPhase": "Moon phase",
@@ -866,7 +868,8 @@
     "chooseImage": "Choose image",
     "linkEntry": "Link entry …",
     "addTag": "Add tag …",
-    "removeTag": "Remove tag"
+    "removeTag": "Remove tag",
+    "area": "Module"
   },
   "filters": {
     "all": "All",
@@ -992,9 +995,6 @@
     "importDb": "Import Database",
     "importBrowse": "Browse file…",
     "importedVault": "Imported Vault",
-    "includeJournal": "Journal",
-    "includeWiki": "Wiki",
-    "includeOperations": "Operations",
     "includeTasks": "Tasks",
     "includeTags": "Tags",
     "includeLexicon": "Lexicon",
@@ -1161,7 +1161,14 @@
     "theme": "Theme",
     "text": "Text",
     "importErrorOldVersion": "This backup comes from an older version of Emerald and cannot be restored in this one. Nothing was changed; a converter will follow.",
-    "importErrorNewVersion": "This backup comes from a newer version of Emerald. Update this app to restore it. Nothing was changed."
+    "importErrorNewVersion": "This backup comes from a newer version of Emerald. Update this app to restore it. Nothing was changed.",
+    "entriesByCategory": "Entries by category",
+    "includeUncategorizedHint": "Entries without a category, and those whose category is in the trash.",
+    "groupTemplates": "Templates",
+    "previewEntries": "Entries",
+    "previewTemplates": "Templates",
+    "previewTasks": "Tasks",
+    "previewLanguages": "Languages"
   },
   "home": {
     "viewAll": "View all",
@@ -1293,15 +1300,6 @@
     "entryTitlePlaceholder": "Leave empty for the usual title",
     "content": "Content",
     "contentPlaceholder": "What every entry from this template starts with …",
-    "allCategories": "All categories",
-    "overview": {
-      "title": "Assignments",
-      "hint": "New entries start with a copy of the assigned template. “All categories” applies where a category has none of its own.",
-      "category": "Category",
-      "none": "No template",
-      "fallback": "Otherwise: {{name}} (all categories)",
-      "everyEntry": "Every new entry"
-    },
     "saveAsTemplate": "Save as template",
     "insert": {
       "button": "Insert template",
@@ -1311,8 +1309,9 @@
       "noticeApplied": "Template “{{name}}” applied",
       "dismiss": "Dismiss"
     },
-    "assignTitle": "Assignments – {{name}}",
-    "assignHint": "Click a cell to make new entries start with this template, click it again to take it back. Applies at once."
+    "defaultTemplate": "Default template",
+    "defaultTemplateHint": "What a new entry starts with when its category has no start template of its own. Start templates are set on the category, under Categories.",
+    "defaultNone": "None — start empty"
   },
   "lexicon": {
     "languages": "Languages",

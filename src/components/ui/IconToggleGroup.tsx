@@ -5,16 +5,14 @@ import TabIconButton from './TabIconButton';
  * A row of icon buttons as a segmented choice: a shared frame, the
  * active option fills its segment. No visible heading; the icons
  * explain themselves via their tooltips, and the label remains the group's aria-label.
- * Shared by the ListToolbar (view, full width with `fill`),
- * the entry-type choice and the cells in a template's assignment dialog, where
- * a menu per cell would be too much.
+ * Shared by the ListToolbar (view, full width with `fill`) and small
+ * choices where a menu would be too much.
  */
 export default function IconToggleGroup<T extends string>({ label, options, icons, value, onChange, isDisabled, disabledHint, fill }: {
   label: string;
   options: { value: T; label: string }[];
   icons: Record<T, LucideIcon>;
-  /** `null`: no option active, a mixed state, such as "both columns
-   *  at once" in a template's assignments when the columns differ. */
+  /** `null`: no option active — a mixed state. */
   value: T | null;
   onChange: (v: T) => void;
   /** Options that have no effect in the current combination (the
@@ -28,8 +26,7 @@ export default function IconToggleGroup<T extends string>({ label, options, icon
   fill?: boolean;
 }) {
   return (
-    // gap-px keeps the row as narrow as possible without `fill` (cells in the
-    // assignment dialog, entry-type choice).
+    // gap-px keeps the row as narrow as possible without `fill`.
     <div role="group" aria-label={label} className={`${fill ? 'flex w-full' : 'inline-flex'} gap-px p-0.5 rounded-md border border-edge bg-well-strong`}>
       {options.map((option) => {
         const Icon: LucideIcon = icons[option.value];

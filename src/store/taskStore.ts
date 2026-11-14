@@ -5,7 +5,7 @@ import { generateId, nowIso } from '../lib/helpers';
 import { needsWrite, stampFor, type WriteOptions } from '../lib/stamp';
 import { serialKey, serialized } from '../lib/serialize';
 import { fromRow, toInt, type DbRow } from '../lib/row';
-import type { ContentType, Task, TaskLink } from '../types';
+import type { LinkTargetKind, Task, TaskLink } from '../types';
 
 function collectDescendantIds(tasks: Task[], parentId: string): string[] {
   const ids: string[] = [];
@@ -35,7 +35,7 @@ interface TaskState {
   permanentlyDeleteTask: (id: string) => Promise<void>;
   getSubtasks: (parentId: string) => Task[];
 
-  addLink: (taskId: string, targetId: string, targetType: ContentType) => Promise<void>;
+  addLink: (taskId: string, targetId: string, targetType: LinkTargetKind) => Promise<void>;
   removeLink: (id: string) => Promise<void>;
 }
 
@@ -233,7 +233,7 @@ export const useTaskStore = create<TaskState>((set, get) => ({
 
   getSubtasks: (parentId: string) => get().tasks.filter((t) => t.parent_task_id === parentId),
 
-  addLink: async (taskId: string, targetId: string, targetType: ContentType) => {
+  addLink: async (taskId: string, targetId: string, targetType: LinkTargetKind) => {
     // Already linked: nothing to do (the table holds each link only once).
     if (get().links.some((l) => l.task_id === taskId && l.target_id === targetId && l.target_type === targetType)) return;
     const db = await getDb();

@@ -1,18 +1,19 @@
 import { CATEGORY_MODULE_IDS, type CategoryModuleId } from './modules';
 
 /** A translator — `i18n.t`, the `t` from useTranslation or a prop passed down. */
-export type Translate = (key: string) => string;
+export type Translate = (key: string, options?: { defaultValue?: string }) => string;
 
 export interface LabelableCategory {
   id: string;
   name: string;
-  is_builtin: boolean;
+  /** Boolean in the stores, 0/1 in a backup row. */
+  is_builtin: boolean | number;
 }
 
 /**
- * Display name of a category: builtins (`sigils`, `altars`) via the
- * locale key `categories.builtin.<id>`, all others via the stored
- * name.
+ * Display name of a category: builtins (`journal`, `sigils`, `altars`) via the
+ * locale key `categories.builtin.<id>` — one this version does not know
+ * (from a newer backup) by its stored name — all others via the stored name.
  */
 export function categoryLabel(
   t: Translate,
@@ -20,7 +21,7 @@ export function categoryLabel(
   fallback = '',
 ): string {
   if (!cat) return fallback;
-  return cat.is_builtin ? t(`categories.builtin.${cat.id}`) : cat.name;
+  return cat.is_builtin ? t(`categories.builtin.${cat.id}`, { defaultValue: cat.name }) : cat.name;
 }
 
 /**
@@ -66,7 +67,7 @@ export type CategoryUsage = Record<CategoryModuleId, number>;
 /** The entry lists from which a category's usage is derived. */
 export type CategorySources = Record<CategoryModuleId, readonly { category_id: string | null }[]>;
 
-export const emptyCategoryUsage = (): CategoryUsage => ({ wiki: 0, operations: 0, tasks: 0 });
+export const emptyCategoryUsage = (): CategoryUsage => ({ journal: 0, wiki: 0, operations: 0, tasks: 0 });
 
 /**
  * How many entries per module point to each category — one pass per

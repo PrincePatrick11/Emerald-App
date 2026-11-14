@@ -8,7 +8,8 @@ import { useUIStore } from '../../store/uiStore';
 import { EDIT_ENDED, useEntryEditor } from '../../hooks/useEntryEditor';
 import { useEditActions } from '../../hooks/useEditActions';
 import { guardKey } from '../../store/leaveGuardStore';
-import { useEntryStore } from '../../store/entryStore';
+import { findEntry, useEntryStore } from '../../store/entryStore';
+import { useDashboardEntries } from '../../hooks/useDashboardEntries';
 import { useTagMap, visibleTags } from '../../store/tagStore';
 import { useUndoStore } from '../../store/undoStore';
 import BlockStack from '../blocks/BlockStack';
@@ -40,12 +41,14 @@ export default function JournalView() {
   const { activeView, setActiveView, journalPrefs, setJournalPrefs } = useUIStore(
     useShallow((s) => ({ activeView: s.activeView, setActiveView: s.setActiveView, journalPrefs: s.journalPrefs, setJournalPrefs: s.setJournalPrefs }))
   );
-  const { entries, duplicateEntry, updateEntry, deleteEntry, restoreEntry, getEntry } = useEntryStore(
-    useShallow((s) => ({ entries: s.entries.journal, duplicateEntry: s.duplicateEntry, updateEntry: s.updateEntry, deleteEntry: s.deleteEntry, restoreEntry: s.restoreEntry, getEntry: s.getEntry }))
+  const entries = useDashboardEntries('journal');
+  const { duplicateEntry, updateEntry, deleteEntry, restoreEntry, getEntry } = useEntryStore(
+    useShallow((s) => ({ duplicateEntry: s.duplicateEntry, updateEntry: s.updateEntry, deleteEntry: s.deleteEntry, restoreEntry: s.restoreEntry, getEntry: s.getEntry }))
   );
   const pushUndo = useUndoStore((s) => s.push);
 
-  const entry = activeView.id ? getEntry(activeView.id, 'journal') : null;
+  // Any entry opens here, whichever dashboards show it: the page follows its object in the store.
+  const entry = useEntryStore((s) => (activeView.id ? findEntry(s.entries, activeView.id) : undefined)) ?? null;
   // Startup loads content after the lists: until it arrives, the frame with
   // the title is shown, and the block stack only mounts with the real content.
   const contentReady = useEntryContentReady(entry?.id);
@@ -68,21 +71,30 @@ export default function JournalView() {
   // afresh from the restored state via the key.
   const [editorEpoch, setEditorEpoch] = useState(0);
 
-  const fieldsOf = (e: NonNullable<typeof entry>) => ({ title: e.title, content: e.content, tags: e.tags ?? [] });
+  // With the category: moving the entry to another module (`EntryAreaField`) sets it, and Cancel takes it back.
+  const fieldsOf = (e: NonNullable<typeof entry>) => ({
+    title: e.title, content: e.content, tags: e.tags ?? [],
+    category_id: e.category_id, icon: e.icon, cover_image: e.cover_image,
+  });
 
   const { triggerAutoSave, cancelAutoSave, flushAutoSave, restoreOnCancel, isDirty, contentRef, handleContentChange } = useEntryEditor({
     scope: 'journal',
     entityId: entry?.id,
     isEditing,
     ready: !!entry && loadedEntryId === entry.id,
-    // Also what Cancel restores: the entry as it was on entering edit
-    // mode — including the tags the sidebar has saved in the meantime.
     buildPatch: (content) => ({ title, content, tags }),
+    // What Cancel restores: the entry as it was on entering edit
+    // mode — including tags, category, icon and cover image saved meanwhile
+    // (the journal shows neither of the last two, but a move to Wiki does).
+    buildRestorePatch: (content) => ({
+      title, content, tags,
+      category_id: entry?.category_id ?? null, icon: entry?.icon, cover_image: entry?.cover_image,
+    }),
     readStored: (id) => {
-      const stored = getEntry(id, 'journal');
+      const stored = getEntry(id);
       return stored ? fieldsOf(stored) : null;
     },
-    readStamp: (id) => getEntry(id, 'journal')?.updated_at,
+    readStamp: (id) => getEntry(id)?.updated_at,
     update: updateEntry,
   });
 
@@ -179,7 +191,7 @@ export default function JournalView() {
     onSave: handleDone, onCancel: handleCancel, onDelete: handleDelete, flush: flushAutoSave,
     guard: entry ? {
       key: guardKey('journal', entry.id),
-      title: () => title.trim() || getEntry(entry.id, 'journal')?.title.trim() || t('journal.untitled'),
+      title: () => title.trim() || getEntry(entry.id)?.title.trim() || t('journal.untitled'),
       isDirty: () => isDirty(!!activeView.isNew),
     } : undefined,
   });
@@ -340,7 +352,7 @@ export default function JournalView() {
             onClose={() => setCtxMenu(null)}
             actions={[
               { label: t('contextMenu.duplicate'), icon: <Copy size={12} />, onClick: () => handleDuplicate(ctxMenu.id) },
-              saveAsTemplateAction('journal', ctxMenu.id),
+              saveAsTemplateAction(ctxMenu.id),
               { label: t('contextMenu.rename'),    icon: <Pencil size={12} />, onClick: () => startRename(ctxMenu.id) },
               { label: t('contextMenu.delete'),    icon: <Trash2 size={12} />, onClick: () => handleCtxDelete(ctxMenu.id), danger: true },
             ]}
@@ -381,7 +393,7 @@ export default function JournalView() {
           onChange={handleContentChange}
           onReadModeChange={(content) => updateEntry(entry.id, { content })}
           isEditing={isEditing}
-          templateTarget={{ entryType: 'journal', flush: flushAutoSave }}
+          templateTarget={{ flush: flushAutoSave }}
         />
       )}
     </EntryDetailFrame>

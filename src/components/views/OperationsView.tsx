@@ -19,7 +19,8 @@ import { sortItems } from '../../lib/sortItems';
 import { isCardView } from '../../lib/viewMode';
 import { groupByCategory, groupByMonth, UNCATEGORIZED_KEY, countByCategory } from '../../lib/groupBy';
 import { useUIStore } from '../../store/uiStore';
-import { useEntryStore } from '../../store/entryStore';
+import { findEntry, useEntryStore } from '../../store/entryStore';
+import { useDashboardEntries } from '../../hooks/useDashboardEntries';
 import { useTagMap, visibleTags } from '../../store/tagStore';
 import type { Entry } from '../../types';
 import { useCategoryStore } from '../../store/categoryStore';
@@ -42,13 +43,15 @@ export default function OperationsView() {
   );
   const openInNewTabAction = useOpenInNewTabAction();
   const saveAsTemplateAction = useSaveAsTemplateAction();
-  const { operations, duplicateEntry, updateEntry, deleteEntry, restoreEntry, getEntry } = useEntryStore(
-    useShallow((s) => ({ operations: s.entries.operation, duplicateEntry: s.duplicateEntry, updateEntry: s.updateEntry, deleteEntry: s.deleteEntry, restoreEntry: s.restoreEntry, getEntry: s.getEntry }))
+  const operations = useDashboardEntries('operations');
+  const { duplicateEntry, updateEntry, deleteEntry, restoreEntry, getEntry } = useEntryStore(
+    useShallow((s) => ({ duplicateEntry: s.duplicateEntry, updateEntry: s.updateEntry, deleteEntry: s.deleteEntry, restoreEntry: s.restoreEntry, getEntry: s.getEntry }))
   );
   const categories = useCategoryStore((s) => s.categories);
   const pushUndo = useUndoStore((s) => s.push);
 
-  const operation = activeView.id ? getEntry(activeView.id, 'operation') : null;
+  // Any entry opens here, whichever dashboards show it: the page follows its object in the store.
+  const operation = useEntryStore((s) => (activeView.id ? findEntry(s.entries, activeView.id) : undefined)) ?? null;
   // Startup loads content after the lists: until it arrives, the frame with
   // the title is shown, and the block stack only mounts with the real content.
   const contentReady = useEntryContentReady(operation?.id);
@@ -90,10 +93,10 @@ export default function OperationsView() {
       category_id: operation?.category_id ?? null, icon: operation?.icon, cover_image: operation?.cover_image,
     }),
     readStored: (id) => {
-      const stored = getEntry(id, 'operation');
+      const stored = getEntry(id);
       return stored ? fieldsOf(stored) : null;
     },
-    readStamp: (id) => getEntry(id, 'operation')?.updated_at,
+    readStamp: (id) => getEntry(id)?.updated_at,
     update: updateEntry,
   });
 
@@ -195,7 +198,7 @@ export default function OperationsView() {
     onSave: handleDone, onCancel: handleCancel, onDelete: handleDelete, flush: flushAutoSave,
     guard: operation ? {
       key: guardKey('operations', operation.id),
-      title: () => title.trim() || getEntry(operation.id, 'operation')?.title.trim() || t('operations.untitled'),
+      title: () => title.trim() || getEntry(operation.id)?.title.trim() || t('operations.untitled'),
       isDirty: () => isDirty(!!activeView.isNew),
     } : undefined,
   });
@@ -375,7 +378,7 @@ export default function OperationsView() {
               // lost the drawing. Since sigils are blocks in the content,
               // duplicateEntry copies them along — the exception is gone.
               { label: t('contextMenu.duplicate'), icon: <Copy size={12} />, onClick: () => handleDuplicate(ctxMenu.id) },
-              saveAsTemplateAction('operation', ctxMenu.id),
+              saveAsTemplateAction(ctxMenu.id),
               { label: t('contextMenu.rename'),    icon: <Pencil size={12} />, onClick: () => startRename(ctxMenu.id) },
               { label: t('contextMenu.delete'),    icon: <Trash2 size={12} />, onClick: () => handleCtxDelete(ctxMenu.id), danger: true },
             ]}
@@ -409,7 +412,7 @@ export default function OperationsView() {
           onChange={handleContentChange}
           onReadModeChange={(content) => updateEntry(operation.id, { content })}
           isEditing={isEditing}
-          templateTarget={{ entryType: 'operation', flush: flushAutoSave }}
+          templateTarget={{ flush: flushAutoSave }}
         />
       )}
     </EntryDetailFrame>

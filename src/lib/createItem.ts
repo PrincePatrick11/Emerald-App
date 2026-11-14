@@ -7,8 +7,11 @@ import { useLexiconStore } from '../store/lexiconStore';
 import { useTaskStore } from '../store/taskStore';
 import { useTemplateStore } from '../store/templateStore';
 import { useUIStore } from '../store/uiStore';
-import type { ActiveView } from '../types';
+import { useCategoryStore } from '../store/categoryStore';
+import { builtinDashboard, useDashboardStore } from '../store/dashboardStore';
+import type { ActiveView, BuiltinDashboard } from '../types';
 import type { CreatableViewId } from './modules';
+import { firstCategoryOf } from './dashboards';
 
 /**
  * The task the Tasks view should open for naming. A task has no page of its
@@ -34,25 +37,33 @@ function newEntryView(type: 'journal' | 'operations' | 'wiki', entry: { id: stri
     : { type, id: entry.id, mode: 'edit', isNew: true };
 }
 
+/**
+ * The category a new entry created in a module's dashboard starts in: the
+ * first one of the dashboard's filter that is live — the Journal for the
+ * journal. `null` if there is none (the dashboard filters by no category,
+ * or is gone).
+ */
+export function startCategoryOf(dashboard: Exclude<BuiltinDashboard, 'all'>): string | null {
+  const live = new Set(useCategoryStore.getState().categories.map((c) => c.id));
+  return firstCategoryOf(builtinDashboard(useDashboardStore.getState().dashboards, dashboard), live);
+}
+
+/** A new entry in the module's dashboard — in `categoryId` if given, else in its first category. */
+async function createInModule(view: 'journal' | 'operations' | 'wiki', categoryId?: string): Promise<ActiveView> {
+  const entry = await useEntryStore.getState().createEntry({ categoryId: categoryId ?? startCategoryOf(view) });
+  return newEntryView(view, entry);
+}
+
 /** Creates the item and returns where it opens. */
 const creators: Record<CreatableViewId, (categoryId?: string) => Promise<ActiveView>> = {
-  journal: async () => {
-    const entry = await useEntryStore.getState().createEntry('journal');
-    return newEntryView('journal', entry);
-  },
+  journal: () => createInModule('journal'),
   tasks: async (categoryId) => {
     const task = await useTaskStore.getState().createTask(categoryId ?? null);
     taskToName = task.id;
     return { type: 'tasks', id: task.id };
   },
-  operations: async (categoryId) => {
-    const entry = await useEntryStore.getState().createEntry('operation', { categoryId });
-    return newEntryView('operations', entry);
-  },
-  wiki: async (categoryId) => {
-    const entry = await useEntryStore.getState().createEntry('wiki', { categoryId });
-    return newEntryView('wiki', entry);
-  },
+  operations: (categoryId) => createInModule('operations', categoryId),
+  wiki: (categoryId) => createInModule('wiki', categoryId),
   lexicon: async () => {
     const language = await useLexiconStore.getState().createLanguage(i18n.t('lexicon.defaultName'));
     return { type: 'lexicon', id: language.id };

@@ -15,11 +15,11 @@ import { withUsableTags } from '../lib/templateTags';
 import { serializeBlocks } from '../lib/blocks/blockHtml';
 import {
   fieldsWithoutTemplate, fieldsWithTemplate,
-  type Template, type TemplateEntryType, type TemplateFields,
+  type Template, type TemplateFields,
 } from '../lib/blocks/templates';
 
-function entryFields(entryType: TemplateEntryType, id: string): (TemplateFields & { content: string }) | undefined {
-  return useEntryStore.getState().getEntry(id, entryType);
+function entryFields(id: string): (TemplateFields & { content: string }) | undefined {
+  return useEntryStore.getState().getEntry(id);
 }
 
 /** Writes only what has changed in title or tags. */
@@ -38,11 +38,10 @@ async function writeChangedFields(id: string, before: TemplateFields, after: Tem
  * current input.
  */
 export async function applyTemplateFields(
-  entryType: TemplateEntryType,
   id: string,
   template: Pick<Template, 'title' | 'tags'>,
 ): Promise<void> {
-  const fields = entryFields(entryType, id);
+  const fields = entryFields(id);
   if (!fields) return;
   await writeChangedFields(id, fields, fieldsWithTemplate(fields, withUsableTags(template)));
 }
@@ -53,11 +52,10 @@ export async function applyTemplateFields(
  * The stack clears the blocks.
  */
 export async function undoTemplateFields(
-  entryType: TemplateEntryType,
   id: string,
   template: Pick<Template, 'title' | 'tags'>,
 ): Promise<void> {
-  const fields = entryFields(entryType, id);
+  const fields = entryFields(id);
   if (!fields) return;
   await writeChangedFields(id, fields, fieldsWithoutTemplate(fields, template));
 }
@@ -67,10 +65,10 @@ export async function undoTemplateFields(
  * and tags come along. If the entry is currently open in edit mode, the
  * live content of its stack counts, not the last autosave.
  */
-export async function saveEntryAsTemplate(entryType: TemplateEntryType, id: string): Promise<Template | undefined> {
+export async function saveEntryAsTemplate(id: string): Promise<Template | undefined> {
   // Also from the context menu, for an entry never opened since startup.
   await useEntryStore.getState().ensureEntryContent(id);
-  const entry = entryFields(entryType, id);
+  const entry = entryFields(id);
   if (!entry) return undefined;
   const session = useBlockSessionStore.getState().session;
   const content = session?.entryId === id && session.isEditing ? serializeBlocks(session.api.liveBlocks()) : entry.content;

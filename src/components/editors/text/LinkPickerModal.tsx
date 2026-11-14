@@ -13,7 +13,7 @@ type Tab = 'all' | ContentType;
 
 /** Tab order = rail order (registry), not the key order
  *  of some map: journal, task, operation, wiki. */
-const LINK_TYPE_ORDER: ContentType[] = MODULE_LIST.map((mod) => mod.entryType);
+const LINK_TYPE_ORDER: ContentType[] = MODULE_LIST.map((mod) => mod.kind);
 
 interface Props {
   onSelect: (item: SuggestionItem) => void;

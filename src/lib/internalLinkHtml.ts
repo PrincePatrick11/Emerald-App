@@ -1,4 +1,4 @@
-import type { ContentType } from '../types';
+import type { ContentType, LinkTargetKind } from '../types';
 import { htmlTags } from './htmlTags';
 
 /**
@@ -59,30 +59,18 @@ export function extractInternalLinks(
     if (tagAttr(tag, 'data-type') !== 'internalLink') continue;
     const id = tagAttr(tag, 'data-id');
     if (!id) continue;
-    out.push({ id, entryType: tagAttr(tag, 'data-entry-type') ?? 'wiki' });
+    out.push({ id, entryType: linkTargetKindOf(tagAttr(tag, 'data-entry-type')) });
   }
   return out;
 }
 
-const ENTRY_TYPE_ATTR_RE = /\bdata-entry-type=("[^"]*"|'[^']*')/i;
-
 /**
- * Sets the type of all chips pointing at `id` to `entryType` — for an
- * entry that has changed its type (`lib/entryTypeChange.ts`). The ID
- * stays the same, so the one attribute is enough.
- *
- * Deliberately via the start tag like `extractInternalLinks` instead of via
- * `remapInternalLinks`: this runs over the stored content of the whole
- * vault, and a DOM pass would re-serialize every one of them — here only
- * the one attribute changes, everything else stays byte for byte.
+ * The target kind a chip's `data-entry-type` stands for: `task`, or an
+ * entry of whatever kind. Entries have no type — the kind they show under
+ * is looked up live.
  */
-export function retypeInternalLinks(html: string, id: string, entryType: string): string {
-  if (!html || !html.includes(id)) return html;
-  return replaceSpanStartTags(html, (tag) => {
-    if (tagAttr(tag, 'data-type') !== 'internalLink' || tagAttr(tag, 'data-id') !== id) return tag;
-    const attr = `data-entry-type="${entryType}"`;
-    return ENTRY_TYPE_ATTR_RE.test(tag) ? tag.replace(ENTRY_TYPE_ATTR_RE, attr) : tag.replace(/^<span\b/i, `<span ${attr}`);
-  });
+export function linkTargetKindOf(value: string | null | undefined): LinkTargetKind {
+  return value?.trim() === 'task' ? 'task' : 'entry';
 }
 
 const DATA_ID_ATTR_RE = /\bdata-id=("[^"]*"|'[^']*')/i;
@@ -92,7 +80,7 @@ const DATA_ID_ATTR_RE = /\bdata-id=("[^"]*"|'[^']*')/i;
  * import, where the same entries arrive under prefixed IDs. A chip `next`
  * returns `undefined` for stays as it is.
  *
- * Via the start tag like `retypeInternalLinks`: no DOM (the schema harness
+ * Via the start tag like `extractInternalLinks`: no DOM (the schema harness
  * runs the import under Node), and everything but the one attribute stays
  * byte for byte. Only the label is untouched: the target's title does not change.
  */
@@ -165,7 +153,7 @@ export function remapInternalLinks(
   for (const span of Array.from(doc.querySelectorAll('span[data-type="internalLink"]'))) {
     const link: ParsedInternalLink = {
       id: span.getAttribute('data-id') ?? '',
-      entryType: span.getAttribute('data-entry-type') ?? 'wiki',
+      entryType: linkTargetKindOf(span.getAttribute('data-entry-type')),
       label: span.getAttribute('data-label') ?? span.textContent ?? '',
     };
     const resolved = link.id ? resolve(link) : null;
@@ -182,7 +170,7 @@ export function remapInternalLinks(
   return doc.body.innerHTML;
 }
 
-const VALID_ENTRY_TYPES: readonly string[] = ['journal', 'wiki', 'operation', 'task'];
+const VALID_TARGET_KINDS: readonly string[] = ['entry', 'task'];
 /** Standard UUIDs and the 8-character prefix put in front of them on merge import. */
 const LINK_ID_RE = /^([0-9a-z]{8}-)?[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -198,7 +186,7 @@ export function isValidLinkTarget(target: { id?: unknown; entryType?: unknown } 
   if (!target) return false;
   return typeof target.id === 'string'
     && LINK_ID_RE.test(target.id)
-    && VALID_ENTRY_TYPES.includes(String(target.entryType).trim());
+    && VALID_TARGET_KINDS.includes(String(target.entryType).trim());
 }
 
 export function escapeHtml(value: string): string {
@@ -211,24 +199,26 @@ export function escapeHtml(value: string): string {
 
 export interface InternalLinkChip {
   id: string;
-  entryType: ContentType;
+  /** The target kind — `entry` or `task`; an entry's kind is not stored. */
+  entryType: LinkTargetKind;
   label: string;
   icon?: string | null;
   entry_number?: number | null;
 }
 
 /** The chip attributes of a link target — the same names as the node attributes
- *  of `InternalLinkExtension`, so also usable directly as `attrs`. */
+ *  of `InternalLinkExtension`, so also usable directly as `attrs`. `entryType`
+ *  may be a display kind (journal, wiki, …); the chip stores the target kind. */
 export function toInternalLinkChip(item: {
   id: string;
-  entryType: ContentType;
+  entryType: ContentType | LinkTargetKind;
   label: string;
   icon?: string | null;
   entry_number?: number | null;
 }): InternalLinkChip {
   return {
     id: item.id,
-    entryType: item.entryType,
+    entryType: linkTargetKindOf(item.entryType),
     label: item.label,
     icon: item.icon ?? null,
     entry_number: item.entry_number ?? null,

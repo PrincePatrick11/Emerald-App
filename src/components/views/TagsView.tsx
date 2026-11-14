@@ -3,7 +3,7 @@ import { useShallow } from 'zustand/shallow';
 import { useTranslation } from 'react-i18next';
 import { Pencil, Trash2 } from 'lucide-react';
 import { TAG_COLORS, TAG_NAME_TAKEN, randomTagColor, useTagStore } from '../../store/tagStore';
-import { useEntryStore } from '../../store/entryStore';
+import { useEntriesByKind } from '../../hooks/useDashboardEntries';
 import { useTemplateStore } from '../../store/templateStore';
 import { useImageStore } from '../../store/imageStore';
 import { useCategoryStore } from '../../store/categoryStore';
@@ -135,9 +135,7 @@ export default function TagsView() {
   const pushUndo = useUndoStore((s) => s.push);
   // No fetch on mount: reloadAllStores() loads tags and content at startup
   // and on vault switch.
-  const entries = useEntryStore((s) => s.entries.journal);
-  const articles = useEntryStore((s) => s.entries.wiki);
-  const operations = useEntryStore((s) => s.entries.operation);
+  const { journal: entries, wiki: articles, operation: operations } = useEntriesByKind();
   const templates = useTemplateStore((s) => s.templates);
   const images = useImageStore((s) => s.images);
   const categories = useCategoryStore((s) => s.categories);
@@ -371,7 +369,7 @@ export default function TagsView() {
       <DashboardItem view={itemView(item)} layout="row">
         <RowContent
           icon={<Icon size={14} className="text-subtle" />}
-          title={displayTitle(t, meta.entryType, item.title)}
+          title={displayTitle(t, meta.kind, item.title)}
           meta={`${label} · ${formatEntryDate(item.updated_at)}`}
         />
       </DashboardItem>
