@@ -1,8 +1,8 @@
 import { create } from 'zustand';
 import { resolveOpenEdits } from '../lib/openEdits';
 
-/** What the start page turns to when it opens: the server's card, or a check for updates. */
-export type StartFocus = 'server' | 'updates';
+/** What the start page turns to when it opens: a check for updates. */
+export type StartFocus = 'updates';
 
 /**
  * Whether the start page (the vault picker grown into the app's home screen)

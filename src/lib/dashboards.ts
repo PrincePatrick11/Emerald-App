@@ -52,7 +52,7 @@ function jsonObject(raw: unknown): Record<string, unknown> {
   return value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {};
 }
 
-/** A filter from JSON (row, backup, sync): unknown keys and non-ID values drop out. */
+/** A filter from JSON (row or backup): unknown keys and non-ID values drop out. */
 export function parseDashboardFilter(raw: unknown): DashboardFilter {
   const value = jsonObject(raw);
   const filter: DashboardFilter = {};

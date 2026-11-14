@@ -131,7 +131,7 @@ export const fromRow = {
     };
   },
 
-  /** `filter`/`sort`/`display` are validated — the row can come from an import or another device. */
+  /** `filter`/`sort`/`display` are validated — the row can come from an import. */
   dashboard(r: DbRow): Dashboard {
     return {
       id: str(r.id),

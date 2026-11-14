@@ -145,7 +145,7 @@ where one only clicks, right-clicks or types, the tool is now the shorter way.
 - **Title:** `<input class="entry-view-title" placeholder="Untitled Entry">`
 - **i18n:** react-i18next, 4 languages (EN/DE/ES/FR), switchable live in Settings
 - **Themes:** "Emerald Noctis" (dark, default), "Emerald Parchment" (light)
-- **Persistence:** SQLite + optional GitHub sync via `.env` (note: that is only an ENV token, not a UI sync — the `git push` flow is not implemented in `lib.rs`)
+- **Persistence:** SQLite encrypted with SQLCipher, one `emerald.db` per vault; no sync (Settings → Sync and the start page's Server card are placeholders)
 - **Hot reload:** Vite reloads automatically on code changes in `src/`
 
 ## Main UI anatomy

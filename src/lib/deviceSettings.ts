@@ -8,11 +8,11 @@ import type { VaultFileRead } from './vaultSettings';
  * What belongs to this installation rather than to a vault: the language and
  * the theme, custom themes included.
  *
- * `{appDataDir}/device.json`, next to `vaults.json`, `update.json` and
- * `sync.json`, so it is there before any vault is unlocked — the start page
- * and the loading screen already show it — and no vault, backup or sync
- * brings it along. localStorage keeps a mirror of it for the first frame
- * (`index.html` and `main.tsx` read it before the file can be).
+ * `{appDataDir}/device.json`, next to `vaults.json` and `update.json`, so it
+ * is there before any vault is unlocked — the start page and the loading
+ * screen already show it — and no vault or backup brings it along.
+ * localStorage keeps a mirror of it for the first frame (`index.html` and
+ * `main.tsx` read it before the file can be).
  */
 export interface DeviceSettings {
   version: 1;

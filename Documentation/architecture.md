@@ -14,7 +14,6 @@ This file is the overview: tech stack, module map, data flow and the IPC surface
 | [`architecture/navigation.md`](architecture/navigation.md) | Global search, drag and drop, tabs, navigation history, left sidebar |
 | [`architecture/storage.md`](architecture/storage.md) | Image storage, vault layout, vault settings |
 | [`architecture/encryption.md`](architecture/encryption.md) | Vault keys, sealed files, the SQL layer, the unlock gate, re-encryption, encrypted backups |
-| [`architecture/sync.md`](architecture/sync.md) | Sync with a server: change capture, merge rules |
 | [`architecture/appearance.md`](architecture/appearance.md) | Theming and fonts |
 | [`architecture/shell.md`](architecture/shell.md) | Window chrome, boot order, PDF export |
 
@@ -53,7 +52,7 @@ src/
 │   │   ├── LeaveGuardModal, VaultPicker        leave-an-edit question, vault picker (start view)
 │   │   ├── VaultKeyDialog, BackupUnlockDialog, RecoveryKeyBox, vaultKeyParts   password, unlock, recovery key
 │   │   ├── moduleViews.ts                      ViewId → lazy view (MainArea only)
-│   │   ├── PickerRows, PickerServerPanel       the start page's vault rows and server section
+│   │   ├── PickerRows, PickerServerPanel       the start page's vault rows and the server placeholder
 │   │   ├── start/                              the start page's brand, language, sections, Appearance, version and updates
 │   │   ├── settings/                           SettingsModal, one *Page per tab, sections
 │   │   └── titlebar/                           custom title bar, menus, SearchModal
@@ -129,7 +128,6 @@ src/
 │   ├── pictureExport.ts         a rendered picture saved where the user chooses
 │   ├── export.ts, exportData.ts, emeraldFormat.ts
 │   ├── dbBackup.ts, importStaging.ts   .emeralddb backup and restore
-│   ├── sync/                    sync with a server: `tracking.ts` (capture), `apply.ts` (merge), `blockStack.ts` (blocks on the wire), `engine.ts` (when)
 │   ├── autoBackup.ts            automatic backup: when one is due, the run
 │   ├── vaultManager.ts, vaultSettings.ts
 │   ├── altarBackground.ts, altarIcon.ts   the app's own altar backgrounds; the Altar block's icon
@@ -155,7 +153,6 @@ src-tauri/src/
 ├── images.rs           image commands + emerald-img scheme
 ├── vault.rs            vault registry and vault directory commands
 ├── updates.rs          in-app updater
-├── sync.rs             the way to a sync server: connection, sealing, images
 ├── devbridge.rs, devbridge.js   dev only (cargo feature `devbridge`): lets the MCP server drive the app on macOS and Linux
 └── pdf_export/         native-webview PDF export
     ├── mod.rs          per-platform re-export
@@ -199,7 +196,7 @@ One detail of what the stores load: **sigil drawings are files, not columns.** A
 
 Every content-store update method (`updateEntry`, `updateTask`/`toggleComplete`, `updateTag`, `updateTemplate`, `updateDefinition`, the lexicon's updates) reads a snapshot from the store, merges the patch into it, and writes the row back — the whole row, except that `updateEntry` writes `content` only when the patch carries it (it is by far the largest column). Two overlapping updates to the same entity — an autosave while the sidebar changes a property — would race, and the later one would overwrite the other's fields with a stale snapshot.
 
-`src/lib/serialize.ts` closes that race. `serialized(serialKey(domain, id), task)` chains same-key tasks strictly one after another, so a merge-and-write always runs against the previous one's result. The invariant: **any store method that writes back a whole row from a snapshot must run its write through `serialized()`, keyed per entity id.** `serialKey` types the domains (`entry`/`task`/`tag`/`blockDefinition`/`template`/`language`/`image`); `templateStore` and `lexiconStore` use one store-wide key (`'*'`); creating an entry and the sync's writes of incoming entries share `ENTRY_NUMBER_KEY`, since both hand out numbers. `taskStore.toggleComplete` queues each affected descendant under its own `task:<id>` key, so a concurrent `updateTask` on a child can't have its `completed` columns rewound by the parent's cascade (or vice versa).
+`src/lib/serialize.ts` closes that race. `serialized(serialKey(domain, id), task)` chains same-key tasks strictly one after another, so a merge-and-write always runs against the previous one's result. The invariant: **any store method that writes back a whole row from a snapshot must run its write through `serialized()`, keyed per entity id.** `serialKey` types the domains (`entry`/`task`/`tag`/`blockDefinition`/`template`/`language`/`image`); `templateStore` and `lexiconStore` use one store-wide key (`'*'`); creating an entry runs under `ENTRY_NUMBER_KEY` as well, since it hands out a number. `taskStore.toggleComplete` queues each affected descendant under its own `task:<id>` key, so a concurrent `updateTask` on a child can't have its `completed` columns rewound by the parent's cascade (or vice versa).
 
 Deliberately not serialized, with a comment at its definition: `updateCategory` (writes only the columns passed in, no snapshot merge).
 
@@ -252,7 +249,6 @@ All Rust commands are *registered* in `src-tauri/src/lib.rs` and invoked from Ty
 | `update_menu_labels(...)` | Translate the native menu's labels. macOS only in effect — see [Window Chrome](architecture/shell.md#window-chrome). |
 | `set_dock_icon(png?)` | Show a custom theme's Dock icon, or with none the one the app started with. Lasts while the app runs. macOS only in effect. |
 | `set_view_menu_checked(rail, left_list, right_sidebar, view_locked)` | Mirror sidebar visibility and the view lock onto the View menu's check items, on every change (not only menu-triggered ones). macOS only in effect. |
-| `sync_status`, `sync_server_status`, `sync_pair`, `sync_unpair`, `sync_devices`, `sync_remove_device`, `sync_set_paused`, `sync_forget_link`, `sync_delete_remote`, `sync_rename`, `sync_remote_vaults`, `sync_create_remote`, `sync_adopt_remote`, `sync_push`, `sync_pull`, `sync_remote_state`, `sync_snapshot_begin`, `sync_snapshot_add`, `sync_snapshot_put`, `sync_snapshot_fetch`, `sync_snapshot_frame`, `sync_snapshot_done`, `sync_images`, `sync_images_delete`, `sync_adopt_new_password`, `sync_rekey_done`, `sync_watch`, `sync_unwatch` | The way to a sync server, see [`architecture/sync.md`](architecture/sync.md). |
 | `update_settings()` / `set_update_settings(endpoint, auto_check)` | Read/write `{appDataDir}/update.json`, an installation-level setting like the automatic backup's `auto-backup.json`; the endpoint must be a complete `https` URL. See [`security.md` → In-App Updates](security.md#in-app-updates). |
 | `check_for_update()` / `install_update()` | Reach the network for updates — `tauri-plugin-updater`, driven from `updates.rs` rather than the plugin's JS API so the CSP needs no update host. `install_update` installs only the result `check_for_update` holds, then restarts. See [`security.md` → In-App Updates](security.md#in-app-updates). |
 

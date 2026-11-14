@@ -39,8 +39,6 @@ mod backup;
 mod auto_backup;
 /// The in-app updater: variable source, check, installation.
 mod updates;
-/// The way to a sync server.
-mod sync;
 /// Lets the MCP server in `tools/mcp` drive the app where the webview has no
 /// debug port. Dev builds only, and only when asked for.
 #[cfg(feature = "devbridge")]
@@ -264,26 +262,7 @@ pub(crate) fn guarded_read_path(app: &tauri::AppHandle, path: &str) -> Result<Pa
     if !is_within_allowed_roots(&canonical, &allowed_roots) {
         return Err("access denied: path outside allowed directories".to_string());
     }
-    let app_data_dir = app.path().app_data_dir().ok().and_then(|dir| std::fs::canonicalize(dir).ok());
-    if app_data_dir.is_some_and(|dir| !app_data_read_allowed(&canonical, &dir)) {
-        return Err("access denied: this file is not for reading".to_string());
-    }
     Ok(canonical)
-}
-
-/// `sync.json` may hold the sync token, which the webview must never see — and
-/// so may its temp file and a copy set aside as unreadable. In any case: a file
-/// system that folds case would answer to another spelling.
-fn app_data_read_allowed(target: &Path, app_data_dir: &Path) -> bool {
-    target
-        .strip_prefix(app_data_dir)
-        .ok()
-        .and_then(|below| below.to_str())
-        .is_none_or(|below| {
-            ![sync::SETTINGS_FILE, sync::SETTINGS_TEMP_FILE, sync::BAD_FILE]
-                .iter()
-                .any(|name| below.eq_ignore_ascii_case(name))
-        })
 }
 
 // ── commands ──────────────────────────────────────────────────────────────────
@@ -812,7 +791,6 @@ pub fn run() {
         .manage(db::Databases::default())
         .manage(keys::VaultKeys::default())
         .manage(updates::PendingUpdate::default())
-        .manage(sync::SyncState::default())
         .manage(CloseWatch::default())
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::CloseRequested { .. } = event {
@@ -860,34 +838,6 @@ pub fn run() {
             images::delete_image_files,
             vault::register_vaults,
             vault::ensure_vault_dirs,
-            sync::sync_status,
-            sync::sync_pair,
-            sync::sync_server_status,
-            sync::sync_unpair,
-            sync::sync_devices,
-            sync::sync_set_paused,
-            sync::sync_forget_link,
-            sync::sync_delete_remote,
-            sync::sync_rename,
-            sync::sync_remove_device,
-            sync::sync_remote_vaults,
-            sync::sync_create_remote,
-            sync::sync_adopt_remote,
-            sync::sync_push,
-            sync::sync_pull,
-            sync::sync_remote_state,
-            sync::sync_snapshot_begin,
-            sync::sync_snapshot_add,
-            sync::sync_snapshot_put,
-            sync::sync_snapshot_fetch,
-            sync::sync_snapshot_frame,
-            sync::sync_snapshot_done,
-            sync::sync_images,
-            sync::sync_images_delete,
-            sync::sync_adopt_new_password,
-            sync::sync_rekey_done,
-            sync::sync_watch,
-            sync::sync_unwatch,
             vault::create_vault_dirs,
             vault::default_vault_dir,
             vault::new_vault_base_dir,
@@ -946,18 +896,6 @@ pub fn run() {
 #[cfg(test)]
 mod app_data_write_tests {
     use super::*;
-
-    #[test]
-    fn the_sync_settings_cannot_be_read_by_path() {
-        let data = Path::new("/home/u/.local/share/emerald");
-        for refused in ["sync.json", "SYNC.JSON", "Sync.Json", "sync.json.bad", "sync.json.tmp"] {
-            assert!(!app_data_read_allowed(&data.join(refused), data), "{refused}");
-        }
-        for allowed in ["vaults.json", "vaults/sync.json"] {
-            assert!(app_data_read_allowed(&data.join(allowed), data), "{allowed}");
-        }
-        assert!(app_data_read_allowed(Path::new("/home/u/Documents/sync.json"), data));
-    }
 
     #[test]
     fn only_the_registry_and_the_vaults_folder_are_writable_in_the_app_data_dir() {

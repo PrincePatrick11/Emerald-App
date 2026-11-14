@@ -28,9 +28,8 @@ export function serialKey(
 }
 
 /**
- * The one key of handing out entry numbers: `createEntry` and the sync (a page
- * of changes, a snapshot restore) both read the highest number and write later,
- * and the number is unique (`idx_entries_number`).
+ * The one key of handing out entry numbers: `createEntry` reads the highest
+ * number and writes later, and the number is unique (`idx_entries_number`).
  */
 export const ENTRY_NUMBER_KEY = serialKey('entry', '#new');
 

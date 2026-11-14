@@ -96,7 +96,7 @@ Top-level keys of `en.json`, with the conventions worth knowing:
 | `settings` | Settings modal, and on the start page the keys its sections share with it (language, theme, custom themes, updates, tagline, website) |
 | `start` | The start page's own: section headings, links, version and author |
 | `createItem` | The rail's plus: `CreateItemModal` |
-| `sync` | The sync server: the start page's server section, Settings → Sync, the vault list's state marks, sync errors |
+| `sync` | The sync placeholder: Settings → Sync and the start page's Server card |
 | `vaultKey` | `VaultKeyDialog` and its shared parts: unlock, create, recover, the recovery-key box, the "remember on this device" switch and the failure texts (`wrongPassword`, `tooShort` with `{{count}}`, …) |
 | `security` | Settings → Security: remember, lock, change password, each with a hint and a tooltip |
 | `backupKey` | `BackupUnlockDialog`: opening an encrypted backup |

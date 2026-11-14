@@ -13,11 +13,8 @@ import StartLanguage from './start/StartLanguage';
 import { keyErrorOf } from '../../lib/vaultKeys';
 import { vaultOpenErrorKey } from '../../lib/db';
 import { hideLoadingScreen, hideSplash, showLoadingScreen } from '../../lib/splash';
-import { adoptRemoteVault, deleteRemoteVault, syncErrorCode, type RemoteVault } from '../../lib/sync/engine';
-import { syncErrorKey } from '../../lib/sync/errors';
-import { formatBytes } from '../../lib/helpers';
-import PickerServerPanel, { useServerState } from './PickerServerPanel';
-import { CreateRow, CreateTile, DeleteConfirmRow, EditRow, RemoteRow, VaultRow, type VaultState } from './PickerRows';
+import PickerServerPanel from './PickerServerPanel';
+import { CreateRow, CreateTile, DeleteConfirmRow, EditRow, VaultRow } from './PickerRows';
 import {
   DB_FILE,
   NEW_VAULT_TARGET_ERROR_KEY,
@@ -40,7 +37,6 @@ type Editor =
   | { kind: 'none' }
   | { kind: 'edit'; id: string; name: string; icon?: string }
   | { kind: 'confirmDelete'; id: string; deleteFiles: boolean }
-  | { kind: 'confirmRemote'; id: string }
   | {
       kind: 'create';
       name: string;
@@ -50,18 +46,6 @@ type Editor =
       /** Chosen by hand — then takes `baseDir` out of the running. */
       customPath: string | null;
     };
-
-/** A folder for a vault of this name that is not taken. */
-async function freeTarget(name: string): Promise<{ name: string; path: string | undefined }> {
-  const base = await newVaultBaseDir().catch(() => null);
-  for (let n = 1; n < 100; n++) {
-    const candidate = n === 1 ? name : `${name} ${n}`;
-    const path = newVaultTarget(base, null, candidate);
-    if (!path) return { name: candidate, path: undefined };
-    if (!(await probeNewVaultTarget(path))) return { name: candidate, path };
-  }
-  throw new Error('no free folder');
-}
 
 /** The brand column's width, dragged as the entry list's is, kept the same way
  *  (`AppShell`): in `localStorage`, for this installation. */
@@ -92,8 +76,8 @@ function loadBrandWidth(): number {
  * the last vault removed, the vault to start with did not open or its password
  * was cancelled) and when it is asked for (`openVaultPicker`). It fills the
  * window as the shell does: the brand on the frame at the left, and on the
- * sheet one page with the vaults, the server, the appearance and, at the
- * foot, the version and its updates.
+ * sheet one page with the vaults, the server (a placeholder for now), the
+ * appearance and, at the foot, the version and its updates.
  */
 export default function VaultPicker() {
   const { t } = useTranslation();
@@ -115,8 +99,6 @@ export default function VaultPicker() {
   // The difference is that between "look elsewhere" and "allow access".
   const [unreachable, setUnreachable] = useState<Map<string, 'missing' | 'denied'>>(new Map());
   const [error, setError] = useState('');
-  const [fetchingId, setFetchingId] = useState<string | null>(null);
-  const server = useServerState();
   const [brandWidth, setBrandWidth] = useState(loadBrandWidth);
   const drag = useRef<{ x: number; width: number } | null>(null);
   // Set together with the state: the release may come before the render.
@@ -386,69 +368,10 @@ export default function VaultPicker() {
       closeEditor();
     } finally {
       setRemovingId(null);
-      void server.refresh();
     }
   }
 
-  /**
-   * A vault only on the server: a new local vault holding its `vault.key`,
-   * opened like any other — the password, then the first sync fills it.
-   */
-  async function fetchRemote(remote: RemoteVault, label: string) {
-    if (fetchingId || switchingId) return;
-    setFetchingId(remote.id);
-    setError('');
-    try {
-      const target = await freeTarget(label);
-      const record = await newVaultRecord(target.name, { path: target.path });
-      await addVault(record);
-      try {
-        await adoptRemoteVault(record.id, remote.id, target.name);
-      } catch (e) {
-        // No half-fetched vault in the list: the record and the folder made
-        // for it go again.
-        await removeVault(record.id, true).catch((err: unknown) => console.warn('[sync] could not remove the new vault', err));
-        void server.refresh();
-        throw e;
-      }
-      await server.refresh();
-      await choose(record.id);
-    } catch (e) {
-      if (keyErrorOf(e) !== VAULT_KEY_CANCELLED) {
-        console.warn('[sync] fetch', e);
-        setError(t(syncErrorKey(syncErrorCode(e))));
-      }
-    } finally {
-      setFetchingId(null);
-    }
-  }
-
-  async function removeRemote(remote: RemoteVault) {
-    setError('');
-    try {
-      await deleteRemoteVault(remote.id, null);
-      closeEditor();
-      await server.refresh();
-    } catch (e) {
-      console.warn('[sync] delete', e);
-      setError(t(syncErrorKey(syncErrorCode(e))));
-    }
-  }
-
-  // Links outlast a disconnected server (connecting it again resumes them):
-  // without one, a linked vault shows as paused rather than as local.
-  const links = server.status?.links ?? {};
-  const online = !!server.status?.url && !server.loggedOut;
-  const stateOf = (id: string): VaultState => {
-    const link = links[id];
-    return !link ? 'local' : link.paused || !online ? 'paused' : 'synced';
-  };
-  // On the server and not here. A vault removed from the list keeps its link in
-  // `sync.json`, so only links of vaults still in the list count.
-  const here = new Set(vaults.flatMap((v) => (links[v.id] ? [links[v.id].remote] : [])));
-  const remoteOnly = server.remotes.filter((remote) => !here.has(remote.id));
-  const units: [string, string, string] = [t('common.bytes'), t('common.kilobytes'), t('common.megabytes')];
-  const busy = switchingId !== null || fetchingId !== null;
+  const busy = switchingId !== null;
 
   return (
     <div
@@ -529,7 +452,6 @@ export default function VaultPicker() {
                         vault={v}
                         isActive={v.id === activeVaultId}
                         unreachable={unreachable.get(v.id) ?? null}
-                        state={stateOf(v.id)}
                         isSwitching={switchingId === v.id}
                         busy={busy}
                         onSwitch={() => { void choose(v.id); }}
@@ -540,24 +462,6 @@ export default function VaultPicker() {
                     )}
                   </li>
                 ))}
-                {remoteOnly.map((remote, i) => {
-                  const label = remote.name ?? t('sync.unnamedVault', { number: i + 1 });
-                  return (
-                    <li key={remote.id}>
-                      <RemoteRow
-                        name={label}
-                        size={formatBytes(remote.storedBytes, units)}
-                        isFetching={fetchingId === remote.id}
-                        busy={busy}
-                        confirming={editor.kind === 'confirmRemote' && editor.id === remote.id}
-                        onFetch={() => { void fetchRemote(remote, label); }}
-                        onDelete={() => setEditor({ kind: 'confirmRemote', id: remote.id })}
-                        onConfirmDelete={() => { void removeRemote(remote); }}
-                        onCancelDelete={closeEditor}
-                      />
-                    </li>
-                  );
-                })}
                 <li>
                   {editor.kind === 'create' ? (
                     <CreateRow
@@ -584,7 +488,7 @@ export default function VaultPicker() {
           </StartSection>
 
           <div className="start-columns">
-            <PickerServerPanel server={server} />
+            <PickerServerPanel />
             <StartAppearance />
           </div>
         </div>

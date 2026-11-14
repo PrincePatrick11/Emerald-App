@@ -6,7 +6,6 @@ import { seedAltarTemplate, seedSigilTemplate } from './templateRows';
 import i18n from '../i18n';
 import { useSettingsStore } from '../store/settingsStore';
 import { rewriteTagRefs, stripTagIds } from './tagRefs';
-import { dropTriggers, installTriggers, isTracked, markMigrated } from './sync/tracking';
 import { clearSavedBlocks } from './blockStore';
 
 /**
@@ -214,9 +213,9 @@ async function storedSchemaState(db: Database): Promise<'empty' | 'unfinished' |
 
 /**
  * Brings an opened database to `baseline` — or refuses it, before anything is
- * written. `migrations` and `baseline` are parameters only for the checks
- * (`scripts/sync-check.mjs`, `scripts/schema-check.mjs`), which exercise the
- * runner with a step of their own; the app always passes the defaults.
+ * written. `migrations` and `baseline` are parameters only for
+ * `scripts/schema-check.mjs`, which exercises the runner with a step of its
+ * own; the app always passes the defaults.
  */
 export async function runMigrations(
   db: Database,
@@ -266,13 +265,6 @@ export async function runMigrations(
   const current = state as number;
   if (current === baseline) return;
 
-  // A migration changes rows on every device on its own, so sync starts over
-  // from a snapshot. Noted first: a crash in the chain must not lose that.
-  const tracked = await isTracked(db);
-  if (tracked) {
-    await markMigrated(db);
-    await dropTriggers(db);
-  }
   for (const migration of migrations) {
     if (migration.version <= current) continue;
     await migration.up(db);
@@ -281,7 +273,6 @@ export async function runMigrations(
       [migration.version, migration.name, new Date().toISOString()]
     );
   }
-  if (tracked) await installTriggers(db);
 }
 
 /**

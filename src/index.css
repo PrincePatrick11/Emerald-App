@@ -786,31 +786,11 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
     color: var(--text-subtle);
   }
 
-  /* A panel that is no choice: the server's state and its fields. */
+  /* A panel that is no choice: the server's placeholder. */
   .start-panel {
     @apply rounded-xl border p-4;
     background-color: var(--bg-surface-1);
     border-color: var(--border-soft);
-  }
-
-  .start-stats {
-    @apply grid grid-cols-3 gap-3;
-  }
-
-  /* Value first to the eye, its name under it, with the name still first in
-     the markup for screen readers. */
-  .start-stats > div {
-    @apply flex flex-col-reverse gap-0.5 min-w-0;
-  }
-
-  .start-stats dt {
-    @apply text-[11px] truncate;
-    color: var(--text-subtle);
-  }
-
-  .start-stats dd {
-    @apply text-base font-medium tabular-nums truncate;
-    color: var(--text-primary);
   }
 
   /* ── The vault tiles ── */
@@ -850,12 +830,6 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
     border-color: var(--border-strong);
   }
 
-  /* Only on the server: a dashed edge, present but not yet here. */
-  .picker-tile.picker-tile-remote {
-    background-color: transparent;
-    border-style: dashed;
-  }
-
   .picker-tile-main {
     @apply flex flex-col justify-between gap-3 w-full h-28 px-4 py-3.5 text-left rounded-xl;
   }
@@ -874,19 +848,9 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
     color: var(--accent-text);
   }
 
-  .picker-tile-remote .picker-badge {
-    background-color: transparent;
-    border: 1px dashed var(--border-soft);
-    color: var(--text-subtle);
-  }
-
   .picker-tile .picker-row-name {
     @apply font-medium;
     color: var(--text-primary);
-  }
-
-  .picker-tile-remote .picker-row-name {
-    color: var(--text-muted);
   }
 
   /* Top right: "open" on the open vault, edit and delete in its place on
@@ -924,19 +888,6 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
     background-color: currentColor;
   }
 
-  .picker-tile-state.picker-tile-state-synced {
-    color: var(--accent-text);
-  }
-
-  .picker-tile-state.picker-tile-state-paused {
-    color: var(--warning-text);
-  }
-
-  .picker-tile-state-remote .picker-tile-dot {
-    background-color: transparent;
-    border: 1px solid currentColor;
-  }
-
   .picker-tile-new,
   .start-theme-new {
     @apply flex flex-col items-center justify-center gap-2 w-full rounded-xl border border-dashed text-xs transition-colors duration-150;
@@ -958,7 +909,6 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
   .start-theme-new:focus-visible,
   .start-theme:focus-visible,
   .start-theme-remove:focus-visible,
-  .picker-device-remove:focus-visible,
   .picker-badge-interactive:focus-visible {
     outline: 2px solid var(--focus-ring);
     outline-offset: 1px;
@@ -1059,11 +1009,6 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
     outline-offset: 1px;
   }
 
-  .picker-label {
-    @apply block text-xs mb-1.5;
-    color: var(--text-muted);
-  }
-
   /* The rows that open in a tile's place: edit, create, confirm. */
   .picker-row {
     @apply relative flex items-center gap-2 rounded-xl border px-3 py-2.5;
@@ -1095,49 +1040,11 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
     @apply flex items-center gap-1 shrink-0 opacity-0 transition-opacity duration-150;
   }
 
-  .picker-dot {
-    @apply inline-block w-1.5 h-1.5 rounded-full shrink-0;
-    background-color: var(--text-subtle);
-  }
-
-  /* Compound: Tailwind emits a rule that uses @apply after plain ones, so a
-     single-class modifier would lose to `.picker-dot`. */
-  .picker-dot.picker-dot-up {
-    background-color: var(--accent);
-  }
-
-  .picker-dot.picker-dot-down {
-    background-color: var(--danger-text);
-  }
-
-  .picker-device {
-    @apply flex items-center justify-between gap-2 text-sm rounded-md px-2 py-1;
-  }
-
-  .picker-device:hover {
-    background-color: var(--interactive-hover);
-  }
-
-  .picker-device-remove {
-    @apply flex items-center justify-center w-5 h-5 rounded-md opacity-0 transition-opacity duration-150;
-    color: var(--text-subtle);
-  }
-
-  .picker-device:hover .picker-device-remove,
-  .picker-device-remove:focus-visible {
-    opacity: 1;
-  }
-
-  .picker-device-remove:hover {
-    color: var(--danger-text);
-  }
-
   @media (prefers-reduced-motion: reduce) {
     .picker-tile,
     .picker-tile-open,
     .picker-tile-new,
     .picker-row-actions,
-    .picker-device-remove,
     .start-foot-action,
     .start-theme,
     .start-theme-new,

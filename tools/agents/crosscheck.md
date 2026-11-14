@@ -54,7 +54,6 @@ Scope focus for Emerald:
 
 - Shared TypeScript interfaces, union types, and DTOs that must include the new module's shape.
 
-- Sync/cloud functions, where present, that must replicate every module's data.
 
 Method:
 

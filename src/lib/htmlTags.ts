@@ -26,9 +26,9 @@ const FAILS = -1;
  * The tags and comments of markup, in order — quote-aware: a `>` in a quoted
  * attribute value does not end a tag. A `<` that does not start one is text.
  *
- * A scan rather than a regular expression: markup comes from imports and
- * other devices, and a backtracking pattern over a few kilobytes of `<a` without
- * a `>` takes minutes. Every character is looked at a bounded number of times:
+ * A scan rather than a regular expression: markup comes from imports, and a
+ * backtracking pattern over a few kilobytes of `<a` without a `>` takes
+ * minutes. Every character is looked at a bounded number of times:
  * a tag that is found is skipped as a whole, a comment without an end is
  * remembered as such, and where an attribute scan ends (at a `>`, or failing
  * at a quote that never closes) is remembered for every position it passed,

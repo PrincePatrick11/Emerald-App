@@ -92,7 +92,7 @@ export const TABLE_DDL: Record<TableName, string> = {
 
   // Views over entries by filter rules (`lib/dashboards.ts`). The built-in
   // ones carry their key in `builtin` and as ID (`BUILTIN_DASHBOARDS`), so
-  // that devices seeded apart mean the same rows. `filter`, `sort` and
+  // that vaults and backups agree on them. `filter`, `sort` and
   // `display` are JSON. The category IDs in `filter` have no foreign key:
   // `reassignCategoryContent` drops or moves them with the category.
   dashboards: `
@@ -378,8 +378,8 @@ export const ALTAR_CATEGORY_ID = 'altars';
 
 /**
  * The tag "Altar Library": what an Altar block's "Images" show at first,
- * created by the block when it needs it. A fixed ID, so that synced devices
- * arrive at the same tag. An ordinary tag otherwise — renamable, deletable.
+ * created by the block when it needs it. A fixed ID, so that vaults and
+ * backups agree on it. An ordinary tag otherwise — renamable, deletable.
  */
 export const ALTAR_LIBRARY_TAG_ID = 'altar-library';
 export const ALTAR_LIBRARY_TAG_NAME = 'Altar Library';
@@ -629,13 +629,6 @@ async function replaceCategoryInDashboards(db: Database, from: string, to: strin
 // ─────────────────────────────────────────────────────────────────────────────
 // Image references
 // ─────────────────────────────────────────────────────────────────────────────
-
-/**
- * The block stack of an entry or template as sync carries it (`content`,
- * `lib/sync/blockStack.ts`). The vault has no such column: its blocks are rows
- * of `blocks`, and what they name is in `block_refs`.
- */
-export const BLOCK_STACK_COLUMN = 'content';
 
 /**
  * The columns of a row in which an image can be referenced, besides the

@@ -37,7 +37,7 @@ Work happens on the branch of the version in progress, `version/x.y.z`, not on `
 |---|---|
 | [Documentation/features.md](Documentation/features.md) | Full feature guide |
 | [Documentation/architecture.md](Documentation/architecture.md) | Architecture overview: module map, data flow, IPC |
-| [Documentation/architecture/](Documentation/architecture/) | Per-area patterns: modules, editing, blocks, editors, templates, navigation, storage, encryption, sync, appearance, window shell |
+| [Documentation/architecture/](Documentation/architecture/) | Per-area patterns: modules, editing, blocks, editors, templates, navigation, storage, encryption, appearance, window shell |
 | [Documentation/design.md](Documentation/design.md) | Design tokens, component patterns, and known inconsistencies |
 | [Documentation/components.md](Documentation/components.md) | Shared UI building blocks and when to use them |
 | [Documentation/themes.md](Documentation/themes.md) | Custom theme format |

@@ -117,7 +117,7 @@ export function hideSplash(): void {
 /** The loading screen standing in while a vault chosen in the picker opens. */
 let openLoading: HTMLElement | null = null;
 let loadingFallback: ReturnType<typeof setTimeout> | undefined;
-/** Longer than `FALLBACK_MS`: opening a fetched vault includes its first sync. */
+/** Longer than `FALLBACK_MS`, as a generous upper bound for a switch: it only guards against one that never returns. */
 const LOADING_FALLBACK_MS = 30_000;
 
 /**
@@ -131,7 +131,7 @@ export function showLoadingScreen(): void {
   el.removeAttribute('id');
   openLoading = el;
   document.body.appendChild(el);
-  // The same net as `armFallback`, with room for a fetched vault's first sync:
+  // The same net as `armFallback`, with more room:
   // a switch that never returns must not leave the window covered — on
   // Windows and Linux that covers its buttons too. The picker under it still
   // shows the switch going on.

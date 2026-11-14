@@ -654,26 +654,6 @@ pub fn probe_vault_dir(path: String) -> Result<VaultProbe, String> {
     })
 }
 
-/// Database, drafts and images go; the folder and its settings stay. For a vault
-/// that fetches itself anew from a sync server.
-pub(crate) fn remove_vault_content(dir: &Path) -> Result<(), String> {
-    let journal = format!("{DB_FILE}-journal");
-    for name in [DB_FILE, journal.as_str(), DRAFTS_FILE] {
-        let file = dir.join(name);
-        if file.is_file() {
-            std::fs::remove_file(&file).map_err(|e| format!("remove {}: {e}", file.display()))?;
-        }
-    }
-    if let Ok(entries) = std::fs::read_dir(dir.join(IMAGES_SUBDIR)) {
-        for entry in entries.flatten() {
-            if crate::images::is_valid_image_name(&entry.file_name().to_string_lossy()) {
-                std::fs::remove_file(entry.path()).ok();
-            }
-        }
-    }
-    Ok(())
-}
-
 /// Deletes a vault's files — the database, its journal, its images and its
 /// settings. Only ever reached through the vault picker's opt-in "delete files"
 /// checkbox.
@@ -701,8 +681,6 @@ pub fn delete_vault_files(app: tauri::AppHandle, vault_id: String) -> Result<boo
     if !dir.join(DB_FILE).is_file() {
         return Err("not a vault directory: no database found".to_string());
     }
-    crate::sync::forget(&app, &vault_id);
-
     // The database first: it is the only piece that can still be locked, and
     // a failure then at least leaves the images in place.
     let journal = format!("{DB_FILE}-journal");
@@ -988,12 +966,7 @@ fn write_json_in(dir: &Path, name: &str, temp_name: &str, max_bytes: u64, conten
 /// Writes `bytes` to `dir/name` through `dir/temp_name` and a rename, so a
 /// crash leaves either the old file or the new one, never half of either.
 pub(crate) fn write_atomic(dir: &Path, name: &str, temp_name: &str, bytes: &[u8]) -> Result<(), String> {
-    write_atomic_with(dir, name, temp_name, bytes, true, false)
-}
-
-/// [`write_atomic`] for a file only this account may read, from its first byte on.
-pub(crate) fn write_atomic_private(dir: &Path, name: &str, temp_name: &str, bytes: &[u8]) -> Result<(), String> {
-    write_atomic_with(dir, name, temp_name, bytes, true, true)
+    write_atomic_with(dir, name, temp_name, bytes, true)
 }
 
 /// [`write_atomic`] for a folder that is not the vault's: a volume that cannot
@@ -1001,7 +974,7 @@ pub(crate) fn write_atomic_private(dir: &Path, name: &str, temp_name: &str, byte
 /// backup that is the better answer; for `vault.key` it would not be. A flush
 /// that fails for any other reason still fails the write.
 pub(crate) fn write_atomic_anywhere(dir: &Path, name: &str, temp_name: &str, bytes: &[u8]) -> Result<(), String> {
-    write_atomic_with(dir, name, temp_name, bytes, false, false)
+    write_atomic_with(dir, name, temp_name, bytes, false)
 }
 
 /// Whether a failed flush only says "this volume cannot flush" — the one
@@ -1027,7 +1000,7 @@ fn sync_refusal_is_harmless(error: &std::io::Error) -> bool {
 }
 
 /// `must_sync`: whether a flush the volume refuses fails the write.
-fn write_atomic_with(dir: &Path, name: &str, temp_name: &str, bytes: &[u8], must_sync: bool, private: bool) -> Result<(), String> {
+fn write_atomic_with(dir: &Path, name: &str, temp_name: &str, bytes: &[u8], must_sync: bool) -> Result<(), String> {
     use std::io::Write;
 
     // Whatever lies under the temp name — a crash remnant or a planted
@@ -1036,16 +1009,9 @@ fn write_atomic_with(dir: &Path, name: &str, temp_name: &str, bytes: &[u8], must
     // link.
     let temp = dir.join(temp_name);
     std::fs::remove_file(&temp).ok();
-    let mut options = std::fs::OpenOptions::new();
-    options.write(true).create_new(true);
-    #[cfg(unix)]
-    if private {
-        use std::os::unix::fs::OpenOptionsExt;
-        options.mode(0o600);
-    }
-    #[cfg(not(unix))]
-    let _ = private;
-    let written = options
+    let written = std::fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
         .open(&temp)
         // First onto the disk, then rename: otherwise an empty file can sit under
         // the target name after a power failure — for `vault.key` that would mean the
