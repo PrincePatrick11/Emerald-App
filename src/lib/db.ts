@@ -287,6 +287,8 @@ export async function runMigrations(
  */
 const CLEANUP_TABLES = [
   'entries',
+  // "All entries" never reaches the trash; nothing points at a dashboard.
+  'dashboards',
   'tags',
   'tasks',
   // No foreign keys and no follow-up: entries carry their own copies.

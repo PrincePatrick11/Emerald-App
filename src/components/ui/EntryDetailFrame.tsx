@@ -7,7 +7,7 @@ import { displayTitle } from '../../lib/entryTitle';
 import TagInput from './TagInput';
 
 /** The page title as a heading: entries and dashboards
- *  (`Dashboard`, Home) are deliberately the same size. One class chain. */
+ *  (`Dashboard`) are deliberately the same size. One class chain. */
 export const ENTRY_TITLE_HEADING_CLASSES = 'entry-view-title text-2xl font-semibold text-primary';
 
 /** The title line as an input: entries when editing and the libraries' pages (`LibraryPageFrame`). */

@@ -84,13 +84,13 @@
     "templateDeleted": "Template deleted",
     "languageDeleted": "Language deleted",
     "imageDeleted": "Image deleted",
-    "wordDeleted": "Word deleted"
+    "wordDeleted": "Word deleted",
+    "dashboardDeleted": "Dashboard deleted"
   },
   "createItem": {
     "title": "Create new"
   },
   "nav": {
-    "home": "Home",
     "all": "All",
     "journal": "Journal",
     "wiki": "Wiki",
@@ -104,7 +104,8 @@
     "operations": "Operations",
     "tasks": "Tasks",
     "settings": "Settings",
-    "startPage": "Start page"
+    "startPage": "Start page",
+    "allEntries": "All entries"
   },
   "sidebar": {
     "allEmpty": "No entries yet",
@@ -113,7 +114,8 @@
     "noResultsHint": "Try a different spelling",
     "tasksEmpty": "No tasks yet",
     "showMore": "Show {{count}} more",
-    "showMore_other": "Show {{count}} more"
+    "showMore_other": "Show {{count}} more",
+    "dashboardEmpty": "No entries here yet"
   },
   "operations": {
     "new": "New operation",
@@ -1119,7 +1121,7 @@
     "groupBackup": "Automatic backup",
     "uiScaleHint": "Scales the whole interface — text, icons and spacing.",
     "editorFontSizeHint": "Text size in entries and field values, independent of the UI size.",
-    "sidebarListHint": "Which entries the left sidebar shows: all of them, or one module's.",
+    "sidebarListHint": "Which entries the left sidebar shows: all of them, or those of one dashboard.",
     "sidebarLimitHint": "How many entries a list shows at first. The rest loads below via “Show more”.",
     "emojiDefaultsHint": "The emojis every emoji picker in this vault offers before you search. Click to remove, drag to reorder, search to add new ones.",
     "imagesHint": "Applies to newly inserted images. Larger ones are scaled down first and only rejected if they are still too large.",
@@ -1172,14 +1174,6 @@
     "previewTasks": "Tasks",
     "previewLanguages": "Languages"
   },
-  "home": {
-    "viewAll": "View all",
-    "view": "View",
-    "sort": "Sort",
-    "show": "Show",
-    "newest": "Newest",
-    "oldest": "Oldest"
-  },
   "contextMenu": {
     "openInNewTab": "Open in New Tab",
     "duplicate": "Duplicate",
@@ -1207,7 +1201,9 @@
     "languages": "Languages",
     "deleteSelected": "Delete selected ({{count}})",
     "confirmDeleteSelected": "Yes, delete {{count}}",
-    "retentionNoteNever": "Items stay until you delete them permanently."
+    "retentionNoteNever": "Items stay until you delete them permanently.",
+    "entries": "Entries",
+    "dashboards": "Dashboards"
   },
   "leaveGuard": {
     "title": "Unsaved changes",
@@ -1410,6 +1406,14 @@
     },
     "trash": {
       "title": "Trash is empty"
+    },
+    "allEntries": {
+      "title": "No entries yet",
+      "description": "Every entry of the vault shows up here, whatever its category."
+    },
+    "dashboard": {
+      "title": "Nothing here yet",
+      "description": "This dashboard shows the entries its filter lets through. Change the filter in its settings."
     }
   },
   "sync": {
@@ -1429,5 +1433,23 @@
     "oldVersion": "This file comes from an older version of Emerald and cannot be imported in this one. Nothing was changed; a converter will follow.",
     "newVersion": "This file comes from a newer version of Emerald. Update this app to import it. Nothing was changed.",
     "unsupported": "This file is not an Emerald file this version can read. Nothing was changed."
+  },
+  "dashboards": {
+    "unnamed": "Unnamed dashboard",
+    "defaultName": "New dashboard",
+    "dashboard": "Dashboard",
+    "newEntry": "New entry",
+    "settings": "Dashboard settings",
+    "settingsTitle": "Dashboard",
+    "name": "Name",
+    "allHasNoFilter": "“All entries” shows every entry and has no filter.",
+    "filterCategories": "Categories",
+    "filterCategoriesHint": "Shows entries of the ticked categories. “All” shows every category.",
+    "filterTags": "Tags",
+    "filterTagsHint": "If set, only entries with at least one of these tags.",
+    "newCategory": "New category",
+    "addCategory": "Create",
+    "moveUp": "Move up",
+    "moveDown": "Move down"
   }
 }

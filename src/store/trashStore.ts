@@ -13,8 +13,9 @@ import i18n from '../i18n';
 import { displayTitle } from '../lib/entryTitle';
 import type { TrashedItem } from '../types';
 import { kindOfEntry } from './dashboardStore';
-import { jsonArray } from '../lib/row';
 import { entryTagsSql } from '../lib/tagRefs';
+import { fromRow, jsonArray, type DbRow } from '../lib/row';
+import { dashboardLabel } from '../lib/dashboards';
 
 interface TrashState {
   items: TrashedItem[];
@@ -34,13 +35,14 @@ export const useTrashStore = create<TrashState>((set, get) => ({
     set({ loading: true });
     try {
       const db = await getDb();
-      // All entries in one query; the group they show under follows from their category (`kindOfEntry`).
+      // All entries in one query — one kind in the trash, grouped by their category there.
       const entries = await db.select<{ id: string; category_id: string | null; tags: string; title: string; deleted_at: string; category: string | null }[]>(
         `SELECT e.id, e.category_id, e.title, e.deleted_at, c.name as category,
                 ${entryTagsSql('e.id')} AS tags
            FROM entries e LEFT JOIN categories c ON e.category_id = c.id
           WHERE e.deleted_at IS NOT NULL`
       );
+      const dashboards = await db.select<DbRow[]>('SELECT * FROM dashboards WHERE deleted_at IS NOT NULL');
       const tags = await db.select<{ id: string; name: string; deleted_at: string }[]>(
         `SELECT id, name, deleted_at FROM tags WHERE deleted_at IS NOT NULL`
       );
@@ -63,16 +65,20 @@ export const useTrashStore = create<TrashState>((set, get) => ({
       );
       const items: TrashedItem[] = [
         // Without a title of its own, "Unnamed…", as everywhere (`displayTitle`).
-        ...entries.map((r) => {
-          const kind = kindOfEntry({ category_id: r.category_id, tags: jsonArray(r.tags) });
-          return {
-            id: r.id,
-            title: displayTitle(i18n.t, kind, r.title),
-            deleted_at: r.deleted_at,
-            type: kind,
-            category: r.category ?? undefined,
-          };
-        }),
+        ...entries.map((r) => ({
+          id: r.id,
+          // "Unnamed …" in the words of the kind it counts as — the title is all the trash shows of it.
+          title: displayTitle(i18n.t, kindOfEntry({ category_id: r.category_id, tags: jsonArray(r.tags) }), r.title),
+          deleted_at: r.deleted_at,
+          type: 'entry' as const,
+          category: r.category ?? undefined,
+        })),
+        ...dashboards.map(fromRow.dashboard).map((d) => ({
+          id: d.id,
+          title: d.icon ? iconTitle(d.icon, dashboardLabel(i18n.t, d)) : dashboardLabel(i18n.t, d),
+          deleted_at: d.deleted_at ?? '',
+          type: 'dashboard' as const,
+        })),
         ...tags.map((r) => ({ id: r.id, title: r.name, deleted_at: r.deleted_at, type: 'tag' as const })),
         ...categories.map((r) => ({ id: r.id, title: `${r.emoji} ${r.name}`, deleted_at: r.deleted_at, type: 'category' as const })),
         ...tasks.map((r) => ({ ...r, title: displayTitle(i18n.t, 'task', r.title), type: 'task' as const })),
@@ -122,6 +128,8 @@ export const useTrashStore = create<TrashState>((set, get) => ({
   emptyTrash: async () => {
     const db = await getDb();
     await db.execute(`DELETE FROM entries WHERE deleted_at IS NOT NULL`);
+    // "All entries" never reaches the trash; the guard is for a row that got there anyway.
+    await db.execute(`DELETE FROM dashboards WHERE deleted_at IS NOT NULL AND (builtin IS NULL OR builtin <> 'all')`);
     // Tags hang on entries by ID — first from every list, then the rows.
     await useTagStore.getState().purgeTrashedTags();
     await db.execute(`DELETE FROM task_links WHERE task_id IN (SELECT id FROM tasks WHERE deleted_at IS NOT NULL)`);

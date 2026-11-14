@@ -78,8 +78,9 @@ Top-level keys of `en.json`, with the conventions worth knowing:
 | `categories` | The one category block for every module: the Categories view (`add`, `name`, `nameTaken`, `dragHint`, `builtinHint`), `uncategorized`, `builtin.*` and `starter.*` (see [Built-in Category Names](#built-in-category-names)) |
 | `listView` | View/sort/grouping labels of the dashboard sidebar. The sort trigger combines a date field (`dateCreated`/`dateUpdated`/`dateDeleted`) with `sortNewest`/`sortOldest`, or uses `sortAlphaAsc`/`sortAlphaDesc`/`sortCountDesc`. `groupBy` (`"Group by {{label, lowercase}}"`) uses the `lowercase` formatter registered in `src/i18n/index.ts`; German capitalises the noun and skips the formatter |
 | `undo` | Undo toast messages |
-| `nav` | Navigation labels, including `home`, `categories`, `all` and `vaults`. A rail entry needs its `nav.<id>` key in all four locales, since `ModuleMeta`/`AUX_VIEWS` resolve the label dynamically |
-| `sidebar` | Left sidebar strings (`allEmpty`) |
+| `nav` | Navigation labels, including `allEntries`, `categories`, `all` and `vaults`; `allEntries`/`journal`/`wiki`/`operations` are also the names of the built-in dashboards (`dashboardLabel`) as long as they have no name of their own. A rail entry needs its `nav.<id>` key in all four locales, since `ModuleMeta`/`AUX_VIEWS` resolve the label dynamically |
+| `sidebar` | Left sidebar strings (`allEmpty`, `tasksEmpty`, `dashboardEmpty`) |
+| `dashboards` | Dashboards: the settings dialog (`settingsTitle`, `name`, `filterCategories`/`filterTags` with their hints, `newCategory`/`addCategory`, `allHasNoFilter`), the rail menu (`settings`, `moveUp`, `moveDown`), `newEntry`, the plus's `dashboard` tile, `defaultName` for a new one and `unnamed` for one without a name |
 | `journal`, `wiki`, `operations`, `tasks` | Module UI strings. Each module's `untitled` key is what `displayTitle` (`src/lib/entryTitle.ts`) shows for an empty title — display text only, never stored |
 | `creation` | The sigil creation tools (intention, letters, canvas, charge) |
 | `blocks` | Content-block UI and the Blocks view: `types.*` (block types), `kinds.*` (one per `ElementKind`, shared by the "Add block" menu and the builder's element picker), `fields.*` (field block), `sigil.*` (calculator, drawing and charge, on their own or as parts of a block), `canvas.*` (the Canvas and Altar blocks), `paint.*` (the Painting block), `library.*` (the Blocks builder and its update/remove-copies notices) |
@@ -100,10 +101,9 @@ Top-level keys of `en.json`, with the conventions worth knowing:
 | `vaultKey` | `VaultKeyDialog` and its shared parts: unlock, create, recover, the recovery-key box, the "remember on this device" switch and the failure texts (`wrongPassword`, `tooShort` with `{{count}}`, …) |
 | `security` | Settings → Security: remember, lock, change password, each with a hint and a tooltip |
 | `backupKey` | `BackupUnlockDialog`: opening an encrypted backup |
-| `home` | Home view |
-| `emptyState` | Per-dashboard empty states (`title`, `description`, `action`) |
+| `emptyState` | Per-dashboard empty states (`title`, `description`, `action`), including `allEntries` and `dashboard` (every dashboard made by hand) |
 | `contextMenu` | Context menu actions, including `openInNewTab` |
-| `trash` | Trash view: section labels per kind, `confirmEmptyAction`/`confirmDeleteSelected` (the primary button's own in-place confirmation label) |
+| `trash` | Trash view: section labels per kind (`entries`, `dashboards`, `categories`, …), `confirmEmptyAction`/`confirmDeleteSelected` (the primary button's own in-place confirmation label) |
 | `tabBar` | Tab strip (`editing`, `closeTab`, `newTab`); tab titles fall back to `nav.*` and the modules' `untitled` keys |
 | `linkPicker` | Internal link picker modal |
 | `importDestination` | Markdown-import destination picker; option labels reuse `linkPicker.tab*` |

@@ -77,9 +77,6 @@ interface DashboardBaseProps<T> {
   /** Only the title: no icon, no number. The icon is already in the rail,
    *  and counting is not done in the sections below (equally plain everywhere). */
   title?: string;
-  /** Replaces the whole title line, for a header with more than the title
-   *  (Home: the date over the moon phase). */
-  headerLeft?: ReactNode;
   /** Labelled button that fills the bar at the top of the sidebar. */
   primaryAction?: DashboardPrimaryAction;
   /** Compact icon buttons to the right of the primary action, in the same row;
@@ -170,7 +167,6 @@ const DEFAULT_GROUPS_CLASSNAME = 'space-y-6';
 
 export default function Dashboard<T>({
   title,
-  headerLeft,
   primaryAction,
   extraActions,
   view,
@@ -363,7 +359,7 @@ export default function Dashboard<T>({
           independently of the indentation a view sets for its content. */}
       <div className="px-8 pt-6 flex items-center gap-4 flex-shrink-0">
         <div className="flex-1 min-w-0">
-          {headerLeft ?? (title && <h1 className={`${ENTRY_TITLE_HEADING_CLASSES} truncate`}>{title}</h1>)}
+          {title && <h1 className={`${ENTRY_TITLE_HEADING_CLASSES} truncate`}>{title}</h1>}
         </div>
         {onSearch && (
           <ListSearchField

@@ -18,8 +18,9 @@ import {
   Box,
   CheckSquare,
   CopyPlus,
+  FileText,
   FolderOpen,
-  Home,
+  LayoutDashboard,
   Languages,
   LayoutList,
   Library,
@@ -30,7 +31,7 @@ import {
   Wand2,
   type LucideIcon,
 } from 'lucide-react';
-import type { ContentType, EntryKind } from '../types';
+import type { ContentType, Dashboard, EntryKind } from '../types';
 
 /**
  * Emoji fallback per kind, when neither a custom icon nor a
@@ -48,7 +49,7 @@ export const DEFAULT_ENTRY_EMOJI: Record<ContentType, string> = {
 };
 
 /**
- * The icon of an entry in lists, on Home, in the left list and in the
+ * The icon of an entry in lists, on the dashboards, in the left list and in the
  * export: its own (emoji or image), otherwise the category's emoji, otherwise
  * that of its kind. Either an emoji or an icon file (`iconSrc`) — `isImageIcon` tells
  * them apart. Entries of the category Journal show their moon phase instead
@@ -73,7 +74,12 @@ export function entryIcon(
 export const ENTRY_MODULE_IDS = ['journal', 'tasks', 'operations', 'wiki'] as const;
 export type EntryModuleId = (typeof ENTRY_MODULE_IDS)[number];
 
-export const AUX_VIEW_IDS = ['home', 'tags', 'categories', 'images', 'blocks', 'templates', 'lexicon', 'trash'] as const;
+/**
+ * `dashboard` is a dashboard's list by its ID (`{ type: 'dashboard', id }`):
+ * "All entries" (`id: 'all'`) and the user's own. Journal, Wiki and
+ * Operations keep views of their own.
+ */
+export const AUX_VIEW_IDS = ['dashboard', 'tags', 'categories', 'images', 'blocks', 'templates', 'lexicon', 'trash'] as const;
 export type AuxViewId = (typeof AUX_VIEW_IDS)[number];
 
 /**
@@ -93,15 +99,23 @@ export function isLibraryView(viewType: string): viewType is LibraryViewId {
   return (LIBRARY_VIEW_IDS as readonly string[]).includes(viewType);
 }
 
-/** What can be newly created: the entry modules and the libraries. */
-export type CreatableViewId = EntryModuleId | LibraryViewId;
+/** What can be newly created besides entries (`createEntryIn`): tasks and the libraries. */
+export type CreatableViewId = 'tasks' | LibraryViewId;
+
+/** The rail's "All entries" — the one dashboard that cannot go. */
+export const ALL_ENTRIES_ICON: LucideIcon = LayoutList;
+
+/** The rail glyph of a dashboard without an icon of its own. */
+export const DEFAULT_DASHBOARD_ICON: LucideIcon = LayoutDashboard;
 
 /** Everything `ActiveView.type` can be. */
 export type ViewId = EntryModuleId | AuxViewId;
 
-export type LeftListTabId = 'all' | EntryModuleId;
-/** The tabs of the entry list in their order — "All" first. */
-export const LEFT_LIST_TAB_IDS: readonly LeftListTabId[] = ['all', ...ENTRY_MODULE_IDS];
+/**
+ * Which list the left sidebar shows: `all` (every entry and task), `tasks`, or
+ * a dashboard by ID. A dashboard that is gone falls back to `all`.
+ */
+export type LeftListTabId = string;
 
 /** Modules whose items carry a category — all of them; the journal's is the category Journal. */
 export const CATEGORY_MODULE_IDS: readonly EntryModuleId[] = ENTRY_MODULE_IDS;
@@ -139,14 +153,8 @@ export const MODULES: Record<EntryModuleId, ModuleMeta> = {
 
 export const MODULE_LIST: readonly ModuleMeta[] = ENTRY_MODULE_IDS.map((id) => MODULES[id]);
 
-/** The tabs of the entry list with their icon — "All" is the only one without a module. */
-export const LEFT_LIST_TABS: ReadonlyArray<{ id: LeftListTabId; icon: LucideIcon }> = LEFT_LIST_TAB_IDS.map((id) => ({
-  id,
-  icon: id === 'all' ? LayoutList : MODULES[id].icon,
-}));
-
 export const AUX_VIEWS: Record<AuxViewId, { icon: LucideIcon; navLabelKey: string }> = {
-  home: { icon: Home, navLabelKey: 'nav.home' },
+  dashboard: { icon: ALL_ENTRIES_ICON, navLabelKey: 'nav.allEntries' },
   tags: { icon: Tag, navLabelKey: 'nav.tags' },
   // The same glyph as `TRASH_KIND_ICONS.category`: a deleted category
   // in the trash and its management should read as the same thing.
@@ -161,13 +169,33 @@ export const AUX_VIEWS: Record<AuxViewId, { icon: LucideIcon; navLabelKey: strin
   lexicon: { icon: Languages, navLabelKey: 'nav.lexicon' },
 };
 
-/** What the rail's plus offers, in this order: the modules, Journal first as the most common choice, then the libraries. */
+/**
+ * What the rail's plus offers besides the dashboards (`CreateItemModal` puts
+ * one tile per dashboard first): tasks, then the libraries.
+ */
 export const CREATABLE_VIEWS: ReadonlyArray<{ id: CreatableViewId; icon: LucideIcon; navLabelKey: string }> = [
-  ...MODULE_LIST,
+  { id: 'tasks', icon: MODULES.tasks.icon, navLabelKey: MODULES.tasks.navLabelKey },
   { id: 'lexicon', ...AUX_VIEWS.lexicon },
   { id: 'templates', ...AUX_VIEWS.templates },
   { id: 'blocks', ...AUX_VIEWS.blocks },
 ];
+
+/**
+ * The rail glyph of a dashboard without an icon of its own: "All entries",
+ * a built-in's module icon, or the dashboard glyph. Callers draw an own icon
+ * (`FaviconGlyph`) first, each in its own size.
+ */
+export function dashboardIcon(dashboard: Pick<Dashboard, 'builtin'>): LucideIcon {
+  if (dashboard.builtin === 'all') return ALL_ENTRIES_ICON;
+  return dashboard.builtin ? MODULES[dashboard.builtin].icon : DEFAULT_DASHBOARD_ICON;
+}
+
+/** The undo notice after deleting an entry, by the kind it counts as. */
+export const ENTRY_DELETED_UNDO_KEYS: Record<EntryKind, string> = {
+  journal: 'undo.entryDeleted',
+  wiki: 'undo.articleDeleted',
+  operation: 'undo.operationDeleted',
+};
 
 const VIEW_ID_SET: ReadonlySet<string> = new Set<string>([...ENTRY_MODULE_IDS, ...AUX_VIEW_IDS]);
 
@@ -176,7 +204,7 @@ export function isViewId(value: unknown): value is ViewId {
   return typeof value === 'string' && VIEW_ID_SET.has(value);
 }
 
-/** ModuleMeta for a view type — null for home/tags/categories/blocks/templates/trash. */
+/** ModuleMeta for a view type — null for dashboard/tags/categories/blocks/templates/trash. */
 export function moduleMeta(viewType: string): ModuleMeta | null {
   return (MODULES as Record<string, ModuleMeta | undefined>)[viewType] ?? null;
 }
@@ -212,17 +240,16 @@ export function isEntryView(viewType: string): viewType is 'journal' | 'wiki' | 
   return kindForView(viewType) !== undefined;
 }
 
-/** All trash item types (`TrashedItem['type']`). */
+/** All trash item types (`TrashedItem['type']`). Entries are one kind: they have no type of their own. */
 export const TRASH_KINDS = [
-  'journal', 'wiki', 'tag', 'operation', 'task', 'category', 'blockDefinition', 'template', 'language', 'image',
+  'entry', 'dashboard', 'tag', 'task', 'category', 'blockDefinition', 'template', 'language', 'image',
 ] as const;
 export type TrashKind = (typeof TRASH_KINDS)[number];
 
 export const TRASH_KIND_ICONS: Record<TrashKind, LucideIcon> = {
-  journal: BookOpen,
-  wiki: Library,
+  entry: FileText,
+  dashboard: LayoutDashboard,
   tag: Tag,
-  operation: Wand2,
   // Deliberately ListTodo instead of the rail icon CheckSquare: in the trash it is
   // the list that stands, not the single completed task.
   task: ListTodo,

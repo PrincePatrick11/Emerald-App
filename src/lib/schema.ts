@@ -446,11 +446,13 @@ export const BUILTIN_DASHBOARDS: readonly {
   key: 'all' | 'journal' | 'operations' | 'wiki';
   categories: readonly string[] | null;
   sort: { by: 'created' | 'title' | 'updated'; dir: 'asc' | 'desc' };
+  /** The start values of the `display` column — afterwards the row is all the app reads. */
+  display: { view: 'list' | 'cards'; grouping: 'grouped' | 'flat' };
 }[] = [
-  { key: 'all', categories: null, sort: { by: 'updated', dir: 'desc' } },
-  { key: 'journal', categories: [JOURNAL_CATEGORY_ID], sort: { by: 'created', dir: 'desc' } },
-  { key: 'operations', categories: [SIGIL_CATEGORY_ID, ALTAR_CATEGORY_ID, 'ritual', 'meditation'], sort: { by: 'updated', dir: 'desc' } },
-  { key: 'wiki', categories: ['paradigm', 'herbs', 'crystals', 'candles', 'deities', 'tools'], sort: { by: 'title', dir: 'asc' } },
+  { key: 'all', categories: null, sort: { by: 'updated', dir: 'desc' }, display: { view: 'list', grouping: 'flat' } },
+  { key: 'journal', categories: [JOURNAL_CATEGORY_ID], sort: { by: 'created', dir: 'desc' }, display: { view: 'list', grouping: 'flat' } },
+  { key: 'operations', categories: [SIGIL_CATEGORY_ID, ALTAR_CATEGORY_ID, 'ritual', 'meditation'], sort: { by: 'updated', dir: 'desc' }, display: { view: 'list', grouping: 'grouped' } },
+  { key: 'wiki', categories: ['paradigm', 'herbs', 'crystals', 'candles', 'deities', 'tools'], sort: { by: 'title', dir: 'asc' }, display: { view: 'cards', grouping: 'grouped' } },
 ];
 
 /** The content tables with `category_id`. A literal, because it is interpolated into SQL. */
@@ -491,9 +493,9 @@ export async function seedBuiltins(
   for (const [i, dashboard] of BUILTIN_DASHBOARDS.entries()) {
     const filter = dashboard.categories ? { categories: [...dashboard.categories] } : {};
     await db.execute(
-      `INSERT INTO dashboards (id, builtin, position, filter, sort, created_at, updated_at)
-       VALUES ($1,$2,$3,$4,$5,$6,$6)`,
-      [dashboard.key, dashboard.key, i, JSON.stringify(filter), JSON.stringify(dashboard.sort), now]
+      `INSERT INTO dashboards (id, builtin, position, filter, sort, display, created_at, updated_at)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$7)`,
+      [dashboard.key, dashboard.key, i, JSON.stringify(filter), JSON.stringify(dashboard.sort), JSON.stringify(dashboard.display), now]
     );
   }
 }

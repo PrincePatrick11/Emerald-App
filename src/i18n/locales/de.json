@@ -84,13 +84,13 @@
     "templateDeleted": "Vorlage gelöscht",
     "languageDeleted": "Sprache gelöscht",
     "imageDeleted": "Bild gelöscht",
-    "wordDeleted": "Vokabel gelöscht"
+    "wordDeleted": "Vokabel gelöscht",
+    "dashboardDeleted": "Dashboard gelöscht"
   },
   "createItem": {
     "title": "Neu anlegen"
   },
   "nav": {
-    "home": "Start",
     "all": "Alle",
     "journal": "Journal",
     "wiki": "Wiki",
@@ -104,7 +104,8 @@
     "operations": "Operationen",
     "tasks": "Aufgaben",
     "settings": "Einstellungen",
-    "startPage": "Startseite"
+    "startPage": "Startseite",
+    "allEntries": "Alle Einträge"
   },
   "sidebar": {
     "allEmpty": "Noch keine Einträge",
@@ -113,7 +114,8 @@
     "noResultsHint": "Andere Schreibweise versuchen",
     "tasksEmpty": "Noch keine Aufgaben",
     "showMore": "{{count}} weiteren anzeigen",
-    "showMore_other": "{{count}} weitere anzeigen"
+    "showMore_other": "{{count}} weitere anzeigen",
+    "dashboardEmpty": "Hier gibt es noch keine Einträge"
   },
   "operations": {
     "new": "Neue Operation",
@@ -1119,7 +1121,7 @@
     "groupBackup": "Automatisches Backup",
     "uiScaleHint": "Vergrößert oder verkleinert die ganze Oberfläche — Text, Symbole und Abstände.",
     "editorFontSizeHint": "Schriftgröße in Einträgen und Feldwerten, unabhängig von der Größe der Oberfläche.",
-    "sidebarListHint": "Welche Einträge die Seitenleiste links zeigt: alle oder die eines Moduls.",
+    "sidebarListHint": "Welche Einträge die Seitenleiste links zeigt: alle oder die eines Dashboards.",
     "sidebarLimitHint": "Wie viele Einträge eine Liste zuerst zeigt. Der Rest lädt darunter über „Weitere anzeigen“ nach.",
     "emojiDefaultsHint": "Die Emojis, die jeder Emoji-Picker dieses Vaults vor der Suche anbietet. Klicken entfernt, Ziehen sortiert, über die Suche kommen neue dazu.",
     "imagesHint": "Gilt für neu eingefügte Bilder. Größere werden erst verkleinert und nur abgelehnt, wenn sie danach noch zu groß sind.",
@@ -1172,14 +1174,6 @@
     "previewTasks": "Aufgaben",
     "previewLanguages": "Sprachen"
   },
-  "home": {
-    "viewAll": "Alle anzeigen",
-    "view": "Ansicht",
-    "sort": "Sortierung",
-    "show": "Anzahl",
-    "newest": "Neueste",
-    "oldest": "Älteste"
-  },
   "contextMenu": {
     "openInNewTab": "In neuem Tab öffnen",
     "duplicate": "Duplizieren",
@@ -1207,7 +1201,9 @@
     "languages": "Sprachen",
     "deleteSelected": "Ausgewählte löschen ({{count}})",
     "confirmDeleteSelected": "Ja, {{count}} löschen",
-    "retentionNoteNever": "Elemente bleiben, bis du sie endgültig löschst."
+    "retentionNoteNever": "Elemente bleiben, bis du sie endgültig löschst.",
+    "entries": "Einträge",
+    "dashboards": "Dashboards"
   },
   "leaveGuard": {
     "title": "Ungespeicherte Änderungen",
@@ -1410,6 +1406,14 @@
     },
     "trash": {
       "title": "Papierkorb ist leer"
+    },
+    "allEntries": {
+      "title": "Noch keine Einträge",
+      "description": "Hier erscheint jeder Eintrag des Vaults, egal in welcher Kategorie."
+    },
+    "dashboard": {
+      "title": "Hier ist noch nichts",
+      "description": "Dieses Dashboard zeigt die Einträge, die sein Filter durchlässt. Den Filter änderst du in seinen Einstellungen."
     }
   },
   "sync": {
@@ -1429,5 +1433,23 @@
     "oldVersion": "Diese Datei stammt aus einer älteren Emerald-Version und lässt sich in dieser nicht importieren. Es wurde nichts verändert; ein Konverter folgt.",
     "newVersion": "Diese Datei stammt aus einer neueren Emerald-Version. Aktualisiere diese App, um sie zu importieren. Es wurde nichts verändert.",
     "unsupported": "Diese Datei ist keine Emerald-Datei, die diese Version lesen kann. Es wurde nichts verändert."
+  },
+  "dashboards": {
+    "unnamed": "Unbenanntes Dashboard",
+    "defaultName": "Neues Dashboard",
+    "dashboard": "Dashboard",
+    "newEntry": "Neuer Eintrag",
+    "settings": "Dashboard-Einstellungen",
+    "settingsTitle": "Dashboard",
+    "name": "Name",
+    "allHasNoFilter": "„Alle Einträge“ zeigt jeden Eintrag und hat keinen Filter.",
+    "filterCategories": "Kategorien",
+    "filterCategoriesHint": "Zeigt Einträge der angehakten Kategorien. „Alle“ zeigt jede Kategorie.",
+    "filterTags": "Tags",
+    "filterTagsHint": "Wenn gesetzt, nur Einträge mit mindestens einem dieser Tags.",
+    "newCategory": "Neue Kategorie",
+    "addCategory": "Anlegen",
+    "moveUp": "Nach oben",
+    "moveDown": "Nach unten"
   }
 }

@@ -8,9 +8,10 @@ import { useTaskStore } from '../store/taskStore';
 import { useTemplateStore } from '../store/templateStore';
 import { useUIStore } from '../store/uiStore';
 import { useCategoryStore } from '../store/categoryStore';
-import { builtinDashboard, useDashboardStore } from '../store/dashboardStore';
-import type { ActiveView, BuiltinDashboard } from '../types';
-import type { CreatableViewId } from './modules';
+import { dashboardById, useDashboardStore } from '../store/dashboardStore';
+import { viewOfEntry } from '../store/entryViews';
+import type { ActiveView } from '../types';
+import { isEntryView, type CreatableViewId } from './modules';
 import { firstCategoryOf } from './dashboards';
 
 /**
@@ -38,32 +39,33 @@ function newEntryView(type: 'journal' | 'operations' | 'wiki', entry: { id: stri
 }
 
 /**
- * The category a new entry created in a module's dashboard starts in: the
- * first one of the dashboard's filter that is live — the Journal for the
- * journal. `null` if there is none (the dashboard filters by no category,
- * or is gone).
+ * The category a new entry created in a dashboard starts in: the first one
+ * of the dashboard's filter that is live — the Journal for the journal.
+ * `null` if there is none (the dashboard filters by no category, or is gone).
+ * The built-ins' IDs are their keys, so `'journal'` works as well.
  */
-export function startCategoryOf(dashboard: Exclude<BuiltinDashboard, 'all'>): string | null {
+export function startCategoryOf(dashboardId: string): string | null {
   const live = new Set(useCategoryStore.getState().categories.map((c) => c.id));
-  return firstCategoryOf(builtinDashboard(useDashboardStore.getState().dashboards, dashboard), live);
+  return firstCategoryOf(dashboardById(useDashboardStore.getState().dashboards, dashboardId), live);
 }
 
-/** A new entry in the module's dashboard — in `categoryId` if given, else in its first category. */
-async function createInModule(view: 'journal' | 'operations' | 'wiki', categoryId?: string): Promise<ActiveView> {
-  const entry = await useEntryStore.getState().createEntry({ categoryId: categoryId ?? startCategoryOf(view) });
-  return newEntryView(view, entry);
+/**
+ * A new entry in the dashboard `dashboardId` — in `categoryId` if given, else
+ * in its first category. Journal, Wiki and Operations open it in their own
+ * view; any other dashboard in the view its category leads to.
+ */
+async function createInDashboard(dashboardId: string, categoryId?: string): Promise<ActiveView> {
+  const entry = await useEntryStore.getState().createEntry({ categoryId: categoryId ?? startCategoryOf(dashboardId) });
+  return newEntryView(isEntryView(dashboardId) ? dashboardId : viewOfEntry(entry), entry);
 }
 
 /** Creates the item and returns where it opens. */
 const creators: Record<CreatableViewId, (categoryId?: string) => Promise<ActiveView>> = {
-  journal: () => createInModule('journal'),
   tasks: async (categoryId) => {
     const task = await useTaskStore.getState().createTask(categoryId ?? null);
     taskToName = task.id;
     return { type: 'tasks', id: task.id };
   },
-  operations: (categoryId) => createInModule('operations', categoryId),
-  wiki: (categoryId) => createInModule('wiki', categoryId),
   lexicon: async () => {
     const language = await useLexiconStore.getState().createLanguage(i18n.t('lexicon.defaultName'));
     return { type: 'lexicon', id: language.id };
@@ -90,5 +92,12 @@ const creators: Record<CreatableViewId, (categoryId?: string) => Promise<ActiveV
 export async function createItem(view: CreatableViewId, options: { categoryId?: string } = {}): Promise<void> {
   if (useUIStore.getState().editLocked || !(await confirmLeave())) return;
   const target = await creators[view](options.categoryId);
+  useUIStore.getState().setActiveView(target);
+}
+
+/** "New entry" in a dashboard: the rail's plus, its own button and its category headers' "+". */
+export async function createEntryIn(dashboardId: string, options: { categoryId?: string } = {}): Promise<void> {
+  if (useUIStore.getState().editLocked || !(await confirmLeave())) return;
+  const target = await createInDashboard(dashboardId, options.categoryId);
   useUIStore.getState().setActiveView(target);
 }

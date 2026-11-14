@@ -1,5 +1,5 @@
 import { invoke } from '@tauri-apps/api/core';
-import { LEFT_LIST_TAB_IDS, type LeftListTabId } from './modules';
+import type { LeftListTabId } from './modules';
 import { oneOf } from './helpers';
 import type { Weekday } from './formatDate';
 import {
@@ -42,9 +42,8 @@ export type LeftListLimit = (typeof LEFT_LIST_LIMIT_OPTIONS)[number];
 export const DEFAULT_LEFT_LIST_LIMIT: LeftListLimit = null;
 
 export interface LeftListSettings {
-  /** Which list the entry list shows — all entries or those of one module.
-   *  Replaces the former tab selection `tabs`; an old `tabs` stays in the file
-   *  via the spread in `normalizeVaultSettings`, for older builds. */
+  /** Which list the entry list shows: `all` (every entry and task), `tasks`,
+   *  or a dashboard by ID — one that is gone shows `all`. */
   list: LeftListTabId;
   limit: LeftListLimit;
 }
@@ -215,20 +214,17 @@ function normalizeEmojiList(raw: unknown): string[] | null {
   return valid.length ? [...new Set(valid)].slice(0, MAX_EMOJI_DEFAULTS) : null;
 }
 
+/** A list ID as the settings file carries it: any short non-empty string — whether the dashboard still exists is the list's business. */
+function listId(value: unknown): LeftListTabId {
+  return typeof value === 'string' && value !== '' && value.length <= 100 ? value : DEFAULT_VAULT_SETTINGS.leftList.list;
+}
+
 /**
  * Turns arbitrary JSON into valid settings: every field is validated,
  * invalid values fall back to the default. Keys that this build does not know
  * stay — a newer version that opened the vault earlier
  * should find its settings again after a detour into an older one.
  */
-/** A vault from the time of the tab selection in which exactly one tab was visible
- *  practically showed only that list — it stays that one. Otherwise "All". */
-function legacySingleList(tabs: unknown): LeftListTabId {
-  if (!Array.isArray(tabs)) return DEFAULT_VAULT_SETTINGS.leftList.list;
-  const valid = LEFT_LIST_TAB_IDS.filter((id) => tabs.includes(id));
-  return valid.length === 1 ? valid[0] : DEFAULT_VAULT_SETTINGS.leftList.list;
-}
-
 export function normalizeVaultSettings(raw: unknown): VaultSettings {
   const root = asRecord(raw);
   const appearance = asRecord(root.appearance);
@@ -261,7 +257,7 @@ export function normalizeVaultSettings(raw: unknown): VaultSettings {
     },
     leftList: {
       ...leftList,
-      list: oneOf(leftList.list, LEFT_LIST_TAB_IDS, legacySingleList(leftList.tabs)),
+      list: listId(leftList.list),
       limit: oneOf(leftList.limit, LEFT_LIST_LIMIT_OPTIONS, DEFAULT_LEFT_LIST_LIMIT),
     },
     emojis: {

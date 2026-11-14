@@ -42,17 +42,13 @@ export const trashWiring: Record<TrashKind, {
   restore: (id: string) => Promise<void>;
   permanentlyDelete: (id: string) => Promise<void>;
 }> = {
-  journal: {
+  entry: {
     restore: (id) => useEntryStore.getState().restoreEntry(id),
     permanentlyDelete: (id) => useEntryStore.getState().permanentlyDeleteEntry(id),
   },
-  wiki: {
-    restore: (id) => useEntryStore.getState().restoreEntry(id),
-    permanentlyDelete: (id) => useEntryStore.getState().permanentlyDeleteEntry(id),
-  },
-  operation: {
-    restore: (id) => useEntryStore.getState().restoreEntry(id),
-    permanentlyDelete: (id) => useEntryStore.getState().permanentlyDeleteEntry(id),
+  dashboard: {
+    restore: (id) => useDashboardStore.getState().restoreDashboard(id),
+    permanentlyDelete: (id) => useDashboardStore.getState().permanentlyDeleteDashboard(id),
   },
   category: {
     restore: async (id) => { await useCategoryStore.getState().restoreCategory(id); },

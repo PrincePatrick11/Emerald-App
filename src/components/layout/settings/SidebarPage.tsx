@@ -2,7 +2,10 @@ import { useTranslation } from 'react-i18next';
 import { ListOrdered, PanelLeft } from 'lucide-react';
 import { useSettingsStore } from '../../../store/settingsStore';
 import { LEFT_LIST_LIMIT_OPTIONS } from '../../../lib/vaultSettings';
-import { LEFT_LIST_TABS } from '../../../lib/modules';
+import { MODULES, dashboardIcon } from '../../../lib/modules';
+import { dashboardLabel } from '../../../lib/dashboards';
+import { useDashboardStore } from '../../../store/dashboardStore';
+import { FaviconGlyph } from '../../sidebar/fields/Favicon';
 import SettingsChoiceButton, { SettingsChoiceRow } from './SettingsChoiceButton';
 import SettingsSection from './SettingsSection';
 
@@ -11,20 +14,37 @@ export default function SidebarPage() {
   const { t } = useTranslation();
   const leftList = useSettingsStore((s) => s.settings.leftList);
   const update = useSettingsStore((s) => s.update);
+  const dashboards = useDashboardStore((s) => s.dashboards);
+  // "All entries" first, then the dashboards in rail order, then the tasks — the
+  // same as the rail. A list whose dashboard is gone shows "All entries".
+  const current = leftList.list === 'tasks' || dashboards.some((d) => d.id === leftList.list) ? leftList.list : 'all';
+  const choices = [
+    ...dashboards.filter((d) => d.builtin === 'all'),
+    ...dashboards.filter((d) => d.builtin !== 'all'),
+  ].map((d) => {
+    const Icon = dashboardIcon(d);
+    return {
+      id: d.id,
+      label: dashboardLabel(t, d),
+      icon: d.icon ? <FaviconGlyph value={d.icon} className="w-[14px] h-[14px] text-xs" /> : <Icon size={14} />,
+    };
+  });
+  const TasksIcon = MODULES.tasks.icon;
+  choices.push({ id: 'tasks', label: t('nav.tasks'), icon: <TasksIcon size={14} /> });
 
   return (
     <>
       <SettingsSection icon={<PanelLeft size={14} />} title={t('settings.sidebarList')} description={t('settings.sidebarListHint')}>
         <SettingsChoiceRow>
-          {LEFT_LIST_TABS.map(({ id, icon: Icon }) => (
+          {choices.map(({ id, label, icon }) => (
             <SettingsChoiceButton
               key={id}
-              active={leftList.list === id}
+              active={current === id}
               onClick={() => update('leftList', { list: id })}
               className="flex items-center gap-2"
             >
-              <Icon size={14} />
-              {t(`nav.${id}`)}
+              {icon}
+              {label}
             </SettingsChoiceButton>
           ))}
         </SettingsChoiceRow>

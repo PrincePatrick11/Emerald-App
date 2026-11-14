@@ -6,13 +6,13 @@
  * — metadata (icon, label) comes from `lib/modules.ts`, not from here.
  *
  * Each view as a chunk of its own: TipTap hangs on Journal/Wiki/Operations and
- * would otherwise be loaded on every start, even when only Home is open.
+ * would otherwise be loaded on every start, even when only a dashboard is open.
  */
 import { lazy, type ComponentType, type LazyExoticComponent } from 'react';
 import type { ViewId } from '../../lib/modules';
 
 export const VIEW_COMPONENTS: Record<ViewId, LazyExoticComponent<ComponentType>> = {
-  home: lazy(() => import('../views/HomeView')),
+  dashboard: lazy(() => import('../views/DashboardView')),
   journal: lazy(() => import('../views/JournalView')),
   wiki: lazy(() => import('../views/WikiView')),
   tags: lazy(() => import('../views/TagsView')),

@@ -270,9 +270,8 @@ export default function TrashView() {
   // Without 'timeline': the timeline has its own branch, otherwise it would
   // silently fall into the card branch here.
   const renderGrouped = (viewMode: Exclude<ViewMode, 'timeline'>) => {
-    const journal    = sorted.filter((i) => i.type === 'journal');
-    const wiki       = sorted.filter((i) => i.type === 'wiki');
-    const operations = sorted.filter((i) => i.type === 'operation');
+    const entries    = sorted.filter((i) => i.type === 'entry');
+    const dashboards = sorted.filter((i) => i.type === 'dashboard');
     const tags       = sorted.filter((i) => i.type === 'tag');
     const tasks      = sorted.filter((i) => i.type === 'task');
     const cats       = sorted.filter((i) => i.type === 'category');
@@ -287,17 +286,15 @@ export default function TrashView() {
         : <div className={cardsGridClass}>{subset.map((item) => <ItemCard key={item.id} item={item} {...itemProps} />)}</div>;
 
     // '' = no category; trashStore joins c.name as category — the key is the name, not the id.
-    const wikiByCategory = groupBy(wiki, (item) => item.category ?? '');
-    const opsByCategory = groupBy(operations, (item) => item.category ?? '');
+    const entriesByCategory = groupBy(entries, (item) => item.category ?? '');
     const categoryGroupLabel = (name: string) => {
       const catDef = categories.find((c) => c.name === name);
       return catDef ? `${catDef.emoji} ${categoryLabel(t, catDef)}` : name || t('categories.uncategorized');
     };
 
     const sections: { label: string; items: TrashedItem[]; groups?: { label: string; items: TrashedItem[] }[] }[] = [
-      { label: t('nav.journal'), items: journal },
-      { label: t('nav.wiki'), items: wiki, groups: wikiByCategory },
-      { label: t('nav.operations'), items: operations, groups: opsByCategory },
+      { label: t('trash.entries'), items: entries, groups: entriesByCategory },
+      { label: t('trash.dashboards'), items: dashboards },
       { label: t('nav.tasks'), items: tasks },
       { label: t('nav.images'), items: images },
       { label: t('nav.tags'), items: tags },

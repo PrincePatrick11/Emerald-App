@@ -20,7 +20,9 @@ import { useTemplateStore } from '../../store/templateStore';
 import { useLexiconStore } from '../../store/lexiconStore';
 import { useSettingsStore } from '../../store/settingsStore';
 import { definitionLabel, templateLabel } from '../../lib/blocks/blockAttrs';
-import { AUX_VIEWS, DEFAULT_ENTRY_EMOJI, entryIcon, kindForView, moduleMeta, type AuxViewId } from '../../lib/modules';
+import { AUX_VIEWS, dashboardIcon, DEFAULT_ENTRY_EMOJI, entryIcon, kindForView, moduleMeta, type AuxViewId } from '../../lib/modules';
+import { dashboardLabel } from '../../lib/dashboards';
+import { dashboardOrAll, useDashboardStore } from '../../store/dashboardStore';
 
 function getFallbackTitle(view: ActiveView, t: TFunction) {
   const meta = moduleMeta(view.type);
@@ -56,10 +58,14 @@ function TabButton({ view, onSelect, onClose }: { view: ActiveView; onSelect: ()
   const categoryId = entry?.category_id;
   const category = useCategoryStore((s) => (categoryId ? s.categories.find((c) => c.id === categoryId) : undefined));
   const showMoonPhase = useSettingsStore((s) => s.settings.journal.moonPhase);
+  // A dashboard's list: "All entries", one of the user's own, or Journal, Wiki and Operations — by name, as renamed.
+  const dashboardId = type === 'dashboard' ? (id ?? 'all') : kind && !id ? type : undefined;
+  // A deleted built-in's list shows "All entries" (and so does an unknown dashboard id) — the tab says so too.
+  const dashboard = useDashboardStore((s) => (dashboardId === undefined ? undefined : dashboardOrAll(s.dashboards, dashboardId)));
 
   const fallback = getFallbackTitle(view, t);
-  let title = fallback;
-  if (id) {
+  let title = dashboard ? dashboardLabel(t, dashboard) : fallback;
+  if (id && type !== 'dashboard') {
     const entityTitle = entry?.title ?? task?.title;
     if (hasOwnTitle(entityTitle)) title = entityTitle;
     else if (definition) title = definitionLabel(t, definition);
@@ -68,8 +74,10 @@ function TabButton({ view, onSelect, onClose }: { view: ActiveView; onSelect: ()
   }
 
   let icon: ReactNode;
-  const Icon = moduleMeta(type)?.icon ?? AUX_VIEWS[type as AuxViewId]?.icon ?? MoreHorizontal;
-  if (kind && id) {
+  const Icon = dashboard ? dashboardIcon(dashboard) : moduleMeta(type)?.icon ?? AUX_VIEWS[type as AuxViewId]?.icon ?? MoreHorizontal;
+  if (dashboard) {
+    icon = renderIconValue(dashboard.icon, <Icon size={14} />);
+  } else if (kind && id) {
     icon = kind === 'journal'
       ? <span className="text-sm leading-none">{entry ? journalIcon(entry, showMoonPhase) : DEFAULT_ENTRY_EMOJI.journal}</span>
       : renderIconValue(entryIcon(kind, entry ?? {}, category), null);

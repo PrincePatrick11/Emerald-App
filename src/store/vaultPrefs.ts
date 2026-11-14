@@ -1,12 +1,10 @@
 import {
-  GROUPING_MODES, HOME_COUNTS, HOME_VIEWS, SORT_MODES, TAGS_SORTS, VIEW_MODES, useUIStore,
-  type HomeSectionPrefs, type ListPrefs,
+  GROUPING_MODES, SORT_MODES, TAGS_SORTS, VIEW_MODES, useUIStore, type ListPrefs,
 } from './uiStore';
 
 /**
  * The preferences of a vault: how each list looks (view, sorting,
- * grouping), the sections of the home page, which groups and sections
- * are collapsed. Permanent and per vault — another vault has different
+ * grouping), which groups and sections are collapsed. Permanent and per vault — another vault has different
  * categories and different habits.
  *
  * They live in the `uiStore`, as before; this module loads the fields when
@@ -20,15 +18,17 @@ import {
  * bar widths, which sidebars are open, the tabs —, which applies to the app
  * regardless of which vault is open.
  */
-/** The lists with view, sorting and grouping (`ListPrefs`). */
+/**
+ * The lists with view, sorting and grouping (`ListPrefs`). Journal, Wiki,
+ * Operations and every other dashboard keep theirs in the dashboard's row.
+ */
 const LIST_PREF_KEYS = [
-  'journalPrefs', 'wikiPrefs', 'operationsPrefs', 'tasksPrefs', 'trashPrefs',
+  'tasksPrefs', 'trashPrefs',
   'templatesPrefs', 'blocksPrefs', 'lexiconPrefs',
 ] as const;
 
 const PREF_KEYS = [
   ...LIST_PREF_KEYS,
-  'homeJournalPrefs', 'homeOpsPrefs', 'homeWikiPrefs',
   'tagsSort',
   'collapsedGroups', 'flags',
 ] as const;
@@ -68,16 +68,6 @@ function listPrefs(saved: unknown, fallback: ListPrefs): ListPrefs {
   };
 }
 
-function homePrefs(saved: unknown, fallback: HomeSectionPrefs): HomeSectionPrefs {
-  if (!isRecord(saved)) return fallback;
-  return {
-    view: oneOf(saved.view, HOME_VIEWS, fallback.view),
-    sort: oneOf(saved.sort, SORT_MODES.filter((s) => s !== 'count_desc'), fallback.sort),
-    // Only what the menu offers — an older vault may still carry the old wiki default 6.
-    count: (HOME_COUNTS as readonly unknown[]).includes(saved.count) ? (saved.count as number) : fallback.count,
-  };
-}
-
 /**
  * The saved preferences, checked rather than trusted: only fields that exist
  * and are valid — a key survives versions in which there were other
@@ -107,9 +97,6 @@ function parse(raw: string | null): Prefs {
   return {
     ...DEFAULTS,
     ...lists,
-    homeJournalPrefs: homePrefs(saved.homeJournalPrefs, DEFAULTS.homeJournalPrefs),
-    homeOpsPrefs: homePrefs(saved.homeOpsPrefs, DEFAULTS.homeOpsPrefs),
-    homeWikiPrefs: homePrefs(saved.homeWikiPrefs, DEFAULTS.homeWikiPrefs),
     tagsSort: oneOf(saved.tagsSort, TAGS_SORTS, DEFAULTS.tagsSort),
     collapsedGroups,
     flags,

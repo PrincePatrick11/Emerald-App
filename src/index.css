@@ -715,8 +715,8 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
   /* ── Start page (the vault picker) ─────────────────────────────────────
      The whole window, as the shell is: the brand on the frame at the left,
      one sheet beside it. On the sheet the vaults as tiles across the width,
-     server and appearance side by side below, each headed as Home heads its
-     sections, and at its foot language and updates. Tiles and panels take
+     server and appearance side by side below, each headed as a dashboard heads its
+     groups, and at its foot language and updates. Tiles and panels take
      the tokens of `.panel-interactive` rather than the class: it carries
      per-theme overrides (html[data-theme=…] .panel-interactive, 0-2-1) that
      outrank an active tint on top (design.md, Specificity Traps). */

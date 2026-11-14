@@ -627,7 +627,8 @@ export async function buildBackupFrom(db: Awaited<ReturnType<typeof getDb>>, opt
     data.entries = await withTagLists(db, 'entry', rows.filter((row) => entrySelected(row, options, live)));
     collectImageRefs('entries', data.entries, allImagePaths);
     data.blocks = await exportBlockRows(db, 'entry', data.entries, allImagePaths);
-    data.dashboards = await db.select<Row[]>('SELECT * FROM dashboards');
+    // Trashed ones only with the trash, like the entries.
+    data.dashboards = await db.select<Row[]>(`SELECT * FROM dashboards WHERE 1=1 ${deletedClause}`);
   }
 
   // ── Tags ─────────────────────────────────────────────────────────────────

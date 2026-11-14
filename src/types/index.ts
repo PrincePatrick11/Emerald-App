@@ -73,6 +73,16 @@ export interface DashboardSort {
   dir: 'asc' | 'desc';
 }
 
+/**
+ * How a dashboard draws its entries: the layout (list, cards, wide cards,
+ * timeline) and whether they are grouped (by category; the journal groups by
+ * moon phase). A fresh vault writes the built-ins' start values into the row.
+ */
+export interface DashboardDisplay {
+  view: 'list' | 'cards' | 'cards_wide' | 'timeline';
+  grouping: 'grouped' | 'flat';
+}
+
 /** The key of a built-in dashboard — at the same time its fixed ID. */
 export type BuiltinDashboard = 'all' | 'journal' | 'wiki' | 'operations';
 
@@ -89,8 +99,8 @@ export interface Dashboard {
   position: number;
   filter: DashboardFilter;
   sort: DashboardSort;
-  /** How the dashboard draws its entries — empty until dashboards can be built. */
-  display: Record<string, unknown>;
+  /** How the dashboard draws its entries: layout and grouping. */
+  display: DashboardDisplay;
   created_at: string;
   updated_at: string;
   deleted_at: string | null;

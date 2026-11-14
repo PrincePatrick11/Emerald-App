@@ -9,7 +9,11 @@ import { EDIT_ENDED, useEntryEditor } from '../../hooks/useEntryEditor';
 import { useEditActions } from '../../hooks/useEditActions';
 import { guardKey } from '../../store/leaveGuardStore';
 import { findEntry, useEntryStore } from '../../store/entryStore';
-import { useDashboardEntries } from '../../hooks/useDashboardEntries';
+import { useDashboard, useDashboardEntries } from '../../hooks/useDashboardEntries';
+import { useDashboardPrefs } from '../../hooks/useDashboardPrefs';
+import { dashboardLabel } from '../../lib/dashboards';
+import { dashboardSettingsAction } from './EntryDashboard';
+import DashboardView from './DashboardView';
 import { useTagMap, visibleTags } from '../../store/tagStore';
 import { useUndoStore } from '../../store/undoStore';
 import BlockStack from '../blocks/BlockStack';
@@ -32,16 +36,19 @@ import type { Entry, MoonPhase } from '../../types';
 import { useSaveAsTemplateAction } from '../../hooks/useSaveAsTemplateAction';
 import { useSessionState } from '../../store/sessionStore';
 import { useEntryContentReady } from '../../hooks/useEntryContentReady';
-import { createItem } from '../../lib/createItem';
+import { createEntryIn } from '../../lib/createItem';
 
 export default function JournalView() {
   const { t } = useTranslation();
   const tagMap = useTagMap();
   const saveAsTemplateAction = useSaveAsTemplateAction();
-  const { activeView, setActiveView, journalPrefs, setJournalPrefs } = useUIStore(
-    useShallow((s) => ({ activeView: s.activeView, setActiveView: s.setActiveView, journalPrefs: s.journalPrefs, setJournalPrefs: s.setJournalPrefs }))
+  const { activeView, setActiveView } = useUIStore(
+    useShallow((s) => ({ activeView: s.activeView, setActiveView: s.setActiveView }))
   );
+  const dashboard = useDashboard('journal');
   const entries = useDashboardEntries('journal');
+  // View, sorting and grouping are the journal dashboard's own.
+  const [journalPrefs, setJournalPrefs] = useDashboardPrefs(dashboard, 'created');
   const { duplicateEntry, updateEntry, deleteEntry, restoreEntry, getEntry } = useEntryStore(
     useShallow((s) => ({ duplicateEntry: s.duplicateEntry, updateEntry: s.updateEntry, deleteEntry: s.deleteEntry, restoreEntry: s.restoreEntry, getEntry: s.getEntry }))
   );
@@ -120,7 +127,7 @@ export default function JournalView() {
     if (entry) setTitle(entry.title);
   }, [entry?.title]);
 
-  const handleNew = () => createItem('journal');
+  const handleNew = () => createEntryIn('journal');
 
   const openCtxMenu = (e: React.MouseEvent, id: string) => { e.preventDefault(); setCtxMenu({ id, x: e.clientX, y: e.clientY }); };
 
@@ -198,6 +205,8 @@ export default function JournalView() {
 
   // List view
   if (!entry) {
+    // A deleted built-in has no list of its own any more: "All entries" stands in.
+    if (!dashboard) return <DashboardView />;
     const { view, sort, grouping } = journalPrefs;
 
     const searchFiltered = search
@@ -295,8 +304,9 @@ export default function JournalView() {
 
     return (
       <Dashboard<Entry>
-        title={t('journal.title')}
+        title={dashboardLabel(t, dashboard)}
         primaryAction={{ label: t('journal.newEntry'), onClick: handleNew }}
+        extraActions={[dashboardSettingsAction(t, dashboard.id)]}
         view={view}
         sort={sort}
         onView={(v) => setJournalPrefs({ view: v })}

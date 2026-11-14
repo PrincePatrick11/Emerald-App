@@ -60,7 +60,7 @@ src/
 │   │   └── text/     TextEditor, its host (toolbar, link picker, drops), TipTap extensions
 │   ├── blocks/       BlockStack, block views, fields/sigil/canvas/painting blocks, block editor
 │   ├── images/       picture tile, picker, add and edit dialogs, the strip below a canvas
-│   ├── views/        one view per module and aux view (Home … Trash)
+│   ├── views/        one view per module and aux view (Dashboard … Trash)
 │   ├── sidebar/
 │   │   ├── panels/   Journal/Wiki/Operation properties panels
 │   │   └── fields/   sidebar sections, property rows, tags, links, type toggle
@@ -70,7 +70,7 @@ src/
 ├── store/
 │   ├── entryStore.ts            all entries, one list
 │   ├── taskStore.ts, tagStore.ts, categoryStore.ts
-│   ├── dashboardStore.ts, entryViews.ts   dashboards; where an entry opens
+│   ├── dashboardStore.ts, dashboardActions.ts, dashboardSettingsStore.ts, entryViews.ts   dashboards; where an entry opens
 │   ├── blockDefinitionStore.ts  user-built blocks
 │   ├── blockSessionStore.ts     BlockStack ↔ sidebar block manager bridge
 │   ├── templateStore.ts, templateApply.ts   templates; applying one
@@ -260,7 +260,7 @@ Tauri menu events (not `invoke`) come from the native menu and are received in `
 | `toggle-rail` | View > Navigation Rail |
 | `toggle-left-list` | View > Entry List |
 | `toggle-right-sidebar` | View > Properties |
-| `reset-sidebar-widths` | View > Reset View — resets the entry-list and right-sidebar widths **and** brings back a hidden rail, entry list and right sidebar (`uiStore.showAllPanels`; with the rail hidden, Settings and the Vault button would otherwise be unreachable) |
+| `reset-sidebar-widths` | View > Reset View — resets the entry-list and right-sidebar widths **and** brings back a hidden rail, entry list and right sidebar (`uiStore.showAllPanels`; with the rail hidden, Settings and the start page would otherwise be unreachable) |
 | `toggle-view-lock` | View > Lock View — while on (`uiStore.viewLocked`, kept in localStorage), `AppShell` renders no resize handle on either sidebar; hiding and showing them and Reset View still work |
 | `show-splash` | View > Show Loading Screen |
 | `navigate-back` | Mouse back button (macOS NSEvent monitor; Windows and Linux read the button in the page — see [Navigation History](architecture/navigation.md#navigation-history)) |

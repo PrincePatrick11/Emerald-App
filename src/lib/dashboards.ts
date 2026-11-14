@@ -11,9 +11,11 @@
  *
  * Pure and store-free, like the rest of `lib/` that scripts use.
  */
+import type { TFunction } from 'i18next';
 import type {
-  BuiltinDashboard, Dashboard, DashboardFilter, DashboardSort, Entry, EntryKind,
+  BuiltinDashboard, Dashboard, DashboardDisplay, DashboardFilter, DashboardSort, Entry, EntryKind,
 } from '../types';
+import type { SortMode } from '../store/uiStore';
 
 export const BUILTIN_DASHBOARD_KEYS: readonly BuiltinDashboard[] = ['all', 'journal', 'wiki', 'operations'];
 
@@ -32,6 +34,15 @@ export const MODULE_DASHBOARD_KINDS: Readonly<Record<Exclude<BuiltinDashboard, '
 export const FALLBACK_ENTRY_KIND: EntryKind = 'wiki';
 
 const DEFAULT_SORT: DashboardSort = { by: 'updated', dir: 'desc' };
+
+/**
+ * Only for a `display` that is missing or broken: a fresh vault writes the
+ * built-ins' own start values into their rows (`BUILTIN_DASHBOARDS`), and a
+ * new dashboard starts with this.
+ */
+export const DEFAULT_DISPLAY: DashboardDisplay = { view: 'list', grouping: 'flat' };
+
+const DISPLAY_VIEWS: readonly DashboardDisplay['view'][] = ['list', 'cards', 'cards_wide', 'timeline'];
 
 const MAX_FILTER_IDS = 1000;
 
@@ -55,12 +66,19 @@ function jsonObject(raw: unknown): Record<string, unknown> {
 /** A filter from JSON (row or backup): unknown keys and non-ID values drop out. */
 export function parseDashboardFilter(raw: unknown): DashboardFilter {
   const value = jsonObject(raw);
-  const filter: DashboardFilter = {};
-  const categories = idList(value.categories);
-  if (categories) filter.categories = categories;
-  const tags = idList(value.tags);
-  if (tags) filter.tags = tags;
-  return filter;
+  return normalizeFilter({ categories: idList(value.categories), tags: idList(value.tags) });
+}
+
+/**
+ * A filter without empty rules: an empty list would not mean "no rule" but
+ * "nothing passes" for the categories — a dashboard with everything
+ * deselected shows all entries, like "All entries".
+ */
+export function normalizeFilter(filter: DashboardFilter): DashboardFilter {
+  const next: DashboardFilter = {};
+  if (filter.categories?.length) next.categories = filter.categories;
+  if (filter.tags?.length) next.tags = filter.tags;
+  return next;
 }
 
 export function parseDashboardSort(raw: unknown): DashboardSort {
@@ -70,8 +88,42 @@ export function parseDashboardSort(raw: unknown): DashboardSort {
   return { by, dir };
 }
 
-export function parseDashboardDisplay(raw: unknown): Record<string, unknown> {
-  return jsonObject(raw);
+export function parseDashboardDisplay(raw: unknown): DashboardDisplay {
+  const value = jsonObject(raw);
+  return {
+    view: DISPLAY_VIEWS.includes(value.view as DashboardDisplay['view']) ? value.view as DashboardDisplay['view'] : DEFAULT_DISPLAY.view,
+    grouping: value.grouping === 'grouped' || value.grouping === 'flat' ? value.grouping : DEFAULT_DISPLAY.grouping,
+  };
+}
+
+/** The toolbar's sort mode for a dashboard's sort: the date modes compare the date the sort names. */
+export function sortModeOf(sort: DashboardSort): Exclude<SortMode, 'count_desc'> {
+  if (sort.by === 'title') return sort.dir === 'asc' ? 'alpha_asc' : 'alpha_desc';
+  return sort.dir === 'asc' ? 'date_asc' : 'date_desc';
+}
+
+/**
+ * The dashboard's sort for a toolbar sort mode. A date mode keeps the date the
+ * dashboard sorts by — `dateField` when it sorted by title until now.
+ */
+export function sortFromMode(mode: SortMode, current: DashboardSort, dateField: 'created' | 'updated'): DashboardSort {
+  if (mode === 'alpha_asc' || mode === 'alpha_desc') return { by: 'title', dir: mode === 'alpha_asc' ? 'asc' : 'desc' };
+  return { by: current.by === 'title' ? dateField : current.by, dir: mode === 'date_asc' ? 'asc' : 'desc' };
+}
+
+/** The translation key of a built-in dashboard's name, shown while its own `name` is empty. */
+const BUILTIN_NAME_KEYS: Record<BuiltinDashboard, string> = {
+  all: 'nav.allEntries',
+  journal: 'nav.journal',
+  operations: 'nav.operations',
+  wiki: 'nav.wiki',
+};
+
+/** The name a dashboard shows: its own, else the built-in's translated name, else "Unnamed dashboard". */
+export function dashboardLabel(t: TFunction, dashboard: Pick<Dashboard, 'name' | 'builtin'>): string {
+  const name = dashboard.name.trim();
+  if (name) return name;
+  return t(dashboard.builtin ? BUILTIN_NAME_KEYS[dashboard.builtin] : 'dashboards.unnamed');
 }
 
 export function isBuiltinDashboard(value: unknown): value is BuiltinDashboard {
@@ -122,6 +174,9 @@ export function moduleDashboards(dashboards: readonly Dashboard[]): Dashboard[] 
  */
 export function entryKindOf(entry: Pick<Entry, 'category_id' | 'tags'>, modules: readonly Dashboard[]): EntryKind {
   for (const dashboard of modules) {
+    // A module dashboard without any rule shows every entry, but claims none:
+    // otherwise clearing its filter would make every entry its kind.
+    if (!dashboard.filter.categories && !dashboard.filter.tags) continue;
     if (dashboard.builtin && dashboard.builtin !== 'all' && matchesFilter(entry, dashboard.filter)) {
       return MODULE_DASHBOARD_KINDS[dashboard.builtin];
     }

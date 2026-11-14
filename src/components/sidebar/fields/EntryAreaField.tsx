@@ -2,7 +2,7 @@ import { useTranslation } from 'react-i18next';
 import { Shapes, type LucideIcon } from 'lucide-react';
 import SegmentedControl from '../../ui/SegmentedControl';
 import { MODULE_LIST, isEntryView, type EntryModuleId } from '../../../lib/modules';
-import { matchesFilter } from '../../../lib/dashboards';
+import { dashboardLabel, matchesFilter } from '../../../lib/dashboards';
 import { startCategoryOf } from '../../../lib/createItem';
 import { EditPropertyRow } from './EditProperties';
 import { useUIStore, withEditLock } from '../../../store/uiStore';
@@ -53,7 +53,7 @@ export default function EntryAreaField({ entry }: { entry: Entry }) {
   const locked = useUIStore((s) => s.editLocked);
   const view = useUIStore((s) => s.activeView.type);
   // Re-renders with the dashboards: the area follows from their filters.
-  useDashboardStore((s) => s.modules);
+  const modules = useDashboardStore((s) => s.modules);
   const area = viewOfEntry(entry);
 
   const select = (to: Area) => {
@@ -68,9 +68,13 @@ export default function EntryAreaField({ entry }: { entry: Entry }) {
     <EditPropertyRow icon={<Shapes size={14} />} label={t('properties.area')}>
       <SegmentedControl
         ariaLabel={t('properties.area')}
-        options={AREAS.map((meta) => {
+        // Only areas whose dashboard is live (a deleted one has no category to
+        // move to), plus the one the entry counts as now; named as renamed.
+        options={AREAS.flatMap((meta) => {
+          const dashboard = modules.find((d) => d.builtin === meta.id);
+          if (!dashboard && meta.id !== area) return [];
           const Icon = ICONS[meta.id];
-          return { value: meta.id, label: t(meta.navLabelKey), icon: <Icon size={14} /> };
+          return [{ value: meta.id, label: dashboard ? dashboardLabel(t, dashboard) : t(meta.navLabelKey), icon: <Icon size={14} /> }];
         })}
         value={area}
         onChange={select}

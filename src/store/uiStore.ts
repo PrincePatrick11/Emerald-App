@@ -29,14 +29,6 @@ export type TagsSort = Extract<SortMode, 'alpha_asc' | 'alpha_desc' | 'count_des
 export const TAGS_SORTS: TagsSort[] = ['alpha_asc', 'alpha_desc', 'count_desc'];
 export const isTagsSort = (s: SortMode): s is TagsSort => (TAGS_SORTS as SortMode[]).includes(s);
 
-/** The sorting of the home sections — the date and alpha modes. */
-export type HomeSort = Exclude<SortMode, 'count_desc'>;
-export const HOME_VIEWS = ['list', 'cards'] as const;
-export type HomeView = (typeof HOME_VIEWS)[number];
-/** How many entries a section of the home page shows; 0 = all. */
-export const HOME_COUNTS = [3, 5, 10, 25, 0] as const;
-export interface HomeSectionPrefs { sort: HomeSort; view: HomeView; count: number; } // count 0 = all
-
 export interface EditActions {
   onSave: () => void | Promise<void>;
   onCancel: () => void | Promise<void>;
@@ -85,9 +77,6 @@ interface UIState {
    *  dragged. Persistent (localStorage), like the widths themselves. */
   viewLocked: boolean;
   searchQuery: string;
-  journalPrefs: ListPrefs;
-  wikiPrefs: ListPrefs;
-  operationsPrefs: ListPrefs;
   tasksPrefs: ListPrefs;
   trashPrefs: ListPrefs;
   templatesPrefs: ListPrefs;
@@ -96,9 +85,6 @@ interface UIState {
   /** The language list of the lexicon — the translate field beneath stays untouched. */
   lexiconPrefs: ListPrefs;
   tagsSort: TagsSort;
-  homeJournalPrefs: HomeSectionPrefs;
-  homeOpsPrefs: HomeSectionPrefs;
-  homeWikiPrefs: HomeSectionPrefs;
   /** The groups per module that deviate from the default (see hooks/useCollapsedSet):
    *  collapsed ones — or, in scopes that start collapsed, expanded ones.
    *  In the store rather than view-local, because MainArea unmounts the views
@@ -143,19 +129,16 @@ interface UIState {
   /** Shows rail, left list and right sidebar again — part of "Reset view". */
   showAllPanels: () => void;
   setSearchQuery: (q: string) => void;
-  setJournalPrefs: (p: Partial<ListPrefs>) => void;
-  setWikiPrefs: (p: Partial<ListPrefs>) => void;
-  setOperationsPrefs: (p: Partial<ListPrefs>) => void;
   setTasksPrefs: (p: Partial<ListPrefs>) => void;
   setTrashPrefs: (p: Partial<ListPrefs>) => void;
   setTemplatesPrefs: (p: Partial<ListPrefs>) => void;
   setBlocksPrefs: (p: Partial<ListPrefs>) => void;
   setLexiconPrefs: (p: Partial<ListPrefs>) => void;
   setTagsSort: (sort: TagsSort) => void;
-  setHomeJournalPrefs: (p: Partial<HomeSectionPrefs>) => void;
-  setHomeOpsPrefs: (p: Partial<HomeSectionPrefs>) => void;
-  setHomeWikiPrefs: (p: Partial<HomeSectionPrefs>) => void;
 }
+
+/** Where the app starts, and where it lands without a tab: the dashboard "All entries". */
+export const ALL_ENTRIES_VIEW: ActiveView = { type: 'dashboard', id: 'all' };
 
 const RAIL_OPEN_KEY = 'rail-open';
 const LEFT_LIST_OPEN_KEY = 'left-list-open';
@@ -340,7 +323,7 @@ function closeTabNow(id: string): void {
     saveTabs(tabs, nextTab?.id ?? null);
     // The closed tab's history goes with it; without a tab the tabless one starts fresh.
     if (!nextTab) {
-      return { tabs, activeTabId: null, activeView: { type: 'home' }, tablessHistory: freshHistory({ type: 'home' }) };
+      return { tabs, activeTabId: null, activeView: ALL_ENTRIES_VIEW, tablessHistory: freshHistory(ALL_ENTRIES_VIEW) };
     }
     return { tabs, activeTabId: nextTab.id, activeView: nextTab.view };
   });
@@ -348,14 +331,14 @@ function closeTabNow(id: string): void {
 
 const savedTabs = loadSavedTabs();
 const initialView: ActiveView = savedTabs.activeTabId
-  ? savedTabs.tabs.find((tab) => tab.id === savedTabs.activeTabId)?.view ?? { type: 'home' }
-  : { type: 'home' };
+  ? savedTabs.tabs.find((tab) => tab.id === savedTabs.activeTabId)?.view ?? ALL_ENTRIES_VIEW
+  : ALL_ENTRIES_VIEW;
 
 export const useUIStore = create<UIState>((set, get) => ({
   activeView: initialView,
   tabs: savedTabs.tabs,
   activeTabId: savedTabs.activeTabId,
-  tablessHistory: freshHistory({ type: 'home' }),
+  tablessHistory: freshHistory(ALL_ENTRIES_VIEW),
   // A restored tab in edit mode needs the sidebar, even
   // if it was last collapsed — the same rule as in `setActiveView`.
   rightSidebarOpen: loadOpenFlag(RIGHT_SIDEBAR_OPEN_KEY) || viewNeedsSidebar(initialView),
@@ -368,17 +351,8 @@ export const useUIStore = create<UIState>((set, get) => ({
   // Unlike the sidebars: off as long as nothing is saved.
   viewLocked: localStorage.getItem(VIEW_LOCKED_KEY) === '1',
   searchQuery: '',
-  // Where "Category" used to be the sort mode (wiki, operations,
-  // tasks), it is now `grouping: 'grouped'` — the same view as
-  // before. Within a group the old mode compared only the
-  // group name, so it was equal for every visible row; the order
-  // actually came from the store. The new sort value reproduces exactly that:
-  // wiki loads `ORDER BY title` (alpha_asc), operations `updated_at DESC`
-  // and tasks `created_at DESC` (date_desc). Journal and
-  // trash were never grouped and stay 'flat'.
-  journalPrefs: { view: 'list', sort: 'date_desc', grouping: 'flat' },
-  wikiPrefs: { view: 'cards', sort: 'alpha_asc', grouping: 'grouped' },
-  operationsPrefs: { view: 'list', sort: 'date_desc', grouping: 'grouped' },
+  // Journal, Wiki and Operations keep view, sorting and grouping in their
+  // dashboard's row (`useDashboardPrefs`), not here.
   tasksPrefs: { view: 'list', sort: 'date_desc', grouping: 'grouped' },
   trashPrefs: { view: 'list', sort: 'date_desc', grouping: 'flat' },
   // Templates have nothing to group — the field is only there for the shared ListPrefs.
@@ -387,9 +361,6 @@ export const useUIStore = create<UIState>((set, get) => ({
   // Languages carry no categories — `grouping` is here, as with templates, only for the shared ListPrefs.
   lexiconPrefs: { view: 'list', sort: 'alpha_asc', grouping: 'flat' },
   tagsSort: 'alpha_asc',
-  homeJournalPrefs: { sort: 'date_desc', view: 'list', count: 5 },
-  homeOpsPrefs:     { sort: 'date_desc', view: 'list', count: 5 },
-  homeWikiPrefs:    { sort: 'alpha_asc', view: 'cards', count: 5 },
   collapsedGroups: {},
   flags: {},
 
@@ -433,7 +404,7 @@ export const useUIStore = create<UIState>((set, get) => ({
       // to where the entry was opened from.
       activeTabId = createTabId();
       tabs = [{ id: activeTabId, view, history: pushHistory(s.tablessHistory, view) }];
-      tablessHistory = freshHistory({ type: 'home' });
+      tablessHistory = freshHistory(ALL_ENTRIES_VIEW);
     } else {
       tablessHistory = pushHistory(s.tablessHistory, view);
     }
@@ -444,7 +415,7 @@ export const useUIStore = create<UIState>((set, get) => ({
 
   // For vault switch and replace import: tabs and history carry entry IDs
   // that do not exist in the new database — both fall back to the fresh
-  // start state (no tabs, Home), as on the very first start. The
+  // start state (no tabs, "All entries"), as on the very first start. The
   // working state of the lists goes with them; the preferences (including the collapse states)
   // belong to the vault and come with `loadVaultPrefs`.
   closeAllTabs: () => {
@@ -453,8 +424,8 @@ export const useUIStore = create<UIState>((set, get) => ({
     set({
       tabs: [],
       activeTabId: null,
-      activeView: { type: 'home' },
-      tablessHistory: freshHistory({ type: 'home' }),
+      activeView: ALL_ENTRIES_VIEW,
+      tablessHistory: freshHistory(ALL_ENTRIES_VIEW),
     });
   },
 
@@ -486,7 +457,7 @@ export const useUIStore = create<UIState>((set, get) => ({
     return { activeView: view, tabs, activeTabId: id };
   }),
 
-  addTab: (view = { type: 'home' }) => set((s) => {
+  addTab: (view = ALL_ENTRIES_VIEW) => set((s) => {
     const id = createTabId();
     const tabs = [...s.tabs, { id, view, history: freshHistory(view) }];
     saveTabs(tabs, id);
@@ -580,18 +551,12 @@ export const useUIStore = create<UIState>((set, get) => ({
     set({ railOpen: true, leftListOpen: true, rightSidebarOpen: true });
   },
   setSearchQuery: (q) => set({ searchQuery: q }),
-  setJournalPrefs: (p) => set((s) => ({ journalPrefs: { ...s.journalPrefs, ...p } })),
-  setWikiPrefs: (p) => set((s) => ({ wikiPrefs: { ...s.wikiPrefs, ...p } })),
-  setOperationsPrefs: (p) => set((s) => ({ operationsPrefs: { ...s.operationsPrefs, ...p } })),
   setTasksPrefs: (p) => set((s) => ({ tasksPrefs: { ...s.tasksPrefs, ...p } })),
   setTrashPrefs: (p) => set((s) => ({ trashPrefs: { ...s.trashPrefs, ...p } })),
   setTemplatesPrefs: (p) => set((s) => ({ templatesPrefs: { ...s.templatesPrefs, ...p } })),
   setBlocksPrefs: (p) => set((s) => ({ blocksPrefs: { ...s.blocksPrefs, ...p } })),
   setLexiconPrefs: (p) => set((s) => ({ lexiconPrefs: { ...s.lexiconPrefs, ...p } })),
   setTagsSort: (sort) => set({ tagsSort: sort }),
-  setHomeJournalPrefs: (p) => set((s) => ({ homeJournalPrefs: { ...s.homeJournalPrefs, ...p } })),
-  setHomeOpsPrefs:     (p) => set((s) => ({ homeOpsPrefs:     { ...s.homeOpsPrefs,     ...p } })),
-  setHomeWikiPrefs:    (p) => set((s) => ({ homeWikiPrefs:    { ...s.homeWikiPrefs,    ...p } })),
 }));
 
 /** How many `withEditLock` calls are running right now. */

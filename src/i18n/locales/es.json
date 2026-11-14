@@ -84,13 +84,13 @@
     "templateDeleted": "Plantilla eliminada",
     "languageDeleted": "Idioma eliminado",
     "imageDeleted": "Imagen eliminada",
-    "wordDeleted": "Palabra eliminada"
+    "wordDeleted": "Palabra eliminada",
+    "dashboardDeleted": "Panel eliminado"
   },
   "createItem": {
     "title": "Crear nuevo"
   },
   "nav": {
-    "home": "Inicio",
     "all": "Todo",
     "journal": "Diario",
     "wiki": "Wiki",
@@ -104,7 +104,8 @@
     "operations": "Operaciones",
     "tasks": "Tareas",
     "settings": "Ajustes",
-    "startPage": "Página de inicio"
+    "startPage": "Página de inicio",
+    "allEntries": "Todas las entradas"
   },
   "sidebar": {
     "allEmpty": "Aún no hay entradas",
@@ -113,7 +114,8 @@
     "noResultsHint": "Prueba otra ortografía",
     "tasksEmpty": "Aún no hay tareas",
     "showMore": "Mostrar {{count}} más",
-    "showMore_other": "Mostrar {{count}} más"
+    "showMore_other": "Mostrar {{count}} más",
+    "dashboardEmpty": "Aún no hay entradas aquí"
   },
   "operations": {
     "new": "Nueva operación",
@@ -879,14 +881,6 @@
     "moonPhase": "Fase lunar",
     "status": "Estado"
   },
-  "home": {
-    "viewAll": "Ver todo",
-    "view": "Vista",
-    "sort": "Orden",
-    "show": "Mostrar",
-    "newest": "Recientes",
-    "oldest": "Antiguos"
-  },
   "vault": {
     "title": "Vaults",
     "edit": "Editar",
@@ -1127,7 +1121,7 @@
     "groupBackup": "Copia automática",
     "uiScaleHint": "Escala toda la interfaz — texto, iconos y espacios.",
     "editorFontSizeHint": "Tamaño del texto en entradas y valores de campo, independiente del tamaño de la interfaz.",
-    "sidebarListHint": "Qué entradas muestra la barra lateral izquierda: todas o las de un módulo.",
+    "sidebarListHint": "Qué entradas muestra la barra lateral izquierda: todas o las de un panel.",
     "sidebarLimitHint": "Cuántas entradas muestra una lista al principio. El resto se carga debajo con «Mostrar más».",
     "emojiDefaultsHint": "Los emojis que ofrece cada selector de este vault antes de buscar. Clic para quitar, arrastrar para ordenar, buscar para añadir nuevos.",
     "imagesHint": "Se aplica a las imágenes que se insertan. Las más grandes se reducen primero y solo se rechazan si siguen siendo demasiado grandes.",
@@ -1207,7 +1201,9 @@
     "languages": "Idiomas",
     "deleteSelected": "Eliminar seleccionados ({{count}})",
     "confirmDeleteSelected": "Sí, eliminar {{count}}",
-    "retentionNoteNever": "Los elementos se quedan hasta que los elimines definitivamente."
+    "retentionNoteNever": "Los elementos se quedan hasta que los elimines definitivamente.",
+    "entries": "Entradas",
+    "dashboards": "Paneles"
   },
   "leaveGuard": {
     "title": "Cambios sin guardar",
@@ -1410,6 +1406,14 @@
     },
     "trash": {
       "title": "La papelera está vacía"
+    },
+    "allEntries": {
+      "title": "Aún no hay entradas",
+      "description": "Aquí aparece cada entrada del vault, sea cual sea su categoría."
+    },
+    "dashboard": {
+      "title": "Aún no hay nada aquí",
+      "description": "Este panel muestra las entradas que deja pasar su filtro. Cambia el filtro en sus ajustes."
     }
   },
   "sync": {
@@ -1429,5 +1433,23 @@
     "oldVersion": "Este archivo procede de una versión anterior de Emerald y no se puede importar en esta. No se ha cambiado nada; llegará un conversor.",
     "newVersion": "Este archivo procede de una versión más reciente de Emerald. Actualiza esta aplicación para importarlo. No se ha cambiado nada.",
     "unsupported": "Este archivo no es un archivo de Emerald que esta versión pueda leer. No se ha cambiado nada."
+  },
+  "dashboards": {
+    "unnamed": "Panel sin nombre",
+    "defaultName": "Nuevo panel",
+    "dashboard": "Panel",
+    "newEntry": "Nueva entrada",
+    "settings": "Ajustes del panel",
+    "settingsTitle": "Panel",
+    "name": "Nombre",
+    "allHasNoFilter": "«Todas las entradas» muestra cada entrada y no tiene filtro.",
+    "filterCategories": "Categorías",
+    "filterCategoriesHint": "Muestra entradas de las categorías marcadas. «Todas» muestra todas las categorías.",
+    "filterTags": "Etiquetas",
+    "filterTagsHint": "Si se indican, solo entradas con al menos una de estas etiquetas.",
+    "newCategory": "Nueva categoría",
+    "addCategory": "Crear",
+    "moveUp": "Subir",
+    "moveDown": "Bajar"
   }
 }

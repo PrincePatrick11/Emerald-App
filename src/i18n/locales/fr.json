@@ -84,13 +84,13 @@
     "templateDeleted": "Modèle supprimé",
     "languageDeleted": "Langue supprimée",
     "imageDeleted": "Image supprimée",
-    "wordDeleted": "Mot supprimé"
+    "wordDeleted": "Mot supprimé",
+    "dashboardDeleted": "Tableau de bord supprimé"
   },
   "createItem": {
     "title": "Créer"
   },
   "nav": {
-    "home": "Accueil",
     "all": "Tout",
     "journal": "Journal",
     "wiki": "Wiki",
@@ -104,7 +104,8 @@
     "operations": "Opérations",
     "tasks": "Tâches",
     "settings": "Paramètres",
-    "startPage": "Page d’accueil"
+    "startPage": "Page d’accueil",
+    "allEntries": "Toutes les entrées"
   },
   "sidebar": {
     "allEmpty": "Aucune entrée pour le moment",
@@ -113,7 +114,8 @@
     "noResultsHint": "Essayez une autre orthographe",
     "tasksEmpty": "Aucune tâche pour l'instant",
     "showMore": "Afficher {{count}} de plus",
-    "showMore_other": "Afficher {{count}} de plus"
+    "showMore_other": "Afficher {{count}} de plus",
+    "dashboardEmpty": "Pas encore d’entrées ici"
   },
   "operations": {
     "new": "Nouvelle opération",
@@ -879,14 +881,6 @@
     "moonPhase": "Phase lunaire",
     "status": "Statut"
   },
-  "home": {
-    "viewAll": "Voir tout",
-    "view": "Vue",
-    "sort": "Tri",
-    "show": "Afficher",
-    "newest": "Récents",
-    "oldest": "Anciens"
-  },
   "vault": {
     "title": "Vaults",
     "edit": "Modifier",
@@ -1127,7 +1121,7 @@
     "groupBackup": "Sauvegarde automatique",
     "uiScaleHint": "Met à l'échelle toute l'interface — texte, icônes et espacements.",
     "editorFontSizeHint": "Taille du texte dans les entrées et les valeurs de champ, indépendante de la taille de l'interface.",
-    "sidebarListHint": "Les entrées qu'affiche la barre latérale gauche : toutes, ou celles d'un module.",
+    "sidebarListHint": "Les entrées qu'affiche la barre latérale gauche : toutes, ou celles d'un tableau de bord.",
     "sidebarLimitHint": "Nombre d'entrées affichées au départ. Le reste se charge en dessous via « Afficher plus ».",
     "emojiDefaultsHint": "Les emojis proposés par chaque sélecteur de ce vault avant toute recherche. Cliquer pour retirer, glisser pour trier, rechercher pour en ajouter.",
     "imagesHint": "S'applique aux images nouvellement insérées. Les plus grandes sont d'abord réduites et refusées seulement si elles restent trop lourdes.",
@@ -1207,7 +1201,9 @@
     "languages": "Langues",
     "deleteSelected": "Supprimer la sélection ({{count}})",
     "confirmDeleteSelected": "Oui, supprimer {{count}}",
-    "retentionNoteNever": "Les éléments restent jusqu'à ce que vous les supprimiez définitivement."
+    "retentionNoteNever": "Les éléments restent jusqu'à ce que vous les supprimiez définitivement.",
+    "entries": "Entrées",
+    "dashboards": "Tableaux de bord"
   },
   "leaveGuard": {
     "title": "Modifications non enregistrées",
@@ -1410,6 +1406,14 @@
     },
     "trash": {
       "title": "La corbeille est vide"
+    },
+    "allEntries": {
+      "title": "Pas encore d’entrées",
+      "description": "Chaque entrée du vault apparaît ici, quelle que soit sa catégorie."
+    },
+    "dashboard": {
+      "title": "Rien ici pour l’instant",
+      "description": "Ce tableau de bord montre les entrées que son filtre laisse passer. Modifie le filtre dans ses réglages."
     }
   },
   "sync": {
@@ -1429,5 +1433,23 @@
     "oldVersion": "Ce fichier provient d'une version antérieure d'Emerald et ne peut pas être importé dans celle-ci. Rien n'a été modifié ; un convertisseur suivra.",
     "newVersion": "Ce fichier provient d'une version plus récente d'Emerald. Mettez à jour cette application pour l'importer. Rien n'a été modifié.",
     "unsupported": "Ce fichier n'est pas un fichier Emerald que cette version peut lire. Rien n'a été modifié."
+  },
+  "dashboards": {
+    "unnamed": "Tableau de bord sans nom",
+    "defaultName": "Nouveau tableau de bord",
+    "dashboard": "Tableau de bord",
+    "newEntry": "Nouvelle entrée",
+    "settings": "Réglages du tableau de bord",
+    "settingsTitle": "Tableau de bord",
+    "name": "Nom",
+    "allHasNoFilter": "« Toutes les entrées » montre chaque entrée et n’a pas de filtre.",
+    "filterCategories": "Catégories",
+    "filterCategoriesHint": "Montre les entrées des catégories cochées. « Toutes » montre chaque catégorie.",
+    "filterTags": "Étiquettes",
+    "filterTagsHint": "Si renseignées, seulement les entrées avec au moins une de ces étiquettes.",
+    "newCategory": "Nouvelle catégorie",
+    "addCategory": "Créer",
+    "moveUp": "Monter",
+    "moveDown": "Descendre"
   }
 }

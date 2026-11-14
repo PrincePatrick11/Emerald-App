@@ -126,22 +126,22 @@ There is no `UNIQUE` on `name`: uniqueness is enforced by the store (`categoryKe
 
 ### dashboards
 
-Views over entries by filter rules (`lib/dashboards.ts`, `store/dashboardStore.ts`, see [Dashboards](architecture/modules.md#dashboards)). Journal, Wiki and Operations show the entries of the built-in dashboard of the same name.
+Views over entries by filter rules (`lib/dashboards.ts`, `store/dashboardStore.ts`, see [Dashboards](architecture/modules.md#dashboards)). Journal, Wiki and Operations show the entries of the built-in dashboard of the same name; "All entries" and every dashboard made by hand show theirs as `{ type: 'dashboard', id }`.
 
 | Column | Type | Notes |
 |---|---|---|
 | id | TEXT PK | the key for a built-in (`'all'`, `'journal'`, `'wiki'`, `'operations'`) — the same on every device, so two fresh vaults mean the same rows; UUID otherwise |
 | builtin | TEXT | the built-in's key, `NULL` for one built by hand |
 | name | TEXT | NOT NULL DEFAULT `''`; empty shows the translated name of the built-in |
-| icon | TEXT | emoji or an icon file (see [Icons](#icons)), NOT NULL DEFAULT `''`; empty shows the module's |
+| icon | TEXT | emoji or an icon file (see [Icons](#icons)), NOT NULL DEFAULT `''`; empty shows the built-in's rail icon, or the generic dashboard glyph |
 | position | INTEGER | order in the rail |
-| filter | TEXT | JSON `{ categories?: string[], tags?: string[] }`; a missing key does not narrow, so `{}` shows every entry |
+| filter | TEXT | JSON `{ categories?: string[], tags?: string[] }`; a missing key does not narrow, so `{}` shows every entry; an empty list is dropped on save (`normalizeFilter`), since an empty category list would hide everything |
 | sort | TEXT | JSON `{ by: 'created' \| 'title' \| 'updated', dir }` |
-| display | TEXT | JSON, empty until dashboards can be built |
+| display | TEXT | JSON `{ view: 'list' \| 'cards' \| 'cards_wide' \| 'timeline', grouping: 'grouped' \| 'flat' }` — the list's view and grouping; missing or broken JSON reads as list/flat (`parseDashboardDisplay`) |
 | created_at / updated_at | TEXT | ISO 8601 |
-| deleted_at | TEXT | NULL = active |
+| deleted_at | TEXT | NULL = active; a dashboard in the Trash is purged after the retention period (`CLEANUP_TABLES`) and removed when the Trash is emptied — "All entries" never gets there |
 
-A fresh vault gets "All entries" (no filter), Journal (`journal`), Operations (`sigils`, `altars`, `ritual`, `meditation`) and Wiki (`paradigm`, `herbs`, `crystals`, `candles`, `deities`, `tools`) — `BUILTIN_DASHBOARDS` in `schema.ts`. The category ids in `filter` have no foreign key (see [What foreign keys cannot cover](#what-foreign-keys-cannot-cover)).
+A fresh vault gets "All entries" (no filter; list, flat, last changed first), Journal (`journal`; list, flat, newest first), Operations (`sigils`, `altars`, `ritual`, `meditation`; list, grouped, last changed first) and Wiki (`paradigm`, `herbs`, `crystals`, `candles`, `deities`, `tools`; cards, grouped, A–Z) — `BUILTIN_DASHBOARDS` in `schema.ts`, whose `sort` and `display` are only start values: afterwards the app reads the row. A dashboard made by hand starts without filter, list/flat, last changed first. "All entries" can be neither deleted nor given a filter; every other dashboard, the built-ins included, goes to the Trash. The category ids in `filter` have no foreign key (see [What foreign keys cannot cover](#what-foreign-keys-cannot-cover)).
 
 ### block_definitions
 
@@ -366,7 +366,7 @@ A patch that changes nothing is not written at all (`needsWrite`). Checking a ch
 
 ### Icons
 
-The `icon` columns of `ICON_FIELDS` in `schema.ts` — `entries`, `templates`, `block_definitions`, `languages`, `dashboards` — hold an emoji or the stored name of a file in the vault's `icons/` folder. An uploaded icon is brought down to 128px (`saveIcon` in `src/lib/icons.ts`, through `useShrunkIcon`) and stored by `save_icon` like a picture by `save_image`: named after a hash of its bytes, sealed in an encrypted vault — under a context of its own, so a file of one folder does not open as one of the other. `isImageIcon` (`lib/helpers.ts`) tells a file name from an emoji, `iconSrc` builds its URL (`emerald-img` under `/{vaultId}/icons/{name}`). A custom block's copies carry the definition's icon in their config JSON and name it in [block_refs](#block_refs) (`target_kind` `icon`), so every copy points at the same file. Categories, tags and vaults know only emoji; no view writes `dashboards.icon` yet. Icons are not pictures of "Images": `collectImageUses` never sees them, and their own cleanup is `collectUsedIconFilenames` (the icon columns, the icon references and every stored name in the block rows' `config`/`attrs`, the trash included) behind the same action in Settings → Storage.
+The `icon` columns of `ICON_FIELDS` in `schema.ts` — `entries`, `templates`, `block_definitions`, `languages`, `dashboards` — hold an emoji or the stored name of a file in the vault's `icons/` folder. An uploaded icon is brought down to 128px (`saveIcon` in `src/lib/icons.ts`, through `useShrunkIcon`) and stored by `save_icon` like a picture by `save_image`: named after a hash of its bytes, sealed in an encrypted vault — under a context of its own, so a file of one folder does not open as one of the other. `isImageIcon` (`lib/helpers.ts`) tells a file name from an emoji, `iconSrc` builds its URL (`emerald-img` under `/{vaultId}/icons/{name}`). A custom block's copies carry the definition's icon in their config JSON and name it in [block_refs](#block_refs) (`target_kind` `icon`), so every copy points at the same file. Categories, tags and vaults know only emoji. Icons are not pictures of "Images": `collectImageUses` never sees them, and their own cleanup is `collectUsedIconFilenames` (the icon columns, the icon references and every stored name in the block rows' `config`/`attrs`, the trash included) behind the same action in Settings → Storage.
 
 ## Sigil Workflow
 

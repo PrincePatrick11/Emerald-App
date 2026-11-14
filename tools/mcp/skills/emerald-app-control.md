@@ -178,6 +178,7 @@ document.querySelector('.left-sidebar-rail button:has(.lucide-book-open)').click
 
 | Target | Icon class | Selector |
 | --- | --- | --- |
+| All entries | `lucide-layout-list` | `.left-sidebar-rail [data-dashboard-id="all"]` |
 | Journal | `lucide-book-open` | `.left-sidebar-rail button:has(.lucide-book-open)` |
 | Tasks | `lucide-square-check-big` | `.left-sidebar-rail button:has(.lucide-square-check-big)` |
 | Operations | `lucide-wand-sparkles` | `.left-sidebar-rail button:has(.lucide-wand-sparkles)` |
@@ -187,6 +188,8 @@ document.querySelector('.left-sidebar-rail button:has(.lucide-book-open)').click
 | Settings | `lucide-settings` | `.left-sidebar-rail button:has(.lucide-settings)` |
 
 `:has()` is supported by WebView2 — verified against the running build.
+
+Every dashboard button (All entries, Journal, Operations, Wiki and dashboards made by hand) also carries `data-dashboard-id`, e.g. `[data-dashboard-id="wiki"]` — the only stable handle for a user-made dashboard, whose icon can be anything. A built-in given its own icon loses its lucide class (renaming keeps it); the attribute stays.
 
 **`.sidebar-item` is not navigation.** Today the class denotes list rows:
 entries in the list panel, backlinks, routines, tags. Trying to navigate with it

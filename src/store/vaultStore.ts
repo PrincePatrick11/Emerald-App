@@ -111,7 +111,7 @@ async function loadActiveVault(): Promise<void> {
   await useSettingsStore.getState().loadForVault(useVaultStore.getState().activeVaultId);
   await getDb();
   // Tabs and history point into the old vault by entry ID — close everything,
-  // not just the active tab to Home.
+  // not just the active tab to "All entries".
   useUIStore.getState().closeAllTabs();
   loadVaultPrefs(useVaultStore.getState().activeVaultId);
   // The drafts of the new vault; those of the old one only leave memory.

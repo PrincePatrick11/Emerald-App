@@ -1,15 +1,20 @@
 import { useEntryStore } from '../store/entryStore';
-import { builtinDashboard, useDashboardStore } from '../store/dashboardStore';
+import { dashboardById, useDashboardStore } from '../store/dashboardStore';
 import { entriesByKind, entriesOfDashboard } from '../store/entryViews';
 import type { EntriesByKind } from '../lib/dashboards';
-import type { BuiltinDashboard, Entry } from '../types';
+import type { Dashboard, Entry } from '../types';
+
+/** A live dashboard by ID (the built-ins' IDs are their keys) — `undefined` if it is gone. */
+export function useDashboard(id: string | undefined): Dashboard | undefined {
+  return useDashboardStore((s) => dashboardById(s.dashboards, id));
+}
 
 /**
- * The entries a built-in dashboard shows, in its order — what Journal, Wiki
- * and Operations list. Empty if the dashboard is gone.
+ * The entries a dashboard shows, in its order — what Journal, Wiki,
+ * Operations and every other dashboard list. Empty if the dashboard is gone.
  */
-export function useDashboardEntries(key: BuiltinDashboard): Entry[] {
-  const dashboard = useDashboardStore((s) => builtinDashboard(s.dashboards, key));
+export function useDashboardEntries(id: string | undefined): Entry[] {
+  const dashboard = useDashboard(id);
   return useEntryStore((s) => entriesOfDashboard(s.entries, dashboard));
 }
 
