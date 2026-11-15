@@ -74,9 +74,7 @@
   },
   "undo": {
     "action": "Undo",
-    "entryDeleted": "Journal entry deleted",
-    "articleDeleted": "Wiki article deleted",
-    "operationDeleted": "Operation deleted",
+    "entryDeleted": "Entry deleted",
     "taskDeleted": "Task deleted",
     "categoryDeleted": "Category deleted",
     "tagDeleted": "Tag deleted",
@@ -117,18 +115,10 @@
     "showMore_other": "Show {{count}} more",
     "dashboardEmpty": "No entries here yet"
   },
-  "operations": {
-    "new": "New operation",
-    "untitled": "Untitled Operation",
-    "placeholder": "Document your operation...",
-    "all": "All"
-  },
-  "journal": {
-    "title": "Journal",
-    "newEntry": "New entry",
+  "entries": {
+    "label": "Entries",
     "untitled": "Untitled Entry",
-    "placeholder": "Begin your record...",
-    "noPhase": "No moon phase"
+    "placeholder": "Begin your record..."
   },
   "creation": {
     "intention": "Intention",
@@ -147,15 +137,6 @@
     "noLetters": "No letters prepared yet.",
     "targetDate": "Target date",
     "brushSize": "Brush"
-  },
-  "wiki": {
-    "title": "Wiki",
-    "newArticle": "New article",
-    "untitled": "Untitled Article",
-    "placeholder": "Document your knowledge...",
-    "addIcon": "Add icon",
-    "changeIcon": "Change icon",
-    "removeIcon": "Remove icon"
   },
   "blocks": {
     "add": "Add block",
@@ -793,8 +774,6 @@
     "noResultsForFiltered": "Nothing found for “{{query}}” with the selected filters.",
     "noResultsFiltered": "Nothing matches the selected filters.",
     "resetFilters": "Reset filters",
-    "operations": "Search operations…",
-    "wikiArticles": "Search wiki articles…",
     "globalPlaceholder": "Search everything…",
     "hint": "Titles, tags and content across every module.",
     "clear": "Clear search",
@@ -852,7 +831,6 @@
   "properties": {
     "noEntry": "Open an entry to see its properties.",
     "title": "Properties",
-    "type": "Type",
     "category": "Category",
     "noCategory": "None",
     "moonPhase": "Moon phase",
@@ -872,13 +850,13 @@
     "linkEntry": "Link entry …",
     "addTag": "Add tag …",
     "removeTag": "Remove tag",
-    "area": "Module"
+    "addIcon": "Add icon",
+    "changeIcon": "Change icon",
+    "removeIcon": "Remove icon"
   },
   "filters": {
     "all": "All",
     "category": "Category",
-    "module": "Module",
-    "moonPhase": "Moon Phase",
     "status": "Status"
   },
   "vault": {
@@ -1250,9 +1228,6 @@
     "title": "Insert link",
     "searchPlaceholder": "Search entries…",
     "tabAll": "All",
-    "tabJournal": "Journal",
-    "tabWiki": "Wiki",
-    "tabOperations": "Operations",
     "tabTasks": "Tasks",
     "noResults": "No entries found"
   },
@@ -1363,22 +1338,9 @@
     "unmappedCount_other": "{{count}} unmapped"
   },
   "emptyState": {
-    "journal": {
-      "title": "No entries yet",
-      "description": "Record what you experience, dream and work. New entries get the day's moon phase.",
-      "action": "First entry"
-    },
-    "wiki": {
-      "title": "No articles yet",
-      "description": "Collect knowledge about herbs, stones and symbols."
-    },
     "tasks": {
       "title": "All done",
       "description": "No open tasks. New ones land here."
-    },
-    "operations": {
-      "title": "No operations yet",
-      "description": "Plan rituals with ingredients, steps and outcome."
     },
     "images": {
       "title": "No images yet",

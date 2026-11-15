@@ -1,20 +1,8 @@
 import type { TrashKind, ViewId } from '../lib/modules';
 
 /**
- * The kind of an entry as the modules show it — journal, wiki or operation.
- * Not stored: an entry has no kind of its own, it follows from which
- * built-in dashboard's filter its category falls into (`entryKindOf`,
- * `lib/dashboards.ts`). Keys the per-kind texts and icons (untitled title,
- * fallback emoji, trash groups, search hits).
- */
-export type EntryKind = 'journal' | 'wiki' | 'operation';
-
-/** An entry kind or a task — what lists, search hits and link chips show. */
-export type ContentType = EntryKind | 'task';
-
-/**
  * What a link points at (`task_links.target_type`, the chip's
- * `data-entry-type`, drag payloads): an entry — of whatever kind — or a task.
+ * `data-entry-type`, drag payloads, link items, search hits): an entry or a task.
  */
 export type LinkTargetKind = 'entry' | 'task';
 
@@ -210,10 +198,15 @@ export interface LexiconEntry {
 }
 
 export interface ActiveView {
-  // ViewId instead of the old ad-hoc union: via ContentType it also contained
-  // 'operation' (singular), which was never a valid view type.
   type: ViewId;
+  /** The entry, dashboard, task, library item … the view shows. */
   id?: string;
+  /**
+   * Only for `type: 'entry'`: the dashboard the entry was opened from — it
+   * stays highlighted in the rail and is where "back" leads. Unset, or a
+   * dashboard that is gone, means "All entries".
+   */
+  dashboard?: string;
   mode?: 'view' | 'edit';
   /** Freshly created and never confirmed with "Done" — Cancel discards
    *  the entry again instead of just returning to the last saved state.

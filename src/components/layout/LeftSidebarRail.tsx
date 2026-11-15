@@ -1,7 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import { LayoutGrid, Plus, Settings, type LucideIcon } from 'lucide-react';
 import { Suspense, lazy, useEffect, useState } from 'react';
-import { AUX_VIEWS, MODULES, type ViewId } from '../../lib/modules';
+import { AUX_VIEWS, TASKS_VIEW, type ViewId } from '../../lib/modules';
 import { useUIStore } from '../../store/uiStore';
 import { useVaultStore } from '../../store/vaultStore';
 import { useAutoBackupStore } from '../../store/autoBackupStore';
@@ -135,7 +135,7 @@ export default function LeftSidebarRail() {
         {/* The dashboards in their order (drag to move), then the tasks. */}
         <div className={RAIL_GROUP}>
           {railDashboards.group}
-          {viewButton('tasks', MODULES.tasks)}
+          {viewButton('tasks', TASKS_VIEW)}
         </div>
         <div className={RAIL_GROUP}>
           {viewButton('lexicon', AUX_VIEWS.lexicon)}

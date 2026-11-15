@@ -71,7 +71,7 @@ export function LinkTarget({ target, onRemove }: { target: { id: string; entryTy
   );
   const open = () => {
     if (!isValidLinkTarget(target)) return;
-    setActiveView({ type: viewOfLinkTarget(target.entryType, target.id), id: target.id, mode: 'view' });
+    setActiveView(viewOfLinkTarget(target.entryType, target.id));
   };
   return (
     <span className="inline-flex">

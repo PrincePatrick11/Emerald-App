@@ -8,7 +8,7 @@ import { useUndoStore } from '../../store/undoStore';
 import { takeTaskToName } from '../../lib/createItem';
 import { generateId } from '../../lib/helpers';
 import { displayTitle, hasOwnTitle } from '../../lib/entryTitle';
-import { MODULES } from '../../lib/modules';
+import { TASKS_VIEW } from '../../lib/modules';
 import { linkTargetKindOf } from '../../lib/internalLinkHtml';
 import { viewOfLinkTarget } from '../../store/entryViews';
 import EmptyState, { NoResults } from '../ui/EmptyState';
@@ -324,7 +324,7 @@ export default function TasksView() {
             matter, the global ones always do. */}
         {nothingVisible && (isFiltering ? noResults : (
           <EmptyState
-            icon={MODULES.tasks.icon}
+            icon={TASKS_VIEW.icon}
             title={t('emptyState.tasks.title')}
             description={t('emptyState.tasks.description')}
             actionLabel={t('tasks.newTask')}
@@ -595,7 +595,7 @@ const TaskRow = memo(function TaskRow({
                 className="tasks-linked-entry text-xs cursor-pointer px-1.5 py-0.5 rounded-md transition-colors"
                 title={link.title}
                 onClick={() => {
-                  useUIStore.getState().setActiveView({ type: viewOfLinkTarget(link.target_type, link.target_id), id: link.target_id, mode: 'view' });
+                  useUIStore.getState().setActiveView(viewOfLinkTarget(link.target_type, link.target_id));
                 }}
               >
                 {link.title}

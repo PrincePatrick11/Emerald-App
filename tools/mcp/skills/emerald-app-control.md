@@ -295,65 +295,20 @@ await mcp.call_tool("eval", { expression: "[...document.querySelectorAll('button
 // Trash auto-deletes after 30 days
 ```
 
-### Creating Wiki / Operations / Tasks entries
+### Creating entries and tasks
 
 **These views open the editor inline**: clicking "New..." opens the editor immediately.
 
-**IMPORTANT: the title commit mechanism differs per area!**
-
 | Area | Title input selector | Commit method | Body editor |
 |---|---|---|---|
-| **Journal** | `input[placeholder="Untitled Entry" i]` | click the "Done" button | `.ProseMirror` |
-| **Wiki** | `input[placeholder="Untitled Article" i]` | `input.entry-view-title.blur()` | `.ProseMirror` |
-| **Operations** | `input[placeholder="Untitled Operation" i]` | **right-click → "Rename"** (NOT blur!) | `.ProseMirror` + 2 textareas |
+| **Any entry** (one entry page for all dashboards) | `input.entry-view-title` (placeholder "Untitled Entry") | click the "Done" button | `.ProseMirror` |
 | **Tasks** | `input.bg-stone-800[type="text"]` (NO placeholder) | Enter + blur | tasks have no body |
 
-**Category options per area:**
-
-| Area | Categories |
-|---|---|
-| **Wiki** | 12 options (Paradigm, Banishing, Meditation, Sigil Charging, Ritual, Deity, Herb, Symbol, Tool, Concept, Spell, Other) |
-| **Operations** | **ONLY 2 options**: `sigils` and `servitors` — Operations is for sigil work only! |
+The category is chosen in the Properties panel's category row while editing; a new entry starts in the first category of the dashboard it was created in.
 
 **Creating a journal entry (Done button):** see above.
 
-**Creating a wiki article (blur() commit):** like Journal, but instead of Done:
-```js
-await mcp.call_tool("eval", {
-  expression: "(() => { const t = document.querySelector('input.entry-view-title'); if (t) t.blur(); return true; })()"
-});
-// view-switch refresh (Journal -> Wiki) so the article becomes visible
-await mcp.call_tool("eval", { expression: "document.querySelector('.left-sidebar-rail button:has(.lucide-book-open)')?.click()" });
-await mcp.call_tool("wait_for", { timeout_ms: 500 });
-await mcp.call_tool("eval", { expression: "document.querySelector('.left-sidebar-rail button:has(.lucide-library)')?.click()" });
-await mcp.call_tool("wait_for", { timeout_ms: 1500 });
-```
-
-**Creating an operation (rename workflow):**
-```js
-// 1. Sidebar + New Operation
-const sb = document.querySelector('.left-sidebar-rail button:has(.lucide-wand-sparkles)');
-if (sb) sb.click();
-const b = [...document.querySelectorAll('button')].find(b => /New Operation/i.test((b.innerText || '').trim()) && b.offsetParent !== null);
-if (b) b.click();
-// 2. Fill title
-await mcp.call_tool("eval", { expression: "(() => { const i = document.querySelector('input.entry-view-title'); if (i) { const s = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value'); s.set.call(i, 'My title'); i.dispatchEvent(new Event('input', { bubbles: true })); } return true; })()" });
-// 3. Fill body textareas
-await mcp.call_tool("eval", { expression: "(() => { const tas = [...document.querySelectorAll('textarea')]; const intent = tas.find(t => t.placeholder?.includes('sigil')); if (intent) { const s = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value'); s.set.call(intent, 'I AM PROTECTED'); intent.dispatchEvent(new Event('input', { bubbles: true })); } return true; })()" });
-// 4. Set category
-await mcp.call_tool("eval", { expression: "(() => { const sels = [...document.querySelectorAll('select')].filter(s => s.offsetParent !== null); const s = sels[0]; if (s) { const set = Object.getOwnPropertyDescriptor(window.HTMLSelectElement.prototype, 'value'); set.call(s, 'sigils'); s.dispatchEvent(new Event('change', { bubbles: true })); } return true; })()" });
-// 5. Commit via right-click + Rename
-await mcp.call_tool("eval", { expression: "(() => { const item = [...document.querySelectorAll('.panel-interactive')].find(el => el.offsetParent !== null && (el.innerText || '').includes('Untitled Operation')); if (item) { const r = item.getBoundingClientRect(); item.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, view: window, clientX: r.left + 20, clientY: r.top + 20, button: 2, buttons: 2 })); } return true; })()" });
-await mcp.call_tool("wait_for", { timeout_ms: 500 });
-await mcp.call_tool("eval", { expression: "[...document.querySelectorAll('.context-menu-item')].find(el => /^rename$/i.test((el.innerText || '').trim()))?.click()" });
-await mcp.call_tool("wait_for", { timeout_ms: 500 });
-await mcp.call_tool("eval", { expression: "(() => { const input = [...document.querySelectorAll('input')].find(el => el.offsetParent !== null && (el.className || '').includes('flex-1 bg-transparent text-sm')); if (input) { const s = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value'); s.set.call(input, 'My title'); input.dispatchEvent(new Event('input', { bubbles: true })); input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })); input.blur(); } return true; })()" });
-```
-
-**Creating a task:**
-```js
-await mcp.call_tool("eval", { expression: "(() => { const i = [...document.querySelectorAll('input[type=\"text\"]')].find(el => el.offsetParent !== null && !el.placeholder && (el.className || '').includes('bg-stone-800')); if (i) { const s = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value'); s.set.call(i, 'Buy sage'); i.dispatchEvent(new Event('input', { bubbles: true })); i.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })); i.blur(); } return true; })()" });
-```
+**Any other entry:** there is one entry page for every entry. Open a dashboard (`.left-sidebar-rail [data-dashboard-id="<id>"]`), press its "New entry" button (or a category group's "+"), type the title and press Done, as for a journal entry above. The entry starts in the dashboard's first category; the category can be changed in the Properties panel while editing.
 
 ## Pitfalls
 
@@ -368,19 +323,6 @@ If you do have to select by text, check the active language first:
 document.documentElement.lang || localStorage.getItem('i18nextLng')
 ```
 
-
-### Wiki needs a view-switch refresh after create
-**Wiki articles are in the list immediately after `entry-view-title.blur()`, but React needs ~500ms to re-render.**
-
-```js
-await mcp.call_tool("eval", { expression: "document.querySelector('.left-sidebar-rail button:has(.lucide-book-open)')?.click()" });
-await mcp.call_tool("wait_for", { timeout_ms: 500 });
-await mcp.call_tool("eval", { expression: "document.querySelector('.left-sidebar-rail button:has(.lucide-library)')?.click()" });
-await mcp.call_tool("wait_for", { timeout_ms: 1500 });
-```
-
-### Operations need the rename workflow
-**Operations do NOT react to `entry-view-title.blur()`** the way Wiki does. Commit via right-click → Rename in the context menu. See the table above.
 
 ### `btn-primary` only exists in list views
 `button.btn-primary` is there as long as a list view without an open detail is

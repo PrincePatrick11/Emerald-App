@@ -1,12 +1,12 @@
 import { isValidLinkTarget } from './internalLinkHtml';
-import type { ContentType } from '../types';
+import type { LinkTargetKind } from '../types';
 
 /** What the sidebar's linking field sends to the editor. Matches
  *  `SuggestionItem` (where `label` is required), but stays
  *  self-contained here: `lib/` imports no components. */
 export interface EntryLinkRequest {
   id: string;
-  entryType: ContentType;
+  entryType: LinkTargetKind;
   label: string;
   icon?: string | null;
   /** Heading above the appended link — see `SuggestionItem.categoryLabel`. */
@@ -43,7 +43,7 @@ export function requestEntryLinkAppend(item: EntryLinkRequest): boolean {
  */
 export const REVEAL_ENTRY_LINK_EVENT = 'entry-link-reveal';
 
-export function requestEntryLinkReveal(target: { id: string; entryType: ContentType }): boolean {
+export function requestEntryLinkReveal(target: { id: string; entryType: LinkTargetKind }): boolean {
   const event = new CustomEvent(REVEAL_ENTRY_LINK_EVENT, {
     detail: target,
     cancelable: true,
@@ -64,7 +64,7 @@ export function requestEntryLinkReveal(target: { id: string; entryType: ContentT
 export const REMOVE_ENTRY_LINK_EVENT = 'entry-link-remove';
 
 export function requestEntryLinkRemove(
-  target: { id: string; entryType: ContentType; categoryLabel?: string },
+  target: { id: string; entryType: LinkTargetKind; categoryLabel?: string },
 ): boolean {
   const event = new CustomEvent(REMOVE_ENTRY_LINK_EVENT, {
     detail: target,

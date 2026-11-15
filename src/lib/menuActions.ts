@@ -185,11 +185,7 @@ export interface MenuEnabledState {
  * and drawing out on its own (`renderBlocksForExport`, `withoutConcealed`).
  */
 export function computeMenuEnabledState(activeView: ActiveView): MenuEnabledState {
-  const isEntryView =
-    (activeView.type === 'journal' ||
-     activeView.type === 'wiki' ||
-     activeView.type === 'operations') &&
-    !!activeView.id;
+  const isEntryView = activeView.type === 'entry' && !!activeView.id;
   const isTemplatePage = activeView.type === 'templates' && !!activeView.id;
 
   return {

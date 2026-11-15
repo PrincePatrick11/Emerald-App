@@ -46,8 +46,8 @@ export type DashboardEmptyState = EmptyStateProps;
 export interface DashboardGroupBy {
   value: GroupingMode;
   onChange: (g: GroupingMode) => void;
-  /** What is grouped by, in the module's own words: "Moon phase" in the
-   *  journal, "Type" in the trash. Default: "Category". */
+  /** What is grouped by, in the view's own words: "Type" in the trash.
+   *  Default: "Category". */
   label?: string;
 }
 

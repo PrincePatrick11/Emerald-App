@@ -2,8 +2,9 @@ import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ChevronLeft } from 'lucide-react';
 import { useUIStore } from '../../store/uiStore';
-import { MODULES, type EntryModuleId } from '../../lib/modules';
 import { displayTitle } from '../../lib/entryTitle';
+import { dashboardLabel } from '../../lib/dashboards';
+import type { Dashboard } from '../../types';
 import TagInput from './TagInput';
 
 /** The page title as a heading: entries and dashboards
@@ -16,7 +17,7 @@ export const ENTRY_TITLE_INPUT_CLASSES =
 
 /**
  * The narrow row above the title: on the left the way back to the overview
- * (chevron and module name), on the right the date, or when editing the
+ * (chevron and dashboard name), on the right the date, or when editing the
  * status (`EntryStatus`) instead. Shared by `EntryDetailFrame` and `LibraryPageFrame`.
  */
 export function EntryHeaderRow({ back, meta }: {
@@ -24,7 +25,7 @@ export function EntryHeaderRow({ back, meta }: {
   meta?: ReactNode;
 }) {
   return (
-    <div className={`px-8 pt-5 flex items-center gap-4 flex-shrink-0 min-w-0`}>
+    <div className="px-8 pt-5 flex items-center gap-4 flex-shrink-0 min-w-0">
       <button type="button" onClick={back.onClick} className="entry-back-link">
         <ChevronLeft size={14} className="flex-shrink-0" />
         <span className="truncate">{back.label}</span>
@@ -50,18 +51,16 @@ export function EntryStatus({ tone, children }: { tone: 'accent' | 'warning'; ch
 }
 
 interface EntryDetailFrameProps {
-  /** Determines the back target/label and the Untitled placeholder (registry). */
-  module: EntryModuleId;
+  /** The dashboard the entry is shown in — back target and label; `undefined` = "All entries". */
+  dashboard: Pick<Dashboard, 'id' | 'name' | 'builtin'> | undefined;
   isEditing: boolean;
   /** Top right above the title when reading, usually the date. When editing, the status is there. */
   meta?: ReactNode;
   /** Edit mode: local title state; view mode: saved title. */
   title: string;
   onTitleChange: (value: string) => void;
-  /** Before the title block (wiki: cover hero). */
+  /** Before the title block (the cover). */
   aboveTitle?: ReactNode;
-  /** Between title and tags (journal: chips; operations: cover + property chips). */
-  belowTitle?: ReactNode;
   /** Omit = no tag row. Always readOnly; editing happens in the properties panel. */
   tags?: { value: string[]; onChange: (tags: string[]) => void };
   /** The body scrolls within the frame; the BlockStack's sticky toolbar needs the scroll area here, not in the editor. */
@@ -69,25 +68,26 @@ interface EntryDetailFrameProps {
 }
 
 /**
- * The shared detail-view frame of journal, wiki and operations (including
- * sigils, blocks since v41): title block (input ↔ h1), optional tag row,
- * body container. Above it the header row (`EntryHeaderRow`): back to the
- * module's overview, on the right the date (`meta`) or, when editing, the
- * status. `useEntryEditor`, `setEditActions` and the
- * `editorEpoch` key stay in the views; the frame is purely presentational.
+ * The frame of the entry page (`EntryView`): title block (input ↔ h1),
+ * optional tag row, body container. Above it the header row
+ * (`EntryHeaderRow`): back to the dashboard's list, on the right the date
+ * (`meta`) or, when editing, the status. `useEntryEditor`, `setEditActions`
+ * and the `editorEpoch` key stay in the view; the frame is purely presentational.
  */
 export default function EntryDetailFrame({
-  module, isEditing, meta,
-  title, onTitleChange, aboveTitle, belowTitle, tags, children,
+  dashboard, isEditing, meta,
+  title, onTitleChange, aboveTitle, tags, children,
 }: EntryDetailFrameProps) {
   const { t } = useTranslation();
   const setActiveView = useUIStore((s) => s.setActiveView);
-  const moduleInfo = MODULES[module];
 
   return (
     <div className="h-full flex flex-col">
       <EntryHeaderRow
-        back={{ label: t(moduleInfo.navLabelKey), onClick: () => setActiveView({ type: module }) }}
+        back={{
+          label: dashboard ? dashboardLabel(t, dashboard) : t('nav.allEntries'),
+          onClick: () => setActiveView({ type: 'dashboard', id: dashboard?.id ?? 'all' }),
+        }}
         meta={isEditing ? <EntryStatus tone="accent">{t('editor.editing')}</EntryStatus> : meta}
       />
 
@@ -101,17 +101,15 @@ export default function EntryDetailFrame({
             type="text"
             value={title}
             onChange={(e) => onTitleChange(e.target.value)}
-            placeholder={t(moduleInfo.untitledKey)}
+            placeholder={t('entries.untitled')}
             className={ENTRY_TITLE_INPUT_CLASSES}
           />
         ) : (
           <h1 className={ENTRY_TITLE_HEADING_CLASSES}>
-            {displayTitle(t, moduleInfo.kind, title)}
+            {displayTitle(t, 'entry', title)}
           </h1>
         )}
       </div>
-
-      {belowTitle}
 
       {tags && (
         <div className="px-8 pb-3 flex-shrink-0">

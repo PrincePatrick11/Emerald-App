@@ -3,8 +3,7 @@
  * their order. Built-in ones (`all`, `journal`, `wiki`, `operations`) and
  * the user's own; all but "All entries" can be renamed, filtered and deleted
  * (into the trash). The store also keeps the category IDs in their filters
- * in step with the categories, and gives the kind an entry counts as
- * (`entryKindOf`).
+ * in step with the categories.
  *
  * Import rule: imports no other store.
  */
@@ -12,8 +11,8 @@ import { create } from 'zustand';
 import { getDb } from '../lib/db';
 import { generateId, nowIso } from '../lib/helpers';
 import { fromRow, type DbRow } from '../lib/row';
-import { DEFAULT_DISPLAY, entryKindOf, moduleDashboards, normalizeFilter } from '../lib/dashboards';
-import type { BuiltinDashboard, Dashboard, DashboardDisplay, DashboardFilter, DashboardSort, Entry, EntryKind } from '../types';
+import { DEFAULT_DISPLAY, normalizeFilter } from '../lib/dashboards';
+import type { Dashboard, DashboardDisplay, DashboardFilter, DashboardSort } from '../types';
 
 /** What can be changed on a dashboard. */
 export interface DashboardPatch {
@@ -27,8 +26,6 @@ export interface DashboardPatch {
 interface DashboardState {
   /** The active dashboards in their order. */
   dashboards: Dashboard[];
-  /** The live module dashboards in their order — what `entryKindOf` walks. */
-  modules: Dashboard[];
   fetchDashboards: () => Promise<void>;
   createDashboard: (name: string) => Promise<Dashboard>;
   updateDashboard: (id: string, patch: DashboardPatch) => Promise<void>;
@@ -41,18 +38,13 @@ interface DashboardState {
   reorderDashboards: (ids: string[]) => Promise<void>;
 }
 
-function withModules(dashboards: Dashboard[]): Pick<DashboardState, 'dashboards' | 'modules'> {
-  return { dashboards, modules: moduleDashboards(dashboards) };
-}
-
 export const useDashboardStore = create<DashboardState>((set, get) => ({
   dashboards: [],
-  modules: [],
 
   fetchDashboards: async () => {
     const db = await getDb();
     const rows = await db.select<DbRow[]>('SELECT * FROM dashboards WHERE deleted_at IS NULL ORDER BY position ASC, id ASC');
-    set(withModules(rows.map(fromRow.dashboard)));
+    set({ dashboards: rows.map(fromRow.dashboard) });
   },
 
   createDashboard: async (name) => {
@@ -79,7 +71,7 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
       [dashboard.id, dashboard.name, dashboard.icon, dashboard.position, JSON.stringify(dashboard.filter),
         JSON.stringify(dashboard.sort), JSON.stringify(dashboard.display), now],
     );
-    set((s) => withModules([...s.dashboards, dashboard]));
+    set((s) => ({ dashboards: [...s.dashboards, dashboard] }));
     return dashboard;
   },
 
@@ -95,7 +87,7 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
       updated_at: nowIso(),
     };
     // First in memory: sort and layout buttons answer at once.
-    set((s) => withModules(s.dashboards.map((d) => (d.id === id ? next : d))));
+    set((s) => ({ dashboards: s.dashboards.map((d) => (d.id === id ? next : d)) }));
     const db = await getDb();
     await db.execute(
       'UPDATE dashboards SET name=$1, icon=$2, filter=$3, sort=$4, display=$5, updated_at=$6 WHERE id=$7',
@@ -108,7 +100,7 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
     if (!dashboard || dashboard.builtin === 'all') return;
     const db = await getDb();
     await db.execute('UPDATE dashboards SET deleted_at=$1 WHERE id=$2', [nowIso(), id]);
-    set((s) => withModules(s.dashboards.filter((d) => d.id !== id)));
+    set((s) => ({ dashboards: s.dashboards.filter((d) => d.id !== id) }));
   },
 
   restoreDashboard: async (id, { keepPlace = false } = {}) => {
@@ -137,16 +129,11 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
     const ordered = ids.map((id) => byId.get(id)).filter((d): d is Dashboard => !!d);
     if (ordered.length !== get().dashboards.length) return;
     const positioned = ordered.map((d, position) => ({ ...d, position }));
-    set(withModules(positioned));
+    set({ dashboards: positioned });
     const db = await getDb();
     await db.batch(positioned.map((d) => ['UPDATE dashboards SET position=$1 WHERE id=$2', [d.position, d.id]] as const));
   },
 }));
-
-/** A built-in dashboard by key — `undefined` if it is deleted. */
-export function builtinDashboard(dashboards: readonly Dashboard[], key: BuiltinDashboard): Dashboard | undefined {
-  return dashboards.find((d) => d.builtin === key);
-}
 
 /** A live dashboard by ID — `undefined` if it is deleted or unknown. */
 export function dashboardById(dashboards: readonly Dashboard[], id: string | undefined): Dashboard | undefined {
@@ -156,11 +143,6 @@ export function dashboardById(dashboards: readonly Dashboard[], id: string | und
 /** A live dashboard by ID — "All entries" if it is deleted or unknown, which is what such a page shows. */
 export function dashboardOrAll(dashboards: readonly Dashboard[], id: string): Dashboard | undefined {
   return dashboardById(dashboards, id) ?? dashboardById(dashboards, 'all');
-}
-
-/** The kind of an entry under the dashboards loaded now — outside of React. */
-export function kindOfEntry(entry: Pick<Entry, 'category_id' | 'tags'>): EntryKind {
-  return entryKindOf(entry, useDashboardStore.getState().modules);
 }
 
 /**
@@ -178,6 +160,6 @@ export function reassignDashboardCategoriesInMemory(ids: ReadonlySet<string>, to
       const next = [...new Set(categories.map((c) => (ids.has(c) ? to : c)).filter((c): c is string => c !== null))];
       return { ...d, filter: normalizeFilter({ ...d.filter, categories: next }) };
     });
-    return changed ? withModules(dashboards) : {};
+    return changed ? { dashboards } : {};
   });
 }

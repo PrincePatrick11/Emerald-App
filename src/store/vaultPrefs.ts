@@ -19,8 +19,8 @@ import {
  * regardless of which vault is open.
  */
 /**
- * The lists with view, sorting and grouping (`ListPrefs`). Journal, Wiki,
- * Operations and every other dashboard keep theirs in the dashboard's row.
+ * The lists with view, sorting and grouping (`ListPrefs`). Every dashboard
+ * keeps its own in the dashboard's row.
  */
 const LIST_PREF_KEYS = [
   'tasksPrefs', 'trashPrefs',

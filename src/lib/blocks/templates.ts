@@ -8,7 +8,7 @@ import { TEXT_BLOCK_TYPE, type BlockInstance } from './types';
 /**
  * Templates (table `templates`, since v43): a prefilled entry —
  * optional title, block stack with content, tags — that is applied when
- * creating an entry or later in journal, wiki and operations.
+ * creating an entry or later on the entry page.
  *
  * A template is cross-type and knows no type-specific properties.
  * What it brings into an entry is a copy: changes to the template

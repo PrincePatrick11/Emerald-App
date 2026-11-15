@@ -60,7 +60,7 @@ These are exactly the places where orphans accumulate. Three things stand in for
 - **`sweepDanglingTaskLinks(db)`** in `db.ts` deletes `task_links` rows whose target does not exist in the table its `target_type` names (`LINK_TARGET_EXISTS`: `entries` or `tasks`, by `id`). Its rule and `checkIntegrity`'s map of target kinds are kept in step by hand. Soft-deleted targets count as valid — trashed content isn't an orphan yet. It runs in the periodic cleanup, when the trash is emptied, and at the end of every backup import (a partial restore or an imported link row can point at something the import didn't bring).
 - **Permanent deletes clean up directly.** `taskStore.permanentlyDeleteTask` (which takes every subtask in the Trash along) deletes both directions. A task's *soft* delete removes no `task_links` row — `taskStore` only loads the links of tasks outside the Trash, and restoring the task brings them back.
 
-An entry has no type, so nothing ever rewrites `target_type`: a link to an entry says `entry`, whichever module the entry's category puts it in (see [Moving an entry to another module](architecture/editing.md#moving-an-entry-to-another-module)).
+An entry has no type, so nothing ever rewrites `target_type`: a link to an entry says `entry`, whatever the entry's category is (see [Changing an entry's category](architecture/editing.md#changing-an-entrys-category)).
 
 ### Deleting a category never deletes its content
 
@@ -126,7 +126,7 @@ There is no `UNIQUE` on `name`: uniqueness is enforced by the store (`categoryKe
 
 ### dashboards
 
-Views over entries by filter rules (`lib/dashboards.ts`, `store/dashboardStore.ts`, see [Dashboards](architecture/modules.md#dashboards)). Journal, Wiki and Operations show the entries of the built-in dashboard of the same name; "All entries" and every dashboard made by hand show theirs as `{ type: 'dashboard', id }`.
+Views over entries by filter rules (`lib/dashboards.ts`, `store/dashboardStore.ts`, see [Dashboards](architecture/modules.md#dashboards)). Every dashboard, built-in or made by hand, shows its entries as `{ type: 'dashboard', id }`.
 
 | Column | Type | Notes |
 |---|---|---|
@@ -350,7 +350,7 @@ The `deleted_at` indexes matter because `runPeriodicCleanup` runs a range scan a
 
 **entry_number.** A stable, compact, human-readable number, shown in the search and the link picker as `#12`. `nextEntryNumber(db)` in `db.ts` assigns it at insert time — one count over all entries, trashed rows included, so a restored entry never duplicates a number; `idx_entries_number` makes it unique. It is a stored value, never derived from `ROWID`, so a replace import cannot shift it, and a change of category keeps it. An import numbers what it brings behind the vault's (see [Import](#import)).
 
-**Titles.** A new entry or task is stored with an **empty** title. What the user sees is `displayTitle(t, kind, title)` from `src/lib/entryTitle.ts`: the title if it has text, otherwise the translated "Untitled …" of the entry's kind (the module it counts as, `entryKindOf`) — in lists, cards, tabs, search, the Trash, link chips and pickers, task links and exports. `hasOwnTitle(title)` is the one test for "has a title of its own"; nothing compares against a magic string. The one exception is where data comes in: a `.emerald` or Markdown import reads the app-language "Untitled …" a Markdown/PDF export writes for an empty title as no title. The DDL default of `tasks.title` still says `'Untitled Task'`, but no insert relies on it.
+**Titles.** A new entry or task is stored with an **empty** title. What the user sees is `displayTitle(t, 'entry' | 'task', title)` from `src/lib/entryTitle.ts`: the title if it has text, otherwise the translated "Untitled entry" or "Untitled task" — in lists, cards, tabs, search, the Trash, link chips and pickers, task links and exports. `hasOwnTitle(title)` is the one test for "has a title of its own"; nothing compares against a magic string. The one exception is where data comes in: a `.emerald` or Markdown import reads the app-language "Untitled …" a Markdown/PDF export writes for an empty title as no title. The DDL default of `tasks.title` still says `'Untitled Task'`, but no insert relies on it.
 
 **Timestamps.** ISO 8601 text produced by `nowIso()`, sorted and compared lexicographically. No column holds a date-only value; dates inside blocks are `YYYY-MM-DD`.
 

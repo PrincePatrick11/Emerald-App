@@ -74,9 +74,7 @@
   },
   "undo": {
     "action": "Deshacer",
-    "entryDeleted": "Entrada de diario eliminada",
-    "articleDeleted": "Artículo wiki eliminado",
-    "operationDeleted": "Operación eliminada",
+    "entryDeleted": "Entrada eliminada",
     "taskDeleted": "Tarea eliminada",
     "categoryDeleted": "Categoría eliminada",
     "tagDeleted": "Etiqueta eliminada",
@@ -117,18 +115,10 @@
     "showMore_other": "Mostrar {{count}} más",
     "dashboardEmpty": "Aún no hay entradas aquí"
   },
-  "operations": {
-    "new": "Nueva operación",
-    "untitled": "Operación sin título",
-    "placeholder": "Documenta tu operación...",
-    "all": "Todas"
-  },
-  "journal": {
-    "title": "Diario",
-    "newEntry": "Nueva entrada",
+  "entries": {
+    "label": "Entradas",
     "untitled": "Entrada sin título",
-    "placeholder": "Comienza tu registro...",
-    "noPhase": "Sin fase lunar"
+    "placeholder": "Comienza tu registro..."
   },
   "creation": {
     "intention": "Intención",
@@ -147,15 +137,6 @@
     "noLetters": "Aún no hay letras preparadas.",
     "targetDate": "Fecha objetivo",
     "brushSize": "Pincel"
-  },
-  "wiki": {
-    "title": "Wiki",
-    "newArticle": "Nuevo artículo",
-    "untitled": "Artículo sin título",
-    "placeholder": "Documenta tu conocimiento...",
-    "addIcon": "Añadir icono",
-    "changeIcon": "Cambiar icono",
-    "removeIcon": "Eliminar icono"
   },
   "blocks": {
     "add": "Añadir bloque",
@@ -793,8 +774,6 @@
     "noResultsForFiltered": "No se encontró nada para «{{query}}» con los filtros elegidos.",
     "noResultsFiltered": "Nada coincide con los filtros elegidos.",
     "resetFilters": "Restablecer filtros",
-    "operations": "Buscar operaciones…",
-    "wikiArticles": "Buscar artículos wiki…",
     "globalPlaceholder": "Buscar en todo…",
     "hint": "Títulos, etiquetas y contenido de todos los módulos.",
     "clear": "Borrar búsqueda",
@@ -852,7 +831,6 @@
   "properties": {
     "noEntry": "Abre una entrada para ver sus propiedades.",
     "title": "Propiedades",
-    "type": "Tipo",
     "category": "Categoría",
     "noCategory": "Ninguna",
     "moonPhase": "Fase lunar",
@@ -872,13 +850,13 @@
     "linkEntry": "Vincular entrada …",
     "addTag": "Añadir etiqueta …",
     "removeTag": "Quitar etiqueta",
-    "area": "Módulo"
+    "addIcon": "Añadir icono",
+    "changeIcon": "Cambiar icono",
+    "removeIcon": "Eliminar icono"
   },
   "filters": {
     "all": "Todas",
     "category": "Categoría",
-    "module": "Módulo",
-    "moonPhase": "Fase lunar",
     "status": "Estado"
   },
   "vault": {
@@ -1250,9 +1228,6 @@
     "title": "Insertar enlace",
     "searchPlaceholder": "Buscar entradas…",
     "tabAll": "Todas",
-    "tabJournal": "Diario",
-    "tabWiki": "Wiki",
-    "tabOperations": "Operaciones",
     "tabTasks": "Tareas",
     "noResults": "No se encontraron entradas"
   },
@@ -1363,22 +1338,9 @@
     "unmappedCount_other": "{{count}} sin equivalencia"
   },
   "emptyState": {
-    "journal": {
-      "title": "Aún no hay entradas",
-      "description": "Registra lo que vives, sueñas y obras. Las entradas nuevas reciben la fase lunar del día.",
-      "action": "Primera entrada"
-    },
-    "wiki": {
-      "title": "Aún no hay artículos",
-      "description": "Reúne saber sobre hierbas, piedras y símbolos."
-    },
     "tasks": {
       "title": "Todo hecho",
       "description": "No hay tareas abiertas. Las nuevas aparecerán aquí."
-    },
-    "operations": {
-      "title": "Aún no hay operaciones",
-      "description": "Planifica rituales con ingredientes, desarrollo y resultado."
     },
     "images": {
       "title": "Aún no hay imágenes",

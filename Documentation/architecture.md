@@ -62,8 +62,8 @@ src/
 │   ├── images/       picture tile, picker, add and edit dialogs, the strip below a canvas
 │   ├── views/        one view per module and aux view (Dashboard … Trash)
 │   ├── sidebar/
-│   │   ├── panels/   Journal/Wiki/Operation properties panels
-│   │   └── fields/   sidebar sections, property rows, tags, links, type toggle
+│   │   ├── panels/   the entry properties panel
+│   │   └── fields/   sidebar sections, property rows, tags, links
 │   ├── templates/    template page, default template, insertion, pickers
 │   ├── lexicon/      LanguagePage, vocabulary/alphabet tables, TranslatePanel
 │   └── ui/           shared component layer (see components.md)
@@ -77,7 +77,7 @@ src/
 │   ├── lexiconStore.ts          languages and their words
 │   ├── draftStore.ts            unsaved block/template page drafts
 │   ├── autoBackupStore.ts       what the automatic backup did last
-│   ├── entryEdit.ts             entry baselines for Cancel, carried across a move to another module
+│   ├── entryEdit.ts             entry baselines for Cancel
 │   ├── leaveGuardStore.ts       edit guards, "save / discard / keep editing"
 │   ├── uiStore.ts               tabs, active view, panels
 │   ├── sessionStore.ts          per-view search/filter state (session only)

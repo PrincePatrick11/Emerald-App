@@ -150,8 +150,8 @@ export default function BlockStack({
   const { orderedEditors, targetEditor, focusOnMount } = textHost;
 
   const context = useMemo<BlockStackContextValue>(() => ({
-    // Only the first text block carries the module's placeholder ("What happened
-    // today?"); further text blocks get a neutral one.
+    // Only the first text block carries the page's placeholder ("Begin your
+    // record…"); further text blocks get a neutral one.
     placeholderFor: (blockId) =>
       blocksRef.current.find((b) => b.type === TEXT_BLOCK_TYPE)?.id === blockId
         ? placeholder
@@ -352,7 +352,7 @@ export default function BlockStack({
         // A loaded sigil that locks the entry ends the edit: the entry can only be read until it is unloaded.
         if (!sigilState(blocksRef.current, todayIso()).lockEntry) return;
         const { activeView, setActiveView } = useUIStore.getState();
-        if (activeView.id === entryId) setActiveView({ type: activeView.type, id: entryId, mode: 'view' });
+        if (activeView.id === entryId) setActiveView({ ...activeView, mode: 'view', isNew: undefined });
       })
       .catch((e: unknown) => console.error('[BlockStack] applying template fields failed:', e));
   };

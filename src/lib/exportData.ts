@@ -5,7 +5,6 @@ import { blockLabel, fieldFallbackText } from './blocks/blockAttrs';
 import { formatIsoDateLong } from './formatDate';
 import { useCategoryStore } from '../store/categoryStore';
 import { useUIStore } from '../store/uiStore';
-import { kindOfEntry } from '../store/dashboardStore';
 import { entryMoonPhase, MOON_PHASE_SYMBOLS } from './moonPhase';
 import { useSettingsStore } from '../store/settingsStore';
 import { displayTitle } from './entryTitle';
@@ -37,7 +36,6 @@ function exportText(): ExportText {
 }
 
 export interface ExportData {
-  type: 'journal' | 'wiki' | 'operations';
   title: string;
   entryNumber?: number;
   content: string;
@@ -58,7 +56,7 @@ function moonLabel(phase: string): string {
 
 export async function collectExportData(): Promise<ExportData | null> {
   const view = useUIStore.getState().activeView;
-  if (!view.id || (view.type !== 'journal' && view.type !== 'wiki' && view.type !== 'operations')) return null;
+  if (!view.id || view.type !== 'entry') return null;
   // Right after startup the content of the open entry may still be pending.
   await useEntryStore.getState().ensureEntryContent(view.id);
   const entry = useEntryStore.getState().getEntry(view.id);
@@ -68,14 +66,12 @@ export async function collectExportData(): Promise<ExportData | null> {
   const phase = entryMoonPhase(entry, useSettingsStore.getState().settings.journal.moonPhase);
 
   return {
-    // The view it is open in — the export's layout follows the module.
-    type: view.type,
-    title: displayTitle(i18n.t, kindOfEntry(entry), entry.title),
+    title: displayTitle(i18n.t, 'entry', entry.title),
     entryNumber: entry.entry_number,
     content: renderBlocksForExport(entry.content, exportText()),
     createdAt: entry.created_at,
     moonPhase: phase ? `${MOON_PHASE_SYMBOLS[phase]} ${moonLabel(phase)}` : undefined,
-    category: cat && !phase ? { label: categoryLabel(i18n.t, cat), icon: cat.emoji } : undefined,
+    category: cat ? { label: categoryLabel(i18n.t, cat), icon: cat.emoji } : undefined,
     // An uploaded icon as a data URL: the export document cannot reach the vault's files.
     entryIcon: (await portableIcon(entry.icon)) || undefined,
     tagNames: liveTagNames(entry.tags),

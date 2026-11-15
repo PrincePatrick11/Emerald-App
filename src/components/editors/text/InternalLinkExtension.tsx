@@ -2,15 +2,12 @@ import Mention from '@tiptap/extension-mention';
 import { mergeAttributes } from '@tiptap/core';
 import { ReactNodeViewRenderer, NodeViewWrapper } from '@tiptap/react';
 import type { NodeViewRendererProps } from '@tiptap/react';
-import SuggestionList, { DEFAULT_ENTRY_EMOJI, type SuggestionItem } from './SuggestionList';
+import SuggestionList, { type SuggestionItem } from './SuggestionList';
+import { defaultLinkIcon } from '../../../lib/entryIcon';
 import { suggestionPopup } from './suggestionPopup';
 import { linkTargetKindOf } from '../../../lib/internalLinkHtml';
 import { isImageIcon } from '../../../lib/helpers';
 import { iconSrc } from '../../../lib/icons';
-
-function getDefaultIcon(entryType: string): string {
-  return entryType === 'task' ? DEFAULT_ENTRY_EMOJI.task : DEFAULT_ENTRY_EMOJI.wiki;
-}
 
 interface InternalLinkOptions {
   getIcon?: (id: string, entryType: string) => string | null;
@@ -23,7 +20,7 @@ function InternalLinkNodeView({ node, editor, extension }: NodeViewRendererProps
   // Look up icon and label live from the store via extension callbacks,
   // so both always reflect the latest state without re-parsing stored HTML.
   const { getIcon, getLabel } = (extension as unknown as { options: InternalLinkOptions }).options;
-  const icon = getIcon?.(id, entryType) ?? getDefaultIcon(entryType);
+  const icon = getIcon?.(id, entryType) ?? defaultLinkIcon(entryType);
   const displayLabel = getLabel?.(id, entryType) ?? label;
 
   const handleClick = (e: React.MouseEvent) => {

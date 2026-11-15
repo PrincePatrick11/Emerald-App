@@ -7,13 +7,16 @@ import { ALL_ENTRIES_ICON, DEFAULT_DASHBOARD_ICON } from '../../lib/modules';
 import EntryDashboard from './EntryDashboard';
 
 /**
- * The list of a dashboard by ID (`{ type: 'dashboard', id }`): "All entries"
- * and the user's own. A dashboard that is gone — deleted in another tab —
- * shows "All entries" instead. An entry opens in the view of its kind.
+ * The list of a dashboard by ID (`{ type: 'dashboard', id }`): "All entries",
+ * the built-ins and the user's own. A dashboard that is gone — deleted in
+ * another tab — shows "All entries" instead. An entry opens on the entry page
+ * inside this dashboard. `dashboardId` overrides the view's ID: the entry page
+ * shows its dashboard's list for an entry that no longer exists.
  */
-export default function DashboardView() {
+export default function DashboardView({ dashboardId }: { dashboardId?: string } = {}) {
   const { t } = useTranslation();
-  const id = useUIStore((s) => s.activeView.id) ?? 'all';
+  const viewId = useUIStore((s) => s.activeView.id);
+  const id = dashboardId ?? viewId ?? 'all';
   const dashboard = useDashboardStore((s) => dashboardOrAll(s.dashboards, id));
   const isAll = dashboard?.builtin === 'all';
 
@@ -28,7 +31,6 @@ export default function DashboardView() {
       key={dashboard?.id}
       dashboard={dashboard}
       title={dashboard ? dashboardLabel(t, dashboard) : t('nav.allEntries')}
-      scope={`dashboard:${dashboard?.id ?? 'all'}`}
       newLabel={t('dashboards.newEntry')}
       onNew={onNew}
       emptyState={{

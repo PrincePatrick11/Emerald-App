@@ -79,14 +79,6 @@ export async function withoutLeaveGuard<T>(key: string, run: () => T | Promise<T
   }
 }
 
-/**
- * Is "Done", "Cancel" or "Delete" currently running on page `key`? Anyone who
- * would pull it out from under it — a move to another module — waits for
- * that: its step back to the list or to reading would otherwise fall into that
- * lock (`uiStore.editLocked`) and be dropped.
- */
-export const isEnding = (key: string): boolean => ending.has(key);
-
 /** Would a question have to be asked before leaving the open page? */
 export function leaveNeedsConfirm(): boolean {
   const guard = useLeaveGuardStore.getState().guard;

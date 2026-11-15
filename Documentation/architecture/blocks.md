@@ -57,7 +57,7 @@ The right sidebar and the main area are sibling trees, so `BlockStack` publishes
 - Each mount gets a fresh `sessionId`, keying the sidebar's manager so an open menu or rename can't outlive a Cancel remount.
 - Only edit mode writes: a read-mode sidebar view gets no `setAttr`, since the change would miss autosave and be swallowed by the next Cancel baseline.
 
-`BlockSidebarArea` (rendered by `RightSidebar` for modules with `ModuleMeta.usesBlocks`, rows described in [components.md](../components.md)) shows the session only if its `entryId` matches the open entry. Types can add settings via `components/blocks/blockSidebarViews.ts` (read/edit variant; the fields block's and the canvas block's edit views), expanded in a box under the selected row. `blockSidebarViews.ts` must never import TipTap: the sidebar is loaded eagerly.
+`BlockSidebarArea` (rendered by `RightSidebar` on the entry page, rows described in [components.md](../components.md)) shows the session only if its `entryId` matches the open entry. Types can add settings via `components/blocks/blockSidebarViews.ts` (read/edit variant; the fields block's and the canvas block's edit views), expanded in a box under the selected row. `blockSidebarViews.ts` must never import TipTap: the sidebar is loaded eagerly.
 
 ### Canvas block
 

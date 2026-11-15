@@ -1,4 +1,4 @@
-import type { ContentType, LinkTargetKind } from '../types';
+import type { LinkTargetKind } from '../types';
 import { htmlTags } from './htmlTags';
 
 /**
@@ -207,11 +207,10 @@ export interface InternalLinkChip {
 }
 
 /** The chip attributes of a link target — the same names as the node attributes
- *  of `InternalLinkExtension`, so also usable directly as `attrs`. `entryType`
- *  may be a display kind (journal, wiki, …); the chip stores the target kind. */
+ *  of `InternalLinkExtension`, so also usable directly as `attrs`. */
 export function toInternalLinkChip(item: {
   id: string;
-  entryType: ContentType | LinkTargetKind;
+  entryType: LinkTargetKind | string;
   label: string;
   icon?: string | null;
   entry_number?: number | null;

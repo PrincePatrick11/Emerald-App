@@ -7,12 +7,12 @@ import { useOutsideClick } from '../../../hooks/useOutsideClick';
 import { OP_PROP_SELECT_CLASSES } from '../../../lib/styleClasses';
 import { isImageIcon } from '../../../lib/helpers';
 import { iconSrc } from '../../../lib/icons';
-import { DEFAULT_ENTRY_EMOJI } from '../../../lib/modules';
+import { defaultLinkIcon } from '../../../lib/entryIcon';
 import type { SuggestionItem } from '../../../lib/linkItems';
 
-/** The icon of a link target in chips and hit rows: image, emoji, or the default of its kind. */
+/** The icon of a link target in chips and hit rows: image, emoji, or the entry/task default. */
 export function LinkItemIcon({ item }: { item: SuggestionItem }) {
-  const icon = item.displayIcon || item.icon || DEFAULT_ENTRY_EMOJI[item.entryType];
+  const icon = item.displayIcon || item.icon || defaultLinkIcon(item.entryType);
   return isImageIcon(icon)
     ? <img src={iconSrc(icon)} alt="" className="w-4 h-4 object-cover rounded-md flex-shrink-0" />
     : <span className="flex-shrink-0">{icon}</span>;

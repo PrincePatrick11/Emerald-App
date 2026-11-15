@@ -96,7 +96,7 @@ The vault picker is the app's start page. `VaultPicker` is a view in the main wi
 
 Emerald renders PDFs by driving its own embedded webview rather than bundling an HTML-to-PDF engine. There is one module per platform, selected at compile time by `#[cfg(target_os = "…")]` in `src-tauri/src/pdf_export/mod.rs`, so `lib.rs` just calls `pdf_export::export_pdf(&app, html, path, page_size).await`.
 
-The command backs one flow: Journal/Wiki/Operations entries (see [Menu enablement gating](#menu-enablement-gating)) export their text at the default Letter/Portrait size. The command also takes an optional `page_size` in inches, which the frontend does not pass at present.
+The command backs one flow: an open entry (see [Menu enablement gating](#menu-enablement-gating)) export their text at the default Letter/Portrait size. The command also takes an optional `page_size` in inches, which the frontend does not pass at present.
 
 ### Flow — entry text
 
@@ -143,8 +143,8 @@ The three "Export as …" items (`export-pdf`, `export-markdown`, `export-emeral
 
 | Item | Enabled for |
 |---|---|
-| `export-markdown` | an open Journal/Wiki/Operations entry |
-| `export-pdf` | an open Journal/Wiki/Operations entry (an altar is an operation) |
+| `export-markdown` | an open entry |
+| `export-pdf` | an open entry |
 | `export-emerald` | an entry, or an open template page |
 
 
@@ -154,10 +154,10 @@ There is one item per format, not one per content type: the handlers branch on w
 
 ### Bridging imperative menu-event code to a React modal
 
-`import-markdown` is a menu action, so its handler (`importFromMarkdown()` in `src/lib/emeraldFormat.ts`) is plain imperative code with no component tree to render a dialog into. When the file's frontmatter has no usable `type`, the user has to pick a destination first. `src/store/importStore.ts` bridges this with a promise-based Zustand store:
+`import-markdown` is a menu action, so its handler (`importFromMarkdown()` in `src/lib/emeraldFormat.ts`) is plain imperative code with no component tree to render a dialog into. When the file's header names no category, the user has to pick a dashboard first. `src/store/importStore.ts` bridges this with a promise-based Zustand store:
 
-- `askDestination(title)` sets `pending = { title, resolve }` and returns a `Promise<ImportDestinationType | null>` that resolves only when `choose(type)` or `cancel()` is called.
-- `ImportDestinationModal` (mounted once in `AppShell`, next to `UndoToast`) renders while `pending` is set; an option calls `choose`, clicking outside/Escape/Cancel calls `cancel` (resolves `null`).
+- `askDestination(title)` sets `pending = { title, resolve }` and returns a `Promise<string | null>` (a dashboard id) that resolves only when `choose(dashboardId)` or `cancel()` is called.
+- `ImportDestinationModal` (mounted once in `AppShell`, next to `UndoToast`) renders while `pending` is set, one option per dashboard; an option calls `choose`, clicking outside/Escape/Cancel calls `cancel` (resolves `null`).
 - `importFromMarkdown()` awaits the promise and treats `null` as a full abort, before any DB write.
 
 This pattern — an imperative caller `await`s a store method, a mounted-once modal resolves it — is the template for any non-component code that needs a blocking user decision.

@@ -2,22 +2,23 @@ import { useShallow } from 'zustand/shallow';
 import { useTranslation } from 'react-i18next';
 import { formatEntryDate } from '../../lib/formatDate';
 import { categoryLabel, lookupCategory } from '../../lib/categories';
-import { ENTRY_DELETED_UNDO_KEYS, entryIcon, MODULES, viewTypeForKind, type LeftListTabId } from '../../lib/modules';
-import { entryKindOf } from '../../lib/dashboards';
+import type { LeftListTabId } from '../../lib/modules';
+import { entryIcon } from '../../lib/entryIcon';
+import { dashboardDateField, entryDateOf } from '../../lib/dashboards';
 import { displayTitle } from '../../lib/entryTitle';
 import { CheckSquare, Square, Copy, Pencil, Trash2 } from 'lucide-react';
 import { useUIStore } from '../../store/uiStore';
 import { useSettingsStore } from '../../store/settingsStore';
 import { useEntryStore } from '../../store/entryStore';
 import { useDashboardEntries } from '../../hooks/useDashboardEntries';
-import { useDashboardStore } from '../../store/dashboardStore';
+import { dashboardOrAll, useDashboardStore } from '../../store/dashboardStore';
+import { entryView } from '../../store/entryViews';
 import { useTaskStore } from '../../store/taskStore';
 import { useCategoryStore } from '../../store/categoryStore';
 import { useUndoStore } from '../../store/undoStore';
 import { setDragItem } from '../../lib/dragState';
 import { generateId, isImageIcon } from '../../lib/helpers';
 import { iconSrc } from '../../lib/icons';
-import { journalIcon } from '../../lib/moonPhase';
 import type { Entry, Task } from '../../types';
 import EntryListTab, { type EntryListTabProps } from '../ui/EntryListTab';
 import { useOpenInNewTabAction } from '../../hooks/useOpenInNewTabAction';
@@ -90,14 +91,13 @@ function toAllRows<T>(
 
 function AllList() {
   const { t } = useTranslation();
-  const modules = useDashboardStore((s) => s.modules);
   const entries = useEntryStore((s) => s.entries);
-  const entryConfig = useEntriesConfig(entries);
+  const entryConfig = useEntriesConfig(entries, 'all');
   const tasks = useTasksConfig();
 
   const rows = [
-    // Labelled with the module the entry opens in.
-    ...toAllRows('entry', (e) => t(MODULES[viewTypeForKind(entryKindOf(e, modules))].navLabelKey), entryConfig, (e) => e.updated_at),
+    // An entry is labelled by its category (in its own subtitle), a task as a task.
+    ...toAllRows('entry', () => '', entryConfig, (e) => e.updated_at),
     ...toAllRows('task', () => t('nav.tasks'), tasks, (task) => task.updated_at),
   ].sort((a, b) => b.sortDate.localeCompare(a.sortDate));
 
@@ -108,7 +108,7 @@ function AllList() {
       getTitle={(r) => r.src.cfg.getTitle(r.item)}
       getEditTitle={(r) => (r.src.cfg.getEditTitle ?? r.src.cfg.getTitle)(r.item)}
       // Reuse the list's own subtitle so an entry never shows one date here and
-      // another there; the kind label is what "All" adds on top.
+      // another there; the task label is what "All" adds on top.
       getDateStr={(r) => [r.src.kindLabel(r.item), r.src.cfg.getDateStr?.(r.item)].filter(Boolean).join(' · ')}
       getIcon={(r) => r.src.cfg.getIcon?.(r.item)}
       isActive={(r) => r.src.cfg.isActive?.(r.item) ?? false}
@@ -124,12 +124,11 @@ function AllList() {
 
 // ── Entries ──────────────────────────────────────────────────────────────────
 /**
- * One config for every list of entries. Each entry is drawn as its kind:
- * a journal entry with its moon phase and the day it was written, any other
- * with its category and when it changed — newest first, by that date. It
- * opens in the view of its kind.
+ * One config for every list of entries: each entry with its icon
+ * (`entryIcon`), its category and the date the dashboard sorts by — newest
+ * first, by that date. It opens on the entry page inside `dashboardId`.
  */
-function useEntriesConfig(entries: readonly Entry[]): EntryListTabProps<Entry> {
+function useEntriesConfig(entries: readonly Entry[], dashboardId: string): EntryListTabProps<Entry> {
   const { t } = useTranslation();
   const openInNewTabAction = useOpenInNewTabAction();
   const saveAsTemplateAction = useSaveAsTemplateAction();
@@ -139,15 +138,14 @@ function useEntriesConfig(entries: readonly Entry[]): EntryListTabProps<Entry> {
   const { duplicateEntry, updateEntry, deleteEntry, restoreEntry } = useEntryStore(
     useShallow((s) => ({ duplicateEntry: s.duplicateEntry, updateEntry: s.updateEntry, deleteEntry: s.deleteEntry, restoreEntry: s.restoreEntry }))
   );
-  const modules = useDashboardStore((s) => s.modules);
+  const dateField = useDashboardStore((s) => dashboardDateField(dashboardOrAll(s.dashboards, dashboardId)));
   const categories = useCategoryStore((s) => s.categories);
   const pushUndo = useUndoStore((s) => s.push);
   const showMoonPhase = useSettingsStore((s) => s.settings.journal.moonPhase);
 
   const catById = Object.fromEntries(categories.map((c) => [c.id, c]));
-  const kindOf = (e: Entry) => entryKindOf(e, modules);
-  const viewOf = (e: Entry) => ({ type: viewTypeForKind(kindOf(e)), id: e.id, mode: 'view' as const });
-  const dateOf = (e: Entry) => (kindOf(e) === 'journal' ? e.created_at : e.updated_at);
+  const viewOf = (e: Entry) => entryView(e.id, dashboardId);
+  const dateOf = (e: Entry) => entryDateOf(e, dateField);
 
   const handleDuplicate = async (entry: Entry) => {
     const copy = await duplicateEntry(entry.id);
@@ -155,10 +153,11 @@ function useEntriesConfig(entries: readonly Entry[]): EntryListTabProps<Entry> {
   };
 
   const handleDelete = async (entry: Entry) => {
-    const view = viewOf(entry);
     await deleteEntry(entry.id);
-    pushUndo({ id: generateId(), description: t(ENTRY_DELETED_UNDO_KEYS[kindOf(entry)]), undo: () => restoreEntry(entry.id) });
-    if (activeView.id === entry.id) setActiveView({ type: view.type });
+    pushUndo({ id: generateId(), description: t('undo.entryDeleted'), undo: () => restoreEntry(entry.id) });
+    if (activeView.type === 'entry' && activeView.id === entry.id) {
+      setActiveView({ type: 'dashboard', id: activeView.dashboard ?? 'all' });
+    }
   };
 
   const sorted = entries.slice().sort((a, b) => dateOf(b).localeCompare(dateOf(a)));
@@ -166,29 +165,26 @@ function useEntriesConfig(entries: readonly Entry[]): EntryListTabProps<Entry> {
   return {
     items: sorted,
     getId: (e) => e.id,
-    getTitle: (e) => displayTitle(t, kindOf(e), e.title),
+    getTitle: (e) => displayTitle(t, 'entry', e.title),
     getEditTitle: (e) => e.title,
     getDateStr: (e) => {
-      if (kindOf(e) === 'journal') return formatEntryDate(e.created_at);
       // No fallback to the raw category_id — for a deleted category the label is omitted.
       const catLabel = categoryLabel(t, lookupCategory(catById, e.category_id));
-      return `${catLabel}${catLabel ? ' · ' : ''}${formatEntryDate(e.updated_at)}`;
+      return `${catLabel}${catLabel ? ' · ' : ''}${formatEntryDate(dateOf(e))}`;
     },
     getIcon: (e) => {
-      const kind = kindOf(e);
-      const icon = kind === 'journal' ? journalIcon(e, showMoonPhase) : entryIcon(kind, e, lookupCategory(catById, e.category_id));
+      const icon = entryIcon(e, lookupCategory(catById, e.category_id), showMoonPhase);
       return isImageIcon(icon)
         ? <img src={iconSrc(icon)} alt="" className="w-4 h-4 object-cover rounded-md flex-shrink-0" />
         : <span className="text-base leading-none flex-shrink-0">{icon}</span>;
     },
-    isActive: (e) => activeView.id === e.id,
+    isActive: (e) => activeView.type === 'entry' && activeView.id === e.id,
     onOpen: (e) => setActiveView(viewOf(e)),
     onOpenNewTab: (e) => openViewInNewTab(viewOf(e)),
     onDragStart: (e) => {
-      const kind = kindOf(e);
       setDragItem({
-        id: e.id, entryType: kind, label: displayTitle(t, kind, e.title),
-        category: kind === 'journal' ? undefined : lookupCategory(catById, e.category_id)?.emoji,
+        id: e.id, entryType: 'entry', label: displayTitle(t, 'entry', e.title),
+        category: lookupCategory(catById, e.category_id)?.emoji,
       });
     },
     onRename: (e, title) => updateEntry(e.id, { title }),
@@ -203,9 +199,9 @@ function useEntriesConfig(entries: readonly Entry[]): EntryListTabProps<Entry> {
   };
 }
 
-/** The entries of one dashboard — Journal, Wiki, Operations or one of the user's own. */
+/** The entries of one dashboard; they open inside it. */
 function DashboardList({ id }: { id: string }) {
-  return <EntryListTab {...useEntriesConfig(useDashboardEntries(id))} />;
+  return <EntryListTab {...useEntriesConfig(useDashboardEntries(id), id)} />;
 }
 
 // ── Tasks ────────────────────────────────────────────────────────────────────

@@ -22,9 +22,8 @@ import { useTemplateStore } from '../store/templateStore';
 import i18n from '../i18n';
 import { buildLinkItems, linkItemKey, linkItemsByKey } from './linkItems';
 import { extractInternalLinks, linkTargetKindOf, remapInternalLinks } from './internalLinkHtml';
-import { entriesByKindNow, viewOfEntryId } from '../store/entryViews';
+import { entryView } from '../store/entryViews';
 import { startCategoryOf } from './createItem';
-import { isEntryView } from './modules';
 import type { SuggestionItem } from '../components/editors/text/SuggestionList';
 import type { Category } from '../types';
 import type { WriteOptions } from './stamp';
@@ -46,12 +45,9 @@ export type { ImageMode } from './emerald/manifest';
 /** `buildLinkItems` over the current stores — the React-free variant of
  *  `useLinkItems`, for the import/export paths. */
 function linkItemsSnapshot(): SuggestionItem[] {
-  const byKind = entriesByKindNow();
   return buildLinkItems({
-    entries: byKind.journal,
+    entries: useEntryStore.getState().entries,
     tasks: useTaskStore.getState().tasks,
-    operations: byKind.operation,
-    articles: byKind.wiki,
     categories: useCategoryStore.getState().categories,
     showMoonPhase: useSettingsStore.getState().settings.journal.moonPhase,
   }, i18n.t);
@@ -310,7 +306,7 @@ export async function exportAsEmerald(): Promise<void> {
   if (view.type === 'templates' && view.id) {
     return exportTemplateAsEmerald(view.id);
   }
-  if (!view.id || !isEntryView(view.type)) {
+  if (!view.id || view.type !== 'entry') {
     await message(i18n.t('emeraldExport.openEntryFirst'), { title: i18n.t('emeraldExport.title'), kind: 'info' });
     return;
   }
@@ -356,9 +352,6 @@ async function ensureTagIds(names: string[]): Promise<string[]> {
   }
   return result;
 }
-
-/** The modules an imported entry can land in (the Markdown import asks for one). */
-type EntryFileType = 'journal' | 'wiki' | 'operations';
 
 // ── Import from Emerald ──────────────────────────────────────────────────────
 
@@ -592,9 +585,9 @@ export async function importFromEmerald(): Promise<void> {
   }
   if (!result) return;
 
-  await reloadModules(['journal', 'wiki', 'operations']);
+  await reloadModules(['entries']);
   const [firstEntry] = result.entries;
-  if (firstEntry) useUIStore.getState().setActiveView({ type: viewOfEntryId(firstEntry), id: firstEntry });
+  if (firstEntry) useUIStore.getState().setActiveView(entryView(firstEntry));
   else if (result.templates[0]) useUIStore.getState().setActiveView({ type: 'templates', id: result.templates[0] });
   await message(
     i18n.t('emeraldImport.done', { entries: result.entries.length, templates: result.templates.length }),
@@ -634,7 +627,7 @@ function importedTitle(file: { title: string }): string {
   if (!hasOwnTitle(file.title)) return '';
   // A Markdown or PDF export writes "Untitled…" for an empty title
   // in the app's language — that comes back empty on re-import.
-  const untitled = (['journal', 'wiki', 'operation', 'task'] as const)
+  const untitled = (['entry', 'task'] as const)
     .map((type) => displayTitle(i18n.t, type, ''));
   return untitled.includes(file.title.trim()) ? '' : file.title;
 }
@@ -737,19 +730,15 @@ export async function importFromMarkdown(): Promise<void> {
   const bodyMd = lines.slice(bodyStart).join('\n').trim();
   const html   = await marked.parse(bodyMd) as string;
 
-  // Markdown import only supports journal/wiki/operations as a destination
-  // (unlike .emerald files, which also carry templates). A missing or
-  // unrecognised `type` frontmatter key is ambiguous, so ask the user
-  // instead of silently defaulting to journal.
-  const rawType = frontMeta['type'];
-  const validTypes = ['journal', 'wiki', 'operations'];
-  let type: EntryFileType;
-  if (rawType && validTypes.includes(rawType)) {
-    type = rawType as EntryFileType;
-  } else {
+  // A file that names its category lands there, in "All entries". One
+  // without asks for a dashboard instead of silently picking one: the entry
+  // starts in that dashboard's first category and opens inside it.
+  const categoryName = stripIconPrefix(frontMeta['category'] ?? '');
+  let dashboardId = 'all';
+  if (!categoryName) {
     const chosen = await useImportStore.getState().askDestination(title);
     if (!chosen) return;
-    type = chosen;
+    dashboardId = chosen;
   }
 
   const tagIds = await ensureTagIds(
@@ -758,29 +747,27 @@ export async function importFromMarkdown(): Promise<void> {
 
   let newId: string;
   try {
-    newId = await importMarkdownEntry(type, title, html, tagIds, frontMeta);
+    newId = await importMarkdownEntry(dashboardId, categoryName, title, html, tagIds);
   } catch (e) {
     await message(`Import failed: ${e}`, { title: 'Import', kind: 'error' });
     return;
   }
 
-  await reloadModules([type]);
-  useUIStore.getState().setActiveView({ type, id: newId });
+  await reloadModules(['entries']);
+  useUIStore.getState().setActiveView(entryView(newId, dashboardId));
   await message('Entry imported successfully!', { title: 'Import', kind: 'info' });
 }
 
 /**
  * An entry from Markdown: in the category its front matter names, else in
- * the first category of the chosen module. Without a date in the file it is
- * created today — with today's moon phase if it lands in the journal.
+ * the first category of the chosen dashboard. It is created now — with
+ * today's moon phase if it lands in the category Journal.
  */
 async function importMarkdownEntry(
-  type: EntryFileType, title: string, html: string, tagIds: string[],
-  meta: Record<string, string>,
+  dashboardId: string, categoryName: string, title: string, html: string, tagIds: string[],
 ): Promise<string> {
   const { createEntry, updateEntry } = useEntryStore.getState();
-  const categoryName = meta['category'] ? stripIconPrefix(meta['category']) : null;
-  const categoryId = await ensureCategoryByName(categoryName) ?? startCategoryOf(type);
+  const categoryId = await ensureCategoryByName(categoryName) ?? startCategoryOf(dashboardId);
   const entry = await createEntry({ categoryId, blank: true });
   await updateEntry(entry.id, { title, content: sanitizeImportedHtml(html), tags: tagIds });
   return entry.id;

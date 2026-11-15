@@ -2,10 +2,10 @@ import { useTranslation } from 'react-i18next';
 import { ListOrdered, PanelLeft } from 'lucide-react';
 import { useSettingsStore } from '../../../store/settingsStore';
 import { LEFT_LIST_LIMIT_OPTIONS } from '../../../lib/vaultSettings';
-import { MODULES, dashboardIcon } from '../../../lib/modules';
+import { TASKS_VIEW } from '../../../lib/modules';
 import { dashboardLabel } from '../../../lib/dashboards';
 import { useDashboardStore } from '../../../store/dashboardStore';
-import { FaviconGlyph } from '../../sidebar/fields/Favicon';
+import DashboardGlyph from '../../ui/DashboardGlyph';
 import SettingsChoiceButton, { SettingsChoiceRow } from './SettingsChoiceButton';
 import SettingsSection from './SettingsSection';
 
@@ -21,15 +21,12 @@ export default function SidebarPage() {
   const choices = [
     ...dashboards.filter((d) => d.builtin === 'all'),
     ...dashboards.filter((d) => d.builtin !== 'all'),
-  ].map((d) => {
-    const Icon = dashboardIcon(d);
-    return {
-      id: d.id,
-      label: dashboardLabel(t, d),
-      icon: d.icon ? <FaviconGlyph value={d.icon} className="w-[14px] h-[14px] text-xs" /> : <Icon size={14} />,
-    };
-  });
-  const TasksIcon = MODULES.tasks.icon;
+  ].map((d) => ({
+    id: d.id,
+    label: dashboardLabel(t, d),
+    icon: <DashboardGlyph dashboard={d} size={14} />,
+  }));
+  const TasksIcon = TASKS_VIEW.icon;
   choices.push({ id: 'tasks', label: t('nav.tasks'), icon: <TasksIcon size={14} /> });
 
   return (

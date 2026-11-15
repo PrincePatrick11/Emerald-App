@@ -2,25 +2,17 @@ import { useEffect, useRef, type FocusEvent, type KeyboardEvent, type ReactNode 
 import { useTranslation } from 'react-i18next';
 import { createEntryIn, createItem } from '../../lib/createItem';
 import { dashboardLabel } from '../../lib/dashboards';
-import { CREATABLE_VIEWS, DEFAULT_DASHBOARD_ICON, dashboardIcon } from '../../lib/modules';
+import { CREATABLE_VIEWS, DEFAULT_DASHBOARD_ICON } from '../../lib/modules';
 import { useDashboardStore } from '../../store/dashboardStore';
 import { createDashboardAndOpen } from '../../store/dashboardActions';
-import { FaviconGlyph } from '../sidebar/fields/Favicon';
+import DashboardGlyph from '../ui/DashboardGlyph';
 import Modal from '../ui/Modal';
-import type { Dashboard } from '../../types';
 
 interface Tile {
   key: string;
   label: string;
   icon: ReactNode;
   create: () => Promise<void>;
-}
-
-/** A dashboard's glyph on its tile: its own icon, else the built-in's rail icon. */
-function tileIcon(d: Dashboard): ReactNode {
-  if (d.icon) return <FaviconGlyph value={d.icon} className="w-4 h-4 text-sm" />;
-  const Icon = dashboardIcon(d);
-  return <Icon size={16} />;
 }
 
 /** Tiles per row, for the arrow keys; keep in step with `grid-cols-4` below. */
@@ -44,7 +36,7 @@ export default function CreateItemModal({ onClose }: { onClose: () => void }) {
   const dashboards = useDashboardStore((s) => s.dashboards);
   const ordered = [...dashboards.filter((d) => d.builtin !== 'all'), ...dashboards.filter((d) => d.builtin === 'all')];
   const tiles: Tile[] = [
-    ...ordered.map((d) => ({ key: `dashboard:${d.id}`, label: dashboardLabel(t, d), icon: tileIcon(d), create: () => createEntryIn(d.id) })),
+    ...ordered.map((d) => ({ key: `dashboard:${d.id}`, label: dashboardLabel(t, d), icon: <DashboardGlyph dashboard={d} size={16} />, create: () => createEntryIn(d.id) })),
     ...CREATABLE_VIEWS.map(({ id, icon: Icon, navLabelKey }) => ({ key: id, label: t(navLabelKey), icon: <Icon size={16} />, create: () => createItem(id) })),
     { key: 'new-dashboard', label: t('dashboards.dashboard'), icon: <DEFAULT_DASHBOARD_ICON size={16} />, create: createDashboardAndOpen },
   ];

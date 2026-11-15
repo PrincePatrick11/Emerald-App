@@ -2,12 +2,12 @@ import { useDeferredValue, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useImageStore } from '../store/imageStore';
 import { useCategoryStore } from '../store/categoryStore';
-import { useEntriesByKind } from './useDashboardEntries';
+import { useEntryStore } from '../store/entryStore';
 import { useTagStore } from '../store/tagStore';
 import { useTaskStore } from '../store/taskStore';
 import { useLexiconStore } from '../store/lexiconStore';
 import { searchCorpus, type SearchCategory, type SearchCorpus, type SearchResults } from '../lib/globalSearch';
-import { categoryLabel, categoryUsageCounts, dominantCategoryModule } from '../lib/categories';
+import { categoryLabel } from '../lib/categories';
 
 /**
  * The store side of the global search: it assembles the corpus and hands it to
@@ -21,7 +21,7 @@ import { categoryLabel, categoryUsageCounts, dominantCategoryModule } from '../l
 function useSearchCorpus(): SearchCorpus {
   const { t } = useTranslation();
 
-  const { journal, wiki, operation: operations } = useEntriesByKind();
+  const entries = useEntryStore((s) => s.entries);
   const tasks = useTaskStore((s) => s.tasks);
   const images = useImageStore((s) => s.images);
   const allCategories = useCategoryStore((s) => s.categories);
@@ -29,21 +29,15 @@ function useSearchCorpus(): SearchCorpus {
   const languages = useLexiconStore((s) => s.languages);
   const lexiconEntries = useLexiconStore((s) => s.entries);
 
-  // The hit opens the categories view; `module` merely labels it with the
-  // module that uses the category most. The same count as the number columns
-  // there — one helper for both.
-  const categories = useMemo<SearchCategory[]>(() => {
-    const counts = categoryUsageCounts({ journal, wiki, operations, tasks });
-    return allCategories.map((c) => ({
-      id: c.id,
-      name: categoryLabel(t, c),
-      module: dominantCategoryModule(counts.get(c.id)),
-    }));
-  }, [allCategories, journal, wiki, operations, tasks, t]);
+  // The hit opens the categories view.
+  const categories = useMemo<SearchCategory[]>(
+    () => allCategories.map((c) => ({ id: c.id, name: categoryLabel(t, c) })),
+    [allCategories, t],
+  );
 
   return useMemo(
-    () => ({ journal, wiki, operations, tasks, images, tags, categories, languages, lexiconEntries }),
-    [journal, wiki, operations, tasks, images, tags, categories, languages, lexiconEntries],
+    () => ({ entries, tasks, images, tags, categories, languages, lexiconEntries }),
+    [entries, tasks, images, tags, categories, languages, lexiconEntries],
   );
 }
 

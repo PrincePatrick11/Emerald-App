@@ -1,6 +1,6 @@
 /**
  * The module registry: one source of truth for "which modules exist and what belongs
- * to each" — icon, nav label, untitled key, view type vocabulary.
+ * to each" — icon, nav label, view type vocabulary.
  *
  * Import rule of this file: only lucide-react and type imports. No stores,
  * no React components — `store/moduleWiring.ts` wires the stores, and the
@@ -31,55 +31,23 @@ import {
   Wand2,
   type LucideIcon,
 } from 'lucide-react';
-import type { ContentType, Dashboard, EntryKind } from '../types';
+import type { BuiltinDashboard, Dashboard } from '../types';
 
 /**
- * Emoji fallback per kind, when neither a custom icon nor a
- * category emoji applies — one source of truth for the chip NodeView, editor lookups,
- * picker and export. It lives here instead of in `SuggestionList`
- * because `lib/` modules (down to `db.ts`) need it too and no component
- * may be imported there; `SuggestionList` re-exports it
- * for the components that already get it from there.
+ * The content modules: the entries (one store, shown by the dashboards) and
+ * the tasks. What `moduleWiring` reloads; an entry has no module of its own
+ * beyond that — what it is follows from its category.
  */
-export const DEFAULT_ENTRY_EMOJI: Record<ContentType, string> = {
-  journal: '📓',
-  wiki: '📚',
-  operation: '⚡',
-  task: '✅',
-};
-
-/**
- * The icon of an entry in lists, on the dashboards, in the left list and in the
- * export: its own (emoji or image), otherwise the category's emoji, otherwise
- * that of its kind. Either an emoji or an icon file (`iconSrc`) — `isImageIcon` tells
- * them apart. Entries of the category Journal show their moon phase instead
- * (`journalIcon`), where the moon phase is shown.
- */
-export function entryIcon(
-  kind: EntryKind,
-  entry: { icon?: string | null },
-  category: { emoji: string } | null | undefined,
-): string {
-  return entry.icon || category?.emoji || DEFAULT_ENTRY_EMOJI[kind];
-}
-
-
-/**
- * Order = rail and entry-list tab order. Via
- * `CATEGORY_MODULE_IDS` two more things hang on it: the column order of the
- * usage counters in `CategoriesView` and, on a tie, which module
- * `dominantCategoryModule` names as the hint on a search hit. A rearrangement
- * here therefore also renames search hits.
- */
-export const ENTRY_MODULE_IDS = ['journal', 'tasks', 'operations', 'wiki'] as const;
-export type EntryModuleId = (typeof ENTRY_MODULE_IDS)[number];
+export const CONTENT_MODULE_IDS = ['entries', 'tasks'] as const;
+export type ContentModuleId = (typeof CONTENT_MODULE_IDS)[number];
 
 /**
  * `dashboard` is a dashboard's list by its ID (`{ type: 'dashboard', id }`):
- * "All entries" (`id: 'all'`) and the user's own. Journal, Wiki and
- * Operations keep views of their own.
+ * "All entries" (`id: 'all'`), the built-ins and the user's own. `entry` is
+ * the one entry page (`{ type: 'entry', id, dashboard }`), shown inside the
+ * dashboard it was opened from.
  */
-export const AUX_VIEW_IDS = ['dashboard', 'tags', 'categories', 'images', 'blocks', 'templates', 'lexicon', 'trash'] as const;
+export const AUX_VIEW_IDS = ['dashboard', 'entry', 'tags', 'categories', 'images', 'blocks', 'templates', 'lexicon', 'trash'] as const;
 export type AuxViewId = (typeof AUX_VIEW_IDS)[number];
 
 /**
@@ -108,8 +76,11 @@ export const ALL_ENTRIES_ICON: LucideIcon = LayoutList;
 /** The rail glyph of a dashboard without an icon of its own. */
 export const DEFAULT_DASHBOARD_ICON: LucideIcon = LayoutDashboard;
 
+/** The glyph of "an entry" where no entry icon is drawn — the same as `TRASH_KIND_ICONS.entry`. */
+export const ENTRY_ICON: LucideIcon = FileText;
+
 /** Everything `ActiveView.type` can be. */
-export type ViewId = EntryModuleId | AuxViewId;
+export type ViewId = 'tasks' | AuxViewId;
 
 /**
  * Which list the left sidebar shows: `all` (every entry and task), `tasks`, or
@@ -117,43 +88,10 @@ export type ViewId = EntryModuleId | AuxViewId;
  */
 export type LeftListTabId = string;
 
-/** Modules whose items carry a category — all of them; the journal's is the category Journal. */
-export const CATEGORY_MODULE_IDS: readonly EntryModuleId[] = ENTRY_MODULE_IDS;
-export type CategoryModuleId = EntryModuleId;
+/** The tasks view in the rail and the plus. */
+export const TASKS_VIEW: { icon: LucideIcon; navLabelKey: string } = { icon: CheckSquare, navLabelKey: 'nav.tasks' };
 
-/** Modules whose entries carry tags — all except tasks. */
-export const TAG_MODULE_IDS: readonly Exclude<EntryModuleId, 'tasks'>[] = ENTRY_MODULE_IDS.filter(
-  (id): id is Exclude<EntryModuleId, 'tasks'> => id !== 'tasks',
-);
-export type TagModuleId = (typeof TAG_MODULE_IDS)[number];
-
-export interface ModuleMeta {
-  id: EntryModuleId;
-  icon: LucideIcon;
-  navLabelKey: string;
-  untitledKey: string;
-  /**
-   * The kind of what the module shows — `'operation'` singular! Keys the
-   * per-kind texts and icons; an entry's kind follows from its category
-   * (`entryKindOf`).
-   */
-  kind: ContentType;
-  /** Save/Cancel/Delete live in the right sidebar. */
-  usesEditorSidebar: boolean;
-  /** The content is a block stack — the sidebar shows the block management. */
-  usesBlocks: boolean;
-}
-
-export const MODULES: Record<EntryModuleId, ModuleMeta> = {
-  journal: { id: 'journal', icon: BookOpen, navLabelKey: 'nav.journal', untitledKey: 'journal.untitled', kind: 'journal', usesEditorSidebar: true, usesBlocks: true },
-  tasks: { id: 'tasks', icon: CheckSquare, navLabelKey: 'nav.tasks', untitledKey: 'tasks.untitled', kind: 'task', usesEditorSidebar: false, usesBlocks: false },
-  operations: { id: 'operations', icon: Wand2, navLabelKey: 'nav.operations', untitledKey: 'operations.untitled', kind: 'operation', usesEditorSidebar: true, usesBlocks: true },
-  wiki: { id: 'wiki', icon: Library, navLabelKey: 'nav.wiki', untitledKey: 'wiki.untitled', kind: 'wiki', usesEditorSidebar: true, usesBlocks: true },
-};
-
-export const MODULE_LIST: readonly ModuleMeta[] = ENTRY_MODULE_IDS.map((id) => MODULES[id]);
-
-export const AUX_VIEWS: Record<AuxViewId, { icon: LucideIcon; navLabelKey: string }> = {
+export const AUX_VIEWS: Record<Exclude<AuxViewId, 'entry'>, { icon: LucideIcon; navLabelKey: string }> = {
   dashboard: { icon: ALL_ENTRIES_ICON, navLabelKey: 'nav.allEntries' },
   tags: { icon: Tag, navLabelKey: 'nav.tags' },
   // The same glyph as `TRASH_KIND_ICONS.category`: a deleted category
@@ -174,70 +112,37 @@ export const AUX_VIEWS: Record<AuxViewId, { icon: LucideIcon; navLabelKey: strin
  * one tile per dashboard first): tasks, then the libraries.
  */
 export const CREATABLE_VIEWS: ReadonlyArray<{ id: CreatableViewId; icon: LucideIcon; navLabelKey: string }> = [
-  { id: 'tasks', icon: MODULES.tasks.icon, navLabelKey: MODULES.tasks.navLabelKey },
+  { id: 'tasks', ...TASKS_VIEW },
   { id: 'lexicon', ...AUX_VIEWS.lexicon },
   { id: 'templates', ...AUX_VIEWS.templates },
   { id: 'blocks', ...AUX_VIEWS.blocks },
 ];
 
 /**
- * The rail glyph of a dashboard without an icon of its own: "All entries",
- * a built-in's module icon, or the dashboard glyph. Callers draw an own icon
- * (`FaviconGlyph`) first, each in its own size.
+ * The glyphs of the built-in dashboards — of the dashboard rows, not of the
+ * entries they show.
  */
-export function dashboardIcon(dashboard: Pick<Dashboard, 'builtin'>): LucideIcon {
-  if (dashboard.builtin === 'all') return ALL_ENTRIES_ICON;
-  return dashboard.builtin ? MODULES[dashboard.builtin].icon : DEFAULT_DASHBOARD_ICON;
-}
-
-/** The undo notice after deleting an entry, by the kind it counts as. */
-export const ENTRY_DELETED_UNDO_KEYS: Record<EntryKind, string> = {
-  journal: 'undo.entryDeleted',
-  wiki: 'undo.articleDeleted',
-  operation: 'undo.operationDeleted',
+const BUILTIN_DASHBOARD_ICONS: Record<BuiltinDashboard, LucideIcon> = {
+  all: ALL_ENTRIES_ICON,
+  journal: BookOpen,
+  wiki: Library,
+  operations: Wand2,
 };
 
-const VIEW_ID_SET: ReadonlySet<string> = new Set<string>([...ENTRY_MODULE_IDS, ...AUX_VIEW_IDS]);
+/**
+ * The rail glyph of a dashboard without an icon of its own: a built-in's
+ * glyph, or the dashboard glyph. Callers draw an own icon (`FaviconGlyph`)
+ * first, each in its own size.
+ */
+export function dashboardIcon(dashboard: Pick<Dashboard, 'builtin'>): LucideIcon {
+  return dashboard.builtin ? BUILTIN_DASHBOARD_ICONS[dashboard.builtin] : DEFAULT_DASHBOARD_ICON;
+}
+
+const VIEW_ID_SET: ReadonlySet<string> = new Set<string>(['tasks', ...AUX_VIEW_IDS]);
 
 /** Guard for persisted tabs: outdated or foreign view types drop out cleanly. */
 export function isViewId(value: unknown): value is ViewId {
   return typeof value === 'string' && VIEW_ID_SET.has(value);
-}
-
-/** ModuleMeta for a view type — null for dashboard/tags/categories/blocks/templates/trash. */
-export function moduleMeta(viewType: string): ModuleMeta | null {
-  return (MODULES as Record<string, ModuleMeta | undefined>)[viewType] ?? null;
-}
-
-/**
- * The view type something of `kind` opens in.
- *
- * The one rename in the app: the kind says `operation`, singular, while
- * `ActiveView` says `operations`, plural, after the module rather than the
- * record. Journal and wiki spell both the same, which is why the mismatch is
- * easy to forget.
- *
- * A reverse lookup via the registry instead of a mapping of its own — which makes
- * `ModuleMeta.kind` the single source of truth for this assignment.
- */
-export function viewTypeForKind(kind: ContentType): EntryModuleId {
-  const mod = MODULE_LIST.find((meta) => meta.kind === kind);
-  if (!mod) throw new Error(`No module for kind "${kind}"`);
-  return mod.id;
-}
-
-/**
- * The entry kind of a view — `undefined` for everything that is not the
- * journal, wiki or operations view. Like `viewTypeForKind`, the other way.
- */
-export function kindForView(viewType: string): EntryKind | undefined {
-  const kind = (MODULES as Partial<Record<string, ModuleMeta>>)[viewType]?.kind;
-  return kind === 'journal' || kind === 'wiki' || kind === 'operation' ? kind : undefined;
-}
-
-/** Is the view one of the entry modules — journal, wiki or operations? */
-export function isEntryView(viewType: string): viewType is 'journal' | 'wiki' | 'operations' {
-  return kindForView(viewType) !== undefined;
 }
 
 /** All trash item types (`TrashedItem['type']`). Entries are one kind: they have no type of their own. */

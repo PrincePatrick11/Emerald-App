@@ -13,10 +13,9 @@ import { useCollapsedSet } from '../../hooks/useCollapsedSet';
 import { useDashboardEntries } from '../../hooks/useDashboardEntries';
 import { useDashboardPrefs } from '../../hooks/useDashboardPrefs';
 import { entryBlockSummary } from '../../lib/blocks/entrySummary';
-import { entryKindOf } from '../../lib/dashboards';
 import { generateId } from '../../lib/helpers';
-import { ENTRY_DELETED_UNDO_KEYS, entryIcon, viewTypeForKind, type EntryModuleId } from '../../lib/modules';
-import { journalIcon } from '../../lib/moonPhase';
+import { entryIcon } from '../../lib/entryIcon';
+import { dashboardDateField, entryDateOf } from '../../lib/dashboards';
 import { displayTitle } from '../../lib/entryTitle';
 import { categoriesUsedBy, categoryLabel, hasUncategorized, lookupCategory } from '../../lib/categories';
 import { formatEntryDate } from '../../lib/formatDate';
@@ -25,14 +24,14 @@ import { isCardView } from '../../lib/viewMode';
 import { countByCategory, groupByCategory, groupByMonth, UNCATEGORIZED_KEY } from '../../lib/groupBy';
 import { useUIStore } from '../../store/uiStore';
 import { useEntryStore } from '../../store/entryStore';
-import { useDashboardStore } from '../../store/dashboardStore';
 import { useTagMap, visibleTags } from '../../store/tagStore';
 import { useCategoryStore } from '../../store/categoryStore';
 import { useSettingsStore } from '../../store/settingsStore';
 import { useUndoStore } from '../../store/undoStore';
 import { useSessionState } from '../../store/sessionStore';
+import { entryView } from '../../store/entryViews';
 import { openDashboardSettings } from '../../store/dashboardSettingsStore';
-import type { Dashboard as DashboardRow, Entry, EntryKind } from '../../types';
+import type { Dashboard as DashboardRow, Entry } from '../../types';
 
 /** The compact button beside "New …" that opens the dashboard's settings — name, icon, filter. */
 export function dashboardSettingsAction(t: (key: string) => string, id: string) {
@@ -43,13 +42,6 @@ export interface EntryDashboardProps {
   /** The dashboard whose entries, filter rules, sorting and layout this is. */
   dashboard: DashboardRow | undefined;
   title: string;
-  /**
-   * Where an entry opens and what kind it is drawn as. Wiki and Operations
-   * pass their own; without it, each entry opens in the view of its kind.
-   */
-  own?: { view: Exclude<EntryModuleId, 'tasks'>; kind: EntryKind };
-  /** Keys the session's search and category selection and the collapsed groups. */
-  scope: 'wiki' | 'operations' | `dashboard:${string}`;
   newLabel: string;
   /** "New …" — with the category of the group header's "+". */
   onNew: (categoryId?: string) => void;
@@ -58,20 +50,18 @@ export interface EntryDashboardProps {
 
 /**
  * The list of a dashboard over entries: search, a category filter in the
- * sidebar, grouping by category, list, cards and timeline. Wiki and
- * Operations show their built-in dashboard with it, "All entries" and the
- * user's own dashboards theirs — one list instead of one copy per view.
- * View, sorting and grouping are the dashboard's (`useDashboardPrefs`).
+ * sidebar, grouping by category, list, cards and timeline — the one list of
+ * every dashboard. Every entry is drawn by the same rule (`entryIcon`) and
+ * opens on the entry page inside this dashboard. View, sorting and grouping
+ * are the dashboard's (`useDashboardPrefs`).
  */
-export default function EntryDashboard({ dashboard, title, own, scope, newLabel, onNew, emptyState }: EntryDashboardProps) {
+export default function EntryDashboard({ dashboard, title, newLabel, onNew, emptyState }: EntryDashboardProps) {
   const { t } = useTranslation();
   const tagMap = useTagMap();
   const setActiveView = useUIStore((s) => s.setActiveView);
-  const activeViewId = useUIStore((s) => s.activeView.id);
   const openInNewTabAction = useOpenInNewTabAction();
   const saveAsTemplateAction = useSaveAsTemplateAction();
   const entries = useDashboardEntries(dashboard?.id);
-  const modules = useDashboardStore((s) => s.modules);
   const { duplicateEntry, updateEntry, deleteEntry, restoreEntry } = useEntryStore(
     useShallow((s) => ({ duplicateEntry: s.duplicateEntry, updateEntry: s.updateEntry, deleteEntry: s.deleteEntry, restoreEntry: s.restoreEntry }))
   );
@@ -79,9 +69,11 @@ export default function EntryDashboard({ dashboard, title, own, scope, newLabel,
   const showMoonPhase = useSettingsStore((s) => s.settings.journal.moonPhase);
   const pushUndo = useUndoStore((s) => s.push);
 
-  const dateField = dashboard?.sort.by === 'created' ? 'created' : 'updated';
+  // Keys the session's search and category selection and the collapsed groups.
+  const scope = `dashboard:${dashboard?.id ?? 'all'}` as const;
+  const dateField = dashboardDateField(dashboard);
   const [{ view, sort, grouping }, setPrefs] = useDashboardPrefs(dashboard, dateField);
-  const dateOf = (e: Entry) => (dateField === 'created' ? e.created_at : e.updated_at);
+  const dateOf = (e: Entry) => entryDateOf(e, dateField);
 
   const [ctxMenu, setCtxMenu] = useState<{ id: string; x: number; y: number } | null>(null);
   const [renamingId, setRenamingId] = useState<string | null>(null);
@@ -90,9 +82,7 @@ export default function EntryDashboard({ dashboard, title, own, scope, newLabel,
   const [filterCatIds, setFilterCatIds] = useSessionState<string[]>(`${scope}.filter`, []);
   const { isCollapsed: isCatCollapsed, toggle: toggleCatCollapse } = useCollapsedSet(scope);
 
-  const kindOf = (e: Entry): EntryKind => own?.kind ?? entryKindOf(e, modules);
-  const viewOf = (e: Entry) => own?.view ?? (viewTypeForKind(kindOf(e)) as Exclude<EntryModuleId, 'tasks'>);
-  const openView = (e: Entry) => ({ type: viewOf(e), id: e.id, mode: 'view' as const });
+  const openView = (e: Entry) => entryView(e.id, dashboard?.id);
 
   const openCtxMenu = (e: React.MouseEvent, id: string) => { e.preventDefault(); setCtxMenu({ id, x: e.clientX, y: e.clientY }); };
 
@@ -115,8 +105,7 @@ export default function EntryDashboard({ dashboard, title, own, scope, newLabel,
   const handleDelete = async (entry: Entry) => {
     const id = entry.id;
     await deleteEntry(id);
-    pushUndo({ id: generateId(), description: t(ENTRY_DELETED_UNDO_KEYS[kindOf(entry)]), undo: () => restoreEntry(id) });
-    if (activeViewId === id && own) setActiveView({ type: own.view });
+    pushUndo({ id: generateId(), description: t('undo.entryDeleted'), undo: () => restoreEntry(id) });
   };
 
   const catById = Object.fromEntries(categories.map((c) => [c.id, c]));
@@ -155,24 +144,22 @@ export default function EntryDashboard({ dashboard, title, own, scope, newLabel,
   const timelineGroups = groupByMonth(sorted, dateOf);
 
   const renderEntry = (e: Entry) => {
-    const kind = kindOf(e);
     const cat = lookupCategory(catById, e.category_id);
-    // An entry of the journal shows its moon phase and the day it was written.
-    const icon = kind === 'journal' ? journalIcon(e, showMoonPhase) : entryIcon(kind, e, cat);
+    const icon = entryIcon(e, cat, showMoonPhase);
     // No fallback to the raw category_id: for a deleted category the label is omitted.
-    const catLabel = kind === 'journal' ? '' : categoryLabel(t, cat);
+    const catLabel = categoryLabel(t, cat);
     // A sigil with a target date appends it — row and card alike.
-    const revealDate = kind === 'operation' ? entryBlockSummary(e.id, e.content).sigil?.revealDate : undefined;
+    const revealDate = entryBlockSummary(e.id, e.content).sigil?.revealDate;
     const meta = [
       catLabel,
-      formatEntryDate(kind === 'journal' ? e.created_at : dateOf(e)),
+      formatEntryDate(dateOf(e)),
       revealDate ? `${t('creation.targetDate')}: ${formatEntryDate(revealDate)}` : '',
     ].filter(Boolean).join(' · ');
     const renaming = renamingId === e.id;
     const itemTitle = renaming
       ? <RenameField value={renameValue} onChange={setRenameValue} onCommit={commitRename}
           onCancel={() => setRenamingId(null)} className={RENAME_INPUT_CLASS} />
-      : displayTitle(t, kind, e.title);
+      : displayTitle(t, 'entry', e.title);
     return (
       <DashboardItem
         view={openView(e)}

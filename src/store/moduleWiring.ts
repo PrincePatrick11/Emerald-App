@@ -19,23 +19,15 @@ import { useLexiconStore } from './lexiconStore';
 import { useImageStore } from './imageStore';
 import { restorePicture } from './imageActions';
 import { useSymbolStore } from './symbolStore';
-import { ENTRY_MODULE_IDS, type EntryModuleId, type TrashKind } from '../lib/modules';
-
-/**
- * Reloads the content of a module from the active DB. Journal, wiki and
- * operations share one store and thus the same function — the
- * reload helpers below call it only once per invocation.
- */
-const reloadEntries = (options?: ReloadOptions) => useEntryStore.getState().fetchEntries(options);
+import { CONTENT_MODULE_IDS, type ContentModuleId, type TrashKind } from '../lib/modules';
 
 /** `keepLoaded`: already loaded contents stay (`fetchEntries`) — only after an import. */
 type ReloadOptions = { keepLoaded?: boolean };
 
-export const moduleWiring: Record<EntryModuleId, { reload: (options?: ReloadOptions) => Promise<void> }> = {
-  journal: { reload: reloadEntries },
+/** Reloads the content of a module from the active DB. */
+export const moduleWiring: Record<ContentModuleId, { reload: (options?: ReloadOptions) => Promise<void> }> = {
+  entries: { reload: (options) => useEntryStore.getState().fetchEntries(options) },
   tasks: { reload: () => useTaskStore.getState().fetchAll() },
-  operations: { reload: reloadEntries },
-  wiki: { reload: reloadEntries },
 };
 
 export const trashWiring: Record<TrashKind, {
@@ -102,7 +94,7 @@ export async function reloadAllStores(): Promise<void> {
     useImageStore.getState().fetchImages(),
     useSymbolStore.getState().fetchSymbols(),
   ]);
-  await reloadEach(ENTRY_MODULE_IDS);
+  await reloadEach(CONTENT_MODULE_IDS);
 }
 
 /**
@@ -110,7 +102,7 @@ export async function reloadAllStores(): Promise<void> {
  * custom blocks, templates, the lexicon and the named contents — the first
  * five always, because an import can create new ones.
  */
-export async function reloadModules(ids: readonly EntryModuleId[]): Promise<void> {
+export async function reloadModules(ids: readonly ContentModuleId[]): Promise<void> {
   await Promise.all([
     useTagStore.getState().fetchTags(),
     useCategoryStore.getState().fetchCategories(),
@@ -125,8 +117,6 @@ export async function reloadModules(ids: readonly EntryModuleId[]): Promise<void
   await reloadEach(ids, { keepLoaded: true });
 }
 
-/** Reloads the modules — journal, wiki and operations share one query. */
-function reloadEach(ids: readonly EntryModuleId[], options?: ReloadOptions): Promise<unknown> {
-  const reloads = new Set(ids.map((id) => moduleWiring[id].reload));
-  return Promise.all([...reloads].map((reload) => reload(options)));
+function reloadEach(ids: readonly ContentModuleId[], options?: ReloadOptions): Promise<unknown> {
+  return Promise.all(ids.map((id) => moduleWiring[id].reload(options)));
 }

@@ -1,13 +1,13 @@
 import { useTranslation } from 'react-i18next';
 import { useUIStore } from '../../../store/uiStore';
 import { findEntry, useEntryStore } from '../../../store/entryStore';
-import TagsField from '../fields/TagsField';
-import LinkedEntriesField from '../fields/LinkedEntriesField';
-import EntryAreaField from '../fields/EntryAreaField';
-import EntryReadSections, { PropertiesSection } from '../fields/EntryReadSections';
-import { SidebarPropertyRow } from '../fields/SidebarSection';
 import { useSettingsStore } from '../../../store/settingsStore';
 import { entryMoonPhase, MOON_PHASE_SYMBOLS } from '../../../lib/moonPhase';
+import TagsField from '../fields/TagsField';
+import LinkedEntriesField from '../fields/LinkedEntriesField';
+import EntryReadSections, { CategoryPropertyRow, PropertiesSection } from '../fields/EntryReadSections';
+import CategoryIconCoverRows from '../fields/CategoryIconCoverRows';
+import { SidebarPropertyRow } from '../fields/SidebarSection';
 import type { MoonPhase } from '../../../types';
 
 /**
@@ -26,20 +26,19 @@ function MoonPhaseRow({ phase }: { phase: MoonPhase }) {
 }
 
 /**
- * The properties of a journal entry: type and (display only) moon phase. Paradigm,
- * banishing and meditation were three fixed fields, one per wiki category,
- * and since migration v37 are ordinary links in the content (sorted by
- * category in the section below). Plus links and tags.
+ * The properties of every entry: category, icon and cover image, the moon
+ * phase for an entry of the category Journal (when the vault shows it),
+ * links and tags. Everything else (status, sigil, charge …) is blocks in the
+ * content and brings its own settings. What an entry is follows from its
+ * category — changing it here is all there is to "moving" an entry.
  */
-export default function JournalPropertiesPanel() {
+export default function EntryPropertiesPanel() {
   const { t } = useTranslation();
   const activeView = useUIStore((s) => s.activeView);
   const isEditing = activeView.mode === 'edit';
   const entry = useEntryStore((s) => (activeView.id ? findEntry(s.entries, activeView.id) : undefined));
   const updateEntry = useEntryStore((s) => s.updateEntry);
-
   const showMoonPhase = useSettingsStore((s) => s.settings.journal.moonPhase);
-
 
   if (!entry) {
     return <p className="text-xs text-subtle px-2 py-3">{t('properties.noEntry')}</p>;
@@ -50,7 +49,12 @@ export default function JournalPropertiesPanel() {
   if (!isEditing) {
     return (
       <EntryReadSections
-        properties={phase && <MoonPhaseRow phase={phase} />}
+        properties={(
+          <>
+            <CategoryPropertyRow categoryId={entry.category_id} />
+            {phase && <MoonPhaseRow phase={phase} />}
+          </>
+        )}
         content={entry.content}
         tags={entry.tags ?? []}
       />
@@ -60,7 +64,7 @@ export default function JournalPropertiesPanel() {
   return (
     <>
       <PropertiesSection>
-        <EntryAreaField entry={entry} />
+        <CategoryIconCoverRows entry={entry} update={(patch) => updateEntry(entry.id, patch)} />
         {phase && <MoonPhaseRow phase={phase} />}
       </PropertiesSection>
       <LinkedEntriesField content={entry.content} />

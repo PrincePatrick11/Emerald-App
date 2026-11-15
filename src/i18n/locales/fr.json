@@ -74,9 +74,7 @@
   },
   "undo": {
     "action": "Annuler",
-    "entryDeleted": "Entrée de journal supprimée",
-    "articleDeleted": "Article wiki supprimé",
-    "operationDeleted": "Opération supprimée",
+    "entryDeleted": "Entrée supprimée",
     "taskDeleted": "Tâche supprimée",
     "categoryDeleted": "Catégorie supprimée",
     "tagDeleted": "Étiquette supprimée",
@@ -117,18 +115,10 @@
     "showMore_other": "Afficher {{count}} de plus",
     "dashboardEmpty": "Pas encore d’entrées ici"
   },
-  "operations": {
-    "new": "Nouvelle opération",
-    "untitled": "Opération sans titre",
-    "placeholder": "Documentez votre opération...",
-    "all": "Toutes"
-  },
-  "journal": {
-    "title": "Journal",
-    "newEntry": "Nouvelle entrée",
+  "entries": {
+    "label": "Entrées",
     "untitled": "Entrée sans titre",
-    "placeholder": "Commencez votre enregistrement...",
-    "noPhase": "Sans phase lunaire"
+    "placeholder": "Commencez votre enregistrement..."
   },
   "creation": {
     "intention": "Intention",
@@ -147,15 +137,6 @@
     "noLetters": "Aucune lettre préparée pour le moment.",
     "targetDate": "Date cible",
     "brushSize": "Pinceau"
-  },
-  "wiki": {
-    "title": "Wiki",
-    "newArticle": "Nouvel article",
-    "untitled": "Article sans titre",
-    "placeholder": "Documentez vos connaissances...",
-    "addIcon": "Ajouter une icône",
-    "changeIcon": "Changer l'icône",
-    "removeIcon": "Supprimer l'icône"
   },
   "blocks": {
     "add": "Ajouter un bloc",
@@ -793,8 +774,6 @@
     "noResultsForFiltered": "Rien trouvé pour « {{query}} » avec les filtres choisis.",
     "noResultsFiltered": "Rien ne correspond aux filtres choisis.",
     "resetFilters": "Réinitialiser les filtres",
-    "operations": "Rechercher des opérations…",
-    "wikiArticles": "Rechercher des articles wiki…",
     "globalPlaceholder": "Tout rechercher…",
     "hint": "Titres, étiquettes et contenus de tous les modules.",
     "clear": "Effacer la recherche",
@@ -852,7 +831,6 @@
   "properties": {
     "noEntry": "Ouvrez une entrée pour voir ses propriétés.",
     "title": "Propriétés",
-    "type": "Type",
     "category": "Catégorie",
     "noCategory": "Aucune",
     "moonPhase": "Phase lunaire",
@@ -872,13 +850,13 @@
     "linkEntry": "Lier une entrée …",
     "addTag": "Ajouter un tag …",
     "removeTag": "Retirer le tag",
-    "area": "Module"
+    "addIcon": "Ajouter une icône",
+    "changeIcon": "Changer l'icône",
+    "removeIcon": "Supprimer l'icône"
   },
   "filters": {
     "all": "Toutes",
     "category": "Catégorie",
-    "module": "Module",
-    "moonPhase": "Phase lunaire",
     "status": "Statut"
   },
   "vault": {
@@ -1250,9 +1228,6 @@
     "title": "Insérer un lien",
     "searchPlaceholder": "Rechercher des entrées…",
     "tabAll": "Tout",
-    "tabJournal": "Journal",
-    "tabWiki": "Wiki",
-    "tabOperations": "Opérations",
     "tabTasks": "Tâches",
     "noResults": "Aucune entrée trouvée"
   },
@@ -1363,22 +1338,9 @@
     "unmappedCount_other": "{{count}} sans équivalent"
   },
   "emptyState": {
-    "journal": {
-      "title": "Aucune entrée pour l'instant",
-      "description": "Notez ce que vous vivez, rêvez et accomplissez. Les nouvelles entrées reçoivent la phase lunaire du jour.",
-      "action": "Première entrée"
-    },
-    "wiki": {
-      "title": "Aucun article pour l'instant",
-      "description": "Rassemblez votre savoir sur les herbes, les pierres et les symboles."
-    },
     "tasks": {
       "title": "Tout est fait",
       "description": "Aucune tâche ouverte. Les nouvelles arrivent ici."
-    },
-    "operations": {
-      "title": "Aucune opération pour l'instant",
-      "description": "Planifiez des rituels avec ingrédients, déroulement et résultat."
     },
     "images": {
       "title": "Pas encore d’images",

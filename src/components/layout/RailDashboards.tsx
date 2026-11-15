@@ -3,36 +3,27 @@ import { useTranslation } from 'react-i18next';
 import { ArrowDown, ArrowUp, SlidersHorizontal, Trash2 } from 'lucide-react';
 import RailButton from '../ui/RailButton';
 import ContextMenu, { type ContextMenuAction } from '../ui/ContextMenu';
-import { FaviconGlyph } from '../sidebar/fields/Favicon';
+import DashboardGlyph from '../ui/DashboardGlyph';
 import { DRAG_THRESHOLD_PX, trackPointerDrag } from '../../lib/pointerDrag';
 import { dashboardLabel } from '../../lib/dashboards';
-import { dashboardIcon, isEntryView } from '../../lib/modules';
 import { dashboardOrAll, useDashboardStore } from '../../store/dashboardStore';
 import { openDashboardSettings } from '../../store/dashboardSettingsStore';
 import { deleteDashboardWithUndo } from '../../store/dashboardActions';
 import { useUIStore } from '../../store/uiStore';
 import type { ActiveView, Dashboard } from '../../types';
 
-/** Where a dashboard's rail button leads: Journal, Wiki and Operations to their own views, every other one to its list. */
+/** Where a dashboard's rail button leads: its list. */
 function viewOfDashboard(d: Dashboard): ActiveView {
-  if (d.builtin === 'journal' || d.builtin === 'wiki' || d.builtin === 'operations') return { type: d.builtin };
   return { type: 'dashboard', id: d.id };
-}
-
-/** The glyph of a dashboard: its own icon, else the built-in's rail icon, else the dashboard glyph. */
-function DashboardGlyph({ dashboard }: { dashboard: Dashboard }) {
-  if (dashboard.icon) return <FaviconGlyph value={dashboard.icon} className="w-[18px] h-[18px] text-[16px]" />;
-  const Icon = dashboardIcon(dashboard);
-  return <Icon size={18} />;
 }
 
 /** Is the open page this dashboard's list? An unknown dashboard ID shows "All entries" (`DashboardView`). */
 function useIsActive(): (d: Dashboard) => boolean {
   const view = useUIStore((s) => s.activeView);
   const dashboards = useDashboardStore((s) => s.dashboards);
-  // The dashboard the page shows: Journal, Wiki and Operations are view types of
-  // their own (with an entry open too); a gone one shows "All entries".
-  const shownId = view.type === 'dashboard' ? view.id ?? 'all' : isEntryView(view.type) ? view.type : undefined;
+  // The dashboard the page shows — its list, or an entry opened from it;
+  // a gone one shows "All entries".
+  const shownId = view.type === 'dashboard' ? view.id ?? 'all' : view.type === 'entry' ? view.dashboard ?? 'all' : undefined;
   const shown = shownId === undefined ? undefined : dashboardOrAll(dashboards, shownId)?.id;
   return (d) => d.id === shown;
 }
@@ -127,7 +118,7 @@ export function useRailDashboards() {
       title={dashboardLabel(t, d)}
       className={drag?.id === d.id ? 'opacity-60' : undefined}
     >
-      <DashboardGlyph dashboard={d} />
+      <DashboardGlyph dashboard={d} size={18} />
     </RailButton>
   );
 

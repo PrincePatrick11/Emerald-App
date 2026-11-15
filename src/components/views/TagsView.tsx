@@ -3,7 +3,8 @@ import { useShallow } from 'zustand/shallow';
 import { useTranslation } from 'react-i18next';
 import { Pencil, Trash2 } from 'lucide-react';
 import { TAG_COLORS, TAG_NAME_TAKEN, randomTagColor, useTagStore } from '../../store/tagStore';
-import { useEntriesByKind } from '../../hooks/useDashboardEntries';
+import { useEntryStore } from '../../store/entryStore';
+import { useSettingsStore } from '../../store/settingsStore';
 import { useTemplateStore } from '../../store/templateStore';
 import { useImageStore } from '../../store/imageStore';
 import { useCategoryStore } from '../../store/categoryStore';
@@ -13,41 +14,27 @@ import { useCollapsedSet } from '../../hooks/useCollapsedSet';
 import { useDeepLink } from '../../hooks/useDeepLink';
 import { useOutsideClick } from '../../hooks/useOutsideClick';
 import { generateId } from '../../lib/helpers';
-import { categoryLabel } from '../../lib/categories';
+import { categoryLabel, lookupCategory } from '../../lib/categories';
+import { entryIcon } from '../../lib/entryIcon';
 import { formatEntryDate } from '../../lib/formatDate';
-import { AUX_VIEWS, MODULES, TAG_MODULE_IDS, type TagModuleId } from '../../lib/modules';
+import { AUX_VIEWS } from '../../lib/modules';
 import { displayTitle } from '../../lib/entryTitle';
 import { sortItems } from '../../lib/sortItems';
 import CollapseChevron from '../ui/CollapseChevron';
 import ContextMenu from '../ui/ContextMenu';
 import Dashboard, { type DashboardGroup } from '../ui/Dashboard';
-import DashboardItem, { DashboardRow, RowContent } from '../ui/DashboardItem';
+import DashboardItem, { DashboardRow, ItemGlyph, RowContent } from '../ui/DashboardItem';
 import InlineNameEditor from '../ui/InlineNameEditor';
 import ModuleCounts from '../ui/ModuleCounts';
-import type { ActiveView, Tag } from '../../types';
+import type { Entry, Tag } from '../../types';
+import { entryView } from '../../store/entryViews';
 import { useSessionState } from '../../store/sessionStore';
 
-/** A tagged entry, whatever module it belongs to — the row under a tag. */
-interface TaggedItem {
-  module: TagModuleId;
-  id: string;
-  title: string;
-  updated_at: string;
-  /** Only operations show their category instead of the module name. */
-  categoryId?: string | null;
-}
-
-type TagUsage = Record<TagModuleId, number>;
-
-const emptyUsage = (): TagUsage => ({ journal: 0, operations: 0, wiki: 0 });
+/** A tagged entry — the row under a tag. Only entries carry tags (templates and pictures are counted apart). */
+type TaggedItem = Entry;
 
 /** Creating and renaming exclude each other — one state instead of two. */
 type FormState = { mode: 'add' } | { mode: 'rename'; id: string };
-
-/** Where a click on the row leads. */
-function itemView(item: TaggedItem): ActiveView {
-  return { type: item.module, id: item.id, mode: 'view' };
-}
 
 /** A tag's colour dot; with `onPick`, a click opens the palette. */
 function TagColorDot({ color, onPick }: { color: string; onPick?: (color: string) => void }) {
@@ -113,8 +100,8 @@ function TagEditRow({
 }
 
 /**
- * The management of tags, in the same dashboard as every module: title, "New
- * tag", search, sorting and module filter sit in the right sidebar;
+ * The management of tags, in the same dashboard as every list: title, "New
+ * tag", search and sorting sit in the right sidebar;
  * in the main area every tag is a row that starts collapsed — the rows are
  * the overview (colour, name, where it occurs), a click on one opens the tagged
  * entries below it, indented like a task's subtasks.
@@ -135,7 +122,8 @@ export default function TagsView() {
   const pushUndo = useUndoStore((s) => s.push);
   // No fetch on mount: reloadAllStores() loads tags and content at startup
   // and on vault switch.
-  const { journal: entries, wiki: articles, operation: operations } = useEntriesByKind();
+  const entries = useEntryStore((s) => s.entries);
+  const showMoonPhase = useSettingsStore((s) => s.settings.journal.moonPhase);
   const templates = useTemplateStore((s) => s.templates);
   const images = useImageStore((s) => s.images);
   const categories = useCategoryStore((s) => s.categories);
@@ -144,55 +132,37 @@ export default function TagsView() {
   const { isCollapsed, toggle, expand } = useCollapsedSet('tags', { defaultCollapsed: true });
 
   const [search, setSearch] = useSessionState('tags.search', '');
-  const [moduleFilter, setModuleFilter] = useSessionState<TagModuleId[]>('tags.filter', []);
   const [form, setForm] = useState<FormState | null>(null);
   const [name, setName] = useState('');
   const [color, setColor] = useState(TAG_COLORS[0]);
   const [nameError, setNameError] = useState<string | null>(null);
   const [ctxMenu, setCtxMenu] = useState<{ tagId: string; x: number; y: number } | null>(null);
 
-  // The deep link from the global search expands the tag; search and
-  // filter are cleared, otherwise it might not be in the list at all.
+  // The deep link from the global search expands the tag; the search is
+  // cleared, otherwise it might not be in the list at all.
   const { scrollTo } = useDeepLink({
     type: 'tags',
     items: tags,
     rowAttribute: 'data-tag-id',
     onOpen: (tag) => {
       setSearch('');
-      setModuleFilter([]);
       expand(tag.id);
     },
   });
 
-  /** Tag ID → tagged entries, in module order, within that by title. */
+  /** Tag ID → tagged entries, by title. */
   const itemsByTag = useMemo(() => {
     const map = new Map<string, TaggedItem[]>();
-    const add = (tagIds: string[] | undefined, item: TaggedItem) => {
-      for (const tagId of tagIds ?? []) {
+    for (const e of entries) {
+      for (const tagId of e.tags ?? []) {
         const list = map.get(tagId);
-        if (list) list.push(item);
-        else map.set(tagId, [item]);
+        if (list) list.push(e);
+        else map.set(tagId, [e]);
       }
-    };
-    for (const e of entries) add(e.tags, { module: 'journal', id: e.id, title: e.title, updated_at: e.updated_at });
-    for (const op of operations) add(op.tags, { module: 'operations', id: op.id, title: op.title, updated_at: op.updated_at, categoryId: op.category_id });
-    for (const a of articles) add(a.tags, { module: 'wiki', id: a.id, title: a.title, updated_at: a.updated_at });
-    for (const list of map.values()) {
-      list.sort((a, b) =>
-        TAG_MODULE_IDS.indexOf(a.module) - TAG_MODULE_IDS.indexOf(b.module) || a.title.localeCompare(b.title));
     }
+    for (const list of map.values()) list.sort((a, b) => a.title.localeCompare(b.title));
     return map;
-  }, [entries, operations, articles]);
-
-  const usageByTag = useMemo(() => {
-    const map = new Map<string, TagUsage>();
-    for (const [tagId, items] of itemsByTag) {
-      const usage = emptyUsage();
-      for (const item of items) usage[item.module]++;
-      map.set(tagId, usage);
-    }
-    return map;
-  }, [itemsByTag]);
+  }, [entries]);
 
   /** Tag ID → number of templates carrying it. A tag used only there is not unused. */
   const templateUsage = useMemo(() => {
@@ -205,11 +175,9 @@ export default function TagsView() {
   const imageTags = useMemo(() => new Set(images.flatMap((image) => image.tags)), [images]);
 
   const query = search.trim().toLowerCase();
-  const filterActive = moduleFilter.length > 0;
 
   /** What the search leaves of a tag: if its name matches, all its
-   *  entries, otherwise those whose title matches. The list and the module
-   *  counts share this one rule so the numbers match the list. */
+   *  entries, otherwise those whose title matches. */
   const matchTag = useCallback((tag: Tag) => {
     const all = itemsByTag.get(tag.id) ?? [];
     const nameMatches = !query || tag.name.toLowerCase().includes(query);
@@ -218,7 +186,7 @@ export default function TagsView() {
 
   /**
    * A tag is in the list if its name matches the search or entries under
-   * it do; a module filter hides tags without a hit entirely.
+   * it do.
    * If the search only hits entries, the tag appears with exactly those — and
    * open (`openBySearch`), otherwise the reason for the hit would not be visible.
    */
@@ -232,35 +200,13 @@ export default function TagsView() {
     });
     const result: DashboardGroup<TaggedItem>[] = [];
     for (const tag of sortedTags) {
-      const { nameMatches, items: matched } = matchTag(tag);
-      const items = filterActive ? matched.filter((item) => moduleFilter.includes(item.module)) : matched;
-      // Without a hit underneath, a tag stays only if its name matches and no
-      // module filter leaves it empty.
-      const keep = items.length > 0 || (nameMatches && !filterActive);
-      if (!keep) continue;
+      const { nameMatches, items } = matchTag(tag);
+      if (items.length === 0 && !nameMatches) continue;
       if (!nameMatches) openIds.add(tag.id);
       result.push({ key: tag.id, label: tag.name, items });
     }
     return { groups: result, openBySearch: openIds };
-  }, [tags, sort, itemsByTag, filterActive, moduleFilter, matchTag]);
-
-  /**
-   * Counts for the module filters: how many tags would be there if only this
-   * module were chosen — by the same rule as the list, over the search, without
-   * the module filter itself. `all` is the number without a module filter.
-   */
-  const moduleCounts = useMemo(() => {
-    const byModule = new Map<string, number>();
-    let all = 0;
-    for (const tag of tags) {
-      const { nameMatches, items } = matchTag(tag);
-      if (items.length > 0 || nameMatches) all++;
-      for (const module of new Set(items.map((item) => item.module))) {
-        byModule.set(module, (byModule.get(module) ?? 0) + 1);
-      }
-    }
-    return { byModule, all };
-  }, [tags, matchTag]);
+  }, [tags, sort, itemsByTag, matchTag]);
 
   const tagById = useMemo(() => new Map(tags.map((tag) => [tag.id, tag])), [tags]);
   const catById = useMemo(() => new Map(categories.map((c) => [c.id, c])), [categories]);
@@ -288,9 +234,8 @@ export default function TagsView() {
     try {
       if (form.mode === 'add') {
         const tag = await createTag(trimmed, color);
-        // Search and filter could hide the new, still unused tag.
+        // The search could hide the new, still unused tag.
         setSearch('');
-        setModuleFilter([]);
         scrollTo(tag.id);
       } else {
         await updateTag(form.id, { name: trimmed, color });
@@ -332,7 +277,7 @@ export default function TagsView() {
         <div data-tag-id={tag.id}>{editRow}</div>
       );
     }
-    const usage = usageByTag.get(tag.id);
+    const usage = itemsByTag.get(tag.id)?.length ?? 0;
     const collapsed = groupCollapsed(group);
     return (
       <DashboardRow
@@ -349,7 +294,7 @@ export default function TagsView() {
         </span>
         <RowContent title={tag.name} />
         {usage
-          ? <ModuleCounts modules={TAG_MODULE_IDS} counts={usage} />
+          ? <ModuleCounts modules={['entries'] as const} counts={{ entries: usage }} />
           : <span className="text-xs text-muted flex-shrink-0">
               {templateUsage.has(tag.id) ? t('tags.onlyInTemplates') : imageTags.has(tag.id) ? t('tags.onlyInImages') : t('tags.unused')}
             </span>}
@@ -358,19 +303,14 @@ export default function TagsView() {
   };
 
   const renderItem = (item: TaggedItem) => {
-    const meta = MODULES[item.module];
-    const Icon = meta.icon;
-    let label = t(meta.navLabelKey);
-    if (item.module === 'operations') {
-      const cat = item.categoryId ? catById.get(item.categoryId) : undefined;
-      label = cat ? `${cat.emoji} ${categoryLabel(t, cat)}` : label;
-    }
+    const cat = lookupCategory(catById, item.category_id);
+    const meta = [categoryLabel(t, cat), formatEntryDate(item.updated_at)].filter(Boolean).join(' · ');
     return (
-      <DashboardItem view={itemView(item)} layout="row">
+      <DashboardItem view={entryView(item.id)} layout="row">
         <RowContent
-          icon={<Icon size={14} className="text-subtle" />}
-          title={displayTitle(t, meta.kind, item.title)}
-          meta={`${label} · ${formatEntryDate(item.updated_at)}`}
+          icon={<ItemGlyph icon={entryIcon(item, cat, showMoonPhase)} />}
+          title={displayTitle(t, 'entry', item.title)}
+          meta={meta}
         />
       </DashboardItem>
     );
@@ -387,25 +327,9 @@ export default function TagsView() {
       sortModes={TAGS_SORTS}
       search={search}
       onSearch={setSearch}
-      filters={{
-        activeFilterCount: filterActive ? 1 : 0,
-        onClearAll: () => setModuleFilter([]),
-        panelProps: {
-          chipLabel: t('filters.module'),
-          chips: TAG_MODULE_IDS.map((id) => {
-            const Icon = MODULES[id].icon;
-            return { value: id, label: t(MODULES[id].navLabelKey), icon: <Icon size={14} />, count: moduleCounts.byModule.get(id) ?? 0 };
-          }),
-          selectedChips: moduleFilter,
-          onChipToggle: (v) => setModuleFilter((prev) =>
-            prev.includes(v as TagModuleId) ? prev.filter((x) => x !== v) : [...prev, v as TagModuleId]),
-          onAllChips: () => setModuleFilter([]),
-          allChipsCount: moduleCounts.all,
-        },
-      }}
       contentHeader={form?.mode === 'add' && <div className="mb-1.5">{editRow}</div>}
       items={groups.flatMap((g) => g.items)}
-      itemKey={(item) => `${item.module}:${item.id}`}
+      itemKey={(item) => item.id}
       renderItem={renderItem}
       isEmpty={tags.length === 0}
       emptyState={{

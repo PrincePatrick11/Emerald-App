@@ -9,9 +9,9 @@ import { useTemplateStore } from '../store/templateStore';
 import { useUIStore } from '../store/uiStore';
 import { useCategoryStore } from '../store/categoryStore';
 import { dashboardById, useDashboardStore } from '../store/dashboardStore';
-import { viewOfEntry } from '../store/entryViews';
+import { entryView } from '../store/entryViews';
 import type { ActiveView } from '../types';
-import { isEntryView, type CreatableViewId } from './modules';
+import type { CreatableViewId } from './modules';
 import { firstCategoryOf } from './dashboards';
 
 /**
@@ -32,10 +32,10 @@ export function takeTaskToName(id: string): boolean {
  * Where a new entry opens: for editing — unless its template brought a loaded
  * sigil that locks the entry, which can only be read until it is unloaded.
  */
-function newEntryView(type: 'journal' | 'operations' | 'wiki', entry: { id: string; content: string }): ActiveView {
+function newEntryView(dashboard: string, entry: { id: string; content: string }): ActiveView {
   return entryBlockSummary(entry.id, entry.content).sigil?.lockEntry
-    ? { type, id: entry.id, mode: 'view' }
-    : { type, id: entry.id, mode: 'edit', isNew: true };
+    ? entryView(entry.id, dashboard)
+    : { ...entryView(entry.id, dashboard, 'edit'), isNew: true };
 }
 
 /**
@@ -51,12 +51,11 @@ export function startCategoryOf(dashboardId: string): string | null {
 
 /**
  * A new entry in the dashboard `dashboardId` — in `categoryId` if given, else
- * in its first category. Journal, Wiki and Operations open it in their own
- * view; any other dashboard in the view its category leads to.
+ * in its first category. It opens on the entry page inside that dashboard.
  */
 async function createInDashboard(dashboardId: string, categoryId?: string): Promise<ActiveView> {
   const entry = await useEntryStore.getState().createEntry({ categoryId: categoryId ?? startCategoryOf(dashboardId) });
-  return newEntryView(isEntryView(dashboardId) ? dashboardId : viewOfEntry(entry), entry);
+  return newEntryView(dashboardId, entry);
 }
 
 /** Creates the item and returns where it opens. */

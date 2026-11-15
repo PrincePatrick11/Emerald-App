@@ -1,7 +1,6 @@
 import type { ViewId } from '../lib/modules';
 import { isInEdit, useUIStore } from './uiStore';
 import { guardKey, registerEditProbe } from './leaveGuardStore';
-import { useEntryStore } from './entryStore';
 import type { Entry } from '../types';
 
 /**
@@ -15,12 +14,8 @@ import type { Entry } from '../types';
  * "Done", Cancel, delete, closing the tab and a page change
  * in the same tab end the edit — the reconciliation below reads that off the
  * `uiStore`, no view has to report it. In memory only: a restart
- * begins with what is saved.
- *
- * Moving the entry to another module (`EntryAreaField`) does not end the
- * edit: the baseline moves along into the new view (`carryBaseline`) and
- * remembers the view the edit began in — Cancel restores the category and
- * brings the tab back there.
+ * begins with what is saved. A change of category in the properties panel
+ * is part of the edit like any other: Cancel brings it back.
  */
 export interface EditBaseline {
   scope: ViewId;
@@ -30,8 +25,6 @@ export interface EditBaseline {
   stamp: string | undefined;
   /** The saved state, in the shape of `patch` — `null` if the entry no longer exists. */
   stored: () => unknown;
-  /** Only after a move to another module: the view the edit began in. */
-  origin?: ViewId;
 }
 
 /** What a baseline holds: an excerpt of the entry. */
@@ -44,52 +37,19 @@ export const baselineKey = guardKey;
 /**
  * Does an edit carry changes? The one rule for the guard of the
  * open page and the probe in the background: a deleted entry
- * (`stored === null`) has nothing left to preserve; a new, never confirmed one,
- * one with a pending autosave or moved to another module always does; otherwise
+ * (`stored === null`) has nothing left to preserve; a new, never confirmed one
+ * or one with a pending autosave always does; otherwise
  * what counts is whether the saved state differs from the baseline.
  */
 export function editIsDirty(stored: unknown, baseline: EditBaseline | undefined, isNew: boolean, pending = false): boolean {
   if (stored === null) return false;
-  if (isNew || pending || baseline?.origin) return true;
+  if (isNew || pending) return true;
   return baseline !== undefined && JSON.stringify(stored) !== JSON.stringify(baseline.patch);
 }
 
-/**
- * The baseline of the edit of `id` — under whichever view it currently
- * sits: after a move to another module that is no longer the one in which
- * "Edit" was pressed.
- */
+/** The baseline of the edit of `id`. */
 export function baselineOf(id: string): EditBaseline | undefined {
-  for (const baseline of baselines.values()) {
-    if (baseline.id === id) return baseline;
-  }
-  return undefined;
-}
-
-/**
- * Carries the baseline along into the view `to` when the entry moves to
- * another module during the edit. It remembers the view the edit began in;
- * a move back there makes it an ordinary edit again. Must run before the
- * tabs move (`moveEntryViews`) — the reconciliation below would otherwise
- * clear the baseline.
- *
- * Until the new view is mounted and installs its reader (`useEntryEditor`),
- * `stored` only says whether the entry exists — in a tab that went to the
- * background beforehand, it stays that way.
- */
-export function carryBaseline(id: string, from: ViewId, to: ViewId): void {
-  const fromKey = baselineKey(from, id);
-  const baseline = baselines.get(fromKey);
-  if (!baseline || from === to) return;
-  const origin = baseline.origin ?? from;
-  baselines.delete(fromKey);
-  baselines.set(baselineKey(to, id), {
-    ...baseline,
-    scope: to,
-    origin: origin === to ? undefined : origin,
-    // `{}` matches no baseline — with `origin` the edit counts as changed anyway.
-    stored: () => (useEntryStore.getState().getEntry(id) ? {} : null),
-  });
+  return baselines.get(baselineKey('entry', id));
 }
 
 /**
@@ -107,12 +67,11 @@ export function reassignBaselineCategories(ids: ReadonlySet<string>, to: string 
 
 /**
  * The entries whose edit Cancel is discarding right now — after a
- * move back also beyond that, until their next edit
+ * deletion also beyond that, until their next edit
  * begins: the views are only being torn down then. Whatever a view would
  * still save now — the debounce, the save on navigating away or on
  * teardown — would write the discarded input over the restored
- * entry. Per entry and not per view: when Cancel moves an entry back,
- * not only the view in which it was pressed is torn down.
+ * entry. Per entry and not per view: every tab that shows it is affected.
  */
 const discarding = new Set<string>();
 
@@ -129,8 +88,7 @@ export function endDiscard(id: string): void {
 
 /**
  * A change that only writes after some work of its own — an image icon is
- * shrunk first. Cancel waits for it after `beginDiscard`, and a move to
- * another module before it starts. Dropping a late write is the caller's job: its write
+ * shrunk first. Cancel waits for it after `beginDiscard`. Dropping a late write is the caller's job: its write
  * checks `isDiscarding` first, or it would land after Cancel's restore.
  */
 const pending = new Map<string, Promise<unknown>>();

@@ -3,8 +3,8 @@ import { create } from 'zustand';
 
 /**
  * The working state of the lists — search, filters, selection — per view under
- * a key like `wiki.search`. It survives a module switch: anyone who
- * glances at the journal from the filtered wiki finds the filter again. It does
+ * a key like `dashboard:<id>.search`. It survives a view switch: anyone who
+ * glances at another dashboard from a filtered one finds the filter again. It does
  * not survive a restart, nor a vault switch or
  * replacing from a backup (`clearSessionState`, from `closeAllTabs`) —
  * its ids would then point into the void.

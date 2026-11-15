@@ -8,8 +8,7 @@ import { LinkedEntriesSection } from './LinkedEntriesField';
 import { TagsSection } from './TagsField';
 
 /**
- * The read view of an entry in the right sidebar, the same for journal, wiki
- * and operations: properties, links, tags. A fragment, so that
+ * The read view of an entry in the right sidebar: properties, links, tags. A fragment, so that
  * the blocks below (`BlockSidebarArea`) follow at the same spacing.
  * Without `properties` the properties section is omitted.
  */

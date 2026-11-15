@@ -2,10 +2,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useShallow } from 'zustand/shallow';
 import { useTranslation } from 'react-i18next';
 import { Check, GripVertical, Pencil, Trash2, X } from 'lucide-react';
-import { CATEGORY_MODULE_IDS } from '../../lib/modules';
+import { CONTENT_MODULE_IDS } from '../../lib/modules';
 import { categoryLabel, categoryUsageCounts, emptyCategoryUsage } from '../../lib/categories';
 import { CATEGORY_NAME_TAKEN, useCategoryStore } from '../../store/categoryStore';
-import { useEntriesByKind } from '../../hooks/useDashboardEntries';
+import { useEntryStore } from '../../store/entryStore';
 import { useTaskStore } from '../../store/taskStore';
 import Button from '../ui/Button';
 import TemplateSelect from '../ui/TemplateSelect';
@@ -149,7 +149,7 @@ export default function CategoriesView() {
 
   // No fetch on mount: reloadAllStores() loads entries and tasks
   // along with categories at startup and on vault switch.
-  const { journal, wiki: articles, operation: operations } = useEntriesByKind();
+  const entries = useEntryStore((s) => s.entries);
   const tasks = useTaskStore((s) => s.tasks);
   const setStartTemplate = useCategoryStore((s) => s.setStartTemplate);
 
@@ -190,8 +190,8 @@ export default function CategoriesView() {
    * stores only hold live rows — what is in the trash does not count.
    */
   const countsById = useMemo(
-    () => categoryUsageCounts({ journal, wiki: articles, operations, tasks }),
-    [journal, articles, operations, tasks],
+    () => categoryUsageCounts({ entries, tasks }),
+    [entries, tasks],
   );
 
   // ── Drag sorting ──────────────────────────────────────────────────────────
@@ -358,7 +358,7 @@ export default function CategoriesView() {
           </span>
         )}
         <RowContent icon={cat.emoji} title={categoryLabel(t, cat)} />
-        <ModuleCounts modules={CATEGORY_MODULE_IDS} counts={counts} />
+        <ModuleCounts modules={CONTENT_MODULE_IDS} counts={counts} />
       </DashboardRow>
     );
   };

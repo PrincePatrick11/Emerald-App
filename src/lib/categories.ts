@@ -1,4 +1,4 @@
-import { CATEGORY_MODULE_IDS, type CategoryModuleId } from './modules';
+import { CONTENT_MODULE_IDS, type ContentModuleId } from './modules';
 
 /** A translator — `i18n.t`, the `t` from useTranslation or a prop passed down. */
 export type Translate = (key: string, options?: { defaultValue?: string }) => string;
@@ -61,27 +61,22 @@ export function lookupCategory<C>(
   return byId instanceof Map ? byId.get(id) : (byId as Readonly<Record<string, C>>)[id];
 }
 
-/** How often a category is used per module. */
-export type CategoryUsage = Record<CategoryModuleId, number>;
+/** How often a category is used: by entries and by tasks. */
+export type CategoryUsage = Record<ContentModuleId, number>;
 
-/** The entry lists from which a category's usage is derived. */
-export type CategorySources = Record<CategoryModuleId, readonly { category_id: string | null }[]>;
+/** The lists from which a category's usage is derived. */
+export type CategorySources = Record<ContentModuleId, readonly { category_id: string | null }[]>;
 
-export const emptyCategoryUsage = (): CategoryUsage => ({ journal: 0, wiki: 0, operations: 0, tasks: 0 });
+export const emptyCategoryUsage = (): CategoryUsage => ({ entries: 0, tasks: 0 });
 
 /**
- * How many entries per module point to each category — one pass per
- * list instead of one filter per category. Categories without a single
- * entry are missing from the map; `emptyCategoryUsage()` is their fallback value.
- *
- * One truth for the categories view (shows all three numbers) and the
- * global search (takes only the largest of them). Otherwise a fourth
- * categorized module would leave two places to maintain, and the two would contradict each other
- * about the same category.
+ * How many entries and tasks point to each category — one pass per list
+ * instead of one filter per category. Categories without a single use are
+ * missing from the map; `emptyCategoryUsage()` is their fallback value.
  */
 export function categoryUsageCounts(sources: CategorySources): Map<string, CategoryUsage> {
   const counts = new Map<string, CategoryUsage>();
-  for (const module of CATEGORY_MODULE_IDS) {
+  for (const module of CONTENT_MODULE_IDS) {
     for (const item of sources[module]) {
       if (!item.category_id) continue;
       let usage = counts.get(item.category_id);
@@ -90,15 +85,6 @@ export function categoryUsageCounts(sources: CategorySources): Map<string, Categ
     }
   }
   return counts;
-}
-
-/**
- * The module that uses a category the most — undefined if none does.
- * On a tie the one earlier in `ENTRY_MODULE_IDS` wins.
- */
-export function dominantCategoryModule(usage: CategoryUsage | undefined): CategoryModuleId | undefined {
-  if (!usage) return undefined;
-  return CATEGORY_MODULE_IDS.reduce((best, id) => (usage[id] > usage[best] ? id : best));
 }
 
 /**

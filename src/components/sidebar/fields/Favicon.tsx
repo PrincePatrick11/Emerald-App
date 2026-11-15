@@ -79,7 +79,7 @@ export default function Favicon({ value, onChange, onRemove }: FaviconProps) {
         trigger={({ toggle }) => (
           <div className="flex flex-wrap items-center gap-1.5">
             {value && <FaviconGlyph value={value} />}
-            <Button tone="neutral" small title={value ? t('wiki.changeIcon') : t('wiki.addIcon')} onClick={pickFile}>
+            <Button tone="neutral" small title={value ? t('properties.changeIcon') : t('properties.addIcon')} onClick={pickFile}>
               <ImagePlus size={12} /> {value ? t('properties.change') : t('properties.icon')}
             </Button>
             <Button tone="neutral" small title={t('properties.chooseEmoji')} onClick={toggle}>
@@ -89,7 +89,7 @@ export default function Favicon({ value, onChange, onRemove }: FaviconProps) {
                 sidebar, and the X is unambiguous enough for a destructive
                 row action. */}
             {value && (
-              <Button tone="danger" small compact title={t('wiki.removeIcon')} aria-label={t('wiki.removeIcon')} onClick={() => onRemove?.()}>
+              <Button tone="danger" small compact title={t('properties.removeIcon')} aria-label={t('properties.removeIcon')} onClick={() => onRemove?.()}>
                 <X size={12} />
               </Button>
             )}

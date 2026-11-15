@@ -9,7 +9,7 @@ import {
   requestEntryLinkAppend, requestEntryLinkRemove, requestEntryLinkReveal,
 } from '../../../lib/links';
 import { extractInternalLinks } from '../../../lib/internalLinkHtml';
-import { viewTypeForKind } from '../../../lib/modules';
+import { viewOfLinkTarget } from '../../../store/entryViews';
 import { linkItemKey as itemKey, linkItemsByKey } from '../../../lib/linkItems';
 import {
   ENTRY_TYPE_ICONS,
@@ -91,13 +91,13 @@ function useRevealLink() {
   const setActiveView = useUIStore((s) => s.setActiveView);
   return (item: SuggestionItem) => {
     if (requestEntryLinkReveal(item)) return;
-    setActiveView({ type: viewTypeForKind(item.entryType), id: item.id, mode: 'view' });
+    setActiveView(viewOfLinkTarget(item.entryType, item.id));
   };
 }
 
 /**
  * The links in the read view: a section with a counter, one row per link:
- * icon, title, and on the right the category (the module if there is no category).
+ * icon, title, and on the right the category (entry/task if there is none).
  */
 export function LinkedEntriesSection({ content }: Props) {
   const { t } = useTranslation();
@@ -111,7 +111,7 @@ export function LinkedEntriesSection({ content }: Props) {
           key={itemKey(item)}
           icon={<LinkItemIcon item={item} />}
           label={item.label}
-          meta={item.categoryLabel ?? t(ENTRY_TYPE_LABEL_KEYS[item.entryType])}
+          meta={item.categoryLabel || t(ENTRY_TYPE_LABEL_KEYS[item.entryType])}
           onClick={() => reveal(item)}
         />
       ))}
@@ -149,8 +149,8 @@ export default function LinkedEntriesField({ content }: Props) {
     const q = query.toLowerCase();
     return items
       .filter((i) => !linkedKeys.has(itemKey(i)) && i.label.toLowerCase().includes(q))
-      // Most recently edited first; otherwise the module order from
-      // `buildLinkItems` would decide, and with no search term only journal would be in the list.
+      // Most recently edited first; otherwise the order of `buildLinkItems`
+      // would decide, and with no search term no task would be in the list.
       .sort(byRecency)
       .slice(0, RESULT_LIMIT);
   }, [items, linked, query]);
@@ -180,7 +180,7 @@ export default function LinkedEntriesField({ content }: Props) {
           key={itemKey(item)}
           icon={<LinkItemIcon item={item} />}
           label={item.label}
-          meta={item.categoryLabel ?? t(ENTRY_TYPE_LABEL_KEYS[item.entryType])}
+          meta={item.categoryLabel || t(ENTRY_TYPE_LABEL_KEYS[item.entryType])}
           title={item.label}
           onClick={() => reveal(item)}
           action={<SidebarRowRemove title={t('properties.removeLink')} onClick={() => remove(item)} />}

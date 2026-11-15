@@ -12,9 +12,7 @@ import { iconTitle } from '../lib/helpers';
 import i18n from '../i18n';
 import { displayTitle } from '../lib/entryTitle';
 import type { TrashedItem } from '../types';
-import { kindOfEntry } from './dashboardStore';
-import { entryTagsSql } from '../lib/tagRefs';
-import { fromRow, jsonArray, type DbRow } from '../lib/row';
+import { fromRow, type DbRow } from '../lib/row';
 import { dashboardLabel } from '../lib/dashboards';
 
 interface TrashState {
@@ -36,9 +34,8 @@ export const useTrashStore = create<TrashState>((set, get) => ({
     try {
       const db = await getDb();
       // All entries in one query — one kind in the trash, grouped by their category there.
-      const entries = await db.select<{ id: string; category_id: string | null; tags: string; title: string; deleted_at: string; category: string | null }[]>(
-        `SELECT e.id, e.category_id, e.title, e.deleted_at, c.name as category,
-                ${entryTagsSql('e.id')} AS tags
+      const entries = await db.select<{ id: string; title: string; deleted_at: string; category: string | null }[]>(
+        `SELECT e.id, e.title, e.deleted_at, c.name as category
            FROM entries e LEFT JOIN categories c ON e.category_id = c.id
           WHERE e.deleted_at IS NOT NULL`
       );
@@ -67,8 +64,7 @@ export const useTrashStore = create<TrashState>((set, get) => ({
         // Without a title of its own, "Unnamed…", as everywhere (`displayTitle`).
         ...entries.map((r) => ({
           id: r.id,
-          // "Unnamed …" in the words of the kind it counts as — the title is all the trash shows of it.
-          title: displayTitle(i18n.t, kindOfEntry({ category_id: r.category_id, tags: jsonArray(r.tags) }), r.title),
+          title: displayTitle(i18n.t, 'entry', r.title),
           deleted_at: r.deleted_at,
           type: 'entry' as const,
           category: r.category ?? undefined,

@@ -1,7 +1,8 @@
 import { forwardRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { BookOpen, CheckSquare, Library, Wand2, type LucideIcon } from 'lucide-react';
-import type { ContentType } from '../../../types';
+import { CheckSquare, type LucideIcon } from 'lucide-react';
+import { ENTRY_ICON } from '../../../lib/modules';
+import type { LinkTargetKind } from '../../../types';
 import type { SuggestionItem } from '../../../lib/linkItems';
 import { useListKeys, type SuggestionListHandle } from './suggestionPopup';
 
@@ -9,25 +10,16 @@ import { useListKeys, type SuggestionListHandle } from './suggestionPopup';
  *  only re-exported here for the components that take the type from here. */
 export type { SuggestionItem };
 
-/** Not the registry (`MODULES`): that one is keyed by view type (plural),
- *  whereas the link type counts here. One row for the suggestion list and
- *  LinkPickerModal (tabs, type badges). */
-export const ENTRY_TYPE_ICONS: Record<ContentType, LucideIcon> = {
-  journal: BookOpen,
-  wiki: Library,
-  operation: Wand2,
+/** The glyph of a link target: an entry or a task. One row for the suggestion
+ *  list, LinkPickerModal (tabs) and the linking field. */
+export const ENTRY_TYPE_ICONS: Record<LinkTargetKind, LucideIcon> = {
+  entry: ENTRY_ICON,
   task: CheckSquare,
 };
 
-/** Lives in `lib/modules.ts` so that `lib/` can reach it too; only
- *  re-exported here for the components that import it from here. */
-export { DEFAULT_ENTRY_EMOJI } from '../../../lib/modules';
-
-/** Translated type labels: tabs and badges in the LinkPicker, badge here. */
-export const ENTRY_TYPE_LABEL_KEYS: Record<ContentType, string> = {
-  journal: 'linkPicker.tabJournal',
-  wiki: 'linkPicker.tabWiki',
-  operation: 'linkPicker.tabOperations',
+/** Translated target labels: tabs in the LinkPicker, and the badge where a target has no category. */
+export const ENTRY_TYPE_LABEL_KEYS: Record<LinkTargetKind, string> = {
+  entry: 'entries.label',
   task: 'linkPicker.tabTasks',
 };
 
@@ -67,8 +59,8 @@ const SuggestionList = forwardRef<SuggestionListHandle, Props>(
             >
               <TypeIcon size={12} className="text-subtle flex-shrink-0" />
               <span className="flex-1 truncate">{item.label}</span>
-              <span className="text-xs text-subtle flex-shrink-0 capitalize">
-                {t(ENTRY_TYPE_LABEL_KEYS[item.entryType])}
+              <span className="text-xs text-subtle flex-shrink-0">
+                {item.categoryLabel || t(ENTRY_TYPE_LABEL_KEYS[item.entryType])}
               </span>
             </button>
           );

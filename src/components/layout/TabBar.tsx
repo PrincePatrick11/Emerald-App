@@ -1,13 +1,12 @@
-import { MoreHorizontal, Plus, X } from 'lucide-react';
+import { MoreHorizontal, Plus, X, type LucideIcon } from 'lucide-react';
 import { useShallow } from 'zustand/shallow';
 import { useTranslation } from 'react-i18next';
-import type { TFunction } from 'i18next';
 import { LazyMotion, Reorder, domAnimation } from 'framer-motion';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { journalIcon } from '../../lib/moonPhase';
+import { entryIcon } from '../../lib/entryIcon';
+import { displayTitle } from '../../lib/entryTitle';
 import { isImageIcon } from '../../lib/helpers';
 import { iconSrc } from '../../lib/icons';
-import { hasOwnTitle } from '../../lib/entryTitle';
 import { REORDER_SPRING } from '../../lib/motion';
 import { useHorizontalWheel } from '../../hooks/useHorizontalWheel';
 import { findEntry, useEntryStore } from '../../store/entryStore';
@@ -20,15 +19,15 @@ import { useTemplateStore } from '../../store/templateStore';
 import { useLexiconStore } from '../../store/lexiconStore';
 import { useSettingsStore } from '../../store/settingsStore';
 import { definitionLabel, templateLabel } from '../../lib/blocks/blockAttrs';
-import { AUX_VIEWS, dashboardIcon, DEFAULT_ENTRY_EMOJI, entryIcon, kindForView, moduleMeta, type AuxViewId } from '../../lib/modules';
+import { AUX_VIEWS, dashboardIcon, ENTRY_ICON, TASKS_VIEW } from '../../lib/modules';
 import { dashboardLabel } from '../../lib/dashboards';
 import { dashboardOrAll, useDashboardStore } from '../../store/dashboardStore';
 
-function getFallbackTitle(view: ActiveView, t: TFunction) {
-  const meta = moduleMeta(view.type);
-  if (meta) return view.id ? t(meta.untitledKey) : t(meta.navLabelKey);
-  const aux = AUX_VIEWS[view.type as AuxViewId];
-  return aux ? t(aux.navLabelKey) : '';
+/** The view's name — for a tab without a title of its own. */
+function viewMeta(type: ActiveView['type']): { icon: LucideIcon; navLabelKey: string } | undefined {
+  if (type === 'tasks') return TASKS_VIEW;
+  if (type === 'entry') return undefined;
+  return AUX_VIEWS[type];
 }
 
 function renderIconValue(icon: string | null | undefined, fallback: ReactNode) {
@@ -49,8 +48,8 @@ function renderIconValue(icon: string | null | undefined, fallback: ReactNode) {
 function TabButton({ view, onSelect, onClose }: { view: ActiveView; onSelect: () => void; onClose: () => void }) {
   const { t } = useTranslation();
   const { type, id } = view;
-  const kind = kindForView(type);
-  const entry = useEntryStore((s) => (kind && id ? findEntry(s.entries, id) : undefined));
+  const isEntry = type === 'entry';
+  const entry = useEntryStore((s) => (isEntry && id ? findEntry(s.entries, id) : undefined));
   const task = useTaskStore((s) => (type === 'tasks' && id ? s.tasks.find((task) => task.id === id) : undefined));
   const definition = useBlockDefinitionStore((s) => (type === 'blocks' && id ? s.definitions.find((d) => d.id === id) : undefined));
   const template = useTemplateStore((s) => (type === 'templates' && id ? s.templates.find((tpl) => tpl.id === id) : undefined));
@@ -58,29 +57,29 @@ function TabButton({ view, onSelect, onClose }: { view: ActiveView; onSelect: ()
   const categoryId = entry?.category_id;
   const category = useCategoryStore((s) => (categoryId ? s.categories.find((c) => c.id === categoryId) : undefined));
   const showMoonPhase = useSettingsStore((s) => s.settings.journal.moonPhase);
-  // A dashboard's list: "All entries", one of the user's own, or Journal, Wiki and Operations — by name, as renamed.
-  const dashboardId = type === 'dashboard' ? (id ?? 'all') : kind && !id ? type : undefined;
-  // A deleted built-in's list shows "All entries" (and so does an unknown dashboard id) — the tab says so too.
+  // A dashboard's list — by name, as renamed. A deleted one shows "All entries"
+  // (and so does an unknown dashboard id) — the tab says so too.
+  const dashboardId = type === 'dashboard' ? (id ?? 'all') : undefined;
   const dashboard = useDashboardStore((s) => (dashboardId === undefined ? undefined : dashboardOrAll(s.dashboards, dashboardId)));
 
-  const fallback = getFallbackTitle(view, t);
-  let title = dashboard ? dashboardLabel(t, dashboard) : fallback;
-  if (id && type !== 'dashboard') {
-    const entityTitle = entry?.title ?? task?.title;
-    if (hasOwnTitle(entityTitle)) title = entityTitle;
-    else if (definition) title = definitionLabel(t, definition);
+  const meta = viewMeta(type);
+  let title = dashboard ? dashboardLabel(t, dashboard) : meta ? t(meta.navLabelKey) : '';
+  if (isEntry) {
+    title = displayTitle(t, 'entry', entry?.title);
+  } else if (type === 'tasks' && id) {
+    title = displayTitle(t, 'task', task?.title);
+  } else if (id && type !== 'dashboard') {
+    if (definition) title = definitionLabel(t, definition);
     else if (template) title = templateLabel(t, template);
     else if (language) title = language.name;
   }
 
   let icon: ReactNode;
-  const Icon = dashboard ? dashboardIcon(dashboard) : moduleMeta(type)?.icon ?? AUX_VIEWS[type as AuxViewId]?.icon ?? MoreHorizontal;
+  const Icon = dashboard ? dashboardIcon(dashboard) : isEntry ? ENTRY_ICON : meta?.icon ?? MoreHorizontal;
   if (dashboard) {
     icon = renderIconValue(dashboard.icon, <Icon size={14} />);
-  } else if (kind && id) {
-    icon = kind === 'journal'
-      ? <span className="text-sm leading-none">{entry ? journalIcon(entry, showMoonPhase) : DEFAULT_ENTRY_EMOJI.journal}</span>
-      : renderIconValue(entryIcon(kind, entry ?? {}, category), null);
+  } else if (isEntry) {
+    icon = entry ? renderIconValue(entryIcon(entry, category, showMoonPhase), null) : <Icon size={14} />;
   } else if (type === 'blocks' && id) {
     icon = renderIconValue(definition?.icon, <Icon size={14} />);
   } else if (type === 'templates' && id) {

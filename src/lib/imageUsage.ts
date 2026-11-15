@@ -1,5 +1,4 @@
 import type Database from './sqlite';
-import { jsonArray } from './row';
 import { decodeHtmlAttr, parseBlocks, serializeBlocks } from './blocks/blockHtml';
 import type { BlockRefRole } from './blocks/blockRefs';
 import type { BlockInstance } from './blocks/types';
@@ -7,7 +6,6 @@ import { FIELDS_BLOCK_TYPE, isSigilElement, parseFields, withoutElementContent }
 import { isDrawingBlockType } from './blocks/paint';
 import { isCanvasBlockType, withoutCanvasFile } from './blocks/canvas';
 import { storedImageName } from './schema';
-import { entryTagsSql } from './tagRefs';
 
 /**
  * Where the vault's pictures are used — for "Images": which entries show a
@@ -27,8 +25,6 @@ export interface ImageUse {
   kind: 'entry' | 'template' | 'blockDefinition';
   id: string;
   title: string;
-  /** For an entry: what its kind follows from (`entryKindOf`), to open it. */
-  entry?: { category_id: string | null; tags: string[] };
   role: ImageUseRole;
 }
 
@@ -45,8 +41,6 @@ interface RefRow {
   file: string;
   role: Exclude<ImageUseRole, 'cover'>;
   entry_id: string | null;
-  entry_category: string | null;
-  entry_tags: string | null;
   entry_title: string | null;
   template_id: string | null;
   template_name: string | null;
@@ -66,8 +60,7 @@ export async function collectImageUses(db: Database): Promise<Map<string, ImageU
 
   const refs = await db.select<RefRow[]>(
     `SELECT r.target AS file, r.role,
-            e.id AS entry_id, e.category_id AS entry_category, e.title AS entry_title,
-            ${entryTagsSql('e.id')} AS entry_tags,
+            e.id AS entry_id, e.title AS entry_title,
             t.id AS template_id, t.name AS template_name
        FROM block_refs r
        JOIN blocks b ON b.row_id = r.block_row
@@ -77,20 +70,19 @@ export async function collectImageUses(db: Database): Promise<Map<string, ImageU
   );
   for (const ref of refs) {
     if (ref.entry_id) {
-      add(ref.file, { kind: 'entry', id: ref.entry_id, title: ref.entry_title ?? '', entry: { category_id: ref.entry_category, tags: jsonArray(ref.entry_tags) }, role: ref.role });
+      add(ref.file, { kind: 'entry', id: ref.entry_id, title: ref.entry_title ?? '', role: ref.role });
     } else if (ref.template_id) {
       add(ref.file, { kind: 'template', id: ref.template_id, title: ref.template_name ?? '', role: ref.role });
     }
   }
 
   // Covers: the column names the picture.
-  const covers = await db.select<{ id: string; title: string; category_id: string | null; cover_image: string; tags: string }[]>(
-    `SELECT e.id, e.title, e.category_id, e.cover_image,
-            ${entryTagsSql('e.id')} AS tags
+  const covers = await db.select<{ id: string; title: string; cover_image: string }[]>(
+    `SELECT e.id, e.title, e.cover_image
        FROM entries e WHERE e.deleted_at IS NULL AND e.cover_image IS NOT NULL`
   );
   for (const cover of covers) {
-    add(cover.cover_image, { kind: 'entry', id: cover.id, title: cover.title, entry: { category_id: cover.category_id, tags: jsonArray(cover.tags) }, role: 'cover' });
+    add(cover.cover_image, { kind: 'entry', id: cover.id, title: cover.title, role: 'cover' });
   }
 
   const definitions = await db.select<{ id: string; name: string; elements: string | null }[]>(

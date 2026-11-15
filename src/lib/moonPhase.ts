@@ -1,5 +1,4 @@
 import type { MoonPhase } from '../types';
-import { DEFAULT_ENTRY_EMOJI } from './modules';
 import { JOURNAL_CATEGORY_ID } from './schema';
 
 /**
@@ -54,10 +53,4 @@ export function entryMoonPhase(entry: { created_at: string; category_id: string 
   if (!shown || entry.category_id !== JOURNAL_CATEGORY_ID) return null;
   const created = new Date(entry.created_at);
   return Number.isNaN(created.getTime()) ? null : getMoonPhase(created);
-}
-
-/** The icon of an entry in the journal: its moon phase, otherwise the journal emoji. */
-export function journalIcon(entry: { created_at: string; category_id: string | null }, shown: boolean): string {
-  const phase = entryMoonPhase(entry, shown);
-  return phase ? MOON_PHASE_SYMBOLS[phase] : DEFAULT_ENTRY_EMOJI.journal;
 }

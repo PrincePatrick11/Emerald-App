@@ -6,7 +6,7 @@ import {
 import {
   confirmLeave, guardKey, guardRegistered, holdsOpenEdit, leaveNeedsConfirm, useLeaveGuardStore,
 } from './leaveGuardStore';
-import { isLibraryView, isViewId, moduleMeta, type ViewId } from '../lib/modules';
+import { isLibraryView, isViewId } from '../lib/modules';
 import type { ActiveView } from '../types';
 import { clearSessionState } from './sessionStore';
 
@@ -33,9 +33,6 @@ export interface EditActions {
   onSave: () => void | Promise<void>;
   onCancel: () => void | Promise<void>;
   onDelete?: () => void | Promise<void>;
-  /** Write the deferred autosave immediately — for sidebar actions
-   *  that afterwards read the entry's store state (a move to another module). */
-  flush?: () => Promise<void>;
 }
 
 interface UIState {
@@ -61,13 +58,12 @@ interface UIState {
   /** Whether a `Dashboard` is currently mounted — it registers itself.
    *  RightSidebar provides the portal target based on this, instead of
    *  guessing from `activeView.id`: tasks show their list even with an id (jump target, no
-   *  open entry), and the id of a deleted entry also makes journal,
-   *  wiki and operations fall back to their dashboard. */
+   *  open entry), and the id of a deleted entry makes the entry page
+   *  fall back to its dashboard's list. */
   dashboardMounted: boolean;
   editActions: EditActions | null;
-  /** A move to another module or a cancel is writing right now (`withEditLock`): Done,
-   *  Delete, Cancel and the module switch of the open entry are locked,
-   *  and the page cannot be left — a click in between would hit the
+  /** A Cancel is writing the entry back right now (`withEditLock`): Done,
+   *  Delete and Cancel are locked, and the page cannot be left — a click in between would hit the
    *  view that is being torn down, and the confirmation would apply to it. */
   editLocked: boolean;
   /** The rail on the far left. Persistent (localStorage), like `leftListOpen`. */
@@ -101,12 +97,6 @@ interface UIState {
   addCollapsedGroups: (scope: string, ids: string[]) => void;
   setFlag: (key: string, value: boolean) => void;
   closeAllTabs: () => void;
-  /** An entry has moved to another module: every tab and every history that
-   *  opens it under `from` now opens it under `to` — same id. With
-   *  `endEdit` the open page is then in read mode: Cancel moves an entry
-   *  back, and the view it had moved to should not even appear in edit
-   *  mode. Other tabs keep their mode. */
-  moveEntryViews: (id: string, from: ViewId, to: ViewId, options?: { endEdit?: boolean }) => void;
   openViewInNewTab: (view: ActiveView) => void;
   addTab: (view?: ActiveView) => void;
   selectTab: (id: string) => void;
@@ -194,8 +184,7 @@ function saveTabs(tabs: OpenTab[], activeTabId: string | null) {
 /** Save/Cancel/Delete live only in the right sidebar, so edit mode must not start with it closed.
  *  A user-built block's or template's page is always editing and keeps its Save there too. */
 function viewNeedsSidebar(view: ActiveView): boolean {
-  const usesEditorSidebar = moduleMeta(view.type)?.usesEditorSidebar ?? false;
-  return (view.mode === 'edit' && usesEditorSidebar) || (isLibraryView(view.type) && !!view.id);
+  return (view.mode === 'edit' && view.type === 'entry') || (isLibraryView(view.type) && !!view.id);
 }
 
 /** The history that Back and Forward currently walk through: that of the active tab, otherwise the tabless one. */
@@ -289,10 +278,6 @@ let heldHistory: NavHistory | null = null;
  * "Save" and "Discard" switch the page themselves (back to the list)
  * and would otherwise have shifted it by exactly that step — one would be back
  * on the page one wanted to leave.
- *
- * It lives in `heldHistory`, not in the closure: if "Discard" reverts a
- * move to another module, `moveEntryViews` rewrites it too — otherwise it would
- * keep leading to the entry under the discarded view.
  */
 function stepGuarded(delta: -1 | 1): void {
   // A step into the void does not ask about unsaved changes: the
@@ -351,7 +336,7 @@ export const useUIStore = create<UIState>((set, get) => ({
   // Unlike the sidebars: off as long as nothing is saved.
   viewLocked: localStorage.getItem(VIEW_LOCKED_KEY) === '1',
   searchQuery: '',
-  // Journal, Wiki and Operations keep view, sorting and grouping in their
+  // Dashboards keep view, sorting and grouping in their
   // dashboard's row (`useDashboardPrefs`), not here.
   tasksPrefs: { view: 'list', sort: 'date_desc', grouping: 'grouped' },
   trashPrefs: { view: 'list', sort: 'date_desc', grouping: 'flat' },
@@ -426,26 +411,6 @@ export const useUIStore = create<UIState>((set, get) => ({
       activeTabId: null,
       activeView: ALL_ENTRIES_VIEW,
       tablessHistory: freshHistory(ALL_ENTRIES_VIEW),
-    });
-  },
-
-  moveEntryViews: (id, from, to, { endEdit = false } = {}) => {
-    const isEntry = (view: ActiveView) => view.type === from && view.id === id;
-    const move = (view: ActiveView): ActiveView => (isEntry(view) ? { ...view, type: to } : view);
-    const moveHistory = (history: NavHistory): NavHistory => ({ ...history, views: history.views.map(move) });
-    // The open page: with `endEdit` straight into read mode if it is this entry.
-    const moveOpenPage = (view: ActiveView): ActiveView => (
-      endEdit && isEntry(view) ? { type: to, id, mode: 'view' } : move(view)
-    );
-    if (heldHistory) heldHistory = moveHistory(heldHistory);
-    set((s) => {
-      const tabs = s.tabs.map((tab) => ({
-        ...tab,
-        view: tab.id === s.activeTabId ? moveOpenPage(tab.view) : move(tab.view),
-        history: moveHistory(tab.history),
-      }));
-      saveTabs(tabs, s.activeTabId);
-      return { tabs, activeView: moveOpenPage(s.activeView), tablessHistory: moveHistory(s.tablessHistory) };
     });
   },
 
@@ -566,18 +531,17 @@ let editLocksStarted = 0;
 
 /**
  * Counts every lock that has begun. Anyone reading across several awaits (the
- * automatic backup) can tell from it that a move to another module or a
- * cancel has written in between — even if `editLocked` is off again at the end.
+ * automatic backup) can tell from it that a Cancel has written in
+ * between — even if `editLocked` is off again at the end.
  */
 export function editLockEpoch(): number {
   return editLocksStarted;
 }
 
 /**
- * Locks editing while `run` writes (`editLocked`): the sidebar,
- * the module switch and leaving the page. Counted, not toggled: a
- * cancel can wait for a move that is still running — whichever finishes
- * first does not release the other's lock.
+ * Locks editing while `run` writes (`editLocked`): the sidebar's buttons
+ * and leaving the page. Counted, not toggled: Cancels in two tabs can
+ * overlap — whichever finishes first does not release the other's lock.
  */
 export async function withEditLock<T>(run: () => Promise<T>): Promise<T> {
   editLocksStarted++;

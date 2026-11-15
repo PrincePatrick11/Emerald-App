@@ -9,7 +9,7 @@ const OPEN_KEY = 'entry-sidebar-tags-open';
 /**
  * The tags when editing: the same section as when reading (`TagsSection`,
  * same counter, same open/closed state), the chips with "×", and below them the field
- * "Add tag …". Journal, wiki, operations and a template's page
+ * "Add tag …". The entry page and a template's page
  * show it the same way.
  */
 export default function TagsField({ tags, onChange }: {

@@ -8,7 +8,6 @@ import type { Entry } from '../types';
 import i18n from '../i18n';
 import { displayTitle } from '../lib/entryTitle';
 import { startOfNewEntry, useTemplateNoticeStore } from './templateStore';
-import { kindOfEntry } from './dashboardStore';
 import { contentOf, loadBlocks, planContentWrite, type BlockOwner } from '../lib/blockStore';
 import { readTagLinks, readTags, tagStatements } from '../lib/tagRefs';
 
@@ -264,7 +263,7 @@ export const useEntryStore = create<EntryState>((set, get) => ({
       entry_number: _number,
       ...fields
     } = src;
-    await get().updateEntry(copy.id, { ...fields, title: displayTitle(i18n.t, kindOfEntry(src), src.title) + i18n.t('common.copySuffix') });
+    await get().updateEntry(copy.id, { ...fields, title: displayTitle(i18n.t, 'entry', src.title) + i18n.t('common.copySuffix') });
     return get().getEntry(copy.id) ?? copy;
   },
 

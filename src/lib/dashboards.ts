@@ -1,9 +1,9 @@
 /**
  * Dashboards (table `dashboards`): views over entries by filter rules. One
  * rule for "which entries does a dashboard show" — `matchesFilter` — and
- * everything that follows from it: the lists of Journal, Wiki and
- * Operations, which category a new entry there starts in, and the kind an
- * entry counts as (`entryKindOf`), since an entry has no type of its own.
+ * everything that follows from it: the lists, and which category a new entry
+ * there starts in. An entry has no type of its own and belongs to no
+ * dashboard: it opens in whichever dashboard it was clicked in.
  *
  * The filters are evaluated in memory: every entry is in the store anyway,
  * and the lists read only from there. Filters on field values of blocks
@@ -13,25 +13,11 @@
  */
 import type { TFunction } from 'i18next';
 import type {
-  BuiltinDashboard, Dashboard, DashboardDisplay, DashboardFilter, DashboardSort, Entry, EntryKind,
+  BuiltinDashboard, Dashboard, DashboardDisplay, DashboardFilter, DashboardSort, Entry,
 } from '../types';
 import type { SortMode } from '../store/uiStore';
 
 export const BUILTIN_DASHBOARD_KEYS: readonly BuiltinDashboard[] = ['all', 'journal', 'wiki', 'operations'];
-
-/** The built-in dashboards that stand for a module of the rail, with the kind their entries count as. */
-export const MODULE_DASHBOARD_KINDS: Readonly<Record<Exclude<BuiltinDashboard, 'all'>, EntryKind>> = {
-  journal: 'journal',
-  operations: 'operation',
-  wiki: 'wiki',
-};
-
-/**
- * The kind of an entry that no module dashboard shows — no category, or one
- * that no filter names. It opens in the wiki view until "All entries"
- * becomes a view of its own.
- */
-export const FALLBACK_ENTRY_KIND: EntryKind = 'wiki';
 
 const DEFAULT_SORT: DashboardSort = { by: 'updated', dir: 'desc' };
 
@@ -160,38 +146,16 @@ export function firstCategoryOf(
   return dashboard?.filter.categories?.find((id) => existing.has(id)) ?? null;
 }
 
-/** The live module dashboards in their order — what `entryKindOf` walks. */
-export function moduleDashboards(dashboards: readonly Dashboard[]): Dashboard[] {
-  return dashboards
-    .filter((d) => d.deleted_at === null && d.builtin !== null && d.builtin !== 'all')
-    .sort((a, b) => a.position - b.position);
+/**
+ * The date a dashboard sorts its entries by — and therefore the one its list,
+ * the left list and the entry page's header show: the creation date for a
+ * dashboard sorted by it, else "last changed".
+ */
+export function dashboardDateField(dashboard: Pick<Dashboard, 'sort'> | undefined): 'created' | 'updated' {
+  return dashboard?.sort.by === 'created' ? 'created' : 'updated';
 }
 
-/**
- * The kind an entry counts as: that of the first module dashboard (in the
- * order of the rail) whose filter it passes, otherwise `FALLBACK_ENTRY_KIND`.
- * `modules` is `moduleDashboards(...)`.
- */
-export function entryKindOf(entry: Pick<Entry, 'category_id' | 'tags'>, modules: readonly Dashboard[]): EntryKind {
-  for (const dashboard of modules) {
-    // A module dashboard without any rule shows every entry, but claims none:
-    // otherwise clearing its filter would make every entry its kind.
-    if (!dashboard.filter.categories && !dashboard.filter.tags) continue;
-    if (dashboard.builtin && dashboard.builtin !== 'all' && matchesFilter(entry, dashboard.filter)) {
-      return MODULE_DASHBOARD_KINDS[dashboard.builtin];
-    }
-  }
-  return FALLBACK_ENTRY_KIND;
-}
-
-export type EntriesByKind = Record<EntryKind, Entry[]>;
-
-/**
- * Every entry under exactly one kind (`entryKindOf`) — for what lists all
- * entries labelled by module: search, link picker, counts. Order is kept.
- */
-export function partitionByKind(entries: readonly Entry[], modules: readonly Dashboard[]): EntriesByKind {
-  const byKind: EntriesByKind = { journal: [], wiki: [], operation: [] };
-  for (const entry of entries) byKind[entryKindOf(entry, modules)].push(entry);
-  return byKind;
+/** An entry's date under `dashboardDateField`. */
+export function entryDateOf(entry: Pick<Entry, 'created_at' | 'updated_at'>, field: 'created' | 'updated'): string {
+  return field === 'created' ? entry.created_at : entry.updated_at;
 }

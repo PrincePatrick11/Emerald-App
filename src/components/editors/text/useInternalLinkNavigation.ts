@@ -21,7 +21,7 @@ export function useInternalLinkNavigation(enabled: boolean): void {
       // Check before navigating; protects against synthetic events from
       // XSS in the editor content. The same check as when appending and displaying.
       if (!isValidLinkTarget({ id, entryType })) return;
-      setActiveView({ type: viewOfLinkTarget(entryType, id), id, mode: 'view' });
+      setActiveView(viewOfLinkTarget(entryType, id));
     };
     document.addEventListener('internal-link-navigate', handler);
     return () => document.removeEventListener('internal-link-navigate', handler);
