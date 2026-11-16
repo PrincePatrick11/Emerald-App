@@ -1,6 +1,6 @@
 ---
 name: emerald-app-control
-description: Drives the Emerald Tauri/journal app through the emerald-devtools MCP server Covers Journal, Wiki, Operations (altars included), Tasks, Tags, Trash, Settings, export, theme and language switching.
+description: Drives the Emerald Tauri/journal app through the emerald-devtools MCP server Covers the dashboards Journal, Practice and Knowledge (altars included), Tasks, Tags, Trash, Settings, export, theme and language switching.
 version: 1.0.0
 platforms: [windows, macos, linux]
 metadata:
@@ -97,10 +97,10 @@ placeholder — in practice the MCP client replaces that with direct tool calls.
 
 **Example conversation:**
 
-> User: "Create a wiki article about sage for me"
+> User: "Create an article about sage for me"
 >
 > Hermes (following this skill):
-> 1. Looks up the wiki create pattern
+> 1. Looks up the entry create pattern
 > 2. Clicks sidebar → New Article
 > 3. Types the title "Sage"
 > 4. Fills the body via ProseMirror
@@ -157,7 +157,7 @@ where one only clicks, right-clicks or types, the tool is now the shorter way.
 │                                        .window-control ×3 (Min/Max/Close)   │
 ├─ aside.app-sidebar-left ──┬─ main.app-main ─────────┬─ aside.app-sidebar-right ┤
 │ .left-sidebar-rail        │ .tabbar (+ .tab-add)    │ Properties / Tags        │
-│   icon buttons btn-ghost  │ view content            │ Linked ops / wiki        │
+│   icon buttons btn-ghost  │ view content            │ Linked entries        │
 │ entry-list panel          │                         │ Routines / backlinks     │
 │   rows = .sidebar-item    │                         │                          │
 └───────────────────────────┴─────────────────────────┴──────────────────────────┘
@@ -181,15 +181,15 @@ document.querySelector('.left-sidebar-rail button:has(.lucide-book-open)').click
 | All entries | `lucide-layout-list` | `.left-sidebar-rail [data-dashboard-id="all"]` |
 | Journal | `lucide-book-open` | `.left-sidebar-rail button:has(.lucide-book-open)` |
 | Tasks | `lucide-square-check-big` | `.left-sidebar-rail button:has(.lucide-square-check-big)` |
-| Operations | `lucide-wand-sparkles` | `.left-sidebar-rail button:has(.lucide-wand-sparkles)` |
-| Wiki | `lucide-library` | `.left-sidebar-rail button:has(.lucide-library)` |
+| Practice | `lucide-wand-sparkles` | `.left-sidebar-rail button:has(.lucide-wand-sparkles)` |
+| Knowledge | `lucide-library` | `.left-sidebar-rail button:has(.lucide-library)` |
 | Tags | `lucide-tag` | `.left-sidebar-rail button:has(.lucide-tag)` |
 | Trash | `lucide-trash2` | `.left-sidebar-rail button:has(.lucide-trash2)` |
 | Settings | `lucide-settings` | `.left-sidebar-rail button:has(.lucide-settings)` |
 
 `:has()` is supported by WebView2 — verified against the running build.
 
-Every dashboard button (All entries, Journal, Operations, Wiki and dashboards made by hand) also carries `data-dashboard-id`, e.g. `[data-dashboard-id="wiki"]` — the only stable handle for a user-made dashboard, whose icon can be anything. A built-in given its own icon loses its lucide class (renaming keeps it); the attribute stays.
+Every dashboard button (All entries, Journal, Practice, Knowledge and dashboards made by hand) also carries `data-dashboard-id`, e.g. `[data-dashboard-id="knowledge"]` — the only stable handle for a user-made dashboard, whose icon can be anything. A built-in given its own icon loses its lucide class (renaming keeps it); the attribute stays.
 
 **`.sidebar-item` is not navigation.** Today the class denotes list rows:
 entries in the list panel, backlinks, routines, tags. Trying to navigate with it
@@ -328,7 +328,7 @@ document.documentElement.lang || localStorage.getItem('i18nextLng')
 `button.btn-primary` is there as long as a list view without an open detail is
 active; with a tab open it disappears. Use the stable route instead:
 `button[title="New Entry"]` in the head of the list panel — that one is always
-present. (Verified: in the wiki list view `btn-primary` is present, with a detail
+present. (Verified: in a dashboard list view `btn-primary` is present, with a detail
 tab open it is not.)
 
 ### Settings is a modal, no longer a panel
@@ -408,16 +408,16 @@ Then check the UI via `eval`:
   const view = () => document.querySelector('.app-main')?.innerText.trim().split('\n')[1] || '';
   document.querySelector('.left-sidebar-rail button:has(.lucide-wand-sparkles)').click();
   await new Promise(s => setTimeout(s, 700));
-  const operations = view();
+  const pageName = view();
   document.querySelector('.left-sidebar-rail button:has(.lucide-book-open)').click();
   await new Promise(s => setTimeout(s, 700));
-  return { railSelectorsMissing: missing, navigatedTo: operations, backTo: view(),
+  return { railSelectorsMissing: missing, navigatedTo: pageName, backTo: view(),
            newEntryBtn: !!document.querySelector('button[title="New Entry"]'),
-           pass: missing.length === 0 && operations.length > 0 };
+           pass: missing.length === 0 && pageName.length > 0 };
 })()
 ```
 
-Expected: `railSelectorsMissing: []`, `navigatedTo: "Operations"`, `pass: true`.
+Expected: `railSelectorsMissing: []`, `navigatedTo: "Practice"`, `pass: true`.
 If `railSelectorsMissing` is not empty, the rail has changed — update this skill
 before running tests.
 

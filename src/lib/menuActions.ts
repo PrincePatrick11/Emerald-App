@@ -169,9 +169,9 @@ export function dispatchMenuAction(id: MenuActionId): void {
 }
 
 export interface MenuEnabledState {
-  /** Markdown export — journal / wiki / operation entries. */
+  /** Markdown export — entries. */
   entryEnabled: boolean;
-  /** PDF export — journal / wiki / operation entries. */
+  /** PDF export — entries. */
   pdfEnabled: boolean;
   /** Emerald export — like PDF, plus an open template page. */
   emeraldEnabled: boolean;

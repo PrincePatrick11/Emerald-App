@@ -42,9 +42,9 @@ export interface ExportData {
   createdAt: string;
   // journal
   moonPhase?: string;         // emoji + label, e.g. "🌕 Full Moon"
-  // wiki + operation: the entry's category, shown in the header line
+  // the entry's category, shown in the header line
   category?: ChipData;
-  // custom icon on the entry itself (wiki article or operation), may be data-URL or emoji
+  // custom icon on the entry itself (of any entry), may be data-URL or emoji
   entryIcon?: string;
   // common
   tagNames?: string[];

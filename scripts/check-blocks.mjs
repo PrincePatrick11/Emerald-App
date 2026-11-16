@@ -263,7 +263,7 @@ console.log('\n4c. Field block\n');
   const linkBlock = createFieldsBlock('link');
   const linkModel = parseFields(linkBlock);
   const linkEl = linkModel.elements[0];
-  const chip = internalLinkChipHtml({ id: '22222222-2222-2222-2222-222222222222', entryType: 'wiki', label: 'Ziel "A"' }); // lang-ok
+  const chip = internalLinkChipHtml({ id: '22222222-2222-2222-2222-222222222222', entryType: 'entry', label: 'Ziel "A"' }); // lang-ok
   const withLink = serializeFields(linkBlock, { ...linkModel, slots: { [linkEl.id]: chip } }, text);
   check('the link is a slot in the markup, not in the JSON',
     withLink.html.includes(`data-block-slot="el:${linkEl.id}"`) && !(withLink.attrs[BLOCK_ATTR.data] ?? '').includes('2222'),
@@ -678,7 +678,7 @@ console.log('\n4f. Sigils\n');
 
 console.log('\n4g. Link and image defaults with markup\n');
 {
-  const wikiId = 'b1111111-1111-1111-1111-111111111111';
+  const linkTargetId = 'b1111111-1111-1111-1111-111111111111';
   const img = `${'cd'.repeat(32)}.png`;
   const text = {
     title: (b) => `T:${b.type}`, date: (iso) => iso, number: String, targetDate: '', technique: '', loaded: '', notLoaded: '',
@@ -686,7 +686,7 @@ console.log('\n4g. Link and image defaults with markup\n');
   };
 
   const elements = parseDefinitionElements(JSON.stringify([
-    { id: 'lnk', kind: 'link', label: 'Quelle', defaultValue: { id: wikiId, entryType: 'entry', label: 'Artikel' } },
+    { id: 'lnk', kind: 'link', label: 'Quelle', defaultValue: { id: linkTargetId, entryType: 'entry', label: 'Artikel' } },
     { id: 'pic', kind: 'image', label: 'Bild', defaultValue: `bilder/${img}` },
     { id: 'lnk2', kind: 'link', label: 'Kaputt', defaultValue: { id: 'nicht-uuid', entryType: 'entry', label: 'x' } }, // lang-ok
     { id: 'pic2', kind: 'image', label: 'Fremd', defaultValue: 'javascript:alert(1)' },
@@ -707,7 +707,7 @@ console.log('\n4g. Link and image defaults with markup\n');
   const copy = instantiateDefinition(def, text.fields);
   const cm = parseFields(copy);
   check('a new copy carries chip and image in its slots',
-    linkFromSlot(cm.slots.lnk)?.id === wikiId && imageFromSlot(cm.slots.pic) === img && !cm.slots.lnk2 && !cm.slots.pic2, cm.slots);
+    linkFromSlot(cm.slots.lnk)?.id === linkTargetId && imageFromSlot(cm.slots.pic) === img && !cm.slots.lnk2 && !cm.slots.pic2, cm.slots);
   check('the links of the copy are in the content (link table, backlinks)',
     extractInternalLinks(serializeBlocks([copy])).length === 1);
   check('export: the link field shows its chip', renderBlocksForExport(serializeBlocks([copy]), text).includes('data-entry-type="entry"'));
@@ -718,7 +718,7 @@ console.log('\n4g. Link and image defaults with markup\n');
   ));
   const rm = Object.fromEntries(remapped.map((e) => [e.id, e]));
   check('import: image defaults follow the stored images, link defaults the new IDs',
-    rm.pic.defaultValue === `${'ef'.repeat(32)}.png` && rm.lnk.defaultValue?.id === `abcd1234-${wikiId}` && rm.lnk.defaultValue?.label === 'Neu', remapped);
+    rm.pic.defaultValue === `${'ef'.repeat(32)}.png` && rm.lnk.defaultValue?.id === `abcd1234-${linkTargetId}` && rm.lnk.defaultValue?.label === 'Neu', remapped);
   check('the images of the defaults are known', definitionImageRefs(elements).join() === img);
 }
 
@@ -1042,7 +1042,7 @@ console.log('\n7. Blocks as rows (blocks, block_refs)\n');
   const bg = `${'4'.repeat(64)}.jpg`;
   const def = `${'5'.repeat(64)}.webp`;
   const linked = '33333333-3333-3333-3333-333333333333';
-  const chip = internalLinkChipHtml({ id: linked, entryType: 'wiki', label: 'Ziel' }); // lang-ok
+  const chip = internalLinkChipHtml({ id: linked, entryType: 'entry', label: 'Ziel' }); // lang-ok
   const fallback = { label: (e) => e.label, yes: 'Yes', no: 'No', moonName: (p) => p };
 
   const linkBlock = createFieldsBlock('link');

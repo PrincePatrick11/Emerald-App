@@ -9,7 +9,7 @@
  * Previously it was spread across eight stores, in four different spellings
  * (`boolToInt()`, `x ? 1 : 0`, `=== false ? 0 : 1`,
  * `(r.x as unknown as number) !== 0`), and in two places it was missing entirely:
- * `OperationCategory.is_builtin` and `TaskCategory.is_builtin` held `0`/`1`,
+ * the category types' `is_builtin` held `0`/`1`,
  * although declared as `boolean` — which is why the code had to cast them
  * back to `number` at branches.
  *

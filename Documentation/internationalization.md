@@ -55,7 +55,7 @@ Skipping step 3 is the most common mistake: the fallback to English makes the om
 
 ## Built-in Category Names
 
-Wiki, Operations and Tasks share one `categories` table (see [`database.md`](database.md#categories)). Two rows are true built-ins (`is_builtin = 1`): `sigils` and `altars` (a new operation in one starts with the sigil blocks, in the other with an altar). Their `name` column holds a fixed English seed value that must never be displayed directly — the display name always goes through the shared helper:
+Entries and Tasks share one `categories` table (see [`database.md`](database.md#categories)). Two rows are true built-ins (`is_builtin = 1`): `sigils` and `altars` (a new entry in one starts with the sigil blocks, in the other with an altar). Their `name` column holds a fixed English seed value that must never be displayed directly — the display name always goes through the shared helper:
 
 ```tsx
 // correct — the one rule for every module
@@ -78,7 +78,7 @@ Top-level keys of `en.json`, with the conventions worth knowing:
 | `categories` | The one category block for every module: the Categories view (`add`, `name`, `nameTaken`, `dragHint`, `builtinHint`) and its edit dialog (`editTitle`, `nameLabel`, `startTemplate*`, `shownIn*`, `shownEverywhere`), `uncategorized`, `builtin.*` and `starter.*` (see [Built-in Category Names](#built-in-category-names)) |
 | `listView` | View/sort/grouping labels of the dashboard sidebar. The sort trigger combines a date field (`dateCreated`/`dateUpdated`/`dateDeleted`) with `sortNewest`/`sortOldest`, or uses `sortAlphaAsc`/`sortAlphaDesc`/`sortCountDesc`/`sortManual` ("Custom order", the categories). `groupBy` (`"Group by {{label, lowercase}}"`) uses the `lowercase` formatter registered in `src/i18n/index.ts`; German capitalises the noun and skips the formatter |
 | `undo` | Undo toast messages |
-| `nav` | Navigation labels, including `allEntries`, `categories`, `all` and `vaults`; `allEntries`/`journal`/`wiki`/`operations` are also the names of the built-in dashboards (`dashboardLabel`) as long as they have no name of their own. A rail entry needs its `nav.<id>` key in all four locales, since `TASKS_VIEW`/`AUX_VIEWS` resolve the label dynamically |
+| `nav` | Navigation labels, including `allEntries`, `categories`, `all` and `vaults`; `allEntries`/`journal`/`practice`/`knowledge` are also the names of the built-in dashboards (`dashboardLabel`) as long as they have no name of their own. A rail entry needs its `nav.<id>` key in all four locales, since `TASKS_VIEW`/`AUX_VIEWS` resolve the label dynamically |
 | `sidebar` | Left sidebar strings (`allEmpty`, `tasksEmpty`, `dashboardEmpty`) |
 | `dashboards` | Dashboards: the settings dialog (`settingsTitle`, `name`, `filterCategories`/`filterTags` with their hints, `newCategory`/`addCategory`, `allHasNoFilter`), the rail menu (`settings`, `moveUp`, `moveDown`), `newEntry`, the plus's `dashboard` tile, `defaultName` for a new one and `unnamed` for one without a name |
 | `entries`, `tasks` | Entry and task UI strings. Their `untitled` key is what `displayTitle` (`src/lib/entryTitle.ts`) shows for an empty title — display text only, never stored |

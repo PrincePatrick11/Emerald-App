@@ -72,7 +72,7 @@ export interface DashboardDisplay {
 }
 
 /** The key of a built-in dashboard — at the same time its fixed ID. */
-export type BuiltinDashboard = 'all' | 'journal' | 'wiki' | 'operations';
+export type BuiltinDashboard = 'all' | 'journal' | 'practice' | 'knowledge';
 
 /**
  * A row of `dashboards`: a view over entries by filter rules. The built-in

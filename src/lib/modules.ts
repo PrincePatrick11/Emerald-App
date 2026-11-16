@@ -136,8 +136,8 @@ export const CREATABLE_VIEWS: ReadonlyArray<{ id: CreatableViewId; icon: LucideI
 const BUILTIN_DASHBOARD_ICONS: Record<BuiltinDashboard, LucideIcon> = {
   all: ALL_ENTRIES_ICON,
   journal: BookOpen,
-  wiki: Library,
-  operations: Wand2,
+  knowledge: Library,
+  practice: Wand2,
 };
 
 /**

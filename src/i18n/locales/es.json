@@ -36,6 +36,7 @@
       "journal": "Diario"
     },
     "starter": {
+      "dreams": "Diario de sueños",
       "paradigm": "Paradigma",
       "ritual": "Ritual",
       "meditation": "Meditación",
@@ -100,7 +101,7 @@
   "nav": {
     "all": "Todo",
     "journal": "Diario",
-    "wiki": "Wiki",
+    "knowledge": "Conocimiento",
     "tags": "Etiquetas",
     "categories": "Categorías",
     "images": "Imágenes",
@@ -108,7 +109,7 @@
     "blocks": "Bloques",
     "templates": "Plantillas",
     "lexicon": "Léxico",
-    "operations": "Operaciones",
+    "practice": "Práctica",
     "tasks": "Tareas",
     "settings": "Ajustes",
     "startPage": "Página de inicio",

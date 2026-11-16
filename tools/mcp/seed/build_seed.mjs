@@ -400,10 +400,11 @@ function fitFixture(fixture, tables) {
     uses.set(entry.category_id, counts);
   }
   const fixtureCategories = new Set((fixture.categories ?? []).map((c) => c.id));
-  const dashboardCategories = { wiki: [], operations: [] };
+  const dashboardCategories = { knowledge: [], practice: [] };
   for (const [category, counts] of uses) {
     if (!fixtureCategories.has(category)) continue;
-    dashboardCategories[counts.operation > counts.wiki ? 'operations' : 'wiki'].push(category);
+    // Fixture rows are still typed wiki/operation (the old shape); operation-heavy categories go to Practice.
+    dashboardCategories[counts.operation > counts.wiki ? 'practice' : 'knowledge'].push(category);
   }
   const target = (type) => (type === 'task' ? 'task' : 'entry');
   return {

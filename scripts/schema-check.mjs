@@ -406,7 +406,7 @@ console.log('\n3. checkIntegrity finds what foreign keys do not cover\n');
   check('the correct link to the same entry does not', !hit('e1', 'entry'), JSON.stringify(found));
   let badKind = false;
   try {
-    await db.execute("INSERT INTO task_links (id,task_id,target_id,target_type) VALUES ('tl4','t1','e1','wiki')");
+    await db.execute("INSERT INTO task_links (id,task_id,target_id,target_type) VALUES ('tl4','t1','e1','note')");
   } catch {
     badKind = true;
   }
@@ -615,7 +615,7 @@ console.log('\n7. Seeds: built-in categories, starter set, built-in templates an
   );
   check(
     'starter set as normal categories, translated (harness: en)',
-    cats.some((c) => c.id === 'herbs' && c.is_builtin === 0 && c.name === 'Herbs'),
+    cats.some((c) => c.id === 'herbs' && c.is_builtin === 0 && c.name === 'Herbs') && cats.some((c) => c.id === 'dreams' && c.is_builtin === 0 && c.name === 'Dream Journal'),
     JSON.stringify(cats)
   );
   const [t] = await baseline.select("SELECT * FROM templates WHERE id='core-sigil'");
@@ -637,12 +637,12 @@ console.log('\n7. Seeds: built-in categories, starter set, built-in templates an
   const dashboards = await baseline.select('SELECT id, builtin, position, filter, sort FROM dashboards ORDER BY position');
   const filterOf = (id) => JSON.parse(dashboards.find((d) => d.id === id)?.filter ?? 'null');
   check('four built-in dashboards, "all" first, each with its key as ID',
-    dashboards.map((d) => d.id).join() === 'all,journal,operations,wiki' && dashboards.every((d) => d.builtin === d.id), JSON.stringify(dashboards));
-  check('"all" has no filter; journal, operations and wiki filter by their starter categories',
+    dashboards.map((d) => d.id).join() === 'all,journal,practice,knowledge' && dashboards.every((d) => d.builtin === d.id), JSON.stringify(dashboards));
+  check('"all" has no filter; journal, practice and knowledge filter by their starter categories',
     JSON.stringify(filterOf('all')) === '{}'
-      && JSON.stringify(filterOf('journal')) === JSON.stringify({ categories: ['journal'] })
-      && JSON.stringify(filterOf('operations')) === JSON.stringify({ categories: ['sigils', 'altars', 'ritual', 'meditation'] })
-      && JSON.stringify(filterOf('wiki')) === JSON.stringify({ categories: ['paradigm', 'herbs', 'crystals', 'candles', 'deities', 'tools'] }),
+      && JSON.stringify(filterOf('journal')) === JSON.stringify({ categories: ['journal', 'dreams'] })
+      && JSON.stringify(filterOf('practice')) === JSON.stringify({ categories: ['sigils', 'altars', 'ritual', 'meditation'] })
+      && JSON.stringify(filterOf('knowledge')) === JSON.stringify({ categories: ['paradigm', 'herbs', 'crystals', 'candles', 'deities', 'tools'] }),
     JSON.stringify(dashboards));
   check('every category of a dashboard exists', (await checkIntegrity(baseline)).filter((o) => o.table === 'dashboards').length === 0);
 }
@@ -749,7 +749,7 @@ console.log('\n9. Block rows\n');
   check('the seeded templates have their block rows', seeded.n >= 4, seeded);
 
   const linked = '44444444-4444-4444-4444-444444444444';
-  const chip = `<span data-type="internalLink" class="internal-link" data-id="${linked}" data-entry-type="wiki" data-label="Ziel">Ziel</span>`;
+  const chip = `<span data-type="internalLink" class="internal-link" data-id="${linked}" data-entry-type="entry" data-label="Ziel">Ziel</span>`;
   await insertWithStack(db, 'entries', { id: 'p1', title: 'Plain', created_at: now, updated_at: now }, `<p>Text ${chip}</p>`);
   const [p1] = await db.select("SELECT type, text FROM blocks WHERE entry_id = 'p1'");
   check('a text entry is one text row with its plain text', p1?.type === 'core.text' && p1.text === 'Text Ziel', p1); // lang-ok
@@ -968,7 +968,7 @@ console.log("\n11. Backups: the round trip of '17', older and newer files refuse
   await doReplace(dst, restored);
   const iconNames = new Map(Object.entries(restored.icons).map(([n, url]) => [n, savedName(url)]));
   const names = new Map([...namesAfterImport(restored), ...iconNames]);
-  for (const [kind, id, label] of [['entry', J, 'journal entry'], ['entry', W, 'wiki article'], ['template', TPL, 'template']]) {
+  for (const [kind, id, label] of [['entry', J, 'journal entry'], ['entry', W, 'second entry'], ['template', TPL, 'template']]) {
     const expected = renamed(await blockRows(src, kind, id), names);
     const got = await blockRows(dst, kind, id);
     check(`restore: the ${label} has its blocks unchanged, position and time included`,
@@ -1020,7 +1020,7 @@ console.log("\n11. Backups: the round trip of '17', older and newer files refuse
   const dst2 = await freshVault('backup-partial.db');
   clearSavedBlocks();
   await doReplace(dst2, partial);
-  check('partial restore: the journal entry has its blocks, the wiki article neither row nor blocks',
+  check('partial restore: the journal entry has its blocks, the second entry neither row nor blocks',
     (await blockRows(dst2, 'entry', J)).length === 4 && (await blockRows(dst2, 'entry', W)).length === 0
       && (await dst2.select('SELECT COUNT(*) AS n FROM entries WHERE id = $1', [W]))[0].n === 0);
   check('partial restore: the task link to the article left out is swept',

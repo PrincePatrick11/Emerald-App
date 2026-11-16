@@ -1,6 +1,6 @@
 # Emerald
 
-Emerald is a private desktop workspace for magical practice: journal, wiki, operations with sigils and altars, tasks and a lexicon for your own languages, with templates and custom blocks, all in encrypted vaults. This repository is where it is developed; [`Documentation/features.md`](Documentation/features.md) describes what the app does.
+Emerald is a private desktop workspace for magical practice: a journal, knowledge and practice entries with sigils and altars, tasks and a lexicon for your own languages, with templates and custom blocks, all in encrypted vaults. This repository is where it is developed; [`Documentation/features.md`](Documentation/features.md) describes what the app does.
 
 Built with Tauri 2, React 19 and SQLCipher, for macOS, Windows and Linux. Emerald is in early development: expect breaking changes between versions and back up your data.
 

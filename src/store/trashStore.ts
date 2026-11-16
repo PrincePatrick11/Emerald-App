@@ -165,8 +165,8 @@ export const useTrashStore = create<TrashState>((set, get) => ({
     if (doomed.size > 0) reassignCategoriesInMemory(doomed);
 
     // Only now, when all contents are gone: clear links pointing into the void.
-    // Previously this ran only over journal and wiki IDs and left the links
-    // of deleted operations as well as all task_links in place.
+    // Previously this ran only over some entry IDs and left the links
+    // of the other entries as well as all task_links in place.
     await sweepDanglingTaskLinks(db);
 
     set({ items: [] });

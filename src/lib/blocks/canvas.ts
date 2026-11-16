@@ -272,7 +272,7 @@ export function createCanvasBlock(type: typeof CANVAS_BLOCK_TYPE | typeof ALTAR_
 /** The night an altar starts on: a radial gradient from a dark blue, as the altars of old had. */
 const ALTAR_NIGHT = { fill: { kind: 'radial', colors: ['#1e1e3c', '#0f0f1e', '#0a0a0f'], cx: 0.5, cy: 0.25 }, image: null, tint: null };
 
-/** What an operation of the "Altars" category starts with (the template `core-altar`): an altar on its night, and a text for notes. */
+/** What an entry of the "Altars" category starts with (the template `core-altar`): an altar on its night, and a text for notes. */
 export function altarBlockSet(): BlockInstance[] {
   const altar = createCanvasBlock(ALTAR_BLOCK_TYPE);
   const { scene, render } = parseCanvasBlock(altar);

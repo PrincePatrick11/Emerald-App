@@ -238,8 +238,8 @@ export default function Dashboard<T>({
 
     // mode === 'category'
     // Empty groups are dropped centrally here: the category list is global,
-    // so a category created for the wiki would otherwise also show up as an empty header
-    // in operations.
+    // so a category used by one dashboard would otherwise also show up as an empty header
+    // in another.
     // If no group remains, the "No results" notice kicks in,
     // which hasNoResults would otherwise supply.
     // Not the only place: Tasks renders in custom mode and applies

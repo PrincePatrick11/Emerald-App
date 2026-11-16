@@ -122,7 +122,7 @@ One list shared by entries and tasks; an entry has at most one.
 | template_id | TEXT | nullable **FK → templates.id**, ON DELETE SET NULL; the start template of a new entry in the category — `NULL`, or a template in the Trash: the vault's default template (setting `templates.defaultTemplateId`), see [Starting an entry](architecture/templates.md#starting-an-entry) |
 | deleted_at | TEXT | NULL = active |
 
-There is no `UNIQUE` on `name`: uniqueness is enforced by the store (`categoryKey`: trimmed, case-insensitive), because a `UNIQUE` index would block restoring a trashed category whenever an active one shares its name. `JOURNAL_CATEGORY_ID`, `SIGIL_CATEGORY_ID` and `ALTAR_CATEGORY_ID` are the categories with behaviour (see above). A fresh vault also seeds eight ordinary starter categories (`STARTER_CATEGORIES`, named in the app's language at creation), freely renamable and deletable. `templates` comes before `categories` in `TABLES`, since a category names its template.
+There is no `UNIQUE` on `name`: uniqueness is enforced by the store (`categoryKey`: trimmed, case-insensitive), because a `UNIQUE` index would block restoring a trashed category whenever an active one shares its name. `JOURNAL_CATEGORY_ID`, `SIGIL_CATEGORY_ID` and `ALTAR_CATEGORY_ID` are the categories with behaviour (see above). A fresh vault also seeds nine ordinary starter categories (`STARTER_CATEGORIES`, named in the app's language at creation), freely renamable and deletable. `templates` comes before `categories` in `TABLES`, since a category names its template.
 
 ### dashboards
 
@@ -130,7 +130,7 @@ Views over entries by filter rules (`lib/dashboards.ts`, `store/dashboardStore.t
 
 | Column | Type | Notes |
 |---|---|---|
-| id | TEXT PK | the key for a built-in (`'all'`, `'journal'`, `'wiki'`, `'operations'`) — the same on every device, so two fresh vaults mean the same rows; UUID otherwise |
+| id | TEXT PK | the key for a built-in (`'all'`, `'journal'`, `'practice'`, `'knowledge'`) — the same on every device, so two fresh vaults mean the same rows; UUID otherwise |
 | builtin | TEXT | the built-in's key, `NULL` for one built by hand |
 | name | TEXT | NOT NULL DEFAULT `''`; empty shows the translated name of the built-in |
 | icon | TEXT | emoji or an icon file (see [Icons](#icons)), NOT NULL DEFAULT `''`; empty shows the built-in's rail icon, or the generic dashboard glyph |
@@ -141,7 +141,7 @@ Views over entries by filter rules (`lib/dashboards.ts`, `store/dashboardStore.t
 | created_at / updated_at | TEXT | ISO 8601 |
 | deleted_at | TEXT | NULL = active; a dashboard in the Trash is purged after the retention period (`CLEANUP_TABLES`) and removed when the Trash is emptied — "All entries" never gets there |
 
-A fresh vault gets "All entries" (no filter; list, flat, last changed first), Journal (`journal`; list, flat, newest first), Operations (`sigils`, `altars`, `ritual`, `meditation`; list, grouped, last changed first) and Wiki (`paradigm`, `herbs`, `crystals`, `candles`, `deities`, `tools`; cards, grouped, A–Z) — `BUILTIN_DASHBOARDS` in `schema.ts`, whose `sort` and `display` are only start values: afterwards the app reads the row. A dashboard made by hand starts without filter, list/flat, last changed first. "All entries" can be neither deleted nor given a filter; every other dashboard, the built-ins included, goes to the Trash. The category ids in `filter` have no foreign key (see [What foreign keys cannot cover](#what-foreign-keys-cannot-cover)).
+A fresh vault gets "All entries" (no filter; list, flat, last changed first), Journal (`journal`, `dreams`; list, flat, newest first), Practice (`sigils`, `altars`, `ritual`, `meditation`; list, grouped, last changed first) and Knowledge (`paradigm`, `herbs`, `crystals`, `candles`, `deities`, `tools`; cards, grouped, A–Z) — `BUILTIN_DASHBOARDS` in `schema.ts`, whose `sort` and `display` are only start values: afterwards the app reads the row. A dashboard made by hand starts without filter, list/flat, last changed first. "All entries" can be neither deleted nor given a filter; every other dashboard, the built-ins included, goes to the Trash. The category ids in `filter` have no foreign key (see [What foreign keys cannot cover](#what-foreign-keys-cannot-cover)).
 
 ### block_definitions
 
@@ -164,7 +164,7 @@ An element's `defaultValue` (the builder's "Prefill") is what a new copy starts 
 
 ### templates
 
-The templates dashboard's rows, behind Journal/Wiki/Operations' "insert a template" flow — see [Templates](architecture/templates.md#templates) for start and default templates. Like `block_definitions`, a row is only ever copied into an entry's blocks with no link back, so deleting a row touches no entry. Its own block stack is rows of [blocks](#blocks) with `template_id` set.
+The templates dashboard's rows, behind every entry's "insert a template" flow — see [Templates](architecture/templates.md#templates) for start and default templates. Like `block_definitions`, a row is only ever copied into an entry's blocks with no link back, so deleting a row touches no entry. Its own block stack is rows of [blocks](#blocks) with `template_id` set.
 
 | Column | Type | Notes |
 |---|---|---|
@@ -360,7 +360,7 @@ The `deleted_at` indexes matter because `runPeriodicCleanup` runs a range scan a
 - `false` keeps the stamp for writes that are a consequence of something elsewhere (a tag id stripped from or merged into a list);
 - a timestamp sets exactly that one (Cancel puts back the stamp from before editing).
 
-A patch that changes nothing is not written at all (`needsWrite`). Checking a checklist item in read mode is a change and does stamp. Ticking a task stamps that task only; its subtasks change along without a new stamp, and ones already in that state are not written. An imported entry's `updated_at` is its creation date (the file knows no other), so an old operation does not jump to the top of a list sorted by last change.
+A patch that changes nothing is not written at all (`needsWrite`). Checking a checklist item in read mode is a change and does stamp. Ticking a task stamps that task only; its subtasks change along without a new stamp, and ones already in that state are not written. An imported entry's `updated_at` is its creation date (the file knows no other), so an old entry does not jump to the top of a list sorted by last change.
 
 **No Base64 in SQLite.** Image data lives in files (see [Rules for Future Schema Changes](#rules-for-future-schema-changes)); no column holds a data URL. A cover is a picture of `images/`, an uploaded icon a file of `icons/`.
 
@@ -370,7 +370,7 @@ The `icon` columns of `ICON_FIELDS` in `schema.ts` — `entries`, `templates`, `
 
 ## Sigil Workflow
 
-A sigil is not a kind of row but three blocks of an entry (`src/lib/blocks/sigil.ts`), in any category; a new operation in `sigils` starts with them via the built-in `core-sigil` template (see [templates](#templates)). Calculator and charge are fields blocks with that one element (element IDs `calc` and `charge`), the drawing a paint block marked as a sigil drawing — the same three exist as parts of a user-built block:
+A sigil is not a kind of row but three blocks of an entry (`src/lib/blocks/sigil.ts`), in any category; a new entry in `sigils` starts with them via the built-in `core-sigil` template (see [templates](#templates)). Calculator and charge are fields blocks with that one element (element IDs `calc` and `charge`), the drawing a paint block marked as a sigil drawing — the same three exist as parts of a user-built block:
 
 1. **Calculator** (element kind `sigilCalc`) — the intention, the letter bank (each letter once) and the letters already implemented, as the element's value in `data-block-data`, the readable version in its slot.
 2. **Drawing** (`core.paint` with `data-block-config='{"sigil":true}'`, or element kind `sigilCanvas`) — the vector strokes as data JSON (`data-block-data`, layers of strokes, see [Editors](architecture/editors.md#canvas-editor)), and as inner HTML the rendered image first (`<img src="{sha}.png" data-paint="render">`), then the image of every layer that has one (`data-paint="<layer ID>"`), so backups, exports and the image cleanup see them. A block whose first image is not marked as the render (one from before the vector format) opens with that image as its only layer. No base64 in content; rendered images saved while drawing become unused files that "Delete unused images" removes.

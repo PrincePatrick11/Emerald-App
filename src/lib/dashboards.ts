@@ -17,7 +17,7 @@ import type {
 } from '../types';
 import type { SortMode } from '../store/uiStore';
 
-export const BUILTIN_DASHBOARD_KEYS: readonly BuiltinDashboard[] = ['all', 'journal', 'wiki', 'operations'];
+export const BUILTIN_DASHBOARD_KEYS: readonly BuiltinDashboard[] = ['all', 'journal', 'practice', 'knowledge'];
 
 const DEFAULT_SORT: DashboardSort = { by: 'updated', dir: 'desc' };
 
@@ -101,8 +101,8 @@ export function sortFromMode(mode: SortMode, current: DashboardSort, dateField: 
 const BUILTIN_NAME_KEYS: Record<BuiltinDashboard, string> = {
   all: 'nav.allEntries',
   journal: 'nav.journal',
-  operations: 'nav.operations',
-  wiki: 'nav.wiki',
+  practice: 'nav.practice',
+  knowledge: 'nav.knowledge',
 };
 
 /** The name a dashboard shows: its own, else the built-in's translated name, else "Unnamed dashboard". */

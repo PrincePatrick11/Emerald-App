@@ -286,7 +286,7 @@ export default function TasksView() {
               />
             ))}</div>}
 
-        {/* At the very bottom, like the orphan bucket in Wiki/Operations — and
+        {/* At the very bottom, like the orphan bucket of the grouped dashboards — and
             as there, only if it contains something. */}
         {showUncatBlock && (
           <div className="mb-6 space-y-1.5">

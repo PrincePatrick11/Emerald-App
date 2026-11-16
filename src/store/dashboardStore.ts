@@ -1,6 +1,6 @@
 /**
  * The dashboards (table `dashboards`): the rail's views over entries, in
- * their order. Built-in ones (`all`, `journal`, `wiki`, `operations`) and
+ * their order. Built-in ones (`all`, `journal`, `practice`, `knowledge`) and
  * the user's own; all but "All entries" can be renamed, filtered and deleted
  * (into the trash). The store also keeps the category IDs in their filters
  * in step with the categories.

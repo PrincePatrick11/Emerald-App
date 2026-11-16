@@ -2,10 +2,10 @@
 
 ## All Entries and Dashboards
 
-**All entries** (the second button of the rail, a list icon) shows every entry of the vault in one list — it is what the app opens with and what a new tab shows. A **dashboard** is a list over entries chosen by category and tag: Journal, Operations and Wiki are dashboards a fresh vault starts with, and you can add your own. Each one has a button in the rail and a tile in the plus's window.
+**All entries** (the second button of the rail, a list icon) shows every entry of the vault in one list — it is what the app opens with and what a new tab shows. A **dashboard** is a list over entries chosen by category and tag: Journal, Practice and Knowledge are dashboards a fresh vault starts with, and you can add your own. Each one has a button in the rail and a tile in the plus's window.
 
 - **Create** a dashboard with the "Dashboard" tile of the rail's plus: it opens at once, together with its settings.
-- **Settings** — the button beside "New …" on every dashboard, or "Dashboard settings" in its right-click menu in the rail: the name, the icon (an emoji or an image), which categories it shows ("All" means every category; a new category can be created right there and is ticked at once) and which tags. An entry shows when it passes both rules — its category is ticked and it carries one of the tags; a rule left empty does not narrow. A renamed Journal, Wiki or Operations shows its new name as title, tab title and rail tooltip; cleared, the name goes back to the translated one. "All entries" has a name and an icon, but no filter.
+- **Settings** — the button beside "New …" on every dashboard, or "Dashboard settings" in its right-click menu in the rail: the name, the icon (an emoji or an image), which categories it shows ("All" means every category; a new category can be created right there and is ticked at once) and which tags. An entry shows when it passes both rules — its category is ticked and it carries one of the tags; a rule left empty does not narrow. A renamed Journal, Practice or Knowledge shows its new name as title, tab title and rail tooltip; cleared, the name goes back to the translated one. "All entries" has a name and an icon, but no filter.
 - **Reorder** by dragging a dashboard's rail button, or with Move up / Move down in its right-click menu. The plus's tiles follow the same order.
 - **Delete** from the right-click menu or the settings: the dashboard goes to the Trash, with an undo toast, and can be restored from there; its entries stay where they are. "All entries" cannot be deleted, so no entry can become unfindable.
 
@@ -13,7 +13,7 @@ A dashboard's list has the usual search, category filter, grouping by category a
 
 ## Journal
 
-The journal is the primary day-to-day writing space. Each entry has a title and a rich-text body. Besides the usual formatting (headings, lists, checklists, quotes, code, images, links), the toolbar inserts a horizontal rule, a table, a web link and a collapsible section around the selected text and aligns paragraphs, headings and images left, center or right — an image aligns on its own, since it is a block with its own width. Wiki and Operations use the same editor.
+The journal is the primary day-to-day writing space. Each entry has a title and a rich-text body. Besides the usual formatting (headings, lists, checklists, quotes, code, images, links), the toolbar inserts a horizontal rule, a table, a web link and a collapsible section around the selected text and aligns paragraphs, headings and images left, center or right — an image aligns on its own, since it is a block with its own width. Every entry uses this editor.
 
 **Writing.** Typing `/` at the start of a line or after a space opens a list of what to insert — text, headings, lists, a checklist, quote, divider, a collapsible section, a table, images or a link to an entry; typing on filters it. Selected text gets a small menu above it for bold, italic, strikethrough, highlight, code, one of six text colours (also in the toolbar) and a link to a web address; the colours follow the theme, so coloured text stays readable in light and dark ones. A table gets a menu at its top edge for rows, columns and the header row, and its columns can be dragged wider or narrower. ⌘F (Ctrl+F), or the toolbar's magnifier, finds text across all of the entry's text blocks, the shortcut while reading too; while editing it also replaces one hit or all of them. While editing, the words and characters of the entry show under the text.
 
@@ -23,7 +23,7 @@ The journal is the primary day-to-day writing space. Each entry has a title and 
 
 **Blocks.** An entry's body is a stack of blocks — text blocks, each with the full editor, and field blocks (below). In edit mode every block shows its type above it; hovering a block or typing in it reveals a grip to its left to drag it up or down and a "…" menu to duplicate or remove it, and a dragged block lifts off the page. Hovering between two blocks reveals a line with a "+" that inserts a new one there; "+ Add block" below the last block is always visible. Read mode shows none of this — the blocks flow like one document.
 
-There is one formatting toolbar, pinned to the top while scrolling, acting on the text block you are typing in. A link added from "Linked entries" lands in the text block you last worked in; an image dropped from the file explorer or an entry dragged in from the left list lands where the pointer is, shown by a line or caret while dragging. Cancel reverts block changes along with the text. All of this applies to Wiki articles and Operations too, sigils included.
+There is one formatting toolbar, pinned to the top while scrolling, acting on the text block you are typing in. A link added from "Linked entries" lands in the text block you last worked in; an image dropped from the file explorer or an entry dragged in from the left list lands where the pointer is, shown by a line or caret while dragging. Cancel reverts block changes along with the text. All of this applies to every entry, sigils included.
 
 **Field blocks.** "Add block" offers nine kinds of field besides text: short text, number, date, choice, yes/no, checklist, link (to any entry), image and moon phase.
 - **Read mode** shows a field as a small label with its value, in the same typeface as the text around it; an empty field is left out.
@@ -41,7 +41,7 @@ There is one formatting toolbar, pinned to the top while scrolling, acting on th
 
 All of this is part of the entry's text, so Cancel reverts it too.
 
-**Your own blocks.** The **Blocks** view (rail, below Templates) lists the blocks you've built on the same dashboard every module uses — icon, name, field count, and "Unsaved" for a draft left open elsewhere. The right sidebar holds the header: "New block", view (list, cards, or a timeline by month of last change) and sort (last changed, name); the search sits beside the title.
+**Your own blocks.** The **Blocks** view (rail, below Templates) lists the blocks you've built as a [collection](#collections) — icon, name, field count, and "Unsaved" for a draft left open elsewhere. The right sidebar holds the header: "New block", view (list, cards, or a timeline by month of last change) and sort (last changed, name); the search sits beside the title.
 
 The list opens with a collapsible "Your blocks" section; below it a collapsible "Built-in blocks" section lists what "Add block" offers out of the box — text, every field kind and the three sigil parts (calculator, drawing, charge) — as a plain, non-clickable list (text and the sigil parts have a description tooltip). Search filters both sections. With none of your own yet, a hint invites you to build the first; the built-in section stays regardless.
 
@@ -57,9 +57,9 @@ The list opens with a collapsible "Your blocks" section; below it a collapsible 
 
 **Sigil parts.** A block can also hold the three sigil parts — calculator, drawing and charge — which work exactly as they do on their own in a sigil (see [Sigil Workflow](#sigil-workflow)). The builder lets a calculator choose how it reaches its letter bank (automatic, manual, or both — the default), a drawing preset its starting brush colour and size, and a charge preset its lock and which of the block's calculators and drawings it covers. Duplicating a block that a charge hides or locks makes a copy that charge covers too, just as loaded.
 
-**Moon phase.** A journal entry's lunar phase is never stored — it is worked out from the entry's creation date whenever it is shown. Settings → Entries decides whether journal entries show it at all, for every entry, old ones included. On, it appears as the entry's icon (unless the entry has an icon of its own), beside the date on the entry page, as a read-only row in the Properties sidebar and in exports, whichever dashboard shows the entry; off, all of that is gone. The lists group by category, not by phase. It is not something you choose: a duplicate gets today's phase, an imported entry the phase of the file's date.
+**Moon phase.** The lunar phase of an entry in the category Journal (not Dream Journal) is never stored — it is worked out from the entry's creation date whenever it is shown. Settings → Entries decides whether journal entries show it at all, for every entry, old ones included. On, it appears as the entry's icon (unless the entry has an icon of its own), beside the date on the entry page, as a read-only row in the Properties sidebar and in exports, whichever dashboard shows the entry; off, all of that is gone. The lists group by category, not by phase. It is not something you choose: a duplicate gets today's phase, an imported entry the phase of the file's date.
 
-**Linked entries.** The Properties sidebar's "Linked entries" field (above the tags) lists everything the entry links in its own text — journal entries, wiki articles, operations and tasks — read directly from the content rather than kept as a separate list. The chips are grouped by category under small headings.
+**Linked entries.** The Properties sidebar's "Linked entries" field (above the tags) lists everything the entry links in its own text — entries and tasks — read directly from the content rather than kept as a separate list. The chips are grouped by category under small headings.
 
 - In edit mode, searching (up to 50 matches, most recently updated first) and picking a result appends the link to the end of the entry as its own block — a divider, the linked item's category as a heading, then the chip; one block per link. The view jumps to it and briefly highlights it. An entry with no text yet gets its first link block without the divider.
 - Clicking a listed link does the same jump-and-highlight (or navigates to the target if the link somehow isn't in the text).
@@ -67,7 +67,7 @@ The list opens with a collapsible "Your blocks" section; below it a collapsible 
 
 Every entry has the same field. Links are included in Markdown and Emerald exports.
 
-**Changing the category.** An entry has no type: what it is follows from its category, and the dashboards show the categories of their filter (Journal: Journal; Operations: Sigils, Altars, Ritual, Meditation; Wiki: Paradigm, Herbs, Crystals, Candles, Deities, Tools — in a fresh vault). Every entry opens on the same page with the same Properties panel — category, icon, cover image, (for a journal entry) the moon phase, linked entries, tags. Choosing another category in edit mode is all it takes to "move" an entry; Cancel takes the old category back with the rest. Id, title, content, tags, number, icon, cover image and creation date stay, and every link, task link and prefilled link keeps working. The content stays as it is — a start template applies only when an entry is created. The open page stays in the dashboard it was opened from.
+**Changing the category.** An entry has no type: what it is follows from its category, and the dashboards show the categories of their filter (Journal: Journal, Dream Journal; Practice: Sigils, Altars, Ritual, Meditation; Knowledge: Paradigm, Herbs, Crystals, Candles, Deities, Tools — in a fresh vault). Every entry opens on the same page with the same Properties panel — category, icon, cover image, (for a journal entry) the moon phase, linked entries, tags. Choosing another category in edit mode is all it takes to "move" an entry; Cancel takes the old category back with the rest. Id, title, content, tags, number, icon, cover image and creation date stay, and every link, task link and prefilled link keeps working. The content stays as it is — a start template applies only when an entry is created. The open page stays in the dashboard it was opened from.
 
 **Tags.** Free-form labels shared across the app. Renaming a tag changes it on every entry at once. The Tags view is a [collection](#collections): in the list a click on a tag opens the entries carrying it below, each with its icon, category and date, and a click on one opens it in "All entries"; on a card a click renames the tag. It sorts by name or by how many entries carry a tag, and filters by where a tag is used (in entries, only in templates, only in images, only in templates and images, nowhere). Tasks carry no tags. A tag used only by templates reads "only in templates", one only pictures in [Images](#images) carry "only in images", one carried by both "only in templates and images", instead of "unused"; opened, such a tag says that no entry carries it, but templates, images or both do. A tag in the Trash disappears from its entries until it is restored; deleting it for good removes it from them, including entries in the Trash.
 
@@ -80,35 +80,35 @@ Every entry has the same field. Links are included in Markdown and Emerald expor
 
 **Context menu.** Right-click any entry in the list or sidebar to Duplicate, Rename or Delete it — most menus also offer *Open in new tab*. The menu draws above everything and stays inside the window, flipping towards the cursor near an edge. See [Context Menus](#context-menus).
 
-## Wiki
+## Knowledge
 
-The wiki stores reference articles about anything relevant to your practice: rituals, deities, herbs, symbols, concepts, spells, tools, and more.
+Knowledge stores reference entries about anything relevant to your practice: rituals, deities, herbs, symbols, concepts, spells, tools, and more.
 
-**Categories.** An article can belong to one category from the shared list — see [Categories](#categories) for how it works, including grouping and the category filter.
+**Categories.** An entry can belong to one category from the shared list — see [Categories](#categories) for how it works, including grouping and the category filter.
 
 **Icons.** Every entry takes its icon by one rule everywhere — dashboards, lists, tabs, the left list, link chips, exports: its own icon (an emoji or an image), else its moon phase (a journal entry, with the moon phase shown), else its category's emoji, else 📄. Image icons from remote `http(s)` addresses are not rendered; only uploaded icon files of the vault are.
 
-**Sort and date.** The wiki list sorts, and its timeline groups, by "last changed" — the date its rows show, as in the left list.
+**Sort and view.** The Knowledge list starts sorted A–Z, as cards grouped by category; the sort and the view are the dashboard's own (see [All Entries and Dashboards](#all-entries-and-dashboards)).
 
-**Cover Images.** A banner image shown at the top of the article in read mode. It is stored with the entry itself, not as a file in the vault's image folder.
+**Cover Images.** A banner image shown at the top of the entry in read mode. It is a picture of Images.
 
-## Operations
+## Practice
 
-Operations track magical workings: rituals in progress, ongoing practices, servitors, and sigils.
+Practice tracks magical workings: rituals in progress, ongoing practices, servitors, and sigils.
 
-**Categories.** The same shared list as Wiki and Tasks — see [Categories](#categories). Its two built-ins belong here: **Sigils** (see [Sigil Workflow](#sigil-workflow)) and **Altars** (see [Altars](#altars)).
+**Categories.** The same shared list as Knowledge and Tasks — see [Categories](#categories). Its two built-ins belong here: **Sigils** (see [Sigil Workflow](#sigil-workflow)) and **Altars** (see [Altars](#altars)).
 
-**Status, end date and version are yours to build.** Operations have no fixed status fields: a block of your own in the Blocks view (say, Active — yes/no, End date, Version) is added via "Add block", and a yes/no field can be toggled straight from read mode. Filtering the list by block values is planned.
+**Status, end date and version are yours to build.** Practice entries have no fixed status fields: a block of your own in the Blocks view (say, Active — yes/no, End date, Version) is added via "Add block", and a yes/no field can be toggled straight from read mode. Filtering the list by block values is planned.
 
-**Icon and Cover Image.** Operations use the same icon rule and cover image as wiki articles (see [Wiki](#wiki)). A row shows "category · last changed"; a sigil with a target date appends "Target date: …", in rows and cards alike.
+**Icon and Cover Image.** Practice entries use the same icon rule and cover image as Knowledge entries (see [Knowledge](#knowledge)). A row shows "category · last changed"; a sigil with a target date appends "Target date: …", in rows and cards alike.
 
 ### Sigil Workflow
 
-A sigil is an operation with three blocks — **Sigil calculator**, **Sigil drawing** and **Charge**, each holding just that one part — alongside text and any other block. A new operation in the **Sigils** category starts with all three (through the built-in template assigned there, see [Templates](#templates)); any other operation can add them via "Add block".
+A sigil is an entry with three blocks — **Sigil calculator**, **Sigil drawing** and **Charge**, each holding just that one part — alongside text and any other block. A new entry in the **Sigils** category starts with all three (through the built-in template assigned there, see [Templates](#templates)); any other entry can add them via "Add block".
 
 1. In the calculator, write the intention and use "Reduce automatically" (or "Reduce manually") to get the letter bank — each letter once. Tick letters off as you work them into the drawing.
 2. Draw the sigil in the drawing block, a paint editor (the canvas editor fixed on one drawing): a pen that follows the pressure of a stylus (with a mouse or finger the speed shapes the line), line, ellipse and rectangle (Shift for 15° steps, circles and squares), an eraser, seven colours or any other and the brush size right in the bar, polygons and stars with 3–12 corners or points, shapes outlined or filled (Alt draws a shape from its middle), a paint bucket whose fill becomes a smooth vector area with its holes, a grid with the page's middle lines that shapes, lines and moves can snap to, drawing in symmetry (mirrored, four quarters, or radial with 3–16 rays, with the axes shown), a picker that takes a colour from the drawing (or Alt with the pen or the bucket), brush size, layers in a panel beside the drawing that can stay open, each with a picture of what it holds, that can be added, hidden, locked, dragged into another order, renamed, copied, merged down, given an opacity and removed, undo/redo and clear. Strokes can be selected with a rectangle or a lasso (a freehand stroke reaching out of it is cut at its edge, so only the part inside is taken; lines, shapes and fills count when they lie wholly inside) or a click and then moved, scaled, turned, copied, pasted, duplicated or deleted; the move tool shifts a whole layer. Pinch or ⌘ with the wheel zooms into the drawing, Space or the middle button pans, ⌘0 shows it whole again. Keys while drawing: ⌘Z/Ctrl+Z, with Shift to redo, V, Q, M, P, L, O, R, G, S, B, E and I for the tools, `[` and `]` for the size, ⌘A, ⌘C, ⌘X, ⌘V, ⌘D, Delete and the arrows for the selected strokes. The strokes are kept as lines, not pixels, and an image of the drawing is saved for reading, cards and exports. A drawing from before keeps its picture as the first layer, so drawing on it and erasing from it work as before.
-3. In the charge block, optionally set a reveal date and link a charging technique (any wiki article), choose what charging locks — the whole entry, or only the calculators and drawings it covers — and, when the entry holds more than one calculator or drawing, which of them this charge covers (all by default).
+3. In the charge block, optionally set a reveal date and link a charging technique (any entry), choose what charging locks — the whole entry, or only the calculators and drawings it covers — and, when the entry holds more than one calculator or drawing, which of them this charge covers (all by default).
 4. In read mode, charge the sigil — optionally after a timer — and confirm.
 
 While charged, the calculators and drawings it covers are hidden (also in search) and left out of exports until the reveal date; a charge without a reveal date hides them until you unload it. From the reveal date on they show again, still locked. "Unload sigil" (with confirmation) lifts the lock. A charge that locks the whole entry disables Edit, with a tooltip saying why.
@@ -117,11 +117,11 @@ Duplicating keeps the charge: a duplicated entry, or a duplicated block the char
 
 ### Servitors
 
-Servitors use the standard operations editor with no special fields. File them under whichever category fits — including one you name "Servitors" yourself.
+Servitors use the standard entry editor with no special fields. File them under whichever category fits — including one you name "Servitors" yourself.
 
 ## Altars
 
-An altar is an operation in the built-in category **Altars** (🪔), a virtual arrangement of pictures and symbols on a canvas. A new operation there starts, through the built-in template "Altar", with an **Altar block** on a night background and a text block for notes. Altars are listed, searched, tagged, linked from texts and tasks, exported and trashed like every other operation; there is no separate Altar section. Any other entry can hold an Altar or a Canvas block too ("Add block").
+An altar is an entry in the built-in category **Altars** (🪔), a virtual arrangement of pictures and symbols on a canvas. A new entry there starts, through the built-in template "Altar", with an **Altar block** on a night background and a text block for notes. Altars are listed, searched, tagged, linked from texts and tasks, exported and trashed like every other entry; there is no separate Altar section. Any other entry can hold an Altar or a Canvas block too ("Add block").
 
 **The Altar block** is the Canvas block (see [Images](#images)) with "Images" below it while editing: two rows of pictures to scroll sideways, a search, and a tag filter.
 
@@ -161,7 +161,7 @@ The title bar, the rail and the left entry list share one plain background with 
 
 **Left sidebar structure.** The left sidebar has two parts side by side:
 
-1. A narrow icon **rail**: a plus and All entries, then the dashboards in their order (Journal, Operations, Wiki and your own — see [All Entries and Dashboards](#all-entries-and-dashboards)) and Tasks, then Lexicon, then Templates and Blocks at the top, the groups set apart by space; at the bottom, Images, Categories, Tags and Trash, then Settings and the start page. The rail scrolls without a bar when the window is too low. Clicking a navigation icon switches the main view of the active tab — it never opens a new tab. The open view's icon is highlighted (also while an entry inside it is open). The start page button (a grid of four squares) opens the [start page](#vaults). The plus opens a small window with a tile for each dashboard in rail order (a new entry in it), All entries (an entry without a category), Tasks, Lexicon, Templates, Blocks and Dashboard (a new dashboard); the choice is created and opened right away, a task as a new row ready to be named in the Tasks view. Arrow keys and Tab move between the tiles, the focused one shows a ring from the start, Enter picks it (the first tile is preselected), the number keys 1–9 pick a tile directly, and Escape or a click beside the window closes it.
+1. A narrow icon **rail**: a plus and All entries, then the dashboards in their order (Journal, Practice, Knowledge and your own — see [All Entries and Dashboards](#all-entries-and-dashboards)) and Tasks, then Lexicon, then Templates and Blocks at the top, the groups set apart by space; at the bottom, Symbols, Images, Categories, Tags and Trash, then Settings and the start page. The rail scrolls without a bar when the window is too low. Clicking a navigation icon switches the main view of the active tab — it never opens a new tab. The open view's icon is highlighted (also while an entry inside it is open). The start page button (a grid of four squares) opens the [start page](#vaults). The plus opens a small window with a tile for each dashboard in rail order (a new entry in it), All entries (an entry without a category), Tasks, Lexicon, Templates, Blocks and Dashboard (a new dashboard); the choice is created and opened right away, a task as a new row ready to be named in the Tasks view. Arrow keys and Tab move between the tiles, the focused one shows a ring from the start, Enter picks it (the first tile is preselected), the number keys 1–9 pick a tile directly, and Escape or a click beside the window closes it.
 2. A resizable, collapsible **entry list** showing either every entry and task together (**All entries**, by last change), one dashboard's entries or the tasks — chosen in Settings → Sidebar; a dashboard that is deleted falls back to All entries. It has its own search, inline rename (from the context menu, starting from the stored title) and a context menu (Open in new tab/Duplicate/Rename/Delete where they apply — Tasks offers Rename/Delete). Task rows show a completion checkbox (in the All list a static checkbox icon). Every row can be dragged into an editor to insert an internal link — Tasks included. The list caps how many entries it shows (Settings → Sidebar: 10/25/50/100 or all); a "Show more" row reveals the next batch. With "all" it fills in as you scroll, so a vault with thousands of entries opens it at once. Creating items happens through the rail's plus and the dashboards; the entry list has no "New" button.
 
 The rail has no toggle buttons: **View → Entry List** and **View → Properties** collapse and expand the two sidebars (with a checkmark for their state), animating their width. **View → Reset View** restores the sidebar widths and brings back a hidden rail, entry list or right sidebar — without the rail, Settings and the start page would be out of reach. **View → Lock View** (with a checkmark while on) fixes the widths of the entry list and the right sidebar: their edges can no longer be dragged. Hiding and showing the sidebars and Reset View keep working, and the lock survives a restart.
@@ -183,13 +183,13 @@ If the entry was just created and never confirmed with Done, Cancel moves it to 
 
 The same applies to the page of one of your own blocks or a template.
 
-**List header, split between the main area and the sidebar.** While a list view is showing — All entries and every dashboard, Journal, Wiki, Operations, Tasks, Trash, Categories, Tags, or the Blocks, Templates and Lexicon lists — its title and search sit above the list in the main area. Everything else lives in the right sidebar while it is open: the view's actions (a labelled "+ New …" button; Trash shows select-all and bulk delete instead), then view and sort as two rows of icon toggles, then the always-visible filter panel. Closing the sidebar hides those parts and gives the list the width back.
+**List header, split between the main area and the sidebar.** While a list view is showing — All entries and every dashboard, Journal, Practice, Knowledge, Tasks, Trash, Categories, Tags, or the Blocks, Templates and Lexicon lists — its title and search sit above the list in the main area. Everything else lives in the right sidebar while it is open: the view's actions (a labelled "+ New …" button; Trash shows select-all and bulk delete instead), then view and sort as two rows of icon toggles, then the always-visible filter panel. Closing the sidebar hides those parts and gives the list the width back.
 
-**Internal link chips.** Links inserted with `[[` render as chips in both edit and view mode. A link can point at a Journal entry, Wiki article, Operation (an altar too) or Task — offered by the `[[` popup, the link picker (the toolbar's link button), and by dragging a row from the left entry list. Only Journal, Wiki and Operations can hold links; Tasks have no editor. Clicking a Task chip opens the Tasks view and highlights the task. The link picker's tabs (All/Journal/Tasks/Operations/Wiki) are icons in the rail's order, each with its match count.
+**Internal link chips.** Links inserted with `[[` render as chips in both edit and view mode. A link can point at an entry (an altar too) or a Task — offered by the `[[` popup, the link picker (the toolbar's link button), and by dragging a row from the left entry list. Only entries can hold links; Tasks have no editor. Clicking a Task chip opens the Tasks view and highlights the task. The link picker's tabs (All/Entries/Tasks) are icons, each with its match count.
 
 ## Search
 
-The magnifier in the title bar opens the search: one field, results beneath it, over everything in the current vault. Matches come from Journal, Wiki, Operations (altars included), Tasks, pictures of "Images", tags, categories, and the Lexicon's languages and words. A title match ranks above a tag match, which ranks above a match in body text; ties go to whatever was updated more recently. Body-text matches start at two typed characters, so a single letter doesn't return most of the vault.
+The magnifier in the title bar opens the search: one field, results beneath it, over everything in the current vault. Matches come from entries (altars included), Tasks, pictures of "Images", tags, categories, and the Lexicon's languages and words. A title match ranks above a tag match, which ranks above a match in body text; ties go to whatever was updated more recently. Body-text matches start at two typed characters, so a single letter doesn't return most of the vault.
 
 Each result shows what it is (entry, task, category …) and, for an entry, its number (e.g. `#12`). A body-text match shows a snippet with the word highlighted. An entry opens in "All entries", a category in the Categories view. A word shows as "term – translation" and opens its language. An untitled entry is found by its "Untitled …" name.
 
@@ -203,7 +203,7 @@ There is no keyboard shortcut to open the search. Templates and your own blocks 
 
 ## Tabs & Workspace
 
-Emerald has browser-like tabs, so you can keep several things open at once — for example writing a journal entry while referencing a wiki article and an active operation. You can:
+Emerald has browser-like tabs, so you can keep several things open at once — for example writing a journal entry while referencing a Knowledge entry and a practice entry. You can:
 
 - Open entries and any other view in tabs, and switch between them.
 - Close tabs individually, or with a middle-click on the tab.
@@ -218,14 +218,14 @@ Opening an item in a new tab (middle-click, "Open in new tab", Ctrl/Cmd+Enter in
 
 **What Emerald remembers.** Two kinds of things, with one rule each:
 
-- **Preferences stay, per vault** — how each list looks (view, sort, grouping — for the dashboards, Journal, Wiki and Operations included, stored with the dashboard), which groups and sections are collapsed, Tasks' "Show completed". A vault opened for the first time starts from the defaults.
+- **Preferences stay, per vault** — how each list looks (view, sort, grouping — the dashboards, Journal, Practice and Knowledge included, stored with the dashboard), which groups and sections are collapsed, Tasks' "Show completed". A vault opened for the first time starts from the defaults.
 - **Working state lasts for the session** — searches, filters and the Trash selection. Switching to another module and back finds them as you left them; a restart, a vault switch or restoring a backup starts clean.
 
 The window layout — open tabs, which sidebars are open, their widths — belongs to the app rather than to a vault; settings live in the vault (see [Settings](#settings)).
 
 ## Templates
 
-A template is a pre-filled starting point for a Journal entry, Wiki article or Operation: an optional title, a block stack — the same content an entry has — and tags. The **Templates** button sits in the left rail next to Blocks. The [collection](#collections) lists templates under a collapsible "Templates" heading with its own view (List, Cards, or Timeline by month), sort (date or name) and a filter by tag; each row or card shows the icon, the name, and "Unsaved" while a draft is open.
+A template is a pre-filled starting point for an entry: an optional title, a block stack — the same content an entry has — and tags. The **Templates** button sits in the left rail next to Blocks. The [collection](#collections) lists templates under a collapsible "Templates" heading with its own view (List, Cards, or Timeline by month), sort (date or name) and a filter by tag; each row or card shows the icon, the name, and "Unsaved" while a draft is open.
 
 Clicking one opens its page — name as the title, the title new entries get, and the block stack — which works like a block's own page (see "Your own blocks" under [Journal](#journal)): edits are a draft until Done, leaving with changes asks first, and an unfinished page in another tab shows "Unsaved" in the list.
 
@@ -249,7 +249,7 @@ The Tasks module is a hierarchical task manager with categories, priorities, and
 
 **Priorities.** Low, Medium or High, shown as a coloured flag (green, yellow, red) and changed from a dropdown on each row.
 
-**Links.** A task can link to journal entries, wiki articles, operations (altars included) and other tasks — the same link picker the editor uses. Linked entries show as clickable chips on the row. A link whose target was deleted for good reads "Deleted".
+**Links.** A task can link to entries (altars included) and other tasks — the same link picker the editor uses. Linked entries show as clickable chips on the row. A link whose target was deleted for good reads "Deleted".
 
 **Toolbar.** Search, a sort ("Created · newest/oldest", "Name · A → Z/Z → A") and a separate Grouping switch (by category, or ungrouped). Only the List view is available.
 
@@ -283,7 +283,7 @@ Everything that is neither an entry nor a task is a **collection**: Tags, Catego
 
 One list of categories serves every entry and the tasks, and the Categories view in the left rail — next to Tags — is the one place it is managed, as a [collection](#collections). Dashboards and Tasks only *assign* a category to an entry and group their lists by it; none of them can create, rename or delete one.
 
-A fresh vault starts with eight ordinary categories in the app's language (Paradigm, Ritual, Meditation, Herbs, Crystals, Candles, Deities, Tools) plus the built-in **Sigils** and **Altars**: a new operation in Altars starts with an altar and a text for notes.
+A fresh vault starts with nine ordinary categories in the app's language (Dream Journal, Paradigm, Ritual, Meditation, Herbs, Crystals, Candles, Deities, Tools) plus the built-in **Sigils** and **Altars**: a new entry in Altars starts with an altar and a text for notes.
 
 Each row or card shows the category's emoji, its name, its start template if it has one, and how many entries and tasks use it (two columns, each with its icon). Only live entries count, not the Trash. The filter shows the categories a dashboard filters by.
 
@@ -307,7 +307,7 @@ A category found through the global search opens this view and briefly highlight
 
 The Lexicon is where you keep **languages** — Enochian, runes, a tongue of your own — and translate with them. Everything it knows comes from your own vault.
 
-**Dashboard.** The rail's Lexicon button opens the list of your languages on the same dashboard every module uses — icon, name, and how many words and characters each holds — with the usual search, view (List / Cards / Timeline) and sort (date, name, most words) in the right sidebar. A row's context menu offers Open in new tab, Duplicate (copying the alphabet and every word) and Delete; deleting moves the language to the Trash with an undo toast, its words travelling with it both ways.
+**Languages.** The rail's Lexicon button opens the list of your languages as a [collection](#collections) — icon, name, and how many words and characters each holds — with the usual search, view (List / Cards / Timeline) and sort (date, name, most words) in the right sidebar. A row's context menu offers Open in new tab, Duplicate (copying the alphabet and every word) and Delete; deleting moves the language to the Trash with an undo toast, its words travelling with it both ways.
 
 **A language's page.** Clicking a language opens its page: a breadcrumb back to the list, its name as the title, and two sections.
 
@@ -330,7 +330,7 @@ Multi-word entries match as a phrase ("I am" → ZIRDO), capitalisation carries 
 
 ## Trash
 
-Deleting a journal entry, wiki article, operation (an altar too), task or picture moves it to the Trash rather than removing it. Trashed items are kept for a period set per vault (Settings → Storage — 7/14/30/60/90 days or never; 30 by default) and purged when the vault opens once that period has passed — categories too, whose entries are then left without one. The Trash's "time left" note names that period, or is left out when purging is off.
+Deleting an entry (an altar too), task or picture moves it to the Trash rather than removing it. Trashed items are kept for a period set per vault (Settings → Storage — 7/14/30/60/90 days or never; 30 by default) and purged when the vault opens once that period has passed — categories too, whose entries are then left without one. The Trash's "time left" note names that period, or is left out when purging is off.
 
 From the Trash view you can:
 
@@ -339,7 +339,7 @@ From the Trash view you can:
 - Select several items by clicking them, then restore or delete the selection from the sidebar's action bar, where "Select all" sits too.
 - Empty the entire Trash at once (with confirmation).
 
-Dashboards, tags, categories, your own blocks, templates and the Lexicon's languages also go to the Trash and can be restored; a language brings its words back with it, and deleted for good takes them along. Grouped, the Trash shows "Entries" first — Journal entries, wiki articles and operations together, sub-grouped by category, those without one under "Uncategorized" — then "Dashboards", then the rest. Only the latest deletion can be undone from the toast — a new one replaces the previous Undo; older items are restored from the Trash.
+Dashboards, tags, categories, your own blocks, templates and the Lexicon's languages also go to the Trash and can be restored; a language brings its words back with it, and deleted for good takes them along. Grouped, the Trash shows "Entries" first — every entry together, sub-grouped by category, those without one under "Uncategorized" — then "Dashboards", then the rest. Only the latest deletion can be undone from the toast — a new one replaces the previous Undo; older items are restored from the Trash.
 
 ## Vaults
 
@@ -429,7 +429,7 @@ A menu to export several entries at once, with a password and compressed or left
 
 ### Import from Markdown
 
-Reads a Markdown file exported by Emerald (or with the same structure). The `# Title` line becomes the title, key-value lines before `---` are metadata (unknown keys are ignored), and the body below is converted to rich text. A Markdown import has no creation date and is created now. Header fields of earlier versions (an operation's status, end date and version, a journal entry's paradigm, banishing, meditation and linked operations or articles) count as unknown keys.
+Reads a Markdown file exported by Emerald (or with the same structure). The `# Title` line becomes the title, key-value lines before `---` are metadata (unknown keys are ignored), and the body below is converted to rich text. A Markdown import has no creation date and is created now. Header fields of earlier versions (an entry's status, end date and version, a journal entry's paradigm, banishing, meditation and linked operations or articles) count as unknown keys.
 
 **Destination.** A file whose header names a category lands in it (found or created by name) and opens in "All entries". One without asks which dashboard it goes to — the dialog shows the detected title and lists the dashboards; the entry starts in that dashboard's first category and opens there. Cancelling aborts the import. `.emerald` entries keep their category by name and never ask.
 
@@ -479,7 +479,7 @@ A picture taken into [Images](#images) is never unused, wherever it appears. Not
 
 ## Image Upload Validation
 
-Every image upload accepts only **PNG**, **JPEG**, **GIF**, **WebP** and **SVG**; anything else is rejected before processing. This covers icons and cover images of articles and operations; template and block icons; and images inserted into the editor via the toolbar, paste, or drag-and-drop from the file manager. Icons (of entries, templates, blocks and languages) refuse SVG on top of that, also when they arrive in a backup or an `.emerald` file.
+Every image upload accepts only **PNG**, **JPEG**, **GIF**, **WebP** and **SVG**; anything else is rejected before processing. This covers icons and cover images of entries; template and block icons; and images inserted into the editor via the toolbar, paste, or drag-and-drop from the file manager. Icons (of entries, templates, blocks and languages) refuse SVG on top of that, also when they arrive in a backup or an `.emerald` file.
 
 A rejected file from a file picker shows an inline error near the control, cleared after 2.5 seconds. When every file dragged into the editor has an unsupported format, a dialog lists the allowed formats instead of silently ignoring the drop.
 
@@ -532,7 +532,7 @@ The menu at the bottom left of the start page, a flag beside each name, switches
 Settings → General has two independent font controls:
 
 - **UI font** — the typeface of the application shell, sidebars, settings, lists and all other non-editor UI. Default: **Inter**.
-- **Editor body font** — the typeface of the editor body, entry titles, and the read-mode body of journal entries, wiki articles and operations. Default: **Lora**.
+- **Editor body font** — the typeface of the editor body, entry titles, and the read-mode body of entries. Default: **Lora**.
 
 Both offer the same eight typefaces: Inter, Source Sans 3, Nunito, IBM Plex Sans, Alegreya, Cormorant Garamond, Lora and Merriweather. They ship with the app (Latin and Latin Extended), so they look the same offline and nothing is fetched from the network. Serif fonts fall back to Georgia, sans-serif ones to Segoe UI / system-ui.
 

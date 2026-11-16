@@ -190,7 +190,7 @@ The schema itself lives in `src/lib/schema.ts`, not in `db.ts`: fresh vaults exe
 
 `AppShell` calls `reloadAllStores()` (`src/store/moduleWiring.ts`) on mount and again on every vault switch — see [Module Registry](architecture/modules.md#module-registry) for the sequence. Views do **not** refetch on mount; a view that mounts before the startup fetch resolves renders its empty state until the store fills.
 
-One detail of what the stores load: **sigil drawings are files, not columns.** A drawing's rendered image is a file referenced from the sigil drawing's (a paint block's) or drawing part's `<img src>`, next to its vector strokes as block data (see [Editors](architecture/editors.md#canvas-editor)), so the entry rows stay small. `entryBlockSummary(...).sigil` resolves the first visible, unconcealed drawing (`image`) and the target date; the Operations dashboard shows only the target date, in row and card alike.
+One detail of what the stores load: **sigil drawings are files, not columns.** A drawing's rendered image is a file referenced from the sigil drawing's (a paint block's) or drawing part's `<img src>`, next to its vector strokes as block data (see [Editors](architecture/editors.md#canvas-editor)), so the entry rows stay small. `entryBlockSummary(...).sigil` resolves the first visible, unconcealed drawing (`image`) and the target date; the Practice dashboard shows only the target date, in row and card alike.
 
 ### Store write serialization
 

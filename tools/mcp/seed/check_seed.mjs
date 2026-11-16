@@ -52,7 +52,7 @@ const typeless = tables.includes('dashboards');
 const inDashboard = (id) =>
   `entries WHERE category_id IN (SELECT j.value FROM dashboards d, json_each(d.filter, '$.categories') j WHERE d.id = '${id}')`;
 const modules = typeless
-  ? ['journal', 'wiki', 'operations'].map((id) => [id, inDashboard(id), 'AND'])
+  ? ['journal', 'knowledge', 'practice'].map((id) => [id, inDashboard(id), 'AND'])
   : unified
     ? ['journal', 'wiki', 'operation'].map((type) => [type, `entries WHERE type = '${type}'`, 'AND'])
     : ['journal_entries', 'wiki_articles', 'operations'].map((table) => [table, table, 'WHERE']);

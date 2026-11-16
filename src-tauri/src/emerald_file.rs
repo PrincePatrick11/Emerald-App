@@ -505,7 +505,7 @@ mod tests {
 
     #[test]
     fn old_json_files_are_named() {
-        assert_eq!(decode(br#"{"version":"5","type":"wiki"}"#, None, LIMITS).unwrap_err(), EMERALD_OLD_FORMAT);
+        assert_eq!(decode(br#"{"version":"5","type":"entry"}"#, None, LIMITS).unwrap_err(), EMERALD_OLD_FORMAT);
         assert_eq!(decode(b"\xEF\xBB\xBF\n  {\"version\":\"3\"}", None, LIMITS).unwrap_err(), EMERALD_OLD_FORMAT);
         assert_eq!(decode(b"hello", None, LIMITS).unwrap_err(), EMERALD_UNREADABLE);
         assert_eq!(decode(b"", None, LIMITS).unwrap_err(), EMERALD_UNREADABLE);
