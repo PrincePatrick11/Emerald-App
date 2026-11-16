@@ -75,8 +75,8 @@ Top-level keys of `en.json`, with the conventions worth knowing:
 | Key | Contents |
 |---|---|
 | `common` | Shared labels: `save`/`cancel`/`delete`/`ok`, `loading`, the shared inline delete confirmation `confirmSure`/`confirmYes`/`confirmNo` ("Sure? Yes/No"), `copySuffix`, image-format and size messages, `searchEmoji`/`noEmojiResults` for the shared `EmojiPicker` |
-| `categories` | The one category block for every module: the Categories view (`add`, `name`, `nameTaken`, `dragHint`, `builtinHint`), `uncategorized`, `builtin.*` and `starter.*` (see [Built-in Category Names](#built-in-category-names)) |
-| `listView` | View/sort/grouping labels of the dashboard sidebar. The sort trigger combines a date field (`dateCreated`/`dateUpdated`/`dateDeleted`) with `sortNewest`/`sortOldest`, or uses `sortAlphaAsc`/`sortAlphaDesc`/`sortCountDesc`. `groupBy` (`"Group by {{label, lowercase}}"`) uses the `lowercase` formatter registered in `src/i18n/index.ts`; German capitalises the noun and skips the formatter |
+| `categories` | The one category block for every module: the Categories view (`add`, `name`, `nameTaken`, `dragHint`, `builtinHint`) and its edit dialog (`editTitle`, `nameLabel`, `startTemplate*`, `shownIn*`, `shownEverywhere`), `uncategorized`, `builtin.*` and `starter.*` (see [Built-in Category Names](#built-in-category-names)) |
+| `listView` | View/sort/grouping labels of the dashboard sidebar. The sort trigger combines a date field (`dateCreated`/`dateUpdated`/`dateDeleted`) with `sortNewest`/`sortOldest`, or uses `sortAlphaAsc`/`sortAlphaDesc`/`sortCountDesc`/`sortManual` ("Custom order", the categories). `groupBy` (`"Group by {{label, lowercase}}"`) uses the `lowercase` formatter registered in `src/i18n/index.ts`; German capitalises the noun and skips the formatter |
 | `undo` | Undo toast messages |
 | `nav` | Navigation labels, including `allEntries`, `categories`, `all` and `vaults`; `allEntries`/`journal`/`wiki`/`operations` are also the names of the built-in dashboards (`dashboardLabel`) as long as they have no name of their own. A rail entry needs its `nav.<id>` key in all four locales, since `TASKS_VIEW`/`AUX_VIEWS` resolve the label dynamically |
 | `sidebar` | Left sidebar strings (`allEmpty`, `tasksEmpty`, `dashboardEmpty`) |
@@ -85,12 +85,12 @@ Top-level keys of `en.json`, with the conventions worth knowing:
 | `creation` | The sigil creation tools (intention, letters, canvas, charge) |
 | `blocks` | Content-block UI and the Blocks view: `types.*` (block types), `kinds.*` (one per `ElementKind`, shared by the "Add block" menu and the builder's element picker), `fields.*` (field block), `sigil.*` (calculator, drawing and charge, on their own or as parts of a block), `canvas.*` (the Canvas and Altar blocks), `paint.*` (the Painting block), `library.*` (the Blocks builder and its update/remove-copies notices) |
 | `editor` | Shared editor buttons, link-popup actions, `lockedBySigil`, and `toolbar.*` (every formatting-toolbar tooltip) |
-| `symbols` | The canvas editor's symbol library: its own labels, `packs.*` the pack names, and `<pack>.<name>` every symbol's name, which the library's search looks in |
+| `symbols` | The canvas editor's symbol library: its own labels, `packs.*` the pack names, and `<pack>.<name>` every symbol's name, which the library's search looks in; also `editTitle`, the title of the Symbols view's edit dialog |
 | `moonPhase` | Display names of the eight moon phases |
 | `search` | Dashboard search placeholders (`placeholder`, `placeholderIn` with `{{title}}`) and the title bar's global search (`globalPlaceholder`, `hint`, `clear`, `showMore`). Result module labels reuse `nav.*`; only `categories` has its own |
 | `templates` | Templates dashboard and page; `builtin.sigil` and `builtin.altar` name the built-in `core-sigil` and `core-altar` templates the way `categories.builtin.*` names a category; `insert.*` is the editor's picker and apply flow |
 | `lexicon` | Lexicon dashboard, language page and translate field. `wordCount` counts vocabulary rows; the translated text's own count is `textWordCount` |
-| `tags` | Tags view (`new`, `name`, `nameTaken`, `color`, `unused`, `onlyInTemplates`, `onlyInImages`) |
+| `tags` | Tags view (`new`, `name`, `nameTaken`, `color`, `unused`; the usage filter `usage`, `inEntries` and the `onlyIn*`, `*Filter` and `*Hint` keys, one set per state) |
 | `properties` | Right sidebar Properties panel |
 | `filters` | Filter panel; `all` is the "All" row every `FilterList` shows on top |
 | `vault` | `VaultPicker`: list/switch, edit, create, open/relocate, delete, the way back. Some keys (`chooseFolder`, `defaultFolder`, `alreadyOpen`, `accessDenied`, `folderHasVault`, `folderNotEmpty`) also serve the backup import's add-vault mode via `VaultLocationRow` and `NEW_VAULT_TARGET_ERROR_KEY`. `outdated` and `tooNew` are what a vault of an earlier or a newer version is refused with (`vaultOpenErrorKey`) |
@@ -101,7 +101,7 @@ Top-level keys of `en.json`, with the conventions worth knowing:
 | `vaultKey` | `VaultKeyDialog` and its shared parts: unlock, create, recover, the recovery-key box, the "remember on this device" switch and the failure texts (`wrongPassword`, `tooShort` with `{{count}}`, …) |
 | `security` | Settings → Security: remember, lock, change password, each with a hint and a tooltip |
 | `backupKey` | `BackupUnlockDialog`: opening an encrypted backup |
-| `emptyState` | Per-dashboard empty states (`title`, `description`, `action`), including `allEntries` and `dashboard` (every dashboard made by hand) |
+| `emptyState` | Per-dashboard and per-collection empty states (`title`, `description`, `action`), including `allEntries`, `dashboard` (every dashboard made by hand), `categories` and `symbols` |
 | `contextMenu` | Context menu actions, including `openInNewTab` |
 | `trash` | Trash view: section labels per kind (`entries`, `dashboards`, `categories`, …), `confirmEmptyAction`/`confirmDeleteSelected` (the primary button's own in-place confirmation label) |
 | `tabBar` | Tab strip (`editing`, `closeTab`, `newTab`); tab titles fall back to `nav.*` and the modules' `untitled` keys |

@@ -46,8 +46,16 @@
       "tools": "Outils"
     },
     "startTemplate": "Modèle de départ",
-    "startTemplateDefault": "Modèle par défaut",
-    "startTemplateHint": "Ce par quoi commence une nouvelle entrée de cette catégorie. « Modèle par défaut » est celui choisi sous Modèles."
+    "startTemplateHint": "Ce par quoi commence une nouvelle entrée de cette catégorie. « Modèle par défaut » est celui choisi sous Modèles.",
+    "editTitle": "Modifier la catégorie",
+    "nameLabel": "Nom",
+    "startTemplateDefaultNamed": "Modèle par défaut ({{name}})",
+    "startTemplateDefaultNone": "Modèle par défaut (aucun)",
+    "startTemplateMeta": "Modèle de départ : {{name}}",
+    "shownIn": "Apparaît dans",
+    "shownInHint": "Tableaux de bord dont le filtre inclut cette catégorie. Cela se modifie dans les réglages du tableau de bord.",
+    "shownInNone": "Aucun tableau de bord ne filtre sur cette catégorie.",
+    "shownEverywhere": "Aussi dans tous les tableaux de bord sans filtre de catégories :"
   },
   "listView": {
     "view": "Vue",
@@ -66,6 +74,7 @@
     "sortAlphaAsc": "Nom · A → Z",
     "sortAlphaDesc": "Nom · Z → A",
     "sortCountDesc": "Utilisation · plus utilisé",
+    "sortManual": "Ordre personnalisé",
     "category": "Catégorie",
     "grouping": "Regroupement",
     "groupBy": "Grouper par {{label, lowercase}}",
@@ -103,7 +112,8 @@
     "tasks": "Tâches",
     "settings": "Paramètres",
     "startPage": "Page d’accueil",
-    "allEntries": "Toutes les entrées"
+    "allEntries": "Toutes les entrées",
+    "symbols": "Symboles"
   },
   "sidebar": {
     "allEmpty": "Aucune entrée pour le moment",
@@ -586,7 +596,8 @@
       "ankh": "Ânkh",
       "monad": "Monade hiéroglyphique",
       "eye": "Œil de la providence"
-    }
+    },
+    "editTitle": "Modifier le symbole"
   },
   "canvas": {
     "keyNames": {
@@ -823,10 +834,20 @@
     "color": "Changer la couleur",
     "unused": "inutilisée",
     "onlyInTemplates": "seulement dans des modèles",
-    "onlyInImages": "seulement dans Images",
+    "onlyInImages": "seulement dans des images",
     "unusedHint": "Aucune entrée ne porte encore cette étiquette.",
     "createNamed": "+ Créer « {{name}} »",
-    "unknownOpenDashboard": "Aucune étiquette « {{name}} » — la créer dans Étiquettes"
+    "unknownOpenDashboard": "Aucune étiquette « {{name}} » — la créer dans Étiquettes",
+    "usage": "Utilisation",
+    "inEntries": "Dans des entrées",
+    "onlyInTemplatesFilter": "Seulement dans des modèles",
+    "onlyInImagesFilter": "Seulement dans des images",
+    "unusedFilter": "Inutilisés",
+    "onlyInTemplatesHint": "Aucune entrée ne porte cette étiquette, mais des modèles oui.",
+    "onlyInImagesHint": "Aucune entrée ne porte cette étiquette, mais des images oui.",
+    "onlyInTemplatesAndImages": "seulement dans des modèles et des images",
+    "onlyInTemplatesAndImagesFilter": "Modèles et images",
+    "onlyInTemplatesAndImagesHint": "Aucune entrée ne porte cette étiquette, mais des modèles et des images oui."
   },
   "properties": {
     "noEntry": "Ouvrez une entrée pour voir ses propriétés.",
@@ -1375,7 +1396,15 @@
     },
     "dashboard": {
       "title": "Rien ici pour l’instant",
-      "description": "Ce tableau de bord montre les entrées que son filtre laisse passer. Modifie le filtre dans ses réglages."
+      "description": "Ce tableau de bord montre les entrées que son filtre laisse passer. Modifiez le filtre dans ses réglages."
+    },
+    "categories": {
+      "title": "Pas encore de catégories",
+      "description": "Les catégories rangent vos entrées ; chacune peut partir de son propre modèle."
+    },
+    "symbols": {
+      "title": "Pas encore de symboles",
+      "description": "Dessinez sur une toile, sélectionnez le dessin et enregistrez-le comme symbole dans la barre latérale."
     }
   },
   "sync": {

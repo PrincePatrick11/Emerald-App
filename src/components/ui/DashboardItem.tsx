@@ -13,14 +13,21 @@ const ROW_CLASS = `panel-interactive ${ROW_GEOMETRY_CLASS} group`;
 /** Frame per presentation; the card's `w-full` is for the grid cell. */
 const LAYOUT_CLASS: Record<DashboardItemLayout, string> = {
   row: ROW_CLASS,
-  card: 'panel-interactive w-full text-left px-4 py-4',
+  // A column from the top: a button centres its content, and cards of one
+  // grid row stretch to the tallest — a shorter one would sit lower.
+  card: 'panel-interactive w-full text-left px-4 py-4 flex flex-col justify-start',
 };
 
 export type DashboardItemLayout = 'row' | 'card';
 
-interface DashboardItemProps {
+type DashboardItemTarget =
   /** Where click (this tab) and middle click (new tab) lead. */
-  view: ActiveView;
+  | { view: ActiveView; onOpen?: undefined }
+  /** What a click does instead, for items that open a dialog rather than a
+   *  page (a category, a picture, a symbol); no middle click then. */
+  | { view?: undefined; onOpen: () => void };
+
+type DashboardItemProps = DashboardItemTarget & {
   layout: DashboardItemLayout;
   onContextMenu?: (event: MouseEvent) => void;
   /** Rename in place: the same frame as a plain `div`, without
@@ -28,14 +35,15 @@ interface DashboardItemProps {
    *  should receive clicks, not the navigation. `view` is then unused. */
   editing?: boolean;
   children: ReactNode;
-}
+};
 
 /**
  * A clickable entry on a dashboard: `panel-interactive` frame,
- * click opens `view`, middle click opens it in a new tab. The content
+ * click opens `view`, middle click opens it in a new tab — or, with
+ * `onOpen` instead of `view`, a click runs that. The content
  * is `RowContent` or `CardContent`.
  */
-export default function DashboardItem({ view, layout, onContextMenu, editing, children }: DashboardItemProps) {
+export default function DashboardItem({ view, onOpen, layout, onContextMenu, editing, children }: DashboardItemProps) {
   const setActiveView = useUIStore((s) => s.setActiveView);
   const openViewInNewTab = useUIStore((s) => s.openViewInNewTab);
 
@@ -43,9 +51,9 @@ export default function DashboardItem({ view, layout, onContextMenu, editing, ch
 
   return (
     <button
-      onClick={() => setActiveView(view)}
+      onClick={() => (view ? setActiveView(view) : onOpen?.())}
       onAuxClick={(e) => {
-        if (e.button !== 1) return;
+        if (e.button !== 1 || !view) return;
         e.preventDefault();
         openViewInNewTab(view);
       }}

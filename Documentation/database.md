@@ -225,12 +225,12 @@ How words are matched when translating lives in `src/lib/lexicon.ts` — see [Le
 
 ### symbols
 
-The vault's own symbols for the canvas editor's library, made from drawings. An element on a canvas keeps its own copy of the path data, so removing a symbol here changes nothing already placed. There is no `deleted_at`: removing one is immediate, with an undo toast that writes the same row back (`symbolStore`'s `removeSymbol`/`restoreSymbol`). Rows are read through `readUserSymbol` (`src/lib/userSymbols.ts`), which drops one without an id or usable path data.
+The vault's own symbols for the canvas editor's library, made from drawings. An element on a canvas keeps its own copy of the path data, so removing a symbol here changes nothing already placed. There is no `deleted_at`: removing one is immediate, with an undo toast that writes the same row back (`symbolStore`'s `removeSymbol`/`restoreSymbol`). `removeSymbolWithUndo` (`src/store/symbolActions.ts`) adds the toast; `renameSymbol` changes the name. Rows are read through `readUserSymbol` (`src/lib/userSymbols.ts`), which drops one without an id or usable path data.
 
 | Column | Type | Notes |
 |---|---|---|
 | id | TEXT PK | UUID; in the library `own.<id>` |
-| name | TEXT | NOT NULL DEFAULT `''`; at most 80 characters |
+| name | TEXT | NOT NULL DEFAULT `''`; at most 80 characters (`SYMBOL_NAME_MAX`) |
 | d | TEXT | NOT NULL DEFAULT `''`; the lines, path data in a box of 100 × 100 (commands and numbers only, `isSymbolPath`) |
 | solid | TEXT | NOT NULL DEFAULT `''`; the filled parts, in the same box |
 | weight | REAL | NOT NULL DEFAULT 5; the lines' width in that box, 1–16 |

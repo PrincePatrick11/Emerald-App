@@ -1,6 +1,7 @@
 import {
-  GROUPING_MODES, SORT_MODES, TAGS_SORTS, VIEW_MODES, useUIStore, type ListPrefs,
+  GROUPING_MODES, SORT_MODES, VIEW_MODES, useUIStore, type ListPrefs,
 } from './uiStore';
+import { COLLECTION_IDS, type CollectionId } from '../lib/modules';
 
 /**
  * The preferences of a vault: how each list looks (view, sorting,
@@ -20,16 +21,14 @@ import {
  */
 /**
  * The lists with view, sorting and grouping (`ListPrefs`). Every dashboard
- * keeps its own in the dashboard's row.
+ * keeps its own in the dashboard's row; the collections keep theirs together
+ * in `collectionPrefs`.
  */
-const LIST_PREF_KEYS = [
-  'tasksPrefs', 'trashPrefs',
-  'templatesPrefs', 'blocksPrefs', 'lexiconPrefs',
-] as const;
+const LIST_PREF_KEYS = ['tasksPrefs', 'trashPrefs'] as const;
 
 const PREF_KEYS = [
   ...LIST_PREF_KEYS,
-  'tagsSort',
+  'collectionPrefs',
   'collapsedGroups', 'flags',
 ] as const;
 
@@ -84,6 +83,10 @@ function parse(raw: string | null): Prefs {
   const lists = Object.fromEntries(
     LIST_PREF_KEYS.map((key) => [key, listPrefs(saved[key], DEFAULTS[key])]),
   ) as Pick<Prefs, (typeof LIST_PREF_KEYS)[number]>;
+  const savedCollections = isRecord(saved.collectionPrefs) ? saved.collectionPrefs : {};
+  const collectionPrefs = Object.fromEntries(
+    COLLECTION_IDS.map((id) => [id, listPrefs(savedCollections[id], DEFAULTS.collectionPrefs[id])]),
+  ) as Record<CollectionId, ListPrefs>;
   const collapsedGroups: Record<string, ReadonlySet<string>> = {};
   if (isRecord(saved.collapsedGroups)) {
     for (const [scope, ids] of Object.entries(saved.collapsedGroups)) {
@@ -97,7 +100,7 @@ function parse(raw: string | null): Prefs {
   return {
     ...DEFAULTS,
     ...lists,
-    tagsSort: oneOf(saved.tagsSort, TAGS_SORTS, DEFAULTS.tagsSort),
+    collectionPrefs,
     collapsedGroups,
     flags,
   };

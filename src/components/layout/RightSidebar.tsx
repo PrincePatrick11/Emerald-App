@@ -3,7 +3,7 @@ import { entryBlockSummary } from '../../lib/blocks/entrySummary';
 import { Pencil } from 'lucide-react';
 import { useUIStore } from '../../store/uiStore';
 import { findEntry, useEntryStore } from '../../store/entryStore';
-import { LIBRARY_VIEW_IDS, type ViewId } from '../../lib/modules';
+import { COLLECTION_IDS, type ViewId } from '../../lib/modules';
 import BlockSidebarArea, { BlockAddActions } from '../blocks/BlockSidebarArea';
 import EntryPropertiesPanel from '../sidebar/panels/EntryPropertiesPanel';
 import Button from '../ui/Button';
@@ -18,7 +18,7 @@ import SidebarColumn, { EditActionBar, SidebarActionBar } from '../ui/SidebarCol
  * 'templates', id }`) brings its own bar and portals it into
  * the same host as a dashboard.
  */
-const VIEWS_WITHOUT_ENTRIES: ReadonlySet<ViewId> = new Set<ViewId>(['dashboard', 'tags', 'categories', 'images', ...LIBRARY_VIEW_IDS]);
+const VIEWS_WITHOUT_ENTRIES: ReadonlySet<ViewId> = new Set<ViewId>(['dashboard', ...COLLECTION_IDS]);
 
 
 // Eager, not lazy: the panel depends on stores that are loaded at startup

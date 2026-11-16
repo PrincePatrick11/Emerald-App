@@ -24,6 +24,7 @@ import {
   Languages,
   LayoutList,
   Library,
+  Shapes,
   Images,
   ListTodo,
   Tag,
@@ -47,8 +48,16 @@ export type ContentModuleId = (typeof CONTENT_MODULE_IDS)[number];
  * the one entry page (`{ type: 'entry', id, dashboard }`), shown inside the
  * dashboard it was opened from.
  */
-export const AUX_VIEW_IDS = ['dashboard', 'entry', 'tags', 'categories', 'images', 'blocks', 'templates', 'lexicon', 'trash'] as const;
+export const AUX_VIEW_IDS = ['dashboard', 'entry', 'tags', 'categories', 'images', 'symbols', 'blocks', 'templates', 'lexicon', 'trash'] as const;
 export type AuxViewId = (typeof AUX_VIEW_IDS)[number];
+
+/**
+ * The collections — everything that is not an entry, each shown by
+ * `CollectionDashboard` with its own view and sorting (`uiStore.collectionPrefs`).
+ * Each keeps its own table; "collection" is a word of the display only.
+ */
+export const COLLECTION_IDS = ['tags', 'categories', 'images', 'templates', 'blocks', 'lexicon', 'symbols'] as const;
+export type CollectionId = (typeof COLLECTION_IDS)[number];
 
 /**
  * Libraries whose entries open as a page of their own (`{ type, id }`).
@@ -99,6 +108,8 @@ export const AUX_VIEWS: Record<Exclude<AuxViewId, 'entry'>, { icon: LucideIcon; 
   categories: { icon: FolderOpen, navLabelKey: 'nav.categories' },
   // The same glyph as `TRASH_KIND_ICONS.image`.
   images: { icon: Images, navLabelKey: 'nav.images' },
+  // The canvas editor's own symbols — the library there uses no rail glyph.
+  symbols: { icon: Shapes, navLabelKey: 'nav.symbols' },
   trash: { icon: Trash2, navLabelKey: 'nav.trash' },
   blocks: { icon: Box, navLabelKey: 'nav.blocks' },
   // The same glyph as `TRASH_KIND_ICONS.template`.

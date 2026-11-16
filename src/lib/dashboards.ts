@@ -83,7 +83,7 @@ export function parseDashboardDisplay(raw: unknown): DashboardDisplay {
 }
 
 /** The toolbar's sort mode for a dashboard's sort: the date modes compare the date the sort names. */
-export function sortModeOf(sort: DashboardSort): Exclude<SortMode, 'count_desc'> {
+export function sortModeOf(sort: DashboardSort): Exclude<SortMode, 'count_desc' | 'manual'> {
   if (sort.by === 'title') return sort.dir === 'asc' ? 'alpha_asc' : 'alpha_desc';
   return sort.dir === 'asc' ? 'date_asc' : 'date_desc';
 }

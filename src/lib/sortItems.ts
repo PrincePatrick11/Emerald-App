@@ -30,7 +30,9 @@ export function sortItems<T extends object>(
   sort: SortMode,
   opts: SortOptions<T>,
 ): T[] {
-  const title = opts.title ?? ((item: T) => (item as { title?: string }).title ?? '');
+  // The items' own order (categories: `sort_order`) — nothing to compare.
+  if (sort === 'manual') return [...items];
+  const title = opts.title ??((item: T) => (item as { title?: string }).title ?? '');
   const compare = (a: T, b: T): number => {
     if (sort === 'alpha_asc') return title(a).localeCompare(title(b));
     if (sort === 'alpha_desc') return title(b).localeCompare(title(a));

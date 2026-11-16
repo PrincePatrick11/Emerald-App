@@ -27,16 +27,9 @@ type DashboardGrouping<T> =
       mode: 'category';
       groups: DashboardGroup<T>[];
       renderGroupHeader?: (group: DashboardGroup<T>) => ReactNode;
-      /** Shown instead of the item list when a group has zero items (default: a muted em-dash).
-       *  Only reachable with `keepEmptyGroups` — otherwise empty groups are dropped first. */
-      renderEmptyGroup?: (group: DashboardGroup<T>) => ReactNode;
       /** Collapsed groups render only their header — the chevron lives in the
        *  caller's renderGroupHeader (CollapsibleGroupHeader's onToggleCollapse). */
       isGroupCollapsed?: (group: DashboardGroup<T>) => boolean;
-      /** Keep empty groups instead of filtering them out centrally, for
-       *  groups that are something in themselves (tags: an unused tag stays
-       *  visible and manageable). */
-      keepEmptyGroups?: boolean;
     }
   | { mode: 'custom'; render: () => ReactNode };
 
@@ -127,9 +120,6 @@ interface DashboardBaseProps<T> {
    *  A separate prop instead of a variant of `cardsClassName`, because modules may
    *  fill the wide card differently. */
   wideCardsClassName?: string;
-  listClassName?: string;
-  /** Spacing between groups; rows that are themselves the groups sit closer (tags). */
-  groupsClassName?: string;
   /** <ContextMenu> stays caller-owned since its trigger is wired inside renderItem. */
   contextMenuSlot?: ReactNode;
 }
@@ -162,8 +152,8 @@ export type DashboardProps<T> = DashboardBaseProps<T> & DashboardContentProps<T>
 
 const DEFAULT_CARDS_CLASSNAME = 'grid grid-cols-3 gap-3';
 const DEFAULT_WIDE_CARDS_CLASSNAME = 'grid grid-cols-1 gap-3';
-const DEFAULT_LIST_CLASSNAME = 'space-y-1.5';
-const DEFAULT_GROUPS_CLASSNAME = 'space-y-6';
+const LIST_CLASSNAME = 'space-y-1.5';
+const GROUPS_CLASSNAME = 'space-y-6';
 
 export default function Dashboard<T>({
   title,
@@ -192,8 +182,6 @@ export default function Dashboard<T>({
   contentFooter,
   cardsClassName = DEFAULT_CARDS_CLASSNAME,
   wideCardsClassName = DEFAULT_WIDE_CARDS_CLASSNAME,
-  listClassName = DEFAULT_LIST_CLASSNAME,
-  groupsClassName = DEFAULT_GROUPS_CLASSNAME,
   contextMenuSlot,
 }: DashboardProps<T>) {
   const { t } = useTranslation();
@@ -205,7 +193,7 @@ export default function Dashboard<T>({
         {subset.map((item) => <Fragment key={itemKey(item)}>{renderItem!(item)}</Fragment>)}
       </div>
     ) : (
-      <div className={listClassName}>
+      <div className={LIST_CLASSNAME}>
         {subset.map((item) => <Fragment key={itemKey(item)}>{renderItem!(item)}</Fragment>)}
       </div>
     );
@@ -249,27 +237,21 @@ export default function Dashboard<T>({
     }
 
     // mode === 'category'
-    // Empty groups are dropped centrally here (except with `keepEmptyGroups`): the category list is global,
+    // Empty groups are dropped centrally here: the category list is global,
     // so a category created for the wiki would otherwise also show up as an empty header
     // in operations.
     // If no group remains, the "No results" notice kicks in,
     // which hasNoResults would otherwise supply.
     // Not the only place: Tasks renders in custom mode and applies
     // the same rule itself (TasksView, `visibleCategories`).
-    const groups = grouping.keepEmptyGroups
-      ? grouping.groups
-      : grouping.groups.filter((group) => group.items.length > 0);
+    const groups = grouping.groups.filter((group) => group.items.length > 0);
     if (groups.length === 0) return noResults;
     return (
-      <div className={groupsClassName}>
+      <div className={GROUPS_CLASSNAME}>
         {groups.map((group) => (
           <div key={group.key ?? group.label}>
             {grouping.renderGroupHeader?.(group)}
-            {grouping.isGroupCollapsed?.(group)
-              ? null
-              : group.items.length === 0
-                ? (grouping.renderEmptyGroup?.(group) ?? <p className="text-xs text-subtle px-1 py-1">—</p>)
-                : renderItems(group.items)}
+            {grouping.isGroupCollapsed?.(group) ? null : renderItems(group.items)}
           </div>
         ))}
       </div>

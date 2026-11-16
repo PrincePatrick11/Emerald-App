@@ -1,5 +1,8 @@
 import { isSymbolPath, MAX_WEIGHT, MIN_WEIGHT } from '../components/editors/canvas/symbols/limits';
 
+/** The longest name a symbol keeps — on saving, renaming and reading alike. */
+export const SYMBOL_NAME_MAX = 80;
+
 /** A symbol of the vault's own, as the table `symbols` holds it (since v59). */
 export interface UserSymbol {
   id: string;
@@ -21,7 +24,7 @@ export function readUserSymbol(row: Record<string, unknown>): UserSymbol | null 
   const weight = Number(row.weight);
   return {
     id,
-    name: typeof row.name === 'string' ? row.name.slice(0, 80) : '',
+    name: typeof row.name === 'string' ? row.name.slice(0, SYMBOL_NAME_MAX) : '',
     d,
     solid,
     weight: Number.isFinite(weight) ? Math.max(MIN_WEIGHT, Math.min(MAX_WEIGHT, weight)) : 5,

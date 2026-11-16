@@ -1,25 +1,19 @@
-import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Copy, FileDown, Trash2 } from 'lucide-react';
 import { useTemplateStore } from '../../store/templateStore';
 import { useTemplateDraftStore } from '../../store/draftStore';
 import { useUIStore } from '../../store/uiStore';
 import { AUX_VIEWS } from '../../lib/modules';
-import { sortItems } from '../../lib/sortItems';
-import { isCardView } from '../../lib/viewMode';
-import { groupByMonth } from '../../lib/groupBy';
 import { usePersistedFlag } from '../../hooks/usePersistedFlag';
 import { templateLabel } from '../../lib/blocks/blockAttrs';
 import type { Template } from '../../lib/blocks/templates';
-import Dashboard from '../ui/Dashboard';
 import CollapsibleGroupHeader from '../ui/CollapsibleGroupHeader';
-import DashboardItem, { RowSymbol } from '../ui/DashboardItem';
-import ContextMenu from '../ui/ContextMenu';
+import CollectionDashboard, { useCollectionState } from './CollectionDashboard';
+import { useTagStore } from '../../store/tagStore';
 import { useOpenInNewTabAction } from '../../hooks/useOpenInNewTabAction';
 import BlockGlyph from '../blocks/BlockGlyph';
 import TemplateEditor from '../templates/TemplateEditor';
 import DefaultTemplateSection from '../templates/DefaultTemplateSection';
-import { useSessionState } from '../../store/sessionStore';
 import { createItem } from '../../lib/createItem';
 import { useLibraryItemRemove } from '../../hooks/useLibraryItemRemove';
 
@@ -74,9 +68,8 @@ async function exportTemplate(id: string): Promise<void> {
 }
 
 /**
- * The list of templates in the shared dashboard scaffold — with view and
- * sorting like the other dashboards, under a collapsible
- * heading like the default template below.
+ * The list of templates as a collection — view, sorting and a tag filter like
+ * every collection, under a collapsible heading like the default template below.
  */
 function TemplateList({ onCreate, onDelete }: {
   onCreate: () => void;
@@ -85,78 +78,41 @@ function TemplateList({ onCreate, onDelete }: {
   const { t } = useTranslation();
   const templates = useTemplateStore((s) => s.templates);
   const duplicateTemplate = useTemplateStore((s) => s.duplicateTemplate);
+  const tags = useTagStore((s) => s.tags);
   // The page keeps unsaved drafts in the store; here only the indication of them.
   const drafts = useTemplateDraftStore((s) => s.drafts);
   const openInNewTabAction = useOpenInNewTabAction();
-  const prefs = useUIStore((s) => s.templatesPrefs);
-  const setPrefs = useUIStore((s) => s.setTemplatesPrefs);
+  const state = useCollectionState('templates');
   const [collapsed, toggleCollapsed] = usePersistedFlag('templates-list-collapsed');
-  const [search, setSearch] = useSessionState('templates.search', '');
-  const [ctxMenu, setCtxMenu] = useState<{ id: string; x: number; y: number } | null>(null);
 
-  const query = search.trim().toLowerCase();
-  const filtered = query
-    ? templates.filter((tpl) => templateLabel(t, tpl).toLowerCase().includes(query))
-    : templates;
-  const sorted = sortItems(filtered, prefs.sort, { date: (tpl) => tpl.updated_at, title: (tpl) => templateLabel(t, tpl) });
-
-  const cards = isCardView(prefs.view);
-  const renderItem = (template: Template) => {
-    const unsaved = template.id in drafts && (
-      <span className="text-xs italic text-subtle flex-shrink-0">{t('editor.unsaved')}</span>
-    );
-    return (
-      <DashboardItem
-        view={{ type: 'templates', id: template.id }}
-        layout={cards ? 'card' : 'row'}
-        onContextMenu={(e) => {
-          e.preventDefault();
-          setCtxMenu({ id: template.id, x: e.clientX, y: e.clientY });
-        }}
-      >
-        {cards ? (
-          <>
-            <div className="flex items-center gap-2 mb-2">
-              <BlockGlyph icon={template.icon} size={20} />
-              <span className="flex-1" />
-              {unsaved}
-            </div>
-            <div className="text-sm font-medium text-secondary truncate">{templateLabel(t, template)}</div>
-          </>
-        ) : (
-          <>
-            <RowSymbol><BlockGlyph icon={template.icon} size={14} /></RowSymbol>
-            <span className="flex-1 min-w-0 text-sm text-soft truncate">{templateLabel(t, template)}</span>
-            {unsaved}
-          </>
-        )}
-      </DashboardItem>
-    );
-  };
-
-  const menuTemplate = ctxMenu && templates.find((tpl) => tpl.id === ctxMenu.id);
+  const usedTags = tags.filter((tag) => templates.some((tpl) => tpl.tags.includes(tag.id)));
 
   return (
-    <Dashboard<Template>
+    <CollectionDashboard<Template>
+      state={state}
       title={t('nav.templates')}
       primaryAction={{ label: t('templates.newTemplate'), onClick: onCreate }}
-      view={prefs.view}
-      sort={prefs.sort}
-      sortDate="updated"
-      onView={(view) => setPrefs({ view })}
-      onSort={(sort) => setPrefs({ sort })}
-      search={search}
-      onSearch={setSearch}
-      // Collapsed means an empty list instead of a special branch — like blocks and the lexicon.
-      items={collapsed ? [] : sorted}
+      items={templates}
       itemKey={(tpl) => tpl.id}
-      renderItem={renderItem}
-      grouping={
-        prefs.view === 'timeline' && !collapsed
-          ? { mode: 'timeline', groups: groupByMonth(sorted, (tpl) => tpl.updated_at) }
-          : { mode: 'flat' }
-      }
-      isEmpty={!collapsed && templates.length === 0}
+      itemTitle={(tpl) => templateLabel(t, tpl)}
+      itemDate={(tpl) => tpl.updated_at}
+      filter={{
+        label: t('nav.tags'),
+        chips: usedTags.map((tag) => ({ value: tag.id, label: tag.name, test: (tpl) => tpl.tags.includes(tag.id) })),
+      }}
+      describe={(tpl) => ({
+        icon: <BlockGlyph icon={tpl.icon} size={14} />,
+        cardIcon: <BlockGlyph icon={tpl.icon} size={20} />,
+        title: templateLabel(t, tpl),
+        trailing: tpl.id in drafts && <span className="text-xs italic text-subtle flex-shrink-0">{t('editor.unsaved')}</span>,
+        view: { type: 'templates', id: tpl.id },
+      })}
+      contextActions={(tpl) => [
+        openInNewTabAction({ type: 'templates', id: tpl.id }),
+        { label: t('contextMenu.duplicate'), icon: <Copy size={12} />, onClick: () => void duplicateTemplate(tpl.id) },
+        { label: t('menu.exportEmerald'), icon: <FileDown size={12} />, onClick: () => void exportTemplate(tpl.id) },
+        { label: t('contextMenu.delete'), icon: <Trash2 size={12} />, onClick: () => onDelete(tpl), danger: true },
+      ]}
       emptyState={{
         icon: AUX_VIEWS.templates.icon,
         title: t('emptyState.templates.title'),
@@ -164,7 +120,8 @@ function TemplateList({ onCreate, onDelete }: {
         actionLabel: t('templates.newTemplate'),
         onAction: onCreate,
       }}
-      hasNoResults={!collapsed && filtered.length === 0}
+      // Collapsed means an empty list instead of a special branch — like blocks and the lexicon.
+      collapsed={collapsed}
       contentHeader={
         <CollapsibleGroupHeader
           label={t('nav.templates')}
@@ -173,19 +130,6 @@ function TemplateList({ onCreate, onDelete }: {
         />
       }
       contentFooter={<DefaultTemplateSection />}
-      contextMenuSlot={ctxMenu && menuTemplate && (
-        <ContextMenu
-          x={ctxMenu.x}
-          y={ctxMenu.y}
-          onClose={() => setCtxMenu(null)}
-          actions={[
-            openInNewTabAction({ type: 'templates', id: menuTemplate.id }),
-            { label: t('contextMenu.duplicate'), icon: <Copy size={12} />, onClick: () => void duplicateTemplate(menuTemplate.id) },
-            { label: t('menu.exportEmerald'), icon: <FileDown size={12} />, onClick: () => void exportTemplate(menuTemplate.id) },
-            { label: t('contextMenu.delete'), icon: <Trash2 size={12} />, onClick: () => onDelete(menuTemplate), danger: true },
-          ]}
-        />
-      )}
     />
   );
 }

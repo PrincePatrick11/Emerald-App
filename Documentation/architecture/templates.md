@@ -28,7 +28,7 @@ Creation is the only moment a start template applies by itself. Changing an entr
 
 ### The dashboard and the template page
 
-`TemplatesView` is a `Dashboard` of active templates under a collapsible `CollapsibleGroupHeader`, with view and sort in `uiStore.templatesPrefs` (a `ListPrefs` field, per vault — see [Tabs and Workspace State](navigation.md#tabs-and-workspace-state)). A row shows icon, name and an "Unsaved" marker; clicking opens `{ type: 'templates', id }`.
+`TemplatesView` is a collection (`CollectionDashboard`) of active templates under a collapsible `CollapsibleGroupHeader`, filtered by tag, with view and sort in `uiStore.collectionPrefs.templates` (per vault — see [Tabs and Workspace State](navigation.md#tabs-and-workspace-state)). A row shows icon, name and an "Unsaved" marker; clicking opens `{ type: 'templates', id }`.
 
 `TemplateEditor` renders that page on `LibraryPageFrame`, the shell it shares with `BlockDefinitionEditor` (back link, "Unsaved" marker, name-as-title input, `EditActionBar`/ `SidebarColumn` portalled into the right sidebar). Its draft lifecycle is `useDraftPage`:
 
@@ -39,4 +39,4 @@ Templates have no description; the picker matches the name only. `useShrunkIcon`
 
 ### Start and default template in the interface
 
-A category's start template is chosen in its edit row under Categories (`TemplateSelect`: "Default template" or a template), saved with the row; the built-in categories open that row from their context menu, with only the template to change. The default template is a `TemplateSelect` below the template list (`DefaultTemplateSection`, a `DashboardSection`), shown while there are templates, and applies at once. `TemplateSelect` shows a template in the Trash as none, the rule `resolveStartTemplate` applies.
+A category's start template is chosen in its dialog under Categories (`CategoryEditModal`: "Default template" or a template), saved on Save; a start template in the Trash stays stored unless another one is picked, so it comes back with its category. The built-in categories have only the template to change there. The default template is a `TemplateSelect` below the template list (`DefaultTemplateSection`, a `DashboardSection`), shown while there are templates, and applies at once. `TemplateSelect` shows a template in the Trash as none, the rule `resolveStartTemplate` applies.

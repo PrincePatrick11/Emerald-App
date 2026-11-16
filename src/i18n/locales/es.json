@@ -46,8 +46,16 @@
       "tools": "Herramientas"
     },
     "startTemplate": "Plantilla inicial",
-    "startTemplateDefault": "Plantilla predeterminada",
-    "startTemplateHint": "Con qué empieza una entrada nueva de esta categoría. «Plantilla predeterminada» es la que se elige en Plantillas."
+    "startTemplateHint": "Con qué empieza una entrada nueva de esta categoría. «Plantilla predeterminada» es la que se elige en Plantillas.",
+    "editTitle": "Editar categoría",
+    "nameLabel": "Nombre",
+    "startTemplateDefaultNamed": "Plantilla predeterminada ({{name}})",
+    "startTemplateDefaultNone": "Plantilla predeterminada (ninguna)",
+    "startTemplateMeta": "Plantilla inicial: {{name}}",
+    "shownIn": "Aparece en",
+    "shownInHint": "Paneles cuyo filtro incluye esta categoría. Se cambia en los ajustes del panel.",
+    "shownInNone": "Ningún panel filtra por esta categoría.",
+    "shownEverywhere": "También en todos los paneles sin filtro de categorías:"
   },
   "listView": {
     "view": "Vista",
@@ -66,6 +74,7 @@
     "sortAlphaAsc": "Nombre · A → Z",
     "sortAlphaDesc": "Nombre · Z → A",
     "sortCountDesc": "Uso · más usado",
+    "sortManual": "Orden propio",
     "category": "Categoría",
     "grouping": "Agrupación",
     "groupBy": "Agrupar por {{label, lowercase}}",
@@ -103,7 +112,8 @@
     "tasks": "Tareas",
     "settings": "Ajustes",
     "startPage": "Página de inicio",
-    "allEntries": "Todas las entradas"
+    "allEntries": "Todas las entradas",
+    "symbols": "Símbolos"
   },
   "sidebar": {
     "allEmpty": "Aún no hay entradas",
@@ -586,7 +596,8 @@
       "ankh": "Anj",
       "monad": "Mónada jeroglífica",
       "eye": "Ojo de la providencia"
-    }
+    },
+    "editTitle": "Editar símbolo"
   },
   "canvas": {
     "keyNames": {
@@ -823,10 +834,20 @@
     "color": "Cambiar color",
     "unused": "sin usar",
     "onlyInTemplates": "solo en plantillas",
-    "onlyInImages": "solo en Imágenes",
+    "onlyInImages": "solo en imágenes",
     "unusedHint": "Ninguna entrada lleva esta etiqueta todavía.",
     "createNamed": "+ Crear «{{name}}»",
-    "unknownOpenDashboard": "No existe «{{name}}» — créala en Etiquetas"
+    "unknownOpenDashboard": "No existe «{{name}}» — créala en Etiquetas",
+    "usage": "Uso",
+    "inEntries": "En entradas",
+    "onlyInTemplatesFilter": "Solo en plantillas",
+    "onlyInImagesFilter": "Solo en imágenes",
+    "unusedFilter": "Sin usar",
+    "onlyInTemplatesHint": "Ninguna entrada lleva esta etiqueta, pero sí plantillas.",
+    "onlyInImagesHint": "Ninguna entrada lleva esta etiqueta, pero sí imágenes.",
+    "onlyInTemplatesAndImages": "solo en plantillas e imágenes",
+    "onlyInTemplatesAndImagesFilter": "Plantillas e imágenes",
+    "onlyInTemplatesAndImagesHint": "Ninguna entrada lleva esta etiqueta, pero sí plantillas e imágenes."
   },
   "properties": {
     "noEntry": "Abre una entrada para ver sus propiedades.",
@@ -1376,6 +1397,14 @@
     "dashboard": {
       "title": "Aún no hay nada aquí",
       "description": "Este panel muestra las entradas que deja pasar su filtro. Cambia el filtro en sus ajustes."
+    },
+    "categories": {
+      "title": "Aún no hay categorías",
+      "description": "Las categorías ordenan tus entradas; cada una puede empezar con su propia plantilla."
+    },
+    "symbols": {
+      "title": "Aún no hay símbolos",
+      "description": "Dibuja en un lienzo, selecciona el dibujo y guárdalo como símbolo en la barra lateral."
     }
   },
   "sync": {

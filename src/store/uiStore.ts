@@ -6,15 +6,16 @@ import {
 import {
   confirmLeave, guardKey, guardRegistered, holdsOpenEdit, leaveNeedsConfirm, useLeaveGuardStore,
 } from './leaveGuardStore';
-import { isLibraryView, isViewId } from '../lib/modules';
+import { isLibraryView, isViewId, type CollectionId } from '../lib/modules';
 import type { ActiveView } from '../types';
 import { clearSessionState } from './sessionStore';
 
 export const VIEW_MODES = ['list', 'cards', 'cards_wide', 'timeline'] as const;
 export type ViewMode = (typeof VIEW_MODES)[number];
-/** `count_desc` = "most frequent first" — only the tags dashboard offers it
- *  (`sortModes`), the other lists have nothing to count. */
-export const SORT_MODES = ['date_desc', 'date_asc', 'alpha_asc', 'alpha_desc', 'count_desc'] as const;
+/** `count_desc` = "most frequent first" — only collections with something to
+ *  count offer it (`CollectionDashboard`'s `itemCount`). `manual` = the
+ *  hand-dragged order of the categories. */
+export const SORT_MODES = ['date_desc', 'date_asc', 'alpha_asc', 'alpha_desc', 'count_desc', 'manual'] as const;
 export type SortMode = (typeof SORT_MODES)[number];
 /** Grouping as its own axis beside view and sorting. Formerly
  *  "Category" was a SortMode — which put two decisions into one button:
@@ -23,11 +24,17 @@ export const GROUPING_MODES = ['grouped', 'flat'] as const;
 export type GroupingMode = (typeof GROUPING_MODES)[number];
 export interface ListPrefs { view: ViewMode; sort: SortMode; grouping: GroupingMode; }
 
-/** The sorting of the tags dashboard: tags have no date, but they have a
- *  frequency. */
-export type TagsSort = Extract<SortMode, 'alpha_asc' | 'alpha_desc' | 'count_desc'>;
-export const TAGS_SORTS: TagsSort[] = ['alpha_asc', 'alpha_desc', 'count_desc'];
-export const isTagsSort = (s: SortMode): s is TagsSort => (TAGS_SORTS as SortMode[]).includes(s);
+
+/** What a vault without saved preferences shows — and what an invalid saved value falls back to. */
+export const DEFAULT_COLLECTION_PREFS: Record<CollectionId, ListPrefs> = {
+  tags: { view: 'list', sort: 'alpha_asc', grouping: 'flat' },
+  categories: { view: 'list', sort: 'manual', grouping: 'flat' },
+  images: { view: 'cards', sort: 'alpha_asc', grouping: 'flat' },
+  templates: { view: 'list', sort: 'alpha_asc', grouping: 'flat' },
+  blocks: { view: 'list', sort: 'alpha_asc', grouping: 'flat' },
+  lexicon: { view: 'list', sort: 'alpha_asc', grouping: 'flat' },
+  symbols: { view: 'cards', sort: 'date_desc', grouping: 'flat' },
+};
 
 export interface EditActions {
   onSave: () => void | Promise<void>;
@@ -75,12 +82,9 @@ interface UIState {
   searchQuery: string;
   tasksPrefs: ListPrefs;
   trashPrefs: ListPrefs;
-  templatesPrefs: ListPrefs;
-  /** The custom blocks in the blocks view — the built-in ones beneath stay untouched. */
-  blocksPrefs: ListPrefs;
-  /** The language list of the lexicon — the translate field beneath stays untouched. */
-  lexiconPrefs: ListPrefs;
-  tagsSort: TagsSort;
+  /** View and sorting of each collection (`grouping` is unused there, kept
+   *  for the shared `ListPrefs`). */
+  collectionPrefs: Record<CollectionId, ListPrefs>;
   /** The groups per module that deviate from the default (see hooks/useCollapsedSet):
    *  collapsed ones — or, in scopes that start collapsed, expanded ones.
    *  In the store rather than view-local, because MainArea unmounts the views
@@ -121,10 +125,7 @@ interface UIState {
   setSearchQuery: (q: string) => void;
   setTasksPrefs: (p: Partial<ListPrefs>) => void;
   setTrashPrefs: (p: Partial<ListPrefs>) => void;
-  setTemplatesPrefs: (p: Partial<ListPrefs>) => void;
-  setBlocksPrefs: (p: Partial<ListPrefs>) => void;
-  setLexiconPrefs: (p: Partial<ListPrefs>) => void;
-  setTagsSort: (sort: TagsSort) => void;
+  setCollectionPrefs: (id: CollectionId, p: Partial<ListPrefs>) => void;
 }
 
 /** Where the app starts, and where it lands without a tab: the dashboard "All entries". */
@@ -340,12 +341,7 @@ export const useUIStore = create<UIState>((set, get) => ({
   // dashboard's row (`useDashboardPrefs`), not here.
   tasksPrefs: { view: 'list', sort: 'date_desc', grouping: 'grouped' },
   trashPrefs: { view: 'list', sort: 'date_desc', grouping: 'flat' },
-  // Templates have nothing to group — the field is only there for the shared ListPrefs.
-  templatesPrefs: { view: 'list', sort: 'alpha_asc', grouping: 'flat' },
-  blocksPrefs: { view: 'list', sort: 'alpha_asc', grouping: 'flat' },
-  // Languages carry no categories — `grouping` is here, as with templates, only for the shared ListPrefs.
-  lexiconPrefs: { view: 'list', sort: 'alpha_asc', grouping: 'flat' },
-  tagsSort: 'alpha_asc',
+  collectionPrefs: DEFAULT_COLLECTION_PREFS,
   collapsedGroups: {},
   flags: {},
 
@@ -518,10 +514,9 @@ export const useUIStore = create<UIState>((set, get) => ({
   setSearchQuery: (q) => set({ searchQuery: q }),
   setTasksPrefs: (p) => set((s) => ({ tasksPrefs: { ...s.tasksPrefs, ...p } })),
   setTrashPrefs: (p) => set((s) => ({ trashPrefs: { ...s.trashPrefs, ...p } })),
-  setTemplatesPrefs: (p) => set((s) => ({ templatesPrefs: { ...s.templatesPrefs, ...p } })),
-  setBlocksPrefs: (p) => set((s) => ({ blocksPrefs: { ...s.blocksPrefs, ...p } })),
-  setLexiconPrefs: (p) => set((s) => ({ lexiconPrefs: { ...s.lexiconPrefs, ...p } })),
-  setTagsSort: (sort) => set({ tagsSort: sort }),
+  setCollectionPrefs: (id, p) => set((s) => ({
+    collectionPrefs: { ...s.collectionPrefs, [id]: { ...s.collectionPrefs[id], ...p } },
+  })),
 }));
 
 /** How many `withEditLock` calls are running right now. */

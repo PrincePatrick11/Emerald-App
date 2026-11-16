@@ -14,7 +14,8 @@ export interface FilterChip {
   count?: number;
 }
 
-function FilterRow({ active, onClick, lead, label, count }: {
+/** One row of a filter list — also the row of a single choice from a list (a category's start template). */
+export function FilterRow({ active, onClick, lead, label, count }: {
   active: boolean;
   onClick: () => void;
   lead: ReactNode;

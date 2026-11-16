@@ -46,8 +46,16 @@
       "tools": "Werkzeuge"
     },
     "startTemplate": "Startvorlage",
-    "startTemplateDefault": "Standardvorlage",
-    "startTemplateHint": "Womit ein neuer Eintrag in dieser Kategorie beginnt. „Standardvorlage“ ist die unter Vorlagen eingestellte."
+    "startTemplateHint": "Womit ein neuer Eintrag in dieser Kategorie beginnt. „Standardvorlage“ ist die unter Vorlagen eingestellte.",
+    "editTitle": "Kategorie bearbeiten",
+    "nameLabel": "Name",
+    "startTemplateDefaultNamed": "Standardvorlage ({{name}})",
+    "startTemplateDefaultNone": "Standardvorlage (keine eingestellt)",
+    "startTemplateMeta": "Startvorlage: {{name}}",
+    "shownIn": "Erscheint in",
+    "shownInHint": "Dashboards, deren Filter diese Kategorie enthält. Ändern lässt sich das in den Einstellungen des Dashboards.",
+    "shownInNone": "Kein Dashboard filtert nach dieser Kategorie.",
+    "shownEverywhere": "Außerdem in allen Dashboards ohne Kategorienfilter:"
   },
   "listView": {
     "view": "Ansicht",
@@ -66,6 +74,7 @@
     "sortAlphaAsc": "Name · A → Z",
     "sortAlphaDesc": "Name · Z → A",
     "sortCountDesc": "Nutzung · häufigste",
+    "sortManual": "Eigene Reihenfolge",
     "category": "Kategorie",
     "grouping": "Gruppierung",
     "groupBy": "Nach {{label}} gruppieren",
@@ -103,7 +112,8 @@
     "tasks": "Aufgaben",
     "settings": "Einstellungen",
     "startPage": "Startseite",
-    "allEntries": "Alle Einträge"
+    "allEntries": "Alle Einträge",
+    "symbols": "Symbole"
   },
   "sidebar": {
     "allEmpty": "Noch keine Einträge",
@@ -586,7 +596,8 @@
       "ankh": "Anch",
       "monad": "Monas hieroglyphica",
       "eye": "Auge der Vorsehung"
-    }
+    },
+    "editTitle": "Symbol bearbeiten"
   },
   "canvas": {
     "keyNames": {
@@ -826,7 +837,17 @@
     "onlyInImages": "nur in Bildern",
     "unusedHint": "Noch kein Eintrag trägt diesen Tag.",
     "createNamed": "+ „{{name}}“ anlegen",
-    "unknownOpenDashboard": "Kein Tag „{{name}}“ — unter Tags anlegen"
+    "unknownOpenDashboard": "Kein Tag „{{name}}“ — unter Tags anlegen",
+    "usage": "Verwendung",
+    "inEntries": "In Einträgen",
+    "onlyInTemplatesFilter": "Nur in Vorlagen",
+    "onlyInImagesFilter": "Nur in Bildern",
+    "unusedFilter": "Nirgends verwendet",
+    "onlyInTemplatesHint": "Kein Eintrag trägt diesen Tag, aber Vorlagen.",
+    "onlyInImagesHint": "Kein Eintrag trägt diesen Tag, aber Bilder.",
+    "onlyInTemplatesAndImages": "nur in Vorlagen und Bildern",
+    "onlyInTemplatesAndImagesFilter": "Vorlagen und Bilder",
+    "onlyInTemplatesAndImagesHint": "Kein Eintrag trägt diesen Tag, aber Vorlagen und Bilder."
   },
   "properties": {
     "noEntry": "Öffne einen Eintrag, um seine Eigenschaften zu sehen.",
@@ -1376,6 +1397,14 @@
     "dashboard": {
       "title": "Hier ist noch nichts",
       "description": "Dieses Dashboard zeigt die Einträge, die sein Filter durchlässt. Den Filter änderst du in seinen Einstellungen."
+    },
+    "categories": {
+      "title": "Noch keine Kategorien",
+      "description": "Kategorien ordnen Einträge; jede kann mit einer eigenen Startvorlage beginnen."
+    },
+    "symbols": {
+      "title": "Noch keine Symbole",
+      "description": "Zeichne auf einer Leinwand, wähle die Zeichnung aus und speichere sie in der Leiste als Symbol."
     }
   },
   "sync": {

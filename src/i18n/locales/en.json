@@ -46,8 +46,16 @@
       "tools": "Tools"
     },
     "startTemplate": "Start template",
-    "startTemplateDefault": "Default template",
-    "startTemplateHint": "What a new entry in this category starts with. \"Default template\" is the one set under Templates."
+    "startTemplateHint": "What a new entry in this category starts with. \"Default template\" is the one set under Templates.",
+    "editTitle": "Edit category",
+    "nameLabel": "Name",
+    "startTemplateDefaultNamed": "Default template ({{name}})",
+    "startTemplateDefaultNone": "Default template (none set)",
+    "startTemplateMeta": "Start template: {{name}}",
+    "shownIn": "Shown in",
+    "shownInHint": "Dashboards whose filter includes this category. Change that in a dashboard's settings.",
+    "shownInNone": "No dashboard filters by this category.",
+    "shownEverywhere": "Also in every dashboard without a category filter:"
   },
   "listView": {
     "view": "View",
@@ -66,6 +74,7 @@
     "sortAlphaAsc": "Name · A → Z",
     "sortAlphaDesc": "Name · Z → A",
     "sortCountDesc": "Usage · most used",
+    "sortManual": "Custom order",
     "category": "Category",
     "grouping": "Grouping",
     "groupBy": "Group by {{label, lowercase}}",
@@ -103,7 +112,8 @@
     "tasks": "Tasks",
     "settings": "Settings",
     "startPage": "Start page",
-    "allEntries": "All entries"
+    "allEntries": "All entries",
+    "symbols": "Symbols"
   },
   "sidebar": {
     "allEmpty": "No entries yet",
@@ -586,7 +596,8 @@
       "ankh": "Ankh",
       "monad": "Monas hieroglyphica",
       "eye": "Eye of providence"
-    }
+    },
+    "editTitle": "Edit symbol"
   },
   "canvas": {
     "keyNames": {
@@ -823,10 +834,20 @@
     "color": "Change color",
     "unused": "unused",
     "onlyInTemplates": "only in templates",
-    "onlyInImages": "only in Images",
+    "onlyInImages": "only in images",
     "unusedHint": "No entry carries this tag yet.",
     "createNamed": "+ Create “{{name}}”",
-    "unknownOpenDashboard": "No tag “{{name}}” — create it in Tags"
+    "unknownOpenDashboard": "No tag “{{name}}” — create it in Tags",
+    "usage": "Usage",
+    "inEntries": "In entries",
+    "onlyInTemplatesFilter": "Only in templates",
+    "onlyInImagesFilter": "Only in images",
+    "unusedFilter": "Unused",
+    "onlyInTemplatesHint": "No entry carries this tag, but templates do.",
+    "onlyInImagesHint": "No entry carries this tag, but images do.",
+    "onlyInTemplatesAndImages": "only in templates and images",
+    "onlyInTemplatesAndImagesFilter": "Templates and images",
+    "onlyInTemplatesAndImagesHint": "No entry carries this tag, but templates and images do."
   },
   "properties": {
     "noEntry": "Open an entry to see its properties.",
@@ -1376,6 +1397,14 @@
     "dashboard": {
       "title": "Nothing here yet",
       "description": "This dashboard shows the entries its filter lets through. Change the filter in its settings."
+    },
+    "categories": {
+      "title": "No categories yet",
+      "description": "Categories sort your entries; each can start from a template of its own."
+    },
+    "symbols": {
+      "title": "No symbols yet",
+      "description": "Draw on a canvas, select the drawing and save it as a symbol in the sidebar."
     }
   },
   "sync": {
