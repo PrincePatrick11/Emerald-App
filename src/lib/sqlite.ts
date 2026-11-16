@@ -13,13 +13,13 @@
  */
 import { invoke } from '@tauri-apps/api/core';
 
-export interface QueryResult {
+interface QueryResult {
   rowsAffected: number;
   lastInsertId?: number;
 }
 
 /** The database files of a vault (`DbFile` in `db.rs`). */
-export type DbFile = 'main' | 'importStaging';
+type DbFile = 'main' | 'importStaging';
 
 export default class Database {
   /** The handle under which Rust keeps the pool. */

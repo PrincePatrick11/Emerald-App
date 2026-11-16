@@ -7,6 +7,7 @@ import type { TemplatePatch } from './templateStore';
 import type { VaultFileRead } from '../lib/vaultSettings';
 import { tagNameKey } from '../lib/tagRefs';
 import { storedImageNamesIn } from '../lib/schema';
+import { isRecord } from '../lib/helpers';
 
 /** What the page of a custom block edits — exactly what `updateDefinition` accepts. */
 export type DefinitionDraft = Required<BlockDefinitionPatch>;
@@ -19,7 +20,7 @@ export type TemplateDraft = Required<TemplatePatch>;
  * (`draft`). "Done" saves only what has changed relative to `base` —
  * whatever other places have written in the meantime (a renamed tag) stays in place.
  */
-export interface DraftEntry<T> {
+interface DraftEntry<T> {
   base: T;
   draft: T;
 }
@@ -111,10 +112,6 @@ export function flushDrafts(): Promise<void> {
   return writing;
 }
 
-function isPlainObject(value: unknown): value is Record<string, unknown> {
-  return !!value && typeof value === 'object' && !Array.isArray(value);
-}
-
 /**
  * The drafts of one kind from the file — only what has the shape of a draft.
  * A draft without a name on both sides is not one this app
@@ -123,10 +120,10 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
  */
 function readKind(raw: unknown, normalize: Normalize<unknown>): Record<string, DraftEntry<unknown>> {
   const drafts: Record<string, DraftEntry<unknown>> = Object.create(null);
-  if (!isPlainObject(raw)) return drafts;
+  if (!isRecord(raw)) return drafts;
   for (const [id, entry] of Object.entries(raw)) {
-    if (!isDefinitionId(id) || !isPlainObject(entry)) continue;
-    if (!isPlainObject(entry.base) || !isPlainObject(entry.draft)) continue;
+    if (!isDefinitionId(id) || !isRecord(entry)) continue;
+    if (!isRecord(entry.base) || !isRecord(entry.draft)) continue;
     if (typeof entry.base.name !== 'string' || typeof entry.draft.name !== 'string') continue;
     const base = normalize(entry.base);
     const draft = normalize(entry.draft);
@@ -142,18 +139,18 @@ function readKind(raw: unknown, normalize: Normalize<unknown>): Record<string, D
  * a tag is dropped.
  */
 async function withTemplateTagIds(file: Record<string, unknown>): Promise<Record<string, unknown>> {
-  if (!isPlainObject(file.templates)) return file;
+  if (!isRecord(file.templates)) return file;
   const { getDb } = await import('../lib/db');
   const rows = await (await getDb()).select<{ id: string; name: string }[]>('SELECT id, name FROM tags');
   const byName = new Map(rows.map((r) => [tagNameKey(r.name), r.id]));
   const toIds = (side: unknown) => {
-    if (!isPlainObject(side) || !Array.isArray(side.tags)) return side;
+    if (!isRecord(side) || !Array.isArray(side.tags)) return side;
     const ids = side.tags.flatMap((name) => (typeof name === 'string' ? byName.get(tagNameKey(name)) ?? [] : []));
     return { ...side, tags: [...new Set(ids)] };
   };
   const templates = Object.fromEntries(Object.entries(file.templates).map(([id, entry]) => [
     id,
-    isPlainObject(entry) ? { ...entry, base: toIds(entry.base), draft: toIds(entry.draft) } : entry,
+    isRecord(entry) ? { ...entry, base: toIds(entry.base), draft: toIds(entry.draft) } : entry,
   ]));
   return { ...file, templates };
 }
@@ -167,7 +164,7 @@ async function readDraftsFile(vaultId: string): Promise<{ drafts: Record<string,
     const read = await invoke<VaultFileRead>('read_vault_drafts', { vaultId });
     if (read.kind !== 'found') return { drafts: {}, foreign: false };
     const parsed: unknown = JSON.parse(read.contents);
-    if (!isPlainObject(parsed)) return { drafts: {}, foreign: false };
+    if (!isRecord(parsed)) return { drafts: {}, foreign: false };
     if (parsed.version === DRAFTS_VERSION) return { drafts: parsed, foreign: false };
     if (parsed.version === 1) return { drafts: await withTemplateTagIds(parsed), foreign: false };
     return { drafts: {}, foreign: typeof parsed.version === 'number' && parsed.version > DRAFTS_VERSION };

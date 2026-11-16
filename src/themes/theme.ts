@@ -50,7 +50,7 @@ export const DEFAULT_EDITOR_FONT_SIZE: EditorFontSize = 17;
 const VALID_THEME_IDS = new Set<ThemeId>(THEME_OPTIONS.map(({ id }) => id));
 const VALID_FONT_IDS = new Set<FontId>(FONT_OPTIONS.map(({ id }) => id));
 
-export function normalizeThemeId(raw: string | null): ThemeId {
+function normalizeThemeId(raw: string | null): ThemeId {
   if (raw && VALID_THEME_IDS.has(raw as ThemeId)) return raw as ThemeId;
   if (raw === 'light') return 'emerald-parchment';
   return DEFAULT_THEME_ID;

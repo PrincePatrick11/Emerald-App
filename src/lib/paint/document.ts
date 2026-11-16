@@ -10,6 +10,7 @@
  *
  * Pure and DOM-free, so that storage code and checks running under Node can use it.
  */
+import { isRecord } from '../helpers';
 
 /** The document's own coordinate space; a stroke's points are in it. */
 export const PAINT_WIDTH = 1200;
@@ -84,7 +85,7 @@ export interface PaintLayer {
   strokes: PaintStroke[];
 }
 
-export const FULL_PAGE: PaintRect = { x: 0, y: 0, width: PAINT_WIDTH, height: PAINT_HEIGHT };
+const FULL_PAGE: PaintRect = { x: 0, y: 0, width: PAINT_WIDTH, height: PAINT_HEIGHT };
 
 export interface PaintDoc {
   layers: PaintLayer[];
@@ -121,10 +122,6 @@ export function paintDocFromImage(image: string): PaintDoc {
 
 export function isPaintDocEmpty(doc: PaintDoc): boolean {
   return doc.layers.every((l) => !l.image && l.strokes.length === 0);
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
 const round1 = (n: number) => Math.round(n * 10) / 10;
@@ -372,7 +369,7 @@ export function strokeBounds(stroke: PaintStroke): PaintRect {
 }
 
 /** The four corners of a rectangle or ellipse's box, turned with it. */
-export function shapeCorners(stroke: PaintStroke): [number, number][] {
+function shapeCorners(stroke: PaintStroke): [number, number][] {
   const [x0, y0, , x1, y1] = stroke.points;
   const t: PaintTransform = { ...IDENTITY, angle: stroke.rotation, cx: (x0 + x1) / 2, cy: (y0 + y1) / 2 };
   return [[x0, y0], [x1, y0], [x1, y1], [x0, y1]].map(([x, y]) => applyTransform(t, x, y));

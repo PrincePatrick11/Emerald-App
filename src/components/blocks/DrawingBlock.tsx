@@ -13,7 +13,7 @@ import type { BlockViewProps } from './blockViews';
 const SAVE_DELAY = 300;
 
 /** What the drawing says in its own words: the paint block's, the sigil's. */
-export interface DrawingTexts {
+interface DrawingTexts {
   empty: string;
   /** Shown above the picture while editing is not allowed (a loaded sigil). */
   locked: string;

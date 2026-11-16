@@ -24,7 +24,7 @@ export interface SlashCommand {
 }
 
 /** The commands in menu order; each removes the typed `/…` first. */
-export const SLASH_COMMANDS: SlashCommand[] = [
+const SLASH_COMMANDS: SlashCommand[] = [
   {
     id: 'paragraph', labelKey: 'editor.menu.paragraph', icon: Pilcrow, keywords: ['text', 'paragraph'],
     available: () => true,
@@ -88,7 +88,7 @@ export const SLASH_COMMANDS: SlashCommand[] = [
 ];
 
 /** The commands for a query, matched against the translated label and the keywords. */
-export function matchCommands(editor: Editor, query: string, translate: (key: string) => string): SlashCommand[] {
+function matchCommands(editor: Editor, query: string, translate: (key: string) => string): SlashCommand[] {
   const q = query.trim().toLowerCase();
   return SLASH_COMMANDS.filter((cmd) => cmd.available(editor)).filter((cmd) =>
     !q || translate(cmd.labelKey).toLowerCase().includes(q) || cmd.keywords.some((k) => k.startsWith(q)));

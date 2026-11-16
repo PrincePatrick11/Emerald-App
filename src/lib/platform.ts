@@ -19,7 +19,7 @@ const ua = typeof navigator === 'undefined' ? '' : navigator.userAgent;
 export const isMacOS = /Mac OS X|Macintosh/.test(ua);
 export const isWindows = /Windows/.test(ua);
 
-export type PlatformName = 'macos' | 'windows' | 'linux';
+type PlatformName = 'macos' | 'windows' | 'linux';
 
 export const platformName: PlatformName = isMacOS ? 'macos' : isWindows ? 'windows' : 'linux';
 

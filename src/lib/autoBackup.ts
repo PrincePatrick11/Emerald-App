@@ -40,7 +40,7 @@ const DB_CLOSED = 'DB_CLOSED';
  * is none yet — so a missed date is made up at the next open,
  * and with no backup at all one is due immediately.
  */
-export function isBackupDue(settings: Pick<BackupSettings, 'interval' | 'weekday'>, newest: string | null, today: string): boolean {
+function isBackupDue(settings: Pick<BackupSettings, 'interval' | 'weekday'>, newest: string | null, today: string): boolean {
   if (!newest) return true;
   if (settings.interval === 'daily') return newest < today;
   // The first of this month.
@@ -113,7 +113,7 @@ export async function resetAutoBackupDir(vaultId: string): Promise<void> {
  * a run is in progress, an import holds the database, a Cancel is writing back,
  * or it was closed or replaced during the run — and a new attempt is worthwhile.
  */
-export async function runAutoBackup({ force = false }: { force?: boolean } = {}): Promise<'done' | 'busy'> {
+async function runAutoBackup({ force = false }: { force?: boolean } = {}): Promise<'done' | 'busy'> {
   const vaultState = useVaultStore.getState();
   const vaultId = vaultState.activeVaultId;
   if (!hasActiveVault(vaultState) || vaultState.locked) return 'done';

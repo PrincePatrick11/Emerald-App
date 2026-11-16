@@ -1,7 +1,6 @@
 {
   "common": {
     "delete": "Löschen",
-    "deleteConfirm": "Löschen?",
     "confirmSure": "Sicher?",
     "confirmYes": "Ja, löschen",
     "confirmNo": "Abbrechen",
@@ -65,8 +64,6 @@
     "cards": "Karten",
     "cardsWide": "Karten (volle Breite)",
     "timeline": "Zeitstrahl",
-    "alphaAsc": "A → Z",
-    "alphaDesc": "Z → A",
     "dateCreated": "Erstellt",
     "dateUpdated": "Geändert",
     "dateDeleted": "Gelöscht",
@@ -99,7 +96,6 @@
     "title": "Neu anlegen"
   },
   "nav": {
-    "all": "Alle",
     "journal": "Journal",
     "knowledge": "Wissen",
     "tags": "Tags",
@@ -986,11 +982,8 @@
   },
   "settings": {
     "language": "Sprache",
-    "version": "Version",
     "pageGeneral": "Allgemein",
     "tagline": "Der Arbeitsbereich für deine magische Praxis.",
-    "author": "Autor",
-    "license": "Lizenz",
     "website": "Webseite",
     "backup": "Datensicherung",
     "exportDb": "Datenbank exportieren",
@@ -1162,7 +1155,6 @@
     "updateErrorInstall": "Die Installation ist fehlgeschlagen.",
     "pageSecurity": "Sicherheit",
     "pageSync": "Synchronisation",
-    "theme": "Theme",
     "text": "Text",
     "importErrorOldVersion": "Dieses Backup stammt aus einer älteren Emerald-Version und lässt sich in dieser nicht wiederherstellen. Es wurde nichts verändert; ein Konverter folgt.",
     "importErrorNewVersion": "Dieses Backup stammt aus einer neueren Emerald-Version. Aktualisiere diese App, um es wiederherzustellen. Es wurde nichts verändert.",

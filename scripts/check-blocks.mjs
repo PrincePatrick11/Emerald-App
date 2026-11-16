@@ -37,7 +37,7 @@ writeFileSync(
    export { createPaintBlock, isDrawingBlockType, PAINT_BLOCK_TYPE, parseDrawing, withDrawing, withDrawingImage, isSigilDrawing, drawingImage } from '${root}/src/lib/blocks/paint';
    export { resolveBlockType } from '${root}/src/lib/blocks/blockTypes';
    export { createCanvasBlock, parseCanvasBlock, withCanvasScene, withCanvasParts, withCanvasStripTag, withoutCanvasFile, CANVAS_BLOCK_TYPE, ALTAR_BLOCK_TYPE } from '${root}/src/lib/blocks/canvas';
-   export { resolveStartTemplate, instantiateTemplateBlocks, isContentEmpty, templateStart, mergeTemplateTags, areBlocksEmpty, fieldsWithTemplate, fieldsWithoutTemplate } from '${root}/src/lib/blocks/templates';
+   export { resolveStartTemplate, instantiateTemplateBlocks, templateStart, mergeTemplateTags, areBlocksEmpty, fieldsWithTemplate, fieldsWithoutTemplate } from '${root}/src/lib/blocks/templates';
    export { internalLinkChipHtml } from '${root}/src/lib/internalLinkHtml';
    export { extractInternalLinks } from '${root}/src/lib/internalLinkHtml';
    export { toBlockRow, fromBlockRow, blockPlainText, htmlPlainText } from '${root}/src/lib/blocks/blockRows';
@@ -77,7 +77,7 @@ const {
   symbolFromDrawing, readUserSymbol,
   sigilUnits, sigilPartBlock, sigilPartId, withSigilPart, withChargesCoveringOnly,
   remapDefinitionDefaults, definitionImageRefs, withRenamedPartTargets,
-  resolveStartTemplate, instantiateTemplateBlocks, isContentEmpty,
+  resolveStartTemplate, instantiateTemplateBlocks,
   templateStart, mergeTemplateTags, areBlocksEmpty,
   fieldsWithTemplate, fieldsWithoutTemplate,
   createCanvasBlock, parseCanvasBlock, withCanvasScene, withCanvasParts, withCanvasStripTag, withoutCanvasFile, CANVAS_BLOCK_TYPE, ALTAR_BLOCK_TYPE,
@@ -263,7 +263,7 @@ console.log('\n4c. Field block\n');
   const linkBlock = createFieldsBlock('link');
   const linkModel = parseFields(linkBlock);
   const linkEl = linkModel.elements[0];
-  const chip = internalLinkChipHtml({ id: '22222222-2222-2222-2222-222222222222', entryType: 'entry', label: 'Ziel "A"' }); // lang-ok
+  const chip = internalLinkChipHtml({ id: '22222222-2222-2222-2222-222222222222', targetKind: 'entry', label: 'Ziel "A"' }); // lang-ok
   const withLink = serializeFields(linkBlock, { ...linkModel, slots: { [linkEl.id]: chip } }, text);
   check('the link is a slot in the markup, not in the JSON',
     withLink.html.includes(`data-block-slot="el:${linkEl.id}"`) && !(withLink.attrs[BLOCK_ATTR.data] ?? '').includes('2222'),
@@ -686,16 +686,16 @@ console.log('\n4g. Link and image defaults with markup\n');
   };
 
   const elements = parseDefinitionElements(JSON.stringify([
-    { id: 'lnk', kind: 'link', label: 'Quelle', defaultValue: { id: linkTargetId, entryType: 'entry', label: 'Artikel' } },
+    { id: 'lnk', kind: 'link', label: 'Quelle', defaultValue: { id: linkTargetId, targetKind: 'entry', label: 'Artikel' } },
     { id: 'pic', kind: 'image', label: 'Bild', defaultValue: `bilder/${img}` },
-    { id: 'lnk2', kind: 'link', label: 'Kaputt', defaultValue: { id: 'nicht-uuid', entryType: 'entry', label: 'x' } }, // lang-ok
+    { id: 'lnk2', kind: 'link', label: 'Kaputt', defaultValue: { id: 'nicht-uuid', targetKind: 'entry', label: 'x' } }, // lang-ok
     { id: 'pic2', kind: 'image', label: 'Fremd', defaultValue: 'javascript:alert(1)' },
     // The altar field is gone (v62 made it a link field); one left over is dropped.
     { id: 'alt', kind: 'altar', label: 'Altar' },
   ]));
   const byId = Object.fromEntries(elements.map((e) => [e.id, e]));
   check('defaults: link and image are read, image as a plain file name',
-    byId.lnk.defaultValue?.entryType === 'entry' && byId.pic.defaultValue === img, elements);
+    byId.lnk.defaultValue?.targetKind === 'entry' && byId.pic.defaultValue === img, elements);
   check('defaults: links only valid targets, images only stored files; an altar field is no element',
     byId.lnk2.defaultValue === undefined && byId.pic2.defaultValue === undefined && !byId.alt);
 
@@ -710,7 +710,7 @@ console.log('\n4g. Link and image defaults with markup\n');
     linkFromSlot(cm.slots.lnk)?.id === linkTargetId && imageFromSlot(cm.slots.pic) === img && !cm.slots.lnk2 && !cm.slots.pic2, cm.slots);
   check('the links of the copy are in the content (link table, backlinks)',
     extractInternalLinks(serializeBlocks([copy])).length === 1);
-  check('export: the link field shows its chip', renderBlocksForExport(serializeBlocks([copy]), text).includes('data-entry-type="entry"'));
+  check('export: the link field shows its chip', renderBlocksForExport(serializeBlocks([copy]), text).includes('data-target-kind="entry"'));
 
   const remapped = parseDefinitionElements(remapDefinitionDefaults(
     JSON.stringify(elements), (name) => (name === img ? `${'ef'.repeat(32)}.png` : name),
@@ -891,10 +891,13 @@ console.log('\n5. What is derived from the content sees through the blocks\n');
 {
   const chip =
     '<span data-type="internalLink" class="internal-link" data-id="11111111-1111-1111-1111-111111111111" ' +
-    'data-entry-type="entry" data-label="A">A</span>';
+    'data-target-kind="entry" data-label="A">A</span>';
   const html = serializeBlocks([createTextBlock('<p>ohne</p>'), createTextBlock(`<p>${chip}</p>`)]); // lang-ok
   const links = extractInternalLinks(html);
-  check('extractInternalLinks finds chips in wrapped text blocks', links.length === 1 && links[0].entryType === 'entry', links);
+  check('extractInternalLinks finds chips in wrapped text blocks', links.length === 1 && links[0].targetKind === 'entry', links);
+  const taskChip = internalLinkChipHtml({ id: '33333333-3333-3333-3333-333333333333', targetKind: 'task', label: 'T' });
+  const taskLinks = extractInternalLinks(serializeBlocks([createTextBlock(`<p>${taskChip}</p>`)]));
+  check('a task chip is written and read back as a task', taskChip.includes('data-target-kind="task"') && taskLinks.length === 1 && taskLinks[0].targetKind === 'task', taskLinks);
 }
 
 console.log('\n6. Templates: start template, insertion\n');
@@ -967,11 +970,11 @@ console.log('\n6. Templates: start template, insertion\n');
   check('fields with template: without a custom title that of the template is used',
     fieldsWithTemplate({ title: '  ', tags: [] }, { title: 'Artikel', tags: [] }).title === 'Artikel');
 
-  check('empty: no content', isContentEmpty(''));
-  check('empty: only empty paragraphs', isContentEmpty('<p></p><p style="text-align: center"><br></p>'));
-  check('not empty: text', !isContentEmpty('<p>x</p>'));
-  check('not empty: an image', !isContentEmpty(`<p><img src="${'a'.repeat(64)}.png"></p>`));
-  check('not empty: a field block', !isContentEmpty(serializeBlocks([createFieldsBlock('shorttext')])));
+  check('empty: no content', areBlocksEmpty(parseBlocks('')));
+  check('empty: only empty paragraphs', areBlocksEmpty(parseBlocks('<p></p><p style="text-align: center"><br></p>')));
+  check('not empty: text', !areBlocksEmpty(parseBlocks('<p>x</p>')));
+  check('not empty: an image', !areBlocksEmpty(parseBlocks(`<p><img src="${'a'.repeat(64)}.png"></p>`)));
+  check('not empty: a field block', !areBlocksEmpty(parseBlocks(serializeBlocks([createFieldsBlock('shorttext')]))));
 
   const start = templateStart({ ...sigilTpl, title: '  Ritual ', tags: ['a'] });
   check('start from template: title trimmed, tags copied, content inserted',
@@ -1042,7 +1045,7 @@ console.log('\n7. Blocks as rows (blocks, block_refs)\n');
   const bg = `${'4'.repeat(64)}.jpg`;
   const def = `${'5'.repeat(64)}.webp`;
   const linked = '33333333-3333-3333-3333-333333333333';
-  const chip = internalLinkChipHtml({ id: linked, entryType: 'entry', label: 'Ziel' }); // lang-ok
+  const chip = internalLinkChipHtml({ id: linked, targetKind: 'entry', label: 'Ziel' }); // lang-ok
   const fallback = { label: (e) => e.label, yes: 'Yes', no: 'No', moonName: (p) => p };
 
   const linkBlock = createFieldsBlock('link');
@@ -1220,7 +1223,7 @@ console.log('\n8. .emerald manifest (lib/emerald/manifest.ts)\n');
   const outside = '33333333-3333-4333-8333-333333333333';
   const pic = `${'ab'.repeat(32)}.png`;
   const kept = `${'cd'.repeat(32)}.jpg`;
-  const chipTo = (id, label) => internalLinkChipHtml({ id, entryType: 'entry', label });
+  const chipTo = (id, label) => internalLinkChipHtml({ id, targetKind: 'entry', label });
 
   // Two entries of one file that link to each other, plus a link outside and pictures.
   const contentA = serializeBlocks([

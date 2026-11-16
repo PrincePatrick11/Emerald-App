@@ -16,8 +16,9 @@ import type {
   BuiltinDashboard, Dashboard, DashboardDisplay, DashboardFilter, DashboardSort, Entry,
 } from '../types';
 import type { SortMode } from '../store/uiStore';
+import { asRecord } from './helpers';
 
-export const BUILTIN_DASHBOARD_KEYS: readonly BuiltinDashboard[] = ['all', 'journal', 'practice', 'knowledge'];
+const BUILTIN_DASHBOARD_KEYS: readonly BuiltinDashboard[] = ['all', 'journal', 'practice', 'knowledge'];
 
 const DEFAULT_SORT: DashboardSort = { by: 'updated', dir: 'desc' };
 
@@ -46,7 +47,7 @@ function jsonObject(raw: unknown): Record<string, unknown> {
       return {};
     }
   }
-  return value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {};
+  return asRecord(value);
 }
 
 /** A filter from JSON (row or backup): unknown keys and non-ID values drop out. */
@@ -117,14 +118,14 @@ export function isBuiltinDashboard(value: unknown): value is BuiltinDashboard {
 }
 
 /** Does the entry pass the filter? A missing rule does not narrow. */
-export function matchesFilter(entry: Pick<Entry, 'category_id' | 'tags'>, filter: DashboardFilter): boolean {
+function matchesFilter(entry: Pick<Entry, 'category_id' | 'tags'>, filter: DashboardFilter): boolean {
   if (filter.categories && !(entry.category_id !== null && filter.categories.includes(entry.category_id))) return false;
   if (filter.tags && filter.tags.length && !entry.tags.some((tag) => filter.tags!.includes(tag))) return false;
   return true;
 }
 
 /** The comparison of a sort — ties fall back to the number, so the order is stable. */
-export function compareEntries(sort: DashboardSort): (a: Entry, b: Entry) => number {
+function compareEntries(sort: DashboardSort): (a: Entry, b: Entry) => number {
   const sign = sort.dir === 'asc' ? 1 : -1;
   const key = sort.by === 'created' ? 'created_at' : sort.by === 'updated' ? 'updated_at' : 'title';
   return (a, b) => sign * a[key].localeCompare(b[key]) || (a.entry_number ?? 0) - (b.entry_number ?? 0);

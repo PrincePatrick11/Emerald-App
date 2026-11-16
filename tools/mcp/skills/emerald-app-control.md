@@ -140,7 +140,7 @@ where one only clicks, right-clicks or types, the tool is now the shorter way.
 
 ## Architecture in brief
 
-- **Stack:** Tauri 2 + React 19 + Vite + Zustand + SQLite (local, via `tauri-plugin-sql`)
+- **Stack:** Tauri 2 + React 19 + Vite + Zustand + SQLite (local, SQLCipher through the app's own SQL layer in `db.rs`)
 - **Editor:** Tiptap (ProseMirror). Body = `<div class="tiptap ProseMirror" contenteditable="true">`
 - **Title:** `<input class="entry-view-title" placeholder="Untitled Entry">`
 - **i18n:** react-i18next, 4 languages (EN/DE/ES/FR), switchable live in Settings
@@ -158,7 +158,7 @@ where one only clicks, right-clicks or types, the tool is now the shorter way.
 ├─ aside.app-sidebar-left ──┬─ main.app-main ─────────┬─ aside.app-sidebar-right ┤
 │ .left-sidebar-rail        │ .tabbar (+ .tab-add)    │ Properties / Tags        │
 │   icon buttons btn-ghost  │ view content            │ Linked entries        │
-│ entry-list panel          │                         │ Routines / backlinks     │
+│ entry-list panel          │                         │                          │
 │   rows = .sidebar-item    │                         │                          │
 └───────────────────────────┴─────────────────────────┴──────────────────────────┘
 ```
@@ -192,7 +192,7 @@ document.querySelector('.left-sidebar-rail button:has(.lucide-book-open)').click
 Every dashboard button (All entries, Journal, Practice, Knowledge and dashboards made by hand) also carries `data-dashboard-id`, e.g. `[data-dashboard-id="knowledge"]` — the only stable handle for a user-made dashboard, whose icon can be anything. A built-in given its own icon loses its lucide class (renaming keeps it); the attribute stays.
 
 **`.sidebar-item` is not navigation.** Today the class denotes list rows:
-entries in the list panel, backlinks, routines, tags. Trying to navigate with it
+entries in the list panel, linked entries, tags. Trying to navigate with it
 hits nothing, and `?.click()` fails silently.
 
 **Creating an entry:** `button[title="New Entry"]` in the head of the list panel

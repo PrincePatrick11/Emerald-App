@@ -57,7 +57,7 @@ export function VaultLocationRow({
 }
 
 /** A vault's own emoji, or the generic glyph while it has none. */
-export function VaultGlyph({ icon, size }: { icon?: string; size: number }) {
+function VaultGlyph({ icon, size }: { icon?: string; size: number }) {
   return icon
     ? <span className="leading-none" style={{ fontSize: size }}>{icon}</span>
     : <Vault size={size} />;

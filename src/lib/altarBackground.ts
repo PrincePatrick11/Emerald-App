@@ -1,7 +1,7 @@
 import { imageSrc } from './images';
 
 /** Whether a background picture is one of the app's own (`public/backgrounds`), not an image of the vault. */
-export function isAppBackground(src: string): boolean {
+function isAppBackground(src: string): boolean {
   return /^\/backgrounds\/[a-z0-9_]+\.webp$/.test(src);
 }
 

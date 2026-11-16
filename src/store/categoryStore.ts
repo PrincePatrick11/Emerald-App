@@ -22,7 +22,7 @@ import { reassignDashboardCategoriesInMemory } from './dashboardStore';
 /** Error message from addCategory/updateCategory when the name is already taken. */
 export const CATEGORY_NAME_TAKEN = 'CATEGORY_NAME_TAKEN';
 
-export interface CategoryState {
+interface CategoryState {
   /** Active categories in display order. */
   categories: Category[];
 

@@ -34,11 +34,11 @@ import { openDashboardSettings } from '../../store/dashboardSettingsStore';
 import type { Dashboard as DashboardRow, Entry } from '../../types';
 
 /** The compact button beside "New …" that opens the dashboard's settings — name, icon, filter. */
-export function dashboardSettingsAction(t: (key: string) => string, id: string) {
+function dashboardSettingsAction(t: (key: string) => string, id: string) {
   return { label: t('dashboards.settings'), icon: <SlidersHorizontal size={14} />, onClick: () => openDashboardSettings(id) };
 }
 
-export interface EntryDashboardProps {
+interface EntryDashboardProps {
   /** The dashboard whose entries, filter rules, sorting and layout this is. */
   dashboard: DashboardRow | undefined;
   title: string;

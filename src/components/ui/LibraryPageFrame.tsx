@@ -15,7 +15,7 @@ import { useUIStore } from '../../store/uiStore';
  * presuppose `useDraftPage`; a page without a draft leaves them out and
  * brings its own actions (`actions`).
  */
-export interface LibraryPageDraft {
+interface LibraryPageDraft {
   dirty: boolean;
   busy: boolean;
   onDone: () => void;

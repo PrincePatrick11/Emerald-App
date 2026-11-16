@@ -15,7 +15,7 @@ import type { ActiveView } from '../types';
  * Import rule: this store imports no other — the others read
  * it, not the other way round.
  */
-export interface EditGuard {
+interface EditGuard {
   /** The page the guard belongs to: `guardKey(view type, id)`. */
   key: string;
   /** The name of what is being edited — shown in the modal. */
@@ -28,7 +28,7 @@ export interface EditGuard {
   discard: () => void | Promise<void>;
 }
 
-export type LeaveChoice = 'save' | 'discard' | 'stay';
+type LeaveChoice = 'save' | 'discard' | 'stay';
 
 interface LeaveQuestion {
   title: string;

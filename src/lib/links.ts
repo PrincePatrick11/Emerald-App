@@ -6,7 +6,7 @@ import type { LinkTargetKind } from '../types';
  *  self-contained here: `lib/` imports no components. */
 export interface EntryLinkRequest {
   id: string;
-  entryType: LinkTargetKind;
+  targetKind: LinkTargetKind;
   label: string;
   icon?: string | null;
   /** Heading above the appended link — see `SuggestionItem.categoryLabel`. */
@@ -43,7 +43,7 @@ export function requestEntryLinkAppend(item: EntryLinkRequest): boolean {
  */
 export const REVEAL_ENTRY_LINK_EVENT = 'entry-link-reveal';
 
-export function requestEntryLinkReveal(target: { id: string; entryType: LinkTargetKind }): boolean {
+export function requestEntryLinkReveal(target: { id: string; targetKind: LinkTargetKind }): boolean {
   const event = new CustomEvent(REVEAL_ENTRY_LINK_EVENT, {
     detail: target,
     cancelable: true,
@@ -64,7 +64,7 @@ export function requestEntryLinkReveal(target: { id: string; entryType: LinkTarg
 export const REMOVE_ENTRY_LINK_EVENT = 'entry-link-remove';
 
 export function requestEntryLinkRemove(
-  target: { id: string; entryType: LinkTargetKind; categoryLabel?: string },
+  target: { id: string; targetKind: LinkTargetKind; categoryLabel?: string },
 ): boolean {
   const event = new CustomEvent(REMOVE_ENTRY_LINK_EVENT, {
     detail: target,

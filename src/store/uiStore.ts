@@ -26,7 +26,7 @@ export interface ListPrefs { view: ViewMode; sort: SortMode; grouping: GroupingM
 
 
 /** What a vault without saved preferences shows — and what an invalid saved value falls back to. */
-export const DEFAULT_COLLECTION_PREFS: Record<CollectionId, ListPrefs> = {
+const DEFAULT_COLLECTION_PREFS: Record<CollectionId, ListPrefs> = {
   tags: { view: 'list', sort: 'alpha_asc', grouping: 'flat' },
   categories: { view: 'list', sort: 'manual', grouping: 'flat' },
   images: { view: 'cards', sort: 'alpha_asc', grouping: 'flat' },

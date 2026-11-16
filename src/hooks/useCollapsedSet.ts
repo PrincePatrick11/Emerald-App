@@ -1,7 +1,7 @@
 import { useCallback } from 'react';
 import { useUIStore } from '../store/uiStore';
 
-export type CollapseScope = 'tasks' | 'tags' | `dashboard:${string}`;
+type CollapseScope = 'tasks' | 'tags' | `dashboard:${string}`;
 
 const EMPTY: ReadonlySet<string> = new Set();
 

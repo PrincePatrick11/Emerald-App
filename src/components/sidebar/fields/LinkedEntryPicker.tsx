@@ -12,7 +12,7 @@ import type { SuggestionItem } from '../../../lib/linkItems';
 
 /** The icon of a link target in chips and hit rows: image, emoji, or the entry/task default. */
 export function LinkItemIcon({ item }: { item: SuggestionItem }) {
-  const icon = item.displayIcon || item.icon || defaultLinkIcon(item.entryType);
+  const icon = item.displayIcon || item.icon || defaultLinkIcon(item.targetKind);
   return isImageIcon(icon)
     ? <img src={iconSrc(icon)} alt="" className="w-4 h-4 object-cover rounded-md flex-shrink-0" />
     : <span className="flex-shrink-0">{icon}</span>;

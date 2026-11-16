@@ -1,7 +1,6 @@
 {
   "common": {
     "delete": "Eliminar",
-    "deleteConfirm": "¿Eliminar?",
     "confirmSure": "¿Seguro?",
     "confirmYes": "Sí, eliminar",
     "confirmNo": "Cancelar",
@@ -65,8 +64,6 @@
     "cards": "Tarjetas",
     "cardsWide": "Tarjetas (ancho completo)",
     "timeline": "Línea temporal",
-    "alphaAsc": "A → Z",
-    "alphaDesc": "Z → A",
     "dateCreated": "Creado",
     "dateUpdated": "Modificado",
     "dateDeleted": "Eliminado",
@@ -99,7 +96,6 @@
     "title": "Crear nuevo"
   },
   "nav": {
-    "all": "Todo",
     "journal": "Diario",
     "knowledge": "Conocimiento",
     "tags": "Etiquetas",
@@ -986,11 +982,8 @@
   },
   "settings": {
     "language": "Idioma",
-    "version": "Versión",
     "pageGeneral": "General",
     "tagline": "El espacio de trabajo para tu práctica mágica.",
-    "author": "Autor",
-    "license": "Licencia",
     "website": "Sitio web",
     "backup": "Copia de seguridad",
     "exportDb": "Exportar base de datos",
@@ -1162,7 +1155,6 @@
     "updateErrorInstall": "La instalación ha fallado.",
     "pageSecurity": "Seguridad",
     "pageSync": "Sincronización",
-    "theme": "Tema",
     "text": "Texto",
     "importErrorOldVersion": "Esta copia de seguridad procede de una versión anterior de Emerald y no se puede restaurar en esta. No se ha cambiado nada; llegará un conversor.",
     "importErrorNewVersion": "Esta copia de seguridad procede de una versión más reciente de Emerald. Actualiza esta aplicación para restaurarla. No se ha cambiado nada.",

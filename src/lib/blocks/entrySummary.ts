@@ -1,14 +1,15 @@
 import { parseBlocks } from './blockHtml';
 import { isBlockHidden } from './blockAttrs';
-import { isDrawingUnitType, mayHoldSigil, sigilState, sigilUnits, todayIso, type SigilState } from './sigil';
+import { isDrawingUnitType, mayHoldSigil, sigilState, sigilUnits, type SigilState } from './sigil';
 import { drawingImage } from './paint';
+import { localIsoDay } from '../helpers';
 
 /**
  * What lists, sidebar and menu want to know about the blocks
  * of an entry without opening it — parsed from the `content` that the stores
  * keep in memory anyway, once per content state (and day).
  */
-export interface EntryBlockSummary {
+interface EntryBlockSummary {
   /** The entry's sigil together with the file name of the first visible, non-concealed drawing (cards) — `null` without sigil blocks. */
   sigil: (SigilState & { image: string | null }) | null;
 }
@@ -33,7 +34,7 @@ function summarize(content: string, today: string): EntryBlockSummary {
 }
 
 /** The summary of an entry; the same content is not parsed twice on the same day. */
-export function entryBlockSummary(id: string, content: string, today = todayIso()): EntryBlockSummary {
+export function entryBlockSummary(id: string, content: string, today = localIsoDay()): EntryBlockSummary {
   const hit = cache.get(id);
   if (hit?.content === content && hit.day === today) return hit.summary;
   const summary = summarize(content, today);

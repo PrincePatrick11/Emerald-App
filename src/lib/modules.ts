@@ -48,7 +48,7 @@ export type ContentModuleId = (typeof CONTENT_MODULE_IDS)[number];
  * the one entry page (`{ type: 'entry', id, dashboard }`), shown inside the
  * dashboard it was opened from.
  */
-export const AUX_VIEW_IDS = ['dashboard', 'entry', 'tags', 'categories', 'images', 'symbols', 'blocks', 'templates', 'lexicon', 'trash'] as const;
+const AUX_VIEW_IDS = ['dashboard', 'entry', 'tags', 'categories', 'images', 'symbols', 'blocks', 'templates', 'lexicon', 'trash'] as const;
 export type AuxViewId = (typeof AUX_VIEW_IDS)[number];
 
 /**
@@ -69,7 +69,7 @@ export type CollectionId = (typeof COLLECTION_IDS)[number];
  * it saves every row immediately and has no draft. What this list
  * governs is only the three things above, and that holds for all three.
  */
-export const LIBRARY_VIEW_IDS = ['blocks', 'templates', 'lexicon'] as const;
+const LIBRARY_VIEW_IDS = ['blocks', 'templates', 'lexicon'] as const;
 export type LibraryViewId = (typeof LIBRARY_VIEW_IDS)[number];
 
 export function isLibraryView(viewType: string): viewType is LibraryViewId {

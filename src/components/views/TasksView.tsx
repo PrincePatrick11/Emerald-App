@@ -227,8 +227,8 @@ export default function TasksView() {
    */
   const linkItems = useLinkItems();
   const linkItemByKey = useMemo(() => linkItemsByKey(linkItems), [linkItems]);
-  const resolveTaskLinkTitle = useCallback((targetType: string, targetId: string) =>
-    linkItemByKey.get(linkItemKey({ id: targetId, entryType: targetType }))?.label ?? t('tasks.linkTargetGone'),
+  const resolveTaskLinkTitle = useCallback((targetKind: string, targetId: string) =>
+    linkItemByKey.get(linkItemKey({ id: targetId, targetKind }))?.label ?? t('tasks.linkTargetGone'),
   [linkItemByKey, t]);
 
   const renderTasksContent = () => (
@@ -410,7 +410,7 @@ export default function TasksView() {
 
       {linkModal && (
         <LinkPickerModal
-          onSelect={(item) => { addLink(linkModal.taskId, item.id, linkTargetKindOf(item.entryType)); }}
+          onSelect={(item) => { addLink(linkModal.taskId, item.id, linkTargetKindOf(item.targetKind)); }}
           onClose={() => setLinkModal(null)}
         />
       )}

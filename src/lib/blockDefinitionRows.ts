@@ -1,5 +1,4 @@
 import type Database from './sqlite';
-import { fromRow, type DbRow } from './row';
 import { definitionToRow, type BlockDefinition } from './blocks/definitions';
 
 /**
@@ -25,10 +24,4 @@ export async function insertDefinitionRow(db: Database, def: BlockDefinition): P
       row.created_at, row.updated_at, row.deleted_at,
     ]
   );
-}
-
-/** One definition by ID — from the trash too, unlike the store, which holds only the active ones. */
-export async function definitionById(db: Database, id: string): Promise<BlockDefinition | undefined> {
-  const [row] = await db.select<DbRow[]>('SELECT * FROM block_definitions WHERE id=$1', [id]);
-  return row ? fromRow.blockDefinition(row) : undefined;
 }

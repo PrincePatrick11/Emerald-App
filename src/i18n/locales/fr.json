@@ -1,7 +1,6 @@
 {
   "common": {
     "delete": "Supprimer",
-    "deleteConfirm": "Supprimer ?",
     "confirmSure": "Sûr ?",
     "confirmYes": "Oui, supprimer",
     "confirmNo": "Annuler",
@@ -65,8 +64,6 @@
     "cards": "Cartes",
     "cardsWide": "Cartes (pleine largeur)",
     "timeline": "Chronologie",
-    "alphaAsc": "A → Z",
-    "alphaDesc": "Z → A",
     "dateCreated": "Créé",
     "dateUpdated": "Modifié",
     "dateDeleted": "Supprimé",
@@ -99,7 +96,6 @@
     "title": "Créer"
   },
   "nav": {
-    "all": "Tout",
     "journal": "Journal",
     "knowledge": "Savoir",
     "tags": "Étiquettes",
@@ -986,11 +982,8 @@
   },
   "settings": {
     "language": "Langue",
-    "version": "Version",
     "pageGeneral": "Général",
     "tagline": "L'espace de travail pour votre pratique magique.",
-    "author": "Auteur",
-    "license": "Licence",
     "website": "Site web",
     "backup": "Sauvegarde",
     "exportDb": "Exporter la base de données",
@@ -1162,7 +1155,6 @@
     "updateErrorInstall": "L'installation a échoué.",
     "pageSecurity": "Sécurité",
     "pageSync": "Synchronisation",
-    "theme": "Thème",
     "text": "Texte",
     "importErrorOldVersion": "Cette sauvegarde provient d'une version antérieure d'Emerald et ne peut pas être restaurée dans celle-ci. Rien n'a été modifié ; un convertisseur suivra.",
     "importErrorNewVersion": "Cette sauvegarde provient d'une version plus récente d'Emerald. Mettez à jour cette application pour la restaurer. Rien n'a été modifié.",

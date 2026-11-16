@@ -6,7 +6,7 @@ export interface Guide {
   at: number;
 }
 
-export interface SnapResult {
+interface SnapResult {
   dx: number;
   dy: number;
   guides: Guide[];

@@ -17,7 +17,7 @@ import type { Category, Entry, LinkTargetKind, Task } from '../types';
  */
 export interface SuggestionItem {
   id: string;
-  entryType: LinkTargetKind;
+  targetKind: LinkTargetKind;
   label: string;
   /** Emoji of the entry's category, where there is one. */
   category?: string;
@@ -58,7 +58,7 @@ export interface SuggestionItem {
  * Deleted entries are already filtered out by the stores (`deleted_at IS NULL`
  * on load), so no second filter is needed here.
  */
-export interface LinkItemSources {
+interface LinkItemSources {
   entries: readonly Entry[];
   tasks: readonly Task[];
   /** The one global list — entries and tasks both point into it. */
@@ -88,7 +88,7 @@ export function buildLinkItems(s: LinkItemSources, t: TFunction): SuggestionItem
       const phase = entryMoonPhase(e, s.showMoonPhase);
       return {
         id: e.id,
-        entryType: 'entry' as const,
+        targetKind: 'entry' as const,
         label: displayTitle(t, 'entry', e.title),
         category: cat?.emoji,
         ...splitIcon(entryIcon(e, cat, s.showMoonPhase), cat?.emoji || DEFAULT_ENTRY_ICON),
@@ -101,7 +101,7 @@ export function buildLinkItems(s: LinkItemSources, t: TFunction): SuggestionItem
       const cat = lookupCategory(catById, task.category_id);
       return {
         id: task.id,
-        entryType: 'task' as const,
+        targetKind: 'task' as const,
         label: displayTitle(t, 'task', task.title),
         category: cat?.emoji,
         icon: cat?.emoji || DEFAULT_TASK_ICON,
@@ -116,8 +116,8 @@ export function buildLinkItems(s: LinkItemSources, t: TFunction): SuggestionItem
  * `entry:id` or `task:id` → item. The key under which link chips are looked
  * up — chips and items carry the same target kind (`entry`/`task`).
  */
-export function linkItemKey(target: { id: string; entryType: string }): string {
-  return `${target.entryType === 'task' ? 'task' : 'entry'}:${target.id}`;
+export function linkItemKey(target: { id: string; targetKind: string }): string {
+  return `${target.targetKind === 'task' ? 'task' : 'entry'}:${target.id}`;
 }
 
 export function linkItemsByKey(items: SuggestionItem[]): Map<string, SuggestionItem> {

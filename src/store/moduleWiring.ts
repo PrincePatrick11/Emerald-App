@@ -25,7 +25,7 @@ import { CONTENT_MODULE_IDS, type ContentModuleId, type TrashKind } from '../lib
 type ReloadOptions = { keepLoaded?: boolean };
 
 /** Reloads the content of a module from the active DB. */
-export const moduleWiring: Record<ContentModuleId, { reload: (options?: ReloadOptions) => Promise<void> }> = {
+const moduleWiring: Record<ContentModuleId, { reload: (options?: ReloadOptions) => Promise<void> }> = {
   entries: { reload: (options) => useEntryStore.getState().fetchEntries(options) },
   tasks: { reload: () => useTaskStore.getState().fetchAll() },
 };

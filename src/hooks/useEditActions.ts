@@ -3,7 +3,7 @@ import { useUIStore, type EditActions } from '../store/uiStore';
 import { useLeaveGuardStore, withoutLeaveGuard } from '../store/leaveGuardStore';
 
 /** What a view registers: its handlers, plus the guard for leaving with changes. */
-export interface EditHandlers extends EditActions {
+interface EditHandlers extends EditActions {
   /**
    * What the page is asked with before it is left with changes
    * (`leaveGuardStore`): "Save" calls `onSave`, "Discard" calls `onCancel`.

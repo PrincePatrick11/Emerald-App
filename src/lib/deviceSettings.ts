@@ -3,6 +3,7 @@ import { LANGUAGE_OPTIONS, LANGUAGE_STORAGE_KEY, type AppLanguage } from '../i18
 import { DEFAULT_THEME_ID, normalizeThemeSelection, type ThemeSelection } from '../themes/theme';
 import { normalizeCustomThemes, type CustomTheme } from '../themes/customTheme';
 import type { VaultFileRead } from './vaultSettings';
+import { asRecord, asString } from './helpers';
 
 /**
  * What belongs to this installation rather than to a vault: the language and
@@ -30,7 +31,7 @@ export interface DeviceSettings {
 /** A guard against a runaway list, not a limit anybody meets. */
 const MAX_ADOPTED = 500;
 
-export const DEFAULT_DEVICE_SETTINGS: DeviceSettings = {
+const DEFAULT_DEVICE_SETTINGS: DeviceSettings = {
   version: 1,
   language: 'en',
   theme: DEFAULT_THEME_ID,
@@ -41,19 +42,11 @@ export const DEFAULT_DEVICE_SETTINGS: DeviceSettings = {
 const LANGUAGES = new Set<string>(LANGUAGE_OPTIONS.map((o) => o.code));
 
 /** The localStorage keys of the mirror. `theme-id` is read by hand in `index.html`. */
-export const DEVICE_MIRROR_KEYS = {
+const DEVICE_MIRROR_KEYS = {
   language: LANGUAGE_STORAGE_KEY,
   theme: 'theme-id',
   customThemes: 'custom-themes',
 } as const;
-
-function asRecord(value: unknown): Record<string, unknown> {
-  return value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
-}
-
-function asString(value: unknown): string | null {
-  return typeof value === 'string' ? value : null;
-}
 
 /**
  * Anything in the shape of these settings — the file, the mirror, or the
@@ -118,7 +111,7 @@ export function writeDeviceMirror(settings: DeviceSettings): void {
  * read as settings — Rust has set it aside as `device.json.bad`, and the caller
  * stays on the mirror without writing anything until the user chooses.
  */
-export type DeviceSettingsRead =
+type DeviceSettingsRead =
   | { kind: 'missing' }
   | { kind: 'found'; settings: DeviceSettings }
   | { kind: 'corrupt' };

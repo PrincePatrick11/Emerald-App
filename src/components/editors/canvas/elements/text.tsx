@@ -32,9 +32,9 @@ export const FONT_FAMILIES: Record<CanvasFont, string> = {
   sans: 'Inter, system-ui, sans-serif',
 };
 
-export const TEXT_LINE_HEIGHT = 1.25;
+const TEXT_LINE_HEIGHT = 1.25;
 
-export function fontString(p: Pick<TextProps, 'font' | 'fontSize' | 'bold' | 'italic'>): string {
+function fontString(p: Pick<TextProps, 'font' | 'fontSize' | 'bold' | 'italic'>): string {
   return `${p.italic ? 'italic ' : ''}${p.bold ? 600 : 400} ${p.fontSize}px ${FONT_FAMILIES[p.font]}`;
 }
 
@@ -44,7 +44,7 @@ let measureCtx: CanvasRenderingContext2D | null = null;
  * The lines of a text box: explicit line breaks, then words wrapped at
  * `width`; a word wider than that breaks between characters.
  */
-export function layoutText(p: TextProps, width: number): string[] {
+function layoutText(p: TextProps, width: number): string[] {
   measureCtx ??= document.createElement('canvas').getContext('2d');
   const ctx = measureCtx;
   const paragraphs = p.text.split('\n');

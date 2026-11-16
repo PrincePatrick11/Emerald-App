@@ -18,7 +18,7 @@ const LAYOUT_CLASS: Record<DashboardItemLayout, string> = {
   card: 'panel-interactive w-full text-left px-4 py-4 flex flex-col justify-start',
 };
 
-export type DashboardItemLayout = 'row' | 'card';
+type DashboardItemLayout = 'row' | 'card';
 
 type DashboardItemTarget =
   /** Where click (this tab) and middle click (new tab) lead. */
@@ -88,7 +88,7 @@ export function ItemGlyph({ icon, large }: { icon: string; large?: boolean }) {
 
 /** A row's symbol column, at least as wide as an emoji, so names line up across
  *  a list. */
-export function RowSymbol({ children }: { children: ReactNode }) {
+function RowSymbol({ children }: { children: ReactNode }) {
   return <span className="min-w-5 flex items-center justify-center flex-shrink-0 text-base">{children}</span>;
 }
 

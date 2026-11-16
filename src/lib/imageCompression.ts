@@ -5,7 +5,7 @@ import { decodeImage } from './shrinkImage';
  * and re-encoded on a canvas. The pictures in the vault are never touched.
  * The levels are those of the export menu of 0.1.3.7.
  */
-export type ImageCompression = 'balanced' | 'strong';
+type ImageCompression = 'balanced' | 'strong';
 
 const PRESETS: Record<ImageCompression, { maxSide: number; quality: number }> = {
   balanced: { maxSide: 1600, quality: 0.8 },

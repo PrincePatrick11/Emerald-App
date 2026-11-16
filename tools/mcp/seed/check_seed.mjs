@@ -41,51 +41,31 @@ check('stamped at a baseline version', typeof version === 'number' && version > 
 check('exactly one schema_version row', one('SELECT COUNT(*) AS n FROM schema_version').n === 1);
 check('no foreign key violations', q('PRAGMA foreign_key_check').length === 0);
 
-const tables = q("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'")
-  .map((r) => r.name);
-// Since v49 journal entries, wiki articles and operations share one `entries`
-// table; before that each had its own. Both are a valid seed, for the
-// checkout it was built from.
-const unified = tables.includes('entries');
-// Checkouts with dashboards have no entry types: a module shows the categories of its dashboard's filter.
-const typeless = tables.includes('dashboards');
+// Entries have no type: a dashboard shows the categories of its filter.
 const inDashboard = (id) =>
   `entries WHERE category_id IN (SELECT j.value FROM dashboards d, json_each(d.filter, '$.categories') j WHERE d.id = '${id}')`;
-const modules = typeless
-  ? ['journal', 'knowledge', 'practice'].map((id) => [id, inDashboard(id), 'AND'])
-  : unified
-    ? ['journal', 'wiki', 'operation'].map((type) => [type, `entries WHERE type = '${type}'`, 'AND'])
-    : ['journal_entries', 'wiki_articles', 'operations'].map((table) => [table, table, 'WHERE']);
+const dashboards = ['journal', 'knowledge', 'practice'].map((id) => [id, inDashboard(id)]);
 
-// Since v66 the blocks are rows of `blocks` only; before, the block stack was `content`.
-const blockRows = unified && tables.includes('blocks') && !q('PRAGMA table_info(entries)').some((c) => c.name === 'content');
 /** Entries with a block of this type. */
-const withBlock = (type, where = '1') => blockRows
-  ? one(`SELECT COUNT(DISTINCT e.id) AS n FROM entries e JOIN blocks b ON b.entry_id = e.id WHERE b.type = '${type}' AND ${where}`).n
-  : one(`SELECT COUNT(*) AS n FROM entries e WHERE content LIKE '%${type}%' AND ${where}`).n;
+const withBlock = (type, where = '1') =>
+  one(`SELECT COUNT(DISTINCT e.id) AS n FROM entries e JOIN blocks b ON b.entry_id = e.id WHERE b.type = '${type}' AND ${where}`).n;
 
 check('the sigil category is there', one("SELECT COUNT(*) AS n FROM categories WHERE id = 'sigils'").n === 1);
-if (unified) check('an altar is there, an operation of the altars', withBlock('core.altar', "e.category_id = 'altars'") >= 1);
-if (tables.includes('images')) {
-  const pictures = one("SELECT COUNT(*) AS n FROM images WHERE deleted_at IS NULL").n;
-  check('Images has pictures', pictures >= 3, `${pictures}`);
-  check('Images has a trashed picture', one("SELECT COUNT(*) AS n FROM images WHERE deleted_at IS NOT NULL").n >= 1);
-  // Since v102 a picture's tags are rows of `image_tags`.
-  const linked = tables.includes('image_tags');
-  check('some pictures carry the tag Altar Library', linked
-    ? one("SELECT COUNT(*) AS n FROM image_tags WHERE tag_id = 'altar-library'").n >= 2
-    : one("SELECT COUNT(*) AS n FROM images WHERE tags LIKE '%\"altar-library\"%'").n >= 2);
-  check('every picture names a stored file', q('SELECT file FROM images').every((r) => /^[0-9a-f]{64}\.(png|jpe?g|gif|webp|svg)$/.test(r.file)));
-}
-if (tables.includes('symbols')) check('an own symbol is there', one('SELECT COUNT(*) AS n FROM symbols').n >= 1);
-if (unified) {
-  check('a canvas block is there', withBlock('core.canvas') >= 1);
-  check('a painting block is there', withBlock('core.paint') >= 1);
-}
+check('an altar is there, an entry of the category Altars', withBlock('core.altar', "e.category_id = 'altars'") >= 1);
+check('the Dream Journal has an entry', one("SELECT COUNT(*) AS n FROM entries WHERE category_id = 'dreams'").n >= 1);
+const pictures = one('SELECT COUNT(*) AS n FROM images WHERE deleted_at IS NULL').n;
+check('Images has pictures', pictures >= 3, `${pictures}`);
+check('Images has a trashed picture', one('SELECT COUNT(*) AS n FROM images WHERE deleted_at IS NOT NULL').n >= 1);
+check('some pictures carry the tag Altar Library', one("SELECT COUNT(*) AS n FROM image_tags WHERE tag_id = 'altar-library'").n >= 2);
+check('every picture names a stored file', q('SELECT file FROM images').every((r) => /^[0-9a-f]{64}\.(png|jpe?g|gif|webp|svg)$/.test(r.file)));
+check('an own symbol is there', one('SELECT COUNT(*) AS n FROM symbols').n >= 1);
+check('a template of its own is there', one("SELECT COUNT(*) AS n FROM templates WHERE id NOT LIKE 'core-%'").n >= 1);
+check('a canvas block is there', withBlock('core.canvas') >= 1);
+check('a painting block is there', withBlock('core.paint') >= 1);
 
-// A vault with an empty module renders an empty screen, which is exactly what
+// A dashboard without entries renders an empty screen, which is exactly what
 // the seed exists to avoid.
-for (const [label, from] of modules) {
+for (const [label, from] of dashboards) {
   const n = one(`SELECT COUNT(*) AS n FROM ${from}`).n;
   check(`${label} has content`, n > 0, `${n} rows`);
 }
@@ -96,8 +76,8 @@ for (const table of ['tasks', 'tags', 'categories']) {
 
 // Trash needs something in it, or the trash view cannot be tested without
 // deleting something first.
-for (const [label, from, and] of modules) {
-  const n = one(`SELECT COUNT(*) AS n FROM ${from} ${and} deleted_at IS NOT NULL`).n;
+for (const [label, from] of dashboards) {
+  const n = one(`SELECT COUNT(*) AS n FROM ${from} AND deleted_at IS NOT NULL`).n;
   check(`${label} has a trashed row`, n >= 1, `${n}`);
 }
 for (const table of ['tags', 'categories', 'tasks']) {
@@ -106,46 +86,34 @@ for (const table of ['tags', 'categories', 'tasks']) {
 }
 // Older than the trash retention and the app purges them as soon as it opens
 // the vault. 7 days is the shortest retention a vault can be set to.
-const trashDates = [
-  ...modules.map(([, from, and]) => `${from} ${and} deleted_at IS NOT NULL`),
-  ...['tags', 'categories', 'tasks'].map((table) => `${table} WHERE deleted_at IS NOT NULL`),
-].flatMap((where) => q(`SELECT deleted_at FROM ${where}`).map((r) => Date.parse(r.deleted_at)));
+const trashDates = ['entries', 'tags', 'categories', 'tasks', 'images']
+  .flatMap((table) => q(`SELECT deleted_at FROM ${table} WHERE deleted_at IS NOT NULL`).map((r) => Date.parse(r.deleted_at)));
 const oldest = trashDates.length ? Math.min(...trashDates) : NaN;
 check('trashed rows are recent enough to survive the purge',
   Date.now() - oldest < 7 * 24 * 60 * 60 * 1000, Number.isNaN(oldest) ? 'none' : new Date(oldest).toISOString());
 
-const contents = blockRows
-  ? q("SELECT html || ' ' || COALESCE(config, '') || ' ' || COALESCE(data, '') || ' ' || attrs AS content FROM blocks WHERE entry_id IS NOT NULL")
-    .map((r) => String(r.content ?? ''))
-  : q(modules.map(([, from]) => `SELECT content FROM ${from}`).join(' UNION ALL '))
-    .map((r) => String(r.content ?? ''));
-if (blockRows) {
-  const empty = one('SELECT COUNT(*) AS n FROM entries e WHERE NOT EXISTS (SELECT 1 FROM blocks b WHERE b.entry_id = e.id)').n;
-  check('every entry has its block rows', one('SELECT COUNT(*) AS n FROM blocks').n > 0 && empty === 0, `${empty} without`);
-}
+const contents = q("SELECT html || ' ' || COALESCE(config, '') || ' ' || COALESCE(data, '') || ' ' || attrs AS content FROM blocks WHERE entry_id IS NOT NULL")
+  .map((r) => String(r.content ?? ''));
+const empty = one('SELECT COUNT(*) AS n FROM entries e WHERE NOT EXISTS (SELECT 1 FROM blocks b WHERE b.entry_id = e.id)').n;
+check('every entry has its block rows', one('SELECT COUNT(*) AS n FROM blocks').n > 0 && empty === 0, `${empty} without`);
 
-if (unified) {
-  // Tags are referenced by id there; a name left in the list matches nothing.
-  const tagIds = new Set(q('SELECT id FROM tags').map((r) => r.id));
-  const used = tables.includes('entry_tags')
-    ? q('SELECT tag_id FROM entry_tags').map((r) => r.tag_id)
-    : q("SELECT tags FROM entries WHERE tags != '[]'").flatMap((r) => JSON.parse(r.tags));
-  check('entries carry tags', used.length > 0, `${used.length}`);
-  check('every entry tag is a tag id', used.every((id) => tagIds.has(id)));
-}
+const tagIds = new Set(q('SELECT id FROM tags').map((r) => r.id));
+const used = q('SELECT tag_id FROM entry_tags').map((r) => r.tag_id);
+check('entries carry tags', used.length > 0, `${used.length}`);
+check('every entry tag is a tag id', used.every((id) => tagIds.has(id)));
 check('internal link chips rendered',
   contents.some((c) => c.includes('data-type="internalLink"')));
+check('a link chip points at a task',
+  contents.some((c) => c.includes('data-target-kind="task"')));
 check('no unexpanded @@chip() placeholders',
   !contents.some((c) => c.includes('@@chip(')));
 check('no unexpanded @@file() placeholders',
-  !contents.some((c) => c.includes('@@file(')) && !(tables.includes('images') && q('SELECT file FROM images').some((r) => r.file.includes('@@file('))));
+  !contents.some((c) => c.includes('@@file(')) && !q('SELECT file FROM images').some((r) => r.file.includes('@@file(')));
 
 // The app follows a link only to a UUID (isValidLinkTarget in
 // src/lib/internalLinkHtml.ts); a readable id would make every chip dead.
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-// The altar tables went with v63; an older checkout's seed still has them.
-const linkable = [...modules.map(([, from]) => from), 'tasks', ...(tables.includes('altars') ? ['altars'] : [])]
-  .flatMap((from) => q(`SELECT id FROM ${from}`).map((r) => r.id));
+const linkable = ['entries', 'tasks'].flatMap((table) => q(`SELECT id FROM ${table}`).map((r) => r.id));
 const badIds = linkable.filter((id) => !UUID_RE.test(id));
 check('every linkable row has a UUID', badIds.length === 0, badIds.slice(0, 3).join(', '));
 const chipIds = contents.flatMap((c) => [...c.matchAll(/data-id="([^"]*)"/g)].map((m) => m[1]));

@@ -2,6 +2,7 @@ import {
   GROUPING_MODES, SORT_MODES, VIEW_MODES, useUIStore, type ListPrefs,
 } from './uiStore';
 import { COLLECTION_IDS, type CollectionId } from '../lib/modules';
+import { isRecord, oneOf } from '../lib/helpers';
 
 /**
  * The preferences of a vault: how each list looks (view, sorting,
@@ -48,14 +49,6 @@ let hydrating = false;
 
 function pick(s: UIState): Prefs {
   return Object.fromEntries(PREF_KEYS.map((key) => [key, s[key]])) as Prefs;
-}
-
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === 'object' && value !== null && !Array.isArray(value);
-
-/** `saved` if it is one of the allowed values, otherwise `fallback`. */
-function oneOf<T>(saved: unknown, allowed: readonly string[], fallback: T): T {
-  return typeof saved === 'string' && allowed.includes(saved) ? (saved as T) : fallback;
 }
 
 function listPrefs(saved: unknown, fallback: ListPrefs): ListPrefs {

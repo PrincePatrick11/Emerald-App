@@ -1,9 +1,10 @@
 import type { ActiveView, Entry, Language, LexiconEntry, Tag, Task, VaultImage } from '../types';
 import { foldTypography, plainTextFor } from './searchText';
-import { todayIso, withoutConcealed } from './blocks/sigil';
+import { withoutConcealed } from './blocks/sigil';
 import { entryView } from '../store/entryViews';
 import { displayTitle } from './entryTitle';
 import i18n from '../i18n';
+import { localIsoDay } from './helpers';
 
 /**
  * The global search behind the title bar's field.
@@ -202,7 +203,7 @@ export function searchCorpus(corpus: SearchCorpus, rawQuery: string): SearchHit[
   // visible content changes as soon as one of several chargings reaches its
   // target date — then it is re-read. Likewise when the content was only
   // loaded after startup (`pendingContent`): before that it is empty.
-  const today = todayIso();
+  const today = localIsoDay();
   const visibleText = (id: string, updatedAt: string, content: string) => {
     const visible = withoutConcealed(content, today);
     return plainTextFor(id, `${updatedAt}|${visible.length}`, visible);

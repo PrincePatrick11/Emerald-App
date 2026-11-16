@@ -8,7 +8,7 @@ import { ALL_ENTRIES_VIEW, useUIStore } from './uiStore';
 import type { ActiveView } from '../types';
 
 /** Does the view show the list of dashboard `id`? An entry opened from it stays open (it falls back to "All entries"). */
-export function showsDashboard(view: ActiveView, id: string): boolean {
+function showsDashboard(view: ActiveView, id: string): boolean {
   return view.type === 'dashboard' && (view.id ?? 'all') === id;
 }
 

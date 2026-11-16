@@ -14,7 +14,7 @@ import type { ActiveView } from '../types';
  * The native ids are the same strings on both paths — keep them in sync with
  * `install_native_menu` in `src-tauri/src/lib.rs`.
  */
-export type MenuActionId =
+type MenuActionId =
   | 'reset-sidebar-widths'
   | 'toggle-rail'
   | 'toggle-left-list'
@@ -35,7 +35,7 @@ export type MenuActionId =
  * among them: it manipulates `AppShell`'s local width state, so it stays an
  * event that `AppShell`'s own listener answers (see `dispatchMenuAction`).
  */
-export type SelfContainedMenuActionId = Exclude<MenuActionId, 'reset-sidebar-widths'>;
+type SelfContainedMenuActionId = Exclude<MenuActionId, 'reset-sidebar-widths'>;
 
 /** The actions only the title bar offers; every other one is a native menu event. */
 type TitleBarOnlyMenuActionId =
@@ -168,7 +168,7 @@ export function dispatchMenuAction(id: MenuActionId): void {
   void runMenuAction(id);
 }
 
-export interface MenuEnabledState {
+interface MenuEnabledState {
   /** Markdown export — entries. */
   entryEnabled: boolean;
   /** PDF export — entries. */

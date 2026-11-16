@@ -21,10 +21,10 @@ import { BLOCK_ATTR, type BlockInstance } from './types';
  * - `icon`: a custom block's copy's icon, a file in the vault's `icons/`
  *   (kind `icon`) — every copy names the same file.
  */
-export type BlockRefKind = 'entry' | 'image' | 'icon';
+type BlockRefKind = 'entry' | 'image' | 'icon';
 export type BlockRefRole = 'content' | 'render' | 'layer' | 'background' | 'default' | 'icon';
 
-export interface BlockRef {
+interface BlockRef {
   kind: BlockRefKind;
   /** The entry's ID, or the stored file name of the picture or the icon. */
   target: string;

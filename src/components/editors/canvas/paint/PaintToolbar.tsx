@@ -22,13 +22,13 @@ interface ToolDef {
 }
 
 /** The tools that work on what is drawn, before the ones that draw. */
-export const EDIT_TOOL_DEFS: readonly ToolDef[] = [
+const EDIT_TOOL_DEFS: readonly ToolDef[] = [
   { tool: 'select', icon: MousePointer2, key: 'v' },
   { tool: 'lasso', icon: Lasso, key: 'q' },
   { tool: 'move', icon: Move, key: 'm' },
 ];
 
-export const DRAW_TOOL_DEFS: readonly ToolDef[] = [
+const DRAW_TOOL_DEFS: readonly ToolDef[] = [
   { tool: 'pen', icon: PenTool, key: 'p' },
   { tool: 'line', icon: Minus, key: 'l' },
   { tool: 'ellipse', icon: Circle, key: 'o' },

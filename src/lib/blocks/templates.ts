@@ -129,11 +129,6 @@ export function isTextBlockEmpty(block: BlockInstance): boolean {
   return block.type === TEXT_BLOCK_TYPE && EMPTY_TEXT_RE.test(block.html);
 }
 
-/** `areBlocksEmpty` for stored content. */
-export function isContentEmpty(content: string): boolean {
-  return areBlocksEmpty(parseBlocks(content));
-}
-
 /** Append the template's tags (IDs) to a list — without duplicates. */
 export function mergeTemplateTags(tags: readonly string[], added: readonly string[]): string[] {
   return [...new Set([...tags, ...added])];

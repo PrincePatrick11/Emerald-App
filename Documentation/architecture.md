@@ -175,7 +175,7 @@ Zustand stores (in-memory)
 Components (render)
     ↓  user edits
 Store actions (updateEntry, updateTask, …)
-    ↓  toInt / toJson (row.ts)
+    ↓  toInt (row.ts)
     ↓  db.execute / db.select / db.batch  (src/lib/sqlite.ts → db_* commands in db.rs)
 SQLite (persisted)
 ```

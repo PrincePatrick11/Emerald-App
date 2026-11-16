@@ -54,7 +54,7 @@ export const TABLES = [
   'image_tags',
 ] as const;
 
-export type TableName = (typeof TABLES)[number];
+type TableName = (typeof TABLES)[number];
 
 export const TABLE_DDL: Record<TableName, string> = {
   schema_version: `
@@ -364,7 +364,7 @@ const ENTRIES_INDEX_DDL: readonly string[] = [
  * because `runPeriodicCleanup` runs a range scan over all soft-delete tables
  * every time a vault is opened.
  */
-export const INDEX_DDL: readonly string[] = [
+const INDEX_DDL: readonly string[] = [
   'CREATE INDEX idx_task_links_task ON task_links(task_id)',
   'CREATE INDEX idx_task_links_target ON task_links(target_id)',
   'CREATE INDEX idx_tasks_category ON tasks(category_id)',
@@ -414,7 +414,7 @@ export const ALTAR_LIBRARY_TAG_ID = 'altar-library';
 export const ALTAR_LIBRARY_TAG_NAME = 'Altar Library';
 
 /** [id, name (database only — `categories.builtin.<id>` is displayed), emoji]. */
-export const BUILTIN_CATEGORIES: readonly [string, string, string][] = [
+const BUILTIN_CATEGORIES: readonly [string, string, string][] = [
   [JOURNAL_CATEGORY_ID, 'Journal', '📓'],
   [SIGIL_CATEGORY_ID, 'Sigils', '🔯'],
   [ALTAR_CATEGORY_ID, 'Altars', '🪔'],
@@ -425,7 +425,7 @@ export const BUILTIN_CATEGORIES: readonly [string, string, string][] = [
  * deletable categories, created in the app language (`categories.starter.<key>`).
  * The keys are at the same time the IDs.
  */
-export const STARTER_CATEGORIES: readonly [string, string][] = [
+const STARTER_CATEGORIES: readonly [string, string][] = [
   ['dreams', '💭'],
   ['paradigm', '🌀'],
   ['ritual', '🪄'],
@@ -443,7 +443,7 @@ export const STARTER_CATEGORIES: readonly [string, string][] = [
  * entries" has no filter, so that no entry can become unfindable. Renaming
  * and changing the filters is the user's business afterwards.
  */
-export const BUILTIN_DASHBOARDS: readonly {
+const BUILTIN_DASHBOARDS: readonly {
   key: 'all' | 'journal' | 'practice' | 'knowledge';
   categories: readonly string[] | null;
   sort: { by: 'created' | 'title' | 'updated'; dir: 'asc' | 'desc' };
@@ -457,7 +457,7 @@ export const BUILTIN_DASHBOARDS: readonly {
 ];
 
 /** The content tables with `category_id`. A literal, because it is interpolated into SQL. */
-export const CATEGORIZED_TABLES = ['entries', 'tasks'] as const;
+const CATEGORIZED_TABLES = ['entries', 'tasks'] as const;
 
 /** Creates tables and indexes. The order follows TABLES. */
 export async function createSchema(db: Database): Promise<void> {
@@ -480,9 +480,15 @@ export async function seedBuiltins(
   db: Database,
   starterName: (key: string) => string
 ): Promise<void> {
+  const builtins = BUILTIN_CATEGORIES.map(([id, name, emoji]) => ({ id, name, emoji, is_builtin: 1 }));
+  const starters = STARTER_CATEGORIES.map(([key, emoji]) => ({ id: key, name: starterName(key), emoji, is_builtin: 0 }));
+  // The dream journal comes right after the journal, ahead of sigils and altars.
+  const afterJournal = starters.filter((c) => c.id === 'dreams');
   const rows = [
-    ...BUILTIN_CATEGORIES.map(([id, name, emoji]) => ({ id, name, emoji, is_builtin: 1 })),
-    ...STARTER_CATEGORIES.map(([key, emoji]) => ({ id: key, name: starterName(key), emoji, is_builtin: 0 })),
+    ...builtins.filter((c) => c.id === JOURNAL_CATEGORY_ID),
+    ...afterJournal,
+    ...builtins.filter((c) => c.id !== JOURNAL_CATEGORY_ID),
+    ...starters.filter((c) => c.id !== 'dreams'),
   ];
   for (const [i, row] of rows.entries()) {
     await db.execute(
@@ -534,7 +540,7 @@ export async function reassignCategoryContent(db: Database, categoryId: string, 
 }
 
 /** An orphaned reference: row `id` in `table` points to a target that is missing. */
-export interface Orphan {
+interface Orphan {
   table: string;
   column: string;
   id: string;

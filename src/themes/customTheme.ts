@@ -5,6 +5,7 @@
  * Format: Documentation/themes.md.
  */
 import { TEXT_COLOR_SHADES } from '../lib/textColors';
+import { isRecord } from '../lib/helpers';
 
 export interface CustomThemeColors {
   frame: string;
@@ -27,9 +28,9 @@ export interface CustomTheme {
   colors: CustomThemeColors;
 }
 
-export type CustomThemeError = 'invalidFile' | 'tooLarge' | 'unreadableText';
+type CustomThemeError = 'invalidFile' | 'tooLarge' | 'unreadableText';
 
-export const CUSTOM_THEME_FILE_VERSION = 1;
+const CUSTOM_THEME_FILE_VERSION = 1;
 export const MAX_CUSTOM_THEMES = 20;
 export const MAX_CUSTOM_THEME_FILE_BYTES = 16 * 1024;
 const MAX_NAME_LENGTH = 40;
@@ -45,10 +46,6 @@ const OPTIONAL_COLORS: Record<CustomTheme['base'], Pick<CustomThemeColors, 'dang
 
 const MIN_TEXT_CONTRAST = 2;
 
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
 
 /** The shape shared by a file and a stored theme; everything unknown is dropped. */
 function readTheme(raw: unknown, id: string): CustomTheme | null {
@@ -336,7 +333,7 @@ function luminance(hex: string): number {
   return 0.2126 * r + 0.7152 * g + 0.0722 * b;
 }
 
-export function contrastRatio(a: string, b: string): number {
+function contrastRatio(a: string, b: string): number {
   const [hi, lo] = [luminance(a), luminance(b)].sort((x, y) => y - x);
   return (hi + 0.05) / (lo + 0.05);
 }

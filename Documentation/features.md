@@ -283,7 +283,7 @@ Everything that is neither an entry nor a task is a **collection**: Tags, Catego
 
 One list of categories serves every entry and the tasks, and the Categories view in the left rail — next to Tags — is the one place it is managed, as a [collection](#collections). Dashboards and Tasks only *assign* a category to an entry and group their lists by it; none of them can create, rename or delete one.
 
-A fresh vault starts with nine ordinary categories in the app's language (Dream Journal, Paradigm, Ritual, Meditation, Herbs, Crystals, Candles, Deities, Tools) plus the built-in **Sigils** and **Altars**: a new entry in Altars starts with an altar and a text for notes.
+A fresh vault starts with the built-in **Journal**, **Sigils** and **Altars** plus nine ordinary categories in the app's language, in this order: Journal, Dream Journal, Sigils, Altars, Paradigm, Ritual, Meditation, Herbs, Crystals, Candles, Deities, Tools. A new entry in Altars starts with an altar and a text for notes.
 
 Each row or card shows the category's emoji, its name, its start template if it has one, and how many entries and tasks use it (two columns, each with its icon). Only live entries count, not the Trash. The filter shows the categories a dashboard filters by.
 
@@ -431,7 +431,7 @@ A menu to export several entries at once, with a password and compressed or left
 
 Reads a Markdown file exported by Emerald (or with the same structure). The `# Title` line becomes the title, key-value lines before `---` are metadata (unknown keys are ignored), and the body below is converted to rich text. A Markdown import has no creation date and is created now. Header fields of earlier versions (an entry's status, end date and version, a journal entry's paradigm, banishing, meditation and linked operations or articles) count as unknown keys.
 
-**Destination.** A file whose header names a category lands in it (found or created by name) and opens in "All entries". One without asks which dashboard it goes to — the dialog shows the detected title and lists the dashboards; the entry starts in that dashboard's first category and opens there. Cancelling aborts the import. `.emerald` entries keep their category by name and never ask.
+**Destination.** A file whose header names a category lands in it (found or created by name) and opens in "All entries". One without asks which dashboard it goes to — the dialog shows the detected title and lists the dashboards; the entry starts in that dashboard's first category and opens there. Cancelling aborts the import. `.emerald` entries keep their category by name and never ask.
 
 ### Vault Backup (`.emeralddb`)
 
@@ -450,7 +450,7 @@ The whole vault can be backed up and restored as one self-contained file (`.emer
 **Import.**
 
 - Choosing a backup first opens it. If it belongs to a vault that is unlocked right now, that is automatic. Otherwise Emerald asks for the password the backup was made with, or its recovery key from that time, and asks again after a wrong answer.
-- **Only backups of this version are restored** (format 16). A backup of an earlier version — one from before encryption included — is refused with a notice that a converter will follow; one of a newer version asks for an update. Nothing is changed either way. Earlier versions of Emerald refuse a format-16 backup in turn.
+- **Only backups of this version are restored** (format 17). A backup of an earlier version — one from before encryption included — is refused with a notice that a converter will follow; one of a newer version asks for an update. Nothing is changed either way. Earlier versions of Emerald refuse a format-16 backup in turn.
 - A preview line counts the file's contents. The same choices pick what to apply: one box per category the file holds entries of, with their number, "Uncategorized", then Tasks, Tags and Lexicon. Replace replaces only the entries of the categories the file brings.
 - Three modes, from least to most invasive: **Add Vault** (into a new vault, then switch to it — the default, since it can't touch existing data), **Merge** (imported items get new ids, so nothing existing is overwritten), and **Replace** (overwrite the selected content in the current vault, with a warning).
 - Add Vault asks for the new vault's name **and folder**, with the same folder row as creating a vault (default `Documents/Emerald Vaults/{name}`). The folder is checked before anything is touched: it must be empty or not exist yet, must not hold a vault, and must be readable. The new vault then asks for its own password; cancelling that cancels the import and removes the empty vault.

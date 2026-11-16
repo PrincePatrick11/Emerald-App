@@ -76,7 +76,7 @@ function hex(n: number): string {
 }
 
 /** Where the surface lies in its positioned parent, in CSS pixels, and how it is turned (degrees). */
-export interface SurfaceBox {
+interface SurfaceBox {
   left: number;
   top: number;
   width: number;

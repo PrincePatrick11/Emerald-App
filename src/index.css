@@ -4,7 +4,6 @@
 
 @layer base {
   :root {
-    --sidebar-left-width: 240px;
     --font-ui: 'Inter', 'Segoe UI', system-ui, sans-serif;
     --font-editor: 'Lora', Georgia, serif;
     /* Adjustable (settingsStore); 17px is the default. */
@@ -1398,10 +1397,6 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
   font-family: var(--font-editor);
 }
 
-.entry-view-body {
-  font-family: var(--font-editor);
-}
-
 /* Lists: the items close together (their paragraphs without the paragraph
    gap), a nested list tight under its item, and the markers quieter than the
    text, the numbers in even widths. Nested bullets change shape per level. */
@@ -1608,14 +1603,6 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
 
 .tiptap .internal-link {
   @apply cursor-pointer;
-}
-
-/* Edit mode: [[Label(id)]] inline text representation */
-.internal-link-edit {
-  color: var(--accent-text);
-  font-style: italic;
-  cursor: text;
-  user-select: text;
 }
 
 .tiptap img {
@@ -1966,18 +1953,6 @@ button.sidebar-section-title:focus-visible {
   transition: color 150ms, background-color 150ms;
 }
 
-.prop-segments--fill {
-  flex-shrink: 1;
-}
-
-.prop-segment--text {
-  flex: 1 1 0%;
-  width: auto;
-  height: 26px;
-  padding: 0 8px;
-  font-size: 12px;
-}
-
 /* A segment with a word instead of an icon (`SegmentedControl`). */
 .prop-segment--label {
   width: auto;
@@ -2085,31 +2060,6 @@ html[data-theme] .sidebar-add-field input::placeholder,
 .tag-chip-remove:hover {
   /* Deliberately without a token: darkens the chip's tag colour, the same in both themes. */
   background-color: var(--interactive-active);
-}
-
-/* An action as a row instead of a bordered button ("Update all"). */
-.sidebar-action-row {
-  display: flex;
-  width: 100%;
-  height: 2rem;
-  align-items: center;
-  gap: 0.625rem;
-  padding: 0 0.625rem;
-  border-radius: 6px;
-  color: var(--text-muted);
-  font-size: 13px;
-  text-align: left;
-  transition: color 150ms, background-color 150ms;
-}
-
-.sidebar-action-row:hover:not(:disabled) {
-  background-color: var(--interactive-hover);
-  color: var(--menu-item-active-text);
-}
-
-.sidebar-action-row:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
 }
 
 /* The settings of a block below its row (`BlockSettingsBox`):
@@ -2294,7 +2244,6 @@ html[data-theme] .prop-segment--active {
 .sidebar-row-main:focus-visible,
 .sidebar-row-remove:focus-visible,
 .tag-chip-remove:focus-visible,
-.sidebar-action-row:focus-visible,
 .edit-bar-done:focus-visible,
 .edit-bar-icon:focus-visible {
   outline: none;
@@ -3897,43 +3846,6 @@ html[data-theme] .prop-segment--active {
   font-size: 0.75rem;
 }
 
-/* Assignment table: a cell as a quiet choice. */
-.template-assign-cell {
-  display: flex;
-  width: 100%;
-  min-width: 0;
-  align-items: center;
-  gap: 0.375rem;
-  padding: 0.25rem 0.5rem;
-  margin-left: -0.5rem;
-  border-radius: 6px;
-  color: var(--text-secondary);
-  transition: background-color 150ms, color 150ms;
-}
-
-.template-assign-cell:hover {
-  background: var(--menu-item-hover-bg);
-  color: var(--text-primary);
-}
-
-.template-assign-cell:focus-visible {
-  outline: none;
-  box-shadow: 0 0 0 2px var(--focus-ring);
-}
-
-.template-assign-chevron {
-  flex-shrink: 0;
-  margin-left: auto;
-  color: var(--text-subtle);
-  opacity: 0;
-  transition: opacity 150ms;
-}
-
-.template-assign-cell:hover .template-assign-chevron,
-.template-assign-cell:focus-visible .template-assign-chevron {
-  opacity: 1;
-}
-
 .block-def-element {
   padding: 0.5rem;
   border: 1px solid color-mix(in srgb, var(--border-soft) 55%, transparent);
@@ -4286,20 +4198,6 @@ html[data-theme] .block-manager-row--idle,
      slips through stays inside the block's box — even `position: fixed`. */
   contain: paint;
   overflow: hidden;
-}
-
-/* Candle flame animation — replace .candle-placeholder with real animation when available */
-@keyframes flicker {
-  0%, 100% { opacity: 1;   transform: scaleY(1)    scaleX(1); }
-  25%       { opacity: .9;  transform: scaleY(1.04) scaleX(.97); }
-  50%       { opacity: .85; transform: scaleY(.96)  scaleX(1.03); }
-  75%       { opacity: .92; transform: scaleY(1.02) scaleX(.98); }
-}
-.candle-flame {
-  display: inline-block;
-  animation: flicker 1.8s ease-in-out infinite;
-  filter: drop-shadow(0 0 6px #ff8c00) drop-shadow(0 0 14px #ff4500);
-  transform-origin: bottom center;
 }
 
 /* ── Light Mode Tailwind bridge ───────────────────────────────────────────── */

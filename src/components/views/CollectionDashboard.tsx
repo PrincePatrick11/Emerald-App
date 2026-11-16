@@ -39,10 +39,10 @@ export function useCollectionState(id: CollectionId) {
   };
 }
 
-export type CollectionState = ReturnType<typeof useCollectionState>;
+type CollectionState = ReturnType<typeof useCollectionState>;
 
 /** A filter value of a collection: a chip in the sidebar and the test behind it. */
-export interface CollectionChip<T> {
+interface CollectionChip<T> {
   value: string;
   label: string;
   emoji?: string;
@@ -51,7 +51,7 @@ export interface CollectionChip<T> {
 
 /** How an item looks in a row and on a card, and what a click on it does:
  *  a page of its own (`view`) or a dialog (`onOpen`). */
-export type CollectionItemLook = {
+type CollectionItemLook = {
   icon?: ReactNode;
   /** The card's larger icon; default `icon`. */
   cardIcon?: ReactNode;
@@ -61,7 +61,7 @@ export type CollectionItemLook = {
   trailing?: ReactNode;
 } & ({ view: ActiveView; onOpen?: undefined } | { view?: undefined; onOpen: () => void });
 
-export interface CollectionDashboardProps<T extends object> {
+interface CollectionDashboardProps<T extends object> {
   state: CollectionState;
   title: string;
   items: readonly T[];

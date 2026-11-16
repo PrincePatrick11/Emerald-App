@@ -6,7 +6,7 @@ import { editorHas } from './hostContext';
 import type { Alignment } from './ResizableImageExtension';
 
 /** A button that toggles a mark, shared by the toolbar and the selection menu. */
-export interface MarkAction {
+interface MarkAction {
   key: string;
   labelKey: string;
   icon: LucideIcon;
@@ -15,7 +15,7 @@ export interface MarkAction {
   toggle: (editor: Editor) => void;
 }
 
-export const MARK_ACTIONS: MarkAction[] = [
+const MARK_ACTIONS: MarkAction[] = [
   { key: 'bold', labelKey: 'editor.toolbar.bold', icon: Bold, mark: 'bold', toggle: (ed) => ed.chain().focus().toggleBold().run() },
   { key: 'italic', labelKey: 'editor.toolbar.italic', icon: Italic, mark: 'italic', toggle: (ed) => ed.chain().focus().toggleItalic().run() },
   { key: 'strike', labelKey: 'editor.toolbar.strikethrough', icon: Strikethrough, mark: 'strike', toggle: (ed) => ed.chain().focus().toggleStrike().run() },

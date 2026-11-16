@@ -4,7 +4,7 @@ import { computeMenuEnabledState, dispatchMenuAction } from '../../../lib/menuAc
 import { cutSelection, copySelection, pasteFromClipboard, selectAll } from './editCommands';
 import type { MenuNode } from './MenuDropdown';
 
-export interface TitleBarMenu {
+interface TitleBarMenu {
   label: string;
   nodes: MenuNode[];
 }

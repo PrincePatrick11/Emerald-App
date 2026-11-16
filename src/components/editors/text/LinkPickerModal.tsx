@@ -3,7 +3,7 @@ import { LayoutList } from 'lucide-react';
 import { useLinkItems } from '../../../hooks/useLinkItems';
 import { LinkItemIcon } from '../../sidebar/fields/LinkedEntryPicker';
 import type { LinkTargetKind } from '../../../types';
-import { ENTRY_TYPE_ICONS, ENTRY_TYPE_LABEL_KEYS, type SuggestionItem } from './SuggestionList';
+import { TARGET_KIND_ICONS, TARGET_KIND_LABEL_KEYS, type SuggestionItem } from './SuggestionList';
 import { useTranslation } from 'react-i18next';
 import Modal from '../../ui/Modal';
 import SearchField from '../../ui/SearchField';
@@ -35,7 +35,7 @@ export default function LinkPickerModal({ onSelect, onClose }: Props) {
   const filtered = useMemo(() => {
     const q = query.toLowerCase();
     return allItems.filter((item) => {
-      if (activeTab !== 'all' && item.entryType !== activeTab) return false;
+      if (activeTab !== 'all' && item.targetKind !== activeTab) return false;
       if (q && !item.label.toLowerCase().includes(q)) return false;
       return true;
     });
@@ -46,7 +46,7 @@ export default function LinkPickerModal({ onSelect, onClose }: Props) {
     const q = query.toLowerCase();
     const visible = q ? allItems.filter((i) => i.label.toLowerCase().includes(q)) : allItems;
     const next: Record<Tab, number> = { all: visible.length, entry: 0, task: 0 };
-    for (const item of visible) next[item.entryType]++;
+    for (const item of visible) next[item.targetKind]++;
     return next;
   }, [allItems, query]);
 
@@ -55,8 +55,8 @@ export default function LinkPickerModal({ onSelect, onClose }: Props) {
     // ListToolbar); 12 is the step for meta rows and badges.
     { id: 'all', label: t('linkPicker.tabAll'), icon: <LayoutList size={14} />, count: counts.all },
     ...LINK_TYPE_ORDER.map((type) => {
-      const Icon = ENTRY_TYPE_ICONS[type];
-      return { id: type as Tab, label: t(ENTRY_TYPE_LABEL_KEYS[type]), icon: <Icon size={14} />, count: counts[type] };
+      const Icon = TARGET_KIND_ICONS[type];
+      return { id: type as Tab, label: t(TARGET_KIND_LABEL_KEYS[type]), icon: <Icon size={14} />, count: counts[type] };
     }),
   ];
 
@@ -123,7 +123,7 @@ export default function LinkPickerModal({ onSelect, onClose }: Props) {
           ) : (
             <div className="space-y-0.5">
               {filtered.map((item) => {
-                const TypeIcon = ENTRY_TYPE_ICONS[item.entryType];
+                const TypeIcon = TARGET_KIND_ICONS[item.targetKind];
                 return (
                   <button
                     key={item.id}
@@ -141,7 +141,7 @@ export default function LinkPickerModal({ onSelect, onClose }: Props) {
                     {/* Type badge: the category, else entry/task */}
                     <span className="text-xs text-subtle flex-shrink-0 flex items-center gap-1">
                       <TypeIcon size={12} />
-                      <span>{item.categoryLabel || t(ENTRY_TYPE_LABEL_KEYS[item.entryType])}</span>
+                      <span>{item.categoryLabel || t(TARGET_KIND_LABEL_KEYS[item.targetKind])}</span>
                     </span>
 
                     {item.entry_number != null && (

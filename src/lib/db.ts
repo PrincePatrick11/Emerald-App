@@ -165,7 +165,7 @@ export async function getDb(): Promise<Database> {
   return promise;
 }
 
-export type Migration = {
+type Migration = {
   /** Above `FRESH_START_VERSION`; the last one equals `BASELINE_VERSION`. */
   version: number;
   name: string;
@@ -179,7 +179,7 @@ export type Migration = {
  * changes `schema.ts`, appends a step here and raises `BASELINE_VERSION` to
  * its version (see "Rules for Future Schema Changes" in `database.md`).
  */
-export const MIGRATIONS: Migration[] = [];
+const MIGRATIONS: Migration[] = [];
 
 /**
  * Where the file stands: `'empty'` (a new vault), `'unfinished'` (a new vault

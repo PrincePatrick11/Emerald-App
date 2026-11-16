@@ -1,7 +1,6 @@
 {
   "common": {
     "delete": "Delete",
-    "deleteConfirm": "Delete?",
     "confirmSure": "Sure?",
     "confirmYes": "Yes, delete",
     "confirmNo": "Cancel",
@@ -65,8 +64,6 @@
     "cards": "Cards",
     "cardsWide": "Cards (full width)",
     "timeline": "Timeline",
-    "alphaAsc": "A → Z",
-    "alphaDesc": "Z → A",
     "dateCreated": "Created",
     "dateUpdated": "Modified",
     "dateDeleted": "Deleted",
@@ -99,7 +96,6 @@
     "title": "Create new"
   },
   "nav": {
-    "all": "All",
     "journal": "Journal",
     "knowledge": "Knowledge",
     "tags": "Tags",
@@ -986,11 +982,8 @@
   },
   "settings": {
     "language": "Language",
-    "version": "Version",
     "pageGeneral": "General",
     "tagline": "The workspace for your magickal practice.",
-    "author": "Author",
-    "license": "License",
     "website": "Website",
     "backup": "Backup",
     "exportDb": "Export Database",
@@ -1162,7 +1155,6 @@
     "updateErrorInstall": "The installation failed.",
     "pageSecurity": "Security",
     "pageSync": "Sync",
-    "theme": "Theme",
     "text": "Text",
     "importErrorOldVersion": "This backup comes from an older version of Emerald and cannot be restored in this one. Nothing was changed; a converter will follow.",
     "importErrorNewVersion": "This backup comes from a newer version of Emerald. Update this app to restore it. Nothing was changed.",

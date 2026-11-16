@@ -166,7 +166,7 @@ const ATTR_ORDER: readonly string[] = [
 ];
 
 /** The attributes of a block in the order they are written (`ATTR_ORDER`, then the rest). */
-export function orderedBlockAttrs(attrs: Record<string, string>): Array<[string, string]> {
+function orderedBlockAttrs(attrs: Record<string, string>): Array<[string, string]> {
   const known = ATTR_ORDER.filter((name) => name in attrs).map((name): [string, string] => [name, attrs[name]]);
   return [...known, ...Object.entries(attrs).filter(([name]) => !ATTR_ORDER.includes(name))];
 }

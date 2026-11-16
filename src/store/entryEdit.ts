@@ -17,7 +17,7 @@ import type { Entry } from '../types';
  * begins with what is saved. A change of category in the properties panel
  * is part of the edit like any other: Cancel brings it back.
  */
-export interface EditBaseline {
+interface EditBaseline {
   scope: ViewId;
   id: string;
   patch: BaselineFields;

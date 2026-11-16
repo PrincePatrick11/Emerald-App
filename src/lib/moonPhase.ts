@@ -5,7 +5,7 @@ import { JOURNAL_CATEGORY_ID } from './schema';
  * Calculates the approximate moon phase for a given date.
  * Based on the known new moon on 2000-01-06 and the synodic period of ~29.53 days.
  */
-export function getMoonPhase(date: Date = new Date()): MoonPhase {
+function getMoonPhase(date: Date = new Date()): MoonPhase {
   const knownNewMoon = new Date('2000-01-06T18:14:00Z');
   const synodicPeriod = 29.53058867;
 

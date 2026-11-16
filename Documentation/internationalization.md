@@ -66,7 +66,7 @@ const label = categoryLabel(t, cat);
 const label = cat.name;
 ```
 
-`categoryLabel` resolves a builtin via `categories.builtin.<id>` and returns `cat.name` unchanged for everything else. That includes a fresh vault's eight starter categories: `categories.starter.<key>` is used only once, to *name* them at creation; from then on they are ordinary rows the user can rename or delete. There are no module-scoped category keys: every category name goes through `categories.*`.
+`categoryLabel` resolves a builtin via `categories.builtin.<id>` and returns `cat.name` unchanged for everything else. That includes a fresh vault's nine starter categories: `categories.starter.<key>` is used only once, to *name* them at creation; from then on they are ordinary rows the user can rename or delete. There are no module-scoped category keys: every category name goes through `categories.*`.
 
 ## Key Structure
 

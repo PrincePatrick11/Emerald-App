@@ -27,9 +27,9 @@ interface VaultsFile {
 /** Mirrors `DB_FILE` in `src-tauri/src/vault.rs`. */
 export const DB_FILE = 'emerald.db';
 /** Mirrors `IMPORT_STAGING_FILE` in `src-tauri/src/vault.rs`. */
-export const IMPORT_STAGING_FILE = 'emerald.db.import';
+const IMPORT_STAGING_FILE = 'emerald.db.import';
 
-export interface VaultProbe {
+interface VaultProbe {
   exists: boolean;
   /** The folder is there, but Emerald may not look inside — on macOS the
    *  normal answer for `~/Documents`, `~/Desktop` and iCloud as long as the
@@ -132,7 +132,7 @@ export function parentDir(filePath: string): string {
  * it was joined onto — separators, `..`, the Windows-reserved characters, and
  * the device names that are not filenames on Windows no matter the extension.
  */
-export function vaultFolderName(name: string): string {
+function vaultFolderName(name: string): string {
   const cleaned = name
     // eslint-disable-next-line no-control-regex
     .replace(/[<>:"/\\|?*\u0000-\u001f]/g, ' ')
@@ -252,7 +252,7 @@ async function readVaultsFile(): Promise<VaultsFile> {
   return data;
 }
 
-export async function saveVaultsFile(data: VaultsFile): Promise<void> {
+async function saveVaultsFile(data: VaultsFile): Promise<void> {
   const path = await getVaultsPath();
   const content = { ...data, vaults: [...data.vaults, ..._unreadRecords] };
   await invoke('write_file', { path, content: JSON.stringify(content, null, 2) });
@@ -262,7 +262,7 @@ export async function saveVaultsFile(data: VaultsFile): Promise<void> {
 }
 
 /** The active vault's directory. */
-export async function getActiveVaultPath(): Promise<string> {
+async function getActiveVaultPath(): Promise<string> {
   const data = await loadVaultsFile();
   const active = data.vaults.find((v) => v.id === data.activeVaultId);
   // No fallback to `vaults[0]`: that would open someone else's database under the
@@ -324,7 +324,7 @@ export function newVaultTarget(
 }
 
 /** Why a folder cannot take a *new* vault — or `null` when it can. */
-export type NewVaultTargetProblem = 'alreadyOpen' | 'denied' | 'hasVault' | 'notEmpty';
+type NewVaultTargetProblem = 'alreadyOpen' | 'denied' | 'hasVault' | 'notEmpty';
 
 /**
  * The message each problem gets. Lives beside {@link probeNewVaultTarget} so
@@ -366,7 +366,7 @@ export async function probeNewVaultTarget(path: string): Promise<NewVaultTargetP
 }
 
 /** Where a vault with this id would land without a user-chosen location. */
-export function defaultVaultDir(vaultId: string): Promise<string> {
+function defaultVaultDir(vaultId: string): Promise<string> {
   return invoke<string>('default_vault_dir', { vaultId });
 }
 

@@ -183,7 +183,7 @@ function useEntriesConfig(entries: readonly Entry[], dashboardId: string): Entry
     onOpenNewTab: (e) => openViewInNewTab(viewOf(e)),
     onDragStart: (e) => {
       setDragItem({
-        id: e.id, entryType: 'entry', label: displayTitle(t, 'entry', e.title),
+        id: e.id, targetKind: 'entry', label: displayTitle(t, 'entry', e.title),
         category: lookupCategory(catById, e.category_id)?.emoji,
       });
     },
@@ -225,7 +225,7 @@ function useTasksConfig(): EntryListTabProps<Task> {
   // One payload for both drag spots (default config for the "All" tab and
   // the hand grip in renderRow below), so they do not drift apart.
   const taskDragItem = (task: Task) =>
-    setDragItem({ id: task.id, entryType: 'task', label: displayTitle(t, 'task', task.title), category: lookupCategory(catById, task.category_id)?.emoji });
+    setDragItem({ id: task.id, targetKind: 'task', label: displayTitle(t, 'task', task.title), category: lookupCategory(catById, task.category_id)?.emoji });
 
   const handleDelete = async (task: (typeof tasks)[number]) => {
     await deleteTask(task.id);

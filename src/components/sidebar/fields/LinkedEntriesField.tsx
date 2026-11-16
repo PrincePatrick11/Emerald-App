@@ -12,8 +12,8 @@ import { extractInternalLinks } from '../../../lib/internalLinkHtml';
 import { viewOfLinkTarget } from '../../../store/entryViews';
 import { linkItemKey as itemKey, linkItemsByKey } from '../../../lib/linkItems';
 import {
-  ENTRY_TYPE_ICONS,
-  ENTRY_TYPE_LABEL_KEYS,
+  TARGET_KIND_ICONS,
+  TARGET_KIND_LABEL_KEYS,
   type SuggestionItem,
 } from '../../editors/text/SuggestionList';
 
@@ -91,7 +91,7 @@ function useRevealLink() {
   const setActiveView = useUIStore((s) => s.setActiveView);
   return (item: SuggestionItem) => {
     if (requestEntryLinkReveal(item)) return;
-    setActiveView(viewOfLinkTarget(item.entryType, item.id));
+    setActiveView(viewOfLinkTarget(item.targetKind, item.id));
   };
 }
 
@@ -111,7 +111,7 @@ export function LinkedEntriesSection({ content }: Props) {
           key={itemKey(item)}
           icon={<LinkItemIcon item={item} />}
           label={item.label}
-          meta={item.categoryLabel || t(ENTRY_TYPE_LABEL_KEYS[item.entryType])}
+          meta={item.categoryLabel || t(TARGET_KIND_LABEL_KEYS[item.targetKind])}
           onClick={() => reveal(item)}
         />
       ))}
@@ -180,7 +180,7 @@ export default function LinkedEntriesField({ content }: Props) {
           key={itemKey(item)}
           icon={<LinkItemIcon item={item} />}
           label={item.label}
-          meta={item.categoryLabel || t(ENTRY_TYPE_LABEL_KEYS[item.entryType])}
+          meta={item.categoryLabel || t(TARGET_KIND_LABEL_KEYS[item.targetKind])}
           title={item.label}
           onClick={() => reveal(item)}
           action={<SidebarRowRemove title={t('properties.removeLink')} onClick={() => remove(item)} />}
@@ -196,13 +196,13 @@ export default function LinkedEntriesField({ content }: Props) {
           placeholder={t('properties.linkEntry')}
           fieldIcon={<Search size={14} />}
           renderResult={(item) => {
-            const TypeIcon = ENTRY_TYPE_ICONS[item.entryType];
+            const TypeIcon = TARGET_KIND_ICONS[item.targetKind];
             return (
               <>
                 <LinkItemIcon item={item} />
                 <span className="flex-1 truncate">{item.label}</span>
                 <TypeIcon size={12} className="text-subtle flex-shrink-0" />
-                <span className="text-subtle flex-shrink-0">{t(ENTRY_TYPE_LABEL_KEYS[item.entryType])}</span>
+                <span className="text-subtle flex-shrink-0">{t(TARGET_KIND_LABEL_KEYS[item.targetKind])}</span>
               </>
             );
           }}

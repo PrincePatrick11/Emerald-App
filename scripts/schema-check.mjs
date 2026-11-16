@@ -618,6 +618,11 @@ console.log('\n7. Seeds: built-in categories, starter set, built-in templates an
     cats.some((c) => c.id === 'herbs' && c.is_builtin === 0 && c.name === 'Herbs') && cats.some((c) => c.id === 'dreams' && c.is_builtin === 0 && c.name === 'Dream Journal'),
     JSON.stringify(cats)
   );
+  check(
+    'the dream journal comes right after the journal, ahead of sigils and altars',
+    cats.slice(0, 4).map((c) => c.id).join() === 'journal,dreams,sigils,altars',
+    JSON.stringify(cats)
+  );
   const [t] = await baseline.select("SELECT * FROM templates WHERE id='core-sigil'");
   const content = await stackOf(baseline, 'template', 'core-sigil');
   const starts = Object.fromEntries((await baseline.select('SELECT id, template_id FROM categories')).map((c) => [c.id, c.template_id]));
@@ -749,7 +754,7 @@ console.log('\n9. Block rows\n');
   check('the seeded templates have their block rows', seeded.n >= 4, seeded);
 
   const linked = '44444444-4444-4444-4444-444444444444';
-  const chip = `<span data-type="internalLink" class="internal-link" data-id="${linked}" data-entry-type="entry" data-label="Ziel">Ziel</span>`;
+  const chip = `<span data-type="internalLink" class="internal-link" data-id="${linked}" data-target-kind="entry" data-label="Ziel">Ziel</span>`;
   await insertWithStack(db, 'entries', { id: 'p1', title: 'Plain', created_at: now, updated_at: now }, `<p>Text ${chip}</p>`);
   const [p1] = await db.select("SELECT type, text FROM blocks WHERE entry_id = 'p1'");
   check('a text entry is one text row with its plain text', p1?.type === 'core.text' && p1.text === 'Text Ziel', p1); // lang-ok
@@ -905,14 +910,14 @@ console.log("\n11. Backups: the round trip of '17', older and newer files refuse
   const TASK = '7b000000-0000-4000-8000-000000000004';
   const pic = (c) => `${c.repeat(64)}.png`;
   const attr = (value) => JSON.stringify(value).replace(/&/g, '&amp;').replace(/"/g, '&quot;');
-  const chipTo = (id) => `<span data-type="internalLink" class="internal-link" data-id="${id}" data-entry-type="entry" data-label="Ziel">Ziel</span>`; // lang-ok
+  const chipTo = (id) => `<span data-type="internalLink" class="internal-link" data-id="${id}" data-target-kind="entry" data-label="Ziel">Ziel</span>`; // lang-ok
   const scene = {
     width: 1600, height: 1000, elements: [], guides: [], guidesLocked: false,
     background: { fill: null, image: { src: pic('4') }, tint: null },
   };
   const fieldsConfig = {
     elements: [
-      { id: 'ln', kind: 'link', label: 'L', defaultValue: { id: W, entryType: 'entry', label: 'Ziel' } }, // lang-ok
+      { id: 'ln', kind: 'link', label: 'L', defaultValue: { id: W, targetKind: 'entry', label: 'Ziel' } }, // lang-ok
       { id: 'im', kind: 'image', label: 'I', defaultValue: pic('5') },
     ],
   };

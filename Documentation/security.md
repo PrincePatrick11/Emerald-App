@@ -231,7 +231,6 @@ Validation rules against malformed, oversized, or untrusted data, much of it in 
 
 - **Image sources.** Stored image references are turned into a `src` only through `imageSrc()` (`src/lib/images.ts`): a valid stored filename becomes an `emerald-img` URL for the active vault, `data:`, `blob:` and `http…` values pass through, and anything else yields an empty string, so the `<img>` is skipped and the emoji or live preview is shown instead. Pictures on a canvas, the tiles of "Images" and image fields all go through it. Remote `http(s)` images are blocked by the CSP's `img-src` (see [Content Security Policy](#content-security-policy)).
 - **Background CSS interpolation.** All canvas background CSS is built by the canvas editor's `backgroundCss`, with the picture's URL from `altarBackgroundUrl` (`src/lib/altarBackground.ts`, used by `CanvasBlock`): one of the app's own `/backgrounds/{name}.webp` or whatever `imageSrc()` allows — so only those shapes reach the CSS `url(…)`, with any quote escaped.
-- **`hexToRgb`** (`src/lib/helpers.ts`) calls `isValidHexColor` first and returns `{r:0, g:0, b:0}` for invalid input instead of `NaN` values that would propagate into `rgba(...)`.
 - **No SVG icons.** Every icon upload (entry, template, block, language) goes through `readIconFile` (`src/lib/imageLimits.ts`), which refuses `image/svg+xml` on top of the general MIME allowlist (`isAcceptedImageFile`); `save_icon` refuses an SVG data URL as well, so a backup or an `.emerald` file cannot bring one into `icons/` either (the row falls back to its default icon). Other upload paths accept SVG.
 ## Backup Import Column Validation
 
@@ -249,7 +248,7 @@ A password-sealed `.emerald` file (XChaCha20-Poly1305 under an Argon2id key, hea
 
 ## HTML Escaping in Exports
 
-User-provided text interpolated into the PDF export HTML goes through `htmlEscape()` (exported from `src/lib/export.ts`), which replaces `&`, `<`, `>`, `"` and `'` with HTML entities. It is applied to:
+User-provided text interpolated into the PDF export HTML goes through `htmlEscape()` (in `src/lib/export.ts`), which replaces `&`, `<`, `>`, `"` and `'` with HTML entities. It is applied to:
 
 - the entry title (in `<title>` and the `<h1>`),
 - the top bar's emoji icon and its label (moon phase name or category name),
@@ -261,9 +260,9 @@ An image icon is passed through `sanitizeDataImageUrl` instead. The content HTML
 
 All HTML that enters the app from outside is sanitised with DOMPurify before being stored or displayed.
 
-**PDF export (`src/lib/export.ts`).** Before the content HTML is handed to `export_pdf`, it passes through `DOMPurify.sanitize` with an allowlist for the internal-link attributes — `data-type`, `data-id`, `data-entry-type`, `data-label`, `data-icon`, `data-entry-number`, `data-href` — so internal-link chips survive, plus `colwidth` (table column widths) and `data-color` (one of six colour names; the print CSS matches only those). This closes an injection path if an editor extension or import produces unexpected HTML.
+**PDF export (`src/lib/export.ts`).** Before the content HTML is handed to `export_pdf`, it passes through `DOMPurify.sanitize` with an allowlist for the internal-link attributes — `data-type`, `data-id`, `data-target-kind`, `data-label`, `data-icon`, `data-entry-number`, `data-href` — so internal-link chips survive, plus `colwidth` (table column widths) and `data-color` (one of six colour names; the print CSS matches only those). This closes an injection path if an editor extension or import produces unexpected HTML.
 
-**Emerald import (`src/lib/emeraldFormat.ts`).** After picture names and links are remapped, content passes through `sanitizeImportedHtml` — the last step of every import that writes HTML to the database. It keeps TipTap's own attributes (`data-type`, `data-id`, `data-entry-type`, `data-label`, `data-icon`, `data-entry-number`, `data-align`, `colwidth`, `data-color`) and strips everything DOMPurify removes by default (script tags, event handlers, …). `data-align` is intentionally not in the PDF allowlist: that path never reads it, and alignment survives through the image's inline margins.
+**Emerald import (`src/lib/emeraldFormat.ts`).** After picture names and links are remapped, content passes through `sanitizeImportedHtml` — the last step of every import that writes HTML to the database. It keeps TipTap's own attributes (`data-type`, `data-id`, `data-target-kind`, `data-label`, `data-icon`, `data-entry-number`, `data-align`, `colwidth`, `data-color`) and strips everything DOMPurify removes by default (script tags, event handlers, …). `data-align` is intentionally not in the PDF allowlist: that path never reads it, and alignment survives through the image's inline margins.
 
 **Markdown import.** `marked` converts the body to HTML in `emeraldFormat.ts`, and `sanitizeImportedHtml` runs as the very last step, so nothing added along the way skips the filter.
 

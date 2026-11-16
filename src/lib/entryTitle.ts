@@ -6,7 +6,7 @@ export function hasOwnTitle(title: string | null | undefined): title is string {
 }
 
 /** The "Untitled …" text of an entry and of a task. */
-export const UNTITLED_KEYS: Record<LinkTargetKind, string> = {
+const UNTITLED_KEYS: Record<LinkTargetKind, string> = {
   entry: 'entries.untitled',
   task: 'tasks.untitled',
 };

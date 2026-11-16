@@ -1,9 +1,9 @@
 import { CONTENT_MODULE_IDS, type ContentModuleId } from './modules';
 
 /** A translator — `i18n.t`, the `t` from useTranslation or a prop passed down. */
-export type Translate = (key: string, options?: { defaultValue?: string }) => string;
+type Translate = (key: string, options?: { defaultValue?: string }) => string;
 
-export interface LabelableCategory {
+interface LabelableCategory {
   id: string;
   name: string;
   /** Boolean in the stores, 0/1 in a backup row. */
@@ -62,10 +62,10 @@ export function lookupCategory<C>(
 }
 
 /** How often a category is used: by entries and by tasks. */
-export type CategoryUsage = Record<ContentModuleId, number>;
+type CategoryUsage = Record<ContentModuleId, number>;
 
 /** The lists from which a category's usage is derived. */
-export type CategorySources = Record<ContentModuleId, readonly { category_id: string | null }[]>;
+type CategorySources = Record<ContentModuleId, readonly { category_id: string | null }[]>;
 
 export const emptyCategoryUsage = (): CategoryUsage => ({ entries: 0, tasks: 0 });
 

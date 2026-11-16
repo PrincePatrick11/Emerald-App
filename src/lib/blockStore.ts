@@ -38,7 +38,7 @@ export const OWNER: Record<BlockOwnerKind, { column: 'entry_id' | 'template_id';
 const ROW_COLUMNS = 'id, position, type, version, hidden, title, show_title, config, data, attrs, html';
 
 /** Bound values per `IN (…)` list — far below SQLite's limit. */
-export const ID_CHUNK = 500;
+const ID_CHUNK = 500;
 
 /* ---------------- What was last saved ---------------- */
 
@@ -242,7 +242,7 @@ function deleteStatements(owner: BlockOwner, ids: readonly string[]): Statement[
   return out;
 }
 
-export interface BlockWrite {
+interface BlockWrite {
   /** The statements for the rows; the caller adds its own row's and runs them in one batch. */
   statements: Statement[];
   /** The block HTML as it follows from the blocks — what the store keeps in memory. */

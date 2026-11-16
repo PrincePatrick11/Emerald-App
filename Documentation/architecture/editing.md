@@ -102,7 +102,7 @@ Two guards protect the save paths:
 
 ## Internal Links
 
-`createInternalLinkExtension(getItems, getIcon, getLabel)` renders linked entries as inline chips; its callbacks are ref-backed so they always see current store state. Each chip stores `data-type="internalLink"`, `data-id`, `data-entry-type`, `data-label` and `data-icon`. Chips render identically in edit and view mode; the node view reads `editor.isEditable` at event time.
+`createInternalLinkExtension(getItems, getIcon, getLabel)` renders linked entries as inline chips; its callbacks are ref-backed so they always see current store state. Each chip stores `data-type="internalLink"`, `data-id`, `data-target-kind`, `data-label` and `data-icon`. Chips render identically in edit and view mode; the node view reads `editor.isEditable` at event time.
 
 The chips in the text blocks are the record of what links where — there is no links table of their own. `block_refs` lists each chip's target per block, which is how the image cleanup and the backup find what a block names; what an open entry links is read from its in-memory text.
 
@@ -138,7 +138,7 @@ Pictures go from the vault into the archive in Rust (`images::load`), so no pict
 
 **Import** (`importEmeraldFile(path)`; the menu adds the open dialog). Rust checks the file before anything is stored (limits in [`security.md`](../security.md#emerald-import-limits)) and accepts only the three member shapes. It stores pictures and icons under this vault's names and returns the manifest and, per picture and icon, the name stored here, keyed by the hash part of its name in the file. A file starting with `{` is the JSON format of earlier versions (`EMERALD_OLD_FORMAT`). The frontend checks the manifest field by field (`parseManifest`), creates every entry blank first so the in-file ids can be mapped, then writes each item's content: icons and pictures renamed, left-out pictures pointed at one placeholder picture stored for the import, in-file links re-pointed, other links resolved as above, `sanitizeImportedHtml` last. If a step fails, the entries and templates created so far are deleted again; categories and tags it created stay, pictures are left to the image cleanup.
 
-**What a chip stores.** `data-entry-type` holds the target *kind* — `entry` or `task` (`linkTargetKindOf`), never anything about the entry's category: a click opens the entry page in "All entries" (`viewOfLinkTarget` in `store/entryViews.ts`). So a change of category rewrites no chip. `linkItemKey` maps a chip and a link item onto the same key, `entry:<id>` or `task:<id>`.
+**What a chip stores.** `data-target-kind` holds the target *kind* — `entry` or `task` (`linkTargetKindOf`), never anything about the entry's category: a click opens the entry page in "All entries" (`viewOfLinkTarget` in `store/entryViews.ts`). So a change of category rewrites no chip. `linkItemKey` maps a chip and a link item onto the same key, `entry:<id>` or `task:<id>`.
 
 ## Text and Image Alignment
 

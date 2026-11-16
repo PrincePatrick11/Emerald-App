@@ -43,14 +43,14 @@ export function insertTemplateStatements(template: Template): [string, unknown[]
 }
 
 /** A template with its block stack — for the seeds of a fresh vault. */
-export async function insertTemplateRow(db: Database, template: Template): Promise<void> {
+async function insertTemplateRow(db: Database, template: Template): Promise<void> {
   const blocks = replaceOwnerBlocks({ kind: 'template', id: template.id }, template.content, template.updated_at, { hasRows: false });
   await db.batch([...insertTemplateStatements(template), ...blocks.statements]);
   blocks.commit();
 }
 
 /** A template by ID — also from the trash, unlike the store, which holds only the active ones; its blocks from their rows. */
-export async function templateById(db: Database, id: string): Promise<Template | undefined> {
+async function templateById(db: Database, id: string): Promise<Template | undefined> {
   const [row] = await db.select<DbRow[]>('SELECT * FROM templates WHERE id=$1', [id]);
   if (!row) return undefined;
   const template = fromRow.template({ ...row, tags: await readTags(db, 'template', id) });

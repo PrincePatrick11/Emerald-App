@@ -18,15 +18,15 @@ import { revealFolded } from './HeadingFoldExtension';
  * from there.
  */
 
-/** Position of the FIRST link chip for `id`/`entryType` in the document, or `null`.
+/** Position of the FIRST link chip for `id`/`targetKind` in the document, or `null`.
  *  A target linked twice is thus always found at its first spot;
  *  for "is this already linked?" and "show me the spot" that is enough,
  *  a second hit would first need a way to operate it. */
-export function findEntryLinkPos(doc: ProseMirrorNode, target: { id: string; entryType: string }): number | null {
+export function findEntryLinkPos(doc: ProseMirrorNode, target: { id: string; targetKind: string }): number | null {
   let found: number | null = null;
   doc.descendants((node, pos) => {
     if (found !== null) return false;
-    if (node.type.name === 'internalLink' && node.attrs.id === target.id && linkTargetKindOf(node.attrs.entryType) === linkTargetKindOf(target.entryType)) {
+    if (node.type.name === 'internalLink' && node.attrs.id === target.id && linkTargetKindOf(node.attrs.targetKind) === linkTargetKindOf(target.targetKind)) {
       found = pos;
       return false;
     }
@@ -80,11 +80,11 @@ export function appendEntryLink(editor: Editor, item: EntryLinkRequest): void {
 }
 
 /** Does the paragraph carry only this one chip (plus whitespace)? */
-function holdsOnlyLink(paragraph: ProseMirrorNode, target: { id: string; entryType: string }): boolean {
+function holdsOnlyLink(paragraph: ProseMirrorNode, target: { id: string; targetKind: string }): boolean {
   let only = true;
   paragraph.forEach((child) => {
     if (child.type.name === 'internalLink') {
-      if (child.attrs.id !== target.id || linkTargetKindOf(child.attrs.entryType) !== linkTargetKindOf(target.entryType)) only = false;
+      if (child.attrs.id !== target.id || linkTargetKindOf(child.attrs.targetKind) !== linkTargetKindOf(target.targetKind)) only = false;
       return;
     }
     if (child.isText && !(child.text ?? '').trim()) return;
@@ -187,7 +187,7 @@ export function revealPosition(editor: Editor, pos: number): void {
  */
 export function revealEntryLink(
   editor: Editor,
-  target: { id: string; entryType: string },
+  target: { id: string; targetKind: string },
   { caretAtBlockEnd = false }: { caretAtBlockEnd?: boolean } = {},
 ): boolean {
   const pos = findEntryLinkPos(editor.state.doc, target);

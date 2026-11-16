@@ -11,7 +11,7 @@ import { readTagLinks, readTags, tagStatements } from '../lib/tagRefs';
 import type { VaultImage } from '../types';
 
 /** What a row lets one change; the file stays what it is. */
-export type ImagePatch = Partial<Pick<VaultImage, 'name' | 'tags' | 'note'>>;
+type ImagePatch = Partial<Pick<VaultImage, 'name' | 'tags' | 'note'>>;
 
 const byName = (a: VaultImage, b: VaultImage) =>
   (a.name || a.file).localeCompare(b.name || b.file) || a.created_at.localeCompare(b.created_at);

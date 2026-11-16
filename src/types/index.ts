@@ -2,7 +2,7 @@ import type { TrashKind, ViewId } from '../lib/modules';
 
 /**
  * What a link points at (`task_links.target_type`, the chip's
- * `data-entry-type`, drag payloads, link items, search hits): an entry or a task.
+ * `data-target-kind`, drag payloads, link items, search hits): an entry or a task.
  */
 export type LinkTargetKind = 'entry' | 'task';
 

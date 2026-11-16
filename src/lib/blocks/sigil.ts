@@ -32,7 +32,7 @@ import { BLOCK_ATTR, type BlockInstance } from './types';
  */
 
 /** The virtual block types of the parts: the field kinds themselves. */
-export const SIGIL_CALC_KIND = 'sigilCalc' satisfies SigilElementKind;
+const SIGIL_CALC_KIND = 'sigilCalc' satisfies SigilElementKind;
 export const SIGIL_CANVAS_KIND = 'sigilCanvas' satisfies SigilElementKind;
 export const SIGIL_CHARGE_KIND = 'sigilCharge' satisfies SigilElementKind;
 
@@ -70,18 +70,12 @@ export function isSigilToolType(type: string): boolean {
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
-export function isIsoDate(value: unknown): value is string {
+function isIsoDate(value: unknown): value is string {
   return typeof value === 'string' && ISO_DATE.test(value);
 }
 
-/** Today's date as `YYYY-MM-DD`, local — that is how it compares with the target date. */
-export function todayIso(now = new Date()): string {
-  const pad = (n: number) => String(n).padStart(2, '0');
-  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
-}
-
 /** Plain text as paragraphs, one line per `<p>`, escaped. */
-export function textParagraphs(text: string): string {
+function textParagraphs(text: string): string {
   return text.split('\n').map((line) => `<p>${escapeHtml(line)}</p>`).join('');
 }
 
@@ -249,7 +243,7 @@ export function withSigilPart(model: FieldsModel, element: ElementDef, part: Blo
 }
 
 /** A sigil of the entry: a sigil drawing block, or the part of a fields block (then with element and field block). */
-export interface SigilUnit {
+interface SigilUnit {
   block: BlockInstance;
   part?: { parent: BlockInstance; element: ElementDef };
 }
@@ -433,7 +427,7 @@ export function withoutConcealed(content: string, today: string): string {
  * under its title (`FieldsBlock` then shows the part without a label row).
  * The converter of the old sigil blocks writes the same.
  */
-export function sigilFieldAttrs(kind: SigilElementKind, elementId: string): Record<string, string> {
+function sigilFieldAttrs(kind: SigilElementKind, elementId: string): Record<string, string> {
   const element: ElementDef = { id: elementId, kind, label: '' };
   return {
     [BLOCK_ATTR.config]: JSON.stringify({ elements: [element], display: { ...DEFAULT_DISPLAY, readHideEmpty: false } }),

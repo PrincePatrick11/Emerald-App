@@ -32,14 +32,14 @@ export type TranslateMode = 'words' | 'letters' | 'both';
  * A piece of the result. `source` is what was in the input text — the UI
  * shows it in the tooltip and uses it to mark what was not matched.
  */
-export interface TranslationSegment {
+interface TranslationSegment {
   text: string;
   source: string;
   /** `gap` is everything between the words: spaces, punctuation, line breaks. */
   kind: 'word' | 'letters' | 'unknown' | 'gap';
 }
 
-export interface TranslationResult {
+interface TranslationResult {
   segments: TranslationSegment[];
   /** The segments joined together — what the copy button takes. */
   text: string;
@@ -57,7 +57,7 @@ export interface TranslationResult {
  * A character pair only takes effect if both sides carry something — the one rule
  * for that, here instead of spelled out three separate times.
  */
-export function isUsablePair(pair: AlphabetPair): boolean {
+function isUsablePair(pair: AlphabetPair): boolean {
   return pair.from.trim() !== '' && pair.to.trim() !== '';
 }
 

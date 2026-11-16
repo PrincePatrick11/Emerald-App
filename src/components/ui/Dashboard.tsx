@@ -55,7 +55,7 @@ export interface DashboardPrimaryAction {
   disabled?: boolean;
 }
 
-export interface DashboardFilters {
+interface DashboardFilters {
   /** Counts for the reset button of the "No results" notice. */
   activeFilterCount: number;
   /** Clears the filters, the same button; in the sidebar itself the
@@ -148,7 +148,7 @@ type DashboardContentProps<T> =
       hasNoResults?: undefined;
     };
 
-export type DashboardProps<T> = DashboardBaseProps<T> & DashboardContentProps<T>;
+type DashboardProps<T> = DashboardBaseProps<T> & DashboardContentProps<T>;
 
 const DEFAULT_CARDS_CLASSNAME = 'grid grid-cols-3 gap-3';
 const DEFAULT_WIDE_CARDS_CLASSNAME = 'grid grid-cols-1 gap-3';

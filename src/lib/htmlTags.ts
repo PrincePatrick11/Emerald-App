@@ -5,7 +5,7 @@
  */
 
 /** A tag or comment in markup, as `htmlTags` finds it. */
-export interface HtmlTag {
+interface HtmlTag {
   /** Where it starts, and how long it is (`<` to `>` inclusive). */
   index: number;
   length: number;

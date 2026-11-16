@@ -4,6 +4,7 @@ import { save, message } from '@tauri-apps/plugin-dialog';
 import TurndownService from 'turndown';
 import { TEXT_COLORS, TEXT_COLOR_SHADES } from './textColors';
 import { format } from 'date-fns';
+import { exportFilename } from './helpers';
 import DOMPurify from 'dompurify';
 import type { ExportData } from './exportData';
 import { useEntryStore } from '../store/entryStore';
@@ -15,7 +16,7 @@ import i18n from '../i18n';
 
 // ── helpers ────────────────────────────────────────────────────────────────
 
-export function htmlEscape(str: string): string {
+function htmlEscape(str: string): string {
   return str
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
@@ -81,7 +82,7 @@ async function resolveInternalLinkIcons(html: string): Promise<string> {
     // Only fill missing icons
     if (el.getAttribute('data-icon')) continue;
     const id        = el.getAttribute('data-id');
-    const targetKind = el.getAttribute('data-entry-type');
+    const targetKind = el.getAttribute('data-target-kind');
     if (!id) continue;
 
     let icon = '';
@@ -142,17 +143,6 @@ function transformInternalLinks(html: string): string {
   }
 
   return doc.body.innerHTML;
-}
-
-function safeFilename(title: string): string {
-  return title.replace(/[^\w\s\-äöüÄÖÜß]/g, '').trim().replace(/\s+/g, '_') || 'export';
-}
-
-/** `<title>_<yyyy-MM-dd>.<ext>`, the title reduced to what a file name takes — every export's default name. */
-export function exportFilename(title: string, date: string, ext: string): string {
-  const base = safeFilename(title);
-  const dateStr = format(new Date(date), 'yyyy-MM-dd');
-  return `${base}_${dateStr}.${ext}`;
 }
 
 // Top bar: icon, date and the moon phase's or category's name — 🌕 January 15, 2026 · Full Moon
@@ -341,7 +331,7 @@ export async function exportAsPDF(data: ExportData): Promise<void> {
     <h1 class="entry-title">${escapedTitle}${numStr}</h1>
     ${metaHtml}
     <div class="entry-content">${DOMPurify.sanitize(transformedContent, {
-      ADD_ATTR: ['data-type', 'data-id', 'data-entry-type', 'data-label', 'data-icon', 'data-entry-number', 'data-href', 'colwidth', 'data-color'],
+      ADD_ATTR: ['data-type', 'data-id', 'data-target-kind', 'data-label', 'data-icon', 'data-entry-number', 'data-href', 'colwidth', 'data-color'],
     })}</div>
   </div>
 </body>
@@ -373,7 +363,7 @@ function mdIcon(icon?: string | null, fallbackIcon?: string | null): string {
 }
 
 /** HTML of the content to Markdown, with the rules for what the app's content holds beyond plain HTML. */
-export function createMarkdownConverter(): TurndownService {
+function createMarkdownConverter(): TurndownService {
   const td = new TurndownService({ headingStyle: 'atx', codeBlockStyle: 'fenced' });
 
   td.addRule('internalLink', {

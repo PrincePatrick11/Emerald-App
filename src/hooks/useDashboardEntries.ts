@@ -4,7 +4,7 @@ import { entriesOfDashboard } from '../store/entryViews';
 import type { Dashboard, Entry } from '../types';
 
 /** A live dashboard by ID (the built-ins' IDs are their keys) — `undefined` if it is gone. */
-export function useDashboard(id: string | undefined): Dashboard | undefined {
+function useDashboard(id: string | undefined): Dashboard | undefined {
   return useDashboardStore((s) => dashboardById(s.dashboards, id));
 }
 

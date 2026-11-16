@@ -14,20 +14,20 @@ import { useCanvasHistory, type CanvasScene } from './useCanvasHistory';
 import { FULL_CANVAS_FEATURES, type CanvasFeatures } from './features';
 import { BUILTIN_CANVAS_TYPES } from './elements';
 import {
-  align, arrange, clamp, copiesOf, distribute, group, moveInStack, nudge, ungroup, withGroups,
+  align, arrange, copiesOf, distribute, group, moveInStack, nudge, ungroup, withGroups,
   type AlignEdge, type ArrangeMove,
 } from './canvasActions';
 import { byZ, type CanvasAddition, type CanvasElement, type CanvasGrid, type CanvasTypes } from './types';
 import CanvasToolbar, { CanvasToolRail, CanvasZoom } from './CanvasToolbar';
 import TextEditOverlay from './TextEditOverlay';
 import ElementList from './ElementList';
-import Rulers, { RULER_SIZE, rulerLayout, type RulerGuide } from './Rulers';
+import Rulers, { RULER_SIZE, readToken, rulerLayout, type RulerGuide } from './Rulers';
 import PaintSurface from './paint/PaintSurface';
 import PaintToolbar, { PAINT_TOOL_DEFS, PaintToolRail, toolEnabled } from './paint/PaintToolbar';
 import LayerPanel from './paint/LayerPanel';
 import { isSelectTool, usePaintBrush, usePaintControls } from './paint/usePaintTools';
 import { FULL_PAINT_FEATURES, type PaintFeatures } from './paint/features';
-import { emptyPaintDoc, type PaintDoc } from '../../../lib/paint/document';
+import { clamp, emptyPaintDoc, type PaintDoc } from '../../../lib/paint/document';
 import { ToolbarBtn } from '../shared/toolbarParts';
 import { Check, Keyboard } from 'lucide-react';
 import ShortcutOverview from './ShortcutOverview';
@@ -160,11 +160,6 @@ interface View {
   zoom: number;
   x: number;
   y: number;
-}
-
-function readToken(el: HTMLElement | null, name: string, fallback: string): string {
-  if (!el) return fallback;
-  return getComputedStyle(el).getPropertyValue(name).trim() || fallback;
 }
 
 /**

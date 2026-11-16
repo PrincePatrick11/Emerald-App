@@ -1,3 +1,4 @@
+import { clamp } from '../../../lib/paint/document';
 import { elementBounds, unionBounds, type Box } from './geometry';
 import { byZ, type CanvasElement } from './types';
 
@@ -174,6 +175,3 @@ export function nudge(
     : el));
 }
 
-export function clamp(value: number, min: number, max: number): number {
-  return Math.max(min, Math.min(max, value));
-}

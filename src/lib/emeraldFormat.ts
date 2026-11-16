@@ -5,7 +5,7 @@ import { storedImageName, storedImageNamesIn } from './schema';
 import { parseBlocks } from './blocks/blockHtml';
 import { blockRefs } from './blocks/blockRefs';
 import { open as openDialog, save, message } from '@tauri-apps/plugin-dialog';
-import { format } from 'date-fns';
+import { exportFilename } from './helpers';
 import { marked } from 'marked';
 import DOMPurify from 'dompurify';
 import { useUIStore } from '../store/uiStore';
@@ -63,7 +63,7 @@ function collectContentLinks(contents: readonly string[]): ManifestLink[] {
       const key = linkItemKey(link);
       if (seen.has(key)) continue;
       seen.add(key);
-      out.push({ id: link.id, kind: link.entryType === 'task' ? 'task' : 'entry', title: byKey.get(key)?.label ?? '' });
+      out.push({ id: link.id, kind: link.targetKind === 'task' ? 'task' : 'entry', title: byKey.get(key)?.label ?? '' });
     }
   }
   return out;
@@ -89,10 +89,10 @@ function remapImportedLinks(
   ownIds: ReadonlySet<string> = new Set(),
 ): string {
   const byKey = linkItemsByKey(items);
-  const titleByKey = new Map(links.map((l) => [linkItemKey({ id: l.id, entryType: l.kind }), l.title]));
+  const titleByKey = new Map(links.map((l) => [linkItemKey({ id: l.id, targetKind: l.kind }), l.title]));
   return remapInternalLinks(content, (link) => (
     // An entry of the same file, created by this import: its title is not written yet, the chip's own label stays.
-    link.entryType !== 'task' && ownIds.has(link.id)
+    link.targetKind !== 'task' && ownIds.has(link.id)
       ? { id: link.id }
       : resolveImportedTarget(link, titleByKey.get(linkItemKey(link)), items, byKey)
   ));
@@ -103,31 +103,19 @@ function remapImportedLinks(
  * the same title under the same kind — or `null`.
  */
 function resolveImportedTarget(
-  link: { id: string; entryType: string; label: string },
+  link: { id: string; targetKind: string; label: string },
   manifestTitle: string | undefined,
   items: SuggestionItem[],
   byKey = linkItemsByKey(items),
 ): { id: string; label: string } | null {
-  const local = byKey.get(linkItemKey({ id: link.id, entryType: link.entryType as SuggestionItem['entryType'] }));
+  const local = byKey.get(linkItemKey({ id: link.id, targetKind: link.targetKind as SuggestionItem['targetKind'] }));
   if (local) return { id: local.id, label: local.label };
   // No title, or only the "Untitled …" every untitled entry shows: nothing to find it by.
   const title = importedTitle({ title: manifestTitle || link.label });
   if (!title) return null;
-  const kind = linkTargetKindOf(link.entryType);
-  const match = items.find((i) => linkTargetKindOf(i.entryType) === kind && i.label === title);
+  const kind = linkTargetKindOf(link.targetKind);
+  const match = items.find((i) => linkTargetKindOf(i.targetKind) === kind && i.label === title);
   return match ? { id: match.id, label: match.label } : null;
-}
-
-// ── File names ───────────────────────────────────────────────────────────────
-
-function safeFilename(title: string): string {
-  return title.replace(/[^\w\s\-äöüÄÖÜß]/g, '').trim().replace(/\s+/g, '_') || 'export';
-}
-
-function exportFilename(title: string, date: string, ext: string): string {
-  const base = safeFilename(title);
-  const dateStr = format(new Date(date), 'yyyy-MM-dd');
-  return `${base}_${dateStr}.${ext}`;
 }
 
 // ── Export ───────────────────────────────────────────────────────────────────
@@ -603,7 +591,7 @@ export async function importFromEmerald(): Promise<void> {
 function sanitizeImportedHtml(html: string): string {
   return DOMPurify.sanitize(html, {
     ADD_ATTR: [
-      'data-type', 'data-id', 'data-entry-type', 'data-label', 'data-icon',
+      'data-type', 'data-id', 'data-target-kind', 'data-label', 'data-icon',
       'data-entry-number', 'data-align', 'colwidth', 'data-color',
     ],
   });

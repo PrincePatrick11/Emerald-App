@@ -15,7 +15,7 @@ export interface OpenTab {
 }
 
 /** Upper limit per history: it is saved to localStorage along with the tabs. */
-export const MAX_HISTORY_LENGTH = 50;
+const MAX_HISTORY_LENGTH = 50;
 
 export function createTabId(): string {
   return crypto.randomUUID();

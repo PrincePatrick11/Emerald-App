@@ -13,7 +13,7 @@
  * although declared as `boolean` — which is why the code had to cast them
  * back to `number` at branches.
  *
- * Use `fromRow.*` when reading, `toInt` and `toJson` when writing.
+ * Use `fromRow.*` when reading, `toInt` when writing.
  */
 import type {
   Category,
@@ -41,7 +41,7 @@ export type DbRow = Record<string, unknown>;
  * columns that had no value before they were introduced (switches that are
  * on by default).
  */
-export function bool(v: unknown, fallback = false): boolean {
+function bool(v: unknown, fallback = false): boolean {
   if (v === null || v === undefined) return fallback;
   if (typeof v === 'boolean') return v;
   return Number(v) !== 0;
@@ -68,11 +68,6 @@ export function jsonArray<T = string>(v: unknown): T[] {
     }
   }
   return [];
-}
-
-/** Array → JSON text for parameter lists. */
-export function toJson(v: readonly unknown[] | null | undefined): string {
-  return JSON.stringify(v ?? []);
 }
 
 const str = (v: unknown): string => (v == null ? '' : String(v));

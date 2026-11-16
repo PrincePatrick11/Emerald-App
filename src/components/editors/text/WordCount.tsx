@@ -5,7 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { useEditorsUpdate } from './useEditorsUpdate';
 
 /** Words and characters of a document; a link chip counts with its label, a line break separates words. */
-export function countText(doc: ProseMirrorNode): { words: number; characters: number } {
+function countText(doc: ProseMirrorNode): { words: number; characters: number } {
   const text = doc.textBetween(0, doc.content.size, '\n', (node) =>
     node.type.name === 'hardBreak' ? '\n' : (node.attrs.label as string | undefined) ?? '');
   return {

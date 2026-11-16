@@ -24,7 +24,7 @@ import { schemeUrl, type StoredImage, type UnusedImages } from './images';
  * sharp on every high-resolution screen. A custom block's copies all point at
  * the same file, so the size is paid once.
  */
-export const ICON_MAX_EDGE = 128;
+const ICON_MAX_EDGE = 128;
 
 /** Whether an icon value is a stored icon file (and not an emoji). The same rule as `isImageIcon` in `helpers.ts`. */
 export const isIconFile = isImageIcon;
@@ -84,7 +84,7 @@ export async function portableIcon(icon: string | null | undefined): Promise<str
 }
 
 /** Every icon file in the active vault's `icons/`. */
-export async function listIconFiles(): Promise<StoredImage[]> {
+async function listIconFiles(): Promise<StoredImage[]> {
   return invoke<StoredImage[]>('list_icon_files', { vaultId: await getActiveVaultId() });
 }
 

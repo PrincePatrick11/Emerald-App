@@ -13,7 +13,7 @@
 
  *
  * The bundling technique (esbuild + Tauri stubs + a node:sqlite adapter behind
- * the tauri-plugin-sql interface) is lifted from the app's own
+ * the app's `Database` interface in src/lib/sqlite.ts) is lifted from the app's own
  * scripts/schema-check.mjs, which runs this way in CI.
  *
  *   node build_seed.mjs --checkout <dir> --out <emerald.db> [--fixture f.json]
@@ -63,9 +63,9 @@ export function parseArgs(argv) {
   return out;
 }
 
-/* -- node:sqlite behind the tauri-plugin-sql interface ----------------- */
+/* -- node:sqlite behind the app's Database interface ------------------- */
 
-/** The plugin uses $1 placeholders; node:sqlite binds SQLite's own ?1 form. */
+/** The app writes $1 placeholders; node:sqlite binds SQLite's own ?1 form. */
 function toIndexedPlaceholders(sql) {
   return sql.replace(/\$(\d+)/g, '?$1');
 }
@@ -94,21 +94,14 @@ class HarnessDb {
 /* -- bundling the checkout's schema ------------------------------------ */
 
 const STUBS = {
-  '@tauri-apps/plugin-sql': `
-    export default class Database {
-      static async load() { throw new Error('Database.load is not used in the seed builder'); }
-    }`,
   // vaultManager is only pulled in transitively; nothing here writes a vault.
   '@tauri-apps/api/core': `
     export async function invoke(cmd) {
-      // Newer checkouts open databases through invoke('db_load', ...) instead
-      // of the plugin above; here every database is HarnessDb.
+      // The app opens databases through invoke('db_load', ...); here every
+      // database is HarnessDb.
       if (String(cmd).startsWith('db_')) throw new Error(cmd + ' is not used in the seed builder');
       if (cmd === 'read_file') throw new Error('ENOENT (seed builder)');
-      if (cmd === 'legacy_default_db_exists') return true;
-      if (cmd === 'migrate_vault_layout' || cmd === 'default_vault_dir' || cmd === 'new_vault_base_dir') {
-        return process.env.EMERALD_HARNESS_DIR;
-      }
+      if (cmd === 'default_vault_dir' || cmd === 'new_vault_base_dir') return process.env.EMERALD_HARNESS_DIR;
       return undefined;
     }`,
   '@tauri-apps/api/path': `
@@ -133,17 +126,13 @@ async function loadAppModules(checkout, workDir) {
   const { build } = await import(pathToFileURL(require_.resolve('esbuild')).href);
 
   const src = checkout.replace(/\\/g, '/') + '/src/lib';
-  // Since v66 the blocks of entries and templates are rows of `blocks` only;
-  // a checkout that far writes them through its own block store.
-  const blockStore = join(checkout, 'src', 'lib', 'blockStore.ts');
-  const hasBlockRows = existsSync(blockStore) && readFileSync(blockStore, 'utf-8').includes('export function replaceOwnerBlocks');
   const entry = join(workDir, 'entry.ts');
   writeFileSync(
     entry,
     `export { BASELINE_VERSION, TABLES, createSchema, seedBuiltins, checkIntegrity } from '${src}/schema';
      export { internalLinkChipHtml } from '${src}/internalLinkHtml';
-     export { runMigrations, MIGRATIONS } from '${src}/db';
-     ${hasBlockRows ? `export { replaceOwnerBlocks } from '${src}/blockStore';` : ''}`
+     export { runMigrations } from '${src}/db';
+     export { replaceOwnerBlocks } from '${src}/blockStore';`
   );
 
   const bundlePath = join(workDir, 'bundle.mjs');
@@ -199,8 +188,8 @@ function expandFiles(value) {
 
 function expandChips(value, chipHtml) {
   if (typeof value !== 'string' || !value.includes('@@chip(')) return value;
-  return value.replace(CHIP_RE, (_, id, entryType, label) =>
-    chipHtml({ id: id.trim(), entryType: entryType.trim(), label: label.trim() })
+  return value.replace(CHIP_RE, (_, id, targetKind, label) =>
+    chipHtml({ id: id.trim(), targetKind: targetKind.trim(), label: label.trim() })
   );
 }
 
@@ -213,22 +202,20 @@ function columnsOf(db, table) {
 /** Which owner kind a table's rows are, for their block rows. */
 const BLOCK_OWNERS = { entries: 'entry', templates: 'template' };
 
-/** Since v102 tags are link rows: the table and owner column for a row's `tags` list. */
+/** Tags are link rows: the table and owner column for a row's `tags` list. */
 const TAG_LINKS = {
   entries: ['entry_tags', 'entry_id'],
   templates: ['template_tags', 'template_id'],
   images: ['image_tags', 'image_id'],
 };
 
-async function insertRows(db, table, rows, chipHtml, report, app = {}) {
+async function insertRows(db, table, rows, chipHtml, report, app) {
   if (!rows?.length) return;
   const known = columnsOf(db, table);
   const dropped = new Set();
-  // Since v66 a block stack is no column but rows of `blocks`.
+  // A block stack is no column but rows of `blocks`.
   const owner = BLOCK_OWNERS[table];
-  const asBlockRows = owner && !known.has('content') && typeof app.replaceOwnerBlocks === 'function';
   const [linkTable, linkOwner] = TAG_LINKS[table] ?? [];
-  const asTagLinks = !!linkTable && !known.has('tags') && columnsOf(db, linkTable).size > 0;
   const now = new Date().toISOString();
   for (const row of rows) {
     const cols = [];
@@ -247,28 +234,28 @@ async function insertRows(db, table, rows, chipHtml, report, app = {}) {
       `INSERT INTO ${table} (${cols.join(', ')}) VALUES (${placeholders})`,
       values
     );
-    if (asBlockRows && typeof row.content === 'string') {
+    if (owner && typeof row.content === 'string') {
       const content = expandFiles(expandChips(row.content, chipHtml));
       const plan = app.replaceOwnerBlocks({ kind: owner, id: row.id }, content, row.updated_at ?? now, { hasRows: false });
       for (const [query, params] of plan.statements) await db.execute(query, params ?? []);
     }
-    if (asTagLinks && row.tags) {
+    if (linkTable && row.tags) {
       const tags = typeof row.tags === 'string' ? JSON.parse(row.tags) : row.tags;
       for (const tag of new Set(tags)) {
         await db.execute(`INSERT OR IGNORE INTO ${linkTable} (${linkOwner}, tag_id) SELECT $1, id FROM tags WHERE id = $2`, [row.id, tag]);
       }
     }
   }
-  if (asBlockRows) dropped.delete('content');
-  if (asTagLinks) dropped.delete('tags');
+  if (owner) dropped.delete('content');
+  if (linkTable) dropped.delete('tags');
   report.counts[table] = (report.counts[table] ?? 0) + rows.length;
   if (dropped.size) report.dropped[table] = [...dropped];
 }
 
 /** Two passes: a subtask's parent may sit further down the fixture, and the
  *  self-referencing foreign key is checked at insert time. */
-async function insertTasks(db, tasks, chipHtml, report) {
-  await insertRows(db, 'tasks', tasks.map(({ parent_task_id, ...rest }) => rest), chipHtml, report);
+async function insertTasks(db, tasks, chipHtml, report, app) {
+  await insertRows(db, 'tasks', tasks.map(({ parent_task_id, ...rest }) => rest), chipHtml, report, app);
   for (const task of tasks) {
     if (!task.parent_task_id) continue;
     await db.execute('UPDATE tasks SET parent_task_id = $1 WHERE id = $2', [
@@ -293,7 +280,7 @@ export function seedUuid(name) {
 }
 
 /**
- * The fixture names its rows `seed-wiki-sigil` and so on, which keeps it
+ * The fixture names its rows `seed-entry-moon` and so on, which keeps it
  * readable. The app only follows internal links to UUIDs
  * (isValidLinkTarget in src/lib/internalLinkHtml.ts), so every id a fixture
  * row declares is replaced by its UUID here - in its own row and wherever it
@@ -342,86 +329,14 @@ export function withFreshTrash(fixture, now = Date.now()) {
     [key, !key.startsWith('_') && Array.isArray(rows) ? fresh(rows) : rows]));
 }
 
-/* -- fitting the fixture to the checkout's schema ----------------------- */
+/* -- dashboards -------------------------------------------------------- */
 
-const ENTRY_SOURCES = [
-  ['journal_entries', 'journal'],
-  ['wiki_articles', 'wiki'],
-  ['operations', 'operation'],
-];
-
-/**
- * The fixture is written against the three content tables Emerald had up to
- * v48. Checkouts since v49 keep journal entries, wiki articles and operations
- * in one `entries` table told apart by `type`, and since v53 an entry lists
- * its tags by id rather than by name.
- *
- * Rather than keep two fixtures in step, the old shape is translated here
- * when the checkout turns out to be a newer one. Columns that went away with
- * the old tables (slug, mood, ingredients, ...) are dropped by insertRows like
- * any other column the schema no longer has; plain HTML is still valid
- * content, the app reads it as a single text block.
- *
- * Checkouts with a `dashboards` table have no entry types at all: what an
- * entry is follows from its category. There a journal entry goes into the
- * category Journal, numbers run over all entries, link targets are `entry`
- * or `task`, and every category of the fixture joins the dashboard of the
- * module most of its entries came from (`_dashboardCategories`, applied by
- * `fitDashboards` once the rows are in).
- */
-function fitFixture(fixture, tables) {
-  if (!tables.includes('entries') || fixture.entries) return fixture;
-  const typeless = tables.includes('dashboards');
-
-  const tagIds = new Map((fixture.tags ?? []).map((tag) => [tag.name, tag.id]));
-  const tagsById = (json) => JSON.stringify(JSON.parse(json).map((name) => tagIds.get(name) ?? name));
-
-  const entries = [];
-  for (const [source, type] of ENTRY_SOURCES) {
-    for (const row of fixture[source] ?? []) {
-      const entry = typeless ? { ...row } : { ...row, type };
-      if (row.tags) entry.tags = tagsById(row.tags);
-      if (typeless && type === 'journal') entry.category_id = 'journal';
-      // The journal has no categories; the app keeps the column NULL there.
-      else if (type === 'journal') delete entry.category_id;
-      entries.push(Object.assign(entry, { _type: type }));
-    }
-  }
-  if (!typeless) return { ...fixture, entries: entries.map(({ _type, ...entry }) => entry) };
-
-  // One count over all entries, in creation order.
-  [...entries].sort((a, b) => String(a.created_at).localeCompare(String(b.created_at)))
-    .forEach((entry, i) => { entry.entry_number = i + 1; });
-  const uses = new Map();
-  for (const entry of entries) {
-    if (!entry.category_id || entry.category_id === 'journal') continue;
-    const counts = uses.get(entry.category_id) ?? { wiki: 0, operation: 0 };
-    counts[entry._type] += 1;
-    uses.set(entry.category_id, counts);
-  }
-  const fixtureCategories = new Set((fixture.categories ?? []).map((c) => c.id));
-  const dashboardCategories = { knowledge: [], practice: [] };
-  for (const [category, counts] of uses) {
-    if (!fixtureCategories.has(category)) continue;
-    // Fixture rows are still typed wiki/operation (the old shape); operation-heavy categories go to Practice.
-    dashboardCategories[counts.operation > counts.wiki ? 'practice' : 'knowledge'].push(category);
-  }
-  const target = (type) => (type === 'task' ? 'task' : 'entry');
-  return {
-    ...fixture,
-    entries: entries.map(({ _type, ...entry }) => entry),
-    task_links: (fixture.task_links ?? []).map((link) => ({ ...link, target_type: target(link.target_type) })),
-    _typelessChips: true,
-    _dashboardCategories: dashboardCategories,
-  };
-}
-
-/** Adds the fixture's own categories to the built-in dashboards `fitFixture` chose for them. */
+/** Adds the fixture's own categories to the filters of the built-in dashboards (`dashboard_categories`). */
 async function fitDashboards(db, fixture) {
-  for (const [dashboard, categories] of Object.entries(fixture._dashboardCategories ?? {})) {
+  for (const [dashboard, categories] of Object.entries(fixture.dashboard_categories ?? {})) {
     if (!categories.length) continue;
     const rows = await db.select('SELECT filter FROM dashboards WHERE id = $1', [dashboard]);
-    if (!rows.length) continue;
+    if (!rows.length) throw new Error(`fixture names a dashboard the app does not seed: ${dashboard}`);
     const filter = JSON.parse(rows[0].filter || '{}');
     filter.categories = [...new Set([...(filter.categories ?? []), ...categories])];
     await db.execute('UPDATE dashboards SET filter = $1 WHERE id = $2', [JSON.stringify(filter), dashboard]);
@@ -445,7 +360,7 @@ export async function buildSeed(opts) {
   let db = null;
   try {
     const app = await loadAppModules(opts.checkout, workDir);
-    const fixture = fitFixture(withFreshTrash(withUuids(JSON.parse(readFileSync(opts.fixture, 'utf-8')))), app.TABLES);
+    const fixture = withFreshTrash(withUuids(JSON.parse(readFileSync(opts.fixture, 'utf-8'))));
 
     db = new HarnessDb(stagingPath);
     // Match what the app opens with; a WAL sidecar would be left behind here.
@@ -456,10 +371,7 @@ export async function buildSeed(opts) {
     await app.seedBuiltins(db, starterNamer(opts.checkout, opts.locale));
 
     const report = { counts: {}, dropped: {} };
-    // Without entry types a chip names its target kind: an entry, or a task.
-    const chipHtml = fixture._typelessChips
-      ? (chip) => app.internalLinkChipHtml({ ...chip, entryType: chip.entryType === 'task' ? 'task' : 'entry' })
-      : app.internalLinkChipHtml;
+    const chipHtml = app.internalLinkChipHtml;
 
     // TABLES order is dependency order: parents before children, and it has to
     // be followed exactly - task_links comes after tasks for a reason.
@@ -467,7 +379,7 @@ export async function buildSeed(opts) {
     for (const table of app.TABLES) {
       if (table === 'schema_version') continue;
       if (table === 'tasks') {
-        await insertTasks(db, fixture.tasks ?? [], chipHtml, report);
+        await insertTasks(db, fixture.tasks ?? [], chipHtml, report, app);
         continue;
       }
       await insertRows(db, table, fixture[table], chipHtml, report, app);

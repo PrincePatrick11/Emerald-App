@@ -12,13 +12,13 @@ export type { SuggestionItem };
 
 /** The glyph of a link target: an entry or a task. One row for the suggestion
  *  list, LinkPickerModal (tabs) and the linking field. */
-export const ENTRY_TYPE_ICONS: Record<LinkTargetKind, LucideIcon> = {
+export const TARGET_KIND_ICONS: Record<LinkTargetKind, LucideIcon> = {
   entry: ENTRY_ICON,
   task: CheckSquare,
 };
 
 /** Translated target labels: tabs in the LinkPicker, and the badge where a target has no category. */
-export const ENTRY_TYPE_LABEL_KEYS: Record<LinkTargetKind, string> = {
+export const TARGET_KIND_LABEL_KEYS: Record<LinkTargetKind, string> = {
   entry: 'entries.label',
   task: 'linkPicker.tabTasks',
 };
@@ -44,7 +44,7 @@ const SuggestionList = forwardRef<SuggestionListHandle, Props>(
     return (
       <div className="bg-well-solid border border-edge-default rounded-lg overflow-hidden shadow-menu min-w-[220px] max-h-64 overflow-y-auto">
         {items.map((item, index) => {
-          const TypeIcon = ENTRY_TYPE_ICONS[item.entryType];
+          const TypeIcon = TARGET_KIND_ICONS[item.targetKind];
           return (
             <button
               key={item.id}
@@ -60,7 +60,7 @@ const SuggestionList = forwardRef<SuggestionListHandle, Props>(
               <TypeIcon size={12} className="text-subtle flex-shrink-0" />
               <span className="flex-1 truncate">{item.label}</span>
               <span className="text-xs text-subtle flex-shrink-0">
-                {item.categoryLabel || t(ENTRY_TYPE_LABEL_KEYS[item.entryType])}
+                {item.categoryLabel || t(TARGET_KIND_LABEL_KEYS[item.targetKind])}
               </span>
             </button>
           );

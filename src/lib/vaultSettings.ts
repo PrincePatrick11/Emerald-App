@@ -1,6 +1,6 @@
 import { invoke } from '@tauri-apps/api/core';
 import type { LeftListTabId } from './modules';
-import { oneOf } from './helpers';
+import { oneOf, isRecord, asRecord, asString } from './helpers';
 import type { Weekday } from './formatDate';
 import {
   DEFAULT_EDITOR_FONT_ID, DEFAULT_EDITOR_FONT_SIZE, DEFAULT_UI_FONT_ID, DEFAULT_UI_SCALE,
@@ -29,8 +29,8 @@ export interface AppearanceSettings {
 
 /** Days until permanent deletion; `null` = never. */
 export const TRASH_RETENTION_OPTIONS = [7, 14, 30, 60, 90, null] as const;
-export type TrashRetention = (typeof TRASH_RETENTION_OPTIONS)[number];
-export const DEFAULT_TRASH_RETENTION: TrashRetention = 30;
+type TrashRetention = (typeof TRASH_RETENTION_OPTIONS)[number];
+const DEFAULT_TRASH_RETENTION: TrashRetention = 30;
 
 export interface TrashSettings {
   retentionDays: TrashRetention;
@@ -38,8 +38,8 @@ export interface TrashSettings {
 
 /** Entries per list in the left sidebar; `null` = all. */
 export const LEFT_LIST_LIMIT_OPTIONS = [10, 25, 50, 100, null] as const;
-export type LeftListLimit = (typeof LEFT_LIST_LIMIT_OPTIONS)[number];
-export const DEFAULT_LEFT_LIST_LIMIT: LeftListLimit = null;
+type LeftListLimit = (typeof LEFT_LIST_LIMIT_OPTIONS)[number];
+const DEFAULT_LEFT_LIST_LIMIT: LeftListLimit = null;
 
 export interface LeftListSettings {
   /** Which list the entry list shows: `all` (every entry and task), `tasks`,
@@ -59,10 +59,10 @@ const MAX_EMOJI_LENGTH = 32;
 
 /** Largest edge length of inserted images in px; `null` = original. */
 export const IMAGE_MAX_EDGE_OPTIONS = [1024, 1920, 2560, 3840, null] as const;
-export type ImageMaxEdge = (typeof IMAGE_MAX_EDGE_OPTIONS)[number];
+type ImageMaxEdge = (typeof IMAGE_MAX_EDGE_OPTIONS)[number];
 /** Largest file size after shrinking in MB; `null` = unlimited. */
 export const IMAGE_MAX_SIZE_MB_OPTIONS = [1, 2, 5, 10, 20, null] as const;
-export type ImageMaxSizeMb = (typeof IMAGE_MAX_SIZE_MB_OPTIONS)[number];
+type ImageMaxSizeMb = (typeof IMAGE_MAX_SIZE_MB_OPTIONS)[number];
 
 export interface ImageSettings {
   maxEdge: ImageMaxEdge;
@@ -105,7 +105,7 @@ export interface TemplateSettings {
 /** How often the automatic backup runs — whole days only, the file name carries the date. */
 export const BACKUP_INTERVAL_OPTIONS = ['daily', 'weekly', 'monthly'] as const;
 export type BackupInterval = (typeof BACKUP_INTERVAL_OPTIONS)[number];
-export const BACKUP_WEEKDAY_OPTIONS = [0, 1, 2, 3, 4, 5, 6] as const satisfies readonly Weekday[];
+const BACKUP_WEEKDAY_OPTIONS = [0, 1, 2, 3, 4, 5, 6] as const satisfies readonly Weekday[];
 /** How many automatic backups are kept; `null` = all. The numbers
  *  are checked once more by `KEEP_CHOICES` in `auto_backup.rs` — change both together. */
 export const BACKUP_KEEP_OPTIONS = [3, 5, 10, 30, null] as const;
@@ -194,18 +194,6 @@ export const DEFAULT_VAULT_SETTINGS: VaultSettings = {
   },
 };
 
-
-export function isPlainObject(value: unknown): value is Record<string, unknown> {
-  return !!value && typeof value === 'object' && !Array.isArray(value);
-}
-
-function asRecord(value: unknown): Record<string, unknown> {
-  return isPlainObject(value) ? value : {};
-}
-
-function asString(value: unknown): string | null {
-  return typeof value === 'string' ? value : null;
-}
 
 function normalizeEmojiList(raw: unknown): string[] | null {
   if (!Array.isArray(raw)) return null;
@@ -310,7 +298,7 @@ export function normalizeVaultSettings(raw: unknown): VaultSettings {
  * there at the size limit) and in the next export.
  */
 export function importableSettings(raw: unknown): VaultSettings | null {
-  if (!isPlainObject(raw)) return null;
+  if (!isRecord(raw)) return null;
   const normalized = normalizeVaultSettings(raw);
   const known: Record<string, unknown> = { version: normalized.version };
   for (const group of SETTINGS_GROUPS) {

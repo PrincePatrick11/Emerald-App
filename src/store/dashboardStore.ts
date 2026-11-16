@@ -15,7 +15,7 @@ import { DEFAULT_DISPLAY, normalizeFilter } from '../lib/dashboards';
 import type { Dashboard, DashboardDisplay, DashboardFilter, DashboardSort } from '../types';
 
 /** What can be changed on a dashboard. */
-export interface DashboardPatch {
+interface DashboardPatch {
   name?: string;
   icon?: string;
   filter?: DashboardFilter;

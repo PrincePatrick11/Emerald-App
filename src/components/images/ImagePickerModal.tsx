@@ -20,7 +20,7 @@ import ImageTile from './ImageTile';
  * files from the disk too, by button or by dropping them on the window:
  * those are stored, taken into "Images" under their file name, and inserted.
  */
-export default function ImagePickerModal({ multiple, tags }: { multiple: boolean; tags: string[] }) {
+function ImagePickerModal({ multiple, tags }: { multiple: boolean; tags: string[] }) {
   const { t } = useTranslation();
   const { pictures, loaded } = useVaultPictures();
   const [search, setSearch] = useState('');

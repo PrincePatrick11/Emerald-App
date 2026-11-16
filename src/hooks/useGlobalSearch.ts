@@ -41,7 +41,7 @@ function useSearchCorpus(): SearchCorpus {
   );
 }
 
-export interface GlobalSearchState {
+interface GlobalSearchState {
   results: SearchResults;
   /**
    * The query the results actually came from — deferred and trimmed, exactly as

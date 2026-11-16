@@ -60,18 +60,18 @@ export function LinkEditor({ slot, onChange }: {
 }
 
 /** A linked entry, with current title and icon as long as it exists. */
-export function LinkTarget({ target, onRemove }: { target: { id: string; entryType: string; label: string }; onRemove?: () => void }) {
+export function LinkTarget({ target, onRemove }: { target: { id: string; targetKind: string; label: string }; onRemove?: () => void }) {
   const { t } = useTranslation();
   const items = useLinkItems();
   const setActiveView = useUIStore((s) => s.setActiveView);
-  const { id, entryType } = target;
+  const { id, targetKind } = target;
   const live = useMemo(
-    () => linkItemsByKey(items).get(linkItemKey({ id, entryType })),
-    [items, id, entryType],
+    () => linkItemsByKey(items).get(linkItemKey({ id, targetKind })),
+    [items, id, targetKind],
   );
   const open = () => {
     if (!isValidLinkTarget(target)) return;
-    setActiveView(viewOfLinkTarget(target.entryType, target.id));
+    setActiveView(viewOfLinkTarget(target.targetKind, target.id));
   };
   return (
     <span className="inline-flex">

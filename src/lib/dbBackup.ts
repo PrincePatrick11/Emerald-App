@@ -48,7 +48,7 @@ import { isTagId, readTagLinks, tagIdList, tagInsertStatements, tagNameKey, unli
 import { randomTagColor } from '../store/tagStore';
 import { categoryKey } from './categories';
 import i18n from '../i18n';
-import { generateId, isValidHexColor, nowIso } from './helpers';
+import { asString, generateId, isRecord, isValidHexColor, nowIso } from './helpers';
 import { useVaultStore } from '../store/vaultStore';
 import { VAULT_KEY_CANCELLED } from '../store/vaultKeyStore';
 import { KEY_ERRORS, keyErrorOf } from './vaultKeys';
@@ -59,7 +59,7 @@ import { clearAllDrafts, flushDrafts } from '../store/draftStore';
 import { resumeEditorSaves, suspendEditorSaves } from './editorLock';
 import { drainSerialized } from './serialize';
 import { importViaStaging } from './importStaging';
-import { importableSettings, isPlainObject, withSettingsGroups, withoutDeviceKeys, writeVaultSettings, type SettingsGroup } from './vaultSettings';
+import { importableSettings, withSettingsGroups, withoutDeviceKeys, writeVaultSettings, type SettingsGroup } from './vaultSettings';
 import { useSettingsStore } from '../store/settingsStore';
 import { useDeviceStore } from '../store/deviceStore';
 
@@ -192,7 +192,7 @@ const TAG_NAME_MAX = 100;
  * Runs in the working copy (`importViaStaging`): if the import fails afterwards,
  * nothing of the tags remains either.
  */
-export async function importTagsAndRemap(db: Awaited<ReturnType<typeof getDb>>, d: BackupFile['data']): Promise<BackupFile['data']> {
+async function importTagsAndRemap(db: Awaited<ReturnType<typeof getDb>>, d: BackupFile['data']): Promise<BackupFile['data']> {
   const local = await db.select<{ id: string; name: string; deleted_at: string | null }[]>('SELECT id, name, deleted_at FROM tags');
   const byId = new Map(local.map((t) => [t.id, t]));
   const byName = new Map(local.map((t) => [tagNameKey(t.name), t]));
@@ -300,7 +300,7 @@ const MAX_ENTRY_NUMBER = 1_000_000_000;
  * second holder of a number (`idx_entries_number` is unique), or one out of
  * range, gets none and is numbered afterwards (`numberUnnumbered`).
  */
-export function entryRowsForInsert(rows: Row[]): Row[] {
+function entryRowsForInsert(rows: Row[]): Row[] {
   const seen = new Set<string>();
   const numbers = new Set<number>();
   const out: Row[] = [];
@@ -330,14 +330,14 @@ async function numberUnnumbered(db: Awaited<ReturnType<typeof getDb>>): Promise<
 }
 
 /** Does an entry row pass the selection by category? `known`: the category IDs at hand. */
-export function entrySelected(row: Row, selection: EntrySelection, known: ReadonlySet<string>): boolean {
+function entrySelected(row: Row, selection: EntrySelection, known: ReadonlySet<string>): boolean {
   const category = row.category_id == null ? null : String(row.category_id);
   if (category === null || !known.has(category)) return selection.includeUncategorized;
   return selection.categoryIds === null || selection.categoryIds.includes(category);
 }
 
 /** Selects every category, with the uncategorized entries. */
-export const ALL_ENTRIES: EntrySelection = { categoryIds: null, includeUncategorized: true };
+const ALL_ENTRIES: EntrySelection = { categoryIds: null, includeUncategorized: true };
 
 /** Does the selection take any entry at all? */
 function selectsEntries(selection: EntrySelection): boolean {
@@ -822,7 +822,7 @@ export async function openBackupFile(): Promise<{ path: string; backup: BackupFi
 }
 
 /** What the import offers to choose from: the categories in use and how many entries each holds. */
-export function previewOf(backup: BackupFile): BackupPreview {
+function previewOf(backup: BackupFile): BackupPreview {
   const entries = backup.data.entries ?? [];
   const known = new Set((backup.data.categories ?? []).map((c) => String(c.id)));
   const entryCounts: Record<string, number> = {};
@@ -843,7 +843,7 @@ export function previewOf(backup: BackupFile): BackupPreview {
     taskCount: backup.data.tasks?.length ?? 0,
     languagesCount: backup.data.languages?.length ?? 0,
     categories: (backup.data.categories ?? []).filter((c) => usedCatIds.has(String(c.id))) as BackupCategoryEntry[],
-    hasSettings: isPlainObject(backup.settings),
+    hasSettings: isRecord(backup.settings),
   };
 }
 
@@ -1052,18 +1052,17 @@ const BLOCK_BATCH = 500;
 /** A row of `data.blocks` in the shape `fromBlockRow` reads — the file is foreign, so every value is checked. */
 function fileBlockRow(row: Row): StoredBlockRow | null {
   if (typeof row.id !== 'string' || !row.id || typeof row.type !== 'string' || !row.type) return null;
-  const text = (v: unknown) => (typeof v === 'string' ? v : null);
   return {
     id: row.id,
     type: row.type,
     version: Number.isInteger(row.version) && row.version > 0 ? row.version : null,
     hidden: row.hidden === 1 ? 1 : 0,
-    title: text(row.title),
+    title: asString(row.title),
     show_title: row.show_title === 0 || row.show_title === 1 ? row.show_title : null,
-    config: text(row.config),
-    data: text(row.data),
-    attrs: text(row.attrs),
-    html: text(row.html) ?? '',
+    config: asString(row.config),
+    data: asString(row.data),
+    attrs: asString(row.attrs),
+    html: asString(row.html) ?? '',
   };
 }
 
@@ -1632,7 +1631,7 @@ const CONTENT_TYPE_LABELS: Record<ContentToggle, string> = {
 };
 
 /** The content kinds besides the entries, which are chosen by category (`EntrySelection`). */
-export type ContentToggle = Exclude<keyof ImportTypeFilters, keyof EntrySelection>;
+type ContentToggle = Exclude<keyof ImportTypeFilters, keyof EntrySelection>;
 
 /** The same kinds as a list — the order of the packing lists. */
 export const CONTENT_TYPES: readonly [ContentToggle, string][] =
@@ -1664,7 +1663,7 @@ export async function importDatabase(
   // A backup from before language and theme moved to the device may hold
   // custom themes; they join this device's list (`adoptCustomThemes` checks
   // them), while its language and selection do not apply here.
-  const backupThemes = isPlainObject(backup.settings) && isPlainObject(backup.settings.appearance)
+  const backupThemes = isRecord(backup.settings) && isRecord(backup.settings.appearance)
     ? backup.settings.appearance.customThemes
     : undefined;
 

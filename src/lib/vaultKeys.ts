@@ -14,7 +14,7 @@
 import { invoke } from '@tauri-apps/api/core';
 import { listen, type UnlistenFn } from '@tauri-apps/api/event';
 
-export interface VaultKeyStatus {
+interface VaultKeyStatus {
   /** `emerald.db` is already there — without it the vault is new. */
   hasDatabase: boolean;
   encrypted: boolean;

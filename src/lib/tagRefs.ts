@@ -90,15 +90,6 @@ export function tagInsertStatements(owner: TagOwner, id: string, ids: readonly s
 }
 
 /**
- * A subquery giving the tag ids of the entry `entryColumn` names, as a JSON
- * array in their order — for a query that reads entries with their tags
- * (`jsonArray` reads it back). `entryColumn` is a literal of the caller.
- */
-export function entryTagsSql(entryColumn: string): string {
-  return `(SELECT json_group_array(tag_id) FROM (SELECT tag_id FROM entry_tags WHERE entry_id = ${entryColumn} ORDER BY rowid))`;
-}
-
-/**
  * Hands every link of tag `from` over to `to` — one tag merges into another.
  * An owner that already carries `to` keeps its place for it; `from`'s rows go
  * once the tag row is deleted (CASCADE), or here at once.

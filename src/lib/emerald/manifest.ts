@@ -1,4 +1,5 @@
 import { parseBlocks, serializeBlocks } from '../blocks/blockHtml';
+import { asString, isRecord } from '../helpers';
 import { fromBlockRow, toBlockRow, type BlockRowValues } from '../blocks/blockRows';
 
 /**
@@ -119,24 +120,22 @@ export const MANIFEST_LIMITS = { items: 1000, blocks: 50_000, links: 50_000 } as
 const UUID_RE = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi;
 const isUuid = (v: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v);
 
-const isObject = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v);
 const text = (v: unknown): string => (typeof v === 'string' ? v : '');
-const textOrNull = (v: unknown): string | null => (typeof v === 'string' ? v : null);
 const strings = (v: unknown): string[] => (Array.isArray(v) ? v.filter((s): s is string => typeof s === 'string') : []);
 
 /** A block row from the file — `null` for one without ID or type; the other columns only as their own types. */
 function readBlock(raw: unknown): ManifestBlock | null {
-  if (!isObject(raw) || typeof raw.id !== 'string' || !raw.id || typeof raw.type !== 'string' || !raw.type) return null;
+  if (!isRecord(raw) || typeof raw.id !== 'string' || !raw.id || typeof raw.type !== 'string' || !raw.type) return null;
   const version = typeof raw.version === 'number' && Number.isInteger(raw.version) && raw.version > 0 ? raw.version : null;
   return {
     id: raw.id,
     type: raw.type,
     version,
     hidden: raw.hidden === 1 ? 1 : 0,
-    title: textOrNull(raw.title),
+    title: asString(raw.title),
     show_title: raw.show_title === 0 || raw.show_title === 1 ? raw.show_title : null,
-    config: textOrNull(raw.config),
-    data: textOrNull(raw.data),
+    config: asString(raw.config),
+    data: asString(raw.data),
     attrs: typeof raw.attrs === 'string' ? raw.attrs : '{}',
     html: text(raw.html),
   };
@@ -147,7 +146,7 @@ function readBlocks(raw: unknown): ManifestBlock[] {
 }
 
 function readItem(raw: unknown): ManifestItem | null {
-  if (!isObject(raw) || typeof raw.id !== 'string' || !raw.id) return null;
+  if (!isRecord(raw) || typeof raw.id !== 'string' || !raw.id) return null;
   const common = {
     id: raw.id,
     createdAt: text(raw.createdAt),
@@ -160,7 +159,7 @@ function readItem(raw: unknown): ManifestItem | null {
     return { kind: 'template', ...common, name: text(raw.name), title: text(raw.title) };
   }
   if (raw.kind !== 'entry' || !isUuid(raw.id)) return null;
-  const category = isObject(raw.category) && typeof raw.category.name === 'string' && raw.category.name.trim()
+  const category = isRecord(raw.category) && typeof raw.category.name === 'string' && raw.category.name.trim()
     ? { name: raw.category.name, icon: text(raw.category.icon), builtin: raw.category.builtin === true }
     : null;
   return {
@@ -168,7 +167,7 @@ function readItem(raw: unknown): ManifestItem | null {
     ...common,
     title: text(raw.title),
     number: typeof raw.number === 'number' ? raw.number : null,
-    cover: textOrNull(raw.cover),
+    cover: asString(raw.cover),
     category,
   };
 }
@@ -185,7 +184,7 @@ export function parseManifest(json: string): EmeraldManifest | ManifestProblem {
   } catch {
     return 'unsupported';
   }
-  if (!isObject(raw) || raw.format !== 'emerald') return 'unsupported';
+  if (!isRecord(raw) || raw.format !== 'emerald') return 'unsupported';
   if (raw.version !== EMERALD_FORMAT_VERSION) {
     if (typeof raw.version !== 'number' || !Number.isInteger(raw.version)) return 'unsupported';
     return raw.version < EMERALD_FORMAT_VERSION ? 'oldVersion' : 'newVersion';
@@ -199,7 +198,7 @@ export function parseManifest(json: string): EmeraldManifest | ManifestProblem {
   if (items.length === 0) return 'unsupported';
   if (items.reduce((n, item) => n + item.blocks.length, 0) > MANIFEST_LIMITS.blocks) return 'tooLarge';
   const links = Array.isArray(raw.links)
-    ? raw.links.flatMap((l): ManifestLink[] => (isObject(l) && typeof l.id === 'string' && l.id
+    ? raw.links.flatMap((l): ManifestLink[] => (isRecord(l) && typeof l.id === 'string' && l.id
       ? [{ id: l.id, kind: l.kind === 'task' ? 'task' : 'entry', title: text(l.title) }]
       : []))
     : [];

@@ -34,7 +34,7 @@ import { useSettingsStore } from './settingsStore';
 export type TemplatePatch = Partial<Pick<Template, 'name' | 'icon' | 'title' | 'content' | 'tags'>>;
 
 /** What a new template brings along. */
-export type TemplateInit = Omit<TemplatePatch, 'name'>;
+type TemplateInit = Omit<TemplatePatch, 'name'>;
 
 interface TemplateState {
   /** Active templates in display order. */
@@ -182,7 +182,7 @@ export function startOfNewEntry(categoryTemplateId: string | null, blank = false
 }
 
 /** A template just applied automatically — the entry's block stack shows Undo for it. */
-export interface AppliedTemplateNotice {
+interface AppliedTemplateNotice {
   entryId: string;
   templateId: string;
 }

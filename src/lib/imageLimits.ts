@@ -21,7 +21,7 @@ function mimeOf(dataUrl: string): string {
 }
 
 /** The bytes behind a base64 data URL, without decoding it. */
-export function dataUrlBytes(dataUrl: string): number {
+function dataUrlBytes(dataUrl: string): number {
   const base64 = dataUrl.slice(dataUrl.indexOf(',') + 1);
   const padding = base64.endsWith('==') ? 2 : base64.endsWith('=') ? 1 : 0;
   return Math.floor((base64.length * 3) / 4) - padding;
