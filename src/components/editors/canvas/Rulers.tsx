@@ -17,7 +17,9 @@ function tickStep(zoom: number, minPx = 56): number {
   return [1, 2, 5, 10].map((m) => m * power).find((step) => step >= raw) ?? 10 * power;
 }
 
-function readToken(el: Element, name: string, fallback: string): string {
+/** A theme token's value on `el`, or `fallback` when it has none (or there is no element yet). */
+export function readToken(el: Element | null, name: string, fallback: string): string {
+  if (!el) return fallback;
   return getComputedStyle(el).getPropertyValue(name).trim() || fallback;
 }
 

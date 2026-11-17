@@ -19,7 +19,7 @@ export function registerTagLookup(lookup: (id: string) => boolean): void {
  * in the trash stays in the template (it can come back), but does not pass
  * into any new entry.
  */
-export function usableTemplateTags(ids: readonly string[]): string[] {
+function usableTemplateTags(ids: readonly string[]): string[] {
   return [...new Set(ids.filter((id) => isLiveTag(id)))];
 }
 

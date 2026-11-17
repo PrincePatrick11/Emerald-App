@@ -1,7 +1,7 @@
 import type { ButtonHTMLAttributes } from 'react';
 
-export type ButtonVariant = 'primary' | 'primaryDanger' | 'secondary' | 'ghost' | 'danger';
-export type ButtonTone = 'jade' | 'amber' | 'danger' | 'neutral';
+type ButtonVariant = 'primary' | 'primaryDanger' | 'secondary' | 'ghost' | 'danger';
+type ButtonTone = 'jade' | 'amber' | 'danger' | 'neutral';
 
 const VARIANT_CLASS: Record<ButtonVariant, string> = {
   primary: 'btn-primary',

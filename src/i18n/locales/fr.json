@@ -1,7 +1,6 @@
 {
   "common": {
     "delete": "Supprimer",
-    "deleteConfirm": "Supprimer ?",
     "confirmSure": "Sûr ?",
     "confirmYes": "Oui, supprimer",
     "confirmNo": "Annuler",
@@ -29,13 +28,14 @@
     "uncategorized": "Sans catégorie",
     "nameTaken": "Cette catégorie existe déjà",
     "dragHint": "Glissez pour réordonner.",
-    "builtinHint": "Intégrée — ne peut être ni renommée ni supprimée.",
+    "builtinHint": "Intégrée — ne peut être ni renommée ni supprimée. Son modèle de départ peut être changé.",
     "builtin": {
-      "other": "Autre",
       "sigils": "Sigils",
-      "altars": "Autels"
+      "altars": "Autels",
+      "journal": "Journal"
     },
     "starter": {
+      "dreams": "Journal de rêves",
       "paradigm": "Paradigme",
       "ritual": "Rituel",
       "meditation": "Méditation",
@@ -44,7 +44,18 @@
       "candles": "Bougies",
       "deities": "Divinités",
       "tools": "Outils"
-    }
+    },
+    "startTemplate": "Modèle de départ",
+    "startTemplateHint": "Ce par quoi commence une nouvelle entrée de cette catégorie. « Modèle par défaut » est celui choisi sous Modèles.",
+    "editTitle": "Modifier la catégorie",
+    "nameLabel": "Nom",
+    "startTemplateDefaultNamed": "Modèle par défaut ({{name}})",
+    "startTemplateDefaultNone": "Modèle par défaut (aucun)",
+    "startTemplateMeta": "Modèle de départ : {{name}}",
+    "shownIn": "Apparaît dans",
+    "shownInHint": "Tableaux de bord dont le filtre inclut cette catégorie. Cela se modifie dans les réglages du tableau de bord.",
+    "shownInNone": "Aucun tableau de bord ne filtre sur cette catégorie.",
+    "shownEverywhere": "Aussi dans tous les tableaux de bord sans filtre de catégories :"
   },
   "listView": {
     "view": "Vue",
@@ -53,8 +64,6 @@
     "cards": "Cartes",
     "cardsWide": "Cartes (pleine largeur)",
     "timeline": "Chronologie",
-    "alphaAsc": "A → Z",
-    "alphaDesc": "Z → A",
     "dateCreated": "Créé",
     "dateUpdated": "Modifié",
     "dateDeleted": "Supprimé",
@@ -63,6 +72,7 @@
     "sortAlphaAsc": "Nom · A → Z",
     "sortAlphaDesc": "Nom · Z → A",
     "sortCountDesc": "Utilisation · plus utilisé",
+    "sortManual": "Ordre personnalisé",
     "category": "Catégorie",
     "grouping": "Regroupement",
     "groupBy": "Grouper par {{label, lowercase}}",
@@ -71,9 +81,7 @@
   },
   "undo": {
     "action": "Annuler",
-    "entryDeleted": "Entrée de journal supprimée",
-    "articleDeleted": "Article wiki supprimé",
-    "operationDeleted": "Opération supprimée",
+    "entryDeleted": "Entrée supprimée",
     "taskDeleted": "Tâche supprimée",
     "categoryDeleted": "Catégorie supprimée",
     "tagDeleted": "Étiquette supprimée",
@@ -81,16 +89,15 @@
     "templateDeleted": "Modèle supprimé",
     "languageDeleted": "Langue supprimée",
     "imageDeleted": "Image supprimée",
-    "wordDeleted": "Mot supprimé"
+    "wordDeleted": "Mot supprimé",
+    "dashboardDeleted": "Tableau de bord supprimé"
   },
   "createItem": {
     "title": "Créer"
   },
   "nav": {
-    "home": "Accueil",
-    "all": "Tout",
     "journal": "Journal",
-    "wiki": "Wiki",
+    "knowledge": "Savoir",
     "tags": "Étiquettes",
     "categories": "Catégories",
     "images": "Images",
@@ -98,10 +105,12 @@
     "blocks": "Blocs",
     "templates": "Modèles",
     "lexicon": "Lexique",
-    "operations": "Opérations",
+    "practice": "Pratique",
     "tasks": "Tâches",
     "settings": "Paramètres",
-    "startPage": "Page d’accueil"
+    "startPage": "Page d’accueil",
+    "allEntries": "Toutes les entrées",
+    "symbols": "Symboles"
   },
   "sidebar": {
     "allEmpty": "Aucune entrée pour le moment",
@@ -110,37 +119,13 @@
     "noResultsHint": "Essayez une autre orthographe",
     "tasksEmpty": "Aucune tâche pour l'instant",
     "showMore": "Afficher {{count}} de plus",
-    "showMore_other": "Afficher {{count}} de plus"
+    "showMore_other": "Afficher {{count}} de plus",
+    "dashboardEmpty": "Pas encore d’entrées ici"
   },
-  "operations": {
-    "new": "Nouvelle opération",
-    "untitled": "Opération sans titre",
-    "placeholder": "Documentez votre opération...",
-    "all": "Toutes",
-    "categories": {
-      "sigils": "Sigils",
-      "servitors": "Serviteurs",
-      "other": "Autre"
-    }
-  },
-  "altar": {
-    "categories": {
-      "candle": "Bougie",
-      "crystal": "Cristal",
-      "herb": "Herbe",
-      "deity": "Divinité",
-      "symbol": "Symbole",
-      "tool": "Outil",
-      "table": "Table",
-      "other": "Autre"
-    }
-  },
-  "journal": {
-    "title": "Journal",
-    "newEntry": "Nouvelle entrée",
+  "entries": {
+    "label": "Entrées",
     "untitled": "Entrée sans titre",
-    "placeholder": "Commencez votre enregistrement...",
-    "noPhase": "Sans phase lunaire"
+    "placeholder": "Commencez votre enregistrement..."
   },
   "creation": {
     "intention": "Intention",
@@ -159,29 +144,6 @@
     "noLetters": "Aucune lettre préparée pour le moment.",
     "targetDate": "Date cible",
     "brushSize": "Pinceau"
-  },
-  "wiki": {
-    "title": "Wiki",
-    "newArticle": "Nouvel article",
-    "untitled": "Article sans titre",
-    "placeholder": "Documentez vos connaissances...",
-    "categories": {
-      "ritual": "Rituel",
-      "deity": "Divinité",
-      "herb": "Herbe",
-      "symbol": "Symbole",
-      "tool": "Outil",
-      "concept": "Concept",
-      "spell": "Sort",
-      "paradigm": "Paradigme",
-      "bannung": "Bannissement",
-      "meditation": "Méditation",
-      "sigil_charging": "Chargement de sigils",
-      "other": "Autre"
-    },
-    "addIcon": "Ajouter une icône",
-    "changeIcon": "Changer l'icône",
-    "removeIcon": "Supprimer l'icône"
   },
   "blocks": {
     "add": "Ajouter un bloc",
@@ -291,12 +253,6 @@
       "display": "Affichage",
       "fieldCount": "{{count}} champ",
       "fieldCount_other": "{{count}} champs"
-    },
-    "status": {
-      "name": "Statut",
-      "active": "Active",
-      "endDate": "Date de fin",
-      "version": "Version"
     },
     "sigil": {
       "hidden": "Masqué tant que le sigil est chargé",
@@ -637,7 +593,8 @@
       "ankh": "Ânkh",
       "monad": "Monade hiéroglyphique",
       "eye": "Œil de la providence"
-    }
+    },
+    "editTitle": "Modifier le symbole"
   },
   "canvas": {
     "keyNames": {
@@ -825,8 +782,6 @@
     "noResultsForFiltered": "Rien trouvé pour « {{query}} » avec les filtres choisis.",
     "noResultsFiltered": "Rien ne correspond aux filtres choisis.",
     "resetFilters": "Réinitialiser les filtres",
-    "operations": "Rechercher des opérations…",
-    "wikiArticles": "Rechercher des articles wiki…",
     "globalPlaceholder": "Tout rechercher…",
     "hint": "Titres, étiquettes et contenus de tous les modules.",
     "clear": "Effacer la recherche",
@@ -852,6 +807,7 @@
     "removeFromUses_other": "Affichée à {{count}} endroits – la retirer là aussi ?",
     "removeAndDelete": "Retirer et supprimer",
     "roles": {
+      "cover": "Image de couverture",
       "default": "Valeur par défaut du bloc",
       "drawing": "Dessin",
       "background": "Arrière-plan"
@@ -875,17 +831,24 @@
     "color": "Changer la couleur",
     "unused": "inutilisée",
     "onlyInTemplates": "seulement dans des modèles",
-    "onlyInImages": "seulement dans Images",
+    "onlyInImages": "seulement dans des images",
     "unusedHint": "Aucune entrée ne porte encore cette étiquette.",
     "createNamed": "+ Créer « {{name}} »",
-    "unknownOpenDashboard": "Aucune étiquette « {{name}} » — la créer dans Étiquettes"
+    "unknownOpenDashboard": "Aucune étiquette « {{name}} » — la créer dans Étiquettes",
+    "usage": "Utilisation",
+    "inEntries": "Dans des entrées",
+    "onlyInTemplatesFilter": "Seulement dans des modèles",
+    "onlyInImagesFilter": "Seulement dans des images",
+    "unusedFilter": "Inutilisés",
+    "onlyInTemplatesHint": "Aucune entrée ne porte cette étiquette, mais des modèles oui.",
+    "onlyInImagesHint": "Aucune entrée ne porte cette étiquette, mais des images oui.",
+    "onlyInTemplatesAndImages": "seulement dans des modèles et des images",
+    "onlyInTemplatesAndImagesFilter": "Modèles et images",
+    "onlyInTemplatesAndImagesHint": "Aucune entrée ne porte cette étiquette, mais des modèles et des images oui."
   },
   "properties": {
     "noEntry": "Ouvrez une entrée pour voir ses propriétés.",
     "title": "Propriétés",
-    "type": "Type",
-    "typeDropsProperties": "Les entrées du journal n’ont ni catégorie, ni icône, ni image de couverture ; elles seront supprimées.",
-    "changeType": "Convertir",
     "category": "Catégorie",
     "noCategory": "Aucune",
     "moonPhase": "Phase lunaire",
@@ -904,22 +867,15 @@
     "chooseImage": "Choisir une image",
     "linkEntry": "Lier une entrée …",
     "addTag": "Ajouter un tag …",
-    "removeTag": "Retirer le tag"
+    "removeTag": "Retirer le tag",
+    "addIcon": "Ajouter une icône",
+    "changeIcon": "Changer l'icône",
+    "removeIcon": "Supprimer l'icône"
   },
   "filters": {
     "all": "Toutes",
     "category": "Catégorie",
-    "module": "Module",
-    "moonPhase": "Phase lunaire",
     "status": "Statut"
-  },
-  "home": {
-    "viewAll": "Voir tout",
-    "view": "Vue",
-    "sort": "Tri",
-    "show": "Afficher",
-    "newest": "Récents",
-    "oldest": "Anciens"
   },
   "vault": {
     "title": "Vaults",
@@ -952,7 +908,10 @@
     "backTo": "Retour à {{name}}",
     "openFailed": "Le dernier vault n'a pas pu être ouvert. Choisissez-le à nouveau ou un autre.",
     "removeConfirm": "Retirer de la liste ?",
-    "deleteConfirmFiles": "Supprimer le vault et ses fichiers ?"
+    "deleteConfirmFiles": "Supprimer le vault et ses fichiers ?",
+    "outdated": "Ce vault provient d'une version antérieure d'Emerald et ne peut pas être ouvert dans celle-ci. Il reste tel quel ; un convertisseur suivra.",
+    "tooNew": "Ce vault provient d'une version plus récente d'Emerald. Mettez à jour cette application pour l'ouvrir. Il reste tel quel.",
+    "stateLocal": "ici seulement"
   },
   "vaultKey": {
     "unlockTitle": "Déverrouiller « {{name}} »",
@@ -989,10 +948,6 @@
     "rememberUnavailable": "Ce système n’a pas de trousseau où mémoriser la clé.",
     "rememberFailed": "Le trousseau du système d’exploitation a refusé de mémoriser la clé. Le vault est ouvert, mais Emerald redemandera le mot de passe la prochaine fois.",
     "continue": "Continuer",
-    "encryptTitle": "Chiffrer « {{name}} »",
-    "encryptHint": "Ce vault date d’avant le chiffrement. Désormais, tous les vaults sont chiffrés : choisis un mot de passe et Emerald chiffre les entrées, les images et les brouillons. Selon la taille, cela prend un moment, et l’original reste intact jusqu’à ce que tout soit vérifié.",
-    "encryptNote": "Les sauvegardes exportées auparavant (.emeralddb) restent non chiffrées jusqu’à ce que tu les supprimes. Sur les SSD, des fichiers supprimés peuvent parfois être récupérés pendant un temps – seul un disque chiffré (BitLocker, FileVault) comble cette faille.",
-    "encryptFailed": "Impossible de chiffrer le vault. Il est inchangé – réessaie.",
     "progressDatabase": "Chiffrement de la base de données…",
     "progressImages": "Images : {{done}} sur {{total}}",
     "progressImagesPhase": "Chiffrement des images…",
@@ -1027,11 +982,8 @@
   },
   "settings": {
     "language": "Langue",
-    "version": "Version",
     "pageGeneral": "Général",
     "tagline": "L'espace de travail pour votre pratique magique.",
-    "author": "Auteur",
-    "license": "Licence",
     "website": "Site web",
     "backup": "Sauvegarde",
     "exportDb": "Exporter la base de données",
@@ -1040,9 +992,6 @@
     "importDb": "Importer la base de données",
     "importBrowse": "Sélectionner un fichier…",
     "importedVault": "Vault importé",
-    "includeJournal": "Journal",
-    "includeWiki": "Wiki",
-    "includeOperations": "Opérations",
     "includeTasks": "Tâches",
     "includeTags": "Tags",
     "includeLexicon": "Lexique",
@@ -1165,7 +1114,7 @@
     "groupBackup": "Sauvegarde automatique",
     "uiScaleHint": "Met à l'échelle toute l'interface — texte, icônes et espacements.",
     "editorFontSizeHint": "Taille du texte dans les entrées et les valeurs de champ, indépendante de la taille de l'interface.",
-    "sidebarListHint": "Les entrées qu'affiche la barre latérale gauche : toutes, ou celles d'un module.",
+    "sidebarListHint": "Les entrées qu'affiche la barre latérale gauche : toutes, ou celles d'un tableau de bord.",
     "sidebarLimitHint": "Nombre d'entrées affichées au départ. Le reste se charge en dessous via « Afficher plus ».",
     "emojiDefaultsHint": "Les emojis proposés par chaque sélecteur de ce vault avant toute recherche. Cliquer pour retirer, glisser pour trier, rechercher pour en ajouter.",
     "imagesHint": "S'applique aux images nouvellement insérées. Les plus grandes sont d'abord réduites et refusées seulement si elles restent trop lourdes.",
@@ -1189,7 +1138,7 @@
     "moonPhase": "Phase lunaire",
     "moonPhaseHint": "La phase lunaire du jour où une entrée du journal a été créée.",
     "moonPhaseShow": "Afficher sur les entrées du journal",
-    "moonPhaseShowHint": "S'applique à toutes les entrées, anciennes comprises. Désactivé : pas de phase lunaire comme icône, dans la barre latérale ni à l'export, et pas de filtre ni de regroupement par phase.",
+    "moonPhaseShowHint": "S'applique à toutes les entrées du journal, anciennes comprises. Désactivé : pas de phase lunaire comme icône, dans la barre latérale ni à l'export.",
     "trashRetentionHint": "Durée pendant laquelle les éléments supprimés restent dans la corbeille. Ensuite, ils sont effacés définitivement à l'ouverture du vault.",
     "customThemeImport": "Importer un thème…",
     "customThemeRemove": "Retirer « {{name}} »",
@@ -1206,8 +1155,16 @@
     "updateErrorInstall": "L'installation a échoué.",
     "pageSecurity": "Sécurité",
     "pageSync": "Synchronisation",
-    "theme": "Thème",
-    "text": "Texte"
+    "text": "Texte",
+    "importErrorOldVersion": "Cette sauvegarde provient d'une version antérieure d'Emerald et ne peut pas être restaurée dans celle-ci. Rien n'a été modifié ; un convertisseur suivra.",
+    "importErrorNewVersion": "Cette sauvegarde provient d'une version plus récente d'Emerald. Mettez à jour cette application pour la restaurer. Rien n'a été modifié.",
+    "entriesByCategory": "Entrées par catégorie",
+    "includeUncategorizedHint": "Les entrées sans catégorie et celles dont la catégorie est dans la corbeille.",
+    "groupTemplates": "Modèles",
+    "previewEntries": "Entrées",
+    "previewTemplates": "Modèles",
+    "previewTasks": "Tâches",
+    "previewLanguages": "Langues"
   },
   "contextMenu": {
     "openInNewTab": "Ouvrir dans un nouvel onglet",
@@ -1236,7 +1193,9 @@
     "languages": "Langues",
     "deleteSelected": "Supprimer la sélection ({{count}})",
     "confirmDeleteSelected": "Oui, supprimer {{count}}",
-    "retentionNoteNever": "Les éléments restent jusqu'à ce que vous les supprimiez définitivement."
+    "retentionNoteNever": "Les éléments restent jusqu'à ce que vous les supprimiez définitivement.",
+    "entries": "Entrées",
+    "dashboards": "Tableaux de bord"
   },
   "leaveGuard": {
     "title": "Modifications non enregistrées",
@@ -1283,9 +1242,6 @@
     "title": "Insérer un lien",
     "searchPlaceholder": "Rechercher des entrées…",
     "tabAll": "Tout",
-    "tabJournal": "Journal",
-    "tabWiki": "Wiki",
-    "tabOperations": "Opérations",
     "tabTasks": "Tâches",
     "noResults": "Aucune entrée trouvée"
   },
@@ -1331,15 +1287,6 @@
     "entryTitlePlaceholder": "Laisser vide pour le titre habituel",
     "content": "Contenu",
     "contentPlaceholder": "Ce que chaque entrée issue de ce modèle contient au départ …",
-    "allCategories": "Toutes les catégories",
-    "overview": {
-      "title": "Attributions",
-      "hint": "Les nouvelles entrées commencent par une copie du modèle attribué. « Toutes les catégories » s’applique lorsqu’une catégorie n’en a pas.",
-      "category": "Catégorie",
-      "none": "Aucun modèle",
-      "fallback": "Sinon : {{name}} (toutes les catégories)",
-      "everyEntry": "Chaque nouvelle entrée"
-    },
     "saveAsTemplate": "Enregistrer comme modèle",
     "insert": {
       "button": "Insérer un modèle",
@@ -1349,8 +1296,9 @@
       "noticeApplied": "Modèle « {{name}} » appliqué",
       "dismiss": "Fermer"
     },
-    "assignTitle": "Attributions – {{name}}",
-    "assignHint": "Cliquez sur une cellule pour que les nouvelles entrées commencent par ce modèle ; un second clic l’annule. S’applique aussitôt."
+    "defaultTemplate": "Modèle par défaut",
+    "defaultTemplateHint": "Ce par quoi commence une nouvelle entrée quand sa catégorie n’a pas de modèle de départ propre. Les modèles de départ se choisissent sur la catégorie, sous Catégories.",
+    "defaultNone": "Aucun — commencer vide"
   },
   "lexicon": {
     "languages": "Langues",
@@ -1404,22 +1352,9 @@
     "unmappedCount_other": "{{count}} sans équivalent"
   },
   "emptyState": {
-    "journal": {
-      "title": "Aucune entrée pour l'instant",
-      "description": "Notez ce que vous vivez, rêvez et accomplissez. Les nouvelles entrées reçoivent la phase lunaire du jour.",
-      "action": "Première entrée"
-    },
-    "wiki": {
-      "title": "Aucun article pour l'instant",
-      "description": "Rassemblez votre savoir sur les herbes, les pierres et les symboles."
-    },
     "tasks": {
       "title": "Tout est fait",
       "description": "Aucune tâche ouverte. Les nouvelles arrivent ici."
-    },
-    "operations": {
-      "title": "Aucune opération pour l'instant",
-      "description": "Planifiez des rituels avec ingrédients, déroulement et résultat."
     },
     "images": {
       "title": "Pas encore d’images",
@@ -1447,68 +1382,27 @@
     },
     "trash": {
       "title": "La corbeille est vide"
+    },
+    "allEntries": {
+      "title": "Pas encore d’entrées",
+      "description": "Chaque entrée du vault apparaît ici, quelle que soit sa catégorie."
+    },
+    "dashboard": {
+      "title": "Rien ici pour l’instant",
+      "description": "Ce tableau de bord montre les entrées que son filtre laisse passer. Modifiez le filtre dans ses réglages."
+    },
+    "categories": {
+      "title": "Pas encore de catégories",
+      "description": "Les catégories rangent vos entrées ; chacune peut partir de son propre modèle."
+    },
+    "symbols": {
+      "title": "Pas encore de symboles",
+      "description": "Dessinez sur une toile, sélectionnez le dessin et enregistrez-le comme symbole dans la barre latérale."
     }
   },
   "sync": {
     "title": "Synchronisation",
-    "url": "Adresse du serveur",
-    "connect": "Connecter",
-    "login": "Reconnecter",
-    "connecting": "Connexion…",
-    "running": "Synchronisation…",
-    "last": "Dernière synchronisation il y a {{time}}",
-    "notYet": "Pas encore synchronisé dans cette session",
-    "now": "Synchroniser maintenant",
-    "needsLogin": "Cet appareil n'est plus connecté. Saisissez à nouveau la clé de synchronisation.",
-    "conflicts_one": "{{count}} entrée a été modifiée sur deux appareils. Les deux versions sont conservées : cherchez « (conflit) » dans le titre.",
-    "conflicts_other": "{{count}} entrées ont été modifiées sur deux appareils. Les deux versions sont conservées : cherchez « (conflit) » dans le titre.",
-    "conflictTitle": "{{title}} (conflit)",
-    "fetch": "Récupérer",
-    "errorUnreachable": "Le serveur ne répond pas. La synchronisation reprendra à son retour.",
-    "errorInsecure": "Cette adresse n'est pas sûre. Utilisez https, ou http uniquement sur cet ordinateur, un réseau privé ou un tailnet.",
-    "errorOutdated": "Le vault du serveur provient d'une version plus récente d'Emerald. Mettez à jour cette application.",
-    "errorServerOutdated": "Ce serveur est trop ancien pour cette version d'Emerald. Mettez à jour le serveur.",
-    "errorAppOutdated": "Ce serveur nécessite une version plus récente d'Emerald. Mettez à jour cette application.",
-    "errorServerOlder": "Le vault du serveur provient d'une version plus ancienne d'Emerald. Mettez d'abord à jour l'appareil qui l'y a déposé.",
-    "errorCannotOpen": "Ce que le serveur a envoyé ne peut pas être ouvert avec la clé de ce vault.",
-    "errorFailed": "La synchronisation a échoué.",
-    "passwordChanged": "Le mot de passe du vault a été changé sur un autre appareil. Saisissez le nouveau : cette copie sera récupérée à nouveau avec lui.",
-    "newVaultPassword": "Nouveau mot de passe du vault",
-    "adoptPassword": "Récupérer à nouveau avec ce mot de passe",
-    "key": "Clé de synchronisation",
-    "devices": "Appareils connectés",
-    "thisDevice": "cet appareil",
-    "unnamedDevice": "Appareil sans nom",
-    "removeDevice": "Retirer",
-    "errorWrongKey": "Ce n'est pas la clé de ce serveur.",
-    "disconnectServer": "Déconnecter le serveur",
-    "stateLocal": "ici seulement",
-    "statePaused": "déconnecté",
-    "stateSynced": "synchronisé",
-    "upload": "Mettre sur le serveur",
-    "pause": "Déconnecter",
-    "resume": "Reconnecter",
-    "deleteFromServer": "Supprimer du serveur",
-    "reallyDelete": "Vraiment supprimer",
-    "unnamedVault": "Vault {{number}}",
-    "goneFromServer": "Ce vault a été retiré du serveur. Il reste ici en tant que vault local.",
-    "replaceWarning": "Ce vault se synchronise : la sauvegarde le remplace aussi sur vos autres appareils, qui enregistrent d'abord leur propre sauvegarde.",
-    "keychainWarning": "Emerald conserve la connexion dans le trousseau du système. Si vous refusez l'accès, elle sera seulement masquée dans un fichier sur cet appareil.",
-    "keychainShort": "La connexion est conservée dans le trousseau du système.",
-    "deleteFromServerConfirm": "Retirer du serveur ?",
-    "noServer": "Aucun serveur connecté.",
-    "openPicker": "Serveur et vaults…",
-    "stateRemote": "seulement sur le serveur",
-    "notConnected": "Non connecté",
-    "loggedOut": "Reconnexion requise",
-    "unreachable": "Injoignable",
-    "reachable": "Joignable",
-    "statLastSync": "Dernière synchro",
-    "statDevices": "Appareils",
-    "statSpace": "Espace utilisé",
-    "unencryptedShort": "Pas dans le trousseau du système : seulement masquée sur cet appareil.",
-    "removeDeviceConfirm": "Retirer ?",
-    "disconnectServerConfirm": "Déconnecter ?"
+    "comingLater": "La synchronisation arrivera dans une version ultérieure. D’ici là, chaque vault reste sur cet appareil."
   },
   "start": {
     "server": "Serveur",
@@ -1518,5 +1412,43 @@
     "opened": "ouvert",
     "byAuthor": "par {{name}}",
     "updateServer": "Serveur de mises à jour"
+  },
+  "emeraldImport": {
+    "title": "Importer",
+    "oldVersion": "Ce fichier provient d'une version antérieure d'Emerald et ne peut pas être importé dans celle-ci. Rien n'a été modifié ; un convertisseur suivra.",
+    "newVersion": "Ce fichier provient d'une version plus récente d'Emerald. Mettez à jour cette application pour l'importer. Rien n'a été modifié.",
+    "unsupported": "Ce fichier n'est pas un fichier Emerald que cette version peut lire. Rien n'a été modifié.",
+    "tooLarge": "Ce fichier est trop volumineux ou compte trop de parties pour être importé. Rien n'a été modifié.",
+    "failed": "L'importation a échoué. Les entrées et modèles déjà créés ont été supprimés.",
+    "done": "Importation terminée – entrées : {{entries}}, modèles : {{templates}}."
+  },
+  "emeraldExport": {
+    "title": "Exporter",
+    "openEntryFirst": "Ouvrez d'abord une entrée.",
+    "openTemplateFirst": "Ouvrez d'abord un modèle."
+  },
+  "emeraldKey": {
+    "title": "Ouvrir un fichier Emerald",
+    "hint": "Ce fichier est chiffré par un mot de passe. Saisis le mot de passe donné lors de l’exportation.",
+    "password": "Mot de passe du fichier",
+    "open": "Ouvrir",
+    "wrongPassword": "Le mot de passe ne correspond pas à ce fichier."
+  },
+  "dashboards": {
+    "unnamed": "Tableau de bord sans nom",
+    "defaultName": "Nouveau tableau de bord",
+    "dashboard": "Tableau de bord",
+    "newEntry": "Nouvelle entrée",
+    "settings": "Réglages du tableau de bord",
+    "name": "Nom",
+    "allHasNoFilter": "« Toutes les entrées » montre chaque entrée et n’a pas de filtre.",
+    "filterCategories": "Catégories",
+    "filterCategoriesHint": "Montre les entrées des catégories cochées. « Toutes » montre chaque catégorie.",
+    "filterTags": "Étiquettes",
+    "filterTagsHint": "Si renseignées, seulement les entrées avec au moins une de ces étiquettes.",
+    "newCategory": "Nouvelle catégorie",
+    "addCategory": "Ajouter",
+    "moveUp": "Monter",
+    "moveDown": "Descendre"
   }
 }

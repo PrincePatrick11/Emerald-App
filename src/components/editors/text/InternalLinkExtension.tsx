@@ -2,27 +2,26 @@ import Mention from '@tiptap/extension-mention';
 import { mergeAttributes } from '@tiptap/core';
 import { ReactNodeViewRenderer, NodeViewWrapper } from '@tiptap/react';
 import type { NodeViewRendererProps } from '@tiptap/react';
-import SuggestionList, { DEFAULT_ENTRY_EMOJI, type SuggestionItem } from './SuggestionList';
+import SuggestionList, { type SuggestionItem } from './SuggestionList';
+import { defaultLinkIcon } from '../../../lib/entryIcon';
 import { suggestionPopup } from './suggestionPopup';
-import type { ContentType } from '../../../types';
-
-function getDefaultIcon(entryType: string): string {
-  return DEFAULT_ENTRY_EMOJI[entryType as ContentType] ?? DEFAULT_ENTRY_EMOJI.operation;
-}
+import { linkTargetKindOf } from '../../../lib/internalLinkHtml';
+import { isImageIcon } from '../../../lib/helpers';
+import { iconSrc } from '../../../lib/icons';
 
 interface InternalLinkOptions {
-  getIcon?: (id: string, entryType: string) => string | null;
-  getLabel?: (id: string, entryType: string) => string | null;
+  getIcon?: (id: string, targetKind: string) => string | null;
+  getLabel?: (id: string, targetKind: string) => string | null;
 }
 
 function InternalLinkNodeView({ node, editor, extension }: NodeViewRendererProps) {
-  const { id, entryType, label } = node.attrs;
+  const { id, targetKind, label } = node.attrs;
 
   // Look up icon and label live from the store via extension callbacks,
   // so both always reflect the latest state without re-parsing stored HTML.
   const { getIcon, getLabel } = (extension as unknown as { options: InternalLinkOptions }).options;
-  const icon = getIcon?.(id, entryType) ?? getDefaultIcon(entryType);
-  const displayLabel = getLabel?.(id, entryType) ?? label;
+  const icon = getIcon?.(id, targetKind) ?? defaultLinkIcon(targetKind);
+  const displayLabel = getLabel?.(id, targetKind) ?? label;
 
   const handleClick = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -31,7 +30,7 @@ function InternalLinkNodeView({ node, editor, extension }: NodeViewRendererProps
     if (!editor.isEditable) {
       // Navigation via CustomEvent; no direct store access possible from a NodeView
       document.dispatchEvent(new CustomEvent('internal-link-navigate', {
-        detail: { id, entryType },
+        detail: { id, targetKind },
         bubbles: true,
       }));
     }
@@ -40,7 +39,7 @@ function InternalLinkNodeView({ node, editor, extension }: NodeViewRendererProps
   return (
     <NodeViewWrapper as="span" className="internal-link-chip" onClick={handleClick} data-drag-handle>
       <span className="internal-link-icon">
-        {icon?.startsWith('data:') ? <img src={icon} alt="" /> : icon}
+        {isImageIcon(icon) ? <img src={iconSrc(icon)} alt="" /> : icon}
       </span>
       <span className="internal-link-label">{displayLabel}</span>
     </NodeViewWrapper>
@@ -49,8 +48,8 @@ function InternalLinkNodeView({ node, editor, extension }: NodeViewRendererProps
 
 export function createInternalLinkExtension(
   getItems: (query: string) => SuggestionItem[],
-  getIcon: (id: string, entryType: string) => string | null,
-  getLabel: (id: string, entryType: string) => string | null
+  getIcon: (id: string, targetKind: string) => string | null,
+  getLabel: (id: string, targetKind: string) => string | null
 ) {
   return Mention.extend({
     name: 'internalLink',
@@ -62,10 +61,10 @@ export function createInternalLinkExtension(
           parseHTML: (el) => el.getAttribute('data-id'),
           renderHTML: (attrs) => ({ 'data-id': attrs.id }),
         },
-        entryType: {
-          default: 'wiki',
-          parseHTML: (el) => el.getAttribute('data-entry-type'),
-          renderHTML: (attrs) => ({ 'data-entry-type': attrs.entryType }),
+        targetKind: {
+          default: 'entry',
+          parseHTML: (el) => linkTargetKindOf(el.getAttribute('data-target-kind')),
+          renderHTML: (attrs) => ({ 'data-target-kind': attrs.targetKind }),
         },
         label: {
           default: '',
@@ -153,7 +152,7 @@ export function createInternalLinkExtension(
             type: 'internalLink',
             attrs: {
               id: item.id,
-              entryType: item.entryType,
+              targetKind: item.targetKind,
               label: item.label,
               icon: item.icon ?? null,
               entry_number: item.entry_number ?? null,

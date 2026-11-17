@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Trash2 } from 'lucide-react';
 import SearchField from '../../../ui/SearchField';
@@ -13,12 +13,35 @@ export function symbolName(id: string, t: (key: string) => string, own?: string)
   return own ?? t(`symbols.${id}`);
 }
 
-/** A symbol drawn small, in the current text colour. */
-export function SymbolGlyph({ d, solid, weight = 5, size = 28 }: { d: string; solid?: string; weight?: number; size?: number }) {
+/**
+ * A symbol drawn small, in the current text colour. With `fit` the drawing
+ * fills the square instead of sitting where it was drawn in its 100 × 100 box —
+ * for previews of the collection, where a small drawing would otherwise be a speck.
+ */
+export function SymbolGlyph({ d, solid, weight = 5, size = 28, fit = false }: {
+  d: string;
+  solid?: string;
+  weight?: number;
+  size?: number;
+  fit?: boolean;
+}) {
+  const ref = useRef<SVGGElement>(null);
+  const [viewBox, setViewBox] = useState('0 0 100 100');
+  const stroke = Math.max(2.5, weight * 1.2);
+  useLayoutEffect(() => {
+    if (!fit || !ref.current) return;
+    const box = ref.current.getBBox();
+    if (!box.width && !box.height) return;
+    // Room for half the stroke on every side, so its edges are not cut off.
+    const side = Math.max(box.width, box.height) + stroke + 4;
+    setViewBox(`${box.x + box.width / 2 - side / 2} ${box.y + box.height / 2 - side / 2} ${side} ${side}`);
+  }, [fit, d, solid, stroke]);
   return (
-    <svg viewBox="0 0 100 100" width={size} height={size} aria-hidden>
-      {solid && <path d={solid} fill="currentColor" />}
-      <path d={d} fill="none" stroke="currentColor" strokeWidth={Math.max(2.5, weight * 1.2)} strokeLinecap="round" strokeLinejoin="round" />
+    <svg viewBox={viewBox} width={size} height={size} aria-hidden>
+      <g ref={ref}>
+        {solid && <path d={solid} fill="currentColor" />}
+        <path d={d} fill="none" stroke="currentColor" strokeWidth={stroke} strokeLinecap="round" strokeLinejoin="round" />
+      </g>
     </svg>
   );
 }

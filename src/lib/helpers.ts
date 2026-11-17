@@ -1,11 +1,18 @@
+import { format } from 'date-fns';
+import { storedImageName } from './schema';
+
+/**
+ * Whether an icon is an uploaded picture — the stored name of a file in the
+ * vault's `icons/` (`lib/icons.ts`) — rather than an emoji. Shown through
+ * `iconSrc`.
+ */
 export function isImageIcon(icon: string | null | undefined): boolean {
-  if (!icon) return false;
-  return icon.startsWith('data:image/') || icon.startsWith('blob:') || icon.startsWith('/');
+  return !!icon && storedImageName(icon) === icon;
 }
 
 /**
  * Icon and name as one line — for lists that show both side by side
- * (trash). An image icon is a data URL and would appear as Base64 in front of the
+ * (trash). An image icon is a file name and would appear as text in front of the
  * name; in that case the row already carries its symbol in its own column.
  */
 export function iconTitle(icon: string, name: string): string {
@@ -48,16 +55,6 @@ export function readFileAsDataUrl(file: Blob): Promise<string> {
   });
 }
 
-export function hexToRgb(hex: string): { r: number; g: number; b: number } {
-  if (!isValidHexColor(hex)) return { r: 0, g: 0, b: 0 };
-  const normalized = hex.replace('#', '');
-  return {
-    r: parseInt(normalized.slice(0, 2), 16),
-    g: parseInt(normalized.slice(2, 4), 16),
-    b: parseInt(normalized.slice(4, 6), 16),
-  };
-}
-
 /**
  * File size for display — one decimal place from MB upwards.
  *
@@ -68,6 +65,27 @@ export function formatBytes(bytes: number, units: [string, string, string]): str
   if (bytes < 1024) return `${bytes} ${units[0]}`;
   if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} ${units[1]}`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} ${units[2]}`;
+}
+
+/** A non-null object that is not an array — the shape of parsed JSON worth reading keys from. */
+export function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+/** `value` if it is a record (`isRecord`), otherwise an empty one. */
+export function asRecord(value: unknown): Record<string, unknown> {
+  return isRecord(value) ? value : {};
+}
+
+/** `value` if it is a string, otherwise `null`. */
+export function asString(value: unknown): string | null {
+  return typeof value === 'string' ? value : null;
+}
+
+/** `<title>_<yyyy-MM-dd>.<ext>`, the title reduced to what a file name takes — every export's default name. */
+export function exportFilename(title: string, date: string, ext: string): string {
+  const base = title.replace(/[^\w\s\-äöüÄÖÜß]/g, '').trim().replace(/\s+/g, '_') || 'export';
+  return `${base}_${format(new Date(date), 'yyyy-MM-dd')}.${ext}`;
 }
 
 /** `raw` if it is exactly one of the `options`, otherwise `fallback` — for values

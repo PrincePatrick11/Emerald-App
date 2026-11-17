@@ -1,7 +1,7 @@
 import { invoke } from '@tauri-apps/api/core';
 import { message, save } from '@tauri-apps/plugin-dialog';
 import type { CanvasExportFormat } from '../components/editors/canvas';
-import { exportFilename } from './export';
+import { exportFilename } from './helpers';
 
 const FILTERS: Record<CanvasExportFormat, { name: string; extensions: string[] }> = {
   png: { name: 'PNG Image', extensions: ['png'] },

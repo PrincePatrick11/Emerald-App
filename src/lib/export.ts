@@ -4,17 +4,19 @@ import { save, message } from '@tauri-apps/plugin-dialog';
 import TurndownService from 'turndown';
 import { TEXT_COLORS, TEXT_COLOR_SHADES } from './textColors';
 import { format } from 'date-fns';
+import { exportFilename } from './helpers';
 import DOMPurify from 'dompurify';
 import type { ExportData } from './exportData';
 import { useEntryStore } from '../store/entryStore';
 import { useTaskStore } from '../store/taskStore';
 import { useCategoryStore } from '../store/categoryStore';
-import { DEFAULT_ENTRY_EMOJI, entryIcon } from './modules';
+import { DEFAULT_ENTRY_ICON, DEFAULT_TASK_ICON, entryIcon } from './entryIcon';
+import { portableIcon } from './icons';
 import i18n from '../i18n';
 
 // ── helpers ────────────────────────────────────────────────────────────────
 
-export function htmlEscape(str: string): string {
+function htmlEscape(str: string): string {
   return str
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
@@ -64,13 +66,15 @@ function stripImages(html: string): string {
 /**
  * Pre-resolve missing data-icon attributes on internal link spans.
  * TipTap only stores the icon at save-time; if it was null then, we fill it now.
+ * An uploaded icon is a file the export document cannot reach: it goes in as
+ * a data URL (`portableIcon`).
  */
-function resolveInternalLinkIcons(html: string): string {
+async function resolveInternalLinkIcons(html: string): Promise<string> {
   const doc = new DOMParser().parseFromString(html, 'text/html');
   const links = doc.querySelectorAll<HTMLElement>('span[data-type="internalLink"]');
   if (!links.length) return html;
 
-  const { wiki: articles, operation: operations } = useEntryStore.getState().entries;
+  const { entries } = useEntryStore.getState();
   const { tasks } = useTaskStore.getState();
   const { categories } = useCategoryStore.getState();
 
@@ -78,22 +82,21 @@ function resolveInternalLinkIcons(html: string): string {
     // Only fill missing icons
     if (el.getAttribute('data-icon')) continue;
     const id        = el.getAttribute('data-id');
-    const entryType = el.getAttribute('data-entry-type');
+    const targetKind = el.getAttribute('data-target-kind');
     if (!id) continue;
 
     let icon = '';
-    if (entryType === 'wiki') {
-      const article = articles.find(a => a.id === id);
-      if (article) icon = entryIcon('wiki', article, categories.find(c => c.id === article.category_id));
-    } else if (entryType === 'operation') {
-      const op = operations.find(o => o.id === id);
-      if (op) icon = entryIcon('operation', op, categories.find(c => c.id === op.category_id));
-    } else if (entryType === 'task') {
+    if (targetKind === 'entry') {
+      // The same icon as in the app; the moon phase is left out, as the chip shows it live only.
+      const entry = entries.find(e => e.id === id);
+      if (entry) icon = entryIcon(entry, categories.find(c => c.id === entry.category_id), false);
+    } else if (targetKind === 'task') {
       // Task chips from sidebar drags carry no data-icon — as in the
       // editor's live lookup: category emoji, otherwise the chip fallback.
       const task = tasks.find(t => t.id === id);
-      if (task) icon = categories.find(c => c.id === task.category_id)?.emoji ?? DEFAULT_ENTRY_EMOJI.task;
+      if (task) icon = categories.find(c => c.id === task.category_id)?.emoji ?? DEFAULT_TASK_ICON;
     }
+    icon = await portableIcon(icon);
     if (icon) el.setAttribute('data-icon', icon);
   }
 
@@ -142,43 +145,27 @@ function transformInternalLinks(html: string): string {
   return doc.body.innerHTML;
 }
 
-function safeFilename(title: string): string {
-  return title.replace(/[^\w\s\-äöüÄÖÜß]/g, '').trim().replace(/\s+/g, '_') || 'export';
-}
-
-/** `<title>_<yyyy-MM-dd>.<ext>`, the title reduced to what a file name takes — every export's default name. */
-export function exportFilename(title: string, date: string, ext: string): string {
-  const base = safeFilename(title);
-  const dateStr = format(new Date(date), 'yyyy-MM-dd');
-  return `${base}_${dateStr}.${ext}`;
-}
-
-// Top bar: exactly like the main view — 🌕 January 15, 2026 · Full Moon
+// Top bar: icon, date and the moon phase's or category's name — 🌕 January 15, 2026 · Full Moon
 function buildTopBar(data: ExportData): string {
   const dateStr = format(new Date(data.createdAt), 'MMMM d, yyyy');
 
-  // Pick a left icon
-  let icon = '📓'; // journal default
-  let moonName = '';
+  // data.moonPhase = "🌕 Full Moon" — split at first space
+  const sp = data.moonPhase?.indexOf(' ') ?? -1;
+  const moonSymbol = data.moonPhase && (sp > 0 ? data.moonPhase.slice(0, sp) : data.moonPhase);
+  const moonName = data.moonPhase && sp > 0 ? data.moonPhase.slice(sp + 1) : '';
+  const subtitle = data.moonPhase ? moonName : data.category?.label ?? '';
 
-  if (data.moonPhase) {
-    // data.moonPhase = "🌕 Full Moon" — split at first space
-    const sp = data.moonPhase.indexOf(' ');
-    icon     = sp > 0 ? data.moonPhase.slice(0, sp) : data.moonPhase;
-    moonName = sp > 0 ? data.moonPhase.slice(sp + 1) : '';
-  } else if (data.category) {
-    const ic = data.entryIcon ?? data.category.icon;
-    icon = (!ic || ic.startsWith('data:')) ? DEFAULT_ENTRY_EMOJI[data.type === 'wiki' ? 'wiki' : 'operation'] : ic;
-    moonName = data.category.label;
-  }
-
-  // Render icon: data-URL → <img>, else emoji text
+  // The icon rule of the app (`entryIcon`): own icon, else moon phase, else
+  // category emoji, else the default. An uploaded icon arrives as a data URL.
   const safeEntryIcon = sanitizeDataImageUrl(data.entryIcon);
-  const iconHtml = (safeEntryIcon && data.category)
+  const ownEmoji = data.entryIcon && !data.entryIcon.startsWith('data:') ? data.entryIcon : undefined;
+  const categoryEmoji = data.category?.icon && !data.category.icon.startsWith('data:') ? data.category.icon : undefined;
+  const icon = ownEmoji || moonSymbol || categoryEmoji || DEFAULT_ENTRY_ICON;
+  const iconHtml = safeEntryIcon
     ? `<img src="${safeEntryIcon}" class="topbar-icon-img">`
     : `<span class="topbar-icon">${htmlEscape(icon)}</span>`;
 
-  const suffix = moonName ? ` · ${htmlEscape(moonName)}` : '';
+  const suffix = subtitle ? ` · ${htmlEscape(subtitle)}` : '';
   return `<div class="entry-topbar">${iconHtml}<span class="topbar-date">${dateStr}${suffix}</span></div>`;
 }
 
@@ -319,7 +306,7 @@ const PRINT_CSS = `
 // shape as the Markdown / Emerald exports.
 
 export async function exportAsPDF(data: ExportData): Promise<void> {
-  const resolvedContent  = resolveInternalLinkIcons(data.content);
+  const resolvedContent  = await resolveInternalLinkIcons(data.content);
   const embeddedContent  = await embedImages(resolvedContent);
   // Pre-render the internal-link chips here, so the export document stays
   // script-free (see `transformInternalLinks`).
@@ -344,7 +331,7 @@ export async function exportAsPDF(data: ExportData): Promise<void> {
     <h1 class="entry-title">${escapedTitle}${numStr}</h1>
     ${metaHtml}
     <div class="entry-content">${DOMPurify.sanitize(transformedContent, {
-      ADD_ATTR: ['data-type', 'data-id', 'data-entry-type', 'data-label', 'data-icon', 'data-entry-number', 'data-href', 'colwidth', 'data-color'],
+      ADD_ATTR: ['data-type', 'data-id', 'data-target-kind', 'data-label', 'data-icon', 'data-entry-number', 'data-href', 'colwidth', 'data-color'],
     })}</div>
   </div>
 </body>
@@ -376,7 +363,7 @@ function mdIcon(icon?: string | null, fallbackIcon?: string | null): string {
 }
 
 /** HTML of the content to Markdown, with the rules for what the app's content holds beyond plain HTML. */
-export function createMarkdownConverter(): TurndownService {
+function createMarkdownConverter(): TurndownService {
   const td = new TurndownService({ headingStyle: 'atx', codeBlockStyle: 'fenced' });
 
   td.addRule('internalLink', {
@@ -440,7 +427,6 @@ export async function exportAsMarkdown(data: ExportData): Promise<void> {
 
   // Build frontmatter / header block
   const lines: string[] = [`# ${data.title}`, ''];
-  lines.push(`Type: ${data.type}`);
   lines.push(`*${format(new Date(data.createdAt), 'MMMM d, yyyy')}*`);
   if (data.moonPhase)   lines.push(`Moon: ${data.moonPhase}`);
   if (data.category)            lines.push(`Category: ${mdIcon(data.category.icon, data.category.fallbackIcon)}${data.category.label}`.trim());
@@ -461,7 +447,7 @@ export async function exportAsMarkdown(data: ExportData): Promise<void> {
 // ── guard ──────────────────────────────────────────────────────────────────
 
 export async function noEntryMessage(): Promise<void> {
-  await message('Please open a journal entry, wiki article, or operation first.', {
+  await message('Please open an entry first.', {
     title: 'Export', kind: 'info',
   });
 }

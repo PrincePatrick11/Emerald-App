@@ -1,6 +1,6 @@
 ---
 name: emerald-app-control
-description: Drives the Emerald Tauri/journal app through the emerald-devtools MCP server Covers Journal, Wiki, Operations (altars included), Tasks, Tags, Trash, Settings, export, theme and language switching.
+description: Drives the Emerald Tauri/journal app through the emerald-devtools MCP server Covers the dashboards Journal, Practice and Knowledge (altars included), Tasks, Tags, Trash, Settings, export, theme and language switching.
 version: 1.0.0
 platforms: [windows, macos, linux]
 metadata:
@@ -97,10 +97,10 @@ placeholder — in practice the MCP client replaces that with direct tool calls.
 
 **Example conversation:**
 
-> User: "Create a wiki article about sage for me"
+> User: "Create an article about sage for me"
 >
 > Hermes (following this skill):
-> 1. Looks up the wiki create pattern
+> 1. Looks up the entry create pattern
 > 2. Clicks sidebar → New Article
 > 3. Types the title "Sage"
 > 4. Fills the body via ProseMirror
@@ -140,12 +140,12 @@ where one only clicks, right-clicks or types, the tool is now the shorter way.
 
 ## Architecture in brief
 
-- **Stack:** Tauri 2 + React 19 + Vite + Zustand + SQLite (local, via `tauri-plugin-sql`)
+- **Stack:** Tauri 2 + React 19 + Vite + Zustand + SQLite (local, SQLCipher through the app's own SQL layer in `db.rs`)
 - **Editor:** Tiptap (ProseMirror). Body = `<div class="tiptap ProseMirror" contenteditable="true">`
 - **Title:** `<input class="entry-view-title" placeholder="Untitled Entry">`
 - **i18n:** react-i18next, 4 languages (EN/DE/ES/FR), switchable live in Settings
 - **Themes:** "Emerald Noctis" (dark, default), "Emerald Parchment" (light)
-- **Persistence:** SQLite + optional GitHub sync via `.env` (note: that is only an ENV token, not a UI sync — the `git push` flow is not implemented in `lib.rs`)
+- **Persistence:** SQLite encrypted with SQLCipher, one `emerald.db` per vault; no sync (Settings → Sync and the start page's Server card are placeholders)
 - **Hot reload:** Vite reloads automatically on code changes in `src/`
 
 ## Main UI anatomy
@@ -157,8 +157,8 @@ where one only clicks, right-clicks or types, the tool is now the shorter way.
 │                                        .window-control ×3 (Min/Max/Close)   │
 ├─ aside.app-sidebar-left ──┬─ main.app-main ─────────┬─ aside.app-sidebar-right ┤
 │ .left-sidebar-rail        │ .tabbar (+ .tab-add)    │ Properties / Tags        │
-│   icon buttons btn-ghost  │ view content            │ Linked ops / wiki        │
-│ entry-list panel          │                         │ Routines / backlinks     │
+│   icon buttons btn-ghost  │ view content            │ Linked entries        │
+│ entry-list panel          │                         │                          │
 │   rows = .sidebar-item    │                         │                          │
 └───────────────────────────┴─────────────────────────┴──────────────────────────┘
 ```
@@ -178,18 +178,21 @@ document.querySelector('.left-sidebar-rail button:has(.lucide-book-open)').click
 
 | Target | Icon class | Selector |
 | --- | --- | --- |
+| All entries | `lucide-layout-list` | `.left-sidebar-rail [data-dashboard-id="all"]` |
 | Journal | `lucide-book-open` | `.left-sidebar-rail button:has(.lucide-book-open)` |
 | Tasks | `lucide-square-check-big` | `.left-sidebar-rail button:has(.lucide-square-check-big)` |
-| Operations | `lucide-wand-sparkles` | `.left-sidebar-rail button:has(.lucide-wand-sparkles)` |
-| Wiki | `lucide-library` | `.left-sidebar-rail button:has(.lucide-library)` |
+| Practice | `lucide-wand-sparkles` | `.left-sidebar-rail button:has(.lucide-wand-sparkles)` |
+| Knowledge | `lucide-library` | `.left-sidebar-rail button:has(.lucide-library)` |
 | Tags | `lucide-tag` | `.left-sidebar-rail button:has(.lucide-tag)` |
 | Trash | `lucide-trash2` | `.left-sidebar-rail button:has(.lucide-trash2)` |
 | Settings | `lucide-settings` | `.left-sidebar-rail button:has(.lucide-settings)` |
 
 `:has()` is supported by WebView2 — verified against the running build.
 
+Every dashboard button (All entries, Journal, Practice, Knowledge and dashboards made by hand) also carries `data-dashboard-id`, e.g. `[data-dashboard-id="knowledge"]` — the only stable handle for a user-made dashboard, whose icon can be anything. A built-in given its own icon loses its lucide class (renaming keeps it); the attribute stays.
+
 **`.sidebar-item` is not navigation.** Today the class denotes list rows:
-entries in the list panel, backlinks, routines, tags. Trying to navigate with it
+entries in the list panel, linked entries, tags. Trying to navigate with it
 hits nothing, and `?.click()` fails silently.
 
 **Creating an entry:** `button[title="New Entry"]` in the head of the list panel
@@ -292,65 +295,20 @@ await mcp.call_tool("eval", { expression: "[...document.querySelectorAll('button
 // Trash auto-deletes after 30 days
 ```
 
-### Creating Wiki / Operations / Tasks entries
+### Creating entries and tasks
 
 **These views open the editor inline**: clicking "New..." opens the editor immediately.
 
-**IMPORTANT: the title commit mechanism differs per area!**
-
 | Area | Title input selector | Commit method | Body editor |
 |---|---|---|---|
-| **Journal** | `input[placeholder="Untitled Entry" i]` | click the "Done" button | `.ProseMirror` |
-| **Wiki** | `input[placeholder="Untitled Article" i]` | `input.entry-view-title.blur()` | `.ProseMirror` |
-| **Operations** | `input[placeholder="Untitled Operation" i]` | **right-click → "Rename"** (NOT blur!) | `.ProseMirror` + 2 textareas |
+| **Any entry** (one entry page for all dashboards) | `input.entry-view-title` (placeholder "Untitled Entry") | click the "Done" button | `.ProseMirror` |
 | **Tasks** | `input.bg-stone-800[type="text"]` (NO placeholder) | Enter + blur | tasks have no body |
 
-**Category options per area:**
-
-| Area | Categories |
-|---|---|
-| **Wiki** | 12 options (Paradigm, Banishing, Meditation, Sigil Charging, Ritual, Deity, Herb, Symbol, Tool, Concept, Spell, Other) |
-| **Operations** | **ONLY 2 options**: `sigils` and `servitors` — Operations is for sigil work only! |
+The category is chosen in the Properties panel's category row while editing; a new entry starts in the first category of the dashboard it was created in.
 
 **Creating a journal entry (Done button):** see above.
 
-**Creating a wiki article (blur() commit):** like Journal, but instead of Done:
-```js
-await mcp.call_tool("eval", {
-  expression: "(() => { const t = document.querySelector('input.entry-view-title'); if (t) t.blur(); return true; })()"
-});
-// view-switch refresh (Journal -> Wiki) so the article becomes visible
-await mcp.call_tool("eval", { expression: "document.querySelector('.left-sidebar-rail button:has(.lucide-book-open)')?.click()" });
-await mcp.call_tool("wait_for", { timeout_ms: 500 });
-await mcp.call_tool("eval", { expression: "document.querySelector('.left-sidebar-rail button:has(.lucide-library)')?.click()" });
-await mcp.call_tool("wait_for", { timeout_ms: 1500 });
-```
-
-**Creating an operation (rename workflow):**
-```js
-// 1. Sidebar + New Operation
-const sb = document.querySelector('.left-sidebar-rail button:has(.lucide-wand-sparkles)');
-if (sb) sb.click();
-const b = [...document.querySelectorAll('button')].find(b => /New Operation/i.test((b.innerText || '').trim()) && b.offsetParent !== null);
-if (b) b.click();
-// 2. Fill title
-await mcp.call_tool("eval", { expression: "(() => { const i = document.querySelector('input.entry-view-title'); if (i) { const s = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value'); s.set.call(i, 'My title'); i.dispatchEvent(new Event('input', { bubbles: true })); } return true; })()" });
-// 3. Fill body textareas
-await mcp.call_tool("eval", { expression: "(() => { const tas = [...document.querySelectorAll('textarea')]; const intent = tas.find(t => t.placeholder?.includes('sigil')); if (intent) { const s = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value'); s.set.call(intent, 'I AM PROTECTED'); intent.dispatchEvent(new Event('input', { bubbles: true })); } return true; })()" });
-// 4. Set category
-await mcp.call_tool("eval", { expression: "(() => { const sels = [...document.querySelectorAll('select')].filter(s => s.offsetParent !== null); const s = sels[0]; if (s) { const set = Object.getOwnPropertyDescriptor(window.HTMLSelectElement.prototype, 'value'); set.call(s, 'sigils'); s.dispatchEvent(new Event('change', { bubbles: true })); } return true; })()" });
-// 5. Commit via right-click + Rename
-await mcp.call_tool("eval", { expression: "(() => { const item = [...document.querySelectorAll('.panel-interactive')].find(el => el.offsetParent !== null && (el.innerText || '').includes('Untitled Operation')); if (item) { const r = item.getBoundingClientRect(); item.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, view: window, clientX: r.left + 20, clientY: r.top + 20, button: 2, buttons: 2 })); } return true; })()" });
-await mcp.call_tool("wait_for", { timeout_ms: 500 });
-await mcp.call_tool("eval", { expression: "[...document.querySelectorAll('.context-menu-item')].find(el => /^rename$/i.test((el.innerText || '').trim()))?.click()" });
-await mcp.call_tool("wait_for", { timeout_ms: 500 });
-await mcp.call_tool("eval", { expression: "(() => { const input = [...document.querySelectorAll('input')].find(el => el.offsetParent !== null && (el.className || '').includes('flex-1 bg-transparent text-sm')); if (input) { const s = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value'); s.set.call(input, 'My title'); input.dispatchEvent(new Event('input', { bubbles: true })); input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })); input.blur(); } return true; })()" });
-```
-
-**Creating a task:**
-```js
-await mcp.call_tool("eval", { expression: "(() => { const i = [...document.querySelectorAll('input[type=\"text\"]')].find(el => el.offsetParent !== null && !el.placeholder && (el.className || '').includes('bg-stone-800')); if (i) { const s = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value'); s.set.call(i, 'Buy sage'); i.dispatchEvent(new Event('input', { bubbles: true })); i.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })); i.blur(); } return true; })()" });
-```
+**Any other entry:** there is one entry page for every entry. Open a dashboard (`.left-sidebar-rail [data-dashboard-id="<id>"]`), press its "New entry" button (or a category group's "+"), type the title and press Done, as for a journal entry above. The entry starts in the dashboard's first category; the category can be changed in the Properties panel while editing.
 
 ## Pitfalls
 
@@ -366,24 +324,11 @@ document.documentElement.lang || localStorage.getItem('i18nextLng')
 ```
 
 
-### Wiki needs a view-switch refresh after create
-**Wiki articles are in the list immediately after `entry-view-title.blur()`, but React needs ~500ms to re-render.**
-
-```js
-await mcp.call_tool("eval", { expression: "document.querySelector('.left-sidebar-rail button:has(.lucide-book-open)')?.click()" });
-await mcp.call_tool("wait_for", { timeout_ms: 500 });
-await mcp.call_tool("eval", { expression: "document.querySelector('.left-sidebar-rail button:has(.lucide-library)')?.click()" });
-await mcp.call_tool("wait_for", { timeout_ms: 1500 });
-```
-
-### Operations need the rename workflow
-**Operations do NOT react to `entry-view-title.blur()`** the way Wiki does. Commit via right-click → Rename in the context menu. See the table above.
-
 ### `btn-primary` only exists in list views
 `button.btn-primary` is there as long as a list view without an open detail is
 active; with a tab open it disappears. Use the stable route instead:
 `button[title="New Entry"]` in the head of the list panel — that one is always
-present. (Verified: in the wiki list view `btn-primary` is present, with a detail
+present. (Verified: in a dashboard list view `btn-primary` is present, with a detail
 tab open it is not.)
 
 ### Settings is a modal, no longer a panel
@@ -463,16 +408,16 @@ Then check the UI via `eval`:
   const view = () => document.querySelector('.app-main')?.innerText.trim().split('\n')[1] || '';
   document.querySelector('.left-sidebar-rail button:has(.lucide-wand-sparkles)').click();
   await new Promise(s => setTimeout(s, 700));
-  const operations = view();
+  const pageName = view();
   document.querySelector('.left-sidebar-rail button:has(.lucide-book-open)').click();
   await new Promise(s => setTimeout(s, 700));
-  return { railSelectorsMissing: missing, navigatedTo: operations, backTo: view(),
+  return { railSelectorsMissing: missing, navigatedTo: pageName, backTo: view(),
            newEntryBtn: !!document.querySelector('button[title="New Entry"]'),
-           pass: missing.length === 0 && operations.length > 0 };
+           pass: missing.length === 0 && pageName.length > 0 };
 })()
 ```
 
-Expected: `railSelectorsMissing: []`, `navigatedTo: "Operations"`, `pass: true`.
+Expected: `railSelectorsMissing: []`, `navigatedTo: "Practice"`, `pass: true`.
 If `railSelectorsMissing` is not empty, the rail has changed — update this skill
 before running tests.
 

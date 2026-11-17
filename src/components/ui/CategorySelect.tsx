@@ -8,7 +8,7 @@ interface Props<C extends { id: string; emoji: string }> {
   categories: readonly C[];
   value: string | null;
   onChange: (id: string | null) => void;
-  /** Wiki/Ops binden categoryLabel: (c) => categoryLabel(t, 'wiki', c); Tasks: (c) => c.name */
+  /** How a category is named, e.g. (c) => categoryLabel(t, c). */
   getLabel: (cat: C) => string;
   align?: 'left' | 'right';
   /** Tooltip of the chip trigger. */

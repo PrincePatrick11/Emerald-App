@@ -5,10 +5,9 @@ import BlockGlyph from '../blocks/BlockGlyph';
 import TemplatePickerModal from './TemplatePickerModal';
 import { useTemplateNoticeStore, useTemplateStore } from '../../store/templateStore';
 import { templateLabel } from '../../lib/blocks/blockAttrs';
-import type { Template, TemplateEntryType } from '../../lib/blocks/templates';
+import type { Template } from '../../lib/blocks/templates';
 
 export interface TemplateTarget {
-  entryType: TemplateEntryType;
   /** Immediately saves what the editor still defers (title, tags), before inserting. */
   flush: () => Promise<void>;
 }

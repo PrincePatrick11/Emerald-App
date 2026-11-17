@@ -132,12 +132,12 @@ export default function TextEditor({
   const byKey = useMemo(() => linkItemsByKey(linkItems), [linkItems]);
   const byKeyRef = useRef(byKey);
   byKeyRef.current = byKey;
-  const getIconRef = useRef((id: string, entryType: string): string | null => {
-    const item = byKeyRef.current.get(linkItemKey({ id, entryType }));
+  const getIconRef = useRef((id: string, targetKind: string): string | null => {
+    const item = byKeyRef.current.get(linkItemKey({ id, targetKind }));
     return item ? (item.displayIcon ?? item.icon ?? null) : null;
   });
-  const getLabelRef = useRef((id: string, entryType: string): string | null =>
-    byKeyRef.current.get(linkItemKey({ id, entryType }))?.label ?? null);
+  const getLabelRef = useRef((id: string, targetKind: string): string | null =>
+    byKeyRef.current.get(linkItemKey({ id, targetKind }))?.label ?? null);
 
   // What the editor formats by itself while typing and pasting
   // (Settings → Entries). Read at creation: an open editor
@@ -193,8 +193,8 @@ export default function TextEditor({
                   item.label.toLowerCase().includes(q)
                 );
               },
-              (id, entryType) => getIconRef.current(id, entryType),
-              (id, entryType) => getLabelRef.current(id, entryType)
+              (id, targetKind) => getIconRef.current(id, targetKind),
+              (id, targetKind) => getLabelRef.current(id, targetKind)
             ),
           ]
         : []),

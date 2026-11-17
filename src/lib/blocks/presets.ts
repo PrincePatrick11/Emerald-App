@@ -22,7 +22,7 @@ import type { BlockInstance } from './types';
  * the caller reads them from the store and passes them in, because
  * `lib/blocks` knows no stores.
  */
-export interface BlockPreset {
+interface BlockPreset {
   id: string;
   labelKey: string;
   /** Explanation as a tooltip in the overview of the blocks view — only where the label is not enough. */

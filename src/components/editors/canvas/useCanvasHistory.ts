@@ -26,7 +26,7 @@ function same(a: CanvasScene, b: CanvasScene): boolean {
     && (a.background === b.background || JSON.stringify(a.background) === JSON.stringify(b.background));
 }
 
-export interface CanvasHistory {
+interface CanvasHistory {
   undo: () => void;
   redo: () => void;
   canUndo: boolean;

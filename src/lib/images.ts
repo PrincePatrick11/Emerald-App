@@ -43,8 +43,16 @@ export function imageSrc(ref: string | null | undefined): string {
 
   const name = storedImageName(ref);
   if (!name) return '';
+  return schemeUrl(`${getActiveVaultIdSync()}/${name}`);
+}
 
-  const path = `${getActiveVaultIdSync()}/${name}`;
+/**
+ * The `emerald-img` URL of a path under the scheme — `{vaultId}/{name}` for a
+ * picture, `{vaultId}/icons/{name}` for an icon (`iconSrc`). Windows serves
+ * custom schemes through `http://{scheme}.localhost`, the other platforms
+ * through the scheme itself.
+ */
+export function schemeUrl(path: string): string {
   return isWindows
     ? `http://emerald-img.localhost/${path}`
     : `emerald-img://localhost/${path}`;
@@ -151,24 +159,15 @@ export async function listImageFiles(): Promise<StoredImage[]> {
 
 /** Deletes the named images from the active vault. Returns bytes freed. */
 export async function deleteImageFiles(filenames: string[]): Promise<number> {
-  const vaultId = await getActiveVaultId();
-  const freed = await invoke<number>('delete_image_files', { filenames, vaultId });
-  // Unused here need not stop the server from keeping them for a while, so a failure is no reason to report one.
-  void invoke('sync_images_delete', { vaultId, names: filenames }).catch(() => {});
-  return freed;
+  return invoke<number>('delete_image_files', { filenames, vaultId: await getActiveVaultId() });
 }
 
-/** Copies images out of the pre-0.2.1 shared pool into the active vault. */
-export async function adoptLegacyImages(filenames: string[]): Promise<number> {
-  return invoke<number>('adopt_legacy_images', {
-    filenames,
-    vaultId: await getActiveVaultId(),
-  });
-}
 
 export interface UnusedImages {
   names: string[];
   bytes: number;
+  /** The size of each unused file, by name. */
+  sizes: Map<string, number>;
 }
 
 /**
@@ -179,13 +178,8 @@ export interface UnusedImages {
  * that only exists in an editor buffer nobody has saved yet would count as
  * unused, and deleting it would be a surprise.
  *
- * The pre-per-vault shared pool is not considered. `list_image_files` only
- * reports the vault's own folder, and vaults that have not been opened since
- * the migration still read from that pool.
- *
- * Takes the database rather than calling `getDb()` so this module does not
- * depend on `db.ts` — `db.ts` needs `adoptLegacyImages` from here for migration
- * v35, and a cycle between the two would be the fragile way to get it.
+ * Takes the database rather than calling `getDb()`, so this module does not
+ * depend on `db.ts`.
  */
 export async function findUnusedImages(db: Database): Promise<UnusedImages> {
   const [files, used] = await Promise.all([listImageFiles(), collectUsedImageFilenames(db)]);
@@ -193,5 +187,6 @@ export async function findUnusedImages(db: Database): Promise<UnusedImages> {
   return {
     names: unused.map((file) => file.name),
     bytes: unused.reduce((total, file) => total + file.bytes, 0),
+    sizes: new Map(unused.map((file) => [file.name, file.bytes])),
   };
 }

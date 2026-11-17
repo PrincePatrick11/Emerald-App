@@ -10,7 +10,7 @@ import { listen, type UnlistenFn } from '@tauri-apps/api/event';
  * WebView, and the endpoints can only be overridden at runtime there.
  */
 
-export interface UpdateSettings {
+interface UpdateSettings {
   version: number;
   /** Empty means: the app's compiled-in sources. */
   endpoint: string;

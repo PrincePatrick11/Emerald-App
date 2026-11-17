@@ -1,6 +1,6 @@
 import { invoke } from '@tauri-apps/api/core';
-import { LEFT_LIST_TAB_IDS, type LeftListTabId } from './modules';
-import { oneOf } from './helpers';
+import type { LeftListTabId } from './modules';
+import { oneOf, isRecord, asRecord, asString } from './helpers';
 import type { Weekday } from './formatDate';
 import {
   DEFAULT_EDITOR_FONT_ID, DEFAULT_EDITOR_FONT_SIZE, DEFAULT_UI_FONT_ID, DEFAULT_UI_SCALE,
@@ -29,8 +29,8 @@ export interface AppearanceSettings {
 
 /** Days until permanent deletion; `null` = never. */
 export const TRASH_RETENTION_OPTIONS = [7, 14, 30, 60, 90, null] as const;
-export type TrashRetention = (typeof TRASH_RETENTION_OPTIONS)[number];
-export const DEFAULT_TRASH_RETENTION: TrashRetention = 30;
+type TrashRetention = (typeof TRASH_RETENTION_OPTIONS)[number];
+const DEFAULT_TRASH_RETENTION: TrashRetention = 30;
 
 export interface TrashSettings {
   retentionDays: TrashRetention;
@@ -38,13 +38,12 @@ export interface TrashSettings {
 
 /** Entries per list in the left sidebar; `null` = all. */
 export const LEFT_LIST_LIMIT_OPTIONS = [10, 25, 50, 100, null] as const;
-export type LeftListLimit = (typeof LEFT_LIST_LIMIT_OPTIONS)[number];
-export const DEFAULT_LEFT_LIST_LIMIT: LeftListLimit = null;
+type LeftListLimit = (typeof LEFT_LIST_LIMIT_OPTIONS)[number];
+const DEFAULT_LEFT_LIST_LIMIT: LeftListLimit = null;
 
 export interface LeftListSettings {
-  /** Which list the entry list shows — all entries or those of one module.
-   *  Replaces the former tab selection `tabs`; an old `tabs` stays in the file
-   *  via the spread in `normalizeVaultSettings`, for older builds. */
+  /** Which list the entry list shows: `all` (every entry and task), `tasks`,
+   *  or a dashboard by ID — one that is gone shows `all`. */
   list: LeftListTabId;
   limit: LeftListLimit;
 }
@@ -60,10 +59,10 @@ const MAX_EMOJI_LENGTH = 32;
 
 /** Largest edge length of inserted images in px; `null` = original. */
 export const IMAGE_MAX_EDGE_OPTIONS = [1024, 1920, 2560, 3840, null] as const;
-export type ImageMaxEdge = (typeof IMAGE_MAX_EDGE_OPTIONS)[number];
+type ImageMaxEdge = (typeof IMAGE_MAX_EDGE_OPTIONS)[number];
 /** Largest file size after shrinking in MB; `null` = unlimited. */
 export const IMAGE_MAX_SIZE_MB_OPTIONS = [1, 2, 5, 10, 20, null] as const;
-export type ImageMaxSizeMb = (typeof IMAGE_MAX_SIZE_MB_OPTIONS)[number];
+type ImageMaxSizeMb = (typeof IMAGE_MAX_SIZE_MB_OPTIONS)[number];
 
 export interface ImageSettings {
   maxEdge: ImageMaxEdge;
@@ -94,10 +93,19 @@ export interface JournalSettings {
   moonPhase: boolean;
 }
 
+export interface TemplateSettings {
+  /**
+   * The vault's default template: what a new entry starts with when its
+   * category has no start template of its own, or it has none
+   * (`resolveStartTemplate`). `null`: such entries start empty.
+   */
+  defaultTemplateId: string | null;
+}
+
 /** How often the automatic backup runs — whole days only, the file name carries the date. */
 export const BACKUP_INTERVAL_OPTIONS = ['daily', 'weekly', 'monthly'] as const;
 export type BackupInterval = (typeof BACKUP_INTERVAL_OPTIONS)[number];
-export const BACKUP_WEEKDAY_OPTIONS = [0, 1, 2, 3, 4, 5, 6] as const satisfies readonly Weekday[];
+const BACKUP_WEEKDAY_OPTIONS = [0, 1, 2, 3, 4, 5, 6] as const satisfies readonly Weekday[];
 /** How many automatic backups are kept; `null` = all. The numbers
  *  are checked once more by `KEEP_CHOICES` in `auto_backup.rs` — change both together. */
 export const BACKUP_KEEP_OPTIONS = [3, 5, 10, 30, null] as const;
@@ -128,6 +136,7 @@ export interface VaultSettings {
   tags: TagSettings;
   editor: EditorSettings;
   journal: JournalSettings;
+  templates: TemplateSettings;
   backup: BackupSettings;
 }
 
@@ -136,7 +145,7 @@ export type SettingsGroup = Exclude<keyof VaultSettings, 'version'>;
 /** Each group exactly once — the record forces a new one not to be missing. */
 const GROUP_SET: Record<SettingsGroup, true> = {
   appearance: true, trash: true, leftList: true, emojis: true, images: true, tags: true,
-  editor: true, journal: true, backup: true,
+  editor: true, journal: true, templates: true, backup: true,
 };
 export const SETTINGS_GROUPS = Object.keys(GROUP_SET) as SettingsGroup[];
 
@@ -174,6 +183,9 @@ export const DEFAULT_VAULT_SETTINGS: VaultSettings = {
   journal: {
     moonPhase: true,
   },
+  templates: {
+    defaultTemplateId: null,
+  },
   backup: {
     auto: false,
     interval: 'weekly',
@@ -183,23 +195,16 @@ export const DEFAULT_VAULT_SETTINGS: VaultSettings = {
 };
 
 
-export function isPlainObject(value: unknown): value is Record<string, unknown> {
-  return !!value && typeof value === 'object' && !Array.isArray(value);
-}
-
-function asRecord(value: unknown): Record<string, unknown> {
-  return isPlainObject(value) ? value : {};
-}
-
-function asString(value: unknown): string | null {
-  return typeof value === 'string' ? value : null;
-}
-
 function normalizeEmojiList(raw: unknown): string[] | null {
   if (!Array.isArray(raw)) return null;
   const valid = raw.filter((e): e is string => typeof e === 'string' && e.length > 0 && e.length <= MAX_EMOJI_LENGTH);
   // Empty would mean: every picker opens without a selection. Better the built-in one then.
   return valid.length ? [...new Set(valid)].slice(0, MAX_EMOJI_DEFAULTS) : null;
+}
+
+/** A list ID as the settings file carries it: any short non-empty string — whether the dashboard still exists is the list's business. */
+function listId(value: unknown): LeftListTabId {
+  return typeof value === 'string' && value !== '' && value.length <= 100 ? value : DEFAULT_VAULT_SETTINGS.leftList.list;
 }
 
 /**
@@ -208,14 +213,6 @@ function normalizeEmojiList(raw: unknown): string[] | null {
  * stay — a newer version that opened the vault earlier
  * should find its settings again after a detour into an older one.
  */
-/** A vault from the time of the tab selection in which exactly one tab was visible
- *  practically showed only that list — it stays that one. Otherwise "All". */
-function legacySingleList(tabs: unknown): LeftListTabId {
-  if (!Array.isArray(tabs)) return DEFAULT_VAULT_SETTINGS.leftList.list;
-  const valid = LEFT_LIST_TAB_IDS.filter((id) => tabs.includes(id));
-  return valid.length === 1 ? valid[0] : DEFAULT_VAULT_SETTINGS.leftList.list;
-}
-
 export function normalizeVaultSettings(raw: unknown): VaultSettings {
   const root = asRecord(raw);
   const appearance = asRecord(root.appearance);
@@ -226,6 +223,7 @@ export function normalizeVaultSettings(raw: unknown): VaultSettings {
   const tags = asRecord(root.tags);
   const editor = asRecord(root.editor);
   const journal = asRecord(root.journal);
+  const templates = asRecord(root.templates);
   const backup = asRecord(root.backup);
   const flag = (value: unknown, fallback: boolean) => (typeof value === 'boolean' ? value : fallback);
   const version = typeof root.version === 'number' && Number.isInteger(root.version) && root.version > 1
@@ -247,7 +245,7 @@ export function normalizeVaultSettings(raw: unknown): VaultSettings {
     },
     leftList: {
       ...leftList,
-      list: oneOf(leftList.list, LEFT_LIST_TAB_IDS, legacySingleList(leftList.tabs)),
+      list: listId(leftList.list),
       limit: oneOf(leftList.limit, LEFT_LIST_LIMIT_OPTIONS, DEFAULT_LEFT_LIST_LIMIT),
     },
     emojis: {
@@ -274,6 +272,13 @@ export function normalizeVaultSettings(raw: unknown): VaultSettings {
       ...journal,
       moonPhase: flag(journal.moonPhase, DEFAULT_VAULT_SETTINGS.journal.moonPhase),
     },
+    templates: {
+      ...templates,
+      // Only an ID of the harmless form; a template it names that is gone resolves to none.
+      defaultTemplateId: typeof templates.defaultTemplateId === 'string' && /^[\w-]{1,100}$/.test(templates.defaultTemplateId)
+        ? templates.defaultTemplateId
+        : null,
+    },
     backup: {
       ...backup,
       auto: flag(backup.auto, DEFAULT_VAULT_SETTINGS.backup.auto),
@@ -293,7 +298,7 @@ export function normalizeVaultSettings(raw: unknown): VaultSettings {
  * there at the size limit) and in the next export.
  */
 export function importableSettings(raw: unknown): VaultSettings | null {
-  if (!isPlainObject(raw)) return null;
+  if (!isRecord(raw)) return null;
   const normalized = normalizeVaultSettings(raw);
   const known: Record<string, unknown> = { version: normalized.version };
   for (const group of SETTINGS_GROUPS) {

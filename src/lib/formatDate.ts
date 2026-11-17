@@ -67,22 +67,12 @@ export function formatMonthGroup(date: string | Date): string {
   return format(new Date(date), 'LLLL yyyy', { locale: activeLocale });
 }
 
-/** 'EEEE, MMMM d' — the day heading of the Home view. */
-export function formatDayHeading(date: string | Date): string {
-  return format(new Date(date), 'EEEE, MMMM d', { locale: activeLocale });
-}
-
 /**
  * Localized distance WITHOUT a suffix ("3 days"), for keys like trash.deletedAgo
  * ("Deleted {{time}} ago") that bring the "ago" themselves.
  */
 export function formatTimeDistance(date: string | Date): string {
   return formatDistanceToNow(new Date(date), { locale: activeLocale });
-}
-
-/** The same with the language's own "ago": "5 minutes ago", "vor 5 Minuten". */
-export function formatTimeAgo(date: string | Date): string {
-  return formatDistanceToNow(new Date(date), { locale: activeLocale, addSuffix: true });
 }
 
 /**

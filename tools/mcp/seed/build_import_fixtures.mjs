@@ -1,9 +1,12 @@
 /**
- * Writes the files of older app versions that the import must still read
- * (`tools/mcp/seed/imports/`): two backups and two `.emerald` files from
- * before the block rebuild, with the sigil blocks of v42–v63 and altars both
- * as tables (before v62) and as operations (v62/v63). `npm run check:schema`
- * imports the backups; `qacheck` imports all four through the app.
+ * Writes files of older app versions (`tools/mcp/seed/imports/`): two backups
+ * and two `.emerald` files from before the block rebuild, with the sigil
+ * blocks of v42–v63 and altars both as tables (before v62) and as operations
+ * (v62/v63). Since the fresh start of the schema the app refuses them, and
+ * that is what they are for: `npm run check:schema` checks that the backups
+ * are refused, `qacheck` that all four come back as a notice and change
+ * nothing.
+
  *
  * Plain JSON: an `.emeralddb` without the sealed container is still read.
  * Deterministic — run it again after changing it and commit the result:

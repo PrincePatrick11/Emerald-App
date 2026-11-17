@@ -1,4 +1,3 @@
-import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Trash2 } from 'lucide-react';
 import { useBlockDefinitionStore } from '../../store/blockDefinitionStore';
@@ -8,26 +7,21 @@ import { AUX_VIEWS } from '../../lib/modules';
 import { definitionLabel } from '../../lib/blocks/blockAttrs';
 import type { BlockDefinition } from '../../lib/blocks/definitions';
 import { BLOCK_PRESETS } from '../../lib/blocks/presets';
-import { sortItems } from '../../lib/sortItems';
-import { isCardView } from '../../lib/viewMode';
-import { groupByMonth } from '../../lib/groupBy';
 import { usePersistedFlag } from '../../hooks/usePersistedFlag';
-import Dashboard from '../ui/Dashboard';
 import CollapsibleGroupHeader from '../ui/CollapsibleGroupHeader';
-import DashboardItem, { ROW_GEOMETRY_CLASS, RowContent, RowSymbol } from '../ui/DashboardItem';
-import ContextMenu from '../ui/ContextMenu';
+import { ROW_GEOMETRY_CLASS, RowContent } from '../ui/DashboardItem';
 import { useOpenInNewTabAction } from '../../hooks/useOpenInNewTabAction';
 import BlockGlyph from '../blocks/BlockGlyph';
 import BlockDefinitionEditor from '../blocks/BlockDefinitionEditor';
-import { useSessionState } from '../../store/sessionStore';
 import { createItem } from '../../lib/createItem';
 import { useLibraryItemRemove } from '../../hooks/useLibraryItemRemove';
 import DashboardSection from '../ui/DashboardSection';
+import CollectionDashboard, { useCollectionState } from './CollectionDashboard';
 
 /**
- * The rail view "Blocks", built like the other dashboards: the list of
- * custom blocks, header (title, "New block", search, view and sorting —
- * both only for the custom ones) in the right sidebar. A click opens the block as a page of its own
+ * The rail view "Blocks", a collection like the others: the list of custom
+ * blocks, header (title, "New block", search, view and sorting — both only
+ * for the custom ones) in the right sidebar. A click opens the block as a page of its own
  * (`{ type: 'blocks', id }`) — like an entry, with saving and display in
  * the sidebar. Custom blocks are inserted in every
  * entry via "Add block".
@@ -106,7 +100,7 @@ function BuiltInBlocksSection({ query }: { query: string }) {
   );
 }
 
-/** The list of custom blocks in the shared dashboard scaffold. */
+/** The custom blocks as a collection; the built-in ones follow below. */
 function BlockList({ onCreate, onDelete }: {
   onCreate: () => void;
   onDelete: (def: BlockDefinition) => void;
@@ -116,88 +110,34 @@ function BlockList({ onCreate, onDelete }: {
   // The page keeps unsaved drafts in the store; here only the indication of them.
   const drafts = useBlockDraftStore((s) => s.drafts);
   const openInNewTabAction = useOpenInNewTabAction();
-  const [search, setSearch] = useSessionState('blocks.search', '');
-  const [ctxMenu, setCtxMenu] = useState<{ id: string; x: number; y: number } | null>(null);
+  const state = useCollectionState('blocks');
   const [customCollapsed, toggleCustom] = usePersistedFlag('blocks-custom-collapsed');
-  const { view, sort } = useUIStore((s) => s.blocksPrefs);
-  const setPrefs = useUIStore((s) => s.setBlocksPrefs);
-  const cards = isCardView(view);
-
-  const query = search.trim().toLowerCase();
-  const timeline = view === 'timeline';
-  const sorted = useMemo(() => sortItems(
-    query ? definitions.filter((d) => definitionLabel(t, d).toLowerCase().includes(query)) : definitions,
-    sort,
-    {
-      date: (d) => d.updated_at,
-      title: (d) => definitionLabel(t, d),
-      tiebreak: (a, b) => definitionLabel(t, a).localeCompare(definitionLabel(t, b)),
-    },
-  ), [definitions, query, sort, t]);
-  // Collapsed means an empty list instead of a special branch, as in templates and the lexicon.
-  const shown = customCollapsed ? [] : sorted;
-
-  const renderRow = (def: BlockDefinition) => {
-    const unsaved = def.id in drafts && (
-      <span className="text-xs italic text-subtle flex-shrink-0">{t('editor.unsaved')}</span>
-    );
-    const counts = (
-      <span className="text-xs text-subtle tabular-nums flex-shrink-0">
-        {t('blocks.library.fieldCount', { count: def.elements.length })}
-      </span>
-    );
-    return (
-      <DashboardItem
-        view={{ type: 'blocks', id: def.id }}
-        layout={cards ? 'card' : 'row'}
-        onContextMenu={(e) => {
-          e.preventDefault();
-          setCtxMenu({ id: def.id, x: e.clientX, y: e.clientY });
-        }}
-      >
-        {cards ? (
-          <>
-            <div className="flex items-center gap-2 mb-2">
-              <BlockGlyph icon={def.icon} size={16} />
-              <span className="flex-1" />
-              {unsaved}
-            </div>
-            <div className="text-sm font-medium text-secondary truncate mb-1">{definitionLabel(t, def)}</div>
-            {counts}
-          </>
-        ) : (
-          <>
-            <RowSymbol><BlockGlyph icon={def.icon} size={14} /></RowSymbol>
-            <span className="flex-1 min-w-0 text-sm text-soft truncate">{definitionLabel(t, def)}</span>
-            {unsaved}
-            {counts}
-          </>
-        )}
-      </DashboardItem>
-    );
-  };
-
-
-  const menuDef = ctxMenu && definitions.find((d) => d.id === ctxMenu.id);
 
   return (
-    <Dashboard<BlockDefinition>
+    <CollectionDashboard<BlockDefinition>
+      state={state}
       title={t('nav.blocks')}
       primaryAction={{ label: t('blocks.library.newBlock'), onClick: onCreate }}
-      view={view}
-      sort={sort}
-      sortDate="updated"
-      onView={(next) => setPrefs({ view: next })}
-      onSort={(next) => setPrefs({ sort: next })}
-      search={search}
-      onSearch={setSearch}
-      items={shown}
+      items={definitions}
       itemKey={(d) => d.id}
-      renderItem={renderRow}
-      grouping={timeline
-        ? { mode: 'timeline', groups: groupByMonth(shown, (d) => d.updated_at) }
-        : { mode: 'flat' }}
-      isEmpty={!customCollapsed && definitions.length === 0}
+      itemTitle={(d) => definitionLabel(t, d)}
+      itemDate={(d) => d.updated_at}
+      describe={(def) => ({
+        icon: <BlockGlyph icon={def.icon} size={14} />,
+        cardIcon: <BlockGlyph icon={def.icon} size={16} />,
+        title: definitionLabel(t, def),
+        meta: (
+          <span className="tabular-nums">
+            {def.id in drafts && <span className="italic">{t('editor.unsaved')} · </span>}
+            {t('blocks.library.fieldCount', { count: def.elements.length })}
+          </span>
+        ),
+        view: { type: 'blocks', id: def.id },
+      })}
+      contextActions={(def) => [
+        openInNewTabAction({ type: 'blocks', id: def.id }),
+        { label: t('contextMenu.delete'), icon: <Trash2 size={12} />, onClick: () => onDelete(def), danger: true },
+      ]}
       emptyState={{
         icon: AUX_VIEWS.blocks.icon,
         title: t('emptyState.blocks.title'),
@@ -205,7 +145,8 @@ function BlockList({ onCreate, onDelete }: {
         actionLabel: t('blocks.library.newBlock'),
         onAction: onCreate,
       }}
-      hasNoResults={!customCollapsed && sorted.length === 0}
+      // Collapsed means an empty list instead of a special branch, as in templates and the lexicon.
+      collapsed={customCollapsed}
       contentHeader={
         <CollapsibleGroupHeader
           label={t('blocks.library.custom')}
@@ -213,18 +154,7 @@ function BlockList({ onCreate, onDelete }: {
           onToggleCollapse={toggleCustom}
         />
       }
-      contentFooter={<BuiltInBlocksSection query={query} />}
-      contextMenuSlot={ctxMenu && menuDef && (
-        <ContextMenu
-          x={ctxMenu.x}
-          y={ctxMenu.y}
-          onClose={() => setCtxMenu(null)}
-          actions={[
-            openInNewTabAction({ type: 'blocks', id: menuDef.id }),
-            { label: t('contextMenu.delete'), icon: <Trash2 size={12} />, onClick: () => onDelete(menuDef), danger: true },
-          ]}
-        />
-      )}
+      contentFooter={<BuiltInBlocksSection query={state.query} />}
     />
   );
 }

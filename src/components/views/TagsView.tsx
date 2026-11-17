@@ -1,53 +1,33 @@
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { useShallow } from 'zustand/shallow';
 import { useTranslation } from 'react-i18next';
 import { Pencil, Trash2 } from 'lucide-react';
 import { TAG_COLORS, TAG_NAME_TAKEN, randomTagColor, useTagStore } from '../../store/tagStore';
 import { useEntryStore } from '../../store/entryStore';
+import { useSettingsStore } from '../../store/settingsStore';
 import { useTemplateStore } from '../../store/templateStore';
 import { useImageStore } from '../../store/imageStore';
 import { useCategoryStore } from '../../store/categoryStore';
-import { TAGS_SORTS, isTagsSort, useUIStore } from '../../store/uiStore';
 import { useUndoStore } from '../../store/undoStore';
 import { useCollapsedSet } from '../../hooks/useCollapsedSet';
 import { useDeepLink } from '../../hooks/useDeepLink';
 import { useOutsideClick } from '../../hooks/useOutsideClick';
 import { generateId } from '../../lib/helpers';
-import { categoryLabel } from '../../lib/categories';
+import { categoryLabel, lookupCategory } from '../../lib/categories';
+import { entryIcon } from '../../lib/entryIcon';
 import { formatEntryDate } from '../../lib/formatDate';
-import { AUX_VIEWS, MODULES, TAG_MODULE_IDS, type TagModuleId } from '../../lib/modules';
+import { AUX_VIEWS } from '../../lib/modules';
 import { displayTitle } from '../../lib/entryTitle';
-import { sortItems } from '../../lib/sortItems';
 import CollapseChevron from '../ui/CollapseChevron';
-import ContextMenu from '../ui/ContextMenu';
-import Dashboard, { type DashboardGroup } from '../ui/Dashboard';
-import DashboardItem, { DashboardRow, RowContent } from '../ui/DashboardItem';
+import DashboardItem, { DashboardRow, ItemGlyph, RowContent } from '../ui/DashboardItem';
 import InlineNameEditor from '../ui/InlineNameEditor';
 import ModuleCounts from '../ui/ModuleCounts';
-import type { ActiveView, Tag } from '../../types';
-import { useSessionState } from '../../store/sessionStore';
-
-/** A tagged entry, whatever module it belongs to — the row under a tag. */
-interface TaggedItem {
-  module: TagModuleId;
-  id: string;
-  title: string;
-  updated_at: string;
-  /** Only operations show their category instead of the module name. */
-  categoryId?: string | null;
-}
-
-type TagUsage = Record<TagModuleId, number>;
-
-const emptyUsage = (): TagUsage => ({ journal: 0, operations: 0, wiki: 0 });
+import type { Entry, Tag } from '../../types';
+import { entryView } from '../../store/entryViews';
+import CollectionDashboard, { useCollectionState } from './CollectionDashboard';
 
 /** Creating and renaming exclude each other — one state instead of two. */
 type FormState = { mode: 'add' } | { mode: 'rename'; id: string };
-
-/** Where a click on the row leads. */
-function itemView(item: TaggedItem): ActiveView {
-  return { type: item.module, id: item.id, mode: 'view' };
-}
 
 /** A tag's colour dot; with `onPick`, a click opens the palette. */
 function TagColorDot({ color, onPick }: { color: string; onPick?: (color: string) => void }) {
@@ -113,11 +93,11 @@ function TagEditRow({
 }
 
 /**
- * The management of tags, in the same dashboard as every module: title, "New
- * tag", search, sorting and module filter sit in the right sidebar;
- * in the main area every tag is a row that starts collapsed — the rows are
- * the overview (colour, name, where it occurs), a click on one opens the tagged
- * entries below it, indented like a task's subtasks.
+ * The tags as a collection: search, a filter by where a tag is used, sorting
+ * by name or frequency, list or cards. In the list every tag is a row that
+ * starts collapsed — a click on one opens the tagged entries below it,
+ * indented like a task's subtasks. A card shows the tag at a glance; a click
+ * on it renames it.
  *
  * Entries carry tag IDs: counting, grouping and collapsing are done by ID.
  */
@@ -135,136 +115,67 @@ export default function TagsView() {
   const pushUndo = useUndoStore((s) => s.push);
   // No fetch on mount: reloadAllStores() loads tags and content at startup
   // and on vault switch.
-  const entries = useEntryStore((s) => s.entries.journal);
-  const articles = useEntryStore((s) => s.entries.wiki);
-  const operations = useEntryStore((s) => s.entries.operation);
+  const entries = useEntryStore((s) => s.entries);
+  const showMoonPhase = useSettingsStore((s) => s.settings.journal.moonPhase);
   const templates = useTemplateStore((s) => s.templates);
   const images = useImageStore((s) => s.images);
   const categories = useCategoryStore((s) => s.categories);
-  const sort = useUIStore((s) => s.tagsSort);
-  const setSort = useUIStore((s) => s.setTagsSort);
+  const state = useCollectionState('tags');
+  const { query } = state;
   const { isCollapsed, toggle, expand } = useCollapsedSet('tags', { defaultCollapsed: true });
 
-  const [search, setSearch] = useSessionState('tags.search', '');
-  const [moduleFilter, setModuleFilter] = useSessionState<TagModuleId[]>('tags.filter', []);
   const [form, setForm] = useState<FormState | null>(null);
   const [name, setName] = useState('');
   const [color, setColor] = useState(TAG_COLORS[0]);
   const [nameError, setNameError] = useState<string | null>(null);
-  const [ctxMenu, setCtxMenu] = useState<{ tagId: string; x: number; y: number } | null>(null);
 
-  // The deep link from the global search expands the tag; search and
+  // The deep link from the global search expands the tag; the search and the
   // filter are cleared, otherwise it might not be in the list at all.
   const { scrollTo } = useDeepLink({
     type: 'tags',
     items: tags,
     rowAttribute: 'data-tag-id',
     onOpen: (tag) => {
-      setSearch('');
-      setModuleFilter([]);
+      state.reset();
       expand(tag.id);
     },
   });
 
-  /** Tag ID → tagged entries, in module order, within that by title. */
+  /** Tag ID → tagged entries, by title. */
   const itemsByTag = useMemo(() => {
-    const map = new Map<string, TaggedItem[]>();
-    const add = (tagIds: string[] | undefined, item: TaggedItem) => {
-      for (const tagId of tagIds ?? []) {
+    const map = new Map<string, Entry[]>();
+    for (const e of entries) {
+      for (const tagId of e.tags ?? []) {
         const list = map.get(tagId);
-        if (list) list.push(item);
-        else map.set(tagId, [item]);
+        if (list) list.push(e);
+        else map.set(tagId, [e]);
       }
-    };
-    for (const e of entries) add(e.tags, { module: 'journal', id: e.id, title: e.title, updated_at: e.updated_at });
-    for (const op of operations) add(op.tags, { module: 'operations', id: op.id, title: op.title, updated_at: op.updated_at, categoryId: op.category_id });
-    for (const a of articles) add(a.tags, { module: 'wiki', id: a.id, title: a.title, updated_at: a.updated_at });
-    for (const list of map.values()) {
-      list.sort((a, b) =>
-        TAG_MODULE_IDS.indexOf(a.module) - TAG_MODULE_IDS.indexOf(b.module) || a.title.localeCompare(b.title));
     }
+    for (const list of map.values()) list.sort((a, b) => a.title.localeCompare(b.title));
     return map;
-  }, [entries, operations, articles]);
+  }, [entries]);
 
-  const usageByTag = useMemo(() => {
-    const map = new Map<string, TagUsage>();
-    for (const [tagId, items] of itemsByTag) {
-      const usage = emptyUsage();
-      for (const item of items) usage[item.module]++;
-      map.set(tagId, usage);
-    }
-    return map;
-  }, [itemsByTag]);
-
-  /** Tag ID → number of templates carrying it. A tag used only there is not unused. */
-  const templateUsage = useMemo(() => {
-    const map = new Map<string, number>();
-    for (const template of templates) for (const tagId of template.tags) map.set(tagId, (map.get(tagId) ?? 0) + 1);
-    return map;
-  }, [templates]);
-
+  /** Tag IDs some template carries. A tag used only there is not unused. */
+  const templateTags = useMemo(() => new Set(templates.flatMap((tpl) => tpl.tags)), [templates]);
   /** Tag IDs some picture of "Images" carries: such a tag is not unused either. */
   const imageTags = useMemo(() => new Set(images.flatMap((image) => image.tags)), [images]);
 
-  const query = search.trim().toLowerCase();
-  const filterActive = moduleFilter.length > 0;
+  const usage = (tag: Tag) => itemsByTag.get(tag.id)?.length ?? 0;
+  const inEntries = (tag: Tag) => usage(tag) > 0;
+  // Where a tag without entries hangs: templates, images, both — each a state of its own.
+  const onlyInTemplates = (tag: Tag) => !inEntries(tag) && templateTags.has(tag.id) && !imageTags.has(tag.id);
+  const onlyInImages = (tag: Tag) => !inEntries(tag) && !templateTags.has(tag.id) && imageTags.has(tag.id);
+  const inTemplatesAndImages = (tag: Tag) => !inEntries(tag) && templateTags.has(tag.id) && imageTags.has(tag.id);
+  const unused = (tag: Tag) => !inEntries(tag) && !templateTags.has(tag.id) && !imageTags.has(tag.id);
 
-  /** What the search leaves of a tag: if its name matches, all its
-   *  entries, otherwise those whose title matches. The list and the module
-   *  counts share this one rule so the numbers match the list. */
-  const matchTag = useCallback((tag: Tag) => {
+  /** The entries of a tag the search leaves: all if its name matches, otherwise those whose title does. */
+  const entriesShown = (tag: Tag) => {
     const all = itemsByTag.get(tag.id) ?? [];
-    const nameMatches = !query || tag.name.toLowerCase().includes(query);
-    return { nameMatches, items: nameMatches ? all : all.filter((item) => item.title.toLowerCase().includes(query)) };
-  }, [itemsByTag, query]);
+    return !query || tag.name.toLowerCase().includes(query) ? all : all.filter((e) => e.title.toLowerCase().includes(query));
+  };
+  /** Found only through its entries: then it is open, otherwise the reason for the hit would not be visible. */
+  const openBySearch = (tag: Tag) => !!query && !tag.name.toLowerCase().includes(query);
 
-  /**
-   * A tag is in the list if its name matches the search or entries under
-   * it do; a module filter hides tags without a hit entirely.
-   * If the search only hits entries, the tag appears with exactly those — and
-   * open (`openBySearch`), otherwise the reason for the hit would not be visible.
-   */
-  const { groups, openBySearch } = useMemo(() => {
-    const openIds = new Set<string>();
-    const sortedTags = sortItems(tags, sort, {
-      date: () => '',
-      title: (tag) => tag.name,
-      count: (tag) => itemsByTag.get(tag.id)?.length ?? 0,
-      tiebreak: (a, b) => a.name.localeCompare(b.name),
-    });
-    const result: DashboardGroup<TaggedItem>[] = [];
-    for (const tag of sortedTags) {
-      const { nameMatches, items: matched } = matchTag(tag);
-      const items = filterActive ? matched.filter((item) => moduleFilter.includes(item.module)) : matched;
-      // Without a hit underneath, a tag stays only if its name matches and no
-      // module filter leaves it empty.
-      const keep = items.length > 0 || (nameMatches && !filterActive);
-      if (!keep) continue;
-      if (!nameMatches) openIds.add(tag.id);
-      result.push({ key: tag.id, label: tag.name, items });
-    }
-    return { groups: result, openBySearch: openIds };
-  }, [tags, sort, itemsByTag, filterActive, moduleFilter, matchTag]);
-
-  /**
-   * Counts for the module filters: how many tags would be there if only this
-   * module were chosen — by the same rule as the list, over the search, without
-   * the module filter itself. `all` is the number without a module filter.
-   */
-  const moduleCounts = useMemo(() => {
-    const byModule = new Map<string, number>();
-    let all = 0;
-    for (const tag of tags) {
-      const { nameMatches, items } = matchTag(tag);
-      if (items.length > 0 || nameMatches) all++;
-      for (const module of new Set(items.map((item) => item.module))) {
-        byModule.set(module, (byModule.get(module) ?? 0) + 1);
-      }
-    }
-    return { byModule, all };
-  }, [tags, matchTag]);
-
-  const tagById = useMemo(() => new Map(tags.map((tag) => [tag.id, tag])), [tags]);
   const catById = useMemo(() => new Map(categories.map((c) => [c.id, c])), [categories]);
 
   // ── Create / rename / delete ──────────────────────────────────────────────
@@ -290,9 +201,8 @@ export default function TagsView() {
     try {
       if (form.mode === 'add') {
         const tag = await createTag(trimmed, color);
-        // Search and filter could hide the new, still unused tag.
-        setSearch('');
-        setModuleFilter([]);
+        // The search and the filter could hide the new, still unused tag.
+        state.reset();
         scrollTo(tag.id);
       } else {
         await updateTag(form.id, { name: trimmed, color });
@@ -322,94 +232,104 @@ export default function TagsView() {
       error={nameError} onSave={submitForm} onCancel={closeForm} />
   );
 
-  // ── Tag rows and tagged entries ─────────────────────────────────────────────────
-  const groupCollapsed = (group: DashboardGroup<TaggedItem>) =>
-    !openBySearch.has(group.key!) && isCollapsed(group.key!);
+  /** Where a tag occurs: the number of entries, else where else it is used. */
+  const usageLabel = (tag: Tag) => (inEntries(tag)
+    ? <ModuleCounts modules={['entries'] as const} counts={{ entries: usage(tag) }} />
+    : <span className="text-xs text-muted flex-shrink-0">
+        {t(onlyInTemplates(tag) ? 'tags.onlyInTemplates'
+          : onlyInImages(tag) ? 'tags.onlyInImages'
+          : inTemplatesAndImages(tag) ? 'tags.onlyInTemplatesAndImages' : 'tags.unused')}
+      </span>);
 
-  const renderTagHeader = (group: DashboardGroup<TaggedItem>) => {
-    const tag = tagById.get(group.key!);
-    if (!tag) return null;
-    if (form?.mode === 'rename' && form.id === tag.id) {
-      return (
-        <div data-tag-id={tag.id}>{editRow}</div>
-      );
-    }
-    const usage = usageByTag.get(tag.id);
-    const collapsed = groupCollapsed(group);
+  // ── The list: tag rows with their entries below ──────────────────────────
+  const renderEntry = (item: Entry) => {
+    const cat = lookupCategory(catById, item.category_id);
+    const meta = [categoryLabel(t, cat), formatEntryDate(item.updated_at)].filter(Boolean).join(' · ');
     return (
-      <DashboardRow
-        data-tag-id={tag.id}
-        onClick={() => toggle(tag.id)}
-        onContextMenu={(e) => { e.preventDefault(); setCtxMenu({ tagId: tag.id, x: e.clientX, y: e.clientY }); }}
-      >
-        {/* A button of its own for the keyboard; the row's click is for the pointer. */}
-        <span onClick={(e) => e.stopPropagation()} className="flex flex-shrink-0">
-          <CollapseChevron collapsed={collapsed} onToggle={() => toggle(tag.id)} />
-        </span>
-        <span onClick={(e) => e.stopPropagation()} className="w-5 flex items-center justify-center flex-shrink-0">
-          <TagColorDot color={tag.color} onPick={(color) => updateTag(tag.id, { color })} />
-        </span>
-        <RowContent title={tag.name} />
-        {usage
-          ? <ModuleCounts modules={TAG_MODULE_IDS} counts={usage} />
-          : <span className="text-xs text-muted flex-shrink-0">
-              {templateUsage.has(tag.id) ? t('tags.onlyInTemplates') : imageTags.has(tag.id) ? t('tags.onlyInImages') : t('tags.unused')}
-            </span>}
-      </DashboardRow>
-    );
-  };
-
-  const renderItem = (item: TaggedItem) => {
-    const meta = MODULES[item.module];
-    const Icon = meta.icon;
-    let label = t(meta.navLabelKey);
-    if (item.module === 'operations') {
-      const cat = item.categoryId ? catById.get(item.categoryId) : undefined;
-      label = cat ? `${cat.emoji} ${categoryLabel(t, cat)}` : label;
-    }
-    return (
-      <DashboardItem view={itemView(item)} layout="row">
+      <DashboardItem key={item.id} view={entryView(item.id)} layout="row">
         <RowContent
-          icon={<Icon size={14} className="text-subtle" />}
-          title={displayTitle(t, meta.entryType, item.title)}
-          meta={`${label} · ${formatEntryDate(item.updated_at)}`}
+          icon={<ItemGlyph icon={entryIcon(item, cat, showMoonPhase)} />}
+          title={displayTitle(t, 'entry', item.title)}
+          meta={meta}
         />
       </DashboardItem>
     );
   };
 
-  const ctxTag = ctxMenu ? tagById.get(ctxMenu.tagId) : undefined;
+  /** Below an open tag without entries: why — it hangs on templates, pictures or both, or nowhere. */
+  const emptyHintKey = (tag: Tag) => (onlyInTemplates(tag) ? 'tags.onlyInTemplatesHint'
+    : onlyInImages(tag) ? 'tags.onlyInImagesHint'
+    : inTemplatesAndImages(tag) ? 'tags.onlyInTemplatesAndImagesHint' : 'tags.unusedHint');
+
+  const renderTagRow = (tag: Tag, openMenu: (tag: Tag, e: React.MouseEvent) => void) => {
+    if (form?.mode === 'rename' && form.id === tag.id) {
+      return <div key={tag.id} data-tag-id={tag.id}>{editRow}</div>;
+    }
+    const collapsed = !openBySearch(tag) && isCollapsed(tag.id);
+    const shownEntries = entriesShown(tag);
+    return (
+      <div key={tag.id}>
+        <DashboardRow
+          data-tag-id={tag.id}
+          onClick={() => toggle(tag.id)}
+          onContextMenu={(e) => openMenu(tag, e)}
+        >
+          {/* A button of its own for the keyboard; the row's click is for the pointer. */}
+          <span onClick={(e) => e.stopPropagation()} className="flex flex-shrink-0">
+            <CollapseChevron collapsed={collapsed} onToggle={() => toggle(tag.id)} />
+          </span>
+          <span onClick={(e) => e.stopPropagation()} className="w-5 flex items-center justify-center flex-shrink-0">
+            <TagColorDot color={tag.color} onPick={(c) => updateTag(tag.id, { color: c })} />
+          </span>
+          <RowContent title={tag.name} />
+          {usageLabel(tag)}
+        </DashboardRow>
+        {!collapsed && (shownEntries.length === 0
+          ? <p className="ml-6 mt-1.5 text-xs text-subtle px-1 py-1">{t(emptyHintKey(tag))}</p>
+          : <div className="ml-6 mt-1.5 space-y-1.5">{shownEntries.map(renderEntry)}</div>)}
+      </div>
+    );
+  };
 
   return (
-    <Dashboard<TaggedItem>
+    <CollectionDashboard<Tag>
+      state={state}
       title={t('nav.tags')}
       primaryAction={{ label: t('tags.new'), onClick: openAddForm }}
-      sort={sort}
-      onSort={(s) => { if (isTagsSort(s)) setSort(s); }}
-      sortModes={TAGS_SORTS}
-      search={search}
-      onSearch={setSearch}
-      filters={{
-        activeFilterCount: filterActive ? 1 : 0,
-        onClearAll: () => setModuleFilter([]),
-        panelProps: {
-          chipLabel: t('filters.module'),
-          chips: TAG_MODULE_IDS.map((id) => {
-            const Icon = MODULES[id].icon;
-            return { value: id, label: t(MODULES[id].navLabelKey), icon: <Icon size={14} />, count: moduleCounts.byModule.get(id) ?? 0 };
-          }),
-          selectedChips: moduleFilter,
-          onChipToggle: (v) => setModuleFilter((prev) =>
-            prev.includes(v as TagModuleId) ? prev.filter((x) => x !== v) : [...prev, v as TagModuleId]),
-          onAllChips: () => setModuleFilter([]),
-          allChipsCount: moduleCounts.all,
-        },
+      items={tags}
+      itemKey={(tag) => tag.id}
+      itemTitle={(tag) => tag.name}
+      itemCount={usage}
+      // A tag is found by its name or by the titles of the entries under it.
+      matchesSearch={(tag, q) => (itemsByTag.get(tag.id) ?? []).some((e) => e.title.toLowerCase().includes(q))}
+      filter={{
+        label: t('tags.usage'),
+        chips: [
+          { value: 'entries', label: t('tags.inEntries'), test: inEntries },
+          { value: 'templates', label: t('tags.onlyInTemplatesFilter'), test: onlyInTemplates },
+          { value: 'images', label: t('tags.onlyInImagesFilter'), test: onlyInImages },
+          { value: 'templatesAndImages', label: t('tags.onlyInTemplatesAndImagesFilter'), test: inTemplatesAndImages },
+          { value: 'unused', label: t('tags.unusedFilter'), test: unused },
+        ],
       }}
-      contentHeader={form?.mode === 'add' && <div className="mb-1.5">{editRow}</div>}
-      items={groups.flatMap((g) => g.items)}
-      itemKey={(item) => `${item.module}:${item.id}`}
-      renderItem={renderItem}
-      isEmpty={tags.length === 0}
+      describe={(tag) => ({
+        icon: <TagColorDot color={tag.color} />,
+        title: tag.name,
+        trailing: usageLabel(tag),
+        onOpen: () => startRename(tag),
+      })}
+      renderItem={(tag, layout) => (layout === 'card' && form?.mode === 'rename' && form.id === tag.id
+        ? editRow
+        : undefined)}
+      // Cards too: the deep link and a newly created tag scroll to it.
+      itemAttribute="data-tag-id"
+      renderList={(shown, openMenu) => (
+        <div className="space-y-1.5">{shown.map((tag) => renderTagRow(tag, openMenu))}</div>
+      )}
+      contextActions={(tag) => [
+        { label: t('contextMenu.rename'), icon: <Pencil size={12} />, onClick: () => startRename(tag) },
+        { label: t('contextMenu.delete'), icon: <Trash2 size={12} />, danger: true, onClick: () => void handleDelete(tag) },
+      ]}
       emptyState={{
         icon: AUX_VIEWS.tags.icon,
         title: t('emptyState.tags.title'),
@@ -417,31 +337,7 @@ export default function TagsView() {
         actionLabel: t('tags.new'),
         onAction: openAddForm,
       }}
-      // If no group is left, the category mode reports that itself.
-      hasNoResults={false}
-      groupsClassName="space-y-1.5"
-      listClassName="ml-6 mt-1.5 space-y-1.5"
-      grouping={{
-        mode: 'category',
-        groups,
-        renderGroupHeader: renderTagHeader,
-        renderEmptyGroup: () => <p className="ml-6 mt-1.5 text-xs text-subtle px-1 py-1">{t('tags.unusedHint')}</p>,
-        isGroupCollapsed: groupCollapsed,
-        // The selection above has already decided which tags are shown — an
-        // unused tag is still one without search and filter.
-        keepEmptyGroups: true,
-      }}
-      contextMenuSlot={ctxMenu && ctxTag && (
-        <ContextMenu
-          x={ctxMenu.x}
-          y={ctxMenu.y}
-          onClose={() => setCtxMenu(null)}
-          actions={[
-            { label: t('contextMenu.rename'), icon: <Pencil size={12} />, onClick: () => startRename(ctxTag) },
-            { label: t('contextMenu.delete'), icon: <Trash2 size={12} />, danger: true, onClick: () => handleDelete(ctxTag) },
-          ]}
-        />
-      )}
+      contentHeader={form?.mode === 'add' && <div className="mb-1.5">{editRow}</div>}
     />
   );
 }

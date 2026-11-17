@@ -1,5 +1,6 @@
 import { extractInternalLinks } from '../internalLinkHtml';
 import { storedImageName, storedImageNamesIn } from '../schema';
+import { isImageIcon } from '../helpers';
 import { canvasBackgroundFile, canvasElementFile, isCanvasBlockType, parseCanvasBlock } from './canvas';
 import { FIELDS_BLOCK_TYPE, isSigilElement, parseFields } from './fields';
 import { isDrawingBlockType, parseDrawing } from './paint';
@@ -16,14 +17,16 @@ import { BLOCK_ATTR, type BlockInstance } from './types';
  * - `render`: the rendered picture of a canvas or a drawing;
  * - `layer`: the picture of a drawing's layer;
  * - `background`: a canvas's background picture;
- * - `default`: what a custom block's copy brings as a prefill.
+ * - `default`: what a custom block's copy brings as a prefill;
+ * - `icon`: a custom block's copy's icon, a file in the vault's `icons/`
+ *   (kind `icon`) — every copy names the same file.
  */
-export type BlockRefKind = 'entry' | 'image';
-export type BlockRefRole = 'content' | 'render' | 'layer' | 'background' | 'default';
+type BlockRefKind = 'entry' | 'image' | 'icon';
+export type BlockRefRole = 'content' | 'render' | 'layer' | 'background' | 'default' | 'icon';
 
-export interface BlockRef {
+interface BlockRef {
   kind: BlockRefKind;
-  /** The entry's ID, or the stored file name of the picture. */
+  /** The entry's ID, or the stored file name of the picture or the icon. */
   target: string;
   role: BlockRefRole;
 }
@@ -39,6 +42,7 @@ class RefSet {
   add(kind: BlockRefKind, target: string | null | undefined, role: BlockRefRole): void {
     if (!target) return;
     if (kind === 'image' && !storedImageName(target)) return;
+    if (kind === 'icon' && !isImageIcon(target)) return;
     const key = `${kind}\u0000${target}\u0000${role}`;
     if (this.seen.has(key)) return;
     this.seen.add(key);
@@ -83,6 +87,7 @@ export function blockRefs(block: BlockInstance): BlockRef[] {
       if (element?.kind === 'sigilCanvas' && isSigilElement(element)) set.drawing(sigilPartBlock(block, element, model));
       else set.markup(html, 'content');
     }
+    if (model.icon) set.add('icon', model.icon, 'icon');
     for (const element of model.elements) {
       const value = element.defaultValue;
       if (element.kind === 'image' && typeof value === 'string') set.add('image', value, 'default');

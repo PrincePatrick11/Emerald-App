@@ -6,13 +6,14 @@ import Button from '../ui/Button';
 import Dropdown from '../ui/Dropdown';
 import { linkFromSlot, parseFields, soleSigilElement, type ElementDef } from '../../lib/blocks/fields';
 import {
-  chargeConceals, chargeCovers, isSigilToolType, parseSigilCharge, serializeSigilCharge, sigilUnits, todayIso,
+  chargeConceals, chargeCovers, isSigilToolType, parseSigilCharge, serializeSigilCharge, sigilUnits,
   type SigilCharge, type SigilLockScope,
 } from '../../lib/blocks/sigil';
 import { blockLabel, elementLabel } from '../../lib/blocks/blockAttrs';
 import { resolveBlockType } from '../../lib/blocks/blockTypes';
 import type { BlockInstance } from '../../lib/blocks/types';
 import { formatIsoDateLong } from '../../lib/formatDate';
+import { localIsoDay } from '../../lib/helpers';
 import { OP_PROP_SELECT_CLASSES } from '../../lib/styleClasses';
 import UnknownBlock from './UnknownBlock';
 import BlockCheckbox from './BlockCheckbox';
@@ -134,7 +135,7 @@ function chargeStatus(t: TFunction, charge: ChargeData, date: string | null): st
   if (!charge.loaded) return t('blocks.sigil.notLoaded');
   const detail = !date
     ? t('blocks.sigil.hiddenUntilUnloaded')
-    : chargeConceals(charge, todayIso())
+    : chargeConceals(charge, localIsoDay())
       ? t('creation.hiddenUntilDate', { date })
       : t('blocks.sigil.revealedSince', { date });
   return `${t('blocks.sigil.loaded')} · ${detail}`;

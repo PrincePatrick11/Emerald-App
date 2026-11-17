@@ -21,7 +21,7 @@ function mimeOf(dataUrl: string): string {
 }
 
 /** The bytes behind a base64 data URL, without decoding it. */
-export function dataUrlBytes(dataUrl: string): number {
+function dataUrlBytes(dataUrl: string): number {
   const base64 = dataUrl.slice(dataUrl.indexOf(',') + 1);
   const padding = base64.endsWith('==') ? 2 : base64.endsWith('=') ? 1 : 0;
   return Math.floor((base64.length * 3) / 4) - padding;
@@ -175,16 +175,17 @@ export async function prepareImageDataUrl(dataUrl: string, options: { capBytes?:
 }
 
 /**
- * A chosen file as an icon (entry, template, block): only the
- * accepted image formats and no SVG — icons sit inline in the row —,
- * downscaled like any image. `null` for a rejected file; the
- * error message is left to the caller.
+ * A chosen file as an icon (entry, template, block, language): only the
+ * accepted image formats and no SVG, read as a data URL. The vault's image
+ * limits do not apply: an icon is brought down to 128px when it is stored
+ * (`saveIcon` in `lib/icons.ts`). `null` for a rejected file; the error
+ * message is left to the caller.
  *
- * @throws like `prepareImageDataUrl`, or if reading fails.
+ * @throws if reading fails.
  */
 export async function readIconFile(file: File): Promise<string | null> {
   if (!isAcceptedImageFile(file) || file.type === 'image/svg+xml') return null;
-  return prepareImageDataUrl(await readFileAsDataUrl(file));
+  return readFileAsDataUrl(file);
 }
 
 /** Whether the vault's limits can change anything about an image at all. */

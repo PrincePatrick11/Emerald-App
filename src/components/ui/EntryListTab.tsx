@@ -79,7 +79,7 @@ export default function EntryListTab<T>({
   // A new limit or a new search starts at the first page again.
   useEffect(() => { setPages(1); setRendered(RENDER_STEP); }, [limit, searchQuery]);
 
-  const query = searchQuery.toLowerCase();
+  const query = searchQuery.trim().toLowerCase();
   const matching = query ? items.filter((item) => getTitle(item).toLowerCase().includes(query)) : items;
   const visible = matching.slice(0, limit === null ? rendered : limit * pages);
   const hiddenCount = limit === null ? 0 : matching.length - visible.length;

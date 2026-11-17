@@ -4,15 +4,14 @@
  * (see `lib/blocks/templates.ts`). Deleting, restoring and changing
  * therefore touch no entry.
  *
- * Per combination (entry kind × category) at most one active template is
- * assigned. This store enforces that, not the database: `assignTemplate` takes
- * the combination from whoever held it. Deleting a template clears its assignments,
- * so it comes back from the trash without them.
+ * Which template a new entry starts with is said by its category
+ * (`categories.template_id`) and the vault's default template (setting
+ * `templates.defaultTemplateId`); a template in the trash counts as none, so
+ * it comes back from there with its categories.
  *
  * Import rule as in `blockDefinitionStore`: no content stores — they
  * conversely import this one, to apply a template on creation.
- * All writes run under a shared key: an assignment
- * may affect several rows.
+ * All writes run under a shared key.
  */
 import { create } from 'zustand';
 import type Database from '../lib/sqlite';
@@ -21,19 +20,21 @@ import { generateId, nowIso } from '../lib/helpers';
 import { needsWrite, stampFor, type WriteOptions } from '../lib/stamp';
 import { fromRow, type DbRow } from '../lib/row';
 import { serialized, serialKey } from '../lib/serialize';
-import { insertTemplateStatement, nextTemplateSortOrder } from '../lib/templateRows';
+import { insertTemplateStatements, nextTemplateSortOrder } from '../lib/templateRows';
+import { readTagLinks, tagStatements } from '../lib/tagRefs';
 import { contentOf, loadBlocks, planContentWrite, type BlockOwner } from '../lib/blockStore';
 import {
-  DEFAULT_TEMPLATE_ICON, matches, resolveAssignedTemplate, templateStart, templateToRow, assignedCategoryId,
-  type EntryStart, type Template, type TemplateAssignment, type TemplateEntryType,
+  DEFAULT_TEMPLATE_ICON, resolveStartTemplate, templateStart, templateToRow,
+  type EntryStart, type Template,
 } from '../lib/blocks/templates';
 import i18n from '../i18n';
 import { withUsableTags } from '../lib/templateTags';
+import { useSettingsStore } from './settingsStore';
 
 export type TemplatePatch = Partial<Pick<Template, 'name' | 'icon' | 'title' | 'content' | 'tags'>>;
 
-/** What a new template brings along. It starts without assignments. */
-export type TemplateInit = Omit<TemplatePatch, 'name'>;
+/** What a new template brings along. */
+type TemplateInit = Omit<TemplatePatch, 'name'>;
 
 interface TemplateState {
   /** Active templates in display order. */
@@ -42,13 +43,8 @@ interface TemplateState {
   fetchTemplates: () => Promise<void>;
   createTemplate: (name: string, init?: TemplateInit) => Promise<Template>;
   updateTemplate: (id: string, patch: TemplatePatch, options?: WriteOptions) => Promise<void>;
-  /**
-   * New entries of this combination start with this template, or with none
-   * (`null`). Applies immediately; whoever held the combination loses it.
-   */
-  assignTemplate: (entryType: TemplateEntryType, category: string | null, templateId: string | null) => Promise<void>;
   duplicateTemplate: (id: string) => Promise<Template | undefined>;
-  /** Soft delete, without assignments. Entries from this template stay as they are. */
+  /** Soft delete. Entries from this template stay as they are; its categories fall back to the default meanwhile. */
   deleteTemplate: (id: string) => Promise<void>;
   restoreTemplate: (id: string) => Promise<void>;
   permanentlyDeleteTemplate: (id: string) => Promise<void>;
@@ -61,9 +57,10 @@ async function selectActive(db: Database): Promise<Template[]> {
     'SELECT * FROM templates WHERE deleted_at IS NULL ORDER BY sort_order ASC, name ASC'
   );
   // The block stack comes from the block rows (`blocks`).
-  const blocks = await loadBlocks(db, 'template', rows.map((r) => String(r.id)));
+  const ids = rows.map((r) => String(r.id));
+  const [blocks, tags] = await Promise.all([loadBlocks(db, 'template', ids), readTagLinks(db, 'template', ids)]);
   return rows.map((r) => {
-    const template = fromRow.template(r);
+    const template = fromRow.template({ ...r, tags: tags.get(String(r.id)) ?? [] });
     return { ...template, content: contentOf(blocks.get(template.id) ?? []) };
   });
 }
@@ -88,14 +85,13 @@ export const useTemplateStore = create<TemplateState>((set, get) => ({
       title: init.title ?? '',
       content: blocks.content,
       tags: init.tags ?? [],
-      assignments: [],
       sort_order: await nextTemplateSortOrder(db),
       created_at: now,
       updated_at: now,
       deleted_at: null,
     };
     // The row first: its blocks point at it.
-    await db.batch([insertTemplateStatement(template), ...blocks.statements]);
+    await db.batch([...insertTemplateStatements(template), ...blocks.statements]);
     blocks.commit();
     set((s) => ({ templates: [...s.templates, template] }));
     return template;
@@ -122,26 +118,15 @@ export const useTemplateStore = create<TemplateState>((set, get) => ({
     await db.batch([
       [
         `UPDATE templates
-            SET name=$1, icon=$2, title=$3, tags=$4, updated_at=$5
-          WHERE id=$6`,
-        [row.name, row.icon, row.title, row.tags, row.updated_at, id],
+            SET name=$1, icon=$2, title=$3, updated_at=$4
+          WHERE id=$5`,
+        [row.name, row.icon, row.title, row.updated_at, id],
       ],
+      ...(patch.tags !== undefined ? tagStatements('template', id, updated.tags) : []),
       ...(blocks?.statements ?? []),
     ]);
     blocks?.commit();
     set((s) => ({ templates: s.templates.map((t) => (t.id === id ? updated : t)) }));
-  }),
-
-  assignTemplate: (entryType, category, templateId) => serialized(WRITE_KEY, async () => {
-    const holdsIt = (t: Template) => t.assignments.some((a) => matches(a, entryType, category));
-    const changed = get().templates.flatMap((t): Template[] => {
-      if (t.id === templateId) return holdsIt(t) ? [] : [{ ...t, assignments: [...t.assignments, { entryType, category }] }];
-      return holdsIt(t) ? [{ ...t, assignments: t.assignments.filter((a) => !matches(a, entryType, category)) }] : [];
-    });
-    const db = await getDb();
-    await db.batch(changed.map((t) => ['UPDATE templates SET assignments=$1 WHERE id=$2', [templateToRow(t).assignments, t.id]] as const));
-    const byId = new Map(changed.map((t) => [t.id, t]));
-    set((s) => ({ templates: s.templates.map((t) => byId.get(t.id) ?? t) }));
   }),
 
   duplicateTemplate: async (id) => {
@@ -157,7 +142,7 @@ export const useTemplateStore = create<TemplateState>((set, get) => ({
 
   deleteTemplate: (id) => serialized(WRITE_KEY, async () => {
     const db = await getDb();
-    await db.execute("UPDATE templates SET deleted_at=$1, assignments='[]' WHERE id=$2", [nowIso(), id]);
+    await db.execute('UPDATE templates SET deleted_at=$1 WHERE id=$2', [nowIso(), id]);
     set((s) => ({ templates: s.templates.filter((t) => t.id !== id) }));
   }),
 
@@ -174,27 +159,30 @@ export const useTemplateStore = create<TemplateState>((set, get) => ({
   permanentlyDeleteTemplate: async (id) => {
     const db = await getDb();
     // Reachable only from the trash — it is not in `templates` (active).
+    // Its categories lose it by ON DELETE SET NULL; the default setting here.
     await db.execute('DELETE FROM templates WHERE id=$1', [id]);
+    const settings = useSettingsStore.getState();
+    if (settings.settings.templates.defaultTemplateId === id) await settings.update('templates', { defaultTemplateId: null });
   },
 }));
 
 /**
- * What a new entry starts with: the template assigned to its combination (see
- * `resolveAssignedTemplate`) — or none with `blank`. For the `create*` actions of
- * the content stores; imports and duplicates pass `blank`, since they overwrite
- * the content anyway.
+ * What a new entry starts with: the start template of its category, else the
+ * vault's default (`resolveStartTemplate`) — or none with `blank`. For
+ * `createEntry`, which reads the category's `template_id`; imports and
+ * duplicates pass `blank`, since they overwrite the content anyway.
  */
-export function startOfNewEntry(
-  entryType: TemplateEntryType,
-  categoryId: string | null,
-  blank = false,
-): EntryStart {
-  const template = blank ? null : resolveAssignedTemplate(useTemplateStore.getState().templates, entryType, categoryId);
+export function startOfNewEntry(categoryTemplateId: string | null, blank = false): EntryStart {
+  const template = blank ? null : resolveStartTemplate(
+    useTemplateStore.getState().templates,
+    { template_id: categoryTemplateId },
+    useSettingsStore.getState().settings.templates.defaultTemplateId,
+  );
   return withUsableTags(templateStart(template));
 }
 
 /** A template just applied automatically — the entry's block stack shows Undo for it. */
-export interface AppliedTemplateNotice {
+interface AppliedTemplateNotice {
   entryId: string;
   templateId: string;
 }
@@ -219,19 +207,3 @@ export const useTemplateNoticeStore = create<TemplateNoticeState>((set, get) => 
     if (get().notice?.entryId === entryId) set({ notice: null });
   },
 }));
-
-/**
- * Removes permanently deleted categories from the assignments in memory — the
- * counterpart to `dropCategoryFromTemplates` in the database.
- */
-export function dropCategoriesFromTemplatesInMemory(ids: ReadonlySet<string>): void {
-  const dropped = (a: TemplateAssignment) => {
-    const category = assignedCategoryId(a);
-    return category !== null && ids.has(category);
-  };
-  useTemplateStore.setState((s) => ({
-    templates: s.templates.map((t) => (t.assignments.some(dropped)
-      ? { ...t, assignments: t.assignments.filter((a) => !dropped(a)) }
-      : t)),
-  }));
-}

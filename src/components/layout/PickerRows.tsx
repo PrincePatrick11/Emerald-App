@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import {
-  AlertTriangle, Check, CloudDownload, FolderOpen, Loader2, Pencil, Plus, RotateCcw, Trash2, Vault, X,
+  AlertTriangle, Check, FolderOpen, Loader2, Pencil, Plus, RotateCcw, Trash2, Vault, X,
 } from 'lucide-react';
 import Button from '../ui/Button';
 import BlockCheckbox from '../blocks/BlockCheckbox';
@@ -11,21 +11,10 @@ import { newVaultTarget, splitPath, type Vault as VaultRecord } from '../../lib/
 
 /**
  * The tiles of the vault picker's grid, editing included, and the rows that
- * open across it (create, confirm). One shape for every kind of vault — here, synced,
- * paused, only on the server — so the grid reads as one list; the kind is the
- * line under the name.
+ * open across it (create, confirm).
  */
 
 const INPUT_CLASS = 'input-field flex-1 min-w-0 rounded-md px-2.5 py-1.5 text-sm outline-none';
-
-export type VaultState = 'local' | 'synced' | 'paused' | 'remote';
-
-const STATE_LABEL = {
-  local: 'sync.stateLocal',
-  synced: 'sync.stateSynced',
-  paused: 'sync.statePaused',
-  remote: 'sync.stateRemote',
-} as const;
 
 /**
  * Choose-folder button plus the folder the vault will actually land in.
@@ -68,20 +57,20 @@ export function VaultLocationRow({
 }
 
 /** A vault's own emoji, or the generic glyph while it has none. */
-export function VaultGlyph({ icon, size }: { icon?: string; size: number }) {
+function VaultGlyph({ icon, size }: { icon?: string; size: number }) {
   return icon
     ? <span className="leading-none" style={{ fontSize: size }}>{icon}</span>
     : <Vault size={size} />;
 }
 
-/** The line under a tile's name: where the vault lives, in words, with a dot
- *  in the state's colour. */
-function StateLine({ state, extra }: { state: VaultState; extra?: string }) {
+/** The line under a tile's name: a fixed "only here" with its dot, the place a
+ *  vault's sync state will take once sync comes back. */
+function StateLine() {
   const { t } = useTranslation();
   return (
-    <span className={`picker-tile-state picker-tile-state-${state}`}>
+    <span className="picker-tile-state">
       <span className="picker-tile-dot" aria-hidden />
-      <span className="truncate">{extra ? `${t(STATE_LABEL[state])} · ${extra}` : t(STATE_LABEL[state])}</span>
+      <span className="truncate">{t('vault.stateLocal')}</span>
     </span>
   );
 }
@@ -260,12 +249,11 @@ export function DeleteConfirmRow({
  *  choosing it goes back to it. Edit and delete show in its corner on hover or
  *  focus. */
 export function VaultRow({
-  vault, isActive, unreachable, state, isSwitching, busy, onSwitch, onEdit, onRelocate, onDelete,
+  vault, isActive, unreachable, isSwitching, busy, onSwitch, onEdit, onRelocate, onDelete,
 }: {
   vault: VaultRecord;
   isActive: boolean;
   unreachable: 'missing' | 'denied' | null;
-  state: VaultState;
   isSwitching: boolean;
   busy: boolean;
   onSwitch: () => void;
@@ -300,7 +288,7 @@ export function VaultRow({
               <span className="truncate">{t(unreachable === 'denied' ? 'vault.accessDenied' : 'vault.missing')}</span>
             </span>
           ) : (
-            <StateLine state={state} />
+            <StateLine />
           )}
         </span>
       </button>
@@ -317,56 +305,6 @@ export function VaultRow({
             <Pencil size={12} />
           </Button>
           <Button tone="danger" compact small title={t('vault.delete')} aria-label={t('vault.delete')} onClick={onDelete}>
-            <Trash2 size={12} />
-          </Button>
-        </span>
-      </span>
-    </div>
-  );
-}
-
-/** A vault only on the server, as a tile with a dashed edge: choosing it fetches it. */
-export function RemoteRow({
-  name, size, isFetching, busy, confirming, onFetch, onDelete, onConfirmDelete, onCancelDelete,
-}: {
-  name: string;
-  size: string;
-  isFetching: boolean;
-  busy: boolean;
-  confirming: boolean;
-  onFetch: () => void;
-  onDelete: () => void;
-  onConfirmDelete: () => void;
-  onCancelDelete: () => void;
-}) {
-  const { t } = useTranslation();
-  if (confirming) {
-    return (
-      <div className="picker-row picker-row-open">
-        <span className="picker-badge"><Trash2 size={16} /></span>
-        <span className="picker-row-name flex-1 min-w-0">{name}</span>
-        <InlineConfirm
-          message={t('sync.deleteFromServerConfirm')}
-          onConfirm={() => { if (!busy) onConfirmDelete(); }}
-          onCancel={onCancelDelete}
-        />
-      </div>
-    );
-  }
-  return (
-    <div className="picker-tile picker-tile-remote group">
-      <button type="button" className="picker-tile-main" disabled={busy} onClick={onFetch} title={t('sync.fetch')}>
-        <span className="picker-badge">
-          {isFetching ? <Loader2 size={18} className="animate-spin" /> : <CloudDownload size={18} />}
-        </span>
-        <span className="block min-w-0">
-          <span className="picker-row-name">{name}</span>
-          <StateLine state="remote" extra={size} />
-        </span>
-      </button>
-      <span className="picker-tile-corner">
-        <span className="picker-row-actions">
-          <Button tone="danger" compact small title={t('sync.deleteFromServer')} aria-label={t('sync.deleteFromServer')} onClick={onDelete}>
             <Trash2 size={12} />
           </Button>
         </span>

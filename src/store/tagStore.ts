@@ -1,17 +1,17 @@
 import { useMemo } from 'react';
 import { create } from 'zustand';
-import type Database from '../lib/sqlite';
 import { registerTagLookup } from '../lib/templateTags';
-import { AS_A_CONSEQUENCE } from '../lib/stamp';
 import { getDb } from '../lib/db';
 import { fromRow, type DbRow } from '../lib/row';
-import { replaceTagId, stripTagIds, tagNameKey } from '../lib/tagRefs';
-import { useEntryStore, findEntry, mapEntries } from './entryStore';
+import { replaceTagId, tagNameKey, unlinkTags } from '../lib/tagRefs';
+import { replaceTagsInDashboards } from '../lib/schema';
+import { useDashboardStore } from './dashboardStore';
+import { useEntryStore } from './entryStore';
 import { useTemplateStore } from './templateStore';
 import { useImageStore } from './imageStore';
 import { generateId, nowIso } from '../lib/helpers';
 import { serialKey, serialized } from '../lib/serialize';
-import type { EntryType, Tag } from '../types';
+import type { Tag } from '../types';
 
 /** The palette of tag colours — colour choice in TagsView and random colour of new tags. */
 export const TAG_COLORS = [
@@ -30,27 +30,28 @@ export function randomTagColor() {
 
 const byName = (a: Tag, b: Tag) => a.name.localeCompare(b.name);
 
-export type TaggedType = EntryType | 'template';
-
 const sameName = (a: string, b: string) => tagNameKey(a) === tagNameKey(b);
 
 /**
- * Rewrites tag lists in the database (`rewriteTagRefs`) and updates the
- * stores that hold the rows in memory. An entry that is currently
- * open receives the new list through its store.
+ * Drops the tags from every owner in memory — what the database did by
+ * deleting links (CASCADE, `unlinkTags`). An entry that is currently open
+ * receives the new list through its store.
  */
-async function rewriteRefs(rewrite: (db: Database) => Promise<Map<string, string[]>>): Promise<void> {
-  const changed = await rewrite(await getDb());
-  if (!changed.size) return;
-  useEntryStore.setState((s) => ({
-    entries: mapEntries(s.entries, (list) => list.map((e) => (changed.has(e.id) ? { ...e, tags: changed.get(e.id)! } : e))),
-  }));
-  useTemplateStore.setState((s) => ({
-    templates: s.templates.map((t) => (changed.has(t.id) ? { ...t, tags: changed.get(t.id)! } : t)),
-  }));
-  useImageStore.setState((s) => ({
-    images: s.images.map((i) => (changed.has(i.id) ? { ...i, tags: changed.get(i.id)! } : i)),
-  }));
+function dropFromStores(ids: Iterable<string>, replacement: string | null = null): void {
+  const gone = new Set(ids);
+  if (!gone.size) return;
+  const swap = (tags: string[]): string[] => {
+    if (!tags.some((t) => gone.has(t))) return tags;
+    return [...new Set(tags.map((t) => (gone.has(t) ? replacement : t)).filter((t): t is string => t !== null))];
+  };
+  const patch = <T extends { tags: string[] }>(items: T[]): T[] =>
+    items.map((item) => {
+      const tags = swap(item.tags);
+      return tags === item.tags ? item : { ...item, tags };
+    });
+  useEntryStore.setState((s) => ({ entries: patch(s.entries) }));
+  useTemplateStore.setState((s) => ({ templates: patch(s.templates) }));
+  useImageStore.setState((s) => ({ images: patch(s.images) }));
 }
 
 /** The tags in the trash with this name (case-insensitive). */
@@ -72,18 +73,21 @@ async function trashedNamesakes(name: string): Promise<{ id: string; name: strin
 async function reviveTrashedNamesake(name: string): Promise<Tag | null> {
   const [hit] = await trashedNamesakes(name);
   if (!hit) return null;
-  await rewriteRefs((db) => stripTagIds(db, [hit.id]));
   const db = await getDb();
+  await unlinkTags(db, [hit.id]);
+  dropFromStores([hit.id]);
   await db.execute('UPDATE tags SET deleted_at=NULL WHERE id=$1', [hit.id]);
   return { id: hit.id, name: hit.name, color: hit.color };
 }
 
-/** Deletes tags permanently — first from every list, then the rows. */
+/** Deletes tags permanently: the rows, their links with them (CASCADE), and their place in the dashboards' filters. */
 async function purgeTags(ids: string[]): Promise<void> {
   if (!ids.length) return;
-  await rewriteRefs((db) => stripTagIds(db, ids));
   const db = await getDb();
-  for (const id of ids) await db.execute('DELETE FROM tags WHERE id=$1', [id]);
+  await db.batch(ids.map((id) => ['DELETE FROM tags WHERE id=$1', [id]] as [string, unknown[]]));
+  await replaceTagsInDashboards(db, ids);
+  await useDashboardStore.getState().fetchDashboards();
+  dropFromStores(ids);
 }
 
 /** New tags run one after another: a doubly triggered creation of the same
@@ -108,12 +112,6 @@ interface TagState {
   permanentlyDeleteTag: (id: string) => Promise<void>;
   /** Empty the trash: all tags in it permanently. */
   purgeTrashedTags: () => Promise<void>;
-  /**
-   * An entry is back from the trash: IDs of tags that no longer exist at all
-   * are dropped. Those of a tag in the trash stay — it may
-   * come back.
-   */
-  dropUnknownTagIds: (type: TaggedType, id: string) => Promise<void>;
   getByName: (name: string) => Tag | undefined;
 }
 
@@ -214,8 +212,11 @@ export const useTagStore = create<TagState>((set, get) => {
       // entries get its ID, the deleted row disappears.
       const namesake = get().tags.find((t) => sameName(t.name, name));
       if (namesake) {
-        await rewriteRefs((database) => replaceTagId(database, id, namesake.id));
+        await replaceTagId(db, id, namesake.id);
         await db.execute('DELETE FROM tags WHERE id=$1', [id]);
+        await replaceTagsInDashboards(db, [id], namesake.id);
+        await useDashboardStore.getState().fetchDashboards();
+        dropFromStores([id], namesake.id);
         return;
       }
       await db.execute('UPDATE tags SET deleted_at=NULL WHERE id=$1', [id]);
@@ -228,20 +229,6 @@ export const useTagStore = create<TagState>((set, get) => {
       const db = await getDb();
       const rows = await db.select<{ id: string }[]>('SELECT id FROM tags WHERE deleted_at IS NOT NULL');
       await purgeTags(rows.map((r) => r.id));
-    },
-
-    dropUnknownTagIds: async (type, id) => {
-      const item = type === 'template'
-        ? useTemplateStore.getState().templates.find((t) => t.id === id)
-        : findEntry(useEntryStore.getState().entries, id, type);
-      if (!item?.tags.length) return;
-      const db = await getDb();
-      const known = new Set((await db.select<{ id: string }[]>('SELECT id FROM tags')).map((r) => r.id));
-      const kept = item.tags.filter((tagId) => known.has(tagId));
-      if (kept.length === item.tags.length) return;
-      // A consequence, not a change to the entry: "Last modified" stays.
-      if (type === 'template') await useTemplateStore.getState().updateTemplate(id, { tags: kept }, AS_A_CONSEQUENCE);
-      else await useEntryStore.getState().updateEntry(id, { tags: kept }, AS_A_CONSEQUENCE);
     },
 
     getByName: (name) => get().tags.find((t) => sameName(t.name, name)),

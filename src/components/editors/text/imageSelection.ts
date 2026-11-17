@@ -12,7 +12,7 @@ import { Decoration, DecorationSet, type EditorView } from '@tiptap/pm/view';
  */
 
 /** Whether a position lies in a table cell. */
-export function inTableCell($pos: ResolvedPos): boolean {
+function inTableCell($pos: ResolvedPos): boolean {
   for (let depth = $pos.depth; depth > 0; depth--) {
     const role = $pos.node(depth).type.spec.tableRole as string | undefined;
     if (role === 'cell' || role === 'header_cell') return true;

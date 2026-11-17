@@ -119,7 +119,7 @@ The file is generated: `npm run fonts` runs `scripts/make-fonts-css.mjs`, whose 
 **CSS variable mapping.** Each font id defines a `--font-<id>` variable with the full stack; `data-ui-font` sets `--font-ui`, `data-editor-font` sets `--font-editor`.
 
 - `--font-ui` is applied to `body` (all UI chrome).
-- `--font-editor` is applied to `.tiptap`, `.entry-view-title`, `.entry-view-body` and block text — the editor, entry titles in every detail view, and read-mode body text. There is no separate heading font.
+- `--font-editor` is applied to `.tiptap`, `.entry-view-title` and block text — the editor, entry titles in every detail view, and read-mode body text. There is no separate heading font.
 - `--editor-font-size` is applied wherever editor and field text should track the setting, independent of the font.
 
 **Defaults.** UI font **Inter**, editor font **Lora**, editor text size **17px**. Invalid or missing values fall back to these via `normalizeUIFontId()`/`normalizeEditorFontId()`/`normalizeEditorFontSize()`.

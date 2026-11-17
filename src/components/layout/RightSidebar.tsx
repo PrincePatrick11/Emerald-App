@@ -1,26 +1,13 @@
 import { useTranslation } from 'react-i18next';
 import { entryBlockSummary } from '../../lib/blocks/entrySummary';
-import type { ComponentType } from 'react';
 import { Pencil } from 'lucide-react';
 import { useUIStore } from '../../store/uiStore';
 import { findEntry, useEntryStore } from '../../store/entryStore';
-import type { ActiveView } from '../../types';
-import { entryTypeForView, LIBRARY_VIEW_IDS, moduleMeta, type ViewId } from '../../lib/modules';
+import { COLLECTION_IDS, type ViewId } from '../../lib/modules';
 import BlockSidebarArea, { BlockAddActions } from '../blocks/BlockSidebarArea';
-import JournalPropertiesPanel from '../sidebar/panels/JournalPropertiesPanel';
-import WikiPropertiesPanel from '../sidebar/panels/WikiPropertiesPanel';
-import OperationPropertiesPanel from '../sidebar/panels/OperationPropertiesPanel';
+import EntryPropertiesPanel from '../sidebar/panels/EntryPropertiesPanel';
 import Button from '../ui/Button';
 import SidebarColumn, { EditActionBar, SidebarActionBar } from '../ui/SidebarColumn';
-
-// Eager, not lazy: the panels depend on stores that are loaded at startup
-// anyway, and the sidebar is visible from the first frame.
-// tasks deliberately has no panel (tasks are edited inline).
-const PROPERTIES_PANELS: Partial<Record<ViewId, ComponentType>> = {
-  journal: JournalPropertiesPanel,
-  wiki: WikiPropertiesPanel,
-  operations: OperationPropertiesPanel,
-};
 
 /**
  * Views without entries. They never get the entry action bar: a
@@ -31,14 +18,16 @@ const PROPERTIES_PANELS: Partial<Record<ViewId, ComponentType>> = {
  * 'templates', id }`) brings its own bar and portals it into
  * the same host as a dashboard.
  */
-const VIEWS_WITHOUT_ENTRIES: ReadonlySet<ViewId> = new Set<ViewId>(['home', 'tags', 'categories', 'images', ...LIBRARY_VIEW_IDS]);
+const VIEWS_WITHOUT_ENTRIES: ReadonlySet<ViewId> = new Set<ViewId>(['dashboard', ...COLLECTION_IDS]);
 
 
-function PropertiesContent({ activeView }: { activeView: ActiveView }) {
+// Eager, not lazy: the panel depends on stores that are loaded at startup
+// anyway, and the sidebar is visible from the first frame. Tasks
+// deliberately have no panel (they are edited inline).
+function PropertiesContent({ isEntry }: { isEntry: boolean }) {
   const { t } = useTranslation();
-  const Panel = PROPERTIES_PANELS[activeView.type];
-  if (!Panel) return <p className="text-xs text-subtle px-2 py-3">{t('properties.noEntry')}</p>;
-  return <Panel />;
+  if (!isEntry) return <p className="text-xs text-subtle px-2 py-3">{t('properties.noEntry')}</p>;
+  return <EntryPropertiesPanel />;
 }
 
 function RightSidebarActionBar() {
@@ -48,8 +37,8 @@ function RightSidebarActionBar() {
   const editActions = useUIStore((s) => s.editActions);
   const editLocked = useUIStore((s) => s.editLocked);
   // The content of the open entry — for the lock of a loaded sigil.
-  const entryType = entryTypeForView(activeView.type);
-  const content = useEntryStore((s) => (entryType && activeView.id ? findEntry(s.entries, activeView.id, entryType)?.content : undefined));
+  const entryView = activeView.type === 'entry';
+  const content = useEntryStore((s) => (entryView && activeView.id ? findEntry(s.entries, activeView.id)?.content : undefined));
 
   if (!activeView.id) return null;
   const isEditing = activeView.mode === 'edit';
@@ -72,7 +61,7 @@ function RightSidebarActionBar() {
   }
 
   // A loaded sigil with the "whole entry" lock cannot be edited — the
-  // charge decides, in every entry type. The button stays
+  // charge decides, in every entry. The button stays
   // and says why it does nothing.
   const locked = content !== undefined && !!entryBlockSummary(activeView.id, content).sigil?.lockEntry;
 
@@ -115,13 +104,14 @@ export default function RightSidebar() {
     return <div ref={setListHeaderHost} className="flex flex-col h-full" />;
   }
 
+  const isEntry = activeView.type === 'entry';
   // Reading and editing show the same sections (`SidebarSection`) without a
   // line between them; the spacing comes from here.
   return (
     <SidebarColumn bar={<RightSidebarActionBar />} bodyClassName="flex flex-col gap-5">
-      {moduleMeta(activeView.type)?.usesBlocks && <BlockAddActions />}
-      <PropertiesContent activeView={activeView} />
-      {moduleMeta(activeView.type)?.usesBlocks && <BlockSidebarArea />}
+      {isEntry && <BlockAddActions />}
+      <PropertiesContent isEntry={isEntry} />
+      {isEntry && <BlockSidebarArea />}
     </SidebarColumn>
   );
 }

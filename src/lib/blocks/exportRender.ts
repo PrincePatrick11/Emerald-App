@@ -9,11 +9,11 @@ import {
 import {
   parseSigilCharge, sigilPartBlock, sigilState, SIGIL_CANVAS_KIND, SIGIL_CHARGE_KIND,
   withoutConcealedParts,
-  todayIso,
 } from './sigil';
 import { TEXT_BLOCK_TYPE, type BlockInstance } from './types';
 import { ALTAR_BLOCK_TYPE, CANVAS_BLOCK_TYPE, parseCanvasBlock } from './canvas';
 import { drawingImage, PAINT_BLOCK_TYPE } from './paint';
+import { localIsoDay } from '../helpers';
 
 /**
  * The blocks of an entry as HTML for PDF and Markdown — one serializer per
@@ -145,7 +145,7 @@ function bodyHtml(
   }
 }
 
-export function renderBlocksForExport(content: string, text: ExportText, today = todayIso()): string {
+export function renderBlocksForExport(content: string, text: ExportText, today = localIsoDay()): string {
   const blocks = parseBlocks(content);
   const { concealed } = sigilState(blocks, today);
   const parts: string[] = [];

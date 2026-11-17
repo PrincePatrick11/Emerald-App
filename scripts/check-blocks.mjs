@@ -28,12 +28,8 @@ writeFileSync(
    export { parseFields, serializeFields, createFieldsBlock, isElementEmpty, isHiddenInRead, linkFromSlot, imageFromSlot } from '${root}/src/lib/blocks/fields';
    export { instantiateDefinition, parseDefinitionElements, parseDefinitionDisplay, remapDefinitionDefaults, definitionImageRefs } from '${root}/src/lib/blocks/definitions';
    export { entryBlockSummary } from '${root}/src/lib/blocks/entrySummary';
-   export { withLegacyStatus, statusDefinition, hasLegacyStatus, convertLegacyStatusRows, STATUS_DEFINITION_ID } from '${root}/src/lib/blocks/legacyStatus';
    export { extractUniqueLetters, parseSigilCalc, serializeSigilCalc, createSigilCalcBlock, createSigilCanvasBlock, createSigilChargeBlock, parseSigilCharge, serializeSigilCharge, sigilState, withoutConcealed, letterList, sigilUnits, sigilPartBlock, sigilPartId, withSigilPart, withChargesCoveringOnly, withRenamedPartTargets } from '${root}/src/lib/blocks/sigil';
-   export { convertLegacySigilBlocks, contentWithoutLegacySigils, legacySigilBlock, LEGACY_SIGIL_CALC_TYPE, LEGACY_SIGIL_CANVAS_TYPE, LEGACY_SIGIL_CHARGE_TYPE } from '${root}/src/lib/blocks/legacySigilBlocks';
    export { paintDocFromJson, paintDocToJson, emptyPaintDoc, isPaintDocEmpty, thinPoints, transformStroke, mergeDown, canMergeDown, strokeSamples, inPolygon, symmetricCopies, mirrorStroke, splitStroke } from '${root}/src/lib/paint/document';
-   export { parseAltarElements, altarElementsJson } from '${root}/src/lib/altarElements';
-   export { parseAltarSettings } from '${root}/src/lib/altarSettings';
    export { symbolFromDrawing } from '${root}/src/components/editors/canvas/symbols/fromDrawing';
    export { readUserSymbol } from '${root}/src/lib/userSymbols';
    export { group, ungroup, withGroups, moveInStack, copiesOf, align } from '${root}/src/components/editors/canvas/canvasActions';
@@ -41,14 +37,15 @@ writeFileSync(
    export { createPaintBlock, isDrawingBlockType, PAINT_BLOCK_TYPE, parseDrawing, withDrawing, withDrawingImage, isSigilDrawing, drawingImage } from '${root}/src/lib/blocks/paint';
    export { resolveBlockType } from '${root}/src/lib/blocks/blockTypes';
    export { createCanvasBlock, parseCanvasBlock, withCanvasScene, withCanvasParts, withCanvasStripTag, withoutCanvasFile, CANVAS_BLOCK_TYPE, ALTAR_BLOCK_TYPE } from '${root}/src/lib/blocks/canvas';
-   export { parseAssignments, resolveAssignedTemplate, instantiateTemplateBlocks, isContentEmpty, templateStart, mergeTemplateTags, assignedTemplateAt, areBlocksEmpty, fieldsWithTemplate, fieldsWithoutTemplate } from '${root}/src/lib/blocks/templates';
+   export { resolveStartTemplate, instantiateTemplateBlocks, templateStart, mergeTemplateTags, areBlocksEmpty, fieldsWithTemplate, fieldsWithoutTemplate } from '${root}/src/lib/blocks/templates';
    export { internalLinkChipHtml } from '${root}/src/lib/internalLinkHtml';
    export { extractInternalLinks } from '${root}/src/lib/internalLinkHtml';
    export { toBlockRow, fromBlockRow, blockPlainText, htmlPlainText } from '${root}/src/lib/blocks/blockRows';
    export { blockRefs } from '${root}/src/lib/blocks/blockRefs';
    export { withoutImage } from '${root}/src/lib/imageUsage';
    export { keyBetween, evenKeys, positionsFor, isPositionKey } from '${root}/src/lib/blocks/position';
-   export { blocksOfContent, planBlockWrite, clearSavedBlocks, contentOf } from '${root}/src/lib/blockStore';`
+   export { blocksOfContent, planBlockWrite, clearSavedBlocks, contentOf } from '${root}/src/lib/blockStore';
+   export { contentToBlocks, blocksToContent, parseManifest, renameStoredFiles, relinkWithinFile, gentlestImageMode, storedNameStem, EMERALD_FORMAT_VERSION } from '${root}/src/lib/emerald/manifest';`
 );
 
 const bundlePath = join(workDir, 'bundle.mjs');
@@ -72,23 +69,23 @@ const {
   parseFields, serializeFields, createFieldsBlock, isElementEmpty, isHiddenInRead, linkFromSlot, imageFromSlot,
   internalLinkChipHtml,
   instantiateDefinition, parseDefinitionElements, parseDefinitionDisplay, entryBlockSummary,
-  withLegacyStatus, statusDefinition, hasLegacyStatus, convertLegacyStatusRows, STATUS_DEFINITION_ID,
   extractUniqueLetters, parseSigilCalc, serializeSigilCalc, createSigilCalcBlock, createSigilCanvasBlock,
   createSigilChargeBlock, parseSigilCharge, serializeSigilCharge, sigilState, withoutConcealed,
   drawingImage, withDrawingImage, isSigilDrawing, letterList, renderBlocksForExport, parseDrawing, withDrawing,
-  convertLegacySigilBlocks, contentWithoutLegacySigils, legacySigilBlock, LEGACY_SIGIL_CALC_TYPE, LEGACY_SIGIL_CANVAS_TYPE, LEGACY_SIGIL_CHARGE_TYPE,
   paintDocFromJson, paintDocToJson, emptyPaintDoc, isPaintDocEmpty, thinPoints, transformStroke, mergeDown, canMergeDown, strokeSamples, inPolygon, symmetricCopies, mirrorStroke, splitStroke,
-  group, ungroup, withGroups, moveInStack, copiesOf, align, parseAltarElements, altarElementsJson, parseAltarSettings,
+  group, ungroup, withGroups, moveInStack, copiesOf, align,
   symbolFromDrawing, readUserSymbol,
   sigilUnits, sigilPartBlock, sigilPartId, withSigilPart, withChargesCoveringOnly,
   remapDefinitionDefaults, definitionImageRefs, withRenamedPartTargets,
-  parseAssignments, resolveAssignedTemplate, instantiateTemplateBlocks, isContentEmpty,
-  templateStart, mergeTemplateTags, assignedTemplateAt, areBlocksEmpty,
+  resolveStartTemplate, instantiateTemplateBlocks,
+  templateStart, mergeTemplateTags, areBlocksEmpty,
   fieldsWithTemplate, fieldsWithoutTemplate,
   createCanvasBlock, parseCanvasBlock, withCanvasScene, withCanvasParts, withCanvasStripTag, withoutCanvasFile, CANVAS_BLOCK_TYPE, ALTAR_BLOCK_TYPE,
   createPaintBlock, isDrawingBlockType, PAINT_BLOCK_TYPE, resolveBlockType,
   toBlockRow, fromBlockRow, blockPlainText, htmlPlainText, blockRefs, withoutImage, keyBetween, evenKeys, positionsFor, isPositionKey,
   blocksOfContent, planBlockWrite, clearSavedBlocks, contentOf,
+  contentToBlocks, blocksToContent, parseManifest, renameStoredFiles, relinkWithinFile, gentlestImageMode, storedNameStem,
+  EMERALD_FORMAT_VERSION,
 } = bundle;
 
 const failures = [];
@@ -266,7 +263,7 @@ console.log('\n4c. Field block\n');
   const linkBlock = createFieldsBlock('link');
   const linkModel = parseFields(linkBlock);
   const linkEl = linkModel.elements[0];
-  const chip = internalLinkChipHtml({ id: '22222222-2222-2222-2222-222222222222', entryType: 'wiki', label: 'Ziel "A"' }); // lang-ok
+  const chip = internalLinkChipHtml({ id: '22222222-2222-2222-2222-222222222222', targetKind: 'entry', label: 'Ziel "A"' }); // lang-ok
   const withLink = serializeFields(linkBlock, { ...linkModel, slots: { [linkEl.id]: chip } }, text);
   check('the link is a slot in the markup, not in the JSON',
     withLink.html.includes(`data-block-slot="el:${linkEl.id}"`) && !(withLink.attrs[BLOCK_ATTR.data] ?? '').includes('2222'),
@@ -412,48 +409,6 @@ console.log('\n4d. Custom blocks: copies\n');
   check('the copy does not carry the default in its config, and items get their own IDs',
     !prefilled.attrs['data-block-config'].includes('defaultValue') && items.every((i) => i.id !== 'i1' && i.id !== 'i2'),
     prefilled.attrs['data-block-config']);
-}
-
-console.log('\n4e. Legacy operation status becomes a block\n');
-{
-  const labels = {
-    'blocks.status.name': 'Status', 'blocks.status.active': 'Aktiv', 'blocks.status.endDate': 'Enddatum',
-    'blocks.status.version': 'Version', 'blocks.fields.yes': 'Ja', 'blocks.fields.no': 'Nein',
-  };
-  const t = (key) => labels[key] ?? key;
-  const def = statusDefinition(t, '2026-01-01T00:00:00.000Z');
-
-  check('active without end date and version is not a legacy status',
-    !hasLegacyStatus({ isActive: true, endDate: null, version: ' ' }) && hasLegacyStatus({ isActive: false, endDate: null, version: null }));
-
-  const out = withLegacyStatus('<p>Text</p>', { isActive: false, endDate: '2026-03-01', version: ' 1.2 ' }, def, t);
-  const [status, text] = parseBlocks(out);
-  const model = parseFields(status);
-  check('the status block comes before the content, the text stays',
-    status?.type === 'core.fields' && model.name === 'Status' && text?.html === '<p>Text</p>', out);
-  check('values: inactive, end date, version trimmed',
-    model.values.active === false && model.values['end-date'] === '2026-03-01' && model.values.version === '1.2', model.values);
-  check('the fallback names the values readably', status.html.includes('Nein') && status.html.includes('1.2'), status.html);
-
-  const md = parseFields(parseBlocks(withLegacyStatus('', { isActive: true, endDate: 'Sep 10, 2026', version: null }, def, t))[0]);
-  check('a date from a Markdown export becomes ISO', md.values['end-date'] === '2026-09-10', md.values);
-
-  const rows = [
-    { id: 'a', content: '<p>x</p>', is_active: 0, end_date: null, version: null },
-    { id: 'b', content: '<p>y</p>', is_active: 1, end_date: null, version: '' },
-  ];
-  const converted = convertLegacyStatusRows(rows, t, 'now');
-  check('convertLegacyStatusRows: only the row with a legacy status, columns cleared',
-    converted.definition?.id === STATUS_DEFINITION_ID && converted.rows[1] === rows[1] &&
-      converted.rows[0].is_active === 1 && converted.rows[0].content.includes('core.fields'), converted.rows);
-  check('without a legacy status no definition is needed', convertLegacyStatusRows([rows[1]], t, 'now').definition === null);
-
-  // i18n not ready yet: `t` returns the key — never make it permanent as a label.
-  const raw = statusDefinition((key) => key, 'now');
-  check('without translation: English labels instead of keys',
-    raw.name === 'Status' && raw.elements.map((e) => e.label).join() === 'Active,End date,Version', raw);
-  const rawHtml = parseBlocks(withLegacyStatus('', { isActive: false, endDate: null, version: null }, raw, (key) => key))[0].html;
-  check('without translation: the fallback text has no keys either', rawHtml.includes('No') && !rawHtml.includes('blocks.'), rawHtml);
 }
 
 // A sigil is written as the UI writes it: the part as a virtual block, then back into the fields block.
@@ -603,32 +558,10 @@ console.log('\n4f. Sigils\n');
       order(moveInStack(scene, ['a', 'b'], 2)) === 'cdab' && order(moveInStack(scene, ['d'], 0)) === 'dabc');
     let n = 0;
     const copies = copiesOf(grouped.filter((e) => e.group), grouped, 10, () => `n${n++}`);
-    const drawn = parseAltarElements(JSON.stringify([
-      { id: 'p', kind: 'shape', group: 'g1', shape: { type: 'polygon', sides: 8 } },
-      { id: 'q', kind: 'shape', shape: { type: 'star', sides: 40 } },
-    ]), 'altar');
-    const again = parseAltarElements(altarElementsJson(drawn), 'altar');
-    check('altar: a drawn element keeps its group and corners, nonsense is clamped',
-      again[0].group === 'g1' && again[0].shape.sides === 8 && !again[1].group && again[1].shape.sides === 12, again);
     const pair = [el('a', 0, { x: 100, y: 0, group: 'g' }), el('b', 1, { x: 200, y: 0, group: 'g' }), el('c', 2, { x: 500, y: 300 })];
     const lined = align(pair, ['a', 'b', 'c'], 'left', { width: 1000, height: 600 });
     check('canvas: aligning moves a group as one, its members keeping their distance',
       lined[1].x - lined[0].x === 100 && lined[0].x === 100 && lined[2].x === 100, lined.map((e) => e.x));
-    const settings = parseAltarSettings(JSON.stringify({ guides_locked: true, guides: [
-      { id: 'a', orientation: 'vertical', at: 25 }, { id: 'a', orientation: 'vertical', at: 30 },
-      { id: 'b', orientation: 'diagonal', at: 10 }, { id: 'c', orientation: 'horizontal', at: 140 },
-    ] }));
-    check('altar: guides are read with their place in percent, doubles and nonsense left out',
-      settings.guides_locked && settings.guides.length === 2 && settings.guides[1].at === 100
-        && !parseAltarSettings('{}').guides_locked && parseAltarSettings('{}').guides.length === 0, settings.guides);
-    const symbols = parseAltarElements(JSON.stringify([
-      { id: 's', kind: 'symbol', symbol: { symbol: 'runes.fehu', d: 'M38 10L38 90', color: '#123456', weight: 99, fill: null } },
-      { id: 't', kind: 'symbol', symbol: { symbol: 'planets.sun', d: 'M0 0<script>' } },
-    ]), 'altar');
-    const symbolsAgain = parseAltarElements(altarElementsJson(symbols), 'altar');
-    check('altar: a symbol keeps its path and colour, its weight is clamped, a foreign path gives way to the library\'s',
-      symbolsAgain[0].symbol.d === 'M38 10L38 90' && symbolsAgain[0].symbol.color === '#123456' && symbolsAgain[0].symbol.weight === 16
-        && symbolsAgain[1].symbol.symbol === 'planets.sun' && !symbolsAgain[1].symbol.d.includes('<'), symbolsAgain);
     const sketch = emptyPaintDoc();
     sketch.layers[0].strokes = [
       { id: 'p', tool: 'pen', color: '#ff0000', size: 20, points: [100, 100, 0.5, 300, 200, 0.5, 500, 100, 0.5], pressure: false, rotation: 0, filled: false, sides: 5, rings: [] },
@@ -745,7 +678,7 @@ console.log('\n4f. Sigils\n');
 
 console.log('\n4g. Link and image defaults with markup\n');
 {
-  const wikiId = 'b1111111-1111-1111-1111-111111111111';
+  const linkTargetId = 'b1111111-1111-1111-1111-111111111111';
   const img = `${'cd'.repeat(32)}.png`;
   const text = {
     title: (b) => `T:${b.type}`, date: (iso) => iso, number: String, targetDate: '', technique: '', loaded: '', notLoaded: '',
@@ -753,16 +686,16 @@ console.log('\n4g. Link and image defaults with markup\n');
   };
 
   const elements = parseDefinitionElements(JSON.stringify([
-    { id: 'lnk', kind: 'link', label: 'Quelle', defaultValue: { id: wikiId, entryType: 'wiki', label: 'Artikel' } },
+    { id: 'lnk', kind: 'link', label: 'Quelle', defaultValue: { id: linkTargetId, targetKind: 'entry', label: 'Artikel' } },
     { id: 'pic', kind: 'image', label: 'Bild', defaultValue: `bilder/${img}` },
-    { id: 'lnk2', kind: 'link', label: 'Kaputt', defaultValue: { id: 'nicht-uuid', entryType: 'wiki', label: 'x' } }, // lang-ok
+    { id: 'lnk2', kind: 'link', label: 'Kaputt', defaultValue: { id: 'nicht-uuid', targetKind: 'entry', label: 'x' } }, // lang-ok
     { id: 'pic2', kind: 'image', label: 'Fremd', defaultValue: 'javascript:alert(1)' },
     // The altar field is gone (v62 made it a link field); one left over is dropped.
     { id: 'alt', kind: 'altar', label: 'Altar' },
   ]));
   const byId = Object.fromEntries(elements.map((e) => [e.id, e]));
   check('defaults: link and image are read, image as a plain file name',
-    byId.lnk.defaultValue?.entryType === 'wiki' && byId.pic.defaultValue === img, elements);
+    byId.lnk.defaultValue?.targetKind === 'entry' && byId.pic.defaultValue === img, elements);
   check('defaults: links only valid targets, images only stored files; an altar field is no element',
     byId.lnk2.defaultValue === undefined && byId.pic2.defaultValue === undefined && !byId.alt);
 
@@ -774,10 +707,10 @@ console.log('\n4g. Link and image defaults with markup\n');
   const copy = instantiateDefinition(def, text.fields);
   const cm = parseFields(copy);
   check('a new copy carries chip and image in its slots',
-    linkFromSlot(cm.slots.lnk)?.id === wikiId && imageFromSlot(cm.slots.pic) === img && !cm.slots.lnk2 && !cm.slots.pic2, cm.slots);
+    linkFromSlot(cm.slots.lnk)?.id === linkTargetId && imageFromSlot(cm.slots.pic) === img && !cm.slots.lnk2 && !cm.slots.pic2, cm.slots);
   check('the links of the copy are in the content (link table, backlinks)',
     extractInternalLinks(serializeBlocks([copy])).length === 1);
-  check('export: the link field shows its chip', renderBlocksForExport(serializeBlocks([copy]), text).includes('data-entry-type="wiki"'));
+  check('export: the link field shows its chip', renderBlocksForExport(serializeBlocks([copy]), text).includes('data-target-kind="entry"'));
 
   const remapped = parseDefinitionElements(remapDefinitionDefaults(
     JSON.stringify(elements), (name) => (name === img ? `${'ef'.repeat(32)}.png` : name),
@@ -785,7 +718,7 @@ console.log('\n4g. Link and image defaults with markup\n');
   ));
   const rm = Object.fromEntries(remapped.map((e) => [e.id, e]));
   check('import: image defaults follow the stored images, link defaults the new IDs',
-    rm.pic.defaultValue === `${'ef'.repeat(32)}.png` && rm.lnk.defaultValue?.id === `abcd1234-${wikiId}` && rm.lnk.defaultValue?.label === 'Neu', remapped);
+    rm.pic.defaultValue === `${'ef'.repeat(32)}.png` && rm.lnk.defaultValue?.id === `abcd1234-${linkTargetId}` && rm.lnk.defaultValue?.label === 'Neu', remapped);
   check('the images of the defaults are known', definitionImageRefs(elements).join() === img);
 }
 
@@ -954,145 +887,41 @@ console.log('\n4h1. A sigil part on its own shows without a label row — a cust
     copyOut.includes('<dt>Monatsladung</dt>'), copyOut);
 }
 
-console.log('\n4h2. The sigil blocks of v42 to v63 become fields and paint blocks (v64)\n');
-{
-  const legacy = (type, data, html = '', attrs = {}) => ({
-    ...legacySigilBlock(type), html, attrs: { ...attrs, ...(data ? { 'data-block-data': JSON.stringify(data) } : {}) },
-  });
-  const img = `${'7c'.repeat(32)}.png`;
-  const chip = internalLinkChipHtml({ id: 'b2222222-2222-2222-2222-222222222222', entryType: 'wiki', label: 'Technik' });
-  const oldCalc = legacy(LEGACY_SIGIL_CALC_TYPE, { intention: 'Alte Absicht', letters: ['A', 'L'], implemented: ['A'] },
-    '<p>Alte Absicht</p><p><s>A</s> L</p>', { 'data-block-title': 'Mein Rechner' });
-  const oldCanvas = legacy(LEGACY_SIGIL_CANVAS_TYPE, null, `<img src="${img}" alt="">`, { 'data-block-hidden': '1' });
-  const oldCalc2 = legacy(LEGACY_SIGIL_CALC_TYPE, { intention: 'Zweite', letters: ['Z'], implemented: [] }, '<p>Zweite</p>');
-  const oldCharge = legacy(LEGACY_SIGIL_CHARGE_TYPE,
-    { loaded: true, revealDate: '2030-01-01', lock: 'sigil', targets: [oldCalc.id, oldCanvas.id, 'fremd-block', 'feld:draw'] },
-    `<p>2030-01-01</p><p data-block-slot="technique">${chip}</p>`);
-  const unreadable = { ...legacySigilBlock(LEGACY_SIGIL_CALC_TYPE), attrs: { 'data-block-data': '{kaputt' } };
-  const newer = legacy(LEGACY_SIGIL_CANVAS_TYPE, null, '', { 'data-block-v': '2' });
-  const partCharge = {
-    id: 'feld', type: 'core.fields', html: '',
-    attrs: {
-      'data-block-config': JSON.stringify({ elements: [{ id: 'l', kind: 'sigilCharge', label: '' }], display: { readHideEmpty: true, readOnly: false } }),
-      'data-block-data': JSON.stringify({ values: { l: { loaded: false, revealDate: null, lock: 'entry', targets: [oldCalc2.id] } } }),
-    },
-  };
-  const source = [createTextBlock('<p>Notiz</p>'), oldCalc, oldCanvas, oldCalc2, oldCharge, partCharge, unreadable, newer];
-  const content = serializeBlocks(source);
-  const out = contentWithoutLegacySigils(content, { calc: 'Rechner', charge: 'Ladung' });
-  const blocks = parseBlocks(out);
-  check('v64: every block keeps its ID and place',
-    blocks.map((b) => b.id).join() === source.map((b) => b.id).join(), blocks.map((b) => b.id));
-  check('v64: calculator and charge become fields blocks, the drawing a paint block; unreadable and newer ones stay',
-    blocks.map((b) => b.type).join() === 'core.text,core.fields,core.paint,core.fields,core.fields,core.fields,core.sigil.calc,core.sigil.canvas',
-    blocks.map((b) => b.type));
-
-  const calcModel = parseFields(blocks[1]);
-  const calcUnit = sigilUnits([blocks[1]])[0].block;
-  const calc = parseSigilCalc(calcUnit);
-  check('v64: the calculator keeps intention, letters, title; label and slot in the fallback',
-    calcModel.elements.map((e) => `${e.id}:${e.kind}`).join() === 'calc:sigilCalc' && !calcModel.display.readHideEmpty
-      && calc.intention === 'Alte Absicht' && calc.letters.join() === 'A,L' && calc.implemented.join() === 'A'
-      && blocks[1].attrs['data-block-title'] === 'Mein Rechner' && blocks[1].attrs['data-block-show-title'] === '1'
-      && blocks[1].html.startsWith('<dl><dt>Rechner</dt>')
-      && calcUnit.html === oldCalc.html && calcUnit.id === `${oldCalc.id}:calc`, [calcModel, blocks[1]]);
-
-  const drawing = blocks[2];
-  check('v64: the drawing is a marked paint block, hidden as before, with its picture as the only layer',
-    isSigilDrawing(drawing) && drawing.attrs['data-block-hidden'] === '1' && drawing.attrs['data-block-show-title'] === '1'
-      && drawingImage(drawing) === img && parseDrawing(drawing).doc?.layers[0].image === img, drawing);
-
-  const charge = parseSigilCharge(chargeUnit(blocks[4]));
-  check('v64: the charge keeps its state and technique; a calculator target becomes its part, the others stay',
-    charge.loaded && charge.revealDate === '2030-01-01' && charge.lock === 'sigil' && charge.technique === chip
-      && charge.targets.join() === [`${oldCalc.id}:calc`, oldCanvas.id, 'fremd-block', 'feld:draw'].join()
-      && blocks[4].html.includes('<dt>Ladung</dt>'), charge);
-  check('v64: a charge part of a custom block follows the calculator too',
-    parseSigilCharge(chargeUnit(blocks[5])).targets.join() === `${oldCalc2.id}:calc`, parseSigilCharge(chargeUnit(blocks[5])));
-  check('v64: unreadable and newer blocks are left byte for byte',
-    isDeepStrictEqual(blocks[6], parseBlocks(serializeBlocks([unreadable]))[0]) && isDeepStrictEqual(blocks[7], parseBlocks(serializeBlocks([newer]))[0]));
-
-  check('v64: a second run changes nothing', contentWithoutLegacySigils(out) === out);
-
-  const brokenDrawing = { ...legacySigilBlock(LEGACY_SIGIL_CANVAS_TYPE), html: `<img src="${img}" alt="">`, attrs: { 'data-block-data': '{kaputt' } };
-  const [rescued] = parseBlocks(contentWithoutLegacySigils(serializeBlocks([brokenDrawing])));
-  check('v64: a drawing with unreadable data still becomes a sigil drawing, showing its picture',
-    isSigilDrawing(rescued) && parseDrawing(rescued).render === img, rescued);
-  const prototypeNames = serializeBlocks([oldCalc, ...['constructor', '__proto__', 'toString'].map((type) => ({ id: `p-${type.replace(/_/g, '')}`, type, html: '<p>a</p>', attrs: {} }))]);
-  let protoOut = null;
-  try { protoOut = parseBlocks(contentWithoutLegacySigils(prototypeNames)); } catch { protoOut = null; }
-  check('v64: a block named like an object property is left alone, nothing throws',
-    protoOut !== null && protoOut.slice(1).map((b) => b.type).join() === 'constructor,__proto__,toString', protoOut);
-  const plain = serializeBlocks([createTextBlock('<p>core.paint, sigil</p>'), createFieldsBlock('date')]);
-  check('v64: content without the old blocks comes back as the same string', contentWithoutLegacySigils(plain) === plain);
-
-  const state = sigilState(blocks, '2029-12-31');
-  check('v64: the charge conceals what it concealed — the calculator part and the drawing, not the second calculator',
-    state.concealed.get(`${oldCalc.id}:calc`) === '2030-01-01' && state.concealed.has(oldCanvas.id)
-      && !state.concealed.has(`${oldCalc2.id}:calc`) && !state.lockEntry, state);
-  const hidden = withoutConcealed(out, '2029-12-31');
-  check('v64: search does not see what stays concealed', !hidden.includes('Alte Absicht') && !hidden.includes(img) && hidden.includes('Zweite'), hidden);
-
-  // `targets: null` — every calculator and drawing of the entry, before and after; a painting of its own is none of them.
-  const oldAll = legacy(LEGACY_SIGIL_CHARGE_TYPE, { loaded: true, revealDate: null, lock: 'entry' });
-  const painting = withDrawingImage(createPaintBlock(), `${'8d'.repeat(32)}.png`);
-  const all = parseBlocks(contentWithoutLegacySigils(serializeBlocks([oldCalc, oldCanvas, painting, oldAll])));
-  const allState = sigilState(all, '2099-01-01');
-  check('v64: a charge for "all" stays one, conceals calculator and drawing until unloaded, locks the entry',
-    parseSigilCharge(chargeUnit(all[3])).targets === null && allState.lockEntry
-      && allState.concealed.get(`${oldCalc.id}:calc`) === null && allState.concealed.get(oldCanvas.id) === null
-      && !allState.concealed.has(painting.id), allState);
-  const summary = entryBlockSummary('v64-all', serializeBlocks(all), '2099-01-01');
-  check('v64: the card still knows the sigil (lock, no image while concealed)',
-    summary.sigil?.lockEntry === true && summary.sigil.image === null, summary.sigil);
-}
-
 console.log('\n5. What is derived from the content sees through the blocks\n');
 {
   const chip =
     '<span data-type="internalLink" class="internal-link" data-id="11111111-1111-1111-1111-111111111111" ' +
-    'data-entry-type="wiki" data-label="A">A</span>';
+    'data-target-kind="entry" data-label="A">A</span>';
   const html = serializeBlocks([createTextBlock('<p>ohne</p>'), createTextBlock(`<p>${chip}</p>`)]); // lang-ok
   const links = extractInternalLinks(html);
-  check('extractInternalLinks finds chips in wrapped text blocks', links.length === 1 && links[0].entryType === 'wiki', links);
+  check('extractInternalLinks finds chips in wrapped text blocks', links.length === 1 && links[0].targetKind === 'entry', links);
+  const taskChip = internalLinkChipHtml({ id: '33333333-3333-3333-3333-333333333333', targetKind: 'task', label: 'T' });
+  const taskLinks = extractInternalLinks(serializeBlocks([createTextBlock(`<p>${taskChip}</p>`)]));
+  check('a task chip is written and read back as a task', taskChip.includes('data-target-kind="task"') && taskLinks.length === 1 && taskLinks[0].targetKind === 'task', taskLinks);
 }
 
-console.log('\n6. Templates: assignment, insertion\n');
+console.log('\n6. Templates: start template, insertion\n');
 {
-  const assignments = parseAssignments(JSON.stringify([
-    { entryType: 'journal', category: 'ritual', isDefault: true },
-    { entryType: 'wiki', category: 'ritual' },
-    { entryType: 'wiki', category: 'ritual', isDefault: true },
-    { entryType: 'wiki', category: 'offered', isDefault: false },
-    { entryType: 'wiki', category: null },
-    { entryType: 'operation', category: '<x>' },
-    { entryType: 'task', category: '*' },
-    'kaputt',
-  ]));
-  check('assignments: journal always "all", duplicates merge, foreign and merely offered ones are dropped',
-    JSON.stringify(assignments) === JSON.stringify([
-      { entryType: 'journal', category: '*' },
-      { entryType: 'wiki', category: 'ritual' },
-      { entryType: 'wiki', category: null },
-    ]), assignments);
-  check('assignments: unreadable JSON yields none', parseAssignments('{kaputt').length === 0);
-
-  const tpl = (id, assignments, content = '') => ({ id, name: id, icon: '', title: '', content, tags: [], assignments, sort_order: 0, created_at: '', updated_at: '', deleted_at: null });
-  const exact = tpl('exact', [{ entryType: 'wiki', category: 'ritual' }]);
-  const fallback = tpl('fallback', [{ entryType: 'wiki', category: '*' }]);
-  const none = tpl('none', [{ entryType: 'wiki', category: null }]);
-  const free = tpl('free', []);
-  const all = [free, fallback, exact, none];
-  check('assigned: the exact combination before "all categories"', resolveAssignedTemplate(all, 'wiki', 'ritual')?.id === 'exact');
-  check('assigned: without one of its own, the fallback', resolveAssignedTemplate(all, 'wiki', 'herbs')?.id === 'fallback');
-  check('assigned: "no category" is a combination of its own', resolveAssignedTemplate(all, 'wiki', null)?.id === 'none');
-  check('assigned: none for another entry type', resolveAssignedTemplate(all, 'journal', null) === null);
+  const tpl = (id, content = '') => ({ id, name: id, icon: '', title: '', content, tags: [], sort_order: 0, created_at: '', updated_at: '', deleted_at: null });
+  const own = tpl('own');
+  const standard = tpl('standard');
+  const all = [standard, own];
+  check('start: the category\'s own start template before the default',
+    resolveStartTemplate(all, { template_id: 'own' }, 'standard')?.id === 'own');
+  check('start: a category without one gets the default',
+    resolveStartTemplate(all, { template_id: null }, 'standard')?.id === 'standard');
+  check('start: no category gets the default',
+    resolveStartTemplate(all, null, 'standard')?.id === 'standard');
+  check('start: a start template in the trash (not among the active) falls back to the default',
+    resolveStartTemplate(all, { template_id: 'trashed' }, 'standard')?.id === 'standard');
+  check('start: neither — none',
+    resolveStartTemplate(all, { template_id: null }, null) === null && resolveStartTemplate(all, null, 'gone') === null);
 
   // Insertion: new IDs, charge targets carried along, everything else as it is.
   const calc = createSigilCalcBlock();
   const canvas = withDrawingImage(createSigilCanvasBlock(), `${'ef'.repeat(32)}.png`);
   const charge = chargeOf({ loaded: true, revealDate: null, lock: 'entry', technique: null, targets: [canvas.id] });
-  const sigilTpl = tpl('sigil-tpl', [], serializeBlocks([createTextBlock('<p>Absicht</p>'), calc, canvas, charge]));
+  const sigilTpl = tpl('sigil-tpl', serializeBlocks([createTextBlock('<p>Absicht</p>'), calc, canvas, charge]));
   const first = instantiateTemplateBlocks(sigilTpl);
   const second = instantiateTemplateBlocks(sigilTpl);
   const firstCharge = parseSigilCharge(chargeUnit(first[3]));
@@ -1121,13 +950,13 @@ console.log('\n6. Templates: assignment, insertion\n');
     ])),
   };
   const partCopy = instantiateDefinition(partDef, partText);
-  const [partBlock] = instantiateTemplateBlocks(tpl('part-tpl', [], serializeBlocks([partCopy])));
+  const [partBlock] = instantiateTemplateBlocks(tpl('part-tpl', serializeBlocks([partCopy])));
   const partCharge = parseSigilCharge(sigilUnits([partBlock]).find((u) => u.block.type === 'sigilCharge').block);
   check('insertion: a charge as a part targets the part in the new block',
     partBlock.id !== partCopy.id && partCharge.targets.join() === sigilPartId(partBlock.id, 'draw'), partCharge);
 
   // Title and tags when undoing a template.
-  const journalStd = { ...sigilTpl, id: 'journal-std', title: 'Tagebuch', tags: ['tag-j'], assignments: [{ entryType: 'journal', category: '*' }] };
+  const journalStd = { ...sigilTpl, id: 'journal-std', title: 'Tagebuch', tags: ['tag-j'] };
 
   // Tags are IDs: the same ID is the same tag, there is no other spelling.
   const cleared = fieldsWithoutTemplate({ title: 'Tagebuch', tags: ['eigen', 'tag-j'] }, journalStd);
@@ -1141,11 +970,11 @@ console.log('\n6. Templates: assignment, insertion\n');
   check('fields with template: without a custom title that of the template is used',
     fieldsWithTemplate({ title: '  ', tags: [] }, { title: 'Artikel', tags: [] }).title === 'Artikel');
 
-  check('empty: no content', isContentEmpty(''));
-  check('empty: only empty paragraphs', isContentEmpty('<p></p><p style="text-align: center"><br></p>'));
-  check('not empty: text', !isContentEmpty('<p>x</p>'));
-  check('not empty: an image', !isContentEmpty(`<p><img src="${'a'.repeat(64)}.png"></p>`));
-  check('not empty: a field block', !isContentEmpty(serializeBlocks([createFieldsBlock('shorttext')])));
+  check('empty: no content', areBlocksEmpty(parseBlocks('')));
+  check('empty: only empty paragraphs', areBlocksEmpty(parseBlocks('<p></p><p style="text-align: center"><br></p>')));
+  check('not empty: text', !areBlocksEmpty(parseBlocks('<p>x</p>')));
+  check('not empty: an image', !areBlocksEmpty(parseBlocks(`<p><img src="${'a'.repeat(64)}.png"></p>`)));
+  check('not empty: a field block', !areBlocksEmpty(parseBlocks(serializeBlocks([createFieldsBlock('shorttext')]))));
 
   const start = templateStart({ ...sigilTpl, title: '  Ritual ', tags: ['a'] });
   check('start from template: title trimmed, tags copied, content inserted',
@@ -1154,8 +983,6 @@ console.log('\n6. Templates: assignment, insertion\n');
     JSON.stringify(templateStart(null)) === JSON.stringify({ title: '', content: '', tags: [], templateId: null }));
   check('merge tags without duplicate IDs', mergeTemplateTags(['a', 'b'], ['a', 'c']).join() === 'a,b,c');
 
-  check('assigned exactly here, without fallback',
-    assignedTemplateAt(all, 'wiki', 'herbs') === undefined && assignedTemplateAt(all, 'wiki', '*')?.id === 'fallback');
   check('empty blocks', areBlocksEmpty([createTextBlock('<p></p>')]) && !areBlocksEmpty([createTextBlock('<p>x</p>')]));
 }
 
@@ -1210,7 +1037,7 @@ console.log('\nCanvas block\n');
   check('the export shows the rendered picture', exported.includes(render) && !exported.includes(`src="${pic}"`), exported);
 }
 
-console.log('\n7. Blocks as rows (blocks, block_refs, v65)\n');
+console.log('\n7. Blocks as rows (blocks, block_refs)\n');
 {
   const pic = `${'1'.repeat(64)}.png`;
   const layerPic = `${'2'.repeat(64)}.png`;
@@ -1218,7 +1045,7 @@ console.log('\n7. Blocks as rows (blocks, block_refs, v65)\n');
   const bg = `${'4'.repeat(64)}.jpg`;
   const def = `${'5'.repeat(64)}.webp`;
   const linked = '33333333-3333-3333-3333-333333333333';
-  const chip = internalLinkChipHtml({ id: linked, entryType: 'wiki', label: 'Ziel' }); // lang-ok
+  const chip = internalLinkChipHtml({ id: linked, targetKind: 'entry', label: 'Ziel' }); // lang-ok
   const fallback = { label: (e) => e.label, yes: 'Yes', no: 'No', moonName: (p) => p };
 
   const linkBlock = createFieldsBlock('link');
@@ -1385,6 +1212,92 @@ console.log('\n7. Blocks as rows (blocks, block_refs, v65)\n');
       && htmlPlainText('<p>a</p><script>x').includes('x'), htmlPlainText('<p>a</p><script>x()</script><style>p{}</style><p>b</p>'));
   check('plain text: a chip inside a word still stands apart, formatting does not',
     htmlPlainText(`ab${chip}cd <b>fe</b>tt`) === 'ab Ziel cd fett', htmlPlainText(`ab${chip}cd <b>fe</b>tt`)); // lang-ok
+}
+
+console.log('\n8. .emerald manifest (lib/emerald/manifest.ts)\n');
+{
+  const idA = '11111111-1111-4111-8111-111111111111';
+  const idB = '22222222-2222-4222-8222-222222222222';
+  const newA = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+  const newB = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+  const outside = '33333333-3333-4333-8333-333333333333';
+  const pic = `${'ab'.repeat(32)}.png`;
+  const kept = `${'cd'.repeat(32)}.jpg`;
+  const chipTo = (id, label) => internalLinkChipHtml({ id, targetKind: 'entry', label });
+
+  // Two entries of one file that link to each other, plus a link outside and pictures.
+  const contentA = serializeBlocks([
+    { ...createTextBlock(`<p>see ${chipTo(idB, 'B')} and ${chipTo(outside, 'Elsewhere')}</p><img src="${pic}">`), id: 'blk-a' },
+  ]);
+  const fields = createFieldsBlock();
+  const contentB = serializeBlocks([
+    { ...createTextBlock(`<p>back to ${chipTo(idA, 'A')}</p><img src="${kept}">`), id: 'blk-b' },
+    { ...fields, attrs: { ...fields.attrs, [BLOCK_ATTR.data]: JSON.stringify({ slots: { l: `link:${idA}` } }) } },
+  ]);
+  const manifest = {
+    format: 'emerald', version: EMERALD_FORMAT_VERSION, exportedAt: '2026-11-14T00:00:00.000Z',
+    items: [
+      { kind: 'entry', id: idA, title: 'A', number: 1, createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '', icon: '🌙', cover: null,
+        category: { name: 'Ritual', icon: '🕯️', builtin: false }, tags: ['x'], blocks: contentToBlocks(contentA) },
+      { kind: 'entry', id: idB, title: 'B', number: 2, createdAt: '', updatedAt: '', icon: '', cover: null, category: null, tags: [],
+        blocks: contentToBlocks(contentB) },
+      { kind: 'template', id: 'tpl', name: 'T', title: 'New', createdAt: '', updatedAt: '', icon: '📄', tags: [], blocks: [] },
+    ],
+    links: [{ id: outside, kind: 'entry', title: 'Elsewhere' }],
+    omittedImages: [pic],
+  };
+  const parsed = parseManifest(JSON.stringify(manifest));
+  check('a manifest round-trips through JSON', typeof parsed === 'object' && parsed.items.length === 3 && parsed.links.length === 1, parsed);
+  check('block rows give back the content byte for byte',
+    blocksToContent(parsed.items[0].blocks) === contentA && blocksToContent(parsed.items[1].blocks) === contentB,
+    blocksToContent(parsed.items[1].blocks));
+
+  const idMap = new Map([[idA, newA], [idB, newB]]);
+  const importedA = relinkWithinFile(blocksToContent(parsed.items[0].blocks), idMap);
+  const importedB = relinkWithinFile(blocksToContent(parsed.items[1].blocks), idMap);
+  const targets = (html) => extractInternalLinks(html).map((l) => l.id);
+  check('two entries of one file stay linked to each other (chips)',
+    targets(importedA).includes(newB) && targets(importedB).includes(newA) && !importedA.includes(idB) && !importedB.includes(idA),
+    { a: targets(importedA), b: targets(importedB) });
+  check('a field block’s link slot follows too', importedB.includes(`link:${newA}`), importedB);
+  check('a link outside the file is left for the title lookup', targets(importedA).includes(outside));
+
+  const placeholder = `${'ef'.repeat(32)}.png`;
+  const stored = `${'01'.repeat(32)}.jpg`;
+  const byStem = new Map([[storedNameStem(pic), placeholder], [storedNameStem(kept), stored]]);
+  const renamedA = renameStoredFiles(importedA, byStem);
+  const renamedB = renameStoredFiles(importedB, byStem);
+  check('a left-out picture becomes the placeholder', renamedA.includes(placeholder) && !renamedA.includes(pic), renamedA);
+  check('a picture of the file gets its new name', renamedB.includes(stored) && !renamedB.includes(kept), renamedB);
+  check('a picture compressed to another type is found by its hash',
+    renameStoredFiles(`<img src="${'ab'.repeat(32)}.webp">`, byStem).includes(placeholder));
+
+  check('the gentlest picture setting wins', gentlestImageMode('placeholder', 'none') === 'none'
+    && gentlestImageMode('strong', 'balanced') === 'balanced');
+
+  check('an older manifest is named as such', parseManifest(JSON.stringify({ ...manifest, version: 5 })) === 'oldVersion');
+  check('a newer manifest is named as such', parseManifest(JSON.stringify({ ...manifest, version: 7 })) === 'newVersion');
+  check('no JSON, another format or no item is refused',
+    parseManifest('nope') === 'unsupported' && parseManifest('{"format":"x","version":6}') === 'unsupported'
+      && parseManifest(JSON.stringify({ ...manifest, items: [] })) === 'unsupported');
+  const hostile = parseManifest(JSON.stringify({ ...manifest, items: [
+    { kind: 'entry', id: idA, title: 7, tags: ['ok', 3, null], category: { name: 5 }, blocks: [{ id: 'b', type: 'core.text', html: '<p>x</p>', hidden: 'yes', version: -1 }, { type: 'core.text' }, 'x'] },
+    { kind: 'script', id: 'x' },
+    null,
+  ] }));
+  check('more items than the limit are refused as too large',
+    parseManifest(JSON.stringify({ ...manifest, items: Array.from({ length: 1001 }, () => manifest.items[2]) })) === 'tooLarge');
+  const shortId = parseManifest(JSON.stringify({ ...manifest, items: [{ ...manifest.items[0], id: 'e' }, manifest.items[2]] }));
+  const twice = parseManifest(JSON.stringify({ ...manifest, items: [manifest.items[0], { ...manifest.items[1], id: idA }] }));
+  check('an item ID that appears twice is taken once', typeof twice === 'object' && twice.items.length === 1, twice);
+  check('an entry whose ID is no UUID is dropped', typeof shortId === 'object' && shortId.items.length === 1 && shortId.items[0].kind === 'template', shortId);
+  check('re-linking replaces whole IDs only, in one pass',
+    relinkWithinFile(`x${idA}y ${idA.slice(0, 8)}`, idMap) === `x${newA}y ${idA.slice(0, 8)}`);
+  check('foreign values of the wrong type are dropped, not trusted',
+    typeof hostile === 'object' && hostile.items.length === 1 && hostile.items[0].title === ''
+      && hostile.items[0].tags.join() === 'ok' && hostile.items[0].category === null
+      && hostile.items[0].blocks.length === 1 && hostile.items[0].blocks[0].hidden === 0 && hostile.items[0].blocks[0].version === null,
+    hostile);
 }
 
 console.log('');

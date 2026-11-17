@@ -7,8 +7,7 @@ import { linkFromSlot } from '../../lib/blocks/fields';
 import { internalLinkChipHtml, toInternalLinkChip } from '../../lib/internalLinkHtml';
 import { isValidLinkTarget } from '../../lib/links';
 import { linkItemKey, linkItemsByKey, type SuggestionItem } from '../../lib/linkItems';
-import { viewTypeForEntryType } from '../../lib/modules';
-import type { ContentType } from '../../types';
+import { viewOfLinkTarget } from '../../store/entryViews';
 
 /**
  * A reference to an entry inside a block, stored as
@@ -34,7 +33,7 @@ export function LinkEditor({ slot, onChange }: {
   const current = linkFromSlot(slot);
 
   const results = useMemo(() => {
-    const q = query.toLowerCase();
+    const q = query.trim().toLowerCase();
     return items
       .filter((i) => i.label.toLowerCase().includes(q))
       .sort((a, b) => (b.updatedAt ?? '').localeCompare(a.updatedAt ?? ''))
@@ -61,18 +60,18 @@ export function LinkEditor({ slot, onChange }: {
 }
 
 /** A linked entry, with current title and icon as long as it exists. */
-export function LinkTarget({ target, onRemove }: { target: { id: string; entryType: string; label: string }; onRemove?: () => void }) {
+export function LinkTarget({ target, onRemove }: { target: { id: string; targetKind: string; label: string }; onRemove?: () => void }) {
   const { t } = useTranslation();
   const items = useLinkItems();
   const setActiveView = useUIStore((s) => s.setActiveView);
-  const { id, entryType } = target;
+  const { id, targetKind } = target;
   const live = useMemo(
-    () => linkItemsByKey(items).get(linkItemKey({ id, entryType: entryType as ContentType })),
-    [items, id, entryType],
+    () => linkItemsByKey(items).get(linkItemKey({ id, targetKind })),
+    [items, id, targetKind],
   );
   const open = () => {
     if (!isValidLinkTarget(target)) return;
-    setActiveView({ type: viewTypeForEntryType(target.entryType as ContentType), id: target.id, mode: 'view' });
+    setActiveView(viewOfLinkTarget(target.targetKind, target.id));
   };
   return (
     <span className="inline-flex">

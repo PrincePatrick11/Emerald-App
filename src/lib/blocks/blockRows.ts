@@ -1,3 +1,4 @@
+import { isRecord } from '../helpers';
 import { htmlTags } from '../htmlTags';
 import { decodeHtmlAttr } from './blockHtml';
 import { isCanvasBlockType } from './canvas';
@@ -78,8 +79,8 @@ function restAttrs(raw: unknown): Record<string, string> {
     return {};
   }
   const out: Record<string, string> = {};
-  if (typeof value !== 'object' || value === null || Array.isArray(value)) return out;
-  for (const [name, v] of Object.entries(value as Record<string, unknown>)) {
+  if (!isRecord(value)) return out;
+  for (const [name, v] of Object.entries(value)) {
     if (KEPT_ATTR_RE.test(name) && typeof v === 'string' && name !== 'data-block' && name !== 'data-block-id') out[name] = v;
   }
   return out;

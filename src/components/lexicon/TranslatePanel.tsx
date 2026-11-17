@@ -2,7 +2,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ArrowRightLeft, Check, Copy } from 'lucide-react';
 import { useLexiconStore } from '../../store/lexiconStore';
-import { entriesOfLanguage, translateText, type TranslateDirection, type TranslateMode } from '../../lib/lexicon';
+import { DEFAULT_LANGUAGE_ICON, entriesOfLanguage, translateText, type TranslateDirection, type TranslateMode } from '../../lib/lexicon';
+import { isImageIcon } from '../../lib/helpers';
 import DashboardSection from '../ui/DashboardSection';
 import Button from '../ui/Button';
 import EmptyState from '../ui/EmptyState';
@@ -85,7 +86,7 @@ export default function TranslatePanel() {
             <Dropdown
               label={t('lexicon.language')}
               value={language.id}
-              options={languages.map((l) => ({ value: l.id, label: l.name, emoji: l.icon }))}
+              options={languages.map((l) => ({ value: l.id, label: l.name, emoji: isImageIcon(l.icon) ? DEFAULT_LANGUAGE_ICON : l.icon }))}
               onChange={setLanguageId}
             />
             <Button

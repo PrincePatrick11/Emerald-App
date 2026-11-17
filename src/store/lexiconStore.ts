@@ -28,7 +28,7 @@ import {
 import i18n from '../i18n';
 import type { Language, LexiconEntry } from '../types';
 
-export type LanguagePatch = Partial<Pick<Language, 'name' | 'icon' | 'alphabet'>>;
+type LanguagePatch = Partial<Pick<Language, 'name' | 'icon' | 'alphabet'>>;
 export type EntryPatch = Partial<Pick<LexiconEntry, 'term' | 'translation' | 'pronunciation' | 'note'>>;
 
 interface LexiconState {

@@ -16,9 +16,8 @@ interface Patch {
 }
 
 /**
- * Category, icon and cover image when editing: what wiki and operations
- * carry alike, under the type in the "Properties" section. A
- * category change leaves the content as it is.
+ * Category, icon and cover image when editing, in the "Properties" section
+ * of every entry. A category change leaves the content as it is.
  */
 export default function CategoryIconCoverRows({ entry, update }: {
   entry: { id: string; category_id: string | null; icon?: string; cover_image?: string };

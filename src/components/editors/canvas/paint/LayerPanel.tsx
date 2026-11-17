@@ -9,7 +9,7 @@ import { drawLayer, type LayerImages } from './render';
 import type { PaintControls } from './usePaintTools';
 
 /** A layer's name as shown: its own, or its place counted from the bottom. */
-export function layerLabel(t: (key: string, opts?: Record<string, unknown>) => string, layer: PaintLayer, index: number): string {
+function layerLabel(t: (key: string, opts?: Record<string, unknown>) => string, layer: PaintLayer, index: number): string {
   return layer.name || t('editor.paint.layerN', { n: index + 1 });
 }
 

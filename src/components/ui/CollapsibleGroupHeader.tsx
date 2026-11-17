@@ -9,8 +9,6 @@ interface Props {
   collapsed?: boolean;
   /** Fixed w-5 column as in every row; keeps the labels of a list aligned. */
   emoji?: string;
-  /** Instead of the emoji, in the same w-5 column (Home: the module icon). */
-  leading?: ReactNode;
   label: string;
   /** The "(n)" counter right of the label; the one place for its class chain. */
   count?: number;
@@ -30,15 +28,13 @@ interface Props {
  * `CategoriesView`, as a row.
  */
 export default function CollapsibleGroupHeader({
-  onToggleCollapse, collapsed = false, emoji, leading, label, count, meta, add, actions,
+  onToggleCollapse, collapsed = false, emoji, label, count, meta, add, actions,
 }: Props) {
   const labelClass = 'flex-1 min-w-0 truncate text-left text-xs font-semibold text-subtle uppercase tracking-wider';
   return (
     <div className="flex items-center gap-2 min-h-6 mb-2">
       {onToggleCollapse && <CollapseChevron collapsed={collapsed} onToggle={onToggleCollapse} />}
-      {leading
-        ? <span className="w-5 flex items-center justify-center flex-shrink-0">{leading}</span>
-        : emoji && <span className="w-5 text-center flex-shrink-0 text-base">{emoji}</span>}
+      {emoji && <span className="w-5 text-center flex-shrink-0 text-base">{emoji}</span>}
       {onToggleCollapse
         ? <button onClick={onToggleCollapse} className={`${labelClass} transition-colors hover:text-raise`}>{label}</button>
         : <p className={labelClass}>{label}</p>}

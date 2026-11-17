@@ -100,7 +100,7 @@ export function definitionImageRefs(elements: readonly ElementDef[]): string[] {
 }
 
 /** A link target as the import resolves it — `null` means: does not exist here. */
-export type LinkDefaultResolver = (target: { id: string; entryType: string; label: string }) => { id: string; label: string; entryType?: string } | null;
+export type LinkDefaultResolver = (target: { id: string; targetKind: string; label: string }) => { id: string; label: string; targetKind?: string } | null;
 
 /**
  * The `elements` of a definition row from a foreign source with rewritten
@@ -121,17 +121,17 @@ export function remapDefinitionDefaults(
     const value = (el as { defaultValue: unknown }).defaultValue;
     if (typeof value === 'string' && (el as { kind?: unknown }).kind === 'image') return { ...el, defaultValue: image(value) };
     if (typeof value === 'object' && value !== null && typeof (value as { id?: unknown }).id === 'string') {
-      const raw = value as { id: string; entryType?: unknown; label?: unknown };
+      const raw = value as { id: string; targetKind?: unknown; label?: unknown };
       const target = link({
         id: raw.id,
-        entryType: typeof raw.entryType === 'string' ? raw.entryType : '',
+        targetKind: typeof raw.targetKind === 'string' ? raw.targetKind : '',
         label: typeof raw.label === 'string' ? raw.label : '',
       });
       if (!target) {
         const { defaultValue: _dropped, ...rest } = el as Record<string, unknown>;
         return rest;
       }
-      return { ...el, defaultValue: { ...raw, id: target.id, label: target.label, ...(target.entryType ? { entryType: target.entryType } : {}) } };
+      return { ...el, defaultValue: { ...raw, id: target.id, label: target.label, ...(target.targetKind ? { targetKind: target.targetKind } : {}) } };
     }
     return el;
   });

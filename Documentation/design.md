@@ -123,9 +123,8 @@ Size tokens in both theme files: `--tab-pill-h` (30px, `TabBar`) and `--control-
 
 The exceptions, each for a reason:
 
-- **Home** keeps view, sort and length in its section headings, because it has three lists and the sidebar has room for one; those headings are 30px tall for it. Its title is the date over the moon phase.
 - **Tasks** have no layout choice, since subtasks and inline editing have no card to live on; the view section holds only "Show completed". The checkbox and the subtask chevron come before the name. Add subtask, category, link and priority appear on hover, because a task is worked on from its row; rename and delete stay in the menu.
-- **Categories** have a drag handle, because their order is the hand-dragged one, and no view or sort for the same reason. **Tags** have a chevron and a colour dot, because a tag opens in place and its colour is its value.
+- **Categories** have a drag handle under the sort "Custom order", because that order is the hand-dragged one; with a search or a filter on, the handle stays away. **Tags** have a chevron and a colour dot in the list, because a tag opens in place and its colour is its value.
 - **Trash** rows carry a checkbox and select on click, and a jade Restore button, since restoring is what the page is for. Deleting for good stays in the menu.
 - **Built-in blocks** are rows without hover, since nothing opens from them.
 - The **"+"** in a group heading stays visible: it is jade, creates rather than alters, and belongs to the group.
@@ -160,7 +159,7 @@ Where the code contradicts the rules above today. No prioritisation — each poi
 
 **2. Per-theme component rules with hex values.** `index.css` still has about 210 `html[data-theme=…]` rules for individual components with literal colours. They keep Noctis and Parchment as they are; a third theme falls back to the token-based base rules, so nothing breaks. *Cost: move them onto tokens when a component is touched.*
 
-**3. The entry actions live exclusively in a collapsible surface.** Edit/Done/Delete/Cancel exist only in the right sidebar. Collapsing it mid-edit leaves no visible way back; there is no keyboard fallback. *Switching* into edit mode expands it automatically (`uiStore.ts`, driven by the registry's `usesEditorSidebar`) — that covers entry, not later collapsing. Mitigated, not fixed: both sidebars can also be reopened from the View menu. *Cost: keyboard shortcuts for Edit/Done/Cancel, or a second home for the actions.*
+**3. The entry actions live exclusively in a collapsible surface.** Edit/Done/Delete/Cancel exist only in the right sidebar. Collapsing it mid-edit leaves no visible way back; there is no keyboard fallback. *Switching* into edit mode expands it automatically (`viewNeedsSidebar` in `uiStore.ts`) — that covers entry, not later collapsing. Mitigated, not fixed: both sidebars can also be reopened from the View menu. *Cost: keyboard shortcuts for Edit/Done/Cancel, or a second home for the actions.*
 
 **4. `LinkPickerModal`'s six tabs are a hand-written button, not `TabIconButton`.** `TabIconButton`'s active state is wired to the stone tone the sidebars use; the picker needs the jade tone the modal is themed in, and the component has no tone variant for that yet. The deviation is commented at the definition (`LinkPickerModal.tsx`). *Cost: add a `tone` prop to `TabIconButton`, then switch the picker over.*
 

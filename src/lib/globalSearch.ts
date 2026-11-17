@@ -1,10 +1,10 @@
 import type { ActiveView, Entry, Language, LexiconEntry, Tag, Task, VaultImage } from '../types';
 import { foldTypography, plainTextFor } from './searchText';
-import { todayIso, withoutConcealed } from './blocks/sigil';
-import { viewTypeForEntryType } from './modules';
+import { withoutConcealed } from './blocks/sigil';
+import { entryView } from '../store/entryViews';
 import { displayTitle } from './entryTitle';
 import i18n from '../i18n';
-import type { CategoryModuleId } from './modules';
+import { localIsoDay } from './helpers';
 
 /**
  * The global search behind the title bar's field.
@@ -20,7 +20,7 @@ import type { CategoryModuleId } from './modules';
  */
 
 export type SearchKind =
-  | 'journal' | 'wiki' | 'operation' | 'task'
+  | 'entry' | 'task'
   | 'image' | 'tag' | 'category'
   | 'language' | 'lexiconEntry';
 
@@ -45,8 +45,6 @@ export interface SearchHit {
   matchedIn: 'title' | 'tag' | 'content';
   /** Only ever set for `matchedIn: 'content'`. */
   snippet?: SearchSnippet;
-  /** Only for `kind: 'category'`: the module holding most of its entries, shown as a hint — unset when nothing uses it. */
-  module?: CategoryModuleId;
   categoryId?: string | null;
   /** Only for `kind: 'lexiconEntry'`: the language the word belongs to — its jump target. */
   languageId?: string;
@@ -60,15 +58,11 @@ export interface SearchCategory {
   id: string;
   /** Already translated: built-in categories are named by a locale key. */
   name: string;
-  /** The module holding most of its entries, shown as a hint beside the hit — unset when nothing uses it. */
-  module?: CategoryModuleId;
 }
 
 export interface SearchCorpus {
-  journal: Entry[];
-  wiki: Entry[];
-  operations: Entry[];
-  tasks: Task[];
+  entries: readonly Entry[];
+  tasks: readonly Task[];
   /** The pictures taken into "Images" — a hit opens the picture there. */
   images: VaultImage[];
   tags: Tag[];
@@ -188,7 +182,7 @@ export function searchCorpus(corpus: SearchCorpus, rawQuery: string): SearchHit[
     id: string,
     title: string,
     match: FieldMatch | null,
-    extra: Partial<Pick<SearchHit, 'updatedAt' | 'module' | 'categoryId' | 'languageId' | 'entryNumber'>> = {},
+    extra: Partial<Pick<SearchHit, 'updatedAt' | 'categoryId' | 'languageId' | 'entryNumber'>> = {},
   ) => {
     if (!match) return;
     hits.push({
@@ -205,34 +199,21 @@ export function searchCorpus(corpus: SearchCorpus, rawQuery: string): SearchHit[
   };
 
   // A loaded sigil that is still concealed is concealed from the search too —
-  // in every entry type. The state lives in the cache stamp: the length of the
+  // in every entry. The state lives in the cache stamp: the length of the
   // visible content changes as soon as one of several chargings reaches its
   // target date — then it is re-read. Likewise when the content was only
   // loaded after startup (`pendingContent`): before that it is empty.
-  const today = todayIso();
+  const today = localIsoDay();
   const visibleText = (id: string, updatedAt: string, content: string) => {
     const visible = withoutConcealed(content, today);
     return plainTextFor(id, `${updatedAt}|${visible.length}`, visible);
   };
 
-  for (const entry of corpus.journal.filter(notDeleted)) {
-    push('journal', entry.id, displayTitle(i18n.t, 'journal', entry.title),
-      matchRecord(q, displayTitle(i18n.t, 'journal', entry.title), namesOf(entry.tags),
-        () => [visibleText(entry.id, entry.updated_at, entry.content)]),
-      { updatedAt: entry.updated_at, entryNumber: entry.entry_number });
-  }
-
-  for (const article of corpus.wiki.filter(notDeleted)) {
-    push('wiki', article.id, displayTitle(i18n.t, 'wiki', article.title),
-      matchRecord(q, displayTitle(i18n.t, 'wiki', article.title), namesOf(article.tags),
-        () => [visibleText(article.id, article.updated_at, article.content)]),
-      { updatedAt: article.updated_at, categoryId: article.category_id, entryNumber: article.entry_number });
-  }
-
-  for (const op of corpus.operations.filter(notDeleted)) {
-    push('operation', op.id, displayTitle(i18n.t, 'operation', op.title),
-      matchRecord(q, displayTitle(i18n.t, 'operation', op.title), namesOf(op.tags), () => [visibleText(op.id, op.updated_at, op.content)]),
-      { updatedAt: op.updated_at, categoryId: op.category_id, entryNumber: op.entry_number });
+  for (const entry of corpus.entries.filter(notDeleted)) {
+    const title = displayTitle(i18n.t, 'entry', entry.title);
+    push('entry', entry.id, title,
+      matchRecord(q, title, namesOf(entry.tags), () => [visibleText(entry.id, entry.updated_at, entry.content)]),
+      { updatedAt: entry.updated_at, categoryId: entry.category_id, entryNumber: entry.entry_number });
   }
 
   for (const task of corpus.tasks.filter(notDeleted)) {
@@ -273,8 +254,7 @@ export function searchCorpus(corpus: SearchCorpus, rawQuery: string): SearchHit[
 
   for (const category of corpus.categories) {
     push('category', category.id, category.name,
-      matchRecord(q, category.name, null, () => []),
-      { module: category.module });
+      matchRecord(q, category.name, null, () => []));
   }
 
   hits.sort((a, b) =>
@@ -293,12 +273,10 @@ export function searchCorpus(corpus: SearchCorpus, rawQuery: string): SearchHit[
  * since `CategoriesView` — which is also why an *unused* category is
  * addressable at all, where it used to resolve to nothing.
  */
-export function viewForSearchHit(hit: Pick<SearchHit, 'kind' | 'id' | 'module' | 'languageId'>): ActiveView | null {
+export function viewForSearchHit(hit: Pick<SearchHit, 'kind' | 'id' | 'languageId'>): ActiveView | null {
   switch (hit.kind) {
-    case 'journal':
-    case 'wiki':
-    case 'operation':
-      return { type: viewTypeForEntryType(hit.kind), id: hit.id, mode: 'view' };
+    case 'entry':
+      return entryView(hit.id);
     case 'task':
       return { type: 'tasks', id: hit.id };
     case 'image':

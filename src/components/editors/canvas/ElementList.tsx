@@ -55,7 +55,7 @@ function rowsOf(elements: readonly CanvasElement[]): Row[] {
   return rows;
 }
 
-export interface ElementListProps {
+interface ElementListProps {
   elements: CanvasElement[];
   selectedIds: string[];
   types: CanvasTypes;

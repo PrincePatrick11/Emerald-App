@@ -1,7 +1,7 @@
 import type { ReactNode, Ref } from 'react';
 
 /**
- * A section of the start page's sheet, headed as Home heads its sections: a
+ * A section of the start page's sheet, headed as a dashboard heads its groups: a
  * small uppercase label with its icon, what acts on the section to the right
  * (`aside`). The content sits on the sheet itself, not in a box of its own.
  */

@@ -5,13 +5,19 @@ export type BackupSecret = { password: string } | { recoveryKey: string };
 
 export const BACKUP_UNLOCK_CANCELLED = 'BACKUP_UNLOCK_CANCELLED';
 
+/**
+ * What is being opened: a backup (password or recovery key of its vault) or a
+ * `.emerald` file (only the password it was exported with).
+ */
+export type SecretFor = 'backup' | 'emerald';
+
 interface BackupSecretStore {
   /**
    * The open question. `error`: why it is being asked again. `busy`: the
    * answer is being checked right now — the dialog stays up until it is
    * clear whether it fit.
    */
-  request: { error: string | null; busy: boolean } | null;
+  request: { error: string | null; busy: boolean; for: SecretFor } | null;
   answer: (secret: BackupSecret) => void;
   cancel: () => void;
 }
@@ -36,20 +42,21 @@ export const useBackupSecretStore = create<BackupSecretStore>((set) => ({
 
 /**
  * Asks for the secret of an encrypted backup that none of the open vaults
- * can open — or, after a failed attempt, asks again.
+ * can open, or of an encrypted `.emerald` file (`secretFor`) — or, after a
+ * failed attempt, asks again.
  * `error`: the text saying why the last attempt failed. Ends with
  * {@link BACKUP_UNLOCK_CANCELLED} on cancel. Whoever asks closes the
  * question with {@link endBackupSecret} once the outcome is known.
  */
-export function askBackupSecret(error: string | null): Promise<BackupSecret> {
+export function askBackupSecret(error: string | null, secretFor: SecretFor = 'backup'): Promise<BackupSecret> {
   pending?.reject(new Error(BACKUP_UNLOCK_CANCELLED));
   return new Promise<BackupSecret>((resolve, reject) => {
     pending = { resolve, reject };
-    useBackupSecretStore.setState({ request: { error, busy: false } });
+    useBackupSecretStore.setState({ request: { error, busy: false, for: secretFor } });
   });
 }
 
-/** Closes the question — the backup is open, or the error is not one that warrants new input. */
+/** Closes the question — the backup or file is open, or the error is not one that warrants new input. */
 export function endBackupSecret(): void {
   pending = null;
   useBackupSecretStore.setState({ request: null });

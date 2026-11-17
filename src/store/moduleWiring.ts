@@ -10,57 +10,37 @@
  */
 import { useEntryStore } from './entryStore';
 import { useTaskStore } from './taskStore';
-import { useTagStore, type TaggedType } from './tagStore';
+import { useTagStore } from './tagStore';
 import { useCategoryStore } from './categoryStore';
+import { useDashboardStore } from './dashboardStore';
 import { useBlockDefinitionStore } from './blockDefinitionStore';
 import { useTemplateStore } from './templateStore';
 import { useLexiconStore } from './lexiconStore';
 import { useImageStore } from './imageStore';
 import { restorePicture } from './imageActions';
 import { useSymbolStore } from './symbolStore';
-import { ENTRY_MODULE_IDS, type EntryModuleId, type TrashKind } from '../lib/modules';
-
-/**
- * Reloads the content of a module from the active DB. Journal, wiki and
- * operations share one store and thus the same function — the
- * reload helpers below call it only once per invocation.
- */
-const reloadEntries = (options?: ReloadOptions) => useEntryStore.getState().fetchEntries(options);
+import { CONTENT_MODULE_IDS, type ContentModuleId, type TrashKind } from '../lib/modules';
 
 /** `keepLoaded`: already loaded contents stay (`fetchEntries`) — only after an import. */
 type ReloadOptions = { keepLoaded?: boolean };
 
-export const moduleWiring: Record<EntryModuleId, { reload: (options?: ReloadOptions) => Promise<void> }> = {
-  journal: { reload: reloadEntries },
+/** Reloads the content of a module from the active DB. */
+const moduleWiring: Record<ContentModuleId, { reload: (options?: ReloadOptions) => Promise<void> }> = {
+  entries: { reload: (options) => useEntryStore.getState().fetchEntries(options) },
   tasks: { reload: () => useTaskStore.getState().fetchAll() },
-  operations: { reload: reloadEntries },
-  wiki: { reload: reloadEntries },
 };
-
-/**
- * After restoring: IDs of tags that no longer exist are dropped
- * (`dropUnknownTagIds`) — for everything that carries tags.
- */
-async function withLiveTags(type: TaggedType, id: string, restored: Promise<void>): Promise<void> {
-  await restored;
-  await useTagStore.getState().dropUnknownTagIds(type, id);
-}
 
 export const trashWiring: Record<TrashKind, {
   restore: (id: string) => Promise<void>;
   permanentlyDelete: (id: string) => Promise<void>;
 }> = {
-  journal: {
-    restore: (id) => withLiveTags('journal', id, useEntryStore.getState().restoreEntry(id)),
+  entry: {
+    restore: (id) => useEntryStore.getState().restoreEntry(id),
     permanentlyDelete: (id) => useEntryStore.getState().permanentlyDeleteEntry(id),
   },
-  wiki: {
-    restore: (id) => withLiveTags('wiki', id, useEntryStore.getState().restoreEntry(id)),
-    permanentlyDelete: (id) => useEntryStore.getState().permanentlyDeleteEntry(id),
-  },
-  operation: {
-    restore: (id) => withLiveTags('operation', id, useEntryStore.getState().restoreEntry(id)),
-    permanentlyDelete: (id) => useEntryStore.getState().permanentlyDeleteEntry(id),
+  dashboard: {
+    restore: (id) => useDashboardStore.getState().restoreDashboard(id),
+    permanentlyDelete: (id) => useDashboardStore.getState().permanentlyDeleteDashboard(id),
   },
   category: {
     restore: async (id) => { await useCategoryStore.getState().restoreCategory(id); },
@@ -79,7 +59,7 @@ export const trashWiring: Record<TrashKind, {
     permanentlyDelete: (id) => useBlockDefinitionStore.getState().permanentlyDeleteDefinition(id),
   },
   template: {
-    restore: (id) => withLiveTags('template', id, useTemplateStore.getState().restoreTemplate(id)),
+    restore: (id) => useTemplateStore.getState().restoreTemplate(id),
     permanentlyDelete: (id) => useTemplateStore.getState().permanentlyDeleteTemplate(id),
   },
   language: {
@@ -107,13 +87,14 @@ export async function reloadAllStores(): Promise<void> {
   await Promise.all([
     useTagStore.getState().fetchTags(),
     useCategoryStore.getState().fetchCategories(),
+    useDashboardStore.getState().fetchDashboards(),
     useBlockDefinitionStore.getState().fetchDefinitions(),
     useTemplateStore.getState().fetchTemplates(),
     useLexiconStore.getState().fetchLexicon(),
     useImageStore.getState().fetchImages(),
     useSymbolStore.getState().fetchSymbols(),
   ]);
-  await reloadEach(ENTRY_MODULE_IDS);
+  await reloadEach(CONTENT_MODULE_IDS);
 }
 
 /**
@@ -121,10 +102,11 @@ export async function reloadAllStores(): Promise<void> {
  * custom blocks, templates, the lexicon and the named contents — the first
  * five always, because an import can create new ones.
  */
-export async function reloadModules(ids: readonly EntryModuleId[]): Promise<void> {
+export async function reloadModules(ids: readonly ContentModuleId[]): Promise<void> {
   await Promise.all([
     useTagStore.getState().fetchTags(),
     useCategoryStore.getState().fetchCategories(),
+    useDashboardStore.getState().fetchDashboards(),
     useBlockDefinitionStore.getState().fetchDefinitions(),
     useTemplateStore.getState().fetchTemplates(),
     useLexiconStore.getState().fetchLexicon(),
@@ -135,8 +117,6 @@ export async function reloadModules(ids: readonly EntryModuleId[]): Promise<void
   await reloadEach(ids, { keepLoaded: true });
 }
 
-/** Reloads the modules — journal, wiki and operations share one query. */
-function reloadEach(ids: readonly EntryModuleId[], options?: ReloadOptions): Promise<unknown> {
-  const reloads = new Set(ids.map((id) => moduleWiring[id].reload));
-  return Promise.all([...reloads].map((reload) => reload(options)));
+function reloadEach(ids: readonly ContentModuleId[], options?: ReloadOptions): Promise<unknown> {
+  return Promise.all(ids.map((id) => moduleWiring[id].reload(options)));
 }

@@ -2,8 +2,10 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Brush, HardDrive, Trash2 } from 'lucide-react';
 import Button from '../../ui/Button';
-import { deleteImageFiles, findUnusedImages, type UnusedImages } from '../../../lib/images';
+import { deleteImageFiles, findUnusedImages } from '../../../lib/images';
+import { deleteIconFiles, findUnusedIcons } from '../../../lib/icons';
 import { getDb } from '../../../lib/db';
+import { fileNamesHeldByDrafts } from '../../../store/draftStore';
 import { formatBytes } from '../../../lib/helpers';
 import { TRASH_RETENTION_OPTIONS } from '../../../lib/vaultSettings';
 import { useSettingsStore } from '../../../store/settingsStore';
@@ -16,8 +18,9 @@ export default function StoragePage() {
   const retentionDays = useSettingsStore((s) => s.settings.trash.retentionDays);
   const update = useSettingsStore((s) => s.update);
 
-  // Cleaning up the image store: count first, then delete on confirmation.
-  const [unused, setUnused] = useState<UnusedImages | null>(null);
+  // Cleaning up the image store and the icons beside it: count first, then
+  // delete on confirmation. One action for both — an icon is a picture too.
+  const [unused, setUnused] = useState<{ names: string[]; bytes: number; images: string[]; icons: string[] } | null>(null);
   const [scanning, setScanning] = useState(false);
   const [cleanupFreed, setCleanupFreed] = useState<number | null>(null);
   const byteUnits: [string, string, string] = [
@@ -28,10 +31,18 @@ export default function StoragePage() {
     setScanning(true);
     setCleanupFreed(null);
     try {
-      setUnused(await findUnusedImages(await getDb()));
+      const db = await getDb();
+      const [found, foundIcons] = await Promise.all([findUnusedImages(db), findUnusedIcons(db)]);
+      // A file an unsaved draft of a template or a block already names stays.
+      const held = fileNamesHeldByDrafts();
+      const images = found.names.filter((name) => !held.has(name));
+      const icons = foundIcons.names.filter((name) => !held.has(name));
+      const sizes = new Map([...found.sizes, ...foundIcons.sizes]);
+      const bytes = [...images, ...icons].reduce((total, name) => total + (sizes.get(name) ?? 0), 0);
+      setUnused({ names: [...images, ...icons], bytes, images, icons });
     } catch (e) {
       console.error('[images] scan failed', e);
-      setUnused({ names: [], bytes: 0 });
+      setUnused({ names: [], bytes: 0, images: [], icons: [] });
     } finally {
       setScanning(false);
     }
@@ -40,7 +51,11 @@ export default function StoragePage() {
   async function removeUnusedImages() {
     if (!unused?.names.length) return;
     try {
-      setCleanupFreed(await deleteImageFiles(unused.names));
+      const [images, iconBytes] = await Promise.all([
+        unused.images.length ? deleteImageFiles(unused.images) : Promise.resolve(0),
+        unused.icons.length ? deleteIconFiles(unused.icons) : Promise.resolve(0),
+      ]);
+      setCleanupFreed(images + iconBytes);
       setUnused(null);
     } catch (e) {
       console.error('[images] cleanup failed', e);

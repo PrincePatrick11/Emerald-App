@@ -68,7 +68,7 @@ export function polygonPoints(tool: 'polygon' | 'star', sides: number, cx: numbe
  * The shape between two corners (or the two ends of a line), a box shape
  * turned by `rotation` around its centre; a polygon or star has `sides`.
  */
-export function shapePath<T extends PathSink = Path2D>(
+function shapePath<T extends PathSink = Path2D>(
   tool: PaintStroke['tool'], points: readonly number[], rotation = 0, sides = 5, path: T = new Path2D() as unknown as T,
 ): T {
   const [x0, y0, , x1 = x0, y1 = y0] = points;

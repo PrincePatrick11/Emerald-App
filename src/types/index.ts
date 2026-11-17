@@ -1,44 +1,41 @@
-import type { CanvasBackground } from '../components/editors/canvas/background';
-import type { PaintDoc } from '../lib/paint/document';
 import type { TrashKind, ViewId } from '../lib/modules';
 
-export type ContentType = 'journal' | 'wiki' | 'operation' | 'task';
-
-/** The entry kinds of the `entries` table — the modules with a block stack. */
-export type EntryType = 'journal' | 'wiki' | 'operation';
+/**
+ * What a link points at (`task_links.target_type`, the chip's
+ * `data-target-kind`, drag payloads, link items, search hits): an entry or a task.
+ */
+export type LinkTargetKind = 'entry' | 'task';
 
 /**
- * An entry from `entries` — journal, wiki or operation. What sets the three
- * apart lives in the content (blocks); `type` only says which module it
- * belongs to, and a type change changes exactly that (`entryTypeChange`).
+ * An entry from `entries`. It has no type: what it is follows from its
+ * category, which dashboards show it and with which template it started.
  *
- * The moon phase of a journal entry follows from `created_at`
- * (`entryMoonPhase`); status, sigils, paradigm, banishing, meditation and the
- * linked entries have been blocks or link chips in the content since v36–v42.
+ * The moon phase of an entry of the category Journal follows from
+ * `created_at` (`entryMoonPhase`).
  */
 export interface Entry {
   id: string;
-  type: EntryType;
   title: string;
   content: string; // HTML, as TipTap's getHTML() returns it
-  /** `null` = no category, the normal case for a new entry since v39 — always in the journal. */
+  /** At most one category; `null` = none. */
   category_id: string | null;
   created_at: string;
   updated_at: string;
   /** Tag IDs (`lib/tagRefs.ts`) — those of tags in the trash stay in place, invisible. */
   tags: string[];
   deleted_at: string | null;
+  /** Running number over all entries, unique. */
   entry_number?: number;
-  /** Custom icon (emoji or image) — wiki and operations only. */
+  /** Custom icon (emoji or image). */
   icon?: string;
-  /** Cover image — wiki and operations only. */
+  /** Cover image. */
   cover_image?: string;
 }
 
 /**
- * A row of the global `categories` table — the same list for wiki,
- * operations and tasks. `is_builtin` applies only to `other`
- * and `sigils`; the display name goes through `lib/categories.categoryLabel`.
+ * A row of the global `categories` table — one list for entries and tasks.
+ * `is_builtin` holds for `journal`, `sigils` and `altars`; the display name
+ * goes through `lib/categories.categoryLabel`.
  */
 export interface Category {
   id: string;
@@ -46,6 +43,54 @@ export interface Category {
   emoji: string;
   sort_order: number;
   is_builtin: boolean;
+  /** The template a new entry of this category starts with — `null`: the vault's default. */
+  template_id: string | null;
+  deleted_at: string | null;
+}
+
+/** Which entries a dashboard shows. A missing key does not narrow. */
+export interface DashboardFilter {
+  /** The entry's category is one of these. */
+  categories?: string[];
+  /** The entry carries at least one of these tags. */
+  tags?: string[];
+}
+
+export interface DashboardSort {
+  by: 'created' | 'title' | 'updated';
+  dir: 'asc' | 'desc';
+}
+
+/**
+ * How a dashboard draws its entries: the layout (list, cards, wide cards,
+ * timeline) and whether they are grouped (by category; the journal groups by
+ * moon phase). A fresh vault writes the built-ins' start values into the row.
+ */
+export interface DashboardDisplay {
+  view: 'list' | 'cards' | 'cards_wide' | 'timeline';
+  grouping: 'grouped' | 'flat';
+}
+
+/** The key of a built-in dashboard — at the same time its fixed ID. */
+export type BuiltinDashboard = 'all' | 'journal' | 'practice' | 'knowledge';
+
+/**
+ * A row of `dashboards`: a view over entries by filter rules. The built-in
+ * ones carry their key in `builtin` and as ID; an empty `name` shows the
+ * translated name of the built-in.
+ */
+export interface Dashboard {
+  id: string;
+  builtin: BuiltinDashboard | null;
+  name: string;
+  icon: string;
+  position: number;
+  filter: DashboardFilter;
+  sort: DashboardSort;
+  /** How the dashboard draws its entries: layout and grouping. */
+  display: DashboardDisplay;
+  created_at: string;
+  updated_at: string;
   deleted_at: string | null;
 }
 
@@ -73,52 +118,6 @@ export type MoonPhase =
   | 'last_quarter'
   | 'waning_crescent';
 
-export interface AltarGuide {
-  id: string;
-  orientation: 'vertical' | 'horizontal';
-  at: number;
-}
-
-/**
- * A row of the old `altars` table, as the conversion of migration v62 and of
- * older backups reads it (`lib/altarConversion.ts`). Altars are operations of
- * the "Altars" category now, holding an Altar block.
- */
-export interface AltarRecord {
-  id: string;
-  title: string;
-  background_preset: string;
-  background_image_data: string | null;
-  background_overlay: number;
-  background_overlay_color: string;
-  created_at: string;
-  updated_at: string;
-  grid_enabled: boolean;
-  grid_size: number;
-  grid_opacity: number;
-  grid_color: string;
-  snap_to_grid: boolean;
-  rotation_snap_enabled: boolean;
-  rotation_snap_angle: number;
-  snap_scale_to_grid: boolean;
-  resolution: string;
-  /** Guide lines pulled out of the canvas editor's rulers; `at` in percent of the altar's width or height. */
-  guides: AltarGuide[];
-  /** The guides cannot be moved or removed. */
-  guides_locked: boolean;
-  /**
-   * The background as the canvas editor sets it; `null` until it is first
-   * changed there, and then the older `background_preset` and overlay are
-   * shown. Its picture is the `background_image_data` column's image or one
-   * of the app's own (`/backgrounds/…`).
-   */
-  canvas_background: CanvasBackground | null;
-  thumbnail_data?: string | null;
-  icon_data?: string | null;
-  /** In the trash since. */
-  deleted_at?: string | null;
-}
-
 /**
  * A picture of "Images" with details (`images`, since v56): a stored file of
  * the vault with a name, tags and a note. Every other file of the vault is
@@ -136,108 +135,13 @@ export interface VaultImage {
   updated_at: string;
 }
 
-/** A row of the old `altar_items` table — its pictures went to "Images" with v62. */
-export interface AltarItem {
-  id: string;
-  name: string;
-  emoji: string;
-  /** `null` = no category, the normal case for a new entry since v39. */
-  category_id: string | null;
-  note: string;
-  image_data?: string;
-  /** Only for sorting the library — the column already existed in
-   *  `altar_items`, it just never made it into the type. */
-  created_at: string;
-  updated_at: string;
-}
-
-/**
- * What sits on an altar: an item from the library (a row of
- * `altar_placements`), or a shape or text drawn on the altar itself (kept in
- * `altars.elements`, see `lib/altarElements.ts`). Both in one list, as the
- * conversion into an Altar block reads them (`lib/altarScene.ts`).
- */
-export type AltarPlacementKind = 'item' | 'shape' | 'text' | 'drawing' | 'symbol';
-
-/** `triangle` and `hexagon` come from older altars; new shapes with corners are polygons. */
-export type AltarShapeType = 'rect' | 'ellipse' | 'polygon' | 'triangle' | 'star' | 'hexagon';
-
-/** A drawn shape. Sizes in pixels at the reference width of 1920. */
-export interface AltarShapeStyle {
-  type: AltarShapeType;
-  fill: string | null;
-  stroke: string | null;
-  stroke_width: number;
-  corner_radius: number;
-  /** A polygon's corners or a star's points; missing: six and five. */
-  sides?: number;
-}
-
-/** A drawn text. The size in pixels at the reference width of 1920. */
-export interface AltarTextStyle {
-  content: string;
-  font: 'serif' | 'book' | 'sans';
-  size: number;
-  color: string;
-  align: 'left' | 'center' | 'right';
-  bold: boolean;
-  italic: boolean;
-}
-
-/** A symbol of the canvas editor's library: its path in a box of 100 × 100, the line weight in those units. */
-export interface AltarSymbolStyle {
-  symbol: string;
-  d: string;
-  /** Parts filled in `color`. */
-  solid?: string;
-  /** The name of one of the vault's own symbols. */
-  name?: string;
-  color: string;
-  weight: number;
-  fill: string | null;
-}
-
-export interface AltarPlacement {
-  id: string;
-  altar_id?: string;
-  kind: AltarPlacementKind;
-  /** The library item; empty for a shape or text. */
-  item_id: string;
-  // name, emoji, category_id and image_data come from altar_items and are
-  // joined in on load — they are not columns of altar_placements.
-  name: string;
-  emoji: string;
-  /** `null` = no category, the normal case for a new entry since v39. */
-  category_id: string | null;
-  x: number;
-  y: number;
-  z_index: number;
-  width: number;
-  height: number;
-  rotation: number;
-  opacity: number;
-  locked: boolean;
-  hidden: boolean;
-  /** The group it is selected and moved with on the canvas; elements of one group share it. */
-  group?: string;
-  image_data?: string;
-  /** Only for `kind: 'drawing'`: the painted document (`lib/paint/document.ts`). */
-  drawing?: PaintDoc;
-  /** Only for `kind: 'shape'`. */
-  shape?: AltarShapeStyle;
-  /** Only for `kind: 'text'`. */
-  text?: AltarTextStyle;
-  /** Only for `kind: 'symbol'`. */
-  symbol?: AltarSymbolStyle;
-}
-
 export type TaskPriority = 'low' | 'medium' | 'high';
 
 export interface TaskLink {
   id: string;
   task_id: string;
   target_id: string;
-  target_type: ContentType;
+  target_type: LinkTargetKind;
 }
 
 export interface Task {
@@ -268,7 +172,7 @@ export interface AlphabetPair {
 export interface Language {
   id: string;
   name: string;
-  /** Emoji or image data URL, as with custom blocks and templates. */
+  /** Emoji or an icon file in `icons/` (`lib/icons.ts`), as with custom blocks and templates. */
   icon: string;
   alphabet: AlphabetPair[];
   sort_order: number;
@@ -294,10 +198,15 @@ export interface LexiconEntry {
 }
 
 export interface ActiveView {
-  // ViewId instead of the old ad-hoc union: via ContentType it also contained
-  // 'operation' (singular), which was never a valid view type.
   type: ViewId;
+  /** The entry, dashboard, task, library item … the view shows. */
   id?: string;
+  /**
+   * Only for `type: 'entry'`: the dashboard the entry was opened from — it
+   * stays highlighted in the rail and is where "back" leads. Unset, or a
+   * dashboard that is gone, means "All entries".
+   */
+  dashboard?: string;
   mode?: 'view' | 'edit';
   /** Freshly created and never confirmed with "Done" — Cancel discards
    *  the entry again instead of just returning to the last saved state.

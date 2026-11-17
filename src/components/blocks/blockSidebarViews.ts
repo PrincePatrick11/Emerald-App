@@ -21,7 +21,7 @@ import CanvasSidebarEdit from './CanvasSidebarEdit';
  * Import rule: only `BlockSidebarArea` imports this file, and it must not
  * pull in anything that loads TipTap, since the sidebar is loaded eagerly.
  */
-export interface BlockSidebarReadProps {
+interface BlockSidebarReadProps {
   block: BlockInstance;
 }
 
@@ -37,7 +37,7 @@ export interface BlockSidebarEditProps extends BlockSidebarReadProps {
   update: (next: BlockInstance) => void;
 }
 
-export interface BlockSidebarViews {
+interface BlockSidebarViews {
   Read?: ComponentType<BlockSidebarReadProps>;
   Edit?: ComponentType<BlockSidebarEditProps>;
 }

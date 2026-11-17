@@ -8,7 +8,9 @@ import { useUndoStore } from '../../store/undoStore';
 import { takeTaskToName } from '../../lib/createItem';
 import { generateId } from '../../lib/helpers';
 import { displayTitle, hasOwnTitle } from '../../lib/entryTitle';
-import { MODULES, viewTypeForEntryType } from '../../lib/modules';
+import { TASKS_VIEW } from '../../lib/modules';
+import { linkTargetKindOf } from '../../lib/internalLinkHtml';
+import { viewOfLinkTarget } from '../../store/entryViews';
 import EmptyState, { NoResults } from '../ui/EmptyState';
 import { useCollapsedSet } from '../../hooks/useCollapsedSet';
 import { usePersistedFlag } from '../../hooks/usePersistedFlag';
@@ -81,9 +83,10 @@ export default function TasksView() {
   const rootTasks = tasks.filter((task) => task.parent_task_id === null);
 
   // Completed and search apply to everything, including the filter counts.
+  const query = searchQuery.trim().toLowerCase();
   const visibleRootTasks = rootTasks.filter((task) =>
     (showCompleted || !task.completed)
-    && (!searchQuery || task.title.toLowerCase().includes(searchQuery.toLowerCase())));
+    && (!query || task.title.toLowerCase().includes(query)));
   // The "No category" filter selects the orphans — their category_id
   // (deleted category) is never itself in the selection.
   const matchesCategory = (task: Task) => filterCategory.size === 0
@@ -200,7 +203,7 @@ export default function TasksView() {
   });
 
   const activeFilterCount = filterCategory.size + filterPriority.size;
-  const isFiltering = !!searchQuery.trim() || activeFilterCount > 0;
+  const isFiltering = !!query || activeFilterCount > 0;
   // When grouped, what counts is whether a group is left (a category chip can
   // hide all of them although tasks match), when ungrouped the list itself.
   const nothingVisible = groupedTasks
@@ -225,8 +228,8 @@ export default function TasksView() {
    */
   const linkItems = useLinkItems();
   const linkItemByKey = useMemo(() => linkItemsByKey(linkItems), [linkItems]);
-  const resolveTaskLinkTitle = useCallback((targetType: string, targetId: string) =>
-    linkItemByKey.get(linkItemKey({ id: targetId, entryType: targetType }))?.label ?? t('tasks.linkTargetGone'),
+  const resolveTaskLinkTitle = useCallback((targetKind: string, targetId: string) =>
+    linkItemByKey.get(linkItemKey({ id: targetId, targetKind }))?.label ?? t('tasks.linkTargetGone'),
   [linkItemByKey, t]);
 
   const renderTasksContent = () => (
@@ -284,7 +287,7 @@ export default function TasksView() {
               />
             ))}</div>}
 
-        {/* At the very bottom, like the orphan bucket in Wiki/Operations — and
+        {/* At the very bottom, like the orphan bucket of the grouped dashboards — and
             as there, only if it contains something. */}
         {showUncatBlock && (
           <div className="mb-6 space-y-1.5">
@@ -322,7 +325,7 @@ export default function TasksView() {
             matter, the global ones always do. */}
         {nothingVisible && (isFiltering ? noResults : (
           <EmptyState
-            icon={MODULES.tasks.icon}
+            icon={TASKS_VIEW.icon}
             title={t('emptyState.tasks.title')}
             description={t('emptyState.tasks.description')}
             actionLabel={t('tasks.newTask')}
@@ -408,7 +411,7 @@ export default function TasksView() {
 
       {linkModal && (
         <LinkPickerModal
-          onSelect={(item) => { addLink(linkModal.taskId, item.id, item.entryType); }}
+          onSelect={(item) => { addLink(linkModal.taskId, item.id, linkTargetKindOf(item.targetKind)); }}
           onClose={() => setLinkModal(null)}
         />
       )}
@@ -591,9 +594,9 @@ const TaskRow = memo(function TaskRow({
               <span
                 key={link.id}
                 className="tasks-linked-entry text-xs cursor-pointer px-1.5 py-0.5 rounded-md transition-colors"
-                title={`${link.target_type}: ${link.title}`}
+                title={link.title}
                 onClick={() => {
-                  useUIStore.getState().setActiveView({ type: viewTypeForEntryType(link.target_type), id: link.target_id, mode: 'view' });
+                  useUIStore.getState().setActiveView(viewOfLinkTarget(link.target_type, link.target_id));
                 }}
               >
                 {link.title}

@@ -7,14 +7,13 @@ This file is the overview: tech stack, module map, data flow and the IPC surface
 | File | Covers |
 |---|---|
 | [`architecture/modules.md`](architecture/modules.md) | Module registry, entry store, store selectors, categories, tags, moon phase, lexicon |
-| [`architecture/editing.md`](architecture/editing.md) | Edit mode, Cancel, leaving an edit, type change, auto-save, sidebar action bar, internal links |
+| [`architecture/editing.md`](architecture/editing.md) | Edit mode, Cancel, leaving an edit, moving to another module, auto-save, sidebar action bar, internal links |
 | [`architecture/blocks.md`](architecture/blocks.md) | Content blocks: stored format, fields, sigils, user-built blocks |
 | [`architecture/editors.md`](architecture/editors.md) | Editors shared across modules: the text editor, its host and features; the canvas editor, the Canvas and Altar blocks |
-| [`architecture/templates.md`](architecture/templates.md) | Templates: assignments, defaults, insertion |
+| [`architecture/templates.md`](architecture/templates.md) | Templates: start and default templates, insertion |
 | [`architecture/navigation.md`](architecture/navigation.md) | Global search, drag and drop, tabs, navigation history, left sidebar |
 | [`architecture/storage.md`](architecture/storage.md) | Image storage, vault layout, vault settings |
 | [`architecture/encryption.md`](architecture/encryption.md) | Vault keys, sealed files, the SQL layer, the unlock gate, re-encryption, encrypted backups |
-| [`architecture/sync.md`](architecture/sync.md) | Sync with a server: change capture, merge rules |
 | [`architecture/appearance.md`](architecture/appearance.md) | Theming and fonts |
 | [`architecture/shell.md`](architecture/shell.md) | Window chrome, boot order, PDF export |
 
@@ -53,7 +52,7 @@ src/
 │   │   ├── LeaveGuardModal, VaultPicker        leave-an-edit question, vault picker (start view)
 │   │   ├── VaultKeyDialog, BackupUnlockDialog, RecoveryKeyBox, vaultKeyParts   password, unlock, recovery key
 │   │   ├── moduleViews.ts                      ViewId → lazy view (MainArea only)
-│   │   ├── PickerRows, PickerServerPanel       the start page's vault rows and server section
+│   │   ├── PickerRows, PickerServerPanel       the start page's vault rows and the server placeholder
 │   │   ├── start/                              the start page's brand, language, sections, Appearance, version and updates
 │   │   ├── settings/                           SettingsModal, one *Page per tab, sections
 │   │   └── titlebar/                           custom title bar, menus, SearchModal
@@ -61,23 +60,24 @@ src/
 │   │   └── text/     TextEditor, its host (toolbar, link picker, drops), TipTap extensions
 │   ├── blocks/       BlockStack, block views, fields/sigil/canvas/painting blocks, block editor
 │   ├── images/       picture tile, picker, add and edit dialogs, the strip below a canvas
-│   ├── views/        one view per module and aux view (Home … Trash)
+│   ├── views/        one view per module and aux view (Dashboard … Trash)
 │   ├── sidebar/
-│   │   ├── panels/   Journal/Wiki/Operation properties panels
-│   │   └── fields/   sidebar sections, property rows, tags, links, type toggle
-│   ├── templates/    template page, assignments modal, insertion, pickers
+│   │   ├── panels/   the entry properties panel
+│   │   └── fields/   sidebar sections, property rows, tags, links
+│   ├── templates/    template page, default template, insertion, pickers
 │   ├── lexicon/      LanguagePage, vocabulary/alphabet tables, TranslatePanel
 │   └── ui/           shared component layer (see components.md)
 ├── store/
-│   ├── entryStore.ts            Journal, Wiki and Operations entries
+│   ├── entryStore.ts            all entries, one list
 │   ├── taskStore.ts, tagStore.ts, categoryStore.ts
+│   ├── dashboardStore.ts, dashboardActions.ts, dashboardSettingsStore.ts, entryViews.ts   dashboards; where an entry opens
 │   ├── blockDefinitionStore.ts  user-built blocks
 │   ├── blockSessionStore.ts     BlockStack ↔ sidebar block manager bridge
 │   ├── templateStore.ts, templateApply.ts   templates; applying one
 │   ├── lexiconStore.ts          languages and their words
 │   ├── draftStore.ts            unsaved block/template page drafts
 │   ├── autoBackupStore.ts       what the automatic backup did last
-│   ├── entryEdit.ts             entry baselines for Cancel, carried across a type change
+│   ├── entryEdit.ts             entry baselines for Cancel
 │   ├── leaveGuardStore.ts       edit guards, "save / discard / keep editing"
 │   ├── uiStore.ts               tabs, active view, panels
 │   ├── sessionStore.ts          per-view search/filter state (session only)
@@ -103,22 +103,18 @@ src/
 │   └── useShrunkIcon.ts, useEmojiSearchData.ts
 ├── lib/
 │   ├── sqlite.ts                the SQL interface over the `db_*` commands
-│   ├── db.ts                    connection and migration chain
+│   ├── db.ts                    connection, schema check on open (`openVaultDb`), migration steps above the fresh start
 │   ├── vaultKeys.ts             wrappers for the key commands in `keys.rs`
 │   ├── schema.ts                live DDL, builtin/starter seed
 │   ├── row.ts                   SQLite row ↔ TypeScript type conversion
 │   ├── serialize.ts             per-entity write serialization
-│   ├── normalizeSchema.ts, dbRebuild.ts, schemaV37.ts, schemaV48.ts, schemaV65.ts   table rebuilds, frozen shapes
-│   ├── unifyEntries.ts, tagsById.ts, nullableCategory.ts, mergeCategoryTables.ts,
-│   │   migrate*.ts               individual migrations, shared with importers
 │   ├── modules.ts               module registry
 │   ├── blocks/                  block format, types, fields, sigils, canvas, painting, definitions, templates;
 │   │                            a block as a row (`blockRows.ts`), its references (`blockRefs.ts`), positions (`position.ts`), field values by SQL (`blockQuery.ts`), an imported block pointed at this vault (`blockRemap.ts`)
 │   ├── blockStore.ts            blocks as rows: loading, writing only what changed, replacing a whole stack
-│   ├── contentColumn.ts         the old `content` column: migrations v65/v66, the working copy of an import of an older backup
-│   ├── entryTitle.ts, entryTypeChange.ts, moonPhase.ts
-│   ├── categories.ts, categoryMerge.ts
-│   ├── tagRefs.ts, templateTags.ts, templateRows.ts, blockDefinitionRows.ts
+│   ├── entryTitle.ts, dashboards.ts, moonPhase.ts
+│   ├── categories.ts
+│   ├── tagRefs.ts, templateTags.ts, templateRows.ts, blockDefinitionRows.ts, icons.ts
 │   ├── lexicon.ts, lexiconRows.ts
 │   ├── links.ts, linkItems.ts, internalLinkHtml.ts
 │   ├── tabs.ts                  tab ids, navigation history helpers
@@ -132,13 +128,9 @@ src/
 │   ├── pictureExport.ts         a rendered picture saved where the user chooses
 │   ├── export.ts, exportData.ts, emeraldFormat.ts
 │   ├── dbBackup.ts, importStaging.ts   .emeralddb backup and restore
-│   ├── sync/                    sync with a server: `tracking.ts` (capture), `apply.ts` (merge), `blockStack.ts` (blocks on the wire), `engine.ts` (when)
 │   ├── autoBackup.ts            automatic backup: when one is due, the run
 │   ├── vaultManager.ts, vaultSettings.ts
-│   ├── altarConversion.ts       older altars → operations (v62, v63, imports; `migrateAltars.ts` runs it)
-│   ├── migrateLegacySigils.ts   sigil columns and v42–v63 sigil blocks → current form (v42, v64, imports; converter in `blocks/legacySigilBlocks.ts`)
-│   ├── altarScene.ts, altarElements.ts, altarSettings.ts, altarBackground.ts, altarConstants.ts
-│   │                            reading those altars; `altarIcon.ts` the Altar block's icon
+│   ├── altarBackground.ts, altarIcon.ts   the app's own altar backgrounds; the Altar block's icon
 │   ├── menuActions.ts, platform.ts, updates.ts, splash.ts
 │   ├── formatDate.ts, sortItems.ts, groupBy.ts, viewMode.ts
 │   ├── helpers.ts, stamp.ts, reveal.ts, motion.ts, styleClasses.ts
@@ -155,13 +147,12 @@ src-tauri/src/
 ├── db.rs               SQLCipher pools, `db_*` commands, SQL authorizer
 ├── crypto.rs           sealed-file format, subkeys, keyed hash
 ├── keys.rs             vault.key, unlocking, OS keychain, `VaultKeys`
-├── reencrypt.rs        encrypting a vault, changing the password, crash recovery
+├── reencrypt.rs        changing the password, recovery, crash recovery
 ├── backup.rs           encrypted .emeralddb files
 ├── auto_backup.rs      automatic backups: target folder, file name, pruning
 ├── images.rs           image commands + emerald-img scheme
 ├── vault.rs            vault registry and vault directory commands
 ├── updates.rs          in-app updater
-├── sync.rs             the way to a sync server: connection, sealing, images
 ├── devbridge.rs, devbridge.js   dev only (cargo feature `devbridge`): lets the MCP server drive the app on macOS and Linux
 └── pdf_export/         native-webview PDF export
     ├── mod.rs          per-platform re-export
@@ -177,14 +168,14 @@ Only `en` ships in the start bundle; de/es/fr load on demand through `changeAppL
 
 ```
 SQLite (emerald.db)
-    ↓  read on startup (getDb + runMigrations)
+    ↓  opened after unlocking (openVaultDb → runMigrations), read on startup (getDb)
     ↓  fromRow.* (row.ts)
 Zustand stores (in-memory)
     ↓  React subscriptions
 Components (render)
     ↓  user edits
 Store actions (updateEntry, updateTask, …)
-    ↓  toInt / toJson (row.ts)
+    ↓  toInt (row.ts)
     ↓  db.execute / db.select / db.batch  (src/lib/sqlite.ts → db_* commands in db.rs)
 SQLite (persisted)
 ```
@@ -193,19 +184,19 @@ Stores are the single source of truth for in-memory state. Components never quer
 
 `src/lib/row.ts` sits on both edges of that flow and is the only place that translates between SQLite rows and the types in `src/types`. SQLite has neither booleans nor arrays — booleans arrive as `0`/`1`, arrays as JSON text — and converting per store lets the same field hold a number in one code path and a boolean in another.
 
-The schema itself lives in `src/lib/schema.ts`, not in `db.ts`: fresh vaults execute that DDL directly, existing ones reach the same shape through the migration chain and the rebuild in `normalizeSchema.ts`. `npm run check:schema` builds a vault each way and compares them. See [`database.md`](database.md) for the details.
+The schema itself lives in `src/lib/schema.ts`, not in `db.ts`: fresh vaults execute that DDL directly; a vault from before the fresh start of the schema (or from a newer app) is refused unchanged, and later schema changes reach existing vaults through the steps of `MIGRATIONS`. `npm run check:schema` checks the fresh vault and the refusals. See [`database.md`](database.md) for the details.
 
 ### Startup loading and lazy data
 
 `AppShell` calls `reloadAllStores()` (`src/store/moduleWiring.ts`) on mount and again on every vault switch — see [Module Registry](architecture/modules.md#module-registry) for the sequence. Views do **not** refetch on mount; a view that mounts before the startup fetch resolves renders its empty state until the store fills.
 
-One detail of what the stores load: **sigil drawings are files, not columns.** A drawing's rendered image is a file referenced from the sigil drawing's (a paint block's) or drawing part's `<img src>`, next to its vector strokes as block data (see [Editors](architecture/editors.md#canvas-editor)), so the entry rows stay small. `entryBlockSummary(...).sigil` resolves the first visible, unconcealed drawing (`image`) and the target date; the Operations dashboard shows only the target date, in row and card alike.
+One detail of what the stores load: **sigil drawings are files, not columns.** A drawing's rendered image is a file referenced from the sigil drawing's (a paint block's) or drawing part's `<img src>`, next to its vector strokes as block data (see [Editors](architecture/editors.md#canvas-editor)), so the entry rows stay small. `entryBlockSummary(...).sigil` resolves the first visible, unconcealed drawing (`image`) and the target date; the Practice dashboard shows only the target date, in row and card alike.
 
 ### Store write serialization
 
 Every content-store update method (`updateEntry`, `updateTask`/`toggleComplete`, `updateTag`, `updateTemplate`, `updateDefinition`, the lexicon's updates) reads a snapshot from the store, merges the patch into it, and writes the row back — the whole row, except that `updateEntry` writes `content` only when the patch carries it (it is by far the largest column). Two overlapping updates to the same entity — an autosave while the sidebar changes a property — would race, and the later one would overwrite the other's fields with a stale snapshot.
 
-`src/lib/serialize.ts` closes that race. `serialized(serialKey(domain, id), task)` chains same-key tasks strictly one after another, so a merge-and-write always runs against the previous one's result. The invariant: **any store method that writes back a whole row from a snapshot must run its write through `serialized()`, keyed per entity id.** `serialKey` types the domains (`entry`/`task`/`tag`/`blockDefinition`/`template`/`language`/`image`); `templateStore` and `lexiconStore` use one store-wide key (`'*'`). `taskStore.toggleComplete` queues each affected descendant under its own `task:<id>` key, so a concurrent `updateTask` on a child can't have its `completed` columns rewound by the parent's cascade (or vice versa).
+`src/lib/serialize.ts` closes that race. `serialized(serialKey(domain, id), task)` chains same-key tasks strictly one after another, so a merge-and-write always runs against the previous one's result. The invariant: **any store method that writes back a whole row from a snapshot must run its write through `serialized()`, keyed per entity id.** `serialKey` types the domains (`entry`/`task`/`tag`/`blockDefinition`/`template`/`language`/`image`); `templateStore` and `lexiconStore` use one store-wide key (`'*'`); creating an entry runs under `ENTRY_NUMBER_KEY` as well, since it hands out a number. `taskStore.toggleComplete` queues each affected descendant under its own `task:<id>` key, so a concurrent `updateTask` on a child can't have its `completed` columns rewound by the parent's cascade (or vice versa).
 
 Deliberately not serialized, with a comment at its definition: `updateCategory` (writes only the columns passed in, no snapshot merge).
 
@@ -219,7 +210,7 @@ A serialized task must never await another task under its own key — it would w
 
 All Rust commands are *registered* in `src-tauri/src/lib.rs` and invoked from TypeScript with `invoke()`; most are *defined* in `db.rs`, `keys.rs`, `reencrypt.rs`, `backup.rs`, `auto_backup.rs`, `images.rs`, `vault.rs` and `updates.rs`.
 
-**File commands run off the main thread.** `write_file`, `read_file`, `export_image`, `ensure_app_storage_dirs` and all seven commands in `images.rs` are `async` and wrap their `std::fs` work in `tauri::async_runtime::spawn_blocking`, so a multi-megabyte `.emeralddb` doesn't block the window. `async fn` alone would not do: the blocking call would still run on a runtime worker and could starve the SQL pools, PDF export and IPC replies on a machine with few cores. The `emerald-img` scheme handler uses `spawn_blocking` as well. The four native-menu commands stay synchronous on purpose — they mutate `NSMenu`, which is main-thread-only on macOS.
+**File commands run off the main thread.** `write_file`, `read_file`, `export_image`, `ensure_app_storage_dirs` and all six commands in `images.rs` are `async` and wrap their `std::fs` work in `tauri::async_runtime::spawn_blocking`, so a multi-megabyte `.emeralddb` doesn't block the window. `async fn` alone would not do: the blocking call would still run on a runtime worker and could starve the SQL pools, PDF export and IPC replies on a machine with few cores. The `emerald-img` scheme handler uses `spawn_blocking` as well. The four native-menu commands stay synchronous on purpose — they mutate `NSMenu`, which is main-thread-only on macOS.
 
 - A static `IMAGE_WRITE_LOCK` in `images.rs` serializes the image folder's writes and deletes; without it, a storage cleanup could delete a file whose hash a concurrent `save_image` had just judged "already exists".
 - `resolve_allowed_roots()` caches its result in a `OnceLock` once every root canonicalizes, and re-resolves on every call while any root fails (a not-yet-existing directory, an unmounted drive), so a transient failure heals on the next call.
@@ -231,7 +222,7 @@ All Rust commands are *registered* in `src-tauri/src/lib.rs` and invoked from Ty
 | `db_batch(db, statements)` | Run several `(query, values)` statements as one transaction on one connection — all or none — and return the rows affected in all. `Database.batch` in `sqlite.ts`. |
 | `vault_key_status(vault_id)` | `{hasDatabase, encrypted, unlocked}`; first finishes an interrupted re-encryption. The unlock gate's first question. |
 | `vault_create_key` / `vault_unlock` / `vault_unlock_remembered` / `vault_lock` | Create a new vault's key, unlock with the password, unlock from the OS keychain, forget the key held in memory. |
-| `vault_encrypt_existing` / `vault_change_password` / `vault_recover` | Re-encrypt a plain vault, change the password, or set a new one from the recovery key; all three build a copy under a new key and return the new recovery key. See [Re-encrypting a vault](architecture/encryption.md#re-encrypting-a-vault). |
+| `vault_change_password` / `vault_recover` | Change the password, or set a new one from the recovery key; both build a copy under a new key and return the new recovery key. See [Re-encrypting a vault](architecture/encryption.md#re-encrypting-a-vault). |
 | `vault_set_remembered` / `vault_is_remembered` / `keychain_available` | The "remember on this device" switch, its state, and whether the system has a keychain. |
 | `write_backup_file(vault_id, path, content)` / `read_backup_file(path, password?, recovery_key?)` | Write a `.emeralddb` sealed under the vault key / open one with an unlocked vault's key, a password or a recovery key (`BACKUP_LOCKED` when none fits). |
 | `auto_backup_status(vault_id)` / `pick_auto_backup_dir(vault_id)` / `reset_auto_backup_dir(vault_id)` / `write_auto_backup(vault_id, content, keep?)` | The automatic backup: target folder and newest backup / native folder dialog, opened in Rust / back to the vault's `backup/` / write today's sealed backup and prune beyond `keep`. No path crosses IPC — see [`security.md`](security.md#automatic-backups). |
@@ -241,20 +232,18 @@ All Rust commands are *registered* in `src-tauri/src/lib.rs` and invoked from Ty
 | `read_image_file(source)` | An *external* image file as a data-URL, without storing it, so the frontend can scale it to the vault's image limits before `save_image`. Same checks as `copy_image_file` (`checked_image_source`), plus a 64 MB source cap. |
 | `read_vault_drafts(vault_id)` / `write_vault_drafts(vault_id, contents)` | The vault's `drafts.json` — unsaved drafts of block and template pages (`store/draftStore.ts`), sealed in an encrypted vault. An empty object removes the file. `async`, since it is written after every pause in typing; a rename or remove that fails is retried briefly, since on Windows a scanner or sync client may hold the file. |
 | `read_vault_settings(vault_id)` / `write_vault_settings(vault_id, contents)` | The vault's `settings.json` — see [Vault Settings](architecture/storage.md#vault-settings) and [`security.md`](security.md#vault-json-files) for atomicity and symlink handling. |
-| `adopt_legacy_images(vault_id, filenames)` | Copy images from the pre-per-vault shared pool into a vault's own folder. Migration v35 only. |
 | `list_image_files(vault_id)` / `delete_image_files(vault_id, filenames)` | Back the *Unused images* cleanup. Confined to the vault's folder; reject any name that is not 64 hex digits plus a known extension. |
+| `save_icon(data_url, vault_id)` / `read_icon_as_base64(filename, vault_id)` / `list_icon_files(vault_id)` / `delete_icon_files(vault_id, filenames)` | The same four for the vault's `icons/` (uploaded icons, already 128px; `save_icon` refuses a data URL above 2 MB). Sealed under the icons' own context; shown through `emerald-img` under `/{vaultId}/icons/{name}`. See [Icons](database.md#icons). |
 | `register_vaults(vaults)` | Mirror `vaults.json` into the `id → path` registry every storage command resolves against. |
 | `create_vault_dirs(vault_id)` / `ensure_vault_dirs(vault_id)` | Build a new vault's tree / verify an existing one before its database opens. `ensure_vault_dirs` does not create the vault directory — see [Vault Layout](architecture/storage.md#vault-layout). |
 | `default_vault_dir(vault_id)` / `probe_vault_dir(path)` | The location a vault gets when the user picks none / what a chosen folder already contains. |
 | `new_vault_base_dir()` | Where new vaults are offered: `{documentDir}/Emerald Vaults`, else `{appDataDir}/vaults`. |
-| `legacy_default_db_exists()` | Whether an `emerald.db` from before `vaults.json` sits in `app_config_dir`, `app_data_dir` or the migration target — a genuine first start vs. an installation with data on disk. |
-| `migrate_vault_layout(vault_id, legacy_db_name)` | Move a pre-per-vault flat database into its own directory. Returns that directory. |
 | `delete_vault_files(vault_id)` | Removes only the vault's own artefacts by name, never `remove_dir_all`; returns whether the vault folder is gone, so the UI can say "the folder stayed". What it deletes: [`security.md`](security.md#vault-directories-as-a-trust-boundary). |
 | `discard_import_staging(vault_id)` | Removes a backup import's staging copy (`emerald.db.import` plus `-journal`/`-wal`/`-shm`). Run before and after every import; a missing file is not an error. See [DB Backup / Restore](database.md#db-backup--restore-emeralddb). |
-| `prune_migration_backups(vault_id)` | Deletes every migration backup but the newest (written by `backupDatabaseFile` in `dbRebuild.ts`; name rule in [`security.md`](security.md#vault-directories-as-a-trust-boundary)). Returns the count. Called by `getDb()` after `runMigrations`; failure is only logged. |
 | `ensure_backup_dir(vault_id)` | The vault's `backup/` folder, the database export's default destination; recreated on demand, refused outside the allowed storage roots and, inside the app data directory, outside `vaults/` — wherever the write command would refuse the export afterwards. |
 | `export_image(path, data_url)` | Write a data-URL's image bytes to a user-chosen `.png`/`.jpg`/`.jpeg`/`.webp`/`.svg` path. Same path checks as `write_file`. |
-| `write_file(path, content)` | Write UTF-8 text to a user-selected `.md`/`.emerald`/`.json`/`.txt` path. Rejects symlinks; the path must resolve within the allowed storage roots, and inside the app data directory only `vaults.json` and `vaults/` are writable (see [Path Confinement](security.md#path-confinement)). |
+| `write_emerald_file(vault_id, path, manifest, images, icons, password?)` / `read_emerald_file(vault_id, path, password?)` | Write a `.emerald` archive from a manifest and the vault's pictures, sealed if a password is given / read one within fixed limits and store its pictures and icons in the vault. Same path checks as `write_file`. See [The `.emerald` file](architecture/editing.md#the-emerald-file). |
+| `write_file(path, content)` | Write UTF-8 text to a user-selected `.md`/`.json`/`.txt` path. Rejects symlinks; the path must resolve within the allowed storage roots, and inside the app data directory only `vaults.json` and `vaults/` are writable (see [Path Confinement](security.md#path-confinement)). |
 | `read_file(path)` | Read a file as UTF-8. Same allowlist and confinement as `write_file`. |
 | `ensure_app_storage_dirs()` | Create the app data and config directories before vault metadata is written or SQLite opens. |
 | `export_pdf(html, path, page_size?)` | Render HTML to a PDF at a path the frontend obtained from the `dialog` plugin, by driving the app's own webview. `page_size` (inches) overrides the default Letter page; the frontend passes none at present. See [PDF Export](architecture/shell.md#pdf-export). |
@@ -262,7 +251,6 @@ All Rust commands are *registered* in `src-tauri/src/lib.rs` and invoked from Ty
 | `update_menu_labels(...)` | Translate the native menu's labels. macOS only in effect — see [Window Chrome](architecture/shell.md#window-chrome). |
 | `set_dock_icon(png?)` | Show a custom theme's Dock icon, or with none the one the app started with. Lasts while the app runs. macOS only in effect. |
 | `set_view_menu_checked(rail, left_list, right_sidebar, view_locked)` | Mirror sidebar visibility and the view lock onto the View menu's check items, on every change (not only menu-triggered ones). macOS only in effect. |
-| `sync_status`, `sync_server_status`, `sync_pair`, `sync_unpair`, `sync_devices`, `sync_remove_device`, `sync_set_paused`, `sync_forget_link`, `sync_delete_remote`, `sync_rename`, `sync_remote_vaults`, `sync_create_remote`, `sync_adopt_remote`, `sync_push`, `sync_pull`, `sync_remote_state`, `sync_snapshot_begin`, `sync_snapshot_add`, `sync_snapshot_put`, `sync_snapshot_fetch`, `sync_snapshot_frame`, `sync_snapshot_done`, `sync_images`, `sync_images_delete`, `sync_adopt_new_password`, `sync_rekey_done`, `sync_watch`, `sync_unwatch` | The way to a sync server, see [`architecture/sync.md`](architecture/sync.md). |
 | `update_settings()` / `set_update_settings(endpoint, auto_check)` | Read/write `{appDataDir}/update.json`, an installation-level setting like the automatic backup's `auto-backup.json`; the endpoint must be a complete `https` URL. See [`security.md` → In-App Updates](security.md#in-app-updates). |
 | `check_for_update()` / `install_update()` | Reach the network for updates — `tauri-plugin-updater`, driven from `updates.rs` rather than the plugin's JS API so the CSP needs no update host. `install_update` installs only the result `check_for_update` holds, then restarts. See [`security.md` → In-App Updates](security.md#in-app-updates). |
 
@@ -273,7 +261,7 @@ Tauri menu events (not `invoke`) come from the native menu and are received in `
 | `toggle-rail` | View > Navigation Rail |
 | `toggle-left-list` | View > Entry List |
 | `toggle-right-sidebar` | View > Properties |
-| `reset-sidebar-widths` | View > Reset View — resets the entry-list and right-sidebar widths **and** brings back a hidden rail, entry list and right sidebar (`uiStore.showAllPanels`; with the rail hidden, Settings and the Vault button would otherwise be unreachable) |
+| `reset-sidebar-widths` | View > Reset View — resets the entry-list and right-sidebar widths **and** brings back a hidden rail, entry list and right sidebar (`uiStore.showAllPanels`; with the rail hidden, Settings and the start page would otherwise be unreachable) |
 | `toggle-view-lock` | View > Lock View — while on (`uiStore.viewLocked`, kept in localStorage), `AppShell` renders no resize handle on either sidebar; hiding and showing them and Reset View still work |
 | `show-splash` | View > Show Loading Screen |
 | `navigate-back` | Mouse back button (macOS NSEvent monitor; Windows and Linux read the button in the page — see [Navigation History](architecture/navigation.md#navigation-history)) |

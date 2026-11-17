@@ -1,8 +1,7 @@
 import { useEffect } from 'react';
 import { useUIStore } from '../../../store/uiStore';
 import { isValidLinkTarget } from '../../../lib/links';
-import { viewTypeForEntryType } from '../../../lib/modules';
-import type { ContentType } from '../../../types';
+import { viewOfLinkTarget } from '../../../store/entryViews';
 
 /**
  * Click on a link chip in read mode → navigate to the target. The chip
@@ -17,12 +16,12 @@ export function useInternalLinkNavigation(enabled: boolean): void {
   useEffect(() => {
     if (!enabled) return;
     const handler = (e: Event) => {
-      const { id, entryType: rawEntryType } = (e as CustomEvent<{ id: string; entryType: string }>).detail;
-      const entryType = rawEntryType?.trim();
+      const { id, targetKind: rawTargetKind } = (e as CustomEvent<{ id: string; targetKind: string }>).detail;
+      const targetKind = rawTargetKind?.trim();
       // Check before navigating; protects against synthetic events from
       // XSS in the editor content. The same check as when appending and displaying.
-      if (!isValidLinkTarget({ id, entryType })) return;
-      setActiveView({ type: viewTypeForEntryType(entryType as ContentType), id, mode: 'view' });
+      if (!isValidLinkTarget({ id, targetKind })) return;
+      setActiveView(viewOfLinkTarget(targetKind, id));
     };
     document.addEventListener('internal-link-navigate', handler);
     return () => document.removeEventListener('internal-link-navigate', handler);

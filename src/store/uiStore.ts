@@ -6,15 +6,16 @@ import {
 import {
   confirmLeave, guardKey, guardRegistered, holdsOpenEdit, leaveNeedsConfirm, useLeaveGuardStore,
 } from './leaveGuardStore';
-import { isLibraryView, isViewId, moduleMeta, type EntryModuleId } from '../lib/modules';
+import { isLibraryView, isViewId, type CollectionId } from '../lib/modules';
 import type { ActiveView } from '../types';
 import { clearSessionState } from './sessionStore';
 
 export const VIEW_MODES = ['list', 'cards', 'cards_wide', 'timeline'] as const;
 export type ViewMode = (typeof VIEW_MODES)[number];
-/** `count_desc` = "most frequent first" — only the tags dashboard offers it
- *  (`sortModes`), the other lists have nothing to count. */
-export const SORT_MODES = ['date_desc', 'date_asc', 'alpha_asc', 'alpha_desc', 'count_desc'] as const;
+/** `count_desc` = "most frequent first" — only collections with something to
+ *  count offer it (`CollectionDashboard`'s `itemCount`). `manual` = the
+ *  hand-dragged order of the categories. */
+export const SORT_MODES = ['date_desc', 'date_asc', 'alpha_asc', 'alpha_desc', 'count_desc', 'manual'] as const;
 export type SortMode = (typeof SORT_MODES)[number];
 /** Grouping as its own axis beside view and sorting. Formerly
  *  "Category" was a SortMode — which put two decisions into one button:
@@ -23,27 +24,22 @@ export const GROUPING_MODES = ['grouped', 'flat'] as const;
 export type GroupingMode = (typeof GROUPING_MODES)[number];
 export interface ListPrefs { view: ViewMode; sort: SortMode; grouping: GroupingMode; }
 
-/** The sorting of the tags dashboard: tags have no date, but they have a
- *  frequency. */
-export type TagsSort = Extract<SortMode, 'alpha_asc' | 'alpha_desc' | 'count_desc'>;
-export const TAGS_SORTS: TagsSort[] = ['alpha_asc', 'alpha_desc', 'count_desc'];
-export const isTagsSort = (s: SortMode): s is TagsSort => (TAGS_SORTS as SortMode[]).includes(s);
 
-/** The sorting of the home sections — the date and alpha modes. */
-export type HomeSort = Exclude<SortMode, 'count_desc'>;
-export const HOME_VIEWS = ['list', 'cards'] as const;
-export type HomeView = (typeof HOME_VIEWS)[number];
-/** How many entries a section of the home page shows; 0 = all. */
-export const HOME_COUNTS = [3, 5, 10, 25, 0] as const;
-export interface HomeSectionPrefs { sort: HomeSort; view: HomeView; count: number; } // count 0 = all
+/** What a vault without saved preferences shows — and what an invalid saved value falls back to. */
+const DEFAULT_COLLECTION_PREFS: Record<CollectionId, ListPrefs> = {
+  tags: { view: 'list', sort: 'alpha_asc', grouping: 'flat' },
+  categories: { view: 'list', sort: 'manual', grouping: 'flat' },
+  images: { view: 'cards', sort: 'alpha_asc', grouping: 'flat' },
+  templates: { view: 'list', sort: 'alpha_asc', grouping: 'flat' },
+  blocks: { view: 'list', sort: 'alpha_asc', grouping: 'flat' },
+  lexicon: { view: 'list', sort: 'alpha_asc', grouping: 'flat' },
+  symbols: { view: 'cards', sort: 'date_desc', grouping: 'flat' },
+};
 
 export interface EditActions {
   onSave: () => void | Promise<void>;
   onCancel: () => void | Promise<void>;
   onDelete?: () => void | Promise<void>;
-  /** Write the deferred autosave immediately — for sidebar actions
-   *  that afterwards read the entry's store state (type change). */
-  flush?: () => Promise<void>;
 }
 
 interface UIState {
@@ -69,13 +65,12 @@ interface UIState {
   /** Whether a `Dashboard` is currently mounted — it registers itself.
    *  RightSidebar provides the portal target based on this, instead of
    *  guessing from `activeView.id`: tasks show their list even with an id (jump target, no
-   *  open entry), and the id of a deleted entry also makes journal,
-   *  wiki and operations fall back to their dashboard. */
+   *  open entry), and the id of a deleted entry makes the entry page
+   *  fall back to its dashboard's list. */
   dashboardMounted: boolean;
   editActions: EditActions | null;
-  /** A type change or a cancel is writing right now (`withEditLock`): Done,
-   *  Delete, Cancel and the type switch of the open entry are locked,
-   *  and the page cannot be left — a click in between would hit the
+  /** A Cancel is writing the entry back right now (`withEditLock`): Done,
+   *  Delete and Cancel are locked, and the page cannot be left — a click in between would hit the
    *  view that is being torn down, and the confirmation would apply to it. */
   editLocked: boolean;
   /** The rail on the far left. Persistent (localStorage), like `leftListOpen`. */
@@ -85,20 +80,11 @@ interface UIState {
    *  dragged. Persistent (localStorage), like the widths themselves. */
   viewLocked: boolean;
   searchQuery: string;
-  journalPrefs: ListPrefs;
-  wikiPrefs: ListPrefs;
-  operationsPrefs: ListPrefs;
   tasksPrefs: ListPrefs;
   trashPrefs: ListPrefs;
-  templatesPrefs: ListPrefs;
-  /** The custom blocks in the blocks view — the built-in ones beneath stay untouched. */
-  blocksPrefs: ListPrefs;
-  /** The language list of the lexicon — the translate field beneath stays untouched. */
-  lexiconPrefs: ListPrefs;
-  tagsSort: TagsSort;
-  homeJournalPrefs: HomeSectionPrefs;
-  homeOpsPrefs: HomeSectionPrefs;
-  homeWikiPrefs: HomeSectionPrefs;
+  /** View and sorting of each collection (`grouping` is unused there, kept
+   *  for the shared `ListPrefs`). */
+  collectionPrefs: Record<CollectionId, ListPrefs>;
   /** The groups per module that deviate from the default (see hooks/useCollapsedSet):
    *  collapsed ones — or, in scopes that start collapsed, expanded ones.
    *  In the store rather than view-local, because MainArea unmounts the views
@@ -115,12 +101,6 @@ interface UIState {
   addCollapsedGroups: (scope: string, ids: string[]) => void;
   setFlag: (key: string, value: boolean) => void;
   closeAllTabs: () => void;
-  /** An entry has changed type: every tab and every history that opens it
-   *  under `from` now opens it under `to` — same id. With
-   *  `endEdit` the open page is then in read mode: Cancel reverts a
-   *  type change, and the view of the old type should not even appear in
-   *  edit mode. Other tabs keep their mode. */
-  retypeEntryViews: (id: string, from: EntryModuleId, to: EntryModuleId, options?: { endEdit?: boolean }) => void;
   openViewInNewTab: (view: ActiveView) => void;
   addTab: (view?: ActiveView) => void;
   selectTab: (id: string) => void;
@@ -143,19 +123,13 @@ interface UIState {
   /** Shows rail, left list and right sidebar again — part of "Reset view". */
   showAllPanels: () => void;
   setSearchQuery: (q: string) => void;
-  setJournalPrefs: (p: Partial<ListPrefs>) => void;
-  setWikiPrefs: (p: Partial<ListPrefs>) => void;
-  setOperationsPrefs: (p: Partial<ListPrefs>) => void;
   setTasksPrefs: (p: Partial<ListPrefs>) => void;
   setTrashPrefs: (p: Partial<ListPrefs>) => void;
-  setTemplatesPrefs: (p: Partial<ListPrefs>) => void;
-  setBlocksPrefs: (p: Partial<ListPrefs>) => void;
-  setLexiconPrefs: (p: Partial<ListPrefs>) => void;
-  setTagsSort: (sort: TagsSort) => void;
-  setHomeJournalPrefs: (p: Partial<HomeSectionPrefs>) => void;
-  setHomeOpsPrefs: (p: Partial<HomeSectionPrefs>) => void;
-  setHomeWikiPrefs: (p: Partial<HomeSectionPrefs>) => void;
+  setCollectionPrefs: (id: CollectionId, p: Partial<ListPrefs>) => void;
 }
+
+/** Where the app starts, and where it lands without a tab: the dashboard "All entries". */
+export const ALL_ENTRIES_VIEW: ActiveView = { type: 'dashboard', id: 'all' };
 
 const RAIL_OPEN_KEY = 'rail-open';
 const LEFT_LIST_OPEN_KEY = 'left-list-open';
@@ -211,8 +185,7 @@ function saveTabs(tabs: OpenTab[], activeTabId: string | null) {
 /** Save/Cancel/Delete live only in the right sidebar, so edit mode must not start with it closed.
  *  A user-built block's or template's page is always editing and keeps its Save there too. */
 function viewNeedsSidebar(view: ActiveView): boolean {
-  const usesEditorSidebar = moduleMeta(view.type)?.usesEditorSidebar ?? false;
-  return (view.mode === 'edit' && usesEditorSidebar) || (isLibraryView(view.type) && !!view.id);
+  return (view.mode === 'edit' && view.type === 'entry') || (isLibraryView(view.type) && !!view.id);
 }
 
 /** The history that Back and Forward currently walk through: that of the active tab, otherwise the tabless one. */
@@ -306,10 +279,6 @@ let heldHistory: NavHistory | null = null;
  * "Save" and "Discard" switch the page themselves (back to the list)
  * and would otherwise have shifted it by exactly that step — one would be back
  * on the page one wanted to leave.
- *
- * It lives in `heldHistory`, not in the closure: if "Discard" reverts a
- * type change, `retypeEntryViews` rewrites it too — otherwise it would
- * keep leading to the entry under the discarded type.
  */
 function stepGuarded(delta: -1 | 1): void {
   // A step into the void does not ask about unsaved changes: the
@@ -340,7 +309,7 @@ function closeTabNow(id: string): void {
     saveTabs(tabs, nextTab?.id ?? null);
     // The closed tab's history goes with it; without a tab the tabless one starts fresh.
     if (!nextTab) {
-      return { tabs, activeTabId: null, activeView: { type: 'home' }, tablessHistory: freshHistory({ type: 'home' }) };
+      return { tabs, activeTabId: null, activeView: ALL_ENTRIES_VIEW, tablessHistory: freshHistory(ALL_ENTRIES_VIEW) };
     }
     return { tabs, activeTabId: nextTab.id, activeView: nextTab.view };
   });
@@ -348,14 +317,14 @@ function closeTabNow(id: string): void {
 
 const savedTabs = loadSavedTabs();
 const initialView: ActiveView = savedTabs.activeTabId
-  ? savedTabs.tabs.find((tab) => tab.id === savedTabs.activeTabId)?.view ?? { type: 'home' }
-  : { type: 'home' };
+  ? savedTabs.tabs.find((tab) => tab.id === savedTabs.activeTabId)?.view ?? ALL_ENTRIES_VIEW
+  : ALL_ENTRIES_VIEW;
 
 export const useUIStore = create<UIState>((set, get) => ({
   activeView: initialView,
   tabs: savedTabs.tabs,
   activeTabId: savedTabs.activeTabId,
-  tablessHistory: freshHistory({ type: 'home' }),
+  tablessHistory: freshHistory(ALL_ENTRIES_VIEW),
   // A restored tab in edit mode needs the sidebar, even
   // if it was last collapsed — the same rule as in `setActiveView`.
   rightSidebarOpen: loadOpenFlag(RIGHT_SIDEBAR_OPEN_KEY) || viewNeedsSidebar(initialView),
@@ -368,28 +337,11 @@ export const useUIStore = create<UIState>((set, get) => ({
   // Unlike the sidebars: off as long as nothing is saved.
   viewLocked: localStorage.getItem(VIEW_LOCKED_KEY) === '1',
   searchQuery: '',
-  // Where "Category" used to be the sort mode (wiki, operations,
-  // tasks), it is now `grouping: 'grouped'` — the same view as
-  // before. Within a group the old mode compared only the
-  // group name, so it was equal for every visible row; the order
-  // actually came from the store. The new sort value reproduces exactly that:
-  // wiki loads `ORDER BY title` (alpha_asc), operations `updated_at DESC`
-  // and tasks `created_at DESC` (date_desc). Journal and
-  // trash were never grouped and stay 'flat'.
-  journalPrefs: { view: 'list', sort: 'date_desc', grouping: 'flat' },
-  wikiPrefs: { view: 'cards', sort: 'alpha_asc', grouping: 'grouped' },
-  operationsPrefs: { view: 'list', sort: 'date_desc', grouping: 'grouped' },
+  // Dashboards keep view, sorting and grouping in their
+  // dashboard's row (`useDashboardPrefs`), not here.
   tasksPrefs: { view: 'list', sort: 'date_desc', grouping: 'grouped' },
   trashPrefs: { view: 'list', sort: 'date_desc', grouping: 'flat' },
-  // Templates have nothing to group — the field is only there for the shared ListPrefs.
-  templatesPrefs: { view: 'list', sort: 'alpha_asc', grouping: 'flat' },
-  blocksPrefs: { view: 'list', sort: 'alpha_asc', grouping: 'flat' },
-  // Languages carry no categories — `grouping` is here, as with templates, only for the shared ListPrefs.
-  lexiconPrefs: { view: 'list', sort: 'alpha_asc', grouping: 'flat' },
-  tagsSort: 'alpha_asc',
-  homeJournalPrefs: { sort: 'date_desc', view: 'list', count: 5 },
-  homeOpsPrefs:     { sort: 'date_desc', view: 'list', count: 5 },
-  homeWikiPrefs:    { sort: 'alpha_asc', view: 'cards', count: 5 },
+  collectionPrefs: DEFAULT_COLLECTION_PREFS,
   collapsedGroups: {},
   flags: {},
 
@@ -433,7 +385,7 @@ export const useUIStore = create<UIState>((set, get) => ({
       // to where the entry was opened from.
       activeTabId = createTabId();
       tabs = [{ id: activeTabId, view, history: pushHistory(s.tablessHistory, view) }];
-      tablessHistory = freshHistory({ type: 'home' });
+      tablessHistory = freshHistory(ALL_ENTRIES_VIEW);
     } else {
       tablessHistory = pushHistory(s.tablessHistory, view);
     }
@@ -444,7 +396,7 @@ export const useUIStore = create<UIState>((set, get) => ({
 
   // For vault switch and replace import: tabs and history carry entry IDs
   // that do not exist in the new database — both fall back to the fresh
-  // start state (no tabs, Home), as on the very first start. The
+  // start state (no tabs, "All entries"), as on the very first start. The
   // working state of the lists goes with them; the preferences (including the collapse states)
   // belong to the vault and come with `loadVaultPrefs`.
   closeAllTabs: () => {
@@ -453,28 +405,8 @@ export const useUIStore = create<UIState>((set, get) => ({
     set({
       tabs: [],
       activeTabId: null,
-      activeView: { type: 'home' },
-      tablessHistory: freshHistory({ type: 'home' }),
-    });
-  },
-
-  retypeEntryViews: (id, from, to, { endEdit = false } = {}) => {
-    const isEntry = (view: ActiveView) => view.type === from && view.id === id;
-    const retype = (view: ActiveView): ActiveView => (isEntry(view) ? { ...view, type: to } : view);
-    const retypeHistory = (history: NavHistory): NavHistory => ({ ...history, views: history.views.map(retype) });
-    // The open page: with `endEdit` straight into read mode if it is this entry.
-    const retypeOpenPage = (view: ActiveView): ActiveView => (
-      endEdit && isEntry(view) ? { type: to, id, mode: 'view' } : retype(view)
-    );
-    if (heldHistory) heldHistory = retypeHistory(heldHistory);
-    set((s) => {
-      const tabs = s.tabs.map((tab) => ({
-        ...tab,
-        view: tab.id === s.activeTabId ? retypeOpenPage(tab.view) : retype(tab.view),
-        history: retypeHistory(tab.history),
-      }));
-      saveTabs(tabs, s.activeTabId);
-      return { tabs, activeView: retypeOpenPage(s.activeView), tablessHistory: retypeHistory(s.tablessHistory) };
+      activeView: ALL_ENTRIES_VIEW,
+      tablessHistory: freshHistory(ALL_ENTRIES_VIEW),
     });
   },
 
@@ -486,7 +418,7 @@ export const useUIStore = create<UIState>((set, get) => ({
     return { activeView: view, tabs, activeTabId: id };
   }),
 
-  addTab: (view = { type: 'home' }) => set((s) => {
+  addTab: (view = ALL_ENTRIES_VIEW) => set((s) => {
     const id = createTabId();
     const tabs = [...s.tabs, { id, view, history: freshHistory(view) }];
     saveTabs(tabs, id);
@@ -580,18 +512,11 @@ export const useUIStore = create<UIState>((set, get) => ({
     set({ railOpen: true, leftListOpen: true, rightSidebarOpen: true });
   },
   setSearchQuery: (q) => set({ searchQuery: q }),
-  setJournalPrefs: (p) => set((s) => ({ journalPrefs: { ...s.journalPrefs, ...p } })),
-  setWikiPrefs: (p) => set((s) => ({ wikiPrefs: { ...s.wikiPrefs, ...p } })),
-  setOperationsPrefs: (p) => set((s) => ({ operationsPrefs: { ...s.operationsPrefs, ...p } })),
   setTasksPrefs: (p) => set((s) => ({ tasksPrefs: { ...s.tasksPrefs, ...p } })),
   setTrashPrefs: (p) => set((s) => ({ trashPrefs: { ...s.trashPrefs, ...p } })),
-  setTemplatesPrefs: (p) => set((s) => ({ templatesPrefs: { ...s.templatesPrefs, ...p } })),
-  setBlocksPrefs: (p) => set((s) => ({ blocksPrefs: { ...s.blocksPrefs, ...p } })),
-  setLexiconPrefs: (p) => set((s) => ({ lexiconPrefs: { ...s.lexiconPrefs, ...p } })),
-  setTagsSort: (sort) => set({ tagsSort: sort }),
-  setHomeJournalPrefs: (p) => set((s) => ({ homeJournalPrefs: { ...s.homeJournalPrefs, ...p } })),
-  setHomeOpsPrefs:     (p) => set((s) => ({ homeOpsPrefs:     { ...s.homeOpsPrefs,     ...p } })),
-  setHomeWikiPrefs:    (p) => set((s) => ({ homeWikiPrefs:    { ...s.homeWikiPrefs,    ...p } })),
+  setCollectionPrefs: (id, p) => set((s) => ({
+    collectionPrefs: { ...s.collectionPrefs, [id]: { ...s.collectionPrefs[id], ...p } },
+  })),
 }));
 
 /** How many `withEditLock` calls are running right now. */
@@ -601,18 +526,17 @@ let editLocksStarted = 0;
 
 /**
  * Counts every lock that has begun. Anyone reading across several awaits (the
- * automatic backup) can tell from it that a type change or a
- * cancel has written in between — even if `editLocked` is off again at the end.
+ * automatic backup) can tell from it that a Cancel has written in
+ * between — even if `editLocked` is off again at the end.
  */
 export function editLockEpoch(): number {
   return editLocksStarted;
 }
 
 /**
- * Locks editing while `run` writes (`editLocked`): the sidebar,
- * the type switch and leaving the page. Counted, not toggled: a
- * cancel can wait for a type change that is still running — whichever finishes
- * first does not release the other's lock.
+ * Locks editing while `run` writes (`editLocked`): the sidebar's buttons
+ * and leaving the page. Counted, not toggled: Cancels in two tabs can
+ * overlap — whichever finishes first does not release the other's lock.
  */
 export async function withEditLock<T>(run: () => Promise<T>): Promise<T> {
   editLocksStarted++;

@@ -10,7 +10,7 @@ import {
 } from './vaultKeyParts';
 import { useVaultKeyStore, type VaultKeyRequest } from '../../store/vaultKeyStore';
 import {
-  createVaultKey, encryptExistingVault, keychainAvailable, recoverVault, unlockVault, type CreatedKey,
+  createVaultKey, keychainAvailable, recoverVault, unlockVault, type CreatedKey,
 } from '../../lib/vaultKeys';
 import { hideSplash } from '../../lib/splash';
 
@@ -29,13 +29,12 @@ export default function VaultKeyDialog() {
 }
 
 /** `rememberFailed`: unlocked, but the keychain refused to remember it. */
-type Step = 'unlock' | 'recover' | 'create' | 'encrypt' | 'showRecovery' | 'rememberFailed';
+type Step = 'unlock' | 'recover' | 'create' | 'showRecovery' | 'rememberFailed';
 
 const FAILED_KEY = {
   unlock: 'vaultKey.unlockFailed',
   recover: 'vaultKey.recoverFailed',
   create: 'vaultKey.createFailed',
-  encrypt: 'vaultKey.encryptFailed',
 } as const;
 
 function VaultKeyDialogBody({ request }: { request: VaultKeyRequest }) {
@@ -47,7 +46,7 @@ function VaultKeyDialogBody({ request }: { request: VaultKeyRequest }) {
   const [password, setPassword] = useState('');
   const [repeat, setRepeat] = useState('');
   const [recoveryInput, setRecoveryInput] = useState('');
-  // On when creating and encrypting — the usual wish on one's own
+  // On when creating — the usual wish on one's own
   // computer. Off when unlocking, but only displayed: as long as nobody moves
   // the switch, the keychain stays as it is (`rememberTouched`).
   const newKey = request.kind !== 'unlock';
@@ -100,17 +99,15 @@ function VaultKeyDialogBody({ request }: { request: VaultKeyRequest }) {
   });
 
   /**
-   * Everything that makes a new key — new vault, encryption
-   * of an old one, "Forgot password" — ends at the new
-   * recovery key.
+   * Everything that makes a new key — new vault, "Forgot password" — ends at
+   * the new recovery key.
    */
-  const submitNewKey = (kind: 'create' | 'encrypt' | 'recover') => attempt(kind, async () => {
+  const submitNewKey = (kind: 'create' | 'recover') => attempt(kind, async () => {
     const problem = newPasswordProblem(t, password, repeat);
     if (problem) { setError(problem); return; }
-    let created: CreatedKey;
-    if (kind === 'recover') created = await recoverVault(request.vaultId, recoveryInput, password, rememberWish);
-    else if (kind === 'create') created = await createVaultKey(request.vaultId, password, rememberWish);
-    else created = await encryptExistingVault(request.vaultId, password, rememberWish);
+    const created: CreatedKey = kind === 'recover'
+      ? await recoverVault(request.vaultId, recoveryInput, password, rememberWish)
+      : await createVaultKey(request.vaultId, password, rememberWish);
     setRecoveryKey(created.recoveryKey);
     setRememberRefused(Boolean(rememberWish) && !created.remembered);
     setPassword('');
@@ -124,7 +121,6 @@ function VaultKeyDialogBody({ request }: { request: VaultKeyRequest }) {
     unlock: t('vaultKey.unlockTitle', { name: request.vaultName }),
     recover: t('vaultKey.recoverTitle'),
     create: t('vaultKey.createTitle', { name: request.vaultName }),
-    encrypt: t('vaultKey.encryptTitle', { name: request.vaultName }),
     showRecovery: t('vaultKey.recoveryTitle'),
     rememberFailed: t('vaultKey.rememberFailedTitle', { name: request.vaultName }),
   }[step];
@@ -132,7 +128,7 @@ function VaultKeyDialogBody({ request }: { request: VaultKeyRequest }) {
   // Cancelling is only possible while nothing has happened yet: after creating
   // it would mean clicking away the recovery key unseen, and
   // while an action is running, Rust would get through with it anyway.
-  const cancelShown = step === 'unlock' || step === 'recover' || step === 'create' || step === 'encrypt';
+  const cancelShown = step === 'unlock' || step === 'recover' || step === 'create';
 
   const busyIcon = busy ? <Loader2 size={14} className="animate-spin" /> : null;
 
@@ -229,14 +225,11 @@ function VaultKeyDialogBody({ request }: { request: VaultKeyRequest }) {
         </Button>
       </>
     );
-  } else if (step === 'create' || step === 'encrypt') {
-    // The same form; an old vault additionally gets the notice about its
-    // earlier backups.
-    const submit = () => submitNewKey(step);
+  } else if (step === 'create') {
+    const submit = () => submitNewKey('create');
     body = (
       <>
-        <p className="text-sm text-secondary">{t(step === 'create' ? 'vaultKey.createHint' : 'vaultKey.encryptHint')}</p>
-        {step === 'encrypt' && <p className="text-xs text-muted">{t('vaultKey.encryptNote')}</p>}
+        <p className="text-sm text-secondary">{t('vaultKey.createHint')}</p>
         {passwordFields(submit, true)}
         {rememberRow}
         {errorLine}
@@ -284,8 +277,8 @@ function VaultKeyDialogBody({ request }: { request: VaultKeyRequest }) {
       }
     >
       {body}
-      {/* Encrypting and "Forgot password" rewrite the whole vault. */}
-      <ReencryptProgressLine vaultId={request.vaultId} active={busy && (step === 'encrypt' || step === 'recover')} />
+      {/* "Forgot password" rewrites the whole vault. */}
+      <ReencryptProgressLine vaultId={request.vaultId} active={busy && step === 'recover'} />
     </Modal>
   );
 }

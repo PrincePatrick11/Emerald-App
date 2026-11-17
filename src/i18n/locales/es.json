@@ -1,7 +1,6 @@
 {
   "common": {
     "delete": "Eliminar",
-    "deleteConfirm": "¿Eliminar?",
     "confirmSure": "¿Seguro?",
     "confirmYes": "Sí, eliminar",
     "confirmNo": "Cancelar",
@@ -29,13 +28,14 @@
     "uncategorized": "Sin categoría",
     "nameTaken": "Esta categoría ya existe",
     "dragHint": "Arrastra para reordenar.",
-    "builtinHint": "Integrada — no se puede renombrar ni eliminar.",
+    "builtinHint": "Integrada — no se puede renombrar ni eliminar. Su plantilla inicial sí se puede cambiar.",
     "builtin": {
-      "other": "Otro",
       "sigils": "Sigilos",
-      "altars": "Altares"
+      "altars": "Altares",
+      "journal": "Diario"
     },
     "starter": {
+      "dreams": "Diario de sueños",
       "paradigm": "Paradigma",
       "ritual": "Ritual",
       "meditation": "Meditación",
@@ -44,7 +44,18 @@
       "candles": "Velas",
       "deities": "Deidades",
       "tools": "Herramientas"
-    }
+    },
+    "startTemplate": "Plantilla inicial",
+    "startTemplateHint": "Con qué empieza una entrada nueva de esta categoría. «Plantilla predeterminada» es la que se elige en Plantillas.",
+    "editTitle": "Editar categoría",
+    "nameLabel": "Nombre",
+    "startTemplateDefaultNamed": "Plantilla predeterminada ({{name}})",
+    "startTemplateDefaultNone": "Plantilla predeterminada (ninguna)",
+    "startTemplateMeta": "Plantilla inicial: {{name}}",
+    "shownIn": "Aparece en",
+    "shownInHint": "Paneles cuyo filtro incluye esta categoría. Se cambia en los ajustes del panel.",
+    "shownInNone": "Ningún panel filtra por esta categoría.",
+    "shownEverywhere": "También en todos los paneles sin filtro de categorías:"
   },
   "listView": {
     "view": "Vista",
@@ -53,8 +64,6 @@
     "cards": "Tarjetas",
     "cardsWide": "Tarjetas (ancho completo)",
     "timeline": "Línea temporal",
-    "alphaAsc": "A → Z",
-    "alphaDesc": "Z → A",
     "dateCreated": "Creado",
     "dateUpdated": "Modificado",
     "dateDeleted": "Eliminado",
@@ -63,6 +72,7 @@
     "sortAlphaAsc": "Nombre · A → Z",
     "sortAlphaDesc": "Nombre · Z → A",
     "sortCountDesc": "Uso · más usado",
+    "sortManual": "Orden propio",
     "category": "Categoría",
     "grouping": "Agrupación",
     "groupBy": "Agrupar por {{label, lowercase}}",
@@ -71,9 +81,7 @@
   },
   "undo": {
     "action": "Deshacer",
-    "entryDeleted": "Entrada de diario eliminada",
-    "articleDeleted": "Artículo wiki eliminado",
-    "operationDeleted": "Operación eliminada",
+    "entryDeleted": "Entrada eliminada",
     "taskDeleted": "Tarea eliminada",
     "categoryDeleted": "Categoría eliminada",
     "tagDeleted": "Etiqueta eliminada",
@@ -81,16 +89,15 @@
     "templateDeleted": "Plantilla eliminada",
     "languageDeleted": "Idioma eliminado",
     "imageDeleted": "Imagen eliminada",
-    "wordDeleted": "Palabra eliminada"
+    "wordDeleted": "Palabra eliminada",
+    "dashboardDeleted": "Panel eliminado"
   },
   "createItem": {
     "title": "Crear nuevo"
   },
   "nav": {
-    "home": "Inicio",
-    "all": "Todo",
     "journal": "Diario",
-    "wiki": "Wiki",
+    "knowledge": "Conocimiento",
     "tags": "Etiquetas",
     "categories": "Categorías",
     "images": "Imágenes",
@@ -98,10 +105,12 @@
     "blocks": "Bloques",
     "templates": "Plantillas",
     "lexicon": "Léxico",
-    "operations": "Operaciones",
+    "practice": "Práctica",
     "tasks": "Tareas",
     "settings": "Ajustes",
-    "startPage": "Página de inicio"
+    "startPage": "Página de inicio",
+    "allEntries": "Todas las entradas",
+    "symbols": "Símbolos"
   },
   "sidebar": {
     "allEmpty": "Aún no hay entradas",
@@ -110,37 +119,13 @@
     "noResultsHint": "Prueba otra ortografía",
     "tasksEmpty": "Aún no hay tareas",
     "showMore": "Mostrar {{count}} más",
-    "showMore_other": "Mostrar {{count}} más"
+    "showMore_other": "Mostrar {{count}} más",
+    "dashboardEmpty": "Aún no hay entradas aquí"
   },
-  "operations": {
-    "new": "Nueva operación",
-    "untitled": "Operación sin título",
-    "placeholder": "Documenta tu operación...",
-    "all": "Todas",
-    "categories": {
-      "sigils": "Sigilos",
-      "servitors": "Servidores",
-      "other": "Otro"
-    }
-  },
-  "altar": {
-    "categories": {
-      "candle": "Vela",
-      "crystal": "Cristal",
-      "herb": "Hierba",
-      "deity": "Deidad",
-      "symbol": "Símbolo",
-      "tool": "Herramienta",
-      "table": "Mesa",
-      "other": "Otro"
-    }
-  },
-  "journal": {
-    "title": "Diario",
-    "newEntry": "Nueva entrada",
+  "entries": {
+    "label": "Entradas",
     "untitled": "Entrada sin título",
-    "placeholder": "Comienza tu registro...",
-    "noPhase": "Sin fase lunar"
+    "placeholder": "Comienza tu registro..."
   },
   "creation": {
     "intention": "Intención",
@@ -159,29 +144,6 @@
     "noLetters": "Aún no hay letras preparadas.",
     "targetDate": "Fecha objetivo",
     "brushSize": "Pincel"
-  },
-  "wiki": {
-    "title": "Wiki",
-    "newArticle": "Nuevo artículo",
-    "untitled": "Artículo sin título",
-    "placeholder": "Documenta tu conocimiento...",
-    "categories": {
-      "ritual": "Ritual",
-      "deity": "Deidad",
-      "herb": "Hierba",
-      "symbol": "Símbolo",
-      "tool": "Herramienta",
-      "concept": "Concepto",
-      "spell": "Hechizo",
-      "paradigm": "Paradigma",
-      "bannung": "Destierro",
-      "meditation": "Meditación",
-      "sigil_charging": "Carga de sigilos",
-      "other": "Otro"
-    },
-    "addIcon": "Añadir icono",
-    "changeIcon": "Cambiar icono",
-    "removeIcon": "Eliminar icono"
   },
   "blocks": {
     "add": "Añadir bloque",
@@ -291,12 +253,6 @@
       "display": "Visualización",
       "fieldCount": "{{count}} campo",
       "fieldCount_other": "{{count}} campos"
-    },
-    "status": {
-      "name": "Estado",
-      "active": "Activa",
-      "endDate": "Fecha de fin",
-      "version": "Versión"
     },
     "sigil": {
       "hidden": "Oculto mientras el sigilo está cargado",
@@ -637,7 +593,8 @@
       "ankh": "Anj",
       "monad": "Mónada jeroglífica",
       "eye": "Ojo de la providencia"
-    }
+    },
+    "editTitle": "Editar símbolo"
   },
   "canvas": {
     "keyNames": {
@@ -825,8 +782,6 @@
     "noResultsForFiltered": "No se encontró nada para «{{query}}» con los filtros elegidos.",
     "noResultsFiltered": "Nada coincide con los filtros elegidos.",
     "resetFilters": "Restablecer filtros",
-    "operations": "Buscar operaciones…",
-    "wikiArticles": "Buscar artículos wiki…",
     "globalPlaceholder": "Buscar en todo…",
     "hint": "Títulos, etiquetas y contenido de todos los módulos.",
     "clear": "Borrar búsqueda",
@@ -852,6 +807,7 @@
     "removeFromUses_other": "Se muestra en {{count}} lugares – ¿quitarla también allí?",
     "removeAndDelete": "Quitar y eliminar",
     "roles": {
+      "cover": "Imagen de portada",
       "default": "Valor por defecto del bloque",
       "drawing": "Dibujo",
       "background": "Fondo"
@@ -875,17 +831,24 @@
     "color": "Cambiar color",
     "unused": "sin usar",
     "onlyInTemplates": "solo en plantillas",
-    "onlyInImages": "solo en Imágenes",
+    "onlyInImages": "solo en imágenes",
     "unusedHint": "Ninguna entrada lleva esta etiqueta todavía.",
     "createNamed": "+ Crear «{{name}}»",
-    "unknownOpenDashboard": "No existe «{{name}}» — créala en Etiquetas"
+    "unknownOpenDashboard": "No existe «{{name}}» — créala en Etiquetas",
+    "usage": "Uso",
+    "inEntries": "En entradas",
+    "onlyInTemplatesFilter": "Solo en plantillas",
+    "onlyInImagesFilter": "Solo en imágenes",
+    "unusedFilter": "Sin usar",
+    "onlyInTemplatesHint": "Ninguna entrada lleva esta etiqueta, pero sí plantillas.",
+    "onlyInImagesHint": "Ninguna entrada lleva esta etiqueta, pero sí imágenes.",
+    "onlyInTemplatesAndImages": "solo en plantillas e imágenes",
+    "onlyInTemplatesAndImagesFilter": "Plantillas e imágenes",
+    "onlyInTemplatesAndImagesHint": "Ninguna entrada lleva esta etiqueta, pero sí plantillas e imágenes."
   },
   "properties": {
     "noEntry": "Abre una entrada para ver sus propiedades.",
     "title": "Propiedades",
-    "type": "Tipo",
-    "typeDropsProperties": "Las entradas del diario no tienen categoría, icono ni imagen de portada; se eliminarán.",
-    "changeType": "Convertir",
     "category": "Categoría",
     "noCategory": "Ninguna",
     "moonPhase": "Fase lunar",
@@ -904,22 +867,15 @@
     "chooseImage": "Elegir imagen",
     "linkEntry": "Vincular entrada …",
     "addTag": "Añadir etiqueta …",
-    "removeTag": "Quitar etiqueta"
+    "removeTag": "Quitar etiqueta",
+    "addIcon": "Añadir icono",
+    "changeIcon": "Cambiar icono",
+    "removeIcon": "Eliminar icono"
   },
   "filters": {
     "all": "Todas",
     "category": "Categoría",
-    "module": "Módulo",
-    "moonPhase": "Fase lunar",
     "status": "Estado"
-  },
-  "home": {
-    "viewAll": "Ver todo",
-    "view": "Vista",
-    "sort": "Orden",
-    "show": "Mostrar",
-    "newest": "Recientes",
-    "oldest": "Antiguos"
   },
   "vault": {
     "title": "Vaults",
@@ -952,7 +908,10 @@
     "backTo": "Volver a {{name}}",
     "openFailed": "No se pudo abrir el último vault. Elígelo de nuevo u otro.",
     "removeConfirm": "¿Quitar de la lista?",
-    "deleteConfirmFiles": "¿Eliminar el vault y sus archivos?"
+    "deleteConfirmFiles": "¿Eliminar el vault y sus archivos?",
+    "outdated": "Este vault procede de una versión anterior de Emerald y no se puede abrir en esta. Se queda como está; llegará un conversor.",
+    "tooNew": "Este vault procede de una versión más reciente de Emerald. Actualiza esta aplicación para abrirlo. Se queda como está.",
+    "stateLocal": "solo aquí"
   },
   "vaultKey": {
     "unlockTitle": "Desbloquear «{{name}}»",
@@ -989,10 +948,6 @@
     "rememberUnavailable": "Este sistema no tiene un llavero en el que recordar la clave.",
     "rememberFailed": "El llavero del sistema operativo no ha aceptado recordar la clave. El vault está abierto, pero Emerald volverá a pedir la contraseña la próxima vez.",
     "continue": "Continuar",
-    "encryptTitle": "Cifrar «{{name}}»",
-    "encryptHint": "Este vault es de antes del cifrado. A partir de ahora todos los vaults están cifrados: elige una contraseña y Emerald cifrará las entradas, las imágenes y los borradores. Según el tamaño tarda un momento, y el original no se toca hasta que todo esté comprobado.",
-    "encryptNote": "Las copias de seguridad que exportaste antes (.emeralddb) siguen sin cifrar hasta que las borres. En los SSD, los archivos borrados a veces se pueden recuperar durante un tiempo; solo un disco cifrado (BitLocker, FileVault) cierra ese hueco.",
-    "encryptFailed": "No se pudo cifrar el vault. No ha cambiado; inténtalo de nuevo.",
     "progressDatabase": "Cifrando la base de datos…",
     "progressImages": "Imágenes: {{done}} de {{total}}",
     "progressImagesPhase": "Cifrando las imágenes…",
@@ -1027,11 +982,8 @@
   },
   "settings": {
     "language": "Idioma",
-    "version": "Versión",
     "pageGeneral": "General",
     "tagline": "El espacio de trabajo para tu práctica mágica.",
-    "author": "Autor",
-    "license": "Licencia",
     "website": "Sitio web",
     "backup": "Copia de seguridad",
     "exportDb": "Exportar base de datos",
@@ -1040,9 +992,6 @@
     "importDb": "Importar base de datos",
     "importBrowse": "Seleccionar archivo…",
     "importedVault": "Vault importado",
-    "includeJournal": "Diario",
-    "includeWiki": "Wiki",
-    "includeOperations": "Operaciones",
     "includeTasks": "Tareas",
     "includeTags": "Etiquetas",
     "includeLexicon": "Léxico",
@@ -1165,7 +1114,7 @@
     "groupBackup": "Copia automática",
     "uiScaleHint": "Escala toda la interfaz — texto, iconos y espacios.",
     "editorFontSizeHint": "Tamaño del texto en entradas y valores de campo, independiente del tamaño de la interfaz.",
-    "sidebarListHint": "Qué entradas muestra la barra lateral izquierda: todas o las de un módulo.",
+    "sidebarListHint": "Qué entradas muestra la barra lateral izquierda: todas o las de un panel.",
     "sidebarLimitHint": "Cuántas entradas muestra una lista al principio. El resto se carga debajo con «Mostrar más».",
     "emojiDefaultsHint": "Los emojis que ofrece cada selector de este vault antes de buscar. Clic para quitar, arrastrar para ordenar, buscar para añadir nuevos.",
     "imagesHint": "Se aplica a las imágenes que se insertan. Las más grandes se reducen primero y solo se rechazan si siguen siendo demasiado grandes.",
@@ -1189,7 +1138,7 @@
     "moonPhase": "Fase lunar",
     "moonPhaseHint": "La fase lunar del día en que se creó una entrada del diario.",
     "moonPhaseShow": "Mostrar en las entradas del diario",
-    "moonPhaseShowHint": "Se aplica a todas las entradas, también a las antiguas. Desactivado: sin fase lunar como icono, en la barra lateral ni en la exportación, y sin filtrar ni agrupar por ella.",
+    "moonPhaseShowHint": "Se aplica a todas las entradas del diario, también a las antiguas. Desactivado: sin fase lunar como icono, en la barra lateral ni en la exportación.",
     "trashRetentionHint": "Cuánto tiempo permanece lo eliminado en la papelera. Después se borra definitivamente al abrir el vault.",
     "customThemeImport": "Importar tema…",
     "customThemeRemove": "Quitar «{{name}}»",
@@ -1206,8 +1155,16 @@
     "updateErrorInstall": "La instalación ha fallado.",
     "pageSecurity": "Seguridad",
     "pageSync": "Sincronización",
-    "theme": "Tema",
-    "text": "Texto"
+    "text": "Texto",
+    "importErrorOldVersion": "Esta copia de seguridad procede de una versión anterior de Emerald y no se puede restaurar en esta. No se ha cambiado nada; llegará un conversor.",
+    "importErrorNewVersion": "Esta copia de seguridad procede de una versión más reciente de Emerald. Actualiza esta aplicación para restaurarla. No se ha cambiado nada.",
+    "entriesByCategory": "Entradas por categoría",
+    "includeUncategorizedHint": "Entradas sin categoría y aquellas cuya categoría está en la papelera.",
+    "groupTemplates": "Plantillas",
+    "previewEntries": "Entradas",
+    "previewTemplates": "Plantillas",
+    "previewTasks": "Tareas",
+    "previewLanguages": "Idiomas"
   },
   "contextMenu": {
     "openInNewTab": "Abrir en nueva pestaña",
@@ -1236,7 +1193,9 @@
     "languages": "Idiomas",
     "deleteSelected": "Eliminar seleccionados ({{count}})",
     "confirmDeleteSelected": "Sí, eliminar {{count}}",
-    "retentionNoteNever": "Los elementos se quedan hasta que los elimines definitivamente."
+    "retentionNoteNever": "Los elementos se quedan hasta que los elimines definitivamente.",
+    "entries": "Entradas",
+    "dashboards": "Paneles"
   },
   "leaveGuard": {
     "title": "Cambios sin guardar",
@@ -1283,9 +1242,6 @@
     "title": "Insertar enlace",
     "searchPlaceholder": "Buscar entradas…",
     "tabAll": "Todas",
-    "tabJournal": "Diario",
-    "tabWiki": "Wiki",
-    "tabOperations": "Operaciones",
     "tabTasks": "Tareas",
     "noResults": "No se encontraron entradas"
   },
@@ -1331,15 +1287,6 @@
     "entryTitlePlaceholder": "Déjalo vacío para el título habitual",
     "content": "Contenido",
     "contentPlaceholder": "Lo que trae cada entrada creada con esta plantilla …",
-    "allCategories": "Todas las categorías",
-    "overview": {
-      "title": "Asignaciones",
-      "hint": "Las entradas nuevas empiezan con una copia de la plantilla asignada. «Todas las categorías» se aplica donde una categoría no tiene una propia.",
-      "category": "Categoría",
-      "none": "Sin plantilla",
-      "fallback": "Si no: {{name}} (todas las categorías)",
-      "everyEntry": "Cada entrada nueva"
-    },
     "saveAsTemplate": "Guardar como plantilla",
     "insert": {
       "button": "Insertar plantilla",
@@ -1349,8 +1296,9 @@
       "noticeApplied": "Plantilla «{{name}}» aplicada",
       "dismiss": "Cerrar aviso"
     },
-    "assignTitle": "Asignaciones – {{name}}",
-    "assignHint": "Haz clic en una celda para que las entradas nuevas empiecen con esta plantilla; otro clic lo deshace. Se aplica al instante."
+    "defaultTemplate": "Plantilla predeterminada",
+    "defaultTemplateHint": "Con qué empieza una entrada nueva cuando su categoría no tiene plantilla inicial propia. Las plantillas iniciales se eligen en la categoría, en Categorías.",
+    "defaultNone": "Ninguna: empezar vacía"
   },
   "lexicon": {
     "languages": "Idiomas",
@@ -1404,22 +1352,9 @@
     "unmappedCount_other": "{{count}} sin equivalencia"
   },
   "emptyState": {
-    "journal": {
-      "title": "Aún no hay entradas",
-      "description": "Registra lo que vives, sueñas y obras. Las entradas nuevas reciben la fase lunar del día.",
-      "action": "Primera entrada"
-    },
-    "wiki": {
-      "title": "Aún no hay artículos",
-      "description": "Reúne saber sobre hierbas, piedras y símbolos."
-    },
     "tasks": {
       "title": "Todo hecho",
       "description": "No hay tareas abiertas. Las nuevas aparecerán aquí."
-    },
-    "operations": {
-      "title": "Aún no hay operaciones",
-      "description": "Planifica rituales con ingredientes, desarrollo y resultado."
     },
     "images": {
       "title": "Aún no hay imágenes",
@@ -1447,68 +1382,27 @@
     },
     "trash": {
       "title": "La papelera está vacía"
+    },
+    "allEntries": {
+      "title": "Aún no hay entradas",
+      "description": "Aquí aparece cada entrada del vault, sea cual sea su categoría."
+    },
+    "dashboard": {
+      "title": "Aún no hay nada aquí",
+      "description": "Este panel muestra las entradas que deja pasar su filtro. Cambia el filtro en sus ajustes."
+    },
+    "categories": {
+      "title": "Aún no hay categorías",
+      "description": "Las categorías ordenan tus entradas; cada una puede empezar con su propia plantilla."
+    },
+    "symbols": {
+      "title": "Aún no hay símbolos",
+      "description": "Dibuja en un lienzo, selecciona el dibujo y guárdalo como símbolo en la barra lateral."
     }
   },
   "sync": {
     "title": "Sincronización",
-    "url": "Dirección del servidor",
-    "connect": "Conectar",
-    "login": "Volver a conectar",
-    "connecting": "Conectando…",
-    "running": "Sincronizando…",
-    "last": "Última sincronización hace {{time}}",
-    "notYet": "Aún sin sincronizar en esta sesión",
-    "now": "Sincronizar ahora",
-    "needsLogin": "Este dispositivo ya no está conectado. Introduce de nuevo la clave de sincronización.",
-    "conflicts_one": "{{count}} entrada se cambió en dos dispositivos. Se conservan ambas versiones: busca «(conflicto)» en el título.",
-    "conflicts_other": "{{count}} entradas se cambiaron en dos dispositivos. Se conservan ambas versiones: busca «(conflicto)» en el título.",
-    "conflictTitle": "{{title}} (conflicto)",
-    "fetch": "Obtener",
-    "errorUnreachable": "El servidor no responde. La sincronización continuará cuando vuelva.",
-    "errorInsecure": "Esta dirección no es segura. Usa https, o http solo en este equipo, en una red privada o en una tailnet.",
-    "errorOutdated": "El vault del servidor es de una versión más reciente de Emerald. Actualiza esta aplicación.",
-    "errorServerOutdated": "Este servidor es demasiado antiguo para esta versión de Emerald. Actualiza el servidor.",
-    "errorAppOutdated": "Este servidor necesita una versión más reciente de Emerald. Actualiza esta aplicación.",
-    "errorServerOlder": "El vault del servidor es de una versión anterior de Emerald. Actualiza primero el dispositivo que lo puso allí.",
-    "errorCannotOpen": "Lo que envió el servidor no se puede abrir con la clave de este vault.",
-    "errorFailed": "La sincronización ha fallado.",
-    "passwordChanged": "La contraseña del vault se cambió en otro dispositivo. Introduce la nueva: esta copia se volverá a obtener con ella.",
-    "newVaultPassword": "Nueva contraseña del vault",
-    "adoptPassword": "Volver a obtener con esta contraseña",
-    "key": "Clave de sincronización",
-    "devices": "Dispositivos conectados",
-    "thisDevice": "este dispositivo",
-    "unnamedDevice": "Dispositivo sin nombre",
-    "removeDevice": "Quitar",
-    "errorWrongKey": "Esta no es la clave de este servidor.",
-    "disconnectServer": "Desconectar servidor",
-    "stateLocal": "solo aquí",
-    "statePaused": "desconectado",
-    "stateSynced": "sincronizando",
-    "upload": "Subir al servidor",
-    "pause": "Desconectar",
-    "resume": "Volver a conectar",
-    "deleteFromServer": "Borrar del servidor",
-    "reallyDelete": "Borrar de verdad",
-    "unnamedVault": "Vault {{number}}",
-    "goneFromServer": "Este vault se eliminó del servidor. Sigue aquí como vault local.",
-    "replaceWarning": "Este vault se sincroniza: la copia de seguridad también lo reemplaza en tus otros dispositivos, que antes guardan su propia copia de seguridad.",
-    "keychainWarning": "Emerald guarda la conexión en el llavero del sistema. Si rechazas el acceso, solo quedará ofuscada en un archivo de este dispositivo.",
-    "keychainShort": "La conexión se guarda en el llavero del sistema.",
-    "deleteFromServerConfirm": "¿Quitar del servidor?",
-    "noServer": "No hay ningún servidor conectado.",
-    "openPicker": "Servidor y vaults…",
-    "stateRemote": "solo en el servidor",
-    "notConnected": "Sin conectar",
-    "loggedOut": "Sesión cerrada",
-    "unreachable": "No disponible",
-    "reachable": "Disponible",
-    "statLastSync": "Última sincronización",
-    "statDevices": "Dispositivos",
-    "statSpace": "Espacio usado",
-    "unencryptedShort": "No está en el llavero del sistema: en este dispositivo solo está ofuscada.",
-    "removeDeviceConfirm": "¿Quitar?",
-    "disconnectServerConfirm": "¿Desconectar?"
+    "comingLater": "La sincronización llegará en una versión posterior. Hasta entonces, cada vault se queda en este dispositivo."
   },
   "start": {
     "server": "Servidor",
@@ -1518,5 +1412,43 @@
     "opened": "abierto",
     "byAuthor": "por {{name}}",
     "updateServer": "Servidor de actualizaciones"
+  },
+  "emeraldImport": {
+    "title": "Importar",
+    "oldVersion": "Este archivo procede de una versión anterior de Emerald y no se puede importar en esta. No se ha cambiado nada; llegará un conversor.",
+    "newVersion": "Este archivo procede de una versión más reciente de Emerald. Actualiza esta aplicación para importarlo. No se ha cambiado nada.",
+    "unsupported": "Este archivo no es un archivo de Emerald que esta versión pueda leer. No se ha cambiado nada.",
+    "tooLarge": "Este archivo es demasiado grande o tiene demasiadas partes para importarlo. No se ha cambiado nada.",
+    "failed": "La importación ha fallado. Las entradas y plantillas ya creadas se han vuelto a eliminar.",
+    "done": "Importación completada – entradas: {{entries}}, plantillas: {{templates}}."
+  },
+  "emeraldExport": {
+    "title": "Exportar",
+    "openEntryFirst": "Abre primero una entrada.",
+    "openTemplateFirst": "Abre primero una plantilla."
+  },
+  "emeraldKey": {
+    "title": "Abrir archivo de Emerald",
+    "hint": "Este archivo está cifrado con una contraseña. Introduce la contraseña que se le dio al exportarlo.",
+    "password": "Contraseña del archivo",
+    "open": "Abrir",
+    "wrongPassword": "La contraseña no corresponde a este archivo."
+  },
+  "dashboards": {
+    "unnamed": "Panel sin nombre",
+    "defaultName": "Nuevo panel",
+    "dashboard": "Panel",
+    "newEntry": "Nueva entrada",
+    "settings": "Ajustes del panel",
+    "name": "Nombre",
+    "allHasNoFilter": "«Todas las entradas» muestra cada entrada y no tiene filtro.",
+    "filterCategories": "Categorías",
+    "filterCategoriesHint": "Muestra entradas de las categorías marcadas. «Todas» muestra todas las categorías.",
+    "filterTags": "Etiquetas",
+    "filterTagsHint": "Si se indican, solo entradas con al menos una de estas etiquetas.",
+    "newCategory": "Nueva categoría",
+    "addCategory": "Añadir",
+    "moveUp": "Subir",
+    "moveDown": "Bajar"
   }
 }

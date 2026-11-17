@@ -28,18 +28,16 @@ function sharedLinkItems(deps: readonly unknown[], build: () => SuggestionItem[]
  */
 export function useLinkItems(): SuggestionItem[] {
   const { t } = useTranslation();
-  const entries = useEntryStore((s) => s.entries.journal);
-  const articles = useEntryStore((s) => s.entries.wiki);
-  const operations = useEntryStore((s) => s.entries.operation);
+  const entries = useEntryStore((s) => s.entries);
   const categories = useCategoryStore((s) => s.categories);
   const tasks = useTaskStore((s) => s.tasks);
   const showMoonPhase = useSettingsStore((s) => s.settings.journal.moonPhase);
 
   return useMemo(
     () => sharedLinkItems(
-      [t, entries, articles, operations, tasks, categories, showMoonPhase],
-      () => buildLinkItems({ entries, tasks, operations, articles, categories, showMoonPhase }, t),
+      [t, entries, tasks, categories, showMoonPhase],
+      () => buildLinkItems({ entries, tasks, categories, showMoonPhase }, t),
     ),
-    [t, entries, articles, operations, tasks, categories, showMoonPhase],
+    [t, entries, tasks, categories, showMoonPhase],
   );
 }

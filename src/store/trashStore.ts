@@ -4,13 +4,16 @@ import { removeUnusedFiles, useImageStore } from './imageStore';
 import { purgeCategory } from '../lib/schema';
 import { trashWiring } from './moduleWiring';
 import { useTagStore } from './tagStore';
+import { useSettingsStore } from './settingsStore';
 import { selectTrashedTaskRoots } from './taskStore';
 import { reassignCategoriesInMemory } from './categoryStore';
 import { definitionLabel, templateLabel } from '../lib/blocks/blockAttrs';
 import { iconTitle } from '../lib/helpers';
 import i18n from '../i18n';
 import { displayTitle } from '../lib/entryTitle';
-import type { EntryType, TrashedItem } from '../types';
+import type { TrashedItem } from '../types';
+import { fromRow, type DbRow } from '../lib/row';
+import { dashboardLabel } from '../lib/dashboards';
 
 interface TrashState {
   items: TrashedItem[];
@@ -30,12 +33,13 @@ export const useTrashStore = create<TrashState>((set, get) => ({
     set({ loading: true });
     try {
       const db = await getDb();
-      // Journal, wiki and operations in one query — only the last two have a category.
-      const entries = await db.select<{ id: string; type: EntryType; title: string; deleted_at: string; category: string | null }[]>(
-        `SELECT e.id, e.type, e.title, e.deleted_at, c.name as category
+      // All entries in one query — one kind in the trash, grouped by their category there.
+      const entries = await db.select<{ id: string; title: string; deleted_at: string; category: string | null }[]>(
+        `SELECT e.id, e.title, e.deleted_at, c.name as category
            FROM entries e LEFT JOIN categories c ON e.category_id = c.id
           WHERE e.deleted_at IS NOT NULL`
       );
+      const dashboards = await db.select<DbRow[]>('SELECT * FROM dashboards WHERE deleted_at IS NOT NULL');
       const tags = await db.select<{ id: string; name: string; deleted_at: string }[]>(
         `SELECT id, name, deleted_at FROM tags WHERE deleted_at IS NOT NULL`
       );
@@ -60,10 +64,16 @@ export const useTrashStore = create<TrashState>((set, get) => ({
         // Without a title of its own, "Unnamed…", as everywhere (`displayTitle`).
         ...entries.map((r) => ({
           id: r.id,
-          title: displayTitle(i18n.t, r.type, r.title),
+          title: displayTitle(i18n.t, 'entry', r.title),
           deleted_at: r.deleted_at,
-          type: r.type,
+          type: 'entry' as const,
           category: r.category ?? undefined,
+        })),
+        ...dashboards.map(fromRow.dashboard).map((d) => ({
+          id: d.id,
+          title: d.icon ? iconTitle(d.icon, dashboardLabel(i18n.t, d)) : dashboardLabel(i18n.t, d),
+          deleted_at: d.deleted_at ?? '',
+          type: 'dashboard' as const,
         })),
         ...tags.map((r) => ({ id: r.id, title: r.name, deleted_at: r.deleted_at, type: 'tag' as const })),
         ...categories.map((r) => ({ id: r.id, title: `${r.emoji} ${r.name}`, deleted_at: r.deleted_at, type: 'category' as const })),
@@ -114,6 +124,8 @@ export const useTrashStore = create<TrashState>((set, get) => ({
   emptyTrash: async () => {
     const db = await getDb();
     await db.execute(`DELETE FROM entries WHERE deleted_at IS NOT NULL`);
+    // "All entries" never reaches the trash; the guard is for a row that got there anyway.
+    await db.execute(`DELETE FROM dashboards WHERE deleted_at IS NOT NULL AND (builtin IS NULL OR builtin <> 'all')`);
     // Tags hang on entries by ID — first from every list, then the rows.
     await useTagStore.getState().purgeTrashedTags();
     await db.execute(`DELETE FROM task_links WHERE task_id IN (SELECT id FROM tasks WHERE deleted_at IS NOT NULL)`);
@@ -122,6 +134,12 @@ export const useTrashStore = create<TrashState>((set, get) => ({
     await db.execute(`DELETE FROM block_definitions WHERE deleted_at IS NOT NULL`);
     // Likewise templates.
     await db.execute(`DELETE FROM templates WHERE deleted_at IS NOT NULL`);
+    // A default template that went with them points nowhere — the setting follows, as on a single deletion.
+    const settings = useSettingsStore.getState();
+    const defaultId = settings.settings.templates.defaultTemplateId;
+    if (defaultId && !(await db.select<{ id: string }[]>('SELECT id FROM templates WHERE id=$1', [defaultId])).length) {
+      settings.update('templates', { defaultTemplateId: null });
+    }
     // ON DELETE CASCADE takes the vocabulary along — it has no `deleted_at` of its own.
     await db.execute(`DELETE FROM languages WHERE deleted_at IS NOT NULL`);
     // The details, then their files where nothing else uses them.
@@ -147,8 +165,8 @@ export const useTrashStore = create<TrashState>((set, get) => ({
     if (doomed.size > 0) reassignCategoriesInMemory(doomed);
 
     // Only now, when all contents are gone: clear links pointing into the void.
-    // Previously this ran only over journal and wiki IDs and left the links
-    // of deleted operations as well as all task_links in place.
+    // Previously this ran only over some entry IDs and left the links
+    // of the other entries as well as all task_links in place.
     await sweepDanglingTaskLinks(db);
 
     set({ items: [] });

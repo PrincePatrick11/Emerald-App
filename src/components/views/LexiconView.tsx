@@ -1,30 +1,24 @@
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Copy, Trash2 } from 'lucide-react';
 import { useLexiconStore } from '../../store/lexiconStore';
 import { useUIStore } from '../../store/uiStore';
 import { AUX_VIEWS } from '../../lib/modules';
-import { sortItems } from '../../lib/sortItems';
-import { isCardView } from '../../lib/viewMode';
-import { groupByMonth } from '../../lib/groupBy';
 import { usePersistedFlag } from '../../hooks/usePersistedFlag';
 import { useOpenInNewTabAction } from '../../hooks/useOpenInNewTabAction';
-import Dashboard from '../ui/Dashboard';
 import CollapsibleGroupHeader from '../ui/CollapsibleGroupHeader';
-import DashboardItem, { CardContent, RowContent } from '../ui/DashboardItem';
-import ContextMenu from '../ui/ContextMenu';
 import BlockGlyph from '../blocks/BlockGlyph';
 import LanguagePage from '../lexicon/LanguagePage';
 import TranslatePanel from '../lexicon/TranslatePanel';
 import type { Language } from '../../types';
-import { useSessionState } from '../../store/sessionStore';
 import { createItem } from '../../lib/createItem';
 import { useLibraryItemRemove } from '../../hooks/useLibraryItemRemove';
+import CollectionDashboard, { useCollectionState } from './CollectionDashboard';
 
 /**
- * The rail view "Lexicon", built like "Templates": the languages in the
- * shared dashboard scaffold, a click opens one as a page of its own
- * (`{ type: 'lexicon', id }`). Below it the translate field — it works with all languages and therefore
+ * The rail view "Lexicon", a collection like the others: the languages,
+ * a click opens one as a page of its own
+ * (`{ type: 'lexicon', id }`), where its words are. Below it the translate field — it works with all languages and therefore
  * belongs next to the list, not on a single language page.
  *
  * Deleting moves a language to the trash (with undo); its vocabulary
@@ -61,9 +55,8 @@ export default function LexiconView() {
 }
 
 /**
- * The list of languages in the shared dashboard scaffold — view and
- * sorting as in the other dashboards, under a collapsible
- * heading like the translate field below.
+ * The languages as a collection — view and sorting like every collection,
+ * under a collapsible heading like the translate field below.
  */
 function LanguageList({ onCreate, onDelete }: {
   onCreate: () => void;
@@ -74,11 +67,8 @@ function LanguageList({ onCreate, onDelete }: {
   const entries = useLexiconStore((s) => s.entries);
   const duplicateLanguage = useLexiconStore((s) => s.duplicateLanguage);
   const openInNewTabAction = useOpenInNewTabAction();
-  const prefs = useUIStore((s) => s.lexiconPrefs);
-  const setPrefs = useUIStore((s) => s.setLexiconPrefs);
+  const state = useCollectionState('lexicon');
   const [collapsed, toggleCollapsed] = usePersistedFlag('lexicon-list-collapsed');
-  const [search, setSearch] = useSessionState('lexicon.search', '');
-  const [ctxMenu, setCtxMenu] = useState<{ id: string; x: number; y: number } | null>(null);
 
   /** How many words per language — one count for all rows instead of one per row. */
   const wordCounts = useMemo(() => {
@@ -87,61 +77,35 @@ function LanguageList({ onCreate, onDelete }: {
     return counts;
   }, [entries]);
 
-  const query = search.trim().toLowerCase();
-  const filtered = query
-    ? languages.filter((l) => l.name.toLowerCase().includes(query))
-    : languages;
-  const sorted = sortItems(filtered, prefs.sort, { date: (l) => l.updated_at, title: (l) => l.name });
-
-  const cards = isCardView(prefs.view);
-  const renderItem = (language: Language) => {
-    const meta = (
-      <span className="tabular-nums">
-        {t('lexicon.wordCount', { count: wordCounts.get(language.id) ?? 0 })}
-        {language.alphabet.length > 0 && (
-          <> · {t('lexicon.letterCount', { count: language.alphabet.length })}</>
-        )}
-      </span>
-    );
-    return (
-      <DashboardItem
-        view={{ type: 'lexicon', id: language.id }}
-        layout={cards ? 'card' : 'row'}
-        onContextMenu={(e) => {
-          e.preventDefault();
-          setCtxMenu({ id: language.id, x: e.clientX, y: e.clientY });
-        }}
-      >
-        {cards
-          ? <CardContent icon={<BlockGlyph icon={language.icon} size={16} />} title={language.name} meta={meta} />
-          : <RowContent icon={<BlockGlyph icon={language.icon} size={14} />} title={language.name} meta={meta} />}
-      </DashboardItem>
-    );
-  };
-
-  const menuLanguage = ctxMenu && languages.find((l) => l.id === ctxMenu.id);
-
   return (
-    <Dashboard<Language>
+    <CollectionDashboard<Language>
+      state={state}
       title={t('nav.lexicon')}
       primaryAction={{ label: t('lexicon.newLanguage'), onClick: onCreate }}
-      view={prefs.view}
-      sort={prefs.sort}
-      sortDate="updated"
-      onView={(view) => setPrefs({ view })}
-      onSort={(sort) => setPrefs({ sort })}
-      search={search}
-      onSearch={setSearch}
-      // Collapsed means an empty list instead of a special branch — like blocks and templates.
-      items={collapsed ? [] : sorted}
+      items={languages}
       itemKey={(l) => l.id}
-      renderItem={renderItem}
-      grouping={
-        prefs.view === 'timeline' && !collapsed
-          ? { mode: 'timeline', groups: groupByMonth(sorted, (l) => l.updated_at) }
-          : { mode: 'flat' }
-      }
-      isEmpty={!collapsed && languages.length === 0}
+      itemTitle={(l) => l.name}
+      itemDate={(l) => l.updated_at}
+      itemCount={(l) => wordCounts.get(l.id) ?? 0}
+      describe={(language) => ({
+        icon: <BlockGlyph icon={language.icon} size={14} />,
+        cardIcon: <BlockGlyph icon={language.icon} size={16} />,
+        title: language.name,
+        meta: (
+          <span className="tabular-nums">
+            {t('lexicon.wordCount', { count: wordCounts.get(language.id) ?? 0 })}
+            {language.alphabet.length > 0 && (
+              <> · {t('lexicon.letterCount', { count: language.alphabet.length })}</>
+            )}
+          </span>
+        ),
+        view: { type: 'lexicon', id: language.id },
+      })}
+      contextActions={(language) => [
+        openInNewTabAction({ type: 'lexicon', id: language.id }),
+        { label: t('contextMenu.duplicate'), icon: <Copy size={12} />, onClick: () => void duplicateLanguage(language.id) },
+        { label: t('contextMenu.delete'), icon: <Trash2 size={12} />, onClick: () => onDelete(language), danger: true },
+      ]}
       emptyState={{
         icon: AUX_VIEWS.lexicon.icon,
         title: t('emptyState.lexicon.title'),
@@ -149,7 +113,8 @@ function LanguageList({ onCreate, onDelete }: {
         actionLabel: t('lexicon.newLanguage'),
         onAction: onCreate,
       }}
-      hasNoResults={!collapsed && filtered.length === 0}
+      // Collapsed means an empty list instead of a special branch — like blocks and templates.
+      collapsed={collapsed}
       contentHeader={
         <CollapsibleGroupHeader
           label={t('lexicon.languages')}
@@ -158,18 +123,6 @@ function LanguageList({ onCreate, onDelete }: {
         />
       }
       contentFooter={<TranslatePanel />}
-      contextMenuSlot={ctxMenu && menuLanguage && (
-        <ContextMenu
-          x={ctxMenu.x}
-          y={ctxMenu.y}
-          onClose={() => setCtxMenu(null)}
-          actions={[
-            openInNewTabAction({ type: 'lexicon', id: menuLanguage.id }),
-            { label: t('contextMenu.duplicate'), icon: <Copy size={12} />, onClick: () => void duplicateLanguage(menuLanguage.id) },
-            { label: t('contextMenu.delete'), icon: <Trash2 size={12} />, onClick: () => onDelete(menuLanguage), danger: true },
-          ]}
-        />
-      )}
     />
   );
 }

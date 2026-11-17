@@ -15,7 +15,7 @@ import type { ActiveView } from '../types';
  * Import rule: this store imports no other — the others read
  * it, not the other way round.
  */
-export interface EditGuard {
+interface EditGuard {
   /** The page the guard belongs to: `guardKey(view type, id)`. */
   key: string;
   /** The name of what is being edited — shown in the modal. */
@@ -28,7 +28,7 @@ export interface EditGuard {
   discard: () => void | Promise<void>;
 }
 
-export type LeaveChoice = 'save' | 'discard' | 'stay';
+type LeaveChoice = 'save' | 'discard' | 'stay';
 
 interface LeaveQuestion {
   title: string;
@@ -78,15 +78,6 @@ export async function withoutLeaveGuard<T>(key: string, run: () => T | Promise<T
     else ending.delete(key);
   }
 }
-
-/**
- * Is "Done", "Cancel" or "Delete" currently running on page `key`? Anyone who
- * would pull it out from under it — a type change — waits for that: its step
- * back to the list or to reading would otherwise fall into that lock
- * (`uiStore.editLocked`) and be dropped, or afterwards hit a type and id
- * pair that no longer exists.
- */
-export const isEnding = (key: string): boolean => ending.has(key);
 
 /** Would a question have to be asked before leaving the open page? */
 export function leaveNeedsConfirm(): boolean {

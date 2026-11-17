@@ -2,17 +2,13 @@ import { useEffect, useRef, type ReactNode } from 'react';
 import { Folder, Tag, type LucideIcon } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { comparable, type SearchHit, type SearchKind, type SearchResults } from '../../../lib/globalSearch';
-import { AUX_VIEWS, MODULES } from '../../../lib/modules';
+import { AUX_VIEWS, ENTRY_ICON, TASKS_VIEW } from '../../../lib/modules';
 
-/** The search speaks data-model vocabulary ('operation' singular, 'task') —
- *  the module kinds take icon and nav label from the registry, the three
- *  non-module kinds have their own. A total record: a new SearchKind
+/** Icon and badge per hit kind. A total record: a new SearchKind
  *  without an entry here is a compile error, not a runtime hole. */
 const KIND_META: Record<SearchKind, { icon: LucideIcon; labelKey: string }> = {
-  journal: { icon: MODULES.journal.icon, labelKey: MODULES.journal.navLabelKey },
-  wiki: { icon: MODULES.wiki.icon, labelKey: MODULES.wiki.navLabelKey },
-  operation: { icon: MODULES.operations.icon, labelKey: MODULES.operations.navLabelKey },
-  task: { icon: MODULES.tasks.icon, labelKey: MODULES.tasks.navLabelKey },
+  entry: { icon: ENTRY_ICON, labelKey: 'entries.label' },
+  task: { icon: TASKS_VIEW.icon, labelKey: TASKS_VIEW.navLabelKey },
   image: { icon: AUX_VIEWS.images.icon, labelKey: AUX_VIEWS.images.navLabelKey },
   tag: { icon: Tag, labelKey: 'nav.tags' },
   category: { icon: Folder, labelKey: 'search.categories' },
@@ -134,17 +130,6 @@ export default function SearchResultList({
               <span className="search-result-badge mt-0.5">
                 {t(KIND_META[hit.kind].labelKey)}
                 {hit.entryNumber != null && <span>#{hit.entryNumber}</span>}
-                {/* Mutually exclusive: a category has no entry number. */}
-                {hit.module && (
-                  <>
-                    <span aria-hidden="true">·</span>
-                    {/* Categories only: the module in which they are used most.
-                        Not a jump target — since the view of its own, the hit
-                        always opens that one —, but a hint as to
-                        which of the identically named categories is meant. */}
-                    <span>{t(MODULES[hit.module].navLabelKey)}</span>
-                  </>
-                )}
               </span>
             </button>
           ))}

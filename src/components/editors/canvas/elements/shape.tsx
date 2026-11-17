@@ -31,7 +31,7 @@ export type ShapeElement = CanvasElement<ShapeProps>;
 export const DEFAULT_FILL = '#d4af37';
 
 /** A polygon's corners or a star's points, with the defaults where none are stored. */
-export function shapeSides(props: Pick<ShapeProps, 'shape' | 'sides'>): number | null {
+function shapeSides(props: Pick<ShapeProps, 'shape' | 'sides'>): number | null {
   switch (props.shape) {
     case 'polygon': return props.sides ?? 6;
     case 'star': return props.sides ?? 5;
@@ -48,7 +48,7 @@ type ShapePathTarget = PathSink & {
 };
 
 /** The outline of a shape in its box, as a path on `ctx`. */
-export function shapePath(ctx: ShapePathTarget, props: Pick<ShapeProps, 'shape' | 'cornerRadius' | 'sides'>, w: number, h: number): void {
+function shapePath(ctx: ShapePathTarget, props: Pick<ShapeProps, 'shape' | 'cornerRadius' | 'sides'>, w: number, h: number): void {
   ctx.beginPath();
   switch (props.shape) {
     case 'rect': {

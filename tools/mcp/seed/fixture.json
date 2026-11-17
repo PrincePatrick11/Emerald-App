@@ -1,232 +1,362 @@
 {
   "_comment": [
-    "Test data for an MCP instance's seed vault. Rows are inserted in the order",
-    "of TABLES in the app's schema.ts (parents before children); within a table",
-    "they go in file order, except tasks, which are inserted twice so a subtask",
-    "can point at a parent that comes later.",
+    "Test data for an MCP instance's seed vault, in the app's current model.",
+    "Rows are inserted in the order of TABLES in the app's schema.ts (parents",
+    "before children); within a table in file order, except tasks, which go in",
+    "twice so a subtask can point at a parent that comes later.",
     "",
     "Columns are filtered against PRAGMA table_info, so a column the app drops",
     "later is ignored rather than failing the build. Anything the app defaults",
     "sensibly is left out on purpose - this file should read as data, not as a",
     "restatement of the schema.",
     "",
-    "@@chip(id,entryType,label)@@ in a content string expands to a real internal",
-    "link chip via the app's own internalLinkChipHtml(), so the markup cannot",
-    "drift from the editor extension.",
+    "`content` of entries and templates becomes block rows through the app's",
+    "own block store; `tags` (tag ids) becomes rows of the tag link tables.",
+    "@@chip(id,entry|task,label)@@ in a content string expands to a real",
+    "internal link chip via the app's own internalLinkChipHtml(), and",
+    "@@file(name)@@ to the stored name of a picture in seed/images.",
     "",
-    "Ids are written readable (seed-wiki-sigil) and become stable UUIDs at build",
+    "dashboard_categories adds the fixture's own categories to the filters of",
+    "the built-in dashboards.",
+    "",
+    "Ids are written readable (seed-entry-moon) and become stable UUIDs at build",
     "time, everywhere they occur: the app only follows links to UUIDs. Write a",
     "new row's id as seed-<something> and reference it by that name.",
     "",
-    "Entries of every module, tags, categories and tasks carry one deleted row each so the trash is",
-    "testable without having to delete something first. Their deleted_at is moved",
-    "to about a day before the build, so the trash retention does not purge them."
+    "Each built-in dashboard has one deleted entry, and tags, categories, tasks",
+    "and images one deleted row each, so the trash is testable without having to",
+    "delete something first.",
+    "Their deleted_at is moved to about a day before the build, so the trash",
+    "retention does not purge them."
   ],
-
   "categories": [
-    { "id": "seed-cat-rituals",  "name": "Rituals",  "emoji": "🪄", "sort_order": 20 },
-    { "id": "seed-cat-research", "name": "Research", "emoji": "📚", "sort_order": 21 },
-    { "id": "seed-cat-archive",  "name": "Archive",  "emoji": "🗃️", "sort_order": 22,
-      "deleted_at": "2026-09-06T09:00:00.000Z" }
+    {
+      "id": "seed-cat-rituals",
+      "name": "Rituals",
+      "emoji": "🪄",
+      "sort_order": 20
+    },
+    {
+      "id": "seed-cat-research",
+      "name": "Research",
+      "emoji": "📚",
+      "sort_order": 21
+    },
+    {
+      "id": "seed-cat-archive",
+      "name": "Archive",
+      "emoji": "🗃️",
+      "sort_order": 22,
+      "deleted_at": "2026-09-06T09:00:00.000Z"
+    }
   ],
-
+  "dashboard_categories": {
+    "knowledge": [
+      "seed-cat-research",
+      "seed-cat-rituals"
+    ]
+  },
   "tags": [
-    { "id": "seed-tag-moon",     "name": "moon",     "color": "#8347ff" },
-    { "id": "seed-tag-ritual",   "name": "ritual",   "color": "#3ba55d" },
-    { "id": "seed-tag-research", "name": "research", "color": "#e0a30c" },
-    { "id": "altar-library",     "name": "Altar Library", "color": "#f59e0b" },
-    { "id": "seed-tag-retired",  "name": "retired",  "color": "#8a8a8a",
-      "deleted_at": "2026-09-06T09:05:00.000Z" }
+    {
+      "id": "seed-tag-moon",
+      "name": "moon",
+      "color": "#8347ff"
+    },
+    {
+      "id": "seed-tag-ritual",
+      "name": "ritual",
+      "color": "#3ba55d"
+    },
+    {
+      "id": "seed-tag-research",
+      "name": "research",
+      "color": "#e0a30c"
+    },
+    {
+      "id": "altar-library",
+      "name": "Altar Library",
+      "color": "#f59e0b"
+    },
+    {
+      "id": "seed-tag-retired",
+      "name": "retired",
+      "color": "#8a8a8a",
+      "deleted_at": "2026-09-06T09:05:00.000Z"
+    }
   ],
-
-  "wiki_articles": [
+  "entries": [
     {
-      "id": "seed-wiki-moon", "title": "Moon Phases", "slug": "moon-phases",
-      "category_id": "seed-cat-research", "entry_number": 1,
+      "id": "seed-entry-moon",
+      "title": "Moon Phases",
+      "category_id": "seed-cat-research",
+      "entry_number": 1,
       "content": "<h2>Moon Phases</h2><p>Eight phases, from new moon to waning crescent. Timing anchor for most of the rituals in this vault.</p><ul><li>New moon &mdash; beginnings</li><li>Full moon &mdash; charging</li></ul>",
-      "tags": "[\"moon\",\"research\"]",
-      "created_at": "2026-09-01T08:00:00.000Z", "updated_at": "2026-09-02T08:00:00.000Z"
+      "tags": [
+        "seed-tag-moon",
+        "seed-tag-research"
+      ],
+      "created_at": "2026-09-01T08:00:00.000Z",
+      "updated_at": "2026-09-02T08:00:00.000Z"
     },
     {
-      "id": "seed-wiki-sigil", "title": "Sigil Method", "slug": "sigil-method",
-      "category_id": "seed-cat-research", "entry_number": 2,
-      "content": "<h2>Sigil Method</h2><p>Statement of intent, strike the vowels and repeated letters, then bind what is left into a glyph. See @@chip(seed-wiki-moon,wiki,Moon Phases)@@ for timing.</p>",
-      "tags": "[\"research\"]",
-      "created_at": "2026-09-01T09:00:00.000Z", "updated_at": "2026-09-03T09:00:00.000Z"
+      "id": "seed-entry-sigil-method",
+      "title": "Sigil Method",
+      "category_id": "seed-cat-research",
+      "entry_number": 2,
+      "content": "<h2>Sigil Method</h2><p>Statement of intent, strike the vowels and repeated letters, then bind what is left into a glyph. See @@chip(seed-entry-moon,entry,Moon Phases)@@ for timing.</p>",
+      "tags": [
+        "seed-tag-research"
+      ],
+      "created_at": "2026-09-01T09:00:00.000Z",
+      "updated_at": "2026-09-03T09:00:00.000Z"
     },
     {
-      "id": "seed-wiki-banishing", "title": "Banishing", "slug": "banishing",
-      "category_id": "seed-cat-rituals", "entry_number": 3,
+      "id": "seed-entry-banishing",
+      "title": "Banishing",
+      "category_id": "seed-cat-rituals",
+      "entry_number": 3,
       "content": "<h2>Banishing</h2><p>Clearing the working space before an operation.</p>",
-      "tags": "[\"ritual\"]",
-      "created_at": "2026-09-01T10:00:00.000Z", "updated_at": "2026-09-01T10:00:00.000Z"
+      "tags": [
+        "seed-tag-ritual"
+      ],
+      "created_at": "2026-09-01T10:00:00.000Z",
+      "updated_at": "2026-09-01T10:00:00.000Z"
     },
     {
-      "id": "seed-wiki-trashed", "title": "Discarded Note", "slug": "discarded-note",
-      "category_id": "seed-cat-research", "entry_number": 4,
-      "content": "<p>Kept only so the wiki trash has something in it.</p>",
-      "created_at": "2026-09-01T11:00:00.000Z", "updated_at": "2026-09-05T11:00:00.000Z",
+      "id": "seed-entry-discarded",
+      "title": "Discarded Note",
+      "category_id": "seed-cat-research",
+      "entry_number": 4,
+      "content": "<p>Kept only so the Knowledge trash has something in it.</p>",
+      "created_at": "2026-09-01T11:00:00.000Z",
+      "updated_at": "2026-09-05T11:00:00.000Z",
       "deleted_at": "2026-09-06T11:00:00.000Z"
     },
     {
-      "id": "seed-wiki-sketch", "title": "Sketchbook", "slug": "sketchbook",
-      "category_id": "seed-cat-research", "entry_number": 5,
-      "content": "<section data-block=\"core.text\" data-block-id=\"seed-sketch-text\"><p>A canvas with pictures from Images, and a painting to try the brushes on.</p></section><section data-block=\"core.canvas\" data-block-id=\"seed-canvas-1\" data-block-data=\"{&quot;width&quot;:1600,&quot;height&quot;:1000,&quot;elements&quot;:[{&quot;id&quot;:&quot;seed-el-sun&quot;,&quot;x&quot;:500,&quot;y&quot;:450,&quot;width&quot;:320,&quot;height&quot;:320,&quot;z&quot;:1,&quot;type&quot;:&quot;image&quot;,&quot;rotation&quot;:0,&quot;opacity&quot;:1,&quot;locked&quot;:false,&quot;hidden&quot;:false,&quot;ref&quot;:&quot;@@file(sun.png)@@&quot;,&quot;props&quot;:{&quot;src&quot;:&quot;@@file(sun.png)@@&quot;,&quot;emoji&quot;:&quot;&quot;}},{&quot;id&quot;:&quot;seed-el-moon&quot;,&quot;x&quot;:1100,&quot;y&quot;:450,&quot;width&quot;:320,&quot;height&quot;:320,&quot;z&quot;:2,&quot;type&quot;:&quot;image&quot;,&quot;rotation&quot;:0,&quot;opacity&quot;:1,&quot;locked&quot;:false,&quot;hidden&quot;:false,&quot;ref&quot;:&quot;@@file(moon.png)@@&quot;,&quot;props&quot;:{&quot;src&quot;:&quot;@@file(moon.png)@@&quot;,&quot;emoji&quot;:&quot;&quot;}},{&quot;id&quot;:&quot;seed-el-text&quot;,&quot;type&quot;:&quot;text&quot;,&quot;x&quot;:800,&quot;y&quot;:150,&quot;width&quot;:700,&quot;height&quot;:90,&quot;rotation&quot;:0,&quot;opacity&quot;:1,&quot;locked&quot;:false,&quot;hidden&quot;:false,&quot;z&quot;:3,&quot;props&quot;:{&quot;text&quot;:&quot;As above, so below&quot;,&quot;font&quot;:&quot;serif&quot;,&quot;fontSize&quot;:64,&quot;color&quot;:&quot;#d4af37&quot;,&quot;align&quot;:&quot;center&quot;,&quot;bold&quot;:false,&quot;italic&quot;:false}}],&quot;background&quot;:null,&quot;guides&quot;:[],&quot;guidesLocked&quot;:false}\" data-block-config=\"{&quot;images&quot;:false,&quot;shapes&quot;:true,&quot;text&quot;:true,&quot;symbols&quot;:true,&quot;drawing&quot;:true}\"><img src=\"@@file(sun.png)@@\" alt=\"\" data-canvas=\"image\"><img src=\"@@file(moon.png)@@\" alt=\"\" data-canvas=\"image\"></section><section data-block=\"core.paint\" data-block-id=\"seed-paint-1\"></section>",
-      "tags": "[\"research\"]",
-      "created_at": "2026-09-04T10:00:00.000Z", "updated_at": "2026-09-04T10:00:00.000Z"
-    }
-  ],
-
-  "journal_entries": [
-    {
-      "id": "seed-journal-1", "title": "First Working", "entry_number": 1,
-      "content": "<p>Opened the circle just after dusk. Followed @@chip(seed-wiki-banishing,wiki,Banishing)@@ first, then sat with the intention for twenty minutes.</p><p>Quiet, but the focus held longer than last time.</p>",
-      "moon_phase": "waxing_crescent", "mood": "focused",
-      "tags": "[\"ritual\",\"moon\"]",
-      "created_at": "2026-09-02T20:00:00.000Z", "updated_at": "2026-09-02T21:30:00.000Z"
-    },
-    {
-      "id": "seed-journal-2", "title": "Charging Notes", "entry_number": 2,
-      "content": "<p>Full moon. Charged the glyph from @@chip(seed-op-prosperity,operation,Prosperity Sigil)@@ on the windowsill overnight.</p>",
-      "moon_phase": "full", "mood": "calm",
-      "linked_operation_ids": "[\"seed-op-prosperity\"]",
-      "tags": "[\"moon\"]",
-      "created_at": "2026-09-04T22:00:00.000Z", "updated_at": "2026-09-04T22:20:00.000Z"
-    },
-    {
-      "id": "seed-journal-3", "title": "Meditation", "entry_number": 3,
-      "content": "<p>Twenty minutes of breath counting. Nothing to report, which is the point.</p>",
-      "is_meditation": 1, "meditation_duration": 20,
-      "meditation_type_wiki_id": "seed-wiki-moon",
-      "created_at": "2026-09-07T07:00:00.000Z", "updated_at": "2026-09-07T07:25:00.000Z"
-    },
-    {
-      "id": "seed-journal-trashed", "title": "Abandoned Draft", "entry_number": 4,
-      "content": "<p>Kept only so the journal trash has something in it.</p>",
-      "created_at": "2026-09-05T12:00:00.000Z", "updated_at": "2026-09-05T12:00:00.000Z",
-      "deleted_at": "2026-09-06T12:00:00.000Z"
-    }
-  ],
-
-  "operations": [
-    {
-      "id": "seed-op-prosperity", "title": "Prosperity Sigil", "entry_number": 1,
-      "category_id": "sigils",
-      "description": "Standing sigil, charged at the full moon.",
-      "content": "<p>Statement of intent, reduced and bound. Method in @@chip(seed-wiki-sigil,wiki,Sigil Method)@@.</p>",
-      "intention_text": "It is my will to keep steady work",
-      "letter_bank": "[\"T\",\"S\",\"M\",\"Y\",\"W\",\"L\",\"K\",\"P\",\"D\",\"R\"]",
-      "implemented_letters": "[\"T\",\"S\",\"M\"]",
-      "is_active": 1, "is_loaded": 1, "show_sigil": 1,
-      "charging_technique_wiki_id": "seed-wiki-moon",
-      "tags": "[\"ritual\"]",
-      "created_at": "2026-09-03T18:00:00.000Z", "updated_at": "2026-09-04T22:30:00.000Z"
-    },
-    {
-      "id": "seed-op-servitor", "title": "Study Servitor", "entry_number": 2,
-      "category_id": "seed-cat-rituals",
-      "description": "Short-lived helper for the reading backlog.",
-      "content": "<p>Task: keep the reading list moving. Dissolves at the next new moon.</p>",
-      "intention_text": "It is my will to read what I have started",
-      "is_active": 1, "is_loaded": 0, "show_sigil": 0,
-      "end_date": "2026-10-01T00:00:00.000Z",
-      "created_at": "2026-09-05T19:00:00.000Z", "updated_at": "2026-09-05T19:00:00.000Z"
-    },
-    {
-      "id": "seed-op-trashed", "title": "Retired Operation", "entry_number": 3,
-      "category_id": "seed-cat-research", "is_active": 0,
-      "content": "<p>Kept only so the operations trash has something in it.</p>",
-      "created_at": "2026-09-02T19:00:00.000Z", "updated_at": "2026-09-05T19:00:00.000Z",
+      "id": "seed-entry-retired",
+      "title": "Retired Operation",
+      "category_id": "ritual",
+      "entry_number": 5,
+      "content": "<p>Kept only so the Practice trash has something in it.</p>",
+      "created_at": "2026-09-02T19:00:00.000Z",
+      "updated_at": "2026-09-05T19:00:00.000Z",
       "deleted_at": "2026-09-06T13:00:00.000Z"
     },
     {
-      "id": "seed-altar-1", "title": "Working Altar", "entry_number": 4,
+      "id": "seed-entry-first-working",
+      "title": "First Working",
+      "category_id": "journal",
+      "entry_number": 6,
+      "content": "<p>Opened the circle just after dusk. Followed @@chip(seed-entry-banishing,entry,Banishing)@@ first, then sat with the intention for twenty minutes.</p><p>Quiet, but the focus held longer than last time.</p>",
+      "tags": [
+        "seed-tag-ritual",
+        "seed-tag-moon"
+      ],
+      "created_at": "2026-09-02T20:00:00.000Z",
+      "updated_at": "2026-09-02T21:30:00.000Z"
+    },
+    {
+      "id": "seed-entry-altar",
+      "title": "Working Altar",
       "category_id": "altars",
-      "content": "<section data-block=\"core.altar\" data-block-id=\"altar-seed-altar-1\" data-block-data=\"{&quot;width&quot;:1920,&quot;height&quot;:1080,&quot;elements&quot;:[{&quot;id&quot;:&quot;seed-place-1&quot;,&quot;x&quot;:614.4,&quot;y&quot;:496.8,&quot;width&quot;:50,&quot;height&quot;:50,&quot;rotation&quot;:0,&quot;opacity&quot;:1,&quot;locked&quot;:false,&quot;hidden&quot;:false,&quot;z&quot;:1,&quot;type&quot;:&quot;image&quot;,&quot;props&quot;:{&quot;src&quot;:null,&quot;emoji&quot;:&quot;🕯️&quot;,&quot;glow&quot;:true}},{&quot;id&quot;:&quot;seed-place-2&quot;,&quot;x&quot;:1228.8,&quot;y&quot;:496.8,&quot;width&quot;:40,&quot;height&quot;:40,&quot;rotation&quot;:15,&quot;opacity&quot;:1,&quot;locked&quot;:false,&quot;hidden&quot;:false,&quot;z&quot;:2,&quot;type&quot;:&quot;image&quot;,&quot;props&quot;:{&quot;src&quot;:null,&quot;emoji&quot;:&quot;🔮&quot;,&quot;glow&quot;:false}}],&quot;background&quot;:{&quot;fill&quot;:{&quot;kind&quot;:&quot;radial&quot;,&quot;colors&quot;:[&quot;#1e1e3c&quot;,&quot;#0f0f1e&quot;,&quot;#0a0a0f&quot;],&quot;cx&quot;:0.5,&quot;cy&quot;:0.25},&quot;image&quot;:null,&quot;tint&quot;:{&quot;color&quot;:&quot;#0a0a0f&quot;,&quot;opacity&quot;:0.16}},&quot;guides&quot;:[],&quot;guidesLocked&quot;:false}\" data-block-config=\"{&quot;images&quot;:true,&quot;shapes&quot;:true,&quot;text&quot;:true,&quot;symbols&quot;:true,&quot;drawing&quot;:true}\"></section><section data-block=\"core.text\" data-block-id=\"notes-seed-altar-1\"></section>",
-      "created_at": "2026-09-03T17:00:00.000Z", "updated_at": "2026-09-06T17:00:00.000Z"
+      "entry_number": 7,
+      "content": "<section data-block=\"core.altar\" data-block-id=\"altar-seed-entry-altar\" data-block-data=\"{&quot;width&quot;:1920,&quot;height&quot;:1080,&quot;elements&quot;:[{&quot;id&quot;:&quot;seed-place-1&quot;,&quot;x&quot;:614.4,&quot;y&quot;:496.8,&quot;width&quot;:50,&quot;height&quot;:50,&quot;rotation&quot;:0,&quot;opacity&quot;:1,&quot;locked&quot;:false,&quot;hidden&quot;:false,&quot;z&quot;:1,&quot;type&quot;:&quot;image&quot;,&quot;props&quot;:{&quot;src&quot;:null,&quot;emoji&quot;:&quot;🕯️&quot;,&quot;glow&quot;:true}},{&quot;id&quot;:&quot;seed-place-2&quot;,&quot;x&quot;:1228.8,&quot;y&quot;:496.8,&quot;width&quot;:40,&quot;height&quot;:40,&quot;rotation&quot;:15,&quot;opacity&quot;:1,&quot;locked&quot;:false,&quot;hidden&quot;:false,&quot;z&quot;:2,&quot;type&quot;:&quot;image&quot;,&quot;props&quot;:{&quot;src&quot;:null,&quot;emoji&quot;:&quot;🔮&quot;,&quot;glow&quot;:false}}],&quot;background&quot;:{&quot;fill&quot;:{&quot;kind&quot;:&quot;radial&quot;,&quot;colors&quot;:[&quot;#1e1e3c&quot;,&quot;#0f0f1e&quot;,&quot;#0a0a0f&quot;],&quot;cx&quot;:0.5,&quot;cy&quot;:0.25},&quot;image&quot;:null,&quot;tint&quot;:{&quot;color&quot;:&quot;#0a0a0f&quot;,&quot;opacity&quot;:0.16}},&quot;guides&quot;:[],&quot;guidesLocked&quot;:false}\" data-block-config=\"{&quot;images&quot;:true,&quot;shapes&quot;:true,&quot;text&quot;:true,&quot;symbols&quot;:true,&quot;drawing&quot;:true}\"></section><section data-block=\"core.text\" data-block-id=\"notes-seed-entry-altar\"></section>",
+      "created_at": "2026-09-03T17:00:00.000Z",
+      "updated_at": "2026-09-06T17:00:00.000Z"
+    },
+    {
+      "id": "seed-entry-prosperity",
+      "title": "Prosperity Sigil",
+      "category_id": "sigils",
+      "entry_number": 8,
+      "content": "<p>Statement of intent, reduced and bound. Method in @@chip(seed-entry-sigil-method,entry,Sigil Method)@@.</p>",
+      "tags": [
+        "seed-tag-ritual"
+      ],
+      "created_at": "2026-09-03T18:00:00.000Z",
+      "updated_at": "2026-09-04T22:30:00.000Z"
+    },
+    {
+      "id": "seed-entry-sketchbook",
+      "title": "Sketchbook",
+      "category_id": "seed-cat-research",
+      "entry_number": 9,
+      "content": "<section data-block=\"core.text\" data-block-id=\"seed-sketch-text\"><p>A canvas with pictures from Images, and a painting to try the brushes on.</p></section><section data-block=\"core.canvas\" data-block-id=\"seed-canvas-1\" data-block-data=\"{&quot;width&quot;:1600,&quot;height&quot;:1000,&quot;elements&quot;:[{&quot;id&quot;:&quot;seed-el-sun&quot;,&quot;x&quot;:500,&quot;y&quot;:450,&quot;width&quot;:320,&quot;height&quot;:320,&quot;z&quot;:1,&quot;type&quot;:&quot;image&quot;,&quot;rotation&quot;:0,&quot;opacity&quot;:1,&quot;locked&quot;:false,&quot;hidden&quot;:false,&quot;ref&quot;:&quot;@@file(sun.png)@@&quot;,&quot;props&quot;:{&quot;src&quot;:&quot;@@file(sun.png)@@&quot;,&quot;emoji&quot;:&quot;&quot;}},{&quot;id&quot;:&quot;seed-el-moon&quot;,&quot;x&quot;:1100,&quot;y&quot;:450,&quot;width&quot;:320,&quot;height&quot;:320,&quot;z&quot;:2,&quot;type&quot;:&quot;image&quot;,&quot;rotation&quot;:0,&quot;opacity&quot;:1,&quot;locked&quot;:false,&quot;hidden&quot;:false,&quot;ref&quot;:&quot;@@file(moon.png)@@&quot;,&quot;props&quot;:{&quot;src&quot;:&quot;@@file(moon.png)@@&quot;,&quot;emoji&quot;:&quot;&quot;}},{&quot;id&quot;:&quot;seed-el-text&quot;,&quot;type&quot;:&quot;text&quot;,&quot;x&quot;:800,&quot;y&quot;:150,&quot;width&quot;:700,&quot;height&quot;:90,&quot;rotation&quot;:0,&quot;opacity&quot;:1,&quot;locked&quot;:false,&quot;hidden&quot;:false,&quot;z&quot;:3,&quot;props&quot;:{&quot;text&quot;:&quot;As above, so below&quot;,&quot;font&quot;:&quot;serif&quot;,&quot;fontSize&quot;:64,&quot;color&quot;:&quot;#d4af37&quot;,&quot;align&quot;:&quot;center&quot;,&quot;bold&quot;:false,&quot;italic&quot;:false}}],&quot;background&quot;:null,&quot;guides&quot;:[],&quot;guidesLocked&quot;:false}\" data-block-config=\"{&quot;images&quot;:false,&quot;shapes&quot;:true,&quot;text&quot;:true,&quot;symbols&quot;:true,&quot;drawing&quot;:true}\"><img src=\"@@file(sun.png)@@\" alt=\"\" data-canvas=\"image\"><img src=\"@@file(moon.png)@@\" alt=\"\" data-canvas=\"image\"></section><section data-block=\"core.paint\" data-block-id=\"seed-paint-1\"></section>",
+      "tags": [
+        "seed-tag-research"
+      ],
+      "created_at": "2026-09-04T10:00:00.000Z",
+      "updated_at": "2026-09-04T10:00:00.000Z"
+    },
+    {
+      "id": "seed-entry-charging-notes",
+      "title": "Charging Notes",
+      "category_id": "journal",
+      "entry_number": 10,
+      "content": "<p>Full moon. Charged the glyph from @@chip(seed-entry-prosperity,entry,Prosperity Sigil)@@ on the windowsill overnight. Next: @@chip(seed-task-prep,task,Prepare the next working)@@.</p>",
+      "tags": [
+        "seed-tag-moon"
+      ],
+      "created_at": "2026-09-04T22:00:00.000Z",
+      "updated_at": "2026-09-04T22:20:00.000Z"
+    },
+    {
+      "id": "seed-entry-abandoned",
+      "title": "Abandoned Draft",
+      "category_id": "journal",
+      "entry_number": 11,
+      "content": "<p>Kept only so the journal trash has something in it.</p>",
+      "created_at": "2026-09-05T12:00:00.000Z",
+      "updated_at": "2026-09-05T12:00:00.000Z",
+      "deleted_at": "2026-09-06T12:00:00.000Z"
+    },
+    {
+      "id": "seed-entry-servitor",
+      "title": "Study Servitor",
+      "category_id": "ritual",
+      "entry_number": 12,
+      "content": "<p>Task: keep the reading list moving. Dissolves at the next new moon.</p>",
+      "created_at": "2026-09-05T19:00:00.000Z",
+      "updated_at": "2026-09-05T19:00:00.000Z"
+    },
+    {
+      "id": "seed-entry-meditation",
+      "title": "Meditation",
+      "category_id": "journal",
+      "entry_number": 13,
+      "content": "<p>Twenty minutes of breath counting. Nothing to report, which is the point.</p>",
+      "created_at": "2026-09-07T07:00:00.000Z",
+      "updated_at": "2026-09-07T07:25:00.000Z"
+    },
+    {
+      "id": "seed-entry-dream",
+      "title": "Tower by the Sea",
+      "category_id": "dreams",
+      "entry_number": 14,
+      "content": "<p>A white tower on a cliff, the stairs going down instead of up. Woke before the bottom.</p>",
+      "tags": [
+        "seed-tag-moon"
+      ],
+      "created_at": "2026-09-08T06:30:00.000Z",
+      "updated_at": "2026-09-08T06:40:00.000Z"
     }
   ],
-
+  "templates": [
+    {
+      "id": "seed-template-evening",
+      "name": "Evening Working",
+      "icon": "🌙",
+      "title": "",
+      "content": "<ol><li>Banish</li><li>Set the intention</li><li>Charge the sigil</li><li>Close</li></ol>",
+      "tags": [
+        "seed-tag-ritual"
+      ],
+      "created_at": "2026-09-03T16:00:00.000Z",
+      "updated_at": "2026-09-06T16:00:00.000Z"
+    }
+  ],
   "tasks": [
     {
-      "id": "seed-task-prep", "title": "Prepare the next working",
-      "description": "Clean the space, set out the candles.",
-      "category_id": "seed-cat-rituals", "priority": "high",
-      "due_date": "2026-09-12T00:00:00.000Z", "sort_order": 0,
-      "tags": "[\"ritual\"]",
-      "created_at": "2026-09-06T08:00:00.000Z", "updated_at": "2026-09-06T08:00:00.000Z"
+      "id": "seed-task-prep",
+      "title": "Prepare the next working",
+      "category_id": "seed-cat-rituals",
+      "priority": "high",
+      "sort_order": 0,
+      "created_at": "2026-09-06T08:00:00.000Z",
+      "updated_at": "2026-09-06T08:00:00.000Z"
     },
     {
-      "id": "seed-task-prep-candles", "title": "Replace the candles",
-      "category_id": "seed-cat-rituals", "parent_task_id": "seed-task-prep",
-      "priority": "medium", "sort_order": 0,
-      "created_at": "2026-09-06T08:05:00.000Z", "updated_at": "2026-09-06T08:05:00.000Z"
+      "id": "seed-task-prep-candles",
+      "title": "Replace the candles",
+      "category_id": "seed-cat-rituals",
+      "parent_task_id": "seed-task-prep",
+      "priority": "medium",
+      "sort_order": 0,
+      "created_at": "2026-09-06T08:05:00.000Z",
+      "updated_at": "2026-09-06T08:05:00.000Z"
     },
     {
-      "id": "seed-task-read", "title": "Finish reading on moon timing",
-      "category_id": "seed-cat-research", "priority": "low", "sort_order": 1,
-      "tags": "[\"research\"]",
-      "created_at": "2026-09-06T08:10:00.000Z", "updated_at": "2026-09-06T08:10:00.000Z"
+      "id": "seed-task-read",
+      "title": "Finish reading on moon timing",
+      "category_id": "seed-cat-research",
+      "priority": "low",
+      "sort_order": 1,
+      "created_at": "2026-09-06T08:10:00.000Z",
+      "updated_at": "2026-09-06T08:10:00.000Z"
     },
     {
-      "id": "seed-task-done", "title": "Copy out the banishing steps",
-      "category_id": "seed-cat-research", "priority": "medium",
-      "completed": 1, "completed_at": "2026-09-07T09:00:00.000Z", "sort_order": 2,
-      "created_at": "2026-09-05T08:00:00.000Z", "updated_at": "2026-09-07T09:00:00.000Z"
+      "id": "seed-task-done",
+      "title": "Copy out the banishing steps",
+      "category_id": "seed-cat-research",
+      "priority": "medium",
+      "completed": 1,
+      "completed_at": "2026-09-07T09:00:00.000Z",
+      "sort_order": 2,
+      "created_at": "2026-09-05T08:00:00.000Z",
+      "updated_at": "2026-09-07T09:00:00.000Z"
     },
     {
-      "id": "seed-task-trashed", "title": "Dropped Task",
-      "category_id": "seed-cat-research", "priority": "low", "sort_order": 3,
-      "created_at": "2026-09-05T08:30:00.000Z", "updated_at": "2026-09-05T08:30:00.000Z",
+      "id": "seed-task-trashed",
+      "title": "Dropped Task",
+      "category_id": "seed-cat-research",
+      "priority": "low",
+      "sort_order": 3,
+      "created_at": "2026-09-05T08:30:00.000Z",
+      "updated_at": "2026-09-05T08:30:00.000Z",
       "deleted_at": "2026-09-06T14:00:00.000Z"
     }
   ],
-
   "task_links": [
-    { "id": "seed-tasklink-1", "task_id": "seed-task-read",
-      "target_id": "seed-wiki-moon", "target_type": "wiki" }
-  ],
-
-  "images": [
-    { "id": "seed-img-moon", "file": "@@file(moon.png)@@", "name": "Crescent Moon", "note": "For the moon workings.",
-      "tags": "[\"altar-library\",\"seed-tag-moon\"]",
-      "created_at": "2026-09-03T16:00:00.000Z", "updated_at": "2026-09-03T16:00:00.000Z" },
-    { "id": "seed-img-sun", "file": "@@file(sun.png)@@", "name": "Sun Disc",
-      "tags": "[\"altar-library\"]",
-      "created_at": "2026-09-03T16:01:00.000Z", "updated_at": "2026-09-03T16:01:00.000Z" },
-    { "id": "seed-img-candle", "file": "@@file(candle.png)@@", "name": "Candle Flame",
-      "tags": "[\"altar-library\",\"seed-tag-ritual\"]",
-      "created_at": "2026-09-03T16:02:00.000Z", "updated_at": "2026-09-03T16:02:00.000Z" },
-    { "id": "seed-img-star", "file": "@@file(star.png)@@", "name": "Old Star", "note": "Kept only so the Images trash has something in it.",
-      "created_at": "2026-09-03T16:03:00.000Z", "updated_at": "2026-09-05T16:03:00.000Z",
-      "deleted_at": "2026-09-06T16:03:00.000Z" }
-  ],
-
-  "symbols": [
-    { "id": "seed-symbol-spiral", "name": "Spiral", "weight": 5,
-      "d": "M50 50 C50 44 58 44 58 50 C58 60 42 60 42 50 C42 36 66 36 66 50 C66 68 34 68 34 50 C34 28 74 28 74 50",
-      "created_at": "2026-09-03T16:10:00.000Z" }
-  ],
-
-  "routines": [
     {
-      "id": "seed-routine-1", "name": "Evening Working", "emoji": "🌙",
-      "content": "<ol><li>Banish</li><li>Set the intention</li><li>Charge the sigil</li><li>Close</li></ol>",
-      "tags": "[\"ritual\"]",
-      "operation_ids": "[\"seed-op-prosperity\"]",
-      "wiki_ids": "[\"seed-wiki-banishing\",\"seed-wiki-moon\"]",
-      "created_at": "2026-09-03T16:00:00.000Z", "updated_at": "2026-09-06T16:00:00.000Z"
+      "id": "seed-tasklink-1",
+      "task_id": "seed-task-read",
+      "target_id": "seed-entry-moon",
+      "target_type": "entry"
     }
   ],
-
-  "links": [
-    { "source_id": "seed-wiki-sigil", "source_type": "wiki",
-      "target_id": "seed-wiki-moon", "target_type": "wiki" },
-    { "source_id": "seed-journal-1", "source_type": "journal",
-      "target_id": "seed-wiki-banishing", "target_type": "wiki" },
-    { "source_id": "seed-journal-2", "source_type": "journal",
-      "target_id": "seed-op-prosperity", "target_type": "operation" },
-    { "source_id": "seed-op-prosperity", "source_type": "operation",
-      "target_id": "seed-wiki-sigil", "target_type": "wiki" }
+  "images": [
+    {
+      "id": "seed-img-moon",
+      "file": "@@file(moon.png)@@",
+      "name": "Crescent Moon",
+      "note": "For the moon workings.",
+      "tags": "[\"altar-library\",\"seed-tag-moon\"]",
+      "created_at": "2026-09-03T16:00:00.000Z",
+      "updated_at": "2026-09-03T16:00:00.000Z"
+    },
+    {
+      "id": "seed-img-sun",
+      "file": "@@file(sun.png)@@",
+      "name": "Sun Disc",
+      "tags": "[\"altar-library\"]",
+      "created_at": "2026-09-03T16:01:00.000Z",
+      "updated_at": "2026-09-03T16:01:00.000Z"
+    },
+    {
+      "id": "seed-img-candle",
+      "file": "@@file(candle.png)@@",
+      "name": "Candle Flame",
+      "tags": "[\"altar-library\",\"seed-tag-ritual\"]",
+      "created_at": "2026-09-03T16:02:00.000Z",
+      "updated_at": "2026-09-03T16:02:00.000Z"
+    },
+    {
+      "id": "seed-img-star",
+      "file": "@@file(star.png)@@",
+      "name": "Old Star",
+      "note": "Kept only so the Images trash has something in it.",
+      "created_at": "2026-09-03T16:03:00.000Z",
+      "updated_at": "2026-09-05T16:03:00.000Z",
+      "deleted_at": "2026-09-06T16:03:00.000Z"
+    }
+  ],
+  "symbols": [
+    {
+      "id": "seed-symbol-spiral",
+      "name": "Spiral",
+      "weight": 5,
+      "d": "M50 50 C50 44 58 44 58 50 C58 60 42 60 42 50 C42 36 66 36 66 50 C66 68 34 68 34 50 C34 28 74 28 74 50",
+      "created_at": "2026-09-03T16:10:00.000Z"
+    }
   ]
 }

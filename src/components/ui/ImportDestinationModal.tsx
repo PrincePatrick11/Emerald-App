@@ -1,20 +1,22 @@
-import { BookOpen, Library, Wand2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { useImportStore, type ImportDestinationType } from '../../store/importStore';
+import { useImportStore } from '../../store/importStore';
+import { useDashboardStore } from '../../store/dashboardStore';
+import { dashboardLabel } from '../../lib/dashboards';
+import DashboardGlyph from './DashboardGlyph';
 import Modal from './Modal';
 import Button from './Button';
 
-const OPTIONS: { type: ImportDestinationType; icon: React.ReactNode; labelKey: string }[] = [
-  { type: 'journal', icon: <BookOpen size={14} />, labelKey: 'linkPicker.tabJournal' },
-  { type: 'wiki', icon: <Library size={14} />, labelKey: 'linkPicker.tabWiki' },
-  { type: 'operations', icon: <Wand2 size={14} />, labelKey: 'linkPicker.tabOperations' },
-];
-
+/**
+ * Where an imported Markdown file without a category goes: one of the
+ * dashboards, in rail order. The entry starts in the dashboard's first
+ * category and opens inside it.
+ */
 export default function ImportDestinationModal() {
   const { t } = useTranslation();
   const pending = useImportStore((s) => s.pending);
   const choose = useImportStore((s) => s.choose);
   const cancel = useImportStore((s) => s.cancel);
+  const dashboards = useDashboardStore((s) => s.dashboards);
 
   if (!pending) return null;
 
@@ -29,14 +31,14 @@ export default function ImportDestinationModal() {
           {t('importDestination.description', { title: pending.title })}
         </p>
         <div className="space-y-1">
-          {OPTIONS.map((opt) => (
+          {dashboards.map((dashboard) => (
             <button
-              key={opt.type}
-              onClick={() => choose(opt.type)}
+              key={dashboard.id}
+              onClick={() => choose(dashboard.id)}
               className="menu-item rounded-md"
             >
-              {opt.icon}
-              {t(opt.labelKey)}
+              <DashboardGlyph dashboard={dashboard} size={14} />
+              {dashboardLabel(t, dashboard)}
             </button>
           ))}
         </div>

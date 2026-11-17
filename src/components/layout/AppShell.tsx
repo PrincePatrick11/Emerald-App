@@ -20,13 +20,14 @@ import VaultKeyDialog from './VaultKeyDialog';
 import BackupUnlockDialog from './BackupUnlockDialog';
 import { ensureVaultReady, VAULT_KEY_CANCELLED } from '../../store/vaultKeyStore';
 import { keyErrorOf, lockVault } from '../../lib/vaultKeys';
+import { vaultOpenErrorKey } from '../../lib/db';
 import UndoToast from '../ui/UndoToast';
+import { DashboardSettingsHost } from '../views/DashboardSettingsModal';
 import ImageNoticeModal from '../ui/ImageNoticeModal';
 import { ImagePickerHost } from '../images/ImagePickerModal';
 import LeaveGuardModal from './LeaveGuardModal';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { isTauri } from '../../lib/platform';
-import { prepareOpenedVault, startSync } from '../../lib/sync/engine';
 import { useMouseNavigation } from '../../hooks/useMouseNavigation';
 import { hasOpenEdits, settleBeforeExit } from '../../lib/openEdits';
 import { restoreDrafts } from '../../store/draftStore';
@@ -108,8 +109,7 @@ export default function AppShell() {
   const [resizing, setResizing] = useState(false);
   // The first start is only done once the vault's settings are loaded too
   // (or that failed): until then nothing may call `getDb()` — the cleanup
-  // routine there needs the trash retention period, the migrations the
-  // language. Without this gate, a restored trash tab, say, would open the
+  // routine there needs the trash retention period. Without this gate, a restored trash tab, say, would open the
   // database with nobody's settings.
   const [bootSettled, setBootSettled] = useState(false);
 
@@ -150,16 +150,15 @@ export default function AppShell() {
         loadVaultPrefs(vaultState.activeVaultId);
         return restoreDrafts(vaultState.activeVaultId)
           .then(() => useSettingsStore.getState().loadForVault(vaultState.activeVaultId))
-          .then(() => prepareOpenedVault(vaultState.activeVaultId))
           .then(reloadAllStores);
       }).catch(async (err: unknown) => {
-        // Cancelled, or the vault would not open (folder gone, a failing
-        // migration): the picker comes up instead, and says why unless it
+        // Cancelled, or the vault would not open (folder gone, from another
+        // version): the picker comes up instead, and says why unless it
         // was the user's own choice. `vaults.json` keeps the vault for the
         // next start.
         if (keyErrorOf(err) !== VAULT_KEY_CANCELLED) {
           console.error('[boot] opening the vault failed', err);
-          useVaultPickerStore.setState({ notice: 'vault.openFailed' });
+          useVaultPickerStore.setState({ notice: vaultOpenErrorKey(err, 'vault.openFailed') });
           void lockVault(active.id).catch(() => {});
         }
         await closeToSetup();
@@ -213,7 +212,6 @@ export default function AppShell() {
 
   // The automatic backup checks for the duration of the session whether one is due.
   useEffect(() => (isTauri ? startAutoBackup() : undefined), []);
-  useEffect(() => (isTauri ? startSync(reloadAllStores) : undefined), []);
 
   // Sync menu bar labels with the current language
   useEffect(() => {
@@ -453,6 +451,7 @@ export default function AppShell() {
         </aside>
       </div>
 
+      <DashboardSettingsHost />
       <UndoToast />
       <ImageNoticeModal />
       <ImagePickerHost />

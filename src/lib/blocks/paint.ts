@@ -23,13 +23,13 @@ export function createPaintBlock(): BlockInstance {
 }
 
 /** The config that marks a paint block as a sigil drawing. */
-export const SIGIL_DRAWING_CONFIG = JSON.stringify({ sigil: true });
+const SIGIL_DRAWING_CONFIG = JSON.stringify({ sigil: true });
 
 /**
  * The attributes of a sigil drawing: marked, and its title shown in read mode,
  * as the sigil drawing's always was. The converter of the old sigil blocks writes the same.
  */
-export const SIGIL_DRAWING_ATTRS: Readonly<Record<string, string>> = {
+const SIGIL_DRAWING_ATTRS: Readonly<Record<string, string>> = {
   [BLOCK_ATTR.config]: SIGIL_DRAWING_CONFIG,
   [BLOCK_ATTR.showTitle]: '1',
 };
@@ -76,7 +76,7 @@ const PAINT_RENDER = 'render';
 const IMG_RE = /<img\b[^<>]{0,2048}>/gi;
 const PAINT_ATTR_RE = /\bdata-paint="([^"]*)"/i;
 
-export interface DrawingData {
+interface DrawingData {
   /** The rendered image — what read mode, the card and the export show. */
   render: string | null;
   /** The vector document, with the old image as a layer where there was no document yet. */

@@ -1,16 +1,16 @@
 import { create } from 'zustand';
-import { extendSplashDuring, resumeSplash } from '../lib/splash';
-import { unlockRemembered, vaultKeyStatus } from '../lib/vaultKeys';
+import { extendSplashDuring, hideSplash, resumeSplash } from '../lib/splash';
+import { lockVault, unlockRemembered, vaultKeyStatus } from '../lib/vaultKeys';
+import { openVaultDb, VAULT_OUTDATED, vaultVersionErrorOf } from '../lib/db';
 
 /**
  * What `VaultKeyDialog` is currently asking.
  *
  * - `create`: a new vault gets its password.
- * - `encrypt`: a vault from before encryption was introduced gets encrypted.
  * - `unlock`: an encrypted vault is locked.
  */
 export type VaultKeyRequest = {
-  kind: 'create' | 'encrypt' | 'unlock';
+  kind: 'create' | 'unlock';
   vaultId: string;
   vaultName: string;
 };
@@ -95,15 +95,18 @@ async function askThenResumeSplash(request: VaultKeyRequest): Promise<void> {
 }
 
 /**
- * The one gate in front of every database: afterwards the vault is encrypted and
- * unlocked.
+ * The one gate in front of every database: afterwards the vault is encrypted,
+ * unlocked, and its database one this version can work with.
  *
- * A new vault (no `emerald.db` yet) gets its password here, an
- * old, unencrypted one is encrypted — mandatory, Rust opens no
- * vault without `vault.key` —, and a locked one is unlocked with the remembered
- * key or asks for the password. Ends with
- * {@link VAULT_KEY_CANCELLED} if the user cancels; a missing
- * vault folder already fails at the status query.
+ * A new vault (no `emerald.db` yet) gets its password here, and a locked one
+ * is unlocked with the remembered key or asks for the password. Then the
+ * database is opened and its schema checked (`openVaultDb`) — before anything
+ * reads or writes the vault's settings or drafts. A vault from before the
+ * fresh start of the schema ends with `VAULT_OUTDATED`, one from a newer app
+ * with `VAULT_TOO_NEW`; both stay untouched and locked. So does an
+ * unencrypted one: every such vault predates encryption, and with it the
+ * fresh start. Ends with {@link VAULT_KEY_CANCELLED} if the user cancels; a
+ * missing vault folder already fails at the status query.
  *
  * Startup, switching, creating, opening and import as a new vault all pass
  * through here, because they all end up in `openActiveVault` or the startup in `AppShell`.
@@ -118,10 +121,23 @@ export async function ensureVaultReady(
 ): Promise<void> {
   const status = await vaultKeyStatus(vault.id);
   if (status.encrypted) {
-    if (status.unlocked) return;
-    // `askPassword`: explicitly locked, so do not silently unlock again right away.
-    if (!askPassword && (await unlockRememberedOnce(vault.id))) return;
-    return askThenResumeSplash({ kind: 'unlock', vaultId: vault.id, vaultName: vault.name });
+    if (!status.unlocked) {
+      // `askPassword`: explicitly locked, so do not silently unlock again right away.
+      const remembered = !askPassword && (await unlockRememberedOnce(vault.id));
+      if (!remembered) await askThenResumeSplash({ kind: 'unlock', vaultId: vault.id, vaultName: vault.name });
+    }
+  } else if (status.hasDatabase) {
+    throw new Error(VAULT_OUTDATED);
+  } else {
+    await askThenResumeSplash({ kind: 'create', vaultId: vault.id, vaultName: vault.name });
   }
-  return askThenResumeSplash({ kind: status.hasDatabase ? 'encrypt' : 'create', vaultId: vault.id, vaultName: vault.name });
+  try {
+    await openVaultDb(vault.id);
+  } catch (err) {
+    // Refused: its key does not stay in memory. A question above put the
+    // loading screen back up; nothing loads now, so it goes again.
+    if (vaultVersionErrorOf(err)) await lockVault(vault.id).catch(() => {});
+    hideSplash();
+    throw err;
+  }
 }

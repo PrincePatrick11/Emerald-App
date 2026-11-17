@@ -9,18 +9,16 @@
  * Previously it was spread across eight stores, in four different spellings
  * (`boolToInt()`, `x ? 1 : 0`, `=== false ? 0 : 1`,
  * `(r.x as unknown as number) !== 0`), and in two places it was missing entirely:
- * `OperationCategory.is_builtin` and `TaskCategory.is_builtin` held `0`/`1`,
+ * the category types' `is_builtin` held `0`/`1`,
  * although declared as `boolean` — which is why the code had to cast them
  * back to `number` at branches.
  *
- * Use `fromRow.*` when reading, `toInt` and `toJson` when writing.
+ * Use `fromRow.*` when reading, `toInt` when writing.
  */
 import type {
-  AltarItem,
-  AltarRecord,
   Category,
+  Dashboard,
   Entry,
-  EntryType,
   Language,
   LexiconEntry,
   Tag,
@@ -31,9 +29,9 @@ import type {
 import {
   DEFAULT_DEFINITION_ICON, parseDefinitionDisplay, parseDefinitionElements, type BlockDefinition,
 } from './blocks/definitions';
-import { DEFAULT_TEMPLATE_ICON, parseAssignments, type Template } from './blocks/templates';
+import { DEFAULT_TEMPLATE_ICON, type Template } from './blocks/templates';
 import { DEFAULT_LANGUAGE_ICON, parseAlphabet } from './lexicon';
-import { parseAltarSettings } from './altarSettings';
+import { isBuiltinDashboard, parseDashboardDisplay, parseDashboardFilter, parseDashboardSort } from './dashboards';
 
 /** A raw row as it comes from `db.select`. */
 export type DbRow = Record<string, unknown>;
@@ -43,7 +41,7 @@ export type DbRow = Record<string, unknown>;
  * columns that had no value before they were introduced (switches that are
  * on by default).
  */
-export function bool(v: unknown, fallback = false): boolean {
+function bool(v: unknown, fallback = false): boolean {
   if (v === null || v === undefined) return fallback;
   if (typeof v === 'boolean') return v;
   return Number(v) !== 0;
@@ -72,20 +70,12 @@ export function jsonArray<T = string>(v: unknown): T[] {
   return [];
 }
 
-/** Array → JSON text for parameter lists. */
-export function toJson(v: readonly unknown[] | null | undefined): string {
-  return JSON.stringify(v ?? []);
-}
-
 const str = (v: unknown): string => (v == null ? '' : String(v));
 const nullableStr = (v: unknown): string | null => (v == null ? null : String(v));
 const num = (v: unknown, fallback: number): number =>
   v == null || Number.isNaN(Number(v)) ? fallback : Number(v);
 const nullableNum = (v: unknown): number | null =>
   v == null || Number.isNaN(Number(v)) ? null : Number(v);
-
-/** The column has a CHECK — anything else ends up in the journal instead of blowing up the list. */
-const entryType = (v: unknown): EntryType => (v === 'wiki' || v === 'operation' ? v : 'journal');
 
 /**
  * Callable as `rows.map(fromRow.entry)` — the mappers ignore the
@@ -95,7 +85,6 @@ export const fromRow = {
   entry(r: DbRow): Entry {
     return {
       id: str(r.id),
-      type: entryType(r.type),
       title: str(r.title),
       content: str(r.content),
       category_id: nullableStr(r.category_id),
@@ -132,6 +121,25 @@ export const fromRow = {
       emoji: str(r.emoji),
       sort_order: num(r.sort_order, 0),
       is_builtin: bool(r.is_builtin),
+      template_id: nullableStr(r.template_id),
+      deleted_at: nullableStr(r.deleted_at),
+    };
+  },
+
+  /** `filter`/`sort`/`display` are validated — the row can come from an import. */
+  dashboard(r: DbRow): Dashboard {
+    return {
+      id: str(r.id),
+      // A built-in key counts only on its own row: another row naming it would take the module over.
+      builtin: isBuiltinDashboard(r.builtin) && r.id === r.builtin ? r.builtin : null,
+      name: str(r.name),
+      icon: str(r.icon),
+      position: num(r.position, 0),
+      filter: parseDashboardFilter(r.filter),
+      sort: parseDashboardSort(r.sort),
+      display: parseDashboardDisplay(r.display),
+      created_at: str(r.created_at),
+      updated_at: str(r.updated_at),
       deleted_at: nullableStr(r.deleted_at),
     };
   },
@@ -151,7 +159,6 @@ export const fromRow = {
     };
   },
 
-  /** `assignments` goes through `parseAssignments` — the row can come from an import. */
   template(r: DbRow): Template {
     return {
       id: str(r.id),
@@ -160,7 +167,6 @@ export const fromRow = {
       title: str(r.title),
       content: str(r.content),
       tags: jsonArray<unknown>(r.tags).filter((t): t is string => typeof t === 'string'),
-      assignments: parseAssignments(r.assignments),
       sort_order: num(r.sort_order, 0),
       created_at: str(r.created_at),
       updated_at: str(r.updated_at),
@@ -195,33 +201,6 @@ export const fromRow = {
     };
   },
 
-  altar(r: DbRow): AltarRecord {
-    return {
-      id: str(r.id),
-      title: str(r.title),
-      ...parseAltarSettings(r.settings),
-      background_image_data: nullableStr(r.background_image_data),
-      created_at: str(r.created_at),
-      updated_at: str(r.updated_at),
-      thumbnail_data: nullableStr(r.thumbnail_data),
-      icon_data: nullableStr(r.icon_data),
-      deleted_at: nullableStr(r.deleted_at),
-    };
-  },
-
-  altarItem(r: DbRow): AltarItem {
-    return {
-      id: str(r.id),
-      name: str(r.name),
-      emoji: str(r.emoji),
-      category_id: nullableStr(r.category_id),
-      note: str(r.note),
-      image_data: r.image_data == null ? undefined : String(r.image_data),
-      created_at: str(r.created_at),
-      updated_at: str(r.updated_at),
-    };
-  },
-
   image(r: DbRow): VaultImage {
     return {
       id: str(r.id),
@@ -243,7 +222,7 @@ export const fromRow = {
       id: str(r.id),
       task_id: str(r.task_id),
       target_id: str(r.target_id),
-      target_type: r.target_type as TaskLink['target_type'],
+      target_type: r.target_type === 'task' ? 'task' : 'entry',
     };
   },
 };

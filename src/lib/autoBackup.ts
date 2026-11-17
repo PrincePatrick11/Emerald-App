@@ -17,7 +17,7 @@ import { useAutoBackupStore, type AutoBackupError, type AutoBackupStatus } from 
  * and the vault is unlocked: shortly after a vault is opened, after every
  * change of the setting or the folder, then hourly — and once more
  * when an attempt hit a running run, an import or a
- * type change. Where it is written and under which name is decided
+ * Cancel writing back an entry. Where it is written and under which name is decided
  * solely by `auto_backup.rs`; no path is ever passed
  * over from here.
  */
@@ -40,7 +40,7 @@ const DB_CLOSED = 'DB_CLOSED';
  * is none yet — so a missed date is made up at the next open,
  * and with no backup at all one is due immediately.
  */
-export function isBackupDue(settings: Pick<BackupSettings, 'interval' | 'weekday'>, newest: string | null, today: string): boolean {
+function isBackupDue(settings: Pick<BackupSettings, 'interval' | 'weekday'>, newest: string | null, today: string): boolean {
   if (!newest) return true;
   if (settings.interval === 'daily') return newest < today;
   // The first of this month.
@@ -110,10 +110,10 @@ export async function resetAutoBackupDir(vaultId: string): Promise<void> {
  *
  * `'done'`: finished for now — written, not due, not responsible or
  * failed (the error is then in the store). `'busy'`: it did not work right now —
- * a run is in progress, an import holds the database, a type change is writing,
+ * a run is in progress, an import holds the database, a Cancel is writing back,
  * or it was closed or replaced during the run — and a new attempt is worthwhile.
  */
-export async function runAutoBackup({ force = false }: { force?: boolean } = {}): Promise<'done' | 'busy'> {
+async function runAutoBackup({ force = false }: { force?: boolean } = {}): Promise<'done' | 'busy'> {
   const vaultState = useVaultStore.getState();
   const vaultId = vaultState.activeVaultId;
   if (!hasActiveVault(vaultState) || vaultState.locked) return 'done';
@@ -124,10 +124,9 @@ export async function runAutoBackup({ force = false }: { force?: boolean } = {})
   if (!force && !backup.auto) return 'done';
   // `editorSavesSuspended`: an import is running (see `editorLock.ts`).
   if (useAutoBackupStore.getState().running || editorSavesSuspended()) return 'busy';
-  // A type change or a cancel that rolls one back writes across
-  // several tables and only queues that after its own awaits — `drainSerialized`
-  // below would not see it yet. The edit lock covers the whole stretch
-  // (it holds every cancel, the simple one too).
+  // A Cancel writes the entry back after awaits of its own (pending icon,
+  // the entry's write chain) — `drainSerialized` below would not see it yet.
+  // The edit lock covers the whole stretch.
   if (useUIStore.getState().editLocked) return 'busy';
 
   // Counts every closing or replacing of the database (`dbEpoch`): a password change
@@ -168,7 +167,7 @@ export async function runAutoBackup({ force = false }: { force?: boolean } = {})
     return 'done';
   } catch (err) {
     // Vault locked or switched, in the middle of an import, password or
-    // type change: not an error, the next attempt reads a quiet state again.
+    // Cancel writing back: not an error, the next attempt reads a quiet state again.
     if (!stillCurrent() || keyErrorOf(err).includes(DB_CLOSED)) return 'busy';
     console.error('[auto-backup] failed', err);
     setError(vaultId, keyErrorOf(err).includes(DIR_MISSING) ? 'dirMissing' : 'failed');
@@ -178,14 +177,14 @@ export async function runAutoBackup({ force = false }: { force?: boolean } = {})
   }
 }
 
-/** How long "Back up now" waits for an import, type change or running run:
+/** How long "Back up now" waits for an import, a Cancel or running run:
  *  30 attempts one second apart. */
 const NOW_RETRY_MS = 1_000;
 const NOW_ATTEMPTS = 30;
 
 /**
  * "Back up now": writes today's backup, even if none is due.
- * If the click hits an import, a type change or a running
+ * If the click hits an import, a Cancel writing back or a running
  * run, it waits that out instead of fizzling — and reports an error if
  * it still did not work after half a minute.
  */
@@ -237,7 +236,7 @@ export function startAutoBackup(): () => void {
     timer = setTimeout(check, SETTLE_MS);
   };
   // A trigger that hits a running run, an import or a
-  // type change would otherwise be lost — until the next full hour.
+  // Cancel writing back would otherwise be lost — until the next full hour.
   const check = () => void runAutoBackup().then((outcome) => { if (outcome === 'busy') schedule(); });
   const unsubscribe = useSettingsStore.subscribe((state, prev) => {
     if (state.vaultId !== prev.vaultId || state.settings.backup !== prev.settings.backup) schedule();

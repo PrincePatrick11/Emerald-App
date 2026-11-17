@@ -1,8 +1,8 @@
-import { escapeHtml, extractInternalLinks, internalLinkChipHtml, isBlankContent, isValidLinkTarget } from '../internalLinkHtml';
-import { generateId } from '../helpers';
+import { escapeHtml, extractInternalLinks, internalLinkChipHtml, isBlankContent, isValidLinkTarget, linkTargetKindOf } from '../internalLinkHtml';
+import { generateId, isRecord } from '../helpers';
 import { storedImageName } from '../schema';
 import { MOON_PHASE_ORDER, MOON_PHASE_SYMBOLS } from '../moonPhase';
-import type { ContentType, MoonPhase } from '../../types';
+import type { LinkTargetKind, MoonPhase } from '../../types';
 import { decodeHtmlAttr, neutralizeSectionTags } from './blockHtml';
 import { BLOCK_ATTR, type BlockInstance, type BlockTypeId } from './types';
 
@@ -129,9 +129,9 @@ export interface ChargeDefault {
 }
 
 /** The default of a link: the target together with its name at the time of selection. */
-export interface LinkDefault {
+interface LinkDefault {
   id: string;
-  entryType: ContentType;
+  targetKind: LinkTargetKind;
   label: string;
 }
 
@@ -176,7 +176,7 @@ export interface FieldsModel {
   orphans: Record<string, unknown>;
   /** Element ID → inner HTML of its slot (link chip or `<img>`), also without a known element. */
   slots: Record<string, string>;
-  /** Name and icon (emoji) of the custom block definition the block was copied from — empty for single fields. */
+  /** Name and icon (an emoji or an icon file, `blockRefs` names it) of the custom block definition the block was copied from — empty for single fields. */
   name: string;
   icon: string;
 }
@@ -190,10 +190,6 @@ function parseJson(raw: string | undefined): { ok: boolean; value: unknown } {
   } catch {
     return { ok: false, value: undefined };
   }
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
 /**
@@ -370,7 +366,7 @@ export function parseFields(block: BlockInstance): FieldsModel {
 }
 
 /** Target of the link chip in a slot, with its stored label — or `null`. */
-export function linkFromSlot(html: string | undefined): { id: string; entryType: string; label: string } | null {
+export function linkFromSlot(html: string | undefined): { id: string; targetKind: string; label: string } | null {
   if (typeof html !== 'string' || !html) return null;
   const [link] = extractInternalLinks(html);
   if (!link) return null;
@@ -397,7 +393,7 @@ function parseDefault(element: ElementDef, raw: unknown): ElementDefault | undef
       return {
         id: raw.id as string,
         // `isValidLinkTarget` has checked the kind against the list.
-        entryType: String(raw.entryType).trim() as ContentType,
+        targetKind: linkTargetKindOf(String(raw.targetKind)),
         label: typeof raw.label === 'string' ? raw.label : '',
       };
     }
@@ -432,7 +428,7 @@ export function slotFromDefault(element: ElementDef): string | null {
   const value = element.defaultValue;
   if (element.kind === 'image') return typeof value === 'string' ? imageSlotHtml(value) : null;
   if (!isSlotKind(element.kind) || !isLinkDefault(value)) return null;
-  return internalLinkChipHtml({ id: value.id, entryType: value.entryType, label: value.label });
+  return internalLinkChipHtml({ id: value.id, targetKind: value.targetKind, label: value.label });
 }
 
 /**

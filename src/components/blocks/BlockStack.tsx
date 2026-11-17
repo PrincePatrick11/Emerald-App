@@ -13,8 +13,8 @@ import {
   APPEND_ENTRY_LINK_EVENT, REMOVE_ENTRY_LINK_EVENT, REVEAL_ENTRY_LINK_EVENT, subscribeEntryLinkRequest,
   type EntryLinkRequest,
 } from '../../lib/links';
-import { extractInternalLinks, internalLinkBlockHtml, remapInternalLinks, toInternalLinkChip } from '../../lib/internalLinkHtml';
-import { generateId } from '../../lib/helpers';
+import { extractInternalLinks, internalLinkBlockHtml, linkTargetKindOf, remapInternalLinks, toInternalLinkChip } from '../../lib/internalLinkHtml';
+import { generateId, localIsoDay } from '../../lib/helpers';
 import { editorSavesSuspended } from '../../lib/editorLock';
 import { activeElements, FIELDS_BLOCK_TYPE, linkFromSlot, parseFields, serializeFields } from '../../lib/blocks/fields';
 import { useFieldFallbackText } from './useFieldFallbackText';
@@ -25,7 +25,7 @@ import { resolveBlockType, type BlockTypeMeta } from '../../lib/blocks/blockType
 import { blockIcon, createFromPreset } from '../../lib/blocks/presets';
 import { useBlockDefinitionStore } from '../../store/blockDefinitionStore';
 import {
-  SIGIL_CHARGE_KIND, withChargesCoveringOnly, sigilState, sigilUnits, todayIso, withChargesCoveringCopy, withoutConcealedParts,
+  SIGIL_CHARGE_KIND, withChargesCoveringOnly, sigilState, sigilUnits, withChargesCoveringCopy, withoutConcealedParts,
   withRenamedPartTargets,
 } from '../../lib/blocks/sigil';
 import { blockLabel, hiddenAttrValue, isBlockHidden, showsTitleInRead, withBlockAttr } from '../../lib/blocks/blockAttrs';
@@ -138,7 +138,7 @@ export default function BlockStack({
   const resetEpoch = useExternalContentReset(initialContent, isEditing, blocksRef, setBlocks, onChangeRef);
 
   // Locked and concealed come from the sigil's charges; all blocks see the same state.
-  const sigil = useMemo(() => sigilState(blocks, todayIso()), [blocks]);
+  const sigil = useMemo(() => sigilState(blocks, localIsoDay()), [blocks]);
 
   const definitions = useBlockDefinitionStore((s) => s.definitions);
 
@@ -150,8 +150,8 @@ export default function BlockStack({
   const { orderedEditors, targetEditor, focusOnMount } = textHost;
 
   const context = useMemo<BlockStackContextValue>(() => ({
-    // Only the first text block carries the module's placeholder ("What happened
-    // today?"); further text blocks get a neutral one.
+    // Only the first text block carries the page's placeholder ("Begin your
+    // record…"); further text blocks get a neutral one.
     placeholderFor: (blockId) =>
       blocksRef.current.find((b) => b.type === TEXT_BLOCK_TYPE)?.id === blockId
         ? placeholder
@@ -186,9 +186,9 @@ export default function BlockStack({
   const fieldText = useFieldFallbackText();
   const fieldTextRef = useRef(fieldText);
   fieldTextRef.current = fieldText;
-  const findBlockLink = useCallback((target: { id: string; entryType: string }) => {
-    const matches = (link: { id: string; entryType: string } | null) =>
-      link?.id === target.id && link.entryType === target.entryType;
+  const findBlockLink = useCallback((target: { id: string; targetKind: string }) => {
+    const matches = (link: { id: string; targetKind: string } | null) =>
+      link?.id === target.id && linkTargetKindOf(link.targetKind) === linkTargetKindOf(target.targetKind);
     for (const block of blocksRef.current) {
       if (resolveBlockType(block)?.id !== FIELDS_BLOCK_TYPE) continue;
       const model = parseFields(block);
@@ -344,15 +344,15 @@ export default function BlockStack({
     // Appended, its sigil conceals only its own calculators and drawings.
     const next = areBlocksEmpty(blocksRef.current) ? added : [...blocksRef.current, ...withChargesCoveringOnly(added)];
     commit(next.length > 0 ? next : [createTextBlock()]);
-    const { entryType, flush } = templateTarget;
+    const { flush } = templateTarget;
     // Save the deferred input first: title and tags are checked against the store.
     void flush()
-      .then(() => applyTemplateFields(entryType, entryId, template))
+      .then(() => applyTemplateFields(entryId, template))
       .then(() => {
         // A loaded sigil that locks the entry ends the edit: the entry can only be read until it is unloaded.
-        if (!sigilState(blocksRef.current, todayIso()).lockEntry) return;
+        if (!sigilState(blocksRef.current, localIsoDay()).lockEntry) return;
         const { activeView, setActiveView } = useUIStore.getState();
-        if (activeView.id === entryId) setActiveView({ type: activeView.type, id: entryId, mode: 'view' });
+        if (activeView.id === entryId) setActiveView({ ...activeView, mode: 'view', isNew: undefined });
       })
       .catch((e: unknown) => console.error('[BlockStack] applying template fields failed:', e));
   };
@@ -361,9 +361,9 @@ export default function BlockStack({
   const undoTemplate = (template: Template) => {
     if (!templateTarget) return;
     commit([createTextBlock()]);
-    const { entryType, flush } = templateTarget;
+    const { flush } = templateTarget;
     void flush()
-      .then(() => undoTemplateFields(entryType, entryId, template))
+      .then(() => undoTemplateFields(entryId, template))
       .catch((e: unknown) => console.error('[BlockStack] undoing template fields failed:', e));
   };
 

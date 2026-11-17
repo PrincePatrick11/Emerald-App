@@ -1,4 +1,4 @@
-import type { ContentType } from '../types';
+import type { LinkTargetKind } from '../types';
 import { htmlTags } from './htmlTags';
 
 /**
@@ -41,48 +41,36 @@ function tagAttr(tag: string, name: string): string | null {
 }
 
 /**
- * All internal link targets in the content — only `id` and `entryType`.
+ * All internal link targets in the content — only `id` and `targetKind`.
  *
  * Deliberately without `DOMParser`: this function sits on the database path
- * (migration v36 and the import) and has to run without a browser too, otherwise the
- * migration cannot be checked in the schema harness (Node). For two attributes,
+ * (the import, the backup merge) and has to run without a browser too, otherwise it
+ * cannot be checked in the schema harness (Node). For two attributes,
  * reading the start tag is enough — and both are entity-free: IDs are UUIDs,
- * `entryType` is a fixed word. Anyone who rebuilds the markup themselves uses
+ * `targetKind` is a fixed word. Anyone who rebuilds the markup themselves uses
  * `remapInternalLinks` further down; that needs a real DOM.
  */
 export function extractInternalLinks(
   html: string
-): Array<{ id: string; entryType: string }> {
+): Array<{ id: string; targetKind: string }> {
   if (!html) return [];
-  const out: Array<{ id: string; entryType: string }> = [];
+  const out: Array<{ id: string; targetKind: string }> = [];
   for (const { tag } of spanStartTags(html)) {
     if (tagAttr(tag, 'data-type') !== 'internalLink') continue;
     const id = tagAttr(tag, 'data-id');
     if (!id) continue;
-    out.push({ id, entryType: tagAttr(tag, 'data-entry-type') ?? 'wiki' });
+    out.push({ id, targetKind: linkTargetKindOf(tagAttr(tag, 'data-target-kind')) });
   }
   return out;
 }
 
-const ENTRY_TYPE_ATTR_RE = /\bdata-entry-type=("[^"]*"|'[^']*')/i;
-
 /**
- * Sets the type of all chips pointing at `id` to `entryType` — for an
- * entry that has changed its type (`lib/entryTypeChange.ts`). The ID
- * stays the same, so the one attribute is enough.
- *
- * Deliberately via the start tag like `extractInternalLinks` instead of via
- * `remapInternalLinks`: this runs over the stored content of the whole
- * vault, and a DOM pass would re-serialize every one of them — here only
- * the one attribute changes, everything else stays byte for byte.
+ * The target kind a chip's `data-target-kind` stands for: `task`, or an
+ * entry of whatever kind. Entries have no type — the kind they show under
+ * is looked up live.
  */
-export function retypeInternalLinks(html: string, id: string, entryType: string): string {
-  if (!html || !html.includes(id)) return html;
-  return replaceSpanStartTags(html, (tag) => {
-    if (tagAttr(tag, 'data-type') !== 'internalLink' || tagAttr(tag, 'data-id') !== id) return tag;
-    const attr = `data-entry-type="${entryType}"`;
-    return ENTRY_TYPE_ATTR_RE.test(tag) ? tag.replace(ENTRY_TYPE_ATTR_RE, attr) : tag.replace(/^<span\b/i, `<span ${attr}`);
-  });
+export function linkTargetKindOf(value: string | null | undefined): LinkTargetKind {
+  return value?.trim() === 'task' ? 'task' : 'entry';
 }
 
 const DATA_ID_ATTR_RE = /\bdata-id=("[^"]*"|'[^']*')/i;
@@ -92,7 +80,7 @@ const DATA_ID_ATTR_RE = /\bdata-id=("[^"]*"|'[^']*')/i;
  * import, where the same entries arrive under prefixed IDs. A chip `next`
  * returns `undefined` for stays as it is.
  *
- * Via the start tag like `retypeInternalLinks`: no DOM (the schema harness
+ * Via the start tag like `extractInternalLinks`: no DOM (the schema harness
  * runs the import under Node), and everything but the one attribute stays
  * byte for byte. Only the label is untouched: the target's title does not change.
  */
@@ -132,16 +120,16 @@ export function isBlankContent(html: string): boolean {
   return !text.replace(/&nbsp;/gi, ' ').trim();
 }
 
-export interface ParsedInternalLink {
+interface ParsedInternalLink {
   id: string;
-  entryType: string;
+  targetKind: string;
   label: string;
 }
 
 /** Where a chip points after the rewrite. `label` overrides the
  *  stored display text — without it, after a change of target it could
  *  claim something other than what the link actually hits. */
-export interface ResolvedInternalLink {
+interface ResolvedInternalLink {
   id: string;
   label?: string;
 }
@@ -165,7 +153,7 @@ export function remapInternalLinks(
   for (const span of Array.from(doc.querySelectorAll('span[data-type="internalLink"]'))) {
     const link: ParsedInternalLink = {
       id: span.getAttribute('data-id') ?? '',
-      entryType: span.getAttribute('data-entry-type') ?? 'wiki',
+      targetKind: linkTargetKindOf(span.getAttribute('data-target-kind')),
       label: span.getAttribute('data-label') ?? span.textContent ?? '',
     };
     const resolved = link.id ? resolve(link) : null;
@@ -182,7 +170,7 @@ export function remapInternalLinks(
   return doc.body.innerHTML;
 }
 
-const VALID_ENTRY_TYPES: readonly string[] = ['journal', 'wiki', 'operation', 'task'];
+const VALID_TARGET_KINDS: readonly string[] = ['entry', 'task'];
 /** Standard UUIDs and the 8-character prefix put in front of them on merge import. */
 const LINK_ID_RE = /^([0-9a-z]{8}-)?[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -194,11 +182,11 @@ const LINK_ID_RE = /^([0-9a-z]{8}-)?[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]
  * append, reveal) — before, only navigating had one, as a copy.
  * The same check applies to the link presets of custom blocks.
  */
-export function isValidLinkTarget(target: { id?: unknown; entryType?: unknown } | null | undefined): boolean {
+export function isValidLinkTarget(target: { id?: unknown; targetKind?: unknown } | null | undefined): boolean {
   if (!target) return false;
   return typeof target.id === 'string'
     && LINK_ID_RE.test(target.id)
-    && VALID_ENTRY_TYPES.includes(String(target.entryType).trim());
+    && VALID_TARGET_KINDS.includes(String(target.targetKind).trim());
 }
 
 export function escapeHtml(value: string): string {
@@ -209,9 +197,10 @@ export function escapeHtml(value: string): string {
     .replace(/"/g, '&quot;');
 }
 
-export interface InternalLinkChip {
+interface InternalLinkChip {
   id: string;
-  entryType: ContentType;
+  /** The target kind — `entry` or `task`; an entry's kind is not stored. */
+  targetKind: LinkTargetKind;
   label: string;
   icon?: string | null;
   entry_number?: number | null;
@@ -221,14 +210,14 @@ export interface InternalLinkChip {
  *  of `InternalLinkExtension`, so also usable directly as `attrs`. */
 export function toInternalLinkChip(item: {
   id: string;
-  entryType: ContentType;
+  targetKind: LinkTargetKind | string;
   label: string;
   icon?: string | null;
   entry_number?: number | null;
 }): InternalLinkChip {
   return {
     id: item.id,
-    entryType: item.entryType,
+    targetKind: linkTargetKindOf(item.targetKind),
     label: item.label,
     icon: item.icon ?? null,
     entry_number: item.entry_number ?? null,
@@ -244,7 +233,7 @@ export function internalLinkChipHtml(chip: InternalLinkChip): string {
     ['data-type', 'internalLink'],
     ['class', 'internal-link'],
     ['data-id', chip.id],
-    ['data-entry-type', chip.entryType],
+    ['data-target-kind', chip.targetKind],
     ['data-label', chip.label],
   ];
   if (chip.icon) attrs.push(['data-icon', chip.icon]);
@@ -254,7 +243,7 @@ export function internalLinkChipHtml(chip: InternalLinkChip): string {
   return `<span ${rendered}>${escapeHtml(chip.label || chip.id)}</span>`;
 }
 
-export interface LinkBlockOptions {
+interface LinkBlockOptions {
   /** `false` omits the separator line — for the first block in a still
    *  empty entry, where there is nothing to separate (see `isBlankContent`). */
   separator?: boolean;
@@ -278,13 +267,4 @@ export function internalLinkBlockHtml(
   const heading = categoryLabel ? `<h3>${escapeHtml(categoryLabel)}</h3>` : '';
   const tail = suffix ? ` ${escapeHtml(suffix)}` : '';
   return `${rule}${heading}<p>${internalLinkChipHtml(chip)}${tail} </p>`;
-}
-
-/**
- * The same block without a chip — for a replaced value whose target does not
- * (or no longer) exist: a set `is_bannung` without an article, say. Without this, migration
- * v37 would lose the information without replacement.
- */
-export function plainBlockHtml(text: string, { separator = true }: LinkBlockOptions = {}): string {
-  return `${separator ? '<hr>' : ''}<p>${escapeHtml(text)}</p>`;
 }

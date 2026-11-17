@@ -4,24 +4,27 @@ import { KeyRound, Loader2 } from 'lucide-react';
 import Modal from '../ui/Modal';
 import Button from '../ui/Button';
 import { KeyField, onEnter } from './vaultKeyParts';
-import { useBackupSecretStore } from '../../store/backupSecretStore';
+import { useBackupSecretStore, type SecretFor } from '../../store/backupSecretStore';
 
 /**
  * The question for the password or recovery key of a backup that
  * none of the open vaults can open — one from another vault, or
- * from this one, but from before a password change.
+ * from this one, but from before a password change. For an encrypted
+ * `.emerald` file the same dialog asks for its password only: such a file
+ * has no recovery key.
  */
 export default function BackupUnlockDialog() {
   const request = useBackupSecretStore((s) => s.request);
   if (!request) return null;
-  return <Body error={request.error} busy={request.busy} />;
+  return <Body error={request.error} busy={request.busy} secretFor={request.for} />;
 }
 
-function Body({ error, busy }: { error: string | null; busy: boolean }) {
+function Body({ error, busy, secretFor }: { error: string | null; busy: boolean; secretFor: SecretFor }) {
   const { t } = useTranslation();
   const answer = useBackupSecretStore((s) => s.answer);
   const cancel = useBackupSecretStore((s) => s.cancel);
   const [useRecovery, setUseRecovery] = useState(false);
+  const texts = secretFor === 'emerald' ? 'emeraldKey' : 'backupKey';
   const [value, setValue] = useState('');
   // The error belongs to the attempt after which it came — not to the other input type.
   const [shownError, setShownError] = useState(error);
@@ -40,7 +43,7 @@ function Body({ error, busy }: { error: string | null; busy: boolean }) {
 
   return (
     <Modal
-      title={t('backupKey.title')}
+      title={t(`${texts}.title`)}
       onClose={cancel}
       dismissible={!busy}
       widthClassName="w-[440px]"
@@ -50,13 +53,13 @@ function Body({ error, busy }: { error: string | null; busy: boolean }) {
           <Button tone="neutral" disabled={busy} onClick={cancel}>{t('common.cancel')}</Button>
           <Button tone="jade" disabled={!value.trim() || busy} onClick={submit}>
             {busy ? <Loader2 size={14} className="animate-spin" /> : <KeyRound size={14} />}
-            {t('backupKey.open')}
+            {t(`${texts}.open`)}
           </Button>
         </>
       }
     >
-      <p className="text-sm text-secondary">{t('backupKey.hint')}</p>
-      <KeyField label={useRecovery ? t('vaultKey.recoveryKey') : t('backupKey.password')}>
+      <p className="text-sm text-secondary">{t(`${texts}.hint`)}</p>
+      <KeyField label={useRecovery ? t('vaultKey.recoveryKey') : t(`${texts}.password`)}>
         {useRecovery ? (
           <textarea
             autoFocus
@@ -83,12 +86,15 @@ function Body({ error, busy }: { error: string | null; busy: boolean }) {
           />
         )}
       </KeyField>
-      <div>
-        {/* A link, not a button — flush with the field, as in the unlock dialog. */}
-        <Button variant="ghost" className="text-xs -ml-1.5" disabled={busy} onClick={switchMode}>
-          {useRecovery ? t('backupKey.usePassword') : t('backupKey.useRecovery')}
-        </Button>
-      </div>
+      {/* A `.emerald` file has no recovery key. */}
+      {secretFor === 'backup' && (
+        <div>
+          {/* A link, not a button — flush with the field, as in the unlock dialog. */}
+          <Button variant="ghost" className="text-xs -ml-1.5" disabled={busy} onClick={switchMode}>
+            {useRecovery ? t('backupKey.usePassword') : t('backupKey.useRecovery')}
+          </Button>
+        </div>
+      )}
       {shownError && <p className="text-xs text-danger" role="alert">{shownError}</p>}
     </Modal>
   );

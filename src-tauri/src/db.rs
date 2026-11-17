@@ -78,9 +78,10 @@ pub async fn db_load(
     file: DbFile,
 ) -> Result<String, String> {
     let dir = vault::vault_dir(&app, &vault_id)?;
-    // Encrypted vaults only: a vault without `vault.key` is encrypted
-    // first (`reencrypt.rs`) and never opened in plain text — not even when
-    // someone deleted `vault.key` and slipped in a plain-text database.
+    // Encrypted vaults only: a vault without `vault.key` is never opened —
+    // the frontend refuses it as one of an older version, and nothing here
+    // opens a plain-text database, not even when someone deleted `vault.key`
+    // and slipped one in.
     let vault_key = keys::key_for(&app, &vault_id)?.ok_or_else(|| keys::VAULT_NOT_ENCRYPTED.to_string())?;
     // The key in memory must belong to this folder: if the id now points
     // elsewhere, a database would otherwise end up under a key that its
@@ -143,10 +144,10 @@ pub(crate) fn normalize_path(path: &str) -> String {
     path.replace('\\', "/").trim_end_matches('/').to_lowercase()
 }
 
-/// The copies of its own database SQL may attach: the backup import's
-/// working copy, and the migration backups `VACUUM INTO` writes (SQLite
-/// attaches its target internally). Both stay under the vault key — an
-/// `ATTACH` without `KEY` inherits it.
+/// The copy of its own database SQL may attach: the backup import's working
+/// copy, which `VACUUM INTO` writes (SQLite attaches its target internally)
+/// and the swap attaches. It stays under the vault key — an `ATTACH` without
+/// `KEY` inherits it.
 fn may_attach(scope: &str, filename: &str) -> bool {
     // `VACUUM` without a target attaches an empty, temporary database.
     if filename.is_empty() {
@@ -154,8 +155,7 @@ fn may_attach(scope: &str, filename: &str) -> bool {
     }
     let file = normalize_path(filename);
     let Some((parent, name)) = file.rsplit_once('/') else { return false };
-    parent == scope
-        && (name == vault::IMPORT_STAGING_FILE || vault::migration_backup_version(name).is_some())
+    parent == scope && name == vault::IMPORT_STAGING_FILE
 }
 
 /// A pool whose every connection carries [`authorize`], scoped to `vault_dir`.
@@ -522,25 +522,28 @@ mod tests {
 
     #[tokio::test]
     async fn copies_of_a_keyed_database_stay_encrypted() {
-        // `backupDatabaseFile` and the import staging copy are `VACUUM INTO`;
-        // the import swap `ATTACH`es the copy without a KEY clause.
+        // The import staging copy is `VACUUM INTO`; the import swap `ATTACH`es
+        // the copy without a KEY clause.
         let dir = scratch_dir();
         let key = crypto::random_key();
         let pool = connect(keyed(&dir.join("main.db"), &key), &dir).await.unwrap();
         execute_on(&pool, "CREATE TABLE t (s TEXT)", vec![]).await.unwrap();
         execute_on(&pool, "INSERT INTO t VALUES ('x')", vec![]).await.unwrap();
-        let copy = dir.join("emerald.db.pre-v99.bak");
+        let copy = dir.join(vault::IMPORT_STAGING_FILE);
         execute_on(&pool, &format!("VACUUM INTO '{}'", copy.display()), vec![]).await.unwrap();
         assert!(!is_plain_sqlite(&copy));
-
-        let attached = dir.join(vault::IMPORT_STAGING_FILE);
-        execute_on(&pool, &format!("ATTACH DATABASE '{}' AS a; CREATE TABLE a.u (s TEXT); INSERT INTO a.u VALUES ('y'); DETACH DATABASE a", attached.display()), vec![]).await.unwrap();
-        pool.close().await;
-        assert!(!is_plain_sqlite(&attached));
-
         let reopened = connect(keyed(&copy, &key), &dir).await.unwrap();
         assert_eq!(select_on(&reopened, "SELECT s FROM t", vec![]).await.unwrap()[0]["s"], json!("x"));
         reopened.close().await;
+        std::fs::remove_file(&copy).unwrap();
+
+        execute_on(&pool, &format!("ATTACH DATABASE '{}' AS a; CREATE TABLE a.u (s TEXT); INSERT INTO a.u VALUES ('y'); DETACH DATABASE a", copy.display()), vec![]).await.unwrap();
+        assert!(!is_plain_sqlite(&copy));
+
+        // Nothing else: the migration backups of old vaults are gone, and with them their exception.
+        let other = dir.join("emerald.db.pre-v99.bak");
+        assert!(execute_on(&pool, &format!("VACUUM INTO '{}'", other.display()), vec![]).await.is_err());
+        pool.close().await;
         std::fs::remove_dir_all(&dir).ok();
     }
 

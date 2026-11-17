@@ -78,7 +78,7 @@ const MAX_KDF_MEMORY_KIB: u32 = 256 * 1024;
 const MAX_KDF_ITERATIONS: u32 = 8;
 const MAX_KDF_PARALLELISM: u32 = 4;
 
-fn derive_key(password: &str, salt: &[u8], params: KdfParams) -> Result<Key, String> {
+pub(crate) fn derive_key(password: &str, salt: &[u8], params: KdfParams) -> Result<Key, String> {
     if params.memory_kib > MAX_KDF_MEMORY_KIB
         || params.iterations > MAX_KDF_ITERATIONS
         || params.parallelism > MAX_KDF_PARALLELISM
@@ -279,11 +279,6 @@ pub(crate) fn read_key_file_named(dir: &Path, name: &str) -> Result<Option<KeyFi
             KeyFile::from_json(&text).map(Some)
         }
     }
-}
-
-/// A `vault.key` fetched from a sync server, for a vault that has none yet.
-pub(crate) fn store_key_file(dir: &Path, file: &KeyFile) -> Result<(), String> {
-    write_key_file(dir, file)
 }
 
 fn write_key_file(dir: &Path, file: &KeyFile) -> Result<(), String> {

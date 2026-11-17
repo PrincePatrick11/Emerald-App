@@ -7,7 +7,7 @@ import type { LucideIcon } from 'lucide-react';
  * FieldValueEditor) is deliberately something else: there the value is content, with
  * a label, not a control.
  */
-export default function Switch({ checked, onChange, disabled, title }: {
+function Switch({ checked, onChange, disabled, title }: {
   checked: boolean;
   onChange: (next: boolean) => void;
   disabled?: boolean;

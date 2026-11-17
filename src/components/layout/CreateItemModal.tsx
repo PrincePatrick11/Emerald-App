@@ -1,8 +1,19 @@
-import { useEffect, useRef, type FocusEvent, type KeyboardEvent } from 'react';
+import { useEffect, useRef, type FocusEvent, type KeyboardEvent, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { createItem } from '../../lib/createItem';
-import { CREATABLE_VIEWS, type CreatableViewId } from '../../lib/modules';
+import { createEntryIn, createItem } from '../../lib/createItem';
+import { dashboardLabel } from '../../lib/dashboards';
+import { CREATABLE_VIEWS, DEFAULT_DASHBOARD_ICON } from '../../lib/modules';
+import { useDashboardStore } from '../../store/dashboardStore';
+import { createDashboardAndOpen } from '../../store/dashboardActions';
+import DashboardGlyph from '../ui/DashboardGlyph';
 import Modal from '../ui/Modal';
+
+interface Tile {
+  key: string;
+  label: string;
+  icon: ReactNode;
+  create: () => Promise<void>;
+}
 
 /** Tiles per row, for the arrow keys; keep in step with `grid-cols-4` below. */
 const COLUMNS = 4;
@@ -14,10 +25,23 @@ const KEY_STEPS: Record<string, number> = {
   ArrowDown: COLUMNS,
 };
 
-/** What the rail's plus opens: one tile per thing that can be created. */
+/**
+ * What the rail's plus opens: one tile per thing that can be created — first
+ * an entry in each dashboard, in rail order (in its first category), "All
+ * entries" (without one), then tasks, the libraries and a new dashboard.
+ */
 export default function CreateItemModal({ onClose }: { onClose: () => void }) {
   const { t } = useTranslation();
-  const tiles = useRef<(HTMLButtonElement | null)[]>([]);
+  const tileRefs = useRef<(HTMLButtonElement | null)[]>([]);
+  const dashboards = useDashboardStore((s) => s.dashboards);
+  const ordered = [...dashboards.filter((d) => d.builtin !== 'all'), ...dashboards.filter((d) => d.builtin === 'all')];
+  const tiles: Tile[] = [
+    ...ordered.map((d) => ({ key: `dashboard:${d.id}`, label: dashboardLabel(t, d), icon: <DashboardGlyph dashboard={d} size={16} />, create: () => createEntryIn(d.id) })),
+    ...CREATABLE_VIEWS.map(({ id, icon: Icon, navLabelKey }) => ({ key: id, label: t(navLabelKey), icon: <Icon size={16} />, create: () => createItem(id) })),
+    { key: 'new-dashboard', label: t('dashboards.dashboard'), icon: <DEFAULT_DASHBOARD_ICON size={16} />, create: createDashboardAndOpen },
+  ];
+  const tilesRef = useRef(tiles);
+  tilesRef.current = tiles;
 
   // A press on the header or the padding takes the focus to nowhere, and with it
   // the ring and the keys: it goes back to the tile. After the event, since the
@@ -34,14 +58,14 @@ export default function CreateItemModal({ onClose }: { onClose: () => void }) {
     const step = e.key === 'Tab' ? (e.shiftKey ? -1 : 1) : KEY_STEPS[e.key];
     if (!step) return;
     e.preventDefault();
-    const count = CREATABLE_VIEWS.length;
-    tiles.current[(index + step + count) % count]?.focus();
+    const count = tiles.length;
+    tileRefs.current[(index + step + count) % count]?.focus();
   };
 
   // The modal goes first: leaving an open edit may ask its own question.
-  const choose = (id: CreatableViewId) => {
+  const choose = (tile: Tile) => {
     onClose();
-    createItem(id).catch((err: unknown) => console.error('[CreateItemModal] creating failed:', err));
+    tile.create().catch((err: unknown) => console.error('[CreateItemModal] creating failed:', err));
   };
 
   // On the window, not the tiles: a number works wherever the focus has gone.
@@ -49,11 +73,12 @@ export default function CreateItemModal({ onClose }: { onClose: () => void }) {
     const onNumber = (e: globalThis.KeyboardEvent) => {
       if (e.ctrlKey || e.metaKey || e.altKey || e.repeat) return;
       // By the physical key first: on AZERTY the unshifted "1" key gives `&`.
-      const number = /^(?:Digit|Numpad)([1-8])$/.exec(e.code)?.[1] ?? e.key;
-      const view = CREATABLE_VIEWS[Number(number) - 1];
-      if (!view) return;
+      const number = /^(?:Digit|Numpad)([1-9])$/.exec(e.code)?.[1] ?? e.key;
+      if (!/^[1-9]$/.test(number)) return;
+      const tile = tilesRef.current[Number(number) - 1];
+      if (!tile) return;
       e.preventDefault();
-      choose(view.id);
+      choose(tile);
     };
     window.addEventListener('keydown', onNumber);
     return () => window.removeEventListener('keydown', onNumber);
@@ -63,22 +88,22 @@ export default function CreateItemModal({ onClose }: { onClose: () => void }) {
   return (
     <Modal title={t('createItem.title')} onClose={onClose} widthClassName="w-[440px] max-w-full">
       <div className="modal-body grid grid-cols-4 gap-2">
-        {CREATABLE_VIEWS.map(({ id, icon: Icon, navLabelKey }, index) => (
+        {tiles.map((tile, index) => (
           <button
-            key={id}
-            ref={(el) => { tiles.current[index] = el; }}
+            key={tile.key}
+            ref={(el) => { tileRefs.current[index] = el; }}
             type="button"
-            // Enter on the open modal gives the most common choice: a journal entry.
+            // Enter on the open modal gives the first dashboard — by default a journal entry.
             autoFocus={index === 0}
-            onClick={() => choose(id)}
+            onClick={() => choose(tile)}
             onKeyDown={(e) => onKeyDown(e, index)}
             onBlur={keepFocus}
-            aria-keyshortcuts={String(index + 1)}
+            aria-keyshortcuts={index < 9 ? String(index + 1) : undefined}
             className="panel-interactive create-item-tile"
           >
-            <span aria-hidden className="create-item-tile-number">{index + 1}</span>
-            <Icon size={16} />
-            <span className="min-w-0 max-w-full truncate">{t(navLabelKey)}</span>
+            {index < 9 && <span aria-hidden className="create-item-tile-number">{index + 1}</span>}
+            {tile.icon}
+            <span className="min-w-0 max-w-full truncate">{tile.label}</span>
           </button>
         ))}
       </div>

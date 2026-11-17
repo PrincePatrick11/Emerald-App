@@ -2,143 +2,117 @@ import type Database from './sqlite';
 import { jsonArray } from './row';
 
 /**
- * Since v53 tags are attached to entries and templates by **ID** — `entries.tags`
- * and `templates.tags` are JSON arrays of `tags.id`. Renaming only changes
- * the tag row; a tag in the trash stays in its entries as an ID
- * and is merely invisible until it comes back. Only when a tag disappears
- * entirely (permanently deleted, grace period expired) or merges into another
- * are the lists rewritten (`rewriteTagRefs`).
+ * Tags are attached to entries, templates and pictures by **ID**, through the
+ * link tables `entry_tags`, `template_tags` and `image_tags` — one row per tag,
+ * in the order the tags were given (`rowid`). Renaming only changes the tag
+ * row; a tag in the trash stays linked and is merely invisible until it comes
+ * back. A tag deleted for good takes its links with it (ON DELETE CASCADE);
+ * one merging into another hands them over (`replaceTagId`).
  *
  * DOM-free and without stores — it also runs in node (`scripts/schema-check.mjs`).
  */
 
-/**
- * The tables whose rows carried tags when v53 turned names into IDs
- * (`tagsById.ts`) — frozen, since that step runs before later tables exist.
- */
-export const TAGGED_TABLES = ['entries', 'templates'] as const;
+/** What carries tags, and where its links are. Literals: they are interpolated into SQL. */
+export const TAG_LINKS = {
+  entry: { table: 'entry_tags', owner: 'entry_id' },
+  template: { table: 'template_tags', owner: 'template_id' },
+  image: { table: 'image_tags', owner: 'image_id' },
+} as const;
 
-/** The tables whose rows carry tags now — including those in the trash. */
-export const TAG_REF_TABLES = [...TAGGED_TABLES, 'images'] as const;
+export type TagOwner = keyof typeof TAG_LINKS;
+
+/** Ids bound per query, below SQLite's variable limit. */
+const SQL_PARAM_CHUNK = 500;
 
 /** A tag ID from a foreign source (backup): only harmless characters, like `isDefinitionId`. */
 export function isTagId(id: unknown): id is string {
   return typeof id === 'string' && /^[\w-]{1,100}$/.test(id);
 }
 
-/** The tag IDs of a row — duplicates once, foreign values dropped. */
+/** The tag IDs of a list from a foreign source (a backup row) — duplicates once, foreign values dropped. */
 export function tagIdList(raw: unknown): string[] {
-  return [...new Set(jsonArray<unknown>(raw).filter(isTagId))];
+  const list = Array.isArray(raw) ? raw : jsonArray<unknown>(raw);
+  return [...new Set(list.filter(isTagId))];
 }
 
 /**
- * Rewrites the tag list of every row in `TAG_REF_TABLES` whose list `fn`
- * changes — trash included, without `updated_at`: a consequence, not a change to the
- * entry. Returns the new lists by row ID so that the stores can catch up
- * in memory.
+ * The tags of every owner of a kind, in their order — or of the owners in
+ * `ids` only. Owners without tags are missing from the map.
  */
-export async function rewriteTagRefs(db: Database, fn: (ids: string[]) => string[]): Promise<Map<string, string[]>> {
-  const changed = new Map<string, string[]>();
-  for (const table of TAG_REF_TABLES) {
-    const rows = await db.select<{ id: string; tags: string }[]>(`SELECT id, tags FROM ${table} WHERE tags != '[]'`);
-    const updates: [string, unknown[]][] = [];
-    for (const row of rows) {
-      const before = jsonArray<string>(row.tags);
-      const after = [...new Set(fn(before))];
-      if (after.length === before.length && after.every((id, i) => id === before[i])) continue;
-      updates.push([`UPDATE ${table} SET tags=$1 WHERE id=$2`, [JSON.stringify(after), row.id]]);
-      changed.set(row.id, after);
+export async function readTagLinks(db: Database, owner: TagOwner, ids?: readonly string[]): Promise<Map<string, string[]>> {
+  const { table, owner: column } = TAG_LINKS[owner];
+  const byOwner = new Map<string, string[]>();
+  const add = (rows: { owner: string; tag: string }[]) => {
+    for (const { owner: id, tag } of rows) {
+      const list = byOwner.get(id);
+      if (list) list.push(tag);
+      else byOwner.set(id, [tag]);
     }
-    // One transaction per table: a tag on hundreds of entries would otherwise be
-    // hundreds of commits.
-    await db.batch(updates);
+  };
+  if (!ids) {
+    add(await db.select<{ owner: string; tag: string }[]>(`SELECT ${column} AS owner, tag_id AS tag FROM ${table} ORDER BY rowid`));
+    return byOwner;
   }
-  return changed;
+  // Bound as parameters, in chunks below SQLite's variable limit.
+  for (let i = 0; i < ids.length; i += SQL_PARAM_CHUNK) {
+    const chunk = ids.slice(i, i + SQL_PARAM_CHUNK);
+    const marks = chunk.map((_, n) => `$${n + 1}`).join(', ');
+    add(await db.select<{ owner: string; tag: string }[]>(
+      `SELECT ${column} AS owner, tag_id AS tag FROM ${table} WHERE ${column} IN (${marks}) ORDER BY rowid`,
+      chunk,
+    ));
+  }
+  return byOwner;
 }
 
-/** Removes the IDs from every list — for tags that are about to no longer exist. */
-export function stripTagIds(db: Database, ids: Iterable<string>): Promise<Map<string, string[]>> {
-  const gone = new Set(ids);
-  if (!gone.size) return Promise.resolve(new Map());
-  return rewriteTagRefs(db, (list) => list.filter((id) => !gone.has(id)));
+/** The tags of one owner, in their order. */
+export async function readTags(db: Database, owner: TagOwner, id: string): Promise<string[]> {
+  return (await readTagLinks(db, owner, [id])).get(id) ?? [];
 }
 
-/** Replaces `from` with `to` in every list — one tag merges into another. */
-export function replaceTagId(db: Database, from: string, to: string): Promise<Map<string, string[]>> {
-  return rewriteTagRefs(db, (list) => list.map((id) => (id === from ? to : id)));
+/**
+ * The statements that make `ids` the tags of an owner, in that order — for a
+ * `batch` together with the owner's own write. An ID without a row in `tags`
+ * is skipped (`INSERT … SELECT`), so a stale ID in memory cannot fail the
+ * write on the foreign key.
+ */
+export function tagStatements(owner: TagOwner, id: string, ids: readonly string[]): [string, unknown[]][] {
+  const { table, owner: column } = TAG_LINKS[owner];
+  return [[`DELETE FROM ${table} WHERE ${column}=$1`, [id]], ...tagInsertStatements(owner, id, ids)];
+}
+
+/** Only the inserts of `tagStatements` — for an owner that has no links yet (a backup import). */
+export function tagInsertStatements(owner: TagOwner, id: string, ids: readonly string[]): [string, unknown[]][] {
+  const { table, owner: column } = TAG_LINKS[owner];
+  return [...new Set(ids)].map((tag) => [
+    `INSERT OR IGNORE INTO ${table} (${column}, tag_id) SELECT $1, id FROM tags WHERE id=$2`, [id, tag],
+  ]);
+}
+
+/**
+ * Hands every link of tag `from` over to `to` — one tag merges into another.
+ * An owner that already carries `to` keeps its place for it; `from`'s rows go
+ * once the tag row is deleted (CASCADE), or here at once.
+ */
+export async function replaceTagId(db: Database, from: string, to: string): Promise<void> {
+  const statements: [string, unknown[]][] = [];
+  for (const { table } of Object.values(TAG_LINKS)) {
+    statements.push([`UPDATE OR IGNORE ${table} SET tag_id=$1 WHERE tag_id=$2`, [to, from]]);
+    statements.push([`DELETE FROM ${table} WHERE tag_id=$1`, [from]]);
+  }
+  await db.batch(statements);
+}
+
+/** Removes every link of the tags — a trashed tag revived as a new one starts without the old owners. */
+export async function unlinkTags(db: Database, ids: Iterable<string>): Promise<void> {
+  const statements: [string, unknown[]][] = [];
+  for (const id of ids) {
+    for (const { table } of Object.values(TAG_LINKS)) statements.push([`DELETE FROM ${table} WHERE tag_id=$1`, [id]]);
+  }
+  if (statements.length) await db.batch(statements);
 }
 
 /** Does a name count as the same tag? Regardless of case and whitespace at the edges. */
 export function tagNameKey(name: string): string {
   return name.trim().toLowerCase();
-}
-
-/** A row from `tags`, as the database up to v52 and backups up to format 11 know it. */
-export interface LegacyTagRow {
-  id: string;
-  name: string;
-  color?: string;
-  deleted_at?: string | null;
-  /** JSON: `{ id, type }` per entry from which the tag was taken on deletion. */
-  affected_ids?: unknown;
-}
-
-/**
- * Turns the tag *names* of a row (state up to v52) into tag IDs — the same
- * rule for migration v53 and for backups up to format 11:
- * - Regardless of case, a live tag before one in the trash (whose names
- *   until then were carried only by entries in the trash).
- * - A name without a tag (after a merge import or a backup without tags)
- *   gets a new one — `created`, so that nothing is lost.
- * - A value that is already a known ID stays: a second run changes
- *   nothing.
- * - `withAffected`: the tag in the trash returns to every row from which
- *   deletion took it (`affected_ids`) — in the new model the row keeps it until it is
- *   restored. Unless it now carries one of the same name.
- */
-export function tagNameResolver(tags: readonly LegacyTagRow[], makeId: () => string) {
-  const byId = new Map<string, LegacyTagRow>(tags.map((t) => [t.id, t]));
-  const byName = new Map<string, LegacyTagRow>();
-  // Live ones first, so that they win on an equal name.
-  for (const tag of [...tags].sort((a, b) => Number(!!a.deleted_at) - Number(!!b.deleted_at))) {
-    const key = tagNameKey(tag.name);
-    if (!byName.has(key)) byName.set(key, tag);
-  }
-  const affected = new Map<string, LegacyTagRow[]>();
-  for (const tag of tags) {
-    if (!tag.deleted_at) continue;
-    for (const ref of jsonArray<{ id?: unknown }>(tag.affected_ids)) {
-      if (typeof ref?.id !== 'string') continue;
-      affected.set(ref.id, [...(affected.get(ref.id) ?? []), tag]);
-    }
-  }
-  const created: LegacyTagRow[] = [];
-
-  function idFor(value: unknown): string | undefined {
-    if (typeof value !== 'string' || !value.trim()) return undefined;
-    if (byId.has(value)) return value;
-    const hit = byName.get(tagNameKey(value));
-    if (hit) return hit.id;
-    const tag: LegacyTagRow = { id: makeId(), name: value.trim(), deleted_at: null };
-    created.push(tag);
-    byId.set(tag.id, tag);
-    byName.set(tagNameKey(tag.name), tag);
-    return tag.id;
-  }
-
-  return {
-    created,
-    idsFor(raw: unknown): string[] {
-      const ids = jsonArray<unknown>(raw).map(idFor).filter((id): id is string => !!id);
-      return [...new Set(ids)];
-    },
-    withAffected(rowId: string, ids: string[]): string[] {
-      const out = [...ids];
-      for (const tag of affected.get(rowId) ?? []) {
-        const sameName = out.some((id) => tagNameKey(byId.get(id)?.name ?? '') === tagNameKey(tag.name));
-        if (!sameName) out.push(tag.id);
-      }
-      return out;
-    },
-  };
 }

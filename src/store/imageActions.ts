@@ -8,9 +8,13 @@ import { useEntryStore } from './entryStore';
 import { useTemplateStore } from './templateStore';
 import type { UndoAction } from './undoStore';
 
-/** A text a picture was taken out of: its content before and after, kept in `images.detached`. */
+/**
+ * A place a picture was taken out of, kept in `images.detached`: a text, with
+ * its content before and after; or an entry's cover (`kind` 'cover', `before`
+ * the picture, `after` empty).
+ */
 interface Detached {
-  kind: 'entry' | 'template';
+  kind: 'entry' | 'template' | 'cover';
   id: string;
   before: string;
   after: string;
@@ -21,14 +25,14 @@ export async function placesShowing(file: string): Promise<ImageUse[]> {
   return ((await collectImageUses(await getDb())).get(file) ?? []).filter(isRemovableUse);
 }
 
-async function writeContent(kind: Detached['kind'], id: string, content: string): Promise<void> {
+async function writeContent(kind: 'entry' | 'template', id: string, content: string): Promise<void> {
   if (kind === 'entry') await useEntryStore.getState().updateEntry(id, { content });
   else await useTemplateStore.getState().updateTemplate(id, { content });
 }
 
 /**
  * A picture out of "Images" into the trash — and, where it is still shown in
- * texts or image fields of entries and templates, out of those too. Sigil
+ * texts, image fields or covers of entries and templates, out of those too. Sigil
  * drawings, canvas backgrounds and block defaults keep it. What it was taken
  * out of is kept with the picture, so that restoring it — by Undo or from
  * the trash — puts it back (`restorePicture`). A file without details gets
@@ -44,12 +48,18 @@ export async function deletePicture(
   const db = await getDb();
   const detached: Detached[] = [];
   for (const use of await placesShowing(file)) {
-    const kind = use.kind as Detached['kind'];
+    const kind = use.kind as 'entry' | 'template';
     const before = await readContent(db, { kind, id: use.id }) ?? '';
     const after = withoutImage(before, file);
     if (after === before) continue;
     await writeContent(kind, use.id, after);
     detached.push({ kind, id: use.id, before, after });
+  }
+  // Covers, read from the column: a place may show the picture in its text and as its cover.
+  const covers = await db.select<{ id: string }[]>('SELECT id FROM entries WHERE cover_image=$1 AND deleted_at IS NULL', [file]);
+  for (const { id } of covers) {
+    await useEntryStore.getState().updateEntry(id, { cover_image: undefined });
+    detached.push({ kind: 'cover', id, before: file, after: '' });
   }
 
   const row = image ?? await store.saveDetails(file);
@@ -77,7 +87,15 @@ export async function restorePicture(id: string): Promise<number> {
     detached = [];
   }
   for (const place of Array.isArray(detached) ? detached : []) {
-    if ((place.kind !== 'entry' && place.kind !== 'template') || typeof place.id !== 'string') continue;
+    if (typeof place.id !== 'string') continue;
+    if (place.kind === 'cover') {
+      // Back as the cover only where none has been chosen since.
+      const entry = useEntryStore.getState().getEntry(place.id);
+      if (!entry || entry.cover_image || typeof place.before !== 'string') { missed++; continue; }
+      await useEntryStore.getState().updateEntry(place.id, { cover_image: place.before });
+      continue;
+    }
+    if (place.kind !== 'entry' && place.kind !== 'template') continue;
     const current = await readContent(db, { kind: place.kind, id: place.id });
     if (current !== place.after) { missed++; continue; }
     await writeContent(place.kind, place.id, place.before);

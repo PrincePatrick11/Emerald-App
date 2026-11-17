@@ -1,7 +1,6 @@
 {
   "common": {
     "delete": "Löschen",
-    "deleteConfirm": "Löschen?",
     "confirmSure": "Sicher?",
     "confirmYes": "Ja, löschen",
     "confirmNo": "Abbrechen",
@@ -29,13 +28,14 @@
     "uncategorized": "Ohne Kategorie",
     "nameTaken": "Diese Kategorie gibt es schon",
     "dragHint": "Zum Sortieren ziehen.",
-    "builtinHint": "Eingebaut — nicht umbenenn- oder löschbar.",
+    "builtinHint": "Eingebaut — nicht umbenennbar oder löschbar. Die Startvorlage lässt sich ändern.",
     "builtin": {
-      "other": "Sonstiges",
       "sigils": "Sigillen",
-      "altars": "Altäre"
+      "altars": "Altäre",
+      "journal": "Journal"
     },
     "starter": {
+      "dreams": "Traumtagebuch",
       "paradigm": "Paradigma",
       "ritual": "Ritual",
       "meditation": "Meditation",
@@ -44,7 +44,18 @@
       "candles": "Kerzen",
       "deities": "Gottheiten",
       "tools": "Werkzeuge"
-    }
+    },
+    "startTemplate": "Startvorlage",
+    "startTemplateHint": "Womit ein neuer Eintrag in dieser Kategorie beginnt. „Standardvorlage“ ist die unter Vorlagen eingestellte.",
+    "editTitle": "Kategorie bearbeiten",
+    "nameLabel": "Name",
+    "startTemplateDefaultNamed": "Standardvorlage ({{name}})",
+    "startTemplateDefaultNone": "Standardvorlage (keine eingestellt)",
+    "startTemplateMeta": "Startvorlage: {{name}}",
+    "shownIn": "Erscheint in",
+    "shownInHint": "Dashboards, deren Filter diese Kategorie enthält. Ändern lässt sich das in den Einstellungen des Dashboards.",
+    "shownInNone": "Kein Dashboard filtert nach dieser Kategorie.",
+    "shownEverywhere": "Außerdem in allen Dashboards ohne Kategorienfilter:"
   },
   "listView": {
     "view": "Ansicht",
@@ -53,8 +64,6 @@
     "cards": "Karten",
     "cardsWide": "Karten (volle Breite)",
     "timeline": "Zeitstrahl",
-    "alphaAsc": "A → Z",
-    "alphaDesc": "Z → A",
     "dateCreated": "Erstellt",
     "dateUpdated": "Geändert",
     "dateDeleted": "Gelöscht",
@@ -63,6 +72,7 @@
     "sortAlphaAsc": "Name · A → Z",
     "sortAlphaDesc": "Name · Z → A",
     "sortCountDesc": "Nutzung · häufigste",
+    "sortManual": "Eigene Reihenfolge",
     "category": "Kategorie",
     "grouping": "Gruppierung",
     "groupBy": "Nach {{label}} gruppieren",
@@ -71,9 +81,7 @@
   },
   "undo": {
     "action": "Rückgängig",
-    "entryDeleted": "Journaleintrag gelöscht",
-    "articleDeleted": "Wiki-Artikel gelöscht",
-    "operationDeleted": "Operation gelöscht",
+    "entryDeleted": "Eintrag gelöscht",
     "taskDeleted": "Aufgabe gelöscht",
     "categoryDeleted": "Kategorie gelöscht",
     "tagDeleted": "Tag gelöscht",
@@ -81,16 +89,15 @@
     "templateDeleted": "Vorlage gelöscht",
     "languageDeleted": "Sprache gelöscht",
     "imageDeleted": "Bild gelöscht",
-    "wordDeleted": "Vokabel gelöscht"
+    "wordDeleted": "Vokabel gelöscht",
+    "dashboardDeleted": "Dashboard gelöscht"
   },
   "createItem": {
     "title": "Neu anlegen"
   },
   "nav": {
-    "home": "Start",
-    "all": "Alle",
     "journal": "Journal",
-    "wiki": "Wiki",
+    "knowledge": "Wissen",
     "tags": "Tags",
     "categories": "Kategorien",
     "images": "Bilder",
@@ -98,10 +105,12 @@
     "blocks": "Blöcke",
     "templates": "Vorlagen",
     "lexicon": "Lexikon",
-    "operations": "Operationen",
+    "practice": "Praxis",
     "tasks": "Aufgaben",
     "settings": "Einstellungen",
-    "startPage": "Startseite"
+    "startPage": "Startseite",
+    "allEntries": "Alle Einträge",
+    "symbols": "Symbole"
   },
   "sidebar": {
     "allEmpty": "Noch keine Einträge",
@@ -110,37 +119,13 @@
     "noResultsHint": "Andere Schreibweise versuchen",
     "tasksEmpty": "Noch keine Aufgaben",
     "showMore": "{{count}} weiteren anzeigen",
-    "showMore_other": "{{count}} weitere anzeigen"
+    "showMore_other": "{{count}} weitere anzeigen",
+    "dashboardEmpty": "Hier gibt es noch keine Einträge"
   },
-  "operations": {
-    "new": "Neue Operation",
-    "untitled": "Unbenannte Operation",
-    "placeholder": "Dokumentiere deine Operation...",
-    "all": "Alle",
-    "categories": {
-      "sigils": "Sigillen",
-      "servitors": "Servitoren",
-      "other": "Sonstiges"
-    }
-  },
-  "altar": {
-    "categories": {
-      "candle": "Kerze",
-      "crystal": "Kristall",
-      "herb": "Kraut",
-      "deity": "Gottheit",
-      "symbol": "Symbol",
-      "tool": "Werkzeug",
-      "table": "Tisch",
-      "other": "Sonstiges"
-    }
-  },
-  "journal": {
-    "title": "Journal",
-    "newEntry": "Neuer Eintrag",
+  "entries": {
+    "label": "Einträge",
     "untitled": "Unbenannter Eintrag",
-    "placeholder": "Beginne deine Aufzeichnung...",
-    "noPhase": "Ohne Mondphase"
+    "placeholder": "Beginne deine Aufzeichnung..."
   },
   "creation": {
     "intention": "Intention",
@@ -159,29 +144,6 @@
     "noLetters": "Noch keine Buchstaben vorbereitet.",
     "targetDate": "Zieldatum",
     "brushSize": "Pinsel"
-  },
-  "wiki": {
-    "title": "Wiki",
-    "newArticle": "Neuer Artikel",
-    "untitled": "Unbenannter Artikel",
-    "placeholder": "Dokumentiere dein Wissen...",
-    "categories": {
-      "ritual": "Ritual",
-      "deity": "Gottheit",
-      "herb": "Kraut",
-      "symbol": "Symbol",
-      "tool": "Werkzeug",
-      "concept": "Konzept",
-      "spell": "Zauber",
-      "paradigm": "Paradigma",
-      "bannung": "Bannung",
-      "meditation": "Meditation",
-      "sigil_charging": "Sigillen-Ladetechnik",
-      "other": "Sonstiges"
-    },
-    "addIcon": "Icon hinzufügen",
-    "changeIcon": "Icon ändern",
-    "removeIcon": "Icon entfernen"
   },
   "blocks": {
     "add": "Block hinzufügen",
@@ -291,12 +253,6 @@
       "display": "Anzeige",
       "fieldCount": "{{count}} Feld",
       "fieldCount_other": "{{count}} Felder"
-    },
-    "status": {
-      "name": "Status",
-      "active": "Aktiv",
-      "endDate": "Enddatum",
-      "version": "Version"
     },
     "sigil": {
       "hidden": "Verborgen, solange die Sigille geladen ist",
@@ -637,7 +593,8 @@
       "ankh": "Anch",
       "monad": "Monas hieroglyphica",
       "eye": "Auge der Vorsehung"
-    }
+    },
+    "editTitle": "Symbol bearbeiten"
   },
   "canvas": {
     "keyNames": {
@@ -825,8 +782,6 @@
     "noResultsForFiltered": "Für „{{query}}“ wurde mit den gewählten Filtern nichts gefunden.",
     "noResultsFiltered": "Mit den gewählten Filtern wurde nichts gefunden.",
     "resetFilters": "Filter zurücksetzen",
-    "operations": "Operationen suchen…",
-    "wikiArticles": "Wiki-Artikel suchen…",
     "globalPlaceholder": "Alles durchsuchen…",
     "hint": "Titel, Tags und Inhalte aller Module.",
     "clear": "Suche leeren",
@@ -852,6 +807,7 @@
     "removeFromUses_other": "An {{count}} Stellen eingebunden – dort auch entfernen?",
     "removeAndDelete": "Entfernen und löschen",
     "roles": {
+      "cover": "Titelbild",
       "default": "Block-Vorgabe",
       "drawing": "Zeichnung",
       "background": "Hintergrund"
@@ -878,14 +834,21 @@
     "onlyInImages": "nur in Bildern",
     "unusedHint": "Noch kein Eintrag trägt diesen Tag.",
     "createNamed": "+ „{{name}}“ anlegen",
-    "unknownOpenDashboard": "Kein Tag „{{name}}“ — unter Tags anlegen"
+    "unknownOpenDashboard": "Kein Tag „{{name}}“ — unter Tags anlegen",
+    "usage": "Verwendung",
+    "inEntries": "In Einträgen",
+    "onlyInTemplatesFilter": "Nur in Vorlagen",
+    "onlyInImagesFilter": "Nur in Bildern",
+    "unusedFilter": "Nirgends verwendet",
+    "onlyInTemplatesHint": "Kein Eintrag trägt diesen Tag, aber Vorlagen.",
+    "onlyInImagesHint": "Kein Eintrag trägt diesen Tag, aber Bilder.",
+    "onlyInTemplatesAndImages": "nur in Vorlagen und Bildern",
+    "onlyInTemplatesAndImagesFilter": "Vorlagen und Bilder",
+    "onlyInTemplatesAndImagesHint": "Kein Eintrag trägt diesen Tag, aber Vorlagen und Bilder."
   },
   "properties": {
     "noEntry": "Öffne einen Eintrag, um seine Eigenschaften zu sehen.",
     "title": "Eigenschaften",
-    "type": "Typ",
-    "typeDropsProperties": "Im Journal fallen Kategorie, Icon und Titelbild weg.",
-    "changeType": "Umwandeln",
     "category": "Kategorie",
     "noCategory": "Keine",
     "moonPhase": "Mondphase",
@@ -904,13 +867,14 @@
     "chooseImage": "Bild wählen",
     "linkEntry": "Eintrag verknüpfen …",
     "addTag": "Tag hinzufügen …",
-    "removeTag": "Tag entfernen"
+    "removeTag": "Tag entfernen",
+    "addIcon": "Icon hinzufügen",
+    "changeIcon": "Icon ändern",
+    "removeIcon": "Icon entfernen"
   },
   "filters": {
     "all": "Alle",
     "category": "Kategorie",
-    "module": "Modul",
-    "moonPhase": "Mondphase",
     "status": "Status"
   },
   "vault": {
@@ -944,7 +908,10 @@
     "backTo": "Zurück zu {{name}}",
     "openFailed": "Der zuletzt geöffnete Vault ließ sich nicht öffnen. Wähle ihn erneut oder einen anderen.",
     "removeConfirm": "Aus der Liste entfernen?",
-    "deleteConfirmFiles": "Vault samt Dateien löschen?"
+    "deleteConfirmFiles": "Vault samt Dateien löschen?",
+    "outdated": "Dieser Vault stammt aus einer älteren Emerald-Version und lässt sich in dieser nicht öffnen. Er bleibt, wie er ist; ein Konverter folgt.",
+    "tooNew": "Dieser Vault stammt aus einer neueren Emerald-Version. Aktualisiere diese App, um ihn zu öffnen. Er bleibt, wie er ist.",
+    "stateLocal": "nur hier"
   },
   "vaultKey": {
     "unlockTitle": "„{{name}}“ entsperren",
@@ -981,10 +948,6 @@
     "rememberUnavailable": "Auf diesem System gibt es keinen Schlüsselbund, in dem sich der Schlüssel merken ließe.",
     "rememberFailed": "Der Schlüsselbund des Betriebssystems hat das Merken abgelehnt. Der Vault ist offen, beim nächsten Start fragt Emerald aber wieder nach dem Passwort.",
     "continue": "Weiter",
-    "encryptTitle": "„{{name}}“ verschlüsseln",
-    "encryptHint": "Dieser Vault stammt aus der Zeit vor der Verschlüsselung. Ab jetzt ist jeder Vault verschlüsselt: Wähle ein Passwort, dann verschlüsselt Emerald Einträge, Bilder und Entwürfe. Das dauert je nach Größe einen Moment, und bis alles geprüft ist, bleibt das Original unangetastet.",
-    "encryptNote": "Früher exportierte Backups (.emeralddb) bleiben unverschlüsselt, bis du sie löschst. Auf SSDs lassen sich gelöschte Dateien unter Umständen noch eine Weile wiederherstellen – ganz sicher bist du erst mit einer verschlüsselten Festplatte (BitLocker, FileVault).",
-    "encryptFailed": "Der Vault konnte nicht verschlüsselt werden. Er ist unverändert – bitte versuche es noch einmal.",
     "progressDatabase": "Datenbank wird verschlüsselt …",
     "progressImages": "Bilder: {{done}} von {{total}}",
     "progressImagesPhase": "Bilder werden verschlüsselt …",
@@ -1019,11 +982,8 @@
   },
   "settings": {
     "language": "Sprache",
-    "version": "Version",
     "pageGeneral": "Allgemein",
     "tagline": "Der Arbeitsbereich für deine magische Praxis.",
-    "author": "Autor",
-    "license": "Lizenz",
     "website": "Webseite",
     "backup": "Datensicherung",
     "exportDb": "Datenbank exportieren",
@@ -1032,9 +992,6 @@
     "importDb": "Datenbank importieren",
     "importBrowse": "Datei auswählen…",
     "importedVault": "Importierter Vault",
-    "includeJournal": "Journal",
-    "includeWiki": "Wiki",
-    "includeOperations": "Operationen",
     "includeTasks": "Aufgaben",
     "includeTags": "Tags",
     "includeLexicon": "Lexikon",
@@ -1157,7 +1114,7 @@
     "groupBackup": "Automatisches Backup",
     "uiScaleHint": "Vergrößert oder verkleinert die ganze Oberfläche — Text, Symbole und Abstände.",
     "editorFontSizeHint": "Schriftgröße in Einträgen und Feldwerten, unabhängig von der Größe der Oberfläche.",
-    "sidebarListHint": "Welche Einträge die Seitenleiste links zeigt: alle oder die eines Moduls.",
+    "sidebarListHint": "Welche Einträge die Seitenleiste links zeigt: alle oder die eines Dashboards.",
     "sidebarLimitHint": "Wie viele Einträge eine Liste zuerst zeigt. Der Rest lädt darunter über „Weitere anzeigen“ nach.",
     "emojiDefaultsHint": "Die Emojis, die jeder Emoji-Picker dieses Vaults vor der Suche anbietet. Klicken entfernt, Ziehen sortiert, über die Suche kommen neue dazu.",
     "imagesHint": "Gilt für neu eingefügte Bilder. Größere werden erst verkleinert und nur abgelehnt, wenn sie danach noch zu groß sind.",
@@ -1181,7 +1138,7 @@
     "moonPhase": "Mondphase",
     "moonPhaseHint": "Die Mondphase des Tages, an dem ein Journal-Eintrag angelegt wurde.",
     "moonPhaseShow": "Bei Journal-Einträgen zeigen",
-    "moonPhaseShowHint": "Gilt für alle Einträge, auch für alte. Aus: keine Mondphase als Icon, in der Seitenleiste, im Export und kein Filtern oder Gruppieren danach.",
+    "moonPhaseShowHint": "Gilt für alle Journal-Einträge, auch für alte. Aus: keine Mondphase als Icon, in der Seitenleiste und im Export.",
     "trashRetentionHint": "So lange bleibt Gelöschtes im Papierkorb. Danach wird es beim Öffnen des Vaults endgültig gelöscht.",
     "customThemeImport": "Theme importieren…",
     "customThemeRemove": "„{{name}}“ entfernen",
@@ -1198,16 +1155,16 @@
     "updateErrorInstall": "Die Installation ist fehlgeschlagen.",
     "pageSecurity": "Sicherheit",
     "pageSync": "Synchronisation",
-    "theme": "Theme",
-    "text": "Text"
-  },
-  "home": {
-    "viewAll": "Alle anzeigen",
-    "view": "Ansicht",
-    "sort": "Sortierung",
-    "show": "Anzahl",
-    "newest": "Neueste",
-    "oldest": "Älteste"
+    "text": "Text",
+    "importErrorOldVersion": "Dieses Backup stammt aus einer älteren Emerald-Version und lässt sich in dieser nicht wiederherstellen. Es wurde nichts verändert; ein Konverter folgt.",
+    "importErrorNewVersion": "Dieses Backup stammt aus einer neueren Emerald-Version. Aktualisiere diese App, um es wiederherzustellen. Es wurde nichts verändert.",
+    "entriesByCategory": "Einträge nach Kategorie",
+    "includeUncategorizedHint": "Einträge ohne Kategorie und solche, deren Kategorie im Papierkorb liegt.",
+    "groupTemplates": "Vorlagen",
+    "previewEntries": "Einträge",
+    "previewTemplates": "Vorlagen",
+    "previewTasks": "Aufgaben",
+    "previewLanguages": "Sprachen"
   },
   "contextMenu": {
     "openInNewTab": "In neuem Tab öffnen",
@@ -1236,7 +1193,9 @@
     "languages": "Sprachen",
     "deleteSelected": "Ausgewählte löschen ({{count}})",
     "confirmDeleteSelected": "Ja, {{count}} löschen",
-    "retentionNoteNever": "Elemente bleiben, bis du sie endgültig löschst."
+    "retentionNoteNever": "Elemente bleiben, bis du sie endgültig löschst.",
+    "entries": "Einträge",
+    "dashboards": "Dashboards"
   },
   "leaveGuard": {
     "title": "Ungespeicherte Änderungen",
@@ -1283,9 +1242,6 @@
     "title": "Link einfügen",
     "searchPlaceholder": "Einträge suchen…",
     "tabAll": "Alle",
-    "tabJournal": "Journal",
-    "tabWiki": "Wiki",
-    "tabOperations": "Operationen",
     "tabTasks": "Aufgaben",
     "noResults": "Keine Einträge gefunden"
   },
@@ -1331,15 +1287,6 @@
     "entryTitlePlaceholder": "Leer lassen für den üblichen Titel",
     "content": "Inhalt",
     "contentPlaceholder": "Was jeder Eintrag aus dieser Vorlage mitbringt …",
-    "allCategories": "Alle Kategorien",
-    "overview": {
-      "title": "Zuweisungen",
-      "hint": "Neue Einträge starten mit einer Kopie der zugewiesenen Vorlage. „Alle Kategorien“ gilt, wo eine Kategorie keine eigene hat.",
-      "category": "Kategorie",
-      "none": "Keine Vorlage",
-      "fallback": "Sonst: {{name}} (alle Kategorien)",
-      "everyEntry": "Jeder neue Eintrag"
-    },
     "saveAsTemplate": "Als Vorlage speichern",
     "insert": {
       "button": "Vorlage einfügen",
@@ -1349,8 +1296,9 @@
       "noticeApplied": "Vorlage „{{name}}“ angewendet",
       "dismiss": "Hinweis schließen"
     },
-    "assignTitle": "Zuweisungen – {{name}}",
-    "assignHint": "Klicke eine Zelle an, damit neue Einträge mit dieser Vorlage starten, ein zweiter Klick nimmt es zurück. Gilt sofort."
+    "defaultTemplate": "Standardvorlage",
+    "defaultTemplateHint": "Womit ein neuer Eintrag beginnt, wenn seine Kategorie keine eigene Startvorlage hat. Startvorlagen stellst du an der Kategorie ein, unter Kategorien.",
+    "defaultNone": "Keine — leer beginnen"
   },
   "lexicon": {
     "languages": "Sprachen",
@@ -1404,22 +1352,9 @@
     "unmappedCount_other": "{{count}} ohne Entsprechung"
   },
   "emptyState": {
-    "journal": {
-      "title": "Noch keine Einträge",
-      "description": "Halte fest, was du erlebst, träumst und wirkst. Neue Einträge bekommen die Mondphase des Tages.",
-      "action": "Erster Eintrag"
-    },
-    "wiki": {
-      "title": "Noch keine Artikel",
-      "description": "Sammle Wissen zu Kräutern, Steinen und Symbolen."
-    },
     "tasks": {
       "title": "Alles erledigt",
       "description": "Keine offenen Aufgaben. Neue landen hier."
-    },
-    "operations": {
-      "title": "Noch keine Operationen",
-      "description": "Plane Rituale mit Zutaten, Ablauf und Ergebnis."
     },
     "images": {
       "title": "Noch keine Bilder",
@@ -1447,68 +1382,27 @@
     },
     "trash": {
       "title": "Papierkorb ist leer"
+    },
+    "allEntries": {
+      "title": "Noch keine Einträge",
+      "description": "Hier erscheint jeder Eintrag des Vaults, egal in welcher Kategorie."
+    },
+    "dashboard": {
+      "title": "Hier ist noch nichts",
+      "description": "Dieses Dashboard zeigt die Einträge, die sein Filter durchlässt. Den Filter änderst du in seinen Einstellungen."
+    },
+    "categories": {
+      "title": "Noch keine Kategorien",
+      "description": "Kategorien ordnen Einträge; jede kann mit einer eigenen Startvorlage beginnen."
+    },
+    "symbols": {
+      "title": "Noch keine Symbole",
+      "description": "Zeichne auf einer Leinwand, wähle die Zeichnung aus und speichere sie in der Leiste als Symbol."
     }
   },
   "sync": {
     "title": "Synchronisation",
-    "url": "Serveradresse",
-    "connect": "Verbinden",
-    "login": "Erneut verbinden",
-    "connecting": "Verbinde …",
-    "running": "Synchronisiert …",
-    "last": "Zuletzt synchronisiert vor {{time}}",
-    "notYet": "In dieser Sitzung noch nicht synchronisiert",
-    "now": "Jetzt synchronisieren",
-    "needsLogin": "Dieses Gerät ist nicht mehr verbunden. Gib den Sync-Key erneut ein.",
-    "conflicts_one": "{{count}} Eintrag wurde auf zwei Geräten geändert. Beide Fassungen bleiben erhalten: Achte auf „(Konflikt)“ im Titel.",
-    "conflicts_other": "{{count}} Einträge wurden auf zwei Geräten geändert. Beide Fassungen bleiben erhalten: Achte auf „(Konflikt)“ im Titel.",
-    "conflictTitle": "{{title}} (Konflikt)",
-    "fetch": "Holen",
-    "errorUnreachable": "Der Server antwortet nicht. Die Synchronisation geht weiter, sobald er wieder da ist.",
-    "errorInsecure": "Diese Adresse ist nicht sicher. Nutze https, oder http nur auf diesem Computer, im privaten Netz oder im Tailnet.",
-    "errorOutdated": "Der Vault auf dem Server stammt von einer neueren Emerald-Version. Aktualisiere diese App.",
-    "errorServerOutdated": "Dieser Server ist zu alt für diese Emerald-Version. Aktualisiere den Server.",
-    "errorAppOutdated": "Dieser Server braucht eine neuere Emerald-Version. Aktualisiere diese App.",
-    "errorServerOlder": "Der Vault auf dem Server stammt aus einer älteren Version von Emerald. Aktualisiere zuerst das Gerät, das ihn dort abgelegt hat.",
-    "errorCannotOpen": "Was der Server geschickt hat, lässt sich mit dem Schlüssel dieses Vaults nicht öffnen.",
-    "errorFailed": "Die Synchronisation ist fehlgeschlagen.",
-    "passwordChanged": "Das Vault-Passwort wurde auf einem anderen Gerät geändert. Gib das neue ein: Diese Kopie wird damit neu geholt.",
-    "newVaultPassword": "Neues Vault-Passwort",
-    "adoptPassword": "Mit diesem Passwort neu holen",
-    "key": "Sync-Key",
-    "devices": "Verbundene Geräte",
-    "thisDevice": "dieses Gerät",
-    "unnamedDevice": "Unbenanntes Gerät",
-    "removeDevice": "Entfernen",
-    "errorWrongKey": "Das ist nicht der Key dieses Servers.",
-    "disconnectServer": "Server trennen",
-    "stateLocal": "nur hier",
-    "statePaused": "getrennt",
-    "stateSynced": "synchronisiert",
-    "upload": "Auf den Server",
-    "pause": "Trennen",
-    "resume": "Wieder verbinden",
-    "deleteFromServer": "Vom Server löschen",
-    "reallyDelete": "Wirklich löschen",
-    "unnamedVault": "Vault {{number}}",
-    "goneFromServer": "Dieser Vault wurde vom Server entfernt. Er bleibt hier als lokaler Vault.",
-    "replaceWarning": "Dieser Vault synchronisiert: Das Backup ersetzt ihn auch auf deinen anderen Geräten, die vorher selbst eine Sicherung anlegen.",
-    "keychainWarning": "Emerald bewahrt die Verbindung im Schlüsselbund des Systems auf. Lehnst du den Zugriff ab, liegt sie stattdessen nur verschleiert in einer Datei auf diesem Gerät.",
-    "keychainShort": "Die Verbindung liegt im Schlüsselbund des Systems.",
-    "deleteFromServerConfirm": "Vom Server entfernen?",
-    "noServer": "Kein Server verbunden.",
-    "openPicker": "Server und Vaults…",
-    "stateRemote": "nur auf dem Server",
-    "notConnected": "Nicht verbunden",
-    "loggedOut": "Abgemeldet",
-    "unreachable": "Nicht erreichbar",
-    "reachable": "Erreichbar",
-    "statLastSync": "Zuletzt synchronisiert",
-    "statDevices": "Geräte",
-    "statSpace": "Belegt",
-    "unencryptedShort": "Nicht im Schlüsselbund: auf diesem Gerät nur verschleiert.",
-    "removeDeviceConfirm": "Entfernen?",
-    "disconnectServerConfirm": "Trennen?"
+    "comingLater": "Die Synchronisation kommt in einer späteren Version. Bis dahin bleibt jeder Vault auf diesem Gerät."
   },
   "start": {
     "server": "Server",
@@ -1518,5 +1412,43 @@
     "opened": "geöffnet",
     "byAuthor": "von {{name}}",
     "updateServer": "Update-Server"
+  },
+  "emeraldImport": {
+    "title": "Import",
+    "oldVersion": "Diese Datei stammt aus einer älteren Emerald-Version und lässt sich in dieser nicht importieren. Es wurde nichts verändert; ein Konverter folgt.",
+    "newVersion": "Diese Datei stammt aus einer neueren Emerald-Version. Aktualisiere diese App, um sie zu importieren. Es wurde nichts verändert.",
+    "unsupported": "Diese Datei ist keine Emerald-Datei, die diese Version lesen kann. Es wurde nichts verändert.",
+    "tooLarge": "Diese Datei ist zu groß oder besteht aus zu vielen Teilen, um sie zu importieren. Es wurde nichts verändert.",
+    "failed": "Der Import ist fehlgeschlagen. Die schon angelegten Einträge und Vorlagen wurden wieder entfernt.",
+    "done": "Import abgeschlossen – Einträge: {{entries}}, Vorlagen: {{templates}}."
+  },
+  "emeraldExport": {
+    "title": "Export",
+    "openEntryFirst": "Öffne zuerst einen Eintrag.",
+    "openTemplateFirst": "Öffne zuerst eine Vorlage."
+  },
+  "emeraldKey": {
+    "title": "Emerald-Datei öffnen",
+    "hint": "Diese Datei ist mit einem Passwort verschlüsselt. Gib das Passwort ein, das beim Export vergeben wurde.",
+    "password": "Passwort der Datei",
+    "open": "Öffnen",
+    "wrongPassword": "Das Passwort passt nicht zu dieser Datei."
+  },
+  "dashboards": {
+    "unnamed": "Unbenanntes Dashboard",
+    "defaultName": "Neues Dashboard",
+    "dashboard": "Dashboard",
+    "newEntry": "Neuer Eintrag",
+    "settings": "Dashboard-Einstellungen",
+    "name": "Name",
+    "allHasNoFilter": "„Alle Einträge“ zeigt jeden Eintrag und hat keinen Filter.",
+    "filterCategories": "Kategorien",
+    "filterCategoriesHint": "Zeigt Einträge der angehakten Kategorien. „Alle“ zeigt jede Kategorie.",
+    "filterTags": "Tags",
+    "filterTagsHint": "Wenn gesetzt, nur Einträge mit mindestens einem dieser Tags.",
+    "newCategory": "Neue Kategorie",
+    "addCategory": "Hinzufügen",
+    "moveUp": "Nach oben",
+    "moveDown": "Nach unten"
   }
 }

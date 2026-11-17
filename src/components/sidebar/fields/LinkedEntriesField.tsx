@@ -9,11 +9,11 @@ import {
   requestEntryLinkAppend, requestEntryLinkRemove, requestEntryLinkReveal,
 } from '../../../lib/links';
 import { extractInternalLinks } from '../../../lib/internalLinkHtml';
-import { viewTypeForEntryType } from '../../../lib/modules';
+import { viewOfLinkTarget } from '../../../store/entryViews';
 import { linkItemKey as itemKey, linkItemsByKey } from '../../../lib/linkItems';
 import {
-  ENTRY_TYPE_ICONS,
-  ENTRY_TYPE_LABEL_KEYS,
+  TARGET_KIND_ICONS,
+  TARGET_KIND_LABEL_KEYS,
   type SuggestionItem,
 } from '../../editors/text/SuggestionList';
 
@@ -91,13 +91,13 @@ function useRevealLink() {
   const setActiveView = useUIStore((s) => s.setActiveView);
   return (item: SuggestionItem) => {
     if (requestEntryLinkReveal(item)) return;
-    setActiveView({ type: viewTypeForEntryType(item.entryType), id: item.id, mode: 'view' });
+    setActiveView(viewOfLinkTarget(item.targetKind, item.id));
   };
 }
 
 /**
  * The links in the read view: a section with a counter, one row per link:
- * icon, title, and on the right the category (the entry type if there is no category).
+ * icon, title, and on the right the category (entry/task if there is none).
  */
 export function LinkedEntriesSection({ content }: Props) {
   const { t } = useTranslation();
@@ -111,7 +111,7 @@ export function LinkedEntriesSection({ content }: Props) {
           key={itemKey(item)}
           icon={<LinkItemIcon item={item} />}
           label={item.label}
-          meta={item.categoryLabel ?? t(ENTRY_TYPE_LABEL_KEYS[item.entryType])}
+          meta={item.categoryLabel || t(TARGET_KIND_LABEL_KEYS[item.targetKind])}
           onClick={() => reveal(item)}
         />
       ))}
@@ -146,11 +146,11 @@ export default function LinkedEntriesField({ content }: Props) {
 
   const filtered = useMemo(() => {
     const linkedKeys = new Set(linked.map(itemKey));
-    const q = query.toLowerCase();
+    const q = query.trim().toLowerCase();
     return items
       .filter((i) => !linkedKeys.has(itemKey(i)) && i.label.toLowerCase().includes(q))
-      // Most recently edited first; otherwise the module order from
-      // `buildLinkItems` would decide, and with no search term only journal would be in the list.
+      // Most recently edited first; otherwise the order of `buildLinkItems`
+      // would decide, and with no search term no task would be in the list.
       .sort(byRecency)
       .slice(0, RESULT_LIMIT);
   }, [items, linked, query]);
@@ -180,7 +180,7 @@ export default function LinkedEntriesField({ content }: Props) {
           key={itemKey(item)}
           icon={<LinkItemIcon item={item} />}
           label={item.label}
-          meta={item.categoryLabel ?? t(ENTRY_TYPE_LABEL_KEYS[item.entryType])}
+          meta={item.categoryLabel || t(TARGET_KIND_LABEL_KEYS[item.targetKind])}
           title={item.label}
           onClick={() => reveal(item)}
           action={<SidebarRowRemove title={t('properties.removeLink')} onClick={() => remove(item)} />}
@@ -196,13 +196,13 @@ export default function LinkedEntriesField({ content }: Props) {
           placeholder={t('properties.linkEntry')}
           fieldIcon={<Search size={14} />}
           renderResult={(item) => {
-            const TypeIcon = ENTRY_TYPE_ICONS[item.entryType];
+            const TypeIcon = TARGET_KIND_ICONS[item.targetKind];
             return (
               <>
                 <LinkItemIcon item={item} />
                 <span className="flex-1 truncate">{item.label}</span>
                 <TypeIcon size={12} className="text-subtle flex-shrink-0" />
-                <span className="text-subtle flex-shrink-0">{t(ENTRY_TYPE_LABEL_KEYS[item.entryType])}</span>
+                <span className="text-subtle flex-shrink-0">{t(TARGET_KIND_LABEL_KEYS[item.targetKind])}</span>
               </>
             );
           }}

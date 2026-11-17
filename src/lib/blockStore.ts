@@ -13,12 +13,10 @@ import { TEXT_BLOCK_TYPE, type BlockInstance } from './blocks/types';
  * `serializeBlocks`), the form `.emerald`, export and backup files hold too.
  *
  * A write that has a whole block stack as a string and no saved state to
- * compare with (sync, a seed, an import) replaces the owner's rows
- * (`replaceOwnerBlocks`). Tools for the old `content` column — migrations
- * and an import's working copy — are in `contentColumn.ts`.
+ * compare with (a seed) replaces the owner's rows (`replaceOwnerBlocks`).
  *
- * Free of `db.ts` (which imports this file for the migration) and of the DOM
- * (the schema harness runs it under Node).
+ * Free of `db.ts` (which imports this file) and of the DOM (the schema
+ * harness runs it under Node).
  */
 
 export type BlockOwnerKind = 'entry' | 'template';
@@ -40,7 +38,7 @@ export const OWNER: Record<BlockOwnerKind, { column: 'entry_id' | 'template_id';
 const ROW_COLUMNS = 'id, position, type, version, hidden, title, show_title, config, data, attrs, html';
 
 /** Bound values per `IN (…)` list — far below SQLite's limit. */
-export const ID_CHUNK = 500;
+const ID_CHUNK = 500;
 
 /* ---------------- What was last saved ---------------- */
 
@@ -52,10 +50,11 @@ const savedByOwner = new Map<string, SavedBlocks>();
 /**
  * Per owner: how many writes have committed. A write remembers its blocks only
  * if no other write of the owner committed between its plan and its commit.
- * The stores serialize an owner's saves, but sync and a snapshot restore write
- * outside that queue (`replaceOwnerBlocks`); a save planned against the state
- * before such a write would otherwise be remembered as what the rows hold,
- * and later saves would never delete the blocks only the other write added.
+ * The stores serialize an owner's saves; a write outside that queue
+ * (`replaceOwnerBlocks`) is the case this guards against: a save planned
+ * against the state before it would otherwise be remembered as what the rows
+ * hold, and later saves would never delete the blocks only the other write
+ * added. Today only seeds write that way, for owners nothing has saved yet.
  */
 const generations = new Map<string, number>();
 
@@ -156,17 +155,6 @@ export async function readContents(db: Database, kind: BlockOwnerKind, ids: read
   return new Map([...blocks].map(([id, list]) => [id, contentOf(list)]));
 }
 
-/**
- * Rows of entries or templates with their block HTML as `content` — the form
- * backup files and sync carry (as the column did until v66). In place.
- */
-export async function withContents<T extends Record<string, unknown>>(db: Database, kind: BlockOwnerKind, rows: T[]): Promise<T[]> {
-  if (!rows.length) return rows;
-  const contents = await readContents(db, kind, rows.map((row) => String(row.id)));
-  for (const row of rows) (row as Record<string, unknown>).content = contents.get(String(row.id)) ?? '';
-  return rows;
-}
-
 /* ---------------- From content to blocks ---------------- */
 
 function isPlainText(block: BlockInstance): boolean {
@@ -254,7 +242,7 @@ function deleteStatements(owner: BlockOwner, ids: readonly string[]): Statement[
   return out;
 }
 
-export interface BlockWrite {
+interface BlockWrite {
   /** The statements for the rows; the caller adds its own row's and runs them in one batch. */
   statements: Statement[];
   /** The block HTML as it follows from the blocks — what the store keeps in memory. */
@@ -303,10 +291,10 @@ export async function planBlockWrite(
 
 /**
  * Every row of the owner anew from a block stack given as one string — for
- * sync, seeds and imports, which have no saved state to compare with. The
- * owner row must exist (or be inserted before in the same batch). `hasRows:
- * false` leaves out the delete, for an owner that is new. `content` is the
- * string as the rows give it back.
+ * seeds, which have no saved state to compare with. The owner row must exist
+ * (or be inserted before in the same batch). `hasRows: false` leaves out the
+ * delete, for an owner that is new. `content` is the string as the rows give
+ * it back.
  */
 export function replaceOwnerBlocks(
   owner: BlockOwner, html: string, now: string, { hasRows }: { hasRows: boolean },

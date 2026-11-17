@@ -1,5 +1,5 @@
 import type { ActiveView } from '../types';
-import { ENTRY_MODULE_IDS, isLibraryView, isViewId } from './modules';
+import { isLibraryView, isViewId } from './modules';
 
 /** A tab's back/forward history: the pages visited and the position one is at. */
 export interface NavHistory {
@@ -15,7 +15,7 @@ export interface OpenTab {
 }
 
 /** Upper limit per history: it is saved to localStorage along with the tabs. */
-export const MAX_HISTORY_LENGTH = 50;
+const MAX_HISTORY_LENGTH = 50;
 
 export function createTabId(): string {
   return crypto.randomUUID();
@@ -38,11 +38,17 @@ export function freshHistory(view: ActiveView): NavHistory {
 /**
  * Appends a page after the current position and cuts off whatever lay ahead of it.
  * The same page (same type, same id) — e.g. switching into
- * edit mode — is not a new step; the history stays unchanged.
+ * edit mode — is not a new step. Only the dashboard an entry is shown in is
+ * taken over, so Back and Forward come back to it as it was left.
  */
 export function pushHistory(history: NavHistory, view: ActiveView): NavHistory {
   const current = history.views[history.index];
-  if (current && current.type === view.type && current.id === view.id) return history;
+  if (current && current.type === view.type && current.id === view.id) {
+    if (current.dashboard === view.dashboard) return history;
+    const views = history.views.slice();
+    views[history.index] = { ...current, dashboard: view.dashboard };
+    return { ...history, views };
+  }
   const views = [...history.views.slice(0, history.index + 1), stripSessionFlags(view)]
     .slice(-MAX_HISTORY_LENGTH);
   return { views, index: views.length - 1 };
@@ -76,5 +82,5 @@ export function normalizeSavedHistory(raw: unknown, view: ActiveView): NavHistor
  */
 export function isContentView(view: ActiveView): boolean {
   if (!view.id) return false;
-  return isLibraryView(view.type) || (ENTRY_MODULE_IDS as readonly string[]).includes(view.type);
+  return view.type === 'entry' || view.type === 'tasks' || isLibraryView(view.type);
 }

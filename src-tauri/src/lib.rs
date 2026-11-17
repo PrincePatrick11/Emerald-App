@@ -35,12 +35,12 @@ mod keys;
 mod reencrypt;
 /// Encrypted `.emeralddb` backups.
 mod backup;
+/// `.emerald` files: entries and templates as a ZIP archive, optionally sealed with a password.
+mod emerald_file;
 /// Automatic backups: the target folder, the file name, what gets pruned.
 mod auto_backup;
 /// The in-app updater: variable source, check, installation.
 mod updates;
-/// The way to a sync server.
-mod sync;
 /// Lets the MCP server in `tools/mcp` drive the app where the webview has no
 /// debug port. Dev builds only, and only when asked for.
 #[cfg(feature = "devbridge")]
@@ -264,26 +264,7 @@ pub(crate) fn guarded_read_path(app: &tauri::AppHandle, path: &str) -> Result<Pa
     if !is_within_allowed_roots(&canonical, &allowed_roots) {
         return Err("access denied: path outside allowed directories".to_string());
     }
-    let app_data_dir = app.path().app_data_dir().ok().and_then(|dir| std::fs::canonicalize(dir).ok());
-    if app_data_dir.is_some_and(|dir| !app_data_read_allowed(&canonical, &dir)) {
-        return Err("access denied: this file is not for reading".to_string());
-    }
     Ok(canonical)
-}
-
-/// `sync.json` may hold the sync token, which the webview must never see — and
-/// so may its temp file and a copy set aside as unreadable. In any case: a file
-/// system that folds case would answer to another spelling.
-fn app_data_read_allowed(target: &Path, app_data_dir: &Path) -> bool {
-    target
-        .strip_prefix(app_data_dir)
-        .ok()
-        .and_then(|below| below.to_str())
-        .is_none_or(|below| {
-            ![sync::SETTINGS_FILE, sync::SETTINGS_TEMP_FILE, sync::BAD_FILE]
-                .iter()
-                .any(|name| below.eq_ignore_ascii_case(name))
-        })
 }
 
 // ── commands ──────────────────────────────────────────────────────────────────
@@ -297,14 +278,15 @@ fn app_data_read_allowed(target: &Path, app_data_dir: &Path) -> bool {
 // synchronous on purpose: they mutate NSMenu, and that is main-thread-only on macOS.
 
 /// Writes text content to a user-selected file path.
-/// Only .md, .emerald, .json, and .txt extensions are permitted. Backups
-/// (.emeralddb) go through `backup::write_backup_file`, which encrypts them —
-/// none may be written in the clear by accident.
+/// Only .md, .json, and .txt extensions are permitted. Backups (.emeralddb)
+/// go through `backup::write_backup_file`, which encrypts them — none may be
+/// written in the clear by accident — and `.emerald` archives through
+/// `emerald_file::write_emerald_file`.
 #[tauri::command]
 async fn write_file(app: tauri::AppHandle, path: String, content: String) -> Result<(), String> {
     tauri::async_runtime::spawn_blocking(move || {
         let ext = ext_for_path(&path);
-        if !matches!(ext.as_str(), "md" | "emerald" | "json" | "txt") {
+        if !matches!(ext.as_str(), "md" | "json" | "txt") {
             return Err("unsupported file type".to_string());
         }
 
@@ -342,13 +324,14 @@ async fn export_image(app: tauri::AppHandle, path: String, data_url: String) -> 
 }
 
 /// Reads a text file and returns its contents as a UTF-8 string.
-/// Only .md, .emerald, .json, and .txt extensions are permitted; backups are
-/// read through `backup::read_backup_file`.
+/// Only .md, .json, and .txt extensions are permitted; backups are read
+/// through `backup::read_backup_file`, `.emerald` archives through
+/// `emerald_file::read_emerald_file`.
 #[tauri::command]
 async fn read_file(app: tauri::AppHandle, path: String) -> Result<String, String> {
     tauri::async_runtime::spawn_blocking(move || {
         let ext = ext_for_path(&path);
-        if !matches!(ext.as_str(), "md" | "emerald" | "json" | "txt") {
+        if !matches!(ext.as_str(), "md" | "json" | "txt") {
             return Err("unsupported file type".to_string());
         }
 
@@ -812,7 +795,6 @@ pub fn run() {
         .manage(db::Databases::default())
         .manage(keys::VaultKeys::default())
         .manage(updates::PendingUpdate::default())
-        .manage(sync::SyncState::default())
         .manage(CloseWatch::default())
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::CloseRequested { .. } = event {
@@ -838,11 +820,12 @@ pub fn run() {
             db::db_batch,
             keys::vault_key_status,
             keys::keychain_available,
-            reencrypt::vault_encrypt_existing,
             reencrypt::vault_change_password,
             reencrypt::vault_recover,
             backup::write_backup_file,
             backup::read_backup_file,
+            emerald_file::write_emerald_file,
+            emerald_file::read_emerald_file,
             auto_backup::auto_backup_status,
             auto_backup::pick_auto_backup_dir,
             auto_backup::reset_auto_backup_dir,
@@ -857,49 +840,21 @@ pub fn run() {
             images::copy_image_file,
             images::read_image_file,
             images::read_image_as_base64,
-            images::adopt_legacy_images,
             images::list_image_files,
             images::delete_image_files,
+            images::save_icon,
+            images::read_icon_as_base64,
+            images::list_icon_files,
+            images::delete_icon_files,
             vault::register_vaults,
             vault::ensure_vault_dirs,
-            sync::sync_status,
-            sync::sync_pair,
-            sync::sync_server_status,
-            sync::sync_unpair,
-            sync::sync_devices,
-            sync::sync_set_paused,
-            sync::sync_forget_link,
-            sync::sync_delete_remote,
-            sync::sync_rename,
-            sync::sync_remove_device,
-            sync::sync_remote_vaults,
-            sync::sync_create_remote,
-            sync::sync_adopt_remote,
-            sync::sync_push,
-            sync::sync_pull,
-            sync::sync_remote_state,
-            sync::sync_snapshot_begin,
-            sync::sync_snapshot_add,
-            sync::sync_snapshot_put,
-            sync::sync_snapshot_fetch,
-            sync::sync_snapshot_frame,
-            sync::sync_snapshot_done,
-            sync::sync_images,
-            sync::sync_images_delete,
-            sync::sync_adopt_new_password,
-            sync::sync_rekey_done,
-            sync::sync_watch,
-            sync::sync_unwatch,
             vault::create_vault_dirs,
             vault::default_vault_dir,
             vault::new_vault_base_dir,
             vault::ensure_backup_dir,
             vault::probe_vault_dir,
-            vault::legacy_default_db_exists,
-            vault::migrate_vault_layout,
             vault::delete_vault_files,
             vault::discard_import_staging,
-            vault::prune_migration_backups,
             vault::read_vault_settings,
             vault::write_vault_settings,
             vault::read_device_settings,
@@ -951,18 +906,6 @@ pub fn run() {
 #[cfg(test)]
 mod app_data_write_tests {
     use super::*;
-
-    #[test]
-    fn the_sync_settings_cannot_be_read_by_path() {
-        let data = Path::new("/home/u/.local/share/emerald");
-        for refused in ["sync.json", "SYNC.JSON", "Sync.Json", "sync.json.bad", "sync.json.tmp"] {
-            assert!(!app_data_read_allowed(&data.join(refused), data), "{refused}");
-        }
-        for allowed in ["vaults.json", "vaults/sync.json"] {
-            assert!(app_data_read_allowed(&data.join(allowed), data), "{allowed}");
-        }
-        assert!(app_data_read_allowed(Path::new("/home/u/Documents/sync.json"), data));
-    }
 
     #[test]
     fn only_the_registry_and_the_vaults_folder_are_writable_in_the_app_data_dir() {

@@ -14,7 +14,7 @@ Translations are managed with `react-i18next`; the setup lives in `src/i18n/inde
 
 Weekday names (the automatic backup's weekday chips) come from `formatWeekday` and `weekdaysInLocaleOrder` in `lib/formatDate.ts`, i.e. from the date-fns locale, so they need no keys of their own.
 
-Code without hook access (stores, migrations, importers — e.g. the duplicate actions' `common.copySuffix`) reads translations through the default `i18n` export.
+Code without hook access (stores, the schema seed in `db.ts`, importers — e.g. the duplicate actions' `common.copySuffix`) reads translations through the default `i18n` export.
 
 Translation files:
 
@@ -27,7 +27,7 @@ src/i18n/locales/fr.json
 
 All four files must have the same key structure. A key missing from a non-English locale silently falls back to English, which is easy to miss — always add every key to all four files.
 
-`npm run check:i18n` (`scripts/i18n-check.mjs`, run in CI) verifies this: it flattens all four files to `a.b.c` paths and fails if a language lacks a key English has, has a key English doesn't, or a value's `{{placeholder}}`s differ from English's. It deliberately does not detect dead keys — dynamic lookups like `t(`${module}.categories.${id}`)` would make a static search too noisy to trust.
+`npm run check:i18n` (`scripts/i18n-check.mjs`, run in CI) verifies this: it flattens all four files to `a.b.c` paths and fails if a language lacks a key English has, has a key English doesn't, or a value's `{{placeholder}}`s differ from English's. It deliberately does not detect dead keys — dynamic lookups like `t(`categories.builtin.${id}`)` would make a static search too noisy to trust.
 
 ## Using Translations
 
@@ -38,7 +38,7 @@ import { useTranslation } from 'react-i18next';
 
 function MyComponent() {
   const { t } = useTranslation();
-  return <span>{t('journal.title')}</span>;
+  return <span>{t('entries.label')}</span>;
 }
 ```
 
@@ -46,16 +46,16 @@ Never hardcode display text. Every string visible to the user must go through `t
 
 ## Adding a New Key
 
-1. Decide where the key belongs in the JSON hierarchy (e.g. `operations.newField`).
+1. Decide where the key belongs in the JSON hierarchy (e.g. `entries.newField`).
 2. Add the key and its English value to `en.json`.
 3. Add the same key with translated values to `de.json`, `es.json`, and `fr.json`.
-4. Use `t('operations.newField')` in the component.
+4. Use `t('entries.newField')` in the component.
 
 Skipping step 3 is the most common mistake: the fallback to English makes the omission invisible when testing in English.
 
 ## Built-in Category Names
 
-Wiki, Operations and Tasks share one `categories` table (see [`database.md`](database.md#categories)). Two rows are true built-ins (`is_builtin = 1`): `sigils` and `altars` (a new operation in one starts with the sigil blocks, in the other with an altar). Their `name` column holds a fixed English seed value that must never be displayed directly — the display name always goes through the shared helper:
+Entries and Tasks share one `categories` table (see [`database.md`](database.md#categories)). Two rows are true built-ins (`is_builtin = 1`): `sigils` and `altars` (a new entry in one starts with the sigil blocks, in the other with an altar). Their `name` column holds a fixed English seed value that must never be displayed directly — the display name always goes through the shared helper:
 
 ```tsx
 // correct — the one rule for every module
@@ -66,9 +66,7 @@ const label = categoryLabel(t, cat);
 const label = cat.name;
 ```
 
-`categoryLabel` resolves a builtin via `categories.builtin.<id>` and returns `cat.name` unchanged for everything else. That includes a fresh vault's eight starter categories: `categories.starter.<key>` is used only once, to *name* them at creation; from then on they are ordinary rows the user can rename or delete.
-
-The module-scoped keys `wiki.categories.*`, `operations.categories.*` and `altar.categories.*` are **legacy-only and must stay in all four locale files**: migrations v36–v38 and the importer for `.emerald`/backup files written before v38 resolve an old builtin id or name through them. Nothing in the live UI reads them; do not remove them, and do not add new keys there.
+`categoryLabel` resolves a builtin via `categories.builtin.<id>` and returns `cat.name` unchanged for everything else. That includes a fresh vault's nine starter categories: `categories.starter.<key>` is used only once, to *name* them at creation; from then on they are ordinary rows the user can rename or delete. There are no module-scoped category keys: every category name goes through `categories.*`.
 
 ## Key Structure
 
@@ -77,35 +75,35 @@ Top-level keys of `en.json`, with the conventions worth knowing:
 | Key | Contents |
 |---|---|
 | `common` | Shared labels: `save`/`cancel`/`delete`/`ok`, `loading`, the shared inline delete confirmation `confirmSure`/`confirmYes`/`confirmNo` ("Sure? Yes/No"), `copySuffix`, image-format and size messages, `searchEmoji`/`noEmojiResults` for the shared `EmojiPicker` |
-| `categories` | The one category block for every module: the Categories view (`add`, `name`, `nameTaken`, `dragHint`, `builtinHint`), `uncategorized`, `builtin.*` and `starter.*` (see [Built-in Category Names](#built-in-category-names)) |
-| `listView` | View/sort/grouping labels of the dashboard sidebar. The sort trigger combines a date field (`dateCreated`/`dateUpdated`/`dateDeleted`) with `sortNewest`/`sortOldest`, or uses `sortAlphaAsc`/`sortAlphaDesc`/`sortCountDesc`. `groupBy` (`"Group by {{label, lowercase}}"`) uses the `lowercase` formatter registered in `src/i18n/index.ts`; German capitalises the noun and skips the formatter |
+| `categories` | The one category block for every module: the Categories view (`add`, `name`, `nameTaken`, `dragHint`, `builtinHint`) and its edit dialog (`editTitle`, `nameLabel`, `startTemplate*`, `shownIn*`, `shownEverywhere`), `uncategorized`, `builtin.*` and `starter.*` (see [Built-in Category Names](#built-in-category-names)) |
+| `listView` | View/sort/grouping labels of the dashboard sidebar. The sort trigger combines a date field (`dateCreated`/`dateUpdated`/`dateDeleted`) with `sortNewest`/`sortOldest`, or uses `sortAlphaAsc`/`sortAlphaDesc`/`sortCountDesc`/`sortManual` ("Custom order", the categories). `groupBy` (`"Group by {{label, lowercase}}"`) uses the `lowercase` formatter registered in `src/i18n/index.ts`; German capitalises the noun and skips the formatter |
 | `undo` | Undo toast messages |
-| `nav` | Navigation labels, including `home`, `categories`, `all` and `vaults`. A rail entry needs its `nav.<id>` key in all four locales, since `ModuleMeta`/`AUX_VIEWS` resolve the label dynamically |
-| `sidebar` | Left sidebar strings (`allEmpty`) |
-| `journal`, `wiki`, `operations`, `tasks` | Module UI strings. Each module's `untitled` key is what `displayTitle` (`src/lib/entryTitle.ts`) shows for an empty title — display text only, never stored. `*.categories.*` is legacy-only (see above) |
+| `nav` | Navigation labels, including `allEntries`, `categories`, `all` and `vaults`; `allEntries`/`journal`/`practice`/`knowledge` are also the names of the built-in dashboards (`dashboardLabel`) as long as they have no name of their own. A rail entry needs its `nav.<id>` key in all four locales, since `TASKS_VIEW`/`AUX_VIEWS` resolve the label dynamically |
+| `sidebar` | Left sidebar strings (`allEmpty`, `tasksEmpty`, `dashboardEmpty`) |
+| `dashboards` | Dashboards: the settings dialog (`settingsTitle`, `name`, `filterCategories`/`filterTags` with their hints, `newCategory`/`addCategory`, `allHasNoFilter`), the rail menu (`settings`, `moveUp`, `moveDown`), `newEntry`, the plus's `dashboard` tile, `defaultName` for a new one and `unnamed` for one without a name |
+| `entries`, `tasks` | Entry and task UI strings. Their `untitled` key is what `displayTitle` (`src/lib/entryTitle.ts`) shows for an empty title — display text only, never stored |
 | `creation` | The sigil creation tools (intention, letters, canvas, charge) |
 | `blocks` | Content-block UI and the Blocks view: `types.*` (block types), `kinds.*` (one per `ElementKind`, shared by the "Add block" menu and the builder's element picker), `fields.*` (field block), `sigil.*` (calculator, drawing and charge, on their own or as parts of a block), `canvas.*` (the Canvas and Altar blocks), `paint.*` (the Painting block), `library.*` (the Blocks builder and its update/remove-copies notices) |
 | `editor` | Shared editor buttons, link-popup actions, `lockedBySigil`, and `toolbar.*` (every formatting-toolbar tooltip) |
-| `symbols` | The canvas editor's symbol library: its own labels, `packs.*` the pack names, and `<pack>.<name>` every symbol's name, which the library's search looks in |
+| `symbols` | The canvas editor's symbol library: its own labels, `packs.*` the pack names, and `<pack>.<name>` every symbol's name, which the library's search looks in; also `editTitle`, the title of the Symbols view's edit dialog |
 | `moonPhase` | Display names of the eight moon phases |
 | `search` | Dashboard search placeholders (`placeholder`, `placeholderIn` with `{{title}}`) and the title bar's global search (`globalPlaceholder`, `hint`, `clear`, `showMore`). Result module labels reuse `nav.*`; only `categories` has its own |
 | `templates` | Templates dashboard and page; `builtin.sigil` and `builtin.altar` name the built-in `core-sigil` and `core-altar` templates the way `categories.builtin.*` names a category; `insert.*` is the editor's picker and apply flow |
 | `lexicon` | Lexicon dashboard, language page and translate field. `wordCount` counts vocabulary rows; the translated text's own count is `textWordCount` |
-| `tags` | Tags view (`new`, `name`, `nameTaken`, `color`, `unused`, `onlyInTemplates`, `onlyInImages`) |
+| `tags` | Tags view (`new`, `name`, `nameTaken`, `color`, `unused`; the usage filter `usage`, `inEntries` and the `onlyIn*`, `*Filter` and `*Hint` keys, one set per state) |
 | `properties` | Right sidebar Properties panel |
 | `filters` | Filter panel; `all` is the "All" row every `FilterList` shows on top |
-| `vault` | `VaultPicker`: list/switch, edit, create, open/relocate, delete, the way back. Some keys (`chooseFolder`, `defaultFolder`, `alreadyOpen`, `accessDenied`, `folderHasVault`, `folderNotEmpty`) also serve the backup import's add-vault mode via `VaultLocationRow` and `NEW_VAULT_TARGET_ERROR_KEY` |
+| `vault` | `VaultPicker`: list/switch, edit, create, open/relocate, delete, the way back. Some keys (`chooseFolder`, `defaultFolder`, `alreadyOpen`, `accessDenied`, `folderHasVault`, `folderNotEmpty`) also serve the backup import's add-vault mode via `VaultLocationRow` and `NEW_VAULT_TARGET_ERROR_KEY`. `outdated` and `tooNew` are what a vault of an earlier or a newer version is refused with (`vaultOpenErrorKey`) |
 | `settings` | Settings modal, and on the start page the keys its sections share with it (language, theme, custom themes, updates, tagline, website) |
 | `start` | The start page's own: section headings, links, version and author |
 | `createItem` | The rail's plus: `CreateItemModal` |
-| `sync` | The sync server: the start page's server section, Settings → Sync, the vault list's state marks, sync errors |
-| `vaultKey` | `VaultKeyDialog` and its shared parts: unlock, create, encrypt, recover, the recovery-key box, the "remember on this device" switch and the failure texts (`wrongPassword`, `tooShort` with `{{count}}`, …) |
+| `sync` | The sync placeholder: Settings → Sync and the start page's Server card |
+| `vaultKey` | `VaultKeyDialog` and its shared parts: unlock, create, recover, the recovery-key box, the "remember on this device" switch and the failure texts (`wrongPassword`, `tooShort` with `{{count}}`, …) |
 | `security` | Settings → Security: remember, lock, change password, each with a hint and a tooltip |
 | `backupKey` | `BackupUnlockDialog`: opening an encrypted backup |
-| `home` | Home view |
-| `emptyState` | Per-dashboard empty states (`title`, `description`, `action`) |
+| `emptyState` | Per-dashboard and per-collection empty states (`title`, `description`, `action`), including `allEntries`, `dashboard` (every dashboard made by hand), `categories` and `symbols` |
 | `contextMenu` | Context menu actions, including `openInNewTab` |
-| `trash` | Trash view: section labels per kind, `confirmEmptyAction`/`confirmDeleteSelected` (the primary button's own in-place confirmation label) |
+| `trash` | Trash view: section labels per kind (`entries`, `dashboards`, `categories`, …), `confirmEmptyAction`/`confirmDeleteSelected` (the primary button's own in-place confirmation label) |
 | `tabBar` | Tab strip (`editing`, `closeTab`, `newTab`); tab titles fall back to `nav.*` and the modules' `untitled` keys |
 | `linkPicker` | Internal link picker modal |
 | `importDestination` | Markdown-import destination picker; option labels reuse `linkPicker.tab*` |

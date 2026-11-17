@@ -14,13 +14,9 @@ import { copyBlockStatements, OWNER, type BlockOwnerKind, type CopiedBlock, type
 import { blockRefs } from './blocks/blockRefs';
 import { fromBlockRow, type StoredBlockRow } from './blocks/blockRows';
 import { remapBlock, renameAll, type BlockRemap } from './blocks/blockRemap';
-import { parseBlocks, serializeBlocks } from './blocks/blockHtml';
-import { convertAltarsInPlace, createAltarTables, removeAltarTables } from './migrateAltars';
-import { legacySigilLabels } from './blocks/legacySigilBlocks';
-import { elementsWithAltarsAsOperations } from './altarConversion';
 import { invoke } from '@tauri-apps/api/core';
 import { save, open } from '@tauri-apps/plugin-dialog';
-import { clearLegacyUntitledTitles, getDb, sweepDanglingTaskLinks } from './db';
+import { getDb, sweepDanglingTaskLinks } from './db';
 import {
   addVault,
   getActiveDbFile,
@@ -33,35 +29,26 @@ import { imageRefsInHtml, isStoredImage, listImageFiles, readImageAsBase64, save
 import { clearSearchTextCache } from './searchText';
 import { clearEntrySummaryCache } from './blocks/entrySummary';
 import {
-  DEFAULT_DEFINITION_ICON, definitionImageRefs, definitionToRow, isDefinitionId, parseDefinitionElements,
-  remapDefinitionDefaults, type BlockDefinition, type LinkDefaultResolver,
+  DEFAULT_DEFINITION_ICON, definitionImageRefs, isDefinitionId, parseDefinitionElements,
+  remapDefinitionDefaults, type LinkDefaultResolver,
 } from './blocks/definitions';
-import { convertLegacyStatusRows, STATUS_DEFINITION_ID } from './blocks/legacyStatus';
-import { definitionById, nextDefinitionSortOrder } from './blockDefinitionRows';
 import { nextTemplateSortOrder } from './templateRows';
 import { nextEntrySortOrder, nextLanguageSortOrder } from './lexiconRows';
 import { alphabetToJson, DEFAULT_LANGUAGE_ICON } from './lexicon';
 import { readUserSymbol, type UserSymbol } from './userSymbols';
-import type { EntryType, Language } from '../types';
+import type { Language } from '../types';
 import {
-  routineLinkResolver, routineToTemplate, vaultRoutineLinkSource, type RoutineCategoryRow, type RoutineTargetRow,
-} from './migrateRoutinesToTemplates';
-import {
-  ALTAR_TEMPLATE_ID, assignedCategoryId, assignmentKey, isTemplateId, parseAssignments, SIGIL_TEMPLATE_ID, templateToRow,
+  ALTAR_TEMPLATE_ID, isTemplateId, SIGIL_TEMPLATE_ID, templateToRow,
 } from './blocks/templates';
+import { isBuiltinDashboard, parseDashboardFilter } from './dashboards';
 import { fromRow } from './row';
-import { convertLegacySigilsInPlace, needsSigilConversion, sigilRowToContent, type LegacySigilRow } from './migrateLegacySigils';
-import { linkedIdsToContent, rowsLinkSource } from './migrateLinkedIdsToContent';
-import { journalFieldsToContent } from './migrateJournalFieldsToContent';
-import { IMAGE_FIELDS, imageColumns, storedImageName, storedImageNamesIn } from './schema';
-import { ALTAR_SETTING_KEYS, altarSettingsJson } from './altarSettings';
-import { withNewElementIds } from './altarElements';
-import { isTagId, rewriteTagRefs, stripTagIds, tagIdList, tagNameKey, tagNameResolver, type LegacyTagRow } from './tagRefs';
+import { ICON_FIELDS, IMAGE_FIELDS, STARTER_CATEGORY_IDS, imageColumns, storedImageName, storedImageNamesIn } from './schema';
+import { iconFileNames, isImageDataUrl, plausibleEmoji, readIconAsBase64, storeIconDataUrl } from './icons';
+import { isTagId, readTagLinks, tagIdList, tagInsertStatements, tagNameKey, unlinkTags, type TagOwner } from './tagRefs';
 import { randomTagColor } from '../store/tagStore';
-import { categoryKey, mergeCategoryRows, type CategorySource } from './categoryMerge';
-import { legacyDisplayName, type LegacyCategoryTable } from './categories';
+import { categoryKey } from './categories';
 import i18n from '../i18n';
-import { generateId, isValidHexColor, nowIso } from './helpers';
+import { asString, generateId, isRecord, isValidHexColor, nowIso } from './helpers';
 import { useVaultStore } from '../store/vaultStore';
 import { VAULT_KEY_CANCELLED } from '../store/vaultKeyStore';
 import { KEY_ERRORS, keyErrorOf } from './vaultKeys';
@@ -72,7 +59,7 @@ import { clearAllDrafts, flushDrafts } from '../store/draftStore';
 import { resumeEditorSaves, suspendEditorSaves } from './editorLock';
 import { drainSerialized } from './serialize';
 import { importViaStaging } from './importStaging';
-import { importableSettings, isPlainObject, withSettingsGroups, withoutDeviceKeys, writeVaultSettings, type SettingsGroup } from './vaultSettings';
+import { importableSettings, withSettingsGroups, withoutDeviceKeys, writeVaultSettings, type SettingsGroup } from './vaultSettings';
 import { useSettingsStore } from '../store/settingsStore';
 import { useDeviceStore } from '../store/deviceStore';
 
@@ -80,10 +67,18 @@ import { useDeviceStore } from '../store/deviceStore';
 // Public types
 // ─────────────────────────────────────────────────────────────────────────────
 
-export interface BackupOptions {
-  includeJournal: boolean;
-  includeWiki: boolean;
-  includeOperations: boolean;
+/**
+ * Which entries come along, by category — the packing list instead of the
+ * former entry types. `categoryIds` null: every category; otherwise only
+ * these. `includeUncategorized`: entries without a category, and those whose
+ * category is not among the categories at hand (in the trash, or not in the file).
+ */
+export interface EntrySelection {
+  categoryIds: string[] | null;
+  includeUncategorized: boolean;
+}
+
+export interface BackupOptions extends EntrySelection {
   includeTasks: boolean;
   includeTags: boolean;
   /** The lexicon's languages with their vocabulary — all of it, no date question. */
@@ -91,7 +86,7 @@ export interface BackupOptions {
   dateFrom: string;       // ISO date string, '' = no lower bound
   dateTo: string;         // ISO date string, '' = no upper bound
   includeDeleted: boolean;
-  /** The vault's `settings.json`. Missing in files from before the vault settings. */
+  /** The vault's `settings.json`. */
   includeSettings?: boolean;
 }
 
@@ -106,11 +101,11 @@ export interface BackupCategoryEntry {
 
 export interface BackupPreview {
   exportedAt: string;
-  journalCount: number;
-  wikiCount: number;
-  /** Operations, with the altars of an older file, which arrive as operations. */
-  opsCount: number;
-  /** Templates plus the routines of older files, which arrive as templates. */
+  entriesCount: number;
+  /** How many entries of the file have no category it carries — the "Uncategorized" choice. */
+  uncategorizedCount: number;
+  /** Entries per category ID of the file. */
+  entryCounts: Record<string, number>;
   templatesCount: number;
   taskCount: number;
   /** The lexicon's languages; their vocabulary travels with them. */
@@ -121,11 +116,8 @@ export interface BackupPreview {
   hasSettings: boolean;
 }
 
-/** Which top-level content types to import. */
-export interface ImportTypeFilters {
-  includeJournal: boolean;
-  includeWiki: boolean;
-  includeOperations: boolean;
+/** Which content to import — the entries by category, the rest by kind. */
+export interface ImportTypeFilters extends EntrySelection {
   includeTasks: boolean;
   includeTags: boolean;
   includeLexicon: boolean;
@@ -139,242 +131,50 @@ export interface ImportTypeFilters {
 type Row = Record<string, any>;
 
 /**
- * '1' = before the schema unification (`wiki_articles.category`,
- * `altar_items.category` with the category *name*), '2' = after it, '3' = since
- * images are referenced by file name instead of absolute path, '4' =
- * since v38 one `categories` table replaces the four module tables
- * (`data.categories` instead of `wikiCategories`/`operationCategories`/
- * `taskCategories`/`altarCategories`), '5' = since v39 `category_id` may be NULL,
- * '6' = since v40 the custom blocks travel along as `data.blockDefinitions`,
- * '7' = since v42 operations carry their sigils as blocks in the content
- * instead of in separate columns, '8' = since v43 the templates travel along as
- * `data.templates`, '9' = since v45 the lexicon as `data.languages` and
- * `data.lexiconEntries`, '10' = since v46 altars carry `deleted_at`, '11' =
- * since v49 journal, wiki and operations are in one `data.entries`
- * array, each row with `type` and without the columns that no longer exist,
- * '12' = since v51 altars carry their appearance as a JSON column `settings`,
- * since v52 altar items `updated_at`/`deleted_at`, and since v53 entries and
- * templates tag IDs instead of tag names, '13' = since v56 `assignments` carry
- * no `isDefault` and `block_definitions` no `revision`, since v57 altars
- * carry the shapes and text drawn on them as a JSON column `elements`, and
- * since v60 the pictures taken into "Images" travel along as `data.vaultImages`,
- * '14' = since v66 the blocks of entries and templates travel as the rows of
- * `blocks` (`data.blocks`) instead of as a `content` column of their owners.
+ * The format of a backup. '17' is the one of the current schema
+ * (`FRESH_START_VERSION` in `schema.ts`): all entries in one `data.entries`
+ * array; categories with their start template (`template_id`); the
+ * dashboards as `data.dashboards`; the blocks of entries and templates as the
+ * rows of `blocks` (`data.blocks`); the pictures taken into "Images" as
+ * `data.vaultImages`. The rows of entries, templates and pictures carry their
+ * tags as an array of IDs in `tags` (the vault keeps them in link tables);
+ * icons are stored names, their files in `icons` beside `images`.
  *
- * The '14' is needed because an older build looks for `content`: it would
- * find none and restore every entry empty.
- *
- * The '13' is needed three times over: an older build would read every assignment
- * as merely offered, it has no `elements` column, so `insertRows` would
- * drop it and the drawn shapes and text would be gone without a word, and it
- * would restore the pictures' files but not their names and tags. With
- * the '13' it rejects the file.
- *
- * The '12' is needed because an older build looks for the twelve individual columns:
- * `insertRows` would drop `settings`, and every altar would arrive with the
- * default values. With the '12' it rejects the file.
- *
- * The '11' is needed because an older build looks for the entries under
- * `journalEntries`/`wikiArticles`/`operations`: it would find nothing there and
- * silently not import them. With the '11' it rejects the file
- * (`version > BACKUP_VERSION`) before anything happens.
- *
- * The '10' is no formality either: a build from before v46 does not know the column,
- * `insertRows` would drop it — and an altar from the trash
- * would come back there as a live one. It is better for it to reject the file.
- *
- * The '5' is no formality: a file written that way contains entries
- * without a category, and a build from before v39 still has a NOT NULL column there.
- * Without the bump it would run into a constraint error in the middle of the import —
- * after the deletions of replace mode, without a transaction. With it, the
- * "newer than me" check (`backup.version > BACKUP_VERSION`) honestly rejects the file
- * before anything happens.
+ * Only this version is read. An older file comes from before the fresh start
+ * and is refused with {@link BACKUP_OUTDATED} before anything happens — its
+ * converters are gone with the old migration chain. A newer one is refused
+ * with {@link BACKUP_TOO_NEW}: `insertRows` filters every row against
+ * `PRAGMA table_info`, so a file this build does not fully understand would
+ * be imported *wrongly* rather than fail. Raise the version whenever an older
+ * build would otherwise import a file wrongly.
  */
-const BACKUP_VERSION = '14' as const;
+const BACKUP_VERSION = '17' as const;
 
-/** The four category arrays of backups up to version 3. */
-interface LegacyCategoryArrays {
-  wikiCategories?: Row[];
-  operationCategories?: Row[];
-  taskCategories?: Row[];
-  altarCategories?: Row[];
-}
+/** A backup from before the fresh start of the schema: refused, not converted. */
+export const BACKUP_OUTDATED = 'BACKUP_OUTDATED';
+/** A backup from a newer version of the app. */
+export const BACKUP_TOO_NEW = 'BACKUP_TOO_NEW';
 
 /**
- * Merges the four category arrays of a backup up to v3 into `data.categories`
- * — the same rule as migration v38 (`mergeCategoryRows`), including
- * the translation of built-in categories into the current app language — and
- * re-points the four content arrays to the new IDs.
+ * Checks a parsed file's version, and clears the `category_id` of an entry
+ * whose category the file does not carry. Throws {@link BACKUP_OUTDATED} /
+ * {@link BACKUP_TOO_NEW} (numerically: a string comparison would consider
+ * '10' older than '4').
  */
-function mergeLegacyCategoryArrays(data: BackupFile['data'] & LegacyCategoryArrays): void {
-  const sources: CategorySource[] = [];
-  const legacy: [keyof LegacyCategoryArrays, LegacyCategoryTable][] = [
-    ['wikiCategories', 'wiki_categories'],
-    ['operationCategories', 'operation_categories'],
-    ['taskCategories', 'task_categories'],
-    ['altarCategories', 'altar_categories'],
-  ];
-  for (const [arrayKey, table] of legacy) {
-    const rows = data[arrayKey];
-    if (!rows) continue;
-    sources.push({
-      table,
-      rows: rows.map((r) => {
-        const id = String(r.id);
-        const name = String(r.name ?? '');
-        return {
-          id,
-          name: legacyDisplayName(i18n, table, { id, name, is_builtin: !!r.is_builtin }),
-          emoji: String(r.emoji ?? '📁'),
-          deleted_at: r.deleted_at == null ? null : String(r.deleted_at),
-        };
-      }),
-    });
-    delete data[arrayKey];
-  }
-  if (!sources.length) return;
-
-  const merged = mergeCategoryRows(sources, {
-    builtinName: (id) => i18n.t(`categories.builtin.${id}`),
-  });
-  data.categories = merged.rows.map((r) => ({
-    id: r.id, name: r.name, emoji: r.emoji, sort_order: r.sort_order,
-    is_builtin: r.is_builtin ? 1 : 0, deleted_at: r.deleted_at,
-  }));
-
-  const remap = (rows: Row[] | undefined, table: LegacyCategoryTable) => {
-    for (const row of rows ?? []) {
-      // Without a match the entry stays uncategorized. Until v38 it fell into the
-      // catch-all — that special case no longer exists, and "none" is
-      // more honest than a category the user never chose.
-      row.category_id = merged.idMap.get(`${table}:${String(row.category_id)}`) ?? null;
-    }
-  };
-  remap(data.wikiArticles, 'wiki_categories');
-  remap(data.operations, 'operation_categories');
-  remap(data.tasks, 'task_categories');
-  remap(data.altarItems, 'altar_categories');
-}
-
-/**
- * Lifts a backup in the old format to the current one.
- *
- * Without this step `insertRows` would silently discard the column
- * `category`, which has become unknown — every article from an older backup
- * would end up without comment in the default category. The filter there protects against
- * crafted files and cannot tell malicious from outdated;
- * so the translation happens here, before it takes effect.
- */
-export function migrateBackupPayload(backup: BackupFile): void {
-  // A version this app does not know yet is rejected instead of
-  // re-stamped — otherwise a file from a newer version would run through the
-  // import as if it had been understood. `.emerald` does the same.
-  // As a number: a string comparison would consider '10' older than '4'.
+export function readBackupPayload(backup: BackupFile): void {
   const version = Number(backup.version);
-  if (!Number.isInteger(version) || version < 1 || version > Number(BACKUP_VERSION)) {
-    throw new Error(`Unsupported backup version: ${backup.version}`);
-  }
-  const data = backup.data as BackupFile['data'] & LegacyCategoryArrays;
-
-  if (version === 1) {
-    for (const row of data.wikiArticles ?? []) {
-      if (row.category_id === undefined && row.category !== undefined) {
-        row.category_id = row.category;
-      }
-      delete row.category;
-    }
-
-    // altar_items used to hold the category *name*. First resolve it against the categories
-    // from the same backup, otherwise to 'other'.
-    const byName = new Map<string, string>(
-      (data.altarCategories ?? []).map((c) => [String(c.name), String(c.id)])
-    );
-    const byId = new Set((data.altarCategories ?? []).map((c) => String(c.id)));
-    for (const row of data.altarItems ?? []) {
-      if (row.category_id === undefined) {
-        const raw = row.category === undefined ? '' : String(row.category);
-        // Without a match the item stays uncategorized instead of falling into the
-        // catch-all — the same as `mergeLegacyCategoryArrays` does below.
-        row.category_id = byId.has(raw) ? raw : (byName.get(raw) ?? null);
-      }
-      delete row.category;
-    }
-
-    for (const row of data.journalEntries ?? []) {
-      row.linked_operation_ids = row.linked_operation_ids ?? '[]';
-      row.linked_wiki_ids = row.linked_wiki_ids ?? '[]';
-    }
-  }
-
-  // v2 → v3 needs no step: the only change is that images are referenced by
-  // file name instead of absolute path, and `restoreImages`
-  // translates the file's keys either way.
-
-  // v3 → v4: four category arrays become one. The comparison is ordered,
-  // not "not equal to 4": a newer file has the single table already and
-  // would otherwise run through the merge a second time.
-  if (version < 4) {
-    mergeLegacyCategoryArrays(data);
-  }
-
-  // v4 → v5 needs no step: `category_id` may now be NULL, and
-  // an older file has a value there everywhere. The check above
-  // covers the other direction.
-
-  // v5 → v6 needs no step: the only new thing is the array `blockDefinitions`,
-  // and a file without it simply brings no custom blocks.
-
-  // v6 → v7 needs no step on the file: sigil columns of old
-  // operations are converted by the import before inserting (`liftLegacySigilRows`),
-  // the old journal fields likewise (`liftLegacyJournalRows`).
-
-  // v7 → v8 needs no step: the only new thing is the array `templates`.
-  // v8 → v9 neither: the only new things are `languages`/`lexiconEntries`, and an
-  // older file simply brings no lexicon.
-  // v9 → v10 neither: altars without `deleted_at` are live altars.
-
-  // v10 → v11 is the reverse: the file already has the three lists, only an
-  // '11' brings `entries`, and that is split by type here. A row
-  // with an unknown type is dropped — there would be no module for it in `entries`.
-  if (version >= 11) splitEntries(data);
-
-  // v11 → v12: the individual columns of altars become `settings`, and
-  // altar items get an `updated_at`.
-  if (version < 12) {
-    for (const row of data.altars ?? []) {
-      row.settings = altarSettingsJson(row);
-      for (const key of ALTAR_SETTING_KEYS) delete row[key];
-    }
-    for (const row of data.altarItems ?? []) row.updated_at ??= row.created_at;
-    tagNamesToIds(data);
-  }
-
-  // Routines (files from before v44) stay as they are here: they only become templates
-  // at import (`withRoutinesAsTemplates`), after the filters — otherwise
-  // their links would point to entries that do not come along at all.
-  backup.sourceVersion = version;
-  backup.version = BACKUP_VERSION;
-}
-
-/**
- * Tag names of a file up to format 11 become tag IDs — the same rule as
- * migration v53 (`tagNameResolver`): names without a tag get a new one in
- * `data.tags`, a tag in the trash comes back into the rows it lost on
- * deletion. The routines too, which only become templates at import.
- */
-function tagNamesToIds(data: BackupFile['data']): void {
-  const tags = (data.tags ?? []).filter((t) => isTagId(t.id) && typeof t.name === 'string') as LegacyTagRow[];
-  const resolver = tagNameResolver(tags, generateId);
-  const lists = [data.journalEntries, data.wikiArticles, data.operations, data.templates, data.routines];
-  for (const rows of lists) {
-    for (const row of rows ?? []) {
-      row.tags = JSON.stringify(resolver.withAffected(String(row.id), resolver.idsFor(row.tags)));
-    }
-  }
-  data.tags = [
-    ...(data.tags ?? []).map(({ affected_ids: _affected, ...tag }) => tag),
-    ...resolver.created.map((t) => ({ id: t.id, name: t.name, deleted_at: null })),
-  ];
+  if (!Number.isInteger(version) || version < 1) throw new Error(`Unsupported backup version: ${backup.version}`);
+  if (version < Number(BACKUP_VERSION)) throw new Error(BACKUP_OUTDATED);
+  if (version > Number(BACKUP_VERSION)) throw new Error(BACKUP_TOO_NEW);
+  if (!Array.isArray(backup.data.entries)) backup.data.entries = [];
+  // An entry is in a category only if the file carries that category. Without
+  // this, a crafted file could count an entry as "uncategorized" in the
+  // dialog and still name a category of this vault — whose entries a replace
+  // would then delete without being asked.
+  const known = new Set((Array.isArray(backup.data.categories) ? backup.data.categories : []).map((c) => String(c?.id)));
+  backup.data.entries = backup.data.entries.map((row) => (
+    row?.category_id != null && !known.has(String(row.category_id)) ? { ...row, category_id: null } : row
+  ));
 }
 
 /** Maximum length of a tag name from a foreign source. */
@@ -392,7 +192,7 @@ const TAG_NAME_MAX = 100;
  * Runs in the working copy (`importViaStaging`): if the import fails afterwards,
  * nothing of the tags remains either.
  */
-export async function importTagsAndRemap(db: Awaited<ReturnType<typeof getDb>>, d: BackupFile['data']): Promise<BackupFile['data']> {
+async function importTagsAndRemap(db: Awaited<ReturnType<typeof getDb>>, d: BackupFile['data']): Promise<BackupFile['data']> {
   const local = await db.select<{ id: string; name: string; deleted_at: string | null }[]>('SELECT id, name, deleted_at FROM tags');
   const byId = new Map(local.map((t) => [t.id, t]));
   const byName = new Map(local.map((t) => [tagNameKey(t.name), t]));
@@ -404,7 +204,7 @@ export async function importTagsAndRemap(db: Awaited<ReturnType<typeof getDb>>, 
     const hit = byId.get(id) ?? byName.get(tagNameKey(name));
     if (hit) {
       if (hit.deleted_at && !row.deleted_at) {
-        await stripTagIds(db, [hit.id]);
+        await unlinkTags(db, [hit.id]);
         await db.execute('UPDATE tags SET deleted_at=NULL WHERE id=$1', [hit.id]);
         hit.deleted_at = null;
       }
@@ -420,158 +220,172 @@ export async function importTagsAndRemap(db: Awaited<ReturnType<typeof getDb>>, 
     byName.set(tagNameKey(name), tag);
     idMap.set(id, id);
   }
-  const remap = (rows: Row[] | undefined) => rows?.map((row) => ({
-    ...row,
-    tags: JSON.stringify(tagIdList(row.tags).flatMap((id) => idMap.get(id) ?? (byId.has(id) ? [id] : []))),
-  }));
+  const localIds = (ids: string[]) => [...new Set(ids.flatMap((id) => idMap.get(id) ?? (byId.has(id) ? [id] : [])))];
+  const remap = (rows: Row[] | undefined) => rows?.map((row) => ({ ...row, tags: localIds(tagIdList(row.tags)) }));
+  // The dashboards' tag filters name the same tags.
+  const dashboards = d.dashboards?.map((row) => {
+    if (typeof row !== 'object' || row === null) return row;
+    const filter = parseDashboardFilter(row.filter);
+    return filter.tags ? { ...row, filter: { ...filter, tags: localIds(filter.tags) } } : row;
+  });
   return {
     ...d,
     tags: [],
-    journalEntries: remap(d.journalEntries),
-    wikiArticles: remap(d.wikiArticles),
-    operations: remap(d.operations),
+    entries: remap(d.entries),
     templates: remap(d.templates),
     vaultImages: remap(d.vaultImages),
+    dashboards,
   };
 }
 
-/** After the import: tag IDs without a tag row drop out of every list. */
-export async function dropUnknownTagIds(db: Awaited<ReturnType<typeof getDb>>): Promise<void> {
-  const known = new Set((await db.select<{ id: string }[]>('SELECT id FROM tags')).map((r) => r.id));
-  await rewriteTagRefs(db, (ids) => ids.filter((id) => known.has(id)));
+/**
+ * Writes the tag links of imported rows — `tags` as `importTagsAndRemap` left
+ * it, under the owner's ID in this vault (`idOf`). Only for owners the import
+ * actually inserted: an existing one keeps its own tags.
+ */
+async function insertTagLinks(
+  db: Awaited<ReturnType<typeof getDb>>,
+  owner: TagOwner,
+  rows: readonly Row[] | undefined,
+  idOf: (id: string) => string | undefined,
+): Promise<void> {
+  let batch: [string, unknown[]][] = [];
+  for (const row of rows ?? []) {
+    if (typeof row !== 'object' || row === null || typeof row.id !== 'string') continue;
+    const id = idOf(row.id);
+    const tags = tagIdList(row.tags);
+    if (!id || !tags.length) continue;
+    batch.push(...tagInsertStatements(owner, id, tags));
+    if (batch.length >= INSERT_CHUNK) {
+      await db.batch(batch);
+      batch = [];
+    }
+  }
+  if (batch.length) await db.batch(batch);
 }
 
-/** Splits `data.entries` (file from '11') into the lists the import works with. */
-function splitEntries(data: BackupFile['data']): void {
-  const rows = Array.isArray(data.entries) ? data.entries : [];
-  const ofType = (type: EntryType) => rows.filter((r) => r?.type === type);
-  data.journalEntries = ofType('journal');
-  data.wikiArticles = ofType('wiki');
-  data.operations = ofType('operation');
-  delete data.entries;
+/** Puts the tags of the owners into their rows, as an array of IDs — what the file carries. */
+async function withTagLists(db: Awaited<ReturnType<typeof getDb>>, owner: TagOwner, rows: Row[]): Promise<Row[]> {
+  const tags = await readTagLinks(db, owner, rows.map((r) => String(r.id)));
+  for (const row of rows) row.tags = tags.get(String(row.id)) ?? [];
+  return rows;
 }
 
 /**
- * The columns of `entries` except `type`. Every row gets all of them: `insertRows`
- * takes the column list from the first row, and a journal entry at the front
- * would otherwise strip category, icon and cover image from the wiki articles behind it. What
- * the old tables had in addition (`slug`, `moon_phase`, dead columns) is dropped
- * here — the conversions before this have read what they needed.
+ * The columns of `entries`. Every row gets all of them: `insertRows` takes
+ * the column list from the first row, and a row without an icon at the front
+ * would otherwise strip the icons from the rows behind it.
  */
 const ENTRY_COLUMNS = [
-  'id', 'title', 'content', 'category_id', 'entry_number', 'icon', 'cover_image',
-  'tags', 'created_at', 'updated_at', 'deleted_at',
+  'id', 'title', 'category_id', 'entry_number', 'icon', 'cover_image',
+  'created_at', 'updated_at', 'deleted_at',
 ] as const;
 
-/**
- * The image columns of an operation row at import: those of `entries` and the
- * sigil drawing of old files — it only becomes a file in `liftLegacySigilRows`
- * and must already carry the local name for that.
- */
-const IMAGE_FIELDS_OP = [...imageColumns('entries'), 'drawing_data'];
+/** The image columns of an entry row at import. */
+const IMAGE_FIELDS_ENTRY = imageColumns('entries');
 
-function asEntryRow(type: EntryType, row: Row): Row {
-  const out: Row = { type };
+function asEntryRow(row: Row): Row {
+  const out: Row = {};
   for (const column of ENTRY_COLUMNS) out[column] = row[column] ?? null;
   out.title ??= '';
-  out.content ??= '';
-  out.tags ??= '[]';
-  // The journal has no category, no icon and no cover image.
-  if (type === 'journal') out.category_id = out.icon = out.cover_image = null;
   return out;
 }
 
+/** The highest number an imported entry may keep — far above any real vault. */
+const MAX_ENTRY_NUMBER = 1_000_000_000;
+
 /**
- * The import's entry rows for `entries`. An ID arrives only once:
- * a backup up to '10' can carry the same entry in two lists (a
- * type change that aborted midway) — as in v49 the first wins, in the
- * order journal, wiki, operations.
+ * The import's entry rows for `entries`. An ID arrives only once (a crafted
+ * file could carry it twice — the first wins), and so does a number: the
+ * second holder of a number (`idx_entries_number` is unique), or one out of
+ * range, gets none and is numbered afterwards (`numberUnnumbered`).
  */
-export function entryRowsForInsert(journal: Row[], wiki: Row[], operations: Row[]): Row[] {
+function entryRowsForInsert(rows: Row[]): Row[] {
   const seen = new Set<string>();
+  const numbers = new Set<number>();
   const out: Row[] = [];
-  for (const [type, rows] of [['journal', journal], ['wiki', wiki], ['operation', operations]] as const) {
-    for (const row of rows) {
-      const id = String(row.id);
-      if (seen.has(id)) {
-        console.warn(`[backup] ${type}.${id} is already in the file under another type — skipped`);
-        continue;
-      }
-      seen.add(id);
-      out.push(asEntryRow(type, row));
+  for (const row of rows) {
+    const id = String(row.id);
+    if (seen.has(id)) {
+      console.warn(`[backup] entry ${id} is in the file twice — skipped`);
+      continue;
     }
+    seen.add(id);
+    const entry = asEntryRow(row);
+    const number = Number(entry.entry_number);
+    // A number out of range (a crafted 1e20 would make every next number collide) is given afresh.
+    if (entry.entry_number != null && (!Number.isSafeInteger(number) || number < 1 || number > MAX_ENTRY_NUMBER || numbers.has(number))) entry.entry_number = null;
+    else if (entry.entry_number != null) numbers.add(number);
+    out.push(entry);
   }
   return out;
 }
 
-/** The entry types a backup brings along — `doReplace` replaces only their entries. */
-function presentEntryTypes(d: BackupFile['data']): EntryType[] {
-  return ([
-    ['journal', d.journalEntries],
-    ['wiki', d.wikiArticles],
-    ['operation', d.operations],
-  ] as const).filter(([, rows]) => (rows?.length ?? 0) > 0).map(([type]) => type);
+/** Gives every entry without a number the next free one, in creation order. */
+async function numberUnnumbered(db: Awaited<ReturnType<typeof getDb>>): Promise<void> {
+  const rows = await db.select<{ id: string }[]>('SELECT id FROM entries WHERE entry_number IS NULL ORDER BY created_at, id');
+  if (!rows.length) return;
+  const [{ n }] = await db.select<{ n: number }[]>('SELECT COALESCE(MAX(entry_number), 0) AS n FROM entries');
+  await db.batch(rows.map((r, i) => ['UPDATE entries SET entry_number=$1 WHERE id=$2', [n + i + 1, r.id]] as const));
+}
+
+/** Does an entry row pass the selection by category? `known`: the category IDs at hand. */
+function entrySelected(row: Row, selection: EntrySelection, known: ReadonlySet<string>): boolean {
+  const category = row.category_id == null ? null : String(row.category_id);
+  if (category === null || !known.has(category)) return selection.includeUncategorized;
+  return selection.categoryIds === null || selection.categoryIds.includes(category);
+}
+
+/** Selects every category, with the uncategorized entries. */
+const ALL_ENTRIES: EntrySelection = { categoryIds: null, includeUncategorized: true };
+
+/** Does the selection take any entry at all? */
+function selectsEntries(selection: EntrySelection): boolean {
+  return selection.includeUncategorized || selection.categoryIds === null || selection.categoryIds.length > 0;
 }
 
 interface BackupFile {
-  version: '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9' | '10' | '11' | '12' | '13' | '14';
-  /** The version the file was written with — `migrateBackupPayload` sets `version` to the current one. */
-  sourceVersion?: number;
+  version: typeof BACKUP_VERSION;
   type: 'backup';
   exportedAt: string;
   filters: BackupOptions;
   data: {
-    /**
-     * In the file (since '11'): journal, wiki and operations as in the
-     * `entries` table. `migrateBackupPayload` splits them into the three lists
-     * below — the import treats each type differently (categories, status,
-     * sigils, old journal fields).
-     */
+    /** The entries, as in the `entries` table. */
     entries?: Row[];
-    /** In the import: the entries per type. In files up to '10' they were in the file like this too. */
-    journalEntries?: Row[];
-    wikiArticles?: Row[];
-    operations?: Row[];
-    /** The global list; included as soon as one of the four categorized modules is included. */
+    /** The global list; included as soon as entries or tasks are included. */
     categories?: Row[];
-    /** The custom blocks (since '5'); included as soon as journal, wiki or operations are included. */
+    /** The dashboards; included with the entries. */
+    dashboards?: Row[];
+    /** The custom blocks; included as soon as entries are included. */
     blockDefinitions?: Row[];
-    /** The templates (since '8'); included as soon as journal, wiki or operations are included. */
+    /** The templates; included as soon as entries are included. */
     templates?: Row[];
     tags?: Row[];
-    /** Only in files from before v44: the routines — the import makes templates of them (`withRoutinesAsTemplates`). */
-    routines?: Row[];
-    altars?: Row[];
-    altarItems?: Row[];
-    altarPlacements?: Row[];
     tasks?: Row[];
     taskLinks?: Row[];
-    // Until schema v46 there was also `links` here, a mirror of the link chips
-    // that nothing read. Old files still carry it; the import ignores it.
-    /** The lexicon's languages (since '9'). */
+    /** The lexicon's languages. */
     languages?: Row[];
-    /** Their vocabulary (since '9') — worthless without its language, hence always together. */
+    /** Their vocabulary — worthless without its language, hence always together. */
     lexiconEntries?: Row[];
-    /**
-     * The vault's own symbols (table `symbols`). Needs no new version: an
-     * older build ignores the field and keeps the rest.
-     */
+    /** The vault's own symbols (table `symbols`). */
     symbols?: Row[];
-    /** The pictures taken into "Images" (since '13'), with their files in `images`. */
+    /** The pictures taken into "Images", with their files in `images`. */
     vaultImages?: Row[];
     /**
-     * The blocks of the entries and templates in the file (since '14'): the
-     * rows of `blocks` without `row_id` and `text`, the owner in `entry_id` or
-     * `template_id`. Before '14' an owner carried them as `content`.
-     * `block_refs` does not travel: the import writes it from the blocks.
+     * The blocks of the entries and templates in the file: the rows of
+     * `blocks` without `row_id` and `text`, the owner in `entry_id` or
+     * `template_id`. `block_refs` does not travel: the import writes it from
+     * the blocks.
      */
     blocks?: Row[];
   };
-  images: Record<string, string>;  // stored file name → data URL (in v1/v2: absolute path)
+  images: Record<string, string>;  // stored file name → data URL
+  /** The icon files: stored name → data URL (`ICON_FIELDS`, the icons of block copies). */
+  icons?: Record<string, string>;
   /**
    * The vault's settings (`settings.json`), unchecked like everything from
-   * the file — normalised only at import. Needs no new
-   * version: an older build simply ignores the field.
+   * the file — normalised only at import. An older build simply ignores the
+   * field.
    */
   settings?: unknown;
 }
@@ -581,12 +395,8 @@ interface BackupFile {
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
- * Enters every image reference of the rows into `into`.
- *
- * The column list comes from `IMAGE_FIELDS`, so that it is the same one that
- * migration v35 and the cleanup action use. Before, it was written out
- * by hand three times here — and `doReplace` and `doMerge` had already
- * diverged for `altars`.
+ * Enters every image reference of the rows into `into`. The column list comes
+ * from `IMAGE_FIELDS`, so that it is the same one the cleanup action uses.
  */
 function collectImageRefs(table: string, rows: Row[] | undefined, into: Set<string>): void {
   const fields = IMAGE_FIELDS.find((f) => f.table === table);
@@ -596,7 +406,7 @@ function collectImageRefs(table: string, rows: Row[] | undefined, into: Set<stri
       const value = row[column];
       if (typeof value === 'string') imageRefsInHtml(value).forEach((ref) => into.add(ref));
     }
-    for (const column of [...fields.plain, ...fields.legacy]) {
+    for (const column of fields.plain) {
       const value = row[column];
       if (isStoredImage(value as string)) into.add(value as string);
     }
@@ -671,9 +481,7 @@ async function selectWhereIn(
 /** Everything in the vault — trash and settings included. The selection
  *  of the automatic backup: one with gaps would be a trap. */
 export const FULL_BACKUP_OPTIONS: Required<BackupOptions> = {
-  includeJournal: true,
-  includeWiki: true,
-  includeOperations: true,
+  ...ALL_ENTRIES,
   includeTasks: true,
   includeTags: true,
   includeLexicon: true,
@@ -713,6 +521,88 @@ async function exportBlockRows(
   return rows;
 }
 
+/**
+ * Where the icon columns of `ICON_FIELDS` travel in a backup's `data`. A
+ * table missing here would lose its icons on the way.
+ */
+const ICON_DATA_KEYS: Record<string, keyof BackupFile['data']> = {
+  entries: 'entries',
+  templates: 'templates',
+  block_definitions: 'blockDefinitions',
+  languages: 'languages',
+  dashboards: 'dashboards',
+};
+
+/**
+ * The icon files the rows of a backup name, embedded as data URLs: the icon
+ * columns (`ICON_FIELDS`) and every stored name in the block rows' `config`
+ * (a custom block's copy carries its icon there). A name that is no file in
+ * `icons/` — a picture of a block — is skipped.
+ */
+async function embedIcons(data: BackupFile['data']): Promise<Record<string, string>> {
+  const names = new Set<string>();
+  for (const { table, column } of ICON_FIELDS) {
+    const rows = data[ICON_DATA_KEYS[table]] as Row[] | undefined;
+    for (const row of rows ?? []) {
+      const name = storedImageName(typeof row[column] === 'string' ? row[column] : null);
+      if (name) names.add(name);
+    }
+  }
+  for (const row of data.blocks ?? []) {
+    if (typeof row.config === 'string') storedImageNamesIn(row.config).forEach((name) => names.add(name));
+  }
+  const stored = await iconFileNames();
+  const icons: Record<string, string> = {};
+  for (const name of names) {
+    if (!stored.has(name)) continue;
+    try {
+      icons[name] = await readIconAsBase64(name);
+    } catch {
+      // Icon file unreadable — the row falls back to its default
+    }
+  }
+  return icons;
+}
+
+/**
+ * The file's icons stored in this vault's `icons/`, by the name the file knew
+ * them by — the counterpart of `restoreImages`. Then every icon column of the
+ * file's rows points at the name here; a value that is neither an emoji nor
+ * an icon the file brings (a data URL, a name without its file) is dropped,
+ * so that the row falls back to its default icon.
+ */
+async function restoreIcons(backup: BackupFile): Promise<Map<string, string>> {
+  const iconMap = new Map<string, string>();
+  const here = await iconFileNames();
+  const icons = backup.icons && typeof backup.icons === 'object' ? backup.icons : {};
+  for (const [oldName, dataUrl] of Object.entries(icons)) {
+    if (!storedImageName(oldName) || !isImageDataUrl(dataUrl)) continue;
+    if (here.has(oldName)) {
+      iconMap.set(oldName, oldName);
+      continue;
+    }
+    try {
+      iconMap.set(oldName, await storeIconDataUrl(dataUrl));
+    } catch {
+      // skip
+    }
+  }
+  for (const { table, column } of ICON_FIELDS) {
+    const key = ICON_DATA_KEYS[table];
+    const rows = backup.data[key] as unknown;
+    if (!Array.isArray(rows)) continue;
+    (backup.data as Record<string, unknown>)[key] = rows.map((row: unknown) => {
+      if (typeof row !== 'object' || row === null) return row;
+      const value = (row as Row)[column];
+      if (typeof value !== 'string' || !value) return row;
+      const name = storedImageName(value);
+      const next = name ? iconMap.get(name) ?? '' : plausibleEmoji(value);
+      return next === value ? row : { ...row, [column]: next || null };
+    });
+  }
+  return iconMap;
+}
+
 /** The content of a backup according to `options`, images embedded. Writes nothing. */
 export async function buildBackup(options: BackupOptions): Promise<BackupFile> {
   return buildBackupFrom(await getDb(), options);
@@ -726,21 +616,19 @@ export async function buildBackupFrom(db: Awaited<ReturnType<typeof getDb>>, opt
   const { clause: dateClause, params: dateParams } = buildDateFilter(options.dateFrom, options.dateTo);
   const deletedClause = deletedFilter(options.includeDeleted);
 
-  // ── Journal, Wiki, Operationen ───────────────────────────────────────────
-  // One table, one array — the selection decides which types come along.
-  // The types are literal in the SQL (no user input).
-  const entryTypes = [
-    options.includeJournal && "'journal'",
-    options.includeWiki && "'wiki'",
-    options.includeOperations && "'operation'",
-  ].filter(Boolean);
-  if (entryTypes.length) {
-    data.entries = await db.select<Row[]>(
-      `SELECT * FROM entries WHERE type IN (${entryTypes.join(', ')}) ${dateClause} ${deletedClause}`,
-      dateParams,
-    );
+  // ── Entries ──────────────────────────────────────────────────────────────
+  // One table, one array — the selection by category decides which come
+  // along. An entry whose category is in the trash counts as uncategorized,
+  // as everywhere it is shown.
+  const withEntries = selectsEntries(options);
+  if (withEntries) {
+    const live = new Set((await db.select<{ id: string }[]>('SELECT id FROM categories WHERE deleted_at IS NULL')).map((r) => r.id));
+    const rows = await db.select<Row[]>(`SELECT * FROM entries WHERE 1=1 ${dateClause} ${deletedClause}`, dateParams);
+    data.entries = await withTagLists(db, 'entry', rows.filter((row) => entrySelected(row, options, live)));
     collectImageRefs('entries', data.entries, allImagePaths);
     data.blocks = await exportBlockRows(db, 'entry', data.entries, allImagePaths);
+    // Trashed ones only with the trash, like the entries.
+    data.dashboards = await db.select<Row[]>(`SELECT * FROM dashboards WHERE 1=1 ${deletedClause}`);
   }
 
   // ── Tags ─────────────────────────────────────────────────────────────────
@@ -765,20 +653,17 @@ export async function buildBackupFrom(db: Awaited<ReturnType<typeof getDb>>, opt
   // ── Images ───────────────────────────────────────────────────────────────
   // The pictures taken into "Images" belong to no module: all of them, trash
   // included, with their files — like the templates, one list, no date question.
-  data.vaultImages = await db.select<Row[]>(`SELECT * FROM images`);
+  data.vaultImages = await withTagLists(db, 'image', await db.select<Row[]>(`SELECT * FROM images`));
   for (const row of data.vaultImages) {
     const file = storedImageName(typeof row.file === 'string' ? row.file : null);
     if (file) allImagePaths.add(file);
   }
 
   // ── Categories ───────────────────────────────────────────────────────────
-  // The one list, as soon as a categorized module is included. Soft-deleted
+  // The one list, as soon as entries or tasks are included. Soft-deleted
   // categories too: their contents are exported along and
   // need their counterpart, otherwise the import fails on the foreign key.
-  // Also with journal alone: the templates then travel along, and their assignments need the categories.
-  if (
-    options.includeJournal || options.includeWiki || options.includeOperations || options.includeTasks
-  ) {
+  if (withEntries || options.includeTasks) {
     data.categories = await db.select<Row[]>(`SELECT * FROM categories`);
     // The categories are read after their contents, and deleting or
     // merging a category runs over several statements without a
@@ -799,7 +684,7 @@ export async function buildBackupFrom(db: Awaited<ReturnType<typeof getDb>>, opt
   // ── Custom blocks ────────────────────────────────────────────────────────
   // The vault's own blocks. All of it, trash included —
   // one list, no date question.
-  if (options.includeJournal || options.includeWiki || options.includeOperations) {
+  if (withEntries) {
     data.blockDefinitions = await db.select<Row[]>(`SELECT * FROM block_definitions`);
     // The image defaults travel along, even if no copy uses them yet.
     for (const row of data.blockDefinitions) {
@@ -809,15 +694,14 @@ export async function buildBackupFrom(db: Awaited<ReturnType<typeof getDb>>, opt
 
   // ── Templates ────────────────────────────────────────────────────────────
   // Like the custom blocks: all of it, trash included, with the images in the block stack.
-  if (options.includeJournal || options.includeWiki || options.includeOperations) {
-    data.templates = await db.select<Row[]>(`SELECT * FROM templates`);
+  if (withEntries) {
+    data.templates = await withTagLists(db, 'template', await db.select<Row[]>(`SELECT * FROM templates`));
     data.blocks = [...(data.blocks ?? []), ...await exportBlockRows(db, 'template', data.templates, allImagePaths)];
   }
 
   // ── Lexicon ──────────────────────────────────────────────────────────────
   // Languages and vocabulary travel together and in full, trash included: it is
   // one list, no date question — like the custom blocks and the templates.
-  // Icons are a data URL in the row, so no image file hangs off them.
   if (options.includeLexicon) {
     data.languages = await db.select<Row[]>(`SELECT * FROM languages`);
     data.lexiconEntries = await db.select<Row[]>(`SELECT * FROM lexicon_entries`);
@@ -837,6 +721,9 @@ export async function buildBackupFrom(db: Awaited<ReturnType<typeof getDb>>, opt
     }
   }
 
+  // ── Embed icons ──────────────────────────────────────────────────────────
+  const icons = await embedIcons(data);
+
   return {
     version: BACKUP_VERSION,
     type: 'backup',
@@ -844,6 +731,7 @@ export async function buildBackupFrom(db: Awaited<ReturnType<typeof getDb>>, opt
     filters: options,
     data,
     images,
+    icons,
     // Without what a `settings.json` from before still carries of language and
     // theme: those belong to the device, and a backup must not bring them back.
     ...(options.includeSettings && { settings: withoutDeviceKeys(useSettingsStore.getState().settings) }),
@@ -927,32 +815,36 @@ export async function openBackupFile(): Promise<{ path: string; backup: BackupFi
   if (raw === null) return null;
   const backup = JSON.parse(raw) as BackupFile;
   if (backup.type !== 'backup') throw new Error('Not an Emerald backup file');
-  migrateBackupPayload(backup);
+  readBackupPayload(backup);
 
-  // Only show categories that are actually used by entries in this backup
-  const usedCatIds = new Set([
-    ...[
-      ...(backup.data.wikiArticles ?? []),
-      ...(backup.data.operations ?? []),
-      ...(backup.data.tasks ?? []),
-      ...(backup.data.altarItems ?? []),
-    ].map((r) => r.category_id as string),
-    ...templateCategoryIds(backup.data.templates),
-  ]);
+  const preview = previewOf(backup);
+  return { path: filePath, backup, preview };
+}
 
-  const preview: BackupPreview = {
+/** What the import offers to choose from: the categories in use and how many entries each holds. */
+function previewOf(backup: BackupFile): BackupPreview {
+  const entries = backup.data.entries ?? [];
+  const known = new Set((backup.data.categories ?? []).map((c) => String(c.id)));
+  const entryCounts: Record<string, number> = {};
+  let uncategorizedCount = 0;
+  for (const row of entries) {
+    const category = row.category_id == null ? null : String(row.category_id);
+    if (category === null || !known.has(category)) uncategorizedCount += 1;
+    else entryCounts[category] = (entryCounts[category] ?? 0) + 1;
+  }
+  // Only show categories that are actually used by entries or tasks in this backup.
+  const usedCatIds = new Set([...entries, ...(backup.data.tasks ?? [])].map((r) => String(r.category_id)));
+  return {
     exportedAt: backup.exportedAt,
-    journalCount: backup.data.journalEntries?.length ?? 0,
-    wikiCount: backup.data.wikiArticles?.length ?? 0,
-    opsCount: (backup.data.operations?.length ?? 0) + (backup.data.altars?.length ?? 0),
-    templatesCount: (backup.data.templates?.length ?? 0) + (backup.data.routines?.length ?? 0),
+    entriesCount: entries.length,
+    uncategorizedCount,
+    entryCounts,
+    templatesCount: backup.data.templates?.length ?? 0,
     taskCount: backup.data.tasks?.length ?? 0,
     languagesCount: backup.data.languages?.length ?? 0,
-    categories: (backup.data.categories ?? []).filter((c) => usedCatIds.has(c.id as string)) as BackupCategoryEntry[],
-    hasSettings: isPlainObject(backup.settings),
+    categories: (backup.data.categories ?? []).filter((c) => usedCatIds.has(String(c.id))) as BackupCategoryEntry[],
+    hasSettings: isRecord(backup.settings),
   };
-
-  return { path: filePath, backup, preview };
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -991,8 +883,7 @@ function remapPaths(value: unknown, pathMap: Map<string, string>): unknown {
 function remapDefinitionRows(rows: unknown, pathMap: Map<string, string>, link?: LinkDefaultResolver): unknown {
   if (!Array.isArray(rows)) return rows;
   return rows.map((r) => (typeof r === 'object' && r !== null
-    // An older file's altar elements are link elements first, or the check below drops them.
-    ? { ...r, elements: remapDefinitionDefaults(elementsWithAltarsAsOperations((r as Row).elements), (name) => pathMap.get(name) ?? name, link) }
+    ? { ...r, elements: remapDefinitionDefaults((r as Row).elements, (name) => pathMap.get(name) ?? name, link) }
     : r));
 }
 
@@ -1074,12 +965,6 @@ async function insertBlockDefinitions(
   await insertRows(db, 'block_definitions', normalized, true);
 }
 
-/** The category IDs that a backup's templates are assigned to. */
-function templateCategoryIds(rows: Row[] | undefined): string[] {
-  return (rows ?? []).flatMap((r) => parseAssignments(r.assignments).map(assignedCategoryId))
-    .filter((id): id is string => id !== null);
-}
-
 /**
  * The pictures of "Images" from a file: like the templates never deleted,
  * missing ones added — by file, since a file is one picture. The file name
@@ -1117,6 +1002,7 @@ async function insertVaultImages(
     });
   }
   await insertRows(db, 'images', fresh);
+  await insertTagLinks(db, 'image', fresh, (id) => id);
 }
 
 /**
@@ -1126,24 +1012,16 @@ async function insertVaultImages(
  * of the list in their order.
  *
  * The file is foreign: every row runs through `fromRow.template` as on
- * reading. `content` gets the images stored here (and, on merge, the
- * renamed link targets), the assignments the local category IDs — whatever
- * points to no category is dropped. A combination that an active template here
- * already holds stays with it, and one from the trash brings no assignments.
+ * reading; its blocks come as rows (`insertImportedBlocks`). Which category
+ * starts with it is the category's business (`applyStartTemplates`).
  */
 async function insertTemplates(
   db: Awaited<ReturnType<typeof getDb>>,
   rows: unknown,
-  pathMap: Map<string, string>,
-  catMap: Map<string, string>,
-  remapContent: (content: string) => string = (content) => content,
 ): Promise<string[]> {
   if (!Array.isArray(rows)) return [];
   const local = (await db.select<Row[]>('SELECT * FROM templates')).map(fromRow.template);
   const known = new Set(local.map((t) => t.id));
-  const taken = new Set(local.filter((t) => t.deleted_at === null)
-    .flatMap((t) => t.assignments.map((a) => assignmentKey(a.entryType, a.category))));
-  const categories = new Set((await db.select<Row[]>('SELECT id FROM categories')).map((r) => String(r.id)));
 
   const now = nowIso();
   const fresh = rows
@@ -1154,30 +1032,17 @@ async function insertTemplates(
     .filter((t) => !known.has(t.id) && !!known.add(t.id));
   let sortOrder = await nextTemplateSortOrder(db);
   const normalized = fresh.map((t) => {
-    const active = t.deleted_at === null;
-    const remapped = parseAssignments(t.assignments.flatMap((a) => {
-      const id = assignedCategoryId(a);
-      if (id === null) return [a];
-      const category = catMap.get(id) ?? id;
-      return categories.has(category) ? [{ ...a, category }] : [];
-    }));
-    const assignments = !active ? [] : remapped.filter((a) => {
-      const key = assignmentKey(a.entryType, a.category);
-      if (taken.has(key)) return false;
-      taken.add(key);
-      return true;
-    });
     return templateToRow({
       ...t,
-      // A '14' file's templates have no `content`: their blocks come as rows (`insertImportedBlocks`).
-      content: t.content ? remapContent(String(remapPaths(t.content, pathMap))) : '',
-      assignments,
+      content: '',
       sort_order: sortOrder++,
       created_at: t.created_at || now,
       updated_at: t.updated_at || now,
     });
   });
   await insertRows(db, 'templates', normalized, true);
+  const inserted = new Set(normalized.map((t) => t.id));
+  await insertTagLinks(db, 'template', fresh.map((t) => ({ id: t.id, tags: t.tags })), (id) => (inserted.has(id) ? id : undefined));
   return normalized.map((t) => t.id);
 }
 
@@ -1187,23 +1052,22 @@ const BLOCK_BATCH = 500;
 /** A row of `data.blocks` in the shape `fromBlockRow` reads — the file is foreign, so every value is checked. */
 function fileBlockRow(row: Row): StoredBlockRow | null {
   if (typeof row.id !== 'string' || !row.id || typeof row.type !== 'string' || !row.type) return null;
-  const text = (v: unknown) => (typeof v === 'string' ? v : null);
   return {
     id: row.id,
     type: row.type,
     version: Number.isInteger(row.version) && row.version > 0 ? row.version : null,
     hidden: row.hidden === 1 ? 1 : 0,
-    title: text(row.title),
+    title: asString(row.title),
     show_title: row.show_title === 0 || row.show_title === 1 ? row.show_title : null,
-    config: text(row.config),
-    data: text(row.data),
-    attrs: text(row.attrs),
-    html: text(row.html) ?? '',
+    config: asString(row.config),
+    data: asString(row.data),
+    attrs: asString(row.attrs),
+    html: asString(row.html) ?? '',
   };
 }
 
 /**
- * The blocks of a '14' file, for the owners the import has just inserted:
+ * The blocks of a file, for the owners the import has just inserted:
  * `owners` maps an owner's ID in the file to its ID here (the merge prefix), and
  * an owner not in it — filtered out, or a template that already existed here —
  * gets none. Each block goes through `remapBlock` (pictures, and on a merge the
@@ -1244,20 +1108,6 @@ async function insertImportedBlocks(
     }
   }
   if (batch.length) await db.batch(batch);
-}
-
-/**
- * Whether a file carries its blocks as rows (`data.blocks`, since '14') rather
- * than as `content`. `doReplace`/`doMerge` expect the working copy to have the
- * `content` columns exactly when it does not (`importViaStaging`).
- */
-function carriesBlockRows(backup: Pick<BackupFile, 'sourceVersion'>): boolean {
-  return (backup.sourceVersion ?? Number(BACKUP_VERSION)) >= 14;
-}
-
-/** The link IDs in an older file's block stack, on a merge — the same rewrite as for the rows of a '14' file. */
-function remapContentIds(content: string, id: (id: string) => string | undefined): string {
-  return serializeBlocks(parseBlocks(content).map((block) => remapBlock(block, { id })));
 }
 
 /**
@@ -1346,113 +1196,6 @@ async function insertSymbols(db: Awaited<ReturnType<typeof getDb>>, symbolRows: 
 }
 
 /**
- * Journal (v36/v37): linked operations and articles, paradigm, banishing
- * and meditation of an older backup become link blocks in the content — before
- * inserting, because since v49 the old columns no longer exist (the
- * others are dropped in `asEntryRows`). The targets are in the file or,
- * if the import deselected them, possibly already in the vault; the file takes
- * precedence. The merge then renames the chips along with all the others — a target
- * from the vault keeps its ID in the process.
- *
- * Status/end date/version (v41) is converted by `convertLegacyStatusRows` per mode —
- * it needs the "Status" definition of the target vault.
- */
-async function liftLegacyJournalRows(
-  db: Awaited<ReturnType<typeof getDb>>,
-  d: BackupFile['data'],
-): Promise<BackupFile['data']> {
-  if (!d.journalEntries?.length) return d;
-  const [vaultTargets, vaultCategories] = await Promise.all([
-    db.select<Row[]>(
-      "SELECT id, type, title, icon, category_id, entry_number, deleted_at FROM entries WHERE type IN ('wiki', 'operation')"
-    ),
-    db.select<Row[]>('SELECT id, name, emoji, is_builtin FROM categories'),
-  ]);
-  // Later wins: first the vault, then the file.
-  const source = rowsLinkSource(
-    {
-      operation: [...vaultTargets.filter((r) => r.type === 'operation'), ...(d.operations ?? [])],
-      wiki: [...vaultTargets.filter((r) => r.type === 'wiki'), ...(d.wikiArticles ?? [])],
-    },
-    [...vaultCategories, ...(d.categories ?? [])],
-  );
-  const journalEntries = d.journalEntries.map((row) => {
-    const linked = linkedIdsToContent(String(row.content ?? ''), { id: String(row.id), ...row }, source);
-    // Broken JSON in the linked IDs: the row stays untouched as in v36.
-    if (linked === null) return row;
-    const content = journalFieldsToContent(linked, row, source);
-    return content === row.content ? row : { ...row, content };
-  });
-  return { ...d, journalEntries };
-}
-
-/**
- * Operations (v42): sigil columns become blocks — after the status
- * conversion, so that the blocks stand in the same order as after
- * migrations v41 and v42. `operations` and `wikiArticles` are the rows of the
- * mode, so already renamed (merge) and with local image names. Empty
- * operations of the category "Sigils" get the set only from files before
- * version 7: in a newer one the user may have removed the blocks
- * deliberately.
- */
-async function liftLegacySigilRows(operations: Row[], wikiArticles: Row[], backup: BackupFile): Promise<Row[]> {
-  const includeSigilCategory = (backup.sourceVersion ?? Number(BACKUP_VERSION)) < 7;
-  const articles = new Map(wikiArticles.map((a) => [String(a.id), {
-    title: a.title == null ? null : String(a.title),
-    icon: a.icon == null ? null : String(a.icon),
-    entry_number: a.entry_number == null ? null : Number(a.entry_number),
-  }]));
-  const out: Row[] = [];
-  for (const row of operations) {
-    const sigilRow = row as LegacySigilRow;
-    if (!needsSigilConversion(sigilRow, includeSigilCategory)) {
-      out.push(row);
-      continue;
-    }
-    const content = await sigilRowToContent(sigilRow, (id) => articles.get(id));
-    // Unlike the migration, the import cannot catch up later — after
-    // v49 there is no column in which the drawing could wait.
-    if (content === undefined) throw new Error(`Sigil drawing of operation ${String(row.id)} could not be saved`);
-    out.push({ ...row, content });
-  }
-
-  return out;
-}
-
-/**
- * The "Status" definition by which old operation rows are rewritten:
- * the vault's (also in the trash), otherwise the file's — as in
- * migration v41. Otherwise the new copies would not match the "Status" that exists
- * in the vault afterwards.
- */
-async function statusDefinitionForImport(
-  db: Awaited<ReturnType<typeof getDb>>,
-  fileRows: unknown,
-): Promise<BlockDefinition | undefined> {
-  const local = await definitionById(db, STATUS_DEFINITION_ID);
-  if (local) return local;
-  const fromFile = Array.isArray(fileRows)
-    ? fileRows.find((r): r is Row => typeof r === 'object' && r !== null && (r as Row).id === STATUS_DEFINITION_ID)
-    : undefined;
-  return fromFile ? fromRow.blockDefinition(fromFile) : undefined;
-}
-
-/**
- * The file's definitions, followed by "Status" if the conversion created it
- * anew (it existed neither in the vault nor in the file) — at the end of the list.
- */
-async function withStatusDefinition(
-  db: Awaited<ReturnType<typeof getDb>>,
-  fileRows: unknown,
-  used: BlockDefinition | null,
-  existing: BlockDefinition | undefined,
-): Promise<unknown[]> {
-  const rows = Array.isArray(fileRows) ? fileRows : [];
-  if (!used || existing) return rows;
-  return [...rows, definitionToRow({ ...used, sort_order: await nextDefinitionSortOrder(db) })];
-}
-
-/**
  * `tasks.parent_task_id` points to the same table. If a child comes before its
  * parent in the backup, the foreign key fails on INSERT.
  * So insert first without the parent reference and fill it in afterwards — then
@@ -1480,22 +1223,16 @@ async function insertTasks(
 // ─────────────────────────────────────────────────────────────────────────────
 
 function applyTypeFilters(d: BackupFile['data'], f: ImportTypeFilters): BackupFile['data'] {
-  const anyCategorized = f.includeWiki || f.includeOperations || f.includeTasks;
-  const anyBlocks = f.includeJournal || f.includeWiki || f.includeOperations;
+  const anyEntries = selectsEntries(f);
+  const known = new Set((d.categories ?? []).map((c) => String(c.id)));
   return {
     ...d,
-    blockDefinitions:   anyBlocks           ? d.blockDefinitions  : [],
-    templates:          anyBlocks           ? d.templates         : [],
-    routines:           anyBlocks           ? d.routines          : [],
-    journalEntries:     f.includeJournal    ? d.journalEntries    : [],
-    wikiArticles:       f.includeWiki       ? d.wikiArticles      : [],
-    operations:         f.includeOperations ? d.operations        : [],
-    // Templates (with `anyBlocks`) need the categories of their assignments; `usedCategoryRows` narrows it down.
-    categories:         anyCategorized || anyBlocks ? d.categories : [],
-    // The altars of an older file arrive as operations.
-    altars:             f.includeOperations ? d.altars            : [],
-    altarItems:         f.includeOperations ? d.altarItems        : [],
-    altarPlacements:    f.includeOperations ? d.altarPlacements   : [],
+    blockDefinitions:   anyEntries          ? d.blockDefinitions  : [],
+    templates:          anyEntries          ? d.templates         : [],
+    entries:            anyEntries          ? (d.entries ?? []).filter((row) => entrySelected(row, f, known)) : [],
+    dashboards:         anyEntries          ? d.dashboards        : [],
+    // `usedCategoryRows` narrows them down to what the rest needs.
+    categories:         anyEntries || f.includeTasks ? d.categories : [],
     tasks:              f.includeTasks      ? d.tasks             : [],
     taskLinks:          f.includeTasks      ? d.taskLinks         : [],
     tags:               f.includeTags       ? d.tags              : [],
@@ -1506,18 +1243,20 @@ function applyTypeFilters(d: BackupFile['data'], f: ImportTypeFilters): BackupFi
 
 /**
  * Translates a backup's categories into this vault's: same ID
- * (the two builtins) or same name (case-insensitive) → local row,
+ * (the builtins) or same name (case-insensitive) → local row,
  * otherwise newly created. Returns the mapping backup ID → local ID, with
- * which the four content arrays are re-pointed (`remapCategoryIds`).
+ * which the content arrays are re-pointed (`remapCategoryIds`), and the
+ * start templates the newly created ones bring (`applyStartTemplates`,
+ * once the templates are in).
  *
- * Categories are never deleted, not even on replace: since v38 a category
- * spans modules, and a partial replace (wiki only) must not pull the
- * categories out from under the tasks.
+ * Categories are never deleted, not even on replace: a category
+ * spans entries and tasks, and a partial replace must not pull the
+ * categories out from under the rest.
  */
 async function resolveImportedCategories(
   db: Awaited<ReturnType<typeof getDb>>,
   rows: Row[],
-): Promise<Map<string, string>> {
+): Promise<CategoryResolution> {
   const local = await db.select<Row[]>('SELECT id, name, deleted_at, sort_order FROM categories');
   const localById = new Map(local.map((r) => [String(r.id), r]));
   // If the same name exists both active and in the trash (a vault from before the
@@ -1526,21 +1265,41 @@ async function resolveImportedCategories(
   const localByKey = new Map(byLiveLast.map((r) => [categoryKey(String(r.name)), r]));
   let nextSort = local.reduce((m, r) => Math.max(m, Number(r.sort_order ?? 0)), -1) + 1;
 
+  // A built-in category carries only its English seed in the column
+  // ("Sigils"); it is displayed via its locale key.
+  const nameOf = (row: Row) => (row.is_builtin
+    ? i18n.t(`categories.builtin.${String(row.id)}`, { defaultValue: String(row.name ?? '') })
+    : String(row.name ?? ''));
+  // Built-ins and starters (`dreams`, `herbs` …) have the same ID in every
+  // vault; a starter's name may have been renamed or come from another app
+  // language. Matched by ID, or the built-in dashboards, which name them,
+  // would end up on a duplicate.
+  const sameIdEverywhere = (row: Row) => !!row.is_builtin || STARTER_CATEGORY_IDS.has(String(row.id));
+  // Unless another category of the file already claims that local starter by
+  // its name (the starter renamed there, its old name given to a new one):
+  // then the starter goes by name too, so two categories stay two.
+  const claimedByName = new Set<string>();
+  for (const row of rows) {
+    if (sameIdEverywhere(row) && localById.has(String(row.id))) continue;
+    const named = localByKey.get(categoryKey(nameOf(row)));
+    if (named) claimedByName.add(String(named.id));
+  }
+  // Built-ins always go by ID; a starter only while no other category of the file claims it by name.
+  const matchesById = (row: Row) => !!row.is_builtin
+    || (STARTER_CATEGORY_IDS.has(String(row.id)) && !claimedByName.has(String(row.id)));
+
   const map = new Map<string, string>();
+  const startTemplates = new Map<string, string>();
   for (const row of rows) {
     const id = String(row.id);
-    // A built-in category carries only its English seed in the column
-    // ("Other", "Sigils"); it was displayed via its locale key. From a
-    // v4 backup it would otherwise arrive as "Other" next to the local "Sonstiges" lang-ok,
-    // instead of merging into it — the same resolution that `mergeCategoryRows` performs via
-    // `builtinName`.
-    const name = row.is_builtin
-      ? i18n.t(`categories.builtin.${id}`, { defaultValue: String(row.name ?? '') })
-      : String(row.name ?? '');
+    const template = typeof row.template_id === 'string' && isTemplateId(row.template_id) ? row.template_id : null;
+    const name = nameOf(row);
     const key = categoryKey(name);
-    const match = (row.is_builtin ? localById.get(id) : undefined) ?? localByKey.get(key);
+    const match = (matchesById(row) ? localById.get(id) : undefined) ?? localByKey.get(key);
     if (match) {
       map.set(id, String(match.id));
+      // A local category keeps its own start template; one without gets the file's.
+      if (template) startTemplates.set(String(match.id), template);
       // An imported active category brings its local counterpart back from the trash.
       if (match.deleted_at != null && row.deleted_at == null) {
         await db.execute('UPDATE categories SET deleted_at=NULL WHERE id=$1', [match.id]);
@@ -1560,25 +1319,92 @@ async function resolveImportedCategories(
     localById.set(newId, inserted);
     localByKey.set(key, inserted);
     map.set(id, newId);
+    if (template) startTemplates.set(newId, template);
   }
-  return map;
+  return { map, startTemplates };
+}
+
+interface CategoryResolution {
+  /** Backup ID → local ID. */
+  map: Map<string, string>;
+  /** Local category ID → the start template the file gives it. */
+  startTemplates: Map<string, string>;
+}
+
+/**
+ * The start templates of the file, once its templates are in: a category
+ * that has none yet gets the file's — if that template is here. A category
+ * with a start template of its own keeps it.
+ */
+async function applyStartTemplates(db: Awaited<ReturnType<typeof getDb>>, startTemplates: Map<string, string>): Promise<void> {
+  for (const [category, template] of startTemplates) {
+    await db.execute(
+      'UPDATE categories SET template_id=$1 WHERE id=$2 AND template_id IS NULL AND EXISTS (SELECT 1 FROM templates WHERE id=$1)',
+      [template, category],
+    );
+  }
 }
 
 /**
  * Only the categories that some content of the (already filtered) payload
- * points to. The export sends the whole table along; what nobody needs here —
- * deselected types, excluded categories, unused ones — should not become
- * a row in the vault.
+ * points to — entries, tasks, the dashboards' filters — and the ones whose
+ * start template the file brings. The export sends
+ * the whole table along; what nobody needs here — excluded categories,
+ * unused ones — should not become a row in the vault.
  */
 function usedCategoryRows(d: BackupFile['data']): Row[] {
   const used = new Set(
-    [...(d.wikiArticles ?? []), ...(d.operations ?? []), ...(d.tasks ?? []), ...(d.altarItems ?? [])]
+    [...(d.entries ?? []), ...(d.tasks ?? [])]
       .filter((r) => r.category_id != null)
       .map((r) => String(r.category_id))
   );
-  // Also the categories a template is assigned to — otherwise it would lose the assignment.
-  templateCategoryIds(d.templates).forEach((id) => used.add(id));
+  for (const row of d.dashboards ?? []) parseDashboardFilter(row?.filter).categories?.forEach((id) => used.add(id));
+  // And a category whose start template comes along — otherwise a fresh vault would lose it.
+  const templates = new Set((d.templates ?? []).map((t) => String(t?.id)));
+  for (const c of d.categories ?? []) if (c?.template_id != null && templates.has(String(c.template_id))) used.add(String(c.id));
   return (d.categories ?? []).filter((c) => used.has(String(c.id)));
+}
+
+/**
+ * The file's dashboards, their category IDs translated to this vault's (an
+ * ID that points nowhere here drops out). `replace`: a dashboard the vault
+ * has (the built-ins, by ID) takes the file's state, one it lacks is added.
+ * `merge`: a dashboard the vault has keeps its state and takes on the file's
+ * categories besides; one it lacks is added.
+ */
+async function importDashboards(
+  db: Awaited<ReturnType<typeof getDb>>,
+  rows: Row[] | undefined,
+  catMap: Map<string, string>,
+  mode: 'replace' | 'merge',
+): Promise<void> {
+  if (!rows?.length) return;
+  const categories = new Set((await db.select<{ id: string }[]>('SELECT id FROM categories')).map((r) => r.id));
+  const local = new Map((await db.select<Row[]>('SELECT * FROM dashboards')).map((r) => [String(r.id), fromRow.dashboard(r)]));
+  const now = nowIso();
+  for (const raw of rows) {
+    if (typeof raw !== 'object' || raw === null || typeof raw.id !== 'string' || !/^[\w-]{1,100}$/.test(raw.id)) continue;
+    // A built-in's id belongs to that built-in: a row that takes it without being it is left out.
+    if (isBuiltinDashboard(raw.id) && raw.builtin !== raw.id) continue;
+    const row = fromRow.dashboard(raw);
+    const mapped = row.filter.categories?.map((id) => catMap.get(id) ?? id).filter((id) => categories.has(id));
+    // "All entries" has no filter, so that no entry can become unfindable.
+    const filter = row.builtin === 'all' ? {} : { ...row.filter, ...(mapped && { categories: [...new Set(mapped)] }) };
+    const mine = local.get(row.id);
+    if (mine && mode === 'merge') {
+      if (!mine.filter.categories || !filter.categories) continue;
+      const merged = [...new Set([...mine.filter.categories, ...filter.categories])];
+      if (merged.length === mine.filter.categories.length) continue;
+      await db.execute('UPDATE dashboards SET filter=$1, updated_at=$2 WHERE id=$3', [JSON.stringify({ ...mine.filter, categories: merged }), now, row.id]);
+      continue;
+    }
+    await db.execute(
+      `INSERT OR REPLACE INTO dashboards (id, builtin, name, icon, position, filter, sort, display, created_at, updated_at, deleted_at)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
+      [row.id, row.builtin, row.name, row.icon, row.position, JSON.stringify(filter), JSON.stringify(row.sort),
+        JSON.stringify(row.display), row.created_at || now, row.updated_at || now, row.deleted_at],
+    );
+  }
 }
 
 function remapCategoryIds(rows: Row[], map: Map<string, string>): Row[] {
@@ -1609,19 +1435,15 @@ export async function assertPayloadReferencesResolve(
   }
 
   const checks = [
-    ['wikiArticles', 'wiki articles'],
-    ['operations', 'operations'],
+    ['entries', 'entries'],
     ['tasks', 'tasks'],
-    ['altarItems', 'altar items'],
   ] as const;
 
   for (const [rowsKey, label] of checks) {
     const missing = new Set<string>();
     for (const row of d[rowsKey] ?? []) {
-      // Since v39 "uncategorized" is a valid state — and the one every new
-      // entry starts with. Reading it as an unresolvable reference
-      // made every backup fail in which even a single entry had no
-      // category. An empty *string* remains a miss.
+      // "Uncategorized" is a valid state — and the one every new entry
+      // starts with. An empty *string* remains a miss.
       if (row.category_id == null) continue;
       const id = String(row.category_id);
       if (!known.has(id)) missing.add(id || '(empty)');
@@ -1636,140 +1458,75 @@ export async function assertPayloadReferencesResolve(
   }
 }
 
-/**
- * The routines of an older backup as templates — the same path as
- * migration v44, but only now, after the type and category filters: a
- * link target must come along (from the file) or already be there (in the vault),
- * otherwise the chip is dropped. New templates go after those of the file. On
- * merge, `insertTemplates` then re-points the chips to the renamed IDs.
- */
-export async function withRoutinesAsTemplates(db: Awaited<ReturnType<typeof getDb>>, d: BackupFile['data']): Promise<BackupFile['data']> {
-  if (!d.routines?.length) return d;
-  const resolve = routineLinkResolver(i18n.t, [
-    {
-      operations: (d.operations ?? []) as RoutineTargetRow[],
-      articles: (d.wikiArticles ?? []) as RoutineTargetRow[],
-      categories: (d.categories ?? []) as RoutineCategoryRow[],
-    },
-    await vaultRoutineLinkSource(db),
-  ]);
-  const now = nowIso();
-  const offset = (d.templates ?? []).reduce((max, r) => Math.max(max, Number(r.sort_order) || 0), -1) + 1;
-  const converted = d.routines
-    .map((routine, i) => routineToTemplate(routine, resolve, offset + i, now))
-    .filter((tpl): tpl is NonNullable<typeof tpl> => tpl !== null)
-    .map(templateToRow);
-  return { ...d, templates: [...(d.templates ?? []), ...converted], routines: [] };
-}
-
-/** The picture columns of the altar tables an older file brings (`IMAGE_FIELDS` no longer has them). */
-const ALTAR_IMAGE_COLUMNS = ['background_image_data', 'thumbnail_data', 'icon_data'];
-const ALTAR_ITEM_IMAGE_COLUMNS = ['image_data'];
-
-/**
- * The altars of an older file (from before v62): written into altar tables
- * the working copy builds for them, turned into operations as v62 did with
- * the vault's own, and the tables dropped again (`migrateAltars.ts`). After
- * the tasks and their links, which then follow the altars to their
- * operations; before the sweep, which would take those links away.
- * `replace`: the file's version of an operation wins over the vault's.
- */
-async function importAltars(
-  db: Awaited<ReturnType<typeof getDb>>, altars: Row[], items: Row[], placements: Row[], replace: boolean,
-): Promise<void> {
-  if (altars.length || items.length) {
-    await createAltarTables(db);
-    await insertRows(db, 'altars', altars);
-    await insertRows(db, 'altar_items', items, true);
-    await insertRows(db, 'altar_placements', placements);
-  }
-  // Also without its altars (Operations not ticked): the file's chips, altar
-  // fields and task links point at operations, or they would be dropped.
-  await convertAltarsInPlace(db, undefined, { replace });
-  await removeAltarTables(db);
-}
-
 export async function doReplace(db: Awaited<ReturnType<typeof getDb>>, backup: BackupFile): Promise<void> {
   const pathMap = await restoreImages(backup);
+  // The block copies name their icons in `config`, beside their pictures: one
+  // rename for both (the same bytes have the same name in either folder).
+  const fileMap = new Map([...pathMap, ...await restoreIcons(backup)]);
   // Tags are not replaced but merged: entries that this file does
   // not replace carry the IDs of the existing ones.
-  const d = await importTagsAndRemap(db, await liftLegacyJournalRows(db, await withRoutinesAsTemplates(db, backup.data)));
+  const d = await importTagsAndRemap(db, backup.data);
 
   await assertPayloadReferencesResolve(db, d);
 
-  // Remap image paths — columns from `IMAGE_FIELDS`, not maintained by hand.
-  const IMAGE_FIELDS_ENTRY = imageColumns('entries');
-
   // Categories first: the contents get the local IDs before they are
   // inserted. Categories are never deleted (see there).
-  const catMap = await resolveImportedCategories(db, usedCategoryRows(d));
+  const { map: catMap, startTemplates } = await resolveImportedCategories(db, usedCategoryRows(d));
 
-  const journalEntries = (d.journalEntries ?? []).map((r) => remapRow(r, IMAGE_FIELDS_ENTRY, pathMap));
-  const wikiArticles = remapCategoryIds((d.wikiArticles ?? []).map((r) => remapRow(r, IMAGE_FIELDS_ENTRY, pathMap)), catMap);
-  // Backups up to v40 still carry status/end date/version in the columns.
-  const replaceStatus = await statusDefinitionForImport(db, d.blockDefinitions);
-  const replaceOps = convertLegacyStatusRows(
-    remapCategoryIds((d.operations ?? []).map((r) => remapRow(r, IMAGE_FIELDS_OP, pathMap)), catMap),
-    i18n.t, nowIso(), replaceStatus,
-  );
-  const operations = await liftLegacySigilRows(replaceOps.rows, wikiArticles, backup);
-  const altars = (d.altars ?? []).map((r) => remapRow(r, ALTAR_IMAGE_COLUMNS, pathMap));
-  const altarItems = remapCategoryIds((d.altarItems ?? []).map((r) => remapRow(r, ALTAR_ITEM_IMAGE_COLUMNS, pathMap)), catMap);
+  const entries = entryRowsForInsert(remapCategoryIds((d.entries ?? []).map((r) => remapRow(r, IMAGE_FIELDS_ENTRY, pathMap)), catMap));
   const tasks = remapCategoryIds(d.tasks ?? [], catMap);
 
   // Custom blocks like categories: never deleted, missing ones added by ID,
   // existing ones stay. `db` here is the working copy (`importViaStaging`):
   // if anything fails before the end, the vault stays as it was.
-  await insertBlockDefinitions(db, await withStatusDefinition(
-    db, remapDefinitionRows(d.blockDefinitions, pathMap), replaceOps.definition, replaceStatus,
-  ));
-  const templateIds = await insertTemplates(db, d.templates, pathMap, catMap);
+  await insertBlockDefinitions(db, remapDefinitionRows(d.blockDefinitions, pathMap));
+  const templateIds = await insertTemplates(db, d.templates);
+  await applyStartTemplates(db, startTemplates);
+  await importDashboards(db, d.dashboards, catMap, 'replace');
   // Like the custom blocks and the templates: never deleted, missing ones added.
   await insertLexicon(db, d.languages, d.lexiconEntries);
   await insertVaultImages(db, d.vaultImages, pathMap);
   await insertSymbols(db, d.symbols);
 
-  // Delete only the content types present in the backup (so a partial backup
-  // replacing only Journal data won't wipe wiki/ops).
-  const entryTypes = presentEntryTypes(d);
   const hasTasks = (d.tasks?.length ?? 0) > 0;
-
   if (hasTasks) {
     await db.execute('DELETE FROM task_links');
     await db.execute('DELETE FROM tasks');
   }
-  for (const type of entryTypes) await db.execute('DELETE FROM entries WHERE type=$1', [type]);
-  // Plus every imported ID, whatever type it has in the vault by now: an
-  // entry that has changed its module since the backup would otherwise appear
-  // twice — and `entries.id` is unique across all types.
-  const entries = entryRowsForInsert(journalEntries, wikiArticles, operations);
+  // Replace only the categories the backup brings entries of (so a partial
+  // backup holding only the journal does not wipe the rest) — and the
+  // uncategorized entries only if it brings some of those.
+  const presentCategories = [...new Set(entries.filter((r) => r.category_id != null).map((r) => String(r.category_id)))];
+  for (let i = 0; i < presentCategories.length; i += IN_CHUNK) {
+    const chunk = presentCategories.slice(i, i + IN_CHUNK);
+    await db.execute(`DELETE FROM entries WHERE category_id IN (${chunk.map((_, n) => `$${n + 1}`).join(',')})`, chunk);
+  }
+  if (entries.some((r) => r.category_id == null)) await db.execute('DELETE FROM entries WHERE category_id IS NULL');
+  // Plus every imported ID, whatever category it has in the vault by now: an
+  // entry that has changed its category since the backup would otherwise
+  // appear twice — and `entries.id` is unique.
   for (let i = 0; i < entries.length; i += IN_CHUNK) {
     const chunk = entries.slice(i, i + IN_CHUNK).map((r) => String(r.id));
     await db.execute(`DELETE FROM entries WHERE id IN (${chunk.map((_, n) => `$${n + 1}`).join(',')})`, chunk);
   }
+  // A number an entry that stays still holds goes to the file's entry afresh (`numberUnnumbered`).
+  const heldNumbers = new Set((await db.select<{ n: number }[]>('SELECT entry_number AS n FROM entries WHERE entry_number IS NOT NULL')).map((r) => r.n));
+  for (const row of entries) if (row.entry_number != null && heldNumbers.has(Number(row.entry_number))) row.entry_number = null;
   // Re-insert
   await insertRows(db, 'entries', entries);
-  if (carriesBlockRows(backup)) {
-    const same = (ids: string[]) => new Map(ids.map((id) => [id, id]));
-    await insertImportedBlocks(db, d.blocks, 'entry', same(entries.map((r) => String(r.id))), { images: pathMap });
-    await insertImportedBlocks(db, d.blocks, 'template', same(templateIds), { images: pathMap });
-  }
+  await numberUnnumbered(db);
+  const same = (ids: string[]) => new Map(ids.map((id) => [id, id]));
+  const insertedEntries = new Set(entries.map((r) => String(r.id)));
+  await insertTagLinks(db, 'entry', d.entries, (id) => (insertedEntries.has(id) ? id : undefined));
+  await insertImportedBlocks(db, d.blocks, 'entry', same(entries.map((r) => String(r.id))), { images: fileMap });
+  await insertImportedBlocks(db, d.blocks, 'template', same(templateIds), { images: fileMap });
   await insertTasks(db, tasks);
   if (d.taskLinks) await insertRows(db, 'task_links', d.taskLinks);
-  if (!carriesBlockRows(backup)) {
-    // The file's version of an altar replaces its operation here.
-    await importAltars(db, altars, altarItems, d.altarPlacements ?? [], true);
-    // The sigil blocks of an older file (or made from its sigil rows) as v64 converts them.
-    await convertLegacySigilsInPlace(db, legacySigilLabels(i18n.t));
-  }
 
   // A partial replace (e.g. only tasks) can orphan existing links that point to
   // just-replaced targets — and imported task_links
   // can point to deselected types. Same sweep as for the trash.
   await sweepDanglingTaskLinks(db);
-  await dropUnknownTagIds(db);
-  // A backup from before v48 brings the English default titles along.
-  await clearLegacyUntitledTitles(db);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1778,12 +1535,13 @@ export async function doReplace(db: Awaited<ReturnType<typeof getDb>>, backup: B
 
 export async function doMerge(db: Awaited<ReturnType<typeof getDb>>, backup: BackupFile): Promise<void> {
   const pathMap = await restoreImages(backup);
-  const d = await importTagsAndRemap(db, await liftLegacyJournalRows(db, await withRoutinesAsTemplates(db, backup.data)));
+  const fileMap = new Map([...pathMap, ...await restoreIcons(backup)]);
+  const d = await importTagsAndRemap(db, backup.data);
 
   // Merge deletes nothing, but aborts midway through inserting if a
   // category is missing — check beforehand so the message says which.
   await assertPayloadReferencesResolve(db, d);
-  const catMap = await resolveImportedCategories(db, usedCategoryRows(d));
+  const { map: catMap, startTemplates } = await resolveImportedCategories(db, usedCategoryRows(d));
 
   // Prefix = base36 encoding of current timestamp (8 chars, unique per merge)
   const prefix = Date.now().toString(36).slice(-8);
@@ -1791,111 +1549,40 @@ export async function doMerge(db: Awaited<ReturnType<typeof getDb>>, backup: Bac
 
   // Build id maps for every entity type
   const allOldIds = new Set<string>([
-    ...(d.journalEntries ?? []).map((r: Row) => r.id as string),
-    ...(d.wikiArticles ?? []).map((r: Row) => r.id as string),
-    ...(d.operations ?? []).map((r: Row) => r.id as string),
-    ...(d.altars ?? []).map((r: Row) => r.id as string),
-    ...(d.altarItems ?? []).map((r: Row) => r.id as string),
+    ...(d.entries ?? []).map((r: Row) => r.id as string),
     ...(d.tasks ?? []).map((r: Row) => r.id as string),
   ]);
 
-  /** The ID here of an entry, task or altar of the file; `undefined` for any other ID. */
+  /** The ID here of an entry or task of the file; `undefined` for any other ID. */
   const nextId = (id: string): string | undefined => (allOldIds.has(id) ? pid(id) : undefined);
   function remapId(id: unknown): unknown {
     return typeof id === 'string' ? nextId(id) ?? id : id;
   }
 
-  function remapJsonIds(jsonStr: unknown): unknown {
-    if (typeof jsonStr !== 'string') return jsonStr;
-    try {
-      const arr = JSON.parse(jsonStr) as unknown[];
-      if (!Array.isArray(arr)) return jsonStr;
-      const remapped = arr.map((v) => (typeof v === 'string' && allOldIds.has(v) ? pid(v) : v));
-      return JSON.stringify(remapped);
-    } catch {
-      return jsonStr;
-    }
-  }
-
   /**
-   * Since v33 `entry_number` is really stored in the database, instead of being generated
-   * from the ROWID on read. On merge the numbers must therefore be shifted
-   * behind the existing ones — otherwise two entries show the same
-   * `#n`.
+   * `entry_number` is stored with the entry and unique over all of them. On
+   * merge the numbers are therefore shifted behind the existing ones —
+   * otherwise two entries would show the same `#n`.
    */
-  async function entryNumberOffset(type: EntryType): Promise<number> {
-    const rows = await db.select<{ n: number }[]>(
-      'SELECT COALESCE(MAX(entry_number), 0) AS n FROM entries WHERE type = $1',
-      [type]
-    );
-    return rows[0]?.n ?? 0;
-  }
-  const offsets: Record<EntryType, number> = {
-    journal: await entryNumberOffset('journal'),
-    wiki: await entryNumberOffset('wiki'),
-    operation: await entryNumberOffset('operation'),
-  };
+  const [{ n: offset }] = await db.select<{ n: number }[]>('SELECT COALESCE(MAX(entry_number), 0) AS n FROM entries');
 
-  function remapEntry(
-    row: Row,
-    imagePaths: string[],
-    idFields: string[],
-    jsonIdFields: string[],
-    entryType?: EntryType,
-  ): Row {
+  function remapEntry(row: Row, imagePaths: string[], idFields: string[], numbered = false): Row {
     const out = remapRow(row, imagePaths, pathMap);
     out.id = pid(out.id as string);
-    if (entryType && out.entry_number != null) {
-      out.entry_number = Number(out.entry_number) + offsets[entryType];
+    if (numbered && out.entry_number != null) {
+      out.entry_number = Number(out.entry_number) + offset;
     }
     for (const f of idFields) {
       if (out[f] != null) out[f] = remapId(out[f]);
     }
-    for (const f of jsonIdFields) {
-      if (out[f] != null) out[f] = remapJsonIds(out[f]);
-    }
     return out;
   }
 
-  /**
-   * The link IDs in an older file's `content` (a '14' file's rows get the same
-   * in `insertImportedBlocks`): every block goes through `remapBlock` with
-   * `nextId` — chips and the IDs in its JSON (a link prefill, an altar's
-   * links). IDs that are not the file's stay. The stack is parsed and written
-   * again; its rows are rebuilt from it at the end of the import anyway.
-   */
-  const withContentLinks = (row: Row): Row => {
-    if (typeof row.content !== 'string') return row;
-    return { ...row, content: remapContentIds(row.content, nextId) };
-  };
-
-  const journalEntries = (d.journalEntries ?? []).map((r: Row) =>
-    withContentLinks(remapEntry(r, ['content'], [], [], 'journal'))
-  );
-  const wikiArticles = remapCategoryIds((d.wikiArticles ?? []).map((r: Row) =>
-    withContentLinks(remapEntry(r, ['content', 'icon', 'cover_image'], [], [], 'wiki'))
-  ), catMap);
-  const mergeStatus = await statusDefinitionForImport(db, d.blockDefinitions);
-  const mergeOps = convertLegacyStatusRows(remapCategoryIds((d.operations ?? []).map((r: Row) =>
-    withContentLinks(remapEntry(r, IMAGE_FIELDS_OP, ['charging_technique_wiki_id'], [], 'operation'))
-  ), catMap), i18n.t, nowIso(), mergeStatus);
-  const operations = await liftLegacySigilRows(mergeOps.rows, wikiArticles, backup);
-  const altars = (d.altars ?? []).map((r: Row) => {
-    const row = remapEntry(r, ALTAR_IMAGE_COLUMNS, [], []);
-    // Drawn shapes and text get new ids like the placements: ids are unique across all altars.
-    return r.elements === undefined ? row : { ...row, elements: withNewElementIds(r.elements, String(row.id)) };
-  });
-  const altarItems = remapCategoryIds((d.altarItems ?? []).map((r: Row) =>
-    remapEntry(r, ALTAR_ITEM_IMAGE_COLUMNS, [], [])
-  ), catMap);
-  const altarPlacements = (d.altarPlacements ?? []).map((r: Row) => ({
-    ...r,
-    id: pid(r.id as string),
-    altar_id: remapId(r.altar_id),
-    item_id: remapId(r.item_id),
-  }));
+  const entries = entryRowsForInsert(remapCategoryIds((d.entries ?? []).map((r: Row) =>
+    remapEntry(r, IMAGE_FIELDS_ENTRY, [], true)
+  ), catMap));
   const tasks = remapCategoryIds((d.tasks ?? []).map((r: Row) =>
-    remapEntry(r, [], ['parent_task_id'], [])
+    remapEntry(r, [], ['parent_task_id'])
   ), catMap);
   const taskLinks = (d.taskLinks ?? []).map((r: Row) => ({
     ...r,
@@ -1908,12 +1595,13 @@ export async function doMerge(db: Awaited<ReturnType<typeof getDb>>, backup: Bac
   // importTagsAndRemap above).
   // Without prefix, so that a block arriving twice stays one.
   // Link defaults point to the renamed entries, like the chips in the content.
-  await insertBlockDefinitions(db, await withStatusDefinition(
+  await insertBlockDefinitions(
     db, remapDefinitionRows(d.blockDefinitions, pathMap, (t) => ({ id: String(remapId(t.id)), label: t.label })),
-    mergeOps.definition, mergeStatus,
-  ));
+  );
   // Without prefix, like the definitions.
-  const templateIds = await insertTemplates(db, d.templates, pathMap, catMap, (content) => remapContentIds(content, nextId));
+  const templateIds = await insertTemplates(db, d.templates);
+  await applyStartTemplates(db, startTemplates);
+  await importDashboards(db, d.dashboards, catMap, 'merge');
   // Without prefix like the two above: a language stands on its own, its ID
   // appears in no entry.
   await insertLexicon(db, d.languages, d.lexiconEntries);
@@ -1923,27 +1611,20 @@ export async function doMerge(db: Awaited<ReturnType<typeof getDb>>, backup: Bac
   await insertSymbols(db, d.symbols);
 
   // Content: plain INSERT with prefixed IDs (no conflicts possible)
-  const entries = entryRowsForInsert(journalEntries, wikiArticles, operations);
   await insertRows(db, 'entries', entries);
-  if (carriesBlockRows(backup)) {
-    // The blocks under the prefixed owners, their pictures and links pointed here like the rows'.
-    const inserted = new Set(entries.map((r) => String(r.id)));
-    const owners = new Map([...allOldIds].filter((id) => inserted.has(pid(id))).map((id) => [id, pid(id)]));
-    await insertImportedBlocks(db, d.blocks, 'entry', owners, { images: pathMap, id: nextId });
-    await insertImportedBlocks(db, d.blocks, 'template', new Map(templateIds.map((id) => [id, id])), { images: pathMap, id: nextId });
-  }
+  await numberUnnumbered(db);
+  // The blocks under the prefixed owners, their pictures and links pointed here like the rows'.
+  const inserted = new Set(entries.map((r) => String(r.id)));
+  const owners = new Map([...allOldIds].filter((id) => inserted.has(pid(id))).map((id) => [id, pid(id)]));
+  await insertTagLinks(db, 'entry', d.entries, (id) => (inserted.has(pid(id)) ? pid(id) : undefined));
+  await insertImportedBlocks(db, d.blocks, 'entry', owners, { images: fileMap, id: nextId });
+  await insertImportedBlocks(db, d.blocks, 'template', new Map(templateIds.map((id) => [id, id])), { images: fileMap, id: nextId });
   await insertTasks(db, tasks);
   await insertRows(db, 'task_links', taskLinks, true);
-  if (!carriesBlockRows(backup)) {
-    await importAltars(db, altars, altarItems, altarPlacements, false);
-    await convertLegacySigilsInPlace(db, legacySigilLabels(i18n.t));
-  }
 
   // Imported task_links can point to targets that the type filter
   // has just deselected — sweep them out as in doReplace.
   await sweepDanglingTaskLinks(db);
-  await dropUnknownTagIds(db);
-  await clearLegacyUntitledTitles(db);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1961,22 +1642,22 @@ export async function doMerge(db: Awaited<ReturnType<typeof getDb>>, backup: Bac
  * below. A kind that was forgotten there was silently excluded from every
  * "import everything".
  */
-const CONTENT_TYPE_LABELS: Record<keyof ImportTypeFilters, string> = {
-  includeJournal: 'settings.includeJournal',
-  includeWiki: 'settings.includeWiki',
-  includeOperations: 'settings.includeOperations',
+const CONTENT_TYPE_LABELS: Record<ContentToggle, string> = {
   includeTasks: 'settings.includeTasks',
   includeTags: 'settings.includeTags',
   includeLexicon: 'settings.includeLexicon',
 };
 
+/** The content kinds besides the entries, which are chosen by category (`EntrySelection`). */
+type ContentToggle = Exclude<keyof ImportTypeFilters, keyof EntrySelection>;
+
 /** The same kinds as a list — the order of the packing lists. */
-export const CONTENT_TYPES: readonly [keyof ImportTypeFilters, string][] =
-  (Object.keys(CONTENT_TYPE_LABELS) as (keyof ImportTypeFilters)[]).map((key) => [key, CONTENT_TYPE_LABELS[key]]);
+export const CONTENT_TYPES: readonly [ContentToggle, string][] =
+  (Object.keys(CONTENT_TYPE_LABELS) as ContentToggle[]).map((key) => [key, CONTENT_TYPE_LABELS[key]]);
 
 /** Everything included — the default of the import filter and its reset value. */
 export function allTypesIncluded(): ImportTypeFilters {
-  const filters = {} as ImportTypeFilters;
+  const filters = { ...ALL_ENTRIES } as ImportTypeFilters;
   for (const [key] of CONTENT_TYPES) filters[key] = true;
   return filters;
 }
@@ -2000,7 +1681,7 @@ export async function importDatabase(
   // A backup from before language and theme moved to the device may hold
   // custom themes; they join this device's list (`adoptCustomThemes` checks
   // them), while its language and selection do not apply here.
-  const backupThemes = isPlainObject(backup.settings) && isPlainObject(backup.settings.appearance)
+  const backupThemes = isRecord(backup.settings) && isRecord(backup.settings.appearance)
     ? backup.settings.appearance.customThemes
     : undefined;
 
@@ -2043,7 +1724,7 @@ export async function importDatabase(
       });
     }
 
-    // 3. Switch to it (resets DB cache + runs migrations on new empty DB)
+    // 3. Switch to it (resets the DB cache and creates the schema in the new empty DB)
     await useVaultStore.getState().loadVaults();
     // `editsResolved`: the question about ongoing edits was asked
     // before the import began (`BackupPage`). If it came up here again and
@@ -2063,31 +1744,26 @@ export async function importDatabase(
 
     // 4. Fill the new (empty) vault with the backup data
     const db = await getDb();
-    // The fresh vault has just created the sigil template itself. If
-    // the file carries its templates along (from '8' — routines of older files do not
-    // count, they do not know the sigil template), its version applies — including that the
-    // template was changed or deleted there. Otherwise the fresh
-    // row would displace the brought-along one, assignments and all.
+    // The fresh vault has just created the built-in templates itself. If
+    // the file carries its templates along, its version applies — including
+    // that a template was changed or deleted there. Otherwise the fresh
+    // row would displace the brought-along one, and the categories would keep starting with it.
     const types = typeFilters ?? ALL_TYPES_INCLUDED;
-    const bringsTemplates = (backup.sourceVersion ?? Number(BACKUP_VERSION)) >= 8 && Array.isArray(backup.data.templates);
+    const bringsTemplates = Array.isArray(backup.data.templates);
     // Via the working copy as with replace: an abort leaves the new vault empty rather than half filled.
     await importViaStaging(db, async (staging) => {
-      if (bringsTemplates && (types.includeJournal || types.includeWiki || types.includeOperations)) {
-        await staging.execute('DELETE FROM templates WHERE id=$1', [SIGIL_TEMPLATE_ID]);
-        // Only a file that knows the altar template brings its version (or its deletion is not known).
-        if (backup.data.templates?.some((t) => t.id === ALTAR_TEMPLATE_ID)) {
-          await staging.execute('DELETE FROM templates WHERE id=$1', [ALTAR_TEMPLATE_ID]);
-        }
+      if (bringsTemplates && selectsEntries(types)) {
+        await staging.execute('DELETE FROM templates WHERE id IN ($1, $2)', [SIGIL_TEMPLATE_ID, ALTAR_TEMPLATE_ID]);
       }
       await doReplace(staging, filteredBackup);
-    }, { withContentColumn: !carriesBlockRows(backup) });
+    });
     // Only once the import went through, as with replace and merge below.
     if (backupThemes) useDeviceStore.getState().adoptCustomThemes(backupThemes);
   } else {
     // Never directly against the vault: `doReplace` deletes before it inserts, and
     // an aborted merge would leave half-imported data behind (see `importStaging.ts`).
     const run = mode === 'replace' ? doReplace : doMerge;
-    await importViaStaging(await getDb(), (staging) => run(staging, filteredBackup), { withContentColumn: !carriesBlockRows(backup) });
+    await importViaStaging(await getDb(), (staging) => run(staging, filteredBackup));
 
     // Only after a successful swap: an aborted import leaves the
     // settings as they were, too.

@@ -1,7 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import { LayoutGrid, Plus, Settings, type LucideIcon } from 'lucide-react';
 import { Suspense, lazy, useEffect, useState } from 'react';
-import { AUX_VIEWS, MODULES, type ViewId } from '../../lib/modules';
+import { AUX_VIEWS, TASKS_VIEW, type ViewId } from '../../lib/modules';
 import { useUIStore } from '../../store/uiStore';
 import { useVaultStore } from '../../store/vaultStore';
 import { useAutoBackupStore } from '../../store/autoBackupStore';
@@ -10,6 +10,7 @@ import { markAutoBackupErrorSeen } from '../../lib/autoBackup';
 import { asUpdateError, checkForUpdate, updateSettings } from '../../lib/updates';
 import { openVaultPicker } from '../../store/vaultPickerStore';
 import CreateItemModal from './CreateItemModal';
+import { useRailDashboards } from './RailDashboards';
 
 // SettingsModal drags the complete backup/restore machinery (dbBackup)
 // along with it — as a chunk of its own, only on first open.
@@ -74,6 +75,7 @@ export default function LeftSidebarRail() {
   const [settingsPage, setSettingsPage] = useState<SettingsPage>('general');
   const [createOpen, setCreateOpen] = useState(false);
   const activeVaultId = useVaultStore((s) => s.activeVaultId);
+  const railDashboards = useRailDashboards();
 
   // The check at startup lives here and not in App.tsx because its only
   // visible result is the dot on the start page button below. Found or not:
@@ -125,20 +127,17 @@ export default function LeftSidebarRail() {
           <RailButton onClick={() => setCreateOpen(true)} title={t('createItem.title')}>
             <Plus size={18} />
           </RailButton>
-          {/* The way to the dashboard. It used to hang on the Emerald logo in the
-              title bar, which nobody reads as a navigation target.
-              Mind the MCP selectors: lucide exports `Home` as an alias of
-              `House`, so the SVG carries `.lucide-house`, not `.lucide-home`. */}
-          {viewButton('home', AUX_VIEWS.home)}
+          {/* "All entries": the dashboard without a filter, so nothing can
+              become unfindable. Every dashboard button carries `data-dashboard-id`
+              for selectors that outlive a session. */}
+          {railDashboards.allButton}
+        </div>
+        {/* The dashboards in their order (drag to move), then the tasks. */}
+        <div className={RAIL_GROUP}>
+          {railDashboards.group}
+          {viewButton('tasks', TASKS_VIEW)}
         </div>
         <div className={RAIL_GROUP}>
-          {viewButton('journal', MODULES.journal)}
-          {viewButton('tasks', MODULES.tasks)}
-          {viewButton('operations', MODULES.operations)}
-        </div>
-        {/* The lexicon is not an entry module, but belongs with the wiki. */}
-        <div className={RAIL_GROUP}>
-          {viewButton('wiki', MODULES.wiki)}
           {viewButton('lexicon', AUX_VIEWS.lexicon)}
         </div>
         <div className={RAIL_GROUP}>
@@ -148,9 +147,10 @@ export default function LeftSidebarRail() {
       </div>
 
       {/* Bottom nav — always visible, read from the bottom: start page,
-          Settings, Trash, Tags, Categories, Images */}
+          Settings, Trash, Tags, Categories, Images, Symbols */}
       <div className="sidebar-bottom-bar w-full flex-[1_0_auto] flex flex-col items-center justify-end gap-3 py-2">
         <div className={RAIL_GROUP}>
+          {viewButton('symbols', AUX_VIEWS.symbols)}
           {viewButton('images', AUX_VIEWS.images)}
           {viewButton('categories', AUX_VIEWS.categories)}
           {viewButton('tags', AUX_VIEWS.tags)}
@@ -193,6 +193,7 @@ export default function LeftSidebarRail() {
       </div>
 
       {createOpen && <CreateItemModal onClose={() => setCreateOpen(false)} />}
+      {railDashboards.menu}
       {settingsOpen && (
         <Suspense fallback={null}>
           <SettingsModal

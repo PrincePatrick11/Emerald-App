@@ -20,9 +20,6 @@ export interface WriteOptions {
   touch?: Touch;
 }
 
-/** For every write that is a consequence of something elsewhere — so they can all be found. */
-export const AS_A_CONSEQUENCE: WriteOptions = { touch: false };
-
 export function stampFor(current: string, touch: Touch = true): string {
   if (touch === true) return nowIso();
   return touch === false ? current : touch;

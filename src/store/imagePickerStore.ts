@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 
 /** What a place asks the picture picker for. */
-export interface PickRequest {
+interface PickRequest {
   /** Several at once (a text) or exactly one (an image field). */
   multiple: boolean;
   /** Tags a picture taken in from the disk gets (a canvas's strip tag). */

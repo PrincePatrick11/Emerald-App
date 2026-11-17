@@ -25,7 +25,6 @@ import { captureLegacySettings } from '../lib/vaultSettings';
 import { resolveOpenEdits } from '../lib/openEdits';
 import { changeVaultPassword, keyErrorOf, lockVault, type CreatedKey } from '../lib/vaultKeys';
 import { ensureVaultReady, VAULT_KEY_CANCELLED } from './vaultKeyStore';
-import { backupBeforeReplacing, keepPendingForNewPassword, prepareOpenedVault, syncNow } from '../lib/sync/engine';
 import { hideSplash } from '../lib/splash';
 
 interface VaultStore {
@@ -64,8 +63,6 @@ interface VaultStore {
    * reloaded — the images are named differently. `null` if a running
    * edit should continue.
    */
-  /** The password changed on another device: this copy starts over under it. */
-  adoptServerPassword: (password: string) => Promise<void>;
   changePassword: (currentPassword: string, newPassword: string) => Promise<(CreatedKey & { reopenFailed?: true }) | null>;
   /** Locks the open vault and asks for the password right away — even if it is remembered. */
   lockActive: () => Promise<void>;
@@ -108,14 +105,13 @@ async function openActiveVault({ askPassword = false }: { askPassword?: boolean 
 
 /** What `openActiveVault` does past the password: the loading screen covers this part. */
 async function loadActiveVault(): Promise<void> {
-  // Before getDb(): the migrations on opening already need the new vault's
-  // language (see `loadForVault`). A missing vault folder already fails
-  // here.
+  // Before getDb(): its purge of the trash needs the vault's retention period
+  // (see `loadForVault`). The gate (`ensureVaultReady`) has opened the
+  // database and checked its schema already.
   await useSettingsStore.getState().loadForVault(useVaultStore.getState().activeVaultId);
-  // runMigrations is idempotent, so this is also what initialises a fresh vault.
   await getDb();
   // Tabs and history point into the old vault by entry ID — close everything,
-  // not just the active tab to Home.
+  // not just the active tab to "All entries".
   useUIStore.getState().closeAllTabs();
   loadVaultPrefs(useVaultStore.getState().activeVaultId);
   // The drafts of the new vault; those of the old one only leave memory.
@@ -127,7 +123,6 @@ async function loadActiveVault(): Promise<void> {
   // their text would be a leak that grows with every switch.
   clearSearchTextCache();
   clearEntrySummaryCache();
-  await prepareOpenedVault(useVaultStore.getState().activeVaultId);
   await reloadAllStores();
 }
 
@@ -197,8 +192,8 @@ export const useVaultStore = create<VaultStore>((set, get) => ({
       } else {
         detachVaultPrefs();
       }
-      // Unlocked and then not opened after all (e.g. a failing
-      // migration): the key does not stay in memory.
+      // Unlocked and then not opened after all (e.g. a vault from another
+      // version): the key does not stay in memory.
       void lockVault(id).catch((e) => console.warn('[vault] lock failed', e));
       throw err;
     }
@@ -306,31 +301,11 @@ export const useVaultStore = create<VaultStore>((set, get) => ({
     return dirRemoved;
   },
 
-  adoptServerPassword: async (password) => {
-    const id = get().activeVaultId;
-    if (!(await resolveOpenEdits())) return;
-    await drainSerialized();
-    await keepPendingForNewPassword();
-    await backupBeforeReplacing(id);
-    await detachDrafts();
-    try {
-      await withDbClosed(() => invoke('sync_adopt_new_password', { vaultId: id, password }));
-    } catch (err) {
-      // A wrong password changed nothing: the vault opens with its old key.
-      await restoreDrafts(id);
-      throw err;
-    }
-    await openActiveVault();
-  },
-
   changePassword: async (currentPassword, newPassword) => {
     const id = get().activeVaultId;
     // Like a switch: settle open edits, write drafts out —
     // the re-encryption rewrites them under the new key.
     if (!(await resolveOpenEdits())) return null;
-    // What other devices did since the last round would be lost in the snapshot
-    // that follows. Offline it stays a risk, not a reason to refuse.
-    await syncNow();
     await drainSerialized();
     await detachDrafts();
     let result: CreatedKey;

@@ -14,7 +14,7 @@ const loaders: Record<string, () => Promise<{ default: typeof en }>> = {
 
 /**
  * The single source for "which languages exist": Settings renders its
- * buttons from it, savedAppLanguage validates against it, changeAppLanguage
+ * buttons from it, the device settings validate against it, changeAppLanguage
  * rejects anything unknown. A new language means: entry here, loader above,
  * locale file — nothing else.
  */
@@ -33,12 +33,6 @@ const SUPPORTED = new Set<string>(LANGUAGE_OPTIONS.map((o) => o.code));
 // key sits only its mirror — the language of the last opened vault, which
 // `main.tsx` starts with before a vault is loaded.
 export const LANGUAGE_STORAGE_KEY = 'app-language';
-
-/** The language of the last opened vault, validated against LANGUAGE_OPTIONS. */
-export function savedAppLanguage(): string {
-  const stored = localStorage.getItem(LANGUAGE_STORAGE_KEY);
-  return stored && SUPPORTED.has(stored) ? stored : 'en';
-}
 
 i18n
   .use(initReactI18next)

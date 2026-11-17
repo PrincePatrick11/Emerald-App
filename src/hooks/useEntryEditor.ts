@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useRef } from 'react';
 import { editorSavesSuspended } from '../lib/editorLock';
-import { entryTypeForView, type ViewId } from '../lib/modules';
-import { revertEntryType } from '../lib/entryTypeChange';
+import type { ViewId } from '../lib/modules';
 import { serialKey, settled } from '../lib/serialize';
 import {
   baselineKey, baselineOf, baselines, beginDiscard, editIsDirty, endDiscard, isDiscarding, pendingEntryWrites, type BaselineFields,
@@ -11,9 +10,9 @@ import type { WriteOptions } from '../lib/stamp';
 
 /**
  * What `restoreOnCancel` reports instead of a state when the view no longer
- * shows this entry and editing has already ended: Cancel reverted a type
- * change, the user switched to another tab while the write-back was running,
- * or an earlier Cancel was faster. The view must then do nothing more — its
+ * shows this entry and editing has already ended: the entry was deleted, the
+ * user switched to another tab while the write-back was running, or an
+ * earlier Cancel was faster. The view must then do nothing more — its
  * own `setActiveView(…)` would point to a type/id pair that no longer
  * exists, or would take the WRONG tab there, and its local state already
  * belongs to the next entry.
@@ -22,14 +21,12 @@ export const EDIT_ENDED = 'edit-ended';
 
 /**
  * Debounced autosave, saving on navigating away and saving on unmount —
- * the editor lifecycle that JournalView, WikiView and OperationsView
- * previously each kept as their own ~80-line copy, with quietly drifting
- * details.
+ * the editor lifecycle of the entry page (`EntryView`).
  *
  * `buildPatch` is only called at the moment of saving and reads the view's
  * current local state plus the editor's content-mirror ref there. The hook
  * keeps the newest closure in a ref on every render; saving on navigating
- * away thus still sees the values of the PREVIOUS entry, because the views'
+ * away thus still sees the values of the PREVIOUS entry, because the view's
  * load effects only run after this hook's effects (the hook call comes
  * before them in the component body).
  *
@@ -150,15 +147,12 @@ export function useEntryEditor<TPatch extends BaselineFields, TRestore extends B
     const key = baselineKey(scope, entityId);
     const running = baselines.get(key);
     if (running) {
-      // Editing is already running. From now on this view reads the saved
-      // state: after a type change the state came along from another view,
-      // and that view's reader would no longer find the entry.
+      // Editing is already running (another tab, or this one remounted):
+      // from now on this view reads the saved state.
       running.stored = () => readStoredRef.current(entityId);
       return;
     }
-    // A new editing session: an earlier Cancel is over, including one that
-    // reverted the type. Not further up — the view that mounts between a type
-    // change and its reversal finds a state and must not save anything.
+    // A new editing session: an earlier Cancel is over.
     endDiscard(entityId);
     const patch = restoreFields(contentRef.current);
     baselines.set(key, {
@@ -175,13 +169,10 @@ export function useEntryEditor<TPatch extends BaselineFields, TRestore extends B
    * state back to store and DB, "last modified" included — whether anything
    * needs to be written at all is decided by the store (`needsWrite`). Returns
    * the baseline so the view can set its local state from it; null if there
-   * is nothing to return (no entry open, the write or the reversal failed) —
-   * the view then falls back to the store state and leaves edit mode anyway.
-   *
-   * If the entry changed type during this editing session, it goes back to
-   * its module with the entry-time state (`revertEntryType`). If the open
-   * page at the end no longer shows this entry in this view, the result is
-   * `EDIT_ENDED` (see there).
+   * is nothing to return (no entry open, the write failed) — the view then
+   * falls back to the store state and leaves edit mode anyway. If the open
+   * page at the end no longer shows this entry, the result is `EDIT_ENDED`
+   * (see there).
    *
    * While it writes, editing is locked (`withEditLock`) and no view saves
    * for this entry any more (`isDiscarding`).
@@ -192,39 +183,31 @@ export function useEntryEditor<TPatch extends BaselineFields, TRestore extends B
     if (!id) return null;
     const tabId = useUIStore.getState().activeTabId;
     beginDiscard(id);
-    type Outcome = { restored: TRestore | null; reverted: boolean };
-    const { restored, reverted } = await withEditLock(async (): Promise<Outcome> => {
+    const restored = await withEditLock(async (): Promise<TRestore | null> => {
       // An icon still being shrunk drops itself now that discarding has begun;
       // inside the lock, so the page stays locked from the click on.
       await pendingEntryWrites(id);
-      // A type change that is still writing already belongs to the editing
-      // session: only after it is it clear under which view its baseline lies.
+      // A category change from the panel that is still writing belongs to the editing session.
       await settled(serialKey('entry', id));
       const baseline = baselineOf(id);
-      // Only journal, wiki and operations change type — `type` then always exists.
-      const type = baseline && entryTypeForView(baseline.scope);
-      if (baseline?.origin && type) {
-        return { restored: null, reverted: await revertEntryType(id, type, baseline.origin, baseline.patch, baseline.stamp) };
-      }
       if (baseline) {
         await updateRef.current(id, baseline.patch as TRestore, { touch: baseline.stamp ?? true });
-        return { restored: baseline.patch as TRestore, reverted: false };
+        return baseline.patch as TRestore;
       }
       // No baseline any more: an earlier Cancel has already ended the editing.
       // What is saved is then the restored entry — not what the view still
       // had in front of it at the click.
-      return { restored: readStoredRef.current(id), reverted: false };
-    }).catch((e: unknown): Outcome => {
+      return readStoredRef.current(id);
+    }).catch((e: unknown): null => {
       console.error('[useEntryEditor] restore on cancel failed:', e);
-      return { restored: null, reverted: false };
+      return null;
     });
     // A keystroke during the await would have armed the timer again.
     cancelAutoSave();
 
-    // The entry no longer belongs to this view: reverted (also by an earlier
-    // Cancel) or deleted. Views are then still being torn down —
-    // the mark stays until the next editing session clears it.
-    const leftView = reverted || readStoredRef.current(id) === null;
+    // The entry is gone (deleted meanwhile): views are then still being torn
+    // down — the mark stays until the next editing session clears it.
+    const leftView = readStoredRef.current(id) === null;
     if (!leftView) endDiscard(id);
     const ui = useUIStore.getState();
     const stillOpen = ui.activeTabId === tabId && ui.activeView.type === scope && ui.activeView.id === id;
@@ -251,9 +234,7 @@ export function useEntryEditor<TPatch extends BaselineFields, TRestore extends B
       // If Cancel is discarding the entry right now, only the write is
       // skipped: timer and `prevRef` are cleared anyway — otherwise a later
       // run would write the state of the NEXT entry under the old id.
-      // The same if the entry no longer belongs to this view: after a type
-      // change `changeEntryType` has saved beforehand, and the state here
-      // still carries the chips with the old type.
+      // The same if the entry is gone (deleted meanwhile): there is nothing left to save into.
       const discarded = isDiscarding(prev.id) || readStoredRef.current(prev.id) === null;
       if (prev.id !== entityId) {
         // Navigated away while editing: the id has already changed in this

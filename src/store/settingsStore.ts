@@ -14,9 +14,8 @@ interface SettingsState {
   settings: VaultSettings;
 
   /** Reads a vault's settings and applies them. Runs at startup
-   *  and on every vault switch BEFORE the database is opened: migration
-   *  v39 translates a category name into the language of the boot mirror, and
-   *  only `changeAppLanguage` writes that here. */
+   *  and on every vault switch after the gate has checked the database and
+   *  before `getDb()`: its purge of the trash needs the retention period. */
   loadForVault: (vaultId: string) => Promise<void>;
   /** No vault open any more (failed switch, last vault removed):
    *  back to the defaults. Otherwise the interface would keep running with the
@@ -68,12 +67,11 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
     set({ vaultId, settings });
     // What this vault still holds from when language and theme were vault
     // settings: its custom themes join the device's, once; on the first start
-    // without a mirror its language and theme too. Awaited: migration v39
-    // needs the language.
+    // without a mirror its language and theme too.
     await useDeviceStore.getState().adoptFromVault(vaultId, stored?.appearance);
     await applyAppearance(settings.appearance);
     // Persist the initial values right away: otherwise the vault would get the
-    // migration snapshot again on the next open instead of what applied.
+    // snapshot of the old device settings again on the next open instead of what applied.
     if (!stored && !corrupt) await persist(vaultId, settings);
   },
 

@@ -1,12 +1,12 @@
 import {
-  GROUPING_MODES, HOME_COUNTS, HOME_VIEWS, SORT_MODES, TAGS_SORTS, VIEW_MODES, useUIStore,
-  type HomeSectionPrefs, type ListPrefs,
+  GROUPING_MODES, SORT_MODES, VIEW_MODES, useUIStore, type ListPrefs,
 } from './uiStore';
+import { COLLECTION_IDS, type CollectionId } from '../lib/modules';
+import { isRecord, oneOf } from '../lib/helpers';
 
 /**
  * The preferences of a vault: how each list looks (view, sorting,
- * grouping), the sections of the home page, which groups and sections
- * are collapsed. Permanent and per vault — another vault has different
+ * grouping), which groups and sections are collapsed. Permanent and per vault — another vault has different
  * categories and different habits.
  *
  * They live in the `uiStore`, as before; this module loads the fields when
@@ -20,16 +20,16 @@ import {
  * bar widths, which sidebars are open, the tabs —, which applies to the app
  * regardless of which vault is open.
  */
-/** The lists with view, sorting and grouping (`ListPrefs`). */
-const LIST_PREF_KEYS = [
-  'journalPrefs', 'wikiPrefs', 'operationsPrefs', 'tasksPrefs', 'trashPrefs',
-  'templatesPrefs', 'blocksPrefs', 'lexiconPrefs',
-] as const;
+/**
+ * The lists with view, sorting and grouping (`ListPrefs`). Every dashboard
+ * keeps its own in the dashboard's row; the collections keep theirs together
+ * in `collectionPrefs`.
+ */
+const LIST_PREF_KEYS = ['tasksPrefs', 'trashPrefs'] as const;
 
 const PREF_KEYS = [
   ...LIST_PREF_KEYS,
-  'homeJournalPrefs', 'homeOpsPrefs', 'homeWikiPrefs',
-  'tagsSort',
+  'collectionPrefs',
   'collapsedGroups', 'flags',
 ] as const;
 
@@ -51,30 +51,12 @@ function pick(s: UIState): Prefs {
   return Object.fromEntries(PREF_KEYS.map((key) => [key, s[key]])) as Prefs;
 }
 
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === 'object' && value !== null && !Array.isArray(value);
-
-/** `saved` if it is one of the allowed values, otherwise `fallback`. */
-function oneOf<T>(saved: unknown, allowed: readonly string[], fallback: T): T {
-  return typeof saved === 'string' && allowed.includes(saved) ? (saved as T) : fallback;
-}
-
 function listPrefs(saved: unknown, fallback: ListPrefs): ListPrefs {
   if (!isRecord(saved)) return fallback;
   return {
     view: oneOf(saved.view, VIEW_MODES, fallback.view),
     sort: oneOf(saved.sort, SORT_MODES, fallback.sort),
     grouping: oneOf(saved.grouping, GROUPING_MODES, fallback.grouping),
-  };
-}
-
-function homePrefs(saved: unknown, fallback: HomeSectionPrefs): HomeSectionPrefs {
-  if (!isRecord(saved)) return fallback;
-  return {
-    view: oneOf(saved.view, HOME_VIEWS, fallback.view),
-    sort: oneOf(saved.sort, SORT_MODES.filter((s) => s !== 'count_desc'), fallback.sort),
-    // Only what the menu offers — an older vault may still carry the old wiki default 6.
-    count: (HOME_COUNTS as readonly unknown[]).includes(saved.count) ? (saved.count as number) : fallback.count,
   };
 }
 
@@ -94,6 +76,10 @@ function parse(raw: string | null): Prefs {
   const lists = Object.fromEntries(
     LIST_PREF_KEYS.map((key) => [key, listPrefs(saved[key], DEFAULTS[key])]),
   ) as Pick<Prefs, (typeof LIST_PREF_KEYS)[number]>;
+  const savedCollections = isRecord(saved.collectionPrefs) ? saved.collectionPrefs : {};
+  const collectionPrefs = Object.fromEntries(
+    COLLECTION_IDS.map((id) => [id, listPrefs(savedCollections[id], DEFAULTS.collectionPrefs[id])]),
+  ) as Record<CollectionId, ListPrefs>;
   const collapsedGroups: Record<string, ReadonlySet<string>> = {};
   if (isRecord(saved.collapsedGroups)) {
     for (const [scope, ids] of Object.entries(saved.collapsedGroups)) {
@@ -107,10 +93,7 @@ function parse(raw: string | null): Prefs {
   return {
     ...DEFAULTS,
     ...lists,
-    homeJournalPrefs: homePrefs(saved.homeJournalPrefs, DEFAULTS.homeJournalPrefs),
-    homeOpsPrefs: homePrefs(saved.homeOpsPrefs, DEFAULTS.homeOpsPrefs),
-    homeWikiPrefs: homePrefs(saved.homeWikiPrefs, DEFAULTS.homeWikiPrefs),
-    tagsSort: oneOf(saved.tagsSort, TAGS_SORTS, DEFAULTS.tagsSort),
+    collectionPrefs,
     collapsedGroups,
     flags,
   };

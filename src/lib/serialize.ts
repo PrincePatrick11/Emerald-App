@@ -28,6 +28,12 @@ export function serialKey(
 }
 
 /**
+ * The one key of handing out entry numbers: `createEntry` reads the highest
+ * number and writes later, and the number is unique (`idx_entries_number`).
+ */
+export const ENTRY_NUMBER_KEY = serialKey('entry', '#new');
+
+/**
  * Waits until all currently queued chains have drained. For the
  * moments when the database is swapped out from under the stores
  * (vault switch, replace import): tasks that queue up afterwards must be

@@ -28,7 +28,7 @@ const cache = new Map<string, { stamp: string; text: string }>();
 
 const parser = new DOMParser();
 
-export function htmlToText(html: string): string {
+function htmlToText(html: string): string {
   if (!html) return '';
   const doc = parser.parseFromString(html, 'text/html');
   // TipTap emits neither, but imported content can carry both, and

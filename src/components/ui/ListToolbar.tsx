@@ -1,7 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import {
   ArrowDown10, ArrowDownAZ, ArrowDownZA, CalendarArrowDown, CalendarArrowUp, CalendarRange,
-  Layers, LayoutGrid, List, Search, StretchHorizontal, X, type LucideIcon,
+  GripVertical, Layers, LayoutGrid, List, Search, StretchHorizontal, X, type LucideIcon,
 } from 'lucide-react';
 import type { ViewMode, SortMode } from '../../store/uiStore';
 import type { DashboardGroupBy } from './Dashboard';
@@ -19,7 +19,8 @@ const VIEW_ICONS: Record<ViewMode, LucideIcon> = {
   timeline: CalendarRange,
 };
 /** Order of the sort select when the caller specifies no `sortModes`.
- *  `count_desc` is deliberately missing: only tags have anything to count. */
+ *  `count_desc` and `manual` are deliberately missing: only some collections
+ *  have anything to count or an order of their own. */
 const DEFAULT_SORT_MODES: readonly SortMode[] = ['date_desc', 'date_asc', 'alpha_asc', 'alpha_desc'];
 
 const SORT_ICONS: Record<SortMode, LucideIcon> = {
@@ -28,6 +29,7 @@ const SORT_ICONS: Record<SortMode, LucideIcon> = {
   alpha_asc: ArrowDownAZ,
   alpha_desc: ArrowDownZA,
   count_desc: ArrowDown10,
+  manual: GripVertical,
 };
 
 /** Which date a list's date sort compares; it comes first
@@ -127,6 +129,7 @@ function SortSelect<S extends SortMode>({ label, value, modes, onChange, dateFie
     alpha_asc: t('listView.sortAlphaAsc'),
     alpha_desc: t('listView.sortAlphaDesc'),
     count_desc: t('listView.sortCountDesc'),
+    manual: t('listView.sortManual'),
   };
   const options = modes.map((mode) => {
     const Icon: LucideIcon = SORT_ICONS[mode];

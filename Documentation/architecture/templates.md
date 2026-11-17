@@ -2,9 +2,9 @@
 
 ## Templates
 
-A **template** (`templates` table, v43, `store/templateStore.ts`) is a pre-filled entry: an optional title, a block stack (rows of `blocks` with `template_id` set, like an entry's), tags, and **assignments** — JSON `TemplateAssignment[]` (`lib/blocks/templates.ts`) of `{ entryType, category }`. `category` is a category id, `null` for "no category", or `'*'` for "all categories" (Journal, which has no categories, only uses `'*'`).
+A **template** (`templates` table, `store/templateStore.ts`) is a pre-filled entry: an optional title, a block stack (rows of `blocks` with `template_id` set, like an entry's) and tags.
 
-An assignment means one thing: new entries of this combination start with a copy of the template. At most one active template holds a combination. `assignTemplate` in `templateStore` enforces that itself (not the database, as with `block_definitions`): it takes the combination from its holder under one write key (`serialKey('template', '*')`), so a change touching two rows can't interleave with another write. `resolveAssignedTemplate` falls back from the exact category to `'*'` — one level for Journal, two for Wiki/Operations.
+Which template a new entry starts with is said by its category, not by the template: every category has at most one **start template** (`categories.template_id`), and the vault has one **default template** (setting `templates.defaultTemplateId`, `lib/vaultSettings.ts`) for entries without a category and categories without a start template of their own. `resolveStartTemplate` (`lib/blocks/templates.ts`) takes the category's, else the default — each only while it is active, so a template in the Trash counts as none and its categories fall back to the default meanwhile. Deleting a template for good clears it on its categories (`ON DELETE SET NULL`) and in the setting (`permanentlyDeleteTemplate`). All writes of `templateStore` run under one key (`serialKey('template', '*')`).
 
 ### Insertion is a copy
 
@@ -12,11 +12,11 @@ An assignment means one thing: new entries of this combination start with a copy
 
 ### Starting an entry
 
-`createEntry` starts from `startOfNewEntry(entryType, categoryId, blank)`, which resolves the assigned template and returns `{ title, content, tags, templateId }` via `templateStart`. Nothing applies with `blank` (imports and duplicates, which overwrite content anyway). The Sigils layout is no special case: `core-sigil` (`SIGIL_TEMPLATE_ID`) is a normal, editable, deletable template seeded for Operations × Sigils. `createItem` opens the new entry for editing, or for reading if the template's loaded sigil locks the whole entry.
+`createEntry` reads the start template of the entry's category from its row and starts from `startOfNewEntry(categoryTemplateId, blank)`, which resolves it with the vault's default and returns `{ title, content, tags, templateId }` via `templateStart`. Nothing applies with `blank` (imports and duplicates, which overwrite content anyway). The Sigils layout is no special case: `core-sigil` (`SIGIL_TEMPLATE_ID`) is a normal, editable, deletable template, seeded as the start template of the category Sigils (and `core-altar` as that of Altars). `createItem` opens the new entry for editing, or for reading if the template's loaded sigil locks the whole entry.
 
 `useTemplateNoticeStore` holds the "template applied" notice a new entry shows (Undo) — a store because the content stores set it and may not import a component. Undoing takes the template's title and tags back through `fieldsWithoutTemplate` (pure, no store reads).
 
-Creation is the only moment an assignment applies by itself. Changing an entry's category or type never touches its content.
+Creation is the only moment a start template applies by itself. Changing an entry's category never touches its content.
 
 ### Manual insertion
 
@@ -28,25 +28,15 @@ Creation is the only moment an assignment applies by itself. Changing an entry's
 
 ### The dashboard and the template page
 
-`TemplatesView` is a `Dashboard` of active templates under a collapsible `CollapsibleGroupHeader`, with view and sort in `uiStore.templatesPrefs` (a `ListPrefs` field, per vault — see [Tabs and Workspace State](navigation.md#tabs-and-workspace-state)). A row shows icon, name and an "Unsaved" marker; clicking opens `{ type: 'templates', id }`.
+`TemplatesView` is a collection (`CollectionDashboard`) of active templates under a collapsible `CollapsibleGroupHeader`, filtered by tag, with view and sort in `uiStore.collectionPrefs.templates` (per vault — see [Tabs and Workspace State](navigation.md#tabs-and-workspace-state)). A row shows icon, name and an "Unsaved" marker; clicking opens `{ type: 'templates', id }`.
 
 `TemplateEditor` renders that page on `LibraryPageFrame`, the shell it shares with `BlockDefinitionEditor` (back link, "Unsaved" marker, name-as-title input, `EditActionBar`/ `SidebarColumn` portalled into the right sidebar). Its draft lifecycle is `useDraftPage`:
 
 - The draft lives in a `DraftStore<T>` (`createDraftStore<T>()` in `store/draftStore.ts`, behind `useBlockDraftStore` and `useTemplateDraftStore`), so edits survive `MainArea` unmounting the view on a module switch.
 - "Done" writes only the fields that changed since the page opened (names compared trimmed), so a tag renamed meanwhile isn't overwritten.
 
-Templates have no description; the picker matches the name only. `useShrunkIcon` (shrink an image icon to icon size, last write wins) and `TagsField` (the edit-mode "Tags" section) are shared with the other pages.
+Templates have no description; the picker matches the name only. `useShrunkIcon` (store an image icon as a 128px file in `icons/`, last write wins) and `TagsField` (the edit-mode "Tags" section) are shared with the other pages.
 
-### The assignment table
+### Start and default template in the interface
 
-`AssignmentGrid` is the one table assignments are read and set in. `TemplateAssignmentTable` shows it below the list and stays away while there are no templates; `TemplateAssignmentProperty` opens it in a modal from a template's page, where a click toggles that template in a cell. Both apply at once, outside the page's draft.
-
-- Journal first on its own, as one "Every new entry" row — as a table column it would stand almost empty.
-- Then a table with Wiki/Operations as columns and one row per "All categories"/ "Uncategorized"/category. "All categories", every row's fallback, is set off by a bold name only (a tinted band was too loud).
-- On the dashboard a cell is a `Dropdown` of all templates and "No template"; a choice calls `assignTemplate` and is saved at once. Without a template of its own the cell shows the fallback ("↳ name"), or "—".
-
-### Routines converted to templates
-
-Migration v44 (`migrateRoutinesToTemplates`) turns every row of the old `routines` table into an unassigned template with the same id, then drops the table (backing up the database first if there was anything to convert). Markdown is parsed by a dedicated `Marked` renderer with raw HTML escaped and only `http(s)`/`mailto` links kept; `operation_ids`/`wiki_ids` become link-chip blocks (`internalLinkBlockHtml`); tags carry over.
-
-A `.emeralddb` below backup version `'8'` with `routines` is converted the same way at import (`withRoutinesAsTemplates`, `dbBackup.ts`), but only *after* the type and category filters, since a link target must be in the file or already in the vault to survive. An add-vault import of such a file keeps the fresh vault's `core-sigil`; a file from `'8'` on that brings templates replaces it with its own version (or its absence).
+A category's start template is chosen in its dialog under Categories (`CategoryEditModal`: "Default template" or a template), saved on Save; a start template in the Trash stays stored unless another one is picked, so it comes back with its category. The built-in categories have only the template to change there. The default template is a `TemplateSelect` below the template list (`DefaultTemplateSection`, a `DashboardSection`), shown while there are templates, and applies at once. `TemplateSelect` shows a template in the Trash as none, the rule `resolveStartTemplate` applies.

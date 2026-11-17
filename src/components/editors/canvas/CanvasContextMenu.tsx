@@ -9,7 +9,7 @@ import type { CanvasFeatures } from './features';
 import type { CanvasElement } from './types';
 import { deleteKey, keys } from './shortcuts';
 
-export interface CanvasMenuContext {
+interface CanvasMenuContext {
   t: TFunction;
   features: CanvasFeatures;
   /** What the menu acts on: the selection, after the right click picked what was under it. */

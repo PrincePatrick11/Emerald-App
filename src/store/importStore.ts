@@ -1,17 +1,16 @@
 import { create } from 'zustand';
 
-export type ImportDestinationType = 'journal' | 'wiki' | 'operations';
 
 interface PendingImportChoice {
   title: string;
-  resolve: (type: ImportDestinationType | null) => void;
+  resolve: (dashboardId: string | null) => void;
 }
 
 interface ImportState {
   pending: PendingImportChoice | null;
-  /** Opens the destination picker and resolves once the user picks a type or cancels (null). */
-  askDestination: (title: string) => Promise<ImportDestinationType | null>;
-  choose: (type: ImportDestinationType) => void;
+  /** Opens the destination picker and resolves with the chosen dashboard's ID, or null on cancel. */
+  askDestination: (title: string) => Promise<string | null>;
+  choose: (dashboardId: string) => void;
   cancel: () => void;
 }
 
@@ -24,8 +23,8 @@ export const useImportStore = create<ImportState>((set, get) => ({
     });
   },
 
-  choose: (type) => {
-    get().pending?.resolve(type);
+  choose: (dashboardId) => {
+    get().pending?.resolve(dashboardId);
     set({ pending: null });
   },
 

@@ -3,7 +3,7 @@ import { useUIStore, type EditActions } from '../store/uiStore';
 import { useLeaveGuardStore, withoutLeaveGuard } from '../store/leaveGuardStore';
 
 /** What a view registers: its handlers, plus the guard for leaving with changes. */
-export interface EditHandlers extends EditActions {
+interface EditHandlers extends EditActions {
   /**
    * What the page is asked with before it is left with changes
    * (`leaveGuardStore`): "Save" calls `onSave`, "Discard" calls `onCancel`.
@@ -38,7 +38,6 @@ export function useEditActions(active: boolean, handlers: EditHandlers): void {
       onSave: () => unguarded(() => handlersRef.current.onSave()),
       onCancel: () => unguarded(() => handlersRef.current.onCancel()),
       onDelete: handlersRef.current.onDelete ? () => unguarded(() => handlersRef.current.onDelete?.()) : undefined,
-      flush: handlersRef.current.flush ? async () => { await handlersRef.current.flush?.(); } : undefined,
     });
     if (key) {
       useLeaveGuardStore.getState().setGuard({

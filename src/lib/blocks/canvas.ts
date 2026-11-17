@@ -1,8 +1,9 @@
-import { generateId } from '../helpers';
+import { generateId, isRecord } from '../helpers';
 import { escapeHtml } from '../internalLinkHtml';
 import { ALTAR_LIBRARY_TAG_ID, storedImageName } from '../schema';
 import { paintDocToJson, type PaintDoc } from '../paint/document';
 import { createTextBlock, decodeHtmlAttr } from './blockHtml';
+import { readBlockJson } from './blockJson';
 import { BLOCK_ATTR, type BlockInstance, type BlockTypeId } from './types';
 
 /**
@@ -36,8 +37,8 @@ export function isCanvasBlockType(type: string): boolean {
 }
 
 /** The artboard of a new canvas, in its own pixels. */
-export const CANVAS_BLOCK_WIDTH = 1600;
-export const CANVAS_BLOCK_HEIGHT = 1000;
+const CANVAS_BLOCK_WIDTH = 1600;
+const CANVAS_BLOCK_HEIGHT = 1000;
 
 /**
  * The parts a canvas block offers; painting covers the drawing element and
@@ -52,10 +53,10 @@ export interface CanvasParts {
   drawing: boolean;
 }
 
-export const ALL_CANVAS_PARTS: CanvasParts = { images: true, shapes: true, text: true, symbols: true, drawing: true };
+const ALL_CANVAS_PARTS: CanvasParts = { images: true, shapes: true, text: true, symbols: true, drawing: true };
 
 /** What a block of the type offers until its settings say otherwise: a plain canvas without "Images" below. */
-export function defaultCanvasParts(type: string): CanvasParts {
+function defaultCanvasParts(type: string): CanvasParts {
   return type === ALTAR_BLOCK_TYPE ? ALL_CANVAS_PARTS : { ...ALL_CANVAS_PARTS, images: false };
 }
 export const CANVAS_PART_KEYS = Object.keys(ALL_CANVAS_PARTS) as (keyof CanvasParts)[];
@@ -94,7 +95,7 @@ export interface CanvasScene {
   guidesLocked: boolean;
 }
 
-export interface CanvasBlock {
+interface CanvasBlock {
   /** Unreadable data: shown as it is, never overwritten. */
   broken: boolean;
   scene: CanvasScene;
@@ -103,20 +104,6 @@ export interface CanvasBlock {
   stripTag: string;
   /** The rendered picture, or `null`. */
   render: string | null;
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
-function readJson(raw: string | undefined): { broken: boolean; value: Record<string, unknown> } {
-  if (raw === undefined) return { broken: false, value: {} };
-  try {
-    const value: unknown = JSON.parse(raw);
-    return isRecord(value) ? { broken: false, value } : { broken: true, value: {} };
-  } catch {
-    return { broken: true, value: {} };
-  }
 }
 
 const finite = (v: unknown, fallback: number) => (typeof v === 'number' && Number.isFinite(v) ? v : fallback);
@@ -167,8 +154,8 @@ const RENDER = 'render';
 const IMG_RE = /<img\b[^<>]{0,2048}>/gi;
 
 export function parseCanvasBlock(block: BlockInstance): CanvasBlock {
-  const data = readJson(block.attrs[BLOCK_ATTR.data]);
-  const config = readJson(block.attrs[BLOCK_ATTR.config]);
+  const data = readBlockJson(block.attrs[BLOCK_ATTR.data]);
+  const config = readBlockJson(block.attrs[BLOCK_ATTR.config]);
   const d = data.value;
   let render: string | null = null;
   for (const [tag] of block.html.matchAll(IMG_RE)) {
@@ -234,14 +221,14 @@ export function withCanvasScene(block: BlockInstance, scene: CanvasScene, render
 }
 
 export function withCanvasParts(block: BlockInstance, parts: CanvasParts): BlockInstance {
-  const config = readJson(block.attrs[BLOCK_ATTR.config]).value;
+  const config = readBlockJson(block.attrs[BLOCK_ATTR.config]).value;
   const tag = typeof config.tag === 'string' ? { tag: config.tag } : {};
   return { ...block, attrs: { ...block.attrs, [BLOCK_ATTR.config]: JSON.stringify({ ...parts, ...tag }) } };
 }
 
 /** The block with another tag for "Images" below ('' for all). */
 export function withCanvasStripTag(block: BlockInstance, tag: string): BlockInstance {
-  const config = readJson(block.attrs[BLOCK_ATTR.config]).value;
+  const config = readBlockJson(block.attrs[BLOCK_ATTR.config]).value;
   const parts = readParts(config, block.type);
   return { ...block, attrs: { ...block.attrs, [BLOCK_ATTR.config]: JSON.stringify({ ...parts, tag }) } };
 }
@@ -272,7 +259,7 @@ export function createCanvasBlock(type: typeof CANVAS_BLOCK_TYPE | typeof ALTAR_
 /** The night an altar starts on: a radial gradient from a dark blue, as the altars of old had. */
 const ALTAR_NIGHT = { fill: { kind: 'radial', colors: ['#1e1e3c', '#0f0f1e', '#0a0a0f'], cx: 0.5, cy: 0.25 }, image: null, tint: null };
 
-/** What an operation of the "Altars" category starts with (the template `core-altar`): an altar on its night, and a text for notes. */
+/** What an entry of the "Altars" category starts with (the template `core-altar`): an altar on its night, and a text for notes. */
 export function altarBlockSet(): BlockInstance[] {
   const altar = createCanvasBlock(ALTAR_BLOCK_TYPE);
   const { scene, render } = parseCanvasBlock(altar);
