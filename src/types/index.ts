@@ -119,7 +119,7 @@ export type MoonPhase =
   | 'waning_crescent';
 
 /**
- * A picture of "Images" with details (`images`, since v56): a stored file of
+ * A picture of "Images" with details (`images`): a stored file of
  * the vault with a name, tags and a note. Every other file of the vault is
  * listed too, unnamed, as `StoredImage` from the folder.
  */
@@ -147,7 +147,7 @@ export interface TaskLink {
 export interface Task {
   id: string;
   title: string;
-  /** `null` = no category, the normal case for a new entry since v39. */
+  /** `null` = no category, the normal case for a new entry. */
   category_id: string | null;
   priority: TaskPriority;
   completed: boolean;

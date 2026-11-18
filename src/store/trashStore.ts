@@ -150,8 +150,7 @@ export const useTrashStore = create<TrashState>((set, get) => ({
 
     // Categories last, and only after their remaining contents have been
     // reassigned. Previously the rows were simply deleted and everything that still
-    // pointed at them kept a category_id without a counterpart. Since v33,
-    // ON DELETE RESTRICT blocks that — which, without this step, would leave the trash stuck
+    // pointed at them kept a category_id without a counterpart. ON DELETE RESTRICT blocks that — which, without this step, would leave the trash stuck
     // with an error message.
     const doomed = new Set(
       (await db.select<{ id: string }[]>(`SELECT id FROM categories WHERE deleted_at IS NOT NULL`))

@@ -1420,12 +1420,26 @@
     "unsupported": "Este archivo no es un archivo de Emerald que esta versión pueda leer. No se ha cambiado nada.",
     "tooLarge": "Este archivo es demasiado grande o tiene demasiadas partes para importarlo. No se ha cambiado nada.",
     "failed": "La importación ha fallado. Las entradas y plantillas ya creadas se han vuelto a eliminar.",
-    "done": "Importación completada – entradas: {{entries}}, plantillas: {{templates}}."
+    "done": "Importación completada – entradas: {{entries}}, plantillas: {{templates}}.",
+    "readFailed": "No se pudo leer el archivo: {{error}}",
+    "markdownFailed": "La importación ha fallado: {{error}}",
+    "markdownDone": "Se ha importado la entrada."
   },
   "emeraldExport": {
     "title": "Exportar",
     "openEntryFirst": "Abre primero una entrada.",
-    "openTemplateFirst": "Abre primero una plantilla."
+    "openTemplateFirst": "Abre primero una plantilla.",
+    "pdfSaved": "PDF guardado:\n{{path}}",
+    "failed": "{{kind}} fallido",
+    "nothing": "No hay nada que exportar.",
+    "kinds": {
+      "pdf": "Exportación a PDF",
+      "markdown": "Exportación a Markdown",
+      "emerald": "Exportación de Emerald",
+      "emeraldImport": "Importación de Emerald",
+      "markdownImport": "Importación de Markdown",
+      "canvas": "Dibujo"
+    }
   },
   "emeraldKey": {
     "title": "Abrir archivo de Emerald",

@@ -63,7 +63,7 @@ async function exportTemplate(id: string): Promise<void> {
     const { exportTemplateAsEmerald } = await import('../../lib/emeraldFormat');
     await exportTemplateAsEmerald(id);
   } catch (e) {
-    await exportErrorMessage(e, 'Emerald export');
+    await exportErrorMessage(e, 'emerald');
   }
 }
 

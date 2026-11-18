@@ -34,8 +34,7 @@ export interface SearchSnippet {
 export interface SearchHit {
   /**
    * Stable identity of a hit, unique across the whole result list — `kind`
-   * plus `id`. (Until v38 the four category tables shipped the same built-in
-   * ids, and the module had to be part of the key; there is one list now.)
+   * plus `id`.
    */
   key: string;
   kind: SearchKind;

@@ -1,5 +1,5 @@
 /**
- * The lexicon: the languages (table `languages`, since v45) and their vocabulary
+ * The lexicon: the languages (table `languages`) and their vocabulary
  * (`lexicon_entries`). One store for both, because the vocabulary is nothing
  * without its language and every view always needs both — the dashboard
  * counts them, the language page lists them, the translate field reads them.

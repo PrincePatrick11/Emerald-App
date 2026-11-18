@@ -268,7 +268,7 @@ export default function CanvasBlock({ block, isEditing, onBlockChange, onPersist
         if (!dataUrl) throw new Error('rendering the picture failed');
         return savePictureAs(dataUrl, options.format, t(`blocks.types.${current.type === ALTAR_BLOCK_TYPE ? 'altar' : 'canvas'}.label`));
       })
-      .catch((e: unknown) => exportErrorMessage(e, 'Canvas picture'));
+      .catch((e: unknown) => exportErrorMessage(e, 'canvas'));
   }, [profile.types, t]);
 
   // The tool column's button: pictures from "Images" or the disk (the picture

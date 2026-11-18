@@ -1420,12 +1420,26 @@
     "unsupported": "This file is not an Emerald file this version can read. Nothing was changed.",
     "tooLarge": "This file is too large or has too many parts to import. Nothing was changed.",
     "failed": "The import failed. The entries and templates it had already created were removed again.",
-    "done": "Import finished – entries: {{entries}}, templates: {{templates}}."
+    "done": "Import finished – entries: {{entries}}, templates: {{templates}}.",
+    "readFailed": "The file could not be read: {{error}}",
+    "markdownFailed": "The import failed: {{error}}",
+    "markdownDone": "The entry was imported."
   },
   "emeraldExport": {
     "title": "Export",
     "openEntryFirst": "Open an entry first.",
-    "openTemplateFirst": "Open a template first."
+    "openTemplateFirst": "Open a template first.",
+    "pdfSaved": "PDF saved:\n{{path}}",
+    "failed": "{{kind}} failed",
+    "nothing": "There is nothing to export.",
+    "kinds": {
+      "pdf": "PDF export",
+      "markdown": "Markdown export",
+      "emerald": "Emerald export",
+      "emeraldImport": "Emerald import",
+      "markdownImport": "Markdown import",
+      "canvas": "Canvas picture"
+    }
   },
   "emeraldKey": {
     "title": "Open Emerald file",

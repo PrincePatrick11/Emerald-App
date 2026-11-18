@@ -35,9 +35,8 @@ export function categoryLabel(
  * not even one just created: it is managed in the
  * categories view and assigned on the entry.
  *
- * Until v39 the catch-all `other` was always included, because every entry had to carry a
- * category and the tab bar needed a target. Entries without a
- * category are now collected by the "Uncategorized" bucket.
+ * There is no catch-all category: entries without a
+ * category are collected by the "Uncategorized" bucket.
  */
 export function categoriesUsedBy<C extends { id: string }>(
   all: readonly C[],
@@ -92,7 +91,7 @@ export function categoryUsageCounts(sources: CategorySources): Map<string, Categ
 
 /**
  * Are there entries without a category? Two cases, the same bucket: the entry
- * carries none at all (`null` — since v39 the normal case for a new one), or its
+ * carries none at all (`null` — the normal case for a new one), or its
  * category is in the trash and no longer resolves.
  *
  * These are the ones `groupByCategory` sorts into the "Uncategorized" bucket.

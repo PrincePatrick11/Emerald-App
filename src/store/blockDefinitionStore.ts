@@ -1,6 +1,5 @@
 /**
- * The custom blocks of the blocks view (table `block_definitions`, since
- * v40). A definition is only the template — inserted blocks are copies in the
+ * The custom blocks of the blocks view (table `block_definitions`). A definition is only the template — inserted blocks are copies in the
  * content of their entry (see `lib/blocks/definitions.ts`). Deleting,
  * restoring and changing therefore touch no entry.
  *

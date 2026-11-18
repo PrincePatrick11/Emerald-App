@@ -61,7 +61,7 @@ const stores: { kind: DraftKind; store: DraftStore<unknown>; normalize: Normaliz
  * writes with a delay, could not promise that), and the content of a vault
  * stays in its folder.
  */
-/** 2 since v53: template drafts carry tag IDs instead of names (a 1 is converted on read). */
+/** 2: template drafts carry tag IDs instead of names (a 1 is converted on read). */
 const DRAFTS_VERSION = 2;
 const PERSIST_DELAY_MS = 400;
 
@@ -134,7 +134,7 @@ function readKind(raw: unknown, normalize: Normalize<unknown>): Record<string, D
 }
 
 /**
- * A file from before v53: the template drafts carry tag names. They become
+ * An older file: the template drafts carry tag names. They become
  * IDs of this vault's tags (case-insensitively); a name without
  * a tag is dropped.
  */

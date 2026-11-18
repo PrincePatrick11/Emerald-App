@@ -346,7 +346,7 @@ export async function exportAsPDF(data: ExportData): Promise<void> {
 
   try {
     await invoke('export_pdf', { html: fullHtml, path });
-    await message(`PDF saved:\n${path}`, { title: 'Export', kind: 'info' });
+    await message(i18n.t('emeraldExport.pdfSaved', { path }), { title: i18n.t('emeraldExport.title'), kind: 'info' });
   } catch (err) {
     console.error('[emerald] export_pdf: failed', err);
     throw err; // re-throw so the caller's exportErrorMessage shows a toast
@@ -447,13 +447,16 @@ export async function exportAsMarkdown(data: ExportData): Promise<void> {
 // ── guard ──────────────────────────────────────────────────────────────────
 
 export async function noEntryMessage(): Promise<void> {
-  await message('Please open an entry first.', {
-    title: 'Export', kind: 'info',
+  await message(i18n.t('emeraldExport.openEntryFirst'), {
+    title: i18n.t('emeraldExport.title'), kind: 'info',
   });
 }
 
 /** Show a non-blocking error toast for an export failure. */
-export async function exportErrorMessage(err: unknown, kind: string): Promise<void> {
+export async function exportErrorMessage(
+  err: unknown,
+  kind: 'pdf' | 'markdown' | 'emerald' | 'emeraldImport' | 'markdownImport' | 'canvas',
+): Promise<void> {
   const detail = err instanceof Error ? err.message : String(err);
-  await message(detail, { title: `${kind} failed`, kind: 'error' });
+  await message(detail, { title: i18n.t('emeraldExport.failed', { kind: i18n.t(`emeraldExport.kinds.${kind}`) }), kind: 'error' });
 }

@@ -118,7 +118,7 @@ export async function runMenuAction(id: SelfContainedMenuActionId): Promise<void
       const { collectExportData } = await import('./exportData');
       const data = await collectExportData();
       if (!data) { noEntryMessage(); return; }
-      exportAsPDF(data).catch((err) => exportErrorMessage(err, 'PDF export'));
+      exportAsPDF(data).catch((err) => exportErrorMessage(err, 'pdf'));
       return;
     }
     case 'export-markdown': {
@@ -126,25 +126,25 @@ export async function runMenuAction(id: SelfContainedMenuActionId): Promise<void
       const { collectExportData } = await import('./exportData');
       const data = await collectExportData();
       if (!data) { noEntryMessage(); return; }
-      exportAsMarkdown(data).catch((err) => exportErrorMessage(err, 'Markdown export'));
+      exportAsMarkdown(data).catch((err) => exportErrorMessage(err, 'markdown'));
       return;
     }
     case 'export-emerald': {
       const { exportErrorMessage } = await import('./export');
       const { exportAsEmerald } = await import('./emeraldFormat');
-      exportAsEmerald().catch((err) => exportErrorMessage(err, 'Emerald export'));
+      exportAsEmerald().catch((err) => exportErrorMessage(err, 'emerald'));
       return;
     }
     case 'import-markdown': {
       const { exportErrorMessage } = await import('./export');
       const { importFromMarkdown } = await import('./emeraldFormat');
-      importFromMarkdown().catch((err) => exportErrorMessage(err, 'Markdown import'));
+      importFromMarkdown().catch((err) => exportErrorMessage(err, 'markdownImport'));
       return;
     }
     case 'import-emerald': {
       const { exportErrorMessage } = await import('./export');
       const { importFromEmerald } = await import('./emeraldFormat');
-      importFromEmerald().catch((err) => exportErrorMessage(err, 'Emerald import'));
+      importFromEmerald().catch((err) => exportErrorMessage(err, 'emeraldImport'));
       return;
     }
     default: {

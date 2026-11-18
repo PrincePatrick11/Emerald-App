@@ -62,8 +62,7 @@ export function schemeUrl(path: string): string {
  * Image references in HTML.
  *
  * Four places used to each spell out this `src` pattern on their own:
- * the backup export, the `.emerald` export, `embedImages` for PDF/Markdown and
- * migration v35. They differ only in what they do with the match.
+ * the backup export, the `.emerald` export, and `embedImages` for PDF/Markdown. They differ only in what they do with the match.
  */
 const SRC_ATTR_RE = /src="([^"]+)"/g;
 

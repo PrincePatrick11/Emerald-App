@@ -107,9 +107,7 @@ export const useCategoryStore = create<CategoryState>((set, get) => ({
       return get().categories.find((c) => c.id === restoredId)!;
     }
 
-    // To the end. Until v39, new ones were inserted before the catch-all `other`
-    // so that it always stayed last — since it became an ordinary category, there
-    // is no reason for that any more, and the order belongs to the
+    // To the end: there is no catch-all that has to stay last, and the order belongs to the
     // user anyway (dragging in the categories view).
     const last = get().categories[get().categories.length - 1];
     const sortOrder = (last?.sort_order ?? -1) + 1;

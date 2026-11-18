@@ -42,7 +42,7 @@ export function findEntryLinkPos(doc: ProseMirrorNode, target: { id: string; tar
  * get two blocks.
  *
  * What the block looks like is defined by `internalLinkBlockHtml`, one definition for
- * the insertion here and for the v36/v37 migrations, which have to write the same blocks without an
+ * the insertion here and for the converters, which have to write the same blocks without an
  * editor.
  *
  * If the entry is still empty, the divider is omitted and the empty paragraph is

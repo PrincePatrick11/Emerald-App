@@ -10,7 +10,7 @@ import type Database from './sqlite';
 
 /**
  * The oldest schema this version opens. Everything below came out of the old
- * migration chain (v1–v66), which is gone: such a vault is recognised and
+ * schema history, which is gone: such a vault is recognised and
  * refused, not changed (`VAULT_OUTDATED` in `db.ts`). So are v100, the first
  * fresh schema, which still told entries apart by a type, and v101, which kept
  * tags as JSON and icons as data URLs in the rows: neither was released.

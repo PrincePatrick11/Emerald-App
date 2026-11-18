@@ -6,7 +6,7 @@ import { withMappedChargeTargets } from './sigil';
 import { TEXT_BLOCK_TYPE, type BlockInstance } from './types';
 
 /**
- * Templates (table `templates`, since v43): a prefilled entry —
+ * Templates (table `templates`): a prefilled entry —
  * optional title, block stack with content, tags — that is applied when
  * creating an entry or later on the entry page.
  *

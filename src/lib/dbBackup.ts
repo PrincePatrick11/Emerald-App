@@ -68,8 +68,7 @@ import { useDeviceStore } from '../store/deviceStore';
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
- * Which entries come along, by category — the packing list instead of the
- * former entry types. `categoryIds` null: every category; otherwise only
+ * Which entries come along, by category — the packing list. `categoryIds` null: every category; otherwise only
  * these. `includeUncategorized`: entries without a category, and those whose
  * category is not among the categories at hand (in the trash, or not in the file).
  */

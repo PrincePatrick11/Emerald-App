@@ -1,5 +1,5 @@
 /**
- * The templates of the templates dashboard (table `templates`, since v43). A
+ * The templates of the templates dashboard (table `templates`). A
  * template only takes effect on insertion — what an entry gets is a copy
  * (see `lib/blocks/templates.ts`). Deleting, restoring and changing
  * therefore touch no entry.

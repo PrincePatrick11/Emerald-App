@@ -3,7 +3,7 @@ import { isSymbolPath, MAX_WEIGHT, MIN_WEIGHT } from '../components/editors/canv
 /** The longest name a symbol keeps — on saving, renaming and reading alike. */
 export const SYMBOL_NAME_MAX = 80;
 
-/** A symbol of the vault's own, as the table `symbols` holds it (since v59). */
+/** A symbol of the vault's own, as the table `symbols` holds it. */
 export interface UserSymbol {
   id: string;
   name: string;

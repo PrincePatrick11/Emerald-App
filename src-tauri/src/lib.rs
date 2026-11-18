@@ -364,7 +364,7 @@ async fn ensure_app_storage_dirs(app: tauri::AppHandle) -> Result<(), String> {
 /// `#[cfg(target_os = "…")]` re-export so this is a one-liner.
 ///
 /// The frontend first prompts the user for a save location via the
-/// `dialog` plugin and passes the chosen path here. The pre-migration
+/// `dialog` plugin and passes the chosen path here. The earlier
 /// implementation bundled a `wkhtmltopdf.exe` subprocess (~42 MB, LGPL,
 /// 2015-era Qt WebKit, no working macOS build); it was replaced because
 /// the app's own WebView2 / WKWebView / WebKitGTK does the same job

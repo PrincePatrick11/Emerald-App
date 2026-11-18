@@ -6,8 +6,8 @@ import { isPositionKey, positionsFor } from './blocks/position';
 import { TEXT_BLOCK_TYPE, type BlockInstance } from './blocks/types';
 
 /**
- * The blocks of entries and templates as rows (`blocks`, `block_refs`, since
- * v65) — reading, and writing only what changed. Since v66 the rows are the
+ * The blocks of entries and templates as rows (`blocks`, `block_refs`) —
+ * reading, and writing only what changed. The rows are the
  * only record: there is no `content` column any more. In memory the stores
  * still carry an owner's blocks as one string (`contentOf`, the block HTML of
  * `serializeBlocks`), the form `.emerald`, export and backup files hold too.

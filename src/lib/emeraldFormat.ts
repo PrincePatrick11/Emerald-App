@@ -225,7 +225,7 @@ export async function writeEmeraldFile(path: string, options: EmeraldExportOptio
     files.icons.forEach((name) => icons.add(name));
     if (isIconFile(built.manifest.icon)) icons.add(built.manifest.icon);
   }
-  if (items.length === 0) throw new Error('Nothing to export.');
+  if (items.length === 0) throw new Error(i18n.t('emeraldExport.nothing'));
 
   const images: Array<{ name: string; dataUrl?: string }> = [];
   const omittedImages: string[] = [];
@@ -690,7 +690,7 @@ export async function importFromMarkdown(): Promise<void> {
   try {
     raw = await invoke<string>('read_file', { path: filePath });
   } catch (e) {
-    await message(`Failed to read file: ${e}`, { title: 'Import', kind: 'error' });
+    await message(i18n.t('emeraldImport.readFailed', { error: String(e) }), { title: i18n.t('emeraldImport.title'), kind: 'error' });
     return;
   }
 
@@ -737,13 +737,13 @@ export async function importFromMarkdown(): Promise<void> {
   try {
     newId = await importMarkdownEntry(dashboardId, categoryName, title, html, tagIds);
   } catch (e) {
-    await message(`Import failed: ${e}`, { title: 'Import', kind: 'error' });
+    await message(i18n.t('emeraldImport.markdownFailed', { error: String(e) }), { title: i18n.t('emeraldImport.title'), kind: 'error' });
     return;
   }
 
   await reloadModules(['entries']);
   useUIStore.getState().setActiveView(entryView(newId, dashboardId));
-  await message('Entry imported successfully!', { title: 'Import', kind: 'info' });
+  await message(i18n.t('emeraldImport.markdownDone'), { title: i18n.t('emeraldImport.title'), kind: 'info' });
 }
 
 /**

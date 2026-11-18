@@ -5,8 +5,7 @@ import { serialized } from '../lib/serialize';
 import { readUserSymbol, SYMBOL_NAME_MAX, type UserSymbol } from '../lib/userSymbols';
 
 /**
- * The vault's own symbols for the canvas editor's library (table `symbols`,
- * since v59), newest first. Made from drawings; shown and renamed in the
+ * The vault's own symbols for the canvas editor's library (table `symbols`), newest first. Made from drawings; shown and renamed in the
  * collection "Symbols"; removing one takes it out at once, and
  * `restoreSymbol` puts it back for undo.
  */

@@ -21,7 +21,7 @@ interface Props<C extends { id: string; emoji: string }> {
  * and an OS popup next to the remaining priority menu of the TaskRow would
  * clash. The trigger is an inline chip in the TaskRow.
  *
- * At the very top is "No category", since v39 a real state and no longer
+ * At the very top is "No category", a real state and not
  * merely the display text for a category that no longer exists. It is
  * also what a new entry starts with.
  */
