@@ -148,6 +148,18 @@ export function firstCategoryOf(
 }
 
 /**
+ * The tag a new entry created in the dashboard starts with: the first of its
+ * filter that still exists — `null` if it filters by none. Without it the entry
+ * would not pass the tag filter and vanish from the dashboard it was made in.
+ */
+export function firstTagOf(
+  dashboard: Pick<Dashboard, 'filter'> | undefined,
+  existing: ReadonlySet<string>,
+): string | null {
+  return dashboard?.filter.tags?.find((id) => existing.has(id)) ?? null;
+}
+
+/**
  * The date a dashboard sorts its entries by — and therefore the one its list,
  * the left list and the entry page's header show: the creation date for a
  * dashboard sorted by it, else "last changed".

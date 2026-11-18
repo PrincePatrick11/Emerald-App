@@ -48,7 +48,8 @@ export async function applyTemplateFields(
 
 /**
  * Undo after an automatically applied template (`fieldsWithoutTemplate`)
- * — for a freshly created entry it carried none of its tags beforehand.
+ * — for a freshly created entry it carried none of the template's tags beforehand,
+ * unless a dashboard's start tag is one of them (Undo then removes it too).
  * The stack clears the blocks.
  */
 export async function undoTemplateFields(

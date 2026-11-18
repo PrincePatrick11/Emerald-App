@@ -41,9 +41,10 @@ interface EntryState {
   ensureEntryContent: (id: string) => Promise<void>;
   /**
    * A new entry in `categoryId`, starting with that category's start template
-   * or the vault's default (`resolveStartTemplate`) — unless `blank`.
+   * or the vault's default (`resolveStartTemplate`) — unless `blank`. `tagIds`
+   * come on top of the template's tags.
    */
-  createEntry: (opts?: { categoryId?: string | null; blank?: boolean; createdAt?: string }) => Promise<Entry>;
+  createEntry: (opts?: { categoryId?: string | null; blank?: boolean; createdAt?: string; tagIds?: string[] }) => Promise<Entry>;
   duplicateEntry: (id: string) => Promise<Entry | undefined>;
   updateEntry: (id: string, patch: Partial<Entry>, options?: WriteOptions) => Promise<void>;
   deleteEntry: (id: string) => Promise<void>;
@@ -205,7 +206,7 @@ export const useEntryStore = create<EntryState>((set, get) => ({
 
   // Serialized: the number is read and then written, and two quick creations
   // must not both take the same one (`idx_entries_number` is unique).
-  createEntry: ({ categoryId = null, blank = false, createdAt } = {}) => serialized(ENTRY_NUMBER_KEY, async () => {
+  createEntry: ({ categoryId = null, blank = false, createdAt, tagIds = [] } = {}) => serialized(ENTRY_NUMBER_KEY, async () => {
     const db = await getDb();
     const now = nowIso();
     // The "Sigils" category thus begins with calculator, drawing and charge
@@ -225,7 +226,7 @@ export const useEntryStore = create<EntryState>((set, get) => ({
       category_id: categoryId,
       created_at: createdAt ?? now,
       updated_at: now,
-      tags: start.tags,
+      tags: [...new Set([...start.tags, ...tagIds])],
       deleted_at: null,
     };
     // The row first: its blocks point at it.

@@ -12,7 +12,8 @@ import { dashboardById, useDashboardStore } from '../store/dashboardStore';
 import { entryView } from '../store/entryViews';
 import type { ActiveView } from '../types';
 import type { CreatableViewId } from './modules';
-import { firstCategoryOf } from './dashboards';
+import { firstCategoryOf, firstTagOf } from './dashboards';
+import { useTagStore } from '../store/tagStore';
 
 /**
  * The task the Tasks view should open for naming. A task has no page of its
@@ -49,12 +50,23 @@ export function startCategoryOf(dashboardId: string): string | null {
   return firstCategoryOf(dashboardById(useDashboardStore.getState().dashboards, dashboardId), live);
 }
 
+/** The tags a new entry created in a dashboard starts with: the first live one of its filter. */
+function startTagsOf(dashboardId: string): string[] {
+  const live = new Set(useTagStore.getState().tags.map((t) => t.id));
+  const tag = firstTagOf(dashboardById(useDashboardStore.getState().dashboards, dashboardId), live);
+  return tag ? [tag] : [];
+}
+
 /**
  * A new entry in the dashboard `dashboardId` — in `categoryId` if given, else
- * in its first category. It opens on the entry page inside that dashboard.
+ * in its first category, and with the first tag of its filter. It opens on the
+ * entry page inside that dashboard.
  */
 async function createInDashboard(dashboardId: string, categoryId?: string): Promise<ActiveView> {
-  const entry = await useEntryStore.getState().createEntry({ categoryId: categoryId ?? startCategoryOf(dashboardId) });
+  const entry = await useEntryStore.getState().createEntry({
+    categoryId: categoryId ?? startCategoryOf(dashboardId),
+    tagIds: startTagsOf(dashboardId),
+  });
   return newEntryView(dashboardId, entry);
 }
 
