@@ -31,9 +31,9 @@ Where shared code lives in Emerald:
 
 - `Documentation/components.md` is the specification for this whole layer and your primary reference. Its `Catalogue` lists every shared building block with what it encapsulates and where it can be extended; read it before claiming something does or does not exist.
 
-- `src/components/ui/` — the shared component layer: `Button`, `Modal`, `ContextMenu`, `EmojiPicker`, `Dashboard`, `EntryListTab`, `ListToolbar`, `FilterPanel`, `RailButton`, `TabIconButton`, `UndoToast`, `ImportDestinationModal`.
+- `src/components/ui/` — the shared component layer: `Button`, `Modal`, `ContextMenu`, `EmojiPicker`, `Dashboard` (with `EntryDashboard` and `CollectionDashboard` in `src/components/views/` on top of it — one list of entries, one display of every collection), `DashboardItem`, `EntryListTab`, `ListToolbar`, `FilterPanel`, `FilterList`, `EmptyState`, `EntryDetailFrame`, `LibraryPageFrame`, `RailButton`, `TabIconButton`, `TagInput`, `TemplateSelect`, `UndoToast`, `ImportDestinationModal`, and more; the `Catalogue` has the full list.
 
-- `src/components/sidebar/fields/` — shared property-panel building blocks reused across the per-module panels.
+- `src/components/sidebar/fields/` — shared property-panel building blocks reused by the one entry page and the collection pages (`EditProperties`, `TagsField`, `LinkedEntriesField`, `IconField`, …).
 
 - `src/lib/` — shared logic: `styleClasses.ts` (the established home for a repeated Tailwind chain — extend it rather than copying the chain again), `platform.ts` (the only permitted source of platform detection), `tabs.ts`, `helpers.ts`.
 
@@ -61,7 +61,7 @@ Method:
 
 - Before reporting, check for a stated reason: a comment at the deviating place in the code (which is how `components.md` requires deviations to be justified), then `CHANGELOG.md` and the commit message. Deliberate duplication with a reason is a documented exception, not a finding.
 
-- Read `components.md` `When Deviating Is Right` and `Known Duplication` as ground truth for what has already been settled. The three deviations (`.vault-card` rebuilding the panel look, `MenuDropdown` alongside `ContextMenu`, the free `EmojiPicker` trigger) and the recorded duplications are not open findings. Reference one only if the reviewed change makes it worse or adds a further copy — and say so when a change has actually resolved one, so the list can be shortened.
+- Read `components.md` `When Deviating Is Right` and `Known Duplication` as ground truth for what has already been settled. The three deviations (`.picker-tile` instead of `.panel-interactive`, `MenuDropdown` alongside `ContextMenu`, the free `EmojiPicker` trigger) and the recorded duplications are not open findings. Reference one only if the reviewed change makes it worse or adds a further copy — and say so when a change has actually resolved one, so the list can be shortened.
 
 - `components.md` `Chrome Principle` decides what counts as a bypass: the shared building blocks standardise the shell, not the content, so a documented escape hatch (`children`, `renderItem`, `renderRow`, `trigger`, appended `className`) is intended use. Do not report it as a bypass. The converse is a real finding: a caller whose `className` undoes half a `Button` variant means a variant is missing in the shared component — report it as `Extract`, targeted at the component, not at the caller.
 

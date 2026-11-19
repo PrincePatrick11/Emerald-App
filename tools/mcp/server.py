@@ -40,6 +40,8 @@ Environment (all optional):
   EMERALD_LAUNCH_POLL_WAIT   default 25 (seconds) — bounded wait per tool call
   EMERALD_LAUNCH_POLL_INTERVAL default 1.5 (seconds) — port-check interval
   EMERALD_LAUNCH_LOG_DIR     default <state dir>/logs
+  EMERALD_CALL_DEADLINE      default 60 (seconds) — a call without an answer by then fails
+                             with an error that names `dialog`
   (instance.py and window.py document the EMERALD_MCP_* knobs)
 
 If Emerald isn't running when a tool is called and EMERALD_AUTO_LAUNCH is on,
@@ -68,7 +70,7 @@ from mcp.server import Server
 
 import dialogs
 import launcher
-from cdp import CDPError, CDPTarget, ConsoleBuffer, browser_version, discover_targets
+from cdp import CDPError, CDPTimeout, CDPTarget, ConsoleBuffer, browser_version, discover_targets
 from instance import Instance, resolve_instance, running_checkout
 from window import hide_instance_windows
 
@@ -77,6 +79,16 @@ log = logging.getLogger("emerald-mcp")
 
 AUTO_ATTACH = os.environ.get("EMERALD_AUTO_ATTACH", "1") == "1"
 AUTO_LAUNCH = os.environ.get("EMERALD_AUTO_LAUNCH", "1") == "1"
+# No tool call may hang: a native message box or a blocked window call must come
+# back as an error that names it, not as silence. Calls that wait on purpose
+# (eval with its own timeout, wait_for) get their own wait plus this margin.
+CALL_DEADLINE = float(os.environ.get("EMERALD_CALL_DEADLINE", "60"))
+CALL_MARGIN = 15.0
+WINDOW_CALL_DEADLINE = 5.0
+DIALOG_HINT = (
+    "The page is probably blocked by a native message or dialog: call `dialog` to list it, "
+    "read and answer it, and report it if it does not belong there."
+)
 LAUNCH_POLL_WAIT = float(os.environ.get("EMERALD_LAUNCH_POLL_WAIT", "25"))
 
 # Resolving the instance touches the filesystem and runs git, so it can fail.
@@ -127,7 +139,14 @@ async def _open(chosen: dict) -> CDPTarget:
         url=chosen.get("url", ""),
         console=_console,
     )
-    await t.connect()
+    try:
+        await t.connect()
+    except BaseException:
+        # A cancelled attach (the call deadline) must not leave a socket and a
+        # reader task behind that keep feeding the shared console.
+        with contextlib.suppress(Exception):
+            await t.close()
+        raise
     return t
 
 
@@ -191,6 +210,23 @@ async def _main_page(inst: Instance, page_targets: list[dict]) -> dict:
         with contextlib.suppress(Exception):
             targets = await discover_targets(inst.cdp_host, inst.cdp_port)
             page_targets = [t for t in targets if t.get("type") == "page"]
+
+
+_window_call: asyncio.Future | None = None
+
+
+async def _hide_windows(inst: Instance) -> dict:
+    """The window calls are synchronous Win32 calls; one that blocks must not
+    take the event loop with it, and must not outlast a short deadline.
+
+    A thread cannot be cancelled: a call that stays blocked keeps its worker.
+    So only one runs at a time, and while it is stuck the next ask is refused
+    instead of using up another worker, which `dialog` needs."""
+    global _window_call
+    if _window_call is not None and not _window_call.done():
+        return {"error": "an earlier window call is still blocked - the app's window is not answering"}
+    _window_call = asyncio.ensure_future(asyncio.to_thread(hide_instance_windows, inst))
+    return await asyncio.wait_for(asyncio.shield(_window_call), WINDOW_CALL_DEADLINE)
 
 
 async def _ensure_target() -> CDPTarget:
@@ -266,7 +302,7 @@ async def _ensure_target() -> CDPTarget:
         # window whenever the Rust source changes, and the new one comes back
         # on screen. Never allowed to break a tool call.
         try:
-            hide_instance_windows(inst)
+            await _hide_windows(inst)
         except Exception:
             log.warning("could not put the window out of sight", exc_info=True)
         return await _attach_to(inst, chosen)
@@ -488,7 +524,9 @@ async def _status(_args: dict) -> Result:
         if warning:
             payload["warning"] = warning
     try:
-        payload["window"] = hide_instance_windows(inst)
+        payload["window"] = await _hide_windows(inst)
+    except asyncio.TimeoutError:
+        payload["window"] = {"error": f"no answer within {WINDOW_CALL_DEADLINE:g}s"}
     except Exception as e:
         payload["window"] = {"error": f"{type(e).__name__}: {e}"}
     if _target is not None:
@@ -690,6 +728,21 @@ async def list_tools() -> list[types.Tool]:
     return TOOLS
 
 
+def _deadline_for(args: dict) -> float:
+    """What a call may take: the default, or its own wait plus a margin; plus
+    the time attaching and launching may use when no page is attached yet."""
+    if args.get("timeout"):  # eval, in seconds
+        own_wait = float(args["timeout"])
+    elif args.get("timeout_ms"):  # wait_for, in milliseconds
+        own_wait = float(args["timeout_ms"]) / 1000
+    else:
+        own_wait = 0.0
+    deadline = max(CALL_DEADLINE, own_wait + CALL_MARGIN) if own_wait else CALL_DEADLINE
+    if _target is None or not _target.is_open():
+        deadline += LAUNCH_POLL_WAIT + MAIN_PAGE_WAIT_SEC + WINDOW_CALL_DEADLINE
+    return deadline
+
+
 @app.call_tool()
 async def call_tool(name: str, arguments: dict) -> Result:
     global _attach_warning
@@ -697,7 +750,14 @@ async def call_tool(name: str, arguments: dict) -> Result:
     if handler is None:
         raise ValueError(f"unknown tool: {name}")
     try:
-        result = await handler(arguments or {})
+        args = arguments or {}
+        deadline = _deadline_for(args)
+        task = asyncio.ensure_future(handler(args))
+        done, _ = await asyncio.wait({task}, timeout=deadline)
+        if not done:
+            task.cancel()
+            raise RuntimeError(f"{name} gave no answer within {deadline:g}s. {DIALOG_HINT}")
+        result = task.result()
         # Said once, with the first answer after attaching, so a session that
         # never asks for `status` hears it too.
         if _attach_warning:
@@ -708,6 +768,8 @@ async def call_tool(name: str, arguments: dict) -> Result:
         # Raised, not returned as text: the SDK turns it into a result with
         # isError set, which is how a client tells a failure from an answer.
         log.warning("%s failed: %s: %s", name, type(e).__name__, e)
+        if isinstance(e, CDPTimeout):
+            raise CDPError(f"{e}. {DIALOG_HINT}") from None
         if isinstance(e, (CDPError, RuntimeError, ValueError)):
             raise
         raise RuntimeError(f"{type(e).__name__}: {e}") from e

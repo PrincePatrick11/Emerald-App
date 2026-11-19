@@ -17,12 +17,13 @@ SERVER = Path(__file__).resolve().parent.parent / "server.py"
 
 
 @asynccontextmanager
-async def session(port: int, home: Path):
+async def session(port: int, home: Path, **extra_env: str):
     env = {
         **os.environ,
         "EMERALD_CDP_PORT": str(port),
         "EMERALD_MCP_HOME": str(home / "home"),
         "EMERALD_AUTO_LAUNCH": "0",
+        **extra_env,
     }
     params = StdioServerParameters(command=sys.executable, args=[str(SERVER)], env=env)
     async with stdio_client(params) as (read, write):
@@ -103,3 +104,12 @@ async def test_status_reports_the_instance(browser_port, tmp_path):
         status = json.loads(text_of(await client.call_tool("status", {})))
     assert status["port_alive"] is True
     assert status["instance"]["cdp_port"] == browser_port
+
+
+async def test_a_call_that_hangs_comes_back_as_an_error_naming_dialog(browser_port, tmp_path):
+    async with session(browser_port, tmp_path, EMERALD_CALL_DEADLINE="1") as client:
+        await client.call_tool("navigate", {"url": PAGE.as_uri()})
+        # wait_for would wait 5 s for an element that never comes; the call deadline is 1 s
+        result = await client.call_tool("wait_for", {"selector": "#nothing-here"})
+    assert result.isError
+    assert "dialog" in text_of(result)

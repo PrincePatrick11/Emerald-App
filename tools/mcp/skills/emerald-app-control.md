@@ -1,6 +1,6 @@
 ---
 name: emerald-app-control
-description: Drives the Emerald Tauri/journal app through the emerald-devtools MCP server Covers the dashboards Journal, Practice and Knowledge (altars included), Tasks, Tags, Trash, Settings, export, theme and language switching.
+description: Drives the Emerald Tauri/journal app through the emerald-devtools MCP server. Covers the rail with its dashboards (All entries, Journal, Practice, Knowledge, own ones), the collections (Templates, Blocks, Symbols, Images, Categories, Tags), Tasks, Lexicon, Trash, Settings, the Start page, the one entry page, theme and language switching, and what to do when a native message stops the page.
 version: 1.0.0
 platforms: [windows, macos, linux]
 metadata:
@@ -101,22 +101,21 @@ placeholder — in practice the MCP client replaces that with direct tool calls.
 >
 > Hermes (following this skill):
 > 1. Looks up the entry create pattern
-> 2. Clicks sidebar → New Article
+> 2. Opens the Knowledge dashboard in the rail and presses "New entry"
 > 3. Types the title "Sage"
 > 4. Fills the body via ProseMirror
-> 5. Commits via `entry-view-title.blur()`
-> 6. Optionally: opens Properties, sets the category to "herb"
+> 5. Presses "Done"
+> 6. Optionally: opens Properties, sets the category to "Herbs"
 
 **Hermes-specific notes:**
-- Plan for a 300–500ms pause between consecutive MCP calls (React needs time to re-render)
-- If the LLM goes quiet: just `await mcp.call_tool("wait_for", { selector, timeout_ms: 3000 })` to wait for an element
-- If the app stops responding: `navigate` to `http://localhost:1420/` as a reset button
+- Wait for the next state with `wait_for` (React needs time to re-render): `await mcp.call_tool("wait_for", { selector, timeout_ms: 3000 })`
+- If the app stops responding: call `dialog` first (see "A silent page"); reload with `navigate` only when nothing is open there
 
 ---
 
 ## MCP tools — overview
 
-The MCP server exposes 15 tools. The most-used ones:
+The MCP server exposes 14 tools. The most-used ones:
 
 | Tool | When |
 |---|---|
@@ -127,7 +126,7 @@ The MCP server exposes 15 tools. The most-used ones:
 | `type_text` | Type into an input, textarea or the Tiptap editor; reports what the field reads afterwards |
 | `press_key` | `Enter`, `Escape`, `Control+K`, … |
 | `hover` | Mouse over an element (tooltips, hover-only controls) |
-| `dialog` | Native file pickers and message boxes - not visible to `snapshot` or `screenshot` |
+| `dialog` | Native file pickers and message boxes - not visible to `snapshot` or `screenshot`. **First call when the page stops answering** (see "A silent page") |
 | `screenshot` | PNG of the app — for "show me what you see" |
 | `console_logs` | Read React/JS errors when something does not work; `clear: true` empties the buffer, `level: "error"` filters |
 | `wait_for` | Wait for a selector to be `visible` (default), `attached`, `hidden` or `detached` |
@@ -142,173 +141,151 @@ where one only clicks, right-clicks or types, the tool is now the shorter way.
 
 - **Stack:** Tauri 2 + React 19 + Vite + Zustand + SQLite (local, SQLCipher through the app's own SQL layer in `db.rs`)
 - **Editor:** Tiptap (ProseMirror). Body = `<div class="tiptap ProseMirror" contenteditable="true">`
-- **Title:** `<input class="entry-view-title" placeholder="Untitled Entry">`
+- **Title:** `<input class="entry-view-title">` (placeholder "Untitled Entry" in English)
 - **i18n:** react-i18next, 4 languages (EN/DE/ES/FR), switchable live in Settings
 - **Themes:** "Emerald Noctis" (dark, default), "Emerald Parchment" (light)
 - **Persistence:** SQLite encrypted with SQLCipher, one `emerald.db` per vault; no sync (Settings → Sync and the start page's Server card are placeholders)
+- **Content model:** one kind of entry; the category decides what it is. Dashboards are filtered views (by category and tag); collections (Tags, Categories, Images, Templates, Blocks, Lexicon, Symbols) have their own pages. Tasks are separate.
 - **Hot reload:** Vite reloads automatically on code changes in `src/`
 
 ## Main UI anatomy
 
 ```
-┌─ header.titlebar ───────────────────────────────────────────────────────────┐
-│ Logo │ .titlebar-menu-trigger ×4 (Edit View Export Import) │ ← → │          │
-│                    button.titlebar-search                                   │
-│                                        .window-control ×3 (Min/Max/Close)   │
-├─ aside.app-sidebar-left ──┬─ main.app-main ─────────┬─ aside.app-sidebar-right ┤
-│ .left-sidebar-rail        │ .tabbar (+ .tab-add)    │ Properties / Tags        │
-│   icon buttons btn-ghost  │ view content            │ Linked entries        │
-│ entry-list panel          │                         │                          │
-│   rows = .sidebar-item    │                         │                          │
-└───────────────────────────┴─────────────────────────┴──────────────────────────┘
+┌─ title bar ─────────────────────────────────────────────────────────────────┐
+│ logo │ Menu · Search · Back · Forward · Export · Import (icon buttons) │ tabs │
+│                                          .window-control ×3 (Min/Max/Close) │
+├─ rail + list ─────────────┬─ main.app-main (sheet) ──┬─ right sidebar ───────┤
+│ .left-sidebar-rail        │ dashboard / collection / │ the dashboard's list  │
+│   button.rail-button ×16  │ entry page               │ controls (New …, view,│
+│ recent entries (left list)│                          │ sort, filter) — or the│
+│   rows = .sidebar-item    │                          │ entry's Properties,   │
+│                           │                          │ Linked entries, Tags  │
+└───────────────────────────┴──────────────────────────┴───────────────────────┘
 ```
 
-**Tabs:** `.tabbar` inside `main.app-main`, a new tab via `button.tab-add`.
+**Tabs:** `.tab-button` per open view, `button.tab-add` for a new one, `button.tab-close`.
+**The Start page has no rail** — it is the vault picker (open/new vault, appearance, language, updates). Its only way back is the vault's own "open" button.
+**Title bar:** Menu (Switch Vault…, Check for Updates…, About, Edit, View), Search (global search modal), Back/Forward, Export, Import — all `.rail-button` icon buttons, no longer four text menus.
 
 ### Selectors — the important part
 
 **Navigation runs through the rail, and its buttons are pure icon buttons.**
-They have no `innerText`, they all carry the same `btn-ghost` class, and they
-differ only by `title` — which is **translated**. The only reliable handle is
-the lucide icon class, which is language-independent:
+They share the classes `btn-ghost rail-button` and differ only by `title` — which is
+**translated**. The only reliable handle is the lucide icon class, which is
+language-independent (`snapshot` shows it as `icon=book-open`):
 
 ```js
 document.querySelector('.left-sidebar-rail button:has(.lucide-book-open)').click()
 ```
 
-| Target | Icon class | Selector |
+Top to bottom the rail holds:
+
+| Target | Icon class | Kind |
 | --- | --- | --- |
-| All entries | `lucide-layout-list` | `.left-sidebar-rail [data-dashboard-id="all"]` |
-| Journal | `lucide-book-open` | `.left-sidebar-rail button:has(.lucide-book-open)` |
-| Tasks | `lucide-square-check-big` | `.left-sidebar-rail button:has(.lucide-square-check-big)` |
-| Practice | `lucide-wand-sparkles` | `.left-sidebar-rail button:has(.lucide-wand-sparkles)` |
-| Knowledge | `lucide-library` | `.left-sidebar-rail button:has(.lucide-library)` |
-| Tags | `lucide-tag` | `.left-sidebar-rail button:has(.lucide-tag)` |
-| Trash | `lucide-trash2` | `.left-sidebar-rail button:has(.lucide-trash2)` |
-| Settings | `lucide-settings` | `.left-sidebar-rail button:has(.lucide-settings)` |
+| Create new | `lucide-plus` | opens the "Create new" modal (tiles: Journal, Practice, Knowledge, All entries, Tasks, Lexicon, Templates, Blocks, Dashboard — number keys 1-9 pick one) |
+| All entries | `lucide-layout-list` | dashboard, `[data-dashboard-id="all"]` |
+| Journal / Practice / Knowledge | `lucide-book-open` / `lucide-wand-sparkles` / `lucide-library` | dashboards, `[data-dashboard-id="journal"]` etc. |
+| own dashboards | any (default `lucide-layout-dashboard`) | dashboards, placed after Knowledge |
+| Tasks | `lucide-square-check-big` | list of tasks |
+| Lexicon | `lucide-languages` | collection |
+| Templates | `lucide-copy-plus` | collection |
+| Blocks | `lucide-box` | collection |
+| Symbols | `lucide-shapes` | collection |
+| Images | `lucide-images` | collection |
+| Categories | `lucide-folder-open` | collection |
+| Tags | `lucide-tag` | collection |
+| Trash | `lucide-trash2` | list |
+| Settings | `lucide-settings` | modal |
+| Start page | `lucide-layout-grid` | leaves the vault view |
 
 `:has()` is supported by WebView2 — verified against the running build.
 
-Every dashboard button (All entries, Journal, Practice, Knowledge and dashboards made by hand) also carries `data-dashboard-id`, e.g. `[data-dashboard-id="knowledge"]` — the only stable handle for a user-made dashboard, whose icon can be anything. A built-in given its own icon loses its lucide class (renaming keeps it); the attribute stays.
+Every dashboard button also carries `data-dashboard-id` — the only stable handle for a user-made dashboard, whose icon can be anything. A built-in given its own icon loses its lucide class (renaming keeps it); the attribute stays. The active rail button has the class `active` (and `[active]` in `snapshot`).
 
-**`.sidebar-item` is not navigation.** Today the class denotes list rows:
-entries in the list panel, linked entries, tags. Trying to navigate with it
-hits nothing, and `?.click()` fails silently.
+**`.sidebar-item` is not navigation.** It denotes the rows of the *left* list (the recent entries and tasks of the whole vault, newest first). Dashboard and collection items in the main area are `.panel-interactive`.
 
-**Creating an entry:** `button[title="New Entry"]` in the head of the list panel
-(`.sidebar-search`, icon `lucide-plus`) is the most stable route. `button.btn-primary`
-only exists in list views with no detail open.
+**Collections** (Templates, Blocks, Symbols, Images, Categories, Tags, Lexicon) share one layout: heading `h1.entry-view-title`, search `input.list-toolbar-input`, items as `.panel-interactive` (Images: `.image-tile`), and in the right sidebar a primary button (`button.btn-primary`: "New template", "New block", "Add images", "New category", "New language"), the view toggle (List / Cards / Timeline), a sort button (`.op-prop-select`) and `.filter-row` chips (tag filters, categories).
+
+**Creating an entry:** `button.btn-primary` ("New entry") in the right sidebar of a dashboard, or the rail's "Create new" plus. There is no `button[title="New Entry"]` any more, and the left list has no plus.
 
 ## Core flows
 
-### Create an entry (Journal)
+### Create an entry
 ```js
-// 1. Sidebar
-const sb = document.querySelector('.left-sidebar-rail button:has(.lucide-book-open)');
-if (sb) sb.click();
+// 1. Open a dashboard, press "New entry"
+await mcp.call_tool("click", { selector: '.left-sidebar-rail [data-dashboard-id="journal"]' });
+await mcp.call_tool("click", { selector: "button.btn-primary" });   // the one in the right sidebar
+// The entry exists at once (it is already in the left list as "Untitled Entry") and is open in
+// edit mode: title input, editor toolbar, .ProseMirror, a "+ Add block" button.
+// It starts in the first category of the dashboard (the category's start template applies).
 
-// 2. btn-primary
-const b = [...document.querySelectorAll('button.btn-primary')]
-  .find(b => b.offsetParent !== null);
-if (b) b.click();
+// 2. Title and body
+await mcp.call_tool("type_text", { selector: "input.entry-view-title", text: "🌙 Full Moon Ritual" });
+await mcp.call_tool("type_text", { selector: ".ProseMirror", text: "My text" });
 
-// 3. Wait for tab + activate
-const tabs = [...document.querySelectorAll('[class*="tab-"]')]
-  .filter(el => el.offsetParent !== null);
-if (tabs.length) tabs[tabs.length - 1].click();
+// 3. Leave edit mode
+await mcp.call_tool("click", { selector: "text=Done" });   // language-dependent; it is the one filled button of the edit bar
+```
+Category, icon, cover image, linked entries and tags are set in the right sidebar while editing
+(`PROPERTIES`, `LINKED ENTRIES`, `TAGS` sections; the category row is `button.prop-value-btn`).
 
-// 4. Type title
-await mcp.call_tool("type_text", {
-  selector: 'input[placeholder="Untitled Entry" i]',
-  text: "🌙 Full Moon Ritual"
-});
+### Open, read and edit an entry
+A click on a row (`.panel-interactive` in a dashboard, `.sidebar-item` in the left list) opens the entry page **in reading mode**: breadcrumb `button.entry-back-link`, the title, the content, an **Edit** button. After Edit it is the same page as above; "Done" returns.
 
-// 5. Click ProseMirror to mount Tiptap, then fill
-await mcp.call_tool("click", { selector: ".ProseMirror" });
-await mcp.call_tool("eval", {
-  expression: "(() => { const pm = document.querySelector('.ProseMirror'); pm.focus(); pm.innerHTML = '<p>My text</p>'; pm.dispatchEvent(new InputEvent('input', { bubbles: true })); return true; })()"
-});
-
-// 6. Click Done
-await mcp.call_tool("eval", {
-  expression: "[...document.querySelectorAll('button')].find(b => b.innerText.trim() === 'Done')?.click()"
-});
+```js
+await mcp.call_tool("eval", { expression: "document.querySelector('.ProseMirror')?.innerText" });
 ```
 
-### Open and read an entry
-```js
-// Clicking .panel-interactive opens the reader (NOT the editor)
-const e = [...document.querySelectorAll('.panel-interactive')].find(el =>
-  el.innerText.includes('Full Moon')
-);
-e?.click();
-mcp.call_tool("eval", { expression: "document.querySelector('.ProseMirror')?.innerText" });
-```
+### Right-click menus
+`click` with `button: "right"`, then `snapshot` with `selector: ".context-menu"`:
 
-### Edit an entry
-```js
-await mcp.call_tool("click", { selector: 'input[placeholder="Untitled Entry" i]' });
-await mcp.call_tool("type_text", { selector: 'input[placeholder="Untitled Entry" i]', text: "New title" });
-await mcp.call_tool("click", { selector: ".ProseMirror" });
-await mcp.call_tool("eval", {
-  expression: "(() => { const pm = document.querySelector('.ProseMirror'); pm.focus(); const p = document.createElement('p'); p.textContent = 'New paragraph.'; pm.appendChild(p); pm.dispatchEvent(new InputEvent('input', { bubbles: true })); return true; })()"
-});
-await mcp.call_tool("eval", { expression: "[...document.querySelectorAll('button')].find(b => b.innerText.trim() === 'Done')?.click()" });
-```
+| On | Items |
+| --- | --- |
+| an entry (list row) | Open in New Tab, Duplicate, Save as template, Rename, Delete |
+| a rail dashboard | Dashboard settings, Move up, Move down, Delete |
+| a tag | Rename, Delete |
+
+**Delete does not ask.** An entry or tag goes to the trash at once, and an "Undo" toast (`button.btn-primary` in the corner) stays for a while. A deleted dashboard is gone; its entries stay. Only the Trash's "Empty trash" and "Delete selected" ask (the button turns into "Yes, …").
+
+### Create new modal and dashboards
+The rail's plus opens "Create new" (`.modal-card`, tiles `.create-item-tile`). The Dashboard tile opens **Dashboard settings**: name, icon/emoji, a category filter (`.filter-row`, "All" or ticked categories, an inline "New category" field) and a tag filter (`TagInput`, placeholder "Add tag …"; Enter or a comma adds a chip, `Remove tag: …` removes it). Buttons: Delete, Cancel, Save. The same dialog opens from "Dashboard settings" (a `sliders-horizontal` icon button beside "New entry") and from the rail's context menu. Save puts the dashboard in the rail and opens it.
+
+Note: a tag typed into the filter that does not exist yet is created at that moment — it shows in Tags as "unused", even if the dashboard is cancelled or deleted afterwards. Delete such a tag when you are done.
+
+### Categories, tags, templates
+- **Categories** — the collection lists them as `.panel-interactive` with the entry/task counts; a click opens **Edit category** (`.modal-card`): name and icon, START TEMPLATE (the "Default template" or one of the templates), SHOWN IN (read only: the dashboards that include it). Delete / Cancel / Save.
+- **Tags** — rows expand (chevron) to the entries carrying the tag; the colour dot is a `button` titled "Change color" (translated); right-click: Rename, Delete.
+- **Templates** — "New template" in the right sidebar; the right sidebar also has the DEFAULT TEMPLATE chip.
+
+### Tasks
+Tasks are grouped by category. "New task" (`button.sidebar-action-btn` in a group header; there are several, the first visible one is taken) opens an inline input — `input.bg-well-solid`, no placeholder, focused — and Enter commits it. Each row has Add subtask, Category, Link entry and a priority button.
 
 ### Switch language
 ```js
-await mcp.call_tool("eval", { expression: "document.querySelector('.left-sidebar-rail button:has(.lucide-settings)')?.click()" });
+await mcp.call_tool("click", { selector: ".left-sidebar-rail button:has(.lucide-settings)" });
 // language names are shown natively, so the German option reads "Deutsch" in every language
-await mcp.call_tool("eval", { expression: "[...document.querySelectorAll('button')].find(b => b.innerText.trim() === 'Deutsch')?.click()" });
-// close
-await mcp.call_tool("eval", { expression: "(() => { document.querySelectorAll('[class*=\"close\"]').forEach(el => el.click()); document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); return true; })()" });
+await mcp.call_tool("click", { selector: "text=Deutsch" });
+await mcp.call_tool("press_key", { key: "Escape" });
 ```
+Settings (`.modal-card`) has the tabs General, Sidebar, Entries, Security, Sync, Backup, Storage. The Start page also has a language and a theme (Noctis / Parchment) button.
 
 ### Switch theme
-```js
-await mcp.call_tool("eval", { expression: "document.querySelector('.left-sidebar-rail button:has(.lucide-settings)')?.click()" });
-await mcp.call_tool("eval", { expression: "[...document.querySelectorAll('button')].find(b => b.innerText.trim() === 'Emerald Parchment')?.click()" });
-```
-
-### Delete an entry (via right-click, NOT Trash)
-```js
-// 1. Right-click the item
-await mcp.call_tool("eval", {
-  expression: "(() => { const item = [...document.querySelectorAll('.panel-interactive')].find(el => el.offsetParent !== null && (el.innerText || '').includes('Full Moon Ritual')); if (item) { const r = item.getBoundingClientRect(); item.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, view: window, clientX: r.left + 20, clientY: r.top + 20, button: 2, buttons: 2 })); } return true; })()"
-});
-// 2. "Delete" in the context menu
-await mcp.call_tool("eval", {
-  expression: "[...document.querySelectorAll('.context-menu-item, [role=\"menuitem\"], button')].filter(el => el.offsetParent !== null).find(el => /^delete$/i.test((el.innerText || '').trim()))?.click()"
-});
-// 3. Confirm dialog
-await mcp.call_tool("eval", {
-  expression: "(() => { const d = document.querySelector('[role=\"dialog\"]'); if (d) { const del = [...d.querySelectorAll('button')].find(b => /^delete$/i.test((b.innerText || '').trim())); if (del) { del.click(); return true; } } return false; })()"
-});
-// CAUTION: this REALLY deletes, it does not go to Trash!
-```
+Settings → General has the theme choice; the Start page lists Noctis and Parchment (`Import theme…` beside them).
 
 ### Trash → Restore
 ```js
-await mcp.call_tool("eval", { expression: "document.querySelector('.left-sidebar-rail button:has(.lucide-trash2)')?.click()" });
-await mcp.call_tool("eval", { expression: "[...document.querySelectorAll('button')].find(b => b.innerText.trim() === 'Restore')?.click()" });
+await mcp.call_tool("click", { selector: ".left-sidebar-rail button:has(.lucide-trash2)" });
+await mcp.call_tool("click", { selector: "text=Restore" });  // one Restore button per row
 // Trash auto-deletes after 30 days
 ```
 
-### Creating entries and tasks
+### A silent page: look for a native message first
+If `snapshot`, `eval`, `click` or `status` stops answering, a native dialog (a message box, a file picker) has stopped the app — it is not in the DOM, so `snapshot` and `screenshot` cannot show it. 
 
-**These views open the editor inline**: clicking "New..." opens the editor immediately.
-
-| Area | Title input selector | Commit method | Body editor |
-|---|---|---|---|
-| **Any entry** (one entry page for all dashboards) | `input.entry-view-title` (placeholder "Untitled Entry") | click the "Done" button | `.ProseMirror` |
-| **Tasks** | `input.bg-stone-800[type="text"]` (NO placeholder) | Enter + blur | tasks have no body |
-
-The category is chosen in the Properties panel's category row while editing; a new entry starts in the first category of the dashboard it was created in.
-
-**Creating a journal entry (Done button):** see above.
-
-**Any other entry:** there is one entry page for every entry. Open a dashboard (`.left-sidebar-rail [data-dashboard-id="<id>"]`), press its "New entry" button (or a category group's "+"), type the title and press Done, as for a journal entry above. The entry starts in the dashboard's first category; the category can be changed in the Properties panel while editing.
+1. Give every call a short deadline: `timeout` (seconds) on `eval`, `timeout_ms` on `wait_for`. The server itself answers any call with an error after about a minute (`EMERALD_CALL_DEADLINE`; a call with its own timeout gets that plus 15 s) that names `dialog`.
+2. When the page does not answer, call `dialog` (default action `list`) at once. Read the message, then answer it (`action: "click"` with `button`, or `accept` / `cancel`).
+3. If a message appears where none belongs, **report it as a finding** with the step that raised it — do not just dismiss it.
+4. Never wait out a timeout of minutes. `navigate` (reload) only after `dialog` shows nothing open.
 
 ## Pitfalls
 
@@ -323,30 +300,20 @@ If you do have to select by text, check the active language first:
 document.documentElement.lang || localStorage.getItem('i18nextLng')
 ```
 
+### `eval` with an async function returns `{}` on Windows
+`(async () => {...})()` comes back as `{}`. Use top-level `await` and end with the value
+(`await sleep(); ({a: 1})`), or return `JSON.stringify(...)` from a synchronous expression.
 
-### `btn-primary` only exists in list views
-`button.btn-primary` is there as long as a list view without an open detail is
-active; with a tab open it disappears. Use the stable route instead:
-`button[title="New Entry"]` in the head of the list panel — that one is always
-present. (Verified: in a dashboard list view `btn-primary` is present, with a detail
-tab open it is not.)
+### Settings and every dialog are modals
+Settings is a `.modal-card` above the app, like Create new, Dashboard settings and Edit category. The rail
+stays in the DOM and visible, but `click` fails with "covered by div" — close the modal first:
+`press_key` `Escape` (reliable). Escape closes a dialog without saving.
 
-### Settings is a modal, no longer a panel
-Since the modal consolidation, Settings is a `.modal-card` above the app.
-The rail stays fully in the DOM and visible — the old rule
-"all sidebar items are `offsetParent === null`" **no longer holds**
-(verified: 10 out of 10 rail buttons stay visible). A synthetic `.click()`
-therefore still reaches the rail, but the modal stays open and covers everything
-that follows. Close it explicitly before testing further:
-
-```js
-document.dispatchEvent(new KeyboardEvent('keydown', {key:'Escape', bubbles:true}))
-```
-
-Escape closes it reliably (verified).
+### The Start page replaces the whole vault view
+No rail, no tabs. Go back through the vault's "open" button there.
 
 ### Reload = the reset button
-`mcp.call_tool("navigate", {url: "http://localhost:1420/"})` remounts the app (React state gone, SQLite DB stays).
+`navigate` to `http://localhost:<vite_port>/` (the port `status` names) remounts the app (React state gone, SQLite DB stays).
 
 ## Diagnostic helpers
 
@@ -356,24 +323,20 @@ Escape closes it reliably (verified).
 JSON.stringify({
   lang: document.documentElement.lang,
   platform: document.documentElement.dataset.platform,
-  viewHeading: document.querySelector('.app-main')?.innerText.trim().split('\n')[1],
+  heading: document.querySelector('.app-main h1')?.innerText,
+  activeRail: document.querySelector('.left-sidebar-rail .rail-button.active')?.getAttribute('title'),
   selectedListRow: document.querySelector('.sidebar-item.active')?.innerText.trim(),
-  tabs: [...document.querySelectorAll('.tabbar button')]
-          .map(t => t.innerText.trim()).filter(Boolean),
+  tabs: [...document.querySelectorAll('.tab-button')].map(t => t.innerText.trim()),
   modalOpen: !!document.querySelector('.modal-card'),
   editorOpen: !!document.querySelector('.ProseMirror'),
-  titleValue: document.querySelector('input[placeholder*="ntitled" i]')?.value,
+  titleValue: document.querySelector('input.entry-view-title')?.value,
   bodyText: document.querySelector('.ProseMirror')?.innerText?.slice(0, 200)
 }, null, 2)
 ```
 
-**Careful — there is no reliable signal for the active view.**
-The rail buttons carry no active state whatsoever: no `active`, no
-`aria-current`, no `data-*` — all eight are simply `btn-ghost`
-(verified against the running build). `viewHeading` is therefore only an
-approximation via the text of the main area, and language-dependent with it.
-`.sidebar-item.active` is **not** the active navigation but the highlighted row
-in the entry list — hence `selectedListRow` here.
+The active rail button carries the class `active` and `snapshot` marks it `[active]`;
+`aria-current` is not set. `.sidebar-item.active` is the highlighted row of the *left list*,
+not the navigation.
 
 ### Console logs
 ```js
@@ -388,36 +351,21 @@ const result = await mcp.call_tool("screenshot", {});
 
 ## Verification — smoke test
 
-Checks the connection **and** the selectors that have failed most recently.
-Connect and attach first:
-
-```
-connect  ->  pick the target with "type": "page"
-attach   ->  { "target_id": "<id from connect>" }
-status   ->  confirms the connection
-```
-
-Then check the UI via `eval`:
+Call `status`, then check the UI with `eval`:
 
 ```js
-(async () => {
-  const icons = ['book-open','square-check-big','wand-sparkles','library',
-                 'tag','trash2','settings'];
-  const missing = icons.filter(i =>
-    !document.querySelector(`.left-sidebar-rail button:has(.lucide-${i})`));
-  const view = () => document.querySelector('.app-main')?.innerText.trim().split('\n')[1] || '';
-  document.querySelector('.left-sidebar-rail button:has(.lucide-wand-sparkles)').click();
-  await new Promise(s => setTimeout(s, 700));
-  const pageName = view();
-  document.querySelector('.left-sidebar-rail button:has(.lucide-book-open)').click();
-  await new Promise(s => setTimeout(s, 700));
-  return { railSelectorsMissing: missing, navigatedTo: pageName, backTo: view(),
-           newEntryBtn: !!document.querySelector('button[title="New Entry"]'),
-           pass: missing.length === 0 && pageName.length > 0 };
-})()
+const icons = ['plus','layout-list','book-open','wand-sparkles','library','square-check-big','languages',
+               'copy-plus','box','shapes','images','folder-open','tag','trash2','settings','layout-grid'];
+const missing = icons.filter(i => !document.querySelector(`.left-sidebar-rail button:has(.lucide-${i})`));
+document.querySelector('.left-sidebar-rail button:has(.lucide-wand-sparkles)').click();
+await new Promise(s => setTimeout(s, 700));
+const heading = document.querySelector('.app-main h1')?.innerText;
+JSON.stringify({ railSelectorsMissing: missing, heading,
+                 newEntryBtn: !!document.querySelector('button.btn-primary'),
+                 pass: missing.length === 0 && !!heading })
 ```
 
-Expected: `railSelectorsMissing: []`, `navigatedTo: "Practice"`, `pass: true`.
+Expected: `railSelectorsMissing: []`, `heading: "Practice"` (in English), `pass: true`.
 If `railSelectorsMissing` is not empty, the rail has changed — update this skill
 before running tests.
 
@@ -425,11 +373,13 @@ before running tests.
 
 | Symptom | Cause | Fix |
 |---|---|---|
-| `attach` fails | Emerald is not running, or `start_emerald_mcp.bat` did not source vcvars | use cmd instead of bash |
-| No window anywhere | Intended — it is off-screen. Use `screenshot`; `EMERALD_MCP_OFFSCREEN_XY=40,40` brings it back |
-| Unexpected entries in the app | Intended — the test vault's fixtures, plus what earlier runs left: it is not reset between runs |
-| Driving the wrong checkout | Check `status`: it names the checkout and how it was found; `EMERALD_APP_DIR` forces one |
-| Sidebar buttons do not react | the Settings modal is open | press Escape + click the X buttons |
-| The entry is not saved | no "Done" button → the editor is still in reader mode | click/type first, then Done |
+| `attach` fails | Emerald is not running | the first tool call starts it; see the cold-start checklist |
+| No window anywhere | Intended — it is off-screen | Use `screenshot`; `EMERALD_MCP_OFFSCREEN_XY=40,40` brings it back |
+| Unexpected entries in the app | Intended — the test vault's fixtures, plus what earlier runs left | it is not reset between runs |
+| Driving the wrong checkout | `status` names the checkout and how it was found | `EMERALD_APP_DIR` forces one |
+| A call hangs or times out | A native dialog is open | `dialog`, read and answer it — see "A silent page" |
+| `click` says "covered by div" | A modal is open | Escape, or answer the modal |
+| Rail buttons do nothing | the Start page is showing (no rail) or a modal is open | open the vault; Escape |
+| The entry looks unsaved | The page is still in edit mode | click Done |
 | `Suchen...` instead of `Search...` | the language is set to German | intended, or switch back in Settings |
-| `.ProseMirror` is null | the editor is not mounted yet | click into the body area first |
+| `.ProseMirror` is null | no entry page is open, or it is still loading | `wait_for` it |

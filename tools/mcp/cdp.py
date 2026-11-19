@@ -68,6 +68,10 @@ class CDPError(RuntimeError):
     pass
 
 
+class CDPTimeout(CDPError):
+    """A request the page did not answer in time."""
+
+
 class ConsoleBuffer:
     """Console output, kept apart from the target so it outlives a reattach -
     the errors from just before the WebView was replaced are usually the ones
@@ -275,7 +279,7 @@ class CDPTarget:
             await self._ws.send_json({"id": msg_id, "method": method, "params": params or {}})
             return await asyncio.wait_for(fut, timeout=timeout)
         except asyncio.TimeoutError:
-            raise CDPError(f"timeout after {timeout:g}s waiting for {method}") from None
+            raise CDPTimeout(f"timeout after {timeout:g}s waiting for {method}") from None
         finally:
             self._inflight.pop(msg_id, None)
 

@@ -138,6 +138,7 @@ The vault is created once. `seed/provision.mjs` stops as soon as the instance ha
 | `EMERALD_MCP_SEED` | unset | `force` rebuilds the test vault on the next start |
 | `EMERALD_MCP_OFFSCREEN_XY` | off-screen | Windows: `40,40` keeps the window on screen, for watching a run |
 | `EMERALD_MCP_SHOW_WINDOW` | unset | macOS: `1` leaves the window visible, for watching a run |
+| `EMERALD_CALL_DEADLINE` | `60` | Seconds after which any tool call is answered with an error that names `dialog` — a native message stopping the page must not leave a call hanging. `eval`'s `timeout` and `wait_for`'s `timeout_ms` raise it for that call (plus 15 s) |
 | `EMERALD_AUTO_ATTACH` | `1` | Attach to the app's main page on first use |
 | `EMERALD_AUTO_LAUNCH` | `1` | Start the app when no target is found |
 | `EMERALD_LAUNCHER_PATH` | the platform's `start_emerald_mcp` script | Launcher script |
