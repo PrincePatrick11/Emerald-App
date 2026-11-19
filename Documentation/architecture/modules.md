@@ -33,7 +33,7 @@ A second, smaller registry sits in `src/components/editors/text/SuggestionList.t
 These places enumerate modules or tables and are easy to miss. Follow how the closest existing module does it: the Lexicon for a module with its own tables, Tasks for one with its own items. Leaving a place out can be right, as with the Lexicon and single-file export, but it should be a decision.
 
 - **Schema:** `src/lib/schema.ts` (the table in `TABLES`), a step appended to `MIGRATIONS` in `src/lib/db.ts` and `BASELINE_VERSION` raised to it, see [Rules for Future Schema Changes](../database.md#rules-for-future-schema-changes). Image columns go into `IMAGE_FIELDS`.
-- **Backup:** export, filter and insert in `src/lib/dbBackup.ts`, and a raised `BACKUP_VERSION` when an older build would import the new shape wrongly. A table missing here is lost on restore without an error.
+- **Backup:** export, filter and insert in `src/lib/dbBackup.ts`, and a raised `EMERALD_FORMAT_VERSION` (`lib/emerald/manifest.ts`, with `FORMAT_VERSION` in `emerald_file.rs`) when an older build would import the new shape wrongly. A table missing here is lost on restore without an error.
 - **Registry:** `src/lib/modules.ts`, the store's reload in `src/store/moduleWiring.ts`, the view in `src/components/layout/moduleViews.ts`.
 - **Trash:** a soft-deleted item needs `TRASH_KINDS`, `trashWiring`, and listing and emptying in `src/store/trashStore.ts`.
 - **Search:** `SearchKind` and the query in `src/lib/globalSearch.ts`, the display in `src/components/layout/titlebar/SearchResultList.tsx`.
@@ -144,7 +144,7 @@ Names are compared case-insensitively everywhere (`tagNameKey`, trim + lowercase
 - Renaming onto a trashed tag's name deletes the trashed namesake for good (its links go with it) — its entries do not get the name back. Categories differ here: their trashed namesake is merged in, entries included (see [Categories](#categories)).
 - An entry or template **restored from the Trash** reads its tags from the links; a tag gone for good took its links along, a trashed one stays linked, since it can come back.
 
-**`tags.createInline` governs every way a new tag can appear.** Off, the tag field accepts only existing tags and a `.emerald` import keeps only names that already are tags (`ensureTagIds`); on, both create what's missing. A template carries ids, so it never creates a tag: `usableTemplateTags(ids)` (`lib/templateTags.ts`, fed by `tagStore` via `registerTagLookup` to avoid an import cycle) hands over only its live tags. A `.emeralddb` backup is a restore, not a content import, and always brings its tags (resolved by id, then name — see [`database.md`](../database.md#db-backup--restore-emeralddb)). `drafts.json` is version 2: a version-1 file's template drafts carry tag names, which `draftStore` maps onto this vault's tag ids when reading (a name without a tag drops out).
+**`tags.createInline` governs every way a new tag can appear.** Off, the tag field accepts only existing tags and a `.emerald` import keeps only names that already are tags (`ensureTagIds`); on, both create what's missing. A template carries ids, so it never creates a tag: `usableTemplateTags(ids)` (`lib/templateTags.ts`, fed by `tagStore` via `registerTagLookup` to avoid an import cycle) hands over only its live tags. A `.vault.emerald` backup is a restore, not a content import, and always brings its tags (resolved by id, then name — see [`database.md`](../database.md#db-backup--restore-vaultemerald)). `drafts.json` is version 2: a version-1 file's template drafts carry tag names, which `draftStore` maps onto this vault's tag ids when reading (a name without a tag drops out).
 
 **`TagsView`** is a collection (`CollectionDashboard`): sort A→Z/Z→A/most used, a filter by where a tag is used (entries, only templates, only Images, templates and Images, nowhere), list or cards. The list (`renderList`) is one row per tag with its entries below; a card renames on click.
 
@@ -169,7 +169,7 @@ The Lexicon (rail, below Tasks) is a module without entries: it holds **language
 
 **Saving is immediate.** A vocabulary row is a pair of fields, not a draft: every field writes when it loses focus, the alphabet the same, the name after a short typing pause. The language page therefore has no `useDraftPage` and no "Done": it sits on `LibraryPageFrame` but passes its own `actions` (back to the list, delete) instead of `draft`. `lexicon` is in `LIBRARY_VIEW_IDS` like blocks and templates: `{ type, id }` is a page with its own tab, and it opens the right sidebar.
 
-A language is **not** exportable as a single `.emerald` file the way a template is. That format carries a block stack; a language is two tables and an alphabet, and nothing in it has a place for a `.emerald` importer. Backups carry it instead (see [`database.md`](../database.md#db-backup--restore-emeralddb)).
+A language is **not** exportable as a single `.emerald` file the way a template is. That format carries a block stack; a language is two tables and an alphabet, and nothing in it has a place for a `.emerald` importer. Backups carry it instead (see [`database.md`](../database.md#db-backup--restore-vaultemerald)).
 
 **Translating** lives in `src/lib/lexicon.ts`, free of stores and i18n like the rest of `lib/`:
 

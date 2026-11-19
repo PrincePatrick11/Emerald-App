@@ -1,6 +1,7 @@
 import { parseBlocks, serializeBlocks } from '../blocks/blockHtml';
 import { asString, isRecord } from '../helpers';
 import { fromBlockRow, toBlockRow, type BlockRowValues } from '../blocks/blockRows';
+import { FIELDS_BLOCK_TYPE, parseFields } from '../blocks/fields';
 
 /**
  * The manifest of a `.emerald` file (`manifest.json` in the archive that
@@ -13,10 +14,20 @@ import { fromBlockRow, toBlockRow, type BlockRowValues } from '../blocks/blockRo
  */
 
 /**
- * '6' is the archive. Every version before was one JSON file ('1' to '5');
- * those are refused before a manifest is read (`EMERALD_OLD_FORMAT`).
+ * '7' is the archive behind a header that names its kind and protection, the
+ * manifest deflated, starter categories with their ID, custom blocks along,
+ * and the vault's content as a kind of its own. Every version before ('6',
+ * the bare archive; '1' to '5', one JSON file) is refused before a manifest is
+ * read (`EMERALD_OLD_FORMAT`) — 0.2.0 reads only what it writes.
  */
-export const EMERALD_FORMAT_VERSION = 6;
+export const EMERALD_FORMAT_VERSION = 7;
+
+/**
+ * What a file holds, said in its header and again in the manifest: entries
+ * and templates for another vault (`.emerald`), or a vault's content
+ * (`.vault.emerald`, built by `lib/dbBackup.ts`).
+ */
+export type EmeraldKind = 'items' | 'vault';
 
 /**
  * What happens to the pictures of an item on export — the names of the export
@@ -32,13 +43,28 @@ export const IMAGE_MODES: readonly ImageMode[] = ['none', 'balanced', 'strong', 
 /** A block as a row of `blocks`, without owner, position and search text: the order of the list is the order of the blocks. */
 export type ManifestBlock = Omit<BlockRowValues, 'text'>;
 
+/**
+ * The category of an entry as it was at export. The import finds a built-in
+ * or starter category by its ID, which is the same in every vault — renamed
+ * or named in another language, it is still the same; every other category
+ * by the name it had, created anew if there is none of that name.
+ */
 export interface ManifestCategory {
-  /** The stored name — a built-in's is the same in every vault, its label is not. */
+  /** The ID in the exporting vault. */
+  id: string;
+  /** The name as it was shown — a built-in's label in the exporting app's language. */
   name: string;
   /** The category's emoji. */
   icon: string;
   builtin: boolean;
 }
+
+/**
+ * A custom block definition (table `block_definitions`) that a copy in the
+ * file came from (`FieldsModel.definition`) — the row as the vault holds it,
+ * checked on import like a backup's (`insertBlockDefinitions`).
+ */
+export type ManifestBlockDefinition = Record<string, unknown> & { id: string };
 
 export interface ManifestEntry {
   kind: 'entry';
@@ -83,11 +109,29 @@ export interface ManifestLink {
 export interface EmeraldManifest {
   format: 'emerald';
   version: typeof EMERALD_FORMAT_VERSION;
+  kind: 'items';
   exportedAt: string;
   items: ManifestItem[];
   links: ManifestLink[];
   /** Pictures the content names that were left out on purpose (`placeholder`). */
   omittedImages: string[];
+  /** The custom blocks the items' copies came from — empty when the export left them out. */
+  blockDefinitions: ManifestBlockDefinition[];
+}
+
+/**
+ * The manifest of a `.vault.emerald`: the vault's content as `lib/dbBackup.ts`
+ * builds and reads it (`VaultContent`). Only the frame is checked here; the
+ * rows are checked where they are inserted, as foreign as anything in a file.
+ */
+export interface EmeraldVaultManifest {
+  format: 'emerald';
+  version: typeof EMERALD_FORMAT_VERSION;
+  kind: 'vault';
+  exportedAt: string;
+  filters: unknown;
+  data: Record<string, unknown>;
+  settings?: unknown;
 }
 
 /* ---------------- Blocks ---------------- */
@@ -101,6 +145,49 @@ export function contentToBlocks(content: string): ManifestBlock[] {
 
 export function blocksToContent(blocks: readonly ManifestBlock[]): string {
   return serializeBlocks(blocks.map(fromBlockRow));
+}
+
+/* ---------------- Categories and custom blocks ---------------- */
+
+/** An entry's category as the file carries it: its ID, and the name shown in the exporting app right now. */
+export function manifestCategoryOf(
+  category: { id: string; emoji: string; is_builtin: number | boolean },
+  shownName: string,
+): ManifestCategory {
+  return { id: category.id, name: shownName, icon: category.emoji, builtin: Boolean(category.is_builtin) };
+}
+
+/** A category row the import resolves like a backup's (`resolveImportedCategories`). */
+export interface CategoryImportRow {
+  id: string;
+  name: string;
+  emoji: string;
+  is_builtin: number;
+  deleted_at: null;
+}
+
+/** The categories of a file's entries, once each, as rows for `resolveImportedCategories`. */
+export function categoryRowsOf(items: readonly ManifestItem[], emojiOf: (icon: string) => string): CategoryImportRow[] {
+  const rows = new Map<string, CategoryImportRow>();
+  for (const item of items) {
+    if (item.kind !== 'entry' || !item.category || rows.has(item.category.id)) continue;
+    const { id, name, icon, builtin } = item.category;
+    rows.set(id, { id, name: name.trim(), emoji: emojiOf(icon), is_builtin: builtin ? 1 : 0, deleted_at: null });
+  }
+  return [...rows.values()];
+}
+
+/** The custom block definitions the copies in the contents came from, by their quiet note (`FieldsModel.definition`). */
+export function usedDefinitionIds(contents: readonly string[]): string[] {
+  const ids = new Set<string>();
+  for (const content of contents) {
+    for (const block of parseBlocks(content)) {
+      if (block.type !== FIELDS_BLOCK_TYPE) continue;
+      const { definition } = parseFields(block);
+      if (definition) ids.add(definition);
+    }
+  }
+  return [...ids];
 }
 
 /* ---------------- Reading a foreign manifest ---------------- */
@@ -119,6 +206,9 @@ export const MANIFEST_LIMITS = { items: 1000, blocks: 50_000, links: 50_000 } as
 /** What `generateId` makes. An entry's ID in a file must be one: re-linking replaces it wherever it stands. */
 const UUID_RE = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi;
 const isUuid = (v: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v);
+
+/** A category's or definition's ID from a file: harmless characters only, as `isDefinitionId`. */
+const isRowId = (v: unknown): v is string => typeof v === 'string' && /^[\w-]{1,100}$/.test(v);
 
 const text = (v: unknown): string => (typeof v === 'string' ? v : '');
 const strings = (v: unknown): string[] => (Array.isArray(v) ? v.filter((s): s is string => typeof s === 'string') : []);
@@ -160,7 +250,8 @@ function readItem(raw: unknown): ManifestItem | null {
   }
   if (raw.kind !== 'entry' || !isUuid(raw.id)) return null;
   const category = isRecord(raw.category) && typeof raw.category.name === 'string' && raw.category.name.trim()
-    ? { name: raw.category.name, icon: text(raw.category.icon), builtin: raw.category.builtin === true }
+    && isRowId(raw.category.id)
+    ? { id: raw.category.id, name: raw.category.name, icon: text(raw.category.icon), builtin: raw.category.builtin === true }
     : null;
   return {
     kind: 'entry',
@@ -172,12 +263,8 @@ function readItem(raw: unknown): ManifestItem | null {
   };
 }
 
-/**
- * The manifest of a file, checked field by field — the file is foreign. An
- * item it cannot read is dropped; a manifest of another version, or without
- * a single readable item, is a problem.
- */
-export function parseManifest(json: string): EmeraldManifest | ManifestProblem {
+/** The frame every manifest shares: JSON, the format, this version, the kind. */
+function readFrame(json: string, kind: EmeraldKind): Record<string, unknown> | ManifestProblem {
   let raw: unknown;
   try {
     raw = JSON.parse(json);
@@ -189,7 +276,35 @@ export function parseManifest(json: string): EmeraldManifest | ManifestProblem {
     if (typeof raw.version !== 'number' || !Number.isInteger(raw.version)) return 'unsupported';
     return raw.version < EMERALD_FORMAT_VERSION ? 'oldVersion' : 'newVersion';
   }
-  if ((Array.isArray(raw.items) && raw.items.length > MANIFEST_LIMITS.items)
+  return raw.kind === kind ? raw : 'unsupported';
+}
+
+/** The manifest of a `.vault.emerald`, its frame checked. */
+export function parseVaultManifest(json: string): EmeraldVaultManifest | ManifestProblem {
+  const raw = readFrame(json, 'vault');
+  if (typeof raw === 'string') return raw;
+  if (!isRecord(raw.data)) return 'unsupported';
+  return {
+    format: 'emerald',
+    version: EMERALD_FORMAT_VERSION,
+    kind: 'vault',
+    exportedAt: text(raw.exportedAt),
+    filters: raw.filters,
+    data: raw.data,
+    ...(raw.settings !== undefined && { settings: raw.settings }),
+  };
+}
+
+/**
+ * The manifest of a file, checked field by field — the file is foreign. An
+ * item it cannot read is dropped; a manifest of another version, or without
+ * a single readable item, is a problem.
+ */
+export function parseManifest(json: string): EmeraldManifest | ManifestProblem {
+  const raw = readFrame(json, 'items');
+  if (typeof raw === 'string') return raw;
+  if ((Array.isArray(raw.blockDefinitions) && raw.blockDefinitions.length > MANIFEST_LIMITS.items)
+    || (Array.isArray(raw.items) && raw.items.length > MANIFEST_LIMITS.items)
     || (Array.isArray(raw.links) && raw.links.length > MANIFEST_LIMITS.links)) return 'tooLarge';
   // An ID twice would create an entry nothing ever fills: the first one stays.
   const seen = new Set<string>();
@@ -202,13 +317,18 @@ export function parseManifest(json: string): EmeraldManifest | ManifestProblem {
       ? [{ id: l.id, kind: l.kind === 'task' ? 'task' : 'entry', title: text(l.title) }]
       : []))
     : [];
+  const blockDefinitions = Array.isArray(raw.blockDefinitions)
+    ? raw.blockDefinitions.filter((d): d is ManifestBlockDefinition => isRecord(d) && isRowId(d.id))
+    : [];
   return {
     format: 'emerald',
     version: EMERALD_FORMAT_VERSION,
+    kind: 'items',
     exportedAt: text(raw.exportedAt),
     items,
     links,
     omittedImages: strings(raw.omittedImages),
+    blockDefinitions,
   };
 }
 

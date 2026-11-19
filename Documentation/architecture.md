@@ -85,7 +85,8 @@ src/
 │   ├── settingsStore.ts         the open vault's settings.json
 │   ├── vaultStore.ts, trashStore.ts, undoStore.ts, importStore.ts
 │   ├── vaultKeyStore.ts         the unlock gate (`ensureVaultReady`)
-│   ├── backupSecretStore.ts     asks for an encrypted backup's password
+│   ├── backupSecretStore.ts     asks for a `.emerald` file's password, or its vault's password or recovery key
+│   ├── vaultImportStore.ts      a `.vault.emerald` the title bar's import opened, on its way to Settings → Backup
 │   ├── imageStore.ts            "Images": rows, files, places of use; `takeIn`, `discardRenders`
 │   ├── imagePickerStore.ts      `pickPictures`, the picture picker's open request
 │   ├── imageNoticeStore.ts      "image not inserted" notice
@@ -126,8 +127,9 @@ src/
 │   ├── storeImage.ts            a file from the disk or a Blob into `images/`
 │   ├── imageUsage.ts            where each picture is used, and in which role (`block_refs`)
 │   ├── pictureExport.ts         a rendered picture saved where the user chooses
-│   ├── export.ts, exportData.ts, emeraldFormat.ts
-│   ├── dbBackup.ts, importStaging.ts   .emeralddb backup and restore
+│   ├── export.ts, exportData.ts, emeraldFormat.ts   Markdown and PDF export; `.emerald` files of entries and templates
+│   ├── emerald/                 `manifest.ts` (the manifest, pure), `file.ts` (the `.emerald` commands, asking for a secret)
+│   ├── dbBackup.ts, importStaging.ts   a vault's content as `.vault.emerald`: export and restore; the automatic backup's JSON
 │   ├── autoBackup.ts            automatic backup: when one is due, the run
 │   ├── vaultManager.ts, vaultSettings.ts
 │   ├── altarBackground.ts, altarIcon.ts   the app's own altar backgrounds; the Altar block's icon
@@ -148,7 +150,9 @@ src-tauri/src/
 ├── crypto.rs           sealed-file format, subkeys, keyed hash
 ├── keys.rs             vault.key, unlocking, OS keychain, `VaultKeys`
 ├── reencrypt.rs        changing the password, recovery, crash recovery
-├── backup.rs           encrypted .emeralddb files
+├── emerald_file.rs     .emerald and .vault.emerald files: header, archive, limits, the four commands
+├── emerald_seal.rs     the sealed body of a .emerald file: chunked XChaCha20-Poly1305, streamed
+├── backup.rs           the sealed .emeralddb the automatic backup writes
 ├── auto_backup.rs      automatic backups: target folder, file name, pruning
 ├── images.rs           image commands + emerald-img scheme
 ├── vault.rs            vault registry and vault directory commands
@@ -208,9 +212,9 @@ A serialized task must never await another task under its own key — it would w
 
 ## IPC Command Surface
 
-All Rust commands are *registered* in `src-tauri/src/lib.rs` and invoked from TypeScript with `invoke()`; most are *defined* in `db.rs`, `keys.rs`, `reencrypt.rs`, `backup.rs`, `auto_backup.rs`, `images.rs`, `vault.rs` and `updates.rs`.
+All Rust commands are *registered* in `src-tauri/src/lib.rs` and invoked from TypeScript with `invoke()`; most are *defined* in `db.rs`, `keys.rs`, `reencrypt.rs`, `emerald_file.rs`, `auto_backup.rs`, `images.rs`, `vault.rs` and `updates.rs`.
 
-**File commands run off the main thread.** `write_file`, `read_file`, `export_image`, `ensure_app_storage_dirs` and all six commands in `images.rs` are `async` and wrap their `std::fs` work in `tauri::async_runtime::spawn_blocking`, so a multi-megabyte `.emeralddb` doesn't block the window. `async fn` alone would not do: the blocking call would still run on a runtime worker and could starve the SQL pools, PDF export and IPC replies on a machine with few cores. The `emerald-img` scheme handler uses `spawn_blocking` as well. The four native-menu commands stay synchronous on purpose — they mutate `NSMenu`, which is main-thread-only on macOS.
+**File commands run off the main thread.** `write_file`, `read_file`, `export_image`, `ensure_app_storage_dirs`, `write_emerald_file`, `read_emerald_file`, `store_emerald_files` and all six commands in `images.rs` are `async` and wrap their `std::fs` work in `tauri::async_runtime::spawn_blocking`, so a large export or import doesn't block the window. `async fn` alone would not do: the blocking call would still run on a runtime worker and could starve the SQL pools, PDF export and IPC replies on a machine with few cores. The `emerald-img` scheme handler uses `spawn_blocking` as well. The four native-menu commands stay synchronous on purpose — they mutate `NSMenu`, which is main-thread-only on macOS.
 
 - A static `IMAGE_WRITE_LOCK` in `images.rs` serializes the image folder's writes and deletes; without it, a storage cleanup could delete a file whose hash a concurrent `save_image` had just judged "already exists".
 - `resolve_allowed_roots()` caches its result in a `OnceLock` once every root canonicalizes, and re-resolves on every call while any root fails (a not-yet-existing directory, an unmounted drive), so a transient failure heals on the next call.
@@ -224,11 +228,10 @@ All Rust commands are *registered* in `src-tauri/src/lib.rs` and invoked from Ty
 | `vault_create_key` / `vault_unlock` / `vault_unlock_remembered` / `vault_lock` | Create a new vault's key, unlock with the password, unlock from the OS keychain, forget the key held in memory. |
 | `vault_change_password` / `vault_recover` | Change the password, or set a new one from the recovery key; both build a copy under a new key and return the new recovery key. See [Re-encrypting a vault](architecture/encryption.md#re-encrypting-a-vault). |
 | `vault_set_remembered` / `vault_is_remembered` / `keychain_available` | The "remember on this device" switch, its state, and whether the system has a keychain. |
-| `write_backup_file(vault_id, path, content)` / `read_backup_file(path, password?, recovery_key?)` | Write a `.emeralddb` sealed under the vault key / open one with an unlocked vault's key, a password or a recovery key (`BACKUP_LOCKED` when none fits). |
-| `auto_backup_status(vault_id)` / `pick_auto_backup_dir(vault_id)` / `reset_auto_backup_dir(vault_id)` / `write_auto_backup(vault_id, content, keep?)` | The automatic backup: target folder and newest backup / native folder dialog, opened in Rust / back to the vault's `backup/` / write today's sealed backup and prune beyond `keep`. No path crosses IPC — see [`security.md`](security.md#automatic-backups). |
+| `auto_backup_status(vault_id)` / `pick_auto_backup_dir(vault_id)` / `reset_auto_backup_dir(vault_id)` / `write_auto_backup(vault_id, content, keep?)` | The automatic backup: target folder and newest backup / native folder dialog, opened in Rust / back to the vault's `backup/` / write today's sealed `.emeralddb` (`backup.rs`) and prune beyond `keep`. No path crosses IPC — see [`security.md`](security.md#automatic-backups). |
 | `save_image(data_url, vault_id)` | Decode a data-URL, write it into the vault's `images/` — sealed and named by a keyed hash in an encrypted vault. Skips if it exists. Returns the **filename**. |
 | `copy_image_file(source, vault_id)` | Copy a file from an arbitrary path into the vault's `images/` under its content name. png/jpg/jpeg/gif/webp/svg only; rejects symlinks, canonicalizes the source and confines it to the allowed storage roots. Returns the filename. |
-| `read_image_as_base64(filename, vault_id)` | A stored image, opened if sealed, as a data-URL — only for the PDF export (renders in a `file://` webview) and the backup writer (embeds bytes in JSON); everything else uses the `emerald-img` scheme. |
+| `read_image_as_base64(filename, vault_id)` | A stored image, opened if sealed, as a data-URL — only for the PDF export (renders in a `file://` webview), the automatic backup (embeds bytes in JSON) and a picture the `.emerald` export compresses; everything else uses the `emerald-img` scheme. |
 | `read_image_file(source)` | An *external* image file as a data-URL, without storing it, so the frontend can scale it to the vault's image limits before `save_image`. Same checks as `copy_image_file` (`checked_image_source`), plus a 64 MB source cap. |
 | `read_vault_drafts(vault_id)` / `write_vault_drafts(vault_id, contents)` | The vault's `drafts.json` — unsaved drafts of block and template pages (`store/draftStore.ts`), sealed in an encrypted vault. An empty object removes the file. `async`, since it is written after every pause in typing; a rename or remove that fails is retried briefly, since on Windows a scanner or sync client may hold the file. |
 | `read_vault_settings(vault_id)` / `write_vault_settings(vault_id, contents)` | The vault's `settings.json` — see [Vault Settings](architecture/storage.md#vault-settings) and [`security.md`](security.md#vault-json-files) for atomicity and symlink handling. |
@@ -239,10 +242,12 @@ All Rust commands are *registered* in `src-tauri/src/lib.rs` and invoked from Ty
 | `default_vault_dir(vault_id)` / `probe_vault_dir(path)` | The location a vault gets when the user picks none / what a chosen folder already contains. |
 | `new_vault_base_dir()` | Where new vaults are offered: `{documentDir}/Emerald Vaults`, else `{appDataDir}/vaults`. |
 | `delete_vault_files(vault_id)` | Removes only the vault's own artefacts by name, never `remove_dir_all`; returns whether the vault folder is gone, so the UI can say "the folder stayed". What it deletes: [`security.md`](security.md#vault-directories-as-a-trust-boundary). |
-| `discard_import_staging(vault_id)` | Removes a backup import's staging copy (`emerald.db.import` plus `-journal`/`-wal`/`-shm`). Run before and after every import; a missing file is not an error. See [DB Backup / Restore](database.md#db-backup--restore-emeralddb). |
+| `discard_import_staging(vault_id)` | Removes a backup import's staging copy (`emerald.db.import` plus `-journal`/`-wal`/`-shm`). Run before and after every import; a missing file is not an error. See [DB Backup / Restore](database.md#db-backup--restore-vaultemerald). |
 | `ensure_backup_dir(vault_id)` | The vault's `backup/` folder, the database export's default destination; recreated on demand, refused outside the allowed storage roots and, inside the app data directory, outside `vaults/` — wherever the write command would refuse the export afterwards. |
 | `export_image(path, data_url)` | Write a data-URL's image bytes to a user-chosen `.png`/`.jpg`/`.jpeg`/`.webp`/`.svg` path. Same path checks as `write_file`. |
-| `write_emerald_file(vault_id, path, manifest, images, icons, password?)` / `read_emerald_file(vault_id, path, password?)` | Write a `.emerald` archive from a manifest and the vault's pictures, sealed if a password is given / read one within fixed limits and store its pictures and icons in the vault. Same path checks as `write_file`. See [The `.emerald` file](architecture/editing.md#the-emerald-file). |
+| `write_emerald_file(vault_id, path, kind, manifest, images, icons, protection)` | Write a `.emerald` (`kind` `items`) or `.vault.emerald` (`vault`) from the frontend's manifest and the vault's pictures and icons, streamed into `{path}.part` and renamed into place; `protection` is `none`, an own `password` or the `vaultKey`. Same path checks as `write_file`. See [The `.emerald` file](architecture/editing.md#the-emerald-file). |
+| `read_emerald_file(path, password?, recovery_key?)` | Open a `.emerald` within the limits of its kind and return `{ticket, kind, manifest}`; the pictures stay in the file. `EMERALD_LOCKED` / `EMERALD_VAULT_LOCKED` while a secret is missing. Same path checks as `read_file`. |
+| `store_emerald_files(ticket, vault_id)` / `close_emerald_file(ticket)` | Store an opened file's pictures and icons in the vault, once the import really starts; returns name in the file → name stored here / forget an opened file. Tickets live in Rust (`EmeraldTickets`, at most four). |
 | `write_file(path, content)` | Write UTF-8 text to a user-selected `.md`/`.json`/`.txt` path. Rejects symlinks; the path must resolve within the allowed storage roots, and inside the app data directory only `vaults.json` and `vaults/` are writable (see [Path Confinement](security.md#path-confinement)). |
 | `read_file(path)` | Read a file as UTF-8. Same allowlist and confinement as `write_file`. |
 | `ensure_app_storage_dirs()` | Create the app data and config directories before vault metadata is written or SQLite opens. |

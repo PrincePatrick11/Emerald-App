@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { VAULT_KEY_CANCELLED } from '../../../store/vaultKeyStore';
 import { keyErrorOf } from '../../../lib/vaultKeys';
 import { useTranslation } from 'react-i18next';
@@ -19,15 +19,15 @@ import {
   type ImportTypeFilters,
   CONTENT_TYPES,
   allTypesIncluded,
-  BACKUP_OUTDATED,
-  BACKUP_TOO_NEW,
-  type BackupFile,
-  type BackupPreview,
+  closeVaultFile,
   exportDatabase,
   FULL_BACKUP_OPTIONS,
-  openBackupFile,
   importDatabase,
+  pickVaultFile,
+  type OpenedVaultFile,
 } from '../../../lib/dbBackup';
+import { EmeraldNotice } from '../../../lib/emerald/file';
+import { useVaultImportStore } from '../../../store/vaultImportStore';
 import { SETTINGS_GROUPS, type SettingsGroup } from '../../../lib/vaultSettings';
 import { resolveOpenEdits } from '../../../lib/openEdits';
 import AutoBackupSection from './AutoBackupSection';
@@ -79,7 +79,11 @@ export default function BackupPage() {
   const [exportError, setExportError] = useState(false);
 
   // Import
-  const [importedFile, setImportedFile] = useState<{ backup: BackupFile; preview: BackupPreview } | null>(null);
+  const [importedFile, setImportedFile] = useState<OpenedVaultFile | null>(null);
+  // The open file, for closing it when another one is picked or the page goes.
+  const openFile = useRef<OpenedVaultFile | null>(null);
+  const closeTimer = useRef<number | undefined>(undefined);
+  const importArea = useRef<HTMLDivElement>(null);
   // Add-vault as the default: the only mode that surely does not touch
   // existing data.
   const [importMode, setImportMode] = useState<ImportMode>('add-vault');
@@ -117,34 +121,60 @@ export default function BackupPage() {
   }
 
   // ── Import handlers ────────────────────────────────────────────────────────
+  /** Takes an opened file as the one to import, closing the one before. */
+  async function takeFile(file: OpenedVaultFile) {
+    if (openFile.current && openFile.current !== file) closeVaultFile(openFile.current);
+    openFile.current = file;
+    setImportedFile(file);
+    setImportDone(false);
+    setNewVaultName(t('settings.importedVault'));
+    setVaultCustomPath(null);
+    // Like `openCreateRow` in the vault picker: resolve once so the row shows
+    // a real path from the start — and before the import becomes clickable,
+    // otherwise a quick click runs into the fallback
+    // `{appDataDir}/vaults/{id}`. If resolving fails, that fallback stays.
+    setVaultBaseDir(await newVaultBaseDir().catch(() => null));
+    setImportTypeFilters(allTypesIncluded());
+    setSettingsGroups([]);
+  }
+
+  // A file the menu's import opened arrives here; whatever is still open when
+  // the page goes is closed.
+  useEffect(() => {
+    window.clearTimeout(closeTimer.current);
+    const pending = useVaultImportStore.getState().take();
+    // From the menu: the import options are what the page was opened for.
+    if (pending) void takeFile(pending).then(() => importArea.current?.closest('section')?.scrollIntoView({ block: 'start' }));
+    return () => {
+      // Deferred: mounted again at once (React's development double run), the page keeps its file.
+      closeTimer.current = window.setTimeout(() => {
+        if (openFile.current) closeVaultFile(openFile.current);
+        openFile.current = null;
+      }, 0);
+    };
+    // Once, on mounting: `takeFile` only sets state.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   async function handleBrowse() {
     setImportError('');
     try {
-      const result = await openBackupFile();
-      if (!result) return;
-      setImportedFile({ backup: result.backup, preview: result.preview });
-      setNewVaultName(t('settings.importedVault'));
-      setVaultCustomPath(null);
-      // Like `openCreateRow` in the vault picker: resolve once so the row shows
-      // a real path from the start — and before the import becomes clickable,
-      // otherwise a quick click runs into the fallback
-      // `{appDataDir}/vaults/{id}`. If resolving fails, that fallback stays.
-      setVaultBaseDir(await newVaultBaseDir().catch(() => null));
-      setImportTypeFilters(allTypesIncluded());
-      setSettingsGroups([]);
+      const file = await pickVaultFile();
+      if (file) await takeFile(file);
     } catch (err) {
-      // Emerald reads nothing outside its own folders (`guarded_read_path`) —
-      // so an automatic backup on another drive is not a broken one, and the
-      // message says what to do. A file from another version is not broken
-      // either: it says which.
-      const code = keyErrorOf(err);
-      setImportError(t(
-        code.includes('access denied') ? 'settings.importErrorOutside'
-          : code.includes(BACKUP_OUTDATED) ? 'settings.importErrorOldVersion'
-            : code.includes(BACKUP_TOO_NEW) ? 'settings.importErrorNewVersion'
-              : 'settings.importErrorInvalid',
-      ));
+      // A file from another version or a damaged one says so itself
+      // (`EmeraldNotice`) — and so does one outside the folders Emerald reads
+      // from, so an automatic backup on another drive is not a broken one.
+      // A file of entries is no vault: it belongs to the Import button.
+      setImportError(err instanceof EmeraldNotice ? err.message : t('settings.importErrorInvalid'));
     }
+  }
+
+  /** Closes the chosen file and takes it off the page. */
+  function dropFile() {
+    if (openFile.current) closeVaultFile(openFile.current);
+    openFile.current = null;
+    setImportedFile(null);
   }
 
   async function handleImport() {
@@ -171,7 +201,7 @@ export default function BackupPage() {
         }
       }
       await importDatabase(
-        importedFile.backup,
+        importedFile,
         importMode,
         importMode === 'add-vault'
           ? { name: vaultName, path: vaultTarget ?? undefined }
@@ -180,10 +210,15 @@ export default function BackupPage() {
         importMode === 'merge' ? settingsGroups : [],
       );
       setImportDone(true);
-      setImportedFile(null);
+      dropFile();
     } catch (err) {
-      // Cancelled at the new vault's password: not an error, just no import.
-      if (keyErrorOf(err) !== VAULT_KEY_CANCELLED) setImportError(String(err));
+      // Cancelled at the new vault's password: not an error, just no import —
+      // the file stays chosen for another try.
+      if (keyErrorOf(err) === VAULT_KEY_CANCELLED) return;
+      // A damaged file says so itself; anything else as it came.
+      setImportError(err instanceof EmeraldNotice ? err.message : String(err));
+      // Whatever went wrong, it went wrong with this file: another attempt starts with picking one.
+      dropFile();
     } finally {
       setImporting(false);
     }
@@ -298,7 +333,7 @@ export default function BackupPage() {
       </SettingsSection>
 
       <SettingsSection icon={<Upload size={14} />} title={t('settings.importDb')} description={t('settings.importDbHint')}>
-        <div className="space-y-3">
+        <div ref={importArea} className="space-y-3">
           {/* File picker — the preview on its own line: in the button row it
               had squeezed every further neighbour to zero width. */}
           <div className="space-y-1.5">
@@ -462,11 +497,12 @@ export default function BackupPage() {
                   <Upload size={14} />
                   {importing ? t('settings.importing') : t('settings.importBtn')}
                 </Button>
-                {importDone && <SettingsStatus tone="success">{t('settings.importDone')}</SettingsStatus>}
               </div>
             </>
           )}
 
+          {/* Not by the button: the options and the button go once the import is done. */}
+          {importDone && <SettingsStatus tone="success">{t('settings.importDone')}</SettingsStatus>}
           {/* At the end of the panel, not in the file row: there the message
               was squeezed to zero width next to the button and preview text —
               set, but invisible. Here it sits by the import button that

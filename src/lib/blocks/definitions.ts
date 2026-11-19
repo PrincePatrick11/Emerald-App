@@ -105,7 +105,7 @@ export type LinkDefaultResolver = (target: { id: string; targetKind: string; lab
 /**
  * The `elements` of a definition row from a foreign source with rewritten
  * defaults: image names via `image`, link targets via `link` (merge import
- * with prefix, `.emerald` by ID or title). If `link` finds no target, the
+ * with prefix, `.emerald` by the ID of an entry of the same file). If `link` finds no target, the
  * default is dropped — otherwise every new copy would carry a chip pointing
  * nowhere. Unreadable input comes back unchanged; reading validates anyway.
  */
@@ -184,6 +184,8 @@ export function instantiateDefinition(def: BlockDefinition, text: FallbackText):
       display: blockDisplay(def.display),
       name: def.name,
       icon: def.icon,
+      // Where the copy came from — a note for the `.emerald` export, not a link.
+      definition: def.id,
     }),
   };
   // The field block's default is "without title"; only the deviation becomes an attribute.

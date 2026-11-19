@@ -134,7 +134,8 @@ writeFileSync(
   `export { runMigrations, VAULT_OUTDATED, VAULT_TOO_NEW, sweepDanglingTaskLinks } from '${root}/src/lib/db';
    export { TABLES, TABLE_DDL, BASELINE_VERSION, FRESH_START_VERSION, checkIntegrity, reassignCategoryContent, collectUsedImageFilenames, collectUsedIconFilenames, replaceTagsInDashboards } from '${root}/src/lib/schema';
    export { readTagLinks, replaceTagId, tagStatements } from '${root}/src/lib/tagRefs';
-   export { assertPayloadReferencesResolve, buildBackupFrom, doMerge, doReplace, readBackupPayload, BACKUP_OUTDATED, BACKUP_TOO_NEW } from '${root}/src/lib/dbBackup';
+   export { assertPayloadReferencesResolve, collectVaultContent, definitionRows, doMerge, doReplace, insertBlockDefinitions, resolveImportedCategories, vaultContentOf, vaultManifestOf } from '${root}/src/lib/dbBackup';
+   export { categoryRowsOf, contentToBlocks, manifestCategoryOf, parseManifest, parseVaultManifest, usedDefinitionIds, EMERALD_FORMAT_VERSION } from '${root}/src/lib/emerald/manifest';
    export { invalidateVaultCache } from '${root}/src/lib/vaultManager';
    export { clearSavedBlocks, readContents, replaceOwnerBlocks } from '${root}/src/lib/blockStore';
    export { entriesWithFieldValue } from '${root}/src/lib/blocks/blockQuery';
@@ -175,7 +176,9 @@ const {
   runMigrations, VAULT_OUTDATED, VAULT_TOO_NEW, sweepDanglingTaskLinks,
   TABLES, BASELINE_VERSION, FRESH_START_VERSION, checkIntegrity, reassignCategoryContent, collectUsedImageFilenames,
   collectUsedIconFilenames, replaceTagsInDashboards, readTagLinks, replaceTagId, tagStatements,
-  assertPayloadReferencesResolve, buildBackupFrom, doMerge, doReplace, readBackupPayload, BACKUP_OUTDATED, BACKUP_TOO_NEW,
+  assertPayloadReferencesResolve, collectVaultContent, definitionRows, doMerge, doReplace, insertBlockDefinitions,
+  resolveImportedCategories, vaultContentOf, vaultManifestOf,
+  categoryRowsOf, contentToBlocks, manifestCategoryOf, parseManifest, parseVaultManifest, usedDefinitionIds, EMERALD_FORMAT_VERSION,
   invalidateVaultCache, clearSavedBlocks, readContents, replaceOwnerBlocks, entriesWithFieldValue, collectImageUses,
 } = await import(pathToFileURL(bundlePath).href);
 
@@ -871,13 +874,12 @@ console.log('\n10. Readers of the block rows: "Images", image cleanup, field val
   db.close();
 }
 
-console.log("\n11. Backups: the round trip of '17', older and newer files refused\n");
+console.log('\n11. .vault.emerald: the round trip of a vault content, other versions refused\n');
 
 {
   const { createHash } = await import('node:crypto');
-  // Every picture the import saves gets a name of its own, the hash of what it was given.
-  const savedName = (dataUrl) => `${createHash('sha256').update(dataUrl).digest('hex')}.png`;
-  globalThis.harnessSaveImage = savedName;
+  // Every picture the import stores gets a name of its own here, as Rust gives it.
+  const savedName = (name) => `${createHash('sha256').update(name).digest('hex')}.png`;
   const FULL = {
     categoryIds: null, includeUncategorized: true, includeTasks: true, includeTags: true,
     includeLexicon: true, dateFrom: '', dateTo: '', includeDeleted: true,
@@ -890,14 +892,18 @@ console.log("\n11. Backups: the round trip of '17', older and newer files refuse
     `SELECT b.id AS block, r.target_kind, r.target, r.role FROM block_refs r JOIN blocks b ON b.row_id = r.block_row
       WHERE b.${ownColumn[kind]} = $1 ORDER BY b.id, r.target_kind, r.target, r.role`, [id],
   )).map((r) => ({ ...r }));
-  /** The file through JSON, as it is written and read, and checked like on opening it. */
-  const reread = (file) => {
-    const copy = JSON.parse(JSON.stringify(file));
-    readBackupPayload(copy);
-    return copy;
-  };
-  /** A stored name in the file → the name the import saved it under. */
-  const namesAfterImport = (file) => new Map(Object.entries(file.images).map(([name, url]) => [name, savedName(url)]));
+  /**
+   * What writing and opening a `.vault.emerald` does: the manifest through
+   * JSON and read back as on opening; the archive's pictures and icons stored
+   * under names of this vault (`store_emerald_files`).
+   */
+  const asFile = (collected) => ({
+    content: vaultContentOf(JSON.stringify(vaultManifestOf(collected.content))),
+    files: {
+      images: new Map(collected.images.map((name) => [name, savedName(name)])),
+      icons: new Map(collected.icons.map((name) => [name, savedName(name)])),
+    },
+  });
   const renamed = (value, names) => {
     let out = JSON.stringify(value);
     for (const [from, to] of names) out = out.split(from).join(to);
@@ -949,16 +955,18 @@ console.log("\n11. Backups: the round trip of '17', older and newer files refuse
   const journalBefore = await blockRows(src, 'entry', J);
   const sigilBefore = await blockRows(src, 'template', 'core-sigil');
 
-  const backup = await buildBackupFrom(src, FULL);
-  check("export: version '17', the blocks as rows, no content on their owners",
-    backup.version === '17' && Array.isArray(backup.data.blocks) && backup.data.blocks.length > 0
+  const collected = await collectVaultContent(src, FULL);
+  const backup = collected.content;
+  check('export: a manifest of the kind vault, the blocks as rows, no content on their owners',
+    vaultManifestOf(backup).kind === 'vault' && vaultManifestOf(backup).version === EMERALD_FORMAT_VERSION && Array.isArray(backup.data.blocks) && backup.data.blocks.length > 0
       && backup.data.entries.every((r) => !('content' in r)) && backup.data.templates.every((r) => !('content' in r))
       && backup.data.blocks.every((r) => !('row_id' in r) && !('text' in r)), backup.data.blocks?.[0]);
   check("export: every picture of the blocks travels, the one only in a prefill's JSON too",
-    ['1', '2', '3', '4', '5', '6'].every((c) => pic(c) in backup.images), Object.keys(backup.images));
-  check('export: the cover travels as a picture', pic('7') in backup.images);
-  check("export: the icons travel as files of their own — the entry's, the template's and a block copy's — none among the pictures",
-    ['a', 'b', 'c'].every((c) => ico(c) in (backup.icons ?? {})) && !Object.keys(backup.images).some((n) => n.endsWith('.webp')), Object.keys(backup.icons ?? {}));
+    ['1', '2', '3', '4', '5', '6'].every((c) => collected.images.includes(pic(c))), collected.images);
+  check('export: the cover travels as a picture', collected.images.includes(pic('7')));
+  check('export: the manifest carries names only, no picture data', !JSON.stringify(vaultManifestOf(backup)).includes('data:image'));
+  check("export: the icons travel as files of their own — the entry's, the template's and a block copy's — the entry's and the template's not among the pictures",
+    ['a', 'b', 'c'].every((c) => collected.icons.includes(ico(c))) && !collected.images.includes(ico('b')) && !collected.images.includes(ico('c')), { icons: collected.icons, images: collected.images });
   check('export: rows carry their tags as arrays of IDs, in their order',
     backup.data.entries.find((r) => r.id === W)?.tags.join() === 't-b,t-a'
       && backup.data.templates.find((r) => r.id === TPL)?.tags.join() === 't-a'
@@ -967,12 +975,12 @@ console.log("\n11. Backups: the round trip of '17', older and newer files refuse
   // (a) Replace into an empty vault: the same rows, pictures renamed, references rebuilt.
   // The target vault has none of the source's icon files.
   globalThis.harnessIconFiles = [];
-  const restored = reread(backup);
+  const restored = asFile(collected);
   const dst = await freshVault('backup-dst.db');
   clearSavedBlocks();
-  await doReplace(dst, restored);
-  const iconNames = new Map(Object.entries(restored.icons).map(([n, url]) => [n, savedName(url)]));
-  const names = new Map([...namesAfterImport(restored), ...iconNames]);
+  await doReplace(dst, restored.content, restored.files);
+  const iconNames = restored.files.icons;
+  const names = new Map([...restored.files.images, ...iconNames]);
   for (const [kind, id, label] of [['entry', J, 'journal entry'], ['entry', W, 'second entry'], ['template', TPL, 'template']]) {
     const expected = renamed(await blockRows(src, kind, id), names);
     const got = await blockRows(dst, kind, id);
@@ -1003,7 +1011,8 @@ console.log("\n11. Backups: the round trip of '17', older and newer files refuse
 
   // (b) Merge into the vault it came from: copies under prefixed IDs, links pointing at the copies.
   clearSavedBlocks();
-  await doMerge(src, reread(backup));
+  const again = asFile(collected);
+  await doMerge(src, again.content, again.files);
   const [copy] = await src.select('SELECT id FROM entries WHERE id LIKE $1', [`%-${J}`]);
   const prefixed = copy ? copy.id.slice(0, copy.id.length - J.length) + W : null;
   const copyStack = copy ? await stackOf(src, 'entry', copy.id) : '';
@@ -1020,11 +1029,11 @@ console.log("\n11. Backups: the round trip of '17', older and newer files refuse
   src.close();
 
   // (c) A partial replace — journal and tasks only: no other owner gets blocks, a link to the missing article goes.
-  const partial = reread(backup);
-  partial.data.entries = partial.data.entries.filter((r) => r.id !== W);
+  const partial = asFile(collected);
+  partial.content.data.entries = partial.content.data.entries.filter((r) => r.id !== W);
   const dst2 = await freshVault('backup-partial.db');
   clearSavedBlocks();
-  await doReplace(dst2, partial);
+  await doReplace(dst2, partial.content, partial.files);
   check('partial restore: the journal entry has its blocks, the second entry neither row nor blocks',
     (await blockRows(dst2, 'entry', J)).length === 4 && (await blockRows(dst2, 'entry', W)).length === 0
       && (await dst2.select('SELECT COUNT(*) AS n FROM entries WHERE id = $1', [W]))[0].n === 0);
@@ -1036,18 +1045,18 @@ console.log("\n11. Backups: the round trip of '17', older and newer files refuse
   const fresh = await freshVault('backup-add-vault.db');
   clearSavedBlocks();
   await fresh.execute("DELETE FROM templates WHERE id = 'core-sigil'");
-  const asNew = reread(backup);
-  await doReplace(fresh, asNew);
+  const asNew = asFile(collected);
+  await doReplace(fresh, asNew.content, asNew.files);
   check('new vault: the sigil template has exactly the blocks of the file',
-    JSON.stringify(await blockRows(fresh, 'template', 'core-sigil')) === JSON.stringify(renamed(sigilBefore, namesAfterImport(asNew))));
+    JSON.stringify(await blockRows(fresh, 'template', 'core-sigil')) === JSON.stringify(renamed(sigilBefore, asNew.files.images)));
   fresh.close();
 
   // A crafted file with short picture keys: every name is renamed once, nothing grows key by key.
-  const crafted = reread(backup);
-  crafted.images = { ...crafted.images, '': 'data:image/png;base64,AA', 0: 'data:image/png;base64,AB', a: 'data:image/png;base64,AC' };
+  const crafted = asFile(collected);
+  for (const key of ['', '0', 'a']) crafted.files.images.set(key, savedName(key));
   const dst3 = await freshVault('backup-crafted.db');
   clearSavedBlocks();
-  await doReplace(dst3, crafted);
+  await doReplace(dst3, crafted.content, crafted.files);
   const longest = (await dst3.select('SELECT MAX(LENGTH(html) + LENGTH(COALESCE(data, \'\'))) AS n FROM blocks'))[0].n;
   check('crafted picture keys: the import finishes and the blocks keep their size', longest < 5000, longest);
   dst3.close();
@@ -1058,13 +1067,14 @@ console.log("\n11. Backups: the round trip of '17', older and newer files refuse
   const dreamsSrc = await freshVault('backup-starter-src.db');
   clearSavedBlocks();
   await insertWithStack(dreamsSrc, 'entries', { id: 'dream-1', title: 'Tower', category_id: 'dreams', created_at: now, updated_at: now }, '<p>Tower</p>');
-  const dreamsBackup = await buildBackupFrom(dreamsSrc, FULL);
+  const dreamsBackup = await collectVaultContent(dreamsSrc, FULL);
   dreamsSrc.close();
   const dreamsDst = await freshVault('backup-starter-dst.db');
   await dreamsDst.execute("UPDATE categories SET name = 'Träume' WHERE id = 'dreams'"); // lang-ok
   const categoriesBefore = (await dreamsDst.select('SELECT COUNT(*) AS n FROM categories'))[0].n;
   clearSavedBlocks();
-  await doReplace(dreamsDst, reread(dreamsBackup));
+  const dreamsFile = asFile(dreamsBackup);
+  await doReplace(dreamsDst, dreamsFile.content, dreamsFile.files);
   const categoriesAfter = (await dreamsDst.select('SELECT COUNT(*) AS n FROM categories'))[0].n;
   const [dreamEntry] = await dreamsDst.select("SELECT category_id FROM entries WHERE id = 'dream-1'");
   const journalFilter = JSON.parse((await dreamsDst.select("SELECT filter FROM dashboards WHERE id = 'journal'"))[0].filter);
@@ -1083,12 +1093,13 @@ console.log("\n11. Backups: the round trip of '17', older and newer files refuse
   await swapSrc.execute("INSERT INTO categories (id, name, emoji, sort_order, is_builtin) VALUES ('c-own', $1, '🌙', 99, 0)", [dreamsName]);
   await insertWithStack(swapSrc, 'entries', { id: 'vision-1', title: 'Vision', category_id: 'dreams', created_at: now, updated_at: now }, '<p>Vision</p>');
   await insertWithStack(swapSrc, 'entries', { id: 'own-1', title: 'Own', category_id: 'c-own', created_at: now, updated_at: now }, '<p>Own</p>');
-  const swapBackup = await buildBackupFrom(swapSrc, FULL);
+  const swapBackup = await collectVaultContent(swapSrc, FULL);
   swapSrc.close();
   const swapDst = await freshVault('backup-starter-swap-dst.db');
   const localDreams = (await swapDst.select("SELECT name FROM categories WHERE id = 'dreams'"))[0].name;
   clearSavedBlocks();
-  await doReplace(swapDst, reread(swapBackup));
+  const swapFile = asFile(swapBackup);
+  await doReplace(swapDst, swapFile.content, swapFile.files);
   const swapped = await swapDst.select("SELECT e.id, c.name FROM entries e JOIN categories c ON c.id = e.category_id WHERE e.id IN ('vision-1', 'own-1') ORDER BY e.id");
   const swapJournal = JSON.parse((await swapDst.select("SELECT filter FROM dashboards WHERE id = 'journal'"))[0].filter);
   const [visionsRow] = await swapDst.select("SELECT id FROM categories WHERE name = 'Visions'");
@@ -1097,20 +1108,84 @@ console.log("\n11. Backups: the round trip of '17', older and newer files refuse
       && !!visionsRow && swapJournal.categories?.includes(visionsRow.id), JSON.stringify({ localDreams, swapped, swapJournal, visionsRow }));
   swapDst.close();
 
+  // Merging keeps the same rule: the renamed starter is the same category.
+  const mergeDst = await freshVault('backup-starter-merge-dst.db');
+  await mergeDst.execute("UPDATE categories SET name = 'Kräuter und Träume' WHERE id = 'dreams'"); // lang-ok
+  const mergeBefore = (await mergeDst.select('SELECT COUNT(*) AS n FROM categories'))[0].n;
+  clearSavedBlocks();
+  const mergeFile = asFile(dreamsBackup);
+  await doMerge(mergeDst, mergeFile.content, mergeFile.files);
+  const [merged] = await mergeDst.select("SELECT category_id FROM entries WHERE id LIKE '%-dream-1'");
+  check('merge after renaming a starter category: no duplicate, the entry lands in it',
+    (await mergeDst.select('SELECT COUNT(*) AS n FROM categories'))[0].n === mergeBefore && merged?.category_id === 'dreams', merged);
+  mergeDst.close();
 
-  // Files of other versions: refused when they are read, before anything happens.
-  const refused = (version, code) => throwsCode(() => readBackupPayload({ ...JSON.parse(JSON.stringify(backup)), version }), code);
-  check("a backup of '16' (tags as JSON, icons as data URLs) is refused as outdated", await refused('16', BACKUP_OUTDATED));
-  check("a backup of '15' (entries with a type) is refused as outdated", await refused('15', BACKUP_OUTDATED));
-  check("a backup of '14' (the last version before the fresh start) is refused as outdated", await refused('14', BACKUP_OUTDATED));
-  check("a backup of '1' is refused as outdated", await refused('1', BACKUP_OUTDATED));
-  check("a backup of '18' is refused as too new", await refused('18', BACKUP_TOO_NEW));
-  check('a backup without a usable version is refused', await throwsCode(() => readBackupPayload({ ...backup, version: 'x' }), 'Unsupported backup version'));
-  const fixture = (name) => JSON.parse(readFileSync(join(process.cwd(), 'tools/mcp/seed/imports', name), 'utf8'));
-  for (const name of ['backup-v12-altars.emeralddb', 'backup-v13-pre-rebuild.emeralddb']) {
-    check(`the old fixture ${name} is refused as outdated`, await throwsCode(() => readBackupPayload(fixture(name)), BACKUP_OUTDATED));
+  // ── A .emerald file of entries: the same rule for its categories, its custom blocks along ──
+  {
+    const itemSrc = await freshVault('items-src.db');
+    clearSavedBlocks();
+    const DEF = 'def-plant';
+    await itemSrc.execute(
+      "INSERT INTO block_definitions (id, name, icon, elements, display, sort_order, created_at, updated_at) VALUES ($1, 'Plant', '🌿', '[]', '{}', 0, $2, $2)",
+      [DEF, now],
+    );
+    await itemSrc.execute("INSERT INTO categories (id, name, emoji, sort_order, is_builtin) VALUES ('c-ritual', 'Night work', '🕯️', 98, 0), ('c-new', 'Only there', '🌙', 99, 0)");
+    const copyOf = `<section data-block="core.fields" data-block-id="f1" data-block-config="${attr({ elements: [], name: 'Plant', icon: '🌿', definition: DEF })}"></section>`;
+    const source = [
+      { id: '7c000000-0000-4000-8000-000000000001', category: 'dreams', content: '<p>Tower</p>' + copyOf },
+      { id: '7c000000-0000-4000-8000-000000000002', category: 'c-ritual', content: '<p>Night</p>' },
+      { id: '7c000000-0000-4000-8000-000000000003', category: 'c-new', content: '<p>New</p>' },
+    ];
+    // The exporting app runs in another language: the starter is shown under its name there.
+    const shown = { dreams: 'Traumtagebuch' }; // lang-ok
+    const categoryRows = new Map((await itemSrc.select('SELECT id, name, emoji, is_builtin FROM categories')).map((c) => [c.id, c]));
+    const items = source.map((e) => ({
+      kind: 'entry', id: e.id, title: e.id, number: null, createdAt: now, updatedAt: now, icon: '', cover: null, tags: [],
+      category: manifestCategoryOf(categoryRows.get(e.category), shown[e.category] ?? categoryRows.get(e.category).name),
+      blocks: contentToBlocks(e.content),
+    }));
+    const definitionIds = usedDefinitionIds(source.map((e) => e.content));
+    const manifest = {
+      format: 'emerald', version: EMERALD_FORMAT_VERSION, kind: 'items', exportedAt: now, items, links: [], omittedImages: [],
+      blockDefinitions: await definitionRows(itemSrc, definitionIds),
+    };
+    itemSrc.close();
+    check('.emerald: the copy of a custom block names its definition, which goes along',
+      definitionIds.join() === DEF && manifest.blockDefinitions.length === 1, definitionIds);
+    const parsed = parseManifest(JSON.stringify(manifest));
+    check('.emerald: the manifest carries the starter category with its ID', typeof parsed === 'object'
+      && parsed.items[0].category?.id === 'dreams' && parsed.items[0].category?.name === 'Traumtagebuch', parsed); // lang-ok
+
+    const itemDst = await freshVault('items-dst.db');
+    await itemDst.execute("UPDATE categories SET name = 'Visions' WHERE id = 'dreams'");
+    await itemDst.execute("INSERT INTO categories (id, name, emoji, sort_order, is_builtin) VALUES ('c-local', 'night WORK', '🕯️', 98, 0)");
+    const before = (await itemDst.select('SELECT COUNT(*) AS n FROM categories'))[0].n;
+    const { map } = await resolveImportedCategories(itemDst, categoryRowsOf(parsed.items, (icon) => icon));
+    const [created] = await itemDst.select("SELECT id FROM categories WHERE name = 'Only there'");
+    check('.emerald: a renamed starter category from another language is found by its ID, no duplicate',
+      map.get('dreams') === 'dreams', [...map]);
+    check('.emerald: another category goes by the name it had at export', map.get('c-ritual') === 'c-local', [...map]);
+    check('.emerald: a category without a namesake here is created, once',
+      !!created && map.get('c-new') === created.id && (await itemDst.select('SELECT COUNT(*) AS n FROM categories'))[0].n === before + 1);
+    await insertBlockDefinitions(itemDst, parsed.blockDefinitions);
+    await insertBlockDefinitions(itemDst, parsed.blockDefinitions);
+    const definitions = await itemDst.select('SELECT id, name FROM block_definitions WHERE id = $1', [DEF]);
+    check('.emerald: the custom block is created, and recognised by its ID the second time', definitions.length === 1 && definitions[0].name === 'Plant', definitions);
+    itemDst.close();
   }
-  delete globalThis.harnessSaveImage;
+
+
+  // Files of other versions or kinds: refused when they are read, before anything happens.
+  const manifestJson = JSON.parse(JSON.stringify(vaultManifestOf(backup)));
+  const problem = (patch) => parseVaultManifest(JSON.stringify({ ...manifestJson, ...patch }));
+  check('a manifest of format 6 is refused as old', problem({ version: 6 }) === 'oldVersion');
+  check('a manifest of a newer format is refused as too new', problem({ version: EMERALD_FORMAT_VERSION + 1 }) === 'newVersion');
+  check('a file of entries is no vault', problem({ kind: 'items' }) === 'unsupported');
+  check('a vault manifest without data, or no JSON, is refused',
+    problem({ data: [] }) === 'unsupported' && parseVaultManifest('nope') === 'unsupported');
+  const strayEntry = { ...manifestJson, data: { ...manifestJson.data, entries: [{ id: 'x', category_id: 'not-in-file' }] } };
+  check('an entry is in a category only if the file carries it',
+    vaultContentOf(JSON.stringify(strayEntry)).data.entries[0].category_id === null);
   delete globalThis.harnessIconFiles;
 }
 
@@ -1128,6 +1203,18 @@ console.log('\n12. Mirrored constants\n');
   // Deliberately literal comparisons instead of parsed values: whoever changes one of these
   // constants should fail here and be forced to update the other
   // side too. A comment "Mirrors X in Y" does not achieve that.
+
+  // The `.emerald` format: Rust checks the version and item count before any
+  // picture is stored, the frontend writes and reads the same.
+  const emeraldRs = read('src-tauri/src/emerald_file.rs');
+  const manifestTs = read('src/lib/emerald/manifest.ts');
+  check(
+    '.emerald: Rust and the frontend name the same format version',
+    emeraldRs.includes(`const FORMAT_VERSION: u64 = ${EMERALD_FORMAT_VERSION};`),
+  );
+  const maxItems = /const MAX_ITEMS: usize = (\d+);/.exec(emeraldRs)?.[1];
+  const tsItems = /MANIFEST_LIMITS = \{ items: ([\d_]+),/.exec(manifestTs)?.[1]?.replace(/_/g, '');
+  check('.emerald: Rust and the frontend allow the same number of items', !!maxItems && maxItems === tsItems, { maxItems, tsItems });
 
   // The file name of a stored image is the boundary between the
   // URI scheme and the file system. If the checks drift apart,

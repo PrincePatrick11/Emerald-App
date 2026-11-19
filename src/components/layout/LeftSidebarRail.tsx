@@ -5,6 +5,7 @@ import { AUX_VIEWS, TASKS_VIEW, type ViewId } from '../../lib/modules';
 import { useUIStore } from '../../store/uiStore';
 import { useVaultStore } from '../../store/vaultStore';
 import { useAutoBackupStore } from '../../store/autoBackupStore';
+import { useVaultImportStore } from '../../store/vaultImportStore';
 import { useSettingsStore } from '../../store/settingsStore';
 import { markAutoBackupErrorSeen } from '../../lib/autoBackup';
 import { asUpdateError, checkForUpdate, updateSettings } from '../../lib/updates';
@@ -73,6 +74,8 @@ export default function LeftSidebarRail() {
   const activeViewType = useUIStore((s) => s.activeView.type);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settingsPage, setSettingsPage] = useState<SettingsPage>('general');
+  // Changed to open the window afresh on another page, also while it is open.
+  const [settingsKey, setSettingsKey] = useState(0);
   const [createOpen, setCreateOpen] = useState(false);
   const activeVaultId = useVaultStore((s) => s.activeVaultId);
   const railDashboards = useRailDashboards();
@@ -89,6 +92,16 @@ export default function LeftSidebarRail() {
     });
     return () => { dead = true; };
   }, []);
+
+  // A `.vault.emerald` from the menu's import is replaced or merged on the
+  // Backup page: it opens there, which takes the file over.
+  const vaultFilePending = useVaultImportStore((s) => s.pending !== null);
+  useEffect(() => {
+    if (!vaultFilePending) return;
+    setSettingsPage('backup');
+    setSettingsKey((k) => k + 1);
+    setSettingsOpen(true);
+  }, [vaultFilePending]);
 
   // A failed automatic backup reports at the same dot: failing silently is
   // the last thing it should do. Only while it is switched on — otherwise the
@@ -197,6 +210,7 @@ export default function LeftSidebarRail() {
       {settingsOpen && (
         <Suspense fallback={null}>
           <SettingsModal
+            key={settingsKey}
             onClose={() => setSettingsOpen(false)}
             initialPage={settingsPage}
           />

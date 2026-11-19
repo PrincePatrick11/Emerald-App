@@ -33,9 +33,11 @@ mod keys;
 /// Putting a vault under a new key — encrypting an old one, changing the
 /// password —, resumable after a crash.
 mod reencrypt;
-/// Encrypted `.emeralddb` backups.
+/// The sealed `.emeralddb` of the automatic backup, until step 2 replaces it.
 mod backup;
-/// `.emerald` files: entries and templates as a ZIP archive, optionally sealed with a password.
+/// The sealed body of a `.emerald` file: encrypted in chunks, read and written as a stream.
+mod emerald_seal;
+/// `.emerald` files: entries and templates, or a whole vault (`.vault.emerald`), as a ZIP archive behind a header, optionally sealed.
 mod emerald_file;
 /// Automatic backups: the target folder, the file name, what gets pruned.
 mod auto_backup;
@@ -270,7 +272,7 @@ pub(crate) fn guarded_read_path(app: &tauri::AppHandle, path: &str) -> Result<Pa
 // ── commands ──────────────────────────────────────────────────────────────────
 //
 // The file commands are `async` and wrap their `std::fs` work in
-// `spawn_blocking`: an `.emeralddb` with embedded images is tens of MB large
+// `spawn_blocking`: a large export or import is hundreds of MB
 // and used to block the window for its duration. `async` alone is not enough —
 // without `spawn_blocking` the blocking work would sit on a runtime worker and
 // could occupy all workers on small machines (SQL plugin, PDF export and IPC
@@ -278,10 +280,9 @@ pub(crate) fn guarded_read_path(app: &tauri::AppHandle, path: &str) -> Result<Pa
 // synchronous on purpose: they mutate NSMenu, and that is main-thread-only on macOS.
 
 /// Writes text content to a user-selected file path.
-/// Only .md, .json, and .txt extensions are permitted. Backups (.emeralddb)
-/// go through `backup::write_backup_file`, which encrypts them — none may be
-/// written in the clear by accident — and `.emerald` archives through
-/// `emerald_file::write_emerald_file`.
+/// Only .md, .json, and .txt extensions are permitted. `.emerald` and
+/// `.vault.emerald` files go through `emerald_file::write_emerald_file`,
+/// which seals them as the export asked.
 #[tauri::command]
 async fn write_file(app: tauri::AppHandle, path: String, content: String) -> Result<(), String> {
     tauri::async_runtime::spawn_blocking(move || {
@@ -324,9 +325,8 @@ async fn export_image(app: tauri::AppHandle, path: String, data_url: String) -> 
 }
 
 /// Reads a text file and returns its contents as a UTF-8 string.
-/// Only .md, .json, and .txt extensions are permitted; backups are read
-/// through `backup::read_backup_file`, `.emerald` archives through
-/// `emerald_file::read_emerald_file`.
+/// Only .md, .json, and .txt extensions are permitted; `.emerald` files are
+/// read through `emerald_file::read_emerald_file`.
 #[tauri::command]
 async fn read_file(app: tauri::AppHandle, path: String) -> Result<String, String> {
     tauri::async_runtime::spawn_blocking(move || {
@@ -794,6 +794,7 @@ pub fn run() {
         .manage(vault::VaultRegistry::default())
         .manage(db::Databases::default())
         .manage(keys::VaultKeys::default())
+        .manage(emerald_file::EmeraldTickets::default())
         .manage(updates::PendingUpdate::default())
         .manage(CloseWatch::default())
         .on_window_event(|window, event| {
@@ -822,8 +823,8 @@ pub fn run() {
             keys::keychain_available,
             reencrypt::vault_change_password,
             reencrypt::vault_recover,
-            backup::write_backup_file,
-            backup::read_backup_file,
+            emerald_file::store_emerald_files,
+            emerald_file::close_emerald_file,
             emerald_file::write_emerald_file,
             emerald_file::read_emerald_file,
             auto_backup::auto_backup_status,
@@ -910,7 +911,7 @@ mod app_data_write_tests {
     #[test]
     fn only_the_registry_and_the_vaults_folder_are_writable_in_the_app_data_dir() {
         let data = Path::new("/home/u/.local/share/emerald");
-        for allowed in ["vaults.json", "vaults/1a2b/backup/emerald-backup-2026-10-06.emeralddb", "vaults/update.json"] {
+        for allowed in ["vaults.json", "vaults/1a2b/backup/emerald-backup-2026-10-06.vault.emerald", "vaults/update.json"] {
             assert!(app_data_write_allowed(&data.join(allowed), data), "{allowed}");
         }
         for refused in [

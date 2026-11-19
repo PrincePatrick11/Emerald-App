@@ -31,7 +31,7 @@ pub const ICONS_SUBDIR: &str = "icons";
 pub const VAULTS_SUBDIR: &str = "vaults";
 /// The folder new vaults are offered in, inside the user's documents directory.
 pub const VAULT_HOME_DIR: &str = "Emerald Vaults";
-/// Where the database export offers to write its `.emeralddb`, inside the vault.
+/// Where the database export offers to write its `.vault.emerald`, inside the vault.
 pub const BACKUP_SUBDIR: &str = "backup";
 /// The vault's own settings. The frontend owns its shape; Rust only moves the text.
 pub const SETTINGS_FILE: &str = "settings.json";
@@ -997,7 +997,7 @@ pub(crate) fn write_atomic_anywhere(dir: &Path, name: &str, temp_name: &str, byt
 /// answer a backup may ignore. Everything else fails the write: on a network
 /// volume a full disk, an exhausted quota or a failing medium only shows when
 /// the data is flushed, because `write` has merely filled a cache by then.
-fn sync_refusal_is_harmless(error: &std::io::Error) -> bool {
+pub(crate) fn sync_refusal_is_harmless(error: &std::io::Error) -> bool {
     use std::io::ErrorKind;
     // ENOTTY: what a file system answers that does not know the flush call.
     // The same number on Linux and macOS; on Windows 25 would mean something else.

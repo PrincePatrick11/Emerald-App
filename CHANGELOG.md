@@ -38,7 +38,10 @@ Version 0.2.0 is a fresh start: the database, backups and `.emerald` files have 
 - **Fonts ship with the app;** no request leaves the device on start. Imports go through the same HTML filter; a crafted file can no longer freeze the app.
 
 ### Import, export and backup
-- **A new `.emerald` format:** a ZIP archive with pictures as files, holding one or several entries and templates with blocks, category, tags, icon and cover; it can be encrypted with a password.
+- **A new `.emerald` format:** one or several entries and templates with blocks, category, tags, icon and cover, the pictures as files of their own. A file can be unprotected, protected with a password of its own, or with the vault's password (and so its recovery key). Smaller than before, and written and read piece by piece, so large files need little memory.
+- **`.emerald` imports recognise the starter categories** (Journal, Dream Journal, Sigils …) even when renamed or from an app in another language; other categories are found by name or created.
+- **Your own blocks travel along:** an entry exported as `.emerald` takes the blocks its copies were made from, which then appear in the other vault's Blocks view.
+- **Backups are `.vault.emerald` files** — the same format, holding the whole vault and encrypted with its password. Export and restore them in Settings → Backup, or open one with the Import button, which leads there. The automatic backup still writes the earlier `.emeralddb` format for now; such files cannot be restored in the app until the next step brings a converter.
 - **Markdown import** asks for a dashboard when the file names no category; export to Markdown, PDF and `.emerald` from the entry.
 - **Restoring a backup** can add to a new vault, merge or replace, by category; imports keep their original dates.
 

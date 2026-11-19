@@ -3,12 +3,11 @@
  * and two `.emerald` files from before the block rebuild, with the sigil
  * blocks of v42–v63 and altars both as tables (before v62) and as operations
  * (v62/v63). Since the fresh start of the schema the app refuses them, and
- * that is what they are for: `npm run check:schema` checks that the backups
- * are refused, `qacheck` that all four come back as a notice and change
- * nothing.
-
+ * that is what they are for: `qacheck` checks that the two `.emerald` files
+ * come back as a notice and change nothing. The app reads no `.emeralddb` at
+ * all any more; the two backups wait for the converter (#115).
  *
- * Plain JSON: an `.emeralddb` without the sealed container is still read.
+ * Plain JSON, without the sealed container.
  * Deterministic — run it again after changing it and commit the result:
  *
  *   node tools/mcp/seed/build_import_fixtures.mjs

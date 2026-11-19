@@ -29,16 +29,16 @@ Scope policy:
 
 Scope focus for Emerald:
 
-- `Documentation/database.md` holds the rules this review enforces: `Where the schema lives`, `Rules for Future Schema Changes` and `Backup versions`. Read them when the change touches a table, a migration or the backup format.
+- `Documentation/database.md` holds the rules this review enforces: `Where the schema lives`, `Rules for Future Schema Changes` and `Format versions`. Read them when the change touches a table, a migration, the backup or the `.emerald` format.
 
 - DB schema and shared tables, including foreign keys and referential integrity between module tables. A schema change is `src/lib/schema.ts` plus a step in `MIGRATIONS` (`src/lib/db.ts`) above the current baseline plus `BASELINE_VERSION`; one without the others is a `Must fix`. Vaults from before the fresh start (`FRESH_START_VERSION`) are refused, not migrated — code that reads or converts their data is a finding.
 
 
-- Backup format: a change to the shape of exported rows needs a `BACKUP_VERSION` bump in `dbBackup.ts`, or an older build imports the file wrongly instead of refusing it; files of any other version are refused (`readBackupPayload`), not lifted.
+- File format: the database export is a `.vault.emerald` and the exchange file a `.emerald` — one format, versioned by `EMERALD_FORMAT_VERSION` (`src/lib/emerald/manifest.ts`) and `FORMAT_VERSION` (`src-tauri/src/emerald_file.rs`), which must match. A change to the shape of exported rows, of the vault content (`VaultContent`, built by `collectVaultContent`, read by `vaultContentOf` / `doReplace` / `doMerge` in `dbBackup.ts`) or of the items manifest (`EmeraldManifest`, `parseManifest`, `writeEmeraldFile` / `importManifest` in `emeraldFormat.ts`) needs that version raised on both sides, or an older build imports the file wrongly instead of refusing it; files of any other version are refused, not lifted. What Rust checks before storing pictures (`check_manifest`: format, version, kind, item count or `data` object) must still hold for what the frontend writes, and `npm run check:schema` (section 11, the `.vault.emerald` round trip and the `.emerald` items block) and `npm run check:blocks` (manifest parse) must cover the new shape. The automatic backup still writes the old `.emeralddb` JSON through `buildBackup`, which the app does not read; it shares `collectVaultContent`, so new content reaches it without a change there.
 
 - Image-backed columns must be listed in `IMAGE_FIELDS`, or the backup and the image cleanup do not see them.
 
-- Encryption: anything new that a vault keeps on disk must be sealed, and re-encryption (`reencrypt.rs`) and encrypted backups must carry it along.
+- Encryption: anything new that a vault keeps on disk must be sealed, and re-encryption (`reencrypt.rs`) and the `.vault.emerald` export must carry it along — a new kind of file in the vault folder also needs a member shape in `emerald_file.rs` if it is to travel.
 
 - Constants mirrored between Rust, TypeScript and `tauri.conf.json` — image extensions, vault file names, the `emerald-img` scheme — change together.
 
