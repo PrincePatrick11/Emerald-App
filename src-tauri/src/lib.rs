@@ -33,13 +33,13 @@ mod keys;
 /// Putting a vault under a new key — encrypting an old one, changing the
 /// password —, resumable after a crash.
 mod reencrypt;
-/// The sealed `.emeralddb` of the automatic backup, until step 2 replaces it.
-mod backup;
+/// Raw backups: a vault's files packed as they lie on the disk, consistent while it is written.
+mod raw_backup;
 /// The sealed body of a `.emerald` file: encrypted in chunks, read and written as a stream.
 mod emerald_seal;
 /// `.emerald` files: entries and templates, or a whole vault (`.vault.emerald`), as a ZIP archive behind a header, optionally sealed.
 mod emerald_file;
-/// Automatic backups: the target folder, the file name, what gets pruned.
+/// The automatic backup: which vaults, how often, where to, and its schedule.
 mod auto_backup;
 /// The in-app updater: variable source, check, installation.
 mod updates;
@@ -795,6 +795,7 @@ pub fn run() {
         .manage(db::Databases::default())
         .manage(keys::VaultKeys::default())
         .manage(emerald_file::EmeraldTickets::default())
+        .manage(auto_backup::AutoBackup::default())
         .manage(updates::PendingUpdate::default())
         .manage(CloseWatch::default())
         .on_window_event(|window, event| {
@@ -830,7 +831,11 @@ pub fn run() {
             auto_backup::auto_backup_status,
             auto_backup::pick_auto_backup_dir,
             auto_backup::reset_auto_backup_dir,
-            auto_backup::write_auto_backup,
+            auto_backup::auto_backup_settings,
+            auto_backup::set_auto_backup_settings,
+            auto_backup::back_up_vault_now,
+            emerald_file::open_raw_backup_db,
+            emerald_file::discard_raw_backup_db,
             keys::vault_create_key,
             keys::vault_unlock,
             keys::vault_unlock_remembered,
@@ -891,6 +896,8 @@ pub fn run() {
             // What a crashed PDF export left in the temp folder — an entry would
             // sit there in plain text.
             tauri::async_runtime::spawn_blocking(pdf_export::sweep_leftovers);
+            // Every chosen vault, on schedule, as long as the app runs.
+            auto_backup::start(_app.handle());
             // Both of these are macOS-only; `_app` keeps the parameter from
             // reading as unused on the platforms where the block is empty.
             #[cfg(target_os = "macos")]
@@ -911,7 +918,7 @@ mod app_data_write_tests {
     #[test]
     fn only_the_registry_and_the_vaults_folder_are_writable_in_the_app_data_dir() {
         let data = Path::new("/home/u/.local/share/emerald");
-        for allowed in ["vaults.json", "vaults/1a2b/backup/emerald-backup-2026-10-06.vault.emerald", "vaults/update.json"] {
+        for allowed in ["vaults.json", "vaults/1a2b/backups/emerald-backup-2026-10-06.vault.emerald", "vaults/update.json"] {
             assert!(app_data_write_allowed(&data.join(allowed), data), "{allowed}");
         }
         for refused in [

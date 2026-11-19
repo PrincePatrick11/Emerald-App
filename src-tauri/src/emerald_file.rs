@@ -6,7 +6,7 @@
 //! ```text
 //! "EMRE" | version (1) | header length (u32 LE) | header JSON | body
 //!
-//! header JSON  { "kind": "items" | "vault",
+//! header JSON  { "kind": "items" | "vault" | "raw",
 //!                "protection": { "type": "none" }
 //!                            | { "type": "password", "kdf": {…}, "salt", "nonce" }
 //!                            | { "type": "vaultKey", "keyFile": {…}, "salt", "nonce" } }
@@ -14,7 +14,13 @@
 //!
 //! - `items`: entries and templates for another vault (`.emerald`).
 //! - `vault`: a vault's content, what the import can replace or merge
-//!   (`.vault.emerald`). Step 2 adds the raw backup as a third kind.
+//!   (`.vault.emerald`).
+//! - `raw`: a raw backup of a vault (`.vault.emerald` as well), written by the
+//!   automatic backup (`raw_backup.rs`): the vault's files as they lie on the
+//!   disk — encrypted already, so the archive is not sealed again. The header
+//!   carries the vault's `vault.key` under `keyFile`; the import unlocks it
+//!   with that vault's password or recovery key, or with the key of an
+//!   unlocked vault it fits.
 //!
 //! The body is a ZIP archive with exactly these members:
 //!
@@ -22,6 +28,12 @@
 //! manifest.json        built and read by the frontend, deflated
 //! images/{name}        pictures, stored (they are compressed already)
 //! icons/{name}         icons, stored
+//!
+//! raw only, all stored, byte for byte as in the vault folder:
+//! emerald.db           the SQLCipher database
+//! emerald.db-journal   its rollback journal, where one was left behind
+//! vault.key            the wrapped vault key
+//! settings.json        the vault's settings, where it has some
 //! ```
 //!
 //! With `none` the archive follows as it is. Otherwise it is sealed in chunks
@@ -76,7 +88,7 @@ const IMAGES_DIR: &str = "images/";
 const ICONS_DIR: &str = "icons/";
 
 /// The manifest's own version — the frontend's `EMERALD_FORMAT_VERSION`.
-const FORMAT_VERSION: u64 = 7;
+pub(crate) const FORMAT_VERSION: u64 = 7;
 /// The most items a manifest may list — the frontend's `MANIFEST_LIMITS.items`.
 const MAX_ITEMS: usize = 1000;
 
@@ -96,6 +108,8 @@ pub const EMERALD_NEWER: &str = "EMERALD_NEWER";
 pub enum Kind {
     Items,
     Vault,
+    /// A raw backup (`raw_backup.rs`).
+    Raw,
 }
 
 impl Kind {
@@ -103,6 +117,7 @@ impl Kind {
         match self {
             Kind::Items => "items",
             Kind::Vault => "vault",
+            Kind::Raw => "raw",
         }
     }
 }
@@ -129,6 +144,9 @@ fn limits_for(kind: Kind) -> Limits {
     match kind {
         Kind::Items => Limits { file: 2 * GIB, members: 5000, manifest: 32 * MIB, member: 64 * MIB, total: 2 * GIB },
         Kind::Vault => Limits { file: 64 * GIB, members: 500_000, manifest: 512 * MIB, member: GIB, total: 64 * GIB },
+        // `member` bounds the pictures; the database is bounded by `total`
+        // alone (`extract_raw_database`). The manifest only says what the file is.
+        Kind::Raw => Limits { file: 64 * GIB, members: 500_005, manifest: MIB, member: GIB, total: 64 * GIB },
     }
 }
 
@@ -150,9 +168,23 @@ enum Protection {
 }
 
 #[derive(Serialize, Deserialize)]
-struct Header {
+pub(crate) struct Header {
     kind: Kind,
     protection: Protection,
+    /// A raw backup's `vault.key`, as JSON — and only a raw backup's.
+    #[serde(rename = "keyFile", default, skip_serializing_if = "Option::is_none")]
+    key_file: Option<serde_json::Value>,
+}
+
+impl Header {
+    /// The header of a raw backup: not sealed, the vault's key file in it.
+    pub(crate) fn raw(key_file: &KeyFile) -> Header {
+        Header {
+            kind: Kind::Raw,
+            protection: Protection::None,
+            key_file: Some(serde_json::from_str(&key_file.to_json()).expect("a key file is JSON")),
+        }
+    }
 }
 
 /// The header as it stands in the file, and its parts.
@@ -162,7 +194,7 @@ struct ReadHeader {
     header: Header,
 }
 
-fn header_bytes(header: &Header) -> Vec<u8> {
+pub(crate) fn header_bytes(header: &Header) -> Vec<u8> {
     let json = serde_json::to_vec(header).expect("serialisable");
     let mut out = Vec::with_capacity(PREFIX_LEN + json.len());
     out.extend_from_slice(MAGIC);
@@ -206,6 +238,11 @@ fn read_header(file: &mut impl Read) -> Result<ReadHeader, String> {
     // A kind or protection this build does not know comes from a newer app.
     let value: serde_json::Value = serde_json::from_slice(&json).map_err(|_| EMERALD_UNREADABLE.to_string())?;
     let header: Header = serde_json::from_value(value).map_err(|_| EMERALD_NEWER.to_string())?;
+    // A raw backup and only a raw backup carries a key file, and it is never sealed again.
+    let raw = header.kind == Kind::Raw;
+    if raw != header.key_file.is_some() || (raw && !matches!(header.protection, Protection::None)) {
+        return Err(EMERALD_UNREADABLE.into());
+    }
     Ok(ReadHeader { bytes: [prefix.as_slice(), &json].concat(), header })
 }
 
@@ -256,6 +293,21 @@ fn unlock(header: &Header, secrets: &Secrets) -> Result<Option<FileKey>, String>
             };
             Ok(Some((file_key_from_vault_key(&vault_key, &salt), nonce)))
         }
+    }
+}
+
+/// The vault key of a raw backup, from the key file in its header: the key of
+/// an unlocked vault it fits, or that vault's password or recovery key.
+fn raw_vault_key(header: &Header, secrets: &Secrets) -> Result<Key, String> {
+    let key_file = header.key_file.as_ref().ok_or(EMERALD_UNREADABLE)?;
+    let key_file = KeyFile::from_json(&key_file.to_string()).map_err(|_| EMERALD_UNREADABLE.to_string())?;
+    match secrets.unlocked.iter().find(|key| key_file.accepts(key)) {
+        Some(key) => Ok(key.clone()),
+        None => match (secrets.password, secrets.recovery_key) {
+            (Some(password), _) => key_file.unlock_with_password(password),
+            (None, Some(recovery)) => key_file.unlock_with_recovery_key(recovery),
+            (None, None) => Err(EMERALD_VAULT_LOCKED.into()),
+        },
     }
 }
 
@@ -343,11 +395,41 @@ enum Member {
     Manifest,
     Image(String),
     Icon(String),
+    /// One of a vault's own files — in a raw backup only.
+    VaultFile(RawMember),
 }
 
-fn member_kind(name: &str) -> Option<Member> {
+/// A vault's own files in a raw backup, under their names in the vault folder.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum RawMember {
+    Database,
+    Journal,
+    KeyFile,
+    Settings,
+}
+
+/// SQLite's rollback journal beside the database.
+pub(crate) const RAW_JOURNAL: &str = "emerald.db-journal";
+
+impl RawMember {
+    pub(crate) const ALL: [RawMember; 4] = [RawMember::Database, RawMember::Journal, RawMember::KeyFile, RawMember::Settings];
+
+    pub(crate) fn name(self) -> &'static str {
+        match self {
+            RawMember::Database => crate::vault::DB_FILE,
+            RawMember::Journal => RAW_JOURNAL,
+            RawMember::KeyFile => keys::KEY_FILE,
+            RawMember::Settings => crate::vault::SETTINGS_FILE,
+        }
+    }
+}
+
+fn member_kind(name: &str, kind: Kind) -> Option<Member> {
     if name == MANIFEST {
         return Some(Member::Manifest);
+    }
+    if let Some(member) = RawMember::ALL.into_iter().find(|m| m.name() == name) {
+        return (kind == Kind::Raw).then_some(Member::VaultFile(member));
     }
     // `is_valid_image_name` admits 64 hex digits and an extension only — no
     // separator, no `..`, nothing absolute.
@@ -363,7 +445,7 @@ fn member_kind(name: &str) -> Option<Member> {
 type Zip = zip::ZipArchive<Box<dyn Body>>;
 
 /// The archive in a body, its members checked by name and count.
-fn open_zip(mut body: Box<dyn Body>, limits: Limits) -> Result<Zip, String> {
+fn open_zip(mut body: Box<dyn Body>, kind: Kind, limits: Limits) -> Result<Zip, String> {
     let count = member_count(body.as_mut()).ok_or(EMERALD_UNREADABLE)?;
     if count > limits.members {
         return Err(EMERALD_TOO_LARGE.into());
@@ -374,15 +456,25 @@ fn open_zip(mut body: Box<dyn Body>, limits: Limits) -> Result<Zip, String> {
         return Err(EMERALD_TOO_LARGE.into());
     }
     let mut manifests = 0;
+    let mut vault_files = Vec::new();
     for index in 0..zip.len() {
         let name = zip.name_for_index(index).ok_or(EMERALD_UNREADABLE)?;
-        match member_kind(name).ok_or(EMERALD_UNREADABLE)? {
+        match member_kind(name, kind).ok_or(EMERALD_UNREADABLE)? {
             Member::Manifest => manifests += 1,
+            Member::VaultFile(member) => vault_files.push(member),
             Member::Image(_) | Member::Icon(_) => {}
         }
     }
     if manifests != 1 {
         return Err(EMERALD_UNREADABLE.into());
+    }
+    // A raw backup: each of the vault's files at most once, database and key always.
+    if kind == Kind::Raw {
+        let once = RawMember::ALL.iter().all(|m| vault_files.iter().filter(|f| *f == m).count() <= 1);
+        let whole = vault_files.contains(&RawMember::Database) && vault_files.contains(&RawMember::KeyFile);
+        if !(once && whole) {
+            return Err(EMERALD_UNREADABLE.into());
+        }
     }
     Ok(zip)
 }
@@ -465,6 +557,8 @@ fn check_manifest(manifest: &[u8], kind: Kind) -> Result<(), String> {
             Some(AnyObject) => Ok(()),
             None => Err(EMERALD_UNREADABLE.into()),
         },
+        // What a raw backup holds is in its members, not in its manifest.
+        Kind::Raw => Ok(()),
     }
 }
 
@@ -558,7 +652,7 @@ fn write_file<W: Write>(out: W, contents: Contents, sealing: Sealing, limits: Li
     {
         return Err(EMERALD_TOO_LARGE.into());
     }
-    let head = header_bytes(&Header { kind: contents.kind, protection: sealing.protection });
+    let head = header_bytes(&Header { kind: contents.kind, protection: sealing.protection, key_file: None });
     let mut out = out;
     out.write_all(&head).map_err(|e| e.to_string())?;
     let sink = match sealing.key {
@@ -587,6 +681,71 @@ fn write_file<W: Write>(out: W, contents: Contents, sealing: Sealing, limits: Li
     }
     let sink = zip.finish().map_err(|e| e.to_string())?.into_inner();
     sink.finish().map_err(|e| e.to_string())
+}
+
+/// What goes into a raw backup: its manifest, the vault's own files and its
+/// pictures, each a file on the disk that is streamed into the archive as it
+/// lies there. A picture that is gone by the time it is read is left out.
+pub(crate) struct RawContents {
+    pub key_file: KeyFile,
+    pub manifest: Vec<u8>,
+    pub files: Vec<(RawMember, PathBuf)>,
+    pub pictures: Vec<(Store, String, PathBuf)>,
+}
+
+/// Writes a raw backup into `out`: the header with the key file, then the
+/// archive, every member stored. Bounded like the reading side.
+pub(crate) fn write_raw<W: Write>(out: W, contents: RawContents) -> Result<W, String> {
+    let limits = limits_for(Kind::Raw);
+    if contents.manifest.len() as u64 > limits.manifest
+        || (1 + contents.files.len() + contents.pictures.len()) as u64 > limits.members
+    {
+        return Err(EMERALD_TOO_LARGE.into());
+    }
+    let mut out = out;
+    out.write_all(&header_bytes(&Header::raw(&contents.key_file))).map_err(|e| e.to_string())?;
+    let mut zip = zip::ZipWriter::new_stream(out);
+    let stored = zip::write::SimpleFileOptions::default().compression_method(zip::CompressionMethod::Stored);
+    zip.start_file(MANIFEST, stored).map_err(|e| e.to_string())?;
+    zip.write_all(&contents.manifest).map_err(|e| e.to_string())?;
+    let mut total = 0u64;
+    for (member, path) in &contents.files {
+        let mut file = File::open(path).map_err(|e| format!("read {}: {e}", member.name()))?;
+        let large = file.metadata().map_err(|e| e.to_string())?.len() >= u32::MAX as u64;
+        zip.start_file(member.name(), stored.large_file(large)).map_err(|e| e.to_string())?;
+        total += std::io::copy(&mut file, &mut zip).map_err(|e| e.to_string())?;
+        if total > limits.total {
+            return Err(EMERALD_TOO_LARGE.into());
+        }
+    }
+    for (store, name, path) in &contents.pictures {
+        // Gone in between — deleted as unused, most likely. The database says what is missing.
+        let Ok(bytes) = std::fs::read(path) else { continue };
+        total += bytes.len() as u64;
+        if bytes.len() as u64 > limits.member || total > limits.total {
+            return Err(EMERALD_TOO_LARGE.into());
+        }
+        let dir = match store {
+            Store::Images => IMAGES_DIR,
+            Store::Icons => ICONS_DIR,
+        };
+        zip.start_file(format!("{dir}{name}"), stored).map_err(|e| e.to_string())?;
+        zip.write_all(&bytes).map_err(|e| e.to_string())?;
+    }
+    let mut out = zip.finish().map_err(|e| e.to_string())?.into_inner();
+    out.flush().map_err(|e| e.to_string())?;
+    Ok(out)
+}
+
+/// Writes a raw backup through `{target}.part` (see [`place_file`]). `check`
+/// runs once everything is written: an `Err` from it and the part goes
+/// instead of coming into place.
+pub(crate) fn place_raw(target: &Path, contents: RawContents, check: impl FnOnce() -> Result<(), String>) -> Result<(), String> {
+    place_file(target, limits_for(Kind::Raw).file, |out| {
+        let out = write_raw(out, contents)?;
+        check()?;
+        Ok(out)
+    })
 }
 
 fn path_ok(path: &str) -> Result<(), String> {
@@ -747,11 +906,13 @@ struct Ticket {
     path: PathBuf,
     key: Option<FileKey>,
     kind: Kind,
+    /// A raw backup's vault key: its database and pictures are sealed under it.
+    raw_key: Option<Key>,
     serial: u64,
 }
 
 /// The opened files, by ticket. Only a handful: an import that never finished
-/// (a closed settings page) gives its place to the next one.
+/// (a closed dialog) gives its place to the next one.
 #[derive(Default)]
 pub struct EmeraldTickets(Mutex<(u64, HashMap<String, Ticket>)>);
 
@@ -781,28 +942,38 @@ impl EmeraldTickets {
     }
 }
 
+/// An opened file: its kind, the key of its body, a raw backup's vault key, the archive.
+struct Opened {
+    kind: Kind,
+    key: Option<FileKey>,
+    raw_key: Option<Key>,
+    zip: Zip,
+}
+
 /// Opens a file: header, key, archive. The size is checked against the limits
 /// of the kind the header names before anything else is read.
-fn open_file(path: &Path, secrets: &Secrets) -> Result<(Kind, Option<FileKey>, Zip), String> {
+fn open_file(path: &Path, secrets: &Secrets) -> Result<Opened, String> {
     let mut file = File::open(path).map_err(|e| e.to_string())?;
     let size = file.metadata().map_err(|e| e.to_string())?.len();
     let head = read_header(&mut file)?;
-    let limits = limits_for(head.header.kind);
+    let kind = head.header.kind;
+    let limits = limits_for(kind);
     if size > limits.file {
         return Err(EMERALD_TOO_LARGE.into());
     }
     let key = unlock(&head.header, secrets)?;
-    let zip = open_zip(body(file, &head, key.as_ref())?, limits)?;
-    Ok((head.header.kind, key, zip))
+    let raw_key = if kind == Kind::Raw { Some(raw_vault_key(&head.header, secrets)?) } else { None };
+    let zip = open_zip(body(file, &head, key.as_ref())?, kind, limits)?;
+    Ok(Opened { kind, key, raw_key, zip })
 }
 
 /// The same file again, with the key found at opening.
 fn reopen(path: &Path, key: Option<&FileKey>) -> Result<(Kind, Zip), String> {
     let mut file = File::open(path).map_err(|e| e.to_string())?;
     let head = read_header(&mut file)?;
-    let limits = limits_for(head.header.kind);
-    let zip = open_zip(body(file, &head, key)?, limits)?;
-    Ok((head.header.kind, zip))
+    let kind = head.header.kind;
+    let zip = open_zip(body(file, &head, key)?, kind, limits_for(kind))?;
+    Ok((kind, zip))
 }
 
 #[derive(Serialize)]
@@ -810,12 +981,16 @@ pub struct OpenedFile {
     ticket: String,
     kind: Kind,
     manifest: String,
+    /// A raw backup's `settings.json`, if it carries one — unchecked, as everything from a file.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    settings: Option<String>,
 }
 
 /// Opens a `.emerald` file and returns its kind and manifest; its pictures stay
-/// in the file until `store_emerald_files`. Errors: [`EMERALD_LOCKED`] /
-/// [`EMERALD_VAULT_LOCKED`] while a secret is missing, `WRONG_PASSWORD` /
-/// `WRONG_RECOVERY_KEY`, and the format codes above.
+/// in the file until `store_emerald_files`, a raw backup's database until
+/// `open_raw_backup_db`. Errors: [`EMERALD_LOCKED`] / [`EMERALD_VAULT_LOCKED`]
+/// while a secret is missing, `WRONG_PASSWORD` / `WRONG_RECOVERY_KEY`, and the
+/// format codes above.
 #[tauri::command]
 pub async fn read_emerald_file(
     app: tauri::AppHandle,
@@ -831,12 +1006,17 @@ pub async fn read_emerald_file(
             password: password.as_deref().map(String::as_str),
             recovery_key: recovery_key.as_deref().map(String::as_str),
         };
-        let (kind, key, mut zip) = open_file(&file, &secrets)?;
+        let Opened { kind, key, raw_key, mut zip } = open_file(&file, &secrets)?;
         let manifest = read_manifest(&mut zip, limits_for(kind))?;
         check_manifest(&manifest, kind)?;
         let manifest = String::from_utf8(manifest).map_err(|_| EMERALD_UNREADABLE.to_string())?;
-        let ticket = app.state::<EmeraldTickets>().insert(Ticket { path: file, key, kind, serial: 0 });
-        Ok(OpenedFile { ticket, kind, manifest })
+        let settings = match zip.index_for_name(crate::vault::SETTINGS_FILE).filter(|_| kind == Kind::Raw) {
+            // Too large or not text: the backup is still one, without its settings.
+            Some(index) => read_member(&mut zip, index, crate::vault::SETTINGS_MAX_BYTES).ok().and_then(|bytes| String::from_utf8(bytes).ok()),
+            None => None,
+        };
+        let ticket = app.state::<EmeraldTickets>().insert(Ticket { path: file, key, kind, raw_key, serial: 0 });
+        Ok(OpenedFile { ticket, kind, manifest, settings })
     })
     .await
     .map_err(|e| e.to_string())?
@@ -850,28 +1030,43 @@ pub struct StoredFiles {
     icons: HashMap<String, String>,
 }
 
-/// Every picture and icon of the archive, one by one, through `store`.
+/// Every picture and icon of the archive, one by one, through `store`. The
+/// pictures of a raw backup are sealed under its vault's key (`raw_key`) and
+/// opened first — one that does not open under it is damage.
 fn store_members(
     zip: &mut Zip,
+    kind: Kind,
     limits: Limits,
+    raw_key: Option<&Key>,
     mut store: impl FnMut(Store, &[u8], &str) -> Result<String, String>,
 ) -> Result<StoredFiles, String> {
+    let files_key = raw_key.map(|key| crypto::subkey(key, Purpose::Files));
     let mut out = StoredFiles::default();
     let mut total = 0u64;
     for index in 0..zip.len() {
         let name = zip.name_for_index(index).ok_or(EMERALD_UNREADABLE)?.to_string();
-        let (kind, file) = match member_kind(&name).ok_or(EMERALD_UNREADABLE)? {
-            Member::Manifest => continue,
+        let (store_in, file) = match member_kind(&name, kind).ok_or(EMERALD_UNREADABLE)? {
+            Member::Manifest | Member::VaultFile(_) => continue,
             Member::Image(file) => (Store::Images, file),
             Member::Icon(file) => (Store::Icons, file),
         };
-        let data = read_member(zip, index, limits.member)?;
+        let mut data = read_member(zip, index, limits.member)?;
         total += data.len() as u64;
         if total > limits.total {
             return Err(EMERALD_TOO_LARGE.into());
         }
+        // Every picture of a raw backup is sealed under its vault's key: one
+        // that is not, or does not open, was put there by someone else.
+        if let Some(files_key) = files_key.as_ref() {
+            if !crypto::is_sealed(&data) {
+                return Err(EMERALD_UNREADABLE.into());
+            }
+            data = crypto::open(files_key, store_in.context(&file), &data)
+                .map_err(|_| EMERALD_UNREADABLE.to_string())?
+                .to_vec();
+        }
         let ext = crate::ext_for_path(&file);
-        match kind {
+        match store_in {
             Store::Images => {
                 out.images.insert(file, store(Store::Images, &data, &ext)?);
             }
@@ -891,18 +1086,126 @@ fn store_members(
 #[tauri::command]
 pub async fn store_emerald_files(app: tauri::AppHandle, ticket: String, vault_id: String) -> Result<StoredFiles, String> {
     tauri::async_runtime::spawn_blocking(move || {
-        let (path, key, expected) = app
+        let (path, key, raw_key, expected) = app
             .state::<EmeraldTickets>()
-            .get(&ticket, |t| (t.path.clone(), t.key.clone(), t.kind))
+            .get(&ticket, |t| (t.path.clone(), t.key.clone(), t.raw_key.clone(), t.kind))
             .ok_or("the file is no longer open")?;
         let (kind, mut zip) = reopen(&path, key.as_ref())?;
         if kind != expected {
             return Err(EMERALD_UNREADABLE.into());
         }
-        store_members(&mut zip, limits_for(kind), |store, data, ext| images::store(&app, &vault_id, store, data, ext))
+        store_members(&mut zip, kind, limits_for(kind), raw_key.as_ref(), |store, data, ext| images::store(&app, &vault_id, store, data, ext))
     })
     .await
     .map_err(|e| e.to_string())?
+}
+
+/// Unpacks a raw backup's database — and the journal beside it, if it has
+/// one — into `dir` under `name`, streamed and bounded by the kind's total.
+/// Whatever lay there goes first; on an error nothing stays.
+fn extract_raw_database(zip: &mut Zip, dir: &Path, name: &str) -> Result<(), String> {
+    let limits = limits_for(Kind::Raw);
+    let target = dir.join(name);
+    let journal = dir.join(format!("{name}-journal"));
+    remove_sqlite_files(dir, name);
+    let result = (|| {
+        let mut total = 0u64;
+        for (member, path) in [(RawMember::Database, &target), (RawMember::Journal, &journal)] {
+            let Some(index) = zip.index_for_name(member.name()) else { continue };
+            let mut from = zip.by_index(index).map_err(|_| EMERALD_UNREADABLE.to_string())?;
+            let mut to = std::fs::OpenOptions::new().write(true).create_new(true).open(path).map_err(|e| e.to_string())?;
+            total += std::io::copy(&mut (&mut from).take(limits.total + 1), &mut to).map_err(|_| EMERALD_UNREADABLE.to_string())?;
+            if total > limits.total {
+                return Err(EMERALD_TOO_LARGE.to_string());
+            }
+        }
+        // A journal that names a super journal would have SQLite delete that
+        // file while rolling back — any path the crafted record names. Such a
+        // journal belongs to a transaction over several databases, which this
+        // app never runs: it goes, and the database is read as it lies.
+        if names_super_journal(&journal)? {
+            std::fs::remove_file(&journal).map_err(|e| e.to_string())?;
+        }
+        Ok(())
+    })();
+    if result.is_err() {
+        remove_sqlite_files(dir, name);
+    }
+    result
+}
+
+/// SQLite's journal magic, which ends a journal's super-journal record.
+const JOURNAL_MAGIC: [u8; 8] = [0xd9, 0xd5, 0x05, 0xf9, 0x20, 0xa1, 0x63, 0xd7];
+
+/// Whether the rollback journal at `path` ends in a super-journal record (it
+/// is read from the end, as SQLite reads it). No journal: `false`.
+fn names_super_journal(path: &Path) -> Result<bool, String> {
+    let mut file = match File::open(path) {
+        Ok(file) => file,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(false),
+        Err(e) => return Err(e.to_string()),
+    };
+    let len = file.metadata().map_err(|e| e.to_string())?.len();
+    if len < JOURNAL_MAGIC.len() as u64 {
+        return Ok(false);
+    }
+    let mut tail = [0u8; 8];
+    file.seek(SeekFrom::End(-8)).map_err(|e| e.to_string())?;
+    file.read_exact(&mut tail).map_err(|e| e.to_string())?;
+    Ok(tail == JOURNAL_MAGIC)
+}
+
+/// A database file in `dir` and whatever SQLite left beside it — a raw backup's
+/// unpacked database, a snapshot, a working copy.
+pub(crate) fn remove_sqlite_files(dir: &Path, name: &str) {
+    for suffix in ["", "-journal", "-wal", "-shm"] {
+        let path = dir.join(format!("{name}{suffix}"));
+        if path.exists() {
+            // Patiently: a scanner or sync client may hold the fresh file for a moment.
+            crate::vault::patiently(|| std::fs::remove_file(&path)).ok();
+        }
+    }
+}
+
+/// Unpacks the database of an opened raw backup into the vault `vault_id`
+/// (`emerald.db.raw`) and opens it under the backup's own key. Returns the
+/// handle the SQL commands take; `discard_raw_backup_db` closes and removes it.
+#[tauri::command]
+pub async fn open_raw_backup_db(app: tauri::AppHandle, ticket: String, vault_id: String) -> Result<String, String> {
+    let (path, raw_key) = app
+        .state::<EmeraldTickets>()
+        .get(&ticket, |t| (t.path.clone(), t.raw_key.clone()))
+        .ok_or("the file is no longer open")?;
+    let raw_key = raw_key.ok_or(EMERALD_UNREADABLE)?;
+    let dir = crate::vault::vault_dir(&app, &vault_id)?;
+    crate::db::close_raw(&app, &vault_id).await;
+    let unpack_dir = dir.clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        let (kind, mut zip) = reopen(&path, None)?;
+        if kind != Kind::Raw {
+            return Err(EMERALD_UNREADABLE.to_string());
+        }
+        extract_raw_database(&mut zip, &unpack_dir, crate::vault::RAW_IMPORT_FILE)
+    })
+    .await
+    .map_err(|e| e.to_string())??;
+    match crate::db::load_raw(&app, &vault_id, &dir, &raw_key).await {
+        Ok(handle) => Ok(handle),
+        Err(e) => {
+            remove_sqlite_files(&dir, crate::vault::RAW_IMPORT_FILE);
+            Err(e)
+        }
+    }
+}
+
+/// Closes the unpacked database of a raw backup and removes it. Without one
+/// this changes nothing.
+#[tauri::command]
+pub async fn discard_raw_backup_db(app: tauri::AppHandle, vault_id: String) -> Result<(), String> {
+    let dir = crate::vault::vault_dir(&app, &vault_id)?;
+    crate::db::close_raw(&app, &vault_id).await;
+    remove_sqlite_files(&dir, crate::vault::RAW_IMPORT_FILE);
+    Ok(())
 }
 
 /// Forgets an opened file. Closing one that is not open does nothing.
@@ -924,6 +1227,7 @@ mod tests {
         match kind {
             Kind::Items => br#"{"format":"emerald","version":7,"kind":"items","items":[{"secret":"GEHEIM-EMERALD"}]}"#.to_vec(),
             Kind::Vault => br#"{"format":"emerald","version":7,"kind":"vault","data":{"secret":"GEHEIM-EMERALD"}}"#.to_vec(),
+            Kind::Raw => br#"{"format":"emerald","version":7,"kind":"raw"}"#.to_vec(),
         }
     }
 
@@ -955,12 +1259,12 @@ mod tests {
     fn read(bytes: &[u8], secrets: &Secrets) -> Result<(Kind, Vec<u8>, Vec<(String, Vec<u8>)>), String> {
         let path = scratch_file(bytes);
         let result = (|| {
-            let (kind, _key, mut zip) = open_file(&path, secrets)?;
+            let Opened { kind, mut zip, .. } = open_file(&path, secrets)?;
             let limits = limits_for(kind);
             let manifest = read_manifest(&mut zip, limits)?;
             check_manifest(&manifest, kind)?;
             let mut stored = Vec::new();
-            store_members(&mut zip, limits, |store, data, ext| {
+            store_members(&mut zip, kind, limits, None, |store, data, ext| {
                 let name = format!("{}-{ext}", if matches!(store, Store::Icons) { "icon" } else { "image" });
                 stored.push((name.clone(), data.to_vec()));
                 Ok(name)
@@ -1051,6 +1355,143 @@ mod tests {
         assert_eq!(read(&bytes, &wrong_recovery).unwrap_err(), keys::WRONG_RECOVERY_KEY);
     }
 
+    /// A raw backup of a vault folder holding a database, a sealed picture and an icon.
+    fn raw_backup(key_file: &KeyFile, vault_key: &Key) -> (Vec<u8>, String) {
+        let dir = scratch_file(b"").with_extension("dir");
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(dir.join("emerald.db"), b"SQLCipher pages").unwrap();
+        std::fs::write(dir.join("vault.key"), key_file.to_json()).unwrap();
+        std::fs::write(dir.join("settings.json"), br#"{"theme":"x"}"#).unwrap();
+        let (image, sealed) = images::seal_for_vault(vault_key, Store::Images, b"png bytes", "png");
+        std::fs::write(dir.join(&image), sealed).unwrap();
+        let contents = RawContents {
+            key_file: key_file.clone(),
+            manifest: manifest(Kind::Raw),
+            files: [RawMember::Database, RawMember::KeyFile, RawMember::Settings].iter().map(|m| (*m, dir.join(m.name()))).collect(),
+            pictures: vec![(Store::Images, image.clone(), dir.join(&image))],
+        };
+        let bytes = write_raw(Vec::new(), contents).unwrap();
+        let _ = std::fs::remove_dir_all(&dir);
+        (bytes, image)
+    }
+
+    /// A raw backup whose journal names a super journal — a file that must survive — and whose picture is not sealed.
+    fn crafted_raw_backup(key_file: &KeyFile, canary: &Path) -> Vec<u8> {
+        let dir = scratch_file(b"").with_extension("crafted");
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(dir.join("emerald.db"), b"SQLCipher pages").unwrap();
+        std::fs::write(dir.join("vault.key"), key_file.to_json()).unwrap();
+        let name = canary.to_string_lossy().into_owned();
+        let mut journal = vec![0u8; 512];
+        journal.extend_from_slice(&0u32.to_be_bytes());
+        journal.extend_from_slice(name.as_bytes());
+        journal.extend_from_slice(&(name.len() as u32).to_be_bytes());
+        journal.extend_from_slice(&0u32.to_be_bytes());
+        journal.extend_from_slice(&JOURNAL_MAGIC);
+        std::fs::write(dir.join(RAW_JOURNAL), journal).unwrap();
+        std::fs::write(dir.join(IMG), b"plain picture").unwrap();
+        let contents = RawContents {
+            key_file: key_file.clone(),
+            manifest: manifest(Kind::Raw),
+            files: [RawMember::Database, RawMember::Journal, RawMember::KeyFile].iter().map(|m| (*m, dir.join(m.name()))).collect(),
+            pictures: vec![(Store::Images, IMG.into(), dir.join(IMG))],
+        };
+        let bytes = write_raw(Vec::new(), contents).unwrap();
+        let _ = std::fs::remove_dir_all(&dir);
+        bytes
+    }
+
+    #[test]
+    fn a_crafted_journal_is_dropped_and_an_unsealed_picture_refused() {
+        let (key_file, vault_key, _) = KeyFile::create("vault password", TEST_KDF).unwrap();
+        let canary = scratch_file(b"keep me");
+        let path = scratch_file(&crafted_raw_backup(&key_file, &canary));
+        let Opened { kind, raw_key, mut zip, .. } = open_file(&path, &Secrets { unlocked: vec![vault_key], ..none() }).unwrap();
+        let out = path.with_extension("unpacked");
+        std::fs::create_dir_all(&out).unwrap();
+        extract_raw_database(&mut zip, &out, "emerald.db.raw").unwrap();
+        assert!(out.join("emerald.db.raw").is_file());
+        assert!(!out.join("emerald.db.raw-journal").exists(), "the journal naming a super journal goes");
+        assert!(canary.is_file());
+        let stored = store_members(&mut zip, kind, limits_for(kind), raw_key.as_ref(), |_, _, _| Ok("x".into()));
+        assert_eq!(stored.unwrap_err(), EMERALD_UNREADABLE);
+        let _ = std::fs::remove_dir_all(&out);
+        let _ = std::fs::remove_file(path);
+        let _ = std::fs::remove_file(canary);
+    }
+
+    #[test]
+    fn a_raw_backup_opens_with_its_vaults_secret_and_its_pictures_are_unsealed() {
+        let (key_file, vault_key, recovery) = KeyFile::create("vault password", TEST_KDF).unwrap();
+        let (bytes, image) = raw_backup(&key_file, &vault_key);
+        // Stored as it lies: the database's bytes are in the file unchanged.
+        assert!(bytes.windows(15).any(|w| w == b"SQLCipher pages"));
+
+        let path = scratch_file(&bytes);
+        assert_eq!(open_file(&path, &none()).err(), Some(EMERALD_VAULT_LOCKED.to_string()));
+        let wrong = Secrets { password: Some("wrong password"), ..none() };
+        assert_eq!(open_file(&path, &wrong).err(), Some(keys::WRONG_PASSWORD.to_string()));
+        for secrets in [
+            Secrets { password: Some("vault password"), ..none() },
+            Secrets { recovery_key: Some(&recovery), ..none() },
+            Secrets { unlocked: vec![vault_key.clone()], ..none() },
+        ] {
+            let Opened { kind, key, raw_key, mut zip } = open_file(&path, &secrets).unwrap();
+            assert_eq!((kind, key.is_none()), (Kind::Raw, true));
+            let raw_key = raw_key.unwrap();
+            assert_eq!(raw_key.as_slice(), vault_key.as_slice());
+            check_manifest(&read_manifest(&mut zip, limits_for(kind)).unwrap(), kind).unwrap();
+            let mut stored = Vec::new();
+            store_members(&mut zip, kind, limits_for(kind), Some(&raw_key), |_, data, _| {
+                stored.push(data.to_vec());
+                Ok("new".into())
+            })
+            .unwrap();
+            // The picture comes out in the clear, to be sealed under the target vault's key.
+            assert_eq!(stored, vec![b"png bytes".to_vec()]);
+
+            let out = path.with_extension("unpacked");
+            std::fs::create_dir_all(&out).unwrap();
+            extract_raw_database(&mut zip, &out, "emerald.db.raw").unwrap();
+            assert_eq!(std::fs::read(out.join("emerald.db.raw")).unwrap(), b"SQLCipher pages");
+            let _ = std::fs::remove_dir_all(&out);
+        }
+        let _ = std::fs::remove_file(path);
+        let _ = image;
+    }
+
+    #[test]
+    fn a_raw_backup_without_its_database_or_with_vault_files_elsewhere_is_refused() {
+        let (key_file, _, _) = KeyFile::create("vault password", TEST_KDF).unwrap();
+        let raw_head = header_bytes(&Header::raw(&key_file));
+        let raw_manifest = manifest(Kind::Raw);
+        let zip_of = |members: &[(&str, &[u8])]| {
+            let mut zip = zip::ZipWriter::new(Cursor::new(Vec::new()));
+            for (name, data) in members {
+                zip.start_file(*name, zip::write::SimpleFileOptions::default()).unwrap();
+                zip.write_all(data).unwrap();
+            }
+            zip.finish().unwrap().into_inner()
+        };
+        let opens = |head: &[u8], members: &[(&str, &[u8])]| {
+            let path = scratch_file(&[head, &zip_of(members)].concat());
+            let secrets = Secrets { password: Some("vault password"), ..none() };
+            let result = open_file(&path, &secrets).map(|_| ());
+            let _ = std::fs::remove_file(path);
+            result
+        };
+        let key = key_file.to_json();
+        assert!(opens(&raw_head, &[(MANIFEST, &raw_manifest), ("emerald.db", b"x"), ("vault.key", key.as_bytes())]).is_ok());
+        // No database.
+        assert_eq!(opens(&raw_head, &[(MANIFEST, &raw_manifest), ("vault.key", key.as_bytes())]).unwrap_err(), EMERALD_UNREADABLE);
+        // A vault file in a file of entries.
+        let items_head = header_bytes(&Header { kind: Kind::Items, protection: Protection::None, key_file: None });
+        assert_eq!(opens(&items_head, &[(MANIFEST, ITEMS_MANIFEST), ("emerald.db", b"x")]).unwrap_err(), EMERALD_UNREADABLE);
+        // A raw kind without its key file in the header, or one sealed again.
+        let bare = header_bytes(&Header { kind: Kind::Raw, protection: Protection::None, key_file: None });
+        assert_eq!(opens(&bare, &[(MANIFEST, &raw_manifest), ("emerald.db", b"x"), ("vault.key", key.as_bytes())]).unwrap_err(), EMERALD_UNREADABLE);
+    }
+
     #[test]
     fn a_large_file_streams_through_many_chunks() {
         // Several megabytes of pictures, sealed: written and read chunk by chunk.
@@ -1081,6 +1522,7 @@ mod tests {
         let head = header_bytes(&Header {
             kind: Kind::Items,
             protection: Protection::Password { kdf: stalling, salt: B64.encode([0u8; SALT_LEN]), nonce: B64.encode([0u8; NONCE_PREFIX_LEN]) },
+            key_file: None,
         });
         let hostile = [head, vec![0u8; 64]].concat();
         assert_eq!(read(&hostile, &right).unwrap_err(), EMERALD_UNREADABLE);
@@ -1131,14 +1573,14 @@ mod tests {
             zip.write_all(bytes).unwrap();
         }
         let body = zip.finish().unwrap().into_inner();
-        [header_bytes(&Header { kind: Kind::Items, protection: Protection::None }), body].concat()
+        [header_bytes(&Header { kind: Kind::Items, protection: Protection::None, key_file: None }), body].concat()
     }
 
     fn raw_zip_of(bytes: &[u8], limits: Limits) -> Result<Zip, String> {
         let mut cursor = Cursor::new(bytes.to_vec());
         let head = read_header(&mut cursor)?;
         let body: Box<dyn Body> = Box::new(Window::new(cursor, head.bytes.len() as u64).unwrap());
-        open_zip(body, limits)
+        open_zip(body, Kind::Items, limits)
     }
 
     const ITEMS_MANIFEST: &[u8] = br#"{"format":"emerald","version":7,"kind":"items","items":[{}]}"#;
@@ -1151,7 +1593,7 @@ mod tests {
         let bytes = raw_file(&[(MANIFEST, ITEMS_MANIFEST), (&format!("images/{IMG}"), &big)], true);
         let mut zip = raw_zip_of(&bytes, limits).unwrap();
         let small = Limits { member: 1024, ..limits };
-        assert_eq!(store_members(&mut zip, small, |_, _, _| Ok(String::new())).unwrap_err(), EMERALD_TOO_LARGE);
+        assert_eq!(store_members(&mut zip, Kind::Items, small, None, |_, _, _| Ok(String::new())).unwrap_err(), EMERALD_TOO_LARGE);
         // The manifest above its own.
         let bytes = raw_file(&[(MANIFEST, &big)], true);
         let mut zip = raw_zip_of(&bytes, limits).unwrap();
@@ -1164,7 +1606,7 @@ mod tests {
         let bytes = raw_file(&members, false);
         let mut zip = raw_zip_of(&bytes, limits).unwrap();
         let tight = Limits { total: 10_000, member: 2000, ..limits };
-        assert_eq!(store_members(&mut zip, tight, |_, _, _| Ok(String::new())).unwrap_err(), EMERALD_TOO_LARGE);
+        assert_eq!(store_members(&mut zip, Kind::Items, tight, None, |_, _, _| Ok(String::new())).unwrap_err(), EMERALD_TOO_LARGE);
         // And the export does not write what the import would refuse.
         let too_big = Limits { member: 4, ..limits };
         assert_eq!(write_file(Vec::new(), contents(Kind::Items, b"png bytes".to_vec()), plain(), too_big).unwrap_err(), EMERALD_TOO_LARGE);
@@ -1186,7 +1628,7 @@ mod tests {
     fn a_zip64_count_is_read_from_its_record() {
         // A ZIP64 end record claiming a vast number of members, in front of the end record.
         let mut bytes = raw_file(&[(MANIFEST, ITEMS_MANIFEST)], false);
-        let start = header_bytes(&Header { kind: Kind::Items, protection: Protection::None }).len();
+        let start = header_bytes(&Header { kind: Kind::Items, protection: Protection::None, key_file: None }).len();
         let eocd = bytes.windows(4).rposition(|w| w == b"PK\x05\x06").unwrap();
         let cd_size = u32::from_le_bytes(bytes[eocd + 12..eocd + 16].try_into().unwrap()) as u64;
         let cd_offset = u32::from_le_bytes(bytes[eocd + 16..eocd + 20].try_into().unwrap()) as u64;
@@ -1300,7 +1742,7 @@ mod tests {
         let svg = "fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210.svg";
         let bytes = raw_file(&[(MANIFEST, ITEMS_MANIFEST), (&format!("icons/{svg}"), b"<svg/>")], false);
         let mut zip = raw_zip_of(&bytes, limits_for(Kind::Items)).unwrap();
-        let stored = store_members(&mut zip, limits_for(Kind::Items), |_, _, _| Ok("x".into())).unwrap();
+        let stored = store_members(&mut zip, Kind::Items, limits_for(Kind::Items), None, |_, _, _| Ok("x".into())).unwrap();
         assert!(stored.icons.is_empty());
     }
 }

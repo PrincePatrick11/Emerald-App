@@ -134,7 +134,7 @@ writeFileSync(
   `export { runMigrations, VAULT_OUTDATED, VAULT_TOO_NEW, sweepDanglingTaskLinks } from '${root}/src/lib/db';
    export { TABLES, TABLE_DDL, BASELINE_VERSION, FRESH_START_VERSION, checkIntegrity, reassignCategoryContent, collectUsedImageFilenames, collectUsedIconFilenames, replaceTagsInDashboards } from '${root}/src/lib/schema';
    export { readTagLinks, replaceTagId, tagStatements } from '${root}/src/lib/tagRefs';
-   export { assertPayloadReferencesResolve, collectVaultContent, definitionRows, doMerge, doReplace, insertBlockDefinitions, resolveImportedCategories, vaultContentOf, vaultManifestOf } from '${root}/src/lib/dbBackup';
+   export { assertPayloadReferencesResolve, collectVaultContent, definitionRows, doMerge, doReplace, FULL_BACKUP_OPTIONS, insertBlockDefinitions, prepareRawDatabase, resolveImportedCategories, vaultContentOf, vaultManifestOf } from '${root}/src/lib/dbBackup';
    export { categoryRowsOf, contentToBlocks, manifestCategoryOf, parseManifest, parseVaultManifest, usedDefinitionIds, EMERALD_FORMAT_VERSION } from '${root}/src/lib/emerald/manifest';
    export { invalidateVaultCache } from '${root}/src/lib/vaultManager';
    export { clearSavedBlocks, readContents, replaceOwnerBlocks } from '${root}/src/lib/blockStore';
@@ -177,7 +177,7 @@ const {
   TABLES, BASELINE_VERSION, FRESH_START_VERSION, checkIntegrity, reassignCategoryContent, collectUsedImageFilenames,
   collectUsedIconFilenames, replaceTagsInDashboards, readTagLinks, replaceTagId, tagStatements,
   assertPayloadReferencesResolve, collectVaultContent, definitionRows, doMerge, doReplace, insertBlockDefinitions,
-  resolveImportedCategories, vaultContentOf, vaultManifestOf,
+  resolveImportedCategories, vaultContentOf, vaultManifestOf, FULL_BACKUP_OPTIONS, prepareRawDatabase,
   categoryRowsOf, contentToBlocks, manifestCategoryOf, parseManifest, parseVaultManifest, usedDefinitionIds, EMERALD_FORMAT_VERSION,
   invalidateVaultCache, clearSavedBlocks, readContents, replaceOwnerBlocks, entriesWithFieldValue, collectImageUses,
 } = await import(pathToFileURL(bundlePath).href);
@@ -1189,7 +1189,111 @@ console.log('\n11. .vault.emerald: the round trip of a vault content, other vers
   delete globalThis.harnessIconFiles;
 }
 
-console.log('\n12. Mirrored constants\n');
+console.log('\n12. The raw backup: an open and a closed vault, replaced and merged\n');
+
+{
+  const { copyFileSync } = await import('node:fs');
+  const { createHash } = await import('node:crypto');
+  const savedName = (name) => `${createHash('sha256').update(`raw:${name}`).digest('hex')}.png`;
+  const pic = (c) => `${c.repeat(64)}.png`;
+  const RAW_SETTINGS = { version: 1, trash: { retentionDays: 7 } };
+
+  /** A vault with an entry, a picture, a tag and a task — the source of both backups. */
+  async function sourceVault(name, title) {
+    const db = await freshVault(name);
+    clearSavedBlocks();
+    await insertWithStack(db, 'entries', { id: `${name}-e`, title, category_id: 'dreams', created_at: now, updated_at: now }, `<p>${title}</p><img src="${pic('9')}">`);
+    await db.execute("INSERT INTO tags (id,name) VALUES ('raw-tag','Raw')");
+    await db.batch(tagStatements('entry', `${name}-e`, ['raw-tag']));
+    await db.execute(`INSERT INTO tasks (id,title,created_at,updated_at) VALUES ($1,'Task',$2,$2)`, [`${name}-t`, now]);
+    return db;
+  }
+
+  /**
+   * What importing a raw backup does with its database (`rawBackupContent`):
+   * brought to this schema, read whole like a vault with the backup's
+   * settings, its pictures stored under names of this vault.
+   */
+  async function readRaw(copyPath) {
+    const copy = new HarnessDb(copyPath);
+    try {
+      await prepareRawDatabase(copy);
+      const collected = await collectVaultContent(copy, FULL_BACKUP_OPTIONS, { settings: RAW_SETTINGS });
+      return {
+        content: collected.content,
+        files: { images: new Map(collected.images.map((n) => [n, savedName(n)])), icons: new Map() },
+      };
+    } finally {
+      copy.close();
+    }
+  }
+
+  // Open: copied with `VACUUM INTO` while the vault stays open, as `raw_backup.rs` does.
+  const open = await sourceVault('raw-open-src.db', 'While open');
+  const openCopy = join(workDir, 'raw-open-copy.db');
+  await open.execute(`VACUUM INTO '${openCopy.replace(/'/g, "''")}'`);
+  // Written after the copy: not in the backup.
+  await insertWithStack(open, 'entries', { id: 'later', title: 'Later', created_at: now, updated_at: now }, '<p>Later</p>');
+  open.close();
+  // Closed: the file as it lies.
+  const closed = await sourceVault('raw-closed-src.db', 'While closed');
+  const closedPath = join(workDir, 'raw-closed-src', 'raw-closed-src.db');
+  closed.close();
+  const closedCopy = join(workDir, 'raw-closed-copy.db');
+  copyFileSync(closedPath, closedCopy);
+
+  for (const [label, copyPath, id, title] of [
+    ['an open vault', openCopy, 'raw-open-src.db-e', 'While open'],
+    ['a closed vault', closedCopy, 'raw-closed-src.db-e', 'While closed'],
+  ]) {
+    const raw = await readRaw(copyPath);
+    check(`raw backup of ${label}: read like a vault, with its settings`,
+      raw.content.data.entries.some((r) => r.id === id) && raw.content.settings === RAW_SETTINGS
+        && !raw.content.data.entries.some((r) => r.id === 'later'), raw.content.data.entries.map((r) => r.id));
+
+    const replaced = await freshVault(`raw-replace-${label.split(' ')[1]}.db`);
+    clearSavedBlocks();
+    await doReplace(replaced, raw.content, raw.files);
+    const [entry] = await replaced.select('SELECT title, category_id FROM entries WHERE id = $1', [id]);
+    const stack = await stackOf(replaced, 'entry', id);
+    check(`raw backup of ${label}, replaced: entry, category, tag, task and picture are back`,
+      entry?.title === title && entry.category_id === 'dreams'
+        && ((await readTagLinks(replaced, 'entry', [id])).get(id) ?? []).join() === 'raw-tag'
+        && (await replaced.select('SELECT COUNT(*) AS n FROM tasks'))[0].n === 1
+        && stack.includes(savedName(pic('9'))), { entry, stack });
+    check(`raw backup of ${label}, replaced: schema identical to the fresh vault`,
+      JSON.stringify(await readSchema(replaced)) === JSON.stringify(schemaA));
+    const categoriesBefore = (await replaced.select('SELECT COUNT(*) AS n FROM categories'))[0].n;
+
+    // Merged into the vault it was just restored to: a copy beside the original, no second category.
+    clearSavedBlocks();
+    const again = await readRaw(copyPath);
+    await doMerge(replaced, again.content, again.files);
+    const copies = await replaced.select('SELECT id, category_id FROM entries WHERE id LIKE $1', [`%-${id}`]);
+    check(`raw backup of ${label}, merged: a copy beside the original, in the same starter category`,
+      copies.length === 1 && copies[0].category_id === 'dreams'
+        && (await replaced.select('SELECT COUNT(*) AS n FROM entries WHERE id = $1', [id]))[0].n === 1
+        && (await replaced.select('SELECT COUNT(*) AS n FROM categories'))[0].n === categoriesBefore, copies);
+    replaced.close();
+  }
+
+  // What is no vault's database is refused before anything is written.
+  const emptyPath = join(workDir, 'raw-empty.db');
+  new HarnessDb(emptyPath).close();
+  const empty = new HarnessDb(emptyPath);
+  check('raw backup without a schema: refused, nothing created in it',
+    await prepareRawDatabase(empty).then(() => false, () => true)
+      && (await empty.select("SELECT COUNT(*) AS n FROM sqlite_master WHERE type = 'table'"))[0].n === 0);
+  empty.close();
+  const newerPath = join(workDir, 'raw-newer.db');
+  copyFileSync(closedPath, newerPath);
+  const newer = new HarnessDb(newerPath);
+  await newer.execute('INSERT INTO schema_version (version, name, applied_at) VALUES ($1, $2, $3)', [BASELINE_VERSION + 1, 'future', now]);
+  check('raw backup from a newer app: refused', await prepareRawDatabase(newer).then(() => false, () => true));
+  newer.close();
+}
+
+console.log('\n13. Mirrored constants\n');
 
 {
   const read = (rel) => readFileSync(join(process.cwd(), rel), 'utf8');
@@ -1215,6 +1319,14 @@ console.log('\n12. Mirrored constants\n');
   const maxItems = /const MAX_ITEMS: usize = (\d+);/.exec(emeraldRs)?.[1];
   const tsItems = /MANIFEST_LIMITS = \{ items: ([\d_]+),/.exec(manifestTs)?.[1]?.replace(/_/g, '');
   check('.emerald: Rust and the frontend allow the same number of items', !!maxItems && maxItems === tsItems, { maxItems, tsItems });
+  // The start page offers what Rust accepts for "keep" — plus "all".
+  const keepRs = /const KEEP_CHOICES: \[u32; \d+\] = \[([\d, ]+)\];/.exec(read('src-tauri/src/auto_backup.rs'))?.[1];
+  const keepTs = /BACKUP_KEEP_OPTIONS = \[([\d, ]+), null\]/.exec(read('src/store/autoBackupStore.ts'))?.[1];
+  check('automatic backup: Rust and the start page know the same retention choices', !!keepRs && keepRs === keepTs, { keepRs, keepTs });
+  check(
+    "automatic backup: the vault's own folder is called backups",
+    read('src-tauri/src/vault.rs').includes('pub const BACKUP_SUBDIR: &str = "backups";'),
+  );
 
   // The file name of a stored image is the boundary between the
   // URI scheme and the file system. If the checks drift apart,

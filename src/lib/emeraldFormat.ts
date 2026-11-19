@@ -614,8 +614,8 @@ async function importFailed(e: unknown): Promise<void> {
 
 /**
  * The menu's import: the open dialog, then by the file's kind — entries and
- * templates are imported and the first one opened; a vault's content goes to
- * Settings → Backup, where it is replaced or merged.
+ * templates are imported and the first one opened; a vault's content — and a
+ * raw backup — goes to the import dialog, where it is replaced or merged.
  */
 export async function importFromEmerald(): Promise<void> {
   const picked = await openDialog({
@@ -634,11 +634,11 @@ export async function importFromEmerald(): Promise<void> {
   }
   if (!opened) return;
 
-  if (opened.kind === 'vault') {
-    // Handed on, still open: Settings → Backup closes it once it is done with it.
+  if (opened.kind === 'vault' || opened.kind === 'raw') {
+    // Handed on, still open: the import dialog closes it once it is done with it.
     try {
       const { openedVaultFile } = await import('./dbBackup');
-      useVaultImportStore.getState().offer(openedVaultFile(opened));
+      useVaultImportStore.getState().offer(await openedVaultFile(opened));
     } catch (e) {
       closeArchive(opened.ticket);
       await importFailed(e);

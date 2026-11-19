@@ -33,6 +33,11 @@ export default class Database {
     return new Database(await invoke<string>('db_load', { vaultId, file }));
   }
 
+  /** A pool Rust opened by another way — a raw backup's database (`open_raw_backup_db`). */
+  static fromHandle(handle: string): Database {
+    return new Database(handle);
+  }
+
   async execute(query: string, bindValues?: unknown[]): Promise<QueryResult> {
     const [rowsAffected, lastInsertId] = await invoke<[number, number]>('db_execute', {
       db: this.path,

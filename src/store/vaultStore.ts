@@ -1,5 +1,4 @@
 import { create } from 'zustand';
-import { invoke } from '@tauri-apps/api/core';
 import {
   type Vault,
   loadVaultsFile,
@@ -246,12 +245,11 @@ export const useVaultStore = create<VaultStore>((set, get) => ({
     if (deleteFiles && wasActive) await withDbClosed(removeFromFile);
     else await removeFromFile();
     forgetVaultPrefs(id);
-    // The folder chosen for the automatic backup belongs to the installation
-    // (`auto_backup.rs`) and would otherwise linger forever. Only now: if
-    // the removal fails, the vault keeps its folder. Directly and not via
-    // `resetAutoBackupDir` — its status query would concern a vault that no longer exists.
-    void invoke('reset_auto_backup_dir', { vaultId: id })
-      .catch((e: unknown) => console.warn('[vault] forget backup folder failed', e));
+    // A vault that is gone is backed up no more. Only now: if the removal
+    // fails, the vault stays chosen. Dynamic: `autoBackup` reads this store.
+    void import('../lib/autoBackup')
+      .then(({ dropFromAutoBackup }) => dropFromAutoBackup(id))
+      .catch((e: unknown) => console.warn('[vault] dropping from the automatic backup failed', e));
     // A removed vault is locked too — with the files Rust has already forgotten
     // the key; without them it would otherwise stay in memory.
     void lockVault(id).catch((e) => console.warn('[vault] lock failed', e));

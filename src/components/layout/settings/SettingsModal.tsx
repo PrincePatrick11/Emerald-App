@@ -1,17 +1,16 @@
 import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Archive, FileText, HardDrive, PanelLeft, ShieldCheck, SlidersHorizontal, Cloud } from 'lucide-react';
+import { FileText, HardDrive, PanelLeft, ShieldCheck, SlidersHorizontal, Cloud } from 'lucide-react';
 import Modal from '../../ui/Modal';
 import { useCloseOnKeepEditing } from '../../../hooks/useCloseOnKeepEditing';
 import GeneralPage from './GeneralPage';
 import SidebarPage from './SidebarPage';
 import EntriesPage from './EntriesPage';
 import SecurityPage from './SecurityPage';
-import BackupPage from './BackupPage';
 import StoragePage from './StoragePage';
 import SyncPage from './SyncPage';
 
-export type SettingsPage = 'general' | 'sidebar' | 'entries' | 'security' | 'sync' | 'backup' | 'storage';
+type SettingsPage = 'general' | 'sidebar' | 'entries' | 'security' | 'sync' | 'storage';
 
 const PAGES = [
   { id: 'general', labelKey: 'settings.pageGeneral', Icon: SlidersHorizontal },
@@ -19,21 +18,17 @@ const PAGES = [
   { id: 'entries', labelKey: 'settings.pageEntries', Icon: FileText },
   { id: 'security', labelKey: 'settings.pageSecurity', Icon: ShieldCheck },
   { id: 'sync', labelKey: 'settings.pageSync', Icon: Cloud },
-  { id: 'backup', labelKey: 'settings.backup', Icon: Archive },
   { id: 'storage', labelKey: 'settings.storage', Icon: HardDrive },
 ] as const;
 
-interface Props {
-  onClose: () => void;
-  /** Area the window opens with. The rail uses it to jump straight to
-   *  "Backup" when an automatic backup failed. Updates and About are on the
-   *  start page (`VaultPicker`), with language and theme. */
-  initialPage?: SettingsPage;
-}
-
-export default function SettingsModal({ onClose, initialPage = 'general' }: Props) {
+/**
+ * The vault's settings. Updates, About, language, theme and the automatic
+ * backup are on the start page (`VaultPicker`); exporting and importing a
+ * whole vault go through the title bar.
+ */
+export default function SettingsModal({ onClose }: { onClose: () => void }) {
   const { t } = useTranslation();
-  const [page, setPage] = useState<SettingsPage>(initialPage);
+  const [page, setPage] = useState<SettingsPage>('general');
   // A page that must not be left right now — the security page
   // with a new recovery key that has not been saved yet.
   const [closeBlocked, setCloseBlocked] = useState(false);
@@ -95,7 +90,6 @@ export default function SettingsModal({ onClose, initialPage = 'general' }: Prop
         {page === 'entries' && <EntriesPage />}
         {page === 'security' && <SecurityPage onClose={onClose} onBlockClose={blockClose} />}
         {page === 'sync' && <SyncPage />}
-        {page === 'backup' && <BackupPage />}
         {page === 'storage' && <StoragePage />}
       </div>
     </Modal>

@@ -144,7 +144,7 @@ export default function TitleBar({ tabs = false, leadWidth = 0, animate = true, 
           </div>
         )}
 
-        {/* Export carries Download, Import Upload — as in Settings → Backup. */}
+        {/* Export carries Download, Import Upload — as the vault export and import dialogs do. */}
         {!picker && (
           <div className="ml-1 flex items-center gap-0.5 flex-shrink-0">
             <TitleBarMenuButton label={menus.exportMenu.label} icon={<Download size={16} />} nodes={menus.exportMenu.nodes} />

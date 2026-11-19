@@ -27,6 +27,7 @@ type MenuActionId =
   | 'export-pdf'
   | 'export-markdown'
   | 'export-emerald'
+  | 'export-vault'
   | 'import-markdown'
   | 'import-emerald';
 
@@ -42,6 +43,7 @@ type TitleBarOnlyMenuActionId =
   | 'export-pdf'
   | 'export-markdown'
   | 'export-emerald'
+  | 'export-vault'
   | 'import-markdown'
   | 'import-emerald';
 
@@ -127,6 +129,12 @@ export async function runMenuAction(id: SelfContainedMenuActionId): Promise<void
       const data = await collectExportData();
       if (!data) { noEntryMessage(); return; }
       exportAsMarkdown(data).catch((err) => exportErrorMessage(err, 'markdown'));
+      return;
+    }
+    // The whole vault as a `.vault.emerald` — in its dialog, until the export menu takes it over.
+    case 'export-vault': {
+      const { useVaultImportStore } = await import('../store/vaultImportStore');
+      useVaultImportStore.getState().setExportOpen(true);
       return;
     }
     case 'export-emerald': {

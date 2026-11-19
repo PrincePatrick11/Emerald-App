@@ -34,14 +34,15 @@ Version 0.2.0 is a fresh start: the database, backups and `.emerald` files have 
 
 ### Security and vaults
 - **Every vault is encrypted** (SQLCipher; pictures and drafts sealed too). A password and a recovery key, "Remember on this device" via the system keychain, Lock now, Change password with progress and a check for free space.
-- **Backups are encrypted** and open with the password the vault had, or the recovery key. Automatic backup on a schedule keeps the newest few.
+- **Backups are encrypted** and open with the password the vault had, or the recovery key.
 - **Fonts ship with the app;** no request leaves the device on start. Imports go through the same HTML filter; a crafted file can no longer freeze the app.
 
 ### Import, export and backup
 - **A new `.emerald` format:** one or several entries and templates with blocks, category, tags, icon and cover, the pictures as files of their own. A file can be unprotected, protected with a password of its own, or with the vault's password (and so its recovery key). Smaller than before, and written and read piece by piece, so large files need little memory.
 - **`.emerald` imports recognise the starter categories** (Journal, Dream Journal, Sigils …) even when renamed or from an app in another language; other categories are found by name or created.
 - **Your own blocks travel along:** an entry exported as `.emerald` takes the blocks its copies were made from, which then appear in the other vault's Blocks view.
-- **Backups are `.vault.emerald` files** — the same format, holding the whole vault and encrypted with its password. Export and restore them in Settings → Backup, or open one with the Import button, which leads there. The automatic backup still writes the earlier `.emeralddb` format for now; such files cannot be restored in the app until the next step brings a converter.
+- **Backups are `.vault.emerald` files** — the same format, holding the whole vault and encrypted with its password. Export one with **Export → Export database…** in the title bar and restore it with the Import button.
+- **Automatic backup on the start page:** tick the vaults to back up and set the interval, how many to keep and the folder once for all — by default each vault's own `backups` folder, with a tip to pick one in a cloud or on another drive. As long as the app runs, every ticked vault is backed up on schedule, locked ones too and the open one while you work, as a raw copy encrypted like the vault. A raw backup is restored like any backup, with the vault's password or recovery key.
 - **Markdown import** asks for a dashboard when the file names no category; export to Markdown, PDF and `.emerald` from the entry.
 - **Restoring a backup** can add to a new vault, merge or replace, by category; imports keep their original dates.
 

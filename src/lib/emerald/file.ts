@@ -75,11 +75,17 @@ export function noticeFor(err: unknown): string | null {
   }
 }
 
-/** An opened file: its kind and manifest; the pictures wait in it under `ticket`. */
+/**
+ * An opened file: its kind and manifest; the pictures wait in it under
+ * `ticket`. `raw` is a raw backup of a vault (`raw_backup.rs`) — its content
+ * is in its database (`dbBackup.ts`), its settings come as `settings`.
+ */
 export interface OpenedArchive {
   ticket: string;
-  kind: EmeraldKind;
+  kind: EmeraldKind | 'raw';
   manifest: string;
+  /** A raw backup's `settings.json`, unchecked. */
+  settings?: string;
 }
 
 /**

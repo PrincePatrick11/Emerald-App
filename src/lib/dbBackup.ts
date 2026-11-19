@@ -11,8 +11,11 @@
  *   merge    — insert all rows with a date-based ID prefix (no overwrites)
  *   add-vault — create a new vault from the file and switch to it
  *
- * The automatic backup still writes the old sealed `.emeralddb` JSON
- * (`buildBackup`) until step 2 of the export rework; the app reads it no more.
+ * A raw backup (the automatic backup's `.vault.emerald`, `raw_backup.rs`)
+ * imports the same way: its database is unpacked beside the active vault,
+ * opened under the backup's own key, brought to this version's schema and
+ * read like a vault (`collectVaultContent`) — from there on it is the same
+ * content as any `.vault.emerald`.
  */
 
 import { copyBlockStatements, OWNER, type BlockOwnerKind, type CopiedBlock, type Statement } from './blockStore';
@@ -21,7 +24,8 @@ import { fromBlockRow, type StoredBlockRow } from './blocks/blockRows';
 import { remapBlock, renameAll, type BlockRemap } from './blocks/blockRemap';
 import { invoke } from '@tauri-apps/api/core';
 import { save, open } from '@tauri-apps/plugin-dialog';
-import { getDb, sweepDanglingTaskLinks } from './db';
+import { getDb, runMigrations, sweepDanglingTaskLinks, VAULT_OUTDATED, VAULT_TOO_NEW, vaultVersionErrorOf } from './db';
+import Database from './sqlite';
 import {
   addVault,
   getActiveDbFile,
@@ -30,7 +34,7 @@ import {
   joinPath,
   newVaultRecord,
 } from './vaultManager';
-import { imageRefsInHtml, isStoredImage, readImageAsBase64 } from './images';
+import { imageRefsInHtml, isStoredImage } from './images';
 import { clearSearchTextCache } from './searchText';
 import { clearEntrySummaryCache } from './blocks/entrySummary';
 import {
@@ -48,7 +52,7 @@ import {
 import { isBuiltinDashboard, parseDashboardFilter } from './dashboards';
 import { fromRow } from './row';
 import { ICON_FIELDS, IMAGE_FIELDS, STARTER_CATEGORY_IDS, imageColumns, storedImageName, storedImageNamesIn } from './schema';
-import { iconFileNames, plausibleEmoji, readIconAsBase64 } from './icons';
+import { iconFileNames, plausibleEmoji } from './icons';
 import { isTagId, readTagLinks, tagIdList, tagInsertStatements, tagNameKey, unlinkTags, type TagOwner } from './tagRefs';
 import { randomTagColor } from '../store/tagStore';
 import { categoryKey } from './categories';
@@ -358,19 +362,6 @@ function selectsEntries(selection: EntrySelection): boolean {
   return selection.includeUncategorized || selection.categoryIds === null || selection.categoryIds.length > 0;
 }
 
-/**
- * What the automatic backup still writes until step 2: the content as one
- * JSON document, pictures and icons as data URLs, sealed by `backup.rs`.
- * Nothing in the app reads it any more.
- */
-interface BackupFile extends VaultContent {
-  version: '17';
-  type: 'backup';
-  images: Record<string, string>;  // stored file name → data URL
-  /** The icon files: stored name → data URL. */
-  icons: Record<string, string>;
-}
-
 interface VaultData {
   /** The entries, as in the `entries` table. */
   entries?: Row[];
@@ -567,19 +558,6 @@ async function iconNamesOf(data: VaultData): Promise<string[]> {
   return [...names].filter((name) => stored.has(name));
 }
 
-/** The icon files, embedded as data URLs — for the automatic backup's JSON. */
-async function embedIcons(names: readonly string[]): Promise<Record<string, string>> {
-  const icons: Record<string, string> = {};
-  for (const name of names) {
-    try {
-      icons[name] = await readIconAsBase64(name);
-    } catch {
-      // Icon file unreadable — the row falls back to its default
-    }
-  }
-  return icons;
-}
-
 /**
  * Points every icon column of the file's rows at the name its icon was
  * stored under here (`iconMap`, from the archive); a value that is neither an
@@ -605,30 +583,16 @@ function remapIconColumns(data: VaultData, iconMap: ReadonlyMap<string, string>)
 }
 
 /**
- * The automatic backup's JSON according to `options`, pictures and icons
- * embedded — until step 2 replaces it with the raw backup. Writes nothing.
- */
-export async function buildBackup(options: BackupOptions): Promise<BackupFile> {
-  const { content, images: imageNames, icons: iconNames } = await collectVaultContent(await getDb(), options);
-  const images: Record<string, string> = {};
-  for (const path of imageNames) {
-    try {
-      images[path] = await readImageAsBase64(path);
-    } catch {
-      // Image file missing — skip silently
-    }
-  }
-  return { version: '17', type: 'backup', ...content, images, icons: await embedIcons(iconNames) };
-}
-
-/**
  * A vault's content according to `options`, with the stored names of the
  * pictures and icons it names — their files go into the archive beside it.
- * Writes nothing; the schema harness calls it directly.
+ * For `raw`, a raw backup's database: its settings come along instead of the
+ * active vault's, and no icons are looked up here. Writes nothing; the
+ * schema harness calls it directly.
  */
 export async function collectVaultContent(
   db: Awaited<ReturnType<typeof getDb>>,
   options: BackupOptions,
+  raw?: { settings: unknown },
 ): Promise<{ content: VaultContent; images: string[]; icons: string[] }> {
   const data: VaultData = {};
   const allImagePaths = new Set<string>();
@@ -737,9 +701,12 @@ export async function collectVaultContent(
     data,
     // Without what a `settings.json` from before still carries of language and
     // theme: those belong to the device, and a backup must not bring them back.
-    ...(options.includeSettings && { settings: withoutDeviceKeys(useSettingsStore.getState().settings) }),
+    ...(options.includeSettings && {
+      settings: raw ? raw.settings : withoutDeviceKeys(useSettingsStore.getState().settings),
+    }),
   };
-  return { content, images: [...allImagePaths], icons: await iconNamesOf(data) };
+  // A raw backup's pictures come from its own archive, not from this vault's folders.
+  return { content, images: [...allImagePaths], icons: raw ? [] : await iconNamesOf(data) };
 }
 
 /** The name a vault file gets in the save dialog. */
@@ -763,7 +730,7 @@ export async function exportDatabase(
   options: BackupOptions,
   protection: EmeraldProtection = { type: 'vaultKey' },
 ): Promise<boolean> {
-  // The dialog opens in the active vault's `backup/` folder — created
+  // The dialog opens in the active vault's `backups/` folder — created
   // if needed. If that fails (vault folder currently unreachable),
   // it stays with the bare file name and the dialog opens wherever the
   // operating system wants; the export itself does not depend on it.
@@ -810,18 +777,87 @@ export async function openVaultFile(path: string): Promise<OpenedVaultFile | nul
   const opened = await openArchiveAsking(path);
   if (!opened) return null;
   try {
-    if (opened.kind !== 'vault') throw new EmeraldNotice(i18n.t('settings.importErrorItems'));
-    return openedVaultFile(opened);
+    if (opened.kind === 'items') throw new EmeraldNotice(i18n.t('settings.importErrorItems'));
+    return await openedVaultFile(opened);
   } catch (err) {
     closeArchive(opened.ticket);
     throw err;
   }
 }
 
-/** A file opened elsewhere (the menu's import) as a vault's content — still open. */
-export function openedVaultFile(opened: OpenedArchive): OpenedVaultFile {
-  const content = vaultContentOf(opened.manifest);
+/**
+ * A file opened elsewhere (the menu's import) as a vault's content — still
+ * open. A raw backup's content is read from its database first.
+ */
+export async function openedVaultFile(opened: OpenedArchive): Promise<OpenedVaultFile> {
+  const content = opened.kind === 'raw' ? await rawBackupContent(opened) : vaultContentOf(opened.manifest);
   return { ticket: opened.ticket, content, preview: previewOf(content) };
+}
+
+/** When a raw backup was written, from its manifest — `null` if it does not say. */
+function rawBackupDate(manifest: string): string | null {
+  try {
+    const parsed: unknown = JSON.parse(manifest);
+    const created = isRecord(parsed) ? parsed.createdAt : null;
+    return typeof created === 'string' && !Number.isNaN(Date.parse(created)) ? created : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Brings a raw backup's database to this version's schema, as opening a vault
+ * does (`runMigrations`). One without any schema is no vault's, one from
+ * before the fresh start or from a newer app is refused — before anything is
+ * written. The copy is the backup's, not the vault's: what the migrations
+ * change there is thrown away with it.
+ */
+export async function prepareRawDatabase(db: Database): Promise<void> {
+  const stamped = await db.select<{ n: number }[]>(
+    "SELECT COUNT(*) AS n FROM sqlite_master WHERE type = 'table' AND name = 'schema_version'",
+  );
+  if (!stamped[0]?.n) throw new EmeraldNotice(i18n.t('emeraldImport.unsupported'));
+  try {
+    await runMigrations(db);
+  } catch (err) {
+    const version = vaultVersionErrorOf(err);
+    if (version === VAULT_TOO_NEW) throw new EmeraldNotice(i18n.t('emeraldImport.newVersion'));
+    if (version === VAULT_OUTDATED) throw new EmeraldNotice(i18n.t('emeraldImport.oldVersion'));
+    throw err;
+  }
+}
+
+/**
+ * The content of a raw backup: its database unpacked beside the active vault
+ * and opened under the backup's own key (`open_raw_backup_db`), read whole
+ * like a vault, then closed and removed again. Its pictures stay in the file
+ * until the import stores them.
+ */
+async function rawBackupContent(opened: OpenedArchive): Promise<VaultContent> {
+  const vaultId = await getActiveVaultId();
+  let handle: string;
+  try {
+    handle = await invoke<string>('open_raw_backup_db', { ticket: opened.ticket, vaultId });
+  } catch (err) {
+    const notice = noticeFor(err);
+    throw notice ? new EmeraldNotice(notice) : err;
+  }
+  try {
+    const db = Database.fromHandle(handle);
+    await prepareRawDatabase(db);
+    let settings: unknown;
+    try {
+      settings = opened.settings === undefined ? undefined : JSON.parse(opened.settings);
+    } catch {
+      // Unreadable settings: the backup is still one, without them.
+    }
+    const { content } = await collectVaultContent(db, FULL_BACKUP_OPTIONS, { settings });
+    // The day of the backup, not of this reading.
+    return { ...content, exportedAt: rawBackupDate(opened.manifest) ?? content.exportedAt };
+  } finally {
+    await invoke('discard_raw_backup_db', { vaultId })
+      .catch((err: unknown) => console.warn('[backup] raw backup database left behind:', err));
+  }
 }
 
 /** The open dialog, then `openVaultFile`. `null`: cancelled. */
@@ -1747,7 +1783,7 @@ export async function importDatabase(
     // 3. Switch to it (resets the DB cache and creates the schema in the new empty DB)
     await useVaultStore.getState().loadVaults();
     // `editsResolved`: the question about ongoing edits was asked
-    // before the import began (`BackupPage`). If it came up here again and
+    // before the import began (`VaultImportModal`). If it came up here again and
     // the answer were "keep editing", the old vault would stay active —
     // and step 4 would fill it instead of the new one.
     // If the user cancels at the new vault's password, the import is

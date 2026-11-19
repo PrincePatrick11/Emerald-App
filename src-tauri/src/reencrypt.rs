@@ -281,12 +281,20 @@ pub fn remove_leftovers(dir: &Path) {
 }
 
 /// [`recover_interrupted`], unless a re-encryption is running right now — its
-/// half-made copy is not a crash's leftover. Then nothing is touched.
+/// half-made copy is not a crash's leftover. Then nothing is touched. A raw
+/// backup holding [`RUNNING`] is no reason to skip it: skipping would let the
+/// vault open half swapped.
 pub fn recover_if_idle(dir: &Path) -> Result<(), String> {
-    match RUNNING.try_lock() {
-        Ok(_guard) => recover_interrupted(dir),
-        Err(_) => Ok(()),
+    if REENCRYPTING.load(std::sync::atomic::Ordering::SeqCst) > 0 {
+        return Ok(());
     }
+    recover_interrupted(dir)
+}
+
+/// Whether a re-encryption of the vault in `dir` was cut short and waits for
+/// [`recover_interrupted`]: its database and `vault.key` may not belong together.
+pub(crate) fn interrupted(dir: &Path) -> bool {
+    dir.join(MARKER).exists() || dir.join(PENDING_KEY).exists()
 }
 
 /// Brings a vault directory back to a consistent state after a crash during
@@ -382,7 +390,9 @@ fn finish_commit(dir: &Path) -> Result<bool, String> {
             }
         }
     }
-    for base in [DB_OLD, vault::IMPORT_STAGING_FILE] {
+    // A raw backup's snapshot or unpacked database left by a crash is a copy
+    // under the old key too.
+    for base in [DB_OLD, vault::IMPORT_STAGING_FILE, vault::SNAPSHOT_FILE, vault::RAW_IMPORT_FILE] {
         for suffix in std::iter::once("").chain(DB_SIDE_FILES) {
             remove_checked(&dir.join(format!("{base}{suffix}")), &mut failed);
         }
@@ -742,9 +752,37 @@ async fn rekey_dir(dir: &Path, old_key: &Key, password: &str, kdf: KdfParams, pr
     reencrypt(dir, Source::Key(old_key), password, kdf, progress).await
 }
 
-/// One re-encryption at a time — across awaits, so not the `std` mutex.
-/// [`recover_if_idle`] checks it too.
-static RUNNING: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
+/// One re-encryption at a time — across awaits, so not the `std` mutex. A
+/// raw backup (`raw_backup.rs`) and deleting a vault's files hold it as well:
+/// neither may meet a swap of database and `vault.key` half done. Whether a
+/// re-encryption itself runs is [`REENCRYPTING`], which [`recover_if_idle`] asks.
+pub(crate) static RUNNING: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
+
+/// How many re-encryptions run right now — what [`recover_if_idle`] asks;
+/// [`RUNNING`] alone may be held by a backup.
+static REENCRYPTING: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+
+/// Counts a re-encryption for as long as it lives.
+struct Reencrypting;
+
+impl Reencrypting {
+    /// The lock and the count together, so neither is taken without the other.
+    async fn begin() -> (tokio::sync::MutexGuard<'static, ()>, Reencrypting) {
+        let guard = RUNNING.lock().await;
+        (guard, Reencrypting::start())
+    }
+
+    fn start() -> Reencrypting {
+        REENCRYPTING.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        Reencrypting
+    }
+}
+
+impl Drop for Reencrypting {
+    fn drop(&mut self) {
+        REENCRYPTING.fetch_sub(1, std::sync::atomic::Ordering::SeqCst);
+    }
+}
 
 /// Remembers the new key where the old one was remembered, or as asked. A
 /// keychain that refuses the new key loses the old one too: it no longer
@@ -809,7 +847,7 @@ pub async fn vault_change_password(
     current_password: zeroize::Zeroizing<String>,
     new_password: zeroize::Zeroizing<String>,
 ) -> Result<keys::CreatedKey, String> {
-    let _guard = RUNNING.lock().await;
+    let _running = Reencrypting::begin().await;
     let dir = vault_dir_checked(&app, &vault_id)?;
     let old_key = tauri::async_runtime::spawn_blocking(move || {
         let file = keys::read_key_file(&dir)?.ok_or_else(|| keys::VAULT_NOT_ENCRYPTED.to_string())?;
@@ -836,7 +874,7 @@ pub async fn dev_seed(app: &tauri::AppHandle, vault_id: &str) {
     if crate::db::normalize_path(&dir.to_string_lossy()) != crate::db::normalize_path(&seed) {
         return;
     }
-    let _guard = RUNNING.lock().await;
+    let _running = Reencrypting::begin().await;
     recover_interrupted(&dir).ok();
     let vault_keys = app.state::<keys::VaultKeys>();
     if !keys::is_encrypted_dir(&dir) {
@@ -868,7 +906,7 @@ pub async fn vault_recover(
     new_password: zeroize::Zeroizing<String>,
     remember_key: Option<bool>,
 ) -> Result<keys::CreatedKey, String> {
-    let _guard = RUNNING.lock().await;
+    let _running = Reencrypting::begin().await;
     let dir = vault_dir_checked(&app, &vault_id)?;
     let old_key = tauri::async_runtime::spawn_blocking(move || {
         let file = keys::read_key_file(&dir)?.ok_or_else(|| keys::VAULT_NOT_ENCRYPTED.to_string())?;
@@ -1094,7 +1132,7 @@ mod tests {
         vault::write_atomic(&dir, PENDING_KEY, PENDING_KEY_TEMP, file.to_json().as_bytes()).unwrap();
         prepare(&dir, Source::Plain, &new_key, &quiet).await.unwrap();
         {
-            let _running = RUNNING.lock().await;
+            let _active = Reencrypting::start();
             recover_if_idle(&dir).unwrap();
             assert!(dir.join(PENDING_KEY).exists() && dir.join(IMAGES_NEW).exists() && dir.join(DB_NEW).exists());
         }

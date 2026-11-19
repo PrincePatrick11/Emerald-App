@@ -57,6 +57,8 @@ export function useTitleBarMenus() {
       { kind: 'item', label: t('menu.exportPdf'), disabled: !enabled.pdfEnabled, onSelect: () => dispatchMenuAction('export-pdf') },
       { kind: 'item', label: t('menu.exportMarkdown'), disabled: !enabled.entryEnabled, onSelect: () => dispatchMenuAction('export-markdown') },
       { kind: 'item', label: t('menu.exportEmerald'), disabled: !enabled.emeraldEnabled, onSelect: () => dispatchMenuAction('export-emerald') },
+      { kind: 'separator' },
+      { kind: 'item', label: t('menu.exportVault'), onSelect: () => dispatchMenuAction('export-vault') },
     ],
   };
   const importMenu: TitleBarMenu = {
