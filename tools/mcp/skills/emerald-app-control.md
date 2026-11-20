@@ -144,7 +144,7 @@ where one only clicks, right-clicks or types, the tool is now the shorter way.
 - **Title:** `<input class="entry-view-title">` (placeholder "Untitled Entry" in English)
 - **i18n:** react-i18next, 4 languages (EN/DE/ES/FR), switchable live in Settings
 - **Themes:** "Emerald Noctis" (dark, default), "Emerald Parchment" (light)
-- **Persistence:** SQLite encrypted with SQLCipher, one `emerald.db` per vault; no sync (Settings → Sync and the start page's Server card are placeholders)
+- **Persistence:** SQLite encrypted with SQLCipher, one `emerald.db` per vault; no sync (Settings → Sync and the start page's Server and Store cards are placeholders)
 - **Content model:** one kind of entry; the category decides what it is. Dashboards are filtered views (by category and tag); collections (Tags, Categories, Images, Templates, Blocks, Lexicon, Symbols) have their own pages. Tasks are separate.
 - **Hot reload:** Vite reloads automatically on code changes in `src/`
 

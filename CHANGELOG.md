@@ -29,7 +29,7 @@ Version 0.2.0 is a fresh start: the database, backups and `.emerald` files have 
 - **After opening a tag, category, task or image from a search hit, the search and filters you set there stay** when you switch tabs or step Back and Forward; an opened subtask stays expanded.
 - **Lists remember how you left them,** per vault.
 - **The mouse's back and forward buttons work on every system,** also through mouse software such as Logi Options+; on macOS ⌘[ / ⌘] go back and forward too.
-- **A start page** as the app's home: a tile per vault, the server and theme cards, language and updates.
+- **A start page** as the app's home: a tile per vault, a sync and a store placeholder (both "coming in v0.3.0") and the theme cards, language and updates.
 - **Language and theme belong to the device**; all other settings belong to the vault and travel with its backup.
 
 ### Templates and blocks
@@ -60,7 +60,7 @@ Version 0.2.0 is a fresh start: the database, backups and `.emerald` files have 
 ### Removed
 - **Wiki and Operations as separate modules,** the separate Altar module and its library, entry types, "Update block", usage counts and the Home page.
 - **Vaults, backups and `.emerald` files of earlier versions are not opened, restored or imported.** An older vault is recognised and left exactly as it was; a converter will follow.
-- **Sync is not in this version;** it comes back later, rebuilt.
+- **Sync is not in this version;** it comes back in v0.3.0, rebuilt.
 
 ## [0.1.3.6] - 2026-08-12
 

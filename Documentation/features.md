@@ -353,7 +353,7 @@ A vault is a **folder** you choose, holding its own encrypted database and its o
 
 **Vaults of other versions.** A vault made by an earlier version of Emerald — one from before the fresh start of the database in this version, an unencrypted one included — is not opened: the start page says it comes from an older version and that a converter will follow, and the vault stays exactly as it was. A vault made by a newer version is refused the same way, with a hint to update. Vault records of an installation from before per-vault folders are not listed.
 
-The start page is one page without tabs. On the left the name, the tagline, links to the website, GitHub, Patreon and Discord, and at the bottom the version and the author; its edge to the page can be dragged, as the entry list's can. Beside it, each under a heading with its icon: **Vaults**, a tile for every vault, and below it side by side **Server** (a placeholder, see [Sync](#sync)) and **Appearance** (the [theme](#theming) as small pictures, custom themes included). At the bottom of the page the [language](#language) on the left, the [updates](#updates) on the right. **Emerald → About Emerald App** opens it.
+The start page is one page without tabs. On the left the name, the tagline, links to the website, GitHub, Patreon and Discord, and at the bottom the version and the author; its edge to the page can be dragged, as the entry list's can. Beside it, each under a heading with its icon: **Vaults**, a tile for every vault, and below it two columns: on the left, stacked, **Server** (a placeholder, see [Sync](#sync)) and **Store** (a placeholder: a store for discovering and sharing templates, blocks, themes and entry packs comes in v0.3.0; nothing to act on, no network access), on the right **Appearance** (the [theme](#theming) as small pictures, custom themes included). At the bottom of the page the [language](#language) on the left, the [updates](#updates) on the right. **Emerald → About Emerald App** opens it.
 
 - Each tile is a vault, with "only here" under its name. Clicking a tile opens that vault; the open vault's tile is tinted and marked open. Opening a locked vault asks for its password first, in the picker; cancelling leaves you there. The folder shows when you point at a row.
 - **New Vault** (the last tile) creates an empty one. Give it a name and optionally an icon; the row that opens shows live where it will land — by default `Documents/Emerald Vaults/{name}`, with a folder picker to choose elsewhere and a reset button. The target folder has to be empty: sharing it with unrelated files would make deleting them ambiguous later. Opening the new vault asks for its password.
@@ -367,7 +367,7 @@ New vaults are not switched to automatically — except while no vault is open, 
 
 ### Sync
 
-Sync between devices comes in a later version, rebuilt from the ground up. Until then every vault stays on the device it is on; Settings → Sync and the start page's **Server** card say so and offer nothing to set.
+Sync between devices comes in v0.3.0, rebuilt from the ground up. Until then every vault stays on the device it is on; Settings → Sync and the start page's **Server** card say so and offer nothing to set.
 
 ## Vault Encryption
 
@@ -505,7 +505,7 @@ Settings are **per vault** — stored in the vault's own `settings.json`. Switch
 - **Sidebar** — which list the left entry list shows (All entries, one dashboard's entries, or the tasks), and how many entries it lists before "Show more".
 - **Entries** — the emoji picker's default set, how inserted images are stored (photos as JPEG, size limits), whether new tags may appear on the spot (typed, from a template, from an import), **Automatic formatting** (Markdown shortcuts such as `# ` or `**bold**`; typography such as curly quotes, dashes, arrows and fractions; auto-links for typed or pasted addresses — each its own switch, applying to editors opened afterwards), and whether journal entries show their **moon phase** (see [Journal](#journal)).
 - **Security** — remember on this device, lock now, change password (see [Vault Encryption](#vault-encryption)).
-- **Sync** — a placeholder: sync comes in a later version (see [Sync](#sync)).
+- **Sync** — a placeholder: sync comes in v0.3.0 (see [Sync](#sync)).
 - **Backup** — see [Vault Backup](#vault-backup-emeralddb).
 - **Storage** — how long the Trash keeps deleted items, and the unused-images cleanup (see [Image Storage and Cleanup](#image-storage-and-cleanup)).
 

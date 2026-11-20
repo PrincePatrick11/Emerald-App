@@ -1402,10 +1402,14 @@
   },
   "sync": {
     "title": "Sync",
-    "comingLater": "Sync is coming in a later version. Until then, every vault stays on this device."
+    "comingLater": "Sync is coming in v0.3.0. Until then, every vault stays on this device."
+  },
+  "store": {
+    "comingLater": "Coming in v0.3.0: discover and share templates, blocks, themes and entry packs."
   },
   "start": {
     "server": "Server",
+    "store": "Store",
     "appearance": "Appearance",
     "links": "Links",
     "version": "Version {{version}}",

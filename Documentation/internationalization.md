@@ -98,6 +98,7 @@ Top-level keys of `en.json`, with the conventions worth knowing:
 | `start` | The start page's own: section headings, links, version and author |
 | `createItem` | The rail's plus: `CreateItemModal` |
 | `sync` | The sync placeholder: Settings → Sync and the start page's Server card |
+| `store` | The store placeholder on the start page |
 | `vaultKey` | `VaultKeyDialog` and its shared parts: unlock, create, recover, the recovery-key box, the "remember on this device" switch and the failure texts (`wrongPassword`, `tooShort` with `{{count}}`, …) |
 | `security` | Settings → Security: remember, lock, change password, each with a hint and a tooltip |
 | `backupKey` | `BackupUnlockDialog`: opening an encrypted backup |

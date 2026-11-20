@@ -772,6 +772,11 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
     align-items: start;
   }
 
+  /* The placeholders for what a later version brings, one above the other. */
+  .start-later {
+    @apply flex flex-col gap-10 min-w-0;
+  }
+
   .start-section {
     @apply min-w-0;
   }
@@ -785,7 +790,7 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
     color: var(--text-subtle);
   }
 
-  /* A panel that is no choice: the server's placeholder. */
+  /* A panel that is no choice: the placeholders for sync and the store. */
   .start-panel {
     @apply rounded-xl border p-4;
     background-color: var(--bg-surface-1);

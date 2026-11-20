@@ -1402,10 +1402,14 @@
   },
   "sync": {
     "title": "Synchronisation",
-    "comingLater": "Die Synchronisation kommt in einer späteren Version. Bis dahin bleibt jeder Vault auf diesem Gerät."
+    "comingLater": "Die Synchronisation kommt in v0.3.0. Bis dahin bleibt jeder Vault auf diesem Gerät."
+  },
+  "store": {
+    "comingLater": "Kommt in v0.3.0: Vorlagen, Blöcke, Themes und Eintrags-Packs entdecken und teilen."
   },
   "start": {
     "server": "Server",
+    "store": "Store",
     "appearance": "Aussehen",
     "links": "Links",
     "version": "Version {{version}}",

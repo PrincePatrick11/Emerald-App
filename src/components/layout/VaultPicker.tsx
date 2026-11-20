@@ -14,6 +14,7 @@ import { keyErrorOf } from '../../lib/vaultKeys';
 import { vaultOpenErrorKey } from '../../lib/db';
 import { hideLoadingScreen, hideSplash, showLoadingScreen } from '../../lib/splash';
 import PickerServerPanel from './PickerServerPanel';
+import PickerStorePanel from './PickerStorePanel';
 import { CreateRow, CreateTile, DeleteConfirmRow, EditRow, VaultRow } from './PickerRows';
 import {
   DB_FILE,
@@ -488,7 +489,10 @@ export default function VaultPicker() {
           </StartSection>
 
           <div className="start-columns">
-            <PickerServerPanel />
+            <div className="start-later">
+              <PickerServerPanel />
+              <PickerStorePanel />
+            </div>
             <StartAppearance />
           </div>
         </div>
