@@ -129,7 +129,9 @@ src/
 │   ├── storeImage.ts            a file from the disk or a Blob into `images/`
 │   ├── imageUsage.ts            where each picture is used, and in which role (`block_refs`)
 │   ├── pictureExport.ts         a rendered picture saved where the user chooses
-│   ├── export.ts, exportData.ts, emeraldFormat.ts   Markdown and PDF export (one entry or several); `.emerald` files of entries and templates
+│   ├── export.ts, exportData.ts, emeraldFormat.ts   Markdown and PDF export (one entry or several), the article PDF and HTML share; `.emerald` files of entries and templates
+│   ├── htmlExport.ts            the interactive HTML export: one self-contained file with its own stylesheet, script and CSP
+│   ├── exportFonts.ts           the fonts of PDF and HTML: the app's (embedded from `fonts.css` as data URLs) and common system ones
 │   ├── exportMenu.ts            the export menu's rules: remembered choices, Normal's fixed settings, period, collection, order
 │   ├── emerald/                 `manifest.ts` (the manifest, pure), `file.ts` (the `.emerald` commands, asking for a secret)
 │   ├── dbBackup.ts, importStaging.ts   a vault's content as `.vault.emerald`: export and restore, a raw backup's content read from its database
@@ -211,7 +213,7 @@ A serialized task must never await another task under its own key — it would w
 
 ### Code splitting
 
-`MainArea` loads every view with `React.lazy` via `VIEW_COMPONENTS` in `moduleViews.ts`, so TipTap (the largest chunk) only loads when an editor view first opens. `SettingsModal` is lazy for the same reason (it pulls in `dbBackup`). `menuActions.runMenuAction` imports the import modules (`emeraldFormat.ts` — and with it `marked` —, `export.ts` for its error message) with `await import()` per action, the export menu is lazy (and brings `dbBackup.ts` along); it loads `emeraldFormat.ts` for the linked-entry list or a `.emerald`, and `export.ts`, `exportData.ts` (and `turndown`) only when it writes, and `src/i18n/index.ts` ships only `en` eagerly. `vite.config.ts` deliberately has **no catch-all vendor chunk** — a blanket `return "vendor"` would pull the lazy libraries back into the eager bundle.
+`MainArea` loads every view with `React.lazy` via `VIEW_COMPONENTS` in `moduleViews.ts`, so TipTap (the largest chunk) only loads when an editor view first opens. `SettingsModal` is lazy for the same reason (it pulls in `dbBackup`). `menuActions.runMenuAction` imports the import modules (`emeraldFormat.ts` — and with it `marked` —, `export.ts` for its error message) with `await import()` per action, the export menu is lazy (and brings `dbBackup.ts` along); it loads `emeraldFormat.ts` for the linked-entry list or a `.emerald`, and `export.ts`, `htmlExport.ts`, `exportData.ts` (and `turndown`) only when it writes, and `src/i18n/index.ts` ships only `en` eagerly. `vite.config.ts` deliberately has **no catch-all vendor chunk** — a blanket `return "vendor"` would pull the lazy libraries back into the eager bundle.
 
 ## IPC Command Surface
 
@@ -253,8 +255,8 @@ All Rust commands are *registered* in `src-tauri/src/lib.rs` and invoked from Ty
 | `read_emerald_file(path, password?, recovery_key?)` | Open a `.emerald` within the limits of its kind and return `{ticket, kind, manifest}` (a raw backup: also its `settings`); the pictures stay in the file. `EMERALD_LOCKED` / `EMERALD_VAULT_LOCKED` while a secret is missing. Same path checks as `read_file`. |
 | `open_raw_backup_db(ticket, vault_id)` / `discard_raw_backup_db(vault_id)` | Unpack an opened raw backup's database beside the vault (`emerald.db.raw`) and open it under the backup's own key, returning a handle for `db_select` / close and remove it. See [Raw backups](database.md#raw-backups). |
 | `store_emerald_files(ticket, vault_id)` / `close_emerald_file(ticket)` | Store an opened file's pictures and icons in the vault, once the import really starts; returns name in the file → name stored here / forget an opened file. Tickets live in Rust (`EmeraldTickets`, at most four). |
-| `write_file(path, content)` | Write UTF-8 text to a user-selected `.md`/`.json`/`.txt` path. Rejects symlinks; the path must resolve within the allowed storage roots, and inside the app data directory only `vaults.json` and `vaults/` are writable (see [Path Confinement](security.md#path-confinement)). |
-| `read_file(path)` | Read a file as UTF-8. Same allowlist and confinement as `write_file`. |
+| `write_file(path, content)` | Write UTF-8 text to a user-selected `.md`/`.html`/`.json`/`.txt` path. Rejects symlinks; the path must resolve within the allowed storage roots, and inside the app data directory only `vaults.json` and `vaults/` are writable (see [Path Confinement](security.md#path-confinement)). |
+| `read_file(path)` | Read a file as UTF-8. Same confinement as `write_file`; `.md`/`.json`/`.txt` only (not `.html`). |
 | `ensure_app_storage_dirs()` | Create the app data and config directories before vault metadata is written or SQLite opens. |
 | `export_pdf(html, path, page_size?)` | Render HTML to a PDF at a path the frontend obtained from the `dialog` plugin, by driving the app's own webview. The page is A4 on every system; `page_size` (inches) overrides it on Windows only; the frontend passes none at present. See [PDF Export](architecture/shell.md#pdf-export). |
 | `close_request_seen()` | The frontend's acknowledgement of a close request — see [Closing the window](architecture/shell.md#closing-the-window). |

@@ -280,14 +280,14 @@ pub(crate) fn guarded_read_path(app: &tauri::AppHandle, path: &str) -> Result<Pa
 // synchronous on purpose: they mutate NSMenu, and that is main-thread-only on macOS.
 
 /// Writes text content to a user-selected file path.
-/// Only .md, .json, and .txt extensions are permitted. `.emerald` and
+/// Only .md, .html, .json, and .txt extensions are permitted. `.emerald` and
 /// `.vault.emerald` files go through `emerald_file::write_emerald_file`,
 /// which seals them as the export asked.
 #[tauri::command]
 async fn write_file(app: tauri::AppHandle, path: String, content: String) -> Result<(), String> {
     tauri::async_runtime::spawn_blocking(move || {
         let ext = ext_for_path(&path);
-        if !matches!(ext.as_str(), "md" | "json" | "txt") {
+        if !matches!(ext.as_str(), "md" | "html" | "json" | "txt") {
             return Err("unsupported file type".to_string());
         }
 

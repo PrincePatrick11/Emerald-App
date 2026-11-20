@@ -1427,6 +1427,7 @@
     "nothing": "No hay nada que exportar.",
     "kinds": {
       "pdf": "Exportación a PDF",
+      "html": "Exportación HTML",
       "markdown": "Exportación a Markdown",
       "emerald": "Exportación de Emerald",
       "emeraldImport": "Importación de Emerald",
@@ -1504,11 +1505,13 @@
     "format": "Formato",
     "formatNames": {
       "pdf": "PDF",
+      "html": "HTML",
       "markdown": "Markdown",
       "emerald": ".emerald"
     },
     "formats": {
       "pdf": "Para leer e imprimir; varias entradas en un archivo, cada una en una página nueva.",
+      "html": "Un archivo para cualquier navegador: con búsqueda, esquema y enlaces entre las entradas; varias entradas con una barra lateral por categoría.",
       "markdown": "Texto plano para otros programas; sin imágenes.",
       "emerald": "Para pasar a otro Emerald, con imágenes, categorías, etiquetas y bloques propios."
     },
@@ -1516,6 +1519,13 @@
     "templateOnlyEmerald": "Una plantilla solo se puede exportar como .emerald.",
     "blockDefinitions": "Incluir bloques propios",
     "blockDefinitionsHint": "Los bloques propios que usan las entradas; en el destino aparecen en «Bloques».",
+    "typography": {
+      "label": "Fuente",
+      "hint": "Para el título y el texto de las entradas. Una fuente de la app se incrusta en el archivo.",
+      "font": "Fuente",
+      "size": "Tamaño de fuente",
+      "appFont": "{{font}} (app)"
+    },
     "protection": {
       "label": "Protección",
       "vaultKey": "Contraseña del vault",
@@ -1524,6 +1534,16 @@
       "vaultKeyDesc": "Se abre con la contraseña o la clave de recuperación de este vault.",
       "passwordDesc": "Solo se abre con esta contraseña. Si se pierde, el archivo ya no se puede leer.",
       "noneDesc": "Cualquiera que tenga el archivo puede abrirlo."
+    },
+    "html": {
+      "search": "Buscar…",
+      "linkedFrom": "Enlazado desde",
+      "linksTo": "Enlaza a",
+      "outline": "Esquema",
+      "print": "Imprimir",
+      "toggleTheme": "Claro / oscuro",
+      "toggleSidebar": "Barra lateral",
+      "exportedOn": "Exportado desde {{app}} el {{date}}"
     }
   },
   "emeraldKey": {

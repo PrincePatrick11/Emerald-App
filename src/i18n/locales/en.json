@@ -1427,6 +1427,7 @@
     "nothing": "There is nothing to export.",
     "kinds": {
       "pdf": "PDF export",
+      "html": "HTML export",
       "markdown": "Markdown export",
       "emerald": "Emerald export",
       "emeraldImport": "Emerald import",
@@ -1504,11 +1505,13 @@
     "format": "Format",
     "formatNames": {
       "pdf": "PDF",
+      "html": "HTML",
       "markdown": "Markdown",
       "emerald": ".emerald"
     },
     "formats": {
       "pdf": "For reading and printing; several entries in one file, each on a new page.",
+      "html": "One file for any browser – with search, outline and links between the entries; several entries with a sidebar by category.",
       "markdown": "Plain text for other programs; without images.",
       "emerald": "For passing on to another Emerald — with images, categories, tags and custom blocks."
     },
@@ -1516,6 +1519,13 @@
     "templateOnlyEmerald": "A template can only be exported as .emerald.",
     "blockDefinitions": "Include custom blocks",
     "blockDefinitionsHint": "The custom blocks the entries use — in the target they land under “Blocks”.",
+    "typography": {
+      "label": "Font",
+      "hint": "For the entries' title and text. A font of the app is embedded in the file.",
+      "font": "Font",
+      "size": "Font size",
+      "appFont": "{{font}} (app)"
+    },
     "protection": {
       "label": "Protection",
       "vaultKey": "Vault password",
@@ -1524,6 +1534,16 @@
       "vaultKeyDesc": "Opens with this vault's password or recovery key.",
       "passwordDesc": "Opens only with this password. If it is lost, the file can no longer be read.",
       "noneDesc": "Anyone who has the file can open it."
+    },
+    "html": {
+      "search": "Search…",
+      "linkedFrom": "Linked from",
+      "linksTo": "Links to",
+      "outline": "Outline",
+      "print": "Print",
+      "toggleTheme": "Light / dark",
+      "toggleSidebar": "Sidebar",
+      "exportedOn": "Exported from {{app}} on {{date}}"
     }
   },
   "emeraldKey": {

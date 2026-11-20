@@ -114,7 +114,7 @@ src/lib/vaultSettings.ts     # uiFont, editorFont, editorFontSize in AppearanceS
 
 **The font files ship with the app.** The eight typefaces come from `@fontsource` packages, never from the network, so the CSP names no remote origin (see [`security.md`](../security.md#content-security-policy)). `src/fonts.css` holds their `@font-face` rules and is imported in `src/main.tsx`; Vite bundles the `woff2` files (about 1.7 MB, `latin` and `latin-ext` only, `font-display: swap`).
 
-The file is generated: `npm run fonts` runs `scripts/make-fonts-css.mjs`, whose `FONTS` map lists package and weights. The packages' per-subset stylesheets carry no `unicode-range`, so two side by side would cover each other; the script takes the rules from the complete files and keeps the two subsets. A new typeface or weight means `FONTS`, the package, `npm run fonts`, and `FONT_OPTIONS` in `theme.ts`.
+The file is generated: `npm run fonts` runs `scripts/make-fonts-css.mjs`, whose `FONTS` map lists package and weights. The packages' per-subset stylesheets carry no `unicode-range`, so two side by side would cover each other; the script takes the rules from the complete files and keeps the two subsets. A new typeface or weight means `FONTS`, the package, `npm run fonts`, and `FONT_OPTIONS` in `theme.ts` (and, for a serif, `SERIF_APP_FONTS` in `src/lib/exportFonts.ts`, the exports' fallback).
 
 **CSS variable mapping.** Each font id defines a `--font-<id>` variable with the full stack; `data-ui-font` sets `--font-ui`, `data-editor-font` sets `--font-editor`.
 
@@ -123,3 +123,5 @@ The file is generated: `npm run fonts` runs `scripts/make-fonts-css.mjs`, whose 
 - `--editor-font-size` is applied wherever editor and field text should track the setting, independent of the font.
 
 **Defaults.** UI font **Inter**, editor font **Lora**, editor text size **17px**. Invalid or missing values fall back to these via `normalizeUIFontId()`/`normalizeEditorFontId()`/`normalizeEditorFontSize()`.
+
+**Exports.** PDF and HTML set an entry's title and text in the editor font and text size by default; the export menu's Advanced level offers the app's fonts plus Georgia, Times New Roman, Arial and Verdana, and the same sizes (`src/lib/exportFonts.ts`). An app font is embedded: `embeddedFontCss` reads its `@font-face` rules from the loaded `fonts.css`, fetches each `woff2` and inlines it as a data URL with its weight, style and `unicode-range`; the export's stylesheet reads `--doc-font` and `--doc-size`.

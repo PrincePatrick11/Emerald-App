@@ -19,15 +19,17 @@ import { useCategoryStore } from '../../../store/categoryStore';
 import { useTemplateStore } from '../../../store/templateStore';
 import { useTagStore } from '../../../store/tagStore';
 import { useVaultStore } from '../../../store/vaultStore';
+import { useSettingsStore } from '../../../store/settingsStore';
 import { categoryLabel } from '../../../lib/categories';
 import { dashboardLabel } from '../../../lib/dashboards';
 import { displayTitle } from '../../../lib/entryTitle';
 import { exportFilename, safeFileBase } from '../../../lib/helpers';
 import { IMAGE_MODES, type ImageMode } from '../../../lib/emerald/manifest';
 import type { EmeraldProtection } from '../../../lib/emerald/file';
+import { EXPORT_FONT_OPTIONS, EXPORT_FONT_SIZES, type ExportFontId } from '../../../lib/exportFonts';
 import {
-  EXPORT_FORMATS, PRESET_PERIODS, bulkEntries, byCreated, effectiveSettings, freeFilter, linkedImageMode, liveFilter,
-  loadExportPrefs, periodRange,
+  EXPORT_FORMATS, PRESET_PERIODS, TYPESET_FORMATS, bulkEntries, byCreated, effectiveSettings, exportTypography, freeFilter,
+  linkedImageMode, liveFilter, loadExportPrefs, periodRange,
   saveExportPrefs, type ExportFormat, type ExportPeriod, type ExportPrefs, type ExportScope,
 } from '../../../lib/exportMenu';
 import type { Entry } from '../../../types';
@@ -71,6 +73,7 @@ function ExportMenuBody({ target }: { target: ExportTarget }) {
 
   const tags = useTagStore((s) => s.tags);
   const vaultId = useVaultStore((s) => s.activeVaultId);
+  const appearance = useSettingsStore((s) => s.settings.appearance);
 
   const [prefs, setPrefs] = useState<ExportPrefs>(() => loadExportPrefs(vaultId));
   useEffect(() => { saveExportPrefs(prefs, vaultId); }, [prefs, vaultId]);
@@ -101,6 +104,8 @@ function ExportMenuBody({ target }: { target: ExportTarget }) {
   // A template only goes as `.emerald`.
   const fmt: ExportFormat | 'vault' = scope === 'vault' ? 'vault' : template ? 'emerald' : prefs.format;
   const sealed = fmt === 'emerald' || fmt === 'vault';
+  const typeset = (TYPESET_FORMATS as readonly string[]).includes(fmt);
+  const typography = exportTypography(prefs, { font: appearance.editorFont, size: appearance.editorFontSize });
 
   // ── A collective export's entries ──
   const dashboard = dashboardOrAll(dashboards, prefs.dashboardId);
@@ -201,6 +206,7 @@ function ExportMenuBody({ target }: { target: ExportTarget }) {
         saved = await exportItemsAsEmerald({ items, images: s.images, protection, blockDefinitions: s.blockDefinitions }, name);
       } else {
         const { exportAsPDF, exportAsMarkdown } = await import('../../../lib/export');
+        const { exportAsHTML } = await import('../../../lib/htmlExport');
         const { collectExportDataFor } = await import('../../../lib/exportData');
         const linkedIds = new Set(linkedChosen.map((e) => e.id));
         const items = [];
@@ -208,8 +214,10 @@ function ExportMenuBody({ target }: { target: ExportTarget }) {
           const data = await collectExportDataFor(entry.id);
           if (data) items.push({ data, images: linkedIds.has(entry.id) ? linkedImageMode(s) : s.images });
         }
-        const file = { bundle: scope === 'bulk' ? bundleName() : undefined };
-        saved = fmt === 'pdf' ? await exportAsPDF(items, file) : await exportAsMarkdown(items, file);
+        const file = { bundle: scope === 'bulk' ? bundleName() : undefined, typography, order: s.order };
+        saved = fmt === 'pdf' ? await exportAsPDF(items, file)
+          : fmt === 'html' ? await exportAsHTML(items, file)
+          : await exportAsMarkdown(items, file);
       }
       // Cancelling in the save dialog is no success, and no reason to close.
       if (saved) close();
@@ -344,7 +352,7 @@ function ExportMenuBody({ target }: { target: ExportTarget }) {
     </Part>
   );
 
-  const picturePart = advanced && (fmt === 'pdf' || fmt === 'emerald') && !template && (
+  const picturePart = advanced && (typeset || fmt === 'emerald') && !template && (
     <Part title={t('exportMenu.images.label')}>
       <SegmentedControl className="w-fit" options={imageOptions} value={prefs.images} onChange={(images) => update({ images })} ariaLabel={t('exportMenu.images.label')} />
       <p className="text-xs text-subtle leading-snug">{t(`exportMenu.images.${prefs.images}Desc`)}</p>
@@ -365,6 +373,30 @@ function ExportMenuBody({ target }: { target: ExportTarget }) {
           )}
         </div>
       )}
+    </Part>
+  );
+
+  // Advanced, PDF and HTML: the font and size the entries are set in; the app's to start with.
+  const typePart = advanced && typeset && (
+    <Part title={t('exportMenu.typography.label')} hint={t('exportMenu.typography.hint')}>
+      <div className="w-64">
+        <FieldDropdown<ExportFontId>
+          value={typography.font}
+          options={EXPORT_FONT_OPTIONS.map(({ id, label }) => ({
+            value: id,
+            label: id === appearance.editorFont ? t('exportMenu.typography.appFont', { font: label }) : label,
+          }))}
+          // The app's own is stored as none, so the export follows a later change in Settings.
+          onChange={(font) => update({ font: font === appearance.editorFont ? null : font })}
+          ariaLabel={t('exportMenu.typography.font')}
+        />
+      </div>
+      <SegmentedControl className="w-fit"
+        options={EXPORT_FONT_SIZES.map((size) => ({ value: size, label: t('common.pixelValue', { value: size }) }))}
+        value={typography.size}
+        onChange={(fontSize) => update({ fontSize: fontSize === appearance.editorFontSize ? null : fontSize })}
+        ariaLabel={t('exportMenu.typography.size')}
+      />
     </Part>
   );
 
@@ -434,7 +466,6 @@ function ExportMenuBody({ target }: { target: ExportTarget }) {
             title={t('exportMenu.format')}
             hint={template ? t('exportMenu.templateOnlyEmerald') : t(`exportMenu.formats.${fmt}`)}
           >
-            {/* HTML joins these once it is back. */}
             <SegmentedControl className="w-fit"
               options={EXPORT_FORMATS.map((value) => ({ value, label: t(`exportMenu.formatNames.${value}`) }))}
               value={fmt as ExportFormat}
@@ -449,6 +480,7 @@ function ExportMenuBody({ target }: { target: ExportTarget }) {
           <VaultExportOptions options={prefs.vault} onChange={(vault) => update({ vault })} />
         )}
 
+        {typePart}
         {picturePart}
 
         {advanced && fmt === 'emerald' && !template && (

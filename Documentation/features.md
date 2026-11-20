@@ -390,7 +390,7 @@ Every vault is encrypted: entries, images, drafts and backups are unreadable wit
 **What encryption does not do.**
 
 - While a vault is unlocked, its content is in the computer's memory. Encryption protects a vault at rest, not a running session.
-- Files that already left the vault stay as they are: backups exported before encryption and kept elsewhere, Markdown, PDF and unprotected `.emerald` exports, and old versions kept by a cloud service. Deleted files can sometimes be recovered from an SSD — only an encrypted disk (BitLocker, FileVault) closes that gap.
+- Files that already left the vault stay as they are: backups exported before encryption and kept elsewhere, Markdown, PDF, HTML and unprotected `.emerald` exports, and old versions kept by a cloud service. Deleted files can sometimes be recovered from an SSD — only an encrypted disk (BitLocker, FileVault) closes that gap.
 - The password cannot be recovered. Without the password and the recovery key, the vault is gone.
 
 ## Export and Import
@@ -411,17 +411,22 @@ The period counts from the day an entry was created; a custom period chosen unde
 |---|---|---|
 | Linked entries | only the directly linked | direct only, or all (also what the linked ones link to); a list to tick them off |
 | Order | oldest first | oldest or newest first |
-| Pictures (PDF, `.emerald`) | balanced | original, balanced, strong, or left out — optionally a level of their own for the linked entries |
+| Pictures (PDF, HTML, `.emerald`) | balanced | original, balanced, strong, or left out — optionally a level of their own for the linked entries |
 | Custom blocks (`.emerald`) | along | along or not |
+| Font and size (PDF, HTML) | the vault's editor font and text size (Settings → General) | one of the app's eight fonts, or Georgia, Times New Roman, Arial, Verdana; 14–22 px |
 | Whole database | everything except the Trash | entries by category, tasks, tags, lexicon, settings, the Trash, a period |
 
-The formats are PDF, Markdown and `.emerald`; the whole database is always a `.vault.emerald`. A `.emerald` or `.vault.emerald` gets a **protection**: the vault's password (opens with the vault's password or recovery key), an own password (at least 8 characters, typed twice), or none. The menu remembers every choice for the next time — dashboard, filter and database contents per vault — except a password and "none", which has to be picked again each time; an unprotected database export is not offered the vault's own `backups/` folder. Cancelling the save dialog leaves the menu open.
+The formats are PDF, HTML, Markdown and `.emerald`; the whole database is always a `.vault.emerald`. A `.emerald` or `.vault.emerald` gets a **protection**: the vault's password (opens with the vault's password or recovery key), an own password (at least 8 characters, typed twice), or none. The menu remembers every choice for the next time — dashboard, filter and database contents per vault — except a password and "none", which has to be picked again each time; an unprotected database export is not offered the vault's own `backups/` folder. Cancelling the save dialog leaves the menu open.
 
-> **Exports show an entry the way read mode does.** Markdown and PDF render each block on its own: hidden blocks are left out, field blocks list only the fields read mode shows (label and value), block titles appear as headings where read mode shows them, and a sigil exports its intention and letters, its drawing (in Markdown a placeholder) and its charge. While a sigil is charged and its reveal date not reached, calculator and drawing are left out of these exports. A `.emerald` file carries the sigil as it is, still concealed. Import is unaffected.
+> **Exports show an entry the way read mode does.** Markdown, PDF and HTML render each block on its own: hidden blocks are left out, field blocks list only the fields read mode shows (label and value), block titles appear as headings where read mode shows them, and a sigil exports its intention and letters, its drawing (in Markdown a placeholder) and its charge. While a sigil is charged and its reveal date not reached, calculator and drawing are left out of these exports. A `.emerald` file carries the sigil as it is, still concealed. Import is unaffected.
 
 ### PDF Export
 
-A native save dialog asks for the destination and the PDF is written directly — no preview and no print dialog. It is rendered by the app's own webview, so emoji come out as proper colour glyphs. The suggested filename is `<Title>_YYYY-MM-DD.pdf`; a collection of several entries is `Emerald_<Dashboard>_<from>_<to>.pdf` (`Export` for an own filter, no dates for "all"). The page is A4 on every system. Several entries go into one PDF, one after another, each starting on a new page. Images are embedded at the chosen level (or left out); internal link chips appear as styled text.
+A native save dialog asks for the destination and the PDF is written directly — no preview and no print dialog. It is rendered by the app's own webview, so emoji come out as proper colour glyphs. The suggested filename is `<Title>_YYYY-MM-DD.pdf`; a collection of several entries is `Emerald_<Dashboard>_<from>_<to>.pdf` (`Export` for an own filter, no dates for "all"). The page is A4 on every system. Several entries go into one PDF, one after another, each starting on a new page. Images are embedded at the chosen level (or left out); internal link chips appear as styled text. Title and text are set in the chosen font and size; an app font is embedded in the PDF, so it looks the same everywhere.
+
+### HTML Export
+
+Saves one self-contained `.html` file that opens in any browser, also offline: pictures (at the chosen level) and an app font are embedded, and nothing is fetched from the network. The suggested filename follows the PDF's. It has light and dark (following the system until switched), Print, and an outline of the open entry's headings on wide windows. Without a `#` link it opens on the first entry of its sidebar. With several entries a sidebar lists them grouped by category, in the app's order of categories (entries without one last), sorted by date — the sort button flips it — with a search over titles and text that counts and highlights the hits (`/` jumps into it). A link chip to an entry in the same file jumps there; one to an entry outside is shown dashed. Under each entry, **Links to** and **Linked from** list the entries of the file it links to and that link to it. A Georgia, Times New Roman, Arial or Verdana font is the reader's own; where it is missing a similar one takes over.
 
 ### Markdown Export
 

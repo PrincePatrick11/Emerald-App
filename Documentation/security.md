@@ -219,7 +219,7 @@ On top of the guards, each command allowlists extensions and returns `"unsupport
 
 | Command | Extensions | Notes |
 |---|---|---|
-| `write_file`, `read_file` | `.md`, `.json`, `.txt` | keeps them from being a general filesystem read/write primitive. `.emerald` is not on the list: a `.emerald` file is written only through `write_emerald_file`, sealed as its export asks, or by the automatic backup, so no backup can be written in the clear by accident |
+| `write_file`, `read_file` | `.md`, `.json`, `.txt`; `write_file` also `.html` (the HTML export) | keeps them from being a general filesystem read/write primitive. `.emerald` is not on the list: a `.emerald` file is written only through `write_emerald_file`, sealed as its export asks, or by the automatic backup, so no backup can be written in the clear by accident |
 | `write_emerald_file`, `read_emerald_file` | `.emerald` (which `.vault.emerald` ends in) | the same path guards |
 | `export_image` | `.png`, `.jpg`, `.jpeg`, `.webp`, `.svg` | the base64 payload is decoded in Rust before writing, so no text encoding or newline handling can alter the bytes |
 | `copy_image_file`, `read_image_file` | `png`, `jpg`, `jpeg`, `gif`, `webp`, `svg` | shared helper `checked_image_source` |
@@ -264,7 +264,7 @@ A `.emerald` file comes from anywhere. `read_emerald_file` (`src-tauri/src/emera
 
 ## HTML Escaping in Exports
 
-User-provided text interpolated into the PDF export HTML goes through `htmlEscape()` (in `src/lib/export.ts`), which replaces `&`, `<`, `>`, `"` and `'` with HTML entities. It is applied to:
+User-provided text interpolated into the PDF and HTML export goes through `htmlEscape()` (in `src/lib/export.ts`), which replaces `&`, `<`, `>`, `"` and `'` with HTML entities. It is applied to:
 
 - the entry title (in `<title>` and the `<h1>`),
 - the top bar's emoji icon and its label (moon phase name or category name),
@@ -276,7 +276,7 @@ An image icon is passed through `sanitizeDataImageUrl` instead. The content HTML
 
 All HTML that enters the app from outside is sanitised with DOMPurify before being stored or displayed.
 
-**PDF export (`src/lib/export.ts`).** Before the content HTML is handed to `export_pdf`, it passes through `DOMPurify.sanitize` with an allowlist for the internal-link attributes — `data-type`, `data-id`, `data-target-kind`, `data-label`, `data-icon`, `data-entry-number`, `data-href` — so internal-link chips survive, plus `colwidth` (table column widths) and `data-color` (one of six colour names; the print CSS matches only those). This closes an injection path if an editor extension or import produces unexpected HTML.
+**PDF and HTML export (`src/lib/export.ts`, `exportArticle`).** Before the content HTML is handed to `export_pdf` or written into an HTML export, it passes through `DOMPurify.sanitize` with an allowlist for the internal-link attributes — `data-type`, `data-id`, `data-target-kind`, `data-label`, `data-icon`, `data-entry-number`, `data-href` — so internal-link chips survive, plus `colwidth` (table column widths) and `data-color` (one of six colour names; the print CSS matches only those). This closes an injection path if an editor extension or import produces unexpected HTML.
 
 **Emerald import (`src/lib/emeraldFormat.ts`).** After picture names and links are remapped, content passes through `sanitizeImportedHtml` — the last step of every import that writes HTML to the database. It keeps TipTap's own attributes (`data-type`, `data-id`, `data-target-kind`, `data-label`, `data-icon`, `data-entry-number`, `data-align`, `colwidth`, `data-color`) and strips everything DOMPurify removes by default (script tags, event handlers, …). `data-align` is intentionally not in the PDF allowlist: that path never reads it, and alignment survives through the image's inline margins.
 
@@ -315,6 +315,8 @@ The eight typefaces ship with the app (`@fontsource` woff2 files bundled by Vite
 **Inline styles.** Tauri gives each `<style>` element a nonce, and a nonce in `style-src` makes CSP3 ignore `'unsafe-inline'` — which would silently block every `style={{…}}` attribute in the app (the sidebar widths in `AppShell`, among others) in a packaged build. That is why the loading screen's CSS lives in `public/splash.css`, loaded via `<link>`, rather than a `<style>` block in `index.html`.
 
 **PDF export.** The export HTML is written to a unique file in the OS temp directory and loaded by a hidden webview over a `file://` URL. That document carries **no CSP at all** — a `file://` document has nothing to inherit it from. What controls that path is `htmlEscape` and `DOMPurify.sanitize` in `src/lib/export.ts` (see [HTML Escaping in Exports](#html-escaping-in-exports) and [HTML Sanitisation](#html-sanitisation)), and the export file — the entry in plain text, outside the vault — is removed as soon as the export ends, however it ends (a drop guard), is created readable by its user only on Unix, is never logged by path, and any that a crash left behind are swept at startup once they are an hour old. The internal-link chip transformation (`transformInternalLinks`) is pre-rendered in TypeScript as a convenience, not a CSP necessity.
+
+**HTML export.** The `.html` file (`src/lib/htmlExport.ts`) is opened by the reader's browser, not by the app, so the app's CSP does not apply to it and it carries its own in a `<meta>` tag: `default-src 'none'; img-src data:; font-src data:; style-src 'unsafe-inline'; script-src 'unsafe-inline'; form-action 'none'; base-uri 'none'` — nothing is loaded from the network and no form posts anywhere. Its one inline script is a constant of the app (navigation, search, outline, theme, sorting); it reads everything from the DOM, and no entry data is ever interpolated into script source. Entry content goes through the same `htmlEscape` and `DOMPurify.sanitize` as the PDF, so an entry cannot add a script of its own; besides `#entry-…` anchors into the same file it keeps the links DOMPurify allows by default (http(s), `mailto:`, `tel:` and the like, never `javascript:` or `data:`); the script opens the http(s) ones in a new tab with `noopener`. An embedded app font is the app's own `woff2` file, read from the app's stylesheet and inlined as a data URL.
 
 ## File Dialog Safety
 

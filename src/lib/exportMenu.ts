@@ -6,27 +6,31 @@
  *
  * "Normal" fixes what "Advanced" lets one choose (`effectiveSettings`):
  * pictures balanced, linked entries only direct, oldest first, custom blocks
- * along, the collective export by a dashboard — the choices made under
- * "Advanced" stay remembered for the next time.
+ * along, the collective export by a dashboard, PDF and HTML in the app's
+ * editor font and text size — the choices made under "Advanced" stay
+ * remembered for the next time.
  */
 import { format, isValid, parseISO, startOfDay, startOfMonth, subDays } from 'date-fns';
 import { matchesFilter } from './dashboards';
 import { asRecord, oneOf } from './helpers';
 import { FULL_BACKUP_OPTIONS, type BackupOptions } from './dbBackup';
 import { IMAGE_MODES, type ImageMode } from './emerald/manifest';
+import { EXPORT_FONT_IDS, EXPORT_FONT_SIZES, type ExportFontId, type ExportTypography } from './exportFonts';
 import type { DashboardFilter, Entry } from '../types';
 
 export type ExportScope = 'entry' | 'bulk' | 'vault';
 export type ExportLevel = 'normal' | 'advanced';
 /** The formats of one entry or a collective export; a whole vault is always a `.vault.emerald`. */
-export type ExportFormat = 'pdf' | 'markdown' | 'emerald';
+export type ExportFormat = 'pdf' | 'html' | 'markdown' | 'emerald';
 export type ExportPeriod = 'last7' | 'last30' | 'thisMonth' | 'all' | 'custom';
 export type ExportOrder = 'asc' | 'desc';
 /** Where a collective export's entries come from: what a dashboard shows, or a filter of its own (Advanced). */
 export type BulkSource = 'dashboard' | 'filter';
 export type ProtectionChoice = 'vaultKey' | 'password' | 'none';
 
-export const EXPORT_FORMATS: readonly ExportFormat[] = ['pdf', 'markdown', 'emerald'];
+export const EXPORT_FORMATS: readonly ExportFormat[] = ['pdf', 'html', 'markdown', 'emerald'];
+/** The formats set in a font and size of their own. */
+export const TYPESET_FORMATS: readonly ExportFormat[] = ['pdf', 'html'];
 /** The periods Normal offers; Advanced adds `custom`. */
 export const PRESET_PERIODS: readonly ExportPeriod[] = ['last7', 'last30', 'thisMonth', 'all'];
 const PERIODS: readonly ExportPeriod[] = [...PRESET_PERIODS, 'custom'];
@@ -56,6 +60,9 @@ export interface ExportPrefs {
   linkedImagesOwn: boolean;
   linkedImages: ImageMode;
   blockDefinitions: boolean;
+  /** PDF and HTML; `null` is the app's own until one is chosen. */
+  font: ExportFontId | null;
+  fontSize: ExportTypography['size'] | null;
   vault: BackupOptions;
 }
 
@@ -77,6 +84,7 @@ function defaultPrefs(): ExportPrefs {
     level: 'normal', scope: 'entry', format: 'pdf', includeLinked: false, protection: 'vaultKey',
     dashboardId: 'all', period: 'last30', from: '', to: '',
     filter: { categories: [], tags: [] },
+    font: null, fontSize: null,
     ...NORMAL_FIXED,
   };
 }
@@ -127,6 +135,8 @@ export function loadExportPrefs(vaultId: string): ExportPrefs {
     linkedImagesOwn: bool(stored.linkedImagesOwn, base.linkedImagesOwn),
     linkedImages: oneOf(stored.linkedImages, IMAGE_MODES, base.linkedImages),
     blockDefinitions: bool(stored.blockDefinitions, base.blockDefinitions),
+    font: oneOf<ExportFontId | null>(stored.font, EXPORT_FONT_IDS, null),
+    fontSize: oneOf<ExportTypography['size'] | null>(stored.fontSize, EXPORT_FONT_SIZES, null),
     vault: {
       categoryIds: vault.categoryIds === null || vault.categoryIds === undefined ? null : strings(vault.categoryIds),
       includeUncategorized: bool(vault.includeUncategorized, DEFAULT_VAULT_OPTIONS.includeUncategorized),
@@ -157,6 +167,12 @@ export function saveExportPrefs(prefs: ExportPrefs, vaultId: string): void {
 /** The settings that apply: under Normal the fixed ones in place of the remembered Advanced choices. */
 export function effectiveSettings(prefs: ExportPrefs): ExportPrefs {
   return prefs.level === 'advanced' ? prefs : { ...prefs, ...NORMAL_FIXED };
+}
+
+/** The font and size of a PDF or HTML: the app's under Normal, and under Advanced until another is chosen. */
+export function exportTypography(prefs: ExportPrefs, app: ExportTypography): ExportTypography {
+  if (prefs.level !== 'advanced') return app;
+  return { font: prefs.font ?? app.font, size: prefs.fontSize ?? app.size };
 }
 
 /** The picture level of linked entries. */
