@@ -83,7 +83,7 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
       ...patch,
       name: patch.name !== undefined ? patch.name.trim() : current.name,
       // "All entries" shows everything; nothing narrows it.
-      filter: current.builtin === 'all' ? {} : normalizeFilter(patch.filter ?? current.filter),
+      filter: current.builtin === 'all' ? {} : (patch.filter ? normalizeFilter(patch.filter) : current.filter),
       updated_at: nowIso(),
     };
     // First in memory: sort and layout buttons answer at once.
@@ -158,7 +158,8 @@ export function reassignDashboardCategoriesInMemory(ids: ReadonlySet<string>, to
       if (!categories?.some((c) => ids.has(c))) return d;
       changed = true;
       const next = [...new Set(categories.map((c) => (ids.has(c) ? to : c)).filter((c): c is string => c !== null))];
-      return { ...d, filter: normalizeFilter({ ...d.filter, categories: next }) };
+      // An empty list stays: the dashboard then shows nothing, as in the database.
+      return { ...d, filter: { ...d.filter, categories: next } };
     });
     return changed ? { dashboards } : {};
   });

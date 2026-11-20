@@ -46,6 +46,8 @@ interface CollectionChip<T> {
   value: string;
   label: string;
   emoji?: string;
+  /** Shown on hover, for a label that is short on purpose. */
+  hint?: string;
   test: (item: T) => boolean;
 }
 
@@ -222,7 +224,7 @@ export default function CollectionDashboard<T extends object>({
       panelProps: {
         chipLabel: filter!.label,
         chips: chips.map((chip) => ({
-          value: chip.value, label: chip.label, emoji: chip.emoji, count: searched.filter(chip.test).length,
+          value: chip.value, label: chip.label, emoji: chip.emoji, hint: chip.hint, count: searched.filter(chip.test).length,
         })),
         selectedChips: selected,
         onChipToggle: (v: string) => setFilter((prev) => (prev.includes(v) ? prev.filter((x) => x !== v) : [...prev, v])),

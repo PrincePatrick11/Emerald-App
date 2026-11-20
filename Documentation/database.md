@@ -64,7 +64,7 @@ An entry has no type, so nothing ever rewrites `target_type`: a link to an entry
 
 ### Deleting a category never deletes its content
 
-`RESTRICT` deletes nothing; it refuses a delete that would leave a dangling reference. `reassignCategoryContent(db, categoryId)` in `schema.ts` is the other half: it sets `category_id` to `NULL` across `CATEGORIZED_TABLES` (`entries`, `tasks`) so the delete becomes permissible, and strips the category out of every dashboard's `filter` (trashed ones too; `replaceCategoryInDashboards`). `dashboardStore`'s `reassignDashboardCategoriesInMemory` mirrors that trim in the loaded store. A category's own start template (`template_id`) goes with its row.
+`RESTRICT` deletes nothing; it refuses a delete that would leave a dangling reference. `reassignCategoryContent(db, categoryId)` in `schema.ts` is the other half: it sets `category_id` to `NULL` across `CATEGORIZED_TABLES` (`entries`, `tasks`) so the delete becomes permissible, and strips the category out of every dashboard's `filter` (trashed ones too; `replaceCategoryInDashboards`). A filter left with an empty category list keeps it: an empty list matches nothing, only a filter without the rule shows everything (`matchesFilter`); a category in the trash lets no entry pass either. `dashboardStore`'s `reassignDashboardCategoriesInMemory` mirrors that trim in the loaded store. A category's own start template (`template_id`) goes with its row.
 
 When a category is merged into a namesake instead (`reassignCategoryContent(db, from, to)`, via `mergeCategory` from `categoryStore.restoreCategory` and `updateCategory`), content and the dashboards' filters move to `to`, which names it once; `to` keeps its own start template.
 
@@ -135,7 +135,7 @@ Views over entries by filter rules (`lib/dashboards.ts`, `store/dashboardStore.t
 | name | TEXT | NOT NULL DEFAULT `''`; empty shows the translated name of the built-in |
 | icon | TEXT | emoji or an icon file (see [Icons](#icons)), NOT NULL DEFAULT `''`; empty shows the built-in's rail icon, or the generic dashboard glyph |
 | position | INTEGER | order in the rail |
-| filter | TEXT | JSON `{ categories?: string[], tags?: string[] }`; a missing key does not narrow, so `{}` shows every entry; an empty list is dropped on save (`normalizeFilter`), since an empty category list would hide everything |
+| filter | TEXT | JSON `{ categories?: string[], tags?: string[] }`; a missing key does not narrow, so `{}` shows every entry; an empty category list is kept and matches nothing (a filter whose categories were all deleted); the settings dialog drops an empty list when the user saves a changed selection (`normalizeFilter`) |
 | sort | TEXT | JSON `{ by: 'created' \| 'title' \| 'updated', dir }` |
 | display | TEXT | JSON `{ view: 'list' \| 'cards' \| 'cards_wide' \| 'timeline', grouping: 'grouped' \| 'flat' }` — the list's view and grouping; missing or broken JSON reads as list/flat (`parseDashboardDisplay`) |
 | created_at / updated_at | TEXT | ISO 8601 |

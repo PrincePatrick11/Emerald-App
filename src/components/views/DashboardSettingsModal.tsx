@@ -57,7 +57,14 @@ function DashboardSettingsModal({ dashboard, onClose }: { dashboard: Dashboard; 
     // A dashboard of the user's own needs a name; a built-in falls back to its translated one.
     const nextName = name.trim() || (dashboard.builtin ? '' : dashboardLabel(t, dashboard));
     const finalTags = await commitDraftTags(tags, draftTags);
-    await updateDashboard(dashboard.id, { name: nextName, icon, filter: { categories: categoryIds, tags: finalTags } });
+    // A filter the user did not touch stays as it is: an emptied category list shows nothing, and saving a new name must not turn it into "all".
+    const same = (a: string[], b: string[]) => a.length === b.length && a.every((id, i) => id === b[i]);
+    const filterUnchanged = same(categoryIds, dashboard.filter.categories ?? []) && same(finalTags, dashboard.filter.tags ?? []);
+    await updateDashboard(dashboard.id, {
+      name: nextName,
+      icon,
+      ...(filterUnchanged ? {} : { filter: { categories: categoryIds, tags: finalTags } }),
+    });
     onClose();
   };
 

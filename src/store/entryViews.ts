@@ -7,7 +7,7 @@
  * Import rule: imports no store; pure functions over what callers pass.
  */
 import { dashboardEntries } from '../lib/dashboards';
-import type { ActiveView, Dashboard, Entry, LinkTargetKind } from '../types';
+import type { ActiveView, Category, Dashboard, Entry, LinkTargetKind } from '../types';
 
 /** The page of entry `id`, shown in dashboard `dashboard` ("All entries" by default). */
 export function entryView(id: string, dashboard = 'all', mode: 'view' | 'edit' = 'view'): ActiveView {
@@ -22,25 +22,32 @@ export function viewOfLinkTarget(kind: LinkTargetKind | string, id: string): Act
 /**
  * One result per list of entries and dashboard: every view that shows a
  * dashboard filters and sorts once per change, and gets the same array back as
- * long as neither changed — zustand needs stable snapshots, and a list should
+ * long as neither the entries, the dashboard nor the category list changed — zustand needs stable snapshots, and a list should
  * not re-render for nothing.
  */
-const dashboardCache = new WeakMap<readonly Entry[], WeakMap<Dashboard, Entry[]>>();
+const dashboardCache = new WeakMap<readonly Entry[], WeakMap<Dashboard, { categories: readonly Category[]; result: Entry[] }>>();
 
 const EMPTY: Entry[] = [];
 
-/** The entries a dashboard shows, in its order — the same array until entries or dashboard change. */
-export function entriesOfDashboard(entries: readonly Entry[], dashboard: Dashboard | undefined): Entry[] {
+/**
+ * The entries a dashboard shows, in its order — the same array until entries,
+ * dashboard or the live categories change (a category in the trash no longer
+ * lets its entries pass a category filter).
+ */
+export function entriesOfDashboard(
+  entries: readonly Entry[],
+  dashboard: Dashboard | undefined,
+  categories: readonly Category[],
+): Entry[] {
   if (!dashboard) return EMPTY;
   let inner = dashboardCache.get(entries);
   if (!inner) {
     inner = new WeakMap();
     dashboardCache.set(entries, inner);
   }
-  let result = inner.get(dashboard);
-  if (!result) {
-    result = dashboardEntries(entries, dashboard);
-    inner.set(dashboard, result);
-  }
+  const cached = inner.get(dashboard);
+  if (cached && cached.categories === categories) return cached.result;
+  const result = dashboardEntries(entries, dashboard, new Set(categories.map((c) => c.id)));
+  inner.set(dashboard, { categories, result });
   return result;
 }

@@ -55,7 +55,7 @@ export default function CategoryEditModal({ category, onClose, onDelete, onCreat
 
   const defaultTemplate = defaultTemplateId ? templates.find((tpl) => tpl.id === defaultTemplateId) : undefined;
   const filtering = category ? dashboards.filter((d) => d.filter.categories?.includes(category.id)) : [];
-  const showingAll = dashboards.filter((d) => !d.filter.categories?.length);
+  const showingAll = dashboards.filter((d) => !d.filter.categories);
 
   const save = async () => {
     const trimmed = name.trim();

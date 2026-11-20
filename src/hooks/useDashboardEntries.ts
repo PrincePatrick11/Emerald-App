@@ -1,5 +1,6 @@
 import { useEntryStore } from '../store/entryStore';
 import { dashboardById, useDashboardStore } from '../store/dashboardStore';
+import { useCategoryStore } from '../store/categoryStore';
 import { entriesOfDashboard } from '../store/entryViews';
 import type { Dashboard, Entry } from '../types';
 
@@ -11,5 +12,6 @@ function useDashboard(id: string | undefined): Dashboard | undefined {
 /** The entries a dashboard shows, in its order. Empty if the dashboard is gone. */
 export function useDashboardEntries(id: string | undefined): Entry[] {
   const dashboard = useDashboard(id);
-  return useEntryStore((s) => entriesOfDashboard(s.entries, dashboard));
+  const categories = useCategoryStore((s) => s.categories);
+  return useEntryStore((s) => entriesOfDashboard(s.entries, dashboard, categories));
 }

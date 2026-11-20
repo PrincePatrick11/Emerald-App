@@ -12,21 +12,25 @@ export interface FilterChip {
   /** Hits of this value in the list after the search, without its own
    *  filter, so the number stays put while you toggle it on and off. */
   count?: number;
+  /** Shown on hover, for a label that is short on purpose. */
+  hint?: string;
 }
 
 /** One row of a filter list — also the row of a single choice from a list (a category's start template). */
-export function FilterRow({ active, onClick, lead, label, count }: {
+export function FilterRow({ active, onClick, lead, label, count, hint }: {
   active: boolean;
   onClick: () => void;
   lead: ReactNode;
   label: string;
   count?: number;
+  hint?: string;
 }) {
   return (
     // 30px tall (leading-5 + 2×5px) like the primary button at the top of the sidebar
     // and the sort select: all controls in the sidebar equally tall.
     <button
       type="button"
+      title={hint}
       aria-pressed={active}
       onClick={onClick}
       className={`filter-row flex items-center gap-2.5 w-full px-3 py-[5px] rounded-md text-[13px] leading-5 text-left${active ? ' filter-row--active' : ''}`}
@@ -75,6 +79,7 @@ export default function FilterList({ label, chips, selected, onToggle, onAll, al
             lead={chip.icon ?? (chip.emoji && <span className="text-sm">{chip.emoji}</span>)}
             label={chip.label}
             count={chip.count}
+            hint={chip.hint}
           />
         ))}
       </div>

@@ -8,6 +8,8 @@ import { useSettingsStore } from '../../store/settingsStore';
 import { useTemplateStore } from '../../store/templateStore';
 import { useImageStore } from '../../store/imageStore';
 import { useCategoryStore } from '../../store/categoryStore';
+import { useDashboardStore } from '../../store/dashboardStore';
+import { dashboardLabel } from '../../lib/dashboards';
 import { useUndoStore } from '../../store/undoStore';
 import { useCollapsedSet } from '../../hooks/useCollapsedSet';
 import { useDeepLink } from '../../hooks/useDeepLink';
@@ -120,6 +122,7 @@ export default function TagsView() {
   const templates = useTemplateStore((s) => s.templates);
   const images = useImageStore((s) => s.images);
   const categories = useCategoryStore((s) => s.categories);
+  const dashboards = useDashboardStore((s) => s.dashboards);
   const state = useCollectionState('tags');
   const { query } = state;
   const { isCollapsed, toggle, expand } = useCollapsedSet('tags', { defaultCollapsed: true });
@@ -160,13 +163,38 @@ export default function TagsView() {
   /** Tag IDs some picture of "Images" carries: such a tag is not unused either. */
   const imageTags = useMemo(() => new Set(images.flatMap((image) => image.tags)), [images]);
 
+  /** Tag ID → names of the dashboards whose filter names it. */
+  const dashboardsByTag = useMemo(() => {
+    const map = new Map<string, string[]>();
+    for (const d of dashboards) {
+      for (const tagId of d.filter.tags ?? []) {
+        const names = map.get(tagId);
+        if (names) names.push(dashboardLabel(t, d));
+        else map.set(tagId, [dashboardLabel(t, d)]);
+      }
+    }
+    return map;
+  }, [dashboards, t]);
+
   const usage = (tag: Tag) => itemsByTag.get(tag.id)?.length ?? 0;
   const inEntries = (tag: Tag) => usage(tag) > 0;
-  // Where a tag without entries hangs: templates, images, both — each a state of its own.
-  const onlyInTemplates = (tag: Tag) => !inEntries(tag) && templateTags.has(tag.id) && !imageTags.has(tag.id);
-  const onlyInImages = (tag: Tag) => !inEntries(tag) && !templateTags.has(tag.id) && imageTags.has(tag.id);
-  const inTemplatesAndImages = (tag: Tag) => !inEntries(tag) && templateTags.has(tag.id) && imageTags.has(tag.id);
-  const unused = (tag: Tag) => !inEntries(tag) && !templateTags.has(tag.id) && !imageTags.has(tag.id);
+  const inTemplates = (tag: Tag) => templateTags.has(tag.id);
+  const inImages = (tag: Tag) => imageTags.has(tag.id);
+  const inDashboards = (tag: Tag) => dashboardsByTag.has(tag.id);
+  const unused = (tag: Tag) => !inEntries(tag) && !inTemplates(tag) && !inImages(tag) && !inDashboards(tag);
+
+  /** The places a tag without entries is used, as a sentence part: "templates, images". `hint` names the dashboards. */
+  const placesOf = (tag: Tag, hint: boolean) => {
+    const places: string[] = [];
+    if (inTemplates(tag)) places.push(t('tags.placeTemplates'));
+    if (inImages(tag)) places.push(t('tags.placeImages'));
+    if (inDashboards(tag)) {
+      places.push(hint
+        ? t('tags.placeDashboardsNamed', { names: dashboardsByTag.get(tag.id)!.join(', ') })
+        : t('tags.placeDashboards'));
+    }
+    return places.join(', ');
+  };
 
   /** The entries of a tag the search leaves: all if its name matches, otherwise those whose title does. */
   const entriesShown = (tag: Tag) => {
@@ -236,9 +264,7 @@ export default function TagsView() {
   const usageLabel = (tag: Tag) => (inEntries(tag)
     ? <ModuleCounts modules={['entries'] as const} counts={{ entries: usage(tag) }} />
     : <span className="text-xs text-muted flex-shrink-0">
-        {t(onlyInTemplates(tag) ? 'tags.onlyInTemplates'
-          : onlyInImages(tag) ? 'tags.onlyInImages'
-          : inTemplatesAndImages(tag) ? 'tags.onlyInTemplatesAndImages' : 'tags.unused')}
+        {unused(tag) ? t('tags.unused') : t('tags.onlyIn', { places: placesOf(tag, false) })}
       </span>);
 
   // ── The list: tag rows with their entries below ──────────────────────────
@@ -256,10 +282,8 @@ export default function TagsView() {
     );
   };
 
-  /** Below an open tag without entries: why — it hangs on templates, pictures or both, or nowhere. */
-  const emptyHintKey = (tag: Tag) => (onlyInTemplates(tag) ? 'tags.onlyInTemplatesHint'
-    : onlyInImages(tag) ? 'tags.onlyInImagesHint'
-    : inTemplatesAndImages(tag) ? 'tags.onlyInTemplatesAndImagesHint' : 'tags.unusedHint');
+  /** Below an open tag without entries: why — it hangs on templates, pictures, dashboard filters, or nowhere. */
+  const emptyHint = (tag: Tag) => (unused(tag) ? t('tags.unusedHint') : t('tags.onlyInHint', { places: placesOf(tag, true) }));
 
   const renderTagRow = (tag: Tag, openMenu: (tag: Tag, e: React.MouseEvent) => void) => {
     if (form?.mode === 'rename' && form.id === tag.id) {
@@ -285,7 +309,7 @@ export default function TagsView() {
           {usageLabel(tag)}
         </DashboardRow>
         {!collapsed && (shownEntries.length === 0
-          ? <p className="ml-6 mt-1.5 text-xs text-subtle px-1 py-1">{t(emptyHintKey(tag))}</p>
+          ? <p className="ml-6 mt-1.5 text-xs text-subtle px-1 py-1">{emptyHint(tag)}</p>
           : <div className="ml-6 mt-1.5 space-y-1.5">{shownEntries.map(renderEntry)}</div>)}
       </div>
     );
@@ -306,9 +330,7 @@ export default function TagsView() {
         label: t('tags.usage'),
         chips: [
           { value: 'entries', label: t('tags.inEntries'), test: inEntries },
-          { value: 'templates', label: t('tags.onlyInTemplatesFilter'), test: onlyInTemplates },
-          { value: 'images', label: t('tags.onlyInImagesFilter'), test: onlyInImages },
-          { value: 'templatesAndImages', label: t('tags.onlyInTemplatesAndImagesFilter'), test: inTemplatesAndImages },
+          { value: 'elsewhere', label: t('tags.onlyElsewhereFilter'), hint: t('tags.onlyElsewhereHint'), test: (tag) => !inEntries(tag) && !unused(tag) },
           { value: 'unused', label: t('tags.unusedFilter'), test: unused },
         ],
       }}

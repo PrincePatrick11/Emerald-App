@@ -53,7 +53,13 @@ function jsonObject(raw: unknown): Record<string, unknown> {
 /** A filter from JSON (row or backup): unknown keys and non-ID values drop out. */
 export function parseDashboardFilter(raw: unknown): DashboardFilter {
   const value = jsonObject(raw);
-  return normalizeFilter({ categories: idList(value.categories), tags: idList(value.tags) });
+  // An empty list stays: a rule whose categories are all gone matches nothing —
+  // only a filter without the rule shows everything.
+  const next: DashboardFilter = {};
+  if (Array.isArray(value.categories)) next.categories = idList(value.categories);
+  const tags = idList(value.tags);
+  if (tags?.length) next.tags = tags;
+  return next;
 }
 
 /**
@@ -117,9 +123,20 @@ export function isBuiltinDashboard(value: unknown): value is BuiltinDashboard {
   return (BUILTIN_DASHBOARD_KEYS as readonly unknown[]).includes(value);
 }
 
-/** Does the entry pass the filter? A missing rule does not narrow. */
-function matchesFilter(entry: Pick<Entry, 'category_id' | 'tags'>, filter: DashboardFilter): boolean {
-  if (filter.categories && !(entry.category_id !== null && filter.categories.includes(entry.category_id))) return false;
+/**
+ * Does the entry pass the filter? A missing rule does not narrow; a category
+ * rule names categories, and one that names none that still exist (gone, or in
+ * the trash — `live` lacks them) matches nothing.
+ */
+function matchesFilter(
+  entry: Pick<Entry, 'category_id' | 'tags'>,
+  filter: DashboardFilter,
+  live: ReadonlySet<string>,
+): boolean {
+  if (filter.categories) {
+    const id = entry.category_id;
+    if (id === null || !filter.categories.includes(id) || !live.has(id)) return false;
+  }
   if (filter.tags && filter.tags.length && !entry.tags.some((tag) => filter.tags!.includes(tag))) return false;
   return true;
 }
@@ -131,9 +148,13 @@ function compareEntries(sort: DashboardSort): (a: Entry, b: Entry) => number {
   return (a, b) => sign * a[key].localeCompare(b[key]) || (a.entry_number ?? 0) - (b.entry_number ?? 0);
 }
 
-/** The entries a dashboard shows, in its order. */
-export function dashboardEntries(entries: readonly Entry[], dashboard: Pick<Dashboard, 'filter' | 'sort'>): Entry[] {
-  return entries.filter((e) => matchesFilter(e, dashboard.filter)).sort(compareEntries(dashboard.sort));
+/** The entries a dashboard shows, in its order. `live` is the IDs of the categories that exist (not in the trash). */
+export function dashboardEntries(
+  entries: readonly Entry[],
+  dashboard: Pick<Dashboard, 'filter' | 'sort'>,
+  live: ReadonlySet<string>,
+): Entry[] {
+  return entries.filter((e) => matchesFilter(e, dashboard.filter, live)).sort(compareEntries(dashboard.sort));
 }
 
 /**
