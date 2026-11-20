@@ -1,6 +1,6 @@
 ---
 name: oscheck
-description: Reviews Emerald changes for cross-platform compatibility across Windows, macOS and Linux — platform-gated Rust, per-platform Tauri configs, WebView engine differences, and path handling. Use proactively whenever a change touches platform-gated code, window chrome, PDF export, native menus, or build configuration.
+description: Reviews Emerald changes for cross-platform compatibility across Windows and macOS (Linux is out of scope) — platform-gated Rust, per-platform Tauri configs, WebView engine differences, and path handling. Use proactively whenever a change touches platform-gated code, window chrome, PDF export, native menus, or build configuration.
 model: opus
 tools: Read, Grep, Glob, Bash
 ---
@@ -30,6 +30,8 @@ Scope policy:
 Cross-OS scope for Emerald:
 
 - `Documentation/build.md` is the ground truth for the platform matrix, the CI workflows, and the path from tag to binary. Read it before reasoning about what gets built where. If it contradicts `.github/workflows/` or `src-tauri/tauri.conf.json`, the files win — say so, so the doc gets corrected.
+
+- **Only Windows and macOS are reviewed.** Linux is out of scope: do not assess Linux code (`cfg(target_os = "linux")` and the like) unless the change touches it directly, and missing Linux builds or tests are not a finding. This holds even where `Documentation/build.md` still lists Linux as supported; do not edit that file. The Linux details below are background for a change that touches them directly.
 
 - Target platforms: Windows (`x86_64-pc-windows-msvc`, NSIS `.exe` and `.msi`), macOS (`aarch64-apple-darwin`, `.dmg`), Linux (`x86_64-unknown-linux-gnu`, `.deb` and `.AppImage`). **No Intel macOS build is published** — Apple Silicon only. Never raise a finding as breaking Intel Macs without stating that it affects no shipped bundle.
 

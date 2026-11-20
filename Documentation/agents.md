@@ -20,11 +20,11 @@ A git worktree is a checkout of its own and needs its own link, unless the agent
 | `bugcheck` | Correctness: whether a change does what its task and approved plan say, and whether it holds for every input, state and order of events. Every finding names a failing case |
 | `crosscheck` | Missing cross-module updates: shared schema, migrations, the backup format and its version, export/import, referential integrity between modules. Enforces the rules in [`database.md`](database.md) and runs `check:schema` |
 | `securitycheck` | Tauri commands, the SQL boundary, key handling and encryption at rest, input validation, trust boundaries. Reads [`security.md`](security.md) and [`architecture/encryption.md`](architecture/encryption.md) |
-| `oscheck` | Compatibility across Windows, macOS and Linux: platform-gated Rust, per-platform Tauri configs, WebView engine differences, path handling. Reads [`build.md`](build.md) for the platform matrix |
+| `oscheck` | Compatibility across Windows and macOS (Linux is out of scope; missing Linux builds or tests are no finding): platform-gated Rust, per-platform Tauri configs, WebView engine differences, path handling. Reads [`build.md`](build.md) for the platform matrix |
 | `centralize` | Consolidation in both directions: duplication that should become a shared building block, and shared building blocks that were bypassed. Works off [`components.md`](components.md) |
 | `i18ncheck` | Drift between the `de`/`en`/`es`/`fr` locale files: missing or orphaned keys, hardcoded visible strings, mismatched placeholders |
 | `designcheck` | UI changes against the binding rules in [`design.md`](design.md) and the building blocks in [`components.md`](components.md), and the rendered result in the running app in both themes |
-| `qacheck` | Drives the running app end to end to validate a feature, with what it read from the page and the console as evidence per test case |
+| `qacheck` | Drives the running app to validate a feature, with what it read from the page and the console as evidence per test case. Narrow by default: the task's "done when" points, about five cases, nothing the session already proved, one system |
 | `optimize` | Finds and fixes measurable performance bottlenecks: React render, SQLite, the Tauri bridge, startup |
 | `sync-docs` | Updates `CHANGELOG.md` and `Documentation/` with what a session actually landed, leaving out intermediate steps and reverted changes |
 | `release` | Prepares a release: syncs the version across the three manifests, cuts the changelog, checks the release workflow. Prints the tag command and never tags or pushes |
@@ -41,10 +41,12 @@ A git worktree is a checkout of its own and needs its own link, unless the agent
 | Locale file or visible text | `i18ncheck` |
 | Non-trivial code in general | `review` |
 | Logic: stores, migrations, Rust, anything with state or async work | `bugcheck` |
-| A visible feature finished | `qacheck` |
+| A visible feature finished (at the end of the task, not after each step) | `qacheck` |
 | Something is measurably slow | `optimize` |
 
 When several apply, the static reviewers come first, in any order, since they only cost reading time. `designcheck` and `qacheck` follow one after the other: both drive the same app instance, and `qacheck` is the most expensive of all.
+
+`qacheck` is started when a task is finished or on request, and keeps to the task's "done when" points with about five cases. It skips pure logic, the Rust side, texts and translations, documentation, and small fixes the session already verified in the app, and says so in one line. It repeats no case the session proved in the running app and tests only the system it runs on. A full pass, neighbouring areas included, is for the landing of a refactor, the release test, or an explicit request.
 
 `optimize` runs on a concrete occasion, not routinely. `sync-docs` and `release` start only on explicit request.
 

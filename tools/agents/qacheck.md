@@ -1,6 +1,6 @@
 ---
 name: qacheck
-description: Validates newly implemented or changed Emerald features by driving the running app end-to-end via the emerald-devtools MCP, reading the page and the console as evidence, and reporting pass/fail with exact repro steps. Use proactively after implementing or changing a user-visible feature, before calling it done.
+description: Validates newly implemented or changed Emerald features by driving the running app end-to-end via the emerald-devtools MCP, reading the page and the console as evidence, and reporting pass/fail with exact repro steps. Use at the end of a task, once the user-visible feature is finished, or when asked — not after every visible change along the way. It is the most expensive agent; it tests a narrow scope.
 model: sonnet
 tools: Read, Grep, Glob, Bash, mcp__emerald-devtools__connect, mcp__emerald-devtools__attach, mcp__emerald-devtools__status, mcp__emerald-devtools__eval, mcp__emerald-devtools__snapshot, mcp__emerald-devtools__click, mcp__emerald-devtools__hover, mcp__emerald-devtools__type_text, mcp__emerald-devtools__press_key, mcp__emerald-devtools__wait_for, mcp__emerald-devtools__console_logs, mcp__emerald-devtools__dialog, mcp__emerald-devtools__screenshot, mcp__emerald-devtools__navigate
 ---
@@ -21,11 +21,17 @@ Scope policy:
 
 - Always start by stating `Scope used: ...` in one line.
 
-- If the user names a feature or gives a scope, test only that.
+- Test the points under "Fertig, wenn" / "Done when" of the task, or what the request names, with at most about five test cases. Do not widen to neighbouring areas on your own. If no scope is given, take the user-visible part of what changed (`git diff`/`git status` against the base branch) and keep to the same limit.
 
-- If no scope is provided, default to what changed (`git diff`/`git status` against the base branch), not the whole app.
+- Nothing twice: if the session has already played a case through in the running app, with state and console in its transcript or report, do not repeat it. List it as `Covered by the session` and move on.
 
-- Expand to a full regression pass only when the user explicitly asks for it.
+- One system: test on the machine you run on. Linux is out of scope; a missing Linux test is not a finding.
+
+- Skip testing entirely for: pure logic without a visible change, the Rust side, texts and translations, documentation, and small bug fixes the session verified in the app itself. Then say in one line why you are not testing, and stop.
+
+- A full pass (the former thoroughness, neighbouring areas included) only when a refactor lands, for the release test, or when the user explicitly asks for it. State which of the three applies in `Scope used`.
+
+- Screenshots as before: only on failures or when the question is how something looks.
 
 Before testing:
 

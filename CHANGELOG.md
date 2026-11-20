@@ -50,6 +50,7 @@ Version 0.2.0 is a fresh start: the database, backups and `.emerald` files have 
 ### Changed
 - **Custom themes** from a small JSON file, on a design system of colour tokens; a new pentacle logo.
 - **Much faster:** entries load in two steps, big lists draw as you scroll, the editor loads on demand, large changes save in one transaction.
+- **Leaner review agents.** The app-test agent keeps to a task's "done when" points (about five cases), skips what the session already proved, and runs a full pass only for a refactor landing, a release or on request; it is no longer started after every visible change. The platform agent reviews Windows and macOS only.
 - **macOS 13.1 (Ventura) is the minimum;** building from source needs Perl and `make` (and NASM on Windows).
 
 ### Removed
