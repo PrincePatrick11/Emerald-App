@@ -20,6 +20,7 @@ Version 0.2.0 is a fresh start: the database, backups and `.emerald` files have 
 - **Dashboards.** "All entries" is what the app opens with; Journal, Practice and Knowledge are dashboards like your own. A dashboard lists entries chosen by category and tag, with a name, an icon, list, cards or timeline, sorting and grouping. The plus in the rail creates anything. A new entry made in a dashboard starts with the first tag of its filter, so it stays visible there.
 - **Collections.** Tags, Categories, Images, Templates, Blocks, Symbols and the Lexicon's languages share one look with search, views and a right-click menu for rename and delete.
 - **A new window shell.** Title bar with the tabs, a rail grouped by purpose, one left entry list (All entries, a dashboard or Tasks — chosen in Settings), collapsible right sidebars that read the same in reading and edit mode, one shared empty and "no matches" state.
+- **Middle click on a link chip in the text opens its target in a new tab,** in reading and edit mode; the current entry stays as it is.
 - **Lists remember how you left them,** per vault. The mouse's back and forward buttons work on every system.
 - **A start page** as the app's home: a tile per vault, the server and theme cards, language and updates.
 - **Language and theme belong to the device**; all other settings belong to the vault and travel with its backup.

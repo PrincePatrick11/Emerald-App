@@ -26,7 +26,7 @@ interface TextEditorHostOptions {
 /**
  * Everything that may exist only ONCE for a set of text editors shown
  * together, such as the text blocks of an entry: the one toolbar, bound to the
- * focused editor; the link picker; chip-click navigation in read mode; file
+ * focused editor; the link picker; chip-click navigation (middle click also while editing); file
  * drops from the explorer, pointer drops from the entry list and images moved
  * by dragging, with the indicator of where they land; the drag tag; the find
  * bar (⌘F / Ctrl+F) across all its editors.
@@ -44,7 +44,7 @@ export function useTextEditorHost({ isEditing, getOrder, getContainer }: TextEdi
   const { registerTextEditor, orderedEditors, targetEditor, toolbarEditor, focusOnMount } =
     useTextEditorRegistry(getOrder);
 
-  useInternalLinkNavigation(!isEditing);
+  useInternalLinkNavigation(isEditing);
   // Both drops only reach editors that have the feature (image, link chip).
   const [spots] = useState(() => createDragChannel<DropSpot>());
   const fileDrop = useEditorFileDrop({

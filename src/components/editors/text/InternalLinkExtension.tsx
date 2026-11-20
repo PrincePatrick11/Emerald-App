@@ -36,8 +36,29 @@ function InternalLinkNodeView({ node, editor, extension }: NodeViewRendererProps
     }
   };
 
+  // Middle click opens the target in a new tab, in read and edit mode alike
+  // (the current entry stays). preventDefault on mousedown suppresses Chromium's autoscroll.
+  const handleMouseDown = (e: React.MouseEvent) => {
+    if (e.button === 1) e.preventDefault();
+  };
+  const handleAuxClick = (e: React.MouseEvent) => {
+    if (e.button !== 1) return;
+    e.preventDefault();
+    document.dispatchEvent(new CustomEvent('internal-link-navigate', {
+      detail: { id, targetKind, newTab: true },
+      bubbles: true,
+    }));
+  };
+
   return (
-    <NodeViewWrapper as="span" className="internal-link-chip" onClick={handleClick} data-drag-handle>
+    <NodeViewWrapper
+      as="span"
+      className="internal-link-chip"
+      onClick={handleClick}
+      onMouseDown={handleMouseDown}
+      onAuxClick={handleAuxClick}
+      data-drag-handle
+    >
       <span className="internal-link-icon">
         {isImageIcon(icon) ? <img src={iconSrc(icon)} alt="" /> : icon}
       </span>
