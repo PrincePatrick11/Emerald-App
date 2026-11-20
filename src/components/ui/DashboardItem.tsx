@@ -103,7 +103,7 @@ export function RowContent({ icon, title, meta }: { icon?: ReactNode; title: Rea
   );
 }
 
-/** Inside a card: the same three things, stacked. `children` follow below (a journal entry's tags). */
+/** Inside a card: the same three things, stacked. `children` follow below (an entry's tags). */
 export function CardContent({ icon, title, meta, children }: {
   icon: ReactNode;
   title: ReactNode;

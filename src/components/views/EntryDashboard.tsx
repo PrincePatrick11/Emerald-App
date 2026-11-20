@@ -7,6 +7,7 @@ import Dashboard, { type DashboardGroup } from '../ui/Dashboard';
 import DashboardItem, { CardContent, ItemGlyph, RENAME_INPUT_CLASS, RowContent } from '../ui/DashboardItem';
 import RenameField from '../ui/RenameField';
 import CollapsibleGroupHeader from '../ui/CollapsibleGroupHeader';
+import CardTags from '../ui/CardTags';
 import { useOpenInNewTabAction } from '../../hooks/useOpenInNewTabAction';
 import { useSaveAsTemplateAction } from '../../hooks/useSaveAsTemplateAction';
 import { useCollapsedSet } from '../../hooks/useCollapsedSet';
@@ -169,7 +170,9 @@ export default function EntryDashboard({ dashboard, title, newLabel, onNew, empt
         onContextMenu={(ev) => openCtxMenu(ev, e.id)}
       >
         {isCardView(view)
-          ? <CardContent icon={<ItemGlyph icon={icon} large />} title={itemTitle} meta={meta} />
+          ? <CardContent icon={<ItemGlyph icon={icon} large />} title={itemTitle} meta={meta}>
+              <CardTags tags={visibleTags(e.tags, tagMap)} />
+            </CardContent>
           : <RowContent icon={<ItemGlyph icon={icon} />} title={itemTitle} meta={meta} />}
       </DashboardItem>
     );

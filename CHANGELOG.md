@@ -18,6 +18,7 @@ Version 0.2.0 is a fresh start: the database, backups and `.emerald` files have 
 
 ### Dashboards and navigation
 - **Dashboards.** "All entries" is what the app opens with; Journal, Practice and Knowledge are dashboards like your own. A dashboard lists entries chosen by category and tag, with a name, an icon, list, cards or timeline, sorting and grouping. The plus in the rail creates anything. A new entry made in a dashboard starts with the first tag of its filter, so it stays visible there, also after undoing the template it started with.
+- **Tags on cards.** Cards and wide cards show an entry's tags in one line: the tags that fit whole, the rest as a "+N" chip whose tooltip lists the hidden names; if not even the first fits, it stays, shortened.
 - **Collections.** Tags, Categories, Images, Templates, Blocks, Symbols and the Lexicon's languages share one look with search, views and a right-click menu for rename and delete.
 - **A new window shell.** Title bar with the tabs, a rail grouped by purpose, one left entry list (All entries, a dashboard or Tasks — chosen in Settings), collapsible right sidebars that read the same in reading and edit mode, one shared empty and "no matches" state.
 - **A dashboard whose categories are all deleted or in the Trash shows nothing,** instead of every entry; saving only its name or icon leaves its filter alone.
