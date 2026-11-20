@@ -1,6 +1,6 @@
-import { useLayoutEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import type { CSSProperties, ReactNode } from 'react';
+import type { CSSProperties, KeyboardEvent, ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { X } from 'lucide-react';
 import { useOutsideClick } from '../../../hooks/useOutsideClick';
@@ -138,11 +138,47 @@ export default function LinkedEntryPicker<T>({
     };
   }, [open, query, results.length]);
 
+  // The row Enter picks, as `useListKeys` does for the `[[` list: the arrows
+  // move it (wrapping at the ends). Reset on the query, not on `results`: the hits
+  // are rebuilt on every store change, and an autosave would otherwise throw
+  // the highlight back to the top (the same reasoning as in `SearchModal`).
+  const [activeIndex, setActiveIndex] = useState(0);
+  useEffect(() => setActiveIndex(0), [query]);
+  const current = Math.min(activeIndex, Math.max(results.length - 1, 0));
+  // Keep the row in view within the menu only; `scrollIntoView` would also
+  // move the sidebar and the page behind it.
+  useEffect(() => {
+    const menu = menuRef.current;
+    const row = menu?.children[current] as HTMLElement | undefined;
+    if (!menu || !row) return;
+    if (row.offsetTop < menu.scrollTop) menu.scrollTop = row.offsetTop;
+    else if (row.offsetTop + row.offsetHeight > menu.scrollTop + menu.clientHeight) {
+      menu.scrollTop = row.offsetTop + row.offsetHeight - menu.clientHeight;
+    }
+  }, [current]);
+
   // Closing AND clearing belong together; previously each field did this itself.
   const select = (item: T) => {
     onSelect(item);
     onQueryChange('');
     setOpen(false);
+  };
+
+  const onKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
+    // Enter while an IME is composing confirms the composition, not a hit.
+    // WebKit reports that Enter with `isComposing` false but key code 229.
+    if (e.nativeEvent.isComposing || e.nativeEvent.keyCode === 229) return;
+    if (results.length === 0) return;
+    const count = results.length;
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      if (!open) { setOpen(true); return; }
+      setActiveIndex(e.key === 'ArrowDown' ? (current + 1) % count : (current + count - 1) % count);
+    } else if (e.key === 'Enter' && open) {
+      e.preventDefault();
+      const item = results[current];
+      if (item) select(item);
+    }
   };
 
   return (
@@ -153,6 +189,7 @@ export default function LinkedEntryPicker<T>({
           value={query}
           onChange={(e) => { onQueryChange(e.target.value); setOpen(true); }}
           onFocus={() => setOpen(true)}
+          onKeyDown={onKeyDown}
           placeholder={placeholder}
           aria-label={placeholder}
           className={fieldIcon ? 'selectable' : OP_PROP_SELECT_CLASSES}
@@ -165,7 +202,7 @@ export default function LinkedEntryPicker<T>({
           >
             {results.length === 0 ? (
               <p className="text-xs text-subtle px-3 py-2">{t('search.noResultsShort')}</p>
-            ) : results.map((item) => (
+            ) : results.map((item, index) => (
               <button
                 key={resultKey(item)}
                 // Only defuse mousedown (the blur would close the menu before the
@@ -173,7 +210,10 @@ export default function LinkedEntryPicker<T>({
                 // stays reachable by keyboard too.
                 onMouseDown={(e) => e.preventDefault()}
                 onClick={() => select(item)}
-                className="linked-entry-menu-item w-full text-left flex items-center gap-2 px-3 py-1.5 text-xs text-muted hover:text-secondary"
+                onMouseMove={() => setActiveIndex(index)}
+                // The highlight is the current row alone, not `:hover` too: the
+                // mouse moves the current row, so the two never disagree.
+                className={`linked-entry-menu-item${index === current ? ' linked-entry-menu-item--current' : ''} w-full text-left flex items-center gap-2 px-3 py-1.5 text-xs text-muted`}
               >
                 {renderResult(item)}
               </button>

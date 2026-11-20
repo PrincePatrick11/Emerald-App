@@ -61,7 +61,7 @@ The list opens with a collapsible "Your blocks" section; below it a collapsible 
 
 **Linked entries.** The Properties sidebar's "Linked entries" field (above the tags) lists everything the entry links in its own text — entries and tasks — read directly from the content rather than kept as a separate list. The chips are grouped by category under small headings.
 
-- In edit mode, searching (up to 50 matches, most recently updated first) and picking a result appends the link to the end of the entry as its own block — a divider, the linked item's category as a heading, then the chip; one block per link. The view jumps to it and briefly highlights it. An entry with no text yet gets its first link block without the divider.
+- In edit mode, searching (up to 50 matches, most recently updated first) and picking a result appends the link to the end of the entry as its own block — a divider, the linked item's category as a heading, then the chip; one block per link. The view jumps to it and briefly highlights it. An entry with no text yet gets its first link block without the divider. A result is picked by click, or with the arrow keys and Enter (Enter takes the highlighted one, the first unless moved); the same holds for a link field's search.
 - Clicking a listed link does the same jump-and-highlight (or navigates to the target if the link somehow isn't in the text).
 - The "×" removes it — the whole block if it is one of these appended blocks, just the chip if it sits inline in running text.
 

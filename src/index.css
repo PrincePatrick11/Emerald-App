@@ -4416,7 +4416,7 @@ html[data-theme] .sidebar-search-inner:focus-within {
   box-shadow: var(--menu-shadow);
 }
 
-.linked-entry-menu-item:hover {
+.linked-entry-menu-item--current {
   background-color: var(--menu-item-hover-bg);
   color: var(--menu-item-hover-text);
 }
