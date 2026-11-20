@@ -6,7 +6,8 @@
 //! `pub use` re-exports below let `lib.rs` call `pdf_export::export_pdf`
 //! without knowing which platform it's on.
 //!
-//! All three are implemented and verified end-to-end on real hardware.
+//! All three are implemented and verified end-to-end on real hardware; the
+//! A4 paper and margins on Linux are not yet tried on a Linux machine.
 
 #[cfg(target_os = "windows")]
 mod windows;
@@ -23,6 +24,15 @@ pub use macos::export_pdf;
 pub use linux::export_pdf;
 
 use std::path::{Path, PathBuf};
+
+/// Every export page is A4, whatever the system's paper setting — in inches
+/// (210 × 297 mm). Linux names the paper instead (`iso_a4`).
+#[cfg(any(target_os = "windows", target_os = "macos"))]
+pub(crate) const A4_INCHES: (f64, f64) = (210.0 / 25.4, 297.0 / 25.4);
+/// The page margins of the export's print styles, in inches — keep in step
+/// with `@page { margin: 2cm 2.5cm }` in `src/lib/export.ts`.
+pub(crate) const MARGIN_VERTICAL_IN: f64 = 2.0 / 2.54;
+pub(crate) const MARGIN_HORIZONTAL_IN: f64 = 2.5 / 2.54;
 
 const TEMP_PREFIX: &str = "emerald-export-";
 const TEMP_SUFFIX: &str = ".html";

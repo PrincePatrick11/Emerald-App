@@ -371,9 +371,8 @@ async fn ensure_app_storage_dirs(app: tauri::AppHandle) -> Result<(), String> {
 /// with smaller install, modern CSS, and native color emoji.
 ///
 /// `page_size`, when present, is `(width_in, height_in)` in inches and
-/// overrides the default Letter/Portrait page with a custom size —
-/// used by the Altar PDF export so the page matches the altar's own
-/// aspect ratio instead of leaving it letterboxed on a portrait page.
+/// overrides the default A4 page with a custom size, edge to edge — on
+/// Windows only; the frontend passes none at present.
 #[tauri::command]
 async fn export_pdf(app: tauri::AppHandle, html: String, path: String, page_size: Option<(f64, f64)>) -> Result<(), String> {
     pdf_export::export_pdf(&app, html, path, page_size).await

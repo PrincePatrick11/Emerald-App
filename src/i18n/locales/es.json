@@ -985,8 +985,6 @@
     "pageGeneral": "General",
     "tagline": "El espacio de trabajo para tu práctica mágica.",
     "website": "Sitio web",
-    "exportDb": "Exportar base de datos",
-    "exportBtn": "Exportar como .vault.emerald",
     "exportInclude": "Incluir",
     "importDb": "Importar base de datos",
     "importedVault": "Vault importado",
@@ -1011,9 +1009,7 @@
     "newVaultName": "Nombre del nuevo vault",
     "newVaultLocation": "Carpeta del nuevo vault",
     "importBtn": "Importar",
-    "exporting": "Exportando…",
     "importing": "Importando…",
-    "exportError": "Error al exportar.",
     "previewContains": "Contiene:",
     "uiFont": "Fuente de la interfaz",
     "editorFont": "Fuente del cuerpo del editor",
@@ -1115,7 +1111,6 @@
     "customThemeContrast": "Importado, pero difícil de leer: {{pairs}}.",
     "uiFontHint": "Fuente de menús, listas y rótulos.",
     "editorFontHint": "Fuente de títulos y texto en las entradas.",
-    "exportDbHint": "Guarda el vault como archivo .vault.emerald, con las imágenes, protegido con la contraseña del vault. Las opciones de abajo deciden qué se incluye.",
     "includeSettingsHint": "Fuentes y tamaños, barra lateral, papelera, emojis, imágenes, reglas de etiquetas y copia automática de este vault",
     "importDbHint": "Recupera un archivo .vault.emerald — como vault nuevo, junto a las entradas existentes o reemplazándolo todo. Las opciones aparecen al elegir un archivo.",
     "storageHint": "Imágenes de la carpeta del vault que ya no usa ninguna entrada. «Buscar» muestra cuánto ocupan, «Eliminar» las borra definitivamente.",
@@ -1217,10 +1212,7 @@
     "resetView": "Restablecer vista",
     "lockView": "Bloquear vista",
     "showSplash": "Mostrar pantalla de carga",
-    "exportPdf": "Exportar como PDF…",
-    "exportMarkdown": "Exportar como Markdown…",
     "exportEmerald": "Exportar como Emerald…",
-    "exportVault": "Exportar base de datos…",
     "importMarkdown": "Desde Markdown…",
     "importEmerald": "Desde Emerald…",
     "quit": "Salir de Emerald App",
@@ -1429,7 +1421,6 @@
   },
   "emeraldExport": {
     "title": "Exportar",
-    "openEntryFirst": "Abre primero una entrada.",
     "openTemplateFirst": "Abre primero una plantilla.",
     "pdfSaved": "PDF guardado:\n{{path}}",
     "failed": "{{kind}} fallido",
@@ -1440,7 +1431,99 @@
       "emerald": "Exportación de Emerald",
       "emeraldImport": "Importación de Emerald",
       "markdownImport": "Importación de Markdown",
-      "canvas": "Dibujo"
+      "canvas": "Dibujo",
+      "vault": "Exportación de la base de datos"
+    }
+  },
+  "exportMenu": {
+    "title": "Exportar",
+    "export": "Exportar",
+    "exporting": "Exportando…",
+    "count_one": "{{count}} entrada",
+    "count_other": "{{count}} entradas",
+    "total_one": "{{count}} entrada en total",
+    "total_other": "{{count}} entradas en total",
+    "wholeVault": "Todo el vault",
+    "oneTemplate": "1 plantilla",
+    "bundleFilter": "Export",
+    "scope": {
+      "label": "Alcance",
+      "entry": "Esta entrada",
+      "template": "Esta plantilla",
+      "bulk": "Exportación conjunta",
+      "vault": "Base de datos completa"
+    },
+    "level": {
+      "label": "Nivel",
+      "normal": "Normal",
+      "advanced": "Avanzado"
+    },
+    "source": {
+      "label": "Selección",
+      "dashboard": "Panel",
+      "filter": "Filtro propio"
+    },
+    "dashboard": "Panel",
+    "period": {
+      "label": "Periodo",
+      "last7": "Últimos 7 días",
+      "last30": "Últimos 30 días",
+      "thisMonth": "Este mes",
+      "all": "Todo",
+      "custom": "Propio",
+      "customNote": "Se aplica el periodo propio de «Avanzado». Elige otro arriba para sustituirlo."
+    },
+    "invalidDate": "Una fecha está incompleta.",
+    "noMatches": "No hay entradas en esta selección y este periodo.",
+    "includeLinked": "Incluir entradas vinculadas",
+    "linked": "Entradas vinculadas",
+    "includeLinkedHint": "También se incluyen las entradas a las que enlazan, solo las enlazadas directamente.",
+    "noLinked": "No hay entradas vinculadas.",
+    "depth": {
+      "label": "Profundidad de los vínculos",
+      "direct": "Solo directas ({{count}})",
+      "all": "Todas ({{count}})"
+    },
+    "images": {
+      "label": "Imágenes",
+      "none": "Original",
+      "balanced": "Equilibrado",
+      "strong": "Alta compresión",
+      "placeholder": "Omitir",
+      "noneDesc": "Imágenes a tamaño completo: el archivo será grande.",
+      "balancedDesc": "Imágenes reducidas, aún nítidas.",
+      "strongDesc": "Imágenes muy reducidas: el archivo más pequeño.",
+      "placeholderDesc": "Sin imágenes; los campos de imagen dejan su leyenda.",
+      "linkedOwn": "Nivel de imagen propio para entradas vinculadas"
+    },
+    "order": {
+      "label": "Orden",
+      "asc": "Más antiguas primero",
+      "desc": "Más recientes primero"
+    },
+    "format": "Formato",
+    "formatNames": {
+      "pdf": "PDF",
+      "markdown": "Markdown",
+      "emerald": ".emerald"
+    },
+    "formats": {
+      "pdf": "Para leer e imprimir; varias entradas en un archivo, cada una en una página nueva.",
+      "markdown": "Texto plano para otros programas; sin imágenes.",
+      "emerald": "Para pasar a otro Emerald, con imágenes, categorías, etiquetas y bloques propios."
+    },
+    "vaultHint": "Guarda el vault con sus imágenes como archivo .vault.emerald; se restaura con Importar.",
+    "templateOnlyEmerald": "Una plantilla solo se puede exportar como .emerald.",
+    "blockDefinitions": "Incluir bloques propios",
+    "blockDefinitionsHint": "Los bloques propios que usan las entradas; en el destino aparecen en «Bloques».",
+    "protection": {
+      "label": "Protección",
+      "vaultKey": "Contraseña del vault",
+      "password": "Contraseña propia",
+      "none": "Sin protección",
+      "vaultKeyDesc": "Se abre con la contraseña o la clave de recuperación de este vault.",
+      "passwordDesc": "Solo se abre con esta contraseña. Si se pierde, el archivo ya no se puede leer.",
+      "noneDesc": "Cualquiera que tenga el archivo puede abrirlo."
     }
   },
   "emeraldKey": {

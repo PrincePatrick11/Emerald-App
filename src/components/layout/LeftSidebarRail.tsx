@@ -5,6 +5,7 @@ import { AUX_VIEWS, TASKS_VIEW, type ViewId } from '../../lib/modules';
 import { useUIStore } from '../../store/uiStore';
 import { autoBackupFailed, useAutoBackupStore } from '../../store/autoBackupStore';
 import { useVaultImportStore } from '../../store/vaultImportStore';
+import { useExportMenuStore } from '../../store/exportMenuStore';
 import { markAutoBackupErrorSeen } from '../../lib/autoBackup';
 import { asUpdateError, checkForUpdate, updateSettings } from '../../lib/updates';
 import { openVaultPicker } from '../../store/vaultPickerStore';
@@ -16,7 +17,7 @@ import { useRailDashboards } from './RailDashboards';
 // loaded on first open — the latter drag the backup machinery (dbBackup) along.
 const SettingsModal = lazy(() => import('./settings/SettingsModal'));
 const VaultImportModal = lazy(() => import('./VaultImportModal'));
-const VaultExportModal = lazy(() => import('./VaultExportModal'));
+const ExportMenuModal = lazy(() => import('./export/ExportMenuModal'));
 import RailButton from '../ui/RailButton';
 
 /** Width of the rail: the 32px buttons with 6px of air each, tight, so the list
@@ -96,7 +97,7 @@ export default function LeftSidebarRail() {
     const file = useVaultImportStore.getState().take();
     if (file) setImportFile(file);
   }, [vaultFilePending]);
-  const exportOpen = useVaultImportStore((s) => s.exportOpen);
+  const exportOpen = useExportMenuStore((s) => s.request !== null);
 
   // A failed automatic backup reports at the start page button, where it is
   // set: failing silently is the last thing it should do.
@@ -211,7 +212,7 @@ export default function LeftSidebarRail() {
       )}
       {exportOpen && (
         <Suspense fallback={null}>
-          <VaultExportModal onClose={() => useVaultImportStore.getState().setExportOpen(false)} />
+          <ExportMenuModal />
         </Suspense>
       )}
     </div>

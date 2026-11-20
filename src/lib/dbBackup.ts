@@ -734,10 +734,12 @@ export async function exportDatabase(
   // if needed. If that fails (vault folder currently unreachable),
   // it stays with the bare file name and the dialog opens wherever the
   // operating system wants; the export itself does not depend on it.
+  // An unprotected copy is not offered the vault's own folder: whoever gets
+  // that folder must read nothing without the password.
   const filename = vaultFileName();
   // One chain, one catch: if `getActiveVaultId()` stood as its own await in the
   // argument, its rejection would escape the `.catch` and take the export down with it.
-  const backupDir = await getActiveVaultId()
+  const backupDir = protection.type === 'none' ? null : await getActiveVaultId()
     .then((vaultId) => invoke<string>('ensure_backup_dir', { vaultId }))
     .catch(() => null);
 
@@ -1687,7 +1689,8 @@ export async function doMerge(db: Awaited<ReturnType<typeof getDb>>, backup: Vau
  * label is a type error, not a forgotten entry.
  *
  * One truth for four places that previously each kept the same list:
- * the two packing lists in the settings window (export and import), the
+ * the two packing lists (the export menu's `VaultExportOptions`, the vault
+ * import's `VaultImportModal`; `loadExportPrefs` reads the same kinds back), the
  * initial and reset value of the import filter, and `ALL_TYPES_INCLUDED`
  * below. A kind that was forgotten there was silently excluded from every
  * "import everything".

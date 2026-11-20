@@ -36,7 +36,7 @@ Per-platform window settings live in `src-tauri/tauri.{windows,linux,macos}.conf
 
 `install_native_menu` in `src-tauri/src/lib.rs` is gated to macOS. On Windows and Linux, `set_menu` attaches an in-window menu bar (an HMENU / a GTK menubar) regardless of `decorations`, which would sit beside the app's own title-bar menus. The menu commands (`update_menu_labels`, `set_view_menu_checked`) return early when `app.menu()` is `None`, so they are no-ops there without frontend branching. The native menu holds the app menu, Edit and View; Export and Import are only in the title bar.
 
-Both forms run the same code. `src/lib/menuActions.ts` owns the actions (`runMenuAction`) and the rules for which export items are available (`computeMenuEnabledState`). The native menu emits the event ids listed in [IPC Command Surface](../architecture.md#ipc-command-surface), which `AppShell` forwards; the HTML buttons call `dispatchMenuAction` directly. `View > Reset View` is the exception: it changes `AppShell`'s local sidebar widths, so the HTML menu re-emits `reset-sidebar-widths` and `AppShell`'s listener answers it on both platforms.
+Both forms run the same code. `src/lib/menuActions.ts` owns the actions (`runMenuAction`); the title bar's Export is one action, `export`, which opens the export menu. The native menu emits the event ids listed in [IPC Command Surface](../architecture.md#ipc-command-surface), which `AppShell` forwards; the HTML buttons call `dispatchMenuAction` directly. `View > Reset View` is the exception: it changes `AppShell`'s local sidebar widths, so the HTML menu re-emits `reset-sidebar-widths` and `AppShell`'s listener answers it on both platforms.
 
 ### Closing the window
 
@@ -96,7 +96,7 @@ The vault picker is the app's start page. `VaultPicker` is a view in the main wi
 
 Emerald renders PDFs by driving its own embedded webview rather than bundling an HTML-to-PDF engine. There is one module per platform, selected at compile time by `#[cfg(target_os = "…")]` in `src-tauri/src/pdf_export/mod.rs`, so `lib.rs` just calls `pdf_export::export_pdf(&app, html, path, page_size).await`.
 
-The command backs one flow: an open entry (see [Menu enablement gating](#menu-enablement-gating)) export their text at the default Letter/Portrait size. The command also takes an optional `page_size` in inches, which the frontend does not pass at present.
+The command backs one flow: the export menu's PDF (see [The export menu](#the-export-menu)) — one entry or several in one document — on A4 portrait on every system, whatever its paper setting (`A4_INCHES` and the margins in `pdf_export/mod.rs`). The command also takes an optional `page_size` in inches, which the frontend does not pass at present.
 
 ### Flow — entry text
 
@@ -104,7 +104,7 @@ The command backs one flow: an open entry (see [Menu enablement gating](#menu-en
 frontend export.ts:exportAsPDF
     ↓  build full HTML (DOMPurify, transformInternalLinks, embedImages)
 frontend save() dialog → user picks destination path
-    ↓  invoke('export_pdf', { html, path })   // no page_size → default Letter/Portrait
+    ↓  invoke('export_pdf', { html, path })   // no page_size → A4 portrait
 src-tauri/src/lib.rs:export_pdf
     ↓  pdf_export::export_pdf(&app, html, path, None).await
 src-tauri/src/pdf_export/{windows,macos,linux}.rs
@@ -120,10 +120,10 @@ All three platforms share that shape, with a 30 s page-load and a 120 s print ti
 
 ### Per-platform implementations
 
-- **Windows (`windows.rs`)** — tested end-to-end. Calls `PrintToPdf` on the WebView2 core (`ICoreWebView2_7`). A `page_size` becomes custom print settings (`CreatePrintSettings`, `SetMediaSize(COREWEBVIEW2_PRINT_MEDIA_SIZE_CUSTOM)`, page width/height in inches, zero margins); if building them fails, the export falls back to the default Letter/Portrait instead of aborting. The COM completion handler runs on a worker thread and is bridged back to async with a second `oneshot`.
-- **macOS (`macos.rs`)** — verified on real hardware. Calls `createPDFWithConfiguration:completionHandler:` on the `WKWebView`, bridged with a `block2::RcBlock` + `oneshot`, and writes the bytes with `std::fs::write` (`NSData` has no `writeToFile:atomically:error:`). `page_size` is unused; honouring it needs `WKPDFConfiguration.rect` sized in points.
+- **Windows (`windows.rs`)** — tested end-to-end. Calls `PrintToPdf` on the WebView2 core (`ICoreWebView2_7`). The page is custom print settings (`CreatePrintSettings`, `SetMediaSize(COREWEBVIEW2_PRINT_MEDIA_SIZE_CUSTOM)`, width/height in inches): A4 with the export's 2 cm / 2.5 cm margins, or a `page_size` with zero margins; if building them fails, the export falls back to WebView2's default page instead of aborting. The COM completion handler runs on a worker thread and is bridged back to async with a second `oneshot`.
+- **macOS (`macos.rs`)** — verified on real hardware. Prints the `WKWebView` into the file: `printOperationWithPrintInfo:` with a copy of the shared `NSPrintInfo` (A4 as `paperSize`, the export's 2 cm / 2.5 cm margins, width fitted), saving to the path through AppKit's `NSPrintSaveJob` / `NSPrintJobSavingURL` — set on the operation's own print info too, or a save panel asks. It runs `runOperationModalForWindow:` on the hidden window without panels; a `define_class!` delegate reports `printOperationDidRun:success:contextInfo:` through a `oneshot`. `createPDFWithConfiguration:` is not used: it captures the screen as one tall page, without print styles or page breaks. `page_size` is unused; honouring it would replace the A4 `paperSize`.
 - **Linux (`linux.rs`)** — verified on real hardware (spot-checked on Ubuntu 26.04; supported distributions in [`build.md`](../build.md)). Specific to GTK:
-  - **Print settings** come from `gtk::PrintSettings` (`webkit2gtk` owns only `PrintOperation`), set through its string-keyed `set()`: `"output-file-format"` = `"pdf"`, `"output-uri"` = a `file://` URI.
+  - **Print settings** come from `gtk::PrintSettings` (`webkit2gtk` owns only `PrintOperation`), set through its string-keyed `set()`: `"output-file-format"` = `"pdf"`, `"output-uri"` = a `file://` URI. The paper is A4 (`iso_a4`), set on the settings and on a `gtk::PageSetup` (`set_page_setup`), with the export's margins in inches (`gtk::Unit::Inch`) — not yet tried on a Linux machine.
   - **Printer resolution via FFI.** `webkit_print_operation_print()` fails with "Printer not found" unless the `printer` key names an existing printer, and most machines have no CUPS printer. GTK's virtual "Print to File" printer is neither the default nor stably named (the name is translated). `gtk_enumerate_printers` is missing from the `gtk` crate's bindings, so a small `printer_ffi` module calls libgtk-3 directly; `find_pdf_printer_name()` returns the first virtual, PDF-capable printer, and the export fails fast if there is none.
   - **Async completion.** `PrintOperation::print()` returns immediately; `run_print` relays the result from the `finished`/`failed` signals through the `oneshot` the caller awaits.
   - `page_size` is unused; honouring it needs a custom `GtkPaperSize`.
@@ -137,20 +137,18 @@ The hidden webview loads the HTML from a `file://` URL, which carries no CSP and
 - `resolveInternalLinkIcons(html)` fills missing `data-icon` attributes from the live stores, so chips saved without an icon still render.
 - DOMPurify sanitises the HTML in TypeScript, with the TipTap internal-link attributes allowlisted so chips survive.
 
-### Menu enablement gating
+### The export menu
 
-The three "Export as …" items (`export-pdf`, `export-markdown`, `export-emerald`) share one menu but are gated differently. `computeMenuEnabledState(activeView)` in `src/lib/menuActions.ts` is the single rule set, read by the title bar's Export menu on every platform.
+The title bar's Export is a button, not a menu: it runs the `export` action, which opens `ExportMenuModal` (`src/components/layout/export/`) through `store/exportMenuStore.ts`. The store records the entry or template on screen at that moment (`ExportTarget`); every opening remounts the dialog, so it starts from that view.
 
-| Item | Enabled for |
-|---|---|
-| `export-markdown` | an open entry |
-| `export-pdf` | an open entry |
-| `export-emerald` | an entry, or an open template page |
+The dialog decides **what** goes out; the exports decide **how** it is written:
 
+- `lib/exportMenu.ts` holds the rules without React: the remembered choices (`loadExportPrefs`/`saveExportPrefs`, `localStorage` key `export-menu-prefs`, the vault-bound dashboard, filter and database contents under `export-menu-prefs:<vaultId>`, everything but a password; "none" is read back as the vault key; categories and tags gone since drop out through `liveFilter`), what Normal fixes in place of the Advanced choices (`effectiveSettings`: pictures balanced, linked entries direct only, oldest first, custom blocks along, a collection by dashboard, the whole database without the Trash), the periods (`periodRange`, counted from the creation day) and the collection (`bulkEntries`: `matchesFilter` from `lib/dashboards.ts` with the dashboard's filter or the own one, then the period, then the order).
+- Linked entries come from `linkedEntriesOf(ids, { recursive, blocked })` (blocked entries — ticked off — are listed but not followed further) (`block_refs`, not from the Trash); a collection's entries ticked off are kept out of them too.
+- PDF and Markdown: `collectExportDataFor(id)` (`lib/exportData.ts`) per entry, then `exportAsPDF(items, file)` / `exportAsMarkdown(items, file)` (`lib/export.ts`) — one file, entries one after another, each PDF article from a new page; an item carries its picture level (`embedImages` compresses through `compressDataUrl`, `placeholder` strips them).
+- `.emerald`: `exportItemsAsEmerald(options, defaultName)`; the whole database: `exportDatabase(options, protection)` (`lib/dbBackup.ts`).
 
-There is one item per format, not one per content type: the handlers branch on what is open. `exportAsEmerald()` (`src/lib/emeraldFormat.ts`) re-reads `useUIStore.getState().activeView` at click time and writes an entry or a template.
-
-**Blocks export through their own serializers, so there is no concealed-sigil gate.** `collectExportData` runs `renderBlocksForExport` (`lib/blocks/exportRender.ts`, pure, texts passed in as `ExportText`): one serializer per block type, by the read-mode rules — hidden blocks and a concealed sigil's calculator and drawing are left out, field blocks list only what `isHiddenInRead` lets through, titles become `<h3>` where `showsTitleInRead` says so, unknown types go out as their stored inner HTML. The result is plain HTML without `<section>`, so DOMPurify, `embedImages`, the link-chip transform and Turndown work unchanged (Turndown has rules for `<dt>`/`<dd>`; `stripImages` keeps a block image's alt text as a placeholder). The `.emerald` export keeps blocks as stored, hidden ones flagged and concealed sigils concealed (see [The `.emerald` file](editing.md#the-emerald-file)).
+**Blocks export through their own serializers, so there is no concealed-sigil gate.** `collectExportDataFor` runs `renderBlocksForExport` (`lib/blocks/exportRender.ts`, pure, texts passed in as `ExportText`): one serializer per block type, by the read-mode rules — hidden blocks and a concealed sigil's calculator and drawing are left out, field blocks list only what `isHiddenInRead` lets through, titles become `<h3>` where `showsTitleInRead` says so, unknown types go out as their stored inner HTML. The result is plain HTML without `<section>`, so DOMPurify, `embedImages`, the link-chip transform and Turndown work unchanged (Turndown has rules for `<dt>`/`<dd>`; `stripImages` keeps a block image's alt text as a placeholder). The `.emerald` export keeps blocks as stored, hidden ones flagged and concealed sigils concealed (see [The `.emerald` file](editing.md#the-emerald-file)).
 
 ### Bridging imperative menu-event code to a React modal
 

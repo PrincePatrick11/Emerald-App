@@ -137,7 +137,7 @@ export interface EmeraldExportItem {
 }
 
 /**
- * What an export writes — the settings the export menu (#98) offers:
+ * What an export writes — the settings the export menu offers:
  *
  * - `items`: the entries and templates, chosen by the caller (linked entries
  *   included or not; `linkedEntriesOf` finds them).
@@ -300,13 +300,18 @@ async function usedDefinitions(contents: readonly string[]): Promise<ManifestBlo
 }
 
 /**
- * For the export menu (#98), which does not exist yet: the entries the given ones link to (`block_refs`, kind `entry`), without
+ * The entries the given ones link to (`block_refs`, kind `entry`), without
  * the given ones and without entries in the trash — with `recursive`, also
  * those the linked ones link to, and so on. For the export menu's
- * "include linked entries".
+ * "include linked entries". `blocked` entries (ticked off in the menu) are
+ * listed when linked, but not walked through: what only they link to stays out.
  */
-export async function linkedEntriesOf(ids: readonly string[], { recursive = false } = {}): Promise<string[]> {
+export async function linkedEntriesOf(
+  ids: readonly string[],
+  { recursive = false, blocked = [] }: { recursive?: boolean; blocked?: readonly string[] } = {},
+): Promise<string[]> {
   const db = await getDb();
+  const stop = new Set(blocked);
   const seen = new Set(ids);
   const found: string[] = [];
   let frontier = [...ids];
@@ -319,27 +324,12 @@ export async function linkedEntriesOf(ids: readonly string[], { recursive = fals
         WHERE r.target_kind = 'entry' AND b.entry_id IN (SELECT value FROM json_each($1))`,
       [JSON.stringify(frontier)],
     );
-    frontier = rows.map((r) => r.target).filter((id) => !seen.has(id));
-    frontier.forEach((id) => { seen.add(id); found.push(id); });
+    const fresh = rows.map((r) => r.target).filter((id) => !seen.has(id));
+    fresh.forEach((id) => { seen.add(id); found.push(id); });
+    frontier = fresh.filter((id) => !stop.has(id));
     if (!recursive) break;
   }
   return found;
-}
-
-/** The menu's export: the open entry or template, as it is, without a password. */
-export async function exportAsEmerald(): Promise<void> {
-  const view = useUIStore.getState().activeView;
-  if (view.type === 'templates' && view.id) {
-    return exportTemplateAsEmerald(view.id);
-  }
-  if (!view.id || view.type !== 'entry') {
-    await message(i18n.t('emeraldExport.openEntryFirst'), { title: i18n.t('emeraldExport.title'), kind: 'info' });
-    return;
-  }
-  await useEntryStore.getState().ensureEntryContent(view.id);
-  const entry = useEntryStore.getState().getEntry(view.id);
-  if (!entry) return;
-  await saveWithDialog(entry.title, entry.created_at, { kind: 'entry', id: entry.id });
 }
 
 /** A template as `.emerald` — the saved state, not an open draft. */
@@ -349,16 +339,22 @@ export async function exportTemplateAsEmerald(templateId: string): Promise<void>
     await message(i18n.t('emeraldExport.openTemplateFirst'), { title: i18n.t('emeraldExport.title'), kind: 'info' });
     return;
   }
-  await saveWithDialog(template.name || 'Template', template.created_at, { kind: 'template', id: template.id });
+  const name = exportFilename(template.name || i18n.t('templates.untitled'), template.created_at, 'emerald');
+  await exportItemsAsEmerald({ items: [{ kind: 'template', id: template.id }] }, name);
 }
 
-async function saveWithDialog(title: string, date: string, item: EmeraldExportItem): Promise<void> {
+/**
+ * The export menu's `.emerald`: asks where, then writes. Resolves to `false`
+ * when the save dialog was cancelled.
+ */
+export async function exportItemsAsEmerald(options: EmeraldExportOptions, defaultName: string): Promise<boolean> {
   const path = await save({
-    defaultPath: exportFilename(title, date, 'emerald'),
+    defaultPath: defaultName,
     filters: [{ name: 'Emerald', extensions: ['emerald'] }],
   });
-  if (!path) return;
-  await writeEmeraldFile(withEmeraldEnding(path), { items: [item] });
+  if (!path) return false;
+  await writeEmeraldFile(withEmeraldEnding(path), options);
+  return true;
 }
 
 // ── Import helpers ───────────────────────────────────────────────────────────

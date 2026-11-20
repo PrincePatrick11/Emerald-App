@@ -395,23 +395,41 @@ Every vault is encrypted: entries, images, drafts and backups are unreadable wit
 
 ## Export and Import
 
-All export and import actions are in the application menu — on macOS the native menu bar, on Windows and Linux the app's own title bar, with the same items and rules.
+Export and Import are two buttons in the title bar, on every platform. **Export** opens the export menu; **Import** is a small menu (From Markdown…, From Emerald…).
+
+### The export menu
+
+One dialog for every export. On top it asks **what** — the **scope** — and **how much to decide** — the **level**:
+
+- **This entry** — the entry on screen (only offered while one is open; on a template's page it reads **This template** and writes `.emerald` only).
+- **Collection** — several entries in one file. Under **Normal** they are what a dashboard shows, created within a period: last 7 days, last 30 days, this month, or all. Under **Advanced** they come either from a dashboard or from an own filter of categories and tags that works exactly like a dashboard's filter, and the period can be a custom from–to range; a list shows the entries, each can be ticked off.
+- **Whole database** — the vault's content as a `.vault.emerald` (see [Vault Backup](#vault-backup-vaultemerald)).
+
+The period counts from the day an entry was created; a custom period chosen under Advanced stays in force under Normal (a note says so) until another one is picked. **Include linked entries** adds the entries the chosen ones link to (not those in the Trash, never one ticked off the collection).
+
+| Setting | Normal | Advanced |
+|---|---|---|
+| Linked entries | only the directly linked | direct only, or all (also what the linked ones link to); a list to tick them off |
+| Order | oldest first | oldest or newest first |
+| Pictures (PDF, `.emerald`) | balanced | original, balanced, strong, or left out — optionally a level of their own for the linked entries |
+| Custom blocks (`.emerald`) | along | along or not |
+| Whole database | everything except the Trash | entries by category, tasks, tags, lexicon, settings, the Trash, a period |
+
+The formats are PDF, Markdown and `.emerald`; the whole database is always a `.vault.emerald`. A `.emerald` or `.vault.emerald` gets a **protection**: the vault's password (opens with the vault's password or recovery key), an own password (at least 8 characters, typed twice), or none. The menu remembers every choice for the next time — dashboard, filter and database contents per vault — except a password and "none", which has to be picked again each time; an unprotected database export is not offered the vault's own `backups/` folder. Cancelling the save dialog leaves the menu open.
 
 > **Exports show an entry the way read mode does.** Markdown and PDF render each block on its own: hidden blocks are left out, field blocks list only the fields read mode shows (label and value), block titles appear as headings where read mode shows them, and a sigil exports its intention and letters, its drawing (in Markdown a placeholder) and its charge. While a sigil is charged and its reveal date not reached, calculator and drawing are left out of these exports. A `.emerald` file carries the sigil as it is, still concealed. Import is unaffected.
 
 ### PDF Export
 
-A native save dialog asks for the destination and the PDF is written directly — no preview and no print dialog. It is rendered by the app's own webview, so emoji come out as proper colour glyphs. The suggested filename is `<Title>_YYYY-MM-DD.pdf`. Images are embedded; internal link chips appear as styled text.
-
-**Export → Export as PDF…** is available while an entry is open; it is disabled elsewhere (dashboards, Tags, Trash …).
+A native save dialog asks for the destination and the PDF is written directly — no preview and no print dialog. It is rendered by the app's own webview, so emoji come out as proper colour glyphs. The suggested filename is `<Title>_YYYY-MM-DD.pdf`; a collection of several entries is `Emerald_<Dashboard>_<from>_<to>.pdf` (`Export` for an own filter, no dates for "all"). The page is A4 on every system. Several entries go into one PDF, one after another, each starting on a new page. Images are embedded at the chosen level (or left out); internal link chips appear as styled text.
 
 ### Markdown Export
 
-Saves a `.md` file: the `# Title`, a header with date, moon phase (when shown), category and tags, then `---` and the entry body. Images are left out; a block image (the sigil drawing, an image field) leaves its label as a placeholder, `*[Label]*`. Internal link chips become `[[Title]]` wiki links — an entry's links live in its body.
+Saves a `.md` file: the `# Title`, a header with date, moon phase (when shown), category and tags, then `---` and the entry body; several entries follow one another in the same file. Images are left out; a block image (the sigil drawing, an image field) leaves its label as a placeholder, `*[Label]*`. Internal link chips become `[[Title]]` wiki links — an entry's links live in its body.
 
 ### Emerald Format
 
-The Emerald format (`.emerald`) carries entries and templates from one vault to another, without loss — and, as a `.vault.emerald`, a whole vault's content (see [Vault Backup](#vault-backup-vaultemerald)). A file holds the entries and templates with the pictures and icons as files of their own, compressed where that helps; it can hold one or several entries and templates. It can be left unprotected, protected with a password of its own (at least 8 characters), or protected with the vault's password — then it opens with the password or recovery key the vault had at export, and without asking while that vault is unlocked. **Export → Export as Emerald…** is enabled while an entry or a template's page is open, and writes whichever is active, unprotected. **Import → From Emerald…** reads any of them; for a protected file it asks for the password (or the vault's recovery key) first, and a wrong one says so. A `.vault.emerald` picked there — a vault's content or a raw backup — opens the import dialog with its options. An imported entry opens in "All entries".
+The Emerald format (`.emerald`) carries entries and templates from one vault to another, without loss — and, as a `.vault.emerald`, a whole vault's content (see [Vault Backup](#vault-backup-vaultemerald)). A file holds the entries and templates with the pictures and icons as files of their own, compressed where that helps; it can hold one or several entries and templates. It can be left unprotected, protected with a password of its own (at least 8 characters), or protected with the vault's password — then it opens with the password or recovery key the vault had at export, and without asking while that vault is unlocked. The export menu writes it (see [The export menu](#the-export-menu)); a template's right-click menu in Templates has **Export as Emerald…**, unprotected. **Import → From Emerald…** reads any of them; for a protected file it asks for the password (or the vault's recovery key) first, and a wrong one says so. A `.vault.emerald` picked there — a vault's content or a raw backup — opens the import dialog with its options. An imported entry opens in "All entries".
 
 **What travels.** Per entry: title, creation date, its blocks as stored (hidden blocks flagged, concealed sigils concealed — they can be revealed over there as usual), category with its emoji, tags by name, icon and cover. Per template: name, the title new entries get, icon, tags and blocks. Every picture and icon these use travels along as a file. Links name their target's title too, so the import can find it in the other vault. Not carried yet: a picture's name, note and tags, and tag colours.
 
@@ -425,8 +443,6 @@ The Emerald format (`.emerald`) carries entries and templates from one vault to 
 
 **Limits.** A file of entries is refused, with nothing changed, if it is larger than 2 GB, has more than 5,000 parts or more than 1,000 entries and templates, a single picture above 64 MB, or anything inside that is not the manifest, a picture or an icon.
 
-A menu to export several entries at once, with the choice of protection and compressed or left-out pictures, will follow; the format already carries all of it (see [`architecture/editing.md`](architecture/editing.md#the-emerald-file)).
-
 ### Import from Markdown
 
 Reads a Markdown file exported by Emerald (or with the same structure). The `# Title` line becomes the title, key-value lines before `---` are metadata (unknown keys are ignored), and the body below is converted to rich text. A Markdown import has no creation date and is created now. Header fields of earlier versions (an entry's status, end date and version, a journal entry's paradigm, banishing, meditation and linked operations or articles) count as unknown keys.
@@ -437,15 +453,15 @@ Reads a Markdown file exported by Emerald (or with the same structure). The `# T
 
 The whole vault can be backed up and restored as one self-contained file (`.vault.emerald`), separate from per-entry exports. There are two kinds: the **export** of a vault's content, made by hand, and the **raw backup** the automatic backup writes. Both are imported the same way, through **Import → From Emerald…** in the title bar.
 
-**Export.** **Export → Export database…** in the title bar opens the export of the vault's content (until the export menu replaces it).
+**Export.** **Export → Whole database** in the title bar exports the vault's content. Under **Normal** everything goes except the Trash; **Advanced** offers the choices below.
 
 - "Entries by category" picks the entries: one box per category, and "Uncategorized" (entries without a category, and those whose category is in the Trash). What a chosen entry needs travels with it — its category, its pictures. A "What to include" row adds Tasks, Tags, Lexicon and Settings. Templates, your own blocks and the dashboards travel whenever entries do.
 - The Settings chip (on by default) exports the vault's settings — fonts, sizes, trash retention, sidebar, emoji defaults, image limits, tag rule — independently of the content chips. Language and theme belong to the installation and are not part of it; custom themes a backup still carries join this installation's list when it is imported.
 - Optional from/to dates restrict entries to those created in that window (tags, categories, blocks, templates, languages and settings are not date-filtered).
 - Trashed items are left out unless **Include deleted** is ticked — tags included, since trashed entries carry their ids.
 - Images and icons referenced by exported entries travel in the file, as they are.
-- A backup is **encrypted** with the vault's password. It opens with the password the vault has now — also on another computer, and also after the password is changed later: a backup is tied to the password it was made with, not to the current one.
-- The file is named `emerald-backup-YYYY-MM-DD.vault.emerald`. The save dialog opens in the vault's own **`backups/` folder** (recreated if it went missing), so backups travel with the vault folder — deleting the vault's files leaves a non-empty `backups/` standing. Any other location can be picked; for a vault outside the allowed storage locations (see [`security.md`](security.md)) the dialog just suggests a filename. Cancelling the dialog closes nothing.
+- A backup is **encrypted** with the vault's password by default — or with an own password, or not at all, as chosen in the export menu. With the vault's password it opens with the password the vault had when it was made — also on another computer, and also after the password is changed later: a backup is tied to the password it was made with, not to the current one.
+- The file is named `emerald-backup-YYYY-MM-DD.vault.emerald`. Unless it is unprotected, the save dialog opens in the vault's own **`backups/` folder** (recreated if it went missing), so backups travel with the vault folder — deleting the vault's files leaves a non-empty `backups/` standing. Any other location can be picked; for a vault outside the allowed storage locations (see [`security.md`](security.md)) the dialog just suggests a filename. Cancelling the dialog closes nothing.
 
 **Import.**
 

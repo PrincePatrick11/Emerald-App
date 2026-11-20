@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import { useUIStore } from '../../../store/uiStore';
-import { computeMenuEnabledState, dispatchMenuAction } from '../../../lib/menuActions';
+import { dispatchMenuAction } from '../../../lib/menuActions';
 import { cutSelection, copySelection, pasteFromClipboard, selectAll } from './editCommands';
 import type { MenuNode } from './MenuDropdown';
 
@@ -14,20 +14,19 @@ interface TitleBarMenu {
  *
  * On macOS, Edit and View are in the system menu bar instead
  * (`install_native_menu` in `src-tauri/src/lib.rs`, the only platform with a
- * native menu); Export and Import are in the title bar everywhere.
+ * native menu); Import is in the title bar everywhere. Export is no menu: its
+ * button opens the export menu (`ExportMenuModal`).
  *
- * Content only: where the four menus sit is decided by `TitleBar` —
- * Edit and View behind the three-line button, Export and
- * Import as buttons of their own behind the arrows.
+ * Content only: where the menus sit is decided by `TitleBar` —
+ * Edit and View behind the three-line button, Import as a
+ * button of its own behind the arrows.
  */
 export function useTitleBarMenus() {
   const { t } = useTranslation();
-  const activeView = useUIStore((s) => s.activeView);
   const railOpen = useUIStore((s) => s.railOpen);
   const leftListOpen = useUIStore((s) => s.leftListOpen);
   const rightSidebarOpen = useUIStore((s) => s.rightSidebarOpen);
   const viewLocked = useUIStore((s) => s.viewLocked);
-  const enabled = computeMenuEnabledState(activeView);
 
   const edit: TitleBarMenu = {
     label: t('menu.edit'),
@@ -51,16 +50,6 @@ export function useTitleBarMenus() {
       { kind: 'item', label: t('menu.showSplash'), onSelect: () => dispatchMenuAction('show-splash') },
     ],
   };
-  const exportMenu: TitleBarMenu = {
-    label: t('menu.export'),
-    nodes: [
-      { kind: 'item', label: t('menu.exportPdf'), disabled: !enabled.pdfEnabled, onSelect: () => dispatchMenuAction('export-pdf') },
-      { kind: 'item', label: t('menu.exportMarkdown'), disabled: !enabled.entryEnabled, onSelect: () => dispatchMenuAction('export-markdown') },
-      { kind: 'item', label: t('menu.exportEmerald'), disabled: !enabled.emeraldEnabled, onSelect: () => dispatchMenuAction('export-emerald') },
-      { kind: 'separator' },
-      { kind: 'item', label: t('menu.exportVault'), onSelect: () => dispatchMenuAction('export-vault') },
-    ],
-  };
   const importMenu: TitleBarMenu = {
     label: t('menu.import'),
     nodes: [
@@ -79,5 +68,5 @@ export function useTitleBarMenus() {
     ...[edit, view].map((menu): MenuNode => ({ kind: 'submenu', label: menu.label, children: menu.nodes })),
   ];
 
-  return { appMenu, exportMenu, importMenu };
+  return { appMenu, importMenu };
 }

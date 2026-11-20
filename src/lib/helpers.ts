@@ -84,8 +84,12 @@ export function asString(value: unknown): string | null {
 
 /** `<title>_<yyyy-MM-dd>.<ext>`, the title reduced to what a file name takes — every export's default name. */
 export function exportFilename(title: string, date: string, ext: string): string {
-  const base = title.replace(/[^\w\s\-äöüÄÖÜß]/g, '').trim().replace(/\s+/g, '_') || 'export';
-  return `${base}_${format(new Date(date), 'yyyy-MM-dd')}.${ext}`;
+  return `${safeFileBase(title)}_${format(new Date(date), 'yyyy-MM-dd')}.${ext}`;
+}
+
+/** A text as the stem of a file name: only letters (of any language), digits, `_` and hyphens, spaces as `_`. */
+export function safeFileBase(text: string): string {
+  return text.replace(/[^\p{L}\p{N}_\s-]/gu, '').trim().replace(/\s+/g, '_') || 'export';
 }
 
 /** `raw` if it is exactly one of the `options`, otherwise `fallback` — for values

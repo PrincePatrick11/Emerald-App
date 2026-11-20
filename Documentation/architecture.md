@@ -53,6 +53,7 @@ src/
 │   │   ├── VaultKeyDialog, BackupUnlockDialog, RecoveryKeyBox, vaultKeyParts   password, unlock, recovery key
 │   │   ├── moduleViews.ts                      ViewId → lazy view (MainArea only)
 │   │   ├── PickerRows, PickerServerPanel       the start page's vault rows and the server placeholder
+│   │   ├── export/                             the export menu (ExportMenuModal), its entry checklist and the database options
 │   │   ├── start/                              the start page's brand, language, sections, Appearance, automatic backup, version and updates
 │   │   ├── settings/                           SettingsModal, one *Page per tab, sections
 │   │   └── titlebar/                           custom title bar, menus, SearchModal
@@ -86,7 +87,8 @@ src/
 │   ├── vaultStore.ts, trashStore.ts, undoStore.ts, importStore.ts
 │   ├── vaultKeyStore.ts         the unlock gate (`ensureVaultReady`)
 │   ├── backupSecretStore.ts     asks for a `.emerald` file's password, or its vault's password or recovery key
-│   ├── vaultImportStore.ts      a `.vault.emerald` the title bar's import opened, on its way to its dialog; the database export's dialog
+│   ├── vaultImportStore.ts      a `.vault.emerald` the title bar's import opened, on its way to its dialog
+│   ├── exportMenuStore.ts       the export menu's open request, with the entry or template on screen
 │   ├── imageStore.ts            "Images": rows, files, places of use; `takeIn`, `discardRenders`
 │   ├── imagePickerStore.ts      `pickPictures`, the picture picker's open request
 │   ├── imageNoticeStore.ts      "image not inserted" notice
@@ -127,7 +129,8 @@ src/
 │   ├── storeImage.ts            a file from the disk or a Blob into `images/`
 │   ├── imageUsage.ts            where each picture is used, and in which role (`block_refs`)
 │   ├── pictureExport.ts         a rendered picture saved where the user chooses
-│   ├── export.ts, exportData.ts, emeraldFormat.ts   Markdown and PDF export; `.emerald` files of entries and templates
+│   ├── export.ts, exportData.ts, emeraldFormat.ts   Markdown and PDF export (one entry or several); `.emerald` files of entries and templates
+│   ├── exportMenu.ts            the export menu's rules: remembered choices, Normal's fixed settings, period, collection, order
 │   ├── emerald/                 `manifest.ts` (the manifest, pure), `file.ts` (the `.emerald` commands, asking for a secret)
 │   ├── dbBackup.ts, importStaging.ts   a vault's content as `.vault.emerald`: export and restore, a raw backup's content read from its database
 │   ├── autoBackup.ts            automatic backup: the start page's setting and status (the schedule is Rust's)
@@ -208,7 +211,7 @@ A serialized task must never await another task under its own key — it would w
 
 ### Code splitting
 
-`MainArea` loads every view with `React.lazy` via `VIEW_COMPONENTS` in `moduleViews.ts`, so TipTap (the largest chunk) only loads when an editor view first opens. `SettingsModal` is lazy for the same reason (it pulls in `dbBackup`). `menuActions.runMenuAction` imports the export/import modules (`export.ts`, `exportData.ts`, `emeraldFormat.ts` — and with them `turndown` and `marked`) with `await import()` per action, and `src/i18n/index.ts` ships only `en` eagerly. `vite.config.ts` deliberately has **no catch-all vendor chunk** — a blanket `return "vendor"` would pull the lazy libraries back into the eager bundle.
+`MainArea` loads every view with `React.lazy` via `VIEW_COMPONENTS` in `moduleViews.ts`, so TipTap (the largest chunk) only loads when an editor view first opens. `SettingsModal` is lazy for the same reason (it pulls in `dbBackup`). `menuActions.runMenuAction` imports the import modules (`emeraldFormat.ts` — and with it `marked` —, `export.ts` for its error message) with `await import()` per action, the export menu is lazy (and brings `dbBackup.ts` along); it loads `emeraldFormat.ts` for the linked-entry list or a `.emerald`, and `export.ts`, `exportData.ts` (and `turndown`) only when it writes, and `src/i18n/index.ts` ships only `en` eagerly. `vite.config.ts` deliberately has **no catch-all vendor chunk** — a blanket `return "vendor"` would pull the lazy libraries back into the eager bundle.
 
 ## IPC Command Surface
 
@@ -253,7 +256,7 @@ All Rust commands are *registered* in `src-tauri/src/lib.rs` and invoked from Ty
 | `write_file(path, content)` | Write UTF-8 text to a user-selected `.md`/`.json`/`.txt` path. Rejects symlinks; the path must resolve within the allowed storage roots, and inside the app data directory only `vaults.json` and `vaults/` are writable (see [Path Confinement](security.md#path-confinement)). |
 | `read_file(path)` | Read a file as UTF-8. Same allowlist and confinement as `write_file`. |
 | `ensure_app_storage_dirs()` | Create the app data and config directories before vault metadata is written or SQLite opens. |
-| `export_pdf(html, path, page_size?)` | Render HTML to a PDF at a path the frontend obtained from the `dialog` plugin, by driving the app's own webview. `page_size` (inches) overrides the default Letter page; the frontend passes none at present. See [PDF Export](architecture/shell.md#pdf-export). |
+| `export_pdf(html, path, page_size?)` | Render HTML to a PDF at a path the frontend obtained from the `dialog` plugin, by driving the app's own webview. The page is A4 on every system; `page_size` (inches) overrides it on Windows only; the frontend passes none at present. See [PDF Export](architecture/shell.md#pdf-export). |
 | `close_request_seen()` | The frontend's acknowledgement of a close request — see [Closing the window](architecture/shell.md#closing-the-window). |
 | `update_menu_labels(...)` | Translate the native menu's labels. macOS only in effect — see [Window Chrome](architecture/shell.md#window-chrome). |
 | `set_dock_icon(png?)` | Show a custom theme's Dock icon, or with none the one the app started with. Lasts while the app runs. macOS only in effect. |

@@ -985,8 +985,6 @@
     "pageGeneral": "Général",
     "tagline": "L'espace de travail pour votre pratique magique.",
     "website": "Site web",
-    "exportDb": "Exporter la base de données",
-    "exportBtn": "Exporter en .vault.emerald",
     "exportInclude": "Inclure",
     "importDb": "Importer la base de données",
     "importedVault": "Vault importé",
@@ -1011,9 +1009,7 @@
     "newVaultName": "Nom du nouveau vault",
     "newVaultLocation": "Dossier du nouveau vault",
     "importBtn": "Importer",
-    "exporting": "Export en cours…",
     "importing": "Import en cours…",
-    "exportError": "L'export a échoué.",
     "previewContains": "Contient :",
     "uiFont": "Police de l'interface",
     "editorFont": "Police du corps de l'éditeur",
@@ -1115,7 +1111,6 @@
     "customThemeContrast": "Importé, mais difficile à lire : {{pairs}}.",
     "uiFontHint": "Police des menus, listes et libellés.",
     "editorFontHint": "Police des titres et du texte des entrées.",
-    "exportDbHint": "Enregistre le vault dans un fichier .vault.emerald, images comprises, protégé par le mot de passe du vault. Les choix ci-dessous décident du contenu.",
     "includeSettingsHint": "Polices et tailles, barre latérale, corbeille, emojis, images, règles d'étiquettes et sauvegarde automatique de ce vault",
     "importDbHint": "Restaure un fichier .vault.emerald — comme nouveau vault, en plus des entrées existantes ou en remplaçant tout. Les options apparaissent une fois le fichier choisi.",
     "storageHint": "Images du dossier du vault qu'aucune entrée n'utilise plus. « Rechercher » montre la place occupée, « Supprimer » les efface définitivement.",
@@ -1217,10 +1212,7 @@
     "resetView": "Réinitialiser la vue",
     "lockView": "Verrouiller la vue",
     "showSplash": "Afficher l'écran de chargement",
-    "exportPdf": "Exporter en PDF…",
-    "exportMarkdown": "Exporter en Markdown…",
     "exportEmerald": "Exporter en Emerald…",
-    "exportVault": "Exporter la base de données…",
     "importMarkdown": "Depuis Markdown…",
     "importEmerald": "Depuis Emerald…",
     "quit": "Quitter Emerald App",
@@ -1429,7 +1421,6 @@
   },
   "emeraldExport": {
     "title": "Exporter",
-    "openEntryFirst": "Ouvrez d'abord une entrée.",
     "openTemplateFirst": "Ouvrez d'abord un modèle.",
     "pdfSaved": "PDF enregistré :\n{{path}}",
     "failed": "{{kind}} : échec",
@@ -1440,7 +1431,99 @@
       "emerald": "Export Emerald",
       "emeraldImport": "Import Emerald",
       "markdownImport": "Import Markdown",
-      "canvas": "Dessin"
+      "canvas": "Dessin",
+      "vault": "Export de la base de données"
+    }
+  },
+  "exportMenu": {
+    "title": "Exporter",
+    "export": "Exporter",
+    "exporting": "Exportation…",
+    "count_one": "{{count}} entrée",
+    "count_other": "{{count}} entrées",
+    "total_one": "{{count}} entrée au total",
+    "total_other": "{{count}} entrées au total",
+    "wholeVault": "Le vault entier",
+    "oneTemplate": "1 modèle",
+    "bundleFilter": "Export",
+    "scope": {
+      "label": "Étendue",
+      "entry": "Cette entrée",
+      "template": "Ce modèle",
+      "bulk": "Export groupé",
+      "vault": "Base de données complète"
+    },
+    "level": {
+      "label": "Niveau",
+      "normal": "Normal",
+      "advanced": "Avancé"
+    },
+    "source": {
+      "label": "Sélection",
+      "dashboard": "Tableau de bord",
+      "filter": "Filtre propre"
+    },
+    "dashboard": "Tableau de bord",
+    "period": {
+      "label": "Période",
+      "last7": "7 derniers jours",
+      "last30": "30 derniers jours",
+      "thisMonth": "Ce mois-ci",
+      "all": "Tout",
+      "custom": "Personnalisée",
+      "customNote": "La période personnalisée d'« Avancé » s'applique. Choisissez-en une autre ci-dessus pour la remplacer."
+    },
+    "invalidDate": "Une date est incomplète.",
+    "noMatches": "Aucune entrée dans cette sélection et cette période.",
+    "includeLinked": "Inclure les entrées liées",
+    "linked": "Entrées liées",
+    "includeLinkedHint": "Les entrées vers lesquelles pointent les liens sont incluses — seulement les liens directs.",
+    "noLinked": "Aucune entrée liée.",
+    "depth": {
+      "label": "Profondeur des liens",
+      "direct": "Directes seulement ({{count}})",
+      "all": "Toutes ({{count}})"
+    },
+    "images": {
+      "label": "Images",
+      "none": "Original",
+      "balanced": "Équilibré",
+      "strong": "Compression forte",
+      "placeholder": "Omettre",
+      "noneDesc": "Images en pleine taille — le fichier devient lourd.",
+      "balancedDesc": "Images réduites, encore nettes.",
+      "strongDesc": "Images fortement réduites — fichier le plus petit.",
+      "placeholderDesc": "Sans images ; les champs d'image laissent leur légende.",
+      "linkedOwn": "Niveau d'image propre pour les entrées liées"
+    },
+    "order": {
+      "label": "Ordre",
+      "asc": "Plus anciennes d'abord",
+      "desc": "Plus récentes d'abord"
+    },
+    "format": "Format",
+    "formatNames": {
+      "pdf": "PDF",
+      "markdown": "Markdown",
+      "emerald": ".emerald"
+    },
+    "formats": {
+      "pdf": "Pour lire et imprimer ; plusieurs entrées dans un fichier, chacune sur une nouvelle page.",
+      "markdown": "Texte brut pour d'autres programmes ; sans images.",
+      "emerald": "Pour transmettre à un autre Emerald — avec images, catégories, étiquettes et blocs personnalisés."
+    },
+    "vaultHint": "Enregistre le vault avec ses images dans un fichier .vault.emerald ; on le restaure via Importer.",
+    "templateOnlyEmerald": "Un modèle ne s'exporte qu'en .emerald.",
+    "blockDefinitions": "Inclure les blocs personnalisés",
+    "blockDefinitionsHint": "Les blocs personnalisés utilisés par les entrées — dans la cible, ils arrivent sous « Blocs ».",
+    "protection": {
+      "label": "Protection",
+      "vaultKey": "Mot de passe du vault",
+      "password": "Mot de passe propre",
+      "none": "Aucune",
+      "vaultKeyDesc": "S'ouvre avec le mot de passe ou la clé de récupération de ce vault.",
+      "passwordDesc": "S'ouvre seulement avec ce mot de passe. S'il est perdu, le fichier n'est plus lisible.",
+      "noneDesc": "Toute personne qui a le fichier peut l'ouvrir."
     }
   },
   "emeraldKey": {

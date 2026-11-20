@@ -152,7 +152,7 @@ where one only clicks, right-clicks or types, the tool is now the shorter way.
 
 ```
 ┌─ header.titlebar ───────────────────────────────────────────────────────────┐
-│ Logo │ .titlebar-menu-trigger ×4 (Edit View Export Import) │ ← → │          │
+│ Logo │ menu (Edit View) │ search ← → │ Export (export menu) · Import (menu)  │
 │                    button.titlebar-search                                   │
 │                                        .window-control ×3 (Min/Max/Close)   │
 ├─ aside.app-sidebar-left ──┬─ main.app-main ─────────┬─ aside.app-sidebar-right ┤

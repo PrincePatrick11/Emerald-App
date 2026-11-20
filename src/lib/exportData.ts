@@ -4,7 +4,6 @@ import { renderBlocksForExport, type ExportText } from './blocks/exportRender';
 import { blockLabel, fieldFallbackText } from './blocks/blockAttrs';
 import { formatIsoDateLong } from './formatDate';
 import { useCategoryStore } from '../store/categoryStore';
-import { useUIStore } from '../store/uiStore';
 import { entryMoonPhase, MOON_PHASE_SYMBOLS } from './moonPhase';
 import { useSettingsStore } from '../store/settingsStore';
 import { displayTitle } from './entryTitle';
@@ -54,12 +53,11 @@ function moonLabel(phase: string): string {
   return phase.split('_').map(w => w[0].toUpperCase() + w.slice(1)).join(' ');
 }
 
-export async function collectExportData(): Promise<ExportData | null> {
-  const view = useUIStore.getState().activeView;
-  if (!view.id || view.type !== 'entry') return null;
-  // Right after startup the content of the open entry may still be pending.
-  await useEntryStore.getState().ensureEntryContent(view.id);
-  const entry = useEntryStore.getState().getEntry(view.id);
+/** An entry as the PDF and Markdown exports read it — `null` if it is gone. */
+export async function collectExportDataFor(id: string): Promise<ExportData | null> {
+  // Right after startup an entry's content may still be pending.
+  await useEntryStore.getState().ensureEntryContent(id);
+  const entry = useEntryStore.getState().getEntry(id);
   if (!entry) return null;
 
   const cat = useCategoryStore.getState().categories.find((c) => c.id === entry.category_id);

@@ -985,8 +985,6 @@
     "pageGeneral": "Allgemein",
     "tagline": "Der Arbeitsbereich für deine magische Praxis.",
     "website": "Webseite",
-    "exportDb": "Datenbank exportieren",
-    "exportBtn": "Als .vault.emerald exportieren",
     "exportInclude": "Einschließen",
     "importDb": "Datenbank importieren",
     "importedVault": "Importierter Vault",
@@ -1011,9 +1009,7 @@
     "newVaultName": "Name des neuen Vaults",
     "newVaultLocation": "Ordner des neuen Vaults",
     "importBtn": "Importieren",
-    "exporting": "Exportiere…",
     "importing": "Importiere…",
-    "exportError": "Export fehlgeschlagen.",
     "previewContains": "Enthält:",
     "uiFont": "UI-Schriftart",
     "editorFont": "Editor-Textschrift",
@@ -1115,7 +1111,6 @@
     "customThemeContrast": "Importiert, aber schwer lesbar: {{pairs}}.",
     "uiFontHint": "Schrift für Menüs, Listen und Beschriftungen.",
     "editorFontHint": "Schrift für Titel und Text in Einträgen.",
-    "exportDbHint": "Speichert den Vault als .vault.emerald-Datei samt Bildern, geschützt mit dem Vault-Passwort. Die Auswahl darunter bestimmt, was hineinkommt.",
     "includeSettingsHint": "Schriften und Größen, Seitenleiste, Papierkorb, Emojis, Bilder, Tag-Regel sowie das automatische Backup dieses Vaults",
     "importDbHint": "Holt eine .vault.emerald-Datei zurück — als neuer Vault, zusätzlich zu den vorhandenen Einträgen oder als Ersatz für alles. Nach der Dateiwahl erscheinen die Optionen.",
     "storageHint": "Bilder im Vault-Ordner, die kein Eintrag mehr benutzt. „Suchen“ zeigt, wie viel Platz sie belegen, „Entfernen“ löscht sie endgültig.",
@@ -1217,10 +1212,7 @@
     "resetView": "Ansicht zurücksetzen",
     "lockView": "Ansicht sperren",
     "showSplash": "Ladebildschirm anzeigen",
-    "exportPdf": "Als PDF exportieren…",
-    "exportMarkdown": "Als Markdown exportieren…",
     "exportEmerald": "Als Emerald exportieren…",
-    "exportVault": "Datenbank exportieren…",
     "importMarkdown": "Aus Markdown…",
     "importEmerald": "Aus Emerald…",
     "quit": "Emerald App beenden",
@@ -1429,7 +1421,6 @@
   },
   "emeraldExport": {
     "title": "Export",
-    "openEntryFirst": "Öffne zuerst einen Eintrag.",
     "openTemplateFirst": "Öffne zuerst eine Vorlage.",
     "pdfSaved": "PDF gespeichert:\n{{path}}",
     "failed": "{{kind}} fehlgeschlagen",
@@ -1440,7 +1431,99 @@
       "emerald": "Emerald-Export",
       "emeraldImport": "Emerald-Import",
       "markdownImport": "Markdown-Import",
-      "canvas": "Zeichnung"
+      "canvas": "Zeichnung",
+      "vault": "Datenbank-Export"
+    }
+  },
+  "exportMenu": {
+    "title": "Exportieren",
+    "export": "Exportieren",
+    "exporting": "Exportiere…",
+    "count_one": "{{count}} Eintrag",
+    "count_other": "{{count}} Einträge",
+    "total_one": "{{count}} Eintrag insgesamt",
+    "total_other": "{{count}} Einträge insgesamt",
+    "wholeVault": "Der ganze Vault",
+    "oneTemplate": "1 Vorlage",
+    "bundleFilter": "Export",
+    "scope": {
+      "label": "Umfang",
+      "entry": "Dieser Eintrag",
+      "template": "Diese Vorlage",
+      "bulk": "Sammelexport",
+      "vault": "Komplette Datenbank"
+    },
+    "level": {
+      "label": "Stufe",
+      "normal": "Normal",
+      "advanced": "Erweitert"
+    },
+    "source": {
+      "label": "Auswahl",
+      "dashboard": "Dashboard",
+      "filter": "Eigener Filter"
+    },
+    "dashboard": "Dashboard",
+    "period": {
+      "label": "Zeitraum",
+      "last7": "Letzte 7 Tage",
+      "last30": "Letzte 30 Tage",
+      "thisMonth": "Dieser Monat",
+      "all": "Alles",
+      "custom": "Eigener",
+      "customNote": "Es gilt der eigene Zeitraum aus „Erweitert“. Wähle oben einen anderen, um ihn zu ersetzen."
+    },
+    "invalidDate": "Ein Datum ist unvollständig.",
+    "noMatches": "Keine Einträge in dieser Auswahl und diesem Zeitraum.",
+    "includeLinked": "Verknüpfte Einträge mitnehmen",
+    "linked": "Verknüpfte Einträge",
+    "includeLinkedHint": "Die Einträge, auf die verwiesen wird, kommen mit – nur die direkt verknüpften.",
+    "noLinked": "Keine verknüpften Einträge.",
+    "depth": {
+      "label": "Tiefe der Verknüpfungen",
+      "direct": "Nur direkte ({{count}})",
+      "all": "Alle ({{count}})"
+    },
+    "images": {
+      "label": "Bilder",
+      "none": "Original",
+      "balanced": "Ausgewogen",
+      "strong": "Stark",
+      "placeholder": "Weglassen",
+      "noneDesc": "Bilder in voller Größe – die Datei wird groß.",
+      "balancedDesc": "Bilder verkleinert, gut erkennbar.",
+      "strongDesc": "Bilder stark verkleinert – kleinste Datei.",
+      "placeholderDesc": "Ohne Bilder; Bildfelder hinterlassen ihre Beschriftung.",
+      "linkedOwn": "Eigene Bildstufe für verknüpfte Einträge"
+    },
+    "order": {
+      "label": "Reihenfolge",
+      "asc": "Älteste zuerst",
+      "desc": "Neueste zuerst"
+    },
+    "format": "Format",
+    "formatNames": {
+      "pdf": "PDF",
+      "markdown": "Markdown",
+      "emerald": ".emerald"
+    },
+    "formats": {
+      "pdf": "Zum Lesen und Drucken; mehrere Einträge in einer Datei, jeder auf einer neuen Seite.",
+      "markdown": "Reiner Text für andere Programme; ohne Bilder.",
+      "emerald": "Zum Weitergeben an ein anderes Emerald – mit Bildern, Kategorien, Tags und eigenen Blöcken."
+    },
+    "vaultHint": "Speichert den Vault mit Bildern als .vault.emerald-Datei; einspielen geht über Importieren.",
+    "templateOnlyEmerald": "Eine Vorlage lässt sich nur als .emerald exportieren.",
+    "blockDefinitions": "Eigene Blöcke mitnehmen",
+    "blockDefinitionsHint": "Die Vorlagen der eigenen Blöcke, die die Einträge benutzen – im Ziel landen sie unter „Blöcke“.",
+    "protection": {
+      "label": "Schutz",
+      "vaultKey": "Vault-Passwort",
+      "password": "Eigenes Passwort",
+      "none": "Kein Schutz",
+      "vaultKeyDesc": "Öffnet sich mit dem Passwort oder dem Wiederherstellungsschlüssel dieses Vaults.",
+      "passwordDesc": "Öffnet sich nur mit diesem Passwort. Geht es verloren, ist die Datei nicht mehr lesbar.",
+      "noneDesc": "Jeder, der die Datei hat, kann sie öffnen."
     }
   },
   "emeraldKey": {

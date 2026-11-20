@@ -117,8 +117,8 @@ export function isBuiltinDashboard(value: unknown): value is BuiltinDashboard {
   return (BUILTIN_DASHBOARD_KEYS as readonly unknown[]).includes(value);
 }
 
-/** Does the entry pass the filter? A missing rule does not narrow. */
-function matchesFilter(entry: Pick<Entry, 'category_id' | 'tags'>, filter: DashboardFilter): boolean {
+/** Does the entry pass the filter? A missing rule does not narrow. Also the export menu's free filter. */
+export function matchesFilter(entry: Pick<Entry, 'category_id' | 'tags'>, filter: DashboardFilter): boolean {
   if (filter.categories && !(entry.category_id !== null && filter.categories.includes(entry.category_id))) return false;
   if (filter.tags && filter.tags.length && !entry.tags.some((tag) => filter.tags!.includes(tag))) return false;
   return true;

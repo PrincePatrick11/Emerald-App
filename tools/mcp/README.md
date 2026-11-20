@@ -253,7 +253,7 @@ Everything that looks at the DOM is in `pagelib.js`, which `cdp.py` sends along 
   them, the click is dispatched at the element instead and the result says
   so. Seeing that on every click means the real path is not getting through
   to this WebView.
-- **Tauri menu items are not exposed via CDP.** You cannot trigger the
-  File → Export as Markdown… menu from MCP. 
+- **Native (macOS) menu items are not exposed via CDP.** The title bar's
+  Export button and its export menu are HTML and can be driven.
 - **No undo/redo exposed.** Tauri WebView doesn't give CDP control over
   these. The skill works around this by being explicit about state.
