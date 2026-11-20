@@ -49,16 +49,17 @@ export async function applyTemplateFields(
 /**
  * Undo after an automatically applied template (`fieldsWithoutTemplate`)
  * — for a freshly created entry it carried none of the template's tags beforehand,
- * unless a dashboard's start tag is one of them (Undo then removes it too).
+ * and a dashboard's start tag (`keep`) stays even if the template has it too.
  * The stack clears the blocks.
  */
 export async function undoTemplateFields(
   id: string,
   template: Pick<Template, 'title' | 'tags'>,
+  keep: readonly string[] = [],
 ): Promise<void> {
   const fields = entryFields(id);
   if (!fields) return;
-  await writeChangedFields(id, fields, fieldsWithoutTemplate(fields, template));
+  await writeChangedFields(id, fields, fieldsWithoutTemplate(fields, template, keep));
 }
 
 /**

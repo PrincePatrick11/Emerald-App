@@ -431,7 +431,7 @@ A menu to export several entries at once, with a password and compressed or left
 
 Reads a Markdown file exported by Emerald (or with the same structure). The `# Title` line becomes the title, key-value lines before `---` are metadata (unknown keys are ignored), and the body below is converted to rich text. A Markdown import has no creation date and is created now. Header fields of earlier versions (an entry's status, end date and version, a journal entry's paradigm, banishing, meditation and linked operations or articles) count as unknown keys.
 
-**Destination.** A file whose header names a category lands in it (found or created by name) and opens in "All entries". One without asks which dashboard it goes to — the dialog shows the detected title and lists the dashboards; the entry starts in that dashboard's first category and opens there. Cancelling aborts the import. `.emerald` entries keep their category by name and never ask.
+**Destination.** A file whose header names a category lands in it (found or created by name) and opens in "All entries". One without asks which dashboard it goes to — the dialog shows the detected title and lists the dashboards; the entry starts in that dashboard's first category, gets the first tag of its tag filter besides the file's own tags, and opens there. Cancelling aborts the import. `.emerald` entries keep their category by name and never ask.
 
 ### Vault Backup (`.emeralddb`)
 

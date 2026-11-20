@@ -23,7 +23,7 @@ import i18n from '../i18n';
 import { buildLinkItems, linkItemKey, linkItemsByKey } from './linkItems';
 import { extractInternalLinks, linkTargetKindOf, remapInternalLinks } from './internalLinkHtml';
 import { entryView } from '../store/entryViews';
-import { startCategoryOf } from './createItem';
+import { startCategoryOf, startTagsOf } from './createItem';
 import type { SuggestionItem } from '../components/editors/text/SuggestionList';
 import type { Category } from '../types';
 import type { WriteOptions } from './stamp';
@@ -757,6 +757,8 @@ async function importMarkdownEntry(
   const { createEntry, updateEntry } = useEntryStore.getState();
   const categoryId = await ensureCategoryByName(categoryName) ?? startCategoryOf(dashboardId);
   const entry = await createEntry({ categoryId, blank: true });
-  await updateEntry(entry.id, { title, content: sanitizeImportedHtml(html), tags: tagIds });
+  // Plus the dashboard's start tag, so the entry stays visible in it.
+  const tags = [...new Set([...tagIds, ...startTagsOf(dashboardId)])];
+  await updateEntry(entry.id, { title, content: sanitizeImportedHtml(html), tags });
   return entry.id;
 }

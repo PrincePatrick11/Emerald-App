@@ -51,7 +51,7 @@ export function startCategoryOf(dashboardId: string): string | null {
 }
 
 /** The tags a new entry created in a dashboard starts with: the first live one of its filter. */
-function startTagsOf(dashboardId: string): string[] {
+export function startTagsOf(dashboardId: string): string[] {
   const live = new Set(useTagStore.getState().tags.map((t) => t.id));
   const tag = firstTagOf(dashboardById(useDashboardStore.getState().dashboards, dashboardId), live);
   return tag ? [tag] : [];

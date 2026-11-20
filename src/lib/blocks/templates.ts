@@ -157,13 +157,14 @@ export function fieldsWithTemplate(
 /**
  * Title and tags without the template: the title becomes empty again if it is still
  * the template's; its tags are dropped — even one that the entry
- * already carried beforehand.
+ * already carried beforehand, except those in `keep` (a dashboard's start tag).
  */
 export function fieldsWithoutTemplate(
   fields: TemplateFields,
   template: Pick<Template, 'title' | 'tags'>,
+  keep: readonly string[] = [],
 ): TemplateFields {
-  const removed = new Set(template.tags);
+  const removed = new Set(template.tags.filter((tag) => !keep.includes(tag)));
   return {
     title: template.title.trim() && fields.title === template.title.trim() ? '' : fields.title,
     tags: fields.tags.filter((tag) => !removed.has(tag)),

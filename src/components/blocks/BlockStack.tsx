@@ -33,6 +33,7 @@ import { BLOCK_ATTR, TEXT_BLOCK_TYPE, type BlockAttrName, type BlockInstance } f
 import { useBlockSessionStore, type BlockStackApi } from '../../store/blockSessionStore';
 import { useTemplateNoticeStore } from '../../store/templateStore';
 import { useUIStore } from '../../store/uiStore';
+import { startTagsOf } from '../../lib/createItem';
 import { applyTemplateFields, undoTemplateFields } from '../../store/templateApply';
 import { areBlocksEmpty, instantiateTemplateBlocks, isTextBlockEmpty, type Template } from '../../lib/blocks/templates';
 import TemplateInsertion, { type TemplateTarget } from '../templates/TemplateInsertion';
@@ -361,9 +362,12 @@ export default function BlockStack({
   const undoTemplate = (template: Template) => {
     if (!templateTarget) return;
     commit([createTextBlock()]);
+    // The dashboard's start tag was there before the template: Undo leaves it.
+    const view = useUIStore.getState().activeView;
+    const keep = view.type === 'entry' && view.id === entryId ? startTagsOf(view.dashboard ?? 'all') : [];
     const { flush } = templateTarget;
     void flush()
-      .then(() => undoTemplateFields(entryId, template))
+      .then(() => undoTemplateFields(entryId, template, keep))
       .catch((e: unknown) => console.error('[BlockStack] undoing template fields failed:', e));
   };
 

@@ -14,7 +14,7 @@ Which template a new entry starts with is said by its category, not by the templ
 
 `createEntry` reads the start template of the entry's category from its row and starts from `startOfNewEntry(categoryTemplateId, blank)`, which resolves it with the vault's default and returns `{ title, content, tags, templateId }` via `templateStart`. Nothing applies with `blank` (imports and duplicates, which overwrite content anyway). The Sigils layout is no special case: `core-sigil` (`SIGIL_TEMPLATE_ID`) is a normal, editable, deletable template, seeded as the start template of the category Sigils (and `core-altar` as that of Altars). `createItem` opens the new entry for editing, or for reading if the template's loaded sigil locks the whole entry.
 
-`useTemplateNoticeStore` holds the "template applied" notice a new entry shows (Undo) — a store because the content stores set it and may not import a component. Undoing takes the template's title and tags back through `fieldsWithoutTemplate` (pure, no store reads).
+`useTemplateNoticeStore` holds the "template applied" notice a new entry shows (Undo) — a store because the content stores set it and may not import a component. Undoing takes the template's title and tags back through `fieldsWithoutTemplate` (pure, no store reads); the dashboard's start tag, passed as `keep`, stays.
 
 Creation is the only moment a start template applies by itself. Changing an entry's category never touches its content.
 
