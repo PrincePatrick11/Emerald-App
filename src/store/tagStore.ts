@@ -99,8 +99,9 @@ interface TagState {
   tags: Tag[];
 
   fetchTags: () => Promise<void>;
-  /** `id` only for a tag with a fixed ID ("Altar Library"), used when the name is new. */
-  ensureTag: (name: string, id?: string) => Promise<Tag>;
+  /** `id` only for a tag with a fixed ID ("Altar Library"), used when the name is new.
+   *  `newColor` colours only a tag that is really new; a namesake (live or from the trash) keeps its own. */
+  ensureTag: (name: string, id?: string, newColor?: string) => Promise<Tag>;
   /** Like ensureTag, but throws TAG_NAME_TAKEN instead of returning the
    *  existing tag. Without `color` the tag gets a random one from TAG_COLORS. */
   createTag: (name: string, color?: string) => Promise<Tag>;
@@ -117,7 +118,7 @@ interface TagState {
 
 export const useTagStore = create<TagState>((set, get) => {
   /** Returns the existing tag of the same name or creates it. */
-  const ensure = (name: string, { color, fixedId }: { color?: string; fixedId?: string } = {}): Promise<Tag> => serialized(NEW_TAG_KEY, async () => {
+  const ensure = (name: string, { color, fixedId, newColor }: { color?: string; fixedId?: string; newColor?: string } = {}): Promise<Tag> => serialized(NEW_TAG_KEY, async () => {
     const trimmed = name.trim();
     const existing = get().tags.find((t) => sameName(t.name, trimmed));
     if (existing) return existing;
@@ -131,7 +132,7 @@ export const useTagStore = create<TagState>((set, get) => {
     } else {
       // The fixed ID only while no row holds it (renamed, in the trash).
       const taken = fixedId ? (await db.select<{ n: number }[]>('SELECT COUNT(*) AS n FROM tags WHERE id=$1', [fixedId]))[0]?.n : 0;
-      tag = { id: fixedId && !taken ? fixedId : generateId(), name: trimmed, color: color ?? randomTagColor() };
+      tag = { id: fixedId && !taken ? fixedId : generateId(), name: trimmed, color: color ?? newColor ?? randomTagColor() };
       await db.execute('INSERT INTO tags (id, name, color) VALUES ($1, $2, $3)', [tag.id, tag.name, tag.color]);
     }
     set((s) => ({
@@ -156,7 +157,7 @@ export const useTagStore = create<TagState>((set, get) => {
       set({ tags: rows.map(fromRow.tag).sort(byName) });
     },
 
-    ensureTag: (name, id) => ensure(name, { fixedId: id }),
+    ensureTag: (name, id, newColor) => ensure(name, { fixedId: id, newColor }),
 
     createTag: async (name, color) => {
       // The check before the chain, not inside it: there it would throw through

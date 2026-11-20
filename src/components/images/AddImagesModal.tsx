@@ -12,7 +12,7 @@ import {
 import { OP_PROP_SELECT_CLASSES } from '../../lib/styleClasses';
 import Modal from '../ui/Modal';
 import Button from '../ui/Button';
-import TagInput from '../ui/TagInput';
+import TagInput, { commitDraftTags, type DraftTag } from '../ui/TagInput';
 
 /** A picture waiting in the dialog: stored already, its details still open. */
 interface Staged {
@@ -41,6 +41,8 @@ export default function AddImagesModal({ dropped, dragOver, initialTags, onClose
   const { t } = useTranslation();
   const [staged, setStaged] = useState<Staged[]>([]);
   const [tags, setTags] = useState<string[]>(() => initialTags ?? []);
+  // Tags typed here are created on adding, not before.
+  const [draftTags, setDraftTags] = useState<DraftTag[]>([]);
   const [busy, setBusy] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -75,8 +77,9 @@ export default function AddImagesModal({ dropped, dragOver, initialTags, onClose
 
   const add = async () => {
     const store = useImageStore.getState();
+    const finalTags = await commitDraftTags(tags, draftTags);
     for (const item of staged) {
-      const row = await store.takeIn(item.file, { name: item.name, tags });
+      const row = await store.takeIn(item.file, { name: item.name, tags: finalTags });
       // A name typed over the one it was staged with.
       const typed = item.name.trim();
       if (row && typed && typed !== item.staged.trim() && row.name !== typed) await store.updateImage(row.id, { name: typed });
@@ -143,7 +146,7 @@ export default function AddImagesModal({ dropped, dragOver, initialTags, onClose
       {(staged.length > 0 || !!initialTags?.length) && (
         <div>
           <p className="label-xs mb-1">{t('images.tagsForAll')}</p>
-          <TagInput tags={tags} onChange={setTags} flush />
+          <TagInput tags={tags} onChange={setTags} drafts={draftTags} onDraftsChange={setDraftTags} flush />
         </div>
       )}
     </Modal>

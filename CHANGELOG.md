@@ -14,6 +14,7 @@ Version 0.2.0 is a fresh start: the database, backups and `.emerald` files have 
 - **Calm block design.** In edit mode a block shows its type until you point at it; then its grip and "…" menu appear.
 - **Names are unique.** A name belongs to one tag or category; creating one whose name sits in the Trash brings that one back.
 - **Tags are real links.** Renaming a tag touches no entry; a tag in the Trash stays hidden on its entries and returns with them.
+- **A tag typed in a dialog is created on saving.** In a dashboard's settings and in "Add images" / "Edit image", a new tag name no longer becomes a tag at once; Cancel leaves no unused tag behind.
 
 ### Dashboards and navigation
 - **Dashboards.** "All entries" is what the app opens with; Journal, Practice and Knowledge are dashboards like your own. A dashboard lists entries chosen by category and tag, with a name, an icon, list, cards or timeline, sorting and grouping. The plus in the rail creates anything. A new entry made in a dashboard starts with the first tag of its filter, so it stays visible there.

@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { Plus, Trash2 } from 'lucide-react';
 import Modal from '../ui/Modal';
 import Button from '../ui/Button';
-import TagInput from '../ui/TagInput';
+import TagInput, { commitDraftTags, type DraftTag } from '../ui/TagInput';
 import FilterList from '../ui/FilterList';
 import Favicon from '../sidebar/fields/Favicon';
 import { OP_PROP_SELECT_CLASSES } from '../../lib/styleClasses';
@@ -47,6 +47,8 @@ function DashboardSettingsModal({ dashboard, onClose }: { dashboard: Dashboard; 
   const chooseIcon = (value: string) => { pendingIcon.current = shrinkIcon(value); };
   const [categoryIds, setCategoryIds] = useState<string[]>(dashboard.filter.categories ?? []);
   const [tags, setTags] = useState<string[]>(dashboard.filter.tags ?? []);
+  // Tags typed here are created on saving, not before.
+  const [draftTags, setDraftTags] = useState<DraftTag[]>([]);
   const [newCategory, setNewCategory] = useState('');
   const [categoryError, setCategoryError] = useState<string | null>(null);
 
@@ -54,7 +56,8 @@ function DashboardSettingsModal({ dashboard, onClose }: { dashboard: Dashboard; 
     await pendingIcon.current;
     // A dashboard of the user's own needs a name; a built-in falls back to its translated one.
     const nextName = name.trim() || (dashboard.builtin ? '' : dashboardLabel(t, dashboard));
-    await updateDashboard(dashboard.id, { name: nextName, icon, filter: { categories: categoryIds, tags } });
+    const finalTags = await commitDraftTags(tags, draftTags);
+    await updateDashboard(dashboard.id, { name: nextName, icon, filter: { categories: categoryIds, tags: finalTags } });
     onClose();
   };
 
@@ -144,7 +147,7 @@ function DashboardSettingsModal({ dashboard, onClose }: { dashboard: Dashboard; 
           <div>
             <p className="label-xs mb-1">{t('dashboards.filterTags')}</p>
             <p className="text-xs text-subtle mb-2">{t('dashboards.filterTagsHint')}</p>
-            <TagInput tags={tags} onChange={setTags} flush />
+            <TagInput tags={tags} onChange={setTags} drafts={draftTags} onDraftsChange={setDraftTags} flush />
           </div>
         </>
       )}

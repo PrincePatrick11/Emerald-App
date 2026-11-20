@@ -2,7 +2,10 @@ import { useState, useRef } from 'react';
 import { useShallow } from 'zustand/shallow';
 import { useTranslation } from 'react-i18next';
 import { Tag, X } from 'lucide-react';
-import { useTagMap, useTagStore, visibleTags } from '../../store/tagStore';
+import { randomTagColor, useTagMap, useTagStore } from '../../store/tagStore';
+import { generateId } from '../../lib/helpers';
+import { tagNameKey } from '../../lib/tagRefs';
+import type { Tag as TagRow } from '../../types';
 import { useSettingsStore } from '../../store/settingsStore';
 import { useUIStore } from '../../store/uiStore';
 import { useOutsideClick } from '../../hooks/useOutsideClick';
@@ -17,14 +20,40 @@ interface TagInputProps {
   chipSize?: 'default' | 'row';
   /** Flush with the fields around it (a dialog), instead of indented like the sidebar's rows. */
   flush?: boolean;
+  /** Dialogs that save later: a new name does not become a tag at once but a draft
+   *  with an ID of its own in `tags`; the caller creates it on saving (`commitDraftTags`). */
+  drafts?: DraftTag[];
+  onDraftsChange?: (drafts: DraftTag[]) => void;
 }
 
-export default function TagInput({ tags, onChange, readOnly = false, chipSize = 'default', flush = false }: TagInputProps) {
+export type DraftTag = Pick<TagRow, 'id' | 'name' | 'color'>;
+
+/** Creates the drafts still in `tags` and returns the list with their real IDs. */
+export async function commitDraftTags(tags: string[], drafts: DraftTag[]): Promise<string[]> {
+  const { ensureTag } = useTagStore.getState();
+  const result: string[] = [];
+  for (const id of tags) {
+    const draft = drafts.find((d) => d.id === id);
+    if (!draft) { result.push(id); continue; }
+    // ensureTag finds a tag of the same name, even one from the trash (keeping its own colour);
+    // the draft's colour only goes to a tag that is really new.
+    const tag = await ensureTag(draft.name, undefined, draft.color);
+    result.push(tag.id);
+  }
+  return [...new Set(result)];
+}
+
+export default function TagInput({ tags, onChange, readOnly = false, chipSize = 'default', flush = false, drafts, onDraftsChange }: TagInputProps) {
   const { t } = useTranslation();
   const { tags: allTags, ensureTag, getByName } = useTagStore(
     useShallow((s) => ({ tags: s.tags, ensureTag: s.ensureTag, getByName: s.getByName }))
   );
-  const shown = visibleTags(tags, useTagMap());
+  const activeDrafts = (drafts ?? []).filter((d) => tags.includes(d.id));
+  const tagMap = useTagMap();
+  // In the order of `tags`, drafts among the real ones.
+  const shown = tags
+    .map((id) => tagMap.get(id) ?? activeDrafts.find((d) => d.id === id))
+    .filter((tag): tag is DraftTag => !!tag);
   const createInline = useSettingsStore((s) => s.settings.tags.createInline);
   const setActiveView = useUIStore((s) => s.setActiveView);
   const [input, setInput] = useState('');
@@ -38,7 +67,8 @@ export default function TagInput({ tags, onChange, readOnly = false, chipSize = 
   );
 
   const trimmedInput = input.trim();
-  const inputMatchesTag = !!trimmedInput && !!getByName(trimmedInput);
+  const draftByName = (name: string) => activeDrafts.find((d) => tagNameKey(d.name) === tagNameKey(name));
+  const inputMatchesTag = !!trimmedInput && (!!getByName(trimmedInput) || !!draftByName(trimmedInput));
 
   const addTag = async (name: string) => {
     const trimmed = name.trim();
@@ -46,6 +76,14 @@ export default function TagInput({ tags, onChange, readOnly = false, chipSize = 
     // Without permission to create, only existing tags; the hint in the menu below
     // says where new ones come from.
     if (!createInline && !getByName(trimmed)) { setOpen(true); return; }
+    if (onDraftsChange && !getByName(trimmed)) {
+      const draft = draftByName(trimmed) ?? { id: generateId(), name: trimmed, color: randomTagColor() };
+      onDraftsChange([...activeDrafts.filter((d) => d.id !== draft.id), draft]);
+      onChange([...new Set([...tags, draft.id])]);
+      setInput('');
+      setOpen(false);
+      return;
+    }
     // ensureTag finds "foo" also as "Foo". Always write: if it fetches a
     // tag from the trash, it also takes it out of this entry, and the
     // list here would then be stale.
@@ -57,6 +95,7 @@ export default function TagInput({ tags, onChange, readOnly = false, chipSize = 
 
   const removeTag = (id: string) => {
     onChange(tags.filter((t) => t !== id));
+    if (drafts?.some((d) => d.id === id)) onDraftsChange?.(drafts.filter((d) => d.id !== id));
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -125,7 +164,7 @@ export default function TagInput({ tags, onChange, readOnly = false, chipSize = 
     </div>
   );
 
-  // Editing happens only in the sidebar (`TagsField`): the chips (24px,
+  // Editing happens in the sidebar (`TagsField`) and in dialogs (`flush`, with drafts): the chips (24px,
   // with a round "×") stand on their own, with the field "Add tag …" below.
   return (
     <div ref={wrapperRef} className="relative flex flex-col gap-1">

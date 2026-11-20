@@ -14,7 +14,7 @@ import { OP_PROP_SELECT_CLASSES } from '../../lib/styleClasses';
 import type { ActiveView, VaultImage } from '../../types';
 import Modal from '../ui/Modal';
 import Button from '../ui/Button';
-import TagInput from '../ui/TagInput';
+import TagInput, { commitDraftTags, type DraftTag } from '../ui/TagInput';
 
 /** The icon of a place of use: an entry, the templates, the custom blocks. */
 function iconOf(use: ImageUse) {
@@ -52,6 +52,8 @@ export default function ImageEditModal({ file, image, confirmDelete = false, onC
   const removable = uses.filter(isRemovableUse);
   const [name, setName] = useState(image?.name ?? '');
   const [tags, setTags] = useState<string[]>(image?.tags ?? []);
+  // Tags typed here are created on saving, not before.
+  const [draftTags, setDraftTags] = useState<DraftTag[]>([]);
   const [note, setNote] = useState(image?.note ?? '');
   const [asking, setAsking] = useState(confirmDelete);
   const [showing, setShowing] = useState(removable.length);
@@ -60,7 +62,8 @@ export default function ImageEditModal({ file, image, confirmDelete = false, onC
   useEffect(() => { void useImageStore.getState().refreshUses(); }, []);
 
   const save = async () => {
-    await useImageStore.getState().saveDetails(file, { name: name.trim(), tags, note });
+    const finalTags = await commitDraftTags(tags, draftTags);
+    await useImageStore.getState().saveDetails(file, { name: name.trim(), tags: finalTags, note });
     onClose();
   };
 
@@ -113,7 +116,7 @@ export default function ImageEditModal({ file, image, confirmDelete = false, onC
       />
       <div>
         <p className="label-xs mb-1">{t('nav.tags')}</p>
-        <TagInput tags={tags} onChange={setTags} flush />
+        <TagInput tags={tags} onChange={setTags} drafts={draftTags} onDraftsChange={setDraftTags} flush />
       </div>
       <div>
         <p className="label-xs mb-1">{t('images.note')}</p>
