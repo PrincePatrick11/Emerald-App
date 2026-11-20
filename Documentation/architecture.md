@@ -96,7 +96,7 @@ src/
 │   ├── useDraftPage.ts          draft lifecycle of block/template pages
 │   ├── useGlobalSearch.ts, useDeepLink.ts, useLinkItems.ts
 │   ├── useOutsideClick.ts, useCloseOnKeepEditing.ts, useHorizontalWheel.ts
-│   ├── useMouseNavigation.ts    mouse back/forward buttons, browser keys
+│   ├── useMouseNavigation.ts    mouse back/forward buttons, browser keys, ⌘[ / ⌘] on macOS
 │   ├── useCollapsedSet.ts, usePersistedFlag.ts, usePointerReorder.ts
 │   ├── useOpenInNewTabAction.tsx, useSaveAsTemplateAction.tsx
 │   ├── useVaultPictures.ts, useFileDrop.ts   the pictures of "Images"; files dropped from the disk
@@ -254,7 +254,7 @@ All Rust commands are *registered* in `src-tauri/src/lib.rs` and invoked from Ty
 | `update_settings()` / `set_update_settings(endpoint, auto_check)` | Read/write `{appDataDir}/update.json`, an installation-level setting like the automatic backup's `auto-backup.json`; the endpoint must be a complete `https` URL. See [`security.md` → In-App Updates](security.md#in-app-updates). |
 | `check_for_update()` / `install_update()` | Reach the network for updates — `tauri-plugin-updater`, driven from `updates.rs` rather than the plugin's JS API so the CSP needs no update host. `install_update` installs only the result `check_for_update` holds, then restarts. See [`security.md` → In-App Updates](security.md#in-app-updates). |
 
-Tauri menu events (not `invoke`) come from the native menu and are received in `AppShell` via `listen()`. On Windows and Linux there is no native menu — the HTML title-bar menus call the same actions directly through `src/lib/menuActions.ts`, so both run one implementation:
+Tauri menu events (not `invoke`) come from the native menu and are received in `AppShell` via `listen()`; the two `navigate-*` events at the end come from Rust's mouse hooks instead and are received in `useMouseNavigation`. On Windows and Linux there is no native menu — the HTML title-bar menus call the same actions directly through `src/lib/menuActions.ts`, so both run one implementation:
 
 | Event ID | Trigger |
 |---|---|
@@ -264,7 +264,7 @@ Tauri menu events (not `invoke`) come from the native menu and are received in `
 | `reset-sidebar-widths` | View > Reset View — resets the entry-list and right-sidebar widths **and** brings back a hidden rail, entry list and right sidebar (`uiStore.showAllPanels`; with the rail hidden, Settings and the start page would otherwise be unreachable) |
 | `toggle-view-lock` | View > Lock View — while on (`uiStore.viewLocked`, kept in localStorage), `AppShell` renders no resize handle on either sidebar; hiding and showing them and Reset View still work |
 | `show-splash` | View > Show Loading Screen |
-| `navigate-back` | Mouse back button (macOS NSEvent monitor; Windows and Linux read the button in the page — see [Navigation History](architecture/navigation.md#navigation-history)) |
+| `navigate-back` | Mouse back, from Rust rather than a menu: macOS NSEvent monitor; on Windows mouse software's `WM_APPCOMMAND`, via `install_app_command_hook`. A raw button press on Windows and Linux never becomes this event — the page reads it directly, see [Navigation History](architecture/navigation.md#navigation-history) |
 | `navigate-forward` | Mouse forward button (same) |
 
 Only `reset-sidebar-widths` is emitted from the frontend as well — the HTML menu re-emits it so `AppShell`'s listener handles it identically on both platforms; the other menu actions run directly through `runMenuAction`.

@@ -1,9 +1,9 @@
 use base64::{engine::general_purpose, Engine as _};
 use std::path::{Path, PathBuf};
 use tauri::Manager;
-// Every `emit` call site (the native menu's events and the mouse-navigation
-// monitor) is macOS-only, so the trait is too.
-#[cfg(target_os = "macos")]
+// The `emit` call sites are the native menu's events and the mouse-navigation
+// hooks — macOS and Windows only, so the trait is too.
+#[cfg(any(target_os = "macos", target_os = "windows"))]
 use tauri::Emitter;
 #[cfg(target_os = "macos")]
 use tauri::menu::{CheckMenuItem, Menu, MenuItem, PredefinedMenuItem, Submenu};
@@ -625,6 +625,59 @@ fn install_mouse_nav_monitor(app_handle: tauri::AppHandle) {
     }
 }
 
+// ── Windows mouse back/forward via app commands ───────────────────────────────
+
+/// Mouse drivers such as Logi Options+ or the Microsoft mouse software often
+/// send the thumb buttons as `WM_APPCOMMAND` (browser back/forward) instead of
+/// a button press. WebView2 ignores those, and they bubble up from the focused
+/// child window to the top-level one — so it is caught there and emitted as
+/// the same `navigate-back`/`navigate-forward` the macOS monitor sends. A raw
+/// thumb-button press reaches the page as a mouse event and is handled there;
+/// WebView2 marks it (and the `BrowserBack` key) handled, so it produces no
+/// app command here as well and still steps only once.
+#[cfg(target_os = "windows")]
+fn install_app_command_hook(window: &tauri::WebviewWindow) {
+    use std::sync::OnceLock;
+    use windows::Win32::Foundation::{HWND, LPARAM, LRESULT, WPARAM};
+    use windows::Win32::UI::Shell::{DefSubclassProc, SetWindowSubclass};
+    use windows::Win32::UI::WindowsAndMessaging::WM_APPCOMMAND;
+
+    const APPCOMMAND_BROWSER_BACKWARD: u32 = 1;
+    const APPCOMMAND_BROWSER_FORWARD: u32 = 2;
+    /// The device bits in the high word of `lParam` (mouse, key, OEM).
+    const FAPPCOMMAND_MASK: u32 = 0xF000;
+    const SUBCLASS_ID: usize = 1;
+    static APP: OnceLock<tauri::AppHandle> = OnceLock::new();
+
+    unsafe extern "system" fn app_command_proc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM, _id: usize, _data: usize) -> LRESULT {
+        if msg == WM_APPCOMMAND {
+            // GET_APPCOMMAND_LPARAM: the high word without the device bits.
+            let command = ((lparam.0 as u32) >> 16) & !FAPPCOMMAND_MASK;
+            let event = match command {
+                APPCOMMAND_BROWSER_BACKWARD => Some("navigate-back"),
+                APPCOMMAND_BROWSER_FORWARD => Some("navigate-forward"),
+                _ => None,
+            };
+            if let (Some(event), Some(app)) = (event, APP.get()) {
+                app.emit(event, ()).ok();
+                // Handled: nothing further up should act on it.
+                return LRESULT(1);
+            }
+        }
+        unsafe { DefSubclassProc(hwnd, msg, wparam, lparam) }
+    }
+
+    let _ = APP.set(window.app_handle().clone());
+    match window.hwnd() {
+        Ok(hwnd) => unsafe {
+            if !SetWindowSubclass(HWND(hwnd.0), Some(app_command_proc), SUBCLASS_ID, 0).as_bool() {
+                eprintln!("[mouse-nav] could not subclass the window for app commands");
+            }
+        },
+        Err(e) => eprintln!("[mouse-nav] no window handle for app commands: {e}"),
+    }
+}
+
 /// Mirrors the frontend's sidebar visibility and view lock onto the View
 /// menu's check items. Called on every change, because the rail's own toggle buttons can
 /// flip the same state without the menu ever being opened.
@@ -890,12 +943,17 @@ pub fn run() {
             // What a crashed PDF export left in the temp folder — an entry would
             // sit there in plain text.
             tauri::async_runtime::spawn_blocking(pdf_export::sweep_leftovers);
-            // Both of these are macOS-only; `_app` keeps the parameter from
-            // reading as unused on the platforms where the block is empty.
+            // The next two blocks are macOS- and Windows-only; `_app` keeps the
+            // parameter from reading as unused on Linux, where both are empty.
             #[cfg(target_os = "macos")]
             {
                 install_mouse_nav_monitor(_app.handle().clone());
                 install_native_menu(_app)?;
+            }
+            #[cfg(target_os = "windows")]
+            match _app.get_webview_window("main") {
+                Some(window) => install_app_command_hook(&window),
+                None => eprintln!("[mouse-nav] no main window for app commands"),
             }
             Ok(())
         })
