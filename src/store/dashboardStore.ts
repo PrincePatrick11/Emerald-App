@@ -5,12 +5,17 @@
  * (into the trash). The store also keeps the category IDs in their filters
  * in step with the categories.
  *
- * Import rule: imports no other store.
+ * Create, update, delete and reorder: a failed write puts the state back (or
+ * never sets it) and reports through `saveNoticeStore` instead of throwing.
+ * Restore and permanent delete throw — the trash and undo handle their errors.
+ *
+ * Import rule: imports no other store except the leaf `saveNoticeStore`.
  */
 import { create } from 'zustand';
 import { getDb } from '../lib/db';
 import { generateId, nowIso } from '../lib/helpers';
 import { fromRow, type DbRow } from '../lib/row';
+import { reportSaveError } from './saveNoticeStore';
 import { DEFAULT_DISPLAY, normalizeFilter } from '../lib/dashboards';
 import type { Dashboard, DashboardDisplay, DashboardFilter, DashboardSort } from '../types';
 
@@ -27,10 +32,11 @@ interface DashboardState {
   /** The active dashboards in their order. */
   dashboards: Dashboard[];
   fetchDashboards: () => Promise<void>;
-  createDashboard: (name: string) => Promise<Dashboard>;
+  /** `null` if it could not be saved. */
+  createDashboard: (name: string) => Promise<Dashboard | null>;
   updateDashboard: (id: string, patch: DashboardPatch) => Promise<void>;
-  /** Into the trash — "All entries" cannot go. */
-  deleteDashboard: (id: string) => Promise<void>;
+  /** Into the trash — "All entries" cannot go. `false` if nothing was deleted or it could not be saved. */
+  deleteDashboard: (id: string) => Promise<boolean>;
   /** Out of the trash — to the end of the rail, or with `keepPlace` (Undo) where it was. */
   restoreDashboard: (id: string, options?: { keepPlace?: boolean }) => Promise<void>;
   permanentlyDeleteDashboard: (id: string) => Promise<void>;
@@ -48,31 +54,37 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
   },
 
   createDashboard: async (name) => {
-    const db = await getDb();
-    const now = nowIso();
-    // After every row.
-    const [{ max }] = await db.select<{ max: number | null }[]>('SELECT MAX(position) AS max FROM dashboards');
-    const dashboard: Dashboard = {
-      id: generateId(),
-      builtin: null,
-      name: name.trim(),
-      icon: '',
-      position: (max ?? 0) + 1,
-      filter: {},
-      sort: { by: 'updated', dir: 'desc' },
-      display: DEFAULT_DISPLAY,
-      created_at: now,
-      updated_at: now,
-      deleted_at: null,
-    };
-    await db.execute(
-      `INSERT INTO dashboards (id, builtin, name, icon, position, filter, sort, display, created_at, updated_at)
-       VALUES ($1, NULL, $2, $3, $4, $5, $6, $7, $8, $8)`,
-      [dashboard.id, dashboard.name, dashboard.icon, dashboard.position, JSON.stringify(dashboard.filter),
-        JSON.stringify(dashboard.sort), JSON.stringify(dashboard.display), now],
-    );
-    set((s) => ({ dashboards: [...s.dashboards, dashboard] }));
-    return dashboard;
+    try {
+      const db = await getDb();
+      const now = nowIso();
+      // After every row.
+      const [{ max }] = await db.select<{ max: number | null }[]>('SELECT MAX(position) AS max FROM dashboards');
+      const dashboard: Dashboard = {
+        id: generateId(),
+        builtin: null,
+        name: name.trim(),
+        icon: '',
+        position: (max ?? 0) + 1,
+        filter: {},
+        sort: { by: 'updated', dir: 'desc' },
+        display: DEFAULT_DISPLAY,
+        created_at: now,
+        updated_at: now,
+        deleted_at: null,
+      };
+      await db.execute(
+        `INSERT INTO dashboards (id, builtin, name, icon, position, filter, sort, display, created_at, updated_at)
+         VALUES ($1, NULL, $2, $3, $4, $5, $6, $7, $8, $8)`,
+        [dashboard.id, dashboard.name, dashboard.icon, dashboard.position, JSON.stringify(dashboard.filter),
+          JSON.stringify(dashboard.sort), JSON.stringify(dashboard.display), now],
+      );
+      // Only after the write: a dashboard that is not in the database must not show.
+      set((s) => ({ dashboards: [...s.dashboards, dashboard] }));
+      return dashboard;
+    } catch (err) {
+      reportSaveError(err, 'dashboards');
+      return null;
+    }
   },
 
   updateDashboard: async (id, patch) => {
@@ -88,19 +100,31 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
     };
     // First in memory: sort and layout buttons answer at once.
     set((s) => ({ dashboards: s.dashboards.map((d) => (d.id === id ? next : d)) }));
-    const db = await getDb();
-    await db.execute(
-      'UPDATE dashboards SET name=$1, icon=$2, filter=$3, sort=$4, display=$5, updated_at=$6 WHERE id=$7',
-      [next.name, next.icon, JSON.stringify(next.filter), JSON.stringify(next.sort), JSON.stringify(next.display), next.updated_at, id],
-    );
+    try {
+      const db = await getDb();
+      await db.execute(
+        'UPDATE dashboards SET name=$1, icon=$2, filter=$3, sort=$4, display=$5, updated_at=$6 WHERE id=$7',
+        [next.name, next.icon, JSON.stringify(next.filter), JSON.stringify(next.sort), JSON.stringify(next.display), next.updated_at, id],
+      );
+    } catch (err) {
+      // Back to what the database still holds — unless a later change has replaced `next` meanwhile.
+      set((s) => ({ dashboards: s.dashboards.map((d) => (d === next ? current : d)) }));
+      reportSaveError(err, 'dashboards');
+    }
   },
 
   deleteDashboard: async (id) => {
     const dashboard = get().dashboards.find((d) => d.id === id);
-    if (!dashboard || dashboard.builtin === 'all') return;
-    const db = await getDb();
-    await db.execute('UPDATE dashboards SET deleted_at=$1 WHERE id=$2', [nowIso(), id]);
-    set((s) => ({ dashboards: s.dashboards.filter((d) => d.id !== id) }));
+    if (!dashboard || dashboard.builtin === 'all') return false;
+    try {
+      const db = await getDb();
+      await db.execute('UPDATE dashboards SET deleted_at=$1 WHERE id=$2', [nowIso(), id]);
+      set((s) => ({ dashboards: s.dashboards.filter((d) => d.id !== id) }));
+      return true;
+    } catch (err) {
+      reportSaveError(err, 'dashboards');
+      return false;
+    }
   },
 
   restoreDashboard: async (id, { keepPlace = false } = {}) => {
@@ -125,13 +149,20 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
   },
 
   reorderDashboards: async (ids) => {
-    const byId = new Map(get().dashboards.map((d) => [d.id, d]));
+    const before = get().dashboards;
+    const byId = new Map(before.map((d) => [d.id, d]));
     const ordered = ids.map((id) => byId.get(id)).filter((d): d is Dashboard => !!d);
-    if (ordered.length !== get().dashboards.length) return;
+    if (ordered.length !== before.length) return;
     const positioned = ordered.map((d, position) => ({ ...d, position }));
     set({ dashboards: positioned });
-    const db = await getDb();
-    await db.batch(positioned.map((d) => ['UPDATE dashboards SET position=$1 WHERE id=$2', [d.position, d.id]] as const));
+    try {
+      const db = await getDb();
+      await db.batch(positioned.map((d) => ['UPDATE dashboards SET position=$1 WHERE id=$2', [d.position, d.id]] as const));
+    } catch (err) {
+      // Back to the old order — unless a later change has replaced it meanwhile.
+      if (get().dashboards === positioned) set({ dashboards: before });
+      reportSaveError(err, 'dashboards');
+    }
   },
 }));
 

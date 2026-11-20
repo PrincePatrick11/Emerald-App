@@ -22,6 +22,7 @@ Version 0.2.0 is a fresh start: the database, backups and `.emerald` files have 
 - **A new window shell.** Title bar with the tabs, a rail grouped by purpose, one left entry list (All entries, a dashboard or Tasks — chosen in Settings), collapsible right sidebars that read the same in reading and edit mode, one shared empty and "no matches" state.
 - **A dashboard whose categories are all deleted or in the Trash shows nothing,** instead of every entry; saving only its name or icon leaves its filter alone.
 - **Tags in a dashboard's filter are not "unused" in Tags.** The usage filter reads In entries / Only elsewhere / Nowhere, and an open tag names the dashboards that use it.
+- **A dashboard change that cannot be saved is undone and reported.** If creating, changing, reordering or deleting a dashboard fails to reach the database, the dashboard goes back to what is stored and a notice says so, instead of showing a state that is gone after a restart.
 - **Middle click on a link chip in the text opens its target in a new tab,** in reading and edit mode; the current entry stays as it is.
 - **After opening a tag, category, task or image from a search hit, the search and filters you set there stay** when you switch tabs or step Back and Forward; an opened subtask stays expanded.
 - **Lists remember how you left them,** per vault. The mouse's back and forward buttons work on every system.

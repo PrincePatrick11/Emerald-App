@@ -1,5 +1,6 @@
 {
   "common": {
+    "saveFailed": "Impossible d’enregistrer la modification ; elle a été annulée.",
     "delete": "Supprimer",
     "confirmSure": "Sûr ?",
     "confirmYes": "Oui, supprimer",

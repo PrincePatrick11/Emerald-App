@@ -1,5 +1,6 @@
 {
   "common": {
+    "saveFailed": "Änderung konnte nicht gespeichert werden – sie wurde zurückgenommen.",
     "delete": "Löschen",
     "confirmSure": "Sicher?",
     "confirmYes": "Ja, löschen",

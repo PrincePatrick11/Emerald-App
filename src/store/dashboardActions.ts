@@ -21,7 +21,8 @@ export async function deleteDashboardWithUndo(id: string): Promise<void> {
   const store = useDashboardStore.getState();
   const dashboard = store.dashboards.find((d) => d.id === id);
   if (!dashboard || dashboard.builtin === 'all') return;
-  await store.deleteDashboard(id);
+  // The write failed and the store kept it: nothing to undo, nothing to leave.
+  if (!(await store.deleteDashboard(id))) return;
   useUndoStore.getState().push({
     id: generateId(),
     description: i18n.t('undo.dashboardDeleted'),
@@ -38,6 +39,7 @@ export async function deleteDashboardWithUndo(id: string): Promise<void> {
 export async function createDashboardAndOpen(): Promise<void> {
   if (useUIStore.getState().editLocked || !(await confirmLeave())) return;
   const dashboard = await useDashboardStore.getState().createDashboard(i18n.t('dashboards.defaultName'));
+  if (!dashboard) return;
   useUIStore.getState().setActiveView({ type: 'dashboard', id: dashboard.id });
   openDashboardSettings(dashboard.id);
 }

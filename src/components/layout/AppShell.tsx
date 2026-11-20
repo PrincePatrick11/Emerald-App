@@ -22,6 +22,7 @@ import { ensureVaultReady, VAULT_KEY_CANCELLED } from '../../store/vaultKeyStore
 import { keyErrorOf, lockVault } from '../../lib/vaultKeys';
 import { vaultOpenErrorKey } from '../../lib/db';
 import UndoToast from '../ui/UndoToast';
+import SaveNoticeToast from '../ui/SaveNoticeToast';
 import { DashboardSettingsHost } from '../views/DashboardSettingsModal';
 import ImageNoticeModal from '../ui/ImageNoticeModal';
 import { ImagePickerHost } from '../images/ImagePickerModal';
@@ -453,6 +454,7 @@ export default function AppShell() {
 
       <DashboardSettingsHost />
       <UndoToast />
+      <SaveNoticeToast />
       <ImageNoticeModal />
       <ImagePickerHost />
       <LeaveGuardModal />

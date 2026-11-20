@@ -1,5 +1,6 @@
 {
   "common": {
+    "saveFailed": "No se pudo guardar el cambio; se ha deshecho.",
     "delete": "Eliminar",
     "confirmSure": "¿Seguro?",
     "confirmYes": "Sí, eliminar",

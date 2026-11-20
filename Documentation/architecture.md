@@ -83,7 +83,7 @@ src/
 │   ├── sessionStore.ts          per-view search/filter state (session only)
 │   ├── vaultPrefs.ts            per-vault list and layout preferences
 │   ├── settingsStore.ts         the open vault's settings.json
-│   ├── vaultStore.ts, trashStore.ts, undoStore.ts, importStore.ts
+│   ├── vaultStore.ts, trashStore.ts, undoStore.ts, saveNoticeStore.ts, importStore.ts
 │   ├── vaultKeyStore.ts         the unlock gate (`ensureVaultReady`)
 │   ├── backupSecretStore.ts     asks for an encrypted backup's password
 │   ├── imageStore.ts            "Images": rows, files, places of use; `takeIn`, `discardRenders`

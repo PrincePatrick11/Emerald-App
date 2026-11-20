@@ -1,5 +1,6 @@
 {
   "common": {
+    "saveFailed": "Could not save the change — it was undone.",
     "delete": "Delete",
     "confirmSure": "Sure?",
     "confirmYes": "Yes, delete",
