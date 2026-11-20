@@ -16,13 +16,20 @@ interface DeepLinkOptions<T extends { id: string }> {
   onOpen: (target: T) => void;
 }
 
+/** Deep links already acted on. Module level, not per mounted view: a tab switch
+ *  or a history step mounts the view again with the very same `activeView`
+ *  object (`stripSessionFlags` keeps it identical), and that must not clear the
+ *  search and filters the user has typed since. A `WeakSet`, so marks go away
+ *  with the views that drop out of history. */
+const handledViews = new WeakSet<object>();
+
 /**
  * The deep link from global search for views without their own detail page:
  * `{ type, id }` brings the row into view.
  *
  * It is triggered by the `activeView` *object*, not by the id inside it:
- * `setActiveView` creates a fresh one on every navigation, so the same hit
- * works twice in a row. `handledView` remembers which object was already
+ * `setActiveView` creates a fresh one on every new navigation, so the same hit
+ * works twice in a row; a tab switch or a history step hands back the stored one. `handledViews` remembers which objects were already
  * handled — so `items` may stay in the dependencies without a later change
  * clearing the user's filters.
  *
@@ -41,15 +48,14 @@ export function useDeepLink<T extends { id: string }>({
   onOpenRef.current = onOpen;
 
   const activeView = useUIStore((s) => s.activeView);
-  const handledView = useRef<typeof activeView | null>(null);
   const [pendingScrollId, setPendingScrollId] = useState<string | null>(null);
 
   useEffect(() => {
     if (activeView.type !== type || !activeView.id) return;
-    if (handledView.current === activeView) return;
+    if (handledViews.has(activeView)) return;
     const target = items.find((item) => item.id === activeView.id);
     if (!target) return;
-    handledView.current = activeView;
+    handledViews.add(activeView);
     onOpenRef.current(target);
     setPendingScrollId(target.id);
   }, [activeView, type, items]);

@@ -67,7 +67,7 @@ export default function TasksView() {
   const [ctxMenu, setCtxMenu] = useState<{ id: string; x: number; y: number; actions: ContextMenuAction[] } | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editValue, setEditValue] = useState('');
-  const [expandedTasks, setExpandedTasks] = useState<Set<string>>(new Set());
+  const [expandedTasks, setExpandedTasks] = useSessionState<Set<string>>('tasks.expanded', new Set());
   const [searchQuery, setSearchQuery] = useSessionState('tasks.search', '');
   const [filterCategory, setFilterCategory] = useSessionState<Set<string>>('tasks.filterCategory', new Set());
   const [filterPriority, setFilterPriority] = useSessionState<Set<string>>('tasks.filterPriority', new Set());

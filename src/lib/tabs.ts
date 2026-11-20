@@ -24,9 +24,12 @@ export function createTabId(): string {
 /**
  * isNew does not go into the history: if one came back to the fresh edit view
  * via Back (or after a restart), Cancel would permanently delete an
- * entry that was autosaved long ago.
+ * entry that was autosaved long ago. Returns `view` itself when there is
+ * nothing to strip: `useDeepLink` marks handled deep links by object, and a
+ * copy would make Back replay them.
  */
 export function stripSessionFlags(view: ActiveView): ActiveView {
+  if (!('isNew' in view)) return view;
   const { isNew: _isNew, ...rest } = view;
   return rest;
 }
