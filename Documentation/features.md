@@ -326,7 +326,7 @@ Multi-word entries match as a phrase ("I am" → ZIRDO), capitalisation carries 
 
 **Search.** The global search finds languages and single words — see [Search](#search).
 
-**Backups.** Languages and their words travel in `.emeralddb` backups under their own "Lexicon" choice, on export and import.
+**Backups.** Languages and their words travel in `.vault.emerald` backups under their own "Lexicon" choice, on export and import.
 
 ## Trash
 
@@ -353,17 +353,17 @@ A vault is a **folder** you choose, holding its own encrypted database and its o
 
 **Vaults of other versions.** A vault made by an earlier version of Emerald — one from before the fresh start of the database in this version, an unencrypted one included — is not opened: the start page says it comes from an older version and that a converter will follow, and the vault stays exactly as it was. A vault made by a newer version is refused the same way, with a hint to update. Vault records of an installation from before per-vault folders are not listed.
 
-The start page is one page without tabs. On the left the name, the tagline, links to the website, GitHub, Patreon and Discord, and at the bottom the version and the author; its edge to the page can be dragged, as the entry list's can. Beside it, each under a heading with its icon: **Vaults**, a tile for every vault, and below it two columns: on the left, stacked, **Server** (a placeholder, see [Sync](#sync)) and **Store** (a placeholder: a store for discovering and sharing templates, blocks, themes and entry packs comes in v0.3.0; nothing to act on, no network access), on the right **Appearance** (the [theme](#theming) as small pictures, custom themes included). At the bottom of the page the [language](#language) on the left, the [updates](#updates) on the right. **Emerald → About Emerald App** opens it.
+The start page is one page without tabs. On the left the name, the tagline, links to the website, GitHub, Patreon and Discord, and at the bottom the version and the author; its edge to the page can be dragged, as the entry list's can. Beside it, each under a heading with its icon: **Vaults**, a tile for every vault, and below it two columns: on the left, stacked, **Server** (a placeholder, see [Sync](#sync)) and **Store** (a placeholder: a store for discovering and sharing templates, blocks, themes and entry packs comes in v0.3.0; nothing to act on, no network access), on the right **Appearance** (the [theme](#theming) as small pictures, custom themes included), then the **Automatic backup** of the ticked vaults (see [Vault Backup](#vault-backup-vaultemerald)). At the bottom of the page the [language](#language) on the left, the [updates](#updates) on the right. **Emerald → About Emerald App** opens it.
 
 - Each tile is a vault, with "only here" under its name. Clicking a tile opens that vault; the open vault's tile is tinted and marked open. Opening a locked vault asks for its password first, in the picker; cancelling leaves you there. The folder shows when you point at a row.
 - **New Vault** (the last tile) creates an empty one. Give it a name and optionally an icon; the row that opens shows live where it will land — by default `Documents/Emerald Vaults/{name}`, with a folder picker to choose elsewhere and a reset button. The target folder has to be empty: sharing it with unrelated files would make deleting them ambiguous later. Opening the new vault asks for its password.
 - **Open vault** (at the top right of the section) adds a vault that already exists on disk: pick its `emerald.db` file (not the folder — a folder dialog can't show whether one is there), and it joins the list under its folder's name. This is how you take over a vault from another machine or re-add one you removed.
-- **Edit** and **Delete** appear in a tile's corner when you point at it. Edit works in the tile itself; Delete opens as a row in its place. Edit changes name and icon together. Delete asks for confirmation and offers **"Delete the files as well"** (off by default). It removes the vault's own files — database, its journal, images, the key file, and an empty `backup/` — but leaves anything else (an exported backup, a stray system file) and with it the folder; the picker then says so, making clear the database is gone either way. A folder that stayed can't host a *new* vault until it is emptied. Any vault can be deleted, including the active one (Emerald switches to another) and the last one (the picker then has nothing to go back to).
+- **Edit** and **Delete** appear in a tile's corner when you point at it. Edit works in the tile itself; Delete opens as a row in its place. Edit changes name and icon together. Delete asks for confirmation and offers **"Delete the files as well"** (off by default). It removes the vault's own files — database, its journal, images, the key file, and an empty `backups/` — but leaves anything else (an exported backup, a stray system file) and with it the folder; the picker then says so, making clear the database is gone either way. A folder that stayed can't host a *new* vault until it is emptied. Any vault can be deleted, including the active one (Emerald switches to another) and the last one (the picker then has nothing to go back to).
 - A vault whose folder moved or is on a disconnected drive is marked **Folder not found** and can't be switched to; a folder button lets you point it at the new location (again via its `emerald.db`). Emerald deliberately doesn't recreate a missing folder — SQLite would put a fresh, empty database in it, and the vault would come back looking empty instead of telling you something is wrong.
 - A vault Emerald is not *allowed* to read is marked **No access** and gets no relocate button — the folder is where you left it. On macOS this is what `~/Documents`, `~/Desktop` and iCloud folders look like until you grant access in System Settings › Privacy & Security; picking the `.db` file in the open dialog does not grant it.
 - A vault in iCloud Drive, Dropbox or OneDrive works, but SQLite in a synchronised folder can be damaged if the sync client touches the file mid-write.
 
-New vaults are not switched to automatically — except while no vault is open, where the new one is opened right away. Importing a `.emeralddb` backup in Add Vault mode also creates a vault, filled from the backup — see [Vault Backup](#vault-backup-emeralddb).
+New vaults are not switched to automatically — except while no vault is open, where the new one is opened right away. Importing a `.vault.emerald` backup in Add Vault mode also creates a vault, filled from the backup — see [Vault Backup](#vault-backup-vaultemerald).
 
 ### Sync
 
@@ -390,84 +390,106 @@ Every vault is encrypted: entries, images, drafts and backups are unreadable wit
 **What encryption does not do.**
 
 - While a vault is unlocked, its content is in the computer's memory. Encryption protects a vault at rest, not a running session.
-- Files that already left the vault stay as they are: backups exported before encryption and kept elsewhere, Markdown, PDF and `.emerald` exports, and old versions kept by a cloud service. Deleted files can sometimes be recovered from an SSD — only an encrypted disk (BitLocker, FileVault) closes that gap.
+- Files that already left the vault stay as they are: backups exported before encryption and kept elsewhere, Markdown, PDF, HTML and unprotected `.emerald` exports, and old versions kept by a cloud service. Deleted files can sometimes be recovered from an SSD — only an encrypted disk (BitLocker, FileVault) closes that gap.
 - The password cannot be recovered. Without the password and the recovery key, the vault is gone.
 
 ## Export and Import
 
-All export and import actions are in the application menu — on macOS the native menu bar, on Windows and Linux the app's own title bar, with the same items and rules.
+Export and Import are two buttons in the title bar, on every platform. **Export** opens the export menu; **Import** is a small menu (From Markdown…, From Emerald…).
 
-> **Exports show an entry the way read mode does.** Markdown and PDF render each block on its own: hidden blocks are left out, field blocks list only the fields read mode shows (label and value), block titles appear as headings where read mode shows them, and a sigil exports its intention and letters, its drawing (in Markdown a placeholder) and its charge. While a sigil is charged and its reveal date not reached, calculator and drawing are left out of these exports. A `.emerald` file carries the sigil as it is, still concealed. Import is unaffected.
+### The export menu
+
+One dialog for every export. On top it asks **what** — the **scope** — and **how much to decide** — the **level**:
+
+- **This entry** — the entry on screen (only offered while one is open; on a template's page it reads **This template** and writes `.emerald` only).
+- **Collection** — several entries in one file. Under **Normal** they are what a dashboard shows, created within a period: last 7 days, last 30 days, this month, or all. Under **Advanced** they come either from a dashboard or from an own filter of categories and tags that works exactly like a dashboard's filter, and the period can be a custom from–to range; a list shows the entries, each can be ticked off.
+- **Whole database** — the vault's content as a `.vault.emerald` (see [Vault Backup](#vault-backup-vaultemerald)).
+
+The period counts from the day an entry was created; a custom period chosen under Advanced stays in force under Normal (a note says so) until another one is picked. **Include linked entries** adds the entries the chosen ones link to (not those in the Trash, never one ticked off the collection).
+
+| Setting | Normal | Advanced |
+|---|---|---|
+| Linked entries | only the directly linked | direct only, or all (also what the linked ones link to); a list to tick them off |
+| Order | oldest first | oldest or newest first |
+| Pictures (PDF, HTML, `.emerald`) | balanced | original, balanced, strong, or left out — optionally a level of their own for the linked entries |
+| Custom blocks (`.emerald`) | along | along or not |
+| Font and size (PDF, HTML) | the vault's editor font and text size (Settings → General) | one of the app's eight fonts, or Georgia, Times New Roman, Arial, Verdana; 14–22 px |
+| Whole database | everything except the Trash | entries by category, tasks, tags, lexicon, settings, the Trash, a period |
+
+The formats are PDF, HTML, Markdown and `.emerald`; the whole database is always a `.vault.emerald`. A `.emerald` or `.vault.emerald` gets a **protection**: the vault's password (opens with the vault's password or recovery key), an own password (at least 8 characters, typed twice), or none. The menu remembers every choice for the next time — dashboard, filter and database contents per vault — except a password and "none", which has to be picked again each time; an unprotected database export is not offered the vault's own `backups/` folder. Cancelling the save dialog leaves the menu open.
+
+> **Exports show an entry the way read mode does.** Markdown, PDF and HTML render each block on its own: hidden blocks are left out, field blocks list only the fields read mode shows (label and value), block titles appear as headings where read mode shows them, and a sigil exports its intention and letters, its drawing (in Markdown a placeholder) and its charge. While a sigil is charged and its reveal date not reached, calculator and drawing are left out of these exports. A `.emerald` file carries the sigil as it is, still concealed. Import is unaffected.
 
 ### PDF Export
 
-A native save dialog asks for the destination and the PDF is written directly — no preview and no print dialog. It is rendered by the app's own webview, so emoji come out as proper colour glyphs. The suggested filename is `<Title>_YYYY-MM-DD.pdf`. Images are embedded; internal link chips appear as styled text.
+A native save dialog asks for the destination and the PDF is written directly — no preview and no print dialog. It is rendered by the app's own webview, so emoji come out as proper colour glyphs. The suggested filename is `<Title>_YYYY-MM-DD.pdf`; a collection of several entries is `Emerald_<Dashboard>_<from>_<to>.pdf` (`Export` for an own filter, no dates for "all"). The page is A4 on every system. Several entries go into one PDF, one after another, each starting on a new page. Images are embedded at the chosen level (or left out); internal link chips appear as styled text. Title and text are set in the chosen font and size; an app font is embedded in the PDF, so it looks the same everywhere. Background colours — link chips, tags, code — are kept in the PDF, on macOS and Windows.
 
-**Export → Export as PDF…** is available while an entry is open; it is disabled elsewhere (dashboards, Tags, Trash …).
+### HTML Export
+
+Saves one self-contained `.html` file that opens in any browser, also offline: pictures (at the chosen level) and an app font are embedded, and nothing is fetched from the network. The suggested filename follows the PDF's. It has light and dark (following the system until switched), Print, and an outline of the open entry's headings on wide windows. Without a `#` link it opens on the first entry of its sidebar. With several entries a sidebar lists them grouped by category, in the app's order of categories (entries without one last), sorted by date — the sort button flips it — with a search over titles and text that counts and highlights the hits (`/` jumps into it). A link chip to an entry in the same file jumps there; one to an entry outside is shown dashed. Under each entry, **Links to** and **Linked from** list the entries of the file it links to and that link to it. A Georgia, Times New Roman, Arial or Verdana font is the reader's own; where it is missing a similar one takes over.
 
 ### Markdown Export
 
-Saves a `.md` file: the `# Title`, a header with date, moon phase (when shown), category and tags, then `---` and the entry body. Images are left out; a block image (the sigil drawing, an image field) leaves its label as a placeholder, `*[Label]*`. Internal link chips become `[[Title]]` wiki links — an entry's links live in its body.
+Saves a `.md` file: the `# Title`, a header with date, moon phase (when shown), category and tags, then `---` and the entry body; several entries follow one another in the same file. Images are left out; a block image (the sigil drawing, an image field) leaves its label as a placeholder, `*[Label]*`. Internal link chips become `[[Title]]` wiki links — an entry's links live in its body.
 
 ### Emerald Format
 
-The Emerald format (`.emerald`) carries entries and templates from one vault to another, without loss. A file is a ZIP archive with a `manifest.json` and the pictures and icons as files of their own; it can hold one or several entries and templates, and it can be sealed with a password. **Export → Export as Emerald…** is enabled while an entry or a template's page is open, and writes whichever is active, without a password. **Import → From Emerald…** reads any of them; for a sealed file it asks for the password first, and a wrong one says so. An imported entry opens in "All entries".
+The Emerald format (`.emerald`) carries entries and templates from one vault to another, without loss — and, as a `.vault.emerald`, a whole vault's content (see [Vault Backup](#vault-backup-vaultemerald)). A file holds the entries and templates with the pictures and icons as files of their own, compressed where that helps; it can hold one or several entries and templates. It can be left unprotected, protected with a password of its own (at least 8 characters), or protected with the vault's password — then it opens with the password or recovery key the vault had at export, and without asking while that vault is unlocked. The export menu writes it (see [The export menu](#the-export-menu)); a template's right-click menu in Templates has **Export as Emerald…**, unprotected. **Import → From Emerald…** reads any of them; for a protected file it asks for the password (or the vault's recovery key) first, and a wrong one says so. A `.vault.emerald` picked there — a vault's content or a raw backup — opens the import dialog with its options. An imported entry opens in "All entries".
 
-**What travels.** Per entry: title, creation date, its blocks as stored (hidden blocks flagged, concealed sigils concealed — they can be revealed over there as usual), category by name and emoji, tags by name, icon and cover. Per template: name, the title new entries get, icon, tags and blocks. Every picture and icon these use travels along as a file. Links name their target's title too, so the import can find it in the other vault. Not carried yet: a picture's name, note and tags, and tag colours.
+**What travels.** Per entry: title, creation date, its blocks as stored (hidden blocks flagged, concealed sigils concealed — they can be revealed over there as usual), category with its emoji, tags by name, icon and cover. Per template: name, the title new entries get, icon, tags and blocks. Every picture and icon these use travels along as a file. Links name their target's title too, so the import can find it in the other vault. Not carried yet: a picture's name, note and tags, and tag colours.
 
-**Entries.** On import, the category of the same name is used — a built-in one by its stored name — or created; tags are found by name or added; if the vault doesn't create tags inline, a tag it doesn't have is left off. Pictures and icons are stored in the vault's folders as they are, without the vault's image limits. Links between entries of the same file point at the new entries; a link to an entry outside the file is found by its id, then by its title, and otherwise becomes plain text. An entry keeps the file's creation date as both creation and "last changed" date, so it lands at its place in the timeline — provided it is a readable date with a four-digit year; otherwise it is created now. A picture left out on export (see below) shows as a grey placeholder picture. The first imported entry opens in "All entries"; a category the import created is in no dashboard's filter yet, so its entries show in All entries until a dashboard ticks it (see [All Entries and Dashboards](#all-entries-and-dashboards)). Importing the same file twice gives two copies. If a step fails, the entries and templates created so far are removed again; a category or tag it added stays.
+**Entries.** On import, a built-in or starter category (Journal, Dream Journal, Sigils …) is recognised as itself, even when it was renamed or the file comes from an app in another language; any other category is found by the name it had at export, or created — one of that name in the Trash comes back. Tags are found by name or added; if the vault doesn't create tags inline, a tag it doesn't have is left off. Pictures and icons are stored in the vault's folders as they are, without the vault's image limits. Links between entries of the same file point at the new entries; a link to an entry outside the file is found by its id, then by its title, and otherwise becomes plain text. An entry keeps the file's creation date as both creation and "last changed" date, so it lands at its place in the timeline — provided it is a readable date with a four-digit year; otherwise it is created now. A picture left out on export (see below) shows as a grey placeholder picture. The first imported entry opens in "All entries"; a category the import created is in no dashboard's filter yet, so its entries show in All entries until a dashboard ticks it (see [All Entries and Dashboards](#all-entries-and-dashboards)). Importing the same file twice gives two copies. If a step fails, the entries and templates created so far are removed again; a category or tag it added stays.
 
-**Your own blocks.** An entry carries its copies of Blocks-view blocks in its content, complete and usable; the blocks of the Blocks view themselves do not travel.
+**Your own blocks.** An entry carries its copies of Blocks-view blocks in its content, complete and usable. The blocks they were made from travel along too, with their prefilled pictures, and appear in the other vault's Blocks view; one that vault already has stays as it is there.
 
 **Templates** export from their page or the templates list's context menu. Which category starts with a template, and whether it is the default template, never travels: that is this vault's decision.
 
-**Versions.** The archive is version 6 of the format. A `.emerald` file of an earlier version (a single JSON file) is not imported — a notice says it comes from an older version and that a converter will follow — and one of a newer version asks for an update; nothing is changed either way.
+**Versions.** Files are version 7 of the format. A `.emerald` file of an earlier version is not imported — a notice says it comes from an older version and that a converter will follow — and one of a newer version asks for an update; nothing is changed either way.
 
-**Limits.** A file is refused, with nothing changed, if it is larger than 512 MB, has more than 5,000 parts or more than 1,000 entries and templates, a single picture above 64 MB, or anything inside that is not the manifest, a picture or an icon.
-
-A menu to export several entries at once, with a password and compressed or left-out pictures, will follow; the format already carries all of it (see [`architecture/editing.md`](architecture/editing.md#the-emerald-file)).
+**Limits.** A file of entries is refused, with nothing changed, if it is larger than 2 GB, has more than 5,000 parts or more than 1,000 entries and templates, a single picture above 64 MB, or anything inside that is not the manifest, a picture or an icon.
 
 ### Import from Markdown
 
 Reads a Markdown file exported by Emerald (or with the same structure). The `# Title` line becomes the title, key-value lines before `---` are metadata (unknown keys are ignored), and the body below is converted to rich text. A Markdown import has no creation date and is created now. Header fields of earlier versions (an entry's status, end date and version, a journal entry's paradigm, banishing, meditation and linked operations or articles) count as unknown keys.
 
-**Destination.** A file whose header names a category lands in it (found or created by name) and opens in "All entries". One without asks which dashboard it goes to — the dialog shows the detected title and lists the dashboards; the entry starts in that dashboard's first category, gets the first tag of its tag filter besides the file's own tags, and opens there. Cancelling aborts the import. `.emerald` entries keep their category by name and never ask.
+**Destination.** A file whose header names a category lands in it (found or created by name) and opens in "All entries". One without asks which dashboard it goes to — the dialog shows the detected title and lists the dashboards; the entry starts in that dashboard's first category, gets the first tag of its tag filter besides the file's own tags, and opens there. Cancelling aborts the import. `.emerald` entries keep their category — a starter category by its fixed ID, any other by name — and never ask.
 
-### Vault Backup (`.emeralddb`)
+### Vault Backup (`.vault.emerald`)
 
-The whole vault can be backed up and restored as one self-contained file (`.emeralddb`), separate from per-entry exports. The Backup page in **Settings** offers two manual flows and, below them, an automatic backup.
+The whole vault can be backed up and restored as one self-contained file (`.vault.emerald`), separate from per-entry exports. There are two kinds: the **export** of a vault's content, made by hand, and the **raw backup** the automatic backup writes. Both are imported the same way, through **Import → From Emerald…** in the title bar.
 
-**Export.**
+**Export.** **Export → Whole database** in the title bar exports the vault's content. Under **Normal** everything goes except the Trash; **Advanced** offers the choices below.
 
 - "Entries by category" picks the entries: one box per category, and "Uncategorized" (entries without a category, and those whose category is in the Trash). What a chosen entry needs travels with it — its category, its pictures. A "What to include" row adds Tasks, Tags, Lexicon and Settings. Templates, your own blocks and the dashboards travel whenever entries do.
-- The Settings chip (on by default) exports the vault's settings — fonts, sizes, trash retention, sidebar, emoji defaults, image limits, tag rule, automatic backup — independently of the content chips. Language and theme belong to the installation and are not part of it; custom themes a backup still carries join this installation's list when it is imported.
-- Optional from/to dates restrict entries to those created in that window (tags, categories, blocks, templates, languages and settings are not date-filtered).
+- The Settings chip (on by default) exports the vault's settings — fonts, sizes, trash retention, sidebar, emoji defaults, image limits, tag rule — independently of the content chips. Language and theme belong to the installation and are not part of it; custom themes a backup still carries join this installation's list when it is imported.
+- Optional from/to dates restrict entries to those created in that window, counted in whole local days as in a collection; a range entered backwards is read the right way round (tags, categories, blocks, templates, languages and settings are not date-filtered).
 - Trashed items are left out unless **Include deleted** is ticked — tags included, since trashed entries carry their ids.
-- Images referenced by exported entries are embedded.
-- A backup is **encrypted**. It opens with the password the vault has now — also on another computer, and also after the password is changed later: a backup is tied to the password it was made with, not to the current one.
-- The save dialog opens in the vault's own **`backup/` folder** (recreated if it went missing), so backups travel with the vault folder — deleting the vault's files leaves a non-empty `backup/` standing. Any other location can be picked; for a vault outside the allowed storage locations (see [`security.md`](security.md)) the dialog just suggests a filename. Cancelling the dialog reports nothing.
+- Images and icons referenced by exported entries travel in the file, as they are.
+- A backup is **encrypted** with the vault's password by default — or with an own password, or not at all, as chosen in the export menu. With the vault's password it opens with the password the vault had when it was made — also on another computer, and also after the password is changed later: a backup is tied to the password it was made with, not to the current one.
+- The file is named `emerald-backup-YYYY-MM-DD.vault.emerald`. Unless it is unprotected, the save dialog opens in the vault's own **`backups/` folder** (recreated if it went missing), so backups travel with the vault folder — deleting the vault's files leaves a non-empty `backups/` standing. Any other location can be picked; for a vault outside the allowed storage locations (see [`security.md`](security.md)) the dialog just suggests a filename. Cancelling the dialog closes nothing.
 
 **Import.**
 
+- **Import → From Emerald…** opens either kind; a file of entries goes its own way (see [Emerald Format](#emerald-format)). Import only reads from the user's own folders (see [`security.md`](security.md#path-confinement)): a file on another drive has to be copied there first, and the notice says so.
 - Choosing a backup first opens it. If it belongs to a vault that is unlocked right now, that is automatic. Otherwise Emerald asks for the password the backup was made with, or its recovery key from that time, and asks again after a wrong answer.
-- **Only backups of this version are restored** (format 17). A backup of an earlier version — one from before encryption included — is refused with a notice that a converter will follow; one of a newer version asks for an update. Nothing is changed either way. Earlier versions of Emerald refuse a format-17 backup in turn.
-- A preview line counts the file's contents. The same choices pick what to apply: one box per category the file holds entries of, with their number, "Uncategorized", then Tasks, Tags and Lexicon. Replace replaces only the entries of the categories the file brings.
+- **Only backups of this version are restored** (format 7). A backup of an earlier version is refused with a notice that a converter will follow; one of a newer version asks for an update. Nothing is changed either way. `.emeralddb` files of earlier versions are not read at all.
+- A dialog shows the day of the backup and counts its contents. The same choices pick what to apply: one box per category the file holds entries of, with their number, "Uncategorized", then Tasks, Tags and Lexicon. Replace replaces only the entries of the categories the file brings.
 - Three modes, from least to most invasive: **Add Vault** (into a new vault, then switch to it — the default, since it can't touch existing data), **Merge** (imported items get new ids, so nothing existing is overwritten), and **Replace** (overwrite the selected content in the current vault, with a warning).
 - Add Vault asks for the new vault's name **and folder**, with the same folder row as creating a vault (default `Documents/Emerald Vaults/{name}`). The folder is checked before anything is touched: it must be empty or not exist yet, must not hold a vault, and must be readable. The new vault then asks for its own password; cancelling that cancels the import and removes the empty vault.
-- A failed import — a corrupt file, a crash partway — leaves the vault exactly as it was: every mode fills a hidden copy of the database and swaps it in only once the import succeeded.
-- If the file carries settings, Add Vault and Replace apply them; Merge lists them as checkboxes (appearance, trash, sidebar, emoji, images, tag rule, automatic formatting, journal, templates, automatic backup) so only the ticked groups come in.
+- A failed import — a corrupt file, a crash partway — leaves the vault exactly as it was: every mode fills a hidden copy of the database and swaps it in only once the import succeeded. The dialog then says what went wrong; another attempt starts with opening the file again.
+- If the file carries settings, Add Vault and Replace apply them; Merge lists them as checkboxes (appearance, trash, sidebar, emoji, images, tag rule, automatic formatting, journal, templates) so only the ticked groups come in.
+- No import touches the vault's `backups/` folder.
 
-**Automatic backup.**
+**Automatic backup.** It is set on the [start page](#vaults), once for all vaults.
 
-- Off by default. Switched on, Emerald saves the whole vault — every module, the Trash, images and settings — on a schedule: **daily**, **weekly** on a chosen weekday, or **monthly** on the 1st.
-- It runs while Emerald is open and the vault is unlocked; there is no background service. A backup that was due while the app was closed is made the next time the vault opens, and the first one is made right after switching the option on.
-- Files are named `emerald-auto-…-YYYY-MM-DD.emeralddb`, one per day. **Keep** (3, 5, 10, 30 or all; default 10) decides how many stay — older automatic backups are deleted, backups saved by hand never are.
-- The **folder** is the vault's own `backup/` folder or any folder picked in the dialog, including one on another drive. The choice belongs to this computer, not to the vault: on another machine the vault's own folder applies again.
-- The section shows the date of the last backup and has **Back up now**, which waits for a running import or backup to finish. If a backup fails — the picked folder's drive is not connected, say — the section says so and the settings gear in the rail shows a dot.
-- An automatic backup is an ordinary encrypted `.emeralddb` and is restored through Import below. Import only reads from the user's own folders (see [`security.md`](security.md#automatic-backups)): a backup in a picked folder on another drive has to be copied there first, and Browse says so.
+- Off by default: a vault is backed up when its box is ticked. As long as Emerald runs, every ticked vault is backed up on a schedule — whichever vault is open, also a locked one, also while only the start page is shown: **daily**, **weekly** on a chosen weekday, or **monthly** on the 1st. There is no background service: a backup that was due while the app was closed is made shortly after the next start, and a newly ticked vault gets its first one right away.
+- What is saved is a **raw backup**: the vault's database, pictures, icons, key and settings exactly as they lie on the disk — encrypted as they are there, so writing one asks for no password, and it opens only with that vault's password or recovery key. The vault that is open is copied in one consistent state while you keep working.
+- Files are named `emerald-auto-…-YYYY-MM-DD.vault.emerald`, one per vault and day. **Keep** (3, 5, 10, 30 or all; default 10) decides how many stay per vault — older automatic backups are deleted, backups saved by hand never are.
+- The **folder** is each vault's own `backups/` folder unless one is picked — any folder, including one on another drive. A tip below says why picking one is wise: backups inside the vault folder go down with its drive; a cloud folder or another drive is safer. The choice belongs to this computer, not to the vaults.
+- Every ticked vault shows the date of its last backup and has **Back up now**. If a backup fails — the picked folder's drive is not connected, say — its row says so and the start page button in the rail shows a red dot that leads there.
 - The file name carries the start of the vault's id on this computer. A vault folder that is removed and opened again — or opened on another computer — gets a new id: its earlier automatic backups stay where they are, but are no longer counted or pruned.
 
-For the file structure and per-mode semantics, see [DB Backup / Restore (`.emeralddb`) in `database.md`](database.md#db-backup--restore-emeralddb).
+For the file structure and per-mode semantics, see [DB Backup / Restore (`.vault.emerald`) in `database.md`](database.md#db-backup--restore-vaultemerald).
 
 ## Image Storage and Cleanup
 
@@ -499,14 +521,13 @@ Right-click any entry in the left sidebar or in any list view (List, Cards, Card
 
 ## Settings
 
-Settings are **per vault** — stored in the vault's own `settings.json`. Switching vaults switches the whole configuration, and a vault folder copied to another machine keeps its settings; a new vault starts with the defaults. Language, theme, updates and About belong to the installation and live on the [start page](#vaults). The window has seven pages:
+Settings are **per vault** — stored in the vault's own `settings.json`. Switching vaults switches the whole configuration, and a vault folder copied to another machine keeps its settings; a new vault starts with the defaults. Language, theme, updates, About and the automatic backup belong to the installation and live on the [start page](#vaults). The window has six pages:
 
 - **General** — the two fonts, interface size and editor text size (see [Typography](#typography), [Sizing](#sizing)).
 - **Sidebar** — which list the left entry list shows (All entries, one dashboard's entries, or the tasks), and how many entries it lists before "Show more".
 - **Entries** — the emoji picker's default set, how inserted images are stored (photos as JPEG, size limits), whether new tags may appear on the spot (typed, from a template, from an import), **Automatic formatting** (Markdown shortcuts such as `# ` or `**bold**`; typography such as curly quotes, dashes, arrows and fractions; auto-links for typed or pasted addresses — each its own switch, applying to editors opened afterwards), and whether journal entries show their **moon phase** (see [Journal](#journal)).
 - **Security** — remember on this device, lock now, change password (see [Vault Encryption](#vault-encryption)).
 - **Sync** — a placeholder: sync comes in v0.3.0 (see [Sync](#sync)).
-- **Backup** — see [Vault Backup](#vault-backup-emeralddb).
 - **Storage** — how long the Trash keeps deleted items, and the unused-images cleanup (see [Image Storage and Cleanup](#image-storage-and-cleanup)).
 
 Each section has a short description under its heading, and a tooltip where useful.

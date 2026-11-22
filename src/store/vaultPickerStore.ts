@@ -1,8 +1,8 @@
 import { create } from 'zustand';
 import { resolveOpenEdits } from '../lib/openEdits';
 
-/** What the start page turns to when it opens: a check for updates. */
-type StartFocus = 'updates';
+/** What the start page turns to when it opens: a check for updates, or the automatic backup. */
+type StartFocus = 'updates' | 'backup';
 
 /**
  * Whether the start page (the vault picker grown into the app's home screen)

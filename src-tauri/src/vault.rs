@@ -1,7 +1,7 @@
 //! Vault storage layout.
 //!
 //! A vault is a directory the user picked. Inside it live `emerald.db`, an
-//! `images/` folder, a `backup/` folder, and `settings.json`.
+//! `images/` folder, a `backups/` folder, and `settings.json`.
 //! `vaults.json` in the app data directory
 //! maps vault ids to those directories; the frontend owns that file and
 //! mirrors it into [`VaultRegistry`] on every write.
@@ -24,6 +24,11 @@ use tauri::Manager;
 pub const DB_FILE: &str = "emerald.db";
 /// The copy a backup import fills before it swaps it in, next to [`DB_FILE`].
 pub const IMPORT_STAGING_FILE: &str = "emerald.db.import";
+/// A raw backup's database, unpacked for its import (`emerald_file.rs`).
+pub const RAW_IMPORT_FILE: &str = "emerald.db.raw";
+/// The consistent copy of an open vault's database that a raw backup packs
+/// (`raw_backup.rs`), removed once it is in the backup.
+pub const SNAPSHOT_FILE: &str = "emerald.db.snapshot";
 pub const IMAGES_SUBDIR: &str = "images";
 /// The vault's uploaded icons (`images.rs`, `Store::Icons`), apart from the pictures.
 pub const ICONS_SUBDIR: &str = "icons";
@@ -31,8 +36,10 @@ pub const ICONS_SUBDIR: &str = "icons";
 pub const VAULTS_SUBDIR: &str = "vaults";
 /// The folder new vaults are offered in, inside the user's documents directory.
 pub const VAULT_HOME_DIR: &str = "Emerald Vaults";
-/// Where the database export offers to write its `.emeralddb`, inside the vault.
-pub const BACKUP_SUBDIR: &str = "backup";
+/// The vault's own backup folder: where the automatic backup writes while no
+/// folder of its own is chosen, and where the database export offers to
+/// write. Nothing that deletes, replaces or backs up a vault touches it.
+pub const BACKUP_SUBDIR: &str = "backups";
 /// The vault's own settings. The frontend owns its shape; Rust only moves the text.
 pub const SETTINGS_FILE: &str = "settings.json";
 /// Written first and renamed over [`SETTINGS_FILE`], so a crash mid-write
@@ -40,7 +47,7 @@ pub const SETTINGS_FILE: &str = "settings.json";
 const SETTINGS_TEMP_FILE: &str = "settings.json.tmp";
 /// Far above anything the settings page can produce — a guard against a
 /// runaway write, not a format limit.
-const SETTINGS_MAX_BYTES: u64 = 256 * 1024;
+pub(crate) const SETTINGS_MAX_BYTES: u64 = 256 * 1024;
 /// The installation's own settings — language and theme, custom themes
 /// included — in the app data directory, beside [`VAULTS_FILE`]: there before
 /// any vault is unlocked, and no vault or backup brings it along. The frontend
@@ -553,10 +560,10 @@ pub fn create_vault_dirs(app: tauri::AppHandle, vault_id: String) -> Result<(), 
     let dir = vault_dir(&app, &vault_id)?;
     std::fs::create_dir_all(dir.join(IMAGES_SUBDIR)).map_err(|e| e.to_string())?;
     std::fs::create_dir_all(dir.join(ICONS_SUBDIR)).map_err(|e| e.to_string())?;
-    // `backup/` belongs from the start, not only from the first export — that
+    // `backups/` belongs from the start, not only from the first export — that
     // way the structure of a vault folder is always the same. For vaults outside
     // the allowed roots it stays empty without consequence (the export does not
-    // offer it there, see `ensure_backup_dir`), and an empty `backup/` does not
+    // offer it there, see `ensure_backup_dir`), and an empty `backups/` does not
     // stand in the way of deleting the folder.
     std::fs::create_dir_all(dir.join(BACKUP_SUBDIR)).map_err(|e| e.to_string())
 }
@@ -583,7 +590,7 @@ pub fn default_vault_dir(app: tauri::AppHandle, vault_id: String) -> Result<Stri
         .into_owned())
 }
 
-/// The vault's `backup/` folder, created on demand — where the database
+/// The vault's `backups/` folder, created on demand — where the database
 /// export dialog opens by default. Deliberately *inside* the vault: the backup
 /// travels with the data it captures when the folder is copied elsewhere. And
 /// deliberately not part of what [`delete_vault_files`] removes — a backup is
@@ -601,7 +608,7 @@ pub fn ensure_backup_dir(app: tauri::AppHandle, vault_id: String) -> Result<Stri
     // them). Offering a target for a vault outside — another drive, a folder
     // outside `~` — would mean offering one that the write command then refuses.
     // The `Err` ends up in the frontend's fallback (bare file name) before a dead
-    // `backup/` folder is created.
+    // `backups/` folder is created.
     let allowed = crate::resolve_allowed_roots(&app)?;
     let canonical = std::fs::canonicalize(&vault).map_err(|e| e.to_string())?;
     if !crate::is_within_allowed_roots(&canonical, &allowed) {
@@ -679,7 +686,7 @@ pub fn probe_vault_dir(path: String) -> Result<VaultProbe, String> {
 /// Documents.
 ///
 /// So only this vault's own artefacts are removed by name. Whatever else lies
-/// there — the `backup/` folder of the database export, a `desktop.ini`, in
+/// there — the `backups/` folder of the database export, a `desktop.ini`, in
 /// `~/Documents` the rule rather than the exception — stays, and with it the
 /// directory: both directories go with plain `remove_dir`, which fails while
 /// anything is left inside, and that failure is the answer here, not an error.
@@ -689,9 +696,18 @@ pub fn probe_vault_dir(path: String) -> Result<VaultProbe, String> {
 /// A half-deleted vault cannot come back as an empty one: the caller takes
 /// it out of `vaults.json` after every `Ok`, and an `Err` only occurs while
 /// the database is still there (deletion locked/refused).
+///
+/// Waits for a raw backup of the vault that is running (`raw_backup.rs`).
 #[tauri::command]
-pub fn delete_vault_files(app: tauri::AppHandle, vault_id: String) -> Result<bool, String> {
-    let dir = vault_dir(&app, &vault_id)?;
+pub async fn delete_vault_files(app: tauri::AppHandle, vault_id: String) -> Result<bool, String> {
+    let _guard = crate::reencrypt::RUNNING.lock().await;
+    tauri::async_runtime::spawn_blocking(move || delete_files(&app, &vault_id))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+fn delete_files(app: &tauri::AppHandle, vault_id: &str) -> Result<bool, String> {
+    let dir = vault_dir(app, vault_id)?;
     if !dir.join(DB_FILE).is_file() {
         return Err("not a vault directory: no database found".to_string());
     }
@@ -728,8 +744,11 @@ pub fn delete_vault_files(app: tauri::AppHandle, vault_id: String) -> Result<boo
     }
     // What is useless without the key: working copies, backups before
     // migrations, remains of an aborted re-encryption.
-    for suffix in ["", "-journal", "-wal", "-shm"] {
-        std::fs::remove_file(dir.join(format!("{IMPORT_STAGING_FILE}{suffix}"))).ok();
+    // The backups in `backups/` are not among them: they stay.
+    for file in [IMPORT_STAGING_FILE, RAW_IMPORT_FILE, SNAPSHOT_FILE] {
+        for suffix in ["", "-journal", "-wal", "-shm"] {
+            std::fs::remove_file(dir.join(format!("{file}{suffix}"))).ok();
+        }
     }
     if let Ok(entries) = std::fs::read_dir(&dir) {
         for entry in entries.flatten() {
@@ -740,9 +759,9 @@ pub fn delete_vault_files(app: tauri::AppHandle, vault_id: String) -> Result<boo
     }
     crate::reencrypt::remove_leftovers(&dir);
     // With the files gone the key is worthless — the remembered one too.
-    crate::keys::discard(&app, &vault_id);
+    crate::keys::discard(app, vault_id);
 
-    // An *empty* `backup/` — the normal case without an export, since
+    // An *empty* `backups/` — the normal case without an export, since
     // `create_vault_dirs` creates it too — should not prevent the folder from
     // being removed. `remove_dir` fails as soon as a backup lies in it, and
     // exactly then both stay.
@@ -979,25 +998,11 @@ fn write_json_in(dir: &Path, name: &str, temp_name: &str, max_bytes: u64, conten
     write_atomic(dir, name, temp_name, contents.as_bytes())
 }
 
-/// Writes `bytes` to `dir/name` through `dir/temp_name` and a rename, so a
-/// crash leaves either the old file or the new one, never half of either.
-pub(crate) fn write_atomic(dir: &Path, name: &str, temp_name: &str, bytes: &[u8]) -> Result<(), String> {
-    write_atomic_with(dir, name, temp_name, bytes, true)
-}
-
-/// [`write_atomic`] for a folder that is not the vault's: a volume that cannot
-/// flush to disk — some network shares refuse it — still gets the file. For a
-/// backup that is the better answer; for `vault.key` it would not be. A flush
-/// that fails for any other reason still fails the write.
-pub(crate) fn write_atomic_anywhere(dir: &Path, name: &str, temp_name: &str, bytes: &[u8]) -> Result<(), String> {
-    write_atomic_with(dir, name, temp_name, bytes, false)
-}
-
 /// Whether a failed flush only says "this volume cannot flush" — the one
 /// answer a backup may ignore. Everything else fails the write: on a network
 /// volume a full disk, an exhausted quota or a failing medium only shows when
 /// the data is flushed, because `write` has merely filled a cache by then.
-fn sync_refusal_is_harmless(error: &std::io::Error) -> bool {
+pub(crate) fn sync_refusal_is_harmless(error: &std::io::Error) -> bool {
     use std::io::ErrorKind;
     // ENOTTY: what a file system answers that does not know the flush call.
     // The same number on Linux and macOS; on Windows 25 would mean something else.
@@ -1015,8 +1020,9 @@ fn sync_refusal_is_harmless(error: &std::io::Error) -> bool {
         || (cfg!(windows) && error.raw_os_error().is_some_and(|code| WINDOWS_NOT_SUPPORTED.contains(&code)))
 }
 
-/// `must_sync`: whether a flush the volume refuses fails the write.
-fn write_atomic_with(dir: &Path, name: &str, temp_name: &str, bytes: &[u8], must_sync: bool) -> Result<(), String> {
+/// Writes `bytes` to `dir/name` through `dir/temp_name` and a rename, so a
+/// crash leaves either the old file or the new one, never half of either.
+pub(crate) fn write_atomic(dir: &Path, name: &str, temp_name: &str, bytes: &[u8]) -> Result<(), String> {
     use std::io::Write;
 
     // Whatever lies under the temp name — a crash remnant or a planted
@@ -1031,14 +1037,10 @@ fn write_atomic_with(dir: &Path, name: &str, temp_name: &str, bytes: &[u8], must
         .open(&temp)
         // First onto the disk, then rename: otherwise an empty file can sit under
         // the target name after a power failure — for `vault.key` that would mean the
-        // vault is lost. Without `must_sync` a volume may refuse the flush — any
-        // other error there counts.
+        // vault is lost.
         .and_then(|mut file| {
             file.write_all(bytes)?;
-            match file.sync_all() {
-                Err(e) if must_sync || !sync_refusal_is_harmless(&e) => Err(e),
-                _ => Ok(()),
-            }
+            file.sync_all()
         });
     if let Err(e) = written {
         std::fs::remove_file(&temp).ok();

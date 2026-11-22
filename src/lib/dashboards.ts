@@ -126,9 +126,10 @@ export function isBuiltinDashboard(value: unknown): value is BuiltinDashboard {
 /**
  * Does the entry pass the filter? A missing rule does not narrow; a category
  * rule names categories, and one that names none that still exist (gone, or in
- * the trash — `live` lacks them) matches nothing.
+ * the trash — `live` lacks them) matches nothing. Also the export menu's
+ * collection (`bulkEntries`).
  */
-function matchesFilter(
+export function matchesFilter(
   entry: Pick<Entry, 'category_id' | 'tags'>,
   filter: DashboardFilter,
   live: ReadonlySet<string>,

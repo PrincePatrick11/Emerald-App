@@ -164,8 +164,8 @@ where one only clicks, right-clicks or types, the tool is now the shorter way.
 ```
 
 **Tabs:** `.tab-button` per open view, `button.tab-add` for a new one, `button.tab-close`.
-**The Start page has no rail** — it is the vault picker (open/new vault, appearance, language, updates). Its only way back is the vault's own "open" button.
-**Title bar:** Menu (Switch Vault…, Check for Updates…, About, Edit, View), Search (global search modal), Back/Forward, Export, Import — all `.rail-button` icon buttons, no longer four text menus.
+**The Start page has no rail** — it is the vault picker (open/new vault, automatic backup, appearance, language, updates). Its only way back is the vault's own "open" button.
+**Title bar:** Menu (Switch Vault…, Check for Updates…, About, Edit, View), Search (global search modal), Back/Forward, Export (opens the export menu: this entry, a collective export or the whole database), Import (a menu) — all `.rail-button` icon buttons, no longer four text menus.
 
 ### Selectors — the important part
 
@@ -267,7 +267,7 @@ await mcp.call_tool("click", { selector: ".left-sidebar-rail button:has(.lucide-
 await mcp.call_tool("click", { selector: "text=Deutsch" });
 await mcp.call_tool("press_key", { key: "Escape" });
 ```
-Settings (`.modal-card`) has the tabs General, Sidebar, Entries, Security, Sync, Backup, Storage. The Start page also has a language and a theme (Noctis / Parchment) button.
+Settings (`.modal-card`) has the tabs General, Sidebar, Entries, Security, Sync, Storage — no Backup tab: the database export is in the export menu, restoring in Import, the automatic backup on the Start page. The Start page also has a language and a theme (Noctis / Parchment) button.
 
 ### Switch theme
 Settings → General has the theme choice; the Start page lists Noctis and Parchment (`Import theme…` beside them).

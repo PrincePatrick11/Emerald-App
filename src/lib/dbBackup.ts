@@ -1,13 +1,21 @@
 /**
- * Full-database backup (.emeralddb) — export and import.
+ * A vault's content as a `.vault.emerald` — export and import.
  *
- * Export: queries the active vault and serialises all selected tables to a
- * self-contained JSON file with embedded base64 images.
+ * Export: queries the active vault and puts the selected tables into the
+ * manifest of a `.emerald` file of the kind `vault`; its pictures and icons
+ * travel as members of the archive, read from the vault by Rust
+ * (`lib/emerald/file.ts`, `emerald_file.rs`).
  *
  * Import modes:
- *   replace  — wipe the current vault and restore from backup
- *   merge    — insert all backup rows with a date-based ID prefix (no overwrites)
- *   add-vault — create a new vault from the backup and switch to it
+ *   replace  — wipe the current vault and restore from the file
+ *   merge    — insert all rows with a date-based ID prefix (no overwrites)
+ *   add-vault — create a new vault from the file and switch to it
+ *
+ * A raw backup (the automatic backup's `.vault.emerald`, `raw_backup.rs`)
+ * imports the same way: its database is unpacked beside the active vault,
+ * opened under the backup's own key, brought to this version's schema and
+ * read like a vault (`collectVaultContent`) — from there on it is the same
+ * content as any `.vault.emerald`.
  */
 
 import { copyBlockStatements, OWNER, type BlockOwnerKind, type CopiedBlock, type Statement } from './blockStore';
@@ -16,7 +24,8 @@ import { fromBlockRow, type StoredBlockRow } from './blocks/blockRows';
 import { remapBlock, renameAll, type BlockRemap } from './blocks/blockRemap';
 import { invoke } from '@tauri-apps/api/core';
 import { save, open } from '@tauri-apps/plugin-dialog';
-import { getDb, sweepDanglingTaskLinks } from './db';
+import { getDb, runMigrations, sweepDanglingTaskLinks, VAULT_OUTDATED, VAULT_TOO_NEW, vaultVersionErrorOf } from './db';
+import Database from './sqlite';
 import {
   addVault,
   getActiveDbFile,
@@ -25,7 +34,7 @@ import {
   joinPath,
   newVaultRecord,
 } from './vaultManager';
-import { imageRefsInHtml, isStoredImage, listImageFiles, readImageAsBase64, saveImage } from './images';
+import { imageRefsInHtml, isStoredImage } from './images';
 import { clearSearchTextCache } from './searchText';
 import { clearEntrySummaryCache } from './blocks/entrySummary';
 import {
@@ -43,16 +52,21 @@ import {
 import { isBuiltinDashboard, parseDashboardFilter } from './dashboards';
 import { fromRow } from './row';
 import { ICON_FIELDS, IMAGE_FIELDS, STARTER_CATEGORY_IDS, imageColumns, storedImageName, storedImageNamesIn } from './schema';
-import { iconFileNames, isImageDataUrl, plausibleEmoji, readIconAsBase64, storeIconDataUrl } from './icons';
+import { iconFileNames, plausibleEmoji } from './icons';
 import { isTagId, readTagLinks, tagIdList, tagInsertStatements, tagNameKey, unlinkTags, type TagOwner } from './tagRefs';
 import { randomTagColor } from '../store/tagStore';
 import { categoryKey } from './categories';
 import i18n from '../i18n';
+import { endOfDay, isValid, parseISO, startOfDay } from 'date-fns';
 import { asString, generateId, isRecord, isValidHexColor, nowIso } from './helpers';
 import { useVaultStore } from '../store/vaultStore';
 import { VAULT_KEY_CANCELLED } from '../store/vaultKeyStore';
-import { KEY_ERRORS, keyErrorOf } from './vaultKeys';
-import { askBackupSecret, BACKUP_UNLOCK_CANCELLED, endBackupSecret, type BackupSecret } from '../store/backupSecretStore';
+import { keyErrorOf } from './vaultKeys';
+import {
+  closeArchive, EmeraldNotice, noticeFor, openArchiveAsking, storeArchiveFiles, withEmeraldEnding, writeArchive,
+  type EmeraldProtection, type OpenedArchive, type StoredArchiveFiles,
+} from './emerald/file';
+import { EMERALD_FORMAT_VERSION, parseVaultManifest, type EmeraldVaultManifest, type ManifestBlockDefinition } from './emerald/manifest';
 import { reloadAllStores } from '../store/moduleWiring';
 import { useUIStore } from '../store/uiStore';
 import { clearAllDrafts, flushDrafts } from '../store/draftStore';
@@ -130,50 +144,56 @@ export interface ImportTypeFilters extends EntrySelection {
 type Row = Record<string, any>;
 
 /**
- * The format of a backup. '17' is the one of the current schema
- * (`FRESH_START_VERSION` in `schema.ts`): all entries in one `data.entries`
- * array; categories with their start template (`template_id`); the
- * dashboards as `data.dashboards`; the blocks of entries and templates as the
- * rows of `blocks` (`data.blocks`); the pictures taken into "Images" as
+ * The content of a `.vault.emerald` (the manifest of the kind `vault`, format
+ * version `EMERALD_FORMAT_VERSION`): all entries in one `data.entries` array;
+ * categories with their start template (`template_id`); the dashboards as
+ * `data.dashboards`; the blocks of entries and templates as the rows of
+ * `blocks` (`data.blocks`); the pictures taken into "Images" as
  * `data.vaultImages`. The rows of entries, templates and pictures carry their
  * tags as an array of IDs in `tags` (the vault keeps them in link tables);
- * icons are stored names, their files in `icons` beside `images`.
+ * pictures and icons are stored names, their files members of the archive.
  *
- * Only this version is read. An older file comes from before the fresh start
- * and is refused with {@link BACKUP_OUTDATED} before anything happens — its
- * converters are gone with the old migration chain. A newer one is refused
- * with {@link BACKUP_TOO_NEW}: `insertRows` filters every row against
- * `PRAGMA table_info`, so a file this build does not fully understand would
- * be imported *wrongly* rather than fail. Raise the version whenever an older
- * build would otherwise import a file wrongly.
+ * Only this version is read (`parseVaultManifest`, and Rust before it): a
+ * newer one is refused, since `insertRows` filters every row against
+ * `PRAGMA table_info` and a file this build does not fully understand would
+ * be imported *wrongly* rather than fail. Raise `EMERALD_FORMAT_VERSION`
+ * whenever an older build would otherwise import a file wrongly.
  */
-const BACKUP_VERSION = '17' as const;
-
-/** A backup from before the fresh start of the schema: refused, not converted. */
-export const BACKUP_OUTDATED = 'BACKUP_OUTDATED';
-/** A backup from a newer version of the app. */
-export const BACKUP_TOO_NEW = 'BACKUP_TOO_NEW';
+export interface VaultContent {
+  exportedAt: string;
+  filters: BackupOptions;
+  data: VaultData;
+  /**
+   * The vault's settings (`settings.json`), unchecked like everything from
+   * the file — normalised only at import.
+   */
+  settings?: unknown;
+}
 
 /**
- * Checks a parsed file's version, and clears the `category_id` of an entry
- * whose category the file does not carry. Throws {@link BACKUP_OUTDATED} /
- * {@link BACKUP_TOO_NEW} (numerically: a string comparison would consider
- * '10' older than '4').
+ * The content of a vault's manifest, the `category_id` of an entry whose
+ * category the file does not carry cleared. Throws {@link EmeraldNotice} for
+ * a manifest of another version or none at all.
  */
-export function readBackupPayload(backup: BackupFile): void {
-  const version = Number(backup.version);
-  if (!Number.isInteger(version) || version < 1) throw new Error(`Unsupported backup version: ${backup.version}`);
-  if (version < Number(BACKUP_VERSION)) throw new Error(BACKUP_OUTDATED);
-  if (version > Number(BACKUP_VERSION)) throw new Error(BACKUP_TOO_NEW);
-  if (!Array.isArray(backup.data.entries)) backup.data.entries = [];
+export function vaultContentOf(manifest: string): VaultContent {
+  const parsed = parseVaultManifest(manifest);
+  if (typeof parsed === 'string') throw new EmeraldNotice(i18n.t(`emeraldImport.${parsed}`));
+  const data = parsed.data as VaultData;
+  if (!Array.isArray(data.entries)) data.entries = [];
   // An entry is in a category only if the file carries that category. Without
   // this, a crafted file could count an entry as "uncategorized" in the
   // dialog and still name a category of this vault — whose entries a replace
   // would then delete without being asked.
-  const known = new Set((Array.isArray(backup.data.categories) ? backup.data.categories : []).map((c) => String(c?.id)));
-  backup.data.entries = backup.data.entries.map((row) => (
+  const known = new Set((Array.isArray(data.categories) ? data.categories : []).map((c) => String(c?.id)));
+  data.entries = data.entries.map((row) => (
     row?.category_id != null && !known.has(String(row.category_id)) ? { ...row, category_id: null } : row
   ));
+  return { exportedAt: parsed.exportedAt, filters: parsed.filters as BackupOptions, data, settings: parsed.settings };
+}
+
+/** The manifest of a vault's content, as the file carries it. */
+export function vaultManifestOf(content: VaultContent): EmeraldVaultManifest {
+  return { format: 'emerald', version: EMERALD_FORMAT_VERSION, kind: 'vault', ...content, data: { ...content.data } };
 }
 
 /** Maximum length of a tag name from a foreign source. */
@@ -191,7 +211,7 @@ const TAG_NAME_MAX = 100;
  * Runs in the working copy (`importViaStaging`): if the import fails afterwards,
  * nothing of the tags remains either.
  */
-async function importTagsAndRemap(db: Awaited<ReturnType<typeof getDb>>, d: BackupFile['data']): Promise<BackupFile['data']> {
+async function importTagsAndRemap(db: Awaited<ReturnType<typeof getDb>>, d: VaultData): Promise<VaultData> {
   const local = await db.select<{ id: string; name: string; deleted_at: string | null }[]>('SELECT id, name, deleted_at FROM tags');
   const byId = new Map(local.map((t) => [t.id, t]));
   const byName = new Map(local.map((t) => [tagNameKey(t.name), t]));
@@ -343,50 +363,35 @@ function selectsEntries(selection: EntrySelection): boolean {
   return selection.includeUncategorized || selection.categoryIds === null || selection.categoryIds.length > 0;
 }
 
-interface BackupFile {
-  version: typeof BACKUP_VERSION;
-  type: 'backup';
-  exportedAt: string;
-  filters: BackupOptions;
-  data: {
-    /** The entries, as in the `entries` table. */
-    entries?: Row[];
-    /** The global list; included as soon as entries or tasks are included. */
-    categories?: Row[];
-    /** The dashboards; included with the entries. */
-    dashboards?: Row[];
-    /** The custom blocks; included as soon as entries are included. */
-    blockDefinitions?: Row[];
-    /** The templates; included as soon as entries are included. */
-    templates?: Row[];
-    tags?: Row[];
-    tasks?: Row[];
-    taskLinks?: Row[];
-    /** The lexicon's languages. */
-    languages?: Row[];
-    /** Their vocabulary — worthless without its language, hence always together. */
-    lexiconEntries?: Row[];
-    /** The vault's own symbols (table `symbols`). */
-    symbols?: Row[];
-    /** The pictures taken into "Images", with their files in `images`. */
-    vaultImages?: Row[];
-    /**
-     * The blocks of the entries and templates in the file: the rows of
-     * `blocks` without `row_id` and `text`, the owner in `entry_id` or
-     * `template_id`. `block_refs` does not travel: the import writes it from
-     * the blocks.
-     */
-    blocks?: Row[];
-  };
-  images: Record<string, string>;  // stored file name → data URL
-  /** The icon files: stored name → data URL (`ICON_FIELDS`, the icons of block copies). */
-  icons?: Record<string, string>;
+interface VaultData {
+  /** The entries, as in the `entries` table. */
+  entries?: Row[];
+  /** The global list; included as soon as entries or tasks are included. */
+  categories?: Row[];
+  /** The dashboards; included with the entries. */
+  dashboards?: Row[];
+  /** The custom blocks; included as soon as entries are included. */
+  blockDefinitions?: Row[];
+  /** The templates; included as soon as entries are included. */
+  templates?: Row[];
+  tags?: Row[];
+  tasks?: Row[];
+  taskLinks?: Row[];
+  /** The lexicon's languages. */
+  languages?: Row[];
+  /** Their vocabulary — worthless without its language, hence always together. */
+  lexiconEntries?: Row[];
+  /** The vault's own symbols (table `symbols`). */
+  symbols?: Row[];
+  /** The pictures taken into "Images", with their files in `images`. */
+  vaultImages?: Row[];
   /**
-   * The vault's settings (`settings.json`), unchecked like everything from
-   * the file — normalised only at import. An older build simply ignores the
-   * field.
+   * The blocks of the entries and templates in the file: the rows of
+   * `blocks` without `row_id` and `text`, the owner in `entry_id` or
+   * `template_id`. `block_refs` does not travel: the import writes it from
+   * the blocks.
    */
-  settings?: unknown;
+  blocks?: Row[];
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -421,13 +426,18 @@ function collectImageRefs(table: string, rows: Row[] | undefined, into: Set<stri
 function buildDateFilter(dateFrom: string, dateTo: string): { clause: string; params: string[] } {
   const parts: string[] = [];
   const params: string[] = [];
-  if (dateFrom) {
+  // Whole local days, as the export menu's collection counts them
+  // (`createdWithin`); a range given backwards is read the right way round.
+  const day = (s: string) => (s && isValid(parseISO(s)) ? parseISO(s) : null);
+  let [from, to] = [day(dateFrom), day(dateTo)];
+  if (from && to && from > to) [from, to] = [to, from];
+  if (from) {
     parts.push('created_at >= $1');
-    params.push(dateFrom);
+    params.push(startOfDay(from).toISOString());
   }
-  if (dateTo) {
+  if (to) {
     parts.push(`created_at <= $${params.length + 1}`);
-    params.push(`${dateTo}T23:59:59`);
+    params.push(endOfDay(to).toISOString());
   }
   return {
     clause: parts.length ? `AND ${parts.join(' AND ')}` : '',
@@ -454,7 +464,7 @@ const IN_CHUNK = 400;
  * from the file, and on the next export they ended up unbound in
  * `db.select`. sqlx splits SQL at `;` and runs every statement
  * (`sqlx-sqlite/src/statement/virtual.rs`), so a crafted
- * `.emeralddb` could execute arbitrary SQL — a second-order
+ * backup could execute arbitrary SQL — a second-order
  * injection, triggered only by a later, harmless-looking action.
  */
 async function selectWhereIn(
@@ -524,7 +534,7 @@ async function exportBlockRows(
  * Where the icon columns of `ICON_FIELDS` travel in a backup's `data`. A
  * table missing here would lose its icons on the way.
  */
-const ICON_DATA_KEYS: Record<string, keyof BackupFile['data']> = {
+const ICON_DATA_KEYS: Record<string, keyof VaultData> = {
   entries: 'entries',
   templates: 'templates',
   block_definitions: 'blockDefinitions',
@@ -533,12 +543,12 @@ const ICON_DATA_KEYS: Record<string, keyof BackupFile['data']> = {
 };
 
 /**
- * The icon files the rows of a backup name, embedded as data URLs: the icon
- * columns (`ICON_FIELDS`) and every stored name in the block rows' `config`
- * (a custom block's copy carries its icon there). A name that is no file in
+ * The icon files the rows of a vault's content name: the icon columns
+ * (`ICON_FIELDS`) and every stored name in the block rows' `config` (a
+ * custom block's copy carries its icon there). A name that is no file in
  * `icons/` — a picture of a block — is skipped.
  */
-async function embedIcons(data: BackupFile['data']): Promise<Record<string, string>> {
+async function iconNamesOf(data: VaultData): Promise<string[]> {
   const names = new Set<string>();
   for (const { table, column } of ICON_FIELDS) {
     const rows = data[ICON_DATA_KEYS[table]] as Row[] | undefined;
@@ -551,46 +561,22 @@ async function embedIcons(data: BackupFile['data']): Promise<Record<string, stri
     if (typeof row.config === 'string') storedImageNamesIn(row.config).forEach((name) => names.add(name));
   }
   const stored = await iconFileNames();
-  const icons: Record<string, string> = {};
-  for (const name of names) {
-    if (!stored.has(name)) continue;
-    try {
-      icons[name] = await readIconAsBase64(name);
-    } catch {
-      // Icon file unreadable — the row falls back to its default
-    }
-  }
-  return icons;
+  return [...names].filter((name) => stored.has(name));
 }
 
 /**
- * The file's icons stored in this vault's `icons/`, by the name the file knew
- * them by — the counterpart of `restoreImages`. Then every icon column of the
- * file's rows points at the name here; a value that is neither an emoji nor
- * an icon the file brings (a data URL, a name without its file) is dropped,
- * so that the row falls back to its default icon.
+ * Points every icon column of the file's rows at the name its icon was
+ * stored under here (`iconMap`, from the archive); a value that is neither an
+ * emoji nor an icon the file brings (a data URL, a name without its file) is
+ * dropped, so that the row falls back to its default icon.
  */
-async function restoreIcons(backup: BackupFile): Promise<Map<string, string>> {
-  const iconMap = new Map<string, string>();
-  const here = await iconFileNames();
-  const icons = backup.icons && typeof backup.icons === 'object' ? backup.icons : {};
-  for (const [oldName, dataUrl] of Object.entries(icons)) {
-    if (!storedImageName(oldName) || !isImageDataUrl(dataUrl)) continue;
-    if (here.has(oldName)) {
-      iconMap.set(oldName, oldName);
-      continue;
-    }
-    try {
-      iconMap.set(oldName, await storeIconDataUrl(dataUrl));
-    } catch {
-      // skip
-    }
-  }
+function remapIconColumns(data: VaultData, iconMap: ReadonlyMap<string, string>): VaultData {
+  const out: VaultData = { ...data };
   for (const { table, column } of ICON_FIELDS) {
     const key = ICON_DATA_KEYS[table];
-    const rows = backup.data[key] as unknown;
+    const rows = data[key] as unknown;
     if (!Array.isArray(rows)) continue;
-    (backup.data as Record<string, unknown>)[key] = rows.map((row: unknown) => {
+    (out as Record<string, unknown>)[key] = rows.map((row: unknown) => {
       if (typeof row !== 'object' || row === null) return row;
       const value = (row as Row)[column];
       if (typeof value !== 'string' || !value) return row;
@@ -599,17 +585,22 @@ async function restoreIcons(backup: BackupFile): Promise<Map<string, string>> {
       return next === value ? row : { ...row, [column]: next || null };
     });
   }
-  return iconMap;
+  return out;
 }
 
-/** The content of a backup according to `options`, images embedded. Writes nothing. */
-export async function buildBackup(options: BackupOptions): Promise<BackupFile> {
-  return buildBackupFrom(await getDb(), options);
-}
-
-/** `buildBackup` against a given database — the schema harness calls it directly. */
-export async function buildBackupFrom(db: Awaited<ReturnType<typeof getDb>>, options: BackupOptions): Promise<BackupFile> {
-  const data: BackupFile['data'] = {};
+/**
+ * A vault's content according to `options`, with the stored names of the
+ * pictures and icons it names — their files go into the archive beside it.
+ * For `raw`, a raw backup's database: its settings come along instead of the
+ * active vault's, and no icons are looked up here. Writes nothing; the
+ * schema harness calls it directly.
+ */
+export async function collectVaultContent(
+  db: Awaited<ReturnType<typeof getDb>>,
+  options: BackupOptions,
+  raw?: { settings: unknown },
+): Promise<{ content: VaultContent; images: string[]; icons: string[] }> {
+  const data: VaultData = {};
   const allImagePaths = new Set<string>();
 
   const { clause: dateClause, params: dateParams } = buildDateFilter(options.dateFrom, options.dateTo);
@@ -710,118 +701,204 @@ export async function buildBackupFrom(db: Awaited<ReturnType<typeof getDb>>, opt
   // Always and in full, like the lexicon: a short list, path data in the row.
   data.symbols = await db.select<Row[]>('SELECT * FROM symbols');
 
-  // ── Embed images ─────────────────────────────────────────────────────────
-  const images: Record<string, string> = {};
-  for (const path of allImagePaths) {
-    try {
-      images[path] = await readImageAsBase64(path);
-    } catch {
-      // Image file missing — skip silently
-    }
-  }
-
-  // ── Embed icons ──────────────────────────────────────────────────────────
-  const icons = await embedIcons(data);
-
-  return {
-    version: BACKUP_VERSION,
-    type: 'backup',
+  const content: VaultContent = {
     exportedAt: new Date().toISOString(),
     filters: options,
     data,
-    images,
-    icons,
     // Without what a `settings.json` from before still carries of language and
     // theme: those belong to the device, and a backup must not bring them back.
-    ...(options.includeSettings && { settings: withoutDeviceKeys(useSettingsStore.getState().settings) }),
+    ...(options.includeSettings && {
+      settings: raw ? raw.settings : withoutDeviceKeys(useSettingsStore.getState().settings),
+    }),
   };
+  // A raw backup's pictures come from its own archive, not from this vault's folders.
+  return { content, images: [...allImagePaths], icons: raw ? [] : await iconNamesOf(data) };
+}
+
+/** The name a vault file gets in the save dialog. */
+export function vaultFileName(date = new Date()): string {
+  return `emerald-backup-${date.toISOString().slice(0, 10)}.vault.emerald`;
+}
+
+/**
+ * Writes the vault's content as a `.vault.emerald` at `path`, without a
+ * dialog: the manifest of the kind `vault`, the pictures and icons as members
+ * of the archive (read from the vault by Rust, never through here).
+ */
+export async function writeVaultFile(path: string, options: BackupOptions, protection: EmeraldProtection): Promise<void> {
+  const { content, images, icons } = await collectVaultContent(await getDb(), options);
+  await writeArchive(path, 'vault', JSON.stringify(vaultManifestOf(content)), images.map((name) => ({ name })), icons, protection);
 }
 
 /** Resolves to `false` when the save dialog was cancelled — nothing was
  *  written, and the UI must not report success then. */
-export async function exportDatabase(options: BackupOptions): Promise<boolean> {
-  const backup = await buildBackup(options);
-
-  // The dialog opens in the active vault's `backup/` folder — created
+export async function exportDatabase(
+  options: BackupOptions,
+  protection: EmeraldProtection = { type: 'vaultKey' },
+): Promise<boolean> {
+  // The dialog opens in the active vault's `backups/` folder — created
   // if needed. If that fails (vault folder currently unreachable),
   // it stays with the bare file name and the dialog opens wherever the
   // operating system wants; the export itself does not depend on it.
-  const filename = `emerald-backup-${new Date().toISOString().slice(0, 10)}.emeralddb`;
+  // An unprotected copy is not offered the vault's own folder: whoever gets
+  // that folder must read nothing without the password.
+  const filename = vaultFileName();
   // One chain, one catch: if `getActiveVaultId()` stood as its own await in the
   // argument, its rejection would escape the `.catch` and take the export down with it.
-  const backupDir = await getActiveVaultId()
+  const backupDir = protection.type === 'none' ? null : await getActiveVaultId()
     .then((vaultId) => invoke<string>('ensure_backup_dir', { vaultId }))
     .catch(() => null);
 
   const savePath = await save({
     defaultPath: backupDir ? joinPath(backupDir, filename) : filename,
-    filters: [{ name: 'Emerald Backup', extensions: ['emeralddb'] }],
+    filters: [{ name: 'Emerald', extensions: ['emerald'] }],
   });
   if (!savePath) return false;
 
-  // Sealed under the vault's key, with its `vault.key` in the header
-  // (`backup.rs`) — opens with the password that applies now.
-  await invoke('write_backup_file', { vaultId: await getActiveVaultId(), path: savePath, content: JSON.stringify(backup) });
+  // By default under the vault's key, with its `vault.key` in the header
+  // (`emerald_file.rs`) — opens with the password that applies now.
+  await writeVaultFile(withEmeraldEnding(savePath, '.vault.emerald'), options, protection);
   return true;
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Open + preview
+// ─────────────────────────────────────────────────────────────────────────────
+
 /**
- * The JSON text of a backup. An encrypted one is opened by Rust with the
- * key of an open vault if it fits; otherwise the password or
- * recovery key is asked for — until it fits or the user
- * cancels (`null`).
+ * An opened `.vault.emerald`: its content and what the import offers from it.
+ * Its pictures wait in the file under `ticket` until the import stores them;
+ * whoever drops it closes it (`closeVaultFile`).
  */
-async function readBackupText(path: string): Promise<string | null> {
-  let secret: BackupSecret | null = null;
+export interface OpenedVaultFile {
+  ticket: string;
+  content: VaultContent;
+  preview: BackupPreview;
+}
+
+/**
+ * Opens a `.vault.emerald` at `path`, asking for its secret as long as needed.
+ * `null`: cancelled at the question. A file of entries and templates, and one
+ * that cannot be read, are refused with an `EmeraldNotice`.
+ */
+export async function openVaultFile(path: string): Promise<OpenedVaultFile | null> {
+  const opened = await openArchiveAsking(path);
+  if (!opened) return null;
   try {
-    for (;;) {
-      let message: string | null;
-      try {
-        return await invoke<string>('read_backup_file', { path, ...(secret ?? {}) });
-      } catch (err) {
-        const code = keyErrorOf(err);
-        if (code === KEY_ERRORS.backupLocked) message = null;
-        else if (code === KEY_ERRORS.wrongPassword) message = i18n.t('vaultKey.wrongPassword');
-        else if (code === KEY_ERRORS.wrongRecoveryKey) message = i18n.t('vaultKey.wrongRecoveryKey');
-        else throw err;
-      }
-      try {
-        secret = await askBackupSecret(message);
-      } catch (cancelled) {
-        if (keyErrorOf(cancelled) === BACKUP_UNLOCK_CANCELLED) return null;
-        throw cancelled;
-      }
-    }
-  } finally {
-    // Opened, discarded or failed — the question is settled.
-    endBackupSecret();
+    if (opened.kind === 'items') throw new EmeraldNotice(i18n.t('settings.importErrorItems'));
+    return await openedVaultFile(opened);
+  } catch (err) {
+    closeArchive(opened.ticket);
+    throw err;
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Parse + preview
-// ─────────────────────────────────────────────────────────────────────────────
+/**
+ * A file opened elsewhere (the menu's import) as a vault's content — still
+ * open. A raw backup's content is read from its database first.
+ */
+export async function openedVaultFile(opened: OpenedArchive): Promise<OpenedVaultFile> {
+  const content = opened.kind === 'raw' ? await rawBackupContent(opened) : vaultContentOf(opened.manifest);
+  return { ticket: opened.ticket, content, preview: previewOf(content) };
+}
 
-export async function openBackupFile(): Promise<{ path: string; backup: BackupFile; preview: BackupPreview } | null> {
+/** When a raw backup was written, from its manifest — `null` if it does not say. */
+function rawBackupDate(manifest: string): string | null {
+  try {
+    const parsed: unknown = JSON.parse(manifest);
+    const created = isRecord(parsed) ? parsed.createdAt : null;
+    return typeof created === 'string' && !Number.isNaN(Date.parse(created)) ? created : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Brings a raw backup's database to this version's schema, as opening a vault
+ * does (`runMigrations`). One without any schema is no vault's, one from
+ * before the fresh start or from a newer app is refused — before anything is
+ * written. The copy is the backup's, not the vault's: what the migrations
+ * change there is thrown away with it.
+ */
+export async function prepareRawDatabase(db: Database): Promise<void> {
+  const stamped = await db.select<{ n: number }[]>(
+    "SELECT COUNT(*) AS n FROM sqlite_master WHERE type = 'table' AND name = 'schema_version'",
+  );
+  if (!stamped[0]?.n) throw new EmeraldNotice(i18n.t('emeraldImport.unsupported'));
+  try {
+    await runMigrations(db);
+  } catch (err) {
+    const version = vaultVersionErrorOf(err);
+    if (version === VAULT_TOO_NEW) throw new EmeraldNotice(i18n.t('emeraldImport.newVersion'));
+    if (version === VAULT_OUTDATED) throw new EmeraldNotice(i18n.t('emeraldImport.oldVersion'));
+    throw err;
+  }
+}
+
+/**
+ * The content of a raw backup: its database unpacked beside the active vault
+ * and opened under the backup's own key (`open_raw_backup_db`), read whole
+ * like a vault, then closed and removed again. Its pictures stay in the file
+ * until the import stores them.
+ */
+async function rawBackupContent(opened: OpenedArchive): Promise<VaultContent> {
+  const vaultId = await getActiveVaultId();
+  let handle: string;
+  try {
+    handle = await invoke<string>('open_raw_backup_db', { ticket: opened.ticket, vaultId });
+  } catch (err) {
+    const notice = noticeFor(err);
+    throw notice ? new EmeraldNotice(notice) : err;
+  }
+  try {
+    const db = Database.fromHandle(handle);
+    await prepareRawDatabase(db);
+    let settings: unknown;
+    try {
+      settings = opened.settings === undefined ? undefined : JSON.parse(opened.settings);
+    } catch {
+      // Unreadable settings: the backup is still one, without them.
+    }
+    const { content } = await collectVaultContent(db, FULL_BACKUP_OPTIONS, { settings });
+    // The day of the backup, not of this reading.
+    return { ...content, exportedAt: rawBackupDate(opened.manifest) ?? content.exportedAt };
+  } finally {
+    await invoke('discard_raw_backup_db', { vaultId })
+      .catch((err: unknown) => console.warn('[backup] raw backup database left behind:', err));
+  }
+}
+
+/** The open dialog, then `openVaultFile`. `null`: cancelled. */
+export async function pickVaultFile(): Promise<OpenedVaultFile | null> {
   const selected = await open({
-    filters: [{ name: 'Emerald Backup', extensions: ['emeralddb'] }],
+    filters: [{ name: 'Emerald', extensions: ['emerald'] }],
     multiple: false,
   });
   if (!selected) return null;
-  const filePath = typeof selected === 'string' ? selected : selected[0];
+  return openVaultFile(typeof selected === 'string' ? selected : selected[0]);
+}
 
-  const raw = await readBackupText(filePath);
-  if (raw === null) return null;
-  const backup = JSON.parse(raw) as BackupFile;
-  if (backup.type !== 'backup') throw new Error('Not an Emerald backup file');
-  readBackupPayload(backup);
+/** Drops an opened file that will not be imported. */
+export function closeVaultFile(file: OpenedVaultFile): void {
+  closeArchive(file.ticket);
+}
 
-  const preview = previewOf(backup);
-  return { path: filePath, backup, preview };
+/**
+ * The file's pictures and icons stored in the active vault. Opening read only
+ * the parts it needed: a damaged picture further in shows only here, and is
+ * named like any other damage of a file.
+ */
+async function storeFiles(file: OpenedVaultFile): Promise<StoredArchiveFiles> {
+  try {
+    return await storeArchiveFiles(file.ticket);
+  } catch (err) {
+    const notice = noticeFor(err);
+    throw notice ? new EmeraldNotice(notice) : err;
+  }
 }
 
 /** What the import offers to choose from: the categories in use and how many entries each holds. */
-function previewOf(backup: BackupFile): BackupPreview {
+function previewOf(backup: VaultContent): BackupPreview {
   const entries = backup.data.entries ?? [];
   const known = new Set((backup.data.categories ?? []).map((c) => String(c.id)));
   const entryCounts: Record<string, number> = {};
@@ -850,36 +927,12 @@ function previewOf(backup: BackupFile): BackupPreview {
 // Image restore helpers
 // ─────────────────────────────────────────────────────────────────────────────
 
-/**
- * The file's pictures stored in this vault, by the name the file knew them by.
- * A file already here under that very name stays as it is: a stored name is
- * a hash of the content, and saving again could spell the type differently
- * (a `.jpeg` taken from the disk comes back as `.jpg`), which would leave the
- * picture in "Images" twice and the texts pointing at the second.
- */
-async function restoreImages(backup: BackupFile): Promise<Map<string, string>> {
-  const pathMap = new Map<string, string>();
-  const here = new Set(await listImageFiles().then((files) => files.map((f) => f.name), () => []));
-  for (const [oldPath, dataUrl] of Object.entries(backup.images)) {
-    if (here.has(oldPath) && storedImageName(oldPath) === oldPath) {
-      pathMap.set(oldPath, oldPath);
-      continue;
-    }
-    try {
-      pathMap.set(oldPath, await saveImage(dataUrl));
-    } catch {
-      // skip
-    }
-  }
-  return pathMap;
-}
-
 function remapPaths(value: unknown, pathMap: Map<string, string>): unknown {
   return typeof value === 'string' ? renameAll(value, pathMap) : value;
 }
 
 /** Rewrite the defaults of brought-along definitions to the images stored here (and, on merge, to the new IDs). */
-function remapDefinitionRows(rows: unknown, pathMap: Map<string, string>, link?: LinkDefaultResolver): unknown {
+export function remapDefinitionRows(rows: unknown, pathMap: Map<string, string>, link?: LinkDefaultResolver): unknown {
   if (!Array.isArray(rows)) return rows;
   return rows.map((r) => (typeof r === 'object' && r !== null
     ? { ...r, elements: remapDefinitionDefaults((r as Row).elements, (name) => pathMap.get(name) ?? name, link) }
@@ -940,7 +993,7 @@ const INSERT_CHUNK = 500;
  * — `insertRows` takes the columns of the first row, and a row
  * without a required column would abort the INSERT. Anything without a usable ID is dropped.
  */
-async function insertBlockDefinitions(
+export async function insertBlockDefinitions(
   db: Awaited<ReturnType<typeof getDb>>,
   rows: unknown,
 ): Promise<void> {
@@ -1221,7 +1274,7 @@ async function insertTasks(
 // Replace import
 // ─────────────────────────────────────────────────────────────────────────────
 
-function applyTypeFilters(d: BackupFile['data'], f: ImportTypeFilters): BackupFile['data'] {
+function applyTypeFilters(d: VaultData, f: ImportTypeFilters): VaultData {
   const anyEntries = selectsEntries(f);
   const known = new Set((d.categories ?? []).map((c) => String(c.id)));
   return {
@@ -1252,7 +1305,7 @@ function applyTypeFilters(d: BackupFile['data'], f: ImportTypeFilters): BackupFi
  * spans entries and tasks, and a partial replace must not pull the
  * categories out from under the rest.
  */
-async function resolveImportedCategories(
+export async function resolveImportedCategories(
   db: Awaited<ReturnType<typeof getDb>>,
   rows: Row[],
 ): Promise<CategoryResolution> {
@@ -1351,7 +1404,7 @@ async function applyStartTemplates(db: Awaited<ReturnType<typeof getDb>>, startT
  * the whole table along; what nobody needs here — excluded categories,
  * unused ones — should not become a row in the vault.
  */
-function usedCategoryRows(d: BackupFile['data']): Row[] {
+function usedCategoryRows(d: VaultData): Row[] {
   const used = new Set(
     [...(d.entries ?? []), ...(d.tasks ?? [])]
       .filter((r) => r.category_id != null)
@@ -1424,7 +1477,7 @@ function remapCategoryIds(rows: Row[], map: Map<string, string>): Row[] {
  */
 export async function assertPayloadReferencesResolve(
   db: Awaited<ReturnType<typeof getDb>>,
-  d: BackupFile['data'],
+  d: VaultData,
 ): Promise<void> {
   // Categories survive every import (see resolveImportedCategories) — the
   // vault's existing data therefore counts as a target in both modes.
@@ -1457,14 +1510,20 @@ export async function assertPayloadReferencesResolve(
   }
 }
 
-export async function doReplace(db: Awaited<ReturnType<typeof getDb>>, backup: BackupFile): Promise<void> {
-  const pathMap = await restoreImages(backup);
+/**
+ * Per picture and icon of the file, the name it was stored under here — what
+ * `storeArchiveFiles` returns, before the rows are written.
+ */
+export type ImportedFiles = StoredArchiveFiles;
+
+export async function doReplace(db: Awaited<ReturnType<typeof getDb>>, backup: VaultContent, files: ImportedFiles): Promise<void> {
+  const pathMap = new Map(files.images);
   // The block copies name their icons in `config`, beside their pictures: one
   // rename for both (the same bytes have the same name in either folder).
-  const fileMap = new Map([...pathMap, ...await restoreIcons(backup)]);
+  const fileMap = new Map([...pathMap, ...files.icons]);
   // Tags are not replaced but merged: entries that this file does
   // not replace carry the IDs of the existing ones.
-  const d = await importTagsAndRemap(db, backup.data);
+  const d = await importTagsAndRemap(db, remapIconColumns(backup.data, files.icons));
 
   await assertPayloadReferencesResolve(db, d);
 
@@ -1532,10 +1591,10 @@ export async function doReplace(db: Awaited<ReturnType<typeof getDb>>, backup: B
 // Merge import (ID-prefix strategy)
 // ─────────────────────────────────────────────────────────────────────────────
 
-export async function doMerge(db: Awaited<ReturnType<typeof getDb>>, backup: BackupFile): Promise<void> {
-  const pathMap = await restoreImages(backup);
-  const fileMap = new Map([...pathMap, ...await restoreIcons(backup)]);
-  const d = await importTagsAndRemap(db, backup.data);
+export async function doMerge(db: Awaited<ReturnType<typeof getDb>>, backup: VaultContent, files: ImportedFiles): Promise<void> {
+  const pathMap = new Map(files.images);
+  const fileMap = new Map([...pathMap, ...files.icons]);
+  const d = await importTagsAndRemap(db, remapIconColumns(backup.data, files.icons));
 
   // Merge deletes nothing, but aborts midway through inserting if a
   // category is missing — check beforehand so the message says which.
@@ -1636,7 +1695,8 @@ export async function doMerge(db: Awaited<ReturnType<typeof getDb>>, backup: Bac
  * label is a type error, not a forgotten entry.
  *
  * One truth for four places that previously each kept the same list:
- * the two packing lists in the settings window (export and import), the
+ * the two packing lists (the export menu's `VaultExportOptions`, the vault
+ * import's `VaultImportModal`; `loadExportPrefs` reads the same kinds back), the
  * initial and reset value of the import filter, and `ALL_TYPES_INCLUDED`
  * below. A kind that was forgotten there was silently excluded from every
  * "import everything".
@@ -1663,8 +1723,13 @@ export function allTypesIncluded(): ImportTypeFilters {
 
 const ALL_TYPES_INCLUDED: ImportTypeFilters = allTypesIncluded();
 
+/**
+ * Imports an opened `.vault.emerald`. Its pictures and icons are stored
+ * first, in the vault they are imported into (for `add-vault` the new one).
+ * The file stays open: whoever opened it closes it (`closeVaultFile`).
+ */
 export async function importDatabase(
-  backup: BackupFile,
+  file: OpenedVaultFile,
   mode: ImportMode,
   /** Only for `add-vault`: name and — if the user chose one —
    *  target folder of the new vault. Without `path` the fallback from
@@ -1675,6 +1740,7 @@ export async function importDatabase(
    *  replace and add-vault take over the file's settings entirely. */
   settingsGroups: readonly SettingsGroup[] = [],
 ): Promise<void> {
+  const backup = file.content;
   // Unchecked from the file — from here on only in checked form.
   const backupSettings = importableSettings(backup.settings);
   // A backup from before language and theme moved to the device may hold
@@ -1697,7 +1763,7 @@ export async function importDatabase(
   // queued finish before the working copy is taken.
   await drainSerialized();
 
-  const filteredBackup: BackupFile = {
+  const filteredBackup: VaultContent = {
     ...backup,
     data: applyTypeFilters(backup.data, typeFilters ?? ALL_TYPES_INCLUDED),
   };
@@ -1726,7 +1792,7 @@ export async function importDatabase(
     // 3. Switch to it (resets the DB cache and creates the schema in the new empty DB)
     await useVaultStore.getState().loadVaults();
     // `editsResolved`: the question about ongoing edits was asked
-    // before the import began (`BackupPage`). If it came up here again and
+    // before the import began (`VaultImportModal`). If it came up here again and
     // the answer were "keep editing", the old vault would stay active —
     // and step 4 would fill it instead of the new one.
     // If the user cancels at the new vault's password, the import is
@@ -1741,7 +1807,8 @@ export async function importDatabase(
       throw new Error('could not switch to the new vault');
     }
 
-    // 4. Fill the new (empty) vault with the backup data
+    // 4. Fill the new (empty) vault with the backup data — its pictures first, into this vault.
+    const files = await storeFiles(file);
     const db = await getDb();
     // The fresh vault has just created the built-in templates itself. If
     // the file carries its templates along, its version applies — including
@@ -1754,7 +1821,7 @@ export async function importDatabase(
       if (bringsTemplates && selectsEntries(types)) {
         await staging.execute('DELETE FROM templates WHERE id IN ($1, $2)', [SIGIL_TEMPLATE_ID, ALTAR_TEMPLATE_ID]);
       }
-      await doReplace(staging, filteredBackup);
+      await doReplace(staging, filteredBackup, files);
     });
     // Only once the import went through, as with replace and merge below.
     if (backupThemes) useDeviceStore.getState().adoptCustomThemes(backupThemes);
@@ -1762,7 +1829,8 @@ export async function importDatabase(
     // Never directly against the vault: `doReplace` deletes before it inserts, and
     // an aborted merge would leave half-imported data behind (see `importStaging.ts`).
     const run = mode === 'replace' ? doReplace : doMerge;
-    await importViaStaging(await getDb(), (staging) => run(staging, filteredBackup));
+    const files = await storeFiles(file);
+    await importViaStaging(await getDb(), (staging) => run(staging, filteredBackup, files));
 
     // Only after a successful swap: an aborted import leaves the
     // settings as they were, too.
@@ -1806,5 +1874,12 @@ export async function importDatabase(
   }
 }
 
-// Re-export BackupFile type for use in UI
-export type { BackupFile };
+
+/** The rows of these custom block definitions — what a `.emerald` file of entries takes along. */
+export async function definitionRows(db: Awaited<ReturnType<typeof getDb>>, ids: readonly string[]): Promise<ManifestBlockDefinition[]> {
+  return db.select<ManifestBlockDefinition[]>(
+    // Not from the trash: what was thrown away there does not go to another vault.
+    'SELECT * FROM block_definitions WHERE deleted_at IS NULL AND id IN (SELECT value FROM json_each($1)) ORDER BY sort_order',
+    [JSON.stringify(ids)],
+  );
+}

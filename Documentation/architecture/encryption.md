@@ -1,6 +1,6 @@
 # Encryption and the SQL Layer
 
-Every vault is encrypted. This file describes how: the key hierarchy, what is sealed and how, the SQL layer that opens the database, the unlock gate in the frontend, re-encryption, and encrypted backups. What the encryption protects against, and what it does not, is in [`security.md`](../security.md#vault-encryption); the user's view is in [`features.md`](../features.md#vault-encryption).
+Every vault is encrypted. This file describes how: the key hierarchy, what is sealed and how, the SQL layer that opens the database, the unlock gate in the frontend, re-encryption, and encrypted `.emerald` files and backups. What the encryption protects against, and what it does not, is in [`security.md`](../security.md#vault-encryption); the user's view is in [`features.md`](../features.md#vault-encryption).
 
 ## Keys
 
@@ -27,7 +27,7 @@ A remembered key is checked against `check` before it is used, and a keychain th
 
 ## Sealed files
 
-One format seals everything outside the database: images, `drafts.json`, backups, and the wrapped vault keys.
+One format seals everything outside the database: images, `drafts.json` and the wrapped vault keys. A `.emerald` file has a streamed format of its own (see [Encrypted files](#encrypted-files)).
 
 ```text
 "EMRC" | version (1 byte) | nonce (24 bytes) | XChaCha20-Poly1305 ciphertext + tag
@@ -81,7 +81,7 @@ Nothing in the vault is touched until a complete, checked copy under the new key
 
 1. **Prepare.** `vault.key.pending`; the database exported into `emerald.db.reencrypting` with `sqlcipher_export`; every image sealed under its new keyed name into `images.reencrypting/`, every icon likewise into `icons.reencrypting/` (under the icons' own sealing context); every image and icon name inside the copy rewritten; `drafts.json.reencrypting`. Image names are rewritten in every text column of every table — a name is 64 hex digits plus an image extension, unique enough that no schema knowledge is needed. The copy is then verified: `integrity_check` and the same row count in every table as the original.
 2. **Commit.** The marker `vault.reencrypting` is written, naming the new key by its `check` value and the images and icons to keep (`keep`, `keep_icons`; a marker without `keep_icons` leaves `icons/` alone). Then database, `vault.key`, drafts, images and icons are swapped in.
-3. **Clean up.** The old database, the import staging copy, any `emerald.db.pre-vNN.bak` an earlier version's migrations left (a vault from before the fresh start can still be recovered before it is refused) and every image or icon not named in the marker are deleted, then the marker.
+3. **Clean up.** The old database, the import staging copy, a raw backup's snapshot or unpacked database, any `emerald.db.pre-vNN.bak` an earlier version's migrations left (a vault from before the fresh start can still be recovered before it is refused) and every image or icon not named in the marker are deleted, then the marker.
 
 The same run from a plain folder (`encrypt_dir`) exists only for debug builds' `dev_seed` and the tests; the app has no command that encrypts a user's plain vault.
 
@@ -89,21 +89,36 @@ A run first checks free space (`fs4::statvfs`; on macOS the larger of that and t
 
 A run reports progress as the event `vault-reencrypt-progress` (`vaultId`, `phase` `database`/`images`/`checking`, `done`, `total`), at most ten a second. `ReencryptProgressLine` (`vaultKeyParts.tsx`) shows it in `VaultKeyDialog` while recovering, and on the Security page while the password changes. On a large vault a run takes minutes, and without it the app would look hung.
 
-`recover_interrupted` makes a crash anywhere safe: without the marker the original is untouched and the half-made copy is thrown away; with it, the swap is finished, every step of it being repeatable. It runs from `vault_key_status` — the first call on every open — and is skipped while a run is in progress.
+`recover_interrupted` makes a crash anywhere safe: without the marker the original is untouched and the half-made copy is thrown away; with it, the swap is finished, every step of it being repeatable. It runs from `vault_key_status` — the first call on every open — and is skipped while a re-encryption runs (`REENCRYPTING`); a raw backup holding the same lock does not count, so a vault never opens half swapped.
 
 Before the commit the frontend closes the vault's connections (`withDbClosed`) and settles open edits and drafts (`resolveOpenEdits`, `detachDrafts`); afterwards it reloads everything, because image names changed. A change that fails before the commit leaves the vault as it was.
 
-## Encrypted backups
+## Encrypted files
 
-`backup.rs` writes and reads `.emeralddb` files (`auto_backup.rs` writes the automatic ones, sealed through the same `seal_for_vault`); `write_file` and `read_file` refuse that extension, so no backup can be written in the clear by accident.
+A `.emerald` file — entries and templates, or a vault's content as `.vault.emerald` — carries its protection in its header (layout in [The `.emerald` file](editing.md#the-emerald-file)), written and read by `emerald_file.rs`:
+
+- **`none`.** The archive follows the header in the clear. The export menu writes it when asked to, and a template's **Export as Emerald…** always.
+- **`password`.** An own password of at least eight characters. The key is derived with Argon2id (`DEFAULT_KDF`); parameters, a 16-byte salt and the nonce prefix stand in the header, and parameters out of the bounds `vault.key`'s are read within are refused as damaged. A missing password is `EMERALD_LOCKED`, a wrong one `WRONG_PASSWORD`.
+- **`vaultKey`.** The header carries the vault's `vault.key` as it was at export, so the file opens with the password (or recovery key) the vault had **then** — after a later password change, which replaces the vault key, and on another machine. The file's key is `HMAC(Files subkey of the vault key, "emerald/emerald-file/" + salt)`, one per file. Opening tries the keys of the vaults unlocked right now first and opens without asking when one fits; otherwise it answers `EMERALD_VAULT_LOCKED`, and the frontend (`openArchiveAsking` in `lib/emerald/file.ts`) asks through `BackupUnlockDialog` for that vault's password or recovery key, repeating after `WRONG_PASSWORD` / `WRONG_RECOVERY_KEY` until the file opens or the user cancels. The export menu's default for `.emerald` and `.vault.emerald`.
+
+A protected body is sealed in 64 KiB chunks (`emerald_seal.rs`):
 
 ```text
-"EMRB" | version (1 byte) | header length (u32 LE) | header JSON {keyFile} | sealed JSON
+chunk i = XChaCha20-Poly1305(file key, nonce prefix (16) | i (u64 LE), plain chunk,
+                             associated data: whole header | last-chunk flag)
 ```
 
-The payload is the JSON of [DB Backup / Restore](../database.md#db-backup--restore-emeralddb), sealed under the vault key's `Files` subkey with the `Backup` context. The header carries the vault's `vault.key` as it was at export time, so the backup opens with the password (or recovery key) the vault had **then** — after a later password change, which replaces the vault key, and on another machine.
+The header — kind, protection, salt, nonce prefix — is bound into every chunk, the counter keeps the chunks in their order, and the flag on the last one makes a file cut off at a chunk boundary fail instead of reading as a shorter archive. Writing never holds the whole file in memory; reading decrypts only the chunk the ZIP reader asks for (a seekable reader), so the clear archive never touches the disk. With a password, a first chunk that does not open is `WRONG_PASSWORD`; with a vault key, whose `check` has already confirmed the key, it is damage (`EMERALD_UNREADABLE`).
 
-Opening a backup (`read_backup_file`) tries the keys of the vaults that are unlocked right now first and opens without asking when one fits. Otherwise it answers `BACKUP_LOCKED`, and the frontend (`readBackupText` in `dbBackup.ts`) asks through `BackupUnlockDialog` — password or recovery key — repeating on a wrong answer until the backup opens or the user cancels. A file without the magic bytes is read as plain JSON; a backup from before encryption (format 12 and below) is then refused like every format below 17 (see [Backup versions](../database.md#backup-versions)).
+`read_emerald_file` keeps the derived key in Rust state with the file's path under a ticket (`EmeraldTickets`, at most four, the oldest given up), so `store_emerald_files` can read the pictures later without asking again; `close_emerald_file` forgets it.
+
+### Raw backups
+
+The automatic backup writes a `.vault.emerald` of the kind `raw` (`raw_backup.rs`, read by `emerald_file.rs`): the vault's files as they lie on the disk, packed as stored ZIP members behind the header — `emerald.db` (SQLCipher), its `emerald.db-journal` where one was left, `vault.key`, `settings.json`, `images/*` and `icons/*`. Everything but the settings is encrypted already, so the archive is not sealed again and no password is asked when one is written; the header's protection is `none` and it carries the vault's `vault.key` under `keyFile`. Only a raw backup carries a key file and only a raw backup may hold the vault's own files; a header or archive that says otherwise is damage.
+
+- **Opening** unwraps that key file like a `vaultKey` file: with the key of a vault unlocked right now (no question), or that vault's password or recovery key through `BackupUnlockDialog`. The vault key stays in Rust state under the ticket.
+- **The database** is unpacked beside the active vault as `emerald.db.raw` (`open_raw_backup_db`) and opened under the backup's own database key — never through `db_load`, which knows only the vault's own key. The frontend brings it to this version's schema (`prepareRawDatabase`: one without `schema_version` or from a newer app is refused before anything is written), reads it whole (`collectVaultContent`), and `discard_raw_backup_db` closes and removes it. From there on it is the content of any `.vault.emerald`: Add vault, Merge or Replace.
+- **The pictures** are opened under the backup's `Files` subkey as `store_emerald_files` reads them, and stored under this vault's key and names; one that does not open is damage.
 
 ## Leftovers outside the vault
 

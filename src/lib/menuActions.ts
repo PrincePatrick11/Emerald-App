@@ -3,7 +3,6 @@ import { useUIStore } from '../store/uiStore';
 import { hasActiveVault, useVaultStore } from '../store/vaultStore';
 import { openVaultPicker, useVaultPickerStore } from '../store/vaultPickerStore';
 import { showSplash } from './splash';
-import type { ActiveView } from '../types';
 
 /**
  * The application menu's actions, shared by the menus that can trigger them:
@@ -24,9 +23,7 @@ type MenuActionId =
   | 'switch-vault'
   | 'show-about'
   | 'check-updates'
-  | 'export-pdf'
-  | 'export-markdown'
-  | 'export-emerald'
+  | 'export'
   | 'import-markdown'
   | 'import-emerald';
 
@@ -39,9 +36,7 @@ type SelfContainedMenuActionId = Exclude<MenuActionId, 'reset-sidebar-widths'>;
 
 /** The actions only the title bar offers; every other one is a native menu event. */
 type TitleBarOnlyMenuActionId =
-  | 'export-pdf'
-  | 'export-markdown'
-  | 'export-emerald'
+  | 'export'
   | 'import-markdown'
   | 'import-emerald';
 
@@ -113,26 +108,10 @@ export async function runMenuAction(id: SelfContainedMenuActionId): Promise<void
   // The export/import modules (including turndown and marked) are only loaded on the
   // first menu call — otherwise they would hang on the startup path via AppShell.
   switch (id) {
-    case 'export-pdf': {
-      const { exportAsPDF, noEntryMessage, exportErrorMessage } = await import('./export');
-      const { collectExportData } = await import('./exportData');
-      const data = await collectExportData();
-      if (!data) { noEntryMessage(); return; }
-      exportAsPDF(data).catch((err) => exportErrorMessage(err, 'pdf'));
-      return;
-    }
-    case 'export-markdown': {
-      const { exportAsMarkdown, noEntryMessage, exportErrorMessage } = await import('./export');
-      const { collectExportData } = await import('./exportData');
-      const data = await collectExportData();
-      if (!data) { noEntryMessage(); return; }
-      exportAsMarkdown(data).catch((err) => exportErrorMessage(err, 'markdown'));
-      return;
-    }
-    case 'export-emerald': {
-      const { exportErrorMessage } = await import('./export');
-      const { exportAsEmerald } = await import('./emeraldFormat');
-      exportAsEmerald().catch((err) => exportErrorMessage(err, 'emerald'));
+    // The export menu: one entry, a collective export or the whole database.
+    case 'export': {
+      const { useExportMenuStore } = await import('../store/exportMenuStore');
+      useExportMenuStore.getState().open();
       return;
     }
     case 'import-markdown': {
@@ -166,31 +145,4 @@ export function dispatchMenuAction(id: MenuActionId): void {
     return;
   }
   void runMenuAction(id);
-}
-
-interface MenuEnabledState {
-  /** Markdown export — entries. */
-  entryEnabled: boolean;
-  /** PDF export — entries. */
-  pdfEnabled: boolean;
-  /** Emerald export — like PDF, plus an open template page. */
-  emeraldEnabled: boolean;
-}
-
-/**
- * Decides which export menu items are available for the current view. Pure so
- * that the HTML menu bar can call it during render.
- *
- * A concealed sigil needs no exception here: the export leaves its calculator
- * and drawing out on its own (`renderBlocksForExport`, `withoutConcealed`).
- */
-export function computeMenuEnabledState(activeView: ActiveView): MenuEnabledState {
-  const isEntryView = activeView.type === 'entry' && !!activeView.id;
-  const isTemplatePage = activeView.type === 'templates' && !!activeView.id;
-
-  return {
-    entryEnabled: isEntryView,
-    pdfEnabled: isEntryView,
-    emeraldEnabled: isEntryView || isTemplatePage,
-  };
 }

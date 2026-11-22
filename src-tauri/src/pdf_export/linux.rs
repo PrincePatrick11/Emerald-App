@@ -100,11 +100,9 @@ type PdfSender = Arc<Mutex<Option<oneshot::Sender<Result<(), String>>>>>;
 const PAGE_LOAD_TIMEOUT: Duration = Duration::from_secs(30);
 const PRINT_TIMEOUT: Duration = Duration::from_secs(120);
 
-/// `page_size` — `(width_in, height_in)` in inches, used on Windows to size
-/// the PDF page to the Altar's own aspect ratio (see `windows.rs`). Not yet
-/// wired up here (would need a custom `GtkPaperSize` on the print
-/// settings); left unused pending real-device verification, same caveat
-/// as the rest of this file.
+/// `page_size` — `(width_in, height_in)` in inches, honoured on Windows only
+/// (see `windows.rs`; the frontend passes none at present). Not
+/// wired up here (would replace the A4 `GtkPaperSize`).
 pub async fn export_pdf(
     app: &AppHandle,
     html: String,
@@ -253,6 +251,18 @@ fn run_print(
     // user-chosen absolute path on disk.
     let file_uri = format!("file://{path}");
     settings.set("output-uri", Some(&file_uri));
+
+    // A4 on every system, whatever paper the locale suggests, with the
+    // export's margins — as on Windows and macOS.
+    let a4 = gtk::PaperSize::new(Some("iso_a4"));
+    settings.set_paper_size(&a4);
+    let page_setup = gtk::PageSetup::new();
+    page_setup.set_paper_size(&a4);
+    page_setup.set_top_margin(super::MARGIN_VERTICAL_IN, gtk::Unit::Inch);
+    page_setup.set_bottom_margin(super::MARGIN_VERTICAL_IN, gtk::Unit::Inch);
+    page_setup.set_left_margin(super::MARGIN_HORIZONTAL_IN, gtk::Unit::Inch);
+    page_setup.set_right_margin(super::MARGIN_HORIZONTAL_IN, gtk::Unit::Inch);
+    print_op.set_page_setup(&page_setup);
 
     print_op.set_print_settings(&settings);
 

@@ -1,43 +1,67 @@
 import { create } from 'zustand';
+import type { Weekday } from '../lib/formatDate';
 
-/** Mirrors `AutoBackupStatus` in `src-tauri/src/auto_backup.rs`. */
-export interface AutoBackupStatus {
-  /** The folder chosen by the user; `null` while the vault's `backup/` folder applies. */
+/** How often the automatic backup runs — whole days only, the file name carries the date. */
+export const BACKUP_INTERVAL_OPTIONS = ['daily', 'weekly', 'monthly'] as const;
+export type BackupInterval = (typeof BACKUP_INTERVAL_OPTIONS)[number];
+/** How many automatic backups of each vault are kept; `null` = all. The
+ *  numbers are checked once more by `KEEP_CHOICES` in `auto_backup.rs` —
+ *  change both together. */
+export const BACKUP_KEEP_OPTIONS = [3, 5, 10, 30, null] as const;
+export type BackupKeep = (typeof BACKUP_KEEP_OPTIONS)[number];
+
+/** Mirrors `AutoBackupSettings` in `src-tauri/src/auto_backup.rs`. */
+export interface AutoBackupSettings {
+  /** The vaults that are backed up. */
+  vaults: string[];
+  interval: BackupInterval;
+  /** Applies to `weekly` only. */
+  weekday: Weekday;
+  keep: BackupKeep;
+  /** The folder chosen by the user; `null` while each vault's own `backups/` applies. */
   customDir: string | null;
-  dir: string;
   /** The chosen folder is currently unreachable. */
-  missing: boolean;
-  /** Day of this vault's most recent automatic backup, `YYYY-MM-DD`. */
-  newest: string | null;
-  today: string;
+  dirMissing: boolean;
 }
 
-/** Kept as a code and translated only on render — so the message follows a language change. */
-export type AutoBackupError = 'dirMissing' | 'failed';
+/** What the last run of a vault came to — kept as a code and translated on render. */
+export type AutoBackupError = 'dirMissing' | 'vaultMissing' | 'interrupted' | 'failed';
+
+/** Mirrors `VaultBackupStatus` in `auto_backup.rs`. */
+export interface VaultBackupStatus {
+  vaultId: string;
+  /** Where its backups go. */
+  dir: string;
+  /** Day of its most recent automatic backup, `YYYY-MM-DD`. */
+  newest: string | null;
+  running: boolean;
+  error: AutoBackupError | null;
+}
 
 interface AutoBackupState {
-  /** The vault that `status` and `error` belong to. */
-  vaultId: string | null;
-  status: AutoBackupStatus | null;
-  running: boolean;
-  /** "Back up now" was clicked and is still waiting for its run (`backUpNow`). */
-  requested: boolean;
-  error: AutoBackupError | null;
-  /** The dot on the gear has done its job; a new error after a success shows it again. */
+  settings: AutoBackupSettings | null;
+  /** By vault ID, for every vault of the list. */
+  statuses: Record<string, VaultBackupStatus>;
+  /** The vaults whose "Back up now" is still under way. */
+  requested: string[];
+  /** The dot on the start page button has done its job; a new error shows it again. */
   errorSeen: boolean;
 }
 
 /**
- * What the automatic backup did last. Written only by
- * `lib/autoBackup.ts`; read by the section in the settings and by the
- * gear in the bar. A store of its own, so the bar can know it without
- * pulling `dbBackup` into the main chunk.
+ * What the automatic backup is set to and what it did last. Written only by
+ * `lib/autoBackup.ts`; read by the start page and the button that leads
+ * there. A store of its own, so the rail can know it without loading more.
  */
 export const useAutoBackupStore = create<AutoBackupState>(() => ({
-  vaultId: null,
-  status: null,
-  running: false,
-  requested: false,
-  error: null,
+  settings: null,
+  statuses: {},
+  requested: [],
   errorSeen: false,
 }));
+
+/** Whether a chosen vault's last run failed. */
+export function autoBackupFailed(state: AutoBackupState): boolean {
+  const chosen = new Set(state.settings?.vaults ?? []);
+  return Object.values(state.statuses).some((s) => chosen.has(s.vaultId) && s.error !== null);
+}

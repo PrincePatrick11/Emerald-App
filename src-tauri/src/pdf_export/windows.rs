@@ -46,10 +46,11 @@ const PAGE_LOAD_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(30
 /// (many pages) is still realistically a couple of seconds.
 const PRINT_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(120);
 
-/// `page_size`, when present, is `(width_in, height_in)` in inches and is
-/// applied as a custom media size (zero margins) via
-/// `ICoreWebView2Environment6::CreatePrintSettings`, instead of the
-/// default Letter/Portrait page `PrintToPdf` otherwise falls back to.
+/// The page is A4 with the export's margins (`super::A4_INCHES`), set as a
+/// custom media size via `ICoreWebView2Environment6::CreatePrintSettings` —
+/// WebView2 would otherwise fall back to the system's default (Letter in the
+/// US). `page_size`, when present, is `(width_in, height_in)` in inches and
+/// replaces it, with zero margins.
 pub async fn export_pdf(
     app: &AppHandle,
     html: String,
@@ -130,11 +131,15 @@ pub async fn export_pdf(
                 }
             };
 
-            // Build a custom-size print settings object when the caller
-            // asked for one (Altar PDF export). Any failure along this
-            // path just falls back to the default Letter/Portrait page
-            // rather than aborting the whole export.
-            let print_settings: Option<ICoreWebView2PrintSettings> = page_size.and_then(|(width_in, height_in)| {
+            // The page: A4 with the export's margins, the same on every
+            // system — or the size the caller asked for (none at present),
+            // edge to edge. Any failure along this path just falls back to
+            // WebView2's default page rather than aborting the whole export.
+            let (width_in, height_in, margin_v, margin_h) = match page_size {
+                Some((w, h)) => (w, h, 0.0, 0.0),
+                None => (super::A4_INCHES.0, super::A4_INCHES.1, super::MARGIN_VERTICAL_IN, super::MARGIN_HORIZONTAL_IN),
+            };
+            let print_settings: Option<ICoreWebView2PrintSettings> = {
                 let build = || -> windows::core::Result<ICoreWebView2PrintSettings> {
                     let core2: ICoreWebView2_2 = core.cast()?;
                     let env = unsafe { core2.Environment()? };
@@ -146,21 +151,21 @@ pub async fn export_pdf(
                         settings.SetOrientation(COREWEBVIEW2_PRINT_ORIENTATION_PORTRAIT)?;
                         settings.SetPageWidth(width_in)?;
                         settings.SetPageHeight(height_in)?;
-                        settings.SetMarginTop(0.0)?;
-                        settings.SetMarginBottom(0.0)?;
-                        settings.SetMarginLeft(0.0)?;
-                        settings.SetMarginRight(0.0)?;
+                        settings.SetMarginTop(margin_v)?;
+                        settings.SetMarginBottom(margin_v)?;
+                        settings.SetMarginLeft(margin_h)?;
+                        settings.SetMarginRight(margin_h)?;
                     }
                     Ok(settings)
                 };
                 match build() {
                     Ok(s) => Some(s),
                     Err(e) => {
-                        eprintln!("emerald pdf-export (webview2): custom page size setup failed, falling back to default: {e}");
+                        eprintln!("emerald pdf-export (webview2): page size setup failed, falling back to default: {e}");
                         None
                     }
                 }
-            });
+            };
 
             // The Arc is cloned into the closure so we can still report
             // synchronously if `PrintToPdf` itself fails before the

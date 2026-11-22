@@ -24,6 +24,9 @@ interface TagInputProps {
    *  with an ID of its own in `tags`; the caller creates it on saving (`commitDraftTags`). */
   drafts?: DraftTag[];
   onDraftsChange?: (drafts: DraftTag[]) => void;
+  /** A filter rather than a field to tag with (the export menu): only existing tags,
+   *  a new name neither becomes one nor points at the Tags dashboard. */
+  existingOnly?: boolean;
 }
 
 export type DraftTag = Pick<TagRow, 'id' | 'name' | 'color'>;
@@ -43,7 +46,7 @@ export async function commitDraftTags(tags: string[], drafts: DraftTag[]): Promi
   return [...new Set(result)];
 }
 
-export default function TagInput({ tags, onChange, readOnly = false, chipSize = 'default', flush = false, drafts, onDraftsChange }: TagInputProps) {
+export default function TagInput({ tags, onChange, readOnly = false, chipSize = 'default', flush = false, drafts, onDraftsChange, existingOnly = false }: TagInputProps) {
   const { t } = useTranslation();
   const { tags: allTags, ensureTag, getByName } = useTagStore(
     useShallow((s) => ({ tags: s.tags, ensureTag: s.ensureTag, getByName: s.getByName }))
@@ -73,24 +76,30 @@ export default function TagInput({ tags, onChange, readOnly = false, chipSize = 
   const addTag = async (name: string) => {
     const trimmed = name.trim();
     if (!trimmed) { setInput(''); return; }
+    const pick = (id: string) => {
+      onChange([...new Set([...tags, id])]);
+      setInput('');
+      setOpen(false);
+    };
+    // A filter picks from existing tags only; a typed new name adds nothing.
+    if (existingOnly) {
+      const existing = getByName(trimmed);
+      if (existing) pick(existing.id);
+      return;
+    }
     // Without permission to create, only existing tags; the hint in the menu below
     // says where new ones come from.
     if (!createInline && !getByName(trimmed)) { setOpen(true); return; }
     if (onDraftsChange && !getByName(trimmed)) {
       const draft = draftByName(trimmed) ?? { id: generateId(), name: trimmed, color: randomTagColor() };
       onDraftsChange([...activeDrafts.filter((d) => d.id !== draft.id), draft]);
-      onChange([...new Set([...tags, draft.id])]);
-      setInput('');
-      setOpen(false);
+      pick(draft.id);
       return;
     }
     // ensureTag finds "foo" also as "Foo". Always write: if it fetches a
     // tag from the trash, it also takes it out of this entry, and the
     // list here would then be stale.
-    const { id } = await ensureTag(trimmed);
-    onChange([...new Set([...tags, id])]);
-    setInput('');
-    setOpen(false);
+    pick((await ensureTag(trimmed)).id);
   };
 
   const removeTag = (id: string) => {
@@ -131,7 +140,7 @@ export default function TagInput({ tags, onChange, readOnly = false, chipSize = 
     );
   }
 
-  const menu = open && (input || suggestions.length > 0) && (
+  const menu = open && ((input && !existingOnly) || suggestions.length > 0) && (
     <div className="absolute top-full left-0 mt-1 z-50 bg-well-solid border border-edge-default rounded-lg shadow-menu min-w-[160px] py-1">
       {suggestions.map((t) => (
         <button
@@ -146,7 +155,7 @@ export default function TagInput({ tags, onChange, readOnly = false, chipSize = 
           {t.name}
         </button>
       ))}
-      {trimmedInput && !inputMatchesTag && (createInline ? (
+      {trimmedInput && !inputMatchesTag && !existingOnly && (createInline ? (
         <button
           onMouseDown={(e) => { e.preventDefault(); addTag(input); }}
           className="w-full text-left px-3 py-1.5 text-xs text-accent hover:bg-well-raise"
@@ -164,7 +173,7 @@ export default function TagInput({ tags, onChange, readOnly = false, chipSize = 
     </div>
   );
 
-  // Editing happens in the sidebar (`TagsField`) and in dialogs (`flush`, with drafts): the chips (24px,
+  // Editing happens in the sidebar (`TagsField`), in dialogs (`flush`, with drafts) and in a filter (`existingOnly`): the chips (24px,
   // with a round "×") stand on their own, with the field "Add tag …" below.
   return (
     <div ref={wrapperRef} className="relative flex flex-col gap-1">

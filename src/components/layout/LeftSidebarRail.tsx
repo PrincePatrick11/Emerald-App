@@ -3,21 +3,21 @@ import { LayoutGrid, Plus, Settings, type LucideIcon } from 'lucide-react';
 import { Suspense, lazy, useEffect, useState } from 'react';
 import { AUX_VIEWS, TASKS_VIEW, type ViewId } from '../../lib/modules';
 import { useUIStore } from '../../store/uiStore';
-import { useVaultStore } from '../../store/vaultStore';
-import { useAutoBackupStore } from '../../store/autoBackupStore';
-import { useSettingsStore } from '../../store/settingsStore';
+import { autoBackupFailed, useAutoBackupStore } from '../../store/autoBackupStore';
+import { useVaultImportStore } from '../../store/vaultImportStore';
+import { useExportMenuStore } from '../../store/exportMenuStore';
 import { markAutoBackupErrorSeen } from '../../lib/autoBackup';
 import { asUpdateError, checkForUpdate, updateSettings } from '../../lib/updates';
 import { openVaultPicker } from '../../store/vaultPickerStore';
+import type { OpenedVaultFile } from '../../lib/dbBackup';
 import CreateItemModal from './CreateItemModal';
 import { useRailDashboards } from './RailDashboards';
 
-// SettingsModal drags the complete backup/restore machinery (dbBackup)
-// along with it — as a chunk of its own, only on first open.
+// SettingsModal and the two dialogs of a whole vault are chunks of their own,
+// loaded on first open — the latter drag the backup machinery (dbBackup) along.
 const SettingsModal = lazy(() => import('./settings/SettingsModal'));
-// Only the type — `import type` disappears on compilation and does not pull
-// the module back into the main chunk.
-import type { SettingsPage } from './settings/SettingsModal';
+const VaultImportModal = lazy(() => import('./VaultImportModal'));
+const ExportMenuModal = lazy(() => import('./export/ExportMenuModal'));
 import RailButton from '../ui/RailButton';
 
 /** Width of the rail: the 32px buttons with 6px of air each, tight, so the list
@@ -72,9 +72,7 @@ export default function LeftSidebarRail() {
   const setActiveView = useUIStore((s) => s.setActiveView);
   const activeViewType = useUIStore((s) => s.activeView.type);
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [settingsPage, setSettingsPage] = useState<SettingsPage>('general');
   const [createOpen, setCreateOpen] = useState(false);
-  const activeVaultId = useVaultStore((s) => s.activeVaultId);
   const railDashboards = useRailDashboards();
 
   // The check at startup lives here and not in App.tsx because its only
@@ -90,11 +88,20 @@ export default function LeftSidebarRail() {
     return () => { dead = true; };
   }, []);
 
-  // A failed automatic backup reports at the same dot: failing silently is
-  // the last thing it should do. Only while it is switched on — otherwise the
-  // dot would lead to a page that shows nothing about it.
-  const backupOn = useSettingsStore((s) => s.settings.backup.auto);
-  const backupFailed = useAutoBackupStore((s) => s.error !== null && !s.errorSeen && s.vaultId === activeVaultId) && backupOn;
+  // A `.vault.emerald` from the menu's import is replaced or merged in its
+  // dialog, which takes the file over. A newer one replaces it there.
+  const [importFile, setImportFile] = useState<OpenedVaultFile | null>(null);
+  const vaultFilePending = useVaultImportStore((s) => s.pending !== null);
+  useEffect(() => {
+    if (!vaultFilePending) return;
+    const file = useVaultImportStore.getState().take();
+    if (file) setImportFile(file);
+  }, [vaultFilePending]);
+  const exportOpen = useExportMenuStore((s) => s.request !== null);
+
+  // A failed automatic backup reports at the start page button, where it is
+  // set: failing silently is the last thing it should do.
+  const backupFailed = useAutoBackupStore((s) => autoBackupFailed(s) && !s.errorSeen);
 
   // One button per view; it is highlighted as long as its view is open —
   // also with an entry open inside it.
@@ -157,24 +164,20 @@ export default function LeftSidebarRail() {
           {viewButton('trash', AUX_VIEWS.trash)}
         </div>
         <div className={RAIL_GROUP}>
-          <RailButton
-            // The target is captured here and the dot cleared immediately: it
-            // has done its job as soon as something opens.
-            onClick={() => {
-              setSettingsPage(backupFailed ? 'backup' : 'general');
-              setSettingsOpen(true);
-              if (backupFailed) markAutoBackupErrorSeen();
-            }}
-            title={backupFailed ? t('settings.autoBackupFailedDot') : t('nav.settings')}
-            className="relative"
-          >
+          <RailButton onClick={() => setSettingsOpen(true)} title={t('nav.settings')}>
             <Settings size={18} />
-            {backupFailed && <RailDot tone="danger" />}
           </RailButton>
           {/* Last, at the very bottom: the start page, the app's cockpit.
-              A found update shows here, since installing lives there. */}
+              A found update shows here, since installing lives there — and a
+              failed automatic backup, since it is set there. The dot is
+              cleared once the page opens: then it has done its job. */}
           <RailButton
             onClick={() => {
+              if (backupFailed) {
+                // Seen only once the page is open — "Keep editing" keeps the dot.
+                void openVaultPicker('backup').then((opened) => { if (opened) markAutoBackupErrorSeen(); });
+                return;
+              }
               if (updateVersion) {
                 setUpdateVersion(null);
                 dotSeen = true;
@@ -183,11 +186,13 @@ export default function LeftSidebarRail() {
               }
               void openVaultPicker();
             }}
-            title={updateVersion ? t('settings.updateFound', { version: updateVersion }) : t('nav.startPage')}
+            title={backupFailed
+              ? t('autoBackup.failedDot')
+              : updateVersion ? t('settings.updateFound', { version: updateVersion }) : t('nav.startPage')}
             className="relative"
           >
             <LayoutGrid size={18} />
-            {updateVersion && <RailDot tone="accent" />}
+            {backupFailed ? <RailDot tone="danger" /> : updateVersion && <RailDot tone="accent" />}
           </RailButton>
         </div>
       </div>
@@ -196,10 +201,18 @@ export default function LeftSidebarRail() {
       {railDashboards.menu}
       {settingsOpen && (
         <Suspense fallback={null}>
-          <SettingsModal
-            onClose={() => setSettingsOpen(false)}
-            initialPage={settingsPage}
-          />
+          <SettingsModal onClose={() => setSettingsOpen(false)} />
+        </Suspense>
+      )}
+      {importFile && (
+        <Suspense fallback={null}>
+          {/* Keyed by the file: a newer one opens the dialog afresh. */}
+          <VaultImportModal key={importFile.ticket} file={importFile} onClose={() => setImportFile(null)} />
+        </Suspense>
+      )}
+      {exportOpen && (
+        <Suspense fallback={null}>
+          <ExportMenuModal />
         </Suspense>
       )}
     </div>

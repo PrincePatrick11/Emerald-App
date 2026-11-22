@@ -4,7 +4,9 @@ import { save, message } from '@tauri-apps/plugin-dialog';
 import TurndownService from 'turndown';
 import { TEXT_COLORS, TEXT_COLOR_SHADES } from './textColors';
 import { format } from 'date-fns';
-import { exportFilename } from './helpers';
+import { exportFilename, safeFileBase } from './helpers';
+import { compressDataUrl } from './imageCompression';
+import type { ImageMode } from './emerald/manifest';
 import DOMPurify from 'dompurify';
 import type { ExportData } from './exportData';
 import { useEntryStore } from '../store/entryStore';
@@ -12,11 +14,13 @@ import { useTaskStore } from '../store/taskStore';
 import { useCategoryStore } from '../store/categoryStore';
 import { DEFAULT_ENTRY_ICON, DEFAULT_TASK_ICON, entryIcon } from './entryIcon';
 import { portableIcon } from './icons';
+import { typographyCss, type ExportTypography } from './exportFonts';
+import type { ExportOrder } from './exportMenu';
 import i18n from '../i18n';
 
 // ── helpers ────────────────────────────────────────────────────────────────
 
-function htmlEscape(str: string): string {
+export function htmlEscape(str: string): string {
   return str
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
@@ -25,14 +29,15 @@ function htmlEscape(str: string): string {
     .replace(/'/g, '&#39;');
 }
 
-function sanitizeDataImageUrl(value: string | null | undefined): string | null {
+export function sanitizeDataImageUrl(value: string | null | undefined): string | null {
   if (!value) return null;
   const trimmed = value.trim();
   return /^data:image\/[a-zA-Z0-9.+-]+;base64,[A-Za-z0-9+/=]+$/.test(trimmed) ? trimmed : null;
 }
 
 
-async function embedImages(html: string): Promise<string> {
+/** The vault's pictures in the HTML as data URLs, compressed by `mode` (`placeholder` is `stripImages`' job). */
+async function embedImages(html: string, mode: Exclude<ImageMode, 'placeholder'>): Promise<string> {
   const refs = [...new Set(imageRefsInHtml(html))];
   if (refs.length === 0) return html;
 
@@ -40,7 +45,8 @@ async function embedImages(html: string): Promise<string> {
   await Promise.all(
     refs.map(async (ref) => {
       try {
-        resolved.set(ref, await readImageAsBase64(ref));
+        const original = await readImageAsBase64(ref);
+        resolved.set(ref, mode === 'none' ? original : await compressDataUrl(original, mode));
       } catch {
         // File is missing — empty src instead of a dead reference in the export.
         resolved.set(ref, '');
@@ -103,16 +109,25 @@ async function resolveInternalLinkIcons(html: string): Promise<string> {
   return doc.body.innerHTML;
 }
 
+/** DOM id of an entry in a PDF or HTML export — what its links jump to. */
+export function entryAnchor(id: string): string {
+  return `entry-${id.replace(/[^\w-]/g, '')}`;
+}
+
 /**
  * Replaces the inner content of every `<span data-type="internalLink">` with
  * the visible chip elements (icon `<img>` or `<span>` + label `<span>`) and
  * strips the now-redundant `data-icon` / `data-label` attributes.
  *
- * Runs in TypeScript before the HTML is handed to `export_pdf`, so the
- * export document needs no script of its own: it is loaded over `file://`,
- * where the app CSP does not apply, and stays script-free on purpose.
+ * Runs in TypeScript before the HTML is handed to `export_pdf`, so the PDF
+ * document needs no script of its own: it is loaded over `file://`, where
+ * the app CSP does not apply, and stays script-free on purpose.
+ *
+ * With `bundleIds` (the HTML export) a link to an entry in the same file
+ * becomes an `<a href="#entry-…">` that jumps there; one to an entry outside
+ * stays a chip, marked `il-external`.
  */
-function transformInternalLinks(html: string): string {
+function transformInternalLinks(html: string, bundleIds?: ReadonlySet<string>): string {
   const doc = new DOMParser().parseFromString(html, 'text/html');
   const links = doc.querySelectorAll<HTMLElement>('span[data-type="internalLink"]');
   if (!links.length) return html;
@@ -140,30 +155,47 @@ function transformInternalLinks(html: string): string {
     const lbl = doc.createElement('span');
     lbl.textContent = label;
     el.appendChild(lbl);
+
+    if (!bundleIds) continue;
+    const targetId = el.getAttribute('data-id') ?? '';
+    if (bundleIds.has(targetId)) {
+      const a = doc.createElement('a');
+      for (const attr of Array.from(el.attributes)) a.setAttribute(attr.name, attr.value);
+      a.setAttribute('href', `#${entryAnchor(targetId)}`);
+      while (el.firstChild) a.appendChild(el.firstChild);
+      el.replaceWith(a);
+    } else {
+      el.classList.add('il-external');
+    }
   }
 
   return doc.body.innerHTML;
 }
 
+/** The entry's icon (`ExportData.icon`) as a picture or an emoji; an icon file that could not be read is the default. */
+export function exportIcon(data: ExportData): { image: string | null; emoji: string } {
+  const image = sanitizeDataImageUrl(data.icon);
+  const emojiIcon = !image && data.icon && !data.icon.startsWith('data:');
+  return { image, emoji: emojiIcon ? data.icon : DEFAULT_ENTRY_ICON };
+}
+
+/** The date an export shows, in English like the Markdown it shares with the import: January 15, 2026. */
+export function exportDate(iso: string | Date): string {
+  return format(new Date(iso), 'MMMM d, yyyy');
+}
+
 // Top bar: icon, date and the moon phase's or category's name — 🌕 January 15, 2026 · Full Moon
 function buildTopBar(data: ExportData): string {
-  const dateStr = format(new Date(data.createdAt), 'MMMM d, yyyy');
+  const dateStr = exportDate(data.createdAt);
 
-  // data.moonPhase = "🌕 Full Moon" — split at first space
+  // data.moonPhase = "🌕 Full Moon" — the name after the first space
   const sp = data.moonPhase?.indexOf(' ') ?? -1;
-  const moonSymbol = data.moonPhase && (sp > 0 ? data.moonPhase.slice(0, sp) : data.moonPhase);
-  const moonName = data.moonPhase && sp > 0 ? data.moonPhase.slice(sp + 1) : '';
-  const subtitle = data.moonPhase ? moonName : data.category?.label ?? '';
+  const subtitle = data.moonPhase ? (sp > 0 ? data.moonPhase.slice(sp + 1) : '') : data.category?.label ?? '';
 
-  // The icon rule of the app (`entryIcon`): own icon, else moon phase, else
-  // category emoji, else the default. An uploaded icon arrives as a data URL.
-  const safeEntryIcon = sanitizeDataImageUrl(data.entryIcon);
-  const ownEmoji = data.entryIcon && !data.entryIcon.startsWith('data:') ? data.entryIcon : undefined;
-  const categoryEmoji = data.category?.icon && !data.category.icon.startsWith('data:') ? data.category.icon : undefined;
-  const icon = ownEmoji || moonSymbol || categoryEmoji || DEFAULT_ENTRY_ICON;
-  const iconHtml = safeEntryIcon
-    ? `<img src="${safeEntryIcon}" class="topbar-icon-img">`
-    : `<span class="topbar-icon">${htmlEscape(icon)}</span>`;
+  const icon = exportIcon(data);
+  const iconHtml = icon.image
+    ? `<img src="${icon.image}" class="topbar-icon-img">`
+    : `<span class="topbar-icon">${htmlEscape(icon.emoji)}</span>`;
 
   const suffix = subtitle ? ` · ${htmlEscape(subtitle)}` : '';
   return `<div class="entry-topbar">${iconHtml}<span class="topbar-date">${dateStr}${suffix}</span></div>`;
@@ -184,10 +216,11 @@ function buildMetaHtml(data: ExportData): string {
 
 // CSS for the print window
 const PRINT_CSS = `
-  * { box-sizing: border-box; margin: 0; padding: 0; }
+  /* Both webviews print without backgrounds by default; chips, tags and code keep theirs. */
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   body {
-    font-family: Georgia, 'Times New Roman', serif;
-    font-size: 12pt;
+    font-family: var(--doc-font, Georgia, 'Times New Roman', serif);
+    font-size: var(--doc-size, 12pt);
     line-height: 1.75;
     color: #111;
     background: #f0f0f0;
@@ -280,6 +313,7 @@ const PRINT_CSS = `
     width: 13px; height: 13px; object-fit: cover; border-radius: 2px;
   }
   .entry-content span[data-type="internalLink"] .il-icon-emoji { font-size: 0.9em; line-height: 1; }
+  /* Mirrored for the native page setup in src-tauri/src/pdf_export/mod.rs. */
   @page { margin: 2cm 2.5cm; }
   @media print {
     body { background: #fff; }
@@ -295,7 +329,11 @@ const PRINT_CSS = `
       break-before:      auto !important;
       break-after:       auto !important;
     }
+    /* Several entries: each starts on a page of its own. */
+    .entry-article + .entry-article { page-break-before: always !important; break-before: page !important; }
   }
+  /* On screen a gap instead of the page break; every platform prints with the print styles. */
+  @media screen { .entry-article + .entry-article { margin-top: 3em; padding-top: 2em; border-top: 1px solid #ddd; } }
 `;
 
 // ── PDF export ──────────────────────────────────────────────────────────────
@@ -305,44 +343,103 @@ const PRINT_CSS = `
 // side — no print dialog, no printer selection, no extra window. Same UX
 // shape as the Markdown / Emerald exports.
 
-export async function exportAsPDF(data: ExportData): Promise<void> {
+/** One entry of an export, with what happens to its pictures (PDF and HTML; Markdown has none). */
+export interface ExportItem {
+  data: ExportData;
+  images: ImageMode;
+}
+
+/**
+ * The file an export writes: one entry is named after its title and date;
+ * several after `bundle` — a name chosen by the export menu, which also titles
+ * the document. PDF and HTML set the entries in `typography`.
+ */
+export interface ExportFile {
+  bundle?: string;
+  typography?: ExportTypography;
+  /** The HTML sidebar's starting order; the entries come in the order given. */
+  order?: ExportOrder;
+}
+
+/** The save dialog's path with the format's ending: the GTK dialog on Linux does not add it to a name typed without. */
+export function withEnding(path: string, ext: string): string {
+  return path.toLowerCase().endsWith(`.${ext}`) ? path : `${path}.${ext}`;
+}
+
+export function defaultFilename(items: readonly ExportItem[], file: ExportFile, ext: string): string {
+  if (items.length > 1 && file.bundle) return `${safeFileBase(file.bundle)}.${ext}`;
+  return exportFilename(items[0].data.title, items[0].data.createdAt, ext);
+}
+
+/** The document's title: the bundle's name for several entries, else the entry's. */
+export function documentTitle(items: readonly ExportItem[], file: ExportFile): string {
+  return items.length > 1 && file.bundle ? file.bundle : items[0].data.title;
+}
+
+/** The `<style>` content that sets the entries in the chosen font and size; empty keeps the stylesheet's own. */
+export async function typographyStyle(file: ExportFile): Promise<string> {
+  return file.typography ? typographyCss(file.typography) : '';
+}
+
+/**
+ * One entry as an `<article>` of a PDF or HTML document: top bar, title,
+ * tags and content, pictures as `images` says, link chips pre-rendered.
+ * `bundleIds` and `footerHtml` are the HTML export's: links into the file,
+ * and the references inside the article.
+ */
+export async function exportArticle(
+  { data, images }: ExportItem,
+  opts: { bundleIds?: ReadonlySet<string>; footerHtml?: string } = {},
+): Promise<string> {
   const resolvedContent  = await resolveInternalLinkIcons(data.content);
-  const embeddedContent  = await embedImages(resolvedContent);
+  const embeddedContent  = images === 'placeholder' ? stripImages(resolvedContent) : await embedImages(resolvedContent, images);
   // Pre-render the internal-link chips here, so the export document stays
   // script-free (see `transformInternalLinks`).
   // Collapsible sections print open, or their content would be missing on paper.
-  const transformedContent = transformInternalLinks(embeddedContent).replace(/<details(?![^>]*\sopen)/g, '<details open');
+  const transformedContent = transformInternalLinks(embeddedContent, opts.bundleIds).replace(/<details(?![^>]*\sopen)/g, '<details open');
+  const numStr = data.entryNumber ? `<span class="entry-number">#${data.entryNumber}</span>` : '';
+  return `<article class="entry-article" id="${entryAnchor(data.id)}" data-title="${htmlEscape(data.title)}">
+    ${buildTopBar(data)}
+    <h1 class="entry-title">${htmlEscape(data.title)}${numStr}</h1>
+    ${buildMetaHtml(data)}
+    <div class="entry-content">${DOMPurify.sanitize(transformedContent, {
+      ADD_ATTR: ['data-type', 'data-id', 'data-target-kind', 'data-label', 'data-icon', 'data-entry-number', 'data-href', 'colwidth', 'data-color'],
+    })}</div>
+    ${opts.footerHtml ?? ''}
+  </article>`;
+}
 
-  const topBarHtml = buildTopBar(data);
-  const metaHtml   = buildMetaHtml(data);
-  const numStr     = data.entryNumber ? `<span class="entry-number">#${data.entryNumber}</span>` : '';
+/**
+ * The entries as one PDF, one after another, each from a new page. Resolves
+ * to `false` when the save dialog was cancelled.
+ */
+export async function exportAsPDF(items: readonly ExportItem[], file: ExportFile = {}): Promise<boolean> {
+  if (items.length === 0) throw new Error(i18n.t('emeraldExport.nothing'));
+  // Same UX as Markdown / Emerald: native save dialog first, then render.
+  const chosen = await save({
+    defaultPath: defaultFilename(items, file, 'pdf'),
+    filters: [{ name: 'PDF', extensions: ['pdf'] }],
+  });
+  if (!chosen) return false;
+  const path = withEnding(chosen, 'pdf');
 
-  const escapedTitle = htmlEscape(data.title);
+  const articles: string[] = [];
+  for (const item of items) articles.push(await exportArticle(item));
+  const title = documentTitle(items, file);
   const fullHtml = `<!DOCTYPE html>
 <html lang="${i18n.language}">
 <head>
   <meta charset="utf-8">
-  <title>${escapedTitle}</title>
+  <title>${htmlEscape(title)}</title>
   <style>${PRINT_CSS}</style>
+  <style>${await typographyStyle(file)}</style>
 </head>
 <body>
   <div id="page">
-    ${topBarHtml}
-    <h1 class="entry-title">${escapedTitle}${numStr}</h1>
-    ${metaHtml}
-    <div class="entry-content">${DOMPurify.sanitize(transformedContent, {
-      ADD_ATTR: ['data-type', 'data-id', 'data-target-kind', 'data-label', 'data-icon', 'data-entry-number', 'data-href', 'colwidth', 'data-color'],
-    })}</div>
+    ${articles.join('\n')}
   </div>
 </body>
 </html>`;
-
-  // Same UX as Markdown / Emerald: native save dialog first, then render.
-  const path = await save({
-    defaultPath: exportFilename(data.title, data.createdAt, 'pdf'),
-    filters: [{ name: 'PDF', extensions: ['pdf'] }],
-  });
-  if (!path) return;
 
   try {
     await invoke('export_pdf', { html: fullHtml, path });
@@ -351,6 +448,7 @@ export async function exportAsPDF(data: ExportData): Promise<void> {
     console.error('[emerald] export_pdf: failed', err);
     throw err; // re-throw so the caller's exportErrorMessage shows a toast
   }
+  return true;
 }
 
 // ── Markdown export ─────────────────────────────────────────────────────────
@@ -421,41 +519,41 @@ function createMarkdownConverter(): TurndownService {
   return td;
 }
 
-export async function exportAsMarkdown(data: ExportData): Promise<void> {
-  const stripped = stripImages(data.content);
-  const td = createMarkdownConverter();
-
-  // Build frontmatter / header block
+function markdownOf(data: ExportData, td: TurndownService): string {
   const lines: string[] = [`# ${data.title}`, ''];
-  lines.push(`*${format(new Date(data.createdAt), 'MMMM d, yyyy')}*`);
+  lines.push(`*${exportDate(data.createdAt)}*`);
   if (data.moonPhase)   lines.push(`Moon: ${data.moonPhase}`);
   if (data.category)            lines.push(`Category: ${mdIcon(data.category.icon, data.category.fallbackIcon)}${data.category.label}`.trim());
   if (data.tagNames?.length)    lines.push(`Tags: ${data.tagNames.join(', ')}`);
   lines.push('', '---', '');
-  lines.push(td.turndown(stripped), '');
+  lines.push(td.turndown(stripImages(data.content)), '');
+  return lines.join('\n');
+}
 
-  const markdown = lines.join('\n');
+/**
+ * The entries as one Markdown file, one after another, without pictures.
+ * Resolves to `false` when the save dialog was cancelled.
+ */
+export async function exportAsMarkdown(items: readonly ExportItem[], file: ExportFile = {}): Promise<boolean> {
+  if (items.length === 0) throw new Error(i18n.t('emeraldExport.nothing'));
+  const td = createMarkdownConverter();
+  const markdown = items.map((item) => markdownOf(item.data, td)).join('\n');
 
-  const path = await save({
-    defaultPath: exportFilename(data.title, data.createdAt, 'md'),
+  const chosen = await save({
+    defaultPath: defaultFilename(items, file, 'md'),
     filters: [{ name: 'Markdown', extensions: ['md'] }],
   });
-  if (!path) return;
-  await invoke('write_file', { path, content: markdown });
+  if (!chosen) return false;
+  await invoke('write_file', { path: withEnding(chosen, 'md'), content: markdown });
+  return true;
 }
 
-// ── guard ──────────────────────────────────────────────────────────────────
-
-export async function noEntryMessage(): Promise<void> {
-  await message(i18n.t('emeraldExport.openEntryFirst'), {
-    title: i18n.t('emeraldExport.title'), kind: 'info',
-  });
-}
+// ── errors ─────────────────────────────────────────────────────────────────
 
 /** Show a non-blocking error toast for an export failure. */
 export async function exportErrorMessage(
   err: unknown,
-  kind: 'pdf' | 'markdown' | 'emerald' | 'emeraldImport' | 'markdownImport' | 'canvas',
+  kind: 'pdf' | 'html' | 'markdown' | 'emerald' | 'vault' | 'emeraldImport' | 'markdownImport' | 'canvas',
 ): Promise<void> {
   const detail = err instanceof Error ? err.message : String(err);
   await message(detail, { title: i18n.t('emeraldExport.failed', { kind: i18n.t(`emeraldExport.kinds.${kind}`) }), kind: 'error' });

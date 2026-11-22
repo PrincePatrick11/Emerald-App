@@ -179,6 +179,12 @@ export interface FieldsModel {
   /** Name and icon (an emoji or an icon file, `blockRefs` names it) of the custom block definition the block was copied from — empty for single fields. */
   name: string;
   icon: string;
+  /**
+   * The ID of the custom block definition the block was copied from — a quiet
+   * note, no link: nothing follows it while editing. The `.emerald` export
+   * takes the definitions of an entry's copies along by it.
+   */
+  definition?: string;
 }
 
 /* ---------------- Reading ---------------- */
@@ -360,6 +366,8 @@ export function parseFields(block: BlockInstance): FieldsModel {
     broken, elements, display, values, orphans, slots,
     name: typeof cfg.name === 'string' ? cfg.name : '',
     icon: typeof cfg.icon === 'string' ? cfg.icon : '',
+    // The harmless shape of a definition ID from a file (`isDefinitionId`).
+    ...(typeof cfg.definition === 'string' && /^[\w-]{1,100}$/.test(cfg.definition) ? { definition: cfg.definition } : {}),
   };
   modelCache.set(block, model);
   return model;
@@ -568,6 +576,7 @@ export function serializeFields(block: BlockInstance, model: FieldsModel, text: 
       display: model.display,
       ...(model.name ? { name: model.name } : {}),
       ...(model.icon ? { icon: model.icon } : {}),
+      ...(model.definition ? { definition: model.definition } : {}),
     }),
   };
   const values = { ...model.orphans, ...model.values };

@@ -33,11 +33,6 @@ interface BlockDefinitionState {
   deleteDefinition: (id: string) => Promise<void>;
   restoreDefinition: (id: string) => Promise<void>;
   permanentlyDeleteDefinition: (id: string) => Promise<void>;
-  /**
-   * `.emerald` import: create definitions that are missing here with their ID.
-   * An existing one (even in the trash) stays as it is.
-   */
-  importDefinitions: (defs: readonly BlockDefinition[]) => Promise<void>;
 }
 
 async function selectActive(db: Database): Promise<BlockDefinition[]> {
@@ -118,20 +113,5 @@ export const useBlockDefinitionStore = create<BlockDefinitionState>((set, get) =
     const db = await getDb();
     // Reachable only from the trash — it is not in `definitions` (active).
     await db.execute('DELETE FROM block_definitions WHERE id=$1', [id]);
-  },
-
-  importDefinitions: async (defs) => {
-    if (!defs.length) return;
-    const db = await getDb();
-    const known = new Set((await db.select<{ id: string }[]>('SELECT id FROM block_definitions')).map((r) => r.id));
-    let sortOrder = await nextSortOrder(db);
-    let added = 0;
-    for (const def of defs) {
-      if (known.has(def.id)) continue;
-      await insertDefinition(db, { ...def, sort_order: sortOrder++, deleted_at: null });
-      known.add(def.id);
-      added++;
-    }
-    if (added) set({ definitions: await selectActive(db) });
   },
 }));

@@ -28,17 +28,26 @@ import type { SuggestionItem } from '../components/editors/text/SuggestionList';
 import type { Category } from '../types';
 import type { WriteOptions } from './stamp';
 import { displayTitle, hasOwnTitle } from './entryTitle';
-import { getActiveVaultId } from './vaultManager';
 import { compressDataUrl } from './imageCompression';
-import { keyErrorOf, KEY_ERRORS } from './vaultKeys';
-import { askBackupSecret, BACKUP_UNLOCK_CANCELLED, endBackupSecret } from '../store/backupSecretStore';
 import {
-  blocksToContent, contentToBlocks, EMERALD_FORMAT_VERSION, gentlestImageMode, parseManifest, relinkWithinFile,
+  definitionImageRefs, parseDefinitionElements, remapDefinitionDefaults, type LinkDefaultResolver,
+} from './blocks/definitions';
+import { nextDefinitionSortOrder } from './blockDefinitionRows';
+import {
+  blocksToContent, categoryRowsOf, contentToBlocks, EMERALD_FORMAT_VERSION, gentlestImageMode, manifestCategoryOf,
+  parseManifest, relinkWithinFile, usedDefinitionIds,
   renameStoredFiles, storedNameStem,
-  type EmeraldManifest, type ImageMode, type ManifestEntry, type ManifestItem, type ManifestLink, type ManifestTemplate,
+  type EmeraldManifest, type ImageMode, type ManifestBlockDefinition, type ManifestEntry, type ManifestItem,
+  type ManifestLink, type ManifestTemplate,
 } from './emerald/manifest';
+import {
+  closeArchive, EmeraldNotice, openArchiveAsking, storeArchiveFiles, withEmeraldEnding, writeArchive,
+  type ArchiveImage, type EmeraldProtection, type OpenedArchive,
+} from './emerald/file';
+import { useVaultImportStore } from '../store/vaultImportStore';
 
 export type { ImageMode } from './emerald/manifest';
+export type { EmeraldProtection } from './emerald/file';
 
 // ── Link chips across vault boundaries ───────────────────────────────────────
 
@@ -128,22 +137,29 @@ export interface EmeraldExportItem {
 }
 
 /**
- * What an export writes — the settings the export menu (#98) offers:
+ * What an export writes — the settings the export menu offers:
  *
  * - `items`: the entries and templates, chosen by the caller (linked entries
  *   included or not; `linkedEntriesOf` finds them).
  * - `images`: what happens to the pictures (`ImageMode`); each item can
  *   override it, so linked entries can have a setting of their own. A picture
  *   two items share gets the gentlest setting either asks for.
- * - `password`: seals the whole file; at least 8 characters.
+ * - `protection`: none (the default), an own password of at least 8
+ *   characters, or the vault's key — the file then opens with the vault's
+ *   password or recovery key.
+ * - `blockDefinitions`: the custom blocks the items' copies came from
+ *   (`FieldsModel.definition`) go along, so that the importing vault has them
+ *   too; on by default.
  *
- * Always along, without a setting: category and tags by name, icons, cover,
- * the copies of custom blocks in the content and concealed sigils (concealed).
+ * Always along, without a setting: category (a built-in or starter one with
+ * its ID) and tags by name, icons, cover, the copies of custom blocks in the
+ * content and concealed sigils (concealed).
  */
 export interface EmeraldExportOptions {
   items: readonly EmeraldExportItem[];
   images?: ImageMode;
-  password?: string;
+  protection?: EmeraldProtection;
+  blockDefinitions?: boolean;
 }
 
 /** The pictures and icons a block stack names — from the blocks (`blockRefs`), and every stored name in it, as the backup does. */
@@ -190,9 +206,9 @@ async function manifestItemOf(item: EmeraldExportItem): Promise<{ manifest: Mani
     updatedAt: entry.updated_at,
     icon: entry.icon ?? '',
     cover: storedImageName(entry.cover_image) ?? null,
-    // A built-in by its stored name, the same in every vault — its label
-    // depends on the language and would create a new category elsewhere.
-    category: cat ? { name: cat.is_builtin ? cat.name : categoryLabel(i18n.t, cat), icon: cat.emoji, builtin: Boolean(cat.is_builtin) } : null,
+    // With its ID — a built-in or starter category is found by it in every
+    // vault, whatever its name there — and the name it has here and now.
+    category: cat ? manifestCategoryOf(cat, categoryLabel(i18n.t, cat)) : null,
     tags: liveTagNames(entry.tags),
     // Concealed sigils go along as they are: they arrive concealed.
     blocks: contentToBlocks(content),
@@ -227,7 +243,22 @@ export async function writeEmeraldFile(path: string, options: EmeraldExportOptio
   }
   if (items.length === 0) throw new Error(i18n.t('emeraldExport.nothing'));
 
-  const images: Array<{ name: string; dataUrl?: string }> = [];
+  // A definition's prefilled link names an entry of this vault: it goes along
+  // only to an entry the file carries too — of any other the file says nothing.
+  const exported = new Set(options.items.filter((i) => i.kind === 'entry').map((i) => i.id));
+  const linkInFile: LinkDefaultResolver = (t) => (exported.has(t.id) ? t : null);
+  const blockDefinitions = (options.blockDefinitions === false ? [] : await usedDefinitions(contents))
+    .map((row): ManifestBlockDefinition => ({ ...row, elements: remapDefinitionDefaults(row.elements, (name) => name, linkInFile) }));
+  // A definition's prefilled pictures and its icon travel like the items' own.
+  for (const row of blockDefinitions) {
+    for (const name of definitionPictures(row)) {
+      const known = imageModes.get(name);
+      imageModes.set(name, known ? gentlestImageMode(known, fallback) : fallback);
+    }
+    if (typeof row.icon === 'string' && isIconFile(row.icon)) icons.add(row.icon);
+  }
+
+  const images: ArchiveImage[] = [];
   const omittedImages: string[] = [];
   for (const [name, mode] of imageModes) {
     if (mode === 'placeholder') {
@@ -246,29 +277,42 @@ export async function writeEmeraldFile(path: string, options: EmeraldExportOptio
   const manifest: EmeraldManifest = {
     format: 'emerald',
     version: EMERALD_FORMAT_VERSION,
+    kind: 'items',
     exportedAt: new Date().toISOString(),
     items,
     links: collectContentLinks(contents),
     omittedImages,
+    blockDefinitions,
   };
-  await invoke('write_emerald_file', {
-    vaultId: await getActiveVaultId(),
-    path,
-    manifest: JSON.stringify(manifest),
-    images,
-    icons: [...icons],
-    password: options.password || null,
-  });
+  await writeArchive(path, 'items', JSON.stringify(manifest), images, [...icons], options.protection ?? { type: 'none' });
 }
 
 /**
- * For the export menu (#98), which does not exist yet: the entries the given ones link to (`block_refs`, kind `entry`), without
+ * The custom block definitions the copies in the contents came from, by the
+ * quiet note every copy carries (`FieldsModel.definition`) — the rows as the
+ * vault holds them, not those in the trash (`definitionRows`): the copy
+ * travels and works without its origin.
+ */
+async function usedDefinitions(contents: readonly string[]): Promise<ManifestBlockDefinition[]> {
+  const ids = usedDefinitionIds(contents);
+  if (ids.length === 0) return [];
+  const { definitionRows } = await import('./dbBackup');
+  return definitionRows(await getDb(), ids);
+}
+
+/**
+ * The entries the given ones link to (`block_refs`, kind `entry`), without
  * the given ones and without entries in the trash — with `recursive`, also
  * those the linked ones link to, and so on. For the export menu's
- * "include linked entries".
+ * "include linked entries". `blocked` entries (ticked off in the menu) are
+ * listed when linked, but not walked through: what only they link to stays out.
  */
-export async function linkedEntriesOf(ids: readonly string[], { recursive = false } = {}): Promise<string[]> {
+export async function linkedEntriesOf(
+  ids: readonly string[],
+  { recursive = false, blocked = [] }: { recursive?: boolean; blocked?: readonly string[] } = {},
+): Promise<string[]> {
   const db = await getDb();
+  const stop = new Set(blocked);
   const seen = new Set(ids);
   const found: string[] = [];
   let frontier = [...ids];
@@ -281,27 +325,12 @@ export async function linkedEntriesOf(ids: readonly string[], { recursive = fals
         WHERE r.target_kind = 'entry' AND b.entry_id IN (SELECT value FROM json_each($1))`,
       [JSON.stringify(frontier)],
     );
-    frontier = rows.map((r) => r.target).filter((id) => !seen.has(id));
-    frontier.forEach((id) => { seen.add(id); found.push(id); });
+    const fresh = rows.map((r) => r.target).filter((id) => !seen.has(id));
+    fresh.forEach((id) => { seen.add(id); found.push(id); });
+    frontier = fresh.filter((id) => !stop.has(id));
     if (!recursive) break;
   }
   return found;
-}
-
-/** The menu's export: the open entry or template, as it is, without a password. */
-export async function exportAsEmerald(): Promise<void> {
-  const view = useUIStore.getState().activeView;
-  if (view.type === 'templates' && view.id) {
-    return exportTemplateAsEmerald(view.id);
-  }
-  if (!view.id || view.type !== 'entry') {
-    await message(i18n.t('emeraldExport.openEntryFirst'), { title: i18n.t('emeraldExport.title'), kind: 'info' });
-    return;
-  }
-  await useEntryStore.getState().ensureEntryContent(view.id);
-  const entry = useEntryStore.getState().getEntry(view.id);
-  if (!entry) return;
-  await saveWithDialog(entry.title, entry.created_at, { kind: 'entry', id: entry.id });
 }
 
 /** A template as `.emerald` — the saved state, not an open draft. */
@@ -311,16 +340,22 @@ export async function exportTemplateAsEmerald(templateId: string): Promise<void>
     await message(i18n.t('emeraldExport.openTemplateFirst'), { title: i18n.t('emeraldExport.title'), kind: 'info' });
     return;
   }
-  await saveWithDialog(template.name || 'Template', template.created_at, { kind: 'template', id: template.id });
+  const name = exportFilename(template.name || i18n.t('templates.untitled'), template.created_at, 'emerald');
+  await exportItemsAsEmerald({ items: [{ kind: 'template', id: template.id }] }, name);
 }
 
-async function saveWithDialog(title: string, date: string, item: EmeraldExportItem): Promise<void> {
+/**
+ * The export menu's `.emerald`: asks where, then writes. Resolves to `false`
+ * when the save dialog was cancelled.
+ */
+export async function exportItemsAsEmerald(options: EmeraldExportOptions, defaultName: string): Promise<boolean> {
   const path = await save({
-    defaultPath: exportFilename(title, date, 'emerald'),
+    defaultPath: defaultName,
     filters: [{ name: 'Emerald', extensions: ['emerald'] }],
   });
-  if (!path) return;
-  await writeEmeraldFile(path, { items: [item] });
+  if (!path) return false;
+  await writeEmeraldFile(withEmeraldEnding(path), options);
+  return true;
 }
 
 // ── Import helpers ───────────────────────────────────────────────────────────
@@ -342,67 +377,6 @@ async function ensureTagIds(names: string[]): Promise<string[]> {
 }
 
 // ── Import from Emerald ──────────────────────────────────────────────────────
-
-/** What `read_emerald_file` returns: the manifest, and the pictures stored in this vault by the hash part of their name in the file. */
-interface ReadArchive {
-  manifest: string;
-  images: Record<string, string>;
-  icons: Record<string, string>;
-}
-
-/** Error codes of `emerald_file.rs`. */
-const EMERALD_ERRORS = {
-  locked: 'EMERALD_LOCKED',
-  oldFormat: 'EMERALD_OLD_FORMAT',
-  tooLarge: 'EMERALD_TOO_LARGE',
-  unreadable: 'EMERALD_UNREADABLE',
-  newer: 'EMERALD_NEWER',
-} as const;
-
-/** Thrown with a text for the person importing — nothing was changed. */
-class EmeraldImportNotice extends Error {}
-
-function noticeFor(err: unknown): string | null {
-  switch (keyErrorOf(err)) {
-    case EMERALD_ERRORS.oldFormat: return i18n.t('emeraldImport.oldVersion');
-    case EMERALD_ERRORS.tooLarge: return i18n.t('emeraldImport.tooLarge');
-    case EMERALD_ERRORS.unreadable: return i18n.t('emeraldImport.unsupported');
-    case EMERALD_ERRORS.newer: return i18n.t('emeraldImport.newVersion');
-    default: return null;
-  }
-}
-
-/**
- * Reads the file, asking for its password while one is needed and the last
- * one did not fit. `null`: the question was cancelled.
- */
-async function readArchiveAsking(path: string): Promise<ReadArchive | null> {
-  const vaultId = await getActiveVaultId();
-  let password: string | null = null;
-  try {
-    for (;;) {
-      let error: string | null;
-      try {
-        return await invoke<ReadArchive>('read_emerald_file', { vaultId, path, password });
-      } catch (err) {
-        const code = keyErrorOf(err);
-        if (code === EMERALD_ERRORS.locked) error = null;
-        else if (code === KEY_ERRORS.wrongPassword) error = i18n.t('emeraldKey.wrongPassword');
-        else throw err;
-      }
-      try {
-        // A `.emerald` file has no recovery key: the answer is always a password.
-        const secret = await askBackupSecret(error, 'emerald');
-        password = 'password' in secret ? secret.password : null;
-      } catch (cancelled) {
-        if (keyErrorOf(cancelled) === BACKUP_UNLOCK_CANCELLED) return null;
-        throw cancelled;
-      }
-    }
-  } finally {
-    endBackupSecret();
-  }
-}
 
 /** The picture a left-out one becomes: grey, with a crossed-out picture, without words — stored once per import. */
 async function placeholderImage(): Promise<string> {
@@ -443,37 +417,109 @@ export interface EmeraldImportResult {
 }
 
 /**
- * Reads a `.emerald` file at `path` into the active vault — without the open
- * dialog, so a check can call it; it still asks for a password when the file
- * needs one. `null`: cancelled at the password.
+ * Reads a `.emerald` file of entries and templates at `path` into the active
+ * vault — without the open dialog, so a check can call it; it still asks for
+ * a password when the file needs one. `null`: cancelled at the password.
  */
 export async function importEmeraldFile(path: string): Promise<EmeraldImportResult | null> {
-  let archive: ReadArchive | null;
+  const opened = await openArchiveAsking(path);
+  if (!opened) return null;
   try {
-    archive = await readArchiveAsking(path);
-  } catch (err) {
-    const notice = noticeFor(err);
-    throw notice ? new EmeraldImportNotice(notice) : err;
+    if (opened.kind !== 'items') throw new EmeraldNotice(i18n.t('emeraldImport.vaultFile'));
+    return await importOpened(opened);
+  } finally {
+    closeArchive(opened.ticket);
   }
-  if (!archive) return null;
-  const manifest = parseManifest(archive.manifest);
-  // Checked before anything is created (format, version and item count already
-  // by Rust, before it stored the pictures): a refused file leaves the vault as it is.
-  if (typeof manifest === 'string') throw new EmeraldImportNotice(i18n.t(`emeraldImport.${manifest}`));
-  return importManifest(manifest, archive);
+}
+
+/** The items of an opened file: its manifest checked, then its pictures stored, then the items created. */
+async function importOpened(opened: OpenedArchive): Promise<EmeraldImportResult> {
+  const manifest = parseManifest(opened.manifest);
+  // Checked before anything is stored or created (format, version and item
+  // count already by Rust): a refused file leaves the vault as it is.
+  if (typeof manifest === 'string') throw new EmeraldNotice(i18n.t(`emeraldImport.${manifest}`));
+  const stored = await storeArchiveFiles(opened.ticket);
+  // By the hash part of the name: a picture compressed on export travels with
+  // the extension of its new type, the content still names the old one.
+  const byStem = (files: ReadonlyMap<string, string>) => new Map([...files].map(([name, here]) => [storedNameStem(name), here]));
+  return importManifest(manifest, byStem(stored.images), byStem(stored.icons));
+}
+
+/**
+ * The categories of the file's entries in this vault, by the rule of the
+ * backup import (`resolveImportedCategories`): a built-in or starter category
+ * by its ID, renamed or in another language as it may be; every other one by
+ * the name it had at export, created when there is none of that name (one in
+ * the trash comes back). Returns: ID in the file → ID here.
+ */
+async function resolveFileCategories(items: readonly ManifestItem[]): Promise<Map<string, string>> {
+  const rows = categoryRowsOf(items, (icon) => plausibleEmoji(icon) || '📁');
+  if (rows.length === 0) return new Map();
+  const { resolveImportedCategories } = await import('./dbBackup');
+  const { map } = await resolveImportedCategories(await getDb(), rows);
+  await useCategoryStore.getState().fetchCategories();
+  return map;
+}
+
+/**
+ * The custom blocks of the file: added by ID, one this vault has already
+ * (also in the trash) stays as it is — the rule of the backup import. A new
+ * one is usable at once, at the end of the Blocks view. Its prefilled pictures
+ * and its icon point at the files stored here; a prefilled link only at an
+ * entry of the same file (the export keeps no other), else it is dropped.
+ */
+async function importBlockDefinitions(
+  rows: readonly ManifestBlockDefinition[],
+  imageNames: ReadonlyMap<string, string>,
+  iconNames: ReadonlyMap<string, string>,
+  idMap: ReadonlyMap<string, string>,
+): Promise<void> {
+  if (rows.length === 0) return;
+  const pictures = new Map<string, string>();
+  for (const row of rows) {
+    for (const name of definitionPictures(row)) {
+      const here = imageNames.get(storedNameStem(name));
+      if (here) pictures.set(name, here);
+    }
+  }
+  const db = await getDb();
+  let sortOrder = await nextDefinitionSortOrder(db);
+  const fresh = rows.map((row) => ({
+    ...row,
+    // An icon file under this vault's name, or — without its file — the default.
+    icon: typeof row.icon === 'string' && isIconFile(row.icon) ? iconNames.get(storedNameStem(row.icon)) ?? '' : row.icon,
+    sort_order: sortOrder++,
+    deleted_at: null,
+  }));
+  const { insertBlockDefinitions, remapDefinitionRows } = await import('./dbBackup');
+  await insertBlockDefinitions(db, remapDefinitionRows(fresh, pictures, (t) => {
+    const id = idMap.get(t.id);
+    return id ? { id, label: t.label } : null;
+  }));
+}
+
+/** The stored names of the pictures a definition row prefills. */
+function definitionPictures(row: ManifestBlockDefinition): string[] {
+  return definitionImageRefs(parseDefinitionElements(row.elements))
+    .map((name) => storedImageName(name))
+    .filter((name): name is string => !!name);
 }
 
 /**
  * Creates the items of a manifest. Entries are created first, all of them, so
  * that links between items of the same file can point at the new ones; then
- * each gets its content, category, tags, icon and cover. If a step fails, what
- * was created is removed again.
+ * each gets its content, category, tags, icon and cover. If a step fails, the
+ * entries and templates created are removed again; categories and custom
+ * blocks it found missing stay, as they would after a successful import. `storedImages`/`iconNames`: the hash part of
+ * a name in the file → the name stored here.
  */
-async function importManifest(manifest: EmeraldManifest, archive: ReadArchive): Promise<EmeraldImportResult> {
+async function importManifest(
+  manifest: EmeraldManifest, storedImages: ReadonlyMap<string, string>, iconNames: ReadonlyMap<string, string>,
+): Promise<EmeraldImportResult> {
   const result: EmeraldImportResult = { entries: [], templates: [] };
   const entryStore = useEntryStore.getState();
   try {
-    const imageNames = new Map(Object.entries(archive.images));
+    const imageNames = new Map(storedImages);
     if (manifest.omittedImages.length > 0) {
       const placeholder = await placeholderImage();
       for (const name of manifest.omittedImages) {
@@ -481,7 +527,7 @@ async function importManifest(manifest: EmeraldManifest, archive: ReadArchive): 
         if (!imageNames.has(stem)) imageNames.set(stem, placeholder);
       }
     }
-    const iconNames = new Map(Object.entries(archive.icons));
+    const categories = await resolveFileCategories(manifest.items);
     // Created blank, so that the IDs are there before any content refers to them.
     // The link targets of this vault as they were before the import: a blank
     // entry it creates must not be found by title ("Untitled …") for a link
@@ -491,7 +537,7 @@ async function importManifest(manifest: EmeraldManifest, archive: ReadArchive): 
     const createdAt = new Map<string, string | undefined>();
     for (const item of manifest.items) {
       if (item.kind !== 'entry') continue;
-      const categoryId = item.category ? await ensureCategoryByName(item.category.name, item.category.icon) : null;
+      const categoryId = item.category ? categories.get(item.category.id) ?? null : null;
       const at = importedCreatedAt(item.createdAt);
       const entry = await entryStore.createEntry({ categoryId, blank: true, createdAt: at });
       idMap.set(item.id, entry.id);
@@ -532,6 +578,9 @@ async function importManifest(manifest: EmeraldManifest, archive: ReadArchive): 
         ...(cover ? { cover_image: cover } : {}),
       }, importedStamp(createdAt.get(id)));
     }
+    // Last: a prefilled link points at an entry of this import, which a failure
+    // before here would have removed again. The copies need no definition.
+    await importBlockDefinitions(manifest.blockDefinitions, imageNames, iconNames, idMap);
     return result;
   } catch (err) {
     await Promise.allSettled([
@@ -554,7 +603,17 @@ async function discardEntry(id: string): Promise<void> {
   useEntryStore.setState((s) => ({ entries: s.entries.filter((e) => e.id !== id) }));
 }
 
-/** The menu's import: the open dialog, the import, then the first imported item opened. */
+/** The error message of the menu's import. */
+async function importFailed(e: unknown): Promise<void> {
+  const text = e instanceof EmeraldNotice ? e.message : `${i18n.t('emeraldImport.failed')}\n${e}`;
+  await message(text, { title: i18n.t('emeraldImport.title'), kind: 'error' });
+}
+
+/**
+ * The menu's import: the open dialog, then by the file's kind — entries and
+ * templates are imported and the first one opened; a vault's content — and a
+ * raw backup — goes to the import dialog, where it is replaced or merged.
+ */
 export async function importFromEmerald(): Promise<void> {
   const picked = await openDialog({
     filters: [{ name: 'Emerald', extensions: ['emerald'] }],
@@ -563,15 +622,36 @@ export async function importFromEmerald(): Promise<void> {
   const filePath = Array.isArray(picked) ? picked[0] : picked;
   if (!filePath) return;
 
-  let result: EmeraldImportResult | null;
+  let opened: OpenedArchive | null;
   try {
-    result = await importEmeraldFile(filePath);
+    opened = await openArchiveAsking(filePath);
   } catch (e) {
-    const text = e instanceof EmeraldImportNotice ? e.message : `${i18n.t('emeraldImport.failed')}\n${e}`;
-    await message(text, { title: i18n.t('emeraldImport.title'), kind: 'error' });
+    await importFailed(e);
     return;
   }
-  if (!result) return;
+  if (!opened) return;
+
+  if (opened.kind === 'vault' || opened.kind === 'raw') {
+    // Handed on, still open: the import dialog closes it once it is done with it.
+    try {
+      const { openedVaultFile } = await import('./dbBackup');
+      useVaultImportStore.getState().offer(await openedVaultFile(opened));
+    } catch (e) {
+      closeArchive(opened.ticket);
+      await importFailed(e);
+    }
+    return;
+  }
+
+  let result: EmeraldImportResult;
+  try {
+    result = await importOpened(opened);
+  } catch (e) {
+    await importFailed(e);
+    return;
+  } finally {
+    closeArchive(opened.ticket);
+  }
 
   await reloadModules(['entries']);
   const [firstEntry] = result.entries;

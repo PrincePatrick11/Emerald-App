@@ -370,6 +370,10 @@ console.log('\n4d. Custom blocks: copies\n');
     copyModel.elements.map((e) => e.id).join() === 'e-date,e-result');
 
   const filled = serializeFields(copy, { ...copyModel, values: { 'e-date': '2026-09-10', 'e-result': 'gut' } }, text);
+  check('a copy notes which definition it came from, and keeps the note when its values change',
+    copyModel.definition === def.id && parseFields(filled).definition === def.id, copy.attrs);
+  check('a note of a foreign shape is not read',
+    parseFields({ ...copy, attrs: { ...copy.attrs, 'data-block-config': JSON.stringify({ elements: [], definition: '../x y' }) } }).definition === undefined);
   const content = serializeBlocks([createTextBlock('<p>a</p>'), filled, createFieldsBlock('number')]);
   check('a field archived by an earlier version is gone from the definition',
     parseDefinitionElements(JSON.stringify([{ id: 'a', kind: 'date', label: 'A', archived: true }, { id: 'b', kind: 'date', label: 'B' }])).map((e) => e.id).join() === 'b');
@@ -1235,19 +1239,22 @@ console.log('\n8. .emerald manifest (lib/emerald/manifest.ts)\n');
     { ...fields, attrs: { ...fields.attrs, [BLOCK_ATTR.data]: JSON.stringify({ slots: { l: `link:${idA}` } }) } },
   ]);
   const manifest = {
-    format: 'emerald', version: EMERALD_FORMAT_VERSION, exportedAt: '2026-11-14T00:00:00.000Z',
+    format: 'emerald', version: EMERALD_FORMAT_VERSION, kind: 'items', exportedAt: '2026-11-14T00:00:00.000Z',
     items: [
       { kind: 'entry', id: idA, title: 'A', number: 1, createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '', icon: '🌙', cover: null,
-        category: { name: 'Ritual', icon: '🕯️', builtin: false }, tags: ['x'], blocks: contentToBlocks(contentA) },
+        category: { id: 'c-ritual', name: 'Ritual', icon: '🕯️', builtin: false }, tags: ['x'], blocks: contentToBlocks(contentA) },
       { kind: 'entry', id: idB, title: 'B', number: 2, createdAt: '', updatedAt: '', icon: '', cover: null, category: null, tags: [],
         blocks: contentToBlocks(contentB) },
       { kind: 'template', id: 'tpl', name: 'T', title: 'New', createdAt: '', updatedAt: '', icon: '📄', tags: [], blocks: [] },
     ],
     links: [{ id: outside, kind: 'entry', title: 'Elsewhere' }],
     omittedImages: [pic],
+    blockDefinitions: [{ id: 'def-1', name: 'Plant' }, { id: '../x' }, 'x'],
   };
   const parsed = parseManifest(JSON.stringify(manifest));
   check('a manifest round-trips through JSON', typeof parsed === 'object' && parsed.items.length === 3 && parsed.links.length === 1, parsed);
+  check('a category goes with its ID; a custom block only with a harmless one',
+    parsed.items[0].category?.id === 'c-ritual' && parsed.blockDefinitions.map((d) => d.id).join() === 'def-1', parsed.blockDefinitions);
   check('block rows give back the content byte for byte',
     blocksToContent(parsed.items[0].blocks) === contentA && blocksToContent(parsed.items[1].blocks) === contentB,
     blocksToContent(parsed.items[1].blocks));
@@ -1275,10 +1282,11 @@ console.log('\n8. .emerald manifest (lib/emerald/manifest.ts)\n');
   check('the gentlest picture setting wins', gentlestImageMode('placeholder', 'none') === 'none'
     && gentlestImageMode('strong', 'balanced') === 'balanced');
 
-  check('an older manifest is named as such', parseManifest(JSON.stringify({ ...manifest, version: 5 })) === 'oldVersion');
-  check('a newer manifest is named as such', parseManifest(JSON.stringify({ ...manifest, version: 7 })) === 'newVersion');
+  check('an older manifest is named as such', parseManifest(JSON.stringify({ ...manifest, version: 6 })) === 'oldVersion');
+  check('a newer manifest is named as such', parseManifest(JSON.stringify({ ...manifest, version: EMERALD_FORMAT_VERSION + 1 })) === 'newVersion');
+  check('a vault file is no file of entries', parseManifest(JSON.stringify({ ...manifest, kind: 'vault' })) === 'unsupported');
   check('no JSON, another format or no item is refused',
-    parseManifest('nope') === 'unsupported' && parseManifest('{"format":"x","version":6}') === 'unsupported'
+    parseManifest('nope') === 'unsupported' && parseManifest('{"format":"x","version":7}') === 'unsupported'
       && parseManifest(JSON.stringify({ ...manifest, items: [] })) === 'unsupported');
   const hostile = parseManifest(JSON.stringify({ ...manifest, items: [
     { kind: 'entry', id: idA, title: 7, tags: ['ok', 3, null], category: { name: 5 }, blocks: [{ id: 'b', type: 'core.text', html: '<p>x</p>', hidden: 'yes', version: -1 }, { type: 'core.text' }, 'x'] },

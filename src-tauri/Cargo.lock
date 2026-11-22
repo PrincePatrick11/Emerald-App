@@ -1051,6 +1051,7 @@ dependencies = [
  "block2",
  "chacha20poly1305",
  "chrono",
+ "flate2",
  "fs4",
  "futures-util",
  "gtk",
@@ -6851,6 +6852,7 @@ checksum = "caa8cd6af31c3b31c6631b8f483848b91589021b28fffe50adada48d4f4d2ed1"
 dependencies = [
  "arbitrary",
  "crc32fast",
+ "flate2",
  "indexmap 2.13.0",
  "memchr",
 ]

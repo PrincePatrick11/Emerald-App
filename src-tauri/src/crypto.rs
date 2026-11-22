@@ -40,7 +40,6 @@ pub enum Context<'a> {
     /// A stored icon (`icons/`), by its filename.
     Icon(&'a str),
     Drafts,
-    Backup,
 }
 
 impl Context<'_> {
@@ -51,7 +50,6 @@ impl Context<'_> {
             Context::Image(name) => (b"emerald/image", name.as_bytes()),
             Context::Icon(name) => (b"emerald/icon", name.as_bytes()),
             Context::Drafts => (b"emerald/drafts", b""),
-            Context::Backup => (b"emerald/backup", b""),
         };
         [MAGIC.as_slice(), &[VERSION], label, &[0], id].concat()
     }
@@ -200,10 +198,10 @@ mod tests {
     #[test]
     fn tampering_fails() {
         let key = random_key();
-        let mut sealed = seal(&key, Context::Backup, b"secret");
+        let mut sealed = seal(&key, Context::Drafts, b"secret");
         let last = sealed.len() - 1;
         sealed[last] ^= 1;
-        assert_eq!(open(&key, Context::Backup, &sealed), Err(OpenError::Corrupt));
+        assert_eq!(open(&key, Context::Drafts, &sealed), Err(OpenError::Corrupt));
     }
 
     #[test]

@@ -100,7 +100,11 @@ pub async fn db_load(
         // every further pass decrypts everything again (measured: 2000
         // entries 238 instead of 40 ms). 32 MB per connection; only what
         // was read is actually occupied.
-        .pragma("cache_size", "-32768");
+        .pragma("cache_size", "-32768")
+        // A raw backup copies the open database in one read transaction
+        // (`raw_backup.rs`); a write waits for it instead of failing after
+        // the 5 s default.
+        .busy_timeout(std::time::Duration::from_secs(60));
     let pool = connect(options, &dir).await?;
 
     let handle = handle(&vault_id, file);
@@ -123,6 +127,51 @@ pub async fn db_load(
         tauri::async_runtime::spawn(async move { previous.close().await });
     }
     Ok(handle)
+}
+
+/// The handle of a raw backup's unpacked database in a vault.
+fn raw_handle(vault_id: &str) -> String {
+    format!("{vault_id}/{}", vault::RAW_IMPORT_FILE)
+}
+
+/// Opens the unpacked database of a raw backup (`emerald_file.rs`) in
+/// `vault_dir` under the key of the vault it was taken from — not the key of
+/// the vault it lies in, which is why it is no [`DbFile`]: the frontend can
+/// read it through the handle, but never name it to `db_load`. A key that
+/// does not open it is a damaged file.
+pub(crate) async fn load_raw(app: &tauri::AppHandle, vault_id: &str, vault_dir: &Path, vault_key: &crypto::Key) -> Result<String, String> {
+    let key = crypto::subkey(vault_key, Purpose::Database);
+    let options = SqliteConnectOptions::new()
+        .filename(vault_dir.join(vault::RAW_IMPORT_FILE))
+        .create_if_missing(false)
+        .disable_statement_logging()
+        .pragma("key", sqlcipher_key(&key).to_string());
+    let pool = connect(options, vault_dir).await?;
+    if pool.execute("SELECT count(*) FROM sqlite_master").await.is_err() {
+        pool.close().await;
+        return Err(crate::emerald_file::EMERALD_UNREADABLE.to_string());
+    }
+    let handle = raw_handle(vault_id);
+    let previous = app.state::<Databases>().0.write().await.insert(handle.clone(), pool);
+    if let Some(previous) = previous {
+        previous.close().await;
+    }
+    Ok(handle)
+}
+
+/// Closes the pool of a raw backup's unpacked database, if one is open.
+pub(crate) async fn close_raw(app: &tauri::AppHandle, vault_id: &str) {
+    let pool = app.state::<Databases>().0.write().await.remove(&raw_handle(vault_id));
+    if let Some(pool) = pool {
+        pool.close().await;
+    }
+}
+
+/// Whether the vault's database is open right now. Blocking: for the
+/// blocking pool, never for an async task.
+pub(crate) fn is_open_blocking(app: &tauri::AppHandle, vault_id: &str) -> bool {
+    let main = handle(vault_id, DbFile::Main);
+    app.state::<Databases>().0.blocking_read().contains_key(&main)
 }
 
 /// The vault folder an authorizer allows `ATTACH` in, as a lowercase string

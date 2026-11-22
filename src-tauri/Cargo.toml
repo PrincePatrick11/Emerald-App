@@ -53,10 +53,12 @@ chacha20poly1305 = "0.10"
 argon2 = "0.5"
 hmac = "0.12"
 zeroize = { version = "1", features = ["serde"] }
-# `.emerald` archives (`emerald_file.rs`). Stored members only: the images in
-# them are compressed already, and without a decompressor no member can unpack
-# to more than it occupies.
-zip = { version = "4", default-features = false }
+# `.emerald` archives (`emerald_file.rs`). The manifest is deflated, the images
+# are stored (they are compressed already); every member is read through a cap,
+# so a deflate bomb unpacks no further than a stored member could.
+zip = { version = "4", default-features = false, features = ["deflate-flate2"] }
+# The deflate of `.emerald` manifests, in pure Rust.
+flate2 = { version = "1", default-features = false, features = ["rust_backend"] }
 # Free space before a re-encryption writes its copy (`reencrypt.rs`).
 fs4 = { version = "0.13", features = ["sync"] }
 # The WebSocket the dev bridge serves; only with the `devbridge` feature.
@@ -72,9 +74,10 @@ keyring = { version = "3", features = ["apple-native"] }
 objc = "0.2"
 block = "0.1"
 # objc2 family is already pulled in transitively by Tauri 2; we promote it
-# to a direct dep for WKPDFConfiguration/createPDF in the PDF export
+# to a direct dep for printing through NSPrintOperation in the PDF export
 # (`pdf_export/macos.rs`), the dev bridge's snapshots and mouse events
-# (`devbridge.rs`) and the free-space check (`reencrypt.rs`). Versions
+# (`devbridge.rs`, which alone uses `block2`) and the free-space check
+# (`reencrypt.rs`). Versions
 # match Tauri's Cargo.lock at the time of writing.
 objc2 = "0.6"
 objc2-foundation = "0.3"

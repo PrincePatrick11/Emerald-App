@@ -26,8 +26,6 @@ export const KEY_ERRORS = {
   wrongPassword: 'WRONG_PASSWORD',
   wrongRecoveryKey: 'WRONG_RECOVERY_KEY',
   passwordTooShort: 'PASSWORD_TOO_SHORT',
-  /** An encrypted backup that none of the open vaults can open. */
-  backupLocked: 'BACKUP_LOCKED',
   /** Not enough space for the copy; followed by `:<needed>:<free>` in bytes. */
   notEnoughSpace: 'NOT_ENOUGH_SPACE',
 } as const;

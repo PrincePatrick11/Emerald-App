@@ -1,7 +1,6 @@
 import { invoke } from '@tauri-apps/api/core';
 import type { LeftListTabId } from './modules';
 import { oneOf, isRecord, asRecord, asString } from './helpers';
-import type { Weekday } from './formatDate';
 import {
   DEFAULT_EDITOR_FONT_ID, DEFAULT_EDITOR_FONT_SIZE, DEFAULT_UI_FONT_ID, DEFAULT_UI_SCALE,
   normalizeEditorFontId, normalizeEditorFontSize, normalizeUIFontId, normalizeUIScale,
@@ -102,26 +101,10 @@ export interface TemplateSettings {
   defaultTemplateId: string | null;
 }
 
-/** How often the automatic backup runs — whole days only, the file name carries the date. */
-export const BACKUP_INTERVAL_OPTIONS = ['daily', 'weekly', 'monthly'] as const;
-export type BackupInterval = (typeof BACKUP_INTERVAL_OPTIONS)[number];
-const BACKUP_WEEKDAY_OPTIONS = [0, 1, 2, 3, 4, 5, 6] as const satisfies readonly Weekday[];
-/** How many automatic backups are kept; `null` = all. The numbers
- *  are checked once more by `KEEP_CHOICES` in `auto_backup.rs` — change both together. */
-export const BACKUP_KEEP_OPTIONS = [3, 5, 10, 30, null] as const;
-export type BackupKeep = (typeof BACKUP_KEEP_OPTIONS)[number];
-
-/** The automatic backup. The target folder is deliberately not here: it belongs
- *  to the installation (`auto_backup.rs`), not to the vault — otherwise an
- *  imported backup would bring a foreign path along. */
-export interface BackupSettings {
-  auto: boolean;
-  interval: BackupInterval;
-  /** Applies to `weekly` only. */
-  weekday: Weekday;
-  keep: BackupKeep;
-}
-
+/**
+ * A vault's settings. The automatic backup is not among them: it belongs to
+ * the installation and is set on the start page (`lib/autoBackup.ts`).
+ */
 export interface VaultSettings {
   /** Not read, like `version` in `vaults.json`: only a shape that needs a
    *  conversion increments it. A higher number from a newer
@@ -137,7 +120,6 @@ export interface VaultSettings {
   editor: EditorSettings;
   journal: JournalSettings;
   templates: TemplateSettings;
-  backup: BackupSettings;
 }
 
 export type SettingsGroup = Exclude<keyof VaultSettings, 'version'>;
@@ -145,7 +127,7 @@ export type SettingsGroup = Exclude<keyof VaultSettings, 'version'>;
 /** Each group exactly once — the record forces a new one not to be missing. */
 const GROUP_SET: Record<SettingsGroup, true> = {
   appearance: true, trash: true, leftList: true, emojis: true, images: true, tags: true,
-  editor: true, journal: true, templates: true, backup: true,
+  editor: true, journal: true, templates: true,
 };
 export const SETTINGS_GROUPS = Object.keys(GROUP_SET) as SettingsGroup[];
 
@@ -186,12 +168,6 @@ export const DEFAULT_VAULT_SETTINGS: VaultSettings = {
   templates: {
     defaultTemplateId: null,
   },
-  backup: {
-    auto: false,
-    interval: 'weekly',
-    weekday: 1,
-    keep: 10,
-  },
 };
 
 
@@ -224,7 +200,6 @@ export function normalizeVaultSettings(raw: unknown): VaultSettings {
   const editor = asRecord(root.editor);
   const journal = asRecord(root.journal);
   const templates = asRecord(root.templates);
-  const backup = asRecord(root.backup);
   const flag = (value: unknown, fallback: boolean) => (typeof value === 'boolean' ? value : fallback);
   const version = typeof root.version === 'number' && Number.isInteger(root.version) && root.version > 1
     ? root.version
@@ -278,13 +253,6 @@ export function normalizeVaultSettings(raw: unknown): VaultSettings {
       defaultTemplateId: typeof templates.defaultTemplateId === 'string' && /^[\w-]{1,100}$/.test(templates.defaultTemplateId)
         ? templates.defaultTemplateId
         : null,
-    },
-    backup: {
-      ...backup,
-      auto: flag(backup.auto, DEFAULT_VAULT_SETTINGS.backup.auto),
-      interval: oneOf(backup.interval, BACKUP_INTERVAL_OPTIONS, DEFAULT_VAULT_SETTINGS.backup.interval),
-      weekday: oneOf(backup.weekday, BACKUP_WEEKDAY_OPTIONS, DEFAULT_VAULT_SETTINGS.backup.weekday),
-      keep: oneOf(backup.keep, BACKUP_KEEP_OPTIONS, DEFAULT_VAULT_SETTINGS.backup.keep),
     },
   };
 }

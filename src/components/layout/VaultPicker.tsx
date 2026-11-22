@@ -10,6 +10,7 @@ import StartSection from './start/StartSection';
 import StartAppearance from './start/StartAppearance';
 import StartUpdates from './start/StartUpdates';
 import StartLanguage from './start/StartLanguage';
+import StartAutoBackup from './start/StartAutoBackup';
 import { keyErrorOf } from '../../lib/vaultKeys';
 import { vaultOpenErrorKey } from '../../lib/db';
 import { hideLoadingScreen, hideSplash, showLoadingScreen } from '../../lib/splash';
@@ -29,8 +30,6 @@ import {
   splitPath,
   type Vault as VaultRecord,
 } from '../../lib/vaultManager';
-
-export { VaultLocationRow } from './PickerRows';
 
 /** The one open editor, if any — edit, delete confirmation and the create row
     are mutually exclusive, so they share a single state. */
@@ -495,6 +494,8 @@ export default function VaultPicker() {
             </div>
             <StartAppearance />
           </div>
+
+          <StartAutoBackup />
         </div>
 
         <footer className="start-foot">

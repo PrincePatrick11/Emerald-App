@@ -10,6 +10,7 @@ import TabBar from '../TabBar';
 import RailButton from '../../ui/RailButton';
 import TitleBarMenuButton from './TitleBarMenuButton';
 import { useTitleBarMenus } from './useTitleBarMenus';
+import { dispatchMenuAction } from '../../../lib/menuActions';
 import SearchModal from './SearchModal';
 import WindowControls from './WindowControls';
 
@@ -144,10 +145,13 @@ export default function TitleBar({ tabs = false, leadWidth = 0, animate = true, 
           </div>
         )}
 
-        {/* Export carries Download, Import Upload — as in Settings → Backup. */}
+        {/* Export carries Download, Import Upload — as the export menu and the vault import dialog do.
+            Export opens the export menu, Import a menu of its own. */}
         {!picker && (
           <div className="ml-1 flex items-center gap-0.5 flex-shrink-0">
-            <TitleBarMenuButton label={menus.exportMenu.label} icon={<Download size={16} />} nodes={menus.exportMenu.nodes} />
+            <RailButton onClick={() => dispatchMenuAction('export')} title={t('menu.export')} aria-label={t('menu.export')}>
+              <Download size={16} />
+            </RailButton>
             <TitleBarMenuButton label={menus.importMenu.label} icon={<Upload size={16} />} nodes={menus.importMenu.nodes} />
           </div>
         )}
