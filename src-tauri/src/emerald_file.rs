@@ -996,6 +996,8 @@ pub struct OpenedFile {
     ticket: String,
     kind: Kind,
     manifest: String,
+    /// Whether opening it took a key: a sealed file, or a raw backup (its database under its vault's key).
+    protected: bool,
     /// A raw backup's `settings.json`, if it carries one — unchecked, as everything from a file.
     #[serde(skip_serializing_if = "Option::is_none")]
     settings: Option<String>,
@@ -1030,8 +1032,9 @@ pub async fn read_emerald_file(
             Some(index) => read_member(&mut zip, index, crate::vault::SETTINGS_MAX_BYTES).ok().and_then(|bytes| String::from_utf8(bytes).ok()),
             None => None,
         };
+        let protected = key.is_some() || raw_key.is_some();
         let ticket = app.state::<EmeraldTickets>().insert(Ticket { path: file, key, kind, raw_key, serial: 0 });
-        Ok(OpenedFile { ticket, kind, manifest, settings })
+        Ok(OpenedFile { ticket, kind, manifest, protected, settings })
     })
     .await
     .map_err(|e| e.to_string())?

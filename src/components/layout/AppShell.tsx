@@ -34,7 +34,6 @@ import { hasOpenEdits, settleBeforeExit } from '../../lib/openEdits';
 import { restoreDrafts } from '../../store/draftStore';
 import { loadVaultPrefs } from '../../store/vaultPrefs';
 import { startAutoBackup } from '../../lib/autoBackup';
-import ImportDestinationModal from '../ui/ImportDestinationModal';
 
 // No props, everything through their own store subscriptions: `memo` keeps them
 // out of the shell's re-renders — otherwise dragging a sidebar would push every
@@ -458,7 +457,6 @@ export default function AppShell() {
       <ImageNoticeModal />
       <ImagePickerHost />
       <LeaveGuardModal />
-      <ImportDestinationModal />
       <VaultKeyDialog />
       <BackupUnlockDialog />
     </div>

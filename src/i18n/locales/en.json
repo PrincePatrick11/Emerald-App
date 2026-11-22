@@ -1002,9 +1002,9 @@
     "modeMerge": "Merge",
     "modeMergeDesc": "Add all entries alongside existing ones (each entry gets a unique ID prefix)",
     "modeReplace": "Replace",
-    "modeReplaceDesc": "Delete all current data and restore from backup",
+    "modeReplaceDesc": "Delete all current data and restore from the file",
     "modeAddVault": "New Vault",
-    "modeAddVaultDesc": "Create a new, separate vault from the backup",
+    "modeAddVaultDesc": "Create a new, separate vault from the file",
     "modeReplaceWarning": "This will permanently delete all current data in this vault.",
     "newVaultName": "New vault name",
     "newVaultLocation": "New vault folder",
@@ -1041,7 +1041,7 @@
     "updateErrorStale": "The update that was found is no longer held. Please check again.",
     "updateErrorWrite": "The setting could not be saved.",
     "includeSettings": "Settings",
-    "importSettings": "Apply settings from the backup",
+    "importSettings": "Apply settings from the file",
     "groupAppearance": "Fonts & sizes",
     "uiScale": "UI size",
     "editorFontSize": "Editor text size",
@@ -1123,8 +1123,7 @@
     "previewEntries": "Entries",
     "previewTemplates": "Templates",
     "previewTasks": "Tasks",
-    "previewLanguages": "Languages",
-    "importErrorItems": "This file holds entries, not a vault. Import it with the Import button in the title bar. Nothing was changed."
+    "previewLanguages": "Languages"
   },
   "autoBackup": {
     "title": "Automatic backup",
@@ -1155,9 +1154,6 @@
     "errorVaultMissing": "The vault folder cannot be reached.",
     "errorInterrupted": "A password change of this vault was interrupted. Open the vault once and the backup carries on.",
     "errorSave": "The setting could not be saved."
-  },
-  "vaultImport": {
-    "fileFrom": "File from {{date}}."
   },
   "contextMenu": {
     "openInNewTab": "Open in New Tab",
@@ -1212,8 +1208,6 @@
     "lockView": "Lock View",
     "showSplash": "Show Loading Screen",
     "exportEmerald": "Export as Emerald…",
-    "importMarkdown": "From Markdown…",
-    "importEmerald": "From Emerald…",
     "quit": "Quit Emerald App",
     "switchVault": "Switch Vault…",
     "about": "About Emerald App",
@@ -1235,11 +1229,6 @@
     "tabAll": "All",
     "tabTasks": "Tasks",
     "noResults": "No entries found"
-  },
-  "importDestination": {
-    "title": "Choose destination",
-    "description": "\"{{title}}\" doesn't specify where to import it. Where should it go?",
-    "cancel": "Cancel"
   },
   "tasks": {
     "newTask": "New task",
@@ -1417,10 +1406,9 @@
     "failed": "The import failed. The entries and templates it had already created were removed again.",
     "done": "Import finished – entries: {{entries}}, templates: {{templates}}.",
     "readFailed": "The file could not be read: {{error}}",
-    "markdownFailed": "The import failed: {{error}}",
     "markdownDone": "The entry was imported.",
     "outside": "Emerald can only open files from your own folders (home, Documents, Desktop, Downloads). Copy the file there first. Nothing was changed.",
-    "vaultFile": "This file holds a whole vault. Restore it with Import → From Emerald… in the title bar. Nothing was changed."
+    "doneSkipped": "Import complete – entries: {{entries}}, templates: {{templates}}, skipped as already here: {{skipped}}."
   },
   "emeraldExport": {
     "title": "Export",
@@ -1433,8 +1421,6 @@
       "html": "HTML export",
       "markdown": "Markdown export",
       "emerald": "Emerald export",
-      "emeraldImport": "Emerald import",
-      "markdownImport": "Markdown import",
       "canvas": "Canvas picture",
       "vault": "Database export"
     }
@@ -1572,5 +1558,66 @@
     "addCategory": "Add",
     "moveUp": "Move up",
     "moveDown": "Move down"
+  },
+  "importWindow": {
+    "title": "Import",
+    "import": "Import",
+    "importing": "Importing…",
+    "dropHere": "Drag a file here or click to choose one",
+    "dropHint": "Emerald (.emerald, .vault.emerald) or Markdown (.md)",
+    "fileFilter": "Emerald or Markdown",
+    "opening": "Opening file…",
+    "otherFile": "Other file…",
+    "notImportable": "This file cannot be imported here. Emerald takes Emerald files (.emerald, .vault.emerald) and Markdown (.md).",
+    "oneAtATime": "One file is imported at a time – “{{name}}” was taken.",
+    "kind": {
+      "label": "Kind",
+      "entry": "Entry",
+      "entries": "Several entries",
+      "template": "Template",
+      "templates": "Several templates",
+      "items": "Entries and templates",
+      "vault": "Database export",
+      "raw": "Raw backup",
+      "markdown": "Markdown file"
+    },
+    "contains": {
+      "label": "Contents",
+      "entries_one": "{{count}} entry",
+      "entries_other": "{{count}} entries",
+      "templates_one": "{{count}} template",
+      "templates_other": "{{count}} templates",
+      "nothing": "empty"
+    },
+    "date": "Date",
+    "protected": "Encrypted",
+    "yes": "Yes",
+    "no": "No",
+    "items_one": "In the file: {{count}}",
+    "items_other": "In the file: {{count}}",
+    "exists": "already here",
+    "existing": {
+      "label": "Already here",
+      "copy": "Create as copy",
+      "skip": "Skip",
+      "count_one": "{{count}} of them is already in this vault.",
+      "count_other": "{{count}} of them are already in this vault.",
+      "normalHint": "They are created as copies; under “Advanced” they can be skipped.",
+      "allSkipped": "Everything is here already – with “Skip” nothing is left to import."
+    },
+    "target": {
+      "label": "Destination for entries without a category",
+      "hint": "Applies to entries that bring no category. A dashboard gives them its first category and its start tag.",
+      "none": "No category",
+      "dashboard": "Dashboard: {{name}}"
+    },
+    "markdown": {
+      "dashboard": "Destination dashboard",
+      "hint": "The file names no category. The entry starts in the dashboard’s first category and opens inside it.",
+      "ownCategory": "The file names its category “{{name}}” – the entry goes there.",
+      "target": "Destination"
+    },
+    "total_one": "{{count}} to import",
+    "total_other": "{{count}} to import"
   }
 }

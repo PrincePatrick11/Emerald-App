@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { format } from 'date-fns';
 import { Download, Loader2 } from 'lucide-react';
@@ -10,6 +10,7 @@ import FilterList from '../../ui/FilterList';
 import TagInput from '../../ui/TagInput';
 import BlockCheckbox from '../../blocks/BlockCheckbox';
 import ExportEntryChecklist from './ExportEntryChecklist';
+import { Part } from '../menuParts';
 import VaultExportOptions from './VaultExportOptions';
 import { NewPasswordFields, newPasswordProblem } from '../vaultKeyParts';
 import { useExportMenuStore, type ExportTarget } from '../../../store/exportMenuStore';
@@ -50,17 +51,6 @@ export default function ExportMenuModal() {
   if (!request) return null;
   // Remount per opening, so the menu starts from the view on screen then.
   return <ExportMenuBody key={request.seq} target={request.target} />;
-}
-
-/** A titled part of the menu. */
-function Part({ title, children, hint }: { title: string; children: ReactNode; hint?: string }) {
-  return (
-    <section className="space-y-2">
-      <p className="label-xs">{title}</p>
-      {children}
-      {hint && <p className="text-xs text-subtle leading-snug">{hint}</p>}
-    </section>
-  );
 }
 
 function ExportMenuBody({ target }: { target: ExportTarget }) {

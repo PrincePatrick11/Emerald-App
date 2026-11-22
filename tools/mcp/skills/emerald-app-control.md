@@ -165,7 +165,7 @@ where one only clicks, right-clicks or types, the tool is now the shorter way.
 
 **Tabs:** `.tab-button` per open view, `button.tab-add` for a new one, `button.tab-close`.
 **The Start page has no rail** — it is the vault picker (open/new vault, automatic backup, appearance, language, updates). Its only way back is the vault's own "open" button.
-**Title bar:** Menu (Switch Vault…, Check for Updates…, About, Edit, View), Search (global search modal), Back/Forward, Export (opens the export menu: this entry, a collective export or the whole database), Import (a menu) — all `.rail-button` icon buttons, no longer four text menus.
+**Title bar:** Menu (Switch Vault…, Check for Updates…, About, Edit, View), Search (global search modal), Back/Forward, Export (opens the export menu: this entry, a collective export or the whole database), Import (opens the import window; a file can also be dragged into the app window) — all `.rail-button` icon buttons, no longer four text menus.
 
 ### Selectors — the important part
 

@@ -145,14 +145,16 @@ export default function TitleBar({ tabs = false, leadWidth = 0, animate = true, 
           </div>
         )}
 
-        {/* Export carries Download, Import Upload — as the export menu and the vault import dialog do.
-            Export opens the export menu, Import a menu of its own. */}
+        {/* Export carries Download, Import Upload — as the export menu and the import window do.
+            Export opens the export menu, Import the import window. */}
         {!picker && (
           <div className="ml-1 flex items-center gap-0.5 flex-shrink-0">
             <RailButton onClick={() => dispatchMenuAction('export')} title={t('menu.export')} aria-label={t('menu.export')}>
               <Download size={16} />
             </RailButton>
-            <TitleBarMenuButton label={menus.importMenu.label} icon={<Upload size={16} />} nodes={menus.importMenu.nodes} />
+            <RailButton onClick={() => dispatchMenuAction('import')} title={t('menu.import')} aria-label={t('menu.import')}>
+              <Upload size={16} />
+            </RailButton>
           </div>
         )}
       </div>

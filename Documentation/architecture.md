@@ -54,6 +54,7 @@ src/
 │   │   ├── moduleViews.ts                      ViewId → lazy view (MainArea only)
 │   │   ├── PickerRows, PickerServerPanel, PickerStorePanel  the start page's vault rows and the sync/store placeholders
 │   │   ├── export/                             the export menu (ExportMenuModal), its entry checklist and the database options
+│   │   ├── import/                             the import window (ImportModal) and its part for a database file (useVaultImport)
 │   │   ├── start/                              the start page's brand, language, sections, Appearance, automatic backup, version and updates
 │   │   ├── settings/                           SettingsModal, one *Page per tab, sections
 │   │   └── titlebar/                           custom title bar, menus, SearchModal
@@ -84,10 +85,10 @@ src/
 │   ├── sessionStore.ts          per-view search/filter state (session only)
 │   ├── vaultPrefs.ts            per-vault list and layout preferences
 │   ├── settingsStore.ts         the open vault's settings.json
-│   ├── vaultStore.ts, trashStore.ts, undoStore.ts, saveNoticeStore.ts, importStore.ts
+│   ├── vaultStore.ts, trashStore.ts, undoStore.ts, saveNoticeStore.ts
 │   ├── vaultKeyStore.ts         the unlock gate (`ensureVaultReady`)
 │   ├── backupSecretStore.ts     asks for a `.emerald` file's password, or its vault's password or recovery key
-│   ├── vaultImportStore.ts      a `.vault.emerald` the title bar's import opened, on its way to its dialog
+│   ├── importWindowStore.ts     the import window's open state and the paths of a drop
 │   ├── exportMenuStore.ts       the export menu's open request, with the entry or template on screen
 │   ├── imageStore.ts            "Images": rows, files, places of use; `takeIn`, `discardRenders`
 │   ├── imagePickerStore.ts      `pickPictures`, the picture picker's open request
@@ -103,6 +104,7 @@ src/
 │   ├── useCollapsedSet.ts, usePersistedFlag.ts, usePointerReorder.ts
 │   ├── useOpenInNewTabAction.tsx, useSaveAsTemplateAction.tsx
 │   ├── useVaultPictures.ts, useFileDrop.ts   the pictures of "Images"; files dropped from the disk
+│   ├── useImportDrop.ts         import files dragged into the window open the import window
 │   └── useShrunkIcon.ts, useEmojiSearchData.ts
 ├── lib/
 │   ├── sqlite.ts                the SQL interface over the `db_*` commands
@@ -133,6 +135,7 @@ src/
 │   ├── htmlExport.ts            the interactive HTML export: one self-contained file with its own stylesheet, script and CSP
 │   ├── exportFonts.ts           the fonts of PDF and HTML: the app's (embedded from `fonts.css` as data URLs) and common system ones
 │   ├── exportMenu.ts            the export menu's rules: remembered choices, Normal's fixed settings, period, collection, order
+│   ├── importFile.ts, importPaths.ts   the import window's files: which it takes, opening one to see what it is, what it remembers
 │   ├── emerald/                 `manifest.ts` (the manifest, pure), `file.ts` (the `.emerald` commands, asking for a secret)
 │   ├── dbBackup.ts, importStaging.ts   a vault's content as `.vault.emerald`: export and restore, a raw backup's content read from its database
 │   ├── autoBackup.ts            automatic backup: the start page's setting and status (the schedule is Rust's)
@@ -252,7 +255,7 @@ All Rust commands are *registered* in `src-tauri/src/lib.rs` and invoked from Ty
 | `ensure_backup_dir(vault_id)` | The vault's `backups/` folder, the database export's default destination; recreated on demand, refused outside the allowed storage roots and, inside the app data directory, outside `vaults/` — wherever the write command would refuse the export afterwards. |
 | `export_image(path, data_url)` | Write a data-URL's image bytes to a user-chosen `.png`/`.jpg`/`.jpeg`/`.webp`/`.svg` path. Same path checks as `write_file`. |
 | `write_emerald_file(vault_id, path, kind, manifest, images, icons, protection)` | Write a `.emerald` (`kind` `items`) or `.vault.emerald` (`vault`) from the frontend's manifest and the vault's pictures and icons, streamed into `{path}.part` and renamed into place; `protection` is `none`, an own `password` or the `vaultKey`. Same path checks as `write_file`. See [The `.emerald` file](architecture/editing.md#the-emerald-file). |
-| `read_emerald_file(path, password?, recovery_key?)` | Open a `.emerald` within the limits of its kind and return `{ticket, kind, manifest}` (a raw backup: also its `settings`); the pictures stay in the file. `EMERALD_LOCKED` / `EMERALD_VAULT_LOCKED` while a secret is missing. Same path checks as `read_file`. |
+| `read_emerald_file(path, password?, recovery_key?)` | Open a `.emerald` within the limits of its kind and return `{ticket, kind, manifest, protected}` (a raw backup: also its `settings`); the pictures stay in the file. `EMERALD_LOCKED` / `EMERALD_VAULT_LOCKED` while a secret is missing. Same path checks as `read_file`. |
 | `open_raw_backup_db(ticket, vault_id)` / `discard_raw_backup_db(vault_id)` | Unpack an opened raw backup's database beside the vault (`emerald.db.raw`) and open it under the backup's own key, returning a handle for `db_select` / close and remove it. See [Raw backups](database.md#raw-backups). |
 | `store_emerald_files(ticket, vault_id)` / `close_emerald_file(ticket)` | Store an opened file's pictures and icons in the vault, once the import really starts; returns name in the file → name stored here / forget an opened file. Tickets live in Rust (`EmeraldTickets`, at most four). |
 | `write_file(path, content)` | Write UTF-8 text to a user-selected `.md`/`.html`/`.json`/`.txt` path. Rejects symlinks; the path must resolve within the allowed storage roots, and inside the app data directory only `vaults.json` and `vaults/` are writable (see [Path Confinement](security.md#path-confinement)). |

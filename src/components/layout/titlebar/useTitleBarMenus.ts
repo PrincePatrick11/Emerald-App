@@ -14,12 +14,11 @@ interface TitleBarMenu {
  *
  * On macOS, Edit and View are in the system menu bar instead
  * (`install_native_menu` in `src-tauri/src/lib.rs`, the only platform with a
- * native menu); Import is in the title bar everywhere. Export is no menu: its
- * button opens the export menu (`ExportMenuModal`).
+ * native menu). Export and Import are no menus: their buttons open the
+ * export menu (`ExportMenuModal`) and the import window (`ImportModal`).
  *
  * Content only: where the menus sit is decided by `TitleBar` —
- * Edit and View behind the three-line button, Import as a
- * button of its own behind the arrows.
+ * Edit and View behind the three-line button.
  */
 export function useTitleBarMenus() {
   const { t } = useTranslation();
@@ -50,14 +49,6 @@ export function useTitleBarMenus() {
       { kind: 'item', label: t('menu.showSplash'), onSelect: () => dispatchMenuAction('show-splash') },
     ],
   };
-  const importMenu: TitleBarMenu = {
-    label: t('menu.import'),
-    nodes: [
-      { kind: 'item', label: t('menu.importMarkdown'), onSelect: () => dispatchMenuAction('import-markdown') },
-      { kind: 'item', label: t('menu.importEmerald'), onSelect: () => dispatchMenuAction('import-emerald') },
-    ],
-  };
-
   // The three-line button is the Emerald menu, as on macOS: Switch Vault…,
   // Check for Updates…, About Emerald App, then Edit and View as submenus.
   const appMenu: MenuNode[] = [
@@ -68,5 +59,5 @@ export function useTitleBarMenus() {
     ...[edit, view].map((menu): MenuNode => ({ kind: 'submenu', label: menu.label, children: menu.nodes })),
   ];
 
-  return { appMenu, importMenu };
+  return { appMenu };
 }

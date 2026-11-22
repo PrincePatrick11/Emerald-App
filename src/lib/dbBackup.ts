@@ -23,7 +23,7 @@ import { blockRefs } from './blocks/blockRefs';
 import { fromBlockRow, type StoredBlockRow } from './blocks/blockRows';
 import { remapBlock, renameAll, type BlockRemap } from './blocks/blockRemap';
 import { invoke } from '@tauri-apps/api/core';
-import { save, open } from '@tauri-apps/plugin-dialog';
+import { save } from '@tauri-apps/plugin-dialog';
 import { getDb, runMigrations, sweepDanglingTaskLinks, VAULT_OUTDATED, VAULT_TOO_NEW, vaultVersionErrorOf } from './db';
 import Database from './sqlite';
 import {
@@ -63,7 +63,7 @@ import { useVaultStore } from '../store/vaultStore';
 import { VAULT_KEY_CANCELLED } from '../store/vaultKeyStore';
 import { keyErrorOf } from './vaultKeys';
 import {
-  closeArchive, EmeraldNotice, noticeFor, openArchiveAsking, storeArchiveFiles, withEmeraldEnding, writeArchive,
+  EmeraldNotice, noticeFor, storeArchiveFiles, withEmeraldEnding, writeArchive,
   type EmeraldProtection, type OpenedArchive, type StoredArchiveFiles,
 } from './emerald/file';
 import { EMERALD_FORMAT_VERSION, parseVaultManifest, type EmeraldVaultManifest, type ManifestBlockDefinition } from './emerald/manifest';
@@ -768,7 +768,7 @@ export async function exportDatabase(
 /**
  * An opened `.vault.emerald`: its content and what the import offers from it.
  * Its pictures wait in the file under `ticket` until the import stores them;
- * whoever drops it closes it (`closeVaultFile`).
+ * whoever drops it closes it (`closeImportSource`).
  */
 export interface OpenedVaultFile {
   ticket: string;
@@ -777,24 +777,7 @@ export interface OpenedVaultFile {
 }
 
 /**
- * Opens a `.vault.emerald` at `path`, asking for its secret as long as needed.
- * `null`: cancelled at the question. A file of entries and templates, and one
- * that cannot be read, are refused with an `EmeraldNotice`.
- */
-export async function openVaultFile(path: string): Promise<OpenedVaultFile | null> {
-  const opened = await openArchiveAsking(path);
-  if (!opened) return null;
-  try {
-    if (opened.kind === 'items') throw new EmeraldNotice(i18n.t('settings.importErrorItems'));
-    return await openedVaultFile(opened);
-  } catch (err) {
-    closeArchive(opened.ticket);
-    throw err;
-  }
-}
-
-/**
- * A file opened elsewhere (the menu's import) as a vault's content — still
+ * A file opened by the import window as a vault's content — still
  * open. A raw backup's content is read from its database first.
  */
 export async function openedVaultFile(opened: OpenedArchive): Promise<OpenedVaultFile> {
@@ -866,21 +849,6 @@ async function rawBackupContent(opened: OpenedArchive): Promise<VaultContent> {
     await invoke('discard_raw_backup_db', { vaultId })
       .catch((err: unknown) => console.warn('[backup] raw backup database left behind:', err));
   }
-}
-
-/** The open dialog, then `openVaultFile`. `null`: cancelled. */
-export async function pickVaultFile(): Promise<OpenedVaultFile | null> {
-  const selected = await open({
-    filters: [{ name: 'Emerald', extensions: ['emerald'] }],
-    multiple: false,
-  });
-  if (!selected) return null;
-  return openVaultFile(typeof selected === 'string' ? selected : selected[0]);
-}
-
-/** Drops an opened file that will not be imported. */
-export function closeVaultFile(file: OpenedVaultFile): void {
-  closeArchive(file.ticket);
 }
 
 /**
@@ -1696,7 +1664,7 @@ export async function doMerge(db: Awaited<ReturnType<typeof getDb>>, backup: Vau
  *
  * One truth for four places that previously each kept the same list:
  * the two packing lists (the export menu's `VaultExportOptions`, the vault
- * import's `VaultImportModal`; `loadExportPrefs` reads the same kinds back), the
+ * import's vault part (`useVaultImport`); `loadExportPrefs` reads the same kinds back), the
  * initial and reset value of the import filter, and `ALL_TYPES_INCLUDED`
  * below. A kind that was forgotten there was silently excluded from every
  * "import everything".
@@ -1726,7 +1694,7 @@ const ALL_TYPES_INCLUDED: ImportTypeFilters = allTypesIncluded();
 /**
  * Imports an opened `.vault.emerald`. Its pictures and icons are stored
  * first, in the vault they are imported into (for `add-vault` the new one).
- * The file stays open: whoever opened it closes it (`closeVaultFile`).
+ * The file stays open: whoever opened it closes it (`closeImportSource`).
  */
 export async function importDatabase(
   file: OpenedVaultFile,
@@ -1792,7 +1760,7 @@ export async function importDatabase(
     // 3. Switch to it (resets the DB cache and creates the schema in the new empty DB)
     await useVaultStore.getState().loadVaults();
     // `editsResolved`: the question about ongoing edits was asked
-    // before the import began (`VaultImportModal`). If it came up here again and
+    // before the import began (`useVaultImport`). If it came up here again and
     // the answer were "keep editing", the old vault would stay active —
     // and step 4 would fill it instead of the new one.
     // If the user cancels at the new vault's password, the import is

@@ -322,6 +322,8 @@ The eight typefaces ship with the app (`@fontsource` woff2 files bundled by Vite
 
 File open and save operations use `@tauri-apps/plugin-dialog`, which presents a native OS file picker. The user explicitly selects or names the file; the application never constructs paths from user-provided text without going through this picker.
 
+The one other source of paths is a file dragged in from the disk (Tauri's drag-drop event, `useFileDrop`): the user chose it just as in the picker. Such a path is treated exactly like a picked one. The import window (`ImportModal`, `useImportDrop`) takes only the endings its open dialog offers (`isImportPath`: `.emerald`, which `.vault.emerald` ends in, and `.md`) and hands the path to the same `read_emerald_file` / `read_file` as the dialog, with their path guards, extension lists and limits; a picture drop goes through `acceptedImagePaths` and the image commands. A file of another kind dropped on the open import window is refused with a notice, never read.
+
 ## No `window.confirm()`
 
 Emerald does not use the browser's `window.confirm()` because WKWebView suppresses it. Destructive actions use an inline two-click confirmation (`InlineConfirm`, typically driven by a `confirmingId` state), which also gives control over styling and placement.

@@ -553,7 +553,7 @@ export async function exportAsMarkdown(items: readonly ExportItem[], file: Expor
 /** Show a non-blocking error toast for an export failure. */
 export async function exportErrorMessage(
   err: unknown,
-  kind: 'pdf' | 'html' | 'markdown' | 'emerald' | 'vault' | 'emeraldImport' | 'markdownImport' | 'canvas',
+  kind: 'pdf' | 'html' | 'markdown' | 'emerald' | 'vault' | 'canvas',
 ): Promise<void> {
   const detail = err instanceof Error ? err.message : String(err);
   await message(detail, { title: i18n.t('emeraldExport.failed', { kind: i18n.t(`emeraldExport.kinds.${kind}`) }), kind: 'error' });

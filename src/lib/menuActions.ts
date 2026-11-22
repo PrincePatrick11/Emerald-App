@@ -24,8 +24,7 @@ type MenuActionId =
   | 'show-about'
   | 'check-updates'
   | 'export'
-  | 'import-markdown'
-  | 'import-emerald';
+  | 'import';
 
 /**
  * Actions `runMenuAction` handles on its own. `reset-sidebar-widths` is not
@@ -37,8 +36,7 @@ type SelfContainedMenuActionId = Exclude<MenuActionId, 'reset-sidebar-widths'>;
 /** The actions only the title bar offers; every other one is a native menu event. */
 type TitleBarOnlyMenuActionId =
   | 'export'
-  | 'import-markdown'
-  | 'import-emerald';
+  | 'import';
 
 // Keyed rather than a plain array so that adding a `MenuActionId` without
 // listing it here is a compile error, not a menu item that silently stops
@@ -99,9 +97,8 @@ export async function runMenuAction(id: SelfContainedMenuActionId): Promise<void
 
   // Export and Import live in the title bar, which leaves them out over the
   // vault picker; this guard is the second line. Without a vault there is no
-  // database: "Export" would run into a raw NO_ACTIVE_VAULT dialog, and
-  // "Import Markdown" would wait for a target modal that is not mounted then,
-  // a promise that would only resolve once a vault was ready. Over an open
+  // database: "Export" would run into a raw NO_ACTIVE_VAULT dialog, and the
+  // import window would import into nothing. Over an open
   // vault the picker hides every view there would be to act on.
   if (!hasActiveVault(useVaultStore.getState()) || useVaultPickerStore.getState().open) return;
 
@@ -114,16 +111,10 @@ export async function runMenuAction(id: SelfContainedMenuActionId): Promise<void
       useExportMenuStore.getState().open();
       return;
     }
-    case 'import-markdown': {
-      const { exportErrorMessage } = await import('./export');
-      const { importFromMarkdown } = await import('./emeraldFormat');
-      importFromMarkdown().catch((err) => exportErrorMessage(err, 'markdownImport'));
-      return;
-    }
-    case 'import-emerald': {
-      const { exportErrorMessage } = await import('./export');
-      const { importFromEmerald } = await import('./emeraldFormat');
-      importFromEmerald().catch((err) => exportErrorMessage(err, 'emeraldImport'));
+    // The import window: a file dragged in or chosen, Emerald or Markdown.
+    case 'import': {
+      const { useImportWindowStore } = await import('../store/importWindowStore');
+      useImportWindowStore.getState().show();
       return;
     }
     default: {

@@ -4,19 +4,19 @@ import { Suspense, lazy, useEffect, useState } from 'react';
 import { AUX_VIEWS, TASKS_VIEW, type ViewId } from '../../lib/modules';
 import { useUIStore } from '../../store/uiStore';
 import { autoBackupFailed, useAutoBackupStore } from '../../store/autoBackupStore';
-import { useVaultImportStore } from '../../store/vaultImportStore';
+import { useImportWindowStore } from '../../store/importWindowStore';
+import { useImportDrop } from '../../hooks/useImportDrop';
 import { useExportMenuStore } from '../../store/exportMenuStore';
 import { markAutoBackupErrorSeen } from '../../lib/autoBackup';
 import { asUpdateError, checkForUpdate, updateSettings } from '../../lib/updates';
 import { openVaultPicker } from '../../store/vaultPickerStore';
-import type { OpenedVaultFile } from '../../lib/dbBackup';
 import CreateItemModal from './CreateItemModal';
 import { useRailDashboards } from './RailDashboards';
 
 // SettingsModal and the two dialogs of a whole vault are chunks of their own,
 // loaded on first open — the latter drag the backup machinery (dbBackup) along.
 const SettingsModal = lazy(() => import('./settings/SettingsModal'));
-const VaultImportModal = lazy(() => import('./VaultImportModal'));
+const ImportModal = lazy(() => import('./import/ImportModal'));
 const ExportMenuModal = lazy(() => import('./export/ExportMenuModal'));
 import RailButton from '../ui/RailButton';
 
@@ -88,15 +88,9 @@ export default function LeftSidebarRail() {
     return () => { dead = true; };
   }, []);
 
-  // A `.vault.emerald` from the menu's import is replaced or merged in its
-  // dialog, which takes the file over. A newer one replaces it there.
-  const [importFile, setImportFile] = useState<OpenedVaultFile | null>(null);
-  const vaultFilePending = useVaultImportStore((s) => s.pending !== null);
-  useEffect(() => {
-    if (!vaultFilePending) return;
-    const file = useVaultImportStore.getState().take();
-    if (file) setImportFile(file);
-  }, [vaultFilePending]);
+  // The import window, from the title bar's Import or files dragged into the window.
+  const importOpen = useImportWindowStore((s) => s.open);
+  useImportDrop(true);
   const exportOpen = useExportMenuStore((s) => s.request !== null);
 
   // A failed automatic backup reports at the start page button, where it is
@@ -204,10 +198,9 @@ export default function LeftSidebarRail() {
           <SettingsModal onClose={() => setSettingsOpen(false)} />
         </Suspense>
       )}
-      {importFile && (
+      {importOpen && (
         <Suspense fallback={null}>
-          {/* Keyed by the file: a newer one opens the dialog afresh. */}
-          <VaultImportModal key={importFile.ticket} file={importFile} onClose={() => setImportFile(null)} />
+          <ImportModal />
         </Suspense>
       )}
       {exportOpen && (

@@ -107,7 +107,7 @@ Top-level keys of `en.json`, with the conventions worth knowing:
 | `trash` | Trash view: section labels per kind (`entries`, `dashboards`, `categories`, …), `confirmEmptyAction`/`confirmDeleteSelected` (the primary button's own in-place confirmation label) |
 | `tabBar` | Tab strip (`editing`, `closeTab`, `newTab`); tab titles fall back to `nav.*` and the modules' `untitled` keys |
 | `linkPicker` | Internal link picker modal |
-| `importDestination` | Markdown-import destination picker; option labels reuse `linkPicker.tab*` |
+| `importWindow` | The import window: drop zone, what a file is (`kind`, `contains`), existing items, the destination for entries without a category, Markdown's dashboard; the level switch reuses `exportMenu.level` |
 | `menu` | Application menu labels, used by both menus: macOS's native menu (labels pushed into Rust via `update_menu_labels`) and the HTML menu bar on Windows/Linux. `rail`/`entryList`/`properties` are the only toggles for the three sidebars. `cut`/`copy`/`paste`/`selectAll` exist only for the HTML menu — on macOS those are `PredefinedMenuItem`s labelled by the OS |
 | `leaveGuard` | `LeaveGuardModal`, asked when a page with unsaved edits is left; Save reuses `common.save` |
 | `titlebar` | Window buttons (Windows/Linux only), `back`/`forward`, `search` (the search button's accessible name — not `search.placeholder`, which reads poorly as a name) and `menu` (the collapsed-menu button) |

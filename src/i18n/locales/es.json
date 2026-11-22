@@ -1002,9 +1002,9 @@
     "modeMerge": "Combinar",
     "modeMergeDesc": "Añadir todas las entradas junto a las existentes (cada entrada obtiene un prefijo de ID único)",
     "modeReplace": "Reemplazar",
-    "modeReplaceDesc": "Eliminar todos los datos actuales y restaurar desde la copia de seguridad",
+    "modeReplaceDesc": "Eliminar todos los datos actuales y restaurar desde el archivo",
     "modeAddVault": "Nuevo vault",
-    "modeAddVaultDesc": "Crear un nuevo vault separado a partir de la copia de seguridad",
+    "modeAddVaultDesc": "Crear un nuevo vault separado a partir del archivo",
     "modeReplaceWarning": "Todos los datos actuales de este vault se eliminarán permanentemente.",
     "newVaultName": "Nombre del nuevo vault",
     "newVaultLocation": "Carpeta del nuevo vault",
@@ -1041,7 +1041,7 @@
     "updateErrorStale": "La actualización encontrada ya no está disponible. Vuelve a buscar.",
     "updateErrorWrite": "No se ha podido guardar el ajuste.",
     "includeSettings": "Ajustes",
-    "importSettings": "Aplicar ajustes de la copia",
+    "importSettings": "Aplicar ajustes del archivo",
     "groupAppearance": "Fuentes y tamaños",
     "uiScale": "Tamaño de la interfaz",
     "editorFontSize": "Tamaño del texto del editor",
@@ -1123,8 +1123,7 @@
     "previewEntries": "Entradas",
     "previewTemplates": "Plantillas",
     "previewTasks": "Tareas",
-    "previewLanguages": "Idiomas",
-    "importErrorItems": "Este archivo contiene entradas, no un vault. Impórtalo con el botón Importar de la barra de título. No se ha cambiado nada."
+    "previewLanguages": "Idiomas"
   },
   "autoBackup": {
     "title": "Copia de seguridad automática",
@@ -1155,9 +1154,6 @@
     "errorVaultMissing": "No se puede acceder a la carpeta del vault.",
     "errorInterrupted": "Se interrumpió un cambio de contraseña de este vault. Ábrelo una vez y la copia continuará.",
     "errorSave": "No se pudo guardar el ajuste."
-  },
-  "vaultImport": {
-    "fileFrom": "Archivo del {{date}}."
   },
   "contextMenu": {
     "openInNewTab": "Abrir en nueva pestaña",
@@ -1212,8 +1208,6 @@
     "lockView": "Bloquear vista",
     "showSplash": "Mostrar pantalla de carga",
     "exportEmerald": "Exportar como Emerald…",
-    "importMarkdown": "Desde Markdown…",
-    "importEmerald": "Desde Emerald…",
     "quit": "Salir de Emerald App",
     "switchVault": "Cambiar de vault…",
     "about": "Acerca de Emerald App",
@@ -1235,11 +1229,6 @@
     "tabAll": "Todas",
     "tabTasks": "Tareas",
     "noResults": "No se encontraron entradas"
-  },
-  "importDestination": {
-    "title": "Elegir destino",
-    "description": "«{{title}}» no especifica dónde importarlo. ¿Dónde debería importarse?",
-    "cancel": "Cancelar"
   },
   "tasks": {
     "newTask": "Nueva tarea",
@@ -1417,10 +1406,9 @@
     "failed": "La importación ha fallado. Las entradas y plantillas ya creadas se han vuelto a eliminar.",
     "done": "Importación completada – entradas: {{entries}}, plantillas: {{templates}}.",
     "readFailed": "No se pudo leer el archivo: {{error}}",
-    "markdownFailed": "La importación ha fallado: {{error}}",
     "markdownDone": "Se ha importado la entrada.",
     "outside": "Emerald solo puede abrir archivos de tus propias carpetas (carpeta personal, Documentos, Escritorio, Descargas). Copia primero el archivo allí. No se ha cambiado nada.",
-    "vaultFile": "Este archivo contiene un vault completo. Restáuralo con Importar → Desde Emerald… en la barra de título. No se ha cambiado nada."
+    "doneSkipped": "Importación completada – entradas: {{entries}}, plantillas: {{templates}}, omitidas por existir ya: {{skipped}}."
   },
   "emeraldExport": {
     "title": "Exportar",
@@ -1433,8 +1421,6 @@
       "html": "Exportación HTML",
       "markdown": "Exportación a Markdown",
       "emerald": "Exportación de Emerald",
-      "emeraldImport": "Importación de Emerald",
-      "markdownImport": "Importación de Markdown",
       "canvas": "Dibujo",
       "vault": "Exportación de la base de datos"
     }
@@ -1572,5 +1558,66 @@
     "addCategory": "Añadir",
     "moveUp": "Subir",
     "moveDown": "Bajar"
+  },
+  "importWindow": {
+    "title": "Importar",
+    "import": "Importar",
+    "importing": "Importando…",
+    "dropHere": "Arrastra un archivo aquí o haz clic para elegirlo",
+    "dropHint": "Emerald (.emerald, .vault.emerald) o Markdown (.md)",
+    "fileFilter": "Emerald o Markdown",
+    "opening": "Abriendo archivo…",
+    "otherFile": "Otro archivo…",
+    "notImportable": "Este archivo no se puede importar aquí. Emerald acepta archivos Emerald (.emerald, .vault.emerald) y Markdown (.md).",
+    "oneAtATime": "Se importa un archivo a la vez: se tomó «{{name}}».",
+    "kind": {
+      "label": "Tipo",
+      "entry": "Entrada",
+      "entries": "Varias entradas",
+      "template": "Plantilla",
+      "templates": "Varias plantillas",
+      "items": "Entradas y plantillas",
+      "vault": "Exportación de base de datos",
+      "raw": "Copia de seguridad en bruto",
+      "markdown": "Archivo Markdown"
+    },
+    "contains": {
+      "label": "Contenido",
+      "entries_one": "{{count}} entrada",
+      "entries_other": "{{count}} entradas",
+      "templates_one": "{{count}} plantilla",
+      "templates_other": "{{count}} plantillas",
+      "nothing": "vacío"
+    },
+    "date": "Fecha",
+    "protected": "Cifrado",
+    "yes": "Sí",
+    "no": "No",
+    "items_one": "En el archivo: {{count}}",
+    "items_other": "En el archivo: {{count}}",
+    "exists": "ya existe",
+    "existing": {
+      "label": "Ya existentes",
+      "copy": "Crear como copia",
+      "skip": "Omitir",
+      "count_one": "{{count}} de ellas ya está en este vault.",
+      "count_other": "{{count}} de ellas ya están en este vault.",
+      "normalHint": "Se crean como copias; en «Avanzado» se pueden omitir.",
+      "allSkipped": "Ya está todo aquí: con «Omitir» no queda nada que importar."
+    },
+    "target": {
+      "label": "Destino de las entradas sin categoría",
+      "hint": "Se aplica a las entradas que no traen categoría. Un panel les da su primera categoría y su etiqueta inicial.",
+      "none": "Sin categoría",
+      "dashboard": "Panel: {{name}}"
+    },
+    "markdown": {
+      "dashboard": "Panel de destino",
+      "hint": "El archivo no nombra ninguna categoría. La entrada empieza en la primera categoría del panel y se abre en él.",
+      "ownCategory": "El archivo nombra su categoría «{{name}}»: la entrada irá allí.",
+      "target": "Destino"
+    },
+    "total_one": "{{count}} para importar",
+    "total_other": "{{count}} para importar"
   }
 }

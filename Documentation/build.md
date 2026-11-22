@@ -124,7 +124,7 @@ The *data* is carried over in the app rather than by an installer: `adopt_previo
 
 An installer hook is the wrong tool: NSIS is Windows-only, so the `.dmg` and `.deb`/`.AppImage` would need their own answer anyway. What adoption cannot carry is `localStorage` — the appearance boot mirror, sidebar widths, open tabs. On Windows and Linux it lives in the webview profile keyed by the identifier; on macOS WKWebView keeps it under `~/Library/WebKit/{identifier}`. Copying a browser profile across identifiers is platform-specific and brittle, for state that is cheap to lose: appearance comes back from the vault's `settings.json` on open, and the rest is re-set in seconds.
 
-**Naming convention:** the product is "Emerald App" — window title, macOS menu, About card, PDF-export window titles. The user's data and the file format stay plain "Emerald" — vault folder names (`Documents/Emerald Vaults/{name}`), the `.emerald` export format — `.vault.emerald` for a vault's content — with its file-picker filter ("Emerald") and its menu entries ("Export as Emerald…" / "From Emerald…"). Those name what the data *is*, not what the program is called, and stay untouched by a future product rename.
+**Naming convention:** the product is "Emerald App" — window title, macOS menu, About card, PDF-export window titles. The user's data and the file format stay plain "Emerald" — vault folder names (`Documents/Emerald Vaults/{name}`), the `.emerald` export format — `.vault.emerald` for a vault's content — with its file-picker filters ("Emerald", "Emerald or Markdown") and the template menu's "Export as Emerald…". Those name what the data *is*, not what the program is called, and stay untouched by a future product rename.
 
 ## App icons
 

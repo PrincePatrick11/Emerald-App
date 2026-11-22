@@ -2,7 +2,9 @@ import { invoke } from '@tauri-apps/api/core';
 import i18n from '../../i18n';
 import { getActiveVaultId } from '../vaultManager';
 import { keyErrorOf, KEY_ERRORS } from '../vaultKeys';
-import { askBackupSecret, BACKUP_UNLOCK_CANCELLED, endBackupSecret, type BackupSecret } from '../../store/backupSecretStore';
+import {
+  askBackupSecret, BACKUP_UNLOCK_CANCELLED, endBackupSecret, lastBackupSecretQuestion, type BackupSecret,
+} from '../../store/backupSecretStore';
 import type { EmeraldKind } from './manifest';
 
 /**
@@ -84,6 +86,8 @@ export interface OpenedArchive {
   ticket: string;
   kind: EmeraldKind | 'raw';
   manifest: string;
+  /** Whether opening it took a key: a file sealed with a password or a vault key, or a raw backup. */
+  protected: boolean;
   /** A raw backup's `settings.json`, unchecked. */
   settings?: string;
 }
@@ -99,6 +103,8 @@ export async function openArchiveAsking(path: string): Promise<OpenedArchive | n
   let secret: BackupSecret | null = null;
   // Which question: a file's own password, or a vault's password or recovery key.
   let asking: 'emerald' | 'backup' = 'emerald';
+  // The question this opening asked, if any — closed at the end, unless another asker took over since.
+  let question: number | null = null;
   try {
     for (;;) {
       let error: string | null;
@@ -117,7 +123,9 @@ export async function openArchiveAsking(path: string): Promise<OpenedArchive | n
         }
       }
       try {
-        secret = await askBackupSecret(error, asking);
+        const answer = askBackupSecret(error, asking);
+        question = lastBackupSecretQuestion();
+        secret = await answer;
       } catch (cancelled) {
         if (keyErrorOf(cancelled) === BACKUP_UNLOCK_CANCELLED) return null;
         throw cancelled;
@@ -125,7 +133,7 @@ export async function openArchiveAsking(path: string): Promise<OpenedArchive | n
     }
   } finally {
     // Opened, discarded or failed — the question is settled.
-    endBackupSecret();
+    if (question !== null) endBackupSecret(question);
   }
 }
 

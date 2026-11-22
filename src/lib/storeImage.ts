@@ -2,6 +2,7 @@ import { copyImageFile, readImageFile, saveImage } from './images';
 import { hasImageLimits, ImageTooLargeError, needsPreparing, prepareImageDataUrl } from './imageLimits';
 import { isAcceptedImageFile, readFileAsDataUrl } from './helpers';
 import { useImageNoticeStore } from '../store/imageNoticeStore';
+import { isImportPath } from './importPaths';
 
 /** The image formats a file from the disk is taken in by its name; the same as `ACCEPTED_IMAGE_MIME`. */
 const ACCEPTED_IMAGE_PATH_RE = /\.(png|jpe?g|gif|webp|svg)$/i;
@@ -13,9 +14,13 @@ function acceptedOnly<T>(items: T[], accepted: (item: T) => boolean): T[] {
   return kept;
 }
 
-/** Paths dropped from the disk that are images (by their extension); the format notice for the rest. */
+/**
+ * Paths dropped from the disk that are images (by their extension); the
+ * format notice for the rest — but not for files the import window takes
+ * (`useImportDrop`): those were dropped for it.
+ */
 export function acceptedImagePaths(paths: string[]): string[] {
-  return acceptedOnly(paths, (path) => ACCEPTED_IMAGE_PATH_RE.test(path));
+  return acceptedOnly(paths.filter((path) => !isImportPath(path)), (path) => ACCEPTED_IMAGE_PATH_RE.test(path));
 }
 
 /** Chosen or pasted files that are images (by their type); the format notice for the rest. */

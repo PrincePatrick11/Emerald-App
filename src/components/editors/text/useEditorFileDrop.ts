@@ -3,6 +3,7 @@ import type { Editor } from '@tiptap/react';
 import { getCurrentWebview } from '@tauri-apps/api/webview';
 import { acceptedImagePaths, storeImageFromPath } from '../../../lib/storeImage';
 import { useImagePickerStore } from '../../../store/imagePickerStore';
+import { useImportWindowStore } from '../../../store/importWindowStore';
 import { dropClaimedAt, dropPositionToCss } from '../../../hooks/useFileDrop';
 import { reportImageError } from '../../../store/imageNoticeStore';
 import { editorAtPoint, lineSpot, type DropSpot } from './dropSpot';
@@ -52,7 +53,7 @@ export function useEditorFileDrop({ enabled, getEditors, getContainer, getFallba
       .onDragDropEvent(async (event) => {
         const { type } = event.payload;
 
-        if ((type === 'enter' || type === 'over') && useImagePickerStore.getState().request) return;
+        if ((type === 'enter' || type === 'over') && (useImagePickerStore.getState().request || useImportWindowStore.getState().open)) return;
         if (type === 'enter' || type === 'over') {
           setFileDragOver(true);
           optionsRef.current.onSpot(spotAt(event.payload.position));
@@ -62,8 +63,8 @@ export function useEditorFileDrop({ enabled, getEditors, getContainer, getFallba
 
         if (type === 'drop') {
           setFileDragOver(false);
-          // The picture picker is open and takes the files itself.
-          if (useImagePickerStore.getState().request) { optionsRef.current.onSpot(null); return; }
+          // The picture picker or the import window is open and takes the files itself.
+          if (useImagePickerStore.getState().request || useImportWindowStore.getState().open) { optionsRef.current.onSpot(null); return; }
           optionsRef.current.onSpot(null);
           const { paths, position } = event.payload;
           // A place under the pointer takes the files itself.

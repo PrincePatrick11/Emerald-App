@@ -15,7 +15,7 @@ Every trigger is an icon-only `RailButton`, so nothing has to shrink, wrap or fo
 
 The logo (`EmeraldMark`, an inline SVG) is not a control. Its wrapper carries `data-tauri-drag-region` and the mark `pointer-events-none`, since the element under the cursor could otherwise be a `<polygon>` inside the SVG (see **Dragging** below).
 
-**The application menu is a menu-icon button, not a bar.** `TitleBarMenuButton` (`RailButton` + an in-place `MenuDropdown`, dismissed via `useOutsideClick`) renders once for the app menu — **Switch Vault…**, **Check for Updates…** and **About Emerald App** (`switch-vault`, `check-updates`, `show-about`, as in the macOS app menu), then Edit and View as submenus, built in `useTitleBarMenus.ts` — and once each for Export and Import, with their own icons (`Download`/`Upload`, as in the vault export and import dialogs). Each opens independently; there is no shared `role="menubar"`.
+**The application menu is a menu-icon button, not a bar.** `TitleBarMenuButton` (`RailButton` + an in-place `MenuDropdown`, dismissed via `useOutsideClick`) renders once for the app menu — **Switch Vault…**, **Check for Updates…** and **About Emerald App** (`switch-vault`, `check-updates`, `show-about`, as in the macOS app menu), then Edit and View as submenus, built in `useTitleBarMenus.ts`. Export and Import are plain `RailButton`s beside it, with their own icons (`Download`/`Upload`, as in the export menu and the import window), opening those two; there is no shared `role="menubar"`.
 
 **The split is per platform, and deliberately not uniform.** `src/lib/platform.ts` decides at module-eval time (a synchronous user-agent check, so the first paint is already right) and `main.tsx` mirrors the result onto `html[data-platform]` for CSS. `usesCustomWindowControls` additionally requires `isTauri` (`'__TAURI_INTERNALS__' in window`): in a plain browser the window APIs do not exist, and `getCurrentWindow()` would throw during render.
 
@@ -151,12 +151,16 @@ The dialog decides **what** goes out; the exports decide **how** it is written:
 
 **Blocks export through their own serializers, so there is no concealed-sigil gate.** `collectExportDataFor` runs `renderBlocksForExport` (`lib/blocks/exportRender.ts`, pure, texts passed in as `ExportText`): one serializer per block type, by the read-mode rules — hidden blocks and a concealed sigil's calculator and drawing are left out, field blocks list only what `isHiddenInRead` lets through, titles become `<h3>` where `showsTitleInRead` says so, unknown types go out as their stored inner HTML. The result is plain HTML without `<section>`, so DOMPurify, `embedImages`, the link-chip transform and Turndown work unchanged (Turndown has rules for `<dt>`/`<dd>`; `stripImages` keeps a block image's alt text as a placeholder). The `.emerald` export keeps blocks as stored, hidden ones flagged and concealed sigils concealed (see [The `.emerald` file](editing.md#the-emerald-file)).
 
-### Bridging imperative menu-event code to a React modal
+### The import window
 
-`import-markdown` is a menu action, so its handler (`importFromMarkdown()` in `src/lib/emeraldFormat.ts`) is plain imperative code with no component tree to render a dialog into. When the file's header names no category, the user has to pick a dashboard first. `src/store/importStore.ts` bridges this with a promise-based Zustand store:
+The title bar's Import runs the menu action `import`, which only opens the window (`importWindowStore.show`); `LeftSidebarRail` mounts `ImportModal` while it is open. A drop goes through `useImportDrop` (mounted in `LeftSidebarRail`, on `useFileDrop`):
 
-- `askDestination(title)` sets `pending = { title, resolve }` and returns a `Promise<string | null>` (a dashboard id) that resolves only when `choose(dashboardId)` or `cancel()` is called.
-- `ImportDestinationModal` (mounted once in `AppShell`, next to `UndoToast`) renders while `pending` is set, one option per dashboard; an option calls `choose`, clicking outside/Escape/Cancel calls `cancel` (resolves `null`).
-- `importFromMarkdown()` awaits the promise and treats `null` as a full abort, before any DB write.
+- With the window closed, it opens it with the dropped import files (`isImportPath`) — but not under another modal or over the start page.
+- With the window open, every drop goes to it (`importWindowStore.drop`, a `seq` per drop); the window refuses what it does not take, and the text editors leave drops alone meanwhile.
+- Picture drops leave import files alone: `acceptedImagePaths` filters them out before its format notice.
 
-This pattern — an imperative caller `await`s a store method, a mounted-once modal resolves it — is the template for any non-component code that needs a blocking user decision.
+The window opens a path with `openImportFile` (`lib/importFile.ts`): Markdown is read and parsed (`readMarkdownFile`); an Emerald file is opened with `openArchiveAsking` (which asks for a secret only on `EMERALD_LOCKED` / `EMERALD_VAULT_LOCKED`), then by its kind — `items` checked (`itemsManifestOf`) with the items already in the vault (`existingItemsOf`), `vault` and `raw` read as a vault's content (`openedVaultFile`). `read_emerald_file` returns `protected` besides kind and manifest, which the window shows. The window holds the opened file and closes it when another replaces it, after a failed import (whose pictures may be partly stored) and when it goes.
+
+The import runs through `importItems(opened, manifest, { only, target, skip })` (see [The `.emerald` file](editing.md#the-emerald-file)) and `showImportedItems`, `importMarkdown(file, target)`, and `importDatabase` through `useVaultImport`, which asks `resolveOpenEdits` first for replace and new vault. A target is `none`, a dashboard (its `startCategoryOf` and `startTagsOf`) or a category, for entries that bring no category.
+
+A blocking question from non-component code — the password of a file, `askBackupSecret` — follows the promise-store pattern: the caller `await`s a store method, a mounted-once modal (`BackupUnlockDialog` in `AppShell`) resolves it.

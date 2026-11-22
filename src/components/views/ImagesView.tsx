@@ -13,6 +13,7 @@ import { useVaultPictures, type PictureItem } from '../../hooks/useVaultPictures
 import ImageTile from '../images/ImageTile';
 import ImageEditModal from '../images/ImageEditModal';
 import AddImagesModal from '../images/AddImagesModal';
+import { isImportPath } from '../../lib/importPaths';
 import CollectionDashboard, { useCollectionState } from './CollectionDashboard';
 
 type ImageItem = PictureItem;
@@ -36,7 +37,10 @@ export default function ImagesView() {
   const pushUndo = useUndoStore((s) => s.push);
 
   // Files dropped anywhere over the view go into the add dialog, opening it.
-  const { dragOver } = useFileDrop(!editing, (paths) => {
+  // Files the import window takes are its own (`useImportDrop`).
+  const { dragOver } = useFileDrop(!editing, (all) => {
+    const paths = all.filter((path) => !isImportPath(path));
+    if (paths.length === 0) return;
     setDropped((list) => [...list, ...paths]);
     setAdding(true);
   });

@@ -23,6 +23,8 @@ interface BackupSecretStore {
 }
 
 let pending: { resolve: (secret: BackupSecret) => void; reject: (err: Error) => void } | null = null;
+/** The number of the last question — so that an asker can only close its own, never a newer one. */
+let asked = 0;
 
 export const useBackupSecretStore = create<BackupSecretStore>((set) => ({
   request: null,
@@ -50,14 +52,25 @@ export const useBackupSecretStore = create<BackupSecretStore>((set) => ({
  */
 export function askBackupSecret(error: string | null, secretFor: SecretFor = 'backup'): Promise<BackupSecret> {
   pending?.reject(new Error(BACKUP_UNLOCK_CANCELLED));
+  asked += 1;
   return new Promise<BackupSecret>((resolve, reject) => {
     pending = { resolve, reject };
     useBackupSecretStore.setState({ request: { error, busy: false, for: secretFor } });
   });
 }
 
-/** Closes the question — the backup or file is open, or the error is not one that warrants new input. */
-export function endBackupSecret(): void {
+/** The number of the question asked last, for `endBackupSecret`. */
+export function lastBackupSecretQuestion(): number {
+  return asked;
+}
+
+/**
+ * Closes the question — the backup or file is open, or the error is not one
+ * that warrants new input. `question` (from `lastBackupSecretQuestion` after
+ * asking): only if no one has asked since — a newer asker keeps its question.
+ */
+export function endBackupSecret(question?: number): void {
+  if (question !== undefined && question !== asked) return;
   pending = null;
   useBackupSecretStore.setState({ request: null });
 }

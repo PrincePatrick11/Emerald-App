@@ -31,7 +31,7 @@ Where shared code lives in Emerald:
 
 - `Documentation/components.md` is the specification for this whole layer and your primary reference. Its `Catalogue` lists every shared building block with what it encapsulates and where it can be extended; read it before claiming something does or does not exist.
 
-- `src/components/ui/` — the shared component layer: `Button`, `Modal`, `ContextMenu`, `EmojiPicker`, `Dashboard` (with `EntryDashboard` and `CollectionDashboard` in `src/components/views/` on top of it — one list of entries, one display of every collection), `DashboardItem`, `EntryListTab`, `ListToolbar`, `FilterPanel`, `FilterList`, `EmptyState`, `EntryDetailFrame`, `LibraryPageFrame`, `RailButton`, `TabIconButton`, `TagInput`, `TemplateSelect`, `UndoToast`, `ImportDestinationModal`, and more; the `Catalogue` has the full list.
+- `src/components/ui/` — the shared component layer: `Button`, `Modal`, `ContextMenu`, `EmojiPicker`, `Dashboard` (with `EntryDashboard` and `CollectionDashboard` in `src/components/views/` on top of it — one list of entries, one display of every collection), `DashboardItem`, `EntryListTab`, `ListToolbar`, `FilterPanel`, `FilterList`, `EmptyState`, `EntryDetailFrame`, `LibraryPageFrame`, `RailButton`, `TabIconButton`, `TagInput`, `TemplateSelect`, `UndoToast`, and more; the `Catalogue` has the full list.
 
 - `src/components/sidebar/fields/` — shared property-panel building blocks reused by the one entry page and the collection pages (`EditProperties`, `TagsField`, `LinkedEntriesField`, `IconField`, …).
 

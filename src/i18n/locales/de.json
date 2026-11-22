@@ -1002,9 +1002,9 @@
     "modeMerge": "Mergen",
     "modeMergeDesc": "Alle Einträge neben bestehenden hinzufügen (jeder Eintrag erhält einen eindeutigen ID-Präfix)",
     "modeReplace": "Ersetzen",
-    "modeReplaceDesc": "Alle aktuellen Daten löschen und aus dem Backup wiederherstellen",
+    "modeReplaceDesc": "Alle aktuellen Daten löschen und aus der Datei wiederherstellen",
     "modeAddVault": "Neuer Vault",
-    "modeAddVaultDesc": "Einen neuen, separaten Vault aus dem Backup erstellen",
+    "modeAddVaultDesc": "Einen neuen, separaten Vault aus der Datei erstellen",
     "modeReplaceWarning": "Alle aktuellen Daten in diesem Vault werden dauerhaft gelöscht.",
     "newVaultName": "Name des neuen Vaults",
     "newVaultLocation": "Ordner des neuen Vaults",
@@ -1041,7 +1041,7 @@
     "updateErrorStale": "Das gefundene Update steht nicht mehr bereit. Suche bitte noch einmal.",
     "updateErrorWrite": "Die Einstellung konnte nicht gespeichert werden.",
     "includeSettings": "Einstellungen",
-    "importSettings": "Einstellungen aus dem Backup übernehmen",
+    "importSettings": "Einstellungen aus der Datei übernehmen",
     "groupAppearance": "Schriften & Größen",
     "uiScale": "UI-Größe",
     "editorFontSize": "Editor-Textgröße",
@@ -1123,8 +1123,7 @@
     "previewEntries": "Einträge",
     "previewTemplates": "Vorlagen",
     "previewTasks": "Aufgaben",
-    "previewLanguages": "Sprachen",
-    "importErrorItems": "Diese Datei enthält Einträge, keinen Vault. Importiere sie über den Import-Knopf in der Titelleiste. Es wurde nichts verändert."
+    "previewLanguages": "Sprachen"
   },
   "autoBackup": {
     "title": "Automatische Sicherung",
@@ -1155,9 +1154,6 @@
     "errorVaultMissing": "Der Vault-Ordner ist nicht erreichbar.",
     "errorInterrupted": "Ein Passwortwechsel dieses Vaults wurde unterbrochen. Öffne den Vault einmal, dann geht die Sicherung weiter.",
     "errorSave": "Die Einstellung konnte nicht gespeichert werden."
-  },
-  "vaultImport": {
-    "fileFrom": "Datei vom {{date}}."
   },
   "contextMenu": {
     "openInNewTab": "In neuem Tab öffnen",
@@ -1212,8 +1208,6 @@
     "lockView": "Ansicht sperren",
     "showSplash": "Ladebildschirm anzeigen",
     "exportEmerald": "Als Emerald exportieren…",
-    "importMarkdown": "Aus Markdown…",
-    "importEmerald": "Aus Emerald…",
     "quit": "Emerald App beenden",
     "switchVault": "Vault wechseln…",
     "about": "Über Emerald App",
@@ -1235,11 +1229,6 @@
     "tabAll": "Alle",
     "tabTasks": "Aufgaben",
     "noResults": "Keine Einträge gefunden"
-  },
-  "importDestination": {
-    "title": "Ziel wählen",
-    "description": "„{{title}}“ enthält keine Angabe, wohin importiert werden soll. Wohin soll der Eintrag importiert werden?",
-    "cancel": "Abbrechen"
   },
   "tasks": {
     "newTask": "Neue Aufgabe",
@@ -1417,10 +1406,9 @@
     "failed": "Der Import ist fehlgeschlagen. Die schon angelegten Einträge und Vorlagen wurden wieder entfernt.",
     "done": "Import abgeschlossen – Einträge: {{entries}}, Vorlagen: {{templates}}.",
     "readFailed": "Die Datei konnte nicht gelesen werden: {{error}}",
-    "markdownFailed": "Der Import ist fehlgeschlagen: {{error}}",
     "markdownDone": "Der Eintrag wurde importiert.",
     "outside": "Emerald kann Dateien nur aus deinen eigenen Ordnern öffnen (Benutzerordner, Dokumente, Desktop, Downloads). Kopiere die Datei zuerst dorthin. Es wurde nichts verändert.",
-    "vaultFile": "Diese Datei enthält einen ganzen Vault. Spiele sie über Importieren → Aus Emerald… in der Titelleiste ein. Es wurde nichts verändert."
+    "doneSkipped": "Import abgeschlossen – Einträge: {{entries}}, Vorlagen: {{templates}}, übersprungen, weil schon vorhanden: {{skipped}}."
   },
   "emeraldExport": {
     "title": "Export",
@@ -1433,8 +1421,6 @@
       "html": "HTML-Export",
       "markdown": "Markdown-Export",
       "emerald": "Emerald-Export",
-      "emeraldImport": "Emerald-Import",
-      "markdownImport": "Markdown-Import",
       "canvas": "Zeichnung",
       "vault": "Datenbank-Export"
     }
@@ -1572,5 +1558,66 @@
     "addCategory": "Hinzufügen",
     "moveUp": "Nach oben",
     "moveDown": "Nach unten"
+  },
+  "importWindow": {
+    "title": "Importieren",
+    "import": "Importieren",
+    "importing": "Importiere…",
+    "dropHere": "Datei hierher ziehen oder klicken, um sie zu wählen",
+    "dropHint": "Emerald (.emerald, .vault.emerald) oder Markdown (.md)",
+    "fileFilter": "Emerald oder Markdown",
+    "opening": "Datei wird geöffnet…",
+    "otherFile": "Andere Datei…",
+    "notImportable": "Diese Datei kann hier nicht importiert werden. Emerald nimmt Emerald-Dateien (.emerald, .vault.emerald) und Markdown (.md).",
+    "oneAtATime": "Es wird eine Datei auf einmal importiert – genommen wurde „{{name}}“.",
+    "kind": {
+      "label": "Art",
+      "entry": "Eintrag",
+      "entries": "Mehrere Einträge",
+      "template": "Vorlage",
+      "templates": "Mehrere Vorlagen",
+      "items": "Einträge und Vorlagen",
+      "vault": "Datenbank-Export",
+      "raw": "Rohsicherung",
+      "markdown": "Markdown-Datei"
+    },
+    "contains": {
+      "label": "Inhalt",
+      "entries_one": "{{count}} Eintrag",
+      "entries_other": "{{count}} Einträge",
+      "templates_one": "{{count}} Vorlage",
+      "templates_other": "{{count}} Vorlagen",
+      "nothing": "leer"
+    },
+    "date": "Stand",
+    "protected": "Verschlüsselt",
+    "yes": "Ja",
+    "no": "Nein",
+    "items_one": "Enthalten: {{count}}",
+    "items_other": "Enthalten: {{count}}",
+    "exists": "schon vorhanden",
+    "existing": {
+      "label": "Schon vorhanden",
+      "copy": "Als Kopie anlegen",
+      "skip": "Überspringen",
+      "count_one": "{{count}} davon gibt es in diesem Vault schon.",
+      "count_other": "{{count}} davon gibt es in diesem Vault schon.",
+      "normalHint": "Sie werden als Kopie angelegt; unter „Erweitert“ lassen sie sich überspringen.",
+      "allSkipped": "Alles gibt es hier schon – mit „Überspringen“ bleibt nichts zu importieren."
+    },
+    "target": {
+      "label": "Ziel für Einträge ohne Kategorie",
+      "hint": "Gilt für Einträge, die keine Kategorie mitbringen. Ein Dashboard gibt ihnen seine erste Kategorie und seinen Start-Tag.",
+      "none": "Ohne Kategorie",
+      "dashboard": "Dashboard: {{name}}"
+    },
+    "markdown": {
+      "dashboard": "Ziel-Dashboard",
+      "hint": "Die Datei nennt keine Kategorie. Der Eintrag beginnt in der ersten Kategorie des Dashboards und öffnet sich darin.",
+      "ownCategory": "Die Datei nennt ihre Kategorie „{{name}}“ – dort landet der Eintrag.",
+      "target": "Ziel"
+    },
+    "total_one": "{{count}} wird importiert",
+    "total_other": "{{count}} werden importiert"
   }
 }

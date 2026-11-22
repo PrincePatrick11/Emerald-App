@@ -106,7 +106,7 @@ export default function AddImagesModal({ dropped, dragOver, initialTags, onClose
       <button
         type="button"
         onClick={() => inputRef.current?.click()}
-        className={`image-drop-zone${dragOver ? ' image-drop-zone--over' : ''}`}
+        className={`file-drop-zone${dragOver ? ' file-drop-zone--over' : ''}`}
       >
         <ImagePlus size={22} />
         <span>{busy > 0 ? t('images.storing') : t('images.dropHere')}</span>

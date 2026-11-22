@@ -2376,9 +2376,10 @@ html[data-theme] .prop-segment--active {
   gap: 4px;
 }
 .image-tile--compact .image-tile-label { font-size: 11px; }
-/* The add dialog (AddImagesModal): a zone to drop files on or click, then
-   one row per picture with its name. */
-.image-drop-zone {
+/* A zone to drop files on or click — the add dialog of "Images"
+   (AddImagesModal) and the import window (ImportModal); then, in the add
+   dialog, one row per picture with its name. */
+.file-drop-zone {
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -2394,13 +2395,13 @@ html[data-theme] .prop-segment--active {
   font-size: 13px;
   transition: border-color 150ms, background-color 150ms, color 150ms;
 }
-.image-drop-zone:hover,
-.image-drop-zone--over {
+.file-drop-zone:hover,
+.file-drop-zone--over {
   border-color: var(--accent-edge);
   background: var(--accent-wash);
   color: var(--accent-text);
 }
-.image-drop-zone:focus-visible {
+.file-drop-zone:focus-visible {
   outline: none;
   box-shadow: 0 0 0 2px var(--focus-ring);
 }

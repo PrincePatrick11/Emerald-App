@@ -4,7 +4,7 @@ import { isIconFile, plausibleEmoji } from './icons';
 import { storedImageName, storedImageNamesIn } from './schema';
 import { parseBlocks } from './blocks/blockHtml';
 import { blockRefs } from './blocks/blockRefs';
-import { open as openDialog, save, message } from '@tauri-apps/plugin-dialog';
+import { save, message } from '@tauri-apps/plugin-dialog';
 import { exportFilename } from './helpers';
 import { marked } from 'marked';
 import DOMPurify from 'dompurify';
@@ -13,7 +13,6 @@ import { useEntryStore } from '../store/entryStore';
 import { liveTagNames, useTagStore } from '../store/tagStore';
 import { useSettingsStore } from '../store/settingsStore';
 import { reloadModules } from '../store/moduleWiring';
-import { useImportStore } from '../store/importStore';
 import { useTaskStore } from '../store/taskStore';
 import { getDb } from './db';
 import { categoryKey, categoryLabel } from './categories';
@@ -41,10 +40,9 @@ import {
   type ManifestLink, type ManifestTemplate,
 } from './emerald/manifest';
 import {
-  closeArchive, EmeraldNotice, openArchiveAsking, storeArchiveFiles, withEmeraldEnding, writeArchive,
+  EmeraldNotice, noticeFor, storeArchiveFiles, withEmeraldEnding, writeArchive,
   type ArchiveImage, type EmeraldProtection, type OpenedArchive,
 } from './emerald/file';
-import { useVaultImportStore } from '../store/vaultImportStore';
 
 export type { ImageMode } from './emerald/manifest';
 export type { EmeraldProtection } from './emerald/file';
@@ -410,39 +408,100 @@ async function placeholderImage(): Promise<string> {
   return saveImage(canvas.toDataURL('image/png'));
 }
 
-/** What an import created, in the order of the file. */
+/** What an import created, in the order of the file, and how many items it left out as already here. */
 export interface EmeraldImportResult {
   entries: string[];
   templates: string[];
+  skipped: number;
 }
 
 /**
- * Reads a `.emerald` file of entries and templates at `path` into the active
- * vault — without the open dialog, so a check can call it; it still asks for
- * a password when the file needs one. `null`: cancelled at the password.
+ * Where an imported entry goes that brings no category of its own: nowhere
+ * (no category), the start category and tag of a dashboard, or a category.
  */
-export async function importEmeraldFile(path: string): Promise<EmeraldImportResult | null> {
-  const opened = await openArchiveAsking(path);
-  if (!opened) return null;
-  try {
-    if (opened.kind !== 'items') throw new EmeraldNotice(i18n.t('emeraldImport.vaultFile'));
-    return await importOpened(opened);
-  } finally {
-    closeArchive(opened.ticket);
+export type ImportTarget = { kind: 'none' } | { kind: 'dashboard'; id: string } | { kind: 'category'; id: string };
+
+/** The category and tags a target gives an entry without a category of its own. */
+function placementOf(target: ImportTarget): { categoryId: string | null; tagIds: string[] } {
+  if (target.kind === 'dashboard') return { categoryId: startCategoryOf(target.id), tagIds: startTagsOf(target.id) };
+  if (target.kind === 'category' && useCategoryStore.getState().categories.some((c) => c.id === target.id)) {
+    return { categoryId: target.id, tagIds: [] };
   }
+  return { categoryId: null, tagIds: [] };
 }
 
-/** The items of an opened file: its manifest checked, then its pictures stored, then the items created. */
-async function importOpened(opened: OpenedArchive): Promise<EmeraldImportResult> {
+/** The dashboard an imported entry opens in: the target's, else "All entries". */
+function dashboardOf(target: ImportTarget): string {
+  return target.kind === 'dashboard' ? target.id : 'all';
+}
+
+/** What the import window decides for a file of entries and templates. */
+export interface ItemImportOptions {
+  /** IDs in the file of the items to import; every item when absent. */
+  only?: ReadonlySet<string>;
+  /** Where entries go that bring no category; no category when absent. */
+  target?: ImportTarget;
+  /** Items already here (`existingItemsOf`: ID in the file → ID here), left out. */
+  skip?: ReadonlyMap<string, string>;
+}
+
+/** The manifest of an opened file of entries and templates, checked — before anything is stored or created. */
+export function itemsManifestOf(opened: OpenedArchive): EmeraldManifest {
   const manifest = parseManifest(opened.manifest);
-  // Checked before anything is stored or created (format, version and item
-  // count already by Rust): a refused file leaves the vault as it is.
+  // Format, version and item count already checked by Rust: a refused file leaves the vault as it is.
   if (typeof manifest === 'string') throw new EmeraldNotice(i18n.t(`emeraldImport.${manifest}`));
+  return manifest;
+}
+
+/** A date as the instant it names, so that two spellings of one compare equal. */
+function instantKey(value: string | undefined): string | null {
+  const time = value ? Date.parse(value) : NaN;
+  return Number.isNaN(time) ? null : new Date(time).toISOString();
+}
+
+/**
+ * The items of a file this vault already has — ID in the file → ID here. An
+ * entry by its ID (a file of this vault) or by title and creation date (an
+ * entry imported before keeps both); a template by its ID or its name. Only
+ * what is not in the trash counts.
+ */
+export function existingItemsOf(manifest: EmeraldManifest): Map<string, string> {
+  const entries = useEntryStore.getState().entries.filter((e) => !e.deleted_at);
+  const templates = useTemplateStore.getState().templates;
+  const entryIds = new Set(entries.map((e) => e.id));
+  const stampOf = (title: string, at: string | null) => (at ? `${title.trim()}\u0000${at}` : null);
+  const byStamp = new Map<string, string>();
+  for (const entry of entries) {
+    const stamp = stampOf(entry.title ?? '', instantKey(entry.created_at));
+    if (stamp && !byStamp.has(stamp)) byStamp.set(stamp, entry.id);
+  }
+  const found = new Map<string, string>();
+  for (const item of manifest.items) {
+    if (item.kind === 'entry') {
+      const stamp = stampOf(importedTitle(item), instantKey(importedCreatedAt(item.createdAt)));
+      const here = entryIds.has(item.id) ? item.id : stamp ? byStamp.get(stamp) : undefined;
+      if (here) found.set(item.id, here);
+    } else {
+      const name = item.name.trim();
+      const here = templates.find((tpl) => tpl.id === item.id || (name && tpl.name.trim() === name));
+      if (here) found.set(item.id, here.id);
+    }
+  }
+  return found;
+}
+
+/**
+ * The items of an opened file (its manifest from `itemsManifestOf`): its
+ * pictures stored, then the items created. The file stays open.
+ */
+export async function importItems(
+  opened: OpenedArchive, manifest: EmeraldManifest, options: ItemImportOptions = {},
+): Promise<EmeraldImportResult> {
   const stored = await storeArchiveFiles(opened.ticket);
   // By the hash part of the name: a picture compressed on export travels with
   // the extension of its new type, the content still names the old one.
   const byStem = (files: ReadonlyMap<string, string>) => new Map([...files].map(([name, here]) => [storedNameStem(name), here]));
-  return importManifest(manifest, byStem(stored.images), byStem(stored.icons));
+  return importManifest(manifest, byStem(stored.images), byStem(stored.icons), options);
 }
 
 /**
@@ -506,8 +565,9 @@ function definitionPictures(row: ManifestBlockDefinition): string[] {
 }
 
 /**
- * Creates the items of a manifest. Entries are created first, all of them, so
- * that links between items of the same file can point at the new ones; then
+ * Creates the items of a manifest — those `options` keep. Entries are created
+ * first, all of them, so that links between items of the same file can point
+ * at the new ones (and at the ones already here that were left out); then
  * each gets its content, category, tags, icon and cover. If a step fails, the
  * entries and templates created are removed again; categories and custom
  * blocks it found missing stay, as they would after a successful import. `storedImages`/`iconNames`: the hash part of
@@ -515,8 +575,13 @@ function definitionPictures(row: ManifestBlockDefinition): string[] {
  */
 async function importManifest(
   manifest: EmeraldManifest, storedImages: ReadonlyMap<string, string>, iconNames: ReadonlyMap<string, string>,
+  options: ItemImportOptions,
 ): Promise<EmeraldImportResult> {
-  const result: EmeraldImportResult = { entries: [], templates: [] };
+  const chosen = options.only ? manifest.items.filter((item) => options.only!.has(item.id)) : manifest.items;
+  const skip = options.skip ?? new Map<string, string>();
+  const items = chosen.filter((item) => !skip.has(item.id));
+  const placement = placementOf(options.target ?? { kind: 'none' });
+  const result: EmeraldImportResult = { entries: [], templates: [], skipped: chosen.length - items.length };
   const entryStore = useEntryStore.getState();
   try {
     const imageNames = new Map(storedImages);
@@ -527,7 +592,7 @@ async function importManifest(
         if (!imageNames.has(stem)) imageNames.set(stem, placeholder);
       }
     }
-    const categories = await resolveFileCategories(manifest.items);
+    const categories = await resolveFileCategories(items);
     // Created blank, so that the IDs are there before any content refers to them.
     // The link targets of this vault as they were before the import: a blank
     // entry it creates must not be found by title ("Untitled …") for a link
@@ -535,21 +600,26 @@ async function importManifest(
     const linkItems = linkItemsSnapshot();
     const idMap = new Map<string, string>();
     const createdAt = new Map<string, string | undefined>();
-    for (const item of manifest.items) {
+    const placed = new Set<string>();
+    for (const item of items) {
       if (item.kind !== 'entry') continue;
-      const categoryId = item.category ? categories.get(item.category.id) ?? null : null;
+      const own = item.category ? categories.get(item.category.id) ?? null : null;
+      const categoryId = own ?? placement.categoryId;
       const at = importedCreatedAt(item.createdAt);
       const entry = await entryStore.createEntry({ categoryId, blank: true, createdAt: at });
       idMap.set(item.id, entry.id);
       createdAt.set(entry.id, at);
+      if (!own) placed.add(item.id);
       result.entries.push(entry.id);
     }
 
     const ownIds = new Set(idMap.values());
+    // A link to an item left out as already here points at the one here.
+    const relinkMap = new Map([...skip, ...idMap]); // later pairs win: a created item over a skipped one
     const contentOf = (item: ManifestItem): string => {
       const raw = blocksToContent(item.blocks);
       const renamed = renameStoredFiles(renameStoredFiles(raw, iconNames), imageNames);
-      const relinked = remapImportedLinks(relinkWithinFile(renamed, idMap), manifest.links, linkItems, ownIds);
+      const relinked = remapImportedLinks(relinkWithinFile(renamed, relinkMap), manifest.links, linkItems, ownIds);
       return sanitizeImportedHtml(relinked);
     };
     const iconOf = (icon: string): string | undefined => {
@@ -558,9 +628,13 @@ async function importManifest(
       return plausibleEmoji(icon) || undefined;
     };
 
-    for (const item of manifest.items) {
+    for (const item of items) {
       const content = contentOf(item);
-      const tags = await ensureTagIds(item.tags);
+      const own = await ensureTagIds(item.tags);
+      // An entry placed by the target gets the dashboard's start tag, so it shows there.
+      const tags = placed.has(item.id)
+        ? [...new Set([...own, ...placement.tagIds])]
+        : own;
       if (item.kind === 'template') {
         const created = await useTemplateStore.getState().createTemplate(item.name, {
           icon: iconOf(item.icon), title: item.title, content, tags,
@@ -580,7 +654,9 @@ async function importManifest(
     }
     // Last: a prefilled link points at an entry of this import, which a failure
     // before here would have removed again. The copies need no definition.
-    await importBlockDefinitions(manifest.blockDefinitions, imageNames, iconNames, idMap);
+    // Only the definitions the imported items' copies came from.
+    const used = new Set(usedDefinitionIds(items.map((item) => blocksToContent(item.blocks))));
+    await importBlockDefinitions(manifest.blockDefinitions.filter((row) => used.has(row.id)), imageNames, iconNames, relinkMap);
     return result;
   } catch (err) {
     await Promise.allSettled([
@@ -603,62 +679,19 @@ async function discardEntry(id: string): Promise<void> {
   useEntryStore.setState((s) => ({ entries: s.entries.filter((e) => e.id !== id) }));
 }
 
-/** The error message of the menu's import. */
-async function importFailed(e: unknown): Promise<void> {
-  const text = e instanceof EmeraldNotice ? e.message : `${i18n.t('emeraldImport.failed')}\n${e}`;
-  await message(text, { title: i18n.t('emeraldImport.title'), kind: 'error' });
-}
-
 /**
- * The menu's import: the open dialog, then by the file's kind — entries and
- * templates are imported and the first one opened; a vault's content — and a
- * raw backup — goes to the import dialog, where it is replaced or merged.
+ * After an import of entries and templates: the lists reloaded, the first
+ * entry opened (in the target's dashboard), or else the first template; then
+ * the note with what came in.
  */
-export async function importFromEmerald(): Promise<void> {
-  const picked = await openDialog({
-    filters: [{ name: 'Emerald', extensions: ['emerald'] }],
-    multiple: false,
-  });
-  const filePath = Array.isArray(picked) ? picked[0] : picked;
-  if (!filePath) return;
-
-  let opened: OpenedArchive | null;
-  try {
-    opened = await openArchiveAsking(filePath);
-  } catch (e) {
-    await importFailed(e);
-    return;
-  }
-  if (!opened) return;
-
-  if (opened.kind === 'vault' || opened.kind === 'raw') {
-    // Handed on, still open: the import dialog closes it once it is done with it.
-    try {
-      const { openedVaultFile } = await import('./dbBackup');
-      useVaultImportStore.getState().offer(await openedVaultFile(opened));
-    } catch (e) {
-      closeArchive(opened.ticket);
-      await importFailed(e);
-    }
-    return;
-  }
-
-  let result: EmeraldImportResult;
-  try {
-    result = await importOpened(opened);
-  } catch (e) {
-    await importFailed(e);
-    return;
-  } finally {
-    closeArchive(opened.ticket);
-  }
-
+export async function showImportedItems(result: EmeraldImportResult, target: ImportTarget = { kind: 'none' }): Promise<void> {
   await reloadModules(['entries']);
   const [firstEntry] = result.entries;
-  if (firstEntry) useUIStore.getState().setActiveView(entryView(firstEntry));
+  if (firstEntry) useUIStore.getState().setActiveView(entryView(firstEntry, dashboardOf(target)));
   else if (result.templates[0]) useUIStore.getState().setActiveView({ type: 'templates', id: result.templates[0] });
+  const counts = { entries: result.entries.length, templates: result.templates.length, skipped: result.skipped };
   await message(
-    i18n.t('emeraldImport.done', { entries: result.entries.length, templates: result.templates.length }),
+    i18n.t(result.skipped > 0 ? 'emeraldImport.doneSkipped' : 'emeraldImport.done', counts),
     { title: i18n.t('emeraldImport.title'), kind: 'info' },
   );
 }
@@ -758,20 +791,22 @@ function stripIconPrefix(val: string): string {
   return trimmed;
 }
 
-export async function importFromMarkdown(): Promise<void> {
-  const result = await openDialog({
-    filters: [{ name: 'Markdown', extensions: ['md'] }],
-    multiple: false,
-  });
-  const filePath = Array.isArray(result) ? result[0] : result;
-  if (!filePath) return;
+/** A Markdown file as read for the import window: its title, the category its front matter names, its tags, its body as HTML. */
+export interface MarkdownFile {
+  title: string;
+  /** The category the file names — empty when it names none. */
+  categoryName: string;
+  tags: string[];
+  html: string;
+}
 
+/** Reads and parses the Markdown file at `path`; one that cannot be read is an `EmeraldNotice`. */
+export async function readMarkdownFile(path: string): Promise<MarkdownFile> {
   let raw: string;
   try {
-    raw = await invoke<string>('read_file', { path: filePath });
+    raw = await invoke<string>('read_file', { path });
   } catch (e) {
-    await message(i18n.t('emeraldImport.readFailed', { error: String(e) }), { title: i18n.t('emeraldImport.title'), kind: 'error' });
-    return;
+    throw new EmeraldNotice(noticeFor(e) ?? i18n.t('emeraldImport.readFailed', { error: String(e) }));
   }
 
   // ── Parse frontmatter ──────────────────────────────────────────────────
@@ -796,49 +831,32 @@ export async function importFromMarkdown(): Promise<void> {
   }
 
   const bodyMd = lines.slice(bodyStart).join('\n').trim();
-  const html   = await marked.parse(bodyMd) as string;
-
-  // A file that names its category lands there, in "All entries". One
-  // without asks for a dashboard instead of silently picking one: the entry
-  // starts in that dashboard's first category and opens inside it.
-  const categoryName = stripIconPrefix(frontMeta['category'] ?? '');
-  let dashboardId = 'all';
-  if (!categoryName) {
-    const chosen = await useImportStore.getState().askDestination(title);
-    if (!chosen) return;
-    dashboardId = chosen;
-  }
-
-  const tagIds = await ensureTagIds(
-    (frontMeta['tags'] ?? '').split(',').map(t => t.trim()).filter(Boolean),
-  );
-
-  let newId: string;
-  try {
-    newId = await importMarkdownEntry(dashboardId, categoryName, title, html, tagIds);
-  } catch (e) {
-    await message(i18n.t('emeraldImport.markdownFailed', { error: String(e) }), { title: i18n.t('emeraldImport.title'), kind: 'error' });
-    return;
-  }
-
-  await reloadModules(['entries']);
-  useUIStore.getState().setActiveView(entryView(newId, dashboardId));
-  await message(i18n.t('emeraldImport.markdownDone'), { title: i18n.t('emeraldImport.title'), kind: 'info' });
+  return {
+    title,
+    categoryName: stripIconPrefix(frontMeta['category'] ?? ''),
+    tags: (frontMeta['tags'] ?? '').split(',').map((t) => t.trim()).filter(Boolean),
+    html: await marked.parse(bodyMd) as string,
+  };
 }
 
 /**
- * An entry from Markdown: in the category its front matter names, else in
- * the first category of the chosen dashboard. It is created now — with
- * today's moon phase if it lands in the category Journal.
+ * Imports a read Markdown file as an entry and opens it: in the category it
+ * names (in "All entries"), else where `target` says.
  */
-async function importMarkdownEntry(
-  dashboardId: string, categoryName: string, title: string, html: string, tagIds: string[],
-): Promise<string> {
+export async function importMarkdown(file: MarkdownFile, target: ImportTarget): Promise<void> {
+  const tagIds = await ensureTagIds(file.tags);
+  const byName = await ensureCategoryByName(file.categoryName);
+  const placement = byName ? { categoryId: byName, tagIds: [] } : placementOf(target);
   const { createEntry, updateEntry } = useEntryStore.getState();
-  const categoryId = await ensureCategoryByName(categoryName) ?? startCategoryOf(dashboardId);
-  const entry = await createEntry({ categoryId, blank: true });
-  // Plus the dashboard's start tag, so the entry stays visible in it.
-  const tags = [...new Set([...tagIds, ...startTagsOf(dashboardId)])];
-  await updateEntry(entry.id, { title, content: sanitizeImportedHtml(html), tags });
-  return entry.id;
+  // Created now — with today's moon phase if it lands in the category Journal.
+  const entry = await createEntry({ categoryId: placement.categoryId, blank: true });
+  try {
+    const tags = [...new Set([...tagIds, ...placement.tagIds])];
+    await updateEntry(entry.id, { title: file.title, content: sanitizeImportedHtml(file.html), tags });
+  } catch (err) {
+    await discardEntry(entry.id).catch(() => { /* the error that counts is the first */ });
+    throw err;
+  }
+  await reloadModules(['entries']);
+  useUIStore.getState().setActiveView(entryView(entry.id, byName ? 'all' : dashboardOf(target)));
 }
